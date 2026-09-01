@@ -126,6 +126,18 @@ type CycleState struct {
 	// hand a failing cycle unlimited retries. Additive omitempty: pre-field
 	// checkpoints decode as 0, which is exactly "no repair attempted yet".
 	AuditRepairAttempts int `json:"audit_repair_attempts,omitempty"`
+	// AuditDispatches counts audit DISPATCHES (not completions) this cycle. It
+	// is the round-supersession index for retiring the previous audit round's
+	// verdict artifacts (cycle-1603): CompletedPhases records only successes,
+	// so an audit that crashed or quota-paused mid-flight after the auditor
+	// pre-wrote acs-verdict.json would be invisible to a completion-derived
+	// index and its dead attempt's verdict would be honored on resume.
+	// Incremented in the audit pre-dispatch block BEFORE the pre-phase
+	// cycle-state write, so an interrupted round has already persisted its
+	// dispatch and the resumed re-dispatch retires it. Additive omitempty:
+	// pre-field checkpoints decode as 0 and the completion-derived count
+	// backstops them (supersedePreviousAuditRound).
+	AuditDispatches int `json:"audit_dispatches,omitempty"`
 	// AuditRepairActive marks that the cycle is CURRENTLY inside a repair round
 	// — set when a repair is granted, cleared when audit is re-dispatched. It is
 	// deliberately separate from the counter above: AuditRepairAttempts is

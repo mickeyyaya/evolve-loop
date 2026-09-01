@@ -83,7 +83,7 @@ func buildFailureDossier(cs CycleState, finalVerdict string, fp policy.SystemFai
 		Audit:            audit,
 		ACS:              acs,
 		AuditRan:         auditRan,
-		SubstantiveError: len(cs.AuditFailReasons) > 0 || len(cs.ShipFailReasons) > 0,
+		SubstantiveError: hasSubstantiveFailReasons(cs),
 		FailReasons:      cs.AuditFailReasons,
 	})
 

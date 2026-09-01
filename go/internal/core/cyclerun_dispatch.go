@@ -52,6 +52,13 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 		// diagnosed to the ADR-0072 floor. Cleared BEFORE the pre-phase
 		// cycle-state write below so the cleared state is also what persists.
 		resetFloorFailReason(&cr.cs, next)
+		// Same supersession rule for the round's verdict ARTIFACTS: a
+		// re-dispatched audit must not replay the previous round's pre-staged
+		// acs-verdict.json/audit-report.md through the verdict-exists gate
+		// (cycle-1603: round-1's ship_eligible=false force-FAILed every
+		// repaired PASS). First dispatch (round 0) retires nothing, so an
+		// operator/CI pre-stage keeps its honor.
+		supersedePreviousAuditRound(&cr.cs)
 	}
 	if err := cr.o.storage.WriteCycleState(cr.ctx, cr.cs); err != nil {
 		return dispatchResult{}, loopAbort, fmt.Errorf("write cycle-state pre-%s: %w", next, err)
