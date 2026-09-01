@@ -261,6 +261,16 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 		if prefix, ok := sandboxPrefixForLaunch(deps, cfg); ok {
 			launchCmd = joinPrefixForTmux(prefix) + " " + launchCmd
 			fmt.Fprintf(deps.Stderr, "%s sandbox prefix applied (%d argv elements)\n", pfx, len(prefix))
+		} else if sandboxRequiredButUnavailable(deps, cfg, false) {
+			// Same three-way classification as the headless drivers: nested
+			// sessions are already confined by the outer sandbox, an explicit
+			// EVOLVE_SANDBOX=off is a loud host opt-out, and only the genuine
+			// auto/on-with-no-wrap case fails closed. This is the DEFAULT
+			// execution path (tmux drivers) — the first classification pass
+			// covered only the headless minority and left this exact line
+			// killing every nested contract-active build (review CRITICAL).
+			fmt.Fprintf(deps.Stderr, "%s safety gate: activated Build explanation contract requires OS sandbox confinement\n", pfx)
+			return ExitSafetyGate, nil
 		}
 		_ = deps.Tmux.SendKeys(ctx, lp.session, launchCmd, true)
 		fmt.Fprintf(deps.Stderr, "%s launching: %s\n", pfx, launchCmd)

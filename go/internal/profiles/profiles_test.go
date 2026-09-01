@@ -93,6 +93,31 @@ func TestGet_HappyPath_TypedFields(t *testing.T) {
 	}
 }
 
+func TestRepositoryBuilderProfile_ProtectsHostExplanationState(t *testing.T) {
+	profileDir := filepath.Join("..", "..", "..", ".evolve", "profiles")
+	p, err := NewFromDir(profileDir).Get("builder")
+	if err != nil {
+		t.Fatalf("load repository builder profile: %v", err)
+	}
+	if p.Sandbox == nil || !p.Sandbox.Enabled || !p.Sandbox.ReadOnlyRepo {
+		t.Fatalf("builder host repo must be sandboxed read-only: %+v", p.Sandbox)
+	}
+	want := map[string]bool{
+		".evolve/build-explanation-contracts": false,
+		".evolve/cycle-state.json":            false,
+	}
+	for _, path := range p.Sandbox.DenySubpaths {
+		if _, ok := want[path]; ok {
+			want[path] = true
+		}
+	}
+	for path, found := range want {
+		if !found {
+			t.Errorf("builder sandbox deny_subpaths is missing %q", path)
+		}
+	}
+}
+
 // TestGet_SandboxConfig — nested object parses into typed struct.
 func TestGet_SandboxConfig(t *testing.T) {
 	l := NewFromFS(fixtureFS())

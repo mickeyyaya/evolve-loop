@@ -1,6 +1,36 @@
 package phaseio
 
-import "testing"
+import (
+	"encoding/json"
+	"reflect"
+	"testing"
+)
+
+func TestExplanationView_JSONRoundTrip(t *testing.T) {
+	t.Parallel()
+	in := ExplanationView{
+		SchemaVersion:   1,
+		ContractVersion: 1,
+		Status:          "required",
+		Cycle:           42,
+		Reason:          "material behavior changed",
+		BaseSHA:         "abc123",
+		DocumentPath:    "docs/explain/builds/cycle-42.md",
+		DocumentSHA256:  "document-sha",
+		MaterialPaths:   []string{"go/internal/core/phase.go"},
+	}
+	raw, err := json.Marshal(in)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var out ExplanationView
+	if err := json.Unmarshal(raw, &out); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if !reflect.DeepEqual(out, in) {
+		t.Fatalf("round-trip mismatch:\n in=%+v\nout=%+v", in, out)
+	}
+}
 
 // TestHandoffs_AuditAccessor_AbsentReturnsFalse is the named RED anchor for
 // 3.1: an absent typed view yields the zero value AND ok=false, never a

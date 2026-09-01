@@ -341,14 +341,14 @@ func TestRunCycleFromPhaseAdditionalBranchesCoverage(t *testing.T) {
 	baseCS := CycleState{CycleID: 0, WorkspacePath: t.TempDir()}
 	req := CycleRequest{ProjectRoot: t.TempDir(), Env: map[string]string{"K": "V"}, Context: map[string]string{"C": "D"}}
 	t.Run("write cycle state failure", func(t *testing.T) {
-		st := &fakeStorage{state: State{LastCycleNumber: 4}, cycleState: baseCS, failOnWriteCS: true}
+		st := &fakeStorage{state: State{LastCycleNumber: 5}, cycleState: baseCS, failOnWriteCS: true}
 		o := NewOrchestrator(st, &fakeLedger{}, buildRunners(nil))
 		if _, err := o.RunCycleFromPhase(context.Background(), req, &ResumePoint{Phase: string(PhaseBuild), CycleID: 5}); err == nil {
 			t.Fatal("expected pre-phase cycle-state write failure")
 		}
 	})
 	t.Run("runner error records outcome", func(t *testing.T) {
-		st := &fakeStorage{state: State{LastCycleNumber: 4}, cycleState: baseCS}
+		st := &fakeStorage{state: State{LastCycleNumber: 5}, cycleState: baseCS}
 		runners := buildRunners(nil)
 		runners[PhaseBuild] = &fakeRunner{name: "build", failErr: errors.New("phase failed"), failUntil: 1}
 		o := NewOrchestrator(st, &fakeLedger{}, runners)
@@ -358,7 +358,7 @@ func TestRunCycleFromPhaseAdditionalBranchesCoverage(t *testing.T) {
 		}
 	})
 	t.Run("non canonical verdict", func(t *testing.T) {
-		st := &fakeStorage{state: State{LastCycleNumber: 4}, cycleState: baseCS}
+		st := &fakeStorage{state: State{LastCycleNumber: 5}, cycleState: baseCS}
 		runners := buildRunners(nil)
 		runners[PhaseBuild] = &fakeRunner{name: "build", verdict: "MAYBE"}
 		o := NewOrchestrator(st, &fakeLedger{}, runners)

@@ -17,6 +17,23 @@ type TriageView struct {
 	PhaseSkip []string // PSMAS phase_skip[] recommendation (additive only)
 }
 
+// ExplanationView is the immutable, hash-bound documentation handoff produced
+// after Build verification. It points downstream phases at the permanent,
+// cycle-owned explanation record without replacing build-report.md as Build's
+// primary artifact.
+type ExplanationView struct {
+	SchemaVersion   int      `json:"schema_version"`
+	ContractVersion int      `json:"contract_version"`
+	Status          string   `json:"status"`
+	Cycle           int      `json:"cycle"`
+	Reason          string   `json:"reason"`
+	BaseSHA         string   `json:"base_sha,omitempty"`
+	DocumentPath    string   `json:"document_path,omitempty"`
+	DocumentSHA256  string   `json:"document_sha256,omitempty"`
+	DiffSHA256      string   `json:"diff_sha256"`
+	MaterialPaths   []string `json:"material_paths,omitempty"`
+}
+
 // BuildView is the typed projection of a build handoff.
 type BuildView struct {
 	Verdict       string

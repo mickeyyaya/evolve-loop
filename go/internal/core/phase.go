@@ -65,6 +65,15 @@ type (
 	SystemFailureSignal = cyclestate.SystemFailureSignal
 )
 
+type BuildExplanationState string
+
+const (
+	BuildExplanationLegacy      BuildExplanationState = "legacy"
+	BuildExplanationNotYetBuilt BuildExplanationState = "not_yet_built"
+	BuildExplanationAvailable   BuildExplanationState = "available"
+	BuildExplanationInvalid     BuildExplanationState = "missing_or_invalid"
+)
+
 // PhaseRequest is the input envelope to PhaseRunner.Run. JSON-tagged
 // so the subprocess override path (pkg/phaseproto) can serialise the
 // same struct over stdin/stdout.
@@ -89,6 +98,10 @@ type PhaseRequest struct {
 	// (code) distinct: collapsing them reintroduces the cycle-190 "predicate
 	// ran against main" bug.
 	Worktree string `json:"worktree"`
+	// WorktreeBaseSHA is the host-owned cycle base. Downstream integrity checks
+	// must diff against this value, never a mutable workspace manifest field.
+	WorktreeBaseSHA                 string `json:"worktree_base_sha,omitempty"`
+	ExplanationDocumentationVersion int    `json:"explanation_documentation_version,omitempty"`
 	// RunID is the CA.5 event-sourced run identity, threaded to every phase
 	// dispatch (CB.5) so the bridge mints run-scoped tmux session names
 	// (evolve-bridge-r<runid8>-…) and the per-run session registry records
@@ -106,6 +119,17 @@ type PhaseRequest struct {
 	// EVOLVE_PHASE_IO>=advisory with the planner enabled; empty at off/shadow so
 	// the build phase reads disk exactly as before (byte-identical dispatch).
 	BuildPlan string `json:"build_plan,omitempty"`
+
+	// BuildExplanation is the verified secondary Build handoff. The primary
+	// watched artifact remains build-report.md; this typed view carries only the
+	// permanent documentation paths and hashes that Audit, Ship, Retro, Memo,
+	// and optional post-Build phases need to inspect the same evidence.
+	BuildExplanation *phaseio.ExplanationView `json:"build_explanation,omitempty"`
+	// BuildExplanationState distinguishes a legitimate pre-Build failure Retro
+	// from a post-Build missing/corrupt handoff. Error is host-derived diagnostic
+	// data and is never treated as prompt instructions.
+	BuildExplanationState BuildExplanationState `json:"build_explanation_state,omitempty"`
+	BuildExplanationError string                `json:"build_explanation_error,omitempty"`
 
 	// Input is the unified typed phase-I/O envelope (ADR-0050 Phase 3.10). It is
 	// assembled once at the dispatch seam and ONLY at EVOLVE_PHASE_IO>=enforce; the

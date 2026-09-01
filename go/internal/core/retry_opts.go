@@ -130,7 +130,7 @@ func (cr *cycleRun) recoverShipError(next Phase, err error, resp PhaseResponse, 
 	// unresolved (ADR-0039 §8 / D10) — cleared when a later ship succeeds.
 	cr.preserveWorktree = true
 	fleetWidth := fleetWidthFromEnv(cr.req.Env)
-	rec, recovering := cr.o.recoverFromShipError(cr.ctx, cr.cycle, cr.cs, se, cr.recoveryDepth, fleetWidth)
+	rec, recovering := cr.o.recoverFromShipError(cr.ctx, cr.req.ProjectRoot, cr.cycle, &cr.cs, se, cr.recoveryDepth, fleetWidth)
 	if !recovering {
 		return false
 	}

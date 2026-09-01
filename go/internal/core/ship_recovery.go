@@ -10,12 +10,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-func (o *Orchestrator) recoverFromShipError(ctx context.Context, cycle int, cs CycleState, se *ShipError, depth, fleetWidth int) (Phase, bool) {
-	o.recordShipError(ctx, cycle, cs, se)
+func (o *Orchestrator) recoverFromShipError(ctx context.Context, projectRoot string, cycle int, cs *CycleState, se *ShipError, depth, fleetWidth int) (Phase, bool) {
+	o.recordShipError(ctx, cycle, *cs, se)
 	budget := shipRecoveryBudget(se.Code, fleetWidth)
 	if depth >= budget {
 		fmt.Fprintf(os.Stderr, "[orchestrator] ship recovery exhausted after %d attempt(s) (%s/%s, budget %d, fleet width %d); aborting\n", depth, se.Code, se.Class, budget, fleetWidth)
@@ -72,6 +73,29 @@ func (o *Orchestrator) recoverFromShipError(ctx context.Context, cycle int, cs C
 		ok, conflict := rebaseCycleBranchOntoMain(ctx, cs.ActiveWorktree)
 		switch {
 		case ok:
+			// The explanation is bound to the pre-rebase base SHA. A peer's
+			// newly composed base therefore invalidates the approved snapshot
+			// even when the lane patch-id itself is unchanged. Rebind host state
+			// and return to Build so the Builder, not the host, authors the new
+			// rationale/binding before Audit and Ship run again.
+			if cs.ExplanationDocumentationVersion > 0 {
+				newBase, code, gitErr := gitCapture(ctx, cs.ActiveWorktree, "rev-parse", "main")
+				newBase = strings.TrimSpace(newBase)
+				if gitErr != nil || code != 0 {
+					fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d resolve rebased explanation base failed: %v (exit %d)\n", cycle, gitErr, code)
+					return "", false
+				}
+				rebasedState := *cs
+				rebasedState.WorktreeBaseSHA = newBase
+				if err := explanationdocs.RebaseBuildAndPersist(ctx, explanationBinding(projectRoot, *cs), newBase, func() error {
+					return o.storage.WriteCycleState(ctx, rebasedState)
+				}); err != nil {
+					fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d invalidate rebased Build explanation failed: %v\n", cycle, err)
+					return "", false
+				}
+				*cs = rebasedState
+				return PhaseBuild, true
+			}
 			// A clean replay MAY carry the audit verdict forward without a
 			// full re-audit (RUNG 0, cycle-801): if the composed diff's
 			// patch-id still matches what the audit reviewed and every
@@ -79,7 +103,7 @@ func (o *Orchestrator) recoverFromShipError(ctx context.Context, cycle int, cs C
 			// and reship directly. Any rejection falls through unchanged to
 			// the pre-existing route below (router routes RebaseNeeded to
 			// audit, re-binding the merged tree).
-			if o.compositionCarryForward(ctx, cycle, cs) {
+			if o.compositionCarryForward(ctx, cycle, *cs) {
 				return PhaseShip, true
 			}
 			// RUNG 2 (cycle-941): a RUNG 0 miss means the composed patch-id
@@ -88,7 +112,7 @@ func (o *Orchestrator) recoverFromShipError(ctx context.Context, cycle int, cs C
 			// patch-id-verified overlap composes directly with a
 			// composition-verdict{method:"scoped-review"} and reships.
 			// Entangled (or a dark reviewer) falls through unchanged.
-			if o.scopedMergeCarryForward(ctx, cycle, cs) {
+			if o.scopedMergeCarryForward(ctx, cycle, *cs) {
 				return PhaseShip, true
 			}
 		case conflict:

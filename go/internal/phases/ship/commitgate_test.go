@@ -268,6 +268,8 @@ func TestCommitGate_CyclePersonaLint(t *testing.T) {
 	repo := makeRepo(t)
 	addRemote(t, repo)
 	writePersonaFixture(t, repo, "builder", []string{"Read"}, []string{"Read"})
+	runGit(t, repo, "add", "agents/evolve-builder.md")
+	runGit(t, repo, "-c", "commit.gpgsign=false", "commit", "-q", "-m", "add persona fixture")
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\ncycle change\n")
 	seedAudit(t, repo, "PASS")
 

@@ -143,7 +143,7 @@ func TestRole_TDDWritesTestsInWorktree(t *testing.T) {
 
 	dec := g.Decide(context.Background(), core.GuardInput{
 		ToolName:  "Write",
-		ToolInput: map[string]any{"file_path": filepath.Join(worktree, "go/internal/bridge/stopreview_stage1_test.go")},
+		ToolInput: map[string]any{"file_path": filepath.Join(worktree, "go/internal/textutil/new_behavior_test.go")},
 	})
 	if !dec.Allow {
 		t.Errorf("tdd write of *_test.go in worktree denied: %s", dec.Reason)

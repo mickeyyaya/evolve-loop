@@ -683,13 +683,15 @@ func (fl failureLearningRequest) retroRequest(summary, todoID string) PhaseReque
 	retroCtx["failure_attempt"] = strconv.Itoa(fl.Attempt)
 	retroCtx["failure_summary"] = summary
 	retroCtx["next_cycle_todo_id"] = todoID
-	return PhaseRequest{
+	req := PhaseRequest{
 		Cycle:       fl.Cycle,
 		ProjectRoot: fl.CycleRequest.ProjectRoot,
 		Workspace:   fl.CycleState.WorkspacePath,
 		// CB.1: even this out-of-band retro keeps the no-main-tree-cwd
 		// invariant — read-only, but invariants with exceptions aren't structural.
-		Worktree: fl.CycleState.ActiveWorktree,
+		Worktree:                        fl.CycleState.ActiveWorktree,
+		WorktreeBaseSHA:                 fl.CycleState.WorktreeBaseSHA,
+		ExplanationDocumentationVersion: fl.CycleState.ExplanationDocumentationVersion,
 		// CB.5: and the run identity, for run-scoped session naming.
 		RunID:         fl.CycleState.RunID,
 		GoalHash:      fl.CycleRequest.GoalHash,
@@ -697,6 +699,8 @@ func (fl failureLearningRequest) retroRequest(summary, todoID string) PhaseReque
 		Env:           fl.Env,
 		Context:       retroCtx,
 	}
+	projectBuildExplanation(fl.CycleRequest.ProjectRoot, *fl.CycleState).apply(&req)
+	return req
 }
 
 func (o *Orchestrator) writeFailureLearningState(ctx context.Context, state *State) {

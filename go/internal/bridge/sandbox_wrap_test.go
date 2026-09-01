@@ -53,6 +53,19 @@ func TestSandboxPrefix_NoWorktree_SkipsWrap(t *testing.T) {
 	}
 }
 
+func TestSandboxPrefix_RequiredContractConsultsWrapperWithoutWorktree(t *testing.T) {
+	fw := &fakeWrap{prefix: []string{"sandbox-exec", "-p", "x"}, available: true}
+	deps := Deps{SandboxWrap: fw.wrap()}
+	cfg := &Config{RequireSandbox: true, Workspace: "/ws", ProjectRoot: "/repo", Agent: "build"}
+	prefix, ok := sandboxPrefixForLaunch(deps, cfg)
+	if !ok || len(prefix) == 0 || len(fw.calls) != 1 {
+		t.Fatalf("required contract did not request confinement: prefix=%v ok=%v calls=%d", prefix, ok, len(fw.calls))
+	}
+	if !sandboxRequiredButUnavailable(Deps{Env: map[string]string{}}, cfg, false) || sandboxRequiredButUnavailable(Deps{Env: map[string]string{}}, cfg, true) {
+		t.Fatal("required-sandbox fail-closed predicate is incorrect")
+	}
+}
+
 func TestSandboxPrefix_WorktreePhase_PassesAbsolutePaths(t *testing.T) {
 	// Source-writing phases pass their absolute Worktree+Workspace+RepoRoot
 	// to the wrapper — the SBPL profile depends on every path being absolute
@@ -143,7 +156,7 @@ func TestWrapHeadless_NoWrap_PassesThrough(t *testing.T) {
 	fw := &fakeWrap{returnEmpty: true}
 	deps := Deps{SandboxWrap: fw.wrap()}
 	cfg := &Config{Worktree: "/abs/wt/x", Agent: "build"}
-	name, args := wrapHeadlessInvocation(deps, cfg, "/usr/bin/claude", []string{"-p", "do thing"})
+	name, args, _ := wrapHeadlessInvocation(deps, cfg, "/usr/bin/claude", []string{"-p", "do thing"})
 	if name != "/usr/bin/claude" || !equalSlice(args, []string{"-p", "do thing"}) {
 		t.Errorf("pass-through broken; got name=%q args=%v", name, args)
 	}
@@ -156,7 +169,7 @@ func TestWrapHeadless_WithWrap_PrependsPrefix(t *testing.T) {
 	fw := &fakeWrap{prefix: []string{"sandbox-exec", "-p", "/tmp/sb.sb"}, available: true}
 	deps := Deps{SandboxWrap: fw.wrap()}
 	cfg := &Config{Worktree: "/abs/wt/x", Agent: "build"}
-	name, args := wrapHeadlessInvocation(deps, cfg, "/usr/bin/claude", []string{"-p", "do thing"})
+	name, args, _ := wrapHeadlessInvocation(deps, cfg, "/usr/bin/claude", []string{"-p", "do thing"})
 	if name != "sandbox-exec" {
 		t.Errorf("name=%q, want sandbox-exec", name)
 	}

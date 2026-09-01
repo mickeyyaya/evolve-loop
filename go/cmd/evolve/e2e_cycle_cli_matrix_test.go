@@ -121,6 +121,7 @@ func runOneCycle(t *testing.T, cfg cycleRunConfig) {
 	shipScript := writeFakeShipScript(t, projRoot)
 
 	env := append(os.Environ(),
+		"EVOLVE_SANDBOX=off", // host opt-out: pipeline-semantics tests, runners cannot promise a wrap (see e2e_pipeline_paths_test.go)
 		"EVOLVE_CLI="+cfg.CLI,
 		"EVOLVE_PROMPTS_DIR="+cfg.RepoRoot,
 		"EVOLVE_SHIP_SCRIPT="+shipScript,
@@ -337,9 +338,15 @@ func gitInit(t *testing.T, root string) {
 	run("config", "user.email", "e2e@test.local")
 	run("config", "user.name", "E2E Test")
 	run("config", "commit.gpgsign", "false")
-	// .gitignore so the symlinked agent-bridge doesn't pollute the index.
+	// .gitignore, COMMITTED so worktrees inherit it (an uncommitted root
+	// ignore never reaches a worktree checkout). Production shape: the real
+	// repo ignores .evolve/* and go/bin/ — without those rules the worktree's
+	// symlinked runtime state and the build-selfcheck's compiled binary read
+	// as untracked "changes" to every base-bound diff consumer (the
+	// explanation floor demanded a full REQUIRED document for builds that
+	// changed no code, hanging every pipeline e2e in the correction ladder).
 	if err := os.WriteFile(filepath.Join(root, ".gitignore"),
-		[]byte("tools/\n.evolve/runs/\n.evolve/ledger.jsonl\n.evolve/cycle-state.json\n"), 0o644); err != nil {
+		[]byte("tools/\n.evolve/\ngo/bin/\n"), 0o644); err != nil {
 		t.Fatalf("write .gitignore: %v", err)
 	}
 	// Seed file so the initial commit isn't empty.

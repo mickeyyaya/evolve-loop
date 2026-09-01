@@ -13,6 +13,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 	"github.com/mickeyyaya/evolve-loop/go/internal/directives"
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
+	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseconfig"
@@ -251,6 +252,13 @@ type CycleRequest struct {
 	BypassPolicy bool
 }
 
+// legacyExplanationTestStorage is deliberately package-private: only core's
+// same-package legacy unit fake can opt out of the fresh-cycle contract.
+// Production and external storage adapters cannot implement this method.
+type legacyExplanationTestStorage interface {
+	disableFreshExplanationContractForTest() bool
+}
+
 // Orchestrator drives one cycle through the state machine, calling a
 // PhaseRunner per phase and appending ledger entries. It is pure: all
 // I/O is delegated to the injected Storage and Ledger ports.
@@ -436,6 +444,12 @@ type Orchestrator struct {
 	// WithMaxPhaseIterations; tests set it low to exercise the C1
 	// chokepoint-escape guard deterministically.
 	maxPhaseIterations int
+
+	// explanationContractVersion is the writer version stamped on fresh cycles.
+	// It has no exported option: production callers cannot downgrade the
+	// mandatory contract. Same-package tests may set it to zero when exercising
+	// unrelated legacy fixtures.
+	explanationContractVersion int
 
 	// reviewer adjudicates a finished phase's deliverable before the cycle
 	// advances (Workstream E2). Nil ⇒ noopReviewer default ⇒ every non-error,
@@ -747,12 +761,12 @@ func WithDirectivesProvider(fn func(ctx context.Context, cycle int) directives.S
 // orchestrator calls reviewer.Review(...) after each phase's runner.Run returns
 // a non-error, non-SKIPPED verdict, BEFORE the ledger append or
 // CompletedPhases++. Approve=false aborts the cycle with the reviewer's Reason
-// (no retry budget yet — that's a follow-up; see the WS-E plan). A nil reviewer
-// keeps the noopReviewer default, which is byte-identical to the pre-E2 cycle.
+// (no retry budget yet — that's a follow-up; see the WS-E plan). The core-owned
+// Build explanation floor and lifecycle remain outside this optional seam.
 func WithReviewer(r DeliverableReviewer) Option {
 	return func(o *Orchestrator) {
 		if r != nil {
-			o.reviewer = r
+			o.reviewer = withMandatoryExplanationReviewer(r)
 		}
 	}
 }
@@ -801,22 +815,26 @@ func (o *Orchestrator) HasRunner(p Phase) bool {
 
 func NewOrchestrator(storage Storage, ledger Ledger, runners map[Phase]PhaseRunner, opts ...Option) *Orchestrator {
 	o := &Orchestrator{
-		storage:         storage,
-		ledger:          ledger,
-		runners:         runners,
-		sm:              NewStateMachine(),
-		now:             time.Now,
-		gitHEAD:         defaultGitHEAD,
-		gitMutationLock: defaultGitMutationLock,
-		gitDirtyPaths:   defaultGitDirtyPaths,
-		worktree:        gitWorktree{},
-		strategy:        router.StaticPreset{},
-		retryConfig:     policy.Policy{}.RetryConfig(),
-		workflowConfig:  policy.Policy{}.WorkflowConfig(),
-		chronicle:       policy.Policy{}.ChronicleConfig(),
-		failurePolicy:   policy.DefaultSystemFailurePolicy(),
-		reviewer:        noopReviewer{}, // WS-E2: byte-identical default until WithReviewer is used
-		observer:        noopObserver{}, // cycle-122 Fix 3 / ADR-0030: byte-identical default until WithObserver is used
+		storage:                    storage,
+		ledger:                     ledger,
+		runners:                    runners,
+		sm:                         NewStateMachine(),
+		now:                        time.Now,
+		gitHEAD:                    defaultGitHEAD,
+		gitMutationLock:            defaultGitMutationLock,
+		gitDirtyPaths:              defaultGitDirtyPaths,
+		worktree:                   gitWorktree{},
+		strategy:                   router.StaticPreset{},
+		retryConfig:                policy.Policy{}.RetryConfig(),
+		workflowConfig:             policy.Policy{}.WorkflowConfig(),
+		chronicle:                  policy.Policy{}.ChronicleConfig(),
+		failurePolicy:              policy.DefaultSystemFailurePolicy(),
+		reviewer:                   withMandatoryExplanationReviewer(noopReviewer{}),
+		explanationContractVersion: explanationdocs.CurrentContractVersion,
+		observer:                   noopObserver{}, // cycle-122 Fix 3 / ADR-0030: byte-identical default until WithObserver is used
+	}
+	if legacy, ok := storage.(legacyExplanationTestStorage); ok && legacy.disableFreshExplanationContractForTest() {
+		o.explanationContractVersion = 0
 	}
 	for _, opt := range opts {
 		opt(o)
@@ -918,6 +936,15 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (_ CycleR
 	// the distinguisher that keeps three distinct aborts from sharing one
 	// Unexplained fingerprint (batch-19 cycle-1208 halt).
 	defer func() { cr.abnormalEpilogue(retErr) }()
+	// A marker created at fresh-cycle allocation distinguishes new cycles,
+	// whose Build explanation contract is mandatory, from old workspaces being
+	// resumed after an upgrade. Persist it before the first phase so a crash
+	// before Build cannot accidentally turn a new cycle into a legacy exemption.
+	if cr.cs.ExplanationDocumentationVersion != 0 {
+		if err := activateBuildExplanationContract(req.ProjectRoot, cr.cs); err != nil {
+			return CycleResult{}, fmt.Errorf("activate Build explanation contract: %w", err)
+		}
+	}
 
 	// Pre-loop planning (catalog refresh, per-cycle env/ctx snapshots, fleet
 	// scope, challenge-token mint, pre-cycle HEAD capture, clamped whole-cycle
@@ -1009,6 +1036,14 @@ OuterLoop:
 			cr.reachedPhaseEnd = true
 			break OuterLoop
 		}
+		// Triage continuation adoption runs at the previous phase boundary and
+		// may replace both worktree and review base. Seal that final context once
+		// before the first Build dispatch; repeats are idempotent.
+		if next == PhaseBuild {
+			if err := sealBuildExplanationContext(req.ProjectRoot, cr.cs); err != nil {
+				return cr.result, fmt.Errorf("seal Build explanation context: %w", err)
+			}
+		}
 
 		// PR2b: at ParallelEvaluate=enforce, when `next` begins a run of
 		// independent post-build checking phases (archetype "evaluate", audit
@@ -1049,7 +1084,7 @@ OuterLoop:
 			return cr.result, merr
 		}
 
-		// End-of-iteration record + branch (success ledger, bindings, normalize,
+		// End-of-iteration record + branch (success ledger, bindings,
 		// CompletedPhases persist, checkpoint, outcome record + cursor advance,
 		// retro/debugger non-verdict-driven branches) → recordAndBranch.
 		switch act, berr := cr.recordAndBranch(next, dr); act {

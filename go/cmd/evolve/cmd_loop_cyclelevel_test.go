@@ -45,6 +45,7 @@ func (r *secondCallErrRunner) Run(context.Context, core.PhaseRequest) (core.Phas
 // second fails with ErrCycleLevelFailure → third cycle still runs".
 func TestLoop_CycleLevelFailureContinues(t *testing.T) {
 	projectRoot := t.TempDir()
+	initLoopContractRepo(t, projectRoot)
 	writeDispatchPolicy(t, filepath.Join(projectRoot, ".evolve"), "off")
 	scout := &secondCallErrRunner{name: "scout"}
 

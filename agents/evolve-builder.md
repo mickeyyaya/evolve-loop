@@ -134,8 +134,8 @@ If `workspace/build-plan.md` exists (produced by the build-planner phase when `w
   either as "adhered: <directive>" or "diverged: <directive> — reason: <why>".
 - This is advisory only. Step 3 Design remains the authoritative driver.
   Divergences are noted, not blocked, until cycle-105 enforcement.
-### Step 3: Design (chain-of-thought required)
-Enumerate reasoning explicitly:
+### Step 3: Design (engineering rationale required)
+Enumerate reviewable decisions, tradeoffs, risks, and evidence — not private chain-of-thought:
 1. **What files?** List with why.
 2. **Order?** Numbered with dependencies.
 3. **Risks?** ≥1 per file.
@@ -158,7 +158,7 @@ Gaming evaluations (auto-pass, trivial implementations, bypassed gates) is a kno
 2. **Command injection** — unsanitized vars in shell commands
 3. **Unvalidated input** — validate before use in paths, URLs, logic
 
-On fail: fix, document in Risks, re-verify.
+On fail: fix, document in Risks, re-verify. **Step 5.5 — permanent explanation deliverable:** when Cycle Context carries `explanation_documentation_version: 1`, follow reference `explanation-documentation-contract`; write the single canonical cycle-owned document plus `build-report.md ## Explanation Documentation`, or the valid no-material-diff declaration. The host alone writes and seals verification state.
 
 **Self-Review Skill Loop** (opt-in, default OFF): When set, invoke configured skills against diff, revise until clean or cap hit. See reference `self-review-loop-detail` for pseudocode and variables.
 
@@ -270,10 +270,10 @@ Before posting your completion ledger entry, execute the Reflection Authoring St
 **Distinct from the self-review loop:** that controls a code-quality review of your diff; this reflection journal entry covers process retrospection on your phase's execution. Both can run; they emit to different artifacts (`build-report.md ## Self-Review` vs `build-reflection.yaml`). Skip the reflection only if `EVOLVE_REFLECTION_JOURNAL=0`.
 
 ## Reference Index (Layer 3, on-demand)
-Stripped from dispatched prompts (CompactPrompts); operational directives live ABOVE this marker — enforced by `internal/phasecoherence/persona_strip_operational_test.go` (cycle-1390–1429 lesson).
-Reference: [agents/evolve-builder-reference.md](agents/evolve-builder-reference.md)
+Stripped from dispatched prompts (CompactPrompts); operational directives live ABOVE this marker — enforced by `internal/phasecoherence/persona_strip_operational_test.go` (cycle-1390–1429 lesson). Reference: [agents/evolve-builder-reference.md](agents/evolve-builder-reference.md)
 | When | Section |
 |---|---|
+| Cycle Context carries `explanation_documentation_version: 1` | `explanation-documentation-contract` |
 | Step 4.5 E2E activates (route/page/form changes) | `e2e-test-generation` |
 | `code-review-simplify.sh` exists in project | `optional-self-review` |
 | Task cannot proceed with existing tools | `capability-gap-detection` |

@@ -24,6 +24,15 @@ func TestIsProtectedSurface(t *testing.T) {
 		"/Users/runner/.claude/settings.json",                 // GLOBAL hook wiring (C1: must not be "always safe")
 		"/wt/.evolve/policy.json",                             // M2: gate-default overrides
 		"/wt/Go/ACS/Regression/evil_test.go",                  // M1: case-insensitive FS (Go/ACS == go/acs)
+		"/wt/go/internal/core/orchestrator.go",                // fresh explanation activation/seal wiring
+		"/wt/go/internal/core/cyclerun.go",                    // explanation version stamp
+		"/wt/go/internal/core/cyclerun_dispatch.go",           // downstream handoff projection
+		"/wt/go/internal/core/cyclerun_review.go",             // post-Build refresh wiring
+		"/wt/go/internal/core/resume.go",                      // resumed lifecycle wiring
+		"/wt/go/internal/phases/runner/runner.go",             // required sandbox propagation
+		"/wt/go/internal/phases/audit/audit.go",               // qualitative Audit wiring
+		"/wt/go/internal/phases/retro/retro.go",               // qualitative Retro wiring
+		"/wt/go/internal/phases/ship/native.go",               // native Ship gate wiring
 	}
 	for _, p := range protected {
 		if !IsProtectedSurface(p) {
@@ -32,7 +41,7 @@ func TestIsProtectedSurface(t *testing.T) {
 	}
 
 	allowed := []string{
-		"/wt/go/internal/core/orchestrator.go",     // ordinary source
+		"/wt/go/internal/core/observer.go",         // unrelated ordinary source
 		"/wt/go/acs/cycle21/predicates_test.go",    // cycles legitimately write their OWN predicates
 		"/wt/go/internal/flagregistry/registry.go", // non-SSOT registry code
 		"/wt/go/internal/flagregistry/lookup.go",   // non-SSOT registry code

@@ -30,6 +30,7 @@ package core_test
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -39,6 +40,32 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/evalgate"
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
+
+type materializationWorktree struct{ path string }
+
+func (w materializationWorktree) Create(string, int) (string, error) { return w.path, nil }
+func (materializationWorktree) Cleanup(string, string) error         { return nil }
+
+func initMaterializationRepo(t *testing.T, root string) {
+	t.Helper()
+	for _, args := range [][]string{
+		{"init", "-q"},
+		{"config", "user.email", "test@example.invalid"},
+		{"config", "user.name", "Test"},
+	} {
+		if out, err := exec.Command("git", append([]string{"-C", root}, args...)...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v: %s", args, err, out)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(root, ".gitignore"), []byte(".evolve/\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{{"add", ".gitignore"}, {"commit", "-q", "-m", "test base"}} {
+		if out, err := exec.Command("git", append([]string{"-C", root}, args...)...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v: %s", args, err, out)
+		}
+	}
+}
 
 // materializationScoutRunner plays the scout phase across a correction
 // round-trip: call 1 selects a slug but writes no eval (the live defect
@@ -82,11 +109,13 @@ func (r *materializationScoutRunner) Run(_ context.Context, req core.PhaseReques
 func runMaterializationCycle(t *testing.T, scout *materializationScoutRunner) error {
 	t.Helper()
 	root := t.TempDir()
+	initMaterializationRepo(t, root)
 	st := &fixtures.FakeStorage{}
 	runners := fixtures.BuildRunners(nil)
 	runners[core.PhaseScout] = scout
 	reviewer := evalgate.NewReviewer(config.StageEnforce)
-	o := core.NewOrchestrator(st, &fixtures.FakeLedger{}, runners, core.WithReviewer(reviewer))
+	o := core.NewOrchestrator(st, &fixtures.FakeLedger{}, runners,
+		core.WithReviewer(reviewer), core.WithWorktreeProvisioner(materializationWorktree{path: root}))
 	_, err := o.RunCycle(context.Background(), core.CycleRequest{
 		ProjectRoot: root, GoalHash: "g", DisableWorkspaceGuard: true,
 	})

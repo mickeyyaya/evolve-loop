@@ -189,20 +189,17 @@ const envSandboxMode = "EVOLVE_SANDBOX"
 
 // sandboxPrefixForLaunch is the shared adapter that turns the SandboxWrap
 // decision into a per-driver consumable. Returns (prefix []string, true) only
-// when this is a source-writing phase (cfg.Worktree non-empty) AND the wrap
-// is available; otherwise (nil, false) for "run unwrapped". Centralizing the
-// gate here keeps every driver call site identical. Takes *Config to match
-// the driver-call convention (cfg is passed by pointer throughout this pkg).
+// when the launch carries a worktree or explicitly requires confinement and
+// the wrap is available; otherwise (nil, false) for "run unwrapped".
 func sandboxPrefixForLaunch(deps Deps, cfg *Config) ([]string, bool) {
-	if cfg == nil || cfg.Worktree == "" {
+	if cfg == nil || cfg.Worktree == "" && !cfg.RequireSandbox {
 		return nil, false // not a source-writing phase
 	}
 	if deps.SandboxWrap == nil {
 		return nil, false
 	}
-	// Reaching here means cfg.Worktree != "", which guarantees a CLOUD
-	// model-reaching CLI: ollama-tmux — the only local driver — rejects any
-	// non-empty Worktree at launch (driver_ollamatmux.go), so only
+	// Reaching here means a cloud model CLI requested confinement. ollama-tmux —
+	// the only local driver — never requests this wrapper, so only
 	// claude/codex/agy-tmux get here. That covers both source-writing phases
 	// (built-in build/tdd or a custom writes_source phase) AND the boot/live-smoke
 	// probes, which set a scratch Worktree via applyScratchCwd — all of them need
@@ -286,19 +283,49 @@ func joinPrefixForTmux(prefix []string) string {
 	return strings.Join(parts, " ")
 }
 
-// wrapHeadlessInvocation transforms a (name, args) pair into the sandboxed
-// equivalent: when the sandbox prefix is available, name becomes prefix[0]
-// (e.g. "sandbox-exec") and args becomes prefix[1:]+[name]+oldArgs. Otherwise
-// returns the inputs unchanged. Centralizes the rewrite so claude-p and codex
-// drivers (and any future headless driver) share one path.
-func wrapHeadlessInvocation(deps Deps, cfg *Config, name string, args []string) (string, []string) {
+// wrapHeadlessInvocation transforms a command into its sandboxed equivalent
+// and reports whether confinement was installed. Callers that require a
+// sandbox fail closed when wrapped is false.
+func wrapHeadlessInvocation(deps Deps, cfg *Config, name string, args []string) (wrappedName string, wrappedArgs []string, wrapped bool) {
 	prefix, ok := sandboxPrefixForLaunch(deps, cfg)
 	if !ok {
-		return name, args
+		return name, args, false
 	}
 	newArgs := make([]string, 0, len(prefix)-1+1+len(args))
 	newArgs = append(newArgs, prefix[1:]...)
 	newArgs = append(newArgs, name)
 	newArgs = append(newArgs, args...)
-	return prefix[0], newArgs
+	return prefix[0], newArgs, true
+}
+
+// sandboxRequiredButUnavailable reports whether a RequireSandbox launch must
+// fail closed. It distinguishes WHY the launch is unwrapped, because
+// ShouldWrap's three non-wrap causes differ in kind:
+//
+//   - nested LLM-CLI session: the OUTER sandbox + Tier-1 hooks already confine
+//     (ShouldWrap's own rationale — and on macOS an inner sandbox-exec
+//     EPERM-hangs the REPL). The requirement is SATISFIED, not violated;
+//     treating it as a violation made the Build-explanation contract
+//     unrunnable inside every Claude-driven session, including this repo's
+//     own e2e suite (observed: exit=2 on every pipeline e2e test).
+//   - explicit EVOLVE_SANDBOX=off: a host operator opt-out — the same posture
+//     as --human-input's host opt-in that ExitSafetyGate was built for.
+//     Honoured, but LOUDLY: the warning names the contract and the fact the
+//     phase runs unconfined.
+//   - anything else (auto/on with no usable wrap): the genuine violation this
+//     gate exists for. Fails closed, unchanged.
+func sandboxRequiredButUnavailable(deps Deps, cfg *Config, wrapped bool) bool {
+	if cfg == nil || !cfg.RequireSandbox || wrapped {
+		return false
+	}
+	if sandbox.DetectNested(depEnvGetter(deps)) {
+		return false // outer layer already confines — requirement satisfied
+	}
+	if strings.TrimSpace(deps.Env[envSandboxMode]) == config.SandboxModeOff {
+		if deps.Stderr != nil {
+			fmt.Fprintf(deps.Stderr, "[bridge] WARN: EVOLVE_SANDBOX=off — host opt-out honoured; phase %q runs UNCONFINED despite the activated Build explanation contract\n", cfg.Agent)
+		}
+		return false
+	}
+	return true
 }

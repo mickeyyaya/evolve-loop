@@ -3,10 +3,14 @@ package core
 import (
 	"context"
 	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
@@ -23,19 +27,24 @@ import (
 // place the test-double dedup deliberately cannot reach.
 
 type fakeStorage struct {
-	state            State
-	cycleState       CycleState
-	cycleStateLog    []CycleState
-	stateLog         []State
-	lockHeld         bool
-	lockCount        int
-	mu               sync.Mutex
-	lockErr          error
-	failOnWriteCS    bool
-	failOnReadState  bool
-	failOnWriteState bool
-	writeCSFailAt    int // 0 = never; N = N-th write
-	writeCSCalls     int
+	state                      State
+	cycleState                 CycleState
+	cycleStateLog              []CycleState
+	stateLog                   []State
+	lockHeld                   bool
+	lockCount                  int
+	mu                         sync.Mutex
+	lockErr                    error
+	failOnWriteCS              bool
+	failOnReadState            bool
+	failOnWriteState           bool
+	writeCSFailAt              int // 0 = never; N = N-th write
+	writeCSCalls               int
+	enforceExplanationContract bool
+}
+
+func (f *fakeStorage) disableFreshExplanationContractForTest() bool {
+	return !f.enforceExplanationContract
 }
 
 func (f *fakeStorage) ReadState(_ context.Context) (State, error) {
@@ -121,6 +130,99 @@ type fakeRunner struct {
 	// retry path (Fix D). failErr nil → never fails (default).
 	failErr   error
 	failUntil int
+}
+
+type requiredExplanationBuilder struct{}
+
+func (*requiredExplanationBuilder) Name() string { return string(PhaseBuild) }
+func (*requiredExplanationBuilder) Run(ctx context.Context, req PhaseRequest) (PhaseResponse, error) {
+	if err := os.WriteFile(filepath.Join(req.Worktree, "feature.txt"), []byte("implemented\n"), 0o644); err != nil {
+		return PhaseResponse{}, err
+	}
+	document, err := explanationdocs.DocumentPath(req.Cycle, req.RunID)
+	if err != nil {
+		return PhaseResponse{}, err
+	}
+	var changedAreas strings.Builder
+	for _, path := range changedWorktreePathsSince(ctx, req.Worktree, req.WorktreeBaseSHA) {
+		fmt.Fprintf(&changedAreas, "- `%s` — records a material artifact exercised by the fresh-cycle fixture.\n", path)
+	}
+	body := fmt.Sprintf(`# Build Explanation
+
+## Build Binding
+- Cycle: %d
+- Base SHA: %s
+
+## Summary
+Adds the feature fixture used to exercise the fresh-cycle contract.
+
+## Rationale
+The material Build change requires a cycle-owned explanation.
+
+## Changed Areas
+%s
+
+## Design Decisions
+The fixture uses one plain file because no abstraction is needed.
+
+## Verification
+The orchestrator test exercises the full Build handoff floor.
+
+## Compatibility
+The fixture does not change a public interface.
+
+## Limitations
+The files exist only inside this isolated test repository.
+`, req.Cycle, req.WorktreeBaseSHA, changedAreas.String())
+	path := filepath.Join(req.Worktree, filepath.FromSlash(document))
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return PhaseResponse{}, err
+	}
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		return PhaseResponse{}, err
+	}
+	report := "## Explanation Documentation\n- Status: REQUIRED\n- Document: " + document + "\n"
+	if err := os.WriteFile(filepath.Join(req.Workspace, "build-report.md"), []byte(report), 0o644); err != nil {
+		return PhaseResponse{}, err
+	}
+	return PhaseResponse{Phase: string(PhaseBuild), Verdict: VerdictPASS, ArtifactsDir: req.Workspace}, nil
+}
+
+type normalizingExplanationBuilder struct{}
+
+func (*normalizingExplanationBuilder) Name() string { return string(PhaseBuild) }
+func (*normalizingExplanationBuilder) Run(ctx context.Context, req PhaseRequest) (PhaseResponse, error) {
+	// Intentionally leave valid but non-gofmt source behind. The host owns this
+	// normalization, so the explanation must be sealed only after it runs.
+	if err := os.WriteFile(filepath.Join(req.Worktree, "go", "feature.go"), []byte("package fixture\n\nfunc Answer()int{return 42}\n"), 0o644); err != nil {
+		return PhaseResponse{}, err
+	}
+	return (&requiredExplanationBuilder{}).Run(ctx, req)
+}
+
+type verifyingExplanationAudit struct {
+	calls int
+}
+
+func (*verifyingExplanationAudit) Name() string { return string(PhaseAudit) }
+func (r *verifyingExplanationAudit) Run(ctx context.Context, req PhaseRequest) (PhaseResponse, error) {
+	r.calls++
+	binding := explanationdocs.CycleBinding{
+		ProjectRoot: req.ProjectRoot, Worktree: req.Worktree, Workspace: req.Workspace,
+		BaseSHA: req.WorktreeBaseSHA, Cycle: req.Cycle, RunID: req.RunID,
+		ContractVersion: req.ExplanationDocumentationVersion,
+	}
+	if _, active, err := explanationdocs.Verify(ctx, binding); err != nil || !active {
+		return PhaseResponse{}, fmt.Errorf("first Audit received stale Build explanation: active=%v err=%v", active, err)
+	}
+	formatted, err := os.ReadFile(filepath.Join(req.Worktree, "go", "feature.go"))
+	if err != nil {
+		return PhaseResponse{}, err
+	}
+	if string(formatted) != "package fixture\n\nfunc Answer() int { return 42 }\n" {
+		return PhaseResponse{}, fmt.Errorf("first Audit ran before gofmt normalization: %q", formatted)
+	}
+	return PhaseResponse{Phase: string(PhaseAudit), Verdict: VerdictPASS, ArtifactsDir: req.Workspace}, nil
 }
 
 func (f *fakeRunner) Name() string { return f.name }
@@ -466,6 +568,58 @@ func TestOrchestrator_RecordsCompletedPhases(t *testing.T) {
 		if final.CompletedPhases[i] != p {
 			t.Errorf("completed[%d]=%s, want %s", i, final.CompletedPhases[i], p)
 		}
+	}
+}
+
+func TestOrchestrator_FreshCycleActivatesBuildExplanationContract(t *testing.T) {
+	st := &fakeStorage{enforceExplanationContract: true}
+	runners := buildRunners(nil)
+	runners[PhaseBuild] = &requiredExplanationBuilder{}
+	o := NewOrchestrator(st, &fakeLedger{}, runners)
+	root := initTempGitRepo(t)
+	if err := os.WriteFile(filepath.Join(root, ".gitignore"), []byte(".evolve/\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runGit(t, root, "add", ".gitignore")
+	runGit(t, root, "commit", "-q", "-m", "base")
+
+	if _, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: root}); err != nil {
+		t.Fatalf("RunCycle: %v", err)
+	}
+	if st.cycleState.ExplanationDocumentationVersion != explanationdocs.CurrentContractVersion {
+		t.Fatalf("cycle contract version=%d, want %d", st.cycleState.ExplanationDocumentationVersion, explanationdocs.CurrentContractVersion)
+	}
+	marker := filepath.Join(root, ".evolve", "build-explanation-contracts", fmt.Sprintf("cycle-%d.json", st.cycleState.CycleID))
+	if _, err := os.Stat(marker); err != nil {
+		t.Fatalf("fresh cycle activation marker: %v", err)
+	}
+}
+
+func TestOrchestrator_NormalizesBuildBeforeSealingExplanationForFirstAudit(t *testing.T) {
+	st := &fakeStorage{enforceExplanationContract: true}
+	runners := buildRunners(nil)
+	runners[PhaseBuild] = &normalizingExplanationBuilder{}
+	audit := &verifyingExplanationAudit{}
+	runners[PhaseAudit] = audit
+	o := NewOrchestrator(st, &fakeLedger{}, runners)
+	root := initTempGitRepo(t)
+	if err := os.WriteFile(filepath.Join(root, ".gitignore"), []byte(".evolve/\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "go"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "go", "go.mod"), []byte("module example.com/fixture\n\ngo 1.22\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runGit(t, root, "add", ".gitignore", "go/go.mod")
+	runGit(t, root, "commit", "-q", "-m", "base")
+
+	if _, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: root}); err != nil {
+		t.Fatalf("RunCycle: %v", err)
+	}
+	if audit.calls != 1 {
+		t.Fatalf("Audit calls=%d, want first-attempt success", audit.calls)
 	}
 }
 

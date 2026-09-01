@@ -78,7 +78,11 @@ func (codexDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, err
 
 	// codex reads the prompt on stdin.
 	// Workstream B: sandbox-confine source-writing phases (CLI-agnostic).
-	name, args := wrapHeadlessInvocation(deps, cfg, resolveBinary(deps, "codex"), args)
+	name, args, wrapped := wrapHeadlessInvocation(deps, cfg, resolveBinary(deps, "codex"), args)
+	if sandboxRequiredButUnavailable(deps, cfg, wrapped) {
+		fmt.Fprintln(deps.Stderr, "[codex] safety gate: activated Build explanation contract requires OS sandbox confinement")
+		return ExitSafetyGate, nil
+	}
 	// cfg.Worktree is "" for non-source-writing phases → inherits caller cwd.
 	rc, err := deps.Runner(ctx, name, cfg.Worktree, args, driverEnv(deps), bytes.NewReader([]byte(prompt)), stdoutF, stderrF)
 	if err != nil {

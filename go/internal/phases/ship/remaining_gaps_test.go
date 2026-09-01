@@ -198,6 +198,8 @@ func TestRun_PostShipError_LogsWarnAndContinues(t *testing.T) {
 		Class:          ClassCycle,
 		CommitMessage:  "feat: post-ship warn",
 		ProjectRoot:    repo,
+		WorkspacePath:  filepath.Join(repo, ".evolve", "runs", "cycle-1"),
+		CycleID:        1,
 		PluginRoot:     repo,
 		ShipBinaryPath: filepath.Join(repo, "ship-binary-fixture"),
 		Runner:         execRunner,

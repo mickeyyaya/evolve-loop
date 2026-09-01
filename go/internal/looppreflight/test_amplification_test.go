@@ -8,7 +8,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
-func TestAmplifyRun_HostCapabilitiesMultipleWarningsStayNonHalting(t *testing.T) {
+func TestAmplifyRun_RequiredSandboxHaltAlsoReportsDiskWarning(t *testing.T) {
 	opts := goodPipelineOptions(t)
 	opts.ProfileGetter = func(name string) (profiles.Profile, error) {
 		return profiles.Profile{Name: name, CLI: "claude-tmux", Sandbox: &profiles.SandboxConfig{Enabled: true}}, nil
@@ -22,12 +22,12 @@ func TestAmplifyRun_HostCapabilitiesMultipleWarningsStayNonHalting(t *testing.T)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
-	if r.Halted() {
-		t.Fatalf("warning-only host degradations must not halt, got %s", r.OverallLevel)
+	if !r.Halted() {
+		t.Fatalf("required sandbox failure must halt, got %s", r.OverallLevel)
 	}
 	c := findCheck(t, r, "host-capabilities")
-	if c.Level != LevelWarn {
-		t.Fatalf("combined host degradations should warn, got %s (%q)", c.Level, c.Detail)
+	if c.Level != LevelHalt {
+		t.Fatalf("sandbox failure plus disk warning should halt, got %s (%q)", c.Level, c.Detail)
 	}
 	detail := strings.ToLower(c.Detail)
 	for _, want := range []string{"sandbox", "disk"} {

@@ -106,7 +106,11 @@ func (claudePDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, e
 
 	// Workstream B: confine to worktree when this is a source-writing phase
 	// and the host can wrap (sandbox-exec / bwrap). Degrades unwrapped.
-	name, args := wrapHeadlessInvocation(deps, cfg, resolveBinary(deps, "claude"), args)
+	name, args, wrapped := wrapHeadlessInvocation(deps, cfg, resolveBinary(deps, "claude"), args)
+	if sandboxRequiredButUnavailable(deps, cfg, wrapped) {
+		fmt.Fprintln(deps.Stderr, "[claude-p] safety gate: activated Build explanation contract requires OS sandbox confinement")
+		return ExitSafetyGate, nil
+	}
 	// Publish the agent PID to a per-phase file so the auto-spawn observer's CPU
 	// liveness probe can tell a silently-thinking headless agent from a hung one
 	// (the tmux drivers use the pane probe instead, so only the headless driver

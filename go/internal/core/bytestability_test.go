@@ -48,14 +48,15 @@ var legacyCycleStateKeys = []string{
 }
 
 var additiveCycleStateKeys = []string{
-	"run_id",                        // CA.5
-	"worktree_base_sha",             // cycle-156 resume parity
-	"audit_fail_reasons",            // ADR-0072 diagnosed-downgrade signal (cycles 930-932 false-HALT fix)
-	"failed_at",                     // ADR-0072 S4 dossier non-progress counters (per-cycle history mirror)
-	"ship_fail_reasons",             // ADR-0072 ship-phase explained-failure carrier (pipeline-defect-pipeline-blocker, cycle-1329)
-	"bookkeeping_regrade_attempted", // once-per-cycle bound of the retro→audit bookkeeping regrade (2026-08-10 investigation)
-	"audit_repair_attempts",         // in-cycle audit-repair loop bound (wave-3 cycles 1572/1573/1574)
-	"audit_repair_active",           // in-repair-round flag; distinct from the monotonic counter (review MEDIUM: stale-brief leak)
+	"run_id",                            // CA.5
+	"worktree_base_sha",                 // cycle-156 resume parity
+	"audit_fail_reasons",                // ADR-0072 diagnosed-downgrade signal (cycles 930-932 false-HALT fix)
+	"failed_at",                         // ADR-0072 S4 dossier non-progress counters (per-cycle history mirror)
+	"ship_fail_reasons",                 // ADR-0072 ship-phase explained-failure carrier (pipeline-defect-pipeline-blocker, cycle-1329)
+	"bookkeeping_regrade_attempted",     // once-per-cycle bound of the retro→audit bookkeeping regrade (2026-08-10 investigation)
+	"audit_repair_attempts",             // in-cycle audit-repair loop bound (wave-3 cycles 1572/1573/1574)
+	"audit_repair_active",               // in-repair-round flag; distinct from the monotonic counter (review MEDIUM: stale-brief leak)
+	"explanation_documentation_version", // host-owned Build explanation contract activation
 }
 
 func jsonKeysOf(t *testing.T, v any) []string {

@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/phaseio"
 )
 
 // PhaseRequest/PhaseResponse must round-trip through encoding/json
@@ -20,6 +22,15 @@ func TestPhaseRequest_JSONRoundTrip(t *testing.T) {
 		GoalHash:    "abc123",
 		Context:     map[string]string{"intent": "rewrite as Go"},
 		Env:         map[string]string{"EVOLVE_PROJECT_ROOT": "/tmp/x"},
+		BuildExplanation: &phaseio.ExplanationView{
+			SchemaVersion:   1,
+			ContractVersion: 1,
+			Status:          "required",
+			Cycle:           104,
+			Reason:          "material behavior changed",
+			DocumentPath:    "docs/explain/builds/cycle-104.md",
+			DocumentSHA256:  "document-sha",
+		},
 	}
 	raw, err := json.Marshal(in)
 	if err != nil {
@@ -34,6 +45,9 @@ func TestPhaseRequest_JSONRoundTrip(t *testing.T) {
 	}
 	if out.Context["intent"] != "rewrite as Go" {
 		t.Errorf("Context lost: %+v", out.Context)
+	}
+	if out.BuildExplanation == nil || out.BuildExplanation.DocumentSHA256 != "document-sha" {
+		t.Errorf("BuildExplanation lost: %+v", out.BuildExplanation)
 	}
 }
 

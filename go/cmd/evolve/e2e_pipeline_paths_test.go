@@ -47,6 +47,14 @@ func pipelineCycle(t *testing.T, evolveBin, fakeBin, repoRoot, goalHash string, 
 		"EVOLVE_RESEARCH_HOOK_DISABLED=1",
 		"BRIDGE_TESTING=1",
 		"BRIDGE_CLAUDE_BINARY="+fakeBin,
+		// Explicit host opt-out of OS confinement, honoured (loudly) by the
+		// Build-explanation contract's sandbox gate. DELIBERATE and
+		// deterministic: these tests exercise pipeline semantics with fake
+		// CLIs, not confinement — and the runners cannot promise a working
+		// wrap (ubuntu images ship no bwrap; a nested local run is skipped by
+		// ShouldWrap by design). The gate's own three-way classification is
+		// pinned by TestSandboxGate_* in internal/bridge.
+		"EVOLVE_SANDBOX=off",
 	)
 	for _, e := range extraEnv {
 		if e == strictPolicyMarker {
@@ -66,7 +74,14 @@ func pipelineCycle(t *testing.T, evolveBin, fakeBin, repoRoot, goalHash string, 
 	)
 	cmd.Env = env
 	cmd.Dir = projRoot
-	out, err := runWithTimeout(cmd, 120*time.Second)
+	// 300s, was 120s: the Build-explanation contract added real per-cycle work
+	// (contract activation, the build handoff floor's base-bound git diffs, the
+	// audit review gate, and up to two correction re-dispatches), and an audit
+	// FAIL now takes the bounded ADR-0093 repair loop (tdd+build+audit again)
+	// before retro. A probe cycle completes in ~200-250s; 120s was tuned for
+	// the shorter pre-contract pipeline and killed every cycle mid-flight,
+	// losing the subprocess output with it.
+	out, err := runWithTimeout(cmd, 300*time.Second)
 	t.Logf("cycle run (%s) err=%v\n%s", goalHash, err, lastN(out, 1200))
 
 	return readLedger(t, projRoot)

@@ -14,13 +14,66 @@ import (
 	"testing/fstest"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/acssuite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phaseio"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
+
+const auditorExplanationExample = `## Explanation Documentation
+- Status: VERIFIED
+- Build status: required
+- Document: docs/explain/builds/cycle-42-run-42.md
+- Document SHA256: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+- Evidence: docs/explain/builds/cycle-42-run-42.md:1 accurately explains the behavior implemented at config/app.yaml:1`
+
+func TestAuditorExplanationLiteralExampleMatchesProductionReader(t *testing.T) {
+	body, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "agents", "evolve-auditor-reference.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := auditContractExample(t, string(body), "audit-explanation-review")
+	if got != auditorExplanationExample {
+		t.Fatalf("Auditor explanation example drifted\n--- got ---\n%s\n--- want ---\n%s", got, auditorExplanationExample)
+	}
+	req := core.PhaseRequest{
+		ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,
+		BuildExplanationState:           core.BuildExplanationAvailable,
+		BuildExplanation: &phaseio.ExplanationView{
+			Status: "required", DocumentPath: "docs/explain/builds/cycle-42-run-42.md",
+			DocumentSHA256: strings.Repeat("b", 64), MaterialPaths: []string{"config/app.yaml"},
+		},
+	}
+	if err := validateExplanationReview(got, req); err != nil {
+		t.Fatalf("documented Auditor example rejected by production reader: %v", err)
+	}
+}
+
+func auditContractExample(t *testing.T, body, name string) string {
+	t.Helper()
+	marker := "<!-- CONTRACT-EXAMPLE:" + name + " -->"
+	start := strings.Index(body, marker)
+	if start < 0 {
+		t.Fatalf("missing contract example marker %s", marker)
+	}
+	rest := body[start+len(marker):]
+	const fence = "```markdown\n"
+	open := strings.Index(rest, fence)
+	if open < 0 {
+		t.Fatalf("%s lacks a markdown fence", marker)
+	}
+	rest = rest[open+len(fence):]
+	close := strings.Index(rest, "\n```")
+	if close < 0 {
+		t.Fatalf("%s has no closing fence", marker)
+	}
+	return rest[:close]
+}
 
 // TestExtractHonorsPhaseContract pins audit's verdict extractor to the canonical
 // heading declared in phasecontract.Audit — the single source the producer-side
@@ -95,6 +148,174 @@ func writeACSVerdict(t *testing.T, ws string, redCount int) {
 	b, _ := json.Marshal(v)
 	if err := os.WriteFile(filepath.Join(ws, "acs-verdict.json"), b, 0o644); err != nil {
 		t.Fatalf("write verdict: %v", err)
+	}
+}
+
+func activeMissingExplanationRequest(t *testing.T) core.PhaseRequest {
+	t.Helper()
+	root := t.TempDir()
+	workspace := filepath.Join(root, ".evolve", "runs", "cycle-42")
+	if err := os.MkdirAll(workspace, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	binding := explanationdocs.CycleBinding{
+		ProjectRoot: root, Worktree: t.TempDir(), Workspace: workspace,
+		BaseSHA: strings.Repeat("a", 40), Cycle: 42, RunID: "run-42",
+		ContractVersion: explanationdocs.CurrentContractVersion,
+	}
+	if err := explanationdocs.Activate(binding); err != nil {
+		t.Fatal(err)
+	}
+	if err := explanationdocs.SealBuild(binding); err != nil {
+		t.Fatal(err)
+	}
+	return core.PhaseRequest{
+		Cycle: 42, RunID: "run-42", ProjectRoot: root, Worktree: binding.Worktree,
+		Workspace: workspace, WorktreeBaseSHA: binding.BaseSHA,
+		ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,
+	}
+}
+
+func TestBindExplanationResult_MissingRequiredHandoffBecomesEGPSRed(t *testing.T) {
+	req := activeMissingExplanationRequest(t)
+	workspace := req.Workspace
+	writeACSVerdict(t, workspace, 0)
+	if err := verifyExplanationDocumentation(req); err == nil || !strings.Contains(err.Error(), "build-explanation.json") {
+		t.Fatalf("missing explanation verification error=%v", err)
+	}
+
+	h := hooks{explanationCheck: verifyExplanationDocumentation}
+	got, _, _ := h.Classify("## Verdict\n**PASS**\n", req, core.BridgeResponse{})
+	if got != core.VerdictFAIL {
+		t.Fatalf("deterministic explanation gate must override narrative PASS, got %s", got)
+	}
+	body, err := os.ReadFile(filepath.Join(workspace, "acs-verdict.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var verdict acssuite.Verdict
+	if err := json.Unmarshal(body, &verdict); err != nil {
+		t.Fatal(err)
+	}
+	if verdict.RedCount != 0 || len(verdict.Results) != 0 {
+		t.Fatalf("native host check was mislabeled as an ACS predicate: %+v", verdict)
+	}
+}
+
+func TestClassify_RequiresAuditorExplanationDocumentationReview(t *testing.T) {
+	workspace := t.TempDir()
+	writeACSVerdict(t, workspace, 0)
+	view := &core.PhaseRequest{
+		Workspace:                       workspace,
+		ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,
+		BuildExplanationState:           core.BuildExplanationAvailable,
+		BuildExplanation: &phaseio.ExplanationView{
+			Status: "required", Reason: "material behavior changed",
+			DocumentPath: "docs/explain/builds/cycle-42.md", DocumentSHA256: "document-sha",
+			MaterialPaths: []string{"go/internal/example/example.go"},
+		},
+	}
+	h := hooks{}
+	if got, _, _ := h.Classify("## Verdict\n**PASS**\n", *view, core.BridgeResponse{}); got != core.VerdictFAIL {
+		t.Fatalf("missing qualitative explanation review verdict=%s, want FAIL", got)
+	}
+	report := `## Explanation Documentation
+- Status: VERIFIED
+- Build status: required
+- Build reason: material behavior changed
+- Document: docs/explain/builds/cycle-42.md
+- Document SHA256: document-sha
+- Evidence: compared docs/explain/builds/cycle-42.md:1 with go/internal/example/example.go:12 in the base-bound diff
+
+## Verdict
+**PASS**
+`
+	if got, diags, _ := h.Classify(report, *view, core.BridgeResponse{}); got != core.VerdictPASS {
+		t.Fatalf("complete qualitative explanation review verdict=%s diags=%v", got, diags)
+	}
+}
+
+func TestValidateExplanationReview_RejectsTokenEvidenceAndAcceptsNegativeJudgment(t *testing.T) {
+	req := core.PhaseRequest{
+		ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,
+		BuildExplanationState:           core.BuildExplanationAvailable,
+		BuildExplanation: &phaseio.ExplanationView{
+			Status: "required", DocumentPath: "docs/explain/builds/cycle-42.md",
+			DocumentSHA256: "sha", MaterialPaths: []string{"go/app.go"},
+		},
+	}
+	weak := `## Explanation Documentation
+- Status: VERIFIED
+- Build status: required
+- Document: docs/explain/builds/cycle-42.md
+- Document SHA256: sha
+- Evidence: x
+`
+	if err := validateExplanationReview(weak, req); err == nil || !strings.Contains(err.Error(), "concrete") {
+		t.Fatalf("token evidence was accepted: %v", err)
+	}
+	negative := `## Explanation Documentation
+- Status: NEEDS_CORRECTION
+- Build status: required
+- Document: docs/explain/builds/cycle-42.md
+- Document SHA256: sha
+- Evidence: docs/explain/builds/cycle-42.md:1 misstates the branch behavior implemented at go/app.go:19
+`
+	if err := validateExplanationReview(negative, req); err == nil || !strings.Contains(err.Error(), "NEEDS_CORRECTION") || strings.Contains(err.Error(), "Status must") {
+		t.Fatalf("well-formed negative judgment was not preserved: %v", err)
+	}
+}
+
+func TestValidateExplanationReview_RequiresPathLineEvidenceForEveryReference(t *testing.T) {
+	req := core.PhaseRequest{
+		ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,
+		BuildExplanationState:           core.BuildExplanationAvailable,
+		BuildExplanation: &phaseio.ExplanationView{
+			Status: "required", DocumentPath: "docs/explain/builds/cycle-42.md",
+			DocumentSHA256: "sha", MaterialPaths: []string{"go/app.go"},
+		},
+	}
+	report := `## Explanation Documentation
+- Status: VERIFIED
+- Build status: required
+- Document: docs/explain/builds/cycle-42.md
+- Document SHA256: sha
+- Evidence: reviewed docs/explain/builds/cycle-42.md and go/app.go against the implementation
+`
+	if err := validateExplanationReview(report, req); err == nil || !strings.Contains(err.Error(), "path:line") {
+		t.Fatalf("path-only evidence was accepted: %v", err)
+	}
+}
+
+func TestValidateExplanationReview_NotApplicableRejectsDocumentClaims(t *testing.T) {
+	req := core.PhaseRequest{
+		ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,
+		BuildExplanationState:           core.BuildExplanationAvailable,
+		BuildExplanation:                &phaseio.ExplanationView{Status: "not_applicable", Reason: "tests only"},
+	}
+	report := `## Explanation Documentation
+- Status: VERIFIED
+- Build status: not_applicable
+- Document: docs/explain/builds/forged.md
+- Document SHA256: forged
+- Evidence: verified the base-bound diff contains no material changes
+`
+	if err := validateExplanationReview(report, req); err == nil || !strings.Contains(err.Error(), "must omit") {
+		t.Fatalf("N/A review accepted forged document fields: %v", err)
+	}
+}
+
+func TestValidateExplanationReview_InvalidPostBuildStateRequiresFail(t *testing.T) {
+	req := core.PhaseRequest{
+		ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,
+		BuildExplanationState:           core.BuildExplanationInvalid,
+	}
+	report := `## Explanation Documentation
+- Status: VERIFIED
+- Evidence: the host snapshot is missing
+`
+	if err := validateExplanationReview(report, req); err == nil || !strings.Contains(err.Error(), "Status: FAIL") {
+		t.Fatalf("invalid handoff was not failed: %v", err)
 	}
 }
 

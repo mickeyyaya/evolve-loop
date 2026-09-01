@@ -21,6 +21,9 @@ import "context"
 // resolved git-evidence challenge token (when CommitEvidence >= Shadow), so
 // reviewers don't have to re-discover any of these.
 type ReviewInput struct {
+	Cycle                           int
+	RunID                           string
+	ExplanationDocumentationVersion int
 	// WorktreeBaseSHA is the cycle's worktree base commit (CycleState
 	// .WorktreeBaseSHA) — deterministic reviewers diff against IT, not HEAD,
 	// because a committing builder (the mandated protocol) makes `git diff
@@ -97,6 +100,38 @@ type ReviewResult struct {
 // replace the default.
 type DeliverableReviewer interface {
 	Review(ctx context.Context, in ReviewInput) ReviewResult
+}
+
+// mandatoryExplanationReviewer keeps the versioned Build explanation floor in
+// core, around every optional reviewer: deterministic validation runs first and
+// the host snapshot is sealed only after all optional gates approve.
+type mandatoryExplanationReviewer struct {
+	next DeliverableReviewer
+}
+
+func withMandatoryExplanationReviewer(next DeliverableReviewer) DeliverableReviewer {
+	if next == nil {
+		next = noopReviewer{}
+	}
+	return mandatoryExplanationReviewer{next: next}
+}
+
+func (r mandatoryExplanationReviewer) Review(ctx context.Context, in ReviewInput) ReviewResult {
+	if in.Phase != string(PhaseBuild) || in.ExplanationDocumentationVersion == 0 {
+		return r.next.Review(ctx, in)
+	}
+	if floor := NewBuildExplanationReviewer().Review(ctx, in); !floor.Approve {
+		return floor
+	}
+	optional := r.next.Review(ctx, in)
+	if !optional.Approve {
+		return optional
+	}
+	sealed := NewExplanationLifecycleReviewer().Review(ctx, in)
+	if !sealed.Approve {
+		return carryDemotion(sealed, optional)
+	}
+	return optional
 }
 
 // ContractVerification is a breaker-neutral well-formedness verdict for one
@@ -177,10 +212,8 @@ func carryDemotion(decision, seen ReviewResult) ReviewResult {
 	return decision
 }
 
-// noopReviewer is the orchestrator's default when WithReviewer was not used:
-// every phase is approved unconditionally, exactly reproducing the pre-E2
-// cycle. Kept here (not in a separate file) so the contract — "nil reviewer
-// implies this exact behavior" — lives next to the interface that defines it.
+// noopReviewer is the optional-reviewer default. The core-owned explanation
+// wrapper still runs around it for versioned, non-degraded Build handoffs.
 type noopReviewer struct{}
 
 // Review implements DeliverableReviewer with a permissive default.

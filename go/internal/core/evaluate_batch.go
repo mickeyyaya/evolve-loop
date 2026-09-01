@@ -57,19 +57,22 @@ func evaluateBatch(plan []string, archetypeOf func(string) string) []string {
 // the concurrent run so the (artifact-writing) PhaseIO assemble never races.
 func (cr *cycleRun) phaseRequestFor(phase Phase) PhaseRequest {
 	req := PhaseRequest{
-		Cycle:              cr.cycle,
-		ProjectRoot:        cr.req.ProjectRoot,
-		Workspace:          cr.cs.WorkspacePath,
-		Worktree:           cr.cs.ActiveWorktree,
-		RunID:              cr.cs.RunID,
-		GoalHash:           cr.req.GoalHash,
-		PreviousPhase:      string(cr.current),
-		Env:                cr.envSnap,
-		Context:            cr.ctxSnap,
-		BypassPolicy:       cr.req.BypassPolicy,
-		OperatorDirectives: cr.directivesSet.Merged,
+		Cycle:                           cr.cycle,
+		ProjectRoot:                     cr.req.ProjectRoot,
+		Workspace:                       cr.cs.WorkspacePath,
+		Worktree:                        cr.cs.ActiveWorktree,
+		WorktreeBaseSHA:                 cr.cs.WorktreeBaseSHA,
+		ExplanationDocumentationVersion: cr.cs.ExplanationDocumentationVersion,
+		RunID:                           cr.cs.RunID,
+		GoalHash:                        cr.req.GoalHash,
+		PreviousPhase:                   string(cr.current),
+		Env:                             cr.envSnap,
+		Context:                         cr.ctxSnap,
+		BypassPolicy:                    cr.req.BypassPolicy,
+		OperatorDirectives:              cr.directivesSet.Merged,
 	}
 	req.BuildPlan = readUpstreamBuildPlan(cr.o.cfg.PhaseIO, phase, cr.workflowConfig.PhaseEnables, cr.cs.WorkspacePath)
+	projectBuildExplanation(cr.req.ProjectRoot, cr.cs).apply(&req)
 	if cr.o.cfg.PhaseIO >= config.StageShadow {
 		req.Input = cr.assemblePhaseIO(phase, cr.cs.ActiveWorktree, cr.ctxSnap)
 	}

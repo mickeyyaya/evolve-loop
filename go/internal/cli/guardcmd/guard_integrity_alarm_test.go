@@ -75,7 +75,7 @@ func TestRunGuard_RoleNormalSourceEdit_NoAlarm(t *testing.T) {
 	worktree := filepath.Join(dir, "wt", "cycle-20")
 	writeBuildCycleState(t, evolveDir, worktree)
 
-	src := filepath.Join(worktree, "go/internal/core/orchestrator.go")
+	src := filepath.Join(worktree, "go/internal/widget/widget.go")
 	input := `{"tool_name":"Edit","tool_input":{"file_path":"` + src + `"}}`
 	var stdout, stderr bytes.Buffer
 	rc := RunGuard([]string{"--evolve-dir", evolveDir, "role"}, strings.NewReader(input), &stdout, &stderr)
