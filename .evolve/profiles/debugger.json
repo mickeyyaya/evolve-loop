@@ -45,5 +45,5 @@
   },
   "generated_from": "hand-authored",
   "_note": "Added 2026-06-10 after cycle-270: the ship-error recovery route dispatched the debugger, but the bridge hard-requires the profile file at launch (launch.go LoadProfile -> ExitBadFlags 10) while the runner tolerates a missing profile at CLI-resolution time (source=default) -- so the recovery path had never successfully launched. Decision-only role: diagnoses the ShipError envelope and emits debug-decision.json (RESHIP | RERUN_PHASE | BLOCK); it never edits the repo, so Edit/Write are disallowed and the decision file is written via shell into the run workspace. Opus per persona frontmatter (recovery diagnosis is the high-stakes tier, matching the forced-Opus recovery-audit convention). No cli_fallback: claude is the universal-fallback family and a precision diagnosis must not silently hop families.",
-  "effort_level": "max"
+  "effort_level": "high"
 }

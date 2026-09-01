@@ -1,7 +1,7 @@
 package profiles
 
 // deep_tier_family_arrangement_test.go — the 2026-08-26 operator directive:
-// deep/top-tier task types run on codex (gpt-5.6-sol at max), EXCEPT the two
+// deep/top-tier task types run on codex (gpt-5.6-sol at the directed rung — high since 2026-09-01; effort is pinned by effort_defaults_test.go, not here), EXCEPT the two
 // adversarial checks whose independence from the codex builder is the
 // pipeline's anti-gaming core (cross-family floor: builder=codex ⇒ its graders
 // are another family) and the advisor brain. Pins the WHOLE arrangement so a
