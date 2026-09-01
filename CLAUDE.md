@@ -19,6 +19,7 @@ When reporting on a batch or pipeline run, always include: cycles run, ships/lan
 - **Confirm direction first**: multi-step/multi-cycle work needs a 3-bullet plan + approval. Single-cycle bug fixes, file-path-specified tasks, and approved-plan tasks are exempt.
 - **Output discipline**: summaries with `file:line` refs; >300-line findings go to a markdown file, not chat.
 - **Long-running jobs**: verify health after launch (exit codes, log tail); checkpoint every cycle so `--resume` works; surface failures immediately.
+- **Pre-commit review fleet**: change → code-simplifier → (**architecture-reviewer ∥ code-reviewer**, parallel, both read-only) → address findings → commit. architecture-reviewer ([.claude/agents/architecture-reviewer.md](.claude/agents/architecture-reviewer.md)) is blocking: any CRITICAL finding per the profile's rubric must be fixed before commit. Pure-docs diffs may skip the fleet.
 
 ## Autonomous execution (bypass mode)
 
