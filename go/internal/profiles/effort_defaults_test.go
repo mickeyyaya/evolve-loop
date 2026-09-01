@@ -38,18 +38,17 @@ func effortProfilesDir(t *testing.T) string {
 // basename each phase resolves to.
 func TestEffortDefaults_Matrix(t *testing.T) {
 	loader := NewFromDir(effortProfilesDir(t))
-	// 2026-08-28 operator directive supersedes the 2026-08-24 xhigh rung for
-	// the CODEX-routed deep/top phases: they run at max, the rung above xhigh
-	// that codex 0.147.0 exposes via /model -> "More reasoning..." -> Max
-	// (verified live: `-c model_reasoning_effort=max` renders "gpt-5.6-sol max"
-	// in the status bar, and holds through /plan with the paired plan-mode key).
-	//
-	// The two CLAUDE-routed deep/top graders deliberately STAY at xhigh:
-	// Anthropic's own Opus guidance (docs/research/fable-simulation-2026/
-	// model-profiles.md) recommends xhigh for coding/agentic work and warns max
-	// "can be prone to overthinking". Different family, different ceiling — the
-	// abstract effort dial is realized per family, so this split is by design,
-	// not drift. The fast/balanced rows keep the cycle-566 cost matrix.
+	// 2026-09-01 operator directive: the CODEX-routed deep/top phases
+	// (gpt-5.6-sol) run at HIGH — superseding 2026-08-28's max rung (which
+	// had superseded 2026-08-24's xhigh). Max is codex's most quota-hungry
+	// rung ("Max and Ultra consume usage limits faster"); the operator traded
+	// one rung of reasoning for quota headroom. Note the deliberate inversion
+	// this creates: the CLAUDE-routed deep/top graders stay at xhigh (above
+	// codex's high) — Anthropic's Opus guidance (docs/research/
+	// fable-simulation-2026/model-profiles.md) recommends xhigh for agentic
+	// work, and the graders are the adversarial quality floor. The abstract
+	// effort dial is realized per family; the split is by design, not drift.
+	// The fast/balanced rows keep the cycle-566 cost matrix.
 	want := map[string]string{
 		"scout":              "low",
 		"triage":             "low",
@@ -57,9 +56,9 @@ func TestEffortDefaults_Matrix(t *testing.T) {
 		"builder":            "medium",
 		"auditor":            "xhigh",
 		"adversarial-review": "xhigh",
-		"retrospective":      maxEffortRung,
-		"premise-challenge":  maxEffortRung,
-		"intent":             maxEffortRung,
+		"retrospective":      codexDeepTopRung,
+		"premise-challenge":  codexDeepTopRung,
+		"intent":             codexDeepTopRung,
 	}
 	for profile, effort := range want {
 		p, err := loader.Get(profile)
@@ -72,11 +71,16 @@ func TestEffortDefaults_Matrix(t *testing.T) {
 	}
 }
 
-// maxEffortRung is the single source for the top reasoning rung, read by all
-// THREE guards in this file: the per-phase matrix pin, the codex deep/top class
-// guard, and the CLI-agnostic converse guard. Named for the rung rather than
-// for codex — the converse guard polices every family, so a codex-specific
-// name would mislead the next reader deciding whether it is safe to reuse.
+// codexDeepTopRung is the single source for the codex deep/top effort rung —
+// the one edit a directive change requires (proven: 2026-08-28 max, 2026-09-01
+// high). Read by the matrix pin's codex rows and the class guard.
+const codexDeepTopRung = "high"
+
+// maxEffortRung names the literal top rung for the CLI-agnostic converse
+// guard: "max" is the most expensive rung on every family that exposes it,
+// and it may only ever appear on a deep/top profile. Since 2026-09-01 nothing
+// runs at max (codex deep/top moved to high), so the converse polices a
+// currently-empty set — kept armed for any future adoption.
 const maxEffortRung = "max"
 
 // CLASS GUARD for the 2026-08-28 directive. The original change swept the 21
@@ -107,7 +111,7 @@ const maxEffortRung = "max"
 // a stale PASS after a profile-only edit — reproduced: cached "ok" while the
 // regression was live on disk. CI and `make test` already pass -count=1; the
 // exposure is local verification.
-func TestCodexDeepTierProfilesAllRunAtMax(t *testing.T) {
+func TestCodexDeepTierProfilesAllRunAtDirectedRung(t *testing.T) {
 	// Through RealTreeProfiles, NOT a raw directory scan. The runtime mints
 	// UNTRACKED profile stubs into .evolve/profiles; a scanner that binds
 	// everything on disk reds on state that can never reach a CI checkout
@@ -134,9 +138,9 @@ func TestCodexDeepTierProfilesAllRunAtMax(t *testing.T) {
 			continue
 		}
 		checked++
-		if p.EffortLevel != maxEffortRung {
-			t.Errorf("profile %s: codex %s-tier effort_level = %q, want %q (2026-08-28 operator directive). A codex deep/top phase left at a lower rung runs quieter than its siblings with nothing reporting it.",
-				name, p.ModelTierDefault, p.EffortLevel, maxEffortRung)
+		if p.EffortLevel != codexDeepTopRung {
+			t.Errorf("profile %s: codex %s-tier effort_level = %q, want %q (2026-09-01 operator directive). A codex deep/top phase off the directed rung runs differently than its siblings with nothing reporting it.",
+				name, p.ModelTierDefault, p.EffortLevel, codexDeepTopRung)
 		}
 	}
 	if checked == 0 {
@@ -144,7 +148,7 @@ func TestCodexDeepTierProfilesAllRunAtMax(t *testing.T) {
 	}
 }
 
-// The CONVERSE of TestCodexDeepTierProfilesAllRunAtMax, per the 2026-08-29
+// The CONVERSE of the class guard above (placement law), per the 2026-08-29
 // operator directive: "the max thinking level should only apply to deep/top
 // model". Together the two make it a biconditional for codex — deep/top ⟺ max —
 // and this half alone constrains EVERY family, so `max` can never drift onto a
@@ -197,6 +201,13 @@ func TestMaxEffortOnlyOnDeepOrTopProfiles(t *testing.T) {
 		}
 	}
 	if checked == 0 {
-		t.Fatalf("matched NO tracked profiles at effort %q — the selector is broken and this guard is vacuous", maxEffortRung)
+		// Since 2026-09-01 this is the EXPECTED state: codex deep/top moved to
+		// high, so no tracked profile carries max. The guard stays armed for
+		// any future max adoption. Decode-health delegation, precisely: the
+		// sibling class guard's per-profile comparison reads the same
+		// EffortLevel field through the same loader and fails loudly (Errorf)
+		// on a decode regression; its zero-match Fatal is a separate
+		// CLI/tier-selector check, not an EffortLevel guard.
+		t.Logf("no tracked profile at effort %q — expected since the 2026-09-01 directive; placement law armed for future adoption", maxEffortRung)
 	}
 }

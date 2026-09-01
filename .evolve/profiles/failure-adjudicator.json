@@ -74,5 +74,5 @@
   "cli_fallback": [
     "claude-tmux"
   ],
-  "effort_level": "max"
+  "effort_level": "high"
 }

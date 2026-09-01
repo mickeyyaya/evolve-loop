@@ -2,9 +2,13 @@ package bridge
 
 // effort_toprungs_test.go — the top of the reasoning ladder, pinned per family.
 //
-// 2026-08-24 put deep/top phases at xhigh; 2026-08-28 moves the CODEX-routed
-// ones to max, the rung above it. Both rungs are pinned here because both are
-// live: codex deep/top at max, the claude graders deliberately still at xhigh.
+// Directive history: 2026-08-24 put deep/top phases at xhigh; 2026-08-28
+// moved the CODEX-routed ones to max; 2026-09-01 moved them to high (quota
+// headroom). This file pins REALIZABILITY of the upper rungs regardless of
+// which one the current directive selects — the max/xhigh rows below stay
+// because the manifest must keep every mapped rung realizable (a directive
+// can flip back with one profile edit); WHICH rung profiles actually pin
+// lives in profiles/effort_defaults_test.go, not here.
 //
 // Two contracts: (1) each rung REALIZES on the families with an effort dial —
 // realizeScalar silently drops unmapped enum values, so a missing codex
