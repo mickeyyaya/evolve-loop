@@ -1,0 +1,41 @@
+{
+  "cycle": 1597,
+  "run_id": "01M1CTDT8AC0W5J3Y36CB6GSKK",
+  "goal": "Fix evolve-loop pipeline defects that stop cycles from shipping. Prioritise pipeline-integrity items already queued in .evolve/inbox and carryoverTodos: verdict/disposition routing, gate correctness, and any guard that binds runtime-minted state. Each cycle must land one shippable, tested fix.",
+  "final_verdict": "FAIL",
+  "phases": [
+    {
+      "name": "cycle-recorded",
+      "verdict": "FAIL",
+      "key_findings": "cycle completed; ledger walk deferred to future slice",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "failure": {
+    "fingerprint": "audit|verdict-fail|4f74e9ecfc68",
+    "pre_class": "verdict-fail",
+    "reasons": [
+      "phase audit verdict FAIL routed to retro (agent-graded; see the audit report artifact) defect=H1: forcing n=1 disables the entire N\u003e1 sampling feature and both the triage suite and all 5 cycle-N ACS p"
+    ]
+  },
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 1597",
+      "priority": "high"
+    }
+  ]
+}

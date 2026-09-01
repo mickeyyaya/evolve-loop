@@ -1,0 +1,17 @@
+{
+  "connects_to": [
+    "go/internal/core/phase_bindings_fail_verdict_test.go",
+    "go/internal/core/phase_bindings.go",
+    ".evolve/evals/gitignore-staging-sweep.md"
+  ],
+  "created_at": "2026-09-01T00:00:00Z",
+  "fix": "Make the lane's in-cycle test gate run (or at minimum compile) the `-tags integration` test tier for every package whose production code the lane touched, so a semantics change cannot ship green while redding integration-tagged pins that only CI executes. Acceptance: a lane change to go/internal/core that reds an integration-tagged test in the same package must FAIL the lane's own gate before ship. Consider `go vet -tags integration` + `go test -run xxx -tags integration -count=1 ./<touched pkgs>` compile-only floor if full execution is too slow.",
+  "id": "lane-gate-misses-integration-tags",
+  "kind": "pipeline-repair",
+  "notes": "Class observed live 2026-09-01: cycle-1594's ship 20e839ee changed worktreeContentSHA (git add -A -> add -u, declared-content contract) with 5 new unit pins, but the integration-tagged pins in phase_bindings_fail_verdict_test.go were never run by the lane; main CI went red on both platforms (TestEmitPhaseBindings_AuditWARN_CachePut_Control) and PR #518 inherited the red. Second inherited-main-red burn. Console fixed the stale tests forward (tracked-modification delta); the GATE gap is this item.",
+  "priority": "P1",
+  "root_cause": "The lane test gate runs the default (untagged) test tier only; integration-tagged tests in touched packages are invisible to it, so audit+gates pass on a change that reds main CI.",
+  "summary": "Lane gate blind spot: integration-tagged tests in touched packages are not run in-lane, so lanes can ship changes that red main CI only (live burn: 20e839ee / cycle-1594).",
+  "title": "Lane test gate must cover -tags integration for touched packages (cycle-1594 shipped a main-red)",
+  "weight": 0.9
+}
