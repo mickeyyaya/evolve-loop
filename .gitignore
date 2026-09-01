@@ -200,3 +200,26 @@ go/acs/**/evolve
 .evolve/profiles/defect-disposition-preflight.json
 .evolve/profiles/disposition-preflight.json
 .evolve/profiles/inherited-defect-reconcile.json
+
+# Coverage artifacts the ACS predicate suite writes into go/ — e.g.
+# go/acs/cycle476/predicates_test.go runs `go test -coverprofile=coverage.core476.txt`
+# then `go tool cover -func=... > coverage.core476.func.txt`. Regenerated on every
+# `-tags acs` run; an evolve-cycle broad stage committed 10 of them (918da262). The
+# cover.out / coverage.out / *.coverprofile rules above do not match the per-cycle
+# names, which is exactly how these walked past them.
+coverage.*.txt
+
+# Agent-workspace runtime records that leak to the REPO ROOT whenever the resolved
+# workspace IS the project root (console run, nested sandbox, a lane whose worktree
+# is the project dir). Each is written workspace-relative by production code —
+# sessionrecord.FileName, bridge/tmux_inject.go, cmd_models_live.go — and each was
+# committed that way (20 tracked artifacts found 2026-08-27, oldest from cycle-104).
+# Root-anchored where the class only leaks at the root, so genuine nested content
+# (go/internal/logfilter/testdata/streamjson-input.log) is untouched.
+# Enforced for ALREADY-tracked files by phasecoherence/tracked_artifact_hygiene_test.go
+# — an ignore rule governs new births only, and every file below predated its rule.
+/*.log
+/tmux-sessions.jsonl
+/model-classifier-*
+/lint-baseline.txt
+.bridge-inbox/
