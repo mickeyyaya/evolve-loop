@@ -74,6 +74,7 @@ bash 3.2 target. Banned: `declare -A`, `mapfile`, `${var^^}`, `sed -i ''`, `date
 
 ## References
 
+- [docs/operations/workspace-layout.md](docs/operations/workspace-layout.md) — hub layout: .repo.git bare store + console/runtime planes + dev/ worktrees (since 2026-09-01)
 - [docs/operations/runtime-reference.md](docs/operations/runtime-reference.md) — env-var table, operator commands, ship classes, publishing
 - [docs/architecture/](docs/architecture/) — design docs; [control-flags.md](docs/architecture/control-flags.md) — all `EVOLVE_*` flags
 - [CHANGELOG.md](CHANGELOG.md) · [release-notes/](docs/operations/release-notes/index.md)
