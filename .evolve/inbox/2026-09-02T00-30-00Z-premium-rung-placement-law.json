@@ -1,0 +1,10 @@
+{
+  "id": "premium-rung-placement-law-and-narrative-dedup",
+  "kind": "pipeline-repair",
+  "priority": "P2",
+  "weight": 0.8,
+  "title": "Widen the effort placement law to {max, ultra} (ultra is mapped, above max, unguarded) + de-duplicate the rung narrative",
+  "body": "Retro architecture review of #526 (2026-09-02, Warning: 2 HIGH / 2 MEDIUM / 1 LOW). HIGH-1: codex manifest maps 'ultra' ABOVE max; a balanced profile at effort_level=ultra passes realizability, the deep/top class guard, AND the converse guard (which matches only the literal 'max') while raising spend on the cheapest phase — the guard's own stated failure mode, one rung up. Fix: premiumEffortRungs = {max, ultra} (or derive top-N from the manifest) and iterate. HIGH-2: the current rung is restated in five prose homes — loop_unblock_contract_test.go:53 is ALREADY STALE ('gpt-5.6-sol at max') and effort_defaults_test.go:153 still claims the 'deep/top <=> max' biconditional; satellites must point at the guard, never restate the value. MEDIUM: extract violatesPremiumPlacement(p) as a table-tested Specification (the corpus is empty, so the law's assertions currently never execute); de-changelog runtime-reference.md:119 (current state only, history to CHANGELOG/ADR). LOW: 180-col comment line in deep_tier_family_arrangement_test.go:4.",
+  "created": "2026-09-02T00:30:00Z",
+  "source": "console-retro-architecture-review-526"
+}

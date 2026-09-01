@@ -13,5 +13,7 @@
   "root_cause": "The lane test gate runs the default (untagged) test tier only; integration-tagged tests in touched packages are invisible to it, so audit+gates pass on a change that reds main CI.",
   "summary": "Lane gate blind spot: integration-tagged tests in touched packages are not run in-lane, so lanes can ship changes that red main CI only (live burn: 20e839ee / cycle-1594).",
   "title": "Lane test gate must cover -tags integration for touched packages (cycle-1594 shipped a main-red)",
-  "weight": 0.9
+  "weight": 0.9,
+  "resolution": "RESOLVED 2026-09-01 console-first as PR #523 (integration-tier fossil exclusions removed; record-table SSOT + rule test + deadline semantics). Consumed late \u2014 the fix landed hours before this consumption and one lane re-picked the item in wave-20260901b; its audit will adjudicate the redundant work.",
+  "consumed": "2026-09-01T15:20:00Z"
 }

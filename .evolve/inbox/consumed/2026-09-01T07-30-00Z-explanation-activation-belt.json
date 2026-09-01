@@ -1,0 +1,12 @@
+{
+  "id": "explanation-activation-belt-single-source",
+  "kind": "pipeline-repair",
+  "priority": "P1",
+  "weight": 0.85,
+  "title": "Single-source the explanation-activation cross-check; audit gate lacks ship's belt",
+  "body": "Architecture review 2026-09-01 (HIGH, PR #518): explanationdocs.CycleBinding is hand-assembled at 4 sites from 4 carriers (core.CycleState, core.ReviewInput, ship.Options, audit.PhaseRequest); ContractVersion==0 encodes BOTH 'legacy cycle' and 'caller dropped the field'. Ship has an explicit belt (native_explanation_gate.go:54-69 cross-checks typed identity vs host activation marker); audit has none \u2014 version 0 in => active=false => return nil, silently disabling the gate. Fix the CLASS: extract ONE exported activation cross-check into explanationdocs (single home) called by BOTH ship and audit; or constructors returning Active(version)/Legacy() (Null Object) so exemption is constructed deliberately. Do not copy ship's belt into audit (that duplicates the belief).",
+  "created": "2026-09-01T07:30:00Z",
+  "source": "console-architecture-review",
+  "resolution": "RESOLVED 2026-09-01 console-first as PR #524 (CrossCheckActivation single home; audit silent no-op closed). Residue tracked separately as explanation-identity-belief-remaining-copies.",
+  "consumed": "2026-09-01T15:20:00Z"
+}
