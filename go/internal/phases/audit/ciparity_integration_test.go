@@ -64,7 +64,7 @@ func TestIntegrationTierCheckDefault_NoOpWithoutGoModule(t *testing.T) {
 // AC3.3 (membership / anti-drift pin) — NewDefault must WIRE the real
 // integration-tier gate (cycle-147 dormant-seam lesson), and that gate must
 // actually build the test binary under `-tags integration`. Proof that does NOT
-// couple to the exact -run pattern: a fixture cmd/tool package (deliberately NOT env-exclusive — see integrationTierEnvExclusive) with an
+// couple to the exact -run pattern: a fixture cmd/tool package (not env-exclusive — membership is the record table integrationTierEnvExclusive, the single authority) with an
 // integration-tagged test file that FAILS TO COMPILE only under that tag. Under
 // `-tags integration` the whole test binary fails to build → non-zero exit →
 // offenders, regardless of any -run filter (go compiles the binary before -run

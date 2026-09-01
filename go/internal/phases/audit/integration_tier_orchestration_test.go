@@ -27,6 +27,7 @@ import (
 	"errors"
 	"io"
 	"testing"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
@@ -128,5 +129,64 @@ func TestAuditOrchestration_IntegrationTier_RetakeInfraFailure_FallsBackNotLaund
 	}
 	if calls != 2 {
 		t.Fatalf("want exactly 2 attempts (first + failed retake), got %d", calls)
+	}
+}
+
+// TestAuditOrchestration_IntegrationTier_DeadlineKill_MarkerFreeDegradesToWarn —
+// a retake killed by its budget with NO recognizable verdict in the truncated
+// output is not a judgment: it must degrade to the fail-open WARN, never a
+// red-twice FAIL (2026-09-01: the re-widened tier scope makes the deadline a
+// live path, and integrationTierTimeout became a var to make this testable —
+// the same rationale as apicoverTimeout).
+func TestAuditOrchestration_IntegrationTier_DeadlineKill_MarkerFreeDegradesToWarn(t *testing.T) {
+	req := tierFixture(t)
+	oldBudget := integrationTierTimeout
+	integrationTierTimeout = time.Nanosecond
+	t.Cleanup(func() { integrationTierTimeout = oldBudget })
+	fn, calls, _ := seqRunFunc(t, []struct {
+		Code int
+		Out  string
+	}{{1, "--- FAIL: TestSlowRed (0.00s)\nFAIL\tpkg\t1.0s\n"}, {-1, "partial toolchain chatter, no verdict lines\nsignal: killed\n"}})
+	withFakeRunner(t, fn)
+
+	verdict, diags := classifyThroughProductionIntegrationTierGate(t, req)
+
+	if verdict != core.VerdictPASS {
+		t.Fatalf("a marker-free deadline kill must degrade to WARN, not fail the verdict; got %q, diags=%v", verdict, diags)
+	}
+	if !hasDiagContaining(diags, "budget") {
+		t.Errorf("the WARN must name the budget so the operator can raise it; diags=%v", diags)
+	}
+	if *calls != 2 {
+		t.Fatalf("want 2 attempts, got %d", *calls)
+	}
+}
+
+// TestAuditOrchestration_IntegrationTier_DeadlineKill_FlushedOffendersStillFail —
+// go test flushes each completed package's verdict before the SIGKILL, so a
+// deadline-killed retake can carry REAL offenders; evidence outranks the
+// budget and those offenders must reach the FAIL verdict, not be laundered
+// into the WARN path.
+func TestAuditOrchestration_IntegrationTier_DeadlineKill_FlushedOffendersStillFail(t *testing.T) {
+	req := tierFixture(t)
+	oldBudget := integrationTierTimeout
+	integrationTierTimeout = time.Nanosecond
+	t.Cleanup(func() { integrationTierTimeout = oldBudget })
+	fn, calls, _ := seqRunFunc(t, []struct {
+		Code int
+		Out  string
+	}{{1, "--- FAIL: TestSlowRed (0.00s)\n"}, {-1, "--- FAIL: TestTruncatedButJudged (0.02s)\nFAIL\tpkg\t3.0s\nsignal: killed\n"}})
+	withFakeRunner(t, fn)
+
+	verdict, diags := classifyThroughProductionIntegrationTierGate(t, req)
+
+	if verdict != core.VerdictFAIL {
+		t.Fatalf("flushed offenders in a deadline-killed retake are real verdicts and must FAIL; got %q, diags=%v", verdict, diags)
+	}
+	if !hasDiagContaining(diags, "TestTruncatedButJudged") {
+		t.Errorf("the FAIL must name the flushed offender; diags=%v", diags)
+	}
+	if *calls != 2 {
+		t.Fatalf("want 2 attempts, got %d", *calls)
 	}
 }
