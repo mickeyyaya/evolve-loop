@@ -9,9 +9,14 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/reportdoc"
 )
 
+// validateExplanationReview applies retro's policy around the shared review
+// contract (explanationdocs.ValidateReviewedHandoff): an invalid or missing
+// handoff must be reviewed as NEEDS_CORRECTION with a concrete correction
+// todo, and NEEDS_CORRECTION is accepted when carryover-todos.json backs it.
 func validateExplanationReview(report string, req core.PhaseRequest) error {
 	if req.ExplanationDocumentationVersion == 0 {
 		return nil
@@ -36,31 +41,14 @@ func validateExplanationReview(report string, req core.PhaseRequest) error {
 	if strings.TrimSpace(fields["correction todo"]) == "" {
 		return fmt.Errorf("explanation documentation review requires a Correction todo")
 	}
-	status := fields["status"]
-	if status != "VERIFIED" && status != "NEEDS_CORRECTION" {
-		return fmt.Errorf("explanation documentation review Status must be VERIFIED or NEEDS_CORRECTION")
-	}
 	if req.BuildExplanationState == core.BuildExplanationInvalid || req.BuildExplanation == nil {
-		if status != "NEEDS_CORRECTION" || strings.EqualFold(fields["correction todo"], "none") {
+		if fields["status"] != "NEEDS_CORRECTION" || strings.EqualFold(fields["correction todo"], "none") {
 			return fmt.Errorf("missing Build explanation requires NEEDS_CORRECTION and a concrete Correction todo")
 		}
 		return requireCorrectionTodo(req.Workspace, fields["correction todo"])
 	}
-	if fields["build status"] != req.BuildExplanation.Status {
-		return fmt.Errorf("explanation documentation review build status does not match the host handoff")
-	}
-	switch req.BuildExplanation.Status {
-	case "required":
-		if fields["document"] != req.BuildExplanation.DocumentPath || fields["document sha256"] != req.BuildExplanation.DocumentSHA256 {
-			return fmt.Errorf("explanation documentation review document does not match the host handoff")
-		}
-	case "not_applicable":
-		if fields["document"] != "" || fields["document sha256"] != "" {
-			return fmt.Errorf("not-applicable Explanation Documentation Review must omit Document and Document SHA256")
-		}
-	}
-	references := append([]string{req.BuildExplanation.DocumentPath}, req.BuildExplanation.MaterialPaths...)
-	if err := reportdoc.RequirePathLineEvidenceAt(context.Background(), req.Worktree, req.WorktreeBaseSHA, fields["evidence"], references...); err != nil {
+	status, err := explanationdocs.ValidateReviewedHandoff(context.Background(), fields, req.BuildExplanation, req.Worktree, req.WorktreeBaseSHA)
+	if err != nil {
 		return err
 	}
 	if status == "NEEDS_CORRECTION" {

@@ -6,9 +6,13 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/reportdoc"
 )
 
+// validateExplanationReview applies audit's policy around the shared review
+// contract (explanationdocs.ValidateReviewedHandoff): a missing handoff must
+// be reported as Status: FAIL, and NEEDS_CORRECTION blocks the audit.
 func validateExplanationReview(report string, req core.PhaseRequest) error {
 	if req.ExplanationDocumentationVersion == 0 {
 		return nil
@@ -34,25 +38,8 @@ func validateExplanationReview(report string, req core.PhaseRequest) error {
 		}
 		return nil
 	}
-	status := fields["status"]
-	if status != "VERIFIED" && status != "NEEDS_CORRECTION" {
-		return fmt.Errorf("explanation documentation review Status must be VERIFIED or NEEDS_CORRECTION")
-	}
-	if fields["build status"] != view.Status {
-		return fmt.Errorf("explanation documentation review build status does not match the host Build handoff")
-	}
-	switch view.Status {
-	case "required":
-		if fields["document"] != view.DocumentPath || fields["document sha256"] != view.DocumentSHA256 {
-			return fmt.Errorf("explanation documentation review document does not match the host Build handoff")
-		}
-	case "not_applicable":
-		if fields["document"] != "" || fields["document sha256"] != "" {
-			return fmt.Errorf("not-applicable explanation documentation review must omit Document and Document SHA256")
-		}
-	}
-	references := append([]string{view.DocumentPath}, view.MaterialPaths...)
-	if err := reportdoc.RequirePathLineEvidenceAt(context.Background(), req.Worktree, req.WorktreeBaseSHA, fields["evidence"], references...); err != nil {
+	status, err := explanationdocs.ValidateReviewedHandoff(context.Background(), fields, view, req.Worktree, req.WorktreeBaseSHA)
+	if err != nil {
 		return err
 	}
 	if status == "NEEDS_CORRECTION" {

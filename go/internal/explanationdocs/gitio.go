@@ -16,6 +16,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseio"
+	"github.com/mickeyyaya/evolve-loop/go/internal/reportdoc"
 )
 
 const (
@@ -157,7 +158,7 @@ func untrackedContentSHA256(path string, expected os.FileInfo, remaining int64) 
 		if expected.Size() > remaining {
 			return "", 0, errDiffDigestLimit
 		}
-		file, err := openRegularNoFollow(path)
+		file, err := reportdoc.OpenRegularNoFollow(path)
 		if err != nil {
 			return "", 0, err
 		}
@@ -380,7 +381,7 @@ func readRegularWithin(root, rel string) (string, string, error) {
 	if err != nil || !within(realRoot, real) {
 		return "", "", fmt.Errorf("%s escapes the worktree", rel)
 	}
-	file, err := openRegularNoFollow(real)
+	file, err := reportdoc.OpenRegularNoFollow(real)
 	if err != nil {
 		return "", "", fmt.Errorf("open %s without following links: %w", rel, err)
 	}
@@ -474,8 +475,12 @@ func normalize(path string) string {
 	return path
 }
 
+// validRelative projects the single-sourced path-safety belief from reportdoc
+// (architecture review 2026-09-01: this package's local validator accepted
+// uncleaned traversal, colons, and NUL bytes that the citation validator
+// rejects — the same string was judged safe here and unsafe there).
 func validRelative(path string) bool {
-	return path != "" && path != "." && !filepath.IsAbs(path) && path != ".." && !strings.HasPrefix(path, "../")
+	return reportdoc.ValidReference(path)
 }
 
 func within(root, path string) bool {

@@ -173,7 +173,7 @@ func citationBoundaryAfter(r rune) bool {
 }
 
 func referencedLineCount(ctx context.Context, root, baseSHA, reference string) (int, error) {
-	if !validReference(reference) {
+	if !ValidReference(reference) {
 		return 0, fmt.Errorf("invalid repository-relative path")
 	}
 	body, oneLine, err := readCurrentReference(ctx, root, reference)
@@ -196,7 +196,11 @@ func referencedLineCount(ctx context.Context, root, baseSHA, reference string) (
 	return lines, nil
 }
 
-func validReference(reference string) bool {
+// ValidReference reports whether reference is a safe, clean, relative path —
+// the single home of the "is this relative path safe?" belief, shared with
+// explanationdocs (architecture review 2026-09-01: the two packages had
+// divergent validators judging the same string differently).
+func ValidReference(reference string) bool {
 	clean := filepath.ToSlash(filepath.Clean(filepath.FromSlash(reference)))
 	return reference != "" && clean == reference && clean != "." && !filepath.IsAbs(reference) &&
 		clean != ".." && !strings.HasPrefix(clean, "../") && !strings.ContainsAny(reference, ":\\\x00")
@@ -242,7 +246,7 @@ func readCurrentReference(ctx context.Context, root, reference string) ([]byte, 
 	case info.Size() > maxCitationBytes:
 		return nil, false, fmt.Errorf("citation target exceeds 16 MiB")
 	}
-	file, err := openCitationNoFollow(path)
+	file, err := OpenRegularNoFollow(path)
 	if err != nil {
 		return nil, false, err
 	}
