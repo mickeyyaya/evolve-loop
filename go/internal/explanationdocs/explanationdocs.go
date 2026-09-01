@@ -724,7 +724,7 @@ func resolveActivation(binding CycleBinding) (CycleBinding, bool, error) {
 		return binding, true, fmt.Errorf("activation marker cycle/run binding does not match host state")
 	}
 	strict := binding.ContractVersion != 0
-	if (strict || binding.Workspace != "") && binding.Workspace != marker.Workspace ||
+	if (strict || binding.Workspace != "") && !sameWorkspacePath(binding.Workspace, marker.Workspace) ||
 		marker.Worktree != "" && binding.Worktree != "" && binding.Worktree != marker.Worktree ||
 		marker.BaseSHA != "" && binding.BaseSHA != "" && binding.BaseSHA != marker.BaseSHA {
 		return binding, true, fmt.Errorf("activation marker worktree/workspace/base binding does not match host state")
