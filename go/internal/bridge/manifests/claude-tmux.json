@@ -107,12 +107,22 @@
       "note": "Quick feedback rating prompt from the CLI wrapper; '0' skips/cancels"
     },
     {
-      "name": "trust_prompt",
-      "regex": "1\\.\\s+Yes, I trust this folder",
-      "response_keys": "Enter",
+      "name": "trust_prompt_no_default",
+      "regex": "(?s)❯ No, exit.{0,80}Yes, I trust this folder.{0,120}Enter to confirm · Esc to cancel\\s*\\z",
+      "response_keys": "Down,Enter",
+      "tail_lines": 12,
       "policy": "auto_respond",
       "once": true,
-      "note": "claude v2.1.193 folder-trust dialog: 'Quick safety check: Is this a project you created or one you trust?' with '❯ 1. Yes, I trust this folder' pre-highlighted and footer 'Enter to confirm'. The selection cursor ❯ is the SAME char as claude's REPL prompt marker, so the boot loop mistakes the dialog for a ready REPL and pastes the prompt INTO the dialog (lost → rc=81 artifact-timeout). tickDuringBoot dismisses it during boot before prompt delivery: a single Enter confirms the pre-highlighted 'Yes' (verified 2026-06-26, fresh-dir launch with --dangerously-skip-permissions). Regex anchors on the numbered menu-option line ('1. Yes, I trust this folder') so prose/agent output that merely mentions trusting a folder cannot false-match (tick also runs during the artifact-wait loop). once:true — fired a single time per launch. Same class as the Cycle-121 codex trust-modal premature-ready bug."
+      "note": "claude v2.1.252 folder-trust dialog (live-captured 2026-09-01): options UNNUMBERED, default flipped to '❯ No, exit' — the v2.1.193 rule's Enter would confirm No and kill the REPL (this burned all three wave-20260901b lanes). Down,Enter verified live: Down moves ❯ to 'Yes, I trust this folder', Enter boots a trusted REPL. BOTTOM-ANCHORED (footer + \\z + tail_lines 12 + distance bounds, plan_approval discipline) so tracked files quoting the dialog cannot self-match when rendered. Disjoint by construction from trust_prompt (requires ❯ No, exit; that one requires the numbered ❯ 1. Yes line). Version-tolerant: a future Yes-default build stops matching and falls through. once:true. Source: docs/incidents/2026-09-01-claude-2252-trust-default-flip.md"
+    },
+    {
+      "name": "trust_prompt",
+      "regex": "(?s)❯ 1\\.\\s+Yes, I trust this folder.{0,120}Enter to confirm.{0,40}\\s*\\z",
+      "response_keys": "Enter",
+      "tail_lines": 12,
+      "policy": "auto_respond",
+      "once": true,
+      "note": "claude v2.1.193 folder-trust dialog (numbered options, Yes pre-highlighted): one Enter confirms Yes, verified live 2026-06-26. Kept for older builds; v2.1.252's unnumbered No-default dialog is trust_prompt_no_default above — the two regexes are DISJOINT BY CONSTRUCTION (this one requires the numbered ❯ 1. Yes line; that one requires ❯ No, exit), so array order is irrelevant for correctness. BOTTOM-ANCHORED on the Enter-to-confirm footer + tail_lines per the plan_approval discipline (2026-09-02: the unanchored form self-matched this repo's own tracked files when rendered by an agent — see the self-match guard test). The ❯ cursor collides with the REPL marker, so tickDuringBoot dismisses it before prompt delivery. once:true — lingering-scrollback discipline. Source: docs/incidents/2026-09-01-claude-2252-trust-default-flip.md"
     },
     {
       "name": "askuserquestion_multiselect",
