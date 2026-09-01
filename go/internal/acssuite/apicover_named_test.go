@@ -1,6 +1,8 @@
 package acssuite
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -17,5 +19,23 @@ func TestParseGoTestJSON_SkipCarriesSkipExitCode(t *testing.T) {
 	}
 	if got := results[0]; got.ResultStr != "skip" || got.ExitCode != SkipExitCode {
 		t.Errorf("skip result = {result:%q exit:%d}, want {skip %d}", got.ResultStr, got.ExitCode, SkipExitCode)
+	}
+}
+
+// TestWriteVerdict_LandsAtVerdictFilename names acssuite.VerdictFilename and
+// pins the belief the const exists for: the writer and every external reader/
+// retirement path (core/audit_round_artifacts.go, cycle-1603) agree on ONE
+// spelling because WriteVerdict itself derives its destination from the const.
+func TestWriteVerdict_LandsAtVerdictFilename(t *testing.T) {
+	dir := t.TempDir()
+	path, err := WriteVerdict(dir, Verdict{Cycle: 1603, Verdict: "PASS"})
+	if err != nil {
+		t.Fatalf("WriteVerdict: %v", err)
+	}
+	if filepath.Base(path) != VerdictFilename {
+		t.Errorf("verdict written to %q, want basename %q", path, VerdictFilename)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "runs", "cycle-1603", VerdictFilename)); err != nil {
+		t.Errorf("verdict not at the canonical VerdictFilename path: %v", err)
 	}
 }
