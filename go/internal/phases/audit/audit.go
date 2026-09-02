@@ -50,6 +50,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 	"github.com/mickeyyaya/evolve-loop/go/internal/regressiontia"
+	"github.com/mickeyyaya/evolve-loop/go/internal/reportdoc"
 	"github.com/mickeyyaya/evolve-loop/go/internal/skillcheck"
 )
 
@@ -73,20 +74,13 @@ import (
 // it, low enough to catch a runaway table.
 const auditReportMaxBytes = 32 * 1024
 
-// verdictCanonicalRE matches the canonical two-line heading
-// "## Verdict\n**PASS**" — bold optional, intervening blank lines tolerated.
-var verdictCanonicalRE = regexp.MustCompile(`(?m)^##[^\S\n]*Verdict[^\S\n]*\n\s*\*{0,2}(PASS|FAIL|WARN|SKIPPED)\*{0,2}`)
-
-// verdictInlineRE matches single-line variants agents emit when they don't
-// follow the canonical heading: "**Verdict: PASS**", "**Verdict:** PASS",
-// "## Verdict: PASS", "Verdict: PASS". Horizontal-whitespace classes keep the
-// match on one line. Case-sensitive on "Verdict" (capital V) so it never
-// matches the lowercase JSON key "verdict" in an embedded result blob. The
-// colon is REQUIRED: every real inline form has one, and requiring it stops a
-// prose line like "Verdict PASS is required before shipping." from being
-// mis-read as a PASS declaration on the ship gate. The no-colon canonical
-// "## Verdict\n**PASS**" shape is covered by verdictCanonicalRE above.
-var verdictInlineRE = regexp.MustCompile(`(?m)^[^\S\n]*(?:##[^\S\n]*)?\*{0,2}Verdict\*{0,2}[^\S\n]*:[^\S\n]*\*{0,2}[^\S\n]*(PASS|FAIL|WARN|SKIPPED)\b`)
+// The regex-on-prose verdict fallback (canonical "## Verdict\n**PASS**" and
+// the colon-bearing inline forms) is single-homed in reportdoc.Verdict since
+// ADR-0095: the dashboard's round history and the repair-brief seed read the
+// SAME grammar, so what the gate scores and what the operator/rebuilder sees
+// cannot disagree. reportdoc scans visible lines only (fenced, indented and
+// HTML-commented content stripped), so an embedded template can no longer
+// declare a verdict here either.
 
 // hooks carries the audit phase's variation points. genVerdict is the
 // seam that generates acs-verdict.json when it is absent (cycle-138/139
@@ -620,11 +614,8 @@ func extractAuditVerdict(content string, stage config.Stage) (string, bool) {
 	// against older templates; at enforce the sentinel above is mandatory, so gate
 	// them off (>= StageEnforce). Below enforce they stay active — byte-identical.
 	if stage < config.StageEnforce {
-		if m := verdictCanonicalRE.FindStringSubmatch(content); m != nil {
-			return m[1], true
-		}
-		if m := verdictInlineRE.FindStringSubmatch(content); m != nil {
-			return m[1], true
+		if v := reportdoc.Verdict(content); v != "" {
+			return v, true
 		}
 	}
 	return "", false

@@ -310,11 +310,21 @@ type fence struct {
 }
 
 func visibleLines(markdown string) []string {
+	out, _ := visibleLinesIdx(markdown)
+	return out
+}
+
+// visibleLinesIdx is visibleLines plus, for each visible line, the index of
+// the raw line it came from — so a caller that must bound a RAW scan (the
+// findings TSV block) to a section located on the VISIBLE stream uses this one
+// fence/comment state machine for both, never a second one.
+func visibleLinesIdx(markdown string) (out []string, rawIdx []int) {
 	lines := strings.Split(markdown, "\n")
-	out := make([]string, 0, len(lines))
+	out = make([]string, 0, len(lines))
+	rawIdx = make([]int, 0, len(lines))
 	var active fence
 	inComment := false
-	for _, raw := range lines {
+	for i, raw := range lines {
 		if active.length > 0 {
 			if closesFence(raw, active) {
 				active = fence{}
@@ -330,8 +340,9 @@ func visibleLines(markdown string) []string {
 			continue
 		}
 		out = append(out, line)
+		rawIdx = append(rawIdx, i)
 	}
-	return out
+	return out, rawIdx
 }
 
 func stripHTMLComments(line string, inComment *bool) string {

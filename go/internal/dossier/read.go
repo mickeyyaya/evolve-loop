@@ -19,9 +19,6 @@ import (
 	"strings"
 )
 
-// CyclesDirName is the committed-dossier directory, relative to the project root.
-const cyclesDirName = "cycles"
-
 // ReadCommitted reads the committed dossiers for cycles >= minCycle from
 // <projectRoot>/knowledge-base/cycles/, ascending by cycle number. The cycle
 // number is taken from the FILENAME so the window is applied before any file is
@@ -33,7 +30,7 @@ const cyclesDirName = "cycles"
 // <= 0 reads the whole corpus, so callers that cannot establish a window must
 // decide for themselves whether that is what they want.
 func ReadCommitted(projectRoot string, minCycle int) []*Dossier {
-	dir := filepath.Join(projectRoot, "knowledge-base", cyclesDirName)
+	dir := CyclesDir(projectRoot)
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil
