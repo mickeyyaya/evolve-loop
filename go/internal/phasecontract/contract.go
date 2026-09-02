@@ -128,7 +128,8 @@ var TDD = Report{
 }
 
 // Audit — declares a Verdict heading; the classifier extracts the PASS/FAIL/
-// WARN/SKIPPED token (verdictCanonicalRE/verdictInlineRE in audit.go). Producer
+// WARN/SKIPPED token (ParseVerdictSentinel first, then the reportdoc.Verdict
+// prose grammar shared with the dashboard and the repair brief). Producer
 // declares "## Verdict:" in evolve-auditor-reference.md.
 var Audit = Report{
 	Phase: "audit",

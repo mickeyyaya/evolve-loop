@@ -28,6 +28,8 @@ Commands:
   ledger     Verify or tail the ledger ( ledger verify | ledger tail [--n N] )
   dossier    Read and verify cycle dossiers
               ( dossier verify [--project-root P] )
+  dashboard  Serve the read-only live pipeline dashboard on loopback
+              ( dashboard [--addr 127.0.0.1:8090] [--project-root P] [--snapshot] )
   salvage    Report the recoverable-malformed bad_verdict rate (read-only)
               ( salvage report [-json] [-project-root P] )
   continuation Inspect/release scope-keyed continuation bindings; release

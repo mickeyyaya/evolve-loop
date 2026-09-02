@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>evolve dashboard</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header id="hdr">
+  <div class="brand">evolve <span>dashboard</span></div>
+  <div id="tiles" class="tiles"></div>
+  <div id="live" class="live" title="Server-Sent Events connection">connecting…</div>
+</header>
+<main>
+  <section id="board">
+    <div class="row">
+      <section id="loop" class="card"></section>
+      <section id="trend" class="card"></section>
+    </div>
+    <div class="row">
+      <section id="cycles" class="card grow"></section>
+      <section id="queue" class="card"></section>
+    </div>
+    <section id="grid" class="card"></section>
+    <section id="fps" class="card"></section>
+  </section>
+  <section id="detail" class="card" hidden></section>
+</main>
+<footer id="warnings"></footer>
+<script src="/static/app.js"></script>
+</body>
+</html>

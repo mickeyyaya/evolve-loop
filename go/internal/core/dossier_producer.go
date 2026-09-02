@@ -17,7 +17,6 @@ package core
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
@@ -77,7 +76,7 @@ func writeCycleDossier(lock gitMutationLocker, projectRoot, workspacePath string
 	if err != nil {
 		return fmt.Errorf("build dossier: %w", err)
 	}
-	dir := filepath.Join(projectRoot, "knowledge-base", "cycles")
+	dir := dossier.CyclesDir(projectRoot)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("dossier dir: %w", err)
 	}

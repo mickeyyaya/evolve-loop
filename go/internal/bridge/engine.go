@@ -614,6 +614,13 @@ func (e *Engine) Launch(ctx context.Context, req core.BridgeRequest) (core.Bridg
 	return resp, errors.New(msg)
 }
 
+// LLMCallsLogFilename is the per-workspace dispatch ledger this engine appends
+// one record to per launch attempt. `evolve tokens`, `evolve models live` and
+// the dashboard's per-phase CLI/model join resolve the name here;
+// internal/cycleclassify still spells it inline (an unmigrated reader, not a
+// second owner).
+const LLMCallsLogFilename = "llm-calls.ndjson"
+
 // llmCallLog is the on-disk llm-calls.ndjson record shape (token-telemetry S3),
 // one JSON object per line. Field order/tags are pinned by the S3 inbox item so
 // downstream rollups (S6) and the tokens-report CLI (S7) can decode it without a
@@ -765,7 +772,7 @@ func (e *Engine) recordTokenUsage(req core.BridgeRequest, model string, code int
 		_, _ = fmt.Fprintf(e.deps.Stderr, "[engine] token record marshal failed: %v\n", err)
 		return
 	}
-	path := filepath.Join(req.Workspace, "llm-calls.ndjson")
+	path := filepath.Join(req.Workspace, LLMCallsLogFilename)
 	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		_, _ = fmt.Fprintf(e.deps.Stderr, "[engine] token record open failed: %v\n", err)
