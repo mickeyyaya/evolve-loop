@@ -76,8 +76,7 @@ func retireSupersededAuditArtifacts(workspace string, round int) {
 	}
 	for _, name := range []string{acssuite.VerdictFilename, phasecontract.ArtifactFilename(string(PhaseAudit))} {
 		src := filepath.Join(workspace, name)
-		ext := filepath.Ext(name)
-		dst := filepath.Join(workspace, fmt.Sprintf("%s.round%d%s", name[:len(name)-len(ext)], round, ext))
+		dst := filepath.Join(workspace, phasecontract.RoundArchiveFilename(name, round))
 		if _, err := os.Stat(dst); err == nil {
 			// The archive already exists (a counter rollback — e.g. a lost
 			// cycle-state write). Never clobber it — the first retirement

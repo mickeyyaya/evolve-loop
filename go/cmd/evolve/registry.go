@@ -58,6 +58,7 @@ var commands = []subcommand{
 	{Name: "dossier", Summary: "Read and verify cycle dossiers (dossier verify)", Run: runDossier},
 	{Name: "salvage", Summary: "Report the recoverable-malformed bad_verdict rate from the baseline sidecar (salvage report [-json])", Run: runSalvage},
 	{Name: "soak-report", Summary: "Render the EVOLVE_PHASE_RECOVERY soak evidence table (read-only)", Run: runSoakReport},
+	{Name: "dashboard", Summary: "Serve the read-only live pipeline dashboard (dashboard [--addr A] [--project-root P] [--snapshot])", Run: runDashboard},
 	{Name: "names", Summary: "Guard naming after a rename: names check (scan) | names fix (rewrite dead tokens)", Run: runNames},
 	{Name: "acs", Summary: "Run ACS predicates", Run: runACS},
 	{Name: "apicover", Summary: "Measure public-API coverage (apicover [-cover f] [-require-doc] [-enforce] <pkgdir>...)", Run: runApicover},

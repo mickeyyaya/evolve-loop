@@ -335,7 +335,7 @@ func salvageProbeDiagnostics(scratch, evolveDir, tag string, now func() time.Tim
 					fmt.Fprintf(log, "[models] WARN probe launch-error salvaged to %s\n", filepath.Join(durable, dstName))
 				}
 			}
-		case name == "llm-calls.ndjson":
+		case name == bridge.LLMCallsLogFilename:
 			// O_APPEND append of a few-hundred-byte payload: relies on the
 			// single-write(2) atomicity every other ndjson ledger writer in
 			// this codebase already assumes (see sessionrecord.Append's

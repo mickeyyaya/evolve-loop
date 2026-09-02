@@ -44,7 +44,7 @@ func runDossierVerify(_ []string, stdout, stderr io.Writer) int {
 	}
 	enforced := pol.FloorEnrolls("dossier-closeout")
 
-	dir := filepath.Join(root, "knowledge-base", "cycles")
+	dir := dossier.CyclesDir(root)
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		if os.IsNotExist(err) {

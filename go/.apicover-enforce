@@ -550,3 +550,4 @@
 # `evolve context-fill correlate` (cmd/evolve/cmd_contextfillcorrelate.go).
 # Named+exercised by apicover_named_test.go and contextfillcorrelate_test.go.
 ./internal/contextfillcorrelate
+./internal/dashboard

@@ -67,7 +67,7 @@ func seedChronicleDigest(projectRoot string, cs CycleState, state State, cfg pol
 // filename's cycle number (descending) so only the window is read, not the
 // whole history; unparseable files are skipped (best-effort).
 func loadRecentDossiers(projectRoot string, limit int) []dossier.Dossier {
-	matches, err := filepath.Glob(filepath.Join(projectRoot, "knowledge-base", "cycles", "cycle-*.json"))
+	matches, err := filepath.Glob(filepath.Join(dossier.CyclesDir(projectRoot), "cycle-*.json"))
 	if err != nil || len(matches) == 0 {
 		return nil
 	}

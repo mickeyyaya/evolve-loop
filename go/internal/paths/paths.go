@@ -100,7 +100,7 @@ func Resolve(lookupEnv func(string) string, cwd string) Layout {
 		pluginRoot = projectRoot
 	}
 
-	evolveDir := filepath.Join(projectRoot, ".evolve")
+	evolveDir := EvolveDirOf(projectRoot)
 
 	profilesDir := lookupEnv("EVOLVE_PROFILES_DIR_OVERRIDE")
 	if profilesDir == "" {
@@ -179,3 +179,20 @@ func AbsoluteRoot(label, p string, warn func(string)) string {
 	}
 	return abs
 }
+
+// LoopStopFile is the operator brake marker under .evolve/: `touch
+// .evolve/loop-stop` stops a chained loop at the next batch boundary. Presence
+// is the whole signal (zero bytes). The loop's chain driver (cmd_loop_chain.go)
+// and read-only observers (internal/dashboard) both resolve it through
+// LoopStopPath so the name has exactly one home.
+const LoopStopFile = "loop-stop"
+
+// LoopStopPath returns the brake marker's path under evolveDir.
+func LoopStopPath(evolveDir string) string { return filepath.Join(evolveDir, LoopStopFile) }
+
+// EvolveDirOf returns <projectRoot>/.evolve. Layout.EvolveDir is derived
+// through it, and read-only observers that take a project root directly
+// (internal/dashboard) call it instead of re-typing the join. Other call sites
+// across cmd/ and internal/ still spell the join inline; migrate them here as
+// they are touched — this is the intended home, not yet the only one.
+func EvolveDirOf(projectRoot string) string { return filepath.Join(projectRoot, ".evolve") }

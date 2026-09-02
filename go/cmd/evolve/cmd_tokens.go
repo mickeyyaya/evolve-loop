@@ -18,6 +18,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasetiming"
@@ -210,7 +211,7 @@ func buildTokensReport(runsDir string, cycles []int) TokensReport {
 // TripwireEvents. A missing/unreadable file or a malformed line is skipped as
 // absent evidence, matching buildTokensReport's degrade-gracefully contract.
 func readCycleTripwires(runsDir string, cycle int) []TripwireEvent {
-	path := filepath.Join(runsDir, fmt.Sprintf("cycle-%d", cycle), "llm-calls.ndjson")
+	path := filepath.Join(runsDir, fmt.Sprintf("cycle-%d", cycle), bridge.LLMCallsLogFilename)
 	f, err := os.Open(path)
 	if err != nil {
 		return nil

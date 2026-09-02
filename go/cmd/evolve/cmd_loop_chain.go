@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gc"
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseintegrity"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
@@ -34,7 +35,7 @@ import (
 // chainBrakeFile is the operator brake: `touch .evolve/loop-stop` and the
 // chain stops at the next boundary (the in-flight batch is never interrupted —
 // use SIGINT for that, which the batch already checkpoints).
-const chainBrakeFile = "loop-stop"
+const chainBrakeFile = paths.LoopStopFile
 
 // runLoopBatchFn is the test seam for the chain loop: tests substitute a
 // scripted batch so the boundary decisions can be exercised without running
