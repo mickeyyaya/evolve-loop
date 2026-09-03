@@ -11,6 +11,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
@@ -42,8 +43,9 @@ import (
 // probes — the durable record of what the auditor tried.
 const auditProbesDir = "audit-probes"
 
-// auditPromptArtifact is the dispatch anchor (engine.go: <agent>-prompt.txt).
-const auditPromptArtifact = "audit-prompt.txt"
+// auditPromptArtifact is the dispatch anchor (the bridge writes it under the
+// phasecontract prompt-naming rule).
+var auditPromptArtifact = phasecontract.PromptArtifactFilename("audit")
 
 // quarantineGitTimeout bounds the status probe — a wedged git must degrade,
 // not hang the audit phase (same bound class as ciparity's subprocess calls).

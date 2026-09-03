@@ -28,6 +28,23 @@ type Profile struct {
 	// agy/codex realizes none of claude's argv. Replaces the flat extra_flags
 	// that forwarded one CLI's vocabulary verbatim to every CLI.
 	ExtraFlagsByCLI map[string][]string
+	// EffortOverrides maps a RESOLVED model tier to the effort rung to launch
+	// with when the profile lands on that tier (`effort_overrides` in the
+	// profile JSON, e.g. {"deep": "high"}). It lets a tier escalation — the
+	// audit-repair `audit_retry_2plus` override raising builder from balanced
+	// to deep — carry the deeper tier's reasoning effort with it, without a
+	// second situation-plumbing path: the tier IS the situation. Absent tier
+	// key ⇒ EffortLevel. Config-injected; no Go literal names a rung.
+	EffortOverrides map[string]string
+}
+
+// effortForTier returns the effort rung for the tier this launch resolved to:
+// the profile's effort_overrides[tier] when declared, else effort_level.
+func (p Profile) effortForTier(tier string) string {
+	if e, ok := p.EffortOverrides[tier]; ok && e != "" {
+		return e
+	}
+	return p.EffortLevel
 }
 
 // ProfileSandbox is the bridge's minimal view of profile.sandbox. The json tag
@@ -68,6 +85,7 @@ type profileWire struct {
 	SessionName     string              `json:"session_name"`
 	Sandbox         *ProfileSandbox     `json:"sandbox"`
 	EffortLevel     string              `json:"effort_level"`
+	EffortOverrides map[string]string   `json:"effort_overrides"`
 	ExtraFlagsByCLI map[string][]string `json:"extra_flags_by_cli"`
 }
 
@@ -117,6 +135,7 @@ func LoadProfile(path string) (Profile, error) {
 		SessionName:     w.SessionName,
 		Sandbox:         w.Sandbox,
 		EffortLevel:     w.EffortLevel,
+		EffortOverrides: w.EffortOverrides,
 		ExtraFlagsByCLI: w.ExtraFlagsByCLI,
 	}
 	if w.StreamOutput != nil {

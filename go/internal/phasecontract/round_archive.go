@@ -39,3 +39,12 @@ func ParseRoundArchive(filename, liveName string) (round int, ok bool) {
 	}
 	return n, true
 }
+
+// PromptArtifactFilename is the single home of the dispatched-prompt naming
+// rule: the bridge writes `<agent>-prompt.txt` beside the phase artifacts
+// (the runner passes the phase name as the agent), the audit's probe
+// quarantine anchors on it, and the repair-round archiver retires it through
+// RoundArchiveFilename. One rule, three readers — a rename cannot orphan one.
+func PromptArtifactFilename(agent string) string {
+	return agent + "-prompt.txt"
+}

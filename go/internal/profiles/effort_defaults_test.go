@@ -100,11 +100,12 @@ const maxEffortRung = "max"
 // profile via `model_tier_overrides[situation]`, and one such situation is live
 // today — `cycle_1_or_low_goal` fires whenever Cycle <= 1, so scout.json
 // (codex, balanced, effort low) really does dispatch at DEEP tier on cycle 1
-// while its effort stays low. Whether an ESCALATED tier should also raise
-// effort is a cost decision for the operator, not something a guard should
-// decide silently, so it is deliberately left alone and recorded here instead.
-// builder/tester/evaluator carry the same shape but their situations are not
-// yet plumbed.
+// while its effort stays low. Since ADR-0096 an ESCALATED tier CAN raise
+// effort, but only through the profile's own `effort_overrides[tier]` (read by
+// bridge.effortForTier at launch) — config decides, never a guard. The
+// audit_retry_2plus situation is produced by core.repairRoundTier at the
+// dispatch seam; TestEffortOverrides_PinnedToDirectiveRungs pins the rungs
+// those overrides may name.
 //
 // RUN WITH -count=1 WHEN ONLY A PROFILE JSON CHANGED. Go's test cache does not
 // track reads that escape the module root via "..", so a bare `go test` serves
@@ -209,5 +210,30 @@ func TestMaxEffortOnlyOnDeepOrTopProfiles(t *testing.T) {
 		// on a decode regression; its zero-match Fatal is a separate
 		// CLI/tier-selector check, not an EffortLevel guard.
 		t.Logf("no tracked profile at effort %q — expected since the 2026-09-01 directive; placement law armed for future adoption", maxEffortRung)
+	}
+}
+
+// TestEffortOverrides_PinnedToDirectiveRungs — a per-tier effort override is a
+// second statement of the directive rung for that tier (ADR-0096: the repair
+// round escalates builder/tdd-engineer to deep and the effort follows). Pin it
+// beside the matrix so the next rung change edits ONE constant and the
+// override cannot silently keep the old rung. Run with -count=1 after a
+// profile-only edit (see the class-guard note above).
+func TestEffortOverrides_PinnedToDirectiveRungs(t *testing.T) {
+	loader, _ := RealTreeProfiles(t)
+	want := map[string]map[string]string{
+		"builder":      {"deep": codexDeepTopRung}, // codex-routed builder: the codex deep/top rung
+		"tdd-engineer": {"deep": "xhigh"},          // claude-routed grader-class rung (matches auditor/adversarial-review)
+	}
+	for profile, overrides := range want {
+		p, err := loader.Get(profile)
+		if err != nil {
+			t.Fatalf("Get(%s): %v", profile, err)
+		}
+		for tier, rung := range overrides {
+			if got := p.EffortOverrides[tier]; got != rung {
+				t.Errorf("profile %s: effort_overrides[%s] = %q, want %q (committed directive rung)", profile, tier, got, rung)
+			}
+		}
 	}
 }

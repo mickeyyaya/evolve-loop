@@ -52,6 +52,7 @@ Bash(perl:*)                      # deny all perl invocations
 | `turn_budget_hint` | int | Soft guidance written into the system prompt checkpoint note. |
 | `turn_budget_guidance` | object | `{ target_turns, checkpoint_at_turn, hard_exit_at_turn, checkpoint_note }` |
 | `effort_level` | string | `low`, `medium`, `high` — informs orchestrator scheduling. |
+| `effort_overrides` | object | Per-tier effort rung, e.g. `{"deep": "high"}`: when a launch resolves to that tier (a repair-round escalation, ADR-0096), the bridge dispatches at this rung instead of `effort_level`. Absent tier ⇒ `effort_level`. Values must be realizable by the family manifest (guarded by `TestTrackedProfileEffortLevelsAllRealizable`). |
 
 ### Sandbox
 
