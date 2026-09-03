@@ -65,12 +65,21 @@ func runPhaseVerify(args []string, stdout, stderr io.Writer) int {
 	// the agent's self-check and the gate agree on user/minted phases (no drift —
 	// ADR-0034). A catalog-load failure degrades to built-in-only resolution.
 	resolver := phaseVerifyResolver()
-	if _, ok := resolver.Resolve(phase); !ok {
+	contract, ok := resolver.Resolve(phase)
+	if !ok {
 		fmt.Fprintf(stderr, "evolve phase verify: unknown phase %q\n", phase)
 		return 10
 	}
 
 	roots := phasecontract.Roots{Workspace: *workspace, Worktree: *worktree, EvolveDir: *evolveDir}
+	// Self-check ≡ gate (ADR-0034): the host gate judges a contract's
+	// conditional explanation-documentation sections with the cycle's contract
+	// version, so the self-check reads the same version from the persisted cycle
+	// state — or it would print OK on a report the gate blocks. Only contracts
+	// that declare such sections pay the read.
+	if len(contract.ExplanationSections) > 0 {
+		roots.ExplanationDocumentationVersion = explanationContractVersion(*workspace, *evolveDir, stderr)
+	}
 	res, err := verifyDeliverable(phase, roots, resolver)
 	if err != nil {
 		// Ambiguity/infra — fail OPEN at the call site.
@@ -179,4 +188,36 @@ func phaseVerifyResolver() phasecontract.Resolver {
 		return phasecontract.BuiltinResolver{}
 	}
 	return phasecontract.NewCatalogResolver(cat.Get)
+}
+
+// explanationContractVersion reads the cycle's explanation-documentation
+// contract version from the persisted cycle state through the repo's own
+// resolvers: the run workspace's per-run mirror (core.RunStateFile — the
+// authoritative copy under concurrent fleet lanes, where the global file holds
+// whichever run wrote last) when a workspace is given, else the global path
+// core.ResolveCycleStatePath honours (EVOLVE_CYCLE_STATE_FILE included). No
+// state file, or an unreadable one, is reported on stderr — never silently
+// treated as "not active" — and the host gate still applies the check.
+func explanationContractVersion(workspace, evolveDir string, stderr io.Writer) int {
+	var path string
+	switch {
+	case workspace != "":
+		path = filepath.Join(workspace, core.RunStateFile)
+	case evolveDir != "":
+		path = core.ResolveCycleStatePath(evolveDir)
+	default:
+		fmt.Fprintf(stderr, "phase verify: WARN no --workspace or --evolve-dir — the explanation-documentation section check is skipped; the host gate will still apply it\n")
+		return 0
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		fmt.Fprintf(stderr, "phase verify: WARN %s unreadable (%v) — the explanation-documentation section check is skipped; the host gate will still apply it\n", path, err)
+		return 0
+	}
+	var state core.CycleState
+	if err := json.Unmarshal(raw, &state); err != nil {
+		fmt.Fprintf(stderr, "phase verify: WARN %s unparseable (%v) — the explanation-documentation section check is skipped; the host gate will still apply it\n", path, err)
+		return 0
+	}
+	return state.ExplanationDocumentationVersion
 }

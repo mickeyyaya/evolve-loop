@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
@@ -160,5 +161,46 @@ func TestPhaseVerify_StrayInWorktree_Exit1(t *testing.T) {
 	}
 	if !strings.Contains(errb, "stray") && !strings.Contains(errb, "worktree") {
 		t.Errorf("stderr should name the stray-in-worktree correction; got %q", errb)
+	}
+}
+
+// TestPhaseVerify_ExplanationSectionFollowsCycleState — self-check ≡ gate: the
+// agent's `evolve phase verify audit` asks for the conditional section exactly
+// when the run's persisted state (the workspace's run.json mirror, the
+// authoritative copy under fleet lanes) says the explanation contract is
+// active, says so loudly when that state cannot be read, and never bothers a
+// phase whose contract declares no conditional section.
+func TestPhaseVerify_ExplanationSectionFollowsCycleState(t *testing.T) {
+	ws := t.TempDir()
+	report := "## Verdict\n**PASS**\n\n## Issues\nnone\n\n" + phasecontract.RenderVerdictSentinel("audit", "PASS") + "\n"
+	if err := os.WriteFile(filepath.Join(ws, "audit-report.md"), []byte(report), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeState := func(body string) {
+		if err := os.WriteFile(filepath.Join(ws, core.RunStateFile), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeState(`{"cycle_id":7,"phase":"audit","explanation_documentation_version":1}`)
+	if code, _, errb := runVerify(t, "audit", "--workspace="+ws); code == 0 || !strings.Contains(errb, "## Explanation Documentation") {
+		t.Fatalf("active contract: exit=%d stderr=%q — the self-check must demand the section the gate demands", code, errb)
+	}
+	writeState(`{"cycle_id":7,"phase":"audit"}`)
+	if code, _, errb := runVerify(t, "audit", "--workspace="+ws); code != 0 {
+		t.Fatalf("inactive contract must not ask for the section: exit=%d stderr=%q", code, errb)
+	}
+	if err := os.Remove(filepath.Join(ws, core.RunStateFile)); err != nil {
+		t.Fatal(err)
+	}
+	if code, _, errb := runVerify(t, "audit", "--workspace="+ws); code != 0 || !strings.Contains(errb, core.RunStateFile+" unreadable") {
+		t.Fatalf("unreadable state must be reported, never silently treated as inactive: exit=%d stderr=%q", code, errb)
+	}
+	// A phase without conditional sections never reads the state, never warns.
+	bws := t.TempDir()
+	if err := os.WriteFile(filepath.Join(bws, "build-report.md"), []byte("## Changes\n- foo.go\nVerdict: PASS\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if code, _, errb := runVerify(t, "build", "--workspace="+bws); code != 0 || strings.Contains(errb, "explanation-documentation") {
+		t.Fatalf("build owes no conditional section and must not be warned about one: exit=%d stderr=%q", code, errb)
 	}
 }

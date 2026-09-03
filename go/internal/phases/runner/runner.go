@@ -975,7 +975,7 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 		// its verdict (via Classify) instead of synthesizing FAIL. Reconciliation
 		// can only UPGRADE toward the agent's real verdict, never downgrade a real one.
 		if core.IsInfraTeardownError(bridgeErr) {
-			roots := phasecontract.Roots{Workspace: req.Workspace, Worktree: req.Worktree, DispatchedArtifact: artifactPath}
+			roots := phasecontract.Roots{Workspace: req.Workspace, Worktree: req.Worktree, DispatchedArtifact: artifactPath, ExplanationDocumentationVersion: req.ExplanationDocumentationVersion}
 			if req.ProjectRoot != "" {
 				// EvolveDir completes the roots (orchestrator-target
 				// deliverables) AND locates the merged catalog for the
@@ -1162,7 +1162,7 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	if reconciled {
 		artifact = classifiedArtifact(reconciledRes, artifactPath, artifact)
 	} else {
-		roots := phasecontract.Roots{Workspace: req.Workspace, Worktree: req.Worktree, DispatchedArtifact: artifactPath}
+		roots := phasecontract.Roots{Workspace: req.Workspace, Worktree: req.Worktree, DispatchedArtifact: artifactPath, ExplanationDocumentationVersion: req.ExplanationDocumentationVersion}
 		if req.ProjectRoot != "" {
 			roots.EvolveDir = filepath.Join(req.ProjectRoot, ".evolve")
 		}

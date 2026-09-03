@@ -1,0 +1,16 @@
+{
+  "id": "auditor-explanation-section-correction-ladder",
+  "kind": "pipeline-repair",
+  "priority": "P2",
+  "weight": 0.85,
+  "title": "Auditor intermittently omits ## Explanation Documentation — the deterministic gate forces FAIL with no correction rung",
+  "body": "Cycle-1601 (wave-20260902): auditor narrative WARN but the explanation-documentation qualitative review gate forced FAIL because the audit report carried ZERO '## Explanation Documentation' sections; cycle-1603's auditor (same persona, same CLI) wrote it correctly — intermittent omission, not systemic. Cost: a WARN-shippable cycle became a continuation+release. The correction ladder (ADR-0045) covers deliverable contract violations; wire this gate's rejection into a correction re-dispatch (re-prompt the auditor with the gate's report, one rung) before the verdict-conflict override fires — the same graduated-remediation shape remediable_phases uses. Also consider strengthening the persona's section instruction placement (the #434 persona-strip class watch applies).",
+  "created": "2026-09-02T02:31:00Z",
+  "source": "console-wave-20260902-forensics",
+  "consumed": {
+    "at": "2026-09-03T06:20:00Z",
+    "by": "console-manual",
+    "landing": "phasecontract.ExplanationDocumentation as a CONDITIONAL audit contract section (Contract.ExplanationSections), enforced by the deliverable reviewer while the explanation contract is active — a missing section is a contract violation the correction ladder re-dispatches, no longer a terminal FAIL",
+    "resolution": "FIXED"
+  }
+}

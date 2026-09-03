@@ -56,6 +56,9 @@ func rootsFor(in core.ReviewInput) phasecontract.Roots {
 		Workspace: in.Workspace,
 		Worktree:  in.Worktree,
 		EvolveDir: filepath.Join(in.ProjectRoot, ".evolve"),
+		// The gate's request context, so the conditional sections are judged here
+		// exactly as `evolve phase verify` judges them from cycle-state.json.
+		ExplanationDocumentationVersion: in.ExplanationDocumentationVersion,
 	}
 }
 

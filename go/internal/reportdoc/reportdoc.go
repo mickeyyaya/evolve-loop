@@ -59,6 +59,19 @@ func isSectionBoundary(line string) bool {
 // repeated Status is still the ambiguity it always was.
 var listValuedFields = map[string]bool{"evidence": true}
 
+// HasSection reports whether a level-two heading with exactly this title is
+// present on a visible line — the one presence predicate the deliverable
+// contract and the phase gates share, so a heading inside a fence, a comment,
+// or at another level counts for neither (two matchers would let a report the
+// gate refuses slip past the correction ladder). A duplicated heading is
+// present.
+func HasSection(markdown, title string) bool {
+	// err is non-nil only for a duplicate heading, and Section already reports
+	// that case as found=true, so found alone carries both outcomes.
+	_, found, _ := Section(markdown, title)
+	return found
+}
+
 // Fields parses allowed "- Key: value" metadata lines case-insensitively.
 // Unknown prose fields are ignored; a value's surrounding backticks are
 // stripped (cycle-1606 wrote `Document: `path“); list-valued keys accumulate,

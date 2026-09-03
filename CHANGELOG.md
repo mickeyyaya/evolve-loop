@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — a missing `## Explanation Documentation` section is a correction, not a terminal FAIL (2026-09-03)
+
+Cycles 1601 and 1603 died on `audit-report.md is missing ## Explanation Documentation`: the audit's deterministic gate forced FAIL and nothing re-asked the auditor for a section that costs one re-dispatch to add. The audit contract now declares the section as CONDITIONAL (`phasecontract.ExplanationDocumentation` under `Contract.ExplanationSections`), and every verifier enforces it while the cycle's explanation contract is active — the version rides on `phasecontract.Roots`, so the host gate, the runner, the salvage re-check and the agent's own `evolve phase verify` (reading `cycle-state.json`) agree; the match is the exact visible heading the audit gate itself uses (`reportdoc.HasSection`) — under the same `missing_section` code every other section uses — so the existing correction ladder re-dispatches the auditor with the reason as its directive. A cycle without the contract is never asked for the section; the audit gate's own check stays as the backstop. Closes inbox `auditor-explanation-section-correction-ladder`.
+
+---
+
 ## Fixed — read-only phases can no longer rewrite the builder's tree; the explanation review reads what auditors write (ADR-0097, 2026-09-03)
 
 Seven of eleven consecutive FAILs (cycles 1596–1606) were the harness rejecting its own pipeline's output. Three were the deterministic explanation-digest gate firing on a tree the AUDITOR had altered — its mutation probes rewrote the builder's material files in place (`cp /tmp/digest.go.bak …`, "wrote reverted tdd.go"; reproduced forensically from the salvage worktrees) — and the profile's `sandbox.read_only_repo` was inert because the wave ran `sandbox=false`. Five were the `## Explanation Documentation` section rejected on FORMAT: several `- Evidence:` lines ("duplicate evidence fields"), a line-range citation, backticked values, citations under other field names.

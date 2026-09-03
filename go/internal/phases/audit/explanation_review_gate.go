@@ -7,6 +7,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/reportdoc"
 )
 
@@ -17,12 +18,13 @@ func validateExplanationReview(report string, req core.PhaseRequest) error {
 	if req.ExplanationDocumentationVersion == 0 {
 		return nil
 	}
-	body, found, err := reportdoc.Section(report, "Explanation Documentation")
+	section := phasecontract.ExplanationDocumentation // the contract's declaration; the deliverable gate reads the same one
+	body, found, err := reportdoc.Section(report, section.Title())
 	if err != nil {
 		return err
 	}
 	if !found {
-		return fmt.Errorf("audit-report.md is missing ## Explanation Documentation")
+		return fmt.Errorf("audit-report.md is missing %s", section.Canonical)
 	}
 	fields, err := reportdoc.ReviewFields(body, "Status", "Build status", "Document", "Document SHA256", "Evidence")
 	if err != nil {

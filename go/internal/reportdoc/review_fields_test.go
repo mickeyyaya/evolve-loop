@@ -128,3 +128,21 @@ func TestReviewFields_ParsesOnceForBothGates(t *testing.T) {
 		t.Fatal("ReviewFields must surface Fields errors")
 	}
 }
+
+func TestHasSection_ExactLevelTwoHeadingOnVisibleLinesOnly(t *testing.T) {
+	t.Parallel()
+	cases := map[string]bool{
+		"## Verdict\nPASS\n\n## Explanation Documentation\n- Status: VERIFIED\n": true,
+		"## Explanation Documentation\n\n## Explanation Documentation\n":         true, // duplicated ⇒ present (the gate reports the duplicate)
+		"### Explanation Documentation\n- Status: VERIFIED\n":                    false,
+		"## Explanation Documentation Review\n":                                  false,
+		"```\n## Explanation Documentation\n```\n":                               false,
+		"<!-- ## Explanation Documentation -->\n":                                false,
+		"prose mentioning ## Explanation Documentation inline\n":                 false,
+	}
+	for md, want := range cases {
+		if got := HasSection(md, "Explanation Documentation"); got != want {
+			t.Errorf("HasSection(%q) = %v, want %v", md, got, want)
+		}
+	}
+}

@@ -37,6 +37,10 @@ type Section struct {
 	Accepted  []string
 }
 
+// Title is the heading text without its `## ` marker — the form the exact
+// heading matcher (reportdoc.Section / HasSection) takes.
+func (s Section) Title() string { return strings.TrimPrefix(s.Canonical, "## ") }
+
 // Present reports whether any Accepted variant occurs in content.
 func (s Section) Present(content string) bool {
 	for _, v := range s.Accepted {
@@ -126,6 +130,15 @@ var TDD = Report{
 	},
 	Producers: []string{"evolve-tdd-engineer"},
 }
+
+// ExplanationDocumentation is the audit report section the explanation-
+// documentation contract (explanationdocs, contract v1) requires while it is
+// active for the cycle. It is CONDITIONAL — listed under
+// Contract.ExplanationSections, not Sections — so an audit in a cycle without
+// the contract is not asked for it, and an audit that omits it while the
+// contract is active is a deliverable-contract violation the correction
+// ladder re-dispatches (cycles 1601/1603 were terminal FAILs instead).
+var ExplanationDocumentation = Section{Canonical: "## Explanation Documentation", Accepted: []string{"## Explanation Documentation"}}
 
 // Audit — declares a Verdict heading; the classifier extracts the PASS/FAIL/
 // WARN/SKIPPED token (ParseVerdictSentinel first, then the reportdoc.Verdict
