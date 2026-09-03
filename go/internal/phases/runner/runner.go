@@ -856,6 +856,13 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	// bridgeErr) is what the rest of the function consumes; events file
 	// reflects the final CLI's stdout so cycleclassify sees what actually
 	// happened last.
+	// Worktree fence (ADR-0097): a phase without write permission hands
+	// downstream the exact tree it was given. Snapshot before the first
+	// attempt, restore after the last — the classify hooks below (the audit's
+	// explanation binding among them) must judge the builder's tree, not the
+	// auditor's probes (cycles 1603-1605).
+	fence := takeWorktreeFence(ctx, phase, req)
+
 	var bres core.BridgeResponse
 	var bridgeErr error
 	var attemptLog []string
@@ -942,6 +949,7 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 		log.Diag().Infof("[runner] phase=%s dispatch chain: %s\n", phase, joinAttempts(attemptLog))
 	}
 	durationMS := b.nowFn().Sub(start).Milliseconds()
+	fenceDiags := restoreWorktreeFence(context.WithoutCancel(ctx), phase, fence)
 
 	// reconciled is set when a bridge INFRA teardown (timeout OR transient) is
 	// overridden by a well-formed deliverable on disk: control then FALLS THROUGH
@@ -1184,6 +1192,7 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	}
 
 	verdict, diags, nextPhase := b.hooks.Classify(artifact, req, bres)
+	diags = append(diags, fenceDiags...)
 	if deliverableUnverified {
 		// SHIP-GUARD (anti-gaming). A deliverable that FAILED its well-formedness/anti-
 		// gaming contract must NEVER launder a CLEAN-ship verdict past the failed contract —

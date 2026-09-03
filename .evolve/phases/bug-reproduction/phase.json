@@ -3,7 +3,7 @@
   "archetype": "evaluate",
   "agent": "evolve-bug-reproduction",
   "description": "Produce a FAIL_TO_PASS reproduction that demonstrably fails on the current tree, BEFORE any patch.",
-  "when_to_use": "bugfix cycles, after fault-localization (or triage), before tdd/build \u2014 reproduce-first anchors the fix and raises resolution rates.",
+  "when_to_use": "bugfix cycles, after fault-localization (or triage), before tdd/build — reproduce-first anchors the fix and raises resolution rates.",
   "categories": [
     "bugfix"
   ],
@@ -50,5 +50,6 @@
       }
     ]
   },
-  "after": "fault-localization"
+  "after": "fault-localization",
+  "writes_source": true
 }

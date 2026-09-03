@@ -33,6 +33,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
+	"github.com/mickeyyaya/evolve-loop/go/internal/treefence"
 )
 
 const phaseName = string(core.PhaseRetro)
@@ -205,11 +206,22 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 		Env:          req.Env,
 		Skills:       overlaySkills,
 	}
+	// Read-only worktree fence (ADR-0097): retro calls the bridge itself, so it
+	// holds the same fence the shared runner does — the tree it hands to the
+	// retry envelope (tdd re-entry, salvage) is the tree it was given.
+	fence := treefence.Begin(ctx, bridgeReq.Worktree, req.WorktreeReadOnly)
+	if err := fence.TakeErr(); err != nil {
+		fmt.Fprintf(os.Stderr, "[retro] WARN worktree fence: snapshot failed (%v) — the tree this phase hands downstream is unverified\n", err)
+	}
 	bres, bridgeErr := p.bridge.Launch(ctx, bridgeReq)
 	if bridgeErr != nil && core.DeliveryFailureCause(bridgeErr) != "" {
 		bres, bridgeErr = p.bridge.Launch(ctx, bridgeReq)
 	}
 	durationMS := p.nowFn().Sub(start).Milliseconds()
+	fenceDiags := fence.End(context.WithoutCancel(ctx)).Diagnostics(phaseName)
+	for _, d := range fenceDiags {
+		fmt.Fprintf(os.Stderr, "[retro] WARN %s\n", d.Message)
+	}
 
 	if bridgeErr != nil {
 		// GAP 9 (self-healing): retro is the failure-analysis phase on the
@@ -229,7 +241,7 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 			CostUSD:      bres.CostUSD,
 			Tokens:       bres.Tokens,
 			DurationMS:   durationMS,
-			Diagnostics:  []core.Diagnostic{{Severity: "error", Message: bridgeErr.Error()}},
+			Diagnostics:  append(fenceDiags, core.Diagnostic{Severity: "error", Message: bridgeErr.Error()}),
 		}, nil
 	}
 
@@ -240,7 +252,7 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 		}
 	}
 	verdict := core.VerdictPASS
-	var diagnostics []core.Diagnostic
+	diagnostics := fenceDiags
 	if reviewErr := validateExplanationReview(content, req); reviewErr != nil {
 		diagnostics = append(diagnostics, core.Diagnostic{Severity: "error", Message: reviewErr.Error()})
 		verdict = core.VerdictFAIL

@@ -110,6 +110,9 @@ func (cr *cycleRun) maybeRemediate(next Phase, dr *dispatchResult) (loopAction, 
 	// report instead, which is the context that matters for a scoped fix.
 	breq.ModelRoutingCLI = ""
 	breq.ModelRoutingTier = ""
+	// The gate is read-only and fenced; the fix dispatch is a BUILD and must
+	// keep its writes (a fenced builder would have its fix silently undone).
+	breq.WorktreeReadOnly = false
 	breq.CorrectionDirective = fmt.Sprintf(
 		"REMEDIATION round %d: the deterministic gate %q FAILED after your build. "+
 			"Read its report at %s and fix EXACTLY the enumerated defects in the worktree — "+
