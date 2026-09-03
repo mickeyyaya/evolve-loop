@@ -100,9 +100,10 @@ backticked the document path.
 | retro fences its own bridge launch; resume and evaluate-batch request builders derive the flag; the two source-writing user phases are declared (architecture review, 2026-09-03) | `internal/phases/retro/worktree_fence_test.go::TestRun_ReadOnlyWorktreeIsFencedAroundRetrosOwnLaunch`; `internal/core/cyclerun_remediate_test.go::TestDispatch_ReadOnlyFlagOnResumeAndEvaluateBatchSurfaces`; `internal/phasespec/writes_source_declared_test.go::TestUserSpecs_SourceWritersDeclareWritesSource`; runner proof reads the tree AT classify time |
 
 ## Not fixed here (follow-ups, inbox)
-- A missing `## Explanation Documentation` section (1601, 1603) is still a
-  terminal audit FAIL; routing it through the runner's contract correction
-  ladder (a conditional contract section) is the next step.
+- ~~A missing `## Explanation Documentation` section (1601, 1603) is still a
+  terminal audit FAIL~~ — FIXED the same day: `phasecontract.ExplanationDocumentation`
+  is a conditional audit contract section the deliverable reviewer enforces while the
+  explanation contract is active, so the correction ladder re-dispatches the auditor.
 - The OS sandbox's `read_only_repo` stays environment-dependent; the fence is
   the policy-level floor, the sandbox remains defence in depth when it applies.
 - The auditor still spends budget on in-place mutation probes; the persona's
