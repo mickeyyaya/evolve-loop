@@ -121,6 +121,7 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 	// seedAuditRepairContext) and copy-on-write, so it cannot leak into later
 	// phases or diverge from the resume path.
 	phaseCtx = seedAuditRepairContext(phaseCtx, next, cr.cs)
+	phaseCtx = cr.o.seedTaskContract(cr.ctx, phaseCtx, next, cr.cs, cr.req.ProjectRoot)
 	// Archive the previous attempt's prompt beside the audit archives so each
 	// round's brief stays recoverable (G10); the bridge rewrites the file on
 	// this dispatch.

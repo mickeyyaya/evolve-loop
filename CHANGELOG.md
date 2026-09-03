@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## Added — the Task Contract block: acceptance verbatim + the ACS predicate inventory in the tdd, build and audit prompts (ADR-0098, 2026-09-03)
+
+The acceptance criteria a cycle is graded against live on the inbox item, but reached the builder only through two LLM hops of prose, and the predicates tdd wrote reached it only by grep. `core.seedTaskContract` (both dispatch surfaces) now renders a harness-owned `## Task Contract` block into the tdd, build and audit prompts (the grader reads the same words the builder was handed): each bound task's `acceptance[]` copied VERBATIM from its inbox record (`inboxbatch.LoadFile`, one source, sanitised as a prompt surface), and — for build and audit — the predicate names `go test -list . -tags acs ./acs/cycle<N>` finds in the worktree (bounded by the ACS lane timeout). Unresolved records, items without acceptance, and a cycle with no predicates package are loud lines in the block, never silent omissions. The filed `handoff-tdd.json` half was retired: the inventory derived from the test files IS the handoff. Closes inbox `inline-task-contract-into-build-prompt`.
+
+---
+
 ## Fixed — a missing `## Explanation Documentation` section is a correction, not a terminal FAIL (2026-09-03)
 
 Cycles 1601 and 1603 died on `audit-report.md is missing ## Explanation Documentation`: the audit's deterministic gate forced FAIL and nothing re-asked the auditor for a section that costs one re-dispatch to add. The audit contract now declares the section as CONDITIONAL (`phasecontract.ExplanationDocumentation` under `Contract.ExplanationSections`), and every verifier enforces it while the cycle's explanation contract is active — the version rides on `phasecontract.Roots`, so the host gate, the runner, the salvage re-check and the agent's own `evolve phase verify` (reading `cycle-state.json`) agree; the match is the exact visible heading the audit gate itself uses (`reportdoc.HasSection`) — under the same `missing_section` code every other section uses — so the existing correction ladder re-dispatches the auditor with the reason as its directive. A cycle without the contract is never asked for the section; the audit gate's own check stays as the backstop. Closes inbox `auditor-explanation-section-correction-ladder`.

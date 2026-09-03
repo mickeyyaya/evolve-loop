@@ -530,6 +530,7 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 		// repairSeededPhase(PhaseRetro)==false and rebuilt BLIND. Every sibling
 		// line in this block keys on next for the same reason.
 		phaseCtx := seedAuditRepairContext(ctxSnap, next, cs)
+		phaseCtx = o.seedTaskContract(ctx, phaseCtx, next, cs, req.ProjectRoot)
 		archiveRepairPrompts(cs, next)
 		if next == PhaseAudit {
 			cs.AuditRepairActive = false
