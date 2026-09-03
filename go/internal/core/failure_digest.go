@@ -294,23 +294,8 @@ func verdictFailDistinguisher(phase, workspace string) string {
 		}
 		break // a readable report without bullets settles this layer
 	}
-	if raw, err := os.ReadFile(filepath.Join(workspace, "triage-decision.json")); err == nil {
-		var d struct {
-			TopN []struct {
-				ID string `json:"id"`
-			} `json:"top_n"`
-		}
-		if json.Unmarshal(raw, &d) == nil && len(d.TopN) > 0 {
-			ids := make([]string, 0, len(d.TopN))
-			for _, c := range d.TopN {
-				if c.ID != "" {
-					ids = append(ids, c.ID)
-				}
-			}
-			if len(ids) > 0 {
-				return "tasks=" + strings.Join(ids, ",")
-			}
-		}
+	if ids := triageTopNIDs(workspace); len(ids) > 0 {
+		return "tasks=" + strings.Join(ids, ",")
 	}
 	return ""
 }

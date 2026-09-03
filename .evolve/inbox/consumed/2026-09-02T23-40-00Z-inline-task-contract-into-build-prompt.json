@@ -1,0 +1,36 @@
+{
+  "id": "inline-task-contract-into-build-prompt",
+  "created_at": "2026-09-02T23:40:00Z",
+  "weight": 0.88,
+  "title": "R4 inline the contract: build prompt carries the acceptance criteria verbatim, the ACS predicate names (go test -list over go/acs/cycle<N>), and a schema-validated handoff-tdd.json replacing agent-mailbox.md as the tdd→build authority",
+  "kind": "pipeline-repair",
+  "class": "task-contract-design",
+  "priority": "high",
+  "summary": "Gaps G3+G4: build-prompt.txt carries only the task slug (line 106 tells the builder to open triage-report.md then .evolve/evals/<slug>.md); the RED test names arrive via free-text agent-mailbox.md. A weaker model that skims builds against an imagined contract and nothing checks comprehension. Evidence: SWE-agent ACI (concise informative feedback beats indirection), Spec Kit / Kiro EARS testable criteria, Anthropic feature-list-as-data.",
+  "root_cause": "The prompt assembler (prompts/systemprompt) inlines the persona and cycle context but not the selected item's acceptance[] or the tdd phase's predicate list; the mailbox is prose with no schema.",
+  "fix": "(1) Assembler inlines acceptance[] of every top_n item verbatim in a harness-owned block; (2) after tdd, the harness runs `go test -list . -tags acs ./acs/cycle<N>` and inlines the names; (3) tdd emits handoff-tdd.json {predicates[], fix_sketch, out_of_scope[]} validated by phasecontract; the mailbox stays advisory.",
+  "acceptance": [
+    "build-prompt.txt for a cycle with two top_n items contains both items' acceptance[] arrays verbatim and the ACS test names; unit test pins the block.",
+    "A tdd phase that writes no handoff-tdd.json (or an invalid one) fails the tdd contract gate loudly, not silently.",
+    "No belief duplication: acceptance text is read from the inbox item (single source) and projected.",
+    "go vet ./..., -race, apicover -enforce green."
+  ],
+  "files": [
+    "go/internal/prompts/",
+    "go/internal/systemprompt/",
+    "go/internal/phasecontract/",
+    "agents/evolve-tdd-engineer.md",
+    "agents/evolve-builder.md"
+  ],
+  "connects_to": [
+    "build-exit-deterministic-floor (R3)",
+    "harness-minted-completion (R5)"
+  ],
+  "notes": "Filed 2026-09-02 (proposal R4 in docs/research/ship-rate-harness-reliability-2026-09-02.md).",
+  "consumed": {
+    "at": "2026-09-03T07:30:00Z",
+    "by": "console-manual",
+    "landing": "ADR-0098 — Task Contract block: acceptance[] verbatim from the bound inbox record(s) into the tdd and build prompts; ACS predicate names listed by the harness (go test -list) into the build prompt",
+    "resolution": "FIXED (with one deviation, recorded in the ADR: no handoff-tdd.json — the predicate inventory is derived from the test files themselves, which is the single source the AC-Materialization table already keys on; a second agent-authored handoff file would be a second belief)"
+  }
+}

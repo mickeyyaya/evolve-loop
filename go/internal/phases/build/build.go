@@ -57,6 +57,11 @@ func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	if req.BuildPlan != "" {
 		fmt.Fprintf(&b, "\n\n## Build Plan\n%s", req.BuildPlan)
 	}
+	if contract := req.Context[core.CtxKeyTaskContract]; contract != "" {
+		// Harness-owned (ADR-0098): heading only — the preamble and the block
+		// are composed once in core so tdd, build and audit read identical words.
+		fmt.Fprintf(&b, "\n\n## Task Contract\n%s", contract)
+	}
 	// ADR-0076 slice C: an adopted continuation resumes a prior attempt's
 	// preserved work — hand the builder that attempt's failure findings so it
 	// finishes what remains instead of rediscovering it. Absent key ⇒

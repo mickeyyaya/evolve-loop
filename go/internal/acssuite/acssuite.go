@@ -347,8 +347,14 @@ func goLaneTimeout(optsTimeout time.Duration, cfg policy.ACSConfig) time.Duratio
 // currentCycleGoPkgDir is the Go predicate package dir for the current cycle:
 // <moduleDir>/acs/cycle<N>.
 func currentCycleGoPkgDir(moduleDir string, cycle int) string {
-	return filepath.Join(moduleDir, "acs", fmt.Sprintf("cycle%d", cycle))
+	return filepath.Join(moduleDir, filepath.FromSlash(CyclePackage(cycle)))
 }
+
+// CyclePackage is the ONE spelling of a cycle's ACS predicate package as a Go
+// package pattern relative to the module (`./acs/cycle<N>`). The suite lane,
+// the scope lint and the Task Contract's predicate inventory (core) all derive
+// from it, so the convention cannot drift between the writer and its readers.
+func CyclePackage(cycle int) string { return fmt.Sprintf("./acs/cycle%d", cycle) }
 
 // currentCycleGoPkgExists reports whether the current cycle has a Go predicate
 // package on disk. When absent, the Go lane is a no-op (not an error) — the
@@ -372,7 +378,7 @@ func currentCycleGoPkgExists(moduleDir string, cycle int) bool {
 func goLanePatterns(moduleDir string, cycle int) []string {
 	var pats []string
 	if dirExists(currentCycleGoPkgDir(moduleDir, cycle)) {
-		pats = append(pats, fmt.Sprintf("./acs/cycle%d", cycle))
+		pats = append(pats, CyclePackage(cycle))
 	}
 	if entries, err := os.ReadDir(filepath.Join(moduleDir, "acs", "regression")); err == nil {
 		for _, e := range entries {
