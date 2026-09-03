@@ -19,6 +19,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/tokenusage"
 )
 
@@ -484,7 +485,7 @@ func (e *Engine) Launch(ctx context.Context, req core.BridgeRequest) (core.Bridg
 	if agent == "" {
 		agent = "agent"
 	}
-	promptFile := filepath.Join(req.Workspace, agent+"-prompt.txt")
+	promptFile := filepath.Join(req.Workspace, phasecontract.PromptArtifactFilename(agent))
 	if err := os.WriteFile(promptFile, []byte(req.Prompt), 0o644); err != nil {
 		return core.BridgeResponse{}, fmt.Errorf("bridge: write prompt: %w", err)
 	}

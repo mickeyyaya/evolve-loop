@@ -33,6 +33,10 @@ above and the backlog reflect the fuller parallel sweep.
 
 | Incident | Failure mode | Suspect file | Coverage | Pinning test / proposal |
 |---|---|---|---|---|
+| [2026-09-03 repair rounds blind and flat](2026-09-03-repair-rounds-blind-and-flat.md) | declared `audit_retry_2plus` tier override had no producer; every repair round re-dispatched at the same tier | `core/retry_tier_escalation.go` | ✅ | `core/repair_tier_escalation_test.go` (`TestRepairRoundTier_*` + live-loop `TestRepairRoundDispatch_RaisesBuildTierThroughLiveLoop`) |
+| 2026-09-03 repair rounds blind and flat | repair brief carried gate strings only; auditor's HIGH findings never reached the builder | `core/repair_brief.go` | ✅ | `core/repair_brief_test.go` (`TestComposeRepairBrief_*`, live-loop `TestRepairRoundDispatch_BriefCarriesAuditorFindingsAndArchivesPrompt`) |
+| 2026-09-03 repair rounds blind and flat | round prompts overwritten in place (no forensic trail of what round N was told) | `core/repair_brief.go` | ✅ | `TestArchiveRepairPrompts_RenamesOnceNeverClobbers` |
+| 2026-09-03 repair rounds blind and flat | effort flat across an escalated tier | `bridge/launch.go` | ✅ | `bridge/effort_overrides_test.go` |
 | [2026-08-09 zero-ship batch](2026-08-09-zero-ship-batch.md) | ship gate bound untracked minted profile stubs (false RED, 3 audit-green ships blocked) | `phasecoherence/unpaired_test.go` | ✅ | `phasecoherence/unpaired_tracked_test.go` + `unpaired_tracked_edge_test.go` (stderr fidelity, empty-set, staged, nested-alias) |
 | 2026-08-09 zero-ship batch | disposition contract unsatisfiable (schema never shown; array evidence rejected as unparseable) | `phases/audit/defect_ledger.go` | ✅ | `audit/defect_ledger_evidence_shape_test.go` + `_evidence_edge_test.go` + `_schema_singlesource_test.go` |
 | 2026-08-09 zero-ship batch | varied-fingerprint failure streak never halts (10 cycles burned) | `core/blocker_breaker.go` | ✅ | `core/blocker_breaker_consecutive_test.go` + `_edge_test.go`; `policy/policy_failure_consecutive_test.go` |

@@ -13,6 +13,9 @@ package core
 // routing clamp uses (a single-entry ClampPlanModelRouting pass — never a
 // second clamp implementation), so a profile's envelope Max still wins.
 // Raise-only: a proposal already at or above deep is never touched.
+//
+// ADR-0096 adds a second producer of the same raise (repairRoundTier); both
+// share clampedRaise so the raise-only rule and the clamp live once.
 
 import (
 	"encoding/json"
@@ -30,6 +33,26 @@ import (
 
 // retryEscalationTier is the floor a retried item's build is raised to.
 const retryEscalationTier = "deep"
+
+// clampedRaise is the shared raise-only skeleton of both dispatch-time
+// escalations: a proposal at or above target is untouched; otherwise target
+// is clamped through the ONE envelope guardrail (a single-entry
+// ClampPlanModelRouting pass applying the phase profile's envelope, Max wins)
+// and returned only when it still beats the proposal. Callers own the reason
+// and the log line.
+func (o *Orchestrator) clampedRaise(projectRoot string, phase Phase, currentTier, target string) (string, bool) {
+	if policy.TierRank(currentTier) >= policy.TierRank(target) {
+		return "", false // raise-only: never lower an equal/higher proposal
+	}
+	tmp := &router.PhasePlan{Entries: []router.PhasePlanEntry{{Phase: string(phase), Run: true, Tier: target}}}
+	profileFor := func(p string) *profiles.Profile { return o.profileForModelRouting(projectRoot, p) }
+	clamped, _ := router.ClampPlanModelRouting(tmp, profileFor, o.modelCatalogLookup)
+	tier := clamped.Entries[0].Tier
+	if policy.TierRank(tier) <= policy.TierRank(currentTier) {
+		return "", false // envelope pulled the raise back — no effective gain
+	}
+	return tier, true
+}
 
 // escalatedBuildTier decides the dispatch-time raise for THIS cycle's build.
 // currentTier is whatever the (mode-gated) plan projection already set — the
@@ -51,19 +74,9 @@ func (cr *cycleRun) escalatedBuildTier(currentTier string) (string, bool) {
 	if maxCount < threshold {
 		return "", false
 	}
-	if policy.TierRank(currentTier) >= policy.TierRank(retryEscalationTier) {
-		return "", false // raise-only: never lower an equal/higher proposal
-	}
-	// Clamp through the one true guardrail: a single-entry plan through
-	// ClampPlanModelRouting applies the build profile's envelope (Max wins).
-	tmp := &router.PhasePlan{Entries: []router.PhasePlanEntry{{Phase: string(PhaseBuild), Run: true, Tier: retryEscalationTier}}}
-	profileFor := func(phase string) *profiles.Profile {
-		return cr.o.profileForModelRouting(cr.req.ProjectRoot, phase)
-	}
-	clamped, _ := router.ClampPlanModelRouting(tmp, profileFor, cr.o.modelCatalogLookup)
-	tier := clamped.Entries[0].Tier
-	if policy.TierRank(tier) <= policy.TierRank(currentTier) {
-		return "", false // envelope pulled the raise back — no effective gain
+	tier, raised := cr.o.clampedRaise(cr.req.ProjectRoot, PhaseBuild, currentTier, retryEscalationTier)
+	if !raised {
+		return "", false
 	}
 	fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d: retry tier escalation — scoped item failure_count=%d >= %d, build dispatched at %q (ADR-0076 D deterministic floor; envelope-clamped)\n", cr.cycle, maxCount, threshold, tier)
 	return tier, true
@@ -116,4 +129,43 @@ func processingClaimIDs(projectRoot string, cycle int) []string {
 		ids = append(ids, doc.ID)
 	}
 	return ids
+}
+
+// auditRepairSituation is the model_tier_overrides key an in-cycle audit-repair
+// round activates. builder.json and tdd-engineer.json have declared it since
+// the override table landed; this is its producer.
+const auditRepairSituation = "audit_retry_2plus"
+
+// repairRoundTier decides the dispatch-time raise for a tdd/build re-entry
+// INSIDE an audit-repair round (CycleState.AuditRepairActive — the same
+// persisted flag the repair brief derives from, so the live loop and the
+// crash-resume path cannot diverge). The target tier is the phase profile's
+// declared model_tier_overrides[audit_retry_2plus]; no declaration ⇒ the rule
+// is inert (config decides, not Go). Raise-only and envelope-clamped through
+// clampedRaise, exactly as the ADR-0076 D floor.
+//
+// Why: repair rounds re-dispatched at the identical tier and effort do not
+// converge — cycles 1595–1605 ran balanced/balanced/balanced and ship
+// probability by audit-round count fell 100 % → 50 % → 17 % → 0 % (research:
+// docs/research/ship-rate-harness-reliability-2026-09-02.md, R1). Effort
+// follows the tier via the profile's effort_overrides at the bridge launch.
+func (o *Orchestrator) repairRoundTier(projectRoot string, phase Phase, cs CycleState, currentTier string) (string, bool) {
+	if !cs.AuditRepairActive || !repairSeededPhase(phase) {
+		return "", false
+	}
+	prof := o.profileForModelRouting(projectRoot, string(phase))
+	if prof == nil {
+		return "", false
+	}
+	target := strings.TrimSpace(prof.ModelTierOverrides[auditRepairSituation])
+	if target == "" {
+		return "", false
+	}
+	tier, raised := o.clampedRaise(projectRoot, phase, currentTier, target)
+	if !raised {
+		return "", false
+	}
+	fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d: audit-repair tier escalation — %s re-dispatched at %q (profile model_tier_overrides.%s, repair attempt %d; envelope-clamped)\n",
+		cs.CycleID, phase, tier, auditRepairSituation, cs.AuditRepairAttempts)
+	return tier, true
 }

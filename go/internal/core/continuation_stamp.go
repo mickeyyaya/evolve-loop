@@ -199,7 +199,14 @@ func truncateFindings(s string) string {
 	if len(s) <= maxFindingsBytes {
 		return s
 	}
-	return s[:maxFindingsBytes] + fmt.Sprintf("\n…[truncated %d bytes]", len(s)-maxFindingsBytes)
+	// Cut at the last line break inside the budget: a byte-offset cut can land
+	// mid-rune (the briefs carry — and …) or mid-finding, and a half title is
+	// exactly what the "you were told this already" marker must never hand over.
+	cut := maxFindingsBytes
+	if i := strings.LastIndexByte(s[:cut], '\n'); i > 0 {
+		cut = i
+	}
+	return s[:cut] + fmt.Sprintf("\n…[truncated %d bytes]", len(s)-cut)
 }
 
 // adoptContinuationAfterTriage is the ADR-0076 slice C adoption seam, invoked

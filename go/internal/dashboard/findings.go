@@ -11,24 +11,15 @@ import (
 // panel and the rebuilding agent can never disagree about what a finding is.
 type Finding = reportdoc.Finding
 
-// severityRank orders findings highest severity first; unknown severities sort
-// after the known ones so nothing is dropped.
-var severityRank = map[string]int{"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3}
-
 func parseFindings(markdown string) []Finding { return reportdoc.Findings(markdown) }
 
 func parseVerdict(markdown string) string { return reportdoc.Verdict(markdown) }
 
-// sortFindings orders by severity rank, then by id, in place.
+// sortFindings orders by reportdoc.SeverityRank (highest first; unknown
+// severities after the known ones so nothing is dropped), then by id, in place.
 func sortFindings(fs []Finding) {
-	rank := func(sev string) int {
-		if r, ok := severityRank[sev]; ok {
-			return r
-		}
-		return len(severityRank)
-	}
 	sort.SliceStable(fs, func(i, j int) bool {
-		if ri, rj := rank(fs[i].Severity), rank(fs[j].Severity); ri != rj {
+		if ri, rj := reportdoc.SeverityRank(fs[i].Severity), reportdoc.SeverityRank(fs[j].Severity); ri != rj {
 			return ri < rj
 		}
 		return fs[i].ID < fs[j].ID

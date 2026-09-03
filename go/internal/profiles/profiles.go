@@ -61,13 +61,17 @@ type Profile struct {
 	ResearchQuota      map[string]int     `json:"research_quota,omitempty"`
 	Sandbox            *SandboxConfig     `json:"sandbox,omitempty"`
 	EffortLevel        string             `json:"effort_level,omitempty"`
-	AddDir             []string           `json:"add_dir,omitempty"`
-	PermissionMode     string             `json:"permission_mode,omitempty"`
-	InteractivePolicy  string             `json:"interactive_policy,omitempty"`
-	StreamOutput       bool               `json:"stream_output,omitempty"`
-	StopCriterion      string             `json:"stop_criterion,omitempty"`
-	TurnBudgetHint     int                `json:"turn_budget_hint,omitempty"`
-	GeneratedFrom      string             `json:"generated_from,omitempty"`
+	// EffortOverrides maps a resolved model tier to the effort rung used when
+	// the profile lands on that tier (the bridge's launch seam applies it), so
+	// a model_tier_overrides escalation carries its effort with it.
+	EffortOverrides   map[string]string `json:"effort_overrides,omitempty"`
+	AddDir            []string          `json:"add_dir,omitempty"`
+	PermissionMode    string            `json:"permission_mode,omitempty"`
+	InteractivePolicy string            `json:"interactive_policy,omitempty"`
+	StreamOutput      bool              `json:"stream_output,omitempty"`
+	StopCriterion     string            `json:"stop_criterion,omitempty"`
+	TurnBudgetHint    int               `json:"turn_budget_hint,omitempty"`
+	GeneratedFrom     string            `json:"generated_from,omitempty"`
 	// SystemPrompt / SystemPromptFile carry per-agent system-level rules
 	// prepended to the prompt at launch (facet B). SystemPromptFile is read
 	// relative to the profile dir when not absolute; SystemPrompt wins if both
