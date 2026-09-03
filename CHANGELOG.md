@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — read-only phases can no longer rewrite the builder's tree; the explanation review reads what auditors write (ADR-0097, 2026-09-03)
+
+Seven of eleven consecutive FAILs (cycles 1596–1606) were the harness rejecting its own pipeline's output. Three were the deterministic explanation-digest gate firing on a tree the AUDITOR had altered — its mutation probes rewrote the builder's material files in place (`cp /tmp/digest.go.bak …`, "wrote reverted tdd.go"; reproduced forensically from the salvage worktrees) — and the profile's `sandbox.read_only_repo` was inert because the wave ran `sandbox=false`. Five were the `## Explanation Documentation` section rejected on FORMAT: several `- Evidence:` lines ("duplicate evidence fields"), a line-range citation, backticked values, citations under other field names.
+
+- **Worktree fence** — `internal/treefence` snapshots a worktree as a git tree object (throwaway index; tracked + untracked, ignore rules respected) and restores it. `core.PhaseRequest.WorktreeReadOnly` is derived at every dispatch site from the ONE write-permission predicate (`worktreePhase`) and cleared on a remediation builder fix; `phases/runner` fences every read-only dispatch around its attempts, before the classify hooks, and reports each restored path as a diagnostic on the response. Fail-open, loudly; verdicts untouched.
+- **Explanation-review tolerance** — `reportdoc.Fields` keeps `Evidence` list-valued and strips surrounding backticks; `path:23-48`, `path:12:3` and `path#L7-L9` are citations; `reportdoc.EvidenceOrBody` falls back to the section prose. The grounding rule (every material path cited at a line) is unchanged, and the three real sections are the regression fixtures.
+- Incident record: [docs/incidents/2026-09-03-auditor-mutates-the-worktree.md](docs/incidents/2026-09-03-auditor-mutates-the-worktree.md). The research's R3 draft (a native `build-floor` phase) was retired: the deterministic build handoff floor already exists in the E2 reviewer chain, and the evidence pointed at audit-time mutation.
+
+---
+
 ## Fixed — repair rounds escalate tier + effort and carry the auditor's findings (ADR-0096, 2026-09-03)
 
 Ship probability by audit-round count ran 100 % → 50 % → 17 % → 0 % over cycles 1560–1605: every in-cycle repair round was a byte-identical retry (same tier, same effort, same brief of gate strings), and the profiles' declared `model_tier_overrides.audit_retry_2plus: "deep"` had no producer — nor was its resolver on the production dispatch path.

@@ -61,6 +61,7 @@ func (cr *cycleRun) phaseRequestFor(phase Phase) PhaseRequest {
 		ProjectRoot:                     cr.req.ProjectRoot,
 		Workspace:                       cr.cs.WorkspacePath,
 		Worktree:                        cr.cs.ActiveWorktree,
+		WorktreeReadOnly:                cr.o.worktreeReadOnly(phase),
 		WorktreeBaseSHA:                 cr.cs.WorktreeBaseSHA,
 		ExplanationDocumentationVersion: cr.cs.ExplanationDocumentationVersion,
 		RunID:                           cr.cs.RunID,

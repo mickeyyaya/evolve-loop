@@ -408,11 +408,12 @@ func runPreliminaryStudy(workspace, feedback string) error {
 		return err
 	}
 	req := core.PhaseRequest{
-		Cycle:       cycleFromWorkspace(workspace),
-		ProjectRoot: projectRoot,
-		Workspace:   workspace,
-		Worktree:    worktree,
-		Context:     map[string]string{"campaign_feedback": feedback},
+		Cycle:            cycleFromWorkspace(workspace),
+		ProjectRoot:      projectRoot,
+		Workspace:        workspace,
+		Worktree:         worktree,
+		WorktreeReadOnly: !cfg.WritesSource,
+		Context:          map[string]string{"campaign_feedback": feedback},
 	}
 	resp, err := registered.Runner.Run(context.Background(), req)
 	if err != nil {

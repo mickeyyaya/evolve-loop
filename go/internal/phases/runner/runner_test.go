@@ -38,13 +38,16 @@ type fakeHooks struct {
 	artifact string
 	model    string
 	// scripted outputs
-	prompt         string
-	verdict        string
-	diagnostics    []core.Diagnostic
-	nextPhase      string
-	classifyCalls  int
-	gotArtifact    string
-	gotComposeReq  core.PhaseRequest
+	prompt        string
+	verdict       string
+	diagnostics   []core.Diagnostic
+	nextPhase     string
+	classifyCalls int
+	gotArtifact   string
+	gotComposeReq core.PhaseRequest
+	// onClassify, when set, observes the request at classify time (the fence
+	// tests read the worktree here: Classify must see the restored tree).
+	onClassify     func(core.PhaseRequest)
 	gotComposeBody string
 }
 
@@ -66,6 +69,9 @@ func (h *fakeHooks) ComposePrompt(body string, req core.PhaseRequest) string {
 func (h *fakeHooks) Classify(artifact string, req core.PhaseRequest, bres core.BridgeResponse) (string, []core.Diagnostic, string) {
 	h.classifyCalls++
 	h.gotArtifact = artifact
+	if h.onClassify != nil {
+		h.onClassify(req)
+	}
 	return h.verdict, h.diagnostics, h.nextPhase
 }
 

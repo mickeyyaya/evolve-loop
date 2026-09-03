@@ -1,0 +1,37 @@
+{
+  "id": "build-exit-deterministic-floor",
+  "created_at": "2026-09-02T23:40:00Z",
+  "weight": 0.9,
+  "title": "R3 build-exit deterministic floor: run the cheap gates the auditor would run (apicover on touched pkgs, explanation-SHA binding, Closes-Inbox proof presence, new-export production-caller scan, clean/untracked-test check) at build→audit and re-enter build on RED — no audit dispatch spent",
+  "kind": "pipeline-repair",
+  "class": "pipeline-architecture",
+  "priority": "high",
+  "summary": "Gap G5 (docs/research/ship-rate-harness-reliability-2026-09-02.md §2): every deterministic check runs at audit, after the builder's full ~20-turn budget. Over-claim (4/9 recent FAILs) and attestation-SHA mismatch (3/9) each cost a full audit round to detect although their signatures are already machine-checkable. Evidence: SWE-agent lint-on-edit +3pp and 'guardrails hasten recovery' (arXiv 2405.15793); Claude Code hooks 'deterministic vs advisory'.",
+  "root_cause": "The build phase has no exit floor beyond the apicover graduation check (buildGraduationCheck); the cheap gate set lives only at phases/audit/audit.go:296-400.",
+  "fix": "Extend the existing build-handoff seam (buildGraduationCheck) into a build-exit floor that runs the deterministic subset; on RED, re-dispatch BUILD with the exact gate text as the brief (≤2 micro-rounds, policy-configured), without incrementing audit_dispatches. Gate order and thresholds come from policy/compiled defaults, never Go literals.",
+  "acceptance": [
+    "A build whose diff adds an exported identifier with zero non-test callers is re-dispatched to build with the offender named, before any audit dispatch.",
+    "A build-explanation.json whose diff SHA does not match the base-bound diff is caught at build exit; the auditor never sees it.",
+    "Micro-round count is bounded by policy; the third RED proceeds to audit and records the floor findings in audit-fail-reason.json.",
+    "Wiring proof: a live round-2 build shows the floor output in build-prompt.txt; unit test pins the seam on both dispatch surfaces (cyclerun_dispatch.go + resume.go).",
+    "go vet ./..., -race, apicover -enforce green."
+  ],
+  "files": [
+    "go/internal/core/phase_bindings_graduation_test.go (seam contract)",
+    "go/internal/core/cyclerun_dispatch.go",
+    "go/internal/core/resume.go",
+    "go/internal/phases/audit/audit.go (gate set single-sourced, projected)"
+  ],
+  "connects_to": [
+    "repair-brief-carries-auditor-findings (R2)",
+    "harness-minted-completion (R5)",
+    "ADR-0092 audit repair loop"
+  ],
+  "notes": "Filed 2026-09-02 from the ship-rate investigation (design spec docs/superpowers/specs/2026-09-02-ship-rate-harness-and-pipeline-dashboard-design.md, proposal R3). Console-routed: touches core dispatch surfaces.",
+  "consumed": {
+    "at": "2026-09-03T04:45:00Z",
+    "by": "console-manual",
+    "landing": "ADR-0097 (worktree fence for read-only phases + tolerant explanation-review parser)",
+    "resolution": "SUPERSEDED — forensics on cycles 1603/1604/1605 showed the deterministic build handoff floor already exists (core/build_floor_reviewer.go); the failing gate was the explanation digest firing on a tree the AUDITOR had mutated, plus the review section rejected on format. See docs/incidents/2026-09-03-auditor-mutates-the-worktree.md"
+  }
+}
