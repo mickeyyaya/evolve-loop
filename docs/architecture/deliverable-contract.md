@@ -28,6 +28,24 @@ verdict; a JSON contract requires valid JSON with the listed top-level keys (a *
 — unknown/future keys are ignored). `ArtifactName` is pinned to the profile `output_artifact`
 basename by `TestArtifactNameMatchesProfileOutput` (drift detector).
 
+### Conditional sections (2026-09-03)
+
+Some sections are owed only in some cycles. `Contract.ExplanationSections` lists the sections a phase
+owes while the cycle's explanation-documentation contract is active — today the audit report's
+`## Explanation Documentation` (declared once as `phasecontract.ExplanationDocumentation`; the
+audit's own gate derives its heading from the same declaration). The contract version rides on
+`phasecontract.Roots.ExplanationDocumentationVersion`, so every verifier asks the same question: the
+host gate (from `ReviewInput`), the runner (from the request), the salvage re-check, and the
+agent's `evolve phase verify` (from `cycle-state.json`, derived from the workspace path when
+`--evolve-dir` is absent; an unreadable state is a stderr WARN, never a silent "inactive"). The
+match is the exact visible level-two heading (`reportdoc.HasSection`) — a heading in a fence, a
+comment, or at another level counts for neither the gate nor the self-check. A missing section
+is reported under the same `missing_section` code as any other, so it is a correction re-dispatch
+with the reason as the directive, not a terminal FAIL (cycles 1601/1603); a cycle without the
+contract is never asked for it. The retro's `## Explanation Documentation Review` stays a gate-only
+check for now: retro has no deliverable contract entry, is not on the ship path, and did not
+appear in the failure census.
+
 ### Reading the registry from Go (cycle-1145)
 
 Two accessors project the registry so no consumer re-declares its vocabulary:

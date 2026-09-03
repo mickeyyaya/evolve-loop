@@ -27,6 +27,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolve-loop/go/internal/reportdoc"
 )
 
 // Violation is one confirmed well-formedness failure with an actionable message.
@@ -246,6 +247,19 @@ func verifyMarkdown(res *Result, c phasecontract.Contract, content string, roots
 	for _, s := range c.Sections {
 		if !s.Present(content) {
 			res.add(CodeMissingSection, fmt.Sprintf("required section %q is missing", s.Canonical))
+		}
+	}
+	// Conditional sections (ExplanationSections) are owed only while the cycle's
+	// explanation-documentation contract is active; the version rides on Roots
+	// so every verifier — gate, runner, salvage re-check, `evolve phase verify`
+	// — asks the same question. Matched by the exact visible level-two heading
+	// (reportdoc.HasSection), the predicate the audit's own gate uses, so a
+	// report the gate refuses can never slip past the correction ladder.
+	if roots.ExplanationDocumentationVersion != 0 {
+		for _, s := range c.ExplanationSections {
+			if !reportdoc.HasSection(content, s.Title()) {
+				res.add(CodeMissingSection, fmt.Sprintf("required section %q is missing (the explanation-documentation contract v%d is active for this cycle — review the Build explanation document and emit the section in the shape of the explanation-documentation-review reference's contract example)", s.Canonical, roots.ExplanationDocumentationVersion))
+			}
 		}
 	}
 	if len(c.Verdicts) > 0 && !verdictPresent(content, c.Verdicts, phaseIO) {

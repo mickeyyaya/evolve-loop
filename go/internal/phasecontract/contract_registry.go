@@ -38,6 +38,13 @@ type Roots struct {
 	// deliverable.Verify judged a file the phase was never asked to write).
 	// Only the runner sets it; CLI/gate callers verify the contract path.
 	DispatchedArtifact string
+	// ExplanationDocumentationVersion is the cycle's explanation-documentation
+	// contract version (0 = not active). Contract.ExplanationSections are owed
+	// only when it is non-zero. Every verifier — the host gate (from
+	// ReviewInput), the runner (from the request), the salvage re-check and the
+	// agent's own `evolve phase verify` (from cycle-state.json) — carries it
+	// here, so the self-check and the gate cannot disagree about the section.
+	ExplanationDocumentationVersion int
 }
 
 // WriteTarget values. Every deliverable currently lands in either the per-cycle
@@ -60,9 +67,15 @@ type Contract struct {
 	ArtifactName string // runtime-truth filename (matches the in-process runner hook)
 	Kind         Kind
 	Sections     []Section // markdown only
-	Verdicts     []string  // markdown only — allowed verdict tokens
-	RequiredKeys []string  // json only — minimal required top-level keys
-	WriteTarget  string    // one of Target*
+	// ExplanationSections are required ONLY while the cycle's explanation-
+	// documentation contract is active (Roots.ExplanationDocumentationVersion !=
+	// 0); every verifier — the deliverable reviewer and Verify/VerifyWithStage
+	// alike — checks them against that field, so they agree regardless of which
+	// one is asked. Markdown only.
+	ExplanationSections []Section
+	Verdicts            []string // markdown only — allowed verdict tokens
+	RequiredKeys        []string // json only — minimal required top-level keys
+	WriteTarget         string   // one of Target*
 	// RequireFailureContext makes a FAIL/WARN verdict sentinel without a
 	// structured failure block a violation (ADR-0039 §7) — the correction
 	// loop then re-dispatches with the exact fix. Applies only to
@@ -145,6 +158,7 @@ var contracts = map[string]Contract{
 		Phase: "audit", AgentName: "auditor", ArtifactName: "audit-report.md",
 		Kind: KindMarkdown, Sections: alwaysOn(Audit.Sections), Verdicts: verdictsPassFailWarnSkp,
 		WriteTarget: TargetWorkspace, RequireFailureContext: true,
+		ExplanationSections: []Section{ExplanationDocumentation},
 	},
 	"intent": {
 		Phase: "intent", AgentName: "intent", ArtifactName: "intent.md",
