@@ -111,3 +111,20 @@ func TestEvidenceOrBody_FallsBackToTheSectionProse_Cycle1606(t *testing.T) {
 		t.Fatalf("an explicit Evidence field wins, got %q", got)
 	}
 }
+
+// TestReviewFields_ParsesOnceForBothGates — the single home both phase gates
+// call: Fields over the allowed keys with the evidence text resolved once.
+func TestReviewFields_ParsesOnceForBothGates(t *testing.T) {
+	t.Parallel()
+	body, _, _ := Section(section(t, "1606"), "Explanation Documentation")
+	fields, err := ReviewFields(body, strings.Split(reviewKeys, ",")...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fields["status"] != "NEEDS_CORRECTION" || !strings.Contains(fields["evidence"], "build-explanation.json:9") {
+		t.Fatalf("ReviewFields must resolve the prose evidence: %+v", fields)
+	}
+	if _, err := ReviewFields("- Status: A\n- Status: B\n", "Status"); err == nil {
+		t.Fatal("ReviewFields must surface Fields errors")
+	}
+}
