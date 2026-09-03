@@ -105,10 +105,26 @@ func TestTrackedProfileEffortLevelsAllRealizable(t *testing.T) {
 			continue
 		}
 		var p struct {
-			CLI         string `json:"cli"`
-			EffortLevel string `json:"effort_level"`
+			CLI             string            `json:"cli"`
+			EffortLevel     string            `json:"effort_level"`
+			EffortOverrides map[string]string `json:"effort_overrides"`
 		}
-		if json.Unmarshal(raw, &p) != nil || p.EffortLevel == "" || p.CLI == "" {
+		if json.Unmarshal(raw, &p) != nil || p.CLI == "" {
+			continue
+		}
+		// Every rung the profile can dispatch at: effort_level plus each
+		// per-tier effort_overrides value (ADR-0096) — the override is realized
+		// by the same realizeScalar and silently dropped the same way.
+		rungs := map[string]string{}
+		if p.EffortLevel != "" {
+			rungs["effort_level"] = p.EffortLevel
+		}
+		for tier, e := range p.EffortOverrides {
+			if e != "" {
+				rungs["effort_overrides."+tier] = e
+			}
+		}
+		if len(rungs) == 0 {
 			continue
 		}
 		m, err := LoadManifest(p.CLI)
@@ -121,8 +137,10 @@ func TestTrackedProfileEffortLevelsAllRealizable(t *testing.T) {
 		}
 		checked++
 		if len(spec.Values) > 0 {
-			if _, mapped := spec.Values[p.EffortLevel]; !mapped {
-				t.Errorf("profile %s: effort_level %q is not mapped in %s's effort values — realizeScalar would SILENTLY drop the dial", e.Name(), p.EffortLevel, p.CLI)
+			for field, rung := range rungs {
+				if _, mapped := spec.Values[rung]; !mapped {
+					t.Errorf("profile %s: %s %q is not mapped in %s's effort values — realizeScalar would SILENTLY drop the dial", e.Name(), field, rung, p.CLI)
+				}
 			}
 		}
 	}

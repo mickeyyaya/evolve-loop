@@ -121,6 +121,10 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 	// seedAuditRepairContext) and copy-on-write, so it cannot leak into later
 	// phases or diverge from the resume path.
 	phaseCtx = seedAuditRepairContext(phaseCtx, next, cr.cs)
+	// Archive the previous attempt's prompt beside the audit archives so each
+	// round's brief stays recoverable (G10); the bridge rewrites the file on
+	// this dispatch.
+	archiveRepairPrompts(cr.cs, next)
 	// The repair round ENDS at its own audit: past this point a later re-entry
 	// into tdd/build is unrelated work and must not inherit the brief.
 	if next == PhaseAudit {
@@ -168,6 +172,12 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 		if tier, raised := cr.escalatedBuildTier(phaseReq.ModelRoutingTier); raised {
 			phaseReq.ModelRoutingTier = tier
 		}
+	}
+	// Audit-repair round (research R1): a tdd/build re-entry while
+	// AuditRepairActive raises to the profile's declared audit_retry_2plus tier
+	// — same state the repair brief derives from, same envelope clamp as above.
+	if tier, raised := cr.o.repairRoundTier(cr.req.ProjectRoot, next, cr.cs, phaseReq.ModelRoutingTier); raised {
+		phaseReq.ModelRoutingTier = tier
 	}
 	// ADR-0076 slice A: the build dispatch carries the cycle's difficulty
 	// multiplier so the engine can stretch the artifact-wait deadline. Scale

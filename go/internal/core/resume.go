@@ -530,6 +530,7 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 		// repairSeededPhase(PhaseRetro)==false and rebuilt BLIND. Every sibling
 		// line in this block keys on next for the same reason.
 		phaseCtx := seedAuditRepairContext(ctxSnap, next, cs)
+		archiveRepairPrompts(cs, next)
 		if next == PhaseAudit {
 			cs.AuditRepairActive = false
 		}
@@ -550,6 +551,13 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 			PreviousPhase: string(current),
 			Env:           envSnap,
 			Context:       phaseCtx,
+		}
+		// Resume-path parity for the repair-round tier raise (research R1): a
+		// cycle that crashed mid-repair resumes its tdd/build at the escalated
+		// tier, not blind at the profile default — the same persisted flag and
+		// the same clamp as the live loop.
+		if tier, raised := o.repairRoundTier(req.ProjectRoot, next, cs, phaseReq.ModelRoutingTier); raised {
+			phaseReq.ModelRoutingTier = tier
 		}
 		if next != PhaseBuild {
 			projectBuildExplanation(req.ProjectRoot, cs).apply(&phaseReq)

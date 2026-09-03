@@ -160,9 +160,11 @@ func applyModelTierOverride(base, profileBody string, req ResolveModelTierReques
 }
 
 // activeSituation maps real request signals to a model_tier_overrides key.
-// Primary (only currently plumbed) producer: cycle_1_or_low_goal fires for the
-// first cycle. Additional situation keys (audit_retry_2plus, cold_start, …)
-// remain inert until their producer signals are plumbed — see builder-notes.
+// This resolver produces cycle_1_or_low_goal (the first cycle). The
+// audit_retry_2plus key is produced elsewhere — core.repairRoundTier applies
+// it at the tdd/build re-dispatch seam of an in-cycle repair round (ADR-0096),
+// on the production tier path this resolver is not on. Other keys (cold_start,
+// …) remain inert until a producer is plumbed.
 func activeSituation(req ResolveModelTierRequest) string {
 	if req.Cycle <= 1 {
 		return "cycle_1_or_low_goal"

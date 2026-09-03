@@ -1,9 +1,6 @@
 package core
 
-import (
-	"path/filepath"
-	"strings"
-)
+import "strings"
 
 // repair_eligibility.go — the in-cycle repair BOOKKEEPING: the durable attempt
 // counter, the grant primitive, and the findings-injection seam.
@@ -74,11 +71,15 @@ func repairSeededPhase(p Phase) bool { return p == PhaseTDD || p == PhaseBuild }
 // Absent/unreadable findings degrade to "no key", which the prompts treat as
 // today's behaviour; readContinuationFindings already warns loudly on that path
 // so the operator can tell "none existed" from "we looked in the wrong place".
+//
+// The brief is composeRepairBrief (repair_brief.go): the gate reasons, THEN
+// the rejecting round's auditor findings and the ones that persisted from the
+// previous round — the half of the rejection that used to be dropped (R2).
 func seedAuditRepairContext(base map[string]string, next Phase, cs CycleState) map[string]string {
 	if !cs.AuditRepairActive || !repairSeededPhase(next) {
 		return base
 	}
-	findings := readContinuationFindings(filepath.Join(cs.WorkspacePath, "audit-fail-reason.json"))
+	findings := composeRepairBrief(cs)
 	if findings == "" {
 		return base
 	}

@@ -218,3 +218,13 @@ func TestFindings_QuotedTemplateBeforeRealIssuesSection(t *testing.T) {
 		t.Fatalf("Findings = %+v, want only the real M1", got)
 	}
 }
+
+func TestSeverityRank_OrdersTheGrammarAndParksUnknownLast(t *testing.T) {
+	t.Parallel()
+	if SeverityRank("CRITICAL") != 0 || SeverityRank("HIGH") != 1 || SeverityRank("MEDIUM") != 2 || SeverityRank("LOW") != 3 {
+		t.Fatalf("known ranks drifted: C=%d H=%d M=%d L=%d", SeverityRank("CRITICAL"), SeverityRank("HIGH"), SeverityRank("MEDIUM"), SeverityRank("LOW"))
+	}
+	if SeverityRank("INFO") <= SeverityRank("LOW") || SeverityRank("") <= SeverityRank("LOW") {
+		t.Fatal("unknown severities must rank after every known one")
+	}
+}

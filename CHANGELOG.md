@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — repair rounds escalate tier + effort and carry the auditor's findings (ADR-0096, 2026-09-03)
+
+Ship probability by audit-round count ran 100 % → 50 % → 17 % → 0 % over cycles 1560–1605: every in-cycle repair round was a byte-identical retry (same tier, same effort, same brief of gate strings), and the profiles' declared `model_tier_overrides.audit_retry_2plus: "deep"` had no producer — nor was its resolver on the production dispatch path.
+
+- **R1** — `core.repairRoundTier` raises a tdd/build re-dispatch inside an audit-repair round to the profile's declared `audit_retry_2plus` tier (raise-only, envelope-clamped through the ADR-0076 D guardrail), on both dispatch surfaces; the phase runner honours it as the routing overlay. Effort follows the tier through the new profile `effort_overrides` at the bridge launch (builder deep→high, tdd-engineer deep→xhigh).
+- **R2** — `core.composeRepairBrief` briefs the rejecting round's auditor findings (CRITICAL/HIGH/MEDIUM via `reportdoc.Findings`, the grammar the dashboard and the audit gate share) after the gate reasons, marks findings that persisted from the previous round, and archives the previous attempt's `<phase>-prompt.txt` as `.round<N>.` beside the audit archives.
+- Incident record: [docs/incidents/2026-09-03-repair-rounds-blind-and-flat.md](docs/incidents/2026-09-03-repair-rounds-blind-and-flat.md). The subagent-CLI-path plumbing was built, found inert (I2), and discarded before landing.
+- **Review fleet (architecture + go), addressed before landing** — the raise-only/envelope-clamp skeleton lives once (`core.clampedRaise`, shared by the ADR-0076 D floor and the repair raise); the finding-severity rank is `reportdoc.SeverityRank` (the dashboard panel and the repair brief project it, so a severity added to the grammar reaches both or neither); the dispatched-prompt filename is `phasecontract.PromptArtifactFilename` (bridge writer, audit probe quarantine, repair archiver); `effort_overrides` values are covered by the effort realizability guard and pinned to the directive rungs beside the effort matrix; the prompt archiver is self-guarding on the persisted repair state (one predicate, both dispatch surfaces); the resume surface has its own `RunCycleFromPhase` wiring proof; an unreadable audit report WARNs like its sibling gate reader; the brief truncation cuts at a line boundary.
+
+---
+
 ## Added — `evolve dashboard`: a live, read-only view of the pipeline + the ship-rate investigation (2026-09-02)
 
 The batch SLO "SHIPPED ≥ 60 %" lived in a code comment and nothing computed it. Measured from the committed dossiers it was **19.6 %** over cycles 1560–1605 (an 0 / 11 streak), 81 % of failures land at audit, and ship probability by audit-round count runs 100 % → 50 % → 17 % → 0 % — a repair loop that grinds rather than converges.

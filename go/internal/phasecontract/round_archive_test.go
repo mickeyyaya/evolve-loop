@@ -40,3 +40,13 @@ func TestParseRoundArchive(t *testing.T) {
 		}
 	}
 }
+
+func TestPromptArtifactFilename_IsTheBridgeRule(t *testing.T) {
+	t.Parallel()
+	if got := PromptArtifactFilename("build"); got != "build-prompt.txt" {
+		t.Fatalf("PromptArtifactFilename(build) = %q", got)
+	}
+	if got := RoundArchiveFilename(PromptArtifactFilename("tdd"), 2); got != "tdd-prompt.round2.txt" {
+		t.Fatalf("archived prompt name = %q", got)
+	}
+}

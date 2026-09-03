@@ -47,6 +47,22 @@ type Finding struct {
 
 const severities = `CRITICAL|HIGH|MEDIUM|LOW`
 
+// severityOrder is the vocabulary in rank order; SeverityRank indexes it.
+var severityOrder = strings.Split(severities, "|")
+
+// SeverityRank orders the finding vocabulary CRITICAL(0) < HIGH < MEDIUM <
+// LOW(3). Anything else ranks after every known severity, so a consumer that
+// sorts never drops it and a consumer that filters bounds by a known rank —
+// the dashboard panel and the repair brief both project this one function.
+func SeverityRank(severity string) int {
+	for i, s := range severityOrder {
+		if s == severity {
+			return i
+		}
+	}
+	return len(severityOrder)
+}
+
 // findingParen: `### H1 (HIGH[, qualifier]) [— title]`. Group 1 id, 2 severity,
 // 3 qualifier (may be empty), 4 title (may be absent ⇒ the qualifier is the title).
 var findingParen = regexp.MustCompile(`^###\s+\**([A-Z]+\d+)\**\s*\((` + severities + `)([^)]*)\)\s*(?:[—–-]+\s*(.*))?$`)
