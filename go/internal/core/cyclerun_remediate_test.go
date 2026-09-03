@@ -257,3 +257,75 @@ func TestFailReasonsSurfaceInResult(t *testing.T) {
 		t.Fatalf("FailReasons must surface the override explanation; got %v", res.FailReasons)
 	}
 }
+
+// TestDispatch_ReadOnlyPhasesAreFencedAndSourceWritersAreNot is the core half
+// of the worktree fence (ADR-0097): every dispatched request carries
+// WorktreeReadOnly derived from the ONE write-permission predicate
+// (worktreePhase) — read-only phases (scout, audit) true, the declared source
+// writers (tdd, build) false — and a remediation builder fix never inherits
+// the fenced gate's flag (a fenced builder would have its fix silently
+// undone). Uses scout as the remediable read-only gate so the inherited-flag
+// path is actually exercised.
+func TestDispatch_ReadOnlyPhasesAreFencedAndSourceWritersAreNot(t *testing.T) {
+	runners := buildRunners(nil)
+	gate := &scriptedRunner{name: PhaseScout, verdicts: []string{VerdictFAIL, VerdictPASS}}
+	runners[PhaseScout] = gate
+	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, runners,
+		WithWorkflowConfig(policy.WorkflowConfig{RemediationRounds: 1, RemediablePhases: []string{"scout"}}))
+	if _, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir(), GoalHash: "g"}); err != nil {
+		t.Fatalf("RunCycle: %v", err)
+	}
+	build := runners[PhaseBuild].(*fakeRunner)
+	if len(build.requests) < 2 {
+		t.Fatalf("build dispatched %d time(s); want the remediation fix + the normal build", len(build.requests))
+	}
+	for i, r := range build.requests {
+		if r.WorktreeReadOnly {
+			t.Errorf("build request %d is fenced — a source writer (and a remediation fix inheriting a read-only gate's request) must keep its writes", i)
+		}
+	}
+	for _, p := range []Phase{PhaseAudit, PhaseTriage} {
+		fr := runners[p].(*fakeRunner)
+		if len(fr.requests) == 0 || !fr.requests[0].WorktreeReadOnly {
+			t.Errorf("%s is not a declared source writer and must be dispatched fenced", p)
+		}
+	}
+	if tdd := runners[PhaseTDD].(*fakeRunner); len(tdd.requests) > 0 && tdd.requests[0].WorktreeReadOnly {
+		t.Error("tdd writes source and must not be fenced")
+	}
+}
+
+// TestDispatch_ReadOnlyFlagOnResumeAndEvaluateBatchSurfaces — the other two
+// request builders derive the same flag: the crash-resume path and the
+// parallel-evaluate batch. A flag wired on the live loop alone would leave
+// these red.
+func TestDispatch_ReadOnlyFlagOnResumeAndEvaluateBatchSurfaces(t *testing.T) {
+	// Resume from audit: the resumed audit is fenced, the ship after it is a
+	// native phase (no worktree writes to fence — and it is not a source writer).
+	runners := buildRunners(map[Phase]string{PhaseAudit: VerdictPASS})
+	root := t.TempDir()
+	st := &fakeStorage{state: State{LastCycleNumber: 0}, cycleState: CycleState{CycleID: 41, Phase: string(PhaseAudit), WorkspacePath: RunWorkspacePath(root, 41)}}
+	o := NewOrchestrator(st, &fakeLedger{}, runners)
+	if _, err := o.RunCycleFromPhase(context.Background(), CycleRequest{ProjectRoot: root}, &ResumePoint{Phase: string(PhaseAudit), CycleID: 41}); err != nil {
+		t.Fatalf("RunCycleFromPhase: %v", err)
+	}
+	audit := runners[PhaseAudit].(*fakeRunner)
+	if len(audit.requests) == 0 || !audit.requests[0].WorktreeReadOnly {
+		t.Errorf("a resumed audit must be dispatched fenced (resume.go request builder)")
+	}
+
+	// Evaluate batch: read-only evaluate phases are fenced through phaseRequestFor.
+	batchRunners := buildRunners(nil)
+	tester := &fakeRunner{name: "tester", verdict: VerdictPASS}
+	evaluator := &fakeRunner{name: "evaluator", verdict: VerdictPASS}
+	batchRunners[Phase("tester")], batchRunners[Phase("evaluator")] = tester, evaluator
+	cr := newBatchCycleRun(t, batchRunners, 2)
+	if act, err := cr.dispatchEvaluateBatch([]Phase{"tester", "evaluator"}); err != nil || act != loopNext {
+		t.Fatalf("batch: act=%v err=%v", act, err)
+	}
+	for _, fr := range []*fakeRunner{tester, evaluator} {
+		if len(fr.requests) == 0 || !fr.requests[0].WorktreeReadOnly {
+			t.Errorf("evaluate-batch phase %s must be dispatched fenced (evaluate_batch.go request builder)", fr.name)
+		}
+	}
+}

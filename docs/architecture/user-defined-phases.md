@@ -58,7 +58,7 @@ what does it do about it."*
 | `after` | the phase to slot in right after (e.g. `"build"`) | before `audit` |
 | `agent` | agent doc name | `evolve-<name>` |
 | `model` | model tier or `auto` | `auto` |
-| `writes_source` | `true` ⇒ runs with cwd=worktree (can edit code) | `false` |
+| `writes_source` | `true` ⇒ may edit code in the worktree. `false` ⇒ the phase is FENCED (ADR-0097): the runner snapshots the worktree before dispatch and restores it after; any write the agent made is undone and reported as a diagnostic on the phase response. Declare `true` for any phase that must write source. | `false` |
 | `inputs/outputs.files` | artifact files consumed/produced | — |
 | `inputs/outputs.signals` | namespaced signals consumed/emitted (`<phase>.<key>`) | — |
 | `prompt_context` | `req.Context` keys appended to the prompt | — |

@@ -102,6 +102,16 @@ type PhaseRequest struct {
 	// must diff against this value, never a mutable workspace manifest field.
 	WorktreeBaseSHA                 string `json:"worktree_base_sha,omitempty"`
 	ExplanationDocumentationVersion int    `json:"explanation_documentation_version,omitempty"`
+	// WorktreeReadOnly marks a phase that is not a declared source writer
+	// (registry writes_source=false — audit, adversarial-review, retro, …). The
+	// phase runner fences the worktree around such a dispatch: the tree the
+	// phase hands downstream is byte-identical to the tree it was given, and
+	// any write the agent made in between is reported and undone (the
+	// cycle-1603/1604/1605 class — an auditor's mutation probes rewrote the
+	// builder's material files and the sealed build explanation no longer
+	// matched the tree). Derived from the orchestrator's write-permission
+	// predicate at dispatch, never set by a phase.
+	WorktreeReadOnly bool `json:"worktree_read_only,omitempty"`
 	// RunID is the CA.5 event-sourced run identity, threaded to every phase
 	// dispatch (CB.5) so the bridge mints run-scoped tmux session names
 	// (evolve-bridge-r<runid8>-…) and the per-run session registry records

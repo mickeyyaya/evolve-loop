@@ -223,6 +223,13 @@ func (o *Orchestrator) worktreePhase(p Phase) bool {
 	return false
 }
 
+// worktreeReadOnly is the complement of worktreePhase for the dispatch
+// request: a phase without write permission gets its worktree fenced by the
+// runner (PhaseRequest.WorktreeReadOnly). One predicate, both readings —
+// the role-gate/tree-diff axis and the fence cannot disagree about who may
+// write.
+func (o *Orchestrator) worktreeReadOnly(p Phase) bool { return !o.worktreePhase(p) }
+
 // leakRecoverablePhase reports whether next is eligible for main-tree leak
 // recovery. It is the UNION of the fixed active-worktree set (LeakRecoverablePhase
 // — triage/audit/scout/bug-reproduction/tdd/build) with worktreePhase, so a user

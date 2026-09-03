@@ -31,7 +31,7 @@ func validateExplanationReview(report string, req core.PhaseRequest) error {
 	if !found {
 		return fmt.Errorf("retrospective-report.md is missing ## Explanation Documentation Review")
 	}
-	fields, err := reportdoc.Fields(body, "Status", "Build status", "Document", "Document SHA256", "Evidence", "Correction todo")
+	fields, err := reportdoc.ReviewFields(body, "Status", "Build status", "Document", "Document SHA256", "Evidence", "Correction todo")
 	if err != nil {
 		return err
 	}

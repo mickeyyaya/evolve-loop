@@ -52,8 +52,17 @@ func isSectionBoundary(line string) bool {
 		strings.HasPrefix(trimmed, "## ") && !strings.HasPrefix(trimmed, "### ")
 }
 
-// Fields parses unique, allowed "- Key: value" metadata lines
-// case-insensitively. Unknown prose fields are ignored.
+// listValuedFields may repeat: a careful reviewer writes one `- Evidence:` line
+// per claim (cycle-1604 wrote four and was rejected as "duplicate evidence
+// fields" — five of eleven consecutive FAILs were this section's format). Their
+// values are joined with newlines; every other key stays single-valued, so a
+// repeated Status is still the ambiguity it always was.
+var listValuedFields = map[string]bool{"evidence": true}
+
+// Fields parses allowed "- Key: value" metadata lines case-insensitively.
+// Unknown prose fields are ignored; a value's surrounding backticks are
+// stripped (cycle-1606 wrote `Document: `path“); list-valued keys accumulate,
+// single-valued keys reject a repeat.
 func Fields(body string, allowed ...string) (map[string]string, error) {
 	allow := make(map[string]bool, len(allowed))
 	for _, key := range allowed {
@@ -74,10 +83,14 @@ func Fields(body string, allowed ...string) (map[string]string, error) {
 		if key == "" || len(allow) > 0 && !allow[key] {
 			continue
 		}
-		if _, exists := fields[key]; exists {
-			return nil, fmt.Errorf("report has duplicate %s fields", key)
+		value = strings.Trim(strings.TrimSpace(value), "`")
+		if prev, exists := fields[key]; exists {
+			if !listValuedFields[key] {
+				return nil, fmt.Errorf("report has duplicate %s fields", key)
+			}
+			value = prev + "\n" + value
 		}
-		fields[key] = strings.TrimSpace(value)
+		fields[key] = value
 	}
 	return fields, nil
 }
@@ -147,7 +160,7 @@ func citationLine(evidence, reference string) (int, bool) {
 					i++
 				}
 				next, _ := utf8.DecodeRuneInString(digits[i:])
-				if i > 0 && (i == len(digits) || citationBoundaryAfter(next)) {
+				if i > 0 && (i == len(digits) || citationBoundaryAfter(next) || citationRangeContinues(digits[i:])) {
 					line, err := strconv.Atoi(digits[:i])
 					if err == nil && line > 0 {
 						return line, true
@@ -158,6 +171,42 @@ func citationLine(evidence, reference string) (int, bool) {
 		offset = start + 1
 	}
 	return 0, false
+}
+
+// citationRangeContinues accepts the range and column forms reviewers write
+// after a line number — `:23-48`, `:12:3`, `#L7-L9` — so the first line still
+// counts as the citation (cycle-1605 cited sampler.go:23-48 and was rejected).
+func citationRangeContinues(rest string) bool {
+	if len(rest) < 2 || (rest[0] != '-' && rest[0] != ':') {
+		return false
+	}
+	rest = strings.TrimPrefix(rest[1:], "L")
+	return rest != "" && rest[0] >= '0' && rest[0] <= '9'
+}
+
+// ReviewFields parses an explanation-review section the way both phase gates
+// and the shared review contract read it: Fields over the allowed keys, then
+// the evidence text resolved once (EvidenceOrBody). One home, so a tolerance
+// added here reaches the audit gate and the retro gate together.
+func ReviewFields(body string, allowed ...string) (map[string]string, error) {
+	fields, err := Fields(body, allowed...)
+	if err != nil {
+		return nil, err
+	}
+	fields["evidence"] = EvidenceOrBody(body, fields["evidence"])
+	return fields, nil
+}
+
+// EvidenceOrBody returns the review's evidence text: the Evidence field when
+// the reviewer wrote one, else the whole section body — a reviewer who put the
+// citations under `- Binding:` and `- Correction still required:` (cycle-1606)
+// still has to cite every material path at a line; only the field name is
+// forgiven, never the grounding.
+func EvidenceOrBody(body, evidence string) string {
+	if strings.TrimSpace(evidence) != "" {
+		return evidence
+	}
+	return strings.TrimSpace(body)
 }
 
 func citationBoundaryBefore(value string, index int) bool {

@@ -135,6 +135,7 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 		ProjectRoot:                     cr.req.ProjectRoot,
 		Workspace:                       cr.cs.WorkspacePath,
 		Worktree:                        phaseWorktree,
+		WorktreeReadOnly:                cr.o.worktreeReadOnly(next),
 		WorktreeBaseSHA:                 cr.cs.WorktreeBaseSHA,
 		ExplanationDocumentationVersion: cr.cs.ExplanationDocumentationVersion,
 		RunID:                           cr.cs.RunID,

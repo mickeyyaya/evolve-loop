@@ -39,5 +39,6 @@
       }
     ]
   },
-  "after": "build"
+  "after": "build",
+  "writes_source": true
 }

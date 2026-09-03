@@ -542,6 +542,7 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 			// thread the persisted worktree like the RunCycle loop does — a
 			// resumed phase with Worktree="" runs cwd=main-tree (cycle-280 class).
 			Worktree:                        cs.ActiveWorktree,
+			WorktreeReadOnly:                o.worktreeReadOnly(next),
 			WorktreeBaseSHA:                 cs.WorktreeBaseSHA,
 			ExplanationDocumentationVersion: cs.ExplanationDocumentationVersion,
 			// CB.5: same rule for the persisted run identity (resume reuses

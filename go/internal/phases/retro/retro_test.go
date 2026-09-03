@@ -718,3 +718,28 @@ func TestRun_AutoModel_NoProfile_NeverDispatchesSentinel(t *testing.T) {
 		t.Fatalf("BridgeRequest.Model=%q — the sentinel reached the bridge with no profile present", fb.gotReq.Model)
 	}
 }
+
+// TestValidateExplanationReview_ListValuedEvidence — the retro gate reads the
+// section with the same tolerance the audit gate does (one reportdoc parser).
+func TestValidateExplanationReview_ListValuedEvidence(t *testing.T) {
+	req := core.PhaseRequest{
+		ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,
+		BuildExplanationState:           core.BuildExplanationAvailable,
+		BuildExplanation: &phaseio.ExplanationView{
+			Status: "required", DocumentPath: "docs/explain/builds/cycle-42.md",
+			DocumentSHA256: "sha", MaterialPaths: []string{"go/app.go"},
+		},
+	}
+	report := `## Explanation Documentation Review
+- Status: VERIFIED
+- Build status: required
+- Document: docs/explain/builds/cycle-42.md
+- Document SHA256: sha
+- Evidence: docs/explain/builds/cycle-42.md:12 states the ordering
+- Evidence: implemented at go/app.go:29-31 (range cite)
+- Correction todo: none
+`
+	if err := validateExplanationReview(report, req); err != nil {
+		t.Fatalf("list-valued Evidence with a range cite must pass the retro gate: %v", err)
+	}
+}

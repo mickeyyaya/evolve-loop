@@ -551,3 +551,5 @@
 # Named+exercised by apicover_named_test.go and contextfillcorrelate_test.go.
 ./internal/contextfillcorrelate
 ./internal/dashboard
+# treefence — the read-only phase worktree fence (ADR-0097). Consumer: phases/runner.
+./internal/treefence

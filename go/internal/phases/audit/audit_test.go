@@ -862,3 +862,50 @@ func TestRun_NonEmptyNoVerdict_RedZero_LoudDiag(t *testing.T) {
 		t.Errorf("expected a loud error diagnostic about the unparseable verdict; got %+v", resp.Diagnostics)
 	}
 }
+
+// TestValidateExplanationReview_ReadsTheSectionAsAuditorsWriteIt — the
+// FORMAT tolerance that cycles 1604/1605/1606 needed (several Evidence lines,
+// a line range, citations under another field name, backticked values) while
+// the substance rule (every reference cited at a line) is unchanged.
+func TestValidateExplanationReview_ReadsTheSectionAsAuditorsWriteIt(t *testing.T) {
+	req := core.PhaseRequest{
+		ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,
+		BuildExplanationState:           core.BuildExplanationAvailable,
+		BuildExplanation: &phaseio.ExplanationView{
+			Status: "required", DocumentPath: "docs/explain/builds/cycle-42.md",
+			DocumentSHA256: "sha", MaterialPaths: []string{"go/app.go", "go/other.go"},
+		},
+	}
+	listValued := `## Explanation Documentation
+- Status: VERIFIED
+- Build status: required
+- Document: ` + "`docs/explain/builds/cycle-42.md`" + `
+- Document SHA256: sha
+- Evidence: docs/explain/builds/cycle-42.md:12 states the ordering implemented at go/app.go:29-31
+- Evidence: docs/explain/builds/cycle-42.md:20 names the seam at ` + "`go/other.go:7`" + `
+`
+	if err := validateExplanationReview(listValued, req); err != nil {
+		t.Fatalf("several Evidence lines, a range and backticks are how auditors write; must pass: %v", err)
+	}
+	proseCited := `## Explanation Documentation
+- Status: VERIFIED
+- Build status: required
+- Document: docs/explain/builds/cycle-42.md
+- Document SHA256: sha
+- Binding: docs/explain/builds/cycle-42.md:12 reproduces the handoff; go/app.go:29 and go/other.go:7 match the Changed Areas.
+`
+	if err := validateExplanationReview(proseCited, req); err != nil {
+		t.Fatalf("citations under another field name are still citations: %v", err)
+	}
+	uncited := `## Explanation Documentation
+- Status: VERIFIED
+- Build status: required
+- Document: docs/explain/builds/cycle-42.md
+- Document SHA256: sha
+- Evidence: docs/explain/builds/cycle-42.md:12 checked; go/app.go:29 matches
+- Evidence: go/other.go is listed as a Changed Area
+`
+	if err := validateExplanationReview(uncited, req); err == nil || !strings.Contains(err.Error(), "go/other.go with path:line") {
+		t.Fatalf("a material path without a line is still the substance failure it was: %v", err)
+	}
+}
