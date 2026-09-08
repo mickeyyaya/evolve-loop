@@ -53,6 +53,18 @@ enumerates predicate names. a tdd that wrote no predicates shows up as the loud
 
 ## Consequences
 
+### Review correction: deferred scope (2026-09-09)
+
+- Issue: assigned scope included tasks triage explicitly deferred, making postponed work
+  mandatory acceptance for tdd, build and audit.
+- Gap: scope-resolution tests covered paths, IDs and decomposition but never a decision's
+  `deferred[]` alongside assigned scope.
+- Solution: remove explicitly deferred IDs after resolving scope, preserving decomposed
+  parent IDs and the existing fallback when no readable decision exists. The regression
+  `TestTaskItemRefs_DeferredScopeIsNotMandatory` failed for both path and ID resolution
+  before the fix. The core reader keeps the same `deferred[].id` shape as inboxmover;
+  importing inboxmover would create a cycle through its ledger adapter.
+
 - The build's prompt grows by the acceptance text and the predicate list (bounded).
 - `go test -list` compiles the ACS package once per build dispatch (seconds).
 - A task whose inbox item carries no `acceptance[]` is visible as such to the builder for the

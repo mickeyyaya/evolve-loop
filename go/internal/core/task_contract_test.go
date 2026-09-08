@@ -67,6 +67,20 @@ func TestTaskItemRefs_PathsThenScopeThenTriage(t *testing.T) {
 	}
 }
 
+func TestTaskItemRefs_DeferredScopeIsNotMandatory(t *testing.T) {
+	ws := t.TempDir()
+	if err := os.WriteFile(filepath.Join(ws, "triage-decision.json"), []byte(`{"top_n":[{"id":"sub-task-a"}],"deferred":[{"id":"postponed-item","reason":"needs another fix"}]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil), WithScopePathResolver(func(root, id string) string { return filepath.Join(root, id+".json") }))
+	for _, paths := range []string{"", "renamed-work=/root/renamed-work.json postponed-item=/root/postponed-item.json"} {
+		refs := o.taskItemRefs(map[string]string{"fleet_scope": "renamed-work,postponed-item", "fleet_scope_paths": paths}, "/root", ws)
+		if len(refs) != 1 || refs[0] != (taskItemRef{"renamed-work", "/root/renamed-work.json"}) {
+			t.Errorf("deferred work must stay out of the contract while decomposed scope remains bound; paths=%q refs=%+v", paths, refs)
+		}
+	}
+}
+
 // TestListACSPredicates_InventoriesTheCyclePackage runs the real `go test
 // -list` against a throwaway module: the names come from the test files, and
 // an absent package or an empty one is a loud note.

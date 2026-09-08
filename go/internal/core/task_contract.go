@@ -19,6 +19,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/acssuite"
@@ -87,6 +88,33 @@ func (o *Orchestrator) seedTaskContract(ctx context.Context, base map[string]str
 // (Context["fleet_scope_paths"]), else the scope ids / the triage decision's
 // top_n ids through the scope-path resolver.
 func (o *Orchestrator) taskItemRefs(ctx map[string]string, projectRoot, workspace string) []taskItemRef {
+	refs := o.scopedTaskItemRefs(ctx, projectRoot, workspace)
+	body, err := os.ReadFile(filepath.Join(workspace, "triage-decision.json"))
+	if err != nil {
+		// Without a readable decision, preserve the assigned scope. Only an
+		// explicit deferral can remove a task from its acceptance contract.
+		return refs
+	}
+	// inboxmover cannot be imported here: its ledger adapter depends on core.
+	var decision struct {
+		Deferred []struct {
+			ID string `json:"id"`
+		} `json:"deferred"`
+	}
+	if json.Unmarshal(body, &decision) != nil {
+		return refs
+	}
+	return slices.DeleteFunc(refs, func(ref taskItemRef) bool {
+		for _, item := range decision.Deferred {
+			if item.ID == ref.id {
+				return true
+			}
+		}
+		return false
+	})
+}
+
+func (o *Orchestrator) scopedTaskItemRefs(ctx map[string]string, projectRoot, workspace string) []taskItemRef {
 	var refs []taskItemRef
 	if pairs := strings.Fields(ctx["fleet_scope_paths"]); len(pairs) > 0 {
 		seen := map[string]bool{}
