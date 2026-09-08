@@ -61,7 +61,7 @@ func buildConfig(s ScenarioSpec) config.RoutingConfig {
 		cfg.Mandatory = []string{"scout", "build", "audit", "ship"}
 	}
 	if cfg.Conditional == nil {
-		cfg.Conditional = map[string]config.CondRule{"tdd": {Field: "cycle_size", Op: "!=", Value: "trivial"}}
+		cfg.Conditional = map[string]config.CondRule{"tdd": config.DefaultTddRule()}
 	}
 	if cfg.PhaseEnable == nil {
 		cfg.PhaseEnable = map[string]config.Enable{}

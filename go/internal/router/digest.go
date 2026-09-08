@@ -202,17 +202,44 @@ func buildFromGitFallback(workspace string, degraded *[]string) BuildSignals {
 // signal); a report that exists but cannot be read is a read-miss and degrades
 // LOUDLY (R5), matching readFirstTracked's distinction.
 func scoutFromReportFallback(workspace string, degraded *[]string) ScoutSignals {
-	info, err := os.Stat(filepath.Join(workspace, phasecontract.ArtifactName("scout")))
-	switch {
-	case err == nil && info.Size() > 0:
-		return ScoutSignals{Present: true}
-	case err == nil:
-		return ScoutSignals{} // empty report: the phase did not really deliver
-	case os.IsNotExist(err):
-		return ScoutSignals{} // clean absence
-	default:
-		*degraded = append(*degraded, "scout: report fallback stat: "+err.Error())
+	md, present := readReportFallback(filepath.Join(workspace, phasecontract.ArtifactName("scout")), "scout", degraded)
+	if !present {
 		return ScoutSignals{}
+	}
+	return ScoutSignals{
+		Present:         true,
+		GoalType:        reportHeaderValue(md, headerGoalType),
+		DeliverableKind: NormalizeDeliverableKind(reportHeaderValue(md, headerDeliverableKind)),
+	}
+}
+
+// Report header keys the kernel reads (ADR-0099). The persona lines that WRITE
+// them land with slice 3 and must use exactly these words; until then every
+// cycle stays undeclared ⇒ code. Named once so the prompt side has one constant
+// to generate/assert against instead of a second literal.
+const (
+	headerGoalType        = "goal_type:"
+	headerDeliverableKind = "deliverable_kind:"
+	headerCycleSize       = "cycle_size_estimate:"
+)
+
+// readReportFallback is the ONE report-fallback ladder (R5) the scout and triage
+// fallbacks share: a non-empty report ⇒ (body, present); an empty report or a
+// clean absence ⇒ not present with no degrade entry (the phase did not really
+// deliver / never ran — the enforce gate's fail-closed signal); any other read
+// failure is a read-miss and degrades LOUDLY (never a silent Present:false).
+func readReportFallback(path, role string, degraded *[]string) (string, bool) {
+	raw, err := os.ReadFile(path)
+	switch {
+	case err == nil && len(raw) > 0:
+		return string(raw), true
+	case err == nil:
+		return "", false // empty report: the phase did not really deliver
+	case os.IsNotExist(err):
+		return "", false // clean absence
+	default:
+		*degraded = append(*degraded, role+": report fallback read: "+err.Error())
+		return "", false
 	}
 }
 
@@ -226,17 +253,14 @@ func scoutFromReportFallback(workspace string, degraded *[]string) ScoutSignals 
 // 1.0, so tolerance is safe and single-sourced at the consumer. Absence and
 // read-miss semantics mirror scoutFromReportFallback exactly.
 func triageFromReportFallback(workspace string, degraded *[]string) TriageSignals {
-	raw, err := os.ReadFile(filepath.Join(workspace, "triage-report.md"))
-	switch {
-	case err == nil && len(raw) > 0:
-		return TriageSignals{Present: true, CycleSize: reportHeaderValue(string(raw), "cycle_size_estimate:")}
-	case err == nil:
-		return TriageSignals{} // empty report: the phase did not really deliver
-	case os.IsNotExist(err):
-		return TriageSignals{} // clean absence
-	default:
-		*degraded = append(*degraded, "triage: report fallback read: "+err.Error())
+	md, present := readReportFallback(filepath.Join(workspace, "triage-report.md"), "triage", degraded)
+	if !present {
 		return TriageSignals{}
+	}
+	return TriageSignals{
+		Present:         true,
+		CycleSize:       reportHeaderValue(md, headerCycleSize),
+		DeliverableKind: NormalizeDeliverableKind(reportHeaderValue(md, headerDeliverableKind)),
 	}
 }
 
@@ -308,6 +332,10 @@ func extractScout(raw []byte) ScoutSignals {
 	}
 	s := ScoutSignals{Present: true}
 	_ = json.Unmarshal(top["cycle_size_estimate"], &s.CycleSizeEstimate)
+	_ = json.Unmarshal(top["goal_type"], &s.GoalType)
+	var kind string
+	_ = json.Unmarshal(top["deliverable_kind"], &kind)
+	s.DeliverableKind = NormalizeDeliverableKind(kind)
 	_ = json.Unmarshal(top["carryover_count"], &s.CarryoverCount)
 	_ = json.Unmarshal(top["backlog_size"], &s.BacklogSize)
 	for k := range top {
@@ -334,6 +362,7 @@ func extractTriage(raw []byte) TriageSignals {
 		CycleSize    string   `json:"cycle_size"`
 		CycleSizeEst string   `json:"cycle_size_estimate"`
 		PhaseSkip    []string `json:"phase_skip"`
+		Kind         string   `json:"deliverable_kind"`
 	}
 	if err := json.Unmarshal(raw, &d); err != nil {
 		return TriageSignals{}
@@ -342,7 +371,7 @@ func extractTriage(raw []byte) TriageSignals {
 	if size == "" {
 		size = d.CycleSizeEst
 	}
-	return TriageSignals{CycleSize: size, PhaseSkip: d.PhaseSkip, Present: true}
+	return TriageSignals{CycleSize: size, PhaseSkip: d.PhaseSkip, DeliverableKind: NormalizeDeliverableKind(d.Kind), Present: true}
 }
 
 func extractBuild(raw []byte) BuildSignals {

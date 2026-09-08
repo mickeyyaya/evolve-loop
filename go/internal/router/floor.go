@@ -207,9 +207,9 @@ func ensureRun(plan *PhasePlan, phase string) {
 }
 
 // tddPinned reports whether tdd is mandatory this cycle. It reuses the kernel's
-// existing conditional-mandatory rule (EVOLVE_CONDITIONAL_MANDATORY, default
-// `tdd:cycle_size!=trivial`) so the floor's trivial exemption stays consistent
-// with shouldRun's TDD-pin. Absent rule ⇒ pinned (the safer, more-mandatory side).
+// existing conditional-mandatory rule (EVOLVE_CONDITIONAL_MANDATORY; default
+// config.DefaultTddRuleExpr — trivial OR a document deliverable releases, ADR-0099)
+// so the floor's exemptions stay consistent with shouldRun's TDD-pin. Absent rule ⇒ pinned (the safer, more-mandatory side).
 func tddPinned(in RouteInput) bool {
 	if rule, ok := in.Cfg.Conditional["tdd"]; ok {
 		return evalCondRule(in.Signals, rule)

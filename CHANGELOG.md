@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## Added — deliverable kinds: the kernel signals for solution cycles (ADR-0099 slice 1, 2026-09-09)
+
+The factory can now shape a non-code cycle from the same spine. The kernel READS two new header lines — `goal_type:` and `deliverable_kind: code|document` in scout-report.md, `deliverable_kind:` next to `cycle_size_estimate:` in triage-report.md (the scout/triage persona lines that WRITE them land with slice 3; until then every cycle stays undeclared ⇒ `code`, byte-identical to today) — from the report headers (the trusted path `cycle_size_estimate` already takes — handoff JSON has been extinct since ~cycle 215) onto `RoutingSignals` (`scout.goal_type`, `scout.deliverable_kind`, `triage.deliverable_kind`, projected `deliverable_kind`, absent ⇒ `code`).
+
+- **tdd is released for document cycles by config, not code** — `config.CondRule` ANDs clauses (`a!=b && c!=d`; single-clause rules byte-identical), and the registry's `conditional_mandatory.tdd` is `cycle_size!=trivial && deliverable_kind!=document`. The absent default `code` keeps the pin at plan time; the post-scout RePlan releases it for a digested document declaration. The advisor rubric renders one exemption line per clause.
+- **The 15 domain phases can finally fire** — `scout.goal_type` had no reader on the kernel side (and no writer); the kernel half lands here, the persona line in slice 3; `TestDomainPhaseTrigger_FiresOnScoutGoalType` reads the shipped `forces-analysis` overlay and proves its `insert_when` evaluates live, with D2 fail-closed semantics preserved for undeclared goal types.
+- **Solution recipes** — `strategy-options`, `business-plan`, `partnership-deal` compose the document-side acceptance from the existing catalog (`scope-baseline` before build; `adversarial-review` / `premise-challenge` after); the router persona's recipe block is regenerated and its floor sentence names the release.
+- Typed views (`phaseio.ScoutView/TriageView`), the phase-io shadow rows, the advisor digest line and the routing fixtures carry the new fields. ADR: [docs/architecture/adr/0099-deliverable-kinds.md](docs/architecture/adr/0099-deliverable-kinds.md).
+
+---
+
 ## Added — the Task Contract block: acceptance verbatim + the ACS predicate inventory in the tdd, build and audit prompts (ADR-0098, 2026-09-03)
 
 The acceptance criteria a cycle is graded against live on the inbox item, but reached the builder only through two LLM hops of prose, and the predicates tdd wrote reached it only by grep. `core.seedTaskContract` (both dispatch surfaces) now renders a harness-owned `## Task Contract` block into the tdd, build and audit prompts (the grader reads the same words the builder was handed): each bound task's `acceptance[]` copied VERBATIM from its inbox record (`inboxbatch.LoadFile`, one source, sanitised as a prompt surface), and — for build and audit — the predicate names `go test -list . -tags acs ./acs/cycle<N>` finds in the worktree (bounded by the ACS lane timeout). Unresolved records, items without acceptance, and a cycle with no predicates package are loud lines in the block, never silent omissions. The filed `handoff-tdd.json` half was retired: the inventory derived from the test files IS the handoff. Closes inbox `inline-task-contract-into-build-prompt`.

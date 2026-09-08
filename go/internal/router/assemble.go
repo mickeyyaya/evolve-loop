@@ -30,6 +30,8 @@ func HandoffsFromSignals(sig RoutingSignals) phaseio.Handoffs {
 	if sig.Scout.Present {
 		init.Scout = &phaseio.ScoutView{
 			CycleSizeEstimate: sig.Scout.CycleSizeEstimate,
+			GoalType:          sig.Scout.GoalType,
+			DeliverableKind:   sig.Scout.DeliverableKind,
 			ItemCount:         sig.Scout.ItemCount,
 			CarryoverCount:    sig.Scout.CarryoverCount,
 			BacklogSize:       sig.Scout.BacklogSize,
@@ -37,8 +39,9 @@ func HandoffsFromSignals(sig RoutingSignals) phaseio.Handoffs {
 	}
 	if sig.Triage.Present {
 		init.Triage = &phaseio.TriageView{
-			CycleSize: sig.Triage.CycleSize,
-			PhaseSkip: sig.Triage.PhaseSkip,
+			CycleSize:       sig.Triage.CycleSize,
+			PhaseSkip:       sig.Triage.PhaseSkip,
+			DeliverableKind: sig.Triage.DeliverableKind,
 		}
 	}
 	if sig.Build.Present {

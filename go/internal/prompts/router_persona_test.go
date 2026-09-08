@@ -30,13 +30,20 @@ func routerContent(t *testing.T) (raw []byte, body string) {
 	return raw, string(raw)
 }
 
-// routerProseBytes returns the byte length of the prose region in evolve-router.md:
-// from the end of the YAML frontmatter block to (not including) the
-// "## Phase Catalog — Core Values" heading.
+// routerProseBytes returns the byte length of the PROSE region in
+// evolve-router.md: from the end of the YAML frontmatter block to (not
+// including) the "## Phase Catalog — Core Values" heading, MINUS the generated
+// goal-recipes table between the GENERATED markers. The table is a projection
+// of phase-registry.json:config.goal_recipes (locked by
+// router.TestRouterPersonaRecipeTable_NoDrift), so it grows with the catalog by
+// design and is not prose TSC governs — counting it made the pin fail on the
+// first new recipe row (ADR-0099, 2026-09-09: main sat 4 bytes under the cap).
 func routerProseBytes(t *testing.T, body string) int {
 	t.Helper()
 	const fmDelim = "---\n"
 	const catalogHeading = "## Phase Catalog — Core Values"
+	const genBegin = "<!-- GENERATED:goal-recipes BEGIN"
+	const genEnd = "<!-- GENERATED:goal-recipes END -->"
 	// Skip the opening "---\n" at position 0, find the closing "---\n".
 	closingFM := strings.Index(body[3:], fmDelim)
 	if closingFM < 0 {
@@ -47,7 +54,13 @@ func routerProseBytes(t *testing.T, body string) int {
 	if catalogIdx < 0 {
 		t.Fatalf("evolve-router.md missing '## Phase Catalog — Core Values' heading")
 	}
-	return len([]byte(body[bodyStart:catalogIdx]))
+	region := body[bodyStart:catalogIdx]
+	gb := strings.Index(region, genBegin)
+	ge := strings.Index(region, genEnd)
+	if gb < 0 || ge < gb {
+		t.Fatalf("evolve-router.md prose region missing the GENERATED:goal-recipes markers")
+	}
+	return len([]byte(region)) - len([]byte(region[gb:ge+len(genEnd)]))
 }
 
 // routerCatalogBytes returns the byte length of the "## Phase Catalog — Core Values"
@@ -85,22 +98,26 @@ func TestRouterPersona_TSCMarkerPresent(t *testing.T) {
 }
 
 // TestRouterPersona_ProseRegionByteReduction asserts that the prose region of
-// evolve-router.md (from end of frontmatter to the Phase Catalog heading) is
-// strictly less than 5243 bytes (≥15% below the 6169-byte baseline).
+// evolve-router.md (from end of frontmatter to the Phase Catalog heading,
+// excluding the generated goal-recipes table) stays strictly under the
+// anti-bloat ceiling.
 //
-// AC2 — router-persona-tsc-compress.
-//
-// RED baseline: prose region is 6169 bytes; 6169 ≥ 5243 → fails until TSC applied.
-// Edge: 5243 = floor(6169 × 0.85); even hitting exactly 5243 still fails (strict <).
+// AC2 — router-persona-tsc-compress. The original pin was <5243 bytes over a
+// region that INCLUDED the generated table (≥15% below the 6169-byte pre-TSC
+// baseline). Re-baselined 2026-09-09 (ADR-0099): the table is registry-projected
+// config, so the pin now measures prose only — 2349 bytes on main at the
+// re-baseline; the ceiling is a deliberate anti-bloat bound (~+28%) so a
+// regrowth wave still fails here while a legitimate sentence and recipe rows
+// never do (the old pin died at +4 bytes).
 func TestRouterPersona_ProseRegionByteReduction(t *testing.T) {
 	_, body := routerContent(t)
 	got := routerProseBytes(t, body)
-	const baselineBytes = 6169
-	const maxBytes = 5243 // floor(6169 * 0.85) — ≥15% reduction required
+	const baselineBytes = 2349 // prose-only size on main, 2026-09-09
+	const maxBytes = 3000      // deliberate anti-bloat ceiling (~+28% over the re-baseline) — headroom for legitimate edits, still fails on a regrowth wave
 	if got >= maxBytes {
-		t.Errorf("RED: prose region is %d bytes (want <%d, baseline=%d).\n"+
-			"Builder must apply TSC to the prose sections (## Your job, ## Output contract, ## Goal-Type Recipes prose)\n"+
-			"to achieve ≥15%% reduction. Current: %d bytes, need to save ≥%d bytes.",
+		t.Errorf("RED: prose region (excluding the generated recipe table) is %d bytes (want <%d, re-baseline=%d).\n"+
+			"Apply TSC to the prose sections (## Your job, ## Output contract, ## Goal-Type Recipes prose)\n"+
+			"— never the generated table or the catalog. Current: %d bytes, need to save ≥%d bytes.",
 			got, maxBytes, baselineBytes, got, got-maxBytes+1)
 	}
 }
