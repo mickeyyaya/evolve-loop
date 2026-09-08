@@ -85,12 +85,15 @@ empty protected directories before enabling a profile on Linux.
 
 A missing sandbox binary, measured inability to apply the sandbox, unsupported
 policy, or nested environment without an applied wrapper cannot satisfy a
-mandatory launch. The preflight and dispatch gate use the same decision. The
+mandatory launch. A successful capability measurement outranks a session hint
+(such as a Codex PATH entry): it permits attempting the actual profile wrapper,
+whose successful application is still required. An unchecked nested hint does
+not establish capability or outer confinement. The preflight and dispatch gate
+use the same decision. See [measured capability](measured-sandbox-capability.md). The
 tmux bridge also refuses to reuse an existing named session for a mandatory
 profile: it cannot establish which policy confined that process. A new session
 can apply the requested profile; explicit sandbox-off remains the opt-out.
-The
-optional nested canary remains a diagnostic of one attempted write, not an
+The optional nested canary remains a diagnostic of one attempted write, not an
 attestation of the requested profile's read/write policy. Missing-parent and
 other setup failures are inconclusive; even a permission-denied write may be
 ordinary filesystem permissions. No canary result waives mandatory launch

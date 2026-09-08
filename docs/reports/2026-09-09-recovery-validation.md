@@ -38,6 +38,46 @@ The first macOS CI run passed race/integration tests, then exposed three end-to-
 
 Both platforms subsequently passed all execution suites, including end-to-end tests. Their final API-coverage gate exposed one missing direct consumer test for `core.ResumeBoundaryCheckpointer`. A real-storage integration test now injects checkpoint persistence failure through production resume and checks error propagation, no phase dispatch, the complete saved checkpoint content, preserved identity/worktree, and ordinary FAIL closeout. It permits JSON formatting changes rather than freezing serialization whitespace. No production behavior or coverage gate is changed. The focused boundary/lifecycle/verdict race selection passed; a temporary Go overlay that ignored the callback error made the new test fail. The full enforced API inventory passed locally against CI's execution coverage for unchanged production code and the final test sources (core: 324/324 exports covered).
 
+## First live verification attempt and launch repair
+
+Recovery PR [#535](https://github.com/mickeyyaya/evolve-loop/pull/535) merged as
+`09d32a19` after both platform Go jobs and ACS/configuration checks passed.
+The runtime was synchronized without changing the pre-existing user inbox edits
+or unfinished cycle 1606.
+
+The first requested two-wave dispatch halted in readiness with `cycles: null`;
+no wave ran. A Codex PATH hint overrode a successful native sandbox capability
+measurement. Applying the real profile then exposed invalid empty-root SBPL,
+missing network permission despite `AllowNetwork=true`, and missing interactive
+terminal access. The [launch repair](../architecture/measured-sandbox-capability.md)
+records these implementation gaps and their correction.
+
+The follow-up retains mandatory confinement, shares the measured wrap decision
+between preflight and launch, and confines terminal access to the assigned device
+and explicit termios/window commands. Review rejected unrestricted terminal
+ioctls: an owned-PTY probe showed input injection was possible under that broader
+rule and denied under the filtered one. No real user terminal was used.
+
+Validation before follow-up CI:
+
+- Full default Go suite: 208 packages PASS, 5 without tests; full vet PASS.
+- Four affected integration suites PASS (sandbox, preflight, bridge and loop
+  preflight), including real Claude boot; all 150 exported APIs covered.
+- Native regression fixtures demonstrate valid empty-root policy, allowed versus
+  denied local networking, allowed own-terminal operation, denied peer access,
+  denied protected-file writes, and denied unlisted terminal ioctls. The generic
+  ioctl mutation fails the native fixture.
+- Final termios-setting and confinement race selection: all three affected
+  packages PASS. The fixture exercises all three termios update timings; the
+  previous Node-only policy fails that positive contract.
+- Fresh native `doctor boot <driver> --sandbox --json`: Claude, Codex and Agy all
+  report `exit_code: 0`, `booted: true`. These are startup checks, not improvement
+  waves or useful code changes.
+
+Architecture, Go/simplification/test, and defensive reviewers reviewed the
+follow-up. Live two-wave usefulness remains pending until the repaired version
+is landed and the native batch finishes.
+
 ## Limits and live verification
 
 Linux mandatory linked-worktree confinement is explicitly unsupported and fails closed; native Linux enforcement was not verified on this macOS host. Live writer swarm, hard model-family separation and retry adjudication remain outside this recovery. Legacy resume diagnostics are recovery hints, not authenticated Ship evidence. HEAD-based throughput remains a heuristic under concurrent lanes; live assessment must inspect actual lane commits.
