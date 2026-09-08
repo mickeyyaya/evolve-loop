@@ -24,12 +24,14 @@ import (
 // All paths are absolute (no globs, no placeholders); the orchestrator
 // resolves these before handing them off.
 type Config struct {
-	RepoRoot     string
-	HomeDir      string
-	ReadOnlyRepo bool
-	AllowNetwork bool
-	WritePaths   []string // explicit write allows
-	DenyPaths    []string // explicit write denies (claude.sh:540 deny loop)
+	TerminalPath  string // validated assigned macOS tty; empty means no terminal grant
+	RepoRoot      string
+	HomeDir       string
+	ReadOnlyRepo  bool
+	AllowNetwork  bool
+	WritePaths    []string // explicit write allows
+	DenyPaths     []string // explicit write denies (claude.sh:540 deny loop)
+	DenyReadPaths []string // explicit read denies; separate from immutable readable inputs
 }
 
 // homeStateWriteDirs are CLI-owned HOME state dirs that tmux REPLs may update
@@ -57,9 +59,9 @@ type ProbeResult struct {
 	Reason     string // diagnostic when !Available or when sandbox_apply fails
 
 	// Capable reports whether the sandbox binary actually APPLIES on this host —
-	// a measured fact, not the env-var nested guess. Under nested-Claude on
-	// macOS, sandbox_apply() returns EPERM, so the binary is Available but not
-	// Capable. Only meaningful when CapabilityChecked is true.
+	// a measured fact, not the env-var nested guess. In some nested macOS
+	// environments sandbox_apply() returns EPERM despite an available binary.
+	// Only meaningful when CapabilityChecked is true.
 	Capable bool
 	// CapabilityChecked distinguishes "Capable=false because measured-incapable"
 	// from "Capable=false because never measured" (no binary, or no probe). A
@@ -193,6 +195,9 @@ func GenerateSBPL(cfg Config) string {
 		"/private/etc", "/opt", "/bin", "/sbin", "/var",
 		"/private/var", "/dev",
 	} {
+		if p == "" {
+			continue
+		}
 		fmt.Fprintf(&b, "(allow file-read* (subpath %q))\n", p)
 	}
 	// HOME read.
@@ -204,6 +209,15 @@ func GenerateSBPL(cfg Config) string {
 		fmt.Fprintf(&b, "(allow file-read* (subpath %q))\n", p)
 		fmt.Fprintf(&b, "(allow file-write* (subpath %q))\n", p)
 	}
+	// Interactive clients reopen their controlling terminal and set raw mode
+	// on the inherited descriptor. Grant only this pane's device and its logical
+	// alias, before configured file-read/file-write denials.
+	if cfg.TerminalPath != "" {
+		fmt.Fprintf(&b, "(allow file-write-data (literal \"/dev/tty\") (literal %q))\n", cfg.TerminalPath)
+		// Only terminal attributes and window size are needed. In particular,
+		// arbitrary control/input-injection ioctls are not part of this grant.
+		fmt.Fprintf(&b, "(allow file-ioctl (require-all (require-any (literal \"/dev/tty\") (literal %q)) (require-any (ioctl-command TIOCGETA) (ioctl-command TIOCSETA) (ioctl-command TIOCSETAW) (ioctl-command TIOCSETAF) (ioctl-command TIOCGWINSZ))))\n", cfg.TerminalPath)
+	}
 	// HOME writes for known Claude config dirs.
 	if cfg.HomeDir != "" {
 		for _, p := range homeStateWriteDirs(cfg.HomeDir) {
@@ -212,12 +226,20 @@ func GenerateSBPL(cfg Config) string {
 	}
 	// ReadOnlyRepo: explicit deny before per-write-path allows so later
 	// rules re-permit specific subdirs. Mirrors bash:511-517 contract.
+	for _, wp := range cfg.WritePaths {
+		if coversRepository(wp, cfg.RepoRoot) {
+			fmt.Fprintf(&b, "(allow file-write* (subpath %q))\n", wp)
+		}
+	}
 	if cfg.ReadOnlyRepo && cfg.RepoRoot != "" {
 		fmt.Fprintf(&b, "(deny file-write* (subpath %q))\n", cfg.RepoRoot)
 	}
 	// Per-write-path allows. Globs widen to parent dir (bash:520).
 	for _, wp := range cfg.WritePaths {
 		if wp == "" {
+			continue
+		}
+		if coversRepository(wp, cfg.RepoRoot) {
 			continue
 		}
 		if strings.Contains(wp, "*") {
@@ -233,7 +255,14 @@ func GenerateSBPL(cfg Config) string {
 		fmt.Fprintf(&b, "(deny file-write* (subpath %q))\n", dp)
 	}
 	// Network.
-	if !cfg.AllowNetwork {
+	for _, dp := range cfg.DenyReadPaths {
+		if dp != "" {
+			fmt.Fprintf(&b, "(deny file-read* (subpath %q))\n", dp)
+		}
+	}
+	if cfg.AllowNetwork {
+		b.WriteString("(allow network*)\n")
+	} else {
 		b.WriteString("(deny network*)\n")
 	}
 	return b.String()
@@ -274,6 +303,11 @@ func BwrapPrefix(cfg Config) []string {
 		out = append(out, "--bind-try", p, p)
 	}
 	// Repo: rw or ro by ReadOnlyRepo.
+	for _, wp := range cfg.WritePaths {
+		if coversRepository(wp, cfg.RepoRoot) {
+			out = append(out, "--bind", wp, wp)
+		}
+	}
 	if cfg.RepoRoot != "" {
 		if cfg.ReadOnlyRepo {
 			out = append(out, "--ro-bind", cfg.RepoRoot, cfg.RepoRoot)
@@ -286,16 +320,44 @@ func BwrapPrefix(cfg Config) []string {
 		if wp == "" {
 			continue
 		}
+		if coversRepository(wp, cfg.RepoRoot) {
+			continue
+		}
 		if strings.Contains(wp, "*") {
 			wp = filepath.Dir(wp)
 		}
 		out = append(out, "--bind", wp, wp)
+	}
+	// These overlays follow ALL writable binds. Missing targets fail setup;
+	// --ro-bind-try would silently discard a mandatory restriction.
+	for _, dp := range cfg.DenyPaths {
+		if dp != "" {
+			out = append(out, "--ro-bind", dp, dp)
+		}
+	}
+	for _, dp := range cfg.DenyReadPaths {
+		if dp != "" {
+			out = append(out, "--tmpfs", dp, "--chmod", "000", dp, "--remount-ro", dp)
+		}
+	}
+	if len(cfg.DenyReadPaths) > 0 {
+		out = append(out, "--cap-drop", "ALL")
 	}
 	// Network: bwrap uses namespace isolation, not allow/deny rules.
 	if !cfg.AllowNetwork {
 		out = append(out, "--unshare-net")
 	}
 	return out
+}
+
+// A broad scratch grant such as /tmp must precede a read-only repository
+// located beneath it. Otherwise the later parent grant reopens the whole repo.
+func coversRepository(path, repo string) bool {
+	if path == "" || repo == "" {
+		return false
+	}
+	rel, err := filepath.Rel(filepath.Clean(path), filepath.Clean(repo))
+	return err == nil && rel != "." && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 
 // Sandbox is the runtime-dispatching exec wrapper for ad-hoc CLI use. Exec wraps

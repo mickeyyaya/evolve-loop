@@ -203,10 +203,13 @@ type SandboxWrapper func(req SandboxWrapRequest) (prefixArgv []string, available
 // prefix. Phase is the agent name (used as the SBPL file suffix). Workspace
 // is the absolute path to write the per-phase SBPL into when needed.
 type SandboxWrapRequest struct {
-	Phase     string // e.g. "build", "tdd"
-	Workspace string // absolute path; SBPL file lives here on darwin
-	Worktree  string // absolute path; the only write-allowed location
-	RepoRoot  string // absolute path; the read-only main repo root
+	TerminalPath  string   // assigned tmux tty; empty for headless launches
+	DenyPaths     []string // absolute write denials
+	DenyReadPaths []string // absolute read denials
+	Phase         string   // e.g. "build", "tdd"
+	Workspace     string   // absolute path; SBPL file lives here on darwin
+	Worktree      string   // absolute path; the only write-allowed location
+	RepoRoot      string   // absolute path; the read-only main repo root
 	// AllowNetwork is always true on the sandboxPrefixForLaunch path (forced):
 	// a phase that reaches the sandbox runs a cloud CLI that needs the model API.
 	// See sandbox_wrap.go for the rationale.
@@ -307,7 +310,9 @@ type Config struct {
 	AllowBypass    bool
 	HumanInput     bool
 	RequireFull    bool
-	RequireSandbox bool     // fail closed when OS filesystem confinement is unavailable
+	RequireSandbox bool // fail closed when OS filesystem confinement is unavailable
+	DenyPaths      []string
+	DenyReadPaths  []string
 	AllowedTools   []string // from profile.allowed_tools
 	ExtraFlags     []string // forwarded to the inner CLI after `--` (direct passthrough)
 	// Realization is the per-CLI launch realization (ADR-0022): the model,

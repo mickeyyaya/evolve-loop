@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
 // Profile is the parsed agent profile JSON — the Go port of
@@ -47,14 +49,9 @@ func (p Profile) effortForTier(tier string) string {
 	return p.EffortLevel
 }
 
-// ProfileSandbox is the bridge's minimal view of profile.sandbox. The json tag
-// is load-bearing: profiles spell the key snake_case (profile.sandbox.allow_network),
-// and encoding/json does not fold snake_case onto the CamelCase field name, so
-// without the tag the value is silently dropped and AllowNetwork is always false
-// (which would leave a profile.sandbox.allow_network=true CLI network-blocked).
-type ProfileSandbox struct {
-	AllowNetwork bool `json:"allow_network"`
-}
+// ProfileSandbox shares the canonical profile schema so launch cannot silently
+// drop filesystem restrictions parsed by the profile loader.
+type ProfileSandbox = profiles.SandboxConfig
 
 // validPermissionModes mirrors the claude --permission-mode choice set
 // that bin/bridge and profile.sh both validate against. "" means

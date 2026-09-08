@@ -268,7 +268,7 @@ func (o *Orchestrator) finalizeCycle(ctx context.Context, cs CycleState, cycle i
 	// R9.1: a shipped cycle's committed floors are observed throughput —
 	// record them into the rolling window before the state write below
 	// persists it (nil seam ⇒ byte-identical no-op).
-	if o.throughputRecorder != nil && shippedOutcome(result.FinalVerdict, preCycleHEAD, postCycleHEAD) {
+	if o.throughputRecorder != nil && !hasThroughputCycle(state.TriageThroughput, cycle) && shippedOutcome(result.FinalVerdict, preCycleHEAD, postCycleHEAD) {
 		o.throughputRecorder(state, cycle, cs.WorkspacePath)
 	}
 
@@ -313,7 +313,7 @@ func (o *Orchestrator) finalizeCycle(ctx context.Context, cs CycleState, cycle i
 	// resurrect the very id that was just dropped.
 	retireTriageDroppedCarryover(state, cs.WorkspacePath)
 
-	state.LastCycleNumber = cycle
+	state.LastCycleNumber = max(state.LastCycleNumber, cycle)
 	if perr := o.persistCycleEndState(ctx, *state); perr != nil {
 		return preserveWorktree, fmt.Errorf("write state: %w", perr)
 	}
@@ -412,6 +412,8 @@ func (o *Orchestrator) newCycleRun(ctx context.Context, req CycleRequest) (cycle
 	stack = append(stack, func(_, _ bool) { o.currentRunID.Store("") })
 	cs := CycleState{
 		CycleID:                         cycle,
+		GoalHash:                        req.GoalHash,
+		GoalText:                        req.Context["goal"],
 		Phase:                           string(PhaseStart),
 		StartedAt:                       startedAt,
 		PhaseStartedAt:                  startedAt,
@@ -599,7 +601,7 @@ func (o *Orchestrator) advisorPlanInput(ctx context.Context, current string, sig
 	// WS2 recall memory: the most recent failure's reason + matching KB lessons,
 	// so the advisor plans WITH the benefit of what went wrong before. No-op when
 	// no KB is wired or no failure history.
-	lastReason, lessons := o.recallForPlan(ctx, state.FailedAt)
+	lastReason, lessons := o.recallForPlan(ctx, state.FailedAt, req.Context["goal"])
 	return router.RouteInput{
 		Current: current,
 		Signals: signals,
@@ -716,6 +718,13 @@ func (o *Orchestrator) planCycle(ctx context.Context, req CycleRequest, state St
 				continue
 			}
 			if p := o.scopePathFor(req.ProjectRoot, id); p != "" {
+				// The encoding is "id=path" pairs joined by spaces (read by the
+				// scout and the Task Contract seeder); a value that cannot be
+				// encoded is refused loudly rather than mis-split downstream.
+				if strings.ContainsAny(id, "= \t") || strings.ContainsAny(p, " \t\n") {
+					fmt.Fprintf(os.Stderr, "[orchestrator] WARN fleet_scope_paths: cannot encode id %q path %q (id must not contain '=' or blanks; path must not contain blanks) — left unresolved\n", id, p)
+					continue
+				}
 				pairs = append(pairs, id+"="+p)
 			}
 		}

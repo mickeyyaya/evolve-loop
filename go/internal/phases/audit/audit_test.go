@@ -624,9 +624,8 @@ func TestRun_MissingACSVerdict_GeneratedThenPASS(t *testing.T) {
 	}
 }
 
-// A pre-staged acs-verdict.json must be honored as-is: the generator is
-// NOT invoked when the file already exists (operator/CI pre-stage path).
-func TestRun_ACSVerdictPresent_GeneratorNotCalled(t *testing.T) {
+// A pre-staged candidate is retained for forensics and replaced by execution.
+func TestRun_ACSVerdictPresent_HostRegenerates(t *testing.T) {
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
 	body := "# Audit Report\n\n## Verdict\n**PASS**\n"
@@ -635,13 +634,13 @@ func TestRun_ACSVerdictPresent_GeneratorNotCalled(t *testing.T) {
 	phase := New(Config{
 		Bridge:          fb,
 		Prompts:         fakePromptsFS("body"),
-		GenerateVerdict: func(core.PhaseRequest) error { genCalls++; return nil },
+		GenerateVerdict: func(req core.PhaseRequest) error { genCalls++; writeACSVerdict(t, req.Workspace, 0); return nil },
 	})
 	resp, _ := phase.Run(context.Background(), core.PhaseRequest{
 		Cycle: 1, ProjectRoot: "/p", Workspace: ws,
 	})
-	if genCalls != 0 {
-		t.Errorf("GenerateVerdict called %d times, want 0 (file pre-staged)", genCalls)
+	if genCalls != 1 {
+		t.Errorf("GenerateVerdict called %d times, want 1 (candidate must not suppress execution)", genCalls)
 	}
 	if resp.Verdict != core.VerdictPASS {
 		t.Errorf("Verdict=%q, want PASS", resp.Verdict)
@@ -690,7 +689,7 @@ func writeAuditProfile(t *testing.T, contents string) string {
 // absent), Classify must surface a WARNING diagnostic naming the failure and
 // fall through to the missing-file FAIL floor — the generation error never
 // silently passes the gate.
-func TestRun_GeneratorReturnsError_WarnDiagAndFAIL(t *testing.T) {
+func TestRun_GeneratorReturnsError_ErrorDiagAndFAIL(t *testing.T) {
 	ws := t.TempDir()
 	body := "# Audit Report\n\n## Verdict\n**PASS**\n"
 	fb := &fakeBridge{writeArtifact: body}
@@ -710,12 +709,12 @@ func TestRun_GeneratorReturnsError_WarnDiagAndFAIL(t *testing.T) {
 	}
 	var found bool
 	for _, d := range resp.Diagnostics {
-		if d.Severity == "warning" && strings.Contains(d.Message, "acs-verdict generation failed") && strings.Contains(d.Message, "acssuite boom") {
+		if d.Severity == "error" && strings.Contains(d.Message, "host predicate execution") && strings.Contains(d.Message, "acssuite boom") {
 			found = true
 		}
 	}
 	if !found {
-		t.Errorf("expected a warning diagnostic naming the generation failure; got %+v", resp.Diagnostics)
+		t.Errorf("expected an error diagnostic naming the generation failure; got %+v", resp.Diagnostics)
 	}
 }
 

@@ -75,8 +75,8 @@ func TestProbe_DarwinNested(t *testing.T) {
 	if p.Sandbox.ExpectedToWork {
 		t.Errorf("nested-claude darwin should not expect sandbox to work")
 	}
-	if !strings.Contains(p.Sandbox.Reason, "EPERM") {
-		t.Errorf("missing EPERM reason: %s", p.Sandbox.Reason)
+	if !strings.Contains(p.Sandbox.Reason, "unmeasured") {
+		t.Errorf("missing unmeasured-capability reason: %s", p.Sandbox.Reason)
 	}
 	if p.AutoConfig.SandboxFallbackOnEPERM != "1" {
 		t.Errorf("nested should set fallback=1, got %s", p.AutoConfig.SandboxFallbackOnEPERM)
@@ -84,7 +84,7 @@ func TestProbe_DarwinNested(t *testing.T) {
 	if p.AutoConfig.InnerSandbox {
 		t.Errorf("nested should disable inner_sandbox")
 	}
-	if !strings.Contains(p.AutoConfig.Reasoning, "nested-Claude detected") {
+	if !strings.Contains(p.AutoConfig.Reasoning, "Nested LLM-CLI hint: true") {
 		t.Errorf("missing nested reasoning: %s", p.AutoConfig.Reasoning)
 	}
 }

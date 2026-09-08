@@ -268,6 +268,8 @@ func TestNativeRun_PostPushExplanationRetryUsesLandedTreeAfterWorktreeCleanup(t 
 		t.Fatal(err)
 	}
 
+	mustWrite(t, filepath.Join(repo, ".evolve", "cycle-state.json"), `{"cycle_id":42,"run_id":"run-42","audit_dispatches":1,"active_worktree":"`+worktree+`"}`)
+	seedAudit(t, repo, "PASS")
 	runGit(t, worktree, "add", "-A")
 	runGit(t, worktree, "-c", "commit.gpgsign=false", "commit", "-q", "-m", "cycle 42 landed build")
 	runGit(t, repo, "merge", "--ff-only", "cycle-42-branch")
@@ -283,7 +285,7 @@ func TestNativeRun_PostPushExplanationRetryUsesLandedTreeAfterWorktreeCleanup(t 
 	result, err := runShip(t, repo, Options{
 		Class: ClassCycle, CommitMessage: "cycle 42 retry", CycleID: 42,
 		ActiveWorktree: worktree, WorktreeBaseSHA: base, WorkspacePath: workspace,
-		RunID: "run-42", ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,
+		RunID: "run-42", AuditRound: 1, ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,
 		BuildExplanation: view, RequireBuildExplanationHandoff: true,
 	})
 	if err != nil || result.ExitCode != ExitOK || result.CommitSHA != commit || !containsLog(result, "succeeding report-only") {

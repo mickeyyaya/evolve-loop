@@ -58,6 +58,10 @@ var additiveCycleStateKeys = []string{
 	"audit_repair_active",               // in-repair-round flag; distinct from the monotonic counter (review MEDIUM: stale-brief leak)
 	"audit_dispatches",                  // audit round-supersession index; dispatch-persisted so a crashed round retires on resume (cycle-1603)
 	"explanation_documentation_version", // host-owned Build explanation contract activation
+	"goal_hash",                         // recovery: original task identity across pauses
+	"goal_text",                         // recovery: original goal for phase memory and dossiers
+	"pre_cycle_head",                    // recovery: preserve closeout baseline after Ship
+	"final_verdict",                     // recovery: preserve the host floor disposition across pauses
 }
 
 func jsonKeysOf(t *testing.T, v any) []string {

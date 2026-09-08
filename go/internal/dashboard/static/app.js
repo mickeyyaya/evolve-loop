@@ -66,6 +66,8 @@ function renderLoop() {
   const dl = h('dl', { class: 'kv' });
   const kv = (k, v) => dl.append(h('dt', null, k), h('dd', null, v));
   kv('status', pill(state, label));
+  const active = snap.cycles.filter(c => c.state === 'running');
+  if (active.length > 1) kv('active lanes', active.map(c => '#' + c.id + ' · ' + c.current_phase).join(', '));
   if (l.cycle_id) {
     kv('cycle', h('button', { class: 'link', onclick: () => go('#cycle/' + l.cycle_id) }, '#' + l.cycle_id));
     kv('phase', h('span', null, l.phase || '—', ' ', h('span', { class: 'muted' }, l.phase_started_at ? '· since ' + ago(l.phase_started_at) : '')));

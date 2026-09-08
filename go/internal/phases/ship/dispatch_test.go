@@ -25,7 +25,8 @@ func TestPhaseRun_NativeDispatch_Ships(t *testing.T) {
 
 	p := New(Config{Runner: execRunner})
 	resp, err := p.Run(context.Background(), core.PhaseRequest{
-		Cycle:       1,
+		Cycle: 1,
+		RunID: "test-run", AuditRound: 1,
 		ProjectRoot: repo,
 		Workspace:   filepath.Join(repo, ".evolve", "runs", "cycle-1"),
 		Context:     map[string]string{"commit_message": "feat: native dispatch ship"},

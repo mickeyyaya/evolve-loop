@@ -56,10 +56,8 @@ func TestShouldWrap(t *testing.T) {
 		probe    ProbeResult
 		wantWrap bool
 	}{
-		// The core regression: nested managed LLM CLIs must NOT wrap regardless of binary
-		// availability — on darwin the inner sandbox-exec hangs the REPL boot,
-		// and on every OS the outer Claude session already confines. This is
-		// the cell the bridge's auto-only skip missed for EVOLVE_SANDBOX=on.
+		// Without a capability measurement, a nested hint still refuses the
+		// inner wrapper. Binary presence alone cannot establish applicability.
 		{"darwin nested + available → skip", true, avail("darwin"), false},
 		{"linux nested + available → skip", true, avail("linux"), false},
 		// Not nested + binary available → wrap (the normal confined path).

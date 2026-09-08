@@ -52,7 +52,7 @@ func mergedUnpushedFixture(t *testing.T, cycleBranch string) string {
 	runGit(t, repo, "merge", "--ff-only", "-q", cycleBranch)
 
 	mustWrite(t, filepath.Join(repo, ".evolve", "cycle-state.json"),
-		`{"cycle_id":1,"phase":"ship","active_worktree":"`+wt+`"}`)
+		`{"cycle_id":1,"run_id":"test-run","audit_dispatches":1,"phase":"ship","active_worktree":"`+wt+`"}`)
 	return repo
 }
 
@@ -103,7 +103,7 @@ func TestRepair_Resume_BoundTreeMismatch_NoRepair(t *testing.T) {
 	seedAuditWithBoundTree(t, repo, "PASS", strings.Repeat("d", 40))
 	runGit(t, repo, "merge", "--ff-only", "-q", "cycle-246-mismatch")
 	mustWrite(t, filepath.Join(repo, ".evolve", "cycle-state.json"),
-		`{"cycle_id":1,"phase":"ship","active_worktree":"`+wt+`"}`)
+		`{"cycle_id":1,"run_id":"test-run","audit_dispatches":1,"phase":"ship","active_worktree":"`+wt+`"}`)
 
 	res, err := runShip(t, repo, Options{Class: ClassCycle, CommitMessage: "should decline"})
 	if res.ExitCode == ExitOK {
@@ -134,7 +134,7 @@ func TestRepair_Resume_OriginDiverged_NoRepair(t *testing.T) {
 	seedAuditWithBoundTree(t, repo, "PASS", boundTree)
 	runGit(t, repo, "merge", "--ff-only", "-q", "cycle-246-diverged")
 	mustWrite(t, filepath.Join(repo, ".evolve", "cycle-state.json"),
-		`{"cycle_id":1,"phase":"ship","active_worktree":"`+wt+`"}`)
+		`{"cycle_id":1,"run_id":"test-run","audit_dispatches":1,"phase":"ship","active_worktree":"`+wt+`"}`)
 
 	// A second clone pushes a divergent commit to origin first.
 	pushDivergentCommit(t, bare)

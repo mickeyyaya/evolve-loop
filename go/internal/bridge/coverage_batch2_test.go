@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -56,7 +57,7 @@ func TestLoadProfile_AllBranches(t *testing.T) {
 	}
 	// sandbox.allow_network must parse into ProfileSandbox.AllowNetwork — the
 	// snake_case key only maps with the json tag, so this guards a silent drop.
-	if p.Sandbox == nil || *p.Sandbox != (ProfileSandbox{AllowNetwork: true}) {
+	if p.Sandbox == nil || !reflect.DeepEqual(*p.Sandbox, ProfileSandbox{AllowNetwork: true}) {
 		t.Fatalf("sandbox = %+v, want &{AllowNetwork:true}", p.Sandbox)
 	}
 }

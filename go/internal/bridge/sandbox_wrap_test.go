@@ -44,7 +44,7 @@ func TestSandboxPrefix_NoWorktree_SkipsWrap(t *testing.T) {
 	fw := &fakeWrap{prefix: []string{"sandbox-exec", "-p", "x"}, available: true}
 	deps := Deps{SandboxWrap: fw.wrap()}
 	cfg := &Config{Worktree: "", Agent: "scout"}
-	prefix, ok := sandboxPrefixForLaunch(deps, cfg)
+	prefix, ok := sandboxPrefixForLaunch(deps, cfg, "")
 	if ok || prefix != nil {
 		t.Errorf("non-worktree phase should skip wrap; got (%v, %v)", prefix, ok)
 	}
@@ -57,7 +57,7 @@ func TestSandboxPrefix_RequiredContractConsultsWrapperWithoutWorktree(t *testing
 	fw := &fakeWrap{prefix: []string{"sandbox-exec", "-p", "x"}, available: true}
 	deps := Deps{SandboxWrap: fw.wrap()}
 	cfg := &Config{RequireSandbox: true, Workspace: "/ws", ProjectRoot: "/repo", Agent: "build"}
-	prefix, ok := sandboxPrefixForLaunch(deps, cfg)
+	prefix, ok := sandboxPrefixForLaunch(deps, cfg, "")
 	if !ok || len(prefix) == 0 || len(fw.calls) != 1 {
 		t.Fatalf("required contract did not request confinement: prefix=%v ok=%v calls=%d", prefix, ok, len(fw.calls))
 	}
@@ -78,7 +78,7 @@ func TestSandboxPrefix_WorktreePhase_PassesAbsolutePaths(t *testing.T) {
 		ProjectRoot: "/abs/repo",
 		Agent:       "build",
 	}
-	prefix, ok := sandboxPrefixForLaunch(deps, cfg)
+	prefix, ok := sandboxPrefixForLaunch(deps, cfg, "")
 	if !ok || len(prefix) != 3 {
 		t.Fatalf("worktree phase should wrap; got (%v, %v)", prefix, ok)
 	}
@@ -107,7 +107,7 @@ func TestSandboxPrefix_ForcesNetwork(t *testing.T) {
 		var stderr strings.Builder
 		cfg := base()
 		cfg.AllowNetwork = false
-		_, _ = sandboxPrefixForLaunch(Deps{SandboxWrap: fw.wrap(), Stderr: &stderr}, cfg)
+		_, _ = sandboxPrefixForLaunch(Deps{SandboxWrap: fw.wrap(), Stderr: &stderr}, cfg, "")
 		if len(fw.calls) != 1 || !fw.calls[0].AllowNetwork {
 			t.Fatalf("must force AllowNetwork=true; got %+v", fw.calls)
 		}
@@ -120,7 +120,7 @@ func TestSandboxPrefix_ForcesNetwork(t *testing.T) {
 		var stderr strings.Builder
 		cfg := base()
 		cfg.AllowNetwork = true
-		_, _ = sandboxPrefixForLaunch(Deps{SandboxWrap: fw.wrap(), Stderr: &stderr}, cfg)
+		_, _ = sandboxPrefixForLaunch(Deps{SandboxWrap: fw.wrap(), Stderr: &stderr}, cfg, "")
 		if len(fw.calls) != 1 || !fw.calls[0].AllowNetwork {
 			t.Fatalf("must keep AllowNetwork=true; got %+v", fw.calls)
 		}
@@ -132,7 +132,7 @@ func TestSandboxPrefix_ForcesNetwork(t *testing.T) {
 		fw := &fakeWrap{prefix: []string{"x"}, available: true}
 		cfg := base()
 		cfg.AllowNetwork = false
-		_, _ = sandboxPrefixForLaunch(Deps{SandboxWrap: fw.wrap(), Stderr: nil}, cfg)
+		_, _ = sandboxPrefixForLaunch(Deps{SandboxWrap: fw.wrap(), Stderr: nil}, cfg, "")
 		if len(fw.calls) != 1 || !fw.calls[0].AllowNetwork {
 			t.Fatalf("must force AllowNetwork=true even with nil Stderr; got %+v", fw.calls)
 		}
@@ -144,7 +144,7 @@ func TestSandboxPrefix_NoWrapper_Degrades(t *testing.T) {
 	// return (nil, false) — drivers then run unwrapped. Never panic on nil.
 	deps := Deps{SandboxWrap: nil}
 	cfg := &Config{Worktree: "/abs/wt/x", Agent: "build"}
-	prefix, ok := sandboxPrefixForLaunch(deps, cfg)
+	prefix, ok := sandboxPrefixForLaunch(deps, cfg, "")
 	if ok || prefix != nil {
 		t.Errorf("nil wrapper should degrade silently; got (%v, %v)", prefix, ok)
 	}

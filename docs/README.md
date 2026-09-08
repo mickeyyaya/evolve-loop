@@ -1,5 +1,7 @@
 # evolve-loop documentation
 
+For current supported behavior, start with the [runtime contract](architecture/current-runtime-contract.md). Historical or superseded specifications explain earlier designs; they are not operational guarantees.
+
 This folder is the **single root** for all evolve-loop documentation. Repo-root files
 (`README.md`, `LICENSE`, `CHANGELOG.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`,
 `PRIVACY.md`, `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`) stay at the repo root because external
@@ -66,13 +68,11 @@ different questions:
 
 And then there is one *non-agent* bucket:
 
-- **`private/`** — research backlog, exploratory notes. Public-readable on GitHub but
-  **structurally excluded from agent context** at two surviving defense layers: the OS
-  sandbox and the CLI permission gate, both driven by `docs/private` in each profile's
-  `sandbox.deny_subpaths` (`.evolve/profiles/{scout,auditor,orchestrator,...}.json`).
-  (A third, bash-only context-builder filter existed before the v12.0.0 legacy/ removal;
-  it has no current Go reimplementation — see `architecture/private-context-policy.md`.)
-  "Private" here means "private from the agent's reasoning context", not "secret from humans".
+- **`private/`** — research backlog and exploratory notes, publicly readable on GitHub
+  but excluded from agent context by repository instructions. Scout, Auditor, and
+  Orchestrator additionally declare `sandbox.deny_read_subpaths` for this directory.
+  Applied OS confinement enforces those declared read denials; explicit sandbox opt-out
+  does not. See the [isolation capability contract](architecture/recovery-isolation-policy.md).
 
 The single bright line: **`docs/private/*` is the only path agents cannot read.** Everything
 else under `docs/` is fair game when an agent has reason to look.
@@ -90,11 +90,11 @@ evolve-loop has two flavors of agent doc access:
    `docs/private/`. The agent has the *capability* but uses it only when its persona / skill
    instructions cite a specific reference.
 
-`docs/private/` is the structural exception: the OS sandbox and the CLI permission gate
-(both fed by each profile's `sandbox.deny_subpaths`) block both auto-loading and on-demand
-access. See `private/README.md` and `architecture/private-context-policy.md` for the
-mechanism. (Note: that policy doc still describes a third, bash-only filter layer from before
-the v12.0.0 legacy/ removal; it is equally stale and has no current Go reimplementation.)
+`docs/private/` must not be loaded into agent context. The OS read-denial mechanism applies
+to the configured child profiles; it does not filter host-side prompt assembly. The
+older `architecture/private-context-policy.md` describes a removed bash filter and is
+historical context. The [current isolation contract](architecture/recovery-isolation-policy.md)
+defines the supported enforcement boundary.
 
 `docs/research/` is the **archival** counterpart: research dossiers (merged from the former
 `kb/` and `knowledge-base/research/` roots on 2026-08-05) that informed design decisions but

@@ -26,6 +26,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
 // Invocation is the post-parse shape: enough to write the right
@@ -297,8 +299,9 @@ func detectPhase(artifactPath string) string {
 // to it); retro emits TWO (report + failure-lesson YAML).
 //
 // verdict ∈ {PASS,WARN,FAIL} steers ONLY the audit phase: it shapes both
-// the audit-report.md verdict line and the fused acs-verdict.json red_count
-// (FAIL → red_count 1, so the EGPS gate blocks). Other phases ignore it.
+// the audit-report.md verdict line and the candidate acs-verdict.json red_count.
+// Native Audit replaces that candidate with host-executed predicate results;
+// the E2E project fixture supplies those predicates. Other phases ignore it.
 // An empty/unknown verdict is treated as PASS by the caller (auditVerdict).
 func artifactsFor(phase, mainPath, verdict string) (map[string]string, error) {
 	out := map[string]string{}
@@ -338,6 +341,14 @@ func artifactsFor(phase, mainPath, verdict string) (map[string]string, error) {
 		if verdict == "FAIL" {
 			redCount = 1
 		}
+		var failure *phasecontract.FailureBlock
+		if verdict == "WARN" || verdict == "FAIL" {
+			failure = &phasecontract.FailureBlock{
+				Class:         "code-audit-fail",
+				Defects:       []string{"synthetic e2e " + verdict + " finding"},
+				EvidencePaths: []string{"audit-report.md"},
+			}
+		}
 		// Emit BOTH the prose heading and the machine-readable sentinel: at
 		// EVOLVE_PHASE_IO=enforce (the default since the 3.10 cutover) the sentinel
 		// is mandatory for the audit verdict parse, so a prose-only fake report
@@ -351,13 +362,10 @@ func artifactsFor(phase, mainPath, verdict string) (map[string]string, error) {
 		out[mainPath] = fmt.Sprintf("# Audit Report\n\n## Verdict\n**%s**\n\nSynthetic %s verdict.\n"+
 			"## Explanation Documentation\n- Status: VERIFIED\n- Build status: not_applicable\n"+
 			"- Evidence: reviewed the NOT_APPLICABLE declaration in build-report.md against the empty base-bound diff\n"+
-			"<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"%s\",\"schema_version\":1} -->\n", verdict, verdict, verdict)
-		// Production-shaped acs-verdict (the generateACSVerdict schema): the
-		// armed spine floor's audit anchor reads the TOP-LEVEL verdict field,
-		// so the legacy shape without it (pre-2026-07-16 fake) made the anchor
-		// unsatisfiable and hard-blocked every e2e cycle at the ship
-		// transition (the 2c0559a5 e2e-tier red). A schema-faithful fake lets
-		// e2e exercise the floor exactly as production runs it.
+			"%s\n", verdict, verdict, phasecontract.RenderVerdictSentinelWithFailure("audit", verdict, failure))
+		// Preserve the fake's candidate artifact for CLI-shape tests. It is not
+		// host evidence: native Audit retires it before executing the committed
+		// predicate fixture and sealing its own complete result.
 		acsPath := filepath.Join(filepath.Dir(mainPath), "acs-verdict.json")
 		out[acsPath] = fmt.Sprintf(`{"schema_version":"1.0","verdict":%q,"ship_eligible":%t,"red_count":%d,"yellow_count":0,"green_count":1}`,
 			verdict, verdict != "FAIL", redCount) + "\n"

@@ -185,6 +185,15 @@ func applyWithHooks(h hooks, path string, cp Checkpoint) error {
 }
 
 func init() {
+	core.ResumeBoundaryCheckpointer = func(cs core.CycleState, projectRoot string, now time.Time) error {
+		path := core.ResolveCycleStatePath(filepath.Join(projectRoot, ".evolve"))
+		return flock.WithPathLock(path, func() error {
+			// The current owner has consumed the old pause. Keep a discoverable crash
+			// checkpoint for this dispatch; fresh leases exclude it from fleet discovery.
+			cp := ComposeWithIntegrity(cs, ReasonOperatorRequest, 0, "", now, readExistingIntegrity(path))
+			return applyWithHooks(defaultHooks(), path, cp)
+		})
+	}
 	// Cycle-656: the mid-cycle all-families-exhausted detector needs to write
 	// a quota-likely checkpoint from inside core's dispatch seam. quota-likely
 	// IS an escalation reason, so unlike the phase-complete hook below it

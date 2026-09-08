@@ -78,6 +78,10 @@ func (cr *cycleRun) recordAndBranch(next Phase, dr dispatchResult) (loopAction, 
 	}
 
 	cr.cs.CompletedPhases = append(cr.cs.CompletedPhases, string(next))
+	// Commit the floor disposition with its completed phase so a crash cannot
+	// restore the phase history while losing the verdict it protects.
+	cr.o.recordFinalVerdict(&cr.result, next, dr.resp.Verdict, cr.o.floorAlreadyCompleted(cr.cs.CompletedPhases))
+	cr.cs.FinalVerdict = cr.result.FinalVerdict
 	if err := cr.o.storage.WriteCycleState(cr.ctx, cr.cs); err != nil {
 		werr := fmt.Errorf("write cycle-state post-%s: %w", next, err)
 		cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, dr.resp, dr.attemptCount, werr.Error(), cr.cs.PhaseStartedAt))
@@ -90,13 +94,6 @@ func (cr *cycleRun) recordAndBranch(next Phase, dr dispatchResult) (loopAction, 
 		}
 	}
 
-	// Cycle-802 (retro-bridge-timeout-width10): floor-gated verdict write —
-	// CompletedPhases already includes `next` (appended above), so
-	// floorAlreadyCompleted reflects whether an authoritative (floor/ship)
-	// verdict preceded this phase. A non-floor post-verdict phase failing under
-	// quota/timeout no longer clobbers a floor PASS; its verdict is preserved in
-	// VerdictsNotAdopted instead. See final_verdict_floor.go.
-	cr.o.recordFinalVerdict(&cr.result, next, dr.resp.Verdict, cr.o.floorAlreadyCompleted(cr.cs.CompletedPhases))
 	// Learn from a FLOOR-phase FAIL verdict returned with NO dispatch error:
 	// audit's in-process CI-parity gates (skills-drift / gofmt / EGPS / apicover)
 	// override the auditor's narrative PASS to FAIL (err==nil), so this success

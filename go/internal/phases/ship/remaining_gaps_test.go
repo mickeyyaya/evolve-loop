@@ -195,11 +195,12 @@ func TestRun_PostShipError_LogsWarnAndContinues(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	res, err := Run(ctx, Options{
-		Class:          ClassCycle,
-		CommitMessage:  "feat: post-ship warn",
-		ProjectRoot:    repo,
-		WorkspacePath:  filepath.Join(repo, ".evolve", "runs", "cycle-1"),
-		CycleID:        1,
+		Class:         ClassCycle,
+		CommitMessage: "feat: post-ship warn",
+		ProjectRoot:   repo,
+		WorkspacePath: filepath.Join(repo, ".evolve", "runs", "cycle-1"),
+		CycleID:       1,
+		RunID:         "test-run", AuditRound: 1,
 		PluginRoot:     repo,
 		ShipBinaryPath: filepath.Join(repo, "ship-binary-fixture"),
 		Runner:         execRunner,

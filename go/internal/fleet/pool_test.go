@@ -71,8 +71,9 @@ import (
 // and >=3 disjoint pending todos: kill/fail one running lane -> a replacement
 // lane dispatches within one scheduler tick while the sibling lane is STILL
 // RUNNING." Three mutually file-disjoint todos, Target=2: the pool fills with
-// A and B; B exits immediately; C (the only remaining pending todo, disjoint
-// from A) MUST be dispatched before A -- still blocked -- is ever unblocked.
+// A and B; B exits after both callbacks are observed; C (the only remaining
+// pending todo, disjoint from A) MUST be dispatched before A -- still blocked
+// -- is ever unblocked.
 // A wave-barrier-preserving implementation (dispatch once, wait for ALL of
 // A/B to finish before considering C) fails this: it would never observe C
 // dispatched while A is still in flight.
@@ -83,12 +84,20 @@ func TestRunPool_BackfillsReplacementWhileSiblingLaneStillRunning(t *testing.T) 
 		{ID: "C", Files: []string{"c.go"}},
 	}
 	holdA := make(chan struct{})
+	holdB := make(chan struct{})
+	releaseA := sync.OnceFunc(func() { close(holdA) })
+	releaseB := sync.OnceFunc(func() { close(holdB) })
+	t.Cleanup(releaseA)
+	t.Cleanup(releaseB)
 	dispatched := make(chan string, len(backlog))
 	launch := func(_ context.Context, spec CycleSpec) (int, error) {
 		id := scopeID(spec)
 		dispatched <- id
-		if id == "A" {
+		switch id {
+		case "A":
 			<-holdA
+		case "B":
+			<-holdB
 		}
 		return 0, nil
 	}
@@ -111,10 +120,10 @@ func TestRunPool_BackfillsReplacementWhileSiblingLaneStillRunning(t *testing.T) 
 		t.Fatalf("initial fill dispatched %v, want exactly {A,B}", seen)
 	}
 
-	// B has already returned (its launch call returns immediately). A is
-	// still blocked on holdA. The replacement for B's exit -- C, the only
-	// remaining disjoint pending todo -- must be dispatched NOW, not after A
-	// finishes.
+	// Let B finish only after observing both initial callbacks: callback entry
+	// order is scheduler-dependent even when the pool dispatches A before B.
+	// C must replace B while A remains blocked on holdA.
+	releaseB()
 	select {
 	case id := <-dispatched:
 		if id != "C" {
@@ -124,7 +133,7 @@ func TestRunPool_BackfillsReplacementWhileSiblingLaneStillRunning(t *testing.T) 
 		t.Fatal("no replacement lane was dispatched for B's exit while sibling lane A was still running -- the wave barrier was not removed")
 	}
 
-	close(holdA)
+	releaseA()
 	var results []Result
 	select {
 	case results = <-done:

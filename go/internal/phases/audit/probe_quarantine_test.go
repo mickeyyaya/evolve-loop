@@ -171,14 +171,17 @@ func TestClassify_QuarantinesProbesEvenWhenVerdictPreStaged(t *testing.T) {
 	if err := os.Chtimes(promptPath, past, past); err != nil {
 		t.Fatal(err)
 	}
-	// Verdict PRE-STAGED: genVerdict must not run — and quarantine must anyway.
+	// A pre-staged candidate must not suppress host execution or probe quarantine.
 	if err := os.WriteFile(filepath.Join(workspace, "acs-verdict.json"),
 		[]byte(`{"schema_version":"1.0","cycle":9999,"results":[],"green_count":1,"red_count":0,"verdict":"PASS","ship_eligible":true}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
 	h := hooks{genVerdict: func(core.PhaseRequest) error {
-		t.Fatal("genVerdict must not run when acs-verdict.json is pre-staged")
+		if _, err := os.Stat(filepath.Join(worktree, "go", "internal", "bridge", "zz_audit_probe_test.go")); !os.IsNotExist(err) {
+			t.Fatal("host predicate execution preceded probe quarantine")
+		}
+		writeACSVerdict(t, workspace, 0)
 		return nil
 	}}
 	h.Classify("## Verdict\n**PASS**", core.PhaseRequest{

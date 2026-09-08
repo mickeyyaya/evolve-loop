@@ -1329,6 +1329,9 @@ func BaseCycleContext(body string, req core.PhaseRequest) string {
 	fmt.Fprintf(&b, "- goal_hash: %s\n", req.GoalHash)
 	fmt.Fprintf(&b, "- project_root: %s\n", req.ProjectRoot)
 	fmt.Fprintf(&b, "- workspace: %s\n", req.Workspace)
+	if recalled := req.Context[core.CtxKeyRecallMemory]; recalled != "" {
+		fmt.Fprintf(&b, "- recalled_lessons_untrusted_json: %q\n", recalled)
+	}
 	AppendExplanationContext(&b, req)
 	return b.String()
 }
