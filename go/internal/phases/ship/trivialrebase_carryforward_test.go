@@ -50,6 +50,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // trPassingGates is the full native gate set the composed tree must pass
@@ -120,6 +122,8 @@ func trSetup(t *testing.T) trScenario {
 	mustWrite(t, filepath.Join(repo, ".evolve", "runs", "cycle-1", "audited.diff"),
 		runGitOut(t, repo, "diff", "HEAD"))
 
+	runGit(t, repo, "reset", "--", "fixture.txt") // Separate the staged lane diff from the simulated peer commit.
+
 	// Main moves: another lane lands an UNRELATED file, so the rebase is
 	// conflict-free and the lane diff's patch-id is unchanged.
 	mustWrite(t, filepath.Join(repo, "other-lane.txt"), "another lane landed\n")
@@ -154,20 +158,13 @@ func (s trScenario) entry(t *testing.T, patchID string, gates map[string]string)
 	}
 }
 
-// TestTrivialRebase_CarriesAuditForward: clean rebase, unchanged patch-id,
-// all composed-tree gates pass → verifyAuditBinding accepts the
-// audit+composition chain (nil error), so ship proceeds with NO fresh
-// auditor dispatch. RED until the fast path exists (today:
-// CodeAuditBindingHeadMoved).
-func TestTrivialRebase_CarriesAuditForward(t *testing.T) {
+// A valid composition preserves review context but cannot carry predicate
+// execution evidence onto a changed tree. The typed precondition requests Audit.
+func TestTrivialRebase_ChangedTreeRequiresPredicateReaudit(t *testing.T) {
 	s := trSetup(t)
 	trAppendLedgerLine(t, s.repo, s.entry(t, s.patchID, trPassingGates()))
-
-	opts := auditOpts(t, s.repo)
-	res := &RunResult{}
-	if err := verifyAuditBinding(context.Background(), opts, res); err != nil { //nolint:staticcheck
-		t.Fatalf("trivial-rebase carry-forward: want verifyAuditBinding to accept the audit+composition chain (nil), got: %v", err)
-	}
+	err := verifyAuditBinding(context.Background(), auditOpts(t, s.repo), &RunResult{})
+	wantShipErr(t, err, core.CodeAuditBindingTreeMismatch, core.ShipClassPrecondition, "tree-state mismatch")
 }
 
 // TestTrivialRebase_PatchIdDriftFallsBackToReaudit: the lane's diff changed

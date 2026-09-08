@@ -101,11 +101,12 @@ type ModelTierEnvelope struct {
 
 // SandboxConfig is the typed shape of profile.sandbox.
 type SandboxConfig struct {
-	Enabled       bool     `json:"enabled,omitempty"`
-	ReadOnlyRepo  bool     `json:"read_only_repo,omitempty"`
-	WriteSubpaths []string `json:"write_subpaths,omitempty"`
-	DenySubpaths  []string `json:"deny_subpaths,omitempty"`
-	AllowNetwork  bool     `json:"allow_network,omitempty"`
+	Enabled          bool     `json:"enabled,omitempty"`
+	ReadOnlyRepo     bool     `json:"read_only_repo,omitempty"`
+	WriteSubpaths    []string `json:"write_subpaths,omitempty"`
+	DenySubpaths     []string `json:"deny_subpaths,omitempty"`
+	DenyReadSubpaths []string `json:"deny_read_subpaths,omitempty"`
+	AllowNetwork     bool     `json:"allow_network,omitempty"`
 }
 
 // Loader resolves profile names to parsed Profile values.

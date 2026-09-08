@@ -142,14 +142,15 @@ func (o *Orchestrator) recordAuditBinding(ctx context.Context, cycle int, projec
 		return
 	}
 	artSum := sha256.Sum256(artBytes)
-	// exit_code mirrors the Unix-convention auditor signal ship tolerates (0|1):
-	// 0 = clean PASS, 1 = findings (WARN and FAIL alike — the auditor process
-	// ran to completion; the verdict severity lives in the bound artifact,
-	// which is where ship reads it). 2+ would trip ship's exit-code gate
-	// BEFORE the verdict parse and mask VERDICT_FAIL behind AUDITOR_EXIT.
+	// This host-owned disposition cannot be overridden by the report narrative:
+	// PASS=0, fluent WARN=1, rejected audit=2. Keeping FAIL unshippable also
+	// protects failures to invalidate stale candidate evidence on disk.
 	exitCode := 0
-	if verdict == VerdictWARN || verdict == VerdictFAIL {
+	switch verdict {
+	case VerdictWARN:
 		exitCode = 1
+	case VerdictFAIL:
+		exitCode = 2
 	}
 	if err := o.ledger.Append(ctx, LedgerEntry{
 		TS:              o.now().UTC().Format(time.RFC3339),

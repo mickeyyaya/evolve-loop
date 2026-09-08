@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/sandbox"
@@ -66,8 +67,8 @@ func defaultSandboxWrapWithProbe(deps Deps, probeFunc func() sandbox.ProbeResult
 
 		// Single-source confinement decision — the SAME DetectNested +
 		// ShouldWrap that preflight consumes (internal/adapters/sandbox). The
-		// wrap is skipped for ALL modes when we are nested-Claude (the outer
-		// session already imposes OS sandbox + Tier-1 hooks, and on macOS the
+		// wrap is skipped for ALL modes when we are nested-Claude (outer
+		// confinement is unverified, and on macOS the
 		// inner sandbox-exec returns sandbox_apply() EPERM and hangs the REPL
 		// boot, exit=80) or when no usable sandbox binary is present. `on`
 		// declares mandatory confinement, so its bypass is surfaced loudly
@@ -88,12 +89,43 @@ func defaultSandboxWrapWithProbe(deps Deps, probeFunc func() sandbox.ProbeResult
 		// load their own config/auth state; repo writes remain confined below.
 		home, _ := os.UserHomeDir()
 		cfg := sandbox.Config{
-			RepoRoot:     req.RepoRoot,
-			HomeDir:      home,
-			ReadOnlyRepo: true,
-			WritePaths:   sandboxWritePaths(req),
-			AllowNetwork: req.AllowNetwork,
+			RepoRoot:      req.RepoRoot,
+			HomeDir:       home,
+			ReadOnlyRepo:  true,
+			WritePaths:    sandboxWritePaths(req),
+			AllowNetwork:  req.AllowNetwork,
+			DenyPaths:     req.DenyPaths,
+			DenyReadPaths: req.DenyReadPaths,
 		}
+		// SBPL matches filesystem paths after symlink resolution. In particular,
+		// /var and /tmp aliases on macOS must not bypass the repository deny.
+		gitWrites, gitDenies, err := sandboxGitWritePaths(req.Worktree, probe.OS)
+		if err == nil {
+			gitDenies, err = resolveSandboxDenials(gitDenies, "", "", true)
+		}
+		if err != nil {
+			if deps.Stderr != nil {
+				fmt.Fprintf(deps.Stderr, "[bridge] sandbox capability unavailable: %v\n", err)
+			}
+			return nil, false
+		}
+		cfg.WritePaths = append(cfg.WritePaths, gitWrites...)
+		cfg.DenyPaths = append(append([]string{}, cfg.DenyPaths...), gitDenies...)
+		paths := append([]string{cfg.RepoRoot}, cfg.WritePaths...)
+		for i, path := range paths {
+			if path == "" {
+				continue
+			}
+			real, err := canonicalSandboxPath(path)
+			if err != nil {
+				if deps.Stderr != nil {
+					fmt.Fprintf(deps.Stderr, "[bridge] sandbox path resolution failed: %v\n", err)
+				}
+				return nil, false
+			}
+			paths[i] = real
+		}
+		cfg.RepoRoot, cfg.WritePaths = paths[0], paths[1:]
 
 		switch probe.OS {
 		case "darwin":
@@ -136,9 +168,18 @@ func defaultSandboxWrapWithProbe(deps Deps, probeFunc func() sandbox.ProbeResult
 			}
 			return []string{"sandbox-exec", "-f", sbplPath}, true
 		case "linux":
+			for _, path := range append(append([]string{}, req.DenyPaths...), req.DenyReadPaths...) {
+				info, err := os.Stat(path)
+				if err != nil || (!info.IsDir() && slices.Contains(req.DenyReadPaths, path)) {
+					if deps.Stderr != nil {
+						fmt.Fprintf(deps.Stderr, "[bridge] sandbox policy unavailable: Linux denial target %q must exist; read denials require directories (stat: %v)\n", path, err)
+					}
+					return nil, false
+				}
+			}
 			// bwrap takes the inner argv inline. We don't have it here, so we
 			// return just the prefix portion via the dedicated helper.
-			return sandbox.BwrapPrefix(cfg), true
+			return append([]string{"bwrap"}, sandbox.BwrapPrefix(cfg)...), true
 		default:
 			return nil, false
 		}
@@ -218,11 +259,13 @@ func sandboxPrefixForLaunch(deps Deps, cfg *Config) ([]string, bool) {
 		fmt.Fprintf(deps.Stderr, "[bridge] WARN: source-writing phase %q has sandbox.allow_network=false; forcing true (a sandboxed model-reaching CLI cannot boot with network denied)\n", cfg.Agent)
 	}
 	return deps.SandboxWrap(SandboxWrapRequest{
-		Phase:        cfg.Agent,
-		Workspace:    cfg.Workspace,
-		Worktree:     cfg.Worktree,
-		RepoRoot:     cfg.ProjectRoot,
-		AllowNetwork: true, // forced — see above; source-writing ⇒ model network required
+		Phase:         cfg.Agent,
+		Workspace:     cfg.Workspace,
+		Worktree:      cfg.Worktree,
+		RepoRoot:      cfg.ProjectRoot,
+		AllowNetwork:  true, // forced — see above; source-writing ⇒ model network required
+		DenyPaths:     cfg.DenyPaths,
+		DenyReadPaths: cfg.DenyReadPaths,
 	})
 }
 
@@ -298,22 +341,10 @@ func wrapHeadlessInvocation(deps Deps, cfg *Config, name string, args []string) 
 	return prefix[0], newArgs, true
 }
 
-// sandboxRequiredButUnavailable reports whether a RequireSandbox launch must
-// fail closed. It distinguishes WHY the launch is unwrapped, because
-// ShouldWrap's three non-wrap causes differ in kind:
-//
-//   - nested LLM-CLI session: the OUTER sandbox + Tier-1 hooks already confine
-//     (ShouldWrap's own rationale — and on macOS an inner sandbox-exec
-//     EPERM-hangs the REPL). The requirement is SATISFIED, not violated;
-//     treating it as a violation made the Build-explanation contract
-//     unrunnable inside every Claude-driven session, including this repo's
-//     own e2e suite (observed: exit=2 on every pipeline e2e test).
-//   - explicit EVOLVE_SANDBOX=off: a host operator opt-out — the same posture
-//     as --human-input's host opt-in that ExitSafetyGate was built for.
-//     Honoured, but LOUDLY: the warning names the contract and the fact the
-//     phase runs unconfined.
-//   - anything else (auto/on with no usable wrap): the genuine violation this
-//     gate exists for. Fails closed, unchanged.
+// sandboxRequiredButUnavailable fails mandatory controls closed when no wrapper
+// applied. A nesting marker cannot prove the outer environment enforces this
+// profile's denials. Only the explicit host sandbox-off opt-out permits a
+// mandatory launch to continue unconfined.
 func sandboxRequiredButUnavailable(deps Deps, cfg *Config, wrapped bool) bool {
 	if cfg == nil || !cfg.RequireSandbox || wrapped {
 		return false
@@ -322,14 +353,17 @@ func sandboxRequiredButUnavailable(deps Deps, cfg *Config, wrapped bool) bool {
 	// sandbox.ConfinementSatisfied); preflight's host-capabilities check
 	// displays the same predicate, so the two can no longer diverge (the
 	// 2026-09-01 nested-HALT divergence class).
-	ok, optOut, _ := sandbox.ConfinementSatisfied(
+	ok, optOut, reason := sandbox.ConfinementSatisfied(
 		sandbox.DetectNested(depEnvGetter(deps)),
 		strings.TrimSpace(deps.Env[envSandboxMode]))
 	if ok {
 		if optOut && deps.Stderr != nil {
-			fmt.Fprintf(deps.Stderr, "[bridge] WARN: EVOLVE_SANDBOX=off — host opt-out honoured; phase %q runs UNCONFINED despite the activated Build explanation contract\n", cfg.Agent)
+			fmt.Fprintf(deps.Stderr, "[bridge] WARN: EVOLVE_SANDBOX=off — host opt-out honoured; phase %q runs UNCONFINED despite its sandbox requirement\n", cfg.Agent)
 		}
 		return false
+	}
+	if deps.Stderr != nil {
+		fmt.Fprintf(deps.Stderr, "[bridge] sandbox requirement unsatisfied: %s\n", reason)
 	}
 	return true
 }

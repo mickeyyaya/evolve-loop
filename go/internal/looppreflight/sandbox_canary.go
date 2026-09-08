@@ -7,19 +7,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 )
 
-// checkSandboxNestedFallback is the verified-fallback gate (P2). Under a nested
-// session the inner OS sandbox is skipped, so the loop relies on the OUTER
-// environment to confine source-writing phases. Rather than ASSUME that, this
-// check runs a write-canary — gated by the sandbox.nested_fallback dial — to
-// VERIFY it: if a write outside the inner sandbox's allow-list succeeds, the
-// outer session does not compensate.
-//
-//	off (default) ⇒ canary disabled (no behavior change)
-//	shadow        ⇒ WARN when unverified
-//	enforce       ⇒ HALT when unverified
-//
-// Only engaged when sandboxing is wanted AND the session is nested — the exact
-// scenario the dial governs.
+// checkSandboxNestedFallback samples an out-of-allowlist write under a nested
+// session. Off leaves the diagnostic disabled, shadow warns, and enforce halts
+// on an unsuccessful probe. Even a denied write does not attest the full
+// profile's read/write restrictions and never waives the launch-time gate.
 func checkSandboxNestedFallback(o resolved) CheckResult {
 	const name = "sandbox-nested-fallback"
 	if o.nestedFallbackStage == config.StageOff {
@@ -32,9 +23,9 @@ func checkSandboxNestedFallback(o resolved) CheckResult {
 		return CheckResult{Name: name, Level: LevelPass, Message: "standalone session — nested fallback not engaged"}
 	}
 	if o.sandboxCanaryProbe() {
-		return CheckResult{Name: name, Level: LevelPass, Message: "verified: outer environment blocked an out-of-allowlist write"}
+		return CheckResult{Name: name, Level: LevelPass, Message: "sampled write denied; profile-specific read/write confinement remains UNVERIFIED"}
 	}
-	detail := "a write OUTSIDE the inner sandbox's allow-list succeeded — the outer Claude Code session does not confine source-writing phases at the OS layer; set sandbox.nested_fallback=off to silence, or run under a genuinely-confined outer session"
+	detail := "the probe did not establish an out-of-allowlist write denial (write succeeded or probe setup failed); no profile-specific read or write restriction is verified"
 	if o.nestedFallbackStage == config.StageEnforce {
 		return CheckResult{Name: name, Level: LevelHalt, Message: "nested fallback UNVERIFIED (enforce)", Detail: detail}
 	}
@@ -45,17 +36,17 @@ func checkSandboxNestedFallback(o resolved) CheckResult {
 // OUTSIDE the inner sandbox's write allow-list (a sentinel in the project's
 // PARENT directory — the inner sandbox makes the repo read-only and confines
 // writes to the worktree/workspace/tmp) and reports whether the OUTER
-// environment blocked it. blocked=true ⇒ outer confinement verified; false ⇒
-// the write succeeded, so the outer environment does not confine.
+// environment denied this single write. False includes both a successful
+// write and an inconclusive setup failure.
 //
-// A setup error (couldn't even attempt the write) is treated as blocked — a
-// write we could not perform is not evidence of an unconfined environment, and
-// the conservative reading avoids a spurious HALT.
+// Only a permission-denied result counts as a sampled write denial. Missing
+// parents, descriptor exhaustion, and other setup failures remain unverified.
+// Even a permission denial can be ordinary DAC, not proof of the full policy.
 func defaultSandboxCanary(projectRoot string) func() bool {
 	return func() bool {
 		f, err := os.CreateTemp(filepath.Dir(projectRoot), ".evolve-sandbox-canary-*")
 		if err != nil {
-			return true
+			return os.IsPermission(err)
 		}
 		// Best-effort cleanup: the sentinel is unlinked regardless of the Close
 		// outcome on POSIX, so both errors are intentionally discarded.

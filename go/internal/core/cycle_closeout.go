@@ -1,0 +1,37 @@
+package core
+
+import (
+	"fmt"
+	"os"
+)
+
+// completeCycle is the terminal lifecycle for both entrypoints. Resume must
+// reconcile the verdict and preserve its learning before claiming completion.
+func (cr *cycleRun) completeCycle() error {
+	// Post-loop finalization (verdict reclassification, silent-no-ship warn,
+	// throughput, worktree-preserve decision, state persist) → finalizeCycle.
+	// preserveWorktree is threaded back so the exit defer (registered above)
+	// observes it; cycleCompletedNormally is set only on a clean persist.
+	preserve, ferr := cr.o.finalizeCycle(cr.ctx, cr.cs, cr.cycle, cr.preCycleHEAD, cr.req.ProjectRoot, &cr.result, &cr.state, cr.phaseTimings)
+	if preserve {
+		cr.preserveWorktree = true
+	}
+	if ferr != nil {
+		return ferr
+	}
+	cr.cycleCompletedNormally = true
+	// ADR-0055: emit this completed cycle's closeout dossier to
+	// <ProjectRoot>/knowledge-base/cycles/cycle-N.json. Best-effort — the cycle
+	// has already finalized, so a closeout-artifact write error must not fail it
+	// (presence is enforced separately by `evolve dossier verify` against the
+	// policy floor). Goal text comes from Context["goal"]; falls back to the goal
+	// hash so the dossier's required Goal is never blank.
+	dossierGoal := cr.req.Context["goal"]
+	if dossierGoal == "" {
+		dossierGoal = cr.req.GoalHash
+	}
+	if derr := writeCycleDossier(cr.o.gitMutationLock, cr.req.ProjectRoot, cr.cs.WorkspacePath, cr.cycle, dossierGoal, cr.cs.RunID, cr.result.FinalVerdict, cr.result.SkippedPhases, cr.result.VerdictsNotAdopted, cr.result.SpineFailOpens); derr != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d: closeout dossier not written (non-fatal): %v\n", cr.cycle, derr)
+	}
+	return nil
+}

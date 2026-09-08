@@ -133,6 +133,7 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 	}
 	phaseReq := PhaseRequest{
 		Cycle:                           cr.cycle,
+		AuditRound:                      cr.cs.AuditDispatches,
 		ProjectRoot:                     cr.req.ProjectRoot,
 		Workspace:                       cr.cs.WorkspacePath,
 		Worktree:                        phaseWorktree,
@@ -165,30 +166,7 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 			}
 		}
 	}
-	// ADR-0076 D (deterministic escalation floor — applied AFTER the mode-
-	// gated projection and INDEPENDENT of it, review finding D1: the live
-	// registry runs model_routing=static and a policy floor must still fire):
-	// a retried scoped item raises the build dispatch tier to deep, clamped
-	// through the same envelope guardrail as the routing clamp.
-	if next == PhaseBuild {
-		if tier, raised := cr.escalatedBuildTier(phaseReq.ModelRoutingTier); raised {
-			phaseReq.ModelRoutingTier = tier
-		}
-	}
-	// Audit-repair round (research R1): a tdd/build re-entry while
-	// AuditRepairActive raises to the profile's declared audit_retry_2plus tier
-	// — same state the repair brief derives from, same envelope clamp as above.
-	if tier, raised := cr.o.repairRoundTier(cr.req.ProjectRoot, next, cr.cs, phaseReq.ModelRoutingTier); raised {
-		phaseReq.ModelRoutingTier = tier
-	}
-	// ADR-0076 slice A: the build dispatch carries the cycle's difficulty
-	// multiplier so the engine can stretch the artifact-wait deadline. Scale
-	// 1.0 is left unset — byte-identical legacy dispatch.
-	if next == PhaseBuild {
-		if scale := cr.buildBudgetScale(); scale != 1.0 {
-			phaseReq.BudgetScale = scale
-		}
-	}
+	cr.applyDispatchPolicy(next, &phaseReq)
 	// ADR-0050 Phase 3.7: at advisory+, serve the build phase's upstream
 	// build-plan via the typed envelope (read once here at the seam) instead of
 	// an ad-hoc disk read inside the phase. Off/shadow leave it empty → the phase
@@ -285,30 +263,8 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 				// would otherwise fail forward. Single-family 85 with a healthy
 				// sibling never reaches here all-85 (the sibling attempt's exit
 				// differs), so normal failover is unchanged.
-				if allFamiliesQuotaExhausted(attemptExits) {
-					phaseErr := fmt.Errorf("phase %s: %w: every family in the fallback chain returned exit=85 across %d attempts; checkpoint written — resume with `evolve loop --resume` after quota reset", next, ErrAllFamiliesExhausted, attempt)
-					fmt.Fprintf(os.Stderr, "[orchestrator] WARN %v\n", phaseErr)
-					if QuotaBoundaryCheckpointer != nil {
-						if cperr := QuotaBoundaryCheckpointer(cr.cs, cr.req.ProjectRoot, cr.o.now()); cperr != nil {
-							fmt.Fprintf(os.Stderr, "[orchestrator] WARN quota-boundary checkpoint write failed: %v (defer still recorded; resume may re-run completed phases)\n", cperr)
-						}
-					}
-					if lerr := cr.o.ledger.Append(cr.ctx, LedgerEntry{
-						TS:       cr.o.now().UTC().Format(time.RFC3339),
-						Cycle:    cr.cycle,
-						Role:     string(next),
-						Kind:     "all_families_exhausted",
-						ExitCode: 85,
-					}); lerr != nil {
-						fmt.Fprintf(os.Stderr, "[orchestrator] WARN all_families_exhausted ledger append: %v\n", lerr)
-					}
-					// ADR-0044 C1: record the abort reason with the DEFERRED
-					// prefix so cyclehealth classifies the cycle DEFERRED.
-					cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempt,
-						fmt.Sprintf("%s: %s", abortReasonAllFamiliesExhausted, phaseErr.Error()), cr.cs.PhaseStartedAt))
-					writePhaseFailureDiag(cr.cs.WorkspacePath, string(next), cr.cycle, phaseErr, attempt, cr.o.now)
-					cr.recordFailureLearning(next, phaseErr, attempt)
-					return dispatchResult{}, loopAbort, wrapCycleLevelError(next, phaseErr)
+				if retryHooks.quotaExhausted(attemptExits) {
+					return dispatchResult{}, loopAbort, cr.pauseForQuota(next, resp, attempt)
 				}
 				// Backfill: when exhaustion is specifically due to ErrArtifactTimeout,
 				// try to reconstruct the artifact from stdout.clean.txt before aborting.

@@ -240,6 +240,9 @@ func loadResumeStateFrom(statePath, projectRoot string, opts ResumeOptions) (*Re
 		return nil, fmt.Errorf("resume: parse state: %w", err)
 	}
 
+	if strFromAny(blob["phase"]) == string(PhaseEnd) {
+		return nil, fmt.Errorf("%w: cycle already completed", ErrNoCheckpoint)
+	}
 	cp, ok := blob["checkpoint"].(map[string]any)
 	if !ok {
 		return nil, fmt.Errorf("%w: cycle-state.json has no checkpoint block", ErrNoCheckpoint)
@@ -315,11 +318,10 @@ func ActivateResumeStatePath(rp *ResumePoint, evolveDir string) func() {
 // phase. Skips state-machine traversal of completedPhases and replays
 // from `phase` onward through the rest of the cycle.
 //
-// Unlike RunCycle, RunCycleFromPhase does NOT increment LastCycleNumber
-// — it operates on the cycle that's already in flight. It also does
-// NOT re-acquire the cycle lock (the caller already holds it, since the
-// checkpoint was written under lock).
-func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, resumePoint *ResumePoint) (CycleResult, error) {
+// Unlike RunCycle, this method never allocates a cycle number: it completes
+// the original run and advances the completed cursor monotonically. It acquires
+// the normal storage lock before reading state and shares terminal closeout.
+func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, resumePoint *ResumePoint) (result CycleResult, retErr error) {
 	if err := o.ensureSafeConfig(); err != nil {
 		return CycleResult{}, err
 	}
@@ -348,17 +350,20 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 	if err != nil {
 		return CycleResult{}, fmt.Errorf("read cycle-state: %w", err)
 	}
+	if cs.Phase == string(PhaseEnd) {
+		return CycleResult{}, fmt.Errorf("resume: cycle %d already completed", cs.CycleID)
+	}
 	resumeIdentity, err := authoritativeResumeIdentity(req.ProjectRoot, resumePoint.StatePath, cs.WorkspacePath)
 	if err != nil {
 		return CycleResult{}, err
 	}
 	resumeWorkspace := resumeIdentity.workspace
 	hostCycle := cs.CycleID
-	if state.LastCycleNumber > 0 {
-		// state.json is host-owned and independent of the Builder-writable
-		// cycle-state projection. Fleet checkpoints override this with the cycle
-		// encoded in their run-directory path below.
-		hostCycle = state.LastCycleNumber
+	if allocated := max(state.LastCycleNumber, state.LastAllocatedCycleNumber); allocated > 0 {
+		// The host allocation lease identifies a paused run that has not yet
+		// completed. Using only LastCycleNumber rejects an honest quota pause.
+		// Fleet checkpoints instead bind to their independent per-run path.
+		hostCycle = allocated
 	} else if hostCycle == 0 {
 		hostCycle = resumePoint.CycleID
 	}
@@ -388,6 +393,11 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 	if cs.ActiveWorktree != "" && resumePoint.WorktreePath != "" && filepath.Clean(cs.ActiveWorktree) != filepath.Clean(resumePoint.WorktreePath) {
 		return CycleResult{}, fmt.Errorf("resume identity mismatch: cycle-state worktree %q does not match checkpoint worktree %q", cs.ActiveWorktree, resumePoint.WorktreePath)
 	}
+	req, err = restoreResumeGoal(req, cs, state, resumeIdentity.fleet)
+	if err != nil {
+		return CycleResult{}, err
+	}
+	cs.GoalHash, cs.GoalText = req.GoalHash, req.Context["goal"]
 	cycle := cs.CycleID
 	if cycle == 0 {
 		cycle = resumePoint.CycleID
@@ -419,7 +429,17 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 		ctxSnap[k] = v
 	}
 
-	result := CycleResult{Cycle: cycle, FinalVerdict: VerdictPASS}
+	if scope := loadLaneScope(cs.WorkspacePath); scope != nil {
+		ctxSnap["fleet_scope"] = strings.Join(scope.TodoIDs, ",")
+	}
+	result = CycleResult{Cycle: cycle, FinalVerdict: o.resumeFinalVerdict(cs)}
+	cs.FinalVerdict = result.FinalVerdict
+	preResumeHEAD := cs.PreCycleHEAD
+	if preResumeHEAD == "" {
+		preResumeHEAD, _ = o.gitHEAD()
+		cs.PreCycleHEAD = preResumeHEAD
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN resume cycle %d: legacy checkpoint has no pre-cycle HEAD; earlier ship throughput cannot be reconstructed from this checkpoint\n", cycle)
+	}
 	mainDirtyBaseline := porcelainDirtySet(ctx, req.ProjectRoot)
 
 	// ADR-0044 C1 (deferred-to-C3 debt, now paid): the resume path was a
@@ -433,6 +453,16 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 	// what-actually-ran contract RunCycle adopted in Slice 1; consumers are
 	// printing/telemetry only (audited then).
 	var phaseTimings []phaseTimingEntry
+	completed := false
+	defer func() {
+		if completed || errors.Is(retErr, ErrAllFamiliesExhausted) || ctx.Err() != nil {
+			return
+		}
+		result.FinalVerdict = VerdictFAIL
+		cr := &cycleRun{o: o, ctx: context.Background(), req: req, cycle: cycle, cs: cs, state: state, result: result}
+		cr.abnormalEpilogue(retErr)
+		result = cr.result
+	}()
 	defer func() {
 		// Survey emission is unconditional (a resumed cycle that dispatched
 		// nothing still has pre-crash outputs to account); the timings write
@@ -454,7 +484,12 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 
 	// Run the start phase first, then continue with state-machine.
 	first := true
-	for safety := 0; safety < 32; safety++ {
+	reachedEnd := false
+	maxIterations := o.maxPhaseIterations
+	if maxIterations <= 0 {
+		maxIterations = defaultMaxPhaseIterations
+	}
+	for safety := 0; safety < maxIterations; safety++ {
 		var next Phase
 		switch {
 		case first:
@@ -475,6 +510,7 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 			next = n
 		}
 		if next == PhaseEnd {
+			reachedEnd = true
 			break
 		}
 		if next == PhaseBuild {
@@ -518,6 +554,12 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 			return result, fmt.Errorf("write cycle-state pre-%s: %w", next, err)
 		}
 
+		if resumePoint.StatePath != "" && ResumeBoundaryCheckpointer != nil {
+			if err := ResumeBoundaryCheckpointer(cs, req.ProjectRoot, o.now()); err != nil {
+				return result, fmt.Errorf("resume checkpoint before %s: %w", next, err)
+			}
+		}
+
 		// Resume-path parity for the audit-repair brief (review MEDIUM): the
 		// budget half was already mirrored below via consumeAuditRepairGrant, but
 		// without seeding HERE a cycle that crashed mid-repair burned an attempt
@@ -537,6 +579,7 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 		}
 		phaseReq := PhaseRequest{
 			Cycle:       cycle,
+			AuditRound:  cs.AuditDispatches,
 			ProjectRoot: req.ProjectRoot,
 			Workspace:   cs.WorkspacePath,
 			// CB.1: the resume path is a first-class dispatch surface and must
@@ -554,25 +597,26 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 			Env:           envSnap,
 			Context:       phaseCtx,
 		}
-		// Resume-path parity for the repair-round tier raise (research R1): a
-		// cycle that crashed mid-repair resumes its tdd/build at the escalated
-		// tier, not blind at the profile default — the same persisted flag and
-		// the same clamp as the live loop.
-		if tier, raised := o.repairRoundTier(req.ProjectRoot, next, cs, phaseReq.ModelRoutingTier); raised {
-			phaseReq.ModelRoutingTier = tier
-		}
+		dispatch := &cycleRun{o: o, ctx: ctx, req: req, cs: cs, cycle: cycle, ctxSnap: ctxSnap, retryConfig: o.retryConfig, workflowConfig: o.workflowConfig}
+		dispatch.applyDispatchPolicy(next, &phaseReq)
 		if next != PhaseBuild {
 			projectBuildExplanation(req.ProjectRoot, cs).apply(&phaseReq)
 		}
-		resp, err := runner.Run(ctx, phaseReq)
+		resp, attempts, err := dispatch.retryPhaseRunner(next, phaseReq, retryOpts{quotaExhausted: allFamiliesQuotaExhausted})
+		if errors.Is(err, ErrAllFamiliesExhausted) {
+			dispatch.result, dispatch.phaseTimings = result, phaseTimings
+			err = dispatch.pauseForQuota(next, resp, attempts)
+			result, phaseTimings = dispatch.result, dispatch.phaseTimings
+			return result, err
+		}
 		if err != nil {
 			phaseErr := fmt.Errorf("phase %s: %w", next, err)
-			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, 1, phaseErr.Error(), cs.PhaseStartedAt))
+			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempts, phaseErr.Error(), cs.PhaseStartedAt))
 			return result, phaseErr
 		}
 		if !IsVerdict(resp.Verdict) {
 			ferr := fmt.Errorf("phase %s returned non-canonical verdict %q", next, resp.Verdict)
-			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, 1, ferr.Error(), cs.PhaseStartedAt))
+			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempts, ferr.Error(), cs.PhaseStartedAt))
 			return result, ferr
 		}
 		// Resume parity with reviewAndGuard: host normalization must finish
@@ -580,7 +624,7 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 		o.normalizeBuildWorktree(ctx, next, cs)
 		resp, err = o.reviewResumedDeliverable(ctx, req.ProjectRoot, cycle, cs, next, runner, phaseReq, resp, mainDirtyBaseline)
 		if err != nil {
-			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, 1, err.Error(), cs.PhaseStartedAt))
+			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempts, err.Error(), cs.PhaseStartedAt))
 			return result, err
 		}
 		if cs.ExplanationDocumentationVersion != 0 && next != PhaseBuild &&
@@ -602,25 +646,22 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 			ExitCode: 0,
 		}); err != nil {
 			lerr := fmt.Errorf("ledger append for %s: %w", next, err)
-			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, 1, lerr.Error(), cs.PhaseStartedAt))
+			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempts, lerr.Error(), cs.PhaseStartedAt))
 			return result, lerr
 		}
 
 		o.emitPhaseBindings(ctx, cycle, req.ProjectRoot, cs, next, resp.Verdict)
 		cs.CompletedPhases = append(cs.CompletedPhases, string(next))
+		// Persist the same floor-gated disposition as fresh dispatch before a
+		// later interruption can observe this completed phase.
+		o.recordFinalVerdict(&result, next, resp.Verdict, o.floorAlreadyCompleted(cs.CompletedPhases))
+		cs.FinalVerdict = result.FinalVerdict
 		if err := o.storage.WriteCycleState(ctx, cs); err != nil {
 			werr := fmt.Errorf("write cycle-state post-%s: %w", next, err)
-			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, 1, werr.Error(), cs.PhaseStartedAt))
+			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempts, werr.Error(), cs.PhaseStartedAt))
 			return result, werr
 		}
 
-		// Cycle-802 resume-path parity (Task 2): identical floor-gated verdict
-		// write to cyclerun_record.go — a resumed non-floor phase (a batch mid-
-		// recovery is exactly where the storm recurred) cannot clobber a floor
-		// PASS. CompletedPhases carries phases from BOTH the prior session and
-		// this resume (next appended above), so floorAlreadyCompleted correctly
-		// sees an audit that PASSed before the crash.
-		o.recordFinalVerdict(&result, next, resp.Verdict, o.floorAlreadyCompleted(cs.CompletedPhases))
 		// Resume-path parity for the floor-verdict failure-learning guard
 		// (cyclerun_record.go): a resumed authoritative phase — audit is the one
 		// the skills-drift storm recurred on, and a mid-batch recovery is exactly
@@ -638,7 +679,7 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 		if resp.Verdict == VerdictFAIL && o.isAuthoritativePhase(next) {
 			o.recordFloorVerdictFailure(ctx, req, cycle, next, &state, &cs, resp.Diagnostics)
 		}
-		o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, 1, "", cs.PhaseStartedAt))
+		o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempts, "", cs.PhaseStartedAt))
 		current = next
 		lastVerdict = resp.Verdict
 
@@ -687,6 +728,7 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 				result.SystemFailure = sysFail
 			}
 			if branch == PhaseEnd {
+				reachedEnd = true
 				break
 			}
 			if !o.sm.CanTransition(PhaseRetro, branch) {
@@ -704,11 +746,22 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 		// not an S3 byte-identity change.
 	}
 
-	// Resume completed — preserve LastCycleNumber (already advanced when
-	// the original cycle started; resume doesn't re-advance it).
-	if err := o.storage.WriteState(ctx, state); err != nil {
-		return result, fmt.Errorf("write state: %w", err)
+	if !reachedEnd {
+		return result, fmt.Errorf("resume iteration limit: %d dispatch iterations without reaching PhaseEnd at %s", maxIterations, current)
 	}
+	cr := &cycleRun{o: o, ctx: ctx, req: req, cycle: cycle, cs: cs, state: state, result: result, phaseTimings: phaseTimings, preCycleHEAD: preResumeHEAD}
+	if err := cr.completeCycle(); err != nil {
+		result = cr.result
+		return result, err
+	}
+	result = cr.result
+	completed = true
+	cs.Phase, cs.ActiveAgent = string(PhaseEnd), ""
+	cs.FinalVerdict = result.FinalVerdict
+	if err := o.storage.WriteCycleState(ctx, cs); err != nil {
+		return result, fmt.Errorf("resume terminal state: %w", err)
+	}
+
 	return result, nil
 }
 

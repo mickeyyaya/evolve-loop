@@ -46,3 +46,14 @@ func shippedOutcome(finalVerdict, preHEAD, postHEAD string) bool {
 func IsShippingVerdict(finalVerdict string) bool {
 	return finalVerdict == VerdictPASS || finalVerdict == CycleOutcomeShippedViaBuild
 }
+
+// hasThroughputCycle prevents replayed closeout from observing the same cycle
+// twice. Entries and carryover are already persisted in the same state write.
+func hasThroughputCycle(entries []TriageThroughputEntry, cycle int) bool {
+	for _, entry := range entries {
+		if entry.Cycle == cycle {
+			return true
+		}
+	}
+	return false
+}

@@ -38,6 +38,15 @@ func TestComposeTaskContract_VerbatimAcceptanceAndLoudGaps(t *testing.T) {
 	}
 }
 
+func TestComposeTaskContract_SanitizedCriteriaAreNotClaimedVerbatim(t *testing.T) {
+	dir := t.TempDir()
+	item := writeItem(t, dir, "large", `{"id":"large","acceptance":["`+strings.Repeat("a", 700)+`"]}`)
+	got := composeTaskContract([]taskItemRef{{"large", item}})
+	if strings.Contains(got, "Acceptance (verbatim") || !strings.Contains(got, "sanitized preview") || !strings.Contains(got, item) {
+		t.Fatalf("altered criteria must name their source without claiming verbatim authority: %q", got)
+	}
+}
+
 func TestTaskItemRefs_PathsThenScopeThenTriage(t *testing.T) {
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil), WithScopePathResolver(func(root, id string) string { return filepath.Join(root, id+".json") }))
 	refs := o.taskItemRefs(map[string]string{"fleet_scope_paths": "a=/x/a.json b=/x/b.json"}, "/root", "")

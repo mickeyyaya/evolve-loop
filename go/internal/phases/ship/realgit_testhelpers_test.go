@@ -22,6 +22,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/acssuite"
+	"github.com/mickeyyaya/evolve-loop/go/internal/treefence"
 )
 
 // --- pure file-system helpers (used by fast-tier untagged files) -----------
@@ -152,14 +155,47 @@ func addRemote(t *testing.T, repo string) string {
 // override the ledger entry fields. Use to test mismatch cases.
 func seedAudit(t *testing.T, repo, verdict string, optOverrides ...map[string]string) {
 	t.Helper()
-	auditPath := filepath.Join(repo, ".evolve", "runs", "cycle-1", "audit-report.md")
-	body := fmt.Sprintf("<!-- challenge-token: testtoken123 -->\n# Audit Report — Cycle 1\n\nVerdict: %s\n\nAll criteria met (test fixture).\n", verdict)
-	mustWrite(t, auditPath, body)
-	sha := mustHashFile(t, auditPath)
-
 	overrides := map[string]string{}
 	if len(optOverrides) > 0 {
 		overrides = optOverrides[0]
+	}
+	state, _ := readStateMap(filepath.Join(repo, ".evolve", "cycle-state.json"))
+	if state == nil {
+		state = map[string]any{}
+	}
+	cycle, _ := stateInt(state, "cycle_id")
+	if cycle <= 0 {
+		cycle = 1
+	}
+	runID := stateString(state, "run_id")
+	if runID == "" {
+		runID = "test-run"
+	}
+	if raw := overrides["cycle"]; raw != "" {
+		fmt.Sscanf(raw, "%d", &cycle)
+	}
+	auditPath := filepath.Join(repo, ".evolve", "runs", fmt.Sprintf("cycle-%d", cycle), "audit-report.md")
+	body := fmt.Sprintf("<!-- challenge-token: testtoken123 -->\n# Audit Report — Cycle %d\n\nVerdict: %s\n\nAll criteria met (test fixture).\n", cycle, verdict)
+	mustWrite(t, auditPath, body)
+	testedRoot := stateString(state, "active_worktree")
+	if testedRoot == "" {
+		testedRoot = repo
+	}
+	// Model Builder explicitly staging its intended fixture inputs before Audit.
+	runGit(t, testedRoot, "add", "-A")
+	snap, err := treefence.TakeTracked(context.Background(), testedRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if overrides["bound_tree"] != "" {
+		snap.Tree = overrides["bound_tree"]
+	}
+	sealTestPredicateEvidence(t, acssuite.EvidenceIdentity{Cycle: cycle, RunID: runID, Round: 1, TreeSHA: snap.Tree}, auditPath)
+	sha := mustHashFile(t, auditPath)
+	state["cycle_id"], state["run_id"], state["audit_dispatches"] = cycle, runID, 1
+	state["workspace_path"] = filepath.Dir(auditPath)
+	if err := writeStateMap(filepath.Join(repo, ".evolve", "cycle-state.json"), state); err != nil {
+		t.Fatal(err)
 	}
 
 	headSHA := overrides["head"]
@@ -176,18 +212,20 @@ func seedAudit(t *testing.T, repo, verdict string, optOverrides ...map[string]st
 	}
 
 	entry := map[string]any{
-		"ts":              "2026-04-27T00:00:00Z",
-		"cycle":           1,
-		"role":            "auditor",
-		"kind":            "agent_subprocess",
-		"model":           "sonnet",
-		"exit_code":       exitCode,
-		"duration_s":      "30",
-		"artifact_path":   auditPath,
-		"artifact_sha256": sha,
-		"challenge_token": "testtoken123",
-		"git_head":        headSHA,
-		"tree_state_sha":  treeSHA,
+		"ts":                "2026-04-27T00:00:00Z",
+		"cycle":             cycle,
+		"run_id":            runID,
+		"worktree_tree_sha": snap.Tree,
+		"role":              "auditor",
+		"kind":              "agent_subprocess",
+		"model":             "sonnet",
+		"exit_code":         exitCode,
+		"duration_s":        "30",
+		"artifact_path":     auditPath,
+		"artifact_sha256":   sha,
+		"challenge_token":   "testtoken123",
+		"git_head":          headSHA,
+		"tree_state_sha":    treeSHA,
 	}
 	line, _ := json.Marshal(entry)
 	mustWrite(t, filepath.Join(repo, ".evolve", "ledger.jsonl"), string(line)+"\n")
@@ -303,20 +341,8 @@ func makeWorktree(t *testing.T, repo, branch string) string {
 // opts.internalAuditBoundTreeSHA and gitops enforces the pre-merge check.
 func seedAuditWithBoundTree(t *testing.T, repo, verdict, boundTreeSHA string) {
 	t.Helper()
-	auditPath := filepath.Join(repo, ".evolve", "runs", "cycle-1", "audit-report.md")
-	body := fmt.Sprintf("<!-- challenge-token: testtoken123 -->\n# Audit Report — Cycle 1\n\nVerdict: %s\naudit_bound_tree_sha: %s\n\nAll criteria met (test fixture).\n", verdict, boundTreeSHA)
-	mustWrite(t, auditPath, body)
-	sha := mustHashFile(t, auditPath)
-	headSHA := strings.TrimSpace(runGitOut(t, repo, "rev-parse", "HEAD"))
-	treeSHA := treeStateSHA(t, repo)
-	entry := map[string]any{
-		"ts": "2026-04-27T00:00:00Z", "cycle": 1, "role": "auditor",
-		"kind": "agent_subprocess", "model": "sonnet", "exit_code": 0,
-		"duration_s": "30", "artifact_path": auditPath, "artifact_sha256": sha,
-		"challenge_token": "testtoken123", "git_head": headSHA, "tree_state_sha": treeSHA,
-	}
-	line, _ := json.Marshal(entry)
-	mustWrite(t, filepath.Join(repo, ".evolve", "ledger.jsonl"), string(line)+"\n")
+	seedAudit(t, repo, verdict, map[string]string{"bound_tree": boundTreeSHA})
+
 }
 
 // makeWorktreeScenario returns (mainRepo, worktreePath) where:
@@ -338,4 +364,42 @@ func makeWorktreeScenario(t *testing.T) (string, string) {
 	runGit(t, wt, "add", "wt-change.txt")
 
 	return repo, wt
+}
+
+// predicateVerdictFixture describes complete host execution for ship tests.
+// Audit integration tests separately prove the real runner produces this shape.
+func predicateVerdictFixture(cycle, green, red, skip int) acssuite.Verdict {
+	v := acssuite.Verdict{SchemaVersion: "1.0", Cycle: cycle, GreenCount: green, RedCount: red, SkipCount: skip, Verdict: "PASS", ShipEligible: red == 0,
+		PredicateSuite: acssuite.PredicateSuite{Total: green + red + skip, ThisCycleCount: green + red + skip, SkippedCount: skip}}
+	if red > 0 {
+		v.Verdict = "FAIL"
+	}
+	for i := 0; i < green+red+skip; i++ {
+		id := fmt.Sprintf("predicate-%d", i)
+		r := acssuite.Result{ACID: id, Predicate: "go/acs/cycle/...:" + id, ResultStr: "green"}
+		if i >= green && i < green+red {
+			r.ResultStr = "red"
+			r.ExitCode = 1
+			v.RedIDs = append(v.RedIDs, id)
+		}
+		if i >= green+red {
+			r.ResultStr = "skip"
+			r.ExitCode = acssuite.SkipExitCode
+			v.SkipIDs = append(v.SkipIDs, id)
+		}
+		v.Results = append(v.Results, r)
+	}
+	return v
+}
+
+func sealTestPredicateEvidence(t *testing.T, id acssuite.EvidenceIdentity, reportPath string) {
+	t.Helper()
+	raw, err := json.Marshal(predicateVerdictFixture(id.Cycle, 1, 0, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	mustWrite(t, filepath.Join(filepath.Dir(reportPath), acssuite.VerdictFilename), string(raw))
+	if err := acssuite.SealEvidence(reportPath, raw, id); err != nil {
+		t.Fatal(err)
+	}
 }

@@ -22,6 +22,7 @@
 package ship
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"path/filepath"
@@ -144,12 +145,8 @@ func trackEvolveBinary(t *testing.T, repo string) {
 	runGit(t, repo, "-c", "commit.gpgsign=false", "commit", "-q", "-m", "track evolve binary")
 }
 
-// TestShip_BinaryChurnDiscarded: a `go build`-regenerated go/evolve in the
-// WORKTREE is unaudited churn (the audit bound main's tree). Ship must
-// discard it before staging — the parallel of the orchestrator's
-// recoverBuildLeak for the build phase — so the merged cycle commit carries
-// the audited tree, not binary drift (audit AC5 soundness).
-func TestShip_BinaryChurnDiscarded(t *testing.T) {
+// Binary normalization must happen before Audit so the tested tree is shipped.
+func TestShip_BinaryChurnNormalizedBeforeAudit(t *testing.T) {
 	repo := makeRepo(t)
 	trackEvolveBinary(t, repo)
 	addRemote(t, repo)
@@ -159,6 +156,9 @@ func TestShip_BinaryChurnDiscarded(t *testing.T) {
 	mustWrite(t, filepath.Join(wt, "go", "evolve"), "binary-v2-unaudited-churn\n")
 	mustWrite(t, filepath.Join(repo, ".evolve", "cycle-state.json"),
 		`{"cycle_id":1,"phase":"ship","active_worktree":"`+wt+`"}`)
+	if err := discardBinaryChurn(context.Background(), &Options{ProjectRoot: repo, Runner: execRunner}, wt); err != nil {
+		t.Fatal(err)
+	}
 	seedAudit(t, repo, "PASS")
 
 	res, err := runShip(t, repo, Options{Class: ClassCycle, CommitMessage: "evolve-cycle 1: goal=test"})
@@ -197,6 +197,9 @@ func TestShip_SourceChangesPreserved(t *testing.T) {
 	mustWrite(t, filepath.Join(wt, "go", "evolve"), "binary-v2-unaudited-churn\n")
 	mustWrite(t, filepath.Join(repo, ".evolve", "cycle-state.json"),
 		`{"cycle_id":1,"phase":"ship","active_worktree":"`+wt+`"}`)
+	if err := discardBinaryChurn(context.Background(), &Options{ProjectRoot: repo, Runner: execRunner}, wt); err != nil {
+		t.Fatal(err)
+	}
 	seedAudit(t, repo, "PASS")
 
 	res, err := runShip(t, repo, Options{Class: ClassCycle, CommitMessage: "evolve-cycle 1: goal=test"})

@@ -24,12 +24,13 @@ import (
 // All paths are absolute (no globs, no placeholders); the orchestrator
 // resolves these before handing them off.
 type Config struct {
-	RepoRoot     string
-	HomeDir      string
-	ReadOnlyRepo bool
-	AllowNetwork bool
-	WritePaths   []string // explicit write allows
-	DenyPaths    []string // explicit write denies (claude.sh:540 deny loop)
+	RepoRoot      string
+	HomeDir       string
+	ReadOnlyRepo  bool
+	AllowNetwork  bool
+	WritePaths    []string // explicit write allows
+	DenyPaths     []string // explicit write denies (claude.sh:540 deny loop)
+	DenyReadPaths []string // explicit read denies; separate from immutable readable inputs
 }
 
 // homeStateWriteDirs are CLI-owned HOME state dirs that tmux REPLs may update
@@ -212,12 +213,20 @@ func GenerateSBPL(cfg Config) string {
 	}
 	// ReadOnlyRepo: explicit deny before per-write-path allows so later
 	// rules re-permit specific subdirs. Mirrors bash:511-517 contract.
+	for _, wp := range cfg.WritePaths {
+		if coversRepository(wp, cfg.RepoRoot) {
+			fmt.Fprintf(&b, "(allow file-write* (subpath %q))\n", wp)
+		}
+	}
 	if cfg.ReadOnlyRepo && cfg.RepoRoot != "" {
 		fmt.Fprintf(&b, "(deny file-write* (subpath %q))\n", cfg.RepoRoot)
 	}
 	// Per-write-path allows. Globs widen to parent dir (bash:520).
 	for _, wp := range cfg.WritePaths {
 		if wp == "" {
+			continue
+		}
+		if coversRepository(wp, cfg.RepoRoot) {
 			continue
 		}
 		if strings.Contains(wp, "*") {
@@ -233,6 +242,11 @@ func GenerateSBPL(cfg Config) string {
 		fmt.Fprintf(&b, "(deny file-write* (subpath %q))\n", dp)
 	}
 	// Network.
+	for _, dp := range cfg.DenyReadPaths {
+		if dp != "" {
+			fmt.Fprintf(&b, "(deny file-read* (subpath %q))\n", dp)
+		}
+	}
 	if !cfg.AllowNetwork {
 		b.WriteString("(deny network*)\n")
 	}
@@ -274,6 +288,11 @@ func BwrapPrefix(cfg Config) []string {
 		out = append(out, "--bind-try", p, p)
 	}
 	// Repo: rw or ro by ReadOnlyRepo.
+	for _, wp := range cfg.WritePaths {
+		if coversRepository(wp, cfg.RepoRoot) {
+			out = append(out, "--bind", wp, wp)
+		}
+	}
 	if cfg.RepoRoot != "" {
 		if cfg.ReadOnlyRepo {
 			out = append(out, "--ro-bind", cfg.RepoRoot, cfg.RepoRoot)
@@ -286,16 +305,44 @@ func BwrapPrefix(cfg Config) []string {
 		if wp == "" {
 			continue
 		}
+		if coversRepository(wp, cfg.RepoRoot) {
+			continue
+		}
 		if strings.Contains(wp, "*") {
 			wp = filepath.Dir(wp)
 		}
 		out = append(out, "--bind", wp, wp)
+	}
+	// These overlays follow ALL writable binds. Missing targets fail setup;
+	// --ro-bind-try would silently discard a mandatory restriction.
+	for _, dp := range cfg.DenyPaths {
+		if dp != "" {
+			out = append(out, "--ro-bind", dp, dp)
+		}
+	}
+	for _, dp := range cfg.DenyReadPaths {
+		if dp != "" {
+			out = append(out, "--tmpfs", dp, "--chmod", "000", dp, "--remount-ro", dp)
+		}
+	}
+	if len(cfg.DenyReadPaths) > 0 {
+		out = append(out, "--cap-drop", "ALL")
 	}
 	// Network: bwrap uses namespace isolation, not allow/deny rules.
 	if !cfg.AllowNetwork {
 		out = append(out, "--unshare-net")
 	}
 	return out
+}
+
+// A broad scratch grant such as /tmp must precede a read-only repository
+// located beneath it. Otherwise the later parent grant reopens the whole repo.
+func coversRepository(path, repo string) bool {
+	if path == "" || repo == "" {
+		return false
+	}
+	rel, err := filepath.Rel(filepath.Clean(path), filepath.Clean(repo))
+	return err == nil && rel != "." && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 
 // Sandbox is the runtime-dispatching exec wrapper for ad-hoc CLI use. Exec wraps

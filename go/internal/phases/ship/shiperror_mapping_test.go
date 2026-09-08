@@ -9,6 +9,7 @@
 package ship
 
 import (
+	"encoding/json"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -48,12 +49,16 @@ func TestShipError_EGPSRedCount(t *testing.T) {
 	seedAudit(t, repo, "PASS")
 	// Drop an acs-verdict.json with red_count>0 next to the audit artifact.
 	acsPath := filepath.Join(repo, ".evolve", "runs", "cycle-1", "acs-verdict.json")
-	mustWrite(t, acsPath, `{"red_count":1,"green_count":3,"verdict":"FAIL","red_ids":["pred-xss"],"predicate_suite":{"total":4}}`)
+	raw, marshalErr := json.Marshal(predicateVerdictFixture(1, 3, 1, 0))
+	if marshalErr != nil {
+		t.Fatal(marshalErr)
+	}
+	mustWrite(t, acsPath, string(raw))
 
 	res, err := runShip(t, repo, Options{Class: ClassCycle, CommitMessage: "feat: egps red"})
 
 	se := wantShipErr(t, err, core.CodeEGPSRedCount, core.ShipClassPrecondition, "RED predicate")
-	if !strings.Contains(se.Debug["red_ids"], "pred-xss") {
+	if !strings.Contains(se.Debug["red_ids"], "predicate-3") {
 		t.Errorf("Debug.red_ids must name the failing predicate; got %v", se.Debug)
 	}
 	if res.ExitCode != ExitFailure {
@@ -87,10 +92,8 @@ func TestShipError_GitPushRejected(t *testing.T) {
 	}
 }
 
-// TestShipError_IntegrityTreeDrift proves a genuine pre-merge tree-SHA breach
-// surfaces as an INTEGRITY-class ShipError (recoverable via core.AsShipError)
-// AND maps to ExitIntegrity — the only class that does.
-func TestShipError_IntegrityTreeDrift(t *testing.T) {
+// A forged audit tree is now refused by the predicate precondition before merge.
+func TestShipError_PredicateTreeDrift(t *testing.T) {
 	repo := makeRepo(t)
 	addRemote(t, repo)
 	wt := makeWorktree(t, repo, "drift-branch")
@@ -102,12 +105,12 @@ func TestShipError_IntegrityTreeDrift(t *testing.T) {
 
 	res, err := runShip(t, repo, Options{Class: ClassCycle, CommitMessage: "feat: tree drift"})
 
-	se := wantShipErr(t, err, core.CodeIntegrityTreeDrift, core.ShipClassIntegrity, "INTEGRITY BREACH")
-	if se.Debug["audit_bound_tree"] == "" || se.Debug["worktree_tree"] == "" {
+	se := wantShipErr(t, err, core.CodeAuditBindingTreeMismatch, core.ShipClassPrecondition, "tree-state mismatch")
+	if se.Debug["audited_tree"] == "" || se.Debug["current_tree"] == "" {
 		t.Errorf("Debug must carry both tree SHAs; got %v", se.Debug)
 	}
-	if res.ExitCode != ExitIntegrity {
-		t.Errorf("integrity class → ExitIntegrity; got %d", res.ExitCode)
+	if res.ExitCode != ExitFailure {
+		t.Errorf("predicate precondition → ExitFailure; got %d", res.ExitCode)
 	}
 	// The legacy *IntegrityError wrapper must also still match for back-compat.
 	if _, ok := err.(*IntegrityError); !ok {

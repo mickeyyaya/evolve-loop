@@ -283,17 +283,21 @@ func canonicalCatalogName(p Phase) string {
 // failure history — the legacy no-recall behavior. An empty lesson result is the
 // novel-failure signal (nothing in the corpus matches yet), surfaced as the
 // reason-without-lessons case.
-func (o *Orchestrator) recallForPlan(ctx context.Context, history []FailedRecord) (lastReason string, lessons []string) {
-	if o.kb == nil || len(history) == 0 {
+func (o *Orchestrator) recallForPlan(ctx context.Context, history []FailedRecord, goal ...string) (lastReason string, lessons []string) {
+	if o.kb == nil {
 		return "", nil
 	}
-	latest := history[len(history)-1]
-	if latest.Summary == "" && latest.Classification == "" {
+	var latest FailedRecord
+	if len(history) > 0 {
+		latest = history[len(history)-1]
+	}
+	query := strings.TrimSpace(latest.Summary + " " + strings.Join(goal, " "))
+	if query == "" && latest.Classification == "" {
 		return "", nil
 	}
 	found, err := o.kb.Lookup(ctx, research.Query{
 		Consequence: latest.Classification,
-		Keywords:    strings.Fields(latest.Summary),
+		Keywords:    strings.Fields(query),
 	})
 	if err != nil {
 		// Recall is best-effort: a KB read error must never block planning.

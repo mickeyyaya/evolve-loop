@@ -241,33 +241,19 @@ func checkCLIVersionDrift(o resolved) CheckResult {
 	}
 }
 
-// sandboxUnavailableIssue renders the host-capabilities outcome for "a profile
-// requires the Build sandbox but the inner wrap cannot apply". The DECISION is
-// not made here: it projects from sandbox.ConfinementSatisfied — the same
-// three-cell Specification the dispatch-time gate
-// (bridge.sandboxRequiredButUnavailable) evaluates — so preflight and the gate
-// it fronts can no longer diverge (the 2026-09-01 nested-HALT incident: the
-// first live launch after #518 HALTed a nested host dispatch would have run).
-// Exactly one of (halt, warn) is non-empty. The WARN wording states the
-// posture, never a conclusion: the inner layer is UNCONFINED, and the outer
-// session is UNVERIFIED unless the sandbox-nested-fallback canary (dial
-// sandbox.nested_fallback) verifies it — asserting outer confinement as fact
-// here would contradict that sibling check and regress the honest-WARN slice
-// of docs/architecture/sandbox-confinement-ssot.md.
+// sandboxUnavailableIssue projects the same fail-closed decision as bridge
+// dispatch. A nested session does not prove the requested profile's policy;
+// only an explicit host opt-out permits an unwrapped mandatory launch.
 func sandboxUnavailableIssue(host preflight.Profile, mode string) (halt, warn string) {
-	ok, optOut, _ := sandbox.ConfinementSatisfied(host.ClaudeCode.Nested, mode)
+	ok, optOut, reason := sandbox.ConfinementSatisfied(host.ClaudeCode.Nested, mode)
 	switch {
 	case ok && optOut:
 		return "", fmt.Sprintf(
 			"EVOLVE_SANDBOX=off — host opt-out honoured; source-writing phases run UNCONFINED despite a sandbox-requiring profile (inner sandbox also unavailable: %s)",
 			host.Sandbox.Reason)
-	case ok:
-		return "", fmt.Sprintf(
-			"inner OS sandbox NOT applied (%s) — source-writing phases run UNCONFINED at the inner layer; the outer LLM-CLI session is the only remaining confinement and is UNVERIFIED unless sandbox.nested_fallback is enabled (see check sandbox-nested-fallback)",
-			host.Sandbox.Reason)
 	default:
 		return fmt.Sprintf(
-			"required Build sandbox unavailable (%s); run on a supported non-nested host or restore OS confinement before starting the cycle",
-			host.Sandbox.Reason), ""
+			"required Build sandbox unavailable (%s; %s); run on a supported non-nested host or explicitly opt out with EVOLVE_SANDBOX=off",
+			host.Sandbox.Reason, reason), ""
 	}
 }

@@ -227,6 +227,10 @@ func normalizeReasonForFingerprint(reason string) string {
 // identical-fingerprint breaker rule. A floor-written artifact always wins;
 // the fallback never overwrites (F8: one evidence trail for humans + digest).
 func (o *Orchestrator) ensureFailureDigest(cycle int, projectRoot, workspace, fallbackPhase, fallbackReason string) {
+	if workspace == "" {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN: failure digest not written (cycle %d): missing workspace\n", cycle)
+		return
+	}
 	reasonPath := filepath.Join(workspace, "audit-fail-reason.json")
 	if _, statErr := os.Stat(reasonPath); statErr != nil && fallbackReason != "" {
 		b, merr := json.Marshal(auditFailReason{SchemaVersion: 1, Phase: fallbackPhase, Reasons: []string{fallbackReason}})
