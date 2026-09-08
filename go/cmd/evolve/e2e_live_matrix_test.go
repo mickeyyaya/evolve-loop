@@ -9,17 +9,42 @@
 package main
 
 import (
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"testing"
 	"time"
 )
 
-// liveTierModels maps each CLI to the concrete model per abstract tier. agy
+// liveTierModels maps each CLI to the concrete model per abstract tier. A
+// function, not a package var: the codex row loads a manifest, and init-time
+// I/O (or its panic) must not fire before liveGate's SKIP. agy
 // pins all tiers to one model (per its manifest); ollama is omitted (host model
 // varies — exercise it via EVOLVE_E2E_LIVE_MODEL_OLLAMA + T0).
-var liveTierModels = map[string]map[string]string{
-	"claude-p": {"fast": "haiku", "balanced": "sonnet", "deep": "opus"},
-	"codex":    {"fast": "gpt-5.4-mini", "balanced": "gpt-5.4", "deep": "gpt-5.5"},
-	"agy":      {"fast": "gemini-3.5-flash", "balanced": "gemini-3.5-flash", "deep": "gemini-3.5-flash"},
+func liveTierModels() map[string]map[string]string {
+	return map[string]map[string]string{
+		"claude-p": {"fast": "haiku", "balanced": "sonnet", "deep": "opus"},
+		// codex: a PROJECTION of the family manifest, never a copy (this table sat
+		// three model generations stale until 2026-09-09).
+		"codex": codexTierModels(),
+		"agy":   {"fast": "gemini-3.5-flash", "balanced": "gemini-3.5-flash", "deep": "gemini-3.5-flash"},
+	}
+}
+
+// codexTierModels reads the codex family tier table through the headless
+// manifest (codex.json points at codex-tmux.json via model_tier_map_from — the
+// single source every codex reader resolves through). A load failure panics — loud, never a silent nil that
+// would launch every case without -m.
+func codexTierModels() map[string]string {
+	m, err := bridge.LoadManifest("codex") // the headless manifest the matrix drives; its model_tier_map_from pointer yields the family table
+	if err != nil {
+		// e2e-only binary: an embedded manifest that fails to load is a broken
+		// build, and a silent nil here would launch every codex case with no -m
+		// (the CLI default) while the test still claimed to exercise a tier.
+		panic("e2e: codex family manifest unavailable: " + err.Error())
+	}
+	if len(m.ModelTierMap) == 0 {
+		panic("e2e: codex family manifest declares no model_tier_map")
+	}
+	return m.ModelTierMap
 }
 
 func TestE2ELiveModelTierMatrix(t *testing.T) {
@@ -29,7 +54,7 @@ func TestE2ELiveModelTierMatrix(t *testing.T) {
 
 	for _, cli := range liveHeadlessCLIs {
 		cli := cli
-		tiers := liveTierModels[cli.Driver]
+		tiers := liveTierModels()[cli.Driver]
 		t.Run(cli.Driver, func(t *testing.T) {
 			if ok, why := liveCLIAvailable(cli); !ok {
 				t.Skip(why)

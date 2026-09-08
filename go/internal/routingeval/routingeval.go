@@ -60,16 +60,14 @@ type descriptor struct {
 
 // toRouteInput realizes the descriptor into the minimal router.RouteInput whose
 // IntentRequired + tddPinned(in) drive the floor clamp. When tdd is NOT pinned
-// it installs the conventional `cycle_size != trivial` conditional rule plus a
-// trivial Triage signal, so tddPinned(in) evaluates false (the trivial
-// exemption); otherwise the absent rule leaves tddPinned at its mandatory
+// it installs the compiled default rule (config.DefaultTddRule — trivial OR a
+// document deliverable releases) plus a trivial Triage signal, so tddPinned(in)
+// evaluates false (the trivial exemption); otherwise the absent rule leaves tddPinned at its mandatory
 // default (floor.go: absent rule ⇒ pinned).
 func (d descriptor) toRouteInput() router.RouteInput {
 	in := router.RouteInput{IntentRequired: d.IntentRequired}
 	if d.TddPinned != nil && !*d.TddPinned {
-		in.Cfg.Conditional = map[string]config.CondRule{
-			"tdd": {Field: "cycle_size", Op: "ne", Value: "trivial"},
-		}
+		in.Cfg.Conditional = map[string]config.CondRule{"tdd": config.DefaultTddRule()}
 		in.Signals.Triage = router.TriageSignals{CycleSize: "trivial", Present: true}
 	}
 	// A case replaying a NON-canonical phase (a registry/.evolve/phases overlay

@@ -41,7 +41,7 @@ An unknown value resolves to `Off` and emits an `unknown-value` warning (never a
 **ADR-0024 §1 floor activation (PR-5, live as of this slice).** At `Stage >= Advisory` the orchestrator computes the advisor's whole-cycle plan once at cycle start, clamps it with `router.ClampPlanToFloor`, and threads the clamped plan into every `Route()` so it drives run/skip for non-mandatory phases. Two separate guarantees, deliberately decoupled:
 
 - **Configurable never-skip set** — `EVOLVE_MANDATORY_PHASES` (default `scout,build,audit,ship`). `shouldRun`'s mandatory branch runs first, so the advisor can never skip a mandatory phase.
-- **Non-configurable integrity floor** — `ship ⇒ build ∧ audit ∧ (tdd unless trivial)`, forced *into the plan* before it is threaded. This is what makes a tiny mandatory set safe: an operator may set `EVOLVE_MANDATORY_PHASES=tdd` and the advisor still cannot reach ship without a real build+audit, because `ClampPlanToFloor` re-adds them to the plan.
+- **Non-configurable integrity floor** — `ship ⇒ build ∧ audit ∧ (tdd unless trivial or deliverable_kind=document — ADR-0099)`, forced *into the plan* before it is threaded. This is what makes a tiny mandatory set safe: an operator may set `EVOLVE_MANDATORY_PHASES=tdd` and the advisor still cannot reach ship without a real build+audit, because `ClampPlanToFloor` re-adds them to the plan.
 
 A planner failure (or `routing_mode=static`, which has no advisor) ⇒ nil plan ⇒ the configurable spine drives via the trigger path (**fail-safe to static**). The `enforceNext` override stays re-validated by `CanTransition` + the artifact-backed `SpineSatisfiedUpTo`, and the ship phase's audit-binding remains the ultimate gate — three layers, the floor never the sole one.
 
@@ -66,7 +66,7 @@ The clamp pass in `go/internal/router` enforces the floor regardless of stage or
 |---|---|
 | Mandatory spine | `scout, build, audit, ship` always present + ordered (`EVOLVE_MANDATORY_PHASES`) |
 | Weak-spine guard | Omitting `audit` or `ship` from the spine emits a `weak-spine` warning (`validateSpine`) |
-| Conditional TDD-pin | `tdd` is mandatory unless `cycle_size == trivial` (`EVOLVE_CONDITIONAL_MANDATORY`, default `tdd:cycle_size!=trivial`) |
+| Conditional TDD-pin | `tdd` is mandatory unless `cycle_size == trivial` or the cycle's `deliverable_kind` is `document` (ADR-0099: the code-specific phase is released for solution cycles; clauses are AND-ed) (`EVOLVE_CONDITIONAL_MANDATORY`, default `tdd:cycle_size!=trivial&&deliverable_kind!=document` — `config.DefaultTddRuleExpr`) |
 | Ship-needs-real-audit | A plan that reaches `ship` without a PASS audit bound to the built tree is rejected/clamped |
 | Insertion cap | The router may insert at most `EVOLVE_MAX_OPTIONAL_INSERTIONS` (default 4) optional phases |
 | Unknown-phase drop | An entry naming a phase outside the known-phase set is REMOVED, one `drop-unknown-phase` clamp per removal |
@@ -93,7 +93,7 @@ The failure mode the drop must never cause is deleting a *legitimate* phase, so 
 | `EVOLVE_DYNAMIC_ROUTING` | `advisory` (since 2026-06-06; was `off`) | `Stage` |
 | `EVOLVE_ROUTING_MODE` | `llm` | `Mode` |
 | `EVOLVE_MANDATORY_PHASES` | `scout,build,audit,ship` | `Mandatory` (CSV) |
-| `EVOLVE_CONDITIONAL_MANDATORY` | `tdd:cycle_size!=trivial` | `Conditional` (`phase:expr`; op ∈ `!= == >= <= > <`) |
+| `EVOLVE_CONDITIONAL_MANDATORY` | `tdd:cycle_size!=trivial&&deliverable_kind!=document` | `Conditional` (`phase:expr`; clauses joined by `&&`; op ∈ `!= == >= <= > <`) |
 | `EVOLVE_MAX_OPTIONAL_INSERTIONS` | `4` | `MaxInsertions` (int) |
 | `EVOLVE_USE_PHASE_REGISTRY` | enabled (`0` disables) | whether to read the registry file |
 

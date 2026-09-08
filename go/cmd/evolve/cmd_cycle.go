@@ -520,7 +520,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	// persona (agents/evolve-router.md) + profile (router.json) + artifact. Its
 	// {cli, model} resolve from the profile + EVOLVE_ROUTER_CLI/_MODEL env (the
 	// same precedence phases use), so the brain is configurable to any LLM CLI
-	// (claude/opus default, or codex/gpt-5.5-high, agy/gemini, …). Composing the
+	// (claude/opus default, or codex/<family deep model>-high, agy/gemini, …). Composing the
 	// cycle + minting phases is deep-reasoning work, hence the opus/deep default.
 	// Select consults it only at routing_mode=llm; the kernel clamp is the floor.
 	// The advisor's PRIMARY model is the plan/re-plan (deep) dispatch — the
@@ -788,7 +788,7 @@ func cycleContext(goalHash, goalText string) map[string]string {
 // resolveRouterDispatch resolves the routing advisor's {cli, model} the same way
 // a phase resolves its capability: profile (.evolve/profiles/router.json) defaults,
 // overridden by the per-agent env (EVOLVE_ROUTER_CLI / EVOLVE_ROUTER_MODEL). This
-// makes the brain configurable to any LLM CLI (e.g. codex-tmux + deep→gpt-5.5).
+// makes the brain configurable to any LLM CLI (e.g. codex-tmux + deep→the family manifest's deep model).
 // Fallback is opus on claude-tmux (deep reasoning for composition/minting).
 // routerDecisionType selects which advisor decision a dispatch is resolved for
 // (ADR-0052 WS6-S1). The confidence-critical whole-cycle decisions (plan,

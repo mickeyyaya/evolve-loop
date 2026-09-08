@@ -12,9 +12,9 @@ import (
 // when any of its fields is set; this keeps the dual renderings (Signals /
 // HandoffFiles) in lock-step.
 func (s SignalSpec) scoutPresent() bool {
-	return s.CycleSize != "" || s.ScoutItemCount > 0 || s.ScoutCarryover > 0 || s.ScoutBacklog > 0
+	return s.CycleSize != "" || s.ScoutItemCount > 0 || s.ScoutCarryover > 0 || s.ScoutBacklog > 0 || s.GoalType != "" || s.DeliverableKind != ""
 }
-func (s SignalSpec) triagePresent() bool { return s.TriageSize != "" }
+func (s SignalSpec) triagePresent() bool { return s.TriageSize != "" || s.TriageDeliverableKind != "" }
 func (s SignalSpec) buildPresent() bool {
 	return s.BuildVerdict != "" || s.ACSRed > 0 || s.ACSGreen > 0 || s.ACSRegression > 0 ||
 		s.SeverityMax != "" || s.FilesTouched > 0 || s.DiffLOC > 0
@@ -29,6 +29,8 @@ func (s SignalSpec) Signals() router.RoutingSignals {
 	if s.scoutPresent() {
 		sig.Scout = router.ScoutSignals{
 			CycleSizeEstimate: s.CycleSize,
+			GoalType:          s.GoalType,
+			DeliverableKind:   s.DeliverableKind,
 			ItemCount:         s.ScoutItemCount,
 			CarryoverCount:    s.ScoutCarryover,
 			BacklogSize:       s.ScoutBacklog,
@@ -36,7 +38,7 @@ func (s SignalSpec) Signals() router.RoutingSignals {
 		}
 	}
 	if s.triagePresent() {
-		sig.Triage = router.TriageSignals{CycleSize: s.TriageSize, Present: true}
+		sig.Triage = router.TriageSignals{CycleSize: s.TriageSize, DeliverableKind: s.TriageDeliverableKind, Present: true}
 	}
 	if s.buildPresent() {
 		sig.Build = router.BuildSignals{
@@ -77,6 +79,12 @@ func (s SignalSpec) HandoffFiles() map[string]string {
 		if s.ScoutBacklog > 0 {
 			m["backlog_size"] = s.ScoutBacklog
 		}
+		if s.GoalType != "" {
+			m["goal_type"] = s.GoalType
+		}
+		if s.DeliverableKind != "" {
+			m["deliverable_kind"] = s.DeliverableKind
+		}
 		// Digest counts keys "item<digit>..." for ItemCount.
 		for i := 1; i <= s.ScoutItemCount; i++ {
 			m[fmt.Sprintf("item%d_scope", i)] = "x"
@@ -84,7 +92,11 @@ func (s SignalSpec) HandoffFiles() map[string]string {
 		out["handoff-scout.json"] = mustJSON(m)
 	}
 	if s.triagePresent() {
-		out["handoff-triage.json"] = mustJSON(map[string]interface{}{"cycle_size": s.TriageSize})
+		tr := map[string]interface{}{"cycle_size": s.TriageSize}
+		if s.TriageDeliverableKind != "" {
+			tr["deliverable_kind"] = s.TriageDeliverableKind
+		}
+		out["handoff-triage.json"] = mustJSON(tr)
 	}
 	if s.buildPresent() {
 		acs := map[string]interface{}{

@@ -23,7 +23,8 @@
       "debugger": ["ship", "audit", "build", "tdd", "end"],
       "end": []
     },
-    "conditional_mandatory": { "tdd": "cycle_size!=trivial" },
+    "conditional_mandatory": { "tdd": "cycle_size!=trivial && deliverable_kind!=document" },
+    "_conditional_mandatory_note": "ADR-0099 (docs/architecture/adr/0099-deliverable-kinds.md): tdd is released for a trivial cycle OR a document deliverable; clauses are AND-ed. Must equal config.DefaultTddRuleExpr (the registry-less default) — TestDefaults_TddRuleMatchesRegistry pins them.",
     "max_optional_insertions": 6,
     "_goal_recipes_note": "ADR-0052 WS5 recipe SSOT. Single source for the goal-type → optional-insertion recipe. Each value is the ordered, VERBATIM token list obtained by splitting the persona's recipe cell on ' → '; tokens are opaque (may contain spaces, '+', '=', '[..]' bracket markers). config.Load projects this into RoutingConfig.GoalRecipes; router.RenderRecipeProjection regenerates the agents/evolve-router.md '## Goal-Type Recipes' table body (locked by TestRouterPersonaRecipeTable_NoDrift) and the RecipeVerifier reads the same source — ending three-source recipe drift.",
     "goal_recipes": {
@@ -51,6 +52,9 @@
       "data-pipeline": ["scope-baseline", "[build]", "data-integrity-check", "migration-safety-check"],
       "project-management": ["risk-register", "scope-baseline", "dependency-map", "[build = the planning deliverable]"],
       "business-strategy": ["forces-analysis", "market-sizing", "okr-draft", "[build]"],
+      "strategy-options": ["premise-challenge", "forces-analysis", "market-sizing", "scope-baseline", "[build]", "adversarial-review"],
+      "business-plan": ["forces-analysis", "market-sizing", "scope-baseline", "okr-draft", "[build]", "risk-register", "adversarial-review"],
+      "partnership-deal": ["forces-analysis", "market-sizing", "scope-baseline", "[build]", "risk-register", "adversarial-review"],
       "accounting-close": ["account-reconcile", "variance-analysis", "close-checklist", "[build]"],
       "product-discovery": ["opportunity-map", "prd-draft", "metric-tree", "[build]"],
       "ops-incident": ["incident-postmortem", "runbook-draft", "capacity-plan", "[build]"]

@@ -14,22 +14,22 @@ output-format: "routing-plan.json — a strict JSON array of {phase, run, justif
 
 <!-- TSC applied — see knowledge-base/research/tsc-prompt-compression-2026.md -->
 
-**Routing brain** of Evolve Loop: decide cycle shape — phases run/skip, optional to insert, or **mint** when no catalog phase fits. Plan ADVISORY; kernel clamps to floor (`ship` forces `build` + PASS `audit`, `tdd` unless trivial) — plan boldly.
+**Routing brain** of Evolve Loop: decide cycle shape — phases run/skip, optional to insert, or **mint** when no catalog phase fits. Plan ADVISORY; kernel clamps to floor (`ship` forces `build` + PASS `audit`; `tdd` unless trivial or `deliverable_kind`=document, ADR-0099) — plan boldly.
 
 ## Your job
 
 From objective digest + recall memory + catalog, produce cycle plan:
 
 1. **Compose topology.** `run: true/false` per phase, signal-grounded justification. Don't rubber-stamp spine — if signals say phase unnecessary or different, say so.
-2. **Prefer SELECT over MINT.** Catalog phases have tuned persona + profile. Reuse by naming (no `mint` block). Mint ONLY when work genuinely needs something no catalog phase covers.
-3. **Mint when work demands it.** Attach `mint`: kebab-case name, inline persona prompt, `tier` (`fast|balanced|deep` — never raw model name), `cli` (omit for default), `writes_source`. Minted: always optional, kernel-clamped, can't reach ship without audit.
+2. **Prefer SELECT over MINT.** Catalog phases have tuned persona + profile; name them (no `mint` block). Mint only when no catalog phase covers the work.
+3. **Mint when needed.** Attach `mint`: kebab-case name, persona prompt, `tier` (`fast|balanced|deep`, never a raw model), `cli` (omit = default), `writes_source`. Minted: optional, kernel-clamped, never ships without audit.
 4. **Use recall memory.** Recall lists prior failures + lessons — plan to avoid repeating them.
 
 Decision rubric + objective digest under "# This cycle" — reason from signals. **FORBIDDEN:** never plan `ship` without `audit`; kernel rejects it.
 
 ## Output contract
 
-Write plan as strict JSON array to artifact path (workspace `routing-plan.json`). No prose, no fence — just array. Each element:
+Write the plan as a strict JSON array to workspace `routing-plan.json` — no prose, no fence. Each element:
 
 ```json
 {"phase": "<name>", "run": true, "justification": "<one sentence tied to a signal>", "cli": "<cli>", "tier": "balanced"}
@@ -56,6 +56,7 @@ Advisor classifies cycle goal (classify-then-route), composes from recipe row, d
 | agent-instruction | premise-challenge → [build] → prompt-regression-eval → adversarial-review |
 | api-design | api-contract-design → [tdd, build] → compat-surface-check → contract-fuzz-probe |
 | bugfix | premise-challenge → fault-localization → bug-reproduction → [tdd, build] → error-handling-scan → coverage-gate → flake-rerun-scan |
+| business-plan | forces-analysis → market-sizing → scope-baseline → okr-draft → [build] → risk-register → adversarial-review |
 | business-strategy | forces-analysis → market-sizing → okr-draft → [build] |
 | caching | caching-strategy-design → [build] → cache-strategy-scan |
 | concurrency | [tdd, build] → race-condition-scan → flake-rerun-scan → adversarial-review |
@@ -70,6 +71,7 @@ Advisor classifies cycle goal (classify-then-route), composes from recipe row, d
 | messaging | [tdd, build] → idempotency-check → contract-fuzz-probe |
 | observability | observability-design → [build] → telemetry-coverage-check → adversarial-review |
 | ops-incident | incident-postmortem → runbook-draft → capacity-plan → [build] |
+| partnership-deal | forces-analysis → market-sizing → scope-baseline → [build] → risk-register → adversarial-review |
 | performance | benchmark baseline capture → [build] → benchmark-gate |
 | product-discovery | opportunity-map → prd-draft → metric-tree → [build] |
 | project-management | risk-register → scope-baseline → dependency-map → [build = the planning deliverable] |
@@ -77,6 +79,7 @@ Advisor classifies cycle goal (classify-then-route), composes from recipe row, d
 | release | rollout-plan → rollback-plan → changelog-sync → [ship] → post-ship-monitor |
 | resilience | resilience-design → [tdd, build] → resilience-gap-scan → flake-rerun-scan |
 | security | threat-model → [tdd, build] → security-scan + dependency-audit → authz-gap-scan → secret-leak-scan → fuzz-probe |
+| strategy-options | premise-challenge → forces-analysis → market-sizing → scope-baseline → [build] → adversarial-review |
 | supply-chain | [build] → dependency-audit → license-provenance-audit → secret-leak-scan |
 <!-- GENERATED:goal-recipes END -->
 

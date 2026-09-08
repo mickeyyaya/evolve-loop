@@ -9,7 +9,7 @@
 // every LLM CLI" — the unit half (phase_advisor_test.go, resolveRouterDispatch)
 // pins the Go-side option/precedence wiring without spending quota.
 //
-// Runs the advisor at its DEEP production tier (advisorModelFor: opus / gpt-5.5 /
+// Runs the advisor at its DEEP production tier (advisorModelFor: opus / the codex family manifest's deep model /
 // the family's strongest) — the routing brain is deep-reasoning work, so a fast
 // model would not represent its real behavior. Assertions stay STRUCTURAL (a
 // valid plan is produced), not on plan wording. Unavailable binaries SKIP
@@ -128,7 +128,7 @@ func firstBalancedArray(s string) (string, bool) {
 // advisorModelFor resolves the DEEP / high-level model the advisor runs on per
 // CLI. The routing brain composes the whole cycle and may mint phases — deep-
 // reasoning work — so (unlike the cheap-tier smoke/T2 helpers) the advisor e2e
-// validates at the PRODUCTION tier: opus / gpt-5.5 / the family's strongest. A
+// validates at the PRODUCTION tier: opus / the codex family manifest's deep model / the family's strongest. A
 // fast model like haiku is fine for basic-function checks but does not represent
 // the advisor's real behavior. Overridable per CLI via
 // EVOLVE_E2E_ADVISOR_MODEL_<BASE> (e.g. EVOLVE_E2E_ADVISOR_MODEL_CLAUDE=sonnet).
@@ -141,7 +141,7 @@ func advisorModelFor(driver string) string {
 	case "claude":
 		return "opus"
 	case "codex":
-		return "gpt-5.5"
+		return codexTierModels()["deep"] // projection of the family manifest, never a copy
 	case "agy":
 		return "gemini-3.5-flash" // agy's manifest pins all tiers to one model
 	case "ollama":
@@ -298,7 +298,7 @@ func TestStripFrontmatter(t *testing.T) {
 // first-run interactive trust prompt the headless/auto-responder can't clear
 // (an un-onboarded codex). These quarantine-SKIP like a transient so the matrix
 // stays a meaningful gate on the CLIs that are actually usable here, rather than
-// red-failing on host setup. (Account/model caps like "gpt-5.5 not on a ChatGPT
+// red-failing on host setup. (Account/model caps like "<deep model> not on a ChatGPT
 // account" surface via the trust-loop or transient path.)
 var advisorEnvUnavailableMarkers = []string{
 	"no tool use",
@@ -478,7 +478,7 @@ func TestE2ELiveAdvisorCLIMatrix(t *testing.T) {
 	liveGate(t, "EVOLVE_E2E_LIVE_ADVISOR")
 	repoRoot := mustRepoRoot(t)
 	evolveBin := buildBinary(t, t.TempDir(), "evolve", "./cmd/evolve", repoRoot)
-	// Deep models (opus / gpt-5.5) reason longer than the cheap-tier smoke calls,
+	// Deep models (opus / the codex family's deep model) reason longer than the cheap-tier smoke calls,
 	// so the default ceiling is generous; override with EVOLVE_E2E_LIVE_TIMEOUT_S.
 	timeout := envDurationSeconds("EVOLVE_E2E_LIVE_TIMEOUT_S", 10*time.Minute)
 

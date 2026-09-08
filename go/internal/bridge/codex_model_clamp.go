@@ -1,9 +1,9 @@
 package bridge
 
 // codex_model_clamp.go — cycle-142 incident fix. The codex ModelTierMap
-// translates tier "sonnet" → "gpt-5.4", but a ChatGPT/subscription codex
-// account 400-rejects gpt-5.4 (it is effectively API-key-only by plan tier)
-// and pops a "Switch to gpt-5.4-mini?" modal that the auto-responder does not
+// translates a tier to a model, but a ChatGPT/subscription codex account
+// 400-rejects models outside its plan tier (the 2026-06 case was gpt-5.4)
+// and pops a "Switch to <fallback>?" modal that the auto-responder does not
 // dismiss — stalling the phase for the full artifact-wait window and
 // surfacing as a generic ExitArtifactTimeout. The clamp substitutes a
 // manifest-declared ChatGPT-safe model on subscription auth; API-key auth is
