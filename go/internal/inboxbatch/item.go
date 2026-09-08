@@ -56,6 +56,11 @@ type Item struct {
 	// of restarting cold. Machine-consumed only (never rendered into the triage
 	// prompt); validated at adoption time, tolerant here. Nil = fresh start.
 	Continuation *continuation.Continuation `json:"continuation,omitempty"`
+	// Acceptance is the item's verbatim acceptance criteria. It is the SINGLE
+	// source the harness projects into the tdd, build and audit prompts' Task Contract block
+	// (ADR-0098) — never re-typed by an agent, so the builder and the auditor
+	// grade against the same words.
+	Acceptance []string `json:"acceptance,omitempty"`
 	// Path is the source file (relative name inside the inbox dir) — operator
 	// affordance for `evolve inbox batches` output; not part of grouping.
 	Path string `json:"-"`
@@ -80,29 +85,12 @@ func LoadDir(dir string) (items []Item, warnings []string, err error) {
 		if e.IsDir() || !strings.HasSuffix(name, ".json") {
 			continue
 		}
-		raw, ferr := os.ReadFile(filepath.Join(dir, name))
+		it, ws, ferr := LoadFile(filepath.Join(dir, name))
 		if ferr != nil {
 			warnings = append(warnings, name+": "+ferr.Error())
 			continue
 		}
-		var it Item
-		if jerr := json.Unmarshal(raw, &it); jerr != nil {
-			warnings = append(warnings, name+": "+jerr.Error())
-			continue
-		}
-		if it.ID == "" {
-			// Filename stem is the stable fallback identity (some autofiled
-			// items omit id; the filename is unique by construction).
-			it.ID = strings.TrimSuffix(name, ".json")
-		}
-		it.Path = name
-		// Prompt-injection surface: id/campaign/files render into the triage
-		// LLM prompt (RenderMarkdown / Edge reasons). Strip control characters
-		// + cap length at ingestion, LOUDLY, so a garbled or malicious item
-		// can never fabricate a prompt line.
-		if sanitizeItem(&it) {
-			warnings = append(warnings, name+": sanitized control characters/overlength in rendered fields")
-		}
+		warnings = append(warnings, ws...)
 		items = append(items, it)
 	}
 	sort.Slice(items, func(i, j int) bool { return items[i].ID < items[j].ID })
@@ -120,31 +108,73 @@ func LoadDir(dir string) (items []Item, warnings []string, err error) {
 // the backlog, short enough that a runaway field cannot flood the prompt.
 const maxFieldLen = 160
 
+// maxAcceptanceLen bounds one acceptance criterion as rendered into a prompt —
+// wide enough for a real criterion (the filed items run 150–400 characters),
+// narrow enough that an item cannot smuggle a page of instructions.
+const maxAcceptanceLen = 600
+
+// LoadFile reads ONE inbox item record (the shape the lane-scope resolver
+// hands back per task id) with the same identity fallback and prompt-surface
+// sanitisation LoadDir applies. Warnings are non-fatal sanitisation notes.
+func LoadFile(path string) (Item, []string, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return Item{}, nil, err
+	}
+	var it Item
+	if err := json.Unmarshal(raw, &it); err != nil {
+		return Item{}, nil, err
+	}
+	name := filepath.Base(path)
+	if it.ID == "" {
+		// Filename stem is the stable fallback identity (some autofiled
+		// items omit id; the filename is unique by construction).
+		it.ID = strings.TrimSuffix(name, ".json")
+	}
+	it.Path = name
+	// Prompt-injection surface: id/campaign/files/acceptance render into LLM
+	// prompts (RenderMarkdown / Edge reasons / the Task Contract block). Strip
+	// control characters and bound each field.
+	var warnings []string
+	if sanitizeItem(&it) {
+		warnings = append(warnings, name+": sanitized control characters/overlength in rendered fields")
+	}
+	return it, warnings, nil
+}
+
 // sanitizeItem cleans the fields that reach the triage prompt, reporting
 // whether anything changed. Control characters collapse to a single space
 // (never a newline — one batch, one line) and overlength truncates.
 func sanitizeItem(it *Item) bool {
 	changed := false
-	clean := func(s string) string {
-		mapped := strings.Map(func(r rune) rune {
-			if r < 0x20 || r == 0x7f {
-				return ' '
-			}
-			return r
-		}, s)
-		if len(mapped) > maxFieldLen {
-			mapped = mapped[:maxFieldLen]
-		}
-		if mapped != s {
-			changed = true
-		}
-		return mapped
-	}
+	clean := func(s string) string { return cleanBounded(s, maxFieldLen, &changed) }
 	it.ID = clean(it.ID)
+	it.Title = clean(it.Title) // renders as the Task Contract heading
 	it.Campaign = clean(it.Campaign)
 	it.Route = clean(it.Route)
 	for i := range it.Files {
 		it.Files[i] = clean(it.Files[i])
 	}
+	for i := range it.Acceptance {
+		it.Acceptance[i] = cleanBounded(it.Acceptance[i], maxAcceptanceLen, &changed)
+	}
 	return changed
+}
+
+// cleanBounded strips control characters and bounds s to max bytes, flagging
+// changed when either applied.
+func cleanBounded(s string, max int, changed *bool) string {
+	mapped := strings.Map(func(r rune) rune {
+		if r < 0x20 || r == 0x7f {
+			return ' '
+		}
+		return r
+	}, s)
+	if len(mapped) > max {
+		mapped = mapped[:max]
+	}
+	if mapped != s {
+		*changed = true
+	}
+	return mapped
 }

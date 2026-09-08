@@ -167,6 +167,12 @@ func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	if req.Worktree != "" {
 		fmt.Fprintf(&b, "- worktree: %s\n", req.Worktree)
 	}
+	if contract := req.Context[core.CtxKeyTaskContract]; contract != "" {
+		// Harness-owned (ADR-0098): the SAME acceptance words and predicate
+		// inventory the builder was handed — the grader reads what the builder
+		// read, so the block is an authority, not the builder's claim.
+		fmt.Fprintf(&b, "\n\n## Task Contract\n%s", contract)
+	}
 	// Continuations are TOLD their inherited OPEN defect ids (2026-08-10
 	// investigation: auditors were graded against ids they were never shown).
 	b.WriteString(inheritedDefectsPromptBlock(req))

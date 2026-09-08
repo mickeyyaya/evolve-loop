@@ -716,6 +716,13 @@ func (o *Orchestrator) planCycle(ctx context.Context, req CycleRequest, state St
 				continue
 			}
 			if p := o.scopePathFor(req.ProjectRoot, id); p != "" {
+				// The encoding is "id=path" pairs joined by spaces (read by the
+				// scout and the Task Contract seeder); a value that cannot be
+				// encoded is refused loudly rather than mis-split downstream.
+				if strings.ContainsAny(id, "= \t") || strings.ContainsAny(p, " \t\n") {
+					fmt.Fprintf(os.Stderr, "[orchestrator] WARN fleet_scope_paths: cannot encode id %q path %q (id must not contain '=' or blanks; path must not contain blanks) — left unresolved\n", id, p)
+					continue
+				}
 				pairs = append(pairs, id+"="+p)
 			}
 		}

@@ -419,6 +419,10 @@ type Orchestrator struct {
 	// composition root like continuationFor (core cannot import inboxmover).
 	// Nil (default) = no path disclosure — Context byte-identical.
 	scopePathFor func(projectRoot, taskID string) string
+	// acsPredicates lists the cycle's ACS predicate names for the Task Contract
+	// (ADR-0098); nil ⇒ listACSPredicates (real `go test -list`). Injectable so
+	// the wiring proof exercises the inventory without a Go toolchain.
+	acsPredicates predicateLister
 
 	// chronicle is the resolved chronicle policy (digest stage/caps), resolved
 	// once from policy.json at the composition root (chronicle S3).
