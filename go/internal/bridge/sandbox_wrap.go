@@ -9,8 +9,8 @@ package bridge
 //
 // This file owns ONLY the decision + prefix-argv synthesis. Drivers (tmux +
 // headless) call deps.SandboxWrap at their launch site and either prepend the
-// returned argv or, when available=false, run unwrapped (degraded — a soft
-// fallback so a missing sandbox binary or nested-claude doesn't kill cycles).
+// returned argv or enforce the profile's confinement requirement when no
+// wrapper is available. Mandatory profiles fail closed without an explicit opt-out.
 //
 // Probe is cached behind sync.Once because it shells to LookPath; the cached
 // result is captured in the closure that withDefaults returns.
@@ -65,14 +65,8 @@ func defaultSandboxWrapWithProbe(deps Deps, probeFunc func() sandbox.ProbeResult
 			return nil, false
 		}
 
-		// Single-source confinement decision — the SAME DetectNested +
-		// ShouldWrap that preflight consumes (internal/adapters/sandbox). The
-		// wrap is skipped for ALL modes when we are nested-Claude (outer
-		// confinement is unverified, and on macOS the
-		// inner sandbox-exec returns sandbox_apply() EPERM and hangs the REPL
-		// boot, exit=80) or when no usable sandbox binary is present. `on`
-		// declares mandatory confinement, so its bypass is surfaced loudly
-		// rather than silently honoured-as-unconfined.
+		// Share the measured capability decision with preflight. A session hint
+		// never substitutes for this profile's actual OS wrapper.
 		probe := probeFunc()
 		wrap, reason := sandbox.ShouldWrap(sandbox.DetectNested(depEnvGetter(deps)), probe)
 		if !wrap {
@@ -82,6 +76,17 @@ func defaultSandboxWrapWithProbe(deps Deps, probeFunc func() sandbox.ProbeResult
 			return nil, false
 		}
 
+		// A terminal grant is tied to a real assigned device, never a caller's
+		// arbitrary writable path. Headless and Linux profiles do not need it.
+		if probe.OS == "darwin" && req.TerminalPath != "" {
+			if err := validateSandboxTerminal(req.TerminalPath); err != nil {
+				if deps.Stderr != nil {
+					fmt.Fprintf(deps.Stderr, "[bridge] sandbox terminal unavailable: %v\n", err)
+				}
+				return nil, false
+			}
+		}
+
 		// Build the sandbox.Config for this phase. WritePaths covers the
 		// worktree (the only place source writes are permitted) plus the
 		// workspace (for artifact/log files the agent must write) plus /tmp
@@ -89,6 +94,7 @@ func defaultSandboxWrapWithProbe(deps Deps, probeFunc func() sandbox.ProbeResult
 		// load their own config/auth state; repo writes remain confined below.
 		home, _ := os.UserHomeDir()
 		cfg := sandbox.Config{
+			TerminalPath:  req.TerminalPath,
 			RepoRoot:      req.RepoRoot,
 			HomeDir:       home,
 			ReadOnlyRepo:  true,
@@ -232,7 +238,7 @@ const envSandboxMode = "EVOLVE_SANDBOX"
 // decision into a per-driver consumable. Returns (prefix []string, true) only
 // when the launch carries a worktree or explicitly requires confinement and
 // the wrap is available; otherwise (nil, false) for "run unwrapped".
-func sandboxPrefixForLaunch(deps Deps, cfg *Config) ([]string, bool) {
+func sandboxPrefixForLaunch(deps Deps, cfg *Config, terminalPath string) ([]string, bool) {
 	if cfg == nil || cfg.Worktree == "" && !cfg.RequireSandbox {
 		return nil, false // not a source-writing phase
 	}
@@ -259,6 +265,7 @@ func sandboxPrefixForLaunch(deps Deps, cfg *Config) ([]string, bool) {
 		fmt.Fprintf(deps.Stderr, "[bridge] WARN: source-writing phase %q has sandbox.allow_network=false; forcing true (a sandboxed model-reaching CLI cannot boot with network denied)\n", cfg.Agent)
 	}
 	return deps.SandboxWrap(SandboxWrapRequest{
+		TerminalPath:  terminalPath,
 		Phase:         cfg.Agent,
 		Workspace:     cfg.Workspace,
 		Worktree:      cfg.Worktree,
@@ -330,7 +337,7 @@ func joinPrefixForTmux(prefix []string) string {
 // and reports whether confinement was installed. Callers that require a
 // sandbox fail closed when wrapped is false.
 func wrapHeadlessInvocation(deps Deps, cfg *Config, name string, args []string) (wrappedName string, wrappedArgs []string, wrapped bool) {
-	prefix, ok := sandboxPrefixForLaunch(deps, cfg)
+	prefix, ok := sandboxPrefixForLaunch(deps, cfg, "")
 	if !ok {
 		return name, args, false
 	}

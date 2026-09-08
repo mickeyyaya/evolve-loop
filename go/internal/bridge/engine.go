@@ -203,6 +203,7 @@ type SandboxWrapper func(req SandboxWrapRequest) (prefixArgv []string, available
 // prefix. Phase is the agent name (used as the SBPL file suffix). Workspace
 // is the absolute path to write the per-phase SBPL into when needed.
 type SandboxWrapRequest struct {
+	TerminalPath  string   // assigned tmux tty; empty for headless launches
 	DenyPaths     []string // absolute write denials
 	DenyReadPaths []string // absolute read denials
 	Phase         string   // e.g. "build", "tdd"

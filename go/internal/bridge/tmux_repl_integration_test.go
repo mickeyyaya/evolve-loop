@@ -116,15 +116,16 @@ func itConfig(t *testing.T, promptLines ...string) *Config {
 		t.Fatal(err)
 	}
 	return &Config{
-		Model:      "haiku",
-		Agent:      "itest",
-		Cycle:      0,
-		Worktree:   root, // a real dir for the REPL to cd into
-		Workspace:  ws,
-		PromptFile: promptFile,
-		Artifact:   filepath.Join(root, "artifact"),
-		StdoutLog:  filepath.Join(ws, "stdout.log"),
-		StderrLog:  filepath.Join(ws, "stderr.log"),
+		ProjectRoot: root,
+		Model:       "haiku",
+		Agent:       "itest",
+		Cycle:       0,
+		Worktree:    root, // a real dir for the REPL to cd into
+		Workspace:   ws,
+		PromptFile:  promptFile,
+		Artifact:    filepath.Join(root, "artifact"),
+		StdoutLog:   filepath.Join(ws, "stdout.log"),
+		StderrLog:   filepath.Join(ws, "stderr.log"),
 	}
 }
 

@@ -24,6 +24,7 @@ import (
 // All paths are absolute (no globs, no placeholders); the orchestrator
 // resolves these before handing them off.
 type Config struct {
+	TerminalPath  string // validated assigned macOS tty; empty means no terminal grant
 	RepoRoot      string
 	HomeDir       string
 	ReadOnlyRepo  bool
@@ -58,9 +59,9 @@ type ProbeResult struct {
 	Reason     string // diagnostic when !Available or when sandbox_apply fails
 
 	// Capable reports whether the sandbox binary actually APPLIES on this host —
-	// a measured fact, not the env-var nested guess. Under nested-Claude on
-	// macOS, sandbox_apply() returns EPERM, so the binary is Available but not
-	// Capable. Only meaningful when CapabilityChecked is true.
+	// a measured fact, not the env-var nested guess. In some nested macOS
+	// environments sandbox_apply() returns EPERM despite an available binary.
+	// Only meaningful when CapabilityChecked is true.
 	Capable bool
 	// CapabilityChecked distinguishes "Capable=false because measured-incapable"
 	// from "Capable=false because never measured" (no binary, or no probe). A
@@ -194,6 +195,9 @@ func GenerateSBPL(cfg Config) string {
 		"/private/etc", "/opt", "/bin", "/sbin", "/var",
 		"/private/var", "/dev",
 	} {
+		if p == "" {
+			continue
+		}
 		fmt.Fprintf(&b, "(allow file-read* (subpath %q))\n", p)
 	}
 	// HOME read.
@@ -204,6 +208,15 @@ func GenerateSBPL(cfg Config) string {
 	for _, p := range []string{"/tmp", "/private/tmp", "/var/folders", "/private/var/folders"} {
 		fmt.Fprintf(&b, "(allow file-read* (subpath %q))\n", p)
 		fmt.Fprintf(&b, "(allow file-write* (subpath %q))\n", p)
+	}
+	// Interactive clients reopen their controlling terminal and set raw mode
+	// on the inherited descriptor. Grant only this pane's device and its logical
+	// alias, before configured file-read/file-write denials.
+	if cfg.TerminalPath != "" {
+		fmt.Fprintf(&b, "(allow file-write-data (literal \"/dev/tty\") (literal %q))\n", cfg.TerminalPath)
+		// Only terminal attributes and window size are needed. In particular,
+		// arbitrary control/input-injection ioctls are not part of this grant.
+		fmt.Fprintf(&b, "(allow file-ioctl (require-all (require-any (literal \"/dev/tty\") (literal %q)) (require-any (ioctl-command TIOCGETA) (ioctl-command TIOCSETA) (ioctl-command TIOCSETAW) (ioctl-command TIOCSETAF) (ioctl-command TIOCGWINSZ))))\n", cfg.TerminalPath)
 	}
 	// HOME writes for known Claude config dirs.
 	if cfg.HomeDir != "" {
@@ -247,7 +260,9 @@ func GenerateSBPL(cfg Config) string {
 			fmt.Fprintf(&b, "(deny file-read* (subpath %q))\n", dp)
 		}
 	}
-	if !cfg.AllowNetwork {
+	if cfg.AllowNetwork {
+		b.WriteString("(allow network*)\n")
+	} else {
 		b.WriteString("(deny network*)\n")
 	}
 	return b.String()
