@@ -7,6 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
 // parseArgs must handle three real-world invocation styles:
@@ -211,6 +214,25 @@ func TestArtifactsFor_PerPhaseShape(t *testing.T) {
 						t.Errorf("extra artifact not valid JSON: %v\n%s", err, extra)
 					}
 				}
+			}
+		})
+	}
+}
+
+func TestArtifactsFor_AuditMeetsDeliverableContract(t *testing.T) {
+	for _, verdict := range []string{"PASS", "WARN", "FAIL"} {
+		t.Run(verdict, func(t *testing.T) {
+			ws := t.TempDir()
+			files, err := artifactsFor("audit", filepath.Join(ws, "audit-report.md"), verdict)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := writeArtifacts(files); err != nil {
+				t.Fatal(err)
+			}
+			res, err := deliverable.Verify("audit", phasecontract.Roots{Workspace: ws})
+			if err != nil || !res.OK {
+				t.Fatalf("audit %s violates the real deliverable contract: err=%v violations=%+v", verdict, err, res.Violations)
 			}
 		})
 	}
