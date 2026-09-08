@@ -42,7 +42,7 @@ override per-phase.
 | Driver | fast | balanced | deep | default_model |
 |---|---|---|---|---|
 | `claude-p` / `claude-tmux` | — | — | — | `haiku` (claude-p) |
-| `codex` / `codex-tmux` | `gpt-5.4-mini` | `gpt-5.4` | `gpt-5.5` | empty (auth-determined; `gpt-5.5` is the ChatGPT-account default) |
+| `codex` / `codex-tmux` | `model_tier_map.fast` | `model_tier_map.balanced` | `model_tier_map.deep` | empty (auth-determined) — the ids are declared ONCE in `go/internal/bridge/manifests/codex-tmux.json` (the family table every codex reader resolves through; the CHANGELOG is the value history) |
 | `agy` / `agy-tmux` | `gemini-3.5-flash` | `gemini-3.5-flash` | `gemini-3.5-flash` | `gemini-3.5-flash` (deep-tier string pending live `-m` validation) |
 | `ollama-tmux` | `qwen3:7b` | `qwen3:30b` | `qwen3-coder:30b` | `llama3.1:8b` |
 

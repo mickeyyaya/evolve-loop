@@ -25,7 +25,7 @@ func cheapModelFor(driver string) string {
 	case "claude":
 		return "haiku"
 	case "codex":
-		return "gpt-5.4-mini"
+		return codexTierModels()["fast"] // projection of the family manifest, never a copy
 	case "agy":
 		return "gemini-3.5-flash"
 	case "ollama":

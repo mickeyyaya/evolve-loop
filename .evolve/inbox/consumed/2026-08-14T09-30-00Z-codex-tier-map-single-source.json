@@ -10,5 +10,11 @@
   "notes": "Found during the 2026-08-14 gpt-5.6 cutover: the manifest-only edit red'd CI because this duplicate (plus chatgpt_safe_models and 7 integration-tagged test pins) also carried the old family. Values are aligned as of PR #460; this item removes the class.",
   "summary": "codex tier→model mapping is declared TWICE: manifests/codex-tmux.json model_tier_map (SSOT) and a hardcoded switch in driver_codex.go mapCodexModel. Every model-family refresh must edit both or dispatch and realization disagree.",
   "title": "mapCodexModel duplicates the manifest tier map — single-source via Manifest.ModelTierMap",
-  "weight": 0.7
+  "weight": 0.7,
+  "consumed": {
+    "at": "2026-09-08T16:44:32Z",
+    "via": "console-manual",
+    "cycle": "",
+    "resolution": "feat/codex-gpt6-astra — ONE ladder: bridge.resolveTierModel (realizer flag/repl emit + headless driver). ONE table per family: codex-tmux.json model_tier_map; codex.json declares only model_tier_map_from: codex-tmux, resolved by LoadManifest (resolveTierMapFrom; unresolvable pointer = manifest error). mapCodexModel deleted. Proofs: TestResolveTierModel_FollowsManifest (fixture map followed on both paths), TestCodexHeadlessManifest_PointsAtFamilyTable, TestLoadManifest_ModelTierMapFrom_UnresolvableIsAnError, TestLaunch_Codex_ResolvesTierViaFamilyManifest. e2e tables derive from the manifest. deep/top → gpt-6-astra in the same change."
+  }
 }

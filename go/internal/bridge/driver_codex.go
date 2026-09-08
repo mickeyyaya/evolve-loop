@@ -47,7 +47,18 @@ func (codexDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, err
 		return ExitBadFlags, err
 	}
 
-	resolved := mapCodexModel(cfg.Model)
+	// Single tier table (inbox codex-tier-map-single-source): this driver's
+	// manifest (codex.json) declares no map of its own — its model_tier_map_from
+	// points at the codex FAMILY table (codex-tmux.json) and LoadManifest adopts
+	// it — and the driver resolves through the shared realizer ladder, carrying
+	// no table of its own. A manifest that cannot load (own or family) leaves the
+	// value untranslated — the vocabulary guard below then omits -m (the CLI
+	// default beats a fatal boot) and the WARN names the cause.
+	man, merr := LoadManifest(cfg.CLI)
+	if merr != nil {
+		fmt.Fprintf(deps.Stderr, "[codex] WARN: manifest unavailable (%v) — tier not translated\n", merr)
+	}
+	resolved := resolveTierModel(man, cfg.Model)
 	args := []string{"exec", "--output-last-message", cfg.Artifact}
 	switch {
 	case resolved == "" || isUnresolvedModelToken(resolved):
@@ -90,25 +101,6 @@ func (codexDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, err
 	}
 	fmt.Fprintf(deps.Stderr, "[codex] codex exited rc=%d\n", rc)
 	return rc, nil
-}
-
-// mapCodexModel maps a tier to a codex model name (researched 2026-05-21 per
-// drivers/codex.sh). It accepts BOTH the canonical tier vocabulary
-// (fast/balanced/deep — what policy pins and `evolve setup apply` store) and
-// the legacy Claude aliases (haiku/sonnet/opus); each tier resolves to the same
-// native id. Native ids and genuinely unknown values pass through unchanged.
-// (cycle-378: a pinned canonical tier "deep" was previously unrecognized here,
-// so -m was omitted and codex exited rc=1.)
-func mapCodexModel(m string) string {
-	switch m {
-	case "fast", "haiku":
-		return "gpt-5.6-luna"
-	case "balanced", "sonnet":
-		return "gpt-5.6-terra"
-	case "deep", "opus":
-		return "gpt-5.6-sol"
-	}
-	return m
 }
 
 // isCodexModelName reports whether m looks like a codex-acceptable model

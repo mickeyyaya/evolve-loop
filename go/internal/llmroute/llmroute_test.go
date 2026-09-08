@@ -332,9 +332,10 @@ func TestResolve_PinCLIOnlyLeavesModelNormal(t *testing.T) {
 // incident: a policy pin written with a BARE family ("codex", which is exactly
 // what `evolve setup apply` emits — Assignment.CLI is the base family) selected
 // the headless `codex` driver instead of the default tmux driver `codex-tmux`.
-// The headless driver has neither the manifest model_tier_map nor the
-// ChatGPT-account model clamp, so codex exited rc=1 every cycle and the loop
-// spun. A base family that has a registered "<family>-tmux" driver MUST
+// At the time the headless driver had neither the manifest model_tier_map
+// (since 2026-09-09 codex.json adopts the family table via model_tier_map_from)
+// nor the ChatGPT-account model clamp (still true), so codex exited rc=1 every
+// cycle and the loop spun. A base family that has a registered "<family>-tmux" driver MUST
 // normalize to that default driver; an already-qualified or explicit-headless
 // (e.g. "claude-p") name is left untouched.
 func TestResolve_PinBaseFamilyNormalizesToDefaultDriver(t *testing.T) {
