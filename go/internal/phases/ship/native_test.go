@@ -438,8 +438,8 @@ func TestNative_R_LegacySHAOnlyPin_Migrates(t *testing.T) {
 func TestNative_S_CycleAdvancesLastCycleNumber(t *testing.T) {
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\nv8.34.0 cycle ship test\n")
-	seedAudit(t, repo, "PASS")
 	mustWrite(t, filepath.Join(repo, ".evolve", "cycle-state.json"), `{"cycle_id":1,"phase":"ship"}`)
+	seedAudit(t, repo, "PASS")
 	mustWrite(t, filepath.Join(repo, ".evolve", "state.json"), `{"lastCycleNumber":0}`)
 	addRemote(t, repo)
 
@@ -490,8 +490,8 @@ func TestNative_U_ActualDiffFooter_CycleCommit(t *testing.T) {
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\ndiff transparency test\n")
 	mustWrite(t, filepath.Join(repo, "newfile.txt"), "new file content\n")
-	seedAudit(t, repo, "PASS")
 	mustWrite(t, filepath.Join(repo, ".evolve", "cycle-state.json"), `{"cycle_id":2,"phase":"ship"}`)
+	seedAudit(t, repo, "PASS")
 	addRemote(t, repo)
 
 	res, _ := runShip(t, repo, Options{Class: ClassCycle, CommitMessage: "feat: claims do not match"})

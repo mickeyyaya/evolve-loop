@@ -304,6 +304,12 @@ func (s *Server) handleCycle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	cs = assignState(cs, snap.Loop)
+	for _, summary := range snap.Cycles {
+		if summary.ID == id {
+			cs.State, cs.StateName, cs.CurrentPhase = summary.State, summary.StateName, summary.CurrentPhase
+			break
+		}
+	}
 	arts, err := ListArtifacts(s.root, id)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		warns = append(warns, fmt.Sprintf("artifacts: %v", err))

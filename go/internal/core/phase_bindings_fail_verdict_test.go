@@ -5,7 +5,7 @@
 // had nothing for this run and fell back to a FOREIGN run's entry — the FAIL
 // verdict was the very thing that removed the gate's ability to see it. These
 // pins flip the producer: FAIL records the same rich auditor binding (so ship
-// reads THIS cycle's report and returns the terminal AUDIT_BINDING_VERDICT_FAIL),
+// reads THIS cycle's host rejection rather than another run's evidence),
 // while the verdict-cache projection stays PASS|WARN-only (the cache exists to
 // skip re-audits of known-good trees; caching FAIL would change its consumers'
 // contract, and the WARN control below proves the guard is what's observed,
@@ -46,11 +46,10 @@ func TestEmitPhaseBindings_AuditFAIL_RecordsBinding_NoCachePut(t *testing.T) {
 	if e.Role != "auditor" || e.Kind != "agent_subprocess" {
 		t.Errorf("audit FAIL: role/kind = %q/%q, want auditor/agent_subprocess", e.Role, e.Kind)
 	}
-	// Findings exist and the auditor process did not crash: Unix findings
-	// convention (1), same as WARN — ship's 0|1 gate passes and the verdict
-	// parse of THIS run's artifact returns the honest VERDICT_FAIL terminal.
-	if e.ExitCode != 1 {
-		t.Errorf("audit FAIL: exit_code = %d, want 1", e.ExitCode)
+	// Host rejection must not be overridden by a PASS narrative or candidate
+	// evidence still present on disk. WARN remains the separate fluent case.
+	if e.ExitCode != 2 {
+		t.Errorf("audit FAIL: exit_code = %d, want unshippable host rejection 2", e.ExitCode)
 	}
 	if e.ArtifactSHA256 == "" || e.ArtifactPath != filepath.Join(ws, "audit-report.md") {
 		t.Errorf("audit FAIL: artifact binding incomplete: path=%q sha=%q", e.ArtifactPath, e.ArtifactSHA256)

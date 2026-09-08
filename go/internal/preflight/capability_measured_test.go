@@ -8,8 +8,8 @@ import (
 // TestProbe_MeasuredCapabilityDemotesExpectedToWork — the SandboxCapable seam
 // lets a MEASURED-incapable result demote ExpectedToWork (and InnerSandbox, for
 // consistency) to false on a host the standalone guess would call "working". The
-// override is subtractive: a measured-capable result never promotes, and a nil
-// seam (unmeasured) is byte-identical to the legacy guess.
+// measurement also permits a working sandbox despite a session hint; unknown
+// nested environments remain refused.
 func TestProbe_MeasuredCapabilityDemotesExpectedToWork(t *testing.T) {
 	root := t.TempDir()
 	runProbe := func(capable, checked, withSeam, nested bool) Profile {
@@ -60,8 +60,7 @@ func TestProbe_MeasuredCapabilityDemotesExpectedToWork(t *testing.T) {
 		}
 	})
 
-	// nested+incapable: ExpectedToWork is already false from decideSandbox, so the
-	// subtractive override must NOT fire again and double the EPERM reason text.
+	// Nested and measured-incapable stays refused, with one failure reason.
 	t.Run("nested+incapable → false, reason not doubled", func(t *testing.T) {
 		p := runProbe(false, true, true, true)
 		if p.Sandbox.ExpectedToWork {

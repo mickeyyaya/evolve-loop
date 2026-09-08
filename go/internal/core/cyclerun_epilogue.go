@@ -11,6 +11,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 )
@@ -38,7 +39,9 @@ import (
 // wants stopped at the ceiling — the marker makes that shape legible in the
 // halt message instead of reading as "identical defects".
 func (cr *cycleRun) abnormalEpilogue(cause error) {
-	if cr.cycleCompletedNormally {
+	// Quota exhaustion is a resource pause with its own checkpoint and phase
+	// evidence. A FAIL closeout here would make a resumable cycle look terminal.
+	if cr.cycleCompletedNormally || errors.Is(cause, ErrAllFamiliesExhausted) {
 		return
 	}
 	epilogueCtx := context.Background()

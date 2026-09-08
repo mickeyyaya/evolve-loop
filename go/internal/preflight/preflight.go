@@ -106,7 +106,7 @@ type Options struct {
 	// (capable, checked) — the ground-truth replacement for the nested env-var
 	// guess. Production wires it to sandbox.Probe()'s measurement at the
 	// composition root; nil (the default) leaves the result UNMEASURED so the
-	// legacy guess stands and existing callers stay byte-identical.
+	// legacy unmeasured decision behavior is retained.
 	SandboxCapable func() (capable bool, checked bool)
 	// WorktreeBase is the operator override for the per-cycle worktree base,
 	// resolved from policy.json (worktree.base) at the composition root. Empty ⇒
@@ -167,23 +167,22 @@ func Probe(opts Options) Profile {
 	if _, err := opts.LookPath("bwrap"); err == nil {
 		bwrap = true
 	}
-	// Measured capability (opt-in seam; nil ⇒ unmeasured ⇒ legacy byte-identical).
+	// Measured capability (opt-in seam; nil ⇒ legacy unmeasured decision).
 	var capable, capChecked bool
 	if opts.SandboxCapable != nil {
 		capable, capChecked = opts.SandboxCapable()
 	}
 
-	sandbox := decideSandbox(osType, nested, sandboxExec, bwrap)
-	// Subtractive measured override: a MEASURED-incapable sandbox demotes a
-	// would-be-working host-capability report to "won't work", correcting the
-	// optimistic guess (e.g. a broken/SIP-weird standalone host that today is
-	// guessed working and then hangs the REPL boot). Gated on ExpectedToWork so
-	// it only ever demotes a TRUE to false — never promotes, and never re-explains
-	// an already-false report (which would double the reason text). Mirrors the
-	// subtractive ShouldWrap gate so the report can't hide a confinement gap.
-	if capChecked && !capable && sandbox.ExpectedToWork {
-		sandbox.ExpectedToWork = false
-		sandbox.Reason += " (measured: sandbox_apply failed — EPERM/timeout)"
+	// Host readiness and launch use the same measured wrapping decision. Session
+	// markers describe context; they do not establish sandbox capability.
+	innerSandbox, innerReason := sbx.ShouldWrap(nested, sbx.ProbeResult{
+		OS:        osType,
+		Available: (osType == "darwin" && sandboxExec) || (osType == "linux" && bwrap),
+		Capable:   capable, CapabilityChecked: capChecked,
+	})
+	sandbox := Sandbox{
+		SandboxExecAvailable: sandboxExec, BwrapAvailable: bwrap,
+		ExpectedToWork: innerSandbox, Reason: innerReason,
 	}
 
 	// Filesystem
@@ -221,46 +220,15 @@ func Probe(opts Options) Profile {
 
 	// Auto-config
 	autoEPERM := "0"
-	if nested {
+	if nested && !innerSandbox {
 		autoEPERM = "1"
-	}
-	// The InnerSandbox boolean is the SSOT wrap policy (sbx.ShouldWrap) — the
-	// SAME decision the bridge launch path applies, so preflight's promise and
-	// the hot path can't drift. The reason strings stay preflight-local
-	// (operator-facing host-profile context, not duplicated decision logic).
-	innerProbe := sbx.ProbeResult{
-		OS:                osType,
-		Available:         (osType == "darwin" && sandboxExec) || (osType == "linux" && bwrap),
-		Capable:           capable,
-		CapabilityChecked: capChecked,
-	}
-	innerSandbox, wrapReason := sbx.ShouldWrap(nested, innerProbe)
-	innerReason := "standalone shell with working sandbox: defense-in-depth enabled"
-	switch {
-	case nested:
-		innerReason = "nested-Claude: outer Claude Code OS sandbox + Tier-1 hooks suffice; inner sandbox-exec adds friction without protection (intersect-only nesting)"
-	case !sandbox.ExpectedToWork:
-		innerReason = "sandbox not expected to work on this host: " + sandbox.Reason
-	case !innerSandbox:
-		// Exhaustiveness guard: ShouldWrap declined to wrap for a reason the
-		// cases above don't cover. Derive the reason from the SSOT decision so
-		// innerReason can never drift from innerSandbox (keeps the host-profile
-		// honest even if decideSandbox's ExpectedToWork ever decouples from the
-		// binary probe). Unreachable with today's Probe inputs.
-		innerReason = "inner sandbox not applied: " + wrapReason
 	}
 
 	var autoReasoning string
 	if wtBase != "" {
-		if nested {
-			autoReasoning = fmt.Sprintf(
-				"nested-Claude detected. Sandbox startup-fallback enabled (EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1). Worktree relocated to sandbox-friendly path: %s (%s). Inner sandbox-exec DISABLED (%s). Tier-1 kernel hooks (phase-gate, role-gate, ledger SHA) keep enforcing.",
-				wtBase, wtReason, innerReason)
-		} else {
-			autoReasoning = fmt.Sprintf(
-				"standalone shell. Worktree base: %s (%s). Inner sandbox-exec: %v (%s).",
-				wtBase, wtReason, innerSandbox, innerReason)
-		}
+		autoReasoning = fmt.Sprintf(
+			"Nested LLM-CLI hint: %v. Worktree base: %s (%s). Inner sandbox: %v (%s). Mandatory profiles require their own successful wrapper.",
+			nested, wtBase, wtReason, innerSandbox, innerReason)
 	} else {
 		autoReasoning = fmt.Sprintf(
 			"ERROR: no writable worktree base. Tried in-project (%v), TMPDIR (%v), cache dir (%v). OPERATOR ACTION: set worktree.base in .evolve/policy.json to a writable directory, or run from a different shell with broader permissions. Last-resort: use the explicit no-worktree operator mode (loses per-cycle isolation, NOT recommended).",
@@ -295,34 +263,6 @@ func Probe(opts Options) Profile {
 func MeasuredSandboxCapability() (capable bool, checked bool) {
 	pr := sbx.Probe()
 	return pr.Capable, pr.CapabilityChecked
-}
-
-func decideSandbox(osType string, nested, sbExec, bwrap bool) Sandbox {
-	s := Sandbox{SandboxExecAvailable: sbExec, BwrapAvailable: bwrap}
-	switch osType {
-	case "darwin":
-		if sbExec {
-			if nested {
-				s.ExpectedToWork = false
-				s.Reason = "Darwin nested-Claude: sandbox_apply() returns EPERM (rc=71)"
-			} else {
-				s.ExpectedToWork = true
-				s.Reason = "Darwin standalone: sandbox-exec available and parent unsandboxed"
-			}
-		} else {
-			s.Reason = "Darwin: sandbox-exec binary not on PATH"
-		}
-	case "linux":
-		if bwrap {
-			s.ExpectedToWork = true
-			s.Reason = "Linux: bwrap available; nested namespaces supported"
-		} else {
-			s.Reason = "Linux: bwrap binary not on PATH"
-		}
-	default:
-		s.Reason = fmt.Sprintf("Unsupported OS: %s — sandbox not enforced", osType)
-	}
-	return s
 }
 
 func selectWorktreeBase(opts Options, nested bool, fs Filesystem, inProject, tmpdir, cacheDir string) (string, string) {

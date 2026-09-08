@@ -344,6 +344,10 @@ func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) int {
 			emitSignalStop(stdout, stderr, &lr, result.Cycle)
 			return 130
 		}
+		if errors.Is(err, core.ErrAllFamiliesExhausted) {
+			lr.emitQuotaPause(cfg, result.Cycle, stdout, stderr)
+			return 5
+		}
 		if err != nil {
 			lr.StopReason = "error"
 			fmt.Fprintf(stderr, "evolve loop: resume cycle %d: %v\n", result.Cycle, err)
@@ -801,15 +805,7 @@ func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) int {
 				// into the same drained quota — stop with the same rc=5
 				// resumable contract as the post-cycle detector below.
 				if errors.Is(err, core.ErrAllFamiliesExhausted) {
-					if qp, ok := detectQuotaPause(cfg.EvolveDir); ok {
-						fmt.Fprintf(stderr, "QUOTA-PAUSE: cycle=%d wake-at=%s source=%s attempts=%d/%d (all CLI families exhausted mid-cycle)\n",
-							qp.Cycle, qp.WakeAt, qp.Source, qp.Attempts, qp.MaxAttempts)
-					} else {
-						fmt.Fprintf(stderr, "QUOTA-PAUSE: cycle=%d (all CLI families exhausted mid-cycle; checkpoint block missing — resume re-runs from last boundary)\n", result.Cycle)
-					}
-					fmt.Fprintln(stderr, "[loop]   resume when quota resets: evolve loop --resume")
-					lr.StopReason = "quota-pause"
-					lr.emit(stdout)
+					lr.emitQuotaPause(cfg, result.Cycle, stdout, stderr)
 					return 5
 				}
 				continue

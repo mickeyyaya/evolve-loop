@@ -40,6 +40,28 @@ type Snapshot struct {
 	Worktree string
 	// Tree is the git tree object id the working tree hashed to.
 	Tree string
+	mode snapshotMode
+}
+
+type snapshotMode uint8
+
+const (
+	allFiles snapshotMode = iota
+	trackedFiles
+)
+
+// TakeTracked records the tracked/staged ship tree without adopting untracked
+// execution inputs or mutating the real index. Its seed must be readable:
+// unlike add -A, add -u cannot reconstruct a missing or partial index.
+func TakeTracked(ctx context.Context, worktree string) (Snapshot, error) {
+	if strings.TrimSpace(worktree) == "" {
+		return Snapshot{}, fmt.Errorf("treefence: worktree path required")
+	}
+	tree, err := writeTreeMode(ctx, worktree, trackedFiles)
+	if err != nil {
+		return Snapshot{}, err
+	}
+	return Snapshot{Worktree: worktree, Tree: tree, mode: trackedFiles}, nil
 }
 
 // Result reports what Restore had to undo.
@@ -67,7 +89,7 @@ func Take(ctx context.Context, worktree string) (Snapshot, error) {
 // attempted even when one fails; the failures are joined and returned so the
 // caller reports each by name.
 func (s Snapshot) Restore(ctx context.Context) (Result, error) {
-	after, err := writeTree(ctx, s.Worktree)
+	after, err := writeTreeMode(ctx, s.Worktree, s.mode)
 	if err != nil {
 		return Result{}, err
 	}
@@ -162,23 +184,37 @@ func pruneEmptyParents(root, dir string) {
 // ignore rules respected — into a tree object via a throwaway index seeded
 // from the real one (so only changed paths are re-hashed).
 func writeTree(ctx context.Context, worktree string) (string, error) {
+	return writeTreeMode(ctx, worktree, allFiles)
+}
+
+func writeTreeMode(ctx context.Context, worktree string, mode snapshotMode) (string, error) {
 	tmp, err := os.MkdirTemp("", "treefence-index-*")
 	if err != nil {
 		return "", fmt.Errorf("treefence: temp index: %w", err)
 	}
 	defer func() { _ = os.RemoveAll(tmp) }()
 	index := filepath.Join(tmp, "index")
-	if real, err := git(ctx, worktree, nil, "rev-parse", "--git-path", "index"); err == nil {
+	real, indexErr := git(ctx, worktree, nil, "rev-parse", "--git-path", "index")
+	if indexErr == nil {
 		realPath := strings.TrimSpace(real)
 		if !filepath.IsAbs(realPath) {
 			realPath = filepath.Join(worktree, realPath)
 		}
-		if data, rerr := os.ReadFile(realPath); rerr == nil {
-			_ = os.WriteFile(index, data, 0o644) // best-effort seed; an empty index only costs time
+		var data []byte
+		data, indexErr = os.ReadFile(realPath)
+		if indexErr == nil {
+			indexErr = os.WriteFile(index, data, 0o644)
 		}
 	}
+	if mode == trackedFiles && indexErr != nil {
+		return "", fmt.Errorf("treefence: tracked snapshot requires a complete real-index seed: %w", indexErr)
+	}
 	env := []string{"GIT_INDEX_FILE=" + index}
-	if _, err := git(ctx, worktree, env, "add", "-A", "--", "."); err != nil {
+	addMode := "-A"
+	if mode == trackedFiles {
+		addMode = "-u"
+	}
+	if _, err := git(ctx, worktree, env, "add", addMode, "--", "."); err != nil {
 		return "", err
 	}
 	out, err := git(ctx, worktree, env, "write-tree")

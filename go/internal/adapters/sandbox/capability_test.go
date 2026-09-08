@@ -52,10 +52,9 @@ func TestMeasureCapability_FailureReasonSurfaced(t *testing.T) {
 	}
 }
 
-// TestShouldWrap_CapabilityIsSubtractive — capability only DEMOTES a would-be
-// wrap to skip (the broken-standalone hang), never PROMOTES a nested skip to a
-// wrap. Non-regression invariant: new_wrap ⟹ old_wrap.
-func TestShouldWrap_CapabilityIsSubtractive(t *testing.T) {
+// TestShouldWrap_MeasuredCapability governs attempts to apply the full profile;
+// a session hint cannot overrule a successful measurement.
+func TestShouldWrap_MeasuredCapability(t *testing.T) {
 	base := func(os string) ProbeResult { return ProbeResult{OS: os, Available: true, BinaryPath: "/usr/bin/sb"} }
 	capable := func(pr ProbeResult) ProbeResult { pr.CapabilityChecked = true; pr.Capable = true; return pr }
 	incapable := func(pr ProbeResult) ProbeResult { pr.CapabilityChecked = true; pr.Capable = false; return pr }
@@ -72,10 +71,9 @@ func TestShouldWrap_CapabilityIsSubtractive(t *testing.T) {
 		{"standalone linux + measured incapable → skip", false, incapable(base("linux")), false},
 		// standalone + measured-capable → wrap (confirmed-confined path).
 		{"standalone darwin + measured capable → wrap", false, capable(base("darwin")), true},
-		// Subtractive guarantee: nested + measured-capable must STILL skip —
-		// capability never promotes a nested skip to a wrap.
-		{"nested darwin + measured capable → still skip", true, capable(base("darwin")), false},
-		{"nested linux + measured capable → still skip", true, capable(base("linux")), false},
+		// A measured application succeeds despite a session hint.
+		{"nested darwin + measured capable → wrap", true, capable(base("darwin")), true},
+		{"nested linux + measured capable → wrap", true, capable(base("linux")), true},
 		// Backward-compat: unchecked capability (every caller before this slice)
 		// is unchanged — standalone + available → wrap.
 		{"standalone darwin + unchecked → wrap (unchanged)", false, base("darwin"), true},

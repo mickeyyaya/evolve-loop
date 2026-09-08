@@ -20,8 +20,8 @@ import "strings"
 // Centralizing both here removes the duplication and makes the two consumers
 // agree by construction.
 
-// DetectNested reports whether we are running inside an outer LLM CLI sandbox
-// session. Any known managed-sandbox signal counts, EXCEPT that
+// DetectNested reports a possible nested LLM CLI session, not measured sandbox
+// capability or proof of outer confinement. Known session signals count, EXCEPT that
 // CLAUDECODE_TYPE=host marks the top-level host process (which is not
 // nested-under-another-sandbox and so can confine its children).
 //
@@ -43,49 +43,35 @@ func DetectNested(getenv func(string) string) bool {
 	return false
 }
 
-// ShouldWrap is the single wrap-policy decision: should a source-writing phase
-// launch be wrapped in the inner OS sandbox, given the nested-sandbox signal and
-// the host probe? It returns (wrap, reason) where reason is always non-empty so
-// callers can surface it (the bridge WARNs it for EVOLVE_SANDBOX=on; preflight
-// records it).
-//
-// Policy: wrap IFF the OS is supported AND a sandbox binary is available AND we
-// are NOT nested. The nested exclusion is universal (not OS-specific and not
-// mode-specific): under an outer LLM CLI sandbox session the inner sandbox is both
-// redundant (the outer session already imposes OS sandbox + Tier-1 hooks) and,
-// on macOS, non-functional (sandbox_apply() returns EPERM and the REPL never
-// boots). When !nested, capability collapses to availability — the host can't
-// be a working-but-nested case — so this single predicate matches preflight's
-// richer ExpectedToWork report in every reachable cell.
 // ConfinementSatisfied is the single home of the fail-closed confinement
 // decision for a source-writing phase whose profile REQUIRES sandboxing but
 // whose inner wrap did not apply (the Specification the bridge evaluates and
 // preflight displays — docs/architecture/sandbox-confinement-ssot.md chose
 // this package as the seam). Three cells:
 //
-//	nested        → satisfied: the outer LLM-CLI session is the only remaining
-//	                confinement; honesty note — it is UNVERIFIED unless the
-//	                sandbox.nested_fallback canary verifies it (and under
-//	                bypass-permissions Claude it does not confine writes).
-//	mode == "off" → satisfied via explicit host opt-out; optOut=true so the
-//	                caller surfaces it LOUDLY (the phase runs unconfined).
-//	otherwise     → NOT satisfied — the genuine violation; fail closed.
+//	mode == "off" → explicit host opt-out; optOut=true, never verified confinement.
+//	otherwise     → NOT satisfied, including unverified nested environments.
+//
+// A sampled parent-directory write denial cannot prove the requested profile's
+// read and write policy; the optional preflight canary does not waive this gate.
 func ConfinementSatisfied(nested bool, mode string) (ok, optOut bool, reason string) {
-	if nested {
-		return true, false, "nested LLM-CLI session: inner sandbox unavailable by design; the outer session is the only remaining confinement and is UNVERIFIED unless the sandbox.nested_fallback canary verifies it"
-	}
 	if strings.TrimSpace(mode) == "off" {
 		return true, true, "EVOLVE_SANDBOX=off: host opt-out honoured — the phase runs UNCONFINED despite the sandbox requirement"
+	}
+	if nested {
+		return false, false, "nested LLM-CLI session: inner sandbox unavailable; outer session is UNVERIFIED and does not satisfy mandatory profile restrictions"
 	}
 	return false, false, "inner sandbox required but unavailable"
 }
 
+// ShouldWrap decides whether to attempt the actual profile wrapper. A measured
+// capability outranks session hints; an unchecked nested hint remains refused.
+// Success here does not authorize an unwrapped launch or attest an outer sandbox.
 func ShouldWrap(nested bool, probe ProbeResult) (bool, string) {
 	switch probe.OS {
 	case "darwin", "linux":
-		// supported
 	default:
-		return false, "no sandbox impl for GOOS=" + probe.OS
+		return false, "Unsupported OS: " + probe.OS + " — no sandbox implementation"
 	}
 	if !probe.Available {
 		reason := probe.Reason
@@ -94,23 +80,18 @@ func ShouldWrap(nested bool, probe ProbeResult) (bool, string) {
 		}
 		return false, reason
 	}
-	if nested {
-		return false, "nested LLM-CLI sandbox: outer OS sandbox + Tier-1 hooks already confine; inner sandbox redundant (and on macOS sandbox_apply() returns EPERM, hanging REPL boot)"
-	}
-	// Subtractive capability gate: a MEASURED-incapable sandbox (binary present
-	// but sandbox_apply fails — e.g. a broken/SIP-weird standalone host) must NOT
-	// be wrapped, because wrapping it hangs the REPL boot (exit 80). This is the
-	// only behavioral delta vs the legacy guess, and it is strictly subtractive:
-	// it can only demote a would-be wrap to skip (the nested skip above already
-	// guarantees capability never PROMOTES a nested skip to a wrap), so
-	// new_wrap ⟹ old_wrap. An UNCHECKED probe (CapabilityChecked=false) keeps
-	// the legacy behavior byte-identical.
-	if probe.CapabilityChecked && !probe.Capable {
+	if probe.CapabilityChecked {
+		if probe.Capable {
+			return true, "measured: sandbox applies; inner profile confinement enabled"
+		}
 		reason := probe.Reason
 		if reason == "" {
-			reason = "sandbox binary present but sandbox_apply failed"
+			reason = "sandbox application failed"
 		}
-		return false, "measured: " + reason + " — inner sandbox not applicable here"
+		return false, "measured: " + reason + " — inner sandbox unavailable"
+	}
+	if nested {
+		return false, "nested LLM-CLI hint with unmeasured capability; outer confinement UNVERIFIED"
 	}
 	return true, "standalone host with available sandbox binary: inner confinement enabled"
 }

@@ -33,6 +33,9 @@ import (
 // adding a field here — retry_opts_parity_test.go pins the set by reflection, so
 // a hook that skips this struct fails the build's test suite.
 type retryOpts struct {
+	// quotaExhausted classifies an all-family pause only for dispatch paths
+	// whose caller writes the corresponding durable quota checkpoint.
+	quotaExhausted func(attemptExits []int) bool
 	// backfill attempts to reconstruct a phase's artifact from the driver's
 	// stdout after an ErrArtifactTimeout exhaustion. Returns the synthesized
 	// response and true when it recovered the phase.
@@ -56,6 +59,7 @@ type retryOpts struct {
 // recover from" has exactly one enumeration.
 func (cr *cycleRun) mainDispatchRetryOpts() retryOpts {
 	return retryOpts{
+		quotaExhausted:       allFamiliesQuotaExhausted,
 		backfill:             cr.backfillExhaustedArtifact,
 		optionalInfraSkip:    func(p Phase, err error) bool { return cr.o.optionalInfraSkip(p, err) },
 		postShipObserverSkip: func(p Phase) bool { return cr.o.postShipObserverSkip(p, cr.shipped) },
@@ -69,6 +73,8 @@ func (cr *cycleRun) mainDispatchRetryOpts() retryOpts {
 //     concurrently — artifact reconstruction stays on the serial path;
 //   - shipRecovery: an evaluate batch never contains ship, and the recovery
 //     mutates cycleRun control flow that this path contracts not to touch.
+//   - quotaExhausted: the batch has no resumable partial-batch checkpoint;
+//     retain its existing optional-skip / mandatory-error disposition.
 //
 // The nil fields ARE the documentation: this path's divergence from the
 // reference set is declared, not accidental.
@@ -161,6 +167,7 @@ func (cr *cycleRun) retryPhaseRunner(phase Phase, req PhaseRequest, opts retryOp
 	runner := cr.o.runners[phase]
 	var resp PhaseResponse
 	var err error
+	var attemptExits []int
 	for attempt := 1; ; attempt++ {
 		obsCancel := cr.o.observer.Start(cr.ctx, string(phase), req)
 		resp, err = runner.Run(cr.ctx, req)
@@ -171,7 +178,11 @@ func (cr *cycleRun) retryPhaseRunner(phase Phase, req PhaseRequest, opts retryOp
 			return resp, attempt, nil
 		}
 		if err != nil {
+			attemptExits = append(attemptExits, bridgeExitCode(err))
 			if attempt >= maxAttempts || !IsInfraTeardownError(err) {
+				if opts.quotaExhausted != nil && opts.quotaExhausted(attemptExits) {
+					return resp, attempt, fmt.Errorf("phase %s: %w", phase, ErrAllFamiliesExhausted)
+				}
 				// Hook order mirrors the sequential loop: reconstruct the
 				// artifact if possible, else degrade an optional off-floor
 				// phase, else degrade a best-effort post-ship observer.

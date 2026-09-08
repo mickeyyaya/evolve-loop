@@ -19,8 +19,8 @@ func TestConfinementSatisfied(t *testing.T) {
 		wantOptOut   bool
 		reasonNeedle string
 	}{
-		{"nested satisfies with unverified-outer honesty", true, "", true, false, "UNVERIFIED"},
-		{"nested wins even with mode off", true, "off", true, false, "outer session"},
+		{"nested is unverified and fails closed", true, "", false, false, "UNVERIFIED"},
+		{"nested explicit opt-out", true, "off", true, true, "UNCONFINED"},
 		{"explicit opt-out satisfies loudly", false, "off", true, true, "UNCONFINED"},
 		{"opt-out tolerates whitespace", false, " off ", true, true, "EVOLVE_SANDBOX=off"},
 		{"unavailable fails closed", false, "", false, false, "required but unavailable"},

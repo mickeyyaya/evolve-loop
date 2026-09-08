@@ -1,10 +1,12 @@
 # Evolve Loop
 
+Current guarantees and supported modes: [runtime contract](docs/architecture/current-runtime-contract.md).
+
 **An autonomous pipeline that improves your codebase across many cycles — and structurally detects when the AI tries to fake the result.**
 
 > **The pitch, in one sentence:** Any agent can write a feature overnight. Evolve Loop is the layer that decides whether that code is *safe to merge* — adversarially, structurally, and with memory that compounds across runs.
 
-The mental model is **CI/CD for AI-written code**. You hand it a goal — "add dark mode," "harden the auth flow," "pay down concurrency debt" — and, optionally, a number of cycles; leave the count off and the advisor decides how many the work needs. It runs unattended: it finds the work, plans it, writes it, has a *different* model adversarially review it, ships only what passes deterministic checks, and turns every failure into a durable lesson the next cycle reads automatically.
+The mental model is **CI/CD for AI-written code**. You hand it a goal — "add dark mode," "harden the auth flow," "pay down concurrency debt" — and, optionally, a number of cycles; leave the count off and the advisor decides how many the work needs. It runs unattended: it finds the work, plans it, writes it, has an audit agent adversarially review it, ships only what passes deterministic checks, and records failures as durable lessons and retrieves relevant lessons for later phases.
 
 Over 1,300 autonomous cycles in, the trust layer is structural, not aspirational: **typed routing authority** keeps operator-owned control-plane work out of autonomous lanes entirely (ADR-0074); a **build handoff floor** rejects a red build before it ever reaches review; **graduated remediation** fixes a correct implementation's minor defect in-phase instead of discarding the work; and a **failure-disposition contract** classifies every failed cycle — honest rejection, pipeline fault, or operator-owned — and routes it where it can actually be fixed. The full evidence trail lives in [docs/research/lessons-and-resolutions-2026-07.md](docs/research/lessons-and-resolutions-2026-07.md).
 
@@ -14,7 +16,7 @@ The entire external surface is small enough to list — everything else the loop
 
 **What you control:**
 
-- **One command**: `/evo:loop "add dark mode"` — optionally a strategy (`harden · repair · innovate · balanced`), a hard cycle bound (`--cycles N`), or `--resume` to pick a checkpointed run up exactly where it stopped.
+- **One command**: `/evo:loop "add dark mode"` — optionally a strategy (`harden · repair · innovate · balanced`), a hard cycle bound (`--cycles N`), or `--resume` to resume from a validated durable phase boundary.
 - **The backlog**: drop JSON todos into `.evolve/inbox/` — `weight` sets priority, `route` sets ownership (`"console-manual"` marks an item operator-owned so autonomous lanes structurally cannot draw it; `"lane"` overrides a false positive). Routing is enforced plumbing, not a prompt suggestion.
 - **Policy, not code**: `.evolve/policy.json` — fleet width (`fleet.count`), gate stages, budgets, model-tier pins. Zero feature flags.
 - **Per-phase model routing**: `--cli` / `--model` per agent when you want to pin who does what.
@@ -25,10 +27,10 @@ The entire external surface is small enough to list — everything else the loop
 
 - Finds and scopes the work (scout → triage), batches related backlog items into one cycle, and re-weights recurring pain automatically.
 - Routes each phase to the right model and CLI, detects quota exhaustion from the real provider surface, and fails over across model families mid-run.
-- Writes failing tests before code, self-verifies the build at handoff (a red build never reaches review), and has a *different* model adversarially audit the result.
+- Writes failing tests before code, self-verifies the build at handoff (a red build never reaches review), and has an audit agent adversarially review the result.
 - Ships only through deterministic gates — and when a correct implementation carries one minor gate defect, repairs it in-phase instead of discarding the work.
-- Classifies every failure (honest rejection / pipeline fault / operator-owned), salvages the preserved worktree so effort is never wasted, quarantines poison tasks that can't pass, and files the follow-up work into its own backlog.
-- Checkpoints every phase boundary so `--resume` always works, recovers orphaned state after crashes, and turns every failure into a durable lesson the next cycle reads.
+- Classifies every failure (honest rejection / pipeline fault / operator-owned), preserves worktrees for supported continuation and operator salvage, quarantines poison tasks that can't pass, and files the follow-up work into its own backlog.
+- Checkpoints phase boundaries, validates identity on resume, preserves recoverable work after interruptions, and retrieves relevant durable lessons for later phases.
 
 It works with four CLI families — Claude Code, Codex CLI, Antigravity (agy), and local models via Ollama — and can route a different LLM to each stage of the work.
 
@@ -77,7 +79,7 @@ Start with just a goal. Reach for a flag only when you want more control — eac
 ```bash
 /evo:loop --cycles 3 "add dark mode"
 ```
-> *Behind the scenes:* `--cycles N` is a **contract** — exactly N cycles, never early-stopped. Omit it (step 1) and the advisor decides the count instead.
+> *Behind the scenes:* `--cycles N` is a **contract** — N requested cycles, subject to integrity halts and interruption. Omit it (step 1) and the advisor decides the count instead.
 
 **4 · Control the models** with a one-time setup:
 
@@ -85,14 +87,14 @@ Start with just a goal. Reach for a flag only when you want more control — eac
 /evo:setup                          # pick a preset once
 /evo:loop "harden the auth flow"
 ```
-> *Behind the scenes:* setup writes **per-phase model routing** to `.evolve/policy.json` — e.g. Build on Codex/GPT-5.5 and Audit on Claude/Opus, deliberately **different model families so the reviewer can't rubber-stamp the builder**. Every later run uses it.
+> *Behind the scenes:* setup writes **per-phase model routing** to `.evolve/policy.json` — e.g. Build on Codex/GPT-5.5 and Audit on Claude/Opus, with different model families when available. Family diversity is a routing preference; it does not guarantee independent judgment.
 
 **5 · Resume** a run that was interrupted:
 
 ```bash
 /evo:loop --resume
 ```
-> *Behind the scenes:* a checkpoint (e.g. a quota wall mid-cycle) is picked up **exactly where it stopped** — the worktree and cycle state are restored, no work lost.
+> *Behind the scenes:* a checkpoint (e.g. a quota wall mid-cycle) resumes from the latest durable phase boundary after identity validation. An interrupted phase may run again.
 
 A hands-on walkthrough of your first cycle: [docs/getting-started/your-first-cycle.md](docs/getting-started/your-first-cycle.md).
 
@@ -139,7 +141,7 @@ The industry's default answer is "ask another LLM if it looks done." That judge 
 
 Evolve Loop is built around that exact failure. Two things make it different from a normal CI run or a single-agent loop:
 
-- **The reviewer is a different model family from the author**, and it's prompted to *refute* the work, not bless it.
+- **The reviewer can use a different model family from the author**, and is prompted to challenge the work. Family separation is a routing preference, subject to available providers and failover.
 - **The merge gate is deterministic code, not a model's opinion.** The verdict is a set of executable checks whose exit codes *are* the decision. The model can write eloquent prose all day; nothing ships unless the checks come back green.
 
 ---
@@ -150,7 +152,7 @@ If you only read one section, read this. These are the things Evolve Loop is bui
 
 - **Accomplish long, multi-step work by splitting it into isolated phases.** A big task that would overwhelm one prompt is decomposed into a fixed spine of small, independent stages — each with one job, its own context, and a single artifact it must produce. Complexity is bounded per phase, not per task.
 - **Catch the AI gaming its own success criteria.** Adversarial cross-family review, deterministic verdicts, mutation testing that rejects fake tests, and a tamper-evident ledger together make "lie about being done" structurally hard — not just discouraged by a prompt.
-- **Get smarter every run.** Failures are distilled into lesson files that are fed back into the next cycle's planning. Mistakes don't repeat; the system compounds.
+- **Get smarter every run.** Failures are distilled into lesson files that are fed back into the next cycle's planning. Recall helps later attempts avoid known failures; reduced recurrence must be measured.
 - **Survive long unattended runs.** Quota walls, rate limits, and context-window failures are expected. Work in flight is checkpointed and resumable rather than discarded.
 - **Stay vendor-flexible.** Route Scout to Antigravity's Gemini, the builder to Claude Sonnet, the auditor to Claude Opus — whatever mix you trust, including local models via Ollama — without changing the pipeline.
 - **Run lean on context.** Each phase boots with only the context it needs — the redundant tool schemas, MCP servers, skills, and repo instructions that every turn silently re-reads are stripped per phase (config-injected, no code changes). Measured **~39% fewer context tokens per cycle**, so long unattended runs cost less and hit context walls later. Full record: [token-optimization campaign](docs/research/token-optimization-2026/part5-campaign-implementation-2026-07-17.md).
@@ -159,7 +161,7 @@ It is **not** a benchmark-chasing code-writing agent. It's the governance and tr
 
 ---
 
-## How it works: isolated phases, artifacts as the only interface
+## How it works: isolated phases and validated artifacts
 
 Every cycle runs the same spine of phases:
 
@@ -179,24 +181,24 @@ INTENT → SCOUT → TRIAGE → [PLAN-REVIEW] → [TDD] → BUILD → AUDIT → 
 
 The important part isn't the list of phases — it's how they're wired together.
 
-**Phases communicate only through artifacts.** Each phase reads the file(s) the previous phase wrote and writes exactly one output file for the next. Intent writes a spec; Scout reads it and writes a report; the builder reads that and writes a build report plus the check suite; the auditor reads those and writes a verdict. There is no shared mutable state a phase can reach into, no hidden channel, no "the model just remembers." If it isn't in the artifact, the next phase doesn't see it.
+**Phases receive explicit context and artifacts.** The host assembles goals, task contracts, relevant lessons, and upstream outputs. Phases can produce several reports and sidecars; durable state and the ledger record execution and recovery.
 
-**Each phase runs in isolation.** It gets its own context window, can run on its own model, and — for the agents that write code — its own git worktree on a throwaway branch. A phase can't see another phase's scratch work, can't edit files outside its lane, and can't reach forward or backward in the pipeline. This is what makes long tasks tractable: every stage is a small, well-scoped problem with a defined input and a defined output, not a sprawling conversation that drifts as it grows.
+**Phase processes use scoped access.** Code-writing cycles have dedicated git worktrees. Supported OS profiles enforce declared filesystem restrictions while permitting required workspace, scratch, and CLI state access. These capabilities vary by platform and transport; see the [runtime contract](docs/architecture/current-runtime-contract.md).
 
-**The phases can't be skipped or reordered.** Phase ordering, write-path scoping, and the ship gate are enforced by the runtime at the OS layer — not by asking the model nicely in a prompt. A model can be wrong, biased, or actively adversarial, but it cannot reorder phases, write outside its worktree, or ship without a green verdict, because those aren't instructions; they're code.
+**The host owns phase order and shipping checks.** The Go state machine enforces the required spine. Ship checks host-bound audit evidence for the cycle, run, round, and tested tree. Host-rejected audits cannot authorize shipping through a narrative PASS. OS confinement is a separate boundary with explicit unsupported and opt-out states.
 
 That last point is the whole design philosophy in one line: **LLMs do the qualitative work; deterministic code owns every gate.** Deciding *what* to build, *how* to build it, and *what looks wrong* are judgment calls only a model does well. Phase ordering, scope enforcement, the ship verdict, and the audit trail are mechanical — so they live in code, where the model gets no vote.
 
 ### A cycle, end to end
 
-Say you run `/evo:loop --cycles 1 "make the export endpoint resilient to large payloads."` Each step below reads only the artifact the step before it produced:
+Say you run `/evo:loop --cycles 1 "make the export endpoint resilient to large payloads."` The phases use the goal, selected task contract, code, and upstream evidence:
 
 - **Intent** restates the goal as a spec — and pushes back: *is "large" 10 MB or 10 GB? Is streaming acceptable, or must the response stay synchronous?* It records the assumptions it's proceeding on.
 - **Scout** reads the spec, traces the endpoint through the codebase, notices the current in-memory buffering, and proposes a fix.
 - **Triage** decides the streaming rewrite is in scope for this cycle, and defers the unrelated retry-logic cleanup it also spotted.
 - **TDD** writes failing tests first: a 2 GB payload must not exhaust memory; the response must stay correct.
-- **Build**, in its own throwaway worktree, implements streaming until those tests pass — and can touch nothing outside its lane.
-- **Audit**, on a different model family, tries to *break* it: edge cases, regressions, and whether those tests actually test anything. Then it runs the check suite.
+- **Build**, in its own throwaway worktree, implements streaming until those tests pass, within the supported filesystem policy.
+- **Audit**, preferably on a different model family, tries to *break* it: edge cases, regressions, and whether those tests actually test anything. Then it runs the check suite.
 - **Ship** sees a green verdict and commits. (A red verdict routes the cycle to a retrospective instead of merging.)
 - **Learn** records what carried over for next time.
 
@@ -208,19 +210,15 @@ No step takes the previous step's *word* for anything — it reads the file. Tha
 
 The threat isn't a malicious human. It's the LLM doing what LLMs do under pressure to look successful: confabulating "looks done" verdicts, hallucinating evidence, and taking the path of least resistance to a green checkmark. Evolve Loop answers this structurally, in three layers.
 
-### Layer 1 — Structural integrity (always on, no bypass)
+### Layer 1 — Host integrity checks
 
-Three guards sit between the agents and anything irreversible:
+The Go state machine owns required phase order, and the sanctioned Ship path validates the host-bound audit before accepting a cycle commit. CLI hooks provide additional phase, role, and shipping checks where the transport supports them. Read-only phase fences detect and restore source changes after execution; prevention depends on the applied OS policy.
 
-- **Phase guard** — blocks out-of-order or skipped phases.
-- **Role guard** — blocks any write outside the current phase's allowed paths (the builder can't edit the gates that grade it; the auditor can't touch source at all — its repo is mounted read-only).
-- **Ship guard** — blocks any commit or push that didn't go through the sanctioned ship path with a green verdict.
-
-Behind them is a **tamper-evident ledger**: an append-only log where each entry hashes the previous one. Altering any past entry breaks every hash after it, so the cycle's history can't be quietly rewritten. This layer has no off switch.
+The hash-chained ledger makes changes to recorded history detectable by verification. Operator bypasses, recovery anchors, and confinement opt-outs are explicit administrative paths, described in the [trust contract](docs/concepts/trust-architecture.md).
 
 ### Layer 2 — OS isolation
 
-Every model subprocess can run inside an OS sandbox (`sandbox-exec` on macOS, `bwrap` on Linux), and read-only roles get the repo bind-mounted read-only. Each building cycle gets its own git worktree on a temporary branch, so one cycle's edits can't leak into another's.
+Profiles can require OS confinement. The current macOS implementation supports the linked-worktree policy; Linux bubblewrap cannot currently express its required Git metadata writes narrowly enough and refuses mandatory linked-worktree launches. Read and write denials are distinct controls. See [supported isolation capabilities](docs/architecture/recovery-isolation-policy.md) for tested behavior and limits.
 
 ### Layer 3 — Anti-gaming workflow defaults
 
@@ -228,7 +226,7 @@ This is where the actual *detection* of gaming lives. Each default targets a spe
 
 | How an AI fakes success | How Evolve Loop catches it |
 |---|---|
-| **Self-preference / sibling bias** — a judge sharing the author's model family shares its blind spots and rubber-stamps. | The auditor runs on a **different model family** from the builder, and is told to refute rather than approve. |
+| **Self-preference / sibling bias** — a judge sharing the author's model family shares its blind spots and rubber-stamps. | Setup and routing prefer a different model family when available; the auditor is instructed to seek counterexamples. This is a preference, not a hard family invariant. |
 | **Style over substance** — judges reward confident, verbose, well-formatted prose. | The ship verdict is **not prose**. It's the exit codes of an executable check suite. Eloquence earns nothing. |
 | **Tautological tests** — the agent writes a check that can't fail (`echo PASS`, assert-true, grep-for-its-own-output). | **Mutation testing** rejects checks that still pass when the code is deliberately broken. |
 | **Compounding hallucination** — fake code *and* fake tests reinforce each other. | Tests are written **before** the code, by a **separate agent**, so the implementer can't author its own bar. |

@@ -12,6 +12,7 @@ package ship
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -20,10 +21,12 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/acssuite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/treefence"
 	"github.com/mickeyyaya/evolve-loop/go/internal/treestate"
 )
 
@@ -53,37 +56,9 @@ func verifyAuditBinding(ctx context.Context, opts *Options, res *RunResult) erro
 		return err
 	}
 
-	// 4. Exit code: 0|1 ok, 2+ is true error.
-	switch entry.ExitCode {
-	case 0, 1:
-		// fall through
-	default:
-		return shipErr(core.CodeAuditBindingAuditorExit, core.ShipClassPrecondition, core.StageVerifyClass,
-			fmt.Sprintf("most recent Auditor exited %d (error state — not a Unix-convention findings signal)", entry.ExitCode),
-			"auditor_exit_code", fmt.Sprintf("%d", entry.ExitCode))
-	}
-
-	// 4. Artifact existence + SHA.
-	if _, err := os.Stat(entry.ArtifactPath); err != nil {
-		return shipErr(core.CodeAuditBindingArtifactMissing, core.ShipClassPrecondition, core.StageVerifyClass,
-			"audit-report.md missing on disk: "+entry.ArtifactPath, "artifact_path", entry.ArtifactPath)
-	}
-	actualSHA, err := sha256File(entry.ArtifactPath)
+	body, err := readAuditArtifact(entry)
 	if err != nil {
-		return shipErr(core.CodeStateIO, core.ShipClassTransient, core.StageVerifyClass,
-			"ship: SHA audit-report.md: "+err.Error(), "artifact_path", entry.ArtifactPath)
-	}
-	if actualSHA != entry.ArtifactSHA256 {
-		return shipErr(core.CodeAuditBindingArtifactSHA, core.ShipClassPrecondition, core.StageVerifyClass,
-			fmt.Sprintf("audit-report.md SHA mismatch (ledger=%s actual=%s) — artifact mutated post-audit", entry.ArtifactSHA256, actualSHA),
-			"ledger_sha", entry.ArtifactSHA256, "actual_sha", actualSHA, "artifact_path", entry.ArtifactPath)
-	}
-
-	// 4b. Verdict parse with dual-verdict detection (v8.30.0).
-	body, err := os.ReadFile(entry.ArtifactPath)
-	if err != nil {
-		return shipErr(core.CodeStateIO, core.ShipClassTransient, core.StageVerifyClass,
-			"ship: read audit-report.md: "+err.Error(), "artifact_path", entry.ArtifactPath)
+		return err
 	}
 	pass, warn, fail := parseVerdicts(string(body), opts.PhaseIO)
 
@@ -127,17 +102,17 @@ func verifyAuditBinding(ctx context.Context, opts *Options, res *RunResult) erro
 		opts.internalAuditBoundTreeSHA = strings.TrimSpace(strings.Trim(m[1], "`"))
 	}
 
-	// 4c. EGPS predicate gate (acs-verdict.json:red_count == 0).
-	egpsPath := filepath.Join(filepath.Dir(entry.ArtifactPath), "acs-verdict.json")
-	if err := checkEGPSGate(egpsPath, res); err != nil {
-		return err
-	}
-
 	// 5. Cycle binding: current HEAD/tree must match ledger entry.
 	if entry.GitHEAD == "" || entry.TreeStateSHA == "" {
 		return shipErr(core.CodeAuditBindingNoLedger, core.ShipClassPrecondition, core.StageVerifyClass,
 			"Auditor ledger entry predates v8.13.0 cycle-binding (no git_head/tree_state_sha) — re-run audit")
 	}
+	// The report SHA above binds the host receipt. The mutable verdict must
+	// match its exact execution identity and bytes before it can authorize ship.
+	if err := verifyPredicateReceipt(opts, entry, string(body), res); err != nil {
+		return err
+	}
+
 	currentHEAD, err := captureGitOutput(ctx, opts, "rev-parse", "HEAD")
 	if err != nil {
 		return err
@@ -169,6 +144,16 @@ func verifyAuditBinding(ctx context.Context, opts *Options, res *RunResult) erro
 				"uncommitted changes have been added since audit (tree-state mismatch) — re-run Auditor",
 				"audited_tree", entry.TreeStateSHA, "current_tree", currentTree)
 		}
+	}
+
+	testedRoot := opts.ActiveWorktree
+	if testedRoot == "" {
+		testedRoot = opts.ProjectRoot
+	}
+	currentExecution, err := treefence.Take(ctx, testedRoot)
+	if err != nil || currentExecution.Tree != entry.WorktreeTreeSHA {
+		return shipErr(core.CodeAuditBindingTreeMismatch, core.ShipClassPrecondition, core.StageVerifyClass,
+			fmt.Sprintf("predicate execution tree-state mismatch or unavailable after Audit (audited=%s current=%s error=%v); re-run Audit", entry.WorktreeTreeSHA, currentExecution.Tree, err), "audited_tree", entry.WorktreeTreeSHA, "current_tree", currentExecution.Tree)
 	}
 
 	// 6. Freshness (7d cap when cycle-bound).
@@ -321,32 +306,77 @@ func hasVerdict(body, verdict string) bool {
 	return headingVerdictRe[verdict].MatchString(body)
 }
 
-// checkEGPSGate enforces acs-verdict.json:red_count == 0 when the file
-// exists. Missing file is a pre-v10.0.0 bootstrap (no predicates yet) —
-// fluent posture from audit-report.md still applies.
-func checkEGPSGate(path string, res *RunResult) error {
+// readAuditArtifact checks the exact bytes consumed below, avoiding a second
+// read between SHA verification and interpretation.
+func readAuditArtifact(entry *auditEntry) ([]byte, error) {
+	// 4. Exit code: 0|1 ok, 2+ is true error.
+	switch entry.ExitCode {
+	case 0, 1:
+		// fall through
+	default:
+		return nil, shipErr(core.CodeAuditBindingAuditorExit, core.ShipClassPrecondition, core.StageVerifyClass,
+			fmt.Sprintf("most recent Auditor exited %d (error state — not a Unix-convention findings signal)", entry.ExitCode),
+			"auditor_exit_code", fmt.Sprintf("%d", entry.ExitCode))
+	}
+
+	body, err := os.ReadFile(entry.ArtifactPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, shipErr(core.CodeAuditBindingArtifactMissing, core.ShipClassPrecondition, core.StageVerifyClass,
+				"audit-report.md missing on disk: "+entry.ArtifactPath, "artifact_path", entry.ArtifactPath)
+		}
+		return nil, shipErr(core.CodeStateIO, core.ShipClassTransient, core.StageVerifyClass,
+			"ship: read audit-report.md: "+err.Error(), "artifact_path", entry.ArtifactPath)
+	}
+	actualSHA := fmt.Sprintf("%x", sha256.Sum256(body))
+	if actualSHA != entry.ArtifactSHA256 {
+		return nil, shipErr(core.CodeAuditBindingArtifactSHA, core.ShipClassPrecondition, core.StageVerifyClass,
+			fmt.Sprintf("audit-report.md SHA mismatch (ledger=%s actual=%s) — artifact mutated post-audit", entry.ArtifactSHA256, actualSHA),
+			"ledger_sha", entry.ArtifactSHA256, "actual_sha", actualSHA, "artifact_path", entry.ArtifactPath)
+	}
+	return body, nil
+}
+
+func verifyPostPushPredicateEvidence(ctx context.Context, opts *Options, res *RunResult, commit string) error {
+	entry, err := findLatestAudit(filepath.Join(opts.ProjectRoot, ".evolve", "ledger.jsonl"), opts.RunID)
+	if err != nil {
+		return err
+	}
+	body, err := readAuditArtifact(entry)
+	if err != nil {
+		return err
+	}
+	landedTree, err := captureGitOutput(ctx, opts, "rev-parse", commit+"^{tree}")
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(landedTree) != entry.WorktreeTreeSHA {
+		return shipErr(core.CodeAuditBindingTreeMismatch, core.ShipClassPrecondition, core.StageVerifyClass,
+			"landed commit differs from the host predicate execution tree; re-run Audit")
+	}
+
+	return verifyPredicateReceipt(opts, entry, string(body), res)
+}
+
+// checkEGPSGate refuses incomplete or internally contradictory evidence.
+func checkEGPSGate(path string, res *RunResult) ([]byte, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return nil
-		}
-		return shipErr(core.CodeStateIO, core.ShipClassTransient, core.StageVerifyClass,
-			"ship: read acs-verdict.json: "+err.Error(), "path", path)
+		return nil, shipErr(core.CodeAuditBindingMalformed, core.ShipClassPrecondition, core.StageVerifyClass,
+			"ship predicate evidence unavailable; re-run Audit: "+err.Error(), "path", path)
 	}
-	var v struct {
-		RedCount       int      `json:"red_count"`
-		GreenCount     int      `json:"green_count"`
-		SkipCount      int      `json:"skip_count"`
-		Verdict        string   `json:"verdict"`
-		RedIDs         []string `json:"red_ids"`
-		PredicateSuite struct {
-			Total int `json:"total"`
-		} `json:"predicate_suite"`
+	v, err := acssuite.ReadVerdict(raw)
+	if err != nil {
+		return nil, shipErr(core.CodeAuditBindingMalformed, core.ShipClassPrecondition, core.StageVerifyClass,
+			"ship predicate evidence invalid; re-run Audit: "+err.Error(), "path", path)
 	}
-	if err := json.Unmarshal(raw, &v); err != nil {
-		// Malformed acs-verdict.json: don't block (bash falls through silently).
-		return nil
+	if err := checkPredicateResult(v, res); err != nil {
+		return nil, err
 	}
+	return raw, nil
+}
+
+func checkPredicateResult(v acssuite.Verdict, res *RunResult) error {
 	if v.RedCount != 0 {
 		return shipErr(core.CodeEGPSRedCount, core.ShipClassPrecondition, core.StageVerifyClass,
 			fmt.Sprintf("EGPS predicate suite has %d RED predicate(s): %s (acs-verdict.json verdict=%s total=%d)",
@@ -356,6 +386,22 @@ func checkEGPSGate(path string, res *RunResult) error {
 	}
 	res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: EGPS predicate suite verdict=%s (green=%d skip=%d total=%d)", v.Verdict, v.GreenCount, v.SkipCount, v.PredicateSuite.Total))
 	return nil
+}
+
+func verifyPredicateReceipt(opts *Options, entry *auditEntry, report string, res *RunResult) error {
+	path := filepath.Join(filepath.Dir(entry.ArtifactPath), acssuite.VerdictFilename)
+	raw, err := checkEGPSGate(path, res)
+	if err != nil {
+		return err
+	}
+	_, err = acssuite.VerifyEvidence(report, raw, acssuite.EvidenceIdentity{
+		Cycle: opts.CycleID, RunID: opts.RunID, Round: opts.AuditRound, TreeSHA: entry.WorktreeTreeSHA,
+	})
+	if err == nil {
+		return nil
+	}
+	return shipErr(core.CodeAuditBindingMalformed, core.ShipClassPrecondition, core.StageVerifyClass,
+		"ship predicate evidence invalid; re-run Audit: "+err.Error(), "path", path)
 }
 
 // computeTreeStateSHA computes sha256(git diff HEAD) — the same

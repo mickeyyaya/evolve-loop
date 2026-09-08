@@ -99,6 +99,16 @@ type CarryoverTodo struct {
 
 // CycleState mirrors .evolve/cycle-state.json (transient per-cycle).
 type CycleState struct {
+	// FinalVerdict is the host's floor-gated disposition at the last completed
+	// phase. Post-audit resume must retain it rather than defaulting to PASS.
+	FinalVerdict string `json:"final_verdict,omitempty"`
+	// GoalHash and GoalText preserve the original request across quota pauses.
+	// Absent on legacy checkpoints; resume resolves those conservatively.
+	GoalHash string `json:"goal_hash,omitempty"`
+	GoalText string `json:"goal_text,omitempty"`
+	// PreCycleHEAD retains the closeout baseline when execution pauses after
+	// Ship. Capturing a new baseline on resume would lose that completed ship.
+	PreCycleHEAD    string   `json:"pre_cycle_head,omitempty"`
 	CycleID         int      `json:"cycle_id"`
 	Phase           string   `json:"phase"`
 	StartedAt       string   `json:"started_at"`

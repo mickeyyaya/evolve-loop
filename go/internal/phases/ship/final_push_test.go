@@ -438,6 +438,9 @@ func TestVerifyAuditBinding_EGPSGateReadError_PropagatesFromBinding(t *testing.T
 
 	// Create acs-verdict.json as a directory inside the cycle run dir.
 	acsPath := filepath.Join(repo, ".evolve", "runs", "cycle-1", "acs-verdict.json")
+	if err := os.Remove(acsPath); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.MkdirAll(acsPath, 0o755); err != nil {
 		t.Fatalf("mkdir acs-verdict: %v", err)
 	}

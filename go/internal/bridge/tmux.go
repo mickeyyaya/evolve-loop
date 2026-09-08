@@ -46,6 +46,12 @@ type PaneCommander interface {
 	PaneCommand(ctx context.Context, session string) (string, error)
 }
 
+// paneTTYReader identifies the newly created pane's terminal for an exact
+// macOS sandbox grant. Custom controllers need not supply this capability.
+type paneTTYReader interface {
+	paneTTY(context.Context, string) (string, error)
+}
+
 // execTmux is the production TmuxController — thin wrappers over the
 // tmux binary. Mirrors the exact invocations in drivers/claude-tmux.sh.
 type execTmux struct{}
@@ -220,6 +226,11 @@ func (t execTmux) KillSession(ctx context.Context, session string) error {
 // require-known-binary.
 func (t execTmux) PaneCommand(ctx context.Context, session string) (string, error) {
 	out, err := t.run(ctx, "display-message", "-p", "-t", session, "#{pane_current_command}")
+	return strings.TrimSpace(out), err
+}
+
+func (t execTmux) paneTTY(ctx context.Context, session string) (string, error) {
+	out, err := t.run(ctx, "display-message", "-p", "-t", session, "#{pane_tty}")
 	return strings.TrimSpace(out), err
 }
 

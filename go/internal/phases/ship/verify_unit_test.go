@@ -25,13 +25,11 @@ import (
 
 // --- checkEGPSGate -------------------------------------------------------
 
-// TestCheckEGPSGate_MissingFile is the pre-v10.0.0 bootstrap path: no
-// acs-verdict.json yet ⇒ gate is a no-op (fluent posture from the audit
-// report still applies). Must NOT error.
+// Missing evidence cannot authorize a new ship, including a historical cycle.
 func TestCheckEGPSGate_MissingFile(t *testing.T) {
 	res := &RunResult{}
-	if err := checkEGPSGate(filepath.Join(t.TempDir(), "acs-verdict.json"), res); err != nil {
-		t.Fatalf("missing file must be a soft no-op; got %v", err)
+	if _, err := checkEGPSGate(filepath.Join(t.TempDir(), "acs-verdict.json"), res); err == nil {
+		t.Fatal("missing predicate evidence must refuse ship")
 	}
 	if len(res.Logs) != 0 {
 		t.Errorf("missing file must not append logs; got %v", res.Logs)
@@ -41,14 +39,9 @@ func TestCheckEGPSGate_MissingFile(t *testing.T) {
 // TestCheckEGPSGate_RedCountZero is the clean-ship path: red_count==0
 // returns nil and appends a confirmation log line.
 func TestCheckEGPSGate_RedCountZero(t *testing.T) {
-	path := writeACSVerdict(t, map[string]any{
-		"red_count":       0,
-		"green_count":     12,
-		"verdict":         "PASS",
-		"predicate_suite": map[string]any{"total": 12},
-	})
+	path := writeACSVerdict(t, predicateVerdictFixture(1, 12, 0, 0))
 	res := &RunResult{}
-	if err := checkEGPSGate(path, res); err != nil {
+	if _, err := checkEGPSGate(path, res); err != nil {
 		t.Fatalf("red_count==0 must pass; got %v", err)
 	}
 	if len(res.Logs) == 0 || !strings.Contains(res.Logs[len(res.Logs)-1], "EGPS predicate suite verdict=PASS") {
@@ -61,15 +54,12 @@ func TestCheckEGPSGate_RedCountZero(t *testing.T) {
 // names the offending predicate IDs. This is the highest-value assertion
 // in this file.
 func TestCheckEGPSGate_RedCountNonZero(t *testing.T) {
-	path := writeACSVerdict(t, map[string]any{
-		"red_count":       2,
-		"green_count":     5,
-		"verdict":         "FAIL",
-		"red_ids":         []string{"pred-auth-leak", "pred-null-deref"},
-		"predicate_suite": map[string]any{"total": 7},
-	})
+	v := predicateVerdictFixture(1, 5, 2, 0)
+	v.RedIDs = []string{"pred-auth-leak", "pred-null-deref"}
+	v.Results[5].ACID, v.Results[6].ACID = v.RedIDs[0], v.RedIDs[1]
+	path := writeACSVerdict(t, v)
 	res := &RunResult{}
-	err := checkEGPSGate(path, res)
+	_, err := checkEGPSGate(path, res)
 	if err == nil {
 		t.Fatal("red_count>0 MUST block the ship — got nil error (trust-kernel breach)")
 	}
@@ -80,9 +70,7 @@ func TestCheckEGPSGate_RedCountNonZero(t *testing.T) {
 	}
 }
 
-// TestCheckEGPSGate_MalformedJSON mirrors the bash "fall through silently"
-// posture: a corrupt acs-verdict.json must NOT block the ship (the audit
-// report's verdict is the authoritative signal in that degraded case).
+// Corrupted predicate evidence must fail independently of the narrative report.
 func TestCheckEGPSGate_MalformedJSON(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "acs-verdict.json")
@@ -90,8 +78,8 @@ func TestCheckEGPSGate_MalformedJSON(t *testing.T) {
 		t.Fatalf("write: %v", err)
 	}
 	res := &RunResult{}
-	if err := checkEGPSGate(path, res); err != nil {
-		t.Fatalf("malformed JSON must be a soft no-op; got %v", err)
+	if _, err := checkEGPSGate(path, res); err == nil {
+		t.Fatal("malformed predicate evidence must refuse ship")
 	}
 }
 
@@ -101,7 +89,7 @@ func TestCheckEGPSGate_MalformedJSON(t *testing.T) {
 func TestCheckEGPSGate_ReadError(t *testing.T) {
 	dir := t.TempDir() // a directory, not a file
 	res := &RunResult{}
-	err := checkEGPSGate(dir, res)
+	_, err := checkEGPSGate(dir, res)
 	if err == nil {
 		t.Fatal("reading a directory as acs-verdict.json must error")
 	}
@@ -199,7 +187,7 @@ func TestVerifyManualConfirm_AutoConfirm(t *testing.T) {
 
 // --- helpers -------------------------------------------------------------
 
-func writeACSVerdict(t *testing.T, doc map[string]any) string {
+func writeACSVerdict(t *testing.T, doc any) string {
 	t.Helper()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "acs-verdict.json")
