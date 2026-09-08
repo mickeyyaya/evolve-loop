@@ -1125,7 +1125,10 @@ OuterLoop:
 		// carries preserved work (architect finding #1: resolving at
 		// provisioning time reads a dir that does not exist yet).
 		if next == PhaseTriage {
-			cr.adoptContinuationAfterTriage()
+			if err := cr.adoptContinuationAfterTriage(); err != nil {
+				cr.result.FinalVerdict = VerdictFAIL
+				return cr.result, err
+			}
 		}
 	}
 

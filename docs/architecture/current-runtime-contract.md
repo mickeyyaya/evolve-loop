@@ -6,6 +6,7 @@ This is the current capability index. Historical ADRs explain decisions; an Acce
 |---|---|---|---|
 | Predicate evidence | Host execution and bound modern evidence required at Audit/Ship; legacy shipping requires re-audit | `phases/audit`, `phases/ship`, `acssuite` | [Evidence recovery](recovery-predicate-authority.md) |
 | Isolation | Enforced supported profile read/write restrictions; required but unverified confinement refuses | `bridge`, `adapters/sandbox`, `looppreflight` | [Isolation recovery](recovery-isolation-policy.md) |
+| Continuation adoption | Clean snapshot advances to a pinned main base before archive staging; failures stop dispatch | `core/continuation_stamp.go`, `core/continuation_baseadvance.go` | [Adoption boundary](continuation-adoption-boundary.md) |
 | Resume | Shared terminal lifecycle, policy and checkpoint advancement | `core/resume.go`, fresh cycle lifecycle | [Resume recovery](recovery-resume-lifecycle.md) |
 | Task contract | Selected acceptance/predicate inventory delivered to TDD, Build and Audit; sanitized previews name their original authority | `core/task_contract.go` | `TestDispatch_TaskContractReachesTDDBuildAndAudit`, `TestComposeTaskContract_SanitizedCriteriaAreNotClaimedVerbatim` |
 | Lesson recall | Task/goal recall into Scout/TDD/Build/Audit, current-goal and latest-failure recall into advisor | `core/task_recall.go`, `core/routing_dispatch.go`, `phases/runner` | `TestDispatch_TaskRecallWithoutFailureHistory`, `TestAdvisorPlanInput_RecallsGoalWithoutHistory` |

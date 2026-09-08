@@ -78,6 +78,56 @@ Architecture, Go/simplification/test, and defensive reviewers reviewed the
 follow-up. Live two-wave usefulness remains pending until the repaired version
 is landed and the native batch finishes.
 
+## Live quota and continuation repair
+
+Launch repair PR [#536](https://github.com/mickeyyaya/evolve-loop/pull/536)
+merged as `985cb68e` with Linux, macOS, ACS and configuration CI green.
+A second native `loop --cycles 2 --strategy ultrathink` attempt passed blocking
+preflight and launched cycles 1607–1609 in its first wave. Scout produced two
+concrete plans and identified already-landed work in the third lane. The native
+read-only fence also restored a Triage write outside its allowed surface.
+
+All three lanes subsequently reached TDD under Claude's session quota wall,
+whose reset was printed as 05:10 Asia/Taipei. The dispatcher missed that wording
+and kept waiting. The operator sent SIGINT to the native parent; it returned
+130, `stop_reason: signal`, and `cycles: null`. This is an interrupted attempt,
+not a completed wave. No lane reached Build, Audit or Ship. Reports and worktrees
+remain available; the displayed zero cost is unmeasured telemetry, not evidence
+of free execution.
+
+The follow-up addresses two observed causes:
+
+- The shared manifest recognizes the session wall only with line-leading CLI
+  chrome and reset wording. Live detection retains persistence and provider
+  corroboration; prompt echoes, diff text and healthy quoted content do not
+  immediately bench a working provider. Bench reset parsing honors the explicit
+  IANA timezone and existing two-minute margin, rejecting invalid zone suffixes.
+  This repairs the provider bench deadline; it does not claim to wire the
+  separate persisted cycle checkpoint wake-time hint.
+- Continuation adoption merges a pinned main commit into the clean snapshot
+  before staging unpublished explanation archives. It uses that exact commit
+  as the review/archive base, preserving newly landed canonical records. A
+  merge, archive or adoption-persistence failure stops further dispatch and
+  preserves work; it cannot silently adopt a stale base. A real Git regression
+  reproduces the original archive-before-merge failure, while a raced-main
+  conflict proves TDD/Build/Audit/Ship are not dispatched after failed adoption.
+
+Validation of this follow-up: full default suite 208 packages PASS (five without
+tests), full vet PASS, targeted race checks PASS in core/bridge/clihealth, and
+native adoption failure integration/race PASS. The four affected integration
+packages passed, with bridge requiring a dedicated test tmux server initialized
+with `SHELL=/bin/sh` (34.434 seconds). Two runs on the pre-existing `/bin/zsh`
+server failed accelerated boot deadlines before fixture commands executed;
+independent reviewer login-shell commands also hung. The dedicated-shell run
+keeps real tmux, sandbox and terminal assertions intact. User shell configuration
+was not changed; subsequent live verification uses the same explicit shell.
+
+A fresh native two-wave run allocates new cycle IDs. It preserves interrupted
+1607–1609 and the earlier unfinished 1606; no manual claim recovery or unscoped
+resume is needed. Explicit interrupted-phase resume remains a separate concern:
+these phase-complete checkpoints are intentionally excluded from automatic
+cross-run discovery.
+
 ## Limits and live verification
 
 Linux mandatory linked-worktree confinement is explicitly unsupported and fails closed; native Linux enforcement was not verified on this macOS host. Live writer swarm, hard model-family separation and retry adjudication remain outside this recovery. Legacy resume diagnostics are recovery hints, not authenticated Ship evidence. HEAD-based throughput remains a heuristic under concurrent lanes; live assessment must inspect actual lane commits.
