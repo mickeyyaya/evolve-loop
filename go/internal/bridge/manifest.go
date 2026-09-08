@@ -137,13 +137,21 @@ type Manifest struct {
 	// backward compat with operator-installed v1 override manifests.
 	// See docs/architecture/adr/0022-launch-intent-realizer.md.
 	ModelTierMap map[string]string `json:"model_tier_map,omitempty"`
+	// ModelTierMapFrom names another manifest whose model_tier_map this one
+	// adopts when it declares none of its own — the explicit "one table per
+	// FAMILY, declared once" pointer (inbox codex-tier-map-single-source: the
+	// headless codex.json copy sat three model generations stale). Resolved
+	// by LoadManifest; a pointer that cannot be resolved is a manifest ERROR,
+	// never an empty map. Explicit rather than implied from the family name so
+	// a headless manifest that legitimately declares no map (claude-p — the
+	// tiers ARE its selectors) is never changed.
+	ModelTierMapFrom string `json:"model_tier_map_from,omitempty"`
 	// ChatGPTSafeModels lists the concrete model IDs a ChatGPT/subscription
 	// account can reliably use for this CLI. When the resolved auth mode is
 	// "chatgpt" and the realized -m model is NOT in this set, the driver clamps
 	// it to ChatGPTDefaultModel. Empty → no clamp (API-key-only CLIs, or no
-	// constraint). codex's model picker/docs advertise models (gpt-5.4, gpt-5.5,
-	// gpt-5.3-codex) that the live backend 400-rejects on ChatGPT accounts by
-	// plan tier (multiple open OpenAI issues); this set is the proven-safe
+	// constraint). codex's model picker/docs advertise models that the live
+	// backend 400-rejects on ChatGPT accounts by plan tier (gpt-5.4/5.5 in 2026-06; multiple open OpenAI issues); this set is the proven-safe
 	// subset. See docs/incidents/cycle-142-* and the codex-chatgpt-model-support
 	// research dossier.
 	ChatGPTSafeModels []string `json:"chatgpt_safe_models,omitempty"`
@@ -210,7 +218,37 @@ func LoadManifest(cli string) (Manifest, error) {
 	if err != nil {
 		return m, err
 	}
+	m, err = resolveTierMapFrom(cli, m)
+	if err != nil {
+		return Manifest{}, err
+	}
 	return overlayManifestCatalog(m), nil
+}
+
+// resolveTierMapFrom adopts the model_tier_map of the manifest named by
+// m.ModelTierMapFrom when m declares none of its own (a copied map, never a
+// shared reference). A manifest that declares BOTH keeps its own table. An
+// unresolvable pointer (absent, corrupt, or a target that does not itself DECLARE
+// a map — the target is loaded raw, so pointer chains are rejected, one hop only)
+// is an error:
+// silently launching with an empty map would degrade every dispatch of this
+// CLI to the account default with the log still naming the requested tier.
+func resolveTierMapFrom(cli string, m Manifest) (Manifest, error) {
+	if m.ModelTierMapFrom == "" || len(m.ModelTierMap) != 0 {
+		return m, nil
+	}
+	from, err := loadManifestRaw(m.ModelTierMapFrom)
+	if err != nil {
+		return Manifest{}, fmt.Errorf("bridge:manifest: cli=%s model_tier_map_from=%q: %w", cli, m.ModelTierMapFrom, err)
+	}
+	if len(from.ModelTierMap) == 0 {
+		return Manifest{}, fmt.Errorf("bridge:manifest: cli=%s model_tier_map_from=%q declares no model_tier_map", cli, m.ModelTierMapFrom)
+	}
+	m.ModelTierMap = make(map[string]string, len(from.ModelTierMap))
+	for k, v := range from.ModelTierMap {
+		m.ModelTierMap[k] = v
+	}
+	return m, nil
 }
 
 // loadManifestRaw is the unmodified loader: operator override > embedded set.

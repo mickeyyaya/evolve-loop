@@ -271,19 +271,7 @@ func realizeScalar(r *Realization, m Manifest, param, value string) {
 	// legacy spelling "tier_alias" is accepted unchanged for one release
 	// so operator-installed v1 override manifests keep working.
 	if spec.From == "model_tier_map" || spec.From == "tier_alias" {
-		// Fallback ladder for the cycle-124 deprecation window: try the raw
-		// intent value first (handles synthetic test fixtures + operator
-		// v1 manifests where keys are still haiku/sonnet/opus). If that
-		// misses, try the canonical translation (handles parseManifest's
-		// v1-shimmed manifests where keys are now fast/balanced/deep). Both
-		// surfaces remove together one release after the migration.
-		if alias, found := m.ModelTierMap[value]; found && alias != "" {
-			resolved = alias
-		} else if canonical := legacyTierAlias(value); canonical != value {
-			if alias, found := m.ModelTierMap[canonical]; found && alias != "" {
-				resolved = alias
-			}
-		}
+		resolved = resolveTierModel(m, value)
 	}
 	// ModelFlagPolicy (ADR-0044 C2 / D3, generalized): a vocabulary token here
 	// means model_tier_map translation fell through, so the value names no
@@ -311,4 +299,26 @@ func realizeScalar(r *Realization, m Manifest, param, value string) {
 		}
 	}
 	// controller / noop / unknown channel → no scalar emission.
+}
+
+// resolveTierModel is the ONE tier→model ladder for every transport: the
+// realizer's flag/repl emit (realizeScalar) and the headless codex driver's
+// own -m composition both resolve through it, so a change here (e.g. the
+// queued within-tier fallback axis) reaches every dispatch. Fallback ladder
+// for the cycle-124 deprecation window: try the raw intent value first
+// (synthetic test fixtures + operator v1 manifests where keys are still
+// haiku/sonnet/opus); if that misses, try the canonical translation
+// (parseManifest's v1-shimmed manifests where keys are now fast/balanced/deep).
+// Native ids and genuinely unknown values pass through unchanged — the
+// vocabulary guard at each emit point then decides whether to omit the flag.
+func resolveTierModel(m Manifest, value string) string {
+	if alias, found := m.ModelTierMap[value]; found && alias != "" {
+		return alias
+	}
+	if canonical := legacyTierAlias(value); canonical != value {
+		if alias, found := m.ModelTierMap[canonical]; found && alias != "" {
+			return alias
+		}
+	}
+	return value
 }

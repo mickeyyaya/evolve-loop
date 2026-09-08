@@ -1,7 +1,7 @@
 package profiles
 
 // deep_tier_family_arrangement_test.go — the 2026-08-26 operator directive:
-// deep/top-tier task types run on codex (gpt-5.6-sol at the directed rung — high since 2026-09-01; effort is pinned by effort_defaults_test.go, not here), EXCEPT the two
+// deep/top-tier task types run on codex (gpt-6-astra since 2026-09-09, at the directed rung — high since 2026-09-01; the model is pinned by bridge/codex_tier_map_test.go and effort by effort_defaults_test.go, not here), EXCEPT the two
 // adversarial checks whose independence from the codex builder is the
 // pipeline's anti-gaming core (cross-family floor: builder=codex ⇒ its graders
 // are another family) and the advisor brain. Pins the WHOLE arrangement so a
@@ -48,7 +48,7 @@ func TestDeepTierFamilyArrangement(t *testing.T) {
 			continue
 		}
 		if p.CLI != "codex-tmux" {
-			t.Errorf("%s: cli=%q, want codex-tmux (deep→gpt-5.6-sol arrangement, 2026-08-26)", name, p.CLI)
+			t.Errorf("%s: cli=%q, want codex-tmux (deep→codex arrangement, 2026-08-26; deep model gpt-6-astra since 2026-09-09)", name, p.CLI)
 		}
 		if len(p.CLIFallback) != 1 || p.CLIFallback[0] != "claude-tmux" {
 			t.Errorf("%s: cli_fallback=%v, want [claude-tmux] (universal fallback; agy banned)", name, p.CLIFallback)

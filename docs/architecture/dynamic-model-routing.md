@@ -74,9 +74,9 @@ Tier map (latest CLI models, May 2026):
 
 | Tier | Claude | Gemini | Codex | Grok |
 |---|---|---|---|---|
-| **deep** | `opus` → `claude-opus-4-7` | `gemini-3.1-pro-preview` + `thinkingLevel=high` | `gpt-5.5` + `reasoning=high` | `grok-4-heavy` |
-| **balanced** | `sonnet` → `claude-sonnet-4-6` | `gemini-3-pro-preview` + `thinkingLevel=medium` | `gpt-5.3-codex` | `grok-4-3` |
-| **fast** | `haiku` → `claude-haiku-4-5-20251001` | `gemini-3-flash-lite-preview` | `gpt-5.4-mini` | `grok-4-20-non-reasoning` |
+| **deep** | `opus` → `claude-opus-4-7` | `gemini-3.1-pro-preview` + `thinkingLevel=high` | `codex-tmux.json` `model_tier_map.deep` + `reasoning=high` | `grok-4-heavy` |
+| **balanced** | `sonnet` → `claude-sonnet-4-6` | `gemini-3-pro-preview` + `thinkingLevel=medium` | `codex-tmux.json` `model_tier_map.balanced` | `grok-4-3` |
+| **fast** | `haiku` → `claude-haiku-4-5-20251001` | `gemini-3-flash-lite-preview` | `codex-tmux.json` `model_tier_map.fast` | `grok-4-20-non-reasoning` |
 
 ## Per-phase envelope
 

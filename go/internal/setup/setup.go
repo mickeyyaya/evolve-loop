@@ -62,7 +62,7 @@ var abstractTiers = []string{"fast", "balanced", "deep", "top"}
 
 // familyDriverManifest maps a base CLI family to the bridge manifest that
 // carries its model_tier_map (the interactive -tmux drivers are the multi-
-// CLI defaults; their maps match the headless variants).
+// CLI defaults; the headless variants declare no map and resolve through the same family table).
 func familyDriverManifest(base string) string {
 	switch base {
 	case "claude":
@@ -78,7 +78,7 @@ func familyDriverManifest(base string) string {
 // tierModelsFor resolves the abstract {fast,balanced,deep,top} tiers → this CLI's
 // NATIVE model identifier via the bridge manifest's model_tier_map (the
 // single source of truth — e.g. agy deep→Gemini 3.1 Pro (High), codex deep→
-// gpt-5.5, claude balanced→sonnet). When the manifest declares no entry
+// the family manifest's deep model, claude balanced→sonnet). When the manifest declares no entry
 // for an abstract tier, the abstract name passes through as the model
 // identifier (identity fallback — useful for legacy manifests still on the
 // v1 schema during the deprecation window). Honors operator manifest
@@ -119,7 +119,7 @@ type CLIStatus struct {
 	Verdict          string   `json:"verdict"`         // ready|warning|blocked
 	EnvWarnings      []string `json:"env_warnings,omitempty"`
 	// TierModels maps each abstract tier (fast|balanced|deep) to THIS CLI's
-	// native model (e.g. agy deep→Gemini 3.1 Pro (High), codex deep→gpt-5.5), surfaced by
+	// native model (e.g. agy deep→Gemini 3.1 Pro (High), codex deep→the family manifest's deep model), surfaced by
 	// the /setup skill so per-phase routing is self-documenting; the realizer
 	// resolves the same via tier_aliases.
 	TierModels map[string]string `json:"tier_models,omitempty"`

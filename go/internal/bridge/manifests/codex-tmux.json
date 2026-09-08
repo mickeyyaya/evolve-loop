@@ -149,14 +149,15 @@
   "model_tier_map": {
     "fast": "gpt-5.6-luna",
     "balanced": "gpt-5.6-terra",
-    "deep": "gpt-5.6-sol",
-    "top": "gpt-5.6-sol"
+    "deep": "gpt-6-astra",
+    "top": "gpt-6-astra"
   },
   "chatgpt_safe_models": [
+    "gpt-6-astra",
     "gpt-5.6-sol",
     "gpt-5.6-terra",
     "gpt-5.6-luna"
   ],
-  "chatgpt_default_model": "gpt-5.6-sol",
-  "note": "Interactive codex via tmux. Preserves ChatGPT-account subscription billing (vs codex exec, which may meter differently). Same model_tier_map as the codex-headless driver. chatgpt_safe_models/chatgpt_default_model (cycle-142 mechanism; set refreshed 2026-06-07 per operator): this ChatGPT plan accepts gpt-5.5 and gpt-5.4-mini; gpt-5.4 still 400-rejects on subscription auth (see OpenAI codex issues #14190/#19654) and gpt-5.2 is gone from the /model picker, so the balanced tier (gpt-5.4) clamps UP to gpt-5.5 when auth=chatgpt. API-key auth bypasses the clamp entirely."
+  "chatgpt_default_model": "gpt-6-astra",
+  "note": "Interactive codex via tmux. Preserves ChatGPT-account subscription billing (vs codex exec, which may meter differently). model_tier_map is the codex FAMILY's single tier table: the tmux realization, the headless driver (codex.json declares no map; it resolves through this one via the shared bridge.resolveTierModel ladder), setup's presets, the advisor clamp probe and the live-catalog overlay all read it \u2014 a model-family cutover is ONE edit here (values: see CHANGELOG, the value record; 2026-09-09 directive: deep/top at the high reasoning rung, verified live before the cutover). chatgpt_safe_models/chatgpt_default_model (cycle-142 mechanism): on subscription auth a realized model outside the safe set is clamped to the default, so the deep model MUST be listed here or every deep launch is silently rewritten. API-key auth bypasses the clamp entirely."
 }

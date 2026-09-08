@@ -46,7 +46,7 @@ func TestLoopUnblockProfilesRouteTimeoutPronePhasesToAgy(t *testing.T) {
 	}
 }
 
-// TestRetrospectiveRoutesToCodexSol pins the 2026-08-26 operator-directed
+// TestRetrospectiveRoutesToCodexDeep pins the 2026-08-26 operator-directed
 // reroute (supersedes the 2026-08-14 claude/deep pin, whose own comment named
 // this move: "gpt-5.6-sol is the alternative once codex returns from quota
 // bench" — codex returned, live-verified at 44% dispatch share with zero
@@ -55,7 +55,7 @@ func TestLoopUnblockProfilesRouteTimeoutPronePhasesToAgy(t *testing.T) {
 // lead the deep→sol arrangement: codex/deep (gpt-5.6-sol at the directed
 // rung — see effort_defaults_test.go), claude as the explicit fallback
 // (universal-fallback rule; agy stays banned from fallback chains).
-func TestRetrospectiveRoutesToCodexSol(t *testing.T) {
+func TestRetrospectiveRoutesToCodexDeep(t *testing.T) {
 	loader := NewFromDir(realProfilesDir(t))
 	p, err := loader.Get("retrospective")
 	if err != nil {
@@ -68,7 +68,7 @@ func TestRetrospectiveRoutesToCodexSol(t *testing.T) {
 		t.Fatalf("CLIFallback=%v, want [claude-tmux]", p.CLIFallback)
 	}
 	if p.ModelTierEnvelope == nil || p.ModelTierEnvelope.Default != "deep" {
-		t.Fatalf("envelope default must stay deep (gpt-5.6-sol): %+v", p.ModelTierEnvelope)
+		t.Fatalf("envelope default must stay deep (codex deep tier — gpt-6-astra since 2026-09-09): %+v", p.ModelTierEnvelope)
 	}
 }
 
@@ -98,7 +98,7 @@ func TestAdversarialReviewRoutesToClaudeDeep(t *testing.T) {
 }
 
 // TestTriageRoutesToCodexForQuotaBalance pins the 2026-09-02 reroute
-// (supersedes the 2026-07-30 claude pin the way TestRetrospectiveRoutesToCodexSol
+// (supersedes the 2026-07-30 claude pin the way TestRetrospectiveRoutesToCodexDeep
 // superseded its predecessor). The 2026-07-30 evidence was AGY-specific —
 // triage-on-agy emitted a v1 FAIL sentinel with no schema_version-2 block and
 // the fix promoted the declared fallback (claude) to primary; codex was never
