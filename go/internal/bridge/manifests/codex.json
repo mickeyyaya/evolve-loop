@@ -6,18 +6,15 @@
   "transport": "headless",
   "default_tier": "full",
   "tier_dependencies": {
-    "full": ["codex"]
+    "full": [
+      "codex"
+    ]
   },
   "prompt_marker": null,
   "default_model": "",
   "default_args": [],
   "interactive_prompts": [],
   "stub": false,
-  "model_tier_map": {
-    "fast": "gpt-5.4-mini",
-    "balanced": "gpt-5.4",
-    "deep": "gpt-5.5",
-    "top": "gpt-5.5"
-  },
-  "note": "default_model empty: codex picks the model compatible with active auth. model_tier_map translates abstract fast/balanced/deep tiers to OpenAI-native models (gpt-5.5 is the ChatGPT-account default per ~/.codex/config.toml; verified 2026-05-29 post cycle-124 V1)."
+  "note": "default_model empty: codex picks the model compatible with active auth. This headless manifest declares NO model_tier_map of its own: model_tier_map_from points at the codex FAMILY table (codex-tmux.json) and LoadManifest adopts it \u2014 one declaration per family, never per transport (inbox codex-tier-map-single-source; the old copy here sat three model generations stale). The headless driver resolves its -m through the shared bridge.resolveTierModel ladder over that table.",
+  "model_tier_map_from": "codex-tmux"
 }

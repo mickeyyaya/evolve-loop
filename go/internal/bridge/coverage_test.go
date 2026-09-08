@@ -109,9 +109,10 @@ func TestParseExtendSecs(t *testing.T) {
 }
 
 func TestMapCodexModelAndName(t *testing.T) {
-	for in, want := range map[string]string{"haiku": "gpt-5.6-luna", "sonnet": "gpt-5.6-terra", "opus": "gpt-5.6-sol", "gpt-x": "gpt-x", "weird": "weird"} {
-		if got := mapCodexModel(in); got != want {
-			t.Fatalf("mapCodexModel(%q) = %q, want %q", in, got, want)
+	m := codexFamilyManifest(t)
+	for in, want := range map[string]string{"haiku": m.ModelTierMap["fast"], "sonnet": m.ModelTierMap["balanced"], "opus": m.ModelTierMap["deep"], "gpt-x": "gpt-x", "weird": "weird"} {
+		if got := resolveTierModel(m, in); got != want {
+			t.Fatalf("resolveTierModel(%q) = %q, want %q", in, got, want)
 		}
 	}
 	for in, want := range map[string]bool{"gpt-5": true, "o1-x": true, "o3": true, "codex-z": true, "claude": false, "": false} {

@@ -1,0 +1,20 @@
+{
+  "id": "agy-tier-map-single-source",
+  "title": "agy.json duplicates agy-tmux.json's model_tier_map — point it at the family table via model_tier_map_from",
+  "kind": "pipeline-repair",
+  "class": "single-source",
+  "weight": 0.6,
+  "created_at": "2026-09-09T00:10:00Z",
+  "connects_to": [
+    "go/internal/bridge/manifests/agy.json",
+    "go/internal/bridge/manifests/agy-tmux.json",
+    "go/internal/bridge/manifest.go"
+  ],
+  "summary": "The agy family declares its tier→model table twice (agy.json headless + agy-tmux.json), the exact per-transport duplication the 2026-09-09 codex cutover removed for codex (architecture review HIGH: codex.json sat three model generations stale behind its copy). LoadManifest now resolves an explicit `model_tier_map_from` pointer, so agy.json can drop its map and point at agy-tmux.json.",
+  "fix": "Delete model_tier_map from agy.json, add \"model_tier_map_from\": \"agy-tmux\", and add a relational test (LoadManifest(\"agy\") table == loadManifestRaw(\"agy-tmux\") table; raw agy.json declares none). Sweep readers of LoadManifest(\"agy\") for any that need the raw map. claude-p is NOT in scope: it legitimately declares no map (tiers are its selectors).",
+  "acceptance": [
+    "agy.json declares no model_tier_map and carries model_tier_map_from: agy-tmux",
+    "LoadManifest(\"agy\").ModelTierMap equals loadManifestRaw(\"agy-tmux\").ModelTierMap (relational test, no literal ids)",
+    "go test -count=1 ./internal/bridge/... ./internal/profiles/... ./internal/setup/... green"
+  ]
+}

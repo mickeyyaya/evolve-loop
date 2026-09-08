@@ -121,12 +121,13 @@ func TestLaunchArgs_Codex_OpenAIKey_AllowedProceeds(t *testing.T) {
 // --- codex model-tier mapping (mock-cli-drivers.bats T-mock.5/6/7) --------
 
 func TestLaunchArgs_Codex_ModelMap(t *testing.T) {
+	fam := codexFamilyManifest(t)
 	cases := []struct {
 		tier, codexModel string
 	}{
-		{"haiku", "gpt-5.6-luna"},
-		{"sonnet", "gpt-5.6-terra"},
-		{"opus", "gpt-5.6-sol"},
+		{"haiku", fam.ModelTierMap["fast"]},
+		{"sonnet", fam.ModelTierMap["balanced"]},
+		{"opus", fam.ModelTierMap["deep"]},
 	}
 	for _, tc := range cases {
 		t.Run(tc.tier, func(t *testing.T) {

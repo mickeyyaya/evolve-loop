@@ -120,7 +120,11 @@ func TestTierModelsFor(t *testing.T) {
 	}
 	// codex maps to its native GPT tiers.
 	codex := tierModelsFor("codex")
-	want := map[string]string{"fast": "gpt-5.6-luna", "balanced": "gpt-5.6-terra", "deep": "gpt-5.6-sol"}
+	fam, err := bridge.LoadManifest("codex-tmux")
+	if err != nil {
+		t.Fatalf("LoadManifest(codex-tmux): %v", err)
+	}
+	want := map[string]string{"fast": fam.ModelTierMap["fast"], "balanced": fam.ModelTierMap["balanced"], "deep": fam.ModelTierMap["deep"]}
 	for tier, m := range want {
 		if codex[tier] != m {
 			t.Errorf("codex[%s] = %q, want %q", tier, codex[tier], m)
