@@ -6,6 +6,8 @@ package phaseio
 // Upstream().Scout() instead of re-reading the artifact off disk (P4).
 type ScoutView struct {
 	CycleSizeEstimate string // "trivial|small|medium|large"
+	GoalType          string // scout-declared goal type (phase-registry goal_recipes key); "" = undeclared
+	DeliverableKind   string // "code|document" as scout declared it (ADR-0099); "" = undeclared
 	ItemCount         int    // # of itemN_* scope blocks
 	CarryoverCount    int    // carryover todos surfaced
 	BacklogSize       int    // total queued backlog items
@@ -13,8 +15,9 @@ type ScoutView struct {
 
 // TriageView is the typed projection of a triage handoff.
 type TriageView struct {
-	CycleSize string   // authoritative size after triage refines scout's estimate
-	PhaseSkip []string // PSMAS phase_skip[] recommendation (additive only)
+	CycleSize       string   // authoritative size after triage refines scout's estimate
+	PhaseSkip       []string // PSMAS phase_skip[] recommendation (additive only)
+	DeliverableKind string   // authoritative "code|document" after triage bounds top_n (ADR-0099); "" = undeclared
 }
 
 // ExplanationView is the immutable, hash-bound documentation handoff produced

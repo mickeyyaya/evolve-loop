@@ -52,6 +52,28 @@ func TestRubric_SkipExemptionDerivedFromConditional(t *testing.T) {
 	}
 }
 
+// An AND-ed conditional rule (ADR-0099: tdd pinned only while EVERY clause
+// holds) renders one exemption line PER clause — the negation of any single
+// clause is a release the advisor must see.
+func TestRubric_SkipExemptionRendersEveryClause(t *testing.T) {
+	t.Parallel()
+	in := router.RouteInput{Cfg: config.RoutingConfig{
+		Conditional: map[string]config.CondRule{
+			"tdd": {Field: "cycle_size", Op: "!=", Value: "trivial",
+				And: []config.CondRule{{Field: "deliverable_kind", Op: "!=", Value: "document"}}},
+		},
+	}}
+	got := buildRoutingPrompt(in)
+	for _, want := range []string{
+		"- cycle_size == trivial → skip tdd (conditional-mandatory exemption)",
+		"- deliverable_kind == document → skip tdd (conditional-mandatory exemption)",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("rubric missing per-clause skip-exemption %q\n---\n%s", want, got)
+		}
+	}
+}
+
 // Judgment-only guidance (no structured counterpart) renders verbatim from
 // registry routing.rubric_hint, phases sorted (deterministic prompt ⇒
 // prompt-prefix cache friendly).

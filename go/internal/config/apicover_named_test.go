@@ -51,7 +51,7 @@ func TestLoad_BindsRoutingTypes(t *testing.T) {
 
 	// CondRule: the conditional_mandatory expr must parse into the exact triple.
 	wantRule := CondRule{Field: "cycle_size", Op: "!=", Value: "trivial"}
-	if got := cfg.Conditional["tdd"]; got != wantRule {
+	if got := cfg.Conditional["tdd"]; got.Field != wantRule.Field || got.Op != wantRule.Op || got.Value != wantRule.Value || len(got.And) != 0 {
 		t.Errorf("Conditional[tdd] = %+v, want %+v", got, wantRule)
 	}
 

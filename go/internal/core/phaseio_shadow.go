@@ -54,6 +54,8 @@ func comparePhaseIOShadow(h phaseio.Handoffs, sig router.RoutingSignals) []phase
 	add("scout.present", strconv.FormatBool(sig.Scout.Present), strconv.FormatBool(scOK))
 	if sig.Scout.Present && scOK {
 		add("scout.cycle_size_estimate", sig.Scout.CycleSizeEstimate, sc.CycleSizeEstimate)
+		add("scout.goal_type", sig.Scout.GoalType, sc.GoalType)
+		add("scout.deliverable_kind", sig.Scout.DeliverableKind, sc.DeliverableKind)
 		add("scout.item_count", strconv.Itoa(sig.Scout.ItemCount), strconv.Itoa(sc.ItemCount))
 		add("scout.carryover_count", strconv.Itoa(sig.Scout.CarryoverCount), strconv.Itoa(sc.CarryoverCount))
 		add("scout.backlog_size", strconv.Itoa(sig.Scout.BacklogSize), strconv.Itoa(sc.BacklogSize))
@@ -63,6 +65,7 @@ func comparePhaseIOShadow(h phaseio.Handoffs, sig router.RoutingSignals) []phase
 	add("triage.present", strconv.FormatBool(sig.Triage.Present), strconv.FormatBool(trOK))
 	if sig.Triage.Present && trOK {
 		add("triage.cycle_size", sig.Triage.CycleSize, tr.CycleSize)
+		add("triage.deliverable_kind", sig.Triage.DeliverableKind, tr.DeliverableKind)
 		add("triage.phase_skip", strings.Join(sig.Triage.PhaseSkip, ","), strings.Join(tr.PhaseSkip, ","))
 	}
 

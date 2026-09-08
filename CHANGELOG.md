@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## Added — deliverable kinds: the kernel signals for solution cycles (ADR-0099 slice 1, 2026-09-09)
+
+The factory can now shape a non-code cycle from the same spine. The kernel READS two new header lines — `goal_type:` and `deliverable_kind: code|document` in scout-report.md, `deliverable_kind:` next to `cycle_size_estimate:` in triage-report.md (the scout/triage persona lines that WRITE them land with slice 3; until then every cycle stays undeclared ⇒ `code`, byte-identical to today) — from the report headers (the trusted path `cycle_size_estimate` already takes — handoff JSON has been extinct since ~cycle 215) onto `RoutingSignals` (`scout.goal_type`, `scout.deliverable_kind`, `triage.deliverable_kind`, projected `deliverable_kind`, absent ⇒ `code`).
+
+- **tdd is released for document cycles by config, not code** — `config.CondRule` ANDs clauses (`a!=b && c!=d`; single-clause rules byte-identical), and the registry's `conditional_mandatory.tdd` is `cycle_size!=trivial && deliverable_kind!=document`. The absent default `code` keeps the pin at plan time; the post-scout RePlan releases it for a digested document declaration. The advisor rubric renders one exemption line per clause.
+- **The 15 domain phases can finally fire** — `scout.goal_type` had no reader on the kernel side (and no writer); the kernel half lands here, the persona line in slice 3; `TestDomainPhaseTrigger_FiresOnScoutGoalType` reads the shipped `forces-analysis` overlay and proves its `insert_when` evaluates live, with D2 fail-closed semantics preserved for undeclared goal types.
+- **Solution recipes** — `strategy-options`, `business-plan`, `partnership-deal` compose the document-side acceptance from the existing catalog (`scope-baseline` before build; `adversarial-review` / `premise-challenge` after); the router persona's recipe block is regenerated and its floor sentence names the release.
+- Typed views (`phaseio.ScoutView/TriageView`), the phase-io shadow rows, the advisor digest line and the routing fixtures carry the new fields. ADR: [docs/architecture/adr/0099-deliverable-kinds.md](docs/architecture/adr/0099-deliverable-kinds.md).
+
+---
+
 ## Changed — codex deep/top tier → gpt-6-astra at high reasoning; the codex tier table is single-sourced (2026-09-09)
 
 Operator directive: codex's high tiers (`deep` and `top`) run **gpt-6-astra** at the **high** reasoning rung (the rung was already the 2026-09-01 directive — `codexDeepTopRung`, every codex deep/top profile at `effort_level: high`, the manifest's `params.effort.default` — so only the model moves). Verified live before the cutover: `codex exec -m gpt-6-astra -c model_reasoning_effort=high` on the ChatGPT subscription answered, so adding astra to `chatgpt_safe_models` (which lets it through the cycle-142 clamp) is safe. `fast`/`balanced` stay gpt-5.6-luna/terra.

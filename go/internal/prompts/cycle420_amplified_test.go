@@ -64,17 +64,20 @@ func TestRouterPersona_SectionHeadingsPreserved(t *testing.T) {
 }
 
 // TestRouterPersona_ProseFloor asserts that the prose region of agents/evolve-router.md
-// (from end of frontmatter to ## Phase Catalog — Core Values) is at least 2500 bytes.
+// (from end of frontmatter to ## Phase Catalog — Core Values, EXCLUDING the
+// generated goal-recipes table — see routerProseBytes) is at least 1200 bytes.
 //
 // Amplification angle: AC2 asserts an upper bound (<5243 bytes, ≥15% reduction).
 // Without a floor, a builder could game the byte limit by stripping all prose content
 // except domain tokens, passing AC2 while destroying all decision-routing context.
-// 2500 bytes ≈ 48% of the original 5235-byte post-TSC prose — a generous floor that
+// 1200 bytes ≈ 50% of the 2349-byte prose-only region measured on main at the
+// 2026-09-09 re-baseline (ADR-0099; before that the region included the table
+// and the floor was 2500 ≈ 48% of 5235) — a generous floor that
 // catches catastrophic over-deletion without constraining legitimate future compression.
 func TestRouterPersona_ProseFloor(t *testing.T) {
 	_, body := routerContent(t)
 	got := routerProseBytes(t, body)
-	const minBytes = 2500
+	const minBytes = 1200
 	if got < minBytes {
 		t.Errorf("evolve-router.md prose region suspiciously small: %d bytes (floor=%d bytes).\n"+
 			"TSC must compress prose, not delete routing decision context.\n"+

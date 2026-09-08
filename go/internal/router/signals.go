@@ -92,6 +92,8 @@ func (s RoutingSignals) GenericValue(field string) (any, bool) {
 // ScoutSignals are the routing-relevant fields of handoff-scout.json.
 type ScoutSignals struct {
 	CycleSizeEstimate string // "trivial|small|medium|large"
+	GoalType          string // scout-declared goal type (a phase-registry goal_recipes key); "" = undeclared
+	DeliverableKind   string // "code|document" as scout declared it; "" = undeclared (ADR-0099)
 	ItemCount         int    // # of itemN_* blocks (scope breadth)
 	CarryoverCount    int    // carryover todos surfaced
 	BacklogSize       int    // total queued backlog items (breadth of pending work)
@@ -100,9 +102,10 @@ type ScoutSignals struct {
 
 // TriageSignals are the routing-relevant fields of triage's handoff.
 type TriageSignals struct {
-	CycleSize string   // authoritative size after triage refines scout's estimate
-	PhaseSkip []string // PSMAS phase_skip[] recommendation (additive only)
-	Present   bool
+	CycleSize       string   // authoritative size after triage refines scout's estimate
+	PhaseSkip       []string // PSMAS phase_skip[] recommendation (additive only)
+	DeliverableKind string   // authoritative "code|document" after triage bounds top_n; "" = undeclared (ADR-0099)
+	Present         bool
 }
 
 // BuildSignals are the routing-relevant fields of handoff-build(er).json.
@@ -138,4 +141,39 @@ func (s RoutingSignals) CycleSize() string {
 		return s.Scout.CycleSizeEstimate
 	}
 	return ""
+}
+
+// DeliverableKindCode and DeliverableKindDocument are the two deliverable
+// kinds a cycle can declare (ADR-0099). Any other word is not a kind.
+const (
+	DeliverableKindCode     = "code"
+	DeliverableKindDocument = "document"
+)
+
+// NormalizeDeliverableKind returns the kind when v is one of the two declared
+// kinds and "" otherwise — an unrecognised word is treated as undeclared, so
+// it can never release a pinned phase (fail-safe to the code side).
+func NormalizeDeliverableKind(v string) string {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case DeliverableKindCode:
+		return DeliverableKindCode
+	case DeliverableKindDocument:
+		return DeliverableKindDocument
+	}
+	return ""
+}
+
+// DeliverableKind returns the cycle's authoritative deliverable kind: triage's
+// refinement when declared, else scout's, else "code". The absent default is
+// the CONSERVATIVE side — with nothing digested (plan time) a rule of the form
+// `deliverable_kind != document` holds, so the tdd integrity pin stays on and
+// is released only by a digested document declaration (ADR-0099).
+func (s RoutingSignals) DeliverableKind() string {
+	if s.Triage.Present && s.Triage.DeliverableKind != "" {
+		return s.Triage.DeliverableKind
+	}
+	if s.Scout.Present && s.Scout.DeliverableKind != "" {
+		return s.Scout.DeliverableKind
+	}
+	return DeliverableKindCode
 }

@@ -90,6 +90,10 @@ type SignalSpec struct {
 	ScoutItemCount int
 	ScoutCarryover int
 	ScoutBacklog   int // scout.backlog_size (queued work breadth)
+	// ADR-0099 deliverable-kind signals (scout declares, triage is authoritative).
+	GoalType              string // scout.goal_type
+	DeliverableKind       string // scout.deliverable_kind ("code"|"document")
+	TriageDeliverableKind string // triage.deliverable_kind
 }
 
 // AgentSpec is the simulated LLM router brain: a scripted proposal per

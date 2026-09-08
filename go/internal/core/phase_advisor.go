@@ -743,8 +743,12 @@ func writeRubricLines(b *strings.Builder, cfg config.RoutingConfig) {
 	sort.Strings(names)
 	for _, p := range names {
 		if rule, ok := cfg.Conditional[p]; ok {
-			if op, ok := negateOp(rule.Op); ok {
-				fmt.Fprintf(b, "- %s %s %s → skip %s (conditional-mandatory exemption)\n", rule.Field, op, rule.Value, p)
+			// One exemption line per clause: the rule pins only while EVERY
+			// clause holds, so the negation of any single clause is a release.
+			for _, c := range rule.Clauses() {
+				if op, ok := negateOp(c.Op); ok {
+					fmt.Fprintf(b, "- %s %s %s → skip %s (conditional-mandatory exemption)\n", c.Field, op, c.Value, p)
+				}
 			}
 		}
 		blk := cfg.Triggers[p]
@@ -883,11 +887,11 @@ func writeCarryoverTodos(b *strings.Builder, todos []router.CarryoverTodo) {
 
 func writeSignals(b *strings.Builder, s router.RoutingSignals) {
 	if s.Scout.Present {
-		fmt.Fprintf(b, "- scout: cycle_size_estimate=%s item_count=%d carryover=%d backlog=%d\n",
-			s.Scout.CycleSizeEstimate, s.Scout.ItemCount, s.Scout.CarryoverCount, s.Scout.BacklogSize)
+		fmt.Fprintf(b, "- scout: cycle_size_estimate=%s goal_type=%s deliverable_kind=%s item_count=%d carryover=%d backlog=%d\n",
+			s.Scout.CycleSizeEstimate, s.Scout.GoalType, s.Scout.DeliverableKind, s.Scout.ItemCount, s.Scout.CarryoverCount, s.Scout.BacklogSize)
 	}
 	if s.Triage.Present {
-		fmt.Fprintf(b, "- triage: cycle_size=%s phase_skip=%s\n", s.Triage.CycleSize, strings.Join(s.Triage.PhaseSkip, ","))
+		fmt.Fprintf(b, "- triage: cycle_size=%s deliverable_kind=%s phase_skip=%s\n", s.Triage.CycleSize, s.Triage.DeliverableKind, strings.Join(s.Triage.PhaseSkip, ","))
 	}
 	if s.Build.Present {
 		fmt.Fprintf(b, "- build: verdict=%s acs_green=%d acs_red=%d acs_regression=%d severity_max=%s files_touched=%d diff_loc=%d\n",

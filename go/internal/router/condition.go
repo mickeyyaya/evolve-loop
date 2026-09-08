@@ -48,9 +48,16 @@ func evalCondition(sig RoutingSignals, c config.Condition) bool {
 	}
 }
 
-// evalCondRule evaluates a conditional-mandatory rule (string value form).
+// evalCondRule evaluates a conditional-mandatory rule (string value form): the
+// head clause AND every clause in r.And (ADR-0099). A single-clause rule is
+// byte-identical to the legacy evaluation.
 func evalCondRule(sig RoutingSignals, r config.CondRule) bool {
-	return evalCondition(sig, config.Condition{Field: r.Field, Op: r.Op, Value: r.Value})
+	for _, c := range r.Clauses() {
+		if !evalCondition(sig, config.Condition{Field: c.Field, Op: c.Op, Value: c.Value}) {
+			return false
+		}
+	}
+	return true
 }
 
 // resolveField maps a field path to its signal value. Returns (numeric value,
@@ -61,6 +68,18 @@ func resolveField(sig RoutingSignals, field string) (float64, bool, string, bool
 		return 0, false, sig.CycleSize(), true
 	case "scout.cycle_size":
 		return 0, false, sig.Scout.CycleSizeEstimate, true
+	case "deliverable_kind":
+		// Projected (triage > scout > "code") and ALWAYS present: the absent
+		// default "code" is the conservative side, so `deliverable_kind !=
+		// document` holds pre-handoff and the tdd pin is released only by a
+		// digested document signal (ADR-0099).
+		return 0, false, sig.DeliverableKind(), true
+	case "scout.goal_type":
+		return resolveTypedOrGeneric(sig, field, sig.Scout.GoalType)
+	case "scout.deliverable_kind":
+		return resolveTypedOrGeneric(sig, field, sig.Scout.DeliverableKind)
+	case "triage.deliverable_kind":
+		return resolveTypedOrGeneric(sig, field, sig.Triage.DeliverableKind)
 	case "scout.item_count":
 		return float64(sig.Scout.ItemCount), true, "", true
 	case "scout.carryover_count":
@@ -94,6 +113,19 @@ func resolveField(sig RoutingSignals, field string) (float64, bool, string, bool
 		// unrecognized trigger never fires).
 		return resolveGeneric(sig, field)
 	}
+}
+
+// resolveTypedOrGeneric returns the typed struct value when the phase declared
+// one, else falls through to the generic signal plane for field — the shared
+// pattern behind scout.goal_type, scout.deliverable_kind and
+// triage.deliverable_kind. An undeclared value keeps the D2 fail-closed
+// trigger semantics (absent ⇒ false, present-empty ⇒ ""), so an `ne` trigger
+// never fires on a cycle that declared nothing for the field.
+func resolveTypedOrGeneric(sig RoutingSignals, field, typed string) (float64, bool, string, bool) {
+	if typed != "" {
+		return 0, false, typed, true
+	}
+	return resolveGeneric(sig, field)
 }
 
 // resolveGeneric resolves field from the namespaced generic signal bus. JSON

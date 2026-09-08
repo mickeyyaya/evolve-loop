@@ -106,6 +106,8 @@ Also: add all 15 one-line core values to the "Phase Catalog — Core Values" tab
 
 ### 4.2 New signal namespaces
 
+> **2026-09-09 (ADR-0099):** `scout.goal_type` — the trigger every phase below keys on — is now READ by the kernel: `router.scoutFromReportFallback` lifts a `goal_type:` header line in scout-report.md onto the routing signals (the scout persona line that WRITES it lands with ADR-0099 slice 3) (handoff JSON has been extinct since ~cycle 215, so no trigger here had ever fired). `deliverable_kind` rides the same path.
+
 `risk.*`, `scope.*`, `depmap.*`, `forces.*`, `market.*`, `okr.*`, `reconcile.*`, `variance.*`, `close.*`, `prd.*`, `opportunity.*`, `metric.*`, `postmortem.*`, `runbook.*`, `capacity.*`. (Checked against micro-catalog §4.3 — no collisions; `dependency.*` deliberately avoided.)
 
 ### 4.3 Config

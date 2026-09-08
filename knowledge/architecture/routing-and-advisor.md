@@ -4,7 +4,7 @@
 > skipping discovery on a carryover cycle, inserting a `tester` after a risky
 > build, ending early on an investigation cycle. The safety story is one
 > non-bypassable invariant: the advisor can never reach `ship` without a real
-> `build ∧ audit ∧ (tdd, unless trivial)`. This document describes the Go routing
+> `build ∧ audit ∧ (tdd, unless trivial or a document deliverable — ADR-0099)`. This document describes the Go routing
 > kernel (`go/internal/router`), the `PhaseAdvisor`, the integrity floor, and the
 > rollout stages. Authoritative ADR: **ADR-0024**. Current design (v13.0.0).
 
@@ -66,8 +66,8 @@ anchors and run only when triggered, enabled, or planned.
 1. **Configurable-mandatory** (`cfg.Mandatory`, default `scout,build,audit,ship`).
    Always run; an `enable=off` cannot disable them (recorded as a
    `mandatory-never-skipped` clamp).
-2. **Conditional-mandatory** (`cfg.Conditional`, default `tdd:cycle_size!=trivial`).
-   tdd is pinned on unless the cycle is trivial.
+2. **Conditional-mandatory** (`cfg.Conditional`, default `tdd:cycle_size!=trivial && deliverable_kind!=document` — clauses are AND-ed, ADR-0099).
+   tdd is pinned on unless the cycle is trivial or its deliverable_kind is document (ADR-0099).
 3. **Plan-driven** (Stage ≥ Advisory with an advisor plan). The
    *already-floor-clamped* whole-cycle plan drives run/skip for every
    non-mandatory phase. A phase the advisor scheduled runs; one it omitted is
@@ -102,7 +102,7 @@ plan:
   legitimately end after scout (investigation / convergence). The antecedent is
   false, so the floor imposes nothing.
 - If the plan **does** run `ship`, the clamp *forces* `build` + `audit` on (and
-  `tdd` unless trivial, reusing the kernel's `tddPinned` rule so the exemption
+  `tdd` unless trivial or a document cycle, reusing the kernel's `tddPinned` rule so the exemption
   stays consistent with `shouldRun`), recording one `Clamp` per forced phase. It
   returns a **new** plan (input unmutated).
 
@@ -190,7 +190,7 @@ The integrity floor is LIVE from Advisory onward (ADR-0024 PR-16 widened
 (`llm` = advisor proposes + kernel clamps; `static` = triggers + spine only),
 `EVOLVE_MANDATORY_PHASES` (CSV — omitting `audit`/`ship` emits a `weak-spine` WARN,
 now backstopped by the integrity floor), `EVOLVE_CONDITIONAL_MANDATORY`
-(default `tdd:cycle_size!=trivial`), `EVOLVE_MAX_OPTIONAL_INSERTIONS` (default 4,
+(default `tdd:cycle_size!=trivial&&deliverable_kind!=document`), `EVOLVE_MAX_OPTIONAL_INSERTIONS` (default 4,
 not applied to plan-driven inserts), `EVOLVE_USE_PHASE_REGISTRY`. Precedence:
 env > registry file > built-in default.
 
