@@ -50,6 +50,17 @@ func (c *collector) collect(now time.Time) (*Snapshot, map[int]*dossier.Dossier)
 	var warns []string
 	snap.Loop, warns = readLoop(c.root, now)
 	snap.Warnings = append(snap.Warnings, warns...)
+	runs, warns := readRunStatuses(c.root, now, snap.Loop)
+	snap.Warnings = append(snap.Warnings, warns...)
+	if own, ok := runs[snap.Loop.CycleID]; ok {
+		snap.Loop = own
+	}
+	for _, run := range runs {
+		if run.Running && (!snap.Loop.Running || run.CycleID > snap.Loop.CycleID) {
+			snap.Loop = run
+		}
+	}
+	snap.Loop = enrichLoopStatus(c.root, snap.Loop)
 	snap.Queue, warns = readQueue(c.root)
 	snap.Warnings = append(snap.Warnings, warns...)
 	h := readHistory(c.root, c.cache)
@@ -57,6 +68,18 @@ func (c *collector) collect(now time.Time) (*Snapshot, map[int]*dossier.Dossier)
 	snap.Trend, snap.Fingerprints = h.Trend, h.Fingerprints
 
 	ids, warn := c.selectCycles(h)
+	// History limits may never hide a live lane, even when all active lanes
+	// together exceed the configured history limit.
+	selected := map[int]bool{}
+	for _, id := range ids {
+		selected[id] = true
+	}
+	for id, run := range runs {
+		if run.Running && !selected[id] {
+			ids = append(ids, id)
+		}
+	}
+	sort.Sort(sort.Reverse(sort.IntSlice(ids)))
 	if warn != "" {
 		snap.Warnings = append(snap.Warnings, warn)
 	}
@@ -64,7 +87,9 @@ func (c *collector) collect(now time.Time) (*Snapshot, map[int]*dossier.Dossier)
 	for _, id := range ids {
 		cs, w := readCycle(c.root, id, h.Dossiers[id])
 		snap.Warnings = append(snap.Warnings, w...)
-		snap.Cycles = append(snap.Cycles, assignState(cs, snap.Loop))
+		status := runs[id]
+		status.BrakeEngaged = snap.Loop.BrakeEngaged
+		snap.Cycles = append(snap.Cycles, assignState(cs, status))
 	}
 	snap.Trend.RoundHistogram = roundHistogram(snap.Cycles)
 	return snap, h.Dossiers

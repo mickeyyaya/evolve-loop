@@ -39,6 +39,7 @@ func verifyNativeExplanation(ctx context.Context, opts *Options) error {
 		// Freeze the one host-owned identity snapshot that this Run will verify
 		// and mutate. Later stages must not re-read mutable cycle mirrors.
 		opts.CycleID = cycle
+		opts.AuditRound, _ = stateInt(state, "audit_dispatches")
 		opts.ExplanationDocumentationVersion = version
 		opts.ActiveWorktree = worktree
 		opts.WorkspacePath = workspace

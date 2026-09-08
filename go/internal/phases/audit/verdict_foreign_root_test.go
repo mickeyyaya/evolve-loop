@@ -1,13 +1,6 @@
 package audit
 
-// verdict_foreign_root_test.go — the third leg of the cycle-1434 class: the
-// CLI-written acs-verdict.json (minted under the WRONG state root, 3 false
-// reds) suppressed the phase's own correct-root generation because the
-// verdict-exists gate honored ANY pre-staged file. A file STAMPED with a
-// project_root that differs from the phase's own is a foreign-root artifact —
-// regenerate. Unstamped files (operator/CI pre-stage, every pre-stamp
-// verdict) stay honored untouched: absence means "unstamped", never
-// "mismatch".
+// Candidate root claims never replace host execution; preserve them for forensics.
 
 import (
 	"context"
@@ -62,7 +55,11 @@ func TestRun_ACSVerdictForeignRoot_Regenerated(t *testing.T) {
 	}
 	// The foreign artifact is EVIDENCE — preserved, not clobbered (the
 	// incident class was "the misdiagnosis was invisible from the file").
-	data, err := os.ReadFile(filepath.Join(ws, "acs-verdict.foreign.json"))
+	candidates, err := filepath.Glob(filepath.Join(ws, "acs-verdict.candidate.*.json"))
+	if err != nil || len(candidates) != 1 {
+		t.Fatalf("candidate not preserved: %v %v", candidates, err)
+	}
+	data, err := os.ReadFile(candidates[0])
 	if err != nil {
 		t.Fatalf("foreign verdict not preserved: %v", err)
 	}
@@ -78,22 +75,26 @@ func TestRun_ACSVerdictForeignRoot_Regenerated(t *testing.T) {
 	}
 }
 
-func TestRun_ACSVerdictMatchingRoot_Honored(t *testing.T) {
+func TestRun_ACSVerdictMatchingRoot_StillRegenerated(t *testing.T) {
 	ws := t.TempDir()
 	writeACSVerdictWithRoot(t, ws, 0, "/p")
 	body := "# Audit Report\n\n## Verdict\n**PASS**\n"
 	fb := &fakeBridge{writeArtifact: body}
 	genCalls := 0
 	phase := New(Config{
-		Bridge:          fb,
-		Prompts:         fakePromptsFS("body"),
-		GenerateVerdict: func(core.PhaseRequest) error { genCalls++; return nil },
+		Bridge:  fb,
+		Prompts: fakePromptsFS("body"),
+		GenerateVerdict: func(req core.PhaseRequest) error {
+			genCalls++
+			writeACSVerdictWithRoot(t, req.Workspace, 0, req.ProjectRoot)
+			return nil
+		},
 	})
 	resp, _ := phase.Run(context.Background(), core.PhaseRequest{
 		Cycle: 1, ProjectRoot: "/p", Workspace: ws,
 	})
-	if genCalls != 0 {
-		t.Errorf("GenerateVerdict called %d times, want 0 (matching-root stamp is honored)", genCalls)
+	if genCalls != 1 {
+		t.Errorf("GenerateVerdict called %d times, want 1 (matching root is not proof of execution)", genCalls)
 	}
 	if resp.Verdict != core.VerdictPASS {
 		t.Errorf("Verdict=%q, want PASS", resp.Verdict)

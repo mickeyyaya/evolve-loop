@@ -132,6 +132,7 @@ func (p *Phase) shipOptions(req core.PhaseRequest, msg string) Options {
 		WorkspacePath:                   req.Workspace, // ADR-0049 S3 / G3: run-scope ship's reads
 		RunID:                           req.RunID,     // ADR-0049 S4 / G5: run-scope the audit binding
 		CycleID:                         req.Cycle,
+		AuditRound:                      req.AuditRound,
 		ActiveWorktree:                  req.Worktree,
 		WorktreeBaseSHA:                 req.WorktreeBaseSHA,
 		ExplanationDocumentationVersion: req.ExplanationDocumentationVersion,

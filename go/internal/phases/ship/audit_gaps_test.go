@@ -7,13 +7,14 @@ package ship
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/acssuite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
@@ -165,6 +166,7 @@ func TestVerifyAuditBinding_LegacyEntryNoGitHead_IntegrityError(t *testing.T) {
 	mustWrite(t, filepath.Join(repo, ".evolve", "ledger.jsonl"), entry)
 
 	opts := auditOpts(t, repo)
+	opts.RunID = ""                                                     // Exercise legacy binding diagnostics without claiming a modern host run.
 	err := verifyAuditBinding(context.Background(), opts, &RunResult{}) //nolint:staticcheck
 	wantShipErr(t, err, core.CodeAuditBindingNoLedger, core.ShipClassPrecondition, "predates v8.13.0")
 }
@@ -175,23 +177,14 @@ func TestVerifyAuditBinding_LegacyEntryNoGitHead_IntegrityError(t *testing.T) {
 // tolerated by the anonymous-struct unmarshal.
 func TestCheckEGPSGate_SkipCountWithRedZero_Passes(t *testing.T) {
 	repo := t.TempDir()
-	verdict := `{
-		"red_count": 0,
-		"green_count": 1,
-		"skip_count": 4,
-		"verdict": "PASS",
-		"red_ids": [],
-		"skip_ids": ["regression-suite/cycle-57/030-build-report-verdict-count-match"],
-		"predicate_suite": {"total": 5, "skipped_count": 4},
-		"results": [
-			{"ac_id": "cycle-1/001", "result": "green", "exit_code": 0},
-			{"ac_id": "regression-suite/cycle-57/030-build-report-verdict-count-match", "result": "skip", "exit_code": 77}
-		]
-	}`
+	verdict, err := json.Marshal(predicateVerdictFixture(1, 1, 0, 4))
+	if err != nil {
+		t.Fatal(err)
+	}
 	path := filepath.Join(repo, "acs-verdict.json")
-	mustWrite(t, path, verdict)
+	mustWrite(t, path, string(verdict))
 	res := &RunResult{}
-	if err := checkEGPSGate(path, res); err != nil {
+	if _, err = checkEGPSGate(path, res); err != nil {
 		t.Fatalf("checkEGPSGate returned %v, want nil (red_count==0 with skips must pass)", err)
 	}
 }
@@ -200,18 +193,14 @@ func TestCheckEGPSGate_SkipCountWithRedZero_Passes(t *testing.T) {
 // genuine red must still block ship — SKIP cannot mask a real RED.
 func TestCheckEGPSGate_RedCountWithSkipsPresent_Blocks(t *testing.T) {
 	repo := t.TempDir()
-	verdict := `{
-		"red_count": 1,
-		"green_count": 1,
-		"skip_count": 2,
-		"verdict": "FAIL",
-		"red_ids": ["cycle-1/002"],
-		"predicate_suite": {"total": 4, "skipped_count": 2}
-	}`
+	verdict, err := json.Marshal(predicateVerdictFixture(1, 1, 1, 4))
+	if err != nil {
+		t.Fatal(err)
+	}
 	path := filepath.Join(repo, "acs-verdict.json")
-	mustWrite(t, path, verdict)
+	mustWrite(t, path, string(verdict))
 	res := &RunResult{}
-	err := checkEGPSGate(path, res)
+	_, err = checkEGPSGate(path, res)
 	wantShipErr(t, err, core.CodeEGPSRedCount, core.ShipClassPrecondition, "RED predicate")
 }
 
@@ -225,7 +214,8 @@ func auditOpts(t *testing.T, repo string) *Options {
 	// Pin the TOFU state upfront so verifyAuditBinding doesn't fail on TOFU.
 	preSeedTOFU(t, repo, bin)
 	return &Options{
-		ProjectRoot:    repo,
+		ProjectRoot: repo,
+		CycleID:     1, RunID: "test-run", AuditRound: 1,
 		PluginRoot:     repo,
 		ShipBinaryPath: bin,
 		Runner:         execRunner,
@@ -254,14 +244,22 @@ func preSeedTOFU(t *testing.T, repo, binPath string) {
 // ledger entry with the given exit code, using HEAD/tree of repo at call time.
 func seedCustomAudit(t *testing.T, repo, body string, exitCode int) {
 	t.Helper()
-	auditPath := filepath.Join(repo, ".evolve", "runs", "cycle-1", "audit-report.md")
-	mustWrite(t, auditPath, body)
-	sha := mustHashFile(t, auditPath)
-	headSHA := strings.TrimSpace(runGitOut(t, repo, "rev-parse", "HEAD"))
-	treeSHA := treeStateSHA(t, repo)
-	entry := fmt.Sprintf(`{"role":"auditor","kind":"agent_subprocess","exit_code":%d,"artifact_path":%q,"artifact_sha256":%q,"git_head":%q,"tree_state_sha":%q}`+"\n",
-		exitCode, auditPath, sha, headSHA, treeSHA)
-	mustWrite(t, filepath.Join(repo, ".evolve", "ledger.jsonl"), entry)
+	seedAudit(t, repo, "PASS", map[string]string{"exit_code": fmt.Sprint(exitCode)})
+	ledgerPath := filepath.Join(repo, ".evolve", "ledger.jsonl")
+	raw, err := os.ReadFile(ledgerPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var entry map[string]any
+	if err := json.Unmarshal(raw, &entry); err != nil {
+		t.Fatal(err)
+	}
+	path := entry["artifact_path"].(string)
+	mustWrite(t, path, body)
+	sealTestPredicateEvidence(t, acssuite.EvidenceIdentity{Cycle: 1, RunID: "test-run", Round: 1, TreeSHA: entry["worktree_tree_sha"].(string)}, path)
+	entry["artifact_sha256"] = mustHashFile(t, path)
+	line, _ := json.Marshal(entry)
+	mustWrite(t, ledgerPath, string(line)+"\n")
 }
 
 // TestParseVerdicts_BareHeadingLine: the heading form must also accept a BARE

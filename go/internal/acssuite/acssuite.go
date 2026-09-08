@@ -21,6 +21,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -423,7 +424,7 @@ func runGoTest(opts Options) ([]Result, error) {
 		if !hasGoACSTree(moduleDir) {
 			return nil, nil
 		}
-		goExec = defaultGoExec
+		goExec = executeCompleteGoScope
 		patterns = goLanePatterns(moduleDir, opts.Cycle)
 		if len(patterns) == 0 {
 			return nil, nil
@@ -452,10 +453,20 @@ func runGoTest(opts Options) ([]Result, error) {
 	for _, pat := range patterns {
 		raw, execErr := goExec(ctx, moduleDir, pat, env)
 		results := parseGoTestJSON(strings.NewReader(raw), opts.Cycle)
-		if execErr != nil && len(results) == 0 {
+		if errors.Is(execErr, errIncompleteInventory) {
+			return nil, execErr
+		}
+		if opts.GoExec == nil && len(results) == 0 {
+			return nil, fmt.Errorf("acssuite: active predicate scope %q produced no execution results; required predicates did not run", pat)
+		}
+		hasRed := false
+		for _, result := range results {
+			hasRed = hasRed || result.ResultStr == "red"
+		}
+		if execErr != nil && !hasRed {
 			// Nonzero exit with zero test events ⇒ that package did not compile
 			// (or `go test` could not run). FAIL loudly, never silent-PASS.
-			return nil, fmt.Errorf("acssuite: go predicate scope %q produced no test events but exited "+
+			return nil, fmt.Errorf("acssuite: go predicate scope %q produced no failing test evidence but exited "+
 				"nonzero (compile error / infra failure): %w\noutput:\n%s", pat, execErr, excerpt(raw))
 		}
 		all = append(all, retryFlakyReds(ctx, goExec, moduleDir, pat, env, results, opts.Cycle)...)
@@ -491,14 +502,23 @@ func retryFlakyReds(ctx context.Context, goExec func(context.Context, string, st
 	if !hasTestRed {
 		return results
 	}
-	raw, _ := goExec(ctx, moduleDir, pat, env) // bounded: exactly one retry
+	raw, retryErr := goExec(ctx, moduleDir, pat, env) // bounded: exactly one retry
 	retry := parseGoTestJSON(strings.NewReader(raw), cycle)
+	// An incomplete retry cannot erase a confirmed first-run red, even when
+	// the process emitted a passing prefix before its failure.
+	for _, r := range retry {
+		if strings.HasPrefix(r.ACID, "egps/") {
+			retryErr = fmt.Errorf("incomplete retry evidence")
+		}
+	}
 	greenOnRetry := make(map[string]bool, len(retry))
 	retryRan := make(map[string]bool, len(retry))
 	retryEvidence := make(map[string]string, len(retry))
 	for _, r := range retry {
-		retryRan[r.ACID] = true
-		if r.ResultStr == "green" {
+		if retryErr == nil || r.ResultStr == "red" || r.ResultStr == "skip" {
+			retryRan[r.ACID] = true
+		}
+		if r.ResultStr == "green" && retryErr == nil {
 			greenOnRetry[r.ACID] = true
 		}
 		if r.fullEvidence != "" {
@@ -663,7 +683,12 @@ func parseGoTestJSON(r io.Reader, cycle int) []Result {
 	for _, key := range order {
 		a := byKey[key]
 		if a.result == "" {
-			continue // saw the test run but never a terminal action; ignore
+			out = append(out, Result{
+				ACID:      "egps/go-lane-incomplete/" + a.pkg + "/" + a.test,
+				Predicate: "egps/go-lane-incomplete", ExitCode: 1, ResultStr: "red",
+				EvidenceExcerpt: "predicate started without a terminal result: " + a.pkg + "/" + a.test,
+			})
+			continue
 		}
 		dir := path.Base(a.pkg)
 		isReg, isRT := classifyGoPkg(dir, cycle)

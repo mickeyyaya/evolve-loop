@@ -385,3 +385,17 @@ func dirExists(path string) bool {
 //	first numeric token (if any) → CYCLES
 //	next token if matching strategy whitelist → STRATEGY
 //	remaining tokens (joined by space) → GOAL
+
+// emitQuotaPause keeps fresh and resumed batches on the same resumable CLI
+// contract, including the reset-time hint and durable checkpoint location.
+func (lr *loopResult) emitQuotaPause(cfg loopConfig, cycle int, stdout, stderr io.Writer) {
+	if qp, ok := detectQuotaPause(cfg.EvolveDir); ok {
+		fmt.Fprintf(stderr, "QUOTA-PAUSE: cycle=%d wake-at=%s source=%s attempts=%d/%d (all CLI families exhausted mid-cycle)\n",
+			qp.Cycle, qp.WakeAt, qp.Source, qp.Attempts, qp.MaxAttempts)
+	} else {
+		fmt.Fprintf(stderr, "QUOTA-PAUSE: cycle=%d (all CLI families exhausted mid-cycle; checkpoint block missing — resume re-runs from last boundary)\n", cycle)
+	}
+	fmt.Fprintln(stderr, "[loop]   resume when quota resets: evolve loop --resume")
+	lr.StopReason = "quota-pause"
+	lr.emit(stdout)
+}

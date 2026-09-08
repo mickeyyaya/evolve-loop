@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -49,7 +50,16 @@ func TestNewDefault_WiresVerdictGenerator(t *testing.T) {
 	// Predicate root (the cycle worktree): one trivial passing Go predicate.
 	root := t.TempDir()
 	writeGoPredFixture(t, root, 7, true)
+	if err := os.WriteFile(filepath.Join(root, ".gitignore"), []byte(".evolve/\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := exec.Command("git", "init", "-q", root).CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v %s", err, out)
+	}
 
+	if out, err := exec.Command("git", "-C", root, "add", "-A").CombinedOutput(); err != nil {
+		t.Fatalf("stage Builder fixture: %v %s", err, out)
+	}
 	// Workspace must be <evolveDir>/runs/cycle-7 so generateACSVerdict's
 	// evolveDir = dirname(dirname(workspace)) lands the verdict exactly where
 	// Classify reads it (<workspace>/acs-verdict.json).
@@ -63,7 +73,7 @@ func TestNewDefault_WiresVerdictGenerator(t *testing.T) {
 	phase := NewDefault(fb, fakePromptsFS("body"))
 
 	resp, err := phase.Run(context.Background(), core.PhaseRequest{
-		Cycle: 7, ProjectRoot: root, Worktree: root, Workspace: ws,
+		Cycle: 7, RunID: "run-7", AuditRound: 1, ProjectRoot: root, Worktree: root, Workspace: ws,
 	})
 	if err != nil {
 		t.Fatalf("Run: %v", err)

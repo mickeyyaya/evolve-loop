@@ -179,6 +179,17 @@ func (e *Engine) LaunchArgs(ctx context.Context, args []string, env map[string]s
 	}
 	if prof.Sandbox != nil {
 		cfg.AllowNetwork = prof.Sandbox.AllowNetwork
+		if prof.Sandbox.Enabled {
+			cfg.RequireSandbox = true
+			cfg.DenyPaths, err = resolveSandboxDenials(prof.Sandbox.DenySubpaths, cfg.ProjectRoot, cfg.Worktree, true)
+			if err == nil {
+				cfg.DenyReadPaths, err = resolveSandboxDenials(prof.Sandbox.DenyReadSubpaths, cfg.ProjectRoot, cfg.Worktree, false)
+			}
+			if err != nil {
+				fmt.Fprintf(stderr, "[bridge] invalid sandbox policy: %v\n", err)
+				return ExitBadFlags
+			}
+		}
 	}
 
 	// Non-dispatch modes (bin/bridge order: validate-only → dry-run →

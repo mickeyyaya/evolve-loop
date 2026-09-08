@@ -101,6 +101,7 @@ type Options struct {
 	// resolves them from host-global cycle-state.json. They must never be
 	// populated from the Builder-writable workspace/run.json mirror.
 	CycleID                         int
+	AuditRound                      int
 	ActiveWorktree                  string
 	WorktreeBaseSHA                 string
 	ExplanationDocumentationVersion int
@@ -299,6 +300,9 @@ func Run(ctx context.Context, opts Options) (RunResult, error) {
 	if opts.Class == ClassCycle {
 		commitSHA, idempotent, err := checkPostPushIdempotency(ctx, &opts)
 		if err == nil && idempotent {
+			if err := verifyPostPushPredicateEvidence(ctx, &opts, &res, commitSHA); err != nil {
+				return finalize(ctx, &opts, &res, err, "verify-post-push-predicate-evidence")
+			}
 			res.CommitSHA = commitSHA
 			res.Logs = append(res.Logs, fmt.Sprintf("[ship] post-push correction detected (HEAD is already the ship commit %s); succeeding report-only", res.CommitSHA))
 			return finalize(ctx, &opts, &res, nil, "post-push-idempotency")

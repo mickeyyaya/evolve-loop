@@ -86,8 +86,8 @@ func TestShipFromWorktree_TreeSHAMismatch_VerifiesBeforeCommit(t *testing.T) {
 
 	res, _ := runShip(t, repo, Options{Class: ClassCycle, CommitMessage: "feat: should breach pre-commit"})
 
-	if res.ExitCode != ExitIntegrity {
-		t.Fatalf("want ExitIntegrity, got %d (logs=%v)", res.ExitCode, res.Logs)
+	if res.ExitCode != ExitFailure {
+		t.Fatalf("want ExitFailure (predicate tree mismatch before commit), got %d (logs=%v)", res.ExitCode, res.Logs)
 	}
 	// C1 invariant: verification ran BEFORE the commit — no commit was created.
 	if containsLog(res, "committed in worktree") {

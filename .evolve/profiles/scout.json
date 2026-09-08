@@ -118,6 +118,7 @@
       ".evolve/evals/cycle-*"
     ],
     "read_only_repo": false,
+    "deny_read_subpaths": ["docs/private"],
     "deny_subpaths": [
       ".git",
       "scripts",

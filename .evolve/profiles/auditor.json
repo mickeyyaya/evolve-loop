@@ -149,6 +149,7 @@
       ".evolve/runs/cycle-*"
     ],
     "read_only_repo": true,
+    "deny_read_subpaths": ["docs/private"],
     "deny_subpaths": [
       ".git",
       "scripts",

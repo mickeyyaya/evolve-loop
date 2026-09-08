@@ -1,22 +1,6 @@
 package bridge
 
-// sandbox_gate_classification_test.go — the Build-explanation contract's
-// fail-closed sandbox gate must distinguish WHY a launch is unwrapped.
-//
-// ShouldWrap declines to wrap for three different KINDS of reason, and the
-// first draft of sandboxRequiredButUnavailable treated all of them as
-// violations:
-//
-//  1. nested LLM-CLI session — the OUTER sandbox + Tier-1 hooks already
-//     confine, and on macOS an inner sandbox-exec EPERM-hangs the REPL. The
-//     requirement is SATISFIED here, not violated; failing closed makes the
-//     contract unrunnable inside every Claude-driven session (this repo's own
-//     e2e runs included — observed as exit=2 on every pipeline e2e test).
-//  2. explicit EVOLVE_SANDBOX=off — a host operator opt-out, the same posture
-//     as --human-input's host opt-in that this exit code was built for.
-//     Honoured loudly, never silently.
-//  3. sandbox genuinely unavailable under auto/on — the case the gate exists
-//     for. Fails closed, unchanged.
+// Required confinement needs an applied wrapper; a nesting marker is not evidence.
 
 import (
 	"context"
@@ -30,10 +14,10 @@ func gateCfg() *Config {
 	return &Config{Agent: "build", RequireSandbox: true}
 }
 
-func TestSandboxGate_NestedSessionSatisfiesTheRequirement(t *testing.T) {
+func TestSandboxGate_NestedSessionDoesNotSatisfyRequirement(t *testing.T) {
 	deps := Deps{Env: map[string]string{"CLAUDECODE": "1"}}
-	if sandboxRequiredButUnavailable(deps, gateCfg(), false) {
-		t.Fatal("nested LLM-CLI session: the OUTER sandbox already confines — the requirement is satisfied, and failing closed here makes the contract unrunnable in every nested environment")
+	if !sandboxRequiredButUnavailable(deps, gateCfg(), false) {
+		t.Fatal("unverified outer confinement must fail a mandatory requirement")
 	}
 }
 
@@ -72,16 +56,21 @@ func TestSandboxGate_NoRequirementNeverGates(t *testing.T) {
 	}
 }
 
-// CRITICAL from adversarial review, reproduced through the real driver: the
-// classified gate was wired into the three HEADLESS drivers while
-// driver_tmux_repl.go — the shared engine behind claude-tmux/codex-tmux/
-// agy-tmux, the DOCUMENTED DEFAULT execution mode — kept the pre-fix
-// unconditional `else if cfg.RequireSandbox`. A nested Claude session driving
-// a contract-active build through any tmux driver still died ExitSafetyGate:
-// the exact bug this classification exists to fix, alive on the path
-// production actually uses. The e2e suite never saw it because every pipeline
-// e2e drives the headless claude-p path.
-func TestSandboxGate_TmuxDriverHonoursNestedSatisfaction(t *testing.T) {
+func TestSandboxGate_NamedSessionCannotProveRequestedPolicy(t *testing.T) {
+	fx := newFixture(t, "claude-tmux", "")
+	writeJSON(t, fx.artifact, "done")
+	tmux := &fakeTmux{existing: map[string]bool{"evolve-bridge-named-previous-policy": true}}
+	code, se := runTmux(t, fx, tmux, nil, "--allow-bypass", "--session-name=previous-policy", "--require-sandbox")
+	if code != ExitSafetyGate || !strings.Contains(se, "existing named session") {
+		t.Fatalf("unverified reused session: code=%d stderr=%q; want safety gate with policy diagnostic", code, se)
+	}
+	if len(tmux.sentKeys) != 0 {
+		t.Fatalf("unverified session received keystrokes: %v", tmux.sentKeys)
+	}
+}
+
+// The default tmux driver must enforce the same mandatory boundary as headless.
+func TestSandboxGate_TmuxDriverRejectsUnverifiedNestedConfinement(t *testing.T) {
 	ws := t.TempDir()
 	cfg := paneLiveCfg(t, ws)
 	cfg.RequireSandbox = true
@@ -101,10 +90,7 @@ func TestSandboxGate_TmuxDriverHonoursNestedSatisfaction(t *testing.T) {
 	}
 	lp := tmuxLaunch{name: "claude-tmux", session: "s", launchCmd: "x", promptMarker: "❯", bootIntervalS: 1}
 	code, _ := runTmuxREPL(context.Background(), cfg, deps, lp)
-	if code == ExitSafetyGate {
-		t.Fatalf("nested tmux launch died at the safety gate — the DEFAULT driver path still runs the unclassified RequireSandbox check")
-	}
-	if code != ExitOK {
-		t.Fatalf("code=%d, want ExitOK", code)
+	if code != ExitSafetyGate {
+		t.Fatalf("nested mandatory launch code=%d, want ExitSafetyGate", code)
 	}
 }
