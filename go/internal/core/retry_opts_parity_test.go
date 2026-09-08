@@ -47,14 +47,15 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
-// canonicalRetryHooks is the full hook set the item names verbatim: "backfill,
-// optionalInfraSkip, shipRecovery, postShipObserverSkip". Adding a hook to the
+// canonicalRetryHooks is the full hook set, including the quota-checkpoint
+// classifier shared by fresh and resumed dispatch. Adding a hook to the
 // dispatch loop without adding it here (and to retryOpts) fails this table —
 // which is the whole point of the pin.
 var canonicalRetryHooks = []string{
 	"backfill",
 	"optionalInfraSkip",
 	"postShipObserverSkip",
+	"quotaExhausted",
 	"shipRecovery",
 }
 
@@ -152,6 +153,9 @@ func TestEvaluateBatchRetryOpts_WiresBothSkipsButNotShipRecovery(t *testing.T) {
 	if enabled["shipRecovery"] {
 		t.Error("evaluateBatchRetryOpts() wired shipRecovery — the batch path must NOT run ship " +
 			"recovery (evaluate phases never ship); widening the subset is the anti-goal")
+	}
+	if enabled["quotaExhausted"] {
+		t.Error("evaluate batch has no partial-batch quota checkpoint and must retain its existing disposition")
 	}
 }
 

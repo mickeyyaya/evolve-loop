@@ -2,6 +2,7 @@ package ship
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -20,10 +21,11 @@ func shipOnce(t *testing.T, req core.PhaseRequest) string {
 	t.Helper()
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture\nphaseio slice4\n")
-	seedAudit(t, repo, "PASS")
+	seedAudit(t, repo, "PASS", map[string]string{"cycle": fmt.Sprint(req.Cycle)})
 	addRemote(t, repo)
 	req.ProjectRoot = repo
-	req.Workspace = filepath.Join(repo, ".evolve", "runs", "cycle-1")
+	req.Workspace = filepath.Join(repo, ".evolve", "runs", fmt.Sprintf("cycle-%d", req.Cycle))
+	req.RunID, req.AuditRound = "test-run", 1
 	if req.Env == nil {
 		req.Env = map[string]string{}
 	}

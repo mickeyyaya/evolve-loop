@@ -1,3 +1,5 @@
+//go:build integration
+
 package audit
 
 // graduation_registration_test.go — cycle-675 AC2 (Task 2,
@@ -16,6 +18,7 @@ package audit
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
@@ -27,7 +30,7 @@ import (
 // fixture whose build handoff introduces go/internal/brandnew, with the given
 // .apicover-enforce contents. Subprocess CI gates (vet/acs-durable/apicover)
 // are stubbed to exit 0 so the graduation gate — which is in-process — is the
-// only gate that can FAIL; the EGPS verdict is pre-staged green.
+// only failing gate; the declared predicate fixture is executed by the host.
 func runDefaultAuditOverNewPkg(t *testing.T, enforce string) core.PhaseResponse {
 	t.Helper()
 	root, goDir := goWorktree(t)
@@ -50,15 +53,29 @@ func runDefaultAuditOverNewPkg(t *testing.T, enforce string) core.PhaseResponse 
 		[]byte(`{"thrusts":[{"files_new":["go/internal/brandnew/x.go"]}]}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	ws := t.TempDir()
-	writeACSVerdict(t, ws, 0) // EGPS green → only a CI-parity gate can FAIL
+	ws := runDir
+	if err := os.MkdirAll(filepath.Join(goDir, "acs", "cycle1"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(goDir, "acs", "cycle1", "predicate_test.go"), []byte("package cycle1\n\nimport \"testing\"\n\nfunc TestPredicate(t *testing.T) {}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".gitignore"), []byte(".evolve/\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := exec.Command("git", "init", "-q", root).CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v %s", err, out)
+	}
+	if out, err := exec.Command("git", "-C", root, "add", "-A").CombinedOutput(); err != nil {
+		t.Fatalf("stage Builder fixture: %v %s", err, out)
+	}
 	withFakeRunner(t, fakeRunFunc(0, "", "", nil))
 
 	phase := NewDefaultWithStageCompact(
 		&fakeBridge{writeArtifact: "# Audit Report\n\n## Verdict\n**PASS**\n"},
 		fakePromptsFS("# Auditor body"), config.StageOff, false)
 	resp, err := phase.Run(context.Background(), core.PhaseRequest{
-		Cycle: 1, ProjectRoot: root, Worktree: root, Workspace: ws,
+		Cycle: 1, RunID: "run-1", AuditRound: 1, ProjectRoot: root, Worktree: root, Workspace: ws,
 	})
 	if err != nil {
 		t.Fatalf("Run: %v", err)

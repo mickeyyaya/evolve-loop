@@ -212,6 +212,7 @@
       ".evolve/audit-investigations/*"
     ],
     "read_only_repo": true,
+    "deny_read_subpaths": ["docs/private"],
     "deny_subpaths": [
       ".git",
       "skills",

@@ -52,6 +52,11 @@ func readLoop(root string, now time.Time) (LoopStatus, []string) {
 	if !ok {
 		return ls, warnings
 	}
+	ls, warnings = statusForRun(root, now, cs, ls, warnings)
+	return enrichLoopStatus(root, ls), warnings
+}
+
+func statusForRun(root string, now time.Time, cs cyclestate.CycleState, ls LoopStatus, warnings []string) (LoopStatus, []string) {
 	ls.CycleID = cs.CycleID
 	ls.Phase = cs.Phase
 	ls.PhaseStartedAt = parseTime(cs.PhaseStartedAt)
@@ -65,12 +70,62 @@ func readLoop(root string, now time.Time) (LoopStatus, []string) {
 		warnings = append(warnings, fmt.Sprintf("cycle %d lease: %v", cs.CycleID, err))
 	case ok:
 		ls.LeaseHeartbeat = parseTime(lease.HeartbeatAt)
-		ls.Running = runlease.Fresh(lease, now, runlease.DefaultTTL)
-	}
-	if call, ok := lastCallForPhase(readLLMCalls(ws), cs.Phase); ok {
-		ls.CLI, ls.Model = call.CLI, call.Model
+		if cs.RunID != "" && lease.RunID != cs.RunID {
+			warnings = append(warnings, fmt.Sprintf("cycle %d lease identity does not match state", cs.CycleID))
+		} else {
+			ls.Running = runlease.Fresh(lease, now, runlease.DefaultTTL)
+		}
 	}
 	return ls, warnings
+}
+
+// Only the representative lane needs dispatch metadata here; cycle detail
+// reads are bounded separately by the selected history and live lanes.
+func enrichLoopStatus(root string, ls LoopStatus) LoopStatus {
+	if ls.CycleID > 0 {
+		if call, ok := lastCallForPhase(readLLMCalls(core.RunWorkspacePath(root, ls.CycleID)), ls.Phase); ok {
+			ls.CLI, ls.Model = call.CLI, call.Model
+		}
+	}
+	return ls
+}
+
+// readRunStatuses gives each fleet lane its own state/lease identity. The
+// singleton remains a compatibility source only when a lane has no own state.
+func readRunStatuses(root string, now time.Time, primary LoopStatus) (map[int]LoopStatus, []string) {
+	out := map[int]LoopStatus{}
+	if primary.CycleID > 0 {
+		out[primary.CycleID] = primary
+	}
+	ids, warning := workspaceCycles(root)
+	var warnings []string
+	if warning != "" {
+		warnings = append(warnings, warning)
+	}
+	for _, id := range ids {
+		ws := core.RunWorkspacePath(root, id)
+		cs, ok, err := readCycleState(filepath.Join(ws, core.CycleStateFile))
+		if !ok && err == nil {
+			// run.json is a durable breadcrumb, not a replacement for live state.
+			if id == primary.CycleID {
+				continue
+			}
+			cs, ok, err = readCycleState(filepath.Join(ws, core.RunStateFile))
+		}
+		if !ok && err == nil {
+			continue
+		}
+		ls := LoopStatus{CycleID: id, BrakeEngaged: primary.BrakeEngaged}
+		if err != nil || cs.CycleID != id {
+			warnings = append(warnings, fmt.Sprintf("cycle %d state invalid (declared cycle %d): %v", id, cs.CycleID, err))
+			out[id] = ls
+			continue
+		}
+		var w []string
+		out[id], w = statusForRun(root, now, cs, ls, nil)
+		warnings = append(warnings, w...)
+	}
+	return out, warnings
 }
 
 // newestRunState reads run.json from the highest-numbered run workspace.

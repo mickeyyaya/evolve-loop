@@ -63,19 +63,17 @@ func DetectNested(getenv func(string) string) bool {
 // preflight displays — docs/architecture/sandbox-confinement-ssot.md chose
 // this package as the seam). Three cells:
 //
-//	nested        → satisfied: the outer LLM-CLI session is the only remaining
-//	                confinement; honesty note — it is UNVERIFIED unless the
-//	                sandbox.nested_fallback canary verifies it (and under
-//	                bypass-permissions Claude it does not confine writes).
-//	mode == "off" → satisfied via explicit host opt-out; optOut=true so the
-//	                caller surfaces it LOUDLY (the phase runs unconfined).
-//	otherwise     → NOT satisfied — the genuine violation; fail closed.
+//	mode == "off" → explicit host opt-out; optOut=true, never verified confinement.
+//	otherwise     → NOT satisfied, including unverified nested environments.
+//
+// A sampled parent-directory write denial cannot prove the requested profile's
+// read and write policy; the optional preflight canary does not waive this gate.
 func ConfinementSatisfied(nested bool, mode string) (ok, optOut bool, reason string) {
-	if nested {
-		return true, false, "nested LLM-CLI session: inner sandbox unavailable by design; the outer session is the only remaining confinement and is UNVERIFIED unless the sandbox.nested_fallback canary verifies it"
-	}
 	if strings.TrimSpace(mode) == "off" {
 		return true, true, "EVOLVE_SANDBOX=off: host opt-out honoured — the phase runs UNCONFINED despite the sandbox requirement"
+	}
+	if nested {
+		return false, false, "nested LLM-CLI session: inner sandbox unavailable; outer session is UNVERIFIED and does not satisfy mandatory profile restrictions"
 	}
 	return false, false, "inner sandbox required but unavailable"
 }
@@ -95,7 +93,7 @@ func ShouldWrap(nested bool, probe ProbeResult) (bool, string) {
 		return false, reason
 	}
 	if nested {
-		return false, "nested LLM-CLI sandbox: outer OS sandbox + Tier-1 hooks already confine; inner sandbox redundant (and on macOS sandbox_apply() returns EPERM, hanging REPL boot)"
+		return false, "nested LLM-CLI session: outer confinement UNVERIFIED; inner sandbox skipped to avoid sandbox_apply EPERM and REPL boot hangs"
 	}
 	// Subtractive capability gate: a MEASURED-incapable sandbox (binary present
 	// but sandbox_apply fails — e.g. a broken/SIP-weird standalone host) must NOT

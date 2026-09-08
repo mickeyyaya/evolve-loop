@@ -227,6 +227,10 @@ func normalizeReasonForFingerprint(reason string) string {
 // identical-fingerprint breaker rule. A floor-written artifact always wins;
 // the fallback never overwrites (F8: one evidence trail for humans + digest).
 func (o *Orchestrator) ensureFailureDigest(cycle int, projectRoot, workspace, fallbackPhase, fallbackReason string) {
+	if workspace == "" {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN: failure digest not written (cycle %d): missing workspace\n", cycle)
+		return
+	}
 	reasonPath := filepath.Join(workspace, "audit-fail-reason.json")
 	if _, statErr := os.Stat(reasonPath); statErr != nil && fallbackReason != "" {
 		b, merr := json.Marshal(auditFailReason{SchemaVersion: 1, Phase: fallbackPhase, Reasons: []string{fallbackReason}})
@@ -294,23 +298,8 @@ func verdictFailDistinguisher(phase, workspace string) string {
 		}
 		break // a readable report without bullets settles this layer
 	}
-	if raw, err := os.ReadFile(filepath.Join(workspace, "triage-decision.json")); err == nil {
-		var d struct {
-			TopN []struct {
-				ID string `json:"id"`
-			} `json:"top_n"`
-		}
-		if json.Unmarshal(raw, &d) == nil && len(d.TopN) > 0 {
-			ids := make([]string, 0, len(d.TopN))
-			for _, c := range d.TopN {
-				if c.ID != "" {
-					ids = append(ids, c.ID)
-				}
-			}
-			if len(ids) > 0 {
-				return "tasks=" + strings.Join(ids, ",")
-			}
-		}
+	if ids := triageTopNIDs(workspace); len(ids) > 0 {
+		return "tasks=" + strings.Join(ids, ",")
 	}
 	return ""
 }

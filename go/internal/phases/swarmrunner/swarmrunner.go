@@ -88,6 +88,14 @@ func (d *Decorator) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseR
 	if v := swarm.Validate(plan); v.Collapse {
 		return d.inner.Run(ctx, req) // not partitionable / not disjoint → N=1
 	}
+	// Writer integration lacks an authoritative tree transfer and guard wiring.
+	// Refuse before any side effects instead of reporting an unshippable merge
+	// as a completed build. Reader swarm and the shadow delegate are supported.
+	if d.mode == swarm.ModeWriter {
+		err := fmt.Errorf("writer swarm is unsupported: integration worktree and acceptance authority are not wired; use swarm.stage=shadow or fleet lanes")
+		return core.PhaseResponse{Phase: d.Name(), Verdict: core.VerdictFAIL,
+			Diagnostics: []core.Diagnostic{{Severity: "error", Message: err.Error()}}}, err
+	}
 
 	if st == stageAdvisory {
 		// Advisory: the inner runner stays AUTHORITATIVE, so run it FIRST on the

@@ -79,6 +79,8 @@ const (
 // same struct over stdin/stdout.
 type PhaseRequest struct {
 	Cycle int `json:"cycle"`
+	// AuditRound is the host dispatch counter binding audit evidence to this round.
+	AuditRound int `json:"audit_round,omitempty"`
 	// ProjectRoot is the MAIN repo root — the RUNTIME-DATA root. All `.evolve/`
 	// state (runs/, evals/, the ledger, baselines) lives here, and it is what a
 	// subprocess sees as EVOLVE_PROJECT_ROOT. Stable across the whole cycle.

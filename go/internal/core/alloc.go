@@ -73,10 +73,11 @@ func (o *Orchestrator) persistCycleEndState(ctx context.Context, state State) er
 		return o.storage.WriteState(ctx, state)
 	}
 	_, err := su.UpdateState(ctx, func(s *State) {
-		diskLease, diskRev := s.LastAllocatedCycleNumber, s.StateRevision
+		diskLease, diskRev, diskCycle := s.LastAllocatedCycleNumber, s.StateRevision, s.LastCycleNumber
 		diskFailed, diskCarry := s.FailedAt, s.CarryoverTodos
 		*s = state
 		s.LastAllocatedCycleNumber = max(s.LastAllocatedCycleNumber, diskLease)
+		s.LastCycleNumber = max(s.LastCycleNumber, diskCycle)
 		s.StateRevision = diskRev // UpdateState's own ++ owns the bump
 		// Under EVOLVE_FLEET the global lock is skipped, so a peer run may have
 		// appended outcome records after this run loaded; union them so the blind

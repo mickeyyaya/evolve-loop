@@ -47,6 +47,7 @@ func fingerprint(root string) string {
 	for _, id := range ids {
 		ws := core.RunWorkspacePath(root, id)
 		stamp(ws)
+		stamp(filepath.Join(ws, core.CycleStateFile))
 		stamp(filepath.Join(ws, core.RunStateFile))
 		stamp(phasetiming.Path(ws))
 		stamp(filepath.Join(ws, bridge.LLMCallsLogFilename))

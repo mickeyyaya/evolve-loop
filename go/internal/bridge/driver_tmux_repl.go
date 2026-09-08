@@ -162,6 +162,13 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 			fmt.Fprintf(deps.Stderr, "%s CREATE-NAMED: new named session '%s' (persists on exit for resume)\n", pfx, lp.session)
 		}
 	}
+	// Reusing a process cannot apply this launch's sandbox profile. Without a
+	// policy-bound session receipt, a prior session is unverified even when the
+	// host could wrap a newly launched process.
+	if namedExists && sandboxRequiredButUnavailable(deps, cfg, false) {
+		fmt.Fprintf(deps.Stderr, "%s safety gate: existing named session cannot prove the requested sandbox policy; launch a new session\n", pfx)
+		return ExitSafetyGate, nil
+	}
 	scrollbackFile := filepath.Join(cfg.Workspace, "tmux-final-scrollback.txt")
 	artifactScrollback := defaultIfZero(deps.ScrollbackLines, tmuxArtifactScrollback)
 	if omitted := cfg.Realization.ModelOmitted; omitted != "" {
@@ -262,13 +269,8 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 			launchCmd = joinPrefixForTmux(prefix) + " " + launchCmd
 			fmt.Fprintf(deps.Stderr, "%s sandbox prefix applied (%d argv elements)\n", pfx, len(prefix))
 		} else if sandboxRequiredButUnavailable(deps, cfg, false) {
-			// Same three-way classification as the headless drivers: nested
-			// sessions are already confined by the outer sandbox, an explicit
-			// EVOLVE_SANDBOX=off is a loud host opt-out, and only the genuine
-			// auto/on-with-no-wrap case fails closed. This is the DEFAULT
-			// execution path (tmux drivers) — the first classification pass
-			// covered only the headless minority and left this exact line
-			// killing every nested contract-active build (review CRITICAL).
+			// Match headless dispatch: an unverified outer session cannot
+			// satisfy required controls; explicit sandbox-off remains an opt-out.
 			fmt.Fprintf(deps.Stderr, "%s safety gate: activated Build explanation contract requires OS sandbox confinement\n", pfx)
 			return ExitSafetyGate, nil
 		}

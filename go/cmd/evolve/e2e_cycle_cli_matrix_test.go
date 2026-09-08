@@ -263,6 +263,7 @@ func mustRepoRoot(t *testing.T) string {
 //   - .evolve/profiles/{intent,scout,triage,tdd,build,audit,retro}.json
 //     (stubs — bridge profile loader only requires `name`)
 //   - .evolve/state.json bootstrapped to cycle 0
+//   - committed Go predicate inputs for native Audit (cycle 1 + durable package)
 //
 // The in-process Go bridge resolves paths from the request (no
 // tools/agent-bridge tree is symlinked — that was the pre-cutover bash path).
@@ -318,6 +319,38 @@ func setupTempProject(t *testing.T, repoRoot string) string {
 	seed := `{"lastUpdated":"2026-01-01T00:00:00Z","lastCycleNumber":0,"version":1,"currentBatch":{"cycleAccruedCostUSD":0}}`
 	if err := os.WriteFile(statePath, []byte(seed), 0o644); err != nil {
 		t.Fatalf("write state.json: %v", err)
+	}
+
+	// Native Audit retires agent-authored verdict candidates and executes real
+	// predicates. Seed its inputs before gitInit commits the fixture so every
+	// worktree inherits the same declared execution tree.
+	for rel, body := range map[string]string{
+		"go/go.mod":                "module e2e.local/fixture\n\ngo 1.23\n",
+		"go/acs/regression/doc.go": "package regression\n",
+		"go/acs/cycle1/predicate_test.go": `//go:build acs
+
+package cycle1
+
+import (
+	"os"
+	"strings"
+	"testing"
+)
+
+func TestAuditFixture(t *testing.T) {
+	if strings.EqualFold(strings.TrimSpace(os.Getenv("FAKE_CLI_AUDIT_VERDICT")), "FAIL") {
+		t.Fatal("synthetic e2e failing predicate requested by the fixture")
+	}
+}
+`,
+	} {
+		path := filepath.Join(root, rel)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatalf("mkdir predicate fixture: %v", err)
+		}
+		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+			t.Fatalf("write predicate fixture %s: %v", rel, err)
+		}
 	}
 
 	// Git init + identity + initial commit (ship phase needs a parent).

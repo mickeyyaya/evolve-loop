@@ -82,13 +82,11 @@ const auditReportMaxBytes = 32 * 1024
 // HTML-commented content stripped), so an embedded template can no longer
 // declare a verdict here either.
 
-// hooks carries the audit phase's variation points. genVerdict is the
-// seam that generates acs-verdict.json when it is absent (cycle-138/139
-// fix): the autonomous loop never ran `evolve acs suite`, so the EGPS
-// gate was forced to FAIL on the missing file every cycle. nil = no
-// generation (a pre-staged file is then required, the legacy behavior).
+// hooks carries injected verification seams. Production always executes the
+// predicate generator and seals its evidence. A nil seam supports isolated tests.
 type hooks struct {
-	genVerdict func(req core.PhaseRequest) error
+	genVerdict        func(req core.PhaseRequest) error
+	predicateEvidence func(core.PhaseRequest) (func() error, error)
 	// explanationCheck independently verifies the Build-explanation handoff
 	// after the auditor has finished. A failure overrides the native Audit
 	// response without masquerading as an EGPS predicate. nil keeps legacy unit
@@ -167,6 +165,12 @@ func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	if req.Worktree != "" {
 		fmt.Fprintf(&b, "- worktree: %s\n", req.Worktree)
 	}
+	if contract := req.Context[core.CtxKeyTaskContract]; contract != "" {
+		// Harness-owned (ADR-0098): the SAME acceptance words and predicate
+		// inventory the builder was handed — the grader reads what the builder
+		// read, so the block is an authority, not the builder's claim.
+		fmt.Fprintf(&b, "\n\n## Task Contract\n%s", contract)
+	}
 	// Continuations are TOLD their inherited OPEN defect ids (2026-08-10
 	// investigation: auditors were graded against ids they were never shown).
 	b.WriteString(inheritedDefectsPromptBlock(req))
@@ -237,55 +241,42 @@ func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRes
 	}
 
 	verdictPath := filepath.Join(req.Workspace, "acs-verdict.json")
-	// Probe quarantine runs UNCONDITIONALLY — before the verdict-exists gate.
-	// genVerdict is skipped when the auditor pre-wrote acs-verdict.json (the
-	// persona instructs exactly that), and a quarantine reachable only through
-	// genVerdict would be bypassed with it (review M8). Unconditional also
-	// means UNCOUPLED from the genVerdict hook being wired — a config path
-	// with no generator must not silently lose the quarantine with it.
+	// Probe quarantine precedes every host predicate execution, including
+	// configurations that inject their own generator.
 	// Degrades open on its own (no worktree / git failure → loud log).
 	if qErr := quarantineProbesForRequest(req); qErr != nil {
 		diags = append(diags, core.Diagnostic{Severity: "warning",
 			Message: fmt.Sprintf("probe quarantine: %s", qErr.Error())})
 	}
-	// Generate acs-verdict.json when absent and a generator is wired.
-	// Pre-staged files (operator/CI) are honored untouched — with one
-	// carve-out (cycle-1434): a file STAMPED with a project_root that differs
-	// from this phase's own is a foreign-root artifact (minted against the
-	// wrong plane's state; its reds/greens describe a different checkout) and
-	// is regenerated. Unstamped files keep the full honor — absence means
-	// "unstamped", never "mismatch". If generation writes nothing (zero
-	// predicates), the missing-file FAIL floor holds.
-	if h.genVerdict != nil {
-		_, statErr := os.Stat(verdictPath)
-		regen := os.IsNotExist(statErr)
-		if !regen && statErr == nil {
-			if stampedRoot, foreign := foreignRootVerdict(verdictPath, req.ProjectRoot); foreign {
-				regen = true
-				// Preserve the foreign artifact before regeneration clobbers
-				// it (review MEDIUM; the incident class was "the misdiagnosis
-				// was invisible from the file") — its reds/greens are the
-				// evidence of WHAT the wrong root saw.
-				preserved := filepath.Join(req.Workspace, "acs-verdict.foreign.json")
-				note := fmt.Sprintf(" (preserved as %s)", filepath.Base(preserved))
-				if renameErr := os.Rename(verdictPath, preserved); renameErr != nil {
-					note = fmt.Sprintf(" (preserve failed: %v)", renameErr)
-				}
-				diags = append(diags, core.Diagnostic{
-					Severity: "warning",
-					Message: fmt.Sprintf("acs-verdict.json was minted under project_root %q, not this phase's %q — foreign-root artifact regenerated (cycle-1434 class)%s",
-						stampedRoot, req.ProjectRoot, note),
-				})
+	// Candidate evidence is preserved, then replaced by host execution. A
+	// generator error must never leave an agent-authored green authoritative.
+	var predicateErr error
+	var sealPredicate func() error
+	if h.predicateEvidence != nil {
+		predicateErr = acssuite.InvalidateEvidence(filepath.Join(req.Workspace, "audit-report.md"))
+	}
+	if h.genVerdict != nil || h.predicateEvidence != nil {
+		if _, err := os.Lstat(verdictPath); err == nil {
+			if retireErr := preservePredicateCandidate(verdictPath); predicateErr == nil {
+				predicateErr = retireErr
 			}
+		} else if !os.IsNotExist(err) && predicateErr == nil {
+			predicateErr = err
 		}
-		if regen {
-			if genErr := h.genVerdict(req); genErr != nil {
-				diags = append(diags, core.Diagnostic{
-					Severity: "warning",
-					Message:  fmt.Sprintf("acs-verdict generation failed: %s", genErr.Error()),
-				})
-			}
+	}
+	if h.predicateEvidence != nil && predicateErr == nil {
+		if h.genVerdict == nil {
+			predicateErr = fmt.Errorf("host predicate generator is not configured")
+		} else {
+			sealPredicate, predicateErr = h.predicateEvidence(req)
 		}
+	}
+	if h.genVerdict != nil && predicateErr == nil {
+		predicateErr = h.genVerdict(req)
+	}
+	if predicateErr != nil {
+		diags = append(diags, core.Diagnostic{Severity: "error", Message: "host predicate execution: " + predicateErr.Error()})
+		overrode("host predicate execution")
 	}
 	if h.explanationCheck != nil {
 		if explanationErr := h.explanationCheck(req); explanationErr != nil {
@@ -591,6 +582,12 @@ func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRes
 	// snapshot taken 40 lines too early (review HIGH).
 	//
 	// Records only: every value above is computed and returned unchanged.
+	if sealPredicate != nil && predicateErr == nil {
+		if err := sealPredicate(); err != nil {
+			diags = append(diags, core.Diagnostic{Severity: "error", Message: "host predicate evidence: " + err.Error()})
+			overrode("host predicate evidence")
+		}
+	}
 	recordChainShadow(artifact, req, narrative, string(verdict), overrodeBy)
 
 	return verdict, diags, string(core.PhaseShip)
@@ -631,44 +628,6 @@ func extractAuditVerdict(content string, stage config.Stage) (string, bool) {
 // identical-fingerprint breaker because three DIFFERENT red predicates all
 // produced the byte-identical bare "red_count=1" reason (the cycle-1054/1060
 // constant-message collision class, at the gate-block).
-// foreignRootVerdict reports whether the verdict at path is STAMPED with a
-// project_root different from expected (cycle-1434). Both sides must be
-// non-empty — an unstamped file (pre-stamp verdicts, operator pre-stage) or
-// an unset phase root can never be "foreign". Unreadable/unparseable files
-// return false: the EGPS unreadable branch owns that failure, with its own
-// diagnostic.
-func foreignRootVerdict(path, expected string) (string, bool) {
-	if expected == "" {
-		return "", false
-	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return "", false
-	}
-	var v struct {
-		ProjectRoot string `json:"project_root"`
-	}
-	if json.Unmarshal(data, &v) != nil || v.ProjectRoot == "" {
-		return "", false
-	}
-	if canonRootPath(v.ProjectRoot) == canonRootPath(expected) {
-		return v.ProjectRoot, false
-	}
-	return v.ProjectRoot, true
-}
-
-// canonRootPath normalizes a root for comparison, resolving symlinks when the
-// path exists (macOS: /var vs /private/var — one side stamped resolved, the
-// other not, would otherwise re-run the full single-flight suite every audit;
-// the skew can only fire TOWARD regeneration, so this is cost, not
-// correctness). A path that fails to resolve falls back to Clean.
-func canonRootPath(p string) string {
-	if r, err := filepath.EvalSymlinks(p); err == nil {
-		return r
-	}
-	return filepath.Clean(p)
-}
-
 func readACSVerdict(path string) (redCount int, redIDs, phantomBindings []string, shipEligible *bool, err error) {
 	b, err := os.ReadFile(path)
 	if err != nil {
@@ -773,10 +732,13 @@ type Config struct {
 	Prompts *prompts.Loader
 	NowFn   func() time.Time
 	// GenerateVerdict, when set, produces <workspace>/acs-verdict.json from
-	// the cycle's ACS predicates if the file is absent (cycle-138/139 fix).
-	// nil = no generation (legacy: a pre-staged file is required to PASS).
+	// the cycle's ACS predicates on every classification. Candidates never
+	// suppress execution. A nil generator supports isolated phase tests.
 	// The registry default wires generateACSVerdict (runs acssuite).
 	GenerateVerdict func(req core.PhaseRequest) error
+	// BeginPredicateEvidence captures the host tree before verification and
+	// returns its final evidence sealer. Production always injects this hook.
+	BeginPredicateEvidence func(core.PhaseRequest) (func() error, error)
 	// CheckExplanation binds explanationdocs.Verify into the native Audit
 	// override. nil disables only this injected seam (tests); production defaults
 	// always wire verifyExplanationDocumentation.
@@ -824,6 +786,7 @@ func New(c Config) *Phase {
 		BaseRunner: runner.New(runner.Options{
 			Hooks: hooks{
 				genVerdict:                    c.GenerateVerdict,
+				predicateEvidence:             c.BeginPredicateEvidence,
 				explanationCheck:              c.CheckExplanation,
 				gofmtCheck:                    c.CheckGofmt,
 				skillsDriftCheck:              c.CheckSkillsDrift,
@@ -843,8 +806,8 @@ func New(c Config) *Phase {
 }
 
 // NewDefault builds the audit phase with production defaults — notably
-// GenerateVerdict wired to generateACSVerdict so the EGPS gate auto-generates
-// acs-verdict.json when the auditor agent leaves it absent (cycle-138/139 fix).
+// GenerateVerdict and host evidence capture wired together: every Audit runs
+// the real suite and seals its complete result before the ledger binds it.
 // BOTH the registry init() and the loop's runner map (go/cmd/evolve/cmd_cycle.go)
 // MUST construct audit via this single seam so the generator can never again be
 // wired in one phase-construction path but dormant in the other — the
@@ -871,6 +834,7 @@ func NewDefaultWithStageCompact(br core.Bridge, prm *prompts.Loader, stage confi
 		Bridge:                        br,
 		Prompts:                       prm,
 		GenerateVerdict:               generateACSVerdict,
+		BeginPredicateEvidence:        beginPredicateEvidence,
 		CheckExplanation:              verifyExplanationDocumentation,
 		CheckGofmt:                    gofmtCheckDefault,
 		CheckSkillsDrift:              skillsDriftCheckDefault,
@@ -975,9 +939,8 @@ func generateACSVerdict(req core.PhaseRequest) error {
 	// packages this cycle touched, not about what the suite found, so it must
 	// not sit behind the zero-predicate early return below.
 	emitTIADecision(req, root)
-	// Probe quarantine runs in Classify (before the verdict-exists gate), not
-	// here — a pre-staged acs-verdict.json skips this function entirely and
-	// must not skip the quarantine with it (review M8).
+	// Probe quarantine runs in Classify before host execution, including
+	// configurations with an injected generator.
 	// Discover predicate FILES from the worktree (Root), but resolve `.evolve/`
 	// runtime data (history, baselines, current build-report) to the MAIN project
 	// root via EVOLVE_PROJECT_ROOT — those live in main, not the worktree, so a

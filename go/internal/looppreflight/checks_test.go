@@ -206,14 +206,8 @@ func TestRun_HostCapabilities_DiskProbeError_Ignored(t *testing.T) {
 	}
 }
 
-// A NESTED launch is not an unconfined launch: the outer LLM-CLI session
-// already imposes OS sandbox + Tier-1 hooks, which is exactly why the
-// dispatch-time guard (bridge.sandboxRequiredButUnavailable) and the wrap
-// policy (sandbox.ShouldWrap) both treat nested as requirement-satisfied.
-// The 2026-09-01 first live launch after #518 hit this: preflight HALTed a
-// nested host that dispatch would have happily (and safely) run. Preflight
-// must agree with the gate it fronts: WARN with the doctrine, never HALT.
-func TestRun_HostCapabilities_SandboxWantedNested_WarnsNotHalts(t *testing.T) {
+// Nested markers do not verify the required profile-specific restrictions.
+func TestRun_HostCapabilities_SandboxWantedNested_FailsClosed(t *testing.T) {
 	opts := goodPipelineOptions(t)
 	opts.ProfileGetter = func(name string) (profiles.Profile, error) {
 		return profiles.Profile{Name: name, CLI: "claude-tmux", Sandbox: &profiles.SandboxConfig{Enabled: true}}, nil
@@ -228,27 +222,12 @@ func TestRun_HostCapabilities_SandboxWantedNested_WarnsNotHalts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
-	if r.Halted() {
-		t.Fatalf("a nested launch is confined by the outer session and must not HALT; got %s", r.OverallLevel)
+	if !r.Halted() {
+		t.Fatal("unverified mandatory confinement must HALT")
 	}
 	c := findCheck(t, r, "host-capabilities")
-	if c.Level != LevelWarn {
-		t.Fatalf("want LevelWarn surfacing the outer-confinement doctrine, got %s (%s)", c.Level, c.Detail)
-	}
-	// Honest-WARN register (sandbox-confinement-ssot.md slice 4, re-asserted by
-	// the 2026-09-01 architecture review): state the POSTURE, never a
-	// reassuring conclusion — the inner layer is unconfined, and the outer
-	// session is unverified unless the canary (sibling check) verifies it.
-	if !strings.Contains(c.Detail, "UNCONFINED at the inner layer") || !strings.Contains(c.Detail, "UNVERIFIED") {
-		t.Fatalf("the WARN must state the honest posture; got %q", c.Detail)
-	}
-	if !strings.Contains(c.Detail, "sandbox-nested-fallback") {
-		t.Fatalf("the WARN must point at the verifying sibling check; got %q", c.Detail)
-	}
-	for _, reassuring := range []string{"degrades gracefully", "runs via OUTER confinement", "already confine"} {
-		if strings.Contains(c.Detail, reassuring) {
-			t.Fatalf("reassuring phrasing %q must not appear (honest-WARN slice); got %q", reassuring, c.Detail)
-		}
+	if c.Level != LevelHalt || !strings.Contains(c.Detail, "UNVERIFIED") {
+		t.Fatalf("want explicit UNVERIFIED halt: %+v", c)
 	}
 }
 

@@ -175,17 +175,8 @@ func TestVerifyCommitGate_ReadError_NonNotExist_Transient(t *testing.T) {
 // the cycle-152 fix that prevents INTEGRITY_TREE_DRIFT on every worktree cycle.
 func TestVerifyAuditBinding_WorktreeTreeSHA_TakesPriority(t *testing.T) {
 	repo := makeRepo(t)
-	seedAudit(t, repo, "PASS", map[string]string{}) // matching HEAD/tree
-	// Append worktree_tree_sha to the auditor ledger entry.
-	wantWT := "feedface00000000000000000000000000000000000000000000000000000000"
-	ledger := filepath.Join(repo, ".evolve", "ledger.jsonl")
-	raw, err := os.ReadFile(ledger)
-	if err != nil {
-		t.Fatalf("read ledger: %v", err)
-	}
-	patched := strings.Replace(string(raw), `"tree_state_sha":`,
-		`"worktree_tree_sha":"`+wantWT+`","tree_state_sha":`, 1)
-	mustWrite(t, ledger, patched)
+	wantWT := strings.TrimSpace(runGitOut(t, repo, "write-tree"))
+	seedCustomAudit(t, repo, "Verdict: PASS\n<!-- audit_bound_tree_sha: deadbeef -->\n", 0)
 
 	opts := auditOpts(t, repo)
 	if err := verifyAuditBinding(context.Background(), opts, &RunResult{}); err != nil {
@@ -324,14 +315,15 @@ func TestPhaseRun_NilRunner_Errors(t *testing.T) {
 func TestPhaseRun_DefaultCommitMessage_WhenContextMissing(t *testing.T) {
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\ndefault-msg path\n")
-	seedAudit(t, repo, "PASS")
+	seedAudit(t, repo, "PASS", map[string]string{"cycle": "42"})
 	addRemote(t, repo)
 
 	p := New(Config{Runner: execRunner})
 	resp, err := p.Run(context.Background(), core.PhaseRequest{
-		Cycle:       42,
+		Cycle: 42,
+		RunID: "test-run", AuditRound: 1,
 		ProjectRoot: repo,
-		Workspace:   filepath.Join(repo, ".evolve", "runs", "cycle-1"),
+		Workspace:   filepath.Join(repo, ".evolve", "runs", "cycle-42"),
 		// No Context commit_message → defaultCommitMessage("evolve-cycle 42").
 		Env: map[string]string{"EVOLVE_PLUGIN_ROOT": repo},
 	})
