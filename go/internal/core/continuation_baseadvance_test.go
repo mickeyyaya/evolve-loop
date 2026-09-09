@@ -31,7 +31,10 @@ func TestAdvanceContinuationBase_HealsStaleBase(t *testing.T) {
 	gitOut(t, root, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-m", "carve out .evolve/evals (the #418 shape)")
 	mainTip := gitOut(t, root, "rev-parse", "main")
 
-	healed := advanceContinuationBase(context.Background(), wt, 81)
+	healed, err := advanceContinuationBase(context.Background(), wt, 81)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if healed != mainTip {
 		t.Fatalf("advanceContinuationBase = %q, want main tip %s — the stale base was not healed", healed, mainTip)
 	}
@@ -53,13 +56,13 @@ func TestAdvanceContinuationBase_HealsStaleBase(t *testing.T) {
 }
 
 func TestAdvanceContinuationBase_NoOpWhenCurrent(t *testing.T) {
-	_, wt := initContinuationRepo(t, 82)
-	if healed := advanceContinuationBase(context.Background(), wt, 82); healed != "" {
-		t.Fatalf("advance on an already-current base returned %q, want \"\" (no-op)", healed)
+	root, wt := initContinuationRepo(t, 82)
+	if healed, err := advanceContinuationBase(context.Background(), wt, 82); err != nil || healed != gitOut(t, root, "rev-parse", "main") {
+		t.Fatalf("advance on an already-current base returned %q, want current main (no-op)", healed)
 	}
 }
 
-func TestAdvanceContinuationBase_ConflictDegradesLoudlyToStaleBase(t *testing.T) {
+func TestAdvanceContinuationBase_ConflictReturnsErrorAndAborts(t *testing.T) {
 	root, wt := initContinuationRepo(t, 83)
 	// Lane and main edit the SAME file divergently (the raced-conflict shape
 	// the adopt-time Clean screen normally excludes).
@@ -76,8 +79,8 @@ func TestAdvanceContinuationBase_ConflictDegradesLoudlyToStaleBase(t *testing.T)
 	gitOut(t, root, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-m", "diverge")
 	head := gitOut(t, wt, "rev-parse", "HEAD")
 
-	if healed := advanceContinuationBase(context.Background(), wt, 83); healed != "" {
-		t.Fatalf("conflicting advance returned %q, want \"\" (degrade to stale base)", healed)
+	if healed, err := advanceContinuationBase(context.Background(), wt, 83); err == nil || healed != "" {
+		t.Fatalf("conflicting advance returned %q, want \"\" and an error", healed)
 	}
 	if got := gitOut(t, wt, "rev-parse", "HEAD"); got != head {
 		t.Errorf("worktree HEAD moved across an aborted merge: %s -> %s", head, got)

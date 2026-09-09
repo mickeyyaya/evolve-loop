@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// ParseResetHint extracts a benched-until time from CLI wall text. Two hint
+// ParseResetHint extracts a benched-until time from CLI wall text. Clock and relative hint
 // shapes are recognized (case-insensitive):
 //
 //	"try again at 6:11 AM"   → the NEXT occurrence of that local clock time
@@ -18,8 +18,8 @@ import (
 // is more likely a parse artifact than a real reset). Returns ok=false when
 // no hint parses — the caller falls back to CooldownForStrikes.
 //
-// The clock time is interpreted in now's location: CLIs print wall text in
-// the host's local timezone (verified against the cycle-283 codex transcript).
+// Clock times use the printed IANA timezone when present, otherwise now's
+// location (the host-local convention used by older CLI banners).
 func ParseResetHint(pane string, now time.Time) (time.Time, bool) {
 	if at, ok := parseClockHint(pane, now); ok {
 		return capHint(at, now), true
@@ -35,7 +35,7 @@ func ParseResetHint(pane string, now time.Time) (time.Time, bool) {
 const resetMargin = 2 * time.Minute
 
 var (
-	clockHintRe    = regexp.MustCompile(`(?i)try again at\s+(\d{1,2}):(\d{2})\s*(AM|PM)`)
+	clockHintRe    = regexp.MustCompile(`(?i)(?:try again at|resets)\s+(\d{1,2}):(\d{2})\s*(AM|PM)(?:[ \t]*\(([^)]+)\))?`)
 	relativeHintRe = regexp.MustCompile(`(?i)try again in\s+(?:(\d+)\s*hours?)?\s*(?:(\d+)\s*min(?:ute)?s?)?`)
 )
 
@@ -59,6 +59,18 @@ func parseClockHint(pane string, now time.Time) (time.Time, bool) {
 	m := clockHintRe.FindStringSubmatch(pane)
 	if m == nil {
 		return time.Time{}, false
+	}
+	// An incomplete explicit timezone must not fall back to observer-local time.
+	end := clockHintRe.FindStringIndex(pane)[1]
+	if strings.HasPrefix(strings.TrimLeft(pane[end:], " \t"), "(") {
+		return time.Time{}, false
+	}
+	if m[4] != "" {
+		loc, err := time.LoadLocation(m[4])
+		if err != nil {
+			return time.Time{}, false
+		}
+		now = now.In(loc)
 	}
 	hour, _ := strconv.Atoi(m[1])
 	minute, _ := strconv.Atoi(m[2])

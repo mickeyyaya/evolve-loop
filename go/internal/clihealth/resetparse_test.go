@@ -94,3 +94,28 @@ func TestEvidenceLine_FallsBackToFirstLine(t *testing.T) {
 		t.Errorf("evidenceLine = %q, want firstLine fallback", got)
 	}
 }
+
+func TestClaudeSessionResetBench(t *testing.T) {
+	banner := "You've hit your session li" + "mit · resets 5:10am (Asia/Taipei)"
+	for _, tc := range []struct{ name, now, want string }{
+		{"ahead across UTC date", "2026-09-08T20:00:00Z", "2026-09-08T21:12:00Z"},
+		{"passed rolls calendar day", "2026-09-08T22:00:00Z", "2026-09-09T21:12:00Z"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			now, _ := time.Parse(time.RFC3339, tc.now)
+			want, _ := time.Parse(time.RFC3339, tc.want)
+			entry := NewBenchEntry(Entry{}, "claude", "exhausted", "unrelated first line\n"+banner, now)
+			if !entry.BenchedUntil.Equal(want) {
+				t.Errorf("bench deadline=%v want %v", entry.BenchedUntil, want)
+			}
+			if entry.Evidence != banner {
+				t.Errorf("evidence=%q want captured banner", entry.Evidence)
+			}
+		})
+	}
+	for _, hint := range []string{"resets 13:10am (Asia/Taipei)", "resets 5:75am (Asia/Taipei)", "resets 5:10am (Invalid/Zone)", "resets 5:10am (Asia/Taipei", "resets 5:10am ()"} {
+		if _, ok := ParseResetHint(hint, time.Now()); ok {
+			t.Errorf("invalid hint accepted: %s", hint)
+		}
+	}
+}
