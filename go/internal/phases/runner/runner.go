@@ -550,6 +550,7 @@ func artifactUnchangedSince(path string, snap artifactSnapshot) bool {
 }
 
 func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseResponse, error) {
+	req.WorktreeVerified = false
 	start := b.nowFn()
 	phase := b.hooks.PhaseName()
 
@@ -949,7 +950,8 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 		log.Diag().Infof("[runner] phase=%s dispatch chain: %s\n", phase, joinAttempts(attemptLog))
 	}
 	durationMS := b.nowFn().Sub(start).Milliseconds()
-	fenceDiags := restoreWorktreeFence(context.WithoutCancel(ctx), phase, fence)
+	verified, fenceDiags := restoreWorktreeFence(context.WithoutCancel(ctx), phase, fence)
+	req.WorktreeVerified = verified
 
 	// reconciled is set when a bridge INFRA teardown (timeout OR transient) is
 	// overridden by a well-formed deliverable on disk: control then FALLS THROUGH

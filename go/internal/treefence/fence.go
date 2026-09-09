@@ -320,6 +320,9 @@ func Begin(ctx context.Context, worktree string, readOnly bool) *Fence {
 
 // Outcome is what End did, rendered by Diagnostics for the phase response.
 type Outcome struct {
+	// Verified means an actual snapshot was restored successfully. An inert
+	// fence or a failed snapshot/restore cannot authenticate the worktree.
+	Verified bool
 	// Restored lists the paths written back or removed (also on a partial
 	// failure — the caller reports both halves).
 	Restored []string
@@ -343,7 +346,16 @@ func (f *Fence) End(ctx context.Context) Outcome {
 		return Outcome{}
 	}
 	res, err := f.snap.Restore(ctx)
-	return Outcome{Restored: res.Restored, RestoreErr: err}
+	if err == nil {
+		// Restoration can reveal additions hidden by the phase's temporary
+		// .gitignore changes. Authenticate the final tree, not just write success.
+		var tree string
+		tree, err = writeTreeMode(ctx, f.snap.Worktree, f.snap.mode)
+		if err == nil && tree != f.snap.Tree {
+			err = fmt.Errorf("treefence: restored content differs from dispatch snapshot")
+		}
+	}
+	return Outcome{Verified: err == nil, Restored: res.Restored, RestoreErr: err}
 }
 
 // listMax bounds the restored-path list carried on a diagnostic.

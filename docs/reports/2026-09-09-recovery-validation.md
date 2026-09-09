@@ -208,3 +208,49 @@ loosening exact output equality. These smoke checks do not count as waves.
 Linux mandatory linked-worktree confinement is explicitly unsupported and fails closed; native Linux enforcement was not verified on this macOS host. Live writer swarm, hard model-family separation and retry adjudication remain outside this recovery. Legacy resume diagnostics are recovery hints, not authenticated Ship evidence. HEAD-based throughput remains a heuristic under concurrent lanes; live assessment must inspect actual lane commits.
 
 Two live fleet waves are the next verification step. Their usefulness is not established by unit tests, historical PASS labels or this report; record actual acceptance evidence and landed changes after those waves finish. The pre-existing unfinished cycle 1606 and user inbox edits are preserved separately.
+
+## Live Audit repair and optional dispatch recovery
+
+Prompt-delivery repair PR [#541](https://github.com/mickeyyaya/evolve-loop/pull/541)
+merged as `efecf2557c6f` with both platform jobs green. The next native two-wave
+batch passed preflight and dispatched cycles 1616–1618. Large prompts and TDD
+eval creation worked. Two lanes produced substantive code candidates: shared
+multi-task scope reconciliation, and validated multi-member triage commitments.
+The second candidate's repair reached 18 passing cycle predicates; native ACS
+reported 183 green, zero red, 53 skipped. These were candidate validation
+results, not shipping evidence.
+
+Cycle 1616 aborted when a deliberately skipped optional phase was redispatched
+by deliverable correction. Cycle 1617 underwent a report-only retry after host
+closure-citation rejection. Cycle 1618 underwent a real TDD/Builder repair, but
+its next host Audit quarantined a legitimate newly staged Builder test using
+the first Audit's old timestamp. The operator stopped the batch at that
+confirmed integrity defect. Native termination reported `stop_reason: signal`
+and `cycles: null`; **zero completed verification waves and zero useful
+landings are attributed to this attempt**. Worktrees, reports, and quarantined
+bytes are preserved. Displayed zero cost remains unmeasured telemetry.
+
+The [repair architecture](../architecture/audit-repair-isolation.md) records
+these causes, the exact content-fence authority, optional skip semantics,
+trusted launch roots, and narrow lesson-write capability. Review found an
+additional temporary-`.gitignore` evasion of restoration success; the final
+content comparison rejects that false verification claim. Real regressions
+reproduced the missing Builder file, fresh/resumed optional redispatch, dropped
+launch roots, native lesson-write EPERM, and Audit FAIL shipping-lease retention
+before their respective fixes. Ordinary WARN, mandatory/floor failure, Builder
+lesson denial, protected writes, and symlink retargeting remain negative controls.
+
+Validation of this follow-up: the full default Go suite passed all 208 packages
+(five have no tests), full vet and native build passed, and all seven affected
+integration suites passed with the race detector. The first broad run compiled
+a new lease-test fixture with an incorrect assertion about the ledger wrapper;
+the fixture now retains its injected ledger and the corrected complete core
+race/integration rerun passed. An existing quota test was updated to expect the
+intentional canonical SKIPPED disposition while retaining its failure controls.
+
+Architecture, Go/test/simplification, and defensive review all approve with zero
+remaining findings. Independent reviewers reran the composed fence/optional
+contracts and native Router/lesson positive and negative cases. The legitimate
+cycle-1618 Builder test was restored only after exact equality with its existing
+staged blob was verified; the quarantine copy remains preserved. Platform CI and
+the two completed live waves remain required after this follow-up is pushed.

@@ -115,6 +115,16 @@ func defaultSandboxWrapWithProbe(deps Deps, probeFunc func() sandbox.ProbeResult
 			}
 			return nil, false
 		}
+		if req.Phase == "retrospective" {
+			lessonPath, err := retrospectiveLessonPath(req.RepoRoot)
+			if err != nil {
+				if deps.Stderr != nil {
+					fmt.Fprintf(deps.Stderr, "[bridge] sandbox lesson grant unavailable: %v\n", err)
+				}
+				return nil, false
+			}
+			cfg.WritePaths = append(cfg.WritePaths, lessonPath)
+		}
 		cfg.WritePaths = append(cfg.WritePaths, gitWrites...)
 		cfg.DenyPaths = append(append([]string{}, cfg.DenyPaths...), gitDenies...)
 		paths := append([]string{cfg.RepoRoot}, cfg.WritePaths...)
@@ -373,4 +383,26 @@ func sandboxRequiredButUnavailable(deps Deps, cfg *Config, wrapped bool) bool {
 		fmt.Fprintf(deps.Stderr, "[bridge] sandbox requirement unsatisfied: %s\n", reason)
 	}
 	return true
+}
+
+// retrospectiveLessonPath grants only the role's documented main-repository
+// lesson directory. Resolve existing ancestors too: a not-yet-created leaf
+// below a retargeted instincts directory must not broaden the grant.
+func retrospectiveLessonPath(root string) (string, error) {
+	if !filepath.IsAbs(root) {
+		return "", fmt.Errorf("absolute project root required")
+	}
+	canonicalRoot, err := canonicalSandboxPath(root)
+	if err != nil {
+		return "", err
+	}
+	expected := filepath.Join(canonicalRoot, ".evolve", "instincts", "lessons")
+	actual, err := canonicalSandboxPath(expected)
+	if err != nil {
+		return "", err
+	}
+	if actual != expected {
+		return "", fmt.Errorf("lesson directory resolves outside its declared scope")
+	}
+	return actual, nil
 }

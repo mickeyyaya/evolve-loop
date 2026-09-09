@@ -47,7 +47,7 @@ func wrapCycleLevelError(phase Phase, err error) error {
 }
 
 // optionalInfraSkip reports whether a phase whose retries exhausted may
-// degrade to WARN+advance instead of aborting the cycle (the Workstream-D
+// record SKIPPED with a warning and advance instead of aborting the cycle (the Workstream-D
 // intent documented on ErrArtifactTimeout; cycle-283). Four conditions, all
 // required: the error is skippable-shaped per IsOptionalSkippableError (infra
 // teardown — artifact timeout / transient bridge — OR a missing persona doc,
@@ -69,10 +69,10 @@ func wrapCycleLevelError(phase Phase, err error) error {
 // response so the cause reaches audit/retro, not only stderr + ledger.
 func optionalSkipDetails(p Phase, err error) (kind, msg string, diags []Diagnostic) {
 	if errors.Is(err, ErrAgentDocMissing) {
-		msg = fmt.Sprintf("optional phase %s: persona doc missing (%v) — degrading to WARN and advancing; write agents/<agent>.md or mark the phase catalog:\"on-demand\"", p, err)
+		msg = fmt.Sprintf("optional phase %s: persona doc missing (%v) — skipping with a warning; provide the phase persona before selecting it again", p, err)
 		return "optional_missing_persona_skip", msg, []Diagnostic{{Severity: "warn", Message: msg}}
 	}
-	msg = fmt.Sprintf("optional phase %s exhausted infra retries (%v) — degrading to WARN and advancing", p, err)
+	msg = fmt.Sprintf("optional phase %s exhausted infra retries (%v) — skipping with a warning", p, err)
 	return "optional_infra_skip", msg, []Diagnostic{{Severity: "warn", Message: msg}}
 }
 

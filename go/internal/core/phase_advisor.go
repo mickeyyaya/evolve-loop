@@ -272,6 +272,10 @@ func (p *PhaseAdvisor) advisorLaunch(in router.RouteInput, errPfx, kind, prompt,
 	// single un-fallback-able Launch. identity.CLI (not llmroute.resolvePrimary,
 	// which re-reads profile.cli) is the explicit primary so the composition
 	// root's bench-aware CLI swap is honored (llmroute.ChainFor's H2 seam).
+	worktree := in.ActiveWorktree
+	if worktree == "" {
+		worktree = in.Workspace
+	}
 	plan := llmroute.ChainFor(p.identity.CLI, loadDispatchProfile(profile))
 	var resp BridgeResponse
 	dispatched := llmroute.Dispatch(plan, func(cli string) (int, error) {
@@ -292,7 +296,8 @@ func (p *PhaseAdvisor) advisorLaunch(in router.RouteInput, errPfx, kind, prompt,
 			Skills:       overlaySkills,
 			Prompt:       prompt,
 			Workspace:    in.Workspace,
-			Worktree:     in.ActiveWorktree,
+			Worktree:     worktree,
+			ProjectRoot:  in.ProjectRoot,
 			ArtifactPath: filepath.Join(in.Workspace, artifactFile),
 			Completion:   completion,
 			Agent:        p.identity.AgentLabel,

@@ -41,10 +41,10 @@ type retryOpts struct {
 	// response and true when it recovered the phase.
 	backfill func(phase Phase, err error, attempt, maxAttempts int) (PhaseResponse, bool)
 	// optionalInfraSkip reports whether a catalog-Optional, off-floor phase
-	// whose exhaustion is infra-shaped may degrade to WARN and advance.
+	// whose exhaustion is infra-shaped may return SKIPPED with a warning and advance.
 	optionalInfraSkip func(phase Phase, err error) bool
 	// postShipObserverSkip reports whether a best-effort post-ship Control
-	// observer's failure may degrade to WARN (shipped state read at call time).
+	// observer's failure may return SKIPPED with a warning (shipped state read at call time).
 	postShipObserverSkip func(phase Phase) bool
 	// shipRecovery routes a structured ShipError to the advisor's recovery
 	// chain, returning true when the cycle is recovering rather than aborting.
@@ -192,11 +192,11 @@ func (cr *cycleRun) retryPhaseRunner(phase Phase, req PhaseRequest, opts retryOp
 					}
 				}
 				if opts.optionalInfraSkip != nil && opts.optionalInfraSkip(phase, err) {
-					_, _, diags := optionalSkipDetails(phase, err)
-					return PhaseResponse{Phase: string(phase), Verdict: VerdictWARN, ArtifactsDir: cr.cs.WorkspacePath, Diagnostics: diags}, attempt, nil
+					kind, msg, _ := optionalSkipDetails(phase, err)
+					return cr.recordPhaseSkip(phase, err, kind, msg), attempt, nil
 				}
 				if opts.postShipObserverSkip != nil && opts.postShipObserverSkip(phase) {
-					return PhaseResponse{Phase: string(phase), Verdict: VerdictWARN, ArtifactsDir: cr.cs.WorkspacePath}, attempt, nil
+					return cr.recordPhaseSkip(phase, err, "post_ship_observer_skip", "best-effort observer failed after Ship; skipping"), attempt, nil
 				}
 				return resp, attempt, err
 			}
@@ -205,4 +205,19 @@ func (cr *cycleRun) retryPhaseRunner(phase Phase, req PhaseRequest, opts retryOp
 		}
 		executeRetryBackoff(attempt, cr.retryConfig.RetryBackoffBaseS)
 	}
+}
+
+// recordPhaseSkip is used only after the host admits an absent deliverable.
+// SKIPPED keeps contract review from redispatching the missing phase; the
+// warning and ledger retain its failure without making a success claim.
+func (cr *cycleRun) recordPhaseSkip(phase Phase, cause error, kind, msg string) PhaseResponse {
+	fmt.Fprintf(os.Stderr, "[orchestrator] WARN %s (%s)\n", msg, kind)
+	if err := cr.o.ledger.Append(cr.ctx, LedgerEntry{
+		TS: cr.o.now().UTC().Format(time.RFC3339), Cycle: cr.cycle,
+		Role: string(phase), Kind: kind, ExitCode: bridgeExitCode(cause),
+	}); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN %s ledger append: %v\n", kind, err)
+	}
+	return PhaseResponse{Phase: string(phase), Verdict: VerdictSKIPPED,
+		ArtifactsDir: cr.cs.WorkspacePath, Diagnostics: []Diagnostic{{Severity: "warn", Message: msg}}}
 }

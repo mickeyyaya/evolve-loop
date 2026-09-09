@@ -39,9 +39,14 @@ func (cr *cycleRun) recordAndBranch(next Phase, dr dispatchResult) (loopAction, 
 	// Cycle-778 ship-window lease: audit's binding snapshot (`git rev-parse
 	// HEAD` inside emitPhaseBindings→recordAuditBinding) opens the window a
 	// sibling landing on main would turn into a deep-tier re-audit — acquire
-	// BEFORE the snapshot; any later completed phase (normally ship, after its
+	// BEFORE a shippable snapshot; any later completed phase (normally ship, after its
 	// push) releases below. No-op for every phase but audit; fail-open.
-	cr.acquireShipWindow(next)
+	if next == PhaseAudit && (dr.resp.Verdict == VerdictPASS || dr.resp.Verdict == VerdictWARN) {
+		cr.acquireShipWindow(next)
+	} else if next == PhaseAudit {
+		// A rejected audit cannot ship; repairs must not hold sibling lanes.
+		cr.releaseShipWindow()
+	}
 
 	cr.o.emitPhaseBindings(cr.ctx, cr.cycle, cr.req.ProjectRoot, cr.cs, next, dr.resp.Verdict)
 

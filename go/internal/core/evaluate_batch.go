@@ -90,9 +90,9 @@ func (cr *cycleRun) phaseRequestFor(phase Phase) PhaseRequest {
 // there cannot silently miss this path (the gap that produced this item — an
 // optional evaluate phase exhausting infra retries aborted the whole batch).
 // Keeps `ship ⇒ build ∧ audit ∧ tdd` intact: mandatory/floor phases match no
-// skip predicate, so their errors still propagate. The ledger/failure-learning
-// side effects the sequential path emits are recorded by the batch merge, not
-// here (this helper mutates nothing, per its concurrency contract).
+// skip predicate, so their errors still propagate. Admitted skip records use
+// the synchronized ledger here; cycle state and phase completion records stay
+// on the serial batch merge path.
 func (cr *cycleRun) dispatchRunnerWithRetry(phase Phase, req PhaseRequest) (PhaseResponse, int, error) {
 	// Delegate — never a second hand-maintained loop. The batch's divergence
 	// from the sequential path is declared in evaluateBatchRetryOpts (ship
@@ -106,8 +106,8 @@ func (cr *cycleRun) dispatchRunnerWithRetry(phase Phase, req PhaseRequest) (Phas
 //
 // Safety: only runner.Run (the minutes-long LLM slice) runs concurrently; every
 // shared-state mutation — recordPhaseOutcome (the ADR-0044 C1 chokepoint),
-// CompletedPhases, ledger, cycle-state — happens in the single-goroutine merge,
-// so there are no races. Verdict merge is weakest-link (FAIL>WARN>PASS). A hard
+// CompletedPhases, phase-completion ledger, cycle-state — happens in the single-goroutine merge,
+// except admitted skip records appended through the synchronized ledger by workers. Verdict merge is weakest-link (FAIL>WARN>PASS). A hard
 // dispatch error is all-or-nothing: every phase's outcome is still recorded
 // (C1-complete) and the cycle aborts on the first error.
 //

@@ -6,7 +6,7 @@ package core
 // Context. The sequential dispatch loop (cyclerun_dispatch.go) applies TWO
 // skip predicates before treating a phase's exhausted retries as a
 // cycle-level failure: optionalInfraSkip (an Optional, non-mandatory,
-// off-floor phase whose exhaustion is infra-shaped degrades to WARN+advance)
+// off-floor phase whose exhaustion is infra-shaped degrades to SKIPPED with warning + advance)
 // and postShipObserverSkip (a best-effort post-ship Control observer's
 // failure never turns an already-shipped cycle abnormal). dispatchRunnerWithRetry
 // (evaluate_batch.go) — the SAME per-phase retry loop, reused for the
@@ -14,7 +14,7 @@ package core
 // raw error on exhaustion unconditionally. A batched Optional evaluate phase
 // (or a post-ship Control observer that happened to land in a batch) that
 // exhausts retries therefore aborts the WHOLE cycle in the batched path where
-// the identical phase would have degraded to WARN+advance in the sequential
+// the identical phase would have degraded to SKIPPED with warning + advance in the sequential
 // path — the copy-adapted-control-flow class of defect already fixed once in
 // this codebase (statefile-rmw-flock-single-source, cycle 617). This blocks
 // the parallel-evaluate enforce flip (memory: phase_timing_evidence) because
@@ -22,7 +22,7 @@ package core
 // batched phase.
 //
 // RED today: dispatchRunnerWithRetry ignores both skip predicates, so the
-// assertions below (err==nil, verdict WARN) fail against the current
+// assertions below (err==nil, verdict SKIPPED) fail against the current
 // unconditional-error return — a real behavioral RED, not a compile error.
 
 import (
@@ -80,7 +80,7 @@ func retryParityCycleRun(o *Orchestrator, t *testing.T) *cycleRun {
 
 // TestDispatchRunnerWithRetry_OptionalInfraSkipParity — AC-1 (the core fix):
 // an Optional, off-floor, non-mandatory phase that exhausts retries on an
-// ErrArtifactTimeout must degrade to WARN+advance (err==nil) instead of
+// ErrArtifactTimeout must degrade to SKIPPED with warning + advance (err==nil) instead of
 // propagating the error, matching optionalInfraSkip's sequential-path
 // behavior.
 func TestDispatchRunnerWithRetry_OptionalInfraSkipParity(t *testing.T) {
@@ -91,10 +91,10 @@ func TestDispatchRunnerWithRetry_OptionalInfraSkipParity(t *testing.T) {
 	resp, attempts, err := cr.dispatchRunnerWithRetry(Phase("evaluator"), PhaseRequest{})
 
 	if err != nil {
-		t.Fatalf("optional off-floor phase exhausting infra retries must degrade to WARN+advance (err==nil), got err=%v", err)
+		t.Fatalf("optional off-floor phase exhausting infra retries must degrade to SKIPPED with warning + advance (err==nil), got err=%v", err)
 	}
-	if resp.Verdict != VerdictWARN {
-		t.Errorf("degraded response verdict = %q, want %q", resp.Verdict, VerdictWARN)
+	if resp.Verdict != VerdictSKIPPED {
+		t.Errorf("degraded response verdict = %q, want %q", resp.Verdict, VerdictSKIPPED)
 	}
 	if attempts != o.retryConfig.PhaseMaxAttempts {
 		t.Errorf("attempts = %d, want %d (retries must still exhaust before degrading)", attempts, o.retryConfig.PhaseMaxAttempts)
@@ -106,7 +106,7 @@ func TestDispatchRunnerWithRetry_OptionalInfraSkipParity(t *testing.T) {
 
 // TestDispatchRunnerWithRetry_PostShipObserverSkipParity — AC-2: a best-effort
 // post-ship Control observer phase (memo) that exhausts retries with a
-// NON-infra error, on an already-shipped cycle, must degrade to WARN+advance
+// NON-infra error, on an already-shipped cycle, must degrade to SKIPPED with warning + advance
 // — matching postShipObserverSkip's sequential-path behavior. This is the
 // half optionalInfraSkip alone cannot cover (postShipObserverSkip fires on
 // ANY error shape once shipped==true, not just infra-shaped ones).
@@ -119,10 +119,10 @@ func TestDispatchRunnerWithRetry_PostShipObserverSkipParity(t *testing.T) {
 	resp, _, err := cr.dispatchRunnerWithRetry(Phase("memo"), PhaseRequest{})
 
 	if err != nil {
-		t.Fatalf("post-ship best-effort observer failure on an already-shipped cycle must degrade to WARN+advance (err==nil), got err=%v", err)
+		t.Fatalf("post-ship best-effort observer failure on an already-shipped cycle must degrade to SKIPPED with warning + advance (err==nil), got err=%v", err)
 	}
-	if resp.Verdict != VerdictWARN {
-		t.Errorf("degraded response verdict = %q, want %q", resp.Verdict, VerdictWARN)
+	if resp.Verdict != VerdictSKIPPED {
+		t.Errorf("degraded response verdict = %q, want %q", resp.Verdict, VerdictSKIPPED)
 	}
 }
 
