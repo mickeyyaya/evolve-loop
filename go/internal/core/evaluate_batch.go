@@ -69,6 +69,7 @@ func (cr *cycleRun) phaseRequestFor(phase Phase) PhaseRequest {
 		PreviousPhase:                   string(cr.current),
 		Env:                             cr.envSnap,
 		Context:                         cr.ctxSnap,
+		Signals:                         dispatchSignals(phase, cr.cs.WorkspacePath, cr.req.ProjectRoot),
 		BypassPolicy:                    cr.req.BypassPolicy,
 		OperatorDirectives:              cr.directivesSet.Merged,
 	}

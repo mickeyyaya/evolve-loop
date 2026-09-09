@@ -1,11 +1,13 @@
 # ADR-0099 — Deliverable kinds: solution cycles on the same spine
 
 - **Status:** Accepted (2026-09-09). Slice 1 (the kernel half — `deliverable_kind` / `goal_type`
-  signals, the AND-able conditional rule, the solution recipes) landed as #539; slice 2 (this
-  PR — the document deliverable contract, `internal/solutioncheck` projected as build floor,
+  signals, the AND-able conditional rule, the solution recipes) landed as #539; slice 2 (the
+  document deliverable contract, `internal/solutioncheck` projected as build floor,
   `evolve solution check` and audit gate, the kind on the Task Contract, the first
-  `.evolve/domain.json` reader, the `solution(<slug>)` commit prefix) follows it; slice 3 (the
-  prompt-layer skills and the scout/triage header lines) is next under the same number.
+  `.evolve/domain.json` reader, the `solution(<slug>)` commit prefix) as #543; slice 3 (this
+  PR — the solution-skill personas preloaded by a signal-keyed overlay rule whose signals core
+  projects at dispatch, and the scout/triage header lines in the dispatched personas)
+  completes the ADR.
 - **Driving evidence:** the operator's 2026-09-09 directive — the factory must produce non-code
   solutions *in this repo, through the same pipeline*: intent and scout unchanged in role, build
   delivering several candidate strategies, audit reviewing them, the **advisor** deciding the
@@ -71,6 +73,10 @@
    `assumptions-and-evidence.md`, adversarial steelman of the non-recommended options) are
    skills selected by a policy overlay rule extended with a `when` signal selector; the advisor
    may add more. The scout's Implementation-First rule becomes kind-conditional.
+   The signals the `when` selector reads are core's projection at dispatch (`PhaseRequest.Signals`:
+   declared kind > project default > `code`; `scout.goal_type` when declared), keyed by the
+   kernel's routable field names — the runner copies, never digests; every compiled-default skill
+   is protected surface.
 6. **No flags.** The kind is a typed value in config and report headers dispatched through
    existing seams (the conditional rule, the overlay rule, the floor engine composition).
 
@@ -92,5 +98,9 @@
   semantics otherwise).
 - `docs/architecture/phase-registry.json` is the registry the loop loads (`cmd_cycle.go`); the
   runtime plane's ignored `.evolve/phase-registry.json` copy is a dead June artifact.
-- Persona edits (scout/triage header lines and task bullets) land with slice 3; until then the
-  kernel's default keeps every cycle `code`, byte-identical to today.
+- Persona edits (scout/triage header lines and task bullets) landed with slice 3 in the
+  DISPATCHED personas (`agents/evolve-scout.md`'s operational body above the strip marker,
+  `agents/evolve-triage.md`). A cycle whose reports declare nothing stays `code` for the
+  integrity floor; overlay selection may already follow the project default kind from
+  `.evolve/domain.json` (core's `dispatchSignals`: declared > project default > `code`, one
+  kernel digest per dispatch, copied onto `PhaseRequest.Signals` — the runner digests nothing).

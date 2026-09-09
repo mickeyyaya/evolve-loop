@@ -120,7 +120,7 @@ Synthesize findings into 2-4 small/medium tasks. Each task proposal must include
 
 **Task sizing:** S=20-40K, M=40-80K tokens. Prefer 3 small over 1 large. Verify total fits `tokenBudget.perCycle` (200K default); drop lowest-priority if exceeded.
 
-**Implementation-First:** Tasks MUST target existing files, not standalone docs. See `task-selection-tables` for examples/exceptions.
+**Implementation-First:** Tasks MUST target existing files, not standalone docs. See `task-selection-tables` for examples/exceptions. **Exception:** a `document` task IS the implementation — its deliverable is `<deliverable_root>/<slug>/` (`deliverable_root` in your context), graded by `evolve solution check <slug>` (`[code]`) plus ≥1 `[model]` rubric.
 
 ### Skill Matching (per task)
 
@@ -141,7 +141,7 @@ Per task: write eval under absolute `workspace` path from Cycle Context: `<works
 
 ### Workspace File: `workspace/scout-report.md`
 
-**Challenge token header (REQUIRED).** First line of `scout-report.md` MUST be `<!-- challenge-token: <token-value> -->`. Token from `challengeToken` input (or `workspace/challenge-token.txt`). Missing = CRITICAL FAIL (forgery indicator).
+**Challenge token header (REQUIRED).** First line of `scout-report.md` MUST be `<!-- challenge-token: <token-value> -->`. Token from `challengeToken` input (or `workspace/challenge-token.txt`). Missing = CRITICAL FAIL (forgery indicator). **Kind header lines (REQUIRED, kernel-read):** directly after the token, `goal_type: <a Goal-Type Recipes key>` and `deliverable_kind: <code | document>` — `document` only when EVERY selected task delivers a strategy/plan under `<deliverable_root>/<slug>/` (mixed ⇒ `code`; a task that declares nothing takes `deliverable_kind_default` from your context); each Selected Task carries `- **Deliverable kind:** code | document`. Triage re-declares the kind authoritatively; the advisor releases `tdd` and preloads the solution personas only from these words.
 
 Required sections (in order): Discovery Summary, Key Findings, Research, Research → Implementation Map, Hypotheses, Beyond-the-Ask Hypotheses, Selected Tasks, Acceptance Criteria Summary, Carryover Decisions, Deferred, Decision Trace. See reference `output-template` for template and ANCHOR comments.
 

@@ -70,6 +70,9 @@ func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	if kind := req.Context[core.CtxKeyDeliverableKindDefault]; kind != "" {
 		fmt.Fprintf(&b, "- deliverable_kind_default: %s\n", kind)
 	}
+	if root := req.Context[core.CtxKeyDeliverableRoot]; root != "" {
+		fmt.Fprintf(&b, "- deliverable_root: %s\n", root)
+	}
 	// Goal text propagates via Context["goal"] when the operator
 	// passed --goal-text. Scout reads it as a CONSTRAINT — its
 	// backlog-vs-goal selection should treat the goal as canonical.

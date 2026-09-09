@@ -208,19 +208,19 @@ func scoutFromReportFallback(workspace string, degraded *[]string) ScoutSignals 
 	}
 	return ScoutSignals{
 		Present:         true,
-		GoalType:        reportHeaderValue(md, headerGoalType),
-		DeliverableKind: NormalizeDeliverableKind(reportHeaderValue(md, headerDeliverableKind)),
+		GoalType:        reportHeaderValue(md, HeaderGoalType),
+		DeliverableKind: NormalizeDeliverableKind(reportHeaderValue(md, HeaderDeliverableKind)),
 	}
 }
 
-// Report header keys the kernel reads (ADR-0099). The persona lines that WRITE
-// them land with slice 3 and must use exactly these words; until then every
-// cycle stays undeclared ⇒ code. Named once so the prompt side has one constant
-// to generate/assert against instead of a second literal.
+// Report header keys the kernel READS (ADR-0099) and the scout/triage personas
+// WRITE — exported so the persona templates are pinned to these exact words
+// (TestPersonaTemplates_CarryTheHeaderLines) instead of carrying a second
+// literal that could drift.
 const (
-	headerGoalType        = "goal_type:"
-	headerDeliverableKind = "deliverable_kind:"
-	headerCycleSize       = "cycle_size_estimate:"
+	HeaderGoalType        = "goal_type:"
+	HeaderDeliverableKind = "deliverable_kind:"
+	HeaderCycleSize       = "cycle_size_estimate:"
 )
 
 // readReportFallback is the ONE report-fallback ladder (R5) the scout and triage
@@ -259,8 +259,8 @@ func triageFromReportFallback(workspace string, degraded *[]string) TriageSignal
 	}
 	return TriageSignals{
 		Present:         true,
-		CycleSize:       reportHeaderValue(md, headerCycleSize),
-		DeliverableKind: NormalizeDeliverableKind(reportHeaderValue(md, headerDeliverableKind)),
+		CycleSize:       reportHeaderValue(md, HeaderCycleSize),
+		DeliverableKind: NormalizeDeliverableKind(reportHeaderValue(md, HeaderDeliverableKind)),
 	}
 }
 

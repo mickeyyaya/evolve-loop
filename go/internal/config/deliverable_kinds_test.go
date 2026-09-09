@@ -105,3 +105,22 @@ func TestDocumentSpec_AndKindVocabulary(t *testing.T) {
 		t.Errorf("a contract without root/min_options must load with a warning; got %v", ws)
 	}
 }
+
+// TestSignalKeys_AreTheConditionalRuleWords — ADR-0099 slice 3: an overlay
+// `when` clause, core's dispatch projection and the compiled tdd rule name the
+// deliverable-kind signal with ONE word, and the goal type is the scout's
+// namespaced routable field.
+func TestSignalKeys_AreTheConditionalRuleWords(t *testing.T) {
+	named := false
+	for _, c := range DefaultTddRule().Clauses() {
+		if c.Field == SignalDeliverableKind {
+			named = true
+		}
+	}
+	if !named {
+		t.Errorf("DefaultTddRule %q does not name SignalDeliverableKind %q", DefaultTddRuleExpr, SignalDeliverableKind)
+	}
+	if !strings.HasPrefix(SignalGoalType, "scout.") {
+		t.Errorf("SignalGoalType = %q, want the scout-namespaced routable field", SignalGoalType)
+	}
+}

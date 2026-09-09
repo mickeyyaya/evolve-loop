@@ -22,6 +22,8 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 )
 
 // OverlaysPolicy is the operator-configurable skill-overlay block. Rules are
@@ -62,16 +64,26 @@ type OverlayRule struct {
 	CLIs   []string `json:"clis,omitempty"`
 	Models []string `json:"models,omitempty"`
 	Tiers  []string `json:"tiers,omitempty"`
-	Skills []string `json:"skills,omitempty"`
+	// When keys the rule on the CYCLE's objective signals (ADR-0099 slice 3):
+	// every clause must hold against OverlayDispatch.Signals. An absent
+	// signal never matches (fail-closed, the D2 discipline), so a rule keyed
+	// on `deliverable_kind == document` is inert until core has projected a
+	// document kind. The clause type is the kernel's own (config.Condition),
+	// string-valued here: {"field": "deliverable_kind", "op": "eq", "value": "document"}.
+	When   []config.Condition `json:"when,omitempty"`
+	Skills []string           `json:"skills,omitempty"`
 }
 
 // OverlayDispatch is the descriptor a resolver call is keyed on — the phase,
-// driver (cli), model, and capability tier of a single agent launch.
+// driver (cli), model, and capability tier of a single agent launch, plus the
+// cycle's objective signals the `when` selector reads (nil when the caller
+// has none: every `when` rule then stays inert).
 type OverlayDispatch struct {
-	Phase string
-	CLI   string
-	Model string
-	Tier  string
+	Phase   string
+	CLI     string
+	Model   string
+	Tier    string
+	Signals map[string]string
 }
 
 // compiledDefaultOverlays is the single source of the built-in overlay set —
@@ -79,9 +91,35 @@ type OverlayDispatch struct {
 // it wholesale via policy.json's overlays block (absent ⇒ this default; empty
 // rules ⇒ opt out).
 func compiledDefaultOverlays() []OverlayRule {
+	document := []config.Condition{{Field: config.SignalDeliverableKind, Op: "eq", Value: config.DeliverableKindDocument}}
 	return []OverlayRule{
 		{Tiers: []string{"deep", "top"}, Skills: []string{"fable"}},
+		// ADR-0099 slice 3: a document cycle's discovery, build and audit run
+		// under the solution-skill personas — deterministic, signal-keyed, and
+		// inert for every code cycle (absent/`code` signal ⇒ no match).
+		{Phases: []string{"scout"}, When: document, Skills: []string{"solution-scout"}},
+		{Phases: []string{"build"}, When: document, Skills: []string{"solution-build"}},
+		{Phases: []string{"audit"}, When: document, Skills: []string{"solution-audit"}},
 	}
+}
+
+// CompiledDefaultOverlaySkills returns every skill the compiled-default rules
+// can preload, deduped in rule order — the ONE list the integrity guard pins
+// ProtectedSurfaceManifest to: a persona the kernel injects on its own
+// authority is control-plane (docs/architecture/skill-overlays.md).
+func CompiledDefaultOverlaySkills() []string {
+	var out []string
+	seen := map[string]struct{}{}
+	for _, r := range compiledDefaultOverlays() {
+		for _, s := range r.Skills {
+			if _, dup := seen[s]; dup {
+				continue
+			}
+			seen[s] = struct{}{}
+			out = append(out, s)
+		}
+	}
+	return out
 }
 
 // ResolveOverlays returns the ordered, deduped skill list that applies to the
@@ -260,7 +298,38 @@ func (r OverlayRule) matches(d OverlayDispatch) bool {
 	return matchDim(r.Phases, d.Phase) &&
 		matchDim(r.CLIs, d.CLI) &&
 		matchDim(r.Models, d.Model) &&
-		matchDim(r.Tiers, d.Tier)
+		matchDim(r.Tiers, d.Tier) &&
+		matchWhen(r.When, d.Signals)
+}
+
+// matchWhen reports whether every `when` clause holds. A clause over an
+// ABSENT signal is false in both polarities and an unknown op is false
+// (fail-closed). Which signals can be absent is the producer's contract: core
+// always supplies config.SignalDeliverableKind (declared, else the project default,
+// else "code" — so `ne document` DOES fire on a default-code cycle) and
+// config.SignalGoalType only when the scout declared one; a nil-Signals dispatch
+// (the non-phase launch seams) matches no `when` rule at all.
+func matchWhen(when []config.Condition, signals map[string]string) bool {
+	for _, c := range when {
+		v, ok := signals[c.Field]
+		want, isStr := c.Value.(string)
+		if !ok || !isStr {
+			return false
+		}
+		switch c.Op {
+		case "eq", "==":
+			if v != want {
+				return false
+			}
+		case "ne", "!=":
+			if v == want {
+				return false
+			}
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 // matchDim reports whether value satisfies a selector dimension. An empty

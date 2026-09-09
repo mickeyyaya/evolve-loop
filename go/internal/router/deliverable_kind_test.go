@@ -195,3 +195,44 @@ func TestNormalizeDeliverableKind(t *testing.T) {
 		}
 	}
 }
+
+// TestRoutingSignals_DeclaredDeliverableKind — ADR-0099 slice 3: the kernel
+// exposes whether a kind was DECLARED (triage > scout) separately from its
+// conservative "code" default, so the dispatch-time projection can substitute
+// the project default only when no report spoke, while the integrity floor
+// keeps reading declarations alone.
+func TestRoutingSignals_DeclaredDeliverableKind(t *testing.T) {
+	var none RoutingSignals
+	if k, ok := none.DeclaredDeliverableKind(); ok || k != "" {
+		t.Errorf("undeclared = (%q,%v), want (\"\",false)", k, ok)
+	}
+	if got := none.DeliverableKind(); got != config.DeliverableKindCode {
+		t.Errorf("default = %q, want code", got)
+	}
+	scoutDoc := RoutingSignals{Scout: ScoutSignals{Present: true, DeliverableKind: config.DeliverableKindDocument}}
+	if k, ok := scoutDoc.DeclaredDeliverableKind(); !ok || k != config.DeliverableKindDocument {
+		t.Errorf("scout-declared = (%q,%v), want (document,true)", k, ok)
+	}
+	triageCode := scoutDoc
+	triageCode.Triage = TriageSignals{Present: true, DeliverableKind: config.DeliverableKindCode}
+	if k, ok := triageCode.DeclaredDeliverableKind(); !ok || k != config.DeliverableKindCode {
+		t.Errorf("triage overrides scout = (%q,%v), want (code,true)", k, ok)
+	}
+	if got := triageCode.DeliverableKind(); got != config.DeliverableKindCode {
+		t.Errorf("DeliverableKind must project the same declaration; got %q", got)
+	}
+}
+
+// TestResolveField_OverlaySignalVocabulary: the overlay `when` selector and the
+// kernel's conditional rules name a signal with ONE word — the policy constants
+// are the routable field names, so an operator writes `scout.goal_type` in
+// both places and it resolves to the same value.
+func TestResolveField_OverlaySignalVocabulary(t *testing.T) {
+	sig := RoutingSignals{Scout: ScoutSignals{Present: true, GoalType: "partnership-deal", DeliverableKind: config.DeliverableKindDocument}}
+	if !evalCondition(sig, config.Condition{Field: config.SignalGoalType, Op: "eq", Value: "partnership-deal"}) {
+		t.Errorf("%q must resolve to the scout's declared goal type", config.SignalGoalType)
+	}
+	if !evalCondition(sig, config.Condition{Field: config.SignalDeliverableKind, Op: "eq", Value: config.DeliverableKindDocument}) {
+		t.Errorf("%q must resolve to the projected deliverable kind", config.SignalDeliverableKind)
+	}
+}
