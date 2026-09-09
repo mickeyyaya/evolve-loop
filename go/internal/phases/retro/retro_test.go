@@ -168,6 +168,9 @@ func TestRun_PreviousFAIL_PASSWithLesson(t *testing.T) {
 	if fb.gotReq.ArtifactPath != filepath.Join(ws, "retrospective-report.md") {
 		t.Errorf("ArtifactPath=%q, want retrospective-report.md (agent output path)", fb.gotReq.ArtifactPath)
 	}
+	if fb.gotReq.ProjectRoot != "/tmp/proj" {
+		t.Errorf("ProjectRoot=%q, want trusted main root", fb.gotReq.ProjectRoot)
+	}
 	wantProfile := filepath.Join("/tmp/proj", ".evolve", "profiles", "retrospective.json")
 	if fb.gotReq.Profile != wantProfile {
 		t.Errorf("Profile=%q, want %q", fb.gotReq.Profile, wantProfile)

@@ -63,6 +63,10 @@ func (j *PlanJudge) GradePlan(ctx context.Context, in router.RouteInput, plan *r
 	if in.ProjectRoot != "" {
 		profile = filepath.Join(in.ProjectRoot, ".evolve", "profiles", "judge.json")
 	}
+	worktree := in.ActiveWorktree
+	if worktree == "" {
+		worktree = in.Workspace
+	}
 	artifactPath := filepath.Join(in.Workspace, "routing-judge.json")
 	resp, err := j.bridge.Launch(ctx, BridgeRequest{
 		CLI:          j.cli,
@@ -70,6 +74,8 @@ func (j *PlanJudge) GradePlan(ctx context.Context, in router.RouteInput, plan *r
 		Model:        j.model,
 		Prompt:       j.composeJudgePrompt(in, plan, artifactPath),
 		Workspace:    in.Workspace,
+		Worktree:     worktree,
+		ProjectRoot:  in.ProjectRoot,
 		ArtifactPath: artifactPath, // single-sourced: the prompt instructs the SAME path the bridge watches
 		Completion:   "artifact",
 		Agent:        "judge", // NON-router label — the recursion guard (never re-enters planning)

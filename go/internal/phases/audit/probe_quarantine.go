@@ -63,6 +63,12 @@ const anchorFileName = ".dispatch-anchor"
 // silent skip here would hide the one case where exposure is HIGHEST). No
 // dispatch anchor → skip loudly (no cutoff exists to discriminate with).
 func quarantineProbesForRequest(req core.PhaseRequest) error {
+	// The content fence already removed this dispatch's additions and restored
+	// Builder bytes. Their mtimes may now be newer than any audit anchor;
+	// re-attributing them by time would delete authenticated deliverables.
+	if req.WorktreeVerified {
+		return nil
+	}
 	if req.Worktree == "" {
 		fmt.Fprintf(os.Stderr, "[audit] probe quarantine skipped: no worktree on cycle %d — the EGPS suite runs against the main tree unscanned\n", req.Cycle)
 		return nil

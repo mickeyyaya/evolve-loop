@@ -281,19 +281,9 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 				// the cycle advances toward audit/ship. The failed attempts stay
 				// in failure-learning and the ledger — recovered, never silent.
 				if retryHooks.optionalInfraSkip(next, err) {
-					kind, msg, diags := optionalSkipDetails(next, err)
-					fmt.Fprintf(os.Stderr, "[orchestrator] WARN %s (%s)\n", msg, kind)
+					kind, msg, _ := optionalSkipDetails(next, err)
 					cr.recordFailureLearning(next, fmt.Errorf("phase %s: %w", next, err), attempt)
-					if lerr := cr.o.ledger.Append(cr.ctx, LedgerEntry{
-						TS:       cr.o.now().UTC().Format(time.RFC3339),
-						Cycle:    cr.cycle,
-						Role:     string(next),
-						Kind:     kind,
-						ExitCode: bridgeExitCode(err),
-					}); lerr != nil {
-						fmt.Fprintf(os.Stderr, "[orchestrator] WARN %s ledger append: %v\n", kind, lerr)
-					}
-					resp = PhaseResponse{Phase: string(next), Verdict: VerdictWARN, ArtifactsDir: cr.cs.WorkspacePath, Diagnostics: diags}
+					resp = cr.recordPhaseSkip(next, err, kind, msg)
 					break
 				}
 				// Ship-error recovery seam (Component #7): ship is a pure
@@ -314,22 +304,12 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 				// shape (the memo tier/envelope error is a policy error, not
 				// infra), gated on ship having already landed and the same
 				// floor/mandatory guards so it can never weaken the integrity
-				// floor. Degrade to a synthesized WARN and advance; the failed
+				// floor. Record SKIPPED with a warning and advance; the failed
 				// attempts stay in failure-learning and the ledger — recovered,
 				// never silent.
 				if retryHooks.postShipObserverSkip(next) {
-					fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase %s: best-effort post-ship observer failed after ship (%v); degrading to WARN and advancing (post_ship_observer_skip)\n", next, err)
 					cr.recordFailureLearning(next, fmt.Errorf("phase %s: %w", next, err), attempt)
-					if lerr := cr.o.ledger.Append(cr.ctx, LedgerEntry{
-						TS:       cr.o.now().UTC().Format(time.RFC3339),
-						Cycle:    cr.cycle,
-						Role:     string(next),
-						Kind:     "post_ship_observer_skip",
-						ExitCode: bridgeExitCode(err),
-					}); lerr != nil {
-						fmt.Fprintf(os.Stderr, "[orchestrator] WARN post_ship_observer_skip ledger append: %v\n", lerr)
-					}
-					resp = PhaseResponse{Phase: string(next), Verdict: VerdictWARN, ArtifactsDir: cr.cs.WorkspacePath}
+					resp = cr.recordPhaseSkip(next, err, "post_ship_observer_skip", fmt.Sprintf("phase %s: best-effort observer failed after Ship (%v); skipping", next, err))
 					break
 				}
 				phaseErr := fmt.Errorf("phase %s: %w", next, err)

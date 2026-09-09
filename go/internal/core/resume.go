@@ -602,7 +602,8 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 		if next != PhaseBuild {
 			projectBuildExplanation(req.ProjectRoot, cs).apply(&phaseReq)
 		}
-		resp, attempts, err := dispatch.retryPhaseRunner(next, phaseReq, retryOpts{quotaExhausted: allFamiliesQuotaExhausted})
+		retryHooks := retryOpts{quotaExhausted: allFamiliesQuotaExhausted, optionalInfraSkip: o.optionalInfraSkip}
+		resp, attempts, err := dispatch.retryPhaseRunner(next, phaseReq, retryHooks)
 		if errors.Is(err, ErrAllFamiliesExhausted) {
 			dispatch.result, dispatch.phaseTimings = result, phaseTimings
 			err = dispatch.pauseForQuota(next, resp, attempts)
