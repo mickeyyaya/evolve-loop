@@ -194,7 +194,9 @@ func (t execTmux) LoadBuffer(ctx context.Context, session, file string) error {
 func (t execTmux) PasteBuffer(ctx context.Context, session string) error {
 	// -b selects this session's named buffer; -d deletes it after pasting so
 	// the server's buffer table doesn't accumulate one entry per launch.
-	_, err := t.run(ctx, "paste-buffer", "-b", session, "-t", session, "-d")
+	// Preserve LF bytes (-r), and bracket the paste when the receiving TUI
+	// requested it (-p), so embedded newlines are data rather than submissions.
+	_, err := t.run(ctx, "paste-buffer", "-b", session, "-t", session, "-d", "-p", "-r")
 	return err
 }
 

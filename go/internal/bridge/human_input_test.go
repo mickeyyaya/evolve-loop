@@ -39,12 +39,12 @@ func TestHumanPrimitives(t *testing.T) {
 
 	ws := t.TempDir()
 	pf := writeJSON(t, filepath.Join(ws, "p.txt"), "line1\nline2\nline3")
-	humanPasteWithReview(context.Background(), deps, "s", pf)
+	pastePrompt(context.Background(), deps, "s", pf, true)
 	if len(tmux.sentKeys) == 0 {
 		t.Fatal("paste-with-review should send Enter")
 	}
 	// ReadFile error path (missing file → lines=1, floor review)
-	humanPasteWithReview(context.Background(), deps, "s", "/no/such/file-xyz")
+	pastePrompt(context.Background(), deps, "s", "/no/such/file-xyz", true)
 
 	tmux2 := &fakeTmux{}
 	deps.Tmux = tmux2

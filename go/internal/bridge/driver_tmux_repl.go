@@ -400,12 +400,13 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	// --- Deliver the prompt via the paste buffer (human-input cadence when engaged).
 	if human {
 		humanBootPause(deps)
-		humanPasteWithReview(ctx, deps, lp.session, resolvedPromptFile)
-	} else {
-		_ = deps.Tmux.LoadBuffer(ctx, lp.session, resolvedPromptFile)
-		_ = deps.Tmux.PasteBuffer(ctx, lp.session)
-		deps.Sleep(time.Second)
-		_ = deps.Tmux.SendKeys(ctx, lp.session, "", true) // Enter
+	}
+	if err := pastePrompt(ctx, deps, lp.session, resolvedPromptFile, human); err != nil {
+		// Boot succeeded. Classify delivery failure without recording a provider
+		// boot strike or waiting for an artifact from a prompt that never arrived.
+		fmt.Fprintf(deps.Stderr, "[bridge] %sphase=%s waited=0s transient=true reason=%q\n",
+			artifactTimeoutMarker, phaseName, err.Error())
+		return ExitArtifactTimeout, err
 	}
 	// Let the REPL redraw before ANY pane is read as evidence that this Enter
 	// landed. The interval baseline below is submit-verify's first observation
@@ -621,8 +622,14 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	// paste is submitted with a blind Enter (or the human-cadence review path);
 	// if the prompt is still sitting at the input line, re-send it, bounded.
 	if !lp.bootOnly {
+		// Codex 0.153 renders bracketed multiline input with this chip. Keep
+		// the additional echo local to Codex and to this prompt submission.
+		codexPasteEcho := ""
+		if lp.name == "codex-tmux" {
+			codexPasteEcho = "[Pasted Content "
+		}
 		outcome := verifySubmitted(ctx, deps, lp, pfx, "prompt", intervalBaselinePane,
-			promptSubmitEcho(resolvedPrompt), firstNonEmptyLine(resolvedPrompt), tmuxPastePlaceholderEcho)
+			promptSubmitEcho(resolvedPrompt), firstNonEmptyLine(resolvedPrompt), tmuxPastePlaceholderEcho, codexPasteEcho)
 		recordSubmitVerify(irec, phaseName, cfg.Cycle, "prompt", outcome)
 		if outcome.Result == interaction.ResultSubmitWedged {
 			// GROUND TRUTH outranks the pane heuristic (v22.20.0 release red):
