@@ -1,0 +1,190 @@
+{
+  "cycle": 1616,
+  "run_id": "01M223K6AGST72X9PRD004GN9R",
+  "goal": "Produce useful, tested improvements from eligible lane backlog, satisfy the selected acceptance criteria, and preserve the recovered runtime contracts.",
+  "final_verdict": "FAIL",
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 182100,
+      "started_at": "2026-09-09T03:33:30Z",
+      "ended_at": "2026-09-09T03:36:33Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "FAIL",
+      "duration_ms": 122146,
+      "started_at": "2026-09-09T03:37:07Z",
+      "ended_at": "2026-09-09T03:39:09Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 256409,
+      "started_at": "2026-09-09T03:39:11Z",
+      "ended_at": "2026-09-09T03:43:28Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 48,
+        "output": 19596,
+        "cache_read": 2077957,
+        "cache_write": 81241
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 325153,
+      "started_at": "2026-09-09T03:43:28Z",
+      "ended_at": "2026-09-09T03:48:55Z",
+      "archetype": "build",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "retro",
+      "verdict": "FAIL",
+      "duration_ms": 407856,
+      "started_at": "2026-09-09T03:48:55Z",
+      "ended_at": "2026-09-09T03:55:43Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "pre-audit-evidence-check",
+      "verdict": "FAIL",
+      "started_at": "2026-09-09T03:48:55Z",
+      "ended_at": "2026-09-09T03:55:44Z",
+      "archetype": "plan",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "retro",
+      "verdict": "FAIL",
+      "duration_ms": 179143,
+      "started_at": "2026-09-09T03:55:44Z",
+      "ended_at": "2026-09-09T03:58:43Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "failure": {
+    "fingerprint": "pre-audit-evidence-check|unknown|e1917fcdfc16",
+    "pre_class": "unknown",
+    "reasons": [
+      "phase pre-audit-evidence-check: pre-audit-evidence-check: load agent: core: agent persona doc missing: prompts: read agents/evolve-pre-audit-evidence-check.md: open agents/evolve-pre-audit-evidence-ch"
+    ]
+  },
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 1616",
+      "priority": "high"
+    }
+  ],
+  "skipped_phases": [
+    {
+      "phase": "closeout",
+      "reason": "abnormal exit in phase retro"
+    }
+  ],
+  "timing": {
+    "total_ms": 1472807,
+    "phase_count": 7,
+    "retried_count": 0,
+    "longest_phase": "retro",
+    "longest_ms": 407856,
+    "by_archetype_ms": {
+      "build": 325153,
+      "control": 586999,
+      "plan": 560655
+    },
+    "total_tokens": {
+      "input": 48,
+      "output": 19596,
+      "cache_read": 2077957,
+      "cache_write": 81241
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "control": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "plan": {
+        "input": 48,
+        "output": 19596,
+        "cache_read": 2077957,
+        "cache_write": 81241
+      }
+    },
+    "wasted_tokens": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "cache_hit_ratio": 0.9999769009217976,
+    "hot_phase_count": 1,
+    "hot_phases": [
+      "tdd"
+    ]
+  }
+}
