@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## Added — the document deliverable contract: one deterministic engine behind the build floor, `evolve solution check` and the audit gate (ADR-0099 slice 2, 2026-09-09)
+
+A `document` cycle now has a machine-graded deliverable: `solutions/<slug>/` with at least two candidate strategies under `options/<n>-<name>.md`, a `recommendation.md` (Options Compared · Recommendation) and an `assumptions-and-evidence.md` every number cites. The SHAPE is config (`phase-registry.json:config.deliverable_kinds.document`); ONE LLM-free engine (`internal/solutioncheck`) judges it and is projected three ways so the surfaces can never disagree — quality judgment stays in audit.
+
+- **Build handoff floor** — `core.SolutionFloorChecks(spec)` is chained after `DefaultBuildFloorChecks` in the cycle composition root; `core.SolutionViolations` (shared with the audit gate) reads the kind from the kernel's own digest of the scout/triage report headers and the slugs from the triage decision (never the builder's report), is silent for code cycles, and treats a document cycle that binds NO task as a violation rather than a clean pass.
+- **`evolve solution check <solutions/slug>`** — the eval `[code]` grader and the agent's self-check (exit 0 / 1 violations / 2 usage); same engine, same registry contract.
+- **Audit gate line** — `Config.SolutionSpec` (the registry contract, handed in by the composition root — the same spec the floor runs; the phase loads no config) forces FAIL on a violation with the single-exit shape gofmt uses; infra errors fail open with a warning.
+- **Task Contract carries the kind** — `inboxbatch.Item.DeliverableKind` renders `Deliverable kind: document` plus the contract prose GENERATED from the registry spec (`solutioncheck.Describe` — one renderer, never a hand-typed copy); document cycles skip the Go predicate inventory (the floor is the solution contract).
+- **First Go reader of `.evolve/domain.json`** — `config.LoadDomain` → `Domain.DefaultDeliverableKind()` (writing/research ⇒ document) seeded into the scout/triage dispatch context as `deliverable_kind_default`.
+- **Commit prefix** — a document cycle's default message is `solution(<slug>): evolve-cycle N` (one slug in the scope; further bound slugs ride in the subject). Vocabulary only: the commit-prefix gate passes the parenthesised form through, so no manifest rule claims a scope it cannot enforce. `docs/domain-adapters.md` (a dangling link since v8) now exists and states exactly which part of the adapter record is implemented.
+
+---
+
 ## Added — deliverable kinds: the kernel signals for solution cycles (ADR-0099 slice 1, 2026-09-09)
 
 The factory can now shape a non-code cycle from the same spine. The kernel READS two new header lines — `goal_type:` and `deliverable_kind: code|document` in scout-report.md, `deliverable_kind:` next to `cycle_size_estimate:` in triage-report.md (the scout/triage persona lines that WRITE them land with slice 3; until then every cycle stays undeclared ⇒ `code`, byte-identical to today) — from the report headers (the trusted path `cycle_size_estimate` already takes — handoff JSON has been extinct since ~cycle 215) onto `RoutingSignals` (`scout.goal_type`, `scout.deliverable_kind`, `triage.deliverable_kind`, projected `deliverable_kind`, absent ⇒ `code`).

@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 )
 
 func writeItem(t *testing.T, dir, id, body string) string {
@@ -22,7 +24,7 @@ func TestComposeTaskContract_VerbatimAcceptanceAndLoudGaps(t *testing.T) {
 	a := writeItem(t, dir, "task-a", `{"id":"task-a","title":"Title A","acceptance":["build-prompt.txt carries acceptance[] verbatim","go vet ./... green"]}`)
 	b := writeItem(t, dir, "task-b", `{"id":"task-b","title":"No criteria"}`)
 	c := writeItem(t, dir, "task-c", `{"id":"task-c","title":"Control chars","acceptance":["line one\u0001 with control"]}`)
-	got := composeTaskContract([]taskItemRef{{"task-a", a}, {"task-b", b}, {"task-c", c}, {"task-d", ""}, {"task-e", filepath.Join(dir, "missing.json")}})
+	got := composeTaskContract([]taskItemRef{{"task-a", a}, {"task-b", b}, {"task-c", c}, {"task-d", ""}, {"task-e", filepath.Join(dir, "missing.json")}}, config.DeliverableKindSpec{Root: "solutions", MinOptions: 2})
 	for _, want := range []string{
 		"### task-a — Title A", "1. build-prompt.txt carries acceptance[] verbatim", "2. go vet ./... green",
 		"### task-b — No criteria", "declares no acceptance[]", ".evolve/evals/task-b.md",
@@ -41,7 +43,7 @@ func TestComposeTaskContract_VerbatimAcceptanceAndLoudGaps(t *testing.T) {
 func TestComposeTaskContract_SanitizedCriteriaAreNotClaimedVerbatim(t *testing.T) {
 	dir := t.TempDir()
 	item := writeItem(t, dir, "large", `{"id":"large","acceptance":["`+strings.Repeat("a", 700)+`"]}`)
-	got := composeTaskContract([]taskItemRef{{"large", item}})
+	got := composeTaskContract([]taskItemRef{{"large", item}}, config.DeliverableKindSpec{Root: "solutions", MinOptions: 2})
 	if strings.Contains(got, "Acceptance (verbatim") || !strings.Contains(got, "sanitized preview") || !strings.Contains(got, item) {
 		t.Fatalf("altered criteria must name their source without claiming verbatim authority: %q", got)
 	}

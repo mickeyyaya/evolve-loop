@@ -450,7 +450,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 		core.PhaseTDD:          tdd.New(tdd.Config{Bridge: br, Prompts: prm, CompactPrompts: cfg.CompactPrompts}),
 		core.PhaseBuildPlanner: buildplanner.New(buildplanner.Config{Bridge: br, Prompts: prm}).BaseRunner(),
 		core.PhaseBuild:        swarmrunner.New(build.New(build.Config{Bridge: br, Prompts: prm, PhaseIO: cfg.PhaseIO, CompactPrompts: cfg.CompactPrompts}), br, swarm.ModeWriter, swCfg),
-		core.PhaseAudit:        audit.NewDefaultWithStageCompact(br, prm, cfg.PhaseIO, cfg.CompactPrompts),
+		core.PhaseAudit:        audit.NewDefaultWithStageCompactSpec(br, prm, cfg.PhaseIO, cfg.CompactPrompts, documentSpecPtr(cfg)),
 		// ManifestGate is threaded from policy.json `gates.manifest_gate` (default
 		// "shadow") so the ship-bind manifest gate is operator-activatable — it was
 		// unreachable short of a code edit before cycle-1064.
@@ -619,7 +619,14 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	// the advisory post-build selfcheck skips its duplicate run when this
 	// floor is enforced, so each build pays the go-test cost exactly once.
 	if pol.WorkflowConfig().BuildFloorEnforced {
-		reviewers = append(reviewers, core.NewBuildFloorReviewer(core.DefaultBuildFloorChecks))
+		checks := core.DefaultBuildFloorChecks
+		// ADR-0099 slice 2: a document cycle's solutions/<slug>/ is judged by the
+		// same deterministic floor seam (internal/solutioncheck over the
+		// registry's deliverable_kinds.document contract); silent for code cycles.
+		if spec, ok := cfg.DocumentSpec(); ok {
+			checks = core.ChainBuildFloorChecks(core.DefaultBuildFloorChecks, core.SolutionFloorChecks(spec))
+		}
+		reviewers = append(reviewers, core.NewBuildFloorReviewer(checks))
 	}
 	if cfg.EvalGate != config.StageOff {
 		reviewers = append(reviewers, evalgate.NewReviewer(cfg.EvalGate))
@@ -978,4 +985,16 @@ func failureAdvisorOpts(projectRoot string) []core.FailureAdvisorOption {
 		return nil
 	}
 	return []core.FailureAdvisorOption{core.WithFailureAdvisorCLI(r.CLI)}
+}
+
+// documentSpecPtr is the registry's document deliverable contract as the
+// nil-able pointer the audit phase takes (ADR-0099 slice 2): the ONE
+// resolution the composition root hands to both the build floor and the audit
+// gate, so the two surfaces judge the same shape.
+func documentSpecPtr(cfg config.RoutingConfig) *config.DeliverableKindSpec {
+	spec, ok := cfg.DocumentSpec()
+	if !ok {
+		return nil
+	}
+	return &spec
 }

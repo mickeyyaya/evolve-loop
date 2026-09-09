@@ -71,6 +71,21 @@ func (p *Phase) Name() string { return phaseName }
 // `evolve cycle run` uses (cmd_cycle.go), plus the cycle number for traceable
 // git history.
 func defaultCommitMessage(req core.PhaseRequest) string {
+	// ADR-0099 slice 2: a document cycle lands under `solution(<slug>)` so the
+	// commit-prefix vocabulary names the deliverable it carries (the kernel's
+	// own digest of the triage header decides the kind; the triage decision
+	// names the slugs). Code cycles keep the legacy message byte-identical.
+	if core.DocumentCycle(req.Workspace) {
+		if ids := core.BoundTaskIDs(req.Workspace); len(ids) > 0 {
+			// One slug in the scope (the prefix grammar admits [a-z0-9-] only);
+			// any further bound slugs ride in the subject line.
+			msg := fmt.Sprintf("solution(%s): evolve-cycle %d", ids[0], req.Cycle)
+			if len(ids) > 1 {
+				msg += " (also " + strings.Join(ids[1:], ", ") + ")"
+			}
+			return msg
+		}
+	}
 	if req.GoalHash != "" {
 		return fmt.Sprintf("evolve-cycle %d: goal=%s", req.Cycle, req.GoalHash)
 	}
