@@ -190,12 +190,13 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 	overlaySkills := policy.ResolveLaunchOverlaysFailOpen(req.ProjectRoot, phaseName, cli, model)
 
 	bridgeReq := core.BridgeRequest{
-		CLI:       cli,
-		Profile:   profilePath,
-		Model:     model,
-		Prompt:    prompt,
-		Workspace: req.Workspace,
-		Worktree:  retroWorktree(req),
+		CLI:         cli,
+		Profile:     profilePath,
+		Model:       model,
+		Prompt:      prompt,
+		Workspace:   req.Workspace,
+		Worktree:    retroWorktree(req),
+		ProjectRoot: req.ProjectRoot,
 		SecondaryArtifacts: []string{
 			filepath.Join(req.Workspace, "disposition.json"),
 			filepath.Join(req.Workspace, "carryover-todos.json"),

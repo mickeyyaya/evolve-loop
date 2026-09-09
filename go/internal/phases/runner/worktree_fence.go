@@ -36,10 +36,11 @@ func takeWorktreeFence(ctx context.Context, phase string, req core.PhaseRequest)
 }
 
 // restoreWorktreeFence closes the fence and renders what it did.
-func restoreWorktreeFence(ctx context.Context, phase string, f *treefence.Fence) []core.Diagnostic {
-	diags := f.End(ctx).Diagnostics(phase)
+func restoreWorktreeFence(ctx context.Context, phase string, f *treefence.Fence) (bool, []core.Diagnostic) {
+	outcome := f.End(ctx)
+	diags := outcome.Diagnostics(phase)
 	for _, d := range diags {
 		log.Diag().Warnf("[runner] WARN %s\n", d.Message)
 	}
-	return diags
+	return outcome.Verified, diags
 }

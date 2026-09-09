@@ -40,7 +40,6 @@
     "Edit(.evolve/state.json)",
     "Edit(.evolve/ledger.jsonl)",
     "Edit(.evolve/profiles/**)",
-    "Edit(.evolve/evals/**)",
     "Edit(CLAUDE.md)",
     "Edit(README.md)",
     "Edit(CHANGELOG.md)",
@@ -57,7 +56,6 @@
     "Write(.evolve/state.json)",
     "Write(.evolve/ledger.jsonl)",
     "Write(.evolve/profiles/**)",
-    "Write(.evolve/evals/**)",
     "Write(CLAUDE.md)",
     "Write(README.md)",
     "Write(CHANGELOG.md)",
@@ -88,6 +86,7 @@
     "enabled": true,
     "write_subpaths": [
       "{worktree_path}/tests",
+      "{worktree_path}/.evolve/evals",
       "{worktree_path}/scripts/*-test.sh",
       "{worktree_path}/scripts/test-*.sh",
       "{worktree_path}/go/acs/cycle*",
@@ -101,7 +100,6 @@
       ".evolve/state.json",
       ".evolve/ledger.jsonl",
       ".evolve/profiles",
-      ".evolve/evals",
       "agents",
       "skills"
     ],

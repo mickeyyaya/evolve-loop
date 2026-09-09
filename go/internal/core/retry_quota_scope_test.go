@@ -26,8 +26,8 @@ func TestEvaluateRetry_QuotaExhaustionPreservesBatchDisposition(t *testing.T) {
 				t.Fatalf("attempts=%d calls=%d, want both 2", attempts, runner.n)
 			}
 			if optional {
-				if err != nil || resp.Verdict != VerdictWARN {
-					t.Fatalf("optional quota exhaustion: verdict=%q err=%v, want WARN and nil", resp.Verdict, err)
+				if err != nil || resp.Verdict != VerdictSKIPPED {
+					t.Fatalf("optional quota exhaustion: verdict=%q err=%v, want SKIPPED and nil", resp.Verdict, err)
 				}
 			} else if !errors.Is(err, quotaErr) {
 				t.Fatalf("mandatory quota error=%v, want original error %v", err, quotaErr)

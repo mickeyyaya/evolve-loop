@@ -114,6 +114,9 @@ type PhaseRequest struct {
 	// matched the tree). Derived from the orchestrator's write-permission
 	// predicate at dispatch, never set by a phase.
 	WorktreeReadOnly bool `json:"worktree_read_only,omitempty"`
+	// WorktreeVerified is local classification evidence set by BaseRunner only
+	// after restoring its snapshot. It never crosses the subprocess envelope.
+	WorktreeVerified bool `json:"-"`
 	// RunID is the CA.5 event-sourced run identity, threaded to every phase
 	// dispatch (CB.5) so the bridge mints run-scoped tmux session names
 	// (evolve-bridge-r<runid8>-…) and the per-run session registry records
