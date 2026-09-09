@@ -168,6 +168,41 @@ seconds and ran broad repository checks) and a TDD report treating undefined
 API compilation as RED evidence. These are quality/efficiency observations to
 assess against completed native Audit and Ship results, not successful changes.
 
+## Multiline prompt delivery repair
+
+TDD permission PR [#540](https://github.com/mickeyyaya/evolve-loop/pull/540)
+merged as `e50553ee` with all CI green (Linux 5m29s, macOS 7m59s). The subsequent
+native two-wave attempt allocated cycles 1613–1615 and passed every blocking
+preflight check. All lanes completed Scout and Triage; two adopted continuations
+advanced to pinned main before archive staging, confirming the adoption repair.
+
+The attempt uncovered a separate transport defect. Codex phases initially left
+prompts parked until native idle recovery resent Enter. TDD's Claude session
+then showed only the final deliverable-contract fragment and explicitly reported
+that it had no task to execute. Initial delivery nevertheless recorded
+`submit_verified`. The operator stopped the batch through SIGINT and preserved
+all work. It returned `cycles: null`, so no completed wave is claimed.
+
+The [prompt-delivery repair](../architecture/tmux-prompt-delivery.md) preserves
+multiline bytes using application-aware bracketed paste, stops on transport
+errors in both cadences, and recognizes the current Codex pasted-content chip.
+A real tmux/raw-terminal regression reproduced truncation to 30 bytes from a
+roughly 51 KB message. Exact payload equality after repair is stronger evidence
+than an artifact merely appearing. Live smoke tests require distinct values
+from the beginning, middle and end of a large message; those tests are still
+separate from the requested two completed improvement waves.
+
+Final validation of the transport repair: 208 default Go packages PASS (five
+without tests), full vet PASS, full bridge integration with race detection PASS
+(60.478 seconds), and all three live multiline delivery cases PASS (Claude
+13.78 seconds, Codex 27.94 seconds, Agy 13.84 seconds). Removing either paste
+flag independently fails the exact-byte native regression. Architecture and
+defensive reviewers independently reran the native fixtures; Go/simplification
+and test review found no actionable findings. The initial live check caught
+Codex's new parked-paste rendering and an Agy output newline; the former gained
+a failing regression and fix, while fixture instructions were clarified without
+loosening exact output equality. These smoke checks do not count as waves.
+
 ## Limits and live verification
 
 Linux mandatory linked-worktree confinement is explicitly unsupported and fails closed; native Linux enforcement was not verified on this macOS host. Live writer swarm, hard model-family separation and retry adjudication remain outside this recovery. Legacy resume diagnostics are recovery hints, not authenticated Ship evidence. HEAD-based throughput remains a heuristic under concurrent lanes; live assessment must inspect actual lane commits.
