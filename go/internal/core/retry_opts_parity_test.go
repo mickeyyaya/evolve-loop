@@ -186,9 +186,9 @@ func TestDispatchRunnerWithRetry_DelegatesToTheSharedRetryCore(t *testing.T) {
 		t.Fatalf("optional off-floor phase exhausting infra retries must degrade (err==nil); "+
 			"wrapper err=%v, shared-core err=%v", wErr, cErr)
 	}
-	if wResp.Verdict != VerdictWARN || cResp.Verdict != VerdictWARN {
+	if wResp.Verdict != VerdictSKIPPED || cResp.Verdict != VerdictSKIPPED {
 		t.Errorf("verdicts = wrapper %q / shared-core %q, want both %q",
-			wResp.Verdict, cResp.Verdict, VerdictWARN)
+			wResp.Verdict, cResp.Verdict, VerdictSKIPPED)
 	}
 	if wAttempts != cAttempts {
 		t.Errorf("attempts = wrapper %d / shared-core %d — dispatchRunnerWithRetry must DELEGATE "+
