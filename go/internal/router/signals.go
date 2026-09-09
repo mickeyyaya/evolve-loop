@@ -8,7 +8,11 @@
 // identifiers cross the boundary as plain strings; core converts at the call site.
 package router
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+)
 
 // Severity is an ordinal encoding of a defect/thrust severity so the router
 // can compare with >= against a configured threshold (e.g. insert tester when
@@ -146,8 +150,8 @@ func (s RoutingSignals) CycleSize() string {
 // DeliverableKindCode and DeliverableKindDocument are the two deliverable
 // kinds a cycle can declare (ADR-0099). Any other word is not a kind.
 const (
-	DeliverableKindCode     = "code"
-	DeliverableKindDocument = "document"
+	DeliverableKindCode     = config.DeliverableKindCode
+	DeliverableKindDocument = config.DeliverableKindDocument
 )
 
 // NormalizeDeliverableKind returns the kind when v is one of the two declared

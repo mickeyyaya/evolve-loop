@@ -6,7 +6,10 @@ package main
 // fixes findings inside its own loop and budget instead of post-hoc
 // correction windows. The floor itself is unchanged — it remains the
 // trust-boundary backstop; this is the same check moved to where fixing is
-// cheap. Exit codes: 0 green, 1 findings, 2 usage.
+// cheap. Exit codes: 0 green, 1 findings, 2 usage. This mirrors the CODE floor
+// only; a document cycle's deliverable self-checks with `evolve solution check`
+// (ADR-0099 slice 2), whose engine the cycle composition root chains after
+// DefaultBuildFloorChecks.
 
 import (
 	"context"

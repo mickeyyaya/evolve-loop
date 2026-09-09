@@ -1,9 +1,11 @@
 # ADR-0099 — Deliverable kinds: solution cycles on the same spine
 
-- **Status:** Accepted (2026-09-09). Slice 1 (this ADR's kernel half) landed with the
-  `deliverable_kind` / `goal_type` signals, the AND-able conditional rule and the solution
-  recipes; slices 2–3 (the deliverable contract + floor + CLI, the prompt-layer skills) follow
-  under the same number.
+- **Status:** Accepted (2026-09-09). Slice 1 (the kernel half — `deliverable_kind` / `goal_type`
+  signals, the AND-able conditional rule, the solution recipes) landed as #539; slice 2 (this
+  PR — the document deliverable contract, `internal/solutioncheck` projected as build floor,
+  `evolve solution check` and audit gate, the kind on the Task Contract, the first
+  `.evolve/domain.json` reader, the `solution(<slug>)` commit prefix) follows it; slice 3 (the
+  prompt-layer skills and the scout/triage header lines) is next under the same number.
 - **Driving evidence:** the operator's 2026-09-09 directive — the factory must produce non-code
   solutions *in this repo, through the same pipeline*: intent and scout unchanged in role, build
   delivering several candidate strategies, audit reviewing them, the **advisor** deciding the
@@ -61,7 +63,7 @@
    the agent's self-check), and an audit gate line. `inboxbatch.Item.DeliverableKind` rides the
    ADR-0098 task contract into the tdd/build/audit prompts; `.evolve/domain.json` gets its first
    Go reader (project default kind). Ship is unchanged: commit + push under a `solution(<slug>)`
-   prefix scoped to `solutions/**`; the EGPS gate stays satisfied by the always-present
+   prefix (vocabulary only — the commit-prefix gate passes the parenthesised form through); the EGPS gate stays satisfied by the always-present
    regression suite, and the solution floor + contract gate are the deterministic acceptance.
 5. **Slice 3 (prompt layer).** `solution-scout`, `solution-build` (diverge into ≥ 2 distinct
    options with the inspirer lenses → comparison matrix → recommendation; every number sourced)

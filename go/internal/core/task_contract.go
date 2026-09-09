@@ -24,7 +24,9 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/acssuite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/codequality"
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
+	"github.com/mickeyyaya/evolve-loop/go/internal/solutioncheck"
 )
 
 // CtxKeyTaskContract carries the rendered Task Contract block to the tdd, build
@@ -68,8 +70,19 @@ func (o *Orchestrator) seedTaskContract(ctx context.Context, base map[string]str
 	if len(refs) == 0 {
 		return base
 	}
-	block := taskContractPreamble + composeTaskContract(refs)
-	if next != PhaseTDD { // build and audit run after tdd wrote the predicates
+	spec, hasSpec := o.cfg.DocumentSpec()
+	block := taskContractPreamble + composeTaskContract(refs, spec)
+	if DocumentCycle(cs.WorkspacePath) {
+		// No Go predicate suite for a document deliverable: the deterministic
+		// floor is the solution contract (ADR-0099 slice 2), self-checkable
+		// with `evolve solution check`. Without a registry contract there is
+		// no floor to name — composeTaskContract already said so per item.
+		if hasSpec {
+			block += "No Go predicate inventory: this is a document cycle — the deterministic floor is the solution contract (`evolve solution check " + spec.Root + "/<id>`), and the audit grades the options against the acceptance above.\n"
+		} else {
+			block += "No Go predicate inventory: this is a document cycle, and the registry declares no document contract — the audit grades the deliverable against the acceptance above alone.\n"
+		}
+	} else if next != PhaseTDD { // build and audit run after tdd wrote the predicates
 		lister := o.acsPredicates
 		if lister == nil {
 			lister = listACSPredicates
@@ -141,7 +154,7 @@ func (o *Orchestrator) scopedTaskItemRefs(ctx map[string]string, projectRoot, wo
 	}
 	ids := splitCSV(ctx["fleet_scope"])
 	if len(ids) == 0 {
-		ids = triageTopNIDs(workspace)
+		ids = BoundTaskIDs(workspace)
 	}
 	for _, id := range ids {
 		path := ""
@@ -163,9 +176,11 @@ func splitCSV(s string) []string {
 	return out
 }
 
-// triageTopNIDs reads the cycle's triage decision for the committed task ids.
-// Absent or malformed ⇒ none (the block is then simply not seeded).
-func triageTopNIDs(workspace string) []string {
+// BoundTaskIDs reads the cycle's triage decision for the committed task ids
+// (top_n) — the ONE reader the task contract, the failure digest, the solution
+// floor and ship share. Absent or malformed ⇒ nil (each consumer decides
+// whether that is loud).
+func BoundTaskIDs(workspace string) []string {
 	raw, err := os.ReadFile(filepath.Join(workspace, "triage-decision.json"))
 	if err != nil {
 		return nil
@@ -190,7 +205,7 @@ func triageTopNIDs(workspace string) []string {
 // composeTaskContract projects each bound task's acceptance from its inbox
 // record. Sanitization is explicitly disclosed; the record remains authoritative,
 // and an unreadable record is a loud line.
-func composeTaskContract(refs []taskItemRef) string {
+func composeTaskContract(refs []taskItemRef, spec config.DeliverableKindSpec) string {
 	var b strings.Builder
 	for _, ref := range refs {
 		if ref.path == "" {
@@ -209,6 +224,19 @@ func composeTaskContract(refs []taskItemRef) string {
 		fmt.Fprintf(&b, "### %s — %s\n", ref.id, title)
 		for _, w := range warnings {
 			fmt.Fprintf(&b, "(note: %s)\n", w)
+		}
+		if kind := strings.TrimSpace(item.DeliverableKind); kind != "" {
+			fmt.Fprintf(&b, "Deliverable kind: %s\n", kind)
+			if kind == config.DeliverableKindDocument {
+				// The contract prose is RENDERED from the registry spec (one
+				// renderer, solutioncheck.Describe) — the builder is told exactly
+				// the shape the floor judges, never a hand-typed copy.
+				if desc := solutioncheck.Describe(spec); desc != "" {
+					fmt.Fprintf(&b, "Deliverable: %s/%s/ — %s\n", spec.Root, ref.id, desc)
+				} else {
+					b.WriteString("Deliverable: (the registry declares no document contract — phase-registry.json config.deliverable_kinds.document is missing)\n")
+				}
+			}
 		}
 		if len(item.Acceptance) == 0 {
 			fmt.Fprintf(&b, "(this inbox item declares no acceptance[]; the eval file .evolve/evals/%s.md and the triage report's top_n are the authority)\n\n", ref.id)

@@ -118,6 +118,7 @@ var commands = []subcommand{
 	{Name: "flags", Summary: "Project the EVOLVE_* flag registry into control-flags.md (generate|check; check exits 2 on drift) — L2 flag SSOT", Run: runFlags},
 	{Name: "phase-inventory", Summary: "Build phase inventory cache (the advisor's phase index)", Run: phasecmd.RunPhaseInventory},
 	{Name: "eval", Summary: "Eval-quality + verify subcommands", Run: guardcmd.RunEval},
+	{Name: "solution", Summary: "Document deliverable contract (ADR-0099): check <solutions/slug> [--project-root DIR] — the same engine as the build floor and the audit gate", Run: runSolution},
 	{Name: "cycle-health", Summary: "11-signal cycle integrity fingerprint", Run: runCycleHealth},
 	{Name: "selfcheck", Summary: "Builder pre-flight: the build handoff floor checks in-session ( selfcheck build [--worktree DIR] )", Run: runSelfcheck},
 	{Name: "plan-and-execute", Summary: "Two-pass dispatch: plan → execute", Run: runPlanAndExecute},

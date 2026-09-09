@@ -61,6 +61,11 @@ type Item struct {
 	// (ADR-0098) — never re-typed by an agent, so the builder and the auditor
 	// grade against the same words.
 	Acceptance []string `json:"acceptance,omitempty"`
+	// DeliverableKind is what the item wants built — "code" (default) or
+	// "document" (ADR-0099: a solutions/<id>/ deliverable with candidate options
+	// and a recommendation). Projected into the Task Contract block; the cycle's
+	// authoritative kind is what triage declares in its report header.
+	DeliverableKind string `json:"deliverable_kind,omitempty"`
 	// Path is the source file (relative name inside the inbox dir) — operator
 	// affordance for `evolve inbox batches` output; not part of grouping.
 	Path string `json:"-"`
@@ -152,6 +157,7 @@ func sanitizeItem(it *Item) bool {
 	it.Title = clean(it.Title) // renders as the Task Contract heading
 	it.Campaign = clean(it.Campaign)
 	it.Route = clean(it.Route)
+	it.DeliverableKind = clean(it.DeliverableKind)
 	for i := range it.Files {
 		it.Files[i] = clean(it.Files[i])
 	}

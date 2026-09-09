@@ -126,6 +126,37 @@ func DefaultTddRule() CondRule {
 	return r
 }
 
+// DeliverableKindCode and DeliverableKindDocument are the two deliverable kinds
+// a cycle can declare (ADR-0099). The vocabulary lives here because config is
+// the leaf every consumer (router, core, the phases, the CLI) already imports.
+const (
+	DeliverableKindCode     = "code"
+	DeliverableKindDocument = "document"
+)
+
+// DeliverableKindSpec is the shape a cycle's deliverable must take for one
+// deliverable kind (ADR-0099 slice 2) — declared ONCE in
+// phase-registry.json:config.deliverable_kinds and judged by ONE engine
+// (internal/solutioncheck) that the build floor, the `evolve solution check`
+// CLI and the audit gate all project. Paths are relative to the kind's Root
+// directory under the repo, e.g. solutions/<slug>/recommendation.md.
+type DeliverableKindSpec struct {
+	Root               string              `json:"root"`
+	MinOptions         int                 `json:"min_options"`
+	RequiredFiles      []string            `json:"required_files"`
+	RequiredSections   map[string][]string `json:"required_sections"`
+	ForbidPlaceholders []string            `json:"forbid_placeholders"`
+	EvidenceFile       string              `json:"evidence_file"`
+}
+
+// DocumentSpec returns the document deliverable contract when the registry
+// declares one — the ONE lookup every projection (floor, audit gate, CLI, task
+// contract) uses, so none of them spells the kind key.
+func (c RoutingConfig) DocumentSpec() (DeliverableKindSpec, bool) {
+	spec, ok := c.DeliverableKinds[DeliverableKindDocument]
+	return spec, ok
+}
+
 // CondRule is a parsed conditional-mandatory predicate, e.g. cycle_size != trivial.
 // A rule may AND further clauses (`a!=b && c!=d`, ADR-0099): the head clause
 // keeps the single-clause shape (And nil) so every existing consumer reads it
@@ -353,9 +384,12 @@ type RoutingConfig struct {
 	// three subsystem-migration dials, promoted so existing field access is
 	// unchanged (see RolloutStages).
 	RolloutStages
-	Mandatory     []string            // ordered mandatory phase names
-	Conditional   map[string]CondRule // phase -> conditional-mandatory rule
-	MaxInsertions int
+	Mandatory   []string            // ordered mandatory phase names
+	Conditional map[string]CondRule // phase -> conditional-mandatory rule
+	// DeliverableKinds is the per-kind deliverable contract (ADR-0099 slice 2),
+	// registry-sourced; absent ⇒ no document contract is enforced.
+	DeliverableKinds map[string]DeliverableKindSpec
+	MaxInsertions    int
 	// ParallelEvaluateConcurrency bounds how many post-build evaluate phases the
 	// ParallelEvaluate=enforce dispatcher runs at once. Default 3 (the soak sweet
 	// spot: ~11% saving, diminishing past it). Resolved from policy.
@@ -445,15 +479,16 @@ type Warning struct {
 // registryDoc is the subset of phase-registry.json this loader reads.
 type registryDoc struct {
 	Config struct {
-		DynamicRouting        string              `json:"dynamic_routing"`
-		RoutingMode           string              `json:"routing_mode"`
-		ModelRouting          string              `json:"model_routing"`
-		MandatoryPhases       []string            `json:"mandatory_phases"`
-		SpineOrder            []string            `json:"spine_order"`
-		LegalSuccessors       map[string][]string `json:"legal_successors"`
-		ConditionalMandatory  map[string]string   `json:"conditional_mandatory"`
-		MaxOptionalInsertions *int                `json:"max_optional_insertions"`
-		GoalRecipes           map[string][]string `json:"goal_recipes"`
+		DynamicRouting        string                         `json:"dynamic_routing"`
+		RoutingMode           string                         `json:"routing_mode"`
+		ModelRouting          string                         `json:"model_routing"`
+		MandatoryPhases       []string                       `json:"mandatory_phases"`
+		SpineOrder            []string                       `json:"spine_order"`
+		LegalSuccessors       map[string][]string            `json:"legal_successors"`
+		ConditionalMandatory  map[string]string              `json:"conditional_mandatory"`
+		MaxOptionalInsertions *int                           `json:"max_optional_insertions"`
+		GoalRecipes           map[string][]string            `json:"goal_recipes"`
+		DeliverableKinds      map[string]DeliverableKindSpec `json:"deliverable_kinds"`
 		Workflow              struct {
 			// CompactPrompts enables/disables on-demand reference-section stripping.
 			// Absent = use RoutingConfig default (true). Explicit false opts out.
@@ -645,6 +680,16 @@ func applyRegistry(cfg *RoutingConfig, doc registryDoc, ws *[]Warning) {
 	}
 	if len(c.GoalRecipes) > 0 {
 		cfg.GoalRecipes = c.GoalRecipes
+	}
+	if len(c.DeliverableKinds) > 0 {
+		cfg.DeliverableKinds = c.DeliverableKinds
+		for kind, spec := range c.DeliverableKinds {
+			// The registry is the SSOT for the contract's root and floor — a
+			// consumer must never default them, so a hole is a load warning.
+			if spec.Root == "" || spec.MinOptions <= 0 {
+				*ws = append(*ws, Warning{"unknown-value", fmt.Sprintf("deliverable_kinds[%s]: root and min_options must be set (root=%q, min_options=%d)", kind, spec.Root, spec.MinOptions)})
+			}
+		}
 	}
 	if c.Workflow.CompactPrompts != nil {
 		cfg.CompactPrompts = *c.Workflow.CompactPrompts
