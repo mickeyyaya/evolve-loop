@@ -298,7 +298,7 @@ func verdictFailDistinguisher(phase, workspace string) string {
 		}
 		break // a readable report without bullets settles this layer
 	}
-	if ids := triageTopNIDs(workspace); len(ids) > 0 {
+	if ids := BoundTaskIDs(workspace); len(ids) > 0 {
 		return "tasks=" + strings.Join(ids, ",")
 	}
 	return ""

@@ -98,6 +98,9 @@ type hooks struct {
 	// never ran gofmt over the generated go/acs/cycle<N>/*.go files). nil = no
 	// gofmt gate (legacy/tests). The registry default wires gofmtCheckDefault.
 	gofmtCheck func(req core.PhaseRequest) ([]string, error)
+	// solutionCheck reports document-cycle solution-contract violations
+	// (ADR-0099 slice 2); nil = no gate.
+	solutionCheck func(req core.PhaseRequest) ([]string, error)
 	// skillsDriftCheck reports the worktree's SKILL.md files whose generated
 	// phase-facts region has drifted from its SSOTs (profiles/registry/
 	// phasecontract). A cycle that edits .evolve/profiles/*.json without
@@ -349,6 +352,28 @@ func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRes
 				Message:  fmt.Sprintf("gofmt: %d file(s) are not gofmt -s clean — CI `vet + fmt` would FAIL. Run `gofmt -w -s .` in go/. Offenders: %s", len(dirty), strings.Join(dirty, ", ")),
 			})
 			overrode("gofmt")
+		}
+	}
+
+	// Solution-contract gate (ADR-0099 slice 2): a document cycle whose
+	// solutions/<slug>/ violates the deterministic contract FAILs audit — the
+	// narrative cannot out-vote the ONE engine the build floor and
+	// `evolve solution check` also run. Silent for code cycles; an infra error
+	// fails OPEN with a loud warning, never as clean.
+	if h.solutionCheck != nil {
+		violations, serr := h.solutionCheck(req)
+		switch {
+		case serr != nil:
+			diags = append(diags, core.Diagnostic{
+				Severity: "warning",
+				Message:  fmt.Sprintf("solution-contract gate skipped (could not run): %s", serr.Error()),
+			})
+		case len(violations) > 0:
+			diags = append(diags, core.Diagnostic{
+				Severity: "error",
+				Message:  fmt.Sprintf("solution contract: %d violation(s) in the document deliverable — fix these exactly (self-check: `evolve solution check`): %s", len(violations), strings.Join(violations, "; ")),
+			})
+			overrode("solution-contract")
 		}
 	}
 
@@ -747,6 +772,17 @@ type Config struct {
 	// gofmt -s clean; any offender FAILs the audit (CI-parity gate). nil = no
 	// gofmt gate. NewDefault wires gofmtCheckDefault.
 	CheckGofmt func(req core.PhaseRequest) ([]string, error)
+	// CheckSolution, when set, reports a document cycle's solution-contract
+	// violations (internal/solutioncheck over solutions/<slug>/ for every bound
+	// task); any violation FAILs the audit — the same deterministic-gate shape
+	// as gofmt (ADR-0099 slice 2). nil = no gate. NewDefault wires
+	// solutionCheckDefault, which is silent for code cycles.
+	CheckSolution func(req core.PhaseRequest) ([]string, error)
+	// SolutionSpec is the registry's document deliverable contract, handed in
+	// by the composition root (the SAME spec the build floor runs). When set
+	// and CheckSolution is nil, New wires the production gate over it; nil ⇒
+	// the registry declares no document contract ⇒ no gate.
+	SolutionSpec *config.DeliverableKindSpec
 	// CheckSkillsDrift, when set, reports the worktree SKILL.md files whose
 	// phase-facts region drifted from its SSOTs; any drift FAILs the audit
 	// (CI TestSkills_NoDrift parity). nil = no skills gate. NewDefault wires
@@ -782,6 +818,9 @@ type Config struct {
 type Phase struct{ *runner.BaseRunner }
 
 func New(c Config) *Phase {
+	if c.CheckSolution == nil && c.SolutionSpec != nil {
+		c.CheckSolution = solutionGate(*c.SolutionSpec)
+	}
 	return &Phase{
 		BaseRunner: runner.New(runner.Options{
 			Hooks: hooks{
@@ -789,6 +828,7 @@ func New(c Config) *Phase {
 				predicateEvidence:             c.BeginPredicateEvidence,
 				explanationCheck:              c.CheckExplanation,
 				gofmtCheck:                    c.CheckGofmt,
+				solutionCheck:                 c.CheckSolution,
 				skillsDriftCheck:              c.CheckSkillsDrift,
 				goVetCheck:                    c.CheckGoVet,
 				acsDurableCheck:               c.CheckACSDurable,
@@ -830,7 +870,16 @@ func NewDefaultWithStage(br core.Bridge, prm *prompts.Loader, stage config.Stage
 // (workflow.compact_prompts). Called from cmd_cycle.go with wfCfg.CompactPrompts so
 // the reference tail is stripped before dispatch when the policy default is on.
 func NewDefaultWithStageCompact(br core.Bridge, prm *prompts.Loader, stage config.Stage, compact bool) *Phase {
+	return NewDefaultWithStageCompactSpec(br, prm, stage, compact, nil)
+}
+
+// NewDefaultWithStageCompactSpec is NewDefaultWithStageCompact plus the
+// registry's document deliverable contract (ADR-0099 slice 2), which the
+// composition root resolves ONCE and hands to both the build floor and this
+// audit gate. nil ⇒ no document contract ⇒ no solution gate.
+func NewDefaultWithStageCompactSpec(br core.Bridge, prm *prompts.Loader, stage config.Stage, compact bool, spec *config.DeliverableKindSpec) *Phase {
 	return New(Config{
+		SolutionSpec:                  spec,
 		Bridge:                        br,
 		Prompts:                       prm,
 		GenerateVerdict:               generateACSVerdict,

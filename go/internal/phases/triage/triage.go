@@ -90,6 +90,12 @@ func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	if ro := req.Context["recent_outcomes"]; ro != "" {
 		fmt.Fprintf(&b, "- recent_outcomes: %s\n", ro)
 	}
+	// ADR-0099 slice 2: the project's default deliverable kind (.evolve/domain.json).
+	// Triage's `deliverable_kind:` header is the AUTHORITATIVE kind, so triage
+	// must see the default a task inherits when it declares none.
+	if kind := req.Context[core.CtxKeyDeliverableKindDefault]; kind != "" {
+		fmt.Fprintf(&b, "- deliverable_kind_default: %s\n", kind)
+	}
 	// Inbox batch classifier (2026-07-16): one-item-per-cycle consumption pays
 	// the full pipeline per item, so internal/inboxbatch DETERMINISTICALLY
 	// groups the backlog by campaign / package area / explicit links (Core

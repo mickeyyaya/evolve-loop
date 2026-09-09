@@ -64,6 +64,12 @@ func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	if strategy != "" {
 		fmt.Fprintf(&b, "- strategy: %s\n", strategy)
 	}
+	// ADR-0099 slice 2: the project's default deliverable kind (.evolve/domain.json)
+	// — a task that declares no kind inherits it; scout writes the cycle's
+	// `deliverable_kind:` header line from the tasks it selects.
+	if kind := req.Context[core.CtxKeyDeliverableKindDefault]; kind != "" {
+		fmt.Fprintf(&b, "- deliverable_kind_default: %s\n", kind)
+	}
 	// Goal text propagates via Context["goal"] when the operator
 	// passed --goal-text. Scout reads it as a CONSTRAINT — its
 	// backlog-vs-goal selection should treat the goal as canonical.

@@ -553,3 +553,6 @@
 ./internal/dashboard
 # treefence — the read-only phase worktree fence (ADR-0097). Consumer: phases/runner.
 ./internal/treefence
+
+# ADR-0099 slice 2 (2026-09-09): the document deliverable contract engine — every export named + executed.
+./internal/solutioncheck
