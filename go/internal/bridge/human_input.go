@@ -46,22 +46,33 @@ func humanBootPause(deps Deps) {
 	deps.Sleep(time.Duration(ms) * time.Millisecond)
 }
 
-// humanPasteWithReview pastes the prompt, then pauses proportionally to its
-// length (a human glancing over it) before pressing Enter.
-func humanPasteWithReview(ctx context.Context, deps Deps, session, promptFile string) {
-	_ = deps.Tmux.LoadBuffer(ctx, session, promptFile)
-	_ = deps.Tmux.PasteBuffer(ctx, session)
-	lines := 1
-	if data, err := os.ReadFile(promptFile); err == nil {
-		lines = strings.Count(string(data), "\n") + 1
+// pastePrompt delivers one complete prompt. Human mode changes only the review
+// pause; both cadences stop on the first failed transport operation.
+func pastePrompt(ctx context.Context, deps Deps, session, promptFile string, human bool) error {
+	if err := deps.Tmux.LoadBuffer(ctx, session, promptFile); err != nil {
+		return fmt.Errorf("prompt load-buffer: %w", err)
 	}
-	mean := lines * 80
-	if mean < 200 {
-		mean = 200
+	if err := deps.Tmux.PasteBuffer(ctx, session); err != nil {
+		return fmt.Errorf("prompt paste-buffer: %w", err)
 	}
-	fmt.Fprintf(deps.Stderr, "[human-input] paste review (%d lines)\n", lines)
-	deps.Sleep(humanSampleMS(mean, mean/4))
-	_ = deps.Tmux.SendKeys(ctx, session, "", true)
+	if human {
+		lines := 1
+		if data, err := os.ReadFile(promptFile); err == nil {
+			lines = strings.Count(string(data), "\n") + 1
+		}
+		mean := lines * 80
+		if mean < 200 {
+			mean = 200
+		}
+		fmt.Fprintf(deps.Stderr, "[human-input] paste review (%d lines)\n", lines)
+		deps.Sleep(humanSampleMS(mean, mean/4))
+	} else {
+		deps.Sleep(time.Second)
+	}
+	if err := deps.Tmux.SendKeys(ctx, session, "", true); err != nil {
+		return fmt.Errorf("prompt submit: %w", err)
+	}
+	return nil
 }
 
 // humanSendKeysCSV sends each CSV key token with a human-shaped inter-key

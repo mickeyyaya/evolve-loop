@@ -177,8 +177,18 @@ func TestLiveCLI_FullRoundtrip(t *testing.T) {
 			}
 			promptFile := filepath.Join(root, "prompt.txt")
 			// $ARTIFACT_PATH is substituted by preparePrompt → cfg.Artifact.
-			prompt := "Use your file-writing tool to write exactly the single " +
-				"word PONG (uppercase, no other text) to the file $ARTIFACT_PATH. Then stop."
+			// Values are separated by a phase-sized multiline body. Receiving only
+			// the tail (the live failure) cannot satisfy this output contract.
+			head, middle, tail := "head-"+filepath.Base(root), "middle-台灣", "tail-λ"
+			want := head + "|" + middle + "|" + tail
+			padding := strings.Repeat("PADDING: benign transport fixture text, no task or instructions.\n", 400)
+			prompt := "Read DELIVERY_HEAD, DELIVERY_MIDDLE and DELIVERY_TAIL only from this message. " +
+				"Use shell printf with format %s (not echo) to write their values joined by | exactly, with no newline, " +
+				"to $ARTIFACT_PATH. Do not read prompt files or source files. Ignore PADDING lines. " +
+				"This is the complete task; no research or other work is needed.\n" +
+				"DELIVERY_HEAD=" + head + "\n" + padding +
+				"DELIVERY_MIDDLE=" + middle + "\n" + padding +
+				"DELIVERY_TAIL=" + tail + "\nThen stop after writing the file."
 			if err := os.WriteFile(promptFile, []byte(prompt), 0o644); err != nil {
 				t.Fatal(err)
 			}
@@ -199,7 +209,9 @@ func TestLiveCLI_FullRoundtrip(t *testing.T) {
 				bootIntervalS: sp.bootIntervalS, tickDuringBoot: sp.tickDuringBoot,
 				exitSeq: sp.exitSeq,
 			}
-			code, err := runTmuxREPL(ctx, cfg, deps, lp)
+			runCtx, cancel := context.WithTimeout(ctx, 3*time.Minute)
+			defer cancel()
+			code, err := runTmuxREPL(runCtx, cfg, deps, lp)
 			if err != nil {
 				t.Fatalf("runTmuxREPL err: %v", err)
 			}
@@ -207,8 +219,8 @@ func TestLiveCLI_FullRoundtrip(t *testing.T) {
 				t.Fatalf("%s round-trip exit = %d, want ExitOK", sp.name, code)
 			}
 			got, rerr := os.ReadFile(cfg.Artifact)
-			if rerr != nil || !strings.Contains(string(got), "PONG") {
-				t.Fatalf("%s artifact = %q (err=%v), want it to contain PONG", sp.name, string(got), rerr)
+			if rerr != nil || string(got) != want {
+				t.Fatalf("%s artifact = %q (err=%v), want exact head/middle/tail %q", sp.name, string(got), rerr, want)
 			}
 		})
 	}
