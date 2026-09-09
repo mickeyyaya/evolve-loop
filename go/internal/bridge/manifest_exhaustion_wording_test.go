@@ -1,8 +1,10 @@
 package bridge
 
 import (
+	"context"
 	"regexp"
 	"testing"
+	"time"
 )
 
 // manifest_exhaustion_wording_test.go — regression lock for the claude-tmux
@@ -127,5 +129,55 @@ func TestClaudeTmuxExhaustedRegex_PerModelWording(t *testing.T) {
 		if re.MatchString(n) {
 			t.Errorf("exhausted_regex must NOT match (would kill a working agent):\n  %q\n  regex=%s", n, spec.ExhaustedRegex)
 		}
+	}
+}
+
+// Captured from live cycles 1607–1609; concatenation avoids triggering agents
+// reading this test as ordinary tool output.
+func TestClaudeSessionWallUsesGuardedExhaustion(t *testing.T) {
+	wall := "  ⎿  You've hit your session li" + "mit · resets 5:10am (Asia/Taipei)"
+	if !ClassifyExhausted("claude", wall) {
+		t.Error("usage classifier missed captured session wall")
+	}
+	for _, prose := range []string{"the client hit your session limit yesterday", "You've hit your session limit while testing the classifier", "fixture: " + wall, "You're approaching your session limit"} {
+		if ClassifyExhausted("claude", prose) {
+			t.Errorf("ordinary prose classified as wall: %q", prose)
+		}
+	}
+	for _, tc := range []struct {
+		name      string
+		panes     []string
+		prompt    string
+		confirmed bool
+		want85    bool
+		probes    int
+	}{
+		{name: "persistent wall", panes: []string{wall}, confirmed: true, want85: true, probes: 1},
+		{name: "transient quoted wall", panes: []string{wall, "Working on the next test"}, confirmed: true},
+		{name: "prompt echo", panes: []string{wall}, prompt: wall, confirmed: true},
+		{name: "added diff", panes: []string{"+" + wall}, confirmed: true},
+		{name: "removed diff", panes: []string{"-" + wall}, confirmed: true},
+		{name: "persistent quoted content healthy", panes: []string{wall}, probes: 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			probes := 0
+			deps := Deps{Tmux: &fakeTmux{paneSeq: tc.panes}, Sleep: func(time.Duration) {}, LookupEnv: mapLookup(nil), CorroborateWall: func(context.Context, string) bool { probes++; return tc.confirmed }}.withDefaults()
+			ar := newAutoResponder("claude-tmux", t.TempDir(), deps, false, 0)
+			ar.injectedPrompt = tc.prompt
+			fired := false
+			for i := 0; i < exhaustionPersistObservations+3; i++ {
+				_, rc := ar.tick(context.Background(), "s")
+				if rc == 85 {
+					if i < exhaustionPersistObservations-1 {
+						t.Fatal("wall bypassed persistence guard")
+					}
+					fired = true
+					break
+				}
+			}
+			if fired != tc.want85 || probes != tc.probes {
+				t.Fatalf("escalated=%v probes=%d, want %v/%d", fired, probes, tc.want85, tc.probes)
+			}
+		})
 	}
 }

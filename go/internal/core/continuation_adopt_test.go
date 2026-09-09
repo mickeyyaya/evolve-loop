@@ -12,6 +12,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -110,6 +111,19 @@ func TestRunCycle_AdoptsContinuationAndServesFindings(t *testing.T) {
 		t.Fatal(err)
 	}
 	m := stampedContinuation(t, root, wt, 83)
+
+	// Main lands a canonical record after the snapshot. Adoption must merge
+	// while clean, then classify unpublished records against this effective base.
+	published := "docs/explain/builds/cycle-84-published.md"
+	if err := os.MkdirAll(filepath.Dir(filepath.Join(root, published)), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, published), []byte("published record\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gitOut(t, root, "add", published)
+	gitOut(t, root, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-m", "land canonical record")
+	mainTip := gitOut(t, root, "rev-parse", "main")
 	if err := os.WriteFile(m.FindingsPath, []byte(`{"phase":"build","summary":"export X unnamed in tests"}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -122,7 +136,7 @@ func TestRunCycle_AdoptsContinuationAndServesFindings(t *testing.T) {
 	buildR := runners[PhaseBuild].(*fakeRunner)
 	probe := &worktreeProbeRunner{
 		fakeRunner: buildR, probeFile: "prior_work.go", absentFile: oldExplanation,
-		archiveFile: filepath.Base(oldExplanation),
+		archiveFile: filepath.Base(oldExplanation), publishedFile: published, wantAncestor: mainTip,
 	}
 	runners[PhaseBuild] = probe
 	runners[PhaseTriage] = &claimingTriageRunner{fakeRunner: runners[PhaseTriage].(*fakeRunner), root: root, taskID: "task-a"}
@@ -138,6 +152,15 @@ func TestRunCycle_AdoptsContinuationAndServesFindings(t *testing.T) {
 	req := buildR.requests[0]
 	if req.Worktree == "" || req.Worktree == wt {
 		t.Fatalf("build must run in a NEW seeded worktree, got %q (old %q)", req.Worktree, wt)
+	}
+	if req.WorktreeBaseSHA != mainTip {
+		t.Errorf("review base=%s want pinned main %s", req.WorktreeBaseSHA, mainTip)
+	}
+	if !probe.sawPublishedFile {
+		t.Error("published canonical record was incorrectly archived")
+	}
+	if !probe.sawAncestor {
+		t.Error("Build dispatched before clean snapshot advanced to main")
 	}
 	if !probe.sawFile {
 		t.Error("prior work must be intact in the adopted worktree at build time")
@@ -250,16 +273,29 @@ func (r *claimingTriageRunner) Run(ctx context.Context, req PhaseRequest) (Phase
 // post-RunCycle stats race the cleanup).
 type worktreeProbeRunner struct {
 	*fakeRunner
-	probeFile       string
-	absentFile      string
-	archiveFile     string
-	sawFile         bool
-	sawAbsentFile   bool
-	sawArchivedFile bool
+	probeFile        string
+	absentFile       string
+	archiveFile      string
+	sawFile          bool
+	sawAbsentFile    bool
+	sawArchivedFile  bool
+	publishedFile    string
+	wantAncestor     string
+	sawPublishedFile bool
+	sawAncestor      bool
 }
 
 func (r *worktreeProbeRunner) Run(ctx context.Context, req PhaseRequest) (PhaseResponse, error) {
 	if req.Worktree != "" {
+		if r.publishedFile != "" {
+			_, err := os.Stat(filepath.Join(req.Worktree, r.publishedFile))
+			r.sawPublishedFile = err == nil
+		}
+		if r.wantAncestor != "" {
+			cmd := exec.Command("git", "merge-base", "--is-ancestor", r.wantAncestor, "HEAD")
+			cmd.Dir = req.Worktree
+			r.sawAncestor = cmd.Run() == nil
+		}
 		if _, err := os.Stat(filepath.Join(req.Worktree, r.probeFile)); err == nil {
 			r.sawFile = true
 		}

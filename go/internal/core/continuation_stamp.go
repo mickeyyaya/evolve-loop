@@ -221,10 +221,11 @@ func truncateFindings(s string) string {
 // manifest into THIS cycle's workspace (ship's manifest reconciliation unions
 // the prior attempt's declared paths from it; a re-FAIL overwrites it at the
 // next preserve), and serves the prior findings to the build prompt. Every
-// failure is a loud fall-back to the already-provisioned fresh worktree.
-func (cr *cycleRun) adoptContinuationAfterTriage() {
+// validation failure keeps fresh provisioning. After seeding, any failure
+// stops the cycle and preserves the worktree for diagnosis.
+func (cr *cycleRun) adoptContinuationAfterTriage() error {
 	if cr.o.continuationFor == nil {
-		return
+		return nil
 	}
 	var scopeIDs []string
 	if ls := loadLaneScope(cr.cs.WorkspacePath); ls != nil {
@@ -232,7 +233,7 @@ func (cr *cycleRun) adoptContinuationAfterTriage() {
 	}
 	c := cr.o.continuationFor(cr.req.ProjectRoot, cr.cycle, scopeIDs)
 	if c == nil {
-		return
+		return nil
 	}
 	if err := validateContinuation(cr.ctx, cr.req.ProjectRoot, c); err != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d continuation from cycle %d rejected (%v) — keeping fresh worktree\n", cr.cycle, c.Cycle, err)
@@ -242,50 +243,48 @@ func (cr *cycleRun) adoptContinuationAfterTriage() {
 		// absorbing-FAIL state). Orchestrator-side only — an agent deleting
 		// the WORKSPACE manifest still hits the gate's cycle-1285 block.
 		releaseDeclinedBinding(cr.req.ProjectRoot, scopeIDs, c)
-		return
+		return nil
 	}
 	seeder, ok := cr.o.worktree.(interface {
 		CreateFrom(projectRoot string, cycle int, startRef string) (string, error)
 	})
 	if !ok {
-		return
+		return nil
 	}
 	wt, err := seeder.CreateFrom(cr.req.ProjectRoot, cr.cycle, c.SnapshotSHA)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d continuation seeding failed (%v) — keeping fresh worktree\n", cr.cycle, err)
-		return
+		return fmt.Errorf("continuation seeding from cycle %d: %w", c.Cycle, err)
 	}
-	if c.BaseSHA != "" {
-		archived, cleanupErr := explanationdocs.ArchiveUnpublishedContinuationRecords(cr.ctx, wt, c.BaseSHA)
-		if cleanupErr != nil {
-			fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d continuation rejected: unpublished explanation archive failed: %v\n", cr.cycle, cleanupErr)
-			if cleanupErr := cr.o.worktree.Cleanup(cr.req.ProjectRoot, wt); cleanupErr != nil {
-				fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d continuation cleanup after archive failure: %v\n", cr.cycle, cleanupErr)
-			}
-			return
-		} else if len(archived) > 0 {
-			fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d continuation: archived %d unshipped ancestor explanation record(s) before Build\n", cr.cycle, len(archived))
-		}
-		cr.cs.WorktreeBaseSHA = c.BaseSHA
-	}
-	// Base advance (cycle-1365 class) — see continuation_baseadvance.go. On
-	// success the healed base supersedes the manifest's stale one.
-	if healed := advanceContinuationBase(cr.ctx, wt, cr.cycle); healed != "" {
-		cr.cs.WorktreeBaseSHA = healed
-	}
+
+	// CreateFrom replaces the fresh worktree at the same cycle path. Keep its
+	// actual identity even on failure, so abnormal closeout preserves it.
 	cr.cs.ActiveWorktree = wt
+	cr.cs.WorktreeBaseSHA = c.BaseSHA
+	base, err := advanceContinuationBase(cr.ctx, wt, cr.cycle)
+	if err != nil {
+		return fmt.Errorf("continuation from cycle %d: %w", c.Cycle, err)
+	}
+	cr.cs.WorktreeBaseSHA = base
+	archived, err := explanationdocs.ArchiveUnpublishedContinuationRecords(cr.ctx, wt, base)
+	if err != nil {
+		return fmt.Errorf("continuation unpublished explanation archive: %w", err)
+	}
+	if len(archived) > 0 {
+		fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d continuation: archived %d unshipped ancestor explanation record(s) before Build\n", cr.cycle, len(archived))
+	}
 	if err := cr.o.storage.WriteCycleState(cr.ctx, cr.cs); err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d continuation: cycle-state persist after adoption: %v\n", cr.cycle, err)
+		return fmt.Errorf("continuation cycle-state persist after adoption: %w", err)
 	}
 	if err := continuation.WriteManifest(cr.cs.WorkspacePath, *c); err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d continuation: workspace manifest copy: %v\n", cr.cycle, err)
+		return fmt.Errorf("continuation workspace manifest copy: %w", err)
 	}
 	// Disposition-skeleton preseed — see disposition_seed.go.
 	SeedDispositionSkeleton(cr.cs.WorkspacePath, cr.req.ProjectRoot, c.Cycle)
 	if findings := readContinuationFindings(c.FindingsPath); findings != "" {
 		cr.ctxSnap["continuation_findings"] = findings
 	}
-	fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d ADOPTED continuation: worktree re-seeded from cycle-%d snapshot %s (base %s)\n", cr.cycle, c.Cycle, c.SnapshotSHA[:12], c.BaseSHA)
+	fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d ADOPTED continuation: worktree re-seeded from cycle-%d snapshot %s (base %s)\n", cr.cycle, c.Cycle, c.SnapshotSHA[:12], base)
+	return nil
 }
 
 // releaseDeclinedBinding removes the registry binding(s) that produced a
