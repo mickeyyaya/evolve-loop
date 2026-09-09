@@ -34,8 +34,13 @@ The filesystem fields have separate meanings:
 
 The existing Scout, Auditor, and Orchestrator profiles that named
 `docs/private` now explicitly declare its read denial as well. This change does
-not infer additional private paths for unrelated profiles. Existing immutable
-eval sources remain readable. Network access retains the existing model-CLI
+not infer additional private paths for unrelated profiles. Eval sources remain
+readable for roles with write denials, including Builder. TDD authors permanent
+`.evolve/evals/<task-slug>.md` files inside its active worktree, as required by
+its persona. Its profile permits that authoring; Builder retains its eval write
+denial. The bridge independently keeps the main repository read-only for both
+roles. This is a role boundary, not an append-only historical-eval contract.
+Network access retains the existing model-CLI
 behavior and is not an isolation guarantee supplied by this change.
 
 The bridge retains its existing worktree/workspace/scratch write allowlist.
@@ -119,7 +124,7 @@ Run:
 ```sh
 cd go
 go test ./internal/adapters/sandbox ./internal/bridge ./internal/looppreflight ./internal/profiles -count=1
-go test -tags=integration ./internal/adapters/sandbox ./internal/bridge -run 'TestSandboxFixtureChildEnforcesReadAndWritePolicy|TestLaunchProfilePolicyWithFixtureChild|TestSandboxPreservesLinkedWorktreeGitIndex' -count=1 -v
+go test -tags=integration ./internal/adapters/sandbox ./internal/bridge -run 'TestSandboxFixtureChildEnforcesReadAndWritePolicy|TestLaunchProfilePolicyWithFixtureChild|TestSandboxPreservesLinkedWorktreeGitIndex|TestNativeRoleEvalAuthoringBoundary' -count=1 -v
 ```
 
 Native child tests are behind the `integration` build tag.
@@ -140,3 +145,11 @@ host that cannot apply the sandbox. The recovery session executed these native
 tests successfully on macOS. Linux argument construction and unsupported-path
 behavior were tested deterministically; native Linux enforcement still requires
 running the same fixture-child tests on a capable Linux host.
+
+`TestNativeRoleEvalAuthoringBoundary` (macOS integration) loads the checked-in
+TDD and Builder profiles through `Engine.LaunchArgs` and runs a harmless provider
+fixture under the actual OS sandbox. It reproduces TDD authoring denial before
+the profile repair, then proves TDD creates a worktree eval, both roles read
+existing evals, Builder cannot create or modify evals, and neither role changes
+main-repository evals or protected profile files. Denied writes preserve fixture
+contents. No live provider or private document is used.

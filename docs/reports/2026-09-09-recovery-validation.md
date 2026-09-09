@@ -128,6 +128,46 @@ resume is needed. Explicit interrupted-phase resume remains a separate concern:
 these phase-complete checkpoints are intentionally excluded from automatic
 cross-run discovery.
 
+## TDD eval authoring repair
+
+Quota/continuation PR [#537](https://github.com/mickeyyaya/evolve-loop/pull/537)
+merged as `ab3d99dd` with Linux, macOS, ACS and configuration CI green. The next
+native attempt allocated cycles 1610–1612. Cycle 1611 demonstrated the repaired
+continuation boundary live: it advanced the adopted snapshot to pinned main
+`e8796188` before archiving the unpublished ancestor record.
+
+That lane then exposed a separate role-policy contradiction. TDD's persona
+requires permanent `.evolve/evals/<task-slug>.md` authoring, but its checked-in
+profile prohibited Edit, Write and OS writes to that directory. The live child
+received `Operation not permitted`; its report and ACS tests could not establish
+the required complete eval inventory. The operator interrupted the batch and
+preserved all reports and worktrees. It returned `stop_reason: signal` and
+`cycles: null`; this attempt also does not count as a completed wave.
+
+The repair removes those three TDD-specific denials and declares worktree eval
+authoring in its write paths. Builder's eval denial, main-repository read-only
+boundary and unrelated protected paths remain enforced. No append-only eval
+mechanism or broader profile pattern-language implementation is introduced.
+
+A native macOS regression loads the actual checked-in role profiles through the
+bridge and launches a harmless provider fixture. Before the fix, TDD fails on
+its required eval write while Builder passes its negative probes. After the
+fix, both role cases pass: TDD authoring succeeds, eval reading succeeds, and
+Builder eval creation/modification plus both roles' protected/main writes fail
+without changing fixture contents. This is behavioral sandbox evidence, not a
+claim that model output is useful or that the requested two waves are complete.
+
+Validation: full default Go suite 208 packages PASS (five without tests), full
+vet PASS, full native bridge integration PASS (73.566 seconds on a dedicated
+`SHELL=/bin/sh` tmux server), and the new native role fixture under the race
+detector PASS. The architecture reviewer independently reran both native role
+cases successfully.
+
+The attempt also recorded routing overhead (one post-Scout router took 948
+seconds and ran broad repository checks) and a TDD report treating undefined
+API compilation as RED evidence. These are quality/efficiency observations to
+assess against completed native Audit and Ship results, not successful changes.
+
 ## Limits and live verification
 
 Linux mandatory linked-worktree confinement is explicitly unsupported and fails closed; native Linux enforcement was not verified on this macOS host. Live writer swarm, hard model-family separation and retry adjudication remain outside this recovery. Legacy resume diagnostics are recovery hints, not authenticated Ship evidence. HEAD-based throughput remains a heuristic under concurrent lanes; live assessment must inspect actual lane commits.
