@@ -173,11 +173,24 @@ func NormalizeDeliverableKind(v string) string {
 // `deliverable_kind != document` holds, so the tdd integrity pin stays on and
 // is released only by a digested document declaration (ADR-0099).
 func (s RoutingSignals) DeliverableKind() string {
-	if s.Triage.Present && s.Triage.DeliverableKind != "" {
-		return s.Triage.DeliverableKind
-	}
-	if s.Scout.Present && s.Scout.DeliverableKind != "" {
-		return s.Scout.DeliverableKind
+	if k, ok := s.DeclaredDeliverableKind(); ok {
+		return k
 	}
 	return DeliverableKindCode
+}
+
+// DeclaredDeliverableKind returns the kind a report DECLARED (triage is
+// authoritative over scout) and whether one did. The integrity floor reads
+// DeliverableKind (declaration or the conservative code default); a
+// dispatch-time projection that may substitute the project's default kind
+// reads this, so "nobody said" and "somebody said code" stay distinguishable
+// (ADR-0099 slice 3).
+func (s RoutingSignals) DeclaredDeliverableKind() (string, bool) {
+	if s.Triage.Present && s.Triage.DeliverableKind != "" {
+		return s.Triage.DeliverableKind, true
+	}
+	if s.Scout.Present && s.Scout.DeliverableKind != "" {
+		return s.Scout.DeliverableKind, true
+	}
+	return "", false
 }

@@ -81,6 +81,8 @@ var ollamaCompatible = map[string]bool{
 	"verify-release":         true,
 	"fable":                  true,
 	"engineering-craft":      true,
+	"solution-scout":         true,
+	"solution-audit":         true,
 }
 
 // publishConfig captures the parsed `skills publish` flags.

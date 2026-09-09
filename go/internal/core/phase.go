@@ -122,9 +122,15 @@ type PhaseRequest struct {
 	// (evolve-bridge-r<runid8>-…) and the per-run session registry records
 	// the right owner. Empty on legacy/degraded paths — names then keep the
 	// pre-CB.5 format.
-	RunID         string            `json:"run_id,omitempty"`
-	GoalHash      string            `json:"goal_hash"`
-	Context       map[string]string `json:"context,omitempty"`
+	RunID    string            `json:"run_id,omitempty"`
+	GoalHash string            `json:"goal_hash"`
+	Context  map[string]string `json:"context,omitempty"`
+	// Signals is the cycle's objective signals projected for the dispatch-time
+	// selectors (the skill-overlay `when` rule), keyed by the kernel's routable
+	// field names (config.Signal*). Core sets it at dispatch (dispatchSignals);
+	// the phase runner copies it onto policy.OverlayDispatch and digests nothing
+	// itself (ADR-0099 slice 3).
+	Signals       map[string]string `json:"signals,omitempty"`
 	PreviousPhase string            `json:"previous_phase,omitempty"`
 	Env           map[string]string `json:"env,omitempty"`
 

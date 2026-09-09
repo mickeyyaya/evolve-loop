@@ -145,6 +145,7 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 		PreviousPhase:                   string(cr.current),
 		Env:                             cr.envSnap,
 		Context:                         phaseCtx,
+		Signals:                         dispatchSignals(next, cr.cs.WorkspacePath, cr.req.ProjectRoot),
 		BypassPolicy:                    cr.req.BypassPolicy,
 		// Runtime operator directives snapshotted once at cycle start (same value
 		// for every phase this cycle); empty ⇒ byte-identical dispatch.

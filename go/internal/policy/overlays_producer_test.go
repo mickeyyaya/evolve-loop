@@ -31,7 +31,7 @@ func TestDispatchFromPhaseRequest_AutoTierPopulatedRoundTripsToFable(t *testing.
 	d := policy.DispatchFromPhaseRequest("build", "claude-tmux", "opus", "deep")
 
 	want := policy.OverlayDispatch{Phase: "build", CLI: "claude-tmux", Model: "opus", Tier: "deep"}
-	if d != want {
+	if !reflect.DeepEqual(d, want) {
 		t.Fatalf("DispatchFromPhaseRequest(auto,deep) = %+v, want %+v", d, want)
 	}
 
@@ -52,7 +52,7 @@ func TestDispatchFromPhaseRequest_NonAutoTierEmptyRoundTripsToNoOverlay(t *testi
 	d := policy.DispatchFromPhaseRequest("audit", "codex", "gpt-5", "")
 
 	want := policy.OverlayDispatch{Phase: "audit", CLI: "codex", Model: "gpt-5", Tier: ""}
-	if d != want {
+	if !reflect.DeepEqual(d, want) {
 		t.Fatalf("DispatchFromPhaseRequest(non-auto,empty-tier) = %+v, want %+v", d, want)
 	}
 

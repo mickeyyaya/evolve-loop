@@ -187,6 +187,15 @@ type Condition struct {
 	Value interface{} `json:"value"`
 }
 
+// SignalDeliverableKind and SignalGoalType are the routable field names of the
+// two ADR-0099 signals — the ONE word a conditional_mandatory clause, an
+// overlay `when` clause and core's dispatch projection all use for each
+// (router.resolveField switches on them).
+const (
+	SignalDeliverableKind = "deliverable_kind"
+	SignalGoalType        = "scout.goal_type"
+)
+
 // RoutingBlock is the per-phase declarative trigger set.
 type RoutingBlock struct {
 	InsertWhen []Condition `json:"insert_when"`

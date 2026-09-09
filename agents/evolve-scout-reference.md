@@ -109,7 +109,7 @@ When research is performed, tasks MUST target existing project files for modific
 | "Technique X improves Y" | Create `docs/technique-x.md` | Modify `src/module.py` to implement technique X |
 | "Paper proposes pattern Z" | Create `docs/pattern-z.md` | Add pattern Z to `config/settings.ts` |
 
-**Exception:** If `projectContext.domain == "writing"` or `"research"`, doc creation IS the implementation. Also: if no existing files are suitable, create a new functional file (script, config, test) — not a reference doc. Docs are a last resort, max 1 per cycle.
+**Exception:** a task whose **Deliverable kind** is `document` (a strategy, plan or deal design under `<deliverable_root>/<slug>/` — the root and the project default kind are `deliverable_root` / `deliverable_kind_default` in your context) IS the implementation: its eval's `[code]` grader is `evolve solution check <slug>` and it needs ≥1 `[model]` rubric. For code tasks: if no existing files are suitable, create a new functional file (script, config, test) — not a reference doc; docs are a last resort, max 1 per cycle.
 
 ---
 
@@ -157,6 +157,7 @@ Loaded when writing eval definitions for `.evolve/evals/<task-slug>.md`.
 ````markdown
 # Eval: <task-name>
 ## Code Graders (bash commands that must exit 0)
+<!-- document tasks: `- `[code]` `evolve solution check <slug>`` is the grader; plus ≥1 `[model]` rubric below (distinct options, sourced numbers, recommendation follows the evidence) -->
 - `[code]` `<test command>`
 ## Regression Evals (full test suite)
 - `[code]` `<project test command>`
@@ -185,6 +186,8 @@ Loaded when writing scout-report.md. Not needed when the common-path report stru
 ````markdown
 # Cycle {N} Scout Report
 <!-- challenge-token: {challengeToken} -->
+goal_type: <one key of the Goal-Type Recipes table — e.g. feature, bugfix, business-strategy, strategy-options>
+deliverable_kind: <code | document — document when the selected tasks deliver a strategy/plan under <deliverable_root>/<slug>/, else code; mixed ⇒ code>
 
 ## Handoff Summary
 <!-- Never-evict digest for triage/build (cycle-565 S1). Size-budgeted (~2K
@@ -229,6 +232,7 @@ Finding	Source	Target File(s)	Change Description
 ### Task 1: <name>
 - **Slug:** <kebab-case>
 - **Type:** feature / stability / security / techdebt / performance
+- **Deliverable kind:** code | document (document ⇒ the deliverable is `<deliverable_root>/<slug>/`, graded by `evolve solution check <slug>` against the registry contract)
 - **Complexity:** S / M
 - **Rationale:** <why highest impact>
 - **Expected eval delta:** <dimensions improved>

@@ -222,3 +222,23 @@ func TestSeedDomainDefault_MalformedIsLoudNotSilent(t *testing.T) {
 		t.Errorf("malformed domain.json must seed nothing (and WARN); got %v", got)
 	}
 }
+
+// TestSeedDeliverableRoot: the registry's document root reaches the
+// kind-declaring phases (whose prompts carry no Task Contract) as
+// `deliverable_root`, so their prose never restates the configured root; a
+// later phase reads it from the rendered contract instead.
+func TestSeedDeliverableRoot(t *testing.T) {
+	base := map[string]string{"goal": "g"}
+	if got := seedDeliverableRoot(base, PhaseScout, "solutions"); got[CtxKeyDeliverableRoot] != "solutions" || got["goal"] != "g" {
+		t.Errorf("scout dispatch must carry the root beside the base context; got %v", got)
+	}
+	if got := seedDeliverableRoot(base, PhaseTriage, "solutions"); got[CtxKeyDeliverableRoot] != "solutions" {
+		t.Errorf("triage dispatch must carry the root; got %v", got)
+	}
+	if got := seedDeliverableRoot(base, PhaseBuild, "solutions"); got[CtxKeyDeliverableRoot] != "" {
+		t.Errorf("build reads the root from the Task Contract, not the context; got %v", got)
+	}
+	if got := seedDeliverableRoot(base, PhaseScout, ""); got[CtxKeyDeliverableRoot] != "" {
+		t.Errorf("no configured root ⇒ nothing seeded; got %v", got)
+	}
+}

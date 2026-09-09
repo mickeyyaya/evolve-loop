@@ -596,6 +596,7 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 			PreviousPhase: string(current),
 			Env:           envSnap,
 			Context:       phaseCtx,
+			Signals:       dispatchSignals(next, cs.WorkspacePath, req.ProjectRoot),
 		}
 		dispatch := &cycleRun{o: o, ctx: ctx, req: req, cs: cs, cycle: cycle, ctxSnap: ctxSnap, retryConfig: o.retryConfig, workflowConfig: o.workflowConfig}
 		dispatch.applyDispatchPolicy(next, &phaseReq)
