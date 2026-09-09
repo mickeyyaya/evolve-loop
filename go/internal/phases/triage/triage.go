@@ -96,6 +96,9 @@ func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	if kind := req.Context[core.CtxKeyDeliverableKindDefault]; kind != "" {
 		fmt.Fprintf(&b, "- deliverable_kind_default: %s\n", kind)
 	}
+	if root := req.Context[core.CtxKeyDeliverableRoot]; root != "" {
+		fmt.Fprintf(&b, "- deliverable_root: %s\n", root)
+	}
 	// Inbox batch classifier (2026-07-16): one-item-per-cycle consumption pays
 	// the full pipeline per item, so internal/inboxbatch DETERMINISTICALLY
 	// groups the backlog by campaign / package area / explicit links (Core

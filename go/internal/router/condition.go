@@ -68,13 +68,13 @@ func resolveField(sig RoutingSignals, field string) (float64, bool, string, bool
 		return 0, false, sig.CycleSize(), true
 	case "scout.cycle_size":
 		return 0, false, sig.Scout.CycleSizeEstimate, true
-	case "deliverable_kind":
+	case config.SignalDeliverableKind:
 		// Projected (triage > scout > "code") and ALWAYS present: the absent
 		// default "code" is the conservative side, so `deliverable_kind !=
 		// document` holds pre-handoff and the tdd pin is released only by a
 		// digested document signal (ADR-0099).
 		return 0, false, sig.DeliverableKind(), true
-	case "scout.goal_type":
+	case config.SignalGoalType:
 		return resolveTypedOrGeneric(sig, field, sig.Scout.GoalType)
 	case "scout.deliverable_kind":
 		return resolveTypedOrGeneric(sig, field, sig.Scout.DeliverableKind)

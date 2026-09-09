@@ -891,7 +891,12 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 		// across attempts, and overlay rules key on tier (e.g. deep/top→fable), so
 		// the configured skill set is recomputed for each (cli, tier) actually
 		// dispatched. Pure policy lookup; the adapter materializes the SKILL.md.
-		overlaySkills := overlayPolicy.ResolveOverlays(policy.DispatchFromPhaseRequest(phase, candidateCLI, tier, tier))
+		overlayDispatch := policy.DispatchFromPhaseRequest(phase, candidateCLI, tier, tier)
+		// ADR-0099 slice 3: the objective signals the `when` selector reads are
+		// core's projection (PhaseRequest.Signals, one digest per dispatch); the
+		// runner copies, never re-reads the workspace.
+		overlayDispatch.Signals = req.Signals
+		overlaySkills := overlayPolicy.ResolveOverlays(overlayDispatch)
 		// Observability: announce the resolved overlay set for THIS (cli, tier)
 		// attempt so operators/graders see the persona fired without diffing the
 		// prompt file. Rendered even for the empty set (skill-overlays=[]).

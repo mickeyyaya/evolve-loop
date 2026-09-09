@@ -120,6 +120,7 @@ The triage-report.md MUST emit a `<!-- ANCHOR:triage_decision -->` marker on the
 # Triage Decision — Cycle N
 
 cycle_size_estimate: small
+deliverable_kind: code
 phase_skip: []
 
 ## top_n (commit to THIS cycle)
@@ -203,18 +204,19 @@ The `cycle_size_estimate:` line at the top **must be parseable** by phase-gate (
 
 1. First line of triage-report.md is the challenge-token comment.
 2. `cycle_size_estimate:` is `small`, `medium`, or `large`.
-3. `top_n` length is between 0 and 3.
-4. Run `evolve guard triage-floors <workspace>` and reconcile any
+3. `deliverable_kind:` is `code` or `document` — YOUR line is the authoritative kind (ADR-0099): `document` only when EVERY `top_n` item is a document deliverable (scout's per-task **Deliverable kind**, else the project default `deliverable_kind_default` in your context); a mixed top_n is `code` (tdd runs). `document` releases the tdd pin and preloads the solution-skill personas.
+4. `top_n` length is between 0 and 3.
+5. Run `evolve guard triage-floors <workspace>` and reconcile any
    committed_floors/deferred_floors divergence it reports before exit.
-5. **Blocker-solo check (Core Principle 5):** if any `top_n` item fixes a deterministic
+6. **Blocker-solo check (Core Principle 5):** if any `top_n` item fixes a deterministic
    gate/infrastructure defect that failed the previous cycle, `top_n` length MUST be exactly 1.
-6. Every backlog item from scout-report and every carryoverTodo is accounted for in one of {top_n, deferred, dropped}.
-7. No item is in two buckets.
+7. Every backlog item from scout-report and every carryoverTodo is accounted for in one of {top_n, deferred, dropped}.
+8. No item is in two buckets.
 
-8. `phase_skip:` field is present in `triage-report.md` (value may be `[]`). When `workflow.psmas_enabled=true` in policy, the value follows the size→skip mapping in Step 3a; otherwise emit `[]`.
-9. Every `## top_n` item that touches files carries `files=path1;path2` in its metadata tail (and the same paths in the companion's `files[]`). A card whose action names a repo path but declares no `files=` is WARNed about by the triage-cap reviewer and is invisible to the fleet lane planner.
+9. `phase_skip:` field is present in `triage-report.md` (value may be `[]`). When `workflow.psmas_enabled=true` in policy, the value follows the size→skip mapping in Step 3a; otherwise emit `[]`.
+10. Every `## top_n` item that touches files carries `files=path1;path2` in its metadata tail (and the same paths in the companion's `files[]`). A card whose action names a repo path but declares no `files=` is WARNed about by the triage-cap reviewer and is invisible to the fleet lane planner.
 
-If any check fails, fix in place. Do not mark complete until all nine hold.
+If any check fails, fix in place. Do not mark complete until all ten hold.
 
 ### 0a. Idempotency skip-list (v9.6.0+)
 

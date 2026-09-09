@@ -62,6 +62,9 @@ byte-identically (no overlay).
 
 ## Configuration (`.evolve/policy.json` → `overlays`)
 
+> **`when` (ADR-0099 slice 3):** a rule may also key on the cycle's objective signals — `{"when": [{"field": "deliverable_kind", "op": "eq", "value": "document"}]}` — evaluated against `OverlayDispatch.Signals`, which core projects at dispatch (`PhaseRequest.Signals`, ONE kernel digest per dispatch — the runner copies, never re-reads the workspace): `deliverable_kind` (declared by triage/scout, else the project default from `.evolve/domain.json`, else `code` — always present) and `scout.goal_type` (only when the scout declared one). The keys are the kernel's routable field names (`config.SignalDeliverableKind` / `config.SignalGoalType` — the same words a `conditional_mandatory` clause uses). An absent signal never matches (fail-closed; see Caveats). The compiled default preloads `solution-scout` / `solution-build` / `solution-audit` onto a document cycle's scout / build / audit dispatches.
+
+
 ```jsonc
 {
   "overlays": {
@@ -69,7 +72,7 @@ byte-identically (no overlay).
       // Every non-empty selector dimension must match (empty = wildcard).
       // Glob patterns (path.Match) are allowed, e.g. "gpt-*".
       { "tiers": ["deep", "top"], "skills": ["fable"] },
-      { "phases": ["auditor"],    "skills": ["adversarial-testing"] },
+      { "phases": ["audit"],      "skills": ["adversarial-testing"] },
       { "clis": ["codex-tmux"],   "skills": ["fable"] }
     ],
     // Optional clamp on advisor-PROPOSED skills (advisor adds; kernel disposes):
@@ -86,7 +89,7 @@ Semantics of the `overlays` block:
 
 | `overlays` value                | Behavior                                                        |
 |---------------------------------|----------------------------------------------------------------|
-| **absent** (no block)           | the **compiled default** applies: `{tiers:[deep,top]} → [fable]`|
+| **absent** (no block)           | the **compiled default** applies: `{tiers:[deep,top]} → [fable]` and `{phases:[scout|build|audit], when: deliverable_kind==document} → [solution-scout|-build|-audit]` |
 | present, `rules: []` (empty)    | explicit **opt-out** — zero overlays (not the default)         |
 | present, `rules: [...]`         | the UNION of every matching rule's skills, deduped, stable order|
 
@@ -118,14 +121,28 @@ failure of the dispatch.
   dropped by a pin-bypass. `--bypass-policy` no longer means "byte-identical to
   pre-feature dispatch" for deep/top tiers.
 
+- **`when` fail-closed means three different things.** (1) `deliverable_kind` is
+  ALWAYS present on a phase dispatch (core projects declared > project default >
+  `code`), so `{"field": "deliverable_kind", "op": "ne", "value": "document"}`
+  fires on every undeclared cycle — it selects code cycles, not "cycles that
+  declared something else". (2) `scout.goal_type` is present only when the scout
+  declared one, so a goal-keyed rule stays inert until then. (3) The non-phase
+  launch seams (`subagent run`, retro, the swarm runner) dispatch with nil
+  `Signals`, so no `when` rule matches there — silently; their tier/phase/cli
+  rules still apply.
+
 ## Security surface
 
 Once a skill's `SKILL.md` is injected into every deep/top phase prompt, its
 content is **integrity-load-bearing**: a tampered persona would silently rewrite
-every deep-tier agent's operating discipline. Therefore `skills/fable/` is added
-to `ProtectedSurfaceManifest` (`internal/guards/integrity_surface.go`) — the L4
-control-plane perimeter. **Adding a new skill to the compiled-default overlays
-requires adding its directory to that manifest in the same change**, and that
+every deep-tier agent's operating discipline. Therefore every compiled-default
+skill — `policy.CompiledDefaultOverlaySkills()`: `fable`, `solution-scout`,
+`solution-build`, `solution-audit` — is in `ProtectedSurfaceManifest`
+(`internal/guards/integrity_surface.go`), the L4 control-plane perimeter, pinned
+by `TestProtectedSurface_CompiledDefaultOverlaySkills`, which iterates that
+export so the next compiled skill cannot skip the manifest. **Adding a new skill
+to the compiled-default overlays requires adding its directory to that manifest
+in the same change**, and that
 file is control-plane (no autonomous `--class` cycle may edit it), so such a
 change is a manual, operator-authorized ship.
 

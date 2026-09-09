@@ -2,11 +2,8 @@ package core
 
 import (
 	"context"
-	"fmt"
-	"os"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
-	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 	"github.com/mickeyyaya/evolve-loop/go/internal/solutioncheck"
 )
 
@@ -86,8 +83,7 @@ func DocumentCycle(workspace string) bool {
 	if workspace == "" {
 		return false
 	}
-	sig, _ := router.Digest(workspace, []string{"scout", "triage"})
-	return sig.DeliverableKind() == config.DeliverableKindDocument
+	return kindSignals(workspace).DeliverableKind() == config.DeliverableKindDocument
 }
 
 // seedDispatchContext is the ONE place both dispatch surfaces (the live loop
@@ -95,7 +91,31 @@ func DocumentCycle(workspace string) bool {
 // Contract (ADR-0098) and the project's default deliverable kind (ADR-0099).
 func (o *Orchestrator) seedDispatchContext(ctx context.Context, base map[string]string, next Phase, cs CycleState, projectRoot string) map[string]string {
 	out := o.seedTaskContract(ctx, base, next, cs, projectRoot)
-	return seedDomainDefault(out, next, projectRoot)
+	out = seedDomainDefault(out, next, projectRoot)
+	if spec, ok := o.cfg.DocumentSpec(); ok {
+		out = seedDeliverableRoot(out, next, spec.Root)
+	}
+	return out
+}
+
+// CtxKeyDeliverableRoot carries the registry's document deliverable root
+// (deliverable_kinds.document.root) to the kind-declaring phases, whose
+// prompts carry no Task Contract block — so a scout's files= paths and a
+// triage bullet name the ONE configured root, never a remembered one.
+const CtxKeyDeliverableRoot = "deliverable_root"
+
+// seedDeliverableRoot adds the configured root to a kind-declaring phase's
+// context; other phases read it from the rendered Task Contract instead.
+func seedDeliverableRoot(base map[string]string, next Phase, root string) map[string]string {
+	if root == "" || !kindDeclaringPhase(next) {
+		return base
+	}
+	out := make(map[string]string, len(base)+1)
+	for k, v := range base {
+		out[k] = v
+	}
+	out[CtxKeyDeliverableRoot] = root
+	return out
 }
 
 // seedDomainDefault adds the project's default deliverable kind to the scout
@@ -104,14 +124,10 @@ func (o *Orchestrator) seedDispatchContext(ctx context.Context, base map[string]
 // untouched; a file that exists but cannot be parsed is reported loudly and
 // leaves the default absent (the code side), never a silent reclassification.
 func seedDomainDefault(base map[string]string, next Phase, projectRoot string) map[string]string {
-	if next != PhaseScout && next != PhaseTriage {
+	if !kindDeclaringPhase(next) {
 		return base
 	}
-	d, ok, err := config.LoadDomain(projectRoot)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN .evolve/domain.json unreadable — no default deliverable kind seeded: %v\n", err)
-		return base
-	}
+	kind, ok := domainDefaultKind(projectRoot)
 	if !ok {
 		return base
 	}
@@ -119,6 +135,6 @@ func seedDomainDefault(base map[string]string, next Phase, projectRoot string) m
 	for k, v := range base {
 		out[k] = v
 	}
-	out[CtxKeyDeliverableKindDefault] = d.DefaultDeliverableKind()
+	out[CtxKeyDeliverableKindDefault] = kind
 	return out
 }
