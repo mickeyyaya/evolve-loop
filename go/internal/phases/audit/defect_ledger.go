@@ -646,15 +646,9 @@ func reconcileContinuationDefects(req core.PhaseRequest) (diags []core.Diagnosti
 // mechanism's known ceiling in docs/architecture/continuation-defect-ledger.md
 // rather than papered over.
 func laneRegistryBinding(req core.PhaseRequest) (continuation.Continuation, bool) {
-	raw, err := os.ReadFile(filepath.Join(req.Workspace, core.LaneScopeFile))
-	if err != nil {
-		return continuation.Continuation{}, false
-	}
-	var scope core.LaneScope
-	if err := json.Unmarshal(raw, &scope); err != nil {
-		return continuation.Continuation{}, false
-	}
-	for _, id := range scope.TodoIDs {
+	// ONE lane-scope reader (core.LaneScopeIDs): absent, malformed or empty pin
+	// ⇒ nil ⇒ no lineage — the same degraded-path policy core applies.
+	for _, id := range core.LaneScopeIDs(req.Workspace) {
 		c, ok, rerr := continuation.ReadRegistryEntry(req.ProjectRoot, id)
 		if rerr == nil && ok {
 			return c, true

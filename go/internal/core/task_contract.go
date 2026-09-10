@@ -103,11 +103,36 @@ func (o *Orchestrator) seedTaskContract(ctx context.Context, base map[string]str
 // top_n ids through the scope-path resolver.
 func (o *Orchestrator) taskItemRefs(ctx map[string]string, projectRoot, workspace string) []taskItemRef {
 	refs := o.scopedTaskItemRefs(ctx, projectRoot, workspace)
+	// The pin is authoritative even when resume carries stale scope/path context.
+	// Resolve paths separately: an incomplete disclosure cannot narrow membership.
+	if ids := LaneScopeIDs(workspace); len(ids) > 0 {
+		pinned := make([]taskItemRef, 0, len(ids))
+		for _, id := range ids {
+			ref := taskItemRef{id: id}
+			for _, candidate := range refs {
+				if candidate.id == id {
+					ref = candidate
+					break
+				}
+			}
+			if ref.path == "" && o.scopePathFor != nil {
+				ref.path = o.scopePathFor(projectRoot, id)
+			}
+			pinned = append(pinned, ref)
+		}
+		refs = pinned
+	}
+	deferred := deferredTaskIDs(workspace)
+	return slices.DeleteFunc(refs, func(ref taskItemRef) bool { return slices.Contains(deferred, ref.id) })
+}
+
+// deferredTaskIDs reads the triage decision's deferrals — the ONLY thing that
+// can remove a task from its acceptance contract. Without a readable decision
+// nothing is deferred (the assigned scope is preserved).
+func deferredTaskIDs(workspace string) []string {
 	body, err := os.ReadFile(filepath.Join(workspace, "triage-decision.json"))
 	if err != nil {
-		// Without a readable decision, preserve the assigned scope. Only an
-		// explicit deferral can remove a task from its acceptance contract.
-		return refs
+		return nil
 	}
 	// inboxmover cannot be imported here: its ledger adapter depends on core.
 	var decision struct {
@@ -116,16 +141,37 @@ func (o *Orchestrator) taskItemRefs(ctx map[string]string, projectRoot, workspac
 		} `json:"deferred"`
 	}
 	if json.Unmarshal(body, &decision) != nil {
-		return refs
+		return nil
 	}
-	return slices.DeleteFunc(refs, func(ref taskItemRef) bool {
-		for _, item := range decision.Deferred {
-			if item.ID == ref.id {
-				return true
-			}
-		}
-		return false
-	})
+	var out []string
+	for _, item := range decision.Deferred {
+		out = append(out, item.ID)
+	}
+	return out
+}
+
+// ContractTaskIDs is the ONE id set the Task Contract binds a cycle to — the
+// lane pin when present (LaneScopeIDs), else the triage decision's top_n
+// (BoundTaskIDs), minus the decision's deferrals — the projection every
+// consumer that reasons about "the committed members" reads: the Task
+// Contract itself (taskItemRefs, parity-tested) and the TDD->Build scope gate
+// (cycle-1620 salvage). Never triage-report.md's markdown ## top_n: that is
+// prose in triage's working-id namespace, where decomposition sub-ids are the
+// documented norm.
+func ContractTaskIDs(workspace string) []string {
+	ids := LaneScopeIDs(workspace)
+	if len(ids) == 0 {
+		ids = BoundTaskIDs(workspace)
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	deferred := deferredTaskIDs(workspace)
+	out := slices.DeleteFunc(slices.Clone(ids), func(id string) bool { return slices.Contains(deferred, id) })
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 func (o *Orchestrator) scopedTaskItemRefs(ctx map[string]string, projectRoot, workspace string) []taskItemRef {
