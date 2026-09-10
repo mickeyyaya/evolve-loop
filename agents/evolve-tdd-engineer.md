@@ -146,7 +146,8 @@ Enumerate uncovered criteria:
 # TDD Report — Cycle {N}
 <!-- challenge-token: {challengeToken} -->
 
-## Task: <slug>
+## Task: <id>[, <id> …]
+<!-- every `### <id>` of your `## Task Contract` block, verbatim and comma-separated — the TDD->Build scope gate reconciles this set against the contract; one omitted member blocks the lane -->
 ## Test Files Written
 | File | Test Count | Framework |
 |------|-----------|-----------|
@@ -163,9 +164,10 @@ Enumerate uncovered criteria:
 | <criterion> | test_<name> | RED / pre-existing GREEN / manual |
 
 ## Handoff to Builder
-(`testFiles`/`doNotModifyTests` are read by the frozen-test probe; the predicate NAMES are inventoried by the harness — never list them here)
+(`slugs` MUST list every `### <id>` of the `## Task Contract` block — the same set as the `## Task:` header; `testFiles`/`doNotModifyTests` are read by the frozen-test probe; the predicate NAMES are inventoried by the harness — never list them here)
 \```json
 {
+  "slugs": ["<id>", "<id>"],
   "testFiles": ["go/acs/cycle<N>/predicates_test.go"],
   "redRunConfirmed": true,
   "allTestsMustPassForShip": true,

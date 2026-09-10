@@ -65,6 +65,15 @@ func loadLaneScope(workspace string) *LaneScope {
 	return &ls
 }
 
+// LaneScopeIDs projects the ordered pinned members for contracts and outcome
+// accounting. Absent or malformed pins retain the caller's legacy fallback.
+func LaneScopeIDs(workspace string) []string {
+	if scope := loadLaneScope(workspace); scope != nil && len(scope.TodoIDs) > 0 {
+		return scope.TodoIDs
+	}
+	return nil // absent, malformed or EMPTY pin ⇒ the caller's legacy fallback (never a silent empty contract)
+}
+
 // materializeLaneScope pins an env-provided fleet scope to disk so the lane
 // identity exists on disk BEFORE any phase output does. Best-effort: a write
 // failure WARNs — the Context injection still carries the scope this cycle.
