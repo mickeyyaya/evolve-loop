@@ -295,3 +295,15 @@ func mergeEnv(base, overlay map[string]string) map[string]string {
 	}
 	return out
 }
+
+// PersonaAvailable forwards core.PersonaProber to the decorated runner: a
+// decorator must not narrow the capability of what it wraps, or the planner
+// would silently treat a wrapped optional phase as unprobeable (selectable →
+// dispatch → skip). A wrapped runner that is not a prober reports nil, the
+// same answer core gives an unprobeable runner.
+func (d *Decorator) PersonaAvailable() error {
+	if p, ok := d.inner.(core.PersonaProber); ok {
+		return p.PersonaAvailable()
+	}
+	return nil
+}

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -709,10 +710,22 @@ func writeRoutingContext(b *strings.Builder, in router.RouteInput) {
 		b.WriteString("\n## Optional phases available (insert only on objective signal)\n")
 		names := make([]string, 0, len(in.Cfg.Triggers))
 		for name := range in.Cfg.Triggers {
+			if slices.Contains(in.UnavailablePhases, name) {
+				continue // persona doc absent — not selectable (token-waste #2)
+			}
 			names = append(names, name)
 		}
 		sort.Strings(names) // deterministic prompt ⇒ prompt-prefix cache friendly
 		for _, name := range names {
+			fmt.Fprintf(b, "- %s\n", name)
+		}
+	}
+
+	// Persona-less phases: named so the advisor knows WHY they are absent from
+	// the menus above and never proposes them by memory (token-waste #2).
+	if len(in.UnavailablePhases) > 0 {
+		b.WriteString("\n## Unavailable phases (persona doc missing — NOT selectable this cycle)\n")
+		for _, name := range in.UnavailablePhases {
 			fmt.Fprintf(b, "- %s\n", name)
 		}
 	}

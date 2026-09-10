@@ -602,6 +602,9 @@ func (o *Orchestrator) advisorPlanInput(ctx context.Context, current string, sig
 	// so the advisor plans WITH the benefit of what went wrong before. No-op when
 	// no KB is wired or no failure history.
 	lastReason, lessons := o.recallForPlan(ctx, state.FailedAt, req.Context["goal"])
+	// Phases whose persona doc is absent are excluded from every menu the
+	// advisor sees and listed for the clamp/trigger paths (token-waste #2).
+	unavailable := o.unavailableOptionalPhases()
 	return router.RouteInput{
 		Current: current,
 		Signals: signals,
@@ -611,20 +614,21 @@ func (o *Orchestrator) advisorPlanInput(ctx context.Context, current string, sig
 		// Scout reads; NOT Context["strategy"], the strategy MODE) lets the advisor
 		// reason about WHAT the cycle is for. A nil/absent map key is safe (empty ⇒
 		// no Goal section).
-		Workspace:      cs.WorkspacePath,
-		ProjectRoot:    req.ProjectRoot,
-		ActiveWorktree: cs.ActiveWorktree, // so the advisor's bridge launch has a worktree under EVOLVE_FLEET
-		Cycle:          cycle,
-		Env:            env,
-		LastReason:     lastReason,
-		Lessons:        lessons,
-		Catalog:        phaseCardsFromCatalog(o.catalog),
-		OnDemandPhases: onDemandCatalogNames(o.catalog),
-		GoalText:       req.Context["goal"],
-		CarryoverTodos: carryoverTodosForAdvisor(state.CarryoverTodos),
-		BenchedCLIs:    benchedCLIs,
-		IntentRequired: cs.IntentRequired,
-		PSMASEnabled:   o.workflowConfig.PSMASEnabled,
+		Workspace:         cs.WorkspacePath,
+		ProjectRoot:       req.ProjectRoot,
+		ActiveWorktree:    cs.ActiveWorktree, // so the advisor's bridge launch has a worktree under EVOLVE_FLEET
+		Cycle:             cycle,
+		Env:               env,
+		LastReason:        lastReason,
+		Lessons:           lessons,
+		Catalog:           withoutCards(phaseCardsFromCatalog(o.catalog), unavailable),
+		OnDemandPhases:    withoutNames(onDemandCatalogNames(o.catalog), unavailable),
+		GoalText:          req.Context["goal"],
+		CarryoverTodos:    carryoverTodosForAdvisor(state.CarryoverTodos),
+		BenchedCLIs:       benchedCLIs,
+		UnavailablePhases: unavailable,
+		IntentRequired:    cs.IntentRequired,
+		PSMASEnabled:      o.workflowConfig.PSMASEnabled,
 	}
 }
 

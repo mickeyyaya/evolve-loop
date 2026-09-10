@@ -101,10 +101,22 @@ func recoverBlankPane(ctx context.Context, deps Deps, session string, scrollback
 	return pane, true
 }
 
+// tmuxCleanupTimeout bounds the detached cleanup context: a wedged tmux must
+// delay teardown by at most this, never leave the provider running.
+const tmuxCleanupTimeout = 15 * time.Second
+
 // tmuxCleanup captures final scrollback then kills the session — unless it
-// is a named session, which is preserved for resume.
+// is a named session, which is preserved for resume. It runs on a context
+// DETACHED from the launch context's cancellation and bounded by
+// tmuxCleanupTimeout: the deferred cleanup fires exactly when the launch
+// context has been canceled (operator pause, batch stop, watchdog), and a
+// canceled context would make every tmux command below refuse to run — the
+// provider session then survives the orchestrator (2026-09-09 token-waste
+// root cause #1). Cancellation is the reason to clean up, not a reason to skip it.
 func tmuxCleanup(ctx context.Context, deps Deps, name, session, scrollbackFile string, named bool, scrollback int) {
 	pfx := "[" + name + "]"
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), tmuxCleanupTimeout)
+	defer cancel()
 	if !deps.Tmux.HasSession(ctx, session) {
 		return
 	}
