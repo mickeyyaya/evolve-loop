@@ -16,6 +16,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/mickeyyaya/evolve-loop/go/internal/committedset"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -159,19 +160,22 @@ func deferredTaskIDs(workspace string) []string {
 // prose in triage's working-id namespace, where decomposition sub-ids are the
 // documented norm.
 func ContractTaskIDs(workspace string) []string {
-	ids := LaneScopeIDs(workspace)
-	if len(ids) == 0 {
-		ids = BoundTaskIDs(workspace)
-	}
-	if len(ids) == 0 {
+	// Delegates to internal/committedset — the ONE projection of the committed
+	// set, shared with the cycle dossier (which cannot import core). The
+	// precedence and the deferral subtraction live there; this stays the
+	// kernel-side name every core consumer already reads.
+	//
+	// One deliberate behavior difference from the inline version this replaced:
+	// committedset trims each id and drops blank ones, where the old code took
+	// TodoIDs verbatim and compared untrimmed. Unobservable for well-formed
+	// artifacts (materializeLaneScope trims before writing), and a whitespace-
+	// padded id previously became a phantom member that matched nothing —
+	// pinned by TestContractTaskIDs_WhitespacePaddedIDsAreNotPhantomMembers.
+	ids, ok := committedset.Committed(workspace)
+	if !ok || len(ids) == 0 {
 		return nil
 	}
-	deferred := deferredTaskIDs(workspace)
-	out := slices.DeleteFunc(slices.Clone(ids), func(id string) bool { return slices.Contains(deferred, id) })
-	if len(out) == 0 {
-		return nil
-	}
-	return out
+	return ids
 }
 
 func (o *Orchestrator) scopedTaskItemRefs(ctx map[string]string, projectRoot, workspace string) []taskItemRef {

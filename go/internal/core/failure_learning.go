@@ -184,6 +184,44 @@ func (o *Orchestrator) recordPhaseOutcome(result *CycleResult, timings *[]phaseT
 	}
 }
 
+// flushPhaseTimings composes and persists this cycle's phase-timing log EXACTLY
+// once and returns the composed set, so every consumer — the durable log, the
+// normal-path dossier (completeCycle) and the abort-path dossier
+// (abnormalEpilogue) — sees the identical record regardless of which fires
+// first. Calling it again returns the cached set without re-appending.
+func (cr *cycleRun) flushPhaseTimings() []phaseTimingEntry {
+	if cr.timingsFlushed {
+		return cr.timingsComposed
+	}
+	cr.timingsFlushed = true
+	cr.timingsComposed = writePhaseTimings(cr.cs.WorkspacePath, cr.phaseTimings)
+	return cr.timingsComposed
+}
+
+// composePhaseTimings is the ONE composition rule for a cycle's phase-timing
+// log: entries already on disk (a crashed earlier attempt, the pre-resume
+// phases) come FIRST and this invocation's entries are appended. The log is a
+// record of real dispatches, so a phase appearing twice (failed attempt +
+// resumed attempt) is reality, not duplication — nothing is deduped.
+//
+// It is extracted from writePhaseTimings because the cycle DOSSIER must project
+// exactly the set the file receives. When the dossier composed its own view
+// ("live replaces file"), a resumed cycle recorded only the resumed segment and
+// silently dropped the pre-crash prefix that was sitting on disk — two rules
+// for one fact, and the durable half lost. One rule, one composition, one
+// flush (cycleRun.flushPhaseTimings).
+func composePhaseTimings(workspace string, live []phaseTimingEntry) []phaseTimingEntry {
+	prev, rerr := os.ReadFile(phasetiming.Path(workspace))
+	if rerr != nil {
+		return live
+	}
+	var existing []phaseTimingEntry
+	if jerr := json.Unmarshal(prev, &existing); jerr != nil || len(existing) == 0 {
+		return live
+	}
+	return append(existing, live...)
+}
+
 // writePhaseTimings atomically persists phase-timing.json — shared by
 // RunCycle's and RunCycleFromPhase's deferred writers (ADR-0044 C1: one
 // record format, every execution path). APPEND-MERGE semantics: entries
@@ -193,32 +231,28 @@ func (o *Orchestrator) recordPhaseOutcome(result *CycleResult, timings *[]phaseT
 // is reality, not duplication. A fresh cycle workspace has no existing file
 // ⇒ byte-identical to the pre-merge behavior. Best-effort: failures WARN,
 // never mask the cycle outcome.
-func writePhaseTimings(workspace string, timings []phaseTimingEntry) {
+func writePhaseTimings(workspace string, timings []phaseTimingEntry) []phaseTimingEntry {
 	// Same CWD-relative leak guard as the usage sidecar (recordPhaseOutcome).
 	if workspace == "" {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN: empty workspace — skipping phase-timing.json write\n")
-		return
+		return timings
 	}
 	timingPath := phasetiming.Path(workspace)
-	if prev, rerr := os.ReadFile(timingPath); rerr == nil {
-		var existing []phaseTimingEntry
-		if jerr := json.Unmarshal(prev, &existing); jerr == nil && len(existing) > 0 {
-			timings = append(existing, timings...)
-		}
-	}
+	timings = composePhaseTimings(workspace, timings)
 	data, merr := json.Marshal(timings)
 	if merr != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase-timing marshal: %v\n", merr)
-		return
+		return timings
 	}
 	tmp := timingPath + ".tmp"
 	if werr := os.WriteFile(tmp, data, 0o644); werr != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase-timing write: %v\n", werr)
-		return
+		return timings
 	}
 	if rerr := os.Rename(tmp, timingPath); rerr != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase-timing rename: %v\n", rerr)
 	}
+	return timings
 }
 
 // phaseFailureDiag is the structured diagnostic written to <phase>-failure-diag.json

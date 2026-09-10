@@ -367,6 +367,7 @@
 ./internal/cyclebudget
 
 # Cycle Dossier (ADR-0055): durable per-cycle history record.
+./internal/committedset
 ./internal/dossier
 
 # Post-push GitHub CI watch (cycle-748 push-ci-watch-remote-parity): Watch +

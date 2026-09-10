@@ -14,6 +14,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/mickeyyaya/evolve-loop/go/internal/committedset"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -37,11 +38,13 @@ var scoutArtifactName = func() string {
 const LaneScopeFile = "lane-scope.json"
 
 // LaneScope is the pinned lane identity: the todo ids assigned to this lane
-// and the goal hash the lane was provisioned for.
-type LaneScope struct {
-	TodoIDs  []string `json:"todo_ids"`
-	GoalHash string   `json:"goal_hash"`
-}
+// and the goal hash the lane was provisioned for. It is an ALIAS of the leaf
+// package's declaration, not a second one: exactly one non-test file may
+// declare the pin's wire tags (cycleoutcome's
+// TestLaneScopeProjection_SingleWireShapeDeclaration), and an alias carries no
+// struct tag of its own, so every existing composite literal and field read
+// here is unchanged.
+type LaneScope = committedset.LanePinDoc
 
 // loadLaneScope reads <workspace>/lane-scope.json. nil when the workspace is
 // empty-pathed, the file is absent, or it is unreadable/malformed — fail-open:

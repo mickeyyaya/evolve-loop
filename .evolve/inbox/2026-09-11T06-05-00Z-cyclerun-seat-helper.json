@@ -1,0 +1,20 @@
+{
+  "id": "cyclerun-seat-helper",
+  "created_at": "2026-09-11T06:05:00Z",
+  "weight": 0.45,
+  "title": "RunCycleFromPhase's shared cycleRun re-seats different field subsets at three sites — extract one seat helper",
+  "kind": "techdebt",
+  "priority": "medium",
+  "route": "lane",
+  "summary": "resume.go now hoists ONE cycleRun (timingOwner) so the phase-timing composition happens exactly once across the abnormal-epilogue defer, the timing defer and the completion path. Correct today, but the three sites re-seat DIFFERENT subsets of its fields (construction; cs/state/result; cs/phaseTimings; ctx/cs/state/result/phaseTimings/preCycleHEAD), so verifying it means checking per site that it seats everything its callee reads.",
+  "root_cause": "A shared mutable struct with implicit per-site field requirements. Adding a field that abnormalEpilogue reads means remembering to seat it at every site; the failure mode is a stale cs.WorkspacePath writing the timing log into the wrong workspace.",
+  "fix": "Extract one `func (cr *cycleRun) seat(...)` (or a small per-consumer accessor) so each site states its intent once, or at minimum a comment at the hoist naming which fields each consumer reads.",
+  "acceptance": [
+    "Each of the three resume.go sites seats through one named helper rather than an ad-hoc field list.",
+    "A new field consumed by abnormalEpilogue cannot be silently unseated at one site — demonstrated by the helper's signature or by a test.",
+    "Resume normal/abort/zero-entry paths keep today's behavior; internal/core -race green."
+  ],
+  "files": ["go/internal/core/resume.go", "go/internal/core/cyclerun.go"],
+  "connects_to": ["the 2026-09-11 dossier-evidence projection fix, which introduced the shared owner"],
+  "notes": "Architecture reviewer MEDIUM, round 3, explicitly a follow-up rather than a merge condition. The end-to-end guard the same review asked for (a test driving RunCycleFromPhase) landed partially as core/phase_timing_single_writer_test.go, a source-scan guard pinning the writer count at 1."
+}

@@ -63,7 +63,7 @@ func dossierVerdict(outcome string) string {
 // skipped = phases that did not run (with the cause), notAdopted = phases that RAN
 // whose verdict the floor guard declined (dossier-retro-skipped-mislabel). Returns
 // an error the best-effort caller logs; it never panics.
-func writeCycleDossier(lock gitMutationLocker, projectRoot, workspacePath string, cycle int, goal, runID, outcome string, skipped []SkippedPhase, notAdopted []VerdictNotAdopted, spineFailOpens []SpineFailOpen) error {
+func writeCycleDossier(lock gitMutationLocker, projectRoot, workspacePath string, cycle int, goal, runID, outcome string, skipped []SkippedPhase, notAdopted []VerdictNotAdopted, spineFailOpens []SpineFailOpen, phaseTimings []phaseTimingEntry) error {
 	d, err := dossier.Build(cycle, dossier.BuildOpts{
 		WorkspacePath:      workspacePath,
 		Goal:               goal,
@@ -72,6 +72,12 @@ func writeCycleDossier(lock gitMutationLocker, projectRoot, workspacePath string
 		SkippedPhases:      skipped,
 		VerdictsNotAdopted: notAdopted,
 		SpineFailOpens:     spineFailOpens,
+		// The LIVE per-phase evidence. phase-timing.json is written by a
+		// DEFERRED call in RunCycle and lands AFTER this producer runs, so a
+		// dossier that read only the file recorded no phases on the normal
+		// path (cycle-1623). Passing what we already hold removes the ordering
+		// dependency entirely.
+		PhaseTimings: phaseTimings,
 	})
 	if err != nil {
 		return fmt.Errorf("build dossier: %w", err)

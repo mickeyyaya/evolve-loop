@@ -34,6 +34,11 @@
       "type": "string",
       "description": "Git tree SHA of the shipped commit."
     },
+    "tasks": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Task ids triage COMMITTED for this cycle (top_n). An empty array is meaningful: the cycle committed to nothing."
+    },
     "started_at": {
       "type": "string",
       "description": "RFC3339 timestamp when the cycle started."
