@@ -98,6 +98,19 @@ func TestHandoffsFromSignals_ProjectsDigest(t *testing.T) {
 	}
 }
 
+func TestRoutingSignals_HasEmptyTriageCommitment(t *testing.T) {
+	ws := t.TempDir()
+	writeFile(t, ws, "handoff-triage.json", `{"cycle_size":"small"}`)
+	writeFile(t, ws, "triage-decision.json", `{"top_n":[]}`)
+	sig, err := Digest(ws, []string{"triage"})
+	if err != nil {
+		t.Fatalf("Digest: %v", err)
+	}
+	if !sig.HasEmptyTriageCommitment() {
+		t.Error("HasEmptyTriageCommitment() = false, want true for an explicit empty top_n")
+	}
+}
+
 // TestRouteInput_AdvisorContextTypes binds the four advisor-context value types
 // — BenchedCLI, CarryoverTodo, PhaseCard, MintSpec — onto a RouteInput/PhasePlan
 // exactly as the orchestrator threads them, then reads the fields back. MintSpec

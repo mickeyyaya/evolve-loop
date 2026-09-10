@@ -43,6 +43,10 @@ func Digest(workspace string, completed []string) (RoutingSignals, error) {
 		} else {
 			sig.Triage = triageFromReportFallback(workspace, &sig.DigestDegraded)
 		}
+		if count, ok := triageCommittedCount(workspace, &sig.DigestDegraded); ok {
+			sig.Triage.CommittedCount = count
+			sig.Triage.commitmentKnown = true
+		}
 	}
 	if done["build"] {
 		if raw, ok := readFirstTracked(workspace, &sig.DigestDegraded, "handoff-build.json", "handoff-builder.json"); ok {
@@ -69,6 +73,35 @@ func Digest(workspace string, completed []string) (RoutingSignals, error) {
 		sig.foldFailureSentinel(workspace, phase)
 	}
 	return sig, nil
+}
+
+// triageCommittedCount reads the task commitment from triage's authoritative
+// decision artifact. Missing decisions are unknown, not empty, so legacy and
+// degraded workspaces keep the router's existing fail-open behavior.
+func triageCommittedCount(workspace string, degraded *[]string) (int, bool) {
+	raw, err := os.ReadFile(filepath.Join(workspace, "triage-decision.json"))
+	if os.IsNotExist(err) {
+		return 0, false
+	}
+	if err != nil {
+		*degraded = append(*degraded, "triage: decision read: "+err.Error())
+		return 0, false
+	}
+	var decision map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &decision); err != nil {
+		*degraded = append(*degraded, "triage: decision parse: "+err.Error())
+		return 0, false
+	}
+	topN, ok := decision["top_n"]
+	if !ok {
+		return 0, false
+	}
+	var tasks []json.RawMessage
+	if err := json.Unmarshal(topN, &tasks); err != nil {
+		*degraded = append(*degraded, "triage: decision top_n parse: "+err.Error())
+		return 0, false
+	}
+	return len(tasks), true
 }
 
 // unwrapPayload returns the inner `payload` object bytes of the canonical

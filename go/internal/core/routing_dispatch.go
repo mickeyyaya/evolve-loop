@@ -50,13 +50,18 @@ func (o *Orchestrator) enforceNext(current, staticNext Phase, sig router.Routing
 	if cand == "" || cand == staticNext {
 		return staticNext, advanced
 	}
-	// Early-exit (guarded scout/triage→end): the advisor proposes ending a
-	// no-ship convergence cycle. CanTerminateEarly is the SOLE authority — it
-	// rejects any ship-intended cycle, so this can never bypass build/audit on a
-	// path to ship. It deliberately precedes (and skips) the
+	// Early-exit (guarded scout/triage→end): an explicit empty commitment is a
+	// deterministic no-work result; other end proposals remain governed by
+	// CanTerminateEarly, which rejects ship-intended cycles. This deliberately
+	// precedes (and skips) the
 	// SpineSatisfiedUpTo(end) gate — which would require build+audit — because a
 	// no-ship early-exit legitimately happens before those anchors run.
 	if cand == PhaseEnd {
+		// An explicit empty triage commitment is a deterministic no-work
+		// termination, not an advisor attempt to bypass a planned ship floor.
+		if current == PhaseTriage && sig.HasEmptyTriageCommitment() {
+			return PhaseEnd, true
+		}
 		if o.sm.CanTerminateEarly(current, shipPlanned) {
 			return PhaseEnd, true
 		}

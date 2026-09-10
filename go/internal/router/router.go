@@ -281,6 +281,17 @@ func Route(in RouteInput, proposal *Proposal) RouterDecision {
 		return retroDecision(in, proposal)
 	}
 
+	// Triage owns the cycle's task commitment. An explicit empty top_n has no
+	// authorized work for downstream phases, so terminate before optional or
+	// mandatory spine rules can dispatch TDD, Build, or Audit.
+	if cur == "triage" && in.Signals.HasEmptyTriageCommitment() {
+		return RouterDecision{
+			NextPhase: PhaseEnd,
+			Reason:    "triage-empty-top-n",
+			Evidence:  map[string]interface{}{"committed_count": 0},
+		}
+	}
+
 	// Rule 1 — Audit verdict branch (the one verdict-driven edge). FAIL must not
 	// proceed to ship; it diverts to a learning phase. The advisor's
 	// LearningRichness picks WHICH one (full retrospective vs memo) — never
