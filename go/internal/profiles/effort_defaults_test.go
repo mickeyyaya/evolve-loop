@@ -39,7 +39,7 @@ func effortProfilesDir(t *testing.T) string {
 func TestEffortDefaults_Matrix(t *testing.T) {
 	loader := NewFromDir(effortProfilesDir(t))
 	// 2026-09-01 operator directive: the CODEX-routed deep/top phases
-	// (gpt-6-astra since 2026-09-09; gpt-5.6-sol before) run at HIGH — superseding 2026-08-28's max rung (which
+	// (gpt-5.6-sol — the 2026-09-09 gpt-6-astra cutover was withdrawn 2026-09-10 for token cost) run at HIGH — superseding 2026-08-28's max rung (which
 	// had superseded 2026-08-24's xhigh). Max is codex's most quota-hungry
 	// rung ("Max and Ultra consume usage limits faster"); the operator traded
 	// one rung of reasoning for quota headroom. Note the deliberate inversion

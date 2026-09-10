@@ -25,7 +25,7 @@ func (p *codexPasteChipTmux) CapturePane(ctx context.Context, session string, sc
 
 func TestTmuxPromptCodexPasteChipRecovery(t *testing.T) {
 	for _, tc := range []struct{ name, driver, marker, pane, want string }{
-		{"parked", "codex-tmux", "›", "› [Pasted Content 52509 chars]\n  gpt-6-astra high", `"payload":"site=prompt resends=1","result":"submitted_after_resend"`},
+		{"parked", "codex-tmux", "›", "› [Pasted Content 52509 chars]\n  gpt-5.6-sol high", `"payload":"site=prompt resends=1","result":"submitted_after_resend"`},
 		{"quoted history", "codex-tmux", "›", "Earlier: [Pasted Content 52509 chars]\n› ", `"payload":"site=prompt resends=0","result":"submit_verified"`},
 		{"different driver", "claude-tmux", "❯", "❯ [Pasted Content 52509 chars]", `"payload":"site=prompt resends=0","result":"submit_verified"`},
 	} {
