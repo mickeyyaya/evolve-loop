@@ -17,6 +17,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
 	"io"
 	"os"
 	"path/filepath"
@@ -605,11 +606,15 @@ func writeShipBinding(opts *Options, committedTree, commitSHA string) error {
 		return err
 	}
 	path := filepath.Join(dir, "ship-binding.json")
-	body := map[string]any{
-		"audit_bound_tree_sha": opts.internalAuditBoundTreeSHA,
-		"tree_sha_committed":   committedTree,
-		"commit_sha":           strings.TrimSpace(commitSHA),
-		"cycle":                cid,
+	// The shared type, not an inline map: every reader of this sidecar
+	// (the dossier's delivery record, native.go, the lost-landing floor)
+	// binds to the same declaration, so a field rename is a compile error
+	// rather than a silently empty record.
+	body := dossier.ShipBinding{
+		AuditBoundTreeSHA: opts.internalAuditBoundTreeSHA,
+		TreeSHACommitted:  committedTree,
+		CommitSHA:         strings.TrimSpace(commitSHA),
+		Cycle:             cid,
 	}
 	buf, err := json.MarshalIndent(body, "", "  ")
 	if err != nil {

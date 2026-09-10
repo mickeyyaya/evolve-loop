@@ -1,0 +1,20 @@
+{
+  "id": "task-contract-refs-parity",
+  "created_at": "2026-09-11T06:00:00Z",
+  "weight": 0.5,
+  "title": "taskItemRefs still open-codes the committed-set precedence that ContractTaskIDs now delegates — add a parity guard, then fold it in",
+  "kind": "techdebt",
+  "priority": "medium",
+  "route": "lane",
+  "summary": "core.ContractTaskIDs now delegates to internal/committedset (the one projection of the committed set: lane pin, else triage top_n, minus deferrals). Its documented parity partner core.taskItemRefs still derives the same ids inline from LaneScopeIDs + deferredTaskIDs. They agree today and a parity subtest asserts it for two fixtures, but a future change to committedset's precedence would desync them silently.",
+  "root_cause": "The dossier-evidence change centralized the id projection but stopped short of taskItemRefs, whose job also includes ref/path resolution — reshaping that inside a reporting fix would have widened the diff past its thesis.",
+  "fix": "First, a table-driven parity guard asserting ids(taskItemRefs(ctx, root, ws)) == ContractTaskIDs(ws) across pin/decision/deferral/empty shapes — this makes divergence loud without touching resolution logic and can land alone. Then drive taskItemRefs' id list from committedset.LanePin/DecisionTopN/Deferred, keeping the ctx fleet_scope_paths path only for PATH resolution.",
+  "acceptance": [
+    "A parity test fails if taskItemRefs' id set diverges from ContractTaskIDs for any fixture in the shared table.",
+    "taskItemRefs derives its ids from committedset; ctx fleet_scope_paths is used only to resolve paths, never membership.",
+    "The Task Contract block renders identically for a lane pin, a decision-only cycle, and a deferral — pinned by existing tests; go vet + internal/core -race green."
+  ],
+  "files": ["go/internal/core/task_contract.go", "go/internal/committedset/committedset.go"],
+  "connects_to": ["dossier-producer-params-struct (filed from the same review round)", "the 2026-09-11 dossier-evidence projection fix"],
+  "notes": "Raised by the architecture reviewer as MEDIUM across two rounds, explicitly non-blocking, with the parity-guard-first sequencing suggested by that reviewer."
+}

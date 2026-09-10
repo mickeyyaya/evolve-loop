@@ -389,3 +389,23 @@ func writeWSFile(t *testing.T, ws, name, body string) {
 		t.Fatal(err)
 	}
 }
+
+// TestContractTaskIDs_WhitespacePaddedIDsAreNotPhantomMembers pins the one
+// behavior difference between the shared committedset projection and the
+// inline code it replaced: a padded or blank id in the lane pin is trimmed and
+// dropped rather than carried verbatim. Verbatim, " beta " matched nothing
+// downstream — a phantom member that could never be satisfied.
+func TestContractTaskIDs_WhitespacePaddedIDsAreNotPhantomMembers(t *testing.T) {
+	ws := t.TempDir()
+	writeWSFile(t, ws, LaneScopeFile, `{"todo_ids":["alpha"," beta ","","  "]}`)
+	if got := ContractTaskIDs(ws); strings.Join(got, ",") != "alpha,beta" {
+		t.Fatalf("ContractTaskIDs = %v, want the trimmed, non-blank ids", got)
+	}
+	// A padded DEFERRAL still subtracts the member it names.
+	ws2 := t.TempDir()
+	writeWSFile(t, ws2, LaneScopeFile, `{"todo_ids":["alpha","beta"]}`)
+	writeWSFile(t, ws2, "triage-decision.json", `{"deferred":[{"id":" beta "}]}`)
+	if got := ContractTaskIDs(ws2); strings.Join(got, ",") != "alpha" {
+		t.Fatalf("ContractTaskIDs = %v, want beta deferred despite its padding", got)
+	}
+}

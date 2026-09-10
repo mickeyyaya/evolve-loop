@@ -9,6 +9,7 @@ package dossier
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 )
 
@@ -182,5 +183,32 @@ func TestDossier_JSONRoundTrip(t *testing.T) {
 	}
 	if len(out.Decisions) != 1 {
 		t.Errorf("Decisions: got %d, want 1", len(out.Decisions))
+	}
+}
+
+// TestCommitmentAccessors_NamedAndExercised: HasCommitment and CommitmentLine
+// are reached in production only through text/template reflection, so the
+// apicover gate (an AST identifier scan over _test.go) cannot see them via the
+// render test. Name and exercise them directly — and assert the contract that
+// matters: "committed to nothing" must be sayable, and "we never asked" must
+// stay silent rather than render as a claim.
+func TestCommitmentAccessors_NamedAndExercised(t *testing.T) {
+	var unrecorded Dossier
+	if unrecorded.HasCommitment() || unrecorded.CommitmentLine() != "" {
+		t.Errorf("an unrecorded commitment must render nothing; got %q", unrecorded.CommitmentLine())
+	}
+	empty := []string{}
+	stated := Dossier{Tasks: &empty}
+	if !stated.HasCommitment() || !strings.Contains(stated.CommitmentLine(), "nothing") {
+		t.Errorf("an explicit empty commitment must state itself; got %q", stated.CommitmentLine())
+	}
+	ids := []string{"alpha", "beta"}
+	full := Dossier{Tasks: &ids}
+	if line := full.CommitmentLine(); !strings.Contains(line, "alpha") || !strings.Contains(line, "beta") {
+		t.Errorf("CommitmentLine = %q, want both ids", line)
+	}
+	var nilRecv *Dossier
+	if nilRecv.HasCommitment() {
+		t.Error("a nil receiver must report no commitment, not panic")
 	}
 }

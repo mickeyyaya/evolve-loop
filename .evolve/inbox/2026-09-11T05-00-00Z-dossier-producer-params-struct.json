@@ -1,0 +1,20 @@
+{
+  "id": "dossier-producer-params-struct",
+  "created_at": "2026-09-11T05:00:00Z",
+  "weight": 0.45,
+  "title": "writeCycleDossier takes 11 positional parameters — convert to a params struct mirroring dossier.BuildOpts",
+  "kind": "techdebt",
+  "priority": "low",
+  "route": "lane",
+  "summary": "core.writeCycleDossier now takes 11 positional args (lock, projectRoot, workspacePath, cycle, goal, runID, outcome, skipped, notAdopted, spineFailOpens, phaseTimings). Adding the 11th (the live phase timings, the dossier-evidence fix) required touching all 15 call sites purely to append a positional value. One frame down, the same code already demonstrates the better pattern: dossier.Build(cycle, dossier.BuildOpts{...}).",
+  "root_cause": "The function grew by accretion; each new piece of cycle evidence the dossier needs becomes another trailing parameter, so every call site churns for a change that concerns none of them.",
+  "fix": "Introduce core.cycleDossierParams (or reuse a narrowed view) mirroring dossier.BuildOpts; pass one struct. Field additions then touch only the producer and the site that supplies the new field.",
+  "acceptance": [
+    "writeCycleDossier takes at most 3 parameters (lock, params struct, and any context), with every current field preserved by name.",
+    "Adding a hypothetical new evidence field compiles without editing unrelated call sites — demonstrated by a test or by the diff shape.",
+    "go vet + internal/core and internal/dossier suites green; no behavior change (the dossier bytes for a fixed input are unchanged)."
+  ],
+  "files": ["go/internal/core/dossier_producer.go", "go/internal/core/cycle_closeout.go", "go/internal/core/cyclerun_epilogue.go"],
+  "connects_to": ["the 2026-09-11 dossier-evidence projection fix, which added the 11th parameter and surfaced this"],
+  "notes": "Raised by the go-reviewer as MEDIUM, explicitly non-blocking, on the dossier-evidence PR. Filed rather than folded in to keep that diff focused on the reporting defect."
+}

@@ -49,7 +49,7 @@ func TestDossier_RetroThatRanIsNotRecordedAsSkipped(t *testing.T) {
 	ws := t.TempDir()
 	writeFailureArtifacts(t, ws, []string{"audit FAIL: two defects"})
 	if err := writeCycleDossier(nil, root, ws, 41, "fix the mislabel", "run41", r.FinalVerdict,
-		r.SkippedPhases, r.VerdictsNotAdopted, r.SpineFailOpens); err != nil {
+		r.SkippedPhases, r.VerdictsNotAdopted, r.SpineFailOpens, nil); err != nil {
 		t.Fatalf("writeCycleDossier: %v", err)
 	}
 	m, _ := readDossierPair(t, root, 41)
@@ -80,7 +80,7 @@ func TestDossier_AbnormalExitStillRecordsATrueSkip(t *testing.T) {
 	skipped := []SkippedPhase{{Phase: "closeout", Reason: "abnormal exit in phase build"}}
 
 	if err := writeCycleDossier(nil, root, t.TempDir(), 42, "died mid-build", "run42", VerdictFAIL,
-		skipped, nil, nil); err != nil {
+		skipped, nil, nil, nil); err != nil {
 		t.Fatalf("writeCycleDossier: %v", err)
 	}
 	m, _ := readDossierPair(t, root, 42)

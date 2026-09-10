@@ -45,6 +45,9 @@ var markdownTmpl = template.Must(template.New("dossier-md").
 {{- if .CommitSHA}}
 **Commit:** {{.CommitSHA}}
 {{- end}}
+{{- if .HasCommitment}}
+**Committed:** {{.CommitmentLine}}
+{{- end}}
 {{- if .StartedAt}}
 **Started:** {{.StartedAt}}
 {{- end}}

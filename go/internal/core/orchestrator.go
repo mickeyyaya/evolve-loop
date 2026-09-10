@@ -969,7 +969,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (_ CycleR
 	// grown slice header is observed.
 	defer func() {
 		if len(cr.phaseTimings) > 0 {
-			writePhaseTimings(cr.cs.WorkspacePath, cr.phaseTimings)
+			cr.flushPhaseTimings()
 		}
 		// ADR-0045 I1: roll every per-phase interaction ledger (bridge
 		// subprocess + orchestrator producers alike) into

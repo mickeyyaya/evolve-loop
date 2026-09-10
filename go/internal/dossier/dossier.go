@@ -28,14 +28,29 @@ const (
 
 // Dossier is the aggregated, committed record of one cycle.
 type Dossier struct {
-	Cycle        int           `json:"cycle"`
-	RunID        string        `json:"run_id,omitempty"`
-	Goal         string        `json:"goal"`
-	FinalVerdict string        `json:"final_verdict"`
-	CommitSHA    string        `json:"commit_sha,omitempty"`
-	TreeSHA      string        `json:"tree_sha,omitempty"`
-	Phases       []PhaseRecord `json:"phases"`
-	Defects      []Defect      `json:"defects,omitempty"`
+	Cycle        int    `json:"cycle"`
+	RunID        string `json:"run_id,omitempty"`
+	Goal         string `json:"goal"`
+	FinalVerdict string `json:"final_verdict"`
+	CommitSHA    string `json:"commit_sha,omitempty"`
+	TreeSHA      string `json:"tree_sha,omitempty"`
+	// Tasks is the task set triage COMMITTED for this cycle (top_n ids). It is
+	// a POINTER because the three states are genuinely distinct and the record
+	// must not conflate them:
+	//
+	//	nil         → no triage decision recorded (unknown); the field is omitted
+	//	&[]string{} → an explicit EMPTY commitment; serializes as []
+	//	&[...]      → the committed ids
+	//
+	// "committed to nothing" is a finding in its own right — cycle-1623 did
+	// exactly that and then ran twelve phases anyway — so it must stay
+	// distinguishable from "we never asked". A plain []string cannot express
+	// this: without omitempty a nil marshals to `null`, which the schema's
+	// "type": "array" rejects; with omitempty an explicit empty commitment
+	// silently vanishes.
+	Tasks   *[]string     `json:"tasks,omitempty"`
+	Phases  []PhaseRecord `json:"phases"`
+	Defects []Defect      `json:"defects,omitempty"`
 	// Failure is the FAIL cycle's failure identity (digest fingerprint +
 	// pre-class + bounded reasons[]), ingested from the workspace artifacts
 	// failure-digest.json + audit-fail-reason.json so the committed record
@@ -173,4 +188,24 @@ func (d *Dossier) Validate() error {
 		}
 	}
 	return nil
+}
+
+// HasCommitment reports whether triage recorded a commitment for this cycle at
+// all (as opposed to no decision having been read). It is the template's guard:
+// "committed to nothing" must render, "we never asked" must not.
+func (d *Dossier) HasCommitment() bool { return d != nil && d.Tasks != nil }
+
+// CommitmentLine renders the committed task ids for the human-readable half of
+// the record. An explicit EMPTY commitment renders as a stated fact rather than
+// a blank, because a cycle that committed to nothing and then ran a full spine
+// is exactly what the reader needs to see (cycle-1623).
+func (d *Dossier) CommitmentLine() string {
+	if !d.HasCommitment() {
+		return ""
+	}
+	ids := *d.Tasks
+	if len(ids) == 0 {
+		return "_(nothing — this cycle committed to no task)_"
+	}
+	return "`" + strings.Join(ids, "`, `") + "`"
 }
