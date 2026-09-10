@@ -1,0 +1,16 @@
+{
+  "id": "capability-aware-prompt-scaffold",
+  "created_at": "2026-09-02T23:40:00Z",
+  "weight": 0.8,
+  "title": "R6 capability-aware scaffolding: per-tier prompt_scaffold in profiles (balanced/fast tiers get a numbered DoD with mandatory machine-checkable evidence lines; deep stays terse) + measured effort per phase/tier",
+  "kind": "feature",
+  "class": "pipeline-architecture",
+  "priority": "medium",
+  "summary": "Gap G8: build-prompt bytes are identical whether the phase lands on codex-tmux/balanced or a hypothetical fast tier; internal/capability models transport only. Evidence: SWE-agent 'interface design moves success as much as model choice' (2405.15793); effort dials are non-monotonic for small models (2604.26954) — measure, do not assume.",
+  "root_cause": "No tier/capability signal reaches prompt assembly; effort_level is a static profile field.",
+  "fix": "profiles gain prompt_scaffold keyed by tier (config-injected, Strategy); assembler selects by resolved tier; dashboard records per-phase tier/effort so ship rate by tier×effort is measurable before pinning.",
+  "acceptance": ["A balanced-tier build prompt contains the scaffold block; a deep-tier prompt does not; unit test pins both.", "No Go literal holds scaffold text.", "go vet, -race, apicover green."],
+  "files": [".evolve/profiles/*.json", "go/internal/prompts/", "go/internal/subagent/modeltier.go"],
+  "connects_to": ["arm-audit-retry-escalation (R1)", "evolve dashboard (ADR-0095)"],
+  "notes": "Filed 2026-09-02 (proposal R6)."
+}

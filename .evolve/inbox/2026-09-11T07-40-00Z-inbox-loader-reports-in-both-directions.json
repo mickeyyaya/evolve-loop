@@ -1,0 +1,26 @@
+{
+  "id": "inbox-loader-failure-reporting-lies-both-ways",
+  "title": "The inbox loader drops items silently and calls non-drops \"skipped\" — 7 queued items were invisible for a month, 50 loaded items were reported as skipped",
+  "kind": "pipeline-repair",
+  "class": "pipeline-integrity",
+  "weight": 0.83,
+  "created_at": "2026-09-11T07:40:00Z",
+  "problem": "inboxbatch.LoadDir reports its two outcomes backwards, and both errors cost real work. (1) SILENT DROP: an item whose `priority` is a JSON number instead of a string fails json.Unmarshal, LoadDir appends a warning and `continue`s, and phases/triage/triage.go:226 reads `items, _, err := inboxbatch.LoadDir(...)` — discarding the warnings slice. The item never enters a candidate pool and nothing in the pipeline records why. Seven items were in this state on 2026-09-11, one at weight 0.86 (persona-tail-curation-fleet, invisible since 2026-08-10) and one that provably caused a duplicate to be filed: router-replan-worktree-designation was invisible from 2026-08-11, so the same defect was re-filed on 2026-09-02 as router-fleet-mode-worktree-refusal. A dropped queue item is indistinguishable from an empty queue. (2) FALSE ALARM: LoadFile's sanitisation warnings are documented as non-fatal and the item IS returned, but cmd_inbox.go:65 prints every warning as `inbox batches: WARN skipped <file>`, so 50 items that loaded correctly were reported as skipped. An operator reading that output cannot tell the 7 real losses from the 50 non-events.",
+  "fix": "Separate the two channels at the type level rather than sharing one []string. LoadDir should return dropped items (id/path + the parse error) distinctly from sanitisation notes, cmd_inbox should print each with its own accurate verb, and triage must not discard the dropped set — a dropped item is a queue-integrity event, not a formatting note. Independently, decide whether a numeric `priority` is an error at all: Item carries both `Weight float64` and `Priority string`, and every observed offender meant the number as a weight, so a custom UnmarshalJSON that routes a numeric priority into Weight (or a loud, named validation error) would end the class instead of the instance.",
+  "acceptance": [
+    "A fixture item with a numeric priority is either loaded with its number as weight, or reported through a channel that triage cannot discard — never silently absent from the candidate pool.",
+    "The CLI's wording distinguishes a dropped item from a sanitised one; a sanitised item is never described as skipped.",
+    "A regression test asserts triage's candidate count against a directory containing one malformed item, proving the loss is surfaced rather than swallowed.",
+    "A wiring proof that the dropped-item path reaches an operator-visible surface (not only stderr of a manual command)."
+  ],
+  "files": [
+    "go/internal/inboxbatch/item.go",
+    "go/internal/phases/triage/triage.go",
+    "go/cmd/evolve/cmd_inbox.go"
+  ],
+  "connects_to": [
+    "router-replan-worktree-designation (the duplicate this defect caused)",
+    "lesson_to_action_gap (a queued fix that never reaches a cycle is the same disease)"
+  ],
+  "notes": "The seven offenders were repaired in place at the 2026-09-11 boundary landing by moving the number into `weight`; this item is the class fix, not the instance repair. Filed because the instance repair does not stop the next author from writing a numeric priority."
+}

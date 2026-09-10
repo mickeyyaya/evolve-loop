@@ -2,11 +2,21 @@
   "id": "router-replan-worktree-designation",
   "title": "Router REPLAN dispatch under fleet mode must designate a worktree (or sanctioned scratch cwd)",
   "kind": "pipeline-repair",
-  "priority": 0.68,
+  "weight": 0.84,
   "created_at": "2026-08-11T03:00:00Z",
-  "problem": "Half 2 of null-failreasons-capture (half 1 — seal-time FailReasons backfill — landed in PR #442). The one diagnosed null-reason mechanism: advisor/router REPLAN dispatch under fleet mode launched without a designated worktree and was correctly refused (cycle-1358 router-launch-error.txt). The refusal is now at least VISIBLE in FailReasons via the backfill; the dispatch itself remains broken.",
+  "problem": "Half 2 of null-failreasons-capture (half 1 — seal-time FailReasons backfill — landed in PR #442). The one diagnosed null-reason mechanism: advisor/router REPLAN dispatch under fleet mode launched without a designated worktree and was correctly refused (cycle-1358 router-launch-error.txt). The refusal is now at least VISIBLE in FailReasons via the backfill; the dispatch itself remains broken. SECOND SIGHTING 2026-09-02, cycle-1601 (wave-20260902): the same refusal killed the post-FAIL disposition replan (routing-decision-7) — the agy router launch errored 'fleet mode: explicit worktree required (refusing process-cwd fallback)' in router-launch-error.txt. The refusal is CORRECT; the dispatch path is what must designate a cwd. Weight raised from 0.68 on the recurrence. This item absorbed the separately filed duplicate 'router-fleet-mode-worktree-refusal' rather than carrying two open records of one defect — the duplicate was filed because THIS item was invisible to the queue (its numeric priority field failed to unmarshal, so LoadDir dropped it) from 2026-08-11 until 2026-09-11.",
   "fix": "Designate the worktree on the replan dispatch path (the lane's own worktree when one exists) or fall back to a sanctioned scratch cwd for the router agent under fleet mode.",
-  "acceptance": ["A fleet-mode REPLAN dispatch launches with a designated cwd (no refusal); regression test over the router dispatch seam; wiring proof."],
-  "files": ["go/internal/core/phase_advisor.go", "go/internal/bridge/ (router dispatch path)"],
-  "connects_to": ["PR #442", "2026-08-06T06-20-00Z-null-failreasons-capture.json"]
+  "acceptance": [
+    "A fleet-mode REPLAN dispatch launches with a designated cwd (no refusal); regression test over the router dispatch seam; wiring proof."
+  ],
+  "files": [
+    "go/internal/core/phase_advisor.go",
+    "go/internal/bridge/ (router dispatch path)"
+  ],
+  "connects_to": [
+    "PR #442",
+    "2026-08-06T06-20-00Z-null-failreasons-capture.json",
+    "cycle-1601 router-launch-error.txt",
+    "absorbed duplicate: router-fleet-mode-worktree-refusal (filed 2026-09-02)"
+  ]
 }

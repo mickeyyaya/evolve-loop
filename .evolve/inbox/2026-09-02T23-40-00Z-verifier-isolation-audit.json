@@ -1,0 +1,16 @@
+{
+  "id": "verifier-isolation-audit",
+  "created_at": "2026-09-02T23:40:00Z",
+  "weight": 0.75,
+  "title": "R8 verifier-isolation audit: enumerate every builder-writable seam a gate reads (working tree vs committed tree, probe anchors, pre-staged verdict files) and close the residuals so attestation SHAs are minted by the harness only",
+  "kind": "pipeline-repair",
+  "class": "pipeline-architecture",
+  "priority": "medium",
+  "summary": "Attestation/SHA mismatch contributed to 3/9 recent FAILs (1603/1604/1605) and cycle 1595's probe-quarantine anchor reuse. Evidence: Berkeley RDI agent-eval checklist — a 10-line conftest.py 'resolves' 100% of SWE-bench Verified; 'the system under test must not be able to read, write, or influence the evaluation environment'.",
+  "root_cause": "Some gates still read artifacts the builder can write (explanation doc, pre-staged acs-verdict.json before #529, probe anchors).",
+  "fix": "Inventory (doc) + close: gates evaluate the committed tree in a detached worktree; attestation SHAs computed by the harness from that tree; agent-authored copies are advisory.",
+  "acceptance": ["docs/architecture doc lists every gate input with its writer and trust class.", "No gate reads an agent-writable path as authority (regression test over the inventory).", "go vet, -race, apicover green."],
+  "files": ["go/internal/explanationdocs/", "go/internal/acssuite/", "go/internal/phases/audit/", "docs/architecture/"],
+  "connects_to": ["verdict-incoherence-1603 (#529)", "build-exit-deterministic-floor (R3)"],
+  "notes": "Filed 2026-09-02 (proposal R8)."
+}

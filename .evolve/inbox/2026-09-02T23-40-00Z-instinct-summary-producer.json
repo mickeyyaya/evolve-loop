@@ -1,0 +1,16 @@
+{
+  "id": "instinct-summary-producer",
+  "created_at": "2026-09-02T23:40:00Z",
+  "weight": 0.78,
+  "title": "R7 learning re-entry: produce instinctSummary (top-k lessons by file/keyword overlap with the selected task) and inject it where builder/scout/triage personas already instruct agents to read it — today the variable has ZERO producers in Go",
+  "kind": "pipeline-repair",
+  "class": "pipeline-architecture",
+  "priority": "medium",
+  "summary": "Gap G6: ~650 lesson YAMLs under .evolve/instincts/lessons/, .evolve/genes/ empty, and `instinctSummary` referenced by three personas has no producer (only a prose mention in bedrock.go:111). Retro output re-enters the pipeline through an optional grep competing with a ~20-turn budget. Evidence: Reflexion episodic memory (2303.11366); L1541b 'the same lesson nine cycles later'.",
+  "root_cause": "The learning loop is write-only: lessons are rendered, never selected and injected.",
+  "fix": "Deterministic selector: score lessons by overlap of their files[]/keywords with the top_n item's files[] and title; inject top-k (policy-bounded) as instinctSummary into the build/tdd/scout prompts; record which lessons were injected in the cycle dossier for the dashboard.",
+  "acceptance": ["A cycle whose top_n touches go/internal/core/repair_eligibility.go receives lessons L1596b/L1603a in its build prompt (fixture).", "Injected lesson ids appear in the dossier.", "Selector is pure and unit-tested; k and score threshold come from policy.", "go vet, -race, apicover green."],
+  "files": ["go/internal/faillearn/", "go/internal/prompts/", "go/internal/dossier/", "agents/evolve-builder.md"],
+  "connects_to": ["lesson_to_action_gap (memory)", "repair-brief-carries-auditor-findings (R2)"],
+  "notes": "Filed 2026-09-02 (proposal R7)."
+}

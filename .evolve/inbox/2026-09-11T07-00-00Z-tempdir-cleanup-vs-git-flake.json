@@ -1,0 +1,20 @@
+{
+  "id": "tempdir-cleanup-vs-git-flake",
+  "created_at": "2026-09-11T07:00:00Z",
+  "weight": 0.55,
+  "title": "CI flake class (2nd sighting): a test's assertions pass, then t.TempDir cleanup fails with `unlinkat ... directory not empty` because a git subprocess still holds the fixture",
+  "kind": "bug",
+  "priority": "medium",
+  "route": "lane",
+  "summary": "Tests that build a real git fixture under t.TempDir() can fail AFTER their assertions pass: Go's TempDir cleanup runs RemoveAll while a git process still has the directory open, and the test is marked failed with `testing.go: TempDir RemoveAll cleanup: unlinkat <dir>: directory not empty`. Sighting 1: PR #545, ubuntu, internal/routingtest TestEngine_RunAllExecutesPureAndCycleSpecs/cycle_surface_emits_routing_decisions (.git/objects). Sighting 2: PR #548, macOS, internal/core TestDefaultBuildFloorChecks_IncludesPersonaBudgetCheck. Both passed locally on repeat and on the other platform; both reruns went green.",
+  "root_cause": "Fixtures shell out to git (init/add/commit) and the subprocess can outlive the assertion, or leave an object/lock file mid-write, so RemoveAll races it. t.TempDir registers cleanup unconditionally and turns that race into a test failure, independent of what the test asserted.",
+  "fix": "Give git-backed fixtures a deterministic teardown: wait for the git subprocess before returning (the fixture helpers already run git synchronously — audit for any background/Cancel path), or build the repo under a directory the test removes itself with a bounded retry, or set GIT_OPTIONAL_LOCKS=0 and ensure no `git status`-style command runs concurrently with cleanup. Centralize in one fixture helper rather than per test.",
+  "acceptance": [
+    "A named helper owns git-fixture creation and teardown; tests that build a git repo use it rather than a bare t.TempDir.",
+    "A stress run (-count=20) of the two known-affected tests is green on macOS and Linux.",
+    "The failure mode, if it recurs, names the holding process rather than only the path."
+  ],
+  "files": ["go/internal/core/build_persona_budget_check_test.go", "go/internal/routingtest/engine.go", "go/internal/core/worktree_startref_test.go"],
+  "connects_to": ["PR #545 (sighting 1, classified on the PR)", "PR #548 (sighting 2)"],
+  "notes": "Filed per the repo rule: any failure class seen 2+ times gets a regression issue linked from the PR. Both sightings are cleanup-phase only — no assertion has ever failed — so this costs CI reruns, not correctness."
+}

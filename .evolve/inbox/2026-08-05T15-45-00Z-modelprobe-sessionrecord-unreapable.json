@@ -16,7 +16,7 @@
   ],
   "fix": "Route the picker-capture path's sessionrecord to a reap-discoverable location (a live registry must be visible to a CONCURRENT reaper — archiving after exit is useless, so this is a write-target fix, not a salvage-on-teardown fix), or document + wire the probe's tmux sessions into the orphan-socket GC that already runs at cycle start.",
   "id": "modelprobe-sessionrecord-unreapable",
-  "priority": 0.45,
+  "weight": 0.45,
   "problem": "bridgeModelCapturer's recipe path writes the tmux crash-recovery session registry via sessionrecord.Append(PathIn(cfg.Workspace)) — but the probe's Workspace has never been a cycle-<N> path (projectRoot before 2026-08-05, scratch temp dir after), and the registry's own contract says it is only reap-discoverable under .evolve/runs/cycle-<N>/. A probe crashed mid-capture therefore leaves a tmux session the registry-based reaper never finds (the cycle-start orphan-socket GC is the only net). Pre-existing gap, surfaced by the round-2 adversarial review of the model-latest branch.",
   "source": "console-session adversarial review round 2 (go-reviewer footnote), 2026-08-05",
   "title": "Model-probe tmux session registry is written where no reaper looks"

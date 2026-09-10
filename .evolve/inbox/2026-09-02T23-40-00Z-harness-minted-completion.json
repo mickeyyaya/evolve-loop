@@ -1,0 +1,21 @@
+{
+  "id": "harness-minted-completion",
+  "created_at": "2026-09-02T23:40:00Z",
+  "weight": 0.88,
+  "title": "R5 completion minted by the harness: builder reports per-criterion {id, status ∈ met|partial|blocked, evidence}; the checker writes Closes-Inbox only when every criterion re-verifies; `partial` is a first-class honest outcome routed to carryover without penalty",
+  "kind": "pipeline-repair",
+  "class": "task-contract-design",
+  "priority": "high",
+  "summary": "Over-claim is a contributing cause in 4/9 recent FAILs (1604 Closes-Inbox on a one-fifth-met item; evidence paths resolving to no file in 1595/1597/1604). Evidence: Kalai et al. 2509.04664 (binary grading rewards guessing), Confident-and-Wrong 2603.25764 (100% submit / 44% resolve), Anthropic long-running harness (`passes` flipped only after testing).",
+  "root_cause": "Closes-Inbox is asserted by the builder in prose; the harness verifies it only at audit (inboxmover/closesmarker.go line-anchored marker) and offers no rewarded 'partial' path, so guessing 'done' dominates.",
+  "fix": "Schema-enforced completion report per criterion; deterministic checker re-runs the cited commands/tests on the committed tree; Closes-Inbox emitted by the checker; `partial` routes to carryover with the unmet criteria listed and no failure_count bump; a false `met` (checker disagrees) is an automatic FAIL with tier escalation.",
+  "acceptance": [
+    "A build report claiming Closes-Inbox for an item whose acceptance[] is not fully re-verified never produces a Closes-Inbox marker in the ship commit.",
+    "A build reporting `partial` with unmet criteria ships the met slice and re-queues the remainder as a carryover item automatically.",
+    "Regression fixture from cycle 1604 (one-fifth met) yields `partial`, not FAIL.",
+    "go vet ./..., -race, apicover -enforce green."
+  ],
+  "files": ["go/internal/inboxmover/closesmarker.go", "go/internal/deliverable/", "go/internal/phases/build/", "agents/evolve-builder.md"],
+  "connects_to": ["inline-task-contract-into-build-prompt (R4)", "build-exit-deterministic-floor (R3)"],
+  "notes": "Filed 2026-09-02 (proposal R5)."
+}

@@ -1,0 +1,23 @@
+{
+  "connects_to": [
+    "docs/architecture/adr/0072-system-failure-policy-and-halt.md",
+    ".evolve/pipeline-escalation.json",
+    "/Users/danleemh/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-1603"
+  ],
+  "created_at": "2026-09-01T19:41:42Z",
+  "fix": "Root-cause the verdict-surface path (runner clean-exit deliverable-authority, session-lifecycle verdict clobber, or a new variant). Add a regression test that reproduces the incoherence. Do NOT retry the halted task until the pipeline is fixed.",
+  "id": "pipeline-defect-verdict-incoherence-cycle1603",
+  "kind": "pipeline-repair",
+  "notes": "Auto-filed by the ADR-0072 halt at 2026-09-01T19:41:42Z. Evidence: orchestrator-classified verdict-incoherence: audit-report.md declares PASS with seven current-cycle predicates green, while acs-verdict.json has red_count=0 and verdict PASS but ship_eligible=false because ship_eligible_reason still cites an earlier audit FAIL; audit-probes contains the repair-authored upstream_digest_prompt_test.go that is now absent from the preserved worktree, invalidating build-explanation.json after sealing Console diagnosis (2026-09-02): Console deep-dive state: timeline acs-verdict.json 01:45 (round-1; agent-amended with audit_verdict:FAIL/ship_eligible:False extras) vs audit-report.md 03:19 (round-2 repair audit, PASS, engages H1). coherence.ReadCycleVerdicts reads ONLY the acs 'verdict' field (PASS) + report sentinel (PASS); the halt therefore keyed on Recorded=FinalVerdict remaining FAIL after the authoritative round-2 PASS. Open questions for the fix: (1) why recordFinalVerdict didn't adopt round-2's PASS (repair re-entry recording path vs cyclerun_record), (2) why the benign-race reconcile declined — SubstantiveError (cs.AuditFailReasons not cleared on the repair re-dispatch?) or DeliverableValid=false (full Verify of the round-2 report failing a #518-era section requirement). Also note the agent-amendment class: the auditor persona owns BOTH artifacts and round-2 updated only one; 1590 (successful soak repair ship) has NO agent audit_* extras in acs — host-side projection of the audit binding remains the durable direction (proxy-as-verdict). Fix branch: dev/verdictstamp (fix/host-stamps-acs-audit-binding).",
+  "priority": "P0",
+  "root_cause": "The verdict-surface / cycle-finalization path recorded a negative verdict that contradicts the phases' own on-disk artifacts. See internal/coherence and ADR-0072.",
+  "summary": "ADR-0072 system-failure halt at cycle 1603. The pipeline forged a verdict (category=verdict-incoherence): the recorded cycle verdict was negative while the phase artifacts (audit-report.md + acs-verdict.json) are green. This is a PIPELINE defect, not a task failure — retrying the task reproduces it.",
+  "title": "PIPELINE DEFECT (verdict-incoherence): the loop halted — orchestrator-classified verdict-incoherence: audit-report.md declares PASS with seven current-cycle predicates green, while acs-verdict.json has red_count=0 and verdict PASS but ship_eligible=false because ship_eligible_reason still cites an earlier audit FAIL; audit-probes contains the repair-authored upstream_digest_prompt_test.go that is now absent from the preserved worktree, invalidating build-explanation.json after sealing",
+  "weight": 0.99,
+  "consumed": {
+    "at": "2026-09-02T00:00:00Z",
+    "via": "console-manual",
+    "cycle": "1603",
+    "resolution": "FIXED PR #529 (merged 91e955ca): supersedePreviousAuditRound retires the previous round's acs-verdict.json/audit-report.md at the audit pre-dispatch seam on both dispatch surfaces (index=persisted CycleState.AuditDispatches, crash-correct); hasSubstantiveFailReasons single-sources the diagnosed-downgrade predicate so a prose verdict-incoherence claim never halts a diagnosed FAIL. Incident doc docs/incidents/2026-09-02-repair-round-stale-acs-verdict.md; 5 mutants killed; fleet-reviewed (arch 2 rounds)."
+  }
+}

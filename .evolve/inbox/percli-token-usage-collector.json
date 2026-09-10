@@ -1,0 +1,6 @@
+{
+  "title": "Per-CLI token-usage collector — codex-tmux launches report source=none (TRIPWIRE fired 30x in one run)",
+  "weight": 0.58,
+  "source": "console-progress-check-20260902",
+  "details": "Every non-claude tmux launch (codex-tmux observed; agy likely same) exits 0 with token usage unmeasured (source=none), firing the engine TRIPWIRE per dispatch — 30 times in the 2026-09-02 relaunch log alone. Quota budgeting and the consumption ledger are blind to codex spend, and the tripwire noise buries real signals in lane logs. The tripwire message itself names the fix: build a per-CLI usage collector. codex CLI exposes usage in its session self-report (verified during the #508-#516 fidelity arc: read the self-report, never flag-shape); wire a per-family usage adapter into the bridge teardown path so source!=none for codex/agy, and downgrade the TRIPWIRE to fire only on a family that HAS a collector yet returned nothing. Acceptance: a codex-tmux dispatch records nonzero (or explicit unavailable-with-reason) usage; TRIPWIRE count for a healthy run is 0."
+}

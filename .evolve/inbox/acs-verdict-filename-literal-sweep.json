@@ -1,0 +1,6 @@
+{
+  "title": "Sweep the remaining acs-verdict.json filename literals onto acssuite.VerdictFilename + unify the archive-name conventions",
+  "weight": 0.62,
+  "source": "console-arch-review-20260902",
+  "details": "The cycle-1603 fix (fix/host-stamps-acs-audit-binding) added the first exported spelling, acssuite.VerdictFilename, used by the writer (acssuite.WriteVerdict) and the retirement path (core/audit_round_artifacts.go). Architecture review counted 6+ remaining literal copies: coherence/coherence.go:133, phases/ship/audit.go:131, phases/ship/consume.go:291, router/digest.go:263, phases/audit/audit.go:245, acssuite internal reads. Project each from the const (watch import direction — coherence must stay leaf-safe; if importing acssuite from a package creates a cycle, add a projection const with a drift-pin test instead). SECOND half: acs-verdict now has two archive conventions — acs-verdict.foreign.json (phases/audit foreign-root preserve) and acs-verdict.round<N>.json (core retirement). Produce both names from one helper so forensic tooling has one glob to learn. Acceptance: repo-wide grep for the bare literal finds only the const definition (+ docs/fixtures); a uniqueness-scan guard test pins it (infra_teardown_single_source_test.go pattern)."
+}

@@ -1,0 +1,31 @@
+{
+  "id": "india-operator-bundle-plan",
+  "created_at": "2026-09-10T00:15:00Z",
+  "weight": 0.78,
+  "title": "Partnership deal: business plan + bundle design for Indian telecom operators to sell more Netflix subscriptions with Netflix-supported integration",
+  "kind": "feature",
+  "priority": "high",
+  "route": "lane",
+  "deliverable_kind": "document",
+  "summary": "Operator goal (2026-09-09): build a business plan and design the bundle plan for a deal with Indian telecom operators so they can offer more Netflix subscriptions, with Netflix supporting their technical solution (billing/entitlement integration, device/app distribution, network-aware delivery). This is a DOCUMENT deliverable: several mechanistically distinct deal structures, a comparison-driven recommendation, and an evidence file every number cites. Goal type for the scout header: partnership-deal.",
+  "root_cause": "n/a — a solution cycle, not a defect. Second document deliverable on the code spine (ADR-0099); exercises the partnership-deal recipe (adds risk-register) and the deal-structure judgment in audit.",
+  "fix": "Scout declares goal_type: partnership-deal and deliverable_kind: document; triage re-declares the kind; build delivers <deliverable_root>/india-operator-bundle-plan/ per the rendered Task Contract — options that differ in mechanism (e.g. operator-billed hard bundle on postpaid/prepaid plans, wholesale/revenue-share with carrier billing, device-preload plus data-zero-rated delivery), each with parties, value exchange, commercials (pricing tiers, revenue split, minimum commitments), technical commitments Netflix supports, and a term-sheet outline; recommendation with an Options Compared matrix, the runner-up and the evidence that would flip the choice; assumptions-and-evidence with sourced market numbers (subscriber bases, ARPU, published bundle precedents) — unsourced numbers are explicit assumptions. Self-check with evolve solution check before handoff; audit grades with path:line evidence and steelmans the non-recommended options.",
+  "acceptance": [
+    "At least two deal structures, each changing a DIFFERENT mechanism (who bills, who bears acquisition cost, how entitlement is delivered), each with a quantified subscription-uplift expectation resting on a named assumption.",
+    "Each option states the technical commitments Netflix would support (integration surface, timeline, who operates what) and the top two risks with an early-detection signal.",
+    "The recommendation follows from the Options Compared matrix, names the runner-up, and states the evidence that would flip the choice.",
+    "Every quantitative claim cites an entry in the evidence file whose source supports the magnitude and direction; unsourced numbers are labelled assumptions.",
+    "evolve solution check india-operator-bundle-plan exits 0; the audit report cites path:line evidence per criterion and per option; the routing plan justifies tdd as not run and the cycle ships under the solution(india-operator-bundle-plan) prefix."
+  ],
+  "files": [
+    "solutions/india-operator-bundle-plan/options/",
+    "solutions/india-operator-bundle-plan/recommendation.md",
+    "solutions/india-operator-bundle-plan/assumptions-and-evidence.md"
+  ],
+  "connects_to": [
+    "ADR-0099 deliverable kinds (slices #539, #543, #544)",
+    "netflix-margin-device-experience (PR-F soak #1 — the strategy-options recipe)",
+    "examples/eval-solution.md (the document eval shape)"
+  ],
+  "notes": "PR-F soak item #2 (plan review-the-current-pipeline-tidy-sonnet.md). Expected per cycle: routing-plan tdd:false with a document justification and the partnership-deal domain inserts (premise-challenge, forces-analysis, market-sizing, scope-baseline, risk-register, adversarial-review); solution-scout/-build/-audit preloaded. Weight 0.78: high-value operator goal, below the 0.85-0.97 pipeline-integrity band and just under soak #1 so the two lanes order deterministically."
+}

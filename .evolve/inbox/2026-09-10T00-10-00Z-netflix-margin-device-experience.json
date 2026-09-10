@@ -1,0 +1,31 @@
+{
+  "id": "netflix-margin-device-experience",
+  "created_at": "2026-09-10T00:10:00Z",
+  "weight": 0.80,
+  "title": "Strategy options: raise Netflix operating margin by 1 percentage point through the device experience (ADR-0099 document cycle, PR-F soak #1)",
+  "kind": "feature",
+  "priority": "high",
+  "route": "lane",
+  "deliverable_kind": "document",
+  "summary": "Operator goal (2026-09-09): build a strategy to increase the Netflix profit margin by 1 percentage point by improving the device experience (TV/streaming-device apps, partner integrations, playback quality, device-side cost-to-serve). This is a DOCUMENT deliverable: several mechanistically distinct candidate strategies, a comparison-driven recommendation, and an evidence file every number cites. Goal type for the scout header: strategy-options.",
+  "root_cause": "n/a — a solution cycle, not a defect. The factory's first document deliverable on the code spine (ADR-0099): scout/intent unchanged in role, build diverges into options, audit judges them, tdd released by the kernel signal.",
+  "fix": "Scout declares goal_type: strategy-options and deliverable_kind: document (report header + per-task Deliverable kind bullet); triage re-declares the kind; build delivers <deliverable_root>/netflix-margin-device-experience/ per the rendered Task Contract (options with a different mechanism each — e.g. device-side cost-to-serve, ARPU via device partner economics, churn via playback/quality, partner bundle placement); recommendation with an Options Compared matrix, the runner-up and the evidence that would flip the choice; assumptions-and-evidence with sourced numbers (public filings, published research) — unsourced numbers are explicit assumptions. Self-check with evolve solution check before handoff; audit grades with path:line evidence and steelmans the non-recommended options.",
+  "acceptance": [
+    "At least two candidate strategies, each changing a DIFFERENT mechanism (not the same lever at three sizes), each with a causal chain to operating margin and a quantified expected effect resting on a named assumption.",
+    "The recommendation follows from the Options Compared matrix, names the runner-up, and states the evidence that would flip the choice.",
+    "Every quantitative claim in the options and the recommendation cites an entry in the evidence file whose source supports the magnitude and direction; unsourced numbers are labelled assumptions.",
+    "evolve solution check netflix-margin-device-experience exits 0; the audit report cites path:line evidence per criterion and per option.",
+    "The routing plan justifies tdd as not run (document deliverable) and the cycle ships under the solution(netflix-margin-device-experience) prefix."
+  ],
+  "files": [
+    "solutions/netflix-margin-device-experience/options/",
+    "solutions/netflix-margin-device-experience/recommendation.md",
+    "solutions/netflix-margin-device-experience/assumptions-and-evidence.md"
+  ],
+  "connects_to": [
+    "ADR-0099 deliverable kinds (slices #539, #543, #544)",
+    "india-operator-bundle-plan (PR-F soak #2 — the partnership-deal recipe)",
+    "examples/eval-solution.md (the document eval shape)"
+  ],
+  "notes": "PR-F soak item #1 (plan review-the-current-pipeline-tidy-sonnet.md). Expected per cycle: routing-plan tdd:false with a document justification and the strategy-options domain inserts (premise-challenge, forces-analysis, market-sizing, scope-baseline before build, adversarial-review after); solution-scout/-build/-audit preloaded on scout/build/audit; first deep-tier dispatch status bar reads gpt-5.6-sol high (the 2026-09-10 cost directive). Weight 0.80: high-value operator goal, deliberately below the 0.85-0.97 pipeline-integrity band."
+}
