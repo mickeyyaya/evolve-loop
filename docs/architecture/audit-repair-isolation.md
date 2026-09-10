@@ -44,6 +44,17 @@ still emits its rejected binding but takes no shipping lease; PASS/WARN retain
 the lease across binding and shipping, releasing it at the next completed
 non-Audit phase.
 
+A missing persona doc is the deterministic member of that class. Since
+2026-09-10 the orchestrator learns it without a retrospective agent: the failed
+record, the carryover todo, the failure digest and the lesson artifact are
+written exactly as for any failure, and no LLM is dispatched — the sentinel
+already names the cause and the remedy, and cycles 1619 and 1620 had spent
+344 and 311 seconds of a deep-tier agent discovering nothing beyond it. The
+same absence is excluded from selectable plans before dispatch
+(dynamic-phase-routing.md, "Unavailable-phase drop"), so the skip path is the
+fallback for a persona that vanishes mid-cycle, not the steady state.
+
+
 ## Trusted launch roots and lesson writes
 
 Router and advisory PlanJudge pass the trusted project root and use the active

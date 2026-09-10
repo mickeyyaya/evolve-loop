@@ -35,48 +35,54 @@ import (
 const waveSyncTimeout = 60 * time.Second
 
 // syncMainFromOriginAtWaveBoundary fetches origin and fast-forwards a
-// checked-out `main` onto origin/main. Returns true only when the tree
+// checked-out `main` onto origin/main. synced is true only when the tree
 // actually moved. Every skip path is deliberate: not-on-main (sequential /
 // console launches), no origin remote (offline dev), fetch failure
-// (transient network — WARN), already current (quiet), blocked by local
-// tracked changes (WARN, names the cause), diverged history (WARN — FF-only,
-// the loop never merges).
-func syncMainFromOriginAtWaveBoundary(ctx context.Context, projectRoot string, warn io.Writer) bool {
+// (transient network — WARN), already current (quiet), local main AHEAD
+// (WARN — the local integration HEAD is the lane base; nothing moved),
+// blocked by local tracked changes (WARN, names the cause). DIVERGED history
+// returns halt: the ONE main-relation resolver (gitexec.RelationToRemote)
+// that laneStartRef also reads would refuse every lane, so the batch stops
+// here, before any lane spends a phase, with the same sentence — the two
+// consumers can no longer disagree (2026-09-09 token-waste root cause #3).
+func syncMainFromOriginAtWaveBoundary(ctx context.Context, projectRoot string, warn io.Writer) (synced bool, halt error) {
 	if info, err := plane.Classify(projectRoot); err != nil || info.Branch != "main" {
-		return false
+		return false, nil
 	}
 	sctx, cancel := context.WithTimeout(ctx, waveSyncTimeout)
 	defer cancel()
 	g := gitexec.Git{Dir: projectRoot, Exec: sysexec.DefaultRunner}
 	if _, _, code, err := g.Capture(sctx, "remote", "get-url", "origin"); err != nil || code != 0 {
-		return false
+		return false, nil
 	}
 	if _, stderr, code, err := g.Capture(sctx, "fetch", "-q", "origin", "main"); err != nil || code != 0 {
 		fmt.Fprintf(warn, "[loop] WARN: wave-boundary sync: fetch origin failed (rc=%d %v: %s) — planning against the local main\n", code, err, strings.TrimSpace(stderr))
-		return false
+		return false, nil
 	}
-	local, _, lcode, lerr := g.Capture(sctx, "rev-parse", "HEAD")
-	remote, _, rcode, rerr := g.Capture(sctx, "rev-parse", "origin/main")
-	if lerr != nil || rerr != nil || lcode != 0 || rcode != 0 {
-		return false
+	rel, err := g.RelationToRemote(sctx, "origin/main")
+	if err != nil {
+		fmt.Fprintf(warn, "[loop] WARN: wave-boundary sync: %v — planning against the local main\n", err)
+		return false, nil
 	}
-	if strings.TrimSpace(local) == strings.TrimSpace(remote) {
-		return false // already current — the steady state stays silent
+	switch rel.Kind {
+	case gitexec.RelationCurrent:
+		return false, nil // the steady state stays silent
+	case gitexec.RelationAhead:
+		// --ff-only would "succeed" without moving HEAD here; say what is true.
+		fmt.Fprintf(warn, "[loop] WARN: wave-boundary sync: %s; the next lane ship's push publishes them\n", rel)
+		return false, nil
+	case gitexec.RelationDiverged:
+		fmt.Fprintf(warn, "[loop] WARN: wave-boundary sync: %s\n", rel)
+		return false, fmt.Errorf("wave-boundary sync: %s", rel)
 	}
-	// Probe ancestry BEFORE merging (review HIGH): --ff-only also refuses
-	// when LOCAL TRACKED CHANGES would be overwritten — a normal runtime
-	// state (rebuilt-binary churn) that must not be misdiagnosed as history
-	// divergence, whose "next ship reconciles" remedy is the stowaway class.
-	_, _, acode, aerr := g.Capture(sctx, "merge-base", "--is-ancestor", "HEAD", "origin/main")
-	behindOnly := aerr == nil && acode == 0
+	// Behind: fast-forward. --ff-only can still refuse when LOCAL TRACKED
+	// CHANGES would be overwritten — a normal runtime state (rebuilt-binary
+	// churn) that must be named as such, never as divergence (whose "next
+	// ship reconciles" remedy is the stowaway class).
 	if _, stderr, code, err := g.Capture(sctx, "merge", "--ff-only", "origin/main"); err != nil || code != 0 {
-		if behindOnly {
-			fmt.Fprintf(warn, "[loop] WARN: wave-boundary sync: local tracked changes block the fast-forward (rc=%d: %s) — resolve the dirt (or console-lease it) rather than shipping it\n", code, strings.TrimSpace(stderr))
-		} else {
-			fmt.Fprintf(warn, "[loop] WARN: wave-boundary sync: local main diverged from origin/main (rc=%d: %s) — the loop never merges; the next lane ship's push reconciles\n", code, strings.TrimSpace(stderr))
-		}
-		return false
+		fmt.Fprintf(warn, "[loop] WARN: wave-boundary sync: local tracked changes block the fast-forward (rc=%d: %s) — resolve the dirt (or console-lease it) rather than shipping it\n", code, strings.TrimSpace(stderr))
+		return false, nil
 	}
-	fmt.Fprintf(warn, "[loop] wave-boundary sync: fast-forwarded main to origin/main (%.12s)\n", strings.TrimSpace(remote))
-	return true
+	fmt.Fprintf(warn, "[loop] wave-boundary sync: fast-forwarded main to origin/main (%.12s)\n", rel.Remote)
+	return true, nil
 }

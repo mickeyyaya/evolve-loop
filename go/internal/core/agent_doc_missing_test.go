@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -119,5 +120,55 @@ func TestOptionalPhaseMissingPersonaSkipsShipsAndLedgersOwnKind(t *testing.T) {
 	}
 	if found != "optional_missing_persona_skip" {
 		t.Fatalf("ledger kind = %q, want optional_missing_persona_skip — the class split must reach the ledger, not just the helper", found)
+	}
+}
+
+// 2026-09-09 token-waste root cause #2: cycles 1619/1620 spent 344 s and 311 s
+// in a retrospective AGENT for a missing optional persona — a deterministically
+// known configuration absence. The skip is still learned (FailedRecord,
+// carryover todo, deterministic lesson artifact), but no LLM is dispatched for
+// it: there is nothing a retrospective could discover that the sentinel does
+// not already say.
+func TestOptionalPhaseMissingPersona_LearnsDeterministicallyWithoutRetroAgent(t *testing.T) {
+	root := t.TempDir()
+	st := &fakeStorage{state: State{LastCycleNumber: 0}}
+	led := &fakeLedger{}
+	runners := buildRunners(nil)
+	runners[Phase("amplify-tests")] = &fakeRunner{name: "amplify-tests",
+		failErr: fmt.Errorf("amplify-tests: load agent: %w", ErrAgentDocMissing), failUntil: 99}
+	retroR := runners[PhaseRetro].(*fakeRunner)
+	cat, err := phasespec.Catalog{}.Merge([]phasespec.PhaseSpec{{Name: "amplify-tests", Optional: true, After: "build"}})
+	if err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	cfg := shadowCfg(config.StageAdvisory)
+	cfg.Mode = config.ModeDynamicLLM
+	cfg.Order = []string{"scout", "triage", "tdd", "build-planner", "build", "amplify-tests", "audit", "ship"}
+	plan := &router.PhasePlan{Entries: []router.PhasePlanEntry{
+		{Phase: "scout", Run: true}, {Phase: "tdd", Run: true}, {Phase: "build", Run: true},
+		{Phase: "amplify-tests", Run: true}, {Phase: "audit", Run: true}, {Phase: "ship", Run: true},
+	}}
+	o := NewOrchestrator(st, led, runners,
+		WithRouting(cfg, router.StaticPreset{}), WithCatalog(cat), WithPlanner(&fixedPlanner{plan: plan}))
+	if _, err := o.RunCycle(context.Background(), CycleRequest{
+		ProjectRoot: root, GoalHash: "g", DisableWorkspaceGuard: true,
+	}); err != nil {
+		t.Fatalf("missing persona on an optional phase aborted the cycle: %v", err)
+	}
+	if retroR.calls != 0 {
+		t.Fatalf("retro agent dispatched %d time(s) for a known persona absence — deterministic learning only", retroR.calls)
+	}
+	lessons, gerr := filepath.Glob(filepath.Join(root, ".evolve", "instincts", "lessons", "cycle-*-phase-*.yaml"))
+	if gerr != nil || len(lessons) != 1 {
+		t.Fatalf("want exactly one deterministic failure lesson, got %v (err=%v)", lessons, gerr)
+	}
+	todo := false
+	for _, td := range st.state.CarryoverTodos {
+		if strings.Contains(td.Action, "amplify-tests") {
+			todo = true
+		}
+	}
+	if !todo {
+		t.Fatalf("the skip must still queue its carryover todo; got %+v", st.state.CarryoverTodos)
 	}
 }

@@ -1395,3 +1395,26 @@ func FormatDigestShadowLog(phase string, record digest.ShadowRecord) string {
 func (b *BaseRunner) ComposePrompt(body string, req core.PhaseRequest) string {
 	return b.hooks.ComposePrompt(body, req)
 }
+
+// PersonaAvailable implements core.PersonaProber: it resolves the persona doc
+// exactly as Run does (same loader, same name, same inline-prompt exemption)
+// without dispatching anything, so the planner can exclude a phase whose doc
+// does not exist instead of discovering it one dispatch, one skip and one
+// retrospective later.
+func (b *BaseRunner) PersonaAvailable() error {
+	if ip, ok := b.hooks.(InlinePromptProvider); ok {
+		if _, inline := ip.InlinePromptBody(); inline {
+			return nil
+		}
+	}
+	if b.prompts == nil {
+		return fmt.Errorf("%s: prompts loader required", b.hooks.PhaseName())
+	}
+	if _, err := b.prompts.Agent(b.hooks.AgentPromptName()); err != nil {
+		if errors.Is(err, fs.ErrNotExist) && !errors.Is(err, prompts.ErrNoSource) {
+			return fmt.Errorf("%s: load agent: %w: %w", b.hooks.PhaseName(), core.ErrAgentDocMissing, err)
+		}
+		return fmt.Errorf("%s: load agent: %w", b.hooks.PhaseName(), err)
+	}
+	return nil
+}
