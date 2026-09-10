@@ -1,0 +1,20 @@
+{
+  "id": "multi-member-file-scope-advisory",
+  "created_at": "2026-09-10T06:00:00Z",
+  "weight": 0.6,
+  "title": "TDD->Build scope gate: extend the construction-level file-scope advisory to multi-member lanes (cycle-1620 audit L3)",
+  "kind": "bug",
+  "priority": "medium",
+  "route": "lane",
+  "summary": "The cycle-1620 salvage made multi-member lanes reconcile the TDD handoff's declared member set against the contract's bound set (fatal on mismatch) and return before the single-member tail, so the cycle-1111 construction-level check — authored test files vs the committed item's declared scope (fileScopeAdvisory) — no longer runs for lanes with two or more members. Label drift is legitimately superseded by set equality there; the file-scope advisory is not.",
+  "root_cause": "topngate.tddScopeGate.check: the multi-member branch (reconcileMemberSets) returns early; fileScopeAdvisory is keyed on a single claimed slug and a single committed item's declared scope.",
+  "fix": "Union readScoutTargetFiles over every committed member and run one overlap check of the authored files against that union, advisory only (block=false), after a complete multi-member reconciliation; keep single-member behavior byte-identical.",
+  "acceptance": [
+    "A complete two-member declaration whose authored files lie outside both members' declared scopes yields the file-scope advisory (block=false) with both members named.",
+    "A complete two-member declaration whose authored files lie inside either member's scope yields no advisory.",
+    "Single-member lanes keep today's advisory text and behavior; go vet + topngate suite + -race green."
+  ],
+  "files": ["go/internal/topngate/gate.go", "go/internal/topngate/scope_reconciliation_test.go"],
+  "connects_to": ["multi-slug-lane-scope-reconciliation (consumed 2026-09-10 — the salvage that opened this gap)"],
+  "notes": "Filed from the salvage's architecture review (MEDIUM, documented follow-up). Advisory-only: no ship risk, so it sits below the pipeline-integrity band."
+}

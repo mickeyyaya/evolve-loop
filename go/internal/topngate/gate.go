@@ -14,6 +14,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
@@ -88,7 +89,7 @@ func (topNBindingGate) check(in core.ReviewInput) (string, bool) {
 // of triage-report.md and still authors RED scaffolds for a slug triage
 // explicitly declined; build then honours the empty top_n correctly and chokes
 // on the orphan scaffolds. topNBindingGate covers build->audit; this covers
-// triage->TDD, the transition one phase earlier.
+// TDD->Build, the transition one phase earlier.
 type tddScopeGate struct{}
 
 func (tddScopeGate) name() string { return "topn-tdd-scope" }
@@ -96,7 +97,8 @@ func (tddScopeGate) name() string { return "topn-tdd-scope" }
 // appliesTo scopes the gate to the TDD phase's deliverable only.
 func (tddScopeGate) appliesTo(phase string) bool { return phase == string(core.PhaseTDD) }
 
-// check blocks the ONE CERTAIN out-of-lane authoring and fails open on every
+// check reconciles complete multi-member declarations first. For legacy
+// zero/single-member commitments it blocks certain orphan authoring and fails open on every
 // ambiguity (missing/unparseable report, no claimed slug, nothing authored):
 //
 //  1. empty committed top_n + a non-empty authored set — triage committed
@@ -115,8 +117,25 @@ func (tddScopeGate) check(in core.ReviewInput) (string, bool) {
 	if !ok {
 		return "", false // no triage-report.md → nothing to bind against → fail open
 	}
-	claimed, authored, ok := readTDDScope(in.Workspace)
-	if !ok || len(authored) == 0 {
+	claimed, declared, authored, ok := readTDDScope(in.Workspace)
+	if !ok {
+		return "", false // no test-report.md → nothing to bind → fail open (cycle-1620 audit L1)
+	}
+	// Multi-member lanes need complete set equality before Build starts; a
+	// single matching label cannot account for the second member (cycle-1480).
+	// The committed set is the CONTRACT's (core.ContractTaskIDs: the lane pin,
+	// else the triage decision's top_n, minus deferrals) — the same ids the
+	// Task Contract handed TDD — never triage-report.md's markdown ## top_n,
+	// whose working-id decomposition sub-ids would falsely block a lane whose
+	// TDD declared exactly what it was contracted for. The markdown top_n
+	// stays the authority for the legacy zero/single-member paths below. Known
+	// asymmetry: a complete multi-member reconciliation returns here, before
+	// the single-member file-scope advisory (inbox
+	// multi-member-file-scope-advisory).
+	if committed := normalizedSlugs(core.ContractTaskIDs(in.Workspace)); len(committed) > 1 {
+		return reconcileMemberSets(committed, normalizedSlugs(declared))
+	}
+	if len(authored) == 0 {
 		return "", false // no deliverable, or TDD authored nothing → fail open / no-op PASS
 	}
 	if len(topN) == 0 {
@@ -238,51 +257,99 @@ func backtickedPaths(line string) []string {
 	return paths
 }
 
-// readTDDScope reads <workspace>/test-report.md and returns the slug from its
-// "## Task: <slug>" header plus the test files declared by the "## Handoff to
-// Builder" fenced JSON's testFiles[]. ok is false when the file is
-// absent/unreadable (callers fail open).
-func readTDDScope(workspace string) (slug string, testFiles []string, ok bool) {
-	body, ok := readWorkspaceFile(workspace, tddReportName)
-	if !ok {
-		return "", nil, false
-	}
-	for _, line := range strings.Split(body, "\n") {
-		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "## Task:") {
-			slug = strings.TrimSpace(strings.TrimPrefix(trimmed, "## Task:"))
-			break
+// reconcileMemberSets is the multi-member TDD->Build seam: the declared set
+// must equal the committed set exactly; any missing or unexpected member is a
+// fatal scope-mismatch naming both sides.
+func reconcileMemberSets(committed, declared []string) (string, bool) {
+	var missing, extra []string
+	for _, id := range committed {
+		if !slices.Contains(declared, id) {
+			missing = append(missing, id)
 		}
 	}
-	return slug, handoffTestFiles(body), true
+	for _, id := range declared {
+		if !slices.Contains(committed, id) {
+			extra = append(extra, id)
+		}
+	}
+	if len(missing) > 0 || len(extra) > 0 {
+		return "scope-mismatch at TDD->Build: missing committed members {" + strings.Join(missing, ", ") + "}; unexpected declared members {" + strings.Join(extra, ", ") + "}", true
+	}
+	return "", false
 }
 
-// handoffTestFiles returns the testFiles[] of the first fenced block in body
-// that parses as JSON carrying a non-empty testFiles array. The handoff JSON is
-// authoritative over the markdown "Test Files Written" table, which can be
-// empty while the handoff is not. Non-JSON fences (RED run output) are skipped.
-func handoffTestFiles(body string) []string {
-	var block []string
-	inFence := false
-	for _, line := range strings.Split(body, "\n") {
-		if strings.HasPrefix(strings.TrimSpace(line), "```") {
-			if inFence {
-				var payload struct {
-					TestFiles []string `json:"testFiles"`
-				}
-				if err := json.Unmarshal([]byte(strings.Join(block, "\n")), &payload); err == nil && len(payload.TestFiles) > 0 {
-					return payload.TestFiles
-				}
-				block = nil
-			}
-			inFence = !inFence
-			continue
-		}
-		if inFence {
-			block = append(block, line)
+// normalizedSlugs makes set comparisons and defect messages order-independent.
+func normalizedSlugs(slugs []string) []string {
+	out := make([]string, 0, len(slugs))
+	for _, slug := range slugs {
+		if slug = strings.TrimSpace(slug); slug != "" {
+			out = append(out, slug)
 		}
 	}
-	return nil
+	slices.Sort(out)
+	return slices.Compact(out)
+}
+
+// readTDDScope uses the structured handoff's slugs when present, with the
+// Task header as the legacy fallback. Missing reports remain distinguishable.
+func readTDDScope(workspace string) (slug string, slugs, testFiles []string, ok bool) {
+	body, ok := readWorkspaceFile(workspace, tddReportName)
+	if !ok {
+		return "", nil, nil, false
+	}
+	slug, slugs, testFiles = parseTDDReport(body)
+	return slug, slugs, testFiles, true
+}
+
+// parseTDDReport reads declarations only outside example fences. The handoff
+// JSON must belong to the actual Handoff to Builder section. Track delimiter
+// kind and length so nested backticks inside a tilde/long fence stay examples.
+func parseTDDReport(body string) (slug string, slugs, testFiles []string) {
+	var fence string
+	var block []string
+	inHandoff, capture, found := false, false, false
+	for _, line := range strings.Split(body, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if fence != "" {
+			run := len(trimmed) - len(strings.TrimLeft(trimmed, fence[:1]))
+			if run >= len(fence) && strings.TrimSpace(trimmed[run:]) == "" {
+				if capture {
+					var payload struct {
+						Slugs     []string `json:"slugs"`
+						TestFiles []string `json:"testFiles"`
+					}
+					// The declaration is the first fence that DECLARES something: a
+					// JSON fence carrying neither slugs nor testFiles (RED-run output,
+					// a status object) is not the handoff and must not shadow the
+					// real one that follows (cycle-1620 audit M1).
+					if json.Unmarshal([]byte(strings.Join(block, "\n")), &payload) == nil && (len(payload.Slugs) > 0 || len(payload.TestFiles) > 0) {
+						slugs, testFiles, found = payload.Slugs, payload.TestFiles, true
+					}
+				}
+				fence, block, capture = "", nil, false
+			} else if capture {
+				block = append(block, line)
+			}
+			continue
+		}
+		if strings.HasPrefix(trimmed, "```") || strings.HasPrefix(trimmed, "~~~") {
+			run := len(trimmed) - len(strings.TrimLeft(trimmed, trimmed[:1]))
+			fence = trimmed[:run]
+			info := strings.TrimSpace(trimmed[run:])
+			capture = inHandoff && !found && (info == "json" || info == "")
+			continue
+		}
+		if strings.HasPrefix(trimmed, "## Task:") && slug == "" {
+			slug = strings.TrimSpace(strings.TrimPrefix(trimmed, "## Task:"))
+		}
+		if strings.HasPrefix(trimmed, "## ") || strings.HasPrefix(trimmed, "# ") {
+			inHandoff = trimmed == "## Handoff to Builder"
+		}
+	}
+	if slugs == nil {
+		slugs = strings.Split(slug, ",")
+	}
+	return slug, slugs, testFiles
 }
 
 // readTopNSlugs reads <workspace>/triage-report.md and returns the slugs listed

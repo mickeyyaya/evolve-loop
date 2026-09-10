@@ -8,6 +8,7 @@ package topngate
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,6 +23,7 @@ import (
 // output shape).
 func writeTriageReport(t *testing.T, workspace string, topN ...string) {
 	t.Helper()
+	writeTriageDecision(t, workspace, topN, nil)
 	var b strings.Builder
 	b.WriteString("## top_n (commit to THIS cycle)\n")
 	for _, s := range topN {
@@ -208,13 +210,13 @@ func TestTDDScopeGate(t *testing.T) {
 		}
 	})
 
-	t.Run("multiple top_n slugs: any member passes", func(t *testing.T) {
+	t.Run("multiple top_n slugs: partial declaration blocks", func(t *testing.T) {
 		ws := t.TempDir()
 		writeTriageReport(t, ws, "a", "b")
 		writeTDDReport(t, ws, "b", "go/acs/cycle1073/predicates_test.go")
 		reason, block := tddScopeGate{}.check(core.ReviewInput{Phase: string(core.PhaseTDD), Workspace: ws})
-		if reason != "" || block {
-			t.Errorf("member of top_n must pass; got reason=%q block=%v", reason, block)
+		if !strings.Contains(reason, "scope-mismatch") || !block {
+			t.Errorf("partial commitment must block; got reason=%q block=%v", reason, block)
 		}
 	})
 
@@ -490,4 +492,25 @@ func TestTDDScopeGate_FileScopeBinding(t *testing.T) {
 			t.Fatalf("authoring under an EMPTY top_n must stay fatal; got reason=%q block=false", reason)
 		}
 	})
+}
+
+// writeTriageDecision writes the structural triage decision (top_n + deferred)
+// the Task Contract and the multi-member scope gate bind to
+// (core.ContractTaskIDs); the markdown report stays the legacy paths' source.
+func writeTriageDecision(t *testing.T, workspace string, topN, deferred []string) {
+	t.Helper()
+	ids := func(in []string) []map[string]string {
+		out := make([]map[string]string, 0, len(in))
+		for _, s := range in {
+			out = append(out, map[string]string{"id": s})
+		}
+		return out
+	}
+	body, err := json.Marshal(map[string]any{"top_n": ids(topN), "deferred": ids(deferred)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(workspace, "triage-decision.json"), body, 0o644); err != nil {
+		t.Fatalf("write triage-decision: %v", err)
+	}
 }

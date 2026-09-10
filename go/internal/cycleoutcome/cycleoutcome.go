@@ -17,12 +17,12 @@
 package cycleoutcome
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cycleclassify"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
@@ -142,20 +142,7 @@ func CommittedIDsFor(workspace string) []string {
 // PASS promotion in phases/ship/postship.go (consumption-rides-landing-ship)
 // — one reader, so the two sides can never disagree about what a triage-less
 // cycle worked.
-// Mirrors core.LaneScope's wire shape; this package cannot import core
-// (import cycle), and the shape is pinned by the fallback's own regression
-// test. nil on any absent/unreadable/malformed pin — the legacy whole-dir
-// drain.
+// Delegates to the same projection used by the TDD and Build contracts.
 func LaneScopeIDs(workspace string) []string {
-	raw, err := os.ReadFile(filepath.Join(workspace, "lane-scope.json"))
-	if err != nil {
-		return nil
-	}
-	var scope struct {
-		TodoIDs []string `json:"todo_ids"`
-	}
-	if json.Unmarshal(raw, &scope) != nil {
-		return nil
-	}
-	return scope.TodoIDs
+	return core.LaneScopeIDs(workspace)
 }

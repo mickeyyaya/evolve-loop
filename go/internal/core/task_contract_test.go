@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -214,5 +215,177 @@ func TestListACSPredicates_FailureBranchesAreLoud(t *testing.T) {
 	empty := listACSPredicates(context.Background(), wt, 12)
 	if len(empty.names) != 0 || !strings.Contains(empty.note, "declares no Test functions") {
 		t.Fatalf("empty package must be a loud note: %+v", empty)
+	}
+}
+
+// Both prompt consumers must retain every pinned member, even when a resumed
+// context still carries a partial or stale path disclosure.
+func TestTaskContract_MultiSlugProjectionParity(t *testing.T) {
+	for _, pin := range []bool{false, true} {
+		t.Run(fmt.Sprint("pin=", pin), func(t *testing.T) {
+			ws := t.TempDir()
+			if pin {
+				if err := os.WriteFile(filepath.Join(ws, LaneScopeFile), []byte(`{"todo_ids":["a","b"]}`), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			a := writeItem(t, ws, "a", `{"id":"a","acceptance":["deliver a"]}`)
+			b := writeItem(t, ws, "b", `{"id":"b","acceptance":["deliver b"]}`)
+			o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil), WithScopePathResolver(func(_, id string) string {
+				if id == "a" {
+					return a
+				}
+				return b
+			}))
+			o.acsPredicates = func(context.Context, string, int) acsPredicates { return acsPredicates{} }
+			base := map[string]string{"fleet_scope": "a,b", "fleet_scope_paths": "a=" + a}
+			if pin {
+				base["fleet_scope"] = "a"
+			}
+			for _, phase := range []Phase{PhaseTDD, PhaseBuild} {
+				got := o.seedTaskContract(context.Background(), base, phase, CycleState{WorkspacePath: ws}, ws)[CtxKeyTaskContract]
+				if !strings.Contains(got, "### a —") || !strings.Contains(got, "### b —") || strings.Index(got, "### a —") > strings.Index(got, "### b —") {
+					t.Fatalf("%s lost ordered members: %s", phase, got)
+				}
+			}
+		})
+	}
+}
+
+func TestLaneScopeIDs(t *testing.T) {
+	ws := t.TempDir()
+	if got := LaneScopeIDs(ws); got != nil {
+		t.Fatalf("absent pin = %v", got)
+	}
+	if err := os.WriteFile(filepath.Join(ws, LaneScopeFile), []byte(`{"todo_ids":["b","a"]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := LaneScopeIDs(ws); strings.Join(got, ",") != "b,a" {
+		t.Fatalf("ordered pin = %v", got)
+	}
+	if err := os.WriteFile(filepath.Join(ws, LaneScopeFile), []byte(`{broken`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := LaneScopeIDs(ws); got != nil {
+		t.Fatalf("malformed pin = %v", got)
+	}
+}
+
+func TestDispatch_TaskContractMultiSlugLiveAndResume(t *testing.T) {
+	for _, resume := range []bool{false, true} {
+		t.Run(fmt.Sprint("resume=", resume), func(t *testing.T) {
+			root := t.TempDir()
+			ws := RunWorkspacePath(root, 9)
+			if err := os.MkdirAll(ws, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(ws, LaneScopeFile), []byte(`{"todo_ids":["a","b"]}`), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			a := writeItem(t, ws, "a", `{"id":"a","acceptance":["deliver a"]}`)
+			b := writeItem(t, ws, "b", `{"id":"b","acceptance":["deliver b"]}`)
+			runners := buildRunners(map[Phase]string{PhaseAudit: VerdictPASS})
+			st := &fakeStorage{state: State{LastCycleNumber: 8}, cycleState: CycleState{CycleID: 9, Phase: string(PhaseTDD), WorkspacePath: ws}}
+			if resume {
+				st.state.LastCycleNumber = 9
+			}
+			o := NewOrchestrator(st, &fakeLedger{}, runners, WithScopePathResolver(func(_, id string) string {
+				if id == "a" {
+					return a
+				}
+				return b
+			}))
+			o.acsPredicates = func(context.Context, string, int) acsPredicates { return acsPredicates{} }
+			req := CycleRequest{ProjectRoot: root, GoalHash: "g", DisableWorkspaceGuard: true, Context: map[string]string{"fleet_scope": "a", "fleet_scope_paths": "a=" + a}}
+			var err error
+			if resume {
+				_, err = o.RunCycleFromPhase(context.Background(), req, &ResumePoint{Phase: string(PhaseTDD), CycleID: 9})
+			} else {
+				_, err = o.RunCycle(context.Background(), req)
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, phase := range []Phase{PhaseTDD, PhaseBuild} {
+				requests := runners[phase].(*fakeRunner).requests
+				if len(requests) == 0 {
+					t.Fatalf("%s never reached", phase)
+				}
+				contract := requests[0].Context[CtxKeyTaskContract]
+				if !strings.Contains(contract, "1. deliver a") || !strings.Contains(contract, "1. deliver b") {
+					t.Fatalf("%s lost a member: %s", phase, contract)
+				}
+			}
+		})
+	}
+}
+
+// TestLaneScopeIDs_ExplicitEmptyPinIsNoPin: a present-but-empty pin
+// (`{"todo_ids":[]}`) is not an authoritative empty membership — treating it
+// as one would wipe the triage-derived refs and make the Task Contract
+// silently disappear (the "never a silent omission" doctrine). No producer
+// writes it today; this pins the fallback so a future producer cannot.
+func TestLaneScopeIDs_ExplicitEmptyPinIsNoPin(t *testing.T) {
+	ws := t.TempDir()
+	if err := os.WriteFile(filepath.Join(ws, LaneScopeFile), []byte(`{"todo_ids":[]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := LaneScopeIDs(ws); got != nil {
+		t.Fatalf("explicit empty pin must fall back like an absent one; got %v", got)
+	}
+}
+
+// TestContractTaskIDs — cycle-1620 salvage (architecture CRITICAL 1): the
+// TDD->Build scope gate must bind to the SAME id set the Task Contract handed
+// TDD — the lane pin when present, else the triage decision's top_n, minus the
+// decision's deferrals — never to triage-report.md's markdown ## top_n, which
+// is prose in triage's working-id namespace (decomposition sub-ids are the
+// documented norm). ContractTaskIDs is that one projection; taskItemRefs
+// derives its ids from the same readers, proven by parity below.
+func TestContractTaskIDs(t *testing.T) {
+	decision := `{"top_n":[{"id":"alpha"},{"id":"beta"},{"id":"gamma"}],"deferred":[{"id":"gamma"}]}`
+	t.Run("no pin ⇒ decision top_n minus deferred", func(t *testing.T) {
+		ws := t.TempDir()
+		writeWSFile(t, ws, "triage-decision.json", decision)
+		if got := ContractTaskIDs(ws); strings.Join(got, ",") != "alpha,beta" {
+			t.Fatalf("got %v", got)
+		}
+	})
+	t.Run("pin wins over the decision, deferrals still subtract", func(t *testing.T) {
+		ws := t.TempDir()
+		writeWSFile(t, ws, "triage-decision.json", decision)
+		writeWSFile(t, ws, LaneScopeFile, `{"todo_ids":["renamed-work","gamma"]}`)
+		if got := ContractTaskIDs(ws); strings.Join(got, ",") != "renamed-work" {
+			t.Fatalf("got %v", got)
+		}
+	})
+	t.Run("nothing bound ⇒ nil", func(t *testing.T) {
+		if got := ContractTaskIDs(t.TempDir()); got != nil {
+			t.Fatalf("got %v", got)
+		}
+	})
+	t.Run("parity with the Task Contract's own refs", func(t *testing.T) {
+		for _, pin := range []string{"", `{"todo_ids":["renamed-work","gamma"]}`} {
+			ws := t.TempDir()
+			writeWSFile(t, ws, "triage-decision.json", decision)
+			if pin != "" {
+				writeWSFile(t, ws, LaneScopeFile, pin)
+			}
+			o := &Orchestrator{}
+			var refIDs []string
+			for _, r := range o.taskItemRefs(map[string]string{}, t.TempDir(), ws) {
+				refIDs = append(refIDs, r.id)
+			}
+			if want := ContractTaskIDs(ws); strings.Join(refIDs, ",") != strings.Join(want, ",") {
+				t.Fatalf("pin=%q: taskItemRefs ids %v != ContractTaskIDs %v", pin, refIDs, want)
+			}
+		}
+	})
+}
+
+func writeWSFile(t *testing.T, ws, name, body string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(ws, name), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
 	}
 }
