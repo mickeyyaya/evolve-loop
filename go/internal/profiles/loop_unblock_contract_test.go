@@ -68,7 +68,7 @@ func TestRetrospectiveRoutesToCodexDeep(t *testing.T) {
 		t.Fatalf("CLIFallback=%v, want [claude-tmux]", p.CLIFallback)
 	}
 	if p.ModelTierEnvelope == nil || p.ModelTierEnvelope.Default != "deep" {
-		t.Fatalf("envelope default must stay deep (codex deep tier — gpt-6-astra since 2026-09-09): %+v", p.ModelTierEnvelope)
+		t.Fatalf("envelope default must stay deep (codex deep tier — gpt-5.6-sol per the 2026-09-10 cost directive; gpt-6-astra since 2026-09-09): %+v", p.ModelTierEnvelope)
 	}
 }
 
