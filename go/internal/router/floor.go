@@ -142,6 +142,12 @@ func ClampPlanToFloorWith(in RouteInput, plan *PhasePlan, floor []string, intent
 // a plan entry naming a phase outside the known-phase set.
 const DropUnknownPhaseRule = "drop-unknown-phase"
 
+// DropUnavailablePhaseRule is the clamp rule token recorded when the floor
+// removes a plan entry naming a phase whose persona doc is absent
+// (RouteInput.UnavailablePhases) — a known configuration absence must never
+// cost a dispatch.
+const DropUnavailablePhaseRule = "drop-unavailable-phase"
+
 // dropUnknownPhases returns a NEW entry slice with every entry whose phase is
 // not in knownPhaseSet removed, plus one Clamp per removal so the drop is never
 // silent (floor.go's "no silent disposition" rule).
@@ -161,13 +167,17 @@ func dropUnknownPhases(in RouteInput, plan *PhasePlan) ([]PhasePlanEntry, []Clam
 	entries := make([]PhasePlanEntry, 0, len(plan.Entries))
 	var clamps []Clamp
 	for _, e := range plan.Entries {
-		if _, ok := known[e.Phase]; ok {
-			entries = append(entries, e)
-			continue
-		}
 		proposed := e.Phase + "=skip"
 		if e.Run {
 			proposed = e.Phase + "=run"
+		}
+		if slices.Contains(in.UnavailablePhases, e.Phase) {
+			clamps = append(clamps, Clamp{Phase: e.Phase, Rule: DropUnavailablePhaseRule, Proposed: proposed, Forced: e.Phase + "=drop"})
+			continue
+		}
+		if _, ok := known[e.Phase]; ok {
+			entries = append(entries, e)
+			continue
 		}
 		clamps = append(clamps, Clamp{
 			Phase:    e.Phase,

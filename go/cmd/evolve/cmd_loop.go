@@ -39,6 +39,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/ledgerverify"
 	"github.com/mickeyyaya/evolve-loop/go/internal/plane"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
+	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
 )
 
 // validStrategies mirrors the bash whitelist at
@@ -196,6 +197,20 @@ func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) int {
 	if os.Getenv(bridge.TmuxSocketEnv) == "" {
 		_ = os.Setenv(bridge.TmuxSocketEnv, bridge.DeriveRunSocket(os.Getpid()))
 	}
+	// Batch termination reaps exactly ITS OWN per-run socket — every session on
+	// it is this run's by construction — on every exit path including the
+	// SIGINT unwind above. 2026-09-09 token-waste root cause #1: after the
+	// parent and its cycle children had exited, their per-run server still held
+	// three provider sessions and three readiness probes until the operator
+	// killed it by hand. Ownership is the socket's IDENTITY, not env presence:
+	// os.Setenv is process-sticky, so a chain re-entering runLoopBatch in the
+	// same process sees the var pre-set — a presence check would disarm every
+	// batch after the first. A socket derived from THIS pid is ours (each chain
+	// batch reaps it at its own exit; the next batch recreates it on demand); an
+	// operator override or an enclosing run's socket never matches and is never
+	// killed. A chain-boundary re-exec (syscall.Exec) keeps the pid, so the
+	// inherited socket is still this process's own and is reaped at its exit.
+	defer runSocketTeardown(os.Getenv(bridge.TmuxSocketEnv), swarm.ExecKillServer)()
 
 	// Crash-recovery GC, before any cycle runs: reap tmux sessions left by a
 	// PRIOR crashed run. The per-run registry reaper cannot — a SIGKILL'd loop
@@ -570,8 +585,17 @@ func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) int {
 		// ADR-0080 S3: refresh the runtime plane from origin before planning —
 		// lanes must base on the integration channel's truth, not a stale
 		// local main. FF-only; every skip is deliberate and the diverged case
-		// WARNs (the loop never merges).
-		syncMainFromOriginAtWaveBoundary(ctx, cfg.ProjectRoot, stderr)
+		// HALTs the batch (plane_diverged_halt) — the loop never merges.
+		if _, halt := syncMainFromOriginAtWaveBoundary(ctx, cfg.ProjectRoot, stderr); halt != nil {
+			// DIVERGED plane: every lane would refuse to provision (laneStartRef
+			// reads the same relation), so stop the batch BEFORE any lane spends
+			// a phase — the boot-halt class (exit 2), never a per-lane failure
+			// storm. Reconcile the plane, then relaunch.
+			fmt.Fprintf(stderr, "[loop] HALT: %v\n", halt)
+			lr.StopReason = "plane_diverged_halt"
+			lr.emitFatal(stdout, stderr, cfg, 0)
+			return 2
+		}
 		// fleet-config-hot-reload-wave-boundary (cycle 739): re-resolve the
 		// committed fleet block at every wave boundary, before quota/budget
 		// sizing. A malformed/unreadable policy.json holds the previous width
@@ -1147,3 +1171,25 @@ func finalizeCompletedCycle(cfg loopConfig, stderr io.Writer) {
 // substitute a stub that returns a fake orchestrator + in-memory
 // storage/ledger so the M4 pipeline can be exercised end-to-end
 // without spawning real LLM subagents.
+
+// runSocketTeardownTimeout bounds the exit-time kill-server: a wedged tmux
+// must delay the loop's exit by at most this, never leave the server running
+// unbounded.
+const runSocketTeardownTimeout = 10 * time.Second
+
+// runSocketTeardown returns the deferred reaper for this run's per-run tmux
+// socket. It kills the server ONLY when the socket is the one this PROCESS
+// derives for itself (bridge.DeriveRunSocket(os.Getpid())): a pre-set name
+// belongs to an operator or an enclosing run. The kill runs on a fresh
+// bounded context — the loop's own context is exactly what a SIGINT has
+// already canceled.
+func runSocketTeardown(socket string, kill func(context.Context, string) error) func() {
+	if socket == "" || socket != bridge.DeriveRunSocket(os.Getpid()) {
+		return func() {}
+	}
+	return func() {
+		ctx, cancel := context.WithTimeout(context.Background(), runSocketTeardownTimeout)
+		defer cancel()
+		_ = kill(ctx, socket)
+	}
+}

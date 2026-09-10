@@ -180,7 +180,39 @@ func laneStartRef(ctx context.Context, projectRoot string) (string, error) {
 	if _, stderr, code, err := git.Capture(ctx, "fetch", "origin"); err != nil || code != 0 {
 		return "", fmt.Errorf("git fetch origin: rc=%d err=%v: %s", code, err, strings.TrimSpace(stderr))
 	}
-	return "origin/" + originDefaultBranch(ctx, git), nil
+	remote := "origin/" + originDefaultBranch(ctx, git)
+	return integrationHead(ctx, git, remote)
+}
+
+// integrationHead resolves the ref a fresh lane must base on: the INTEGRATION
+// HEAD its landing targets (2026-09-09 token-waste root cause #3 — a lane
+// based on origin/main while the local main sat AHEAD by unpushed dossier
+// closeouts forced a rebase and a second Build/Audit for twelve dossier
+// files). Off the default branch, or with the local main current or BEHIND,
+// the remote tip is the authority (the wave boundary fast-forwards a behind
+// main). A local main strictly AHEAD is the authority: its unpublished
+// landings ride the next push. Diverged histories are refused loudly — no
+// base choice avoids a rebase then, so the plane must be reconciled before
+// any lane spends a phase.
+func integrationHead(ctx context.Context, git gitexec.Git, remote string) (string, error) {
+	branch, _, bcode, berr := git.Capture(ctx, "symbolic-ref", "--quiet", "--short", "HEAD")
+	if berr != nil || bcode != 0 || "origin/"+strings.TrimSpace(branch) != remote {
+		return remote, nil // detached / feature checkout — the remote tip is the base
+	}
+	rel, err := git.RelationToRemote(ctx, remote)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN lane base: %v — basing on %s\n", err, remote)
+		return remote, nil
+	}
+	switch rel.Kind {
+	case gitexec.RelationAhead:
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN lane base: %s\n", rel)
+		return rel.Local, nil
+	case gitexec.RelationDiverged:
+		return "", fmt.Errorf("lane base: %s", rel)
+	default: // current or behind — the boundary fast-forwards a behind main
+		return remote, nil
+	}
 }
 
 // originDefaultBranch reads the remote's published default branch from
