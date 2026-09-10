@@ -7,14 +7,18 @@ import (
 	"testing"
 )
 
-// codexAstraDeepModel is the 2026-09-09 operator directive: codex's high
-// (deep/top) tiers run gpt-6-astra at the high reasoning rung (the rung is
+// codexDeepModel is the 2026-09-10 operator directive: codex's high (deep/top)
+// tiers run gpt-5.6-sol at the high reasoning rung — the 2026-09-09 gpt-6-astra
+// cutover was withdrawn the next day for token cost (astra burned the
+// subscription far faster; the operator keeps sol for codex and opus for
+// claude). The reasoning rung is unchanged (the rung is
 // pinned by profiles/effort_defaults_test.go — codexDeepTopRung — not here).
-// Verified live before the cutover: `codex exec -m gpt-6-astra -c
+// HISTORICAL (superseded): astra was verified live before the 2026-09-09
+// cutover — `codex exec -m gpt-6-astra -c
 // model_reasoning_effort=high` on the ChatGPT subscription answered. This is
 // the ONE value pin for the directive; every other codex tier test asserts
 // relationally against the family manifest.
-const codexAstraDeepModel = "gpt-6-astra"
+const codexDeepModel = "gpt-5.6-sol"
 
 // codexFamilyManifest loads the codex FAMILY manifest raw — WITHOUT the
 // live-catalog overlay, so a stale .evolve/model-catalog.json cannot mask a
@@ -30,30 +34,30 @@ func codexFamilyManifest(t *testing.T) Manifest {
 	return m
 }
 
-// TestCodexManifest_DeepTopTiers_GPT6Astra pins the directive on the family
-// manifest: deep and top resolve to gpt-6-astra, the ChatGPT clamp's default
-// is gpt-6-astra, and the clamp's safe set admits it (otherwise the clamp would
+// TestCodexManifest_DeepTopTiers_ValuePin pins the directive on the family
+// manifest: deep and top resolve to gpt-5.6-sol, the ChatGPT clamp's default
+// is gpt-5.6-sol, and the clamp's safe set admits it (otherwise the clamp would
 // silently rewrite every deep launch back to the default — the cycle-142
 // mechanism working against the directive). The fast/balanced rows are
 // untouched by the directive.
-func TestCodexManifest_DeepTopTiers_GPT6Astra(t *testing.T) {
+func TestCodexManifest_DeepTopTiers_ValuePin(t *testing.T) {
 	m := codexFamilyManifest(t)
 	for _, tier := range []string{"deep", "top"} {
-		if got := m.ModelTierMap[tier]; got != codexAstraDeepModel {
-			t.Errorf("model_tier_map[%s] = %q, want %q (2026-09-09 directive)", tier, got, codexAstraDeepModel)
+		if got := m.ModelTierMap[tier]; got != codexDeepModel {
+			t.Errorf("model_tier_map[%s] = %q, want %q (2026-09-10 cost directive)", tier, got, codexDeepModel)
 		}
 	}
-	if m.ChatGPTDefaultModel != codexAstraDeepModel {
-		t.Errorf("chatgpt_default_model = %q, want %q", m.ChatGPTDefaultModel, codexAstraDeepModel)
+	if m.ChatGPTDefaultModel != codexDeepModel {
+		t.Errorf("chatgpt_default_model = %q, want %q", m.ChatGPTDefaultModel, codexDeepModel)
 	}
 	safe := false
 	for _, s := range m.ChatGPTSafeModels {
-		if s == codexAstraDeepModel {
+		if s == codexDeepModel {
 			safe = true
 		}
 	}
 	if !safe {
-		t.Errorf("chatgpt_safe_models %v must admit %q — else the subscription clamp rewrites deep launches to the default", m.ChatGPTSafeModels, codexAstraDeepModel)
+		t.Errorf("chatgpt_safe_models %v must admit %q — else the subscription clamp rewrites deep launches to the default", m.ChatGPTSafeModels, codexDeepModel)
 	}
 	if m.ModelTierMap["fast"] != "gpt-5.6-luna" || m.ModelTierMap["balanced"] != "gpt-5.6-terra" {
 		t.Errorf("fast/balanced rows drifted: %v", m.ModelTierMap)
@@ -198,6 +202,24 @@ func TestLaunch_Codex_ManifestUnavailable_OmitsModelFlag(t *testing.T) {
 	for _, a := range fr.calls[0].args {
 		if a == "-m" {
 			t.Fatalf("-m must be omitted when the tier cannot be translated; args=%v", fr.calls[0].args)
+		}
+	}
+}
+
+// TestCodexFamilyManifest_AstraIsNotSelectable — 2026-09-10 cost directive:
+// gpt-6-astra must not be reachable by accident. It is out of the tier table
+// AND out of the subscription clamp's safe set, so even a stray pin to it is
+// rewritten to the family default instead of burning the subscription.
+func TestCodexFamilyManifest_AstraIsNotSelectable(t *testing.T) {
+	m := codexFamilyManifest(t) // raw: a stale live catalog must not mask a manifest regression
+	for tier, model := range m.ModelTierMap {
+		if model == "gpt-6-astra" {
+			t.Errorf("tier %s still maps to gpt-6-astra", tier)
+		}
+	}
+	for _, s := range m.ChatGPTSafeModels {
+		if s == "gpt-6-astra" {
+			t.Errorf("chatgpt_safe_models still admits gpt-6-astra — the clamp must rewrite a stray pin to it")
 		}
 	}
 }
