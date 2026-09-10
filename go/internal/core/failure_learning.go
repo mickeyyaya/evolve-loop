@@ -360,6 +360,21 @@ func (o *Orchestrator) recordFailureLearning(ctx context.Context, fl failureLear
 	}
 	summary, todoID, structured := o.recordFailedApproachState(fl)
 
+	// A missing persona doc is a deterministically KNOWN configuration absence
+	// (cycle-1551 class): the sentinel already names the cause and the remedy,
+	// so a retrospective agent could discover nothing — cycles 1619/1620 spent
+	// 344 s and 311 s of a deep-tier agent on exactly this (2026-09-09
+	// token-waste root cause #2). Learn it deterministically: the FailedRecord
+	// and carryover todo above, the failure digest and the lesson artifact
+	// below — no LLM dispatch. Every other failure keeps the retrospective.
+	if errors.Is(fl.Err, ErrAgentDocMissing) {
+		fmt.Fprintf(os.Stderr, "[orchestrator] failure-learning: %s persona doc missing — known configuration absence, learned deterministically (no retrospective agent dispatched)\n", fl.Failed)
+		o.ensureFailureDigest(fl.Cycle, fl.CycleRequest.ProjectRoot, fl.CycleState.WorkspacePath, string(fl.Failed), fl.Err.Error())
+		o.writeDeterministicLearning(fl, summary, structured)
+		o.writeFailureLearningState(ctx, fl.State)
+		return
+	}
+
 	retroRunner, ok := o.runners[PhaseRetro]
 	if !ok {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-learning: no retro runner registered; queued carryover todo only\n")

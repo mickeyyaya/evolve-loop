@@ -64,7 +64,7 @@ func TestSyncMainAtWaveBoundary_FastForwards(t *testing.T) {
 	origin, runtime := syncFixture(t)
 	originAdvance(t, origin)
 	var warn bytes.Buffer
-	if synced := syncMainFromOriginAtWaveBoundary(context.Background(), runtime, &warn); !synced {
+	if synced, _ := syncMainFromOriginAtWaveBoundary(context.Background(), runtime, &warn); !synced {
 		t.Fatalf("expected FF sync, got skip: %s", warn.String())
 	}
 	if _, err := os.Stat(filepath.Join(runtime, "g.txt")); err != nil {
@@ -75,7 +75,7 @@ func TestSyncMainAtWaveBoundary_FastForwards(t *testing.T) {
 func TestSyncMainAtWaveBoundary_AlreadyCurrentIsQuietNoop(t *testing.T) {
 	_, runtime := syncFixture(t)
 	var warn bytes.Buffer
-	if synced := syncMainFromOriginAtWaveBoundary(context.Background(), runtime, &warn); synced {
+	if synced, _ := syncMainFromOriginAtWaveBoundary(context.Background(), runtime, &warn); synced {
 		t.Fatal("no origin movement must report synced=false (nothing to do)")
 	}
 	if s := warn.String(); strings.Contains(s, "WARN") {
@@ -93,11 +93,15 @@ func TestSyncMainAtWaveBoundary_LocalAheadSkipsLoudly(t *testing.T) {
 	gitrun(t, runtime, "commit", "-q", "-m", "local")
 	originAdvance(t, origin)
 	var warn bytes.Buffer
-	if synced := syncMainFromOriginAtWaveBoundary(context.Background(), runtime, &warn); synced {
+	synced, halt := syncMainFromOriginAtWaveBoundary(context.Background(), runtime, &warn)
+	if synced {
 		t.Fatal("diverged history must never merge or rebase — FF-only")
 	}
+	if halt == nil || !strings.Contains(strings.ToLower(halt.Error()), "diverged") {
+		t.Fatalf("a diverged plane must HALT the batch before any lane spends a phase (laneStartRef reads the same relation); got %v", halt)
+	}
 	if !strings.Contains(warn.String(), "WARN") {
-		t.Errorf("a skipped diverged sync must be loud: %q", warn.String())
+		t.Errorf("a diverged sync must be loud: %q", warn.String())
 	}
 }
 
@@ -105,7 +109,7 @@ func TestSyncMainAtWaveBoundary_NotOnMainSkips(t *testing.T) {
 	_, runtime := syncFixture(t)
 	gitrun(t, runtime, "checkout", "-q", "-b", "feature")
 	var warn bytes.Buffer
-	if synced := syncMainFromOriginAtWaveBoundary(context.Background(), runtime, &warn); synced {
+	if synced, _ := syncMainFromOriginAtWaveBoundary(context.Background(), runtime, &warn); synced {
 		t.Fatal("a non-main checkout must never be synced")
 	}
 }
@@ -119,7 +123,7 @@ func TestSyncMainAtWaveBoundary_NoRemoteSkipsWithoutError(t *testing.T) {
 	gitrun(t, seed, "add", "f.txt")
 	gitrun(t, seed, "commit", "-q", "-m", "c")
 	var warn bytes.Buffer
-	if synced := syncMainFromOriginAtWaveBoundary(context.Background(), seed, &warn); synced {
+	if synced, _ := syncMainFromOriginAtWaveBoundary(context.Background(), seed, &warn); synced {
 		t.Fatal("no remote must be a quiet skip, not a sync")
 	}
 }
@@ -137,10 +141,36 @@ func TestSyncMainAtWaveBoundary_DirtyTrackedFileWarnsBlockedNotDiverged(t *testi
 		t.Fatal(err)
 	}
 	var warn bytes.Buffer
-	if synced := syncMainFromOriginAtWaveBoundary(context.Background(), runtime, &warn); synced {
+	if synced, _ := syncMainFromOriginAtWaveBoundary(context.Background(), runtime, &warn); synced {
 		t.Fatalf("FF over conflicting local changes must not report synced: %s", warn.String())
 	}
 	if s := warn.String(); !strings.Contains(s, "local tracked changes block") || strings.Contains(s, "diverged") {
 		t.Errorf("blocked-by-dirt must be named as such, never as divergence: %q", s)
+	}
+}
+
+// TestSyncMainAtWaveBoundary_LocalAheadOnlyIsNotReportedAsFastForward pins the
+// 2026-09-09 token-waste root cause #3: `git merge --ff-only origin/main`
+// SUCCEEDS without moving HEAD when the local main is strictly AHEAD (unpushed
+// dossier closeouts), and the boundary reported "fast-forwarded main" while
+// the fresh lanes were about to base on a different commit than the landing
+// branch. The honest report names the ahead state; nothing "fast-forwarded".
+func TestSyncMainAtWaveBoundary_LocalAheadOnlyIsNotReportedAsFastForward(t *testing.T) {
+	_, runtime := syncFixture(t)
+	if err := os.WriteFile(filepath.Join(runtime, "local.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gitrun(t, runtime, "add", "local.txt")
+	gitrun(t, runtime, "commit", "-q", "-m", "dossier: cycle-1616 closeout")
+	var warn bytes.Buffer
+	if synced, _ := syncMainFromOriginAtWaveBoundary(context.Background(), runtime, &warn); synced {
+		t.Fatal("a local-ahead main did not move — it must not report synced=true")
+	}
+	s := warn.String()
+	if strings.Contains(s, "fast-forwarded") {
+		t.Errorf("local-ahead must not be reported as a fast-forward: %q", s)
+	}
+	if !strings.Contains(s, "AHEAD") || !strings.Contains(s, "1 commit") {
+		t.Errorf("local-ahead must be named with its count: %q", s)
 	}
 }

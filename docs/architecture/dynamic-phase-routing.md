@@ -84,6 +84,27 @@ The clamp pass in `go/internal/router` enforces the floor regardless of stage or
 
 The failure mode the drop must never cause is deleting a *legitimate* phase, so the known-set is deliberately generous: anything the plan prompt advertised is known by construction.
 
+### Unavailable-phase drop (2026-09-10)
+
+A catalog-Optional phase whose persona doc does not exist is a deterministically
+known configuration absence, and the paused batch of 2026-09-09 showed what
+selecting one costs: a dispatch, a recorded skip and (before deterministic
+learning) a five-minute retrospective agent — twice, for two known absences.
+At plan time core asks every runner that implements `core.PersonaProber`
+(`runner.BaseRunner.PersonaAvailable` — the same loader, name and inline-prompt
+exemption the dispatch path uses) whether its persona doc exists, but only for
+the phases `optionalInfraSkip` would degrade at dispatch: catalog-Optional, not
+configured-mandatory, outside the ship floor. Mandatory and floor phases are
+never probed — their absence must stay a loud dispatch failure, never a silent
+exclusion. The absent ones reach the router as ENVIRONMENTAL context beside
+`BenchedCLIs` (`RouteInput.UnavailablePhases`): the advisor is not offered them
+(they are named in a "Unavailable phases" prompt section instead), the floor
+clamp drops a proposed entry under `DropUnavailablePhaseRule`, and the legacy
+trigger path never inserts them. A phase the plan never selects costs nothing;
+a mandatory phase with a missing persona still aborts the cycle as before, and
+the abort is learned deterministically (see audit-repair-isolation.md).
+
+
 ## Configuration surface
 
 `config.Load(registryPath, env)` is the **single** reader of routing env + registry. Downstream consumers receive the immutable `RoutingConfig` by injection (`WithRouting`) and never call `os.Getenv`. Precedence: **env override > registry file > built-in default**.

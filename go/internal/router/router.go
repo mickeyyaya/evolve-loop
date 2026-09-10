@@ -1,6 +1,7 @@
 package router
 
 import (
+	"slices"
 	"sort"
 	"time"
 
@@ -57,6 +58,14 @@ type RouteInput struct {
 	// family — fewer inserts routed there, scope sized for the fallback CLI
 	// carrying the cycle. The pure Route() ignores it.
 	BenchedCLIs []BenchedCLI
+	// UnavailablePhases is ENVIRONMENTAL context like BenchedCLIs: catalog-
+	// Optional phases whose persona doc does not exist (core probes every
+	// optional runner at plan time — 2026-09-09 token-waste root cause #2).
+	// The advisor is not offered them, the floor clamp drops them if proposed
+	// anyway, and the legacy trigger path never inserts them. Mandatory and
+	// floor phases are never listed here: their absence stays a loud dispatch
+	// failure.
+	UnavailablePhases []string
 
 	// GoalText is the human-readable goal/strategy for this cycle (the same text
 	// Scout works from). Populated by the orchestrator from
@@ -512,6 +521,15 @@ func shouldRun(in RouteInput, phase string, optionalUsed int) (bool, bool, *Clam
 			return true, false, nil // pinned
 		}
 		// rule not satisfied → phase is genuinely optional this cycle; fall through.
+	}
+
+	// A phase whose persona doc is absent is never inserted — by the plan or by
+	// a trigger: the dispatch would only produce a skip (2026-09-09 token-waste
+	// root cause #2). Recorded as a clamp so the routing-plan artifact cites the
+	// exclusion; mandatory and floor phases never reach here (core lists only
+	// catalog-Optional, non-floor phases as unavailable).
+	if slices.Contains(in.UnavailablePhases, phase) {
+		return false, true, &Clamp{Phase: phase, Rule: DropUnavailablePhaseRule, Proposed: phase + "=insert", Forced: phase + "=skip"}
 	}
 
 	// Advisory+ with an advisor plan: the (already floor-clamped) whole-cycle

@@ -259,3 +259,14 @@ type PhaseRunner interface {
 	Name() string
 	Run(ctx context.Context, req PhaseRequest) (PhaseResponse, error)
 }
+
+// PersonaProber is implemented by phase runners that can answer, before any
+// dispatch, whether their persona doc exists. A nil error means available; an
+// error wrapping ErrAgentDocMissing means the doc is absent — the same
+// sentinel the dispatch path raises, so the plan-time exclusion and the skip
+// classifier agree on the cause (2026-09-09 token-waste root cause #2). Any
+// other error is reported but does not exclude the phase: only a KNOWN
+// absence is deterministic enough to remove a phase from the menu.
+type PersonaProber interface {
+	PersonaAvailable() error
+}
