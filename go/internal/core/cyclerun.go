@@ -71,6 +71,14 @@ type cycleRun struct {
 	cs           CycleState         // the ONE authoritative CycleState the loop drives
 	result       CycleResult        // accumulating result; mutated via &cr.result; returned on every abort
 	phaseTimings []phaseTimingEntry // appended via &cr.phaseTimings; read by RunCycle's exit defer (live header)
+	// timingsFlushed/timingsComposed make the phase-timing composition happen
+	// EXACTLY once per cycle. The abort path flushes (RunCycle's defer, LIFO
+	// first) BEFORE the dossier is built (abnormalEpilogue, LIFO last) while
+	// the normal path builds the dossier first — so without a single flush
+	// point one path would double-append and the other would drop the
+	// pre-resume prefix. Both now read the same composed set.
+	timingsFlushed  bool
+	timingsComposed []phaseTimingEntry
 
 	// loop-carried state-machine cursor (produced end of iter N, consumed start of iter N+1)
 	current           Phase         // SM cursor

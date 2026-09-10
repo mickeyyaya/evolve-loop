@@ -24,10 +24,14 @@ func auditArtifactName() string {
 // timingRecords reads phase-timing.json from the cycle workspace and projects it
 // into per-phase dossier records plus the cycle-level roll-up. Returns ok=false
 // when no usable log exists, so Build keeps its always-valid stub.
-func timingRecords(workspace string) ([]PhaseRecord, *phasetiming.Summary, bool) {
-	entries, err := phasetiming.Read(workspace)
-	if err != nil || len(entries) == 0 {
-		return nil, nil, false
+func timingRecords(workspace string, live []phasetiming.Entry) ([]PhaseRecord, *phasetiming.Summary, bool) {
+	entries := live
+	if len(entries) == 0 {
+		read, err := phasetiming.Read(workspace)
+		if err != nil || len(read) == 0 {
+			return nil, nil, false
+		}
+		entries = read
 	}
 	records := make([]PhaseRecord, 0, len(entries))
 	for _, e := range entries {
@@ -64,6 +68,10 @@ type BuildOpts struct {
 	// WorkspacePath is the cycle workspace directory (contains *-report.md files).
 	WorkspacePath string
 	// LedgerPath is the path to ledger.jsonl (for phase record extraction).
+	// NOTE: no production caller sets it — the phase records come from
+	// PhaseTimings (or the workspace log). Kept for the ledger-walk slice that
+	// ADR-0055 describes; until that lands, absence of a ledger is NOT what
+	// makes a record degrade.
 	LedgerPath string
 	// Goal is the cycle goal text.
 	Goal string
@@ -86,13 +94,25 @@ type BuildOpts struct {
 	// SpineFailOpens are the cycle's spine-gate fail-open events (cycle-1166),
 	// surfaced verbatim so the dossier is where the epidemic becomes visible.
 	SpineFailOpens []cyclestate.SpineFailOpen
+	// PhaseTimings is the per-phase evidence the caller already holds — for the
+	// orchestrator, the set core composed and flushed ONCE
+	// (cycleRun.flushPhaseTimings), so the dossier projects exactly the record
+	// the on-disk log receives. It is passed rather than re-read because that
+	// log is written by a DEFERRED call in RunCycle and lands AFTER the dossier
+	// is produced on the normal path (cycle-1623: twelve phases ran, one
+	// synthetic phase was recorded).
+	//
+	// Empty ⇒ fall back to reading the workspace log. That fallback is live,
+	// not vestigial: a dossier built for a workspace whose live timings were
+	// never threaded has the file as its only evidence.
+	PhaseTimings []phasetiming.Entry
 }
 
 // Build assembles a Dossier for the given cycle. It validates the cycle number,
-// then constructs a Dossier from BuildOpts. When no LedgerPath is provided (or
-// the file is absent), Build synthesises a "cycle-recorded" phase so the returned
-// Dossier is always valid (Validate passes when FinalVerdict is PASS). Callers
-// that have a real ledger should set BuildOpts.LedgerPath.
+// then constructs a Dossier from BuildOpts. When no per-phase evidence is
+// available at all — neither live timings nor a readable log — Build records a single
+// `evidence-unavailable` phase at WARN naming the degradation — the returned
+// Dossier stays valid, but it never claims a phase verdict no phase produced.
 func Build(cycle int, opts BuildOpts) (*Dossier, error) {
 	if cycle <= 0 {
 		return nil, fmt.Errorf("dossier: Build: cycle must be >= 1, got %d", cycle)
@@ -108,17 +128,11 @@ func Build(cycle int, opts BuildOpts) (*Dossier, error) {
 		return nil, err
 	}
 	d := &Dossier{
-		Cycle:        cycle,
-		Goal:         opts.Goal,
-		RunID:        opts.RunID,
-		FinalVerdict: verdict,
-		Phases: []PhaseRecord{
-			{
-				Name:        "cycle-recorded",
-				Verdict:     verdict,
-				KeyFindings: "cycle completed; ledger walk deferred to future slice",
-			},
-		},
+		Cycle:                      cycle,
+		Goal:                       opts.Goal,
+		RunID:                      opts.RunID,
+		FinalVerdict:               verdict,
+		Phases:                     []PhaseRecord{evidenceUnavailablePhase()},
 		SkippedPhases:              opts.SkippedPhases,
 		PhasesRunVerdictNotAdopted: opts.VerdictsNotAdopted,
 		SpineFailOpens:             opts.SpineFailOpens,
@@ -127,9 +141,20 @@ func Build(cycle int, opts BuildOpts) (*Dossier, error) {
 	// the cycle-level roll-up replace the stub, so the committed dossier carries
 	// the durable latency evidence. Absent/empty log ⇒ the stub stands (the
 	// always-valid back-compat skeleton).
-	if records, summary, ok := timingRecords(opts.WorkspacePath); ok {
+	if records, summary, ok := timingRecords(opts.WorkspacePath, opts.PhaseTimings); ok {
 		d.Phases = records
 		d.Timing = summary
+	}
+	// Project the ship phase's own proof of delivery. Absent binding ⇒ the
+	// field stays empty: the record claims no commit it cannot point at.
+	if commit, tree, ok := shippedCommit(opts.WorkspacePath); ok {
+		d.CommitSHA, d.TreeSHA = commit, tree
+	}
+	// Project the committed task set. A PRESENT decision with an empty top_n
+	// records an empty (non-nil) list — "this cycle committed to nothing" is
+	// the finding, not a missing field.
+	if tasks, ok := committedTasks(opts.WorkspacePath); ok {
+		d.Tasks = &tasks
 	}
 	// Ingest the post-push CI-watch verdict when the workspace recorded one
 	// (ci-watch-verdict.json). Absent artifact ⇒ nil — never fabricated.
@@ -175,5 +200,22 @@ func resolveBuildVerdict(v string) (string, error) {
 		return v, nil
 	default:
 		return "", fmt.Errorf("dossier: Build: FinalVerdict %q must be empty|PASS|WARN|FAIL", v)
+	}
+}
+
+// evidenceUnavailablePhase is the record a dossier carries when NEITHER the
+// live timings nor the on-disk log yielded per-phase evidence. It replaces the
+// former synthesized "cycle-recorded" phase, which carried the CYCLE's verdict
+// as though a phase had produced it: a twelve-phase cycle then read as a
+// one-phase PASS, and the missing evidence was invisible precisely when the
+// record mattered most. WARN keeps the marker inside the validated verdict
+// vocabulary while stating plainly that this record is degraded; the cycle's
+// own FinalVerdict is untouched.
+func evidenceUnavailablePhase() PhaseRecord {
+	return PhaseRecord{
+		Name:    "evidence-unavailable",
+		Verdict: VerdictWarn,
+		KeyFindings: "per-phase evidence unavailable at dossier build (no live timings; " +
+			phasetiming.FileName + " absent or empty) — this record is DEGRADED, not a one-phase cycle",
 	}
 }

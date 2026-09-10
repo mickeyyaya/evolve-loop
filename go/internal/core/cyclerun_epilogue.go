@@ -75,7 +75,7 @@ func (cr *cycleRun) abnormalEpilogue(cause error) {
 	cr.result.SkippedPhases = append(cr.result.SkippedPhases,
 		SkippedPhase{Phase: "closeout", Reason: "abnormal exit in phase " + cr.cs.Phase})
 	if derr := writeCycleDossier(cr.o.gitMutationLock, cr.req.ProjectRoot, cr.cs.WorkspacePath, cr.cycle, dossierGoal, cr.cs.RunID, VerdictFAIL,
-		cr.result.SkippedPhases, cr.result.VerdictsNotAdopted, cr.result.SpineFailOpens); derr != nil {
+		cr.result.SkippedPhases, cr.result.VerdictsNotAdopted, cr.result.SpineFailOpens, cr.flushPhaseTimings()); derr != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d: abnormal-epilogue dossier not written: %v\n", cr.cycle, derr)
 	}
 	// ADR-0076 slice C (G1, cycle-1078): error-path aborts never reach

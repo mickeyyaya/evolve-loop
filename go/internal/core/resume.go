@@ -454,14 +454,22 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 	// printing/telemetry only (audited then).
 	var phaseTimings []phaseTimingEntry
 	completed := false
+	// ONE cycleRun owns this resume's phase-timing composition, hoisted above
+	// the defers that use it. Both exits (the abnormal epilogue below and the
+	// normal completeCycle at the bottom) and the timing flush share it, so
+	// flushPhaseTimings' exactly-once cache actually holds: a per-instance
+	// cache cannot dedupe across two instances, and the resumed segment would
+	// otherwise be appended to the log twice — the file then disagreeing with
+	// the dossier built from it.
+	timingOwner := &cycleRun{o: o, ctx: context.Background(), req: req, cycle: cycle, cs: cs, state: state, result: result}
 	defer func() {
 		if completed || errors.Is(retErr, ErrAllFamiliesExhausted) || ctx.Err() != nil {
 			return
 		}
 		result.FinalVerdict = VerdictFAIL
-		cr := &cycleRun{o: o, ctx: context.Background(), req: req, cycle: cycle, cs: cs, state: state, result: result}
-		cr.abnormalEpilogue(retErr)
-		result = cr.result
+		timingOwner.cs, timingOwner.state, timingOwner.result = cs, state, result
+		timingOwner.abnormalEpilogue(retErr)
+		result = timingOwner.result
 	}()
 	defer func() {
 		// Survey emission is unconditional (a resumed cycle that dispatched
@@ -473,7 +481,8 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 		if len(phaseTimings) == 0 {
 			return
 		}
-		writePhaseTimings(cs.WorkspacePath, phaseTimings)
+		timingOwner.cs, timingOwner.phaseTimings = cs, phaseTimings
+		timingOwner.flushPhaseTimings()
 	}()
 
 	// Synthesize the loop: start from `startPhase`, follow the state
@@ -751,7 +760,10 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 	if !reachedEnd {
 		return result, fmt.Errorf("resume iteration limit: %d dispatch iterations without reaching PhaseEnd at %s", maxIterations, current)
 	}
-	cr := &cycleRun{o: o, ctx: ctx, req: req, cycle: cycle, cs: cs, state: state, result: result, phaseTimings: phaseTimings, preCycleHEAD: preResumeHEAD}
+	// Same owner as the defers above: completeCycle flushes, and the deferred
+	// writer then finds the composition already done instead of re-appending.
+	cr := timingOwner
+	cr.ctx, cr.cs, cr.state, cr.result, cr.phaseTimings, cr.preCycleHEAD = ctx, cs, state, result, phaseTimings, preResumeHEAD
 	if err := cr.completeCycle(); err != nil {
 		result = cr.result
 		return result, err
