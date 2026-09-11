@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"fmt"
+	"math"
 )
 
 // alloc.go — CA.4 (concurrency-factory plan, Track C-A): the cycle-number
@@ -11,8 +12,9 @@ import (
 // that, so numbers must come from an atomic allocation through the CA.3
 // serialized UpdateState RMW. Semantics:
 //
-//   - allocate = max(lastCompleted, lastAllocated) + 1, persisted before
-//     any run artifact exists under that number;
+//   - allocate = max(lastCompleted, lastAllocated, highest occupied Go ACS
+//     cycle package) + 1, persisted before any run artifact exists under that
+//     number;
 //   - a crashed run BURNS its number (the gap is intentional — a burned
 //     number may have orphaned artifacts; reuse would mix two runs' state);
 //   - resume never re-allocates: RunCycleFromPhase carries the cycle from
@@ -27,29 +29,57 @@ type StateUpdater interface {
 	UpdateState(ctx context.Context, mutate func(*State)) (State, error)
 }
 
-// AllocateCycleNumber mints the next cycle number through the serialized
-// RMW: no two allocators — goroutines or processes — can receive the same
-// number.
+// AllocateCycleNumber mints the next state-derived cycle number through the
+// serialized RMW: no two allocators — goroutines or processes — can receive
+// the same number. RunCycle additionally supplies the repository's occupied
+// ACS package floor through allocateCycleNumberAbove.
 func AllocateCycleNumber(ctx context.Context, su StateUpdater) (int, error) {
+	return allocateCycleNumberAbove(ctx, su, 0)
+}
+
+func allocateCycleNumberAbove(ctx context.Context, su StateUpdater, floor int) (int, error) {
+	var allocationErr error
 	st, err := su.UpdateState(ctx, func(s *State) {
-		s.LastAllocatedCycleNumber = max(s.LastCycleNumber, s.LastAllocatedCycleNumber) + 1
+		base := max(s.LastCycleNumber, s.LastAllocatedCycleNumber, floor)
+		next, err := nextCycleNumber(base)
+		if err != nil {
+			allocationErr = err
+			return
+		}
+		s.LastAllocatedCycleNumber = next
 	})
 	if err != nil {
 		return 0, fmt.Errorf("allocate cycle number: %w", err)
 	}
+	if allocationErr != nil {
+		return 0, allocationErr
+	}
 	return st.LastAllocatedCycleNumber, nil
 }
 
-// allocateCycle is RunCycle's allocation step: the lease when the storage
-// supports it, the legacy LastCycleNumber+1 otherwise. On the lease path
-// the in-memory state is synced with the persisted lease fields so the
-// cycle-end persist does not clobber them with stale zeros.
-func (o *Orchestrator) allocateCycle(ctx context.Context, state *State) (int, error) {
+func nextCycleNumber(base int) (int, error) {
+	if base == math.MaxInt {
+		return 0, fmt.Errorf("allocate cycle number: cycle number exhausted at %d", base)
+	}
+	return base + 1, nil
+}
+
+// allocateCycle is RunCycle's allocation step. It discovers the highest
+// occupied canonical Go ACS package before minting, then folds that floor into
+// the serialized lease when storage supports it. Legacy storage still advances
+// above both LastCycleNumber and the source floor. On the lease path the
+// in-memory state is synced with the persisted lease fields so the cycle-end
+// persist does not clobber them with stale zeros.
+func (o *Orchestrator) allocateCycle(ctx context.Context, state *State, projectRoot string) (int, error) {
+	floor, err := sourceCycleFloor(projectRoot)
+	if err != nil {
+		return 0, fmt.Errorf("discover source cycle floor: %w", err)
+	}
 	su, ok := o.storage.(StateUpdater)
 	if !ok {
-		return state.LastCycleNumber + 1, nil
+		return nextCycleNumber(max(state.LastCycleNumber, floor))
 	}
-	n, err := AllocateCycleNumber(ctx, su)
+	n, err := allocateCycleNumberAbove(ctx, su, floor)
 	if err != nil {
 		return 0, err
 	}

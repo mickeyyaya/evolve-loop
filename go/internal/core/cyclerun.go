@@ -397,10 +397,11 @@ func (o *Orchestrator) newCycleRun(ctx context.Context, req CycleRequest) (cycle
 		return cycleInit{}, nil, fmt.Errorf("read state: %w", err)
 	}
 	// CA.4: mint the cycle number through the allocation lease when the
-	// storage supports the serialized RMW (legacy +1 otherwise). A crashed
-	// run burns its number; resume re-enters via RunCycleFromPhase with the
-	// run record's cycle and never re-allocates.
-	cycle, err := o.allocateCycle(ctx, &state)
+	// storage supports the serialized RMW, always advancing beyond occupied Go
+	// ACS package identities in the source tree. A crashed run burns its number;
+	// resume re-enters via RunCycleFromPhase with the run record's cycle and
+	// never re-allocates.
+	cycle, err := o.allocateCycle(ctx, &state, req.ProjectRoot)
 	if err != nil {
 		failClean()
 		return cycleInit{}, nil, fmt.Errorf("allocate cycle: %w", err)
@@ -481,9 +482,14 @@ func (o *Orchestrator) newCycleRun(ctx context.Context, req CycleRequest) (cycle
 	consoleLeased := adoptConsoleLease(req.ProjectRoot, time.Now(), os.Stderr)
 	// Provision the per-cycle source worktree (ADR-0027): tdd/build write code
 	// here, isolated from the live tree. cs.ActiveWorktree gates source writes
-	// in the role-gate and drives worktree-aware ship. Best-effort — on failure
-	// the source phases are denied by the role-gate (loud, not silent). Cleaned
-	// up on cycle exit (after ship has merged the worktree→main).
+	// in the role-gate and drives worktree-aware ship. Creation remains
+	// best-effort: on failure the source phases are denied by the role-gate
+	// (loud, not silent). A created worktree is checked for an occupied copy of
+	// this fresh cycle identity after the upstream fetch; a collision is fatal
+	// before state persistence or dispatch. A rejected worktree is preserved
+	// because Create may have reused it and does not return ownership metadata.
+	// Safe worktrees are cleaned on cycle exit (after ship has merged the
+	// worktree→main).
 	// cs.WorktreeBaseSHA (persisted) is the worktree HEAD at creation == the
 	// cycle base. After the build phase we soft-reset to it so a committing
 	// builder's work becomes pending again (see normalizeWorktreeToBase + the
@@ -502,6 +508,9 @@ func (o *Orchestrator) newCycleRun(ctx context.Context, req CycleRequest) (cycle
 		} else {
 			o.ensureFailureDigest(cycle, req.ProjectRoot, cs.WorkspacePath, "worktree", fmt.Sprintf("worktree provisioning failed: %v", werr))
 		}
+	} else if sourceErr := verifyFreshCycleSource(wtPath, cycle); sourceErr != nil {
+		failClean()
+		return cycleInit{}, nil, fmt.Errorf("verify fresh cycle %d source in preserved worktree %s: %w", cycle, wtPath, sourceErr)
 	} else {
 		cs.ActiveWorktree = wtPath
 		stack = append(stack, func(preserve, completedNormally bool) {

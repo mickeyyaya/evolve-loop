@@ -85,3 +85,51 @@ func TestModuleDir_PrefersGoSubdir(t *testing.T) {
 		t.Fatalf("with go/ subdir: want %q, got %q", goDir, got)
 	}
 }
+
+func TestResolveModuleDir_PrefersNestedModule(t *testing.T) {
+	root := t.TempDir()
+	goDir := filepath.Join(root, "go")
+	if err := os.Mkdir(goDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(goDir, "go.mod"), []byte("module example.com/nested\n\ngo 1.23\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := ResolveModuleDir(root)
+	if err != nil {
+		t.Fatalf("ResolveModuleDir: %v", err)
+	}
+	if got != goDir {
+		t.Fatalf("ResolveModuleDir = %q, want nested module %q", got, goDir)
+	}
+}
+
+func TestResolveModuleDir_IgnoresGoSupportDirectoryWithoutModule(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module example.com/root\n\ngo 1.23\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "go", "bin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := ResolveModuleDir(root)
+	if err != nil {
+		t.Fatalf("ResolveModuleDir: %v", err)
+	}
+	if got != root {
+		t.Fatalf("ResolveModuleDir = %q, want root module %q", got, root)
+	}
+}
+
+func TestResolveModuleDir_ReportsGoSubdirLookupError(t *testing.T) {
+	root := t.TempDir()
+	if err := os.Symlink("go", filepath.Join(root, "go")); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := ResolveModuleDir(root); err == nil {
+		t.Fatal("ResolveModuleDir accepted a self-referential go/ symlink")
+	}
+}
