@@ -323,6 +323,105 @@ func TestRunLoop_PolicyVerify_RecoverableContinues(t *testing.T) {
 	}
 }
 
+func TestRunLoop_PolicyVerify_AcceptsCompletedEmptyTriageChain(t *testing.T) {
+	projectRoot := t.TempDir()
+	evolveDir := filepath.Join(projectRoot, ".evolve")
+	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	writeDispatchPolicy(t, evolveDir, "verify")
+	storage := &fixtures.FakeStorage{}
+	ledger := &fakeLedgerNoAppend{FakeLedger: &fixtures.FakeLedger{Entries: []core.LedgerEntry{
+		{Cycle: 1, Role: "scout", Kind: "phase", ExitCode: 0},
+		{Cycle: 1, Role: "triage", Kind: "phase", ExitCode: 0},
+	}}}
+	args := []string{
+		"--project-root", projectRoot,
+		"--evolve-dir", evolveDir,
+		"--goal-text", "protected task",
+		"--cycles", "1",
+	}
+	beforeRun := func(_ *fixtures.FakeStorage, _ *fakeLedgerNoAppend) {
+		handoff := filepath.Join(cycleWorkspace(projectRoot, 1), "handoff-triage.json")
+		if err := os.WriteFile(handoff, []byte(`{"cycle_size":"small","deliverable_kind":"code","phase_skip":[]}`), 0o644); err != nil {
+			t.Fatalf("write triage handoff: %v", err)
+		}
+		path := filepath.Join(cycleWorkspace(projectRoot, 1), "triage-decision.json")
+		if err := os.WriteFile(path, []byte(`{"top_n":[],"deferred":[{"id":"protected","reason":"source surface is protected"}]}`), 0o644); err != nil {
+			t.Fatalf("write triage decision: %v", err)
+		}
+	}
+
+	rc, _, stderr := runM4Loop(t, projectRoot, evolveDir, args, storage, ledger, beforeRun, "Triage completed with no authorized work.\n", "", 1)
+	if rc != 0 {
+		t.Fatalf("rc=%d want 0 for an explicit empty Triage commitment; stderr=%q", rc, stderr)
+	}
+	if strings.Contains(stderr, "classification=infrastructure") {
+		t.Fatalf("planned no-work cycle was classified as infrastructure: %q", stderr)
+	}
+}
+
+func TestRunLoop_PolicyVerify_RejectsNullTriageCommitment(t *testing.T) {
+	projectRoot := t.TempDir()
+	evolveDir := filepath.Join(projectRoot, ".evolve")
+	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	writeDispatchPolicy(t, evolveDir, "verify")
+	storage := &fixtures.FakeStorage{}
+	ledger := &fakeLedgerNoAppend{FakeLedger: &fixtures.FakeLedger{Entries: []core.LedgerEntry{
+		{Cycle: 1, Role: "scout", Kind: "phase", ExitCode: 0},
+		{Cycle: 1, Role: "triage", Kind: "phase", ExitCode: 0},
+	}}}
+	args := []string{
+		"--project-root", projectRoot,
+		"--evolve-dir", evolveDir,
+		"--goal-text", "protected task",
+		"--cycles", "1",
+	}
+	beforeRun := func(_ *fixtures.FakeStorage, _ *fakeLedgerNoAppend) {
+		ws := cycleWorkspace(projectRoot, 1)
+		if err := os.WriteFile(filepath.Join(ws, "handoff-triage.json"), []byte(`{"cycle_size":"small"}`), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(ws, "triage-decision.json"), []byte(`{"top_n":null}`), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	rc, _, _ := runM4Loop(t, projectRoot, evolveDir, args, storage, ledger, beforeRun, "Triage completed with no authorized work.\n", "", 1)
+	if rc == 0 {
+		t.Fatal("null top_n was accepted as a completed empty-Triage chain")
+	}
+}
+
+func TestCompletedTriageNoWorkRequiresHostProvenance(t *testing.T) {
+	t.Parallel()
+	valid := core.CycleResult{
+		FinalVerdict:      core.CycleOutcomeSkippedUnknown,
+		TerminationReason: core.CycleTerminationTriageNoWork,
+		PhasesRun:         []core.Phase{core.PhaseScout, core.PhaseTriage},
+	}
+	cases := []struct {
+		name   string
+		result core.CycleResult
+		want   bool
+	}{
+		{name: "host-authorized-terminal-triage", result: valid, want: true},
+		{name: "artifact-alone-has-no-host-reason", result: core.CycleResult{FinalVerdict: core.CycleOutcomeSkippedUnknown, PhasesRun: valid.PhasesRun}},
+		{name: "failed-triage-is-not-no-work", result: core.CycleResult{FinalVerdict: core.VerdictFAIL, TerminationReason: core.CycleTerminationTriageNoWork, PhasesRun: valid.PhasesRun}},
+		{name: "downstream-phase-ran", result: core.CycleResult{FinalVerdict: core.CycleOutcomeSkippedUnknown, TerminationReason: core.CycleTerminationTriageNoWork, PhasesRun: []core.Phase{core.PhaseScout, core.PhaseTriage, core.PhaseTDD}}},
+		{name: "implementation-ran-before-triage", result: core.CycleResult{FinalVerdict: core.CycleOutcomeSkippedUnknown, TerminationReason: core.CycleTerminationTriageNoWork, PhasesRun: []core.Phase{core.PhaseScout, core.PhaseTDD, core.PhaseTriage}}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := completedTriageNoWork(sequentialCycle{result: tc.result}); got != tc.want {
+				t.Errorf("completedTriageNoWork() = %t, want %t", got, tc.want)
+			}
+		})
+	}
+}
+
 // TestRunLoop_PolicyVerify_IntegrityBreachStops seeds a workspace with
 // NO orchestrator-report (classifier → integrity-breach) and an empty
 // ledger. policy=verify must STOP with rc=2.

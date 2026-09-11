@@ -63,6 +63,47 @@ func TestResumeLifecycle_CloseoutRecordsLearningAndRejectsReplay(t *testing.T) {
 	}
 }
 
+func TestResumeLifecycle_EmptyTriageStopsBeforeImplementation(t *testing.T) {
+	root := t.TempDir()
+	initDossierRepo(t, root)
+	ws := RunWorkspacePath(root, 7)
+	if err := os.MkdirAll(ws, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	st := &fakeStorage{
+		state: State{LastCycleNumber: 7},
+		cycleState: CycleState{
+			CycleID:         7,
+			RunID:           "original-run",
+			WorkspacePath:   ws,
+			CompletedPhases: []string{"scout"},
+			FinalVerdict:    VerdictPASS,
+		},
+	}
+	runners := buildRunners(nil)
+	runners[PhaseTriage] = triageDecisionRunner{verdict: VerdictPASS, decision: `{"top_n":[]}`}
+	o := NewOrchestrator(st, &fakeLedger{}, runners)
+
+	result, err := o.RunCycleFromPhase(context.Background(), CycleRequest{ProjectRoot: root, GoalHash: "protected-task"}, &ResumePoint{Phase: string(PhaseTriage), CycleID: 7})
+	if err != nil {
+		t.Fatalf("RunCycleFromPhase: %v", err)
+	}
+	if result.FinalVerdict != CycleOutcomeSkippedUnknown {
+		t.Errorf("FinalVerdict = %q, want %q", result.FinalVerdict, CycleOutcomeSkippedUnknown)
+	}
+	if result.TerminationReason != CycleTerminationTriageNoWork {
+		t.Errorf("TerminationReason = %q, want %q", result.TerminationReason, CycleTerminationTriageNoWork)
+	}
+	if got, want := result.PhasesRun, []Phase{PhaseTriage}; len(got) != len(want) || got[0] != want[0] {
+		t.Errorf("PhasesRun = %v, want %v", got, want)
+	}
+	for _, phase := range []Phase{PhaseTDD, PhaseBuild, PhaseAudit, PhaseShip} {
+		if got := len(runners[phase].(*fakeRunner).requests); got != 0 {
+			t.Errorf("%s dispatched %d time(s) after terminal Triage", phase, got)
+		}
+	}
+}
+
 func TestResumeLifecycle_LostLandingUsesSameTerminalFloor(t *testing.T) {
 	o, st, req, rp := resumedLifecycleFixture(t)
 	if err := os.WriteFile(filepath.Join(st.cycleState.WorkspacePath, "ship-error.json"), []byte(`{"code":"GIT_FLEET_REBASE_NEEDED","class":"transient","message":"peer conflict"}`), 0644); err != nil {

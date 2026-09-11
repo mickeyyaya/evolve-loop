@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
@@ -72,6 +73,57 @@ func TestVerifyCycle_CompletePipeline(t *testing.T) {
 	}
 	if got, want := len(r.Required), 3; got != want {
 		t.Fatalf("required len=%d want %d", got, want)
+	}
+}
+
+func TestVerifyCycle_EmptyTriageTerminationRequiresCompletedShortChain(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name        string
+		entries     []core.LedgerEntry
+		opts        Options
+		wantOK      bool
+		wantMissing []string
+	}{
+		{
+			name: "completed-short-chain",
+			entries: []core.LedgerEntry{
+				entry(1, "scout", "phase", 0),
+				entry(1, "triage", "phase", 0),
+			},
+			opts:   Options{CycleVerdict: "PASS", EmptyTriageTermination: true},
+			wantOK: true,
+		},
+		{
+			name: "missing-triage",
+			entries: []core.LedgerEntry{
+				entry(1, "scout", "phase", 0),
+			},
+			opts:        Options{EmptyTriageTermination: true},
+			wantMissing: []string{"triage"},
+		},
+		{
+			name: "normal-cycle-still-requires-build-and-audit",
+			entries: []core.LedgerEntry{
+				entry(1, "scout", "phase", 0),
+				entry(1, "triage", "phase", 0),
+			},
+			wantMissing: []string{"builder", "auditor"},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := VerifyCycle(context.Background(), &fakeLedger{entries: tc.entries}, 1, tc.opts)
+			if err != nil {
+				t.Fatalf("VerifyCycle: %v", err)
+			}
+			if got.OK != tc.wantOK {
+				t.Errorf("OK = %t, want %t", got.OK, tc.wantOK)
+			}
+			if !slices.Equal(got.Missing, tc.wantMissing) {
+				t.Errorf("Missing = %v, want %v", got.Missing, tc.wantMissing)
+			}
+		})
 	}
 }
 

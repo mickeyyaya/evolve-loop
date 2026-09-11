@@ -17,11 +17,11 @@ package main
 //
 // THE GAP THIS CYCLE CLOSES: the inbox item's own incident (cycles 1302-1309
 // running a stale binary) motivated cycle-1314's fix, but runLoopBatch's OWN
-// per-wave/fleet batch loop (cmd_loop.go, the `for i := 0; i < effectiveMax;
+// per-wave/fleet batch loop (cmd_loop_batch.go, the `for i := 0; i < effectiveMax;
 // i++` loop used by plain `evolve loop --max-cycles N` / fleet mode WITHOUT
 // --chain — runLoop itself is a thin dispatcher that hands off to either
 // runLoopChain or runLoopBatch) never calls maybeRefreshChainBoundary at all
-// — confirmed by acsassert.CountInGoFunc(cmd_loop.go, "runLoopBatch",
+// — confirmed by acsassert.CountInGoFunc(cmd_loop_window.go, "prepareIteration",
 // "maybeRefreshChainBoundary") == 0 in this worktree today. A chained loop
 // self-heals at every boundary; a non-chained multi-wave/fleet loop does
 // not — the exact class of bug cycle-1314 fixed for one caller and left
@@ -71,17 +71,22 @@ import (
 // silently reopens the cycles-1302-1309 stale-binary class for every
 // non-chained multi-wave/fleet run.
 func TestRunLoop_CallsMaybeRefreshChainBoundaryAtWaveBoundary(t *testing.T) {
-	// runLoop itself is a thin dispatcher (parse args -> runLoopChain XOR
-	// runLoopBatch); the actual `for i := 0; i < effectiveMax; i++`
-	// wave/fleet batch loop this test's own doc comment describes lives in
-	// runLoopBatch (cmd_loop.go), so that is the function the call site must
-	// land in.
-	n, err := acsassert.CountInGoFunc("cmd_loop.go", "runLoopBatch", "maybeRefreshChainBoundary")
+	// runLoopBatch is the lifetime/bootstrap facade, while prepareIteration is
+	// the boundary stage invoked once by loopBatchCoordinator.run before any
+	// fleet or sequential dispatch.
+	n, err := acsassert.CountInGoFunc("cmd_loop_window.go", "prepareIteration", "maybeRefreshChainBoundary")
 	if err != nil {
-		t.Fatalf("CountInGoFunc(runLoopBatch, maybeRefreshChainBoundary): %v", err)
+		t.Fatalf("CountInGoFunc(prepareIteration, maybeRefreshChainBoundary): %v", err)
 	}
 	if n < 1 {
 		t.Errorf("runLoopBatch does not call maybeRefreshChainBoundary (count=%d); the wave/fleet batch loop can still run for hours on a stale binary after a chain-less `evolve loop --max-cycles N` — only runLoopChain gets the cycle-1314 self-heal today", n)
+	}
+	wired, err := acsassert.CountInGoFunc("cmd_loop_batch.go", "run", "prepareIteration")
+	if err != nil {
+		t.Fatalf("CountInGoFunc(loopBatchCoordinator.run, prepareIteration): %v", err)
+	}
+	if wired != 1 {
+		t.Errorf("loopBatchCoordinator.run calls prepareIteration %d times, want exactly once at each iteration boundary", wired)
 	}
 }
 

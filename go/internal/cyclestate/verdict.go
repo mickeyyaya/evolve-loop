@@ -11,6 +11,10 @@ const (
 	VerdictSKIPPED = "SKIPPED"
 )
 
+// CycleTerminationTriageNoWork identifies a successful Triage transition that
+// explicitly committed zero tasks and ended before any implementation phase.
+const CycleTerminationTriageNoWork = "triage-empty-commitment"
+
 // CycleOutcome constants — cycle-level FinalVerdict labels emitted by
 // finalizeOutcome. Distinct from the per-phase Verdict* set because a
 // cycle outcome covers multiple phases plus commit-movement signal.

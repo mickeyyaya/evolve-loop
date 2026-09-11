@@ -45,6 +45,7 @@ const (
 	CycleOutcomeShippedViaBuild      = cyclestate.CycleOutcomeShippedViaBuild
 	CycleOutcomeSkippedAuditAdvisory = cyclestate.CycleOutcomeSkippedAuditAdvisory
 	CycleOutcomeSkippedUnknown       = cyclestate.CycleOutcomeSkippedUnknown
+	CycleTerminationTriageNoWork     = cyclestate.CycleTerminationTriageNoWork
 )
 
 // IsVerdict re-exports cyclestate.IsVerdict via a thin wrapper (not a var) so

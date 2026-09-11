@@ -269,7 +269,7 @@ func (o *Orchestrator) finalizeCycle(ctx context.Context, cs CycleState, cycle i
 	// outcome label alone is advisory and easily missed in a batch summary, so
 	// surface it loudly here. Not an error — some cycles legitimately produce no
 	// change — but always worth an operator's eyes.
-	if result.FinalVerdict == CycleOutcomeSkippedUnknown {
+	if shouldWarnSkippedUnknown(*result) {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d ended without shipping (%s): phases ran but HEAD did not advance and no audit-advisory block was recorded — any worktree changes were discarded. Inspect %s (audit-report.md verdict + acs-verdict.json red_count).\n", cycle, CycleOutcomeSkippedUnknown, cs.WorkspacePath)
 	}
 

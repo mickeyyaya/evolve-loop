@@ -64,6 +64,8 @@ func canonicalRole(role string) string {
 	switch role {
 	case "scout":
 		return "scout"
+	case "triage":
+		return "triage"
 	case "builder", "build":
 		return "builder"
 	case "auditor", "audit":
@@ -95,6 +97,10 @@ type Options struct {
 	// (Layer P / Layer E3 contract from v8.58.0). Other verdicts skip
 	// the memo check.
 	CycleVerdict string
+	// EmptyTriageTermination means the caller validated the orchestrator's
+	// terminal no-work result and its explicit empty Triage artifact. The
+	// completed chain is then scout + triage rather than the normal floor.
+	EmptyTriageTermination bool
 }
 
 // Result summarises what VerifyCycle found.
@@ -104,6 +110,7 @@ type Options struct {
 // count came back zero against the resolved requirement set.
 type Result struct {
 	Scout   int      `json:"scout"`
+	Triage  int      `json:"triage"`
 	Builder int      `json:"builder"`
 	Auditor int      `json:"auditor"`
 	Intent  int      `json:"intent"`
@@ -126,11 +133,15 @@ type Result struct {
 // ledger I/O failures.
 func VerifyCycle(ctx context.Context, ledger core.Ledger, cycle int, opts Options) (Result, error) {
 	required := make([]string, 0, 5)
-	required = append(required, requiredRoles...)
+	if opts.EmptyTriageTermination {
+		required = append(required, "scout", "triage")
+	} else {
+		required = append(required, requiredRoles...)
+	}
 	if opts.IntentRequired {
 		required = append(required, "intent")
 	}
-	if strings.EqualFold(opts.CycleVerdict, "PASS") {
+	if strings.EqualFold(opts.CycleVerdict, "PASS") && !opts.EmptyTriageTermination {
 		required = append(required, "memo")
 	}
 
@@ -162,6 +173,8 @@ func VerifyCycle(ctx context.Context, ledger core.Ledger, cycle int, opts Option
 		switch canonicalRole(entry.Role) {
 		case "scout":
 			r.Scout++
+		case "triage":
+			r.Triage++
 		case "builder":
 			r.Builder++
 		case "auditor":
@@ -187,6 +200,8 @@ func roleCount(r Result, role string) int {
 	switch role {
 	case "scout":
 		return r.Scout
+	case "triage":
+		return r.Triage
 	case "builder":
 		return r.Builder
 	case "auditor":
@@ -203,8 +218,9 @@ func roleCount(r Result, role string) int {
 // rather than baked into VerifyCycle so unit tests don't need to
 // fixture-create cycle-state.json + .cycle-verdict files.
 type VerifyContext struct {
-	IntentRequired bool
-	CycleVerdict   string
+	IntentRequired         bool
+	CycleVerdict           string
+	EmptyTriageTermination bool
 }
 
 // LoadVerifyContext resolves IntentRequired + CycleVerdict from on-disk

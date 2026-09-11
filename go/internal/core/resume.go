@@ -12,11 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
-	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
-	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
@@ -341,442 +338,46 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 	}
 	defer func() { _ = release() }()
 
-	state, err := o.storage.ReadState(ctx)
+	boot, err := o.loadResumeBootstrap(ctx, req, resumePoint, startPhase)
 	if err != nil {
-		return CycleResult{}, fmt.Errorf("read state: %w", err)
+		return CycleResult{}, err
 	}
+	req = boot.request
+	state := boot.state
+	cs := boot.cycleState
+	startPhase = boot.startPhase
+	cycle := boot.cycle
 
-	cs, err := o.storage.ReadCycleState(ctx)
-	if err != nil {
-		return CycleResult{}, fmt.Errorf("read cycle-state: %w", err)
-	}
-	if cs.Phase == string(PhaseEnd) {
-		return CycleResult{}, fmt.Errorf("resume: cycle %d already completed", cs.CycleID)
-	}
-	resumeIdentity, err := authoritativeResumeIdentity(req.ProjectRoot, resumePoint.StatePath, cs.WorkspacePath)
-	if err != nil {
-		return CycleResult{}, err
-	}
-	resumeWorkspace := resumeIdentity.workspace
-	hostCycle := cs.CycleID
-	if allocated := max(state.LastCycleNumber, state.LastAllocatedCycleNumber); allocated > 0 {
-		// The host allocation lease identifies a paused run that has not yet
-		// completed. Using only LastCycleNumber rejects an honest quota pause.
-		// Fleet checkpoints instead bind to their independent per-run path.
-		hostCycle = allocated
-	} else if hostCycle == 0 {
-		hostCycle = resumePoint.CycleID
-	}
-	resumeCycle := hostCycle
-	if resumeIdentity.fleet {
-		resumeCycle = resumeIdentity.cycle
-	}
-	recoveryBinding := cs
-	if recoveryBinding.CycleID == 0 {
-		recoveryBinding.CycleID = resumeCycle
-	}
-	if newBase, recoverable, recoveryErr := explanationdocs.RecoverRebaseSplit(ctx, explanationBinding(req.ProjectRoot, recoveryBinding)); recoveryErr != nil {
-		return CycleResult{}, fmt.Errorf("recover rebased Build checkpoint: %w", recoveryErr)
-	} else if recoverable {
-		cs.WorktreeBaseSHA = newBase
-		if err := o.storage.WriteCycleState(ctx, cs); err != nil {
-			return CycleResult{}, fmt.Errorf("persist recovered rebased Build checkpoint: %w", err)
-		}
-		startPhase = PhaseBuild
-	}
-	if err := requireResumeExplanationIdentity(req.ProjectRoot, resumeWorkspace, resumeCycle, cs, resumePoint.CycleID); err != nil {
-		return CycleResult{}, err
-	}
-	if cs.CycleID != 0 && resumePoint.CycleID != 0 && cs.CycleID != resumePoint.CycleID {
-		return CycleResult{}, fmt.Errorf("resume identity mismatch: cycle-state cycle %d does not match checkpoint cycle %d", cs.CycleID, resumePoint.CycleID)
-	}
-	if cs.ActiveWorktree != "" && resumePoint.WorktreePath != "" && filepath.Clean(cs.ActiveWorktree) != filepath.Clean(resumePoint.WorktreePath) {
-		return CycleResult{}, fmt.Errorf("resume identity mismatch: cycle-state worktree %q does not match checkpoint worktree %q", cs.ActiveWorktree, resumePoint.WorktreePath)
-	}
-	req, err = restoreResumeGoal(req, cs, state, resumeIdentity.fleet)
-	if err != nil {
-		return CycleResult{}, err
-	}
-	cs.GoalHash, cs.GoalText = req.GoalHash, req.Context["goal"]
-	cycle := cs.CycleID
-	if cycle == 0 {
-		cycle = resumePoint.CycleID
-	}
-	// CA.5: resume REUSES the run record's identity — the resumed phases'
-	// ledger entries attribute to the original run. A pre-CA.5 record (no
-	// run_id) mints fresh rather than leaving entries unattributed.
-	if cs.RunID == "" {
-		cs.RunID = MintRunID(o.now())
-	}
 	o.currentRunID.Store(cs.RunID)
 	defer o.currentRunID.Store("")
-
-	// ADR-0049 G16: re-establish the per-run .lease for the resumed (still-live)
-	// cycle so gc does not reap its run dir while resume runs. Same heartbeat as
-	// the fresh path; no-op for worktree-less cycles.
 	stopLease := startRunLease(cs.WorkspacePath, cs.RunID, o.now, leaseRefreshInterval())
 	defer stopLease()
 
-	// Snapshot env/context (same discipline as RunCycle).
-	envSnap := make(map[string]string, len(req.Env)+1)
-	for k, v := range req.Env {
-		envSnap[k] = v
+	inputs := o.snapshotResumeInputs(ctx, &boot)
+	cs = boot.cycleState
+	envSnap := inputs.env
+	ctxSnap := inputs.context
+	result = inputs.result
+	preResumeHEAD := inputs.preResumeHEAD
+	mainDirtyBaseline := inputs.mainDirtyBaseline
+
+	execution := resumeExecution{
+		orchestrator:      o,
+		ctx:               ctx,
+		request:           req,
+		resumePoint:       resumePoint,
+		state:             state,
+		cycleState:        cs,
+		cycle:             cycle,
+		startPhase:        startPhase,
+		envSnapshot:       envSnap,
+		contextSnapshot:   ctxSnap,
+		initialResult:     result,
+		preResumeHEAD:     preResumeHEAD,
+		mainDirtyBaseline: mainDirtyBaseline,
 	}
-	// SSOT IPC-protocol-allowed: parent -> child resume-mode handoff (writer).
-	envSnap["EVOLVE_"+"RESUME_MODE"] = "1"
-	ctxSnap := make(map[string]string, len(req.Context))
-	for k, v := range req.Context {
-		ctxSnap[k] = v
-	}
+	return execution.run()
 
-	if scope := loadLaneScope(cs.WorkspacePath); scope != nil {
-		ctxSnap["fleet_scope"] = strings.Join(scope.TodoIDs, ",")
-	}
-	result = CycleResult{Cycle: cycle, FinalVerdict: o.resumeFinalVerdict(cs)}
-	cs.FinalVerdict = result.FinalVerdict
-	preResumeHEAD := cs.PreCycleHEAD
-	if preResumeHEAD == "" {
-		preResumeHEAD, _ = o.gitHEAD()
-		cs.PreCycleHEAD = preResumeHEAD
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN resume cycle %d: legacy checkpoint has no pre-cycle HEAD; earlier ship throughput cannot be reconstructed from this checkpoint\n", cycle)
-	}
-	mainDirtyBaseline := porcelainDirtySet(ctx, req.ProjectRoot)
-
-	// ADR-0044 C1 (deferred-to-C3 debt, now paid): the resume path was a
-	// SECOND recording boundary that wrote no timings/sidecars at all —
-	// resumed phases were invisible in phase-timing.json. Every terminal
-	// disposition below funnels through the same recordPhaseOutcome
-	// chokepoint RunCycle uses; the deferred writer flushes on abort too
-	// and APPEND-MERGES with the pre-crash entries (writePhaseTimings).
-	// Semantic note: PhasesRun now includes aborted-but-DISPATCHED phases on
-	// resume too (the chokepoint appends on every terminal path) — same
-	// what-actually-ran contract RunCycle adopted in Slice 1; consumers are
-	// printing/telemetry only (audited then).
-	var phaseTimings []phaseTimingEntry
-	completed := false
-	// ONE cycleRun owns this resume's phase-timing composition, hoisted above
-	// the defers that use it. Both exits (the abnormal epilogue below and the
-	// normal completeCycle at the bottom) and the timing flush share it, so
-	// flushPhaseTimings' exactly-once cache actually holds: a per-instance
-	// cache cannot dedupe across two instances, and the resumed segment would
-	// otherwise be appended to the log twice — the file then disagreeing with
-	// the dossier built from it.
-	timingOwner := &cycleRun{o: o, ctx: context.Background(), req: req, cycle: cycle, cs: cs, state: state, result: result}
-	defer func() {
-		if completed || errors.Is(retErr, ErrAllFamiliesExhausted) || ctx.Err() != nil {
-			return
-		}
-		result.FinalVerdict = VerdictFAIL
-		timingOwner.cs, timingOwner.state, timingOwner.result = cs, state, result
-		timingOwner.abnormalEpilogue(retErr)
-		result = timingOwner.result
-	}()
-	defer func() {
-		// Survey emission is unconditional (a resumed cycle that dispatched
-		// nothing still has pre-crash outputs to account); the timings write
-		// keeps its emptiness guard. cs.CompletedPhases carries the pre-crash
-		// completions plus everything this resume appended.
-		emitPhaseOutputsSignal(cs.WorkspacePath, cycle, cs.CompletedPhases,
-			phasecontract.NewCatalogResolver(o.catalog.Get))
-		if len(phaseTimings) == 0 {
-			return
-		}
-		timingOwner.cs, timingOwner.phaseTimings = cs, phaseTimings
-		timingOwner.flushPhaseTimings()
-	}()
-
-	// Synthesize the loop: start from `startPhase`, follow the state
-	// machine forward like RunCycle does.
-	current := startPhase
-	lastVerdict := VerdictPASS
-	var scheduledNext Phase
-
-	// Run the start phase first, then continue with state-machine.
-	first := true
-	reachedEnd := false
-	maxIterations := o.maxPhaseIterations
-	if maxIterations <= 0 {
-		maxIterations = defaultMaxPhaseIterations
-	}
-	for safety := 0; safety < maxIterations; safety++ {
-		var next Phase
-		switch {
-		case first:
-			next = current
-			first = false
-		case scheduledNext != "":
-			next = scheduledNext
-			scheduledNext = ""
-		default:
-			// Cycle-637: rehydrate the transition kernel from the run's own plan
-			// so a resumed cycle can transition OUT of an advisor-inserted phase
-			// (invalid on the static spine) instead of dying "invalid phase".
-			// Spine-valid phases keep o.sm.Next byte-identically.
-			n, err := o.resolveResumeNext(cs, current, lastVerdict)
-			if err != nil {
-				return result, fmt.Errorf("transition from %s: %w", current, err)
-			}
-			next = n
-		}
-		if next == PhaseEnd {
-			reachedEnd = true
-			break
-		}
-		if next == PhaseBuild {
-			if err := sealBuildExplanationContext(req.ProjectRoot, cs); err != nil {
-				return result, fmt.Errorf("resume seal Build explanation context: %w", err)
-			}
-		}
-
-		runner, ok := o.runners[next]
-		if !ok {
-			// ADR-0044 C1 (cycle-637): a stranded successor on RESUME is a
-			// terminal disposition that must funnel through the recording
-			// chokepoint — the cycle-635 resume died FAILED_UNEXPLAINED precisely
-			// because this bare error escaped it. Record a synthetic outcome
-			// carrying the abort_reason so the outcome is FAILED_EXPLAINED.
-			noRunnerErr := fmt.Errorf("%w: no runner registered for phase %s", ErrPhaseInvalid, next)
-			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath,
-				phaseOutcomeFrom(next, PhaseResponse{}, 0, noRunnerErr.Error(), ""))
-			return result, noRunnerErr
-		}
-
-		cs.Phase = string(next)
-		// Stamp the per-phase wall-clock start here too (mirrors
-		// cyclerun_dispatch.go): the resume path is a first-class dispatch
-		// surface, so a resumed phase's timing record must carry started_at —
-		// a post-crash resume is exactly when latency evidence matters most.
-		cs.PhaseStartedAt = o.now().UTC().Format(time.RFC3339)
-		cs.ActiveAgent = string(next)
-		if next == PhaseAudit {
-			// Mirrors cyclerun_dispatch.go (resume-parity): a resumed audit
-			// re-dispatch supersedes any prior attempt's diagnosed-FAIL
-			// explanation — stale reasons must never mark a later FAIL as
-			// diagnosed to the ADR-0072 floor.
-			resetFloorFailReason(&cs, next)
-			// Resume-parity for the round's verdict artifacts (cycle-1603):
-			// same supersession rule as cyclerun_dispatch.go — a resumed
-			// re-audit must not replay the previous round's verdict.
-			supersedePreviousAuditRound(&cs)
-		}
-		if err := o.storage.WriteCycleState(ctx, cs); err != nil {
-			return result, fmt.Errorf("write cycle-state pre-%s: %w", next, err)
-		}
-
-		if resumePoint.StatePath != "" && ResumeBoundaryCheckpointer != nil {
-			if err := ResumeBoundaryCheckpointer(cs, req.ProjectRoot, o.now()); err != nil {
-				return result, fmt.Errorf("resume checkpoint before %s: %w", next, err)
-			}
-		}
-
-		// Resume-path parity for the audit-repair brief (review MEDIUM): the
-		// budget half was already mirrored below via consumeAuditRepairGrant, but
-		// without seeding HERE a cycle that crashed mid-repair burned an attempt
-		// and rebuilt BLIND — the exact crash-resilience case the persisted
-		// counter exists for. Same state-derived rule as the live loop.
-		// NEXT, not current: at this point `current` is the phase that ran in the
-		// PREVIOUS iteration (it is reassigned to next only at the bottom of the
-		// loop). Using it meant the first TDD dispatch after a resumed repair
-		// grant — Retro->TDD, the exact crash-resume case this exists for — saw
-		// repairSeededPhase(PhaseRetro)==false and rebuilt BLIND. Every sibling
-		// line in this block keys on next for the same reason.
-		phaseCtx := seedAuditRepairContext(ctxSnap, next, cs)
-		phaseCtx = o.seedDispatchContext(ctx, phaseCtx, next, cs, req.ProjectRoot)
-		archiveRepairPrompts(cs, next)
-		if next == PhaseAudit {
-			cs.AuditRepairActive = false
-		}
-		phaseReq := PhaseRequest{
-			Cycle:       cycle,
-			AuditRound:  cs.AuditDispatches,
-			ProjectRoot: req.ProjectRoot,
-			Workspace:   cs.WorkspacePath,
-			// CB.1: the resume path is a first-class dispatch surface and must
-			// thread the persisted worktree like the RunCycle loop does — a
-			// resumed phase with Worktree="" runs cwd=main-tree (cycle-280 class).
-			Worktree:                        cs.ActiveWorktree,
-			WorktreeReadOnly:                o.worktreeReadOnly(next),
-			WorktreeBaseSHA:                 cs.WorktreeBaseSHA,
-			ExplanationDocumentationVersion: cs.ExplanationDocumentationVersion,
-			// CB.5: same rule for the persisted run identity (resume reuses
-			// the run-record id, so session names stay run-scoped).
-			RunID:         cs.RunID,
-			GoalHash:      req.GoalHash,
-			PreviousPhase: string(current),
-			Env:           envSnap,
-			Context:       phaseCtx,
-			Signals:       dispatchSignals(next, cs.WorkspacePath, req.ProjectRoot),
-		}
-		dispatch := &cycleRun{o: o, ctx: ctx, req: req, cs: cs, cycle: cycle, ctxSnap: ctxSnap, retryConfig: o.retryConfig, workflowConfig: o.workflowConfig}
-		dispatch.applyDispatchPolicy(next, &phaseReq)
-		if next != PhaseBuild {
-			projectBuildExplanation(req.ProjectRoot, cs).apply(&phaseReq)
-		}
-		retryHooks := retryOpts{quotaExhausted: allFamiliesQuotaExhausted, optionalInfraSkip: o.optionalInfraSkip}
-		resp, attempts, err := dispatch.retryPhaseRunner(next, phaseReq, retryHooks)
-		if errors.Is(err, ErrAllFamiliesExhausted) {
-			dispatch.result, dispatch.phaseTimings = result, phaseTimings
-			err = dispatch.pauseForQuota(next, resp, attempts)
-			result, phaseTimings = dispatch.result, dispatch.phaseTimings
-			return result, err
-		}
-		if err != nil {
-			phaseErr := fmt.Errorf("phase %s: %w", next, err)
-			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempts, phaseErr.Error(), cs.PhaseStartedAt))
-			return result, phaseErr
-		}
-		if !IsVerdict(resp.Verdict) {
-			ferr := fmt.Errorf("phase %s returned non-canonical verdict %q", next, resp.Verdict)
-			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempts, ferr.Error(), cs.PhaseStartedAt))
-			return result, ferr
-		}
-		// Resume parity with reviewAndGuard: host normalization must finish
-		// before Build's explanation is reviewed and sealed.
-		o.normalizeBuildWorktree(ctx, next, cs)
-		resp, err = o.reviewResumedDeliverable(ctx, req.ProjectRoot, cycle, cs, next, runner, phaseReq, resp, mainDirtyBaseline)
-		if err != nil {
-			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempts, err.Error(), cs.PhaseStartedAt))
-			return result, err
-		}
-		if cs.ExplanationDocumentationVersion != 0 && next != PhaseBuild &&
-			o.worktreePhase(next) && containsString(cs.CompletedPhases, string(PhaseBuild)) {
-			requiresBuild, refreshErr := explanationdocs.RefreshResult(ctx, explanationBinding(req.ProjectRoot, cs))
-			if refreshErr != nil {
-				return result, fmt.Errorf("resume refresh Build explanation after %s: %w", next, refreshErr)
-			}
-			if requiresBuild {
-				scheduledNext = PhaseBuild
-			}
-		}
-
-		if err := o.ledger.Append(ctx, LedgerEntry{
-			TS:       o.now().UTC().Format(time.RFC3339),
-			Cycle:    cycle,
-			Role:     string(next),
-			Kind:     "phase",
-			ExitCode: 0,
-		}); err != nil {
-			lerr := fmt.Errorf("ledger append for %s: %w", next, err)
-			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempts, lerr.Error(), cs.PhaseStartedAt))
-			return result, lerr
-		}
-
-		o.emitPhaseBindings(ctx, cycle, req.ProjectRoot, cs, next, resp.Verdict)
-		cs.CompletedPhases = append(cs.CompletedPhases, string(next))
-		// Persist the same floor-gated disposition as fresh dispatch before a
-		// later interruption can observe this completed phase.
-		o.recordFinalVerdict(&result, next, resp.Verdict, o.floorAlreadyCompleted(cs.CompletedPhases))
-		cs.FinalVerdict = result.FinalVerdict
-		if err := o.storage.WriteCycleState(ctx, cs); err != nil {
-			werr := fmt.Errorf("write cycle-state post-%s: %w", next, err)
-			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempts, werr.Error(), cs.PhaseStartedAt))
-			return result, werr
-		}
-
-		// Resume-path parity for the floor-verdict failure-learning guard
-		// (cyclerun_record.go): a resumed authoritative phase — audit is the one
-		// the skills-drift storm recurred on, and a mid-batch recovery is exactly
-		// where it recurred — whose in-process CI-parity gate overrides a narrative
-		// PASS to FAIL (dispatch err==nil) must feed failure-learning HERE too, or
-		// the storm class is silently reproduced for resumed cycles specifically.
-		// Same single-source *Orchestrator primitive as the live loop.
-		// Resume-path parity for the judgment-lesson recorder (judgment_lesson.go),
-		// mirroring the floor-verdict guard below: a resumed judgment phase's FAIL
-		// must leave the same lesson, or the objection is lost for resumed cycles
-		// specifically. Same single-source *Orchestrator primitive.
-		if resp.Verdict == VerdictFAIL {
-			o.recordJudgmentLesson(ctx, cycle, cs.WorkspacePath, next, &state, resp.Diagnostics)
-		}
-		if resp.Verdict == VerdictFAIL && o.isAuthoritativePhase(next) {
-			o.recordFloorVerdictFailure(ctx, req, cycle, next, &state, &cs, resp.Diagnostics)
-		}
-		o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempts, "", cs.PhaseStartedAt))
-		current = next
-		lastVerdict = resp.Verdict
-
-		// Resume-path parity for the audit-FAIL disposition (ADR-0093). Without
-		// this branch the resume surface falls through to sm.Next(audit, FAIL) =
-		// retro, so a resumed cycle could NEVER repair — and since retro is now
-		// terminal, the retry the policy table grants would be silently
-		// unreachable on exactly the surface that exists for recovery. The live
-		// loop's branch is cyclerun_record.go; both call the same primitive.
-		if current == PhaseAudit && resp.Verdict == VerdictFAIL {
-			branch, reason, sysFail := o.decideAfterAuditFail(cs)
-			consumeAuditRepairGrant(&cs, reason)
-			if sysFail != nil && result.SystemFailure == nil {
-				result.SystemFailure = sysFail
-			}
-			if branch != PhaseRetro {
-				if !o.sm.CanTransition(PhaseAudit, branch) {
-					return result, fmt.Errorf("audit→%s not allowed by state machine", branch)
-				}
-				scheduledNext = branch
-			}
-		}
-
-		// History-branch gate (ADR-0058): the branch-entry CONDITION is lockstep
-		// with recordAndBranch (both key on successorStrategy == history, which
-		// owns the degrade). The branch BODY differs by design — resume takes the
-		// deterministic decideAfterRetro, whereas the live loop additionally
-		// routes via decideAfterRetroRouted at advisory stage.
-		if o.successorStrategy(current) == phasespec.BranchingHistory {
-			cs.FailedAt = state.FailedAt // S4 dossier non-progress counters (additive)
-			branch, extraEnv, reason, sysFail := o.decideAfterRetro(cs, resp.Verdict, state.FailedAt)
-			for k, v := range extraEnv {
-				envSnap[k] = v
-			}
-			// Resume-path parity for the bookkeeping-regrade once-per-cycle bound
-			// (cyclerun_record.go, same recurrence class as the floor-verdict
-			// guard above): without consuming the slot HERE, a resumed cycle
-			// whose re-audit fails bookkeeping-only again regrades forever
-			// (bounded only by the resume safety counter — ~15 LLM dispatches).
-			// The next pre-phase WriteCycleState persists the consumed slot.
-			consumeBookkeepingRegradeGrant(&cs, reason)
-			result.RetroDecision = reason
-			// ADR-0072 S4: the Go floor is non-bypassable on the resume path too —
-			// a floor category halts + escalates rather than looping as task-level.
-			if sysFail != nil && result.SystemFailure == nil {
-				result.SystemFailure = sysFail
-			}
-			if branch == PhaseEnd {
-				reachedEnd = true
-				break
-			}
-			if !o.sm.CanTransition(PhaseRetro, branch) {
-				return result, fmt.Errorf("retro→%s not allowed by state machine", branch)
-			}
-			scheduledNext = branch
-		}
-
-		// The debugger signal-branch gate (ADR-0058 S3) is intentionally NOT
-		// mirrored here. Per the ADR the debugger override is live-loop-only: of
-		// the two record/resume override sites, resume duplicates only the retro
-		// (history) override. A cycle resumed at debugger therefore terminates via
-		// Next(debugger,_)→end rather than re-running decideAfterDebugger — the
-		// unchanged pre-ADR behavior. Lifting that to resume is a separate slice,
-		// not an S3 byte-identity change.
-	}
-
-	if !reachedEnd {
-		return result, fmt.Errorf("resume iteration limit: %d dispatch iterations without reaching PhaseEnd at %s", maxIterations, current)
-	}
-	// Same owner as the defers above: completeCycle flushes, and the deferred
-	// writer then finds the composition already done instead of re-appending.
-	cr := timingOwner
-	cr.ctx, cr.cs, cr.state, cr.result, cr.phaseTimings, cr.preCycleHEAD = ctx, cs, state, result, phaseTimings, preResumeHEAD
-	if err := cr.completeCycle(); err != nil {
-		result = cr.result
-		return result, err
-	}
-	result = cr.result
-	completed = true
-	cs.Phase, cs.ActiveAgent = string(PhaseEnd), ""
-	cs.FinalVerdict = result.FinalVerdict
-	if err := o.storage.WriteCycleState(ctx, cs); err != nil {
-		return result, fmt.Errorf("resume terminal state: %w", err)
-	}
-
-	return result, nil
 }
 
 func (o *Orchestrator) reviewResumedDeliverable(

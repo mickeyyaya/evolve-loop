@@ -1,6 +1,7 @@
 package router
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -94,6 +95,11 @@ func triageCommittedCount(workspace string, degraded *[]string) (int, bool) {
 	}
 	topN, ok := decision["top_n"]
 	if !ok {
+		return 0, false
+	}
+	topN = bytes.TrimSpace(topN)
+	if len(topN) == 0 || topN[0] != '[' {
+		*degraded = append(*degraded, "triage: decision top_n must be an array")
 		return 0, false
 	}
 	var tasks []json.RawMessage

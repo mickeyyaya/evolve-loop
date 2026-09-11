@@ -8,7 +8,8 @@
 // Verdict mapping:
 //   - empty artifact → FAIL
 //   - missing "## top_n" heading → FAIL
-//   - "## top_n" section with no list items → FAIL
+//   - empty "## top_n" plus explicit triage-decision.json top_n:[] → PASS
+//   - "## top_n" with no items and no explicit empty decision → FAIL
 //   - "## top_n" with ≥1 list item → PASS
 package triage
 
@@ -250,7 +251,7 @@ func inboxBatchesSection(projectRoot string) string {
 	return sect.String()
 }
 
-func (hooks) Classify(artifact string, _ core.PhaseRequest, _ core.BridgeResponse) (string, []core.Diagnostic, string) {
+func (hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeResponse) (string, []core.Diagnostic, string) {
 	// EvaluateClassify handles the empty-artifact and section-presence checks.
 	verdict, diags := specrunner.EvaluateClassify(artifact, &phasespec.ClassifyRules{
 		RequireSections: []string{phasecontract.Triage.Sections[0].Canonical},
@@ -261,7 +262,15 @@ func (hooks) Classify(artifact string, _ core.PhaseRequest, _ core.BridgeRespons
 	}
 	trimmed := strings.TrimSpace(artifact)
 	body, hasSection := topNSectionBody(trimmed)
-	// Extra triage invariant: ## top_n must contain at least one list item.
+	if hasSection && !listItemRE.MatchString(body) {
+		signals, err := router.Digest(req.Workspace, []string{string(core.PhaseTriage)})
+		if err == nil && signals.HasEmptyTriageCommitment() {
+			return core.VerdictPASS, nil, string(core.PhaseTDD)
+		}
+	}
+	// A missing section or an uncorroborated empty report is incomplete. The
+	// decision sidecar must contain an explicit JSON array; router.Digest keeps
+	// null, malformed, and missing commitments unknown.
 	if !hasSection || !listItemRE.MatchString(body) {
 		return core.VerdictFAIL, []core.Diagnostic{{
 			Severity: "error",

@@ -17,13 +17,13 @@ func TestBuildExplanationLifecycleWiring(t *testing.T) {
 		{"../phases/ship/native.go", "Run", "verifyNativeExplanation"},
 		{"../phases/audit/classification.go", "newAuditClassification", "validateExplanationReview"},
 		{"../phases/retro/retro.go", "Run", "validateExplanationReview"},
-		{"../core/cyclerun_review.go", "reviewAndGuard", "explanationdocs.RefreshResult"},
+		{"../core/cyclerun_postreview.go", "applyPostReviewGuards", "explanationdocs.RefreshResult"},
 		{"../core/orchestrator.go", "RunCycle", "activateBuildExplanationContract"},
 		{"../core/orchestrator.go", "RunCycle", "sealBuildExplanationContext"},
 		{"../core/cyclerun_dispatch.go", "dispatch", "projectBuildExplanation"},
-		{"../core/resume.go", "RunCycleFromPhase", "explanationdocs.RefreshResult"},
-		{"../core/resume.go", "RunCycleFromPhase", "sealBuildExplanationContext"},
-		{"../core/resume.go", "RunCycleFromPhase", "projectBuildExplanation"},
+		{"../core/resume_execution.go", "run", "explanationdocs.RefreshResult"},
+		{"../core/resume_execution.go", "run", "sealBuildExplanationContext"},
+		{"../core/resume_execution.go", "run", "projectBuildExplanation"},
 	}
 	for _, pin := range pins {
 		t.Run(filepath.Base(pin.path)+"/"+pin.function, func(t *testing.T) {

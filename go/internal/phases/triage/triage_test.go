@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -22,6 +23,7 @@ type fakeBridge struct {
 	resp          core.BridgeResponse
 	err           error
 	writeArtifact string
+	writeDecision string
 	gotReq        core.BridgeRequest
 }
 
@@ -31,6 +33,9 @@ func (f *fakeBridge) Launch(ctx context.Context, req core.BridgeRequest) (core.B
 		_ = os.MkdirAll(filepath.Dir(req.ArtifactPath), 0o755)
 		_ = os.WriteFile(req.ArtifactPath, []byte(f.writeArtifact), 0o644)
 		f.resp.Stdout = f.writeArtifact
+	}
+	if f.writeDecision != "" {
+		_ = os.WriteFile(filepath.Join(filepath.Dir(req.ArtifactPath), "triage-decision.json"), []byte(f.writeDecision), 0o644)
 	}
 	return f.resp, f.err
 }
@@ -119,6 +124,86 @@ _(empty)_
 	}
 	if resp.Verdict != core.VerdictFAIL {
 		t.Errorf("Verdict=%q, want FAIL", resp.Verdict)
+	}
+}
+
+func TestRun_ExplicitEmptyDecisionIsPlannedNoWork(t *testing.T) {
+	body := `# Triage Report
+
+## top_n
+None.
+
+## deferred
+- protected: control-plane surface
+`
+	ws := t.TempDir()
+	if err := os.WriteFile(filepath.Join(ws, "triage-decision.json"), []byte(`{"top_n":[]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	fb := &fakeBridge{writeArtifact: body}
+	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("body")})
+	resp, err := phase.Run(context.Background(), core.PhaseRequest{
+		Cycle: 1, ProjectRoot: "/p", Workspace: ws,
+	})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if resp.Verdict != core.VerdictPASS {
+		t.Errorf("Verdict=%q, want PASS for an explicit empty decision", resp.Verdict)
+	}
+}
+
+type triageTestWorktree struct {
+	path     string
+	cleanups int
+}
+
+func (w *triageTestWorktree) Create(string, int) (string, error) { return w.path, nil }
+func (w *triageTestWorktree) Cleanup(string, string) error {
+	w.cleanups++
+	return nil
+}
+
+func TestRunCycle_RealTriageClassifierClosesPlannedNoWork(t *testing.T) {
+	projectRoot := t.TempDir()
+	worktree := &triageTestWorktree{path: t.TempDir()}
+	bridge := &fakeBridge{
+		writeArtifact: `# Triage Report
+
+## top_n
+None.
+
+## deferred
+- protected: control-plane surface
+`,
+		writeDecision: `{"top_n":[]}`,
+	}
+	runners := fixtures.BuildRunners(nil)
+	runners[core.PhaseTriage] = New(Config{Bridge: bridge, Prompts: fakePromptsFS("body")})
+	orchestrator := core.NewOrchestrator(
+		&fixtures.FakeStorage{},
+		&fixtures.FakeLedger{},
+		runners,
+		core.WithWorktreeProvisioner(worktree),
+	)
+
+	result, err := orchestrator.RunCycle(context.Background(), core.CycleRequest{ProjectRoot: projectRoot, GoalHash: "protected-task"})
+	if err != nil {
+		t.Fatalf("RunCycle: %v", err)
+	}
+	if !core.IsTriageNoWorkResult(result) {
+		t.Fatalf("result = %+v, want host-authorized planned no-work", result)
+	}
+	if got, want := result.PhasesRun, []core.Phase{core.PhaseScout, core.PhaseTriage}; !slices.Equal(got, want) {
+		t.Errorf("PhasesRun = %v, want %v", got, want)
+	}
+	for _, phase := range []core.Phase{core.PhaseTDD, core.PhaseBuild, core.PhaseAudit, core.PhaseShip} {
+		if got := runners[phase].(*fixtures.FakeRunner).Calls; got != 0 {
+			t.Errorf("%s dispatched %d time(s) after terminal Triage", phase, got)
+		}
+	}
+	if worktree.cleanups != 1 {
+		t.Errorf("worktree cleanups = %d, want 1", worktree.cleanups)
 	}
 }
 

@@ -82,53 +82,24 @@ func (cr *cycleRun) recordAndBranch(next Phase, dr dispatchResult) (loopAction, 
 		}
 	}
 
-	cr.cs.CompletedPhases = append(cr.cs.CompletedPhases, string(next))
-	// Commit the floor disposition with its completed phase so a crash cannot
-	// restore the phase history while losing the verdict it protects.
-	cr.o.recordFinalVerdict(&cr.result, next, dr.resp.Verdict, cr.o.floorAlreadyCompleted(cr.cs.CompletedPhases))
-	cr.cs.FinalVerdict = cr.result.FinalVerdict
-	if err := cr.o.storage.WriteCycleState(cr.ctx, cr.cs); err != nil {
-		werr := fmt.Errorf("write cycle-state post-%s: %w", next, err)
-		cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, dr.resp, dr.attemptCount, werr.Error(), cr.cs.PhaseStartedAt))
-		return loopAbort, werr
+	completion := phaseCompletionRecord{
+		orchestrator:            cr.o,
+		ctx:                     cr.ctx,
+		request:                 cr.req,
+		cycle:                   cr.cycle,
+		phase:                   next,
+		response:                dr.resp,
+		attempts:                dr.attemptCount,
+		state:                   &cr.state,
+		cycleState:              &cr.cs,
+		result:                  &cr.result,
+		timings:                 &cr.phaseTimings,
+		checkpoint:              true,
+		includeAuditFailReasons: true,
 	}
-
-	if PhaseBoundaryCheckpointer != nil {
-		if err := PhaseBoundaryCheckpointer(cr.cs, cr.req.ProjectRoot, cr.o.now()); err != nil {
-			fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase boundary checkpoint failed: %v\n", err)
-		}
+	if err := completion.persist(); err != nil {
+		return loopAbort, err
 	}
-
-	// Learn from a FLOOR-phase FAIL verdict returned with NO dispatch error:
-	// audit's in-process CI-parity gates (skills-drift / gofmt / EGPS / apicover)
-	// override the auditor's narrative PASS to FAIL (err==nil), so this success
-	// path — not an error path — records the outcome. Without feeding
-	// failure-learning here, the deterministic gate-FAIL never reached
-	// state.FailedAt, so the failure-adapter and Scout were blind to it and a
-	// self-defeating task (the skills-drift storm, cycles 836/838/841/843/849)
-	// re-derived the same doomed fix forever. Retro still runs via the normal
-	// FAIL→retro transition, so this records only — it does not run retro.
-	// A JUDGMENT phase's FAIL is not authoritative and carries no dispatch
-	// error, so it reaches neither learning path — its objection was lost and
-	// Scout re-derived the falsified premise. Teaches via a carryover todo only,
-	// never a FailedRecord (see judgment_lesson.go). No-op for other phases.
-	if dr.resp.Verdict == VerdictFAIL {
-		cr.o.recordJudgmentLesson(cr.ctx, cr.cycle, cr.cs.WorkspacePath, next, &cr.state, dr.resp.Diagnostics)
-	}
-	if dr.resp.Verdict == VerdictFAIL && cr.o.isAuthoritativePhase(next) {
-		cr.o.recordFloorVerdictFailure(cr.ctx, cr.req, cr.cycle, next, &cr.state, &cr.cs, dr.resp.Diagnostics)
-		// Surface the override explanation in the RESULT too (cycle-1022: the
-		// reason lived only in workspace artifacts + orchestrator memory while
-		// the summary and dossier stayed silent — an invisible refusal).
-		// Audit-scoped guard (reviewer HIGH): cs.AuditFailReasons is set/reset
-		// ONLY for PhaseAudit — appending it on another authoritative phase's
-		// FAIL (e.g. a retro-routed tdd retry failing later for its own
-		// reason) would misattribute the stale audit string to that phase.
-		if next == PhaseAudit && len(cr.cs.AuditFailReasons) > 0 {
-			cr.result.FailReasons = append(cr.result.FailReasons, cr.cs.AuditFailReasons...)
-		}
-	}
-	cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, dr.resp, dr.attemptCount, "", cr.cs.PhaseStartedAt))
 	cr.current = next
 	cr.lastVerdict = dr.resp.Verdict
 
