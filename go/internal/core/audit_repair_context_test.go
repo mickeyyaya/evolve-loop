@@ -89,7 +89,7 @@ func TestSeedAuditRepairContext_DoesNotMutateCallerMap(t *testing.T) {
 }
 
 // BOTH dispatch surfaces must seed the repair brief. cyclerun_dispatch.go is the
-// live loop; resume.go is the crash-resume path. The code claimed this symmetry
+// live loop; resume_execution.go is the crash-resume path. The code claimed this symmetry
 // in two separate comments ("cannot diverge from the resume path", "the live
 // dispatch loop and the crash-resume path cannot diverge") while resume.go built
 // its PhaseRequest without ever calling the seeder — so a cycle that crashed
@@ -97,7 +97,7 @@ func TestSeedAuditRepairContext_DoesNotMutateCallerMap(t *testing.T) {
 // case the persisted counter was designed for. The budget half was mirrored; the
 // findings half was not.
 func TestAuditRepairBrief_SeededOnBothDispatchSurfaces(t *testing.T) {
-	for _, f := range []string{"cyclerun_dispatch.go", "resume.go"} {
+	for _, f := range []string{"cyclerun_dispatch.go", "resume_execution.go"} {
 		body, err := os.ReadFile(f)
 		if err != nil {
 			t.Fatalf("read %s: %v", f, err)

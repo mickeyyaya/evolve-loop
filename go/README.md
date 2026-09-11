@@ -1,10 +1,10 @@
 # evolve-loop Go binary
 
-Single-binary Go rewrite of the evolve-loop orchestrator and trust kernel.
-See [plan](../scripts/) (parent plan at `~/.claude/plans/this-is-a-big-parallel-locket.md`).
-
-This module is intentionally separate from the repo root so the bash codebase
-(`scripts/`, `agents/`, `skills/`) continues to operate during the rewrite.
+The Go binary is the sole evolve-loop runtime. It contains the orchestrator,
+phase implementations, provider bridge, trust kernel, cycle/loop dispatch,
+verification commands, and release pipeline. There is no shell runtime
+fallback; see [migration-from-bash.md](../docs/migration-from-bash.md) for the
+historical port.
 
 ## Build
 
@@ -26,8 +26,9 @@ make lint          # go vet + gofmt -d
 ```
 cmd/evolve/        # CLI entrypoint; one file per subcommand
 internal/
-  core/            # orchestrator + ports; zero infra imports
-  phases/          # one package per phase (Phase 2)
+  core/            # orchestrator, cycle state machine, and consumer-side ports
+  phases/          # concrete phases plus the shared phase runner
+  bridge/          # provider drivers, tmux REPL lifecycle, completion evidence
   adapters/        # filesystem / subprocess / sandbox impls
   guards/          # trust kernel (ship, phase, role, docdelete, quota, chain)
   log/             # slog wrappers + abnormal-events sidecar
@@ -40,8 +41,10 @@ pkg/
 testdata/          # golden fixtures
 ```
 
-## Phase 1 scope (this branch)
+## Architecture
 
-`go-rewrite-phase-1` covers scaffolding + trust kernel + ledger + ACS runner +
-proof-of-concept 50 ACS predicates. Bridge integration, phase implementations,
-and `evolve loop`/`evolve cycle run` come in Phase 2.
+`cmd/evolve` is the composition root and may import concrete phase packages.
+`internal/core` dispatches phases through its ports and owns lifecycle safety;
+it does not depend on concrete phase implementations. See
+[phase-architecture.md](../docs/architecture/phase-architecture.md) for the
+current runtime, phase, Audit, Ship, resume, and resource-ownership contracts.

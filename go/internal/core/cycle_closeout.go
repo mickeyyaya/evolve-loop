@@ -8,6 +8,7 @@ import (
 // completeCycle is the terminal lifecycle for both entrypoints. Resume must
 // reconcile the verdict and preserve its learning before claiming completion.
 func (cr *cycleRun) completeCycle() error {
+	cr.recordPlannedNoWorkOutcome()
 	// Post-loop finalization (verdict reclassification, silent-no-ship warn,
 	// throughput, worktree-preserve decision, state persist) → finalizeCycle.
 	// preserveWorktree is threaded back so the exit defer (registered above)
@@ -34,4 +35,18 @@ func (cr *cycleRun) completeCycle() error {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d: closeout dossier not written (non-fatal): %v\n", cr.cycle, derr)
 	}
 	return nil
+}
+
+// recordPlannedNoWorkOutcome applies an already-authorized host disposition.
+// The terminal selector owns authorization; closeout only validates that no
+// later phase or earlier implementation floor contradicts it.
+func (cr *cycleRun) recordPlannedNoWorkOutcome() {
+	if cr.result.TerminationReason != CycleTerminationTriageNoWork ||
+		cr.current != PhaseTriage ||
+		(cr.lastVerdict != VerdictPASS && cr.lastVerdict != VerdictWARN) ||
+		cr.o.floorAlreadyCompleted(cr.cs.CompletedPhases) ||
+		!phasesEndAtTriageWithoutImplementation(cr.result.PhasesRun) {
+		return
+	}
+	cr.result.FinalVerdict = VerdictSKIPPED
 }

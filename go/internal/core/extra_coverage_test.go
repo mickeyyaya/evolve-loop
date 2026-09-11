@@ -53,7 +53,7 @@ func TestEnforceNext(t *testing.T) {
 		{"user-phase-insert", "extra-check", true, Phase("extra-check"), true},
 	}
 	for _, tc := range cases {
-		gotPhase, gotOK := o.enforceNext(PhaseScout, PhaseTriage, sig,
+		gotPhase, gotOK := o.enforceNext(PhaseScout, PhaseTriage, VerdictPASS, sig,
 			router.RouterDecision{NextPhase: tc.next}, tc.shipPlanned)
 		if gotPhase != tc.wantPhase || gotOK != tc.wantOK {
 			t.Errorf("%s: enforceNext = (%s, %v), want (%s, %v)", tc.name, gotPhase, gotOK, tc.wantPhase, tc.wantOK)
@@ -70,7 +70,7 @@ func TestEnforceNext(t *testing.T) {
 func TestEnforceNext_EmptyOrderSkipAdvance(t *testing.T) {
 	t.Parallel()
 	o := &Orchestrator{sm: NewStateMachine(), cfg: config.RoutingConfig{}}
-	gotPhase, gotOK := o.enforceNext(PhaseScout, PhaseTriage, router.RoutingSignals{},
+	gotPhase, gotOK := o.enforceNext(PhaseScout, PhaseTriage, VerdictPASS, router.RoutingSignals{},
 		router.RouterDecision{SkipPhases: []string{"triage"}}, true)
 	if gotPhase != PhaseTriage || gotOK {
 		t.Errorf("empty-order skip-advance: enforceNext = (%s, %v), want (%s, false) — skipped staticNext must survive, never become PhaseEnd", gotPhase, gotOK, PhaseTriage)

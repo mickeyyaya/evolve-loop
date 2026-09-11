@@ -93,8 +93,8 @@
       "description": "Generic refactor — gate is permissive"
     },
     "chore(build)": {
-      "required_paths": ["go/evolve", "go/bin/**"],
-      "description": "Tracked-binary rebuilds (go/evolve, go/bin output)"
+      "required_paths": ["go/evolve"],
+      "description": "Tracked build executable rebuilds (go/evolve; generated go/bin output is not a required repository anchor)"
     },
     "chore": {
       "any_path": true,

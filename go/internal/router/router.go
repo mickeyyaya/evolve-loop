@@ -281,9 +281,15 @@ func Route(in RouteInput, proposal *Proposal) RouterDecision {
 		return retroDecision(in, proposal)
 	}
 
-	// Triage owns the cycle's task commitment. An explicit empty top_n has no
-	// authorized work for downstream phases, so terminate before optional or
-	// mandatory spine rules can dispatch TDD, Build, or Audit.
+	// Triage owns the cycle's task commitment. A failed contract or an explicit
+	// empty top_n has no authorized work for downstream implementation phases.
+	if cur == "triage" && in.Verdict == "FAIL" {
+		return RouterDecision{
+			NextPhase: PhaseEnd,
+			Reason:    "triage-fail",
+			Evidence:  map[string]interface{}{"verdict": in.Verdict},
+		}
+	}
 	if cur == "triage" && in.Signals.HasEmptyTriageCommitment() {
 		return RouterDecision{
 			NextPhase: PhaseEnd,

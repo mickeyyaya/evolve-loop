@@ -424,9 +424,8 @@ func TestJudgmentLesson_DedupedByID(t *testing.T) {
 }
 
 // TestJudgmentLesson_WiredInLockstepWithFloorRecorder is a WIRING proof, not a
-// behavioral one. The two FAIL-verdict learning recorders must be wired at the
-// same call sites: today the live loop (recordAndBranch) and the resume path,
-// which re-enters mid-cycle after a crash.
+// behavioral one. Fresh and resumed phase completion share one durable
+// boundary, and that boundary must invoke both FAIL-verdict learning recorders.
 //
 // This exists because the failure mode is silent and path-specific. resume.go's
 // own comment on the floor recorder records the precedent: wiring it on one path
@@ -434,40 +433,24 @@ func TestJudgmentLesson_DedupedByID(t *testing.T) {
 // every unit test passes, and the defect appears only after a mid-batch recovery.
 // A third dispatch path added later must wire BOTH recorders or fail here.
 func TestJudgmentLesson_WiredInLockstepWithFloorRecorder(t *testing.T) {
-	entries, err := os.ReadDir(".")
+	shared, err := os.ReadFile("phase_completion.go")
 	if err != nil {
-		t.Fatalf("readdir: %v", err)
+		t.Fatalf("read shared phase completion: %v", err)
 	}
-	checked := 0
-	for _, e := range entries {
-		name := e.Name()
-		if !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
-			continue
+	body := string(shared)
+	for _, call := range []string{"recordJudgmentLesson(", "recordFloorVerdictFailure("} {
+		if !strings.Contains(body, call) {
+			t.Errorf("shared phase completion does not call %s", call)
 		}
-		src, err := os.ReadFile(name)
+	}
+	for _, path := range []string{"cyclerun_record.go", "resume_execution.go"} {
+		src, err := os.ReadFile(path)
 		if err != nil {
-			t.Fatalf("read %s: %v", name, err)
+			t.Fatalf("read %s: %v", path, err)
 		}
-		body := string(src)
-		// Call sites only — skip the file that DEFINES the floor recorder.
-		if !strings.Contains(body, "o.recordFloorVerdictFailure(") {
-			continue
+		if !strings.Contains(string(src), "phaseCompletionRecord{") {
+			t.Errorf("%s bypasses the shared phase-completion boundary", path)
 		}
-		if strings.Contains(body, "func (o *Orchestrator) recordFloorVerdictFailure(") {
-			continue
-		}
-		checked++
-		if !strings.Contains(body, "o.recordJudgmentLesson(") {
-			t.Errorf("%s records a FLOOR-phase FAIL verdict but never records a JUDGMENT lesson — "+
-				"a judgment phase failing on this path leaves no trace and Scout re-derives the "+
-				"falsified premise. Wire recordJudgmentLesson beside recordFloorVerdictFailure.", name)
-		}
-	}
-	// Guard the guard: if the call sites are ever renamed, this test must fail
-	// loudly rather than silently vacuously passing over zero files.
-	if checked < 2 {
-		t.Errorf("expected at least 2 dispatch paths recording floor failures (live loop + resume); "+
-			"found %d — the scan matched nothing, so this test proves nothing", checked)
 	}
 }
 

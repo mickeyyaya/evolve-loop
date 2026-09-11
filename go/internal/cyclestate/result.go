@@ -10,6 +10,10 @@ type CycleResult struct {
 	Cycle        int
 	FinalVerdict string
 	PhasesRun    []Phase
+	// TerminationReason records a host-owned terminal disposition that cannot
+	// be reconstructed safely from phase artifacts alone. An empty value means
+	// the cycle followed the ordinary verdict/state-machine closeout path.
+	TerminationReason string
 	// RetroDecision is the failure-adapter's verdict on the retro branch,
 	// populated only when retro ran. Format: "<action>: <reason>".
 	RetroDecision string

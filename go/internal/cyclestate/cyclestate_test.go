@@ -69,6 +69,16 @@ func TestVerdictConstants(t *testing.T) {
 	}
 }
 
+// TestCycleTerminationTriageNoWork pins the public cycle-result termination
+// discriminator. Consumers use this exact value to distinguish a planned empty
+// triage commitment from an unexplained skipped cycle.
+func TestCycleTerminationTriageNoWork(t *testing.T) {
+	const want = "triage-empty-commitment"
+	if CycleTerminationTriageNoWork != want {
+		t.Errorf("CycleTerminationTriageNoWork = %q, want %q", CycleTerminationTriageNoWork, want)
+	}
+}
+
 // TestIsVerdict_Rejects guards the case/whitespace sensitivity contract.
 func TestIsVerdict_Rejects(t *testing.T) {
 	for _, s := range []string{"", "pass", " PASS", "OK"} {

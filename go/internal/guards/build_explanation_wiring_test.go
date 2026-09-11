@@ -15,15 +15,15 @@ func TestBuildExplanationLifecycleWiring(t *testing.T) {
 		callee   string
 	}{
 		{"../phases/ship/native.go", "Run", "verifyNativeExplanation"},
-		{"../phases/audit/audit.go", "Classify", "validateExplanationReview"},
+		{"../phases/audit/classification.go", "newAuditClassification", "validateExplanationReview"},
 		{"../phases/retro/retro.go", "Run", "validateExplanationReview"},
-		{"../core/cyclerun_review.go", "reviewAndGuard", "explanationdocs.RefreshResult"},
+		{"../core/cyclerun_postreview.go", "applyPostReviewGuards", "explanationdocs.RefreshResult"},
 		{"../core/orchestrator.go", "RunCycle", "activateBuildExplanationContract"},
 		{"../core/orchestrator.go", "RunCycle", "sealBuildExplanationContext"},
 		{"../core/cyclerun_dispatch.go", "dispatch", "projectBuildExplanation"},
-		{"../core/resume.go", "RunCycleFromPhase", "explanationdocs.RefreshResult"},
-		{"../core/resume.go", "RunCycleFromPhase", "sealBuildExplanationContext"},
-		{"../core/resume.go", "RunCycleFromPhase", "projectBuildExplanation"},
+		{"../core/resume_execution.go", "run", "explanationdocs.RefreshResult"},
+		{"../core/resume_execution.go", "run", "sealBuildExplanationContext"},
+		{"../core/resume_execution.go", "run", "projectBuildExplanation"},
 	}
 	for _, pin := range pins {
 		t.Run(filepath.Base(pin.path)+"/"+pin.function, func(t *testing.T) {
@@ -37,7 +37,7 @@ func TestBuildExplanationLifecycleWiring(t *testing.T) {
 	}{
 		{"../core/orchestrator.go", "NewOrchestrator", "explanationContractVersion", "explanationdocs.CurrentContractVersion"},
 		{"../core/cyclerun.go", "newCycleRun", "ExplanationDocumentationVersion", "o.explanationContractVersion"},
-		{"../phases/runner/runner.go", "Run", "RequireSandbox", "requiresExplanationSandbox"},
+		{"../phases/runner/dispatch.go", "dispatchPhaseAttempts", "RequireSandbox", "requiresExplanationSandbox"},
 	}
 	for _, pin := range assignments {
 		t.Run(filepath.Base(pin.path)+"/"+pin.field, func(t *testing.T) {

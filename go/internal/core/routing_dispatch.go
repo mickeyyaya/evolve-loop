@@ -14,7 +14,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-func (o *Orchestrator) enforceNext(current, staticNext Phase, sig router.RoutingSignals, dec router.RouterDecision, shipPlanned bool) (Phase, bool) {
+func (o *Orchestrator) enforceNext(current, staticNext Phase, verdict string, sig router.RoutingSignals, dec router.RouterDecision, shipPlanned bool) (Phase, bool) {
 	isSkipped := func(p Phase) bool {
 		for _, skip := range dec.SkipPhases {
 			if Phase(skip) == p {
@@ -57,10 +57,10 @@ func (o *Orchestrator) enforceNext(current, staticNext Phase, sig router.Routing
 	// SpineSatisfiedUpTo(end) gate — which would require build+audit — because a
 	// no-ship early-exit legitimately happens before those anchors run.
 	if cand == PhaseEnd {
-		// An explicit empty triage commitment is a deterministic no-work
-		// termination, not an advisor attempt to bypass a planned ship floor.
-		if current == PhaseTriage && sig.HasEmptyTriageCommitment() {
-			return PhaseEnd, true
+		if current == PhaseTriage {
+			if terminal := decideTriageTermination(verdict, sig); terminal.stop {
+				return PhaseEnd, true
+			}
 		}
 		if o.sm.CanTerminateEarly(current, shipPlanned) {
 			return PhaseEnd, true

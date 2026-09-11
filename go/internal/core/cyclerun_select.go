@@ -62,6 +62,17 @@ func (cr *cycleRun) selectNext() (Phase, loopAction, error) {
 		next = n
 	}
 
+	// Triage is a host authorization boundary in every routing rollout stage.
+	// A failed contract stops as FAIL. A successful explicit empty commitment
+	// stops as planned no-work; closeout applies that distinct disposition.
+	if cr.current == PhaseTriage {
+		terminal := cr.o.triageTermination(cr.cs.WorkspacePath, cr.cs.CompletedPhases, cr.lastVerdict)
+		if terminal.stop {
+			cr.result.TerminationReason = terminal.reason
+			return PhaseEnd, loopBreak, nil
+		}
+	}
+
 	// Dynamic routing (shadow → advisory → enforce). Stage:Off — the
 	// default — leaves the static state machine fully in control: no
 	// digest, no ledger entry, byte-identical to legacy. When enabled,
@@ -100,7 +111,7 @@ func (cr *cycleRun) selectNext() (Phase, loopAction, error) {
 			PSMASEnabled:   cr.workflowConfig.PSMASEnabled,
 		})
 		if cr.o.cfg.Stage >= config.StageAdvisory && !fromSchedule {
-			if forced, ok := cr.o.enforceNext(cr.current, next, signals, dec, planRunsShip(cr.clampedPlan)); ok {
+			if forced, ok := cr.o.enforceNext(cr.current, next, cr.lastVerdict, signals, dec, planRunsShip(cr.clampedPlan)); ok {
 				next = forced
 			}
 			// Full spine-integrity check on the SELECTED next (static OR

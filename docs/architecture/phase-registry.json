@@ -233,7 +233,7 @@
         "state_fields": []
       },
       "outputs": {
-        "files": [".evolve/runs/cycle-{cycle}/tdd-contract.md"]
+        "files": [".evolve/runs/cycle-{cycle}/test-report.md"]
       },
       "gate_in": "gate_plan_review_to_tdd",
       "gate_out": "gate_tdd_to_build_planner",

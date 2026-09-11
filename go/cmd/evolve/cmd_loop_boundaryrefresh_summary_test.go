@@ -213,7 +213,8 @@ func TestRunLoopChain_SetsBoundaryRefreshOnReExecStop(t *testing.T) {
 	}
 }
 
-// T7 mirrors T6 for runLoopBatch's wave/fleet boundary (cmd_loop.go), the
+// T7 mirrors T6 for runLoopBatch's wave/fleet boundary stage
+// (cmd_loop_window.go), the
 // non-chain caller maybeRefreshChainBoundary also fires from (cycle 1325
 // wiring). Both callers of the SAME refresh mechanism must surface the
 // SAME summary field — surfacing only the chain-mode caller would silently
@@ -223,9 +224,9 @@ func TestRunLoopChain_SetsBoundaryRefreshOnReExecStop(t *testing.T) {
 //
 // acs-predicate: config-check — see T6.
 func TestRunLoopBatch_SetsBoundaryRefreshOnWaveBoundaryReExecStop(t *testing.T) {
-	n, err := acsassert.CountInGoFunc("cmd_loop.go", "runLoopBatch", "lr.BoundaryRefresh")
+	n, err := acsassert.CountInGoFunc("cmd_loop_window.go", "prepareIteration", "b.result.BoundaryRefresh")
 	if err != nil {
-		t.Fatalf("CountInGoFunc(runLoopBatch, lr.BoundaryRefresh): %v", err)
+		t.Fatalf("CountInGoFunc(prepareIteration, b.result.BoundaryRefresh): %v", err)
 	}
 	if n < 1 {
 		t.Errorf("runLoopBatch does not set lr.BoundaryRefresh (count=%d); the wave/fleet boundary's refresh events stay invisible to the loop summary JSON even though runLoopChain's are surfaced", n)

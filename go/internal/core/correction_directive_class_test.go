@@ -118,17 +118,21 @@ func TestComposeContractSalvageRetry_MalformedClassKeepsTodaysText(t *testing.T)
 // green, and silently restores the 0-for-4 behavior — the gate would compute a
 // remediation nobody reads. Both dispatch paths must pass it.
 func TestCorrectionCallSites_PassTheRemediation(t *testing.T) {
-	src, err := os.ReadFile("cyclerun_review.go")
-	if err != nil {
-		t.Fatalf("read cyclerun_review.go: %v", err)
+	var source strings.Builder
+	for _, name := range []string{"cyclerun_review.go", "cyclerun_correction.go"} {
+		src, err := os.ReadFile(name)
+		if err != nil {
+			t.Fatalf("read %s: %v", name, err)
+		}
+		source.Write(src)
 	}
-	body := string(src)
+	body := source.String()
 	for _, want := range []string{
 		"composeCorrection(rr.Reason, rr.Remediation)",
 		"composeContractSalvageRetry(rr.Reason, rr.Remediation)",
 	} {
 		if !strings.Contains(body, want) {
-			t.Errorf("cyclerun_review.go does not call %s — the gate's remediation is computed and then "+
+			t.Errorf("the cycle review components do not call %s — the gate's remediation is computed and then "+
 				"dropped, so the directive reverts to the generic text that forbids the fix", want)
 		}
 	}
