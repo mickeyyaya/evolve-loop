@@ -60,6 +60,7 @@ package main
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -144,8 +145,9 @@ func TestShouldRunWaveAndPool_MutuallyExclusive(t *testing.T) {
 // through fleet.RunPool, whose defining behavior over the wave barrier is
 // backfilling a replacement lane the instant one lane exits while a sibling is
 // STILL RUNNING. Three mutually file-disjoint todos, fc.Count=2: the pool fills
-// with A and B; B returns immediately; C (the only remaining disjoint pending
-// todo) MUST be dispatched before A — still blocked — is unblocked. A dispatcher
+// with A and B; after both callbacks are observed, B is released; C (the only
+// remaining disjoint pending todo) MUST be dispatched before A — still blocked
+// — is unblocked. A dispatcher
 // that wired the WAVE BARRIER (Supervisor.Run: launch all, wait for ALL, then
 // re-plan) instead of RunPool never observes C dispatched while A is in flight
 // and fails here; so does a no-op that never launches.
@@ -159,12 +161,20 @@ func TestDispatchPoolIteration_BackfillsReplacementWhileSiblingStillRunning(t *t
 	planFn := func(context.Context, int) ([]fleet.Todo, error) { return backlog, nil }
 
 	holdA := make(chan struct{})
+	holdB := make(chan struct{})
+	releaseA := sync.OnceFunc(func() { close(holdA) })
+	releaseB := sync.OnceFunc(func() { close(holdB) })
+	t.Cleanup(releaseA)
+	t.Cleanup(releaseB)
 	dispatched := make(chan string, len(backlog))
 	launch := func(_ context.Context, spec fleet.CycleSpec) (int, error) {
 		id := poolSpecID(spec)
 		dispatched <- id
-		if id == "A" {
+		switch id {
+		case "A":
 			<-holdA
+		case "B":
+			<-holdB
 		}
 		return 0, nil
 	}
@@ -194,9 +204,10 @@ func TestDispatchPoolIteration_BackfillsReplacementWhileSiblingStillRunning(t *t
 		t.Fatalf("initial fill dispatched %v, want exactly {A,B}", seen)
 	}
 
-	// B has already returned; A is still blocked. The replacement for B's exit —
-	// C — must dispatch NOW, while A is still running, or the wave barrier was
-	// never removed (the dispatcher did not wire RunPool).
+	// Release B only after both initial callbacks are observed. Callback entry
+	// order is scheduler-dependent even though RunPool selects A before B. C must
+	// replace B while A remains blocked.
+	releaseB()
 	select {
 	case id := <-dispatched:
 		if id != "C" {
@@ -206,7 +217,7 @@ func TestDispatchPoolIteration_BackfillsReplacementWhileSiblingStillRunning(t *t
 		t.Fatal("no replacement lane dispatched for B's exit while sibling A still ran — dispatchPoolIteration did not wire fleet.RunPool (wave barrier still in place)")
 	}
 
-	close(holdA)
+	releaseA()
 	select {
 	case o := <-done:
 		if o.err != nil {
