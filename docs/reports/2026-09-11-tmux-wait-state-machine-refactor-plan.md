@@ -3,7 +3,8 @@
 **Date:** 2026-09-11
 **Branch:** `refactor/tmux-wait-state-machine`
 **Base:** merged `main` at `774d4c3c`
-**Status:** plan review and characterization passed; extraction pending
+**Status:** characterization and state/admission batch complete; tick and
+checkpoint extraction pending
 
 ## Objective and scope contract
 
@@ -264,6 +265,88 @@ changed observation order.
 
 Every batch keeps all existing tests green and uses the repository-native
 commit gate plus `evolve ship`. `main` receives only reviewed merge commits.
+
+## State and admission implementation record
+
+The first production batch was implemented as two independently reviewed
+function slices after the characterization commit:
+
+| Commit | Component | Result |
+|---|---|---|
+| `14c87602` | Characterization contract and this plan | Nine mutation-sensitive contracts; production unchanged |
+| `93aa511f` | Per-launch state construction and terminal nudge outcome | One state owner for policy, detectors, gates, progress, and result; duplicate extension clamp removed |
+| `e2e7b4da` | Prompt admission and timeout-marker formatting | One baseline capture shared by telemetry, dead-shell detection, and submission verification |
+
+The implemented files have narrow roles:
+
+- `driver_tmux_wait_state.go` owns the mutable state for one launch, resolves
+  defaults once, constructs the completion and liveness strategies, retains
+  checkpoint-only persistence gates, records peak tokens and the deferred nudge
+  outcome, and formats the structured timeout marker from a single snapshot.
+- `driver_tmux_wait_admission.go` captures one post-dispatch pane, reports a
+  failed capture, rejects a confirmed dead-shell spill before sending any more
+  input, records submission verification, and allows a new regular non-symlink
+  artifact to override a parked-pane heuristic without bypassing the completion
+  detector's later stability window.
+- `driver_tmux_wait.go` remains the coordinator. Its ordered sleep,
+  cancellation, channel capture/stream, detector poll, inbox, auto-response,
+  checkpoint, and timeout effects stay visible and in their original order.
+
+Two unreachable branches were deleted instead of preserved with artificial
+conditions. `defaultIfZero` already maps a non-positive extension limit to the
+positive default, so the second clamp could never execute. `runTmuxREPL`
+returns from boot-only launches before prompt dispatch and before constructing
+`replWaiter`, so admission no longer wraps verification in a second boot-only
+condition. No constant-false expression, exported API, interface, dependency,
+goroutine, timer, capture, poll, sleep, send, write, or wall probe was added.
+
+After this batch, `replWaiter.wait` is 380 lines, down from 576. This is an
+intermediate structural measure: the remaining size is the intentionally
+visible tick order plus the still-inline interaction, checkpoint, and terminal
+responsibilities. The batch does not claim the full waiter decomposition is
+finished.
+
+Verification on the exact production slices:
+
+```text
+go test -count=1 -coverprofile=/tmp/evolve-tmux-admission-final.cover ./internal/bridge
+PASS; test summary 93.3% (the cover profile total rounds to 93.4%)
+
+go tool cover -func=/tmp/evolve-tmux-admission-final.cover
+replWaiter.wait                         100.0%
+replWaiter.admitPrompt                  100.0%
+newReplWaitState                        100.0%
+replWaitResult.recordTokens             100.0%
+replWaitState.recordNudgeOutcome        100.0%
+replWaitState.writeArtifactTimeoutMarker 100.0%
+
+go test -count=1 ./internal/bridge/...
+PASS
+
+go test -race -count=1 ./internal/bridge/...
+PASS
+
+go vet ./internal/bridge/...
+PASS
+
+golangci-lint run ./internal/bridge/...
+PASS; 0 issues
+
+go test -tags=integration -count=1 ./internal/bridge \
+  -run '^TestRealTmux_(HappyPath|ArtifactTimeout|NamedSessionResume|ConcurrentSessionsIsolated)$'
+PASS
+
+go test -count=1 ./...
+PASS
+
+go vet ./...
+PASS
+```
+
+Architecture, Go, and simplification/defensive reviewers returned PASS on the
+exact staged state tree `d1b2bab025c5377a63a1a66e76924d9b783b2a4c` and the
+exact staged admission tree `bf7fb7a476d2c70387a2fa46d1d0e38ae380639e`. The
+native commit gate attested each tree before `evolve ship` committed it.
 
 ## Test layers and commands
 
