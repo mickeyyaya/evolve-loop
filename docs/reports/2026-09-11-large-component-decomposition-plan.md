@@ -3,7 +3,7 @@
 **Date:** 2026-09-11
 **Original analysis snapshot:** `10978424`
 **Promotion integration base:** `c1ba55a0` (`runtime/main`)
-**Status:** implementation and two-wave validation complete; final deterministic gates and reviews are in progress
+**Status:** primary decomposition merged; supplemental rescans and post-fix live validation are in progress
 
 **Architecture review:** initial verdict `REVISE`; the plan incorporated those findings before implementation. The final implementation review passed after one TDD correction and accepted the narrower behavior-preserving boundaries recorded below.
 
@@ -42,6 +42,25 @@ The scan was then checked against the actual control flow and existing tests. La
 | Defer | `go/internal/policy/policy.go` | largest function | 92 / lower | 77 | policy fan-in 27, fan-out 3 | The 1,982-line file is large, but its 46 functions are short. It needs file-level organization after the workflow risks, not a new policy framework. |
 
 Other large files such as `phase_advisor.go`, `explanationdocs.go`, and `inboxmover.go` contain smaller functions and do not enter the first campaign. They should be rescanned after the seven workflows are contained.
+
+### Supplemental rescan: PhaseAdvisor plan stage
+
+The post-campaign rescan found one small, cohesive value object embedded in
+`phase_advisor.go`: `planStage` owns the three mappings that distinguish the
+initial plan from the post-Scout re-plan. It is not a new package or public
+abstraction. Moving it to `plan_stage.go` gives that decision table one local
+home while `PhaseAdvisor.planWith` continues to orchestrate the provider call,
+artifact capture, and plan validation. The extraction adds no import, exported
+identifier, runtime branch, or external dependency.
+
+This slice follows the behavior-preserving TDD protocol above. The initial and
+post-Scout mapping tests passed against the original file. A temporary mutation
+that returned `plan` for the post-Scout capture kind made
+`TestPlanStage_PostScout` fail by assertion; the mutation was reverted before
+the move. The same tests then exercised the extracted component unchanged.
+Review removed the diagnostic wave's source-text ownership assertion because
+literal spelling and file placement are not behavioral contracts. The retained
+tests cover the complete stage mapping and the documented zero-value invariant.
 
 ## Boundary rules
 
@@ -362,11 +381,21 @@ The campaign is complete when:
 
 ## Execution outcome
 
-The seven decomposition slices and the same-package Policy organization are implemented on the isolated `refactor/component-decomposition` branch. Architecture review approved the effectful REPL waiter and fresh/resume compatibility exceptions. A later live finding added one bounded outcome module: failed Triage stops before implementation and retains FAIL; a successful explicit empty-array commitment closes as planned no-work and may use the shortened Scout/Triage ledger-verification floor.
+The seven decomposition slices and the same-package Policy organization were implemented in isolated worktrees and promoted through reviewed PRs #549, #550, #553, #554, #556, and #557. Architecture review approved the effectful REPL waiter and fresh/resume compatibility exceptions. Later reviewed PRs #558, #559, and #560 added centralized telemetry and repaired checkpoint and interruption integration history. A live finding also added one bounded outcome module: failed Triage stops before implementation and retains FAIL; a successful explicit empty-array commitment closes as planned no-work and may use the shortened Scout/Triage ledger-verification floor.
 
 Wave 1 shipped a tested clean-checkout manifest correction in its disposable repository. Wave 2 selected an intentionally protected Go test target. Its first run reached TDD and proved that selection was too late; cycle 1628 then stopped after Intent, Scout, and Triage with its Triage FAIL preserved. The outer loop initially mislabeled that safely shortened failed chain as infrastructure failure. Follow-up RED/GREEN work separated failure termination from successful planned no-work, required an explicit JSON array, made the production Triage classifier recognize that corroborated empty result, and bound shortened verification to the host result. A final paid replay was stopped during Intent when correction escalation paired Claude with a Codex model name and the phase sandbox denied the artifact write. Early termination is established by the real cycle-1628 artifacts; successful no-work closeout is established by a composed production-Triage cycle test plus deterministic resume, ledger, and command-loop tests without spending another provider cycle on already-captured inputs.
 
-All disposable cycle worktrees and sessions were reset or reaped. The feature implementation was split into reviewed commits on its isolated branch; runtime/main receives those commits only through the final merge.
+All disposable cycle worktrees and sessions were reset or reaped. Every production batch reached `runtime/main` through its reviewed PR; no feature work was committed directly on `main`.
+
+A later post-#560 diagnostic wave independently selected the `planStage`
+extraction above and produced a useful production move, but its generated test
+and eval evidence included brittle source inspection and test selectors that
+could pass while matching no tests. That disposable commit was not promoted.
+The extraction is being reconstructed in this isolated branch with the compact
+behavioral tests described above, followed by the normal deterministic and
+review gates. Accepted live-wave validation will resume with strict Audit WARN
+handling after this correction; the diagnostic run does not count as an
+accepted wave.
 
 ## Explicit non-goals
 
