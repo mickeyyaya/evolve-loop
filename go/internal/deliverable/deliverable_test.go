@@ -160,13 +160,76 @@ func TestCheckStray_SkipsNonWorkspaceTarget(t *testing.T) {
 
 func TestVerify_ValidJSON_OK(t *testing.T) {
 	ws := t.TempDir()
-	writeFile(t, ws, "routing-plan.json", `{"plan":[{"phase":"build"}],"extra":"ignored"}`)
-	res, err := Verify("advisor", phasecontract.Roots{Workspace: ws})
+	writeFile(t, ws, "cycle-state.json", `{"cycle_id":213,"phase":"build","extra":"ignored"}`)
+	res, err := Verify("orchestrator", phasecontract.Roots{EvolveDir: ws})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !res.OK {
 		t.Errorf("want OK (tolerant reader ignores unknown 'extra'), got %+v", res.Violations)
+	}
+}
+
+func TestVerify_RouterContractsRequireTheirDeclaredJSONShape(t *testing.T) {
+	tests := []struct {
+		name     string
+		contract string
+		content  string
+		wantOK   bool
+	}{
+		{name: "plan array", contract: "router", content: `[{"phase":"build"}]`, wantOK: true},
+		{name: "plan object", contract: "router", content: `{"phase":"build"}`},
+		{name: "plan null", contract: "router", content: `null`},
+		{name: "replan array", contract: "router-replan", content: `[{"phase":"audit"}]`, wantOK: true},
+		{name: "replan scalar", contract: "router-replan", content: `"audit"`},
+		{name: "proposal object", contract: "router-proposal", content: `{"phase":"audit","run":true}`, wantOK: true},
+		{name: "proposal array", contract: "router-proposal", content: `[{"phase":"audit"}]`},
+		{name: "proposal null", contract: "router-proposal", content: `null`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ws := t.TempDir()
+			c, ok := phasecontract.For(tt.contract)
+			if !ok {
+				t.Fatalf("contract %q is not registered", tt.contract)
+			}
+			writeFile(t, ws, c.ArtifactName, tt.content)
+			res, err := Verify(tt.contract, phasecontract.Roots{Workspace: ws})
+			if err != nil {
+				t.Fatalf("Verify(%q): %v", tt.contract, err)
+			}
+			if res.OK != tt.wantOK {
+				t.Errorf("Verify(%q) OK=%v, want %v; violations=%+v", tt.contract, res.OK, tt.wantOK, res.Violations)
+			}
+			if !tt.wantOK && !hasCode(res, CodeInvalidJSON) {
+				t.Errorf("wrong top-level shape must report %q; got %+v", CodeInvalidJSON, res.Violations)
+			}
+		})
+	}
+}
+
+func TestVerify_RouterContractDoesNotAcceptSiblingArtifact(t *testing.T) {
+	ws := t.TempDir()
+	writeFile(t, ws, "routing-plan.json", `[{"phase":"audit"}]`)
+
+	res, err := Verify("router-proposal", phasecontract.Roots{Workspace: ws})
+	if err != nil {
+		t.Fatalf("Verify(router-proposal): %v", err)
+	}
+	if res.OK || !hasCode(res, CodeMissingArtifact) {
+		t.Errorf("a valid routing-plan.json must not satisfy routing-proposal.json; got %+v", res.Violations)
+	}
+}
+
+func TestVerifyJSON_UnspecifiedShapePreservesAnyValidValue(t *testing.T) {
+	contract := phasecontract.Contract{Kind: phasecontract.KindJSON}
+	for _, content := range []string{`null`, `"value"`, `7`, `[]`, `{}`} {
+		var res Result
+		verifyJSON(&res, contract, content)
+		if len(res.Violations) != 0 {
+			t.Errorf("legacy unspecified shape rejected %s: %+v", content, res.Violations)
+		}
 	}
 }
 

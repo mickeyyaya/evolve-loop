@@ -14,7 +14,9 @@
     "Write(.evolve/runs/cycle-*/routing-proposal.json)",
     "Edit(.evolve/runs/cycle-*/routing-proposal.json)",
     "Write(.evolve/runs/cycle-*/routing-plan.json)",
-    "Edit(.evolve/runs/cycle-*/routing-plan.json)"
+    "Edit(.evolve/runs/cycle-*/routing-plan.json)",
+    "Write(.evolve/runs/cycle-*/routing-replan.json)",
+    "Edit(.evolve/runs/cycle-*/routing-replan.json)"
   ],
   "disallowed_tools": [
     "Bash(git commit:*)",
@@ -99,6 +101,6 @@
     "claude-tmux"
   ],
   "stream_output": true,
-  "_note": "v3 (dynamic routing): the DynamicLLM router brain. Read-only, fast, low-budget advisory phase. Emits routing-proposal.json {next_phase, insert_phases, justification}. Output is ADVISORY \u2014 router.Route clamps it to the kernel floor (mandatory spine, TDD-pin, ship-needs-audit). Only invoked at Stage>=Shadow with routing_mode=llm.",
+  "_note": "v4 (dynamic routing): one router identity serves three advisory protocols. Plan and RePlan emit JSON arrays to routing-plan.json and routing-replan.json; Propose emits a JSON object to routing-proposal.json. Each launch selects its matching deliverable contract while model/profile/telemetry identity remains router. router.Route clamps every result to the kernel floor (mandatory spine, TDD-pin, ship-needs-audit).",
   "generated_from": "hand-authored"
 }

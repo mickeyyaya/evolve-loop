@@ -10,9 +10,10 @@ class that dominated recent bug-fix churn.
 
 ## The contract (SSOT)
 
-`go/internal/phasecontract` registers one `Contract` per agent:
+`go/internal/phasecontract` registers one `Contract` per deliverable protocol. Most agents have one
+protocol. The router has three because one model/profile identity produces three different artifacts:
 
-| agent | artifact | kind | location |
+| protocol | artifact | kind | location |
 |---|---|---|---|
 | build | `build-report.md` | markdown | workspace |
 | scout | `scout-report.md` | markdown | workspace |
@@ -20,13 +21,26 @@ class that dominated recent bug-fix churn.
 | audit | `audit-report.md` | markdown | workspace |
 | intent | `intent.md` | markdown | workspace |
 | triage | `triage-report.md` | markdown | workspace |
-| router (a.k.a. advisor) | `routing-plan.json` | json (key `plan`) | workspace |
+| router plan (a.k.a. advisor) | `routing-plan.json` | JSON array | workspace |
+| router replan | `routing-replan.json` | JSON array | workspace |
+| router proposal | `routing-proposal.json` | JSON object | workspace |
 | orchestrator | `cycle-state.json` | json (keys `cycle_id`,`phase`) | `.evolve/` |
 
 A markdown contract requires its sections (from `phasecontract.<Phase>.Sections`) and a parseable
-verdict; a JSON contract requires valid JSON with the listed top-level keys (a **tolerant reader**
-— unknown/future keys are ignored). `ArtifactName` is pinned to the profile `output_artifact`
-basename by `TestArtifactNameMatchesProfileOutput` (drift detector).
+verdict. A JSON contract can require a top-level object or array and can require object keys. Object
+keys use a **tolerant reader**: unknown future keys are ignored. The zero-value JSON shape retains
+the legacy "any valid JSON value" behavior for user-defined contracts. `ArtifactName` is pinned to
+the profile `output_artifact` basename by `TestArtifactNameMatchesProfileOutput` for single-output
+profiles. The multi-protocol router instead has a profile-permission test that projects all three
+artifact names from the registry.
+
+`BridgeRequest.Agent` and `BridgeRequest.Contract` intentionally answer different questions.
+`Agent` selects the router profile, model policy, skill overlays, and telemetry label. `Contract`
+selects the output protocol injected into the prompt. An empty `Contract` defaults to `Agent` for
+existing callers. An explicit unknown contract fails before model dispatch; silently falling back
+would make a typo validate the wrong file. `PhaseAdvisor` explicitly selects `router`,
+`router-replan`, or `router-proposal` beside the corresponding artifact path. It never infers the
+protocol from a filename.
 
 ### Conditional sections (2026-09-03)
 
@@ -43,8 +57,8 @@ comment, or at another level counts for neither the gate nor the self-check. A m
 is reported under the same `missing_section` code as any other, so it is a correction re-dispatch
 with the reason as the directive, not a terminal FAIL (cycles 1601/1603); a cycle without the
 contract is never asked for it. The retro's `## Explanation Documentation Review` stays a gate-only
-check for now: retro has no deliverable contract entry, is not on the ship path, and did not
-appear in the failure census.
+check for now: retro has a registered location/well-formedness contract, but it declares no
+conditional explanation section and is not on the ship path.
 
 ### Reading the registry from Go (cycle-1145)
 
@@ -94,8 +108,10 @@ DELIVERABLE PATH: /…/.evolve/runs/cycle-213/build-report.md
 ```
 
 The invariant block stays in the cacheable prompt prefix; the per-cycle path lives in the footer
-(cache-safe + recency-optimal). The block tells the agent to write there, emit the verdict
-sentinel, and run `evolve phase verify` before finishing.
+(cache-safe + recency-optimal). The block tells the agent to write there, emit the verdict sentinel
+when its contract requires one, and run `evolve phase verify` before finishing. Router prompts name
+the selected protocol, so a proposal runs `evolve phase verify router-proposal`, a replan runs
+`evolve phase verify router-replan`, and a plan runs `evolve phase verify router`.
 
 Immediately after that footer line, `phasecontract.RenderContractTail` appends the **machine** half of
 the contract as one XML-tagged block, at the generation point:

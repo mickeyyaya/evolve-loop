@@ -3,11 +3,11 @@ package core
 import "testing"
 
 func TestPlanStage_Initial(t *testing.T) {
-	assertPlanStageMappings(t, stageInitial, "routing-plan.json", "plan", 0)
+	assertPlanStageMappings(t, stageInitial, "router", "routing-plan.json", "plan", 0)
 }
 
 func TestPlanStage_PostScout(t *testing.T) {
-	assertPlanStageMappings(t, stagePostScout, "routing-replan.json", "replan", 1)
+	assertPlanStageMappings(t, stagePostScout, "router-replan", "routing-replan.json", "replan", 1)
 }
 
 func TestPlanStage_ZeroValueIsInitial(t *testing.T) {
@@ -17,8 +17,11 @@ func TestPlanStage_ZeroValueIsInitial(t *testing.T) {
 	}
 }
 
-func assertPlanStageMappings(t *testing.T, stage planStage, artifact, kind string, depth int) {
+func assertPlanStageMappings(t *testing.T, stage planStage, contract, artifact, kind string, depth int) {
 	t.Helper()
+	if got := stage.contractID(); got != contract {
+		t.Errorf("contractID() = %q, want %q", got, contract)
+	}
 	if got := stage.artifactFile(); got != artifact {
 		t.Errorf("artifactFile() = %q, want %q", got, artifact)
 	}

@@ -135,14 +135,14 @@ func TestContract_WriteTarget(t *testing.T) {
 
 func TestContracts_ReturnsWholeRegistry(t *testing.T) {
 	all := Contracts()
-	if len(all) != 11 {
-		t.Fatalf("Contracts() len=%d, want 11", len(all))
+	if len(all) != 13 {
+		t.Fatalf("Contracts() len=%d, want 13", len(all))
 	}
 	seen := map[string]bool{}
 	for _, c := range all {
 		seen[c.Phase] = true
 	}
-	for _, phase := range []string{"build", "scout", "tdd", "audit", "intent", "triage", "router", "orchestrator", "ship", "retro", "build-planner"} {
+	for _, phase := range []string{"build", "scout", "tdd", "audit", "intent", "triage", "router", "router-replan", "router-proposal", "orchestrator", "ship", "retro", "build-planner"} {
 		if !seen[phase] {
 			t.Errorf("Contracts() missing %q", phase)
 		}
@@ -163,6 +163,56 @@ func TestContract_JSONContractsDeclareRequiredKeys(t *testing.T) {
 	orch, _ := For("orchestrator")
 	if !contains(orch.RequiredKeys, "cycle_id") {
 		t.Errorf("orchestrator RequiredKeys=%v, want to contain 'cycle_id'", orch.RequiredKeys)
+	}
+}
+
+func TestContract_TopLevelJSONShapePreservesLegacyDefaults(t *testing.T) {
+	if got := (Contract{Kind: KindJSON}).TopLevelJSONShape(); got != JSONShapeAny {
+		t.Errorf("unkeyed zero-value JSON shape=%v, want any value", got)
+	}
+	if got := (Contract{Kind: KindJSON, RequiredKeys: []string{"id"}}).TopLevelJSONShape(); got != JSONShapeObject {
+		t.Errorf("legacy keyed JSON shape=%v, want object", got)
+	}
+}
+
+func TestJSONShape_String(t *testing.T) {
+	tests := []struct {
+		shape JSONShape
+		want  string
+	}{
+		{shape: JSONShapeAny, want: "value"},
+		{shape: JSONShapeObject, want: "object"},
+		{shape: JSONShapeArray, want: "array"},
+	}
+	for _, tt := range tests {
+		if got := tt.shape.String(); got != tt.want {
+			t.Errorf("JSONShape(%d).String()=%q, want %q", tt.shape, got, tt.want)
+		}
+	}
+}
+
+func TestRouterArtifactContractsAreDistinct(t *testing.T) {
+	tests := []struct {
+		contract string
+		artifact string
+	}{
+		{contract: "router", artifact: "routing-plan.json"},
+		{contract: "router-replan", artifact: "routing-replan.json"},
+		{contract: "router-proposal", artifact: "routing-proposal.json"},
+	}
+	for _, test := range tests {
+		t.Run(test.contract, func(t *testing.T) {
+			c, ok := For(test.contract)
+			if !ok {
+				t.Fatalf("For(%q): contract not registered", test.contract)
+			}
+			if c.ArtifactName != test.artifact {
+				t.Errorf("For(%q).ArtifactName = %q, want %q", test.contract, c.ArtifactName, test.artifact)
+			}
+			if c.AgentName != "router" {
+				t.Errorf("For(%q).AgentName = %q, want router", test.contract, c.AgentName)
+			}
+		})
 	}
 }
 

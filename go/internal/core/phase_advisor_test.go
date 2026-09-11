@@ -97,6 +97,56 @@ func TestPhaseAdvisor_ParsesValidJSON(t *testing.T) {
 	}
 }
 
+func TestPhaseAdvisor_SelectsContractForEachRouterProtocol(t *testing.T) {
+	tests := []struct {
+		name       string
+		stdout     string
+		contract   string
+		artifact   string
+		completion string
+		launch     func(*PhaseAdvisor, router.RouteInput) error
+	}{
+		{
+			name: "plan", stdout: `[{"phase":"scout","run":true}]`,
+			contract: "router", artifact: "routing-plan.json", completion: "artifact",
+			launch: func(p *PhaseAdvisor, in router.RouteInput) error { _, err := p.Plan(in); return err },
+		},
+		{
+			name: "replan", stdout: `[{"phase":"audit","run":true}]`,
+			contract: "router-replan", artifact: "routing-replan.json", completion: "artifact",
+			launch: func(p *PhaseAdvisor, in router.RouteInput) error { _, err := p.RePlan(in); return err },
+		},
+		{
+			name: "proposal", stdout: `{"next_phase":"audit"}`,
+			contract: "router-proposal", artifact: "routing-proposal.json", completion: "stdout",
+			launch: func(p *PhaseAdvisor, in router.RouteInput) error { _, err := p.Propose(in); return err },
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fb := &fakeBridge{stdout: tt.stdout}
+			in := baseRouteInput()
+			in.Workspace = t.TempDir()
+			if err := tt.launch(NewPhaseAdvisor(fb), in); err != nil {
+				t.Fatalf("%s: %v", tt.name, err)
+			}
+			if fb.gotReq.Agent != "router" {
+				t.Errorf("Agent=%q, want router", fb.gotReq.Agent)
+			}
+			if fb.gotReq.Contract != tt.contract {
+				t.Errorf("Contract=%q, want %q", fb.gotReq.Contract, tt.contract)
+			}
+			if !strings.HasSuffix(fb.gotReq.ArtifactPath, tt.artifact) {
+				t.Errorf("ArtifactPath=%q, want suffix %q", fb.gotReq.ArtifactPath, tt.artifact)
+			}
+			if fb.gotReq.Completion != tt.completion {
+				t.Errorf("Completion=%q, want %q", fb.gotReq.Completion, tt.completion)
+			}
+		})
+	}
+}
+
 func TestPhaseAdvisor_TolerantOfFenceAndProse(t *testing.T) {
 	t.Parallel()
 	fb := &fakeBridge{stdout: "Here is my routing call:\n```json\n{\"next_phase\":\"audit\",\"justification\":\"done\"}\n```\nThanks!"}

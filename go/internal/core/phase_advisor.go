@@ -110,7 +110,7 @@ func NewPhaseAdvisor(bridge Bridge, opts ...PhaseAdvisorOption) *PhaseAdvisor {
 
 // Propose implements router.Proposer.
 func (p *PhaseAdvisor) Propose(in router.RouteInput) (*router.Proposal, error) {
-	resp, err := p.advisorLaunch(in, "routing proposer", "proposal", buildRoutingPrompt(in), "routing-proposal.json", "stdout", 0)
+	resp, err := p.advisorLaunch(in, "routing proposer", "proposal", buildRoutingPrompt(in), "router-proposal", "routing-proposal.json", "stdout", 0)
 	if err != nil {
 		return nil, err
 	}
@@ -156,7 +156,7 @@ func (p *PhaseAdvisor) RePlan(in router.RouteInput) (*router.PhasePlan, error) {
 // both for forensics (advisory vs disposed).
 func (p *PhaseAdvisor) planWith(in router.RouteInput, stage planStage) (*router.PhasePlan, error) {
 	artifact := stage.artifactFile()
-	resp, err := p.advisorLaunch(in, "phase advisor", stage.captureKind(), p.composePlanPrompt(in, artifact), artifact, "artifact", stage.replanDepth())
+	resp, err := p.advisorLaunch(in, "phase advisor", stage.captureKind(), p.composePlanPrompt(in, artifact), stage.contractID(), artifact, "artifact", stage.replanDepth())
 	if err != nil {
 		return nil, err
 	}
@@ -209,7 +209,7 @@ func (p *PhaseAdvisor) composePlanPrompt(in router.RouteInput, artifactFile stri
 // as every phase writes its report. Propose still uses completion="stdout"
 // (ADR-0027 REPL-idle scrollback) pending its own unification. Either way, a
 // failure returns an error and the caller degrades cleanly to the static path.
-func (p *PhaseAdvisor) advisorLaunch(in router.RouteInput, errPfx, kind, prompt, artifactFile, completion string, replanDepth int) (BridgeResponse, error) {
+func (p *PhaseAdvisor) advisorLaunch(in router.RouteInput, errPfx, kind, prompt, contractID, artifactFile, completion string, replanDepth int) (BridgeResponse, error) {
 	if p.bridge == nil {
 		return BridgeResponse{}, fmt.Errorf("%s: nil bridge", errPfx)
 	}
@@ -262,6 +262,7 @@ func (p *PhaseAdvisor) advisorLaunch(in router.RouteInput, errPfx, kind, prompt,
 			ArtifactPath: filepath.Join(in.Workspace, artifactFile),
 			Completion:   completion,
 			Agent:        p.identity.AgentLabel,
+			Contract:     contractID,
 			Cycle:        in.Cycle,
 			Env:          in.Env,
 		})

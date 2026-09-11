@@ -12,6 +12,7 @@ package bridge
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -223,7 +224,14 @@ func (a *Adapter) Launch(ctx context.Context, req core.BridgeRequest) (core.Brid
 	// per-cycle path lands in the footer (last line) — cache-safe AND recency-
 	// optimal. See injectContract. Skill overlays sit at the persona altitude
 	// (just above the profile Rules): stable per phase/tier, so cache-coherent.
-	body := a.injectContract(req.Prompt, req.Agent, req.ArtifactPath)
+	contractID := req.Agent
+	if req.Contract != "" {
+		contractID = req.Contract
+		if _, ok := a.contractResolver().Resolve(contractID); !ok {
+			return core.BridgeResponse{}, fmt.Errorf("bridge: deliverable contract %q not registered", contractID)
+		}
+	}
+	body := a.injectContract(req.Prompt, contractID, req.ArtifactPath)
 	withPolicy := injectPolicyPrefix(body, resolvePolicy(req.ProjectRoot, req.Agent, req.InteractivePolicy))
 	withRules := injectRulesPrefix(withPolicy, req.SystemPrompt)
 	withSkills := injectSkillOverlays(withRules, req)
@@ -296,7 +304,7 @@ func injectPolicyPrefix(prompt, policy string) string {
 }
 
 // injectContract wraps the prompt body with the Deliverable Contract (ADR-0034)
-// when the agent has a registered contract: the invariant instruction block is
+// when the selected protocol has a registered contract: the invariant instruction block is
 // prepended (cacheable prefix) and the volatile exact-path footer is appended
 // (last line). Agents with no contract (non-phase bridge callers) pass through
 // unchanged. The path is surfaced in the prompt TEXT here, not just in the
@@ -306,12 +314,17 @@ func injectPolicyPrefix(prompt, policy string) string {
 // Resolution runs through a.resolver: built-ins always, plus spec-derived
 // contracts for user/minted phases when a catalog resolver is wired (WS-A). A
 // nil resolver (zero-value Adapter in a test) degrades to built-in-only.
-func (a *Adapter) injectContract(prompt, agent, artifactPath string) string {
+func (a *Adapter) contractResolver() phasecontract.Resolver {
 	resolver := a.resolver
 	if resolver == nil {
 		resolver = phasecontract.BuiltinResolver{}
 	}
-	c, ok := resolver.Resolve(agent)
+	return resolver
+}
+
+func (a *Adapter) injectContract(prompt, contractID, artifactPath string) string {
+	resolver := a.contractResolver()
+	c, ok := resolver.Resolve(contractID)
 	if !ok {
 		if artifactPath == "" {
 			return prompt
@@ -324,7 +337,7 @@ func (a *Adapter) injectContract(prompt, agent, artifactPath string) string {
 		// `evolve phase verify <agent>` self-check that is guaranteed exit 10
 		// for a resolver-miss agent — an impossible instruction, the same
 		// class this branch exists to close (adversarial-review BLOCK).
-		c = phasecontract.Contract{Phase: agent, AgentName: agent, ArtifactName: filepath.Base(artifactPath)}
+		c = phasecontract.Contract{Phase: contractID, AgentName: contractID, ArtifactName: filepath.Base(artifactPath)}
 		return prompt + phasecontract.RenderContractFooter(c, artifactPath)
 	}
 	// ADR-0050 §3.8b: at >=StageAdvisory, instruct build/scout/triage to

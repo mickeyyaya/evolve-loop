@@ -51,7 +51,7 @@ func RenderContractBlockStage(c Contract, includePhaseIO bool) string {
 		if len(c.RequiredKeys) > 0 {
 			fmt.Fprintf(&b, "- It MUST be a valid JSON object containing these top-level keys: %s.\n", quoteJoin(c.RequiredKeys))
 		} else {
-			b.WriteString("- It MUST be a valid JSON object.\n")
+			fmt.Fprintf(&b, "- It MUST be a valid JSON %s.\n", c.TopLevelJSONShape())
 		}
 	default:
 		if names := sectionNames(c.Sections); names != "" {
@@ -117,10 +117,7 @@ func RenderContractTail(c Contract, artifactPath string) string {
 	fmt.Fprintf(&b, "  <artifact-path>%s</artifact-path>\n", artifactPath)
 	switch c.Kind {
 	case KindJSON:
-		// Wording matches the prefix's "valid JSON OBJECT containing these
-		// top-level keys" (review MEDIUM: "a single valid JSON value" also
-		// admits an array or string, which the verifier then rejects).
-		b.WriteString("  <format>a single valid JSON object — write nothing else to this file</format>\n")
+		fmt.Fprintf(&b, "  <format>a single valid JSON %s — write nothing else to this file</format>\n", c.TopLevelJSONShape())
 		if len(c.RequiredKeys) > 0 {
 			b.WriteString("  <required-keys>\n")
 			for _, k := range c.RequiredKeys {

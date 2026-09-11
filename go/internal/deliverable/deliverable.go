@@ -322,19 +322,28 @@ func checkStray(res *Result, c phasecontract.Contract, roots phasecontract.Roots
 }
 
 func verifyJSON(res *Result, c phasecontract.Contract, content string) {
-	// No required keys → any valid JSON VALUE passes (object, array, etc.). The
-	// router's routing-plan.json is a bare JSON ARRAY (phase_advisor.go writes
-	// "a strict JSON array"); forcing it through a map[string]… object decode
-	// failed `evolve phase verify router` every cycle (router-contract-bare-
-	// array-vs-plan-key). RequiredKeys, when present, still imply an object.
-	if len(c.RequiredKeys) == 0 {
-		if !json.Valid([]byte(content)) {
-			res.add(CodeInvalidJSON, "not valid JSON")
-		}
+	data := []byte(content)
+	if !json.Valid(data) {
+		res.add(CodeInvalidJSON, "not valid JSON")
 		return
 	}
+
+	shape := c.TopLevelJSONShape()
+	trimmed := strings.TrimSpace(content)
+	if shape == phasecontract.JSONShapeObject && !strings.HasPrefix(trimmed, "{") {
+		res.add(CodeInvalidJSON, "expected a JSON object at the top level")
+		return
+	}
+	if shape == phasecontract.JSONShapeArray && !strings.HasPrefix(trimmed, "[") {
+		res.add(CodeInvalidJSON, "expected a JSON array at the top level")
+		return
+	}
+	if len(c.RequiredKeys) == 0 {
+		return
+	}
+
 	var top map[string]json.RawMessage
-	if err := json.Unmarshal([]byte(content), &top); err != nil {
+	if err := json.Unmarshal(data, &top); err != nil {
 		res.add(CodeInvalidJSON, fmt.Sprintf("not valid JSON object: %v", err))
 		return
 	}

@@ -3,7 +3,7 @@ package phasecontract
 import "path/filepath"
 
 // This file extends the phasecontract SSOT (see contract.go) from "report
-// section headings" to a full per-agent Contract: WHERE the deliverable is
+// section headings" to a full per-protocol Contract: WHERE the deliverable is
 // written, WHAT kind it is, and the well-formedness rules. It is consumed by
 // the shared go/internal/deliverable package (the `evolve phase verify`
 // self-check AND the host-side contract gate run the SAME checks against this
@@ -20,6 +20,28 @@ const (
 	KindMarkdown Kind = iota
 	KindJSON
 )
+
+// JSONShape constrains the top-level value of a JSON deliverable. JSONShapeAny
+// is the zero value so existing and user-defined contracts retain their legacy
+// behavior unless they opt into an object or array protocol.
+type JSONShape int
+
+const (
+	JSONShapeAny JSONShape = iota
+	JSONShapeObject
+	JSONShapeArray
+)
+
+func (s JSONShape) String() string {
+	switch s {
+	case JSONShapeObject:
+		return "object"
+	case JSONShapeArray:
+		return "array"
+	default:
+		return "value"
+	}
+}
 
 // Roots carries the three real directories an artifact can live in. A Contract's
 // WriteTarget selects which one ArtifactPath joins against. EvolveDir is the
@@ -75,7 +97,8 @@ type Contract struct {
 	ExplanationSections []Section
 	Verdicts            []string // markdown only — allowed verdict tokens
 	RequiredKeys        []string // json only — minimal required top-level keys
-	WriteTarget         string   // one of Target*
+	JSONShape           JSONShape
+	WriteTarget         string // one of Target*
 	// RequireFailureContext makes a FAIL/WARN verdict sentinel without a
 	// structured failure block a violation (ADR-0039 §7) — the correction
 	// loop then re-dispatches with the exact fix. Applies only to
@@ -111,6 +134,15 @@ type Contract struct {
 	NoArtifact bool
 }
 
+// TopLevelJSONShape returns the explicit shape, or object for legacy keyed
+// contracts because top-level keys can only be enforced on an object.
+func (c Contract) TopLevelJSONShape() JSONShape {
+	if c.JSONShape == JSONShapeAny && len(c.RequiredKeys) > 0 {
+		return JSONShapeObject
+	}
+	return c.JSONShape
+}
+
 // ArtifactPath resolves the absolute path the agent must write to, joining the
 // ArtifactName against the root selected by WriteTarget.
 func (c Contract) ArtifactPath(r Roots) string {
@@ -127,10 +159,10 @@ func (c Contract) ArtifactPath(r Roots) string {
 // section presence, so their contracts leave Verdicts nil).
 var verdictsPassFailWarnSkp = []string{"PASS", "FAIL", "WARN", "SKIPPED"}
 
-// contracts is the registry: the 6 phase agents + the advisor (LLM routing
-// brain, JSON deliverable) + the orchestrator (host-side driver, validates its
-// own cycle-state.json). Section sets are wired from the Report vars in
-// contract.go so the headings stay single-sourced.
+// contracts is the registry for built-in deliverable protocols. A shared agent
+// can own multiple protocols (the router's plan, replan, and proposal), while
+// each protocol keeps one exact artifact and shape. Section sets are wired from
+// the Report vars in contract.go so the headings stay single-sourced.
 var contracts = map[string]Contract{
 	// build/scout/tdd/intent/triage classify on SECTION presence, not a verdict
 	// token (only audit extracts a verdict). Leaving Verdicts nil keeps the
@@ -170,22 +202,32 @@ var contracts = map[string]Contract{
 		Kind: KindMarkdown, Sections: Triage.Sections, Verdicts: nil,
 		WriteTarget: TargetWorkspace, RequireFailureContextPhaseIO: true,
 	},
-	// The routing brain (PhaseAdvisor) dispatches with Agent="router" (persona
-	// agents/evolve-router.md, profile router.json) and writes routing-plan.json
-	// in whole-cycle Plan mode. Keyed by the wire identity "router" so the bridge
-	// injects the contract; "advisor" resolves here too via aliases.
+	// The routing brain (PhaseAdvisor) keeps AgentName="router" for its shared
+	// persona and model policy, while each protocol has its own contract identity
+	// and artifact. Keeping those identities distinct prevents a proposal or
+	// replan self-check from validating a stale whole-cycle plan.
 	"router": {
 		Phase: "router", AgentName: "router", ArtifactName: "routing-plan.json",
 		// routing-plan.json is a BARE JSON ARRAY (PhaseAdvisor.Plan writes "a
 		// strict JSON array"; the consumer parses an array). No required keys —
 		// an array has none. The prior RequiredKeys=["plan"] expected an object
 		// and failed `evolve phase verify router` every cycle.
-		Kind: KindJSON, RequiredKeys: nil,
+		Kind: KindJSON, JSONShape: JSONShapeArray,
+		WriteTarget: TargetWorkspace,
+	},
+	"router-replan": {
+		Phase: "router-replan", AgentName: "router", ArtifactName: "routing-replan.json",
+		Kind: KindJSON, JSONShape: JSONShapeArray,
+		WriteTarget: TargetWorkspace,
+	},
+	"router-proposal": {
+		Phase: "router-proposal", AgentName: "router", ArtifactName: "routing-proposal.json",
+		Kind: KindJSON, JSONShape: JSONShapeObject,
 		WriteTarget: TargetWorkspace,
 	},
 	"orchestrator": {
 		Phase: "orchestrator", AgentName: "orchestrator", ArtifactName: "cycle-state.json",
-		Kind: KindJSON, RequiredKeys: []string{"cycle_id", "phase"},
+		Kind: KindJSON, RequiredKeys: []string{"cycle_id", "phase"}, JSONShape: JSONShapeObject,
 		WriteTarget: TargetEvolveDir,
 	},
 	// retro and build-planner have real artifacts and real backfill paths but

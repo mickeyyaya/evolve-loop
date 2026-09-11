@@ -107,6 +107,31 @@ func TestPhaseVerify_Advisor_EvolveDirDefault(t *testing.T) {
 	}
 }
 
+func TestPhaseVerify_RouterProtocolsUseOwnArtifact(t *testing.T) {
+	tests := []struct {
+		contract string
+		artifact string
+		content  string
+	}{
+		{contract: "router", artifact: "routing-plan.json", content: `[{"phase":"build"}]`},
+		{contract: "router-replan", artifact: "routing-replan.json", content: `[{"phase":"audit"}]`},
+		{contract: "router-proposal", artifact: "routing-proposal.json", content: `{"next_phase":"audit"}`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.contract, func(t *testing.T) {
+			ws := t.TempDir()
+			if err := os.WriteFile(filepath.Join(ws, tt.artifact), []byte(tt.content), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			code, _, errb := runVerify(t, tt.contract, "--workspace="+ws)
+			if code != 0 {
+				t.Errorf("exit=%d want 0; stderr=%s", code, errb)
+			}
+		})
+	}
+}
+
 // TestPhaseVerify_FailureContextPhaseIO_RespectsStage — Phase 3.8 (ADR-0050):
 // the self-check runs the SAME PhaseIO-gated logic the host gate does (the
 // package's no-drift invariant). A build report that self-reports FAIL without a
