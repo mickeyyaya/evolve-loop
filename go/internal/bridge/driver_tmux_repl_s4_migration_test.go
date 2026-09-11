@@ -106,7 +106,7 @@ func TestRunTmuxREPL_ProgressedFromCenter(t *testing.T) {
 }
 
 // checkpointRegionSource extracts the stop-review checkpoint block from
-// driver_tmux_repl.go, anchored on the two stable comment/line markers that
+// driver_tmux_wait.go, anchored on the two stable comment/line markers that
 // bracket it, so a future reflow can't silently narrow (or widen) the scanned
 // region without also updating this test.
 func checkpointRegionSource(t *testing.T) string {
@@ -115,9 +115,9 @@ func checkpointRegionSource(t *testing.T) string {
 	if !ok {
 		t.Fatal("could not resolve this test file's path via runtime.Caller")
 	}
-	src, err := os.ReadFile(filepath.Join(filepath.Dir(thisFile), "driver_tmux_repl.go"))
+	src, err := os.ReadFile(filepath.Join(filepath.Dir(thisFile), "driver_tmux_wait.go"))
 	if err != nil {
-		t.Fatalf("read driver_tmux_repl.go: %v", err)
+		t.Fatalf("read driver_tmux_wait.go: %v", err)
 	}
 	lines := strings.Split(string(src), "\n")
 
@@ -133,7 +133,7 @@ func checkpointRegionSource(t *testing.T) string {
 		}
 	}
 	if start == -1 || end == -1 {
-		t.Fatal("could not locate the stop-review checkpoint region markers in driver_tmux_repl.go")
+		t.Fatal("could not locate the stop-review checkpoint region markers in driver_tmux_wait.go")
 	}
 	return strings.Join(lines[start:end+1], "\n")
 }
