@@ -56,6 +56,7 @@ func (w replWaiter) deliverArtifactNudge(state *replWaitState, elapsed int) chec
 	outcome := verifySubmitted(w.ctx, w.deps, w.launch, w.prefix, "nudge", nudgePane, nudgeMsg)
 	recordSubmitVerify(w.recorder, w.phaseName, w.cfg.Cycle, "nudge", outcome)
 	if outcome.Result == interaction.ResultSubmitWedged {
+		state.submitWedged = true
 		state.lastVerdict.Reason = fmt.Sprintf("nudge %s (resends=%d)", outcome.Result, outcome.Resends)
 		return checkpointStopWaiting
 	}

@@ -286,12 +286,18 @@ An artifact-timeout death emits ONE self-describing marker line on stderr,
 which `Engine.Launch` lifts verbatim as the recorded cause:
 
 ```
-[bridge] artifact-timeout: phase=router waited=600s interval=300s extends_used=1 \
-  max_extends=4 last_review=pause liveness=idle progressed=false busy=false \
-  transient=true reason="agent produced no output"
+[bridge] artifact-timeout: cause=transient_upstream reason="agent produced no output" \
+  phase=router cycle=1526 driver=claude-tmux artifact="router-output.json" \
+  waited=600s interval=300s extends_used=1 max_extends=4 last_review=pause \
+  liveness=idle progressed=false busy=false transient=true detector_error=""
 ```
 
-Read `transient=` before anything else:
+Read `cause=` first. It distinguishes cancellation, a terminal completion
+detector error, verified submission wedge, manifest-recognized upstream error,
+reviewer stop, reviewer pause, and an unclassified incomplete wait. The full
+field guide is in
+[phase-timing-and-diagnostics.md](phase-timing-and-diagnostics.md#tmux-artifact-timeout-context).
+For older records without `cause`, read `transient=` before anything else:
 
 - `transient=true` — the pane carried a recognized TEMPORARY upstream failure
   (an overloaded/unavailable/erroring server). The agent did not wedge; the

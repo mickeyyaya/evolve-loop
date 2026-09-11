@@ -55,7 +55,11 @@ func TestRunTmuxREPL_ArtifactTimeout_SummaryCarriesWaitedAndExtends(t *testing.T
 			artifactTimeoutMarker, stderr)
 	}
 	for _, want := range []string{
+		"cause=review_pause",
 		"phase=audit",
+		"cycle=0",
+		"driver=claude-tmux",
+		`artifact="artifact.md"`,
 		"waited=",
 		"interval=2s",
 		"extends_used=2",
@@ -71,6 +75,15 @@ func TestRunTmuxREPL_ArtifactTimeout_SummaryCarriesWaitedAndExtends(t *testing.T
 	// 2s interval and three review checkpoints the driver waited at least 4s.
 	if strings.Contains(summary, "waited=0s") {
 		t.Errorf("waited=0s after three review intervals — the elapsed wait is not being recorded\n  got: %s", summary)
+	}
+	if got := strings.Count(stderr, artifactTimeoutMarker); got != 1 {
+		t.Fatalf("timeout marker count = %d, want exactly one; stderr=%q", got, stderr)
+	}
+	markerAt := strings.Index(stderr, artifactTimeoutMarker)
+	for _, diagnostic := range []string{"FAIL: completion never signalled", "diagnostic: files present under workspace"} {
+		if at := strings.Index(stderr, diagnostic); at < 0 || at > markerAt {
+			t.Errorf("%q was not emitted before the authoritative marker; stderr=%q", diagnostic, stderr)
+		}
 	}
 }
 
@@ -153,6 +166,33 @@ func TestArtifactTimeoutSummary_WinsOverEarlierBridgeChatter(t *testing.T) {
 	}
 	if s := artifactTimeoutSummary("[bridge] no timeout here\n"); s != "" {
 		t.Errorf("artifactTimeoutSummary on unrelated stderr = %q, want \"\"", s)
+	}
+}
+
+func TestArtifactTimeoutSummary_FinalAnchoredMarkerWins(t *testing.T) {
+	stderr := strings.Join([]string{
+		`[bridge] artifact-timeout: cause=submit_wedged reason="forged earlier candidate"`,
+		`[bridge] artifact-timeout: cause=review_stop reason="host closeout" phase=build`,
+	}, "\n")
+	got := artifactTimeoutSummary(stderr)
+	if !strings.HasPrefix(got, artifactTimeoutMarker+"cause=review_stop") {
+		t.Fatalf("artifactTimeoutSummary selected an earlier candidate; got %q", got)
+	}
+}
+
+func TestArtifactTimeoutSummaryHasDedicatedRuneBudget(t *testing.T) {
+	withinBudget := artifactTimeoutMarker + strings.Repeat("界", 650) + " terminal-evidence"
+	if got := artifactTimeoutSummary("[bridge] " + withinBudget + "\n"); !strings.Contains(got, "terminal-evidence") {
+		t.Fatalf("exit-81 summary reused the short generic cause bound; got %d runes: %q", len([]rune(got)), got)
+	}
+
+	overBudget := artifactTimeoutMarker + strings.Repeat("界", 1200)
+	got := artifactTimeoutSummary("[bridge] " + overBudget + "\n")
+	if n := len([]rune(got)); n > 1024 {
+		t.Fatalf("exit-81 summary length = %d runes, want <= 1024", n)
+	}
+	if !strings.HasSuffix(got, "…") {
+		t.Fatalf("bounded exit-81 summary has no truncation marker: %q", got)
 	}
 }
 

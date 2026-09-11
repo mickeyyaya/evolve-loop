@@ -83,6 +83,9 @@ func TestRunTmuxREPL_ArtifactTimeout_MarkerFlagsTransientOnLivePane(t *testing.T
 		t.Errorf("the timeout summary does not report the transient upstream error the pane states verbatim — "+
 			"a reader (and the router) cannot tell this 600s burn from a genuine wedge\n  got: %s", summary)
 	}
+	if !strings.Contains(summary, "cause=transient_upstream") {
+		t.Errorf("the recognized upstream failure lacks a stable cause code; summary=%q", summary)
+	}
 	// The added field must be driver-authored, never raw pane text (F1
 	// indirect-prompt-injection hazard): no provider prose may ride the cause.
 	if strings.Contains(summary, "Overloaded") || strings.Contains(summary, "status.claude.com") {

@@ -90,6 +90,140 @@ func TestRunTmuxREPL_CompletionDetectorErrorIsReportedOnce(t *testing.T) {
 	if !strings.Contains(stderr.String(), "not a directory") {
 		t.Fatalf("detector warning omitted relocation cause; stderr:\n%s", stderr.String())
 	}
+	summary := artifactTimeoutSummary(stderr.String())
+	if !strings.Contains(summary, "cause=completion_detector_error") {
+		t.Errorf("terminal detector failure lost its cause code; summary=%q", summary)
+	}
+	if !strings.Contains(summary, `detector_error="`) || !strings.Contains(summary, "not a directory") {
+		t.Errorf("terminal detector failure lost its concrete error; summary=%q", summary)
+	}
+}
+
+func TestRunTmuxREPL_DetectorErrorThenIncompleteStopRetainsSecondaryEvidence(t *testing.T) {
+	fx := newFixture(t, "claude-tmux", "")
+	blockedParent := filepath.Join(fx.ws, "blocked")
+	fx.artifact = filepath.Join(blockedParent, "artifact.md")
+	fallback := filepath.Join(fx.ws, "workspace", filepath.Base(fx.artifact))
+	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}
+	reviewer := &scriptedReviewer{verdicts: []ReviewVerdict{{Action: ReviewStop, Reason: "reviewer stopped an incomplete wait"}}}
+
+	waitTicks := 0
+	sleep := func(delay time.Duration) {
+		if delay != 2*time.Second {
+			return
+		}
+		waitTicks++
+		switch waitTicks {
+		case 1:
+			if err := os.RemoveAll(blockedParent); err != nil {
+				t.Fatalf("replace canonical parent: %v", err)
+			}
+			if err := os.WriteFile(blockedParent, []byte("not a directory"), 0o644); err != nil {
+				t.Fatalf("block canonical parent: %v", err)
+			}
+			if err := os.MkdirAll(filepath.Dir(fallback), 0o755); err != nil {
+				t.Fatalf("create fallback parent: %v", err)
+			}
+			if err := os.WriteFile(fallback, []byte("deliverable at fallback"), 0o644); err != nil {
+				t.Fatalf("write fallback artifact: %v", err)
+			}
+		case 3:
+			if err := os.Remove(fallback); err != nil {
+				t.Fatalf("remove fallback after detector error: %v", err)
+			}
+		}
+	}
+
+	eng := newTestEngine(Deps{
+		Tmux:               tmux,
+		Sleep:              sleep,
+		Reviewer:           reviewer,
+		ArtifactTimeoutS:   8,
+		ArtifactMaxExtends: 1,
+		CaptureBaseline:    zeroBaselineCapture,
+	})
+	var stdout, stderr bytes.Buffer
+	code := eng.LaunchArgs(context.Background(),
+		fx.args("claude-tmux", "--allow-bypass", "--agent=build"), nil, &stdout, &stderr)
+
+	if code != ExitArtifactTimeout {
+		t.Fatalf("exit = %d, want ExitArtifactTimeout; stderr:\n%s", code, stderr.String())
+	}
+	summary := artifactTimeoutSummary(stderr.String())
+	if !strings.Contains(summary, "cause=review_stop") {
+		t.Errorf("error-free terminal observation did not yield to reviewer stop; summary=%q", summary)
+	}
+	if !strings.Contains(summary, `detector_error="`) || !strings.Contains(summary, "not a directory") {
+		t.Errorf("prior detector failure was not retained as secondary evidence; summary=%q", summary)
+	}
+}
+
+func TestRunTmuxREPL_DetectorErrorThenConfirmedCompletionHasNoTimeoutDiagnostic(t *testing.T) {
+	fx := newFixture(t, "claude-tmux", "")
+	blockedParent := filepath.Join(fx.ws, "blocked")
+	fx.artifact = filepath.Join(blockedParent, "artifact.md")
+	fallback := filepath.Join(fx.ws, "workspace", filepath.Base(fx.artifact))
+	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}
+	reviewer := &scriptedReviewer{verdicts: []ReviewVerdict{{Action: ReviewStop, Reason: "must not run"}}}
+
+	waitTicks := 0
+	sleep := func(delay time.Duration) {
+		if delay != 2*time.Second {
+			return
+		}
+		waitTicks++
+		switch waitTicks {
+		case 1:
+			if err := os.RemoveAll(blockedParent); err != nil {
+				t.Fatalf("replace canonical parent: %v", err)
+			}
+			if err := os.WriteFile(blockedParent, []byte("not a directory"), 0o644); err != nil {
+				t.Fatalf("block canonical parent: %v", err)
+			}
+			if err := os.MkdirAll(filepath.Dir(fallback), 0o755); err != nil {
+				t.Fatalf("create fallback parent: %v", err)
+			}
+			if err := os.WriteFile(fallback, []byte("deliverable at fallback"), 0o644); err != nil {
+				t.Fatalf("write fallback artifact: %v", err)
+			}
+		case 3:
+			if err := os.Remove(fallback); err != nil {
+				t.Fatalf("remove fallback after detector error: %v", err)
+			}
+			if err := os.Remove(blockedParent); err != nil {
+				t.Fatalf("remove canonical blocker: %v", err)
+			}
+			if err := os.MkdirAll(blockedParent, 0o755); err != nil {
+				t.Fatalf("create canonical parent: %v", err)
+			}
+			body := "<!-- challenge-token: " + fx.token + " -->\nDONE\n"
+			if err := os.WriteFile(fx.artifact, []byte(body), 0o644); err != nil {
+				t.Fatalf("write canonical artifact: %v", err)
+			}
+		}
+	}
+
+	eng := newTestEngine(Deps{
+		Tmux:               tmux,
+		Sleep:              sleep,
+		Reviewer:           reviewer,
+		ArtifactTimeoutS:   20,
+		ArtifactMaxExtends: 1,
+		CaptureBaseline:    zeroBaselineCapture,
+	})
+	var stdout, stderr bytes.Buffer
+	code := eng.LaunchArgs(context.Background(),
+		fx.args("claude-tmux", "--allow-bypass", "--agent=build"), nil, &stdout, &stderr)
+
+	if code != ExitOK {
+		t.Fatalf("exit = %d, want ExitOK after confirmed completion; stderr:\n%s", code, stderr.String())
+	}
+	if len(reviewer.events) != 0 {
+		t.Fatalf("reviewer ran after completion: %+v", reviewer.events)
+	}
+	if strings.Contains(stderr.String(), artifactTimeoutMarker) {
+		t.Fatalf("successful completion emitted a timeout diagnostic; stderr=%q", stderr.String())
+	}
 }
 
 func TestRunTmuxREPL_OrdinaryCompletionPrecedesTickEffects(t *testing.T) {

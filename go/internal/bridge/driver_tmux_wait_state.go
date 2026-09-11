@@ -1,8 +1,6 @@
 package bridge
 
 import (
-	"fmt"
-	"io"
 	"path/filepath"
 	"time"
 
@@ -27,21 +25,41 @@ type replWaitState struct {
 	fatalDetector   *recovery.FatalPaneDetector
 	detector        completionDetector
 
-	lastEvent             StopEvent
-	lastVerdict           ReviewVerdict
-	completed             bool
-	transientShortcircuit bool
-	nudgeSent             bool
-	nudgeEvent            *interaction.Event
-	nudgeAt               time.Time
-	detectorErrorLogged   bool
-	attempt               int
-	intervalStartS        int
-	waitedS               int
+	lastEvent               StopEvent
+	lastVerdict             ReviewVerdict
+	completed               bool
+	transientShortcircuit   bool
+	nudgeSent               bool
+	submitWedged            bool
+	nudgeEvent              *interaction.Event
+	nudgeAt                 time.Time
+	detectorErrorLogged     bool
+	terminalDetectorErrored bool
+	lastDetectorErr         error
+	cancellationErr         error
+	attempt                 int
+	intervalStartS          int
+	waitedS                 int
 
 	checkpointExhaustion *exhaustionGate
 	checkpointWall       *checkpointWallState
 	checkpointFatal      *fatalPaneGate
+}
+
+// observeDetector records the latest observation separately from the last
+// concrete fault. A later error-free incomplete poll changes terminal cause
+// selection without erasing useful earlier evidence.
+func (s *replWaitState) observeDetector(err error) bool {
+	s.terminalDetectorErrored = err != nil
+	if err == nil {
+		return false
+	}
+	s.lastDetectorErr = err
+	if s.detectorErrorLogged {
+		return false
+	}
+	s.detectorErrorLogged = true
+	return true
 }
 
 type replWaitResult struct {
@@ -117,12 +135,4 @@ func (s *replWaitState) recordNudgeOutcome(recorder *interaction.Recorder, now f
 		Result:    result,
 		LatencyMS: now().Sub(s.nudgeAt).Milliseconds(),
 	})
-}
-
-func (s *replWaitState) writeArtifactTimeoutMarker(stderr io.Writer, phaseName string, transient bool) {
-	fmt.Fprintf(stderr,
-		"[bridge] %sphase=%s waited=%ds interval=%ds extends_used=%d max_extends=%d last_review=%s liveness=%s progressed=%v busy=%v transient=%v reason=%q\n",
-		artifactTimeoutMarker, phaseName, s.waitedS, s.intervalS, s.attempt, s.maxExtends,
-		reviewActionOrNone(s.lastVerdict.Action), livenessOrUnknown(s.lastEvent.State),
-		s.lastEvent.Progressed, s.lastEvent.Busy, transient, s.lastVerdict.Reason)
 }

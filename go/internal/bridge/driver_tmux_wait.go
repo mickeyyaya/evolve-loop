@@ -38,11 +38,9 @@ func newReplInboxCursor(cfg *Config) *inbox.Cursor {
 
 func (w replWaiter) wait() (replWaitResult, int) {
 	ctx := w.ctx
-	cfg := w.cfg
 	deps := w.deps
 	lp := w.launch
 	pfx := w.prefix
-	phaseName := w.phaseName
 	ar := w.responder
 	irec := w.recorder
 	channel := w.channel
@@ -77,8 +75,9 @@ func (w replWaiter) wait() (replWaitResult, int) {
 			// explicit finality marker artifactDetector's short-circuit now keys on
 			// (a live ctx alone would have disarmed it — completion.go).
 			finalCtx, finalCancel := withFinalPoll(ctx)
-			ready, _, note, _ := state.detector.poll(finalCtx)
+			ready, _, note, detectorErr := state.detector.poll(finalCtx)
 			finalCancel()
+			logDetectorError := state.observeDetector(detectorErr)
 			if ready {
 				state.completed = true
 				if note != "" {
@@ -87,9 +86,13 @@ func (w replWaiter) wait() (replWaitResult, int) {
 				fmt.Fprintf(deps.Stderr, "%s context cancelled (%v) AFTER completion — benign teardown of a finished session\n", pfx, err)
 				break
 			}
+			if logDetectorError {
+				fmt.Fprintf(deps.Stderr, "%s WARN: completion detector: %v\n", pfx, detectorErr)
+			}
 			// Load-bearing once a Stage-1 LLM reviewer can extend at length:
 			// stop waiting promptly rather than running out the extend budget.
 			fmt.Fprintf(deps.Stderr, "%s context cancelled (%v) — abandoning completion wait\n", pfx, err)
+			state.cancellationErr = err
 			break
 		}
 		// Live channel: stream newly-stabilized rendered content to pane.live.
@@ -110,6 +113,7 @@ func (w replWaiter) wait() (replWaitResult, int) {
 			}
 		}
 		ready, _, note, derr := state.detector.poll(ctx)
+		logDetectorError := state.observeDetector(derr)
 		if ready {
 			state.completed = true
 			if note != "" {
@@ -117,13 +121,12 @@ func (w replWaiter) wait() (replWaitResult, int) {
 			}
 			break
 		}
-		if derr != nil && !state.detectorErrorLogged {
+		if logDetectorError {
 			// The detector surfaced a fault (e.g. an artifact present at a
 			// non-canonical path that could not be relocated — read-only
 			// workspace). Surface it once, immediately, instead of spinning the
 			// full wait window with no signal.
 			fmt.Fprintf(deps.Stderr, "%s WARN: completion detector: %v\n", pfx, derr)
-			state.detectorErrorLogged = true
 		}
 		waitCaptureOK := true
 		if !channel.on {
@@ -152,78 +155,5 @@ func (w replWaiter) wait() (replWaitResult, int) {
 			}
 		}
 	}
-	if !state.completed {
-		fmt.Fprintf(deps.Stderr, "%s FAIL: completion never signalled (artifact %s; stop-review paused after %d interval(s) of %ds)\n", pfx, cfg.Artifact, state.attempt+1, state.intervalS)
-		fmt.Fprintf(deps.Stderr, "%s diagnostic: files present under workspace %s:\n", pfx, cfg.Workspace)
-		for _, line := range listWorkspaceFiles(cfg.Workspace) {
-			fmt.Fprintf(deps.Stderr, "%s   %s\n", pfx, line)
-		}
-		// Pause (ambiguous stall) and Stop (typed fatal fast-fail, ADR-0044
-		// C2) both leave the operator-facing escalation report; extend keeps
-		// the legacy no-report behavior.
-		if state.lastVerdict.Action == ReviewPause || state.lastVerdict.Action == ReviewStop {
-			_ = writeEscalationReport(cfg.Workspace, phaseName, cfg.Cycle, state.lastEvent, state.lastVerdict)
-		}
-		// Fail-loud drift alarm (exhaustion_drift.go): if this timed-out pane looks
-		// like a quota wall the exhausted_regex missed, the wall wording may have
-		// drifted ahead of the pattern — surface it now so the NEXT drift is caught
-		// in one cycle, not eight (as the per-model wording change was). Diagnostic
-		// only; the exit-81 verdict stands.
-		// Scanned on the SAME agent-stripped pane as the primary detector above:
-		// an alarm that scans the raw pane
-		// fires on wall-shaped text the agent merely wrote or echoed, which the real
-		// regex correctly ignored — an operator chasing a regex that is working.
-		strippedPane := strippedForExhaustionScan(state.result.lastGoodPane, ar.injectedPrompt)
-		warnExhaustionRegexDrift(deps.Stderr, pfx, lp.name, strippedPane, state.paneProfile.ExhaustedRegex)
-		// Transient-upstream recognition (inbox item
-		// transient-api-error-invisible-inside-artifact-timeout): 3 of 4 observed
-		// router stalls (cycles 1523/1524/1526) spent the FULL silence budget on a
-		// pane reading "API Error: 529 Overloaded … usually temporary" — a failure
-		// no path recognizes. It is not a quota wall (exhausted_regex correctly
-		// ignores it) and not a transient exit code (80/85/86). The distinguishing
-		// evidence was already captured right here and simply never consulted.
-		//
-		// Family-agnostic by construction: the pattern is resolved from the
-		// LAUNCHED cli's manifest (lp.name), so every CLI family declares its own
-		// provider's transient signature and none of that vocabulary is hard-coded
-		// here. A family that declares none is fail-open, not misreported.
-		//
-		// Carried as ONE driver-authored field on the marker line below, NOT as a
-		// second cause candidate: extending that line means it can never displace
-		// artifactTimeoutSummary's selection, so the class of regression where the
-		// drift alarm or a workspace listing outranks the timeout summary stays
-		// structurally unreachable. The exit code is untouched — 81 remains
-		// non-transient (transient-bridge-retry AC-1) and the discrimination rides
-		// the cause as data. A bool, never pane text, also keeps agent-authored
-		// content out of the recorded cause (F1 indirect-prompt-injection).
-		//
-		// Scanned on the SAME agent-stripped pane as the drift alarm above: a raw
-		// scan fires on error text the agent merely quoted, flagging a working
-		// agent's own prose as an upstream outage.
-		transient := classifyTransientPane(lp.name, strippedPane)
-		// Self-describing death (inbox item deep-phase-artifact-budget-too-small):
-		// exit 81 alone says nothing, and the diagnostic file listing printed above
-		// used to become the recorded cause. This ONE marker line carries how long
-		// the wait ran and how much of the extend budget it consumed, so the next
-		// reader can separate "too slow — raise bridge.phase_artifact_timeout_s for
-		// this phase" (extends_used == max_extends while the agent was busy) from
-		// "wedged" (paused early, idle, no progress). The phase= field is
-		// cfg.Agent — the SAME key bridge.phase_artifact_timeout_s is indexed on —
-		// so the remedy is copy-pasteable from the diagnostic. Emitted LAST so it
-		// is also the final stderr line, and lifted into the error by Engine.Launch.
-		state.writeArtifactTimeoutMarker(deps.Stderr, phaseName, transient)
-		if state.transientShortcircuit && ctx.Err() == nil {
-			// Deliberately a plain blocking pause: it throttles re-dispatch
-			// against a provider that just spent 60s saying "overloaded", and
-			// under cliadmit it holds this family's slot for the cooldown —
-			// which IS the point during a provider-wide 529 storm. The ctx
-			// guard skips it when the run is already cancelled; a mid-sleep
-			// cancel waits out at most 15s, bounded and small against the
-			// budget this path just saved.
-			deps.Sleep(transientRedispatchDelay)
-		}
-		return state.result, ExitArtifactTimeout
-	}
-
-	return state.result, ExitOK
+	return w.closeout(state)
 }

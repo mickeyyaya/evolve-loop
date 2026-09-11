@@ -67,7 +67,7 @@ func TestTmuxREPL_CancelAfterDeliverable_CompletesNotTimeout(t *testing.T) {
 	eng := NewEngine(Deps{Tmux: tmux, Sleep: sleep, LookupEnv: mapLookup(nil)})
 
 	var stdout bytes.Buffer
-	code := eng.LaunchArgs(ctx, fx.args("claude-tmux", "--allow-bypass"), nil, &stdout, &stderr)
+	code := eng.LaunchArgs(ctx, fx.args("claude-tmux", "--allow-bypass", "--agent=build", "--cycle=17"), nil, &stdout, &stderr)
 
 	if !fired {
 		t.Fatal("test harness defect: the cancel-after-deliverable injection never fired (boot marker not seen)")
@@ -112,7 +112,7 @@ func TestTmuxREPL_CancelWithoutDeliverable_StillTimesOut(t *testing.T) {
 	eng := NewEngine(Deps{Tmux: tmux, Sleep: sleep, LookupEnv: mapLookup(nil)})
 
 	var stdout bytes.Buffer
-	code := eng.LaunchArgs(ctx, fx.args("claude-tmux", "--allow-bypass"), nil, &stdout, &stderr)
+	code := eng.LaunchArgs(ctx, fx.args("claude-tmux", "--allow-bypass", "--agent=build", "--cycle=17"), nil, &stdout, &stderr)
 
 	if !fired {
 		t.Fatal("test harness defect: the cancel injection never fired (boot marker not seen)")
@@ -120,5 +120,59 @@ func TestTmuxREPL_CancelWithoutDeliverable_StillTimesOut(t *testing.T) {
 	if code != ExitArtifactTimeout {
 		t.Fatalf("exit = %d, want %d (ExitArtifactTimeout — no deliverable, the timeout signal is honest); stderr=%q",
 			code, ExitArtifactTimeout, stderr.String())
+	}
+	summary := artifactTimeoutSummary(stderr.String())
+	for _, want := range []string{
+		"cause=context_cancelled",
+		`reason="context canceled"`,
+		"phase=build",
+		"cycle=17",
+		"driver=claude-tmux",
+		`artifact="artifact.md"`,
+	} {
+		if !strings.Contains(summary, want) {
+			t.Errorf("cancel timeout summary missing %q; summary=%q", want, summary)
+		}
+	}
+}
+
+func TestTmuxREPL_ReviewerStopThenLateCancelKeepsReviewCause(t *testing.T) {
+	fx := newFixture(t, "claude-tmux", "")
+	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	callbackRan := false
+	var stderr bytes.Buffer
+	eng := newTestEngine(Deps{
+		Tmux:               tmux,
+		Sleep:              func(time.Duration) {},
+		Reviewer:           &scriptedReviewer{verdicts: []ReviewVerdict{{Action: ReviewStop, Reason: "reviewer found terminal evidence"}}},
+		ArtifactTimeoutS:   2,
+		ArtifactMaxExtends: 1,
+		OnStopReview: func(_, action, _ string) {
+			if action == string(ReviewStop) {
+				callbackRan = true
+				cancel()
+			}
+		},
+	})
+
+	var stdout bytes.Buffer
+	code := eng.LaunchArgs(ctx,
+		fx.args("claude-tmux", "--allow-bypass", "--agent=build", "--cycle=41"), nil, &stdout, &stderr)
+
+	if code != ExitArtifactTimeout {
+		t.Fatalf("exit = %d, want ExitArtifactTimeout; stderr=%q", code, stderr.String())
+	}
+	if !callbackRan {
+		t.Fatal("test premise failed: stop-review callback did not cancel the context")
+	}
+	summary := artifactTimeoutSummary(stderr.String())
+	if !strings.Contains(summary, "cause=review_stop") {
+		t.Fatalf("late cancellation relabelled reviewer stop; summary=%q", summary)
+	}
+	if strings.Contains(summary, "cause=context_cancelled") {
+		t.Fatalf("reviewer stop was misreported as cancellation; summary=%q", summary)
 	}
 }

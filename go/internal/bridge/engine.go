@@ -812,18 +812,30 @@ func firstDiagnosticLine(stderr string) string {
 }
 
 // artifactTimeoutSummary lifts the artifact wait's self-describing summary line
-// out of a launch's stderr, matching on artifactTimeoutMarker rather than on
-// position: a real launch emits `[bridge] WARN:` sandbox chatter BEFORE the wait,
-// so the first-`[bridge]`-line rule firstDiagnosticLine uses would report that
-// WARN as the timeout's cause. Returns "" when the driver produced no summary
+// out of a launch's stderr. The exact [bridge] prefix identifies marker
+// candidates rather than inline evidence. The final candidate wins because
+// earlier free-form diagnostics are sanitized and closeout emits the
+// authoritative marker last. Returns "" when the driver produced no summary
 // (e.g. a non-tmux driver returning 81), leaving the legacy cause in place.
 func artifactTimeoutSummary(stderr string) string {
-	for _, line := range strings.Split(stderr, "\n") {
-		if i := strings.Index(line, artifactTimeoutMarker); i >= 0 {
-			return boundCause(strings.TrimSpace(line[i:]))
+	prefix := "[bridge] " + artifactTimeoutMarker
+	summary := ""
+	for _, rawLine := range strings.Split(stderr, "\n") {
+		line := strings.TrimSpace(rawLine)
+		if strings.HasPrefix(line, prefix) {
+			summary = boundArtifactTimeoutSummary(strings.TrimPrefix(line, "[bridge] "))
 		}
 	}
-	return ""
+	return summary
+}
+
+func boundArtifactTimeoutSummary(line string) string {
+	const maxRunes = 1024
+	runes := []rune(line)
+	if len(runes) <= maxRunes {
+		return line
+	}
+	return string(runes[:maxRunes-1]) + "…"
 }
 
 // boundCause caps the cause line rune-safely (never split UTF-8 mid-sequence).
