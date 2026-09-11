@@ -105,3 +105,33 @@ func TestTmuxREPL_ContentWall_SuppressedByCorroborator(t *testing.T) {
 		t.Errorf("the suppression must be loud in driver stderr; stderr=%q", stderr.String())
 	}
 }
+
+func TestTmuxREPL_CheckpointExhaustionCorroboratesIndependently(t *testing.T) {
+	fx := newFixture(t, "claude-tmux", "")
+	walled := "❯\nYou've reached your Fable 5 limit. Run /usage-credits to continue or switch models with /model.\n❯"
+	tmux := &fakeTmux{paneSeq: []string{walled}}
+	reviewer := &scriptedReviewer{verdicts: []ReviewVerdict{{Action: ReviewExtend, Reason: "first checkpoint continues"}}}
+	probes := 0
+	corroborate := func(context.Context, string) bool {
+		probes++
+		return probes == 2
+	}
+
+	code, stderr := runTmuxOnStopReview(t, fx, tmux, reviewer, nil, Deps{
+		ArtifactTimeoutS: 2,
+		CorroborateWall:  corroborate,
+	}, "--allow-bypass")
+
+	if code != ExitUnknownPrompt {
+		t.Fatalf("exit = %d, want ExitUnknownPrompt from checkpoint corroboration; stderr=%q", code, stderr)
+	}
+	if probes != 2 {
+		t.Fatalf("wall probes = %d, want 2 independent probes (fast-poll suppression, then checkpoint confirmation)", probes)
+	}
+	if len(reviewer.events) != 1 {
+		t.Fatalf("reviewer calls = %d, want 1 between the checkpoint gate's two observations", len(reviewer.events))
+	}
+	if !strings.Contains(stderr, "EXHAUSTION-SUPPRESSED") || !strings.Contains(stderr, "corroborated by live probe") {
+		t.Fatalf("stderr does not show the independent suppression and confirmation decisions: %q", stderr)
+	}
+}
