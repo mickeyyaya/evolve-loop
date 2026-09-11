@@ -99,10 +99,10 @@ func TestRunTmuxREPL_ProgressedFromCenter(t *testing.T) {
 	}
 }
 
-// checkpointRegionSource loads both sides of the extracted checkpoint
-// boundary. The coordinator owns capture and disposition; the checkpoint
-// module owns liveness evidence and adjudication. Scanning both prevents a
-// future direct chrome parser from hiding on either side of that call seam.
+// checkpointRegionSource loads the extracted checkpoint boundary. The
+// coordinator owns capture, the checkpoint module owns liveness evidence and
+// adjudication, and the disposition module applies the verdict. Scanning all
+// three prevents a future direct chrome parser from hiding across a call seam.
 func checkpointRegionSource(t *testing.T) string {
 	t.Helper()
 	_, thisFile, _, ok := runtime.Caller(0)
@@ -110,7 +110,11 @@ func checkpointRegionSource(t *testing.T) string {
 		t.Fatal("could not resolve this test file's path via runtime.Caller")
 	}
 	var sources []string
-	for _, name := range []string{"driver_tmux_wait.go", "driver_tmux_wait_checkpoint.go"} {
+	for _, name := range []string{
+		"driver_tmux_wait.go",
+		"driver_tmux_wait_checkpoint.go",
+		"driver_tmux_wait_disposition.go",
+	} {
 		src, err := os.ReadFile(filepath.Join(filepath.Dir(thisFile), name))
 		if err != nil {
 			t.Fatalf("read %s: %v", name, err)

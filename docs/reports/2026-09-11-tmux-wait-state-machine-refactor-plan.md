@@ -3,10 +3,10 @@
 **Date:** 2026-09-11
 **Campaign branches:** one isolated branch per functional batch
 **Campaign base:** merged `main` at `774d4c3c`
-**Current batch base:** merged `main` at `e7f1460c`
-**Status:** characterization, state/admission, and tick-interaction batches
-merged; checkpoint evidence/adjudication implemented and under review;
-checkpoint disposition pending
+**Current batch base:** merged `main` at `59668fec`
+**Status:** characterization, state/admission, tick-interaction, and checkpoint
+evidence/adjudication batches merged; checkpoint disposition implemented and
+locally green; terminal closeout pending
 
 ## Objective and scope contract
 
@@ -265,7 +265,10 @@ changed observation order.
    publish the review callback.
 5. **Checkpoint disposition:** apply extension accounting and the bounded
    one-shot nudge as a separate transaction after adjudication.
-6. **Coordinator and documentation:** reduce `wait` to readable orchestration,
+6. **Terminal closeout:** isolate timeout diagnostics, escalation evidence,
+   transient classification, final marker emission, and bounded cooldown while
+   preserving their exact order.
+7. **Coordinator and documentation:** reduce `wait` to readable orchestration,
    rerun metrics, update this report with final topology and evidence, and ship
    only after all reviews pass.
 
@@ -450,13 +453,13 @@ The extracted method owns one transaction:
    configured reviewer only when it does not preempt;
 6. save and log one verdict, then invoke the nil-safe review callback.
 
-The coordinator continues to own checkpoint eligibility, the one fresh pane
-capture, blank-pane recovery, failover return, and all verdict disposition.
-That boundary keeps polling and loop control visible while making evidence and
-adjudication independently callable in a unit test. It also preserves the
-load-bearing order: recover pane, retain/classify evidence, exhaustion exit or
-fatal/reviewer selection, durable fatal outcome, verdict log, callback, then
-disposition.
+At that batch boundary, the coordinator continued to own checkpoint
+eligibility, the one fresh pane capture, blank-pane recovery, failover return,
+and all verdict disposition. That boundary kept polling and loop control
+visible while making evidence and adjudication independently callable in a
+unit test. It also preserved the load-bearing order: recover pane,
+retain/classify evidence, exhaustion exit or fatal/reviewer selection, durable
+fatal outcome, verdict log, callback, then disposition.
 
 The existing S4 anti-bypass guard now reads both
 `driver_tmux_wait.go` and `driver_tmux_wait_checkpoint.go`. A future direct
@@ -509,6 +512,116 @@ go test -count=1 -coverprofile=/tmp/evolve-tmux-checkpoint.cover ./internal/brid
 PASS; Bridge package 93.4% statement coverage
 replWaiter.wait              100.0%
 replWaiter.reviewCheckpoint  100.0%
+
+go test -race -count=1 ./internal/bridge/...
+PASS
+
+go vet ./internal/bridge/...
+PASS
+
+golangci-lint run ./internal/bridge/...
+PASS; 0 issues
+
+go test -tags=integration -count=1 ./internal/bridge \
+  -run '^TestRealTmux_(HappyPath|ArtifactTimeout|NamedSessionResume|ConcurrentSessionsIsolated)$'
+PASS
+
+go test -count=1 ./...
+PASS
+
+go vet ./...
+PASS
+```
+
+## Checkpoint disposition implementation record
+
+The fourth production batch starts from merged main `59668fec` on the isolated
+`refactor/tmux-wait-checkpoint-disposition` branch. It adds
+`driver_tmux_wait_disposition.go` with two package-local methods and an explicit
+two-value result type. `checkpointContinueWaiting` starts another interval;
+`checkpointStopWaiting` ends the completion wait and is deliberately the zero
+value so an unknown action cannot accidentally extend a session.
+
+`applyCheckpointDisposition` owns verdict translation and interval accounting:
+
+1. `ReviewExtend` increments the attempt and moves the interval origin;
+2. `ReviewStop` and unknown actions stop immediately;
+3. `ReviewPause` may nudge only when the reviewer is the existing deterministic
+   value or pointer type, `SignalCenter.Busy(session)` is false, and the
+   one-shot nudge has not already been sent;
+4. every ineligible pause stops without pane I/O.
+
+`deliverArtifactNudge` owns the one cohesive I/O transaction: send the existing
+message, announce it, wait for the existing settle duration, capture once,
+verify bounded submission, record the verification, classify a wedged submit,
+and otherwise retain the deferred nudge outcome before starting one final
+interval. The coordinator now performs capture/recovery, calls
+`reviewCheckpoint`, handles failover, and applies this disposition in that
+order. The review callback remains inside `reviewCheckpoint`, so it is
+structurally published before any disposition effect.
+
+Strict TDD used both the public composition and direct component seams:
+
+```text
+Engine.LaunchArgs composition characterization
+TestRunTmuxREPL_StopReviewCallbackPrecedesNudge
+PASS on unchanged production
+
+temporary mutation: move the pause callback after the nudge SendKeys call
+FAIL: artifact nudge was sent before the pause review callback
+
+restore production and verify both production files have no diff
+PASS
+
+direct component contracts written before the method existed
+TestApplyCheckpointDisposition_ExtendAdvancesInterval
+TestApplyCheckpointDisposition_StopEndsWait
+COMPILE-RED: applyCheckpointDisposition and result constants undefined
+
+extract disposition and nudge delivery, then compose after reviewCheckpoint
+PASS
+
+review-strengthening contracts
+TestApplyCheckpointDisposition_StopActionsDoNotNudge
+temporary mutation: remove the ReviewPause action guard
+FAIL: stop, empty, and unknown actions returned continue and sent a nudge
+
+TestApplyCheckpointDisposition_IdlePauseNudgesAndAdvancesOneInterval
+temporary mutation: remove the successful nudge attempt increment
+FAIL: attempt 2, want 3
+
+TestApplyCheckpointDisposition_WedgedNudgeDoesNotAdvanceInterval
+temporary mutation: account the interval before checking the wedged result
+FAIL: wedged nudge changed attempt 2→3 and interval start 4→10
+
+restore each mutation and run all disposition contracts with -race -count=20
+PASS
+```
+
+The S4 anti-bypass guard now reads the coordinator, adjudication module, and
+disposition module. Moving a direct chrome parser into the new file therefore
+cannot evade the existing `PaneBusy` and `PaneHasSubstantiveChange` prohibition.
+Existing integration contracts continue to prove exactly one nudge, a nudge
+buying one interval, submit verification and bounded Enter resend, deferred
+outcome recording, wedged-nudge cause retention, custom-reviewer pause without
+a nudge, busy deterministic review without a nudge, and fatal-stop preemption.
+
+After extraction, `replWaiter.wait` spans 191 lines, down from 237 after the
+checkpoint batch, 332 after tick interaction, 380 after state/admission, and
+576 before the campaign. `applyCheckpointDisposition` spans 19 lines and
+`deliverArtifactNudge` spans 30 lines in a 74-line single-purpose file. All
+three functions reach 100% statement coverage in the Bridge suite. This batch
+adds no capture, completion poll, sleep, send, file write, goroutine, channel,
+timer, dependency, interface, exported name, or constant-false condition.
+
+Validation before review:
+
+```text
+go test -count=1 -coverprofile=/tmp/evolve-bridge-disposition.cover ./internal/bridge
+PASS; Bridge package 93.4% statement coverage
+replWaiter.wait                         100.0%
+replWaiter.applyCheckpointDisposition  100.0%
+replWaiter.deliverArtifactNudge         100.0%
 
 go test -race -count=1 ./internal/bridge/...
 PASS
@@ -610,3 +723,17 @@ overload a success exit code, the public composition contract is
 mutation-sensitive, and the S4 source guard covers both sides of the extraction
 seam. The only later change is this factual review record; all reviewers must
 confirm the final staged tree before attestation.
+
+For the checkpoint disposition batch, the first review caught three evidence
+defects before ship: inaccurate function lengths, a stop-action fixture that
+was not otherwise eligible to nudge, and missing direct assertions for the
+successful versus wedged nudge interval accounting. The tests and report were
+corrected, and temporary mutations proved each new assertion fails for the
+intended regression. The architecture reviewer, Go code/test reviewer, and
+defensive code-simplifier then returned PASS with no findings on staged tree
+`987c1652ebfedb19df9bd8655538c4bb39b46172`. They confirmed the 191/19/30-line
+metrics, callback-before-effect ordering, SignalCenter authority, I/O order,
+per-launch state ownership, unknown-action rejection, and opposite successful
+and wedged accounting outcomes. This factual review record is the only later
+change; all three reviewers must reconfirm the final staged tree before
+attestation.
