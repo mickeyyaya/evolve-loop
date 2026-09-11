@@ -263,7 +263,7 @@ func mustRepoRoot(t *testing.T) string {
 //   - .evolve/profiles/{intent,scout,triage,tdd,build,audit,retro}.json
 //     (stubs — bridge profile loader only requires `name`)
 //   - .evolve/state.json bootstrapped to cycle 0
-//   - committed Go predicate inputs for native Audit (cycle 1 + durable package)
+//   - committed durable Go predicate input for native Audit
 //
 // The in-process Go bridge resolves paths from the request (no
 // tools/agent-bridge tree is symlinked — that was the pre-cutover bash path).
@@ -325,11 +325,10 @@ func setupTempProject(t *testing.T, repoRoot string) string {
 	// predicates. Seed its inputs before gitInit commits the fixture so every
 	// worktree inherits the same declared execution tree.
 	for rel, body := range map[string]string{
-		"go/go.mod":                "module e2e.local/fixture\n\ngo 1.23\n",
-		"go/acs/regression/doc.go": "package regression\n",
-		"go/acs/cycle1/predicate_test.go": `//go:build acs
+		"go/go.mod": "module e2e.local/fixture\n\ngo 1.23\n",
+		"go/acs/regression/auditfixture/predicate_test.go": `//go:build acs
 
-package cycle1
+package auditfixture
 
 import (
 	"os"
