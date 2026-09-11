@@ -74,6 +74,22 @@ func TestRunTmuxREPL_ArtifactTimeout_SummaryCarriesWaitedAndExtends(t *testing.T
 	}
 }
 
+func TestRunTmuxREPL_NegativeMaxExtendsReportsDefault(t *testing.T) {
+	fx := newFixture(t, "claude-tmux", "")
+	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}
+	reviewer := &scriptedReviewer{verdicts: []ReviewVerdict{{Action: ReviewPause, Reason: "stop"}}}
+
+	code, stderr := runTmuxOnStopReview(t, fx, tmux, reviewer, nil,
+		Deps{ArtifactTimeoutS: 2, ArtifactMaxExtends: -1}, "--allow-bypass")
+
+	if code != ExitArtifactTimeout {
+		t.Fatalf("exit = %d, want ExitArtifactTimeout; stderr=%q", code, stderr)
+	}
+	if summary := artifactTimeoutSummary(stderr); !strings.Contains(summary, "max_extends=6") {
+		t.Fatalf("negative extension policy did not resolve to the default backstop; summary=%q", summary)
+	}
+}
+
 // TestEngineLaunch_ArtifactTimeout_ErrorCarriesWaitAndExtends is the live-path
 // proof: the summary reaches the ERROR the orchestrator records, not just a log
 // nobody reads. Driven through the real Engine.Launch → LaunchArgs → tmux driver

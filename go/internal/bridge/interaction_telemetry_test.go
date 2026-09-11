@@ -56,6 +56,32 @@ func (n *nudgeReactiveTmux) SendKeys(ctx context.Context, session, keys string, 
 	return n.fakeTmux.SendKeys(ctx, session, keys, enter)
 }
 
+type nudgeCaptureFailureTmux struct {
+	*fakeTmux
+	artifact    string
+	token       string
+	nudgeSent   bool
+	captureFail bool
+}
+
+func (n *nudgeCaptureFailureTmux) SendKeys(ctx context.Context, session, keys string, enter bool) error {
+	if strings.Contains(keys, n.artifact) && strings.Contains(keys, "complete the phase") {
+		n.nudgeSent = true
+	}
+	return n.fakeTmux.SendKeys(ctx, session, keys, enter)
+}
+
+func (n *nudgeCaptureFailureTmux) CapturePane(ctx context.Context, session string, scrollback int) (string, error) {
+	if n.nudgeSent && !n.captureFail {
+		n.captureFail = true
+		if err := os.WriteFile(n.artifact, []byte("<!-- challenge-token: "+n.token+" -->\nDONE\n"), 0o644); err != nil {
+			return "", err
+		}
+		return "", errCapture
+	}
+	return n.fakeTmux.CapturePane(ctx, session, scrollback)
+}
+
 // runTelemetryLaunch drives a claude-tmux launch with --agent=build so the
 // ledger lands at build-interactions.ndjson.
 func runTelemetryLaunch(t *testing.T, fx launchFixture, tm TmuxController, lookup map[string]string) int {
@@ -106,6 +132,51 @@ func TestOutcome_ArtifactAppearedWithinWindow(t *testing.T) {
 	}
 	if !strings.Contains(n.Payload, "deliverable") {
 		t.Errorf("payload should digest the injected nudge text; got %q", n.Payload)
+	}
+}
+
+func TestOutcome_NudgeCaptureFailureContinuesAndRecordsDeferredResult(t *testing.T) {
+	fx := newFixture(t, "claude-tmux", "")
+	tmux := &nudgeCaptureFailureTmux{
+		fakeTmux: &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}},
+		artifact: fx.artifact,
+		token:    fx.token,
+	}
+	eng := newTestEngine(Deps{
+		Tmux:             tmux,
+		Sleep:            func(time.Duration) {},
+		ArtifactTimeoutS: 4,
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	var stdout, stderr strings.Builder
+	code := eng.LaunchArgs(ctx,
+		fx.args("claude-tmux", "--allow-bypass", "--agent=build", "--cycle=7"), nil, &stdout, &stderr)
+
+	if code != ExitOK {
+		t.Fatalf("exit = %d, want ExitOK after the non-wedged verification failure; stderr=%q", code, stderr.String())
+	}
+	if !tmux.captureFail {
+		t.Fatal("test premise failed: the nudge verification capture did not fail")
+	}
+	if got := strings.Count(stderr.String(), "submit-verify: nudge NOT verified \u2014 capture failed"); got != 1 {
+		t.Fatalf("nudge capture warnings = %d, want exactly 1; stderr=%q", got, stderr.String())
+	}
+
+	var verify, nudge []interaction.Outcome
+	for _, outcome := range readInteractionLedger(t, fx.ws, "build") {
+		switch {
+		case outcome.Kind == interaction.KindSubmitVerify && strings.Contains(outcome.Payload, "site=nudge"):
+			verify = append(verify, outcome)
+		case outcome.Kind == interaction.KindNudge:
+			nudge = append(nudge, outcome)
+		}
+	}
+	if len(verify) != 1 || verify[0].Result != interaction.ResultNotVerified {
+		t.Fatalf("nudge submit-verification records = %+v, want one %q result", verify, interaction.ResultNotVerified)
+	}
+	if len(nudge) != 1 || nudge[0].Result != interaction.ResultArtifactAppeared {
+		t.Fatalf("deferred nudge outcomes = %+v, want one %q result", nudge, interaction.ResultArtifactAppeared)
 	}
 }
 

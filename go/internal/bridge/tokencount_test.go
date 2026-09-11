@@ -60,6 +60,22 @@ func TestExtractTokenCount(t *testing.T) {
 	}
 }
 
+func TestReplWaitResult_RecordTokensRetainsPeak(t *testing.T) {
+	var result replWaitResult
+	for _, pane := range []string{
+		"\u2193 1.2k tokens",
+		"\u2193 5.2k tokens",
+		"\u2193 3.0k tokens",
+		"no token counter",
+	} {
+		result.recordTokens(pane)
+	}
+
+	if result.peakTokens != 5200 {
+		t.Fatalf("peakTokens = %d, want 5200 after the visible count falls", result.peakTokens)
+	}
+}
+
 // TestTmuxPhase_WritesTokenUsage drives the real claude-tmux REPL engine with a
 // pane that carries a token counter and asserts the phase writes
 // workspace/token-usage.json with the peak the pane showed. Behavioral: it

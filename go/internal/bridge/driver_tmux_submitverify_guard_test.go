@@ -30,6 +30,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
 	"github.com/mickeyyaya/evolve-loop/go/internal/repostate"
 )
 
@@ -165,6 +166,42 @@ func TestVerifySubmitted_CaptureErrorIsLogged(t *testing.T) {
 	}
 	if !strings.Contains(out, "tmux: no server running") {
 		t.Errorf("the underlying error must reach the operator\ngot:\n%s", out)
+	}
+}
+
+func TestRunTmuxREPL_InitialSubmitVerificationCaptureFailureIsLoud(t *testing.T) {
+	fx := newFixture(t, "claude-tmux", "")
+	if err := os.WriteFile(fx.artifact, []byte("<!-- challenge-token: "+fx.token+" -->\nDONE\n"), 0o644); err != nil {
+		t.Fatalf("seed artifact: %v", err)
+	}
+	tmux := &captureErrTmux{
+		fakeTmux: &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}},
+		errAfter: 2, // boot capture succeeds; wait admission's baseline capture fails
+	}
+	eng := newTestEngine(Deps{
+		Tmux:            tmux,
+		Sleep:           func(time.Duration) {},
+		CaptureBaseline: zeroBaselineCapture,
+	})
+	var stdout, stderr bytes.Buffer
+	code := eng.LaunchArgs(context.Background(),
+		fx.args("claude-tmux", "--allow-bypass", "--agent=build", "--cycle=1526"), nil, &stdout, &stderr)
+
+	if code != ExitOK {
+		t.Fatalf("exit = %d, want ExitOK; stderr:\n%s", code, stderr.String())
+	}
+	const warning = "submit-verify: prompt NOT verified \u2014 baseline capture failed"
+	if got := strings.Count(stderr.String(), warning); got != 1 {
+		t.Fatalf("baseline-capture warnings = %d, want exactly 1; stderr:\n%s", got, stderr.String())
+	}
+	var promptRecords []interaction.Outcome
+	for _, outcome := range readInteractions(t, fx.ws, "build") {
+		if outcome.Kind == interaction.KindSubmitVerify && strings.Contains(outcome.Payload, "site=prompt") {
+			promptRecords = append(promptRecords, outcome)
+		}
+	}
+	if len(promptRecords) != 1 || promptRecords[0].Result != interaction.ResultNotVerified {
+		t.Fatalf("prompt submit-verification records = %+v, want one %q result", promptRecords, interaction.ResultNotVerified)
 	}
 }
 

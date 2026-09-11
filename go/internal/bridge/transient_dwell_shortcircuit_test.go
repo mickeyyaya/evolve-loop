@@ -439,6 +439,60 @@ func TestRunTmuxREPL_TransientDwell_EnforceDelaysRedispatch(t *testing.T) {
 	}
 }
 
+type cancelOnTransientCaptureTmux struct {
+	fakeTmux
+	pane     string
+	waitTick int
+	cancel   context.CancelFunc
+	canceled bool
+}
+
+func (t *cancelOnTransientCaptureTmux) CapturePane(_ context.Context, _ string, _ int) (string, error) {
+	if t.waitTick >= transientDwellObservations && !t.canceled {
+		t.canceled = true
+		t.cancel()
+	}
+	return t.pane, nil
+}
+
+func TestRunTmuxREPL_TransientDwell_CancelBeforeCooldownSkipsDelay(t *testing.T) {
+	fx := newFixture(t, "claude-tmux", "")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	tmux := &cancelOnTransientCaptureTmux{pane: livePane529(t), cancel: cancel}
+	var sleeps []time.Duration
+	deps := Deps{
+		Tmux: tmux,
+		Sleep: func(delay time.Duration) {
+			sleeps = append(sleeps, delay)
+			if delay == 2*time.Second {
+				tmux.waitTick++
+			}
+		},
+		CaptureBaseline:    zeroBaselineCapture,
+		Reviewer:           &scriptedReviewer{verdicts: []ReviewVerdict{{Action: ReviewPause, Reason: "must not run"}}},
+		ArtifactTimeoutS:   300,
+		ArtifactMaxExtends: 5,
+		RecoveryStage:      "enforce",
+	}
+	eng := newTestEngine(deps)
+	var stdout, stderr bytes.Buffer
+	code := eng.LaunchArgs(ctx,
+		fx.args("claude-tmux", "--allow-bypass", "--agent=router"), nil, &stdout, &stderr)
+
+	if code != ExitArtifactTimeout {
+		t.Fatalf("exit = %d, want ExitArtifactTimeout; stderr=%q", code, stderr.String())
+	}
+	if !tmux.canceled {
+		t.Fatal("test premise failed: context was not canceled during the terminal transient observation")
+	}
+	for _, delay := range sleeps {
+		if delay >= transientRedispatchDelayFloor {
+			t.Fatalf("canceled run requested a %v cooldown; sleeps=%v", delay, sleeps)
+		}
+	}
+}
+
 // TestRunTmuxREPL_TransientDwell_NoDelayOnOrdinaryTimeout — AC-7's negative:
 // the delay is scoped to the transient stop. A silent (genuinely wedged) pane
 // must return as promptly as it does today; a blanket delay would tax every
