@@ -319,3 +319,49 @@ func TestSkippedUnknownWarningExcludesPlannedNoWork(t *testing.T) {
 		t.Error("an unexplained skipped cycle must retain the operator warning")
 	}
 }
+
+func TestIsTriageNoWorkResult(t *testing.T) {
+	t.Parallel()
+	valid := CycleResult{
+		FinalVerdict:      CycleOutcomeSkippedUnknown,
+		TerminationReason: CycleTerminationTriageNoWork,
+		PhasesRun:         []Phase{PhaseScout, PhaseTriage},
+	}
+	tests := []struct {
+		name   string
+		result CycleResult
+		want   bool
+	}{
+		{name: "planned no-work cycle", result: valid, want: true},
+		{
+			name: "resumed at triage",
+			result: CycleResult{
+				FinalVerdict:      CycleOutcomeSkippedUnknown,
+				TerminationReason: CycleTerminationTriageNoWork,
+				PhasesRun:         []Phase{PhaseTriage},
+			},
+			want: true,
+		},
+		{name: "wrong outcome", result: CycleResult{FinalVerdict: VerdictPASS, TerminationReason: valid.TerminationReason, PhasesRun: valid.PhasesRun}},
+		{name: "missing reason", result: CycleResult{FinalVerdict: valid.FinalVerdict, PhasesRun: valid.PhasesRun}},
+		{name: "wrong reason", result: CycleResult{FinalVerdict: valid.FinalVerdict, TerminationReason: "operator-cancelled", PhasesRun: valid.PhasesRun}},
+		{name: "empty phase history", result: CycleResult{FinalVerdict: valid.FinalVerdict, TerminationReason: valid.TerminationReason}},
+		{name: "ends before triage", result: CycleResult{FinalVerdict: valid.FinalVerdict, TerminationReason: valid.TerminationReason, PhasesRun: []Phase{PhaseScout}}},
+		{name: "continues past triage", result: CycleResult{FinalVerdict: valid.FinalVerdict, TerminationReason: valid.TerminationReason, PhasesRun: []Phase{PhaseScout, PhaseTriage, PhaseRetro}}},
+		{name: "tdd ran", result: CycleResult{FinalVerdict: valid.FinalVerdict, TerminationReason: valid.TerminationReason, PhasesRun: []Phase{PhaseScout, PhaseTDD, PhaseTriage}}},
+		{name: "build planner ran", result: CycleResult{FinalVerdict: valid.FinalVerdict, TerminationReason: valid.TerminationReason, PhasesRun: []Phase{PhaseScout, PhaseBuildPlanner, PhaseTriage}}},
+		{name: "swarm plan ran", result: CycleResult{FinalVerdict: valid.FinalVerdict, TerminationReason: valid.TerminationReason, PhasesRun: []Phase{PhaseScout, PhaseSwarmPlan, PhaseTriage}}},
+		{name: "build ran", result: CycleResult{FinalVerdict: valid.FinalVerdict, TerminationReason: valid.TerminationReason, PhasesRun: []Phase{PhaseScout, PhaseBuild, PhaseTriage}}},
+		{name: "audit ran", result: CycleResult{FinalVerdict: valid.FinalVerdict, TerminationReason: valid.TerminationReason, PhasesRun: []Phase{PhaseScout, PhaseAudit, PhaseTriage}}},
+		{name: "ship ran", result: CycleResult{FinalVerdict: valid.FinalVerdict, TerminationReason: valid.TerminationReason, PhasesRun: []Phase{PhaseScout, PhaseShip, PhaseTriage}}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := IsTriageNoWorkResult(tt.result); got != tt.want {
+				t.Errorf("IsTriageNoWorkResult(%+v) = %t, want %t", tt.result, got, tt.want)
+			}
+		})
+	}
+}
