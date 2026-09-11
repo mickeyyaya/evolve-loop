@@ -18,6 +18,71 @@ import (
 	"time"
 )
 
+// assertWatchActivityResetsStallTimer drives the watcher's real polling path
+// with a virtual clock. The activity is written synchronously after the first
+// no-growth sample. On the next poll the clock crosses the original deadline;
+// only recognizing that write and resetting lastGrowth can prevent a stall.
+// This keeps the assertion sensitive without racing a writer ticker against a
+// loaded -race scheduler.
+func assertWatchActivityResetsStallTimer(t *testing.T, cfg Config, activity func() error) {
+	t.Helper()
+	const stall = 200 * time.Millisecond
+	base := time.Unix(1_700_000_000, 0)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	started := false
+	baselineSet := false
+	clockChecks := 0
+	var activityErr error
+	cfg.StallS = stall
+	cfg.PollS = time.Millisecond
+	cfg.OnEvent = func(event Event) {
+		if event.Type == "started" {
+			started = true
+		}
+	}
+
+	var sink bytes.Buffer
+	observer := New(cfg, &sink)
+	observer.nowFunc = func() time.Time {
+		if !started {
+			return base // timestamp for the initial started event
+		}
+		if !baselineSet {
+			baselineSet = true
+			return base // initial lastGrowth
+		}
+		clockChecks++
+		switch clockChecks {
+		case 1:
+			activityErr = activity()
+			return base.Add(150 * time.Millisecond)
+		case 2:
+			return base.Add(210 * time.Millisecond)
+		default:
+			cancel()
+			return base.Add(300 * time.Millisecond)
+		}
+	}
+
+	err := observer.Watch(ctx)
+	if activityErr != nil {
+		t.Fatalf("write activity: %v", activityErr)
+	}
+	if err != context.Canceled {
+		t.Fatalf("Watch returned %v, want controlled context cancellation", err)
+	}
+	if clockChecks < 3 {
+		t.Fatalf("clock checks = %d, want at least 3 to cross the original stall deadline", clockChecks)
+	}
+	for _, event := range parseEvents(t, sink.Bytes()) {
+		if event.Type == "stall_no_output" {
+			t.Errorf("stall fired despite observed activity resetting the timer: %+v", event)
+		}
+	}
+}
+
 // TestNew_Defaults — empty Config uses bash-defaults from CLAUDE.md
 // env-var table: StallS=600s, PollS=5s.
 func TestNew_Defaults(t *testing.T) {
@@ -85,41 +150,20 @@ func TestWatch_GrowthResetsStallTimer(t *testing.T) {
 	if err := os.WriteFile(logFile, []byte("a"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	var sink syncBuffer
-	o := New(Config{
-		StallS: 200 * time.Millisecond,
-		PollS:  20 * time.Millisecond,
-		Cycle:  1, Phase: "scout", Agent: "x",
+	assertWatchActivityResetsStallTimer(t, Config{
+		Cycle: 1, Phase: "scout", Agent: "x",
 		StdoutLog: logFile,
-	}, &sink)
-
-	// Goroutine: append every 50ms for 250ms — total work fits inside
-	// 300ms watch window with reset preventing stall.
-	stop := make(chan struct{})
-	go func() {
-		tick := time.NewTicker(50 * time.Millisecond)
-		defer tick.Stop()
-		for i := 0; i < 5; i++ {
-			select {
-			case <-stop:
-				return
-			case <-tick.C:
-				f, _ := os.OpenFile(logFile, os.O_APPEND|os.O_WRONLY, 0o644)
-				_, _ = f.Write([]byte("more "))
-				_ = f.Close()
-			}
+	}, func() error {
+		file, err := os.OpenFile(logFile, os.O_APPEND|os.O_WRONLY, 0o644)
+		if err != nil {
+			return err
 		}
-	}()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
-	defer cancel()
-	_ = o.Watch(ctx)
-	close(stop)
-	for _, e := range parseEvents(t, sink.bytes()) {
-		if e.Type == "stall_no_output" {
-			t.Errorf("stall fired during continuous growth: %+v", e)
+		if _, err := file.Write([]byte("more ")); err != nil {
+			_ = file.Close()
+			return err
 		}
-	}
+		return file.Close()
+	})
 }
 
 // TestWatch_LivenessProbeSuppressesFalseStall — cycle-190 regression: a
@@ -223,43 +267,18 @@ func TestWatch_WorkspaceActivityResetsStallTimer(t *testing.T) {
 	if err := os.WriteFile(logFile, []byte("initial"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	var sink syncBuffer
-	o := New(Config{
-		StallS: 200 * time.Millisecond,
-		PollS:  20 * time.Millisecond,
-		Cycle:  1, Phase: "build", Agent: "build",
+	assertWatchActivityResetsStallTimer(t, Config{
+		Cycle: 1, Phase: "build", Agent: "build",
 		StdoutLog:    logFile,
 		WorkspaceDir: tmp,
-	}, &sink)
-
-	// Append to a WORKSPACE artifact (not the stdout-log) every 50ms. The
-	// stdout-log never grows, but the workspace mtime advances → no stall.
-	stop := make(chan struct{})
-	go func() {
-		tick := time.NewTicker(50 * time.Millisecond)
-		defer tick.Stop()
-		for i := 0; i < 5; i++ {
-			select {
-			case <-stop:
-				return
-			case <-tick.C:
-				p := filepath.Join(tmp, "build-reflection.yaml")
-				f, _ := os.OpenFile(p, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
-				_, _ = f.Write([]byte("line\n"))
-				_ = f.Close()
-			}
+	}, func() error {
+		path := filepath.Join(tmp, "build-reflection.yaml")
+		if err := os.WriteFile(path, []byte("line\n"), 0o644); err != nil {
+			return err
 		}
-	}()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
-	defer cancel()
-	_ = o.Watch(ctx)
-	close(stop)
-	for _, e := range parseEvents(t, sink.bytes()) {
-		if e.Type == "stall_no_output" {
-			t.Errorf("stall fired while the agent was writing workspace artifacts: %+v", e)
-		}
-	}
+		future := time.Now().Add(time.Hour)
+		return os.Chtimes(path, future, future)
+	})
 }
 
 // TestWatch_WorkspaceConfiguredButIdle_StillStalls — guard against the
