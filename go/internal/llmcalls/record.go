@@ -25,17 +25,28 @@ const (
 	// pipeline through driver completion, excluding token enrichment and the
 	// ledger append itself.
 	TimingBridgeDispatch = "bridge_dispatch"
-	TimingLegacyUnknown  = "legacy_unspecified"
-	SourceUnknown        = "unknown"
+	// TimingLegacyUnknown labels records that do not declare a timing scope.
+	TimingLegacyUnknown = "legacy_unspecified"
+	// SourceUnknown labels records that do not identify token evidence.
+	SourceUnknown = "unknown"
 
-	UnknownModel             = "(unknown)"
-	DispatchUnknown          = "unknown"
-	DispatchArgv             = "argv"
-	DispatchREPL             = "repl"
-	DispatchPositional       = "positional"
-	DispatchCLIDefault       = "cli_default"
-	DispatchResumed          = "resumed_session"
-	DispatchNotStarted       = "not_started"
+	// UnknownModel is the display identity when no dispatched model was verified.
+	UnknownModel = "(unknown)"
+	// DispatchUnknown means the launch boundary could not establish the selector source.
+	DispatchUnknown = "unknown"
+	// DispatchArgv means a model selector was observed in process arguments.
+	DispatchArgv = "argv"
+	// DispatchREPL means a model selector was sent through an interactive command.
+	DispatchREPL = "repl"
+	// DispatchPositional means a model selector occupied the provider's positional argument.
+	DispatchPositional = "positional"
+	// DispatchCLIDefault means no explicit selector replaced the provider default.
+	DispatchCLIDefault = "cli_default"
+	// DispatchResumed means an existing session resumed without a new selector.
+	DispatchResumed = "resumed_session"
+	// DispatchNotStarted means no provider dispatch was observed.
+	DispatchNotStarted = "not_started"
+	// DispatchLegacyUnverified labels historical rows without dispatch provenance.
 	DispatchLegacyUnverified = "legacy_unverified"
 )
 
@@ -44,15 +55,22 @@ const (
 type UsageStatus string
 
 const (
-	UsageMeasured      UsageStatus = "measured"
-	UsagePartial       UsageStatus = "partial"
-	UsageUnavailable   UsageStatus = "unavailable"
+	// UsageMeasured means complete token evidence was collected.
+	UsageMeasured UsageStatus = "measured"
+	// UsagePartial means token evidence is incomplete or not fully comparable.
+	UsagePartial UsageStatus = "partial"
+	// UsageUnavailable means no usable token evidence was collected.
+	UsageUnavailable UsageStatus = "unavailable"
+	// UsageResolverError means the token collector failed.
 	UsageResolverError UsageStatus = "resolver_error"
 )
 
 const (
+	// OutcomeSuccess means the attempt completed with exit code zero.
 	OutcomeSuccess = "success"
+	// OutcomeFailure means the attempt completed with a non-zero exit code.
 	OutcomeFailure = "failure"
+	// OutcomeUnknown means no terminal exit code was recorded.
 	OutcomeUnknown = "unknown"
 )
 

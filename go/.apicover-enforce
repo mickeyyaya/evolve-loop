@@ -557,3 +557,9 @@
 
 # ADR-0099 slice 2 (2026-09-09): the document deliverable contract engine — every export named + executed.
 ./internal/solutioncheck
+
+# Centralized model-attempt telemetry (2026-09-11, new-package graduation):
+# durable schema, locked append/import, canonical reader, and performance
+# aggregation. Every export is named and exercised by the package's behavioral
+# tests plus apicover_named_test.go.
+./internal/llmcalls
