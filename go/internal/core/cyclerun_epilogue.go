@@ -34,10 +34,11 @@ func (cr *cycleRun) checkpointInterruptedPhase(cause error) {
 }
 
 // abnormalEpilogue is deferred by RunCycle and fires ONLY when the cycle did
-// not reach the normal closeout (cycleCompletedNormally=false). Best-effort +
-// loud: it must never mask the original error, and each step tolerates the
-// others failing. Uses a fresh context — the cycle's own ctx is typically
-// already canceled on these paths (the cycle-1048 shape).
+// not reach the normal closeout (cycleCompletedNormally=false). A graceful
+// cancellation is a resumable pause and is checkpointed separately, so it
+// must not create or commit terminal failure evidence. Best-effort + loud:
+// the hard-failure path must never mask the original error, and each step
+// tolerates the others failing.
 //
 // cause is the error RunCycle is about to return — the abort's ONE
 // distinguishing fact (nil on a bare bounce AND on a panic, which reaches
@@ -56,9 +57,11 @@ func (cr *cycleRun) checkpointInterruptedPhase(cause error) {
 // wants stopped at the ceiling — the marker makes that shape legible in the
 // halt message instead of reading as "identical defects".
 func (cr *cycleRun) abnormalEpilogue(cause error) {
-	// Quota exhaustion is a resource pause with its own checkpoint and phase
-	// evidence. A FAIL closeout here would make a resumable cycle look terminal.
-	if cr.cycleCompletedNormally || errors.Is(cause, ErrAllFamiliesExhausted) {
+	// Quota exhaustion and graceful cancellation are resource/operator pauses
+	// with their own checkpoints. A FAIL closeout would make a resumable cycle
+	// look terminal and its dossier commit would diverge from the cycle branch.
+	if cr.cycleCompletedNormally || errors.Is(cause, ErrAllFamiliesExhausted) ||
+		(cr.ctx != nil && cr.ctx.Err() != nil) {
 		return
 	}
 	epilogueCtx := context.Background()
