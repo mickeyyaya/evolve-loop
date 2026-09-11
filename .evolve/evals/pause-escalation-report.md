@@ -32,9 +32,11 @@ Expected: ≥1 match showing the write path.
 ```bash
 # TODO comment must be removed
 grep -n "TODO.*auto-respond\|TODO.*escalation-report" go/internal/bridge/driver_tmux_repl.go
+grep_status=$?
+[ "$grep_status" -eq 1 ] || { echo "FAIL: expected no TODO match; grep exit=$grep_status" >&2; exit 1; }
 ```
 
-Expected: **no match** (exit code 1 → pass, exit code 0 → fail).
+Expected: the negated assertion exits 0 only when there is no match.
 
 ---
 
@@ -91,8 +93,7 @@ Expected: output contains "ok" with no FAIL lines.
 ### NC-1: Extend verdict does NOT create an escalation report [code]
 
 ```bash
-# If there is a test for the extend path, verify it does NOT assert the file exists
-grep -rn "escalation-report\|EscalationReport" go/internal/bridge/*_test.go | grep -v "pause\|Pause\|absent\|not.*exist\|IsNotExist" | head -5
+cd go && go test -count=1 -run '^TestRunTmuxREPL_ExtendNoEscalationReport$' ./internal/bridge
 ```
 
-Expected: zero lines showing an extend-path test asserting the report file exists.
+Expected: the named behavioral test passes and proves extend leaves no report.

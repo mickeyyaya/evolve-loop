@@ -55,7 +55,7 @@ func TestDefaultRunner_StdoutCaptured(t *testing.T) {
 // non-nil error (spawn failure, distinct from exit-error).
 func TestDefaultRunner_BinaryMissing(t *testing.T) {
 	_, _, _, err := DefaultRunner(context.Background(), "", "/no/such/binary/zzz")
-	// /bin/sh -c interprets the path and exits non-zero with "not found".
+	// Bash interprets the path and exits non-zero with "not found".
 	// That's still an exit-error (mapped to exitCode), so err should be nil.
 	// We just confirm the call doesn't panic.
 	_ = err

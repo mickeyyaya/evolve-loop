@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/evalqualitycheck"
 	"github.com/mickeyyaya/evolve-loop/go/internal/verifyeval"
@@ -239,7 +240,8 @@ func runEvalVerify(args []string, stdout, stderr io.Writer) int {
 		if !c.Passed {
 			mark = "FAIL"
 		}
-		fmt.Fprintf(stdout, "  [%s] %s\n", mark, c.Command)
+		command := strings.ReplaceAll(c.Command, "\n", "\n         ")
+		fmt.Fprintf(stdout, "  [%s] %s\n", mark, command)
 		if c.Reason != "" {
 			fmt.Fprintf(stdout, "        reason: %s\n", c.Reason)
 		}
