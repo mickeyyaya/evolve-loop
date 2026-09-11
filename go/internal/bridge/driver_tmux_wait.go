@@ -4,14 +4,12 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/inbox"
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
 	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
-	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
 )
 
 // replWaiter owns the completion wait state machine after prompt dispatch. Its
@@ -32,17 +30,6 @@ type replWaiter struct {
 	channel        *replLiveChannel
 }
 
-type replWaitResult struct {
-	lastGoodPane string
-	peakTokens   int
-}
-
-func (r *replWaitResult) recordTokens(pane string) {
-	if tokens := panestream.ExtractResponseTokens(pane); tokens > r.peakTokens {
-		r.peakTokens = tokens
-	}
-}
-
 func newReplInboxCursor(cfg *Config) *inbox.Cursor {
 	cursor := inbox.NewCursor(cfg.Workspace, cfg.Agent)
 	if fi, err := os.Stat(inbox.Path(cfg.Workspace, cfg.Agent)); err == nil {
@@ -59,110 +46,13 @@ func (w replWaiter) wait() (replWaitResult, int) {
 	pfx := w.prefix
 	phaseName := w.phaseName
 	resolvedPrompt := w.resolvedPrompt
-	artifactBase := w.artifactBase
 	ar := w.responder
 	irec := w.recorder
 	cursor := w.cursor
 	channel := w.channel
-	paneProfile := channel.profile
+	state := newReplWaitState(w)
+	defer state.recordNudgeOutcome(irec, deps.Now)
 
-	// --- Wait for the artifact in review intervals. A hard wall-clock deadline
-	// kills a slow-but-productive agent (it cannot tell "stuck" from "still
-	// thinking"). Instead, when a review interval elapses without the artifact,
-	// a StopReviewer adjudicates the evidence — did the agent emit new output? —
-	// into extend (still working, wait another interval) or pause (stalled,
-	// surface for investigation, do not silently kill). See stopreview.go +
-	// ADR-0026. The interval defaults to tmuxArtifactTimeoutS,
-	// overridable per-launch (cfg.ArtifactTimeoutS) or via Deps.ArtifactTimeoutS (BridgePolicy).
-	interval := cfg.ArtifactTimeoutS
-	if interval <= 0 {
-		interval = defaultIfZero(deps.ArtifactTimeoutS, tmuxArtifactTimeoutS)
-	}
-	// The configured extend backstop, resolved once: it both builds the default
-	// reviewer and is REPORTED in the timeout summary (an operator reading
-	// "extends_used=6 max_extends=6" knows the budget was the wall, not a stall).
-	// The <=0 clamp mirrors newDeterministicReviewer's, so the number reported is
-	// the number actually enforced.
-	maxExtends := defaultIfZero(deps.ArtifactMaxExtends, defaultArtifactMaxExtends)
-	if maxExtends <= 0 {
-		maxExtends = defaultArtifactMaxExtends
-	}
-	// Defensive default: the Engine path sets deps.Reviewer via withDefaults,
-	// but direct runTmuxREPL callers (tests, future Stage-1 wiring) may not —
-	// avoid a nil-deref at the review checkpoint.
-	reviewer := deps.Reviewer
-	if reviewer == nil {
-		reviewer = newDeterministicReviewer(maxExtends)
-	}
-	// SignalCenter (ADR-0068, S3): the authoritative liveness source for the
-	// checkpoint below — Observe+Aggregate replace the bare per-run detectorFor(lp)
-	// probe. deps.LivenessCenter injects a shared/test instance; nil (production)
-	// builds a private center whose empty registry makes Observe fall back to
-	// panestream.DetectorFor(profile) — the SAME probe detectorFor(lp) built, so
-	// the migration is verdict-identical (H1) unless a caller has registered a
-	// handler for this profile's name.
-	livenessCenter := deps.LivenessCenter
-	if livenessCenter == nil {
-		livenessCenter = panestream.NewSignalCenter()
-	}
-	// ADR-0044 C2: the fatal-pane registry consulted before each review
-	// checkpoint (fatalpane.go). Stage off ⇒ fatalPaneVerdict short-circuits
-	// before touching the detector; nil detector is unreachable on that path.
-	recoveryStage := recoveryStageFromEnv(deps)
-	var fatalDet *recovery.FatalPaneDetector
-	if recoveryStage != "off" {
-		// Seeds + durable advisor promotions (ADR-0044 Slice 5): a novel
-		// signature classified once is caught deterministically on every
-		// later boot. Empty ProjectRoot degrades to seeds only.
-		fatalDet = recovery.SeedDetectorWithPromotions(
-			filepath.Join(cfg.ProjectRoot, ".evolve", "instincts", "fatal-signatures"))
-	}
-	// ADR-0027: the completion contract is a Strategy. Default ("" / "artifact")
-	// is the legacy artifact-file poll, byte-identical to the pre-Strategy code;
-	// "stdout" completes on REPL-idle for agents that print their answer and
-	// write no file (the router/advisor). The detector ONLY decides readiness —
-	// the stop-review/extend liveness adjudication below is unchanged.
-	var lastEv StopEvent
-	var lastVerdict ReviewVerdict
-	detector := newCompletionDetector(cfg.Completion, cfg, deps, lp, artifactBase)
-	completed := false
-	transientShortcircuit := false
-	nudgeSent := false
-	// ADR-0045 I1: the one-shot nudge's outcome window — resolved when the
-	// run concludes, against the only evidence that matters: did the
-	// artifact appear within the bounded wait? `nudgeSent=true` with no
-	// outcome record is the cycles-263–269 defect this closes.
-	var nudgeEv *interaction.Event
-	var nudgeAt time.Time
-	defer func() {
-		if nudgeEv == nil {
-			return
-		}
-		res := interaction.ResultNoEffect
-		if completed {
-			res = interaction.ResultArtifactAppeared
-		}
-		irec.Record(interaction.Outcome{
-			Event:     *nudgeEv,
-			Result:    res,
-			LatencyMS: deps.Now().Sub(nudgeAt).Milliseconds(),
-		})
-	}()
-	detectErrLogged := false
-	peakTokens := 0
-	recordTokens := func(pane string) {
-		if n := panestream.ExtractResponseTokens(pane); n > peakTokens {
-			peakTokens = n
-		}
-	}
-	attempt := 0
-	intervalStart := 0
-	// waitedS mirrors the wait loop's `elapsed` into function scope so the
-	// timeout summary below can report how long this launch actually waited.
-	// `elapsed` is scoped to the for statement, and lastEv.ElapsedS is only
-	// populated once a review CHECKPOINT is reached — a wait that ends before the
-	// first checkpoint (ctx cancel) would report 0 and read as "died instantly".
-	waitedS := 0
 	intervalBaselinePane, baselineErr := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
 	if baselineErr != nil {
 		// This pane is submit-verify's ONLY observation on the clean path. A
@@ -171,30 +61,17 @@ func (w replWaiter) wait() (replWaitResult, int) {
 		// unless we say so. Silence here reproduced the pre-fix cycle-1505 log.
 		fmt.Fprintf(deps.Stderr, "%s submit-verify: prompt NOT verified — baseline capture failed, input-line state unknown: %v\n", pfx, baselineErr)
 	}
-	recordTokens(intervalBaselinePane)
+	state.result.recordTokens(intervalBaselinePane)
 	// CB.6: the freshest non-empty pane seen — escalation evidence that
 	// survives a mid-phase server death (cycle-286 masked-evidence class).
-	lastGoodPane := intervalBaselinePane
+	state.result.lastGoodPane = intervalBaselinePane
 	writeArtifactTimeoutMarker := func(transient bool) {
 		fmt.Fprintf(deps.Stderr,
 			"[bridge] %sphase=%s waited=%ds interval=%ds extends_used=%d max_extends=%d last_review=%s liveness=%s progressed=%v busy=%v transient=%v reason=%q\n",
-			artifactTimeoutMarker, phaseName, waitedS, interval, attempt, maxExtends,
-			reviewActionOrNone(lastVerdict.Action), livenessOrUnknown(lastEv.State),
-			lastEv.Progressed, lastEv.Busy, transient, lastVerdict.Reason)
+			artifactTimeoutMarker, phaseName, state.waitedS, state.intervalS, state.attempt, state.maxExtends,
+			reviewActionOrNone(state.lastVerdict.Action), livenessOrUnknown(state.lastEvent.State),
+			state.lastEvent.Progressed, state.lastEvent.Busy, transient, state.lastVerdict.Reason)
 	}
-	// Persistence guard for the checkpoint exhaustion fast-fail (exhaustion_persistence.go):
-	// the wall must be present across consecutive checkpoints before failing over,
-	// so wall-shaped text a working agent momentarily rendered does not kill it.
-	// Its OWN gate (not shared with the fast-poll's) — the two loops observe at
-	// different cadences and must each confirm on their own consecutive frames.
-	checkpointExhaustGate := newExhaustionGate()
-	checkpointWall := &checkpointWallState{}
-	// Persistence guard for the ADR-0044 C2 fatal-pane fast-fail
-	// (fatalpane_persistence.go) — same shape, same reason: the detector matches
-	// substrings against the RAW pane, so a working agent quoting a fatal
-	// signature must not be killed for one frame. Loop-scoped like the gate
-	// above: a per-checkpoint instance could never accumulate a streak.
-	checkpointFatalGate := newFatalPaneGate()
 	// Cycle-274 post-paste spill check (R3.2), on the ALREADY-captured
 	// baseline (no extra capture, no fixture-frame drift): the prompt was
 	// just pasted; if it spilled into a shell continuation (quote>/bquote>)
@@ -206,7 +83,7 @@ func (w replWaiter) wait() (replWaitResult, int) {
 	if lp.guardDeadShell && paneLooksLikeShellSpill(intervalBaselinePane) {
 		if shellCmd, isShell := paneShellProcess(ctx, deps.Tmux, lp.session); isShell {
 			fmt.Fprintf(deps.Stderr, "%s FAIL: prompt spilled into a dead shell (%s) after paste — CLI process gone (cycle-274 class)\n", pfx, shellCmd)
-			return replWaitResult{lastGoodPane: lastGoodPane, peakTokens: peakTokens}, ExitREPLBootTimeout
+			return state.result, ExitREPLBootTimeout
 		}
 	}
 	// Submit-verify the prompt delivery (driver_tmux_submitverify.go). Read off
@@ -246,26 +123,26 @@ func (w replWaiter) wait() (replWaitResult, int) {
 				// Lstat, matching regularFileNonEmpty's never-follow-symlinks
 				// invariant (cycle-1256 D3) — the belt must not re-resolve a
 				// path the locator deliberately refused to follow.
-				if fi, serr := os.Lstat(path); serr == nil && fi.Mode().IsRegular() && !artifactBase.matches(path, fi) {
+				if fi, serr := os.Lstat(path); serr == nil && fi.Mode().IsRegular() && !w.artifactBase.matches(path, fi) {
 					delivered = true
 				}
 			}
 			if delivered {
 				fmt.Fprintf(deps.Stderr, "%s submit-verify: pane looks parked but a post-dispatch deliverable is already on disk — submission evidently landed; continuing the normal wait\n", pfx)
 			} else {
-				lastVerdict = ReviewVerdict{
+				state.lastVerdict = ReviewVerdict{
 					Action: ReviewPause,
 					Reason: fmt.Sprintf("prompt %s (resends=%d)", outcome.Result, outcome.Resends),
 				}
 				writeArtifactTimeoutMarker(false)
-				return replWaitResult{lastGoodPane: lastGoodPane, peakTokens: peakTokens}, ExitArtifactTimeout
+				return state.result, ExitArtifactTimeout
 			}
 		}
 	}
 	ar.transientDwellEnabled = true
 	for elapsed := 0; ; elapsed += 2 {
 		deps.Sleep(2 * time.Second)
-		waitedS = elapsed
+		state.waitedS = elapsed
 		if err := ctx.Err(); err != nil {
 			// Context cancelled (orchestrator timeout / SIGTERM / the next phase
 			// tearing down this session): before abandoning, ONE final completion
@@ -287,10 +164,10 @@ func (w replWaiter) wait() (replWaitResult, int) {
 			// explicit finality marker artifactDetector's short-circuit now keys on
 			// (a live ctx alone would have disarmed it — completion.go).
 			finalCtx, finalCancel := withFinalPoll(ctx)
-			ready, _, note, _ := detector.poll(finalCtx)
+			ready, _, note, _ := state.detector.poll(finalCtx)
 			finalCancel()
 			if ready {
-				completed = true
+				state.completed = true
 				if note != "" {
 					fmt.Fprintf(deps.Stderr, "%s %s\n", pfx, note)
 				}
@@ -315,25 +192,25 @@ func (w replWaiter) wait() (replWaitResult, int) {
 			waitPane, captureErr = deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
 			channelCaptureOK = captureErr == nil
 			if captureErr == nil {
-				recordTokens(waitPane)
+				state.result.recordTokens(waitPane)
 				channel.streamPane(waitPane)
 			}
 		}
-		ready, _, note, derr := detector.poll(ctx)
+		ready, _, note, derr := state.detector.poll(ctx)
 		if ready {
-			completed = true
+			state.completed = true
 			if note != "" {
 				fmt.Fprintf(deps.Stderr, "%s %s\n", pfx, note)
 			}
 			break
 		}
-		if derr != nil && !detectErrLogged {
+		if derr != nil && !state.detectorErrorLogged {
 			// The detector surfaced a fault (e.g. an artifact present at a
 			// non-canonical path that could not be relocated — read-only
 			// workspace). Surface it once, immediately, instead of spinning the
 			// full wait window with no signal.
 			fmt.Fprintf(deps.Stderr, "%s WARN: completion detector: %v\n", pfx, derr)
-			detectErrLogged = true
+			state.detectorErrorLogged = true
 		}
 		waitCaptureOK := true
 		if !channel.on {
@@ -357,7 +234,7 @@ func (w replWaiter) wait() (replWaitResult, int) {
 				channel.injectionDelivered(cid)
 			}
 		}
-		channel.observeIdle(waitPane, livenessCenter)
+		channel.observeIdle(waitPane, state.livenessCenter)
 		action, rc := ar.tickPane(ctx, lp.session, waitPane, channelCaptureOK && waitCaptureOK)
 		switch rc {
 		case 0, 1: // noop / responded
@@ -367,41 +244,41 @@ func (w replWaiter) wait() (replWaitResult, int) {
 			// by the auto-respond loop guard (case 86) — an agent cannot defer
 			// the reviewer indefinitely by repeating the same extend prompt.
 			if parseExtendSecs(action) > 0 {
-				intervalStart = elapsed
+				state.intervalStartS = elapsed
 				fmt.Fprintf(deps.Stderr, "%s agent extend signal — review interval refreshed\n", pfx)
 			}
 		case 3:
 			if strings.TrimSpace(waitPane) != "" {
-				lastGoodPane = waitPane
+				state.result.lastGoodPane = waitPane
 			}
-			lastEv = StopEvent{
+			state.lastEvent = StopEvent{
 				Kind:           StopArtifactTimeout,
 				Phase:          cfg.Agent,
 				Cycle:          cfg.Cycle,
 				ElapsedS:       elapsed,
-				IntervalS:      interval,
+				IntervalS:      state.intervalS,
 				Busy:           false,
-				StdoutTail:     lastLines(lastGoodPane, 40),
+				StdoutTail:     lastLines(state.result.lastGoodPane, 40),
 				InjectedPrompt: ar.injectedPrompt,
 				State:          panestream.LivenessIdle,
 			}
-			lastVerdict = ReviewVerdict{Action: ReviewStop, Reason: "transient upstream error persisted for 60s"}
-			transientShortcircuit = true
+			state.lastVerdict = ReviewVerdict{Action: ReviewStop, Reason: "transient upstream error persisted for 60s"}
+			state.transientShortcircuit = true
 		case 85:
 			fmt.Fprintf(deps.Stderr, "%s auto-respond escalation; abandoning run\n", pfx)
-			return replWaitResult{lastGoodPane: lastGoodPane, peakTokens: peakTokens}, ExitUnknownPrompt
+			return state.result, ExitUnknownPrompt
 		case 86:
 			fmt.Fprintf(deps.Stderr, "%s auto-respond loop guard tripped; abandoning run\n", pfx)
-			return replWaitResult{lastGoodPane: lastGoodPane, peakTokens: peakTokens}, ExitRespondLoopGuard
+			return state.result, ExitRespondLoopGuard
 		}
-		if transientShortcircuit {
+		if state.transientShortcircuit {
 			break
 		}
 		// Review checkpoint: a full interval elapsed without the artifact.
-		if elapsed-intervalStart >= interval {
+		if elapsed-state.intervalStartS >= state.intervalS {
 			rawPane, _ := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
 			curPane, renderWedged := recoverBlankPane(ctx, deps, lp.session, lp.bootScrollback, rawPane, pfx)
-			recordTokens(curPane)
+			state.result.recordTokens(curPane)
 			// CB.6: evidence survives the session's death. When the server
 			// is killed mid-phase every later capture is empty, so the
 			// escalation report's final_pane carried nothing and cycle-286's
@@ -409,9 +286,9 @@ func (w replWaiter) wait() (replWaitResult, int) {
 			// pane; a dead capture falls back to it as the freshest real
 			// evidence (the live pane still wins whenever it renders).
 			if strings.TrimSpace(curPane) != "" {
-				lastGoodPane = curPane
+				state.result.lastGoodPane = curPane
 			}
-			evidencePane := lastGoodPane
+			evidencePane := state.result.lastGoodPane
 			// Progressed = the pane changed during the interval. Stage-0 signal:
 			// good for the common cases (growing token counters, new tool calls),
 			// but a pure spinner/clock animation also reads as progress — so the
@@ -425,10 +302,8 @@ func (w replWaiter) wait() (replWaitResult, int) {
 			// agent merely rendered cannot pause or kill it. Safe: nothing
 			// consumes the center's Exhausted SignalEvent (no RegisterSignalHandler
 			// caller); this fast-fail was its only actor.
-			livenessProfile := paneProfile
-			livenessProfile.ExhaustedRegex = ""
-			livenessCenter.Observe(lp.session, curPane, livenessProfile)
-			livenessState := livenessCenter.Aggregate()
+			state.livenessCenter.Observe(lp.session, curPane, state.livenessProfile)
+			livenessState := state.livenessCenter.Aggregate()
 			// Exhaustion fast-fail: a quota/rate-limit WALL means the artifact will
 			// NEVER come — fail over to the fallback CLI (exit 85) instead of
 			// burning the full artifact timeout. Scanned on the agent-stripped pane
@@ -437,12 +312,12 @@ func (w replWaiter) wait() (replWaitResult, int) {
 			// hang-without-exit fix), while wall text passing through a WORKING
 			// agent's pane clears by the next checkpoint — the raw-pane false-FAIL
 			// class the go-review of the per-model regex fix surfaced.
-			walled := livenessCenter.ExhaustedOf(strippedForExhaustionScan(curPane, ar.injectedPrompt), paneProfile)
+			walled := state.livenessCenter.ExhaustedOf(strippedForExhaustionScan(curPane, ar.injectedPrompt), state.paneProfile)
 			// Corroboration contract shared with the fast-poll site, one
 			// probe per phase, latched (wallcorroborate.go checkpointWallState).
-			if escalate, suppressNow := checkpointWall.decide(ctx, deps.CorroborateWall, lp.name, checkpointExhaustGate.observe(walled)); escalate {
+			if escalate, suppressNow := state.checkpointWall.decide(ctx, deps.CorroborateWall, lp.name, state.checkpointExhaustion.observe(walled)); escalate {
 				fmt.Fprintf(deps.Stderr, "%s EXHAUSTED: pane shows a quota/rate-limit wall (persisted %d checkpoints, corroborated by live probe) — failing over to fallback CLI (exit %d)\n", pfx, exhaustionPersistObservations, ExitUnknownPrompt)
-				return replWaitResult{lastGoodPane: lastGoodPane, peakTokens: peakTokens}, ExitUnknownPrompt
+				return state.result, ExitUnknownPrompt
 			} else if suppressNow {
 				fmt.Fprintf(deps.Stderr, "%s EXHAUSTION-SUPPRESSED: pane matched wall vocabulary but a live probe (cheapest tier) answered — treating as content-induced; a tier-scoped wall would surface via artifact-timeout fallback instead\n", pfx)
 			}
@@ -451,7 +326,7 @@ func (w replWaiter) wait() (replWaitResult, int) {
 			// interval-baseline diff. Behavior-preserving: .Progressed has no
 			// decision consumer (evidence/logging only), so the shift from
 			// baseline-relative to checkpoint-to-checkpoint is safe.
-			progressed := livenessCenter.Changed(lp.session)
+			progressed := state.livenessCenter.Changed(lp.session)
 			// Render-wedge override (cycle-291): a blank pane from a live session
 			// reads as Idle by the content-velocity detector (no affordance in blank
 			// frame). recoverBlankPane already confirmed the session is alive
@@ -460,15 +335,15 @@ func (w replWaiter) wait() (replWaitResult, int) {
 			if renderWedged && livenessState == panestream.LivenessIdle {
 				livenessState = panestream.LivenessBusyButStagnant
 			}
-			lastEv = StopEvent{
+			state.lastEvent = StopEvent{
 				Kind:       StopArtifactTimeout,
 				Phase:      cfg.Agent,
 				Cycle:      cfg.Cycle,
 				ElapsedS:   elapsed,
-				IntervalS:  interval,
-				Attempt:    attempt,
+				IntervalS:  state.intervalS,
+				Attempt:    state.attempt,
 				Progressed: progressed,
-				Busy:       livenessCenter.Busy(lp.session) || renderWedged,
+				Busy:       state.livenessCenter.Busy(lp.session) || renderWedged,
 				StdoutTail: lastLines(evidencePane, 40),
 				// Same source the exhaustion scan strips against, two lines up —
 				// one resolved prompt, one meaning of "what the agent was told",
@@ -491,26 +366,26 @@ func (w replWaiter) wait() (replWaitResult, int) {
 			// call (R8.3) — it must be called exactly once per stop-review
 			// checkpoint, never retried for the same event, or the soak's C2
 			// counts inflate silently.
-			v, preempted := checkpointFatalGate.verdict(fatalDet, lastEv, recoveryStage, irec, deps.Stderr, pfx)
+			v, preempted := state.checkpointFatal.verdict(state.fatalDetector, state.lastEvent, state.recoveryStage, irec, deps.Stderr, pfx)
 			if !preempted {
-				v = reviewer.Review(lastEv)
+				v = state.reviewer.Review(state.lastEvent)
 			}
-			lastVerdict = v
+			state.lastVerdict = v
 			fmt.Fprintf(deps.Stderr, "%s stop-review[%s] elapsed=%ds attempt=%d progressed=%v → %s: %s\n",
-				pfx, StopArtifactTimeout, elapsed, attempt, progressed, lastVerdict.Action, lastVerdict.Reason)
+				pfx, StopArtifactTimeout, elapsed, state.attempt, progressed, state.lastVerdict.Action, state.lastVerdict.Reason)
 			if deps.OnStopReview != nil {
-				deps.OnStopReview(phaseName, string(lastVerdict.Action), lastVerdict.Reason)
+				deps.OnStopReview(phaseName, string(state.lastVerdict.Action), state.lastVerdict.Reason)
 			}
-			if lastVerdict.Action != ReviewExtend {
-				_, isDetVal := reviewer.(deterministicReviewer)
-				_, isDetPtr := reviewer.(*deterministicReviewer)
+			if state.lastVerdict.Action != ReviewExtend {
+				_, isDetVal := state.reviewer.(deterministicReviewer)
+				_, isDetPtr := state.reviewer.(*deterministicReviewer)
 				isDeterministic := isDetVal || isDetPtr
 				// Nudge only on PAUSE (idle agent, remind it once). A fatal
 				// ReviewStop (ADR-0044 C2) must exit now — nudging a dead
 				// shell is exactly the echo that bought cycle-262's dead
 				// panes their extensions. Behavior-identical for the legacy
 				// reviewer, which only ever emits extend|pause.
-				if lastVerdict.Action == ReviewPause && isDeterministic && !livenessCenter.Busy(lp.session) && !nudgeSent {
+				if state.lastVerdict.Action == ReviewPause && isDeterministic && !state.livenessCenter.Busy(lp.session) && !state.nudgeSent {
 					nudgeMsg := fmt.Sprintf("Please write the deliverable to %s to complete the phase.", cfg.Artifact)
 					_ = deps.Tmux.SendKeys(ctx, lp.session, nudgeMsg, true)
 					// The recorded stall (cycles 1505/1510/1517): this nudge was
@@ -530,30 +405,30 @@ func (w replWaiter) wait() (replWaitResult, int) {
 					nudgeOutcome := verifySubmitted(ctx, deps, lp, pfx, "nudge", nudgePane, nudgeMsg)
 					recordSubmitVerify(irec, phaseName, cfg.Cycle, "nudge", nudgeOutcome)
 					if nudgeOutcome.Result == interaction.ResultSubmitWedged {
-						lastVerdict.Reason = fmt.Sprintf("nudge %s (resends=%d)", nudgeOutcome.Result, nudgeOutcome.Resends)
+						state.lastVerdict.Reason = fmt.Sprintf("nudge %s (resends=%d)", nudgeOutcome.Result, nudgeOutcome.Resends)
 						break
 					}
-					nudgeSent = true
-					nudgeEv = &interaction.Event{
+					state.nudgeSent = true
+					state.nudgeEvent = &interaction.Event{
 						Kind:    interaction.KindNudge,
 						Phase:   phaseName,
 						Cycle:   cfg.Cycle,
 						Trigger: "idle_no_artifact",
 						Payload: nudgeMsg,
 					}
-					nudgeAt = deps.Now()
-					intervalStart = elapsed
-					attempt++
+					state.nudgeAt = deps.Now()
+					state.intervalStartS = elapsed
+					state.attempt++
 					continue
 				}
 				break
 			}
-			attempt++
-			intervalStart = elapsed
+			state.attempt++
+			state.intervalStartS = elapsed
 		}
 	}
-	if !completed {
-		fmt.Fprintf(deps.Stderr, "%s FAIL: completion never signalled (artifact %s; stop-review paused after %d interval(s) of %ds)\n", pfx, cfg.Artifact, attempt+1, interval)
+	if !state.completed {
+		fmt.Fprintf(deps.Stderr, "%s FAIL: completion never signalled (artifact %s; stop-review paused after %d interval(s) of %ds)\n", pfx, cfg.Artifact, state.attempt+1, state.intervalS)
 		fmt.Fprintf(deps.Stderr, "%s diagnostic: files present under workspace %s:\n", pfx, cfg.Workspace)
 		for _, line := range listWorkspaceFiles(cfg.Workspace) {
 			fmt.Fprintf(deps.Stderr, "%s   %s\n", pfx, line)
@@ -561,8 +436,8 @@ func (w replWaiter) wait() (replWaitResult, int) {
 		// Pause (ambiguous stall) and Stop (typed fatal fast-fail, ADR-0044
 		// C2) both leave the operator-facing escalation report; extend keeps
 		// the legacy no-report behavior.
-		if lastVerdict.Action == ReviewPause || lastVerdict.Action == ReviewStop {
-			_ = writeEscalationReport(cfg.Workspace, phaseName, cfg.Cycle, lastEv, lastVerdict)
+		if state.lastVerdict.Action == ReviewPause || state.lastVerdict.Action == ReviewStop {
+			_ = writeEscalationReport(cfg.Workspace, phaseName, cfg.Cycle, state.lastEvent, state.lastVerdict)
 		}
 		// Fail-loud drift alarm (exhaustion_drift.go): if this timed-out pane looks
 		// like a quota wall the exhausted_regex missed, the wall wording may have
@@ -573,8 +448,8 @@ func (w replWaiter) wait() (replWaitResult, int) {
 		// (strippedForExhaustionScan, line ~704): an alarm that scans the raw pane
 		// fires on wall-shaped text the agent merely wrote or echoed, which the real
 		// regex correctly ignored — an operator chasing a regex that is working.
-		strippedPane := strippedForExhaustionScan(lastGoodPane, ar.injectedPrompt)
-		warnExhaustionRegexDrift(deps.Stderr, pfx, lp.name, strippedPane, paneProfile.ExhaustedRegex)
+		strippedPane := strippedForExhaustionScan(state.result.lastGoodPane, ar.injectedPrompt)
+		warnExhaustionRegexDrift(deps.Stderr, pfx, lp.name, strippedPane, state.paneProfile.ExhaustedRegex)
 		// Transient-upstream recognition (inbox item
 		// transient-api-error-invisible-inside-artifact-timeout): 3 of 4 observed
 		// router stalls (cycles 1523/1524/1526) spent the FULL silence budget on a
@@ -612,7 +487,7 @@ func (w replWaiter) wait() (replWaitResult, int) {
 		// so the remedy is copy-pasteable from the diagnostic. Emitted LAST so it
 		// is also the final stderr line, and lifted into the error by Engine.Launch.
 		writeArtifactTimeoutMarker(transient)
-		if transientShortcircuit && ctx.Err() == nil {
+		if state.transientShortcircuit && ctx.Err() == nil {
 			// Deliberately a plain blocking pause: it throttles re-dispatch
 			// against a provider that just spent 60s saying "overloaded", and
 			// under cliadmit it holds this family's slot for the cooldown —
@@ -622,8 +497,8 @@ func (w replWaiter) wait() (replWaitResult, int) {
 			// budget this path just saved.
 			deps.Sleep(transientRedispatchDelay)
 		}
-		return replWaitResult{lastGoodPane: lastGoodPane, peakTokens: peakTokens}, ExitArtifactTimeout
+		return state.result, ExitArtifactTimeout
 	}
 
-	return replWaitResult{lastGoodPane: lastGoodPane, peakTokens: peakTokens}, ExitOK
+	return state.result, ExitOK
 }
