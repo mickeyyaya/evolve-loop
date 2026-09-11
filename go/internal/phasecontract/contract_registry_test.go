@@ -175,6 +175,22 @@ func TestContract_TopLevelJSONShapePreservesLegacyDefaults(t *testing.T) {
 	}
 }
 
+func TestJSONShape_String(t *testing.T) {
+	tests := []struct {
+		shape JSONShape
+		want  string
+	}{
+		{shape: JSONShapeAny, want: "value"},
+		{shape: JSONShapeObject, want: "object"},
+		{shape: JSONShapeArray, want: "array"},
+	}
+	for _, tt := range tests {
+		if got := tt.shape.String(); got != tt.want {
+			t.Errorf("JSONShape(%d).String()=%q, want %q", tt.shape, got, tt.want)
+		}
+	}
+}
+
 func TestRouterArtifactContractsAreDistinct(t *testing.T) {
 	tests := []struct {
 		contract string
