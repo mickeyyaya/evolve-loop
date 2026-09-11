@@ -425,6 +425,13 @@ func (o *Orchestrator) recordFailureLearning(ctx context.Context, fl failureLear
 	if fl.Failed == PhaseRetro || fl.Err == nil || fl.State == nil || fl.CycleState == nil || fl.Result == nil || fl.Timings == nil {
 		return
 	}
+	// Cancellation is an operator/runtime stop, not evidence that the task or
+	// phase failed. Keep the active phase intact for the interrupt checkpoint
+	// and do not spend another model call on a retrospective that cannot finish
+	// under an already-canceled context.
+	if ctx.Err() != nil {
+		return
+	}
 	// Preserve a ship dispatch explanation for the coherence floor even when the
 	// quota boundary skips failure learning below.
 	if fl.Failed == PhaseShip {

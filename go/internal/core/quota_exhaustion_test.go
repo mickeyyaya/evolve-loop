@@ -106,6 +106,46 @@ func TestRunCycle_AllFamilies85_CheckpointsAndDefers(t *testing.T) {
 	}
 }
 
+// A signal that arrives while the quota pause is being persisted must not
+// replace that typed pause with the lower-information operator checkpoint.
+// NOT t.Parallel: it swaps both package-level checkpoint hooks.
+func TestRunCycle_InterruptDuringQuotaCheckpointPreservesQuotaPause(t *testing.T) {
+	previousQuota := QuotaBoundaryCheckpointer
+	previousResume := ResumeBoundaryCheckpointer
+	t.Cleanup(func() {
+		QuotaBoundaryCheckpointer = previousQuota
+		ResumeBoundaryCheckpointer = previousResume
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	quotaCalls := 0
+	QuotaBoundaryCheckpointer = func(CycleState, string, time.Time) error {
+		quotaCalls++
+		cancel()
+		return nil
+	}
+	interruptCalls := 0
+	ResumeBoundaryCheckpointer = func(CycleState, string, time.Time) error {
+		interruptCalls++
+		return nil
+	}
+
+	runners := buildRunners(nil)
+	runners[PhaseScout] = &fakeRunner{name: "scout", failErr: wrapTransient(85), failUntil: 99}
+	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, runners)
+
+	_, err := o.RunCycle(ctx, CycleRequest{ProjectRoot: t.TempDir()})
+	if !errors.Is(err, ErrAllFamiliesExhausted) {
+		t.Fatalf("RunCycle error = %v, want ErrAllFamiliesExhausted", err)
+	}
+	if quotaCalls != 1 {
+		t.Fatalf("quota checkpoints = %d, want 1", quotaCalls)
+	}
+	if interruptCalls != 0 {
+		t.Fatalf("interrupt checkpoints = %d, want 0 after the authoritative quota pause", interruptCalls)
+	}
+}
+
 // Mixed exit codes (85 then 80) prove NOT all families are quota-drained: the
 // existing loud-abort path must run unchanged — no checkpoint, no defer.
 // (Single-family 85 followed by a healthy sibling success is already pinned by

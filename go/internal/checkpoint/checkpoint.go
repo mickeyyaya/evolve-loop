@@ -188,8 +188,10 @@ func init() {
 	core.ResumeBoundaryCheckpointer = func(cs core.CycleState, projectRoot string, now time.Time) error {
 		path := core.ResolveCycleStatePath(filepath.Join(projectRoot, ".evolve"))
 		return flock.WithPathLock(path, func() error {
-			// The current owner has consumed the old pause. Keep a discoverable crash
-			// checkpoint for this dispatch; fresh leases exclude it from fleet discovery.
+			// On resume, the current owner has consumed the old pause. On a fresh
+			// cycle, graceful cancellation preserves the phase still in flight. Both
+			// need the same replaceable active-phase checkpoint; fresh leases exclude
+			// it from fleet discovery while the owner remains alive.
 			cp := ComposeWithIntegrity(cs, ReasonOperatorRequest, 0, "", now, readExistingIntegrity(path))
 			return applyWithHooks(defaultHooks(), path, cp)
 		})

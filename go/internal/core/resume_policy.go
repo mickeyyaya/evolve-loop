@@ -2,9 +2,11 @@ package core
 
 import "time"
 
-// ResumeBoundaryCheckpointer advances an already-consumed pause under the
-// checkpoint sidecar lock. Unlike the routine boundary writer, this must replace
-// the previous escalation. The checkpoint package registers the durable writer.
+// ResumeBoundaryCheckpointer writes an operator-requested active-phase
+// checkpoint under the sidecar lock. It advances an already-consumed pause on
+// resume and preserves the in-flight phase on a graceful fresh-cycle interrupt.
+// Unlike the routine boundary writer, it must replace the previous escalation.
+// The checkpoint package registers the durable writer.
 var ResumeBoundaryCheckpointer func(cs CycleState, projectRoot string, now time.Time) error
 
 // applyDispatchPolicy is shared by fresh and resumed phase dispatch. The
