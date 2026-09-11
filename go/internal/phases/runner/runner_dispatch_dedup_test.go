@@ -38,20 +38,24 @@ import (
 // "llmroute.Dispatch" in a comment can't game it — the predicate-quality
 // rule bars a source-text-only assertion from being the SOLE evidence.
 
-// readRunnerSource returns runner.go's contents (sibling of this test file —
-// runtime.Caller(0) locates the package dir so the check works regardless of
-// the caller's cwd, matching the seed_phase_e2e_test.go convention).
+// readRunnerSource returns the facade and dispatch-stage sources. The
+// implementation was split without moving the shared-dispatch invariant out
+// of this package, so the anti-duplication check must cover both files.
 func readRunnerSource(t *testing.T) string {
 	t.Helper()
 	_, thisFile, _, ok := runtime.Caller(0)
 	if !ok {
 		t.Fatal("cannot locate test file")
 	}
-	src, err := os.ReadFile(filepath.Join(filepath.Dir(thisFile), "runner.go"))
-	if err != nil {
-		t.Fatalf("read runner.go: %v", err)
+	var source strings.Builder
+	for _, name := range []string{"runner.go", "dispatch.go"} {
+		src, err := os.ReadFile(filepath.Join(filepath.Dir(thisFile), name))
+		if err != nil {
+			t.Fatalf("read %s: %v", name, err)
+		}
+		source.Write(src)
 	}
-	return string(src)
+	return source.String()
 }
 
 // TestRunnerDispatch_NoInlineFallbackLoop (AC2, negative): the hand-rolled

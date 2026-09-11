@@ -15,7 +15,7 @@ func TestBuildExplanationLifecycleWiring(t *testing.T) {
 		callee   string
 	}{
 		{"../phases/ship/native.go", "Run", "verifyNativeExplanation"},
-		{"../phases/audit/audit.go", "Classify", "validateExplanationReview"},
+		{"../phases/audit/classification.go", "newAuditClassification", "validateExplanationReview"},
 		{"../phases/retro/retro.go", "Run", "validateExplanationReview"},
 		{"../core/cyclerun_review.go", "reviewAndGuard", "explanationdocs.RefreshResult"},
 		{"../core/orchestrator.go", "RunCycle", "activateBuildExplanationContract"},
@@ -37,7 +37,7 @@ func TestBuildExplanationLifecycleWiring(t *testing.T) {
 	}{
 		{"../core/orchestrator.go", "NewOrchestrator", "explanationContractVersion", "explanationdocs.CurrentContractVersion"},
 		{"../core/cyclerun.go", "newCycleRun", "ExplanationDocumentationVersion", "o.explanationContractVersion"},
-		{"../phases/runner/runner.go", "Run", "RequireSandbox", "requiresExplanationSandbox"},
+		{"../phases/runner/dispatch.go", "dispatchPhaseAttempts", "RequireSandbox", "requiresExplanationSandbox"},
 	}
 	for _, pin := range assignments {
 		t.Run(filepath.Base(pin.path)+"/"+pin.field, func(t *testing.T) {
