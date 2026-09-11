@@ -3,9 +3,10 @@
 **Date:** 2026-09-11
 **Campaign branches:** one isolated branch per functional batch
 **Campaign base:** merged `main` at `774d4c3c`
-**Current batch base:** merged `main` at `c72f68b2`
+**Current batch base:** merged `main` at `e7f1460c`
 **Status:** characterization, state/admission, and tick-interaction batches
-complete; checkpoint extraction pending
+merged; checkpoint evidence/adjudication implemented and under review;
+checkpoint disposition pending
 
 ## Objective and scope contract
 
@@ -259,9 +260,12 @@ changed observation order.
    streaming, and completion polling visible in the coordinator; extract only
    a cohesive inbox/auto-response effect if that boundary remains useful after
    characterization.
-4. **Checkpoint:** extract liveness evidence, persistent gates, review callback,
-   extension accounting, and one-shot nudge.
-5. **Coordinator and documentation:** reduce `wait` to readable orchestration,
+4. **Checkpoint evidence/adjudication:** retain pane evidence, update liveness
+   and persistent fault gates, build one `StopEvent`, select one verdict, and
+   publish the review callback.
+5. **Checkpoint disposition:** apply extension accounting and the bounded
+   one-shot nudge as a separate transaction after adjudication.
+6. **Coordinator and documentation:** reduce `wait` to readable orchestration,
    rerun metrics, update this report with final topology and evidence, and ship
    only after all reviews pass.
 
@@ -425,6 +429,107 @@ go vet ./...
 PASS
 ```
 
+## Checkpoint evidence/adjudication implementation record
+
+The third production batch starts from merged main `e7f1460c` on the isolated
+`refactor/tmux-wait-checkpoint-evidence` branch. It adds
+`driver_tmux_wait_checkpoint.go` with one package-local method,
+`reviewCheckpoint`, and a two-value package-local result type. The normal
+result means a verdict has been published; the failover result means the
+coordinator must return the existing `ExitUnknownPrompt` code. No success exit
+code is overloaded to mean "close the timeout loop."
+
+The extracted method owns one transaction:
+
+1. update peak tokens and retain the last non-empty pane;
+2. observe liveness through `SignalCenter`;
+3. evaluate the checkpoint-only exhaustion gate and its one-probe
+   corroboration latch;
+4. derive changed/busy/render-wedge evidence and construct one `StopEvent`;
+5. call the checkpoint fatal gate exactly once, falling through to the
+   configured reviewer only when it does not preempt;
+6. save and log one verdict, then invoke the nil-safe review callback.
+
+The coordinator continues to own checkpoint eligibility, the one fresh pane
+capture, blank-pane recovery, failover return, and all verdict disposition.
+That boundary keeps polling and loop control visible while making evidence and
+adjudication independently callable in a unit test. It also preserves the
+load-bearing order: recover pane, retain/classify evidence, exhaustion exit or
+fatal/reviewer selection, durable fatal outcome, verdict log, callback, then
+disposition.
+
+The existing S4 anti-bypass guard now reads both
+`driver_tmux_wait.go` and `driver_tmux_wait_checkpoint.go`. A future direct
+`PaneBusy` or `PaneHasSubstantiveChange` call cannot evade the guard merely by
+moving across the extraction seam. Stale source-line references were removed
+from that test and from the timeout diagnostic comment.
+
+Strict TDD used two complementary contracts:
+
+```text
+Engine.LaunchArgs composition characterization
+TestRunTmuxREPL_PersistentFatalCheckpointPreservesTheWholeDecisionChain
+PASS on unchanged production
+
+temporary mutation: ignore fatal preemption and always call the reviewer
+FAIL: reviewer calls = 2, want 1 before the fatal gate crosses
+
+restore production and verify driver_tmux_wait.go has no diff
+PASS
+
+direct component contract written before the method existed
+TestReviewCheckpoint_BuildsAndPublishesEvidence
+COMPILE-RED: replWaiter.reviewCheckpoint and checkpointReviewed undefined
+
+extract the minimum checkpoint evidence/adjudication method
+PASS
+```
+
+The composition contract drives the public `Engine.LaunchArgs` entrypoint with
+two consecutive fatal panes at enforcement stage. It proves the first
+observation reaches the reviewer, the gate-crossing observation bypasses it,
+the callbacks are `extend` then `stop`, the durable C2 `fast_failed` record and
+stop log exist before the stop callback, no nudge is sent or recorded, and the
+ordinary exit-81 timeout marker retains `last_review=stop` plus the typed
+`model_invalid` reason. The direct contract proves a standalone checkpoint
+builds its event identity, timing, pane tail, injected prompt, retained pane,
+verdict, and callback.
+
+After extraction, `replWaiter.wait` spans 237 lines, down from 332 after the
+tick-interaction batch, 380 after state/admission, and 576 before the campaign.
+`reviewCheckpoint` spans 74 lines in a 96-line single-purpose file. Both reach
+100% statement coverage in the Bridge suite. This batch adds no capture,
+completion poll, sleep, send, file write, wall probe, goroutine, channel,
+timer, dependency, interface, exported name, or constant-false condition.
+
+Validation before review:
+
+```text
+go test -count=1 -coverprofile=/tmp/evolve-tmux-checkpoint.cover ./internal/bridge/...
+PASS; Bridge package 93.4% statement coverage
+replWaiter.wait              100.0%
+replWaiter.reviewCheckpoint  100.0%
+
+go test -race -count=1 ./internal/bridge/...
+PASS
+
+go vet ./internal/bridge/...
+PASS
+
+golangci-lint run ./internal/bridge/...
+PASS; 0 issues
+
+go test -tags=integration -count=1 ./internal/bridge \
+  -run '^TestRealTmux_(HappyPath|ArtifactTimeout|NamedSessionResume|ConcurrentSessionsIsolated)$'
+PASS
+
+go test -count=1 ./...
+PASS
+
+go vet ./...
+PASS
+```
+
 ## Test layers and commands
 
 | Layer | Evidence | Command |
@@ -494,3 +599,14 @@ immediate exits and common timeout closeout remain distinct, and ordered pane
 observation stays visible in the coordinator. The final documentation-only
 review-record update was applied after those verdicts and is included in the
 commit-gate tree.
+
+For the checkpoint evidence/adjudication batch, the same three reviewers
+returned PASS with no findings on staged tree
+`7143171d6c705bcd91f8a7d20fe8923aaeb84965`. They confirmed that capture and
+recovery remain visible in the coordinator, gate state remains per launch,
+exhaustion still precedes event/review work, fatal preemption still records and
+logs before callback publication, the typed two-result boundary does not
+overload a success exit code, the public composition contract is
+mutation-sensitive, and the S4 source guard covers both sides of the extraction
+seam. The only later change is this factual review record; all reviewers must
+confirm the final staged tree before attestation.

@@ -1,19 +1,13 @@
 package bridge
 
-// driver_tmux_repl_s4_migration_test.go — RED tests for cycle-432 slice S4,
-// Task 2 (s4-migrate-driver-callsites): the stop-review checkpoint must stop
-// parsing CLI chrome directly (panestream.PaneBusy /
-// PaneHasSubstantiveChange at driver_tmux_repl.go:635,654,687) and instead
-// read the panestream.SignalCenter projections added in Task 1
+// driver_tmux_repl_s4_migration_test.go — cycle-432 slice S4 regression tests:
+// the stop-review checkpoint must not parse CLI chrome directly through
+// panestream.PaneBusy / PaneHasSubstantiveChange. It reads the
+// panestream.SignalCenter projections added in Task 1
 // (livenessCenter.Busy(session) / livenessCenter.Changed(session)).
 //
-// TDD contract: written BEFORE the migration lands. AC1/AC2 assert on
-// StopEvent fields the CURRENT direct-call code already happens to satisfy in
-// the positive case (so they may show pre-existing GREEN for the "value is
-// right" half); AC3 is the discriminating RED test — it fails today because
-// the checkpoint still calls the free functions directly. DO NOT MODIFY these
-// tests — Builder migrates the callsites to make AC3 (and any currently-red
-// case) pass without breaking AC1/AC2/AC4.
+// AC1/AC2 pin the projected values and AC3 guards the implementation boundary,
+// which now spans the wait coordinator and its checkpoint module.
 
 import (
 	"os"
@@ -29,10 +23,10 @@ import (
 // this exact fixture/harness): boot consumes 2 captures (the marker-check
 // read, then claude-tmux's tickDuringBoot auto-respond tick, which captures
 // again internally but is not used for the marker decision); the post-paste
-// baseline (driver_tmux_repl.go:499) consumes 1 more; each wait-loop
+// baseline dispatch consumes 1 more; each wait-loop
 // iteration's auto-respond tick (autorespond.go:246) consumes 1 capture
-// BEFORE a checkpoint fires, and the checkpoint's own rawPane read
-// (driver_tmux_repl.go:616) consumes 1 more — but the interval elapses one
+// BEFORE a checkpoint fires, and the coordinator's checkpoint capture
+// consumes 1 more — but the interval elapses one
 // full iteration late (elapsed=0 on the very first iteration never satisfies
 // elapsed-intervalStart>=interval), so checkpoint 1 lands on the SIXTH
 // capture (0-indexed position 5) and checkpoint 2 on the EIGHTH (position 7).
@@ -105,45 +99,32 @@ func TestRunTmuxREPL_ProgressedFromCenter(t *testing.T) {
 	}
 }
 
-// checkpointRegionSource extracts the stop-review checkpoint block from
-// driver_tmux_wait.go, anchored on the two stable comment/line markers that
-// bracket it, so a future reflow can't silently narrow (or widen) the scanned
-// region without also updating this test.
+// checkpointRegionSource loads both sides of the extracted checkpoint
+// boundary. The coordinator owns capture and disposition; the checkpoint
+// module owns liveness evidence and adjudication. Scanning both prevents a
+// future direct chrome parser from hiding on either side of that call seam.
 func checkpointRegionSource(t *testing.T) string {
 	t.Helper()
 	_, thisFile, _, ok := runtime.Caller(0)
 	if !ok {
 		t.Fatal("could not resolve this test file's path via runtime.Caller")
 	}
-	src, err := os.ReadFile(filepath.Join(filepath.Dir(thisFile), "driver_tmux_wait.go"))
-	if err != nil {
-		t.Fatalf("read driver_tmux_wait.go: %v", err)
-	}
-	lines := strings.Split(string(src), "\n")
-
-	start, end := -1, -1
-	for i, ln := range lines {
-		if start == -1 && strings.Contains(ln, "Review checkpoint: a full interval elapsed") {
-			start = i
+	var sources []string
+	for _, name := range []string{"driver_tmux_wait.go", "driver_tmux_wait_checkpoint.go"} {
+		src, err := os.ReadFile(filepath.Join(filepath.Dir(thisFile), name))
+		if err != nil {
+			t.Fatalf("read %s: %v", name, err)
 		}
-		if start != -1 && strings.Contains(ln, "state.intervalStartS = elapsed") {
-			end = i // keep scanning — take the LAST match, the outer-block close
-			// (was "intervalBaselinePane = curPane" until that vestigial S4 dead
-			// assignment was removed; the interval reset now closes the region)
-		}
+		sources = append(sources, string(src))
 	}
-	if start == -1 || end == -1 {
-		t.Fatal("could not locate the stop-review checkpoint region markers in driver_tmux_wait.go")
-	}
-	return strings.Join(lines[start:end+1], "\n")
+	return strings.Join(sources, "\n")
 }
 
 // TestRunTmuxREPL_NoDirectChromeParseAtCheckpoint (AC3, negative —
-// discriminating anti-gaming test): the checkpoint block must no longer call
+// discriminating anti-gaming test): the checkpoint implementation must not call
 // panestream.PaneBusy( or PaneHasSubstantiveChange( directly. This is the
 // test that defeats the "keep the direct call AND also call the center"
-// cheapest fake — it fails today (RED) because driver_tmux_repl.go:635,654,687
-// still call both functions inline.
+// cheapest fake across the coordinator/module seam.
 func TestRunTmuxREPL_NoDirectChromeParseAtCheckpoint(t *testing.T) {
 	region := checkpointRegionSource(t)
 	for _, needle := range []string{"panestream.PaneBusy(", "PaneHasSubstantiveChange("} {
