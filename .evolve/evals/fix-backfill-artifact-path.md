@@ -62,9 +62,11 @@ Expected: `tdd` row shows `test-report.md` (not `tdd-report.md`) and `intent` ro
 
 ```bash
 grep -n '"tdd-report\.md"\|"intent-report\.md"' go/internal/core/orchestrator.go
+grep_status=$?
+[ "$grep_status" -eq 1 ] || { echo "FAIL: expected no wrong path constant; grep exit=$grep_status" >&2; exit 1; }
 ```
 
-Expected: no output (exit non-zero or empty — these wrong paths must not remain).
+Expected: the negated assertion exits 0 only when these wrong paths are absent.
 
 ---
 

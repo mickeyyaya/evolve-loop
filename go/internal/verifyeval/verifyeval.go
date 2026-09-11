@@ -16,9 +16,11 @@
 //	stdout_contains: "FAIL"  # (negated when prefixed with !)
 //	stderr_contains: ""
 //
-// The package executes each ```bash``` block in the eval (one command
-// per non-comment line), captures stdout/stderr/exit, and applies the
-// Expected predicates. Any failure flips the overall verdict to FAIL.
+// The package executes each ```bash``` block as one isolated script, captures
+// stdout/stderr/exit, and applies the Expected predicates.
+// Any failure flips the overall verdict to FAIL.
+// Without a machine-readable exit_code, each script must return zero when its
+// assertion holds; surrounding prose is not interpreted as an expectation.
 //
 // Production execution shells out via opts.Runner. Tests inject a
 // fake runner so no real shell ever runs in unit tests. The shell-
@@ -36,15 +38,15 @@ import (
 	"strings"
 )
 
-// CmdRunner is the seam for command execution. The production impl
-// shells out via /bin/sh; tests inject a fake.
+// CmdRunner is the seam for command execution. The production implementation
+// runs Bash scripts with pipeline failure propagation; tests inject a fake.
 type CmdRunner func(ctx context.Context, workdir, command string) (stdout, stderr string, exitCode int, err error)
 
-// Expectations captures the predicates parsed from the eval's
-// ## Expected section. Each field is optional; absent fields are not
-// enforced.
+// Expectations captures the global predicates parsed from the eval's ## Expected
+// section. ExitCode defaults to zero; the output predicates are enforced only
+// when present.
 type Expectations struct {
-	ExitCode       *int   // when non-nil, observed exit must match
+	ExitCode       *int   // defaults to zero; an explicit value overrides it
 	StdoutContains string // when non-empty, stdout must contain this substring
 	StdoutAbsent   string // when non-empty, stdout must NOT contain this
 	StderrContains string // same for stderr
@@ -59,7 +61,8 @@ type Options struct {
 	Runner    CmdRunner
 }
 
-// CommandResult captures the outcome of one executed command.
+// CommandResult captures the outcome of one executed fence script. Command is
+// retained as the public field name for compatibility.
 type CommandResult struct {
 	Command  string
 	Stdout   string
@@ -76,10 +79,10 @@ type Result struct {
 	Commands []CommandResult
 }
 
-// Verify executes every bash command in the eval and checks each
-// against the parsed Expectations. Returns Verdict=PASS when every
-// command satisfies the predicates; FAIL on first mismatch (subsequent
-// commands still run so the operator sees the full failure picture).
+// Verify executes every bash fence in the eval and checks each script against
+// the parsed Expectations. Returns Verdict=PASS when every script satisfies the
+// predicates; subsequent scripts still run after a mismatch so the operator
+// sees the full failure picture.
 func Verify(opts Options) (Result, error) {
 	if opts.Path == "" {
 		return Result{}, fmt.Errorf("verifyeval: Path required")
@@ -92,17 +95,24 @@ func Verify(opts Options) (Result, error) {
 		runner = DefaultRunner
 	}
 
-	commands, expect, err := parseEval(opts.Path)
+	scripts, expect, err := parseEval(opts.Path)
 	if err != nil {
 		return Result{}, err
+	}
+	if len(scripts) == 0 {
+		return Result{}, fmt.Errorf("verifyeval: no bash scripts found in %s", opts.Path)
+	}
+	if expect.ExitCode == nil {
+		zero := 0
+		expect.ExitCode = &zero
 	}
 
 	res := Result{Path: opts.Path, Verdict: "PASS"}
 	ctx := context.Background()
-	for _, cmd := range commands {
-		stdout, stderr, exit, runErr := runner(ctx, opts.Workspace, cmd)
+	for _, script := range scripts {
+		stdout, stderr, exit, runErr := runner(ctx, opts.Workspace, script)
 		cr := CommandResult{
-			Command:  cmd,
+			Command:  script,
 			Stdout:   stdout,
 			Stderr:   stderr,
 			ExitCode: exit,
@@ -116,6 +126,9 @@ func Verify(opts Options) (Result, error) {
 		if reason := matchExpectations(cr, expect); reason != "" {
 			cr.Reason = reason
 			res.Verdict = "FAIL"
+		} else if reason := executionEvidenceReason(cr); reason != "" {
+			cr.Reason = reason
+			res.Verdict = "FAIL"
 		} else {
 			cr.Passed = true
 		}
@@ -124,7 +137,7 @@ func Verify(opts Options) (Result, error) {
 	return res, nil
 }
 
-// matchExpectations checks one command's outcome against the parsed
+// matchExpectations checks one script's outcome against the parsed
 // predicates. Returns "" when all checks pass; otherwise a one-line
 // reason naming the first failed predicate.
 func matchExpectations(cr CommandResult, e Expectations) string {
@@ -143,8 +156,9 @@ func matchExpectations(cr CommandResult, e Expectations) string {
 	return ""
 }
 
-// parseEval extracts bash commands and the Expected predicate block
-// from the eval markdown file.
+// parseEval extracts bash scripts and the Expected predicate block from the
+// eval markdown file. One fence is one shell so state and multiline syntax are
+// preserved; separate fences remain isolated executions.
 func parseEval(path string) ([]string, Expectations, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -152,35 +166,36 @@ func parseEval(path string) ([]string, Expectations, error) {
 	}
 	defer func() { _ = f.Close() }()
 
-	var commands []string
+	var scripts []string
 	var expect Expectations
+	var script strings.Builder
 	inBash := false
 	inExpected := false
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		line := scanner.Text()
 		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "```") {
-			if inBash {
+		if inBash {
+			if strings.HasPrefix(trimmed, "```") {
+				appendScript(&scripts, &script)
 				inBash = false
-			} else if strings.Contains(trimmed, "bash") {
-				inBash = true
+			} else {
+				script.WriteString(line)
+				script.WriteByte('\n')
 			}
+			continue
+		}
+		if strings.HasPrefix(trimmed, "```") && strings.Contains(trimmed, "bash") {
+			inBash = true
+			script.Reset()
 			continue
 		}
 		if strings.HasPrefix(trimmed, "## Expected") || strings.HasPrefix(trimmed, "## expected") {
 			inExpected = true
-			inBash = false
 			continue
 		}
 		if strings.HasPrefix(trimmed, "## ") && inExpected {
 			inExpected = false
-		}
-		if inBash {
-			if trimmed != "" && !strings.HasPrefix(trimmed, "#") {
-				commands = append(commands, trimmed)
-			}
-			continue
 		}
 		if inExpected {
 			parseExpectedLine(trimmed, &expect)
@@ -189,7 +204,28 @@ func parseEval(path string) ([]string, Expectations, error) {
 	if err := scanner.Err(); err != nil {
 		return nil, Expectations{}, fmt.Errorf("verifyeval: read %s: %w", path, err)
 	}
-	return commands, expect, nil
+	if inBash {
+		appendScript(&scripts, &script)
+	}
+	return scripts, expect, nil
+}
+
+func appendScript(scripts *[]string, script *strings.Builder) {
+	content := strings.TrimSpace(script.String())
+	if scriptHasCommand(content) {
+		*scripts = append(*scripts, content)
+	}
+	script.Reset()
+}
+
+func scriptHasCommand(script string) bool {
+	for _, line := range strings.Split(script, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed != "" && !strings.HasPrefix(trimmed, "#") {
+			return true
+		}
+	}
+	return false
 }
 
 // parseExpectedLine populates Expectations from one `key: value` line
@@ -219,10 +255,11 @@ func parseExpectedLine(line string, e *Expectations) {
 	}
 }
 
-// DefaultRunner shells out to /bin/sh -c. Marked here for clarity;
-// the integration-tag tests exercise it against /bin/true and friends.
+// DefaultRunner executes one fenced script with Bash pipeline failure
+// propagation. The script keeps normal Bash status-handling semantics, including
+// the ability to inspect an expected failure with $?.
 func DefaultRunner(ctx context.Context, workdir, command string) (string, string, int, error) {
-	cmd := exec.CommandContext(ctx, "/bin/sh", "-c", command)
+	cmd := exec.CommandContext(ctx, "/bin/bash", "-o", "pipefail", "-c", command)
 	if workdir != "" {
 		cmd.Dir = workdir
 	}

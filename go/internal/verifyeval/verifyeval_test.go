@@ -61,6 +61,58 @@ func TestVerify_HappyPath_PASS(t *testing.T) {
 	}
 }
 
+func TestVerify_NarrowedGoTestWithNoMatches_FAIL(t *testing.T) {
+	const command = "go test -count=1 -run '^TestMissing$' ./internal/core"
+	path := writeEval(t, "```bash\n"+command+"\n```\n\n## Expected\n\nexit_code: 0\n")
+	runner := func(context.Context, string, string) (string, string, int, error) {
+		return "ok  example.com/project/internal/core  0.4s [no tests to run]\n", "", 0, nil
+	}
+
+	res, err := Verify(Options{Path: path, Workspace: "/tmp", Runner: runner})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Verdict != "FAIL" {
+		t.Fatalf("Verdict = %q, want FAIL; commands=%+v", res.Verdict, res.Commands)
+	}
+	if reason := res.Commands[0].Reason; !strings.Contains(reason, "matched no tests") {
+		t.Errorf("Reason = %q, want missing-test context", reason)
+	}
+}
+
+func TestVerify_NoExpectedSectionNonzeroExit_FAIL(t *testing.T) {
+	path := writeEval(t, "```bash\ngo test ./internal/core\n```\n")
+	runner := func(context.Context, string, string) (string, string, int, error) {
+		return "", "tests failed", 1, nil
+	}
+
+	res, err := Verify(Options{Path: path, Workspace: "/tmp", Runner: runner})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Verdict != "FAIL" {
+		t.Fatalf("Verdict = %q, want FAIL; commands=%+v", res.Verdict, res.Commands)
+	}
+	if reason := res.Commands[0].Reason; !strings.Contains(reason, "expected 0") {
+		t.Errorf("Reason = %q, want default exit-code context", reason)
+	}
+}
+
+func TestVerify_ExplicitNonzeroExit_PASS(t *testing.T) {
+	path := writeEval(t, "```bash\nprobe\n```\n\n## Expected\n\nexit_code: 3\n")
+	runner := func(context.Context, string, string) (string, string, int, error) {
+		return "", "expected rejection", 3, nil
+	}
+
+	res, err := Verify(Options{Path: path, Workspace: "/tmp", Runner: runner})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Verdict != "PASS" {
+		t.Fatalf("Verdict = %q, want PASS; commands=%+v", res.Verdict, res.Commands)
+	}
+}
+
 // TestVerify_ExitCodeMismatch_FAIL — non-matching exit code flips
 // verdict to FAIL with a descriptive reason.
 func TestVerify_ExitCodeMismatch_FAIL(t *testing.T) {
@@ -132,7 +184,7 @@ func TestVerify_StderrContains(t *testing.T) {
 // TestVerify_RunnerError_FAIL — runner returning err marks the command
 // failed but continues to subsequent commands.
 func TestVerify_RunnerError_FAIL(t *testing.T) {
-	path := writeEval(t, "```bash\nbad\ngood\n```\n\n## Expected\n\nexit_code: 0\n")
+	path := writeEval(t, "```bash\nbad\n```\n```bash\ngood\n```\n\n## Expected\n\nexit_code: 0\n")
 	fr := &fakeRunner{scripts: map[string]struct {
 		stdout, stderr string
 		exit           int
@@ -171,16 +223,13 @@ func TestVerify_FileNotFound_Error(t *testing.T) {
 	}
 }
 
-// TestVerify_NoCommands_PASS — eval with no bash blocks PASSes
-// vacuously (nothing to check).
-func TestVerify_NoCommands_PASS(t *testing.T) {
+// TestVerify_NoScripts_Error prevents an empty acceptance definition from
+// passing without executing evidence.
+func TestVerify_NoScripts_Error(t *testing.T) {
 	path := writeEval(t, "## Expected\n\nexit_code: 0\n")
-	res, err := Verify(Options{Path: path, Workspace: "/tmp", Runner: (&fakeRunner{}).run()})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if res.Verdict != "PASS" {
-		t.Errorf("Verdict=%q, want PASS (vacuous)", res.Verdict)
+	_, err := Verify(Options{Path: path, Workspace: "/tmp", Runner: (&fakeRunner{}).run()})
+	if err == nil || !strings.Contains(err.Error(), "no bash scripts") {
+		t.Fatalf("Verify() error = %v, want no-bash-scripts error", err)
 	}
 }
 
@@ -290,12 +339,10 @@ func TestParseEval_ScannerError(t *testing.T) {
 
 // TestDefaultRunner_DefaultBuild covers the production CmdRunner in the
 // DEFAULT build (the integration-tagged file only runs under -tags
-// integration). It uses /bin/sh shell builtins (exit/echo) so no external
-// binary beyond the shell is required; deterministic and offline. Skips
-// only when /bin/sh is genuinely absent.
+// integration). It uses Bash builtins so it is deterministic and offline.
 func TestDefaultRunner_DefaultBuild(t *testing.T) {
-	if _, err := os.Stat("/bin/sh"); err != nil {
-		t.Skip("/bin/sh not present")
+	if _, err := os.Stat("/bin/bash"); err != nil {
+		t.Skip("/bin/bash not present")
 	}
 	ctx := context.Background()
 
