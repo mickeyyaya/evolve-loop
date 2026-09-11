@@ -47,7 +47,6 @@ func (w replWaiter) wait() (replWaitResult, int) {
 	phaseName := w.phaseName
 	ar := w.responder
 	irec := w.recorder
-	cursor := w.cursor
 	channel := w.channel
 	state := newReplWaitState(w)
 	defer state.recordNudgeOutcome(irec, deps.Now)
@@ -136,58 +135,11 @@ func (w replWaiter) wait() (replWaitResult, int) {
 			waitPane, werr = deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
 			waitCaptureOK = werr == nil
 		}
-		// Drain live-injection envelopes BEFORE the auto-respond tick so an
-		// operator interrupt pre-empts a pending auto-reply on this tick.
-		if envs, _ := cursor.Drain(); len(envs) > 0 {
-			for _, env := range envs {
-				// injectEnvelope returns a non-empty CorrID only when an
-				// idle-gated correlated ask was actually pasted (not re-queued,
-				// dropped, or a keystroke/interrupt). The breadcrumb is emitted
-				// HERE — at the moment delivery is confirmed — so the channel sink
-				// (and the open-span tracking) lives entirely in this loop. Gated:
-				// channel off → no breadcrumb, no span tracking.
-				cid := injectEnvelope(ctx, cfg, deps, lp, env)
-				channel.injectionDelivered(cid)
+		step := w.handleTickInteractions(state, elapsed, waitPane, channelCaptureOK && waitCaptureOK)
+		if step.done {
+			if step.code != ExitOK {
+				return state.result, step.code
 			}
-		}
-		channel.observeIdle(waitPane, state.livenessCenter)
-		action, rc := ar.tickPane(ctx, lp.session, waitPane, channelCaptureOK && waitCaptureOK)
-		switch rc {
-		case 0, 1: // noop / responded
-		case 2:
-			// Agent self-signalled progress ("extend_timeout"): restart the
-			// current review interval so the signal counts as activity. Bounded
-			// by the auto-respond loop guard (case 86) — an agent cannot defer
-			// the reviewer indefinitely by repeating the same extend prompt.
-			if parseExtendSecs(action) > 0 {
-				state.intervalStartS = elapsed
-				fmt.Fprintf(deps.Stderr, "%s agent extend signal — review interval refreshed\n", pfx)
-			}
-		case 3:
-			if strings.TrimSpace(waitPane) != "" {
-				state.result.lastGoodPane = waitPane
-			}
-			state.lastEvent = StopEvent{
-				Kind:           StopArtifactTimeout,
-				Phase:          cfg.Agent,
-				Cycle:          cfg.Cycle,
-				ElapsedS:       elapsed,
-				IntervalS:      state.intervalS,
-				Busy:           false,
-				StdoutTail:     lastLines(state.result.lastGoodPane, 40),
-				InjectedPrompt: ar.injectedPrompt,
-				State:          panestream.LivenessIdle,
-			}
-			state.lastVerdict = ReviewVerdict{Action: ReviewStop, Reason: "transient upstream error persisted for 60s"}
-			state.transientShortcircuit = true
-		case 85:
-			fmt.Fprintf(deps.Stderr, "%s auto-respond escalation; abandoning run\n", pfx)
-			return state.result, ExitUnknownPrompt
-		case 86:
-			fmt.Fprintf(deps.Stderr, "%s auto-respond loop guard tripped; abandoning run\n", pfx)
-			return state.result, ExitRespondLoopGuard
-		}
-		if state.transientShortcircuit {
 			break
 		}
 		// Review checkpoint: a full interval elapsed without the artifact.

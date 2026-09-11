@@ -170,6 +170,66 @@ func TestRunTmuxREPL_OrdinaryCompletionPrecedesTickEffects(t *testing.T) {
 	}
 }
 
+func TestRunTmuxREPL_InboxPrecedesAutoRespondOnSameTick(t *testing.T) {
+	swapManifestFS(t, fakeManifestFS{files: map[string][]byte{
+		"manifests/tick-order.json": []byte(`{"cli":"tick-order","binary":"x","interactive_prompts":[{"name":"waiting","regex":"WAITING","response_keys":"AUTO","policy":"auto_respond"}]}`),
+	}})
+
+	ws := t.TempDir()
+	promptFile := writeJSON(t, filepath.Join(ws, "prompt.txt"), "do the work")
+	cfg := &Config{
+		Model:       "m",
+		PromptFile:  promptFile,
+		ProjectRoot: ws,
+		Workspace:   ws,
+		Worktree:    ws,
+		Agent:       "build",
+		Artifact:    filepath.Join(ws, "artifact.md"),
+		StdoutLog:   filepath.Join(ws, "stdout.log"),
+		StderrLog:   filepath.Join(ws, "stderr.log"),
+	}
+	deps := covDeps()
+	tmux := &fakeTmux{paneSeq: []string{"❯ WAITING"}}
+	deps.Tmux = tmux
+
+	waitTicks := 0
+	deps.Sleep = func(delay time.Duration) {
+		if delay != 2*time.Second {
+			return
+		}
+		waitTicks++
+		switch waitTicks {
+		case 1:
+			if err := inbox.Append(ws, "build", inbox.Envelope{
+				Kind: inbox.KindKeystroke, Body: "F13", Source: "test",
+			}, fixedTime); err != nil {
+				t.Fatalf("append inbox effect: %v", err)
+			}
+		case 2:
+			if err := os.WriteFile(cfg.Artifact, []byte("done"), 0o644); err != nil {
+				t.Fatalf("write completing artifact: %v", err)
+			}
+		}
+	}
+
+	lp := tmuxLaunch{
+		name: "tick-order", session: "s", launchCmd: "x",
+		promptMarker: "❯", bootIntervalS: 1,
+	}
+	if code, _ := runTmuxREPL(context.Background(), cfg, deps, lp); code != ExitOK {
+		t.Fatalf("exit = %d, want ExitOK", code)
+	}
+
+	inboxAt := indexOf(tmux.sentSeq, "F13|false")
+	autoAt := indexOf(tmux.sentSeq, "AUTO|false")
+	if inboxAt < 0 || autoAt < 0 {
+		t.Fatalf("missing same-tick effects: inbox=%d auto=%d sent=%v", inboxAt, autoAt, tmux.sentSeq)
+	}
+	if inboxAt >= autoAt {
+		t.Fatalf("inbox effect must precede auto-response on the same tick: inbox=%d auto=%d sent=%v", inboxAt, autoAt, tmux.sentSeq)
+	}
+}
+
 func TestRunTmuxREPL_CancelledCompletionPrecedesTickEffects(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &waitOrderTmux{pane: tmuxPromptMarkerDefault}
