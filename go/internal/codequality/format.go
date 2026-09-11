@@ -10,10 +10,9 @@ import (
 )
 
 // ModuleDir resolves the Go module directory under root: the conventional
-// `<root>/go` submodule when it exists, else root itself. It is the single
-// source of truth for "where the .go files live", shared by the audit gofmt
-// gate and the post-build gofmt normalizer so the two can never disagree on
-// which tree to verify vs. format.
+// `<root>/go` submodule when it exists, else root itself. Formatting callers
+// retain the historical root fallback on inspection errors. Safety decisions
+// use ResolveModuleDir so those errors remain visible.
 func ModuleDir(root string) string {
 	if root == "" {
 		return ""
@@ -24,8 +23,38 @@ func ModuleDir(root string) string {
 	return root
 }
 
-func isDir(p string) bool {
-	info, err := os.Stat(p)
+// ResolveModuleDir resolves a nested Go module only when go/go.mod exists and
+// preserves filesystem errors. Callers that use the result for a safety
+// decision must use this checked form: a support-only go/ directory is not a
+// module, and an unreadable path cannot be treated as absent.
+func ResolveModuleDir(root string) (string, error) {
+	if root == "" {
+		return "", nil
+	}
+	goDir := filepath.Join(root, "go")
+	info, err := os.Stat(goDir)
+	if errors.Is(err, os.ErrNotExist) {
+		return root, nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("inspect Go module directory %s: %w", goDir, err)
+	}
+	if !info.IsDir() {
+		return root, nil
+	}
+	moduleFile := filepath.Join(goDir, "go.mod")
+	_, err = os.Stat(moduleFile)
+	if errors.Is(err, os.ErrNotExist) {
+		return root, nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("inspect nested Go module file %s: %w", moduleFile, err)
+	}
+	return goDir, nil
+}
+
+func isDir(path string) bool {
+	info, err := os.Stat(path)
 	return err == nil && info.IsDir()
 }
 

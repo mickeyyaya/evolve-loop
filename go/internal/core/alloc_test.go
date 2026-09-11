@@ -2,6 +2,11 @@ package core
 
 import (
 	"context"
+	"math"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
 	"sync"
 	"testing"
 )
@@ -98,7 +103,7 @@ func TestAllocateCycleNumber_ConcurrentAllocatorsDistinct(t *testing.T) {
 func TestOrchestratorAllocateCycle_LegacyStorageFallsBack(t *testing.T) {
 	o := &Orchestrator{storage: &fakeStorage{}}
 	st := State{LastCycleNumber: 41}
-	n, err := o.allocateCycle(context.Background(), &st)
+	n, err := o.allocateCycle(context.Background(), &st, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,12 +132,12 @@ func TestPersistCycleEndState_NeverRollsBackLease(t *testing.T) {
 	o := &Orchestrator{storage: f}
 
 	stA := State{LastCycleNumber: 7}
-	nA, err := o.allocateCycle(context.Background(), &stA) // A leases 8
+	nA, err := o.allocateCycle(context.Background(), &stA, "") // A leases 8
 	if err != nil {
 		t.Fatal(err)
 	}
 	stB := State{LastCycleNumber: 7}
-	if _, err := o.allocateCycle(context.Background(), &stB); err != nil { // B leases 9
+	if _, err := o.allocateCycle(context.Background(), &stB, ""); err != nil { // B leases 9
 		t.Fatal(err)
 	}
 
@@ -142,7 +147,7 @@ func TestPersistCycleEndState_NeverRollsBackLease(t *testing.T) {
 	}
 
 	stC := State{LastCycleNumber: nA}
-	nC, err := o.allocateCycle(context.Background(), &stC)
+	nC, err := o.allocateCycle(context.Background(), &stC, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -173,7 +178,7 @@ func TestOrchestratorAllocateCycle_LeaseWhenSupported(t *testing.T) {
 	f.mem.st = State{LastCycleNumber: 7, LastAllocatedCycleNumber: 8} // 8 crashed
 	o := &Orchestrator{storage: f}
 	st := State{LastCycleNumber: 7}
-	n, err := o.allocateCycle(context.Background(), &st)
+	n, err := o.allocateCycle(context.Background(), &st, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -183,4 +188,221 @@ func TestOrchestratorAllocateCycle_LeaseWhenSupported(t *testing.T) {
 	if st.LastAllocatedCycleNumber != 9 {
 		t.Errorf("in-memory state not synced with lease: %+v", st)
 	}
+}
+
+func TestNewCycleRun_AllocatesAboveExistingACSPackage(t *testing.T) {
+	projectRoot := t.TempDir()
+	occupied := writeNestedCyclePackage(t, projectRoot, 41)
+
+	storage := &fakeUpdaterStorage{}
+	worktree := &fakeWorktree{path: t.TempDir()}
+	orchestrator := NewOrchestrator(storage, &fakeLedger{}, buildRunners(nil), WithWorktreeProvisioner(worktree))
+	init, cleanup, err := orchestrator.newCycleRun(context.Background(), CycleRequest{
+		ProjectRoot: projectRoot,
+		GoalHash:    "goal",
+	})
+	if err != nil {
+		t.Fatalf("newCycleRun: %v", err)
+	}
+	defer cleanup(false, true)
+
+	if init.cycle != 42 {
+		t.Fatalf("allocated cycle %d, want 42 to preserve existing %s", init.cycle, occupied)
+	}
+	if len(worktree.createdCycles) != 1 || worktree.createdCycles[0] != 42 {
+		t.Fatalf("worktree created for cycles %v, want [42]", worktree.createdCycles)
+	}
+	if storage.mem.st.LastAllocatedCycleNumber != 42 {
+		t.Fatalf("persisted allocation lease = %d, want 42", storage.mem.st.LastAllocatedCycleNumber)
+	}
+}
+
+func TestOrchestratorAllocateCycle_LegacyStorageHonorsACSPackageFloor(t *testing.T) {
+	projectRoot := t.TempDir()
+	writeNestedCyclePackage(t, projectRoot, 7)
+
+	orchestrator := &Orchestrator{storage: &fakeStorage{}}
+	state := State{}
+	got, err := orchestrator.allocateCycle(context.Background(), &state, projectRoot)
+	if err != nil {
+		t.Fatalf("allocateCycle: %v", err)
+	}
+	if got != 8 {
+		t.Fatalf("allocated cycle %d, want 8", got)
+	}
+}
+
+func TestNewCycleRun_ACSPackageInventoryErrorStopsBeforeAllocation(t *testing.T) {
+	projectRoot := t.TempDir()
+	goDir := writeNestedGoModule(t, projectRoot)
+	if err := os.WriteFile(filepath.Join(goDir, "acs"), []byte("not a directory\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	storage := &fakeUpdaterStorage{}
+	worktree := &fakeWorktree{path: t.TempDir()}
+	orchestrator := NewOrchestrator(storage, &fakeLedger{}, buildRunners(nil), WithWorktreeProvisioner(worktree))
+	_, cleanup, err := orchestrator.newCycleRun(context.Background(), CycleRequest{
+		ProjectRoot: projectRoot,
+		GoalHash:    "goal",
+	})
+	if cleanup != nil {
+		t.Fatal("newCycleRun returned cleanup after allocation failed")
+	}
+	if err == nil || !strings.Contains(err.Error(), "discover source cycle floor") {
+		t.Fatalf("newCycleRun error = %v, want source-floor diagnostic", err)
+	}
+	if len(worktree.createdCycles) != 0 {
+		t.Fatalf("worktree created after allocation failure: %v", worktree.createdCycles)
+	}
+	if storage.mem.st.LastAllocatedCycleNumber != 0 {
+		t.Fatalf("failed inventory burned cycle %d", storage.mem.st.LastAllocatedCycleNumber)
+	}
+}
+
+func TestNewCycleRun_ModuleLookupErrorStopsBeforeAllocation(t *testing.T) {
+	projectRoot := t.TempDir()
+	if err := os.Symlink("go", filepath.Join(projectRoot, "go")); err != nil {
+		t.Fatal(err)
+	}
+
+	storage := &fakeUpdaterStorage{}
+	worktree := &fakeWorktree{path: t.TempDir()}
+	orchestrator := NewOrchestrator(storage, &fakeLedger{}, buildRunners(nil), WithWorktreeProvisioner(worktree))
+	_, cleanup, err := orchestrator.newCycleRun(context.Background(), CycleRequest{
+		ProjectRoot: projectRoot,
+		GoalHash:    "goal",
+	})
+	if cleanup != nil {
+		cleanup(false, true)
+	}
+	if err == nil || !strings.Contains(err.Error(), "inspect Go module directory") {
+		t.Fatalf("newCycleRun error = %v, want module-lookup diagnostic", err)
+	}
+	if storage.mem.st.LastAllocatedCycleNumber != 0 {
+		t.Fatalf("failed module lookup burned cycle %d", storage.mem.st.LastAllocatedCycleNumber)
+	}
+	if len(worktree.createdCycles) != 0 {
+		t.Fatalf("worktree created after module lookup failed: %v", worktree.createdCycles)
+	}
+}
+
+func TestNewCycleRun_ProvisionedModuleLookupErrorPreservesWorktree(t *testing.T) {
+	projectRoot := t.TempDir()
+	worktreePath := t.TempDir()
+	if err := os.Symlink("go", filepath.Join(worktreePath, "go")); err != nil {
+		t.Fatal(err)
+	}
+
+	storage := &fakeUpdaterStorage{}
+	worktree := &fakeWorktree{path: worktreePath}
+	orchestrator := NewOrchestrator(storage, &fakeLedger{}, buildRunners(nil), WithWorktreeProvisioner(worktree))
+	_, cleanup, err := orchestrator.newCycleRun(context.Background(), CycleRequest{
+		ProjectRoot: projectRoot,
+		GoalHash:    "goal",
+	})
+	if cleanup != nil {
+		cleanup(false, true)
+	}
+	if err == nil || !strings.Contains(err.Error(), "inspect Go module directory") {
+		t.Fatalf("newCycleRun error = %v, want provisioned module-lookup diagnostic", err)
+	}
+	if storage.mem.st.LastAllocatedCycleNumber != 1 {
+		t.Fatalf("post-provision inspection lease = %d, want burned cycle 1", storage.mem.st.LastAllocatedCycleNumber)
+	}
+	if len(worktree.cleaned) != 0 {
+		t.Fatalf("source-check failure removed a possibly reused worktree: %v", worktree.cleaned)
+	}
+	if !strings.Contains(err.Error(), worktreePath) {
+		t.Fatalf("source-check error does not report preserved worktree %s: %v", worktreePath, err)
+	}
+	if storage.writeCSCalls != 0 {
+		t.Fatalf("cycle state persisted %d times before provisioned source inspection failed", storage.writeCSCalls)
+	}
+}
+
+func TestOrchestratorAllocateCycle_ConcurrentAllocatorsRespectACSPackageFloor(t *testing.T) {
+	projectRoot := t.TempDir()
+	writeNestedCyclePackage(t, projectRoot, 100)
+
+	storage := &fakeUpdaterStorage{}
+	orchestrator := &Orchestrator{storage: storage}
+	const goroutines = 16
+	got := make(chan int, goroutines)
+	var wait sync.WaitGroup
+	for range goroutines {
+		wait.Add(1)
+		go func() {
+			defer wait.Done()
+			state := State{}
+			n, err := orchestrator.allocateCycle(context.Background(), &state, projectRoot)
+			if err != nil {
+				t.Errorf("allocateCycle: %v", err)
+				return
+			}
+			got <- n
+		}()
+	}
+	wait.Wait()
+	close(got)
+
+	seen := make(map[int]bool, goroutines)
+	for n := range got {
+		if seen[n] {
+			t.Fatalf("duplicate cycle number allocated: %d", n)
+		}
+		seen[n] = true
+	}
+	for n := 101; n <= 100+goroutines; n++ {
+		if !seen[n] {
+			t.Errorf("cycle number %d not allocated above source floor", n)
+		}
+	}
+}
+
+func TestOrchestratorAllocateCycle_ExhaustedACSPackageFloorFails(t *testing.T) {
+	projectRoot := t.TempDir()
+	writeNestedCyclePackage(t, projectRoot, math.MaxInt)
+
+	storage := &fakeUpdaterStorage{}
+	orchestrator := &Orchestrator{storage: storage}
+	state := State{}
+	if _, err := orchestrator.allocateCycle(context.Background(), &state, projectRoot); err == nil || !strings.Contains(err.Error(), "cycle number exhausted") {
+		t.Fatalf("allocateCycle error = %v, want cycle-number exhaustion", err)
+	}
+	if storage.mem.st.LastAllocatedCycleNumber != 0 {
+		t.Fatalf("exhausted source floor wrapped lease to %d", storage.mem.st.LastAllocatedCycleNumber)
+	}
+}
+
+func TestAllocateCycleNumber_ExhaustedPersistedLeaseFails(t *testing.T) {
+	storage := &memUpdater{st: State{LastAllocatedCycleNumber: math.MaxInt}}
+	if _, err := AllocateCycleNumber(context.Background(), storage); err == nil || !strings.Contains(err.Error(), "cycle number exhausted") {
+		t.Fatalf("AllocateCycleNumber error = %v, want cycle-number exhaustion", err)
+	}
+	if storage.st.LastAllocatedCycleNumber != math.MaxInt {
+		t.Fatalf("exhausted persisted lease changed to %d", storage.st.LastAllocatedCycleNumber)
+	}
+}
+
+func writeNestedCyclePackage(t *testing.T, root string, cycle int) string {
+	t.Helper()
+	moduleDir := writeNestedGoModule(t, root)
+	path := filepath.Join(moduleDir, "acs", "cycle"+strconv.Itoa(cycle))
+	if err := os.MkdirAll(path, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func writeNestedGoModule(t *testing.T, root string) string {
+	t.Helper()
+	moduleDir := filepath.Join(root, "go")
+	if err := os.MkdirAll(moduleDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(moduleDir, "go.mod"), []byte("module example.com/nested\n\ngo 1.23\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return moduleDir
 }

@@ -79,6 +79,30 @@ Place it at `go/acs/cycle<N>/predicates_test.go`; the `acssuite` Go lane picks i
 up when the cycle runs. To promote a predicate to the permanent regression set,
 move its package under `go/acs/regression/`.
 
+### Cycle allocation preserves existing packages
+
+A fresh or restored `.evolve/state.json` may lag behind the repository's tracked
+predicate history. Before a new run reserves its number, the orchestrator scans
+the Go module's `acs/` directory for canonical `cycle<N>` entries and allocates
+above the maximum of that source floor, `lastCycleNumber`, and
+`lastAllocatedCycleNumber`. The maximum is applied inside the existing atomic
+state update, so concurrent runs that observe the same source floor still get
+distinct numbers.
+
+Any occupied canonical name reserves its number, including a file or symlink
+where a directory should be. A missing `acs/` tree contributes no floor. An
+unreadable or malformed local tree path aborts allocation before a lease,
+workspace, worktree, or model call is created.
+
+Worktree creation may fetch a commit newer than the local checkout used for the
+floor. Before persisting cycle state or dispatching a phase, the orchestrator
+checks that fetched worktree for the exact selected `cycle<N>` path. A collision
+or inspection error aborts setup before cycle-state persistence or dispatch. The
+error reports the worktree and leaves it available for inspection because the
+provisioner may have reused an existing recovery location. The atomic lease stays
+burned, so a retry advances instead of reusing the rejected identity. Resume
+keeps its recorded cycle identity and bypasses fresh allocation and this check.
+
 ### Absence checks — use `FileNotContains`, never inverted `FileContains`
 
 To assert something is **absent** (e.g. a removed flag no longer appears in a
