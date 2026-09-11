@@ -1,8 +1,11 @@
 package bridge
 
 import (
+	"context"
+	"os"
 	"strings"
 	"testing"
+	"time"
 )
 
 // codex_model_clamp_test.go — cycle-142 incident: the auditor ran codex-tmux
@@ -57,6 +60,69 @@ func TestClampCodexModelForAuth(t *testing.T) {
 			flags:     []string{"--yolo", "-m", "gpt-5.5"},
 			auth:      "chatgpt",
 			wantFlags: []string{"--yolo", "-m", "gpt-5.4-mini"},
+			wantFrom:  "gpt-5.5", wantTo: "gpt-5.4-mini",
+		},
+		{
+			name:      "chatgpt + repeated dedicated selectors → provider-invalid and untouched",
+			flags:     []string{"-m", "gpt-5.4", "--model", "gpt-5.5"},
+			auth:      "chatgpt",
+			wantFlags: []string{"-m", "gpt-5.4", "--model", "gpt-5.5"},
+			wantFrom:  "", wantTo: "",
+		},
+		{
+			name:      "chatgpt + inline selector → effective inline model clamped",
+			flags:     []string{"--model=gpt-5.5"},
+			auth:      "chatgpt",
+			wantFlags: []string{"--model=gpt-5.4-mini"},
+			wantFrom:  "gpt-5.5", wantTo: "gpt-5.4-mini",
+		},
+		{
+			name:      "chatgpt + short inline selector → effective inline model clamped",
+			flags:     []string{"-m=gpt-5.5"},
+			auth:      "chatgpt",
+			wantFlags: []string{"-m=gpt-5.4-mini"},
+			wantFrom:  "gpt-5.5", wantTo: "gpt-5.4-mini",
+		},
+		{
+			name:      "chatgpt + dedicated selector takes precedence over later config",
+			flags:     []string{"-m", "gpt-5.4", "-c", `model="gpt-5.5"`},
+			auth:      "chatgpt",
+			wantFlags: []string{"-m", "gpt-5.4-mini", "-c", `model="gpt-5.5"`},
+			wantFrom:  "gpt-5.4", wantTo: "gpt-5.4-mini",
+		},
+		{
+			name:      "chatgpt + later dedicated selector takes precedence over config",
+			flags:     []string{"-c", `model="gpt-5.5"`, "--model", "gpt-5.4"},
+			auth:      "chatgpt",
+			wantFlags: []string{"-c", `model="gpt-5.5"`, "--model", "gpt-5.4-mini"},
+			wantFrom:  "gpt-5.4", wantTo: "gpt-5.4-mini",
+		},
+		{
+			name:      "chatgpt + safe dedicated selector ignores unsafe config",
+			flags:     []string{"--model", "gpt-5.2", "-c", "model=gpt-5.5"},
+			auth:      "chatgpt",
+			wantFlags: []string{"--model", "gpt-5.2", "-c", "model=gpt-5.5"},
+			wantFrom:  "", wantTo: "",
+		},
+		{
+			name:      "chatgpt + inline config selector → effective config model clamped",
+			flags:     []string{`-c=model='gpt-5.5'`},
+			auth:      "chatgpt",
+			wantFlags: []string{"-c=model=gpt-5.4-mini"},
+			wantFrom:  "gpt-5.5", wantTo: "gpt-5.4-mini",
+		},
+		{
+			name:      "chatgpt + long config selector → effective config model clamped",
+			flags:     []string{"--config", `model="gpt-5.5"`},
+			auth:      "chatgpt",
+			wantFlags: []string{"--config", "model=gpt-5.4-mini"},
+			wantFrom:  "gpt-5.5", wantTo: "gpt-5.4-mini",
+		},
+		{
+			name:      "chatgpt + inline long config selector → effective config model clamped",
+			flags:     []string{`--config=model='gpt-5.5'`},
+			auth:      "chatgpt",
+			wantFlags: []string{"--config=model=gpt-5.4-mini"},
 			wantFrom:  "gpt-5.5", wantTo: "gpt-5.4-mini",
 		},
 		{
@@ -145,13 +211,56 @@ func TestCodexTmuxManifest_HasChatGPTClampPolicy(t *testing.T) {
 	}
 }
 
-// TestModelFlagIndex_TrailingFlag covers the return -1 branch when the -m or
-// --model flag appears as the last element (no value follows it).
-func TestModelFlagIndex_TrailingFlag(t *testing.T) {
-	if got := modelFlagIndex([]string{"-m"}); got != -1 {
-		t.Errorf("modelFlagIndex([\"-m\"]) = %d, want -1 (flag with no value)", got)
+// TestEffectiveModelSelector_TrailingFlag covers incomplete selector forms.
+func TestEffectiveModelSelector_TrailingFlag(t *testing.T) {
+	if got, ok := effectiveCodexModelSelector([]string{"-m"}); ok {
+		t.Errorf("effectiveCodexModelSelector([\"-m\"]) = %+v, want unavailable", got)
 	}
-	if got := modelFlagIndex([]string{"--other", "--model"}); got != -1 {
-		t.Errorf("modelFlagIndex([\"--other\",\"--model\"]) = %d, want -1", got)
+	if got, ok := effectiveCodexModelSelector([]string{"--other", "--model"}); ok {
+		t.Errorf("effectiveCodexModelSelector([\"--other\",\"--model\"]) = %+v, want unavailable", got)
+	}
+}
+
+func TestCodexTmuxDispatchObservationUsesPostClampModel(t *testing.T) {
+	injectCatalogDir(t, t.TempDir())
+	m, err := LoadManifest("codex-tmux")
+	if err != nil {
+		t.Fatalf("LoadManifest: %v", err)
+	}
+	unsafeModel := "gpt-not-on-chatgpt-plan"
+	ws := t.TempDir()
+	cfg := &Config{
+		Workspace: ws, Worktree: ws, ProjectRoot: ws, Agent: "audit",
+		AllowBypass: true, BootOnly: true,
+		Realization: Realization{
+			LaunchFlags:         []string{"-m", unsafeModel},
+			modelDispatchEffect: modelDispatch{model: unsafeModel, source: modelDispatchArgv},
+		},
+	}
+	frames := make([]string, 12)
+	for i := range frames {
+		frames[i] = "›"
+	}
+	tmux := &FakeTmuxController{CaptureFrames: frames}
+	var observations []modelDispatch
+	deps := Deps{
+		Tmux: tmux, Sleep: func(time.Duration) {}, Stderr: os.Stderr,
+		LookupEnv: mapLookup(map[string]string{"EVOLVE_PHASE_RECOVERY": "off"}),
+		onModelDispatch: func(observation modelDispatch) {
+			observations = append(observations, observation)
+		},
+	}.withDefaults()
+
+	code, err := (codexTmuxDriver{}).Launch(context.Background(), cfg, deps)
+	if err != nil || code != ExitOK {
+		t.Fatalf("codexTmuxDriver.Launch = (%d, %v)", code, err)
+	}
+	if len(observations) != 1 || observations[0].model != m.ChatGPTDefaultModel || observations[0].source != modelDispatchArgv {
+		t.Fatalf("dispatch observations = %+v, want post-clamp model %q", observations, m.ChatGPTDefaultModel)
+	}
+	for _, sent := range tmux.SentKeys {
+		if strings.Contains(sent, unsafeModel) {
+			t.Fatalf("unsafe pre-clamp model reached pane: %q", sent)
+		}
 	}
 }

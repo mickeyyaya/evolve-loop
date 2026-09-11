@@ -27,21 +27,24 @@ func codexAuthMode(deps Deps) string {
 	return "chatgpt"
 }
 
-// clampCodexModelForAuth returns flags with the `-m <model>` value rewritten to
-// m.ChatGPTDefaultModel when authMode=="chatgpt" and the realized model is not
-// in m.ChatGPTSafeModels. from/to report the substitution for logging ("","" =
-// no clamp). The input slice is never mutated (a fresh slice is returned on a
-// clamp). No-ops when: auth is api-key, the manifest declares no safe set, the
-// model is already safe, or no -m flag is present.
+// clampCodexModelForAuth returns flags with the effective model-selector token
+// rewritten to m.ChatGPTDefaultModel when authMode=="chatgpt" and the realized
+// model is not in m.ChatGPTSafeModels. It shares selector grammar with dispatch
+// attribution, including split and inline dedicated flags plus -c/--config
+// model overrides. Dedicated flags take precedence over config overrides
+// regardless of argv order. from/to report the substitution for logging
+// ("","" = no clamp). The input slice is never mutated. No-ops when auth is
+// api-key, policy is absent, the model is already safe, or no complete selector
+// is present.
 func clampCodexModelForAuth(flags []string, m Manifest, authMode string) (out []string, from, to string) {
 	if authMode != "chatgpt" || len(m.ChatGPTSafeModels) == 0 || m.ChatGPTDefaultModel == "" {
 		return flags, "", ""
 	}
-	idx := modelFlagIndex(flags)
-	if idx < 0 {
+	selector, ok := effectiveCodexModelSelector(flags)
+	if !ok {
 		return flags, "", ""
 	}
-	current := flags[idx]
+	current := selector.model
 	for _, safe := range m.ChatGPTSafeModels {
 		if current == safe {
 			return flags, "", "" // already ChatGPT-safe
@@ -49,20 +52,6 @@ func clampCodexModelForAuth(flags []string, m Manifest, authMode string) (out []
 	}
 	clamped := make([]string, len(flags))
 	copy(clamped, flags)
-	clamped[idx] = m.ChatGPTDefaultModel
+	clamped[selector.argIndex] = selector.replacementPrefix + m.ChatGPTDefaultModel
 	return clamped, current, m.ChatGPTDefaultModel
-}
-
-// modelFlagIndex returns the index of the value following the first "-m" (or
-// "--model") flag in flags, or -1 when absent or trailing with no value.
-func modelFlagIndex(flags []string) int {
-	for i, f := range flags {
-		if f == "-m" || f == "--model" {
-			if i+1 < len(flags) {
-				return i + 1
-			}
-			return -1
-		}
-	}
-	return -1
 }

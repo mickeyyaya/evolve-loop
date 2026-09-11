@@ -30,6 +30,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/llmcalls"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
@@ -459,22 +460,12 @@ func isPromptEchoSelfReport(workspace, phase, excerpt string) bool {
 // authoritative). Missing file / no record / absent exit_code ⇒ false (a clean
 // exit is unproven, so never veto). Malformed lines are skipped.
 func driverExitedZero(workspace, phase string) bool {
-	f, err := os.Open(filepath.Join(workspace, "llm-calls.ndjson"))
-	if err != nil {
+	result, err := llmcalls.ReadWorkspace(workspace)
+	if err != nil && len(result.Records) == 0 {
 		return false
 	}
-	defer func() { _ = f.Close() }()
 	found, zero := false, false
-	scanner := bufio.NewScanner(f)
-	scanner.Buffer(make([]byte, 1<<10), maxScannerBufBytes)
-	for scanner.Scan() {
-		var rec struct {
-			Phase    string `json:"phase"`
-			ExitCode *int   `json:"exit_code"`
-		}
-		if err := json.Unmarshal(scanner.Bytes(), &rec); err != nil {
-			continue
-		}
+	for _, rec := range result.Records {
 		if rec.Phase != phase || rec.ExitCode == nil {
 			continue
 		}

@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -156,6 +155,11 @@ type Deps struct {
 	// or by headless drivers. Nil-safe: drivers check before invoking. The
 	// Engine wires this per-Launch to populate BridgeResponse.BootMS.
 	OnBoot func(bootMS int64)
+	// onModelDispatch is a call-local observation hook installed by Launch.
+	// Drivers invoke it only when their finalized selector is sent to a new
+	// process/session, or when an existing named session is resumed. It is
+	// deliberately package-private: model-attempt persistence has one owner.
+	onModelDispatch func(modelDispatch)
 	// KeychainProbe reports whether a macOS login-Keychain generic-password
 	// item exists for the given service. doctorAuth consults it for claude,
 	// whose OAuth token Claude Code stores in the Keychain (service
@@ -183,14 +187,15 @@ type Deps struct {
 	// by coincidence but never the latter.
 	LivenessCenter *panestream.SignalCenter
 	// TokenResolver recovers the token usage for a completed Launch window
-	// (token-telemetry S3). nil disables telemetry entirely: Tokens stays zero
-	// and no llm-calls.ndjson record is appended. A resolver error is fail-open —
-	// WARNed to Stderr, and a telemetry failure NEVER fails the Launch. It is a
+	// (token-telemetry S3). nil leaves token counts unavailable while the attempt
+	// ledger still records dispatch, latency, and outcome. A resolver error is
+	// fail-open — WARNed to Stderr, and telemetry NEVER fails the Launch. It is a
 	// DI seam, not a policy toggle (matching the no-feature-flags rule): the
 	// orchestrator building the bridge Deps wires this to the shipped
 	// tokenusage.Chain(TranscriptCollector/EventsResultCollector/ScrollbackPeakCollector);
-	// tests inject a scriptable stub, and withDefaults leaves it nil (telemetry
-	// off) so a Launch never depends on transcript discovery to succeed.
+	// tests inject a scriptable stub, and withDefaults leaves it nil (usage
+	// enrichment unavailable) so a Launch never depends on transcript discovery
+	// to succeed.
 	TokenResolver func(tokenusage.Window) (tokenusage.Result, error)
 }
 
@@ -360,9 +365,9 @@ type Engine struct {
 func NewEngine(deps Deps) *Engine {
 	d := deps.withDefaults()
 	if d.TokenResolver == nil {
-		// Fail-open must be loud: a nil resolver silently zeroes token
-		// telemetry (resolveTokens no-ops), so name the seam once at boot.
-		_, _ = fmt.Fprintf(d.Stderr, "[engine] WARN: Deps.TokenResolver is nil — token telemetry disabled (fail-open); wire tokenusage.DefaultResolver at the composition root\n")
+		// Fail-open must be loud while accurately describing what remains:
+		// lifecycle/outcome records continue, but token counts are unavailable.
+		_, _ = fmt.Fprintf(d.Stderr, "[engine] WARN: Deps.TokenResolver is nil — token usage enrichment unavailable (fail-open); attempt latency and outcome telemetry remain active; wire tokenusage.DefaultResolver at the composition root\n")
 	}
 	return &Engine{deps: d}
 }
@@ -509,12 +514,20 @@ func (e *Engine) Launch(ctx context.Context, req core.BridgeRequest) (core.Bridg
 	// (ADR-0043 A0) into this call's BridgeResponse, chaining any pre-wired
 	// callback. The hook is installed on a per-call Deps COPY (never e.deps).
 	var bootMS int64
+	var dispatched modelDispatch
 	callDeps := e.deps
 	prevOnBoot := callDeps.OnBoot
 	callDeps.OnBoot = func(ms int64) {
 		bootMS = ms
 		if prevOnBoot != nil {
 			prevOnBoot(ms)
+		}
+	}
+	previousDispatchObserver := callDeps.onModelDispatch
+	callDeps.onModelDispatch = func(observation modelDispatch) {
+		dispatched = observation
+		if previousDispatchObserver != nil {
+			previousDispatchObserver(observation)
 		}
 	}
 	// Run the pipeline against a scoped Engine holding that per-call copy, so
@@ -528,11 +541,12 @@ func (e *Engine) Launch(ctx context.Context, req core.BridgeRequest) (core.Bridg
 	var stderrBuf bytes.Buffer
 	start := e.deps.Now()
 	code := callEngine.LaunchArgs(ctx, args, req.Env, io.Discard, &stderrBuf)
+	end := e.deps.Now()
 	resp := core.BridgeResponse{ExitCode: code, Stderr: stderrBuf.String(), BootMS: bootMS}
-	// Token-telemetry S3: attribute this Launch's token cost on every exit path
-	// (before the ExitOK branch), so a failed attempt is still accounted. Runs
-	// once per Launch call → one llm-calls.ndjson record per fallback attempt.
-	e.recordTokenUsage(req, model, code, start, &resp)
+	// The terminal time is frozen before optional token resolution begins. One
+	// orchestration-owned Launch therefore yields one attempt record even when
+	// token enrichment is unavailable or errors.
+	e.recordModelAttempt(req, model, code, start, end, dispatched, stderrBuf.String(), &resp)
 	// Any exit code other than ExitREPLBootTimeout means the REPL booted; reset
 	// the consecutive-strike counter so non-adjacent failures never bench.
 	if e.deps.BootTimeoutStore != nil && !clihealth.IsBootTimeoutExitCode(code) {
@@ -620,41 +634,6 @@ func (e *Engine) Launch(ctx context.Context, req core.BridgeRequest) (core.Bridg
 	return resp, errors.New(msg)
 }
 
-// LLMCallsLogFilename is the per-workspace dispatch ledger this engine appends
-// one record to per launch attempt. `evolve tokens`, `evolve models live` and
-// the dashboard's per-phase CLI/model join resolve the name here;
-// internal/cycleclassify still spells it inline (an unmigrated reader, not a
-// second owner).
-const LLMCallsLogFilename = "llm-calls.ndjson"
-
-// llmCallLog is the on-disk llm-calls.ndjson record shape (token-telemetry S3),
-// one JSON object per line. Field order/tags are pinned by the S3 inbox item so
-// downstream rollups (S6) and the tokens-report CLI (S7) can decode it without a
-// schema migration: ts, agent, phase, cli, model, attempt, tokens, source,
-// duration_ms, exit_code.
-type llmCallLog struct {
-	TS         string          `json:"ts"`
-	Agent      string          `json:"agent"`
-	Phase      string          `json:"phase"`
-	CLI        string          `json:"cli"`
-	Model      string          `json:"model"`
-	Attempt    int             `json:"attempt"`
-	Tokens     core.TokenUsage `json:"tokens"`
-	Source     string          `json:"source"`
-	DurationMS int64           `json:"duration_ms"`
-	ExitCode   int             `json:"exit_code"`
-	// Tripwire is true when a non-claude launch exited 0, ran past the success
-	// threshold, and still resolved to source=none — a genuine unmeasured
-	// success that warrants a per-CLI collector (cycle-1005). Not omitempty: the
-	// false case must stay queryable for the future tokens-report CLI.
-	Tripwire bool `json:"tripwire"`
-	// FillPct is the launch's context-fill reading (percent of the effective
-	// window), or tokenusage.FillPctUnmeasured when it could not be derived.
-	// Not omitempty: the deferred fill%-vs-verdict correlation report has no
-	// corpus unless every record carries the field, measured or not.
-	FillPct float64 `json:"fill_pct"`
-}
-
 // defaultContextFillWarnPct is the bridge-side built-in context-fill WARN
 // threshold for an unconfigured Deps.ContextFillWarnPct. It intentionally
 // matches policy's own built-in: internal/bridge cannot import internal/policy
@@ -677,117 +656,6 @@ func cycleFromWorkspace(ws string) string {
 		}
 	}
 	return ""
-}
-
-// recordTokenUsage attributes a completed Launch's token cost (token-telemetry
-// S3). It is fail-open by contract: a nil resolver disables telemetry (no-op),
-// and a resolver error is WARNed to Stderr and leaves resp.Tokens at its zero
-// value — a telemetry failure must NEVER turn an otherwise-successful Launch
-// into an error, so this helper returns nothing and never touches resp.ExitCode
-// or the Launch error path. On success it populates resp.Tokens and appends one
-// llm-calls.ndjson record; it is called once per Launch call, so each fallback
-// attempt (a distinct Launch on a different CLI) gets its own record rather than
-// overwriting a shared one — the point that makes double-dispatch waste visible.
-func (e *Engine) recordTokenUsage(req core.BridgeRequest, model string, code int, start time.Time, resp *core.BridgeResponse) {
-	if e.deps.TokenResolver == nil {
-		return
-	}
-	end := e.deps.Now()
-	// Lower fallback tiers' inputs both live in the workspace: the launch's
-	// <agent>-events.ndjson (tier 2) and the tmux driver's final scrollback
-	// capture (tier 3). Missing files just leave those tiers with no data.
-	var eventsLogPath, scrollback string
-	if req.Workspace != "" {
-		if req.Agent != "" {
-			eventsLogPath = filepath.Join(req.Workspace, req.Agent+"-events.ndjson")
-		}
-		if b, err := os.ReadFile(filepath.Join(req.Workspace, "tmux-final-scrollback.txt")); err == nil {
-			scrollback = string(b)
-		}
-	}
-	result, err := e.deps.TokenResolver(tokenusage.Window{
-		Worktree:      req.Worktree,
-		ArtifactPath:  req.ArtifactPath,
-		EventsLogPath: eventsLogPath,
-		Scrollback:    scrollback,
-		Driver:        req.CLI,
-		Start:         start,
-		End:           end,
-	})
-	if err != nil {
-		_, _ = fmt.Fprintf(e.deps.Stderr, "[engine] token resolver failed: %v\n", err)
-		return
-	}
-	if result.Warn != "" {
-		// Per-driver coverage WARN (cycle-779): an uncovered launch is recorded
-		// as unmeasured, never left to read as zero-cost.
-		_, _ = fmt.Fprintf(e.deps.Stderr, "[engine] WARN: %s (agent %s)\n", result.Warn, req.Agent)
-	}
-	// Context-fill WARN (cycle-1444): the reading rides out of the resolve
-	// above, so this costs no second measurement. Keyed on a distinct
-	// CONTEXT-FILL marker because the coverage WARN above already names the
-	// agent — an agent-name-only grep could not tell the two lines apart.
-	contributors := result.Usage
-	if result.PeakPromptTokens != 0 {
-		contributors = result.PeakUsage
-	}
-	if w := tokenusage.FillWarnWithContributors(req.Agent, result.FillPct, defaultIfZero(e.deps.ContextFillWarnPct, defaultContextFillWarnPct), contributors); w != "" {
-		_, _ = fmt.Fprintf(e.deps.Stderr, "[engine] WARN: CONTEXT-FILL %s\n", w)
-	}
-	// Telemetry tripwire (cycle-1005): the generic coverage WARN above fires on
-	// every uncovered launch, so a quiet quota-abort (exit 85, seconds long) and
-	// a genuine unmeasured success read identically. Escalate only the latter — a
-	// non-claude CLI that exited 0, ran past the success threshold, and still
-	// resolved to source=none — with a distinct TRIPWIRE line naming CLI+agent
-	// +cycle. Claude is the measured baseline (out of scope), and cycle
-	// derivation fails open (fires without the cycle rather than suppressing).
-	tripwire := code == 0 &&
-		end.Sub(start) > tripwireSuccessThreshold &&
-		result.Source == tokenusage.SourceNone &&
-		!strings.HasPrefix(strings.ToLower(req.CLI), "claude")
-	if tripwire {
-		cycle := cycleFromWorkspace(req.Workspace)
-		if cycle == "" {
-			cycle = "cycle-unknown"
-		}
-		_, _ = fmt.Fprintf(e.deps.Stderr,
-			"[engine] TRIPWIRE: non-claude launch cli=%s agent=%s %s exited 0 after %ds but token usage was unmeasured (source=none) — build a per-CLI usage collector\n",
-			req.CLI, req.Agent, cycle, int(end.Sub(start).Seconds()))
-	}
-	resp.Tokens = core.TokenUsage(result.Usage)
-	attempt := req.Attempt
-	if attempt <= 0 {
-		attempt = 1
-	}
-	rec := llmCallLog{
-		TS:         end.UTC().Format(time.RFC3339),
-		Agent:      req.Agent,
-		Phase:      req.Agent, // the agent role label already IS the phase name
-		CLI:        req.CLI,
-		Model:      model,
-		Attempt:    attempt,
-		Tokens:     core.TokenUsage(result.Usage),
-		Source:     string(result.Source),
-		DurationMS: end.Sub(start).Milliseconds(),
-		ExitCode:   code,
-		Tripwire:   tripwire,
-		FillPct:    result.FillPct,
-	}
-	line, err := json.Marshal(rec)
-	if err != nil {
-		_, _ = fmt.Fprintf(e.deps.Stderr, "[engine] token record marshal failed: %v\n", err)
-		return
-	}
-	path := filepath.Join(req.Workspace, LLMCallsLogFilename)
-	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
-	if err != nil {
-		_, _ = fmt.Fprintf(e.deps.Stderr, "[engine] token record open failed: %v\n", err)
-		return
-	}
-	defer func() { _ = f.Close() }()
-	if _, err := f.Write(append(line, '\n')); err != nil {
-		_, _ = fmt.Fprintf(e.deps.Stderr, "[engine] token record write failed: %v\n", err)
-	}
 }
 
 // firstDiagnosticLine picks the one-line cause threaded into the launch

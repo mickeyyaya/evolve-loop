@@ -111,6 +111,13 @@ func (claudePDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, e
 		fmt.Fprintln(deps.Stderr, "[claude-p] safety gate: activated Build explanation contract requires OS sandbox confinement")
 		return ExitSafetyGate, nil
 	}
+	selection := defaultModelDispatch()
+	if omittedModel == "" && cfg.Model != "" {
+		selection = modelDispatch{model: cfg.Model, source: modelDispatchArgv}
+	}
+	selection = modelDispatchFromRealization("claude-p", selection, cfg.Realization)
+	selection = modelDispatchFromExtraArgs("claude-p", selection, cfg.ExtraFlags)
+	observeModelDispatch(deps, selection)
 	// Publish the agent PID to a per-phase file so the auto-spawn observer's CPU
 	// liveness probe can tell a silently-thinking headless agent from a hung one
 	// (the tmux drivers use the pane probe instead, so only the headless driver

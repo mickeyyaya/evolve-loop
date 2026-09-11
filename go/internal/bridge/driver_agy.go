@@ -46,7 +46,6 @@ func (agyDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, error
 		fmt.Fprintln(deps.Stderr, "[agy] required OS sandbox is unavailable; refusing an unconfined launch")
 		return ExitSafetyGate, nil
 	}
-
 	stdoutF, stderrF, closeFn, err := openDriverLogs(cfg)
 	if err != nil {
 		return ExitBadFlags, err
@@ -54,6 +53,7 @@ func (agyDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, error
 	defer closeFn()
 
 	// cfg.Worktree is "" for non-source-writing phases → inherits caller cwd.
+	observeModelDispatch(deps, defaultModelDispatch())
 	rc, err := deps.Runner(ctx, name, cfg.Worktree, args, driverEnv(deps), nil, stdoutF, stderrF)
 	if err != nil {
 		return ExitMissingBinary, fmt.Errorf("[agy] %w", err)

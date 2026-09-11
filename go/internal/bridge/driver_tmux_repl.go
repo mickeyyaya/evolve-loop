@@ -54,11 +54,12 @@ type tmuxKey struct {
 // driver-specific that the state machine needs is captured here; the
 // driver computes it after its own preflight.
 type tmuxLaunch struct {
-	name         string // log prefix, e.g. "claude-tmux"
-	session      string // resolved tmux session name
-	named        bool   // resume-eligible: skip kill + skip exit seq
-	launchCmd    string // REPL launch command line
-	promptMarker string // boot-ready marker to grep the pane for
+	name          string // log prefix, e.g. "claude-tmux"
+	session       string // resolved tmux session name
+	named         bool   // resume-eligible: skip kill + skip exit seq
+	launchCmd     string // REPL launch command line
+	modelDispatch modelDispatch
+	promptMarker  string // boot-ready marker to grep the pane for
 	// inputLineMarker locates the LIVE INPUT LINE: text after its LAST
 	// occurrence is what has been typed but not yet submitted. Deliberately
 	// DISTINCT from promptMarker, which only answers "has the REPL booted" —
@@ -109,6 +110,9 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	prep, code, err := prepareTmuxREPL(ctx, cfg, deps, lp)
 	if code != ExitOK || err != nil {
 		return code, err
+	}
+	if prep.namedExists {
+		observeModelDispatch(deps, modelDispatch{source: modelDispatchResumed})
 	}
 	pfx := prep.prefix
 	resolvedPrompt := prep.resolvedPrompt

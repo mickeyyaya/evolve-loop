@@ -12,6 +12,8 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/llmcalls"
+	evolog "github.com/mickeyyaya/evolve-loop/go/internal/log"
 	"github.com/mickeyyaya/evolve-loop/go/internal/modelcatalog"
 	"github.com/mickeyyaya/evolve-loop/go/internal/modelquery"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
@@ -322,7 +324,8 @@ func salvageProbeDiagnostics(scratch, evolveDir, tag string, now func() time.Tim
 			dst := fmt.Sprintf("escalation-report-%s.json", stamp)
 			if raw, rerr := os.ReadFile(src); rerr == nil && ensure() {
 				if werr := os.WriteFile(filepath.Join(durable, dst), raw, 0o644); werr == nil {
-					fmt.Fprintf(log, "[models] WARN probe escalation salvaged to %s — a live /model probe needed operator attention\n", filepath.Join(durable, dst))
+					fmt.Fprintf(log, "[models] WARN probe escalation salvaged destination=%s — a live /model probe needed operator attention\n",
+						evolog.DiagnosticField(filepath.Join(durable, dst)))
 				}
 			}
 		case strings.HasSuffix(name, "-launch-error.txt"):
@@ -332,19 +335,20 @@ func salvageProbeDiagnostics(scratch, evolveDir, tag string, now func() time.Tim
 			}
 			if raw, rerr := os.ReadFile(src); rerr == nil && ensure() {
 				if werr := os.WriteFile(filepath.Join(durable, dstName), raw, 0o644); werr == nil {
-					fmt.Fprintf(log, "[models] WARN probe launch-error salvaged to %s\n", filepath.Join(durable, dstName))
+					fmt.Fprintf(log, "[models] WARN probe launch-error salvaged destination=%s\n",
+						evolog.DiagnosticField(filepath.Join(durable, dstName)))
 				}
 			}
 		case name == bridge.LLMCallsLogFilename:
-			// O_APPEND append of a few-hundred-byte payload: relies on the
-			// single-write(2) atomicity every other ndjson ledger writer in
-			// this codebase already assumes (see sessionrecord.Append's
-			// caveat) — fine at probe scale (≤ a handful of lines), torn
-			// lines only become conceivable at multi-syscall payload sizes.
-			if raw, rerr := os.ReadFile(src); rerr == nil && len(raw) > 0 && ensure() {
-				if f, oerr := os.OpenFile(filepath.Join(durable, name), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644); oerr == nil {
-					_, _ = f.Write(raw)
-					_ = f.Close()
+			if ensure() {
+				result, importErr := llmcalls.Import(filepath.Join(durable, name), src)
+				if importErr != nil {
+					fmt.Fprintf(log, "[models] WARN probe attempt-ledger salvage failed source=%s destination=%s detail=%s\n",
+						evolog.DiagnosticField(src), evolog.DiagnosticField(filepath.Join(durable, name)),
+						evolog.DiagnosticField(importErr.Error()))
+				} else if result.Skipped > 0 {
+					fmt.Fprintf(log, "[models] WARN probe attempt-ledger salvage skipped=%d malformed record(s) source=%s\n",
+						result.Skipped, evolog.DiagnosticField(src))
 				}
 			}
 		}

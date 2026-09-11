@@ -8,18 +8,16 @@
 package main
 
 import (
-	"bufio"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
+	"github.com/mickeyyaya/evolve-loop/go/internal/llmcalls"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasetiming"
 )
@@ -63,19 +61,6 @@ type TripwireEvent struct {
 	Phase      string `json:"phase"`
 	DurationMS int64  `json:"duration_ms"`
 	ExitCode   int    `json:"exit_code"`
-}
-
-// llmCallTripwireRecord is the minimal decode shape for an llm-calls.ndjson
-// record — a local copy of the tripwire-relevant fields (matching engine
-// llmCallLog's json tags) so cmd/evolve need not import internal/bridge's
-// unexported record type (the wiring class that broke prior attempts).
-type llmCallTripwireRecord struct {
-	CLI        string `json:"cli"`
-	Agent      string `json:"agent"`
-	Phase      string `json:"phase"`
-	DurationMS int64  `json:"duration_ms"`
-	ExitCode   int    `json:"exit_code"`
-	Tripwire   bool   `json:"tripwire"`
 }
 
 func runTokens(args []string, _ io.Reader, stdout, stderr io.Writer) int {
@@ -206,35 +191,26 @@ func buildTokensReport(runsDir string, cycles []int) TokensReport {
 	return report
 }
 
-// readCycleTripwires streams a cycle's llm-calls.ndjson (bufio.Scanner, bounded
-// — not read-all-then-split) and returns the tripwire-flagged records as
-// TripwireEvents. A missing/unreadable file or a malformed line is skipped as
-// absent evidence, matching buildTokensReport's degrade-gracefully contract.
+// readCycleTripwires projects the canonical bounded ledger reader into the
+// token report. Missing, malformed, and partial evidence degrades quietly.
 func readCycleTripwires(runsDir string, cycle int) []TripwireEvent {
-	path := filepath.Join(runsDir, fmt.Sprintf("cycle-%d", cycle), bridge.LLMCallsLogFilename)
-	f, err := os.Open(path)
-	if err != nil {
-		return nil
-	}
-	defer func() { _ = f.Close() }()
+	workspace := filepath.Join(runsDir, fmt.Sprintf("cycle-%d", cycle))
+	result, _ := llmcalls.ReadWorkspace(workspace)
 	var out []TripwireEvent
-	sc := bufio.NewScanner(f)
-	sc.Buffer(make([]byte, 0, 64*1024), 1024*1024) // tolerate long records
-	for sc.Scan() {
-		line := sc.Bytes()
-		if len(line) == 0 {
-			continue
-		}
-		var rec llmCallTripwireRecord
-		if err := json.Unmarshal(line, &rec); err != nil {
-			continue
-		}
+	for _, rec := range result.Records {
 		if !rec.Tripwire {
 			continue
 		}
+		durationMS, exitCode := int64(0), 0
+		if rec.DurationMS != nil {
+			durationMS = *rec.DurationMS
+		}
+		if rec.ExitCode != nil {
+			exitCode = *rec.ExitCode
+		}
 		out = append(out, TripwireEvent{
 			Cycle: cycle, CLI: rec.CLI, Agent: rec.Agent, Phase: rec.Phase,
-			DurationMS: rec.DurationMS, ExitCode: rec.ExitCode,
+			DurationMS: durationMS, ExitCode: exitCode,
 		})
 	}
 	return out

@@ -123,7 +123,7 @@ var commands = []subcommand{
 	{Name: "selfcheck", Summary: "Builder pre-flight: the build handoff floor checks in-session ( selfcheck build [--worktree DIR] )", Run: runSelfcheck},
 	{Name: "plan-and-execute", Summary: "Two-pass dispatch: plan → execute", Run: runPlanAndExecute},
 	{Name: "compose", Summary: "Ad-hoc phase composition", Run: runCompose},
-	{Name: "models", Summary: "Live tier→model catalog: refresh | list", Run: runModels},
+	{Name: "models", Summary: "Model catalog and attempt performance: refresh | list | performance", Run: runModels},
 	{Name: "tokens", Summary: "Token-usage telemetry: report [--last N] (ranked per-phase consumers)", Run: runTokens},
 	{Name: "lessons", Summary: "Lesson analytics: recurrence (deterministic recurrence ledger, patterns by count + fix status)", Run: runLessons},
 	{Name: "reachability", Summary: "Import-cycle-safety probe for structural test pins (reachability check-pin)", Run: runReachability},
