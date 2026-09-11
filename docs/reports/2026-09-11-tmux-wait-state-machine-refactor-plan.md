@@ -1,10 +1,11 @@
 # Tmux wait state-machine refactor plan
 
 **Date:** 2026-09-11
-**Branch:** `refactor/tmux-wait-state-machine`
-**Base:** merged `main` at `774d4c3c`
-**Status:** characterization and state/admission batch complete; tick and
-checkpoint extraction pending
+**Campaign branches:** one isolated branch per functional batch
+**Campaign base:** merged `main` at `774d4c3c`
+**Current batch base:** merged `main` at `c72f68b2`
+**Status:** characterization, state/admission, and tick-interaction batches
+complete; checkpoint extraction pending
 
 ## Objective and scope contract
 
@@ -214,6 +215,7 @@ end of the batch.
 | Fast-poll and checkpoint wall corroboration remain independent | `TestTmuxREPL_CheckpointExhaustionCorroboratesIndependently` | Changed the corroborated checkpoint exit from `85` to `81`; exit assertion failed |
 | A nudge capture fault remains non-wedged and gets one deferred outcome | `TestOutcome_NudgeCaptureFailureContinuesAndRecordsDeferredResult` | Treated `not_verified` as wedged; the successful run exited `81` and lost its deferred outcome |
 | Ordinary completion precedes later tick effects in both channel modes | `TestRunTmuxREPL_OrdinaryCompletionPrecedesTickEffects` | Removed the completion break; channel-off captures changed `0→2` and channel-on `1→2`. Separately moved channel capture after polling; the capture no longer observed the fallback before detector relocation |
+| Inbox input precedes auto-response when both fire on one tick | `TestRunTmuxREPL_InboxPrecedesAutoRespondOnSameTick` | Moved the inbox drain after `tickPane`; the trace placed `AUTO` at send index 4 and operator `F13` at index 5, and the ordering assertion failed |
 | Cancelled final-poll completion precedes ordinary tick effects | `TestRunTmuxREPL_CancelledCompletionPrecedesTickEffects` | Removed the completed-state transition; success changed to exit `81` |
 | Cancellation before transient cooldown suppresses the delay | `TestRunTmuxREPL_TransientDwell_CancelBeforeCooldownSkipsDelay` | Removed the context guard; the trace gained a `15s` cooldown |
 | Negative maximum-extension policy reports the default | `TestRunTmuxREPL_NegativeMaxExtendsReportsDefault` | Replaced the default backstop with `1`; summary changed from `max_extends=6` to `1` |
@@ -348,6 +350,81 @@ exact staged state tree `d1b2bab025c5377a63a1a66e76924d9b783b2a4c` and the
 exact staged admission tree `bf7fb7a476d2c70387a2fa46d1d0e38ae380639e`. The
 native commit gate attested each tree before `evolve ship` committed it.
 
+## Tick-interaction implementation record
+
+The second production batch starts from merged main `c72f68b2` on the isolated
+`refactor/tmux-wait-tick-interaction` branch. It extracts exactly one cohesive
+effect boundary into `driver_tmux_wait_interaction.go`:
+
+- drain operator envelopes in file order;
+- emit a correlation breadcrumb only after `injectEnvelope` confirms delivery;
+- close a delivered injection's busy-to-idle span;
+- apply the already-resolved auto-response outcome;
+- refresh the review interval, form the transient-dwell stop evidence, or map
+  the two existing auto-response terminal codes.
+
+The method returns the package-local `replWaitStep`, whose only fields are
+`done` and `code`. A transient dwell ends the polling loop with `ExitOK` in the
+step so the existing timeout diagnostics and cooldown still run. Escalation and
+loop-guard outcomes retain their immediate returns. No generic event framework
+or new interface was introduced.
+
+`replWaiter.wait` retains the ordering that must remain reviewable in one place:
+sleep, cancellation and detached final poll, channel-dependent capture and
+stream, ordinary completion poll, channel-off capture, interaction call, and
+checkpoint eligibility. The extraction adds no capture, detector poll, sleep,
+send, write, wall probe, goroutine, channel, timer, dependency, or exported
+name. Its characterization uses the public `runTmuxREPL` seam and proves the
+operator inbox effect wins over a competing auto-response on the same tick.
+
+After extraction, `replWaiter.wait` spans 332 lines, down from 380 after the
+state/admission batch and 576 before the campaign. The new
+`handleTickInteractions` method is 56 executable/comment lines in a 75-line
+single-purpose file. Both functions reach 100% statement coverage in the full
+Bridge package suite; package coverage remains 93.3% in the test summary and
+93.4% in the cover profile total.
+
+The tests-first evidence was:
+
+```text
+go test -count=1 ./internal/bridge \
+  -run '^TestRunTmuxREPL_InboxPrecedesAutoRespondOnSameTick$'
+PASS on the unchanged implementation
+
+temporary mutation: move inbox drain after auto-response
+FAIL: inbox=5 auto=4; sent=[... AUTO|false F13|false AUTO|false]
+
+restore mutation and apply extraction
+PASS
+
+go test -count=1 -coverprofile=/tmp/evolve-tmux-tick.cover ./internal/bridge
+PASS; test summary 93.3%, cover profile total 93.4%
+replWaiter.wait              100.0%
+replWaiter.handleTickInteractions 100.0%
+
+go test -count=1 ./internal/bridge/...
+PASS
+
+go test -race -count=1 ./internal/bridge/...
+PASS
+
+go vet ./internal/bridge/...
+PASS
+
+golangci-lint run ./internal/bridge/...
+PASS; 0 issues
+
+go test -tags=integration -count=1 ./internal/bridge \
+  -run '^TestRealTmux_(HappyPath|ArtifactTimeout|NamedSessionResume|ConcurrentSessionsIsolated)$'
+PASS
+
+go test -count=1 ./...
+PASS
+
+go vet ./...
+PASS
+```
+
 ## Test layers and commands
 
 | Layer | Evidence | Command |
@@ -407,6 +484,13 @@ package-local extraction. After the requested corrections, the architecture,
 Go/test, and defensive/minimalism plan reviewers each returned `PASS`. They
 rejected a universal event framework and required the ordering invariants
 above, one mutable state owner, existing domain types, separate fast/checkpoint
-latches, and no broadened evidence sampling. Final simplifier, Go, and
-architecture verdicts will be recorded here after the staged implementation
-review.
+latches, and no broadened evidence sampling.
+
+For the tick-interaction batch, the code simplifier/defensive reviewer, Go
+code/test reviewer, and architecture reviewer returned PASS with no findings
+on staged tree `a6be7d74175432e7fb96002b59a98d6118292196`. They confirmed
+that the boundary is cohesive, the same-tick test is mutation-sensitive, the
+immediate exits and common timeout closeout remain distinct, and ordered pane
+observation stays visible in the coordinator. The final documentation-only
+review-record update was applied after those verdicts and is included in the
+commit-gate tree.
