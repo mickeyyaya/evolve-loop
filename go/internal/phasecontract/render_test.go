@@ -100,6 +100,31 @@ func TestRenderContractBlock_JSON_UsesRequiredKeys(t *testing.T) {
 	}
 }
 
+func TestRenderJSONContractsDescribeTheirTopLevelShape(t *testing.T) {
+	tests := []struct {
+		contract string
+		shape    string
+	}{
+		{contract: "router", shape: "array"},
+		{contract: "router-replan", shape: "array"},
+		{contract: "router-proposal", shape: "object"},
+		{contract: "orchestrator", shape: "object"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.contract, func(t *testing.T) {
+			c := mustContract(t, tt.contract)
+			want := "valid JSON " + tt.shape
+			if block := RenderContractBlock(c); !strings.Contains(block, want) {
+				t.Errorf("contract block must describe a %s; got:\n%s", tt.shape, block)
+			}
+			if tail := RenderContractTail(c, "/workspace/"+c.ArtifactName); !strings.Contains(tail, want) {
+				t.Errorf("contract tail must describe a %s; got:\n%s", tt.shape, tail)
+			}
+		})
+	}
+}
+
 func TestRenderContractFooter_CarriesExactPath(t *testing.T) {
 	c, _ := For("build")
 	path := "/abs/.evolve/runs/cycle-213/build-report.md"

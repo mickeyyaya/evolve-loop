@@ -22,6 +22,16 @@ func (s planStage) artifactFile() string {
 	return "routing-plan.json"
 }
 
+// contractID is the deliverable protocol selected for the stage. It stays
+// separate from the shared router agent identity used for model and profile
+// resolution.
+func (s planStage) contractID() string {
+	if s == stagePostScout {
+		return "router-replan"
+	}
+	return "router"
+}
+
 // captureKind is the <kind> token embedded in the WS3 capture filenames
 // (advisor-{prompt,response,span}-<kind>.*); isSafeArtifactKind confines it.
 func (s planStage) captureKind() string {

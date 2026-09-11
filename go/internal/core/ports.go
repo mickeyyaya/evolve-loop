@@ -277,7 +277,11 @@ type BridgeRequest struct {
 	// router/advisor). Only the *-tmux drivers honor it; others ignore it.
 	Completion string `json:"completion,omitempty"`
 	Agent      string `json:"agent,omitempty"` // role label
-	Cycle      int    `json:"cycle,omitempty"`
+	// Contract selects the deliverable protocol independently from Agent. Empty
+	// defaults to Agent for backward compatibility. PhaseAdvisor uses this when
+	// one router persona produces plan, replan, and proposal artifacts.
+	Contract string `json:"contract,omitempty"`
+	Cycle    int    `json:"cycle,omitempty"`
 	// Attempt is the 1-based fallback-retry ordinal for this Launch (token-
 	// telemetry S3): the caller's fallback loop calls Launch once per CLI
 	// candidate, and Attempt lets each call's llm-calls.ndjson record be
