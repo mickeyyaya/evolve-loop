@@ -147,55 +147,9 @@ func (w replWaiter) wait() (replWaitResult, int) {
 			if w.reviewCheckpoint(state, elapsed, curPane, renderWedged) == checkpointFailover {
 				return state.result, ExitUnknownPrompt
 			}
-			if state.lastVerdict.Action != ReviewExtend {
-				_, isDetVal := state.reviewer.(deterministicReviewer)
-				_, isDetPtr := state.reviewer.(*deterministicReviewer)
-				isDeterministic := isDetVal || isDetPtr
-				// Nudge only on PAUSE (idle agent, remind it once). A fatal
-				// ReviewStop (ADR-0044 C2) must exit now — nudging a dead
-				// shell is exactly the echo that bought cycle-262's dead
-				// panes their extensions. Behavior-identical for the legacy
-				// reviewer, which only ever emits extend|pause.
-				if state.lastVerdict.Action == ReviewPause && isDeterministic && !state.livenessCenter.Busy(lp.session) && !state.nudgeSent {
-					nudgeMsg := fmt.Sprintf("Please write the deliverable to %s to complete the phase.", cfg.Artifact)
-					_ = deps.Tmux.SendKeys(ctx, lp.session, nudgeMsg, true)
-					// The recorded stall (cycles 1505/1510/1517): this nudge was
-					// still parked at the `❯` input line in the final capture and
-					// every interaction record read result=no_effect. Verify it
-					// was submitted; re-send Enter, bounded, if it was not.
-					// A fresh capture is unavoidable here: the nudge was sent
-					// microseconds ago, so every earlier pane predates it.
-					// Announce the nudge BEFORE verifying it, so an operator never reads
-					// "re-sending Enter" above any line saying a nudge exists.
-					fmt.Fprintf(deps.Stderr, "%s idle with missing artifact; sent one-shot nudge: %s\n", pfx, nudgeMsg)
-					deps.Sleep(submitVerifySettle)
-					nudgePane, nudgeCapErr := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
-					if nudgeCapErr != nil {
-						fmt.Fprintf(deps.Stderr, "%s submit-verify: nudge NOT verified — capture failed, input-line state unknown: %v\n", pfx, nudgeCapErr)
-					}
-					nudgeOutcome := verifySubmitted(ctx, deps, lp, pfx, "nudge", nudgePane, nudgeMsg)
-					recordSubmitVerify(irec, phaseName, cfg.Cycle, "nudge", nudgeOutcome)
-					if nudgeOutcome.Result == interaction.ResultSubmitWedged {
-						state.lastVerdict.Reason = fmt.Sprintf("nudge %s (resends=%d)", nudgeOutcome.Result, nudgeOutcome.Resends)
-						break
-					}
-					state.nudgeSent = true
-					state.nudgeEvent = &interaction.Event{
-						Kind:    interaction.KindNudge,
-						Phase:   phaseName,
-						Cycle:   cfg.Cycle,
-						Trigger: "idle_no_artifact",
-						Payload: nudgeMsg,
-					}
-					state.nudgeAt = deps.Now()
-					state.intervalStartS = elapsed
-					state.attempt++
-					continue
-				}
+			if w.applyCheckpointDisposition(state, elapsed) == checkpointStopWaiting {
 				break
 			}
-			state.attempt++
-			state.intervalStartS = elapsed
 		}
 	}
 	if !state.completed {
