@@ -4,11 +4,9 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/inbox"
-	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
 	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
 )
 
@@ -146,103 +144,8 @@ func (w replWaiter) wait() (replWaitResult, int) {
 		if elapsed-state.intervalStartS >= state.intervalS {
 			rawPane, _ := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
 			curPane, renderWedged := recoverBlankPane(ctx, deps, lp.session, lp.bootScrollback, rawPane, pfx)
-			state.result.recordTokens(curPane)
-			// CB.6: evidence survives the session's death. When the server
-			// is killed mid-phase every later capture is empty, so the
-			// escalation report's final_pane carried nothing and cycle-286's
-			// retro misattributed the failure. Retain the last NON-EMPTY
-			// pane; a dead capture falls back to it as the freshest real
-			// evidence (the live pane still wins whenever it renders).
-			if strings.TrimSpace(curPane) != "" {
-				state.result.lastGoodPane = curPane
-			}
-			evidencePane := state.result.lastGoodPane
-			// Progressed = the pane changed during the interval. Stage-0 signal:
-			// good for the common cases (growing token counters, new tool calls),
-			// but a pure spinner/clock animation also reads as progress — so the
-			// maxExtends backstop, not this diff, bounds a spinner-stuck agent
-			// (~maxExtends×interval). Stage 1's reviewer inspects StdoutTail to
-			// disambiguate genuine work from animation.
-			// Liveness WITHOUT the exhaustion override (empty ExhaustedRegex): a
-			// wall in the pane must not collapse the real converging/idle signal,
-			// because the exhaustion decision is made SEPARATELY below — on the
-			// stripped pane and persistence-gated — so wall-shaped text a working
-			// agent merely rendered cannot pause or kill it. Safe: nothing
-			// consumes the center's Exhausted SignalEvent (no RegisterSignalHandler
-			// caller); this fast-fail was its only actor.
-			state.livenessCenter.Observe(lp.session, curPane, state.livenessProfile)
-			livenessState := state.livenessCenter.Aggregate()
-			// Exhaustion fast-fail: a quota/rate-limit WALL means the artifact will
-			// NEVER come — fail over to the fallback CLI (exit 85) instead of
-			// burning the full artifact timeout. Scanned on the agent-stripped pane
-			// and persistence-gated (exhaustion_persistence.go): a re-printing real wall is
-			// present every checkpoint and still crosses (preserving the agy
-			// hang-without-exit fix), while wall text passing through a WORKING
-			// agent's pane clears by the next checkpoint — the raw-pane false-FAIL
-			// class the go-review of the per-model regex fix surfaced.
-			walled := state.livenessCenter.ExhaustedOf(strippedForExhaustionScan(curPane, ar.injectedPrompt), state.paneProfile)
-			// Corroboration contract shared with the fast-poll site, one
-			// probe per phase, latched (wallcorroborate.go checkpointWallState).
-			if escalate, suppressNow := state.checkpointWall.decide(ctx, deps.CorroborateWall, lp.name, state.checkpointExhaustion.observe(walled)); escalate {
-				fmt.Fprintf(deps.Stderr, "%s EXHAUSTED: pane shows a quota/rate-limit wall (persisted %d checkpoints, corroborated by live probe) — failing over to fallback CLI (exit %d)\n", pfx, exhaustionPersistObservations, ExitUnknownPrompt)
+			if w.reviewCheckpoint(state, elapsed, curPane, renderWedged) == checkpointFailover {
 				return state.result, ExitUnknownPrompt
-			} else if suppressNow {
-				fmt.Fprintf(deps.Stderr, "%s EXHAUSTION-SUPPRESSED: pane matched wall vocabulary but a live probe (cheapest tier) answered — treating as content-induced; a tier-scoped wall would surface via artifact-timeout fallback instead\n", pfx)
-			}
-			// Progressed is sourced from the center's Changed(session)
-			// projection (S4) — a consecutive-observation comparison, not the
-			// interval-baseline diff. Behavior-preserving: .Progressed has no
-			// decision consumer (evidence/logging only), so the shift from
-			// baseline-relative to checkpoint-to-checkpoint is safe.
-			progressed := state.livenessCenter.Changed(lp.session)
-			// Render-wedge override (cycle-291): a blank pane from a live session
-			// reads as Idle by the content-velocity detector (no affordance in blank
-			// frame). recoverBlankPane already confirmed the session is alive
-			// (renderWedged=true); treat as BusyButStagnant so the reviewer extends
-			// rather than pausing a working agent on a pane-rendering failure.
-			if renderWedged && livenessState == panestream.LivenessIdle {
-				livenessState = panestream.LivenessBusyButStagnant
-			}
-			state.lastEvent = StopEvent{
-				Kind:       StopArtifactTimeout,
-				Phase:      cfg.Agent,
-				Cycle:      cfg.Cycle,
-				ElapsedS:   elapsed,
-				IntervalS:  state.intervalS,
-				Attempt:    state.attempt,
-				Progressed: progressed,
-				Busy:       state.livenessCenter.Busy(lp.session) || renderWedged,
-				StdoutTail: lastLines(evidencePane, 40),
-				// Same source the exhaustion scan strips against, two lines up —
-				// one resolved prompt, one meaning of "what the agent was told",
-				// so the two detectors can never strip differently (cycle-1117).
-				InjectedPrompt: ar.injectedPrompt,
-				State:          livenessState,
-			}
-			// ADR-0044 C2: a known-fatal pane (model-invalid boot, CLI
-			// self-update, dead shell) preempts the reviewer in enforce —
-			// cycle-262's dead panes read as "progressed" because the
-			// bridge's own nudge echoed into them, so the legacy
-			// extend-while-progressing flow burned the full maxExtends
-			// backstop on REPLs that no longer existed.
-			// Persistence-gated (fatalpane_persistence.go): the match must be
-			// present on consecutive checkpoints before it can preempt, so a
-			// working agent that renders fatal-shaped text for one frame is
-			// never killed for it, while a parked pane still exits one
-			// checkpoint later than before.
-			// The gate RECORDS a C2 evidence outcome on every gate-crossed
-			// call (R8.3) — it must be called exactly once per stop-review
-			// checkpoint, never retried for the same event, or the soak's C2
-			// counts inflate silently.
-			v, preempted := state.checkpointFatal.verdict(state.fatalDetector, state.lastEvent, state.recoveryStage, irec, deps.Stderr, pfx)
-			if !preempted {
-				v = state.reviewer.Review(state.lastEvent)
-			}
-			state.lastVerdict = v
-			fmt.Fprintf(deps.Stderr, "%s stop-review[%s] elapsed=%ds attempt=%d progressed=%v → %s: %s\n",
-				pfx, StopArtifactTimeout, elapsed, state.attempt, progressed, state.lastVerdict.Action, state.lastVerdict.Reason)
-			if deps.OnStopReview != nil {
-				deps.OnStopReview(phaseName, string(state.lastVerdict.Action), state.lastVerdict.Reason)
 			}
 			if state.lastVerdict.Action != ReviewExtend {
 				_, isDetVal := state.reviewer.(deterministicReviewer)
@@ -312,8 +215,8 @@ func (w replWaiter) wait() (replWaitResult, int) {
 		// drifted ahead of the pattern — surface it now so the NEXT drift is caught
 		// in one cycle, not eight (as the per-model wording change was). Diagnostic
 		// only; the exit-81 verdict stands.
-		// Scanned on the SAME agent-stripped pane as the primary detector above
-		// (strippedForExhaustionScan, line ~704): an alarm that scans the raw pane
+		// Scanned on the SAME agent-stripped pane as the primary detector above:
+		// an alarm that scans the raw pane
 		// fires on wall-shaped text the agent merely wrote or echoed, which the real
 		// regex correctly ignored — an operator chasing a regex that is working.
 		strippedPane := strippedForExhaustionScan(state.result.lastGoodPane, ar.injectedPrompt)
