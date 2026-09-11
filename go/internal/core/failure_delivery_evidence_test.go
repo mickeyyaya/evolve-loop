@@ -54,6 +54,26 @@ func genericSilenceTimeoutErr() error {
 		"transient=false reason=%q: %w", "no output during the last 900s interval — stalled; pause for investigation", ErrArtifactTimeout)
 }
 
+func typedWedgedTimeoutErr(cause, reason string) error {
+	return fmt.Errorf("bridge: launch exit=81: artifact-timeout: cause=%s reason=%q phase=retro: %w",
+		cause, reason, ErrArtifactTimeout)
+}
+
+func TestDeliveryFailureCause_PrefersTypedMarkerField(t *testing.T) {
+	want := `prompt submit_wedged (resends=3) with "quoted" evidence`
+	err := typedWedgedTimeoutErr("submit_wedged", want)
+	if got := DeliveryFailureCause(err); got != want {
+		t.Fatalf("DeliveryFailureCause() = %q, want %q from the typed marker", got, want)
+	}
+}
+
+func TestDeliveryFailureCause_DoesNotParseCauseTextInsideReason(t *testing.T) {
+	err := typedWedgedTimeoutErr("review_stop", "operator quoted cause=submit_wedged while stopping")
+	if got := DeliveryFailureCause(err); got != "" {
+		t.Fatalf("DeliveryFailureCause() = %q, want empty for actual cause=review_stop", got)
+	}
+}
+
 // readFailureDiag runs the production writer and returns the decoded JSON.
 func readFailureDiag(t *testing.T, phase string, phaseErr error) map[string]any {
 	t.Helper()

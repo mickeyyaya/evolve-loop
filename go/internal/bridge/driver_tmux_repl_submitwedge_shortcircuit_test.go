@@ -63,7 +63,8 @@ func TestTmuxREPL_PromptSubmitWedged_ShortCircuitsSilenceBudget(t *testing.T) {
 	if artifactWaitPolls != 0 {
 		t.Fatalf("submit_wedged entered %d normal artifact-wait poll(s); want immediate timeout before consuming the silence budget; stderr=%s", artifactWaitPolls, stderr.String())
 	}
-	if !strings.Contains(stderr.String(), artifactTimeoutMarker+"phase=build") ||
+	if !strings.Contains(stderr.String(), artifactTimeoutMarker+"cause=submit_wedged") ||
+		!strings.Contains(stderr.String(), "phase=build") ||
 		!strings.Contains(stderr.String(), "reason=\"prompt submit_wedged (resends=3)\"") {
 		t.Fatalf("early timeout must preserve the classified submit_wedged cause in the artifact-timeout marker; stderr=%s", stderr.String())
 	}

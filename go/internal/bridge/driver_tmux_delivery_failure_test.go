@@ -186,6 +186,9 @@ func TestTmuxREPL_NudgeSubmitWedged_ClassifiedCauseSurvivesIntoMarker(t *testing
 		t.Errorf("a wedged NUDGE died with the generic stall reason — the classified delivery-failure cause "+
 			"never reached the marker, so failure-learning cannot tell an undelivered nudge from a silent agent\n  summary: %s", summary)
 	}
+	if !strings.Contains(summary, "cause=submit_wedged") {
+		t.Errorf("a wedged nudge lacks its stable cause code; summary=%q", summary)
+	}
 	if !strings.Contains(summary, "nudge") {
 		t.Errorf("delivery-failure cause does not name the submission SITE — an operator cannot tell an "+
 			"undelivered prompt from an undelivered nudge\n  summary: %s", summary)

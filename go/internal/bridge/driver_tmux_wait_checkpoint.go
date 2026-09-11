@@ -88,7 +88,8 @@ func (w replWaiter) reviewCheckpoint(state *replWaitState, elapsed int, curPane 
 	}
 	state.lastVerdict = verdict
 	fmt.Fprintf(w.deps.Stderr, "%s stop-review[%s] elapsed=%ds attempt=%d progressed=%v → %s: %s\n",
-		w.prefix, StopArtifactTimeout, elapsed, state.attempt, progressed, verdict.Action, verdict.Reason)
+		w.prefix, StopArtifactTimeout, elapsed, state.attempt, progressed, verdict.Action,
+		boundedDiagnosticQuote(verdict.Reason, 220))
 	if w.deps.OnStopReview != nil {
 		w.deps.OnStopReview(w.phaseName, string(verdict.Action), verdict.Reason)
 	}

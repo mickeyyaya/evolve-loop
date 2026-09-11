@@ -108,11 +108,56 @@ The diagnostic file contains key context fields to enable immediate automated pa
 
 The presence of the `failure-diag` file serves as a high-signal indicator for automated pipeline alerts. If the pipeline succeeds fully, no `failure-diag` files are created.
 
+### Tmux artifact-timeout context
+
+An interactive model wait that exits with code 81 emits one bounded marker as
+its final timeout diagnostic. `Engine.Launch` copies that marker into
+`error_message`, so operators and failure-learning code see the same evidence:
+
+```text
+artifact-timeout: cause=completion_detector_error reason="reviewer paused" \
+  phase=build cycle=73 driver=claude-tmux artifact="build-report.md" \
+  waited=1200s interval=1200s extends_used=0 max_extends=6 \
+  last_review=pause liveness=idle progressed=false busy=false transient=false \
+  detector_error="relocate ...: not a directory"
+```
+
+`cause` is a closed, host-authored classification. Read it before interpreting
+the free-form evidence:
+
+| Cause | Meaning | First action |
+|---|---|---|
+| `context_cancelled` | The wait coordinator observed cancellation and its detached final completion check did not confirm a deliverable. | Find the orchestrator timeout or shutdown source. |
+| `completion_detector_error` | The terminal completion check failed locally. | Read `detector_error`; repair the path, tmux, or git evidence operation it names. |
+| `submit_wedged` | Bounded submission verification proved the prompt or nudge stayed in the input line. | Recreate or relaunch the REPL session. |
+| `transient_upstream` | The launched family's manifest recognized a temporary provider failure in the agent-stripped pane. | Retry after provider recovery; do not raise the artifact budget first. |
+| `review_stop` | The reviewer or fatal-pane gate selected a terminal stop. | Read `reason` and the escalation report. |
+| `review_pause` | The reviewer selected an investigation pause. | Compare liveness and extension counters, then read the escalation report. |
+| `incomplete` | No known terminal signal explained the missing completion. | Treat it as an unclassified bridge defect and preserve the logs. |
+
+`reason` and `detector_error` are independently bounded and escaped. Long
+evidence preserves both its operation prefix and leaf error suffix. Phase,
+driver, cycle, and artifact identify the failed attempt without exposing full
+workspace paths. A detector error from an earlier poll remains as secondary
+evidence, while `cause=completion_detector_error` is used only when the final
+detector observation itself failed. A completion confirmed after an earlier
+fault emits no timeout marker.
+
+The authoritative line begins with the exact `[bridge] artifact-timeout:`
+prefix and is the final matching line in stderr. Reviewer reasons are bounded,
+quoted, and stripped of terminal and Unicode formatting controls before console
+logging. Consequently, inline text or a newline-prefixed fake marker in
+free-form evidence cannot displace the host-written terminal marker.
+
+The complete exit-81 summary is capped at 1,024 Unicode code points. Other
+bridge errors retain their existing shorter bound. Exit code 81 and
+`ErrArtifactTimeout` semantics are unchanged.
+
 ### Verified Submission Delivery Failures — Issue / Gap / Solution
 
 - **Issue:** A tmux prompt or nudge could remain parked after all three bounded Enter re-sends. Submit verification classified the pane as `submit_wedged`, but the driver still consumed the normal artifact-wait budget before returning exit 81.
 - **Gap:** Both tmux consumer sites recorded the classification without acting on it, and the terminal failure diagnostic exposed only a flat `error_message`. Generic silence and a verified delivery failure therefore looked identical to automation.
-- **Solution:** The prompt site now short-circuits through the existing `ExitArtifactTimeout` marker, while the nudge site carries its classified reason into that same marker. The orchestrator extracts only sentinel-backed `submit_wedged` reasons into `delivery_failure`; generic silence and unrelated failures leave the field empty. The existing resend cap and one-relaunch dispatcher contract are unchanged.
+- **Solution:** The prompt site now short-circuits through the existing `ExitArtifactTimeout` marker, while the nudge site carries its classified reason into that same marker. A typed, host-owned `cause=submit_wedged` field authorizes extraction of the escaped reason into `delivery_failure`; reviewer prose cannot forge that classification. Historical markers without `cause` retain the legacy reason fallback. Generic silence and unrelated failures leave the field empty. The existing resend cap and one-relaunch dispatcher contract are unchanged.
 
 ---
 

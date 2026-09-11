@@ -273,15 +273,62 @@ func DeliveryFailureCause(err error) string {
 	if !errors.Is(err, ErrArtifactTimeout) {
 		return ""
 	}
-	_, reason, ok := strings.Cut(err.Error(), `reason="`)
+	cause, reason, hasCause := artifactTimeoutTypedCause(err.Error())
+	if hasCause {
+		if cause != "submit_wedged" {
+			return ""
+		}
+		if strings.Contains(reason, "submit_wedged") {
+			return reason
+		}
+		return cause
+	}
+
+	_, marker, ok := strings.Cut(err.Error(), "artifact-timeout: ")
 	if !ok {
 		return ""
 	}
-	reason, _, ok = strings.Cut(reason, `"`)
-	if !ok || !strings.Contains(reason, "submit_wedged") {
+	_, reasonField, ok := strings.Cut(marker, "reason=")
+	if !ok {
 		return ""
 	}
-	return reason
+	reason, ok = parseQuotedMarkerValue(reasonField)
+	if ok && strings.Contains(reason, "submit_wedged") {
+		return reason
+	}
+	return ""
+}
+
+func artifactTimeoutTypedCause(message string) (cause, reason string, present bool) {
+	_, marker, ok := strings.Cut(message, "artifact-timeout: ")
+	if !ok || !strings.HasPrefix(marker, "cause=") {
+		return "", "", false
+	}
+	causeField, rest, found := strings.Cut(strings.TrimPrefix(marker, "cause="), " ")
+	if !found {
+		return causeField, "", true
+	}
+	if !strings.HasPrefix(rest, "reason=") {
+		return causeField, "", true
+	}
+	reason, _ = parseQuotedMarkerValue(strings.TrimPrefix(rest, "reason="))
+	return causeField, reason, true
+}
+
+func parseQuotedMarkerValue(value string) (string, bool) {
+	if value == "" || value[0] != '"' {
+		return "", false
+	}
+	for i := 1; i < len(value); i++ {
+		switch value[i] {
+		case '\\':
+			i++
+		case '"':
+			decoded, err := strconv.Unquote(value[:i+1])
+			return decoded, err == nil
+		}
+	}
+	return "", false
 }
 
 // writePhaseFailureDiag writes a structured diagnostic file to

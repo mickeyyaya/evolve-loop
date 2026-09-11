@@ -56,10 +56,11 @@ func (w replWaiter) admitPrompt(state *replWaitState) int {
 		}
 	}
 
+	state.submitWedged = true
 	state.lastVerdict = ReviewVerdict{
 		Action: ReviewPause,
 		Reason: fmt.Sprintf("prompt %s (resends=%d)", outcome.Result, outcome.Resends),
 	}
-	state.writeArtifactTimeoutMarker(w.deps.Stderr, w.phaseName, false)
+	w.writeArtifactTimeoutMarker(state, false)
 	return ExitArtifactTimeout
 }
