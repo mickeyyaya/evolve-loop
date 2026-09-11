@@ -89,13 +89,11 @@ func RunPool(ctx context.Context, cfg PoolConfig, backlog []Todo, launch LaunchF
 		}
 		running++
 		emit()
-		// started rendezvous: the lane goroutine sends BEFORE calling launch, and
-		// dispatch blocks until it does, so the lane is guaranteed scheduled (and
-		// runs on into launch) before the pool considers this slot filled or
-		// dispatches any later lane. Without it the Go scheduler's LIFO runnext
-		// runs the FIRST-dispatched lane LAST, so a backfilled replacement could
-		// be observed before an earlier still-running lane — the pool's realized
-		// dispatch order must follow its decision order.
+		// The rendezvous gives each admitted lane a chance to run before another
+		// slot is filled. It orders goroutine admission, not launch callback entry:
+		// the scheduler may pause the lane after its send and run a later callback
+		// first. Pool correctness comes from claiming files and incrementing running
+		// before the goroutine starts, so it does not depend on callback order.
 		started := make(chan struct{})
 		go func() {
 			started <- struct{}{}
@@ -104,9 +102,8 @@ func RunPool(ctx context.Context, cfg PoolConfig, backlog []Todo, launch LaunchF
 			completions <- idx
 		}()
 		<-started
-		// Hand the P to the just-started lane so it runs its launch body to its own
-		// block/return point before the next dispatch is decided — realized dispatch
-		// order then follows decision order under cooperative (single-P) scheduling.
+		// Yield so the admitted lane can advance toward launch. This is a scheduling
+		// hint only; launch callbacks remain concurrent and unordered.
 		runtime.Gosched()
 	}
 
