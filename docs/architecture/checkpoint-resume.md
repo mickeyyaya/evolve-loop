@@ -8,7 +8,9 @@ The host resolves the explicit state override or singleton state, then eligible 
 
 ## Repeated interruption
 
-Fresh and resumed dispatch share policy application for difficulty budgets, recurrence tiers, and audit-repair constraints. Checkpoint advancement is durable at phase boundaries, and a new quota interruption records the current recovery point. A second resume must use that point rather than replaying the original checkpoint forever.
+Fresh and resumed dispatch share policy application for difficulty budgets, recurrence tiers, and audit-repair constraints. Routine phase-complete checkpoints record the completed-phase list as a conservative crash-recovery boundary. A graceful `SIGINT` or `SIGTERM` records an `operator-requested` checkpoint for the phase that is still active while leaving that phase out of `completedPhases`. Resume therefore re-enters the interrupted phase instead of repeating the preceding completed phase. The signal path does not launch retrospective failure learning because an operator stop is not evidence that the task or phase failed.
+
+Resumed dispatch replaces the consumed pause with an active-phase checkpoint before each new model call. A later quota or operator interruption advances that recovery point, so repeated resume never falls back to the original pause. A typed quota pause remains authoritative when cancellation races its write because it carries the reset time and source needed for recovery. If the active-phase checkpoint write fails, the host reports that resume may repeat the previous completed phase; the original interruption remains the primary outcome.
 
 Transport and quota signals are typed runtime observations. Dollar-cost estimates are telemetry, not checkpoint triggers. Elapsed time or a narrative claim does not prove a phase completed.
 

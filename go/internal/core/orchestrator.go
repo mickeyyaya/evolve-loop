@@ -940,6 +940,10 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (_ CycleR
 	// the distinguisher that keeps three distinct aborts from sharing one
 	// Unexplained fingerprint (batch-19 cycle-1208 halt).
 	defer func() { cr.abnormalEpilogue(retErr) }()
+	// A graceful interrupt must resume the phase that was actually active, not
+	// the previous phase-complete boundary. Registered after abnormalEpilogue so
+	// it runs first and captures cs.Phase before the epilogue marks it aborted.
+	defer func() { cr.checkpointInterruptedPhase(retErr) }()
 	// A marker created at fresh-cycle allocation distinguishes new cycles,
 	// whose Build explanation contract is mandatory, from old workspaces being
 	// resumed after an upgrade. Persist it before the first phase so a crash
