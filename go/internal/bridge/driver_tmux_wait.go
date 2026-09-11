@@ -45,7 +45,6 @@ func (w replWaiter) wait() (replWaitResult, int) {
 	lp := w.launch
 	pfx := w.prefix
 	phaseName := w.phaseName
-	resolvedPrompt := w.resolvedPrompt
 	ar := w.responder
 	irec := w.recorder
 	cursor := w.cursor
@@ -53,91 +52,8 @@ func (w replWaiter) wait() (replWaitResult, int) {
 	state := newReplWaitState(w)
 	defer state.recordNudgeOutcome(irec, deps.Now)
 
-	intervalBaselinePane, baselineErr := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
-	if baselineErr != nil {
-		// This pane is submit-verify's ONLY observation on the clean path. A
-		// failed capture makes the guard entirely blind, and an empty pane reads
-		// as "input line clear" — indistinguishable from a verified submission
-		// unless we say so. Silence here reproduced the pre-fix cycle-1505 log.
-		fmt.Fprintf(deps.Stderr, "%s submit-verify: prompt NOT verified — baseline capture failed, input-line state unknown: %v\n", pfx, baselineErr)
-	}
-	state.result.recordTokens(intervalBaselinePane)
-	// CB.6: the freshest non-empty pane seen — escalation evidence that
-	// survives a mid-phase server death (cycle-286 masked-evidence class).
-	state.result.lastGoodPane = intervalBaselinePane
-	writeArtifactTimeoutMarker := func(transient bool) {
-		fmt.Fprintf(deps.Stderr,
-			"[bridge] %sphase=%s waited=%ds interval=%ds extends_used=%d max_extends=%d last_review=%s liveness=%s progressed=%v busy=%v transient=%v reason=%q\n",
-			artifactTimeoutMarker, phaseName, state.waitedS, state.intervalS, state.attempt, state.maxExtends,
-			reviewActionOrNone(state.lastVerdict.Action), livenessOrUnknown(state.lastEvent.State),
-			state.lastEvent.Progressed, state.lastEvent.Busy, transient, state.lastVerdict.Reason)
-	}
-	// Cycle-274 post-paste spill check (R3.2), on the ALREADY-captured
-	// baseline (no extra capture, no fixture-frame drift): the prompt was
-	// just pasted; if it spilled into a shell continuation (quote>/bquote>)
-	// AND the pane's foreground process IS a shell (authoritative — a pane
-	// merely quoting spill text under a live CLI must not trip this), the
-	// CLI is gone. Fail fast as a transient so the fallback chain takes
-	// over, instead of the 25-min wedge cycles 274/277 burned. Mid-run
-	// process death past this boundary is the observer's job (plan R3.4).
-	if lp.guardDeadShell && paneLooksLikeShellSpill(intervalBaselinePane) {
-		if shellCmd, isShell := paneShellProcess(ctx, deps.Tmux, lp.session); isShell {
-			fmt.Fprintf(deps.Stderr, "%s FAIL: prompt spilled into a dead shell (%s) after paste — CLI process gone (cycle-274 class)\n", pfx, shellCmd)
-			return state.result, ExitREPLBootTimeout
-		}
-	}
-	// Submit-verify the prompt delivery (driver_tmux_submitverify.go). Read off
-	// the SAME already-captured baseline the spill check just used — no extra
-	// capture, no fixture-frame drift — and ordered after it so a pane that
-	// spilled into a dead shell fails fast rather than collecting Enters. The
-	// paste is submitted with a blind Enter (or the human-cadence review path);
-	// if the prompt is still sitting at the input line, re-send it, bounded.
-	if !lp.bootOnly {
-		// Codex 0.153 renders bracketed multiline input with this chip. Keep
-		// the additional echo local to Codex and to this prompt submission.
-		codexPasteEcho := ""
-		if lp.name == "codex-tmux" {
-			codexPasteEcho = "[Pasted Content "
-		}
-		outcome := verifySubmitted(ctx, deps, lp, pfx, "prompt", intervalBaselinePane,
-			promptSubmitEcho(resolvedPrompt), firstNonEmptyLine(resolvedPrompt), tmuxPastePlaceholderEcho, codexPasteEcho)
-		recordSubmitVerify(irec, phaseName, cfg.Cycle, "prompt", outcome)
-		if outcome.Result == interaction.ResultSubmitWedged {
-			// GROUND TRUTH outranks the pane heuristic (v22.20.0 release red):
-			// a REPL that consumes its input and answers by SIDE EFFECT alone —
-			// never redrawing its input line — is indistinguishable from
-			// "parked" by the echo match, and the instant 81 here aborted
-			// sessions whose deliverable was already on disk. One read-only
-			// probe: an artifact present that is NOT the pre-dispatch baseline
-			// proves the submission landed; fall through to the normal wait
-			// (the detector's stability window still gates completion). A
-			// genuinely wedged pane has no post-dispatch artifact and still
-			// fast-fails exactly as the retro-stall fix intended.
-			// NOTE: a submit_wedged outcome was already recorded to the
-			// interactions ledger above — with this belt, that record can
-			// co-occur with a SUCCESSFUL phase (the stall was recovered by
-			// ground truth). Consumers must gate on the actual phase error,
-			// never on the ledger token alone (failure_learning.go does).
-			delivered := false
-			if path, found := artifactLocate(cfg); found {
-				// Lstat, matching regularFileNonEmpty's never-follow-symlinks
-				// invariant (cycle-1256 D3) — the belt must not re-resolve a
-				// path the locator deliberately refused to follow.
-				if fi, serr := os.Lstat(path); serr == nil && fi.Mode().IsRegular() && !w.artifactBase.matches(path, fi) {
-					delivered = true
-				}
-			}
-			if delivered {
-				fmt.Fprintf(deps.Stderr, "%s submit-verify: pane looks parked but a post-dispatch deliverable is already on disk — submission evidently landed; continuing the normal wait\n", pfx)
-			} else {
-				state.lastVerdict = ReviewVerdict{
-					Action: ReviewPause,
-					Reason: fmt.Sprintf("prompt %s (resends=%d)", outcome.Result, outcome.Resends),
-				}
-				writeArtifactTimeoutMarker(false)
-				return state.result, ExitArtifactTimeout
-			}
-		}
+	if code := w.admitPrompt(state); code != ExitOK {
+		return state.result, code
 	}
 	ar.transientDwellEnabled = true
 	for elapsed := 0; ; elapsed += 2 {
@@ -486,7 +402,7 @@ func (w replWaiter) wait() (replWaitResult, int) {
 		// cfg.Agent — the SAME key bridge.phase_artifact_timeout_s is indexed on —
 		// so the remedy is copy-pasteable from the diagnostic. Emitted LAST so it
 		// is also the final stderr line, and lifted into the error by Engine.Launch.
-		writeArtifactTimeoutMarker(transient)
+		state.writeArtifactTimeoutMarker(deps.Stderr, phaseName, transient)
 		if state.transientShortcircuit && ctx.Err() == nil {
 			// Deliberately a plain blocking pause: it throttles re-dispatch
 			// against a provider that just spent 60s saying "overloaded", and

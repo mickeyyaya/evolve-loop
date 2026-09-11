@@ -1,6 +1,8 @@
 package bridge
 
 import (
+	"fmt"
+	"io"
 	"path/filepath"
 	"time"
 
@@ -115,4 +117,12 @@ func (s *replWaitState) recordNudgeOutcome(recorder *interaction.Recorder, now f
 		Result:    result,
 		LatencyMS: now().Sub(s.nudgeAt).Milliseconds(),
 	})
+}
+
+func (s *replWaitState) writeArtifactTimeoutMarker(stderr io.Writer, phaseName string, transient bool) {
+	fmt.Fprintf(stderr,
+		"[bridge] %sphase=%s waited=%ds interval=%ds extends_used=%d max_extends=%d last_review=%s liveness=%s progressed=%v busy=%v transient=%v reason=%q\n",
+		artifactTimeoutMarker, phaseName, s.waitedS, s.intervalS, s.attempt, s.maxExtends,
+		reviewActionOrNone(s.lastVerdict.Action), livenessOrUnknown(s.lastEvent.State),
+		s.lastEvent.Progressed, s.lastEvent.Busy, transient, s.lastVerdict.Reason)
 }
