@@ -78,6 +78,92 @@ func TestReadCycle_PhasesInRunOrderWithRoundsAndRouting(t *testing.T) {
 	}
 }
 
+func TestPhaseRuns_CorrelatesFinalAttemptInsideEachRepeatedPhaseWindow(t *testing.T) {
+	entries := []phasetiming.Entry{
+		{Phase: "audit", Verdict: "PASS", StartedAt: "2026-09-11T10:00:00Z", EndedAt: "2026-09-11T10:10:00Z"},
+		{Phase: "audit", Verdict: "PASS", StartedAt: "2026-09-11T11:00:00Z", EndedAt: "2026-09-11T11:10:00Z"},
+	}
+	calls := []llmCall{
+		{TS: "2026-09-11T10:02:00Z", Phase: "audit", CLI: "codex", Model: "first-failed", Attempt: 1, ExitCode: 81},
+		{TS: "2026-09-11T10:05:00Z", Phase: "audit", CLI: "claude-tmux", Model: "first-final", Attempt: 2, ExitCode: 0},
+		{TS: "2026-09-11T11:05:00Z", Phase: "audit", CLI: "codex-tmux", Model: "second-final", Attempt: 1, ExitCode: 0},
+	}
+
+	got := phaseRuns(entries, calls)
+	if len(got) != 2 {
+		t.Fatalf("phaseRuns = %+v", got)
+	}
+	if got[0].CLI != "claude-tmux" || got[0].Model != "first-final" {
+		t.Fatalf("first audit attributed wrong attempt: %+v", got[0])
+	}
+	if got[1].CLI != "codex-tmux" || got[1].Model != "second-final" {
+		t.Fatalf("second audit attributed wrong attempt: %+v", got[1])
+	}
+}
+
+func TestPhaseRuns_SecondPrecisionEndIncludesFractionalAttemptTimestamp(t *testing.T) {
+	entries := []phasetiming.Entry{{
+		Phase: "audit", Verdict: "PASS",
+		StartedAt: "2026-09-11T10:00:00Z", EndedAt: "2026-09-11T10:10:00Z",
+	}}
+	calls := []llmCall{{
+		StartedAt: "2026-09-11T10:09:59.100Z", EndedAt: "2026-09-11T10:10:00.900Z",
+		Phase: "audit", CLI: "claude-tmux", Model: "opus", Attempt: 1, ExitCode: 0,
+	}}
+
+	got := phaseRuns(entries, calls)
+	if len(got) != 1 || got[0].CLI != "claude-tmux" || got[0].Model != "opus" {
+		t.Fatalf("second-precision phase end lost same-second attempt: %+v", got)
+	}
+}
+
+func TestPhaseRuns_AdjacentSecondPrecisionRoundsNeverShareAttempt(t *testing.T) {
+	entries := []phasetiming.Entry{
+		{Phase: "audit", Verdict: "FAIL", StartedAt: "2026-09-11T10:00:00Z", EndedAt: "2026-09-11T10:10:00Z"},
+		{Phase: "audit", Verdict: "PASS", StartedAt: "2026-09-11T10:10:00Z", EndedAt: "2026-09-11T10:20:00Z"},
+	}
+	calls := []llmCall{
+		{StartedAt: "2026-09-11T10:09:00Z", EndedAt: "2026-09-11T10:09:59.900Z", Phase: "audit", CLI: "codex", Model: "first", CallID: "first"},
+		{StartedAt: "2026-09-11T10:10:00.100Z", EndedAt: "2026-09-11T10:10:00.900Z", Phase: "audit", CLI: "claude-tmux", Model: "second", CallID: "second"},
+	}
+
+	got := phaseRuns(entries, calls)
+	if len(got) != 2 || got[0].Model != "first" || got[1].Model != "second" {
+		t.Fatalf("adjacent phase rounds reused or stole an attempt: %+v", got)
+	}
+}
+
+func TestPhaseRuns_AmbiguousBoundaryCallIsNotMovedIntoLaterRound(t *testing.T) {
+	entries := []phasetiming.Entry{
+		{Phase: "audit", Verdict: "FAIL", StartedAt: "2026-09-11T10:00:00Z", EndedAt: "2026-09-11T10:10:00Z"},
+		{Phase: "audit", Verdict: "PASS", StartedAt: "2026-09-11T10:10:00Z", EndedAt: "2026-09-11T10:20:00Z"},
+	}
+	calls := []llmCall{{
+		TS: "2026-09-11T10:10:00.500Z", Phase: "audit", CLI: "codex", Model: "ambiguous", CallID: "boundary",
+	}}
+
+	got := phaseRuns(entries, calls)
+	if len(got) != 2 || got[0].CLI != "" || got[1].CLI != "" {
+		t.Fatalf("ambiguous timestamp-only call was assigned to a phase: %+v", got)
+	}
+}
+
+func TestPhaseRuns_IndistinguishableWindowsWithholdPreciseCalls(t *testing.T) {
+	entries := []phasetiming.Entry{
+		{Phase: "audit", Verdict: "FAIL", StartedAt: "2026-09-11T10:00:00Z", EndedAt: "2026-09-11T10:10:00Z"},
+		{Phase: "audit", Verdict: "PASS", StartedAt: "2026-09-11T10:00:00Z", EndedAt: "2026-09-11T10:10:00Z"},
+	}
+	calls := []llmCall{{
+		StartedAt: "2026-09-11T10:05:00.100Z", EndedAt: "2026-09-11T10:05:01.200Z",
+		Phase: "audit", CLI: "claude-tmux", Model: "ambiguous", CallID: "same-window",
+	}}
+
+	got := phaseRuns(entries, calls)
+	if len(got) != 2 || got[0].CLI != "" || got[1].CLI != "" {
+		t.Fatalf("indistinguishable windows claimed a precise call: %+v", got)
+	}
+}
+
 func TestReadCycle_DossierOnlyCycle(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
+	"github.com/mickeyyaya/evolve-loop/go/internal/llmcalls"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasetiming"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
@@ -50,7 +50,7 @@ func fingerprint(root string) string {
 		stamp(filepath.Join(ws, core.CycleStateFile))
 		stamp(filepath.Join(ws, core.RunStateFile))
 		stamp(phasetiming.Path(ws))
-		stamp(filepath.Join(ws, bridge.LLMCallsLogFilename))
+		stamp(filepath.Join(ws, llmcalls.Filename))
 		stamp(runlease.PathIn(ws))
 		stamp(filepath.Join(ws, auditReportName))
 	}

@@ -25,11 +25,12 @@ func (agyTmuxDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, e
 	// --model "<display name>" (agy 1.0.15, cycle-447; launchCmdLine quotes
 	// the space/paren tokens). claude-keyed raw flags realize to nothing.
 	return runTmuxREPL(ctx, cfg, deps, tmuxLaunch{
-		name:         "agy-tmux",
-		session:      session,
-		named:        named,
-		launchCmd:    launchCmdLine(resolveBinary(deps, "agy"), cfg.Realization.LaunchFlags),
-		promptMarker: "? for shortcuts",
+		name:          "agy-tmux",
+		session:       session,
+		named:         named,
+		launchCmd:     launchCmdLine(resolveBinary(deps, "agy"), cfg.Realization.LaunchFlags),
+		modelDispatch: modelDispatchForTmux("agy-tmux", cfg.Realization, cfg.ExtraFlags),
+		promptMarker:  "? for shortcuts",
 		// NO input-line marker. agy's boot marker above is a FOOTER hint, not
 		// an input-line prompt, and captured agy panes show no reliable prompt
 		// glyph to anchor on. Declared empty on purpose: submit-verify then

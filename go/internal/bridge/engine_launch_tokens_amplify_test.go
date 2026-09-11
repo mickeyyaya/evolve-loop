@@ -20,7 +20,7 @@ import (
 // implementations were NOT read. They target contract clauses the three RED
 // tests in engine_launch_tokens_test.go leave unguarded:
 //
-//   - nil TokenResolver is the DI "off" switch: no record file at all.
+//   - nil TokenResolver leaves usage unavailable while lifecycle telemetry remains.
 //   - Attempt==0 (existing callers) must default to attempt 1, not 0.
 //   - the append must not truncate a pre-existing llm-calls.ndjson.
 //   - the full on-disk JSON schema S6/S7 rollups decode (phase==agent,
@@ -69,19 +69,16 @@ func readRecords(t *testing.T, ws string) []llmCallRecord {
 	return recs
 }
 
-// TestEngineLaunch_NilResolver_NoTelemetry: the nil TokenResolver is the DI
-// "off" switch (Deps.TokenResolver doc: "nil disables telemetry entirely:
-// Tokens stays zero and no llm-calls.ndjson record is appended"). None of the
-// three RED tests exercise this path — all inject a resolver. A regression that
-// writes an empty/zero record (or panics on the nil func) when telemetry is off
-// would slip past them.
-func TestEngineLaunch_NilResolver_NoTelemetry(t *testing.T) {
+// TestEngineLaunch_NilResolver_RecordsUnavailableAttempt: token collection is
+// optional enrichment. A nil resolver must leave response tokens empty while
+// retaining the launch's identity, duration, and outcome in the attempt ledger.
+func TestEngineLaunch_NilResolver_RecordsUnavailableAttempt(t *testing.T) {
 	ws := t.TempDir()
 	prof := writeProfile(t, ws, "eng-tokens-amp", "")
 	artifact := filepath.Join(ws, "artifact.md")
 	fr := &fakeRunner{writeArtifactPath: artifact, writeArtifactBody: "OK\n"}
 
-	// No TokenResolver set -> telemetry disabled.
+	// No TokenResolver set -> token enrichment unavailable.
 	eng := NewEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(nil)})
 
 	resp, err := eng.Launch(context.Background(), core.BridgeRequest{
@@ -95,10 +92,21 @@ func TestEngineLaunch_NilResolver_NoTelemetry(t *testing.T) {
 		t.Fatalf("resp.ExitCode = %d, want %d", resp.ExitCode, ExitOK)
 	}
 	if resp.Tokens != (core.TokenUsage{}) {
-		t.Fatalf("resp.Tokens = %+v, want zero when telemetry disabled", resp.Tokens)
+		t.Fatalf("resp.Tokens = %+v, want zero when usage enrichment is unavailable", resp.Tokens)
 	}
-	if _, statErr := os.Stat(filepath.Join(ws, "llm-calls.ndjson")); !os.IsNotExist(statErr) {
-		t.Fatalf("llm-calls.ndjson must NOT be created when TokenResolver is nil; stat err = %v", statErr)
+	recs := readRecords(t, ws)
+	if len(recs) != 1 {
+		t.Fatalf("nil resolver must still emit one attempt record, got %d", len(recs))
+	}
+	rec := recs[0]
+	if rec.UsageStatus != "unavailable" || rec.Source != "none" || rec.ExitCode != ExitOK {
+		t.Fatalf("nil-resolver attempt = %+v", rec)
+	}
+	if rec.FillPct != tokenusage.FillPctUnmeasured {
+		t.Fatalf("nil-resolver fill_pct = %v, want unavailable sentinel %v", rec.FillPct, tokenusage.FillPctUnmeasured)
+	}
+	if rec.CallID == "" || rec.StartedAt == "" || rec.EndedAt == "" || rec.TimingScope != "bridge_dispatch" {
+		t.Fatalf("nil-resolver attempt lacks lifecycle identity: %+v", rec)
 	}
 }
 
@@ -171,12 +179,10 @@ func TestEngineLaunch_AppendPreservesExistingRecords(t *testing.T) {
 	}
 }
 
-// TestEngineLaunch_ZeroUsageStillRecords: the record write is gated on the
-// resolver being *present and non-erroring*, not on the usage being non-zero.
-// A resolver that legitimately resolves zero usage (no error) must still append
-// exactly one record — this is what separates "telemetry off" (nil resolver,
-// no file) from "telemetry on, nothing spent" (a real zero-usage record). No
-// RED test covers the zero-usage-success case.
+// TestEngineLaunch_ZeroUsageStillRecords: a resolver that legitimately measures
+// zero usage must still append exactly one record and identify its source. This
+// separates measured zero from the unavailable status emitted for a nil or
+// erroring resolver.
 func TestEngineLaunch_ZeroUsageStillRecords(t *testing.T) {
 	ws := t.TempDir()
 	eng, prof := amplifyEngine(t, ws, cyclestate.TokenUsage{}, tokenusage.SourceTranscript)
@@ -268,6 +274,12 @@ func TestEngineLaunch_RecordSchemaConformance(t *testing.T) {
 	if _, perr := time.Parse(time.RFC3339, rec.TS); perr != nil {
 		t.Errorf("ts %q is not RFC3339: %v", rec.TS, perr)
 	}
+	if rec.SchemaVersion != 2 || rec.CallID == "" || rec.StartedAt == "" || rec.EndedAt == "" || rec.TimingScope != "bridge_dispatch" {
+		t.Errorf("canonical lifecycle fields missing: %+v", rec)
+	}
+	if rec.RequestedModel != "auto" || rec.DispatchedModel != "haiku" || rec.DispatchSource != "argv" || rec.UsageStatus != "measured" {
+		t.Errorf("model/measurement provenance = %+v", rec)
+	}
 
 	// (b) Physical key presence for the contract's guaranteed-non-empty
 	//     top-level fields (these cannot be dropped by omitempty on a success
@@ -276,7 +288,7 @@ func TestEngineLaunch_RecordSchemaConformance(t *testing.T) {
 	if err := json.Unmarshal([]byte(line), &top); err != nil {
 		t.Fatalf("record not a JSON object: %v", err)
 	}
-	for _, k := range []string{"ts", "agent", "phase", "cli", "model", "source", "tokens"} {
+	for _, k := range []string{"schema_version", "call_id", "ts", "started_at", "ended_at", "timing_scope", "agent", "phase", "cli", "model", "requested_model", "dispatched_model", "dispatch_source", "usage_status", "source", "tokens"} {
 		if _, ok := top[k]; !ok {
 			t.Errorf("record is missing required top-level key %q; keys=%v", k, keysOf(top))
 		}
@@ -288,6 +300,11 @@ func TestEngineLaunch_RecordSchemaConformance(t *testing.T) {
 	for _, k := range []string{"input", "output", "cache_read", "cache_write"} {
 		if _, ok := toks[k]; !ok {
 			t.Errorf("tokens object missing nested key %q; keys=%v", k, keysOf(toks))
+		}
+	}
+	for _, absent := range []string{"first_output_ms", "first_output_source"} {
+		if _, ok := top[absent]; ok {
+			t.Errorf("record fabricated unsupported %q measurement", absent)
 		}
 	}
 }

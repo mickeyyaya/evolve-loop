@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
@@ -115,8 +117,9 @@ func readWorkspace(ws string, cs *CycleSummary) []string {
 }
 
 // phaseRuns turns timing entries into PhaseRuns in run order, numbers each
-// phase's occurrence (audit round 2 = second "audit"), and joins the CLI/model
-// that dispatched it from the dispatch ledger by occurrence index.
+// phase's occurrence, and joins the final attempt whose terminal timestamp lies
+// inside that phase window. This prevents retries in round one from shifting
+// every later repeated phase's model attribution.
 func phaseRuns(entries []phasetiming.Entry, calls []llmCall) []PhaseRun {
 	sort.SliceStable(entries, func(i, j int) bool {
 		return parseTime(entries[i].StartedAt).Before(parseTime(entries[j].StartedAt))
@@ -125,24 +128,123 @@ func phaseRuns(entries []phasetiming.Entry, calls []llmCall) []PhaseRun {
 	for _, c := range calls {
 		callsByPhase[c.Phase] = append(callsByPhase[c.Phase], c)
 	}
+	windows := phaseCallWindows(entries)
 	seen := map[string]int{}
+	usedCalls := map[string]map[int]struct{}{}
 	out := make([]PhaseRun, 0, len(entries))
-	for _, e := range entries {
+	for index, e := range entries {
 		seen[e.Phase]++
 		p := PhaseRun{Phase: e.Phase, Verdict: e.Verdict, Archetype: e.Archetype,
 			StartedAt: parseTime(e.StartedAt), EndedAt: parseTime(e.EndedAt),
 			DurationMS: e.DurationMS, Attempt: e.AttemptCount, Round: seen[e.Phase],
 			Tokens: e.Tokens.Input + e.Tokens.Output, Model: e.ResolvedModel}
-		if cs := callsByPhase[e.Phase]; len(cs) > 0 {
-			c := cs[len(cs)-1]
-			if seen[e.Phase]-1 < len(cs) {
-				c = cs[seen[e.Phase]-1]
-			}
+		if usedCalls[e.Phase] == nil {
+			usedCalls[e.Phase] = map[int]struct{}{}
+		}
+		if c, callIndex, ok := callForPhaseWindow(windows[index], callsByPhase[e.Phase], seen[e.Phase], usedCalls[e.Phase]); ok {
 			p.CLI, p.Model = c.CLI, c.Model
+			usedCalls[e.Phase][callIndex] = struct{}{}
 		}
 		out = append(out, p)
 	}
 	return out
+}
+
+type phaseCallWindow struct {
+	start, end        time.Time
+	previousEnd       time.Time
+	nextStart         time.Time
+	indistinguishable bool
+}
+
+func phaseCallWindows(entries []phasetiming.Entry) []phaseCallWindow {
+	windows := make([]phaseCallWindow, len(entries))
+	previousByPhase := map[string]int{}
+	for index, entry := range entries {
+		start, end := parseTime(entry.StartedAt), parseTime(entry.EndedAt)
+		if !end.IsZero() && !strings.Contains(entry.EndedAt, ".") {
+			end = end.Add(time.Second - time.Nanosecond)
+		}
+		windows[index] = phaseCallWindow{start: start, end: end}
+		if previous, ok := previousByPhase[entry.Phase]; ok {
+			windows[index].previousEnd = windows[previous].end
+			windows[previous].nextStart = start
+			if !start.IsZero() && start.Equal(windows[previous].start) {
+				windows[index].indistinguishable = true
+				windows[previous].indistinguishable = true
+			}
+		}
+		previousByPhase[entry.Phase] = index
+	}
+	return windows
+}
+
+func callForPhaseWindow(
+	window phaseCallWindow,
+	calls []llmCall,
+	occurrence int,
+	used map[int]struct{},
+) (llmCall, int, bool) {
+	if !window.start.IsZero() && !window.end.IsZero() {
+		if window.indistinguishable {
+			return llmCall{}, -1, false
+		}
+		var selected llmCall
+		var selectedAt time.Time
+		selectedIndex := -1
+		for index, call := range calls {
+			if _, alreadyUsed := used[index]; alreadyUsed {
+				continue
+			}
+			terminal := parseTime(call.EndedAt)
+			if terminal.IsZero() {
+				terminal = parseTime(call.TS)
+			}
+			if terminal.IsZero() || terminal.Before(window.start) || terminal.After(window.end) {
+				continue
+			}
+			callStart := parseTime(call.StartedAt)
+			if !callStart.IsZero() && (callStart.Before(window.start) || callStart.After(window.end)) {
+				continue
+			}
+			// A legacy call with no start time inside the previous phase's
+			// whole-second overlap could have terminated either round. Withhold
+			// it from the later round just as nextStart withholds it from the
+			// earlier round.
+			if callStart.IsZero() && !window.previousEnd.IsZero() &&
+				!terminal.Before(window.start) && !terminal.After(window.previousEnd) {
+				continue
+			}
+			// Whole-second phase records can overlap at a repeated phase's
+			// boundary. A call that starts in the later round belongs there; a
+			// timestamp-only legacy call at or after that boundary is ambiguous
+			// and is likewise withheld from the earlier round.
+			if !window.nextStart.IsZero() && !terminal.Before(window.nextStart) &&
+				(callStart.IsZero() || !callStart.Before(window.nextStart)) {
+				continue
+			}
+			if selectedAt.IsZero() || terminal.After(selectedAt) {
+				selected, selectedAt, selectedIndex = call, terminal, index
+			}
+		}
+		if !selectedAt.IsZero() {
+			return selected, selectedIndex, true
+		}
+		// A timestamped ledger that does not overlap this entry carries no safe
+		// association; leave routing blank instead of borrowing another round.
+		for _, call := range calls {
+			if !parseTime(call.EndedAt).IsZero() || !parseTime(call.TS).IsZero() {
+				return llmCall{}, -1, false
+			}
+		}
+	}
+	index := occurrence - 1
+	if index >= 0 && index < len(calls) {
+		if _, alreadyUsed := used[index]; !alreadyUsed {
+			return calls[index], index, true
+		}
+	}
+	return llmCall{}, -1, false
 }
 
 func countPhase(phases []string, name string) int {

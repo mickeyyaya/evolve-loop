@@ -45,4 +45,10 @@ type Realization struct {
 	// a launch that silently fell back to the CLI's own default cannot be
 	// reported as if the requested tier had been dispatched.
 	ModelOmitted string
+	// modelDispatchEffect retains selector, ambiguity, and argv-terminator
+	// provenance from the final deduplicated LaunchFlags. Manifest-generated
+	// flags are parsed as trusted structure; the surviving raw-profile suffix is
+	// parsed conservatively. Drivers apply this effect to their own base selector
+	// at the invocation boundary.
+	modelDispatchEffect modelDispatch
 }

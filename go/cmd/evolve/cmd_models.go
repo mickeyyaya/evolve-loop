@@ -19,7 +19,8 @@ import (
 // refactor). Subcommands:
 //
 //	refresh [--evolve-dir P] [--project-root P] [--json]   re-query CLIs, rewrite the cache
-//	list    [--evolve-dir P] [--project-root P] [--json]   print the cached catalog + staleness
+//	list        [--evolve-dir P] [--project-root P] [--json]   print the cached catalog + staleness
+//	performance [--evolve-dir P] [--project-root P] [--json]   aggregate model-attempt latency + I/O
 //
 // Exit codes: 0 OK, 1 runtime error, 10 bad args.
 //
@@ -29,7 +30,7 @@ import (
 // only the producer changes, not this command or the cache schema.
 func runModels(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
-		fmt.Fprintln(stderr, "evolve models: missing subcommand (refresh|list)")
+		fmt.Fprintln(stderr, "evolve models: missing subcommand (refresh|list|performance)")
 		return 10
 	}
 	switch args[0] {
@@ -37,6 +38,8 @@ func runModels(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return runModelsRefresh(args[1:], stdout, stderr)
 	case "list":
 		return runModelsList(args[1:], stdout, stderr)
+	case "performance":
+		return runModelsPerformance(args[1:], stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "evolve models: unknown subcommand %q\n", args[0])
 		return 10

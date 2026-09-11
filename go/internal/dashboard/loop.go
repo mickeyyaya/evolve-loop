@@ -1,7 +1,6 @@
 package dashboard
 
 import (
-	"bufio"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,24 +8,26 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
+	"github.com/mickeyyaya/evolve-loop/go/internal/llmcalls"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
-// llmCall is the subset of a llm-calls.ndjson line the dashboard renders. The
-// writer (bridge/engine.go) pins the full field set; unknown fields are ignored.
+// llmCall is the read-only dashboard projection of the canonical attempt
+// record. Model is a verified dispatched selector for schema-v2 records and the
+// historical requested label for legacy rows.
 type llmCall struct {
-	TS         string `json:"ts"`
-	Agent      string `json:"agent"`
-	Phase      string `json:"phase"`
-	CLI        string `json:"cli"`
-	Model      string `json:"model"`
-	Attempt    int    `json:"attempt"`
-	DurationMS int64  `json:"duration_ms"`
-	ExitCode   int    `json:"exit_code"`
+	TS        string
+	StartedAt string
+	EndedAt   string
+	CallID    string
+	Phase     string
+	CLI       string
+	Model     string
+	Attempt   int
+	ExitCode  int
 }
 
 // readLoop answers "what is the loop doing right now" from cycle-state.json,
@@ -160,23 +161,26 @@ func readCycleState(path string) (cs cyclestate.CycleState, ok bool, err error) 
 	return cs, true, nil
 }
 
-// readLLMCalls parses the workspace's dispatch ledger (bridge.LLMCallsLogFilename),
-// skipping unparsable lines (a line still being written is the normal case,
-// never an error).
+// readLLMCalls projects the canonical bounded reader into dashboard fields.
 func readLLMCalls(ws string) []llmCall {
-	f, err := os.Open(filepath.Join(ws, bridge.LLMCallsLogFilename))
-	if err != nil {
-		return nil
-	}
-	defer func() { _ = f.Close() }()
-	var out []llmCall
-	sc := bufio.NewScanner(f)
-	sc.Buffer(make([]byte, 0, 64*1024), 1<<20)
-	for sc.Scan() {
-		var c llmCall
-		if json.Unmarshal(sc.Bytes(), &c) == nil && c.Phase != "" {
-			out = append(out, c)
+	result, _ := llmcalls.ReadWorkspace(ws)
+	out := make([]llmCall, 0, len(result.Records))
+	for _, rec := range result.Records {
+		if rec.Phase == "" {
+			continue
 		}
+		model := rec.Model
+		if rec.SchemaVersion >= llmcalls.SchemaVersion || rec.CallID != "" {
+			model = rec.DispatchedModel
+		}
+		exitCode := 0
+		if rec.ExitCode != nil {
+			exitCode = *rec.ExitCode
+		}
+		out = append(out, llmCall{
+			TS: rec.TS, StartedAt: rec.StartedAt, EndedAt: rec.EndedAt, CallID: rec.CallID,
+			Phase: rec.Phase, CLI: rec.CLI, Model: model, Attempt: rec.Attempt, ExitCode: exitCode,
+		})
 	}
 	return out
 }

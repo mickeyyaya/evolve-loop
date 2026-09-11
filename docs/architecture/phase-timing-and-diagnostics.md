@@ -48,6 +48,34 @@ By collecting the `duration_ms` field for every phase, operator scripts or dashb
 
 ---
 
+## Per-Attempt Model Telemetry (`llm-calls.ndjson`)
+
+Every completed orchestration-owned `Engine.Launch` writes one canonical attempt
+record to `<workspace>/llm-calls.ndjson`, including failed launches and launches
+whose token collector is absent or errors. This ledger answers retry-level model,
+outcome, latency, and input/output questions that a terminal phase summary cannot.
+
+The two timing artifacts have deliberately different scopes:
+
+| Artifact | Unit | Duration includes | Main use |
+|---|---|---|---|
+| `phase-timing.json` | Completed orchestrator phase occurrence | The phase lifecycle around one or more dispatches | Cycle timing, verdicts, phase retries, cost rollups |
+| `llm-calls.ndjson` | One `Engine.Launch` attempt | The shared Bridge `LaunchArgs` pipeline through driver return | Per-CLI/model latency, failed-attempt cost, dispatch provenance |
+
+Attempt timing stops before optional token resolution and ledger I/O. The record
+distinguishes missing duration from a measured zero, missing token usage from
+measured zero tokens, an abstract requested tier from a selector that reached a
+dispatch boundary, and a resumed session from a newly launched process.
+
+Use `evolve models performance --evolve-dir <project>/.evolve` for the derived
+index. It reports latency coverage, input/output/cache totals, usage coverage,
+and measured amortized output throughput. It does not fabricate input prefill
+speed or time to first token. Full schema, locking, attribution, aggregation,
+and troubleshooting details are in
+[Model Attempt Telemetry](model-attempt-telemetry.md).
+
+---
+
 ## Per-Phase Usage Sidecar (`<phase>-usage.json`)
 
 Immediately after each phase successfully records its timing entry in the orchestrator, a structured usage sidecar file is written to `<workspace>/<phase>-usage.json`. This provides granular metrics for cost, duration, attempts, and verdict for each individual phase run.

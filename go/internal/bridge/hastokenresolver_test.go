@@ -33,9 +33,9 @@ func TestHasTokenResolver_TrueWhenDepsFieldSet(t *testing.T) {
 	}
 }
 
-// TestHasTokenResolver_FalseWhenDepsFieldNil: the documented "telemetry off"
-// DI state (nil TokenResolver, per Deps.TokenResolver's doc comment) must
-// report false, not panic and not default to some non-nil stub.
+// TestHasTokenResolver_FalseWhenDepsFieldNil: the documented usage-enrichment
+// unavailable state must report false, not panic, and not default to a non-nil
+// stub. Lifecycle telemetry remains active independently.
 func TestHasTokenResolver_FalseWhenDepsFieldNil(t *testing.T) {
 	eng := NewEngine(Deps{})
 	if eng.HasTokenResolver() {

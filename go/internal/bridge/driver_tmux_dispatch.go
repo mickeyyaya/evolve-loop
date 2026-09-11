@@ -26,11 +26,20 @@ func dispatchTmuxPrompt(
 	artifactBase := capture(cfg)
 
 	if !prep.namedExists && len(cfg.Realization.REPLInput) > 0 {
-		for _, line := range cfg.Realization.REPLInput {
-			_ = deps.Tmux.SendKeys(ctx, lp.session, line, true)
+		seeded := 0
+		for index, line := range cfg.Realization.REPLInput {
+			if err := deps.Tmux.SendKeys(ctx, lp.session, line, true); err != nil {
+				fmt.Fprintf(deps.Stderr, "%s WARN: REPL seed send failed index=%d total=%d detail=%s\n",
+					prep.prefix, index+1, len(cfg.Realization.REPLInput), diagnosticField(err.Error()))
+				continue
+			}
+			seeded++
+			if observation, ok := modelDispatchFromREPL(line); ok {
+				observeModelDispatch(deps, observation)
+			}
 			deps.Sleep(time.Second)
 		}
-		fmt.Fprintf(deps.Stderr, "%s seeded %d REPL input line(s)\n", prep.prefix, len(cfg.Realization.REPLInput))
+		fmt.Fprintf(deps.Stderr, "%s seeded %d/%d REPL input line(s)\n", prep.prefix, seeded, len(cfg.Realization.REPLInput))
 	}
 
 	if human {

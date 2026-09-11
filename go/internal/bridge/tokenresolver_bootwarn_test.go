@@ -9,13 +9,11 @@ import (
 )
 
 // Cycle-745 task token-resolver-boot-warn: Deps.TokenResolver is a fail-open
-// seam — nil silently disables token telemetry (recordTokenUsage no-ops), which
-// is exactly how the all-zeros first telemetry batch shipped unnoticed. The
-// remaining AC from inbox item token-resolver-production-wiring: fail-open must
-// be LOUD. Constructing an Engine with a nil TokenResolver must emit a
-// WARN-level line on the engine's Stderr at construction (boot) time, naming
-// TokenResolver so the operator can grep for it; a wired resolver must stay
-// silent (no per-boot noise on the healthy path).
+// seam. Historically nil disabled the whole token record, which is how the
+// all-zeros first telemetry batch shipped unnoticed. Lifecycle telemetry now
+// remains active, but token usage is unavailable, so fail-open must still be
+// loud. Constructing an Engine with a nil TokenResolver emits one WARN naming
+// TokenResolver; a wired resolver stays silent.
 
 // stubResolver is a minimal non-nil TokenResolver for the wired case.
 func stubResolver(tokenusage.Window) (tokenusage.Result, error) {

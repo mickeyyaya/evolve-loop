@@ -137,9 +137,15 @@ func Realize(m Manifest, intent LaunchIntent) Realization {
 		r.LaunchFlags = append(r.LaunchFlags, intent.AllowedTools...)
 	}
 
+	// Manifest-realized flags have known construction. Keep their deduplicated
+	// prefix separate so selector provenance can be derived from the exact final
+	// argv while arbitrary profile flags still use the conservative parser.
+	trustedFlags := dedupeLaunchFlags(r.LaunchFlags)
+	combinedFlags := append([]string(nil), r.LaunchFlags...)
+
 	// Raw escape hatch: only the matching CLI's flags.
 	if raw, ok := intent.RawByCLI[m.CLI]; ok {
-		r.LaunchFlags = append(r.LaunchFlags, raw...)
+		combinedFlags = append(combinedFlags, raw...)
 	}
 	// Dedupe LaunchFlags (cycle-124 G1a wire-up consequence): a manifest's
 	// default_args may declare a flag that one of its params ALSO emits when
@@ -149,7 +155,8 @@ func Realize(m Manifest, intent LaunchIntent) Realization {
 	// intent.Permission="bypass"). Dedupe is order-preserving (keep first
 	// occurrence) so the operator-declared default still takes the leading
 	// position. Idempotent for the already-unique case.
-	r.LaunchFlags = dedupeLaunchFlags(r.LaunchFlags)
+	r.LaunchFlags = dedupeLaunchFlags(combinedFlags)
+	r.modelDispatchEffect = modelDispatchFromFinalizedFlags(m.CLI, trustedFlags, r.LaunchFlags)
 	return r
 }
 

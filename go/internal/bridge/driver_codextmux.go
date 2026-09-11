@@ -51,6 +51,7 @@ func (codexTmuxDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int,
 	// emits it as -m; permission is a controller no-op (trust handled by the
 	// auto-responder). No claude argv reaches codex.
 	flags := cfg.Realization.LaunchFlags
+	dispatched := modelDispatchFromRealization("codex-tmux", defaultModelDispatch(), cfg.Realization)
 	// cycle-142: clamp the model to a ChatGPT-safe one on subscription auth.
 	// A model outside the manifest's chatgpt_safe_models is 400-rejected on
 	// ChatGPT accounts (API-key-only by plan tier), which otherwise hangs the
@@ -59,17 +60,22 @@ func (codexTmuxDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int,
 	if m, err := LoadManifest("codex-tmux"); err == nil {
 		if clamped, from, to := clampCodexModelForAuth(flags, m, codexAuthMode(deps)); from != "" {
 			flags = clamped
+			if !dispatched.uncertain {
+				dispatched = modelDispatchFromArgs("codex-tmux", defaultModelDispatch(), flags)
+			}
 			fmt.Fprintf(deps.Stderr, "[codex-tmux] model clamp (auth=chatgpt): %s → %s (not in the manifest's chatgpt_safe_models for a ChatGPT account)\n", from, to)
 		}
 	}
+	dispatched = modelDispatchFromExtraArgs("codex-tmux", dispatched, cfg.ExtraFlags)
 	launchCmd := launchCmdLine(resolveBinary(deps, "codex"), flags)
 
 	return runTmuxREPL(ctx, cfg, deps, tmuxLaunch{
-		name:         "codex-tmux",
-		session:      session,
-		named:        named,
-		launchCmd:    launchCmd,
-		promptMarker: "›", // U+203A
+		name:          "codex-tmux",
+		session:       session,
+		named:         named,
+		launchCmd:     launchCmd,
+		modelDispatch: dispatched,
+		promptMarker:  "›", // U+203A
 		// Same glyph: codex's boot-ready marker IS its input-line prompt.
 		inputLineMarker: "›",
 		bootScrollback:  200, // alt-screen: bare capture-pane is blank

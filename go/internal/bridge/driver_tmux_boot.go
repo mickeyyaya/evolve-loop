@@ -71,7 +71,12 @@ func bootTmuxREPL(
 		fmt.Fprintf(deps.Stderr, "%s safety gate: activated Build explanation contract requires OS sandbox confinement\n", prep.prefix)
 		return nil, ExitSafetyGate, nil
 	}
-	_ = deps.Tmux.SendKeys(ctx, lp.session, launchCmd, true)
+	if err := deps.Tmux.SendKeys(ctx, lp.session, launchCmd, true); err != nil {
+		fmt.Fprintf(deps.Stderr, "%s FAIL: CLI launch send failed session=%s detail=%s\n",
+			prep.prefix, diagnosticField(lp.session), diagnosticField(err.Error()))
+		return nil, ExitBadFlags, fmt.Errorf("%s send CLI launch to session %q: %w", prep.prefix, lp.session, err)
+	}
+	observeModelDispatch(deps, lp.modelDispatch)
 	fmt.Fprintf(deps.Stderr, "%s launching: %s\n", prep.prefix, launchCmd)
 
 	interval := lp.bootIntervalS

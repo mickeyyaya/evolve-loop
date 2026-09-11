@@ -30,16 +30,27 @@ import (
 // exit_code) exactly as pinned by the S3 inbox item so a later cycle
 // (S6/S7 rollups) can decode it without a migration.
 type llmCallRecord struct {
-	TS         string                `json:"ts"`
-	Agent      string                `json:"agent"`
-	Phase      string                `json:"phase"`
-	CLI        string                `json:"cli"`
-	Model      string                `json:"model"`
-	Attempt    int                   `json:"attempt"`
-	Tokens     cyclestate.TokenUsage `json:"tokens"`
-	Source     string                `json:"source"`
-	DurationMS int64                 `json:"duration_ms"`
-	ExitCode   int                   `json:"exit_code"`
+	SchemaVersion   int                   `json:"schema_version"`
+	CallID          string                `json:"call_id"`
+	TS              string                `json:"ts"`
+	StartedAt       string                `json:"started_at"`
+	EndedAt         string                `json:"ended_at"`
+	TimingScope     string                `json:"timing_scope"`
+	Agent           string                `json:"agent"`
+	Phase           string                `json:"phase"`
+	CLI             string                `json:"cli"`
+	Model           string                `json:"model"`
+	RequestedModel  string                `json:"requested_model"`
+	DispatchedModel string                `json:"dispatched_model"`
+	DispatchSource  string                `json:"dispatch_source"`
+	Attempt         int                   `json:"attempt"`
+	Tokens          cyclestate.TokenUsage `json:"tokens"`
+	Source          string                `json:"source"`
+	UsageStatus     string                `json:"usage_status"`
+	DurationMS      int64                 `json:"duration_ms"`
+	ExitCode        int                   `json:"exit_code"`
+	CauseCode       string                `json:"cause_code"`
+	FillPct         float64               `json:"fill_pct"`
 }
 
 // TestEngineLaunch_PopulatesBridgeResponseTokens: a Launch whose
@@ -185,5 +196,12 @@ func TestEngineLaunch_CollectorErrorNeverFailsLaunch(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), "boom: collector unavailable") {
 		t.Fatalf("resolver error must be WARNed to Stderr; got %q", stderr.String())
+	}
+	recs := readRecords(t, ws)
+	if len(recs) != 1 || recs[0].UsageStatus != "resolver_error" || recs[0].Source != "none" {
+		t.Fatalf("resolver error must retain the attempt with unavailable usage: %+v", recs)
+	}
+	if recs[0].FillPct != tokenusage.FillPctUnmeasured {
+		t.Fatalf("resolver-error fill_pct = %v, want unavailable sentinel %v", recs[0].FillPct, tokenusage.FillPctUnmeasured)
 	}
 }

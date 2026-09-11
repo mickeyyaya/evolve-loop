@@ -52,11 +52,12 @@ func (claudeTmuxDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int
 
 	// TODO(manifest slice): prompt marker from the claude-tmux manifest; default ❯.
 	return runTmuxREPL(ctx, cfg, deps, tmuxLaunch{
-		name:         "claude-tmux",
-		session:      session,
-		named:        named,
-		launchCmd:    launchCmd,
-		promptMarker: tmuxPromptMarkerDefault,
+		name:          "claude-tmux",
+		session:       session,
+		named:         named,
+		launchCmd:     launchCmd,
+		modelDispatch: modelDispatchForTmux("claude-tmux", cfg.Realization, cfg.ExtraFlags),
+		promptMarker:  tmuxPromptMarkerDefault,
 		// Same glyph: claude's boot-ready marker IS its input-line prompt.
 		inputLineMarker: tmuxPromptMarkerDefault,
 		bootScrollback:  0, // claude renders to the visible pane
