@@ -43,6 +43,54 @@ The scan was then checked against the actual control flow and existing tests. La
 
 Other large files such as `phase_advisor.go`, `explanationdocs.go`, and `inboxmover.go` contain smaller functions and do not enter the first campaign. They should be rescanned after the seven workflows are contained.
 
+### Supplemental rescan: the release CLI's two `Run` procedures
+
+The same post-campaign rescan ranked two functions the first campaign never
+examined above several it did. Both are in the release path, both are reached
+only by `evolve release`, and neither is named in the table above:
+
+| Function | Lines / approximate complexity | Disposition |
+|---|---:|---|
+| `releasepreflight.Run` | 252 / 84 | Extracted — the highest score measured anywhere in the repo, above four of the seven original targets. |
+| `releasepipeline.Run` | 206 / 34 | Extracted — six pre-publish steps repeating one shape verbatim. |
+
+Both follow the behavior-preserving protocol above, and both use the patterns
+this plan already declares: a parameter object (`preflightRun`, `releaseRun`)
+modelled on `phases/ship`'s `worktreeShip`, plus — for preflight only — an
+ordered stage table so that step ORDER becomes a data structure a test can
+assert against rather than control flow a reader must trace. Neither adds an
+exported identifier or a package import.
+
+**These two slices are why the protocol now treats operator-facing strings as
+contract.** The preflight slice shipped two error-string drifts. The suite
+caught one (`"step 2 branch error"` for `"step 2 git error"`). It could not
+catch the second — `"HEAD is detached"` written where the original said
+`"detached HEAD"` — because every assertion tested the looser substring
+`"detached"`; two independent reviewers found it. An error message that reaches
+the operator through the CLI is observable behavior, not log wording, and the
+distinction matters for TDD protocol rule 2: a characterization test may skip
+log phrasing, but not the text a failure prints.
+
+Two practices were added in response, and both are cheap enough to keep:
+
+1. Characterization tests assert failure messages by EXACT equality, not
+   substring. The pipeline slice's six pre-publish labels are pinned this way,
+   which matters because two of the six deliberately journal under one name and
+   report under another.
+2. After the extraction, a script extracts every operator-facing string literal
+   from the pre-change file and from the new files and diffs the sets. A
+   consolidated format string is then verified to recompose byte-for-byte. On
+   the pipeline slice this reported zero new literals and six consolidated
+   ones, all six verified identical — a mechanical check where the preflight
+   slice had relied on reading.
+
+Also found while verifying, and filed rather than fixed: `acs/cycle50` carries
+two permanently-RED predicates asserting on `go/cmd/evolve/cmd_release_preflight.go`,
+a path that no longer exists (the CLI moved to `internal/cli/opscmd/`). It fails
+identically on untouched `main` and is outside CI scope, since the durable tier
+runs `./acs/regression/...` only. Queued as inbox item
+`acs-cycle50-predicates-point-at-a-moved-file`.
+
 ### Supplemental rescan: PhaseAdvisor plan stage
 
 The post-campaign rescan found one small, cohesive value object embedded in

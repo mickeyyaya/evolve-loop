@@ -40,8 +40,6 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-
-	"github.com/mickeyyaya/evolve-loop/go/internal/semvercheck"
 )
 
 // Sentinel errors. The cmd layer maps these to exit codes.
@@ -197,210 +195,28 @@ func applyDefaultSteps(s Steps) Steps {
 
 // Run executes the pipeline. Returns Result + error mapped to bash exit codes.
 func Run(opts Options) (Result, error) {
-	res := Result{Target: opts.Target}
-
-	logw := opts.Stderr
-	if logw == nil {
-		logw = io.Discard
-	}
-	logf := func(format string, args ...any) {
-		fmt.Fprintf(logw, "[release-pipeline] "+format+"\n", args...)
-	}
-
-	// Argument validation (semver target).
-	if !semvercheck.IsSemver(opts.Target) {
-		return res, fmt.Errorf("%w: target version not semver: %s", ErrPrePublishFailed, opts.Target)
-	}
-
-	// Resolve FromTag if not provided.
-	fromTag := opts.FromTag
-	if fromTag == "" {
-		if t, err := resolvePrevTag(opts.RepoRoot); err == nil && t != "" {
-			fromTag = t
-		} else {
-			logf("WARN: no previous tag found; changelog range will start from initial commit")
-			if init, err := resolveInitCommit(opts.RepoRoot); err == nil {
-				fromTag = init
-			}
-		}
-	}
-
-	// Resolve now seam.
-	now := opts.Now
-	if now == nil {
-		now = time.Now
-	}
-
-	// Steps defaults: only overlay missing fields.
-	steps := applyDefaultSteps(opts.Steps)
-	// Thread StrictPass into the default preflight path. When the caller
-	// provides their own Steps.Preflight (e.g. in tests), they own strictPass.
-	if opts.Steps.Preflight == nil {
-		sp := opts.StrictPass
-		steps.Preflight = func(repoRoot, target string, dryRun, skipTests bool) error {
-			return runPreflightLib(repoRoot, target, dryRun, skipTests, sp)
-		}
-	}
-
-	logf("target: v%s", opts.Target)
-	logf("changelog range: %s..HEAD", fromTag)
-	logf("dry-run: %v | no-rollback: %v | skip-tests: %v",
-		opts.DryRun, opts.NoRollback, opts.SkipTests)
-
-	// Init journal.
-	journal, journalPath, err := initJournal(opts, fromTag, now())
+	r, err := newReleaseRun(opts)
 	if err != nil {
-		return res, fmt.Errorf("%w: journal init: %v", ErrPrePublishFailed, err)
+		return r.res, err
 	}
-	res.JournalPath = journalPath
-	logf("journal: %s", journalPath)
-
-	// Step 0: full-dry-run preflight (opt-in).
-	if opts.RequirePreflight {
-		logf("step: full-dry-run preflight (--require-preflight)")
-		if err := steps.FullDryRunPreflight(opts.RepoRoot, opts.Target); err != nil {
-			appendStep(journal, journalPath, "full-dry-run-preflight", "fail", err.Error(), now())
-			res.StepsFailed = append(res.StepsFailed, "full-dry-run-preflight")
-			return res, fmt.Errorf("%w: full-dry-run preflight: %v", ErrPrePublishFailed, err)
-		}
-		appendStep(journal, journalPath, "full-dry-run-preflight", "ok", "", now())
-		res.StepsCompleted = append(res.StepsCompleted, "full-dry-run-preflight")
+	if err := r.prePublish(); err != nil {
+		return r.res, err
 	}
-
-	// Step 1: preflight.
-	logf("step: preflight")
-	if err := steps.Preflight(opts.RepoRoot, opts.Target, opts.DryRun, opts.SkipTests); err != nil {
-		appendStep(journal, journalPath, "preflight", "fail", err.Error(), now())
-		res.StepsFailed = append(res.StepsFailed, "preflight")
-		return res, fmt.Errorf("%w: preflight: %v", ErrPrePublishFailed, err)
-	}
-	appendStep(journal, journalPath, "preflight", "ok", "", now())
-	res.StepsCompleted = append(res.StepsCompleted, "preflight")
-
-	// Step 2: changelog-gen.
-	logf("step: changelog-gen")
-	if err := steps.ChangelogGen(opts.RepoRoot, fromTag, "HEAD", opts.Target, opts.DryRun); err != nil {
-		appendStep(journal, journalPath, "changelog-gen", "fail", err.Error(), now())
-		res.StepsFailed = append(res.StepsFailed, "changelog-gen")
-		return res, fmt.Errorf("%w: changelog-gen: %v", ErrPrePublishFailed, err)
-	}
-	appendStep(journal, journalPath, "changelog-gen", "ok", "", now())
-	res.StepsCompleted = append(res.StepsCompleted, "changelog-gen")
-
-	// Step 3: version-bump.
-	logf("step: version-bump")
-	if err := steps.VersionBump(opts.RepoRoot, opts.Target, opts.DryRun); err != nil {
-		appendStep(journal, journalPath, "version-bump", "fail", err.Error(), now())
-		res.StepsFailed = append(res.StepsFailed, "version-bump")
-		return res, fmt.Errorf("%w: version-bump: %v", ErrPrePublishFailed, err)
-	}
-	appendStep(journal, journalPath, "version-bump", "ok", "", now())
-	res.StepsCompleted = append(res.StepsCompleted, "version-bump")
-
-	// Step 3.5: rebuild-binary. Rebuilds go/evolve from the version-bumped
-	// source so the marketplace binary is in sync with plugin.json:version
-	// after this release. Without this step, operators install the new
-	// plugin version but run the previous build. Best-effort in dry-run.
-	if opts.DryRun {
-		logf("step: rebuild-binary (DRY-RUN — would run `go build -ldflags '-X …version=%s …'` -o go/evolve ./cmd/evolve from <RepoRoot>/go)", opts.Target)
-		appendStep(journal, journalPath, "rebuild-binary", "skipped-dry-run", "", now())
-	} else {
-		logf("step: rebuild-binary")
-		if err := steps.RebuildBinary(opts.RepoRoot, opts.Target, false); err != nil {
-			appendStep(journal, journalPath, "rebuild-binary", "fail", err.Error(), now())
-			res.StepsFailed = append(res.StepsFailed, "rebuild-binary")
-			return res, fmt.Errorf("%w: rebuild-binary: %v", ErrPrePublishFailed, err)
-		}
-		appendStep(journal, journalPath, "rebuild-binary", "ok", "", now())
-		res.StepsCompleted = append(res.StepsCompleted, "rebuild-binary")
-	}
-
-	// Step 4: release.sh consistency check (skipped in dry-run).
-	if opts.DryRun {
-		logf("step: release.sh-check (DRY-RUN — skipping; markers not actually bumped)")
-		appendStep(journal, journalPath, "release-sh-check", "skipped-dry-run", "", now())
-	} else {
-		logf("step: release.sh-check")
-		if err := steps.ReleaseSh(opts.RepoRoot, opts.Target); err != nil {
-			appendStep(journal, journalPath, "release-sh-check", "fail", err.Error(), now())
-			res.StepsFailed = append(res.StepsFailed, "release-sh-check")
-			return res, fmt.Errorf("%w: release.sh consistency: %v", ErrPrePublishFailed, err)
-		}
-		appendStep(journal, journalPath, "release-sh-check", "ok", "", now())
-		res.StepsCompleted = append(res.StepsCompleted, "release-sh-check")
-	}
-
-	// Step 5: ship.sh --class release.
-	commitMsg := "release: v" + opts.Target
-	if opts.DryRun {
-		logf("step: ship.sh (DRY-RUN — would commit & push & gh release create)")
-		logf("  commit msg: %s", commitMsg)
-		appendStep(journal, journalPath, "ship", "skipped-dry-run", "", now())
-		logf("")
-		logf("DRY RUN COMPLETE — no mutations were made.")
-		return res, nil
-	}
-	releaseNotes := extractReleaseNotes(opts.RepoRoot, opts.Target)
-	// One-binary S5: stamp the fingerprint-impact class (binary- vs config-release)
-	// at the top of the notes so a corporate operator sees at a glance whether
-	// adopting this release needs a new approval. Skipped for empty notes to match
-	// the Fingerprints section's non-empty guard. MUST run BEFORE steps.Ship
-	// commits: rebuild-binary (step 3.5) rewrote go/evolve uncommitted, and
-	// `git diff prevTag..HEAD` compares COMMITTED trees — running after the commit
-	// would make every release diff as changed (always binary-release). On a git
-	// error the banner fails closed (assume approval needed) and we log it rather
-	// than silently drop the classification.
-	if releaseNotes != "" {
-		banner, cerr := releaseClassBanner(opts.RepoRoot, opts.Target, fromTag)
-		if cerr != nil {
-			logf("WARN: release-class classification failed (%v) — stamping fail-closed 'unavailable' banner", cerr)
-		}
-		releaseNotes = banner + "\n\n" + releaseNotes
-	}
-	logf("step: ship.sh (--class release)")
-	newSHA, err := steps.Ship(opts.RepoRoot, commitMsg, releaseNotes)
+	shipped, err := r.ship()
 	if err != nil {
-		appendStep(journal, journalPath, "ship", "fail", err.Error(), now())
-		res.StepsFailed = append(res.StepsFailed, "ship")
-		return res, fmt.Errorf("%w: %v", ErrShipFailed, err)
+		return r.res, err
 	}
-	appendStep(journal, journalPath, "ship", "ok", "", now())
-	res.StepsCompleted = append(res.StepsCompleted, "ship")
-	res.NewCommitSHA = newSHA
-	setJournalField(journal, journalPath, "commit_sha", newSHA)
-
-	// Step 6: marketplace-poll (with auto-rollback).
-	logf("step: marketplace-poll (max_wait=%s)", opts.MaxPollWait)
-	if err := steps.MarketplacePoll(opts.RepoRoot, opts.Target, opts.MaxPollWait); err != nil {
-		return failPostPublish(&res, journal, journalPath, opts, steps, logf, now,
-			"marketplace-poll", "marketplace propagation failed", err)
+	if !shipped {
+		// The dry run's clean stop: ship() has already logged DRY RUN
+		// COMPLETE, and post-publish must not run against a release that was
+		// never pushed.
+		return r.res, nil
 	}
-	appendStep(journal, journalPath, "marketplace-poll", "ok", "", now())
-	res.StepsCompleted = append(res.StepsCompleted, "marketplace-poll")
-
-	// Step 7: release-verify — the terminal self-consistency proof (binary
-	// committed + pinned + version-stamped, local tag present). A release
-	// that cannot prove itself must not stand: same post-publish rollback
-	// semantics as a failed propagation.
-	logf("step: release-verify")
-	if err := steps.ReleaseVerify(opts.RepoRoot, opts.Target, res.NewCommitSHA); err != nil {
-		return failPostPublish(&res, journal, journalPath, opts, steps, logf, now,
-			"release-verify", "release self-consistency verification failed", err)
+	if err := r.postPublish(); err != nil {
+		return r.res, err
 	}
-	appendStep(journal, journalPath, "release-verify", "ok", "", now())
-	res.StepsCompleted = append(res.StepsCompleted, "release-verify")
-
-	setJournalField(journal, journalPath, "completed_at", now().UTC().Format(time.RFC3339))
-	logf("DONE: v%s shipped, propagated, and verified", opts.Target)
-	logf("journal: %s", journalPath)
-	// GitHub CI is intentionally NOT checked here: this pipeline is self-contained
-	// and gh-free (headless/cron-safe). A green pipeline therefore does NOT imply a
-	// green `go`/`CI` workflow on the pushed commit (the v20.1.0 false-success: the
-	// release exited 0 while the released commit's apicover gate was red). Disclose
-	// the gap loudly; CI-gating lives in the /publish skill (pre-release CI-green
-	// check + post-release CI watch).
-	logf("NOTE: GitHub CI is NOT verified by this pipeline — confirm the `go` and `CI` workflows are green on the release commit (e.g. `gh run watch`), or publish via /publish (which watches CI).")
-	return res, nil
+	r.complete()
+	return r.res, nil
 }
 
 // failPostPublish records a failed post-publish step (the commit is already
