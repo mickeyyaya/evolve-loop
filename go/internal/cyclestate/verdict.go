@@ -17,9 +17,11 @@ const CycleTerminationTriageNoWork = "triage-empty-commitment"
 
 // CycleOutcome constants — cycle-level FinalVerdict labels emitted by
 // finalizeOutcome. Distinct from the per-phase Verdict* set because a
-// cycle outcome covers multiple phases plus commit-movement signal.
+// cycle outcome covers multiple phases plus the cycle's own ship latch.
 // They disambiguate the bare "SKIPPED" verdict that previously conflated
-// an inline build-ship, a fluent-mode advisory, and a no-signal noop.
+// a shipped cycle, a fluent-mode advisory, and a no-signal noop.
+// SHIPPED_VIA_BUILD is emitted only when THIS cycle's ship phase PASSed;
+// main HEAD movement is never evidence (a sibling lane moves it too).
 const (
 	CycleOutcomeShippedViaBuild      = "SHIPPED_VIA_BUILD"
 	CycleOutcomeSkippedAuditAdvisory = "SKIPPED_AUDIT_ADVISORY"

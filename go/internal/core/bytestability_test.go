@@ -62,6 +62,7 @@ var additiveCycleStateKeys = []string{
 	"goal_text",                         // recovery: original goal for phase memory and dossiers
 	"pre_cycle_head",                    // recovery: preserve closeout baseline after Ship
 	"final_verdict",                     // recovery: preserve the host floor disposition across pauses
+	"shipped",                           // ADR-0100 PR-3: this cycle's own ship latch, persisted so a pause/resume after Ship keeps it; read by the outcome label + post-ship observer degrade on both roots
 }
 
 func jsonKeysOf(t *testing.T, v any) []string {

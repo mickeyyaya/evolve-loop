@@ -23,17 +23,22 @@ func isScoutEvalMaterialization(phase Phase, p string) bool {
 	return phase == PhaseScout && strings.HasPrefix(p, ".evolve/evals/") && strings.HasSuffix(p, ".md")
 }
 
-// gitCapture runs `git -C dir <args...>` and returns (stdout, exitCode, err).
-// A non-zero exit is returned as exitCode with nil err (the caller decides
-// whether it's fatal — e.g. `git diff HEAD` exit 1 means "differences", not a
-// failure). Only a failure to launch git returns a non-nil err.
-
-func (o *Orchestrator) finalizeOutcome(lastPhaseVerdict, retroDecision, preHEAD, postHEAD string) string {
+// finalizeOutcome translates a bare SKIPPED cycle verdict into a specific
+// CycleOutcome label. PASS/FAIL/WARN pass through untouched.
+//
+// SHIPPED_VIA_BUILD requires THIS cycle's own ship latch (CycleState.Shipped,
+// set by latchShippedState only when the ship phase PASSed and survived the
+// deliverable review, on either dispatch root). It is never
+// inferred from main HEAD movement: in fleet mode a sibling lane moves HEAD
+// constantly, and cycle 1630 — scout, triage, an honest empty commitment, no
+// ship — was credited with a sibling's landing (ADR-0100, PR-3). A SKIPPED
+// verdict without a ship keeps its no-work label so IsTriageNoWorkResult and
+// the throughput recorder read the cycle truthfully.
+func (o *Orchestrator) finalizeOutcome(lastPhaseVerdict, retroDecision string, shipped bool) string {
 	if lastPhaseVerdict != VerdictSKIPPED {
 		return lastPhaseVerdict
 	}
-	// HEAD moved → something shipped inline (build calling `evolve ship --class manual`).
-	if preHEAD != "" && postHEAD != "" && preHEAD != postHEAD {
+	if shipped {
 		return CycleOutcomeShippedViaBuild
 	}
 	if strings.Contains(retroDecision, "would-have-blocked") {
@@ -42,6 +47,17 @@ func (o *Orchestrator) finalizeOutcome(lastPhaseVerdict, retroDecision, preHEAD,
 	return CycleOutcomeSkippedUnknown
 }
 
-// The retry policy bounds per-phase retries on a recoverable bridge
-// ArtifactTimeout (Fix D). 2 = one relaunch after the first timeout; a
-// deterministic timeout still aborts the cycle after the cap.
+// latchShippedState records the cycle's own ship PASS on the persisted cycle
+// state and reports whether it did. Both dispatch roots call it right after the
+// deliverable review approves a phase: the fresh loop (cyclerun_postreview.go)
+// and the resume loop (resume_execution.go). The checkpoint is the latch's ONE
+// home — the outcome label (finalizeOutcome) and the post-ship observer degrade
+// (postShipObserverSkip) read it there — so a pause/resume after ship cannot
+// lose the fact the way an in-memory field of one root would.
+func latchShippedState(cs *CycleState, phase Phase, verdict string) bool {
+	if phase != PhaseShip || verdict != VerdictPASS {
+		return false
+	}
+	cs.Shipped = true
+	return true
+}

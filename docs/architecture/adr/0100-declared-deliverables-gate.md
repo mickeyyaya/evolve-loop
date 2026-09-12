@@ -11,7 +11,12 @@
   - **Cycle 1630**: triage's files existed and were well-formed; the cycle was still empty because
     the *declared effect* — the atomic inbox claim — failed (`rename … operation-not-permitted`),
     triage honestly wrote `top_n: []`, and the cycle ended `triage-empty-commitment` — then was
-    labelled `FinalVerdict: SHIPPED_VIA_BUILD` having run only scout and triage.
+    labelled `FinalVerdict: SHIPPED_VIA_BUILD` having run only scout and triage. **PR-3 fix:**
+    the label now requires this cycle's own ship latch — `CycleState.Shipped`, persisted with the
+    checkpoint and set by `latchShippedState` on both dispatch roots → `finalizeOutcome`
+    (`go/internal/core/cycle_outcome.go`); main HEAD movement is never evidence. Regression:
+    `TestRunCycle_EmptyTriageCommitmentSurvivesSiblingLanding` drives cycle 1630's exact shape
+    through `RunCycle` and asserts the no-work label, `IsTriageNoWorkResult`, and zero throughput credit.
   - **Cycle 1631**: triage printed `[inbox-mover] claimed: … → processing/cycle-1631/`; the plane's
     item never moved, and `.evolve/ledger.jsonl` records no `claim` in the triage window. The
     agent had claimed the **worktree's git-tracked copy** of the inbox: `EVOLVE_PROJECT_ROOT` is

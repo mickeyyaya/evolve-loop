@@ -271,12 +271,12 @@ type Orchestrator struct {
 	runners map[Phase]PhaseRunner
 	sm      *StateMachine
 	now     func() time.Time
-	// gitHEAD returns the current git HEAD SHA. Called once at cycle
-	// start and once before finalizing the verdict so the orchestrator
-	// can detect whether anything got committed during the cycle (e.g.
-	// when the build phase invokes `evolve ship --class manual` inline).
-	// Errors are swallowed and treated as "no movement detected" — the
-	// outcome calculator falls back to SKIPPED_UNKNOWN.
+	// gitHEAD returns the current git HEAD SHA. Called once at cycle start
+	// and once at closeout so the throughput hook can corroborate that a
+	// shipped cycle actually moved main (shippedOutcome). It is NOT evidence
+	// that THIS cycle shipped — in fleet mode a sibling lane moves HEAD too —
+	// so the outcome label reads the ship latch instead (cycle_outcome.go).
+	// Errors are swallowed and treated as "no movement detected".
 	gitHEAD func() (string, error)
 
 	// gitMutationLock serializes the shared-main-repo dossier closeout commit
