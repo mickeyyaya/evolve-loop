@@ -115,16 +115,19 @@ func defaultSandboxWrapWithProbe(deps Deps, probeFunc func() sandbox.ProbeResult
 			}
 			return nil, false
 		}
-		if req.Phase == "retrospective" {
-			lessonPath, err := retrospectiveLessonPath(req.RepoRoot)
-			if err != nil {
-				if deps.Stderr != nil {
-					fmt.Fprintf(deps.Stderr, "[bridge] sandbox lesson grant unavailable: %v\n", err)
-				}
-				return nil, false
+		// The profile's declared write surface (sandbox.write_subpaths) —
+		// the inbox claim dir, the retrospective lesson dir, doc-sync's docs/
+		// — resolved with the same retarget defense the lesson grant carried
+		// when it was the only one hard-coded here. A grant that cannot be
+		// resolved safely refuses the launch rather than confining it wrong.
+		grants, err := resolveSandboxWriteGrants(req.WriteSubpaths, req.RepoRoot, req.Worktree)
+		if err != nil {
+			if deps.Stderr != nil {
+				fmt.Fprintf(deps.Stderr, "[bridge] sandbox write grant unavailable: %v\n", err)
 			}
-			cfg.WritePaths = append(cfg.WritePaths, lessonPath)
+			return nil, false
 		}
+		cfg.WritePaths = append(cfg.WritePaths, grants...)
 		cfg.WritePaths = append(cfg.WritePaths, gitWrites...)
 		cfg.DenyPaths = append(append([]string{}, cfg.DenyPaths...), gitDenies...)
 		paths := append([]string{cfg.RepoRoot}, cfg.WritePaths...)
@@ -202,10 +205,15 @@ func defaultSandboxWrapWithProbe(deps Deps, probeFunc func() sandbox.ProbeResult
 	}
 }
 
-// sandboxWritePaths returns the absolute write-allowlist for a source-writing
-// phase: worktree (source) + workspace (artifacts) + /tmp (scratch). Empty
-// req.Worktree means the orchestrator didn't designate one — return only the
-// workspace so non-worktree code paths don't silently land in the main tree.
+// sandboxWritePaths returns the FLOOR of the write-allowlist for a sandboxed
+// phase: worktree (source) + workspace (artifacts) + /tmp (scratch). It is the
+// orchestrator's designation, not the profile's: the profile's
+// sandbox.write_subpaths (req.WriteSubpaths) can only ADD to it. A profile
+// that declares "{worktree_path}/tests" is documenting where it intends to
+// write; the whole worktree stays writable at the OS layer, and any narrower
+// enforcement is the tool-layer hooks' job. Empty req.Worktree means the
+// orchestrator didn't designate one — return only the workspace so
+// non-worktree code paths don't silently land in the main tree.
 func sandboxWritePaths(req SandboxWrapRequest) []string {
 	out := []string{}
 	if req.Worktree != "" {
@@ -283,6 +291,7 @@ func sandboxPrefixForLaunch(deps Deps, cfg *Config, terminalPath string) ([]stri
 		AllowNetwork:  true, // forced — see above; source-writing ⇒ model network required
 		DenyPaths:     cfg.DenyPaths,
 		DenyReadPaths: cfg.DenyReadPaths,
+		WriteSubpaths: cfg.SandboxWriteSubpaths,
 	})
 }
 
@@ -383,26 +392,4 @@ func sandboxRequiredButUnavailable(deps Deps, cfg *Config, wrapped bool) bool {
 		fmt.Fprintf(deps.Stderr, "[bridge] sandbox requirement unsatisfied: %s\n", reason)
 	}
 	return true
-}
-
-// retrospectiveLessonPath grants only the role's documented main-repository
-// lesson directory. Resolve existing ancestors too: a not-yet-created leaf
-// below a retargeted instincts directory must not broaden the grant.
-func retrospectiveLessonPath(root string) (string, error) {
-	if !filepath.IsAbs(root) {
-		return "", fmt.Errorf("absolute project root required")
-	}
-	canonicalRoot, err := canonicalSandboxPath(root)
-	if err != nil {
-		return "", err
-	}
-	expected := filepath.Join(canonicalRoot, ".evolve", "instincts", "lessons")
-	actual, err := canonicalSandboxPath(expected)
-	if err != nil {
-		return "", err
-	}
-	if actual != expected {
-		return "", fmt.Errorf("lesson directory resolves outside its declared scope")
-	}
-	return actual, nil
 }

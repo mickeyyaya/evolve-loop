@@ -1,0 +1,20 @@
+{
+  "id": "triage-empty-commitment-still-dispatches-spine",
+  "title": "A triage that commits to nothing (top_n []) still dispatches the full spine — the expensive half of cycle 1623, and it survives the claim fix",
+  "kind": "bug",
+  "class": "pipeline-integrity",
+  "weight": 0.86,
+  "priority": "P1",
+  "route": "lane",
+  "created_at": "2026-09-12T10:00:00Z",
+  "problem": "Cycle 1623: triage could not claim its selected item (sandbox denied .evolve/inbox/processing — fixed by honoring profile sandbox.write_subpaths, the triage-sandbox-denies-its-own-claim-write P0). The agent narrated the failure, wrote triage-decision.json with top_n [] and one deferral, and the orchestrator dispatched twelve more phases and shipped 922 lines against no committed task. The claim fix removes that cause; it does not remove the shape. Any future reason for an empty top_n on a cycle that has queued work (a claim race between fleet lanes, a loader that drops an item, an agent that mis-writes the decision) reproduces the same spend: the spine runs, the deep tier pays, and there is no task for the audit to bind to.",
+  "impact": "Bounded by how often top_n is empty with work queued, but each occurrence is a full-spine cost with zero deliverable value, and the ship at the end lands whatever the builder improvised. This is the acceptance criterion the P0 item carried as its fourth line; it is split out because it lives in the orchestrator's terminal selection (recordPlannedNoWorkOutcome / cyclerun_select.go), not the sandbox generator.",
+  "fix": "At the triage→plan-review gate: if triage-decision.json has an empty top_n AND the inbox had claimable items at dispatch time (or the decision names a claim failure), the cycle must NOT proceed to build. Either re-dispatch triage once with the claim error in its prompt (a claim race), or terminate the cycle as planned-no-work with the reason named — recordPlannedNoWorkOutcome already produces VerdictSKIPPED for the legitimate no-work case, so the distinguishing input is 'was there work to claim'. Do not add a flag; this is a gate predicate.",
+  "acceptance": [
+    "A test drives a cycle whose triage writes top_n [] while the inbox holds a claimable item, and asserts no build/tdd/audit phase is dispatched and the cycle records a named reason (claim-failed or no-commitment) — not VerdictPASS.",
+    "The legitimate empty-inbox case still classifies VerdictSKIPPED via recordPlannedNoWorkOutcome (regression pin).",
+    "A cycle 1623-shaped dossier (empty top_n + full PhasesRun) is impossible to produce from the fixed gate; cyclehealth classifies such a historical dossier as an anomaly if it appears."
+  ],
+  "files": ["go/internal/core/cyclerun_select.go", "go/internal/core/cycle_closeout.go", "go/internal/phases/triage/"],
+  "notes": "Split from triage-sandbox-denies-its-own-claim-write (consumed by the write_subpaths landing) so that P0's consumption does not silently claim this criterion. Evidence: .evolve/runs/cycle-1623/triage-decision.json + triage-stdout.clean.txt."
+}

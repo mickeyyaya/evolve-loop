@@ -111,18 +111,17 @@ func TestGenerateSBPL_WritePathsAddedAsSubpath(t *testing.T) {
 	)
 }
 
-// TestGenerateSBPL_GlobInWritePath_WidensToParent — bash:520
-// translates "cycle-*" → parent dir because SBPL subpath doesn't
-// interpret globs.
-func TestGenerateSBPL_GlobInWritePath_WidensToParent(t *testing.T) {
+// TestGenerateSBPL_WritePathsAreLiteral pins the adapter's contract: every
+// WritePath is emitted verbatim. Glob resolution is the bridge's job
+// (resolveSandboxWriteGrants widens a glob to its glob-free ancestor before
+// the hand-off), so the SBPL and bwrap generators never each interpret a
+// glob their own way.
+func TestGenerateSBPL_WritePathsAreLiteral(t *testing.T) {
 	cfg := canonicalConfig()
-	cfg.WritePaths = []string{"/repo/.evolve/runs/cycle-*"}
+	cfg.WritePaths = []string{"/repo/.evolve/runs"}
 	out := GenerateSBPL(cfg)
 	if !strings.Contains(out, `(allow file-write* (subpath "/repo/.evolve/runs"))`) {
-		t.Errorf("glob path not widened to parent: %s", excerpt(out, "cycle"))
-	}
-	if strings.Contains(out, "cycle-*") {
-		t.Errorf("literal glob leaked into SBPL: %s", excerpt(out, "cycle"))
+		t.Errorf("write path not emitted verbatim: %s", excerpt(out, "runs"))
 	}
 }
 
