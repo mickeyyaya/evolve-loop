@@ -41,6 +41,14 @@ func NewCatalogResolver(lookup func(name string) (phasespec.PhaseSpec, bool)) Ca
 // the spec-derived contract when the lookup knows the phase, else a miss.
 func (r CatalogResolver) Resolve(name string) (Contract, bool) {
 	if c, ok := r.builtin.Resolve(name); ok {
+		// ADR-0100: a built-in contract still takes its declared owed
+		// secondaries and effects from the registry entry, looked up by the
+		// same canonical key the catalog uses (retro → retrospective).
+		if r.lookup != nil {
+			if spec, found := r.lookup(RegistryKey(name)); found {
+				c = overlayDeclared(c, spec)
+			}
+		}
 		return c, true
 	}
 	if r.lookup == nil {

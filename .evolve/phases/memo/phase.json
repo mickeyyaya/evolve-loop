@@ -13,6 +13,9 @@
     "files": [
       ".evolve/runs/cycle-{cycle}/memo.md",
       ".evolve/runs/cycle-{cycle}/carryover-todos.json"
+    ],
+    "agent_owed": [
+      "carryover-todos.json"
     ]
   },
   "classify": {

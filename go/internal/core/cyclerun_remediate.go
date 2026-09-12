@@ -181,6 +181,13 @@ func (cr *cycleRun) maybeRemediate(next Phase, dr *dispatchResult) (loopAction, 
 		fmt.Sprintf("%s: round %d -> %s", next, round, resp2.Verdict))
 	fmt.Fprintf(os.Stderr, "[orchestrator] remediation: gate %s re-ran -> %s (round %d/%d)\n",
 		next, resp2.Verdict, round, wf.RemediationRounds)
+	// ADR-0100 §4: the re-run's deliverable meets the same reviewer the
+	// original did. Before this it reached recordAndBranch on the strength of
+	// its verdict alone, so a re-run that omitted a declared deliverable — or
+	// failed any contract check — was recorded as if reviewed.
+	if act, err := cr.reviewAndGuard(next, dr); act == loopAbort || err != nil {
+		return act, err
+	}
 	return loopNext, nil
 }
 

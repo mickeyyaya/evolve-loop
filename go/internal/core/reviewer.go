@@ -220,3 +220,38 @@ type noopReviewer struct{}
 func (noopReviewer) Review(_ context.Context, _ ReviewInput) ReviewResult {
 	return ReviewResult{Approve: true}
 }
+
+// declaredDeliverablesGate is the marker the production contract gate
+// implements (internal/deliverable.Reviewer). core cannot name that type — the
+// import runs the other way — so the composition-root wiring proof asks for
+// the capability instead of the type.
+type declaredDeliverablesGate interface{ VerifiesDeclaredDeliverables() bool }
+
+// DeclaredDeliverablesGateWired reports whether the reviewer chain contains a
+// reviewer that verifies every agent-owed declared output (ADR-0100), looking
+// through the mandatory-explanation wrapper and chain nesting. Introspection
+// for composition-root wiring tests (mirrors ThroughputRecorderWired).
+func (o *Orchestrator) DeclaredDeliverablesGateWired() bool {
+	return reviewerChainHas(o.reviewer, func(r DeliverableReviewer) bool {
+		g, ok := r.(declaredDeliverablesGate)
+		return ok && g.VerifiesDeclaredDeliverables()
+	})
+}
+
+func reviewerChainHas(r DeliverableReviewer, pred func(DeliverableReviewer) bool) bool {
+	switch v := r.(type) {
+	case nil:
+		return false
+	case mandatoryExplanationReviewer:
+		return reviewerChainHas(v.next, pred)
+	case chainReviewer:
+		for _, m := range v {
+			if reviewerChainHas(m, pred) {
+				return true
+			}
+		}
+		return false
+	default:
+		return pred(r)
+	}
+}

@@ -275,10 +275,10 @@ func phaseFromRouter(s string) Phase {
 // is a decided permanent boundary (ADR-0060 §57); this converter is the accepted
 // solution, not a deferred unification.
 func canonicalCatalogName(p Phase) string {
-	if p == PhaseRetro {
-		return "retrospective"
-	}
-	return string(p)
+	// ONE rule, owned by phasecontract (ADR-0100): the registry key for a
+	// core phase name. Keeping a second copy here is how an alias added to
+	// one side silently ungated a phase on the other.
+	return phasecontract.RegistryKey(string(p))
 }
 
 // recallForPlan builds the WS2 recall-memory context for the advisor's plan: the
