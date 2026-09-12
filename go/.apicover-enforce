@@ -563,3 +563,7 @@
 # aggregation. Every export is named and exercised by the package's behavioral
 # tests plus apicover_named_test.go.
 ./internal/llmcalls
+
+# ADR-0101 Signal Center (2026-09-13): the leaf event stream. 100% API + 100% line
+# coverage are both gated (line coverage via .cover-strict / make cover-strict).
+./internal/signalcenter

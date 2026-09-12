@@ -75,7 +75,7 @@ channel to the component that decided or to the operator reading the log.
   PRODUCERS (existing chokepoints, adapted in place)          LISTENERS (registered at the root; observe, never decide)
   ─────────────────────────────────────────────────            ────────────────────────────────────────────────────────
   core.recordPhaseOutcome  ── phase.outcome ──┐                ┌── core.Orchestrator.observeSignal
-  core SystemFailureSignal ── system.failure ─┤                │     → per-cycle SignalSummary → CycleResult.Signals
+  core SystemFailureSignal ── system.failure ─┤                │     → per-cycle Summary (Orchestrator.SignalSummary())
   shiperr / ship phase     ── ship.error ─────┤   signalcenter │── NDJSONSink → runs/cycle-N/signals.ndjson  (everything)
   deliverable (gate)       ── gate.rejected ──┼──►  Center  ───┼── Filter(StderrSink, WARN) → "[module] kind SEV CODE …"
   bridge engine            ── bridge.warning ─┤   (sync,       │── cmd_loop batch report (counts)                 (S4)
@@ -127,11 +127,17 @@ Rules (each is a named test):
   `Emit` stamps `SchemaVersion`, `Seq`, `PID`, `TS`.
 - `Origin` is `Type.Method` for methods and `Func` for functions, exactly as Go spells them
   (`Orchestrator.recordPhaseOutcome`, `finalizeOutcome`); a regex test pins `^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$`.
-- `Fields`: keys match `^[a-z][a-z0-9_]{0,31}$`; at most 12 keys; values pass through
-  `log.DiagnosticField` (UTF-8 clean, rune-capped, no line breaks); over-cap keys are dropped and
-  `fields.truncated=<n>` is set. Rendering (JSON and stderr) sorts keys, so golden lines are stable.
-- The rendered line is capped at 4 KiB (a single `O_APPEND` write stays atomic); a longer event drops
-  fields largest-first and sets `fields.truncated`.
+- `Fields`: keys match `^[a-z][a-z0-9_]{0,31}$`; at most 12 keys; values (and `Reason`) pass through
+  `log.SanitizeField` (UTF-8 clean, control characters and U+2028/2029 folded to spaces, 512-rune
+  cap); over-cap keys are dropped and `fields.truncated=<n>` is set. Rendering (JSON and stderr)
+  sorts keys, so golden lines are stable. (`log.DiagnosticField` stays the quoted rendering for
+  hand-written diagnostics until S5 retires them.)
+- The rendered line is capped at 4 KiB (a single `O_APPEND` write stays atomic) **for any event**:
+  a longer event drops fields largest-first and sets `fields.truncated`; if it is still over (JSON
+  escaping can inflate a rune-capped `Reason` to six bytes a rune) `Reason` is cut to fit with a
+  trailing `…`; `Origin`, `Phase` and `RunID` are identifiers bounded to 128 runes
+  (`MaxIdentRunes`), so an empty `Reason` always fits and the cap provably terminates
+  (`TestNormalize_LineCapHoldsForAnyEvent`).
 - No nested structs: a signal is greppable as one line; structured detail belongs in the artifact the
   event names in `fields.path`.
 - Compatibility with the observer envelope: `source.{component,cycle,phase}` ↔ `module,cycle,phase`;
@@ -176,9 +182,18 @@ raised to WARN — never dropped. *(review 21: `advisor` and `config` added to m
 | `ledger.appended` | a ledger entry was appended (decorator) | INFO | |
 | `cycle.sealed` | final verdict decided (after `finalizeOutcome`) | INFO (FAIL → WARN) | ✓ on FAIL |
 | `loop.wave` / `loop.halt` / `loop.escalation` | batch-level events (today's `dispatchevents`) | INFO / INCIDENT / WARN | / ✓ / |
-| `signalcenter.listener_panicked` / `signalcenter.registry_drift` / `signalcenter.registry_conflict` | self-reports | INCIDENT / WARN / WARN | |
+| `signalcenter.listener_panicked` / `signalcenter.sink_dropped` | self-reports: a panicking listener was dropped / the NDJSON sink could not write (count in `fields.dropped`) | INCIDENT / WARN | |
 
 "Terminal" marks the kinds that end or change a cycle's course — the triage entry point (§9).
+
+Vocabulary drift (unknown module or kind, unregistered or missing code, bad origin, missing reason)
+is **not** a separate event: `Normalize` stamps the drift code onto the offending event itself (§5.4),
+so the drift is one line, next to the producer's own reason. `signalcenter.registry_drift` is the
+kind that line carries only when the producer's own kind is unknown (an unknown kind cannot be
+rendered as itself; `fields.raw_kind` keeps it), and `signalcenter` is likewise the module of a line
+whose module was unknown (`fields.raw_module`). Registry conflicts are recorded at package init —
+before any Center exists — and asserted empty by a named test; they are a review defect, not a
+runtime event.
 
 ### 5.3 Severity — the schema-1.0 contract, unchanged
 
@@ -202,9 +217,11 @@ therefore **not** the triage entry point (§9) *(review 8)*.
   `SHIP_…`, `GATE_CONTRACT_…`, `BRIDGE_…`). Required on every WARN/INCIDENT *(review 18)*.
 - Registration: `signalcenter.RegisterCode(module, code, doc)` at package init of the owning module
   (or a table in the module). Duplicate registration with an identical doc is a no-op; a conflicting
-  registration is recorded in `RegistryConflicts()` and emitted as `signalcenter.registry_conflict`
-  (WARN) — never a panic: a duplicate code is a review defect, not an availability event *(review 9)*.
-  A named repo test asserts `RegistryConflicts()` is empty. `RegisteredCodes()` is exported so
+  registration (a different doc, a malformed code, or a code whose prefix belongs to another module)
+  is recorded in `RegistryConflicts()` — never a panic and never an event, because registration runs
+  at package init, before any Center exists: a duplicate code is a review defect, not an availability
+  event *(review 9)*. `TestRegistryConflicts_RealRegistryIsClean` asserts the real registry is clean;
+  `IsRegistered(code)` answers which module owns a code; `RegisteredCodes()` is exported so
   `docs/architecture/signal-codes.md` is generated from it (S2).
 - Existing vocabularies map by projection, not by copy: `shiperr.ShipErrorCode` (42) → `SHIP_<code>`
   (one function `shiperr.SignalCode(code)`); bridge exit codes → `BRIDGE_EXIT_81`/`_85`/`_86`;
@@ -230,46 +247,67 @@ func (c *Center) Subscribe(l Listener) (unsubscribe func())
 func (c *Center) Emit(e Event)                       // sync, ordered, validating, never drops; re-entrancy-safe; nil-safe
 func (c *Center) Recent() []Event                    // bounded snapshot (newest last), cross-cycle; nil-safe
 func RegisterCode(m Module, code Code, doc string)   // package registry; conflicts recorded, never panic
+func IsRegistered(code Code) (Module, bool)
 func RegisteredCodes() map[Module][]CodeDoc
 func RegistryConflicts() []Conflict
+func Normalize(e Event) (Event, []Code)              // what Emit applies: field bounds, vocabulary, code, text, line cap; returns the drift
 
 // Listeners shipped with the package
-func NDJSONSink(pathFor func(cycle int) string) Listener  // append-only; one open handle per cycle; resolver from the root
-func StderrSink(w io.Writer) Listener                     // the ONE line format (§9)
-func Filter(l Listener, at Severity) Listener             // only events ≥ at — used at the root for stderr (§7)
+func (c *Center) NDJSONSink(pathFor func(cycle int) string) Listener // a Center METHOD: it reports its own drops through c
+func StderrSink(w io.Writer) Listener                // writes FormatLine(e) — the ONE line format (§9)
+func FormatLine(e Event) string                      // exported: golden tests and other sinks share the format
+func Filter(l Listener, at Severity) Listener        // only events ≥ at — used at the root for stderr (§7)
+
+// One listener's per-cycle view (§8); the orchestrator keeps one
+type Summary struct { Cycle, Total int; BySeverity map[Severity]int; ByKind map[Kind]int; LastIncident *Event }
+func NewSummary() *Summary
+func (s *Summary) Observe(e Event)                   // follows the current cycle by itself: a newer cycle resets, an older one is ignored, cycle 0 counts
+func (s *Summary) Snapshot() Summary                 // deep copy
 ```
 
 Semantics (each is a named test):
 
-1. **Synchronous total order, provable.** `Emit` takes the emit mutex, validates and stamps
-   (`Seq` increments under that mutex), snapshots the listener list under the read lock, releases the
-   read lock, then calls listeners in registration order. Concurrent emitters (the evaluate batch
-   dispatches phases in goroutines and each reaches the C1 chokepoint) serialize; every listener sees
-   the same order and `Seq` proves it in the durable file *(review 7)*. The order mutant to kill is
-   "listeners observe different orders", not "registration order reversed".
+1. **Total order, provable — one queue, one drainer.** `Emit` normalizes the event and stamps it
+   (`Seq`, `PID`, `TS`) under the Center's mutex, then appends it to a queue. The first emitter that
+   finds no drain in progress becomes the drainer: it pops events in `Seq` order and delivers each,
+   in registration order, to a snapshot of the listener list taken under the mutex — **the mutex is
+   never held while a listener runs**. Emitters that arrive while a drain is in progress (concurrent
+   evaluate-batch goroutines, or a listener emitting re-entrantly) enqueue and return; the running
+   drainer delivers their events before it returns, so the file order equals `Seq` order and every
+   listener sees the same sequence *(review 7)*. The order mutant to kill is "listeners observe
+   different orders", not "registration order reversed". **Consequence for producers on exit
+   paths** (S1 review): an emitter that arrives while another goroutine drains returns before its
+   event is delivered; the sole S1 producer runs on the draining goroutine, so delivery is
+   synchronous in practice. S2's producers on `os.Exit` paths (`loop.halt`, `system.failure`,
+   watchdog goroutines) must emit from the draining goroutine or S2 adds a `Flush` seam — otherwise
+   the file's `seq` shows an unexplained gap at exit.
 2. **Never drops.** Validation failures rewrite the event with a `SIGNALCENTER_*` code, keep the
    originals in `fields`, and raise severity to at least WARN (§5.4).
-3. **Panic isolation without self-deadlock** *(review 2)*. A panicking listener is recovered; the
-   Center reports `signalcenter.listener_panicked` (INCIDENT) to the remaining listeners through an
-   internal `dispatchLocked` that reuses the already-held emit mutex — never through the public
-   `Emit`. A panic while reporting a panic is written to stderr and swallowed.
+3. **Panic isolation without self-deadlock** *(review 2)*. A panicking listener is recovered and
+   unsubscribed; the Center then reports `signalcenter.listener_panicked` (INCIDENT,
+   `fields.listener` = the registration id) by enqueueing the report like any other event — the drain
+   in progress delivers it to the remaining listeners after the current event. There is no internal
+   dispatch path: one queue and one way in, so a report can neither deadlock nor reorder.
 4. **Re-entrancy is safe, not forbidden** *(review 2)*. A listener that calls the public `Emit`
-   (nested emit) does not deadlock: the Center keeps a per-emit depth flag; a nested event is
-   appended to a pending queue and delivered, in order, after the outer fan-out completes. A test
-   subscribes a re-entrant listener and asserts completion within a timeout and that the nested
-   event follows the outer one by `Seq`.
+   (nested emit) does not deadlock: it enqueues and returns (semantics 1) and the drainer delivers
+   the nested event after the outer one. `TestEmit_ReentrantListenerIsQueuedNotDeadlocked` asserts
+   completion within a timeout and that the nested event follows the outer one by `Seq`.
 5. **Null Object for tests, never for production.** `var c *Center = nil`: `Emit` is a no-op,
    `Subscribe` returns a no-op unsubscribe, `Recent` returns nil. Producers never check for nil.
    Production roots must wire a real Center (§7) *(review 3)*.
 6. **Unsubscribe is idempotent** and safe during an emit (the snapshot semantics above).
 7. **Bounded memory.** `Recent` keeps the last N (default 256) events across cycles; the durable
-   record is the sink; the orchestrator's per-cycle summary is reset on cycle start (§8).
+   record is the sink; the orchestrator's `Summary` keeps only the current cycle — it resets itself
+   when a newer cycle's first event arrives (§8).
 8. **The NDJSON sink holds one open handle per cycle** (opened `O_APPEND|O_CREATE` on the first event
-   for that cycle, closed when the resolver returns a different cycle or on process exit), writes one
-   line per `Write` (≤ 4 KiB, §4), and never re-emits through the public `Emit`: a resolver returning
-   `""` (process-level events before a cycle is allocated) keeps the event in `Recent` only and the
-   drop count is reported once, via `dispatchLocked`, on the next successful write. (`dispatchevents`
-   opens per line today; that is the pattern not to copy at bridge-telemetry rates.)
+   for that cycle, closed when the resolver returns a different path or on process exit) and writes
+   one line per `Write` (≤ 4 KiB, §4). A resolver returning `""` (process-level events before a cycle
+   is allocated), an open failure or a short write counts as a drop; the count is reported once, as
+   `signalcenter.sink_dropped` WARN (`fields.dropped=<n>`), on the next successful write — through the
+   Center's own `Emit`, which is why the sink is a Center method. A resumed cycle appends to the same
+   file from a new process; `pid`+`seq` reconstruct both orders
+   (`TestNDJSONSink_TwoProcessesAppendToTheSameCycleFile`). (`dispatchevents` opens per line today;
+   that is the pattern not to copy at bridge-telemetry rates.)
 9. **The stderr sink is the only module-tagged logger.** Producers do not print. At the root it is
    wrapped in `Filter(…, WARN)`: INFO goes to the durable file only, as the severity contract says
    ("log only, do not surface") *(review 6)*.
@@ -283,14 +321,14 @@ Composition root `go/cmd/evolve/cmd_cycle.go` (`wireOrchestratorDeps`, which the
 
 ```go
 signals := signalcenter.New(signalcenter.WithPID(os.Getpid()))
-signals.Subscribe(signalcenter.NDJSONSink(func(cycle int) string {
+signals.Subscribe(signals.NDJSONSink(func(cycle int) string {
     if cycle == 0 { return "" }
     return filepath.Join(core.RunWorkspacePath(projectRoot, cycle), "signals.ndjson")
 }))
 signals.Subscribe(signalcenter.Filter(signalcenter.StderrSink(os.Stderr), signalcenter.SeverityWarn))
 br := newBridge(gobridge.Deps{Signals: signals, …})     // S3: the engine receives it at construction
 opts = append(opts, core.WithSignalCenter(signals))     // S1
-deps.Signals = signals                                  // orchDeps gains the field in S1, so cmd_loop reads it in S4 (review 16)
+orchDeps.Signals = signals                              // S1: the root keeps the handle; cmd_loop reads Orchestrator.SignalSummary() in S4 (review 16)
 ```
 
 **Non-optional and loud** *(review 3)*: `wireOrchestratorDeps` always constructs a Center; the only
@@ -307,21 +345,24 @@ chokepoint emits); `engine.SignalsWired()` asserted on the bridge side (S3); an 
 // core
 func WithSignalCenter(c *signalcenter.Center) Option   // NewOrchestrator subscribes o.observeSignal when c != nil
 func (o *Orchestrator) SignalCenterWired() bool
-func (o *Orchestrator) SignalSummary() SignalSummary   // the CURRENT cycle: counts by severity and kind, last INCIDENT
+func (o *Orchestrator) SignalSummary() signalcenter.Summary // a snapshot of the CURRENT cycle: counts by severity and kind, last INCIDENT
 ```
 
 - `observeSignal` is O(1): it updates the current cycle's summary under the orchestrator's summary
   mutex. **Lock order** *(review 17)*: emit mutex → summary mutex, never the reverse; no orchestrator
   path holds the summary mutex across an `Emit`. This is the first production mutex in
   `internal/core`; a `-race` test with concurrent evaluate-batch emitters pins it.
-- **Lifetime** *(review 16)*: the summary is reset when a cycle starts (`planCycle`); only the current
-  cycle's summary is retained in the orchestrator (a loop process runs many cycles); `Recent` on the
-  Center is the cross-cycle window.
+- **Lifetime** *(review 16)*: the summary follows the current cycle by itself — the first event of a
+  newer cycle resets it, events of older cycles are ignored, process-level events (cycle 0) count
+  toward the current cycle — so no orchestrator path has to remember to reset it (`Summary.Observe`
+  is tested in isolation); `Recent` on the Center is the cross-cycle window.
 - **Observe, never decide** *(review 10)*: `observeSignal` never emits (no feedback loops) and never
   decides — deciding stays with the existing floors; ADR-0072's `SystemFailureSignal` is produced
   *into* the Center in S2 and its halt path is unchanged. The summary is reporting evidence.
-- `CycleResult.Signals` (S1) carries the summary out to `cmd_loop`, which prints the counts in the
-  batch report without re-reading files (S4) — it does not gate on them.
+- The orchestrator is the contact point: `cmd_loop` reads `Orchestrator.SignalSummary()` (S4) to
+  print the counts in the batch report without re-reading files — it does not gate on them. The
+  summary is deliberately **not** copied onto `CycleResult` (S1 review): one owner, one snapshot
+  method, no second copy to keep in step.
 - The orchestrator's summary is what "closely monitor the loop execution" means in code: at any
   point, `SignalSummary()` says how many WARN/INCIDENT signals the current cycle has raised and the
   last INCIDENT's code and reason.
@@ -330,16 +371,22 @@ func (o *Orchestrator) SignalSummary() SignalSummary   // the CURRENT cycle: cou
 
 ```
 [<module>] <kind> <SEVERITY> <CODE> cycle=<N> phase=<p> attempt=<k> seq=<s> origin=<Type.Method> — <reason> [k=v …sorted]
-[orchestrator] phase.outcome WARN ORCHESTRATOR_PHASE_VERDICT_FAIL cycle=1636 phase=triage attempt=1 seq=41 origin=Orchestrator.recordPhaseOutcome — triage verdict=FAIL: top_n card "…" names protected surface "go/internal/phases/ship/gitops.go" archetype=plan verdict=FAIL
+[orchestrator] phase.outcome WARN ORCHESTRATOR_PHASE_VERDICT_FAIL cycle=1636 phase=triage attempt=1 seq=41 origin=Orchestrator.recordPhaseOutcome — triage verdict=FAIL: top_n card "…" names protected surface "go/internal/phases/ship/gitops.go" archetype=plan duration_ms=121183 verdict=FAIL
 [ship] ship.error WARN SHIP_GIT_FLEET_REBASE_NEEDED cycle=1632 phase=ship attempt=1 seq=77 origin=Landing.Land — main moved during the landing; recovering via build (attempt 1/2) class=transient
-[signalcenter] signalcenter.registry_drift WARN SIGNALCENTER_UNREGISTERED_CODE cycle=1640 seq=12 origin=Center.Emit — code "SHIP_NEW_THING" is not registered module=ship raw_code=SHIP_NEW_THING
+[ship] ship.error WARN SIGNALCENTER_UNREGISTERED_CODE cycle=1640 phase=ship attempt=1 seq=12 origin=Landing.Land — main moved during the landing drift=SIGNALCENTER_UNREGISTERED_CODE raw_code=SHIP_NEW_THING
 ```
+
+The last line shows drift stamped in place: the producer's module, kind, origin and reason stay, the
+unregistered code is replaced by the drift code, and `fields.drift` / `fields.raw_code` say what was
+wrong — one line, where the operator is already looking.
 
 **Triage in a few review steps, kind-first** *(review 8)*: (1) `grep -E '"kind":"(system\.failure|phase\.aborted|gate\.rejected|ship\.error|quota\.paused)"' signals.ndjson`
 — the terminal kinds (§5.2), or `grep INCIDENT` when something halted; (2) the `code` names the rule and
 `module`/`origin` name the function; (3) `fields.path` names the artifact. A WARN budget keeps this
-honest: a healthy PASS cycle emits ≤ N WARN signals (N measured from a real green cycle in S1 and
-asserted by a composed test); if a green cycle cannot stay under budget, the ladder is decoration.
+honest: a healthy PASS cycle emits ≤ N WARN signals (N = 0 on the unit-level green cycle —
+`TestRunCycle_EveryDispatchedPhaseEmitsOnePhaseOutcome_GreenCycleStaysUnderTheWarnBudget`; the live
+budget is measured from the first green runtime cycle after S1 deploys and pinned in S2); if a green
+cycle cannot stay under budget, the ladder is decoration.
 Hand-written `[x]` prose disappears one module at a time (§10 S5).
 
 ## 10. Migration slices
@@ -347,8 +394,8 @@ Hand-written `[x]` prose disappears one module at a time (§10 S5).
 | Slice | Content | Acceptance (measured by tests, not prose) | Depends on |
 |---|---|---|---|
 | **S0** | this design, ADR-0101, the inventory | docs-only PR; links resolve; architect review folded in | — |
-| **S1** | `internal/signalcenter` (schema, Center, registry, sinks, filter); `core.WithSignalCenter` + listener + summary + `CycleResult.Signals`; `orchDeps.Signals`; the C1 chokepoint emits `phase.outcome`/`phase.aborted` on both roots (its PR #577 hand-written line replaced by the sink line); `.apicover-enforce` entry; CI line-coverage gate | package 100 % API coverage (apicover) + 100 % line coverage (CI/make gate, §11), `-race`; composed RunCycle test: every dispatched phase (incl. the ADR-0044 abort-path table) yields exactly one `phase.outcome` observed by the orchestrator listener and one `signals.ndjson` line with monotonic `seq`; WARN-budget test; re-entrancy test; mutants: emit removed, listener not subscribed, sink not attached, validation bypassed, recover removed, same-order-for-all-listeners — each killed by name | PR #577 (lands after the #575/#576/#577 merge order) |
-| **S2** | producers: `SystemFailureSignal` → `system.failure`; `shiperr` → `ship.error` (+ `shiperr.SignalCode`); contract gate → `gate.rejected/corrected`; quota pause → `quota.paused`; `cycle.sealed` after `finalizeOutcome`; `failurelog.Classification` folded into `failureadapter`'s; generated `docs/architecture/signal-codes.md` | each producer has a composed proof; the classification registry test fails if the two vocabularies diverge again | PR #575 (gate codes) |
+| **S1** | `internal/signalcenter` (schema, Center, registry, sinks, filter); `core.WithSignalCenter` + listener + `Orchestrator.SignalSummary()`; `orchDeps.Signals`; the C1 chokepoint emits `phase.outcome`/`phase.aborted` on both roots (its PR #577 hand-written line replaced by the sink line); `.apicover-enforce` entry; CI line-coverage gate | package 100 % API coverage (apicover) + 100 % line coverage (CI/make gate, §11), `-race`; composed RunCycle test: every dispatched phase (incl. the ADR-0044 abort-path table) yields exactly one `phase.outcome` observed by the orchestrator listener and one `signals.ndjson` line with monotonic `seq`; WARN-budget test; re-entrancy test; mutants: emit removed, listener not subscribed, sink not attached, validation bypassed, recover removed, same-order-for-all-listeners — each killed by name | PR #577 (lands after the #575/#576/#577 merge order) |
+| **S2** | producers: `SystemFailureSignal` → `system.failure`; `shiperr` → `ship.error` (+ `shiperr.SignalCode`); contract gate → `gate.rejected/corrected`; quota pause → `quota.paused`; `cycle.sealed` after `finalizeOutcome`; `failurelog.Classification` folded into `failureadapter`'s; generated `docs/architecture/signal-codes.md`; a `Flush` seam (or emit-from-the-drainer rule) for exit-path producers (§6.1); the live WARN budget pinned from the first green runtime cycle | each producer has a composed proof; the classification registry test fails if the two vocabularies diverge again | PR #575 (gate codes) |
 | **S3** | bridge: `Deps.Signals` at construction + `engine.SignalsWired()`; engine WARN/TRIPWIRE/CONTEXT-FILL → `bridge.warning/tripwire`; **commit 1:** the pure rename `panestream.SignalCenter` → `LivenessCenter` (ADR-0068/0070 amended by ADR-0101; `bridge.Deps.LivenessCenter` already carries the target name); **commit 2:** `pane.liveness` production; hand-written `[engine]` lines removed | the repo-wide prefix test's allowlist shrinks by `[engine]`/`[bridge]` | S1 |
 | **S4** | ledger decorator (`ledger.appended`); `dispatchevents` writers and the `observer` adapter emit through the Center (their files stay as sink outputs until readers migrate); `cmd_loop` **reports** signal counts in the batch report; the dashboard SSE subscribes | `abnormal-events.jsonl` **field-equal modulo timestamp precision** before/after, asserted by a decoding golden *(review 11)*; dashboard shows a signal within one SSE tick; no breaker gates on a signal (a shadow comparison test may log disagreement) | S2 |
 | **S5** | per-module log migration riding each decomposition slice (§12): prefix-literal occurrences per module (any writer) `[orchestrator]` 287 → 0, `[loop]` 132 → 0, `[ship]` 130 → 0, … | one repo-wide grep test with a shrinking allowlist (a migrated module cannot be forgotten); the inventory's prefix table regenerated | S1 |
@@ -427,13 +474,13 @@ tag, 100 % API + line coverage, and a design note "why this boundary" appended t
 | Risk | Mitigation |
 |---|---|
 | Double emission during migration (hand-written line + sink line) | the same slice that adds `Emit` deletes the `Fprintf`; the repo-wide prefix allowlist shrinks in the same PR |
-| Emit re-entrancy / self-deadlock | `dispatchLocked` for self-reports; nested emits queued and drained; a timeout-guarded re-entrancy test |
+| Emit re-entrancy / self-deadlock | one queue, one drainer, no lock held during delivery; self-reports and nested emits enqueue like any other event; a timeout-guarded re-entrancy test |
 | Synchronous fan-out latency at hot sites | listeners are O(1) or append-only with an open handle; a slow consumer buffers internally; `signalcenter.slow_listener` WARN when a listener exceeds a budget (S4) |
 | `signals.ndjson` growth | one line per event ≤ 4 KiB, ≤ 12 fields; gc retention already prunes run dirs |
 | Name clash with the bridge center | S3 renames it `LivenessCenter` in its own commit; ADR-0101 amends ADR-0068/0070 |
 | A listener panic taking the orchestrator down | recover + self-report; tested |
 | Vocabulary sprawl (kinds/modules added ad hoc) | closed sets with tests; adding one is a reviewed edit |
-| Registry conflicts | recorded, signalled, asserted empty by a repo test; never a panic |
+| Registry conflicts | recorded at package init, asserted empty by a named test; never a panic, never an event |
 | Monitoring becoming a control input | the observe-never-decide invariant (§3, §8); S4 reports, does not gate |
 
 ## 15. S1 implementation checklist
@@ -443,7 +490,7 @@ tag, 100 % API + line coverage, and a design note "why this boundary" appended t
    import graph.
 2. GREEN: `event.go`, `center.go`, `registry.go`, `sinks.go` (< 800 lines each, functions < 50).
 3. RED: `core` — `WithSignalCenter`, `SignalCenterWired`, `SignalSummary`, `observeSignal` (lock
-   order, reset on cycle start), `CycleResult.Signals`; the C1 chokepoint emits on every terminal path
+   order; the summary follows the cycle by itself); the C1 chokepoint emits on every terminal path
    (reuse `orchestrator_phaseoutcome_test.go`'s abort table); the WARN budget on a green cycle.
 4. GREEN: `recordPhaseOutcome` → `Emit`; delete its PR #577 `Fprintf` line (the sink renders it);
    update `TestRecordPhaseOutcome_CarriesThePhaseDiagnosticsAndNamesAReasonedFail` to assert the
@@ -456,3 +503,41 @@ tag, 100 % API + line coverage, and a design note "why this boundary" appended t
 7. Floors: gofmt/vet/`-race`; whole-module; integration; ACS; apicover.
 8. Fleet: simplifier → architecture-reviewer ∥ go-reviewer (re-review against review findings 2, 3,
    5, 7, 17); commit-gate; ship; PR (after #575/#576/#577).
+
+### 15.1 Landed — S1 as implemented (2026-09-13)
+
+Every item above is done; these are the deltas from the plan, each chosen during implementation
+and folded back into §4–§9 so this document describes the code that exists:
+
+| Planned | Landed | Why |
+|---|---|---|
+| Emit-mutex fan-out + an internal `dispatchLocked` for self-reports | one queue, one drainer, no lock held during delivery; self-reports enqueue like any event (§6.1, §6.3) | one way in means one order and no second dispatch path to get wrong; the mutant "listeners observe different orders" is killed by `TestEmit_AllListenersObserveTheSameOrderUnderConcurrency` |
+| package-level `NDJSONSink` | `(*Center).NDJSONSink` | the sink reports its own drops through the Center it serves |
+| separate `signalcenter.registry_drift` / `registry_conflict` events | drift stamped onto the offending event (`registry_drift` is only the replacement kind for an unknown kind); conflicts recorded only, no `registry_conflict` kind (§5.2, §5.4) | drift is one line next to the producer's reason; conflicts happen at package init, before a Center exists |
+| summary reset in `planCycle`; `CycleResult.Signals` | `signalcenter.Summary` follows the cycle by itself; `Orchestrator.SignalSummary()` is the only reader (§8) | no path can forget the reset; one owner, one snapshot, no copy on the result |
+| `log.DiagnosticField` for field values | `log.SanitizeField` for values and `Reason`; `FormatLine` exported (§4, §9) | a signal line is never quoted twice; sinks share one format |
+| WARN budget N measured live | N = 0 on the unit green cycle; live N pinned in S2 | S1 has no runtime cycle yet |
+
+Folded from the S1 architecture review (Approve; four MEDIUM): the durable sink releases its own
+lock before reporting drops (a `Listener` is a plain func and may run outside a drain —
+`TestNDJSONSink_DropReportIsEmittedOutsideTheSinkLock` reproduced the self-deadlock first); the
+`listener_panicked` INCIDENT names the listener **function** (`fields.listener`, e.g.
+`core.(*Orchestrator).observeSignal-fm`) beside its id; `verdictReason(verdict, diags)` is the one
+rendering of "verdict=<V>[: reasons]" for the floor error, the seal and the FAIL **and** WARN
+events; and the registry-clean assertion lives in `cmd/evolve`
+(`TestSignalCenterRegistry_EveryLinkedModuleRegistersCleanly`), the binary that links every
+producer module — the leaf package's own test cannot see them.
+
+Folded from the S1 Go review (Approve; one MEDIUM): the ≤ 4 KiB line cap only looked at `Fields`, so
+a regex-valid but over-long `Origin` or a hostile `Reason` could break the atomic-append promise —
+identifiers are now bounded and `Reason` is cut to fit (§4).
+
+Proof carried by the S1 PR: `internal/signalcenter` 100 % line coverage (`make cover-strict`, in CI)
+and 98/98 exports API-covered; `core` 343/343; `-race` ×3; nineteen mutants killed by name (emit
+removed, subscribe removed, NDJSON sink not attached, orchestrator not wired, WARN branch
+unreachable, FAIL kept INFO, cycle not stamped, abort not distinguished, summary lock removed,
+zero-summary init removed, stderr filter dropped, stderr sink not attached, sink truncates instead
+of appending, leaf imports core, core registers a conflicting code, listener name blank, sink lock
+held across Emit, reason cut removed, identifier bound removed); named wiring tests `TestWireOrchestratorDeps_SignalCenterWired`,
+`TestWireOrchestratorDeps_SignalCenterConsoleSinkIsFilteredAtWarn`, `TestNilSignalCenterRootsArePinned`,
+`TestImportGraph_LeafPackageImportsOnlyInternalLog`, `TestNDJSONSink_TwoProcessesAppendToTheSameCycleFile`.

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -22,6 +23,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/research"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/verdictcache"
 )
 
@@ -486,6 +488,15 @@ type Orchestrator struct {
 	// the R9 triage-capacity window (throughput_hook.go). Nil (default) ⇒
 	// no-op. Set via WithThroughputRecorder.
 	throughputRecorder ThroughputRecorder
+
+	// signals is the ADR-0101 Signal Center the orchestrator listens to; nil is
+	// the Null Object (tests and the two pinned secondary roots). signalSummary
+	// is the current cycle's view, guarded by signalMu — the first production
+	// mutex in core: the Center holds no lock while delivering, observeSignal
+	// never emits, and no orchestrator path holds signalMu across an Emit.
+	signals       *signalcenter.Center
+	signalMu      sync.Mutex
+	signalSummary *signalcenter.Summary
 
 	// verdictCacheLookupHook, if non-nil, is invoked during the verdict-cache lookup
 	// phase of RunCycle, letting tests verify whether the cache was queried, skipped,

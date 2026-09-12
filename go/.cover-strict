@@ -1,0 +1,6 @@
+# Strict line-coverage gate (ADR-0101 decision 9; design §11). One line per
+# package: `<go list pattern> <minimum statement coverage %>`. `make cover-strict`
+# and the go.yml step "line-coverage strict" read this file, so the two surfaces
+# cannot drift. Packages listed here ship with the coverage they declare; a
+# regression fails the tree. Blank lines and `#` comments are ignored.
+./internal/signalcenter 100

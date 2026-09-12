@@ -58,11 +58,13 @@
    the reason, because a verdict is a disposition the pipeline already handles, not an accident).
 3. **One process-scoped Center (Observer / publish–subscribe), built at the composition root and
    injected.** `signalcenter.New()` in `cmd/evolve/cmd_cycle.go`, passed to the orchestrator via
-   `core.WithSignalCenter` and to the bridge via `bridge.Deps`. Synchronous, ordered fan-out
-   (`Emit` holds one emit mutex so every listener sees the same total order); a listener panic is
-   recovered and reported as an INCIDENT to the other listeners through the already-held emit
-   lock (never a re-entrant `Emit`); a listener that emits is queued and delivered after the outer
-   fan-out; nothing is ever dropped. A nil `*Center` is a Null Object (every method nil-safe) — a
+   `core.WithSignalCenter` and to the bridge via `bridge.Deps`. Ordered fan-out through one queue
+   and one drainer (`Emit` stamps `seq` under the Center's mutex and enqueues; the first emitter
+   with no drain in progress delivers, in `seq` order, to a listener snapshot with no lock held, so
+   every listener sees the same total order); a listener panic is recovered, the listener is
+   unsubscribed and the INCIDENT report is enqueued like any other event (there is no second
+   dispatch path); a listener that emits enqueues and returns; nothing is ever dropped. A nil
+   `*Center` is a Null Object (every method nil-safe) — a
    **test affordance only**: production roots always construct a Center, before the bridge engine
    (`bridge.NewEngine` normalizes `Deps` at construction), and a repo test pins the only nil sites
    (`cmd_cycle_simulate.go`, `routingtest`). Optional nil-default injection is exactly how
@@ -74,7 +76,7 @@
    `fields`, and is raised to at least WARN — the drift itself becomes a signal.
 5. **The orchestrator registers as a listener at construction** and keeps a per-cycle
    `SignalSummary` (counts by severity and kind, the last INCIDENT) exposed through the orchestrator
-   and the cycle result, so the loop and the dashboard read the orchestrator's view rather than
+   only — `Orchestrator.SignalSummary()`, not a copy on the cycle result — so the loop and the dashboard read the orchestrator's view rather than
    re-deriving it from files. INCIDENT-driven halts stay with ADR-0072's `SystemFailureSignal`, which
    becomes a producer (S2); the listener does not add a second halt path. **Listeners observe, never
    decide:** no consumer may treat a signal as authoritative for a verdict, a state transition or a
@@ -145,3 +147,18 @@
   vocabulary, one home) — S2. Fold `subagent.AppendAbnormalEvent`'s hand-rolled JSON into the Center —
   S4. Decide the fate of `abnormal-events.jsonl` once every writer emits through the Center — S4.
   The per-module decomposition order and method live in the design doc §12.
+
+## Implementation notes — S1 (landed 2026-09-13)
+
+`internal/signalcenter` (schema, Center, registry, sinks, filter, `Summary`), `core.WithSignalCenter`
++ the orchestrator listener, the C1 chokepoint as the first producer on both dispatch roots, and the
+composition-root wiring (durable `signals.ndjson` sink + WARN-filtered console sink) landed as one PR
+with 100 % line coverage enforced in CI (`make cover-strict`). Deltas from the decisions above, each
+recorded in the design document (§15.1): delivery is one queue and one drainer with no lock held
+during delivery (decision 3's "already-held emit lock" dispatch path does not exist — self-reports
+enqueue like any event); vocabulary drift is stamped onto the offending event and registry conflicts
+are recorded, never emitted (decision 4 — `signalcenter.registry_drift` survives only as the
+replacement kind for an event whose own kind is unknown; there is no `registry_conflict` kind); the
+per-cycle summary is `signalcenter.Summary`, follows the cycle by itself
+and is read only through `Orchestrator.SignalSummary()` (decision 5). Nothing in the decisions'
+intent changed: one schema, one center, closed vocabularies, observe-never-decide.
