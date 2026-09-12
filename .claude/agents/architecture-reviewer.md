@@ -29,16 +29,28 @@ abstraction level, pattern fit — and what that shape costs the next maintainer
 
 ## When Invoked
 
-1. Run `git diff --staged` and `git diff` (or `git diff <base>...HEAD` when a
-   base is named). If empty, review the most recent commit (`git show HEAD`).
-2. Read every changed file IN FULL — not just the hunks. A seam problem is
-   invisible in a hunk.
-3. Map the blast radius: which packages/layers/modules does the change touch,
-   which boundaries does it cross, what depends on the changed surface
-   (`grep` the callers), and where the changed beliefs (values, rules,
-   thresholds, prose contracts) also live.
-4. Work the rubric below from CRITICAL to LOW.
-5. Report using the output contract at the end. Nothing else.
+1. Run `git diff --stat`, `git status --porcelain`, then `git diff --staged`
+   and `git diff` with `-U8` (or `git diff <base>...HEAD` when a base is
+   named). If empty, review the most recent commit (`git show HEAD`).
+2. Read a CHANGED file in full only when it is ≤ 400 lines; otherwise read
+   each hunk with `Read` `offset`/`limit` (±60 lines) plus the file's imports.
+   If the hunk mutates a type declared elsewhere, `grep -n` its name and read
+   only that ONE declaration. A seam problem is invisible in a hunk, but it is
+   not hidden in unchanged files: do not read sibling files, the package's
+   other tests, or "the rest of the package for context".
+3. Map the blast radius by GREP, not by reading: for each changed exported or
+   package-shared symbol, `grep -rn` its callers and count them; read a caller
+   only when the changed contract could affect it. For a changed belief
+   (value, rule, threshold, prose contract), `grep` for its other homes — the
+   duplicated-belief finding needs the location, not the surrounding file.
+4. Do NOT run the test suite, `-race`, linters, or any `./...` command. The
+   author's verification block in the dispatch prompt is the evidence; you
+   judge structure, not correctness. If a specific structural claim needs a
+   check, run ONE targeted command scoped to the changed package.
+5. Budget: ≤ 20 tool calls, ≤ 60K tokens. Over ~500 diff lines, review the
+   riskiest seams first and name what you skipped in the report.
+6. Work the rubric below from CRITICAL to LOW.
+7. Report using the output contract at the end. Nothing else.
 
 ## Review Rubric
 
