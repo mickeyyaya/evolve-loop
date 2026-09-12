@@ -7,22 +7,9 @@ import (
 	"path/filepath"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/coherence"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
-
-// errorSeverityMessages extracts the error-severity diagnostic messages — the
-// single definition shared by floorVerdictError (the FailedRecord reason) and
-// persistFloorFailReasons (the coherence-floor + forensic signal), so the two
-// can never drift on what counts as "explained".
-func errorSeverityMessages(diags []Diagnostic) []string {
-	var msgs []string
-	for _, d := range diags {
-		if d.Severity == "error" {
-			msgs = append(msgs, d.Message)
-		}
-	}
-	return msgs
-}
 
 // floorFailReason is the FORENSIC workspace artifact recording WHY a floor
 // phase's verdict was recorded FAIL when the phase's own report said otherwise
@@ -63,7 +50,7 @@ func persistFloorFailReasons(cs *CycleState, phase Phase, diags []Diagnostic) {
 	if cs == nil {
 		return
 	}
-	reasons := errorSeverityMessages(diags)
+	reasons := cyclestate.ErrorMessages(diags)
 	if phase == PhaseAudit {
 		cs.AuditFailReasons = reasons
 	}

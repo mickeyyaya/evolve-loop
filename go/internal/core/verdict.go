@@ -1,6 +1,9 @@
 package core
 
-import "github.com/mickeyyaya/evolve-loop/go/internal/failureadapter"
+import (
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
+	"github.com/mickeyyaya/evolve-loop/go/internal/failureadapter"
+)
 
 // maxReasonSummaryLen bounds the short human summary attached to a verdict. Long
 // enough for a one-line "why" (an audit defect list, an EGPS red_count), short
@@ -45,13 +48,19 @@ func (t Taxonomy) IsZero() bool { return t == Taxonomy{} }
 
 // ReasonFromDiagnostics folds a phase classifier's output into a VerdictReason.
 // The classifiers already emit the human "why" as an error-severity Diagnostic
-// (e.g. audit's "EGPS: red_count=N"), so the Summary is the first error message,
-// falling back to the first warning, then to a status-derived default. PURE and
-// nil-safe; never panics.
+// (e.g. audit's "EGPS: red_count=N"), so the Summary is the first error message
+// — projected by cyclestate.ErrorMessages, the ONE rule every reason surface
+// uses, so the ledger's verdict identity cannot name a FAIL differently from
+// the FailedRecord, the chokepoint log line or the seal — falling back to the
+// first warning, then to a status-derived default. PURE and nil-safe; never
+// panics.
 func ReasonFromDiagnostics(status string, diags []Diagnostic, tax Taxonomy) VerdictReason {
-	summary := firstDiagMessage(diags, "error")
+	summary := ""
+	if msgs := cyclestate.ErrorMessages(diags); len(msgs) > 0 {
+		summary = msgs[0]
+	}
 	if summary == "" {
-		summary = firstDiagMessage(diags, "warning")
+		summary = firstDiagMessage(diags, cyclestate.SeverityWarning)
 	}
 	if summary == "" && status != VerdictPASS {
 		summary = "unspecified " + status

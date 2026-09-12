@@ -27,7 +27,7 @@
 // verifiableBy — that ONE Classify call hands the operator BOTH halves of the
 // forensic pair (the auditor's declared verdict AND the gate's red_count /
 // normalized red identity), both at Severity=="error" so both ride
-// errorSeverityMessages → AuditFailReasons → <phase>-fail-reason.json → the
+// cyclestate.ErrorMessages → AuditFailReasons → <phase>-fail-reason.json → the
 // dossier's SubstantiveError. A refactor that keeps the record but drops the
 // gate facts beside it — or demotes either to warning — leaves the operator
 // with the same half-picture cycles 1107/1116/1117 already had, and is caught

@@ -8,7 +8,7 @@
 // the auditor's narrative verdict and then unconditionally overwrites it with
 // core.VerdictFAIL at three EGPS gate branches (acs-verdict.json unreadable,
 // red_count>0, ship_eligible=false) without recording what the narrative said.
-// Every downstream consumer (errorSeverityMessages → AuditFailReasons →
+// Every downstream consumer (cyclestate.ErrorMessages → AuditFailReasons →
 // <phase>-fail-reason.json → dossier SubstantiveError) therefore sees only the
 // gate's own message, so an operator cannot tell a genuine defect from a
 // POISONED predicate the auditor itself flagged clean (cycles 1116/1107/1117,
@@ -121,7 +121,7 @@ func TestC1124_003_ConflictRecordReachesDossierPlumbing(t *testing.T) {
 			"TestVerdictConflict_WarningSeverityWouldBeDropped")
 	if !ok {
 		t.Errorf("RED: the verdict-conflict record does not flow through the existing "+
-			"errorSeverityMessages → AuditFailReasons → dossier chain:\n%s", tail(out, 40))
+			"cyclestate.ErrorMessages → AuditFailReasons → dossier chain:\n%s", tail(out, 40))
 	}
 }
 

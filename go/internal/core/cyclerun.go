@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/directives"
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards/treediff"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
@@ -182,11 +183,21 @@ func (o *Orchestrator) recordFloorVerdictFailure(ctx context.Context, req CycleR
 // FailedRecord names WHY the phase failed, not merely THAT it did — the missing
 // signal that let the skills-drift storm re-derive the same doomed fix forever.
 func floorVerdictError(phase Phase, diags []Diagnostic) error {
-	msgs := errorSeverityMessages(diags)
+	return fmt.Errorf("%s %s", phase, verdictFailReason(diags))
+}
+
+// verdictFailReason is the ONE rendering of "why this phase's verdict is FAIL":
+// the error-severity diagnostics the phase itself reported, joined; bare
+// "verdict=FAIL" when it reported none. floorVerdictError (the FailedRecord),
+// the C1 chokepoint log line and the seal's backfill all project it, so the
+// three surfaces an operator reads first cannot word the same failure
+// differently.
+func verdictFailReason(diags []Diagnostic) string {
+	msgs := cyclestate.ErrorMessages(diags)
 	if len(msgs) == 0 {
-		return fmt.Errorf("%s verdict=FAIL", phase)
+		return "verdict=FAIL"
 	}
-	return fmt.Errorf("%s verdict=FAIL: %s", phase, strings.Join(msgs, "; "))
+	return "verdict=FAIL: " + strings.Join(msgs, "; ")
 }
 
 // recordChokepointEscape closes the ADR-0044 C1 invariant on RunCycle's

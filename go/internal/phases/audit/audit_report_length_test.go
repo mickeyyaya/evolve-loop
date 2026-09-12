@@ -35,7 +35,7 @@ import (
 //     (ship/audit.go:83), so a truncating cap would break the ship-time
 //     integrity check.
 //
-// Severity is WIRING, not taste: core.errorSeverityMessages keys off
+// Severity is WIRING, not taste: cyclestate.ErrorMessages keys off
 // Severity=="error" to build AuditFailReasons, so an error-severity size
 // diagnostic would convert a merely-verbose report into a dossier-visible
 // failure. The size warning must be Severity=="warning".
@@ -142,7 +142,7 @@ func TestAuditReportLength(t *testing.T) {
 		}
 		if got[0].Severity != "warning" {
 			t.Errorf("size diagnostic severity=%q, want \"warning\" — error severity would route the "+
-				"report through errorSeverityMessages into AuditFailReasons, converting a verbose "+
+				"report through cyclestate.ErrorMessages into AuditFailReasons, converting a verbose "+
 				"report into a dossier-visible failure: %s", got[0].Severity, got[0].Message)
 		}
 		for _, want := range []string{strconv.Itoa(size), strconv.Itoa(capBytes)} {
