@@ -94,11 +94,18 @@ func TestDefaultSandboxWrap_GrantsTriagesDeclaredInboxClaimDir(t *testing.T) {
 		WriteSubpaths: prof.Sandbox.WriteSubpaths,
 	})
 
-	want := allowWriteLine(filepath.Join(canonicalRoot, ".evolve", "inbox", "processing"))
-	if !strings.Contains(sbpl, want) {
+	// SBPL (subpath X) covers everything below X, so the claim dir may be
+	// granted by its own line or by a parent's (since PR-0 of ADR-0100 the
+	// profile grants .evolve/inbox — the rename's SOURCE directory too).
+	claimDir := filepath.Join(canonicalRoot, ".evolve", "inbox", "processing", "cycle-1623")
+	var granted []string
+	for _, m := range subpathArgRe.FindAllStringSubmatch(sbpl, -1) {
+		granted = append(granted, m[1])
+	}
+	if !coveredByAGrant(claimDir, granted) {
 		t.Fatalf("the triage profile declares write_subpaths %v but the rendered sandbox never grants the inbox claim dir — "+
-			"`evolve inbox-mover claim` fails at mkdir and the cycle runs its whole spine against an empty commitment (cycle 1623).\nwant line: %s\nprofile:\n%s",
-			prof.Sandbox.WriteSubpaths, want, sbpl)
+			"`evolve inbox-mover claim` fails at mkdir and the cycle runs its whole spine against an empty commitment (cycle 1623).\nclaim dir: %s\nprofile:\n%s",
+			prof.Sandbox.WriteSubpaths, claimDir, sbpl)
 	}
 }
 
@@ -308,3 +315,87 @@ func TestResolveSandboxWriteGrants_RefusesASymlinkRetargetBelowTheBase(t *testin
 
 // subpathArgRe captures the quoted path of every SBPL (subpath "...") form.
 var subpathArgRe = regexp.MustCompile(`\(subpath "([^"]*)"\)`)
+
+// TestTriageProfile_GrantsTheClaimMove pins the grant against the OPERATION
+// the triage persona performs, not just a path. `evolve inbox-mover claim`
+// renames <inbox>/<item>.json → <inbox>/processing/cycle-N/<item>.json; a
+// rename writes BOTH directories (unlink at the source, create at the
+// destination). Batch cycle 1630 (2026-09-12) had the destination granted and
+// the source denied: mkdir succeeded, the rename got EPERM, and the cycle
+// terminated with an empty commitment.
+func TestTriageProfile_GrantsTheClaimMove(t *testing.T) {
+	prof, err := LoadProfile(filepath.Join(realProfilesDir(t), "triage.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := t.TempDir()
+	grants, err := resolveSandboxWriteGrants(prof.Sandbox.WriteSubpaths, root, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	canonicalRoot, err := canonicalSandboxPath(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	inbox := filepath.Join(canonicalRoot, ".evolve", "inbox")
+	for _, dir := range []string{inbox, filepath.Join(inbox, "processing", "cycle-1630")} {
+		if !coveredByAGrant(dir, grants) {
+			t.Fatalf("the claim writes %s, which no triage grant covers (grants %v) — the rename is refused at the source directory, exactly cycle 1630's EPERM", dir, grants)
+		}
+	}
+}
+
+// coveredByAGrant reports whether dir is a granted path or lies below one —
+// the SBPL (subpath …) semantics the generator emits.
+func coveredByAGrant(dir string, grants []string) bool {
+	for _, g := range grants {
+		if dir == g || strings.HasPrefix(dir, g+string(filepath.Separator)) {
+			return true
+		}
+	}
+	return false
+}
+
+// TestTriageProfile_DeniesTheInboxAuditTrail is the negative space of the
+// claim grant. `.evolve/inbox` is granted so a rename can unlink its source,
+// and SBPL subpath grants are recursive — so the history directories under
+// it must be denied explicitly, and the generator must emit those denies
+// AFTER the grant (later rules win) or the carve-out is decorative.
+func TestTriageProfile_DeniesTheInboxAuditTrail(t *testing.T) {
+	prof, err := LoadProfile(filepath.Join(realProfilesDir(t), "triage.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := t.TempDir()
+	for _, d := range []string{"consumed", "processed", "retry"} {
+		if err := os.MkdirAll(filepath.Join(root, ".evolve", "inbox", d), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	denies, err := resolveSandboxDenials(prof.Sandbox.DenySubpaths, root, "", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sbpl := renderSBPL(t, SandboxWrapRequest{
+		Phase: "triage", RepoRoot: root, Worktree: t.TempDir(), Workspace: t.TempDir(),
+		WriteSubpaths: prof.Sandbox.WriteSubpaths, DenyPaths: denies,
+	})
+	canonicalRoot, err := canonicalSandboxPath(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	allowAt := strings.Index(sbpl, allowWriteLine(filepath.Join(canonicalRoot, ".evolve", "inbox")))
+	if allowAt < 0 {
+		t.Fatalf("the inbox grant is missing:\n%s", sbpl)
+	}
+	for _, d := range []string{"consumed", "processed", "retry"} {
+		deny := "(deny file-write* (subpath " + strconv.Quote(filepath.Join(canonicalRoot, ".evolve", "inbox", d)) + "))"
+		at := strings.Index(sbpl, deny)
+		if at < 0 {
+			t.Fatalf("triage can write %s/ — the inbox grant is recursive and nothing carves the audit trail back out:\n%s", d, sbpl)
+		}
+		if at < allowAt {
+			t.Fatalf("the %s/ deny precedes the inbox grant; SBPL applies the LAST matching rule, so the grant would win", d)
+		}
+	}
+}
