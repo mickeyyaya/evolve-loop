@@ -2,7 +2,9 @@ package phasespec
 
 import (
 	"fmt"
+	"path/filepath"
 	"regexp"
+	"slices"
 )
 
 // nameRE constrains a phase name to lowercase kebab-case, matching the built-in
@@ -89,6 +91,7 @@ func isOptionalBuiltinName(name string, builtin Catalog) bool {
 // still apply.
 func validateUserSpec(s PhaseSpec, exemptSingleWordFloor bool) []string {
 	var v []string
+	v = append(v, ValidateOutputsPartition(s)...)
 
 	if s.Name == "" {
 		v = append(v, "name is required")
@@ -149,5 +152,45 @@ func ValidateActivatingFields(s PhaseSpec) []string {
 		v = append(v, fmt.Sprintf("on_pass/on_fail must be declared together (a verdict branch needs both targets); got on_pass=%q on_fail=%q",
 			s.OnPass, s.OnFail))
 	}
+	return v
+}
+
+// ValidateOutputsPartition returns the violations of the ADR-0100 declaration
+// rule for a spec's outputs: every secondary output (files[1:]) is classified
+// exactly once — owed by the agent (agent_owed) or written by the harness
+// (harness_produced) — and every classification names a basename that is
+// declared. It runs for the registry (Load) and for user/overlay specs
+// (validateUserSpec) alike, because an overlay REPLACES a built-in's spec
+// wholesale (Catalog.Merge) and would otherwise ungate a phase silently.
+func ValidateOutputsPartition(s PhaseSpec) []string {
+	var v []string
+	declared := map[string]bool{}
+	for _, f := range s.Outputs.Files[min(1, len(s.Outputs.Files)):] {
+		declared[filepath.Base(f)] = true
+	}
+	seen := map[string]string{}
+	for _, class := range []struct {
+		name    string
+		entries []string
+	}{{"agent_owed", s.Outputs.AgentOwed}, {"harness_produced", s.Outputs.HarnessProduced}} {
+		for _, e := range class.entries {
+			switch {
+			case e == "" || e != filepath.Base(e):
+				v = append(v, fmt.Sprintf("outputs.%s entry %q must be the basename of a declared secondary output", class.name, e))
+			case !declared[e]:
+				v = append(v, fmt.Sprintf("outputs.%s names %q, which outputs.files does not declare after the primary", class.name, e))
+			case seen[e] != "":
+				v = append(v, fmt.Sprintf("%q is classified twice (outputs.%s and outputs.%s)", e, seen[e], class.name))
+			default:
+				seen[e] = class.name
+			}
+		}
+	}
+	for base := range declared {
+		if seen[base] == "" {
+			v = append(v, fmt.Sprintf("secondary output %q is declared but not classified — add it to outputs.agent_owed (the agent writes it) or outputs.harness_produced (a harness component does)", base))
+		}
+	}
+	slices.Sort(v)
 	return v
 }

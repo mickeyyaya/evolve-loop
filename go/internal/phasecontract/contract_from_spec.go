@@ -34,7 +34,20 @@ func FromSpec(spec phasespec.PhaseSpec) Contract {
 		WriteTarget:  TargetWorkspace,
 		// Opt-in, and only meaningful for verdict-emitting phases (ADR-0039 §7).
 		RequireFailureContext: len(verdicts) > 0 && spec.Classify != nil && spec.Classify.RequireFailureContext,
+		// ADR-0100: projected from the declaration only.
+		AgentOwedFiles: spec.Outputs.AgentOwed,
+		Effects:        spec.Effects,
 	}
+}
+
+// overlayDeclared copies the registry-only fields (ADR-0100) from a spec onto
+// a contract that came from the built-in table. Built-ins never declare owed
+// secondaries or effects — the registry is their single source — so this is a
+// pure projection, never a merge of two beliefs.
+func overlayDeclared(c Contract, spec phasespec.PhaseSpec) Contract {
+	c.AgentOwedFiles = spec.Outputs.AgentOwed
+	c.Effects = spec.Effects
+	return c
 }
 
 // SynthesizesContract reports whether a spec yields a meaningful derived

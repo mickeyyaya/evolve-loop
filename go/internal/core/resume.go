@@ -411,9 +411,13 @@ func (o *Orchestrator) reviewResumedDeliverable(
 	resp PhaseResponse,
 	mainDirtyBaseline map[string]bool,
 ) (PhaseResponse, error) {
-	// Resume review parity is scoped to activated contracts. Legacy checkpoints
-	// retain their historical behavior.
-	if o.reviewer == nil || cs.ExplanationDocumentationVersion == 0 || resp.Verdict == VerdictSKIPPED {
+	// The skip set is the fresh loop's (cyclerun_correction.go): no reviewer,
+	// or a SKIPPED verdict. A version-0 (pre-explanation-contract) checkpoint
+	// is NOT a reason to skip — mandatoryExplanationReviewer already delegates
+	// on version 0 itself, so the former extra skip protected nothing it
+	// needed to and silently exempted every other reviewer (the contract gate,
+	// the declared-deliverables gate) for any resumed legacy cycle (ADR-0100 §4).
+	if o.reviewer == nil || resp.Verdict == VerdictSKIPPED {
 		return resp, nil
 	}
 	recoverBeforeReview := func() error {

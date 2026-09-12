@@ -1,0 +1,19 @@
+{
+  "id": "worktree-carries-tracked-inbox-copy",
+  "title": ".evolve/inbox is git-tracked, so every cycle worktree carries a divergent snapshot of the plane's queue — a phase command that resolves the wrong root claims a copy nobody reads",
+  "kind": "bug",
+  "class": "pipeline-integrity",
+  "weight": 0.7,
+  "priority": "P2",
+  "route": "console",
+  "created_at": "2026-09-12T12:00:00Z",
+  "problem": "gitWorktree.Create symlinks cycle-state.json, state.json and ledger.jsonl into the plane (go/internal/core/worktree.go:296-301) but .evolve/inbox/ is a real checkout (250 tracked files; processing/ and consumed/ are gitignored). Batch cycle 1631 (2026-09-12) ran `evolve inbox-mover claim` with cwd = the worktree and no EVOLVE_PROJECT_ROOT, printed `[inbox-mover] claimed:`, and moved the WORKTREE's copy; the plane's item never left .evolve/inbox/ and the plane ledger recorded no claim. PR-0 of ADR-0100 exports EVOLVE_PROJECT_ROOT into the pane and the adapter env so the tool resolves the plane; the snapshot itself remains, and any future path that resolves by cwd reproduces the class.",
+  "impact": "Silent: the agent sees success, the queue does not change, the lane's item stays claimable by a sibling, and closeout reconciles against the plane. The tracked copy also bloats every worktree checkout with ~250 files of queue state that is stale the moment it is created.",
+  "fix": "Operator decision: either stop tracking .evolve/inbox (the queue is runtime state; consumed/ already carries the audit trail in git via the landing commits) and have provisioning symlink <worktree>/.evolve/inbox → <plane>/.evolve/inbox like the other plane-owned files, or keep tracking it and make `inboxmover` refuse to operate on a root that plane.Classify reports as a linked worktree (fail loudly instead of moving a copy). Not both. Pin with a worktree-provisioning test either way.",
+  "acceptance": [
+    "A phase command run from a cycle worktree cwd cannot move a worktree-local inbox copy: either there is no copy (symlink), or the tool refuses with a message naming the plane root.",
+    "The existing provisioning tests keep passing; the claim tests in go/internal/inboxmover keep passing."
+  ],
+  "files": ["go/internal/core/worktree.go", "go/internal/inboxmover/inboxmover.go", ".gitignore"],
+  "notes": "Surfaced by the 2026-09-12 batch analysis (cycles 1630/1631) that produced ADR-0100. The operator owns the tracked-vs-not decision because it changes what `git status` shows in every worktree."
+}
