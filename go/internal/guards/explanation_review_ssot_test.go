@@ -6,6 +6,22 @@ import (
 	"testing"
 )
 
+// explanationReviewGateCallee is the fixed callee every gate below must
+// delegate to. It is a package-level const (not a literal inside the test
+// body) so integrity_surface_explanation_callsites_test.go can read the same
+// belief when it derives the call-site scanner's vocabulary — see the file
+// comment there for why a fourth, re-typed copy of this string is the belief
+// this hoist exists to avoid.
+const explanationReviewGateCallee = "explanationdocs.ValidateReviewedHandoff"
+
+// explanationReviewGateFiles is package-level (not a local literal) so
+// integrity_surface_explanation_callsites_test.go can read the same file list
+// when it derives the call-site scanner's vocabulary.
+var explanationReviewGateFiles = []string{
+	"../phases/audit/explanation_review_gate.go",
+	"../phases/retro/explanation_review_gate.go",
+}
+
 // TestExplanationReviewGates_ShareContractCore pins the single-sourcing of the
 // explanation-review contract (architecture review 2026-09-01, CRITICAL): the
 // status enum, build-status match, required/not_applicable document switch,
@@ -15,13 +31,9 @@ import (
 // reappear in either phase package. Per-phase policy (heading, missing-handoff
 // verdict, NEEDS_CORRECTION disposition) legitimately stays in the gates.
 func TestExplanationReviewGates_ShareContractCore(t *testing.T) {
-	gates := []string{
-		"../phases/audit/explanation_review_gate.go",
-		"../phases/retro/explanation_review_gate.go",
-	}
-	for _, path := range gates {
+	for _, path := range explanationReviewGateFiles {
 		t.Run(path, func(t *testing.T) {
-			if !functionCalls(t, path, "validateExplanationReview", "explanationdocs.ValidateReviewedHandoff") {
+			if !functionCalls(t, path, "validateExplanationReview", explanationReviewGateCallee) {
 				t.Fatalf("validateExplanationReview must delegate the contract core to explanationdocs.ValidateReviewedHandoff")
 			}
 			body, err := os.ReadFile(path)
