@@ -3,9 +3,10 @@ package core
 // cyclerun_worktree_teardown_test.go — cycle-1278
 // `retro-fleet-stale-worktree-fallback`, AC2 (the root-cause companion).
 //
-// cs.ActiveWorktree = wtPath (cyclerun.go:456) is the SOLE assignment; nothing
+// cs.ActiveWorktree = wtPath (cyclerun.go:515) is the SOLE assignment; nothing
 // clears it. When the lane teardown callback prunes the worktree
-// (o.worktree.Cleanup, cyclerun.go:471) the persisted cycle state keeps pointing
+// (o.worktree.Cleanup, cycle_worktree_teardown.go:53 — the rule both RunCycle
+// and RunCycleFromPhase now apply) the persisted cycle state keeps pointing
 // at the now-deleted directory, and the next dispatch to read that file hands the
 // stale path to the bridge — where isDir() refuses the launch. Widening
 // retroWorktree's fallback (AC1) contains the symptom; clearing the field at

@@ -514,16 +514,7 @@ func (o *Orchestrator) newCycleRun(ctx context.Context, req CycleRequest) (cycle
 	} else {
 		cs.ActiveWorktree = wtPath
 		stack = append(stack, func(preserve, completedNormally bool) {
-			if preserve || !completedNormally {
-				fmt.Fprintf(os.Stderr, "[orchestrator] preserving worktree %s — cycle ended abnormally; recover via `evolve loop --resume` or reclaim with `evolve cycle reset`\n", wtPath)
-				return
-			}
-			if cerr := o.worktree.Cleanup(req.ProjectRoot, wtPath); cerr != nil {
-				// The tree may still be on disk — leave the path named so
-				// resume/reset can still reach it.
-				return
-			}
-			o.clearActiveWorktree(wtPath)
+			o.teardownCycleWorktree(req.ProjectRoot, wtPath, preserve, completedNormally)
 		})
 		// NOT a bare `rev-parse HEAD`: a REUSED worktree's HEAD can be an
 		// ADR-0076 salvage snapshot, and recording that as the base makes
