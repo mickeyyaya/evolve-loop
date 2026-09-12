@@ -8,38 +8,50 @@ import (
 	"testing"
 )
 
+// explanationLifecycleCallPins is the SINGLE list of "this function must call
+// that explanation-lifecycle callee" pins. It is package-level (not a local
+// literal) so integrity_surface_explanation_callsites_test.go can project the
+// SAME belief into a call-site scanner's vocabulary — a pin that lives only
+// inside one test function's body cannot be read by another test.
+var explanationLifecycleCallPins = []struct {
+	path     string
+	function string
+	callee   string
+}{
+	{"../phases/ship/native.go", "Run", "verifyNativeExplanation"},
+	{"../phases/audit/classification.go", "newAuditClassification", "validateExplanationReview"},
+	{"../phases/retro/retro.go", "Run", "validateExplanationReview"},
+	{"../core/cyclerun_postreview.go", "applyPostReviewGuards", "explanationdocs.RefreshResult"},
+	{"../core/orchestrator.go", "RunCycle", "activateBuildExplanationContract"},
+	{"../core/orchestrator.go", "RunCycle", "sealBuildExplanationContext"},
+	{"../core/cyclerun_dispatch.go", "dispatch", "projectBuildExplanation"},
+	{"../core/resume_execution.go", "run", "explanationdocs.RefreshResult"},
+	{"../core/resume_execution.go", "run", "sealBuildExplanationContext"},
+	{"../core/resume_execution.go", "run", "projectBuildExplanation"},
+}
+
+// explanationLifecycleAssignPins is the companion list for a callee that
+// reaches the lifecycle by VALUE (a struct-literal field assignment) rather
+// than a bare call. expressionName still resolves a wrapped call expression
+// (e.g. `RequireSandbox: requiresExplanationSandbox(phase, req)`) to the
+// called function's name, so this list also feeds the call-site vocabulary.
+var explanationLifecycleAssignPins = []struct {
+	path, function, field, value string
+}{
+	{"../core/orchestrator.go", "NewOrchestrator", "explanationContractVersion", "explanationdocs.CurrentContractVersion"},
+	{"../core/cyclerun.go", "newCycleRun", "ExplanationDocumentationVersion", "o.explanationContractVersion"},
+	{"../phases/runner/dispatch.go", "dispatchPhaseAttempts", "RequireSandbox", "requiresExplanationSandbox"},
+}
+
 func TestBuildExplanationLifecycleWiring(t *testing.T) {
-	pins := []struct {
-		path     string
-		function string
-		callee   string
-	}{
-		{"../phases/ship/native.go", "Run", "verifyNativeExplanation"},
-		{"../phases/audit/classification.go", "newAuditClassification", "validateExplanationReview"},
-		{"../phases/retro/retro.go", "Run", "validateExplanationReview"},
-		{"../core/cyclerun_postreview.go", "applyPostReviewGuards", "explanationdocs.RefreshResult"},
-		{"../core/orchestrator.go", "RunCycle", "activateBuildExplanationContract"},
-		{"../core/orchestrator.go", "RunCycle", "sealBuildExplanationContext"},
-		{"../core/cyclerun_dispatch.go", "dispatch", "projectBuildExplanation"},
-		{"../core/resume_execution.go", "run", "explanationdocs.RefreshResult"},
-		{"../core/resume_execution.go", "run", "sealBuildExplanationContext"},
-		{"../core/resume_execution.go", "run", "projectBuildExplanation"},
-	}
-	for _, pin := range pins {
+	for _, pin := range explanationLifecycleCallPins {
 		t.Run(filepath.Base(pin.path)+"/"+pin.function, func(t *testing.T) {
 			if !functionCalls(t, pin.path, pin.function, pin.callee) {
 				t.Fatalf("%s must call %s", pin.function, pin.callee)
 			}
 		})
 	}
-	assignments := []struct {
-		path, function, field, value string
-	}{
-		{"../core/orchestrator.go", "NewOrchestrator", "explanationContractVersion", "explanationdocs.CurrentContractVersion"},
-		{"../core/cyclerun.go", "newCycleRun", "ExplanationDocumentationVersion", "o.explanationContractVersion"},
-		{"../phases/runner/dispatch.go", "dispatchPhaseAttempts", "RequireSandbox", "requiresExplanationSandbox"},
-	}
-	for _, pin := range assignments {
+	for _, pin := range explanationLifecycleAssignPins {
 		t.Run(filepath.Base(pin.path)+"/"+pin.field, func(t *testing.T) {
 			if !functionAssigns(t, pin.path, pin.function, pin.field, pin.value) {
 				t.Fatalf("%s must assign %s from %s", pin.function, pin.field, pin.value)
