@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseio"
@@ -347,5 +348,95 @@ func TestWritePhaseIOShadowFile_Parseable(t *testing.T) {
 	}
 	if doc.Phase != "build" || doc.Cycle != 5 || !doc.BuildPresent || doc.ScoutPresent {
 		t.Fatalf("unexpected shadow doc: %+v", doc)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Cycle 1632 RED contract (tokenopt-handoff-digests): the shadow comparator
+// must be CAP-AWARE but not cap-BLIND. NewCycleInputs now bounds the two
+// free-text fields through phaseio.CapField, so comparing the raw legacy value
+// against the typed getter byte-for-byte would flag every over-cap dispatch as
+// a false mismatch AND leak the full uncapped text into the ledger message
+// (cycle-1593 round-2 H1). The fix runs the legacy "want" through the SAME
+// phaseio.CapField — which must still surface a typed value that genuinely
+// differs. Frozen (doNotModifyTests).
+// ---------------------------------------------------------------------------
+
+// overCapCtxValue is a valid-UTF-8 value strictly larger than the cap whose
+// first byte is `lead` so two values can differ INSIDE the retained prefix.
+func overCapCtxValue(lead byte) string {
+	return string(lead) + strings.Repeat("x", phaseio.MaxFieldBytes+64)
+}
+
+// mismatchFor returns the comparator row for field, or nil.
+func mismatchFor(ms []phaseIOMismatch, field string) *phaseIOMismatch {
+	for i := range ms {
+		if ms[i].Field == field {
+			return &ms[i]
+		}
+	}
+	return nil
+}
+
+// TestCompareCycleInputsShadow_CapAware_NoFalseMismatch: an over-cap legacy
+// value assembled through the production assembler yields NO mismatch, and two
+// values that differ only BEYOND the cap are cap-equivalent (no mismatch) —
+// for both bounded fields.
+func TestCompareCycleInputsShadow_CapAware_NoFalseMismatch(t *testing.T) {
+	ctx := map[string]string{
+		"carryover_summary": overCapCtxValue('a'),
+		"previous_verdict":  overCapCtxValue('b'),
+	}
+	if ms := compareCycleInputsShadow(assembleCycleInputs(ctx), nil, ctx); len(ms) != 0 {
+		t.Fatalf("over-cap legacy values assembled via assembleCycleInputs must not mismatch, got %+v", summarizePhaseIOMismatches(ms))
+	}
+	// Cap-equivalent: identical inside the cap, different only past it.
+	beyond := map[string]string{
+		"carryover_summary": overCapCtxValue('a') + "TAIL-ONLY-DIFFERENCE",
+		"previous_verdict":  overCapCtxValue('b') + "TAIL-ONLY-DIFFERENCE",
+	}
+	ms := compareCycleInputsShadow(assembleCycleInputs(ctx), nil, beyond)
+	for _, f := range []string{"cycle_inputs.carryover", "cycle_inputs.previous_verdict"} {
+		if m := mismatchFor(ms, f); m != nil {
+			t.Errorf("%s: cap-equivalent values (differ only beyond the cap) reported as drift: want=%d bytes got=%d bytes", f, len(m.Want), len(m.Got))
+		}
+	}
+}
+
+// TestCompareCycleInputsShadow_DetectsRealDrift: the negative — a typed value
+// that genuinely differs from the legacy value INSIDE the retained prefix is
+// still reported, on exactly its own field, with want/got in the right
+// orientation, and want is the BOUNDED form (no uncapped ledger leak).
+func TestCompareCycleInputsShadow_DetectsRealDrift(t *testing.T) {
+	cases := []struct {
+		name, ctxKey, field string
+		typed               phaseio.CycleInputsInit
+	}{
+		{"carryover", "carryover_summary", "cycle_inputs.carryover", phaseio.CycleInputsInit{Carryover: overCapCtxValue('B')}},
+		{"previous_verdict", "previous_verdict", "cycle_inputs.previous_verdict", phaseio.CycleInputsInit{PreviousVerdict: overCapCtxValue('B')}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			legacy := overCapCtxValue('A')
+			ctx := map[string]string{tc.ctxKey: legacy}
+			ms := compareCycleInputsShadow(phaseio.NewCycleInputs(tc.typed), nil, ctx)
+			m := mismatchFor(ms, tc.field)
+			if m == nil {
+				t.Fatalf("genuine over-cap drift on %s was swallowed (comparator is cap-BLIND): %+v", tc.field, ms)
+			}
+			if m.Want != phaseio.CapField(legacy) {
+				t.Errorf("want must be the bounded legacy value (len %d), got len %d — raw text would leak into the ledger", len(phaseio.CapField(legacy)), len(m.Want))
+			}
+			if m.Got != phaseio.CapField(overCapCtxValue('B')) {
+				t.Errorf("got must be the typed getter's bounded value, got len %d", len(m.Got))
+			}
+			// Only the drifted field may be reported: every other field is
+			// empty on both sides.
+			for _, other := range ms {
+				if other.Field != tc.field {
+					t.Errorf("unexpected extra mismatch on %s: %+v", other.Field, other)
+				}
+			}
+		})
 	}
 }

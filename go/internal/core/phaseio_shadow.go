@@ -148,8 +148,8 @@ func compareCycleInputsShadow(ci phaseio.CycleInputs, ec *phaseio.ErrorContext, 
 	add("cycle_inputs.commit_message", ctx["commit_message"], ci.CommitMessage())
 	add("cycle_inputs.fleet_scope", ctx["fleet_scope"], ci.FleetScope())
 	add("cycle_inputs.challenge_token", ctx["challengeToken"], ci.ChallengeToken())
-	add("cycle_inputs.previous_verdict", ctx["previous_verdict"], ci.PreviousVerdict())
-	add("cycle_inputs.carryover", ctx["carryover_summary"], ci.Carryover())
+	add("cycle_inputs.previous_verdict", phaseio.CapField(ctx["previous_verdict"]), ci.PreviousVerdict())
+	add("cycle_inputs.carryover", phaseio.CapField(ctx["carryover_summary"]), ci.Carryover())
 
 	var gotCode, gotClass, gotStage, gotDebug string
 	if ec != nil {

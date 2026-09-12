@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
@@ -140,5 +141,60 @@ func TestBuildPhaseInput_ErrorContext_NilUnlessShipErrorKeys(t *testing.T) {
 	}
 	if ec.Code != "E_PUSH_NONFF" || ec.Class != "transient" || ec.Stage != "ship" || ec.Debug != "remote moved" {
 		t.Errorf("ErrorContext mismapped from ship_error_* keys: %+v", ec)
+	}
+}
+
+// TestPlanCycle_CarryoverSummary_NoRawWriterBelowEnforce (cycle 1632, task
+// tokenopt-handoff-digests): the cycle-1593 retry minted a raw
+// ctxSnap["carryover_summary"] writer from state.CarryoverTodos and put the
+// full uncapped backlog (218,480 measured bytes) into every below-enforce
+// triage prompt — a path that carried ZERO carryover bytes before that diff
+// (cycle-1593 audit H2/M1). This pins the true baseline: with a populated
+// carryover backlog in state and no carryover_summary in the request Context,
+// NO dispatched request carries the key at StageOff/StageShadow (and the typed
+// PhaseInput stays zero, per the byte-identity proof above). The cap is a
+// guard on what arrives; it is not a licence to create the bytes it bounds.
+func TestPlanCycle_CarryoverSummary_NoRawWriterBelowEnforce(t *testing.T) {
+	backlog := []CarryoverTodo{
+		{ID: "todo-big-1", Action: strings.Repeat("a", phaseio.MaxFieldBytes*8), Priority: "high"},
+		{ID: "todo-big-2", Action: strings.Repeat("b", phaseio.MaxFieldBytes*8), Priority: "high"},
+	}
+	for _, tc := range []struct {
+		name  string
+		stage config.Stage
+	}{
+		{"off", config.StageOff},
+		{"shadow", config.StageShadow},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			st := &fakeStorage{state: State{LastCycleNumber: 0, CarryoverTodos: backlog}}
+			runners := buildRunners(nil)
+			o := NewOrchestrator(st, &fakeLedger{}, runners,
+				WithRouting(phaseIOCfg(tc.stage), router.StaticPreset{}),
+				WithWorktreeProvisioner(&fakeWorktree{path: t.TempDir()}))
+			if _, err := o.RunCycle(context.Background(), CycleRequest{
+				ProjectRoot: t.TempDir(),
+				GoalHash:    "s0",
+				Context:     map[string]string{"goal": "g", "strategy": "profile-first"},
+			}); err != nil {
+				t.Fatalf("RunCycle: %v", err)
+			}
+			dispatched := 0
+			for phase, r := range runners {
+				for i, req := range r.(*fakeRunner).requests {
+					dispatched++
+					if v, has := req.Context["carryover_summary"]; has {
+						t.Errorf("PhaseIO=%s phase %s request[%d]: Context[carryover_summary] minted (%d bytes) — no raw carryover writer may exist below enforce", tc.name, phase, i, len(v))
+					}
+					if !reflect.DeepEqual(req.Input, phaseio.PhaseInput{}) {
+						t.Errorf("PhaseIO=%s phase %s request[%d]: PhaseInput is not the zero value", tc.name, phase, i)
+					}
+				}
+			}
+			if dispatched == 0 {
+				t.Fatal("no phase was dispatched — the assertion above ran vacuously")
+			}
+		})
 	}
 }

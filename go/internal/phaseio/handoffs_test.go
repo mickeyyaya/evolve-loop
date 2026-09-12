@@ -102,6 +102,20 @@ func TestHandoffs_PresentViews_RoundTrip(t *testing.T) {
 	}
 }
 
+func TestHandoffs_UpstreamDigest_RendersAndCaps(t *testing.T) {
+	h := NewHandoffs(HandoffsInit{
+		Scout: &ScoutView{CycleSizeEstimate: "small", ItemCount: 3, CarryoverCount: 1, BacklogSize: 7},
+	})
+
+	const want = `scout: cycle_size="small" items=3 carryover=1 backlog=7`
+	if got := h.UpstreamDigest(1024); got != want {
+		t.Fatalf("UpstreamDigest() = %q, want %q", got, want)
+	}
+	if got := h.UpstreamDigest(5); got != "scout" {
+		t.Fatalf("UpstreamDigest(5) = %q, want %q", got, "scout")
+	}
+}
+
 // TestHandoffs_Audit_NilDefectMap covers the real case of an audit with zero
 // defects emitting a nil DefectsBySeverity — the sealed copy must stay nil-safe.
 func TestHandoffs_Audit_NilDefectMap(t *testing.T) {

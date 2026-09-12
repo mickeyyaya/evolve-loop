@@ -1,5 +1,27 @@
 package phaseio
 
+import "unicode/utf8"
+
+const (
+	// MaxFieldBytes bounds free-text fields copied into phase prompts.
+	MaxFieldBytes = 16 * 1024
+	// TruncationMarker makes a bounded value distinguishable from its source.
+	TruncationMarker = "\n...[truncated]"
+)
+
+// CapField returns s unchanged within the limit, otherwise a rune-aligned
+// prefix with a visible truncation marker.
+func CapField(s string) string {
+	if len(s) <= MaxFieldBytes {
+		return s
+	}
+	cut := MaxFieldBytes - len(TruncationMarker)
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+	return s[:cut] + TruncationMarker
+}
+
 // CycleInputsInit is the construction DTO for NewCycleInputs.
 type CycleInputsInit struct {
 	Goal            string
@@ -35,8 +57,8 @@ func NewCycleInputs(init CycleInputsInit) CycleInputs {
 		commitMessage:   init.CommitMessage,
 		fleetScope:      init.FleetScope,
 		challengeToken:  init.ChallengeToken,
-		previousVerdict: init.PreviousVerdict,
-		carryover:       init.Carryover,
+		previousVerdict: CapField(init.PreviousVerdict),
+		carryover:       CapField(init.Carryover),
 	}
 }
 
