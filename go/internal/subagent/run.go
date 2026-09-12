@@ -380,6 +380,13 @@ func Run(ctx context.Context, req RunRequest, opts RunOptions) (RunResult, error
 		"VALIDATE_ONLY":                "0",
 		"CHALLENGE_TOKEN":              token,
 	}
+	// The subprocess contract (core/phase.go): ProjectRoot is what the agent
+	// sees as EVOLVE_PROJECT_ROOT. Headless drivers inherit it via driverEnv;
+	// the tmux drivers export it into the pane shell themselves. Never an
+	// empty export — an unset variable falls back to cwd by contract.
+	if req.ProjectRoot != "" {
+		env["EVOLVE_PROJECT_ROOT"] = req.ProjectRoot
+	}
 
 	start := opts.Now()
 	exitCode, execErr := opts.ExecAdapter(ctx, adapterPath, env)

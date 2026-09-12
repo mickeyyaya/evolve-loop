@@ -97,7 +97,7 @@
     "enabled": true,
     "write_subpaths": [
       ".evolve/runs/cycle-*",
-      ".evolve/inbox/processing"
+      ".evolve/inbox"
     ],
     "read_only_repo": true,
     "deny_subpaths": [
@@ -113,7 +113,10 @@
       ".evolve/instincts",
       "CHANGELOG.md",
       "README.md",
-      "CLAUDE.md"
+      "CLAUDE.md",
+      ".evolve/inbox/consumed",
+      ".evolve/inbox/processed",
+      ".evolve/inbox/retry"
     ],
     "allow_network": false
   },
@@ -137,5 +140,7 @@
   },
   "stream_output": true,
   "generated_from": "hand-authored",
-  "cli_fallback": ["claude-tmux"]
+  "cli_fallback": [
+    "claude-tmux"
+  ]
 }
