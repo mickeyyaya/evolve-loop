@@ -84,6 +84,14 @@ const (
 	// ADR-0039 structured failure block. (snake_case to match this closed
 	// vocabulary; ADR prose spells it with hyphens.)
 	CodeFailureContextMissing = "failure_context_missing"
+	// ADR-0100 — an AGENT-OWED secondary output (registry outputs.agent_owed)
+	// is absent, blank, or unparseable. The code stays one word per class so
+	// the correction ladder's same-defect identity recognizes a repeat; the
+	// message names the file, and that message is the correction the agent
+	// is re-dispatched with.
+	CodeMissingSecondary   = "missing_secondary"
+	CodeEmptySecondary     = "empty_secondary"
+	CodeMalformedSecondary = "malformed_secondary"
 )
 
 // Verify runs the deterministic well-formedness checks for a phase's deliverable
@@ -121,6 +129,23 @@ func VerifyWithStage(phase string, roots phasecontract.Roots, resolver phasecont
 		// attestation, not a file-shape check.
 		return Result{Phase: phase, OK: true}, nil
 	}
+	res, err := verifyPrimary(phase, c, roots, phaseIO)
+	if err != nil {
+		return Result{}, err
+	}
+	// ADR-0100: the agent-owed secondaries are judged after the primary so a
+	// correction can name everything the phase still owes in one directive.
+	if err := verifySecondaries(&res, c, roots); err != nil {
+		return Result{}, err
+	}
+	res.finish()
+	return res, nil
+}
+
+// verifyPrimary runs the primary-artifact checks (existence with the write-
+// in-flight grace, emptiness, then the kind-specific shape) and returns the
+// Result unfinished: the caller appends the secondary checks and finishes.
+func verifyPrimary(phase string, c phasecontract.Contract, roots phasecontract.Roots, phaseIO config.Stage) (Result, error) {
 	path := c.ArtifactPath(roots)
 	// The runner-threaded dispatched path is the ONE source when present
 	// (Roots.DispatchedArtifact) — the contract keeps owning the SHAPE checks
@@ -143,12 +168,10 @@ func VerifyWithStage(phase string, roots phasecontract.Roots, resolver phasecont
 		// If the agent wrote it into the worktree instead, say so — that is
 		// the actionable correction (the recoverBuildLeak failure class).
 		checkStray(&res, c, roots)
-		res.finish()
 		return res, nil
 	}
 	if strings.TrimSpace(content) == "" {
 		res.add(CodeEmptyArtifact, fmt.Sprintf("deliverable at %s is empty", path))
-		res.finish()
 		return res, nil
 	}
 
@@ -158,7 +181,6 @@ func VerifyWithStage(phase string, roots phasecontract.Roots, resolver phasecont
 	default:
 		verifyMarkdown(&res, c, content, roots, phaseIO)
 	}
-	res.finish()
 	return res, nil
 }
 

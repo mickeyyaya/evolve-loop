@@ -33,6 +33,17 @@ import (
 type IO struct {
 	Files   []string `json:"files,omitempty"`
 	Signals []string `json:"signals,omitempty"`
+	// AgentOwed names the secondary output files (basenames of Files[1:]) the
+	// phase AGENT must write itself; Files[0] is always owed. The declared-
+	// deliverables gate (ADR-0100) verifies these exist and parse after the
+	// phase, and a gap re-dispatches the agent with a correction naming them.
+	AgentOwed []string `json:"agent_owed,omitempty"`
+	// HarnessProduced names the secondary output files a harness component
+	// writes (audit: acs-verdict.json by acsrunner). They are declared so the
+	// file list stays complete, and excluded from the gate because re-
+	// dispatching an agent cannot produce them. Together with AgentOwed this
+	// partitions Files[1:]; the real-registry test pins the partition.
+	HarnessProduced []string `json:"harness_produced,omitempty"`
 }
 
 // ClassifyRules is the declarative verdict spec — replaces per-phase Go Classify
@@ -118,11 +129,17 @@ type PhaseSpec struct {
 	// "on-demand" = keep it installed, take it off the menu. The declined set is
 	// still INDEXED by name in one line of the prompt, so nothing becomes
 	// undiscoverable — this hides phases from the menu, it does not remove them.
-	Catalog       string               `json:"catalog,omitempty"`
-	Enabled       string               `json:"enabled,omitempty"`
-	EnableVar     string               `json:"enable_var,omitempty"`
-	Inputs        IO                   `json:"inputs,omitempty"`
-	Outputs       IO                   `json:"outputs,omitempty"`
+	Catalog   string `json:"catalog,omitempty"`
+	Enabled   string `json:"enabled,omitempty"`
+	EnableVar string `json:"enable_var,omitempty"`
+	Inputs    IO     `json:"inputs,omitempty"`
+	Outputs   IO     `json:"outputs,omitempty"`
+	// Effects names the lifecycle effects the phase's persona is instructed to
+	// perform outside its workspace (triage: "inbox-claim"). Each name binds
+	// to one deterministic check in the declared-deliverables gate; a user
+	// phase may declare them (they only ADD checks — nothing here loosens the
+	// primary contract, so the ADR-0058 stripping does not apply).
+	Effects       []string             `json:"effects,omitempty"`
 	PromptContext []string             `json:"prompt_context,omitempty"`
 	Classify      *ClassifyRules       `json:"classify,omitempty"`
 	Routing       *config.RoutingBlock `json:"routing,omitempty"`
@@ -374,6 +391,11 @@ func Load(path string) (Catalog, error) {
 		// Load-time validator (ADR-0058 S4): the registry is a contract — a
 		// malformed activating field fails loudly here, never silently degrades.
 		if viol := ValidateActivatingFields(s); len(viol) > 0 {
+			return Catalog{}, fmt.Errorf("phase registry %q: phase %q: %s", path, s.Name, strings.Join(viol, "; "))
+		}
+		// ADR-0100: a secondary output nobody classified would be silently
+		// ungated; the registry fails to load instead.
+		if viol := ValidateOutputsPartition(s); len(viol) > 0 {
 			return Catalog{}, fmt.Errorf("phase registry %q: phase %q: %s", path, s.Name, strings.Join(viol, "; "))
 		}
 		if _, ok := cat.byName[s.Name]; ok {

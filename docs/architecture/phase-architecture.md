@@ -117,14 +117,14 @@ The registry contains mandatory spine phases and optional phases selected by pol
 | Phase | Default role | Kind | Required in every shippable code cycle | Primary output |
 |---|---|---|---|---|
 | Intent | structure goal and constraints | LLM | No | `intent.md` |
-| Scout | discover and specify work | LLM | Yes | `scout-report.md`, `handoff-scout.json` |
-| Triage | choose and bind task scope | LLM | Policy default on | `triage-report.md` |
+| Scout | discover and specify work | LLM | Yes | `scout-report.md` (the router reads `handoff-scout.json` only as an optional signal file no scout has produced in recent cycles) |
+| Triage | choose and bind task scope | LLM | Policy default on | `triage-report.md`, `triage-decision.json` (agent-owed, ADR-0100) |
 | Spec Verify | check specification claims | LLM | No | `spec-verify-report.md` |
 | Architecture Design | design large/cross-cutting work | LLM | Content selected | `architecture-design.md` |
 | Plan Review | challenge a plan before implementation | LLM | No | `plan-review-report.md` |
 | TDD | materialize executable contracts | LLM | Conditional | `test-report.md` |
 | Build Planner | split a large implementation | LLM | Default off | `build-plan.md` |
-| Build | produce the scoped deliverable | LLM | Yes | `build-report.md`, `handoff-build.json` |
+| Build | produce the scoped deliverable | LLM | Yes | `build-report.md` (the LLM-emitted `handoff-build.json` has been extinct since ~cycle 215; `changedpkgs.FromGit` derives the change set) |
 | Doc Sync | update affected documentation | LLM | No | `doc-sync-report.md` |
 | Tester | independent test pass | LLM | Content selected | `tester-report.md` |
 | Audit | adversarial review plus host gates | LLM + native gates | Yes | `audit-report.md`, `acs-verdict.json` |
@@ -174,7 +174,7 @@ Artifact completion, provider exhaustion, a dead/fatal pane, cancellation, trans
 
 ## Review, correction, and tree integrity
 
-Core reviews every non-skipped deliverable before recording success. Ordering is load-bearing:
+Core reviews every non-skipped deliverable before recording success — on both loops, and for the remediation re-run of a gate phase (ADR-0100 closed the two paths that bypassed review). The contract gate judges the primary artifact's shape and, since ADR-0100, every **agent-owed** secondary the registry declares (`outputs.agent_owed`: exists, non-empty, parses if JSON/NDJSON); harness-produced secondaries (`outputs.harness_produced`, e.g. `acs-verdict.json`) are never demanded of an agent. Ordering is load-bearing:
 
 ```text
 recover escaped writes → host normalization → review → optional correction → recover/normalize again → re-review

@@ -1,77 +1,315 @@
 {
   "schema_version": 4,
-  "_note": "v1: data-only registry consumed by list-phase-order.sh + orchestrator (cycle-57). v3: + top-level config{} block for dynamic phase routing (config.Load is the sole consumer); + per-phase enabled/routing (Specification triggers). v2 was never released — version jumped 1→3 to align with the dynamic-routing plan's schema number. dynamic_routing=0 ⇒ Stage:Off ⇒ static state machine drives, byte-identical to pre-routing behavior (the operator escape hatch). As of 2026-06-06 the default in the config block below is advisory.",
-  "_v4_note": "v4 (user-definable phases / 'Lego pipeline'): the phasespec.PhaseSpec parser reads the FULL phase entry, accepting additive optional fields — kind (llm|native|command), agent, model, writes_source, inputs.signals/outputs.signals (the typed signal contract), prompt_context, classify (declarative verdict rules), gates.in/out, on_pass/on_fail. All optional and back-compat: omitted fields default (kind→llm, agent→evolve-<name>, model→auto). config.Load still reads only its routing subset and ignores the rest. User phases merge from .evolve/phases/<name>/phase.json over this built-in array (built-ins win on name clash).",
+  "_note": "v1: data-only registry consumed by list-phase-order.sh + orchestrator (cycle-57). v3: + top-level config{} block for dynamic phase routing (config.Load is the sole consumer); + per-phase enabled/routing (Specification triggers). v2 was never released \u2014 version jumped 1\u21923 to align with the dynamic-routing plan's schema number. dynamic_routing=0 \u21d2 Stage:Off \u21d2 static state machine drives, byte-identical to pre-routing behavior (the operator escape hatch). As of 2026-06-06 the default in the config block below is advisory.",
+  "_v4_note": "v4 (user-definable phases / 'Lego pipeline'): the phasespec.PhaseSpec parser reads the FULL phase entry, accepting additive optional fields \u2014 kind (llm|native|command), agent, model, writes_source, inputs.signals/outputs.signals (the typed signal contract), prompt_context, classify (declarative verdict rules), gates.in/out, on_pass/on_fail. All optional and back-compat: omitted fields default (kind\u2192llm, agent\u2192evolve-<name>, model\u2192auto). config.Load still reads only its routing subset and ignores the rest. User phases merge from .evolve/phases/<name>/phase.json over this built-in array (built-ins win on name clash).",
   "config": {
     "dynamic_routing": "advisory",
     "routing_mode": "llm",
     "model_routing": "auto",
-    "mandatory_phases": ["scout", "triage", "build", "audit", "ship"],
-    "spine_order": ["intent", "scout", "triage", "tdd", "build-planner", "build", "audit", "ship", "end"],
-    "_legal_successors_note": "PA-DDK DDK-5 (ADR-0060 §1a): the transition LEGALITY graph — phase → legal successors. The single SSOT for the graph (replaces the kernel's literal `allowed`); keyed by NAME so it spans the graph sentinels start/end and the control phase debugger, which are not phases[] entries. 'retrospective' denormalizes to the kernel's retro node. scout/triage→end are the guarded early-exit edges (semantic authority = early_exit + CanTerminateEarly); ship/debugger fan-outs are the structured-error recovery routes. audit\u2192tdd/build are the audit-FAIL RE-ENTRY edges (ADR-0093): a TASK-level rejection re-enters the dev cycle in the SAME cycle instead of tearing it down. Schedulable ONLY by decideAfterAuditFail, which evaluates the deterministic floor first; excluded from router proposals by decisionOnlyEdge. config.Load projects this into RoutingConfig.LegalSuccessors; the load-time ValidateSafetyInvariants validator HARD-fails any edit that could ship without the floor.",
+    "mandatory_phases": [
+      "scout",
+      "triage",
+      "build",
+      "audit",
+      "ship"
+    ],
+    "spine_order": [
+      "intent",
+      "scout",
+      "triage",
+      "tdd",
+      "build-planner",
+      "build",
+      "audit",
+      "ship",
+      "end"
+    ],
+    "_legal_successors_note": "PA-DDK DDK-5 (ADR-0060 \u00a71a): the transition LEGALITY graph \u2014 phase \u2192 legal successors. The single SSOT for the graph (replaces the kernel's literal `allowed`); keyed by NAME so it spans the graph sentinels start/end and the control phase debugger, which are not phases[] entries. 'retrospective' denormalizes to the kernel's retro node. scout/triage\u2192end are the guarded early-exit edges (semantic authority = early_exit + CanTerminateEarly); ship/debugger fan-outs are the structured-error recovery routes. audit\u2192tdd/build are the audit-FAIL RE-ENTRY edges (ADR-0093): a TASK-level rejection re-enters the dev cycle in the SAME cycle instead of tearing it down. Schedulable ONLY by decideAfterAuditFail, which evaluates the deterministic floor first; excluded from router proposals by decisionOnlyEdge. config.Load projects this into RoutingConfig.LegalSuccessors; the load-time ValidateSafetyInvariants validator HARD-fails any edit that could ship without the floor.",
     "legal_successors": {
-      "start": ["intent", "scout"],
-      "intent": ["scout"],
-      "scout": ["triage", "tdd", "build", "end"],
-      "triage": ["tdd", "build", "end"],
-      "tdd": ["build-planner", "build"],
-      "build-planner": ["build"],
-      "build": ["audit"],
-      "audit": ["ship", "retrospective", "tdd", "build"],
-      "retrospective": ["ship", "tdd", "end", "audit"],
-      "ship": ["end", "debugger", "audit", "build", "tdd", "ship"],
-      "debugger": ["ship", "audit", "build", "tdd", "end"],
+      "start": [
+        "intent",
+        "scout"
+      ],
+      "intent": [
+        "scout"
+      ],
+      "scout": [
+        "triage",
+        "tdd",
+        "build",
+        "end"
+      ],
+      "triage": [
+        "tdd",
+        "build",
+        "end"
+      ],
+      "tdd": [
+        "build-planner",
+        "build"
+      ],
+      "build-planner": [
+        "build"
+      ],
+      "build": [
+        "audit"
+      ],
+      "audit": [
+        "ship",
+        "retrospective",
+        "tdd",
+        "build"
+      ],
+      "retrospective": [
+        "ship",
+        "tdd",
+        "end",
+        "audit"
+      ],
+      "ship": [
+        "end",
+        "debugger",
+        "audit",
+        "build",
+        "tdd",
+        "ship"
+      ],
+      "debugger": [
+        "ship",
+        "audit",
+        "build",
+        "tdd",
+        "end"
+      ],
       "end": []
     },
-    "conditional_mandatory": { "tdd": "cycle_size!=trivial && deliverable_kind!=document" },
-    "_conditional_mandatory_note": "ADR-0099 (docs/architecture/adr/0099-deliverable-kinds.md): tdd is released for a trivial cycle OR a document deliverable; clauses are AND-ed. Must equal config.DefaultTddRuleExpr (the registry-less default) — TestDefaults_TddRuleMatchesRegistry pins them.",
+    "conditional_mandatory": {
+      "tdd": "cycle_size!=trivial && deliverable_kind!=document"
+    },
+    "_conditional_mandatory_note": "ADR-0099 (docs/architecture/adr/0099-deliverable-kinds.md): tdd is released for a trivial cycle OR a document deliverable; clauses are AND-ed. Must equal config.DefaultTddRuleExpr (the registry-less default) \u2014 TestDefaults_TddRuleMatchesRegistry pins them.",
     "max_optional_insertions": 6,
-    "_goal_recipes_note": "ADR-0052 WS5 recipe SSOT. Single source for the goal-type → optional-insertion recipe. Each value is the ordered, VERBATIM token list obtained by splitting the persona's recipe cell on ' → '; tokens are opaque (may contain spaces, '+', '=', '[..]' bracket markers). config.Load projects this into RoutingConfig.GoalRecipes; router.RenderRecipeProjection regenerates the agents/evolve-router.md '## Goal-Type Recipes' table body (locked by TestRouterPersonaRecipeTable_NoDrift) and the RecipeVerifier reads the same source — ending three-source recipe drift.",
-    "_deliverable_kinds_note": "ADR-0099 slice 2: the SHAPE a document cycle's deliverable must take — solutions/<slug>/ with at least min_options candidate strategies under options/*.md, a recommendation and an assumptions-and-evidence file every number traces to. Judged by ONE deterministic engine (internal/solutioncheck) that the build handoff floor, `evolve solution check` and the audit gate line all project; quality judgment stays in audit.",
+    "_goal_recipes_note": "ADR-0052 WS5 recipe SSOT. Single source for the goal-type \u2192 optional-insertion recipe. Each value is the ordered, VERBATIM token list obtained by splitting the persona's recipe cell on ' \u2192 '; tokens are opaque (may contain spaces, '+', '=', '[..]' bracket markers). config.Load projects this into RoutingConfig.GoalRecipes; router.RenderRecipeProjection regenerates the agents/evolve-router.md '## Goal-Type Recipes' table body (locked by TestRouterPersonaRecipeTable_NoDrift) and the RecipeVerifier reads the same source \u2014 ending three-source recipe drift.",
+    "_deliverable_kinds_note": "ADR-0099 slice 2: the SHAPE a document cycle's deliverable must take \u2014 solutions/<slug>/ with at least min_options candidate strategies under options/*.md, a recommendation and an assumptions-and-evidence file every number traces to. Judged by ONE deterministic engine (internal/solutioncheck) that the build handoff floor, `evolve solution check` and the audit gate line all project; quality judgment stays in audit.",
     "deliverable_kinds": {
       "document": {
         "root": "solutions",
         "min_options": 2,
-        "required_files": ["recommendation.md", "assumptions-and-evidence.md"],
+        "required_files": [
+          "recommendation.md",
+          "assumptions-and-evidence.md"
+        ],
         "required_sections": {
-          "recommendation.md": ["Options Compared", "Recommendation"],
-          "assumptions-and-evidence.md": ["Assumptions", "Evidence"]
+          "recommendation.md": [
+            "Options Compared",
+            "Recommendation"
+          ],
+          "assumptions-and-evidence.md": [
+            "Assumptions",
+            "Evidence"
+          ]
         },
-        "forbid_placeholders": ["TBD", "TODO", "lorem ipsum"],
+        "forbid_placeholders": [
+          "TBD",
+          "TODO",
+          "lorem ipsum"
+        ],
         "evidence_file": "assumptions-and-evidence.md"
       }
     },
     "goal_recipes": {
-      "bugfix": ["premise-challenge", "fault-localization", "bug-reproduction", "[tdd, build]", "error-handling-scan", "coverage-gate", "flake-rerun-scan"],
-      "feature": ["premise-challenge", "spec-verify", "api-contract-design", "[tdd, build]", "test-amplification", "coverage-gate", "secret-leak-scan"],
-      "refactor": ["smell-scan", "behavior-baseline", "[build]", "behavior-compare", "type-safety-audit", "mutation-gate", "coverage-gate", "cleanup-sweep"],
-      "security": ["threat-model", "[tdd, build]", "security-scan + dependency-audit", "authz-gap-scan", "secret-leak-scan", "fuzz-probe"],
-      "performance": ["benchmark baseline capture", "[build]", "benchmark-gate"],
-      "release": ["rollout-plan", "rollback-plan", "changelog-sync", "[ship]", "post-ship-monitor"],
-      "docs / trivial": ["spine only (no insertions)"],
-      "concurrency": ["[tdd, build]", "race-condition-scan", "flake-rerun-scan", "adversarial-review"],
-      "api-design": ["api-contract-design", "[tdd, build]", "compat-surface-check", "contract-fuzz-probe"],
-      "data-migration": ["rollback-plan", "[tdd, build]", "migration-safety-check", "coverage-gate"],
-      "observability": ["observability-design", "[build]", "telemetry-coverage-check", "adversarial-review"],
-      "supply-chain": ["[build]", "dependency-audit", "license-provenance-audit", "secret-leak-scan"],
-      "agent-instruction": ["premise-challenge", "[build]", "prompt-regression-eval", "adversarial-review"],
-      "accessibility": ["scope-baseline", "[build]", "accessibility-audit", "adversarial-review"],
-      "frontend-ui": ["prd-draft", "[build]", "frontend-design-review", "accessibility-audit"],
-      "i18n": ["scope-baseline", "[build]", "locale-format-check"],
-      "database": ["data-model-design", "[tdd, build]", "query-performance-scan", "migration-safety-check"],
-      "caching": ["caching-strategy-design", "[build]", "cache-strategy-scan"],
-      "resilience": ["resilience-design", "[tdd, build]", "resilience-gap-scan", "flake-rerun-scan"],
-      "messaging": ["[tdd, build]", "idempotency-check", "contract-fuzz-probe"],
-      "infrastructure": ["[build]", "container-hardening-scan", "cicd-pipeline-audit", "secret-leak-scan"],
-      "data-pipeline": ["scope-baseline", "[build]", "data-integrity-check", "migration-safety-check"],
-      "project-management": ["risk-register", "scope-baseline", "dependency-map", "[build = the planning deliverable]"],
-      "business-strategy": ["forces-analysis", "market-sizing", "okr-draft", "[build]"],
-      "strategy-options": ["premise-challenge", "forces-analysis", "market-sizing", "scope-baseline", "[build]", "adversarial-review"],
-      "business-plan": ["forces-analysis", "market-sizing", "scope-baseline", "okr-draft", "[build]", "risk-register", "adversarial-review"],
-      "partnership-deal": ["forces-analysis", "market-sizing", "scope-baseline", "[build]", "risk-register", "adversarial-review"],
-      "accounting-close": ["account-reconcile", "variance-analysis", "close-checklist", "[build]"],
-      "product-discovery": ["opportunity-map", "prd-draft", "metric-tree", "[build]"],
-      "ops-incident": ["incident-postmortem", "runbook-draft", "capacity-plan", "[build]"]
+      "bugfix": [
+        "premise-challenge",
+        "fault-localization",
+        "bug-reproduction",
+        "[tdd, build]",
+        "error-handling-scan",
+        "coverage-gate",
+        "flake-rerun-scan"
+      ],
+      "feature": [
+        "premise-challenge",
+        "spec-verify",
+        "api-contract-design",
+        "[tdd, build]",
+        "test-amplification",
+        "coverage-gate",
+        "secret-leak-scan"
+      ],
+      "refactor": [
+        "smell-scan",
+        "behavior-baseline",
+        "[build]",
+        "behavior-compare",
+        "type-safety-audit",
+        "mutation-gate",
+        "coverage-gate",
+        "cleanup-sweep"
+      ],
+      "security": [
+        "threat-model",
+        "[tdd, build]",
+        "security-scan + dependency-audit",
+        "authz-gap-scan",
+        "secret-leak-scan",
+        "fuzz-probe"
+      ],
+      "performance": [
+        "benchmark baseline capture",
+        "[build]",
+        "benchmark-gate"
+      ],
+      "release": [
+        "rollout-plan",
+        "rollback-plan",
+        "changelog-sync",
+        "[ship]",
+        "post-ship-monitor"
+      ],
+      "docs / trivial": [
+        "spine only (no insertions)"
+      ],
+      "concurrency": [
+        "[tdd, build]",
+        "race-condition-scan",
+        "flake-rerun-scan",
+        "adversarial-review"
+      ],
+      "api-design": [
+        "api-contract-design",
+        "[tdd, build]",
+        "compat-surface-check",
+        "contract-fuzz-probe"
+      ],
+      "data-migration": [
+        "rollback-plan",
+        "[tdd, build]",
+        "migration-safety-check",
+        "coverage-gate"
+      ],
+      "observability": [
+        "observability-design",
+        "[build]",
+        "telemetry-coverage-check",
+        "adversarial-review"
+      ],
+      "supply-chain": [
+        "[build]",
+        "dependency-audit",
+        "license-provenance-audit",
+        "secret-leak-scan"
+      ],
+      "agent-instruction": [
+        "premise-challenge",
+        "[build]",
+        "prompt-regression-eval",
+        "adversarial-review"
+      ],
+      "accessibility": [
+        "scope-baseline",
+        "[build]",
+        "accessibility-audit",
+        "adversarial-review"
+      ],
+      "frontend-ui": [
+        "prd-draft",
+        "[build]",
+        "frontend-design-review",
+        "accessibility-audit"
+      ],
+      "i18n": [
+        "scope-baseline",
+        "[build]",
+        "locale-format-check"
+      ],
+      "database": [
+        "data-model-design",
+        "[tdd, build]",
+        "query-performance-scan",
+        "migration-safety-check"
+      ],
+      "caching": [
+        "caching-strategy-design",
+        "[build]",
+        "cache-strategy-scan"
+      ],
+      "resilience": [
+        "resilience-design",
+        "[tdd, build]",
+        "resilience-gap-scan",
+        "flake-rerun-scan"
+      ],
+      "messaging": [
+        "[tdd, build]",
+        "idempotency-check",
+        "contract-fuzz-probe"
+      ],
+      "infrastructure": [
+        "[build]",
+        "container-hardening-scan",
+        "cicd-pipeline-audit",
+        "secret-leak-scan"
+      ],
+      "data-pipeline": [
+        "scope-baseline",
+        "[build]",
+        "data-integrity-check",
+        "migration-safety-check"
+      ],
+      "project-management": [
+        "risk-register",
+        "scope-baseline",
+        "dependency-map",
+        "[build = the planning deliverable]"
+      ],
+      "business-strategy": [
+        "forces-analysis",
+        "market-sizing",
+        "okr-draft",
+        "[build]"
+      ],
+      "strategy-options": [
+        "premise-challenge",
+        "forces-analysis",
+        "market-sizing",
+        "scope-baseline",
+        "[build]",
+        "adversarial-review"
+      ],
+      "business-plan": [
+        "forces-analysis",
+        "market-sizing",
+        "scope-baseline",
+        "okr-draft",
+        "[build]",
+        "risk-register",
+        "adversarial-review"
+      ],
+      "partnership-deal": [
+        "forces-analysis",
+        "market-sizing",
+        "scope-baseline",
+        "[build]",
+        "risk-register",
+        "adversarial-review"
+      ],
+      "accounting-close": [
+        "account-reconcile",
+        "variance-analysis",
+        "close-checklist",
+        "[build]"
+      ],
+      "product-discovery": [
+        "opportunity-map",
+        "prd-draft",
+        "metric-tree",
+        "[build]"
+      ],
+      "ops-incident": [
+        "incident-postmortem",
+        "runbook-draft",
+        "capacity-plan",
+        "[build]"
+      ]
     }
   },
   "phases": [
@@ -82,10 +320,14 @@
       "enable_var": "workflow.phase_enables.intent=on",
       "inputs": {
         "files": [],
-        "state_fields": ["lastCycleNumber"]
+        "state_fields": [
+          "lastCycleNumber"
+        ]
       },
       "outputs": {
-        "files": [".evolve/runs/cycle-{cycle}/intent.md"]
+        "files": [
+          ".evolve/runs/cycle-{cycle}/intent.md"
+        ]
       },
       "gate_in": "gate_calibrate_to_intent",
       "gate_out": "gate_intent_to_discover",
@@ -97,23 +339,30 @@
       "role": "scout",
       "optional": false,
       "early_exit": true,
-      "gate": { "requires_present": true },
+      "gate": {
+        "requires_present": true
+      },
       "inputs": {
-        "files": [".evolve/runs/cycle-{cycle}/intent.md"],
-        "state_fields": ["instinctSummary", "ledgerSummary", "carryoverTodos"]
+        "files": [
+          ".evolve/runs/cycle-{cycle}/intent.md"
+        ],
+        "state_fields": [
+          "instinctSummary",
+          "ledgerSummary",
+          "carryoverTodos"
+        ]
       },
       "outputs": {
         "files": [
-          ".evolve/runs/cycle-{cycle}/scout-report.md",
-          ".evolve/runs/cycle-{cycle}/handoff-scout.json"
+          ".evolve/runs/cycle-{cycle}/scout-report.md"
         ]
       },
       "gate_in": "gate_intent_to_discover",
       "gate_out": "gate_discover_to_triage",
       "routing": {
         "rubric_hint": [
-          "scout.carryover_count >= 3 → skip scout (work already queued)",
-          "scout.item_count == 0 → end cycle early (no-ship is legitimate)"
+          "scout.carryover_count >= 3 \u2192 skip scout (work already queued)",
+          "scout.item_count == 0 \u2192 end cycle early (no-ship is legitimate)"
         ]
       },
       "parallel_eligible": true,
@@ -127,11 +376,21 @@
       "enable_var": "workflow.phase_enables.triage",
       "enabled": "on",
       "inputs": {
-        "files": [".evolve/runs/cycle-{cycle}/scout-report.md"],
-        "state_fields": ["carryoverTodos"]
+        "files": [
+          ".evolve/runs/cycle-{cycle}/scout-report.md"
+        ],
+        "state_fields": [
+          "carryoverTodos"
+        ]
       },
       "outputs": {
-        "files": [".evolve/runs/cycle-{cycle}/triage-report.md"]
+        "files": [
+          ".evolve/runs/cycle-{cycle}/triage-report.md",
+          ".evolve/runs/cycle-{cycle}/triage-decision.json"
+        ],
+        "agent_owed": [
+          "triage-decision.json"
+        ]
       },
       "gate_in": "gate_discover_to_triage",
       "gate_out": "gate_triage_to_plan_review",
@@ -143,18 +402,21 @@
       "role": "spec-verifier",
       "optional": true,
       "inputs": {
-        "files": [".evolve/runs/cycle-{cycle}/scout-report.md"],
+        "files": [
+          ".evolve/runs/cycle-{cycle}/scout-report.md"
+        ],
         "state_fields": []
       },
       "outputs": {
-        "files": [".evolve/runs/cycle-{cycle}/spec-verify-report.md"]
+        "files": [
+          ".evolve/runs/cycle-{cycle}/spec-verify-report.md"
+        ]
       },
       "gate_in": "gate_triage_to_plan_review",
       "gate_out": "gate_plan_review_to_tdd",
       "parallel_eligible": false,
       "skippable_when_present": false
     },
-
     {
       "name": "architecture-design",
       "role": "architecture-design",
@@ -168,21 +430,33 @@
       "writes_source": false,
       "routing": {
         "insert_when": [
-          { "field": "scout.cycle_size", "op": "==", "value": "large" }
+          {
+            "field": "scout.cycle_size",
+            "op": "==",
+            "value": "large"
+          }
         ],
         "rubric_hint": [
           "a novel/cross-cutting goal also warrants architecture-design (a design pass before tdd/build)"
         ]
       },
       "inputs": {
-        "files": [".evolve/runs/cycle-{cycle}/scout-report.md"],
+        "files": [
+          ".evolve/runs/cycle-{cycle}/scout-report.md"
+        ],
         "state_fields": []
       },
       "outputs": {
-        "files": [".evolve/runs/cycle-{cycle}/architecture-design.md"]
+        "files": [
+          ".evolve/runs/cycle-{cycle}/architecture-design.md"
+        ]
       },
       "classify": {
-        "require_sections": ["## Design", "## Decision", "## Blueprint"],
+        "require_sections": [
+          "## Design",
+          "## Decision",
+          "## Blueprint"
+        ],
         "fail_if_empty": true,
         "verdict_on_pass": "PASS"
       },
@@ -201,18 +475,22 @@
           ".evolve/runs/cycle-{cycle}/scout-report.md",
           ".evolve/runs/cycle-{cycle}/triage-report.md"
         ],
-        "state_fields": ["instinctSummary"]
+        "state_fields": [
+          "instinctSummary"
+        ]
       },
       "outputs": {
-        "files": [".evolve/runs/cycle-{cycle}/plan-review-report.md"]
+        "files": [
+          ".evolve/runs/cycle-{cycle}/plan-review-report.md"
+        ]
       },
       "gate_in": "gate_triage_to_plan_review",
       "gate_out": "gate_plan_review_to_tdd",
       "routing": {
         "rubric_hint": [
-          "build.files_touched >= 10 OR build.diff_loc >= 500 → insert plan-review"
+          "build.files_touched >= 10 OR build.diff_loc >= 500 \u2192 insert plan-review"
         ],
-        "_note": "Deliberately prose-only: plan-review PRECEDES build in canonical order, so build.* signals cannot drive an insert_when mid-walk — the hint guides the advisor's whole-cycle/next-cycle judgment. This hint is the thresholds' ONE home; if an insert_when is ever added, drop the hint (the rubric derives insert lines from structured triggers)."
+        "_note": "Deliberately prose-only: plan-review PRECEDES build in canonical order, so build.* signals cannot drive an insert_when mid-walk \u2014 the hint guides the advisor's whole-cycle/next-cycle judgment. This hint is the thresholds' ONE home; if an insert_when is ever added, drop the hint (the rubric derives insert lines from structured triggers)."
       },
       "parallel_eligible": true,
       "skippable_when_present": false
@@ -233,7 +511,9 @@
         "state_fields": []
       },
       "outputs": {
-        "files": [".evolve/runs/cycle-{cycle}/test-report.md"]
+        "files": [
+          ".evolve/runs/cycle-{cycle}/test-report.md"
+        ]
       },
       "gate_in": "gate_plan_review_to_tdd",
       "gate_out": "gate_tdd_to_build_planner",
@@ -254,11 +534,13 @@
         "state_fields": []
       },
       "outputs": {
-        "files": [".evolve/runs/cycle-{cycle}/build-plan.md"]
+        "files": [
+          ".evolve/runs/cycle-{cycle}/build-plan.md"
+        ]
       },
       "gate_in": "gate_tdd_to_build_planner",
       "gate_out": "gate_build_planner_to_build",
-      "_note": "Opt C cycle-103 (shadow). EVOLVE_BUILD_PLANNER=0 default — no persona runs until cycle-104.",
+      "_note": "Opt C cycle-103 (shadow). EVOLVE_BUILD_PLANNER=0 default \u2014 no persona runs until cycle-104.",
       "parallel_eligible": false,
       "skippable_when_present": false
     },
@@ -267,18 +549,22 @@
       "role": "builder",
       "optional": false,
       "writes_source": true,
-      "gate": { "requires_present": true },
+      "gate": {
+        "requires_present": true
+      },
       "inputs": {
         "files": [
           ".evolve/runs/cycle-{cycle}/scout-report.md",
           ".evolve/runs/cycle-{cycle}/triage-report.md"
         ],
-        "state_fields": ["instinctSummary", "failedApproaches"]
+        "state_fields": [
+          "instinctSummary",
+          "failedApproaches"
+        ]
       },
       "outputs": {
         "files": [
-          ".evolve/runs/cycle-{cycle}/build-report.md",
-          ".evolve/runs/cycle-{cycle}/handoff-build.json"
+          ".evolve/runs/cycle-{cycle}/build-report.md"
         ]
       },
       "gate_in": "gate_build_planner_to_build",
@@ -291,18 +577,21 @@
       "role": "doc-sync",
       "optional": true,
       "inputs": {
-        "files": [".evolve/runs/cycle-{cycle}/build-report.md"],
+        "files": [
+          ".evolve/runs/cycle-{cycle}/build-report.md"
+        ],
         "state_fields": []
       },
       "outputs": {
-        "files": [".evolve/runs/cycle-{cycle}/doc-sync-report.md"]
+        "files": [
+          ".evolve/runs/cycle-{cycle}/doc-sync-report.md"
+        ]
       },
       "gate_in": "gate_build_to_audit",
       "gate_out": "gate_audit_to_ship",
       "parallel_eligible": false,
       "skippable_when_present": false
     },
-
     {
       "name": "tester",
       "role": "tester",
@@ -311,16 +600,28 @@
       "enabled": "content",
       "routing": {
         "insert_when": [
-          { "field": "build.acs_red", "op": "gt", "value": 0 },
-          { "field": "build.severity_max", "op": "gte", "value": "HIGH" }
+          {
+            "field": "build.acs_red",
+            "op": "gt",
+            "value": 0
+          },
+          {
+            "field": "build.severity_max",
+            "op": "gte",
+            "value": "HIGH"
+          }
         ]
       },
       "inputs": {
-        "files": [".evolve/runs/cycle-{cycle}/build-report.md"],
+        "files": [
+          ".evolve/runs/cycle-{cycle}/build-report.md"
+        ],
         "state_fields": []
       },
       "outputs": {
-        "files": [".evolve/runs/cycle-{cycle}/tester-report.md"]
+        "files": [
+          ".evolve/runs/cycle-{cycle}/tester-report.md"
+        ]
       },
       "gate_in": "gate_build_to_tester",
       "gate_out": "gate_tester_to_audit",
@@ -335,7 +636,13 @@
       "optional": false,
       "on_pass": "ship",
       "on_fail": "retrospective",
-      "gate": { "requires_present": true, "verdict_in": ["PASS", "WARN"] },
+      "gate": {
+        "requires_present": true,
+        "verdict_in": [
+          "PASS",
+          "WARN"
+        ]
+      },
       "inputs": {
         "files": [
           ".evolve/runs/cycle-{cycle}/build-report.md",
@@ -347,6 +654,9 @@
         "files": [
           ".evolve/runs/cycle-{cycle}/audit-report.md",
           ".evolve/runs/cycle-{cycle}/acs-verdict.json"
+        ],
+        "harness_produced": [
+          "acs-verdict.json"
         ]
       },
       "gate_in": "gate_build_to_audit",
@@ -360,7 +670,9 @@
       "kind": "native",
       "optional": false,
       "inputs": {
-        "files": [".evolve/runs/cycle-{cycle}/audit-report.md"],
+        "files": [
+          ".evolve/runs/cycle-{cycle}/audit-report.md"
+        ],
         "state_fields": []
       },
       "outputs": {
@@ -378,9 +690,19 @@
       "optional": true,
       "description": "native regex scan of the diff for credential leaks; 0 tokens, no REPL boot",
       "when_to_use": "security/supply-chain recipes needing a deterministic secret sweep of added lines",
-      "categories": ["security", "supply-chain"],
-      "inputs": { "files": [], "state_fields": [] },
-      "outputs": { "files": [".evolve/runs/cycle-{cycle}/secret-leak-scan-report.md"] },
+      "categories": [
+        "security",
+        "supply-chain"
+      ],
+      "inputs": {
+        "files": [],
+        "state_fields": []
+      },
+      "outputs": {
+        "files": [
+          ".evolve/runs/cycle-{cycle}/secret-leak-scan-report.md"
+        ]
+      },
       "parallel_eligible": true,
       "skippable_when_present": true
     },
@@ -391,9 +713,19 @@
       "optional": true,
       "description": "native rerun-and-diff of new/failed tests to detect flakiness; 0 tokens, no REPL boot",
       "when_to_use": "resilience/bugfix recipes needing deterministic flake detection via repeated reruns",
-      "categories": ["resilience", "bugfix"],
-      "inputs": { "files": [], "state_fields": [] },
-      "outputs": { "files": [".evolve/runs/cycle-{cycle}/flake-rerun-scan-report.md"] },
+      "categories": [
+        "resilience",
+        "bugfix"
+      ],
+      "inputs": {
+        "files": [],
+        "state_fields": []
+      },
+      "outputs": {
+        "files": [
+          ".evolve/runs/cycle-{cycle}/flake-rerun-scan-report.md"
+        ]
+      },
       "parallel_eligible": true,
       "skippable_when_present": true
     },
@@ -402,22 +734,34 @@
       "role": "retrospective",
       "optional": true,
       "branching_strategy": "history",
-      "recovery": { "targets": { "PASS": "ship", "RETRY-WITH-FALLBACK": "tdd", "BLOCK-CODE": "end", "BLOCK-OPERATOR-ACTION": "end", "PROCEED": "end" } },
+      "recovery": {
+        "targets": {
+          "PASS": "ship",
+          "RETRY-WITH-FALLBACK": "tdd",
+          "BLOCK-CODE": "end",
+          "BLOCK-OPERATOR-ACTION": "end",
+          "PROCEED": "end"
+        }
+      },
       "inputs": {
         "files": [
           ".evolve/runs/cycle-{cycle}/audit-report.md",
           ".evolve/runs/cycle-{cycle}/build-report.md"
         ],
-        "state_fields": ["failedApproaches"]
+        "state_fields": [
+          "failedApproaches"
+        ]
       },
       "outputs": {
-        "files": [".evolve/runs/cycle-{cycle}/retrospective-report.md"]
+        "files": [
+          ".evolve/runs/cycle-{cycle}/retrospective-report.md"
+        ]
       },
       "gate_in": "gate_audit_to_retrospective",
       "gate_out": "gate_retrospective_to_complete",
       "routing": {
         "rubric_hint": [
-          "audit.verdict == FAIL OR audit.confidence < 0.85 → insert retrospective"
+          "audit.verdict == FAIL OR audit.confidence < 0.85 \u2192 insert retrospective"
         ]
       },
       "parallel_eligible": true,
@@ -440,6 +784,9 @@
         "files": [
           ".evolve/runs/cycle-{cycle}/memo.md",
           ".evolve/runs/cycle-{cycle}/carryover-todos.json"
+        ],
+        "agent_owed": [
+          "carryover-todos.json"
         ]
       },
       "gate_in": "gate_ship_to_learn",

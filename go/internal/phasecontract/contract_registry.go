@@ -132,6 +132,14 @@ type Contract struct {
 	// every cycle; an explicit NoArtifact contract resolves that ambiguity
 	// intentionally (PASS) instead.
 	NoArtifact bool
+
+	// AgentOwedFiles and Effects are projected from the registry's declaration
+	// ONLY (spec.Outputs.AgentOwed, spec.Effects) — never from a built-in
+	// literal — so the persona's instructions, the sandbox grant, and the
+	// declared-deliverables gate (ADR-0100) all read one word. A built-in
+	// contract receives them as an overlay in CatalogResolver.Resolve.
+	AgentOwedFiles []string
+	Effects        []string
 }
 
 // TopLevelJSONShape returns the explicit shape, or object for legacy keyed
@@ -291,6 +299,22 @@ func alwaysOn(sections []Section) []Section {
 // registry key. "advisor" is the conceptual name for the routing brain whose
 // agent identity on the wire is "router".
 var aliases = map[string]string{"advisor": "router"}
+
+// RegistryKey maps a core or human-facing phase name to the registry's key:
+// the human aliases first ("advisor" → "router"), then the one place the
+// built-in table and the registry disagree ("retro" → "retrospective"). It is
+// the ONE home of that rule — core.canonicalCatalogName delegates to it —
+// so an alias added here reaches every overlay lookup and every catalog
+// lookup at once.
+func RegistryKey(name string) string {
+	if canon, ok := aliases[name]; ok {
+		name = canon
+	}
+	if name == "retro" {
+		return "retrospective"
+	}
+	return name
+}
 
 // For returns the contract for a phase/agent and whether one is registered.
 // Human-facing aliases (e.g. "advisor") resolve to their canonical key.

@@ -21,6 +21,9 @@
     "signals": [
       "study.cycle_count",
       "study.wave_count"
+    ],
+    "agent_owed": [
+      "preliminary-study.md"
     ]
   },
   "classify": {
