@@ -311,6 +311,45 @@ func shipDirect(ctx context.Context, opts *Options, res *RunResult, branch strin
 			"gate_err", err.Error())
 	}
 
+	// Audit-binding check, pre-commit. This path verified NOTHING before, while
+	// still writing audit_bound_tree_sha into ship-binding.json — a sidecar
+	// asserting a verification that had not happened.
+	//
+	// The comparand is the STAGED tree, mirroring verifyStagedTree. Getting
+	// this wrong is easy and expensive, so the reasoning is recorded: the
+	// auditor persona computes `git rev-parse HEAD^{tree}` (evolve-auditor.md),
+	// which on an uncommitted cycle is the BASE tree — but that value cannot
+	// reach here. audit.go's report-comment fallback is taken only when the
+	// ledger entry has no worktree_tree_sha, and twenty lines later
+	// verifyAuditBinding refuses outright unless treefence.Take's tree equals
+	// that same empty value, which it never does. So the binding that reaches
+	// shipDirect is always entry.WorktreeTreeSHA — `git add -u` + `git
+	// write-tree`, the CHANGES tree (core/phase_bindings.go, the cycle-152
+	// fix). An intermediate version of this guard compared HEAD^{tree}
+	// instead, on the strength of a test that hand-set a binding no producer
+	// emits; it would have been inert where reachable and is the reason
+	// TestShipDirect_LegitimateBoundShipIsNotBlocked now drives the REAL
+	// producer rather than a literal.
+	if !opts.DryRun && opts.internalAuditBoundTreeSHA != "" {
+		stagedTree, terr := captureGitOutput(ctx, opts, "write-tree")
+		if terr != nil {
+			return terr
+		}
+		stagedTree = strings.TrimSpace(stagedTree)
+		if stagedTree == "" {
+			return shipErr(core.CodeGitIO, core.ShipClassTransient, core.StageAtomicShip,
+				"ship: git write-tree produced no tree SHA - cannot verify audit-bound tree binding pre-commit")
+		}
+		ok, offending := auditBindingSatisfied(ctx, opts, "", stagedTree)
+		if !ok {
+			return shipErr(core.CodeIntegrityTreeDrift, core.ShipClassIntegrity, core.StageAtomicShip,
+				fmt.Sprintf("INTEGRITY BREACH (pre-commit): audit-bound tree SHA %s != staged tree SHA %s - refused; staged changes preserved for operator triage%s",
+					opts.internalAuditBoundTreeSHA, stagedTree, offending),
+				"audit_bound_tree", opts.internalAuditBoundTreeSHA, "staged_tree", stagedTree, "phase", "pre-commit")
+		}
+		res.Logs = append(res.Logs, fmt.Sprintf("[ship]   OK: pre-commit tree-SHA binding verified (audit=%s staged=%s)", opts.internalAuditBoundTreeSHA, stagedTree))
+	}
+
 	if opts.DryRun {
 		res.Logs = append(res.Logs, fmt.Sprintf("[ship] [DRY-RUN] would commit + push to %s", branch))
 		return nil
@@ -341,6 +380,28 @@ func shipDirect(ctx context.Context, opts *Options, res *RunResult, branch strin
 	// Record HEAD SHA for the result struct.
 	headSHA, _ := captureGitOutput(ctx, opts, "rev-parse", "HEAD")
 	res.CommitSHA = strings.TrimSpace(headSHA)
+
+	// Post-push, mirroring verifyCommittedTree: the pre-commit check inspects
+	// the INDEX, this one inspects what actually landed. No branch on this path
+	// reaches it without the pre-commit check having passed first (an empty
+	// index returns before pushing, and repairPushRace never rebases or
+	// force-pushes), so it is defense in depth rather than an independently
+	// reachable gate — it witnesses commit-time divergence between index and
+	// commit, and it keeps both ship paths applying one rule.
+	if opts.internalAuditBoundTreeSHA != "" {
+		committedTree, _ := captureGitOutput(ctx, opts, "rev-parse", "HEAD^{tree}")
+		committedTree = strings.TrimSpace(committedTree)
+		if committedTree != "" {
+			ok, offending := auditBindingSatisfied(ctx, opts, "", committedTree)
+			if !ok {
+				return shipErr(core.CodeIntegrityTreeDrift, core.ShipClassIntegrity, core.StagePostShip,
+					fmt.Sprintf("INTEGRITY BREACH: audit-bound tree SHA %s != committed tree SHA %s - main-path tree drift detected%s",
+						opts.internalAuditBoundTreeSHA, committedTree, offending),
+					"audit_bound_tree", opts.internalAuditBoundTreeSHA, "committed_tree", committedTree, "phase", "post-push")
+			}
+			res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: tree-SHA binding verified (audit=%s committed=%s)", opts.internalAuditBoundTreeSHA, committedTree))
+		}
+	}
 
 	// Optional GitHub release.
 	return maybeCreateRelease(ctx, opts, res)
