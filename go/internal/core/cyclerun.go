@@ -96,7 +96,6 @@ type cycleRun struct {
 	shipLease *shipwindow.Lease
 
 	// late-visibility exit-defer flags (R2 contract; highest hazard)
-	shipped                bool // latched true when ship records PASS this cycle; read by the dispatch abort path (postShipObserverSkip) so a post-ship observer failure stays non-fatal
 	preserveWorktree       bool // set on ship-error, cleared on PASS ship, OR'd post-loop; read by RunCycle's cleanup defer at exit
 	cycleCompletedNormally bool // set true only post-loop; read by the same cleanup defer at exit
 	reachedPhaseEnd        bool // set at a loopBreak (PhaseEnd) exit; false post-loop ⇒ the bounded-iteration guard tripped (transition-table cycle) → C1 chokepoint-escape record
@@ -208,18 +207,17 @@ func (cr *cycleRun) recordChokepointEscape(reason string) {
 // keep RunCycle a readable coordinator. Each extraction is behavior-preserving;
 // the orchestrator's characterization tests are the safety net.
 
-// finalizeCycle runs RunCycle's post-loop finalization (extracted verbatim,
-// behavior-preserving): reclassify the final verdict against pre/post HEAD, warn
-// loudly on a silent no-ship, record shipped throughput, decide worktree
-// preservation, and persist the cycle-end state.
+// finalizeCycle runs RunCycle's post-loop finalization: reclassify a SKIPPED
+// final verdict against this cycle's own ship latch, warn loudly on a silent
+// no-ship, record shipped throughput, decide worktree preservation, and persist
+// the cycle-end state.
 //
 // It returns whether the worktree must be preserved — the caller's exit defer
 // reads this AFTER finalizeCycle returns, so it MUST be threaded back to
 // RunCycle's frame (the R2 late-visibility contract); a persist error preserves
 // nothing extra here, the defer's !cycleCompletedNormally clause covers it.
 func (o *Orchestrator) finalizeCycle(ctx context.Context, cs CycleState, cycle int, preCycleHEAD, projectRoot string, result *CycleResult, state *State, timings []phaseTimingEntry) (preserveWorktree bool, err error) {
-	postCycleHEAD, _ := o.gitHEAD()
-	result.FinalVerdict = o.finalizeOutcome(result.FinalVerdict, result.RetroDecision, preCycleHEAD, postCycleHEAD)
+	result.FinalVerdict = o.finalizeOutcome(result.FinalVerdict, result.RetroDecision, cs.Shipped)
 	// No FAIL without a reason — see failreasons_backfill.go.
 	backfillFailReasons(result, timings)
 
@@ -263,19 +261,22 @@ func (o *Orchestrator) finalizeCycle(ctx context.Context, cs CycleState, cycle i
 	}
 
 	// Notice the silent no-ship (Fix C): the cycle ran phases but ended without
-	// HEAD advancing and without an audit-advisory "would-have-blocked" record —
+	// its own ship landing and without an audit-advisory "would-have-blocked" record —
 	// i.e. work may have been produced and then discarded with the worktree
 	// (cycle-148: a genuine PASS mis-graded FAIL routed audit→retro→end). The
 	// outcome label alone is advisory and easily missed in a batch summary, so
 	// surface it loudly here. Not an error — some cycles legitimately produce no
 	// change — but always worth an operator's eyes.
 	if shouldWarnSkippedUnknown(*result) {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d ended without shipping (%s): phases ran but HEAD did not advance and no audit-advisory block was recorded — any worktree changes were discarded. Inspect %s (audit-report.md verdict + acs-verdict.json red_count).\n", cycle, CycleOutcomeSkippedUnknown, cs.WorkspacePath)
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d ended without shipping (%s): phases ran but this cycle's ship never landed and no audit-advisory block was recorded — any worktree changes were discarded. Inspect %s (audit-report.md verdict + acs-verdict.json red_count).\n", cycle, CycleOutcomeSkippedUnknown, cs.WorkspacePath)
 	}
 
 	// R9.1: a shipped cycle's committed floors are observed throughput —
 	// record them into the rolling window before the state write below
-	// persists it (nil seam ⇒ byte-identical no-op).
+	// persists it (nil seam ⇒ byte-identical no-op). HEAD movement is only
+	// corroborating evidence here (a shipping verdict whose landing left no
+	// commit is not throughput); it never decides the outcome label above.
+	postCycleHEAD, _ := o.gitHEAD()
 	if o.throughputRecorder != nil && !hasThroughputCycle(state.TriageThroughput, cycle) && shippedOutcome(result.FinalVerdict, preCycleHEAD, postCycleHEAD) {
 		o.throughputRecorder(state, cycle, cs.WorkspacePath)
 	}
@@ -783,7 +784,8 @@ func (o *Orchestrator) planCycle(ctx context.Context, req CycleRequest, state St
 	// Best-effort — a digest failure WARNs and never blocks the cycle.
 	seedChronicleDigest(req.ProjectRoot, cs, state, o.chronicle, ctxSnap)
 
-	// Capture HEAD before any phase so finalizeOutcome can detect mid-cycle commits.
+	// Capture HEAD before any phase so the throughput hook can corroborate a
+	// shipped cycle's landing (shippedOutcome). The outcome label never reads it.
 	preCycleHEAD, _ := o.gitHEAD()
 
 	// Upfront whole-cycle plan (ADR-0024 §2). At Stage>=Advisory with a planner,
