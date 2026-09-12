@@ -46,5 +46,6 @@ func archivePollutedWorkspace(workspace string, now func() time.Time) error {
 
 // defaultGitHEAD runs `git rev-parse HEAD` in cwd.
 // Returns empty string on error AND emits a one-line WARN to stderr so
-// operators see the degraded-mode signal that yields SKIPPED_UNKNOWN.
-// finalizeOutcome treats equal strings as no movement.
+// operators see the degraded-mode signal. Only the throughput hook reads the
+// pre/post pair (shippedOutcome treats an empty or equal pair as no movement);
+// the cycle outcome label never does.
