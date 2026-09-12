@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — a resumed cycle disposes of its worktree, by the rule the fresh path applies (2026-09-12)
+
+`RunCycleFromPhase` registered three of the fresh path's four exit actions and no worktree teardown, so every resumed cycle leaked its worktree whatever its verdict (26 stale `cycle-*` checkouts on the live runtime). `finalizeCycle` computed the preserve decision on resume too; nothing read it. The prune/preserve rule is now ONE function (`teardownCycleWorktree`) both entrypoints defer, reading the closeout's live flags. Found while fixing it: a resume checkpoint can name the **project root** as the worktree (ship already routes that shape to `shipDirect`), and `gitWorktree.Cleanup` runs `os.RemoveAll` unconditionally — the provisioner now refuses the project root, loudly, beside its existing `cycle-` branch gate; an end-to-end test through the real provisioner pins that the repository survives. Record: `docs/operations/fix-2026-09-12-resume-worktree-teardown.md`.
+
+---
+
 ## Fixed — the cycle dossier is a projection of evidence, not a synthesized placeholder (2026-09-11)
 
 Cycle 1623 ran twelve phase dispatches and shipped 922 lines to `origin/main`. Its permanent record contained ONE synthetic phase — `{"name":"cycle-recorded","verdict":"PASS"}` with zero tokens — and no commit. The record was unreadable precisely when it mattered, and it misled a reader into concluding the cycle had shipped nothing.

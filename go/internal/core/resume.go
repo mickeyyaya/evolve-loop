@@ -350,6 +350,26 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 
 	o.currentRunID.Store(cs.RunID)
 	defer o.currentRunID.Store("")
+
+	// The fourth exit action, which this path was missing entirely. Registered
+	// here so it fires in the same LIFO position as the fresh path's cleanup
+	// stack (lease stop, worktree teardown, run-ID clear, lock release). The
+	// one load-bearing relation is teardown-before-lock-release:
+	// clearActiveWorktree is a read-modify-write of the persisted cycle state
+	// and must run under the storage lock this function still holds. The
+	// closure reads the closeout cycleRun LIVE at defer time — the same
+	// preserveWorktree / cycleCompletedNormally fields RunCycle's closure
+	// reads — so a run that returns before completeCycle has decided them
+	// sees zero values and preserves, never prunes.
+	var execution resumeExecution
+	defer func() {
+		var preserve, completedNormally bool
+		if c := execution.closeout; c != nil {
+			preserve, completedNormally = c.preserveWorktree, c.cycleCompletedNormally
+		}
+		o.teardownCycleWorktree(req.ProjectRoot, execution.cycleState.ActiveWorktree, preserve, completedNormally)
+	}()
+
 	stopLease := startRunLease(cs.WorkspacePath, cs.RunID, o.now, leaseRefreshInterval())
 	defer stopLease()
 
@@ -361,7 +381,7 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 	preResumeHEAD := inputs.preResumeHEAD
 	mainDirtyBaseline := inputs.mainDirtyBaseline
 
-	execution := resumeExecution{
+	execution = resumeExecution{
 		orchestrator:      o,
 		ctx:               ctx,
 		request:           req,
