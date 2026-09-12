@@ -1,0 +1,94 @@
+{
+  "cycle": 1642,
+  "run_id": "01M2BSWXC4G7N3HT4EZ3FSHXC9",
+  "goal": "Pipeline-health verification batch (2026-09-12, two waves): work the highest-weight queued inbox items end-to-end — claim, tdd, build, audit, ship — with full phase integrity, now that the resume worktree teardown (#571), the shipDirect audit binding (#569), resume-path outcome recording (#568), and profile sandbox.write_subpaths grants (#572) are on main. Every cycle must commit to a claimed inbox item (an empty top_n must not run the spine), bind its audit to the changes tree it ships, record a terminal outcome on every exit, and leave no stale worktree behind. Pipeline-integrity and pipeline-repair items come first; ADR-0099 document deliverables are eligible.",
+  "final_verdict": "FAIL",
+  "tasks": [
+    "tokenopt-handoff-digests-per-edge-remainder"
+  ],
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 153467,
+      "started_at": "2026-09-12T21:56:20Z",
+      "ended_at": "2026-09-12T21:58:54Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 44,
+        "output": 10675,
+        "cache_read": 1506686,
+        "cache_write": 94310
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "FAIL",
+      "duration_ms": 57414,
+      "started_at": "2026-09-12T21:59:38Z",
+      "ended_at": "2026-09-12T22:00:37Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 8,
+        "output": 2472,
+        "cache_read": 237881,
+        "cache_write": 31899
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 1642",
+      "priority": "high"
+    }
+  ],
+  "timing": {
+    "total_ms": 210881,
+    "phase_count": 2,
+    "retried_count": 0,
+    "longest_phase": "scout",
+    "longest_ms": 153467,
+    "by_archetype_ms": {
+      "plan": 210881
+    },
+    "total_tokens": {
+      "input": 52,
+      "output": 13147,
+      "cache_read": 1744567,
+      "cache_write": 126209
+    },
+    "tokens_by_archetype": {
+      "plan": {
+        "input": 52,
+        "output": 13147,
+        "cache_read": 1744567,
+        "cache_write": 126209
+      }
+    },
+    "wasted_tokens": {
+      "input": 8,
+      "output": 2472,
+      "cache_read": 237881,
+      "cache_write": 31899
+    },
+    "cache_hit_ratio": 0.9999701940652945,
+    "hot_phase_count": 2,
+    "hot_phases": [
+      "scout",
+      "triage"
+    ]
+  }
+}
