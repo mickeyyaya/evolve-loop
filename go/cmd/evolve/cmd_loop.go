@@ -167,6 +167,8 @@ func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) int {
 	gcOrphanSessions("startup", stderr)
 
 	deps := wireOrchestratorDepsFn(cfg.ProjectRoot, cfg.EvolveDir)
+	// ADR-0101 S2a: no queued signal is lost at loop exit (Center.Flush).
+	defer deps.Signals.Flush()
 	// orch is narrowed to loopCycleRunner so tests can inject a scripted
 	// orchestrator (loopOrchOverride) — the real *core.Orchestrator cannot be
 	// driven to emit FinalVerdict=FAIL without a faithful phase machine, which

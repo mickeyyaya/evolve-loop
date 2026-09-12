@@ -72,6 +72,7 @@ type Center struct {
 	seq         uint64
 	queue       []Event
 	draining    bool
+	idle        *sync.Cond // signalled when a drain ends; Flush waits on it
 	recent      []Event
 	recentLimit int
 	now         func() time.Time
@@ -81,6 +82,7 @@ type Center struct {
 // New constructs a Center with the wall clock, no pid and a 256-event window.
 func New(opts ...Option) *Center {
 	c := &Center{now: time.Now, recentLimit: 256}
+	c.idle = sync.NewCond(&c.mu)
 	for _, opt := range opts {
 		opt(c)
 	}
@@ -157,6 +159,23 @@ func (c *Center) drain() {
 		c.mu.Lock()
 	}
 	c.draining = false
+	c.idle.Broadcast()
+	c.mu.Unlock()
+}
+
+// Flush blocks until the queue is empty and no drain is in progress — the
+// seam for producers on exit paths (design §6.1): an Emit that finds a drain
+// in progress returns before its event is delivered. Nil-safe; returns at
+// once when idle. Never call it from inside a listener: the drain that runs
+// the listener is the one Flush would wait for.
+func (c *Center) Flush() {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	for c.draining || len(c.queue) > 0 {
+		c.idle.Wait()
+	}
 	c.mu.Unlock()
 }
 

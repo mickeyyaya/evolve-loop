@@ -10,7 +10,9 @@ import (
 // preserve the same checkpoint and classification rather than creating a FAIL.
 func (cr *cycleRun) pauseForQuota(next Phase, resp PhaseResponse, attempt int) error {
 	phaseErr := fmt.Errorf("phase %s: %w: every family in the fallback chain returned exit=85 across %d attempts; checkpoint written — resume with `evolve loop --resume` after quota reset", next, ErrAllFamiliesExhausted, attempt)
-	fmt.Fprintf(os.Stderr, "[orchestrator] WARN %v\n", phaseErr)
+	// ADR-0101 S2a: the pause is the quota.paused signal (WARN); the sink
+	// renders it — this seam is the one both dispatch roots reach.
+	cr.emitQuotaPaused(next, phaseErr)
 	if QuotaBoundaryCheckpointer != nil {
 		if cperr := QuotaBoundaryCheckpointer(cr.cs, cr.req.ProjectRoot, cr.o.now()); cperr != nil {
 			fmt.Fprintf(os.Stderr, "[orchestrator] WARN quota-boundary checkpoint write failed: %v (defer still recorded; resume may re-run completed phases)\n", cperr)

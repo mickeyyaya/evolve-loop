@@ -73,9 +73,8 @@ func (o *Orchestrator) observeSignal(e signalcenter.Event) {
 // (verdictReason — the same rendering the seal and the floor error use); an abort after the
 // verdict is phase.aborted WARN carrying both. A nil Center is a no-op.
 func (o *Orchestrator) emitPhaseOutcome(cycle int, out recovery.PhaseOutcome) {
-	runID, _ := o.currentRunID.Load().(string)
 	e := signalcenter.Event{
-		Cycle: cycle, RunID: runID, Phase: out.Phase, Attempt: out.AttemptCount,
+		Cycle: cycle, RunID: o.signalRunID(), Phase: out.Phase, Attempt: out.AttemptCount,
 		Module: signalcenter.ModuleOrchestrator, Origin: "Orchestrator.recordPhaseOutcome",
 		Kind: signalcenter.KindPhaseOutcome, Severity: signalcenter.SeverityInfo,
 		Reason: out.Phase + " " + verdictReason(out.Verdict, out.Diagnostics),

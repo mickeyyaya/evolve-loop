@@ -319,6 +319,8 @@ func (o *Orchestrator) recordShipError(ctx context.Context, cycle int, cs CycleS
 	}); err != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN ship_error ledger append: %v\n", err)
 	}
+	// ADR-0101 S2a: the recorded error is also the ship.error signal.
+	o.emitShipError(cycle, cs, se, artifactPath)
 }
 
 // recordDebuggerDecision appends a hash-bound debugger_decision ledger entry

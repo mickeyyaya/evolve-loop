@@ -144,3 +144,18 @@ func TestSignalCenterRegistry_EveryLinkedModuleRegistersCleanly(t *testing.T) {
 		t.Error("core's codes must be registered by the time the binary is linked")
 	}
 }
+
+// Both production roots flush the Center before they return (S2a): an Emit
+// that finds a drain in progress returns before delivery, so an exit path
+// without a Flush could lose the last events of a cycle or a batch.
+func TestSignalCenterFlush_IsWiredAtBothRoots(t *testing.T) {
+	for _, file := range []string{"cmd_cycle.go", "cmd_loop.go"} {
+		src, err := os.ReadFile(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(src), "Signals.Flush()") {
+			t.Errorf("%s: the root must defer Signals.Flush() after wiring the orchestrator", file)
+		}
+	}
+}

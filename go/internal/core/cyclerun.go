@@ -250,8 +250,9 @@ func (o *Orchestrator) finalizeCycle(ctx context.Context, cs CycleState, cycle i
 			fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d verdict-coherence SELF-HEAL: recorded %s but on-disk audit=PASS, acs=PASS, and the audit-report fully verifies (challenge-token + sections + ADR-0039) — a benign clean-exit-late-write race; reconciled recorded verdict to PASS, not halting (ADR-0072).\n", cycle, result.FinalVerdict)
 			result.FinalVerdict = VerdictPASS
 		case sig != nil:
+			// Announced by the closeout's system.failure INCIDENT (ADR-0101
+			// S2a): one line format on stderr, one line in signals.ndjson.
 			result.SystemFailure = sig
-			fmt.Fprintf(os.Stderr, "[orchestrator] SYSTEM-FAILURE HALT cycle %d: %s — %s. Halting the loop for pipeline diagnosis instead of retrying the task (ADR-0072).\n", cycle, sig.Category, sig.Evidence)
 		}
 	}
 
@@ -265,9 +266,10 @@ func (o *Orchestrator) finalizeCycle(ctx context.Context, cs CycleState, cycle i
 	// mode belongs to whichever sibling landed last. See lost_landing_floor.go.
 	if result.SystemFailure == nil {
 		if sig := detectLostLanding(cs.WorkspacePath, result.FinalVerdict); sig != nil {
+			// Announced by the closeout's system.failure WARN (Halt=false: the
+			// recovery path behaved correctly and siblings keep working).
 			result.SystemFailure = sig
 			result.FinalVerdict = lostLandingVerdict()
-			fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d LANDING LOST: %s Recorded as %s (system-class, not halting — the recovery path behaved correctly and siblings are still working).\n", cycle, sig.Evidence, result.FinalVerdict)
 		}
 	}
 
