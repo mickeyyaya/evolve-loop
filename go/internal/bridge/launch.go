@@ -181,6 +181,14 @@ func (e *Engine) LaunchArgs(ctx context.Context, args []string, env map[string]s
 		cfg.AllowNetwork = prof.Sandbox.AllowNetwork
 		if prof.Sandbox.Enabled {
 			cfg.RequireSandbox = true
+			// Carried verbatim; sandboxPrefixForLaunch threads it to the wrapper,
+			// which resolves it against RepoRoot/Worktree with the retarget
+			// defense (resolveSandboxWriteGrants) — the seam where that defense
+			// has always run and where retro_lessons_test.go pins it. Denials were
+			// already resolved eagerly here before this change (a bad policy is
+			// ExitBadFlags at Config build); the two lists resolving at different
+			// seams is inherited drift, noted, not a rule.
+			cfg.SandboxWriteSubpaths = prof.Sandbox.WriteSubpaths
 			cfg.DenyPaths, err = resolveSandboxDenials(prof.Sandbox.DenySubpaths, cfg.ProjectRoot, cfg.Worktree, true)
 			if err == nil {
 				cfg.DenyReadPaths, err = resolveSandboxDenials(prof.Sandbox.DenyReadSubpaths, cfg.ProjectRoot, cfg.Worktree, false)

@@ -1,0 +1,20 @@
+{
+  "id": "acs-cycle50-predicates-point-at-a-moved-file",
+  "title": "acs/cycle50 has two permanently-RED predicates: they assert on go/cmd/evolve/cmd_release_preflight.go, which no longer exists (the CLI moved to internal/cli/opscmd/release_preflight.go)",
+  "kind": "bug",
+  "class": "gate-integrity",
+  "weight": 0.6,
+  "priority": "P2",
+  "route": "lane",
+  "created_at": "2026-09-12T05:30:00Z",
+  "problem": "TestC50B_002_ReleaseStrictPass_AbsentFromReleasePreflight and TestC50B_005_StrictPassFlag_RegisteredInPreflight both resolve go/cmd/evolve/cmd_release_preflight.go and fail with `no such file or directory`. That file was moved to go/internal/cli/opscmd/release_preflight.go and the predicates were never repointed. Verified pre-existing and unrelated to any current work: the same two tests fail identically on the untouched runtime plane at current main, and `git show HEAD:go/cmd/evolve/cmd_release_preflight.go` is absent. A FileContains predicate whose target does not exist can never go green again — it is a dead gate, and the repo's own rule is that a false-RED gate must have its own logic verified before anyone concludes the code is broken.",
+  "impact": "Low blast radius today because the per-cycle acs/cycleN snapshots are NOT in the durable tier (Makefile test-acs-durable and the ci.yml acs-durable job both run ./acs/regression/... only), so CI stays green. The cost is that anyone running the per-cycle suites locally — which the decomposition campaign's own per-slice verification recipe does — hits an unexplained RED and has to re-derive that it is stale.",
+  "fix": "Repoint both predicates at go/internal/cli/opscmd/release_preflight.go, OR, if the --strict-pass migration they were written to enforce is long since complete (check: the flag is registered and EVOLVE_RELEASE_STRICT_PASS is gone from the CLI), retire the two predicates as satisfied rather than leaving them asserting on a path that cannot exist.",
+  "acceptance": [
+    "`go test -count=1 -tags acs ./acs/cycle50/` is green, or the two stale predicates are removed with a recorded reason.",
+    "Any predicate that resolves a source path fails with a message naming the MOVED-file possibility, not just 'no such file'.",
+    "A sweep confirms no other acs/cycleN predicate points at a path that no longer exists."
+  ],
+  "files": ["go/acs/cycle50/predicates_test.go"],
+  "notes": "Found while running the per-slice verification recipe for the releasepreflight decomposition slice. Not caused by that change: its diff is confined to internal/releasepreflight."
+}

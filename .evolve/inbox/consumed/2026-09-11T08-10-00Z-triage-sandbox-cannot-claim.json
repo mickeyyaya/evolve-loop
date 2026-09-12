@@ -1,0 +1,29 @@
+{
+  "id": "triage-sandbox-denies-its-own-claim-write",
+  "title": "P0: the triage phase sandbox denies .evolve/inbox/processing, so triage's own documented claim step cannot succeed — cycle 1623 ran the full spine on an empty commitment",
+  "kind": "pipeline-repair",
+  "class": "pipeline-integrity",
+  "weight": 0.97,
+  "priority": "P0",
+  "route": "console",
+  "created_at": "2026-09-11T08:10:00Z",
+  "problem": "The generated triage sandbox profile denies the whole runtime plane and grants back only the cycle worktree, the cycle run dir, and three git paths. `.evolve/inbox/processing/` is never granted, so `evolve inbox-mover claim <id> <cycle>` -- which the triage persona itself instructs at step 4 as the atomic hand-off -- fails at mkdir. Live evidence, cycle 1623 (.evolve/runs/cycle-1623/): the profile at sbprofile-3601635037/sandbox-triage.sb line 40 denies file-write* on the plane subpath and lines 41-47 are the entire allow-back set; triage-stdout.clean.txt records `[inbox-mover] ERROR: claim: mkdir -p '<plane>/.evolve/inbox/processing/cycle-1623' failed`, then the agent's own words: 'The selected inbox item could not be atomically claimed: the pipeline's inbox processing directory is not writable in this phase sandbox.' The item it had selected was agy-tier-map-single-source. triage-decision.json for that cycle is top_n [] with one deferral. The cycle then dispatched twelve phases and shipped 922 lines against NO committed task. Every phase after triage was working from an empty commitment, and the deep tier paid for all of it.",
+  "root_cause": "The sandbox's allow-back list is derived from the cycle's worktree and run directory, which are the phase's OUTPUT surfaces. The inbox claim is a LIFECYCLE write against shared plane state, so it belongs to no cycle directory and is invisible to that derivation. The persona documents a write the sandbox was never told about; nothing cross-checks a phase's declared lifecycle writes against its generated profile, so the contradiction is silent until an agent trips over it at runtime.",
+  "fix": "Grant `.evolve/inbox/processing/cycle-<n>` (narrowly, that cycle's claim dir -- not the whole inbox) in the triage phase's profile derivation, and make the contradiction impossible to reintroduce: the profile generator should take the phase's declared lifecycle write paths from the same declaration the persona renders from, so a documented write that the profile does not grant is a build-time failure rather than a runtime surprise. Consider also whether a failed claim should be a phase-level abort instead of a warning the agent narrates and continues past -- an empty top_n that still runs the full spine is the expensive half of this defect.",
+  "acceptance": [
+    "A triage dispatch under the sandbox claims an inbox item successfully; the claim dir appears under .evolve/inbox/processing/cycle-<n>.",
+    "A wiring proof that the granted write paths are derived from the same declaration the triage persona's claim step renders from, so the two cannot disagree.",
+    "A regression test that fails if a phase's declared lifecycle write path is absent from its generated profile.",
+    "A failed atomic claim does not silently become an empty top_n that still dispatches the spine: the cycle either retries, or halts with the claim error named."
+  ],
+  "files": [
+    "go/internal/bridge/ (sandbox profile generation)",
+    "go/internal/inboxmover/inboxmover.go",
+    "agents/evolve-triage.md"
+  ],
+  "connects_to": [
+    "cycle-1623 .evolve/runs/cycle-1623/sbprofile-3601635037/sandbox-triage.sb (the profile) and triage-stdout.clean.txt (the denial)",
+    "inbox-loader-failure-reporting-lies-both-ways (the other way the queue loses work silently)"
+  ],
+  "notes": "Diagnosed in console on 2026-09-10 and re-confirmed against the artifacts on 2026-09-11. This blocks the ADR-0099 PR-F soak: the two document items are queued and load cleanly, but no cycle can claim them until this is fixed. Route console because the fix surface is the sandbox generator."
+}

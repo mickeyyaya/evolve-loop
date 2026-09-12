@@ -1,0 +1,21 @@
+{
+  "id": "audit-binding-report-comment-fallback-is-dead-code",
+  "title": "phases/ship/audit.go: the audit_bound_tree_sha report-comment fallback is unreachable, and it gives internalAuditBoundTreeSHA two contradictory meanings",
+  "kind": "bug",
+  "class": "pipeline-integrity",
+  "weight": 0.72,
+  "priority": "P2",
+  "route": "lane",
+  "created_at": "2026-09-12T09:30:00Z",
+  "problem": "audit.go:99-103 sets opts.internalAuditBoundTreeSHA from the ledger entry's WorktreeTreeSHA (the CHANGES tree) and, when that is empty, falls back to the auditor persona's `audit_bound_tree_sha:` report comment, which the persona computes as `git rev-parse HEAD^{tree}` (the BASE tree). The comment at 93-98 documents the fallback as 'for the non-worktree flow'. It cannot reach a ship: audit.go:153-157 unconditionally takes treefence.Take(testedRoot).Tree — never empty — and refuses any entry whose WorktreeTreeSHA differs from it, so an entry with an empty WorktreeTreeSHA is refused on every path before the binding is ever consumed. Every path between 120 and 152 either returns an error or falls through to that check. The live binding is therefore ALWAYS the changes tree, and four consumers (worktree_ship.go pre-commit + post-push, gitops.go shipDirect pre-commit + post-push as of #569) read it that way.",
+  "impact": "Not a runtime defect today — the dead branch never fires. The cost is design-level and already paid once: one field with two documented meanings misled the #569 slice into changing shipDirect's comparand to HEAD^{tree} on the strength of the fallback's comment, which would have made the guard inert exactly where it is reachable (recorded in that PR's history). The next reader of audit.go faces the same trap.",
+  "fix": "One field, one meaning. Delete the report-comment fallback branch (audit.go:101-102) and the now-unused auditBoundTreeSHARe (audit.go:177), and rewrite the 93-98 comment to state that the binding is the ledger's WorktreeTreeSHA, that an entry without one is refused at the treefence check, and WHY (cycle-152: the persona's HEAD^{tree} base never equals a changes commit). If the auditor persona still emits `audit_bound_tree_sha:` in its report, either stop emitting it or document it as informational-only so nobody re-adds a consumer.",
+  "acceptance": [
+    "auditBoundTreeSHARe has zero references in production code; `go build ./...` and `go vet ./...` clean.",
+    "A test pins that an Auditor ledger entry with empty worktree_tree_sha is refused with CodeAuditBindingTreeMismatch BEFORE any ship path consumes internalAuditBoundTreeSHA (this is the invariant that makes the deletion safe, and it should fail if someone re-adds a fallback).",
+    "Every existing TestShip* / TestShipDirect_* / audit_bound_witness test stays green in both unit and -tags integration tiers.",
+    "The audit.go 93-98 comment names the single meaning and the refusal that enforces it."
+  ],
+  "files": ["go/internal/phases/ship/audit.go"],
+  "notes": "Found while landing #569 (shipDirect audit binding). Filed separately per the decomposition campaign's rule that a discovered defect is its own slice; not folded into #569 because that PR's scope was the missing guard, not the field's semantics."
+}

@@ -215,6 +215,16 @@ type SandboxWrapRequest struct {
 	Workspace     string   // absolute path; SBPL file lives here on darwin
 	Worktree      string   // absolute path; the only write-allowed location
 	RepoRoot      string   // absolute path; the read-only main repo root
+	// WriteSubpaths are the phase profile's declared sandbox.write_subpaths,
+	// verbatim: repo-relative, or absolute, or prefixed with the
+	// {worktree_path} template. The wrapper resolves and grants them ON TOP OF
+	// the floor every sandboxed phase gets (worktree, workspace, /tmp — see
+	// sandboxWritePaths). They are the one place a phase's ADDITIONAL writes
+	// (an inbox claim, a lesson file, docs/) are declared, and the persona
+	// renders its instructions from the same profile — so a documented write
+	// is a granted write by construction. A declaration narrower than the
+	// floor documents intent; it does not narrow the floor.
+	WriteSubpaths []string
 	// AllowNetwork is always true on the sandboxPrefixForLaunch path (forced):
 	// a phase that reaches the sandbox runs a cloud CLI that needs the model API.
 	// See sandbox_wrap.go for the rationale.
@@ -318,8 +328,11 @@ type Config struct {
 	RequireSandbox bool // fail closed when OS filesystem confinement is unavailable
 	DenyPaths      []string
 	DenyReadPaths  []string
-	AllowedTools   []string // from profile.allowed_tools
-	ExtraFlags     []string // forwarded to the inner CLI after `--` (direct passthrough)
+	// SandboxWriteSubpaths is profile.sandbox.write_subpaths, carried verbatim
+	// to the wrapper (SandboxWrapRequest.WriteSubpaths), which resolves them.
+	SandboxWriteSubpaths []string
+	AllowedTools         []string // from profile.allowed_tools
+	ExtraFlags           []string // forwarded to the inner CLI after `--` (direct passthrough)
 	// Realization is the per-CLI launch realization (ADR-0022): the model,
 	// permission, and raw flags this CLI actually understands, resolved from a
 	// LaunchIntent against the CLI's manifest. The *-tmux drivers build their

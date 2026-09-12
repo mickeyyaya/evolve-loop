@@ -22,7 +22,7 @@ func resolveSandboxDenials(paths []string, root, worktree string, write bool) ([
 		if !filepath.IsAbs(clean) && root == "" && worktree == "" {
 			return nil, fmt.Errorf("relative sandbox denial requires an absolute project root or worktree")
 		}
-		if clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
+		if escapesBase(clean) {
 			return nil, fmt.Errorf("denial escapes repository: %q", path)
 		}
 		bases := []string{root, worktree}
@@ -117,4 +117,109 @@ func canonicalSandboxPath(path string) (string, error) {
 		}
 		parent = filepath.Dir(parent)
 	}
+}
+
+// worktreePathTemplate is the profile-side placeholder for the cycle's
+// worktree in sandbox.write_subpaths (e.g. "{worktree_path}/tests"). It is
+// the same token the persona files and the bash-era dispatcher used.
+const worktreePathTemplate = "{worktree_path}"
+
+// resolveSandboxWriteGrants turns a profile's declared sandbox.write_subpaths
+// into the absolute paths the SBPL generator grants. It is the write-side
+// sibling of resolveSandboxDenials, with the opposite failure posture:
+//
+//   - A denial resolves to BOTH the declared path and its symlink target, so
+//     a retarget cannot dodge it (fail-closed for denies).
+//   - A grant must resolve to EXACTLY the declared path below the canonical
+//     base. If any component under the base is a symlink, the grant is
+//     refused and the launch fails, because honoring it would hand the phase
+//     write access to wherever the link points (fail-closed for allows). This
+//     is the defense the retrospective grant's former hard-coded helper
+//     carried for its one path, now applied to every declared one.
+//
+// Relative entries resolve against the project root — the bash contract the
+// profiles were written to — and "{worktree_path}" entries against the
+// worktree; a worktree-templated entry with no worktree is skipped (there is
+// nothing to grant and the phase cannot write source anyway). A glob entry is
+// widened here to its longest glob-free ancestor (see globFreeAncestor), and
+// the canonical-path walk stops at the first existing ancestor, so a
+// not-yet-created claim dir resolves cleanly.
+func resolveSandboxWriteGrants(subpaths []string, root, worktree string) ([]string, error) {
+	var out []string
+	for _, declared := range subpaths {
+		if declared == "" || strings.ContainsAny(declared, "\x00\n\r") {
+			return nil, fmt.Errorf("write grant must be a path: %q", declared)
+		}
+		var base, rel string
+		switch {
+		case filepath.IsAbs(declared):
+			// An absolute entry is its own base: granted as declared (cleaned).
+			// The retarget check below is vacuous for it by design (base == the
+			// path, rel == "."), so a symlinked absolute declaration is followed
+			// to its target — the operator declared that exact path.
+			base, rel = filepath.Clean(declared), "."
+		case strings.HasPrefix(declared, worktreePathTemplate):
+			if worktree == "" {
+				continue
+			}
+			base, rel = worktree, strings.TrimPrefix(declared, worktreePathTemplate)
+		default:
+			base, rel = root, declared
+		}
+		rel = filepath.Clean(strings.TrimPrefix(rel, string(filepath.Separator)))
+		if escapesBase(rel) {
+			return nil, fmt.Errorf("write grant escapes its base: %q", declared)
+		}
+		// A glob names a family of paths ("cycle-*"); the grant is that family's
+		// home — the longest glob-free ancestor. This is the ONE home of that
+		// projection: the adapters receive only literal absolute paths (their
+		// stated contract), so SBPL and bwrap cannot disagree about what a glob
+		// means, and a non-terminal glob ("cycle-*/learn") widens to the right
+		// ancestor instead of to a literal "*" that matches nothing.
+		rel = globFreeAncestor(rel)
+		if base == "" || !filepath.IsAbs(base) {
+			return nil, fmt.Errorf("write grant %q needs an absolute project root or worktree", declared)
+		}
+		canonicalBase, err := canonicalSandboxPath(base)
+		if err != nil {
+			return nil, fmt.Errorf("write grant %q: %w", declared, err)
+		}
+		expected := filepath.Join(canonicalBase, rel)
+		actual, err := canonicalSandboxPath(expected)
+		if err != nil {
+			return nil, fmt.Errorf("write grant %q: %w", declared, err)
+		}
+		if actual != expected {
+			return nil, fmt.Errorf("write grant %q resolves outside its declared scope (%s -> %s)", declared, expected, actual)
+		}
+		if !slices.Contains(out, expected) {
+			out = append(out, expected)
+		}
+	}
+	return out, nil
+}
+
+// globFreeAncestor returns the longest leading portion of a cleaned relative
+// path whose segments contain no glob metacharacter, or "." when the first
+// segment already does.
+func globFreeAncestor(rel string) string {
+	segments := strings.Split(rel, string(filepath.Separator))
+	keep := 0
+	for _, s := range segments {
+		if strings.ContainsAny(s, "*?[") {
+			break
+		}
+		keep++
+	}
+	if keep == 0 {
+		return "."
+	}
+	return filepath.Join(segments[:keep]...)
+}
+
+// escapesBase reports whether a Cleaned relative path climbs above its base
+// via a literal ".." component. Shared by the denial and grant resolvers so
+// the two sides of the sandbox contract cannot drift on this check.
+func escapesBase(rel string) bool {
+	return rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
