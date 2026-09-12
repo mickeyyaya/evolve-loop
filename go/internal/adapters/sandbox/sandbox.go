@@ -234,16 +234,16 @@ func GenerateSBPL(cfg Config) string {
 	if cfg.ReadOnlyRepo && cfg.RepoRoot != "" {
 		fmt.Fprintf(&b, "(deny file-write* (subpath %q))\n", cfg.RepoRoot)
 	}
-	// Per-write-path allows. Globs widen to parent dir (bash:520).
+	// Per-write-path allows. Every entry is a literal absolute path: the
+	// bridge resolves profile globs to their glob-free ancestor before handing
+	// them off (resolveSandboxWriteGrants), so SBPL and bwrap grant the same
+	// thing. A glob reaching here would be emitted verbatim and match nothing.
 	for _, wp := range cfg.WritePaths {
 		if wp == "" {
 			continue
 		}
 		if coversRepository(wp, cfg.RepoRoot) {
 			continue
-		}
-		if strings.Contains(wp, "*") {
-			wp = filepath.Dir(wp)
 		}
 		fmt.Fprintf(&b, "(allow file-write* (subpath %q))\n", wp)
 	}

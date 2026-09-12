@@ -320,6 +320,18 @@ func (gitWorktree) Cleanup(projectRoot, worktree string) error {
 	if worktree == "" {
 		return nil
 	}
+	if sameDirectory(worktree, projectRoot) {
+		// NEVER dispose of the live repository. Every worktree this
+		// provisioner mints lives under the runscope base, but Cleanup is a
+		// public seam and a resumed cycle's checkpoint can name the project
+		// root as its worktree (phases/ship branches on exactly that shape).
+		// `git worktree remove` merely fails on the main tree; the
+		// os.RemoveAll below would not. Same defense, same reason, as
+		// deleteCycleBranch's "cycle-" gate: never act on a path this
+		// provisioner did not create.
+		fmt.Fprintf(os.Stderr, "[worktree] WARN refusing to remove %s: it is the project root, not a provisioned worktree\n", worktree)
+		return fmt.Errorf("worktree cleanup: %s is the project root — refusing to remove it", worktree)
+	}
 	_, stderr, code, err := gitexec.Git{Dir: projectRoot, Exec: gitRunner}.Capture(context.Background(), "worktree", "remove", "--force", worktree)
 	if err != nil || code != 0 {
 		// Best-effort, but surface it: a failed remove leaves an orphaned
@@ -387,4 +399,30 @@ func LeakRecoverablePhase(p Phase) bool {
 	default:
 		return false
 	}
+}
+
+// sameDirectory reports whether two paths denote the same directory. It is a
+// REFUSAL predicate — it keeps a destructive operation off the live
+// repository — so it errs toward "same": os.SameFile (device + inode, which
+// handles symlinks and a case-insensitive APFS volume) when both paths stat,
+// OR a lexical cleaned-absolute compare, so that a path that cannot be
+// stat'ed is still refused when it is textually the root. Neither test alone
+// is enough: the lexical compare misses /var vs /private/var, and SameFile
+// cannot see a directory that does not exist yet.
+func sameDirectory(a, b string) bool {
+	if a == "" || b == "" {
+		return false
+	}
+	if fa, err := os.Stat(a); err == nil {
+		if fb, err := os.Stat(b); err == nil && os.SameFile(fa, fb) {
+			return true
+		}
+	}
+	lexical := func(p string) string {
+		if abs, err := filepath.Abs(p); err == nil {
+			return filepath.Clean(abs)
+		}
+		return filepath.Clean(p)
+	}
+	return lexical(a) == lexical(b)
 }

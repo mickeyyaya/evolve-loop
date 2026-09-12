@@ -56,7 +56,13 @@ func TestRunCycleFromPhase_NormalizesBuildWorktree(t *testing.T) {
 		},
 	}
 	led := &fakeLedger{}
-	o := NewOrchestrator(st, led, buildRunners(nil))
+	// A resumed cycle that completes normally now prunes its worktree at exit
+	// (cycle_worktree_teardown.go), and this test inspects that worktree's git
+	// state AFTER the call returns. The fake provisioner records the disposal
+	// instead of performing it, so the normalize assertions below are unchanged
+	// — what the teardown itself does is pinned by
+	// resume_worktree_teardown_test.go, not here.
+	o := NewOrchestrator(st, led, buildRunners(nil), WithWorktreeProvisioner(&fakeWorktree{path: wt}))
 	if _, err := o.RunCycleFromPhase(context.Background(), CycleRequest{
 		ProjectRoot: repo,
 	}, &ResumePoint{Phase: string(PhaseBuild), CycleID: 9}); err != nil {
@@ -92,7 +98,9 @@ func TestRunCycleFromPhase_NoNormalizeWhenResumingPastBuild(t *testing.T) {
 			WorktreeBaseSHA: base,
 		},
 	}
-	o := NewOrchestrator(st, &fakeLedger{}, buildRunners(nil))
+	// See the sibling test: the exit teardown is recorded, not performed, so
+	// this test can still read the worktree it is asserting about.
+	o := NewOrchestrator(st, &fakeLedger{}, buildRunners(nil), WithWorktreeProvisioner(&fakeWorktree{path: wt}))
 	if _, err := o.RunCycleFromPhase(context.Background(), CycleRequest{
 		ProjectRoot: repo,
 	}, &ResumePoint{Phase: string(PhaseAudit), CycleID: 10}); err != nil {

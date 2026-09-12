@@ -29,6 +29,14 @@ type resumeExecution struct {
 	initialResult     CycleResult
 	preResumeHEAD     string
 	mainDirtyBaseline map[string]bool
+
+	// closeout is the cycleRun that owns this resume's timings and terminal
+	// closeout. RunCycleFromPhase's worktree-teardown defer reads its
+	// preserveWorktree / cycleCompletedNormally fields LIVE at exit — the same
+	// fields, on the same type, that RunCycle's cleanup closure reads — rather
+	// than a copy taken at some hand-placed point. run() has a pointer
+	// receiver over an addressable value, so the assignment is visible there.
+	closeout *cycleRun
 }
 
 func (r *resumeExecution) run() (result CycleResult, retErr error) {
@@ -65,6 +73,7 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 		o: o, ctx: context.Background(), req: req, cycle: cycle,
 		cs: cs, state: state, result: result,
 	}
+	r.closeout = timingOwner
 	defer func() {
 		if completed || errors.Is(retErr, ErrAllFamiliesExhausted) || ctx.Err() != nil {
 			return
@@ -359,9 +368,10 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 		// here (orchestrator.go, recordChokepointEscape) precisely so the
 		// escape classifies FAILED_EXPLAINED instead of paging an operator
 		// with the FAILED_UNEXPLAINED alarm bucket — the cycle-492 escape.
-		// (Fresh's "preserves the worktree for salvage" rationale does NOT
-		// carry over: resume makes no preserve/prune decision at all — see the
-		// worktree-leak defect tracked separately.)
+		// Fresh's "preserves the worktree for salvage" rationale carries over
+		// too: this return happens before completeCycle, so the closeout's
+		// cycleCompletedNormally stays false and RunCycleFromPhase's exit
+		// teardown (cycle_worktree_teardown.go) preserves the tree.
 		// Resume returned a bare error, reproducing on this path the exact
 		// defect the fresh path was fixed for. Call the SAME primitive rather
 		// than a second implementation: it records the phase outcome through
@@ -408,6 +418,13 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 	completed = true
 	cs.Phase, cs.ActiveAgent = string(PhaseEnd), ""
 	cs.FinalVerdict = result.FinalVerdict
+	// This terminal write is resume-only; the fresh path has nothing after
+	// completeCycle. If it fails, the closeout has already latched
+	// cycleCompletedNormally, so the exit teardown still prunes a non-FAIL
+	// tree while the checkpoint block may still be live. That is the intended
+	// direction: ship has merged the work, so the tree is spent, and a later
+	// `--resume` then fails loudly ("worktree no longer exists") instead of
+	// re-driving phases on a spent tree — which a preserved tree would invite.
 	if err := o.storage.WriteCycleState(ctx, cs); err != nil {
 		return result, fmt.Errorf("resume terminal state: %w", err)
 	}

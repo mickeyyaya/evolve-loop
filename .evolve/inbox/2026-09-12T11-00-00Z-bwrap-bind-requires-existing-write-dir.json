@@ -1,0 +1,19 @@
+{
+  "id": "bwrap-bind-requires-existing-write-dir",
+  "title": "Linux sandbox: bwrap binds every WritePath with --bind, which fails the launch when a declared write dir does not exist yet (--bind-try or mkdir-before-bind)",
+  "kind": "bug",
+  "class": "pipeline-integrity",
+  "weight": 0.62,
+  "priority": "P2",
+  "route": "lane",
+  "created_at": "2026-09-12T11:00:00Z",
+  "problem": "internal/adapters/sandbox/sandbox.go (BwrapPrefix) emits `--bind wp wp` for every WritePath but `--bind-try` for the home state dirs. bwrap's --bind requires the source to exist, so a write grant for a directory that is created lazily by the phase itself — .evolve/instincts/lessons on a fresh repo, .evolve/inbox/processing before the first claim, a profile's docs/ or knowledge-base/ — fails the whole launch on Linux instead of granting the path. macOS SBPL grants a not-yet-existing subpath fine, so the divergence is platform-specific and invisible on the darwin runtime. Pre-existing: the retrospective lesson grant had the same shape before sandbox.write_subpaths was honored; honoring the declarations widens the set of grants that can hit it.",
+  "impact": "Linux-only launch failures for phases whose declared write dir is created lazily; the repo documents bwrap as a supported backend (runtime-reference.md) but the darwin runtime never exercises it, so this would surface only on a Linux operator or CI host.",
+  "fix": "Either emit --bind-try for WritePaths whose source does not exist at wrap time (fail-open on the grant, which is the SBPL behavior), or create the directory before binding when it lies under RepoRoot/Workspace. Pin with a BwrapPrefix test over a nonexistent WritePath. Do not add a flag.",
+  "acceptance": [
+    "GenerateBwrapArgv/BwrapPrefix over a WritePath that does not exist produces an argv bwrap accepts (unit test; no bwrap binary needed).",
+    "The existing home-state --bind-try behavior is unchanged (regression pin)."
+  ],
+  "files": ["go/internal/adapters/sandbox/sandbox.go", "go/internal/adapters/sandbox/sandbox_test.go"],
+  "notes": "Surfaced by the architecture review of the write_subpaths landing (2026-09-12); out of that slice's scope because it is adapter behavior on a platform the runtime does not run."
+}
