@@ -27,7 +27,7 @@ import (
 // pre-existing per-driver coverage WARN already names the agent, so keying on
 // the agent name alone would false-green on that older line; only a distinct
 // marker proves the fill WARN specifically fired.
-const contextFillMarker = "CONTEXT-FILL"
+var contextFillMarker = string(CodeContextFillHigh) // the code the rendered bridge.warning line carries (ADR-0101 S3)
 
 // runContextFillCase drives recordTokenUsage with a resolver stubbed to report a
 // known fill reading, and returns the captured stderr plus the appended
@@ -43,6 +43,7 @@ func runContextFillCase(t *testing.T, fill float64, warnPct int, agent string) (
 	e := NewEngine(Deps{
 		Now:                func() time.Time { return end },
 		Stderr:             &errBuf,
+		Signals:            sinkDeps(&errBuf),
 		ContextFillWarnPct: warnPct,
 		TokenResolver: func(tokenusage.Window) (tokenusage.Result, error) {
 			return tokenusage.Result{

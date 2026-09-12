@@ -210,6 +210,7 @@ func TestTimeoutSummaryVocabulary(t *testing.T) {
 		{panestream.LivenessBusyButStagnant, "busy_stagnant"},
 		{panestream.LivenessConverging, "converging"},
 		{panestream.LivenessHung, "hung"},
+		{panestream.LivenessExhausted, "exhausted"}, // the one spelling, projected (ADR-0101 S3)
 		{0, "unknown"},
 	} {
 		if got := livenessOrUnknown(tc.in); got != tc.want {

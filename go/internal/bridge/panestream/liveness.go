@@ -363,3 +363,21 @@ func DetectorFor(p PaneProfile) LivenessProbe {
 		return NewDefaultDetector(0)
 	}
 }
+
+// String is the one spelling of a liveness state — the word pane.liveness
+// signals carry in fields.state (ADR-0101 S3).
+func (s LivenessState) String() string {
+	switch s {
+	case LivenessIdle:
+		return "idle"
+	case LivenessBusyButStagnant:
+		return "busy-stagnant"
+	case LivenessConverging:
+		return "converging"
+	case LivenessHung:
+		return "hung"
+	case LivenessExhausted:
+		return "exhausted"
+	}
+	return "unknown"
+}

@@ -163,6 +163,22 @@ per-cycle summary is `signalcenter.Summary`, follows the cycle by itself
 and is read only through `Orchestrator.SignalSummary()` (decision 5). Nothing in the decisions'
 intent changed: one schema, one center, closed vocabularies, observe-never-decide.
 
+## Implementation notes — S3 (landed 2026-09-13)
+
+Decision 3's second injection point is real: `bridge.Deps.Signals` reaches every engine the
+production Adapter builds because the Adapter takes the Center as a constructor argument
+(`adapters/bridge.NewDefault(projectRoot, signals)`), and `Engine.SignalsWired()` / `Adapter.SignalsWired()`
+are the proofs at both seams; every Center-less `NewDefault` site passes an explicit `nil` and a test
+pins them. The engine's telemetry warnings and tripwire are `bridge.warning` / `bridge.tripwire`
+(module `bridge`, six codes); the tmux driver registers a `LivenessHandler` per dispatch that turns
+every `LivenessCenter` edge into `pane.liveness` (module `liveness`, three WARN codes) — the design's
+"Adapter over the existing hook" rather than a change inside the liveness facade. Decision 8 landed
+as its own commit. Deltas from the plan: the dispatch identity comes from `BridgeRequest` with the
+driver Config carrying the same values — ONE `dispatchIdentity` rule, no workspace-path fallback
+(a request without a `Cycle` is an operator probe whose signals stay at cycle 0); `log.SanitizeField`
+folds Unicode format characters
+too (the sink renders plain text where the old field was quoted).
+
 ## Implementation notes — S2a (landed 2026-09-13)
 
 The producers that need only S1: `cycle.sealed` and `system.failure` at the closeout both dispatch

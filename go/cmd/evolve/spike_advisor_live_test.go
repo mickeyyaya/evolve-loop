@@ -26,7 +26,7 @@ func TestSpikeAdvisorLive(t *testing.T) {
 	registry := filepath.Join(root, "docs", "architecture", "phase-registry.json")
 	cfg, _ := config.Load(registry, filterEvolveEnv(os.Environ()))
 
-	br := bridge.NewDefault(root)
+	br := bridge.NewDefault(root, nil)
 	cli, model := resolveRouterDispatch(filepath.Join(root, ".evolve"))
 	var persona string
 	if rp, perr := newPromptsLoader(root).Agent("evolve-router"); perr == nil {

@@ -182,7 +182,7 @@ func TestProbe_DefaultEngineFactoryIsUsable(t *testing.T) {
 // TestNewDefault_ReturnsUsableAdapter — the production constructor wires a
 // real engine factory (projectRoot reserved/unused).
 func TestNewDefault_ReturnsUsableAdapter(t *testing.T) {
-	a := NewDefault("/any/project/root")
+	a := NewDefault("/any/project/root", nil)
 	if a == nil || a.engineFactory == nil {
 		t.Fatal("NewDefault must wire a non-nil engine factory")
 	}
@@ -312,7 +312,7 @@ func TestLaunch_PolicyBlockStableAcrossRuns(t *testing.T) {
 
 func TestLaunch_BootTimeoutStoreWired(t *testing.T) {
 	projectRoot := t.TempDir()
-	a := NewDefault(projectRoot)
+	a := NewDefault(projectRoot, nil)
 	if !a.BootTimeoutStoreWired() {
 		t.Error("expected BootTimeoutStoreWired() true for an Adapter built via NewDefault (production deps inject the boot-timeout strike writer)")
 	}

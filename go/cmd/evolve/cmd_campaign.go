@@ -401,7 +401,7 @@ func runPreliminaryStudy(workspace, feedback string) error {
 	}
 	cfg.Prompt = string(prompt)
 	registered, err := (phaseregistrar.Registrar{
-		Bridge:  bridge.NewDefault(projectRoot),
+		Bridge:  bridge.NewDefault(projectRoot, nil), // Center-less registry default (ADR-0101 S3)
 		Prompts: prompts.NewForProject(worktree),
 	}).Register(cfg)
 	if err != nil {

@@ -68,7 +68,7 @@ func readTestdataFrame(t *testing.T, root, relPath string) string {
 // RED: adapterbridge.Adapter.BootTimeoutStoreWired() absent → compile error.
 func TestC425_001_BootTimeoutStoreWiredInProduction(t *testing.T) {
 	root := acsassert.SetupTempProject(t)
-	adapter := adapterbridge.NewDefault(root)
+	adapter := adapterbridge.NewDefault(root, nil)
 	if !adapter.BootTimeoutStoreWired() {
 		t.Errorf("adapters.NewDefault(%q).BootTimeoutStoreWired() = false; "+
 			"production Adapter must set a non-nil BootTimeoutStore so engine.go:455 can record exit-80 strikes", root)

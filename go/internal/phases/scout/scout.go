@@ -184,7 +184,7 @@ func New(c Config) *Phase {
 func init() {
 	registry.Register(string(core.PhaseScout), func(req core.PhaseRequest) core.PhaseRunner {
 		return New(Config{
-			Bridge:  bridge.NewDefault(req.ProjectRoot),
+			Bridge:  bridge.NewDefault(req.ProjectRoot, nil),
 			Prompts: prompts.NewForProject(req.ProjectRoot),
 		})
 	})
