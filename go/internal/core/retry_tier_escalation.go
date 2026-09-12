@@ -18,11 +18,9 @@ package core
 // share clampedRaise so the raise-only rule and the clamp live once.
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
@@ -105,28 +103,17 @@ func (cr *cycleRun) escalationScopeIDs() []string {
 }
 
 // processingClaimIDs reads the item ids claimed into
-// <root>/.evolve/inbox/processing/cycle-<n>/ — tolerant of malformed files
-// (a bad claim never breaks dispatch, the inbox reader convention).
+// <root>/.evolve/inbox/processing/cycle-<n>/ through the ONE inbox item reader
+// (inboxbatch.LoadDir — a malformed claim is skipped, never breaks dispatch).
+// inboxmover cannot be imported from core (it reaches core via the ledger
+// adapter), so the leaf reader is the shared belief.
 func processingClaimIDs(projectRoot string, cycle int) []string {
-	dir := filepath.Join(projectRoot, ".evolve", "inbox", "processing", "cycle-"+strconv.Itoa(cycle))
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return nil
-	}
+	items, _, _ := inboxbatch.LoadDir(inboxbatch.ProcessingCycleDir(filepath.Join(projectRoot, ".evolve", "inbox"), cycle))
 	var ids []string
-	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), ".json") {
-			continue
+	for _, it := range items {
+		if it.ID != "" {
+			ids = append(ids, it.ID)
 		}
-		raw, rerr := os.ReadFile(filepath.Join(dir, e.Name()))
-		if rerr != nil {
-			continue
-		}
-		var doc inboxbatch.Item
-		if json.Unmarshal(raw, &doc) != nil || doc.ID == "" {
-			continue
-		}
-		ids = append(ids, doc.ID)
 	}
 	return ids
 }

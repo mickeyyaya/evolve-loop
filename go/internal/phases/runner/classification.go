@@ -76,10 +76,7 @@ func (b *BaseRunner) classifyPhaseOutcome(
 	if reconciled {
 		artifact = classifiedArtifact(reconciledRes, artifactPath, artifact)
 	} else {
-		roots := phasecontract.Roots{Workspace: req.Workspace, Worktree: req.Worktree, DispatchedArtifact: artifactPath, ExplanationDocumentationVersion: req.ExplanationDocumentationVersion}
-		if req.ProjectRoot != "" {
-			roots.EvolveDir = filepath.Join(req.ProjectRoot, ".evolve")
-		}
+		roots := verifyRootsFor(req, artifactPath)
 		res, verr := b.verifyReconcileDeliverable(ctx, phase, roots)
 		switch {
 		case verr != nil:
@@ -187,4 +184,23 @@ func (b *BaseRunner) classifyPhaseOutcome(
 		log.Diag().Infof("[runner] RECONCILED phase=%s (%v) verdict=%s deliverable=%s acsFloor=%v\n", phase, bridgeErr, verdict, artifactPath, acsFloorRescued)
 	}
 	return resp, nil
+}
+
+// verifyRootsFor is the ONE translation from a phase request to the contract
+// roots the runner verifies against — shared by the classification check and
+// the teardown reconcile so they can never resolve different paths, or a
+// different cycle, for the same phase. EvolveDir completes the roots
+// (orchestrator-target deliverables, the declared-effects lifecycle state)
+// AND locates the merged catalog for the catalog-aware default; Cycle names
+// the processing/cycle-N/ a declared effect is judged under (ADR-0100).
+func verifyRootsFor(req core.PhaseRequest, artifactPath string) phasecontract.Roots {
+	roots := phasecontract.Roots{
+		Workspace: req.Workspace, Worktree: req.Worktree, DispatchedArtifact: artifactPath,
+		ExplanationDocumentationVersion: req.ExplanationDocumentationVersion,
+		Cycle:                           req.Cycle,
+	}
+	if req.ProjectRoot != "" {
+		roots.EvolveDir = filepath.Join(req.ProjectRoot, ".evolve")
+	}
+	return roots
 }

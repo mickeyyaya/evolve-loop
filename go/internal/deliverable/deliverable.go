@@ -92,6 +92,12 @@ const (
 	CodeMissingSecondary   = "missing_secondary"
 	CodeEmptySecondary     = "empty_secondary"
 	CodeMalformedSecondary = "malformed_secondary"
+	// ADR-0100 slice 2 — declared effects (effects.go). missing_effect: a
+	// committed inbox item the phase was instructed to claim is not under this
+	// cycle's processing/ dir; unbound_effect: the registry names an effect no
+	// deterministic check binds (a registry defect, not an agent one).
+	CodeMissingEffect = "missing_effect"
+	CodeUnboundEffect = "unbound_effect"
 )
 
 // Verify runs the deterministic well-formedness checks for a phase's deliverable
@@ -136,6 +142,11 @@ func VerifyWithStage(phase string, roots phasecontract.Roots, resolver phasecont
 	// ADR-0100: the agent-owed secondaries are judged after the primary so a
 	// correction can name everything the phase still owes in one directive.
 	if err := verifySecondaries(&res, c, roots); err != nil {
+		return Result{}, err
+	}
+	// ADR-0100 slice 2: then the declared effects, so one directive names
+	// every output AND effect the phase still owes.
+	if err := verifyEffects(&res, c, roots); err != nil {
 		return Result{}, err
 	}
 	res.finish()

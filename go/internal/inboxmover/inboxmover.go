@@ -28,6 +28,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -204,8 +205,13 @@ func Claim(opts Options, taskID, cycle string) (ClaimResult, error) {
 		opts.logf("WARN: ", "claim: task '%s' REFUSED — %s (operator-owned; lanes must not draw it)", taskID, reason)
 		return res, fmt.Errorf("%w: %s (%s)", ErrConsoleRouted, taskID, reason)
 	}
+	cycleNum, convErr := strconv.Atoi(cycle)
+	if convErr != nil || cycleNum < 1 {
+		opts.logf("ERROR: ", "claim: cycle %q is not a positive number", cycle)
+		return res, fmt.Errorf("%w: claim cycle must be a positive number, got %q", ErrBadArgs, cycle)
+	}
 	base := filepath.Base(src)
-	destDir := filepath.Join(opts.InboxDir, "processing", "cycle-"+cycle)
+	destDir := inboxbatch.ProcessingCycleDir(opts.InboxDir, cycleNum)
 	dest := filepath.Join(destDir, base)
 	if err := os.MkdirAll(destDir, 0o755); err != nil {
 		opts.logf("ERROR: ", "claim: mkdir -p '%s' failed: %v", destDir, err)
@@ -280,24 +286,12 @@ func Promote(opts Options, taskID, newState string, p PromoteOpts) (PromoteResul
 		return res, fmt.Errorf("%w: %s", ErrBadState, newState)
 	}
 
-	// Search processing/cycle-*/ first, then inbox/ fallback.
+	// A processing claim first, then the inbox root — Locate is the one walk.
 	src, srcRel := "", ""
-	procDir := filepath.Join(opts.InboxDir, "processing")
-	if entries, err := os.ReadDir(procDir); err == nil {
-		for _, e := range entries {
-			if !e.IsDir() || !strings.HasPrefix(e.Name(), "cycle-") {
-				continue
-			}
-			d := filepath.Join(procDir, e.Name())
-			if found, err := FindFileByTaskID(d, taskID); err == nil {
-				src, srcRel = found, "processing"
-				break
-			}
-		}
-	}
-	if src == "" {
-		if found, err := FindFileByTaskID(opts.InboxDir, taskID); err == nil {
-			src, srcRel = found, "inbox"
+	if loc, err := Locate(opts.InboxDir, taskID); err == nil {
+		src, srcRel = loc.Path, "inbox"
+		if loc.Cycle > 0 {
+			srcRel = "processing"
 		}
 	}
 	if src == "" {
@@ -569,7 +563,7 @@ func RecoverOrphans(opts Options) (RecoverResult, error) {
 	opts.resolveOpts()
 	res := RecoverResult{Paths: []string{}}
 
-	procDir := filepath.Join(opts.InboxDir, "processing")
+	procDir := inboxbatch.ProcessingDir(opts.InboxDir)
 	if info, err := os.Stat(procDir); err != nil || !info.IsDir() {
 		opts.logf("", "recover-orphans: no processing/ dir — nothing to do")
 		return res, nil
@@ -580,19 +574,14 @@ func RecoverOrphans(opts Options) (RecoverResult, error) {
 		activeCycle = "-1"
 	}
 
-	entries, _ := os.ReadDir(procDir)
-	// Sort for deterministic test output.
-	sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
-	for _, e := range entries {
-		if !e.IsDir() || !strings.HasPrefix(e.Name(), "cycle-") {
-			continue
-		}
-		cycleNum := strings.TrimPrefix(e.Name(), "cycle-")
-		if cycleNum == activeCycle {
+	activeNum, _ := strconv.Atoi(activeCycle)
+	for _, dir := range inboxbatch.ProcessingCycleDirs(opts.InboxDir) {
+		cycle, _ := inboxbatch.ParseProcessingCycle(filepath.Base(dir))
+		cycleNum := strconv.Itoa(cycle)
+		if cycle == activeNum {
 			opts.logf("", "recover-orphans: cycle-%s/ is active — skipping", cycleNum)
 			continue
 		}
-		dir := filepath.Join(procDir, e.Name())
 		files, _ := os.ReadDir(dir)
 		for _, f := range files {
 			if f.IsDir() || !strings.HasSuffix(f.Name(), ".json") {
@@ -687,7 +676,7 @@ func releaseCycleProcessing(opts Options, cycle int, reason string, quar *quaran
 	opts.resolveOpts()
 	res := RecoverResult{Paths: []string{}}
 
-	cycleDir := filepath.Join(opts.InboxDir, "processing", fmt.Sprintf("cycle-%d", cycle))
+	cycleDir := inboxbatch.ProcessingCycleDir(opts.InboxDir, cycle)
 	info, err := os.Stat(cycleDir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -982,9 +971,7 @@ func strPtr(s string) *string {
 func ReadFailureCount(opts Options, taskID string) (int, bool) {
 	opts.resolveOpts()
 	dirs := []string{opts.InboxDir}
-	if procs, err := filepath.Glob(filepath.Join(opts.InboxDir, "processing", "cycle-*")); err == nil {
-		dirs = append(dirs, procs...)
-	}
+	dirs = append(dirs, inboxbatch.ProcessingCycleDirs(opts.InboxDir)...)
 	for _, d := range dirs {
 		path, err := FindFileByTaskID(d, taskID)
 		if err != nil {
