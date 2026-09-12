@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
@@ -221,7 +222,19 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 			o.worktreePhase(next) && containsString(cs.CompletedPhases, string(PhaseBuild)) {
 			requiresBuild, refreshErr := explanationdocs.RefreshResult(ctx, explanationBinding(req.ProjectRoot, cs))
 			if refreshErr != nil {
-				return result, fmt.Errorf("resume refresh Build explanation after %s: %w", next, refreshErr)
+				// Terminal exit, so it records the outcome through the C1
+				// chokepoint like its three sibling error paths above.
+				// Deliberately only the recording half of fresh's twin
+				// (cyclerun_postreview.go also feeds failure-learning here):
+				// no resume abort exit feeds failure-learning, and adding it
+				// to one arbitrary exit would spend a retro dispatch the other
+				// four do not. Returning bare left
+				// the cycle with no abort_reason on disk, which classifies
+				// FAILED_UNEXPLAINED — an operator paged with nothing to read.
+				phaseErr := fmt.Errorf("resume refresh Build explanation after %s: %w", next, refreshErr)
+				o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath,
+					phaseOutcomeFrom(next, resp, attempts, phaseErr.Error(), cs.PhaseStartedAt))
+				return result, phaseErr
 			}
 			if requiresBuild {
 				cursor.schedule(PhaseBuild)
@@ -297,6 +310,25 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 			// (bounded only by the resume safety counter — ~15 LLM dispatches).
 			// The next pre-phase WriteCycleState persists the consumed slot.
 			consumeBookkeepingRegradeGrant(&cs, reason)
+			// Same parity argument as the line above, for the three steps the
+			// fresh history branch (cyclerun_record.go) runs and this one did
+			// not. Order is fresh's order and it matters: both grants consume
+			// their once-per-cycle slot BEFORE the gate can prepend to reason,
+			// because a prepend breaks the prefix match each consumer keys on.
+			// consumeAuditRepairGrant is symmetry, not a behavior change:
+			// decideAfterRetro's reason vocabulary cannot carry the audit-repair
+			// prefix today, so it is inert on BOTH paths — kept so the shapes
+			// match if that vocabulary ever grows.
+			consumeAuditRepairGrant(&cs, reason)
+			reason = o.escalateRetroReasonForHistory(req.ProjectRoot, reason, state.FailedAt)
+			// S2 disposition gate: an absent or invalid disposition is
+			// surfaced loudly in RetroDecision, never silently recorded clean
+			// (the cycle-1046 gap). Without this, a resumed cycle reports a
+			// clean retro decision over a disposition nothing verified.
+			if gateErr := o.finalizeRetroCompletion(cs.WorkspacePath); gateErr != nil {
+				fmt.Fprintf(os.Stderr, "[orchestrator] WARN retro: %v\n", gateErr)
+				reason = gateErr.Error() + "; " + reason
+			}
 			result.RetroDecision = reason
 			// ADR-0072 S4: the Go floor is non-bypassable on the resume path too —
 			// a floor category halts + escalates rather than looping as task-level.
@@ -323,6 +355,44 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 	}
 
 	if !cursor.reachedEnd {
+		// ADR-0044 C1, resume parity: the fresh path records an explicit abort
+		// here (orchestrator.go, recordChokepointEscape) precisely so the
+		// escape classifies FAILED_EXPLAINED instead of paging an operator
+		// with the FAILED_UNEXPLAINED alarm bucket — the cycle-492 escape.
+		// (Fresh's "preserves the worktree for salvage" rationale does NOT
+		// carry over: resume makes no preserve/prune decision at all — see the
+		// worktree-leak defect tracked separately.)
+		// Resume returned a bare error, reproducing on this path the exact
+		// defect the fresh path was fixed for. Call the SAME primitive rather
+		// than a second implementation: it records the phase outcome through
+		// the C1 chokepoint, feeds failure-learning, and marks the verdict.
+		//
+		// phaseTimings is handed to the owner and read back because
+		// recordPhaseOutcome appends through a pointer to the owner's own
+		// slice; without the round trip the deferred timing flush would write
+		// the pre-escape set and the abort would be invisible on disk.
+		// ctx is assigned deliberately and must NOT be "simplified" away. The
+		// owner is constructed with context.Background() so the timing defers
+		// survive cancellation, but recordChokepointEscape also feeds
+		// failure-learning, which DISPATCHES a retrospective agent and skips
+		// that model call only when its own ctx is already cancelled. Handing
+		// it Background would defeat that guard and spend a dispatch after an
+		// operator interrupt. The abnormal-epilogue defer is unaffected either
+		// way: it guards on the LOCAL ctx before it ever reads the owner.
+		//
+		// All four mutated fields are read back below, not just the two the
+		// escape appends to: recordFailureLearning also mutates cs (it stamps
+		// the retro phase and appends it to CompletedPhases), and the epilogue
+		// defer persists cs — so dropping the read-back would let that write
+		// clobber the retro completion it just recorded.
+		timingOwner.ctx, timingOwner.cs, timingOwner.state = ctx, cs, state
+		timingOwner.result, timingOwner.phaseTimings = result, phaseTimings
+		timingOwner.current = cursor.current
+		timingOwner.recordChokepointEscape(fmt.Sprintf(
+			"transition-table cycle guard: resume dispatch loop ran %d iterations without reaching PhaseEnd (cursor stalled at phase %q) — a transition cycle prevented termination; ADR-0044 C1 chokepoint escape",
+			maxIterations, cursor.current))
+		result, phaseTimings = timingOwner.result, timingOwner.phaseTimings
+		cs, state = timingOwner.cs, timingOwner.state
 		return result, fmt.Errorf("resume iteration limit: %d dispatch iterations without reaching PhaseEnd at %s", maxIterations, cursor.current)
 	}
 	result.TerminationReason = cursor.termination.reason
