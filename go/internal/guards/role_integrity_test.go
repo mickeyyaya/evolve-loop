@@ -184,3 +184,57 @@ func TestRole_BypassProtectedPathAlarms(t *testing.T) {
 		t.Errorf("non-protected bypass must allow without alarm (allow=%v alarm=%v)", dec.Allow, dec.Alarm)
 	}
 }
+
+// TestRole_DeniesRelocatedExplanationCallSitesInBuildPhase is the #549
+// regression: five files gained an explanation-lifecycle call site when #549
+// carved them out of a protected file (cyclerun_review.go, resume.go,
+// audit.go, runner.go) into one the manifest did not yet name. A build phase
+// must be denied (with an alarm) from editing any of them, exactly like the
+// files it was already denied before the move — and two neighboring files
+// that were NEVER part of this call chain must stay allowed, proving the fix
+// is file-narrow rather than a blanket lockdown of the packages involved.
+func TestRole_DeniesRelocatedExplanationCallSitesInBuildPhase(t *testing.T) {
+	worktree := "/work/wt/cycle-1630" // non-/tmp so isAlwaysSafe doesn't short-circuit
+	s, _ := setupStorageWithCS(t, core.CycleState{
+		CycleID:        1630,
+		Phase:          "build",
+		ActiveAgent:    "builder",
+		ActiveWorktree: worktree,
+		WorkspacePath:  filepath.Join(t.TempDir(), ".evolve", "runs", "cycle-1630"),
+	})
+	g := NewRole(s, false)
+
+	for _, rel := range []string{
+		"go/internal/core/cyclerun_postreview.go",
+		"go/internal/core/resume_execution.go",
+		"go/internal/core/resume_bootstrap.go",
+		"go/internal/phases/audit/classification.go",
+		"go/internal/phases/runner/dispatch.go",
+	} {
+		dec := g.Decide(context.Background(), core.GuardInput{
+			ToolName:  "Edit",
+			ToolInput: map[string]any{"file_path": filepath.Join(worktree, rel)},
+		})
+		if dec.Allow {
+			t.Errorf("build phase editing relocated explanation call site %q must be DENIED", rel)
+		}
+		if !dec.Alarm {
+			t.Errorf("relocated explanation call site deny for %q must raise an Alarm", rel)
+		}
+	}
+
+	// Control: neighboring files in the same packages that hold no
+	// explanation-lifecycle call site must stay ordinary, writable source.
+	for _, rel := range []string{
+		"go/internal/core/cyclerun_record.go",
+		"go/internal/core/resume_cursor.go",
+	} {
+		dec := g.Decide(context.Background(), core.GuardInput{
+			ToolName:  "Edit",
+			ToolInput: map[string]any{"file_path": filepath.Join(worktree, rel)},
+		})
+		if !dec.Allow {
+			t.Errorf("%q holds no explanation call site and must remain writable", rel)
+		}
+	}
+}

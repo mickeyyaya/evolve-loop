@@ -40,10 +40,15 @@ type ProtectedSurfaceEntry struct {
 //
 // The manifest is deliberately a COMPILED Go value, not config: the boundary
 // must not be config-softenable (a .evolve/policy.json knob here would let a
-// cycle write the knob that disarms the guard). Its durable tripwire is
-// go/acs/regression/protectedsurface, which walks the repo for gate-shaped Go
-// files and RED-fails when one is not covered here — so the perimeter cannot
-// silently rot as the trust kernel grows (L4, architecture review 2026-07-16).
+// cycle write the knob that disarms the guard). Two durable tripwires check it
+// on different lanes, so neither can silently rot as the trust kernel grows:
+// go/acs/regression/protectedsurface walks the repo by NAME (any *_gate.go or
+// *guard*.go file must be covered here, L4, architecture review 2026-07-16);
+// TestProtectedSurface_CoversEveryExplanationLifecycleCallSite (guards package)
+// walks it by CALL SITE (any file that calls into the explanation-lifecycle
+// API, derived from build_explanation_handoff.go's and explanationdocs'
+// declarations, must be covered here — closes the #549 class where a
+// relocation changed WHICH file holds the code without changing its name).
 var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/acs/regression/", Rationale: "standing deterministic gates"},
 	{Fragment: "/go/internal/acssuite/", Rationale: "the gate runner"},
@@ -98,25 +103,30 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/internal/core/orchestrator.go", Rationale: "fresh-cycle explanation activation and Build-context sealing call sites"},
 	{Fragment: "/go/internal/core/cyclerun.go", Rationale: "fresh-cycle explanation contract-version stamp"},
 	{Fragment: "/go/internal/core/cyclerun_dispatch.go", Rationale: "fresh-cycle downstream explanation projection call site"},
-	{Fragment: "/go/internal/core/cyclerun_review.go", Rationale: "fresh-cycle post-Build explanation refresh call site"},
+	{Fragment: "/go/internal/core/cyclerun_review.go", Rationale: "post-Build explanation refresh eligibility decision and review-to-guard ordering"},
+	{Fragment: "/go/internal/core/cyclerun_postreview.go", Rationale: "fresh-cycle post-Build explanation refresh call site (applyPostReviewGuards -> explanationdocs.RefreshResult); carved out of cyclerun_review.go by #549"},
 	{Fragment: "/go/internal/core/cyclerun_remediate.go", Rationale: "Build explanation correction and remediation projection"},
 	{Fragment: "/go/internal/core/continuation_stamp.go", Rationale: "continuation explanation-history ownership transition"},
 	{Fragment: "/go/internal/core/evaluate_batch.go", Rationale: "parallel evaluator explanation handoff projection"},
 	{Fragment: "/go/internal/core/failure_learning.go", Rationale: "failed-cycle explanation handoff projection"},
 	{Fragment: "/go/internal/core/ship_recovery.go", Rationale: "rebase recovery must invalidate stale explanation and route through Build"},
-	{Fragment: "/go/internal/core/resume.go", Rationale: "resume activation, sealing, projection, and post-Build refresh call sites"},
+	{Fragment: "/go/internal/core/resume.go", Rationale: "resume entry point (RunCycleFromPhase) and resumed-deliverable explanation review parity (reviewResumedDeliverable)"},
+	{Fragment: "/go/internal/core/resume_execution.go", Rationale: "resume sealing, projection, and post-Build refresh call sites (resumeExecution.run); carved out of resume.go by #549"},
+	{Fragment: "/go/internal/core/resume_bootstrap.go", Rationale: "resume rebase-split recovery and explanation identity check (explanationdocs.RecoverRebaseSplit, requireResumeExplanationIdentity); carved out of resume.go by #549"},
 	{Fragment: "/go/internal/core/ports.go", Rationale: "typed Bridge request sandbox requirement"},
 	{Fragment: "/go/internal/core/phase.go", Rationale: "typed phase explanation handoff and contract-version fields"},
 	{Fragment: "/go/internal/cyclestate/state.go", Rationale: "durable explanation contract version and Build binding state"},
 	{Fragment: "/go/internal/phaseio/handoffs.go", Rationale: "typed cross-phase explanation handoff schema"},
-	{Fragment: "/go/internal/phases/runner/runner.go", Rationale: "mandatory versioned-Build sandbox propagation call site"},
+	{Fragment: "/go/internal/phases/runner/runner.go", Rationale: "requiresExplanationSandbox decision (the assignment call site now lives in dispatch.go)"},
+	{Fragment: "/go/internal/phases/runner/dispatch.go", Rationale: "mandatory versioned-Build sandbox propagation call site (dispatchPhaseAttempts sets RequireSandbox from requiresExplanationSandbox); carved out of runner.go by #549"},
 	{Fragment: "/go/internal/bridge/", Rationale: "Bridge registry, drivers, and OS sandbox fail-closed enforcement for versioned Build"},
 	{Fragment: "/go/internal/adapters/bridge/", Rationale: "Bridge request adapter preserving mandatory Build sandbox propagation"},
 	{Fragment: "/go/internal/adapters/sandbox/", Rationale: "OS-specific confinement policy and generated write boundary"},
 	{Fragment: "/go/internal/looppreflight/checks.go", Rationale: "pre-spend required-sandbox readiness HALT"},
 	{Fragment: "/go/internal/looppreflight/drivers.go", Rationale: "sandbox-enabled profile discovery used by readiness HALT"},
 	{Fragment: "/go/internal/preflight/preflight.go", Rationale: "measured host sandbox capability used by readiness HALT"},
-	{Fragment: "/go/internal/phases/audit/audit.go", Rationale: "Auditor explanation-review gate call site"},
+	{Fragment: "/go/internal/phases/audit/audit.go", Rationale: "Auditor explanation documentation host activation gate"},
+	{Fragment: "/go/internal/phases/audit/classification.go", Rationale: "Auditor explanation-review gate call site (newAuditClassification -> validateExplanationReview); carved out of audit.go by #549"},
 	{Fragment: "/go/internal/phases/retro/retro.go", Rationale: "Retrospective explanation-review gate call site"},
 	{Fragment: "/go/internal/phases/ship/native.go", Rationale: "native Ship explanation re-verification call site"},
 	{Fragment: "/go/internal/phases/ship/ship.go", Rationale: "Ship phase typed explanation binding propagation"},
