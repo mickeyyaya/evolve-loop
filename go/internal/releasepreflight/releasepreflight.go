@@ -321,256 +321,30 @@ func defaultCIConclusion(repoRoot string) (CIRunStatus, error) {
 // Run executes all 5 preflight steps in order. Returns ErrCheckFailed
 // wrapped with a per-step message; cmd layer logs the message and exits 1.
 func Run(opts Options) (Result, error) {
-	res := Result{StepsTotal: 5}
-
-	// Resolve defaults.
-	if opts.RepoRoot == "" {
-		return res, fmt.Errorf("%w: RepoRoot required", ErrCheckFailed)
-	}
-	if opts.PluginJSONPath == "" {
-		opts.PluginJSONPath = filepath.Join(opts.RepoRoot, ".claude-plugin", "plugin.json")
-	}
-	if opts.LedgerPath == "" {
-		opts.LedgerPath = filepath.Join(opts.RepoRoot, ".evolve", "ledger.jsonl")
-	}
-	now := opts.Now
-	if now == nil {
-		now = time.Now
-	}
-	gitClean := opts.GitClean
-	if gitClean == nil {
-		gitClean = defaultGitClean
-	}
-	currentBranch := opts.CurrentBranch
-	if currentBranch == nil {
-		currentBranch = defaultCurrentBranch
-	}
-	gateRunner := opts.GateTestRunner
-	if gateRunner == nil {
-		gateRunner = defaultGateTestRunner
-	}
-	logw := opts.Stderr
-	if logw == nil {
-		logw = io.Discard
-	}
-	logf := func(format string, args ...any) {
-		fmt.Fprintf(logw, "[preflight] "+format+"\n", args...)
-	}
-
-	// Step 1: clean tree.
-	logf("step 1: working tree clean?")
-	if opts.DryRun {
-		logf("DRY-RUN: would check git diff --quiet HEAD")
-	} else {
-		clean, err := gitClean(opts.RepoRoot)
-		if err != nil {
-			return res, fmt.Errorf("%w: step 1 git error: %v", ErrCheckFailed, err)
-		}
-		if !clean {
-			return res, fmt.Errorf("%w: working tree has uncommitted changes — commit or stash first", ErrCheckFailed)
-		}
-		logf("OK: working tree clean")
-	}
-	res.StepsPassed++
-
-	// Step 2: branch attached.
-	logf("step 2: branch attached?")
-	if opts.DryRun {
-		logf("DRY-RUN: would check git symbolic-ref --short HEAD")
-	} else {
-		branch, err := currentBranch(opts.RepoRoot)
-		if err != nil {
-			return res, fmt.Errorf("%w: step 2 git error: %v", ErrCheckFailed, err)
-		}
-		if branch == "" {
-			return res, fmt.Errorf("%w: detached HEAD — checkout a branch first", ErrCheckFailed)
-		}
-		logf("OK: on branch %s", branch)
-	}
-	res.StepsPassed++
-
-	// Step 3: semver bump validation.
-	logf("step 3: target version %s > current?", opts.Target)
-	if _, _, _, ok := ParseSemver(opts.Target); !ok {
-		return res, fmt.Errorf("%w: target version not semver: %s", ErrCheckFailed, opts.Target)
-	}
-	if _, err := os.Stat(opts.PluginJSONPath); err != nil {
-		return res, fmt.Errorf("%w: plugin.json missing at %s", ErrCheckFailed, opts.PluginJSONPath)
-	}
-	current, err := ExtractJSONVersion(opts.PluginJSONPath)
+	o, err := resolve(opts)
 	if err != nil {
-		return res, fmt.Errorf("%w: %v", ErrCheckFailed, err)
+		return Result{StepsTotal: len(preflightSteps)}, err
 	}
-	res.CurrentVersion = current
-	if _, _, _, ok := ParseSemver(current); !ok {
-		return res, fmt.Errorf("%w: current plugin.json version not semver: %s", ErrCheckFailed, current)
-	}
-	if opts.Target == current {
-		return res, fmt.Errorf("%w: target %s equals current %s — nothing to bump", ErrCheckFailed, opts.Target, current)
-	}
-	if !SemverGT(opts.Target, current) {
-		return res, fmt.Errorf("%w: target %s is not greater than current %s", ErrCheckFailed, opts.Target, current)
-	}
-	logf("OK: %s → %s (valid bump)", current, opts.Target)
-	res.StepsPassed++
+	p := newPreflightRun(o, opts.Stderr)
 
-	// Step 4: recent audit PASS.
-	logf("step 4: recent auditor PASS verdict?")
-	if opts.DryRun {
-		logf("DRY-RUN: would check %s for recent auditor PASS", opts.LedgerPath)
-	} else {
-		headFn := opts.HeadSHA
-		if headFn == nil {
-			headFn = defaultHeadSHA
+	// The counted contract: each step either advances StepsPassed or is the
+	// failure the caller sees. Result is returned populated either way — its
+	// doc comment promises diagnostics on the failure path too, which
+	// TestRun_StepsPassedOnFailure_CountsStepsReached pins.
+	for _, step := range preflightSteps {
+		if err := step(p); err != nil {
+			return p.res, err
 		}
-		// Resolution failure is not fatal: an empty head simply keeps step 4's
-		// conservative branch, which is the same posture as before this scoping.
-		releaseHead, headErr := headFn(opts.RepoRoot)
-		if headErr != nil {
-			logf("advisory: could not resolve the release commit (%v) — a failing audit will be treated as blocking", headErr)
-			releaseHead = ""
-		}
-		auditRes, err := checkRecentAudit(opts.LedgerPath, releaseHead, opts.StrictPass, now())
-		if err != nil {
-			return res, fmt.Errorf("%w: %v", ErrCheckFailed, err)
-		}
-		res.AuditArtifact = auditRes.artifact
-		res.AuditVerdict = auditRes.verdict
-		res.AuditAge = auditRes.age
-		res.PhantomEntries = auditRes.phantomCount
-		switch auditRes.verdict {
-		case auditVerdictScopedOut:
-			// An audit exists and did not pass, but it did not examine this
-			// release commit's committed tree. Name the artifact and both
-			// commits: reporting it as "no audit" would misdirect an operator
-			// debugging a blocked release toward a missing-artifact hunt.
-			logf("advisory: the most recent audit (%s) did not pass, but it did not audit this release commit's tree (audited %s, releasing %s) — CI-green on the release commit is the authoritative gate (/publish). Not treating it as a veto.",
-				auditRes.artifact, shortSHA(auditRes.auditedHead), shortSHA(releaseHead))
-		case auditVerdictNone:
-			// Determinism: no on-disk audit available in this worktree (clean
-			// checkout / CI / GC'd artifacts). The authoritative release gate is
-			// CI-green on the release commit (enforced by /publish) — advisory only.
-			logf("advisory: no on-disk audit in this worktree — CI-green on the release commit is the authoritative gate (/publish). Skipping the audit-PASS check.")
-		default:
-			if auditRes.phantomCount > 0 {
-				logf("WARN: skipped %d phantom auditor entry/entries (artifact missing on disk). Using most-recent VALID entry.", auditRes.phantomCount)
-			}
-			if auditRes.verdict == "WARN" {
-				logf("INFO: most recent audit is WARN (fluent posture; ships by default). Set EVOLVE_RELEASE_STRICT_PASS=1 for strict-PASS gate.")
-			}
-			logf("OK: latest audit %s, artifact=%s", auditRes.verdict, auditRes.artifact)
-		}
+		p.res.StepsPassed++
 	}
-	res.StepsPassed++
-
-	// Step 5: gate-test suites.
-	logf("step 5: gate-test suites green?")
-	if opts.SkipTests {
-		logf("WARN: --skip-tests set; skipping gate-test execution")
-		res.StepsPassed++
-	} else if opts.DryRun {
-		logf("DRY-RUN: would run %d gate-test suites", len(DefaultGateTestSuites))
-		res.StepsPassed++
-	} else {
-		for _, suite := range DefaultGateTestSuites {
-			logf("  running %s...", suite)
-			if err := gateRunner(opts.RepoRoot, suite); err != nil {
-				return res, fmt.Errorf("%w: gate-test suite failed: %s — re-run interactively to inspect (%v)",
-					ErrCheckFailed, suite, err)
-			}
-			res.GateTestsPassed++
-		}
-		logf("OK: all %d gate-test suites green", len(DefaultGateTestSuites))
-
-		// Step 5 sub-check: no dead naming tokens survive in tracked files.
-		// Shares the legacynames acs gate's scanner + SSOT (.evolve/naming.json),
-		// so a release can't ship a rename that left a 404 slug / dead command
-		// behind. No-ops when the repo has no manifest.
-		nameGuard := opts.NameGuard
-		if nameGuard == nil {
-			nameGuard = defaultNameGuard
-		}
-		logf("  scanning for dead naming tokens (.evolve/naming.json)...")
-		vs, err := nameGuard(opts.RepoRoot)
-		if err != nil {
-			return res, fmt.Errorf("%w: naming guard error: %v", ErrCheckFailed, err)
-		}
-		if len(vs) > 0 {
-			return res, fmt.Errorf("%w: %d dead naming token(s) in tracked files — run `evolve names fix`: %s",
-				ErrCheckFailed, len(vs), vs[0])
-		}
-		logf("OK: no dead naming tokens")
-		// Step 5 counts as passed only here — after BOTH the gate-test suites
-		// (above) and this naming scan come back clean.
-		res.StepsPassed++
+	// Neither of these counts toward StepsPassed/StepsTotal; see their own
+	// doc comments in preflight_run.go for why they sit outside the table.
+	if err := p.gateReleaseCommitCI(); err != nil {
+		return p.res, err
 	}
-
-	// Release-commit CI hard-gate (cycle-748, push-ci-watch-remote-parity):
-	// the remote go CI run for HEAD must be conclusion=success before tagging
-	// (v22.0.0 was cut on red CI). Does NOT count toward StepsPassed/StepsTotal
-	// (back-compat with the 5-step contract). An UNAVAILABLE verdict (no repo,
-	// gh missing, no run visible) is advisory-skipped — same determinism rule
-	// as auditVerdictNone — but a present non-success verdict hard-fails
-	// unless Options.AllowRedCI is explicitly set, and an override is always
-	// logged loudly and recorded in Result.CIOverridden.
-	logf("release-commit CI conclusion green?")
-	if opts.DryRun {
-		logf("DRY-RUN: would check the remote CI conclusion for HEAD")
-	} else {
-		ciFn := opts.CIConclusion
-		if ciFn == nil {
-			ciFn = defaultCIConclusion
-		}
-		ci, err := ciFn(opts.RepoRoot)
-		if err != nil {
-			return res, fmt.Errorf("%w: release-commit CI check error: %v", ErrCheckFailed, err)
-		}
-		res.CIConclusion = ci.Conclusion
-		switch {
-		case ci.Conclusion == "":
-			logf("advisory: remote CI conclusion unavailable (no run visible / gh unavailable) — /publish's CI-green check remains authoritative")
-		case ci.Conclusion == "success":
-			logf("OK: release-commit CI conclusion=success %s", ci.RunURL)
-		case opts.AllowRedCI:
-			res.CIOverridden = true
-			logf("OVERRIDE: release-commit CI conclusion is %q (run %s) — NOT green", ci.Conclusion, ci.RunURL)
-			logf("OVERRIDE: proceeding ONLY because --allow-red-ci was explicitly passed; this release ships without a green remote CI verdict")
-		default:
-			return res, fmt.Errorf("%w: release-commit CI conclusion is %q, not success (run %s) — fix CI or pass --allow-red-ci to override",
-				ErrCheckFailed, ci.Conclusion, ci.RunURL)
-		}
-	}
-
-	// Advisory step (v12.1.5+): auto-respond simulation suite. Does NOT count
-	// toward StepsPassed/StepsTotal and never returns ErrCheckFailed; logged
-	// as WARN on failure. Promotes to a required step in v12.2.0.
-	if opts.SkipTests {
-		logf("advisory: auto-respond simulation suite — skipped (--skip-tests)")
-	} else if opts.DryRun {
-		logf("advisory: auto-respond simulation suite — skipped (dry-run)")
-	} else {
-		simRunner := opts.SimulationRunner
-		if simRunner == nil {
-			simRunner = defaultSimulationRunner
-		}
-		logf("advisory: running auto-respond simulation suite...")
-		if err := simRunner(opts.RepoRoot); err != nil {
-			f := false
-			res.SimulationAdvisoryOK = &f
-			logf("WARN: auto-respond simulation suite failed (advisory in v12.1.5; required in v12.2.0): %v", err)
-		} else {
-			t := true
-			res.SimulationAdvisoryOK = &t
-			logf("OK: auto-respond simulation suite passed")
-		}
-	}
-
-	dryRunSuffix := ""
-	if opts.DryRun {
-		dryRunSuffix = " (dry-run)"
-	}
-	logf("DONE: preflight passed for %s%s", opts.Target, dryRunSuffix)
-	return res, nil
+	p.adviseSimulation()
+	p.logDone()
+	return p.res, nil
 }
 
 // --- Audit-ledger walker ---------------------------------------------------
