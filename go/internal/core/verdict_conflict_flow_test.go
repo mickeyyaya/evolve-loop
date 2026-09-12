@@ -11,7 +11,7 @@ import (
 //
 // The cycle-1124 fix deliberately adds NO new plumbing: it emits the conflict
 // record as an ERROR-severity diagnostic so the existing chain carries it —
-// errorSeverityMessages → CycleState.AuditFailReasons (the ADR-0072 coherence
+// cyclestate.ErrorMessages → CycleState.AuditFailReasons (the ADR-0072 coherence
 // floor's only authoritative source) → <phase>-fail-reason.json (forensics) →
 // failure dossier SubstantiveError/FailReasons (failure_dossier.go:86).
 //
@@ -47,7 +47,7 @@ func TestVerdictConflict_ErrorDiagnosticReachesAuditFailReasons(t *testing.T) {
 
 // TestVerdictConflict_WarningSeverityWouldBeDropped — why the producer MUST use
 // error severity. A warning-severity conflict record is silently discarded by
-// errorSeverityMessages, and worse, clears the carriers entirely: it would look
+// cyclestate.ErrorMessages, and worse, clears the carriers entirely: it would look
 // exactly like today's silent-discard defect.
 func TestVerdictConflict_WarningSeverityWouldBeDropped(t *testing.T) {
 	dir := t.TempDir()
