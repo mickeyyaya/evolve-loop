@@ -98,7 +98,7 @@
    bridge engine's WARN/TRIPWIRE/CONTEXT-FILL and pane liveness. S4: the ledger port (a decorator emits
    `ledger.appended`), `dispatchevents` writers, the observer adapter. The ledger's hash chain is NOT
    replaced — provenance stays where it is; the Center is the monitoring stream beside it.
-8. **`panestream.SignalCenter` is renamed `LivenessCenter`** (S3, as its own commit, amending
+8. **`panestream.SignalCenter` is renamed `LivenessCenter`** (done: S3 commit 1, 2026-09-13, amending
    ADR-0068/0070 — `bridge.Deps.LivenessCenter` already carries the target name, so the rename removes
    an existing name/meaning mismatch) and becomes a producer of `pane.liveness` edges; one name, one
    meaning.

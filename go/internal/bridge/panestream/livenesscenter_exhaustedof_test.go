@@ -2,7 +2,7 @@ package panestream
 
 import "testing"
 
-// signalcenter_exhaustedof_test.go — ExhaustedOf, the STATELESS fast-loop
+// livenesscenter_exhaustedof_test.go — ExhaustedOf, the STATELESS fast-loop
 // exhaustion check (the exhaustion twin of BusyOf). The driver's ~2s poll calls
 // it to fast-fail a walled CLI immediately, instead of waiting for the next 300s
 // stop-review checkpoint's Observe (the production gap the checkpoint-only path
@@ -12,7 +12,7 @@ func TestSignalCenter_ExhaustedOf(t *testing.T) {
 	walled := PaneProfile{Name: "agy", ExhaustedRegex: `(?i)quota (exceeded|reached)`}
 
 	// nil-safe (mirrors BusyOf): a caller holding an optional center needs no guard.
-	var nilSC *SignalCenter
+	var nilSC *LivenessCenter
 	if !nilSC.ExhaustedOf("⚠ Individual quota reached. Resets 52h\n", walled) {
 		t.Error("nil-safe ExhaustedOf must detect a matching wall")
 	}
@@ -20,7 +20,7 @@ func TestSignalCenter_ExhaustedOf(t *testing.T) {
 		t.Error("no wall in pane → false")
 	}
 
-	sc := NewSignalCenter()
+	sc := NewLivenessCenter()
 	if !sc.ExhaustedOf("⚠ Individual quota reached\n", walled) {
 		t.Error("matching wall → true")
 	}

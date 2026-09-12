@@ -156,15 +156,15 @@ func TestC433_002_SameKeyObserveAggregateRaceClean(t *testing.T) {
 // exactly.
 func TestC433_003_StressTestExercisesAllFiveOps(t *testing.T) {
 	path := filepath.Join(acsassert.RepoRoot(t), "go", "internal", "bridge", "panestream",
-		"signalcenter_parallelevaluate_test.go")
+		"livenesscenter_parallelevaluate_test.go")
 	b, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("C433_003: read %s: %v", path, err)
 	}
 	src := string(b)
-	for _, op := range []string{"NewSignalCenter(", ".Observe(", ".Aggregate(", ".Busy(", ".Changed(", "RegisterHandler("} {
+	for _, op := range []string{"NewLivenessCenter(", ".Observe(", ".Aggregate(", ".Busy(", ".Changed(", "RegisterHandler("} {
 		if !strings.Contains(src, op) {
-			t.Errorf("C433_003: signalcenter_parallelevaluate_test.go missing a call to %q — the stress test must exercise ALL FIVE SignalCenter ops on a shared center, not a cheap fake that only drives Observe on distinct keys", op)
+			t.Errorf("C433_003: livenesscenter_parallelevaluate_test.go missing a call to %q — the stress test must exercise ALL FIVE SignalCenter ops on a shared center, not a cheap fake that only drives Observe on distinct keys", op)
 		}
 	}
 }

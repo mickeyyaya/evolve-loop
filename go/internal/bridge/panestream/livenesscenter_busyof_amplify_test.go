@@ -7,13 +7,13 @@ import (
 	"testing"
 )
 
-// signalcenter_busyof_amplify_test.go — Test-Amplification pass for cycle 434
+// livenesscenter_busyof_amplify_test.go — Test-Amplification pass for cycle 434
 // slice S4 (s4-complete-residual-busy-callsites, ADR-0068). Written black-box
 // against the TDD contract (test-report.md) and the eval acceptance criteria
-// (s4-complete-residual-busy-callsites.md) WITHOUT reading signalcenter.go's
+// (s4-complete-residual-busy-callsites.md) WITHOUT reading livenesscenter.go's
 // diff — only the documented signature is used:
 //
-//	func (sc *SignalCenter) BusyOf(rendered string, profile PaneProfile) bool
+//	func (sc *LivenessCenter) BusyOf(rendered string, profile PaneProfile) bool
 //
 // Contract pinned here (from the spec, not the implementation):
 //  1. BusyOf delegates to the SAME PaneBusy(rendered, profile) definition
@@ -22,7 +22,7 @@ import (
 //     oracle against the real, pre-existing panedelta.go:PaneBusy, so any
 //     future divergence (e.g. a "helpful" special case added only to BusyOf)
 //     fails here even though it might look like an improvement.
-//  2. Nil-receiver-safe (build-report.md: "safe on a nil *SignalCenter
+//  2. Nil-receiver-safe (build-report.md: "safe on a nil *LivenessCenter
 //     receiver ... never dereferences sc").
 //  3. Stateless: never mutates sc.sessions (build-report.md).
 //
@@ -32,7 +32,7 @@ import (
 // _NilReceiverSafe) — breadth across all four shipped CLI profiles, the
 // ANSI/large-input/ollama-placeholder edge cases those single-fixture names
 // suggest are not yet covered, and NEW-method safety under the established
-// ParallelEvaluate mixed-op concurrency stress (signalcenter_parallelevaluate_test.go,
+// ParallelEvaluate mixed-op concurrency stress (livenesscenter_parallelevaluate_test.go,
 // cycle 433) which predates BusyOf and so never exercised it.
 
 // TestSignalCenter_BusyOf_AllProfilesMatrix (breadth, differential):
@@ -41,7 +41,7 @@ import (
 // existing MatchesStandalonePaneBusy test (per build-report.md) is singular
 // in name; this closes the per-profile breadth gap explicitly.
 func TestSignalCenter_BusyOf_AllProfilesMatrix(t *testing.T) {
-	sc := NewSignalCenter()
+	sc := NewLivenessCenter()
 	cases := []struct {
 		name         string
 		profile      PaneProfile
@@ -106,7 +106,7 @@ func TestSignalCenter_BusyOf_AllProfilesMatrix(t *testing.T) {
 // unknown profile with an EMPTY pane; an unknown profile must not be
 // conflated with "always reads idle."
 func TestSignalCenter_BusyOf_ZeroValueProfileWithAffordanceLine(t *testing.T) {
-	sc := NewSignalCenter()
+	sc := NewLivenessCenter()
 	zero := PaneProfile{}
 	rendered := "some agent output\nesc to interrupt\n"
 
@@ -125,7 +125,7 @@ func TestSignalCenter_BusyOf_ZeroValueProfileWithAffordanceLine(t *testing.T) {
 // BusyOf that read raw bytes without going through that same path would
 // falsely report idle on live terminal output.
 func TestSignalCenter_BusyOf_ANSIWrappedAffordanceLine(t *testing.T) {
-	sc := NewSignalCenter()
+	sc := NewLivenessCenter()
 	p := Profiles["claude"]
 	rendered := "⏺ thinking\n\x1b[31mesc to interrupt\x1b[0m\n❯ \n"
 
@@ -148,7 +148,7 @@ func TestSignalCenter_BusyOf_ANSIWrappedAffordanceLine(t *testing.T) {
 // future BusyOf edit that "fixes" this by short-circuiting on empty input —
 // which would break the documented single-definition delegation contract.
 func TestSignalCenter_BusyOf_OllamaEmptyPaneReadsBusy(t *testing.T) {
-	sc := NewSignalCenter()
+	sc := NewLivenessCenter()
 	p := Profiles["ollama"]
 
 	want := PaneBusy("", p)
@@ -165,7 +165,7 @@ func TestSignalCenter_BusyOf_OllamaEmptyPaneReadsBusy(t *testing.T) {
 // rules for the one profile where both are simultaneously reachable
 // (ollama has both an IdlePlaceholder AND can carry an affordance line).
 func TestSignalCenter_BusyOf_OllamaIdlePlaceholderBoundary(t *testing.T) {
-	sc := NewSignalCenter()
+	sc := NewLivenessCenter()
 	p := Profiles["ollama"]
 
 	cases := []struct {
@@ -194,7 +194,7 @@ func TestSignalCenter_BusyOf_OllamaIdlePlaceholderBoundary(t *testing.T) {
 // correctly — and the negative case (no affordance anywhere in a
 // large pane) must not false-positive.
 func TestSignalCenter_BusyOf_LargeRenderedPaneBuried(t *testing.T) {
-	sc := NewSignalCenter()
+	sc := NewLivenessCenter()
 	p := Profiles["claude"]
 
 	const numFillerLines = 5000
@@ -237,8 +237,8 @@ func TestSignalCenter_BusyOf_LargeRenderedPaneBuried(t *testing.T) {
 // nil on the majority of production paths per test-report.md's design
 // rationale) — this closes that gap.
 func TestSignalCenter_BusyOf_NilReceiverMatchesNonNilForBusyInput(t *testing.T) {
-	var nilCenter *SignalCenter
-	freshCenter := NewSignalCenter()
+	var nilCenter *LivenessCenter
+	freshCenter := NewLivenessCenter()
 	p := Profiles["claude"]
 	rendered := "⏺ thinking\nesc to interrupt\n❯ \n"
 
@@ -263,14 +263,14 @@ func TestSignalCenter_BusyOf_NilReceiverMatchesNonNilForBusyInput(t *testing.T) 
 
 // TestSignalCenter_BusyOf_RepeatedCallsIdempotentNoStateLeak (stateless,
 // stronger than a single-call check): alternates busy/idle inputs across
-// many calls on the SAME *SignalCenter and asserts every call is correct in
+// many calls on the SAME *LivenessCenter and asserts every call is correct in
 // isolation — a hidden memoization or accumulator bug would surface as
 // cross-call contamination that a single before/after StatelessNoSessionMutation
 // assertion (per build-report.md's name, presumably one Observe-vs-no-Observe
 // check) would not catch. Also re-verifies the sessions map stays untouched
 // after sustained BusyOf traffic.
 func TestSignalCenter_BusyOf_RepeatedCallsIdempotentNoStateLeak(t *testing.T) {
-	sc := NewSignalCenter()
+	sc := NewLivenessCenter()
 	p := Profiles["claude"]
 	busy := "⏺ thinking\nesc to interrupt\n❯ \n"
 	idle := "⏺ done\n❯ \n"
@@ -294,10 +294,10 @@ func TestSignalCenter_BusyOf_RepeatedCallsIdempotentNoStateLeak(t *testing.T) {
 }
 
 // TestSignalCenter_BusyOf_ConcurrentWithObserveAggregateRegisterHandler
-// (-race, S5-forward-looking): BusyOf is the newest method on SignalCenter
+// (-race, S5-forward-looking): BusyOf is the newest method on LivenessCenter
 // and postdates the established ParallelEvaluate mixed-op stress harness
-// (signalcenter_parallelevaluate_test.go, cycle 433's s5-parallelevaluate-stress-race,
-// "written against the ALREADY-SHIPPED SignalCenter") — that harness never
+// (livenesscenter_parallelevaluate_test.go, cycle 433's s5-parallelevaluate-stress-race,
+// "written against the ALREADY-SHIPPED LivenessCenter") — that harness never
 // exercised BusyOf because it did not exist yet. The cycle-434 goal's own S5
 // slice ("concurrency hardening ... under ParallelEvaluate") is still
 // upcoming; this pins BusyOf's concurrency safety now, before S5 formally
@@ -309,7 +309,7 @@ func TestSignalCenter_BusyOf_ConcurrentWithObserveAggregateRegisterHandler(t *te
 	const observesPerProducer = 50
 	const busyOfIterations = 300
 
-	sc := NewSignalCenter()
+	sc := NewLivenessCenter()
 	claudeProfile := Profiles["claude"]
 	busyRendered := "⏺ thinking\nesc to interrupt\n❯ \n"
 	idleRendered := "⏺ done\n❯ \n"

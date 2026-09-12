@@ -18,7 +18,7 @@ type replWaitState struct {
 	intervalS       int
 	maxExtends      int
 	reviewer        StopReviewer
-	livenessCenter  *panestream.SignalCenter
+	livenessCenter  *panestream.LivenessCenter
 	paneProfile     panestream.PaneProfile
 	livenessProfile panestream.PaneProfile
 	recoveryStage   string
@@ -89,7 +89,7 @@ func newReplWaitState(w replWaiter) *replWaitState {
 
 	livenessCenter := w.deps.LivenessCenter
 	if livenessCenter == nil {
-		livenessCenter = panestream.NewSignalCenter()
+		livenessCenter = panestream.NewLivenessCenter()
 	}
 	paneProfile := w.channel.profile
 	livenessProfile := paneProfile

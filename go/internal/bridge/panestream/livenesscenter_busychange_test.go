@@ -1,8 +1,8 @@
 package panestream
 
-// signalcenter_busychange_test.go — RED tests for cycle-432 slice S4, Task 1
+// livenesscenter_busychange_test.go — RED tests for cycle-432 slice S4, Task 1
 // (s4-center-busy-change-projection): fold panestream.PaneBusy and
-// bridge.PaneHasSubstantiveChange into panestream.SignalCenter as per-session
+// bridge.PaneHasSubstantiveChange into panestream.LivenessCenter as per-session
 // projections Busy(sessionKey) bool and Changed(sessionKey) bool, so the
 // driver checkpoint (Task 2) stops parsing CLI chrome a second time itself.
 // TDD contract: these tests are written BEFORE Busy/Changed exist. They
@@ -26,7 +26,7 @@ import (
 // panestream.PaneBusy(pane, profile) for the SAME pane — the projection is the
 // existing function folded in, not a reimplementation that can drift.
 func TestSignalCenter_BusyProjection(t *testing.T) {
-	sc := NewSignalCenter()
+	sc := NewLivenessCenter()
 	p := Profiles["claude"]
 
 	busyPane := "⏺ working\n⏵⏵ bypass permissions on (shift+tab to cycle) · esc to interrupt\n❯ \n"
@@ -52,7 +52,7 @@ func TestSignalCenter_BusyProjection(t *testing.T) {
 // when the CLEANED content of the most recent Observe differs from the prior
 // one, and false when two consecutive Observes carry identical content.
 func TestSignalCenter_ChangedProjection(t *testing.T) {
-	sc := NewSignalCenter()
+	sc := NewLivenessCenter()
 	p := Profiles["claude"]
 
 	sc.Observe("sess-1", "❯ starting task\n⏺ line one\n❯ \n", p)
@@ -72,7 +72,7 @@ func TestSignalCenter_ChangedProjection(t *testing.T) {
 // line) must NOT read as Changed — the ticking-clock hole cleanPane closes
 // today must stay closed after the fold.
 func TestSignalCenter_ChangedIgnoresChrome(t *testing.T) {
-	sc := NewSignalCenter()
+	sc := NewLivenessCenter()
 	p := Profiles["claude"]
 
 	sc.Observe("sess-1", "⏺ working on it\n✻ Schlepping… (4s · ↑ 1.2k tokens)\n❯ \n", p)
@@ -85,7 +85,7 @@ func TestSignalCenter_ChangedIgnoresChrome(t *testing.T) {
 // TestSignalCenter_UnknownKeyIsQuiet (AC4, negative): Busy/Changed on an empty
 // or never-observed session key must return false and must not panic.
 func TestSignalCenter_UnknownKeyIsQuiet(t *testing.T) {
-	sc := NewSignalCenter()
+	sc := NewLivenessCenter()
 	if sc.Busy("") {
 		t.Error(`Busy("") on an empty center = true, want false`)
 	}
@@ -105,7 +105,7 @@ func TestSignalCenter_UnknownKeyIsQuiet(t *testing.T) {
 // -race clean under the existing RWMutex model.
 func TestSignalCenter_ProjectionsConcurrent(t *testing.T) {
 	const numProducers = 8
-	sc := NewSignalCenter()
+	sc := NewLivenessCenter()
 	p := Profiles["claude"]
 	sharedKey := "shared-sess"
 

@@ -177,15 +177,15 @@ type Deps struct {
 	// profile (ADR-0049 S0 / gap G6). Tests inject a stub to drive the
 	// mkdir-error fallback branch deterministically.
 	MkScratchDir func(dir, pattern string) (string, error)
-	// LivenessCenter (ADR-0068, S3) is the SignalCenter the tmux-REPL stop-review
+	// LivenessCenter (ADR-0068, S3) is the LivenessCenter the tmux-REPL stop-review
 	// checkpoint observes/aggregates for StopEvent.State — the authoritative
 	// liveness source, replacing the bare per-run detectorFor(lp) probe. nil (the
-	// production default) has the driver build a private panestream.NewSignalCenter()
+	// production default) has the driver build a private panestream.NewLivenessCenter()
 	// per run; tests inject a shared instance so a registered LivenessProbe can be
 	// proven both to win (its state reaches StopEvent.State) and to be invoked
 	// (its call count is observable) — a bypassed center could satisfy the former
 	// by coincidence but never the latter.
-	LivenessCenter *panestream.SignalCenter
+	LivenessCenter *panestream.LivenessCenter
 	// TokenResolver recovers the token usage for a completed Launch window
 	// (token-telemetry S3). nil leaves token counts unavailable while the attempt
 	// ledger still records dispatch, latency, and outcome. A resolver error is

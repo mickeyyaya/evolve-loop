@@ -1,6 +1,6 @@
 package panestream
 
-// signalcenter_bench_test.go — cycle-433 slice S5, Task 2
+// livenesscenter_bench_test.go — cycle-433 slice S5, Task 2
 // (s5-resolve-sharding-decision): measures concurrent Observe throughput on
 // DISTINCT session keys — the metric that exposes whether sc.mu's
 // write-lock-across-Assess() serializes independent sessions (ADR-0068 KF2/H1).
@@ -21,7 +21,7 @@ import (
 // ns/op will stay flat (or worsen) as GOMAXPROCS/parallelism increases instead
 // of improving; run with `-cpu=1,2,4,8` to compare.
 func BenchmarkSignalCenter_ParallelObserve(b *testing.B) {
-	sc := NewSignalCenter()
+	sc := NewLivenessCenter()
 	profile := Profiles["claude"]
 	var keySeq int64
 

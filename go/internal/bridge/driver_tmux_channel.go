@@ -82,8 +82,8 @@ func (c *replLiveChannel) injectionDelivered(corrID string) {
 }
 
 // observeIdle closes a correlation span after a real busy-to-idle transition.
-// SignalCenter remains the only authority for CLI-specific busy detection.
-func (c *replLiveChannel) observeIdle(pane string, center *panestream.SignalCenter) {
+// LivenessCenter remains the only authority for CLI-specific busy detection.
+func (c *replLiveChannel) observeIdle(pane string, center *panestream.LivenessCenter) {
 	if !c.on || c.openCorrID == "" {
 		return
 	}

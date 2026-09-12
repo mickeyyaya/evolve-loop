@@ -23,7 +23,7 @@ package looppreflight
 // go/internal/core/routing_dispatch.go:155-166 — only fmt.Fprintf them to
 // stderr and discard them; nothing in the codebase escalates a dropped/invalid
 // user-phase spec into a structured, gate-visible signal (confirmed: no
-// HealthSignal/SignalCenter integration anywhere consumes these warnings).
+// HealthSignal/LivenessCenter integration anywhere consumes these warnings).
 //
 // FIX CONTRACT (this cycle's new surface — undefined until Builder adds it,
 // so this package fails to compile today; that compile failure IS the RED

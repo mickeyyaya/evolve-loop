@@ -2,7 +2,7 @@ package panestream
 
 import "sync"
 
-// SignalCenter is a Facade that owns per-session liveness signal state
+// LivenessCenter is a Facade that owns per-session liveness signal state
 // (ADR-0068). It aggregates all active session signals into one LivenessState,
 // and exposes a handler-registration API so that adding a CLI = register a
 // strategy + add a profile entry (OCP — no switch edits required).
@@ -23,33 +23,33 @@ import "sync"
 // dominates — the artifact will never come); else Converging if any session is
 // Converging; else Hung; else BusyButStagnant; else Idle; else 0 (empty center).
 // The rule is documented and testable, not implicit.
-type SignalCenter struct {
+type LivenessCenter struct {
 	mu       sync.RWMutex
 	sessions map[string]*sessionSignals
 	registry map[string]func() LivenessProbe
-	handlers []SignalHandler // signal observers (RegisterSignalHandler); dispatched edge-triggered on state transition
+	handlers []LivenessHandler // signal observers (RegisterLivenessHandler); dispatched edge-triggered on state transition
 }
 
-// SignalEvent is one CLI-status observation dispatched to registered handlers:
+// LivenessEvent is one CLI-status observation dispatched to registered handlers:
 // the session whose state changed and its new liveness state. Handlers filter
 // for the states they act on (e.g. the CLI-bench reacts to LivenessExhausted).
-type SignalEvent struct {
+type LivenessEvent struct {
 	SessionKey string
 	State      LivenessState
 }
 
-// SignalHandler reacts to a CLI-status transition. Registered via
-// RegisterSignalHandler; invoked edge-triggered whenever a session's state
+// LivenessHandler reacts to a CLI-status transition. Registered via
+// RegisterLivenessHandler; invoked edge-triggered whenever a session's state
 // changes. It runs inline under Observe (outside all locks), so it must be cheap
 // and non-blocking.
-type SignalHandler func(SignalEvent)
+type LivenessHandler func(LivenessEvent)
 
 // sessionSignals holds the stateful probe and the most recent liveness verdict
 // for one session key, plus the Busy/Changed projections (S4): busy and clean
 // are folded from the standalone PaneBusy/cleanPane so the driver checkpoint
 // never parses pane chrome a second time itself.
 //
-// mu is this session's OWN lock (S5): it — not SignalCenter.mu — owns
+// mu is this session's OWN lock (S5): it — not LivenessCenter.mu — owns
 // probe/last/busy/clean/changed. Every read and every write of those fields
 // goes through mu, so Observe (writer) and Aggregate/Busy/Changed (readers)
 // can never observe a torn update.
@@ -62,9 +62,9 @@ type sessionSignals struct {
 	changed bool
 }
 
-// NewSignalCenter returns an empty, ready-to-use SignalCenter.
-func NewSignalCenter() *SignalCenter {
-	return &SignalCenter{
+// NewLivenessCenter returns an empty, ready-to-use LivenessCenter.
+func NewLivenessCenter() *LivenessCenter {
+	return &LivenessCenter{
 		sessions: make(map[string]*sessionSignals),
 		registry: make(map[string]func() LivenessProbe),
 	}
@@ -76,7 +76,7 @@ func NewSignalCenter() *SignalCenter {
 //
 // Empty name is a no-op (silently dropped). Duplicate registration is
 // last-writer-wins. RegisterHandler is safe for concurrent use.
-func (sc *SignalCenter) RegisterHandler(name string, factory func() LivenessProbe) {
+func (sc *LivenessCenter) RegisterHandler(name string, factory func() LivenessProbe) {
 	if name == "" {
 		return
 	}
@@ -85,13 +85,13 @@ func (sc *SignalCenter) RegisterHandler(name string, factory func() LivenessProb
 	sc.mu.Unlock()
 }
 
-// RegisterSignalHandler registers h to receive a SignalEvent whenever any
+// RegisterLivenessHandler registers h to receive a LivenessEvent whenever any
 // session's liveness state transitions. This is the PUSH half of the center (the
 // "detected and sent to the registered handler" path): a reactive consumer —
 // e.g. the CLI-bench that benches a walled driver so later phases route around
 // it — registers here instead of polling Aggregate. A nil handler is a no-op
 // (mirroring RegisterHandler's empty-name tolerance). Safe for concurrent use.
-func (sc *SignalCenter) RegisterSignalHandler(h SignalHandler) {
+func (sc *LivenessCenter) RegisterLivenessHandler(h LivenessHandler) {
 	if h == nil {
 		return
 	}
@@ -109,7 +109,7 @@ func (sc *SignalCenter) RegisterSignalHandler(h SignalHandler) {
 // never across probe.Assess(), which runs under the session's OWN lock
 // (ss.mu). This is what lets Observe calls on distinct session keys proceed
 // without serializing on one process-global mutex (ADR-0068, measured).
-func (sc *SignalCenter) Observe(sessionKey, rendered string, profile PaneProfile) {
+func (sc *LivenessCenter) Observe(sessionKey, rendered string, profile PaneProfile) {
 	sc.mu.Lock()
 	ss, existed := sc.sessions[sessionKey]
 	if !existed {
@@ -124,7 +124,7 @@ func (sc *SignalCenter) Observe(sessionKey, rendered string, profile PaneProfile
 		ss = &sessionSignals{probe: NewExhaustionProbe(probe)}
 		sc.sessions[sessionKey] = ss
 	}
-	handlers := append([]SignalHandler(nil), sc.handlers...) // snapshot under the structural lock
+	handlers := append([]LivenessHandler(nil), sc.handlers...) // snapshot under the structural lock
 	sc.mu.Unlock()
 
 	ss.mu.Lock()
@@ -149,7 +149,7 @@ func (sc *SignalCenter) Observe(sessionKey, rendered string, profile PaneProfile
 	// a key transitions 0→initial, so a session walled on its very first frame
 	// still dispatches Exhausted; staying in a state re-fires nothing.
 	if state != prev {
-		ev := SignalEvent{SessionKey: sessionKey, State: state}
+		ev := LivenessEvent{SessionKey: sessionKey, State: state}
 		for _, h := range handlers {
 			h(ev)
 		}
@@ -164,7 +164,7 @@ func (sc *SignalCenter) Observe(sessionKey, rendered string, profile PaneProfile
 // S5: the global lock guards only the map lookup; ss.busy itself is read
 // under ss.mu — the SAME lock Observe writes it under — so no torn read is
 // possible.
-func (sc *SignalCenter) Busy(sessionKey string) bool {
+func (sc *LivenessCenter) Busy(sessionKey string) bool {
 	sc.mu.RLock()
 	ss, ok := sc.sessions[sessionKey]
 	sc.mu.RUnlock()
@@ -183,7 +183,7 @@ func (sc *SignalCenter) Busy(sessionKey string) bool {
 //
 // S5: same pattern as Busy — the global lock guards only the map lookup;
 // ss.changed is read under ss.mu, the SAME lock Observe writes it under.
-func (sc *SignalCenter) Changed(sessionKey string) bool {
+func (sc *LivenessCenter) Changed(sessionKey string) bool {
 	sc.mu.RLock()
 	ss, ok := sc.sessions[sessionKey]
 	sc.mu.RUnlock()
@@ -206,9 +206,9 @@ func (sc *SignalCenter) Changed(sessionKey string) bool {
 // bracket) read the same busy signal without polluting the checkpoint's
 // Observe/Aggregate baseline.
 //
-// Safe on a nil *SignalCenter — it reads no receiver state — so a caller
+// Safe on a nil *LivenessCenter — it reads no receiver state — so a caller
 // holding an optional (possibly-nil) center reference never needs a nil guard.
-func (sc *SignalCenter) BusyOf(rendered string, profile PaneProfile) bool {
+func (sc *LivenessCenter) BusyOf(rendered string, profile PaneProfile) bool {
 	return PaneBusy(rendered, profile)
 }
 
@@ -219,10 +219,10 @@ func (sc *SignalCenter) BusyOf(rendered string, profile PaneProfile) bool {
 // LivenessExhausted (the production gap the checkpoint-only path left — a
 // 5-minute hang per walled phase). It shares matchExhaustedPattern with the
 // ExhaustionProbe, so the fast-poll and checkpoint detections can never disagree;
-// empty/invalid ExhaustedRegex → false (fail-open). Safe on a nil *SignalCenter
+// empty/invalid ExhaustedRegex → false (fail-open). Safe on a nil *LivenessCenter
 // (it reads no receiver state), so a caller holding an optional center reference
 // never needs a nil guard.
-func (sc *SignalCenter) ExhaustedOf(rendered string, profile PaneProfile) bool {
+func (sc *LivenessCenter) ExhaustedOf(rendered string, profile PaneProfile) bool {
 	return matchExhaustedPattern(profile.ExhaustedRegex, rendered)
 }
 
@@ -246,7 +246,7 @@ var aggregatePriority = [...]LivenessState{
 // taken (lock ordering invariant). Each ss.last is then read under that
 // session's own lock, the SAME lock Observe writes it under, so no torn read
 // is possible.
-func (sc *SignalCenter) Aggregate() LivenessState {
+func (sc *LivenessCenter) Aggregate() LivenessState {
 	sc.mu.RLock()
 	snapshot := make([]*sessionSignals, 0, len(sc.sessions))
 	for _, ss := range sc.sessions {

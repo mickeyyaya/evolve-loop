@@ -1,6 +1,11 @@
 # ADR-0068: Bridge SignalCenter — Concurrency Model
 
 Status: Accepted
+Amended by [ADR-0101](0101-signal-center.md) (2026-09-13, S3): the type this ADR calls `SignalCenter`
+is `panestream.LivenessCenter` (`NewLivenessCenter`, `LivenessEvent`, `LivenessHandler`,
+`RegisterLivenessHandler`); "signal center" now names the process-scoped `internal/signalcenter`.
+Everything below — the concurrency model, the Facade, the locks — is unchanged; read `SignalCenter`
+as `LivenessCenter`.
 Date: 2026-07-01
 Relates to:
 - [ADR-0047](0047-surface-classification-and-channel-separation.md) — single-source-with-projection; DetectorFor is the fallback projection

@@ -1,14 +1,14 @@
 package bridge
 
-// driver_tmux_repl_signalcenter_test.go — RED tests for cycle-431 slice S3
-// (SignalCenter consolidation): the driver's stop-review checkpoint must
-// route liveness through panestream.SignalCenter.Observe/Aggregate
+// driver_tmux_repl_livenesscenter_test.go — RED tests for cycle-431 slice S3
+// (LivenessCenter consolidation): the driver's stop-review checkpoint must
+// route liveness through panestream.LivenessCenter.Observe/Aggregate
 // (ADR-0068), not the bare per-run detectorFor(lp) probe, and the
 // reviewer's pre-S3 Progressed/Busy boolean fallback must be retired —
 // verdict becomes a pure function of StopEvent.State.
 //
 // Seam: Deps.LivenessCenter (optional override; nil ⇒ the driver builds its
-// own panestream.NewSignalCenter()) — a minimal DI seam (scout BA2) so a
+// own panestream.NewLivenessCenter()) — a minimal DI seam (scout BA2) so a
 // test can register a distinctive probe and prove the checkpoint actually
 // consults it, without adding a new apicover-tracked symbol (Deps is
 // already covered elsewhere; a struct field is not a SymbolKind apicover
@@ -37,7 +37,7 @@ func (p *fixedStateProbe) Assess(_ string, _ panestream.PaneProfile) (panestream
 }
 
 // TestRunTmuxREPL_SignalCenterStateWins (AC1, positive): a LivenessProbe
-// registered on an injected SignalCenter for the "claude" profile name must
+// registered on an injected LivenessCenter for the "claude" profile name must
 // be the state the checkpoint assigns to StopEvent.State — proof the driver
 // routes through center.Observe + center.Aggregate() (ADR-0068), not a
 // private per-run detectorFor(lp) probe that never learns about the
@@ -46,7 +46,7 @@ func (p *fixedStateProbe) Assess(_ string, _ panestream.PaneProfile) (panestream
 // registered handler winning.
 func TestRunTmuxREPL_SignalCenterStateWins(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
-	center := panestream.NewSignalCenter()
+	center := panestream.NewLivenessCenter()
 	probe := &fixedStateProbe{state: panestream.LivenessHung}
 	center.RegisterHandler("claude", func() panestream.LivenessProbe { return probe })
 
@@ -72,7 +72,7 @@ func TestRunTmuxREPL_SignalCenterStateWins(t *testing.T) {
 // state-only assertion (AC1) cannot by itself rule out.
 func TestRunTmuxREPL_SignalCenterProbeActuallyInvoked(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
-	center := panestream.NewSignalCenter()
+	center := panestream.NewLivenessCenter()
 	probe := &fixedStateProbe{state: panestream.LivenessBusyButStagnant}
 	center.RegisterHandler("claude", func() panestream.LivenessProbe { return probe })
 
@@ -81,7 +81,7 @@ func TestRunTmuxREPL_SignalCenterProbeActuallyInvoked(t *testing.T) {
 	_, _ = runTmuxRev(t, fx, tmux, rev, Deps{ArtifactTimeoutS: 2, LivenessCenter: center}, "--allow-bypass")
 
 	if probe.calls == 0 {
-		t.Fatal("registered SignalCenter probe was never invoked — the driver bypassed the center (AC5: center must not be bypassed)")
+		t.Fatal("registered LivenessCenter probe was never invoked — the driver bypassed the center (AC5: center must not be bypassed)")
 	}
 }
 

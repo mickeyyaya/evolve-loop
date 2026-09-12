@@ -72,7 +72,7 @@ type ExhaustionProbe struct {
 }
 
 // NewExhaustionProbe wraps inner with exhaustion-override detection. The
-// SignalCenter wraps every per-CLI probe in one of these so exhaustion flows
+// LivenessCenter wraps every per-CLI probe in one of these so exhaustion flows
 // through the same abstraction as liveness.
 func NewExhaustionProbe(inner LivenessProbe) *ExhaustionProbe {
 	return &ExhaustionProbe{inner: inner}
@@ -91,7 +91,7 @@ func (e *ExhaustionProbe) Assess(rendered string, profile PaneProfile) (Liveness
 
 // matchExhaustedPattern reports whether rendered shows the quota/rate-limit wall
 // described by pattern — the shared matcher for the two panestream exhaustion
-// paths (ExhaustionProbe's 300s-checkpoint Observe and SignalCenter.ExhaustedOf's
+// paths (ExhaustionProbe's 300s-checkpoint Observe and LivenessCenter.ExhaustedOf's
 // ~2s fast poll), so they can never disagree. (bridge/usageclassify.go's
 // matchExhausted is its cross-layer sibling — the same predicate, kept separate
 // only by the one-way bridge→panestream import boundary; a future modularization

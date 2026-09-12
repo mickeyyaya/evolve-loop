@@ -88,7 +88,7 @@ func TestAmp_Reviewer_HungAtAttemptZeroFastFails(t *testing.T) {
 // StopEvent with its State field at the zero value NEVER extends, regardless of
 // what the legacy Progressed/Busy booleans carry — the pre-S3 fallback that
 // derived LivenessState from those booleans is retired (the driver always
-// supplies State via panestream.SignalCenter now; an actually-unset State
+// supplies State via panestream.LivenessCenter now; an actually-unset State
 // carries no liveness signal at all). Supersedes
 // TestAmp_Reviewer_BackwardCompatStateZeroUsesLegacyFields, which pinned the
 // opposite (now-retired) behavior.
