@@ -76,6 +76,17 @@ C4, and finally the C3 chain refactor that composes them.
   unify it through the chokepoint in the C3 slice. `PhasesRun` consumers audited: printing/telemetry +
   routingtest only; no gate reads it.
 
+- **C1 amendment — 2026-09-13 (cycles 1634/1636, `docs/incidents/2026-09-13-phase-own-fail-reason-invisible.md`).**
+  The envelope and the timing record gain the phase's OWN `Diagnostics` (severity + message, relayed unfiltered
+  by `phaseOutcomeFrom`, additive `diagnostics` omitempty on `phase-timing.json`; the usage sidecar stays a usage
+  record). A FAIL the phase itself reasoned about was previously sealed as "phase-infra class" because only floor
+  phases had a side channel for their diagnostics. `cyclestate.ErrorMessages` (beside the severity vocabulary) is the ONE
+  projection from diagnostics to reasons and `verdictFailReason` the ONE rendering of "why FAIL"
+  (`floorVerdictError`, the chokepoint log line and the seal's backfill project it); `cyclehealth` reads the
+  record through `phasetiming.Entry` — no hand-typed mirror — and projects the same function for its
+  FAILED_EXPLAINED detail. Tests: `phase_diagnostics_seal_test.go`, `failreasons_backfill_test.go`,
+  `phasetiming/diagnostics_test.go`, `cyclehealth/outcome_diagnostics_test.go`.
+
 - **Slice 2 / C2 — shipped 2026-06-10.** Two halves. (a) `recovery.FatalPaneDetector` (the deterministic
   registry, `internal/recovery/detector.go`): typed `TerminalCause` vocabulary
   (model_invalid / cli_self_updated / dead_shell / unknown), ordered first-match-wins substring signatures

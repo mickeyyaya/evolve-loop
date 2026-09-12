@@ -102,7 +102,7 @@ size and the cap; it never flips the verdict and never rewrites the file.
 
 Both properties are load-bearing, not stylistic:
 
-- **Severity is wiring.** `core.errorSeverityMessages` keys off
+- **Severity is wiring.** `cyclestate.ErrorMessages` keys off
   `Severity == "error"` to build `AuditFailReasons`, so an error-severity size
   diagnostic would turn a merely verbose report into a dossier-visible failure.
 - **No on-disk mutation.** The ship phase re-reads this artifact and SHA-binds

@@ -16,7 +16,7 @@ import (
 // constrains the value to PASS/WARN/FAIL/SKIPPED. audit-report.md is
 // LLM-authored content in an agent-writable workspace, so an arbitrary string
 // (including one carrying newlines) could reach an ERROR-severity diagnostic —
-// which is exactly the diagnostic errorSeverityMessages lifts into
+// which is exactly the diagnostic cyclestate.ErrorMessages lifts into
 // CycleState.AuditFailReasons → <phase>-fail-reason.json → the failure
 // dossier's FailReasons → the sha256 fingerprint (failure_digest.go) → the
 // identical-fingerprint blocker breaker (blocker_breaker.go).

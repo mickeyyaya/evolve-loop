@@ -143,7 +143,7 @@ func TestC1127_003_RecordIsAdditiveAndSuitesStayGreen(t *testing.T) {
 
 // TestC1127_004_ConflictRecordReachesDossierPlumbing — the wiring proof. A
 // record nothing reads is inert. Error severity IS the wiring:
-// errorSeverityMessages (core/system_failure.go) keys off Severity=="error",
+// cyclestate.ErrorMessages (cyclestate/result.go) keys off Severity=="error",
 // so the record rides the existing AuditFailReasons → fail-reason.json →
 // dossier SubstantiveError chain with no new plumbing; a warning-severity
 // record would be silently dropped there.
@@ -153,7 +153,7 @@ func TestC1127_004_ConflictRecordReachesDossierPlumbing(t *testing.T) {
 			"TestVerdictConflict_WarningSeverityWouldBeDropped")
 	if !ok {
 		t.Errorf("RED: the verdict-conflict record does not flow through the existing "+
-			"errorSeverityMessages → AuditFailReasons → dossier chain — an unread record is "+
+			"cyclestate.ErrorMessages → AuditFailReasons → dossier chain — an unread record is "+
 			"an unfixed defect:\n%s", tail(out, 40))
 	}
 }

@@ -117,3 +117,27 @@ type Diagnostic struct {
 	Severity string `json:"severity"`
 	Message  string `json:"message"`
 }
+
+// Severity vocabulary of Diagnostic — the wire values producers emit. Only
+// SeverityError entries are a phase's REASONS for a FAIL verdict; everything
+// else is a trail.
+const (
+	SeverityError   = "error"
+	SeverityWarning = "warning"
+)
+
+// ErrorMessages is the ONE projection from diagnostics to a FAIL's reasons:
+// the error-severity messages, in order (nil when there are none). core's
+// FailedRecord, floor fail reasons, chokepoint log line, seal backfill and
+// judgment lessons, and cyclehealth's outcome detail, all call it — the rule
+// lives beside the vocabulary so no reader can re-derive it differently
+// (cycles 1634/1636).
+func ErrorMessages(diags []Diagnostic) []string {
+	var msgs []string
+	for _, d := range diags {
+		if d.Severity == SeverityError {
+			msgs = append(msgs, d.Message)
+		}
+	}
+	return msgs
+}
