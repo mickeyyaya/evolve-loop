@@ -392,6 +392,9 @@
           "triage-decision.json"
         ]
       },
+      "effects": [
+        "inbox-claim"
+      ],
       "gate_in": "gate_discover_to_triage",
       "gate_out": "gate_triage_to_plan_review",
       "parallel_eligible": false,

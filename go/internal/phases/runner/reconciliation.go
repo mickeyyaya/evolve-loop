@@ -9,7 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable"
 	"github.com/mickeyyaya/evolve-loop/go/internal/log"
-	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
 type phaseReconciliation struct {
@@ -60,13 +59,7 @@ func (b *BaseRunner) reconcileDeliverable(
 		// its verdict (via Classify) instead of synthesizing FAIL. Reconciliation
 		// can only UPGRADE toward the agent's real verdict, never downgrade a real one.
 		if core.IsInfraTeardownError(bridgeErr) {
-			roots := phasecontract.Roots{Workspace: req.Workspace, Worktree: req.Worktree, DispatchedArtifact: artifactPath, ExplanationDocumentationVersion: req.ExplanationDocumentationVersion}
-			if req.ProjectRoot != "" {
-				// EvolveDir completes the roots (orchestrator-target
-				// deliverables) AND locates the merged catalog for the
-				// catalog-aware default.
-				roots.EvolveDir = filepath.Join(req.ProjectRoot, ".evolve")
-			}
+			roots := verifyRootsFor(req, artifactPath)
 			// CANCELLATION-IMMUNE ladder (WithoutCancel, deliberate): on THIS path a
 			// cancelled ctx is frequently the CAUSE of the teardown, not a reason to stop
 			// waiting — the tmux driver, on ctx.Err(), takes one final completion poll and

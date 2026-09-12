@@ -8,6 +8,7 @@ package inboxmover
 
 import (
 	"encoding/json"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"os"
 	"path/filepath"
 )
@@ -57,8 +58,7 @@ func ResolveDispatchState(opts Options, taskID string) DispatchState {
 	if path, err := FindFileByTaskID(opts.InboxDir, taskID); err == nil {
 		return DispatchState{State: StatePending, Deps: readTaskDeps(path), Path: path}
 	}
-	cycles, _ := filepath.Glob(filepath.Join(opts.InboxDir, "processing", "cycle-*"))
-	for _, dir := range cycles {
+	for _, dir := range inboxbatch.ProcessingCycleDirs(opts.InboxDir) {
 		if _, err := FindFileByTaskID(dir, taskID); err == nil {
 			return DispatchState{State: StateProcessing, Detail: filepath.Base(dir)}
 		}
