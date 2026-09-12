@@ -57,26 +57,17 @@ func ReleaseContinuationBinding(opts Options, scopeID, reason string) (continuat
 }
 
 // FindScopeItemFile returns the path of the inbox item carrying scopeID, or ""
-// when no copy exists anywhere. Search order is liveness order — the pending
-// root, then a processing claim, then the retirement subtrees — so the
-// preserved pointer always lands on the copy an operator would actually open.
+// when no copy exists anywhere. Search order is liveness order — a processing
+// claim (the lane holding it), then the pending root, then the retirement
+// subtrees (Locate's order, Promote's) — so the preserved pointer always lands
+// on the copy an operator would actually open.
 func FindScopeItemFile(opts Options, scopeID string) string {
 	opts.resolveOpts()
 	if strings.TrimSpace(scopeID) == "" {
 		return ""
 	}
-	if p, err := FindFileByTaskID(opts.InboxDir, scopeID); err == nil {
-		return p
-	}
-	if entries, err := os.ReadDir(filepath.Join(opts.InboxDir, "processing")); err == nil {
-		for _, e := range entries {
-			if !e.IsDir() || !strings.HasPrefix(e.Name(), "cycle-") {
-				continue
-			}
-			if p, ferr := FindFileByTaskID(filepath.Join(opts.InboxDir, "processing", e.Name()), scopeID); ferr == nil {
-				return p
-			}
-		}
+	if loc, err := Locate(opts.InboxDir, scopeID); err == nil {
+		return loc.Path
 	}
 	path, _ := scopeRetiredAt(opts, scopeID)
 	return path

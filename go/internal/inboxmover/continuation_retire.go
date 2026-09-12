@@ -122,22 +122,8 @@ func scopeHasLiveItem(opts Options, scopeID string) bool {
 	if strings.TrimSpace(scopeID) == "" {
 		return false
 	}
-	if _, err := FindFileByTaskID(opts.InboxDir, scopeID); err == nil {
-		return true
-	}
-	entries, err := os.ReadDir(filepath.Join(opts.InboxDir, "processing"))
-	if err != nil {
-		return false
-	}
-	for _, e := range entries {
-		if !e.IsDir() || !strings.HasPrefix(e.Name(), "cycle-") {
-			continue
-		}
-		if _, err := FindFileByTaskID(filepath.Join(opts.InboxDir, "processing", e.Name()), scopeID); err == nil {
-			return true
-		}
-	}
-	return false
+	_, err := Locate(opts.InboxDir, scopeID)
+	return err == nil
 }
 
 // scopeRetiredAt returns the path of the retired copy holding scopeID and the

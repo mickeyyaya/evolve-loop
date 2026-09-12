@@ -2,7 +2,7 @@
 
 - **Status:** Accepted (2026-09-12). PR-0 (the claim resolves the plane's inbox; the grant can
   move a file — #573) and PR-1 (this ADR: agent-owed secondaries in the contract gate, the two
-  review bypasses closed, the wiring proof) land first; PR-2 (declared effects — `inbox-claim`)
+  review bypasses closed, the wiring proof) land first; PR-2 (declared effects — `inbox-claim`, landed 2026-09-13 as decision item 8)
   and PR-3 (`SHIPPED_VIA_BUILD` requires this cycle's own ship) follow as their own slices.
 - **Driving evidence:** the operator's 2026-09-12 ask — *"let the orchestrator review whether
   each phase agent's output exists (no content judgment, just existence and format), and if not,
@@ -78,6 +78,36 @@
 7. **Rollout: enforce immediately, no new dial** (operator decision 2026-09-12). The checks ride
    `gates.contract_gate` (compiled default enforce) and its shadow/advisory semantics; the resumed
    two-wave batch is the soak.
+8. **Slice 2 (2026-09-13): the declared effect `inbox-claim` is verified by the same gate.**
+   `deliverable/effects.go` binds each `phases[].effects` name to one deterministic check by
+   registry lookup (`effectChecks`, one entry today); `verifyEffects` runs after the secondaries so
+   one directive names every output *and* effect the phase still owes. A declared name with no
+   binding is `unbound_effect` — a registry defect the projection test
+   (`TestPhaseRegistry_EveryDeclaredEffectHasACheck`, both directions) catches at commit time,
+   reported rather than passed because re-dispatching an agent cannot bind a check.
+   `checkInboxClaim` owes a claim for every committed id (`committedset.Committed`, the reader
+   closeout reconciles with) **that is an inbox item**: the persona claims the files it ingests
+   (Step 0a.4) and nothing else, so a scout- or carryover-originated `top_n` id — which has no
+   inbox file — owes nothing; the plan's "every committed id" would have rejected every
+   scout-route cycle. Satisfied when `inboxmover.Locate` finds the item under *this* cycle's
+   `processing/cycle-N/`; `missing_effect` when it is still pending at the root (1631's phantom
+   claim) or held by another cycle (a lane committing to a sibling's item). An empty or
+   unrecorded commitment owes nothing. The check needs the cycle, so `phasecontract.Roots` gains
+   `Cycle`, carried by all three verifiers — the gate (`ReviewInput.Cycle`), the runner
+   (`verifyRootsFor`, the ONE roots translation for its classification and teardown-reconcile
+   sites) and the self-check (from the persisted cycle state, only when the contract declares
+   effects) — and a verifier that omits it fails OPEN with an error, never decides blind.
+   The claim layout has ONE home, the leaf `inboxbatch/layout.go` (`ProcessingDir`,    `ProcessingCycleDir`, `ProcessingCycleDirs`, `ParseProcessingCycle`): the writer `inboxmover.Claim` and the one
+   reader walk `inboxmover.Locate` (processing claim first, then the pending root — Promote's
+   liveness order; Promote's source resolution and the continuation scope readers now delegate
+   to it instead of carrying their own walks) both derive from it, and core's dispatch-time
+   claim scan reads through `inboxbatch.LoadDir(inboxbatch.ProcessingCycleDir(...))` — core
+   cannot import `inboxmover` (it reaches core through the ledger adapter), which is why the
+   plan's "core delegates to `inboxmover.ClaimedIDs`" was withdrawn and the leaf owns the
+   belief. The architecture review of the first cut found `Locate` as a fourth hand-typed copy of
+   the walk with nothing tying it to where `Claim` writes; the proof `TestLocate_FindsWhatClaimWrote`
+   (the production writer, then the reader) goes red when the writer's destination drifts — the
+   e2e alone did not, because a vanished item reads as "not an inbox item".
 
 ## Why the existing gate, not a new stage
 
@@ -135,3 +165,11 @@ End-to-end (`declared_deliverables_e2e_test.go`): a real cycle whose builder omi
 `handoff-build.json` is re-dispatched with the file named and ends `FAILED_EXPLAINED` naming it,
 on both `RunCycle` and `RunCycleFromPhase`; a builder that writes it on the correction round ships.
 Every guard was shown to fail by assertion under a reverted mutation.
+Slice 2: `internal/deliverable` effects table (pending at root / claimed by this cycle / held by
+another cycle / no inbox file / empty commitment / no decision; unbound effect; cycle missing
+from roots), the registry↔table projection in both directions, and
+`declared_effects_e2e_test.go` — a real cycle whose triage commits to a pending item without
+claiming it is re-dispatched with the effect and item named and ends `FAILED_EXPLAINED`; a
+triage that claims on the correction round ships; an empty commitment owes no claim and still
+ends triage no-work. `internal/phases/runner` proves both verify sites carry the cycle;
+`internal/cli/phasecmd` proves the self-check follows the persisted cycle state.
