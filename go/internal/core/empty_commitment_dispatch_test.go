@@ -166,15 +166,34 @@ func TestRunCycle_EmptyTriageCommitmentIsPlannedNoWork(t *testing.T) {
 			wantCleanup: 1,
 		},
 		{
+			// Cycle 1623 audit round 1 (H2, M2, M1) / cycle 1639 pinned defect:
+			// decideTriageTermination gave VerdictFAIL precedence over an
+			// explicit empty commitment, so this row previously stayed a plain
+			// FAIL (breaker-counting failure, no worktree cleanup) even though
+			// triage committed no work at all. An explicit empty top_n is
+			// authoritative no-eligible-work evidence regardless of the phase
+			// verdict that carried it.
 			name:        "failed-triage-with-empty-decision",
 			verdict:     VerdictFAIL,
 			decision:    `{"top_n":[]}`,
-			wantVerdict: VerdictFAIL,
-			wantCleanup: 0,
+			wantVerdict: CycleOutcomeSkippedUnknown,
+			wantReason:  CycleTerminationTriageNoWork,
+			wantCleanup: 1,
 		},
 		{
 			name:        "failed-triage-without-decision",
 			verdict:     VerdictFAIL,
+			wantVerdict: VerdictFAIL,
+			wantCleanup: 0,
+		},
+		{
+			// ANTI-NO-OP: a FAIL verdict over a NON-empty commitment must stay a
+			// real failure. A fix that treats every FAIL as planned no-work
+			// would satisfy the row above while masking every genuine
+			// triage-stage defect on committed work.
+			name:        "failed-triage-with-committed-work",
+			verdict:     VerdictFAIL,
+			decision:    `{"top_n":[{"id":"task-a"}]}`,
 			wantVerdict: VerdictFAIL,
 			wantCleanup: 0,
 		},
@@ -205,6 +224,57 @@ func TestRunCycle_EmptyTriageCommitmentIsPlannedNoWork(t *testing.T) {
 				t.Errorf("PhasesRun = %v, want %v", got, want)
 			}
 		})
+	}
+}
+
+// TestRunCycleFromPhase_ResumedFailedTriageWithEmptyDecisionIsPlannedNoWork is
+// the resumed-path twin of TestRunCycle_EmptyTriageCommitmentIsPlannedNoWork's
+// "failed-triage-with-empty-decision" row. resumeCursor.next (resume_cursor.go)
+// routes triage termination through the same o.triageTermination call as a
+// fresh cycle, but closeout's recordPlannedNoWorkOutcome must independently
+// reclassify a resumed FAIL+empty-commitment cycle too, or a paused-and-resumed
+// run diverges from a fresh one on the identical on-disk decision.
+func TestRunCycleFromPhase_ResumedFailedTriageWithEmptyDecisionIsPlannedNoWork(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	ws := RunWorkspacePath(root, 7)
+	if err := os.MkdirAll(ws, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	worktree := &fakeWorktree{path: t.TempDir()}
+	storage := &fakeStorage{
+		state: State{LastCycleNumber: 7},
+		cycleState: CycleState{
+			CycleID:         7,
+			RunID:           "original-run",
+			WorkspacePath:   ws,
+			ActiveWorktree:  worktree.path,
+			CompletedPhases: []string{"scout"},
+		},
+	}
+	runners := buildRunners(nil)
+	runners[PhaseTriage] = triageDecisionRunner{verdict: VerdictFAIL, decision: `{"top_n":[]}`}
+	orchestrator := NewOrchestrator(storage, &fakeLedger{}, runners, WithWorktreeProvisioner(worktree))
+
+	result, err := orchestrator.RunCycleFromPhase(context.Background(),
+		CycleRequest{ProjectRoot: root, GoalHash: "protected-task"},
+		&ResumePoint{Phase: string(PhaseTriage), CycleID: 7})
+	if err != nil {
+		t.Fatalf("RunCycleFromPhase: %v", err)
+	}
+	if result.FinalVerdict != CycleOutcomeSkippedUnknown {
+		t.Errorf("FinalVerdict = %q, want %q", result.FinalVerdict, CycleOutcomeSkippedUnknown)
+	}
+	if result.TerminationReason != CycleTerminationTriageNoWork {
+		t.Errorf("TerminationReason = %q, want %q", result.TerminationReason, CycleTerminationTriageNoWork)
+	}
+	if got := len(worktree.cleaned); got != 1 {
+		t.Errorf("worktree cleanup calls = %d, want 1", got)
+	}
+	for _, phase := range []Phase{PhaseTDD, PhaseBuild, PhaseAudit, PhaseShip} {
+		if got := len(runners[phase].(*fakeRunner).requests); got != 0 {
+			t.Errorf("%s dispatched %d time(s) after a resumed terminal triage", phase, got)
+		}
 	}
 }
 

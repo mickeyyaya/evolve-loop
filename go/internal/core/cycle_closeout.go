@@ -43,7 +43,6 @@ func (cr *cycleRun) completeCycle() error {
 func (cr *cycleRun) recordPlannedNoWorkOutcome() {
 	if cr.result.TerminationReason != CycleTerminationTriageNoWork ||
 		cr.current != PhaseTriage ||
-		(cr.lastVerdict != VerdictPASS && cr.lastVerdict != VerdictWARN) ||
 		cr.o.floorAlreadyCompleted(cr.cs.CompletedPhases) ||
 		!phasesEndAtTriageWithoutImplementation(cr.result.PhasesRun) {
 		return

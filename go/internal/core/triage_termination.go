@@ -11,11 +11,11 @@ type triageTermination struct {
 }
 
 func decideTriageTermination(verdict string, signals router.RoutingSignals) triageTermination {
+	if signals.HasEmptyTriageCommitment() {
+		return triageTermination{stop: true, reason: CycleTerminationTriageNoWork}
+	}
 	if verdict == VerdictFAIL {
 		return triageTermination{stop: true}
-	}
-	if (verdict == VerdictPASS || verdict == VerdictWARN) && signals.HasEmptyTriageCommitment() {
-		return triageTermination{stop: true, reason: CycleTerminationTriageNoWork}
 	}
 	return triageTermination{}
 }
