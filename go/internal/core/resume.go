@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
@@ -445,6 +446,10 @@ func (o *Orchestrator) reviewResumedDeliverable(
 	maxCorrections := (&cycleRun{o: o, cs: cs, retryConfig: o.retryConfig}).correctionLimitFor(phase, o.retryConfig.ContractCorrectionRetries)
 	for correction := 1; !review.Approve && correction <= maxCorrections; correction++ {
 		req.CorrectionDirective = composeCorrection(review.Reason, review.Remediation)
+		o.emitGateCorrection(gateCorrection{
+			origin: "Orchestrator.reviewResumedDeliverable", cycle: cycle, phase: phase, correction: correction, max: maxCorrections,
+			rung: interaction.RungRedispatch, cli: req.ModelRoutingCLI, reason: review.Reason,
+		})
 		cancel := o.observer.Start(ctx, string(phase), req)
 		corrected, err := runner.Run(ctx, req)
 		if cancel != nil {

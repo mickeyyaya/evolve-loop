@@ -568,3 +568,7 @@
 # coverage are both gated (line coverage via .cover-strict / make cover-strict).
 ./internal/signalcenter
 ./internal/core/outcome
+
+# ADR-0101 S2b (2026-09-13): the contract gate's Signal Center producer — one event per
+# gate decision under module gate.contract. 100% API + 100% line coverage gated.
+./internal/deliverable/gatesignal

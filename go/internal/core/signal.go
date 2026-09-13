@@ -94,3 +94,43 @@ func (o *Orchestrator) emitPhaseOutcome(cycle int, out recovery.PhaseOutcome) {
 	}
 	o.signals.Emit(e)
 }
+
+// CodeGateCorrection is the correction ladder's code (ADR-0101 S2b): one
+// gate.corrected INFO per rung the orchestrator runs after a gate rejection.
+const CodeGateCorrection signalcenter.Code = "ORCHESTRATOR_GATE_CORRECTION"
+
+func init() {
+	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodeGateCorrection, "the correction ladder ran a rung after a gate rejection — fields name the correction ordinal, the budget (max), the rung, the CLI re-dispatched on and whether that CLI was escalated; the reason is the rejection being corrected")
+}
+
+// gateCorrection is one rung of the ladder as the stream sees it (a parameter
+// object: six of these become the event's fields, and two adjacent bools at
+// a call site would otherwise swap silently).
+type gateCorrection struct {
+	origin       string // the ladder naming itself: the fresh root's or the resume root's
+	cycle        int
+	phase        Phase
+	correction   int // the ordinal of this correction (1-based)
+	max          int // the correction budget
+	rung         string
+	cli          string // the CLI re-dispatched on, after any escalation
+	escalated    bool
+	salvageRetry bool
+	reason       string // the rejection being corrected
+}
+
+// emitGateCorrection is the ladder's producer on both dispatch roots: the
+// fresh loop's reviewWithCorrections and the resume root's
+// reviewResumedDeliverable name themselves as origin. The correction ordinal
+// has ONE home, fields.correction. A nil Center is a no-op.
+func (o *Orchestrator) emitGateCorrection(gc gateCorrection) {
+	o.signals.Emit(signalcenter.Event{
+		Cycle: gc.cycle, RunID: o.signalRunID(), Phase: string(gc.phase),
+		Module: signalcenter.ModuleOrchestrator, Origin: gc.origin, Kind: signalcenter.KindGateCorrected,
+		Severity: signalcenter.SeverityInfo, Code: CodeGateCorrection, Reason: gc.reason,
+		Fields: map[string]string{
+			"correction": strconv.Itoa(gc.correction), "max": strconv.Itoa(gc.max), "rung": gc.rung, "cli": gc.cli,
+			"escalated": strconv.FormatBool(gc.escalated), "salvage_retry": strconv.FormatBool(gc.salvageRetry),
+		},
+	})
+}

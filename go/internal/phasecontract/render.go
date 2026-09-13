@@ -2,6 +2,7 @@ package phasecontract
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 )
 
@@ -75,6 +76,12 @@ func RenderContractBlockStage(c Contract, includePhaseIO bool) string {
 		}
 	}
 
+	if len(c.AgentOwedFiles) > 0 {
+		fmt.Fprintf(&b, "- Also write these agent-owed files at the EXACT paths listed under <owed-files> at the END of this prompt: %s. The orchestrator's gate verifies each exists, is non-empty and (for .json/.ndjson) parses — a missing one is rejected like a missing deliverable.\n", quoteJoin(c.AgentOwedFiles))
+	}
+	if len(c.Effects) > 0 {
+		fmt.Fprintf(&b, "- Declared effects the gate verifies at the phase boundary (your instructions say how to perform each): %s.\n", quoteJoin(c.Effects))
+	}
 	fmt.Fprintf(&b, "- Before you finish, run:  %s\n", selfCheckCommand(c.Phase))
 	b.WriteString("  Fix every violation it reports. Do not declare done until it exits 0.\n\n---\n\n")
 	return b.String()
@@ -106,7 +113,10 @@ func RenderContractFooter(c Contract, artifactPath string) string {
 // classifier has never seen. A NoArtifact contract (ship: the deliverable is a
 // pushed commit) gets the footer alone — instructing it to write a file would
 // invent an artifact the verifier must not find.
-func RenderContractTail(c Contract, artifactPath string) string {
+// workspace is the cycle workspace the gate reads the agent-owed files from
+// (phasecontract.OwedPath, the ONE join) — not the artifact's directory, which
+// a dispatched-artifact override can move elsewhere.
+func RenderContractTail(c Contract, artifactPath, workspace string) string {
 	footer := RenderContractFooter(c, artifactPath)
 	if c.NoArtifact {
 		return footer
@@ -148,6 +158,20 @@ func RenderContractTail(c Contract, artifactPath string) string {
 					bracketJoin(c.Verdicts), RenderVerdictSentinel(c.Phase, c.Verdicts[0]))
 			}
 		}
+	}
+	if len(c.AgentOwedFiles) > 0 {
+		b.WriteString("  <owed-files note=\"write each at exactly this path; the gate verifies it there\">\n")
+		for _, f := range c.AgentOwedFiles {
+			fmt.Fprintf(&b, "    <owed-file>%s</owed-file>\n", OwedPath(workspace, f))
+		}
+		b.WriteString("  </owed-files>\n")
+	}
+	if len(c.Effects) > 0 {
+		b.WriteString("  <effects note=\"verified at the phase boundary\">\n")
+		for _, e := range c.Effects {
+			fmt.Fprintf(&b, "    <effect>%s</effect>\n", e)
+		}
+		b.WriteString("  </effects>\n")
 	}
 	// Placeholders stay LITERAL like the prefix's: this text is read by an
 	// agent, not an XML parser, and an entity-escaped placeholder gets pasted
@@ -193,4 +217,13 @@ func quoteJoin(keys []string) string {
 
 func bracketJoin(vs []string) string {
 	return strings.Join(vs, "|")
+}
+
+// OwedPath is the ONE join for an agent-owed secondary: the registry declares
+// basenames, and a declared separator never steers a read outside the
+// workspace. The gate (deliverable.verifySecondaries) reads through it and the
+// prompt tail renders through it, so the location the agent is told and the
+// location the gate checks cannot drift.
+func OwedPath(workspace, name string) string {
+	return filepath.Join(workspace, filepath.Base(name))
 }

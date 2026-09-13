@@ -127,6 +127,7 @@ const (
 	KindPhaseAborted     Kind = "phase.aborted"
 	KindGateRejected     Kind = "gate.rejected"
 	KindGateCorrected    Kind = "gate.corrected"
+	KindGatePassed       Kind = "gate.passed"
 	KindShipLanded       Kind = "ship.landed"
 	KindShipError        Kind = "ship.error"
 	KindSystemFailure    Kind = "system.failure"
@@ -147,7 +148,7 @@ const (
 
 var knownKinds = map[Kind]bool{
 	KindPhaseDispatched: true, KindPhaseOutcome: true, KindPhaseAborted: true, KindGateRejected: true,
-	KindGateCorrected: true, KindShipLanded: true, KindShipError: true, KindSystemFailure: true,
+	KindGatePassed: true, KindGateCorrected: true, KindShipLanded: true, KindShipError: true, KindSystemFailure: true,
 	KindQuotaPaused: true, KindBridgeWarning: true, KindBridgeTripwire: true, KindPaneLiveness: true,
 	KindLedgerAppended: true, KindOutcomeWarning: true, KindCycleSealed: true, KindLoopWave: true, KindLoopHalt: true,
 	KindLoopEscalation: true, KindListenerPanicked: true, KindRegistryDrift: true, KindSinkDropped: true,

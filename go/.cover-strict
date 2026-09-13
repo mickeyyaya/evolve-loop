@@ -5,3 +5,4 @@
 # regression fails the tree. Blank lines and `#` comments are ignored.
 ./internal/signalcenter 100
 ./internal/core/outcome 100
+./internal/deliverable/gatesignal 100
