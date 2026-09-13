@@ -227,6 +227,10 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempts, err.Error(), cs.PhaseStartedAt))
 			return result, err
 		}
+		// Resume parity with applyPostReviewGuards: a ship that PASSed and
+		// survived the review latches on the checkpoint the completion below
+		// persists, so closeout reads this cycle's own ship on either root.
+		latchShippedState(&cs, next, resp.Verdict)
 		if cs.ExplanationDocumentationVersion != 0 && next != PhaseBuild &&
 			o.worktreePhase(next) && containsString(cs.CompletedPhases, string(PhaseBuild)) {
 			requiresBuild, refreshErr := explanationdocs.RefreshResult(ctx, explanationBinding(req.ProjectRoot, cs))

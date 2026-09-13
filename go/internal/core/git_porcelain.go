@@ -147,6 +147,3 @@ func defaultGitDirtyPaths(ctx context.Context, repoRoot string) ([]string, error
 	sort.Strings(paths)
 	return paths, nil
 }
-
-// finalizeOutcome translates SKIPPED into a more specific CycleOutcome label
-// using HEAD movement and retro text as signals. PASS/FAIL/WARN pass through.

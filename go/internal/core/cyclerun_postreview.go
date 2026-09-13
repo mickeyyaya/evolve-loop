@@ -34,17 +34,16 @@ func (cr *cycleRun) applyPostReviewGuards(next Phase, dr *dispatchResult) (loopA
 		}
 	}
 
-	if next == PhaseShip && dr.resp.Verdict == VerdictPASS {
+	// cr.cs.Shipped is also the latch read by postShipObserverSkip on the
+	// dispatch abort path (a post-ship observer failure degrades to WARN rather
+	// than turning a shipped cycle abnormal — cycle-574) and by the outcome
+	// label at closeout; it lives on cr.cs so the next persist checkpoints it.
+	if latchShippedState(&cr.cs, next, dr.resp.Verdict) {
 		// Ship landed AND survived the deliverable review gate above — the
 		// worktree is merged, normal exit cleanup applies. Deliberately
 		// AFTER the review gate: a review-rejected ship abort must still
 		// preserve the worktree for triage (ADR-0039 §8 / D10).
 		cr.preserveWorktree = false
-		// Latch ship success so a subsequent post-ship observer failure
-		// (memo / post-ship-monitor) degrades to WARN rather than turning a
-		// shipped cycle abnormal — read by postShipObserverSkip on the dispatch
-		// abort path (cycle-574 memo-phase-tier-envelope).
-		cr.shipped = true
 	}
 
 	// Workstream B: post-phase tree-diff check. Runs BEFORE the ledger

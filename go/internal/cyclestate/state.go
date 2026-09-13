@@ -106,6 +106,13 @@ type CycleState struct {
 	// Absent on legacy checkpoints; resume resolves those conservatively.
 	GoalHash string `json:"goal_hash,omitempty"`
 	GoalText string `json:"goal_text,omitempty"`
+	// Shipped is the cycle's own ship latch: set by both dispatch roots when the
+	// ship phase PASSes and survives the deliverable review, never inferred from
+	// main HEAD movement (a sibling lane moves HEAD too — cycle 1630). Persisted
+	// so a pause/resume after ship keeps the fact; the outcome label
+	// (SHIPPED_VIA_BUILD) and the post-ship observer degrade both read it.
+	// omitempty: pre-latch checkpoints decode/encode unchanged.
+	Shipped bool `json:"shipped,omitempty"`
 	// PreCycleHEAD retains the closeout baseline when execution pauses after
 	// Ship. Capturing a new baseline on resume would lose that completed ship.
 	PreCycleHEAD    string   `json:"pre_cycle_head,omitempty"`
