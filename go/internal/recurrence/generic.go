@@ -20,12 +20,15 @@ import (
 // Every entry with an owner is projected from it (failurelog's taxonomy, the
 // engine's default class); "cycle-fatal" and "unknown" have no owner yet.
 var genericPatternDenylist = map[string]bool{
+	// Owned classifications, projected from their homes.
 	string(failurelog.OperatorReset):          true,
 	string(failurelog.LoopFatal):              true,
-	cyclestate.ClassificationMidExecutionFail: true,
-	"cycle-fatal":                             true,
-	"unknown":                                 true,
 	string(failurelog.UnknownClassification):  true,
+	cyclestate.ClassificationMidExecutionFail: true,
+
+	// No owner yet: literals until one exists.
+	"cycle-fatal": true,
+	"unknown":     true,
 }
 
 // IsGeneric reports whether pattern is classification-vocabulary noise rather
