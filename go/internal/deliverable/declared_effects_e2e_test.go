@@ -180,18 +180,44 @@ func TestDeclaredEffects_ClaimedCommitment_IsAccepted(t *testing.T) {
 	}
 }
 
+// An explicit empty commitment owes the declared-effects gate NO claim (no
+// inbox-claim correction is issued, triage runs once) — and since the
+// cycle-1623 P1 (inbox 2026-09-12T10-00-00Z-triage-empty-commitment-still-
+// dispatches-spine), an empty commitment beside a still-CLAIMABLE inbox item is
+// no longer credited as planned no-work: the host stops at triage with the
+// named claim-failed reason and no implementation phase. The legitimate
+// no-work disposition needs an inbox with nothing claimable (second case).
 func TestDeclaredEffects_EmptyCommitment_OwesNoClaim(t *testing.T) {
-	root := gitRepoWithOneCommit(t)
-	seedPendingItem(t, root) // pending, and legitimately left alone
-	runners, triage := effectRunners(t, 0, false)
-	o := effectOrchestrator(t, root, runners)
+	t.Run("claimable item left alone: no claim owed, stopped as claim-failed", func(t *testing.T) {
+		root := gitRepoWithOneCommit(t)
+		seedPendingItem(t, root) // pending and claimable
+		runners, triage := effectRunners(t, 0, false)
+		o := effectOrchestrator(t, root, runners)
 
-	result, err := o.RunCycle(context.Background(), core.CycleRequest{ProjectRoot: root, GoalHash: "g", DisableWorkspaceGuard: true})
+		result, err := o.RunCycle(context.Background(), core.CycleRequest{ProjectRoot: root, GoalHash: "g", DisableWorkspaceGuard: true})
 
-	if err != nil || len(triage.requests) != 1 || correctionNaming(triage.requests, "inbox-claim") != 0 {
-		t.Fatalf("an explicit empty commitment owes no claim: err=%v triage runs=%d directives=%q", err, len(triage.requests), directives(triage.requests))
-	}
-	if !core.IsTriageNoWorkResult(result) {
-		t.Fatalf("an empty commitment still ends as triage no-work, got verdict=%q termination=%q phases=%v", result.FinalVerdict, result.TerminationReason, result.PhasesRun)
-	}
+		if err != nil || len(triage.requests) != 1 || correctionNaming(triage.requests, "inbox-claim") != 0 {
+			t.Fatalf("an explicit empty commitment owes no claim: err=%v triage runs=%d directives=%q", err, len(triage.requests), directives(triage.requests))
+		}
+		if result.TerminationReason != "triage-empty-commitment-claimable-work" || result.FinalVerdict != core.VerdictFAIL {
+			t.Fatalf("an empty commitment beside claimable work is the NAMED claim-failed stop, never no-work: verdict=%q termination=%q", result.FinalVerdict, result.TerminationReason)
+		}
+		if n := len(result.PhasesRun); n == 0 || result.PhasesRun[n-1] != core.PhaseTriage {
+			t.Fatalf("the cycle stops AT triage (no tdd/build/audit/ship): %v", result.PhasesRun)
+		}
+	})
+	t.Run("nothing claimable: planned no-work", func(t *testing.T) {
+		root := gitRepoWithOneCommit(t)
+		runners, triage := effectRunners(t, 0, false)
+		o := effectOrchestrator(t, root, runners)
+
+		result, err := o.RunCycle(context.Background(), core.CycleRequest{ProjectRoot: root, GoalHash: "g", DisableWorkspaceGuard: true})
+
+		if err != nil || len(triage.requests) != 1 || correctionNaming(triage.requests, "inbox-claim") != 0 {
+			t.Fatalf("an explicit empty commitment owes no claim: err=%v triage runs=%d directives=%q", err, len(triage.requests), directives(triage.requests))
+		}
+		if !core.IsTriageNoWorkResult(result) {
+			t.Fatalf("with nothing claimable an empty commitment is planned no-work, got verdict=%q termination=%q phases=%v", result.FinalVerdict, result.TerminationReason, result.PhasesRun)
+		}
+	})
 }
