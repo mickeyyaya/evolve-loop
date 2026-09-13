@@ -9,3 +9,4 @@
 ./internal/core/failurediag 100
 ./internal/core/carryover 100
 ./internal/core/failurelearning 100
+./internal/phases/ship/landing 100

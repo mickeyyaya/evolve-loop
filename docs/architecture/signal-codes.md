@@ -142,6 +142,10 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `SHIP_GIT_STAGE_FAILED` | atomic-ship: staging failed (transient) |
 | `SHIP_INTEGRITY_TREE_DRIFT` | post-ship: the shipped tree drifted from the verified one (integrity) |
 | `SHIP_INVALID_CLASS` | verify-class: unknown ship class |
+| `SHIP_LANDING_BINARY_RESET_FAILED` | git checkout HEAD -- <binary> before the ff-merge exited non-zero or failed to spawn; the merge still runs and may fail if the tracked binary is dirty; fields.step=integrate, path, git_rc, git_err |
+| `SHIP_LANDING_BINDING_WRITE_FAILED` | ship-binding.json could not be created, written or renamed into the run workspace; the push already landed, the caller keeps shipping and keeps its WARN log line; fields.step=binding, path, err |
+| `SHIP_LANDING_HEAD_READ_FAILED` | git rev-parse HEAD after the push landed errored or returned empty; the result's CommitSHA (the dossier's delivery identity) stays empty and the ship proceeds; fields.step=push, ref, err |
+| `SHIP_LANDING_PUSH_REPAIR_DECLINED` | the inline fetch + fast-forward retry after a rejected push declined at the named probe (fetch, origin_ref, head or push_retry); the original transient GIT_PUSH_REJECTED is returned with repair_attempted/repair_outcome=declined stamped; fields.step=push, branch, probe |
 | `SHIP_MANIFEST_GATE` | atomic-ship: a staged path was declared by no build/TDD report (cross-lane leak guard) |
 | `SHIP_MANUAL_DECLINED` | verify-class: the operator declined the manual ship |
 | `SHIP_MANUAL_NOT_TTY` | verify-class: a manual ship needs an interactive confirmation (or the auto-confirm environment) |

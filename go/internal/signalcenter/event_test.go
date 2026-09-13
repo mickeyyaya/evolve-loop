@@ -67,7 +67,7 @@ func TestKind_ClosedSetAndTerminal(t *testing.T) {
 		KindQuotaPaused: true, KindLoopHalt: true,
 	}
 	all := []Kind{KindPhaseDispatched, KindPhaseOutcome, KindPhaseAborted, KindGateRejected, KindGateCorrected,
-		KindShipLanded, KindShipError, KindSystemFailure, KindQuotaPaused, KindBridgeWarning, KindBridgeTripwire,
+		KindShipLanded, KindShipError, KindShipWarning, KindSystemFailure, KindQuotaPaused, KindBridgeWarning, KindBridgeTripwire,
 		KindPaneLiveness, KindLedgerAppended, KindOutcomeWarning, KindFailureDiagWarning, KindCarryoverWarning, KindFailureLearningWarning, KindGatePassed, KindCycleSealed, KindLoopWave, KindLoopHalt, KindLoopEscalation,
 		KindListenerPanicked, KindRegistryDrift, KindSinkDropped}
 	for _, k := range all {

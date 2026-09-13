@@ -8,6 +8,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship/landing"
 )
 
 // worktreeShip is the transaction for a cycle worktree. Its methods follow
@@ -163,42 +164,20 @@ func (s *worktreeShip) commit() error {
 }
 
 func (s *worktreeShip) integrate() error {
-	if exit, err := s.opts.run(s.ctx, "git", []string{"checkout", "HEAD", "--", "go/evolve"}, io.Discard, io.Discard); exit != 0 || err != nil {
-		fmt.Fprintf(s.opts.Stderr, "[ship] WARN: could not reset go/evolve to HEAD (exit=%d, err=%v); ff-merge may still fail if it is dirty\n", exit, err)
+	if err := s.opts.landing().Integrate(s.ctx, landing.Integration{Branch: s.branch, CycleBranch: s.cycleBranch,
+		Binary: "go/evolve", Fleet: s.opts.envBool(ipcenv.FleetKey), Log: logTo(s.result)}); err != nil {
+		return err
 	}
-
-	exit, err := s.opts.run(s.ctx, "git", []string{"merge", "--ff-only", s.cycleBranch}, s.opts.Stdout, s.opts.Stderr)
-	if err != nil || exit != 0 {
-		if s.opts.envBool(ipcenv.FleetKey) {
-			return shipErr(core.CodeGitFleetRebaseNeeded, core.ShipClassTransient, core.StageAtomicShip,
-				fmt.Sprintf("ship: fleet ff-merge %s into %s diverged (a peer cycle moved %s mid-pipeline); rebase + re-verify the merged tree, then re-ship", s.cycleBranch, s.branch, s.branch),
-				"git_rc", fmt.Sprintf("%d", exit), "git_err", errStr(err), "cycle_branch", s.cycleBranch, "branch", s.branch)
-		}
-		return shipErr(core.CodeGitFFMergeDiverged, core.ShipClassPrecondition, core.StageAtomicShip,
-			fmt.Sprintf("ship: ff-merge %s into %s failed (rc=%d; divergent history): %v", s.cycleBranch, s.branch, exit, err),
-			"git_rc", fmt.Sprintf("%d", exit), "git_err", errStr(err), "cycle_branch", s.cycleBranch, "branch", s.branch)
-	}
-	s.result.Logs = append(s.result.Logs, fmt.Sprintf("[ship]   OK: ff-merged %s into %s", s.cycleBranch, s.branch))
-
-	exit, err = s.opts.run(s.ctx, "git", []string{"push", "origin", s.branch}, s.opts.Stdout, s.opts.Stderr)
-	if err != nil || exit != 0 {
-		head, _ := captureGitOutput(s.ctx, s.opts, "rev-parse", "HEAD")
-		originalErr := shipErr(core.CodeGitPushRejected, core.ShipClassTransient, core.StageAtomicShip,
-			fmt.Sprintf("ship: git push failed (rc=%d); main is at %s: %v", exit, strings.TrimSpace(head), err),
-			"git_rc", fmt.Sprintf("%d", exit), "git_err", errStr(err), "branch", s.branch, "head", strings.TrimSpace(head))
-		if repairErr := repairPushRace(s.ctx, s.opts, s.result, s.branch, originalErr); repairErr != nil {
-			return repairErr
-		}
+	if err := pushWithRepair(s.ctx, s.opts, s.result, s.branch, landing.SiteWorktree); err != nil {
+		return err
 	}
 	s.result.Logs = append(s.result.Logs, fmt.Sprintf("[ship] OK: pushed to origin/%s", s.branch))
 
-	headSHA, _ := captureGitOutput(s.ctx, s.opts, "rev-parse", "HEAD")
-	s.result.CommitSHA = strings.TrimSpace(headSHA)
 	committedTree, err := s.verifyCommittedTree()
 	if err != nil {
 		return err
 	}
-	if err := writeShipBinding(s.opts, committedTree, headSHA); err != nil {
+	if err := writeShipBinding(s.opts, committedTree, s.result.CommitSHA); err != nil {
 		s.result.Logs = append(s.result.Logs, "[ship] WARN: could not write ship-binding.json: "+err.Error())
 	}
 	return maybeCreateRelease(s.ctx, s.opts, s.result)

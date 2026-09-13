@@ -585,3 +585,8 @@
 # deterministic floor, the remediation filer and the recurrence closure (internal/core/failurelearning).
 # 100% API + 100% line coverage gated.
 ./internal/core/failurelearning
+
+# ADR-0103 unit 07 (2026-09-14): the ship landing — the fleet ff-merge, the push with its inline
+# push-race repair and the post-push head read, the shared git probes, the ship-binding witness
+# (internal/phases/ship/landing). 100% API + 100% line coverage gated.
+./internal/phases/ship/landing

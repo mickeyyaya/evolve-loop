@@ -196,8 +196,8 @@ func TestPromoteInbox_ReconcileSuperseded_UnlandedSkipsRetirement(t *testing.T) 
 }
 
 // TestPromoteInbox_NeedsReauditOutcomeNeverPromotes is the cycle-598
-// regression itself: RepairOutcome=="needs-reaudit" (origin diverged,
-// repairPushRace declined to push) paired with a CommitSHA that is only a
+// regression itself: RepairOutcome=="needs-reaudit" (origin diverged, the
+// landing's push repair declined to push) paired with a CommitSHA that is only a
 // local commit (not an ancestor of HEAD-on-origin — modeled here as
 // merge-base --is-ancestor failing) must never promote, regardless of
 // whether a caller upstream still considers the cycle a "PASS". The landing

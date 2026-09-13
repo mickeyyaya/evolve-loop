@@ -1,0 +1,330 @@
+{
+  "captured_at": "8e8f080f",
+  "rows": [
+    {
+      "name": "direct/push-ok",
+      "argv": [
+        "-C \u003croot\u003e -c core.quotePath=false status --porcelain -uall [capture]",
+        "add -A -- [other]",
+        "diff --cached --name-only [capture]",
+        "diff --cached --quiet [discard]",
+        "diff --cached --name-status [capture]",
+        "diff --cached --shortstat [capture]",
+        "commit -m feat: pinned landing [streams]",
+        "push origin main [streams]",
+        "rev-parse HEAD [capture]"
+      ],
+      "logs": [
+        "[ship] staged 0 explicit path(s) (declared manifest=0, changed=0) — no `git add -A`",
+        "[ship] OK: committed to main",
+        "[ship] OK: pushed to origin/main"
+      ],
+      "commit_sha": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+      "repair_attempted": "",
+      "repair_outcome": "",
+      "error": null
+    },
+    {
+      "name": "direct/fetch-rc1",
+      "argv": [
+        "-C \u003croot\u003e -c core.quotePath=false status --porcelain -uall [capture]",
+        "add -A -- [other]",
+        "diff --cached --name-only [capture]",
+        "diff --cached --quiet [discard]",
+        "diff --cached --name-status [capture]",
+        "diff --cached --shortstat [capture]",
+        "commit -m feat: pinned landing [streams]",
+        "push origin main [streams]",
+        "fetch origin main [discard]"
+      ],
+      "logs": [
+        "[ship] staged 0 explicit path(s) (declared manifest=0, changed=0) — no `git add -A`",
+        "[ship] OK: committed to main",
+        "[ship] REPAIR: push rejected — fetching origin and probing for a fast-forward retry"
+      ],
+      "commit_sha": "",
+      "repair_attempted": "GIT_PUSH_REJECTED",
+      "repair_outcome": "declined",
+      "error": {
+        "code": "GIT_PUSH_REJECTED",
+        "class": "transient",
+        "stage": "atomic-ship",
+        "message": "ship: git push failed (rc=1): \u003cnil\u003e",
+        "debug": {
+          "branch": "main",
+          "git_err": "",
+          "git_rc": "1",
+          "repair_attempted": "GIT_PUSH_REJECTED",
+          "repair_outcome": "declined"
+        }
+      }
+    },
+    {
+      "name": "direct/fetch-spawn-error",
+      "argv": [
+        "-C \u003croot\u003e -c core.quotePath=false status --porcelain -uall [capture]",
+        "add -A -- [other]",
+        "diff --cached --name-only [capture]",
+        "diff --cached --quiet [discard]",
+        "diff --cached --name-status [capture]",
+        "diff --cached --shortstat [capture]",
+        "commit -m feat: pinned landing [streams]",
+        "push origin main [streams]",
+        "fetch origin main [discard]"
+      ],
+      "logs": [
+        "[ship] staged 0 explicit path(s) (declared manifest=0, changed=0) — no `git add -A`",
+        "[ship] OK: committed to main",
+        "[ship] REPAIR: push rejected — fetching origin and probing for a fast-forward retry"
+      ],
+      "commit_sha": "",
+      "repair_attempted": "GIT_PUSH_REJECTED",
+      "repair_outcome": "declined",
+      "error": {
+        "code": "GIT_PUSH_REJECTED",
+        "class": "transient",
+        "stage": "atomic-ship",
+        "message": "ship: git push failed (rc=1): \u003cnil\u003e",
+        "debug": {
+          "branch": "main",
+          "git_err": "",
+          "git_rc": "1",
+          "repair_attempted": "GIT_PUSH_REJECTED",
+          "repair_outcome": "declined"
+        }
+      }
+    },
+    {
+      "name": "direct/origin-ref-error",
+      "argv": [
+        "-C \u003croot\u003e -c core.quotePath=false status --porcelain -uall [capture]",
+        "add -A -- [other]",
+        "diff --cached --name-only [capture]",
+        "diff --cached --quiet [discard]",
+        "diff --cached --name-status [capture]",
+        "diff --cached --shortstat [capture]",
+        "commit -m feat: pinned landing [streams]",
+        "push origin main [streams]",
+        "fetch origin main [discard]",
+        "rev-parse origin/main [capture]"
+      ],
+      "logs": [
+        "[ship] staged 0 explicit path(s) (declared manifest=0, changed=0) — no `git add -A`",
+        "[ship] OK: committed to main",
+        "[ship] REPAIR: push rejected — fetching origin and probing for a fast-forward retry"
+      ],
+      "commit_sha": "",
+      "repair_attempted": "GIT_PUSH_REJECTED",
+      "repair_outcome": "declined",
+      "error": {
+        "code": "GIT_PUSH_REJECTED",
+        "class": "transient",
+        "stage": "atomic-ship",
+        "message": "ship: git push failed (rc=1): \u003cnil\u003e",
+        "debug": {
+          "branch": "main",
+          "git_err": "",
+          "git_rc": "1",
+          "repair_attempted": "GIT_PUSH_REJECTED",
+          "repair_outcome": "declined"
+        }
+      }
+    },
+    {
+      "name": "direct/head-error",
+      "argv": [
+        "-C \u003croot\u003e -c core.quotePath=false status --porcelain -uall [capture]",
+        "add -A -- [other]",
+        "diff --cached --name-only [capture]",
+        "diff --cached --quiet [discard]",
+        "diff --cached --name-status [capture]",
+        "diff --cached --shortstat [capture]",
+        "commit -m feat: pinned landing [streams]",
+        "push origin main [streams]",
+        "fetch origin main [discard]",
+        "rev-parse origin/main [capture]",
+        "rev-parse HEAD [capture]",
+        "merge-base --is-ancestor 0f1e2d3c4b5a69788796a5b4c3d2e1f0fedcba98 HEAD [discard]",
+        "push origin main [streams]",
+        "rev-parse HEAD [capture]"
+      ],
+      "logs": [
+        "[ship] staged 0 explicit path(s) (declared manifest=0, changed=0) — no `git add -A`",
+        "[ship] OK: committed to main",
+        "[ship] REPAIR: push rejected — fetching origin and probing for a fast-forward retry",
+        "[ship] REPAIR: push retry after fetch succeeded (origin was an ancestor — fast-forward)",
+        "[ship] OK: pushed to origin/main"
+      ],
+      "commit_sha": "",
+      "repair_attempted": "GIT_PUSH_REJECTED",
+      "repair_outcome": "push-retried",
+      "error": null
+    },
+    {
+      "name": "direct/already-pushed",
+      "argv": [
+        "-C \u003croot\u003e -c core.quotePath=false status --porcelain -uall [capture]",
+        "add -A -- [other]",
+        "diff --cached --name-only [capture]",
+        "diff --cached --quiet [discard]",
+        "diff --cached --name-status [capture]",
+        "diff --cached --shortstat [capture]",
+        "commit -m feat: pinned landing [streams]",
+        "push origin main [streams]",
+        "fetch origin main [discard]",
+        "rev-parse origin/main [capture]",
+        "rev-parse HEAD [capture]",
+        "rev-parse HEAD [capture]"
+      ],
+      "logs": [
+        "[ship] staged 0 explicit path(s) (declared manifest=0, changed=0) — no `git add -A`",
+        "[ship] OK: committed to main",
+        "[ship] REPAIR: push rejected — fetching origin and probing for a fast-forward retry",
+        "[ship] REPAIR: origin already at HEAD — push race resolved itself",
+        "[ship] OK: pushed to origin/main"
+      ],
+      "commit_sha": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+      "repair_attempted": "GIT_PUSH_REJECTED",
+      "repair_outcome": "already-pushed",
+      "error": null
+    },
+    {
+      "name": "direct/ancestor-retry-ok",
+      "argv": [
+        "-C \u003croot\u003e -c core.quotePath=false status --porcelain -uall [capture]",
+        "add -A -- [other]",
+        "diff --cached --name-only [capture]",
+        "diff --cached --quiet [discard]",
+        "diff --cached --name-status [capture]",
+        "diff --cached --shortstat [capture]",
+        "commit -m feat: pinned landing [streams]",
+        "push origin main [streams]",
+        "fetch origin main [discard]",
+        "rev-parse origin/main [capture]",
+        "rev-parse HEAD [capture]",
+        "merge-base --is-ancestor 0f1e2d3c4b5a69788796a5b4c3d2e1f0fedcba98 HEAD [discard]",
+        "push origin main [streams]",
+        "rev-parse HEAD [capture]"
+      ],
+      "logs": [
+        "[ship] staged 0 explicit path(s) (declared manifest=0, changed=0) — no `git add -A`",
+        "[ship] OK: committed to main",
+        "[ship] REPAIR: push rejected — fetching origin and probing for a fast-forward retry",
+        "[ship] REPAIR: push retry after fetch succeeded (origin was an ancestor — fast-forward)",
+        "[ship] OK: pushed to origin/main"
+      ],
+      "commit_sha": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+      "repair_attempted": "GIT_PUSH_REJECTED",
+      "repair_outcome": "push-retried",
+      "error": null
+    },
+    {
+      "name": "direct/ancestor-retry-rc1",
+      "argv": [
+        "-C \u003croot\u003e -c core.quotePath=false status --porcelain -uall [capture]",
+        "add -A -- [other]",
+        "diff --cached --name-only [capture]",
+        "diff --cached --quiet [discard]",
+        "diff --cached --name-status [capture]",
+        "diff --cached --shortstat [capture]",
+        "commit -m feat: pinned landing [streams]",
+        "push origin main [streams]",
+        "fetch origin main [discard]",
+        "rev-parse origin/main [capture]",
+        "rev-parse HEAD [capture]",
+        "merge-base --is-ancestor 0f1e2d3c4b5a69788796a5b4c3d2e1f0fedcba98 HEAD [discard]",
+        "push origin main [streams]"
+      ],
+      "logs": [
+        "[ship] staged 0 explicit path(s) (declared manifest=0, changed=0) — no `git add -A`",
+        "[ship] OK: committed to main",
+        "[ship] REPAIR: push rejected — fetching origin and probing for a fast-forward retry"
+      ],
+      "commit_sha": "",
+      "repair_attempted": "GIT_PUSH_REJECTED",
+      "repair_outcome": "declined",
+      "error": {
+        "code": "GIT_PUSH_REJECTED",
+        "class": "transient",
+        "stage": "atomic-ship",
+        "message": "ship: git push failed (rc=1): \u003cnil\u003e",
+        "debug": {
+          "branch": "main",
+          "git_err": "",
+          "git_rc": "1",
+          "repair_attempted": "GIT_PUSH_REJECTED",
+          "repair_outcome": "declined"
+        }
+      }
+    },
+    {
+      "name": "direct/diverged",
+      "argv": [
+        "-C \u003croot\u003e -c core.quotePath=false status --porcelain -uall [capture]",
+        "add -A -- [other]",
+        "diff --cached --name-only [capture]",
+        "diff --cached --quiet [discard]",
+        "diff --cached --name-status [capture]",
+        "diff --cached --shortstat [capture]",
+        "commit -m feat: pinned landing [streams]",
+        "push origin main [streams]",
+        "fetch origin main [discard]",
+        "rev-parse origin/main [capture]",
+        "rev-parse HEAD [capture]",
+        "merge-base --is-ancestor 0f1e2d3c4b5a69788796a5b4c3d2e1f0fedcba98 HEAD [discard]"
+      ],
+      "logs": [
+        "[ship] staged 0 explicit path(s) (declared manifest=0, changed=0) — no `git add -A`",
+        "[ship] OK: committed to main",
+        "[ship] REPAIR: push rejected — fetching origin and probing for a fast-forward retry"
+      ],
+      "commit_sha": "",
+      "repair_attempted": "GIT_PUSH_REJECTED",
+      "repair_outcome": "needs-reaudit",
+      "error": {
+        "code": "GIT_PUSH_REJECTED",
+        "class": "precondition",
+        "stage": "atomic-ship",
+        "message": "ship: push rejected and origin/main diverged — audited tree must be re-audited on the new base (no auto-rebase; local commit preserved). Reconcile at a batch boundary with `evolve sync-main`, then complete the stranded push with `evolve ship --push-only`.",
+        "debug": {
+          "branch": "main",
+          "head": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+          "origin_ref": "0f1e2d3c4b5a69788796a5b4c3d2e1f0fedcba98",
+          "repair_attempted": "GIT_PUSH_REJECTED",
+          "repair_outcome": "needs-reaudit"
+        }
+      }
+    },
+    {
+      "name": "direct/once-guard-preset",
+      "argv": [
+        "-C \u003croot\u003e -c core.quotePath=false status --porcelain -uall [capture]",
+        "add -A -- [other]",
+        "diff --cached --name-only [capture]",
+        "diff --cached --quiet [discard]",
+        "diff --cached --name-status [capture]",
+        "diff --cached --shortstat [capture]",
+        "commit -m feat: pinned landing [streams]",
+        "push origin main [streams]"
+      ],
+      "logs": [
+        "[ship] staged 0 explicit path(s) (declared manifest=0, changed=0) — no `git add -A`",
+        "[ship] OK: committed to main"
+      ],
+      "commit_sha": "",
+      "repair_attempted": "",
+      "repair_outcome": "",
+      "error": {
+        "code": "GIT_PUSH_REJECTED",
+        "class": "transient",
+        "stage": "atomic-ship",
+        "message": "ship: git push failed (rc=1): \u003cnil\u003e",
+        "debug": {
+          "branch": "main",
+          "git_err": "",
+          "git_rc": "1"
+        }
+      }
+    }
+  ]
+}

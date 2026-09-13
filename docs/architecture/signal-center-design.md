@@ -162,7 +162,7 @@ Examples (what cycles 1636 and 1630 would have produced):
 
 `orchestrator`, `advisor`, `runner`, `bridge`, `liveness` (the renamed pane center), `ship`, `audit`,
 `triage`, `scout`, `build`, `tdd`, `gate.contract`, `gate.eval`, `gate.repo`, `inbox`, `config`,
-`loop`, `watchdog`, `observer`, `dashboard`, `signalcenter` (self-reports), `ledger` (the file ledger's append observer, S4a), `outcome` (the phase-outcome recorder, breakdown unit 01), `failurediag` (the failure-diag sidecar writer and the delivery-failure classifier, breakdown unit 02), `carryover` (the carryover-todo lifecycle, breakdown unit 03), `failurelearning` (the failure-learning engine — the failed-approach recorder, the deterministic floor, the recurrence closure; breakdown unit 03b). A module is added by
+`loop`, `watchdog`, `observer`, `dashboard`, `signalcenter` (self-reports), `ledger` (the file ledger's append observer, S4a), `outcome` (the phase-outcome recorder, breakdown unit 01), `failurediag` (the failure-diag sidecar writer and the delivery-failure classifier, breakdown unit 02), `carryover` (the carryover-todo lifecycle, breakdown unit 03), `failurelearning` (the failure-learning engine — the failed-approach recorder, the deterministic floor, the recurrence closure; breakdown unit 03b); `ship` also carries the landing's warnings (the ff-merge, the push with its inline repair, the ship-binding witness; breakdown unit 07 — `internal/phases/ship/landing`, `ship.warning`). A module is added by
 editing the closed set and its test; an unknown module is stamped `SIGNALCENTER_UNKNOWN_MODULE` and
 raised to WARN — never dropped. *(review 21: `advisor` and `config` added to match §12.)*
 
@@ -176,6 +176,7 @@ raised to WARN — never dropped. *(review 21: `advisor` and `config` added to m
 | `gate.passed` | the contract gate let the phase advance: verified (`GATE_CONTRACT_VERIFIED`, fields name the artifact, its size, the owed files and effects — where it searched), salvaged, or advanced with a WARN it should not hide (would-block under a shadow stage, breaker demotion, fail-open) — S2b | INFO; WARN for would-block / demoted / fail-open | |
 | `gate.rejected` / `gate.corrected` | the contract gate refused at enforce (the reason IS the correction directive; `fields.codes`, `blocks`) / the orchestrator's ladder re-dispatched a correction (`fields.correction`, `max`, `rung`, `cli`, `escalated`) — S2b, both roots | WARN / INFO | ✓ / |
 | `ship.landed` / `ship.error` | a landing / a `shiperr` code | INFO / WARN (INCIDENT for the `integrity` class) | / ✓ |
+| `ship.warning` | the landing could not reset the tracked binary before the ff-merge, declined the inline push-race repair, could not read HEAD after the push, or could not write ship-binding.json; the commit/push stands and the ship's own error (if any) is the `ship.error` that follows, whose `fields.step` names the landing step (unit 07) | WARN | |
 | `system.failure` | ADR-0072 signal (halt-class) | INCIDENT | ✓ |
 | `quota.paused` | all families exhausted, cycle paused | WARN | ✓ |
 | `bridge.warning` / `bridge.tripwire` | engine telemetry warnings, tripwires | WARN | |
@@ -393,8 +394,9 @@ func (o *Orchestrator) SignalSummary() signalcenter.Summary // a snapshot of the
 ```
 [<module>] <kind> <SEVERITY> <CODE> cycle=<N> phase=<p> attempt=<k> seq=<s> origin=<Type.Method> — <reason> [k=v …sorted]
 [orchestrator] phase.outcome WARN ORCHESTRATOR_PHASE_VERDICT_FAIL cycle=1636 phase=triage attempt=1 seq=41 origin=Orchestrator.recordPhaseOutcome — triage verdict=FAIL: top_n card "…" names protected surface "go/internal/phases/ship/gitops.go" archetype=plan duration_ms=121183 verdict=FAIL
-[ship] ship.error WARN SHIP_GIT_FLEET_REBASE_NEEDED cycle=1632 phase=ship attempt=1 seq=77 origin=Landing.Land — main moved during the landing; recovering via build (attempt 1/2) class=transient
-[ship] ship.error WARN SIGNALCENTER_UNREGISTERED_CODE cycle=1640 phase=ship attempt=1 seq=12 origin=Landing.Land — main moved during the landing drift=SIGNALCENTER_UNREGISTERED_CODE raw_code=SHIP_NEW_THING
+[ship] ship.warning WARN SHIP_LANDING_PUSH_REPAIR_DECLINED cycle=1641 phase=ship seq=76 origin=Landing.Push — push rejected; inline fetch + ff-retry declined at fetch branch=main probe=fetch step=push
+[ship] ship.error WARN SHIP_GIT_PUSH_REJECTED cycle=1641 phase=ship seq=77 origin=Orchestrator.recordShipError — ship: git push failed (rc=1); main is at abc123: <nil> branch=main class=transient git_rc=1 path=…/ship-error.json repair_outcome=declined stage=atomic-ship step=push
+[ship] ship.error WARN SIGNALCENTER_UNREGISTERED_CODE cycle=1640 phase=ship seq=12 origin=Orchestrator.recordShipError — main moved during the landing class=transient drift=SIGNALCENTER_UNREGISTERED_CODE raw_code=SHIP_NEW_THING stage=atomic-ship
 [orchestrator] system.failure INCIDENT ORCHESTRATOR_SYSTEM_FAILURE cycle=862 seq=88 origin=cycleRun.completeCycle — verdict-incoherence: recorded FAIL but on-disk audit=PASS, acs=PASS category=verdict-incoherence halt=true level=system
 [orchestrator] cycle.sealed WARN ORCHESTRATOR_CYCLE_FAILED cycle=862 seq=89 origin=cycleRun.completeCycle — final verdict FAIL final_verdict=FAIL phases_run=5 termination_reason=audit-fail-floor
 ```
@@ -468,7 +470,7 @@ ADR-0072's coherence floor and need their own campaign note.
 | 3 | `orchestrator.go` (1158): composition (`New`, options) vs `RunCycle` engine | 1158 | `orchestrator` | Facade over the extracted units |
 | 4 | `cyclerun.go` (904): finalize/closeout → `cycleclose` | 904 | `orchestrator` | `finalizeCycle` + `finalizeOutcome` + dossier |
 | 5 | `inboxmover.go` (1006) | 1006 | `inbox` | claim/release/promote as three units |
-| 6 | `phases/ship/gitops.go` (989) | 989 | `ship` | landing vs binding writer vs staging guard |
+| 6 | **unit 07 landed 2026-09-14** ([decomposition/07-shipgitops.md](decomposition/07-shipgitops.md)): the landing (the ff-merge, the push with its inline repair and the post-push head read, the shared git probes, the binding writer) → `internal/phases/ship/landing` behind the seam `gitops_landing.go`; `gitops.go` 989 → 935, `repair.go` 474 → 402, `worktree_ship.go` 205 → 184; the staging guard and the run-scope policy remain (07b / 07c) | 989 | `ship` | landing vs binding writer vs staging guard |
 | 7 | `config/config.go` (962) | 962 | `config` | typed policy structs; retire env flags as a by-product |
 | 8 | `bridge/engine.go` (791) + `autorespond.go` (787) | 1578 | `bridge` | rides S3 |
 | later wave | `phases/audit/defect_ledger.go` (881), `acssuite.go` (866), `phases/audit/ciparity.go` (801) | 2548 | `audit`, `acs` | gate logic under the ADR-0072 floor; own campaign note |
