@@ -28,6 +28,9 @@ Commands:
   ledger     Verify or tail the ledger ( ledger verify | ledger tail [--n N] )
   dossier    Read and verify cycle dossiers
               ( dossier verify [--project-root P] )
+  audit      Analyze auditor narrative versus deterministic gate outcomes
+              ( audit calibration [--project-root P] [--dossiers-dir D]
+                [--runs-dir R] --output FILE )
   dashboard  Serve the read-only live pipeline dashboard on loopback
               ( dashboard [--addr 127.0.0.1:8090] [--project-root P] [--snapshot] )
   salvage    Report the recoverable-malformed bad_verdict rate (read-only)

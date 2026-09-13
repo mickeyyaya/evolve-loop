@@ -15,6 +15,7 @@
 
 ./internal/failuregrade
 ./internal/auditchain
+./internal/auditcalibration
 ./internal/phaseoutputs
 ./internal/scopedelta
 ./internal/skillcheck

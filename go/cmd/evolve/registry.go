@@ -56,6 +56,7 @@ var commands = []subcommand{
 	{Name: "guard", Summary: "Run a trust-kernel guard", Run: guardcmd.RunGuard},
 	{Name: "ledger", Summary: "Verify or tail the ledger", Run: runLedger},
 	{Name: "dossier", Summary: "Read and verify cycle dossiers (dossier verify)", Run: runDossier},
+	{Name: "audit", Summary: "Analyze auditor calibration evidence (audit calibration)", Run: runAudit},
 	{Name: "salvage", Summary: "Report the recoverable-malformed bad_verdict rate from the baseline sidecar (salvage report [-json])", Run: runSalvage},
 	{Name: "soak-report", Summary: "Render the EVOLVE_PHASE_RECOVERY soak evidence table (read-only)", Run: runSoakReport},
 	{Name: "dashboard", Summary: "Serve the read-only live pipeline dashboard (dashboard [--addr A] [--project-root P] [--snapshot])", Run: runDashboard},
