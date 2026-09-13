@@ -1,6 +1,7 @@
 package core
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"os"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclehealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasetiming"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
 // phase_diagnostics_seal_test.go — a phase's own FAIL reason must reach the seal.
@@ -110,11 +112,15 @@ func redirectStderr(t *testing.T, fn func()) string {
 }
 
 // The C1 chokepoint is the ONE producer: phaseOutcomeFrom relays the phase's
-// diagnostics, recordPhaseOutcome writes them to the record and names a
-// reasoned FAIL once in the log with the same wording the seal will use. A PASS
-// carrying warnings is recorded (the durable trail) but not logged as a failure.
+// diagnostics, recordPhaseOutcome writes them to the record and emits ONE
+// phase.outcome; the root's WARN-filtered stderr sink renders a reasoned FAIL
+// in the one line format (ADR-0101 S1) — the chokepoint itself prints nothing.
+// A PASS carrying warnings is recorded (the durable trail) and stays off stderr.
 func TestRecordPhaseOutcome_CarriesThePhaseDiagnosticsAndNamesAReasonedFail(t *testing.T) {
-	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
+	c := signalcenter.New()
+	var sink bytes.Buffer
+	c.Subscribe(signalcenter.Filter(signalcenter.StderrSink(&sink), signalcenter.SeverityWarn))
+	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil), WithSignalCenter(c))
 	failing := PhaseResponse{Phase: string(PhaseTriage), Verdict: VerdictFAIL, Diagnostics: []Diagnostic{
 		{Severity: "warning", Message: "metrics file absent"},
 		{Severity: "error", Message: protectedSurfaceRejection},
@@ -129,23 +135,26 @@ func TestRecordPhaseOutcome_CarriesThePhaseDiagnosticsAndNamesAReasonedFail(t *t
 	if len(timings) != 1 || len(timings[0].Diagnostics) != 2 || timings[0].Diagnostics[1].Message != protectedSurfaceRejection {
 		t.Errorf("the record must carry the phase's diagnostics verbatim: %+v", timings)
 	}
-	want := "[orchestrator] phase triage verdict=FAIL: " + protectedSurfaceRejection
-	if !strings.Contains(stderr, want) {
-		t.Errorf("a reasoned FAIL must be named once at the chokepoint; stderr:\n%s", stderr)
+	if strings.Contains(stderr, "verdict=FAIL") {
+		t.Errorf("the chokepoint must not hand-write a log line any more; stderr:\n%s", stderr)
 	}
-	if strings.Contains(stderr, "metrics file absent") {
-		t.Errorf("warnings are not reasons and must not be logged as one: %s", stderr)
+	want := "[orchestrator] phase.outcome WARN ORCHESTRATOR_PHASE_VERDICT_FAIL phase=triage attempt=1 seq=1 origin=Orchestrator.recordPhaseOutcome — triage verdict=FAIL: " + protectedSurfaceRejection
+	if !strings.HasPrefix(sink.String(), want) {
+		t.Errorf("the sink renders the reasoned FAIL once in the one line format:\n got %s\nwant prefix %s", sink.String(), want)
+	}
+	if strings.Contains(sink.String(), "metrics file absent") {
+		t.Errorf("warnings are not reasons and must not be in the line: %s", sink.String())
 	}
 
 	passing := PhaseResponse{Phase: string(PhaseAudit), Verdict: VerdictPASS, Diagnostics: []Diagnostic{{Severity: "warning", Message: "ACS floor overrode a hygiene flag"}}}
-	timings = nil
+	timings, sink = nil, bytes.Buffer{}
 	stderr = redirectStderr(t, func() {
 		o.recordPhaseOutcome(&result, &timings, t.TempDir(), phaseOutcomeFrom(PhaseAudit, passing, 1, "", ""))
 	})
 	if len(timings) != 1 || len(timings[0].Diagnostics) != 1 {
 		t.Errorf("a PASS keeps its warning trail on the record: %+v", timings)
 	}
-	if strings.Contains(stderr, "verdict=FAIL") {
-		t.Errorf("a PASS must not be logged as a failure: %s", stderr)
+	if sink.Len() != 0 || strings.Contains(stderr, "verdict") {
+		t.Errorf("a PASS is INFO: filtered off the console and never hand-written: sink=%q stderr=%q", sink.String(), stderr)
 	}
 }

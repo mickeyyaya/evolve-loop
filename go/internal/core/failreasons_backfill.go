@@ -45,7 +45,7 @@ func backfillFailReasons(result *CycleResult, timings []phaseTimingEntry) {
 		if t.AbortReason == "" && t.Verdict == VerdictFAIL && !named[t.Phase] {
 			named[t.Phase] = true
 			if len(cyclestate.ErrorMessages(t.Diagnostics)) > 0 {
-				result.FailReasons = append(result.FailReasons, fmt.Sprintf("phase %s: %s", t.Phase, verdictFailReason(t.Diagnostics)))
+				result.FailReasons = append(result.FailReasons, fmt.Sprintf("phase %s: %s", t.Phase, verdictReason(VerdictFAIL, t.Diagnostics)))
 				continue
 			}
 			result.FailReasons = append(result.FailReasons, fmt.Sprintf("phase %s: verdict FAIL with no recorded abort reason (phase-infra class)", t.Phase))

@@ -57,6 +57,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/research"
 	"github.com/mickeyyaya/evolve-loop/go/internal/resolvellm"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/topngate"
@@ -305,6 +306,11 @@ type orchDeps struct {
 	Storage      core.Storage
 	Ledger       core.Ledger
 	Orchestrator *core.Orchestrator
+	// Signals is the ADR-0101 Signal Center: constructed here, before the
+	// bridge, always (a nil Center is a test affordance only). No production
+	// reader yet, by design: the bridge receives it at construction in S3 and
+	// cmd_loop reads Orchestrator.SignalSummary() for the batch report in S4.
+	Signals *signalcenter.Center
 }
 
 // wireOrchestratorDeps mirrors wireOrchestrator but returns the
@@ -324,6 +330,21 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	// stop-review callback to append kind=stop_review entries (ADR-0026 Stage 1 #5).
 	st := storage.New(evolveDir)
 	ld := ledger.New(evolveDir)
+
+	// ADR-0101 S1: the Signal Center is built FIRST (the bridge receives it at
+	// construction in S3 — Deps normalize inside NewEngine) and unconditionally:
+	// TestNilSignalCenterRootsArePinned lists the only roots allowed to skip it.
+	// Listeners: the durable per-cycle signals.ndjson (everything) and the
+	// console at WARN and above (the severity contract's "log only" INFO tier
+	// stays in the file). The orchestrator subscribes via WithSignalCenter.
+	signals := signalcenter.New(signalcenter.WithPID(os.Getpid()))
+	signals.Subscribe(signals.NDJSONSink(func(cycle int) string {
+		if cycle == 0 {
+			return ""
+		}
+		return filepath.Join(core.RunWorkspacePath(projectRoot, cycle), "signals.ndjson")
+	}))
+	signals.Subscribe(signalcenter.Filter(signalcenter.StderrSink(os.Stderr), signalcenter.SeverityWarn))
 
 	br := bridge.NewDefault(projectRoot)
 	br.SetOnStopReview(func(cycle int, phase, action, reason string) {
@@ -743,11 +764,13 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	// branch carries the audit verdict forward instead of always re-auditing.
 	// All fail-closed — see cmd_composition_wiring.go.
 	opts = append(opts, compositionOptions()...)
+	opts = append(opts, core.WithSignalCenter(signals))
 
 	return orchDeps{
 		Storage:      st,
 		Ledger:       ld,
 		Orchestrator: core.NewOrchestrator(st, ld, runners, opts...),
+		Signals:      signals,
 	}
 }
 

@@ -182,21 +182,21 @@ func (o *Orchestrator) recordFloorVerdictFailure(ctx context.Context, req CycleR
 // FailedRecord names WHY the phase failed, not merely THAT it did — the missing
 // signal that let the skills-drift storm re-derive the same doomed fix forever.
 func floorVerdictError(phase Phase, diags []Diagnostic) error {
-	return fmt.Errorf("%s %s", phase, verdictFailReason(diags))
+	return fmt.Errorf("%s %s", phase, verdictReason(VerdictFAIL, diags))
 }
 
-// verdictFailReason is the ONE rendering of "why this phase's verdict is FAIL":
+// verdictReason is the ONE rendering of "why this phase's verdict is <V>":
 // the error-severity diagnostics the phase itself reported, joined; bare
 // "verdict=FAIL" when it reported none. floorVerdictError (the FailedRecord),
 // the C1 chokepoint log line and the seal's backfill all project it, so the
 // three surfaces an operator reads first cannot word the same failure
 // differently.
-func verdictFailReason(diags []Diagnostic) string {
+func verdictReason(verdict string, diags []Diagnostic) string {
 	msgs := cyclestate.ErrorMessages(diags)
 	if len(msgs) == 0 {
-		return "verdict=FAIL"
+		return "verdict=" + verdict
 	}
-	return "verdict=FAIL: " + strings.Join(msgs, "; ")
+	return "verdict=" + verdict + ": " + strings.Join(msgs, "; ")
 }
 
 // recordChokepointEscape closes the ADR-0044 C1 invariant on RunCycle's
