@@ -229,8 +229,9 @@
 ./internal/retrofile
 
 # Phase 5 gap=5-7 tail batch (2026-06-16): 5 packages (5-7 unnamed exports
-# each, all >=95% cover). phaseobserver: Scope enum + DefaultProcessAlive (live
-# pgid probe) + ExitFatal exit-code-vocabulary contract. deliverable: 4 Verify
+# each, all >=95% cover). phaseobserver: Scope enum (since ADR-0103 unit 12 aliases of the
+# observerengine spellings) + DefaultProcessAlive (live pgid probe); the ExitFatal member was
+# deleted (zero consumers tree-wide). deliverable: 4 Verify
 # error codes via real fixtures + NewVerifier/NewVerifierWithCatalog. subagent:
 # 5 *Result structs bound from their producers + TierHaiku via ResolveModelTier.
 # bridge/recipe: Result/StepResult/StepStatus/SessionDriver/SendKind/AwaitKind/
@@ -593,3 +594,7 @@
 # ADR-0103 unit 08 (2026-09-14): config resolution — the routing-config Loader, its registry/env/policy
 # dials, validators and codes; ./internal/config is enforced by the routing-tier row above (the
 # Phase 5 gap=4 tail batch). 100% API + 100% line coverage gated.
+# ADR-0103 unit 12 (2026-09-14): the phase-observer engine — the stream-json tail/decoder, the stall
+# rules, the incident responder and the envelope/report sinks (internal/observerengine).
+# 100% API + 100% line coverage gated.
+./internal/observerengine

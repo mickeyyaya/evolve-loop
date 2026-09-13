@@ -1,0 +1,95 @@
+{
+  "events": [
+    {
+      "type": "observer_started",
+      "severity": "INFO",
+      "ts": "2026-06-01T09:00:00Z",
+      "keys": [
+        "enforce",
+        "poll_s",
+        "scope",
+        "stall_s"
+      ]
+    },
+    {
+      "type": "heartbeat",
+      "severity": "INFO",
+      "ts": "2026-06-01T09:00:00Z",
+      "keys": [
+        "cumulative_cost",
+        "error_count",
+        "event_count",
+        "tool_call_count"
+      ]
+    },
+    {
+      "type": "soft_stall_nudge",
+      "severity": "WARN",
+      "ts": "2026-06-01T09:06:40Z",
+      "keys": [
+        "idle_s",
+        "threshold_s"
+      ]
+    },
+    {
+      "type": "heartbeat",
+      "severity": "INFO",
+      "ts": "2026-06-01T09:06:40Z",
+      "keys": [
+        "cumulative_cost",
+        "error_count",
+        "event_count",
+        "tool_call_count"
+      ]
+    },
+    {
+      "type": "stuck_no_output",
+      "severity": "INCIDENT",
+      "ts": "2026-06-01T09:11:40Z",
+      "keys": [
+        "action",
+        "action_reason",
+        "idle_s",
+        "threshold_s"
+      ],
+      "action": "extend"
+    },
+    {
+      "type": "heartbeat",
+      "severity": "INFO",
+      "ts": "2026-06-01T09:11:40Z",
+      "keys": [
+        "cumulative_cost",
+        "error_count",
+        "event_count",
+        "tool_call_count"
+      ]
+    },
+    {
+      "type": "observer_shutdown",
+      "severity": "INFO",
+      "ts": "2026-06-01T09:11:40Z",
+      "keys": [
+        "reason"
+      ]
+    }
+  ],
+  "report": {
+    "agent": "builder",
+    "cache_creation_tokens": 256,
+    "cache_read_tokens": 1024,
+    "cumulative_cost": 0.5,
+    "cycle": 7,
+    "duration_s": 700,
+    "error_count": 1,
+    "event_count": 4,
+    "finished_at": "2026-06-01T09:11:40Z",
+    "incident_count": 1,
+    "phase": "build",
+    "rate_limit_count": 1,
+    "schema_version": "1.0",
+    "started_at": "2026-06-01T09:00:00Z",
+    "tool_call_count": 1,
+    "tool_result_count": 1
+  }
+}
