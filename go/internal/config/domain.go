@@ -7,6 +7,8 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 )
 
 // Domain is the project-level adapter record .evolve/domain.json has carried
@@ -27,7 +29,7 @@ type Domain struct {
 // caller must surface: a writing project with a trailing comma must not become
 // a code project silently.
 func LoadDomain(projectRoot string) (Domain, bool, error) {
-	path := filepath.Join(projectRoot, ".evolve", "domain.json")
+	path := filepath.Join(paths.EvolveDirOf(projectRoot), "domain.json")
 	raw, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
 		return Domain{}, false, nil

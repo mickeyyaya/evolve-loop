@@ -1,0 +1,86 @@
+[
+  {
+    "Module": "config",
+    "Kind": "config.warning",
+    "Code": "CONFIG_UNKNOWN_VALUE",
+    "Origin": "Loader.Load",
+    "Step": "registry"
+  },
+  {
+    "Module": "config",
+    "Kind": "config.warning",
+    "Code": "CONFIG_UNKNOWN_VALUE",
+    "Origin": "Loader.Load",
+    "Step": "registry"
+  },
+  {
+    "Module": "config",
+    "Kind": "config.warning",
+    "Code": "CONFIG_UNKNOWN_VALUE",
+    "Origin": "Loader.Load",
+    "Step": "registry"
+  },
+  {
+    "Module": "config",
+    "Kind": "config.warning",
+    "Code": "CONFIG_UNKNOWN_VALUE",
+    "Origin": "Loader.Load",
+    "Step": "registry"
+  },
+  {
+    "Module": "config",
+    "Kind": "config.warning",
+    "Code": "CONFIG_UNKNOWN_VALUE",
+    "Origin": "Loader.Load",
+    "Step": "registry"
+  },
+  {
+    "Module": "config",
+    "Kind": "config.warning",
+    "Code": "CONFIG_UNKNOWN_VALUE",
+    "Origin": "Loader.Load",
+    "Step": "registry"
+  },
+  {
+    "Module": "config",
+    "Kind": "config.warning",
+    "Code": "CONFIG_UNKNOWN_VALUE",
+    "Origin": "Loader.Load",
+    "Step": "env"
+  },
+  {
+    "Module": "config",
+    "Kind": "config.warning",
+    "Code": "CONFIG_UNKNOWN_VALUE",
+    "Origin": "Loader.Load",
+    "Step": "env"
+  },
+  {
+    "Module": "config",
+    "Kind": "config.warning",
+    "Code": "CONFIG_UNKNOWN_VALUE",
+    "Origin": "Loader.Load",
+    "Step": "env"
+  },
+  {
+    "Module": "config",
+    "Kind": "config.warning",
+    "Code": "CONFIG_WEAK_SPINE",
+    "Origin": "Loader.Load",
+    "Step": "spine"
+  },
+  {
+    "Module": "config",
+    "Kind": "config.warning",
+    "Code": "CONFIG_SPINE_ORDER",
+    "Origin": "Loader.Load",
+    "Step": "spine"
+  },
+  {
+    "Module": "config",
+    "Kind": "config.warning",
+    "Code": "CONFIG_INERT_PHASE_ENABLE",
+    "Origin": "Loader.Load",
+    "Step": "inert"
+  }
+]

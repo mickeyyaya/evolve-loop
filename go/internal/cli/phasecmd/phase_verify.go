@@ -190,8 +190,7 @@ func withFrozenPinViolations(res deliverable.Result, worktree string) deliverabl
 // no-drift invariant (ADR-0050 §3.8). A registry that cannot be read degrades to
 // env + code defaults, never a hard failure.
 func phaseVerifyPhaseIO() config.Stage {
-	registryPath := filepath.Join(cmdutil.EnvOrCwd("EVOLVE_PROJECT_ROOT"), "docs", "architecture", "phase-registry.json")
-	cfg, _ := config.Load(registryPath, cmdutil.FilterEvolveEnv(os.Environ()))
+	cfg, _ := config.Load(config.RegistryPath(cmdutil.EnvOrCwd("EVOLVE_PROJECT_ROOT")), cmdutil.FilterEvolveEnv(os.Environ()))
 	return cfg.PhaseIO
 }
 

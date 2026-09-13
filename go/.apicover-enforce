@@ -590,3 +590,6 @@
 # push-race repair and the post-push head read, the shared git probes, the ship-binding witness
 # (internal/phases/ship/landing). 100% API + 100% line coverage gated.
 ./internal/phases/ship/landing
+# ADR-0103 unit 08 (2026-09-14): config resolution — the routing-config Loader, its registry/env/policy
+# dials, validators and codes; ./internal/config is enforced by the routing-tier row above (the
+# Phase 5 gap=4 tail batch). 100% API + 100% line coverage gated.

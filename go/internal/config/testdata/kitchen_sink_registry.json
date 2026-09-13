@@ -1,0 +1,16 @@
+{
+  "schema_version": 3,
+  "config": {
+    "dynamic_routing": "bogus",
+    "routing_mode": "bogus",
+    "model_routing": "bogus",
+    "mandatory_phases": ["scout", "build", "audit", "ship"],
+    "conditional_mandatory": {"plan-review": "nonsense"},
+    "deliverable_kinds": {"document": {"root": "", "min_options": 0}}
+  },
+  "phases": [
+    {"name": "ship", "enabled": "maybe"},
+    {"name": "audit"},
+    {"name": "plan-review", "optional": true, "enabled": "on"}
+  ]
+}

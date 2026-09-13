@@ -84,8 +84,7 @@ func (p PhasePolicy) ShouldRunPhase(phase string) bool {
 // the two phase-construction paths (orchestrator wiring + registry factories)
 // and the zero-value-skip hazard that would create.
 func PolicyForProject(projectRoot string, env map[string]string) PhasePolicy {
-	registryPath := filepath.Join(projectRoot, "docs", "architecture", "phase-registry.json")
-	cfg, _ := config.Load(registryPath, env)
+	cfg, _ := config.Load(config.RegistryPath(projectRoot), env)
 	// Apply the user policy's mandatory_phases here too, identically to the
 	// loop's composition root — otherwise a self-skipping phase (triage/tdd/
 	// build-planner) made mandatory ONLY by policy would re-read config without
