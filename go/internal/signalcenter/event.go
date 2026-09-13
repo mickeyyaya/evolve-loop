@@ -89,6 +89,7 @@ const (
 	ModuleLedger       Module = "ledger"
 	ModuleOutcome      Module = "outcome"
 	ModuleFailureDiag  Module = "failurediag"
+	ModuleCarryover    Module = "carryover"
 	ModuleSignalCenter Module = "signalcenter"
 )
 
@@ -96,7 +97,7 @@ var knownModules = map[Module]bool{
 	ModuleOrchestrator: true, ModuleAdvisor: true, ModuleRunner: true, ModuleBridge: true, ModuleLiveness: true,
 	ModuleShip: true, ModuleAudit: true, ModuleTriage: true, ModuleScout: true, ModuleBuild: true, ModuleTDD: true,
 	ModuleGateContract: true, ModuleGateEval: true, ModuleGateRepo: true, ModuleInbox: true, ModuleConfig: true,
-	ModuleLoop: true, ModuleWatchdog: true, ModuleObserver: true, ModuleDashboard: true, ModuleLedger: true, ModuleOutcome: true, ModuleFailureDiag: true, ModuleSignalCenter: true,
+	ModuleLoop: true, ModuleWatchdog: true, ModuleObserver: true, ModuleDashboard: true, ModuleLedger: true, ModuleOutcome: true, ModuleFailureDiag: true, ModuleCarryover: true, ModuleSignalCenter: true,
 }
 
 // Known reports whether m is in the closed set.
@@ -139,6 +140,7 @@ const (
 	KindLedgerAppended     Kind = "ledger.appended"
 	KindOutcomeWarning     Kind = "outcome.warning"
 	KindFailureDiagWarning Kind = "failurediag.warning"
+	KindCarryoverWarning   Kind = "carryover.warning"
 	KindCycleSealed        Kind = "cycle.sealed"
 	KindLoopWave           Kind = "loop.wave"
 	KindLoopHalt           Kind = "loop.halt"
@@ -152,7 +154,7 @@ var knownKinds = map[Kind]bool{
 	KindPhaseDispatched: true, KindPhaseOutcome: true, KindPhaseAborted: true, KindGateRejected: true,
 	KindGatePassed: true, KindGateCorrected: true, KindShipLanded: true, KindShipError: true, KindSystemFailure: true,
 	KindQuotaPaused: true, KindBridgeWarning: true, KindBridgeTripwire: true, KindPaneLiveness: true,
-	KindLedgerAppended: true, KindOutcomeWarning: true, KindFailureDiagWarning: true, KindCycleSealed: true, KindLoopWave: true, KindLoopHalt: true,
+	KindLedgerAppended: true, KindOutcomeWarning: true, KindFailureDiagWarning: true, KindCarryoverWarning: true, KindCycleSealed: true, KindLoopWave: true, KindLoopHalt: true,
 	KindLoopEscalation: true, KindListenerPanicked: true, KindRegistryDrift: true, KindSinkDropped: true,
 }
 

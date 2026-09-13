@@ -22,7 +22,7 @@ An entry retires when either:
 
 - its `ID` is in `committedIDs` (the ids this cycle actually committed to), or
 - it shares a retired entry's **cross-cycle Action fingerprint**
-  (`carryoverActionFingerprint` — Action text with cycle tokens folded and
+  (`carryover.fingerprint` (internal/core/carryover/identity.go, ADR-0103 unit 03) — Action text with cycle tokens folded and
   whitespace/case normalized). These are the per-cycle re-mints of the same class
   that the ID-keyed dedupe never collapsed.
 

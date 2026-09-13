@@ -172,7 +172,7 @@ var goTestDurationToken = regexp.MustCompile(`\b\d+\.\d+s\b`)
 // ".evolve/worktrees/cycle-42824668-1440/go", and the bare "cycle 1365" of
 // prose reasons. The trailing `(?:-\d+)*` is load-bearing for the worktree
 // shape, whose name carries BOTH a lane hash and a cycle number. Same shape as
-// failure_learning.go's carryoverCycleTokenRE, extended for multi-segment ids.
+// the carryover unit's cycleTokenRE (internal/core/carryover/identity.go), extended for multi-segment ids.
 // Only the NUMBER folds: the path around it (which dir, which artifact FILE)
 // is untouched, so two different artifacts in one cycle dir stay two defects.
 var cycleNumberToken = regexp.MustCompile(`(?i)\bcycle[ -]\d+(?:-\d+)*`)

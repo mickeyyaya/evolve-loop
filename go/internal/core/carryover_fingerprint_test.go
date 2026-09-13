@@ -14,36 +14,6 @@ import (
 	"testing"
 )
 
-func TestCarryoverActionFingerprint_NormalizesCycleTokens(t *testing.T) {
-	t.Parallel()
-	a := carryoverActionFingerprint("cycle 1421 failed during audit: disposition-preflight: MISSING")
-	b := carryoverActionFingerprint("cycle 1428 failed during audit: disposition-preflight: MISSING")
-	if a != b {
-		t.Errorf("same failure class across cycles must fingerprint identically:\n a=%q\n b=%q", a, b)
-	}
-	c := carryoverActionFingerprint("Fix defect from cycle 1424: nested decoy defeats ambiguity guard")
-	d := carryoverActionFingerprint("Fix defect from cycle 1427: nested decoy defeats ambiguity guard")
-	if c != d {
-		t.Errorf("defect-adoption entries must fingerprint identically across cycles:\n c=%q\n d=%q", c, d)
-	}
-	if a == c {
-		t.Error("distinct failure classes must not collide")
-	}
-}
-
-func TestCarryoverFingerprintExists_DedupesAcrossCycles(t *testing.T) {
-	t.Parallel()
-	todos := []CarryoverTodo{{ID: "cycle-1421-defect-0", Action: "Fix defect from cycle 1421: salvage parser drops fenced JSON"}}
-	if !carryoverFingerprintExists(todos, "Fix defect from cycle 1428: salvage parser drops fenced JSON") {
-		t.Error("cross-cycle duplicate not detected — the P0 flood regrows")
-	}
-	if carryoverFingerprintExists(todos, "Fix defect from cycle 1428: an entirely different defect") {
-		t.Error("distinct defect wrongly deduped")
-	}
-}
-
-// The mint-site wiring: adopting the same defect text from two different
-// cycles' records must yield ONE carryover entry.
 func TestAdoptDefects_CrossCycleFingerprintDedupe(t *testing.T) {
 	t.Parallel()
 	var state State

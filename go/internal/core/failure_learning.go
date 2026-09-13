@@ -8,11 +8,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/core/carryover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core/outcome"
 	"github.com/mickeyyaya/evolve-loop/go/internal/faillearn"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failuregrade"
@@ -155,7 +155,7 @@ func (o *Orchestrator) recordFailedApproachState(fl failureLearningRequest) (sum
 	// the record's stamp rather than re-deriving it (single-sourced TTL logic).
 	record.ExpiresAt = failurelog.ComputeExpiresAt(
 		failurelog.NormalizeLegacy(record.Classification), now)
-	appendCarryoverTodoDeduped(fl.State, CarryoverTodo{
+	o.appendCarryoverTodoDeduped(fl.State, CarryoverTodo{
 		ID: todoID, Action: summary, Priority: carryoverPriorityBlocking,
 		FirstSeenCycle: fl.Cycle, ExpiresAt: record.ExpiresAt,
 	})
@@ -491,20 +491,9 @@ func adoptStructuredFailure(workspace, phase string) *phasecontract.FailureBlock
 }
 
 const (
-	maxAdoptedDefects     = 20  // entries per adopted list
-	maxAdoptedDefectRunes = 500 // runes per adopted entry (mirrors faillearn's summary cap)
+	maxAdoptedDefects     = 20                       // entries per adopted list
+	maxAdoptedDefectRunes = carryover.MaxActionRunes // runes per adopted entry — the carryover unit's cap, projected
 )
-
-// capRunes truncates s to at most maxRunes runes, appending an ellipsis marker
-// when truncation occurred. Single source for the rune-cap applied at every
-// state.json write boundary that renders into a router/advisor prompt (adopted
-// defect lists via capStrings, promoted-defect todos, carryover-todo render).
-func capRunes(s string, maxRunes int) string {
-	if r := []rune(s); len(r) > maxRunes {
-		return string(r[:maxRunes]) + "…"
-	}
-	return s
-}
 
 // capStrings bounds an agent-written string list at the adoption boundary.
 func capStrings(in []string, maxEntries, maxRunes int) []string {
@@ -547,252 +536,6 @@ func (fl failureLearningRequest) retroRequest(summary, todoID string) PhaseReque
 	}
 	projectBuildExplanation(fl.CycleRequest.ProjectRoot, *fl.CycleState).apply(&req)
 	return req
-}
-
-func (o *Orchestrator) writeFailureLearningState(ctx context.Context, state *State) {
-	if state == nil {
-		return
-	}
-	su, ok := o.storage.(StateUpdater)
-	if !ok {
-		// Legacy single-mode storage: no serialized RMW available.
-		if err := o.storage.WriteState(ctx, *state); err != nil {
-			fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-learning: write state: %v\n", err)
-		}
-		return
-	}
-	// Under EVOLVE_FLEET the global cycle lock is skipped, so a peer run can write
-	// state.json concurrently. Merge this run's outcome records into the on-disk
-	// state (union, incoming wins per key) rather than clobbering the peer's via a
-	// whole-state WriteState (which would also drop unmodeled state.json keys).
-	if _, err := su.UpdateState(ctx, func(s *State) {
-		s.FailedAt = mergeFailedRecords(s.FailedAt, state.FailedAt)
-		s.CarryoverTodos = mergeCarryoverTodos(s.CarryoverTodos, state.CarryoverTodos)
-	}); err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-learning: update state: %v\n", err)
-	}
-}
-
-// mergeFailedRecords unions disk and incoming failure records, keyed by
-// (cycle, ts, verdict, recordedAt). A peer's disk-only record is preserved; the
-// incoming record wins for a shared key so this run's own update (e.g. the
-// Retrospected flag) is not lost. Order = disk-first appearance, then new keys.
-//
-// Two CONCURRENT fleet runs never collide on this key: each run holds a UNIQUE
-// lease-allocated cycle number (AllocateCycleNumber — no two allocators get the
-// same number), so a peer's records carry a different Cycle and key separately. A
-// shared key therefore only ever identifies the SAME record (this run's updated
-// copy of one it already loaded), where incoming-wins is exactly right.
-func mergeFailedRecords(disk, incoming []FailedRecord) []FailedRecord {
-	key := func(r FailedRecord) string {
-		return fmt.Sprintf("%d\x00%s\x00%s\x00%s", r.Cycle, r.TS, r.Verdict, r.RecordedAt)
-	}
-	byKey := make(map[string]FailedRecord, len(disk)+len(incoming))
-	order := make([]string, 0, len(disk)+len(incoming))
-	add := func(r FailedRecord) {
-		k := key(r)
-		if _, seen := byKey[k]; !seen {
-			order = append(order, k)
-		}
-		byKey[k] = r
-	}
-	for _, r := range disk {
-		add(r)
-	}
-	for _, r := range incoming {
-		add(r) // incoming overrides disk for a shared key
-	}
-	out := make([]FailedRecord, 0, len(order))
-	for _, k := range order {
-		out = append(out, byKey[k])
-	}
-	return out
-}
-
-// mergeCarryoverTodos unions disk and incoming todos, deduped by ID (disk-first),
-// so a concurrent peer's queued todo survives this run's write.
-func mergeCarryoverTodos(disk, incoming []CarryoverTodo) []CarryoverTodo {
-	out := append([]CarryoverTodo(nil), disk...)
-	for _, td := range incoming {
-		if !carryoverTodoExists(out, td.ID) {
-			out = append(out, td)
-		}
-	}
-	return out
-}
-
-func carryoverTodoExists(todos []CarryoverTodo, id string) bool {
-	for _, t := range todos {
-		if t.ID == id {
-			return true
-		}
-	}
-	return false
-}
-
-// carryoverCycleTokenRE matches the cycle-number tokens the two mint sites bake
-// into Action text ("cycle 1421", "cycle-1421"), so the SAME failure class
-// re-minted on a later cycle fingerprints identically.
-var carryoverCycleTokenRE = regexp.MustCompile(`(?i)\bcycle[ -]\d+`)
-
-// carryoverActionFingerprint is the cross-cycle identity of a carryover todo:
-// the Action text with cycle tokens normalized and whitespace/case folded.
-// The 2026-08-10 investigation found 124 of 254 live entries were the same few
-// failure classes duplicated per cycle (ID-keyed dedupe only), saturating the
-// router prompt's 20-slot carryover window with bookkeeping noise.
-func carryoverActionFingerprint(action string) string {
-	s := carryoverCycleTokenRE.ReplaceAllString(action, "cycle-N")
-	return strings.Join(strings.Fields(strings.ToLower(s)), " ")
-}
-
-// carryoverFingerprintIndex returns the index of the entry sharing action's
-// cross-cycle fingerprint, or -1. Cross-family suppression (a defect whose
-// normalized text equals a memo/prescription carryover's) is accepted — one
-// router-window slot per failure class regardless of which writer minted it.
-func carryoverFingerprintIndex(todos []CarryoverTodo, action string) int {
-	fp := carryoverActionFingerprint(action)
-	for i, t := range todos {
-		if carryoverActionFingerprint(t.Action) == fp {
-			return i
-		}
-	}
-	return -1
-}
-
-// carryoverFingerprintExists reports whether an entry with the same
-// cross-cycle Action fingerprint is already tracked.
-func carryoverFingerprintExists(todos []CarryoverTodo, action string) bool {
-	return carryoverFingerprintIndex(todos, action) >= 0
-}
-
-// RetireCarryoverTodos is the PASS-closeout half of the carryover lifecycle:
-// mergeCarryoverTodos only ever UNIONS, so an entry whose work actually shipped
-// persisted forever and the router prompt's 20-slot window filled with done
-// work (124 of 254 live entries were stale on 2026-08-10).
-//
-// An entry retires when its ID is in committedIDs, OR when it shares a retired
-// entry's cross-cycle Action fingerprint — the per-cycle re-mints of the SAME
-// class that the ID-keyed dedupe never collapsed. Everything else survives in
-// order; the input slice is never mutated (callers re-read state under a lock,
-// and a mutated input would corrupt a concurrent peer's merge).
-func RetireCarryoverTodos(todos []CarryoverTodo, committedIDs []string) []CarryoverTodo {
-	committed := make(map[string]bool, len(committedIDs))
-	for _, id := range committedIDs {
-		// A blank committed id is malformed input, not a claim about the
-		// equally-malformed blank-ID entry — never let one retire the other.
-		if id = strings.TrimSpace(id); id != "" {
-			committed[id] = true
-		}
-	}
-	if len(committed) == 0 || len(todos) == 0 {
-		return append([]CarryoverTodo(nil), todos...)
-	}
-
-	// Pass 1: the fingerprints of the directly-committed entries. An empty
-	// Action has no class identity, so it never seeds a fingerprint match.
-	retiredFP := map[string]bool{}
-	for _, t := range todos {
-		if committed[t.ID] {
-			if fp := carryoverActionFingerprint(t.Action); fp != "" {
-				retiredFP[fp] = true
-			}
-		}
-	}
-
-	// Pass 2: drop committed ids and their same-class variants, order intact.
-	out := make([]CarryoverTodo, 0, len(todos))
-	for _, t := range todos {
-		if committed[t.ID] || retiredFP[carryoverActionFingerprint(t.Action)] {
-			continue
-		}
-		out = append(out, t)
-	}
-	return out
-}
-
-// refreshCarryoverExpiry keeps a suppressed re-mint's freshness: a class that
-// keeps failing must not ride its FIRST occurrence's TTL into the boot prune
-// while its duplicates are being deduped away (diff-review MEDIUM). The later
-// stamp wins; an empty new stamp changes nothing.
-func refreshCarryoverExpiry(t *CarryoverTodo, expiresAt string) {
-	if expiresAt > t.ExpiresAt {
-		t.ExpiresAt = expiresAt
-	}
-}
-
-const maxFailureLearningSummaryChars = 500
-
-// carryoverPriorityBlocking is the priority for a todo recording a failure that
-// BLOCKED a cycle (a floor phase, or an errored dispatch). It outranks everything
-// else in the next planner pass, which is correct for blocking work and wrong for
-// advice — see carryoverPriorityLesson.
-const carryoverPriorityBlocking = "P0"
-
-// appendCarryoverTodoDeduped appends one carryover todo to state, or refreshes an
-// existing one's TTL. Single-sourced (never_duplicate) between the failure path
-// (recordFailedApproachState) and the judgment-lesson path (recordJudgmentLesson):
-// both dedupe the same two ways — by content fingerprint first (the same failure
-// re-summarized), then by todo id (the same phase failing twice in one cycle) —
-// and a second copy of that logic would drift the two apart.
-//
-// The router prompt's own "## Carryover todos" section header already says these
-// are prior-cycle items to consider before retrying, so the summary (which carries
-// cycle/phase/error-class) stands alone — no boilerplate prefix repeated per todo.
-func appendCarryoverTodoDeduped(state *State, todo CarryoverTodo) {
-	if state == nil {
-		return
-	}
-	if idx := carryoverFingerprintIndex(state.CarryoverTodos, todo.Action); idx >= 0 {
-		refreshCarryoverExpiry(&state.CarryoverTodos[idx], todo.ExpiresAt)
-		return
-	}
-	if carryoverTodoExists(state.CarryoverTodos, todo.ID) {
-		return
-	}
-	state.CarryoverTodos = append(state.CarryoverTodos, todo)
-}
-
-func failureLearningSummary(cycle int, failed Phase, err error) string {
-	msg := err.Error()
-	r := []rune(msg)
-	if len(r) > maxFailureLearningSummaryChars {
-		msg = string(r[:maxFailureLearningSummaryChars]) + " ...[truncated]"
-	}
-	return fmt.Sprintf("cycle %d failed during %s: %s", cycle, failed, msg)
-}
-
-// ApplyDefectsAsCarryoverTodos promotes each entry in record.Defects into its
-// own CarryoverTodo in state. The D2 contract requires individual defects to be
-// individually addressable — one generic todo per cycle is insufficient.
-func ApplyDefectsAsCarryoverTodos(state *State, record FailedRecord) {
-	n := 0
-	for _, defect := range record.Defects {
-		if strings.TrimSpace(defect) == "" {
-			continue
-		}
-		id := fmt.Sprintf("cycle-%d-defect-%d", record.Cycle, n)
-		n++
-		action := "Fix defect from cycle " + strconv.Itoa(record.Cycle) + ": " + capRunes(defect, maxAdoptedDefectRunes)
-		if idx := carryoverFingerprintIndex(state.CarryoverTodos, action); idx >= 0 {
-			refreshCarryoverExpiry(&state.CarryoverTodos[idx], record.ExpiresAt)
-		} else if !carryoverTodoExists(state.CarryoverTodos, id) {
-			state.CarryoverTodos = append(state.CarryoverTodos, CarryoverTodo{
-				ID: id,
-				// Bound the defect text with the SAME cap failureLearningSummary /
-				// adoptStructuredFailure already apply, so an unbounded audit-gate
-				// diagnostic (e.g. a long strings.Join(offenders, "; ")) can't inject
-				// an arbitrarily large Action that bloats every future router prompt.
-				Action:         action,
-				Priority:       "P0",
-				FirstSeenCycle: record.Cycle,
-				CyclesUnpicked: 0,
-				// Inherit the record's TTL stamp (never recompute) so the two
-				// arrays' TTL logic stays single-sourced. A record with no
-				// ExpiresAt leaves the todo unstamped ⇒ the prune keeps it.
-				ExpiresAt: record.ExpiresAt,
-			})
-		}
-	}
 }
 
 // recorder returns the unit-01 recorder (ADR-0103). NewOrchestrator builds it

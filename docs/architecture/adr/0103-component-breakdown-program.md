@@ -58,7 +58,7 @@ PR, each landing with all of the following — a unit without any of them is not
 |---|---|---|---|
 | 01 | Phase-outcome recorder (the C1 chokepoint: cycle result, phase-timing log, usage sidecar, context fill) | `core/failure_learning.go` | [01-outcome-recorder.md](../decomposition/01-outcome-recorder.md) |
 | 02 | Failure diagnostics and delivery-failure classification (the failure-diag sidecar writer, the delivery-failure classifier, the wire tokens) | `core/failure_learning.go` | [02-failure-diagnostics.md](../decomposition/02-failure-diagnostics.md) |
-| 03 | Carryover-todo lifecycle (merge, fingerprint, expiry, retire) | `core/failure_learning.go` | next |
+| 03 | Carryover-todo lifecycle (mint admission, the closeout merges, the retirements, the state.json persist; three sibling files collapsed) | `core/failure_learning.go` + `carryover_merge.go`, `prescription_carryover.go`, `carryover_triage_retire.go` | [03-carryover-lifecycle.md](../decomposition/03-carryover-lifecycle.md) |
 | 04 | Phase advisor | `core/phase_advisor.go` | next |
 | 05 | Orchestrator: composition root vs `RunCycle` engine | `core/orchestrator.go` | after 01–04 |
 | … | inbox mover, ship gitops, config, bridge engine, audit gates | design §12 | later |
