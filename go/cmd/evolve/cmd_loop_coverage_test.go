@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -248,7 +249,7 @@ func TestRunLoop_ResumePhaseRunnerError(t *testing.T) {
 
 	prev := wireOrchestratorDepsFn
 	defer func() { wireOrchestratorDepsFn = prev }()
-	wireOrchestratorDepsFn = func(string, string) orchDeps {
+	wireOrchestratorDepsFn = func(string, string, io.Writer) orchDeps {
 		st := &fixtures.FakeStorage{CycleState: core.CycleState{
 			CycleID: 1, Phase: string(core.PhaseBuild), ActiveWorktree: wt,
 		}}
@@ -327,7 +328,7 @@ func TestRunLoop_ResumeFailVerdict(t *testing.T) {
 
 	prev := wireOrchestratorDepsFn
 	defer func() { wireOrchestratorDepsFn = prev }()
-	wireOrchestratorDepsFn = func(string, string) orchDeps {
+	wireOrchestratorDepsFn = func(string, string, io.Writer) orchDeps {
 		st := &fixtures.FakeStorage{CycleState: core.CycleState{
 			CycleID: 1, Phase: string(core.PhaseAudit), ActiveWorktree: wt,
 		}}
@@ -382,7 +383,7 @@ func TestRunLoop_OrchestratorError(t *testing.T) {
 	writeDispatchPolicy(t, evolveDir, "off")
 	prev := wireOrchestratorDepsFn
 	defer func() { wireOrchestratorDepsFn = prev }()
-	wireOrchestratorDepsFn = func(string, string) orchDeps {
+	wireOrchestratorDepsFn = func(string, string, io.Writer) orchDeps {
 		st := &fixtures.FakeStorage{}
 		ld := newFakeLedger()
 		runners := map[core.Phase]core.PhaseRunner{
@@ -434,7 +435,7 @@ func TestRunLoop_VerifyIterError(t *testing.T) {
 	writeDispatchPolicy(t, evolveDir, "verify")
 	prev := wireOrchestratorDepsFn
 	defer func() { wireOrchestratorDepsFn = prev }()
-	wireOrchestratorDepsFn = func(string, string) orchDeps {
+	wireOrchestratorDepsFn = func(string, string, io.Writer) orchDeps {
 		st := &fixtures.FakeStorage{}
 		ld := &erroringLedger{fakeLedgerNoAppend: newFakeLedger()}
 		runners := map[core.Phase]core.PhaseRunner{
@@ -509,7 +510,7 @@ func TestRunLoop_FailVerdictBreaks(t *testing.T) {
 	writeDispatchPolicy(t, evolveDir, "off") // skip verify so policy doesn't intercept
 	prev := wireOrchestratorDepsFn
 	defer func() { wireOrchestratorDepsFn = prev }()
-	wireOrchestratorDepsFn = func(string, string) orchDeps {
+	wireOrchestratorDepsFn = func(string, string, io.Writer) orchDeps {
 		st := &fixtures.FakeStorage{}
 		ld := newFakeLedger()
 		// Every phase returns FAIL so the final verdict at retro is FAIL.
@@ -557,7 +558,7 @@ func TestRunLoop_ResumeMissingCheckpoint(t *testing.T) {
 
 	prev := wireOrchestratorDepsFn
 	defer func() { wireOrchestratorDepsFn = prev }()
-	wireOrchestratorDepsFn = func(string, string) orchDeps {
+	wireOrchestratorDepsFn = func(string, string, io.Writer) orchDeps {
 		return orchDeps{
 			Storage: &fixtures.FakeStorage{},
 			Ledger:  newFakeLedger(),
@@ -646,7 +647,7 @@ func TestRunLoop_ResumeFullProtocol(t *testing.T) {
 
 	prev := wireOrchestratorDepsFn
 	defer func() { wireOrchestratorDepsFn = prev }()
-	wireOrchestratorDepsFn = func(string, string) orchDeps {
+	wireOrchestratorDepsFn = func(string, string, io.Writer) orchDeps {
 		st := &fixtures.FakeStorage{CycleState: core.CycleState{
 			CycleID: 1, Phase: string(core.PhaseBuild), ActiveWorktree: worktree,
 		}}

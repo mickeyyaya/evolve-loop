@@ -38,7 +38,7 @@ func TestModule_ClosedSet(t *testing.T) {
 	t.Parallel()
 	for _, m := range []Module{ModuleOrchestrator, ModuleAdvisor, ModuleRunner, ModuleBridge, ModuleLiveness, ModuleShip,
 		ModuleAudit, ModuleTriage, ModuleScout, ModuleBuild, ModuleTDD, ModuleGateContract, ModuleGateEval, ModuleGateRepo,
-		ModuleInbox, ModuleConfig, ModuleLoop, ModuleWatchdog, ModuleObserver, ModuleDashboard, ModuleSignalCenter} {
+		ModuleInbox, ModuleConfig, ModuleLoop, ModuleWatchdog, ModuleObserver, ModuleDashboard, ModuleLedger, ModuleSignalCenter} {
 		if !m.Known() {
 			t.Errorf("%q must be in the closed module set", m)
 		}
@@ -46,8 +46,8 @@ func TestModule_ClosedSet(t *testing.T) {
 	if Module("").Known() || Module("Orchestrator").Known() || Module("core").Known() {
 		t.Error("empty, differently-cased and undeclared modules are unknown")
 	}
-	if got := Modules(); len(got) != 21 || !sortedModules(got) {
-		t.Errorf("Modules() must list the 21 declared modules sorted, got %v", got)
+	if got := Modules(); len(got) != 22 || !sortedModules(got) {
+		t.Errorf("Modules() must list the 22 declared modules sorted, got %v", got)
 	}
 }
 

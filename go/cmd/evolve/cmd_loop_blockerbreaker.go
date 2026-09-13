@@ -16,6 +16,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
 // blockerBreakerHalt evaluates the batch's failure digests (cycles strictly
@@ -25,7 +26,7 @@ import (
 // hot-reload idiom); a missing/malformed policy falls back to compiled
 // defaults via FailurePolicyConfig's own resolution — the breaker never
 // fail-opens to disabled silently.
-func blockerBreakerHalt(evolveDir, projectRoot string, batchStartCycle int, stderr io.Writer) (rc int, halted bool) {
+func blockerBreakerHalt(evolveDir, projectRoot string, batchStartCycle int, stderr io.Writer, signals *signalcenter.Center) (rc int, halted bool) {
 	pol, _ := policy.Load(filepath.Join(evolveDir, "policy.json"))
 	fp, err := pol.FailurePolicyConfig()
 	if err != nil {
@@ -68,6 +69,9 @@ func blockerBreakerHalt(evolveDir, projectRoot string, batchStartCycle int, stde
 		Evidence: v.Reason + " (rule=" + v.Rule + " fingerprint=" + v.Fingerprint + ")",
 		Halt:     true,
 	}
-	fmt.Fprintf(stderr, "[loop] PIPELINE-BLOCKER HALT: %s — stopping the batch instead of passing the failure to the next cycle; fix the pipeline directly, then resume with evolve loop --resume\n", sf.Evidence)
-	return haltOnSystemFailure(evolveDir, projectRoot, latest, workspace, sf, stderr), true
+	// ADR-0101 S4a: the breaker's rule names the ONE loop.halt INCIDENT the
+	// shared halt action emits (its code + the rule's fields); nothing is
+	// signalled twice.
+	rule := loopHaltRule{code: CodeLoopPipelineBlockerHalt, fields: map[string]string{"rule": v.Rule, "fingerprint": v.Fingerprint}}
+	return haltOnSystemFailure(evolveDir, projectRoot, latest, workspace, sf, stderr, signals, rule), true
 }

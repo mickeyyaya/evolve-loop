@@ -7,6 +7,7 @@
 package main
 
 import (
+	"bytes"
 	"io"
 	"os"
 	"path/filepath"
@@ -14,6 +15,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
@@ -24,7 +26,7 @@ func TestWireOrchestratorDeps_SignalCenterWired(t *testing.T) {
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	d := wireOrchestratorDeps(root, evolveDir)
+	d := wireOrchestratorDeps(root, evolveDir, io.Discard)
 	if d.Signals == nil || !d.Orchestrator.SignalCenterWired() {
 		t.Fatal("the production composition root must construct a Signal Center and register the orchestrator as its listener (ADR-0101 S1)")
 	}
@@ -99,8 +101,8 @@ func TestWireOrchestratorDeps_SignalCenterConsoleSinkIsFilteredAtWarn(t *testing
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	stderr := redirectStderr(t, func() {
-		d := wireOrchestratorDeps(root, evolveDir)
+	stderr := captureConsole(func(console io.Writer) {
+		d := wireOrchestratorDeps(root, evolveDir, console)
 		d.Signals.Emit(signalcenter.Event{Cycle: 2, Module: signalcenter.ModuleLoop, Origin: "Test.filtered", Kind: signalcenter.KindLoopWave, Severity: signalcenter.SeverityInfo, Reason: "info stays in the file"})
 		d.Signals.Emit(signalcenter.Event{Cycle: 2, Phase: "triage", Attempt: 1, Module: signalcenter.ModuleOrchestrator, Origin: "Test.filtered", Kind: signalcenter.KindPhaseOutcome, Severity: signalcenter.SeverityWarn, Code: core.CodePhaseVerdictFail, Reason: "triage verdict=FAIL: warn reaches the console"})
 	})
@@ -112,25 +114,12 @@ func TestWireOrchestratorDeps_SignalCenterConsoleSinkIsFilteredAtWarn(t *testing
 	}
 }
 
-func redirectStderr(t *testing.T, fn func()) string {
-	t.Helper()
-	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
-	}
-	orig := os.Stderr
-	os.Stderr = w
-	done := make(chan string)
-	go func() {
-		data, _ := io.ReadAll(r)
-		done <- string(data)
-	}()
-	fn()
-	os.Stderr = orig
-	_ = w.Close()
-	out := <-done
-	_ = r.Close()
-	return out
+// captureConsole runs fn with a buffer as the root's console writer and
+// returns what the Signal Center's WARN-filtered sink rendered into it.
+func captureConsole(fn func(console io.Writer)) string {
+	var buf bytes.Buffer
+	fn(&buf)
+	return buf.String()
 }
 
 // The signalcenter package's own registry test is blind to producer modules
@@ -169,7 +158,7 @@ func TestWireOrchestratorDeps_SignalCenterReachesTheBridge(t *testing.T) {
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	d := wireOrchestratorDeps(root, evolveDir)
+	d := wireOrchestratorDeps(root, evolveDir, io.Discard)
 	if d.Bridge == nil || !d.Bridge.SignalsWired() {
 		t.Fatal("the production bridge Adapter must be built with the Signal Center (bridge.NewDefault(projectRoot, signals))")
 	}
@@ -216,5 +205,20 @@ func TestNilSignalBridgeRootsAreExplicit(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+// ADR-0101 S4a: the production root decorates the ledger so every appended
+// entry is also a ledger.appended signal (Decorator over the file ledger).
+func TestWireOrchestratorDeps_LedgerIsObservedByTheSignalCenter(t *testing.T) {
+	root := t.TempDir()
+	evolveDir := filepath.Join(root, ".evolve")
+	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	d := wireOrchestratorDeps(root, evolveDir, io.Discard)
+	observed, ok := d.Ledger.(*ledger.FileLedger)
+	if !ok || !observed.SignalsWired() {
+		t.Fatalf("the root's ledger must be the file ledger observed by the Signal Center, got %T", d.Ledger)
 	}
 }

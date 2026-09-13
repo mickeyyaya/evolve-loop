@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/budgethistory"
@@ -27,6 +28,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/quotastate"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/triagecap"
 )
 
@@ -183,7 +185,7 @@ func consoleRoutedResolver(projectRoot string, stderr io.Writer) fleet.RoutedFn 
 //     (the only case true sequential fallback stays reserved for).
 //   - guard met, forceOneLaneDispatch errored: WARN "min-width repair failed"
 //     with the wrapped error surfaced, handled=false — never silently swallowed.
-func minWidthRepair(ctx context.Context, fleetCfg, waveCfg policy.FleetConfig, preflight func() error, planFn wavePlanFn, launcher waveLauncher, routed fleet.RoutedFn, waveIndex int, stderr io.Writer) (handled bool) {
+func minWidthRepair(ctx context.Context, fleetCfg, waveCfg policy.FleetConfig, preflight func() error, planFn wavePlanFn, launcher waveLauncher, routed fleet.RoutedFn, waveIndex int, stderr io.Writer, signals *signalcenter.Center) (handled bool) {
 	// Eligibility is the operator-asserted width alone: fleetCfg.Count>1 means
 	// the operator wanted a fleet, so BOTH the quota-shrunk shape (waveCfg.Count
 	// <=1) AND the empty-plan-at-full-capacity shape (waveCfg.Count>1 yet
@@ -206,7 +208,9 @@ func minWidthRepair(ctx context.Context, fleetCfg, waveCfg policy.FleetConfig, p
 				failedLanes++
 			}
 		}
-		fmt.Fprintf(stderr, "[loop] wave %d: min-width repair dispatched %d/%d isolated lane (fleet.count=%d shrank to %d)\n", waveIndex, len(results1)-failedLanes, len(results1), fleetCfg.Count, waveCfg.Count)
+		emitLoopWave(signals, waveIndex, "minWidthRepair", CodeLoopMinWidthRepair,
+			fmt.Sprintf("wave %d: min-width repair dispatched %d/%d isolated lane (fleet.count=%d shrank to %d)", waveIndex, len(results1)-failedLanes, len(results1), fleetCfg.Count, waveCfg.Count),
+			map[string]string{"desired": strconv.Itoa(fleetCfg.Count), "realized": strconv.Itoa(waveCfg.Count)})
 		return true
 	default:
 		fmt.Fprintf(stderr, "[loop] WARN: fleet: wave %d planned zero lanes (empty backlog), falling back to sequential\n", waveIndex)

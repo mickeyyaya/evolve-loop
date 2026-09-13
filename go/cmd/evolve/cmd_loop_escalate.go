@@ -15,11 +15,13 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/dispositionrouter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/recurrence"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
 // applyEscalationBoundary applies every intent staged under
@@ -27,7 +29,7 @@ import (
 // <evolveDir>/escalation-apply-report.json. Stage and escalation formula come
 // from policy.json's failure_disposition block (compiled defaults when absent),
 // so shadow-vs-enforce is config, not a flag.
-func applyEscalationBoundary(evolveDir string, cycle int, stderr io.Writer) {
+func applyEscalationBoundary(evolveDir string, cycle int, stderr io.Writer, signals *signalcenter.Center) {
 	pol, err := policy.Load(filepath.Join(evolveDir, "policy.json"))
 	if err != nil {
 		fmt.Fprintf(stderr, "[loop] WARN: escalation boundary: policy load: %v\n", err)
@@ -54,6 +56,9 @@ func applyEscalationBoundary(evolveDir string, cycle int, stderr io.Writer) {
 	if len(res.Bumped)+len(res.Filed)+len(res.Planned) == 0 {
 		return // nothing staged — stay quiet
 	}
-	fmt.Fprintf(stderr, "[loop] escalation boundary (cycle %d, stage=%s): bumped=%d filed=%d skipped=%d planned=%d\n",
-		cycle, cfg.Stage, len(res.Bumped), len(res.Filed), len(res.Skipped), len(res.Planned))
+	// ADR-0101 S4a: the boundary's outcome is a loop.escalation WARN.
+	emitLoopEscalation(signals, cycle, "applyEscalationBoundary",
+		fmt.Sprintf("escalation boundary staged %d item(s)", len(res.Bumped)+len(res.Filed)+len(res.Planned)),
+		map[string]string{"stage": string(cfg.Stage), "bumped": strconv.Itoa(len(res.Bumped)), "filed": strconv.Itoa(len(res.Filed)),
+			"skipped": strconv.Itoa(len(res.Skipped)), "planned": strconv.Itoa(len(res.Planned))})
 }

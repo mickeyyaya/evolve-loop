@@ -35,6 +35,7 @@
 package main
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -70,7 +71,7 @@ func TestWireOrchestrator_CatalogPublisherWired(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	d := wireOrchestratorDeps(root, evolveDir)
+	d := wireOrchestratorDeps(root, evolveDir, io.Discard)
 	if !d.Orchestrator.CatalogPublisherWired() {
 		t.Fatal("RED (cycle-1429): the production composition root (wireOrchestratorDeps, cmd_cycle.go) does not wire core.WithCatalogPublisher, so the bridge's contract resolver stays bound to the cycle-START catalog snapshot (cmd_cycle.go:482 `catalog.Get`). A phase minted mid-cycle is spliced into o.catalog but NEVER into the resolver — CatalogResolver.Resolve misses it for the rest of the cycle and every dispatch falls back to the unresolved-agent path (the cycle-1424 600s artifact-timeout halt)")
 	}

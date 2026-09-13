@@ -80,7 +80,7 @@ channel to the component that decided or to the operator reading the log.
   deliverable (gate)       ── gate.rejected ──┼──►  Center  ───┼── Filter(StderrSink, WARN) → "[module] kind SEV CODE …"
   bridge engine            ── bridge.warning ─┤   (sync,       │── cmd_loop batch report (counts)                 (S4)
   panestream LivenessCenter── pane.liveness ──┤    ordered,    └── dashboard SSE push                              (S4)
-  ledger decorator         ── ledger.appended ┤    panic-
+  ledger append observer   ── ledger.appended ┤    panic-
   dispatchevents/observer  ── loop.* / obs.* ─┘    isolated)
 ```
 
@@ -94,7 +94,7 @@ channel to the component that decided or to the operator reading the log.
 
 Design patterns, named: **Observer / publish–subscribe** (the Center); **Null Object** (a nil
 `*Center` is safe — a *test* affordance, never the production default); **Adapter** (each existing
-chokepoint maps its native record onto `Event`); **Registry** (module → codes, with docs); **Decorator**
+chokepoint maps its native record onto `Event`); **Registry** (module → codes, with docs); **Observer at the write chokepoint**
 (the ledger port wrapped to emit); **Facade** (the stderr sink is the one module-tagged logger).
 
 ## 4. Event schema
@@ -162,7 +162,7 @@ Examples (what cycles 1636 and 1630 would have produced):
 
 `orchestrator`, `advisor`, `runner`, `bridge`, `liveness` (the renamed pane center), `ship`, `audit`,
 `triage`, `scout`, `build`, `tdd`, `gate.contract`, `gate.eval`, `gate.repo`, `inbox`, `config`,
-`loop`, `watchdog`, `observer`, `dashboard`, `signalcenter` (self-reports). A module is added by
+`loop`, `watchdog`, `observer`, `dashboard`, `signalcenter` (self-reports), `ledger` (the file ledger's append observer, S4a). A module is added by
 editing the closed set and its test; an unknown module is stamped `SIGNALCENTER_UNKNOWN_MODULE` and
 raised to WARN — never dropped. *(review 21: `advisor` and `config` added to match §12.)*
 
@@ -179,7 +179,7 @@ raised to WARN — never dropped. *(review 21: `advisor` and `config` added to m
 | `quota.paused` | all families exhausted, cycle paused | WARN | ✓ |
 | `bridge.warning` / `bridge.tripwire` | engine telemetry warnings, tripwires | WARN | |
 | `pane.liveness` | liveness edge from the LivenessCenter | INFO; WARN with a `LIVENESS_PANE_*` code — the registry (rendered in `signal-codes.md`) is the one list of which states warn | |
-| `ledger.appended` | a ledger entry was appended (decorator) | INFO | |
+| `ledger.appended` | a ledger entry was appended (the file ledger's append observer; `fields.entry_seq` names the line) | INFO | |
 | `cycle.sealed` | final verdict decided (after `finalizeOutcome`) | INFO (FAIL → WARN) | ✓ on FAIL |
 | `loop.wave` / `loop.halt` / `loop.escalation` | batch-level events (today's `dispatchevents`) | INFO / INCIDENT / WARN | / ✓ / |
 | `signalcenter.listener_panicked` / `signalcenter.sink_dropped` | self-reports: a panicking listener was dropped / the NDJSON sink could not write (count in `fields.dropped`) | INCIDENT / WARN | |
@@ -322,16 +322,29 @@ Composition root `go/cmd/evolve/cmd_cycle.go` (`wireOrchestratorDeps`, which the
 *(review 5)*:
 
 ```go
-signals := signalcenter.New(signalcenter.WithPID(os.Getpid()))
-signals.Subscribe(signals.NDJSONSink(func(cycle int) string {
-    if cycle == 0 { return "" }
-    return filepath.Join(core.RunWorkspacePath(projectRoot, cycle), "signals.ndjson")
-}))
-signals.Subscribe(signalcenter.Filter(signalcenter.StderrSink(os.Stderr), signalcenter.SeverityWarn))
-br := newBridge(gobridge.Deps{Signals: signals, …})     // S3: the engine receives it at construction
-opts = append(opts, core.WithSignalCenter(signals))     // S1
-orchDeps.Signals = signals                              // S1: the root keeps the handle; cmd_loop reads Orchestrator.SignalSummary() in S4 (review 16)
+signals := newRootSignalCenter(projectRoot, evolveDir, console) // S4a: the ONE sink topology (below)
+ld := ledger.New(evolveDir, ledger.WithSignals(signals))        // S4a: the ledger's append observer
+br := newBridge(gobridge.Deps{Signals: signals, …})             // S3: the engine receives it at construction
+opts = append(opts, core.WithSignalCenter(signals))             // S1
+orchDeps.Signals = signals                                      // S1: the root keeps the handle; cmd_loop reads the runner's SignalSummary() (S4a)
+
+// newRootSignalCenter — production and the loop tests' stub root build the same topology:
+func newRootSignalCenter(projectRoot, evolveDir string, console io.Writer) *signalcenter.Center {
+    signals := signalcenter.New(signalcenter.WithPID(os.Getpid()))
+    signals.Subscribe(signals.NDJSONSink(func(cycle int) string {
+        if cycle == 0 { return filepath.Join(evolveDir, "signals.ndjson") } // batch-level (cycle-less) signals
+        return filepath.Join(core.RunWorkspacePath(projectRoot, cycle), "signals.ndjson")
+    }))
+    signals.Subscribe(signalcenter.Filter(signalcenter.StderrSink(console), signalcenter.SeverityWarn))
+    return signals
+}
 ```
+
+Batch-level signals — the loop's own halts and wave summaries, a bridge warning raised before any
+cycle — carry no cycle and are durable in `<evolveDir>/signals.ndjson` (S4a). Before S4a the root
+returned no path for cycle 0, which was harmless while no regular producer was cycle-less; the
+loop's wave summary would have made the durable sink report a drop after every wave (caught by the
+stub root building the production topology, §15.4).
 
 **Non-optional and loud** *(review 3)*: `wireOrchestratorDeps` always constructs a Center; the only
 nil-Center construction sites are `cmd_cycle_simulate.go` and `internal/routingtest`, and a repo test
@@ -402,7 +415,8 @@ Hand-written `[x]` prose disappears one module at a time (§10 S5).
 | **S2a** | producers that need only S1: `system.failure` + `cycle.sealed` at `cycleRun.completeCycle` (the closeout both roots share; the hand-written SYSTEM-FAILURE HALT / LANDING LOST lines deleted); `ship.error` at `Orchestrator.recordShipError` with `shiperr.SignalCode` (every ship code registered under module `ship` with a doc each — a source-parsed test proves completeness; `ShipErrorClass.SignalSeverity` is the class → severity rule's one home); `quota.paused` at `cycleRun.pauseForQuota` (the seam both roots reach; its hand-written WARN line deleted); an abnormal exit seals the cycle FAIL from `cycleRun.abnormalEpilogue`; `Center.Flush` deferred at both roots; `evolve signals codes generate\|check` projecting the registry into `docs/architecture/signal-codes.md` | composed `RunCycle` test: `cycle.sealed` is the LAST orchestrator event; each producer has a direct proof (INCIDENT on halt / integrity, WARN otherwise); `signal-codes.md` currency is a `cmd/evolve` test (CI); mutants: each emit removed, INCIDENT not raised, prefix wrong, Flush broadcast removed, drift check disabled | S1 |
 | **S2b** | contract gate → `gate.rejected/corrected` (the `GATE_CONTRACT_*` codes need PR #575); `fields.shipped` on `cycle.sealed` (needs PR #576's `CycleState.Shipped`); `failurelog.Classification` folded into `failureadapter`'s; the live WARN budget pinned from the first green runtime cycle | each producer has a composed proof; the classification registry test fails if the two vocabularies diverge again | S2a, PR #575, PR #576 |
 | **S3** (landed, see §15.3) | bridge: `Deps.Signals` at construction + `engine.SignalsWired()`; the production Adapter takes the Center as a constructor argument (`adapters/bridge.NewDefault(projectRoot, signals)`; every other call site passes an explicit `nil`, pinned) and threads it into every engine; engine telemetry warnings → `bridge.warning` (`BRIDGE_TOKEN_RESOLVER_MISSING/_FAILED`, `BRIDGE_TOKEN_USAGE_WARNING`, `BRIDGE_CONTEXT_FILL_HIGH`, `BRIDGE_TELEMETRY_APPEND_FAILED`), the tripwire → `bridge.tripwire` (`BRIDGE_TELEMETRY_TRIPWIRE`); **commit 1:** the pure rename `panestream.SignalCenter` → `LivenessCenter` (ADR-0068/0070 amended); **commit 2:** `pane.liveness` from a `LivenessHandler` the tmux driver registers per dispatch (module `liveness`, `LIVENESS_PANE_STAGNANT/_HUNG/_EXHAUSTED`); the hand-written `[engine] WARN` / `[engine] TRIPWIRE` lines removed | wiring proofs at the engine, the Adapter (deps + real factory) and the root; every producer a direct proof; the telemetry suites assert what the root's WARN-filtered sink renders; mutants: signals not threaded, wired-always-true, handler not registered, hung not WARN, tripwire/warn/engine-warning not emitted, root passes nil, state name lost, format characters surviving | S1 |
-| **S4** | ledger decorator (`ledger.appended`); `dispatchevents` writers and the `observer` adapter emit through the Center (their files stay as sink outputs until readers migrate); `cmd_loop` **reports** signal counts in the batch report; the dashboard SSE subscribes | `abnormal-events.jsonl` **field-equal modulo timestamp precision** before/after, asserted by a decoding golden *(review 11)*; dashboard shows a signal within one SSE tick; no breaker gates on a signal (a shadow comparison test may log disagreement) | S2 |
+| **S4a** (landed, see §15.4) | the loop module's producers at their seams — ONE `loop.halt` INCIDENT per batch halt, its code the caller's rule (`haltOnSystemFailure` is the one chokepoint: `LOOP_SYSTEM_FAILURE_HALT` for a halt the cycle signalled, `LOOP_PIPELINE_BLOCKER_HALT` for the blocker breaker), a fleet lane's halt code → `LOOP_FLEET_LANE_HALT`, a wave-boundary halt → `LOOP_HALT`; `loop.wave` (INFO for the wave summary the report also prints; WARN `LOOP_MIN_WIDTH_REPAIR`), `loop.escalation` WARN `LOOP_ESCALATION_BOUNDARY`; the hand-written `[loop] … HALT` and escalation lines deleted; the file ledger's append observer (`ledger.New(evolveDir, ledger.WithSignals(signals))`, module `ledger`: `ledger.appended` INFO per entry through `Append` — the orchestrator's records, the bridge's stop_review, the inbox lifecycle lines, the seal anchor — WARN `LEDGER_APPEND_FAILED`) at the root, and the root's ledger threaded into the failed-cycle inbox walk; `cmd_loop` **reports** the driven runner's per-cycle `SignalSummary` in the batch report (`[loop] cycle N signals: …`, a report line, never a gate) through the `loopCycleRunner` seam; ONE sink topology (`newRootSignalCenter(root, evolveDir, console)`) for production and the stub root, with a durable batch-level file for cycle-less signals | every producer a direct proof; the window/escalation/min-width suites assert the sink-rendered line through the stub root (the production topology); a go/ast guard inventories every ledger line writer; mutants: each emit removed, INCIDENT demoted, a second breaker INCIDENT, ledger not observed, lifecycle not observed, ledger failure not WARN, root ledger unobserved, inbox walk on a self-built ledger, report silent / read off the seam, console writer ignored, cycle-less signals dropped | S2a, S3 |
+| **S4b** | `dispatchevents` writers and the `observer` adapter emit through the Center (their files stay as sink outputs until readers migrate; `subagent.AppendAbnormalEvent` folded); the dashboard SSE subscribes | `abnormal-events.jsonl` **field-equal modulo timestamp precision** before/after, asserted by a decoding golden *(review 11)*; dashboard shows a signal within one SSE tick; no breaker gates on a signal (a shadow comparison test may log disagreement) | S4a |
 | **S5** | per-module log migration riding each decomposition slice (§12): prefix-literal occurrences per module (any writer) `[orchestrator]` 287 → 0, `[loop]` 132 → 0, `[ship]` 130 → 0, … | one repo-wide grep test with a shrinking allowlist (a migrated module cannot be forgotten); the inventory's prefix table regenerated | S1 |
 
 ## 11. Test plan and engineering bar
@@ -546,6 +560,63 @@ of appending, leaf imports core, core registers a conflicting code, listener nam
 held across Emit, reason cut removed, identifier bound removed); named wiring tests `TestWireOrchestratorDeps_SignalCenterWired`,
 `TestWireOrchestratorDeps_SignalCenterConsoleSinkIsFilteredAtWarn`, `TestNilSignalCenterRootsArePinned`,
 `TestImportGraph_LeafPackageImportsOnlyInternalLog`, `TestNDJSONSink_TwoProcessesAppendToTheSameCycleFile`.
+
+### 15.4 Landed — S4a (2026-09-13)
+
+| Producer | Chokepoint (origin) | Severity / code | Fields |
+|---|---|---|---|
+| `loop.halt` | `haltOnSystemFailure` — the ONE shared halt+escalate action the sequential path, the cycle-run root and the blocker breaker call; it emits ONE INCIDENT whose code is the caller's `loopHaltRule` | INCIDENT `LOOP_SYSTEM_FAILURE_HALT` (a halt the cycle signalled) or `LOOP_PIPELINE_BLOCKER_HALT` (the breaker's rule, + `rule`, `fingerprint`) | `category`, `level`, `next` (the dossier's own `next_action` — its one home), `escalation`, `inbox_item` (what the halt wrote) |
+| `loop.halt` | `loopBatchCoordinator.fleetHaltDecision` — a fleet lane exited with the halt code; the reason points at the lane's own `LOOP_SYSTEM_FAILURE_HALT` instead of restating its dossier | INCIDENT `LOOP_FLEET_LANE_HALT` | `kind`, `iteration`, `rc` |
+| `loop.halt` | `runWaveIteration` — the wave-boundary sync refused (plane diverged) | INCIDENT `LOOP_HALT` | `stop_reason` |
+| `loop.wave` | `runWaveIteration` (summary; the `[loop] wave N: x/y lanes ok` report line stays — INFO never prints) / `minWidthRepair` | INFO / WARN `LOOP_MIN_WIDTH_REPAIR` | `wave`, `lanes_ok`, `lanes` / `desired`, `realized` |
+| `loop.escalation` | `applyEscalationBoundary` | WARN `LOOP_ESCALATION_BOUNDARY` | `stage`, `bumped`, `filed`, `skipped`, `planned` |
+| `ledger.appended` | `FileLedger.Append` — the file ledger's append observer, installed by the construction option `ledger.WithSignals(signals)` the root passes to `ledger.New`; every entry writer reaches this chokepoint (`AppendLifecycle`, the seal's segment anchor, the bridge's stop_review, the orchestrator's records); the file ledger still chains and locks | INFO; WARN `LEDGER_APPEND_FAILED` when the append errors (the error still returns) | `role`, `kind`, `exit_code`, `path`, `entry_seq` (the line the signal names) |
+
+The batch report reads the driven runner's view: after each sequential cycle `cmd_loop` prints
+`[loop] cycle N signals: T total, W WARN, I INCIDENT (last INCIDENT CODE — reason)` from
+`SignalSummary()` on the `loopCycleRunner` seam (the real orchestrator in production, a scripted
+runner in tests — one seam, no second identity for the collaborator) — a report line (the loop
+reports, never gates; §8). Wiring: `newRootSignalCenter(root, evolveDir, console)` is the ONE sink
+topology — production (`wireOrchestratorDeps`) and the loop tests' stub root call the same
+constructor, so a test that asserts a rendered INCIDENT line proves production's topology; the
+console sink renders into the command's stderr writer (production passes `os.Stderr`). Cycle-less
+signals are durable in `<evolveDir>/signals.ndjson` (see §6 — the stub root's production topology
+caught the drop report the wave summary would otherwise have raised after every wave). Deleted
+1:1: the three-line `[loop] SYSTEM-FAILURE HALT` message, `[loop] PIPELINE-BLOCKER HALT`, the
+fleet-lane halt line, `[loop] HALT: …`, and the escalation-boundary line; the min-width repair
+line became the WARN's reason. `fields.next` on a halt IS the dossier's `next_action`
+(`writePipelineEscalation` returns what it wrote; the prose is stated once); the fleet-lane halt
+points at the lane's own INCIDENT. Under `--simulate` (a pinned nil-Center root) a system-failure
+halt now reports by exit code and dossier alone — the deleted prose is not re-printed there.
+
+**The ledger, after the architecture review (HIGH-1).** The first cut was a Decorator embedding
+`*FileLedger` and overriding `Append`. Go embedding is delegation without virtual dispatch: the
+promoted `AppendLifecycle` called `FileLedger.Append`, never the override, so every inbox
+lifecycle line — and the seal's segment anchor — was appended unobserved; and the inbox mover
+builds its own `FileLedger` over the same file whenever no `Ledger` is supplied, which no
+production caller did. Landed instead: an **append observer at the write chokepoint**, installed
+by the construction option `ledger.WithSignals(signals)` (`ledger.New(evolveDir, opts...)`,
+functional options) — `FileLedger.Append` is the ONE path every entry writer reaches, so
+promotion cannot route around it; the failed-cycle inbox walk (`cycleoutcome.ApplyFailure`,
+reached from the cycle-run root and both sequential loop paths through the one
+`applyCycleFailureOutcome`) receives the root's ledger (`orchDeps.Ledger` is the `rootLedger`
+interface: `core.Ledger` + the mover's `LedgerAppender`, one object, one identity); and a go/ast
+guard (`TestFileLedger_EveryLineWriterReachesTheAppendChokepointOrIsInventoried`) pins every line
+writer inside the package — through method and plain-helper calls alike — to the chokepoint or to
+its inventory with a reason (`Rebaseline`, an operator repair root; `WriteCompositionVerdict`, a
+composition record by a self-constructed ledger), and `TestUnobservedLedgerRootsArePinned`
+(cmd/evolve, the twin of the pinned nil-Center roots) pins every `ledger.New(` outside it that
+passes no `WithSignals`, with its count and reason: the `evolve cycle reset` seal, the
+`--simulate` root, the `evolve ledger` repair commands, the guard chain's read-only ledger, and the
+inbox mover's fallback — which the ship phase's post-ship mover and the operator inbox commands
+still reach. Both inventories are the code-homed list of ledger lines the Center does not see;
+shrinking them is S4b's DI work. A cycle-signalled halt is two records by design — the
+orchestrator's detection (`system.failure`, S2a) and the loop's halt action (`loop.halt`, carrying
+the dossier fields).
+
+Not in this slice: the wave-summary INFO path and the plane-diverged halt have no fleet fixture
+(the wave dispatch needs subprocess lanes); their producers are covered by the direct producer
+tests and the S4b/S5 fleet fixture is the follow-up.
 
 ### 15.3 Landed — S3 (2026-09-13)
 

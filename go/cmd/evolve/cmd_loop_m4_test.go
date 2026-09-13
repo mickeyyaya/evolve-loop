@@ -7,11 +7,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
@@ -28,9 +30,16 @@ import (
 // accumulating fake.)
 type fakeLedgerNoAppend struct {
 	*fixtures.FakeLedger
+	lifecycle []ledger.LifecycleRecord // the inbox walk's lines, recorded so wiring proofs can see them
 }
 
 func (fakeLedgerNoAppend) Append(context.Context, core.LedgerEntry) error { return nil }
+
+// AppendLifecycle satisfies rootLedger (the inbox mover's chained seam).
+func (f *fakeLedgerNoAppend) AppendLifecycle(_ context.Context, r ledger.LifecycleRecord) error {
+	f.lifecycle = append(f.lifecycle, r)
+	return nil
+}
 
 func newFakeLedger() *fakeLedgerNoAppend {
 	return &fakeLedgerNoAppend{FakeLedger: &fixtures.FakeLedger{}}
@@ -85,10 +94,10 @@ func initLoopContractRepo(t *testing.T, projectRoot string) {
 // so the only ledger entries are the phase-kind appends the
 // orchestrator writes itself — verify will fail unless the test
 // pre-seeds agent_subprocess entries via fixtures.FakeLedger.Entries.
-func installStubDeps(t *testing.T, storage core.Storage, ledger core.Ledger) func() {
+func installStubDeps(t *testing.T, storage core.Storage, ledger rootLedger) func() {
 	t.Helper()
 	prev := wireOrchestratorDepsFn
-	wireOrchestratorDepsFn = func(projectRoot, _ string) orchDeps {
+	wireOrchestratorDepsFn = func(projectRoot, evolveDir string, console io.Writer) orchDeps {
 		initLoopContractRepo(t, projectRoot)
 		runners := map[core.Phase]core.PhaseRunner{
 			core.PhaseIntent:       noopRunner{name: "intent"},
@@ -102,6 +111,9 @@ func installStubDeps(t *testing.T, storage core.Storage, ledger core.Ledger) fun
 			core.PhaseRetro:        noopRunner{name: "retro"},
 		}
 		return orchDeps{
+			// ADR-0101 S4a: the stub root builds the production sink topology with
+			// the same constructor, so its rendered lines prove production's.
+			Signals:      newRootSignalCenter(projectRoot, evolveDir, console),
 			Storage:      storage,
 			Ledger:       ledger,
 			Orchestrator: core.NewOrchestrator(storage, ledger, runners),
