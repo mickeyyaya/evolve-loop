@@ -24,7 +24,10 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseio"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship/landing"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
@@ -182,7 +185,8 @@ type Options struct {
 	internalConsumedPaths []string
 
 	// repairAttempted is the repair ladder's once-per-code-per-Run guard
-	// (repair.go). Lazily initialized by attemptRepair/repairPushRace.
+	// (repair.go). Lazily initialized by attemptRepair and by the push step's
+	// projection (pushWithRepair, gitops_landing.go) when its repair ran.
 	repairAttempted map[core.ShipErrorCode]bool
 
 	// shipLock is the test seam for the ADR-0049 S5 integrator lock
@@ -191,6 +195,17 @@ type Options struct {
 	// post-push verify) in shipFromWorktree. nil → flock.Lock on
 	// <ProjectRoot>/.evolve/ship.lock. Signature mirrors flock.Lock.
 	shipLock func(path string) (release func(), err error)
+
+	// Signals is the root's Signal Center the landing's ship.warning events
+	// reach (ADR-0103 unit 07): the orchestrator root threads it through
+	// Config.Signals, the standalone `evolve ship` root builds its own; nil
+	// (the `evolve phase ship` registry factory, direct-helper tests) is the
+	// Null Object — the warnings are dropped, never a panic.
+	Signals *signalcenter.Center
+
+	// land is the unit-07 landing, lazily built and cached on this Options
+	// value by landing() (gitops_landing.go) — one wired construction per Run.
+	land *landing.Landing
 }
 
 // Now is a minimal time interface (Unix seconds + RFC3339 formatter) so
@@ -405,7 +420,7 @@ func checkPostPushIdempotency(ctx context.Context, opts *Options) (string, bool,
 	if err != nil || !ok {
 		return "", false, err
 	}
-	bindingPath := filepath.Join(opts.ProjectRoot, ".evolve", "runs", fmt.Sprintf("cycle-%d", cid), "ship-binding.json")
+	bindingPath := filepath.Join(core.RunWorkspacePath(opts.ProjectRoot, cid), dossier.ShipBindingFile)
 	bindingMap, err := readStateMap(bindingPath)
 	if err != nil {
 		return "", false, err

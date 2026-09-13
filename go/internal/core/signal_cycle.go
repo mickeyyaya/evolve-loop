@@ -72,12 +72,19 @@ func (cr *cycleRun) emitCycleClose(result CycleResult, origin string) {
 }
 
 // emitShipError projects a recorded ShipError verbatim: module ship, the
-// SHIP_<code> projection, INCIDENT for the integrity class (§5.3), and the
-// ship-error.json path when it was written.
+// SHIP_<code> projection, INCIDENT for the integrity class (§5.3), the
+// ship-error.json path when it was written, and the Debug keys the triage
+// whitelist names (shiperr.SignalDebugKeys — the landing step, the git exit
+// code, the branches, the repair outcome; ADR-0103 unit 07) when non-empty.
 func (o *Orchestrator) emitShipError(cycle int, cs CycleState, se *ShipError, artifactPath string) {
 	fields := map[string]string{"class": string(se.Class), "stage": string(se.Stage)}
 	if artifactPath != "" {
 		fields["path"] = artifactPath
+	}
+	for _, k := range shiperr.SignalDebugKeys {
+		if v := se.Debug[k]; v != "" {
+			fields[k] = v
+		}
 	}
 	o.signals.Emit(signalcenter.Event{
 		Cycle: cycle, RunID: cs.RunID, Phase: string(PhaseShip), Module: signalcenter.ModuleShip, Origin: "Orchestrator.recordShipError",

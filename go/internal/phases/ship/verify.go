@@ -395,24 +395,6 @@ func verifyTrivial(ctx context.Context, opts *Options, res *RunResult) error {
 	return nil
 }
 
-// captureGitOutput runs git <args...> and returns stdout, ignoring rc.
-// Used for the trivial-class critical-paths check; an empty repo is fine.
-func captureGitOutput(ctx context.Context, opts *Options, args ...string) (string, error) {
-	var buf strings.Builder
-	exitCode, err := opts.run(ctx, "git", args, &buf, io.Discard)
-	if err != nil {
-		return "", shipErr(core.CodeGitIO, core.ShipClassTransient, core.StageAtomicShip,
-			fmt.Sprintf("ship: git %v: %v", args, err), "git_args", fmt.Sprintf("%v", args), "git_err", err.Error())
-	}
-	if exitCode > 1 {
-		// rc=1 from git diff is "differences exist" — not an error.
-		return "", shipErr(core.CodeGitIO, core.ShipClassTransient, core.StageAtomicShip,
-			fmt.Sprintf("ship: git %v exited %d", args, exitCode),
-			"git_args", fmt.Sprintf("%v", args), "git_rc", fmt.Sprintf("%d", exitCode))
-	}
-	return buf.String(), nil
-}
-
 // errStr renders err for a Debug-map value; "" when nil.
 func errStr(err error) string {
 	if err == nil {

@@ -15,6 +15,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
@@ -45,6 +46,12 @@ type Config struct {
 	// the production site threads the resolved default ("enforce") so the
 	// cycle-1064 silently-unwired trap cannot recur.
 	RepoContractGate string
+	// Signals is the root's Signal Center (ADR-0103 unit 07): the landing's
+	// ship.warning events reach it through Options.Signals. The orchestrator
+	// root (cmd_cycle.go) passes its Center; the `evolve phase ship` registry
+	// factory leaves it nil (the Null Object — a subprocess root has no
+	// Center yet, 07-F10).
+	Signals *signalcenter.Center
 }
 
 // Phase implements core.PhaseRunner for the ship stage.
@@ -54,6 +61,7 @@ type Phase struct {
 	phaseIO          config.Stage
 	manifestGate     string
 	repoContractGate string
+	signals          *signalcenter.Center
 }
 
 func New(c Config) *Phase {
@@ -61,10 +69,16 @@ func New(c Config) *Phase {
 	if nowFn == nil {
 		nowFn = time.Now
 	}
-	return &Phase{runner: c.Runner, nowFn: nowFn, phaseIO: c.PhaseIO, manifestGate: c.ManifestGate, repoContractGate: c.RepoContractGate}
+	return &Phase{runner: c.Runner, nowFn: nowFn, phaseIO: c.PhaseIO, manifestGate: c.ManifestGate, repoContractGate: c.RepoContractGate, signals: c.Signals}
 }
 
 func (p *Phase) Name() string { return phaseName }
+
+// signalsWired reports whether the phase carries a Signal Center for the
+// landing's warnings — the in-package wiring test's handle (ADR-0103 unit
+// 07; unexported: its only consumer is TestShipOptions_ThreadsSignals, and the
+// composition root pins its own site by source scan).
+func (p *Phase) signalsWired() bool { return p.signals != nil }
 
 // defaultCommitMessage synthesizes a deterministic cycle commit message when
 // the caller didn't supply Context["commit_message"]. Mirrors the shape
@@ -158,6 +172,7 @@ func (p *Phase) shipOptions(req core.PhaseRequest, msg string) Options {
 		PhaseIO:                         p.phaseIO, // ADR-0050 §3.10 Slice 6: sentinel-first verdict parse at enforce
 		ManifestGate:                    p.manifestGate,
 		Runner:                          p.runner,
+		Signals:                         p.signals, // ADR-0103 unit 07: the landing's ship.warning events reach the root's Center
 	}
 }
 

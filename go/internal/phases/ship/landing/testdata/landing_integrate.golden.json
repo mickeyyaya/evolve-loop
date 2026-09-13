@@ -1,0 +1,169 @@
+{
+  "captured_at": "8e8f080f",
+  "rows": [
+    {
+      "name": "reset-ok/merge-ok/fleet-off",
+      "argv": [
+        "checkout HEAD -- go/evolve [discard]",
+        "merge --ff-only cycle-7-branch [streams]",
+        "push origin main [streams]",
+        "rev-parse HEAD [capture]",
+        "rev-parse HEAD^{tree} [capture]"
+      ],
+      "logs": [
+        "[ship]   OK: ff-merged cycle-7-branch into main",
+        "[ship] OK: pushed to origin/main"
+      ],
+      "commit_sha": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+      "repair_attempted": "",
+      "repair_outcome": "",
+      "error": null
+    },
+    {
+      "name": "reset-ok/merge-ok/fleet-on",
+      "argv": [
+        "checkout HEAD -- go/evolve [discard]",
+        "merge --ff-only cycle-7-branch [streams]",
+        "push origin main [streams]",
+        "rev-parse HEAD [capture]",
+        "rev-parse HEAD^{tree} [capture]"
+      ],
+      "logs": [
+        "[ship]   OK: ff-merged cycle-7-branch into main",
+        "[ship] OK: pushed to origin/main"
+      ],
+      "commit_sha": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+      "repair_attempted": "",
+      "repair_outcome": "",
+      "error": null
+    },
+    {
+      "name": "reset-ok/merge-diverged/fleet-off",
+      "argv": [
+        "checkout HEAD -- go/evolve [discard]",
+        "merge --ff-only cycle-7-branch [streams]"
+      ],
+      "logs": null,
+      "commit_sha": "",
+      "repair_attempted": "",
+      "repair_outcome": "",
+      "error": {
+        "code": "GIT_FF_MERGE_DIVERGED",
+        "class": "precondition",
+        "stage": "atomic-ship",
+        "message": "ship: ff-merge cycle-7-branch into main failed (rc=128; divergent history): \u003cnil\u003e",
+        "debug": {
+          "branch": "main",
+          "cycle_branch": "cycle-7-branch",
+          "git_err": "",
+          "git_rc": "128"
+        }
+      }
+    },
+    {
+      "name": "reset-ok/merge-diverged/fleet-on",
+      "argv": [
+        "checkout HEAD -- go/evolve [discard]",
+        "merge --ff-only cycle-7-branch [streams]"
+      ],
+      "logs": null,
+      "commit_sha": "",
+      "repair_attempted": "",
+      "repair_outcome": "",
+      "error": {
+        "code": "GIT_FLEET_REBASE_NEEDED",
+        "class": "transient",
+        "stage": "atomic-ship",
+        "message": "ship: fleet ff-merge cycle-7-branch into main diverged (a peer cycle moved main mid-pipeline); rebase + re-verify the merged tree, then re-ship",
+        "debug": {
+          "branch": "main",
+          "cycle_branch": "cycle-7-branch",
+          "git_err": "",
+          "git_rc": "128"
+        }
+      }
+    },
+    {
+      "name": "reset-fail/merge-ok/fleet-off",
+      "argv": [
+        "checkout HEAD -- go/evolve [discard]",
+        "merge --ff-only cycle-7-branch [streams]",
+        "push origin main [streams]",
+        "rev-parse HEAD [capture]",
+        "rev-parse HEAD^{tree} [capture]"
+      ],
+      "logs": [
+        "[ship]   OK: ff-merged cycle-7-branch into main",
+        "[ship] OK: pushed to origin/main"
+      ],
+      "commit_sha": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+      "repair_attempted": "",
+      "repair_outcome": "",
+      "error": null
+    },
+    {
+      "name": "reset-fail/merge-ok/fleet-on",
+      "argv": [
+        "checkout HEAD -- go/evolve [discard]",
+        "merge --ff-only cycle-7-branch [streams]",
+        "push origin main [streams]",
+        "rev-parse HEAD [capture]",
+        "rev-parse HEAD^{tree} [capture]"
+      ],
+      "logs": [
+        "[ship]   OK: ff-merged cycle-7-branch into main",
+        "[ship] OK: pushed to origin/main"
+      ],
+      "commit_sha": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+      "repair_attempted": "",
+      "repair_outcome": "",
+      "error": null
+    },
+    {
+      "name": "reset-fail/merge-diverged/fleet-off",
+      "argv": [
+        "checkout HEAD -- go/evolve [discard]",
+        "merge --ff-only cycle-7-branch [streams]"
+      ],
+      "logs": null,
+      "commit_sha": "",
+      "repair_attempted": "",
+      "repair_outcome": "",
+      "error": {
+        "code": "GIT_FF_MERGE_DIVERGED",
+        "class": "precondition",
+        "stage": "atomic-ship",
+        "message": "ship: ff-merge cycle-7-branch into main failed (rc=128; divergent history): \u003cnil\u003e",
+        "debug": {
+          "branch": "main",
+          "cycle_branch": "cycle-7-branch",
+          "git_err": "",
+          "git_rc": "128"
+        }
+      }
+    },
+    {
+      "name": "reset-fail/merge-diverged/fleet-on",
+      "argv": [
+        "checkout HEAD -- go/evolve [discard]",
+        "merge --ff-only cycle-7-branch [streams]"
+      ],
+      "logs": null,
+      "commit_sha": "",
+      "repair_attempted": "",
+      "repair_outcome": "",
+      "error": {
+        "code": "GIT_FLEET_REBASE_NEEDED",
+        "class": "transient",
+        "stage": "atomic-ship",
+        "message": "ship: fleet ff-merge cycle-7-branch into main diverged (a peer cycle moved main mid-pipeline); rebase + re-verify the merged tree, then re-ship",
+        "debug": {
+          "branch": "main",
+          "cycle_branch": "cycle-7-branch",
+          "git_err": "",
+          "git_rc": "128"
+        }
+      }
+    }
+  ]
+}

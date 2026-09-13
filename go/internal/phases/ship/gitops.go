@@ -15,9 +15,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
 	"io"
 	"os"
 	"path/filepath"
@@ -27,6 +25,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
 	"github.com/mickeyyaya/evolve-loop/go/internal/commitprefixgate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship/landing"
 	"github.com/mickeyyaya/evolve-loop/go/internal/versionbump"
 )
 
@@ -365,29 +364,20 @@ func shipDirect(ctx context.Context, opts *Options, res *RunResult, branch strin
 	res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: committed to %s", branch))
 
 	// git push origin <branch> — a rejection gets ONE inline fetch+ff-retry
-	// (repairPushRace); a diverged origin reclassifies to needs-reaudit.
-	exit, err = opts.run(ctx, "git", []string{"push", "origin", branch}, opts.Stdout, opts.Stderr)
-	if err != nil || exit != 0 {
-		origErr := shipErr(core.CodeGitPushRejected, core.ShipClassTransient, core.StageAtomicShip,
-			fmt.Sprintf("ship: git push failed (rc=%d): %v", exit, err),
-			"git_rc", fmt.Sprintf("%d", exit), "git_err", errStr(err), "branch", branch)
-		if rerr := repairPushRace(ctx, opts, res, branch, origErr); rerr != nil {
-			return rerr
-		}
+	// (the landing's push repair, gitops_landing.go); a diverged origin
+	// reclassifies to needs-reaudit. The landed HEAD is recorded on the result.
+	if err := pushWithRepair(ctx, opts, res, branch, landing.SiteDirect); err != nil {
+		return err
 	}
 	res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: pushed to origin/%s", branch))
-
-	// Record HEAD SHA for the result struct.
-	headSHA, _ := captureGitOutput(ctx, opts, "rev-parse", "HEAD")
-	res.CommitSHA = strings.TrimSpace(headSHA)
 
 	// Post-push, mirroring verifyCommittedTree: the pre-commit check inspects
 	// the INDEX, this one inspects what actually landed. No branch on this path
 	// reaches it without the pre-commit check having passed first (an empty
-	// index returns before pushing, and repairPushRace never rebases or
-	// force-pushes), so it is defense in depth rather than an independently
-	// reachable gate — it witnesses commit-time divergence between index and
-	// commit, and it keeps both ship paths applying one rule.
+	// index returns before pushing, and the landing's push repair never
+	// rebases or force-pushes), so it is defense in depth rather than an
+	// independently reachable gate — it witnesses commit-time divergence
+	// between index and commit, and it keeps both ship paths applying one rule.
 	if opts.internalAuditBoundTreeSHA != "" {
 		committedTree, _ := captureGitOutput(ctx, opts, "rev-parse", "HEAD^{tree}")
 		committedTree = strings.TrimSpace(committedTree)
@@ -410,55 +400,11 @@ func shipDirect(ctx context.Context, opts *Options, res *RunResult, branch strin
 // shipFromWorktree: the v8.43.0 worktree-aware path. Commit in the
 // cycle's worktree (where Builder's edits live), pre-merge tree-SHA
 // check, ff-merge cycle branch into main, push main, post-push
-// integrity verification, ship-binding.json sidecar.
+// integrity verification, ship-binding.json sidecar (the ff-merge, the push
+// with its inline repair and the binding writer live in landing/ — ADR-0103
+// unit 07; gitops_landing.go is the seam).
 func shipFromWorktree(ctx context.Context, opts *Options, res *RunResult, branch, worktree string) error {
 	return newWorktreeShip(ctx, opts, res, branch, worktree).run()
-}
-
-// writeShipBinding emits .evolve/runs/cycle-<N>/ship-binding.json for
-// post-ship audit. Best-effort; failure is a WARN, not a ship failure.
-func writeShipBinding(opts *Options, committedTree, commitSHA string) error {
-	cid, ok, err := cycleIDForShip(opts)
-	if err != nil {
-		return err
-	}
-	if !ok {
-		return errors.New("no cycle_id in cycle-state.json")
-	}
-	dir := filepath.Join(opts.ProjectRoot, ".evolve", "runs", fmt.Sprintf("cycle-%d", cid))
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return err
-	}
-	path := filepath.Join(dir, "ship-binding.json")
-	// The shared type, not an inline map: every reader of this sidecar
-	// (the dossier's delivery record, native.go, the lost-landing floor)
-	// binds to the same declaration, so a field rename is a compile error
-	// rather than a silently empty record.
-	body := dossier.ShipBinding{
-		AuditBoundTreeSHA: opts.internalAuditBoundTreeSHA,
-		TreeSHACommitted:  committedTree,
-		CommitSHA:         strings.TrimSpace(commitSHA),
-		Cycle:             cid,
-	}
-	buf, err := json.MarshalIndent(body, "", "  ")
-	if err != nil {
-		return err
-	}
-	tmp, err := os.CreateTemp(dir, "ship-binding.*.tmp")
-	if err != nil {
-		return err
-	}
-	tmpPath := tmp.Name()
-	if _, err := tmp.Write(append(buf, '\n')); err != nil {
-		_ = tmp.Close()
-		_ = os.Remove(tmpPath)
-		return err
-	}
-	if err := tmp.Close(); err != nil {
-		_ = os.Remove(tmpPath)
-		return err
-	}
-	return os.Rename(tmpPath, path)
 }
 
 // currentBranch returns the short ref name (e.g. "main") or "" when detached.

@@ -54,8 +54,9 @@ type repairFn func(ctx context.Context, opts *Options, res *RunResult, se *core.
 
 // repairFns maps each repairable ShipError code to its single typed repair.
 // GIT_PUSH_REJECTED is deliberately absent: the push retry runs inline at the
-// push site (repairPushRace) so the post-push tree verification and
-// ship-binding sidecar still execute on the healed path.
+// push site (the landing's Push, projected by pushWithRepair in
+// gitops_landing.go) so the post-push tree verification and ship-binding
+// sidecar still execute on the healed path.
 // Read-only after package init — never mutated at runtime.
 var repairFns = map[core.ShipErrorCode]repairFn{
 	core.CodeSelfSHATampered:       repairSelfSHAPin,
@@ -398,77 +399,4 @@ func repairResumeUnpushed(ctx context.Context, opts *Options, res *RunResult, se
 	res.Logs = append(res.Logs, fmt.Sprintf(
 		"[ship] REPAIR: resume-unpushed — HEAD %s carries the audit-bound tree %s; completed with push-only closure", head, bound))
 	return repairCompleted
-}
-
-// isAncestor reports whether anc is an ancestor of desc (git merge-base).
-func isAncestor(ctx context.Context, opts *Options, anc, desc string) bool {
-	exit, err := opts.run(ctx, "git", []string{"merge-base", "--is-ancestor", anc, desc}, io.Discard, io.Discard)
-	return err == nil && exit == 0
-}
-
-// --- mode #4: GIT_PUSH_REJECTED inline fetch + ff-retry ---------------------
-
-// repairPushRace runs INLINE at the push sites (shipDirect/shipFromWorktree)
-// so the healed path still flows through post-push verification and the
-// ship-binding sidecar. Returns nil when the push landed (retried or already
-// present on origin); otherwise the error to surface — the original transient
-// rejection, or a Precondition reclassification (repair_outcome=needs-reaudit)
-// when origin diverged and the only legitimate route is a re-audit on the new
-// base. Never rebases, never force-pushes.
-func repairPushRace(ctx context.Context, opts *Options, res *RunResult, branch string, origErr error) error {
-	se, ok := core.AsShipError(origErr)
-	if !ok || opts.DryRun {
-		return origErr
-	}
-	ensureRepairMap(opts)
-	if opts.repairAttempted[core.CodeGitPushRejected] {
-		return origErr
-	}
-	opts.repairAttempted[core.CodeGitPushRejected] = true
-	res.RepairAttempted = string(core.CodeGitPushRejected)
-	res.Logs = append(res.Logs, "[ship] REPAIR: push rejected — fetching origin and probing for a fast-forward retry")
-
-	declined := func() error {
-		res.RepairOutcome = "declined"
-		se.Debug["repair_attempted"] = string(core.CodeGitPushRejected)
-		se.Debug["repair_outcome"] = "declined"
-		return origErr
-	}
-
-	if exit, err := opts.run(ctx, "git", []string{"fetch", "origin", branch}, io.Discard, io.Discard); err != nil || exit != 0 {
-		return declined()
-	}
-	originRef, err := captureGitOutput(ctx, opts, "rev-parse", "origin/"+branch)
-	if err != nil {
-		return declined()
-	}
-	originRef = strings.TrimSpace(originRef)
-	head, err := captureGitOutput(ctx, opts, "rev-parse", "HEAD")
-	if err != nil {
-		return declined()
-	}
-	head = strings.TrimSpace(head)
-
-	if originRef == head {
-		res.RepairOutcome = "already-pushed"
-		res.Logs = append(res.Logs, "[ship] REPAIR: origin already at HEAD — push race resolved itself")
-		return nil
-	}
-	if isAncestor(ctx, opts, originRef, "HEAD") {
-		exit, pushErr := opts.run(ctx, "git", []string{"push", "origin", branch}, opts.Stdout, opts.Stderr)
-		if pushErr == nil && exit == 0 {
-			res.RepairOutcome = "push-retried"
-			res.Logs = append(res.Logs, "[ship] REPAIR: push retry after fetch succeeded (origin was an ancestor — fast-forward)")
-			return nil
-		}
-		return declined()
-	}
-	// Origin diverged: a push would need a rebase/merge, which mutates the
-	// audited tree. Reclassify so the recovery chain re-audits on the new
-	// base — the local commit is preserved for a cheap re-land.
-	res.RepairOutcome = "needs-reaudit"
-	return shipErr(core.CodeGitPushRejected, core.ShipClassPrecondition, core.StageAtomicShip,
-		fmt.Sprintf("ship: push rejected and origin/%s diverged — audited tree must be re-audited on the new base (no auto-rebase; local commit preserved). Reconcile at a batch boundary with `evolve sync-main`, then complete the stranded push with `evolve ship --push-only`.", branch),
-		"branch", branch, "origin_ref", originRef, "head", head,
-		"repair_attempted", string(core.CodeGitPushRejected), "repair_outcome", "needs-reaudit")
 }
