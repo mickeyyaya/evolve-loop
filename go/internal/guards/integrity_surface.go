@@ -112,6 +112,8 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/internal/core/errors.go", Rationale: "the Bridge port's error sentinels and the integrity predicates on them (ErrArtifactTimeout, isArtifactTimeout — the timeout-only gate unit 02 injects — IsInfraTeardownError, IsOptionalSkippableError)"},
 	{Fragment: "/go/internal/core/failure_diag.go", Rationale: "failed-cycle failure-diagnostic seam: the unit-02 facade and the two injection sites of the timeout-only gate whose body is errors.go (ADR-0103)"},
 	{Fragment: "/go/internal/core/failurediag/", Rationale: "the failure-diag sidecar writer and the delivery-failure classifier the failed-cycle handoff projects from (ADR-0103 unit 02)"},
+	{Fragment: "/go/internal/core/carryover/", Rationale: "the carryover-todo lifecycle — mint admission, closeout merges, retirements and the state.json persist the failed-cycle handoff projects into (ADR-0103 unit 03)"},
+	{Fragment: "/go/internal/core/carryover_lifecycle.go", Rationale: "the unit-03 seam: the lifecycle's one wired construction and the facades the persist callers, ship and the ACS-named tests keep (ADR-0103)"},
 	{Fragment: "/go/internal/core/outcome/", Rationale: "the C1 phase-outcome recorder the failed-cycle handoff projects from (ADR-0103 unit 01)"},
 	{Fragment: "/go/internal/core/ship_recovery.go", Rationale: "rebase recovery must invalidate stale explanation and route through Build"},
 	{Fragment: "/go/internal/core/resume.go", Rationale: "resume entry point (RunCycleFromPhase) and resumed-deliverable explanation review parity (reviewResumedDeliverable)"},

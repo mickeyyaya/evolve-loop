@@ -7,3 +7,4 @@
 ./internal/core/outcome 100
 ./internal/deliverable/gatesignal 100
 ./internal/core/failurediag 100
+./internal/core/carryover 100

@@ -42,6 +42,8 @@ package core
 
 import (
 	"context"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core/carryover"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"os"
 	"path/filepath"
 	"strings"
@@ -152,6 +154,19 @@ func TestMergeWorkspaceCarryover_CapsActionRunes(t *testing.T) {
 // entries missing id/action are tolerated: no panic, no fatal, no bogus todos.
 // The cycle-terminal hook must never abort the cycle over a malformed memo file.
 func TestMergeWorkspaceCarryover_MalformedFileWarnsNotFails(t *testing.T) {
+	t.Run("wired: the malformed memo is a CARRYOVER_WORKSPACE_MALFORMED signal", func(t *testing.T) {
+		ws := t.TempDir()
+		writeMemoCarryover(t, ws, `{ this is not valid json `)
+		signals, got := recordingCenter()
+		o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil), WithSignalCenter(signals))
+		state := &State{}
+		o.carryover().MergeMemo(state, ws, 667, time.Now().UTC())
+		warned := eventsOfKind(*got, signalcenter.KindCarryoverWarning)
+		if len(state.CarryoverTodos) != 0 || len(warned) != 1 || warned[0].Code != carryover.CodeWorkspaceMalformed || warned[0].Origin != "Lifecycle.MergeMemo" {
+			t.Fatalf("the wired lifecycle reports the malformed memo once and merges nothing: %+v", *got)
+		}
+	})
+
 	t.Run("corrupt json", func(t *testing.T) {
 		ws := t.TempDir()
 		writeMemoCarryover(t, ws, `{ this is not valid json `)

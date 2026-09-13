@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core/carryover"
 )
 
 // defect_ledger_prescription_test.go — RED contract for cycle-1327's
@@ -29,7 +30,7 @@ import (
 // was wrong" (a defect) from "a foreseen risk's named fix" (a prescription)
 // without a second ledger or a schema-breaking Kind field.
 
-const prescriptionTagPrefix = "PRESCRIPTION: "
+const prescriptionTagPrefix = carryover.PrescriptionPrefix // the unit's vocabulary, the consumer pin
 
 // warnReportWithPrescription renders an audit-report.md whose evolve-verdict
 // sentinel is WARN, carries the given prescription strings and zero defects —

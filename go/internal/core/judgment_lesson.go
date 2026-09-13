@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/core/carryover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
@@ -29,7 +30,7 @@ import (
 // NOT carryoverPriorityBlocking: a lesson is advice for the next cycle's planner,
 // and filed at P0 it would outrank the cycle's actual blocking work and distort
 // triage — the planner reads priority, not provenance.
-const carryoverPriorityLesson = "P1"
+const carryoverPriorityLesson = carryover.PriorityLesson
 
 // judgmentTeachingPhases are the phases whose FAIL verdict is a REASONED
 // OBJECTION worth carrying to the next cycle.
@@ -99,7 +100,7 @@ func (o *Orchestrator) recordJudgmentLesson(ctx context.Context, cycle int, work
 	// carryover todos carry no classification field, so no failure-adapter path
 	// (which reads state.FailedAt) can see it.
 	expiresAt := failurelog.ComputeExpiresAt(failurelog.IntentRejected, o.now().UTC())
-	appendCarryoverTodoDeduped(state, CarryoverTodo{
+	o.appendCarryoverTodoDeduped(state, CarryoverTodo{
 		ID: todoID, Action: summary, Priority: carryoverPriorityLesson,
 		FirstSeenCycle: cycle, ExpiresAt: expiresAt,
 	})
