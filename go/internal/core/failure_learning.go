@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/contextfill"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core/outcome"
 	"github.com/mickeyyaya/evolve-loop/go/internal/faillearn"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failuregrade"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
@@ -24,29 +24,13 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
 	"github.com/mickeyyaya/evolve-loop/go/internal/recurrence"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
 // phaseTimingEntry is an alias for the single-source schema in internal/
 // phasetiming — defined once there so the orchestrator (sole writer), the
 // dossier producer, and the `evolve cycle timing` CLI cannot drift apart.
 type phaseTimingEntry = phasetiming.Entry
-
-type phaseUsageSidecar struct {
-	Phase        string  `json:"phase"`
-	CostUSD      float64 `json:"cost_usd"`
-	DurationMS   int64   `json:"duration_ms"`
-	AttemptCount int     `json:"attempt_count"`
-	Verdict      string  `json:"verdict"`
-	// StartedAt/EndedAt/Archetype mirror phaseTimingEntry (ADR-0044 C1).
-	StartedAt string `json:"started_at,omitempty"`
-	EndedAt   string `json:"ended_at,omitempty"`
-	Archetype string `json:"archetype,omitempty"`
-	// AbortReason mirrors phaseTimingEntry.AbortReason (ADR-0044 C1).
-	AbortReason string `json:"abort_reason,omitempty"`
-	// Tokens (S4) mirrors phaseTimingEntry.Tokens — the terminal attempt's
-	// token usage, beside CostUSD. Legacy sidecars without it parse to zero.
-	Tokens TokenUsage `json:"tokens,omitempty"`
-}
 
 type failureLearningRequest struct {
 	CycleRequest CycleRequest
@@ -89,21 +73,6 @@ func phaseOutcomeFrom(phase Phase, resp PhaseResponse, attempts int, abortReason
 	}
 }
 
-// contextFillFor derives the terminal attempt's context-window occupancy for one
-// phase outcome. ResolvedModel already IS the tier the attempt ran at (phases/
-// runner sets it from tieredRes.Tier), so it is the honest lookup key; anything
-// that is not a canonical tier yields a zero window and contextfill's
-// ErrInvalidWindow, which degrades to (0, false). Unknown fill is recorded as
-// ABSENT (both fields omitempty), never as a guessed window, and the error never
-// propagates — a phase's timing record must not be lost over a missing tier.
-func contextFillFor(out recovery.PhaseOutcome) (ratio float64, hot bool) {
-	ratio, err := contextfill.FillRatio(out.Tokens, contextfill.WindowSizeForTier(out.ResolvedModel))
-	if err != nil {
-		return 0, false
-	}
-	return ratio, contextfill.IsHot(ratio)
-}
-
 // recordPhaseOutcome is the C1 recording chokepoint (ADR-0044): EVERY
 // terminal disposition of a dispatched phase — happy advance AND each abort
 // return (exhausted retries, non-canonical verdict, review-gate reject,
@@ -116,42 +85,7 @@ func contextFillFor(out recovery.PhaseOutcome) (ratio float64, hot bool) {
 // dispatched (no runner registered, pre-phase state-write failure) have no
 // outcome to record and stay bare.
 func (o *Orchestrator) recordPhaseOutcome(result *CycleResult, timings *[]phaseTimingEntry, workspace string, out recovery.PhaseOutcome) {
-	// EndedAt and Archetype are stamped HERE — the single chokepoint owns the
-	// end-of-dispatch clock reading and the phase classification, so every
-	// terminal path records them consistently without each call site re-reading
-	// the clock (drift) or re-deriving the taxonomy (duplication).
-	out.EndedAt = o.now().UTC().Format(time.RFC3339)
-	out.Archetype = o.phaseArchetype(out.Phase)
-	result.PhasesRun = append(result.PhasesRun, Phase(out.Phase))
-	// Context fill is derived HERE for the same reason EndedAt/Archetype are: the
-	// single chokepoint owns the projection, so every terminal path records it.
-	fillRatio, windowHot := contextFillFor(out)
-	*timings = append(*timings, phaseTimingEntry{
-		Phase:         out.Phase,
-		DurationMS:    out.DurationMS,
-		BootMS:        out.BootMS,
-		Verdict:       out.Verdict,
-		CostUSD:       out.CostUSD,
-		StartedAt:     out.StartedAt,
-		EndedAt:       out.EndedAt,
-		Archetype:     out.Archetype,
-		AttemptCount:  out.AttemptCount,
-		AbortReason:   out.AbortReason,
-		ModelSource:   out.ModelSource,
-		ResolvedModel: out.ResolvedModel,
-		Tokens:        out.Tokens,
-		Diagnostics:   out.Diagnostics,
-
-		ContextFillRatio: fillRatio,
-		ContextWindowHot: windowHot,
-	})
-	// ADR-0101 S1: the chokepoint is the Signal Center's first producer — one
-	// phase.outcome (or phase.aborted) per terminal disposition, on both
-	// dispatch roots. A reasoned FAIL (triage's protected-surface rejection,
-	// cycles 1634/1636) is named by the event's reason (verdictReason, the
-	// same rendering the seal uses) and printed by the root's stderr sink in
-	// the one line format — no hand-written line here.
-	o.emitPhaseOutcome(result.Cycle, out)
+	o.recorder().Record(result, timings, workspace, out)
 	// ADR-0048 Slice A (SHADOW): grade the abort reason. Observe-only — logs the
 	// tier graduated-enforcement WOULD apply; changes nothing (the floor still
 	// aborts). Evidence is conservative here (the per-site benign-churn /
@@ -161,35 +95,6 @@ func (o *Orchestrator) recordPhaseOutcome(result *CycleResult, timings *[]phaseT
 		if tier := failuregrade.Grade(out.AbortReason, failuregrade.Evidence{}); tier != failuregrade.TierAbort {
 			fmt.Fprintf(os.Stderr, "[graduated-enforcement SHADOW] phase %s abort reason %q would grade as %s (ADR-0048 Slice A; enforce pending)\n", out.Phase, out.AbortReason, tier)
 		}
-	}
-	// Empty workspace ⇒ no sidecar: filepath.Join("", f) is CWD-relative and
-	// leaked <phase>-usage.json into go/cmd/evolve during `go test` (the C1
-	// abort-path recording made previously-silent test cycles write). The
-	// in-memory record above still stands.
-	if workspace == "" {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN: empty workspace — skipping %s-usage.json sidecar (in-memory record kept)\n", out.Phase)
-		return
-	}
-	sidecar := phaseUsageSidecar{
-		Phase:        out.Phase,
-		CostUSD:      out.CostUSD,
-		DurationMS:   out.DurationMS,
-		AttemptCount: out.AttemptCount,
-		Verdict:      out.Verdict,
-		StartedAt:    out.StartedAt,
-		EndedAt:      out.EndedAt,
-		Archetype:    out.Archetype,
-		AbortReason:  out.AbortReason,
-		Tokens:       out.Tokens,
-	}
-	data, err := json.MarshalIndent(sidecar, "", "  ")
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN: failed to marshal usage sidecar for %s: %v\n", out.Phase, err)
-		return
-	}
-	path := filepath.Join(workspace, fmt.Sprintf("%s-usage.json", out.Phase))
-	if werr := os.WriteFile(path, data, 0o644); werr != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN: failed to write usage sidecar for %s to %s: %v\n", out.Phase, path, werr)
 	}
 }
 
@@ -203,65 +108,8 @@ func (cr *cycleRun) flushPhaseTimings() []phaseTimingEntry {
 		return cr.timingsComposed
 	}
 	cr.timingsFlushed = true
-	cr.timingsComposed = writePhaseTimings(cr.cs.WorkspacePath, cr.phaseTimings)
+	cr.timingsComposed = cr.o.recorder().WritePhaseTimings(cr.cs.WorkspacePath, cr.phaseTimings)
 	return cr.timingsComposed
-}
-
-// composePhaseTimings is the ONE composition rule for a cycle's phase-timing
-// log: entries already on disk (a crashed earlier attempt, the pre-resume
-// phases) come FIRST and this invocation's entries are appended. The log is a
-// record of real dispatches, so a phase appearing twice (failed attempt +
-// resumed attempt) is reality, not duplication — nothing is deduped.
-//
-// It is extracted from writePhaseTimings because the cycle DOSSIER must project
-// exactly the set the file receives. When the dossier composed its own view
-// ("live replaces file"), a resumed cycle recorded only the resumed segment and
-// silently dropped the pre-crash prefix that was sitting on disk — two rules
-// for one fact, and the durable half lost. One rule, one composition, one
-// flush (cycleRun.flushPhaseTimings).
-func composePhaseTimings(workspace string, live []phaseTimingEntry) []phaseTimingEntry {
-	prev, rerr := os.ReadFile(phasetiming.Path(workspace))
-	if rerr != nil {
-		return live
-	}
-	var existing []phaseTimingEntry
-	if jerr := json.Unmarshal(prev, &existing); jerr != nil || len(existing) == 0 {
-		return live
-	}
-	return append(existing, live...)
-}
-
-// writePhaseTimings atomically persists phase-timing.json — shared by
-// RunCycle's and RunCycleFromPhase's deferred writers (ADR-0044 C1: one
-// record format, every execution path). APPEND-MERGE semantics: entries
-// already on disk (a crashed earlier attempt, the pre-resume phases) are
-// preserved and the new entries appended — the timing file is a LOG of real
-// dispatches, so a phase appearing twice (failed attempt + resumed attempt)
-// is reality, not duplication. A fresh cycle workspace has no existing file
-// ⇒ byte-identical to the pre-merge behavior. Best-effort: failures WARN,
-// never mask the cycle outcome.
-func writePhaseTimings(workspace string, timings []phaseTimingEntry) []phaseTimingEntry {
-	// Same CWD-relative leak guard as the usage sidecar (recordPhaseOutcome).
-	if workspace == "" {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN: empty workspace — skipping phase-timing.json write\n")
-		return timings
-	}
-	timingPath := phasetiming.Path(workspace)
-	timings = composePhaseTimings(workspace, timings)
-	data, merr := json.Marshal(timings)
-	if merr != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase-timing marshal: %v\n", merr)
-		return timings
-	}
-	tmp := timingPath + ".tmp"
-	if werr := os.WriteFile(tmp, data, 0o644); werr != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase-timing write: %v\n", werr)
-		return timings
-	}
-	if rerr := os.Rename(tmp, timingPath); rerr != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase-timing rename: %v\n", rerr)
-	}
-	return timings
 }
 
 // phaseFailureDiag is the structured diagnostic written to <phase>-failure-diag.json
@@ -1061,8 +909,29 @@ func ApplyDefectsAsCarryoverTodos(state *State, record FailedRecord) {
 	}
 }
 
-// fleetMode reports whether this cycle runs under the `evolve fleet` supervisor
-// (EVOLVE_FLEET=1). In fleet mode the whole-cycle global project lock is not
-// taken (ADR-0049 S6 / root-cause R1) so concurrent fleet cycles don't refuse
-// each other; per-resource flocks + per-run isolation keep them safe. Default
-// off — the single-driver loop keeps the coarse lock.
+// recorder returns the unit-01 recorder (ADR-0103). NewOrchestrator builds it
+// eagerly with the root's Center. An Orchestrator assembled as a literal —
+// the test constructions this package keeps — lazily builds and caches that
+// same live recorder on first use. A nil orchestrator (a bare cycleRun with
+// no orchestrator at all) gets a fresh bare, no-op Recorder on every call, so
+// every path that records or flushes still has ONE writer.
+func (o *Orchestrator) recorder() *outcome.Recorder {
+	if o == nil {
+		return outcome.NewRecorder(time.Now, func(string) string { return "" }, func(int, recovery.PhaseOutcome) {})
+	}
+	if o.outcome == nil {
+		o.outcome = o.wiredRecorder()
+	}
+	return o.outcome
+}
+
+// wiredRecorder is the ONE construction of the live recorder, shared by
+// NewOrchestrator (eager) and recorder() (lazy). Every collaborator is read
+// live: the clock through a closure (tests swap o.now after construction), the
+// archetype lookup as the live method value, the Center through an accessor
+// (WithSignalCenter is an option tests apply after construction too); the
+// emission keeps module orchestrator.
+func (o *Orchestrator) wiredRecorder() *outcome.Recorder {
+	return outcome.NewRecorder(func() time.Time { return o.now() }, o.phaseArchetype, o.emitPhaseOutcome,
+		outcome.WithSignals(func() *signalcenter.Center { return o.signals }))
+}

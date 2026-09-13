@@ -44,11 +44,13 @@ func TestWireOrchestratorDeps_SignalCenterWired(t *testing.T) {
 }
 
 // Every production call site of core.NewOrchestrator must pass
-// core.WithSignalCenter, except the two pinned nil roots.
+// core.WithSignalCenter, except the one pinned nil root: the routing-test
+// engine, test machinery that takes a *testing.T. The --simulate root builds
+// the production topology since unit 01 (ADR-0103);
+// TestWireSimulateOrchestrator_SignalCenterWired proves it.
 func TestNilSignalCenterRootsArePinned(t *testing.T) {
 	allowed := map[string]bool{
-		"cmd/evolve/cmd_cycle_simulate.go": true,
-		"internal/routingtest/engine.go":   true,
+		"internal/routingtest/engine.go": true,
 	}
 	callRE := regexp.MustCompile(`\bcore\.NewOrchestrator\(`)
 	moduleRoot := filepath.Join("..", "..")
@@ -220,5 +222,35 @@ func TestWireOrchestratorDeps_LedgerIsObservedByTheSignalCenter(t *testing.T) {
 	observed, ok := d.Ledger.(*ledger.FileLedger)
 	if !ok || !observed.SignalsWired() {
 		t.Fatalf("the root's ledger must be the file ledger observed by the Signal Center, got %T", d.Ledger)
+	}
+}
+
+// Unit 01 (ADR-0103), architecture review HIGH-1: the --simulate root builds
+// the production signal topology — Center, observed ledger, console sink at
+// WARN, durable cycle-less sink — so the recorder's warnings render there as
+// the deleted stderr lines did.
+func TestWireSimulateOrchestrator_SignalCenterWired(t *testing.T) {
+	root := t.TempDir()
+	evolveDir := filepath.Join(root, ".evolve")
+	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var console bytes.Buffer
+	d := wireSimulateOrchestrator(root, evolveDir, &console)
+	if d.Signals == nil || d.Orchestrator == nil || !d.Orchestrator.SignalCenterWired() {
+		t.Fatal("the --simulate root must construct a Signal Center and register the orchestrator as its listener")
+	}
+	if l, ok := d.Ledger.(interface{ SignalsWired() bool }); !ok || !l.SignalsWired() {
+		t.Fatal("the --simulate root's ledger is observed like the production root's")
+	}
+	d.Signals.Emit(signalcenter.Event{
+		Module: signalcenter.ModuleOutcome, Origin: "Test.simulate", Kind: signalcenter.KindOutcomeWarning,
+		Severity: signalcenter.SeverityWarn, Code: "OUTCOME_TIMING_SKIPPED", Reason: "simulate wiring proof",
+	})
+	if !strings.Contains(console.String(), "simulate wiring proof") {
+		t.Fatalf("the console sink renders WARN under --simulate: %q", console.String())
+	}
+	if data, err := os.ReadFile(filepath.Join(evolveDir, "signals.ndjson")); err != nil || !strings.Contains(string(data), "simulate wiring proof") {
+		t.Errorf("cycle-less signals are durable under --simulate too: %v %s", err, data)
 	}
 }

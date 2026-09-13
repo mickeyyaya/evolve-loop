@@ -1,28 +1,41 @@
 # Cycle 1634 Dossier
 
-**Goal:** Pipeline-health verification batch (2026-09-12, two waves): work the highest-weight queued inbox items end-to-end — claim, tdd, build, audit, ship — with full phase integrity, now that the resume worktree teardown (#571), the shipDirect audit binding (#569), resume-path outcome recording (#568), and profile sandbox.write_subpaths grants (#572) are on main. Every cycle must commit to a claimed inbox item (an empty top_n must not run the spine), bind its audit to the changes tree it ships, record a terminal outcome on every exit, and leave no stale worktree behind. Pipeline-integrity and pipeline-repair items come first; ADR-0099 document deliverables are eligible.
+**Goal:** 427dc8c4379cf0b01235f6d60a7c993d5fc4f29dbe9c5d5274689e85c0c27164
 **Final verdict:** FAIL
-**Run ID:** 01M2AXJ3ZAHHT4109BEKYS0FJ6
-**Committed:** `self-consistency-on-decision-phases`
+**Run ID:** 01M2CCJR70EPF64548TW6K7NEH
+**Committed:** `c1`
 
 ## Phases
 
 | Phase | Archetype | Verdict | Duration | Key Findings |
 |-------|-----------|---------|----------|--------------|
-| scout | plan | PASS | 4m11s |  |
-| triage | plan | FAIL | 2m5s |  |
+| scout | plan | PASS |  |  |
+| triage | plan | PASS |  |  |
+| tdd | plan | PASS |  |  |
+| build-planner | plan | PASS |  |  |
+| build | build | PASS |  |  |
+| retro | control | PASS |  |  |
 
 ## Timing
 
-**Total:** 6m15s across 2 phases (0 retried) · **Longest:** scout 4m11s
+**Total:** 0s across 6 phases (0 retried) · **Longest:**  0s
 
 | Archetype | Wall-clock |
 |-----------|------------|
-| plan | 6m15s |
+| build | 0s |
+| control | 0s |
+| plan | 0s |
 
 ## Defects
 
 - **audit-fail** (HIGH): cycle did not pass audit; see audit-report.md + acs-verdict.json — fix: address the audit findings recorded for this cycle
+
+
+## Failure
+
+**Fingerprint:** `build|gate-block|a1859e957104` · **Class:** gate-block
+
+- review gate: phase "build" deliverable rejected after 2 correction(s): build handoff floor: 1 deterministic check failure(s) — fix these exactly before handoff: Explanation Documentation: build-repo
 
 
 ## Carryover

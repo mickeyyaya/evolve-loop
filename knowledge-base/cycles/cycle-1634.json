@@ -1,21 +1,18 @@
 {
   "cycle": 1634,
-  "run_id": "01M2AXJ3ZAHHT4109BEKYS0FJ6",
-  "goal": "Pipeline-health verification batch (2026-09-12, two waves): work the highest-weight queued inbox items end-to-end — claim, tdd, build, audit, ship — with full phase integrity, now that the resume worktree teardown (#571), the shipDirect audit binding (#569), resume-path outcome recording (#568), and profile sandbox.write_subpaths grants (#572) are on main. Every cycle must commit to a claimed inbox item (an empty top_n must not run the spine), bind its audit to the changes tree it ships, record a terminal outcome on every exit, and leave no stale worktree behind. Pipeline-integrity and pipeline-repair items come first; ADR-0099 document deliverables are eligible.",
+  "run_id": "01M2CCJR70EPF64548TW6K7NEH",
+  "goal": "427dc8c4379cf0b01235f6d60a7c993d5fc4f29dbe9c5d5274689e85c0c27164",
   "final_verdict": "FAIL",
   "tasks": [
-    "self-consistency-on-decision-phases"
+    "c1"
   ],
   "phases": [
     {
       "name": "scout",
       "verdict": "PASS",
-      "duration_ms": 250532,
-      "started_at": "2026-09-12T13:40:59Z",
-      "ended_at": "2026-09-12T13:45:11Z",
+      "started_at": "2026-09-13T03:22:12Z",
+      "ended_at": "2026-09-13T03:22:13Z",
       "archetype": "plan",
-      "model_source": "profile",
-      "resolved_model": "balanced",
       "tokens": {
         "input": 0,
         "output": 0,
@@ -25,13 +22,62 @@
     },
     {
       "name": "triage",
-      "verdict": "FAIL",
-      "duration_ms": 124790,
-      "started_at": "2026-09-12T13:46:01Z",
-      "ended_at": "2026-09-12T13:48:06Z",
+      "verdict": "PASS",
+      "started_at": "2026-09-13T03:22:13Z",
+      "ended_at": "2026-09-13T03:22:14Z",
       "archetype": "plan",
-      "model_source": "profile",
-      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "started_at": "2026-09-13T03:22:14Z",
+      "ended_at": "2026-09-13T03:22:17Z",
+      "archetype": "plan",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "build-planner",
+      "verdict": "PASS",
+      "started_at": "2026-09-13T03:22:17Z",
+      "ended_at": "2026-09-13T03:22:19Z",
+      "archetype": "plan",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "started_at": "2026-09-13T03:22:19Z",
+      "ended_at": "2026-09-13T03:22:28Z",
+      "archetype": "build",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "retro",
+      "verdict": "PASS",
+      "started_at": "2026-09-13T03:22:28Z",
+      "ended_at": "2026-09-13T03:22:28Z",
+      "archetype": "control",
       "tokens": {
         "input": 0,
         "output": 0,
@@ -48,6 +94,13 @@
       "fix": "address the audit findings recorded for this cycle"
     }
   ],
+  "failure": {
+    "fingerprint": "build|gate-block|a1859e957104",
+    "pre_class": "gate-block",
+    "reasons": [
+      "review gate: phase \"build\" deliverable rejected after 2 correction(s): build handoff floor: 1 deterministic check failure(s) — fix these exactly before handoff: Explanation Documentation: build-repo"
+    ]
+  },
   "carryover": [
     {
       "id": "address-audit-findings",
@@ -55,14 +108,22 @@
       "priority": "high"
     }
   ],
+  "skipped_phases": [
+    {
+      "phase": "closeout",
+      "reason": "abnormal exit in phase retro"
+    }
+  ],
   "timing": {
-    "total_ms": 375322,
-    "phase_count": 2,
+    "total_ms": 0,
+    "phase_count": 6,
     "retried_count": 0,
-    "longest_phase": "scout",
-    "longest_ms": 250532,
+    "longest_phase": "",
+    "longest_ms": 0,
     "by_archetype_ms": {
-      "plan": 375322
+      "build": 0,
+      "control": 0,
+      "plan": 0
     },
     "total_tokens": {
       "input": 0,
@@ -71,6 +132,18 @@
       "cache_write": 0
     },
     "tokens_by_archetype": {
+      "build": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "control": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      },
       "plan": {
         "input": 0,
         "output": 0,

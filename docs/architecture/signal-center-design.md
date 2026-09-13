@@ -162,7 +162,7 @@ Examples (what cycles 1636 and 1630 would have produced):
 
 `orchestrator`, `advisor`, `runner`, `bridge`, `liveness` (the renamed pane center), `ship`, `audit`,
 `triage`, `scout`, `build`, `tdd`, `gate.contract`, `gate.eval`, `gate.repo`, `inbox`, `config`,
-`loop`, `watchdog`, `observer`, `dashboard`, `signalcenter` (self-reports), `ledger` (the file ledger's append observer, S4a). A module is added by
+`loop`, `watchdog`, `observer`, `dashboard`, `signalcenter` (self-reports), `ledger` (the file ledger's append observer, S4a), `outcome` (the phase-outcome recorder, breakdown unit 01). A module is added by
 editing the closed set and its test; an unknown module is stamped `SIGNALCENTER_UNKNOWN_MODULE` and
 raised to WARN — never dropped. *(review 21: `advisor` and `config` added to match §12.)*
 
@@ -180,6 +180,7 @@ raised to WARN — never dropped. *(review 21: `advisor` and `config` added to m
 | `bridge.warning` / `bridge.tripwire` | engine telemetry warnings, tripwires | WARN | |
 | `pane.liveness` | liveness edge from the LivenessCenter | INFO; WARN with a `LIVENESS_PANE_*` code — the registry (rendered in `signal-codes.md`) is the one list of which states warn | |
 | `ledger.appended` | a ledger entry was appended (the file ledger's append observer; `fields.entry_seq` names the line) | INFO | |
+| `outcome.warning` | the phase-outcome recorder could not persist a record (sidecar or timing log skipped or failed); the in-memory record stands (unit 01) | WARN | |
 | `cycle.sealed` | final verdict decided (after `finalizeOutcome`) | INFO (FAIL → WARN) | ✓ on FAIL |
 | `loop.wave` / `loop.halt` / `loop.escalation` | batch-level events (today's `dispatchevents`) | INFO / INCIDENT / WARN | / ✓ / |
 | `signalcenter.listener_panicked` / `signalcenter.sink_dropped` | self-reports: a panicking listener was dropped / the NDJSON sink could not write (count in `fields.dropped`) | INCIDENT / WARN | |
@@ -346,9 +347,10 @@ returned no path for cycle 0, which was harmless while no regular producer was c
 loop's wave summary would have made the durable sink report a drop after every wave (caught by the
 stub root building the production topology, §15.4).
 
-**Non-optional and loud** *(review 3)*: `wireOrchestratorDeps` always constructs a Center; the only
-nil-Center construction sites are `cmd_cycle_simulate.go` and `internal/routingtest`, and a repo test
-pins that list. Wiring proofs (the `DeclaredDeliverablesGateWired` precedent): `Orchestrator.SignalCenterWired()`
+**Non-optional and loud** *(review 3)*: `wireOrchestratorDeps` always constructs a Center, and so does the
+`--simulate` root (both build `newRootSignalCenter`, ONE topology — unit 01's architecture review
+found the Center-less simulate root had silenced the recorder's warnings); the only nil-Center
+construction site is the test-only `internal/routingtest` engine, and a repo test pins that list. Wiring proofs (the `DeclaredDeliverablesGateWired` precedent): `Orchestrator.SignalCenterWired()`
 asserted by a `cmd/evolve` composition test at both roots (cycle and loop); a `core` test that a
 constructed orchestrator with a Center is subscribed (its `observeSignal` receives what its own
 chokepoint emits); `engine.SignalsWired()` asserted on the bridge side (S3); an import-graph test that
@@ -457,7 +459,7 @@ ADR-0072's coherence floor and need their own campaign note.
 
 | Order | Unit to extract (from) | Size today | Module tag | Notes |
 |---|---|---|---|---|
-| 1 | phase-outcome recording + failure learning → `internal/core/outcome` (`failure_learning.go` 1070) | 1070 | `orchestrator` | already the C1 chokepoint; S1 touches it — extract after S1 lands |
+| 1 | **landed 2026-09-13 as unit 01** ([decomposition/01-outcome-recorder.md](decomposition/01-outcome-recorder.md)): the C1 recorder → `internal/core/outcome`; failure learning and the carryover lifecycle follow as units 02–03 (`failure_learning.go` 1070) | 1070 | `orchestrator` → `outcome` | already the C1 chokepoint; S1 touches it — extract after S1 lands |
 | 2 | phase advisor → `internal/advisor` (`phase_advisor.go` 1144) | 1144 | `advisor` | pure decision logic; strong test seam |
 | 3 | `orchestrator.go` (1158): composition (`New`, options) vs `RunCycle` engine | 1158 | `orchestrator` | Facade over the extracted units |
 | 4 | `cyclerun.go` (904): finalize/closeout → `cycleclose` | 904 | `orchestrator` | `finalizeCycle` + `finalizeOutcome` + dossier |
@@ -586,8 +588,8 @@ caught the drop report the wave summary would otherwise have raised after every 
 fleet-lane halt line, `[loop] HALT: …`, and the escalation-boundary line; the min-width repair
 line became the WARN's reason. `fields.next` on a halt IS the dossier's `next_action`
 (`writePipelineEscalation` returns what it wrote; the prose is stated once); the fleet-lane halt
-points at the lane's own INCIDENT. Under `--simulate` (a pinned nil-Center root) a system-failure
-halt now reports by exit code and dossier alone — the deleted prose is not re-printed there.
+points at the lane's own INCIDENT. Under `--simulate` the root builds the same topology since unit 01
+(ADR-0103), so a system-failure halt renders on the console there exactly as in a real cycle.
 
 **The ledger, after the architecture review (HIGH-1).** The first cut was a Decorator embedding
 `*FileLedger` and overriding `Append`. Go embedding is delegation without virtual dispatch: the
@@ -607,7 +609,7 @@ its inventory with a reason (`Rebaseline`, an operator repair root; `WriteCompos
 composition record by a self-constructed ledger), and `TestUnobservedLedgerRootsArePinned`
 (cmd/evolve, the twin of the pinned nil-Center roots) pins every `ledger.New(` outside it that
 passes no `WithSignals`, with its count and reason: the `evolve cycle reset` seal, the
-`--simulate` root, the `evolve ledger` repair commands, the guard chain's read-only ledger, and the
+`evolve ledger` repair commands, the guard chain's read-only ledger, and the
 inbox mover's fallback — which the ship phase's post-ship mover and the operator inbox commands
 still reach. Both inventories are the code-homed list of ledger lines the Center does not see;
 shrinking them is S4b's DI work. A cycle-signalled halt is two records by design — the

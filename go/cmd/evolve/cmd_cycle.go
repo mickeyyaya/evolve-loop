@@ -215,18 +215,20 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 		gcOrphanSessions("cycle-start", stderr)
 	}
 
-	var orch *core.Orchestrator
-	var signals *signalcenter.Center              // nil under --simulate (Null Object)
-	var lifecycleLedger inboxmover.LedgerAppender // nil under --simulate: the inbox walk falls back to the mover's own file ledger
+	// Both roots share the deps shape and the signal topology
+	// (newRootSignalCenter); --simulate differs only in its runners and has no
+	// bridge. Unit 01 (ADR-0103): a Center-less simulate root had silenced the
+	// recorder's warnings, so the Null-Object root is gone.
+	var d orchDeps
 	if simulate {
-		orch = wireSimulateOrchestrator(projectRoot, evolveDir)
+		d = wireSimulateOrchestrator(projectRoot, evolveDir, stderr)
 	} else {
-		d := wireOrchestratorDeps(projectRoot, evolveDir, stderr)
-		signals, lifecycleLedger = d.Signals, d.Ledger
-		// ADR-0101 S2a: no queued signal is lost at command exit (Center.Flush).
-		defer d.Signals.Flush()
-		orch = d.Orchestrator
+		d = wireOrchestratorDeps(projectRoot, evolveDir, stderr)
 	}
+	var lifecycleLedger inboxmover.LedgerAppender = d.Ledger
+	orch, signals := d.Orchestrator, d.Signals
+	// ADR-0101 S2a: no queued signal is lost at command exit (Center.Flush).
+	defer d.Signals.Flush()
 	cycleEnv := filterEvolveEnv(os.Environ())
 	result, err := orch.RunCycle(context.Background(), core.CycleRequest{
 		ProjectRoot:           projectRoot,

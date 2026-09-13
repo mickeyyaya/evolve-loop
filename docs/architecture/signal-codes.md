@@ -64,6 +64,15 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `ORCHESTRATOR_QUOTA_PAUSED` | every CLI family is quota-exhausted; the cycle is paused at the named phase and resumable |
 | `ORCHESTRATOR_SYSTEM_FAILURE` | an ADR-0072 system-level failure was attached to the cycle (INCIDENT when it halts the loop, WARN otherwise); fields.category names the floor |
 
+### outcome
+
+| Code | Meaning |
+|---|---|
+| `OUTCOME_SIDECAR_SKIPPED` | the phase's <phase>-usage.json sidecar was not written because the workspace is empty (the CWD-relative leak guard); the in-memory record and the phase.outcome event still stand |
+| `OUTCOME_SIDECAR_WRITE_FAILED` | the phase's <phase>-usage.json sidecar could not be encoded or written; the reason names the step and the error, fields name the phase and the path; the in-memory record stands |
+| `OUTCOME_TIMING_SKIPPED` | phase-timing.json was not written because the workspace is empty; the composed timing set is returned to the caller unchanged |
+| `OUTCOME_TIMING_WRITE_FAILED` | phase-timing.json could not be encoded or written (marshal, temp write or rename); the reason names the step and the error; the composed set is still returned |
+
 ### ship
 
 | Code | Meaning |

@@ -39,6 +39,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/core/outcome"
 )
 
 // outcomeRunner PASSes its phase with a scripted cost/duration after running
@@ -132,14 +134,14 @@ func timingEntryFor(t *testing.T, entries []map[string]any, phase string) map[st
 	return found[0]
 }
 
-func requireUsageSidecar(t *testing.T, workspace, phase string) phaseUsageSidecar {
+func requireUsageSidecar(t *testing.T, workspace, phase string) outcome.UsageSidecar {
 	t.Helper()
 	path := filepath.Join(workspace, phase+"-usage.json")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("%s must be written for every terminal disposition (cycle-262: missing build-usage.json was the divergence): %v", path, err)
 	}
-	var sc phaseUsageSidecar
+	var sc outcome.UsageSidecar
 	if err := json.Unmarshal(data, &sc); err != nil {
 		t.Fatalf("%s must be valid JSON: %v\n%s", path, err, data)
 	}

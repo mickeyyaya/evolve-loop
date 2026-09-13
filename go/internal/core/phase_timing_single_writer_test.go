@@ -18,35 +18,53 @@ import (
 // them, so the durable log and the dossier built from it disagree — silently,
 // and only on the resume path, which is exactly where nobody looks.
 //
+// Unit 01 (ADR-0103) moved the writer to the exported
+// (*outcome.Recorder).WritePhaseTimings, which any package could construct
+// and call, so the scan covers the WHOLE module (every non-test .go file
+// outside the unit that defines it), not just this directory: Go's visibility
+// no longer makes "one writer" structurally true, this guard does.
+//
 // If you are adding a legitimate writer: route it through flushPhaseTimings on
 // the cycle's OWN cycleRun. If you truly need another, this test is the place
 // to argue for it.
 func TestPhaseTimings_SingleWriter(t *testing.T) {
-	dir, err := os.Getwd() // internal/core
+	moduleRoot, err := filepath.Abs(filepath.Join("..", "..")) // internal/core → the go/ module
 	if err != nil {
 		t.Fatal(err)
 	}
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	const onlyWriter = "internal/core/failure_learning.go" // cycleRun.flushPhaseTimings
+	const definer = "internal/core/outcome/"
 	var offenders []string
-	for _, e := range entries {
-		name := e.Name()
-		if e.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
-			continue
+	walk := func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
 		}
-		body, rerr := os.ReadFile(filepath.Join(dir, name))
+		rel, _ := filepath.Rel(moduleRoot, path)
+		rel = filepath.ToSlash(rel)
+		if entry.IsDir() {
+			if entry.Name() == "vendor" || entry.Name() == "bin" || entry.Name() == "testdata" || (strings.HasPrefix(entry.Name(), ".") && path != moduleRoot) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(rel, ".go") || strings.HasSuffix(rel, "_test.go") || strings.HasPrefix(rel, definer) {
+			return nil
+		}
+		body, rerr := os.ReadFile(path)
 		if rerr != nil {
-			t.Fatal(rerr)
+			return rerr
 		}
-		if strings.Contains(string(body), "writePhaseTimings(") && name != "failure_learning.go" {
-			offenders = append(offenders, name)
+		if strings.Contains(string(body), ".WritePhaseTimings(") && rel != onlyWriter {
+			offenders = append(offenders, rel)
 		}
+		return nil
+	}
+	if err := filepath.WalkDir(moduleRoot, walk); err != nil {
+		t.Fatal(err)
 	}
 	if len(offenders) > 0 {
-		t.Errorf("phase-timing.json must have ONE writer path (cycleRun.flushPhaseTimings); "+
-			"these non-test files call writePhaseTimings directly: %v — a second raw caller "+
-			"re-appends entries the log already holds, so the durable log and the dossier disagree", offenders)
+		t.Errorf("phase-timing.json must have ONE writer path (cycleRun.flushPhaseTimings in %s); "+
+			"these non-test files call outcome.WritePhaseTimings directly: %v — a second raw caller "+
+			"re-appends entries the log already holds, so the durable log and the dossier disagree", onlyWriter, offenders)
 	}
 }
