@@ -37,6 +37,7 @@ DIST_CHECKSUMS := $(DIST_DIR)/checksums.txt
 
 .PHONY: build test test-component test-integration test-e2e test-acs-durable test-all \
         test-latency cover apicover lint tidy clean help dist dist-clean \
+        cover-strict \
         dist-darwin-amd64 dist-darwin-arm64 dist-linux-amd64 dist-linux-arm64 \
         dist-darwin-universal dist-checksums
 
@@ -130,6 +131,14 @@ apicover: ## Public-API coverage report (warning-only; APICOVER_PKGS=... to scop
 	@$(GO) test -count=1 -coverprofile=coverage.txt $(APICOVER_PKGS) >/dev/null
 	@$(GO) tool cover -func=coverage.txt > coverage.func.txt
 	@$(BIN_DIR)/apicover -cover coverage.func.txt $$($(GO) list -f '{{.Dir}}' $(APICOVER_PKGS))
+
+cover-strict: ## Per-package line-coverage hard-fail over go/.cover-strict (ADR-0101 §11: `<pkg> <min%>` per line; mirrors the go.yml strict step)
+	@fail=0; while read -r pkg min; do \
+		case "$$pkg" in ""|\#*) continue;; esac; \
+		got=$$($(GO) test -count=1 -tags integration -cover $$pkg 2>/dev/null | sed -n 's/.*coverage: \([0-9.]*\)%.*/\1/p'); \
+		if [ -z "$$got" ]; then echo "cover-strict: $$pkg: no coverage figure (build or test failure)"; fail=1; continue; fi; \
+		if awk -v g="$$got" -v m="$$min" 'BEGIN{exit !(g+0 < m+0)}'; then echo "cover-strict: $$pkg: $$got% < $$min% FAIL"; fail=1; else echo "cover-strict: $$pkg: $$got% >= $$min% ok"; fi; \
+	done < .cover-strict; exit $$fail
 
 apicover-enforce: ## Per-package hard-fail over go/.apicover-enforce (mirrors go.yml Phase-5; the composed-gate recipe — a red here means an uncovered/false-green EXPORT, and it must fail the tree)
 	@mkdir -p $(BIN_DIR)

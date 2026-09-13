@@ -4,8 +4,8 @@ package bridge
 // completion (s4-complete-residual-busy-callsites, Task 1): the
 // autoResponder.tick busy-gate (autorespond.go:282) is one of the two
 // surviving direct panestream.PaneBusy consumers the S4 charter targeted
-// (scout finding F1). It must route through panestream.SignalCenter.BusyOf
-// instead of calling panestream.PaneBusy inline, so the SignalCenter remains
+// (scout finding F1). It must route through panestream.LivenessCenter.BusyOf
+// instead of calling panestream.PaneBusy inline, so the LivenessCenter remains
 // the sole liveness facade (ADR-0068) and no bridge consumer parses CLI
 // chrome directly.
 //
@@ -112,6 +112,6 @@ func autorespondTickRegionSource(t *testing.T) string {
 func TestAutoResponderTick_NoDirectChromeParse(t *testing.T) {
 	region := autorespondTickRegionSource(t)
 	if strings.Contains(region, "panestream.PaneBusy(") {
-		t.Error("tick() busy-gate region still calls panestream.PaneBusy( directly — must read it via panestream.SignalCenter.BusyOf instead")
+		t.Error("tick() busy-gate region still calls panestream.PaneBusy( directly — must read it via panestream.LivenessCenter.BusyOf instead")
 	}
 }

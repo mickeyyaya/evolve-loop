@@ -56,7 +56,7 @@ type StopEvent struct {
 	InjectedPrompt string
 	// State carries the per-CLI liveness detector's structured verdict — the
 	// reviewer's SOLE decision input (ev.livenessState()). Populated by the
-	// driver via panestream.SignalCenter.Observe+Aggregate (ADR-0068, S3); the
+	// driver via panestream.LivenessCenter.Observe+Aggregate (ADR-0068, S3); the
 	// pre-S3 Progressed+Busy boolean fallback is retired (an actually-unset
 	// State carries no liveness signal, never a boolean-derived extend).
 	// Progressed/Busy stay populated for fatalpane.go's C2 detector and
@@ -110,23 +110,13 @@ func reviewActionOrNone(a ReviewAction) string {
 	return string(a)
 }
 
-// livenessOrUnknown renders a LivenessState as a stable snake_case word for the
-// timeout summary. panestream.LivenessState is an unexported-vocabulary int with
-// no String method, so %s would emit Go debug chrome; the zero value means "no
-// checkpoint observed liveness", which is itself the signal.
+// livenessOrUnknown renders a LivenessState as the stable snake_case word the
+// timeout summary carries: the vocabulary's ONE spelling (LivenessState.String,
+// ADR-0101 S3) with "-" folded to "_". The zero value means "no checkpoint
+// observed liveness" — itself the signal — and renders "unknown" through the
+// same path, so a new state can never be spelled twice.
 func livenessOrUnknown(s panestream.LivenessState) string {
-	switch s {
-	case panestream.LivenessIdle:
-		return "idle"
-	case panestream.LivenessBusyButStagnant:
-		return "busy_stagnant"
-	case panestream.LivenessConverging:
-		return "converging"
-	case panestream.LivenessHung:
-		return "hung"
-	default:
-		return "unknown"
-	}
+	return strings.ReplaceAll(s.String(), "-", "_")
 }
 
 // defaultArtifactMaxExtends backstops a continuously-working-but-never-finishing
@@ -160,7 +150,7 @@ func NewDeterministicReviewer(maxExtends int) StopReviewer {
 }
 
 // livenessState returns ev.State — the reviewer's sole liveness input (S3: the
-// driver always supplies State via panestream.SignalCenter, so an unset State
+// driver always supplies State via panestream.LivenessCenter, so an unset State
 // carries no signal at all and must never be derived from Progressed/Busy).
 func (ev StopEvent) livenessState() panestream.LivenessState {
 	return ev.State

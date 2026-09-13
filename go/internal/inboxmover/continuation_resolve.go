@@ -11,6 +11,7 @@ package inboxmover
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"os"
 	"path/filepath"
 	"sort"
@@ -41,7 +42,7 @@ func ResolveContinuation(opts Options, cycle int) *continuation.Continuation {
 // let the peer's win.
 func resolveClaim(opts Options, cycle int, inScope map[string]bool) *continuation.Continuation {
 	opts.resolveOpts()
-	cycleDir := filepath.Join(opts.InboxDir, "processing", fmt.Sprintf("cycle-%d", cycle))
+	cycleDir := inboxbatch.ProcessingCycleDir(opts.InboxDir, cycle)
 	entries, err := os.ReadDir(cycleDir)
 	if err != nil {
 		return nil

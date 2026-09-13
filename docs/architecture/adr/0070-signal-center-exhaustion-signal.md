@@ -3,6 +3,9 @@
 **Status:** Accepted
 **Date:** 2026-07-01
 **Extends:** ADR-0068 (SignalCenter Facade), ADR-0047 (liveness Strategy / single-source-with-projection)
+**Amended by:** [ADR-0101](0101-signal-center.md) (2026-09-13, S3) — the `SignalCenter` this ADR extends
+is `panestream.LivenessCenter` now; "signal center" names the process-scoped `internal/signalcenter`.
+The exhaustion signal, its gate and its handlers are unchanged; read `SignalCenter` as `LivenessCenter`.
 
 ## Context / request
 

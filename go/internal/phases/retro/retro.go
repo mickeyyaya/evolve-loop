@@ -254,7 +254,11 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 	}
 	verdict := core.VerdictPASS
 	diagnostics := fenceDiags
-	if reviewErr := validateExplanationReview(content, req); reviewErr != nil {
+	advisories, reviewErr := validateExplanationReview(content, req)
+	for _, advisory := range advisories {
+		diagnostics = append(diagnostics, core.Diagnostic{Severity: "warning", Message: explanationdocs.AdvisoryPrefix + advisory})
+	}
+	if reviewErr != nil {
 		diagnostics = append(diagnostics, core.Diagnostic{Severity: "error", Message: reviewErr.Error()})
 		verdict = core.VerdictFAIL
 	}
@@ -403,7 +407,7 @@ func hasFailureLesson(projectRoot, ws string, cycle int) bool {
 func init() {
 	registry.Register(string(core.PhaseRetro), func(req core.PhaseRequest) core.PhaseRunner {
 		return New(Config{
-			Bridge:  bridge.NewDefault(req.ProjectRoot),
+			Bridge:  bridge.NewDefault(req.ProjectRoot, nil),
 			Prompts: prompts.NewForProject(req.ProjectRoot),
 			Model:   "auto",
 		})

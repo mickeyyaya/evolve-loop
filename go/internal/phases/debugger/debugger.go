@@ -245,7 +245,7 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 func init() {
 	registry.Register(string(core.PhaseDebugger), func(req core.PhaseRequest) core.PhaseRunner {
 		return New(Config{
-			Bridge:  bridge.NewDefault(req.ProjectRoot),
+			Bridge:  bridge.NewDefault(req.ProjectRoot, nil),
 			Prompts: prompts.NewForProject(req.ProjectRoot),
 		})
 	})

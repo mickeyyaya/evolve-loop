@@ -18,7 +18,7 @@ type replWaitState struct {
 	intervalS       int
 	maxExtends      int
 	reviewer        StopReviewer
-	livenessCenter  *panestream.SignalCenter
+	livenessCenter  *panestream.LivenessCenter
 	paneProfile     panestream.PaneProfile
 	livenessProfile panestream.PaneProfile
 	recoveryStage   string
@@ -89,8 +89,11 @@ func newReplWaitState(w replWaiter) *replWaitState {
 
 	livenessCenter := w.deps.LivenessCenter
 	if livenessCenter == nil {
-		livenessCenter = panestream.NewSignalCenter()
+		livenessCenter = panestream.NewLivenessCenter()
 	}
+	// ADR-0101 S3: every liveness edge this dispatch observes is a
+	// pane.liveness signal stamped with its cycle, run and phase.
+	livenessCenter.RegisterLivenessHandler(paneLivenessHandler(w.deps.Signals, configIdentity(w.cfg)))
 	paneProfile := w.channel.profile
 	livenessProfile := paneProfile
 	// Exhaustion is decided separately through its persisted and corroborated

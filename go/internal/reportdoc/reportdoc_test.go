@@ -254,3 +254,57 @@ func TestRequirePathLineEvidenceAt_RejectsOversizedDeletedBaseBlob(t *testing.T)
 		t.Fatal("oversized deleted base blob was read without a limit")
 	}
 }
+
+// RequireReasoning is the reasoning floor (ADR-0102): the one blocking rule
+// the audit and retro review gates keep — a token Evidence is not a review.
+func TestRequireReasoning_TokenEvidenceFailsAProseSentencePasses(t *testing.T) {
+	if err := RequireReasoning("  x  "); err == nil || !strings.Contains(err.Error(), "concrete") {
+		t.Fatalf("token evidence must fail the floor: %v", err)
+	}
+	if err := RequireReasoning("compared the document with the diff line by line"); err != nil {
+		t.Fatalf("a sentence of reasoning passes the floor: %v", err)
+	}
+	if err := RequirePathLineEvidence("x", "go/app.go"); err == nil || !strings.Contains(err.Error(), "concrete") {
+		t.Fatalf("RequirePathLineEvidence applies the floor first: %v", err)
+	}
+}
+
+// ReasonedReview is the one reading of a review section both phase gates
+// share (ADR-0102): absence is never laxer than thinness.
+func TestReasonedReview_AbsenceIsNeverLaxerThanThinness(t *testing.T) {
+	allowed := []string{"Status", "Evidence"}
+	fields, advisories, err := ReasonedReview("## Verdict\n**PASS**\n", "audit-report.md", "Explanation Documentation", allowed...)
+	if fields != nil || len(advisories) != 0 || err == nil || !strings.Contains(err.Error(), "audit-report.md is missing ## Explanation Documentation") {
+		t.Fatalf("a missing section is a missing reasoning: fields=%v advisories=%v err=%v", fields, advisories, err)
+	}
+	dup := "## Explanation Documentation\n- Status: VERIFIED\n- Evidence: compared d.md:1 with the diff line by line\n\n## Explanation Documentation\n- Status: VERIFIED\n"
+	fields, advisories, err = ReasonedReview(dup, "audit-report.md", "Explanation Documentation", allowed...)
+	if fields != nil || !strings.Contains(strings.Join(advisories, "\n"), "duplicate ##") || err == nil || !strings.Contains(err.Error(), "concrete") {
+		t.Fatalf("a duplicated section is a parser finding with no attributable review text: fields=%v advisories=%v err=%v", fields, advisories, err)
+	}
+	garbled := "## Explanation Documentation\n- Status: VERIFIED\n- Status: NEEDS_CORRECTION\n- Evidence: compared d.md:1 with the diff line by line\n"
+	fields, advisories, err = ReasonedReview(garbled, "audit-report.md", "Explanation Documentation", allowed...)
+	if fields != nil || !strings.Contains(strings.Join(advisories, "\n"), "duplicate") || err != nil {
+		t.Fatalf("a garbled field is a finding with the floor on the text as written: fields=%v advisories=%v err=%v", fields, advisories, err)
+	}
+	thin := "## Explanation Documentation\n- Status: VERIFIED\n- Evidence: x\n"
+	if _, _, err = ReasonedReview(thin, "audit-report.md", "Explanation Documentation", allowed...); err == nil || !strings.Contains(err.Error(), "concrete") {
+		t.Fatalf("thin Evidence fails the floor: %v", err)
+	}
+	clean := "## Explanation Documentation\n- Status: VERIFIED\n- Evidence: compared d.md:1 with the diff line by line\n"
+	fields, advisories, err = ReasonedReview(clean, "audit-report.md", "Explanation Documentation", allowed...)
+	if err != nil || len(advisories) != 0 || fields["status"] != "VERIFIED" {
+		t.Fatalf("a clean review yields its fields: fields=%v advisories=%v err=%v", fields, advisories, err)
+	}
+}
+
+// A garbled section whose only content is duplicated boilerplate — no
+// Evidence line — is no reasoning: the floor measures the Evidence as
+// written, never the section's bulk (go review, ADR-0102).
+func TestReasonedReview_GarbledBoilerplateWithoutEvidenceFailsTheFloor(t *testing.T) {
+	boilerplate := "## Explanation Documentation\n- Status: VERIFIED\n- Status: VERIFIED\n- Build status: required\n- Document: docs/explain/builds/cycle-42.md\n"
+	fields, advisories, err := ReasonedReview(boilerplate, "audit-report.md", "Explanation Documentation", "Status", "Build status", "Document", "Evidence")
+	if fields != nil || !strings.Contains(strings.Join(advisories, "\n"), "duplicate") || err == nil || !strings.Contains(err.Error(), "concrete") {
+		t.Fatalf("boilerplate without Evidence must fail the floor: fields=%v advisories=%v err=%v", fields, advisories, err)
+	}
+}

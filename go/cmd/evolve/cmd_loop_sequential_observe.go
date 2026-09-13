@@ -11,7 +11,7 @@ import (
 // breakers before the ledger verification path can mask them.
 func (b *loopBatchCoordinator) observeSequentialCycle(cycle sequentialCycle, state *sequentialBatchState) batchDecision {
 	if failure := cycle.result.SystemFailure; failure != nil && failure.Halt {
-		exitCode := haltOnSystemFailure(b.cfg.EvolveDir, b.cfg.ProjectRoot, cycle.cycle, cycle.workspace, failure, b.stderr)
+		exitCode := haltOnSystemFailure(b.cfg.EvolveDir, b.cfg.ProjectRoot, cycle.cycle, cycle.workspace, failure, b.stderr, b.deps.Signals, systemFailureRule)
 		b.result.StopReason = "system_failure_halt"
 		b.result.emitFatal(b.stdout, b.stderr, b.cfg, cycle.cycle)
 		return batchDecision{flow: batchReturn, exitCode: exitCode}
@@ -27,6 +27,11 @@ func (b *loopBatchCoordinator) observeSequentialCycle(cycle sequentialCycle, sta
 		b.result.TotalCost += cost.Total.CostUSD
 		fmt.Fprintf(b.stderr, "[loop] cycle %d cost: $%.4f (batch total: $%.4f)\n", cycle.cycle, cost.Total.CostUSD, b.result.TotalCost)
 	}
+	// ADR-0101 S4a: the batch report shows the driven runner's per-cycle view
+	// of the Signal Center — read through the loop's own orchestrator seam, so
+	// a scripted runner is reported exactly like the real one. It reports,
+	// never gates.
+	fmt.Fprint(b.stderr, formatSignalReport(cycle.cycle, b.orch.SignalSummary()))
 	if pause, ok := detectQuotaPause(b.cfg.EvolveDir); ok {
 		fmt.Fprintf(b.stderr, "QUOTA-PAUSE: cycle=%d wake-at=%s source=%s attempts=%d/%d\n",
 			pause.Cycle, pause.WakeAt, pause.Source, pause.Attempts, pause.MaxAttempts)

@@ -59,6 +59,9 @@ func rootsFor(in core.ReviewInput) phasecontract.Roots {
 		// The gate's request context, so the conditional sections are judged here
 		// exactly as `evolve phase verify` judges them from cycle-state.json.
 		ExplanationDocumentationVersion: in.ExplanationDocumentationVersion,
+		// Declared effects (ADR-0100 slice 2) are judged against this cycle's
+		// lifecycle state (processing/cycle-N/), so the gate names the cycle.
+		Cycle: in.Cycle,
 	}
 }
 

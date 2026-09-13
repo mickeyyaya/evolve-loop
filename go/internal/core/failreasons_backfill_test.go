@@ -78,3 +78,40 @@ func TestBackfillFailReasons_NoOpWhenExplainedOrNotFAIL(t *testing.T) {
 		t.Errorf("a PASS cycle must not gain fail reasons: %v", pass.FailReasons)
 	}
 }
+
+// A phase that returns FAIL by its OWN Classify — triage's protected-surface
+// admission rejection (cycles 1634 and 1636, 2026-09-12/13) — recorded no
+// abort reason, so the seal labelled it "phase-infra class": a deterministic,
+// reasoned rejection paged as infrastructure. The C1 record now carries the
+// phase's own diagnostics; the seal names the error-severity ones and keeps the
+// infra marker only for a FAIL that truly recorded nothing.
+func TestBackfillFailReasons_PhaseOwnDiagnosticsNameTheReason(t *testing.T) {
+	t.Parallel()
+	result := &CycleResult{FinalVerdict: VerdictFAIL}
+	backfillFailReasons(result, []phaseTimingEntry{
+		{Phase: "scout", Verdict: VerdictPASS},
+		{Phase: "triage", Verdict: VerdictFAIL, Diagnostics: []Diagnostic{
+			{Severity: "warning", Message: "phase-tracker metrics file absent"},
+			{Severity: "error", Message: `top_n card "phase-stub-shape-rule-at-ship-staging" names protected surface "go/internal/phases/ship/gitops.go" — control-plane changes go through the console route (operator-gated), not lane top_n`},
+		}},
+	})
+	if len(result.FailReasons) != 1 {
+		t.Fatalf("FailReasons = %v, want exactly the triage reason", result.FailReasons)
+	}
+	r := result.FailReasons[0]
+	if !strings.HasPrefix(r, "phase triage: ") || !strings.Contains(r, "names protected surface") {
+		t.Errorf("reason must carry the phase and its own error diagnostic: %q", r)
+	}
+	if strings.Contains(r, "phase-infra class") || strings.Contains(r, "metrics file absent") {
+		t.Errorf("a reasoned FAIL must not be labelled infra, and warnings are not reasons: %q", r)
+	}
+
+	// Warnings alone explain nothing: the infra marker stays for that shape.
+	warnOnly := &CycleResult{FinalVerdict: VerdictFAIL}
+	backfillFailReasons(warnOnly, []phaseTimingEntry{
+		{Phase: "triage", Verdict: VerdictFAIL, Diagnostics: []Diagnostic{{Severity: "warning", Message: "metrics file absent"}}},
+	})
+	if len(warnOnly.FailReasons) != 1 || !strings.Contains(warnOnly.FailReasons[0], "phase-infra class") {
+		t.Errorf("warning-only FAIL must keep the explicit infra marker: %v", warnOnly.FailReasons)
+	}
+}

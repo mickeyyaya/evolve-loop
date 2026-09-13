@@ -62,7 +62,7 @@ func (cr *cycleRun) mainDispatchRetryOpts() retryOpts {
 		quotaExhausted:       allFamiliesQuotaExhausted,
 		backfill:             cr.backfillExhaustedArtifact,
 		optionalInfraSkip:    func(p Phase, err error) bool { return cr.o.optionalInfraSkip(p, err) },
-		postShipObserverSkip: func(p Phase) bool { return cr.o.postShipObserverSkip(p, cr.shipped) },
+		postShipObserverSkip: func(p Phase) bool { return cr.o.postShipObserverSkip(p, cr.cs.Shipped) },
 		shipRecovery:         cr.recoverShipError,
 	}
 }
@@ -81,7 +81,7 @@ func (cr *cycleRun) mainDispatchRetryOpts() retryOpts {
 func (cr *cycleRun) evaluateBatchRetryOpts() retryOpts {
 	return retryOpts{
 		optionalInfraSkip:    func(p Phase, err error) bool { return cr.o.optionalInfraSkip(p, err) },
-		postShipObserverSkip: func(p Phase) bool { return cr.o.postShipObserverSkip(p, cr.shipped) },
+		postShipObserverSkip: func(p Phase) bool { return cr.o.postShipObserverSkip(p, cr.cs.Shipped) },
 	}
 }
 

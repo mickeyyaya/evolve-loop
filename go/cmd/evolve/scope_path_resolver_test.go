@@ -5,6 +5,7 @@ package main
 
 import (
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -76,7 +77,7 @@ func TestWireOrchestratorDeps_RegistersTheScopePathResolver(t *testing.T) {
 	live := seedInbox(t, root, "", "pipeline-defect-pipeline-blocker")
 	seedInbox(t, root, "consumed", "pipeline-defect-pipeline-blocker")
 
-	deps := wireOrchestratorDeps(root, evolveDir)
+	deps := wireOrchestratorDeps(root, evolveDir, io.Discard)
 	got, wired := deps.Orchestrator.ScopePathProbe(root, "pipeline-defect-pipeline-blocker")
 	if !wired {
 		t.Fatalf("the composition root must register the scope-path resolver")

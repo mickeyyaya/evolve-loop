@@ -115,7 +115,7 @@ func TestBlockerBreakerBootPath_RunsBindingReconcile(t *testing.T) {
 	}
 	writeBinding(t, root, "boot-item", 3)
 	var errb bytes.Buffer
-	_, _ = blockerBreakerHalt(evolveDir, root, 1, &errb)
+	_, _ = blockerBreakerHalt(evolveDir, root, 1, &errb, testRootSignals(t, &errb))
 	if _, ok, _ := continuation.ReadRegistryEntry(root, "boot-item"); ok {
 		t.Fatalf("breaker boot path did not release the stray binding (stderr=%s)", errb.String())
 	}

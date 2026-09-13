@@ -85,6 +85,7 @@ func phaseOutcomeFrom(phase Phase, resp PhaseResponse, attempts int, abortReason
 		ModelSource:   resp.ModelSource,
 		ResolvedModel: resp.ResolvedModel,
 		Tokens:        resp.Tokens,
+		Diagnostics:   resp.Diagnostics,
 	}
 }
 
@@ -139,10 +140,18 @@ func (o *Orchestrator) recordPhaseOutcome(result *CycleResult, timings *[]phaseT
 		ModelSource:   out.ModelSource,
 		ResolvedModel: out.ResolvedModel,
 		Tokens:        out.Tokens,
+		Diagnostics:   out.Diagnostics,
 
 		ContextFillRatio: fillRatio,
 		ContextWindowHot: windowHot,
 	})
+	// ADR-0101 S1: the chokepoint is the Signal Center's first producer — one
+	// phase.outcome (or phase.aborted) per terminal disposition, on both
+	// dispatch roots. A reasoned FAIL (triage's protected-surface rejection,
+	// cycles 1634/1636) is named by the event's reason (verdictReason, the
+	// same rendering the seal uses) and printed by the root's stderr sink in
+	// the one line format — no hand-written line here.
+	o.emitPhaseOutcome(result.Cycle, out)
 	// ADR-0048 Slice A (SHADOW): grade the abort reason. Observe-only — logs the
 	// tier graduated-enforcement WOULD apply; changes nothing (the floor still
 	// aborts). Evidence is conservative here (the per-site benign-churn /

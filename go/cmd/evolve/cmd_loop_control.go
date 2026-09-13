@@ -16,6 +16,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sessionreaper"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sessionrecord"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
 )
 
@@ -139,6 +140,10 @@ func recordAbsorbedFail(cfg loopConfig, ranCycle int, stderr io.Writer) {
 type loopCycleRunner interface {
 	RunCycle(context.Context, core.CycleRequest) (core.CycleResult, error)
 	RunCycleFromPhase(context.Context, core.CycleRequest, *core.ResumePoint) (core.CycleResult, error)
+	// SignalSummary is the runner's per-cycle view of the Signal Center, read
+	// by the batch report (ADR-0101 S4a) — through this seam, so a scripted
+	// runner is reported exactly like the real orchestrator.
+	SignalSummary() signalcenter.Summary
 }
 
 // loopOrchOverride is a test-only seam: when non-nil, runLoop drives this

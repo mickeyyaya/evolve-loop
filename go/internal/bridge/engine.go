@@ -19,6 +19,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/tokenusage"
 )
 
@@ -177,15 +178,25 @@ type Deps struct {
 	// profile (ADR-0049 S0 / gap G6). Tests inject a stub to drive the
 	// mkdir-error fallback branch deterministically.
 	MkScratchDir func(dir, pattern string) (string, error)
-	// LivenessCenter (ADR-0068, S3) is the SignalCenter the tmux-REPL stop-review
+	// LivenessCenter (ADR-0068, S3) is the LivenessCenter the tmux-REPL stop-review
 	// checkpoint observes/aggregates for StopEvent.State — the authoritative
 	// liveness source, replacing the bare per-run detectorFor(lp) probe. nil (the
-	// production default) has the driver build a private panestream.NewSignalCenter()
+	// production default) has the driver build a private panestream.NewLivenessCenter()
 	// per run; tests inject a shared instance so a registered LivenessProbe can be
 	// proven both to win (its state reaches StopEvent.State) and to be invoked
 	// (its call count is observable) — a bypassed center could satisfy the former
-	// by coincidence but never the latter.
-	LivenessCenter *panestream.SignalCenter
+	// by coincidence but never the latter. An injected center must be
+	// per-dispatch: newReplWaitState registers the pane.liveness handler on it
+	// and there is no unregister, so a center shared across dispatches would
+	// accumulate handlers stamped with stale identities.
+	LivenessCenter *panestream.LivenessCenter
+	// Signals is the ADR-0101 Signal Center the engine produces into:
+	// bridge.warning / bridge.tripwire from the attempt telemetry, and — through
+	// the LivenessHandler the tmux driver registers on the LivenessCenter —
+	// pane.liveness. nil is the Null Object for tests; the production Adapter
+	// injects it at construction (adapters/bridge.NewDefault) and SignalsWired
+	// proves it reached the engine.
+	Signals *signalcenter.Center
 	// TokenResolver recovers the token usage for a completed Launch window
 	// (token-telemetry S3). nil leaves token counts unavailable while the attempt
 	// ledger still records dispatch, latency, and outcome. A resolver error is
@@ -380,10 +391,19 @@ func NewEngine(deps Deps) *Engine {
 	if d.TokenResolver == nil {
 		// Fail-open must be loud while accurately describing what remains:
 		// lifecycle/outcome records continue, but token counts are unavailable.
-		_, _ = fmt.Fprintf(d.Stderr, "[engine] WARN: Deps.TokenResolver is nil — token usage enrichment unavailable (fail-open); attempt latency and outcome telemetry remain active; wire tokenusage.DefaultResolver at the composition root\n")
+		// ADR-0101 S3: a bridge.warning the root's sink renders (no hand-written line).
+		d.Signals.Emit(signalcenter.Event{
+			Module: signalcenter.ModuleBridge, Origin: "NewEngine", Kind: signalcenter.KindBridgeWarning,
+			Severity: signalcenter.SeverityWarn, Code: CodeTokenResolverMissing,
+			Reason: "Deps.TokenResolver is nil — token usage enrichment unavailable (fail-open: lifecycle/outcome records continue without token counts)",
+		})
 	}
 	return &Engine{deps: d}
 }
+
+// SignalsWired reports whether a Signal Center reached this Engine — the
+// wiring proof the production Adapter's tests assert (ADR-0101 S3).
+func (e *Engine) SignalsWired() bool { return e.deps.Signals != nil }
 
 // HasTokenResolver reports whether this Engine was wired with a non-nil
 // TokenResolver — the seam production composition roots (adapters/bridge,
@@ -658,18 +678,6 @@ const defaultContextFillWarnPct = 60
 // unmeasured success from a quiet quota-abort: only launches that ran longer
 // than this can be real work worth building a collector for (cycle-1005).
 const tripwireSuccessThreshold = 60 * time.Second
-
-// cycleFromWorkspace best-effort derives the "cycle-N" segment from a workspace
-// path (e.g. .../.evolve/runs/cycle-1005). Returns "" when no such segment
-// exists so the caller can fail open rather than error.
-func cycleFromWorkspace(ws string) string {
-	for _, seg := range strings.Split(filepath.ToSlash(ws), "/") {
-		if strings.HasPrefix(seg, "cycle-") {
-			return seg
-		}
-	}
-	return ""
-}
 
 // firstDiagnosticLine picks the one-line cause threaded into the launch
 // error chain. Validate-gauntlet failures put the cause FIRST and prefix it

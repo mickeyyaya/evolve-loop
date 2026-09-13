@@ -41,7 +41,7 @@ import (
 // trip (cmd_loop_blockerbreaker.go). Asserting on the breadcrumb rather than
 // on runLoop's exit code keeps these predicates pinned to the BREAKER's
 // behavior and immune to unrelated changes in the loop's own exit vocabulary.
-const haltMarker = "PIPELINE-BLOCKER HALT"
+const haltMarker = "LOOP_PIPELINE_BLOCKER_HALT" // the code the rendered loop.halt line carries (ADR-0101 S4a)
 
 // TestReadBatchWindowFloor_PrefersAllocationLease is the unit-level core of
 // the fix: the breaker window floor must be the MAX of the completion and

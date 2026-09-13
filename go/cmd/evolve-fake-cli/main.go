@@ -353,9 +353,10 @@ func artifactsFor(phase, mainPath, verdict string) (map[string]string, error) {
 		// EVOLVE_PHASE_IO=enforce (the default since the 3.10 cutover) the sentinel
 		// is mandatory for the audit verdict parse, so a prose-only fake report
 		// would fail audit and the happy-path pipeline would never reach ship.
-		// The explanation-review audit gate (validateExplanationReview) is a
-		// deterministic verdict override: when the contract is active the
-		// audit report must independently review the Build handoff. The
+		// The explanation-review audit gate (validateExplanationReview) records
+		// the review's shape as advisories since ADR-0102 and still blocks on a
+		// missing reasoning or a missing delivery: when the contract is active
+		// the audit report must independently review the Build handoff. The
 		// synthetic build declares NOT_APPLICABLE (no material diff), so the
 		// faithful review is VERIFIED with Build status not_applicable, no
 		// Document fields, and concrete >=20-char Evidence.

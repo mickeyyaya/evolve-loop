@@ -175,7 +175,7 @@ func TestEngineLaunch_CollectorErrorNeverFailsLaunch(t *testing.T) {
 	eng := NewEngine(Deps{
 		Runner:    fr.runner(),
 		LookupEnv: mapLookup(nil),
-		Stderr:    &stderr,
+		Stderr:    &stderr, Signals: sinkDeps(&stderr),
 		TokenResolver: func(tokenusage.Window) (tokenusage.Result, error) {
 			return tokenusage.Result{}, errors.New("boom: collector unavailable")
 		},

@@ -21,6 +21,10 @@ func (cr *cycleRun) completeCycle() error {
 		return ferr
 	}
 	cr.cycleCompletedNormally = true
+	// ADR-0101 S2a: the cycle's event stream ends here on both roots —
+	// system.failure (if the floors attached one) then cycle.sealed; the
+	// abnormal path seals from abnormalEpilogue.
+	cr.emitCycleClose(cr.result, "cycleRun.completeCycle")
 	// ADR-0055: emit this completed cycle's closeout dossier to
 	// <ProjectRoot>/knowledge-base/cycles/cycle-N.json. Best-effort — the cycle
 	// has already finalized, so a closeout-artifact write error must not fail it

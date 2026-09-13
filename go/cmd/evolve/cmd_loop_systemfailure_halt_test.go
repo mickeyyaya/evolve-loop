@@ -87,7 +87,7 @@ func TestHaltOnSystemFailure_WritesDossierAndP0AndReturnsHaltExitCode(t *testing
 		Halt:     true,
 	}
 
-	got := haltOnSystemFailure(evolveDir, root, 956, filepath.Join(root, ".evolve/runs/cycle-956"), sf, os.Stderr)
+	got := haltOnSystemFailure(evolveDir, root, 956, filepath.Join(root, ".evolve/runs/cycle-956"), sf, os.Stderr, nil, systemFailureRule)
 	if got != systemFailureHaltExitCode {
 		t.Errorf("haltOnSystemFailure return = %d, want %d", got, systemFailureHaltExitCode)
 	}

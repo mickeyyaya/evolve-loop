@@ -62,9 +62,12 @@ ran `sandbox=false`.
   drafted). The deterministic build handoff floor already exists in the E2 reviewer chain
   with a correction ladder, and the FAIL census pointed at audit-time mutation and the review
   section's shape — not at gates that fired too late. Superseded by this ADR.
-- **Loosen the review gate to prose-only.** Rejected: the grounding rule (path:line for every
+- **Loosen the review gate to prose-only.** Rejected here: the grounding rule (path:line for every
   material path) is what stops a reviewer from repeating path names; only the SHAPE is
-  forgiven.
+  forgiven. *Superseded on 2026-09-13 by [ADR-0102](0102-explanation-review-reasoning-is-the-gate.md):
+  after the rule zeroed a batch's ship rate (cycles 1638/1640 and their continuations), the
+  operator decided the reviewer's reasoning is the gate and the citation form is advisory — the
+  persona still asks for `path:line`, the gate no longer blocks on it.*
 
 ## Consequences
 

@@ -14,6 +14,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasetiming"
 )
 
 // Outcome is the cycle-ending taxonomy. Batch targets: SHIPPED ≥ 60%;
@@ -45,14 +48,11 @@ const (
 // core).
 const abortReasonDeferredPrefix = "all-families-exhausted"
 
-// outcomeTimingEntry mirrors core.phaseTimingEntry's JSON (the C1 record);
-// only the fields the classifier reads. Kept local: cyclehealth must not
-// import core (it is a leaf the cmd layer composes).
-type outcomeTimingEntry struct {
-	Phase       string `json:"phase"`
-	Verdict     string `json:"verdict"`
-	AbortReason string `json:"abort_reason"`
-}
+// The C1 record is read through phasetiming.Entry — its one schema home
+// (cyclehealth must not import core, and does not need to: phasetiming is a
+// leaf over cyclestate). A hand-typed mirror here silently parsed a renamed
+// key to nil and reverted the detail to verdict-only with every test green
+// (architecture review of cycles 1634/1636's fix).
 
 // outcomeRollup mirrors interaction.Summary's counters (schema v1).
 type outcomeRollup struct {
@@ -65,11 +65,14 @@ type outcomeRollup struct {
 // salvage counters) for the batch report. Read failures degrade toward
 // FAILED_UNEXPLAINED — an unreadable record cannot explain anything.
 func ClassifyOutcome(workspace string) (Outcome, string) {
-	var timing []outcomeTimingEntry
+	var timing []phasetiming.Entry
 	timingPresent := false
-	if raw, err := os.ReadFile(filepath.Join(workspace, "phase-timing.json")); err == nil {
+	if entries, err := phasetiming.Read(workspace); err == nil {
+		timingPresent, timing = true, entries
+	} else if !os.IsNotExist(err) {
+		// Present but unreadable: it still marks the cycle as having run
+		// phases; an unparseable record explains nothing (unchanged contract).
 		timingPresent = true
-		_ = json.Unmarshal(raw, &timing)
 	}
 
 	// SHIPPED: any ship dispatch with verdict PASS. Scanned over ALL
@@ -118,6 +121,9 @@ func ClassifyOutcome(workspace string) (Outcome, string) {
 	// names the first failing phase, which is the causal one.
 	for _, e := range timing {
 		if e.Verdict == "FAIL" {
+			if msgs := cyclestate.ErrorMessages(e.Diagnostics); len(msgs) > 0 {
+				return OutcomeFailedExplained, fmt.Sprintf("phase %s recorded verdict FAIL: %s (no abort — cycle completed through its failure path)", e.Phase, strings.Join(msgs, "; "))
+			}
 			return OutcomeFailedExplained, fmt.Sprintf("phase %s recorded verdict FAIL (no abort — cycle completed through its failure path)", e.Phase)
 		}
 	}

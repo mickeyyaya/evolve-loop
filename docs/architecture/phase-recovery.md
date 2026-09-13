@@ -142,8 +142,12 @@ BEFORE (recording is happy-path-only)                AFTER (one chokepoint, ever
 As built: `go/internal/recovery/` leaf package owns the `PhaseOutcome` envelope;
 `core.phaseOutcomeFrom(phase, resp, attempts, abortReason)` owns the reconciliation rule (canonical agent
 verdict recorded as-is; anything else synthesizes FAIL — **never PASS**); the verdict stays the agent's own on
-abort paths, with the abort recorded as additive `abort_reason` (omitempty) in both artifacts. Aborted-but-
-dispatched phases now appear in `PhasesRun`. **This makes the 262-class divergence structurally impossible** —
+abort paths, with the abort recorded as additive `abort_reason` (omitempty) in both artifacts. Since 2026-09-13
+(cycles 1634/1636) the timing record also carries the phase's OWN `diagnostics` (severity + message, as the
+`PhaseResponse` reported them, omitempty): a phase that returns FAIL by its own Classify seals with the reason it
+gave — the seal (`backfillFailReasons`), the chokepoint log line and `cyclehealth` all read that one field —
+instead of the synthesized "phase-infra class" marker, which is now reserved for a FAIL that recorded nothing.
+Aborted-but-dispatched phases now appear in `PhasesRun`. **This makes the 262-class divergence structurally impossible** —
 the faithful 262 replay (test `TestPhaseOutcome_TreeGuardAbort_RecordsBuildOutcome`) still fails the cycle on
 the genuine leak (the guard is right) but records build's PASS + cost + timing, so a salvage needs no forensic
 reconstruction. Deferred to the C3 slice: `resume.go` is a second, simpler recording boundary (writes no

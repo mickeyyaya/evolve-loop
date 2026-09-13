@@ -1,11 +1,12 @@
 package main
 
 import (
-	"fmt"
 	"io"
+	"maps"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
 // systemFailureHaltExitCode is the process exit code a cycle run returns when an
@@ -35,17 +36,23 @@ func cycleRunExitCode(res cyclestate.CycleResult) int {
 }
 
 // haltOnSystemFailure is the ONE shared halt+escalate action (ADR-0072 AC2)
-// invoked by BOTH the sequential single-cycle path (cmd_loop.go) and each fleet
-// lane subprocess (runCycleRun) — so the escalation dossier, the P0 inbox item,
-// and the halt exit code are produced identically on every code path instead of
-// the logic being duplicated inline per call site. It writes the escalation
-// dossier + P0 pipeline-repair inbox item (writePipelineEscalation), prints the
-// operator-facing halt message, and returns systemFailureHaltExitCode so the
-// caller propagates the halt via its exit code.
-func haltOnSystemFailure(evolveDir, projectRoot string, cycle int, workspace string, sf *cyclestate.SystemFailureSignal, w io.Writer) int {
-	writePipelineEscalation(evolveDir, projectRoot, cycle, workspace, sf, w)
-	fmt.Fprintf(w, "[loop] SYSTEM-FAILURE HALT: cycle=%d category=%s level=%s\n[loop]   %s\n[loop]   The pipeline (not the task) is the cause — diagnose + fix before resuming; a P0 pipeline-repair item was filed to .evolve/inbox/. Escalation: .evolve/pipeline-escalation.json\n",
-		cycle, sf.Category, sf.Level, sf.Evidence)
+// invoked by the sequential single-cycle path (cmd_loop.go), each fleet lane
+// subprocess (runCycleRun) and the pipeline-blocker breaker — so the
+// escalation dossier, the P0 inbox item, the halt exit code and the ONE
+// loop.halt INCIDENT are produced identically on every code path instead of
+// the logic being duplicated inline per call site. The caller's rule names
+// the INCIDENT's code and adds the rule's own fields; the chokepoint adds the
+// floor (category, level) and what it wrote — fields.next is the dossier's
+// next_action (its one home), fields.escalation and fields.inbox_item the
+// paths. Returns systemFailureHaltExitCode so the caller propagates the halt
+// via its exit code.
+func haltOnSystemFailure(evolveDir, projectRoot string, cycle int, workspace string, sf *cyclestate.SystemFailureSignal, w io.Writer, signals *signalcenter.Center, rule loopHaltRule) int {
+	wrote := writePipelineEscalation(evolveDir, projectRoot, cycle, workspace, sf, w)
+	fields := make(map[string]string, len(rule.fields)+5)
+	maps.Copy(fields, rule.fields)
+	fields["category"], fields["level"] = sf.Category, sf.Level
+	fields["next"], fields["escalation"], fields["inbox_item"] = wrote.NextAction, wrote.DossierPath, wrote.InboxItemPath
+	emitLoopHalt(signals, cycle, "haltOnSystemFailure", rule.code, sf.Category+": "+sf.Evidence, fields)
 	return systemFailureHaltExitCode
 }
 

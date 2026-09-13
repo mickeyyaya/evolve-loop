@@ -67,6 +67,15 @@ type Entry struct {
 	// parses to the zero value: absent, never a fabricated ratio.
 	ContextFillRatio float64 `json:"context_fill_ratio,omitempty"`
 	ContextWindowHot bool    `json:"context_window_hot,omitempty"`
+	// Diagnostics (cycles 1634/1636) are the phase's OWN structured notes —
+	// severity + message, exactly as its PhaseResponse reported them — carried on
+	// the C1 record so a phase that returns FAIL by its own Classify (triage's
+	// protected-surface admission rejection) seals with the reason it gave. The
+	// seal (core.backfillFailReasons) and cyclehealth read the error-severity
+	// ones; warnings ride along as the durable trail the runner already meant to
+	// leave (reconciliation, ACS-floor overrides). omitempty: a legacy log
+	// without the key parses to nil — absent, never fabricated.
+	Diagnostics []cyclestate.Diagnostic `json:"diagnostics,omitempty"`
 }
 
 // Path is the timing-log path for a cycle workspace.

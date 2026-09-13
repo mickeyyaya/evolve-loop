@@ -14,6 +14,7 @@ package main
 // WithModelCatalogLookup(nil), and nil is precisely the dead-gate state.
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -76,7 +77,7 @@ func TestWireOrchestrator_ModelCatalogLookupWired(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	d := wireOrchestratorDeps(root, evolveDir)
+	d := wireOrchestratorDeps(root, evolveDir, io.Discard)
 	if !d.Orchestrator.ModelCatalogLookupWired() {
 		t.Fatal("production composition root (wireOrchestratorDeps) does not wire core.WithModelCatalogLookup — " +
 			"router.ClampPlanModelRouting short-circuits on a nil lookup, so the catalog-resolvability gate is a " +

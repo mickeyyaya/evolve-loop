@@ -6,7 +6,7 @@ import (
 )
 
 // paneProfileFor must project the per-CLI manifest's quota/rate-limit pattern
-// into PaneProfile.ExhaustedRegex (single-source), so the SignalCenter's
+// into PaneProfile.ExhaustedRegex (single-source), so the LivenessCenter's
 // ExhaustionProbe detects a mid-phase wall. Acceptance: the projected pattern
 // must match the REAL Gemini incident wording — "Individual quota reached" —
 // the exact message that hung the agy router phase (usage-probe pattern already

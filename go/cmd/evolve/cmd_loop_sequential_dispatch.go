@@ -9,7 +9,6 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cycleclassify"
-	"github.com/mickeyyaya/evolve-loop/go/internal/cycleoutcome"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
 )
 
@@ -76,11 +75,7 @@ func (b *loopBatchCoordinator) handleCycleError(result core.CycleResult, cycleEr
 	if recordErr != nil && !errors.Is(recordErr, failurelog.ErrStateMissing) {
 		fmt.Fprintf(b.stderr, "[loop] WARN: could not record cycle failure: %v\n", recordErr)
 	}
-	if _, err := cycleoutcome.ApplyFailure(cycleoutcome.FailureInputsFor(
-		b.cfg.ProjectRoot, b.cfg.EvolveDir, workspace, result.Cycle, b.stderr,
-	)); err != nil {
-		fmt.Fprintf(b.stderr, "[loop] WARN: could not release cycle %d inbox claims: %v\n", result.Cycle, err)
-	}
+	b.applyCycleFailureOutcome(result.Cycle)
 	if errors.Is(cycleErr, core.ErrAllFamiliesExhausted) {
 		b.result.emitQuotaPause(b.cfg, result.Cycle, b.stdout, b.stderr)
 		return batchDecision{flow: batchReturn, exitCode: 5}

@@ -97,7 +97,7 @@ func newDispositionFixture(t *testing.T, action ReviewAction) (replWaiter, *repl
 		Stderr:        &bytes.Buffer{},
 		RecoveryStage: "off",
 	}.withDefaults()
-	center := panestream.NewSignalCenter()
+	center := panestream.NewLivenessCenter()
 	center.Observe(session, tmuxPromptMarkerDefault, panestream.Profiles["claude"])
 	waiter := replWaiter{
 		ctx: context.Background(),

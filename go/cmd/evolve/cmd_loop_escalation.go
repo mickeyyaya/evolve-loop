@@ -25,13 +25,23 @@ type pipelineEscalation struct {
 	ReproHint  string `json:"repro_hint"`
 }
 
+// pipelineEscalationRecord is what writePipelineEscalation alone knows and
+// the halt INCIDENT reports: the dossier's next_action (the ONE home of what
+// the operator does next) and where the dossier and the P0 item landed.
+type pipelineEscalationRecord struct {
+	NextAction    string
+	DossierPath   string
+	InboxItemPath string
+}
+
 // writePipelineEscalation records the ADR-0072 halt: it writes
 // .evolve/pipeline-escalation.json (the diagnostic dossier) and auto-files a P0
 // pipeline-repair inbox item. The inbox write honors never_stop_queue — the
 // QUEUE is still injected even though the loop halts, so on resume the pipeline
 // fix is the first thing worked. Both writes are best-effort + LOUD on error
 // (a halt that also fails to leave a breadcrumb must not do so silently).
-func writePipelineEscalation(evolveDir, projectRoot string, cycle int, workspace string, sf *cyclestate.SystemFailureSignal, stderr io.Writer) {
+// The returned record names what it wrote, for the halt INCIDENT.
+func writePipelineEscalation(evolveDir, projectRoot string, cycle int, workspace string, sf *cyclestate.SystemFailureSignal, stderr io.Writer) pipelineEscalationRecord {
 	now := time.Now().UTC()
 	nextAction := fmt.Sprintf("Diagnose the PIPELINE (not the task) from the system-failure evidence: %s. Fix the pipeline defect, then resume: evolve loop --resume.", sf.Evidence)
 	reproHint := fmt.Sprintf("Reproduce and root-cause the reported system failure: %s.", sf.Evidence)
@@ -87,4 +97,5 @@ func writePipelineEscalation(evolveDir, projectRoot string, cycle int, workspace
 	if werr := atomicwrite.JSON(itemPath, item); werr != nil {
 		fmt.Fprintf(stderr, "[loop] WARN: could not auto-file pipeline-repair inbox item: %v\n", werr)
 	}
+	return pipelineEscalationRecord{NextAction: nextAction, DossierPath: escPath, InboxItemPath: itemPath}
 }

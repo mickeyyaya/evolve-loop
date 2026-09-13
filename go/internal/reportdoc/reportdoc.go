@@ -108,13 +108,52 @@ func Fields(body string, allowed ...string) (map[string]string, error) {
 	return fields, nil
 }
 
+// RequireReasoning is the reasoning floor: a review's Evidence must say
+// something — token or canned evidence is not a review. Since 2026-09-13
+// (ADR-0102) this is the one blocking rule the audit and retro gates keep;
+// the citation form checked below is advisory there.
+func RequireReasoning(evidence string) error {
+	if len(strings.TrimSpace(evidence)) < 20 {
+		return fmt.Errorf("explanation review requires concrete Evidence")
+	}
+	return nil
+}
+
+// ReasonedReview is the ONE reading of a review section every phase gate
+// shares (ADR-0102, "absence is never laxer than thinness"): the section is
+// located by heading, its fields are parsed, and the reasoning floor is
+// applied — a missing section is a missing reasoning (error, naming doc), a
+// duplicated section is a parser finding with no attributable review text
+// (advisory + the floor on ""), a garbled field is a finding with the floor
+// on the Evidence as written (advisory, fields nil; no Evidence line is no
+// reasoning), and thin Evidence fails the floor. The gates apply their phase policy to the fields on top; the guard
+// TestExplanationReviewGates_ShareContractCore forbids them the ladder.
+func ReasonedReview(report, doc, heading string, allowed ...string) (fields map[string]string, advisories []string, err error) {
+	body, found, err := Section(report, heading)
+	if err != nil {
+		return nil, []string{err.Error()}, RequireReasoning("")
+	}
+	if !found {
+		return nil, nil, fmt.Errorf("%s is missing ## %s — the review's reasoning is the must-have (ADR-0102)", doc, heading)
+	}
+	fields, err = ReviewFields(body, allowed...)
+	if err != nil {
+		// A garbled field is a shape finding; the floor applies to the Evidence
+		// line as written — a garbled section earns no body fallback (the
+		// well-formed path keeps EvidenceOrBody), so boilerplate is not reasoning.
+		evidence, _ := Fields(body, "Evidence")
+		return nil, []string{err.Error()}, RequireReasoning(evidence["evidence"])
+	}
+	return fields, nil, RequireReasoning(fields["evidence"])
+}
+
 // RequirePathLineEvidence rejects token/canned evidence and requires every
 // authoritative path to be cited at a concrete line. This keeps qualitative
 // review grounded in inspected source rather than path-name repetition.
 func RequirePathLineEvidence(evidence string, references ...string) error {
 	evidence = strings.TrimSpace(evidence)
-	if len(evidence) < 20 {
-		return fmt.Errorf("explanation review requires concrete Evidence")
+	if err := RequireReasoning(evidence); err != nil {
+		return err
 	}
 	for _, reference := range references {
 		if reference == "" {

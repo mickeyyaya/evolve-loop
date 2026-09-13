@@ -49,7 +49,7 @@ func TestAuditorExplanationLiteralExampleMatchesProductionReader(t *testing.T) {
 			DocumentSHA256: strings.Repeat("b", 64), MaterialPaths: []string{"config/app.yaml"},
 		},
 	}
-	if err := validateExplanationReview(got, req); err != nil {
+	if _, err := validateExplanationReview(got, req); err != nil {
 		t.Fatalf("documented Auditor example rejected by production reader: %v", err)
 	}
 }
@@ -202,7 +202,7 @@ func TestBindExplanationResult_MissingRequiredHandoffBecomesEGPSRed(t *testing.T
 	}
 }
 
-func TestClassify_RequiresAuditorExplanationDocumentationReview(t *testing.T) {
+func TestClassify_MissingExplanationReviewStillBlocksAndACompleteOnePasses(t *testing.T) {
 	workspace := t.TempDir()
 	writeACSVerdict(t, workspace, 0)
 	view := &core.PhaseRequest{
@@ -216,8 +216,11 @@ func TestClassify_RequiresAuditorExplanationDocumentationReview(t *testing.T) {
 		},
 	}
 	h := hooks{}
-	if got, _, _ := h.Classify("## Verdict\n**PASS**\n", *view, core.BridgeResponse{}); got != core.VerdictFAIL {
-		t.Fatalf("missing qualitative explanation review verdict=%s, want FAIL", got)
+	// ADR-0102: a missing review section is a missing reasoning — absence is
+	// never laxer than a token Evidence (go review).
+	got, diags, _ := h.Classify("## Verdict\n**PASS**\n", *view, core.BridgeResponse{})
+	if got != core.VerdictFAIL || !hasError(diags) {
+		t.Fatalf("missing qualitative explanation review verdict=%s diags=%v, want FAIL: no review text is no reasoning", got, diags)
 	}
 	report := `## Explanation Documentation
 - Status: VERIFIED
@@ -251,8 +254,8 @@ func TestValidateExplanationReview_RejectsTokenEvidenceAndAcceptsNegativeJudgmen
 - Document SHA256: sha
 - Evidence: x
 `
-	if err := validateExplanationReview(weak, req); err == nil || !strings.Contains(err.Error(), "concrete") {
-		t.Fatalf("token evidence was accepted: %v", err)
+	if _, err := validateExplanationReview(weak, req); err == nil || !strings.Contains(err.Error(), "concrete") {
+		t.Fatalf("token evidence was accepted — the reasoning floor is the one rule left (ADR-0102): %v", err)
 	}
 	negative := `## Explanation Documentation
 - Status: NEEDS_CORRECTION
@@ -261,12 +264,13 @@ func TestValidateExplanationReview_RejectsTokenEvidenceAndAcceptsNegativeJudgmen
 - Document SHA256: sha
 - Evidence: docs/explain/builds/cycle-42.md:1 misstates the branch behavior implemented at go/app.go:19
 `
-	if err := validateExplanationReview(negative, req); err == nil || !strings.Contains(err.Error(), "NEEDS_CORRECTION") || strings.Contains(err.Error(), "Status must") {
-		t.Fatalf("well-formed negative judgment was not preserved: %v", err)
+	advisories, err := validateExplanationReview(negative, req)
+	if err != nil || !containsAdvisory(advisories, "NEEDS_CORRECTION") || containsAdvisory(advisories, "Status must") {
+		t.Fatalf("the reviewer's negative judgment is an advisory, never a block (ADR-0102): advisories=%v err=%v", advisories, err)
 	}
 }
 
-func TestValidateExplanationReview_RequiresPathLineEvidenceForEveryReference(t *testing.T) {
+func TestValidateExplanationReview_PathOnlyEvidenceIsAdvisory(t *testing.T) {
 	req := core.PhaseRequest{
 		ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,
 		BuildExplanationState:           core.BuildExplanationAvailable,
@@ -282,12 +286,13 @@ func TestValidateExplanationReview_RequiresPathLineEvidenceForEveryReference(t *
 - Document SHA256: sha
 - Evidence: reviewed docs/explain/builds/cycle-42.md and go/app.go against the implementation
 `
-	if err := validateExplanationReview(report, req); err == nil || !strings.Contains(err.Error(), "path:line") {
-		t.Fatalf("path-only evidence was accepted: %v", err)
+	advisories, err := validateExplanationReview(report, req)
+	if err != nil || !containsAdvisory(advisories, "path:line") {
+		t.Fatalf("path-only evidence is an advisory, never a block (ADR-0102): advisories=%v err=%v", advisories, err)
 	}
 }
 
-func TestValidateExplanationReview_NotApplicableRejectsDocumentClaims(t *testing.T) {
+func TestValidateExplanationReview_NotApplicableDocumentClaimsAreAdvisory(t *testing.T) {
 	req := core.PhaseRequest{
 		ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,
 		BuildExplanationState:           core.BuildExplanationAvailable,
@@ -300,8 +305,9 @@ func TestValidateExplanationReview_NotApplicableRejectsDocumentClaims(t *testing
 - Document SHA256: forged
 - Evidence: verified the base-bound diff contains no material changes
 `
-	if err := validateExplanationReview(report, req); err == nil || !strings.Contains(err.Error(), "must omit") {
-		t.Fatalf("N/A review accepted forged document fields: %v", err)
+	advisories, err := validateExplanationReview(report, req)
+	if err != nil || !containsAdvisory(advisories, "must omit") {
+		t.Fatalf("forged document fields on an N/A review are an advisory (ADR-0102): advisories=%v err=%v", advisories, err)
 	}
 }
 
@@ -314,8 +320,8 @@ func TestValidateExplanationReview_InvalidPostBuildStateRequiresFail(t *testing.
 - Status: VERIFIED
 - Evidence: the host snapshot is missing
 `
-	if err := validateExplanationReview(report, req); err == nil || !strings.Contains(err.Error(), "Status: FAIL") {
-		t.Fatalf("invalid handoff was not failed: %v", err)
+	if _, err := validateExplanationReview(report, req); err == nil || !strings.Contains(err.Error(), "Status: FAIL") {
+		t.Fatalf("a missing delivery reviewed as anything but FAIL still blocks (delivery is the must-have): %v", err)
 	}
 }
 
@@ -883,8 +889,8 @@ func TestValidateExplanationReview_ReadsTheSectionAsAuditorsWriteIt(t *testing.T
 - Evidence: docs/explain/builds/cycle-42.md:12 states the ordering implemented at go/app.go:29-31
 - Evidence: docs/explain/builds/cycle-42.md:20 names the seam at ` + "`go/other.go:7`" + `
 `
-	if err := validateExplanationReview(listValued, req); err != nil {
-		t.Fatalf("several Evidence lines, a range and backticks are how auditors write; must pass: %v", err)
+	if advisories, err := validateExplanationReview(listValued, req); err != nil || len(advisories) != 0 {
+		t.Fatalf("several Evidence lines, a range and backticks are how auditors write; must pass clean: advisories=%v err=%v", advisories, err)
 	}
 	proseCited := `## Explanation Documentation
 - Status: VERIFIED
@@ -893,8 +899,8 @@ func TestValidateExplanationReview_ReadsTheSectionAsAuditorsWriteIt(t *testing.T
 - Document SHA256: sha
 - Binding: docs/explain/builds/cycle-42.md:12 reproduces the handoff; go/app.go:29 and go/other.go:7 match the Changed Areas.
 `
-	if err := validateExplanationReview(proseCited, req); err != nil {
-		t.Fatalf("citations under another field name are still citations: %v", err)
+	if advisories, err := validateExplanationReview(proseCited, req); err != nil || len(advisories) != 0 {
+		t.Fatalf("citations under another field name are still citations: advisories=%v err=%v", advisories, err)
 	}
 	uncited := `## Explanation Documentation
 - Status: VERIFIED
@@ -904,7 +910,117 @@ func TestValidateExplanationReview_ReadsTheSectionAsAuditorsWriteIt(t *testing.T
 - Evidence: docs/explain/builds/cycle-42.md:12 checked; go/app.go:29 matches
 - Evidence: go/other.go is listed as a Changed Area
 `
-	if err := validateExplanationReview(uncited, req); err == nil || !strings.Contains(err.Error(), "go/other.go with path:line") {
-		t.Fatalf("a material path without a line is still the substance failure it was: %v", err)
+	if advisories, err := validateExplanationReview(uncited, req); err != nil || !containsAdvisory(advisories, "go/other.go with path:line") {
+		t.Fatalf("a material path without a line is an advisory naming the path (ADR-0102): advisories=%v err=%v", advisories, err)
+	}
+}
+
+func hasWarning(diags []core.Diagnostic, substr string) bool {
+	for _, d := range diags {
+		if d.Severity == "warning" && strings.Contains(d.Message, substr) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasError(diags []core.Diagnostic) bool {
+	for _, d := range diags {
+		if d.Severity == "error" {
+			return true
+		}
+	}
+	return false
+}
+
+func containsAdvisory(advisories []string, substr string) bool {
+	return strings.Contains(strings.Join(advisories, "\n"), substr)
+}
+
+// The cycle-1638/1640 shape (2026-09-13): the auditor's narrative is PASS and
+// its review reasons about the document, but its Evidence cites the material
+// paths without a literal path:line. ADR-0102: the reasoning is the gate, the
+// citation form is advisory — the verdict stands and the advisory rides the
+// record so the shape can still be improved without burning the cycle.
+func TestClassify_PathOnlyCitationsKeepThePassVerdictAndRecordTheAdvisory(t *testing.T) {
+	workspace := t.TempDir()
+	writeACSVerdict(t, workspace, 0)
+	req := core.PhaseRequest{
+		Workspace:                       workspace,
+		ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,
+		BuildExplanationState:           core.BuildExplanationAvailable,
+		BuildExplanation: &phaseio.ExplanationView{
+			Status: "required", Reason: "material behavior changed",
+			DocumentPath: "docs/explain/builds/cycle-1638.md", DocumentSHA256: "document-sha",
+			MaterialPaths: []string{".evolve/inbox/2026-07-21T02-00-00Z-triage-unified-solution-synthesis.json"},
+		},
+	}
+	report := `## Explanation Documentation
+- Status: VERIFIED
+- Build status: required
+- Document: docs/explain/builds/cycle-1638.md
+- Document SHA256: document-sha
+- Evidence: docs/explain/builds/cycle-1638.md:4 explains why every Changed Areas entry resolves; the inbox item .evolve/inbox/2026-07-21T02-00-00Z-triage-unified-solution-synthesis.json is covered by that statement
+
+## Verdict
+**PASS**
+`
+	got, diags, _ := hooks{}.Classify(report, req, core.BridgeResponse{})
+	if got != core.VerdictPASS {
+		t.Fatalf("verdict=%s diags=%v, want PASS: the reasoning is present, only the citation form is short", got, diags)
+	}
+	if !hasWarning(diags, "path:line") || !hasWarning(diags, explanationdocs.AdvisoryPrefix) || hasError(diags) {
+		t.Errorf("the citation gap rides the record as a prefixed advisory, not an error: %v", diags)
+	}
+}
+
+// ADR-0102: an unparsable review section (a duplicated single-valued field)
+// is a shape finding — advisory, never a block.
+func TestValidateExplanationReview_DuplicateFieldIsAdvisory(t *testing.T) {
+	req := core.PhaseRequest{
+		ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,
+		BuildExplanationState:           core.BuildExplanationAvailable,
+		BuildExplanation:                &phaseio.ExplanationView{Status: "required", DocumentPath: "docs/explain/builds/cycle-42.md", DocumentSHA256: "sha"},
+	}
+	report := `## Explanation Documentation
+- Status: VERIFIED
+- Status: NEEDS_CORRECTION
+- Evidence: compared docs/explain/builds/cycle-42.md:1 with the diff line by line
+`
+	advisories, err := validateExplanationReview(report, req)
+	if err != nil || !containsAdvisory(advisories, "duplicate") {
+		t.Fatalf("a duplicated field is an advisory: advisories=%v err=%v", advisories, err)
+	}
+}
+
+// ADR-0102: a report with two review sections is a parser finding (advisory)
+// with no attributable review text — so the reasoning floor still fails it.
+func TestValidateExplanationReview_DuplicateSectionIsAdvisoryButFailsTheFloor(t *testing.T) {
+	req := core.PhaseRequest{ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion, BuildExplanationState: core.BuildExplanationAvailable, BuildExplanation: &phaseio.ExplanationView{Status: "required", DocumentPath: "d.md", DocumentSHA256: "sha"}}
+	report := "## Explanation Documentation\n- Status: VERIFIED\n- Evidence: compared d.md:1 with the diff line by line\n\n## Explanation Documentation\n- Status: VERIFIED\n"
+	advisories, err := validateExplanationReview(report, req)
+	if err == nil || !strings.Contains(err.Error(), "concrete") || !containsAdvisory(advisories, "duplicate ##") {
+		t.Fatalf("a duplicated section is an advisory AND fails the reasoning floor: advisories=%v err=%v", advisories, err)
+	}
+}
+
+// The two remaining blocking paths through the audit gate: a missing delivery
+// honestly reviewed as FAIL is clean (the narrative FAIL carries), and a
+// host-side handoff defect fails loudly through the gate (ADR-0102).
+func TestValidateExplanationReview_MissingDeliveryReviewedAsFailIsCleanAndHostDefectsAreLoud(t *testing.T) {
+	invalid := core.PhaseRequest{ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion, BuildExplanationState: core.BuildExplanationInvalid}
+	honest := "## Explanation Documentation\n- Status: FAIL\n- Evidence: the Build handoff snapshot is missing from the workspace\n"
+	if advisories, err := validateExplanationReview(honest, invalid); err != nil || len(advisories) != 0 {
+		t.Fatalf("a missing delivery reviewed as FAIL is clean: advisories=%v err=%v", advisories, err)
+	}
+	lost := core.PhaseRequest{ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion, BuildExplanationState: core.BuildExplanationInvalid, BuildExplanationError: "typed handoff does not match verified host snapshot"}
+	if _, err := validateExplanationReview("## Explanation Documentation\n- Status: VERIFIED\n- Evidence: the document reads well against the diff\n", lost); err == nil || !strings.Contains(err.Error(), "(host: typed handoff does not match") {
+		t.Fatalf("the blocking rule names the host's reason for the lost handoff: %v", err)
+	}
+	weird := core.PhaseRequest{ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion, BuildExplanationState: core.BuildExplanationAvailable, BuildExplanation: &phaseio.ExplanationView{Status: "weird"}}
+	report := "## Explanation Documentation\n- Status: MAYBE\n- Build status: weird\n- Evidence: compared d.md:1 with the diff line by line\n"
+	advisories, err := validateExplanationReview(report, weird)
+	if err == nil || !strings.Contains(err.Error(), "unknown status") || !containsAdvisory(advisories, "must be VERIFIED") {
+		t.Fatalf("a host-side handoff defect fails loudly and the findings made before it still ride along: advisories=%v err=%v", advisories, err)
 	}
 }

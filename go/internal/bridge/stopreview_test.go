@@ -19,7 +19,7 @@ import (
 // killed at the backstop) — is what keeps a slow-but-working phase alive.
 // Cost/budget caps bound a pathological infinite-producer, not this wait
 // reviewer. StopEvent.State is set explicitly (S3: the driver's
-// panestream.SignalCenter is the sole liveness source; the pre-S3
+// panestream.LivenessCenter is the sole liveness source; the pre-S3
 // Progressed/Busy boolean fallback is retired).
 func TestDeterministicReviewer(t *testing.T) {
 	r := newDeterministicReviewer(2)

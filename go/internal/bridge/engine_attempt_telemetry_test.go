@@ -359,7 +359,7 @@ func TestEngineLaunch_ResolverWarningCarriesAttemptContext(t *testing.T) {
 	fr := &fakeRunner{writeArtifactPath: artifact, writeArtifactBody: "OK\n"}
 	var stderr strings.Builder
 	eng := NewEngine(Deps{
-		Runner: fr.runner(), LookupEnv: mapLookup(nil), Stderr: &stderr,
+		Runner: fr.runner(), LookupEnv: mapLookup(nil), Stderr: &stderr, Signals: sinkDeps(&stderr),
 		TokenResolver: func(tokenusage.Window) (tokenusage.Result, error) {
 			return tokenusage.Result{}, errors.New("collector offline")
 		},
@@ -369,7 +369,7 @@ func TestEngineLaunch_ResolverWarningCarriesAttemptContext(t *testing.T) {
 		Workspace: ws, ArtifactPath: artifact, Agent: "audit", Attempt: 3,
 	})
 	log := stderr.String()
-	for _, want := range []string{"collector offline", "call_id=", `cli="claude-p"`, `agent="audit"`, "attempt=3"} {
+	for _, want := range []string{"collector offline", string(CodeTokenResolverFailed), "call_id=", "cli=claude-p", "agent=audit", "attempt=3"} {
 		if !strings.Contains(log, want) {
 			t.Errorf("resolver warning lacks %q: %s", want, log)
 		}
@@ -383,7 +383,7 @@ func TestEngineLaunch_ResolverWarningCannotInjectDiagnosticLines(t *testing.T) {
 	fr := &fakeRunner{writeArtifactPath: artifact, writeArtifactBody: "OK\n"}
 	var stderr strings.Builder
 	eng := NewEngine(Deps{
-		Runner: fr.runner(), LookupEnv: mapLookup(nil), Stderr: &stderr,
+		Runner: fr.runner(), LookupEnv: mapLookup(nil), Stderr: &stderr, Signals: sinkDeps(&stderr),
 		TokenResolver: func(tokenusage.Window) (tokenusage.Result, error) {
 			return tokenusage.Result{}, errors.New("collector offline\n[bridge] forged\u202e")
 		},
@@ -397,8 +397,8 @@ func TestEngineLaunch_ResolverWarningCannotInjectDiagnosticLines(t *testing.T) {
 	if strings.Contains(log, "\n[bridge] forged") || strings.ContainsRune(log, '\u202e') {
 		t.Fatalf("resolver error injected a diagnostic line or bidi control: %q", log)
 	}
-	if !strings.Contains(log, `detail="collector offline\n[bridge] forged\u202e"`) {
-		t.Fatalf("escaped resolver detail missing from warning: %q", log)
+	if !strings.Contains(log, "token resolver failed: collector offline [bridge] forged") {
+		t.Fatalf("the defanged resolver detail must still be readable on the rendered line: %q", log)
 	}
 	if lines := strings.Count(strings.TrimSpace(log), "\n"); lines != 0 {
 		t.Fatalf("one resolver failure must emit one diagnostic line, got %d newlines: %q", lines, log)

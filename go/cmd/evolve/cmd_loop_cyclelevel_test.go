@@ -15,6 +15,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -51,7 +52,7 @@ func TestLoop_CycleLevelFailureContinues(t *testing.T) {
 
 	prev := wireOrchestratorDepsFn
 	defer func() { wireOrchestratorDepsFn = prev }()
-	wireOrchestratorDepsFn = func(string, string) orchDeps {
+	wireOrchestratorDepsFn = func(string, string, io.Writer) orchDeps {
 		st := &fixtures.FakeStorage{}
 		ld := newFakeLedger()
 		runners := map[core.Phase]core.PhaseRunner{

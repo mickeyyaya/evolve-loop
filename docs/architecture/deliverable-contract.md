@@ -216,6 +216,26 @@ check and the harness's post-phase gate can never drift.
   (per-iteration loop boundary) is the only sanctioned inbox writer — and it applies intents only at
   `failure_disposition.stage=enforce`.
 
+## Declared secondaries and effects (ADR-0100)
+
+The registry (`docs/architecture/phase-registry.json`) has always declared a phase's full output
+list; until ADR-0100 the gate judged only `outputs.files[0]`. Now, after the primary's shape
+checks, `VerifyWithStage` judges two more declared things — and nothing that is not declared:
+
+| Declaration | Where | Check | Codes |
+|---|---|---|---|
+| `outputs.agent_owed` (secondaries the persona writes: `triage-decision.json`, `carryover-todos.json`) | `internal/deliverable/secondaries.go` | exists (same write-in-flight grace), non-empty, parses if `.json`/`.ndjson`; markdown shape stays the primary's business | `missing_secondary` · `empty_secondary` · `malformed_secondary` |
+| `outputs.harness_produced` (`acs-verdict.json`) | — | never demanded of an agent (a harness component writes it) | — |
+| `effects` (lifecycle effects the persona performs outside its workspace; today `inbox-claim` on triage) | `internal/deliverable/effects.go` — `effectChecks`, a registry lookup binding each declared name to one deterministic check | `inbox-claim`: every committed id (`committedset.Committed`) that is an inbox item must sit under THIS cycle's `processing/cycle-N/` (`inboxmover.Locate`, whose layout is `inboxbatch/layout.go`'s (`ProcessingDir` / `ProcessingCycleDir` / `ProcessingCycleDirs` / `ParseProcessingCycle`) — the same the writer `inboxmover.Claim` uses); scout/carryover ids with no inbox file owe nothing; an empty or unrecorded commitment owes nothing | `missing_effect` (item + exact `evolve inbox-mover claim` command in the message) · `unbound_effect` (a declared name no check binds — a registry defect, pinned at commit time by `TestPhaseRegistry_EveryDeclaredEffectHasACheck`) |
+
+Every message is the correction directive the agent is re-dispatched with; a persistent gap ends
+the cycle `FAILED_EXPLAINED` naming the file or effect. A declared effect is judged against
+per-cycle state, so `phasecontract.Roots` carries `Cycle`: the host gate takes it from
+`ReviewInput.Cycle`, the runner from the phase request (`verifyRootsFor`), and the self-check
+from the persisted cycle state — a verifier that omits it fails OPEN with an error rather than
+deciding blind. `Orchestrator.DeclaredDeliverablesGateWired()` is the composition-root proof.
+
+
 ## Write-in-flight grace (read robustness)
 
 A phase agent's final deliverable write is not atomic with respect to the verify call that follows

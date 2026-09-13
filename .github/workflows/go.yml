@@ -133,3 +133,10 @@ jobs:
           path: |
             go/coverage.txt
             go/apicover-report.txt
+      - name: line-coverage strict (go/.cover-strict; per-package hard-fail, ADR-0101)
+        # Packages listed in go/.cover-strict declare the statement coverage they
+        # ship with (100% for internal/signalcenter). Enforced here AND by
+        # `make cover-strict`, both reading the same file — never by a test that
+        # reads its own coverage profile (that would skip silently).
+        run: make cover-strict
+

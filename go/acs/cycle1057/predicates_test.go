@@ -335,7 +335,7 @@ func TestC1057_006_ArtifactTimeout_ProductionAdapterWiresPolicy(t *testing.T) {
 		t.Fatalf("write policy.json: %v", err)
 	}
 	fx := newFixture(t)
-	a := adapterbridge.NewDefault(root)
+	a := adapterbridge.NewDefault(root, nil)
 	if _, err := a.Launch(context.Background(), fx.request(retroAgentLabel)); err != nil {
 		t.Logf("Launch returned err=%v (expected)", err)
 	}
@@ -354,7 +354,7 @@ func TestC1057_006_ArtifactTimeout_ProductionAdapterWiresPolicy(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root2, ".evolve", "policy.json"), []byte(body), 0o644); err != nil {
 		t.Fatalf("write policy.json: %v", err)
 	}
-	if _, err := adapterbridge.NewDefault(root2).Launch(context.Background(), fx.request(retroAgentLabel)); err != nil {
+	if _, err := adapterbridge.NewDefault(root2, nil).Launch(context.Background(), fx.request(retroAgentLabel)); err != nil {
 		t.Logf("Launch returned err=%v (expected)", err)
 	}
 	if got := spy.last(t).ArtifactTimeoutS; got != 1500 {

@@ -36,7 +36,7 @@ func TestBlockerBreakerHalt_TripsAndEscalates(t *testing.T) {
 	writeDigestFixture(t, evolveDir, 11, "build|guard-abort|aaa", "guard-abort")
 	writeDigestFixture(t, evolveDir, 12, "audit|guard-abort|bbb", "guard-abort")
 
-	rc, halted := blockerBreakerHalt(evolveDir, root, 10, io.Discard)
+	rc, halted := blockerBreakerHalt(evolveDir, root, 10, io.Discard, nil)
 	if !halted {
 		t.Fatal("two guard-abort digests in-batch must halt (compiled default ceiling 2)")
 	}
@@ -66,7 +66,7 @@ func TestBlockerBreakerHalt_HistoricDigestsExcluded(t *testing.T) {
 	writeDigestFixture(t, evolveDir, 11, "build|guard-abort|aaa", "guard-abort")
 	writeDigestFixture(t, evolveDir, 12, "audit|guard-abort|bbb", "guard-abort")
 
-	if _, halted := blockerBreakerHalt(evolveDir, root, 12, io.Discard); halted {
+	if _, halted := blockerBreakerHalt(evolveDir, root, 12, io.Discard, nil); halted {
 		t.Fatal("digests at or before batchStartCycle must be out of scope")
 	}
 }
@@ -87,7 +87,7 @@ func TestBlockerBreakerHalt_AckedFingerprintDoesNotReHalt(t *testing.T) {
 		writeDigestFixture(t, evolveDir, 1330, fp, "gate-block")
 		writeDigestFixture(t, evolveDir, 1331, fp, "gate-block")
 
-		if _, halted := blockerBreakerHalt(evolveDir, root, 1328, io.Discard); !halted {
+		if _, halted := blockerBreakerHalt(evolveDir, root, 1328, io.Discard, nil); !halted {
 			t.Fatal("3x identical-fingerprint digests with no ack must still halt (ADR-0072 floor unweakened)")
 		}
 	})
@@ -102,7 +102,7 @@ func TestBlockerBreakerHalt_AckedFingerprintDoesNotReHalt(t *testing.T) {
 			t.Fatalf("seed ack ledger: %v", err)
 		}
 
-		if _, halted := blockerBreakerHalt(evolveDir, root, 1328, io.Discard); halted {
+		if _, halted := blockerBreakerHalt(evolveDir, root, 1328, io.Discard, nil); halted {
 			t.Fatal("an acked fingerprint replaying the exact incident must not re-halt the batch")
 		}
 	})
@@ -114,7 +114,7 @@ func TestBlockerBreakerHalt_QuietOnHealthyBatch(t *testing.T) {
 	writeDigestFixture(t, evolveDir, 11, "audit|gate-block|aaa", "gate-block")
 	writeDigestFixture(t, evolveDir, 12, "audit|gate-block|bbb", "gate-block")
 
-	if _, halted := blockerBreakerHalt(evolveDir, root, 10, io.Discard); halted {
+	if _, halted := blockerBreakerHalt(evolveDir, root, 10, io.Discard, nil); halted {
 		t.Fatal("distinct honest task failures must not trip the breaker")
 	}
 }

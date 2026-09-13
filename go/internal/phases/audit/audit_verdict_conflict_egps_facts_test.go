@@ -20,7 +20,7 @@ import (
 //	(a) the auditor's own declared verdict, and
 //	(b) the gate's red identity facts (red_count and the normalized red_ids),
 //
-// both at Severity=="error", so both ride errorSeverityMessages →
+// both at Severity=="error", so both ride cyclestate.ErrorMessages →
 // AuditFailReasons → <phase>-fail-reason.json → the dossier's SubstantiveError.
 //
 // Scope note (the one ambiguity in the AC, resolved deliberately): the AC reads
@@ -37,7 +37,7 @@ import (
 // the regression this file exists to catch.
 
 // errorMessages returns every error-severity diagnostic message. Severity is
-// load-bearing, not cosmetic: errorSeverityMessages (core/system_failure.go)
+// load-bearing, not cosmetic: cyclestate.ErrorMessages (cyclestate/result.go)
 // keys off exactly this, so a warning-severity fact is a DROPPED fact.
 func errorMessages(diags []core.Diagnostic) []string {
 	var out []string

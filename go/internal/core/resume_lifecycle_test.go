@@ -8,6 +8,7 @@ import (
 	"errors"
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"os"
 	"path/filepath"
 	"strings"
@@ -175,9 +176,19 @@ func TestResumeLifecycle_QuotaExhaustionDefersWithoutTerminalDossier(t *testing.
 	o, st, req, rp := resumedLifecycleFixture(t)
 	o.retryConfig.RetryBackoffBaseS = 0
 	o.runners[PhaseAudit] = &fakeRunner{name: "audit", failErr: wrapTransient(85), failUntil: 99}
+	signals, got := recordingCenter()
+	WithSignalCenter(signals)(o)
 	result, err := o.RunCycleFromPhase(context.Background(), req, rp)
 	if !errors.Is(err, ErrAllFamiliesExhausted) {
 		t.Fatalf("quota pause not typed as resumable: %+v %v", result, err)
+	}
+	// ADR-0101 S2a: the resume root reaches the same quota.paused producer
+	// (pauseForQuota), and a pause never seals the cycle.
+	if paused := eventsOfKind(*got, signalcenter.KindQuotaPaused); len(paused) != 1 || paused[0].Phase != "audit" || paused[0].Origin != "cycleRun.pauseForQuota" {
+		t.Fatalf("the resume root emits exactly one quota.paused for the paused phase: %+v", paused)
+	}
+	if sealed := eventsOfKind(*got, signalcenter.KindCycleSealed); len(sealed) != 0 {
+		t.Fatalf("a pause is not a seal: %+v", sealed)
 	}
 	if st.cycleState.Phase == "aborted" || len(st.state.FailedAt) != 0 {
 		t.Fatalf("quota pause recorded terminal failure: %+v", st.cycleState)

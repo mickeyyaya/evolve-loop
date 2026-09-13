@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
@@ -37,7 +38,7 @@ func (b *loopBatchCoordinator) prepareIteration(
 		b.result.emit(b.stdout)
 		return batchDecision{flow: batchReturn, exitCode: 130}
 	}
-	if exitCode, halted := blockerBreakerHalt(b.cfg.EvolveDir, b.cfg.ProjectRoot, batchStartCycle, b.stderr); halted {
+	if exitCode, halted := blockerBreakerHalt(b.cfg.EvolveDir, b.cfg.ProjectRoot, batchStartCycle, b.stderr, b.deps.Signals); halted {
 		b.result.StopReason = "pipeline_blocker_halt"
 		b.result.emitFatal(b.stdout, b.stderr, b.cfg, 0)
 		return batchDecision{flow: batchReturn, exitCode: exitCode}
@@ -46,8 +47,8 @@ func (b *loopBatchCoordinator) prepareIteration(
 	runCLIHealthCanary(b.cfg.ProjectRoot, b.cycleEnv, defaultLiveProbe(b.cfg.ProjectRoot, b.stderr), b.stderr)
 	runUsageProbe(b.cfg.ProjectRoot, b.cfg.EvolveDir, b.cycleEnv, b.stderr)
 	if _, halt := syncMainFromOriginAtWaveBoundary(b.ctx, b.cfg.ProjectRoot, b.stderr); halt != nil {
-		fmt.Fprintf(b.stderr, "[loop] HALT: %v\n", halt)
 		b.result.StopReason = "plane_diverged_halt"
+		emitLoopHalt(b.deps.Signals, 0, "runWaveIteration", CodeLoopHalt, halt.Error(), map[string]string{"stop_reason": b.result.StopReason})
 		b.result.emitFatal(b.stdout, b.stderr, b.cfg, 0)
 		return batchDecision{flow: batchReturn, exitCode: 2}
 	}
@@ -102,7 +103,7 @@ func (b *loopBatchCoordinator) dispatchFleetIteration(
 			if decision := b.fleetHaltDecision("pool", iteration, results); decision.flow == batchReturn {
 				return decision
 			}
-			applyEscalationBoundary(b.cfg.EvolveDir, iteration, b.stderr)
+			applyEscalationBoundary(b.cfg.EvolveDir, iteration, b.stderr, b.deps.Signals)
 			return batchDecision{flow: batchNextIteration}
 		default:
 			fmt.Fprintf(b.stderr, "[loop] WARN: fleet: pool %d planned zero lanes (empty backlog), falling back to sequential\n", iteration)
@@ -128,6 +129,9 @@ func (b *loopBatchCoordinator) dispatchFleetIteration(
 		fmt.Fprintf(b.stderr, "[loop] WARN: fleet: wave %d dispatch failed, falling back to sequential: %v\n", iteration, err)
 	case ran:
 		fmt.Fprintf(b.stderr, "[loop] wave %d: %d/%d lanes ok\n", iteration, len(results)-failedLaneCount(results), len(results))
+		emitLoopWave(b.deps.Signals, iteration, "runWaveIteration", "",
+			fmt.Sprintf("wave %d: %d/%d lanes ok", iteration, len(results)-failedLaneCount(results), len(results)),
+			map[string]string{"lanes_ok": strconv.Itoa(len(results) - failedLaneCount(results)), "lanes": strconv.Itoa(len(results))})
 		if decision := b.fleetHaltDecision("wave", iteration, results); decision.flow == batchReturn {
 			return decision
 		}
@@ -144,7 +148,7 @@ func (b *loopBatchCoordinator) dispatchFleetIteration(
 				fmt.Fprintf(b.stderr, "[loop] fleet: work-supply starvation after %d waves — self-filed %s\n", fleetConfig.StarvationK, path)
 			}
 		}
-		applyEscalationBoundary(b.cfg.EvolveDir, iteration, b.stderr)
+		applyEscalationBoundary(b.cfg.EvolveDir, iteration, b.stderr, b.deps.Signals)
 		paceBeforeNextWave(b.ctx, pace, b.stderr)
 		return batchDecision{flow: batchNextIteration}
 	default:
@@ -159,6 +163,7 @@ func (b *loopBatchCoordinator) dispatchFleetIteration(
 			consoleRoutedResolver(b.cfg.ProjectRoot, b.stderr),
 			iteration,
 			b.stderr,
+			b.deps.Signals,
 		) {
 			return batchDecision{flow: batchNextIteration}
 		}
@@ -171,7 +176,9 @@ func (b *loopBatchCoordinator) fleetHaltDecision(kind string, iteration int, res
 	if !halt {
 		return batchDecision{flow: batchProceed}
 	}
-	fmt.Fprintf(b.stderr, "[loop] SYSTEM-FAILURE HALT: a fleet lane in %s %d exited with the ADR-0072 halt code (rc=%d) — the lane already filed .evolve/pipeline-escalation.json + a P0 pipeline-repair inbox item. Stopping the batch; diagnose the pipeline (not the task) before resuming with evolve loop --resume.\n", kind, iteration, systemFailureHaltExitCode)
+	emitLoopHalt(b.deps.Signals, 0, "loopBatchCoordinator.fleetHaltDecision", CodeLoopFleetLaneHalt,
+		fmt.Sprintf("a fleet lane in %s %d exited with the ADR-0072 halt code (rc=%d); the lane's own %s names the failure and the escalation it filed; stopping the batch", kind, iteration, systemFailureHaltExitCode, CodeLoopSystemFailureHalt),
+		map[string]string{"kind": kind, "iteration": strconv.Itoa(iteration), "rc": strconv.Itoa(systemFailureHaltExitCode)})
 	b.result.StopReason = stopReason
 	b.result.emitFatal(b.stdout, b.stderr, b.cfg, 0)
 	return batchDecision{flow: batchReturn, exitCode: exitCode}

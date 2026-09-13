@@ -19,7 +19,7 @@ func paneProfileFor(lp tmuxLaunch) panestream.PaneProfile {
 		p = panestream.PaneProfile{Name: cli, BoundaryMarker: lp.promptMarker}
 	}
 	// Project the manifest's quota/rate-limit pattern into the profile
-	// (single-source, ADR-0047): the SignalCenter's ExhaustionProbe reads
+	// (single-source, ADR-0047): the LivenessCenter's ExhaustionProbe reads
 	// ExhaustedRegex to detect a mid-phase wall through the SAME abstraction as
 	// liveness. manifestExhaustedPattern is the one maintained source ("what a
 	// wall looks like") shared with the usage probe (usageclassify.go), so the

@@ -20,7 +20,10 @@ import (
 
 // cancelOnRunOrch cancels the loop's (seam-injected) context on the first
 // RunCycle — simulating a signal landing mid-cycle — then returns ctx.Err().
-type cancelOnRunOrch struct{ cancel context.CancelFunc }
+type cancelOnRunOrch struct {
+	noSignals
+	cancel context.CancelFunc
+}
 
 func (o *cancelOnRunOrch) RunCycle(ctx context.Context, _ core.CycleRequest) (core.CycleResult, error) {
 	o.cancel()

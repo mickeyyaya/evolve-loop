@@ -230,7 +230,7 @@ func TestRunLoop_InvokesBootRecoveryBeforeGate(t *testing.T) {
 
 	prevDeps := wireOrchestratorDepsFn
 	defer func() { wireOrchestratorDepsFn = prevDeps }()
-	wireOrchestratorDepsFn = func(string, string) orchDeps {
+	wireOrchestratorDepsFn = func(string, string, io.Writer) orchDeps {
 		return orchDeps{Storage: &fixtures.FakeStorage{}, Ledger: newFakeLedger()}
 	}
 	prevPf := runLoopPreflightFn

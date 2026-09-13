@@ -6,7 +6,6 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclebudget"
-	"github.com/mickeyyaya/evolve-loop/go/internal/cycleoutcome"
 )
 
 func (b *loopBatchCoordinator) completeSequentialCycle(iteration int, cycle sequentialCycle, state *sequentialBatchState) batchDecision {
@@ -14,11 +13,7 @@ func (b *loopBatchCoordinator) completeSequentialCycle(iteration int, cycle sequ
 	var stop bool
 	state.consecutiveFails, stop = consecutiveFailBreaker(failed, state.consecutiveFails, state.maxConsecutiveFails)
 	if failed {
-		if _, err := cycleoutcome.ApplyFailure(cycleoutcome.FailureInputsFor(
-			b.cfg.ProjectRoot, b.cfg.EvolveDir, cycle.workspace, cycle.cycle, b.stderr,
-		)); err != nil {
-			fmt.Fprintf(b.stderr, "[loop] WARN: could not apply cycle %d failure outcome to the inbox: %v\n", cycle.cycle, err)
-		}
+		b.applyCycleFailureOutcome(cycle.cycle)
 	}
 	if stop {
 		b.result.StopReason = "fail"
@@ -39,7 +34,7 @@ func (b *loopBatchCoordinator) completeSequentialCycle(iteration int, cycle sequ
 	if escalation := state.nonprogress.observe(nonShippingOutcome(cycle.result.FinalVerdict), cycle.result.FinalVerdict, state.stallCfg.nonprogressThreshold); escalation != nil {
 		handleGoalStall(nonprogressKind, b.cfg.EvolveDir, b.cfg.GoalHash, cycle.workspace, cycle.cycle, escalation, state.stallCfg.nonprogressThreshold, state.stallCfg.weight, b.stderr)
 	}
-	applyEscalationBoundary(b.cfg.EvolveDir, cycle.cycle, b.stderr)
+	applyEscalationBoundary(b.cfg.EvolveDir, cycle.cycle, b.stderr, b.deps.Signals)
 
 	if state.budgetStage == cyclebudget.Off || b.cfg.MaxCyclesExplicit || failed {
 		return batchDecision{flow: batchNextIteration}
@@ -58,4 +53,16 @@ func (b *loopBatchCoordinator) completeSequentialCycle(iteration int, cycle sequ
 	fmt.Fprintf(b.stderr, "[loop] cycle-budget: stopping (%s) after cycle %d (backlog=%d)\n", decision.Reason, cycle.cycle, backlog)
 	b.result.StopReason = decision.Reason
 	return batchDecision{flow: batchStopIterations}
+}
+
+// applyCycleFailureOutcome is the loop's voice for the shared failed-cycle
+// inbox walk (applyCycleFailureOutcome in cmd_cycle.go — the ONE call every
+// root makes): best-effort, a lifecycle hiccup WARNs but never changes the
+// batch's flow. The walk appends its lifecycle lines through the root's
+// ledger (deps.Ledger) so the Signal Center observes them like every other
+// entry (ADR-0101 S4a).
+func (b *loopBatchCoordinator) applyCycleFailureOutcome(cycle int) {
+	if err := applyCycleFailureOutcome(b.cfg.ProjectRoot, b.cfg.EvolveDir, cycle, b.stderr, b.deps.Ledger); err != nil {
+		fmt.Fprintf(b.stderr, "[loop] WARN: could not apply cycle %d failure outcome to the inbox: %v\n", cycle, err)
+	}
 }

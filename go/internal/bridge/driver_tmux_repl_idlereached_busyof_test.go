@@ -5,8 +5,8 @@ package bridge
 // idle_reached correlation-span bracket (driver_tmux_repl.go:587) is the
 // second surviving direct panestream.PaneBusy consumer the S4 charter
 // targeted (scout finding F2). It must route through
-// panestream.SignalCenter.BusyOf instead of calling panestream.PaneBusy
-// inline, so the SignalCenter remains the sole liveness facade (ADR-0068).
+// panestream.LivenessCenter.BusyOf instead of calling panestream.PaneBusy
+// inline, so the LivenessCenter remains the sole liveness facade (ADR-0068).
 //
 // AC2 (the bracket fires idle_reached exactly once on a real busy→idle
 // transition) is already pinned end-to-end against real captured claude
@@ -68,6 +68,6 @@ func idleReachedBracketRegionSource(t *testing.T) string {
 func TestRunTmuxREPL_NoDirectChromeParseAtIdleReachedBracket(t *testing.T) {
 	region := idleReachedBracketRegionSource(t)
 	if strings.Contains(region, "panestream.PaneBusy(") {
-		t.Error("idle_reached bracket still calls panestream.PaneBusy( directly — must read it via panestream.SignalCenter.BusyOf instead")
+		t.Error("idle_reached bracket still calls panestream.PaneBusy( directly — must read it via panestream.LivenessCenter.BusyOf instead")
 	}
 }
