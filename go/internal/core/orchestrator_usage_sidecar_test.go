@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/core/outcome"
 )
 
 func TestOrchestrator_WritesPhaseUsageSidecar(t *testing.T) {
@@ -32,7 +34,7 @@ func TestOrchestrator_WritesPhaseUsageSidecar(t *testing.T) {
 			t.Fatalf("%s sidecar must be written: %v", path, rerr)
 		}
 
-		var sidecar phaseUsageSidecar
+		var sidecar outcome.UsageSidecar
 		if err := json.Unmarshal(data, &sidecar); err != nil {
 			t.Fatalf("%s sidecar must be valid JSON: %v", path, err)
 		}

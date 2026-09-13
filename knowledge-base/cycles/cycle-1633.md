@@ -1,34 +1,30 @@
 # Cycle 1633 Dossier
 
-**Goal:** Pipeline-health verification batch (2026-09-12, two waves): work the highest-weight queued inbox items end-to-end — claim, tdd, build, audit, ship — with full phase integrity, now that the resume worktree teardown (#571), the shipDirect audit binding (#569), resume-path outcome recording (#568), and profile sandbox.write_subpaths grants (#572) are on main. Every cycle must commit to a claimed inbox item (an empty top_n must not run the spine), bind its audit to the changes tree it ships, record a terminal outcome on every exit, and leave no stale worktree behind. Pipeline-integrity and pipeline-repair items come first; ADR-0099 document deliverables are eligible.
+**Goal:** 427dc8c4379cf0b01235f6d60a7c993d5fc4f29dbe9c5d5274689e85c0c27164
 **Final verdict:** FAIL
-**Run ID:** 01M2AXJ3YZ8FK7XFHKF6T8GKK1
-**Committed:** `overlay-family-name-transport-ambiguity`, `triage-unified-solution-synthesis`
+**Run ID:** 01M2CCJACEP2MHZC07NPW14180
+**Committed:** `c1`
 
 ## Phases
 
 | Phase | Archetype | Verdict | Duration | Key Findings |
 |-------|-----------|---------|----------|--------------|
-| scout | plan | PASS | 3m52s |  |
-| triage | plan | PASS | 1m53s |  |
-| fault-localization | plan | PASS | 4m4s |  |
-| bug-reproduction | evaluate | PASS | 4m55s |  |
-| tdd | plan | PASS | 10m40s |  |
-| build | build | PASS | 25m47s |  |
-| error-handling-scan | evaluate | PASS | 1m47s |  |
-| audit | evaluate | FAIL | 20m3s |  |
-| retro | control | PASS | 6m55s |  |
+| scout | plan | PASS |  |  |
+| triage | plan | PASS |  |  |
+| tdd | plan | PASS |  |  |
+| build-planner | plan | PASS |  |  |
+| build | build | PASS |  |  |
+| retro | control | PASS |  |  |
 
 ## Timing
 
-**Total:** 1h19m58s across 9 phases (0 retried) · **Longest:** build 25m47s
+**Total:** 0s across 6 phases (0 retried) · **Longest:**  0s
 
 | Archetype | Wall-clock |
 |-----------|------------|
-| build | 25m47s |
-| control | 6m55s |
-| evaluate | 26m45s |
-| plan | 20m30s |
+| build | 0s |
+| control | 0s |
+| plan | 0s |
 
 ## Defects
 
@@ -37,10 +33,9 @@
 
 ## Failure
 
-**Fingerprint:** `audit|verdict-fail|68826e3ad25e` · **Class:** verdict-fail
+**Fingerprint:** `build|gate-block|a1859e957104` · **Class:** gate-block
 
-- explanation review Evidence must cite skills/plan-review/SKILL.md with path:line evidence
-- verdict-conflict: auditor narrative=PASS but 1 deterministic gate(s) forced FAIL [explanation documentation qualitative review] — the gate outranks the narrative (ship policy unchanged); both readin
+- review gate: phase "build" deliverable rejected after 2 correction(s): build handoff floor: 1 deterministic check failure(s) — fix these exactly before handoff: Explanation Documentation: build-repo
 
 
 ## Carryover
