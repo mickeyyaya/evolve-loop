@@ -362,13 +362,13 @@ func TestResumeCursorTriageTerminationOverridesScheduledSuccessor(t *testing.T) 
 	o := &Orchestrator{sm: NewStateMachine()}
 	cursor := newResumeCursor(PhaseTriage)
 	cs := CycleState{WorkspacePath: ws, CompletedPhases: []string{"scout", "triage"}}
-	if next, err := cursor.next(o, cs); err != nil || next != PhaseTriage {
+	if next, err := cursor.next(o, cs, ""); err != nil || next != PhaseTriage {
 		t.Fatalf("first next = (%s, %v), want triage", next, err)
 	}
 	cursor.advance(PhaseTriage, VerdictPASS)
 	cursor.schedule(PhaseTDD)
 
-	next, err := cursor.next(o, cs)
+	next, err := cursor.next(o, cs, "")
 	if err != nil {
 		t.Fatalf("terminal next: %v", err)
 	}

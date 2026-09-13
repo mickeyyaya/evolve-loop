@@ -48,8 +48,10 @@ func TestDossier_RetroThatRanIsNotRecordedAsSkipped(t *testing.T) {
 	initDossierRepo(t, root)
 	ws := t.TempDir()
 	writeFailureArtifacts(t, ws, []string{"audit FAIL: two defects"})
-	if err := writeCycleDossier(nil, root, ws, 41, "fix the mislabel", "run41", r.FinalVerdict,
-		r.SkippedPhases, r.VerdictsNotAdopted, r.SpineFailOpens, nil); err != nil {
+	if err := writeCycleDossier(nil, cycleDossierParams{
+		ProjectRoot: root, WorkspacePath: ws, Cycle: 41, Goal: "fix the mislabel", RunID: "run41", Outcome: r.FinalVerdict,
+		SkippedPhases: r.SkippedPhases, VerdictsNotAdopted: r.VerdictsNotAdopted, SpineFailOpens: r.SpineFailOpens,
+	}); err != nil {
 		t.Fatalf("writeCycleDossier: %v", err)
 	}
 	m, _ := readDossierPair(t, root, 41)
@@ -79,8 +81,10 @@ func TestDossier_AbnormalExitStillRecordsATrueSkip(t *testing.T) {
 	initDossierRepo(t, root)
 	skipped := []SkippedPhase{{Phase: "closeout", Reason: "abnormal exit in phase build"}}
 
-	if err := writeCycleDossier(nil, root, t.TempDir(), 42, "died mid-build", "run42", VerdictFAIL,
-		skipped, nil, nil, nil); err != nil {
+	if err := writeCycleDossier(nil, cycleDossierParams{
+		ProjectRoot: root, WorkspacePath: t.TempDir(), Cycle: 42, Goal: "died mid-build", RunID: "run42", Outcome: VerdictFAIL,
+		SkippedPhases: skipped,
+	}); err != nil {
 		t.Fatalf("writeCycleDossier: %v", err)
 	}
 	m, _ := readDossierPair(t, root, 42)

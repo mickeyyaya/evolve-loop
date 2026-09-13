@@ -1,4 +1,4 @@
-// Package cyclehealth performs a 12-signal integrity check on a
+// Package cyclehealth performs a 13-signal integrity check on a
 // completed cycle's workspace and writes the findings to
 // <workspace>/cycle-health.json. The orchestrator and Scout read the
 // file before the next phase; any ANOMALY in a non-WARN-only signal
@@ -19,6 +19,7 @@
 // 10. duplicate_ledger     — no two ledger entries with same SHA
 // 11. phase_latency        — per-phase execution time stays within policy
 // 12. self_heal_events     — anomalous self-heal retries / backfills in cycle
+// 13. dossier_commitment   — empty commitment never ran implementation phases
 //
 // v12.1 Phase 2A port. CLI: `evolve cycle-health <cycle-N> <workspace>`.
 package cyclehealth
@@ -33,6 +34,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
@@ -106,6 +108,7 @@ func Check(opts Options) (Report, error) {
 		checkCanaryFiles,
 		checkPhaseLatency,
 		checkSelfHealEvents,
+		checkDossierCommitment,
 	}
 	for _, sc := range signals {
 		report.Anomalies = append(report.Anomalies, sc(opts)...)
@@ -143,7 +146,37 @@ func signalNames() []string {
 		"canary_files",
 		"phase_latency",
 		"self_heal_events",
+		"dossier_commitment",
 	}
+}
+
+func checkDossierCommitment(opts Options) []Anomaly {
+	projectRoot := filepath.Dir(filepath.Dir(filepath.Dir(opts.Workspace)))
+	raw, err := os.ReadFile(filepath.Join(dossier.CyclesDir(projectRoot), fmt.Sprintf("cycle-%d.json", opts.Cycle)))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return []Anomaly{{Signal: "dossier_commitment", Severity: SeverityFatal, Message: "read dossier: " + err.Error()}}
+	}
+	d, err := dossier.ParseJSON(raw)
+	if err != nil {
+		return []Anomaly{{Signal: "dossier_commitment", Severity: SeverityFatal, Message: err.Error()}}
+	}
+	if d.Tasks == nil || len(*d.Tasks) != 0 {
+		return nil
+	}
+	for _, phase := range d.Phases {
+		switch phase.Name {
+		case "tdd", "build", "audit", "ship":
+			return []Anomaly{{
+				Signal:   "dossier_commitment",
+				Severity: SeverityFatal,
+				Message:  fmt.Sprintf("empty triage commitment recorded implementation phase %s", phase.Name),
+			}}
+		}
+	}
+	return nil
 }
 
 // --- Signal implementations (kept small; each does one thing) ---

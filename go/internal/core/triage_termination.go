@@ -1,6 +1,13 @@
 package core
 
-import "github.com/mickeyyaya/evolve-loop/go/internal/router"
+import (
+	"path/filepath"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
+	"github.com/mickeyyaya/evolve-loop/go/internal/router"
+)
+
+const cycleTerminationTriageClaimFailed = "triage-empty-commitment-claimable-work"
 
 // triageTermination is the host's terminal decision after Triage. Phase
 // artifacts supply evidence through router.Digest; the host combines that
@@ -20,16 +27,28 @@ func decideTriageTermination(verdict string, signals router.RoutingSignals) tria
 	return triageTermination{}
 }
 
-func (o *Orchestrator) triageTermination(workspace string, completed []string, verdict string) triageTermination {
+func (o *Orchestrator) triageTermination(projectRoot, workspace string, completed []string, verdict string) triageTermination {
 	signals, err := router.Digest(workspace, completed)
 	if err != nil {
 		return decideTriageTermination(verdict, router.RoutingSignals{})
 	}
 	decision := decideTriageTermination(verdict, signals)
+	if decision.reason == CycleTerminationTriageNoWork && hasClaimableInboxWork(projectRoot) {
+		decision.reason = cycleTerminationTriageClaimFailed
+	}
 	if decision.reason != "" && o.floorAlreadyCompleted(completed) {
 		decision.reason = ""
 	}
 	return decision
+}
+
+func hasClaimableInboxWork(projectRoot string) bool {
+	items, warnings, err := inboxbatch.LoadDir(filepath.Join(projectRoot, ".evolve", "inbox"))
+	if err != nil || len(warnings) != 0 {
+		return true
+	}
+	dispatchable, _, _ := inboxbatch.PartitionConsole(items, nil)
+	return len(dispatchable) != 0
 }
 
 func phasesEndAtTriageWithoutImplementation(phases []Phase) bool {

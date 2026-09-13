@@ -63,10 +63,10 @@ func (cr *cycleRun) selectNext() (Phase, loopAction, error) {
 	}
 
 	// Triage is a host authorization boundary in every routing rollout stage.
-	// A failed contract stops as FAIL. A successful explicit empty commitment
-	// stops as planned no-work; closeout applies that distinct disposition.
+	// A failed contract stops as FAIL. An explicit empty commitment stops too;
+	// closeout distinguishes legitimate no-work from unclaimed inbox work.
 	if cr.current == PhaseTriage {
-		terminal := cr.o.triageTermination(cr.cs.WorkspacePath, cr.cs.CompletedPhases, cr.lastVerdict)
+		terminal := cr.o.triageTermination(cr.req.ProjectRoot, cr.cs.WorkspacePath, cr.cs.CompletedPhases, cr.lastVerdict)
 		if terminal.stop {
 			cr.result.TerminationReason = terminal.reason
 			return PhaseEnd, loopBreak, nil

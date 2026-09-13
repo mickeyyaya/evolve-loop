@@ -62,7 +62,7 @@ func TestWriteCycleDossier_AcquiresGitMutationLock(t *testing.T) {
 	initDossierRepo(t, root)
 	spy := &mutexSpyLocker{}
 
-	if err := writeCycleDossier(spy.acquire, root, t.TempDir(), 11, "wire the lock", "run", CycleOutcomeShippedViaBuild, nil, nil, nil, nil); err != nil {
+	if err := writeCycleDossier(spy.acquire, cycleDossierParams{ProjectRoot: root, WorkspacePath: t.TempDir(), Cycle: 11, Goal: "wire the lock", RunID: "run", Outcome: CycleOutcomeShippedViaBuild}); err != nil {
 		t.Fatalf("writeCycleDossier: %v", err)
 	}
 	if got := atomic.LoadInt32(&spy.acquired); got != 1 {
@@ -89,7 +89,7 @@ func TestWriteCycleDossier_ConcurrentLanesEachAcquireAndRelease(t *testing.T) {
 		wg.Add(1)
 		go func(i int, root string) {
 			defer wg.Done()
-			errs[i] = writeCycleDossier(spy.acquire, root, t.TempDir(), 100+i, "lane", "run", CycleOutcomeShippedViaBuild, nil, nil, nil, nil)
+			errs[i] = writeCycleDossier(spy.acquire, cycleDossierParams{ProjectRoot: root, WorkspacePath: t.TempDir(), Cycle: 100 + i, Goal: "lane", RunID: "run", Outcome: CycleOutcomeShippedViaBuild})
 		}(i, root)
 	}
 	wg.Wait()
@@ -116,7 +116,7 @@ func TestWriteCycleDossier_LockError_FailsOpen(t *testing.T) {
 	initDossierRepo(t, root)
 	spy := &mutexSpyLocker{failErr: errors.New("flock unavailable")}
 
-	if err := writeCycleDossier(spy.acquire, root, t.TempDir(), 12, "fail open", "run", CycleOutcomeShippedViaBuild, nil, nil, nil, nil); err != nil {
+	if err := writeCycleDossier(spy.acquire, cycleDossierParams{ProjectRoot: root, WorkspacePath: t.TempDir(), Cycle: 12, Goal: "fail open", RunID: "run", Outcome: CycleOutcomeShippedViaBuild}); err != nil {
 		t.Fatalf("a lock error must fail-open, not fail the dossier write: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(root, "knowledge-base", "cycles", "cycle-12.json")); err != nil {
@@ -171,7 +171,7 @@ func TestWriteCycleDossier_ConcurrentRealRepo_BothLand(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			errs[i] = writeCycleDossier(defaultGitMutationLock, root, t.TempDir(), 200+i, "concurrent", "run", CycleOutcomeShippedViaBuild, nil, nil, nil, nil)
+			errs[i] = writeCycleDossier(defaultGitMutationLock, cycleDossierParams{ProjectRoot: root, WorkspacePath: t.TempDir(), Cycle: 200 + i, Goal: "concurrent", RunID: "run", Outcome: CycleOutcomeShippedViaBuild})
 		}(i)
 	}
 	wg.Wait()

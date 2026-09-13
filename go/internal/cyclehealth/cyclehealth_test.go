@@ -363,23 +363,22 @@ func TestCheck_OverallFatal_TrueOnAnyFatal(t *testing.T) {
 	}
 }
 
-// TestSignalNames_ReturnsTwelve — the public contract settled at "12
-// signals" after cost_envelope was removed with the token-budget cost
-// gates; guard against accidental removal and confirm self_heal_events
-// is still named.
-func TestSignalNames_ReturnsTwelve(t *testing.T) {
+// TestSignalNames_ReturnsThirteen guards against accidental signal removal.
+func TestSignalNames_ReturnsThirteen(t *testing.T) {
 	names := signalNames()
-	if len(names) != 12 {
-		t.Errorf("signalNames len=%d, want 12; got %v", len(names), names)
+	if len(names) != 13 {
+		t.Errorf("signalNames len=%d, want 13; got %v", len(names), names)
 	}
-	found := false
-	for _, n := range names {
-		if n == "self_heal_events" {
-			found = true
+	for _, want := range []string{"self_heal_events", "dossier_commitment"} {
+		found := false
+		for _, n := range names {
+			if n == want {
+				found = true
+			}
 		}
-	}
-	if !found {
-		t.Errorf("signalNames missing self_heal_events; got %v", names)
+		if !found {
+			t.Errorf("signalNames missing %s; got %v", want, names)
+		}
 	}
 }
 
@@ -681,22 +680,20 @@ func TestLoadLedger_Missing_NoFile(t *testing.T) {
 	}
 }
 
-// TestCheck_RunsTwelveSignals pins the signal roster to 12. The roster grew
-// from 11 to 13 over cycles 180/186; the cost_envelope signal was removed with
-// the token-budget cost gates, leaving 12. This behavioral test ties the count
-// in the package comment to reality: SignalsRun must list exactly 12 names,
-// including phase_latency and self_heal_events, and must NOT include the
+// TestCheck_RunsThirteenSignals pins the signal roster to 13. This behavioral
+// test ties the count in the package comment to reality: SignalsRun must list
+// all current names, including dossier_commitment, and must NOT include the
 // removed cost_envelope signal.
-func TestCheck_RunsTwelveSignals(t *testing.T) {
+func TestCheck_RunsThirteenSignals(t *testing.T) {
 	ws := freshWorkspace(t, 1)
 	r, err := Check(Options{Cycle: 1, Workspace: ws, NowFn: func() time.Time { return time.Unix(2000, 0) }})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(r.SignalsRun) != 12 {
-		t.Errorf("SignalsRun has %d entries, want 12: %v", len(r.SignalsRun), r.SignalsRun)
+	if len(r.SignalsRun) != 13 {
+		t.Errorf("SignalsRun has %d entries, want 13: %v", len(r.SignalsRun), r.SignalsRun)
 	}
-	for _, want := range []string{"phase_latency", "self_heal_events"} {
+	for _, want := range []string{"phase_latency", "self_heal_events", "dossier_commitment"} {
 		found := false
 		for _, s := range r.SignalsRun {
 			if s == want {

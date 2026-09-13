@@ -103,7 +103,7 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 		maxIterations = defaultMaxPhaseIterations
 	}
 	for safety := 0; safety < maxIterations; safety++ {
-		next, err := cursor.next(o, cs)
+		next, err := cursor.next(o, cs, req.ProjectRoot)
 		if err != nil {
 			return result, fmt.Errorf("transition from %s: %w", cursor.current, err)
 		}

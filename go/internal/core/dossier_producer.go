@@ -28,6 +28,19 @@ import (
 // deterministic spy. release is called exactly once, after the mutation.
 type gitMutationLocker func(projectRoot string) (release func(), err error)
 
+type cycleDossierParams struct {
+	ProjectRoot        string
+	WorkspacePath      string
+	Cycle              int
+	Goal               string
+	RunID              string
+	Outcome            string
+	SkippedPhases      []SkippedPhase
+	VerdictsNotAdopted []VerdictNotAdopted
+	SpineFailOpens     []SpineFailOpen
+	PhaseTimings       []phaseTimingEntry
+}
+
 // defaultGitMutationLock is the production locker: a blocking cross-process flock
 // on the SHARED integrator lock (flock.ShipLockPath → <projectRoot>/.evolve/ship.lock,
 // the SAME file internal/phases/ship acquireShipLock takes), so a lane's dossier
@@ -63,26 +76,26 @@ func dossierVerdict(outcome string) string {
 // skipped = phases that did not run (with the cause), notAdopted = phases that RAN
 // whose verdict the floor guard declined (dossier-retro-skipped-mislabel). Returns
 // an error the best-effort caller logs; it never panics.
-func writeCycleDossier(lock gitMutationLocker, projectRoot, workspacePath string, cycle int, goal, runID, outcome string, skipped []SkippedPhase, notAdopted []VerdictNotAdopted, spineFailOpens []SpineFailOpen, phaseTimings []phaseTimingEntry) error {
-	d, err := dossier.Build(cycle, dossier.BuildOpts{
-		WorkspacePath:      workspacePath,
-		Goal:               goal,
-		RunID:              runID,
-		FinalVerdict:       dossierVerdict(outcome),
-		SkippedPhases:      skipped,
-		VerdictsNotAdopted: notAdopted,
-		SpineFailOpens:     spineFailOpens,
+func writeCycleDossier(lock gitMutationLocker, p cycleDossierParams) error {
+	d, err := dossier.Build(p.Cycle, dossier.BuildOpts{
+		WorkspacePath:      p.WorkspacePath,
+		Goal:               p.Goal,
+		RunID:              p.RunID,
+		FinalVerdict:       dossierVerdict(p.Outcome),
+		SkippedPhases:      p.SkippedPhases,
+		VerdictsNotAdopted: p.VerdictsNotAdopted,
+		SpineFailOpens:     p.SpineFailOpens,
 		// The LIVE per-phase evidence. phase-timing.json is written by a
 		// DEFERRED call in RunCycle and lands AFTER this producer runs, so a
 		// dossier that read only the file recorded no phases on the normal
 		// path (cycle-1623). Passing what we already hold removes the ordering
 		// dependency entirely.
-		PhaseTimings: phaseTimings,
+		PhaseTimings: p.PhaseTimings,
 	})
 	if err != nil {
 		return fmt.Errorf("build dossier: %w", err)
 	}
-	dir := dossier.CyclesDir(projectRoot)
+	dir := dossier.CyclesDir(p.ProjectRoot)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("dossier dir: %w", err)
 	}
@@ -97,7 +110,7 @@ func writeCycleDossier(lock gitMutationLocker, projectRoot, workspacePath string
 	// dossier via the caller's non-fatal WARN. A rare lost closeout record beats
 	// failing the cycle.
 	if lock != nil {
-		if release, lerr := lock(projectRoot); lerr != nil {
+		if release, lerr := lock(p.ProjectRoot); lerr != nil {
 			fmt.Fprintf(os.Stderr, "[orchestrator] WARN dossier git-mutation lock: %v (proceeding unserialized; a concurrent index collision would skip this dossier)\n", lerr)
 		} else {
 			defer release()

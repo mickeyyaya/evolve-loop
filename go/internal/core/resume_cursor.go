@@ -16,13 +16,13 @@ func newResumeCursor(start Phase) resumeCursor {
 	return resumeCursor{current: start, lastVerdict: VerdictPASS, first: true}
 }
 
-func (c *resumeCursor) next(o *Orchestrator, cs CycleState) (Phase, error) {
+func (c *resumeCursor) next(o *Orchestrator, cs CycleState, projectRoot string) (Phase, error) {
 	if c.first {
 		c.first = false
 		return c.current, nil
 	}
 	if c.current == PhaseTriage {
-		c.termination = o.triageTermination(cs.WorkspacePath, cs.CompletedPhases, c.lastVerdict)
+		c.termination = o.triageTermination(projectRoot, cs.WorkspacePath, cs.CompletedPhases, c.lastVerdict)
 		if c.termination.stop {
 			return PhaseEnd, nil
 		}

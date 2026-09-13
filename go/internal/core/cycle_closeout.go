@@ -35,7 +35,18 @@ func (cr *cycleRun) completeCycle() error {
 	if dossierGoal == "" {
 		dossierGoal = cr.req.GoalHash
 	}
-	if derr := writeCycleDossier(cr.o.gitMutationLock, cr.req.ProjectRoot, cr.cs.WorkspacePath, cr.cycle, dossierGoal, cr.cs.RunID, cr.result.FinalVerdict, cr.result.SkippedPhases, cr.result.VerdictsNotAdopted, cr.result.SpineFailOpens, cr.flushPhaseTimings()); derr != nil {
+	if derr := writeCycleDossier(cr.o.gitMutationLock, cycleDossierParams{
+		ProjectRoot:        cr.req.ProjectRoot,
+		WorkspacePath:      cr.cs.WorkspacePath,
+		Cycle:              cr.cycle,
+		Goal:               dossierGoal,
+		RunID:              cr.cs.RunID,
+		Outcome:            cr.result.FinalVerdict,
+		SkippedPhases:      cr.result.SkippedPhases,
+		VerdictsNotAdopted: cr.result.VerdictsNotAdopted,
+		SpineFailOpens:     cr.result.SpineFailOpens,
+		PhaseTimings:       cr.flushPhaseTimings(),
+	}); derr != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d: closeout dossier not written (non-fatal): %v\n", cr.cycle, derr)
 	}
 	return nil
@@ -45,6 +56,13 @@ func (cr *cycleRun) completeCycle() error {
 // The terminal selector owns authorization; closeout only validates that no
 // later phase or earlier implementation floor contradicts it.
 func (cr *cycleRun) recordPlannedNoWorkOutcome() {
+	if cr.result.TerminationReason == cycleTerminationTriageClaimFailed &&
+		cr.current == PhaseTriage &&
+		!cr.o.floorAlreadyCompleted(cr.cs.CompletedPhases) &&
+		phasesEndAtTriageWithoutImplementation(cr.result.PhasesRun) {
+		cr.result.FinalVerdict = VerdictFAIL
+		return
+	}
 	if cr.result.TerminationReason != CycleTerminationTriageNoWork ||
 		cr.current != PhaseTriage ||
 		cr.o.floorAlreadyCompleted(cr.cs.CompletedPhases) ||

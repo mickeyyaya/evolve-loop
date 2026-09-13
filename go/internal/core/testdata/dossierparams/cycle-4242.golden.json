@@ -1,0 +1,115 @@
+{
+  "cycle": 4242,
+  "run_id": "01JFIXEDRUNIDFORGOLDEN00",
+  "goal": "fixed goal text for the byte-equivalence pin",
+  "final_verdict": "FAIL",
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 1500,
+      "started_at": "2026-09-13T10:00:00Z",
+      "ended_at": "2026-09-13T10:00:01.5Z",
+      "model_source": "profile",
+      "resolved_model": "gpt-5.6-terra",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 800,
+      "started_at": "2026-09-13T10:00:02Z",
+      "ended_at": "2026-09-13T10:00:02.8Z",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "FAIL",
+      "duration_ms": 42000,
+      "started_at": "2026-09-13T10:00:03Z",
+      "ended_at": "2026-09-13T10:00:45Z",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 4242",
+      "priority": "high"
+    }
+  ],
+  "skipped_phases": [
+    {
+      "phase": "closeout",
+      "reason": "abnormal exit in phase build"
+    }
+  ],
+  "phases_run_verdict_not_adopted": [
+    {
+      "phase": "retro",
+      "verdict": "FAIL"
+    }
+  ],
+  "spine_fail_opens": [
+    {
+      "phase": "tdd",
+      "missing_artifact": "handoff-scout.json",
+      "reason": "would-block at enforce"
+    }
+  ],
+  "timing": {
+    "total_ms": 44300,
+    "phase_count": 3,
+    "retried_count": 1,
+    "longest_phase": "build",
+    "longest_ms": 42000,
+    "by_archetype_ms": {
+      "unknown": 44300
+    },
+    "total_tokens": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "tokens_by_archetype": {
+      "unknown": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    "wasted_tokens": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "cache_hit_ratio": 0,
+    "hot_phase_count": 0
+  }
+}
