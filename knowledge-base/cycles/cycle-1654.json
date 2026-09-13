@@ -1,0 +1,93 @@
+{
+  "cycle": 1654,
+  "run_id": "01M2D8PYF6C5EC50B7191F1AFM",
+  "goal": "Pipeline-health verification batch (2026-09-12, two waves): work the highest-weight queued inbox items end-to-end — claim, tdd, build, audit, ship — with full phase integrity, now that the resume worktree teardown (#571), the shipDirect audit binding (#569), resume-path outcome recording (#568), and profile sandbox.write_subpaths grants (#572) are on main. Every cycle must commit to a claimed inbox item (an empty top_n must not run the spine), bind its audit to the changes tree it ships, record a terminal outcome on every exit, and leave no stale worktree behind. Pipeline-integrity and pipeline-repair items come first; ADR-0099 document deliverables are eligible.",
+  "final_verdict": "FAIL",
+  "tasks": [
+    "tokenopt-handoff-digests-per-edge-remainder"
+  ],
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 129219,
+      "started_at": "2026-09-13T11:34:35Z",
+      "ended_at": "2026-09-13T11:36:45Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 18,
+        "output": 9154,
+        "cache_read": 542675,
+        "cache_write": 74695
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "FAIL",
+      "duration_ms": 115684,
+      "started_at": "2026-09-13T11:37:13Z",
+      "ended_at": "2026-09-13T11:39:09Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 1654",
+      "priority": "high"
+    }
+  ],
+  "timing": {
+    "total_ms": 244903,
+    "phase_count": 2,
+    "retried_count": 0,
+    "longest_phase": "scout",
+    "longest_ms": 129219,
+    "by_archetype_ms": {
+      "plan": 244903
+    },
+    "total_tokens": {
+      "input": 18,
+      "output": 9154,
+      "cache_read": 542675,
+      "cache_write": 74695
+    },
+    "tokens_by_archetype": {
+      "plan": {
+        "input": 18,
+        "output": 9154,
+        "cache_read": 542675,
+        "cache_write": 74695
+      }
+    },
+    "wasted_tokens": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "cache_hit_ratio": 0.9999668320763304,
+    "hot_phase_count": 1,
+    "hot_phases": [
+      "scout"
+    ]
+  }
+}
