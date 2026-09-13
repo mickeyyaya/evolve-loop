@@ -183,3 +183,23 @@ func TestPriorities_AreTheProducersSpellings(t *testing.T) {
 		t.Fatalf("the vocabulary the producers spell: %q %q %q %q %q", PriorityBlocking, PriorityLesson, PriorityPrescription, PriorityMemoDefault, PrescriptionPrefix)
 	}
 }
+
+// ADR-0103 unit 03b: the THIRD rune cap — the advisor prompt's and the
+// remediation title's — moved beside CapRunes and Summary so the three rules
+// are enumerable in one file. Distinct marker from both (the F5 twin).
+func TestTruncateRunes_TrimsCapsAndMarks(t *testing.T) {
+	long := strings.Repeat("é", 501)
+	if got := TruncateRunes("  "+strings.Repeat("é", 499)+"  ", 500); got != strings.Repeat("é", 499) {
+		t.Fatalf("under the cap: trimmed, untouched: %q", got)
+	}
+	if got := TruncateRunes(strings.Repeat("é", 500), 500); got != strings.Repeat("é", 500) {
+		t.Fatal("at the cap: untouched")
+	}
+	got := TruncateRunes(long, 500)
+	if got != strings.Repeat("é", 500)+" …[truncated]" {
+		t.Fatalf("over the cap: 500 runes + the exact marker, got %d runes ending %q", len([]rune(got)), got[len(got)-14:])
+	}
+	if got == CapRunes(long, 500) || got == Summary(1, "x", errors.New(long)) {
+		t.Fatal("the three caps are three rules: TruncateRunes' marker differs from CapRunes' and Summary's")
+	}
+}

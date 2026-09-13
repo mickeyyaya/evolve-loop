@@ -11,6 +11,15 @@ const (
 	VerdictSKIPPED = "SKIPPED"
 )
 
+// ClassificationMidExecutionFail is the supervisor's default class for a phase
+// that failed mid-cycle with no self-report. Deliberately OUTSIDE failurelog's
+// taxonomy: NormalizeLegacy maps it to UnknownClassification, so a record
+// carrying it ages out on the one-day legacy bucket (failurelog.LegacyEffectiveTTL)
+// — an operator decision (ADR-0103 unit 03b, F11). Projected by the
+// failure-learning engine (the FailedRecord and the lesson event) and by
+// recurrence's generic-pattern denylist; every other spelling is data.
+const ClassificationMidExecutionFail = "cycle-mid-execution-fail"
+
 // CycleTerminationTriageNoWork identifies a successful Triage transition that
 // explicitly committed zero tasks and ended before any implementation phase.
 const CycleTerminationTriageNoWork = "triage-empty-commitment"

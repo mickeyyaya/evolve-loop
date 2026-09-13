@@ -581,3 +581,7 @@
 # ADR-0103 unit 03 (2026-09-13): the carryover-todo lifecycle — mint admission, closeout merges,
 # retirements and the state.json persist (internal/core/carryover). 100% API + 100% line coverage gated.
 ./internal/core/carryover
+# ADR-0103 unit 03b (2026-09-13): the failure-learning engine — the failed-approach recorder, the
+# deterministic floor, the remediation filer and the recurrence closure (internal/core/failurelearning).
+# 100% API + 100% line coverage gated.
+./internal/core/failurelearning

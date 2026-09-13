@@ -13,16 +13,17 @@ import (
 // side of the diff.
 //
 // It drives writeDeterministicLearning — the production seam the failure path
-// calls at failure_learning.go:366/372 — not faillearn.WriteArtifacts directly,
-// because the collision is MINTED by this package: retroRemediationItems derives
-// the inbox id from remediationSlug(title), and remediationSlug stops at
-// remediationSlugMaxRunes = 60 (failure_learning.go:515, :522-541).
+// calls (the three fallback tails of recordFailureLearning) — not
+// faillearn.WriteArtifacts directly, because the collision is MINTED by the
+// failure-learning engine (ADR-0103 unit 03b, internal/core/failurelearning):
+// remediationItems derives the inbox id from remediationSlug(title), and
+// remediationSlug stops at remediationSlugMaxRunes = 60.
 //
 // Chain: two defect lines sharing a 60-rune slug prefix → one id, two different
 // titles → inbox.go:114-116 (the cycle-1282 DEF-4 fix) raises a hard error →
 // writer.go:30-32 (the WithInbox ordering) returns BEFORE the retrospective and
-// the lesson are written → failure_learning.go:460-462 downgrades the whole
-// thing to one stderr WARN.
+// the lesson are written → the engine downgrades the whole thing to one
+// FAILURELEARNING_FLOOR_WRITE_FAILED signal.
 //
 // Net effect: a failing cycle produces NO retrospective and NO lesson. That is
 // the cycle-1255 state — a defect with no durable record — reached through the
@@ -34,8 +35,9 @@ import (
 // remediationSlug is identical because they diverge only after rune 60.
 //
 // The shared prefix is written out rather than computed so the fixture states
-// its own premise: if remediationSlugMaxRunes changes, the guard below fails
-// loudly instead of the test quietly ceasing to reproduce anything.
+// its own premise: the engine unit's test pins remediationSlugMaxRunes == 60 and
+// the two distinct ids, so a bound change fails loudly there instead of this
+// test quietly ceasing to reproduce anything.
 func collidingDefects() []string {
 	const prefix = "evidenceResolves accepts an unrelated in-repo file as closure evidence"
 	return []string{
@@ -50,23 +52,10 @@ func collidingDefects() []string {
 func TestRepro1285_F1_CollidingRemediationSlugSuppressesRetrospectiveAndLesson(t *testing.T) {
 	o, fl, root := remediationFixture(t)
 	defects := collidingDefects()
-
-	items := retroRemediationItems(root, fl.Cycle, defects)
-	if len(items) != 2 {
-		t.Fatalf("fixture: retroRemediationItems returned %d items, want 2", len(items))
-	}
-	// cycle-1287: the cycle-1285 original SKIPPED here when the ids stopped
-	// colliding, on the reasoning that a non-colliding fixture no longer
-	// reproduces anything. Adopted into the tree as a permanent lock, that guard
-	// would make the fix itself green this test by skipping it — a vacuous pass,
-	// and the exact green-by-skip pattern batch-integrity-review-2026-08-04.md
-	// files as a finding. Distinct ids are not the fixture failing to reproduce;
-	// they ARE the fix (remediationFingerprint), so they are asserted. The three
-	// damage checks below then run for real rather than being stepped over.
-	if items[0].ID == items[1].ID {
-		t.Errorf("two defect lines diverging only after rune %d minted ONE inbox id %q — the id must be injective over the FULL defect text, or the second real defect is dropped and (via the DEF-4 collision refusal) the retrospective and lesson are suppressed with it",
-			remediationSlugMaxRunes, items[0].ID)
-	}
+	// The fixture premise — two defect lines diverging only after the 60-rune
+	// slug bound mint TWO ids — is pinned in the engine unit
+	// (failurelearning.TestRemediationItems_IDsAreInjectiveOverTheFullTitle);
+	// the three damage checks below run for real through the facade.
 
 	o.writeDeterministicLearning(fl,
 		"audit phase exited 1 after 3 attempts",
@@ -89,7 +78,6 @@ func TestRepro1285_F1_CollidingRemediationSlugSuppressesRetrospectiveAndLesson(t
 	//    trigger; dropping one of two real defects is the second-order damage,
 	//    and it is what DEF-4 was filed to stop.
 	if files := inboxFiles(t, root); len(files) != 2 {
-		t.Errorf("inbox holds %v; want one addressable item per defect. Two distinct defects share id %q because remediationSlug truncates at %d runes — the id needs a disambiguating suffix derived from the FULL text",
-			files, items[0].ID, remediationSlugMaxRunes)
+		t.Errorf("inbox holds %v; want one addressable item per defect — two distinct defects sharing a 60-rune slug prefix need the disambiguating suffix derived from the FULL text", files)
 	}
 }

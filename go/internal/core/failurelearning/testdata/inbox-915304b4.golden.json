@@ -1,0 +1,9 @@
+{
+  "id": "retro-1279-the-ledger-row-lacks-evidence-915304b4",
+  "title": "the ledger row lacks evidence",
+  "weight": 0.75,
+  "kind": "bug",
+  "priority": "H",
+  "files": null,
+  "injected_by": "faillearn-failure-floor"
+}
