@@ -180,7 +180,7 @@ func (cr *cycleRun) dispatchEvaluateBatch(batch []Phase) (loopAction, error) {
 	}
 	if firstErr != nil {
 		perr := fmt.Errorf("phase %s: %w", errPhase, firstErr)
-		writePhaseFailureDiag(cr.cs.WorkspacePath, string(errPhase), cr.cycle, firstErr, errAttempts, cr.o.now)
+		cr.o.writePhaseFailureDiag(cr.cs.WorkspacePath, string(errPhase), cr.cycle, firstErr, errAttempts)
 		cr.recordFailureLearning(errPhase, perr, errAttempts)
 		return loopAbort, wrapCycleLevelError(errPhase, perr)
 	}

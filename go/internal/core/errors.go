@@ -90,6 +90,13 @@ func IsInfraTeardownError(err error) bool {
 	return errors.Is(err, ErrArtifactTimeout) || errors.Is(err, ErrTransientBridgeFailure)
 }
 
+// isArtifactTimeout is the timeout-ONLY gate unit 02 (ADR-0103) injects into
+// the failure-diag writer: it decides exit_code 81 and whether a delivery
+// cause may be attributed. Never widen it to the IsInfraTeardownError union
+// (TestTimeoutOnlySites_NotWidenedToUnion pins its body and both injection
+// sites).
+func isArtifactTimeout(err error) bool { return errors.Is(err, ErrArtifactTimeout) }
+
 // IsOptionalSkippableError is the FULL admission predicate for
 // optionalInfraSkip's error gate: infra teardown (IsInfraTeardownError — the
 // original Workstream-D class) OR a missing agent persona doc

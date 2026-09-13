@@ -237,7 +237,7 @@ func TestOrchestratorForensicsHelpersCoverage(t *testing.T) {
 	if err := json.Unmarshal(raw, &got); err != nil || len(got) != 2 {
 		t.Fatalf("phase timing merge got=%+v err=%v raw=%s", got, err, raw)
 	}
-	writePhaseFailureDiag(ws, "build", 281, ErrArtifactTimeout, 3, o.now)
+	o.writePhaseFailureDiag(ws, "build", 281, ErrArtifactTimeout, 3)
 	diagRaw, err := os.ReadFile(filepath.Join(ws, "build-failure-diag.json"))
 	if err != nil {
 		t.Fatalf("failure diag missing: %v", err)

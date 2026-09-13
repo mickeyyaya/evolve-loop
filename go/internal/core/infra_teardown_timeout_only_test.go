@@ -79,7 +79,7 @@ func TestWritePhaseFailureDiag_TimeoutOnlyNotWidened(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ws := t.TempDir()
-			writePhaseFailureDiag(ws, "build", 1267, tc.err, 1, now)
+			(&Orchestrator{now: now}).writePhaseFailureDiag(ws, "build", 1267, tc.err, 1)
 
 			raw, err := os.ReadFile(filepath.Join(ws, "build-failure-diag.json"))
 			if err != nil {
@@ -105,6 +105,11 @@ type timeoutOnlySite struct {
 	file string
 	fn   string
 	why  string
+	// gate is the timeout-only expression the body must reference; "" means
+	// the sentinel itself. Unit 02 (ADR-0103) moved the sidecar writer into
+	// internal/core/failurediag, which cannot import either sentinel, so the
+	// gate the orchestrator injects (isArtifactTimeout) is what the pin reads.
+	gate string
 }
 
 // TestTimeoutOnlySites_NotWidenedToUnion — AC10, the structural half. AC9 pins
@@ -127,8 +132,16 @@ func TestTimeoutOnlySites_NotWidenedToUnion(t *testing.T) {
 				"would promote noise into the instinct store",
 		},
 		{
-			file: "failure_learning.go", fn: "writePhaseFailureDiag",
-			why: "exit 81 is the artifact-timeout code specifically — see AC9",
+			file: "errors.go", fn: "isArtifactTimeout",
+			why: "exit 81 is the artifact-timeout code specifically — see AC9; this is the ONE gate unit 02 injects",
+		},
+		{
+			file: "failure_diag.go", fn: "wiredFailureDiag", gate: "isArtifactTimeout",
+			why: "the sidecar writer is constructed with the timeout-only gate, never the union",
+		},
+		{
+			file: "failure_diag.go", fn: "DeliveryFailureCause", gate: "isArtifactTimeout",
+			why: "delivery attribution is gated on the timeout family alone",
 		},
 	}
 
@@ -138,9 +151,13 @@ func TestTimeoutOnlySites_NotWidenedToUnion(t *testing.T) {
 			if err != nil {
 				t.Fatalf("locate %s in %s: %v", site.fn, site.file, err)
 			}
-			if !strings.Contains(body, "ErrArtifactTimeout") {
-				t.Fatalf("%s no longer references ErrArtifactTimeout — it was the timeout-ONLY gate this "+
-					"pin exists to protect; if the gate genuinely moved, move this pin with it", site.fn)
+			gate := site.gate
+			if gate == "" {
+				gate = "ErrArtifactTimeout"
+			}
+			if !strings.Contains(body, gate) {
+				t.Fatalf("%s no longer references %s — it was the timeout-ONLY gate this "+
+					"pin exists to protect; if the gate genuinely moved, move this pin with it", site.fn, gate)
 			}
 			for _, banned := range []string{"ErrTransientBridgeFailure", "isTransientBridgeError", "IsInfraTeardownError"} {
 				if strings.Contains(body, banned) {

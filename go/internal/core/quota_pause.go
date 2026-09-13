@@ -31,7 +31,7 @@ func (cr *cycleRun) pauseForQuota(next Phase, resp PhaseResponse, attempt int) e
 	// prefix so cyclehealth classifies the cycle DEFERRED.
 	cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempt,
 		fmt.Sprintf("%s: %s", abortReasonAllFamiliesExhausted, phaseErr.Error()), cr.cs.PhaseStartedAt))
-	writePhaseFailureDiag(cr.cs.WorkspacePath, string(next), cr.cycle, phaseErr, attempt, cr.o.now)
+	cr.o.writePhaseFailureDiag(cr.cs.WorkspacePath, string(next), cr.cycle, phaseErr, attempt)
 	cr.recordFailureLearning(next, phaseErr, attempt)
 	return wrapCycleLevelError(next, phaseErr)
 }

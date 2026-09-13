@@ -14,7 +14,7 @@ package core
 // and those two failures have opposite remedies: relaunch the pane vs. raise
 // the phase's artifact budget.
 //
-// Contract: phaseFailureDiag must carry the classified delivery-failure cause
+// Contract: failurediag.Sidecar must carry the classified delivery-failure cause
 // as its OWN field, populated from the driver's `reason=` marker text, and it
 // must stay empty for every failure that is not an evidenced delivery failure.
 // The negative half is the load-bearing one — a field that is always populated
@@ -79,7 +79,7 @@ func readFailureDiag(t *testing.T, phase string, phaseErr error) map[string]any 
 	t.Helper()
 	ws := t.TempDir()
 	now := func() time.Time { return time.Unix(1_700_000_000, 0).UTC() }
-	writePhaseFailureDiag(ws, phase, 1562, phaseErr, 2, now)
+	(&Orchestrator{now: now}).writePhaseFailureDiag(ws, phase, 1562, phaseErr, 2)
 
 	raw, err := os.ReadFile(filepath.Join(ws, phase+"-failure-diag.json"))
 	if err != nil {

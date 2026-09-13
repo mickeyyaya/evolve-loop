@@ -4,11 +4,9 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -110,118 +108,6 @@ func (cr *cycleRun) flushPhaseTimings() []phaseTimingEntry {
 	cr.timingsFlushed = true
 	cr.timingsComposed = cr.o.recorder().WritePhaseTimings(cr.cs.WorkspacePath, cr.phaseTimings)
 	return cr.timingsComposed
-}
-
-// phaseFailureDiag is the structured diagnostic written to <phase>-failure-diag.json
-// when a mandatory phase aborts after exhausting all retry attempts.
-type phaseFailureDiag struct {
-	Phase           string `json:"phase"`
-	Cycle           int    `json:"cycle"`
-	ErrorMessage    string `json:"error_message"`
-	DeliveryFailure string `json:"delivery_failure"`
-	ExitCode        int    `json:"exit_code"`
-	AttemptCount    int    `json:"attempt_count"`
-	Timestamp       string `json:"timestamp"`
-}
-
-// DeliveryFailureCause returns the classified prompt-delivery failure reason,
-// or an empty string when the error is not an evidenced delivery failure.
-func DeliveryFailureCause(err error) string {
-	if !errors.Is(err, ErrArtifactTimeout) {
-		return ""
-	}
-	cause, reason, hasCause := artifactTimeoutTypedCause(err.Error())
-	if hasCause {
-		if cause != "submit_wedged" {
-			return ""
-		}
-		if strings.Contains(reason, "submit_wedged") {
-			return reason
-		}
-		return cause
-	}
-
-	_, marker, ok := strings.Cut(err.Error(), "artifact-timeout: ")
-	if !ok {
-		return ""
-	}
-	_, reasonField, ok := strings.Cut(marker, "reason=")
-	if !ok {
-		return ""
-	}
-	reason, ok = parseQuotedMarkerValue(reasonField)
-	if ok && strings.Contains(reason, "submit_wedged") {
-		return reason
-	}
-	return ""
-}
-
-func artifactTimeoutTypedCause(message string) (cause, reason string, present bool) {
-	_, marker, ok := strings.Cut(message, "artifact-timeout: ")
-	if !ok || !strings.HasPrefix(marker, "cause=") {
-		return "", "", false
-	}
-	causeField, rest, found := strings.Cut(strings.TrimPrefix(marker, "cause="), " ")
-	if !found {
-		return causeField, "", true
-	}
-	if !strings.HasPrefix(rest, "reason=") {
-		return causeField, "", true
-	}
-	reason, _ = parseQuotedMarkerValue(strings.TrimPrefix(rest, "reason="))
-	return causeField, reason, true
-}
-
-func parseQuotedMarkerValue(value string) (string, bool) {
-	if value == "" || value[0] != '"' {
-		return "", false
-	}
-	for i := 1; i < len(value); i++ {
-		switch value[i] {
-		case '\\':
-			i++
-		case '"':
-			decoded, err := strconv.Unquote(value[:i+1])
-			return decoded, err == nil
-		}
-	}
-	return "", false
-}
-
-// writePhaseFailureDiag writes a structured diagnostic file to
-// <workspace>/<phase>-failure-diag.json. Best-effort: failures are logged to
-// stderr but never mask the original error.
-func writePhaseFailureDiag(workspace, phase string, cycle int, phaseErr error, attempts int, now func() time.Time) {
-	exitCode := 1
-	var exitErr *exec.ExitError
-	if errors.Is(phaseErr, ErrArtifactTimeout) {
-		exitCode = 81
-	} else if errors.As(phaseErr, &exitErr) {
-		exitCode = exitErr.ExitCode()
-	}
-	diag := phaseFailureDiag{
-		Phase:           phase,
-		Cycle:           cycle,
-		ErrorMessage:    phaseErr.Error(),
-		DeliveryFailure: DeliveryFailureCause(phaseErr),
-		ExitCode:        exitCode,
-		AttemptCount:    attempts,
-		Timestamp:       now().UTC().Format(time.RFC3339),
-	}
-	data, merr := json.Marshal(diag)
-	if merr != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-diag marshal: %v\n", merr)
-		return
-	}
-	path := filepath.Join(workspace, phase+"-failure-diag.json")
-	tmp := path + ".tmp"
-	if werr := os.WriteFile(tmp, data, 0o644); werr != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-diag write: %v\n", werr)
-		return
-	}
-	if rerr := os.Rename(tmp, path); rerr != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-diag rename: %v\n", rerr)
-	}
 }
 
 // recordFailedApproachState persists the learn-from-failure STATE for a failed

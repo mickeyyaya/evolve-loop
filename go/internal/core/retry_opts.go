@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/backfill"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core/failurediag"
 )
 
 // retryOpts carries the per-path recovery hooks consulted when a phase's retry
@@ -111,7 +112,7 @@ func (cr *cycleRun) backfillExhaustedArtifact(next Phase, err error, attempt, ma
 		Cycle:    cr.cycle,
 		Role:     string(next),
 		Kind:     "backfill",
-		ExitCode: 81,
+		ExitCode: failurediag.ExitCodeArtifactTimeout,
 	}); lerr != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN backfill ledger append: %v\n", lerr)
 	}

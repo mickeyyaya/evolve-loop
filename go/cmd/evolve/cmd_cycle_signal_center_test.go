@@ -8,15 +8,18 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core/failurediag"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
@@ -252,5 +255,30 @@ func TestWireSimulateOrchestrator_SignalCenterWired(t *testing.T) {
 	}
 	if data, err := os.ReadFile(filepath.Join(evolveDir, "signals.ndjson")); err != nil || !strings.Contains(string(data), "simulate wiring proof") {
 		t.Errorf("cycle-less signals are durable under --simulate too: %v %s", err, data)
+	}
+}
+
+// Unit 02 (ADR-0103): the failurediag module tag renders at the --simulate
+// root too — a writer built on the root's Center, writing into a file used as
+// a workspace, reaches the console sink and the durable cycle-less sink.
+func TestWireSimulateOrchestrator_FailureDiagWarningRenders(t *testing.T) {
+	root := t.TempDir()
+	evolveDir := filepath.Join(root, ".evolve")
+	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var console bytes.Buffer
+	d := wireSimulateOrchestrator(root, evolveDir, &console)
+	w := failurediag.NewWriter(time.Now, func(error) bool { return false }, failurediag.WithSignals(func() *signalcenter.Center { return d.Signals }))
+	fileAsWorkspace := filepath.Join(root, "not-a-dir")
+	if err := os.WriteFile(fileAsWorkspace, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	w.Write(fileAsWorkspace, "build", 0, errors.New("boom"), 1)
+	if out := console.String(); !strings.Contains(out, "[failurediag]") || !strings.Contains(out, "FAILUREDIAG_SIDECAR_WRITE_FAILED") {
+		t.Fatalf("the console sink renders the unit's WARN under --simulate: %q", out)
+	}
+	if data, err := os.ReadFile(filepath.Join(evolveDir, "signals.ndjson")); err != nil || !strings.Contains(string(data), `"code":"FAILUREDIAG_SIDECAR_WRITE_FAILED"`) {
+		t.Errorf("the cycle-less signal is durable: %v %s", err, data)
 	}
 }

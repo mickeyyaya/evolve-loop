@@ -12,6 +12,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core/failurediag"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core/outcome"
 	"github.com/mickeyyaya/evolve-loop/go/internal/directives"
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
@@ -274,7 +275,8 @@ type Orchestrator struct {
 	runners map[Phase]PhaseRunner
 	sm      *StateMachine
 	now     func() time.Time
-	outcome *outcome.Recorder // unit 01 (ADR-0103): the C1 recording chokepoint
+	outcome *outcome.Recorder   // unit 01 (ADR-0103): the C1 recording chokepoint
+	diag    *failurediag.Writer // unit 02 (ADR-0103): the failure-diag sidecar + delivery classifier
 	// gitHEAD returns the current git HEAD SHA. Called once at cycle start
 	// and once at closeout so the throughput hook can corroborate that a
 	// shipped cycle actually moved main (shippedOutcome). It is NOT evidence
@@ -860,6 +862,7 @@ func NewOrchestrator(storage Storage, ledger Ledger, runners map[Phase]PhaseRunn
 	// swap o.now after construction; mints change the catalog mid-cycle) and
 	// raises the orchestrator's phase.outcome through emitPhaseOutcome.
 	o.outcome = o.wiredRecorder()
+	o.diag = o.wiredFailureDiag()
 	// ADR-0058: hand the state machine its config-driven verdict-branch
 	// resolution now that the catalog (hence specFor) is settled by options.
 	// Without a catalog, specFor misses and Next stays on the literal table

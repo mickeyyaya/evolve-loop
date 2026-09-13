@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core/failurediag"
 	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
 )
 
@@ -118,7 +119,7 @@ func (o *Orchestrator) adviseOnUnclassifiedFailure(ctx context.Context, cycle in
 	defer advCancel()
 	advice, aerr := o.failureAdviser.Advise(advCtx, FailureAdviseInput{
 		Phase:       string(phase),
-		ExitCode:    81,
+		ExitCode:    failurediag.ExitCodeArtifactTimeout,
 		PaneTail:    report.FinalPane,
 		Workspace:   workspace,
 		ProjectRoot: projectRoot,
