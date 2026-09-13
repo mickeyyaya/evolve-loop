@@ -63,7 +63,7 @@ import (
 // every downstream read.
 //
 // Two properties are load-bearing. The overflow diagnostic is severity
-// "warning", NEVER "error": core's errorSeverityMessages keys off
+// "warning", NEVER "error": core's cyclestate.ErrorMessages keys off
 // Severity=="error" to build AuditFailReasons, so an error here would convert a
 // merely verbose report into a dossier-visible failure. And the check never
 // touches the file on disk — ship SHA-binds those exact bytes, so a truncating

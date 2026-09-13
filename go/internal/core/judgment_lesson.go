@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
@@ -76,10 +77,10 @@ func (o *Orchestrator) recordJudgmentLesson(ctx context.Context, cycle int, work
 	if o.isAuthoritativePhase(failed) {
 		return
 	}
-	if len(errorSeverityMessages(diags)) == 0 {
+	if len(cyclestate.ErrorMessages(diags)) == 0 {
 		if failure, ok := phasecontract.ReadFailureBlock(workspace, string(failed)); ok {
 			for _, defect := range failure.Defects {
-				diags = append(diags, Diagnostic{Severity: "error", Message: defect})
+				diags = append(diags, Diagnostic{Severity: cyclestate.SeverityError, Message: defect})
 			}
 		}
 	}

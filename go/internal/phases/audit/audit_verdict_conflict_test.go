@@ -19,7 +19,7 @@ import (
 // gate branches (acs-verdict.json unreadable, red_count>0, ship_eligible=false)
 // WITHOUT ever recording what the narrative said. The override is correct — the
 // deterministic gate must outrank prose (cycles 339-341) — but the DISAGREEMENT
-// is silently discarded. Downstream (errorSeverityMessages → AuditFailReasons →
+// is silently discarded. Downstream (cyclestate.ErrorMessages → AuditFailReasons →
 // <phase>-fail-reason.json → failure dossier SubstantiveError) therefore only
 // ever sees the gate's own message, so an operator reading a dossier cannot
 // distinguish a genuine defect from a POISONED predicate the auditor itself
@@ -32,7 +32,7 @@ import (
 //  1. When the narrative verdict was FOUND and is NOT FAIL, each of the three
 //     override branches emits an ERROR-severity `verdict-conflict:` diagnostic
 //     naming the narrative verdict and the gate reason.
-//  2. Error severity is the WIRING: errorSeverityMessages (core/system_failure.go:17)
+//  2. Error severity is the WIRING: cyclestate.ErrorMessages (cyclestate/result.go (ErrorMessages))
 //     keys off Severity=="error", so an error-severity diagnostic reaches
 //     AuditFailReasons/the dossier with zero new plumbing. A warning-severity
 //     conflict record would be silently dropped by that same function.
@@ -88,8 +88,8 @@ func requireConflict(t *testing.T, diags []core.Diagnostic, narrative string) st
 		t.Fatalf("want exactly 1 %q diagnostic, got %d; diags=%v", conflictMarker, len(got), diags)
 	}
 	if got[0].Severity != "error" {
-		t.Errorf("conflict diagnostic severity=%q, want \"error\" — errorSeverityMessages "+
-			"(core/system_failure.go:17) drops anything else, so the record never reaches "+
+		t.Errorf("conflict diagnostic severity=%q, want \"error\" — cyclestate.ErrorMessages "+
+			"(cyclestate/result.go (ErrorMessages)) drops anything else, so the record never reaches "+
 			"AuditFailReasons/the dossier: %s", got[0].Severity, got[0].Message)
 	}
 	if !strings.Contains(got[0].Message, narrative) {

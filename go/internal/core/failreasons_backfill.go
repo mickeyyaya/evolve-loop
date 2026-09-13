@@ -11,13 +11,20 @@ package core
 // written at the recordPhaseOutcome chokepoint, never an agent-writable
 // workspace file, so a failure identity cannot be forged from the workspace.
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
+)
 
 // backfillFailReasons guarantees a sealed FAIL carries at least one reason.
 // Already-explained FAILs (audit/ship gate reasons) and non-FAIL verdicts are
 // untouched. Priority: recorded abort reasons (the real infra error, with its
-// originating phase); else the failing phases by name; else one explicit
-// unexplained marker — never null.
+// originating phase); else each failing phase's OWN error-severity diagnostics
+// (a reasoned FAIL such as triage's protected-surface rejection — cycles
+// 1634/1636 sealed it as "phase-infra class" because the record carried no
+// diagnostics); else the failing phases by name with the explicit infra marker;
+// else one explicit unexplained marker — never null.
 func backfillFailReasons(result *CycleResult, timings []phaseTimingEntry) {
 	if result == nil || result.FinalVerdict != VerdictFAIL || len(result.FailReasons) > 0 {
 		return
@@ -37,6 +44,10 @@ func backfillFailReasons(result *CycleResult, timings []phaseTimingEntry) {
 	for _, t := range timings {
 		if t.AbortReason == "" && t.Verdict == VerdictFAIL && !named[t.Phase] {
 			named[t.Phase] = true
+			if len(cyclestate.ErrorMessages(t.Diagnostics)) > 0 {
+				result.FailReasons = append(result.FailReasons, fmt.Sprintf("phase %s: %s", t.Phase, verdictFailReason(t.Diagnostics)))
+				continue
+			}
 			result.FailReasons = append(result.FailReasons, fmt.Sprintf("phase %s: verdict FAIL with no recorded abort reason (phase-infra class)", t.Phase))
 		}
 	}

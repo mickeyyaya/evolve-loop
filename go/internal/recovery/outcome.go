@@ -91,4 +91,10 @@ type PhaseOutcome struct {
 	// dollars. Per-attempt detail already lives in llm-calls.ndjson (S3); this
 	// package only relays what the caller's PhaseResponse reported.
 	Tokens cyclestate.TokenUsage
+	// Diagnostics are the phase's own structured notes (severity + message) as
+	// the PhaseResponse reported them, relayed unfiltered: the C1 record is the
+	// only durable home a non-floor phase's FAIL reason has (floor phases also
+	// persist theirs via core.persistFloorFailReasons). Consumers filter by
+	// severity; this package only relays.
+	Diagnostics []cyclestate.Diagnostic
 }

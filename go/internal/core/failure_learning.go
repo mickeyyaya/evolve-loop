@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/contextfill"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/faillearn"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failuregrade"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
@@ -85,6 +86,7 @@ func phaseOutcomeFrom(phase Phase, resp PhaseResponse, attempts int, abortReason
 		ModelSource:   resp.ModelSource,
 		ResolvedModel: resp.ResolvedModel,
 		Tokens:        resp.Tokens,
+		Diagnostics:   resp.Diagnostics,
 	}
 }
 
@@ -139,10 +141,19 @@ func (o *Orchestrator) recordPhaseOutcome(result *CycleResult, timings *[]phaseT
 		ModelSource:   out.ModelSource,
 		ResolvedModel: out.ResolvedModel,
 		Tokens:        out.Tokens,
+		Diagnostics:   out.Diagnostics,
 
 		ContextFillRatio: fillRatio,
 		ContextWindowHot: windowHot,
 	})
+	// A FAIL the phase itself reasoned about (Classify diagnostics — triage's
+	// protected-surface rejection, cycles 1634/1636) is named HERE, once, by the
+	// chokepoint that owns the durable record. The seal (backfillFailReasons)
+	// and cyclehealth read the same field through the same projection
+	// (cyclestate.ErrorMessages) — one source, one rule, rendered per surface.
+	if out.Verdict == VerdictFAIL && len(cyclestate.ErrorMessages(out.Diagnostics)) > 0 {
+		fmt.Fprintf(os.Stderr, "[orchestrator] phase %s %s\n", out.Phase, verdictFailReason(out.Diagnostics))
+	}
 	// ADR-0048 Slice A (SHADOW): grade the abort reason. Observe-only — logs the
 	// tier graduated-enforcement WOULD apply; changes nothing (the floor still
 	// aborts). Evidence is conservative here (the per-site benign-churn /
