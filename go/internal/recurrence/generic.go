@@ -6,19 +6,29 @@ package recurrence
 // and the CLI report act on actionable patterns only. Backfill sets Entry.Generic
 // via IsGeneric; consumers read the stored flag via IsGenericPattern.
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
+	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
+)
 
 // genericPatternDenylist is the classification-vocabulary noise set: patterns
 // that are error-category labels (not specific defects) and therefore dominate
 // raw recurrence counts without carrying an actionable signal. Kept small and
 // explicit — the pattern==errorCategory echo rule in IsGeneric catches the rest.
+// Every entry with an owner is projected from it (failurelog's taxonomy, the
+// engine's default class); "cycle-fatal" and "unknown" have no owner yet.
 var genericPatternDenylist = map[string]bool{
-	"operator-reset":           true,
-	"loop-fatal":               true,
-	"cycle-mid-execution-fail": true,
-	"cycle-fatal":              true,
-	"unknown":                  true,
-	"unknown-classification":   true,
+	// Owned classifications, projected from their homes.
+	string(failurelog.OperatorReset):          true,
+	string(failurelog.LoopFatal):              true,
+	string(failurelog.UnknownClassification):  true,
+	cyclestate.ClassificationMidExecutionFail: true,
+
+	// No owner yet: literals until one exists.
+	"cycle-fatal": true,
+	"unknown":     true,
 }
 
 // IsGeneric reports whether pattern is classification-vocabulary noise rather

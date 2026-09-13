@@ -1,0 +1,12 @@
+{
+  "entries": {
+    "deliverable-rejected": {
+      "pattern": "deliverable-rejected",
+      "cycles": [
+        1279
+      ],
+      "count": 1,
+      "last_seen": 1279
+    }
+  }
+}

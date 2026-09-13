@@ -59,6 +59,9 @@ PR, each landing with all of the following — a unit without any of them is not
 | 01 | Phase-outcome recorder (the C1 chokepoint: cycle result, phase-timing log, usage sidecar, context fill) | `core/failure_learning.go` | [01-outcome-recorder.md](../decomposition/01-outcome-recorder.md) |
 | 02 | Failure diagnostics and delivery-failure classification (the failure-diag sidecar writer, the delivery-failure classifier, the wire tokens) | `core/failure_learning.go` | [02-failure-diagnostics.md](../decomposition/02-failure-diagnostics.md) |
 | 03 | Carryover-todo lifecycle (mint admission, the closeout merges, the retirements, the state.json persist; three sibling files collapsed) | `core/failure_learning.go` + `carryover_merge.go`, `prescription_carryover.go`, `carryover_triage_retire.go` | [03-carryover-lifecycle.md](../decomposition/03-carryover-lifecycle.md) |
+| 03b | Failure-learning engine (the failed-approach recorder, the deterministic floor, remediation filing, the recurrence closure; `recordFailureLearning` split in place into a pure gate + four named steps for unit 05) | `core/failure_learning.go` | [03b-failure-learning-engine.md](../decomposition/03b-failure-learning-engine.md) |
 | 04 | Phase advisor | `core/phase_advisor.go` | next |
 | 05 | Orchestrator: composition root vs `RunCycle` engine | `core/orchestrator.go` | after 01–04 |
 | … | inbox mover, ship gitops, config, bridge engine, audit gates | design §12 | later |
+
+Row 03b is a numbering insertion (the engine surfaced while unit 03 was designed), not a §12 reorder: it lands before unit 04 because the advisor's `truncateRunes` read now resolves through carryover, and its `ORCHESTRATOR_*` handoff (its doc §5) must be settled before unit 05 splits `RunCycle`.

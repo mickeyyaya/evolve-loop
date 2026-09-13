@@ -610,17 +610,6 @@ const maxGoalTextChars = 4000
 // (rune-safe), marking truncation. Empty/whitespace-only ⇒ "" (no Goal section).
 func truncateGoal(s string) string { return truncateRunes(s, maxGoalTextChars) }
 
-// truncateRunes trims surrounding whitespace and caps s at max runes, marking
-// truncation. Shared by the goal section and the catalog card hints.
-func truncateRunes(s string, max int) string {
-	s = strings.TrimSpace(s)
-	r := []rune(s)
-	if len(r) <= max {
-		return s
-	}
-	return string(r[:max]) + " …[truncated]"
-}
-
 // writeRoutingContext writes the shared, deterministic decision context — cycle
 // header, digested objective signals, available optional phases, and the
 // decision rubric — consumed by both the per-transition prompt and the
