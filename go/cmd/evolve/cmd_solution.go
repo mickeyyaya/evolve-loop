@@ -40,7 +40,7 @@ func runSolution(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		*root = wd
 	}
 	if *registry == "" {
-		*registry = filepath.Join(*root, "docs", "architecture", "phase-registry.json")
+		*registry = config.RegistryPath(*root)
 	}
 	// The same registry + env the cycle composition root loads, so the CLI can
 	// never see a different contract than the floor and the audit gate.

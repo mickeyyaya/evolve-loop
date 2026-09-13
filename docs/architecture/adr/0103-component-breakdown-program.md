@@ -63,6 +63,9 @@ PR, each landing with all of the following — a unit without any of them is not
 | 04 | Phase advisor | `core/phase_advisor.go` | next |
 | 05 | Orchestrator: composition root vs `RunCycle` engine | `core/orchestrator.go` | after 01–04 |
 | 07 | Ship landing (the fleet ff-merge, the push with its inline push-race repair and its reclassification, the post-push head read, the shared git probes, the ship-binding writer; the rebase engine stays with the orchestrator — unit 05; staging → 07b, run-scope → 07c) | `phases/ship/worktree_ship.go` + `repair.go` + `gitops.go` + `pushonly.go` + `verify.go` | [07-shipgitops.md](../decomposition/07-shipgitops.md) |
-| … | inbox mover, config, bridge engine, audit gates | design §12 | later |
+| 08 | Config resolution (the routing-config Loader with an injected reader and Center; the registry/env/policy dials and validators; the malformed-registry and policy-typo blind spots closed; decomposed in place) | `config/config.go` | [08-config.md](../decomposition/08-config.md) |
+| … | inbox mover, bridge engine, audit gates | design §12 | later |
 
 Row 03b is a numbering insertion (the engine surfaced while unit 03 was designed), not a §12 reorder: it lands before unit 04 because the advisor's `truncateRunes` read now resolves through carryover, and its `ORCHESTRATOR_*` handoff (its doc §5) must be settled before unit 05 splits `RunCycle`. Row 07 is likewise an insertion while 04–06 are unassigned: the ship landing is design §12 row 6 and touches no core file, so it could be built in parallel with the advisor and the orchestrator split; its number is the brief's, not a §12 reorder.
+
+Row 08 (design §12 row 7) landed before units 04-05: it is a leaf with no core dependency, its two blind spots (a malformed registry silently dropping triage, a typo'd policy gate dial silently off) were live risks, and its `Loader` is what unit 05's composition root injects.

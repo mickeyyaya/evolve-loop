@@ -22,6 +22,7 @@ import (
 	"text/template"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
@@ -396,7 +397,7 @@ func collectSkillFacts(projectRoot string, spec phasespec.PhaseSpec, roles map[s
 // registry yields an empty map (gaps, not errors).
 func registryRoles(projectRoot string) map[string]string {
 	roles := map[string]string{}
-	raw, err := os.ReadFile(filepath.Join(projectRoot, "docs", "architecture", "phase-registry.json"))
+	raw, err := os.ReadFile(config.RegistryPath(projectRoot))
 	if err != nil {
 		return roles
 	}

@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
@@ -118,7 +119,7 @@ func scan(opts Options, now time.Time) (Inventory, []string) {
 
 	registryPath := opts.RegistryPath
 	if registryPath == "" {
-		registryPath = filepath.Join(opts.ProjectRoot, "docs", "architecture", "phase-registry.json")
+		registryPath = config.RegistryPath(opts.ProjectRoot)
 	}
 	builtins, err := phasespec.Load(registryPath)
 	if err != nil {

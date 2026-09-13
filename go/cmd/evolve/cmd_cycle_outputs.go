@@ -21,6 +21,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"github.com/mickeyyaya/evolve-loop/go/internal/auditchain"
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseoutputs"
@@ -95,7 +96,7 @@ func runCycleOutputs(args []string, stdout, stderr io.Writer) int {
 // false memo-report.md gap). Degrades loudly to builtin-only when the registry
 // cannot load.
 func catalogAwareResolver(projectRoot string, warn func(string)) phasecontract.Resolver {
-	builtinCat, err := phasespec.Load(filepath.Join(projectRoot, "docs", "architecture", "phase-registry.json"))
+	builtinCat, err := phasespec.Load(config.RegistryPath(projectRoot))
 	if err != nil {
 		warn(fmt.Sprintf("builtin registry load failed (%v); resolving builtin-only", err))
 		return phasecontract.BuiltinResolver{}

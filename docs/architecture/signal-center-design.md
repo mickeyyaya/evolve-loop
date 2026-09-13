@@ -161,7 +161,7 @@ Examples (what cycles 1636 and 1630 would have produced):
 ### 5.1 Module (closed)
 
 `orchestrator`, `advisor`, `runner`, `bridge`, `liveness` (the renamed pane center), `ship`, `audit`,
-`triage`, `scout`, `build`, `tdd`, `gate.contract`, `gate.eval`, `gate.repo`, `inbox`, `config`,
+`triage`, `scout`, `build`, `tdd`, `gate.contract`, `gate.eval`, `gate.repo`, `inbox`, `config` (the routing-config loader — registry, env and policy-stage resolution; breakdown unit 08),
 `loop`, `watchdog`, `observer`, `dashboard`, `signalcenter` (self-reports), `ledger` (the file ledger's append observer, S4a), `outcome` (the phase-outcome recorder, breakdown unit 01), `failurediag` (the failure-diag sidecar writer and the delivery-failure classifier, breakdown unit 02), `carryover` (the carryover-todo lifecycle, breakdown unit 03), `failurelearning` (the failure-learning engine — the failed-approach recorder, the deterministic floor, the recurrence closure; breakdown unit 03b); `ship` also carries the landing's warnings (the ff-merge, the push with its inline repair, the ship-binding witness; breakdown unit 07 — `internal/phases/ship/landing`, `ship.warning`). A module is added by
 editing the closed set and its test; an unknown module is stamped `SIGNALCENTER_UNKNOWN_MODULE` and
 raised to WARN — never dropped. *(review 21: `advisor` and `config` added to match §12.)*
@@ -186,6 +186,7 @@ raised to WARN — never dropped. *(review 21: `advisor` and `config` added to m
 | `failurediag.warning` | the failure-diag writer could not land `<phase>-failure-diag.json` (temp write or rename); the phase abort proceeds unchanged and the diagnosis is lost from disk (unit 02) | WARN | |
 | `carryover.warning` | the carryover lifecycle could not read or decode a cycle-workspace document (`carryover-todos.json`, `defect-ledger.json`) or could not persist the failure-learning arrays to state.json; the closeout or the caller proceeds (unit 03) | WARN | |
 | `failurelearning.warning` | the failure-learning engine could not load policy, write the deterministic floor artifacts or update the recurrence ledger, or truncated a self-reported defect list; the FailedRecord and P0 todo stand, the cycle proceeds (unit 03b) | non-terminal |
+| `config.warning` | the routing-config loader took a fail-safe default: a dial outside its vocabulary (registry, env or policy.json), a weak or misordered spine, an inert enable, or a phase registry that exists but could not be read or parsed (the loader degrades to the compiled baseline — which omits triage); the cycle proceeds on the resolved value (unit 08) | WARN | non-terminal |
 | `cycle.sealed` | final verdict decided (after `finalizeOutcome`) | INFO (FAIL → WARN) | ✓ on FAIL |
 | `loop.wave` / `loop.halt` / `loop.escalation` | batch-level events (today's `dispatchevents`) | INFO / INCIDENT / WARN | / ✓ / |
 | `signalcenter.listener_panicked` / `signalcenter.sink_dropped` | self-reports: a panicking listener was dropped / the NDJSON sink could not write (count in `fields.dropped`) | INCIDENT / WARN | |
@@ -471,7 +472,7 @@ ADR-0072's coherence floor and need their own campaign note.
 | 4 | `cyclerun.go` (904): finalize/closeout → `cycleclose` | 904 | `orchestrator` | `finalizeCycle` + `finalizeOutcome` + dossier |
 | 5 | `inboxmover.go` (1006) | 1006 | `inbox` | claim/release/promote as three units |
 | 6 | **unit 07 landed 2026-09-14** ([decomposition/07-shipgitops.md](decomposition/07-shipgitops.md)): the landing (the ff-merge, the push with its inline repair and the post-push head read, the shared git probes, the binding writer) → `internal/phases/ship/landing` behind the seam `gitops_landing.go`; `gitops.go` 989 → 935, `repair.go` 474 → 402, `worktree_ship.go` 205 → 184; the staging guard and the run-scope policy remain (07b / 07c) | 989 | `ship` | landing vs binding writer vs staging guard |
-| 7 | `config/config.go` (962) | 962 | `config` | typed policy structs; retire env flags as a by-product |
+| 7 | **landed 2026-09-14 as unit 08** ([decomposition/08-config.md](decomposition/08-config.md)): `config/config.go` (962 → 229) decomposed in place — `Loader` with an injected reader and Center, `config.warning`, six `CONFIG_*` codes | 962 | `config` | typed policy structs (`PolicyStages`); the "retire env flags" by-product is OUT of scope (the nine keys are prose-contracted in the protected flagregistry table — its own slice) |
 | 8 | `bridge/engine.go` (791) + `autorespond.go` (787) | 1578 | `bridge` | rides S3 |
 | later wave | `phases/audit/defect_ledger.go` (881), `acssuite.go` (866), `phases/audit/ciparity.go` (801) | 2548 | `audit`, `acs` | gate logic under the ADR-0072 floor; own campaign note |
 

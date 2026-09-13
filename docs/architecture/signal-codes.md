@@ -36,6 +36,17 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `CARRYOVER_WORKSPACE_MALFORMED` | a cycle-workspace carryover document is not its documented JSON shape; the file is skipped whole, never aborting the cycle — a persona defect for the memo or audit owner; the reason carries the decode error |
 | `CARRYOVER_WORKSPACE_READ_FAILED` | a cycle-workspace carryover document (carryover-todos.json or defect-ledger.json) exists but could not be read (not absence: permissions, a directory at the path); nothing is merged, the closeout proceeds; fields name the document and path |
 
+### config
+
+| Code | Meaning |
+|---|---|
+| `CONFIG_INERT_PHASE_ENABLE` | a phase is force-enabled (enabled: on) while dynamic_routing is below advisory and it is neither mandatory nor in the static state machine, so the enable never runs it (the cycle-120 confusion); set dynamic_routing>=advisory or remove the enable; fields.step=inert, phase, stage |
+| `CONFIG_REGISTRY_MALFORMED` | docs/architecture/phase-registry.json was read but is not valid JSON (a trailing comma is the classic); the same compiled-baseline degrade as CONFIG_REGISTRY_UNREADABLE — no triage, no registry order — with the decoder's error in the reason; fields.step=registry, path, err |
+| `CONFIG_REGISTRY_UNREADABLE` | docs/architecture/phase-registry.json exists but could not be read (permissions, a directory at the path — absence is silent); every cycle runs on the compiled baseline, which omits triage, the registry order, the enabled/routing blocks, the goal recipes and the deliverable kinds; fields.step=registry, path, err |
+| `CONFIG_SPINE_ORDER` | the registry's phases[] order places ship before audit, so the artifact-backed floor cannot gate ship on a shippable audit by position; the legality graph and the audit verdict branch still block it; fields.step=spine, audit_pos, ship_pos |
+| `CONFIG_UNKNOWN_VALUE` | a routing dial's value is outside its closed vocabulary, or a registry contract is incomplete, and the documented fail-safe was taken — never a kill-path enable (a stage word → off, routing_mode → llm, model_routing → static, enabled → content, EVOLVE_SANDBOX → the current mode, a bad conditional rule or max_optional_insertions ignored); fields.step names the resolving step (registry, env or policy), fields.key the dial, fields.value the word, fields.default the fallback |
+| `CONFIG_WEAK_SPINE` | mandatory_phases (the registry's or EVOLVE_MANDATORY_PHASES) omits audit and/or ship, so the audit-before-ship guarantee rests on the legality graph and the audit verdict branch alone; the cycle proceeds; fields.step=spine, fields.missing = audit, ship or audit+ship |
+
 ### failurediag
 
 | Code | Meaning |

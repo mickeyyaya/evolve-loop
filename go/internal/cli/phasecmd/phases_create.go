@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseinventory"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
@@ -239,7 +240,7 @@ func loadCreateInputs(specArg, personaArg, mintArg string, stdin io.Reader, stde
 // fail-open (user roots are still checked) — matching the inventory's rule
 // that an index/lookup layer must degrade, not block.
 func findCollision(project string, roots []string, name string) string {
-	registryPath := filepath.Join(project, "docs", "architecture", "phase-registry.json")
+	registryPath := config.RegistryPath(project)
 	if builtin, err := phasespec.Load(registryPath); err == nil {
 		if _, ok := builtin.Get(name); ok {
 			return fmt.Sprintf("phase %q is a built-in — a user phase cannot redefine it", name)
