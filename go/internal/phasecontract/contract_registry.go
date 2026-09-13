@@ -67,6 +67,12 @@ type Roots struct {
 	// agent's own `evolve phase verify` (from cycle-state.json) — carries it
 	// here, so the self-check and the gate cannot disagree about the section.
 	ExplanationDocumentationVersion int
+	// Cycle is the verifying cycle number. Declared EFFECTS (ADR-0100 slice 2)
+	// are judged against per-cycle lifecycle state — the inbox claim lives in
+	// <EvolveDir>/inbox/processing/cycle-<Cycle>/ — so every production
+	// verifier (gate, runner, self-check) carries it; 0 means unknown and a
+	// declared effect then fails OPEN with an error rather than deciding blind.
+	Cycle int
 }
 
 // WriteTarget values. Every deliverable currently lands in either the per-cycle
