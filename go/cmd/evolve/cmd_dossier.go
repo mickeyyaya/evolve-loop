@@ -5,6 +5,8 @@ package main
 // Pure reader — no state/ledger mutation — safe to run mid-batch.
 
 import (
+	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -16,16 +18,67 @@ import (
 
 func runDossier(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(stderr, "evolve dossier: usage: dossier verify [--project-root P]")
+		fmt.Fprintln(stderr, "evolve dossier: usage: dossier verify | retro-mislabel [--project-root P] [--json]")
 		return 10
 	}
 	switch args[0] {
 	case "verify":
 		return runDossierVerify(args[1:], stdout, stderr)
+	case "retro-mislabel":
+		return runDossierRetroMislabel(args[1:], stdout, stderr)
 	default:
-		fmt.Fprintf(stderr, "evolve dossier: unknown subcommand %q (want: verify)\n", args[0])
+		fmt.Fprintf(stderr, "evolve dossier: unknown subcommand %q (want: verify | retro-mislabel)\n", args[0])
 		return 10
 	}
+}
+
+type dossierRetroMislabelReport struct {
+	Candidates     int   `json:"candidates"`
+	Mislabeled     []int `json:"mislabeled"`
+	Uncorroborated []int `json:"uncorroborated"`
+}
+
+func runDossierRetroMislabel(args []string, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("evolve dossier retro-mislabel", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	root := fs.String("project-root", ".", "project root containing knowledge-base/cycles")
+	asJSON := fs.Bool("json", false, "emit the derived classification as JSON")
+	if err := fs.Parse(args); err != nil {
+		return 10
+	}
+	if _, err := os.ReadDir(dossier.CyclesDir(*root)); err != nil {
+		fmt.Fprintf(stderr, "dossier retro-mislabel: read knowledge-base/cycles: %v\n", err)
+		return 1
+	}
+
+	report := dossierRetroMislabelReport{
+		Mislabeled:     []int{},
+		Uncorroborated: []int{},
+	}
+	for _, d := range dossier.ReadCommitted(*root, 0) {
+		if d.SchemaVersion != 0 {
+			continue
+		}
+		switch dossier.PhaseSkipEvidence(*root, d, "retro") {
+		case dossier.SkipEvidenceContradicted:
+			report.Candidates++
+			report.Mislabeled = append(report.Mislabeled, d.Cycle)
+		case dossier.SkipEvidenceUnverified:
+			report.Candidates++
+			report.Uncorroborated = append(report.Uncorroborated, d.Cycle)
+		}
+	}
+
+	if *asJSON {
+		if err := json.NewEncoder(stdout).Encode(report); err != nil {
+			fmt.Fprintf(stderr, "dossier retro-mislabel: encode report: %v\n", err)
+			return 1
+		}
+		return 0
+	}
+	fmt.Fprintf(stdout, "dossier retro-mislabel: %d candidates; %d mislabeled; %d uncorroborated\n",
+		report.Candidates, len(report.Mislabeled), len(report.Uncorroborated))
+	return 0
 }
 
 func runDossierVerify(_ []string, stdout, stderr io.Writer) int {

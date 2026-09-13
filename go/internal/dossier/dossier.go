@@ -24,16 +24,21 @@ const (
 	VerdictPass = "PASS"
 	VerdictWarn = "WARN"
 	VerdictFail = "FAIL"
+
+	// CurrentSchemaVersion distinguishes dossiers written after the retro-skip
+	// mislabel fix from the unversioned legacy corpus.
+	CurrentSchemaVersion = 2
 )
 
 // Dossier is the aggregated, committed record of one cycle.
 type Dossier struct {
-	Cycle        int    `json:"cycle"`
-	RunID        string `json:"run_id,omitempty"`
-	Goal         string `json:"goal"`
-	FinalVerdict string `json:"final_verdict"`
-	CommitSHA    string `json:"commit_sha,omitempty"`
-	TreeSHA      string `json:"tree_sha,omitempty"`
+	SchemaVersion int    `json:"schema_version,omitempty"`
+	Cycle         int    `json:"cycle"`
+	RunID         string `json:"run_id,omitempty"`
+	Goal          string `json:"goal"`
+	FinalVerdict  string `json:"final_verdict"`
+	CommitSHA     string `json:"commit_sha,omitempty"`
+	TreeSHA       string `json:"tree_sha,omitempty"`
 	// Tasks is the task set triage COMMITTED for this cycle (top_n ids). It is
 	// a POINTER because the three states are genuinely distinct and the record
 	// must not conflate them:

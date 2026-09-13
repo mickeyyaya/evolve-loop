@@ -1,4 +1,5 @@
 {
+  "schema_version": 2,
   "cycle": 4243,
   "run_id": "01JFIXEDRUNIDFORGOLDEN01",
   "goal": "fixed goal text for the ordinary-PASS byte-clean pin",

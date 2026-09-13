@@ -1,4 +1,5 @@
 {
+  "schema_version": 2,
   "cycle": 4242,
   "run_id": "01JFIXEDRUNIDFORGOLDEN00",
   "goal": "fixed goal text for the byte-equivalence pin",

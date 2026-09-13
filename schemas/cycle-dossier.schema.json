@@ -7,6 +7,11 @@
   "required": ["cycle", "goal", "final_verdict", "phases"],
   "additionalProperties": false,
   "properties": {
+    "schema_version": {
+      "type": "integer",
+      "minimum": 2,
+      "description": "Forward-only dossier schema discriminator. Absent on legacy records."
+    },
     "cycle": {
       "type": "integer",
       "minimum": 1,

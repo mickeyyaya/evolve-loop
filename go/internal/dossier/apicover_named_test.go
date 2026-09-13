@@ -142,6 +142,30 @@ func TestVerdicts_Named(t *testing.T) {
 	}
 }
 
+// TestSchemaVersionAndSkipEvidence_Named executes the forward-only schema
+// discriminator and every result in the sanctioned skipped-phase read seam.
+func TestSchemaVersionAndSkipEvidence_Named(t *testing.T) {
+	d := &Dossier{
+		SchemaVersion: CurrentSchemaVersion,
+		SkippedPhases: []cyclestate.SkippedPhase{{Phase: "retro", Reason: "abnormal exit"}},
+	}
+	if CurrentSchemaVersion < 2 {
+		t.Fatalf("CurrentSchemaVersion = %d, want >= 2", CurrentSchemaVersion)
+	}
+	if got := PhaseSkipEvidence(t.TempDir(), d, "retro"); got != SkipEvidenceTrusted {
+		t.Errorf("versioned retro skip = %q, want %q", got, SkipEvidenceTrusted)
+	}
+	d.SchemaVersion = 0
+	if got := PhaseSkipEvidence(t.TempDir(), d, "retro"); got != SkipEvidenceUnverified {
+		t.Errorf("legacy retro skip without a receipt = %q, want %q", got, SkipEvidenceUnverified)
+	}
+	for _, evidence := range []SkipEvidence{SkipEvidenceNone, SkipEvidenceTrusted, SkipEvidenceContradicted, SkipEvidenceUnverified} {
+		if evidence == "" {
+			t.Error("SkipEvidence constant must not be empty")
+		}
+	}
+}
+
 // TestPhaseRecord_Named covers the PhaseRecord type (apicover typed-var check).
 func TestPhaseRecord_Named(t *testing.T) {
 	pr := PhaseRecord{

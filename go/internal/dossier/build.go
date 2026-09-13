@@ -131,6 +131,7 @@ func Build(cycle int, opts BuildOpts) (*Dossier, error) {
 		return nil, err
 	}
 	d := &Dossier{
+		SchemaVersion:              CurrentSchemaVersion,
 		Cycle:                      cycle,
 		Goal:                       opts.Goal,
 		RunID:                      opts.RunID,

@@ -26,8 +26,8 @@ Commands:
   guard      Run a trust-kernel guard ( guard <name> [--evolve-dir DIR] )
               Guards: ship | phase | role | docdelete | quota | chain
   ledger     Verify or tail the ledger ( ledger verify | ledger tail [--n N] )
-  dossier    Read and verify cycle dossiers
-              ( dossier verify [--project-root P] )
+  dossier    Read, verify, and audit cycle dossiers
+              ( dossier verify | dossier retro-mislabel [--project-root P] [--json] )
   audit      Analyze auditor narrative versus deterministic gate outcomes
               ( audit calibration [--project-root P] [--dossiers-dir D]
                 [--runs-dir R] --output FILE )
