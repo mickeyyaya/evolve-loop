@@ -14,53 +14,58 @@ import (
 )
 
 // validateExplanationReview applies retro's policy around the shared review
-// contract (explanationdocs.ValidateReviewedHandoff): an invalid or missing
-// handoff must be reviewed as NEEDS_CORRECTION with a concrete correction
-// todo, and NEEDS_CORRECTION is accepted when carryover-todos.json backs it.
-func validateExplanationReview(report string, req core.PhaseRequest) error {
+// contract (explanationdocs.ValidateReviewedHandoff). Since 2026-09-13
+// (ADR-0102, operator decision) the review's shape — the section, its
+// fields, the correction-todo bookkeeping, the handoff echoes and the
+// citations — is advisory: the findings ride the retrospective's record as
+// warnings. The error, the only blocking outcome, is the reasoning floor (a
+// token Evidence; a missing or duplicated review section is no review text
+// at all) and host-side defects in the handoff itself.
+func validateExplanationReview(report string, req core.PhaseRequest) (advisories []string, err error) {
 	if req.ExplanationDocumentationVersion == 0 {
-		return nil
+		return nil, nil
 	}
 	if req.BuildExplanationState == core.BuildExplanationNotYetBuilt {
-		return nil
+		return nil, nil
 	}
-	body, found, err := reportdoc.Section(report, "Explanation Documentation Review")
-	if err != nil {
-		return err
+	fields, advisories, err := reportdoc.ReasonedReview(report, "retrospective-report.md", "Explanation Documentation Review", "Status", "Build status", "Document", "Document SHA256", "Evidence", "Correction todo")
+	if err != nil || fields == nil {
+		return advisories, err
 	}
-	if !found {
-		return fmt.Errorf("retrospective-report.md is missing ## Explanation Documentation Review")
-	}
-	fields, err := reportdoc.ReviewFields(body, "Status", "Build status", "Document", "Document SHA256", "Evidence", "Correction todo")
-	if err != nil {
-		return err
-	}
-	if err := reportdoc.RequirePathLineEvidence(fields["evidence"]); err != nil {
-		return err
-	}
-	if strings.TrimSpace(fields["correction todo"]) == "" {
-		return fmt.Errorf("explanation documentation review requires a Correction todo")
+	todo := strings.TrimSpace(fields["correction todo"])
+	if todo == "" {
+		advisories = append(advisories, "explanation documentation review requires a Correction todo")
 	}
 	if req.BuildExplanationState == core.BuildExplanationInvalid || req.BuildExplanation == nil {
-		if fields["status"] != "NEEDS_CORRECTION" || strings.EqualFold(fields["correction todo"], "none") {
-			return fmt.Errorf("missing Build explanation requires NEEDS_CORRECTION and a concrete Correction todo")
+		if fields["status"] != "NEEDS_CORRECTION" || strings.EqualFold(todo, "none") {
+			return append(advisories, "missing Build explanation requires NEEDS_CORRECTION and a concrete Correction todo"+explanationdocs.HostReason(req.BuildExplanationError)), nil
 		}
-		return requireCorrectionTodo(req.Workspace, fields["correction todo"])
+		return adviseUnbackedTodo(advisories, req.Workspace, todo), nil
 	}
-	status, err := explanationdocs.ValidateReviewedHandoff(context.Background(), fields, req.BuildExplanation, req.Worktree, req.WorktreeBaseSHA)
+	review, err := explanationdocs.ValidateReviewedHandoff(context.Background(), fields, req.BuildExplanation, req.Worktree, req.WorktreeBaseSHA)
 	if err != nil {
-		return err
+		return append(advisories, review.Advisories...), err // the findings made before the host defect still ride the record
 	}
-	if status == "NEEDS_CORRECTION" {
-		if strings.EqualFold(fields["correction todo"], "none") {
-			return fmt.Errorf("status NEEDS_CORRECTION requires a concrete Correction todo")
+	advisories = append(advisories, review.Advisories...)
+	if review.Status == "NEEDS_CORRECTION" {
+		if strings.EqualFold(todo, "none") {
+			return append(advisories, "status NEEDS_CORRECTION requires a concrete Correction todo"), nil
 		}
-		return requireCorrectionTodo(req.Workspace, fields["correction todo"])
+		return adviseUnbackedTodo(advisories, req.Workspace, todo), nil
 	}
-	if !strings.EqualFold(fields["correction todo"], "none") {
-		return fmt.Errorf("verified explanation review must use Correction todo: none")
+	if !strings.EqualFold(todo, "none") {
+		advisories = append(advisories, "verified explanation review must use Correction todo: none")
 	}
-	return nil
+	return advisories, nil
+}
+
+// adviseUnbackedTodo records, as an advisory, a correction todo that
+// carryover-todos.json does not back.
+func adviseUnbackedTodo(advisories []string, workspace, todo string) []string {
+	if err := requireCorrectionTodo(workspace, todo); err != nil {
+		return append(advisories, err.Error())
+	}
+	return advisories
 }
 
 func requireCorrectionTodo(workspace, id string) error {

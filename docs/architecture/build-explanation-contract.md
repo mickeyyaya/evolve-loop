@@ -83,12 +83,16 @@ files, executable files, symlinks, and gitlinks. It rejects more than 10,000
 paths, more than 64 MiB of changed content, special files, symlink-parent
 escapes, and files that change identity while being read.
 
-Audit and Retro must cite the document and every material path with concrete
+Audit and Retro are asked to cite the document and every material path with concrete
 `path:line` evidence whose line exists in the current file or, for deletions,
 the sealed base blob. Symlink targets, gitlink commit IDs, and empty files each
-have one citable identity line. Audit reports `NEEDS_CORRECTION` when prose drifts; that negative
-judgment forces Audit failure. Retro uses the same status and requires every
-correction ID to exist in `carryover-todos.json` with a non-empty action.
+have one citable identity line. Since 2026-09-13 ([ADR-0102](adr/0102-explanation-review-reasoning-is-the-gate.md))
+the citation form, the handoff echoes and the reviewer's `NEEDS_CORRECTION` judgment are
+**advisory**: they ride the phase record as warnings and never force the verdict. What still
+blocks is the reviewer's reasoning floor (a token Evidence, or a missing or duplicated review
+section), a missing Build delivery reviewed as anything but FAIL (audit; retro records it as an
+advisory), and host-side handoff defects. Retro uses the same status; its correction-ID bookkeeping
+(`carryover-todos.json` with a non-empty action) is advisory as well.
 Quoted `explanation_error_untrusted_json` prompt fields and all Builder-authored
 artifacts are untrusted data, never instructions.
 

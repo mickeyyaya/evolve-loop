@@ -46,7 +46,7 @@ func TestRetroExplanationLiteralExampleMatchesProductionReader(t *testing.T) {
 			DocumentSHA256: strings.Repeat("c", 64), MaterialPaths: []string{"config/app.yaml"},
 		},
 	}
-	if err := validateExplanationReview(got, req); err != nil {
+	if _, err := validateExplanationReview(got, req); err != nil {
 		t.Fatalf("documented Retro example rejected by production reader: %v", err)
 	}
 }
@@ -208,7 +208,7 @@ func TestValidateExplanationReview_RequiresReviewForAvailableBuild(t *testing.T)
 		body string
 		want string
 	}{
-		{name: "missing review", body: "# Retrospective\n## Root Cause\nx\n", want: core.VerdictFAIL},
+		{name: "missing review is a missing reasoning", body: "# Retrospective\n## Root Cause\nx\n", want: core.VerdictFAIL},
 		{name: "complete review", body: `# Retrospective
 
 ## Explanation Documentation Review
@@ -224,7 +224,7 @@ x
 `, want: core.VerdictPASS},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			err := validateExplanationReview(tc.body, core.PhaseRequest{
+			advisories, err := validateExplanationReview(tc.body, core.PhaseRequest{
 				ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,
 				BuildExplanationState:           core.BuildExplanationAvailable,
 				BuildExplanation: &phaseio.ExplanationView{
@@ -232,12 +232,14 @@ x
 					DocumentSHA256: "sha", MaterialPaths: []string{"go/app.go"},
 				},
 			})
+			// ADR-0102: a missing review is a missing reasoning (FAIL); a
+			// complete review is clean (PASS, no advisories).
 			got := core.VerdictPASS
 			if err != nil {
 				got = core.VerdictFAIL
 			}
-			if got != tc.want {
-				t.Fatalf("qualitative review verdict=%s, want %s; err=%v", got, tc.want, err)
+			if got != tc.want || (tc.want == core.VerdictPASS && len(advisories) != 0) {
+				t.Fatalf("verdict=%s advisories=%v err=%v, want %s", got, advisories, err, tc.want)
 			}
 		})
 	}
@@ -260,12 +262,12 @@ func TestValidateExplanationReview_RejectsTokenEvidence(t *testing.T) {
 - Evidence: x
 - Correction todo: none
 `
-	if err := validateExplanationReview(report, req); err == nil || !strings.Contains(err.Error(), "concrete") {
-		t.Fatalf("token evidence was accepted: %v", err)
+	if _, err := validateExplanationReview(report, req); err == nil || !strings.Contains(err.Error(), "concrete") {
+		t.Fatalf("token evidence was accepted — the reasoning floor is the one rule left (ADR-0102): %v", err)
 	}
 }
 
-func TestValidateExplanationReview_RequiresPathLineEvidenceForEveryReference(t *testing.T) {
+func TestValidateExplanationReview_PathOnlyEvidenceIsAdvisory(t *testing.T) {
 	req := core.PhaseRequest{
 		ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,
 		BuildExplanationState:           core.BuildExplanationAvailable,
@@ -282,8 +284,9 @@ func TestValidateExplanationReview_RequiresPathLineEvidenceForEveryReference(t *
 - Evidence: reviewed docs/explain/builds/cycle-42.md and go/app.go against the failed implementation
 - Correction todo: none
 `
-	if err := validateExplanationReview(report, req); err == nil || !strings.Contains(err.Error(), "path:line") {
-		t.Fatalf("path-only evidence was accepted: %v", err)
+	advisories, err := validateExplanationReview(report, req)
+	if err != nil || !strings.Contains(strings.Join(advisories, "\n"), "path:line") {
+		t.Fatalf("path-only evidence is an advisory, never a block (ADR-0102): advisories=%v err=%v", advisories, err)
 	}
 }
 
@@ -324,12 +327,12 @@ func TestValidateExplanationReview_PreBuildFailureDoesNotInventMissingBuildDefec
 		ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,
 		BuildExplanationState:           core.BuildExplanationNotYetBuilt,
 	}
-	if err := validateExplanationReview("# Retrospective\n", req); err != nil {
+	if _, err := validateExplanationReview("# Retrospective\n", req); err != nil {
 		t.Fatalf("pre-Build failure must not require a nonexistent Build handoff: %v", err)
 	}
 }
 
-func TestValidateExplanationReview_NotApplicableRejectsDocumentClaims(t *testing.T) {
+func TestValidateExplanationReview_NotApplicableDocumentClaimsAreAdvisory(t *testing.T) {
 	req := core.PhaseRequest{
 		ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,
 		BuildExplanationState:           core.BuildExplanationAvailable,
@@ -343,12 +346,12 @@ func TestValidateExplanationReview_NotApplicableRejectsDocumentClaims(t *testing
 - Evidence: checked the base-bound material path set
 - Correction todo: none
 `
-	if err := validateExplanationReview(report, req); err == nil || !strings.Contains(err.Error(), "must omit") {
-		t.Fatalf("N/A review accepted forged document fields: %v", err)
+	if advisories, err := validateExplanationReview(report, req); err != nil || !strings.Contains(strings.Join(advisories, "\n"), "must omit") {
+		t.Fatalf("forged document fields on an N/A review are an advisory (ADR-0102): advisories=%v err=%v", advisories, err)
 	}
 }
 
-func TestValidateExplanationReview_CorrectionTodoMustExistInSidecar(t *testing.T) {
+func TestValidateExplanationReview_UnbackedCorrectionTodoIsAdvisory(t *testing.T) {
 	workspace := t.TempDir()
 	req := core.PhaseRequest{
 		Workspace:                       workspace,
@@ -361,14 +364,14 @@ func TestValidateExplanationReview_CorrectionTodoMustExistInSidecar(t *testing.T
 - Evidence: host verification reported a missing snapshot
 - Correction todo: fix-build-explanation
 `
-	if err := validateExplanationReview(report, req); err == nil || !strings.Contains(err.Error(), "carryover-todos.json") {
-		t.Fatalf("unwritten correction todo was accepted: %v", err)
+	if advisories, err := validateExplanationReview(report, req); err != nil || !strings.Contains(strings.Join(advisories, "\n"), "carryover-todos.json") {
+		t.Fatalf("an unbacked correction todo is an advisory (ADR-0102): advisories=%v err=%v", advisories, err)
 	}
 	sidecar := `[{"id":"fix-build-explanation","action":"Regenerate the base-bound Build explanation","priority":"high","evidence_pointer":"retrospective-report.md#explanation-documentation-review"}]`
 	if err := os.WriteFile(filepath.Join(workspace, "carryover-todos.json"), []byte(sidecar), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := validateExplanationReview(report, req); err != nil {
+	if _, err := validateExplanationReview(report, req); err != nil {
 		t.Fatalf("matching correction sidecar rejected: %v", err)
 	}
 }
@@ -742,7 +745,139 @@ func TestValidateExplanationReview_ListValuedEvidence(t *testing.T) {
 - Evidence: implemented at go/app.go:29-31 (range cite)
 - Correction todo: none
 `
-	if err := validateExplanationReview(report, req); err != nil {
+	if _, err := validateExplanationReview(report, req); err != nil {
 		t.Fatalf("list-valued Evidence with a range cite must pass the retro gate: %v", err)
+	}
+}
+
+// ADR-0102: the review's shape is advisory in retro too — the phase refreshes
+// the handoff itself (this fixture has no snapshot, so the finding is the
+// missing-handoff one) and every finding rides the retrospective's record as a
+// warning while the verdict is untouched.
+func TestRun_PreviousFAIL_LostHandoffAdvisoryRidesTheRecord(t *testing.T) {
+	ws := t.TempDir()
+	body := `# Retrospective
+
+## Explanation Documentation Review
+- Status: VERIFIED
+- Build status: required
+- Document: docs/explain/builds/cycle-5.md
+- Document SHA256: sha
+- Evidence: reviewed docs/explain/builds/cycle-5.md and go/app.go against the failed implementation
+- Correction todo: none
+
+## Root Cause
+Missing rate limit.
+
+## Lessons
+Apply rate limiter pattern.
+`
+	lesson := "id: rate-limit-missing\ntags: [auth, security]\nlesson: install rate limiter\n"
+	fb := &fakeBridge{writeArtifact: body, writeLesson: lesson, resp: core.BridgeResponse{CostUSD: 0.15}}
+	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("# Retro body"), NowFn: fixtures.FixedClock(time.Unix(1_700_000_000, 0), 90*time.Millisecond)})
+	resp, err := phase.Run(context.Background(), core.PhaseRequest{
+		Cycle: 5, ProjectRoot: "/tmp/proj", Workspace: ws,
+		Context:                         map[string]string{"previous_verdict": core.VerdictFAIL},
+		ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,
+		BuildExplanationState:           core.BuildExplanationAvailable,
+		BuildExplanation: &phaseio.ExplanationView{
+			Status: "required", DocumentPath: "docs/explain/builds/cycle-5.md",
+			DocumentSHA256: "sha", MaterialPaths: []string{"go/app.go"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if resp.Verdict != core.VerdictPASS {
+		t.Errorf("Verdict=%q, want PASS: the review reasons, only its citation form is short", resp.Verdict)
+	}
+	warned, errored := false, false
+	for _, d := range resp.Diagnostics {
+		if d.Severity == "warning" && strings.HasPrefix(d.Message, explanationdocs.AdvisoryPrefix) && strings.Contains(d.Message, "(host: ") {
+			warned = true
+		}
+		if d.Severity == "error" {
+			errored = true
+		}
+	}
+	if !warned || errored {
+		t.Errorf("the review finding rides the record as a prefixed advisory naming the host's reason, not an error: %v", resp.Diagnostics)
+	}
+}
+
+// ADR-0102: retro's bookkeeping findings — an absent Correction todo, a
+// duplicated field — are advisories, never a block.
+func TestValidateExplanationReview_BookkeepingFindingsAreAdvisory(t *testing.T) {
+	req := core.PhaseRequest{
+		ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,
+		BuildExplanationState:           core.BuildExplanationAvailable,
+		BuildExplanation: &phaseio.ExplanationView{
+			Status: "required", DocumentPath: "docs/explain/builds/cycle-42.md",
+			DocumentSHA256: "sha", MaterialPaths: []string{"go/app.go"},
+		},
+	}
+	noTodo := `## Explanation Documentation Review
+- Status: VERIFIED
+- Build status: required
+- Document: docs/explain/builds/cycle-42.md
+- Document SHA256: sha
+- Evidence: compared docs/explain/builds/cycle-42.md:1 with go/app.go:19 in the audited source diff
+`
+	advisories, err := validateExplanationReview(noTodo, req)
+	if err != nil || !strings.Contains(strings.Join(advisories, "\n"), "requires a Correction todo") {
+		t.Fatalf("an absent Correction todo is an advisory: advisories=%v err=%v", advisories, err)
+	}
+	duplicated := `## Explanation Documentation Review
+- Status: VERIFIED
+- Status: VERIFIED
+- Evidence: compared docs/explain/builds/cycle-42.md:1 with go/app.go:19 in the audited source diff
+- Correction todo: none
+`
+	advisories, err = validateExplanationReview(duplicated, req)
+	if err != nil || !strings.Contains(strings.Join(advisories, "\n"), "duplicate") {
+		t.Fatalf("a duplicated field is an advisory: advisories=%v err=%v", advisories, err)
+	}
+}
+
+// ADR-0102: a retrospective with two review sections is a parser finding
+// (advisory) with no attributable review text — the reasoning floor fails it.
+func TestValidateExplanationReview_DuplicateSectionIsAdvisoryButFailsTheFloor(t *testing.T) {
+	req := core.PhaseRequest{ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion, BuildExplanationState: core.BuildExplanationAvailable, BuildExplanation: &phaseio.ExplanationView{Status: "required", DocumentPath: "d.md", DocumentSHA256: "sha"}}
+	report := "## Explanation Documentation Review\n- Status: VERIFIED\n- Evidence: compared d.md:1 with the diff line by line\n- Correction todo: none\n\n## Explanation Documentation Review\n- Status: VERIFIED\n"
+	advisories, err := validateExplanationReview(report, req)
+	if err == nil || !strings.Contains(err.Error(), "concrete") || !strings.Contains(strings.Join(advisories, "\n"), "duplicate ##") {
+		t.Fatalf("a duplicated section is an advisory AND fails the reasoning floor: advisories=%v err=%v", advisories, err)
+	}
+}
+
+// ADR-0102 in retro: NEEDS_CORRECTION with "none" or with an unbacked todo is
+// advisory; a host-side handoff defect still fails loudly through the gate.
+func TestValidateExplanationReview_NeedsCorrectionTodoRulesAreAdvisoryAndHostDefectsAreLoud(t *testing.T) {
+	view := &phaseio.ExplanationView{Status: "required", DocumentPath: "docs/explain/builds/cycle-42.md", DocumentSHA256: "sha", MaterialPaths: []string{"go/app.go"}}
+	req := core.PhaseRequest{Workspace: t.TempDir(), ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion, BuildExplanationState: core.BuildExplanationAvailable, BuildExplanation: view}
+	body := func(todo string) string {
+		return "## Explanation Documentation Review\n- Status: NEEDS_CORRECTION\n- Build status: required\n- Document: docs/explain/builds/cycle-42.md\n- Document SHA256: sha\n- Evidence: docs/explain/builds/cycle-42.md:1 misstates the branch behavior implemented at go/app.go:19\n- Correction todo: " + todo + "\n"
+	}
+	if advisories, err := validateExplanationReview(body("none"), req); err != nil || !strings.Contains(strings.Join(advisories, "\n"), "requires a concrete Correction todo") {
+		t.Fatalf("NEEDS_CORRECTION with todo none is an advisory: advisories=%v err=%v", advisories, err)
+	}
+	if advisories, err := validateExplanationReview(body("todo-fix-branch-prose"), req); err != nil || !strings.Contains(strings.Join(advisories, "\n"), "carryover-todos.json") {
+		t.Fatalf("an unbacked NEEDS_CORRECTION todo is an advisory: advisories=%v err=%v", advisories, err)
+	}
+	weird := core.PhaseRequest{ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion, BuildExplanationState: core.BuildExplanationAvailable, BuildExplanation: &phaseio.ExplanationView{Status: "weird"}}
+	report := "## Explanation Documentation Review\n- Status: VERIFIED\n- Build status: weird\n- Evidence: compared d.md:1 with the diff line by line\n- Correction todo: none\n"
+	if _, err := validateExplanationReview(report, weird); err == nil || !strings.Contains(err.Error(), "unknown status") {
+		t.Fatalf("a host-side handoff defect fails loudly: %v", err)
+	}
+}
+
+// Retro parity with audit: the findings made before a host-defect error ride
+// along with it (go re-review).
+func TestValidateExplanationReview_HostDefectKeepsTheFindingsMadeBeforeIt(t *testing.T) {
+	weird := core.PhaseRequest{ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion, BuildExplanationState: core.BuildExplanationAvailable, BuildExplanation: &phaseio.ExplanationView{Status: "weird"}}
+	report := "## Explanation Documentation Review\n- Status: MAYBE\n- Build status: weird\n- Evidence: compared d.md:1 with the diff line by line\n- Correction todo: none\n"
+	advisories, err := validateExplanationReview(report, weird)
+	if err == nil || !strings.Contains(err.Error(), "unknown status") || !strings.Contains(strings.Join(advisories, "\n"), "must be VERIFIED") {
+		t.Fatalf("a host-side defect fails loudly and keeps the findings made before it: advisories=%v err=%v", advisories, err)
 	}
 }

@@ -12,40 +12,38 @@ import (
 )
 
 // validateExplanationReview applies audit's policy around the shared review
-// contract (explanationdocs.ValidateReviewedHandoff): a missing handoff must
-// be reported as Status: FAIL, and NEEDS_CORRECTION blocks the audit.
-func validateExplanationReview(report string, req core.PhaseRequest) error {
+// contract (explanationdocs.ValidateReviewedHandoff). Since 2026-09-13
+// (ADR-0102, operator decision) the reviewer's reasoning is the gate and the
+// section's shape is advisory: the returned advisories ride the phase record
+// as warnings and never touch the verdict. The error — the only blocking
+// outcome — is reserved for a missing reasoning (the Evidence floor; a
+// missing or duplicated review section is no review text at all), a missing
+// Build delivery reviewed as anything but FAIL, and host-side defects in the
+// handoff itself. Before this, cycles 1638 and 1640 (2026-09-13) were burned
+// by a PASS narrative overridden on citation form alone.
+func validateExplanationReview(report string, req core.PhaseRequest) (advisories []string, err error) {
 	if req.ExplanationDocumentationVersion == 0 {
-		return nil
+		return nil, nil
 	}
 	section := phasecontract.ExplanationDocumentation // the contract's declaration; the deliverable gate reads the same one
-	body, found, err := reportdoc.Section(report, section.Title())
-	if err != nil {
-		return err
-	}
-	if !found {
-		return fmt.Errorf("audit-report.md is missing %s", section.Canonical)
-	}
-	fields, err := reportdoc.ReviewFields(body, "Status", "Build status", "Document", "Document SHA256", "Evidence")
-	if err != nil {
-		return err
-	}
-	if err := reportdoc.RequirePathLineEvidence(fields["evidence"]); err != nil {
-		return err
+	fields, advisories, err := reportdoc.ReasonedReview(report, "audit-report.md", section.Title(), "Status", "Build status", "Document", "Document SHA256", "Evidence")
+	if err != nil || fields == nil {
+		return advisories, err
 	}
 	view := req.BuildExplanation
 	if req.BuildExplanationState != core.BuildExplanationAvailable || view == nil {
 		if fields["status"] != "FAIL" {
-			return fmt.Errorf("missing Build explanation handoff must be reported with Status: FAIL")
+			return nil, fmt.Errorf("missing Build explanation handoff must be reported with Status: FAIL%s", explanationdocs.HostReason(req.BuildExplanationError))
 		}
-		return nil
+		return nil, nil
 	}
-	status, err := explanationdocs.ValidateReviewedHandoff(context.Background(), fields, view, req.Worktree, req.WorktreeBaseSHA)
+	review, err := explanationdocs.ValidateReviewedHandoff(context.Background(), fields, view, req.Worktree, req.WorktreeBaseSHA)
 	if err != nil {
-		return err
+		return review.Advisories, err // the findings made before the host defect still ride the record
 	}
-	if status == "NEEDS_CORRECTION" {
-		return fmt.Errorf("explanation documentation review NEEDS_CORRECTION: %s", strings.TrimSpace(fields["evidence"]))
+	advisories = append(advisories, review.Advisories...)
+	if review.Status == "NEEDS_CORRECTION" {
+		advisories = append(advisories, "explanation documentation review NEEDS_CORRECTION: "+strings.TrimSpace(fields["evidence"]))
 	}
-	return nil
+	return advisories, nil
 }

@@ -45,6 +45,17 @@ func TestExplanationReviewGates_ShareContractCore(t *testing.T) {
 			if strings.Contains(string(body), "must be VERIFIED or NEEDS_CORRECTION") {
 				t.Fatalf("%s restates the status-enum belief; it must live only in explanationdocs", path)
 			}
+			// ADR-0102: the reasoning-floor ladder (section → fields → floor) has
+			// ONE home, reportdoc.ReasonedReview; a gate that locates the section
+			// or applies the floor itself has forked the ladder.
+			if !functionCalls(t, path, "validateExplanationReview", "reportdoc.ReasonedReview") {
+				t.Fatalf("%s: validateExplanationReview must read the review through reportdoc.ReasonedReview", path)
+			}
+			for _, forked := range []string{"reportdoc.Section", "reportdoc.ReviewFields", "reportdoc.RequireReasoning"} {
+				if functionCalls(t, path, "validateExplanationReview", forked) {
+					t.Fatalf("%s: validateExplanationReview calls %s directly — the ladder lives in reportdoc.ReasonedReview", path, forked)
+				}
+			}
 		})
 	}
 }
