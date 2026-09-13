@@ -78,33 +78,36 @@ Future haiku-augmented rule (designed for, not built): `semantic_loop` — agent
 
 ## Phase-end report
 
-Written atomically just before the observer exits. Schema:
+Written atomically (`.tmp` + rename) just before the observer exits. The keys the Go port
+(`internal/observerengine`, ADR-0103 unit 12) actually writes — a flat object, 18 keys; the
+`observer` / `summary` / `tool_call_histogram` blocks and the `verdict` / `suggested_action` /
+`cache_hit_rate` fields of the original bash design were never produced (operator question 3 of
+the unit-12 doc):
 
 ```json
 {
   "schema_version": "1.0",
+  "trace_id": "cycle-38-build-1780304400",
+  "started_at": "2026-06-01T09:00:00Z",
+  "finished_at": "2026-06-01T09:11:40Z",
+  "duration_s": 700,
   "cycle": 38,
   "phase": "build",
   "agent": "builder",
-  "observer": {
-    "started_at": "...", "ended_at": "...", "phase_duration_ms": 453000,
-    "exit_reason": "subagent_exited_normally | observer_eof_grace"
-  },
-  "summary": {
-    "verdict": "NORMAL | DEGRADED | INCIDENT",
-    "event_count": 152,
-    "tool_call_count": 47,
-    "error_count": 1,
-    "rate_limit_events": 1,
-    "cumulative_cost_usd": 1.84,
-    "cache_hit_rate": 0.96
-  },
-  "incidents": [ ... full INCIDENT envelopes ... ],
-  "tool_call_histogram": { "Read": {"count": 23, "errors": 0}, ... }
+  "event_count": 152,
+  "tool_call_count": 47,
+  "tool_result_count": 46,
+  "error_count": 1,
+  "rate_limit_count": 1,
+  "cumulative_cost": 1.84,
+  "cache_read_tokens": 120000,
+  "cache_creation_tokens": 4000,
+  "incident_count": 1,
+  "incidents": [ ... full INCIDENT envelopes ... ]
 }
 ```
 
-The orchestrator's directive is one line: "after each phase, read `{phase}-observer-report.json`; if `verdict` is `INCIDENT` or `incidents[]` non-empty, treat the recommended `suggested_action` as a decision input."
+The orchestrator's directive is one line: "after each phase, read `{phase}-observer-report.json`; if `incident_count` is non-zero, read `incidents[]` (each carries `type`, `severity`, `data.action` / `data.action_reason` under a stall policy) as a decision input." The persona rows that still name `summary.verdict` / `suggested_action` are the unit-12 follow-up F6.
 
 ## Spawning & lifecycle
 
@@ -186,12 +189,17 @@ These watchdog env vars still work but emit `[phase-observer] DEPRECATED` warnin
 
 **Watch a live phase**:
 ```bash
-tail -F .evolve/runs/cycle-38/builder-observer-events.ndjson | jq -c '{ts, severity, "metric": .data.metric_type}'
+tail -F .evolve/runs/cycle-38/builder-observer-events.ndjson | jq -c '{ts, type, severity, action: .data.action}'
 ```
 
 **Inspect a completed phase**:
 ```bash
-jq '.summary, {incidents: (.incidents | length)}' .evolve/runs/cycle-38/builder-observer-report.json
+jq '{event_count, tool_call_count, error_count, incident_count, incidents: [.incidents[] | {type, action: .data.action}]}' .evolve/runs/cycle-38/builder-observer-report.json
+```
+
+**Triage the observer's own faults** (ADR-0103 unit 12 — the manual subcommand renders them on its stderr as `[observer] observer.warning …`; the live adapter's land in the cycle's `signals.ndjson`):
+```bash
+grep '"module":"observer"' .evolve/runs/cycle-38/signals.ndjson | jq -c '{code, origin, fields}'
 ```
 
 **Tune for a noisy phase** (e.g., long Memo phases):

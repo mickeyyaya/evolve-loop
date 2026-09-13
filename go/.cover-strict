@@ -11,3 +11,4 @@
 ./internal/core/failurelearning 100
 ./internal/phases/ship/landing 100
 ./internal/config 100
+./internal/observerengine 100

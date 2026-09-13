@@ -98,6 +98,19 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `LOOP_PIPELINE_BLOCKER_HALT` | the pipeline-blocker breaker halted the batch (identical fingerprints, unexplained failures or consecutive failures over the ceiling); fields.rule and fields.fingerprint name the rule, the rest are the system-failure halt's own fields (next, escalation, inbox_item) |
 | `LOOP_SYSTEM_FAILURE_HALT` | the batch halted on an ADR-0072 system failure the cycle itself signalled (the pipeline, not the task, is the cause); fields.category names the floor, fields.next is the escalation dossier's next_action, fields.escalation and fields.inbox_item the dossier and the P0 item the halt wrote |
 
+### observer
+
+| Code | Meaning |
+|---|---|
+| `OBSERVER_EVENTS_SINK_OPEN_FAILED` | the live per-phase observer could not open <phase>-observer-events.ndjson, so the phase runs UNOBSERVED (ADR-0030: the observer never blocks the phase); fields.step=open_sink, path |
+| `OBSERVER_EVENT_APPEND_FAILED` | one line of <agent>-observer-events.ndjson was lost (fields.op = marshal | mkdir | open | write); reported ONCE per op for the observer's life, later losses on the same op are silent; an INCIDENT is still retained for the report when the open succeeded; fields.step=emit, op, path, event_type |
+| `OBSERVER_KILL_FAILED` | the SIGTERM to the agent's process group returned an error (ESRCH: already gone; EPERM: not ours) — the kill was attempted exactly once; fields.step=respond, pgid, signal, kind |
+| `OBSERVER_NUDGE_APPEND_FAILED` | the soft-stall nudge could not be appended to the agent inbox; the soft_stall_nudge envelope still emits and the nudge is not retried; fields.step=nudge, idle_s, threshold_s, agent |
+| `OBSERVER_REPORT_WRITE_FAILED` | <agent>-observer-report.json could not be marshalled, its directory created, its .tmp written or renamed into place; the subcommand still exits 0 (the report is best-effort); fields.step=report, path |
+| `OBSERVER_STALL_KILL_SENT` | the observer sent SIGTERM to the agent's process group after a stall INCIDENT — an act, not a fault — after the INCIDENT envelope was appended and before the signal; fields.step=respond, kind (stuck_no_output | stuck_no_progress | process_dead), pgid, action (legacy_enforce | kill_retry), action_reason, idle_s/threshold_s when the incident carries them |
+| `OBSERVER_STDOUT_TAIL_FAILED` | the agent's stdout log could not be stat'ed (a non-ENOENT error), opened, seeked or fully scanned (a line over the 10 MiB buffer); reported ONCE per op; an absent log stays silent by design (tmux drivers dump it at exit); the prior offset is kept on stat/open/seek, the file size after a scan error; fields.step=tail, op, path |
+| `OBSERVER_WATCHER_LEAKED` | the live observer's watcher goroutine did not exit within the bound after the phase finished; the goroutine and its sink fd are leaked on purpose (closing would race its writes) and the OS reclaims them at exit; fields.step=cancel, timeout_s |
+
 ### orchestrator
 
 | Code | Meaning |

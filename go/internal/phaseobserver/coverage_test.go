@@ -12,8 +12,9 @@ import (
 
 // coverage_test.go targets branches the behavior suite does not yet reach:
 // the zero-value config defaults, the empty-stdoutPath default, the heartbeat
-// emit, the EOF-grace shutdown, the tail rotation/stat-miss paths, and the
-// processLine empty-content / empty-tool-name edges. Behavior-pinned, no real
+// emit, the EOF-grace shutdown and the two fault paths the engine reports
+// (the tail/processLine edges moved to internal/observerengine, ADR-0103
+// unit 12). Behavior-pinned, no real
 // sleeps > ~150ms, deterministic clocks and t.TempDir only.
 
 // fixedClock returns a Now func pinned to a single instant — used where the
@@ -24,9 +25,10 @@ func fixedClock(at time.Time) func() time.Time {
 
 // === Run applies zero-value defaults ========================================
 // Passing a Config with all the tunable knobs left at their zero values forces
-// every `if cfg.X == 0 { cfg.X = default }` branch in Run (PollS, StallS,
-// LoopN, LoopWindowS, ErrorRate, CostSigma, ThrottleN, EOFGraceS,
-// HeartbeatEvery, Scope) plus the empty-stdoutPath default. A quick SIGUSR1
+// every `if cfg.X == 0 { cfg.X = default }` branch in withDefaults (PollS,
+// StallS, EOFGraceS, HeartbeatEvery, Scope — the five never-read defaults
+// LoopN/LoopWindowS/ErrorRate/CostSigma/ThrottleN fell with ADR-0103 unit
+// 12) plus the empty-stdoutPath default. A quick SIGUSR1
 // shutdown keeps it deterministic.
 func TestRun_AppliesZeroValueDefaults(t *testing.T) {
 	t.Parallel()
@@ -120,92 +122,6 @@ func TestRun_EOFGraceShutdown(t *testing.T) {
 	}
 }
 
-// === tail: stat-miss returns the prior offset ===============================
-// A missing stdout path makes os.Stat fail, so tail returns no lines and the
-// unchanged offset (332-335).
-func TestTail_StatMissReturnsPriorOffset(t *testing.T) {
-	t.Parallel()
-	o := &Observer{lastByteOff: 42}
-	lines, off := o.tail(filepath.Join(t.TempDir(), "does-not-exist.log"))
-	if lines != nil {
-		t.Errorf("lines = %v, want nil", lines)
-	}
-	if off != 42 {
-		t.Errorf("offset = %d, want 42 (prior offset preserved on stat miss)", off)
-	}
-}
-
-// === tail: rotation resets the offset to 0 and re-reads ====================
-// When the file shrinks below the saved offset (log rotation), tail must reset
-// lastByteOff to 0 and re-read from the top (336-339).
-func TestTail_RotationResetsOffset(t *testing.T) {
-	t.Parallel()
-	dir := t.TempDir()
-	p := filepath.Join(dir, "stdout.log")
-	if err := os.WriteFile(p, []byte("line-after-rotation\n"), 0o644); err != nil {
-		t.Fatalf("write: %v", err)
-	}
-	// Saved offset is past the new (smaller) file size → rotation detected.
-	o := &Observer{lastByteOff: 9999}
-	lines, off := o.tail(p)
-	if len(lines) != 1 || lines[0] != "line-after-rotation" {
-		t.Fatalf("lines = %v, want [line-after-rotation] (rotation re-read from 0)", lines)
-	}
-	if off != int64(len("line-after-rotation\n")) {
-		t.Errorf("offset = %d, want %d", off, len("line-after-rotation\n"))
-	}
-	if o.lastByteOff != 0 {
-		t.Errorf("lastByteOff = %d, want 0 (reset on rotation)", o.lastByteOff)
-	}
-}
-
-// === processLine: assistant with empty content array ========================
-// An assistant message whose content slice is empty must early-return after
-// the eventCount bump, leaving no tool-call recorded (376-378).
-func TestProcessLine_AssistantEmptyContent(t *testing.T) {
-	t.Parallel()
-	o := &Observer{cfg: Config{Now: time.Now}}
-	o.processLine(`{"type":"assistant","message":{"content":[]}}`)
-	if o.eventCount != 1 {
-		t.Errorf("eventCount = %d, want 1 (line counted)", o.eventCount)
-	}
-	if o.toolCallCount != 0 || len(o.loopHistory) != 0 {
-		t.Errorf("empty content must not record a tool call; tc=%d hist=%d",
-			o.toolCallCount, len(o.loopHistory))
-	}
-}
-
-// === processLine: tool_use with no name defaults to "?" =====================
-// A tool_use block missing its name still counts as a tool call and records a
-// loop-history entry tagged "?" (383-385).
-func TestProcessLine_ToolUseMissingNameDefaultsQuestion(t *testing.T) {
-	t.Parallel()
-	o := &Observer{cfg: Config{Now: time.Now}}
-	o.processLine(`{"type":"assistant","message":{"content":[{"type":"tool_use","input":{}}]}}`)
-	if o.toolCallCount != 1 {
-		t.Fatalf("toolCallCount = %d, want 1", o.toolCallCount)
-	}
-	if len(o.loopHistory) != 1 || o.loopHistory[0].tool != "?" {
-		t.Errorf("loopHistory = %+v, want one entry tool=%q", o.loopHistory, "?")
-	}
-}
-
-// === processLine: user message with empty content array =====================
-// A user message with empty content early-returns after the eventCount bump,
-// recording no tool result (398-400).
-func TestProcessLine_UserEmptyContent(t *testing.T) {
-	t.Parallel()
-	o := &Observer{cfg: Config{Now: time.Now}}
-	o.processLine(`{"type":"user","message":{"content":[]}}`)
-	if o.eventCount != 1 {
-		t.Errorf("eventCount = %d, want 1", o.eventCount)
-	}
-	if o.toolResultCnt != 0 || o.errorCount != 0 {
-		t.Errorf("empty user content must not record a tool result; tr=%d err=%d",
-			o.toolResultCnt, o.errorCount)
-	}
-}
-
 // === Stop-timer shutdown path ===============================================
 // With no ShutdownSig and a frozen clock (no stall), the StopAfterMS timer is
 // the only way out — exercising the stop-timer case (230-238).
@@ -282,8 +198,8 @@ func TestRun_InstallsDefaultNowClock(t *testing.T) {
 
 // === writeReport failure is logged as WARN, Run still returns ExitOK ========
 // Pre-creating the report path as a DIRECTORY makes the final os.Rename fail,
-// so writeReport returns an error and Run takes the WARN branch (324-326)
-// while still exiting ExitOK (report write is best-effort).
+// so the engine reports OBSERVER_REPORT_WRITE_FAILED and Run still exits
+// ExitOK (report write is best-effort).
 func TestRun_WriteReportFailure_WarnsButReturnsOK(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
@@ -305,7 +221,7 @@ func TestRun_WriteReportFailure_WarnsButReturnsOK(t *testing.T) {
 
 // === soft-stall nudge append failure is logged, kill still gated ===========
 // Pre-creating the inbox file path as a DIRECTORY makes inbox.Append's
-// OpenFile fail, so the nudge-append error branch (264-266) logs a WARN. The
+// OpenFile fail, so the engine reports OBSERVER_NUDGE_APPEND_FAILED. The
 // nudged flag is still set, and the clock stays below StallS so no kill fires.
 func TestRun_SoftStallNudge_AppendFailureWarns(t *testing.T) {
 	t.Parallel()

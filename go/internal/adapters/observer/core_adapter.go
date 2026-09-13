@@ -7,16 +7,18 @@ package observer
 // as a separate subprocess.
 //
 // The adapter is intentionally thin: it translates core.PhaseRequest
-// → Config, derives the stdout-log path from <workspace>/<phase>-
-// stdout.log (matching the runner's convention at
-// go/internal/phases/runner/runner.go), opens/creates an append-only
-// events sink at <workspace>/<phase>-observer-events.ndjson, and runs
-// the existing Observer.Watch goroutine. The returned cancel function
-// signals the watcher to stop + closes the events sink.
+// → Config, derives the stdout-log and events paths from the engine's
+// one layout (observerengine.PathsFor — <workspace>/<phase>-stdout.log,
+// matching the runner's convention at go/internal/phases/runner/runner.go,
+// and <workspace>/<phase>-observer-events.ndjson), opens/creates the
+// append-only events sink, and runs the existing Observer.Watch goroutine.
+// The returned cancel function signals the watcher to stop + closes the
+// events sink. Its two faults — the sink could not be opened, the watcher
+// did not exit — are observer.warning signals through the engine's
+// Reporter (ADR-0103 unit 12), never stderr lines.
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -28,8 +30,21 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/channel"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/observerengine"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
+
+// watcherExitTimeout bounds the wait for the watcher goroutine at cancel so
+// a deadlocked watcher can't hold up the orchestrator. The watcher's ticker
+// loop checks ctx.Done every PollS (5s default) so 2s is sometimes too
+// short; 10s covers the worst legitimate case.
+const watcherExitTimeout = 10 * time.Second
+
+// originAdapterStart is the origin the adapter stamps on both its faults: the
+// exported entry point whose call produced them (the leak fires inside the
+// cancel Start returned) — the one home the F1 Start split renames.
+const originAdapterStart = "CoreAdapter.Start"
 
 // CoreAdapter satisfies the core.Observer interface by spawning one
 // Observer.Watch goroutine per Start call. Zero value is a usable adapter
@@ -40,9 +55,6 @@ type CoreAdapter struct {
 	// reviewers that want to consume events in-process.
 	Sink io.Writer
 
-	// EnvLookup overrides os.Getenv for tests. Nil → os.Getenv.
-	EnvLookup func(key string) string
-
 	// RecoveryStage is the ADR-0044 Unified Phase Recovery stage, injected
 	// by the orchestrator from cfg.PhaseRecovery (policy-resolved). Empty →
 	// channel.ResolveStage returns "shadow" (behavior-neutral default).
@@ -50,6 +62,11 @@ type CoreAdapter struct {
 
 	// Config carries policy.json observer settings.
 	Config policy.ObserverPolicy
+
+	// Signals is the orchestrator's Signal Center, read live at every use
+	// (the root builds the Center before the adapter; nil = the Null Object).
+	// ADR-0103 unit 12: the adapter's own faults are observer.warning signals.
+	Signals func() *signalcenter.Center
 }
 
 // NewCoreAdapter returns a CoreAdapter wired with production defaults.
@@ -61,18 +78,25 @@ func NewCoreAdapter(config ...policy.ObserverPolicy) *CoreAdapter {
 	return a
 }
 
+// SignalsWired reports whether the adapter currently reaches a Center.
+func (a *CoreAdapter) SignalsWired() bool { return a.reporter().Wired() }
+
+// reporter is the engine's ONE producer bound to this adapter's accessor.
+func (a *CoreAdapter) reporter() *observerengine.Reporter {
+	return observerengine.NewReporter(a.Signals)
+}
+
 // Start implements core.Observer. Returns a cancel function the
 // orchestrator MUST call when the phase finishes. The cancel is
-// idempotent + waits up to 2s for the watcher goroutine to exit
-// (so the events sink is fully flushed before the next phase starts).
+// idempotent + waits up to watcherExitTimeout for the watcher goroutine to
+// exit (so the events sink is fully flushed before the next phase starts).
 func (a *CoreAdapter) Start(ctx context.Context, phase string, req core.PhaseRequest) func() {
 	if req.Workspace == "" || phase == "" {
 		// No workspace path = no stdout log to watch (e.g., pre-cycle
 		// orchestrator hooks). No-op cancel.
 		return func() {}
 	}
-	stdoutLog := filepath.Join(req.Workspace, phase+"-stdout.log")
-	eventsPath := filepath.Join(req.Workspace, phase+"-observer-events.ndjson")
+	p := observerengine.PathsFor(req.Workspace, phase)
 
 	sink := a.Sink
 	var sinkCloser io.Closer
@@ -80,11 +104,12 @@ func (a *CoreAdapter) Start(ctx context.Context, phase string, req core.PhaseReq
 		// Append-only NDJSON sink. Mkdir best-effort — workspace is
 		// expected to exist by phase-start (orchestrator created it).
 		_ = os.MkdirAll(req.Workspace, 0o755)
-		f, err := os.OpenFile(eventsPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+		f, err := os.OpenFile(p.Events, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 		if err != nil {
-			// Best-effort: print to stderr + degrade to no-op. Per
-			// ADR-0030, observer failure must NOT block the phase.
-			fmt.Fprintf(os.Stderr, "[observer] WARN open events file %s: %v (degraded: no auto-spawn this phase)\n", eventsPath, err)
+			// Best-effort: signal + degrade to no-op. Per ADR-0030, observer
+			// failure must NOT block the phase — it runs unobserved.
+			a.reporter().Report(originAdapterStart, req.Cycle, phase, observerengine.CodeEventsSinkOpenFailed,
+				err.Error()+" (phase runs unobserved)", map[string]string{"step": "open_sink", "path": p.Events})
 			return func() {}
 		}
 		sink = f
@@ -98,7 +123,7 @@ func (a *CoreAdapter) Start(ctx context.Context, phase string, req core.PhaseReq
 		Cycle:     req.Cycle,
 		Phase:     phase,
 		Agent:     phase, // runner-side: agent name == phase name post-prefix-strip
-		StdoutLog: stdoutLog,
+		StdoutLog: p.Stdout,
 		// Treat fresh writes anywhere in the workspace as progress — tmux-driver
 		// agents write live output to the tmux scrollback (not the stdout-log),
 		// so workspace artifact writes are the only filesystem liveness signal
@@ -115,21 +140,23 @@ func (a *CoreAdapter) Start(ctx context.Context, phase string, req core.PhaseReq
 		//     phases, which have no pane; PID written by the bridge at launch).
 		LivenessProbe: anyProbe(
 			newTmuxPaneProbe(req.Cycle, phase, req.RunID, nil),
-			newProcessCPUProbe(core.BridgePIDFile(stdoutLog), nil),
+			newProcessCPUProbe(core.BridgePIDFile(p.Stdout), nil),
 		),
 	}
 	// Cycle-124 Task 6 — KNOWN GAP: the operator's "active liveness
 	// nudging" mechanism is wired into the STANDALONE `evolve phase-
-	// observer` (cmd_phase_observer.go default flipped 0 → 300s) but the
+	// observer` (phasecmd; policy NudgeS defaults to 300s) but the
 	// AUTO-SPAWN path here does NOT yet emit nudge envelopes — this
-	// adapter's Observer is a thin Watch-only implementation; the full
-	// nudge logic (inbox append + nudged dedupe + soft_stall_nudge event)
-	// lives in `internal/phaseobserver` and would need porting. The
-	// resolveNudgeS + DefaultNudgeS scaffolding in this package is ready
-	// for that follow-up. Tracked as the cycle-124 backlog item: "auto-
-	// spawn observer nudge wire-up". For autonomous `evolve loop` runs,
-	// nudging is currently effectively opt-out (no nudge fires unless an
-	// operator runs the standalone phase-observer alongside the loop).
+	// adapter's Observer is a thin Watch-only implementation. The full
+	// nudge logic (inbox append + nudged dedupe + soft_stall_nudge event),
+	// the dead-process probe and the no-progress backstop now live in
+	// `internal/observerengine` (ADR-0103 unit 12) as a clock-stepped
+	// Engine the standalone host drives; folding it in here is the
+	// unit-12 follow-up F8 (operator question 1 — it would start nudging
+	// autonomous runs). DefaultNudgeS stays as the threshold that fold
+	// reads. For autonomous `evolve loop` runs, nudging is currently
+	// effectively opt-out (no nudge fires unless an operator runs the
+	// standalone phase-observer alongside the loop).
 	obs := New(cfg, sink)
 
 	watchCtx, cancel := context.WithCancel(ctx)
@@ -164,22 +191,38 @@ func (a *CoreAdapter) Start(ctx context.Context, phase string, req core.PhaseReq
 		go func() { defer wg.Done(); _ = p.Run(pctx) }()
 	}
 
+	return a.finishFn(req.Cycle, phase, watchHandles{cancel: cancel, prodCancel: prodCancel, obs: obs, wg: &wg, sinkCloser: sinkCloser}, watcherExitTimeout)
+}
+
+// watchHandles is what a running phase's watcher leaves for its cancel.
+type watchHandles struct {
+	cancel     func()
+	prodCancel func()
+	obs        *Observer
+	wg         *sync.WaitGroup
+	sinkCloser io.Closer
+}
+
+// finishFn is the idempotent cancel Start returns: stop the watcher and the
+// producer, wait up to timeout for both, close the sink only if they exited
+// (closeSinkAfterWait), and signal a leak otherwise — the goroutine and its
+// sink fd are then leaked on purpose (closing would race the watcher's
+// writes; the OS reclaims them at process exit; the cycle still completes).
+func (a *CoreAdapter) finishFn(cycle int, phase string, h watchHandles, timeout time.Duration) func() {
 	var once sync.Once
 	return func() {
 		once.Do(func() {
-			cancel()
-			if prodCancel != nil {
-				prodCancel()
+			h.cancel()
+			if h.prodCancel != nil {
+				h.prodCancel()
 			}
-			_ = obs.Stop()
-			// Bounded wait so a deadlocked watcher can't hold up the
-			// orchestrator. The watcher's ticker loop checks ctx.Done
-			// every PollS (5s default) so 2s is sometimes too short;
-			// raise to 10s to cover the worst legitimate case.
+			_ = h.obs.Stop()
 			done := make(chan struct{})
-			go func() { wg.Wait(); close(done) }()
-			if !closeSinkAfterWait(done, 10*time.Second, sinkCloser) {
-				fmt.Fprintf(os.Stderr, "[observer] WARN watcher for phase=%s didn't exit within 10s; leaking goroutine and leaving its events-sink fd open on purpose — closing it would race the watcher's writes; the OS reclaims it at process exit (cycle should still complete)\n", phase)
+			go func() { h.wg.Wait(); close(done) }()
+			if !closeSinkAfterWait(done, timeout, h.sinkCloser) {
+				a.reporter().Report(originAdapterStart, cycle, phase, observerengine.CodeWatcherLeaked,
+					"watcher for phase="+phase+" didn't exit within "+timeout.String()+"; leaking goroutine and leaving its events-sink fd open on purpose — closing it would race the watcher's writes; the OS reclaims it at process exit (cycle should still complete)",
+					map[string]string{"step": "cancel", "timeout_s": strconv.FormatFloat(timeout.Seconds(), 'f', -1, 64)})
 			}
 		})
 	}
@@ -190,7 +233,7 @@ func (a *CoreAdapter) Start(ctx context.Context, phase string, req core.PhaseReq
 // still-running leaked watcher goroutine's sink is never closed out from under
 // it (the use-after-close race the 10s bound describes). A nil closer is a
 // no-op, preserving Start's `if sinkCloser != nil` contract. Returns true iff
-// done fired within timeout (false → the caller may WARN about the leak).
+// done fired within timeout (false → the caller may signal the leak).
 func closeSinkAfterWait(done <-chan struct{}, timeout time.Duration, closer io.Closer) bool {
 	select {
 	case <-done:
@@ -239,56 +282,4 @@ func (a *CoreAdapter) phaseCLI(req core.PhaseRequest, phase string) string {
 		return v
 	}
 	return "claude-tmux"
-}
-
-// resolveDuration reads an injected value as seconds and falls back to def
-// on empty/invalid OR on a non-positive value. Used for
-// PollS/StallS where 0 is meaningless (no polling / no stall threshold)
-// and indistinguishable from "the operator forgot to set it". Per-adapter
-// EnvLookup is honored. For NudgeS the 0-means-disable semantics differ —
-// see resolveNudgeS below.
-func (a *CoreAdapter) resolveDuration(key string, def time.Duration) time.Duration {
-	get := os.Getenv
-	if a.EnvLookup != nil {
-		get = a.EnvLookup
-	}
-	raw := get(key)
-	if raw == "" {
-		return def
-	}
-	n, err := strconv.Atoi(raw)
-	if err != nil || n <= 0 {
-		return def
-	}
-	return time.Duration(n) * time.Second
-}
-
-// resolveString reads an injected string setting and falls back on empty.
-func (a *CoreAdapter) resolveString(key, def string) string {
-	get := os.Getenv
-	if a.EnvLookup != nil {
-		get = a.EnvLookup
-	}
-	if raw := get(key); raw != "" {
-		return raw
-	}
-	return def
-}
-
-// resolveNudgeS resolves an injected seconds setting where zero explicitly
-// disables nudging and invalid/negative values fall back to the default.
-func (a *CoreAdapter) resolveNudgeS(key string, def time.Duration) time.Duration {
-	get := os.Getenv
-	if a.EnvLookup != nil {
-		get = a.EnvLookup
-	}
-	raw := get(key)
-	if raw == "" {
-		return def
-	}
-	n, err := strconv.Atoi(raw)
-	if err != nil || n < 0 {
-		return def
-	}
-	return time.Duration(n) * time.Second
 }

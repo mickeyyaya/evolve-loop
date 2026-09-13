@@ -341,8 +341,8 @@ type rootLedger interface {
 // signals.ndjson — per cycle workspace for cycle-scoped signals, and
 // <evolveDir>/signals.ndjson for batch-level (cycle-less) ones: the loop's
 // own halts and wave summaries, a bridge warning before any cycle — and the
-// console at WARN and above (the severity contract's "log only" INFO tier
-// stays in the files).
+// console at WARN and above (signalcenter.ConsoleSink, the one home of that
+// threshold; the severity contract's "log only" INFO tier stays in the files).
 func newRootSignalCenter(projectRoot, evolveDir string, console io.Writer) *signalcenter.Center {
 	signals := signalcenter.New(signalcenter.WithPID(os.Getpid()))
 	signals.Subscribe(signals.NDJSONSink(func(cycle int) string {
@@ -351,7 +351,7 @@ func newRootSignalCenter(projectRoot, evolveDir string, console io.Writer) *sign
 		}
 		return filepath.Join(core.RunWorkspacePath(projectRoot, cycle), "signals.ndjson")
 	}))
-	signals.Subscribe(signalcenter.Filter(signalcenter.StderrSink(console), signalcenter.SeverityWarn))
+	signals.Subscribe(signalcenter.ConsoleSink(console))
 	return signals
 }
 
@@ -646,6 +646,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 	if *observerCfg.Autospawn {
 		ca := observer.NewCoreAdapter(observerCfg)
 		ca.RecoveryStage = cfg.PhaseRecovery.String()
+		ca.Signals = func() *signalcenter.Center { return signals } // ADR-0103 unit 12: the adapter's own faults are observer.warning signals
 		opts = append(opts, core.WithObserver(ca))
 	}
 	// Structural eval gates (internal/evalgate): Gate A (scout eval-file

@@ -328,3 +328,54 @@ func TestWireSimulateOrchestrator_FailureLearningWarningRenders(t *testing.T) {
 		t.Errorf("the cycle-stamped signal is durable in the cycle workspace: %v %s", err, data)
 	}
 }
+
+// ADR-0103 unit 12 (architecture review fold): the console threshold — "the
+// operator console renders WARN and above" — has ONE home,
+// signalcenter.ConsoleSink. Both composition roots (newRootSignalCenter and
+// the `evolve phase-observer` subprocess) consume it; no production source
+// outside the sink's own file re-spells Filter(StderrSink(…), SeverityWarn),
+// so a console-policy change at one root can never leave the other behind.
+func TestConsoleSinkThresholdHasOneHome(t *testing.T) {
+	const home = "internal/signalcenter/sinks.go"
+	moduleRoot := filepath.Join("..", "..")
+	var respelled []string
+	err := filepath.WalkDir(moduleRoot, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		name := entry.Name()
+		if entry.IsDir() {
+			if name == "vendor" || name == "bin" || strings.HasPrefix(name, ".") && path != moduleRoot {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+			return nil
+		}
+		src, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		rel, _ := filepath.Rel(moduleRoot, path)
+		if rel = filepath.ToSlash(rel); rel != home && strings.Contains(string(src), "StderrSink(") {
+			respelled = append(respelled, rel)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(respelled) != 0 {
+		t.Errorf("the console threshold is spelled outside signalcenter.ConsoleSink: %v", respelled)
+	}
+	for _, root := range []string{"cmd_cycle.go", filepath.Join(moduleRoot, "internal", "cli", "phasecmd", "phase_observer.go")} {
+		src, err := os.ReadFile(root)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(src), "signalcenter.ConsoleSink(") {
+			t.Errorf("%s: a composition root consumes signalcenter.ConsoleSink", root)
+		}
+	}
+}
