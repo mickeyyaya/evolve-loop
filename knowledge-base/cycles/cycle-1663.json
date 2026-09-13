@@ -1,0 +1,245 @@
+{
+  "cycle": 1663,
+  "run_id": "01M2DTGZVSCT02QCZJPH3SBK6P",
+  "goal": "Pipeline-health verification batch (2026-09-12, two waves): work the highest-weight queued inbox items end-to-end — claim, tdd, build, audit, ship — with full phase integrity, now that the resume worktree teardown (#571), the shipDirect audit binding (#569), resume-path outcome recording (#568), and profile sandbox.write_subpaths grants (#572) are on main. Every cycle must commit to a claimed inbox item (an empty top_n must not run the spine), bind its audit to the changes tree it ships, record a terminal outcome on every exit, and leave no stale worktree behind. Pipeline-integrity and pipeline-repair items come first; ADR-0099 document deliverables are eligible.",
+  "final_verdict": "PASS",
+  "commit_sha": "4db205a889490d6788300920062f06fc7068e6b0",
+  "tree_sha": "a518d1117e6690041de76e589d8f04667441ad0b",
+  "tasks": [
+    "dossier-producer-params-struct",
+    "lost-ship-dossier-evidence"
+  ],
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 122406,
+      "started_at": "2026-09-13T16:45:46Z",
+      "ended_at": "2026-09-13T16:47:49Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 28,
+        "output": 9672,
+        "cache_read": 934598,
+        "cache_write": 45955
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 94961,
+      "started_at": "2026-09-13T16:48:21Z",
+      "ended_at": "2026-09-13T16:49:57Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "fault-localization",
+      "verdict": "PASS",
+      "duration_ms": 147763,
+      "started_at": "2026-09-13T16:49:57Z",
+      "ended_at": "2026-09-13T16:52:25Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "bug-reproduction",
+      "verdict": "PASS",
+      "duration_ms": 161994,
+      "started_at": "2026-09-13T16:52:25Z",
+      "ended_at": "2026-09-13T16:55:07Z",
+      "archetype": "evaluate",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 739206,
+      "started_at": "2026-09-13T16:55:08Z",
+      "ended_at": "2026-09-13T17:07:27Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 116,
+        "output": 55800,
+        "cache_read": 8541653,
+        "cache_write": 178690
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 761788,
+      "started_at": "2026-09-13T17:07:27Z",
+      "ended_at": "2026-09-13T17:21:35Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "PASS",
+      "duration_ms": 600823,
+      "started_at": "2026-09-13T17:22:13Z",
+      "ended_at": "2026-09-13T17:37:50Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 104,
+        "output": 38722,
+        "cache_read": 6871067,
+        "cache_write": 142773
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "FAIL",
+      "duration_ms": 7312,
+      "started_at": "2026-09-13T17:38:37Z",
+      "ended_at": "2026-09-13T17:38:46Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 1542344,
+      "started_at": "2026-09-13T17:38:46Z",
+      "ended_at": "2026-09-13T18:15:04Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "PASS",
+      "duration_ms": 471804,
+      "started_at": "2026-09-13T18:16:12Z",
+      "ended_at": "2026-09-13T18:29:14Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 56,
+        "output": 26477,
+        "cache_read": 2911529,
+        "cache_write": 96057
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "PASS",
+      "duration_ms": 9344,
+      "started_at": "2026-09-13T18:29:58Z",
+      "ended_at": "2026-09-13T18:30:08Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "timing": {
+    "total_ms": 4659745,
+    "phase_count": 11,
+    "retried_count": 0,
+    "longest_phase": "build",
+    "longest_ms": 1542344,
+    "by_archetype_ms": {
+      "build": 2304132,
+      "control": 16656,
+      "evaluate": 1234621,
+      "plan": 1104336
+    },
+    "total_tokens": {
+      "input": 304,
+      "output": 130671,
+      "cache_read": 19258847,
+      "cache_write": 463475
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "control": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "evaluate": {
+        "input": 160,
+        "output": 65199,
+        "cache_read": 9782596,
+        "cache_write": 238830
+      },
+      "plan": {
+        "input": 144,
+        "output": 65472,
+        "cache_read": 9476251,
+        "cache_write": 224645
+      }
+    },
+    "wasted_tokens": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "cache_hit_ratio": 0.9999842152958871,
+    "hot_phase_count": 4,
+    "hot_phases": [
+      "scout",
+      "tdd",
+      "audit",
+      "audit"
+    ]
+  }
+}
