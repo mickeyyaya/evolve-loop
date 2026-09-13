@@ -1,0 +1,78 @@
+{
+  "cycle": 1667,
+  "run_id": "01M2E8QACD5NTPPWRHM23D21JG",
+  "goal": "Pipeline-health verification batch (2026-09-12, two waves): work the highest-weight queued inbox items end-to-end — claim, tdd, build, audit, ship — with full phase integrity, now that the resume worktree teardown (#571), the shipDirect audit binding (#569), resume-path outcome recording (#568), and profile sandbox.write_subpaths grants (#572) are on main. Every cycle must commit to a claimed inbox item (an empty top_n must not run the spine), bind its audit to the changes tree it ships, record a terminal outcome on every exit, and leave no stale worktree behind. Pipeline-integrity and pipeline-repair items come first; ADR-0099 document deliverables are eligible.",
+  "final_verdict": "WARN",
+  "tasks": [
+    "dossier-corpus-carries-retro-mislabel"
+  ],
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 120982,
+      "started_at": "2026-09-13T20:53:55Z",
+      "ended_at": "2026-09-13T20:55:57Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 28,
+        "output": 6791,
+        "cache_read": 926809,
+        "cache_write": 39645
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 99502,
+      "started_at": "2026-09-13T20:56:29Z",
+      "ended_at": "2026-09-13T20:58:09Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "timing": {
+    "total_ms": 220484,
+    "phase_count": 2,
+    "retried_count": 0,
+    "longest_phase": "scout",
+    "longest_ms": 120982,
+    "by_archetype_ms": {
+      "plan": 220484
+    },
+    "total_tokens": {
+      "input": 28,
+      "output": 6791,
+      "cache_read": 926809,
+      "cache_write": 39645
+    },
+    "tokens_by_archetype": {
+      "plan": {
+        "input": 28,
+        "output": 6791,
+        "cache_read": 926809,
+        "cache_write": 39645
+      }
+    },
+    "wasted_tokens": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "cache_hit_ratio": 0.9999697897257015,
+    "hot_phase_count": 1,
+    "hot_phases": [
+      "scout"
+    ]
+  }
+}
