@@ -1,0 +1,15 @@
+- id: cycle-1279-phase-audit
+  pattern: deliverable-rejected
+  description: audit phase exited 1 after 3 attempts
+  confidence: 0.5
+  source: docs/x.md, {{WS}}
+  type: failure-lesson
+  category: episodic
+  preventiveAction: Deterministic fallback lesson — the LLM retrospective was unavailable for cycle 1279 (deliverable-rejected). Review the evidence paths and defects, then re-run a full retrospective if deeper analysis is needed.
+  defects:
+    - the ledger row lacks evidence
+    - the manifest row lacks a path
+  failureContext:
+    failedStep: audit
+    errorCategory: deliverable-rejected
+    auditVerdict: FAIL

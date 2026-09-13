@@ -8,3 +8,4 @@
 ./internal/deliverable/gatesignal 100
 ./internal/core/failurediag 100
 ./internal/core/carryover 100
+./internal/core/failurelearning 100

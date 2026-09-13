@@ -21,6 +21,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core/carryover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core/failurediag"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core/failurelearning"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
@@ -305,5 +306,25 @@ func TestWireSimulateOrchestrator_CarryoverWarningRenders(t *testing.T) {
 	}
 	if data, err := os.ReadFile(filepath.Join(evolveDir, "signals.ndjson")); err != nil || !strings.Contains(string(data), `"code":"CARRYOVER_WORKSPACE_READ_FAILED"`) {
 		t.Errorf("the cycle-less signal is durable: %v %s", err, data)
+	}
+}
+
+// ADR-0103 unit 03b: the failure-learning engine's WARN reaches the --simulate
+// root's console sink and the durable stream.
+func TestWireSimulateOrchestrator_FailureLearningWarningRenders(t *testing.T) {
+	root := t.TempDir()
+	evolveDir := filepath.Join(root, ".evolve")
+	if err := os.MkdirAll(filepath.Join(evolveDir, "policy.json"), 0o755); err != nil { // a directory at the path: a read fault, not absence
+		t.Fatal(err)
+	}
+	var console bytes.Buffer
+	d := wireSimulateOrchestrator(root, evolveDir, &console)
+	e := failurelearning.New(time.Now, carryover.New(), failurelearning.WithSignals(func() *signalcenter.Center { return d.Signals }))
+	e.WriteFloor(failurelearning.Failure{Cycle: 3, Phase: core.PhaseAudit, ProjectRoot: root, Workspace: filepath.Join(root, "ws")}, failurelearning.Learned{Summary: "s"})
+	if out := console.String(); !strings.Contains(out, "[failurelearning]") || !strings.Contains(out, "FAILURELEARNING_POLICY_LOAD_FAILED") {
+		t.Fatalf("the console sink renders the unit's WARN under --simulate: %q", out)
+	}
+	if data, err := os.ReadFile(filepath.Join(core.RunWorkspacePath(root, 3), "signals.ndjson")); err != nil || !strings.Contains(string(data), `"code":"FAILURELEARNING_POLICY_LOAD_FAILED"`) {
+		t.Errorf("the cycle-stamped signal is durable in the cycle workspace: %v %s", err, data)
 	}
 }

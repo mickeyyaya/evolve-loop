@@ -125,7 +125,7 @@ func TestMergeWorkspaceCarryover_DedupesById(t *testing.T) {
 }
 
 // TestMergeWorkspaceCarryover_CapsActionRunes — an oversized action is bounded to
-// the capRunes ceiling (maxAdoptedDefectRunes) so a memo todo cannot inject an
+// the capRunes ceiling (carryover.MaxActionRunes) so a memo todo cannot inject an
 // arbitrarily large Action that bloats every future router/advisor prompt.
 func TestMergeWorkspaceCarryover_CapsActionRunes(t *testing.T) {
 	ws := t.TempDir()
@@ -139,11 +139,11 @@ func TestMergeWorkspaceCarryover_CapsActionRunes(t *testing.T) {
 		t.Fatalf("RED: expected 1 merged todo, got %d", len(state.CarryoverTodos))
 	}
 	n := utf8.RuneCountInString(state.CarryoverTodos[0].Action)
-	// capRunes(s, maxAdoptedDefectRunes) yields at most maxAdoptedDefectRunes+1
+	// capRunes(s, carryover.MaxActionRunes) yields at most carryover.MaxActionRunes+1
 	// runes (the trailing ellipsis marker on truncation).
-	if n > maxAdoptedDefectRunes+1 {
-		t.Fatalf("RED: Action not capped: got %d runes, want <= %d — apply capRunes(action, maxAdoptedDefectRunes)",
-			n, maxAdoptedDefectRunes+1)
+	if n > carryover.MaxActionRunes+1 {
+		t.Fatalf("RED: Action not capped: got %d runes, want <= %d — apply capRunes(action, carryover.MaxActionRunes)",
+			n, carryover.MaxActionRunes+1)
 	}
 	if n >= 5000 {
 		t.Fatalf("RED: Action left uncapped at %d runes (input length)", n)

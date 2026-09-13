@@ -16,6 +16,19 @@ func CapRunes(s string, maxRunes int) string {
 	return s
 }
 
+// TruncateRunes trims surrounding whitespace and caps s at max runes, marking
+// truncation with " …[truncated]" — the advisor prompt's and the remediation
+// title's rule (ADR-0103 unit 03b), the third cap beside CapRunes ("…") and
+// Summary (" ...[truncated]"). Three rules, one file.
+func TruncateRunes(s string, max int) string {
+	s = strings.TrimSpace(s)
+	r := []rune(s)
+	if len(r) <= max {
+		return s
+	}
+	return string(r[:max]) + " …[truncated]"
+}
+
 // Summary is the failure-born todo's action and the FailedRecord's summary:
 // the message capped at MaxSummaryRunes with the truncation marker (a
 // different rule from CapRunes' ellipsis — both preserved).

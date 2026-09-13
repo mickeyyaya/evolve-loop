@@ -107,3 +107,9 @@ const (
 	carryoverPriorityBlocking      = carryover.PriorityBlocking
 	maxFailureLearningSummaryChars = carryover.MaxSummaryRunes
 )
+
+// truncateRunes is the advisor prompt's rune cap (the goal section and the
+// catalog card hints) and the remediation title's — carryover.TruncateRunes,
+// the third cap the unit enumerates beside CapRunes and Summary (ADR-0103
+// unit 03b); a facade so phase_advisor.go and task_recall.go keep their spelling.
+func truncateRunes(s string, max int) string { return carryover.TruncateRunes(s, max) }

@@ -2,26 +2,17 @@ package core
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strconv"
-	"strings"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/core/carryover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core/outcome"
-	"github.com/mickeyyaya/evolve-loop/go/internal/faillearn"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failuregrade"
-	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasetiming"
-	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
-	"github.com/mickeyyaya/evolve-loop/go/internal/recurrence"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
@@ -110,115 +101,109 @@ func (cr *cycleRun) flushPhaseTimings() []phaseTimingEntry {
 	return cr.timingsComposed
 }
 
-// recordFailedApproachState persists the learn-from-failure STATE for a failed
-// phase — the FailedRecord appended to state.FailedAt, a deduped P0 carryover
-// todo, and the adopted structured failure block — and returns the summary, todo
-// id, and structured block for callers that continue with retro. It does NOT run
-// retro: that is the caller's concern. Single-sourced (never_duplicate) between
-// the error path (recordFailureLearning, which additionally force-runs retro to
-// capture the lesson before an aborted cycle ends) and the success path (a FLOOR
-// phase returning a FAIL verdict with err==nil via recordFloorVerdictFailure —
-// there the cycle still routes FAIL→retro through the normal state machine, so an
-// inline retro would be a duplicate). Callers guarantee fl.State/CycleState are
-// non-nil.
-func (o *Orchestrator) recordFailedApproachState(fl failureLearningRequest) (summary, todoID string, structured *phasecontract.FailureBlock) {
-	summary = failureLearningSummary(fl.Cycle, fl.Failed, fl.Err)
-	todoID = fmt.Sprintf("cycle-%d-failed-%s", fl.Cycle, fl.Failed)
-	now := o.now().UTC()
-	nowTS := now.Format(time.RFC3339)
-	record := FailedRecord{
-		TS:             nowTS,
-		Cycle:          fl.Cycle,
-		Verdict:        VerdictFAIL,
-		Classification: "cycle-mid-execution-fail",
-		RecordedAt:     nowTS,
-		Summary:        summary,
-		Defects:        []string{summary},
-		Retrospected:   true,
+// learningGate is the PURE pre-recorder decision of recordFailureLearning:
+// which of the three silent exits fires, or that learning proceeds. It never
+// mutates the request — the ShipFailReasons carrier is the coordinator's,
+// written between the gate and the quota return (invariant A).
+//
+// Order: incomplete → canceled → quota-deferred. Cancellation is an
+// operator/runtime stop, not evidence that the task or phase failed: keep the
+// active phase intact for the interrupt checkpoint and spend no model call on
+// a retrospective that cannot finish under an already-canceled context. An
+// all-families quota exhaustion is a DEFERRED resume checkpoint, not a failed
+// phase: it stays out of *all* failure-learning state, including the
+// FailedRecord and P0 todo the recorder mints — errors.Is, because dispatch
+// wraps the sentinel before it reaches this chokepoint.
+type learningGate int
+
+const (
+	gateLearn         learningGate = iota // proceed to the recorder
+	gateIncomplete                        // retro itself failed, no error, or a nil State/CycleState/Result/Timings
+	gateCanceled                          // ctx.Err() != nil, checked BEFORE the quota sentinel
+	gateQuotaDeferred                     // errors.Is(Err, ErrAllFamiliesExhausted)
+)
+
+func failureLearningGate(ctx context.Context, fl failureLearningRequest) learningGate {
+	if fl.Failed == PhaseRetro || fl.Err == nil || fl.State == nil || fl.CycleState == nil || fl.Result == nil || fl.Timings == nil {
+		return gateIncomplete
 	}
-	// ADR-0039 §7: a phase healthy enough to self-report owns its failure
-	// description — its structured block beats the supervisor's synthesis.
-	// Read ONCE here and thread to the deterministic-learning fallback, so
-	// state.json and the lesson artifacts can never diverge on the same
-	// failure event.
-	structured = adoptStructuredFailure(fl.CycleState.WorkspacePath, string(fl.Failed))
-	if structured != nil {
-		record.Classification = structured.Class
-		if len(structured.Defects) > 0 {
-			record.Defects = structured.Defects
-		}
+	if ctx.Err() != nil {
+		return gateCanceled
 	}
-	// Stamp the TTL from the FINAL classification (state.go:87-91 / record.go
-	// contract): without this the field is never populated, so the loop-start
-	// failurelog.PruneExpiredCarryoverTodos pass keeps every entry forever and
-	// the array grows unboundedly. Compute once and share so the todo inherits
-	// the record's stamp rather than re-deriving it (single-sourced TTL logic).
-	record.ExpiresAt = failurelog.ComputeExpiresAt(
-		failurelog.NormalizeLegacy(record.Classification), now)
-	o.appendCarryoverTodoDeduped(fl.State, CarryoverTodo{
-		ID: todoID, Action: summary, Priority: carryoverPriorityBlocking,
-		FirstSeenCycle: fl.Cycle, ExpiresAt: record.ExpiresAt,
-	})
-	fl.State.FailedAt = append(fl.State.FailedAt, record)
-	fl.State.LastCycleNumber = fl.Cycle
-	return summary, todoID, structured
+	if errors.Is(fl.Err, ErrAllFamiliesExhausted) {
+		return gateQuotaDeferred
+	}
+	return gateLearn
 }
 
+// recordFailureLearning is the chokepoint every failed phase reaches — the
+// coordinator of the failure-learning spine (ADR-0103 unit 03b): the gate,
+// the carrier, the recorder (invariant D: before the doc-missing arm and the
+// runner lookup), the deterministic arms, the retro dispatch and its
+// completion. Every stderr line below is verbatim; unit 05 codes them.
 func (o *Orchestrator) recordFailureLearning(ctx context.Context, fl failureLearningRequest) {
-	if fl.Failed == PhaseRetro || fl.Err == nil || fl.State == nil || fl.CycleState == nil || fl.Result == nil || fl.Timings == nil {
+	gate := failureLearningGate(ctx, fl)
+	if gate == gateIncomplete || gate == gateCanceled {
 		return
 	}
-	// Cancellation is an operator/runtime stop, not evidence that the task or
-	// phase failed. Keep the active phase intact for the interrupt checkpoint
-	// and do not spend another model call on a retrospective that cannot finish
-	// under an already-canceled context.
-	if ctx.Err() != nil {
-		return
-	}
-	// Preserve a ship dispatch explanation for the coherence floor even when the
-	// quota boundary skips failure learning below.
+	// Preserve a ship dispatch explanation for the coherence floor even when
+	// the quota boundary skips failure learning below (invariant A).
 	if fl.Failed == PhaseShip {
 		fl.CycleState.ShipFailReasons = []string{fl.Err.Error()}
 	}
-	// An all-families quota exhaustion is a DEFERRED resume checkpoint, not a
-	// failed phase. Keep it out of *all* failure-learning state, including the
-	// FailedRecord and P0 carryover todo created by recordFailedApproachState.
-	// errors.Is is required because dispatch wraps the sentinel before it reaches
-	// this shared chokepoint.
-	if errors.Is(fl.Err, ErrAllFamiliesExhausted) {
+	if gate == gateQuotaDeferred {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-learning: all CLI families quota-exhausted; skipping failure learning (DEFERRED, resumable)\n")
 		return
 	}
 	summary, todoID, structured := o.recordFailedApproachState(fl)
-
 	// A missing persona doc is a deterministically KNOWN configuration absence
-	// (cycle-1551 class): the sentinel already names the cause and the remedy,
-	// so a retrospective agent could discover nothing — cycles 1619/1620 spent
-	// 344 s and 311 s of a deep-tier agent on exactly this (2026-09-09
-	// token-waste root cause #2). Learn it deterministically: the FailedRecord
-	// and carryover todo above, the failure digest and the lesson artifact
-	// below — no LLM dispatch. Every other failure keeps the retrospective.
+	// (cycle-1551 class; cycles 1619/1620 spent a deep-tier agent on exactly
+	// this): learn it deterministically — the FailedRecord and carryover todo
+	// above, the failure digest and the lesson artifact — no LLM dispatch.
 	if errors.Is(fl.Err, ErrAgentDocMissing) {
 		fmt.Fprintf(os.Stderr, "[orchestrator] failure-learning: %s persona doc missing — known configuration absence, learned deterministically (no retrospective agent dispatched)\n", fl.Failed)
 		o.ensureFailureDigest(fl.Cycle, fl.CycleRequest.ProjectRoot, fl.CycleState.WorkspacePath, string(fl.Failed), fl.Err.Error())
-		o.writeDeterministicLearning(fl, summary, structured)
-		o.writeFailureLearningState(ctx, fl.State)
+		o.learnDeterministically(ctx, fl, summary, structured)
 		return
 	}
-
 	retroRunner, ok := o.runners[PhaseRetro]
 	if !ok {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-learning: no retro runner registered; queued carryover todo only\n")
 		o.writeFailureLearningState(ctx, fl.State)
 		return
 	}
+	retroResp, retroErr := o.dispatchRetro(ctx, fl, retroRunner, summary, todoID)
+	if retroErr != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-learning: retro failed after %s failure: %v\n", fl.Failed, retroErr)
+		o.learnDeterministically(ctx, fl, summary, structured)
+		return
+	}
+	if !IsVerdict(retroResp.Verdict) {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-learning: retro returned non-canonical verdict %q after %s failure\n", retroResp.Verdict, fl.Failed)
+		o.learnDeterministically(ctx, fl, summary, structured)
+		return
+	}
+	o.completeRetro(ctx, fl, retroResp, todoID)
+}
 
+// learnDeterministically is the ONE fallback tail (it was copy-pasted three
+// times): the floor, then the persist LAST. It carries no digest — the
+// doc-missing arm writes its digest visibly before calling it, and the two
+// retro tails already wrote theirs before the runner ran.
+func (o *Orchestrator) learnDeterministically(ctx context.Context, fl failureLearningRequest, summary string, structured *phasecontract.FailureBlock) {
+	o.writeDeterministicLearning(fl, summary, structured)
+	o.writeFailureLearningState(ctx, fl.State)
+}
+
+// dispatchRetro runs the inline retrospective: the request, the failure
+// digest BEFORE the agent (invariant C — the S1 identity the S2 disposition
+// gate cross-checks and an input the agent reads; a digest write failure only
+// WARNs, forensics plumbing never blocks learning), the retro stamp on the
+// cycle state (NOT restored afterwards — preserved, see the unit doc Q1), the
+// pre-retro cycle-state write, the observer around the run. Decides nothing:
+// the raw response and error go back to the coordinator.
+func (o *Orchestrator) dispatchRetro(ctx context.Context, fl failureLearningRequest, runner PhaseRunner, summary, todoID string) (PhaseResponse, error) {
 	retroReq := fl.retroRequest(summary, todoID)
-	// S1 failure-digest assembler (ADR-0074 I2 wiring — was landed callerless by
-	// cycle-1034; the digest must exist BEFORE the retro agent runs: it is the
-	// identity the S2 disposition gate cross-checks and an input the agent reads).
-	// Ledger load is fail-soft (nil counter → recurrence 0); a digest write
-	// failure only WARNs — retro learning is never blocked by forensics plumbing.
 	o.ensureFailureDigest(fl.Cycle, retroReq.ProjectRoot, fl.CycleState.WorkspacePath, string(fl.Failed), fl.Err.Error())
 	retroStarted := o.now().UTC()
 	fl.CycleState.Phase = string(PhaseRetro)
@@ -227,25 +212,24 @@ func (o *Orchestrator) recordFailureLearning(ctx context.Context, fl failureLear
 	if err := o.storage.WriteCycleState(ctx, *fl.CycleState); err != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-learning: write cycle-state pre-retro: %v\n", err)
 	}
-
 	cancel := o.observer.Start(ctx, string(PhaseRetro), retroReq)
-	retroResp, retroErr := retroRunner.Run(ctx, retroReq)
+	retroResp, retroErr := runner.Run(ctx, retroReq)
 	if cancel != nil {
 		cancel()
 	}
-	if retroErr != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-learning: retro failed after %s failure: %v\n", fl.Failed, retroErr)
-		o.writeDeterministicLearning(fl, summary, structured)
-		o.writeFailureLearningState(ctx, fl.State)
-		return
-	}
-	if !IsVerdict(retroResp.Verdict) {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-learning: retro returned non-canonical verdict %q after %s failure\n", retroResp.Verdict, fl.Failed)
-		o.writeDeterministicLearning(fl, summary, structured)
-		o.writeFailureLearningState(ctx, fl.State)
-		return
-	}
+	return retroResp, retroErr
+}
 
+// completeRetro is the retro's durable completion — the divergent twin of
+// phaseCompletionRecord.persist, kept and NAMED (the unit doc §2 lists the ten
+// divergences; folding them is unit 05's behaviour-change series): the ledger
+// entry, CompletedPhases, the post-retro cycle-state write, the unconditional
+// checkpoint, the verdict, the disposition gate (S2: a PASS retro must still
+// deliver a valid disposition.json agreeing with the S1 digest, else the
+// completion surfaces a loud gate reason), the retro outcome, and the persist
+// LAST. A failed ledger append is also LEDGER_APPEND_FAILED at the adapter's
+// one chokepoint; its line stays until unit 05 codes the nine kept lines.
+func (o *Orchestrator) completeRetro(ctx context.Context, fl failureLearningRequest, retroResp PhaseResponse, todoID string) {
 	if err := o.ledger.Append(ctx, LedgerEntry{
 		TS:       o.now().UTC().Format(time.RFC3339),
 		Cycle:    fl.Cycle,
@@ -265,10 +249,6 @@ func (o *Orchestrator) recordFailureLearning(ctx context.Context, fl failureLear
 		}
 	}
 	fl.Result.FinalVerdict = retroResp.Verdict
-	// Disposition gate (S2): a PASS retro must still deliver a valid
-	// disposition.json whose failure identity agrees with the S1 digest —
-	// otherwise the completion surfaces a loud gate reason instead of silently
-	// recording a clean outcome (retro cannot invent or omit the disposition).
 	if gateErr := o.finalizeRetroCompletion(fl.CycleState.WorkspacePath); gateErr != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-learning: %v\n", gateErr)
 		fl.Result.RetroDecision = "failure-learning: " + gateErr.Error()
@@ -277,234 +257,6 @@ func (o *Orchestrator) recordFailureLearning(ctx context.Context, fl failureLear
 	}
 	o.recordPhaseOutcome(fl.Result, fl.Timings, fl.CycleState.WorkspacePath, phaseOutcomeFrom(PhaseRetro, retroResp, 1, "", fl.CycleState.PhaseStartedAt))
 	o.writeFailureLearningState(ctx, fl.State)
-}
-
-// writeDeterministicLearning is the failure floor (inbox
-// retro-always-invariant, gap 1 / cycle-243): when the LLM retro cannot
-// run or returns a non-canonical verdict, render the learning artifacts
-// deterministically — retrospective-report.md in the cycle workspace +
-// failure-lesson YAML — so the lesson survives instead of degrading to
-// a stderr WARN. Best-effort: a floor write failure must never mask the
-// original phase failure.
-func (o *Orchestrator) writeDeterministicLearning(fl failureLearningRequest, summary string, structured *phasecontract.FailureBlock) {
-	ev := faillearn.FailureEvent{
-		Cycle:          fl.Cycle,
-		FailedPhase:    string(fl.Failed),
-		Scope:          faillearn.ScopePhase,
-		Classification: "cycle-mid-execution-fail",
-		Verdict:        VerdictFAIL,
-		Summary:        summary,
-		Defects:        []string{summary},
-		EvidencePaths:  []string{fl.CycleState.WorkspacePath},
-		Now:            o.now().UTC(),
-	}
-	// ADR-0039 §7: prefer the failed phase's own structured failure block
-	// (validated + capped by adoptStructuredFailure, read ONCE by the
-	// caller so state.json and the lesson cannot diverge) over the
-	// synthesized summary.
-	if structured != nil {
-		ev.Classification = structured.Class
-		if len(structured.Defects) > 0 {
-			ev.Defects = structured.Defects
-		}
-		if len(structured.EvidencePaths) > 0 {
-			ev.EvidencePaths = append(structured.EvidencePaths, fl.CycleState.WorkspacePath)
-		}
-	}
-	lessonsDir := filepath.Join(fl.CycleRequest.ProjectRoot, ".evolve", "instincts", "lessons")
-	// F1(ii): the retrospective's remediation must reach the QUEUE, not just the
-	// report. Only SELF-REPORTED structured defects are filed — the synthesized
-	// summary echo (ev.Defects == []string{summary}) is a restatement of the
-	// failure, not an actionable item, and filing it would be inbox noise.
-	//
-	// The filter is faillearn.StructuredDefects, the one rule the lesson writer
-	// already applies — NOT a `structured != nil` proxy for it. That proxy did
-	// not implement the claim above: phasecontract.ReadFailureBlock returns a
-	// block whenever Class != "", and ev.Defects is overwritten only when the
-	// block carries defects, so a classed-but-defectless block left the summary
-	// echo in place and filed it as a priority-H bug.
-	// The near-duplicate bound is operator config, not a Go literal: resolved
-	// here (the composition point that already holds projectRoot) and passed as
-	// an Option so faillearn stays a policy-free leaf. A load failure resolves
-	// to the compiled default, never to a disarmed or suppress-everything gate.
-	pol, polErr := policy.Load(filepath.Join(fl.CycleRequest.ProjectRoot, ".evolve", "policy.json"))
-	if polErr != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-learning: policy load for novelty threshold: %v (using compiled default)\n", polErr)
-	}
-	opts := []faillearn.Option{faillearn.WithNoveltyThreshold(pol.ResearchConfig().NoveltyThreshold)}
-	if defects := faillearn.StructuredDefects(ev); len(defects) > 0 {
-		if items := retroRemediationItems(fl.CycleRequest.ProjectRoot, fl.Cycle, defects); len(items) > 0 {
-			opts = append(opts, faillearn.WithInbox(filepath.Join(fl.CycleRequest.ProjectRoot, ".evolve", "inbox"), items))
-		}
-	}
-	if err := faillearn.WriteArtifacts(ev, fl.CycleState.WorkspacePath, lessonsDir, opts...); err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-learning: deterministic fallback write: %v\n", err)
-	}
-	o.recordRecurrenceClosure(fl.CycleRequest.ProjectRoot, ev.Classification, fl.Cycle)
-}
-
-// retroRemediationItems turns a failed phase's self-reported defects into
-// inbox remediation todos (batch-integrity-review-2026-08-04.md F1(ii)): the
-// 1255 defect was a retrospective that "filed" two items which never reached
-// the queue, so nothing downstream could ever work them.
-//
-// Ids are stable per (cycle, defect) so a re-run of the floor is idempotent
-// (faillearn's writeIfAbsent keeps the first write). Weight comes from policy,
-// never a literal here (feedback_phase_settings_from_config_not_code); a load
-// failure still files at the compiled safe default rather than dropping the
-// remediation.
-func retroRemediationItems(projectRoot string, cycle int, defects []string) []faillearn.InboxItem {
-	pol, err := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-learning: policy load for remediation weight: %v (using compiled default)\n", err)
-	}
-	weight := pol.RetroAutofileDefaultWeight()
-	items := make([]faillearn.InboxItem, 0, len(defects))
-	for _, d := range defects {
-		// cycle-1282 DEF-6: defects[] and each line are agent-authored and
-		// previously unbounded, so one verdict sentinel could file hundreds of
-		// inbox files with megabyte titles — a queue nobody can triage is a queue
-		// that hides the real item. Both caps are RECORDED below, never silent.
-		if len(items) >= remediationMaxItems {
-			fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-learning: cycle-%d self-reported %d defects; filing the first %d as remediation items and dropping the rest — fix the emitter or raise remediationMaxItems\n", cycle, len(defects), remediationMaxItems)
-			break
-		}
-		title := truncateRunes(strings.TrimSpace(d), remediationTitleMaxRunes)
-		slug := remediationSlug(title)
-		if title == "" || slug == "" {
-			continue // an unnameable defect yields no addressable item
-		}
-		items = append(items, faillearn.InboxItem{
-			ID:       fmt.Sprintf("retro-%d-%s-%s", cycle, slug, remediationFingerprint(title)),
-			Title:    title,
-			Weight:   weight,
-			Kind:     "bug",
-			Priority: "H",
-			// Non-empty provenance is load-bearing: inboxbatch.ConsoleRouted
-			// treats an empty injected_by as operator-authored.
-			InjectedBy: "faillearn-failure-floor",
-		})
-	}
-	return items
-}
-
-// remediationSlugMaxRunes bounds the id's derived tail so a long defect line
-// cannot produce an unwieldy filename. remediationMaxItems and
-// remediationTitleMaxRunes bound the queue itself (cycle-1282 DEF-6).
-const (
-	remediationSlugMaxRunes  = 60
-	remediationMaxItems      = 32
-	remediationTitleMaxRunes = 500
-)
-
-// remediationFingerprint is the id's injective tail: a short digest of the
-// FULL defect title, appended unconditionally.
-//
-// cycle-1285 F1 (HIGH). remediationSlug is lossy twice over — it stops at
-// remediationSlugMaxRunes, and it collapses every run of non-alphanumerics to
-// one hyphen. Two ordinary defect lines from the same subsystem that diverge
-// only after rune 60 (or only in punctuation) therefore minted ONE inbox id.
-// The DEF-4 collision check then correctly refused to drop the second item,
-// WriteArtifacts returned before the retrospective was written, and the caller
-// downgraded that to a stderr WARN: a failing cycle produced no retrospective,
-// no lesson, and one item for two defects — the cycle-1255 state, reached
-// through the mechanism built to prevent it, on defect text the failing agent
-// chose.
-//
-// Unconditional rather than "only when truncated": a length test does not cover
-// the punctuation collapse, and a rule with no branch cannot be wrong about
-// which branch applies. The slug stays in the id because a human triaging
-// `.evolve/inbox` reads it; the digest is what makes the id addressable.
-func remediationFingerprint(title string) string {
-	sum := sha256.Sum256([]byte(title))
-	return hex.EncodeToString(sum[:])[:8]
-}
-
-// remediationSlug lowercases a defect line and maps runs of non-alphanumerics
-// to single hyphens, matching the inbox's existing id shape. It is NOT
-// injective — see remediationFingerprint, which is what makes the id unique.
-func remediationSlug(s string) string {
-	var b strings.Builder
-	prevHyphen := false
-	for _, r := range strings.ToLower(s) {
-		if b.Len() >= remediationSlugMaxRunes {
-			break
-		}
-		switch {
-		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
-			b.WriteRune(r)
-			prevHyphen = false
-		default:
-			if !prevHyphen && b.Len() > 0 {
-				b.WriteByte('-')
-				prevHyphen = true
-			}
-		}
-	}
-	return strings.Trim(b.String(), "-")
-}
-
-// recordRecurrenceClosure is gap-G1 production wiring (cycle-662): the
-// deterministic retro-closeout seam upserts the failing lesson pattern into the
-// recurrence ledger keyed by the failing cycle, so Count() finally reflects real
-// history instead of staying 0 forever. Escalator/Autofiler are nil here —
-// escalation APPLY stays boundary-only (the live consult site
-// escalateRetroReasonForHistory reads the ledger; it must not race
-// inboxmover.Claim from the mid-cycle closeout). Best-effort: a ledger failure
-// must never mask the original phase failure.
-func (o *Orchestrator) recordRecurrenceClosure(projectRoot, pattern string, cycle int) {
-	if projectRoot == "" || strings.TrimSpace(pattern) == "" {
-		return
-	}
-	path := filepath.Join(projectRoot, ".evolve", "recurrence-ledger.json")
-	led, err := recurrence.Load(path)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN recurrence: load ledger: %v\n", err)
-		return
-	}
-	if err := led.RecordClosure(pattern, cycle, nil, nil, recurrence.DefaultEscalationPolicy()); err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN recurrence: record closure: %v\n", err)
-		return
-	}
-	if err := led.Save(path); err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN recurrence: save ledger: %v\n", err)
-	}
-}
-
-// adoptStructuredFailure is the trust boundary for agent-written failure
-// blocks (ADR-0039 §7): adopt the failed phase's self-report ONLY when its
-// class normalizes into the canonical taxonomy (never blind trust — an
-// out-of-taxonomy class would round-trip to UnknownClassification on the
-// next state read), and cap list/entry sizes so a misbehaving agent cannot
-// bloat state.json or the lesson corpus.
-func adoptStructuredFailure(workspace, phase string) *phasecontract.FailureBlock {
-	fb, ok := phasecontract.ReadFailureBlock(workspace, phase)
-	if !ok {
-		return nil
-	}
-	if failurelog.NormalizeLegacy(fb.Class) == failurelog.UnknownClassification {
-		return nil
-	}
-	fb.Defects = capStrings(fb.Defects, maxAdoptedDefects, maxAdoptedDefectRunes)
-	fb.EvidencePaths = capStrings(fb.EvidencePaths, maxAdoptedDefects, maxAdoptedDefectRunes)
-	return fb
-}
-
-const (
-	maxAdoptedDefects     = 20                       // entries per adopted list
-	maxAdoptedDefectRunes = carryover.MaxActionRunes // runes per adopted entry — the carryover unit's cap, projected
-)
-
-// capStrings bounds an agent-written string list at the adoption boundary.
-func capStrings(in []string, maxEntries, maxRunes int) []string {
-	if len(in) > maxEntries {
-		in = in[:maxEntries]
-	}
-	out := make([]string, len(in))
-	for i, s := range in {
-		out[i] = capRunes(s, maxRunes)
-	}
-	return out
 }
 
 func (fl failureLearningRequest) retroRequest(summary, todoID string) PhaseRequest {
