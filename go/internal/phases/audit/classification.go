@@ -7,6 +7,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/acssuite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
 )
 
 // auditClassification owns the mutable state for one audit classification.
@@ -49,8 +50,15 @@ func newAuditClassification(h hooks, artifact string, req core.PhaseRequest) *au
 			len(artifact), auditReportMaxBytes,
 		))
 	}
-	if err := validateExplanationReview(artifact, req); err != nil {
-		classification.fail("explanation documentation qualitative review", err.Error())
+	// ADR-0102 (2026-09-13): the review's shape is advisory — it rides the
+	// record as warnings; only a missing reasoning or a missing delivery
+	// still forces the verdict.
+	advisories, reviewErr := validateExplanationReview(artifact, req)
+	for _, advisory := range advisories {
+		classification.warn(explanationdocs.AdvisoryPrefix + advisory)
+	}
+	if reviewErr != nil {
+		classification.fail("explanation documentation qualitative review", reviewErr.Error())
 	}
 	return classification
 }
