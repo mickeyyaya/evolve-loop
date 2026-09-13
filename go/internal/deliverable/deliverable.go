@@ -63,6 +63,14 @@ type Result struct {
 	// json:"-" deliberately: the `evolve phase verify` JSON output is a verdict
 	// report, not a copy of the report it verified.
 	Content string `json:"-"`
+
+	// Owed and Effects name the agent-owed files (basenames) and the declared
+	// effects this verdict CHECKED — filled by the verifier, so the contract
+	// gate's verified signal reports what was looked for, never a second
+	// resolution of what is declared now (the single-read seam Content set).
+	// json:"-" like Content: the verdict report is not the evidence stream.
+	Owed    []string `json:"-"`
+	Effects []string `json:"-"`
 }
 
 // Violation codes (stable; consumed by tests, the CLI, and the gate).

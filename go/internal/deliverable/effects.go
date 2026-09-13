@@ -38,6 +38,7 @@ var effectChecks = map[string]effectCheck{
 // verifyEffects runs the check bound to each declared effect.
 func verifyEffects(res *Result, c phasecontract.Contract, roots phasecontract.Roots) error {
 	for _, name := range c.Effects {
+		res.Effects = append(res.Effects, name) // what this verdict checked, for the gate's verified signal
 		check, bound := effectChecks[name]
 		if !bound {
 			res.add(CodeUnboundEffect, fmt.Sprintf("declared effect %q has no deterministic check — a phase-registry defect, not something this agent can correct", name))

@@ -11,8 +11,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable/gatesignal"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
 // reviewer.go — Layer 4 of the deliverable contract (ADR-0034): the host-side
@@ -46,6 +48,10 @@ type Reviewer struct {
 	breakerPath            string // override for the consecutive-block counter file (tests); "" → derive under .evolve
 	logf                   func(format string, args ...any)
 	resolver               phasecontract.Resolver // built-in only by default; catalog-aware via NewReviewerWithCatalog
+	// signals is the gate's Signal Center producer (ADR-0101 S2b): every
+	// decision Review reaches is one gate.passed / gate.rejected event. The
+	// Null Object until WithSignals installs the root's Center.
+	signals *gatesignal.Reporter
 }
 
 // breakerFile is the default persistent counter location.
@@ -54,16 +60,16 @@ const breakerFile = "contract-gate-breaker.json"
 // NewReviewer builds the contract gate for a stage, resolving only built-in
 // contracts. Callers wire it via core.WithReviewer (chained after evalgate)
 // only when stage != StageOff.
-func NewReviewer(stage config.Stage) core.DeliverableReviewer {
-	return newReviewer(stage, phasecontract.BuiltinResolver{}, config.StageOff)
+func NewReviewer(stage config.Stage, opts ...Option) core.DeliverableReviewer {
+	return newReviewer(stage, phasecontract.BuiltinResolver{}, config.StageOff, opts...)
 }
 
 // NewReviewerWithCatalog builds the contract gate resolving built-in contracts
 // first and falling back to spec-derived contracts (FromSpec) for the catalog's
 // user/minted phases. PhaseIO defaults to StageOff (byte-identical); production
 // wires the real dial via NewReviewerWithCatalogStage.
-func NewReviewerWithCatalog(stage config.Stage, cat phasespec.Catalog) core.DeliverableReviewer {
-	return newReviewer(stage, phasecontract.NewCatalogResolver(cat.Get), config.StageOff)
+func NewReviewerWithCatalog(stage config.Stage, cat phasespec.Catalog, opts ...Option) core.DeliverableReviewer {
+	return newReviewer(stage, phasecontract.NewCatalogResolver(cat.Get), config.StageOff, opts...)
 }
 
 // NewReviewerWithCatalogStage is NewReviewerWithCatalog threaded with the
@@ -72,8 +78,8 @@ func NewReviewerWithCatalog(stage config.Stage, cat phasespec.Catalog) core.Deli
 // StageEnforce, and only when the ContractGate stage is also enforce); every
 // other gate behavior is unchanged, so passing StageOff equals the legacy
 // constructor.
-func NewReviewerWithCatalogStage(stage config.Stage, cat phasespec.Catalog, phaseIO config.Stage) core.DeliverableReviewer {
-	return newReviewer(stage, phasecontract.NewCatalogResolver(cat.Get), phaseIO)
+func NewReviewerWithCatalogStage(stage config.Stage, cat phasespec.Catalog, phaseIO config.Stage, opts ...Option) core.DeliverableReviewer {
+	return newReviewer(stage, phasecontract.NewCatalogResolver(cat.Get), phaseIO, opts...)
 }
 
 // NewReviewerWithCatalogStageReportSize is NewReviewerWithCatalogStage plus the
@@ -82,28 +88,59 @@ func NewReviewerWithCatalogStage(stage config.Stage, cat phasespec.Catalog, phas
 // only at StageEnforce; budgetTokens is the budget it enforces. Zero-value
 // (StageOff/0) ⇒ byte-identical to NewReviewerWithCatalogStage, so wiring it in
 // changes nothing until the report-size gate is deliberately promoted.
-func NewReviewerWithCatalogStageReportSize(stage config.Stage, cat phasespec.Catalog, phaseIO, reportSizeGate config.Stage, budgetTokens int) core.DeliverableReviewer {
-	r := newReviewer(stage, phasecontract.NewCatalogResolver(cat.Get), phaseIO)
-	r.reportSizeGate = reportSizeGate
-	r.reportSizeBudgetTokens = budgetTokens
-	return r
+func NewReviewerWithCatalogStageReportSize(stage config.Stage, cat phasespec.Catalog, phaseIO, reportSizeGate config.Stage, budgetTokens int, opts ...Option) core.DeliverableReviewer {
+	return newReviewer(stage, phasecontract.NewCatalogResolver(cat.Get), phaseIO, append([]Option{withReportSize(reportSizeGate, budgetTokens)}, opts...)...)
 }
 
-func newReviewer(stage config.Stage, resolver phasecontract.Resolver, phaseIO config.Stage) *Reviewer {
-	return &Reviewer{
+// withReportSize is the report-size gate's construction setting as an Option,
+// so every setting is applied at the ONE point in newReviewer and a caller's
+// later option is never clobbered by a trailing assignment.
+func withReportSize(gate config.Stage, budgetTokens int) Option {
+	return func(r *Reviewer) {
+		r.reportSizeGate = gate
+		r.reportSizeBudgetTokens = budgetTokens
+	}
+}
+
+func newReviewer(stage config.Stage, resolver phasecontract.Resolver, phaseIO config.Stage, opts ...Option) *Reviewer {
+	r := &Reviewer{
 		stage:     stage,
 		phaseIO:   phaseIO,
 		threshold: defaultBreakerThreshold,
 		logf:      func(f string, a ...any) { fmt.Fprintf(os.Stderr, f+"\n", a...) },
 		resolver:  resolver,
+		signals:   gatesignal.New(nil),
+	}
+	for _, opt := range opts {
+		opt(r)
+	}
+	return r
+}
+
+// Option configures a Reviewer at construction (functional options).
+type Option func(*Reviewer)
+
+// WithSignals hands the gate the Signal Center it reports every decision
+// through (ADR-0101 S2b). A nil Center keeps the Null Object.
+func WithSignals(c *signalcenter.Center) Option {
+	return func(r *Reviewer) {
+		if c != nil {
+			r.signals = gatesignal.New(c)
+		}
 	}
 }
+
+// SignalsWired reports whether a Center was injected — the composition root's
+// wiring proof; core asks for it as a capability beside
+// VerifiesDeclaredDeliverables (it cannot name this type).
+func (r *Reviewer) SignalsWired() bool { return r.signals.Wired() }
 
 // Review adjudicates one finished phase's deliverable.
 func (r *Reviewer) Review(_ context.Context, in core.ReviewInput) core.ReviewResult {
 	if r.stage == config.StageOff {
 		return core.ReviewResult{Approve: true}
 	}
+	check := gatesignal.Check{Cycle: in.Cycle, RunID: in.RunID, Phase: in.Phase}
 	roots := rootsFor(in)
 	// r.resolver is always set by newReviewer (the single construction point):
 	// BuiltinResolver for NewReviewer, a CatalogResolver for
@@ -113,6 +150,7 @@ func (r *Reviewer) Review(_ context.Context, in core.ReviewInput) core.ReviewRes
 		// Ambiguity / infra — fail OPEN (never brick the loop on the gate's own
 		// inability to decide). Does not touch the breaker.
 		r.logf("[contract-gate] %s: ambiguity, failing open: %v", in.Phase, err)
+		r.signals.FailOpen(check, err)
 		return core.ReviewResult{Approve: true}
 	}
 	bp := r.breakerPath
@@ -121,6 +159,7 @@ func (r *Reviewer) Review(_ context.Context, in core.ReviewInput) core.ReviewRes
 	}
 	if res.OK {
 		resetBreaker(bp)
+		r.signals.Verified(check, r.verifiedSet(res))
 		return core.ReviewResult{Approve: true}
 	}
 
@@ -149,8 +188,10 @@ func (r *Reviewer) Review(_ context.Context, in core.ReviewInput) core.ReviewRes
 			// logs summarize(), and an operator tailing the gate at advisory
 			// must not lose the rejection reason for exactly the subset of
 			// reports salvage happens to touch (diff-review LOW).
+			reason := summarize(in.Phase, res)
 			r.logf("[contract-gate] %s: %s (stage=%s, would-block; would salvage the verdict — artifact, telemetry and breaker left untouched)",
-				in.Phase, summarize(in.Phase, res), r.stage)
+				in.Phase, reason, r.stage)
+			r.signals.WouldBlock(check, reason, codesOf(res), r.stage.String(), true)
 			return core.ReviewResult{Approve: true}
 		}
 		// Write back the bytes the salvage re-verify actually approved. This
@@ -170,7 +211,9 @@ func (r *Reviewer) Review(_ context.Context, in core.ReviewInput) core.ReviewRes
 		if err := persistSalvagedArtifact(res.ArtifactPath, res.Content, salvaged.Content); err != nil {
 			r.logf("[contract-gate] %s: salvage recovered the verdict but the repaired artifact could not be persisted; refusing the salvage: %v", in.Phase, err)
 		} else {
-			recordSalvageApplied(roots, in.Phase, ClassifyBadVerdict(res.Content).Pattern, r.logf)
+			pattern := ClassifyBadVerdict(res.Content).Pattern
+			recordSalvageApplied(roots, in.Phase, pattern, r.logf)
+			r.signals.Salvaged(check, filepath.Base(res.ArtifactPath), string(pattern))
 			// Surfaced, not just logged to a sidecar nobody reads: README §8 promises
 			// operators that every coercion is "logged + surfaced", and a salvage
 			// silently approving a phase is exactly the false-confidence failure the
@@ -205,12 +248,14 @@ func (r *Reviewer) Review(_ context.Context, in core.ReviewInput) core.ReviewRes
 	// co-occurring real contract violation still falls through to the block path.
 	if r.reportSizeGate < config.StageEnforce && res.onlyViolation(CodeHandoffBudgetExceeded) {
 		r.logf("[contract-gate] %s: %s (reportSizeGate=%s, would-block, WARN)", in.Phase, reason, r.reportSizeGate)
+		r.signals.WouldBlock(check, reason, codesOf(res), r.reportSizeGate.String(), false)
 		return core.ReviewResult{Approve: true}
 	}
 
 	if r.stage != config.StageEnforce {
 		// Shadow/advisory: log the would-block and approve.
 		r.logf("[contract-gate] %s: %s (stage=%s, would-block)", in.Phase, reason, r.stage)
+		r.signals.WouldBlock(check, reason, codesOf(res), r.stage.String(), false)
 		return core.ReviewResult{Approve: true}
 	}
 
@@ -222,9 +267,11 @@ func (r *Reviewer) Review(_ context.Context, in core.ReviewInput) core.ReviewRes
 		// loud, phase+CLI-named WARN, a cycle-visible ledger entry and a staged
 		// escalation intent. An approval the gate did not earn must not look
 		// like one (inbox contract-block-cli-escalation).
+		r.signals.Demoted(check, reason, n)
 		return core.ReviewResult{Approve: true, Demoted: true, Reason: reason, Blocks: n}
 	}
 	r.logf("[contract-gate] %s: %s (stage=enforce, BLOCK %d/%d)", in.Phase, reason, n, r.threshold)
+	r.signals.Rejected(check, reason, codesOf(res), n, r.threshold)
 	// Blocks reports THIS breaker's consecutive count so the correction ladder
 	// escalates its CLI off the same counter that will open the circuit, instead
 	// of re-deriving a correction ordinal that desyncs from it.
@@ -238,6 +285,26 @@ func summarize(phase string, res Result) string {
 		parts = append(parts, fmt.Sprintf("[%s] %s", v.Code, v.Message))
 	}
 	return fmt.Sprintf("%s deliverable failed contract: %s", phase, strings.Join(parts, "; "))
+}
+
+// codesOf projects a Result's violation codes for the signal's fields.
+func codesOf(res Result) []string {
+	codes := make([]string, 0, len(res.Violations))
+	for _, v := range res.Violations {
+		codes = append(codes, v.Code)
+	}
+	return codes
+}
+
+// verifiedSet names what a clean verification found: the primary (basename and
+// size) and the owed files and effects the verifier CHECKED (Result.Owed /
+// Result.Effects — never a second resolution of the declaration).
+func (r *Reviewer) verifiedSet(res Result) gatesignal.Verified {
+	v := gatesignal.Verified{Bytes: len(res.Content), Owed: res.Owed, Effects: res.Effects, Stage: r.stage.String()}
+	if res.ArtifactPath != "" {
+		v.Artifact = filepath.Base(res.ArtifactPath)
+	}
+	return v
 }
 
 // --- circuit breaker persistence ---

@@ -28,6 +28,17 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `BRIDGE_TOKEN_RESOLVER_MISSING` | the engine was built without a token resolver; lifecycle and outcome records continue without token counts (fail-open) |
 | `BRIDGE_TOKEN_USAGE_WARNING` | the token resolver measured the attempt with a caveat (invalid counters, partial measurement); the caveat is the reason |
 
+### gate.contract
+
+| Code | Meaning |
+|---|---|
+| `GATE_CONTRACT_DEMOTED` | the breaker opened after N consecutive blocks and demoted enforce→advisory; the phase advanced UNVERIFIED — inspect the failing phase and policy.gates.contract_gate |
+| `GATE_CONTRACT_FAIL_OPEN` | the gate could not decide (unknown phase, read fault) and failed open; re-dispatching an agent cannot fix this — the reason is the error |
+| `GATE_CONTRACT_REJECTED` | the gate refused the deliverable at enforce; the reason is the correction directive (one [code] message per violation), fields carry the codes and the breaker count — the orchestrator's ladder re-dispatches |
+| `GATE_CONTRACT_SALVAGED` | a sole recoverable bad_verdict was repaired on disk and re-verified clean; the phase advanced on the repaired artifact |
+| `GATE_CONTRACT_VERIFIED` | the phase's declared deliverables were found in place (fields name the artifact, its size, the agent-owed files and the effects verified) and the phase advanced |
+| `GATE_CONTRACT_WOULD_BLOCK` | the deliverable violated its contract but the stage (shadow/advisory, or the report-size gate's) lets the phase advance; the reason is what enforce would have refused |
+
 ### ledger
 
 | Code | Meaning |
@@ -58,6 +69,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | Code | Meaning |
 |---|---|
 | `ORCHESTRATOR_CYCLE_FAILED` | the cycle sealed with final verdict FAIL; fields carry the termination reason and retro decision |
+| `ORCHESTRATOR_GATE_CORRECTION` | the correction ladder ran a rung after a gate rejection — fields name the correction ordinal, the budget (max), the rung, the CLI re-dispatched on and whether that CLI was escalated; the reason is the rejection being corrected |
 | `ORCHESTRATOR_PHASE_ABORTED` | the cycle aborted after this phase's outcome (review reject, guard, persistence); the abort reason is in fields.abort_reason |
 | `ORCHESTRATOR_PHASE_VERDICT_FAIL` | a phase recorded verdict FAIL; the reason is the phase's own error-severity diagnostics |
 | `ORCHESTRATOR_PHASE_VERDICT_WARN` | a phase recorded verdict WARN; the reason carries its error-severity diagnostics, if any |

@@ -66,11 +66,11 @@ func TestSetContractResolver_NilRestoresBuiltinOnly(t *testing.T) {
 func TestInjectContract_ZeroValueAdapter_DegradesToBuiltin(t *testing.T) {
 	var a Adapter // zero value: resolver is nil
 
-	got := a.injectContract("BODY", "foo", "/ws/foo-report.md")
+	got := a.injectContract("BODY", "foo", "/ws/foo-report.md", "/ws")
 	if !strings.HasPrefix(got, "BODY") || !strings.Contains(got, "/ws/foo-report.md") {
 		t.Errorf("unregistered phase with an artifact must keep body-first and disclose the path; got %q", got)
 	}
-	if got := a.injectContract("BODY", "foo", ""); got != "BODY" {
+	if got := a.injectContract("BODY", "foo", "", ""); got != "BODY" {
 		t.Errorf("no artifact path ⇒ unchanged pass-through; got %q", got)
 	}
 }

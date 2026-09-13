@@ -173,7 +173,8 @@ raised to WARN — never dropped. *(review 21: `advisor` and `config` added to m
 | `phase.dispatched` | a phase attempt started | INFO | |
 | `phase.outcome` | the C1 terminal disposition (verdict recorded) | INFO on PASS, WARN on WARN/FAIL | ✓ on FAIL |
 | `phase.aborted` | the cycle aborted after a phase (review reject, guard, persistence) | WARN | ✓ |
-| `gate.rejected` / `gate.corrected` | a deliverable/contract gate refused / a correction was re-dispatched | WARN / INFO | ✓ / |
+| `gate.passed` | the contract gate let the phase advance: verified (`GATE_CONTRACT_VERIFIED`, fields name the artifact, its size, the owed files and effects — where it searched), salvaged, or advanced with a WARN it should not hide (would-block under a shadow stage, breaker demotion, fail-open) — S2b | INFO; WARN for would-block / demoted / fail-open | |
+| `gate.rejected` / `gate.corrected` | the contract gate refused at enforce (the reason IS the correction directive; `fields.codes`, `blocks`) / the orchestrator's ladder re-dispatched a correction (`fields.correction`, `max`, `rung`, `cli`, `escalated`) — S2b, both roots | WARN / INFO | ✓ / |
 | `ship.landed` / `ship.error` | a landing / a `shiperr` code | INFO / WARN (INCIDENT for the `integrity` class) | / ✓ |
 | `system.failure` | ADR-0072 signal (halt-class) | INCIDENT | ✓ |
 | `quota.paused` | all families exhausted, cycle paused | WARN | ✓ |
@@ -415,7 +416,7 @@ Hand-written `[x]` prose disappears one module at a time (§10 S5).
 | **S0** | this design, ADR-0101, the inventory | docs-only PR; links resolve; architect review folded in | — |
 | **S1** | `internal/signalcenter` (schema, Center, registry, sinks, filter); `core.WithSignalCenter` + listener + `Orchestrator.SignalSummary()`; `orchDeps.Signals`; the C1 chokepoint emits `phase.outcome`/`phase.aborted` on both roots (its PR #577 hand-written line replaced by the sink line); `.apicover-enforce` entry; CI line-coverage gate | package 100 % API coverage (apicover) + 100 % line coverage (CI/make gate, §11), `-race`; composed RunCycle test: every dispatched phase (incl. the ADR-0044 abort-path table) yields exactly one `phase.outcome` observed by the orchestrator listener and one `signals.ndjson` line with monotonic `seq`; WARN-budget test; re-entrancy test; mutants: emit removed, listener not subscribed, sink not attached, validation bypassed, recover removed, same-order-for-all-listeners — each killed by name | PR #577 (lands after the #575/#576/#577 merge order) |
 | **S2a** | producers that need only S1: `system.failure` + `cycle.sealed` at `cycleRun.completeCycle` (the closeout both roots share; the hand-written SYSTEM-FAILURE HALT / LANDING LOST lines deleted); `ship.error` at `Orchestrator.recordShipError` with `shiperr.SignalCode` (every ship code registered under module `ship` with a doc each — a source-parsed test proves completeness; `ShipErrorClass.SignalSeverity` is the class → severity rule's one home); `quota.paused` at `cycleRun.pauseForQuota` (the seam both roots reach; its hand-written WARN line deleted); an abnormal exit seals the cycle FAIL from `cycleRun.abnormalEpilogue`; `Center.Flush` deferred at both roots; `evolve signals codes generate\|check` projecting the registry into `docs/architecture/signal-codes.md` | composed `RunCycle` test: `cycle.sealed` is the LAST orchestrator event; each producer has a direct proof (INCIDENT on halt / integrity, WARN otherwise); `signal-codes.md` currency is a `cmd/evolve` test (CI); mutants: each emit removed, INCIDENT not raised, prefix wrong, Flush broadcast removed, drift check disabled | S1 |
-| **S2b** | contract gate → `gate.rejected/corrected` (the `GATE_CONTRACT_*` codes need PR #575); `fields.shipped` on `cycle.sealed` (needs PR #576's `CycleState.Shipped`); `failurelog.Classification` folded into `failureadapter`'s; the live WARN budget pinned from the first green runtime cycle | each producer has a composed proof; the classification registry test fails if the two vocabularies diverge again | S2a, PR #575, PR #576 |
+| **S2b** (contract-gate producers landed, see §15.5; the rest stays in S2c) | contract gate → `gate.passed/rejected` + the ladder's `gate.corrected` on both roots (the `GATE_CONTRACT_*` codes; PR #575 landed); `fields.shipped` on `cycle.sealed` (needs PR #576's `CycleState.Shipped`); `failurelog.Classification` folded into `failureadapter`'s; the live WARN budget pinned from the first green runtime cycle | each producer has a composed proof; the classification registry test fails if the two vocabularies diverge again | S2a, PR #575, PR #576 |
 | **S3** (landed, see §15.3) | bridge: `Deps.Signals` at construction + `engine.SignalsWired()`; the production Adapter takes the Center as a constructor argument (`adapters/bridge.NewDefault(projectRoot, signals)`; every other call site passes an explicit `nil`, pinned) and threads it into every engine; engine telemetry warnings → `bridge.warning` (`BRIDGE_TOKEN_RESOLVER_MISSING/_FAILED`, `BRIDGE_TOKEN_USAGE_WARNING`, `BRIDGE_CONTEXT_FILL_HIGH`, `BRIDGE_TELEMETRY_APPEND_FAILED`), the tripwire → `bridge.tripwire` (`BRIDGE_TELEMETRY_TRIPWIRE`); **commit 1:** the pure rename `panestream.SignalCenter` → `LivenessCenter` (ADR-0068/0070 amended); **commit 2:** `pane.liveness` from a `LivenessHandler` the tmux driver registers per dispatch (module `liveness`, `LIVENESS_PANE_STAGNANT/_HUNG/_EXHAUSTED`); the hand-written `[engine] WARN` / `[engine] TRIPWIRE` lines removed | wiring proofs at the engine, the Adapter (deps + real factory) and the root; every producer a direct proof; the telemetry suites assert what the root's WARN-filtered sink renders; mutants: signals not threaded, wired-always-true, handler not registered, hung not WARN, tripwire/warn/engine-warning not emitted, root passes nil, state name lost, format characters surviving | S1 |
 | **S4a** (landed, see §15.4) | the loop module's producers at their seams — ONE `loop.halt` INCIDENT per batch halt, its code the caller's rule (`haltOnSystemFailure` is the one chokepoint: `LOOP_SYSTEM_FAILURE_HALT` for a halt the cycle signalled, `LOOP_PIPELINE_BLOCKER_HALT` for the blocker breaker), a fleet lane's halt code → `LOOP_FLEET_LANE_HALT`, a wave-boundary halt → `LOOP_HALT`; `loop.wave` (INFO for the wave summary the report also prints; WARN `LOOP_MIN_WIDTH_REPAIR`), `loop.escalation` WARN `LOOP_ESCALATION_BOUNDARY`; the hand-written `[loop] … HALT` and escalation lines deleted; the file ledger's append observer (`ledger.New(evolveDir, ledger.WithSignals(signals))`, module `ledger`: `ledger.appended` INFO per entry through `Append` — the orchestrator's records, the bridge's stop_review, the inbox lifecycle lines, the seal anchor — WARN `LEDGER_APPEND_FAILED`) at the root, and the root's ledger threaded into the failed-cycle inbox walk; `cmd_loop` **reports** the driven runner's per-cycle `SignalSummary` in the batch report (`[loop] cycle N signals: …`, a report line, never a gate) through the `loopCycleRunner` seam; ONE sink topology (`newRootSignalCenter(root, evolveDir, console)`) for production and the stub root, with a durable batch-level file for cycle-less signals | every producer a direct proof; the window/escalation/min-width suites assert the sink-rendered line through the stub root (the production topology); a go/ast guard inventories every ledger line writer; mutants: each emit removed, INCIDENT demoted, a second breaker INCIDENT, ledger not observed, lifecycle not observed, ledger failure not WARN, root ledger unobserved, inbox walk on a self-built ledger, report silent / read off the seam, console writer ignored, cycle-less signals dropped | S2a, S3 |
 | **S4b** | `dispatchevents` writers and the `observer` adapter emit through the Center (their files stay as sink outputs until readers migrate; `subagent.AppendAbnormalEvent` folded); the dashboard SSE subscribes | `abnormal-events.jsonl` **field-equal modulo timestamp precision** before/after, asserted by a decoding golden *(review 11)*; dashboard shows a signal within one SSE tick; no breaker gates on a signal (a shadow comparison test may log disagreement) | S4a |
@@ -694,3 +695,92 @@ abnormal-path seal names `cycleRun.abnormalEpilogue` (a callee never asserts its
 like the codes do. Accepted as-is: the textual Flush-wiring pin (convention-consistent; the behavioural
 proof is the Flush test) and the `emit…` producer naming beside the loop's `emitQuotaPause` (the
 Signal Center producers keep one prefix; the loop's report emitter is S4's to rename).
+
+### 15.5 Landed — S2b (2026-09-13): the contract gate reports, the ladder reports, the prompt states the gate's criteria
+
+Operator direction (2026-09-13): *"orchestrator … should check if each phase deliverables match to
+the policy through the signal center, it knows where to search and check if all the output docs /
+codes are ready (without looking into the context, it just checked if files are legit and existed)
+and by-pass to the next phase"*, and *"the pass criterions for gating the output should be sent to
+phase agent as part of input … please verify"*.
+
+**Finding.** The check existed and was wired on both roots (ADR-0100: `reviewAndGuard` →
+`reviewWithCorrections` → `reviewDeliverable` → `deliverable.Reviewer.Review` → `VerifyWithStage`;
+resume: `reviewResumedDeliverable`), deterministic Go with no model reading the files — but its
+decisions never reached the Center: `gate.contract`, `gate.rejected` and `gate.corrected` were
+declared in the closed sets with **zero producers**, and the production streams held no gate event.
+The prompt carried the contract block (artifact path, required sections or JSON keys, verdict
+sentinel, the `evolve phase verify` self-check) but the two ADR-0100 additions the gate enforces —
+the agent-owed secondaries and the declared effects — lived only in persona prose, so a registry
+change would have moved the gate without moving the prompt.
+
+| Producer | Chokepoint (origin) | Severity / code | Fields |
+|---|---|---|---|
+| `gate.passed` | `deliverable.Reviewer.Review` through `gatesignal.Reporter` (module `gate.contract`; origin `Reviewer.Review`) | INFO `GATE_CONTRACT_VERIFIED` (the reason names the artifact and its size, the owed files, the effects) · INFO `GATE_CONTRACT_SALVAGED` · WARN `GATE_CONTRACT_WOULD_BLOCK` (shadow/advisory stage, or the report-size gate's) · WARN `GATE_CONTRACT_DEMOTED` (breaker open: advanced UNVERIFIED) · WARN `GATE_CONTRACT_FAIL_OPEN` | `artifact`, `bytes`, `owed`, `effects`, `stage` · `pattern` · `codes`, `salvage` · `blocks` |
+| `gate.rejected` | same | WARN `GATE_CONTRACT_REJECTED` — the reason IS the correction directive (one `[code] message` per violation, from the ONE `summarize()`) | `codes`, `blocks`, `threshold` |
+| `gate.corrected` | `Orchestrator.emitGateCorrection` (module `orchestrator`) from `cycleRun.reviewWithCorrections` (fresh root) and `Orchestrator.reviewResumedDeliverable` (resume root) — one per correction re-dispatch | INFO `ORCHESTRATOR_GATE_CORRECTION` | `correction`, `max`, `rung`, `cli`, `escalated`, `salvage_retry` |
+
+**The record per phase boundary.** `gate.passed` (verified: what was found where) → `phase.outcome`
+(the advance); or `gate.rejected` → `gate.corrected` (1/2, redispatch, cli) → `gate.passed` →
+`phase.outcome`; or `phase.aborted` after the ladder (its `abort_reason` names the file). The batch
+report line adds `· gates: P passed, R rejected, C corrected` (`formatSignalReport`). The check
+itself is unchanged: verdicts, transitions and the ladder stay with the floors; the Center only
+carries the evidence (§8).
+
+**Wiring.** `deliverable.WithSignals(signals)` — a functional option the four reviewer constructors
+accept — at `wireOrchestratorDeps`; the proof `Orchestrator.ContractGateSignalsWired()` asks the
+chain for the capability (`VerifiesDeclaredDeliverables` + `SignalsWired`), the
+`DeclaredDeliverablesGateWired` precedent, because core cannot name the deliverable type.
+
+**The prompt.** `RenderContractBlockStage` (the cache-safe block) names the agent-owed files and
+points at the tail for their paths ("Also write these agent-owed files at the EXACT paths listed
+under <owed-files> at the END of this prompt: … the gate verifies each exists, is non-empty and
+parses") and names the declared effects ("verified at the phase boundary; your instructions say
+how"); `RenderContractTail(c, artifactPath, workspace)` renders each owed file as
+`<owed-file>/abs/path</owed-file>` through `phasecontract.OwedPath(workspace, name)` — the ONE join
+the gate's `verifySecondaries` reads through (basenames only; a declared separator never steers a
+read outside the workspace) — and the effects as `<effects>`. The bridge passes `req.Workspace`,
+not the artifact's directory (a dispatched-artifact override can move the deliverable elsewhere).
+Names come from `phasecontract.Contract` (filled from the registry by `FromSpec`), locations from
+the one join: the gate and the prompt cannot drift on either. Contracts without owed files or
+effects render byte-identical prompts (pinned).
+
+**Patterns.** Observer at the ONE decision point (the gate stays the one verifier; the reporter only
+reports — `internal/deliverable/gatesignal`, a leaf over `signalcenter`); Null Object (nil Center);
+functional options; single-source-with-projection (`summarize()` feeds the log line, the signal
+reason and the correction directive; `signal-codes.md` regenerated — 84 codes).
+
+**Kept / not done.** The gate's `[contract-gate]` log lines and the ladder's `[orchestrator]` lines
+stay (S5 retires them per module; one `summarize()` source, so they cannot drift from the signal).
+`gate.eval` / `gate.repo` producers — the other gate modules of the closed set — are the same shape,
+next slice. A salvage rung emits no `gate.corrected` (only a re-dispatch is a correction). The rest
+of the original S2b row (`fields.shipped` on `cycle.sealed`, the classification fold, the WARN
+budget pin) stays in S2c.
+
+**Tests.** `gatesignal` 100 % lines + every export named (apicover); the reviewer: one test per
+decision (verified, rejected, shadow would-block, report-size would-block, demoted, fail-open,
+salvaged, would-salvage, off and unwired silent), the capability through the core interface; core:
+one re-dispatch → one `gate.corrected` on the fresh root, the escalated second correction says so
+with its CLI, the resume root's ladder; cmd: the root wiring proof and the report clause;
+phasecontract: owed files and effects rendered in block and tail, no clause otherwise; the kind set
+closed at 22. Fourteen build-confirmed mutants killed by name: the rejected, verified,
+demoted, fail-open and report-size would-block emits removed; the owed files and effects not
+projected into the verified event; the fresh-root and the resume-root ladder emits removed; the
+`escalated` field hard-coded; the root not passing its Center to the gate; the report clause never
+rendering; the owed-files clause never rendering; empty-valued fields kept; a rejection emitted as
+`gate.passed`.
+
+**Review folds (fleet: code-simplifier → architecture-reviewer ∥ go-reviewer; both Warning, no
+CRITICAL).** HIGH — the owed-file location was a belief with two homes (the gate's
+`filepath.Join`, the prompt's "SAME directory" prose): `phasecontract.OwedPath` is the one join,
+the tail renders the exact paths, the block points at the tail. MEDIUM — the verified event
+re-resolved the contract instead of reporting what was checked: `Result.Owed` / `Result.Effects`
+(json:"-", the single-read seam `Result.Content` set) are filled by the verifier and the signal
+projects them. MEDIUM — the ladder producer took ten positional parameters with two adjacent
+bools: `gateCorrection` parameter object. MEDIUM — the report-size constructor assigned its
+settings after the options: `withReportSize` is an option applied at the one point. LOW / Go
+review — `Reporter.emit` filters into its own map; the correction ordinal has one home
+(`fields.correction`, no `Attempt`). Seven more build-confirmed mutants (twenty-one in all): the
+join not stripping a directory, the tail rendering the bare name, the owed files or effects not
+recorded by the verifier, the options applied before the report-size setting, the caller's map
+mutated, the gate reading a path the tail did not render.

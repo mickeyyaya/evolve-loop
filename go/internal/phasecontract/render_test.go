@@ -118,7 +118,7 @@ func TestRenderJSONContractsDescribeTheirTopLevelShape(t *testing.T) {
 			if block := RenderContractBlock(c); !strings.Contains(block, want) {
 				t.Errorf("contract block must describe a %s; got:\n%s", tt.shape, block)
 			}
-			if tail := RenderContractTail(c, "/workspace/"+c.ArtifactName); !strings.Contains(tail, want) {
+			if tail := RenderContractTail(c, "/workspace/"+c.ArtifactName, "/workspace"); !strings.Contains(tail, want) {
 				t.Errorf("contract tail must describe a %s; got:\n%s", tt.shape, tail)
 			}
 		})
@@ -151,5 +151,55 @@ func TestRenderContractBlock_FailureContextInstruction(t *testing.T) {
 	build, _ := For("build")
 	if strings.Contains(RenderContractBlock(build), "schema_version\":2") {
 		t.Error("build contract block must not carry the failure-context teaching")
+	}
+}
+
+// ADR-0100 declared the agent-owed secondaries and the effects the gate
+// verifies; the operator's rule is that the gate's pass criteria reach the
+// agent as input. Before this test they lived only in persona prose — a
+// registry change would have moved the gate without moving the prompt.
+func TestRenderContract_StatesTheAgentOwedFilesAndEffectsTheGateVerifies(t *testing.T) {
+	c := Contract{Phase: "triage", ArtifactName: "triage-report.md", Kind: KindMarkdown,
+		AgentOwedFiles: []string{"triage-decision.json"}, Effects: []string{"inbox-claim"}}
+	block := RenderContractBlock(c)
+	if !strings.Contains(block, `"triage-decision.json"`) || !strings.Contains(block, "<owed-files>") {
+		t.Fatalf("the block names each agent-owed file and where it goes:\n%s", block)
+	}
+	if !strings.Contains(block, `"inbox-claim"`) || !strings.Contains(block, "effect") {
+		t.Fatalf("the block names each declared effect the gate verifies:\n%s", block)
+	}
+	tail := RenderContractTail(c, "/ws/triage-report.md", "/ws")
+	if !strings.Contains(tail, "<owed-file>/ws/triage-decision.json</owed-file>") || !strings.Contains(tail, "<effect>inbox-claim</effect>") {
+		t.Fatalf("the tail restates the machine half — owed files and effects — beside the sections:\n%s", tail)
+	}
+	plain, _ := For("build")
+	if got := RenderContractBlock(plain) + RenderContractTail(plain, "/ws/build-report.md", "/ws"); strings.Contains(got, "owed") || strings.Contains(got, "effect") {
+		t.Fatalf("a contract with no owed files or effects renders no such clause (byte-identical prompts):\n%s", got)
+	}
+}
+
+// Architecture review of S2b (HIGH): the owed-file LOCATION had two homes —
+// the gate's filepath.Join in deliverable/secondaries.go and English in the
+// prompt ("in the SAME directory"). OwedPath is the ONE join; the tail renders
+// the exact paths the gate reads, and the cache-safe block points at the tail.
+func TestOwedPath_IsTheOneJoinTheGateReads(t *testing.T) {
+	if got := OwedPath("/ws", "triage-decision.json"); got != "/ws/triage-decision.json" {
+		t.Fatalf("a bare name joins the workspace: %q", got)
+	}
+	if got := OwedPath("/ws", "reports/handoff.json"); got != "/ws/handoff.json" {
+		t.Fatalf("a declared separator never steers the read outside the workspace: %q", got)
+	}
+}
+
+func TestRenderContractTail_RendersTheOwedFilesAtTheExactPathsTheGateReads(t *testing.T) {
+	c := Contract{Phase: "triage", ArtifactName: "triage-report.md", Kind: KindMarkdown,
+		AgentOwedFiles: []string{"triage-decision.json", "reports/handoff.json"}, Effects: []string{"inbox-claim"}}
+	tail := RenderContractTail(c, "/elsewhere/triage-report.md", "/ws")
+	if !strings.Contains(tail, "<owed-file>/ws/triage-decision.json</owed-file>") || !strings.Contains(tail, "<owed-file>/ws/handoff.json</owed-file>") {
+		t.Fatalf("the tail names each owed file at OwedPath(workspace, name) — the workspace, not the artifact's directory:\n%s", tail)
+	}
+	block := RenderContractBlock(c)
+	if strings.Contains(block, "SAME directory") || !strings.Contains(block, "<owed-files>") || !strings.Contains(block, `"triage-decision.json"`) {
+		t.Fatalf("the block names the files and points at the tail for their paths, never describes a location:\n%s", block)
 	}
 }

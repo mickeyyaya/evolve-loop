@@ -36,10 +36,12 @@ import (
 // than re-dispatching an agent for a file nobody could read.
 func verifySecondaries(res *Result, c phasecontract.Contract, roots phasecontract.Roots) error {
 	for _, name := range c.AgentOwedFiles {
-		// The registry declares basenames; the gate never trusts a declared
-		// separator to steer a read outside the workspace.
-		base := filepath.Base(name)
-		path := filepath.Join(roots.Workspace, base)
+		// phasecontract.OwedPath is the ONE join (the prompt tail renders the
+		// same paths): the registry declares basenames and a declared
+		// separator never steers a read outside the workspace.
+		path := phasecontract.OwedPath(roots.Workspace, name)
+		base := filepath.Base(path)
+		res.Owed = append(res.Owed, base)
 		content, exists, err := readDeliverableWithGrace(path)
 		if err != nil {
 			return fmt.Errorf("deliverable: read %s: %w", path, err)
