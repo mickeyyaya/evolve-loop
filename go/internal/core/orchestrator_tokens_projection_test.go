@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/core/outcome"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
 )
@@ -53,7 +54,7 @@ func TestRecordPhaseOutcome_ProjectsTokensToSidecarAndTiming(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read sidecar: %v", err)
 	}
-	var sidecar phaseUsageSidecar
+	var sidecar outcome.UsageSidecar
 	if err := json.Unmarshal(data, &sidecar); err != nil {
 		t.Fatalf("unmarshal sidecar: %v", err)
 	}
@@ -68,7 +69,7 @@ func TestRecordPhaseOutcome_ProjectsTokensToSidecarAndTiming(t *testing.T) {
 func TestSidecar_LegacyWithoutTokensParses(t *testing.T) {
 	t.Parallel()
 	legacy := `{"phase":"scout","cost_usd":0.1,"duration_ms":500,"attempt_count":1,"verdict":"PASS"}`
-	var sidecar phaseUsageSidecar
+	var sidecar outcome.UsageSidecar
 	if err := json.Unmarshal([]byte(legacy), &sidecar); err != nil {
 		t.Fatalf("legacy sidecar must parse: %v", err)
 	}

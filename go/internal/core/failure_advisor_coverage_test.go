@@ -227,8 +227,8 @@ func TestOrchestratorForensicsHelpersCoverage(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(ws, "build-usage.json")); err != nil {
 		t.Fatalf("usage sidecar missing: %v", err)
 	}
-	writePhaseTimings(ws, []phaseTimingEntry{{Phase: "scout", Verdict: "PASS"}})
-	writePhaseTimings(ws, []phaseTimingEntry{{Phase: "build", Verdict: "FAIL"}})
+	o.outcome.WritePhaseTimings(ws, []phaseTimingEntry{{Phase: "scout", Verdict: "PASS"}})
+	o.outcome.WritePhaseTimings(ws, []phaseTimingEntry{{Phase: "build", Verdict: "FAIL"}})
 	raw, err := os.ReadFile(filepath.Join(ws, "phase-timing.json"))
 	if err != nil {
 		t.Fatalf("phase timing missing: %v", err)

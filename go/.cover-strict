@@ -4,3 +4,4 @@
 # cannot drift. Packages listed here ship with the coverage they declare; a
 # regression fails the tree. Blank lines and `#` comments are ignored.
 ./internal/signalcenter 100
+./internal/core/outcome 100

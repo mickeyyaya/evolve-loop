@@ -19,6 +19,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/storage"
@@ -73,14 +74,26 @@ func simulatePhases() []core.Phase {
 	}
 }
 
-func wireSimulateOrchestrator(_, evolveDir string) *core.Orchestrator {
+// wireSimulateOrchestrator builds the --simulate root: the simulate runners,
+// the plane's storage and ledger, and the SAME signal topology as the
+// production root (newRootSignalCenter, the observed ledger, the orchestrator
+// registered as listener) — so the recorder's and the seal's warnings render
+// on the console here exactly as in a real cycle. Unit 01's architecture
+// review (HIGH-1) found a Center-less simulate root had silenced the six
+// warnings the deleted stderr lines used to print. No bridge: the parity walk
+// launches no sessions.
+func wireSimulateOrchestrator(projectRoot, evolveDir string, console io.Writer) orchDeps {
 	phases := simulatePhases()
 	runners := make(map[core.Phase]core.PhaseRunner, len(phases))
 	for _, p := range phases {
 		runners[p] = &simulatePhase{name: p}
 	}
 
+	signals := newRootSignalCenter(projectRoot, evolveDir, console)
 	st := storage.New(evolveDir)
-	ld := ledger.New(evolveDir)
-	return core.NewOrchestrator(st, ld, runners)
+	ld := ledger.New(evolveDir, ledger.WithSignals(signals))
+	return orchDeps{
+		Storage: st, Ledger: ld, Signals: signals,
+		Orchestrator: core.NewOrchestrator(st, ld, runners, core.WithSignalCenter(signals)),
+	}
 }
