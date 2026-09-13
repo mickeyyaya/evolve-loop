@@ -1,0 +1,81 @@
+{
+  "cycle": 4243,
+  "run_id": "01JFIXEDRUNIDFORGOLDEN01",
+  "goal": "fixed goal text for the ordinary-PASS byte-clean pin",
+  "final_verdict": "PASS",
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 1200,
+      "started_at": "2026-09-14T00:00:00Z",
+      "ended_at": "2026-09-14T00:00:01.2Z",
+      "model_source": "profile",
+      "resolved_model": "gpt-5.6-terra",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 30000,
+      "started_at": "2026-09-14T00:00:02Z",
+      "ended_at": "2026-09-14T00:00:32Z",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "PASS",
+      "duration_ms": 4000,
+      "started_at": "2026-09-14T00:00:33Z",
+      "ended_at": "2026-09-14T00:00:37Z",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "timing": {
+    "total_ms": 35200,
+    "phase_count": 3,
+    "retried_count": 0,
+    "longest_phase": "build",
+    "longest_ms": 30000,
+    "by_archetype_ms": {
+      "unknown": 35200
+    },
+    "total_tokens": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "tokens_by_archetype": {
+      "unknown": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    "wasted_tokens": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "cache_hit_ratio": 0,
+    "hot_phase_count": 0
+  }
+}

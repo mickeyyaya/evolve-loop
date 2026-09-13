@@ -35,6 +35,7 @@ type cycleDossierParams struct {
 	Goal               string
 	RunID              string
 	Outcome            string
+	SystemFailure      *SystemFailureSignal
 	SkippedPhases      []SkippedPhase
 	VerdictsNotAdopted []VerdictNotAdopted
 	SpineFailOpens     []SpineFailOpen
@@ -82,6 +83,7 @@ func writeCycleDossier(lock gitMutationLocker, p cycleDossierParams) error {
 		Goal:               p.Goal,
 		RunID:              p.RunID,
 		FinalVerdict:       dossierVerdict(p.Outcome),
+		SystemFailure:      p.SystemFailure,
 		SkippedPhases:      p.SkippedPhases,
 		VerdictsNotAdopted: p.VerdictsNotAdopted,
 		SpineFailOpens:     p.SpineFailOpens,

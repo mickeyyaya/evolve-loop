@@ -11,6 +11,8 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 )
 
 // TestDefect_Named ensures the Defect type and all its fields are reachable by
@@ -112,6 +114,19 @@ func TestFailureRecord_Named(t *testing.T) {
 	if out.Failure == nil || out.Failure.Fingerprint != fr.Fingerprint ||
 		out.Failure.PreClass != fr.PreClass || len(out.Failure.Reasons) != 1 {
 		t.Errorf("FailureRecord round-trip: got %+v, want %+v", out.Failure, fr)
+	}
+}
+
+// TestBuildOpts_SystemFailureNamed covers the exported BuildOpts and Dossier
+// fields while asserting that Build preserves the complete signal.
+func TestBuildOpts_SystemFailureNamed(t *testing.T) {
+	sig := &cyclestate.SystemFailureSignal{Category: "landing-lost", Level: "system", Evidence: "ship ran but did not land"}
+	d, err := Build(1, BuildOpts{WorkspacePath: t.TempDir(), Goal: "preserve system failure", SystemFailure: sig})
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	if d.SystemFailure == nil || *d.SystemFailure != *sig {
+		t.Errorf("Dossier.SystemFailure = %+v, want %+v", d.SystemFailure, sig)
 	}
 }
 

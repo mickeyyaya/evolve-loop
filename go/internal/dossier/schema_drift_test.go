@@ -48,18 +48,19 @@ import (
 // "definitions" must appear here, and the test asserts that too — so adding a
 // definition without naming its Go type fails rather than going unchecked.
 var schemaObjects = map[string]reflect.Type{
-	"":                  reflect.TypeOf(Dossier{}),
-	"PhaseRecord":       reflect.TypeOf(PhaseRecord{}),
-	"Defect":            reflect.TypeOf(Defect{}),
-	"Lesson":            reflect.TypeOf(Lesson{}),
-	"Carryover":         reflect.TypeOf(Carryover{}),
-	"FailureRecord":     reflect.TypeOf(FailureRecord{}),
-	"CIWatchRecord":     reflect.TypeOf(CIWatchRecord{}),
-	"SkippedPhase":      reflect.TypeOf(cyclestate.SkippedPhase{}),
-	"VerdictNotAdopted": reflect.TypeOf(cyclestate.VerdictNotAdopted{}),
-	"SpineFailOpen":     reflect.TypeOf(cyclestate.SpineFailOpen{}),
-	"TimingSummary":     reflect.TypeOf(phasetiming.Summary{}),
-	"TokenUsage":        reflect.TypeOf(cyclestate.TokenUsage{}),
+	"":                    reflect.TypeOf(Dossier{}),
+	"PhaseRecord":         reflect.TypeOf(PhaseRecord{}),
+	"Defect":              reflect.TypeOf(Defect{}),
+	"Lesson":              reflect.TypeOf(Lesson{}),
+	"Carryover":           reflect.TypeOf(Carryover{}),
+	"FailureRecord":       reflect.TypeOf(FailureRecord{}),
+	"SystemFailureSignal": reflect.TypeOf(cyclestate.SystemFailureSignal{}),
+	"CIWatchRecord":       reflect.TypeOf(CIWatchRecord{}),
+	"SkippedPhase":        reflect.TypeOf(cyclestate.SkippedPhase{}),
+	"VerdictNotAdopted":   reflect.TypeOf(cyclestate.VerdictNotAdopted{}),
+	"SpineFailOpen":       reflect.TypeOf(cyclestate.SpineFailOpen{}),
+	"TimingSummary":       reflect.TypeOf(phasetiming.Summary{}),
+	"TokenUsage":          reflect.TypeOf(cyclestate.TokenUsage{}),
 }
 
 type schemaProp struct {

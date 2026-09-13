@@ -83,6 +83,9 @@ type BuildOpts struct {
 	// artifacts, so the dossier records WHY the cycle failed and still satisfies
 	// Validate — the producer never fabricates a PASS for a failed cycle.
 	FinalVerdict string
+	// SystemFailure is the orchestrator's deterministic system-level failure
+	// classification. Nil leaves the field absent from both dossier formats.
+	SystemFailure *cyclestate.SystemFailureSignal
 	// SkippedPhases are phases that genuinely did NOT run, with the skip cause.
 	// Surfaced verbatim.
 	SkippedPhases []cyclestate.SkippedPhase
@@ -132,6 +135,7 @@ func Build(cycle int, opts BuildOpts) (*Dossier, error) {
 		Goal:                       opts.Goal,
 		RunID:                      opts.RunID,
 		FinalVerdict:               verdict,
+		SystemFailure:              opts.SystemFailure,
 		Phases:                     []PhaseRecord{evidenceUnavailablePhase()},
 		SkippedPhases:              opts.SkippedPhases,
 		PhasesRunVerdictNotAdopted: opts.VerdictsNotAdopted,

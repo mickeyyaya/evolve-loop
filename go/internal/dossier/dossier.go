@@ -56,10 +56,13 @@ type Dossier struct {
 	// failure-digest.json + audit-fail-reason.json so the committed record
 	// says WHY the cycle failed. Nil on non-FAIL cycles and whenever the
 	// artifacts yielded no content — best-effort, never fabricated.
-	Failure   *FailureRecord `json:"failure,omitempty"`
-	Decisions []string       `json:"decisions,omitempty"`
-	Lessons   []Lesson       `json:"lessons,omitempty"`
-	Carryover []Carryover    `json:"carryover,omitempty"`
+	Failure *FailureRecord `json:"failure,omitempty"`
+	// SystemFailure preserves the deterministic system-level classification
+	// attached by the orchestrator. Nil keeps ordinary dossiers byte-compatible.
+	SystemFailure *cyclestate.SystemFailureSignal `json:"system_failure,omitempty"`
+	Decisions     []string                        `json:"decisions,omitempty"`
+	Lessons       []Lesson                        `json:"lessons,omitempty"`
+	Carryover     []Carryover                     `json:"carryover,omitempty"`
 	// SkippedPhases records phases that genuinely did NOT run, with the cause
 	// (closeout after an abnormal mid-cycle exit).
 	SkippedPhases []cyclestate.SkippedPhase `json:"skipped_phases,omitempty"`

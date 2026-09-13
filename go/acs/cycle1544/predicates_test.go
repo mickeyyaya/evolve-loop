@@ -89,6 +89,44 @@ func assertDefaultSuiteTestsPass(t *testing.T, pkg string, names ...string) {
 // 006/007's bindings are repointed at the test names the delivering cycle
 // (1546) actually used, because the original names were phantoms that
 // red-blocked every continuation cycle from 1544 onward (the 1539-1546 streak).
+//
+// RESTORED (cycle 1663, inbox lost-ship-dossier-evidence AC3): 004-005, the
+// dossier-evidence half. Their producer — detectLostLanding + the finalizeCycle
+// stamp — landed with PR #482 (TestFinalizeCycle_LostLandingDowngrades… is
+// green in 008 above), so the only gap left is the SINK: writeCycleDossier
+// still receives the outcome string alone. 004/005 bind to the cycle-1663 core
+// tests that drive the two REAL production callers (completeCycle and
+// abnormalEpilogue) over the vendored 1535/1536 artifacts. 001-003 (the
+// witness-redesign slice) still travel with their own inbox item.
+
+// TestC1544_004_LostLandingEvidenceReachesTheCommittedDossier — AC1 of
+// lost-ship-dossier-evidence: a landing-lost cycle's committed dossier carries
+// the signal's structured category AND evidence text, through the REAL
+// writeCycleDossier path — BOTH production callers, the normal closeout
+// (cycle_closeout.go) and the abnormal epilogue (cyclerun_epilogue.go). A
+// seam only a direct producer call reaches is dead code, so the binding
+// tests drive cycleRun.completeCycle / cycleRun.abnormalEpilogue over
+// cycle-1535's real artifacts and assert on the committed JSON + Markdown.
+func TestC1544_004_LostLandingEvidenceReachesTheCommittedDossier(t *testing.T) {
+	assertDefaultSuiteTestsPass(t, corePkg,
+		"TestDossierSystemFailure_LostLandingReachesTheCommittedDossier",
+		"TestDossierSystemFailure_AbnormalEpilogueThreadsTheSignal",
+	)
+}
+
+// TestC1544_005_LandedSiblingAndOrdinaryPassCarryNoEvidence — AC2, the
+// negative that keeps the feature from turning every contended wave into a
+// wall of false evidence: cycle-1536 hit the SAME transient ship error and
+// landed, so its dossier (same real path) carries no system-failure object
+// and leaks neither the category nor the error code; and an ordinary PASS
+// dossier stays BYTE-clean against a golden captured from the pre-change
+// producer (a nil signal adds nothing — no null, no empty md section).
+func TestC1544_005_LandedSiblingAndOrdinaryPassCarryNoEvidence(t *testing.T) {
+	assertDefaultSuiteTestsPass(t, corePkg,
+		"TestDossierSystemFailure_LandedSiblingCarriesNone",
+		"TestDossierSystemFailure_OrdinaryPassStaysByteClean",
+	)
+}
 
 // TestC1544_006_ReusedSnapshotNeverBecomesTheWorktreeBase — AC7 of
 // continuation-create-reuse-snapshot-base-guard. The reuse branch of

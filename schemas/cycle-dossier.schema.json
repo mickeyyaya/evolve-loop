@@ -65,6 +65,9 @@
     "failure": {
       "$ref": "#/definitions/FailureRecord"
     },
+    "system_failure": {
+      "$ref": "#/definitions/SystemFailureSignal"
+    },
     "decisions": {
       "type": "array",
       "description": "Key decisions made during this cycle.",
@@ -243,6 +246,18 @@
           "type": "array",
           "items": {"type": "string"}
         }
+      }
+    },
+    "SystemFailureSignal": {
+      "type": "object",
+      "required": ["category", "level", "evidence", "halt"],
+      "additionalProperties": false,
+      "description": "A deterministic system-level failure attached by the orchestrator and preserved verbatim in the committed dossier.",
+      "properties": {
+        "category": {"type": "string"},
+        "level": {"type": "string"},
+        "evidence": {"type": "string"},
+        "halt": {"type": "boolean"}
       }
     },
     "CIWatchRecord": {

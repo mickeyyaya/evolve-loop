@@ -107,6 +107,7 @@ func (cr *cycleRun) abnormalEpilogue(cause error) {
 		Goal:               dossierGoal,
 		RunID:              cr.cs.RunID,
 		Outcome:            VerdictFAIL,
+		SystemFailure:      cr.result.SystemFailure,
 		SkippedPhases:      cr.result.SkippedPhases,
 		VerdictsNotAdopted: cr.result.VerdictsNotAdopted,
 		SpineFailOpens:     cr.result.SpineFailOpens,

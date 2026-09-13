@@ -92,6 +92,15 @@ var markdownTmpl = template.Must(template.New("dossier-md").
 {{range .Failure.Reasons}}- {{.}}
 {{end}}{{- end}}
 {{- end}}
+{{- if .SystemFailure}}
+
+## System Failure
+
+**Category:** {{.SystemFailure.Category}}
+**Level:** {{.SystemFailure.Level}}
+**Evidence:** {{.SystemFailure.Evidence}}
+**Halt:** {{.SystemFailure.Halt}}
+{{- end}}
 {{- if .Lessons}}
 
 ## Lessons
