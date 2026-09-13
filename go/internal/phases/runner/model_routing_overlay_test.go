@@ -2,11 +2,53 @@ package runner
 
 import (
 	"context"
+	"errors"
+	"slices"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
+
+// TestResolveRouting_AdvisorOverlayPreservesFamilyTransport covers the
+// advisor projection through BaseRunner.Run -> resolveDispatchPlan
+// (routing.go). This is distinct from the contract-escalation projection,
+// which also sets ModelRoutingCLI but is covered in
+// TestRunner_ContractEscalation_RedispatchesOnEscalatedCLIWithDirective.
+func TestResolveRouting_AdvisorOverlayPreservesFamilyTransport(t *testing.T) {
+	tests := []struct {
+		name, primary, overlay, failCLI string
+		fallback, want                  []string
+	}{
+		{name: "bare family keeps headless transport", primary: "claude-p", fallback: []string{"codex"}, overlay: "claude", want: []string{"claude-p"}},
+		{name: "explicit driver wins and keeps fallback", primary: "claude-p", overlay: "claude-tmux", failCLI: "claude-tmux", want: []string{"claude-tmux", "claude-p"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			root := writeFallbackProfile(t, "evolve-scout", tt.primary, tt.fallback)
+			hooks := &fakeHooks{phase: "scout", agent: "evolve-scout", model: "sonnet", prompt: "x", verdict: core.VerdictPASS}
+			bridge := &scriptedBridge{responses: map[string]scriptedResp{}}
+			if tt.failCLI != "" {
+				bridge.responses[tt.failCLI] = scriptedResp{
+					resp: core.BridgeResponse{ExitCode: 80},
+					err:  errors.New("bridge: launch exit=80"),
+				}
+			}
+			runner := New(Options{Hooks: hooks, Bridge: bridge, Prompts: fakePromptsFS("evolve-scout", "x")})
+
+			if _, err := runner.Run(context.Background(), core.PhaseRequest{
+				ProjectRoot:     root,
+				Workspace:       t.TempDir(),
+				ModelRoutingCLI: tt.overlay,
+			}); err != nil {
+				t.Fatalf("Run: %v", err)
+			}
+			if !slices.Equal(bridge.calls, tt.want) {
+				t.Errorf("dispatch order=%v, want %v", bridge.calls, tt.want)
+			}
+		})
+	}
+}
 
 // TestRunner_ModelRoutingAuto_SoftOverlayAppliesAsPrimary (mr4-projection
 // AC1): with req.ModelRoutingCLI/Tier set (the cyclerun_dispatch seam's

@@ -292,7 +292,14 @@ func (hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRespo
 				id, path),
 		}}, string(core.PhaseTDD)
 	}
-	return core.VerdictPASS, nil, string(core.PhaseTDD)
+	unifiedDiags, err := processUnifiedCommitment(req)
+	if err != nil {
+		return core.VerdictFAIL, []core.Diagnostic{{
+			Severity: "error",
+			Message:  "unified_commitment processing failed: " + err.Error(),
+		}}, string(core.PhaseTDD)
+	}
+	return core.VerdictPASS, unifiedDiags, string(core.PhaseTDD)
 }
 
 // topNSectionBody returns the ## top_n section content (everything after the

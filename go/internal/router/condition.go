@@ -80,6 +80,10 @@ func resolveField(sig RoutingSignals, field string) (float64, bool, string, bool
 		return resolveTypedOrGeneric(sig, field, sig.Scout.DeliverableKind)
 	case "triage.deliverable_kind":
 		return resolveTypedOrGeneric(sig, field, sig.Triage.DeliverableKind)
+	case "triage.unified_size":
+		return 0, false, sig.Triage.UnifiedSize, true
+	case "triage.unified_member_count":
+		return float64(sig.Triage.UnifiedMemberCount), true, "", true
 	case "scout.item_count":
 		return float64(sig.Scout.ItemCount), true, "", true
 	case "scout.carryover_count":

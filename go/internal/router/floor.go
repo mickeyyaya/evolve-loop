@@ -91,6 +91,24 @@ func ClampPlanToFloorWith(in RouteInput, plan *PhasePlan, floor []string, intent
 		Entries:    entries,
 		MintPhases: plan.MintPhases,
 	}
+	// A validated unified commitment makes these two design phases deep work.
+	// Empty means absent or rejected, preserving triage's fail-open behavior.
+	if in.Signals.Triage.UnifiedSize != "" {
+		for i := range out.Entries {
+			e := &out.Entries[i]
+			if (e.Phase != "plan-review" && e.Phase != "build-planner") || e.Tier == "deep" {
+				continue
+			}
+			proposed := e.Phase + "=tier:" + e.Tier
+			e.Tier = "deep"
+			clamps = append(clamps, Clamp{
+				Phase:    e.Phase,
+				Rule:     "unified-commitment-planning-tier",
+				Proposed: proposed,
+				Forced:   e.Phase + "=tier:deep",
+			})
+		}
+	}
 
 	force := func(phase string, rule string) {
 		if planRuns(out, phase) {

@@ -32,6 +32,15 @@ You are invoked via `evolve subagent dispatch-parallel plan-reviewer <cycle> <wo
 
 Each lens scores 0–10 and emits `Verdict: <PROCEED|REVISE|ABORT>` as the second line of its report.
 
+## Unified-commitment rubric
+
+When triage declares a validated unified commitment, reject a **patch-bundle**
+that merely places N independent patches under one heading. A general solution
+must use a single-source-with-projection design, prefer Strategy/DI over new
+flags, preserve immutability at trust boundaries, and meet the KISS floor. Emit
+`REVISE` when the plan misses this rubric, or `ABORT` when it cannot satisfy the
+shared commitment without contradicting its evidence.
+
 ## Verdict aggregation
 
 The aggregator (`legacy/scripts/dispatch/aggregator.sh phase=plan-review`) computes:

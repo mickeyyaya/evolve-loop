@@ -44,9 +44,11 @@ func Digest(workspace string, completed []string) (RoutingSignals, error) {
 		} else {
 			sig.Triage = triageFromReportFallback(workspace, &sig.DigestDegraded)
 		}
-		if count, ok := triageCommittedCount(workspace, &sig.DigestDegraded); ok {
-			sig.Triage.CommittedCount = count
+		if decision, ok := digestTriageDecision(workspace, &sig.DigestDegraded); ok {
+			sig.Triage.CommittedCount = decision.committedCount
 			sig.Triage.commitmentKnown = true
+			sig.Triage.UnifiedSize = decision.unifiedSize
+			sig.Triage.UnifiedMemberCount = decision.unifiedMemberCount
 		}
 	}
 	if done["build"] {
@@ -76,38 +78,56 @@ func Digest(workspace string, completed []string) (RoutingSignals, error) {
 	return sig, nil
 }
 
-// triageCommittedCount reads the task commitment from triage's authoritative
-// decision artifact. Missing decisions are unknown, not empty, so legacy and
-// degraded workspaces keep the router's existing fail-open behavior.
-func triageCommittedCount(workspace string, degraded *[]string) (int, bool) {
+// triageDecisionDigest is the validated routing projection plus the independent
+// task count read from triage's authoritative decision artifact.
+type triageDecisionDigest struct {
+	committedCount     int
+	unifiedSize        string
+	unifiedMemberCount int
+}
+
+func digestTriageDecision(workspace string, degraded *[]string) (triageDecisionDigest, bool) {
 	raw, err := os.ReadFile(filepath.Join(workspace, "triage-decision.json"))
 	if os.IsNotExist(err) {
-		return 0, false
+		return triageDecisionDigest{}, false
 	}
 	if err != nil {
 		*degraded = append(*degraded, "triage: decision read: "+err.Error())
-		return 0, false
+		return triageDecisionDigest{}, false
 	}
 	var decision map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &decision); err != nil {
 		*degraded = append(*degraded, "triage: decision parse: "+err.Error())
-		return 0, false
+		return triageDecisionDigest{}, false
 	}
 	topN, ok := decision["top_n"]
 	if !ok {
-		return 0, false
+		return triageDecisionDigest{}, false
 	}
 	topN = bytes.TrimSpace(topN)
 	if len(topN) == 0 || topN[0] != '[' {
 		*degraded = append(*degraded, "triage: decision top_n must be an array")
-		return 0, false
+		return triageDecisionDigest{}, false
 	}
 	var tasks []json.RawMessage
 	if err := json.Unmarshal(topN, &tasks); err != nil {
 		*degraded = append(*degraded, "triage: decision top_n parse: "+err.Error())
-		return 0, false
+		return triageDecisionDigest{}, false
 	}
-	return len(tasks), true
+	result := triageDecisionDigest{committedCount: len(tasks)}
+	if projection, ok := decision["unified_projection"]; ok {
+		var value struct {
+			Size        string `json:"size"`
+			MemberCount int    `json:"member_count"`
+		}
+		if err := json.Unmarshal(projection, &value); err != nil || (value.Size != "small" && value.Size != "large") || value.MemberCount < 2 {
+			*degraded = append(*degraded, "triage: invalid unified projection")
+		} else {
+			result.unifiedSize = value.Size
+			result.unifiedMemberCount = value.MemberCount
+		}
+	}
+	return result, true
 }
 
 // unwrapPayload returns the inner `payload` object bytes of the canonical

@@ -8,6 +8,8 @@
 // profile.cli, one ignored. llmroute.Resolve folds both into a single Plan so
 // there is exactly one place to reason about "which CLI + model runs this
 // phase" — the seam the advisor/Registrar will reuse when it mints a phase.
+// For an overlay CLI, a bare name is a family selector, a hyphen-qualified name
+// is a driver selector, and an exact chain entry outranks both.
 //
 // Precedence (preserved verbatim from the prior two paths):
 //

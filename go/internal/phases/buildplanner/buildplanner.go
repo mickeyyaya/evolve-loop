@@ -60,10 +60,18 @@ func (p *Phase) BaseRunner() *runner.BaseRunner {
 // (config.Load is the sole reader of EVOLVE_BUILD_PLANNER). Legacy posture
 // preserved: build-planner is opt-in — skipped unless the flag enables it.
 func (p *Phase) ShouldSkip(req core.PhaseRequest) (bool, string, string, []core.Diagnostic) {
-	if router.PolicyForProject(req.ProjectRoot, req.Env).ShouldRunPhase(string(core.PhaseBuildPlanner)) {
-		return false, "", "", nil
+	signals, err := router.Digest(req.Workspace, []string{string(core.PhaseTriage)})
+	var diags []core.Diagnostic
+	if err != nil {
+		diags = append(diags, core.Diagnostic{Severity: "warning", Message: "build-planner routing digest failed: " + err.Error()})
 	}
-	return true, core.VerdictSKIPPED, string(core.PhaseBuild), nil
+	if len(signals.DigestDegraded) > 0 {
+		diags = append(diags, core.Diagnostic{Severity: "warning", Message: "build-planner routing digest degraded: " + strings.Join(signals.DigestDegraded, "; ")})
+	}
+	if router.PolicyForProject(req.ProjectRoot, req.Env).Enabled(string(core.PhaseBuildPlanner), signals) {
+		return false, "", "", diags
+	}
+	return true, core.VerdictSKIPPED, string(core.PhaseBuild), diags
 }
 
 // PhaseName implements runner.Hooks.

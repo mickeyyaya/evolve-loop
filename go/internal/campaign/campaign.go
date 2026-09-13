@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 )
 
 const (
@@ -48,6 +49,44 @@ type Citation struct {
 	Title string `json:"title"`
 	URL   string `json:"url,omitempty"`
 	Note  string `json:"note,omitempty"`
+}
+
+// PlanFromUnifiedCommitment projects a validated large commitment onto the
+// existing campaign DAG, preserving each member's files, dependencies, evidence,
+// and acceptance contract.
+func PlanFromUnifiedCommitment(c inboxbatch.UnifiedCommitment, items []inboxbatch.Item) (*Plan, error) {
+	if err := c.Validate(items); err != nil {
+		return nil, err
+	}
+	byID := make(map[string]inboxbatch.Item, len(items))
+	for _, item := range items {
+		byID[item.ID] = item
+	}
+	plan := &Plan{
+		Version: 1,
+		Goal:    c.RootCauseHypothesis,
+		Research: Research{
+			Summary: c.SharedSeam,
+		},
+	}
+	for _, member := range c.Members {
+		item := byID[member.ID]
+		contract := strings.Join(item.Acceptance, "\n")
+		if contract == "" {
+			contract = member.Evidence
+		}
+		plan.Research.Citations = append(plan.Research.Citations, Citation{Title: member.ID, Note: member.Evidence})
+		plan.Cycles = append(plan.Cycles, fleet.Todo{
+			ID:             item.ID,
+			Files:          append([]string(nil), item.Files...),
+			DependsOn:      append([]string(nil), item.Deps...),
+			OutputContract: contract,
+		})
+	}
+	if err := plan.Verify(); err != nil {
+		return nil, err
+	}
+	return plan, nil
 }
 
 // Load parses campaign-plan.json, rejecting unknown fields so schema drift fails

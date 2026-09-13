@@ -106,12 +106,14 @@ type ScoutSignals struct {
 
 // TriageSignals are the routing-relevant fields of triage's handoff.
 type TriageSignals struct {
-	CycleSize       string   // authoritative size after triage refines scout's estimate
-	PhaseSkip       []string // PSMAS phase_skip[] recommendation (additive only)
-	DeliverableKind string   // authoritative "code|document" after triage bounds top_n; "" = undeclared (ADR-0099)
-	CommittedCount  int      // number of tasks in triage-decision.json top_n
-	Present         bool
-	commitmentKnown bool // distinguishes an explicit empty top_n from a missing decision artifact
+	CycleSize          string   // authoritative size after triage refines scout's estimate
+	PhaseSkip          []string // PSMAS phase_skip[] recommendation (additive only)
+	DeliverableKind    string   // authoritative "code|document" after triage bounds top_n; "" = undeclared (ADR-0099)
+	CommittedCount     int      // number of tasks in triage-decision.json top_n
+	UnifiedSize        string   // "small|large" only after triage validates unified_commitment
+	UnifiedMemberCount int      // number of separately accepted members in the validated commitment
+	Present            bool
+	commitmentKnown    bool // distinguishes an explicit empty top_n from a missing decision artifact
 }
 
 // HasEmptyTriageCommitment reports whether triage authoritatively committed no

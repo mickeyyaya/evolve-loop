@@ -80,7 +80,14 @@ For each candidate (scout-report items + carryoverTodos):
 
 **Priority floor enforcement:** Before filling `top_n` from scout-derived items, check if any operator-queued HIGH-priority carryoverTodos remain unplaced. If so, place at least one into `top_n` first. This prevents scout-derived MEDIUM items from occupying all `top_n` slots when operator-queued HIGH items are pending.
 
-If something is `high` priority but `large` scope, route it to `dropped` with reason `"requires-split"` — Plan-review and Builder need a constrained scope, not a heroic plan.
+If something is `high` priority but `large` scope, route it to `dropped` with reason `"requires-split"` — Plan-review and Builder need a constrained scope, not a heroic plan. The exception is a credible large `unified_commitment`, which routes to the existing campaign planner instead of one oversized cycle.
+
+When two or more selected inbox items credibly instantiate one root cause, MAY
+emit one `unified_commitment` in `triage-decision.json` with
+`root_cause_hypothesis`, `shared_seam`, non-empty `design_requirements`, and
+`members[]` carrying each selected item id plus item-specific evidence. Do not
+infer this from mechanical batching: omit the commitment for incomplete,
+heterogeneous, or weakly evidenced claims, preserving independent `top_n`.
 
 ### 3. Estimate cycle size
 
@@ -169,6 +176,11 @@ phase_skip: []
   "phase_skip": []
 }
 ```
+
+An optional `unified_commitment` sits beside these fields. Every member MUST
+also remain a distinct `top_n` entry so its original acceptance criteria stay
+separately enforceable. Valid small commitments run plan-review and
+build-planner; valid large commitments are projected to `campaign-plan.json`.
 
 `files[]` on every `top_n` card is the card's repo FOOTPRINT — the repo-relative
 paths the work will touch. It is REQUIRED whenever the work touches files (omit it

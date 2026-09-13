@@ -84,9 +84,11 @@
       "end": []
     },
     "conditional_mandatory": {
-      "tdd": "cycle_size!=trivial && deliverable_kind!=document"
+      "tdd": "cycle_size!=trivial && deliverable_kind!=document",
+      "plan-review": "triage.unified_size!=",
+      "build-planner": "triage.unified_size!="
     },
-    "_conditional_mandatory_note": "ADR-0099 (docs/architecture/adr/0099-deliverable-kinds.md): tdd is released for a trivial cycle OR a document deliverable; clauses are AND-ed. Must equal config.DefaultTddRuleExpr (the registry-less default) \u2014 TestDefaults_TddRuleMatchesRegistry pins them.",
+    "_conditional_mandatory_note": "ADR-0099 releases tdd for a trivial cycle or document deliverable. The tdd expression must equal config.DefaultTddRuleExpr; TestDefaults_TddRuleMatchesRegistry pins them. Any validated unified commitment pins plan-review and build-planner; a large commitment also routes through campaign planning.",
     "max_optional_insertions": 6,
     "_goal_recipes_note": "ADR-0052 WS5 recipe SSOT. Single source for the goal-type \u2192 optional-insertion recipe. Each value is the ordered, VERBATIM token list obtained by splitting the persona's recipe cell on ' \u2192 '; tokens are opaque (may contain spaces, '+', '=', '[..]' bracket markers). config.Load projects this into RoutingConfig.GoalRecipes; router.RenderRecipeProjection regenerates the agents/evolve-router.md '## Goal-Type Recipes' table body (locked by TestRouterPersonaRecipeTable_NoDrift) and the RecipeVerifier reads the same source \u2014 ending three-source recipe drift.",
     "_deliverable_kinds_note": "ADR-0099 slice 2: the SHAPE a document cycle's deliverable must take \u2014 solutions/<slug>/ with at least min_options candidate strategies under options/*.md, a recommendation and an assumptions-and-evidence file every number traces to. Judged by ONE deterministic engine (internal/solutioncheck) that the build handoff floor, `evolve solution check` and the audit gate line all project; quality judgment stays in audit.",
@@ -476,7 +478,8 @@
       "inputs": {
         "files": [
           ".evolve/runs/cycle-{cycle}/scout-report.md",
-          ".evolve/runs/cycle-{cycle}/triage-report.md"
+          ".evolve/runs/cycle-{cycle}/triage-report.md",
+          ".evolve/runs/cycle-{cycle}/triage-decision.json"
         ],
         "state_fields": [
           "instinctSummary"
@@ -532,7 +535,8 @@
       "inputs": {
         "files": [
           ".evolve/runs/cycle-{cycle}/scout-report.md",
-          ".evolve/runs/cycle-{cycle}/test-report.md"
+          ".evolve/runs/cycle-{cycle}/test-report.md",
+          ".evolve/runs/cycle-{cycle}/triage-decision.json"
         ],
         "state_fields": []
       },
