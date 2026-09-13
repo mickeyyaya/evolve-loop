@@ -28,6 +28,14 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `BRIDGE_TOKEN_RESOLVER_MISSING` | the engine was built without a token resolver; lifecycle and outcome records continue without token counts (fail-open) |
 | `BRIDGE_TOKEN_USAGE_WARNING` | the token resolver measured the attempt with a caveat (invalid counters, partial measurement); the caveat is the reason |
 
+### carryover
+
+| Code | Meaning |
+|---|---|
+| `CARRYOVER_PERSIST_FAILED` | state.json could not take this run's failure-learning arrays (fields.step: write = the legacy whole-state write, update = the serialized read-modify-write); the in-memory state stands and the caller proceeds — the FailedRecord and the P0 todo may be lost from disk |
+| `CARRYOVER_WORKSPACE_MALFORMED` | a cycle-workspace carryover document is not its documented JSON shape; the file is skipped whole, never aborting the cycle — a persona defect for the memo or audit owner; the reason carries the decode error |
+| `CARRYOVER_WORKSPACE_READ_FAILED` | a cycle-workspace carryover document (carryover-todos.json or defect-ledger.json) exists but could not be read (not absence: permissions, a directory at the path); nothing is merged, the closeout proceeds; fields name the document and path |
+
 ### failurediag
 
 | Code | Meaning |

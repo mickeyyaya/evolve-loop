@@ -13,6 +13,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core/carryover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
@@ -228,7 +229,7 @@ func emitDefectLedger(artifact string, req core.PhaseRequest) error {
 		// something itself wrong — an operator reading defect-ledger.json
 		// must be able to tell the two apart without a second ledger or a
 		// schema-breaking Kind field.
-		appendLedgerEntry("PRESCRIPTION: " + text)
+		appendLedgerEntry(carryover.PrescriptionPrefix + text)
 	}
 	if overflow > 0 {
 		// One OPEN row standing for the truncated tail. It has no per-defect

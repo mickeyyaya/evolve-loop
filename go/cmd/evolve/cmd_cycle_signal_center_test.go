@@ -19,6 +19,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core/carryover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core/failurediag"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
@@ -279,6 +280,30 @@ func TestWireSimulateOrchestrator_FailureDiagWarningRenders(t *testing.T) {
 		t.Fatalf("the console sink renders the unit's WARN under --simulate: %q", out)
 	}
 	if data, err := os.ReadFile(filepath.Join(evolveDir, "signals.ndjson")); err != nil || !strings.Contains(string(data), `"code":"FAILUREDIAG_SIDECAR_WRITE_FAILED"`) {
+		t.Errorf("the cycle-less signal is durable: %v %s", err, data)
+	}
+}
+
+// Unit 03 (ADR-0103): the carryover module tag renders at the --simulate root.
+func TestWireSimulateOrchestrator_CarryoverWarningRenders(t *testing.T) {
+	root := t.TempDir()
+	evolveDir := filepath.Join(root, ".evolve")
+	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var console bytes.Buffer
+	d := wireSimulateOrchestrator(root, evolveDir, &console)
+	l := carryover.New(carryover.WithSignals(func() *signalcenter.Center { return d.Signals }))
+	ws := filepath.Join(root, "ws")
+	if err := os.MkdirAll(filepath.Join(ws, "carryover-todos.json"), 0o755); err != nil { // a directory at the path: a read fault, not absence
+		t.Fatal(err)
+	}
+	var state core.State
+	l.MergeMemo(&state, ws, 0, time.Now())
+	if out := console.String(); !strings.Contains(out, "[carryover]") || !strings.Contains(out, "CARRYOVER_WORKSPACE_READ_FAILED") {
+		t.Fatalf("the console sink renders the unit's WARN under --simulate: %q", out)
+	}
+	if data, err := os.ReadFile(filepath.Join(evolveDir, "signals.ndjson")); err != nil || !strings.Contains(string(data), `"code":"CARRYOVER_WORKSPACE_READ_FAILED"`) {
 		t.Errorf("the cycle-less signal is durable: %v %s", err, data)
 	}
 }

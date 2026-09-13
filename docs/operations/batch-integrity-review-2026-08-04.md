@@ -571,7 +571,7 @@ from cycle-1369 before landing.
 Two narrower gaps surfaced by this reconciliation are DEFERRED, not silently
 dropped (see `defect-dispositions.json` for full reasoning): (1) the
 diagnostic-only `.evolve/prescription-backlog.json` mechanism still has no
-scout-side reader — wiring `carryover_merge.go`/scout's carryover step is
+scout-side reader — wiring the carryover unit's memo merge (`internal/core/carryover`, formerly `carryover_merge.go`)/scout's carryover step is
 out-of-scope M/L work for this narrow S-lane; (2) scout-report.md templates
 still omit an explicit `Slug:` field per task (confirmed still true in this
 cycle's own `scout-report.md`) — a prompt/template fix, not a code defect in

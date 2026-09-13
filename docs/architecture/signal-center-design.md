@@ -162,7 +162,7 @@ Examples (what cycles 1636 and 1630 would have produced):
 
 `orchestrator`, `advisor`, `runner`, `bridge`, `liveness` (the renamed pane center), `ship`, `audit`,
 `triage`, `scout`, `build`, `tdd`, `gate.contract`, `gate.eval`, `gate.repo`, `inbox`, `config`,
-`loop`, `watchdog`, `observer`, `dashboard`, `signalcenter` (self-reports), `ledger` (the file ledger's append observer, S4a), `outcome` (the phase-outcome recorder, breakdown unit 01), `failurediag` (the failure-diag sidecar writer and the delivery-failure classifier, breakdown unit 02). A module is added by
+`loop`, `watchdog`, `observer`, `dashboard`, `signalcenter` (self-reports), `ledger` (the file ledger's append observer, S4a), `outcome` (the phase-outcome recorder, breakdown unit 01), `failurediag` (the failure-diag sidecar writer and the delivery-failure classifier, breakdown unit 02), `carryover` (the carryover-todo lifecycle, breakdown unit 03). A module is added by
 editing the closed set and its test; an unknown module is stamped `SIGNALCENTER_UNKNOWN_MODULE` and
 raised to WARN — never dropped. *(review 21: `advisor` and `config` added to match §12.)*
 
@@ -183,6 +183,7 @@ raised to WARN — never dropped. *(review 21: `advisor` and `config` added to m
 | `ledger.appended` | a ledger entry was appended (the file ledger's append observer; `fields.entry_seq` names the line) | INFO | |
 | `outcome.warning` | the phase-outcome recorder could not persist a record (sidecar or timing log skipped or failed); the in-memory record stands (unit 01) | WARN | |
 | `failurediag.warning` | the failure-diag writer could not land `<phase>-failure-diag.json` (temp write or rename); the phase abort proceeds unchanged and the diagnosis is lost from disk (unit 02) | WARN | |
+| `carryover.warning` | the carryover lifecycle could not read or decode a cycle-workspace document (`carryover-todos.json`, `defect-ledger.json`) or could not persist the failure-learning arrays to state.json; the closeout or the caller proceeds (unit 03) | WARN | |
 | `cycle.sealed` | final verdict decided (after `finalizeOutcome`) | INFO (FAIL → WARN) | ✓ on FAIL |
 | `loop.wave` / `loop.halt` / `loop.escalation` | batch-level events (today's `dispatchevents`) | INFO / INCIDENT / WARN | / ✓ / |
 | `signalcenter.listener_panicked` / `signalcenter.sink_dropped` | self-reports: a panicking listener was dropped / the NDJSON sink could not write (count in `fields.dropped`) | INCIDENT / WARN | |
@@ -461,7 +462,7 @@ ADR-0072's coherence floor and need their own campaign note.
 
 | Order | Unit to extract (from) | Size today | Module tag | Notes |
 |---|---|---|---|---|
-| 1 | **landed 2026-09-13 as unit 01** ([decomposition/01-outcome-recorder.md](decomposition/01-outcome-recorder.md)): the C1 recorder → `internal/core/outcome`; **unit 02 landed 2026-09-13** ([decomposition/02-failure-diagnostics.md](decomposition/02-failure-diagnostics.md)): the failure-diag sidecar writer and the delivery-failure classifier → `internal/core/failurediag`; the carryover lifecycle (unit 03) and the failure-learning engine follow (`failure_learning.go` 937 → 826) | 1070 | `orchestrator` → `outcome` | already the C1 chokepoint; S1 touches it — extract after S1 lands |
+| 1 | **landed 2026-09-13 as unit 01** ([decomposition/01-outcome-recorder.md](decomposition/01-outcome-recorder.md)): the C1 recorder → `internal/core/outcome`; **unit 02 landed 2026-09-13** ([decomposition/02-failure-diagnostics.md](decomposition/02-failure-diagnostics.md)): the failure-diag sidecar writer and the delivery-failure classifier → `internal/core/failurediag`; **unit 03 landed 2026-09-13** ([decomposition/03-carryover-lifecycle.md](decomposition/03-carryover-lifecycle.md)): the carryover-todo lifecycle → `internal/core/carryover`, three sibling files deleted; the failure-learning engine (unit 03b) follows (`failure_learning.go` 823 → 567) | 1070 | `orchestrator` → `outcome` | already the C1 chokepoint; S1 touches it — extract after S1 lands |
 | 2 | phase advisor → `internal/advisor` (`phase_advisor.go` 1144) | 1144 | `advisor` | pure decision logic; strong test seam |
 | 3 | `orchestrator.go` (1158): composition (`New`, options) vs `RunCycle` engine | 1158 | `orchestrator` | Facade over the extracted units |
 | 4 | `cyclerun.go` (904): finalize/closeout → `cycleclose` | 904 | `orchestrator` | `finalizeCycle` + `finalizeOutcome` + dossier |

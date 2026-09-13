@@ -313,27 +313,12 @@ func (o *Orchestrator) finalizeCycle(ctx context.Context, cs CycleState, cycle i
 		o.stampContinuationManifest(ctx, cs, cycle, projectRoot)
 	}
 
-	// chronicle-s4: close the PASS-branch learning orphan. evolve-memo and the
-	// retro path both write <workspace>/carryover-todos.json but nothing read it;
-	// merge those queued follow-up todos into state before it persists here, so
-	// they reach the next cycle's planner through the same serialized RMW.
-	MergeWorkspaceCarryover(state, cs.WorkspacePath, cycle, time.Now().UTC())
-
-	// F3 (batch-integrity-review-2026-08-04.md): a WARN-shipped audit's OPEN
-	// "PRESCRIPTION: " defect-ledger rows must reach the next cycle's carryover
-	// flow unconditionally — not only when a later cycle happens to be bound as
-	// a formal continuation of the ledger-holding cycle (reconcileAgainstAncestor's
-	// arming scope). Mirrors MergeWorkspaceCarryover immediately above.
-	MergeWorkspacePrescriptionCarryover(state, cs.WorkspacePath, cycle, time.Now().UTC())
-
-	// Triage's DROPPED set retires here, AFTER both merges above and before the
-	// persist — otherwise a todo triage just declared stale is re-merged from the
-	// workspace and handed straight back to the next cycle's planner, which is
-	// the cycle-1538 reproduction: triage said "stale: existing bridge tests and
-	// ACS replay predicate are green" and the same id came back the next cycle.
-	// Ordering is load-bearing: retiring BEFORE the merges would let the merge
-	// resurrect the very id that was just dropped.
-	retireTriageDroppedCarryover(state, cs.WorkspacePath)
+	// The cycle-terminal carryover order — the memo merge, the prescription merge,
+	// then the triage-dropped retirement — lives in the unit (carryover.Closeout)
+	// with its own test: retiring BEFORE the merges let a merge resurrect the very
+	// id triage had just dropped (the cycle-1538 reproduction, pinned at this seam
+	// by TestFinalizeCycle_RetiresTriageDroppedCarryover).
+	o.carryover().Closeout(state, cs.WorkspacePath, cycle, time.Now().UTC())
 
 	state.LastCycleNumber = max(state.LastCycleNumber, cycle)
 	if perr := o.persistCycleEndState(ctx, *state); perr != nil {

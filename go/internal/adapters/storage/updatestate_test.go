@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core/carryover"
 )
 
 // updatestate_test.go — CA.3 (concurrency-factory plan, Track C-A):
@@ -187,3 +188,11 @@ func TestUpdateState_RevisionOmittedAtZero(t *testing.T) {
 		t.Errorf("zero StateRevision must be omitted: %s", data)
 	}
 }
+
+// The carryover lifecycle probes the store for its Updater at run time
+// (`store.(carryover.Updater)`); a signature drift would silently demote
+// production to the legacy whole-state write. Pin both ports at compile time.
+var (
+	_ carryover.Store   = (*FilesystemStorage)(nil)
+	_ carryover.Updater = (*FilesystemStorage)(nil)
+)

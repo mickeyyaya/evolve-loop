@@ -151,10 +151,10 @@ own prescription ("materialize `.evolve/evals/artifact-ready-crosspoll-debounce.
 1233→1249→1252→1254→1258 salvage chain as the live instance of exactly this
 gap.
 
-`MergeWorkspacePrescriptionCarryover` (`go/internal/core/prescription_carryover.go`)
+`carryover.Lifecycle.MergePrescriptions` (`go/internal/core/carryover/workspace.go`, ADR-0103 unit 03; the `core.MergeWorkspacePrescriptionCarryover` facade remains for tests)
 closes it without touching the Reconcile gate's hardened arming logic. It is a
 cycle-terminal hook — called from `finalizeCycle`
-(`go/internal/core/cyclerun.go`) immediately beside `MergeWorkspaceCarryover`,
+(`go/internal/core/cyclerun.go`) inside `carryover.Lifecycle.Closeout` (memo merge → prescription merge → triage-dropped retirement),
 whose tolerant-decode/dedup/TTL pattern it mirrors exactly — that reads
 `<workspace>/defect-ledger.json` unconditionally (no continuation-manifest
 required), keeps only `status == "OPEN"` entries whose `text` carries the

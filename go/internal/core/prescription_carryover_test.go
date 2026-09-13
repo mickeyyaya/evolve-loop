@@ -55,6 +55,8 @@ package core
 
 import (
 	"context"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core/carryover"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"os"
 	"path/filepath"
 	"strings"
@@ -183,6 +185,19 @@ func TestMergeWorkspacePrescriptionCarryover_AbsentLedgerIsNoOp(t *testing.T) {
 // MergeWorkspaceCarryover's malformed-file discipline. The cycle-terminal hook
 // must never abort the cycle over a malformed anti-laundering record.
 func TestMergeWorkspacePrescriptionCarryover_MalformedLedgerWarnsNotFails(t *testing.T) {
+	t.Run("wired: the malformed ledger is a CARRYOVER_WORKSPACE_MALFORMED signal", func(t *testing.T) {
+		ws := t.TempDir()
+		writeDefectLedgerFixture(t, ws, `{ this is not valid json `)
+		signals, got := recordingCenter()
+		o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil), WithSignalCenter(signals))
+		state := &State{}
+		o.carryover().MergePrescriptions(state, ws, 1375, time.Now().UTC())
+		warned := eventsOfKind(*got, signalcenter.KindCarryoverWarning)
+		if len(state.CarryoverTodos) != 0 || len(warned) != 1 || warned[0].Code != carryover.CodeWorkspaceMalformed || warned[0].Origin != "Lifecycle.MergePrescriptions" {
+			t.Fatalf("the wired lifecycle reports the malformed ledger once and merges nothing: %+v", *got)
+		}
+	})
+
 	ws := t.TempDir()
 	writeDefectLedgerFixture(t, ws, `{ this is not valid json `)
 	state := &State{}
