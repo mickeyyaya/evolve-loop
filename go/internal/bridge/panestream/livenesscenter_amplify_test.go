@@ -7,11 +7,11 @@ import (
 	"testing"
 )
 
-// signalcenter_amplify_test.go — Adversarial amplification for SignalCenter (cycle 430).
+// livenesscenter_amplify_test.go — Adversarial amplification for LivenessCenter (cycle 430).
 // Written by the Test Amplifier — black-box view, spec + ADR-0068 only.
 // No implementation files read; fixedProbe injects controlled LivenessState values.
 //
-// Coverage gaps targeted (not reached by signalcenter_test.go AC1–AC12):
+// Coverage gaps targeted (not reached by livenesscenter_test.go AC1–AC12):
 //   AMP1  Aggregation priority: Hung > BusyButStagnant (two sessions, different states)
 //   AMP2  Aggregation priority: Converging > Hung (two sessions)
 //   AMP3  Aggregation priority: Converging wins over all four states simultaneously
@@ -40,7 +40,7 @@ func (f *fixedProbe) Assess(_ string, _ PaneProfile) (LivenessState, float64) {
 // When one session is Hung and another is BusyButStagnant, Aggregate must return
 // LivenessHung. Validates priority level 2 > level 3 from ADR-0068 aggregation rule.
 func TestAmp_SignalCenter_AggregationPriority_HungBeatsBusyStagnant(t *testing.T) {
-	sc := NewSignalCenter()
+	sc := NewLivenessCenter()
 
 	sc.RegisterHandler("hung-probe", func() LivenessProbe {
 		return &fixedProbe{state: LivenessHung, conf: 0.8}
@@ -68,7 +68,7 @@ func TestAmp_SignalCenter_AggregationPriority_HungBeatsBusyStagnant(t *testing.T
 // When one session is Converging and another is Hung, Aggregate must return
 // LivenessConverging. Validates priority level 1 > level 2 from ADR-0068.
 func TestAmp_SignalCenter_AggregationPriority_ConvergingBeatsHung(t *testing.T) {
-	sc := NewSignalCenter()
+	sc := NewLivenessCenter()
 
 	sc.RegisterHandler("conv-probe", func() LivenessProbe {
 		return &fixedProbe{state: LivenessConverging, conf: 0.95}
@@ -93,7 +93,7 @@ func TestAmp_SignalCenter_AggregationPriority_ConvergingBeatsHung(t *testing.T) 
 // Validates the full priority ordering (Converging > Hung > BusyStagnant > Idle)
 // in a single assertion, guarding the complete ADR-0068 aggregation rule.
 func TestAmp_SignalCenter_AggregationPriority_ConvergingWinsAll(t *testing.T) {
-	sc := NewSignalCenter()
+	sc := NewLivenessCenter()
 
 	states := []struct {
 		name  string
@@ -125,7 +125,7 @@ func TestAmp_SignalCenter_AggregationPriority_ConvergingWinsAll(t *testing.T) {
 // not once per Observe call. Calling it on every Observe would reset stateful
 // detector history (stall counts, peak tokens) — a correctness regression.
 func TestAmp_SignalCenter_FactoryCalledOncePerSession(t *testing.T) {
-	sc := NewSignalCenter()
+	sc := NewLivenessCenter()
 	var callCount int64
 
 	sc.RegisterHandler("counting-cli", func() LivenessProbe {
@@ -149,7 +149,7 @@ func TestAmp_SignalCenter_FactoryCalledOncePerSession(t *testing.T) {
 // A shared-probe bug (single probe reused across all sessions) would corrupt
 // the stall-counter state of one session when the other is observed.
 func TestAmp_SignalCenter_SessionIsolation(t *testing.T) {
-	sc := NewSignalCenter()
+	sc := NewLivenessCenter()
 	var convCalls, stalCalls int64
 
 	sc.RegisterHandler("conv-iso", func() LivenessProbe {
@@ -189,7 +189,7 @@ func TestAmp_SignalCenter_SessionIsolation(t *testing.T) {
 // Maps in Go allow empty-string keys; implementations that validate session key
 // non-emptiness with a panic would violate the no-panic contract.
 func TestAmp_SignalCenter_EmptySessionKey(t *testing.T) {
-	sc := NewSignalCenter()
+	sc := NewLivenessCenter()
 	p := Profiles["claude"]
 
 	defer func() {
@@ -209,7 +209,7 @@ func TestAmp_SignalCenter_EmptySessionKey(t *testing.T) {
 // FindStringSubmatch on the rendered pane — empty input is the boundary that
 // causes index-out-of-bounds in naive implementations.
 func TestAmp_SignalCenter_EmptyRendered(t *testing.T) {
-	sc := NewSignalCenter()
+	sc := NewLivenessCenter()
 	p := Profiles["claude"]
 
 	defer func() {
@@ -228,7 +228,7 @@ func TestAmp_SignalCenter_EmptyRendered(t *testing.T) {
 // Guards against map-resize crashes, O(n²) aggregation, or per-map-entry
 // goroutine-leak bugs that only manifest at scale.
 func TestAmp_SignalCenter_LargeNumSessions(t *testing.T) {
-	sc := NewSignalCenter()
+	sc := NewLivenessCenter()
 	p := Profiles["claude"]
 
 	for i := 0; i < 200; i++ {
@@ -255,7 +255,7 @@ func TestAmp_SignalCenter_LargeNumSessions(t *testing.T) {
 // race-clean. The baseline test (AC5) has only 1 reader goroutine; 4 readers
 // validates that RWMutex allows simultaneous reader acquisition without deadlock.
 func TestAmp_SignalCenter_MultipleReadersConcurrent(t *testing.T) {
-	sc := NewSignalCenter()
+	sc := NewLivenessCenter()
 	p := Profiles["claude"]
 
 	// Seed some sessions so Aggregate has meaningful work to do.
@@ -298,7 +298,7 @@ func TestAmp_SignalCenter_MultipleReadersConcurrent(t *testing.T) {
 // (may be zero or a valid state depending on whether DetectorFor uses prime-on-first
 // or prime+assess models) — panic-free is the only hard contract here.
 func TestAmp_SignalCenter_SingleObservationPerSession(t *testing.T) {
-	sc := NewSignalCenter()
+	sc := NewLivenessCenter()
 	p := Profiles["claude"]
 
 	defer func() {
@@ -317,7 +317,7 @@ func TestAmp_SignalCenter_SingleObservationPerSession(t *testing.T) {
 // is consulted FIRST, before DetectorFor. This allows add-a-CLI and override-a-CLI
 // without editing DetectorFor.
 func TestAmp_SignalCenter_RegisteredHandlerOverridesBuiltin(t *testing.T) {
-	sc := NewSignalCenter()
+	sc := NewLivenessCenter()
 	overrideCalled := false
 
 	sc.RegisterHandler("claude", func() LivenessProbe {
@@ -337,7 +337,7 @@ func TestAmp_SignalCenter_RegisteredHandlerOverridesBuiltin(t *testing.T) {
 // This validates the distinction between "no sessions" (zero) and "all-idle sessions"
 // (LivenessIdle), which an off-by-one in the priority sweep could collapse.
 func TestAmp_SignalCenter_AllIdleSessionsAggregateIdle(t *testing.T) {
-	sc := NewSignalCenter()
+	sc := NewLivenessCenter()
 
 	sc.RegisterHandler("idle-probe", func() LivenessProbe {
 		return &fixedProbe{state: LivenessIdle, conf: 0.7}

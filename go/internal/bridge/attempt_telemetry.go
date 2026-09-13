@@ -2,16 +2,17 @@ package bridge
 
 import (
 	"fmt"
-	"io"
 	"math"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmcalls"
 	evolog "github.com/mickeyyaya/evolve-loop/go/internal/log"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/tokenusage"
 )
 
@@ -20,15 +21,47 @@ import (
 const LLMCallsLogFilename = llmcalls.Filename
 
 type attemptLogContext struct {
+	signals *signalcenter.Center
+	dispatchIdentity
 	callID  string
 	cli     string
 	agent   string
 	attempt int
 }
 
-func (c attemptLogContext) warn(w io.Writer, event, detail string) {
-	_, _ = fmt.Fprintf(w, "[engine] WARN: %s call_id=%s cli=%s agent=%s attempt=%d detail=%s\n",
-		event, diagnosticField(c.callID), diagnosticField(c.cli), diagnosticField(c.agent), c.attempt, diagnosticField(detail))
+// attemptContext is the identity every telemetry signal of one attempt
+// carries: the dispatch (dispatchIdentity, attempt) and the call (call_id,
+// cli, agent).
+func (e *Engine) attemptContext(req core.BridgeRequest, callID string, attempt int) attemptLogContext {
+	return attemptLogContext{signals: e.deps.Signals, dispatchIdentity: requestIdentity(req),
+		callID: callID, cli: req.CLI, agent: req.Agent, attempt: attempt}
+}
+
+// event is the shape every telemetry signal of this attempt shares; origin is
+// the producer's own name — vocabulary, never a hidden default.
+func (c attemptLogContext) event(origin string, kind signalcenter.Kind, code signalcenter.Code, reason string) signalcenter.Event {
+	return signalcenter.Event{
+		Cycle: c.cycle, RunID: c.runID, Phase: c.phase, Attempt: c.attempt,
+		Module: signalcenter.ModuleBridge, Origin: origin, Kind: kind,
+		Severity: signalcenter.SeverityWarn, Code: code, Reason: reason,
+		Fields: map[string]string{"call_id": c.callID, "cli": c.cli, "agent": c.agent},
+	}
+}
+
+// warn is the engine's telemetry-warning producer (ADR-0101 S3): one
+// bridge.warning whose code names the rule and whose reason is the detail.
+// The old "[engine] WARN" line is rendered by the root's stderr sink.
+func (c attemptLogContext) warn(code signalcenter.Code, detail string) {
+	c.signals.Emit(c.event("attemptLogContext.warn", signalcenter.KindBridgeWarning, code, detail))
+}
+
+// tripwire is the bridge.tripwire producer: a successful attempt that ran past
+// the threshold with no measurable token usage.
+func (c attemptLogContext) tripwire(durationMS int64) {
+	e := c.event("attemptLogContext.tripwire", signalcenter.KindBridgeTripwire, CodeTelemetryTripwire,
+		"unmeasured successful launch: past the tripwire threshold with source=none — build a per-CLI usage collector")
+	e.Fields["duration_ms"] = strconv.FormatInt(durationMS, 10)
+	c.signals.Emit(e)
 }
 
 // diagnosticField bounds untrusted text and emits one ASCII-quoted field. It
@@ -52,7 +85,7 @@ func (e *Engine) recordModelAttempt(
 		attempt = 1
 	}
 	callID := llmcalls.NewCallID(start)
-	logContext := attemptLogContext{callID: callID, cli: req.CLI, agent: req.Agent, attempt: attempt}
+	logContext := e.attemptContext(req, callID, attempt)
 	result, usageStatus := e.resolveAttemptTokens(req, start, end, callID, attempt)
 	if usageStatus == llmcalls.UsageMeasured || usageStatus == llmcalls.UsagePartial {
 		resp.Tokens = core.TokenUsage(result.Usage)
@@ -98,8 +131,8 @@ func (e *Engine) recordModelAttempt(
 		CauseCode:       modelAttemptCause(code, launchStderr),
 	}
 	if err := llmcalls.AppendWorkspace(req.Workspace, rec); err != nil {
-		logContext.warn(e.deps.Stderr, "attempt telemetry append failed",
-			fmt.Sprintf("path=%s error=%v", llmcalls.Path(req.Workspace), err))
+		logContext.warn(CodeTelemetryAppendFailed,
+			fmt.Sprintf("attempt telemetry append failed: path=%s error=%v", llmcalls.Path(req.Workspace), err))
 	}
 }
 
@@ -122,8 +155,7 @@ func (e *Engine) resolveAttemptTokens(req core.BridgeRequest, start, end time.Ti
 		Start: start, End: end,
 	})
 	if err != nil {
-		(attemptLogContext{callID: callID, cli: req.CLI, agent: req.Agent, attempt: attempt}).warn(
-			e.deps.Stderr, "token resolver failed", err.Error())
+		(e.attemptContext(req, callID, attempt)).warn(CodeTokenResolverFailed, "token resolver failed: "+err.Error())
 		return tokenusage.Result{Source: tokenusage.SourceNone, FillPct: tokenusage.FillPctUnmeasured}, llmcalls.UsageResolverError
 	}
 	status := llmcalls.UsageUnavailable
@@ -169,27 +201,21 @@ func joinMeasurementWarning(existing, addition string) string {
 }
 
 func (e *Engine) emitTokenWarnings(req core.BridgeRequest, code int, start, end time.Time, callID string, attempt int, result tokenusage.Result) {
-	logContext := attemptLogContext{callID: callID, cli: req.CLI, agent: req.Agent, attempt: attempt}
+	logContext := e.attemptContext(req, callID, attempt)
 	if result.Warn != "" {
-		logContext.warn(e.deps.Stderr, "token usage warning", result.Warn)
+		logContext.warn(CodeTokenUsageWarning, result.Warn)
 	}
 	contributors := result.Usage
 	if result.PeakPromptTokens != 0 {
 		contributors = result.PeakUsage
 	}
 	if warning := tokenusage.FillWarnWithContributors(req.Agent, result.FillPct, defaultIfZero(e.deps.ContextFillWarnPct, defaultContextFillWarnPct), contributors); warning != "" {
-		logContext.warn(e.deps.Stderr, "CONTEXT-FILL", warning)
+		logContext.warn(CodeContextFillHigh, warning)
 	}
 	if isTelemetryTripwire(req.CLI, code, start, end, result.Source) {
-		cycle := cycleFromWorkspace(req.Workspace)
-		if cycle == "" {
-			cycle = "cycle-unknown"
-		}
-		_, _ = fmt.Fprintf(e.deps.Stderr,
-			"[engine] TRIPWIRE: unmeasured successful launch call_id=%s cli=%s agent=%s attempt=%d cycle=%s duration_s=%d source=%s action=%s\n",
-			diagnosticField(callID), diagnosticField(req.CLI), diagnosticField(req.Agent), attempt,
-			diagnosticField(cycle), int(end.Sub(start).Seconds()), diagnosticField(string(tokenusage.SourceNone)),
-			diagnosticField("build a per-CLI usage collector"))
+		// ADR-0101 S3: the escalation is a bridge.tripwire signal; the root's
+		// sink renders it (the hand-written "[engine] TRIPWIRE" line is gone).
+		logContext.tripwire(end.Sub(start).Milliseconds())
 	}
 }
 

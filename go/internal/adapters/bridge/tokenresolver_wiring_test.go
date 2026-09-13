@@ -52,7 +52,7 @@ func mustParseRFC3339(t *testing.T, s string) time.Time {
 // Acceptance Criteria Summary). NewDefault's Deps-building helper must never
 // leave TokenResolver nil for a resolvable HOME.
 func TestProductionEngineDeps_WiresNonNilTokenResolver(t *testing.T) {
-	a := NewDefault(t.TempDir())
+	a := NewDefault(t.TempDir(), nil)
 	d := a.productionEngineDeps(map[string]string{"HOME": t.TempDir()})
 	if d.TokenResolver == nil {
 		t.Error("productionEngineDeps(env).TokenResolver is nil — production launches get silent zero telemetry (the cycle-612+ bug)")
@@ -66,7 +66,7 @@ func TestProductionEngineDeps_WiresNonNilTokenResolver(t *testing.T) {
 // accessor, so a Builder that wires productionEngineDeps into the helper but
 // forgets to route engineFactory through it cannot pass by coincidence.
 func TestEngineFactory_WiresTokenResolver(t *testing.T) {
-	a := NewDefault(t.TempDir())
+	a := NewDefault(t.TempDir(), nil)
 	built := a.engineFactory(map[string]string{"HOME": t.TempDir()})
 	eng, ok := built.(*gobridge.Engine)
 	if !ok {
@@ -99,7 +99,7 @@ func TestProductionEngineDeps_ResolverAppliesRealFixture(t *testing.T) {
 		t.Fatalf("write fixture transcript: %v", err)
 	}
 
-	a := NewDefault(t.TempDir())
+	a := NewDefault(t.TempDir(), nil)
 	d := a.productionEngineDeps(map[string]string{"HOME": home})
 	if d.TokenResolver == nil {
 		t.Fatal("productionEngineDeps(env).TokenResolver is nil")

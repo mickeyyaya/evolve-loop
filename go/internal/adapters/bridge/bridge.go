@@ -23,6 +23,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/log"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/skilloverlay"
 	"github.com/mickeyyaya/evolve-loop/go/internal/tokenusage"
 )
@@ -78,6 +79,9 @@ type Adapter struct {
 	// catalog-aware resolver so user/minted phases get their spec-derived
 	// contract block + exact-path footer (WS-A, ADR-0034).
 	resolver phasecontract.Resolver
+	// signals is the ADR-0101 Signal Center every engine this Adapter builds
+	// produces into; injected at construction (NewDefault), nil = Null Object.
+	signals *signalcenter.Center
 	// phaseIO is the EVOLVE_PHASE_IO rollout stage (ADR-0050 §3.8b). At
 	// >=StageAdvisory the injected contract block instructs build/scout/triage to
 	// self-report failure via a structured sentinel; default StageOff keeps the
@@ -113,8 +117,9 @@ func New() *Adapter {
 // NewDefault constructs the production Adapter, loading timing overrides
 // from <projectRoot>/.evolve/policy.json when available (fail-open: a
 // missing or unparseable policy.json falls back to bridge built-in defaults).
-func NewDefault(projectRoot string) *Adapter {
+func NewDefault(projectRoot string, signals *signalcenter.Center) *Adapter {
 	a := New()
+	a.signals = signals
 	if pol, err := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json")); err == nil {
 		a.bridgeConfig = pol.BridgeConfig()
 		// Resolve through policy's validating resolver, never off the raw
@@ -148,6 +153,7 @@ func (a *Adapter) productionEngineDeps(env map[string]string) gobridge.Deps {
 		ScrollbackLines:       a.bridgeConfig.ScrollbackLines,
 		TokenResolver:         tokenusage.DefaultResolver(configRoot(env)),
 		ContextFillWarnPct:    a.contextFillWarnPct,
+		Signals:               a.signals,
 		// Wall corroboration (2026-08-15 false-wall incident): a pane
 		// exhaustion match escalates rc 85 only after a live one-token probe
 		// corroborates it — subject-matter wall vocabulary (a lane editing
@@ -425,3 +431,7 @@ func injectOperatorDirectives(prompt, directives string) string {
 func SetModelCatalogDirFn(fn func() string) {
 	gobridge.SetModelCatalogDirFn(fn)
 }
+
+// SignalsWired reports whether a Signal Center was injected at construction —
+// the composition root's wiring proof (ADR-0101 S3).
+func (a *Adapter) SignalsWired() bool { return a.signals != nil }

@@ -419,7 +419,7 @@ func (ar *autoResponder) tickPane(ctx context.Context, session, pane string, cap
 	// pane here stays RAW: resolvePending, shadow matching, and writeEscalation
 	// (above/below) need the real terminal. stripAgentDiffLines runs only
 	// inside decideAutoRespond, scoped to the prompt-matching decision.
-	// Routed through SignalCenter.BusyOf (cycle-434 S4 completion), not the
+	// Routed through LivenessCenter.BusyOf (cycle-434 S4 completion), not the
 	// standalone PaneBusy: BusyOf is nil-receiver-safe and stateless (no
 	// Observe), so ar.deps.LivenessCenter — nil outside the driver's
 	// Deps-injected test seam — needs no guard here, and this tick's read
@@ -465,7 +465,7 @@ func (ar *autoResponder) tickPane(ctx context.Context, session, pane string, cap
 	// Exhaustion override (reuses THIS tick's capture — no extra CapturePane, so no
 	// paneSeq churn): a quota/rate-limit wall escalates (rc 85), ungated by paneBusy
 	// (a wall blocks regardless of the spinner) and overriding a lesser verdict —
-	// the artifact will never come. Detected via the SignalCenter (ExhaustedOf, the
+	// the artifact will never come. Detected via the LivenessCenter (ExhaustedOf, the
 	// fast-poll twin of BusyOf); the rc==85 arm below then writes the escalation
 	// report exactly as for any escalate, so the fallback fires within one poll.
 	//

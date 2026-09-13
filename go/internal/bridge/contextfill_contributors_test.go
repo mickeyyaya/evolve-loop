@@ -48,6 +48,7 @@ func TestContextFillWarn_ContributorsMatchPeakPromptReading(t *testing.T) {
 	e := NewEngine(Deps{
 		Now:                func() time.Time { return end },
 		Stderr:             &errBuf,
+		Signals:            sinkDeps(&errBuf),
 		ContextFillWarnPct: 60,
 		TokenResolver: func(tokenusage.Window) (tokenusage.Result, error) {
 			return tokenusage.Result{
@@ -96,6 +97,7 @@ func TestContextFillWarn_ContributorsFallBackToUsageWithoutPeakData(t *testing.T
 	e := NewEngine(Deps{
 		Now:                func() time.Time { return end },
 		Stderr:             &errBuf,
+		Signals:            sinkDeps(&errBuf),
 		ContextFillWarnPct: 60,
 		TokenResolver: func(tokenusage.Window) (tokenusage.Result, error) {
 			return tokenusage.Result{

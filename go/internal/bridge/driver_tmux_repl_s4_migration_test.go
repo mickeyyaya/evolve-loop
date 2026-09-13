@@ -3,7 +3,7 @@ package bridge
 // driver_tmux_repl_s4_migration_test.go — cycle-432 slice S4 regression tests:
 // the stop-review checkpoint must not parse CLI chrome directly through
 // panestream.PaneBusy / PaneHasSubstantiveChange. It reads the
-// panestream.SignalCenter projections added in Task 1
+// panestream.LivenessCenter projections added in Task 1
 // (livenessCenter.Busy(session) / livenessCenter.Changed(session)).
 //
 // AC1/AC2 pin the projected values and AC3 guards the implementation boundary,
@@ -38,7 +38,7 @@ func checkpointPaneSeq(cp1, cp2 string) []string {
 }
 
 // TestRunTmuxREPL_BusyFromCenter (AC1, positive): at the checkpoint,
-// StopEvent.Busy must reflect the SignalCenter's Busy(session) projection
+// StopEvent.Busy must reflect the LivenessCenter's Busy(session) projection
 // (folded from panestream.PaneBusy) — true while a live-turn affordance is
 // present, false once the pane goes quiet (no renderWedged in play).
 func TestRunTmuxREPL_BusyFromCenter(t *testing.T) {
@@ -133,7 +133,7 @@ func TestRunTmuxREPL_NoDirectChromeParseAtCheckpoint(t *testing.T) {
 	region := checkpointRegionSource(t)
 	for _, needle := range []string{"panestream.PaneBusy(", "PaneHasSubstantiveChange("} {
 		if strings.Contains(region, needle) {
-			t.Errorf("checkpoint region still calls %s directly — must read panestream.SignalCenter projections (Busy/Changed) instead", needle)
+			t.Errorf("checkpoint region still calls %s directly — must read panestream.LivenessCenter projections (Busy/Changed) instead", needle)
 		}
 	}
 }
@@ -142,7 +142,7 @@ func TestRunTmuxREPL_NoDirectChromeParseAtCheckpoint(t *testing.T) {
 // anti-gaming): the S4 migration corpus above must exercise the PRODUCTION
 // deterministicReviewer type, not a stub standing in for the decision logic —
 // same guard as TestWedgeCorpus_UsesRealDeterministicReviewer
-// (signalcenter_wedge_invariant_test.go).
+// (livenesscenter_wedge_invariant_test.go).
 func TestRunTmuxREPL_S4MigrationUsesRealDeterministicReviewer(t *testing.T) {
 	var r StopReviewer = newDeterministicReviewer(defaultArtifactMaxExtends)
 	if _, ok := r.(deterministicReviewer); !ok {

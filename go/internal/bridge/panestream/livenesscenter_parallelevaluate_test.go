@@ -1,14 +1,14 @@
 package panestream
 
-// signalcenter_parallelevaluate_test.go — RED/regression tests for cycle-433
+// livenesscenter_parallelevaluate_test.go — RED/regression tests for cycle-433
 // slice S5, Task 1 (s5-parallelevaluate-stress-race): a ParallelEvaluate-style
-// mixed-op stress harness on ONE shared *SignalCenter, proving the RWMutex
+// mixed-op stress harness on ONE shared *LivenessCenter, proving the RWMutex
 // model (ADR-0068 Option C) is race-clean under many concurrent, DISTINCT
 // session producers plus concurrent Aggregate/Busy/Changed readers plus
 // concurrent RegisterHandler calls — not merely the ≥8 single-op producers
-// the existing signalcenter_test.go / signalcenter_busychange_test.go cover.
+// the existing livenesscenter_test.go / livenesscenter_busychange_test.go cover.
 //
-// TDD contract: written against the ALREADY-SHIPPED SignalCenter (S2-S4, on
+// TDD contract: written against the ALREADY-SHIPPED LivenessCenter (S2-S4, on
 // main). No production change is required for this task — it is expected to
 // run GREEN today (pre-existing GREEN; see test-report.md). Its job is to PIN
 // the concurrency invariant so Task 2's evidence-driven sharding decision
@@ -56,7 +56,7 @@ func TestSignalCenter_ParallelEvaluateStress_MixedOpsRaceClean(t *testing.T) {
 	const observesPerProducer = 100
 	const readerIterations = 200
 
-	sc := NewSignalCenter()
+	sc := NewLivenessCenter()
 	p := Profiles["claude"]
 
 	var wg sync.WaitGroup
@@ -131,7 +131,7 @@ func TestSignalCenter_ParallelEvaluateStress_MixedOpsRaceClean(t *testing.T) {
 func TestSignalCenter_ObserveAggregateSameKeyRaceClean(t *testing.T) {
 	const iterations = 500
 
-	sc := NewSignalCenter()
+	sc := NewLivenessCenter()
 	p := Profiles["claude"]
 	key := "shared-key"
 	sc.Observe(key, "⏺ priming\n❯ \n", p) // create the key before racing reads against it

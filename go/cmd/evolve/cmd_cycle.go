@@ -306,6 +306,9 @@ type orchDeps struct {
 	// reader yet, by design: the bridge receives it at construction in S3 and
 	// cmd_loop reads Orchestrator.SignalSummary() for the batch report in S4.
 	Signals *signalcenter.Center
+	// Bridge is the production Adapter injected into every phase runner; it
+	// carries Signals into each engine it builds (ADR-0101 S3).
+	Bridge *bridge.Adapter
 }
 
 // wireOrchestratorDeps mirrors wireOrchestrator but returns the
@@ -341,7 +344,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 	}))
 	signals.Subscribe(signalcenter.Filter(signalcenter.StderrSink(os.Stderr), signalcenter.SeverityWarn))
 
-	br := bridge.NewDefault(projectRoot)
+	br := bridge.NewDefault(projectRoot, signals)
 	br.SetOnStopReview(func(cycle int, phase, action, reason string) {
 		_ = ld.Append(context.Background(), core.LedgerEntry{
 			TS:      time.Now().UTC().Format(time.RFC3339),
@@ -766,6 +769,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 		Ledger:       ld,
 		Orchestrator: core.NewOrchestrator(st, ld, runners, opts...),
 		Signals:      signals,
+		Bridge:       br,
 	}
 }
 

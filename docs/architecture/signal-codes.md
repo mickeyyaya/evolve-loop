@@ -17,6 +17,25 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 
 <!-- GENERATED:signal-codes BEGIN — do not edit by hand; run `evolve signals codes generate` -->
 
+### bridge
+
+| Code | Meaning |
+|---|---|
+| `BRIDGE_CONTEXT_FILL_HIGH` | an attempt's context fill crossed the configured warn threshold; the reason names the fill and the threshold |
+| `BRIDGE_TELEMETRY_APPEND_FAILED` | the per-attempt telemetry record could not be appended to the workspace ledger; fields name the path |
+| `BRIDGE_TELEMETRY_TRIPWIRE` | a successful attempt ran past the tripwire threshold with no measurable token usage — telemetry blind spot, not a phase failure |
+| `BRIDGE_TOKEN_RESOLVER_FAILED` | the token resolver returned an error for a completed attempt; usage recorded as resolver-error |
+| `BRIDGE_TOKEN_RESOLVER_MISSING` | the engine was built without a token resolver; lifecycle and outcome records continue without token counts (fail-open) |
+| `BRIDGE_TOKEN_USAGE_WARNING` | the token resolver measured the attempt with a caveat (invalid counters, partial measurement); the caveat is the reason |
+
+### liveness
+
+| Code | Meaning |
+|---|---|
+| `LIVENESS_PANE_EXHAUSTED` | a tmux pane shows the CLI's quota/rate-limit exhaustion (LivenessCenter edge: exhausted; the exhaustion gate corroborates before rc 85) |
+| `LIVENESS_PANE_HUNG` | a tmux pane is hung: no progress and no completion (LivenessCenter edge: hung) |
+| `LIVENESS_PANE_STAGNANT` | a tmux pane is busy but its output stopped changing (LivenessCenter edge: busy-stagnant) |
+
 ### orchestrator
 
 | Code | Meaning |

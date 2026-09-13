@@ -25,7 +25,7 @@ func stubResolver(tokenusage.Window) (tokenusage.Result, error) {
 // engine's own Stderr, so telemetry fail-open is loud instead of silent.
 func TestEngine_WarnsOnNilTokenResolver(t *testing.T) {
 	var buf bytes.Buffer
-	NewEngine(Deps{Stderr: &buf})
+	NewEngine(Deps{Stderr: &buf, Signals: sinkDeps(&buf)})
 	out := buf.String()
 	if !strings.Contains(out, "WARN") || !strings.Contains(out, "TokenResolver") {
 		t.Fatalf("NewEngine with nil TokenResolver emitted no WARN naming TokenResolver on Stderr; got: %q", out)
@@ -41,7 +41,7 @@ func TestEngine_WarnsOnNilTokenResolver(t *testing.T) {
 // value of AC1 is destroyed.
 func TestEngine_NoTokenResolverWarnWhenWired(t *testing.T) {
 	var buf bytes.Buffer
-	NewEngine(Deps{Stderr: &buf, TokenResolver: stubResolver})
+	NewEngine(Deps{Stderr: &buf, Signals: sinkDeps(&buf), TokenResolver: stubResolver})
 	if out := buf.String(); strings.Contains(out, "TokenResolver") {
 		t.Fatalf("NewEngine with a wired TokenResolver must be silent about it; got: %q", out)
 	}

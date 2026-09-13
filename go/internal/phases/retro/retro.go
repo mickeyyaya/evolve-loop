@@ -403,7 +403,7 @@ func hasFailureLesson(projectRoot, ws string, cycle int) bool {
 func init() {
 	registry.Register(string(core.PhaseRetro), func(req core.PhaseRequest) core.PhaseRunner {
 		return New(Config{
-			Bridge:  bridge.NewDefault(req.ProjectRoot),
+			Bridge:  bridge.NewDefault(req.ProjectRoot, nil),
 			Prompts: prompts.NewForProject(req.ProjectRoot),
 			Model:   "auto",
 		})

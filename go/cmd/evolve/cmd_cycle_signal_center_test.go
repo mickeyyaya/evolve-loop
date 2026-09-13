@@ -159,3 +159,62 @@ func TestSignalCenterFlush_IsWiredAtBothRoots(t *testing.T) {
 		}
 	}
 }
+
+// ADR-0101 S3: the production root hands the Center to the bridge Adapter it
+// injects into every phase runner, so bridge.warning / bridge.tripwire /
+// pane.liveness from any dispatch reach the orchestrator's Center.
+func TestWireOrchestratorDeps_SignalCenterReachesTheBridge(t *testing.T) {
+	root := t.TempDir()
+	evolveDir := filepath.Join(root, ".evolve")
+	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	d := wireOrchestratorDeps(root, evolveDir)
+	if d.Bridge == nil || !d.Bridge.SignalsWired() {
+		t.Fatal("the production bridge Adapter must be built with the Signal Center (bridge.NewDefault(projectRoot, signals))")
+	}
+}
+
+// Every bridge.NewDefault call site outside the production root passes an
+// explicit nil — the Center-less registry defaults are visible, never
+// implicit — and the production root passes its Center.
+func TestNilSignalBridgeRootsAreExplicit(t *testing.T) {
+	callRE := regexp.MustCompile(`bridge\.NewDefault\(\s*([^,)]+)\s*,\s*([^)]+)\)`)
+	moduleRoot := filepath.Join("..", "..")
+	err := filepath.WalkDir(moduleRoot, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		name := entry.Name()
+		if entry.IsDir() {
+			if name == "vendor" || name == "bin" || strings.HasPrefix(name, ".") && path != moduleRoot {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+			return nil
+		}
+		src, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		rel, _ := filepath.Rel(moduleRoot, path)
+		for _, m := range callRE.FindAllStringSubmatch(string(src), -1) {
+			second := strings.TrimSuffix(strings.TrimSpace(m[2]), ",")
+			if filepath.ToSlash(rel) == "cmd/evolve/cmd_cycle.go" {
+				if second == "nil" {
+					t.Errorf("%s: the production root must pass its Signal Center, not nil", rel)
+				}
+				continue
+			}
+			if second != "nil" {
+				t.Errorf("%s: a non-root bridge.NewDefault must pass an explicit nil (Center-less registry default), got %q", rel, second)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}

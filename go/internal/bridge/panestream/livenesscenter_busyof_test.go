@@ -1,8 +1,8 @@
 package panestream
 
-// signalcenter_busyof_test.go — RED tests for cycle-434 slice S4 completion
+// livenesscenter_busyof_test.go — RED tests for cycle-434 slice S4 completion
 // (s4-complete-residual-busy-callsites, Task 1): a STATELESS busy projection
-// on SignalCenter — BusyOf(rendered, profile) bool — that the two surviving
+// on LivenessCenter — BusyOf(rendered, profile) bool — that the two surviving
 // direct panestream.PaneBusy consumers (autorespond.go's tick busy-gate,
 // driver_tmux_repl.go's idle_reached busy/idle bracket) route through instead
 // of calling PaneBusy directly. Unlike Busy(sessionKey) (S4/cycle-432), BusyOf
@@ -23,7 +23,7 @@ import "testing"
 // reimplementation that can drift. Verified for both a busy (live-turn
 // affordance) and an idle pane.
 func TestSignalCenter_BusyOf_MatchesStandalonePaneBusy(t *testing.T) {
-	sc := NewSignalCenter()
+	sc := NewLivenessCenter()
 	p := Profiles["claude"]
 	busyPane := "Which absolute path should I write the deliverable to?\n⏵⏵ bypass permissions on (shift+tab to cycle) · esc to interrupt\n"
 	idlePane := "Which absolute path should I write the deliverable to?\n⏺ answer complete\n"
@@ -48,7 +48,7 @@ func TestSignalCenter_BusyOf_MatchesStandalonePaneBusy(t *testing.T) {
 // call site produces for an unrecognized ar.cli) must read not-busy and must
 // never panic.
 func TestSignalCenter_BusyOf_EmptyPaneUnknownProfileNoPanic(t *testing.T) {
-	sc := NewSignalCenter()
+	sc := NewLivenessCenter()
 	unknown := Profiles["does-not-exist"] // zero-value PaneProfile (map miss)
 
 	defer func() {
@@ -77,7 +77,7 @@ func TestSignalCenter_BusyOf_EmptyPaneUnknownProfileNoPanic(t *testing.T) {
 // two residual call sites are migrated (they fire at different loop points
 // than the checkpoint's own Observe).
 func TestSignalCenter_BusyOf_StatelessNoSessionMutation(t *testing.T) {
-	sc := NewSignalCenter()
+	sc := NewLivenessCenter()
 	p := Profiles["claude"]
 	busyPane := "⏵⏵ bypass permissions on (shift+tab to cycle) · esc to interrupt\n"
 
@@ -97,12 +97,12 @@ func TestSignalCenter_BusyOf_StatelessNoSessionMutation(t *testing.T) {
 }
 
 // TestSignalCenter_BusyOf_NilReceiverSafe (AC4, edge): BusyOf is stateless —
-// it must be safe to call on a nil *SignalCenter, so a caller holding an
+// it must be safe to call on a nil *LivenessCenter, so a caller holding an
 // optional (possibly-nil) center reference (e.g. autorespond.go's
 // ar.deps.LivenessCenter, which is nil outside the driver's Deps-injected
 // test seam) never needs a nil guard before delegating.
 func TestSignalCenter_BusyOf_NilReceiverSafe(t *testing.T) {
-	var sc *SignalCenter
+	var sc *LivenessCenter
 	p := Profiles["claude"]
 	busyPane := "⏵⏵ bypass permissions on (shift+tab to cycle) · esc to interrupt\n"
 	idlePane := "⏺ answer complete\n"

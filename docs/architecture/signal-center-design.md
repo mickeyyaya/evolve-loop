@@ -178,7 +178,7 @@ raised to WARN — never dropped. *(review 21: `advisor` and `config` added to m
 | `system.failure` | ADR-0072 signal (halt-class) | INCIDENT | ✓ |
 | `quota.paused` | all families exhausted, cycle paused | WARN | ✓ |
 | `bridge.warning` / `bridge.tripwire` | engine telemetry warnings, tripwires | WARN | |
-| `pane.liveness` | liveness edge from the LivenessCenter | INFO (hung/stagnant → WARN) | |
+| `pane.liveness` | liveness edge from the LivenessCenter | INFO; WARN with a `LIVENESS_PANE_*` code — the registry (rendered in `signal-codes.md`) is the one list of which states warn | |
 | `ledger.appended` | a ledger entry was appended (decorator) | INFO | |
 | `cycle.sealed` | final verdict decided (after `finalizeOutcome`) | INFO (FAIL → WARN) | ✓ on FAIL |
 | `loop.wave` / `loop.halt` / `loop.escalation` | batch-level events (today's `dispatchevents`) | INFO / INCIDENT / WARN | / ✓ / |
@@ -401,7 +401,7 @@ Hand-written `[x]` prose disappears one module at a time (§10 S5).
 | **S1** | `internal/signalcenter` (schema, Center, registry, sinks, filter); `core.WithSignalCenter` + listener + `Orchestrator.SignalSummary()`; `orchDeps.Signals`; the C1 chokepoint emits `phase.outcome`/`phase.aborted` on both roots (its PR #577 hand-written line replaced by the sink line); `.apicover-enforce` entry; CI line-coverage gate | package 100 % API coverage (apicover) + 100 % line coverage (CI/make gate, §11), `-race`; composed RunCycle test: every dispatched phase (incl. the ADR-0044 abort-path table) yields exactly one `phase.outcome` observed by the orchestrator listener and one `signals.ndjson` line with monotonic `seq`; WARN-budget test; re-entrancy test; mutants: emit removed, listener not subscribed, sink not attached, validation bypassed, recover removed, same-order-for-all-listeners — each killed by name | PR #577 (lands after the #575/#576/#577 merge order) |
 | **S2a** | producers that need only S1: `system.failure` + `cycle.sealed` at `cycleRun.completeCycle` (the closeout both roots share; the hand-written SYSTEM-FAILURE HALT / LANDING LOST lines deleted); `ship.error` at `Orchestrator.recordShipError` with `shiperr.SignalCode` (every ship code registered under module `ship` with a doc each — a source-parsed test proves completeness; `ShipErrorClass.SignalSeverity` is the class → severity rule's one home); `quota.paused` at `cycleRun.pauseForQuota` (the seam both roots reach; its hand-written WARN line deleted); an abnormal exit seals the cycle FAIL from `cycleRun.abnormalEpilogue`; `Center.Flush` deferred at both roots; `evolve signals codes generate\|check` projecting the registry into `docs/architecture/signal-codes.md` | composed `RunCycle` test: `cycle.sealed` is the LAST orchestrator event; each producer has a direct proof (INCIDENT on halt / integrity, WARN otherwise); `signal-codes.md` currency is a `cmd/evolve` test (CI); mutants: each emit removed, INCIDENT not raised, prefix wrong, Flush broadcast removed, drift check disabled | S1 |
 | **S2b** | contract gate → `gate.rejected/corrected` (the `GATE_CONTRACT_*` codes need PR #575); `fields.shipped` on `cycle.sealed` (needs PR #576's `CycleState.Shipped`); `failurelog.Classification` folded into `failureadapter`'s; the live WARN budget pinned from the first green runtime cycle | each producer has a composed proof; the classification registry test fails if the two vocabularies diverge again | S2a, PR #575, PR #576 |
-| **S3** | bridge: `Deps.Signals` at construction + `engine.SignalsWired()`; engine WARN/TRIPWIRE/CONTEXT-FILL → `bridge.warning/tripwire`; **commit 1:** the pure rename `panestream.SignalCenter` → `LivenessCenter` (ADR-0068/0070 amended by ADR-0101; `bridge.Deps.LivenessCenter` already carries the target name); **commit 2:** `pane.liveness` production; hand-written `[engine]` lines removed | the repo-wide prefix test's allowlist shrinks by `[engine]`/`[bridge]` | S1 |
+| **S3** (landed, see §15.3) | bridge: `Deps.Signals` at construction + `engine.SignalsWired()`; the production Adapter takes the Center as a constructor argument (`adapters/bridge.NewDefault(projectRoot, signals)`; every other call site passes an explicit `nil`, pinned) and threads it into every engine; engine telemetry warnings → `bridge.warning` (`BRIDGE_TOKEN_RESOLVER_MISSING/_FAILED`, `BRIDGE_TOKEN_USAGE_WARNING`, `BRIDGE_CONTEXT_FILL_HIGH`, `BRIDGE_TELEMETRY_APPEND_FAILED`), the tripwire → `bridge.tripwire` (`BRIDGE_TELEMETRY_TRIPWIRE`); **commit 1:** the pure rename `panestream.SignalCenter` → `LivenessCenter` (ADR-0068/0070 amended); **commit 2:** `pane.liveness` from a `LivenessHandler` the tmux driver registers per dispatch (module `liveness`, `LIVENESS_PANE_STAGNANT/_HUNG/_EXHAUSTED`); the hand-written `[engine] WARN` / `[engine] TRIPWIRE` lines removed | wiring proofs at the engine, the Adapter (deps + real factory) and the root; every producer a direct proof; the telemetry suites assert what the root's WARN-filtered sink renders; mutants: signals not threaded, wired-always-true, handler not registered, hung not WARN, tripwire/warn/engine-warning not emitted, root passes nil, state name lost, format characters surviving | S1 |
 | **S4** | ledger decorator (`ledger.appended`); `dispatchevents` writers and the `observer` adapter emit through the Center (their files stay as sink outputs until readers migrate); `cmd_loop` **reports** signal counts in the batch report; the dashboard SSE subscribes | `abnormal-events.jsonl` **field-equal modulo timestamp precision** before/after, asserted by a decoding golden *(review 11)*; dashboard shows a signal within one SSE tick; no breaker gates on a signal (a shadow comparison test may log disagreement) | S2 |
 | **S5** | per-module log migration riding each decomposition slice (§12): prefix-literal occurrences per module (any writer) `[orchestrator]` 287 → 0, `[loop]` 132 → 0, `[ship]` 130 → 0, … | one repo-wide grep test with a shrinking allowlist (a migrated module cannot be forgotten); the inventory's prefix table regenerated | S1 |
 
@@ -546,6 +546,48 @@ of appending, leaf imports core, core registers a conflicting code, listener nam
 held across Emit, reason cut removed, identifier bound removed); named wiring tests `TestWireOrchestratorDeps_SignalCenterWired`,
 `TestWireOrchestratorDeps_SignalCenterConsoleSinkIsFilteredAtWarn`, `TestNilSignalCenterRootsArePinned`,
 `TestImportGraph_LeafPackageImportsOnlyInternalLog`, `TestNDJSONSink_TwoProcessesAppendToTheSameCycleFile`.
+
+### 15.3 Landed — S3 (2026-09-13)
+
+| Producer | Chokepoint (origin) | Severity / code | Fields |
+|---|---|---|---|
+| `bridge.warning` | `NewEngine` — a missing token resolver at construction (cycle 0) | WARN `BRIDGE_TOKEN_RESOLVER_MISSING` | — |
+| `bridge.warning` | `attemptLogContext.warn` — the ONE telemetry-warning writer the engine had (resolver failed, usage caveat, context fill over the threshold, ledger append failed) | WARN `BRIDGE_TOKEN_RESOLVER_FAILED` / `BRIDGE_TOKEN_USAGE_WARNING` / `BRIDGE_CONTEXT_FILL_HIGH` / `BRIDGE_TELEMETRY_APPEND_FAILED`; the old line's detail is the reason | `call_id`, `cli`, `agent` (+ cycle/run/phase/attempt on the event) |
+| `bridge.tripwire` | `attemptLogContext.tripwire` from `emitTokenWarnings` — a successful non-claude attempt past the threshold with no measurable usage | WARN `BRIDGE_TELEMETRY_TRIPWIRE` | `call_id`, `cli`, `agent`, `duration_ms` |
+| `pane.liveness` | `paneLivenessHandler`, registered on the dispatch's `LivenessCenter` in `newReplWaitState` — one event per liveness EDGE (the center is edge-triggered) | INFO, or WARN with the `LIVENESS_PANE_*` code the registry lists (`signal-codes.md` is the one list of which states warn) | `session`, `state` (`LivenessState.String`, the vocabulary's one spelling — the timeout summary's snake_case word is a projection of it) |
+
+Wiring: `bridge.Deps.Signals` (nil = Null Object, tests only) → `Engine.SignalsWired()`; the production
+Adapter is `adapters/bridge.NewDefault(projectRoot, signals)` — explicit DI at construction, no setter
+to forget — and `productionEngineDeps` threads it into every engine it builds (`Adapter.SignalsWired`,
+proven on the deps AND through the real `engineFactory`); the root passes its Center
+(`TestWireOrchestratorDeps_SignalCenterReachesTheBridge`, via `orchDeps.Bridge`) and every other
+`bridge.NewDefault` call site — the eight phase-registry defaults, `cmd_campaign`, tests — passes an
+explicit `nil` (`TestNilSignalBridgeRootsAreExplicit`). The dispatch identity every bridge event carries
+comes from `BridgeRequest` (`Cycle`, `RunID`, `Agent` as the phase) — one `dispatchIdentity` rule, the
+driver's Config carrying the same values, no fallback (a request without a `Cycle` is an operator probe
+whose signals stay at cycle 0). Deleted 1:1: `[engine] WARN: Deps.TokenResolver is
+nil`, the `[engine] WARN: <event> call_id=…` writer, `[engine] TRIPWIRE: …`. The telemetry test suites
+(tripwire, context fill, resolver warnings) now assert what the root's WARN-filtered stderr sink renders
+— the one line format the operator reads — instead of hand-written text. `log.SanitizeField` also folds
+Unicode format characters (bidi overrides, zero-width joiners, the BOM): the old quoted field escaped
+them, the sink renders plain, so a resolver error can no longer reorder a terminal line. The rename
+(commit 1) is mechanical and reviewed on its own: `panestream.SignalCenter` → `LivenessCenter`
+(`NewLivenessCenter`, `LivenessEvent`, `LivenessHandler`, `RegisterLivenessHandler`), files moved,
+ADR-0068/0070 carry an "Amended by ADR-0101" note. Remaining hand-written lines in the module —
+`[bridge]` (sandbox, launch validation, dry-run, wall corroboration) and two `[engine]` lines
+(boot-strike clear failed, boot-timeout bench record failed) — are S5's per-module migration; none
+of them is a fact this slice signals. Folded from the S3 architecture review (Block → fixed): the
+§5.2 severity cell above now defers to the registry instead of restating which states warn (the
+copy had already diverged); every bridge signal of one dispatch carries ONE derived
+`dispatchIdentity` (cycle, run, phase = the agent role) with no workspace-path fallback — a request
+without a `Cycle` is an operator probe whose signals stay at cycle 0; `event` takes its origin
+explicitly; `Deps.LivenessCenter` documents that an injected center must be per-dispatch (handlers
+accumulate; there is no unregister). From the re-review: the ADR and this section no longer describe
+the deleted fallback, and the timeout summary's `livenessOrUnknown` is a projection of
+`LivenessState.String` (it had grown its own switch, missing `exhausted`). Follow-up outside this
+slice: CI compiles only `acs/regression/...` under `-tags acs`; widen to `./acs/...` behind a
+shrinking allowlist of the four fossil packages so a signature change can never break a frozen
+predicate silently again.
 
 ### 15.2 Landed — S2a (2026-09-13)
 

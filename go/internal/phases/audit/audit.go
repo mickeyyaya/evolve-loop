@@ -653,7 +653,7 @@ func verdictConflictMessage(narrative string, overrodeBy []string) string {
 
 func init() {
 	registry.Register(string(core.PhaseAudit), func(req core.PhaseRequest) core.PhaseRunner {
-		return NewDefault(bridge.NewDefault(req.ProjectRoot), prompts.NewForProject(req.ProjectRoot))
+		return NewDefault(bridge.NewDefault(req.ProjectRoot, nil), prompts.NewForProject(req.ProjectRoot))
 	})
 }
 

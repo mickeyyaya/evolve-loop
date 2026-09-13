@@ -1,6 +1,6 @@
 package bridge
 
-// signalcenter_wedge_invariant_test.go — cycle-431 slice S3, Task B: pins
+// livenesscenter_wedge_invariant_test.go — cycle-431 slice S3, Task B: pins
 // every wedge-incident invariant against the center-authoritative liveness
 // path (Task A). Each case names a real panestream.Liveness* constant and
 // drives the actual production deterministicReviewer / runTmuxREPL — no

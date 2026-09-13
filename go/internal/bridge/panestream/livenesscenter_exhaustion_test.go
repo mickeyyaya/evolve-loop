@@ -6,11 +6,11 @@ import (
 	"testing"
 )
 
-// Compile-time conformance: a plain reaction function satisfies the SignalHandler
-// type (the Observer contract consumers register via RegisterSignalHandler).
-var _ SignalHandler = func(SignalEvent) {}
+// Compile-time conformance: a plain reaction function satisfies the LivenessHandler
+// type (the Observer contract consumers register via RegisterLivenessHandler).
+var _ LivenessHandler = func(LivenessEvent) {}
 
-// signalcenter_exhaustion_test.go — the SignalCenter's exhaustion integration
+// livenesscenter_exhaustion_test.go — the LivenessCenter's exhaustion integration
 // (S1): the center wraps every per-CLI probe in an ExhaustionProbe so exhaustion
 // is detected through the SAME abstraction as liveness, dominates the aggregate,
 // and is dispatched to registered handlers (Observer) so a reactive consumer
@@ -20,7 +20,7 @@ var _ SignalHandler = func(SignalEvent) {}
 // session present, any Exhausted session makes the center report Exhausted —
 // the top of the winner-takes-all priority order.
 func TestSignalCenter_ExhaustedDominatesAggregate(t *testing.T) {
-	sc := NewSignalCenter()
+	sc := NewLivenessCenter()
 	walled := PaneProfile{Name: "agy", ExhaustedRegex: `(?i)quota (exceeded|reached)`}
 	working := PaneProfile{Name: "codex"}
 	// A converging session (new content across two frames).
@@ -34,13 +34,13 @@ func TestSignalCenter_ExhaustedDominatesAggregate(t *testing.T) {
 	}
 }
 
-// The center dispatches a SignalEvent to every registered handler when a session
+// The center dispatches a LivenessEvent to every registered handler when a session
 // transitions to LivenessExhausted — exactly once per transition (edge-triggered,
 // not re-fired every frame while it stays walled).
 func TestSignalCenter_DispatchesExhaustionToHandler(t *testing.T) {
-	sc := NewSignalCenter()
-	var events []SignalEvent
-	sc.RegisterSignalHandler(func(ev SignalEvent) { events = append(events, ev) })
+	sc := NewLivenessCenter()
+	var events []LivenessEvent
+	sc.RegisterLivenessHandler(func(ev LivenessEvent) { events = append(events, ev) })
 
 	p := PaneProfile{Name: "agy", ExhaustedRegex: `(?i)quota reached`}
 	sc.Observe("s1", "working normally\n", p)    // healthy
@@ -64,22 +64,22 @@ func TestSignalCenter_DispatchesExhaustionToHandler(t *testing.T) {
 // A nil handler registration is a safe no-op (never dispatched, never panics),
 // mirroring RegisterHandler's empty-name tolerance.
 func TestSignalCenter_RegisterNilSignalHandler_NoOp(t *testing.T) {
-	sc := NewSignalCenter()
-	sc.RegisterSignalHandler(nil)
+	sc := NewLivenessCenter()
+	sc.RegisterLivenessHandler(nil)
 	p := PaneProfile{Name: "agy", ExhaustedRegex: `(?i)quota reached`}
 	sc.Observe("s1", "⚠ quota reached\n", p) // must not panic
 }
 
-// Concurrent RegisterSignalHandler + distinct-session Observe must be race-free
+// Concurrent RegisterLivenessHandler + distinct-session Observe must be race-free
 // (-race): sc.handlers is guarded by sc.mu (snapshot under it, dispatched
 // outside it); each session's state is guarded by its own ss.mu. Deterministic
 // tail: every session ends on a walled frame (Aggregate == Exhausted), and the
 // handler registered BEFORE any producer sees at least one exhaustion event.
 func TestSignalCenter_ConcurrentDispatchAndRegister_RaceClean(t *testing.T) {
-	sc := NewSignalCenter()
+	sc := NewLivenessCenter()
 	var mu sync.Mutex
 	seen := 0
-	sc.RegisterSignalHandler(func(ev SignalEvent) {
+	sc.RegisterLivenessHandler(func(ev LivenessEvent) {
 		if ev.State == LivenessExhausted {
 			mu.Lock()
 			seen++
@@ -91,7 +91,7 @@ func TestSignalCenter_ConcurrentDispatchAndRegister_RaceClean(t *testing.T) {
 	var wg sync.WaitGroup
 	for h := 0; h < 3; h++ { // late registrations racing the producers
 		wg.Add(1)
-		go func() { defer wg.Done(); sc.RegisterSignalHandler(func(SignalEvent) {}) }()
+		go func() { defer wg.Done(); sc.RegisterLivenessHandler(func(LivenessEvent) {}) }()
 	}
 	for s := 0; s < 8; s++ { // distinct-session producers, each ending walled
 		wg.Add(1)

@@ -24,6 +24,7 @@ package bridge
 
 import (
 	"bytes"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -31,6 +32,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/tokenusage"
 )
 
@@ -69,10 +71,16 @@ func runTripwireCase(t *testing.T, c tripwireCase) (stderr, record string) {
 		}
 	}
 
+	// ADR-0101 S3: the engine no longer hand-writes telemetry lines; errBuf
+	// holds what the root's WARN-filtered stderr sink renders for the
+	// engine's signals — the same one-line format the operator reads.
 	var errBuf bytes.Buffer
+	signals := signalcenter.New()
+	signals.Subscribe(signalcenter.Filter(signalcenter.StderrSink(&errBuf), signalcenter.SeverityWarn))
 	e := NewEngine(Deps{
 		Now:           func() time.Time { return end },
-		Stderr:        &errBuf,
+		Stderr:        io.Discard,
+		Signals:       signals,
 		TokenResolver: tokenusage.DefaultResolver(t.TempDir()), // empty root: no transcript tier
 	})
 	req := core.BridgeRequest{
@@ -80,6 +88,11 @@ func runTripwireCase(t *testing.T, c tripwireCase) (stderr, record string) {
 		Agent:     c.agent,
 		Workspace: ws,
 		Worktree:  "/repo/worktrees/cycle-1005",
+	}
+	if c.cycleInDir {
+		// The dispatch identity comes from the request (ADR-0101 S3): the
+		// cycle the workspace path names is the one the dispatcher stamped.
+		req.Cycle = 1005
 	}
 	var resp core.BridgeResponse
 	e.recordTokenUsage(req, "sonnet", c.code, start, &resp)
@@ -113,7 +126,7 @@ func TestRecordTokenUsage_Tripwire_NonClaudeExit0Success_Warns(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected a TRIPWIRE escalation line for an exit-0 >60s non-claude source=none launch; stderr:\n%s", stderr)
 	}
-	for _, needle := range []string{"agy", "builder", "cycle-1005"} {
+	for _, needle := range []string{"cli=agy", "agent=builder", "cycle=1005"} {
 		if !strings.Contains(line, needle) {
 			t.Errorf("TRIPWIRE line must name %q (CLI+agent+cycle contract), got: %s", needle, line)
 		}

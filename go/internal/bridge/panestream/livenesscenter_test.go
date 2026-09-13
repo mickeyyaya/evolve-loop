@@ -6,9 +6,9 @@ import (
 	"testing"
 )
 
-// signalcenter_test.go — Behavioral tests for SignalCenter (S2, cycle 430).
-// TDD contract: these tests are written BEFORE the production code (signalcenter.go).
-// They compile-fail until Builder implements the SignalCenter type.
+// livenesscenter_test.go — Behavioral tests for LivenessCenter (S2, cycle 430).
+// TDD contract: these tests are written BEFORE the production code (livenesscenter.go).
+// They compile-fail until Builder implements the LivenessCenter type.
 // DO NOT MODIFY THESE TESTS — Builder implements to make them GREEN.
 
 // ── Task 1: signalcenter-facade-concurrency (S2a) ────────────────────────────
@@ -16,7 +16,7 @@ import (
 // TestSignalCenter_ObserveAndAggregate (AC1, positive):
 // Observe writes a liveness signal for a session; Aggregate returns one non-zero LivenessState.
 func TestSignalCenter_ObserveAndAggregate(t *testing.T) {
-	sc := NewSignalCenter()
+	sc := NewLivenessCenter()
 	p := Profiles["claude"]
 	// Prime on first call (first Assess is baseline), then provide a second
 	// observation that raises ↓ tokens → ClaudeDetector reports Converging.
@@ -31,7 +31,7 @@ func TestSignalCenter_ObserveAndAggregate(t *testing.T) {
 // TestSignalCenter_AggregateIsDeterministic (AC2, semantic):
 // Two consecutive calls to Aggregate with no new observations return the same value.
 func TestSignalCenter_AggregateIsDeterministic(t *testing.T) {
-	sc := NewSignalCenter()
+	sc := NewLivenessCenter()
 	p := Profiles["claude"]
 	sc.Observe("sess-1", "⏺ line A\n❯ \n", p)
 	sc.Observe("sess-1", "⏺ line A\n⏺ line B\n❯ \n", p)
@@ -45,7 +45,7 @@ func TestSignalCenter_AggregateIsDeterministic(t *testing.T) {
 // TestSignalCenter_UnknownProfileFallsToDefault (AC3, OOD/edge):
 // A profile whose Name is not in Profiles must fall back to DefaultDetector (no panic).
 func TestSignalCenter_UnknownProfileFallsToDefault(t *testing.T) {
-	sc := NewSignalCenter()
+	sc := NewLivenessCenter()
 	unknown := PaneProfile{Name: "unknown-cli-xyz", BoundaryMarker: "$"}
 	// Must not panic; DefaultDetector handles any pane content.
 	sc.Observe("sess-x", "some content\n$ \n", unknown)
@@ -60,7 +60,7 @@ func TestSignalCenter_UnknownProfileFallsToDefault(t *testing.T) {
 // TestSignalCenter_EmptyCenter_DefinedState (AC4, negative):
 // Aggregate on a center with no observations must not panic; zero state is acceptable.
 func TestSignalCenter_EmptyCenter_DefinedState(t *testing.T) {
-	sc := NewSignalCenter()
+	sc := NewLivenessCenter()
 	// No observations: must not panic. Return value may be zero (no sessions).
 	_ = sc.Aggregate()
 }
@@ -70,7 +70,7 @@ func TestSignalCenter_EmptyCenter_DefinedState(t *testing.T) {
 // race-clean. Validates RWMutex model under ParallelEvaluate-style dispatch.
 func TestSignalCenter_ParallelProducerRaceClean(t *testing.T) {
 	const numProducers = 8
-	sc := NewSignalCenter()
+	sc := NewLivenessCenter()
 	claudeProfile := Profiles["claude"]
 	sharedKey := "shared-sess"
 
@@ -106,7 +106,7 @@ func TestSignalCenter_ParallelProducerRaceClean(t *testing.T) {
 // that profile — routed through the registry, not through DetectorFor's switch.
 // This is the load-bearing add-a-CLI-without-switch-edit test.
 func TestSignalCenter_RegisterHandlerRoutesNewCLI(t *testing.T) {
-	sc := NewSignalCenter()
+	sc := NewLivenessCenter()
 	factoryCalled := false
 	sc.RegisterHandler("fake-cli", func() LivenessProbe {
 		factoryCalled = true
@@ -122,7 +122,7 @@ func TestSignalCenter_RegisterHandlerRoutesNewCLI(t *testing.T) {
 // TestSignalCenter_UnregisteredProfileFallsToDefault (Task2/AC2, edge):
 // A profile whose Name was never registered must fall back to DefaultDetector.
 func TestSignalCenter_UnregisteredProfileFallsToDefault(t *testing.T) {
-	sc := NewSignalCenter()
+	sc := NewLivenessCenter()
 	p := PaneProfile{Name: "no-such-cli", BoundaryMarker: "~"}
 	sc.Observe("sess-1", "content\n~ \n", p)
 	sc.Observe("sess-1", "content\nnew line\n~ \n", p)
@@ -136,7 +136,7 @@ func TestSignalCenter_UnregisteredProfileFallsToDefault(t *testing.T) {
 // Empty-key registration and duplicate-key registration must not panic.
 // Behavior (ignored vs last-write-wins) is implementation-defined; no crash is the contract.
 func TestSignalCenter_RegisterEmptyOrDuplicateNoPanic(t *testing.T) {
-	sc := NewSignalCenter()
+	sc := NewLivenessCenter()
 	// Empty key: defined (no panic).
 	sc.RegisterHandler("", func() LivenessProbe { return NewDefaultDetector(0) })
 	// Duplicate key: defined (no panic); second registration may win or be dropped.
@@ -147,7 +147,7 @@ func TestSignalCenter_RegisterEmptyOrDuplicateNoPanic(t *testing.T) {
 // TestSignalCenter_RegisterConcurrent (Task2/AC5, -race):
 // Concurrent RegisterHandler + Observe must be race-clean under -race.
 func TestSignalCenter_RegisterConcurrent(t *testing.T) {
-	sc := NewSignalCenter()
+	sc := NewLivenessCenter()
 	p := Profiles["claude"]
 	var wg sync.WaitGroup
 	for i := 0; i < 8; i++ {

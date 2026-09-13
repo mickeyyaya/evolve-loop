@@ -217,7 +217,7 @@ func PaneBusy(rendered string, p PaneProfile) bool {
 // PaneHasSubstantiveChange reports whether prev and cur differ once volatile
 // chrome is stripped from both (cycle-432 S4: relocated from
 // bridge/stopreview.go into panestream, the single home for pane-chrome
-// parsing — panestream.SignalCenter's Changed projection folds this in).
+// parsing — panestream.LivenessCenter's Changed projection folds this in).
 func PaneHasSubstantiveChange(prev, cur string) bool {
 	return cleanPane(prev) != cleanPane(cur)
 }

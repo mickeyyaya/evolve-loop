@@ -10,7 +10,7 @@ import (
 
 // driver_tmux_repl_exhaustion_test.go — the wait-loop fast-fail (S2). A CLI that
 // hits its quota/rate-limit MID-PHASE renders the manifest's exhausted_regex
-// wall and parks at its prompt without exiting. The SignalCenter's ExhaustionProbe
+// wall and parks at its prompt without exiting. The LivenessCenter's ExhaustionProbe
 // now reports LivenessExhausted for that pane; the wait loop must return
 // ExitUnknownPrompt (85) so the dispatch chain fails over — NOT burn the full
 // artifact timeout (81) while nudging a walled CLI (the agy hang-forever livelock).

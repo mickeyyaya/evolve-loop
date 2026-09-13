@@ -34,3 +34,17 @@ func TestSanitizeField_SharesTheBoundWithDiagnosticFieldAndStripsControls(t *tes
 		t.Error("clean input is returned unchanged")
 	}
 }
+
+func TestSanitizeField_FoldsBidiOverridesAndOtherFormatCharacters(t *testing.T) {
+	t.Parallel()
+	in := "collector offline\n[bridge] forged\u202e\u200b\ufeff"
+	got := SanitizeField(in)
+	for _, r := range []rune{'\u202e', '\u200b', '\ufeff', '\n'} {
+		if strings.ContainsRune(got, r) {
+			t.Errorf("format character %U must not survive: %q", r, got)
+		}
+	}
+	if got != "collector offline [bridge] forged   " {
+		t.Errorf("each unsafe rune becomes one space: %q", got)
+	}
+}
