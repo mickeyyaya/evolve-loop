@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core/failurediag"
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards/treediff"
 )
 
@@ -239,7 +240,7 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 					Cycle:    cr.cycle,
 					Role:     string(next),
 					Kind:     "reconciled_timeout",
-					ExitCode: 81,
+					ExitCode: failurediag.ExitCodeArtifactTimeout,
 				}); lerr != nil {
 					fmt.Fprintf(os.Stderr, "[orchestrator] WARN reconciled_timeout ledger append: %v\n", lerr)
 				}
@@ -319,7 +320,7 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 				// chronological (failed phase, then retro). No canonical
 				// agent verdict exists on this path → synthesized FAIL.
 				cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempt, phaseErr.Error(), cr.cs.PhaseStartedAt))
-				writePhaseFailureDiag(cr.cs.WorkspacePath, string(next), cr.cycle, err, attempt, cr.o.now)
+				cr.o.writePhaseFailureDiag(cr.cs.WorkspacePath, string(next), cr.cycle, err, attempt)
 				// ADR-0044 C3: enforce-only, best-effort — classify the
 				// unclassified pane via the LLM tail and promote, so the
 				// NEXT occurrence is deterministic. Never alters the abort.
@@ -369,7 +370,7 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 				// ADR-0044 C1: a non-canonical verdict is never recorded
 				// raw and never upgraded — phaseOutcomeFrom synthesizes FAIL.
 				cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempt, ferr.Error(), cr.cs.PhaseStartedAt))
-				writePhaseFailureDiag(cr.cs.WorkspacePath, string(next), cr.cycle, ferr, attempt, cr.o.now)
+				cr.o.writePhaseFailureDiag(cr.cs.WorkspacePath, string(next), cr.cycle, ferr, attempt)
 				cr.recordFailureLearning(next, ferr, attempt)
 				return dispatchResult{}, loopAbort, wrapCycleLevelError(next, ferr)
 			}

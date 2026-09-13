@@ -88,6 +88,7 @@ const (
 	ModuleDashboard    Module = "dashboard"
 	ModuleLedger       Module = "ledger"
 	ModuleOutcome      Module = "outcome"
+	ModuleFailureDiag  Module = "failurediag"
 	ModuleSignalCenter Module = "signalcenter"
 )
 
@@ -95,7 +96,7 @@ var knownModules = map[Module]bool{
 	ModuleOrchestrator: true, ModuleAdvisor: true, ModuleRunner: true, ModuleBridge: true, ModuleLiveness: true,
 	ModuleShip: true, ModuleAudit: true, ModuleTriage: true, ModuleScout: true, ModuleBuild: true, ModuleTDD: true,
 	ModuleGateContract: true, ModuleGateEval: true, ModuleGateRepo: true, ModuleInbox: true, ModuleConfig: true,
-	ModuleLoop: true, ModuleWatchdog: true, ModuleObserver: true, ModuleDashboard: true, ModuleLedger: true, ModuleOutcome: true, ModuleSignalCenter: true,
+	ModuleLoop: true, ModuleWatchdog: true, ModuleObserver: true, ModuleDashboard: true, ModuleLedger: true, ModuleOutcome: true, ModuleFailureDiag: true, ModuleSignalCenter: true,
 }
 
 // Known reports whether m is in the closed set.
@@ -122,35 +123,36 @@ type Kind string
 
 // The closed kind set (design §5.2).
 const (
-	KindPhaseDispatched  Kind = "phase.dispatched"
-	KindPhaseOutcome     Kind = "phase.outcome"
-	KindPhaseAborted     Kind = "phase.aborted"
-	KindGateRejected     Kind = "gate.rejected"
-	KindGateCorrected    Kind = "gate.corrected"
-	KindGatePassed       Kind = "gate.passed"
-	KindShipLanded       Kind = "ship.landed"
-	KindShipError        Kind = "ship.error"
-	KindSystemFailure    Kind = "system.failure"
-	KindQuotaPaused      Kind = "quota.paused"
-	KindBridgeWarning    Kind = "bridge.warning"
-	KindBridgeTripwire   Kind = "bridge.tripwire"
-	KindPaneLiveness     Kind = "pane.liveness"
-	KindLedgerAppended   Kind = "ledger.appended"
-	KindOutcomeWarning   Kind = "outcome.warning"
-	KindCycleSealed      Kind = "cycle.sealed"
-	KindLoopWave         Kind = "loop.wave"
-	KindLoopHalt         Kind = "loop.halt"
-	KindLoopEscalation   Kind = "loop.escalation"
-	KindListenerPanicked Kind = "signalcenter.listener_panicked"
-	KindRegistryDrift    Kind = "signalcenter.registry_drift"
-	KindSinkDropped      Kind = "signalcenter.sink_dropped"
+	KindPhaseDispatched    Kind = "phase.dispatched"
+	KindPhaseOutcome       Kind = "phase.outcome"
+	KindPhaseAborted       Kind = "phase.aborted"
+	KindGateRejected       Kind = "gate.rejected"
+	KindGateCorrected      Kind = "gate.corrected"
+	KindGatePassed         Kind = "gate.passed"
+	KindShipLanded         Kind = "ship.landed"
+	KindShipError          Kind = "ship.error"
+	KindSystemFailure      Kind = "system.failure"
+	KindQuotaPaused        Kind = "quota.paused"
+	KindBridgeWarning      Kind = "bridge.warning"
+	KindBridgeTripwire     Kind = "bridge.tripwire"
+	KindPaneLiveness       Kind = "pane.liveness"
+	KindLedgerAppended     Kind = "ledger.appended"
+	KindOutcomeWarning     Kind = "outcome.warning"
+	KindFailureDiagWarning Kind = "failurediag.warning"
+	KindCycleSealed        Kind = "cycle.sealed"
+	KindLoopWave           Kind = "loop.wave"
+	KindLoopHalt           Kind = "loop.halt"
+	KindLoopEscalation     Kind = "loop.escalation"
+	KindListenerPanicked   Kind = "signalcenter.listener_panicked"
+	KindRegistryDrift      Kind = "signalcenter.registry_drift"
+	KindSinkDropped        Kind = "signalcenter.sink_dropped"
 )
 
 var knownKinds = map[Kind]bool{
 	KindPhaseDispatched: true, KindPhaseOutcome: true, KindPhaseAborted: true, KindGateRejected: true,
 	KindGatePassed: true, KindGateCorrected: true, KindShipLanded: true, KindShipError: true, KindSystemFailure: true,
 	KindQuotaPaused: true, KindBridgeWarning: true, KindBridgeTripwire: true, KindPaneLiveness: true,
-	KindLedgerAppended: true, KindOutcomeWarning: true, KindCycleSealed: true, KindLoopWave: true, KindLoopHalt: true,
+	KindLedgerAppended: true, KindOutcomeWarning: true, KindFailureDiagWarning: true, KindCycleSealed: true, KindLoopWave: true, KindLoopHalt: true,
 	KindLoopEscalation: true, KindListenerPanicked: true, KindRegistryDrift: true, KindSinkDropped: true,
 }
 

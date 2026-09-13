@@ -8,6 +8,8 @@ At the conclusion of each cycle run, a central timing trace is recorded at `<wor
 
 ### Format and Schema
 
+The schema's home is the unit design [02-failure-diagnostics.md](decomposition/02-failure-diagnostics.md) (`failurediag.Sidecar`, unit 02 of ADR-0103): the struct's field order is the wire order, and the byte-identity test there pins this example.
+
 The JSON payload is an array of objects, where each object contains the following load-bearing fields:
 
 - `phase` (string): The identifier of the phase (e.g. `"scout"`, `"build"`, `"audit"`, `"ship"`).
@@ -117,7 +119,7 @@ The diagnostic file contains key context fields to enable immediate automated pa
 - `cycle` (integer): The cycle ID in which the failure occurred.
 - `error_message` (string): The non-empty error message returned from the runner.
 - `delivery_failure` (string): The classified submission failure (for example, `prompt submit_wedged (resends=3)`); empty for generic artifact timeouts and non-timeout failures.
-- `exit_code` (integer): The bridge exit code, such as `81` for `ErrArtifactTimeout` or transient errors like `80`, `85`, or `86`.
+- `exit_code` (integer): `81` for an artifact timeout (`ErrArtifactTimeout`, wrapped or bare); a subprocess's own exit code when the error is an `*exec.ExitError`; otherwise `1` — a wrapped transient bridge failure (quota exhaustion, exit 80/85/86 at the bridge) records `1` here, its bridge code is in the ledger entry.
 - `attempt_count` (integer): The number of attempts executed before the phase aborted.
 - `timestamp` (string): The UTC timestamp when the failure occurred.
 

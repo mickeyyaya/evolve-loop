@@ -572,3 +572,7 @@
 # ADR-0101 S2b (2026-09-13): the contract gate's Signal Center producer — one event per
 # gate decision under module gate.contract. 100% API + 100% line coverage gated.
 ./internal/deliverable/gatesignal
+
+# ADR-0103 unit 02 (2026-09-13): failure diagnostics + the delivery-failure classifier
+# (internal/core/failurediag). 100% API + 100% line coverage gated.
+./internal/core/failurediag
