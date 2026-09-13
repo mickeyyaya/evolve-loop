@@ -237,7 +237,7 @@ func (a *Adapter) Launch(ctx context.Context, req core.BridgeRequest) (core.Brid
 			return core.BridgeResponse{}, fmt.Errorf("bridge: deliverable contract %q not registered", contractID)
 		}
 	}
-	body := a.injectContract(req.Prompt, contractID, req.ArtifactPath)
+	body := a.injectContract(req.Prompt, contractID, req.ArtifactPath, req.Workspace)
 	withPolicy := injectPolicyPrefix(body, resolvePolicy(req.ProjectRoot, req.Agent, req.InteractivePolicy))
 	withRules := injectRulesPrefix(withPolicy, req.SystemPrompt)
 	withSkills := injectSkillOverlays(withRules, req)
@@ -328,7 +328,7 @@ func (a *Adapter) contractResolver() phasecontract.Resolver {
 	return resolver
 }
 
-func (a *Adapter) injectContract(prompt, contractID, artifactPath string) string {
+func (a *Adapter) injectContract(prompt, contractID, artifactPath, workspace string) string {
 	resolver := a.contractResolver()
 	c, ok := resolver.Resolve(contractID)
 	if !ok {
@@ -359,7 +359,7 @@ func (a *Adapter) injectContract(prompt, contractID, artifactPath string) string
 	// turn-tail instructions more reliably than preamble ones, which is why the
 	// correction prompt — same requirements, tail placement — is what gets
 	// compliance today.
-	return phasecontract.RenderContractBlockStage(c, includePhaseIO) + prompt + phasecontract.RenderContractTail(c, artifactPath)
+	return phasecontract.RenderContractBlockStage(c, includePhaseIO) + prompt + phasecontract.RenderContractTail(c, artifactPath, workspace)
 }
 
 // injectRulesPrefix prepends a "## Rules" block carrying the per-agent

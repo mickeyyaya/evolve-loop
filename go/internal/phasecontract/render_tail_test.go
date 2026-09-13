@@ -12,7 +12,7 @@ package phasecontract
 //
 // Contract under test:
 //
-//	RenderContractTail(c Contract, artifactPath string) string
+//	RenderContractTail(c Contract, artifactPath, workspace string) string
 //
 // It is the tail-most region of the dispatch prompt: the existing
 // FooterMarker path line PLUS one compact XML-tagged <deliverable-contract>
@@ -25,6 +25,7 @@ package phasecontract
 // writer and detector cannot drift. Tests below assert projection, not literals.
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -35,7 +36,7 @@ import (
 func TestRenderContractTail_ProjectsPathSectionsAndSentinel(t *testing.T) {
 	c := mustContract(t, "audit")
 	const path = "/abs/.evolve/runs/cycle-1218/audit-report.md"
-	tail := RenderContractTail(c, path)
+	tail := RenderContractTail(c, path, filepath.Dir(path))
 
 	// The volatile path line the prefix block cross-references must survive —
 	// RenderContractTail is a superset of RenderContractFooter, not a rename.
@@ -91,7 +92,7 @@ func TestRenderContractTail_ProjectsPathSectionsAndSentinel(t *testing.T) {
 // always-on classifier Pass 0 has never seen in production.
 func TestRenderContractTail_SentinelOnlyForVerdictPhases(t *testing.T) {
 	c := mustContract(t, "build")
-	tail := RenderContractTail(c, "/ws/build-report.md")
+	tail := RenderContractTail(c, "/ws/build-report.md", "/ws")
 	if strings.Contains(tail, "evolve-verdict") {
 		t.Errorf("build declares no Verdicts, so the tail must carry no sentinel; got:\n%s", tail)
 	}
@@ -105,7 +106,7 @@ func TestRenderContractTail_SentinelOnlyForVerdictPhases(t *testing.T) {
 // enforces and must not invent a section list.
 func TestRenderContractTail_JSONUsesRequiredKeys(t *testing.T) {
 	c := mustContract(t, "orchestrator")
-	tail := RenderContractTail(c, "/ev/cycle-state.json")
+	tail := RenderContractTail(c, "/ev/cycle-state.json", "/ev")
 	for _, k := range c.RequiredKeys {
 		if !strings.Contains(tail, "<key>"+k+"</key>") {
 			t.Errorf("JSON tail must name required key %q; got:\n%s", k, tail)
@@ -125,7 +126,7 @@ func TestRenderContractTail_JSONUsesRequiredKeys(t *testing.T) {
 // degrades to the footer alone.
 func TestRenderContractTail_NoArtifactEmitsNoBlock(t *testing.T) {
 	c := mustContract(t, "ship")
-	tail := RenderContractTail(c, "/ws")
+	tail := RenderContractTail(c, "/ws", "/ws")
 	if strings.Contains(tail, "<deliverable-contract") {
 		t.Errorf("a NoArtifact contract must emit no deliverable-contract block; got:\n%s", tail)
 	}
@@ -136,7 +137,7 @@ func TestRenderContractTail_NoArtifactEmitsNoBlock(t *testing.T) {
 // and make golden-prompt diffs unreadable.
 func TestRenderContractTail_Deterministic(t *testing.T) {
 	c := mustContract(t, "audit")
-	if RenderContractTail(c, "/p/audit-report.md") != RenderContractTail(c, "/p/audit-report.md") {
+	if RenderContractTail(c, "/p/audit-report.md", "/p") != RenderContractTail(c, "/p/audit-report.md", "/p") {
 		t.Error("RenderContractTail must be deterministic")
 	}
 }

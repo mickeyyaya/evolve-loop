@@ -94,5 +94,10 @@ func formatSignalReport(cycle int, s signalcenter.Summary) string {
 	if s.LastIncident != nil {
 		line += fmt.Sprintf(" (last INCIDENT %s — %s)", s.LastIncident.Code, s.LastIncident.Reason)
 	}
+	// ADR-0101 S2b: the gate verdicts per cycle — the "checked → advanced"
+	// record the operator asked the orchestrator to keep.
+	if p, r, c := s.ByKind[signalcenter.KindGatePassed], s.ByKind[signalcenter.KindGateRejected], s.ByKind[signalcenter.KindGateCorrected]; p+r+c > 0 {
+		line += fmt.Sprintf(" · gates: %d passed, %d rejected, %d corrected", p, r, c)
+	}
 	return line + "\n"
 }

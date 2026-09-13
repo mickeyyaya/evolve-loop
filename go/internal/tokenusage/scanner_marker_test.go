@@ -147,7 +147,7 @@ func TestArtifactAnchors_MatchRenderedContract(t *testing.T) {
 
 	rendered := map[string]string{
 		"RenderContractFooter": phasecontract.RenderContractFooter(c, artifact),
-		"RenderContractTail":   phasecontract.RenderContractTail(c, artifact),
+		"RenderContractTail":   phasecontract.RenderContractTail(c, artifact, filepath.Dir(artifact)),
 	}
 	for name, body := range rendered {
 		matched := false

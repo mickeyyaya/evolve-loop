@@ -114,6 +114,18 @@
    (the production writer, then the reader) goes red when the writer's destination drifts — the
    e2e alone did not, because a vanished item reads as "not an inbox item".
 
+9. **The gate's decisions are signals and its criteria are prompt input (ADR-0101 S2b, 2026-09-13).**
+   Every decision `Reviewer.Review` reaches is one Signal Center event under module `gate.contract`
+   — `gate.passed` (`GATE_CONTRACT_VERIFIED` naming the artifact, its size, the owed files and the
+   effects it found; `_SALVAGED`; WARN `_WOULD_BLOCK` / `_DEMOTED` / `_FAIL_OPEN`) or `gate.rejected`
+   (`GATE_CONTRACT_REJECTED`, the reason being the correction directive) — and the ladder's every
+   re-dispatch is `gate.corrected` (`ORCHESTRATOR_GATE_CORRECTION`) on both roots, so the
+   orchestrator's listener and the triage reader see "checked → advanced" or "checked → rejected:
+   <file> → corrected" per phase boundary (design §15.5). The contract block the agent receives now
+   names the agent-owed files and the declared effects the gate verifies, and the tail renders
+   each owed file at the exact path the gate reads (`phasecontract.OwedPath`, the one join), so the
+   prompt and the gate cannot drift on names or locations (they used to live only in persona prose).
+
 ## Why the existing gate, not a new stage
 
 The first design was a deterministic reviewer *decorated* in front of the semantic one. The

@@ -697,7 +697,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 		// operator promotes gates.report_size_gate to enforce.
 		reviewers = append(reviewers, deliverable.NewReviewerWithCatalogStageReportSize(
 			cfg.ContractGate, catalog, cfg.PhaseIO,
-			parseGateStage(gatesCfg.ReportSizeGate), pol.ReportBudgetConfig().HandoffTokens))
+			parseGateStage(gatesCfg.ReportSizeGate), pol.ReportBudgetConfig().HandoffTokens, deliverable.WithSignals(signals)))
 	}
 	if cfg.TriageCapGate != config.StageOff {
 		// R9.2 triage capacity clamp (internal/triagecap): committed coverage

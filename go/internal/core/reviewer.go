@@ -255,3 +255,21 @@ func reviewerChainHas(r DeliverableReviewer, pred func(DeliverableReviewer) bool
 		return pred(r)
 	}
 }
+
+// contractGateSignals is the capability the composition-root wiring proof
+// asks for beside declaredDeliverablesGate: the contract gate reports its
+// decisions through the Signal Center (ADR-0101 S2b).
+type contractGateSignals interface {
+	VerifiesDeclaredDeliverables() bool
+	SignalsWired() bool
+}
+
+// ContractGateSignalsWired reports whether the reviewer chain's contract gate
+// was handed a Center — without it the gate's verdicts never reach the stream
+// and the orchestrator's listener cannot see "checked → advanced".
+func (o *Orchestrator) ContractGateSignalsWired() bool {
+	return reviewerChainHas(o.reviewer, func(r DeliverableReviewer) bool {
+		g, ok := r.(contractGateSignals)
+		return ok && g.VerifiesDeclaredDeliverables() && g.SignalsWired()
+	})
+}
