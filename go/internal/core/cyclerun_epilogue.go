@@ -94,6 +94,12 @@ func (cr *cycleRun) abnormalEpilogue(cause error) {
 	// field the dossier projects, so it must be where the skip actually lives).
 	cr.result.SkippedPhases = append(cr.result.SkippedPhases,
 		SkippedPhase{Phase: "closeout", Reason: "abnormal exit in phase " + cr.cs.Phase})
+	// ADR-0101 S2a: the cycle's event stream ends with a seal on this path
+	// too — FAIL, the abort reason as the termination reason — so "how did
+	// cycle N end" has one answer in signals.ndjson on every path.
+	sealed := cr.result
+	sealed.FinalVerdict, sealed.TerminationReason = VerdictFAIL, reason
+	cr.emitCycleClose(sealed, "cycleRun.abnormalEpilogue")
 	if derr := writeCycleDossier(cr.o.gitMutationLock, cr.req.ProjectRoot, cr.cs.WorkspacePath, cr.cycle, dossierGoal, cr.cs.RunID, VerdictFAIL,
 		cr.result.SkippedPhases, cr.result.VerdictsNotAdopted, cr.result.SpineFailOpens, cr.flushPhaseTimings()); derr != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d: abnormal-epilogue dossier not written: %v\n", cr.cycle, derr)

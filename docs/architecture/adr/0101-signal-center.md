@@ -94,7 +94,7 @@
    producer must not write the stream the orchestrator reads (ADR-0074's boundary rule). S1: the ADR-0044
    C1 chokepoint (`recordPhaseOutcome`) emits `phase.outcome` for every terminal disposition on both
    dispatch roots (its PR #577 log line becomes the sink's line). S2: `SystemFailureSignal`,
-   `shiperr.ShipError` (42 codes, namespaced `SHIP_*`), contract-gate rejections, quota pauses. S3: the
+   `shiperr.ShipError` (every code, namespaced `SHIP_*`), contract-gate rejections, quota pauses. S3: the
    bridge engine's WARN/TRIPWIRE/CONTEXT-FILL and pane liveness. S4: the ledger port (a decorator emits
    `ledger.appended`), `dispatchevents` writers, the observer adapter. The ledger's hash chain is NOT
    replaced — provenance stays where it is; the Center is the monitoring stream beside it.
@@ -162,3 +162,20 @@ replacement kind for an event whose own kind is unknown; there is no `registry_c
 per-cycle summary is `signalcenter.Summary`, follows the cycle by itself
 and is read only through `Orchestrator.SignalSummary()` (decision 5). Nothing in the decisions'
 intent changed: one schema, one center, closed vocabularies, observe-never-decide.
+
+## Implementation notes — S2a (landed 2026-09-13)
+
+The producers that need only S1: `cycle.sealed` and `system.failure` at the closeout both dispatch
+roots share (`cycleRun.completeCycle`; INCIDENT when the failure halts the loop), `ship.error` at
+`Orchestrator.recordShipError` with the ship vocabulary projected as `SHIP_<code>` (every code
+registered with a doc, completeness parsed from source — decision 4's "one vocabulary, one home";
+`ShipErrorClass.SignalSeverity` keeps the class → severity rule beside the vocabulary), and
+`quota.paused` at `pauseForQuota`, the seam both dispatch roots reach (the abnormal epilogue was
+the wrong seam: the resume root never calls it for a pause). An abnormal exit seals the cycle FAIL
+from the epilogue, so every path ends the cycle's stream with one `cycle.sealed`. `Center.Flush`
+closes decision 3's only gap (an emitter that finds a drain in
+progress returns before delivery): both roots defer it. The code catalogue
+`docs/architecture/signal-codes.md` is generated from the registry (`evolve signals codes
+generate|check`) and its currency is a `cmd/evolve` test. Deferred to S2b: `gate.rejected /
+gate.corrected` (the contract-gate codes land with PR #575), `fields.shipped` on `cycle.sealed`
+(PR #576's `CycleState.Shipped`), the `failurelog` / `failureadapter` classification fold.

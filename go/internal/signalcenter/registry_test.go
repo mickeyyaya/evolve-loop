@@ -7,7 +7,9 @@ package signalcenter
 // availability event) and a named test asserts the registry is conflict-free.
 
 import (
+	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 )
 
@@ -35,7 +37,7 @@ func TestRegistry_BuiltInDriftCodesAreRegisteredWithDocs(t *testing.T) {
 
 func TestRegisterCode_DuplicateIdenticalIsNoOp_ConflictIsRecorded(t *testing.T) {
 	t.Parallel()
-	const code Code = "AUDIT_TEST_REGISTRY_FIXTURE"
+	code := fixtureCode("AUDIT_TEST_REGISTRY_FIXTURE")
 	RegisterCode(ModuleAudit, code, "fixture: an audit gate refused the report")
 	RegisterCode(ModuleAudit, code, "fixture: an audit gate refused the report")  // identical → no-op
 	RegisterCode(ModuleAudit, code, "fixture: a DIFFERENT doc for the same code") // conflicting doc
@@ -78,12 +80,13 @@ func containsCode(docs []CodeDoc, c Code) bool {
 
 func TestRegisterCode_RejectsMalformedAndForeignPrefixAsConflicts(t *testing.T) {
 	t.Parallel()
-	RegisterCode(ModuleShip, "not_a_code", "fixture")          // malformed
-	RegisterCode(ModuleShip, "AUDIT_LOOKS_FOREIGN", "fixture") // prefix belongs to another module
-	if got := len(conflictsFor("not_a_code")) + len(conflictsFor("AUDIT_LOOKS_FOREIGN")); got != 2 {
+	malformed, foreign := fixtureCode("not_a_code"), fixtureCode("AUDIT_LOOKS_FOREIGN")
+	RegisterCode(ModuleShip, malformed, "fixture") // malformed (lower case)
+	RegisterCode(ModuleShip, foreign, "fixture")   // prefix belongs to another module
+	if got := len(conflictsFor(malformed)) + len(conflictsFor(foreign)); got != 2 {
 		t.Errorf("malformed and foreign-prefix registrations are recorded as conflicts, got %d", got)
 	}
-	if _, ok := IsRegistered("not_a_code"); ok {
+	if _, ok := IsRegistered(malformed); ok {
 		t.Error("a malformed code is never registered")
 	}
 }
@@ -95,7 +98,7 @@ func TestRegistryConflicts_RealRegistryIsClean(t *testing.T) {
 	t.Parallel()
 	for _, c := range RegistryConflicts() {
 		s := string(c.Code)
-		if strings.Contains(s, "FIXTURE") || strings.Contains(s, "LOOKS_FOREIGN") || s == "not_a_code" {
+		if strings.Contains(s, "FIXTURE") || strings.Contains(s, "LOOKS_FOREIGN") || strings.HasPrefix(s, "not_a_code") {
 			continue
 		}
 		t.Errorf("real registry conflict: %+v", c)
@@ -110,4 +113,12 @@ func conflictsFor(code Code) []Conflict {
 		}
 	}
 	return out
+}
+
+// fixtureCode mints a per-invocation fixture code so the package-global
+// registry keeps exact per-test counts under `go test -count=N`.
+var fixtureSeq uint64
+
+func fixtureCode(base string) Code {
+	return Code(base + "_" + strconv.FormatUint(atomic.AddUint64(&fixtureSeq, 1), 10))
 }

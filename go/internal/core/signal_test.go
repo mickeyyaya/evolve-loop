@@ -100,16 +100,20 @@ func TestRunCycle_TriageFailIsAWarnOutcomeNamingTheReason(t *testing.T) {
 	if warn.Code != CodePhaseVerdictFail || warn.Phase != string(PhaseTriage) || !strings.Contains(warn.Reason, "names protected surface") || warn.Fields["verdict"] != VerdictFAIL {
 		t.Errorf("the event names the phase, its code and the phase's own reason: %+v", warn)
 	}
-	line := stderr.String()
+	lines := strings.Split(strings.TrimSuffix(stderr.String(), "\n"), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("the WARN filter lets exactly two lines through — the phase's FAIL and the cycle's FAIL seal (S2a) — got:\n%s", stderr.String())
+	}
 	want := "[orchestrator] phase.outcome WARN ORCHESTRATOR_PHASE_VERDICT_FAIL cycle=" + strconv.Itoa(res.Cycle) + " phase=triage attempt=1"
-	if !strings.HasPrefix(line, want) || !strings.Contains(line, "names protected surface") {
-		t.Errorf("the ONE stderr line format replaces the hand-written one:\n got %s\nwant prefix %s", line, want)
+	if !strings.HasPrefix(lines[0], want) || !strings.Contains(lines[0], "names protected surface") {
+		t.Errorf("the ONE stderr line format replaces the hand-written one:\n got %s\nwant prefix %s", lines[0], want)
 	}
-	if strings.Count(line, "\n") != 1 {
-		t.Errorf("the WARN filter lets exactly this line through, got:\n%s", line)
+	seal := "[orchestrator] cycle.sealed WARN ORCHESTRATOR_CYCLE_FAILED cycle=" + strconv.Itoa(res.Cycle)
+	if !strings.HasPrefix(lines[1], seal) || !strings.Contains(lines[1], "final_verdict="+res.FinalVerdict) {
+		t.Errorf("the seal is the last line and names the final verdict:\n got %s\nwant prefix %s", lines[1], seal)
 	}
-	if s := o.SignalSummary(); s.BySeverity[signalcenter.SeverityWarn] != 1 {
-		t.Errorf("the summary counts the WARN: %+v", s)
+	if s := o.SignalSummary(); s.BySeverity[signalcenter.SeverityWarn] != 2 {
+		t.Errorf("the summary counts both WARNs: %+v", s)
 	}
 }
 

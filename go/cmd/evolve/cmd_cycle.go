@@ -219,7 +219,10 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 	if simulate {
 		orch = wireSimulateOrchestrator(projectRoot, evolveDir)
 	} else {
-		orch = wireOrchestrator(projectRoot, evolveDir)
+		d := wireOrchestratorDeps(projectRoot, evolveDir)
+		// ADR-0101 S2a: no queued signal is lost at command exit (Center.Flush).
+		defer d.Signals.Flush()
+		orch = d.Orchestrator
 	}
 	cycleEnv := filterEvolveEnv(os.Environ())
 	result, err := orch.RunCycle(context.Background(), core.CycleRequest{
@@ -289,14 +292,6 @@ func applyCycleFailureOutcome(projectRoot, evolveDir string, cycle int, stderr i
 // share ONE definition. Thin forwarder kept so this file's callers are unchanged.
 func filterEvolveEnv(environ []string) map[string]string {
 	return cmdutil.FilterEvolveEnv(environ)
-}
-
-// wireOrchestrator returns an orchestrator wired with production
-// adapters: filesystem-backed storage + ledger, default bridge, all
-// 8 phase runners. Extracted for cmd_loop reuse.
-func wireOrchestrator(projectRoot, evolveDir string) *core.Orchestrator {
-	d := wireOrchestratorDeps(projectRoot, evolveDir)
-	return d.Orchestrator
 }
 
 // orchDeps is the wired bundle when callers need access to the storage

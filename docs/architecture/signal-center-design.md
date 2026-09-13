@@ -150,10 +150,10 @@ Examples (what cycles 1636 and 1630 would have produced):
  "module":"orchestrator","origin":"Orchestrator.recordPhaseOutcome","kind":"phase.outcome","code":"ORCHESTRATOR_PHASE_VERDICT_FAIL",
  "severity":"WARN","reason":"triage verdict=FAIL: top_n card \"phase-stub-shape-rule-at-ship-staging\" names protected surface \"go/internal/phases/ship/gitops.go\" — control-plane changes go through the console route",
  "fields":{"archetype":"plan","duration_ms":"121183","verdict":"FAIL"}}
-{"schema_version":"signal/1.0","seq":58,"pid":30870,"ts":"2026-09-12T11:11:40.002Z","cycle":1630,"run_id":"01J…","phase":"triage",
- "module":"orchestrator","origin":"Orchestrator.finalizeCycle","kind":"cycle.sealed","code":"",
- "severity":"INFO","reason":"final verdict SKIPPED_UNKNOWN (triage-empty-commitment)",
- "fields":{"final_verdict":"SKIPPED_UNKNOWN","shipped":"false","termination_reason":"triage-empty-commitment"}}
+{"schema_version":"signal/1.0","seq":58,"pid":30870,"ts":"2026-09-12T11:11:40.002Z","cycle":1630,"run_id":"01J…",
+ "module":"orchestrator","origin":"cycleRun.completeCycle","kind":"cycle.sealed",
+ "severity":"INFO","reason":"final verdict SKIPPED_UNKNOWN",
+ "fields":{"final_verdict":"SKIPPED_UNKNOWN","phases_run":"2","termination_reason":"triage-empty-commitment"}}
 ```
 
 ## 5. Vocabularies
@@ -278,9 +278,11 @@ Semantics (each is a named test):
    different orders", not "registration order reversed". **Consequence for producers on exit
    paths** (S1 review): an emitter that arrives while another goroutine drains returns before its
    event is delivered; the sole S1 producer runs on the draining goroutine, so delivery is
-   synchronous in practice. S2's producers on `os.Exit` paths (`loop.halt`, `system.failure`,
-   watchdog goroutines) must emit from the draining goroutine or S2 adds a `Flush` seam — otherwise
-   the file's `seq` shows an unexplained gap at exit.
+   synchronous in practice. `Flush` (S2a) blocks until the queue is empty and no drain is running;
+   both production roots defer it after wiring the orchestrator
+   (`TestSignalCenterFlush_IsWiredAtBothRoots`), so a producer on an `os.Exit` path (`loop.halt`,
+   a watchdog goroutine — S3/S4) can never leave an unexplained gap in the file's `seq` at exit.
+   Never call `Flush` from inside a listener: the drain running the listener is the one it waits for.
 2. **Never drops.** Validation failures rewrite the event with a `SIGNALCENTER_*` code, keep the
    originals in `fields`, and raise severity to at least WARN (§5.4).
 3. **Panic isolation without self-deadlock** *(review 2)*. A panicking listener is recovered and
@@ -374,6 +376,8 @@ func (o *Orchestrator) SignalSummary() signalcenter.Summary // a snapshot of the
 [orchestrator] phase.outcome WARN ORCHESTRATOR_PHASE_VERDICT_FAIL cycle=1636 phase=triage attempt=1 seq=41 origin=Orchestrator.recordPhaseOutcome — triage verdict=FAIL: top_n card "…" names protected surface "go/internal/phases/ship/gitops.go" archetype=plan duration_ms=121183 verdict=FAIL
 [ship] ship.error WARN SHIP_GIT_FLEET_REBASE_NEEDED cycle=1632 phase=ship attempt=1 seq=77 origin=Landing.Land — main moved during the landing; recovering via build (attempt 1/2) class=transient
 [ship] ship.error WARN SIGNALCENTER_UNREGISTERED_CODE cycle=1640 phase=ship attempt=1 seq=12 origin=Landing.Land — main moved during the landing drift=SIGNALCENTER_UNREGISTERED_CODE raw_code=SHIP_NEW_THING
+[orchestrator] system.failure INCIDENT ORCHESTRATOR_SYSTEM_FAILURE cycle=862 seq=88 origin=cycleRun.completeCycle — verdict-incoherence: recorded FAIL but on-disk audit=PASS, acs=PASS category=verdict-incoherence halt=true level=system
+[orchestrator] cycle.sealed WARN ORCHESTRATOR_CYCLE_FAILED cycle=862 seq=89 origin=cycleRun.completeCycle — final verdict FAIL final_verdict=FAIL phases_run=5 termination_reason=audit-fail-floor
 ```
 
 The last line shows drift stamped in place: the producer's module, kind, origin and reason stay, the
@@ -395,7 +399,8 @@ Hand-written `[x]` prose disappears one module at a time (§10 S5).
 |---|---|---|---|
 | **S0** | this design, ADR-0101, the inventory | docs-only PR; links resolve; architect review folded in | — |
 | **S1** | `internal/signalcenter` (schema, Center, registry, sinks, filter); `core.WithSignalCenter` + listener + `Orchestrator.SignalSummary()`; `orchDeps.Signals`; the C1 chokepoint emits `phase.outcome`/`phase.aborted` on both roots (its PR #577 hand-written line replaced by the sink line); `.apicover-enforce` entry; CI line-coverage gate | package 100 % API coverage (apicover) + 100 % line coverage (CI/make gate, §11), `-race`; composed RunCycle test: every dispatched phase (incl. the ADR-0044 abort-path table) yields exactly one `phase.outcome` observed by the orchestrator listener and one `signals.ndjson` line with monotonic `seq`; WARN-budget test; re-entrancy test; mutants: emit removed, listener not subscribed, sink not attached, validation bypassed, recover removed, same-order-for-all-listeners — each killed by name | PR #577 (lands after the #575/#576/#577 merge order) |
-| **S2** | producers: `SystemFailureSignal` → `system.failure`; `shiperr` → `ship.error` (+ `shiperr.SignalCode`); contract gate → `gate.rejected/corrected`; quota pause → `quota.paused`; `cycle.sealed` after `finalizeOutcome`; `failurelog.Classification` folded into `failureadapter`'s; generated `docs/architecture/signal-codes.md`; a `Flush` seam (or emit-from-the-drainer rule) for exit-path producers (§6.1); the live WARN budget pinned from the first green runtime cycle | each producer has a composed proof; the classification registry test fails if the two vocabularies diverge again | PR #575 (gate codes) |
+| **S2a** | producers that need only S1: `system.failure` + `cycle.sealed` at `cycleRun.completeCycle` (the closeout both roots share; the hand-written SYSTEM-FAILURE HALT / LANDING LOST lines deleted); `ship.error` at `Orchestrator.recordShipError` with `shiperr.SignalCode` (every ship code registered under module `ship` with a doc each — a source-parsed test proves completeness; `ShipErrorClass.SignalSeverity` is the class → severity rule's one home); `quota.paused` at `cycleRun.pauseForQuota` (the seam both roots reach; its hand-written WARN line deleted); an abnormal exit seals the cycle FAIL from `cycleRun.abnormalEpilogue`; `Center.Flush` deferred at both roots; `evolve signals codes generate\|check` projecting the registry into `docs/architecture/signal-codes.md` | composed `RunCycle` test: `cycle.sealed` is the LAST orchestrator event; each producer has a direct proof (INCIDENT on halt / integrity, WARN otherwise); `signal-codes.md` currency is a `cmd/evolve` test (CI); mutants: each emit removed, INCIDENT not raised, prefix wrong, Flush broadcast removed, drift check disabled | S1 |
+| **S2b** | contract gate → `gate.rejected/corrected` (the `GATE_CONTRACT_*` codes need PR #575); `fields.shipped` on `cycle.sealed` (needs PR #576's `CycleState.Shipped`); `failurelog.Classification` folded into `failureadapter`'s; the live WARN budget pinned from the first green runtime cycle | each producer has a composed proof; the classification registry test fails if the two vocabularies diverge again | S2a, PR #575, PR #576 |
 | **S3** | bridge: `Deps.Signals` at construction + `engine.SignalsWired()`; engine WARN/TRIPWIRE/CONTEXT-FILL → `bridge.warning/tripwire`; **commit 1:** the pure rename `panestream.SignalCenter` → `LivenessCenter` (ADR-0068/0070 amended by ADR-0101; `bridge.Deps.LivenessCenter` already carries the target name); **commit 2:** `pane.liveness` production; hand-written `[engine]` lines removed | the repo-wide prefix test's allowlist shrinks by `[engine]`/`[bridge]` | S1 |
 | **S4** | ledger decorator (`ledger.appended`); `dispatchevents` writers and the `observer` adapter emit through the Center (their files stay as sink outputs until readers migrate); `cmd_loop` **reports** signal counts in the batch report; the dashboard SSE subscribes | `abnormal-events.jsonl` **field-equal modulo timestamp precision** before/after, asserted by a decoding golden *(review 11)*; dashboard shows a signal within one SSE tick; no breaker gates on a signal (a shadow comparison test may log disagreement) | S2 |
 | **S5** | per-module log migration riding each decomposition slice (§12): prefix-literal occurrences per module (any writer) `[orchestrator]` 287 → 0, `[loop]` 132 → 0, `[ship]` 130 → 0, … | one repo-wide grep test with a shrinking allowlist (a migrated module cannot be forgotten); the inventory's prefix table regenerated | S1 |
@@ -461,7 +466,7 @@ tag, 100 % API + line coverage, and a design note "why this boundary" appended t
 |---|---|---|
 | Where to look first | 15+ files/streams per cycle, different shapes | `signals.ndjson` (one file, `seq`-ordered), stderr (one format, WARN and up) |
 | Severity | 3 vocabularies | 1 (the existing contract) |
-| Error identity | 42 ship codes, 2 classification vocabularies, exit codes, free strings, prose | 1 registry, module-namespaced, unregistered/missing = visible drift |
+| Error identity | the ship error codes, 2 classification vocabularies, exit codes, free strings, prose | 1 registry, module-namespaced, unregistered/missing = visible drift |
 | Module in the log | 361 hand-typed stderr writes across several writers, inconsistent | every line `[module] … origin=Type.Method` from one sink |
 | Orchestrator's view | post-hoc: return values, files re-read by the seal, cyclehealth, breakers | live: a listener with a per-cycle summary |
 | Wiring | optional nil-default injection nobody set (`Deps.LivenessCenter`) | non-optional at the root, proven at both roots, nil sites pinned |
@@ -541,3 +546,36 @@ of appending, leaf imports core, core registers a conflicting code, listener nam
 held across Emit, reason cut removed, identifier bound removed); named wiring tests `TestWireOrchestratorDeps_SignalCenterWired`,
 `TestWireOrchestratorDeps_SignalCenterConsoleSinkIsFilteredAtWarn`, `TestNilSignalCenterRootsArePinned`,
 `TestImportGraph_LeafPackageImportsOnlyInternalLog`, `TestNDJSONSink_TwoProcessesAppendToTheSameCycleFile`.
+
+### 15.2 Landed — S2a (2026-09-13)
+
+| Producer | Chokepoint (origin) | Severity / code | Fields |
+|---|---|---|---|
+| `cycle.sealed` | `cycleRun.completeCycle` — the closeout both dispatch roots share, after `finalizeCycle` so the FINAL verdict is known; the last orchestrator event of every completed cycle. An abnormal exit (the cycle died mid-phase) seals from `cycleRun.abnormalEpilogue` instead: FAIL, the abort reason as `termination_reason` — so "how did cycle N end" has one answer on every path | INFO; WARN `ORCHESTRATOR_CYCLE_FAILED` on FAIL | `final_verdict`, `phases_run`, `termination_reason`, `retro_decision` (`shipped` arrives in S2b with `CycleState.Shipped`) |
+| `system.failure` | `cycleRun.completeCycle`, before the seal, when any floor attached a `SystemFailureSignal` (incoherence, lost landing, audit-fail floor, decision branches) | INCIDENT `ORCHESTRATOR_SYSTEM_FAILURE` when `Halt`, WARN otherwise | `category`, `level`, `halt` |
+| `ship.error` | `Orchestrator.recordShipError` — where core records the phase's typed error (`ship-error.json` + ledger) | WARN `SHIP_<code>` (`shiperr.SignalCode`); INCIDENT for the `integrity` class — `ShipErrorClass.SignalSeverity`, the rule's one home, beside the vocabulary | `class`, `stage`, `path` |
+| `quota.paused` | `cycleRun.pauseForQuota` — the seam BOTH dispatch roots reach (the resume root's deferred guard never calls the epilogue for a pause, so the epilogue was the wrong seam — S2a architecture review); its hand-written `[orchestrator] WARN` line deleted | WARN `ORCHESTRATOR_QUOTA_PAUSED`; the reason is the one error text the ledger and the phase diag carry | `phase` |
+
+Design choices: every producer is an Adapter from a value the pipeline already owns
+(`CycleResult`, `SystemFailureSignal`, `ShipError`, the `ErrAllFamiliesExhausted` sentinel) — no
+new state, no new decision, one call line at each chokepoint and the body in `signal_cycle.go`
+(`verdictReason`-style: one rendering per fact). The ship vocabulary is projected, not copied
+(`SignalCode`, `AllCodes`, one `codeDocs` table registered at init;
+`TestCodeDocs_CoverEveryDeclaredShipErrorCode` parses `shiperr.go` so a new constant cannot slip in
+undocumented — no hand-maintained count anywhere; the generated doc is the only place a count
+lives). `Center.Flush` (`sync.Cond` on drain end) is deferred at both roots. The code catalogue is a
+generated projection of `RegisteredCodes()` (`RenderCodes` → `evolve signals codes generate|check`,
+`docs/architecture/signal-codes.md`) gated by `TestSignalsCodes_RepoDocIsInSyncWithTheLinkedRegistry`
+in `cmd/evolve` — the binary that links every module. The hand-written
+`[orchestrator] SYSTEM-FAILURE HALT`, `LANDING LOST` and quota-pause `WARN` lines were deleted in the
+same slice; the sink renders them in the one line format. Folded from the S2a architecture review
+(Block → fixed): the quota producer moved from the epilogue (unreachable on the resume root) to
+`pauseForQuota`, with fresh-root, resume-root (integration) and direct proofs; the class → severity
+rule moved beside the vocabulary; the completeness proof is parsed from source; `emitCycleClose` is
+a `cycleRun` method so every producer stamps the one run id (`cs.RunID`); an abnormal exit now seals
+the cycle. From the re-review (Approve): `origin` is a parameter of the seal producer, so the
+abnormal-path seal names `cycleRun.abnormalEpilogue` (a callee never asserts its caller's identity —
+`origin` is vocabulary), and the ship-class severity table walks the declared classes from source
+like the codes do. Accepted as-is: the textual Flush-wiring pin (convention-consistent; the behavioural
+proof is the Flush test) and the `emit…` producer naming beside the loop's `emitQuotaPause` (the
+Signal Center producers keep one prefix; the loop's report emitter is S4's to rename).

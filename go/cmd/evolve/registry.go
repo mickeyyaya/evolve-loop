@@ -116,6 +116,7 @@ var commands = []subcommand{
 	{Name: "skill-inventory", Summary: "Build skill inventory cache", Run: runSkillInventory},
 	{Name: "skills", Summary: "Project phase facts into skill docs from SSOT (generate|check); publish skills to other LLM CLIs (publish) — ADR-0040/0041", Run: runSkills},
 	{Name: "flags", Summary: "Project the EVOLVE_* flag registry into control-flags.md (generate|check; check exits 2 on drift) — L2 flag SSOT", Run: runFlags},
+	{Name: "signals", Summary: "Signal Center (ADR-0101): `signals codes generate|check` projects the code registry into signal-codes.md (check exits 2 on drift)", Run: runSignals},
 	{Name: "phase-inventory", Summary: "Build phase inventory cache (the advisor's phase index)", Run: phasecmd.RunPhaseInventory},
 	{Name: "eval", Summary: "Eval-quality + verify subcommands", Run: guardcmd.RunEval},
 	{Name: "solution", Summary: "Document deliverable contract (ADR-0099): check <solutions/slug> [--project-root DIR] — the same engine as the build floor and the audit gate", Run: runSolution},
