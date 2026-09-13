@@ -1,0 +1,93 @@
+{
+  "cycle": 1672,
+  "run_id": "01M2E932KJ6Q3Y40KN00R024V9",
+  "goal": "Pipeline-health verification batch (2026-09-12, two waves): work the highest-weight queued inbox items end-to-end — claim, tdd, build, audit, ship — with full phase integrity, now that the resume worktree teardown (#571), the shipDirect audit binding (#569), resume-path outcome recording (#568), and profile sandbox.write_subpaths grants (#572) are on main. Every cycle must commit to a claimed inbox item (an empty top_n must not run the spine), bind its audit to the changes tree it ships, record a terminal outcome on every exit, and leave no stale worktree behind. Pipeline-integrity and pipeline-repair items come first; ADR-0099 document deliverables are eligible.",
+  "final_verdict": "FAIL",
+  "tasks": [
+    "verdict-sentinel-as-tool-call"
+  ],
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 161329,
+      "started_at": "2026-09-13T21:00:07Z",
+      "ended_at": "2026-09-13T21:02:49Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 28,
+        "output": 10963,
+        "cache_read": 890277,
+        "cache_write": 37865
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "FAIL",
+      "duration_ms": 1028912,
+      "started_at": "2026-09-13T21:03:13Z",
+      "ended_at": "2026-09-13T21:22:01Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 1672",
+      "priority": "high"
+    }
+  ],
+  "timing": {
+    "total_ms": 1190241,
+    "phase_count": 2,
+    "retried_count": 0,
+    "longest_phase": "triage",
+    "longest_ms": 1028912,
+    "by_archetype_ms": {
+      "plan": 1190241
+    },
+    "total_tokens": {
+      "input": 28,
+      "output": 10963,
+      "cache_read": 890277,
+      "cache_write": 37865
+    },
+    "tokens_by_archetype": {
+      "plan": {
+        "input": 28,
+        "output": 10963,
+        "cache_read": 890277,
+        "cache_write": 37865
+      }
+    },
+    "wasted_tokens": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "cache_hit_ratio": 0.9999685501036162,
+    "hot_phase_count": 1,
+    "hot_phases": [
+      "scout"
+    ]
+  }
+}
