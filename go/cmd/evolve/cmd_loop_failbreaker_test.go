@@ -142,6 +142,7 @@ func TestRecordAbsorbedFail_MissingStateIsSoftWarn(t *testing.T) {
 // cannot be scripted to emit FinalVerdict=FAIL without a faithful phase
 // machine). Injected via loopOrchOverride.
 type failingOrch struct {
+	noSignals
 	verdict string
 	n       int
 }

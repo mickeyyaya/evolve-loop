@@ -28,6 +28,12 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `BRIDGE_TOKEN_RESOLVER_MISSING` | the engine was built without a token resolver; lifecycle and outcome records continue without token counts (fail-open) |
 | `BRIDGE_TOKEN_USAGE_WARNING` | the token resolver measured the attempt with a caveat (invalid counters, partial measurement); the caveat is the reason |
 
+### ledger
+
+| Code | Meaning |
+|---|---|
+| `LEDGER_APPEND_FAILED` | the ledger could not append an entry (lock, chain or I/O failure); the reason is the error, fields name the entry |
+
 ### liveness
 
 | Code | Meaning |
@@ -35,6 +41,17 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `LIVENESS_PANE_EXHAUSTED` | a tmux pane shows the CLI's quota/rate-limit exhaustion (LivenessCenter edge: exhausted; the exhaustion gate corroborates before rc 85) |
 | `LIVENESS_PANE_HUNG` | a tmux pane is hung: no progress and no completion (LivenessCenter edge: hung) |
 | `LIVENESS_PANE_STAGNANT` | a tmux pane is busy but its output stopped changing (LivenessCenter edge: busy-stagnant) |
+
+### loop
+
+| Code | Meaning |
+|---|---|
+| `LOOP_ESCALATION_BOUNDARY` | the escalation boundary staged inbox items (bumped/filed/planned) after a cycle; fields carry the counts and the stage |
+| `LOOP_FLEET_LANE_HALT` | a fleet lane exited with the system-failure halt code; the lane's own LOOP_SYSTEM_FAILURE_HALT names the failure and the escalation it filed |
+| `LOOP_HALT` | the batch halted at a wave boundary (plane diverged, sync refused); the reason is the halt error |
+| `LOOP_MIN_WIDTH_REPAIR` | the fleet shrank below its committed width and one isolated lane was dispatched instead (min-width repair) |
+| `LOOP_PIPELINE_BLOCKER_HALT` | the pipeline-blocker breaker halted the batch (identical fingerprints, unexplained failures or consecutive failures over the ceiling); fields.rule and fields.fingerprint name the rule, the rest are the system-failure halt's own fields (next, escalation, inbox_item) |
+| `LOOP_SYSTEM_FAILURE_HALT` | the batch halted on an ADR-0072 system failure the cycle itself signalled (the pipeline, not the task, is the cause); fields.category names the floor, fields.next is the escalation dossier's next_action, fields.escalation and fields.inbox_item the dossier and the P0 item the halt wrote |
 
 ### orchestrator
 

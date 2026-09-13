@@ -86,6 +86,7 @@ const (
 	ModuleWatchdog     Module = "watchdog"
 	ModuleObserver     Module = "observer"
 	ModuleDashboard    Module = "dashboard"
+	ModuleLedger       Module = "ledger"
 	ModuleSignalCenter Module = "signalcenter"
 )
 
@@ -93,7 +94,7 @@ var knownModules = map[Module]bool{
 	ModuleOrchestrator: true, ModuleAdvisor: true, ModuleRunner: true, ModuleBridge: true, ModuleLiveness: true,
 	ModuleShip: true, ModuleAudit: true, ModuleTriage: true, ModuleScout: true, ModuleBuild: true, ModuleTDD: true,
 	ModuleGateContract: true, ModuleGateEval: true, ModuleGateRepo: true, ModuleInbox: true, ModuleConfig: true,
-	ModuleLoop: true, ModuleWatchdog: true, ModuleObserver: true, ModuleDashboard: true, ModuleSignalCenter: true,
+	ModuleLoop: true, ModuleWatchdog: true, ModuleObserver: true, ModuleDashboard: true, ModuleLedger: true, ModuleSignalCenter: true,
 }
 
 // Known reports whether m is in the closed set.

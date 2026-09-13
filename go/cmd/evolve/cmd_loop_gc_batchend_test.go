@@ -64,7 +64,10 @@ type gcHookCall struct {
 // batchEndOrch is the scripted cycle runner for the clean-exit test: it flips
 // the shared cycleHadRun flag the spy samples, then reports a clean PASS so the
 // batch reaches its max-cycles exit.
-type batchEndOrch struct{ ran *bool }
+type batchEndOrch struct {
+	noSignals
+	ran *bool
+}
 
 func (o *batchEndOrch) RunCycle(_ context.Context, _ core.CycleRequest) (core.CycleResult, error) {
 	*o.ran = true
@@ -185,6 +188,7 @@ func TestRunLoopBatch_SignalExitSkipsBatchEndGCHook(t *testing.T) {
 // samples: it marks that a cycle entered, cancels the loop context (simulating
 // SIGINT landing mid-cycle), and returns ctx.Err().
 type signalMarkingOrch struct {
+	noSignals
 	cancel context.CancelFunc
 	ran    *bool
 }

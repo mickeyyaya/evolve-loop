@@ -40,6 +40,17 @@ type FailureInputs struct {
 	SystemLevel bool      // ADR-0072 S3: releases, never bumps, never quarantines
 	Reason      string    // ledger reason ("" = default)
 	Stderr      io.Writer // nil = discard
+	// Ledger is the chained-append seam the lifecycle lines go through — the
+	// root's Signal-Center-observed ledger (ADR-0101 S4a). nil lets the inbox
+	// mover fall back to its own, unobserved file ledger over the same file.
+	Ledger inboxmover.LedgerAppender
+}
+
+// WithLedger returns the inputs with the lifecycle ledger set (the receiver
+// is left untouched).
+func (in FailureInputs) WithLedger(l inboxmover.LedgerAppender) FailureInputs {
+	in.Ledger = l
+	return in
 }
 
 // ApplyFailure walks a failed cycle's committed ids through the inbox failure
@@ -71,6 +82,7 @@ func ApplyFailure(in FailureInputs) (inboxmover.OutcomeResult, error) {
 	}
 	res, err := inboxmover.ApplyCycleOutcome(inboxmover.Options{
 		ProjectRoot: in.ProjectRoot,
+		Ledger:      in.Ledger,
 		Stderr:      stderr,
 	}, inboxmover.CycleOutcome{
 		Cycle:        in.Cycle,

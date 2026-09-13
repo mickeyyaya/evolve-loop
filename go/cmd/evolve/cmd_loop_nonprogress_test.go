@@ -180,6 +180,7 @@ func TestStallKinds_DistinctInboxIdentity(t *testing.T) {
 // cannot be scripted to emit an interleaved FAIL/EMPTY stream without a faithful
 // phase machine). Mirrors failingOrch (cmd_loop_failbreaker_test.go).
 type verdictSeqOrch struct {
+	noSignals
 	verdicts []string
 	n        int
 }

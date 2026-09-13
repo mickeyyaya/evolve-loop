@@ -78,7 +78,7 @@ func TestBlockerBreakerHalt_ReconcilesAlreadyConsumedItem(t *testing.T) {
 		`{"id":"pipeline-blocker","kind":"pipeline-repair","consumed_by":"`+realConsumedByNarrative+`"}`)
 
 	var stderr bytes.Buffer
-	if _, halted := blockerBreakerHalt(evolveDir, root, 1325, &stderr); halted {
+	if _, halted := blockerBreakerHalt(evolveDir, root, 1325, &stderr, testRootSignals(t, &stderr)); halted {
 		t.Fatalf("a fingerprint whose P0 is already consumed must be reconciled into the ledger and excluded — this is the live cycle-1335 state that re-halted three times; stderr=%q", stderr.String())
 	}
 	raw, err := os.ReadFile(filepath.Join(evolveDir, "resolved-fingerprints.json"))
@@ -104,7 +104,7 @@ func TestBlockerBreakerHalt_ReconcilesItemWithNoKindFromNotes(t *testing.T) {
 		`{"id":"x","notes":"boot breaker tripped on fingerprint \"`+incidentFingerprint+`\" three times"}`)
 
 	var stderr bytes.Buffer
-	if _, halted := blockerBreakerHalt(evolveDir, root, 1325, &stderr); halted {
+	if _, halted := blockerBreakerHalt(evolveDir, root, 1325, &stderr, testRootSignals(t, &stderr)); halted {
 		t.Fatalf("reconciliation must gate on parse-success, not on an item `kind` vocabulary that matches zero live items; stderr=%q", stderr.String())
 	}
 }
@@ -123,7 +123,7 @@ func TestBlockerBreakerHalt_ReconcileDoesNotWeakenRuleB(t *testing.T) {
 		`{"id":"other","kind":"pipeline-repair","consumed_by":"console: fingerprint build|guard-abort|deadbeef01 = unrelated"}`)
 
 	var stderr bytes.Buffer
-	if _, halted := blockerBreakerHalt(evolveDir, root, 1325, &stderr); !halted {
+	if _, halted := blockerBreakerHalt(evolveDir, root, 1325, &stderr, testRootSignals(t, &stderr)); !halted {
 		t.Fatal("consuming an UNRELATED fingerprint must not excuse the halting one — reconciliation is per-fingerprint, never a blanket Rule B disable")
 	}
 }
@@ -144,7 +144,7 @@ func TestBlockerBreakerHalt_ReconcileSurvivesUnreadableItem(t *testing.T) {
 		`{"id":"pipeline-blocker","kind":"pipeline-repair","consumed_by":"`+realConsumedByNarrative+`"}`)
 
 	var stderr bytes.Buffer
-	if _, halted := blockerBreakerHalt(evolveDir, root, 1325, &stderr); halted {
+	if _, halted := blockerBreakerHalt(evolveDir, root, 1325, &stderr, testRootSignals(t, &stderr)); halted {
 		t.Fatalf("one corrupt consumed item must not abort the sweep or block the boot — the good item beside it still acks; stderr=%q", stderr.String())
 	}
 	if !strings.Contains(stderr.String(), "00-corrupt.json") {
@@ -163,7 +163,7 @@ func TestBlockerBreakerHalt_NoConsumedDirIsQuiet(t *testing.T) {
 	writeDigestFixture(t, evolveDir, 1329, incidentFingerprint, "gate-block")
 
 	var stderr bytes.Buffer
-	if _, halted := blockerBreakerHalt(evolveDir, root, 1325, &stderr); !halted {
+	if _, halted := blockerBreakerHalt(evolveDir, root, 1325, &stderr, testRootSignals(t, &stderr)); !halted {
 		t.Fatal("with nothing consumed, the breaker must halt exactly as before the fix")
 	}
 	if strings.Contains(stderr.String(), "WARN") && strings.Contains(stderr.String(), "consumed") {

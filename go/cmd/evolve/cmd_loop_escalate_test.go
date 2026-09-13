@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/dispositionrouter"
@@ -64,6 +65,11 @@ func TestRunLoop_EscalatesAtIterationBoundary(t *testing.T) {
 	reportPath := filepath.Join(evolveDir, "escalation-apply-report.json")
 	if _, err := os.Stat(reportPath); err != nil {
 		t.Fatalf("loop wrote no escalation apply report at %s — the iteration-boundary call site is unwired: %v", reportPath, err)
+	}
+	// ADR-0101 S4a: the boundary's outcome is a loop.escalation WARN the stub
+	// root's console renders into this stderr.
+	if !strings.Contains(stderr.String(), "LOOP_ESCALATION_BOUNDARY") || strings.Contains(stderr.String(), "escalation boundary (cycle") {
+		t.Fatalf("the escalation boundary must be a rendered loop.escalation signal, not a hand-written line; stderr=%q", stderr.String())
 	}
 	raw, err := os.ReadFile(itemPath)
 	if err != nil {

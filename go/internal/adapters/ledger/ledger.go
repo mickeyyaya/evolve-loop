@@ -33,7 +33,15 @@ type FileLedger struct {
 	lockPath   string
 	anchorPath string
 	mu         sync.Mutex
+	// onAppend observes every core.LedgerEntry written through Append — the
+	// ONE chokepoint every entry writer reaches (AppendLifecycle, the seal's
+	// segment anchor, the orchestrator's and the bridge's records). Installed
+	// at construction by an Option (WithSignals); nil = unobserved.
+	onAppend func(e core.LedgerEntry, err error)
 }
+
+// Option configures a FileLedger at construction (functional options).
+type Option func(*FileLedger)
 
 // hooks holds injectable seams so tests can drive marshal/I/O error
 // branches that are otherwise unreachable on a healthy filesystem.
@@ -74,14 +82,18 @@ func withHooks(replacement ledgerHooks, fn func()) {
 	fn()
 }
 
-// New constructs a FileLedger rooted at evolveDir.
-func New(evolveDir string) *FileLedger {
-	return &FileLedger{
+// New constructs a FileLedger rooted at evolveDir, applying opts in order.
+func New(evolveDir string, opts ...Option) *FileLedger {
+	l := &FileLedger{
 		ledgerPath: filepath.Join(evolveDir, "ledger.jsonl"),
 		tipPath:    filepath.Join(evolveDir, "ledger.tip"),
 		lockPath:   filepath.Join(evolveDir, "ledger.lock"),
 		anchorPath: filepath.Join(evolveDir, "ledger-anchor.json"),
 	}
+	for _, opt := range opts {
+		opt(l)
+	}
+	return l
 }
 
 // Append serializes e (with prev_hash + entry_seq filled in by the
@@ -91,11 +103,15 @@ func New(evolveDir string) *FileLedger {
 // tip-read→append→tip-write critical section — two `evolve` processes
 // otherwise interleave and break the hash chain).
 func (l *FileLedger) Append(_ context.Context, e core.LedgerEntry) error {
-	return l.appendChained(func(seq int, prevHash string) any {
+	err := l.appendChained(func(seq int, prevHash string) any {
 		e.EntrySeq = seq
 		e.PrevHash = prevHash
 		return e
 	})
+	if l.onAppend != nil {
+		l.onAppend(e, err) // e carries the chained seq the fill stamped on success
+	}
+	return err
 }
 
 // appendChained is the tip-read→append→tip-write critical section shared by

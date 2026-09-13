@@ -216,10 +216,13 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 	}
 
 	var orch *core.Orchestrator
+	var signals *signalcenter.Center              // nil under --simulate (Null Object)
+	var lifecycleLedger inboxmover.LedgerAppender // nil under --simulate: the inbox walk falls back to the mover's own file ledger
 	if simulate {
 		orch = wireSimulateOrchestrator(projectRoot, evolveDir)
 	} else {
-		d := wireOrchestratorDeps(projectRoot, evolveDir)
+		d := wireOrchestratorDeps(projectRoot, evolveDir, stderr)
+		signals, lifecycleLedger = d.Signals, d.Ledger
 		// ADR-0101 S2a: no queued signal is lost at command exit (Center.Flush).
 		defer d.Signals.Flush()
 		orch = d.Orchestrator
@@ -243,7 +246,7 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 		// ceiling reachable for fleet-dispatched work at all.
 		var clf *core.ErrCycleLevelFailure
 		if errors.As(err, &clf) {
-			applyCycleFailureOutcome(projectRoot, evolveDir, result.Cycle, stderr)
+			warnCycleFailureOutcome(stderr, result.Cycle, applyCycleFailureOutcome(projectRoot, evolveDir, result.Cycle, stderr, lifecycleLedger))
 		}
 		fmt.Fprintf(stderr, "evolve cycle run: %v\n", err)
 		return 1
@@ -259,25 +262,36 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 	// when the halt originated inside a lane. Ordinary outcomes keep the historical
 	// rc=2/0 mapping (cycleRunExitCode).
 	if sf := result.SystemFailure; sf != nil && sf.Halt {
-		return haltOnSystemFailure(evolveDir, projectRoot, result.Cycle, cycleWorkspace(projectRoot, result.Cycle), sf, stderr)
+		return haltOnSystemFailure(evolveDir, projectRoot, result.Cycle, cycleWorkspace(projectRoot, result.Cycle), sf, stderr, signals, systemFailureRule)
 	}
 	// The other shape of a FAIL: RunCycle returned no error but the cycle's
 	// final verdict is FAIL. Same closeout, applied exactly once (the err!=nil
 	// branch above already returned).
 	if result.FinalVerdict == cyclestate.VerdictFAIL {
-		applyCycleFailureOutcome(projectRoot, evolveDir, result.Cycle, stderr)
+		warnCycleFailureOutcome(stderr, result.Cycle, applyCycleFailureOutcome(projectRoot, evolveDir, result.Cycle, stderr, lifecycleLedger))
 	}
 	return cycleRunExitCode(result)
 }
 
 // applyCycleFailureOutcome walks the failed cycle's triage-committed ids
 // through the inbox failure lifecycle (bump failure_count, quarantine at the S5
-// ceiling) via the shared seam. Best-effort: a lifecycle hiccup WARNs but never
-// changes the cycle's exit code, which is the lane's only channel to its parent.
-func applyCycleFailureOutcome(projectRoot, evolveDir string, cycle int, stderr io.Writer) {
-	if _, err := cycleoutcome.ApplyFailure(cycleoutcome.FailureInputsFor(
+// ceiling) via the shared seam — the ONE call every root makes (the cycle-run
+// root and both sequential loop paths). The walk appends its lifecycle lines
+// through the root's ledger so the Signal Center observes them like every
+// other entry (ADR-0101 S4a); a nil ledger (the --simulate root) lets the
+// mover fall back to its own, unobserved file ledger. The error returns for
+// the caller to WARN in its own voice: a lifecycle hiccup never changes a
+// cycle's exit code (the lane's only channel to its parent) or a batch's flow.
+func applyCycleFailureOutcome(projectRoot, evolveDir string, cycle int, stderr io.Writer, lifecycle inboxmover.LedgerAppender) error {
+	_, err := cycleoutcome.ApplyFailure(cycleoutcome.FailureInputsFor(
 		projectRoot, evolveDir, cycleWorkspace(projectRoot, cycle), cycle, stderr,
-	)); err != nil {
+	).WithLedger(lifecycle))
+	return err
+}
+
+// warnCycleFailureOutcome is the cycle-run root's voice for a failed walk.
+func warnCycleFailureOutcome(stderr io.Writer, cycle int, err error) {
+	if err != nil {
 		fmt.Fprintf(stderr, "evolve cycle run: WARN: could not apply cycle %d failure outcome to the inbox: %v\n", cycle, err)
 	}
 }
@@ -299,7 +313,7 @@ func filterEvolveEnv(environ []string) map[string]string {
 // the ledger handle for post-cycle verification).
 type orchDeps struct {
 	Storage      core.Storage
-	Ledger       core.Ledger
+	Ledger       rootLedger
 	Orchestrator *core.Orchestrator
 	// Signals is the ADR-0101 Signal Center: constructed here, before the
 	// bridge, always (a nil Center is a test affordance only). No production
@@ -311,11 +325,40 @@ type orchDeps struct {
 	Bridge *bridge.Adapter
 }
 
+// rootLedger is what the composition root's ledger offers its consumers: the
+// core's port (Append/Verify/Iter) and the inbox mover's chained lifecycle
+// seam — one object, one identity, so the failed-cycle inbox walk appends its
+// lifecycle lines through the SAME observed ledger the orchestrator writes.
+type rootLedger interface {
+	core.Ledger
+	inboxmover.LedgerAppender
+}
+
+// newRootSignalCenter is the ONE sink topology every root builds — and the
+// loop tests' stub root, so a test that asserts a rendered line proves
+// production's topology (ADR-0101 S4a). Listeners: the durable
+// signals.ndjson — per cycle workspace for cycle-scoped signals, and
+// <evolveDir>/signals.ndjson for batch-level (cycle-less) ones: the loop's
+// own halts and wave summaries, a bridge warning before any cycle — and the
+// console at WARN and above (the severity contract's "log only" INFO tier
+// stays in the files).
+func newRootSignalCenter(projectRoot, evolveDir string, console io.Writer) *signalcenter.Center {
+	signals := signalcenter.New(signalcenter.WithPID(os.Getpid()))
+	signals.Subscribe(signals.NDJSONSink(func(cycle int) string {
+		if cycle == 0 {
+			return filepath.Join(evolveDir, "signals.ndjson")
+		}
+		return filepath.Join(core.RunWorkspacePath(projectRoot, cycle), "signals.ndjson")
+	}))
+	signals.Subscribe(signalcenter.Filter(signalcenter.StderrSink(console), signalcenter.SeverityWarn))
+	return signals
+}
+
 // wireOrchestratorDeps mirrors wireOrchestrator but returns the
 // underlying storage + ledger so callers can run cross-cutting
 // queries (verify the ledger, read state.json) without re-instantiating
 // the adapters and risking divergence in the evolveDir resolution.
-func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
+func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orchDeps {
 	// Pin the model-catalog dir to the SAME .evolve the cycle-start refresher
 	// writes, so the in-process LoadManifest overlay reads the right file
 	// regardless of EVOLVE_PROJECT_ROOT (which the loop resolves from a flag,
@@ -324,25 +367,18 @@ func wireOrchestratorDeps(projectRoot, evolveDir string) orchDeps {
 		d := evolveDir
 		bridge.SetModelCatalogDirFn(func() string { return d })
 	}
-	// Ledger and storage are created first so the bridge adapter can wire its
-	// stop-review callback to append kind=stop_review entries (ADR-0026 Stage 1 #5).
-	st := storage.New(evolveDir)
-	ld := ledger.New(evolveDir)
-
 	// ADR-0101 S1: the Signal Center is built FIRST (the bridge receives it at
 	// construction in S3 — Deps normalize inside NewEngine) and unconditionally:
 	// TestNilSignalCenterRootsArePinned lists the only roots allowed to skip it.
-	// Listeners: the durable per-cycle signals.ndjson (everything) and the
-	// console at WARN and above (the severity contract's "log only" INFO tier
-	// stays in the file). The orchestrator subscribes via WithSignalCenter.
-	signals := signalcenter.New(signalcenter.WithPID(os.Getpid()))
-	signals.Subscribe(signals.NDJSONSink(func(cycle int) string {
-		if cycle == 0 {
-			return ""
-		}
-		return filepath.Join(core.RunWorkspacePath(projectRoot, cycle), "signals.ndjson")
-	}))
-	signals.Subscribe(signalcenter.Filter(signalcenter.StderrSink(os.Stderr), signalcenter.SeverityWarn))
+	// The orchestrator subscribes via WithSignalCenter.
+	signals := newRootSignalCenter(projectRoot, evolveDir, console)
+	// Ledger and storage come next, so the bridge adapter can wire its
+	// stop-review callback to append kind=stop_review entries (ADR-0026 Stage 1 #5);
+	// the ledger is observed at its append chokepoint so every appended entry
+	// is also a ledger.appended signal (ADR-0101 S4a — the file ledger still
+	// chains and locks; WithSignals is a construction option, not a wrapper).
+	st := storage.New(evolveDir)
+	ld := ledger.New(evolveDir, ledger.WithSignals(signals))
 
 	br := bridge.NewDefault(projectRoot, signals)
 	br.SetOnStopReview(func(cycle int, phase, action, reason string) {

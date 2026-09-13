@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -55,7 +56,7 @@ func TestRunLoop_ResumeQuotaPauseReturnsFiveAndPreservesCheckpoint(t *testing.T)
 	}
 	old := wireOrchestratorDepsFn
 	t.Cleanup(func() { wireOrchestratorDepsFn = old })
-	wireOrchestratorDepsFn = func(string, string) orchDeps {
+	wireOrchestratorDepsFn = func(string, string, io.Writer) orchDeps {
 		ledger := &fixtures.FakeLedger{}
 		orch := core.NewOrchestrator(st, ledger, map[core.Phase]core.PhaseRunner{core.PhaseAudit: resumedQuotaRunner{}}, core.WithRetryConfig(policy.RetryConfig{PhaseMaxAttempts: 2}))
 		return orchDeps{Storage: st, Ledger: ledger, Orchestrator: orch}

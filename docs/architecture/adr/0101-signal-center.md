@@ -95,8 +95,8 @@
    C1 chokepoint (`recordPhaseOutcome`) emits `phase.outcome` for every terminal disposition on both
    dispatch roots (its PR #577 log line becomes the sink's line). S2: `SystemFailureSignal`,
    `shiperr.ShipError` (every code, namespaced `SHIP_*`), contract-gate rejections, quota pauses. S3: the
-   bridge engine's WARN/TRIPWIRE/CONTEXT-FILL and pane liveness. S4: the ledger port (a decorator emits
-   `ledger.appended`), `dispatchevents` writers, the observer adapter. The ledger's hash chain is NOT
+   bridge engine's WARN/TRIPWIRE/CONTEXT-FILL and pane liveness. S4: the ledger port (the file ledger's
+   append observer emits `ledger.appended`), `dispatchevents` writers, the observer adapter. The ledger's hash chain is NOT
    replaced — provenance stays where it is; the Center is the monitoring stream beside it.
 8. **`panestream.SignalCenter` is renamed `LivenessCenter`** (done: S3 commit 1, 2026-09-13, amending
    ADR-0068/0070 — `bridge.Deps.LivenessCenter` already carries the target name, so the rename removes
@@ -142,7 +142,7 @@
   mitigated by removing the hand-written line in the same slice that adds the `Emit`, and by a test
   that greps the touched module for `Fprintf(os.Stderr, "[module]`. Synchronous fan-out adds a
   listener's latency to the emit site — bounded by keeping listeners O(1) and by the ndjson sink's
-  append-only write. `signals.ndjson` growth — bounded per cycle; the existing gc retention applies.
+  append-only write. `signals.ndjson` growth — bounded per cycle in the run dirs (the existing gc retention applies); the batch-level `<evolveDir>/signals.ndjson` (S4a) grows one line per wave or halt across batches, the same order as `ledger.jsonl`, outside run-dir gc — rotation is a follow-up if it ever matters.
 - **Follow-ups filed.** Unify `failureadapter.Classification` and `failurelog.Classification` (one
   vocabulary, one home) — S2. Fold `subagent.AppendAbnormalEvent`'s hand-rolled JSON into the Center —
   S4. Decide the fate of `abnormal-events.jsonl` once every writer emits through the Center — S4.
@@ -162,6 +162,24 @@ replacement kind for an event whose own kind is unknown; there is no `registry_c
 per-cycle summary is `signalcenter.Summary`, follows the cycle by itself
 and is read only through `Orchestrator.SignalSummary()` (decision 5). Nothing in the decisions'
 intent changed: one schema, one center, closed vocabularies, observe-never-decide.
+
+## Implementation notes — S4a (landed 2026-09-13)
+
+The loop module produces: every batch halt is ONE `loop.halt` INCIDENT whose code names the rule
+(`LOOP_SYSTEM_FAILURE_HALT` or `LOOP_PIPELINE_BLOCKER_HALT` from the one halt chokepoint,
+`LOOP_FLEET_LANE_HALT`, `LOOP_HALT`), a wave is `loop.wave` (INFO summary, WARN
+`LOOP_MIN_WIDTH_REPAIR`), an escalation boundary is `loop.escalation` WARN — the hand-written
+`[loop] … HALT` lines are gone. The ledger is observed at its append chokepoint by a construction
+option (`ledger.New(evolveDir, ledger.WithSignals(signals))`, module `ledger`, `ledger.appended`
+per entry) — not the Decorator first drafted, whose promoted methods bypassed it (design §15.4) —
+and the root's ledger is threaded into the failed-cycle inbox walk. Decision 5's "the loop reads the
+orchestrator's view" is a report line in the batch output (`[loop] cycle N signals: …` from the
+driven runner's `SignalSummary()`), never a gate. `newRootSignalCenter` is the one sink topology
+(production and the loop tests' stub root); cycle-less signals are durable in
+`<evolveDir>/signals.ndjson`. Deferred to S4b: the `dispatchevents` writers and the observer adapter
+through the Center (field-equal golden), `subagent.AppendAbnormalEvent`, the dashboard SSE
+subscription, and the remaining self-constructed ledgers (each pinned with its reason in
+`TestUnobservedLedgerRootsArePinned` and the ledger package's line-writer guard).
 
 ## Implementation notes — S3 (landed 2026-09-13)
 
