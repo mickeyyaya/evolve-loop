@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/reportdoc"
 )
@@ -92,6 +93,13 @@ const (
 	// ADR-0039 structured failure block. (snake_case to match this closed
 	// vocabulary; ADR prose spells it with hyphens.)
 	CodeFailureContextMissing = "failure_context_missing"
+	// CodeFailureClassUnknown: the failure block's class is outside the
+	// failurelog vocabulary. The class drives the retry envelope — an unknown
+	// class declines the direct repair grant (cycle 1684's
+	// "superseded-predicate-contradiction" cost a full retrospective before a
+	// retry that carried none of the audit's findings) — so it is validated
+	// at this boundary and the correction hands the agent the vocabulary.
+	CodeFailureClassUnknown = "failure_class_unknown"
 	// ADR-0100 — an AGENT-OWED secondary output (registry outputs.agent_owed)
 	// is absent, blank, or unparseable. The code stays one word per class so
 	// the correction ladder's same-defect identity recognizes a repeat; the
@@ -315,9 +323,24 @@ func verifyMarkdown(res *Result, c phasecontract.Contract, content string, roots
 	// legacy prose-only artifacts stay legal forever. The message is the
 	// correction directive (re-dispatched verbatim).
 	if c.RequireFailureContext || (c.RequireFailureContextPhaseIO && phaseIO >= config.StageEnforce) {
-		if s, ok := phasecontract.ParseVerdictSentinelFull(content); ok &&
-			(s.Verdict == "FAIL" || s.Verdict == "WARN") &&
-			(s.Failure == nil || s.Failure.Class == "") {
+		// NormalizeLegacy is the ONE taxonomy, so its legacy aliases ("FAIL",
+		// "WARN", "audit-fail") pass here although the rendered vocabulary lists
+		// only the canonical spellings — a deliberate trade-off: one source over
+		// a stricter gate that would have to duplicate the alias table.
+		// The class is validated where it is consumed: the audit's unconditional
+		// block feeds decideAfterAuditFail's retry envelope on FAIL and the
+		// failure record on FAIL and WARN alike (a WARN's class is what the
+		// ledger and the carryover read), so both verdicts are checked. The
+		// PhaseIO self-report path (scout/triage) is not: its class feeds no
+		// decision today, and its exemplar now draws from the vocabulary too.
+		s, ok := phasecontract.ParseVerdictSentinelFull(content)
+		isFailOrWarn := ok && (s.Verdict == "FAIL" || s.Verdict == "WARN")
+		if c.RequireFailureContext && isFailOrWarn && s.Failure != nil && s.Failure.Class != "" && failurelog.NormalizeLegacy(s.Failure.Class) == failurelog.UnknownClassification {
+			res.add(CodeFailureClassUnknown, fmt.Sprintf(
+				"verdict %s declares failure class %q, which is not in the failure vocabulary — re-emit the evolve-verdict sentinel with \"class\" set to one of [%s] (on FAIL the class drives the retry envelope — an unknown class forfeits the direct repair; on FAIL and WARN it is what the failure record and the carryover read). Keep your judgment in the defects and prescription entries.",
+				s.Verdict, s.Failure.Class, failurelog.VocabularyList()))
+		}
+		if isFailOrWarn && (s.Failure == nil || s.Failure.Class == "") {
 			res.add(CodeFailureContextMissing, fmt.Sprintf(
 				"verdict %s declares no structured failure context — re-emit the evolve-verdict sentinel as schema_version 2 with a failure block: {\"class\":\"<failure class>\",\"defects\":[\"<one line per defect>\"],\"evidence_paths\":[\"<artifact>\"]}", s.Verdict))
 		}

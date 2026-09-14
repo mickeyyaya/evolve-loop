@@ -150,6 +150,13 @@ type CycleState struct {
 	// in-process context snapshot that also carries the code does not
 	// survive a resume. Additive omitempty.
 	ShipRecoveryCode string `json:"ship_recovery_code,omitempty"`
+	// AuditDeclineReason is the retry envelope's reason when an audit FAIL
+	// earned no direct repair grant (the cycle went to retro, which may still
+	// adjudicate a retry). Set by consumeAuditRepairGrant on the decline
+	// branch, cleared by a later grant or the ship latch; it is the ONE
+	// predicate that marks a retro-routed tdd/build re-entry as re-audited
+	// work owed the audit's standing findings. Additive omitempty.
+	AuditDeclineReason string `json:"audit_decline_reason,omitempty"`
 	// AuditDispatches counts audit DISPATCHES (not completions) this cycle. It
 	// is the round-supersession index for retiring the previous audit round's
 	// verdict artifacts (cycle-1603): CompletedPhases records only successes,

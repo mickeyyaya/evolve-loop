@@ -203,3 +203,15 @@ func TestRenderContractTail_RendersTheOwedFilesAtTheExactPathsTheGateReads(t *te
 		t.Fatalf("the block names the files and points at the tail for their paths, never describes a location:\n%s", block)
 	}
 }
+
+// The failure class drives the retry envelope (an unknown class declines the
+// repair round — cycle 1684), so the contract block names the vocabulary the
+// gate accepts instead of leaving the auditor to invent one.
+func TestRenderContractBlock_Audit_NamesTheFailureClassVocabulary(t *testing.T) {
+	block := RenderContractBlock(mustContract(t, "audit"))
+	for _, want := range []string{"code-audit-fail", "code-audit-warn", "infrastructure-transient", "infrastructure-systemic"} {
+		if !strings.Contains(block, want) {
+			t.Errorf("audit block must list failure class %q; got:\n%s", want, block)
+		}
+	}
+}

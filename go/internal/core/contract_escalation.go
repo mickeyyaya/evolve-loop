@@ -336,7 +336,7 @@ var contractViolationCodeRE = regexp.MustCompile(`\[([A-Za-z0-9_.:-]+)\]`)
 // comment is true as written: deliverable.CodeInvalidJSON and
 // deliverable.CodeFailureContextMissing also repair by editing the artifact, and
 // this cycle's contract (triage top_n; the cycle-1510 eval's vocabulary-drift
-// grader) pins the allowlist to six. Widening to those two is queued as
+// grader) pins the allowlist by membership, not by count. Widening to those two is queued as
 // follow-up work rather than taken here — the omission errs in the fail-closed
 // direction, so it cannot cause the unsound inference above. See the Amendments
 // section of the cycle-1510 build report.
@@ -358,6 +358,7 @@ func contractArtifactDetermined(code string) bool {
 		"missing_section",         // a required heading is absent; repair adds it
 		"missing_challenge_token", // the token is not echoed; repair echoes it
 		"bad_verdict",             // the verdict sentinel is wrong; repair rewrites it
+		"failure_class_unknown",   // the failure block's class is outside the vocabulary; repair rewrites it
 		"missing_key":             // a required JSON key is absent; repair adds it
 		return true
 	}

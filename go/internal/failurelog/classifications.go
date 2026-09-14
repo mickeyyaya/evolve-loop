@@ -24,7 +24,10 @@
 // EVOLVE_AUTO_PRUNE=1, default on).
 package failurelog
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 // Classification is the typed v8.22 taxonomy. Wire-compatible with the
 // strings the bash record_failed_approach writes into
@@ -223,6 +226,18 @@ func ComputeExpiresAt(c Classification, now time.Time) string {
 
 // KnownClassifications returns the canonical taxonomy list (excludes
 // UnknownClassification). Used by tests + operator-facing diagnostics.
+// VocabularyList renders KnownClassifications as a comma-separated list — the
+// ONE spelling the contract block (prompt) and the deliverables gate
+// (correction) hand an agent that must pick a failure class.
+func VocabularyList() string {
+	known := KnownClassifications()
+	parts := make([]string, len(known))
+	for i, c := range known {
+		parts[i] = string(c)
+	}
+	return strings.Join(parts, ", ")
+}
+
 func KnownClassifications() []Classification {
 	return []Classification{
 		InfrastructureTransient,

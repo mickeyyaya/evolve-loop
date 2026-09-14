@@ -24,11 +24,19 @@ const (
 	CodePhaseVerdictFail signalcenter.Code = "ORCHESTRATOR_PHASE_VERDICT_FAIL"
 	CodePhaseVerdictWarn signalcenter.Code = "ORCHESTRATOR_PHASE_VERDICT_WARN"
 	CodePhaseAborted     signalcenter.Code = "ORCHESTRATOR_PHASE_ABORTED"
+	// CodeAuditRepairDeclined / CodeAuditRepairGranted: decideAfterAuditFail's
+	// verdict on an audit FAIL — the decision that sent cycle 1684 through a
+	// full retrospective before a retry was invisible when its invented class
+	// declined the direct grant.
+	CodeAuditRepairDeclined signalcenter.Code = "ORCHESTRATOR_AUDIT_REPAIR_DECLINED"
+	CodeAuditRepairGranted  signalcenter.Code = "ORCHESTRATOR_AUDIT_REPAIR_GRANTED"
 )
 
 func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodePhaseVerdictFail, "a phase recorded verdict FAIL; the reason is the phase's own error-severity diagnostics")
 	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodePhaseVerdictWarn, "a phase recorded verdict WARN; the reason carries its error-severity diagnostics, if any")
+	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodeAuditRepairDeclined, "an audit FAIL earned no repair round and the cycle goes to retro; fields.reason is the retry envelope's verdict (unrecognised class, budget spent, system-level or non-retry class, no class declared), fields.declared_class the audit's own class")
+	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodeAuditRepairGranted, "an audit FAIL earned a repair round; fields.next is the re-entry phase (tdd | build), fields.attempt the repair attempt about to be spent, fields.reason the envelope's basis")
 	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodePhaseAborted, "the cycle aborted after this phase's outcome (review reject, guard, persistence); the abort reason is in fields.abort_reason")
 }
 
