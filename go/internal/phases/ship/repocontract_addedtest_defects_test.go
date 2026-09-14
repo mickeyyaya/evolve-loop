@@ -169,8 +169,14 @@ func TestRepoContractGate_AddedTestDiscoveryFailureIsRecorded(t *testing.T) {
 	}
 
 	ws := t.TempDir()
-	if err := runRepoContractGate(context.Background(), "enforce", root, ws, io.Discard); err != nil {
-		t.Fatalf("an undiscoverable diff is an infrastructure gap, not a contract violation — it must not fail the ship closed, got %v", err)
+	err := runRepoContractGate(context.Background(), "enforce", root, ws, io.Discard)
+	// 2026-09-14: an undiscoverable diff is an infrastructure gap, not a
+	// contract violation — it is the distinct, re-dispatchable INFRA class
+	// (as a twice-ambiguous pack run already was), never a silent green: a
+	// skipped guard on a red-main gate reads as a healthy ship in the ledger.
+	se, ok := shiperr.AsShipError(err)
+	if !ok || se.Code != shiperr.CodeRepoContractInfra {
+		t.Fatalf("an undiscoverable diff is the INFRA class, got %v", err)
 	}
 	log := readScanLog(t, ws)
 	if !strings.Contains(log, "added-test") {
