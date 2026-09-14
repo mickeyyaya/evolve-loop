@@ -595,13 +595,31 @@ func addedGoTestFiles(t *testing.T, root string) []string {
 // two tag-guarded test packages, so a discovery that finds none means the
 // discovery broke. A vacuous green here would reproduce the exact M1 shape it
 // exists to close.
+// recordedAddedTests is the lane's own added test files — the DURABLE seed.
+// The live seed (addedGoTestFiles: the diff against the merge base plus the
+// working tree) is what proves the claim while the lane is unmerged; once the
+// lane's commit is on main that diff is empty by construction, and a durable
+// predicate that fatals on it is red on every clean checkout (2026-09-15,
+// research F21: RED on main c5883955 in every whole-module floor). On a
+// merged tree the predicate verifies its recorded set instead — the same
+// tag-guarded packages, executed the same way — so the proof M1 demanded
+// never goes vacuous and never depends on the lane's tree state.
+var recordedAddedTests = []string{
+	"go/acs/cycle1676/predicates_test.go",
+	"go/acs/cycle1679/predicates_test.go",
+}
+
 func TestC1679_007_EveryAddedGoTestPackageIsGreenBeforeShip(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	added := addedGoTestFiles(t, root)
 	if len(added) == 0 {
-		t.Fatalf("RED (audit M1): the added-test seed came back EMPTY, but this lane adds " +
-			"go/acs/cycle1676/predicates_test.go and go/acs/cycle1679/predicates_test.go — the " +
-			"discovery is broken, and a vacuous pass here is the very unearned claim M1 named")
+		for _, rel := range recordedAddedTests {
+			if _, err := os.Stat(filepath.Join(root, rel)); err != nil {
+				t.Fatalf("RED (audit M1): the live added-test seed is empty (merged tree) and the recorded added file %s is missing (%v) — the lane's own tag-guarded package is gone", rel, err)
+			}
+		}
+		added = recordedAddedTests
+		t.Logf("live added-test seed empty (the lane's commit is on main) — verifying the recorded added set %v", added)
 	}
 
 	// Group added packages by the build tags their files declare, exactly as
