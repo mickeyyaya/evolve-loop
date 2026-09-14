@@ -204,14 +204,7 @@ func runCampaignRun(args []string, stdout, stderr io.Writer) int {
 		Resume:       !*ignoreProgress,
 		MaxRetries:   1, // one batched retry of a wave's failed cycles before abort
 		Cooldown:     campaignQuotaCooldown(*projectRoot),
-		BeforeWave: func() {
-			// Clear recovered quota benches before each wave so a wave doesn't
-			// re-hit a wall that already lifted (and re-bench ones still walled).
-			runCLIHealthCanary(*projectRoot, nil, defaultLiveProbe(*projectRoot, stderr), stderr)
-			// Proactively bench families that are already capped, before the
-			// wave's cycles boot them (opt-in via policy.json cli_health).
-			runUsageProbe(*projectRoot, filepath.Join(*projectRoot, ".evolve"), nil, stderr)
-		},
+		BeforeWave:   campaignBeforeWave(*simulate, *projectRoot, stderr),
 	}); err != nil {
 		fmt.Fprintf(stderr, "evolve campaign run: %v\n", err)
 		return 1
@@ -429,4 +422,20 @@ func cycleFromWorkspace(workspace string) int {
 	base := filepath.Base(filepath.Clean(workspace))
 	n, _ := strconv.Atoi(strings.TrimPrefix(base, "cycle-"))
 	return n
+}
+
+// campaignBeforeWave is the per-wave hook of a REAL run: clear recovered quota
+// benches before each wave so a wave doesn't re-hit a wall that already lifted
+// (and re-bench ones still walled), then proactively bench families that are
+// already capped before the wave's cycles boot them (opt-in via policy.json
+// cli_health). Both launch real CLIs, so a --simulate walk (no-LLM plumbing
+// check) installs no hook at all.
+func campaignBeforeWave(simulate bool, projectRoot string, stderr io.Writer) func() {
+	if simulate {
+		return nil
+	}
+	return func() {
+		runCLIHealthCanary(projectRoot, nil, defaultLiveProbe(projectRoot, stderr), stderr)
+		runUsageProbe(projectRoot, filepath.Join(projectRoot, ".evolve"), nil, stderr)
+	}
 }

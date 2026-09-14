@@ -36,10 +36,16 @@ func TestHostAuditRoundTrip_CoreLedgerAuthorizesOnlyHostPass(t *testing.T) {
 			// The committed fixture also reaches the native durable-ACS check.
 			mustWrite(t, filepath.Join(repo, "go", "acs", "regression", "doc.go"), "package regression\n")
 			runGit(t, repo, "add", "--", "go")
+			runGit(t, repo, "-c", "commit.gpgsign=false", "commit", "-qm", "fixture: predicate + durable acs")
+			// The cycle's worktree is what production provisions — a detached
+			// worktree of the repository — never the repository itself, which
+			// core refuses to stage or normalize (inPlaceWorktree, 2026-09-14).
+			wt := filepath.Join(t.TempDir(), "cycle-7")
+			runGit(t, repo, "worktree", "add", "--detach", "-q", wt, "HEAD")
 			ws := core.RunWorkspacePath(repo, 7)
 			mustMkdir(t, ws)
 			st := &fixtures.FakeStorage{State: core.State{LastAllocatedCycleNumber: 7}, CycleState: core.CycleState{
-				CycleID: 7, RunID: "host-roundtrip", Phase: "audit", WorkspacePath: ws, ActiveWorktree: repo,
+				CycleID: 7, RunID: "host-roundtrip", Phase: "audit", WorkspacePath: ws, ActiveWorktree: wt,
 				CompletedPhases: []string{"scout", "triage", "tdd", "build"},
 			}}
 			runners := fixtures.BuildRunners(nil)
@@ -59,7 +65,7 @@ func TestHostAuditRoundTrip_CoreLedgerAuthorizesOnlyHostPass(t *testing.T) {
 			checked := false
 			check := func(ctx context.Context, req core.PhaseRequest) (core.PhaseResponse, error) {
 				checked = true
-				err := verifyAuditBinding(ctx, &Options{ProjectRoot: repo, WorkspacePath: ws, ActiveWorktree: repo, CycleID: 7, RunID: captured.RunID, AuditRound: captured.AuditRound, Runner: execRunner, NowFn: defaultNow}, &RunResult{})
+				err := verifyAuditBinding(ctx, &Options{ProjectRoot: repo, WorkspacePath: ws, ActiveWorktree: wt, CycleID: 7, RunID: captured.RunID, AuditRound: captured.AuditRound, Runner: execRunner, NowFn: defaultNow}, &RunResult{})
 				if pass && err != nil {
 					t.Errorf("host PASS receipt rejected after core ledger binding: %v", err)
 				}
@@ -74,7 +80,7 @@ func TestHostAuditRoundTrip_CoreLedgerAuthorizesOnlyHostPass(t *testing.T) {
 			runners[core.PhaseShip] = &hostBindingProbeRunner{name: "ship", run: check}
 			runners[core.PhaseRetro] = &hostBindingProbeRunner{name: "retro", run: check}
 			o := core.NewOrchestrator(st, ledger.New(filepath.Join(repo, ".evolve")), runners)
-			_, err = o.RunCycleFromPhase(context.Background(), core.CycleRequest{ProjectRoot: repo, GoalHash: "verify-native-audit", DisableWorkspaceGuard: true}, &core.ResumePoint{Phase: "audit", CycleID: 7, WorktreePath: repo})
+			_, err = o.RunCycleFromPhase(context.Background(), core.CycleRequest{ProjectRoot: repo, GoalHash: "verify-native-audit", DisableWorkspaceGuard: true}, &core.ResumePoint{Phase: "audit", CycleID: 7, WorktreePath: wt})
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -15,6 +15,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
@@ -69,7 +70,7 @@ func (n noopRunner) Run(_ context.Context, req core.PhaseRequest) (core.PhaseRes
 		if err := os.MkdirAll(req.Workspace, 0o755); err != nil {
 			return core.PhaseResponse{}, err
 		}
-		report := "## Explanation Documentation\n- Status: NOT_APPLICABLE\n- Reason: the base-bound Build diff contains no material changes\n"
+		report := explanationdocs.RenderNotApplicableDeclaration("the base-bound Build diff contains no material changes")
 		if err := os.WriteFile(filepath.Join(req.Workspace, "build-report.md"), []byte(report), 0o644); err != nil {
 			return core.PhaseResponse{}, err
 		}

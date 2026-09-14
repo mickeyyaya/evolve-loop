@@ -20,10 +20,14 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/storage"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
 // simulatePhase satisfies core.PhaseRunner with a deterministic PASS
@@ -36,6 +40,25 @@ type simulatePhase struct {
 func (s *simulatePhase) Name() string { return string(s.name) }
 
 func (s *simulatePhase) Run(_ context.Context, req core.PhaseRequest) (core.PhaseResponse, error) {
+	// The contracted report stub: a no-LLM walk still hands the floors a
+	// deliverable to grade (docs/incidents/2026-09-14-simulate-runs-against-the-checkout.md).
+	if req.Workspace != "" {
+		if err := os.MkdirAll(req.Workspace, 0o755); err != nil {
+			return core.PhaseResponse{}, fmt.Errorf("simulate %s: workspace: %w", s.name, err)
+		}
+		// The sentinel and the declaration are rendered by their owners
+		// (phasecontract, explanationdocs) so the walk keeps proving the
+		// contract the real producers meet when either grammar moves.
+		stub := "# " + string(s.name) + " (simulate)\n\n" + phasecontract.RenderVerdictSentinel(string(s.name), core.VerdictPASS) + "\n"
+		if s.name == core.PhaseBuild {
+			// The build handoff floor grades the explanation-documentation
+			// declaration; a walk produces no Build diff, so it declares that.
+			stub += "\n" + explanationdocs.RenderNotApplicableDeclaration("simulate walk — the no-LLM plumbing check produces no Build diff")
+		}
+		if err := os.WriteFile(filepath.Join(req.Workspace, string(s.name)+"-report.md"), []byte(stub), 0o644); err != nil {
+			return core.PhaseResponse{}, fmt.Errorf("simulate %s: report stub: %w", s.name, err)
+		}
+	}
 	return core.PhaseResponse{
 		Phase:        string(s.name),
 		Verdict:      core.VerdictPASS,
@@ -92,8 +115,25 @@ func wireSimulateOrchestrator(projectRoot, evolveDir string, console io.Writer) 
 	signals := newRootSignalCenter(projectRoot, evolveDir, console)
 	st := storage.New(evolveDir)
 	ld := ledger.New(evolveDir, ledger.WithSignals(signals))
+	// A --simulate walk must never mutate the operator's repository: no cycle
+	// worktree or branch (the phases never write, so the root is read in place)
+	// and no `dossier: cycle-N closeout` commit (the record is still written).
+	// docs/incidents/2026-09-14-simulate-runs-against-the-checkout.md.
 	return orchDeps{
 		Storage: st, Ledger: ld, Signals: signals,
-		Orchestrator: core.NewOrchestrator(st, ld, runners, core.WithSignalCenter(signals)),
+		Orchestrator: core.NewOrchestrator(st, ld, runners, core.WithSignalCenter(signals),
+			core.WithWorktreeProvisioner(simulateWorktrees{}), core.WithDossierCommit(false)),
 	}
 }
+
+// simulateWorktrees is the --simulate root's WorktreeProvisioner: the walk's
+// phases never write, so every "worktree" is the project root itself — no git
+// worktree is added, no cycle-* branch is created, and cleanup is a no-op
+// (never delete the operator's root). core recognises the in-place root
+// (inPlaceWorktree) and stands its worktree mutators down. Deliberately no
+// CreateFrom/reuse contract: continuation adoption is a no-op under simulate —
+// a walk has no preserved work to adopt.
+type simulateWorktrees struct{}
+
+func (simulateWorktrees) Create(projectRoot string, _ int) (string, error) { return projectRoot, nil }
+func (simulateWorktrees) Cleanup(_, _ string) error                        { return nil }

@@ -512,6 +512,10 @@ func (o *Orchestrator) newCycleRun(ctx context.Context, req CycleRequest) (cycle
 		return cycleInit{}, nil, fmt.Errorf("verify fresh cycle %d source in preserved worktree %s: %w", cycle, wtPath, sourceErr)
 	} else {
 		cs.ActiveWorktree = wtPath
+		if inPlaceWorktree(wtPath, req.ProjectRoot) {
+			// Said once per cycle; the mutators it names each stand down silently.
+			fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d: the active worktree is the project root %s (in-place provisioner) — host normalization, leak recovery, salvage snapshot and fleet rebase are disabled: a cycle never mutates the operator's tree\n", cycle, wtPath)
+		}
 		stack = append(stack, func(preserve, completedNormally bool) {
 			o.teardownCycleWorktree(req.ProjectRoot, wtPath, preserve, completedNormally)
 		})

@@ -35,7 +35,7 @@ func TestCompositionSnapshot_ReceivesCycleRunID(t *testing.T) {
 		WithCompositionGateRunner(func(context.Context, string) map[string]string { return nil }),
 		WithCompositionVerdictWriter(func(string, CompositionVerdictInput) error { return nil }),
 	)
-	if o.compositionCarryForward(context.Background(), 1, CycleState{ActiveWorktree: "unused", RunID: want}) {
+	if o.compositionCarryForward(context.Background(), 1, CycleState{ActiveWorktree: "unused", RunID: want}, "") {
 		t.Fatal("snapshot error unexpectedly carried composition forward")
 	}
 	if got != want {

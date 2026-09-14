@@ -57,7 +57,7 @@ func TestNormalizeBuildWorktree_GofmtsAfterNonBuildPhase(t *testing.T) {
 
 	// next=audit is a NON-build phase; the soft-reset is skipped but gofmt must
 	// still run so test-amplification's output is clean before the audit gate.
-	(&Orchestrator{}).normalizeBuildWorktree(context.Background(), PhaseAudit, CycleState{ActiveWorktree: wt})
+	(&Orchestrator{}).normalizeBuildWorktree(context.Background(), PhaseAudit, CycleState{ActiveWorktree: wt}, "")
 
 	got, err := os.ReadFile(fp)
 	if err != nil {

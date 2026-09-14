@@ -35,7 +35,7 @@ func (cr *cycleRun) prepareForReview(next Phase) error {
 	if err := cr.recoverBeforeReview(next); err != nil {
 		return err
 	}
-	cr.o.normalizeBuildWorktree(cr.ctx, next, cr.cs)
+	cr.o.normalizeBuildWorktree(cr.ctx, next, cr.cs, cr.req.ProjectRoot)
 	return nil
 }
 

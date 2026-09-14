@@ -515,6 +515,16 @@ func readBuildReport(workspace string) (string, error) {
 	return "", errors.New("build-report.md is missing")
 }
 
+// RenderNotApplicableDeclaration is the producer-side render of the one
+// declaration checkNotApplicable accepts: the Explanation Documentation
+// section with Status NOT_APPLICABLE, the given Reason, and no Document.
+// Every synthetic Build producer (the in-process fake runner, the e2e fake
+// CLI, the --simulate stub) emits it through here so the grammar has one
+// owner — the validator beside it.
+func RenderNotApplicableDeclaration(reason string) string {
+	return "## Explanation Documentation\n- Status: NOT_APPLICABLE\n- Reason: " + reason + "\n"
+}
+
 func parseDeclaration(report string) (reportDeclaration, bool, error) {
 	body, present, err := reportdoc.Section(report, "Explanation Documentation")
 	if err != nil || !present {

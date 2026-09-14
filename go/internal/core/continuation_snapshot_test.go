@@ -72,7 +72,7 @@ func TestSnapshotPreservedWorktree_CommitsDirtAndUntracked(t *testing.T) {
 	}
 	head := gitOut(t, wt, "rev-parse", "HEAD")
 
-	sha, err := snapshotPreservedWorktree(context.Background(), wt)
+	sha, err := snapshotPreservedWorktree(context.Background(), "", wt)
 	if err != nil {
 		t.Fatalf("snapshotPreservedWorktree: %v", err)
 	}
@@ -90,7 +90,7 @@ func TestSnapshotPreservedWorktree_CommitsDirtAndUntracked(t *testing.T) {
 func TestSnapshotPreservedWorktree_CleanIsIdempotentHEAD(t *testing.T) {
 	_, wt := initContinuationRepo(t, 72)
 	head := gitOut(t, wt, "rev-parse", "HEAD")
-	sha, err := snapshotPreservedWorktree(context.Background(), wt)
+	sha, err := snapshotPreservedWorktree(context.Background(), "", wt)
 	if err != nil {
 		t.Fatalf("snapshotPreservedWorktree: %v", err)
 	}
