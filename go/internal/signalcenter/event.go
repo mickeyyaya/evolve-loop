@@ -133,6 +133,7 @@ const (
 	KindGatePassed             Kind = "gate.passed"
 	KindShipLanded             Kind = "ship.landed"
 	KindShipError              Kind = "ship.error"
+	KindShipWarning            Kind = "ship.warning"
 	KindSystemFailure          Kind = "system.failure"
 	KindQuotaPaused            Kind = "quota.paused"
 	KindBridgeWarning          Kind = "bridge.warning"
@@ -143,8 +144,15 @@ const (
 	KindFailureDiagWarning     Kind = "failurediag.warning"
 	KindCarryoverWarning       Kind = "carryover.warning"
 	KindFailureLearningWarning Kind = "failurelearning.warning"
+	KindConfigWarning          Kind = "config.warning"
+	KindObserverWarning        Kind = "observer.warning"
+	KindAuditWarning           Kind = "audit.warning"
+	KindInboxWarning           Kind = "inbox.warning"
+	KindRunnerWarning          Kind = "runner.warning"
+	KindAdvisorWarning         Kind = "advisor.warning"
 	KindCycleSealed            Kind = "cycle.sealed"
 	KindLoopWave               Kind = "loop.wave"
+	KindLoopWarning            Kind = "loop.warning"
 	KindLoopHalt               Kind = "loop.halt"
 	KindLoopEscalation         Kind = "loop.escalation"
 	KindListenerPanicked       Kind = "signalcenter.listener_panicked"
@@ -154,9 +162,9 @@ const (
 
 var knownKinds = map[Kind]bool{
 	KindPhaseDispatched: true, KindPhaseOutcome: true, KindPhaseAborted: true, KindGateRejected: true,
-	KindGatePassed: true, KindGateCorrected: true, KindShipLanded: true, KindShipError: true, KindSystemFailure: true,
+	KindGatePassed: true, KindGateCorrected: true, KindShipLanded: true, KindShipError: true, KindShipWarning: true, KindSystemFailure: true,
 	KindQuotaPaused: true, KindBridgeWarning: true, KindBridgeTripwire: true, KindPaneLiveness: true,
-	KindLedgerAppended: true, KindOutcomeWarning: true, KindFailureDiagWarning: true, KindCarryoverWarning: true, KindFailureLearningWarning: true, KindCycleSealed: true, KindLoopWave: true, KindLoopHalt: true,
+	KindLedgerAppended: true, KindOutcomeWarning: true, KindFailureDiagWarning: true, KindCarryoverWarning: true, KindFailureLearningWarning: true, KindConfigWarning: true, KindAdvisorWarning: true, KindRunnerWarning: true, KindInboxWarning: true, KindAuditWarning: true, KindObserverWarning: true, KindCycleSealed: true, KindLoopWave: true, KindLoopHalt: true, KindLoopWarning: true,
 	KindLoopEscalation: true, KindListenerPanicked: true, KindRegistryDrift: true, KindSinkDropped: true,
 }
 

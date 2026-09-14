@@ -6,8 +6,6 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
-
-	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 // ---------------------------------------------------------------------------
@@ -106,7 +104,9 @@ func assertWriteFailureCleanedUp(t *testing.T, dir, tmpPath string) {
 		t.Errorf("temp file %s not cleaned up after failure (stat err=%v)", tmpPath, err)
 	}
 	entries, err := os.ReadDir(dir)
-	fixtures.RequireNoErr(t, err, "ReadDir after failed write")
+	if err != nil {
+		t.Fatalf("ReadDir after failed write: %v", err)
+	}
 	for _, e := range entries {
 		if filepath.Ext(e.Name()) == ".tmp" {
 			t.Errorf("temp file leaked after failed write: %s", e.Name())
@@ -124,7 +124,7 @@ func TestWriteSurfacesTempWriteFailureAndCleansUp(t *testing.T) {
 
 	err := Write(dir, sampleCatalog(time.Unix(0, 0)))
 
-	fixtures.RequireErrContains(t, err, "modelcatalog: write temp")
+	requireErrContains(t, err, "modelcatalog: write temp")
 	if fake.closeCalls != 1 {
 		t.Errorf("write-failure path must Close the temp exactly once, got %d", fake.closeCalls)
 	}
@@ -141,7 +141,7 @@ func TestWriteSurfacesTempSyncFailureAndCleansUp(t *testing.T) {
 
 	err := Write(dir, sampleCatalog(time.Unix(0, 0)))
 
-	fixtures.RequireErrContains(t, err, "modelcatalog: sync temp")
+	requireErrContains(t, err, "modelcatalog: sync temp")
 	if fake.closeCalls != 1 {
 		t.Errorf("sync-failure path must Close the temp exactly once, got %d", fake.closeCalls)
 	}
@@ -158,7 +158,7 @@ func TestWriteSurfacesTempCloseFailureAndCleansUp(t *testing.T) {
 
 	err := Write(dir, sampleCatalog(time.Unix(0, 0)))
 
-	fixtures.RequireErrContains(t, err, "modelcatalog: close temp")
+	requireErrContains(t, err, "modelcatalog: close temp")
 	if fake.closeCalls != 1 {
 		t.Errorf("close-failure path must call Close exactly once (no double-close), got %d", fake.closeCalls)
 	}

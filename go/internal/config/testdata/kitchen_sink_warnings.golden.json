@@ -1,0 +1,50 @@
+[
+  {
+    "Code": "unknown-value",
+    "Message": "dynamic_routing=\"bogus\" unknown, defaulting to off"
+  },
+  {
+    "Code": "unknown-value",
+    "Message": "routing_mode=\"bogus\" unknown, defaulting to llm"
+  },
+  {
+    "Code": "unknown-value",
+    "Message": "model_routing=\"bogus\" unknown (want static|advisory|auto), defaulting to static"
+  },
+  {
+    "Code": "unknown-value",
+    "Message": "deliverable_kinds[document]: root and min_options must be set (root=\"\", min_options=0)"
+  },
+  {
+    "Code": "unknown-value",
+    "Message": "conditional_mandatory[plan-review]=\"nonsense\": no comparison operator in \"nonsense\""
+  },
+  {
+    "Code": "unknown-value",
+    "Message": "enabled=\"maybe\" unknown, defaulting to content"
+  },
+  {
+    "Code": "unknown-value",
+    "Message": "EVOLVE_COMMIT_EVIDENCE=\"advisory\" unknown (want off|shadow|enforce), defaulting to off"
+  },
+  {
+    "Code": "unknown-value",
+    "Message": "EVOLVE_SANDBOX=\"bogus\" unknown (want auto|on|off), defaulting to \"auto\""
+  },
+  {
+    "Code": "unknown-value",
+    "Message": "EVOLVE_MAX_OPTIONAL_INSERTIONS=\"x\" not an int"
+  },
+  {
+    "Code": "weak-spine",
+    "Message": "mandatory_phases omits audit+ship — audit-before-ship guarantee weakened"
+  },
+  {
+    "Code": "spine-order",
+    "Message": "phase order places ship before audit — audit must precede ship for the shippable-audit floor to gate ship"
+  },
+  {
+    "Code": "inert-phase-enable",
+    "Message": "phase \"plan-review\" is force-enabled but the router is off/shadow (dynamic_routing\u003cadvisory) and it is not in the static state machine — the enable is inert; set dynamic_routing\u003e=advisory or remove the enable"
+  }
+]

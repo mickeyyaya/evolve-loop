@@ -9,3 +9,16 @@
 ./internal/core/failurediag 100
 ./internal/core/carryover 100
 ./internal/core/failurelearning 100
+./internal/phases/ship/landing 100
+./internal/config 100
+./internal/observerengine 100
+./internal/core/defectledger 100
+./internal/inboxmover/lifecycle 100
+./internal/bridge/launchoutcome 100
+./internal/phases/runner/verdict 100
+./internal/textcap 100
+./internal/core/advisor 100
+./internal/loopwave 100
+./internal/loopchain 100
+./internal/phases/audit/ciparitygate 100
+./internal/subagent/subagentrun 100

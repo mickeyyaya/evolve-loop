@@ -2,7 +2,7 @@
 
 > **Status:** Kernel shipped v13.0.0 (PR #4, `53ed48b`), **default `advisory`** since 2026-06-06 (registry-pinned after retro migration steps 1-3 landed; was default-off from v13.0.0; `EVOLVE_DYNAMIC_ROUTING=off` remains the static escape hatch).
 > **Audience:** Operators experimenting with per-cycle phase selection; persona + router authors.
-> **Source:** `go/internal/config/config.go` (composition root), `go/internal/router/` (clamp + strategy), `go/internal/core/phase_advisor.go` (LLM brain), `go/internal/core/orchestrator.go` (`WithRouting`), `docs/architecture/phase-registry.json` (registry).
+> **Source:** `go/internal/config` (the `Loader` the composition root calls — ADR-0103 unit 08, [decomposition/08-config.md](decomposition/08-config.md)), `go/internal/router/` (clamp + strategy), `go/internal/core/phase_advisor.go` (LLM brain), `go/internal/core/orchestrator.go` (`WithRouting`), `docs/architecture/phase-registry.json` (registry).
 > **Successor design:** ADR-0024 (Proposed) replaces the fixed mandatory-spine model with a conditional floor + PhaseAdvisor — read it before extending this kernel.
 
 ## TL;DR
@@ -107,7 +107,7 @@ the abort is learned deterministically (see audit-repair-isolation.md).
 
 ## Configuration surface
 
-`config.Load(registryPath, env)` is the **single** reader of routing env + registry. Downstream consumers receive the immutable `RoutingConfig` by injection (`WithRouting`) and never call `os.Getenv`. Precedence: **env override > registry file > built-in default**.
+`config.Loader.Load(registryPath, env)` is the **single** reader of routing env + registry (the composition root wires the `Loader` with its Signal Center, so every resolution warning is a `config.warning` under module `config`; the package-level `config.Load` facade is the Center-less loader the per-phase callers keep). The root then applies `.evolve/policy.json`'s gate/recovery/router dials through `Loader.ApplyPolicyStages`. Downstream consumers receive the resolved `RoutingConfig` by injection (`WithRouting`) and never call `os.Getenv`. Precedence: **env override > registry file > built-in default**.
 
 | Env var | Default | Maps to |
 |---|---|---|
@@ -118,7 +118,7 @@ the abort is learned deterministically (see audit-repair-isolation.md).
 | `EVOLVE_MAX_OPTIONAL_INSERTIONS` | `4` | `MaxInsertions` (int) |
 | `EVOLVE_USE_PHASE_REGISTRY` | enabled (`0` disables) | whether to read the registry file |
 
-Per-phase legacy enable flags (`EVOLVE_REQUIRE_INTENT`, `EVOLVE_TRIAGE_DISABLE`, `EVOLVE_PLAN_REVIEW`, `EVOLVE_TEST_PHASE_ENABLED`, `EVOLVE_BUILD_PLANNER`, `EVOLVE_DISABLE_AUTO_RETROSPECTIVE`) are absorbed by `config.Load` into `PhaseEnable`, keeping `os.Getenv` out of the phase code.
+The per-phase legacy enable flags were retired (cycle-39; `config_legacyflags_test.go` pins their absence): `PhaseEnable` comes from the registry's `phases[].enabled` over the compiled floor, keeping `os.Getenv` out of the phase code.
 
 ## The phase registry
 
@@ -139,7 +139,7 @@ Triggers are honored only at `Stage >= Advisory`; in `Shadow` they are forensic-
 
 ## The LLM proposer
 
-`core.PhaseAdvisor` (`go/internal/core/phase_advisor.go`) is the bridge-backed `DynamicLLM` brain:
+`core.PhaseAdvisor` (`go/internal/core/phase_advisor.go` — since ADR-0103 unit 04 the seam; the brain is `go/internal/core/advisor`, see [decomposition/04-advisor.md](decomposition/04-advisor.md)) is the bridge-backed `DynamicLLM` brain:
 
 - Asks an LLM, via the `core.Bridge` port, which optional phases to insert/skip given the objective digest (`router.Digest`).
 - Defaults to a cheap/fast model (`haiku`) on the `claude-tmux` driver — routing is a lightweight read-only judgment, not heavy generation. Override with `WithProposerCLI` / `WithProposerModel`.
@@ -163,7 +163,7 @@ Each decision is recorded as a `routing-decision-N.json` artifact in the cycle w
 
 | Anti-pattern | Why bad | Guard |
 |---|---|---|
-| Reading a routing env var outside `config.Load` | Splits the composition root; reintroduces `os.Getenv` sprawl | `config` is a leaf package (stdlib-only); orchestrator/phases take `RoutingConfig` by injection |
+| Reading a routing env var outside `config.Loader.Load` | Splits the composition root; reintroduces `os.Getenv` sprawl | `config` is a leaf package (stdlib + `signalcenter` + `paths`, import-allowlist-tested); orchestrator/phases take `RoutingConfig` by injection |
 | Letting the LLM proposal drive ship directly | Reopens the reward-hacking surface | `router.Route()` clamp re-validates every proposal against the floor before any phase runs |
 | Dropping `audit` or `ship` from `EVOLVE_MANDATORY_PHASES` | Breaks audit-before-ship | `validateSpine` emits `weak-spine`; ship-needs-real-audit still clamps |
 | Hard-failing on an unknown stage/mode value | A typo would break autonomy | Unknown values resolve to safe defaults (`Off` / `llm`) + a warning |

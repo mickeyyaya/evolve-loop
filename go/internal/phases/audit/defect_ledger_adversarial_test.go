@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
@@ -69,16 +70,28 @@ func TestAdversarial_UnrelatedExistingFileDoesNotCloseADefect(t *testing.T) {
 	cases := []struct {
 		name     string
 		evidence string
+		plant    bool // create the cited path as a REAL regular file under the project root, so rule 4 alone rejects it
 	}{
-		{"absolute path outside the repo", "/etc/hosts"},
-		{"the claim's own disposition file", dispositionFile + ":1"},
-		{"the continuation manifest", "continuation-manifest.json"},
-		{"the ledger the gate itself writes", ledgerFile},
-		{"traversal out of the roots", "../../../../../../etc/hosts"},
+		{"absolute path outside the repo", "/etc/hosts", false},
+		{"the claim's own disposition file", dispositionFile + ":1", false},
+		{"the continuation manifest", "continuation-manifest.json", false},
+		{"the ledger the gate itself writes", ledgerFile, false},
+		{"traversal out of the roots", "../../../../../../etc/hosts", false},
+		// The three bookkeeping names PLANTED in the tree (unit-09 review, test
+		// 49's sibling): the bare-name rows above never reach rule 4 — the
+		// workspace is outside the root, so rule 3 already rejects them — and
+		// a denylist row could vanish unnoticed. A real file at each name is
+		// rejected ONLY by rule 4.
+		{"a planted continuation manifest in the tree", "docs/" + continuation.ManifestName, true},
+		{"a planted disposition file in the tree", "docs/" + dispositionFile + ":3", true},
+		{"a planted ledger in the tree", "docs/" + ledgerFile, true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			ws, req := continuationFixture(t, 1255, 1270, laundered)
+			if tc.plant {
+				evidenceFile(t, req.ProjectRoot, strings.TrimSuffix(tc.evidence, ":3"))
+			}
 			var claims []any
 			for i := range laundered {
 				claims = append(claims, map[string]any{
@@ -148,8 +161,8 @@ func TestEmitDefectLedger_CapsUnboundedDefects(t *testing.T) {
 	for i := range defects {
 		defects[i] = "defect " + strconv.Itoa(i) + " " + strings.Repeat("x", defectTextMaxRunes+500)
 	}
-	if err := emitDefectLedger(failingReportWithDefects(defects...), core.PhaseRequest{Cycle: 1285, Workspace: ws}); err != nil {
-		t.Fatalf("emitDefectLedger: %v", err)
+	if diags := emitDefectLedger(failingReportWithDefects(defects...), core.PhaseRequest{Cycle: 1285, Workspace: ws}); len(diags) != 0 {
+		t.Fatalf("emitDefectLedger: %v", diags)
 	}
 	doc := readLedger(t, ws)
 	if len(doc.Entries) > defectLedgerMaxEntries+1 {

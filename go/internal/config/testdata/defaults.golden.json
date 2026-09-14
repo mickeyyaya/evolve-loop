@@ -1,0 +1,60 @@
+{
+  "Stage": 2,
+  "Mode": 0,
+  "ModelRouting": 0,
+  "CommitEvidence": 0,
+  "ReviewGate": 0,
+  "EvalGate": 3,
+  "ContractGate": 3,
+  "TriageCapGate": 3,
+  "TopNGate": 3,
+  "SandboxMode": "auto",
+  "PhaseRecovery": 1,
+  "SpineFloor": 3,
+  "PhaseIO": 3,
+  "RouterReplan": 1,
+  "MergeGate": 1,
+  "ParallelEvaluate": 0,
+  "ScoutDecompose": 0,
+  "Mandatory": [
+    "scout",
+    "build",
+    "audit",
+    "ship"
+  ],
+  "Conditional": {
+    "tdd": {
+      "Field": "cycle_size",
+      "Op": "!=",
+      "Value": "trivial",
+      "And": [
+        {
+          "Field": "deliverable_kind",
+          "Op": "!=",
+          "Value": "document",
+          "And": null
+        }
+      ]
+    }
+  },
+  "DeliverableKinds": null,
+  "MaxInsertions": 4,
+  "ParallelEvaluateConcurrency": 3,
+  "ScoutDecomposeConcurrency": 4,
+  "PhaseEnable": {
+    "build-planner": 2,
+    "swarm-plan": 2,
+    "tdd": 1,
+    "triage": 1
+  },
+  "Triggers": {},
+  "Order": null,
+  "SpineOrder": null,
+  "LegalSuccessors": null,
+  "AuditFailRoutesTo": "",
+  "GoalRecipes": null,
+  "RoutingJudge": false,
+  "ReconDigest": false,
+  "RePlanMaxDepth": 1,
+  "CompactPrompts": true
+}

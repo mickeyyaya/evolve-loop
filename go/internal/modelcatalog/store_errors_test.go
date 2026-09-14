@@ -4,11 +4,23 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
-
-	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
+
+// requireErrContains is the package-local twin of test/fixtures.RequireErrContains:
+// this leaf's tests must not import test/fixtures, which imports internal/core
+// (core → advisor → modelcatalog would be an import cycle in test).
+func requireErrContains(t *testing.T, err error, sub string) {
+	t.Helper()
+	if err == nil {
+		t.Fatalf("expected error containing %q, got nil", sub)
+	}
+	if !strings.Contains(err.Error(), sub) {
+		t.Fatalf("error %q does not contain %q", err.Error(), sub)
+	}
+}
 
 // TestReadOnDirectoryPathErrors pins that a read error OTHER than "file does
 // not exist" is surfaced, not swallowed into a zero catalog. We make the
@@ -26,7 +38,7 @@ func TestReadOnDirectoryPathErrors(t *testing.T) {
 
 	c, err := Read(dir)
 
-	fixtures.RequireErrContains(t, err, "modelcatalog: read")
+	requireErrContains(t, err, "modelcatalog: read")
 	if !c.Empty() {
 		t.Fatalf("on read error the returned catalog must be empty, got %+v", c)
 	}
@@ -41,12 +53,14 @@ func TestWriteMkdirAllFailsWhenParentIsFile(t *testing.T) {
 	// A regular file occupying the slot where evolveDir's parent segment lives,
 	// forcing MkdirAll(evolveDir) to fail (a path component is not a directory).
 	blocker := filepath.Join(root, "blocker")
-	fixtures.MustWrite(t, blocker, "i am a file, not a dir")
+	if err := os.WriteFile(blocker, []byte("i am a file, not a dir"), 0o644); err != nil {
+		t.Fatalf("arrange: write blocker: %v", err)
+	}
 	evolveDir := filepath.Join(blocker, ".evolve") // child of a regular file
 
 	err := Write(evolveDir, sampleCatalog(time.Unix(0, 0)))
 
-	fixtures.RequireErrContains(t, err, "modelcatalog: mkdir")
+	requireErrContains(t, err, "modelcatalog: mkdir")
 }
 
 // TestWriteCreateTempFailsInReadOnlyDir pins that Write surfaces a tempfile
@@ -69,7 +83,7 @@ func TestWriteCreateTempFailsInReadOnlyDir(t *testing.T) {
 
 	err := Write(dir, sampleCatalog(time.Unix(0, 0)))
 
-	fixtures.RequireErrContains(t, err, "modelcatalog: tempfile")
+	requireErrContains(t, err, "modelcatalog: tempfile")
 }
 
 // TestWriteRenameFailsWhenTargetIsDirectory pins that a failed atomic rename is
@@ -88,11 +102,13 @@ func TestWriteRenameFailsWhenTargetIsDirectory(t *testing.T) {
 
 	err := Write(dir, sampleCatalog(time.Unix(0, 0)))
 
-	fixtures.RequireErrContains(t, err, "modelcatalog: rename")
+	requireErrContains(t, err, "modelcatalog: rename")
 
 	// And the failed write left no leftover temp file in the directory.
 	entries, rerr := os.ReadDir(dir)
-	fixtures.RequireNoErr(t, rerr, "ReadDir after failed rename")
+	if rerr != nil {
+		t.Fatalf("ReadDir after failed rename: %v", rerr)
+	}
 	for _, e := range entries {
 		if e.Name() != FileName && filepath.Ext(e.Name()) == ".tmp" {
 			t.Fatalf("temp file leaked after failed rename: %s", e.Name())

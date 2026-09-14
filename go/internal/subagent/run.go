@@ -3,24 +3,27 @@ package subagent
 import (
 	"context"
 	"crypto/rand"
-	"encoding/hex"
-	"errors"
-	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/capability"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
-	"github.com/mickeyyaya/evolve-loop/go/internal/detectcli"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/resolvellm"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
+	"github.com/mickeyyaya/evolve-loop/go/internal/subagent/subagentrun"
 )
+
+// run.go is the unit-16 seam (ADR-0103): the `evolve subagent run` execution
+// path lives in internal/subagent/subagentrun; this file keeps the exported
+// RunRequest / RunOptions / RunResult bag the root and the by-name test
+// binders spell, the ONE wired construction of the dispatcher from those
+// options, the request/result projections, and the facades the fan-out
+// dispatcher, the Runner twin, the validate pipeline and the host tests keep.
 
 // RunRequest captures every input cmd_run reads from argv + environment.
 // Mirrors the bash signature subagent-run.sh <agent> <cycle> <workspace>
@@ -61,24 +64,10 @@ type RunRequest struct {
 
 // ErrInProcessDispatchBanned is returned when a caller requests the retired
 // in-process dispatch path (LEGACY_AGENT_DISPATCH=1). The agent-bridge
-// (`evolve subagent run`) is the ONE and ONLY supported dispatch path; no
-// dispatch may ever reach the in-process Agent tool. The historical escape
-// hatch is gone — setting the flag fails loudly rather than silently routing
-// in-process.
-var ErrInProcessDispatchBanned = errors.New(
-	"subagent/run: in-process dispatch (LEGACY_AGENT_DISPATCH) is retired — all agent dispatch must go through the bridge (`evolve subagent run`); unset LEGACY_AGENT_DISPATCH",
-)
-
-// enforceBridgeOnly is the single source of truth for the bridge-only dispatch
-// invariant. It rejects any request for the in-process escape hatch. Every
-// dispatch path funnels through Run, so enforcing here covers single + fan-out
-// + recursive invocations.
-func enforceBridgeOnly(legacyRequested bool) error {
-	if legacyRequested {
-		return ErrInProcessDispatchBanned
-	}
-	return nil
-}
+// (`evolve subagent run`) is the ONE and ONLY supported dispatch path; the
+// invariant and its sentinel live in the leaf (the same pointer, so errors.Is
+// holds).
+var ErrInProcessDispatchBanned = subagentrun.ErrInProcessDispatchBanned
 
 // RunOptions injects the I/O + sub-process seams. Production wires
 // defaults; tests substitute doubles.
@@ -87,15 +76,27 @@ type RunOptions struct {
 	ResolveLLM        func(agent string) (resolvellm.Result, error)
 	InspectCapability func(adaptersDir, cli string) (capability.Inspection, error)
 	ResolveModelTier  func(req ResolveModelTierRequest, opts ResolveModelTierOptions) (string, error)
-	AdapterExists     func(path string) bool
-	ExecAdapter       func(ctx context.Context, adapterPath string, env map[string]string) (exitCode int, err error)
-	WriteFile         func(path string, data []byte, mode os.FileMode) error
-	GitState          func(ctx context.Context, projectRoot string) (head, treeDiff string, err error)
-	StatMTime         func(path string) (time.Time, error)
-	ReadFile          func(path string) ([]byte, error)
-	HashFile          func(path string) (string, error)
-	Now               func() time.Time
-	Rand              func([]byte) (int, error)
+	// AdapterExists reports whether the resolved cli has a registered bridge
+	// driver. Since ADR-0103 unit 16 it receives the CLI, not the vestigial
+	// <AdaptersDir>/<cli>.sh path (the func type is unchanged; the production
+	// default is driverExists — nothing on the run path decodes a file name).
+	AdapterExists func(cli string) bool
+	ExecAdapter   func(ctx context.Context, adapterPath string, env map[string]string) (exitCode int, err error)
+	// WriteFile is unused since the bridge port (nothing on the run path
+	// writes through it); kept for the by-name binders that set it.
+	//
+	// Deprecated: dead seam, retired with the next binder edit (unit 16 follow-up 16-4).
+	WriteFile func(path string, data []byte, mode os.FileMode) error
+	GitState  func(ctx context.Context, projectRoot string) (head, treeDiff string, err error)
+	StatMTime func(path string) (time.Time, error)
+	ReadFile  func(path string) ([]byte, error)
+	HashFile  func(path string) (string, error)
+	Now       func() time.Time
+	Rand      func([]byte) (int, error)
+	// Signals is the root's Signal Center (ADR-0103 unit 16): the dispatcher's
+	// BRIDGE_SUBAGENT_* warnings and, through the exec seam, the bridge
+	// engine's own producers report into it. nil is the Null Object.
+	Signals *signalcenter.Center
 }
 
 // RunResult carries everything cmd_run printed + the side effects.
@@ -113,10 +114,6 @@ type RunResult struct {
 	Stderr         string // collected adapter stderr for caller logging
 }
 
-// workerNameRE matches fan-out worker names: <role>-worker-<subtask>.
-// Subtask names may include digits and hyphens after the first letter.
-var workerNameRE = regexp.MustCompile(`^([a-z][a-z-]+)-worker-([a-z][a-z0-9-]+)$`)
-
 // nonRegistryRoles are dispatchable agent roles that ship a
 // .evolve/profiles/<role>.json but have NO phasecontract entry: they are not
 // spine phases with a report contract, so the registry cannot know them. This
@@ -131,10 +128,9 @@ var nonRegistryRoles = []string{
 // truth). agentRolePattern is derived from it, and tests iterate it, so a new
 // role is added in exactly one place.
 //
-// Sync point that CANNOT be automated: legacy/scripts/dispatch/subagent-run.sh
-// (cmd_run's role case, ~line 631) carries the bash mirror of this list. It is a
-// separate runtime with no access to the Go registry, so a new role must be
-// added there by hand; every OTHER Go consumer derives from here.
+// The Go list is the ONLY source: the bash dispatcher it once mirrored is
+// retired, and every consumer — the dispatcher's KnownRole port, the fan-out
+// gate and the conformance tests — derives from here.
 var agentRoles = buildAgentRoles()
 
 // buildAgentRoles derives the allow-list as the UNION of (a) every
@@ -174,461 +170,152 @@ func buildAgentRoles() []string {
 // agentRolePattern matches exactly the canonical roles in agentRoles.
 var agentRolePattern = regexp.MustCompile(`^(` + strings.Join(agentRoles, "|") + `)$`)
 
-// Run ports cmd_run from legacy/scripts/dispatch/subagent-run.sh:619.
-//
-// Production-path scope (v11.6.5):
-//   - argument validation (agent + cycle + workspace)
-//   - worker-name regex parsing
-//   - profile load + JSON validate
-//   - resolve-llm + cli/model resolution + antigravity→agy
-//   - adapter exists check (bridge-only invariant enforced up front)
-//   - model tier resolution
-//   - artifact path resolution (worker variant)
-//   - challenge token + git state capture
-//   - prompt source from PromptReader (PROMPT_FILE_OVERRIDE or stdin)
-//   - v2 cache-prefix prompt assembly (INVOCATION CONTEXT + task envelope)
-//   - adversarial auditor framing for auditor agent
-//   - adapter exec with VALIDATE_ONLY=0 + full env propagation
-//   - artifact verification (exists, fresh <5min, token-bearing)
-//   - kind="agent_subprocess" ledger entry write
-//
-// Deferred to follow-on ships:
-//   - prompt-size guard (EVOLVE_PROMPT_MAX_TOKENS / autotrim)
-//   - fast-fail consecutive-failure counter (v9.1.0 cycle-94)
-//   - phase timing sidecar
-//   - cache-prefix v2 file emission (handled by separate evolve subagent cache-prefix)
-//   - context-monitor sidecar (cycle-6 v9.1.0)
+// Run is the `evolve subagent run` execution path: argument validation,
+// worker-name parsing, profile load, cli/model resolution, the driver check,
+// model tier resolution, artifact placement, the challenge token and git
+// state, the prompt (PROMPT_FILE_OVERRIDE or stdin) assembled into the v2
+// cache-prefix envelope with the adversarial auditor framing, the adapter
+// exec with VALIDATE_ONLY=0 and the full env, artifact verification (exists,
+// fresh <5min, token-bearing) and the kind="agent_subprocess" ledger entry.
+// The path is internal/subagent/subagentrun (ADR-0103 unit 16); this facade
+// fills the production defaults, builds the ONE wired dispatcher and projects
+// the result.
 func Run(ctx context.Context, req RunRequest, opts RunOptions) (RunResult, error) {
 	fillRunDefaults(&opts)
-
-	// Step 1: validate inputs.
-	if req.PromptReader == nil {
-		return RunResult{}, fmt.Errorf("subagent/run: PromptReader required (PROMPT_FILE_OVERRIDE or stdin)")
-	}
-	role, worker := parseAgentName(req.Agent)
-	if !agentRolePattern.MatchString(role) {
-		return RunResult{}, fmt.Errorf("subagent/run: unknown agent: %s", req.Agent)
-	}
-	if req.Cycle < 0 {
-		return RunResult{}, fmt.Errorf("subagent/run: cycle must be >= 0, got %d", req.Cycle)
-	}
-	if info, err := os.Stat(req.WorkspacePath); err != nil || !info.IsDir() {
-		return RunResult{}, fmt.Errorf("subagent/run: workspace dir does not exist: %s", req.WorkspacePath)
-	}
-
-	// Bridge-only invariant: reject the retired in-process escape hatch before
-	// any resolution work. This is the single chokepoint all dispatch funnels
-	// through (single + fan-out + recursion).
-	if err := enforceBridgeOnly(req.LegacyAgentDispatch); err != nil {
-		return RunResult{}, err
-	}
-	// Recursion bound: a fan-out worker re-enters here via `subagent run`; cap
-	// nested dispatches so a fan-out loop can't recurse unboundedly.
-	if err := enforceDispatchDepth(req.DispatchDepth); err != nil {
-		return RunResult{}, err
-	}
-
-	// Step 2: load + validate profile.
-	profilePath := filepath.Join(req.ProfilesDir, role+".json")
-	profileBody, err := opts.ReadProfile(profilePath)
-	if err != nil {
-		return RunResult{}, fmt.Errorf("subagent/run: profile not found: %s", profilePath)
-	}
-
-	// Step 3: resolve cli + model via LLM router (with profile fallback).
-	llm, llmErr := opts.ResolveLLM(role)
-	var cli, source, resolvedModel string
-	if llmErr == nil && llm.CLI != "" {
-		cli, source = llm.CLI, llm.Source
-		resolvedModel = llm.ModelTier // Step 9: resolvellm emits only a tier
-	} else {
-		cli = matchField(profileBody, reFieldCLI)
-		source = "profile"
-	}
-	cli = detectcli.Canonical(cli)
-	if cli == "" {
-		return RunResult{}, fmt.Errorf("subagent/run: cli unresolved for agent %s", req.Agent)
-	}
-
-	// Step 5: adapter exists.
-	adapterPath := filepath.Join(req.AdaptersDir, cli+".sh")
-	if !opts.AdapterExists(adapterPath) {
-		return RunResult{}, fmt.Errorf("subagent/run: adapter not executable: %s", adapterPath)
-	}
-
-	// Step 6: model tier resolution. A tier resolved from the profile wins;
-	// otherwise the adaptive resolver evaluates profile + mastery gate + diff complexity.
-	var model string
-	if resolvedModel != "" {
-		model = resolvedModel
-	} else {
-		model, err = opts.ResolveModelTier(
-			ResolveModelTierRequest{
-				ProfilePath:            profilePath,
-				Cycle:                  req.Cycle,
-				ProjectRoot:            req.ProjectRoot,
-				WorktreePath:           req.WorktreePath,
-				ModelTierHint:          req.ModelTierHint,
-				AuditorTierOverride:    req.AuditorTierOverride,
-				DiffComplexityDisabled: req.DiffComplexityDisabled,
-			},
-			ResolveModelTierOptions{},
-		)
-		if err != nil {
-			return RunResult{}, fmt.Errorf("subagent/run: resolve tier: %w", err)
-		}
-	}
-
-	// Step 7: capability inspection — adds WARN strings + plan log fodder.
-	capDir := req.CapabilityDir
-	if capDir == "" {
-		capDir = req.AdaptersDir
-	}
-	insp, err := opts.InspectCapability(capDir, cli)
-	if err != nil {
-		return RunResult{}, fmt.Errorf("subagent/run: capability inspect: %w", err)
-	}
-
-	// Step 8: artifact path. Workers override the profile template.
-	var artifactPath string
-	if worker != "" {
-		artifactPath = filepath.Join(req.WorkspacePath, "workers", req.Agent+".md")
-	} else {
-		template := matchField(profileBody, reFieldOutputArtifact)
-		artifactPath = resolveArtifactPath(template, req.Cycle, req.ProjectRoot)
-	}
-	if err := os.MkdirAll(filepath.Dir(artifactPath), 0o755); err != nil {
-		return RunResult{}, fmt.Errorf("subagent/run: mkdir artifact dir: %w", err)
-	}
-
-	// Step 9: challenge token + git state. A fan-out worker is given the
-	// parent-dictated token so its artifact bears a token the parent verifies;
-	// otherwise mint a fresh one.
-	token := req.ChallengeTokenOverride
-	if token == "" {
-		var err error
-		token, err = generateRunToken(opts.Rand)
-		if err != nil {
-			return RunResult{}, fmt.Errorf("subagent/run: token: %w", err)
-		}
-	}
-	gitHead, treeDiff, _ := opts.GitState(ctx, req.ProjectRoot)
-	if gitHead == "" {
-		gitHead = "unknown"
-	}
-	if treeDiff == "" {
-		treeDiff = "unknown"
-	}
-
-	// Step 10: read user prompt body.
-	promptBody, err := io.ReadAll(req.PromptReader)
-	if err != nil {
-		return RunResult{}, fmt.Errorf("subagent/run: read prompt: %w", err)
-	}
-
-	// Step 11: assemble v2 cache-prefix prompt.
-	fullPrompt := assembleV2Prompt(req.Agent, req.Cycle, req.WorkspacePath, artifactPath, token, filepath.Base(profilePath), string(promptBody))
-	if role == "auditor" && req.AdversarialAudit {
-		fullPrompt += adversarialAuditFraming()
-	}
-
-	// Step 12: build adapter env + exec.
-	//
-	// The ProjectRoot fallback is deliberate — a non-worktree dispatch has no lane
-	// worktree and must still run — but it is never what a FLEET lane wants: an
-	// orchestrator that forgot to propagate WorktreePath silently points the agent
-	// at the main repo tree, which is exactly the shape the tree-diff guard kills a
-	// lane for. Announce it on the Warns channel callers already log, so the
-	// fallback is diagnosable from the run record instead of inferred after the
-	// lane dies.
-	warns := append([]string(nil), insp.Warns...)
-	worktreePath := req.WorktreePath
-	if worktreePath == "" {
-		worktreePath = req.ProjectRoot
-		warns = append(warns, fmt.Sprintf(
-			"[subagent-run] WARN agent=%s cycle=%d: WorktreePath not propagated — WORKTREE_PATH falls back to the project root %s; this agent will run against the main tree",
-			req.Agent, req.Cycle, worktreePath))
-	}
-	promptFile, err := os.CreateTemp("", "evolve-subagent-prompt-*.txt")
-	if err != nil {
-		return RunResult{}, fmt.Errorf("subagent/run: prompt tempfile: %w", err)
-	}
-	promptPath := promptFile.Name()
-	defer func() { _ = os.Remove(promptPath) }()
-	if _, err := promptFile.WriteString(fullPrompt); err != nil {
-		_ = promptFile.Close()
-		return RunResult{}, fmt.Errorf("subagent/run: write prompt tempfile: %w", err)
-	}
-	_ = promptFile.Close()
-
-	overrides := extractAdapterOverrides(profileBody, cli)
-	env := map[string]string{
-		"PROFILE_PATH":                 profilePath,
-		"RESOLVED_MODEL":               model,
-		"PROMPT_FILE":                  promptPath,
-		"CYCLE":                        strconv.Itoa(req.Cycle),
-		"WORKSPACE_PATH":               req.WorkspacePath,
-		"WORKTREE_PATH":                worktreePath,
-		"STDOUT_LOG":                   filepath.Join(req.WorkspacePath, req.Agent+".stdout.log"),
-		"STDERR_LOG":                   filepath.Join(req.WorkspacePath, req.Agent+".stderr.log"),
-		"ARTIFACT_PATH":                artifactPath,
-		"RESOLVED_CLI":                 cli,
-		"CLI_RESOLUTION_SOURCE":        source,
-		"CAP_BUDGET_NATIVE":            capBoolEnv(insp.Manifest.BudgetNative),
-		"ADAPTER_TOOLS_OVERRIDE":       overrides.ToolsJSON,
-		"ADAPTER_EXTRA_FLAGS_OVERRIDE": overrides.ExtraFlagsJSON,
-		"VALIDATE_ONLY":                "0",
-		"CHALLENGE_TOKEN":              token,
-	}
-	// The subprocess contract (core/phase.go): ProjectRoot is what the agent
-	// sees as EVOLVE_PROJECT_ROOT. Headless drivers inherit it via driverEnv;
-	// the tmux drivers export it into the pane shell themselves. Never an
-	// empty export — an unset variable falls back to cwd by contract.
-	if req.ProjectRoot != "" {
-		env["EVOLVE_PROJECT_ROOT"] = req.ProjectRoot
-	}
-
-	start := opts.Now()
-	exitCode, execErr := opts.ExecAdapter(ctx, adapterPath, env)
-	durationMS := opts.Now().Sub(start).Milliseconds()
-
-	res := RunResult{
-		CLI:            cli,
-		Model:          model,
-		ArtifactPath:   artifactPath,
-		ChallengeToken: token,
-		ExitCode:       exitCode,
-		DurationMS:     durationMS,
-		Warns:          warns,
-	}
-
-	// Step 13: verify artifact via the one verification SSOT (contract.go).
-	res.Verdict = VerifyArtifact(opts.StatMTime, opts.ReadFile, opts.Now, artifactPath, token, exitCode, execErr).Verdict
-	if sha, hashErr := opts.HashFile(artifactPath); hashErr == nil {
-		res.ArtifactSHA256 = sha
-	}
-
-	// Step 14: write ledger entry. Always (bash always logs an entry to
-	// preserve the audit chain even on failure).
-	if req.LedgerPath != "" {
-		if err := writeSubprocessLedger(req.LedgerPath, subprocessLedger{
-			Cycle:          req.Cycle,
-			Role:           req.Agent,
-			Model:          model,
-			ExitCode:       exitCode,
-			DurationS:      strconv.FormatInt(durationMS/1000, 10),
-			ArtifactPath:   artifactPath,
-			ArtifactSHA256: res.ArtifactSHA256,
-			ChallengeToken: token,
-			GitHEAD:        gitHead,
-			TreeStateSHA:   treeDiff,
-			QualityTier:    capabilityTier(insp.Manifest),
-			RunID:          core.RunIDFromWorkspace(req.WorkspacePath),
-		}, opts.Now); err != nil {
-			return res, fmt.Errorf("subagent/run: ledger write: %w", err)
-		}
-	}
-
-	if execErr != nil {
-		return res, fmt.Errorf("subagent/run: adapter exec: %w", execErr)
-	}
-	return res, nil
+	out, err := wiredDispatcher(opts).Dispatch(ctx, requestOf(req))
+	return resultOf(out), err
 }
 
-func parseAgentName(agent string) (role, worker string) {
-	if m := workerNameRE.FindStringSubmatch(agent); len(m) == 3 {
-		return m[1], m[2]
+// wiredDispatcher is the ONE construction of the unit-16 dispatcher
+// (TestSubagentRun_OneConstructionSite): every host-backed port is the option
+// the caller (or fillRunDefaults) supplied, projected once onto the leaf's
+// shapes; the stdlib-backed collaborators are the caller's seams; the Center
+// is read through an accessor so a nil one stays the Null Object.
+func wiredDispatcher(opts RunOptions) *subagentrun.Dispatcher {
+	deps := subagentrun.Deps{
+		Profile:     profileOf(opts.ReadProfile),
+		ResolveLLM:  llmOf(opts.ResolveLLM),
+		Inspect:     capabilityOf(opts.InspectCapability),
+		ResolveTier: tierOf(opts.ResolveModelTier),
+
+		KnownRole:  agentRolePattern.MatchString,
+		GuardDepth: enforceDispatchDepth,
+
+		AdapterExists: opts.AdapterExists,
+		Adapter:       adapterOf(opts),
+		GitState:      opts.GitState,
+		RunID:         core.RunIDFromWorkspace,
 	}
-	return agent, ""
-}
-
-func assembleV2Prompt(agent string, cycle int, workspace, artifactPath, token, profileBase, body string) string {
-	var b strings.Builder
-	b.WriteString("## INVOCATION CONTEXT\n\n")
-	fmt.Fprintf(&b, "- Agent: %s\n", agent)
-	fmt.Fprintf(&b, "- Cycle: %d\n", cycle)
-	fmt.Fprintf(&b, "- Workspace: %s\n", workspace)
-	fmt.Fprintf(&b, "- Artifact path: %s\n", artifactPath)
-	fmt.Fprintf(&b, "- Challenge token: %s\n", token)
-	fmt.Fprintf(&b, "- Profile: %s\n\n", profileBase)
-	b.WriteString("--- BEGIN TASK PROMPT ---\n")
-	b.WriteString(body)
-	if !strings.HasSuffix(body, "\n") {
-		b.WriteString("\n")
-	}
-	b.WriteString("--- END TASK PROMPT ---\n")
-	return b.String()
-}
-
-// adversarialAuditFraming returns the auditor framing block prepended when
-// agent=auditor && ADVERSARIAL_AUDIT!=0. It is the canonical source for the
-// auditor's adversarial stance (the archived bash here-doc was its origin).
-// Anti-sycophancy + Google adversarial-testing input taxonomy; the per-block
-// content is documented in skills/adversarial-testing/SKILL.md §8. Keep this
-// deterministic — it sits in the Claude prompt-prefix cache window.
-func adversarialAuditFraming() string {
-	return `ADVERSARIAL AUDIT MODE (default-on)
-
-Your role is not to confirm correctness; it is to find a real defect.
-
-Treat the build as guilty until proven innocent. Specifically:
-- A "PASS" verdict requires positive evidence that each acceptance criterion is
-  met by executable behavior — not by the presence of expected strings in source
-  code. Cite the test output, the diff hunk, or the command that demonstrates it.
-- Confidence below 0.85 → WARN, not PASS. "I see no problems" is not 0.85
-  confidence; it is the absence of evidence, which is the absence of an audit.
-- If you have produced ≥5 consecutive PASS verdicts in this loop, the prior is
-  now SHIFTED toward latent defects — go deeper than your routine checklist.
-- A vague affirmative review is itself a failure. Output ` + "`NO_DEFECT_FOUND`" + ` with
-  explicit per-criterion evidence, OR list at least one concrete defect with
-  file:line and a reproduction command.
-
-ADVERSARIAL INPUT TAXONOMY — apply to every acceptance criterion.
-
-Explicit attacks (obvious; assume the Builder already avoided these):
-- grep-on-source as the only check (AC-by-grep)
-- echo "PASS"; exit 0 with no real execution
-- confidence below 0.85 reported as PASS
-
-Implicit / innocuous-but-harmful inputs (where real defects hide — focus here):
-- a predicate that passes on the GREEN build but would ALSO pass on an EMPTY repo:
-  it does not actually require the feature to be present. This is the hardest class.
-- a build that touches the right files but the change is a no-op (rename, comment, whitespace)
-- a new eval that shares ALL command verbs with the prior cycle's eval for the same
-  module (diversity collapse — the "new" eval is a re-skin of the old one)
-- a check that verifies the wrong level of abstraction (tests the test, not the behavior)
-- a new file verified to EXIST but not verified to be non-empty or correct
-
-PER-CRITERION EVIDENCE REQUIREMENT (replaces "I see no problems").
-For EACH acceptance criterion in build-report.md, cite EXACTLY ONE of:
-  (a) a test output line: test name + exit code + stdout excerpt
-  (b) a diff hunk: file:line + the changed behavior it encodes
-  (c) a command YOU ran during this audit: the command + its actual output
-Citing only (b) without running the code is allowed ONLY for behavior-preserving refactors.
-A criterion with no citation is a FAIL for that criterion, regardless of overall impression.
-
-`
-}
-
-type subprocessLedger struct {
-	Cycle          int
-	Role           string
-	Model          string
-	ExitCode       int
-	DurationS      string
-	ArtifactPath   string
-	ArtifactSHA256 string
-	ChallengeToken string
-	GitHEAD        string
-	TreeStateSHA   string
-	QualityTier    string
-	// RunID is the CA.5 run identity. Empty when it cannot be resolved from the
-	// run workspace, in which case the key is OMITTED from the line (parity with
-	// core.LedgerEntry's `json:"run_id,omitempty"`), never written as "".
-	RunID string
-}
-
-// writeSubprocessLedger appends a `kind: "agent_subprocess"` entry. Field
-// order matches bash write_ledger_entry at subagent-run.sh:436 — chain
-// hash determinism depends on it.
-func writeSubprocessLedger(ledgerPath string, e subprocessLedger, now func() time.Time) error {
-	if now == nil {
-		now = time.Now
-	}
-	if err := os.MkdirAll(filepath.Dir(ledgerPath), 0o755); err != nil {
-		return err
-	}
-	prevHash, entrySeq, err := readChainLink(ledgerPath)
-	if err != nil {
-		return err
-	}
-	// run_id is emitted as a whole fragment so an unresolved identity omits the
-	// key entirely instead of writing "run_id":"". Both decode to RunID == ""
-	// for every in-tree reader, so this is NOT about a third state — it is
-	// byte-shape parity with core.LedgerEntry's `json:"run_id,omitempty"` and
-	// the additive-key rule bytestability_test.go pins: an unstamped entry stays
-	// byte-identical to what this writer emitted before.
-	//
-	// The fragment is passed as an ARGUMENT (%s), never concatenated into the
-	// format string: fmt does not rescan arguments for verbs, but it does rescan
-	// the format. A '%' inside a spliced value would be read as a verb, consume
-	// the next argument and shift every field after it — silently, since the
-	// write still succeeds. jsonStringEscape cannot prevent that (it escapes
-	// \ " \n \r \t, and escaping is the wrong layer for a format hazard);
-	// argument position is what makes it structurally impossible.
-	runIDField := ""
-	if e.RunID != "" {
-		runIDField = `"run_id":"` + jsonStringEscape(e.RunID) + `",`
-	}
-	line := fmt.Sprintf(
-		`{"ts":"%s","cycle":%d,%s"role":"%s","kind":"agent_subprocess","model":"%s","exit_code":%d,`+
-			`"duration_s":"%s","artifact_path":"%s","artifact_sha256":"%s","challenge_token":"%s",`+
-			`"git_head":"%s","tree_state_sha":"%s","entry_seq":%d,"prev_hash":"%s","quality_tier":"%s","cli_resolution":null}`,
-		jsonStringEscape(now().UTC().Format("2006-01-02T15:04:05Z")),
-		e.Cycle,
-		runIDField,
-		jsonStringEscape(e.Role),
-		jsonStringEscape(e.Model),
-		e.ExitCode,
-		jsonStringEscape(e.DurationS),
-		jsonStringEscape(e.ArtifactPath),
-		e.ArtifactSHA256,
-		jsonStringEscape(e.ChallengeToken),
-		jsonStringEscape(e.GitHEAD),
-		jsonStringEscape(e.TreeStateSHA),
-		entrySeq,
-		prevHash,
-		jsonStringEscape(e.QualityTier),
+	return subagentrun.New(deps,
+		subagentrun.WithClock(opts.Now), subagentrun.WithRand(opts.Rand),
+		subagentrun.WithFS(opts.StatMTime, opts.ReadFile, opts.HashFile),
+		subagentrun.WithSignals(func() *signalcenter.Center { return opts.Signals }),
 	)
-	f, err := os.OpenFile(ledgerPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
-	if err != nil {
-		return err
+}
+
+// requestOf is the ONE projection of the root's request onto the leaf's —
+// field for field; PluginRoot is never read by the path and does not ride in.
+func requestOf(req RunRequest) subagentrun.Request {
+	return subagentrun.Request{
+		Agent: req.Agent, Cycle: req.Cycle, WorkspacePath: req.WorkspacePath,
+		ProfilesDir: req.ProfilesDir, AdaptersDir: req.AdaptersDir, CapabilityDir: req.CapabilityDir,
+		ProjectRoot: req.ProjectRoot, WorktreePath: req.WorktreePath, LedgerPath: req.LedgerPath,
+		Prompt:        req.PromptReader,
+		ModelTierHint: req.ModelTierHint, AuditorTierOverride: req.AuditorTierOverride,
+		DiffComplexityDisabled: req.DiffComplexityDisabled, AdversarialAudit: req.AdversarialAudit,
+		LegacyAgentDispatch: req.LegacyAgentDispatch, DispatchDepth: req.DispatchDepth,
+		ChallengeTokenOverride: req.ChallengeTokenOverride,
 	}
-	if _, err := f.WriteString(line + "\n"); err != nil {
-		_ = f.Close()
-		return err
+}
+
+// resultOf is the ONE projection of the leaf's outcome onto the root's
+// result; Stderr is never set (as before) and the verification evidence the
+// outcome carries is the signal's, not the result's.
+func resultOf(out subagentrun.Outcome) RunResult {
+	return RunResult{
+		Verdict: out.Verdict, CLI: out.CLI, Model: out.Model,
+		ArtifactPath: out.ArtifactPath, ArtifactSHA256: out.ArtifactSHA256, ChallengeToken: out.ChallengeToken,
+		ExitCode: out.ExitCode, DurationMS: out.DurationMS, Warns: out.Warns,
 	}
-	if err := f.Close(); err != nil {
-		return err
+}
+
+// profileOf projects the raw-JSON profile grammar (matchField over the body,
+// the adapter overrides for the cli resolved later) onto the leaf's Profile.
+func profileOf(read func(string) (string, error)) func(string) (subagentrun.Profile, error) {
+	return func(path string) (subagentrun.Profile, error) {
+		body, err := read(path)
+		if err != nil {
+			return subagentrun.Profile{}, err
+		}
+		return subagentrun.Profile{
+			CLI:            matchField(body, reFieldCLI),
+			OutputArtifact: matchField(body, reFieldOutputArtifact),
+			Overrides: func(cli string) (string, string) {
+				o := extractAdapterOverrides(body, cli)
+				return o.ToolsJSON, o.ExtraFlagsJSON
+			},
+		}, nil
 	}
-	tipPath := filepath.Join(filepath.Dir(ledgerPath), "ledger.tip")
-	tip := fmt.Sprintf("%d:%s\n", entrySeq, sha256Hex(line))
-	tmp := tipPath + ".tmp"
-	if err := os.WriteFile(tmp, []byte(tip), 0o644); err != nil {
-		_ = os.Remove(tmp)
-		return err
+}
+
+func llmOf(resolve func(string) (resolvellm.Result, error)) func(string) (subagentrun.LLM, error) {
+	return func(role string) (subagentrun.LLM, error) {
+		r, err := resolve(role)
+		return subagentrun.LLM{CLI: r.CLI, ModelTier: r.ModelTier, Source: r.Source}, err
 	}
-	return os.Rename(tmp, tipPath)
+}
+
+func capabilityOf(inspect func(string, string) (capability.Inspection, error)) func(string, string) (subagentrun.Capability, error) {
+	return func(dir, cli string) (subagentrun.Capability, error) {
+		insp, err := inspect(dir, cli)
+		return subagentrun.Capability{BudgetNative: insp.Manifest.BudgetNative, PermissionScoping: insp.Manifest.PermissionScoping, Warns: insp.Warns}, err
+	}
+}
+
+func tierOf(resolve func(ResolveModelTierRequest, ResolveModelTierOptions) (string, error)) func(subagentrun.TierRequest) (string, error) {
+	return func(t subagentrun.TierRequest) (string, error) {
+		return resolve(ResolveModelTierRequest{
+			ProfilePath:            t.ProfilePath,
+			Cycle:                  t.Cycle,
+			ProjectRoot:            t.ProjectRoot,
+			WorktreePath:           t.WorktreePath,
+			ModelTierHint:          t.ModelTierHint,
+			AuditorTierOverride:    t.AuditorTierOverride,
+			DiffComplexityDisabled: t.DiffComplexityDisabled,
+		}, ResolveModelTierOptions{})
+	}
+}
+
+// adapterOf is the bridge exec port: the gobridge-backed adapter carrying the
+// root's Center when no ExecAdapter seam was supplied (production), else the
+// supplied func over the vestigial adapter path and the rendered env (the
+// by-name binders' shape).
+func adapterOf(opts RunOptions) subagentrun.Adapter {
+	if opts.ExecAdapter == nil {
+		return bridgeAdapter{signals: opts.Signals}
+	}
+	return subagentrun.AdapterFunc(func(ctx context.Context, e subagentrun.AdapterEnv) (int, error) {
+		return opts.ExecAdapter(ctx, e.AdapterPath, e.Map())
+	})
 }
 
 // capabilityTier maps Manifest support flags to the v8.51.0 quality_tier
-// label used by ledger entries. full = both supports true; degraded = both
-// false; hybrid = one of each.
+// label used by ledger entries (the fan-out dispatcher's spelling).
 func capabilityTier(m capability.Manifest) string {
-	if m.BudgetNative && m.PermissionScoping {
-		return "full"
-	}
-	if !m.BudgetNative && !m.PermissionScoping {
-		return "degraded"
-	}
-	return "hybrid"
+	return subagentrun.QualityTier(m.BudgetNative, m.PermissionScoping)
 }
 
+// generateRunToken mints the 16-hex challenge token; a nil rng is
+// crypto/rand (the fan-out dispatcher's spelling).
 func generateRunToken(rng func([]byte) (int, error)) (string, error) {
 	if rng == nil {
 		rng = rand.Read
 	}
-	buf := make([]byte, ChallengeTokenBytes)
-	n, err := rng(buf)
-	if err != nil {
-		return "", err
-	}
-	if n != ChallengeTokenBytes {
-		return "", fmt.Errorf("rand returned %d bytes, want %d", n, ChallengeTokenBytes)
-	}
-	return hex.EncodeToString(buf), nil
+	return subagentrun.MintToken(rng)
 }
 
+// fillRunDefaults wires the production seams for every nil option; ExecAdapter
+// stays nil so adapterOf builds the Center-carrying bridge adapter.
 func fillRunDefaults(opts *RunOptions) {
 	if opts.ReadProfile == nil {
 		opts.ReadProfile = defaultReadProfile
@@ -643,10 +330,7 @@ func fillRunDefaults(opts *RunOptions) {
 		opts.ResolveModelTier = ResolveModelTier
 	}
 	if opts.AdapterExists == nil {
-		opts.AdapterExists = defaultAdapterExists
-	}
-	if opts.ExecAdapter == nil {
-		opts.ExecAdapter = defaultExecAdapter
+		opts.AdapterExists = driverExists
 	}
 	if opts.WriteFile == nil {
 		opts.WriteFile = os.WriteFile

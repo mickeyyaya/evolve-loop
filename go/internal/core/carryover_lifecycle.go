@@ -95,8 +95,6 @@ func mergeCarryoverTodos(disk, incoming []CarryoverTodo) []CarryoverTodo {
 	return carryover.MergeTodos(disk, incoming)
 }
 
-func capRunes(s string, maxRunes int) string { return carryover.CapRunes(s, maxRunes) }
-
 func failureLearningSummary(cycle int, failed Phase, err error) string {
 	return carryover.Summary(cycle, failed, err)
 }

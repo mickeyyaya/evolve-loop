@@ -385,6 +385,13 @@ func runSubagentRun(args []string, stdout, stderr io.Writer) int {
 	flags := readSubagentRunFlags()
 	wc := loadWorkflowConfig(layout.EvolveDir)
 
+	// The second Signal Center root (ADR-0103 unit 16): the dispatcher's
+	// BRIDGE_SUBAGENT_* warnings and the bridge engine's own producers land in
+	// <runs/cycle-N>/signals.ndjson beside the orchestrator's (the cycle-less
+	// file at cycle 0) and on stderr at WARN — the same topology cmd_cycle builds.
+	signals := newRootSignalCenter(layout.ProjectRoot, layout.EvolveDir, stderr)
+	defer signals.Flush()
+
 	res, err := subagent.Run(context.Background(), subagent.RunRequest{
 		Agent:                  agent,
 		Cycle:                  cycle,
@@ -404,7 +411,7 @@ func runSubagentRun(args []string, stdout, stderr io.Writer) int {
 		LegacyAgentDispatch:    flags.legacyAgentDispatch,
 		DispatchDepth:          subagent.ReadDispatchDepth(os.Getenv),
 		ChallengeTokenOverride: os.Getenv(subagent.FanoutWorkerTokenEnv),
-	}, subagent.RunOptions{})
+	}, subagent.RunOptions{Signals: signals})
 	if err != nil {
 		fmt.Fprintf(stderr, "[subagent-run] FAIL: %v\n", err)
 		return 1
@@ -412,6 +419,13 @@ func runSubagentRun(args []string, stdout, stderr io.Writer) int {
 	for _, w := range res.Warns {
 		fmt.Fprintln(stderr, w)
 	}
+	return renderRunOutcome(res, agent, cycle, stderr)
+}
+
+// renderRunOutcome prints the verdict line and maps the verdict to the
+// command's exit code: PASS 0, INTEGRITY_FAIL 2, anything else 1 (the fan-out
+// parent folds 1 and 2 to its worker-failure exit).
+func renderRunOutcome(res subagent.RunResult, agent string, cycle int, stderr io.Writer) int {
 	fmt.Fprintf(stderr, "[subagent-run] verdict=%s agent=%s cycle=%d artifact=%s exit=%d duration_ms=%d\n",
 		res.Verdict, agent, cycle, res.ArtifactPath, res.ExitCode, res.DurationMS)
 	switch res.Verdict {

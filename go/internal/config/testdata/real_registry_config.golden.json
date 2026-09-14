@@ -1,0 +1,430 @@
+{
+  "Stage": 2,
+  "Mode": 0,
+  "ModelRouting": 2,
+  "CommitEvidence": 0,
+  "ReviewGate": 0,
+  "EvalGate": 3,
+  "ContractGate": 3,
+  "TriageCapGate": 3,
+  "TopNGate": 3,
+  "SandboxMode": "auto",
+  "PhaseRecovery": 1,
+  "SpineFloor": 3,
+  "PhaseIO": 3,
+  "RouterReplan": 1,
+  "MergeGate": 1,
+  "ParallelEvaluate": 0,
+  "ScoutDecompose": 0,
+  "Mandatory": [
+    "scout",
+    "triage",
+    "build",
+    "audit",
+    "ship"
+  ],
+  "Conditional": {
+    "build-planner": {
+      "Field": "triage.unified_size",
+      "Op": "!=",
+      "Value": "",
+      "And": null
+    },
+    "plan-review": {
+      "Field": "triage.unified_size",
+      "Op": "!=",
+      "Value": "",
+      "And": null
+    },
+    "tdd": {
+      "Field": "cycle_size",
+      "Op": "!=",
+      "Value": "trivial",
+      "And": [
+        {
+          "Field": "deliverable_kind",
+          "Op": "!=",
+          "Value": "document",
+          "And": null
+        }
+      ]
+    }
+  },
+  "DeliverableKinds": {
+    "document": {
+      "root": "solutions",
+      "min_options": 2,
+      "required_files": [
+        "recommendation.md",
+        "assumptions-and-evidence.md"
+      ],
+      "required_sections": {
+        "assumptions-and-evidence.md": [
+          "Assumptions",
+          "Evidence"
+        ],
+        "recommendation.md": [
+          "Options Compared",
+          "Recommendation"
+        ]
+      },
+      "forbid_placeholders": [
+        "TBD",
+        "TODO",
+        "lorem ipsum"
+      ],
+      "evidence_file": "assumptions-and-evidence.md"
+    }
+  },
+  "MaxInsertions": 6,
+  "ParallelEvaluateConcurrency": 3,
+  "ScoutDecomposeConcurrency": 4,
+  "PhaseEnable": {
+    "architecture-design": 0,
+    "build-planner": 2,
+    "swarm-plan": 2,
+    "tdd": 1,
+    "tester": 0,
+    "triage": 1
+  },
+  "Triggers": {
+    "architecture-design": {
+      "insert_when": [
+        {
+          "field": "scout.cycle_size",
+          "op": "==",
+          "value": "large"
+        }
+      ],
+      "skip_when": null,
+      "rubric_hint": [
+        "a novel/cross-cutting goal also warrants architecture-design (a design pass before tdd/build)"
+      ]
+    },
+    "plan-review": {
+      "insert_when": null,
+      "skip_when": null,
+      "rubric_hint": [
+        "build.files_touched \u003e= 10 OR build.diff_loc \u003e= 500 → insert plan-review"
+      ]
+    },
+    "retrospective": {
+      "insert_when": null,
+      "skip_when": null,
+      "rubric_hint": [
+        "audit.verdict == FAIL OR audit.confidence \u003c 0.85 → insert retrospective"
+      ]
+    },
+    "scout": {
+      "insert_when": null,
+      "skip_when": null,
+      "rubric_hint": [
+        "scout.carryover_count \u003e= 3 → skip scout (work already queued)",
+        "scout.item_count == 0 → end cycle early (no-ship is legitimate)"
+      ]
+    },
+    "tester": {
+      "insert_when": [
+        {
+          "field": "build.acs_red",
+          "op": "gt",
+          "value": 0
+        },
+        {
+          "field": "build.severity_max",
+          "op": "gte",
+          "value": "HIGH"
+        }
+      ],
+      "skip_when": null
+    }
+  },
+  "Order": [
+    "intent",
+    "scout",
+    "triage",
+    "spec-verify",
+    "architecture-design",
+    "plan-review",
+    "tdd",
+    "build-planner",
+    "build",
+    "doc-sync",
+    "tester",
+    "audit",
+    "ship",
+    "secret-leak-scan",
+    "flake-rerun-scan",
+    "retrospective",
+    "memo"
+  ],
+  "SpineOrder": [
+    "intent",
+    "scout",
+    "triage",
+    "tdd",
+    "build-planner",
+    "build",
+    "audit",
+    "ship",
+    "end"
+  ],
+  "LegalSuccessors": {
+    "audit": [
+      "ship",
+      "retrospective",
+      "tdd",
+      "build"
+    ],
+    "build": [
+      "audit"
+    ],
+    "build-planner": [
+      "build"
+    ],
+    "debugger": [
+      "ship",
+      "audit",
+      "build",
+      "tdd",
+      "end"
+    ],
+    "end": [],
+    "intent": [
+      "scout"
+    ],
+    "retrospective": [
+      "ship",
+      "tdd",
+      "end",
+      "audit"
+    ],
+    "scout": [
+      "triage",
+      "tdd",
+      "build",
+      "end"
+    ],
+    "ship": [
+      "end",
+      "debugger",
+      "audit",
+      "build",
+      "tdd",
+      "ship"
+    ],
+    "start": [
+      "intent",
+      "scout"
+    ],
+    "tdd": [
+      "build-planner",
+      "build"
+    ],
+    "triage": [
+      "tdd",
+      "build",
+      "end"
+    ]
+  },
+  "AuditFailRoutesTo": "",
+  "GoalRecipes": {
+    "accessibility": [
+      "scope-baseline",
+      "[build]",
+      "accessibility-audit",
+      "adversarial-review"
+    ],
+    "accounting-close": [
+      "account-reconcile",
+      "variance-analysis",
+      "close-checklist",
+      "[build]"
+    ],
+    "agent-instruction": [
+      "premise-challenge",
+      "[build]",
+      "prompt-regression-eval",
+      "adversarial-review"
+    ],
+    "api-design": [
+      "api-contract-design",
+      "[tdd, build]",
+      "compat-surface-check",
+      "contract-fuzz-probe"
+    ],
+    "bugfix": [
+      "premise-challenge",
+      "fault-localization",
+      "bug-reproduction",
+      "[tdd, build]",
+      "error-handling-scan",
+      "coverage-gate",
+      "flake-rerun-scan"
+    ],
+    "business-plan": [
+      "forces-analysis",
+      "market-sizing",
+      "scope-baseline",
+      "okr-draft",
+      "[build]",
+      "risk-register",
+      "adversarial-review"
+    ],
+    "business-strategy": [
+      "forces-analysis",
+      "market-sizing",
+      "okr-draft",
+      "[build]"
+    ],
+    "caching": [
+      "caching-strategy-design",
+      "[build]",
+      "cache-strategy-scan"
+    ],
+    "concurrency": [
+      "[tdd, build]",
+      "race-condition-scan",
+      "flake-rerun-scan",
+      "adversarial-review"
+    ],
+    "data-migration": [
+      "rollback-plan",
+      "[tdd, build]",
+      "migration-safety-check",
+      "coverage-gate"
+    ],
+    "data-pipeline": [
+      "scope-baseline",
+      "[build]",
+      "data-integrity-check",
+      "migration-safety-check"
+    ],
+    "database": [
+      "data-model-design",
+      "[tdd, build]",
+      "query-performance-scan",
+      "migration-safety-check"
+    ],
+    "docs / trivial": [
+      "spine only (no insertions)"
+    ],
+    "feature": [
+      "premise-challenge",
+      "spec-verify",
+      "api-contract-design",
+      "[tdd, build]",
+      "test-amplification",
+      "coverage-gate",
+      "secret-leak-scan"
+    ],
+    "frontend-ui": [
+      "prd-draft",
+      "[build]",
+      "frontend-design-review",
+      "accessibility-audit"
+    ],
+    "i18n": [
+      "scope-baseline",
+      "[build]",
+      "locale-format-check"
+    ],
+    "infrastructure": [
+      "[build]",
+      "container-hardening-scan",
+      "cicd-pipeline-audit",
+      "secret-leak-scan"
+    ],
+    "messaging": [
+      "[tdd, build]",
+      "idempotency-check",
+      "contract-fuzz-probe"
+    ],
+    "observability": [
+      "observability-design",
+      "[build]",
+      "telemetry-coverage-check",
+      "adversarial-review"
+    ],
+    "ops-incident": [
+      "incident-postmortem",
+      "runbook-draft",
+      "capacity-plan",
+      "[build]"
+    ],
+    "partnership-deal": [
+      "forces-analysis",
+      "market-sizing",
+      "scope-baseline",
+      "[build]",
+      "risk-register",
+      "adversarial-review"
+    ],
+    "performance": [
+      "benchmark baseline capture",
+      "[build]",
+      "benchmark-gate"
+    ],
+    "product-discovery": [
+      "opportunity-map",
+      "prd-draft",
+      "metric-tree",
+      "[build]"
+    ],
+    "project-management": [
+      "risk-register",
+      "scope-baseline",
+      "dependency-map",
+      "[build = the planning deliverable]"
+    ],
+    "refactor": [
+      "smell-scan",
+      "behavior-baseline",
+      "[build]",
+      "behavior-compare",
+      "type-safety-audit",
+      "mutation-gate",
+      "coverage-gate",
+      "cleanup-sweep"
+    ],
+    "release": [
+      "rollout-plan",
+      "rollback-plan",
+      "changelog-sync",
+      "[ship]",
+      "post-ship-monitor"
+    ],
+    "resilience": [
+      "resilience-design",
+      "[tdd, build]",
+      "resilience-gap-scan",
+      "flake-rerun-scan"
+    ],
+    "security": [
+      "threat-model",
+      "[tdd, build]",
+      "security-scan + dependency-audit",
+      "authz-gap-scan",
+      "secret-leak-scan",
+      "fuzz-probe"
+    ],
+    "strategy-options": [
+      "premise-challenge",
+      "forces-analysis",
+      "market-sizing",
+      "scope-baseline",
+      "[build]",
+      "adversarial-review"
+    ],
+    "supply-chain": [
+      "[build]",
+      "dependency-audit",
+      "license-provenance-audit",
+      "secret-leak-scan"
+    ]
+  },
+  "RoutingJudge": false,
+  "ReconDigest": false,
+  "RePlanMaxDepth": 1,
+  "CompactPrompts": true
+}

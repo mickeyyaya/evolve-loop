@@ -5,9 +5,9 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseorder"
 )
@@ -42,7 +42,7 @@ func RunPhaseOrder(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 			projectRoot, _ = os.Getwd()
 		}
 	}
-	registryPath := filepath.Join(projectRoot, "docs", "architecture", "phase-registry.json")
+	registryPath := config.RegistryPath(projectRoot)
 
 	phases, err := phaseorder.List(registryPath, useRegistry)
 	if err != nil {

@@ -19,20 +19,19 @@ package core
 // ADR-0086 bookkeeping regrade cover an auditor that finishes without
 // upgrading.
 //
-// The ancestor-ledger read here duplicates the audit package's wire shape by
-// necessity (audit imports core; core cannot import audit). The two readers
-// are pinned against each other by
-// phases/audit/disposition_seed_singlesource_test.go, which feeds one real
+// The ancestor ledger is decoded through its owner, internal/core/defectledger
+// (ADR-0103 unit 09): the seeder reads the same Doc and the same OPEN
+// vocabulary the audit gate writes and grades, so the two sides cannot drift.
+// phases/audit/disposition_seed_singlesource_test.go still feeds one real
 // ledger document through both and asserts the same OPEN id set.
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core/defectledger"
 )
 
 // seededDisposition is one skeleton entry. Text rides along for the auditor
@@ -55,30 +54,17 @@ func SeedDispositionSkeleton(workspace, projectRoot string, ancestorCycle int) {
 	if workspace == "" || projectRoot == "" {
 		return
 	}
-	target := filepath.Join(workspace, "defect-dispositions.json")
+	target := filepath.Join(workspace, defectledger.DispositionsFile)
 	if _, err := os.Stat(target); err == nil {
 		return
 	}
-	raw, err := os.ReadFile(filepath.Join(projectRoot, ".evolve", "runs", "cycle-"+strconv.Itoa(ancestorCycle), "defect-ledger.json"))
-	if err != nil {
-		return
-	}
-	var ledger struct {
-		Entries []struct {
-			ID     string `json:"id"`
-			Text   string `json:"text"`
-			Status string `json:"status"`
-		} `json:"entries"`
-	}
-	if json.Unmarshal(raw, &ledger) != nil {
+	ledger, ok, err := defectledger.Read(RunWorkspacePath(projectRoot, ancestorCycle))
+	if err != nil || !ok {
 		return
 	}
 	var seeds []seededDisposition
-	for _, e := range ledger.Entries {
-		if e.Status != "OPEN" {
-			continue
-		}
-		seeds = append(seeds, seededDisposition{ID: e.ID, Status: "OPEN", Text: e.Text})
+	for _, e := range ledger.OpenEntries() {
+		seeds = append(seeds, seededDisposition{ID: e.ID, Status: defectledger.StatusOpen, Text: e.Text})
 	}
 	if len(seeds) == 0 {
 		return

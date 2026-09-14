@@ -60,9 +60,10 @@ func (b *loopBatchCoordinator) completeSequentialCycle(iteration int, cycle sequ
 // root makes): best-effort, a lifecycle hiccup WARNs but never changes the
 // batch's flow. The walk appends its lifecycle lines through the root's
 // ledger (deps.Ledger) so the Signal Center observes them like every other
-// entry (ADR-0101 S4a).
+// entry (ADR-0101 S4a), and reports its own faults through the root's Center
+// (deps.Signals; ADR-0103 unit 06).
 func (b *loopBatchCoordinator) applyCycleFailureOutcome(cycle int) {
-	if err := applyCycleFailureOutcome(b.cfg.ProjectRoot, b.cfg.EvolveDir, cycle, b.stderr, b.deps.Ledger); err != nil {
+	if err := applyCycleFailureOutcome(b.cfg.ProjectRoot, b.cfg.EvolveDir, cycle, b.stderr, b.deps.Ledger, b.deps.Signals); err != nil {
 		fmt.Fprintf(b.stderr, "[loop] WARN: could not apply cycle %d failure outcome to the inbox: %v\n", cycle, err)
 	}
 }

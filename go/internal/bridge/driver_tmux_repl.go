@@ -232,10 +232,7 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 			}
 		}
 	}
-	contract := cfg.Completion
-	if contract == "" {
-		contract = "artifact"
-	}
+	contract := completionContractName(cfg.Completion)
 	fmt.Fprintf(deps.Stderr, "%s DONE: %s completion verdict = SUCCESS\n", pfx, contract)
 	return 0, nil
 }

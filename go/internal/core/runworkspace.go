@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 )
 
 // ResolveCycleStatePath returns the absolute cycle-state file path THIS process
@@ -86,10 +86,11 @@ func RunIDFromWorkspace(workspace string) string {
 // other's update.
 const CycleStateFile = "cycle-state.json"
 
-// RunWorkspacePath is the single source for a cycle's run-workspace
-// directory: <projectRoot>/.evolve/runs/cycle-<N>. Phase artifacts, the
-// tmux session registry (CB.5) and the run.json guard mirror (CB.4) all
-// live here.
+// RunWorkspacePath is core's single spelling of a cycle's run-workspace
+// directory, <projectRoot>/.evolve/runs/cycle-<N> — a projection of
+// paths.RunWorkspace, the layout's one home (ADR-0103 unit 09). Phase
+// artifacts, the tmux session registry (CB.5) and the run.json guard mirror
+// (CB.4) all live here.
 func RunWorkspacePath(projectRoot string, cycle int) string {
-	return filepath.Join(projectRoot, ".evolve", "runs", "cycle-"+strconv.Itoa(cycle))
+	return paths.RunWorkspace(projectRoot, cycle)
 }

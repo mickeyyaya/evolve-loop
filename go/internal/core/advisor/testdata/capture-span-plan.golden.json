@@ -1,0 +1,1 @@
+{"gen_ai.request.model":"deep","gen_ai.system":"claude","prompt_sha":"70d9ae3e79f1e1c8c5072973a9754a8618b65ea4126e9204b8b2ccfc8b7b9bd8","response_sha":"6ed962f94ccc0525fe8a9974ab5e5dfa73b371cbee135185d603f5896db78927","duration_ms":1234,"replan_depth":0,"tokens":{"input":10,"output":20,"cache_read":3,"cache_write":4}}

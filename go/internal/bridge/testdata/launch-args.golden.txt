@@ -1,0 +1,23 @@
+--cli=claude-tmux
+--profile=/p/profile.json
+--model=opus
+--prompt-file=/ws/build-prompt.txt
+--workspace=/ws
+--stdout-log=/ws/build-stdout.log
+--stderr-log=/ws/build-stderr.log
+--artifact=/ws/report.md
+--secondary-artifacts=/ws/second.md/ws/third.json
+--cycle=1700
+--agent=build
+--artifact-timeout-s=900
+--worktree=/wt
+--run-id=run-1700
+--project-root=/root
+--require-sandbox
+--completion=stdout
+--permission-mode=plan
+--session-name=evolve-build
+--allow-bypass
+--
+--bare
+--strict-mcp-config

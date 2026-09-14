@@ -1,0 +1,8 @@
+== minwidth_guard_not_met handled=false
+[loop] loop.wave WARN LOOP_WAVE_EMPTY_PLAN seq=1 origin=Engine.RepairMinWidth — wave 4 planned zero lanes (empty triage plan), falling back to sequential cause=empty_triage_plan desired=1 realized=1 wave=4
+== minwidth_dispatched handled=true
+[loop] loop.wave WARN LOOP_MIN_WIDTH_REPAIR seq=1 origin=Engine.RepairMinWidth — wave 4: min-width repair dispatched 1/1 isolated lane (fleet.count=3 shrank to 1) desired=3 realized=1 wave=4
+== minwidth_empty_backlog handled=false
+[loop] loop.wave WARN LOOP_WAVE_EMPTY_PLAN seq=1 origin=Engine.RepairMinWidth — wave 4 planned zero lanes (empty backlog), falling back to sequential cause=empty_backlog desired=2 realized=1 wave=4
+== minwidth_failed handled=false
+[loop] loop.wave WARN LOOP_WAVE_DISPATCH_FAILED seq=1 origin=Engine.RepairMinWidth — wave 4 min-width repair failed, falling back to sequential: wave 4: control-plane preflight: dirty control plane error=dirty control plane path=repair step=preflight wave=4

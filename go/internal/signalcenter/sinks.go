@@ -162,3 +162,12 @@ func Filter(l Listener, at Severity) Listener {
 		}
 	}
 }
+
+// ConsoleSink is the console half of every composition root's topology: the
+// stderr line renderer at WARN and above — the severity contract's "log only"
+// INFO tier stays in the durable file (design §6.9, §7). The threshold has
+// this ONE home; the orchestrator roots (newRootSignalCenter) and the
+// `evolve phase-observer` subprocess consume it.
+func ConsoleSink(w io.Writer) Listener {
+	return Filter(StderrSink(w), SeverityWarn)
+}

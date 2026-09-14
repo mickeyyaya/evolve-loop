@@ -21,6 +21,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/observerengine"
 )
 
 // Defaults from CLAUDE.md env-var table.
@@ -43,9 +45,8 @@ const (
 	// adapter writes <phase>-observer-events.ndjson into WorkspaceDir). It is
 	// excluded from the workspace-activity scan so the observer's own
 	// started/stall/stopped writes can never reset the stall timer and mask a
-	// genuine stall. Must match the adapter's eventsPath convention
-	// (core_adapter.go).
-	observerEventsSuffix = "-observer-events.ndjson"
+	// genuine stall. Projected from the engine's one layout (ADR-0103 unit 12).
+	observerEventsSuffix = observerengine.EventsSuffix
 
 	// activityScanMaxFiles bounds the per-poll workspace walk. The per-phase
 	// workspace (.evolve/runs/cycle-N) is small and the per-cycle git worktree

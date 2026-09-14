@@ -29,6 +29,28 @@ import (
 // Default ("" / "artifact") preserves the legacy path-poll byte-for-byte, so
 // the abstraction is dormant until a phase opts into a different contract.
 
+// The contract vocabulary — what core.BridgeRequest.Completion / Config.
+// Completion carry (ports.go:275 documents the request side). Spelled ONCE:
+// the factory switches on these names, and completionContractName is the one
+// spelling of the "" ⇒ artifact default that the engine's result read and
+// the tmux DONE line project (ADR-0103 unit 10, review fold).
+const (
+	completionArtifact = "artifact"
+	completionStdout   = "stdout"
+	completionGit      = "git"
+)
+
+// completionContractName names the contract a mode selects: "" is the
+// artifact contract (the legacy default); any other mode is its own name —
+// the factory's unknown-mode fallback is a detector choice, never a rename,
+// so a typo keeps its bytes wherever the name is rendered.
+func completionContractName(mode string) string {
+	if mode == "" {
+		return completionArtifact
+	}
+	return mode
+}
+
 // stdoutIdlePolls is how many consecutive unchanged poll ticks (each ~2s in
 // the wait loop) with the REPL prompt marker visible count as "the turn
 // finished" for the stdout contract. Debounce: a streaming agent's pane
@@ -91,9 +113,9 @@ type completionDetector interface {
 // disable completion — it just keeps the legacy behavior.
 func newCompletionDetector(mode string, cfg *Config, deps Deps, lp tmuxLaunch, base artifactBaseline) completionDetector {
 	switch mode {
-	case "stdout":
+	case completionStdout:
 		return &stdoutDetector{cfg: cfg, deps: deps, lp: lp, threshold: stdoutIdlePolls}
-	case "git":
+	case completionGit:
 		return newGitEvidenceDetector(cfg, deps)
 	default:
 		return &artifactDetector{cfg: cfg, baseline: base}

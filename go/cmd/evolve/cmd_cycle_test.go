@@ -268,3 +268,22 @@ func readJSONT(t *testing.T, path string) map[string]any {
 	}
 	return m
 }
+
+// TestParseRouterStage_LadderAndUnknown is the missing twin of TestParseGateStage
+// (ADR-0103 unit 08): the router ladder accepts advisory, trims, and maps an
+// unknown word to off silently — the mapping cmd_cycle.go:700 and
+// cmd_loop_preflight.go:32 keep through the seam's forwarders.
+func TestParseRouterStage_LadderAndUnknown(t *testing.T) {
+	for input, want := range map[string]config.Stage{
+		"off":      config.StageOff,
+		"0":        config.StageOff,
+		" shadow ": config.StageShadow,
+		"advisory": config.StageAdvisory,
+		"enforce":  config.StageEnforce,
+		"unknown":  config.StageOff,
+	} {
+		if got := parseRouterStage(input); got != want {
+			t.Errorf("parseRouterStage(%q) = %v, want %v", input, got, want)
+		}
+	}
+}

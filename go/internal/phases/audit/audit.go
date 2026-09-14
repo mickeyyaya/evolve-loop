@@ -42,7 +42,9 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/changedpkgs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/codequality"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core/defectledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
@@ -51,6 +53,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 	"github.com/mickeyyaya/evolve-loop/go/internal/regressiontia"
 	"github.com/mickeyyaya/evolve-loop/go/internal/reportdoc"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/skillcheck"
 )
 
@@ -138,6 +141,10 @@ type hooks struct {
 	// the legacy prose/regex fallbacks are gated off. Zero value (StageOff) keeps
 	// every path active, byte-identical.
 	phaseIO config.Stage
+	// ledger is the unit-09 defect ledger (ADR-0103): New wires it with the
+	// root's Center; nil (a hooks{} literal) resolves to the Null Object
+	// through defectLedger() — same gate, no Center.
+	ledger *defectledger.Ledger
 }
 
 func (hooks) PhaseName() string       { return string(core.PhaseAudit) }
@@ -151,10 +158,10 @@ func (hooks) AgentPromptName() string { return "evolve-auditor" }
 // failed cycles 1397-1429. Non-continuation audits return nil: byte-identical
 // legacy behavior.
 func (hooks) SecondaryArtifacts(req core.PhaseRequest) []string {
-	if _, err := os.Stat(filepath.Join(req.Workspace, "continuation-manifest.json")); err != nil {
+	if _, err := os.Stat(filepath.Join(req.Workspace, continuation.ManifestName)); err != nil {
 		return nil
 	}
-	return []string{filepath.Join(req.Workspace, "defect-dispositions.json")}
+	return []string{filepath.Join(req.Workspace, defectDispositionFile)}
 }
 
 func (hooks) ArtifactFilename(_ core.PhaseRequest) string {
@@ -162,7 +169,7 @@ func (hooks) ArtifactFilename(_ core.PhaseRequest) string {
 }
 func (hooks) DefaultModel() string { return "opus" } // Adversarial cross-family from Builder's Sonnet.
 
-func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
+func (h hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	var b strings.Builder
 	b.WriteString(runner.BaseCycleContext(body, req))
 	if req.Worktree != "" {
@@ -176,7 +183,7 @@ func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	}
 	// Continuations are TOLD their inherited OPEN defect ids (2026-08-10
 	// investigation: auditors were graded against ids they were never shown).
-	b.WriteString(inheritedDefectsPromptBlock(req))
+	b.WriteString(inheritedDefectsPromptBlockVia(h.defectLedger(), req))
 	b.WriteString(chainExamplePromptBlock())
 	return b.String()
 }
@@ -408,35 +415,68 @@ type Config struct {
 	// doc before dispatch. Value flows from workflow.compact_prompts (policy.json);
 	// never set to a bare literal here (standing rule: phase-settings-from-config).
 	CompactPrompts bool
+	// Signals is the accessor of the root's Signal Center the defect ledger
+	// (ADR-0103 unit 09) and the CI-parity gates (unit 14) report through, read
+	// at every use. nil = the Null Object: the registry root (evolve phase
+	// audit), New(Config{}) and the tests emit nothing; the loop root passes
+	// WithSignals.
+	Signals func() *signalcenter.Center
 }
 
-type Phase struct{ *runner.BaseRunner }
+// Option configures the production Config before the phase is built.
+type Option func(*Config)
+
+// WithSignals installs the Signal Center accessor the defect ledger and the
+// CI-parity gates report through (the loop root's Center; deliverable.WithSignals
+// precedent).
+func WithSignals(c func() *signalcenter.Center) Option {
+	return func(cfg *Config) { cfg.Signals = c }
+}
+
+type Phase struct {
+	*runner.BaseRunner
+	signals func() *signalcenter.Center // unit 14 (ADR-0103): the CI-parity gates' Center accessor
+}
+
+// SignalsWired reports whether the CI-parity gates of this phase reach a
+// Signal Center — the roots' wiring proof, through the leaf.
+func (p *Phase) SignalsWired() bool {
+	return ciParity{signals: p.signals}.wiredGates().SignalsWired()
+}
 
 func New(c Config) *Phase {
-	if c.CheckSolution == nil && c.SolutionSpec != nil {
-		c.CheckSolution = solutionGate(*c.SolutionSpec)
-	}
 	return &Phase{
+		signals: c.Signals,
 		BaseRunner: runner.New(runner.Options{
-			Hooks: hooks{
-				genVerdict:                    c.GenerateVerdict,
-				predicateEvidence:             c.BeginPredicateEvidence,
-				explanationCheck:              c.CheckExplanation,
-				gofmtCheck:                    c.CheckGofmt,
-				solutionCheck:                 c.CheckSolution,
-				skillsDriftCheck:              c.CheckSkillsDrift,
-				goVetCheck:                    c.CheckGoVet,
-				acsDurableCheck:               c.CheckACSDurable,
-				integrationTierCheck:          c.CheckIntegrationTier,
-				apicoverEnforceCheck:          c.CheckApicoverEnforce,
-				apicoverNewPkgGraduationCheck: c.CheckApicoverNewPkgGraduation,
-				phaseIO:                       c.PhaseIO,
-			},
+			Hooks:          newHooks(c),
 			Bridge:         c.Bridge,
 			Prompts:        c.Prompts,
 			NowFn:          c.NowFn,
 			CompactPrompts: c.CompactPrompts,
 		}),
+	}
+}
+
+// newHooks is the ONE hooks literal (Factory Method): the injected seams from
+// the Config and the unit-09 defect ledger wired to the Config's Center.
+func newHooks(c Config) hooks {
+	if c.CheckSolution == nil && c.SolutionSpec != nil {
+		c.CheckSolution = solutionGate(*c.SolutionSpec)
+	}
+	return hooks{
+		genVerdict:                    c.GenerateVerdict,
+		predicateEvidence:             c.BeginPredicateEvidence,
+		explanationCheck:              c.CheckExplanation,
+		gofmtCheck:                    c.CheckGofmt,
+		solutionCheck:                 c.CheckSolution,
+		skillsDriftCheck:              c.CheckSkillsDrift,
+		goVetCheck:                    c.CheckGoVet,
+		acsDurableCheck:               c.CheckACSDurable,
+		integrationTierCheck:          c.CheckIntegrationTier,
+		apicoverEnforceCheck:          c.CheckApicoverEnforce,
+		apicoverNewPkgGraduationCheck: c.CheckApicoverNewPkgGraduation,
+		phaseIO:                       c.PhaseIO,
+		ledger:                        wiredDefectLedger(c.Signals),
 	}
 }
 
@@ -471,25 +511,31 @@ func NewDefaultWithStageCompact(br core.Bridge, prm *prompts.Loader, stage confi
 // NewDefaultWithStageCompactSpec is NewDefaultWithStageCompact plus the
 // registry's document deliverable contract (ADR-0099 slice 2), which the
 // composition root resolves ONCE and hands to both the build floor and this
-// audit gate. nil ⇒ no document contract ⇒ no solution gate.
-func NewDefaultWithStageCompactSpec(br core.Bridge, prm *prompts.Loader, stage config.Stage, compact bool, spec *config.DeliverableKindSpec) *Phase {
-	return New(Config{
-		SolutionSpec:                  spec,
-		Bridge:                        br,
-		Prompts:                       prm,
-		GenerateVerdict:               generateACSVerdict,
-		BeginPredicateEvidence:        beginPredicateEvidence,
-		CheckExplanation:              verifyExplanationDocumentation,
-		CheckGofmt:                    gofmtCheckDefault,
-		CheckSkillsDrift:              skillsDriftCheckDefault,
-		CheckGoVet:                    goVetCheckDefault,
-		CheckACSDurable:               acsDurableCheckDefault,
-		CheckIntegrationTier:          integrationTierCheckDefault,
-		CheckApicoverEnforce:          apicoverEnforceChangedDefault,
-		CheckApicoverNewPkgGraduation: apicoverNewPackageGraduationDefault,
-		PhaseIO:                       stage,
-		CompactPrompts:                compact,
-	})
+// audit gate. nil ⇒ no document contract ⇒ no solution gate. The variadic
+// options (WithSignals) let the composition root hand the Signal Center in
+// without touching the other callers.
+func NewDefaultWithStageCompactSpec(br core.Bridge, prm *prompts.Loader, stage config.Stage, compact bool, spec *config.DeliverableKindSpec, opts ...Option) *Phase {
+	cfg := Config{
+		SolutionSpec:           spec,
+		Bridge:                 br,
+		Prompts:                prm,
+		GenerateVerdict:        generateACSVerdict,
+		BeginPredicateEvidence: beginPredicateEvidence,
+		CheckExplanation:       verifyExplanationDocumentation,
+		CheckGofmt:             gofmtCheckDefault,
+		CheckSkillsDrift:       skillsDriftCheckDefault,
+		PhaseIO:                stage,
+		CompactPrompts:         compact,
+	}
+	for _, o := range opts {
+		o(&cfg)
+	}
+	// The CI-parity gates (ADR-0103 unit 14) are wired through the seam's
+	// per-Phase adapter so the loop root's Center reaches them — filling only
+	// the hooks no Option set, so an Option over Config is honoured in full;
+	// the five *Default facades stay Center-less for the by-name tests.
+	ciParity{signals: cfg.Signals}.wire(&cfg)
+	return New(cfg)
 }
 
 // verifyExplanationDocumentation is a native host gate, deliberately separate

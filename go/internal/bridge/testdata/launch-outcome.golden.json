@@ -1,0 +1,1458 @@
+[
+  {
+    "code": 0,
+    "ctx": "live",
+    "stderr": "empty",
+    "err": "",
+    "sentinel": "none",
+    "cause_code": ""
+  },
+  {
+    "code": 0,
+    "ctx": "live",
+    "stderr": "first-bridge-line",
+    "err": "",
+    "sentinel": "none",
+    "cause_code": ""
+  },
+  {
+    "code": 0,
+    "ctx": "live",
+    "stderr": "last-line-only",
+    "err": "",
+    "sentinel": "none",
+    "cause_code": ""
+  },
+  {
+    "code": 0,
+    "ctx": "live",
+    "stderr": "marker-submit-wedged",
+    "err": "",
+    "sentinel": "none",
+    "cause_code": ""
+  },
+  {
+    "code": 0,
+    "ctx": "live",
+    "stderr": "marker-prose",
+    "err": "",
+    "sentinel": "none",
+    "cause_code": ""
+  },
+  {
+    "code": 0,
+    "ctx": "live",
+    "stderr": "long-line",
+    "err": "",
+    "sentinel": "none",
+    "cause_code": ""
+  },
+  {
+    "code": 0,
+    "ctx": "live",
+    "stderr": "long-marker",
+    "err": "",
+    "sentinel": "none",
+    "cause_code": ""
+  },
+  {
+    "code": 0,
+    "ctx": "cancelled",
+    "stderr": "empty",
+    "err": "",
+    "sentinel": "none",
+    "cause_code": ""
+  },
+  {
+    "code": 0,
+    "ctx": "cancelled",
+    "stderr": "first-bridge-line",
+    "err": "",
+    "sentinel": "none",
+    "cause_code": ""
+  },
+  {
+    "code": 0,
+    "ctx": "cancelled",
+    "stderr": "last-line-only",
+    "err": "",
+    "sentinel": "none",
+    "cause_code": ""
+  },
+  {
+    "code": 0,
+    "ctx": "cancelled",
+    "stderr": "marker-submit-wedged",
+    "err": "",
+    "sentinel": "none",
+    "cause_code": ""
+  },
+  {
+    "code": 0,
+    "ctx": "cancelled",
+    "stderr": "marker-prose",
+    "err": "",
+    "sentinel": "none",
+    "cause_code": ""
+  },
+  {
+    "code": 0,
+    "ctx": "cancelled",
+    "stderr": "long-line",
+    "err": "",
+    "sentinel": "none",
+    "cause_code": ""
+  },
+  {
+    "code": 0,
+    "ctx": "cancelled",
+    "stderr": "long-marker",
+    "err": "",
+    "sentinel": "none",
+    "cause_code": ""
+  },
+  {
+    "code": 2,
+    "ctx": "live",
+    "stderr": "empty",
+    "err": "bridge: launch exit=2",
+    "sentinel": "plain",
+    "cause_code": "safety_gate"
+  },
+  {
+    "code": 2,
+    "ctx": "live",
+    "stderr": "first-bridge-line",
+    "err": "bridge: launch exit=2: [bridge] launch: missing required (flag or env): --profile",
+    "sentinel": "plain",
+    "cause_code": "safety_gate"
+  },
+  {
+    "code": 2,
+    "ctx": "live",
+    "stderr": "last-line-only",
+    "err": "bridge: launch exit=2: [claude-tmux] FAIL: completion never signalled",
+    "sentinel": "plain",
+    "cause_code": "safety_gate"
+  },
+  {
+    "code": 2,
+    "ctx": "live",
+    "stderr": "marker-submit-wedged",
+    "err": "bridge: launch exit=2: [bridge] WARN: EVOLVE_SANDBOX=on but inner sandbox not applied",
+    "sentinel": "plain",
+    "cause_code": "safety_gate"
+  },
+  {
+    "code": 2,
+    "ctx": "live",
+    "stderr": "marker-prose",
+    "err": "bridge: launch exit=2: [bridge] artifact-timeout: phase=build reason=\"quoted cause=submit_wedged text\" waited=20s",
+    "sentinel": "plain",
+    "cause_code": "safety_gate"
+  },
+  {
+    "code": 2,
+    "ctx": "live",
+    "stderr": "long-line",
+    "err": "bridge: launch exit=2: 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界…",
+    "sentinel": "plain",
+    "cause_code": "safety_gate"
+  },
+  {
+    "code": 2,
+    "ctx": "live",
+    "stderr": "long-marker",
+    "err": "bridge: launch exit=2: [bridge] artifact-timeout: cause=incomplete 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界…",
+    "sentinel": "plain",
+    "cause_code": "safety_gate"
+  },
+  {
+    "code": 2,
+    "ctx": "cancelled",
+    "stderr": "empty",
+    "err": "bridge: launch exit=2",
+    "sentinel": "plain",
+    "cause_code": "safety_gate"
+  },
+  {
+    "code": 2,
+    "ctx": "cancelled",
+    "stderr": "first-bridge-line",
+    "err": "bridge: launch exit=2: [bridge] launch: missing required (flag or env): --profile",
+    "sentinel": "plain",
+    "cause_code": "safety_gate"
+  },
+  {
+    "code": 2,
+    "ctx": "cancelled",
+    "stderr": "last-line-only",
+    "err": "bridge: launch exit=2: [claude-tmux] FAIL: completion never signalled",
+    "sentinel": "plain",
+    "cause_code": "safety_gate"
+  },
+  {
+    "code": 2,
+    "ctx": "cancelled",
+    "stderr": "marker-submit-wedged",
+    "err": "bridge: launch exit=2: [bridge] WARN: EVOLVE_SANDBOX=on but inner sandbox not applied",
+    "sentinel": "plain",
+    "cause_code": "safety_gate"
+  },
+  {
+    "code": 2,
+    "ctx": "cancelled",
+    "stderr": "marker-prose",
+    "err": "bridge: launch exit=2: [bridge] artifact-timeout: phase=build reason=\"quoted cause=submit_wedged text\" waited=20s",
+    "sentinel": "plain",
+    "cause_code": "safety_gate"
+  },
+  {
+    "code": 2,
+    "ctx": "cancelled",
+    "stderr": "long-line",
+    "err": "bridge: launch exit=2: 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界…",
+    "sentinel": "plain",
+    "cause_code": "safety_gate"
+  },
+  {
+    "code": 2,
+    "ctx": "cancelled",
+    "stderr": "long-marker",
+    "err": "bridge: launch exit=2: [bridge] artifact-timeout: cause=incomplete 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界…",
+    "sentinel": "plain",
+    "cause_code": "safety_gate"
+  },
+  {
+    "code": 3,
+    "ctx": "live",
+    "stderr": "empty",
+    "err": "bridge: launch exit=3",
+    "sentinel": "plain",
+    "cause_code": "cost_leak"
+  },
+  {
+    "code": 3,
+    "ctx": "live",
+    "stderr": "first-bridge-line",
+    "err": "bridge: launch exit=3: [bridge] launch: missing required (flag or env): --profile",
+    "sentinel": "plain",
+    "cause_code": "cost_leak"
+  },
+  {
+    "code": 3,
+    "ctx": "live",
+    "stderr": "last-line-only",
+    "err": "bridge: launch exit=3: [claude-tmux] FAIL: completion never signalled",
+    "sentinel": "plain",
+    "cause_code": "cost_leak"
+  },
+  {
+    "code": 3,
+    "ctx": "live",
+    "stderr": "marker-submit-wedged",
+    "err": "bridge: launch exit=3: [bridge] WARN: EVOLVE_SANDBOX=on but inner sandbox not applied",
+    "sentinel": "plain",
+    "cause_code": "cost_leak"
+  },
+  {
+    "code": 3,
+    "ctx": "live",
+    "stderr": "marker-prose",
+    "err": "bridge: launch exit=3: [bridge] artifact-timeout: phase=build reason=\"quoted cause=submit_wedged text\" waited=20s",
+    "sentinel": "plain",
+    "cause_code": "cost_leak"
+  },
+  {
+    "code": 3,
+    "ctx": "live",
+    "stderr": "long-line",
+    "err": "bridge: launch exit=3: 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界…",
+    "sentinel": "plain",
+    "cause_code": "cost_leak"
+  },
+  {
+    "code": 3,
+    "ctx": "live",
+    "stderr": "long-marker",
+    "err": "bridge: launch exit=3: [bridge] artifact-timeout: cause=incomplete 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界…",
+    "sentinel": "plain",
+    "cause_code": "cost_leak"
+  },
+  {
+    "code": 3,
+    "ctx": "cancelled",
+    "stderr": "empty",
+    "err": "bridge: launch exit=3",
+    "sentinel": "plain",
+    "cause_code": "cost_leak"
+  },
+  {
+    "code": 3,
+    "ctx": "cancelled",
+    "stderr": "first-bridge-line",
+    "err": "bridge: launch exit=3: [bridge] launch: missing required (flag or env): --profile",
+    "sentinel": "plain",
+    "cause_code": "cost_leak"
+  },
+  {
+    "code": 3,
+    "ctx": "cancelled",
+    "stderr": "last-line-only",
+    "err": "bridge: launch exit=3: [claude-tmux] FAIL: completion never signalled",
+    "sentinel": "plain",
+    "cause_code": "cost_leak"
+  },
+  {
+    "code": 3,
+    "ctx": "cancelled",
+    "stderr": "marker-submit-wedged",
+    "err": "bridge: launch exit=3: [bridge] WARN: EVOLVE_SANDBOX=on but inner sandbox not applied",
+    "sentinel": "plain",
+    "cause_code": "cost_leak"
+  },
+  {
+    "code": 3,
+    "ctx": "cancelled",
+    "stderr": "marker-prose",
+    "err": "bridge: launch exit=3: [bridge] artifact-timeout: phase=build reason=\"quoted cause=submit_wedged text\" waited=20s",
+    "sentinel": "plain",
+    "cause_code": "cost_leak"
+  },
+  {
+    "code": 3,
+    "ctx": "cancelled",
+    "stderr": "long-line",
+    "err": "bridge: launch exit=3: 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界…",
+    "sentinel": "plain",
+    "cause_code": "cost_leak"
+  },
+  {
+    "code": 3,
+    "ctx": "cancelled",
+    "stderr": "long-marker",
+    "err": "bridge: launch exit=3: [bridge] artifact-timeout: cause=incomplete 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界…",
+    "sentinel": "plain",
+    "cause_code": "cost_leak"
+  },
+  {
+    "code": 10,
+    "ctx": "live",
+    "stderr": "empty",
+    "err": "bridge: launch exit=10",
+    "sentinel": "plain",
+    "cause_code": "bad_flags"
+  },
+  {
+    "code": 10,
+    "ctx": "live",
+    "stderr": "first-bridge-line",
+    "err": "bridge: launch exit=10: [bridge] launch: missing required (flag or env): --profile",
+    "sentinel": "plain",
+    "cause_code": "bad_flags"
+  },
+  {
+    "code": 10,
+    "ctx": "live",
+    "stderr": "last-line-only",
+    "err": "bridge: launch exit=10: [claude-tmux] FAIL: completion never signalled",
+    "sentinel": "plain",
+    "cause_code": "bad_flags"
+  },
+  {
+    "code": 10,
+    "ctx": "live",
+    "stderr": "marker-submit-wedged",
+    "err": "bridge: launch exit=10: [bridge] WARN: EVOLVE_SANDBOX=on but inner sandbox not applied",
+    "sentinel": "plain",
+    "cause_code": "bad_flags"
+  },
+  {
+    "code": 10,
+    "ctx": "live",
+    "stderr": "marker-prose",
+    "err": "bridge: launch exit=10: [bridge] artifact-timeout: phase=build reason=\"quoted cause=submit_wedged text\" waited=20s",
+    "sentinel": "plain",
+    "cause_code": "bad_flags"
+  },
+  {
+    "code": 10,
+    "ctx": "live",
+    "stderr": "long-line",
+    "err": "bridge: launch exit=10: 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界…",
+    "sentinel": "plain",
+    "cause_code": "bad_flags"
+  },
+  {
+    "code": 10,
+    "ctx": "live",
+    "stderr": "long-marker",
+    "err": "bridge: launch exit=10: [bridge] artifact-timeout: cause=incomplete 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界…",
+    "sentinel": "plain",
+    "cause_code": "bad_flags"
+  },
+  {
+    "code": 10,
+    "ctx": "cancelled",
+    "stderr": "empty",
+    "err": "bridge: launch exit=10",
+    "sentinel": "plain",
+    "cause_code": "bad_flags"
+  },
+  {
+    "code": 10,
+    "ctx": "cancelled",
+    "stderr": "first-bridge-line",
+    "err": "bridge: launch exit=10: [bridge] launch: missing required (flag or env): --profile",
+    "sentinel": "plain",
+    "cause_code": "bad_flags"
+  },
+  {
+    "code": 10,
+    "ctx": "cancelled",
+    "stderr": "last-line-only",
+    "err": "bridge: launch exit=10: [claude-tmux] FAIL: completion never signalled",
+    "sentinel": "plain",
+    "cause_code": "bad_flags"
+  },
+  {
+    "code": 10,
+    "ctx": "cancelled",
+    "stderr": "marker-submit-wedged",
+    "err": "bridge: launch exit=10: [bridge] WARN: EVOLVE_SANDBOX=on but inner sandbox not applied",
+    "sentinel": "plain",
+    "cause_code": "bad_flags"
+  },
+  {
+    "code": 10,
+    "ctx": "cancelled",
+    "stderr": "marker-prose",
+    "err": "bridge: launch exit=10: [bridge] artifact-timeout: phase=build reason=\"quoted cause=submit_wedged text\" waited=20s",
+    "sentinel": "plain",
+    "cause_code": "bad_flags"
+  },
+  {
+    "code": 10,
+    "ctx": "cancelled",
+    "stderr": "long-line",
+    "err": "bridge: launch exit=10: 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界…",
+    "sentinel": "plain",
+    "cause_code": "bad_flags"
+  },
+  {
+    "code": 10,
+    "ctx": "cancelled",
+    "stderr": "long-marker",
+    "err": "bridge: launch exit=10: [bridge] artifact-timeout: cause=incomplete 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界…",
+    "sentinel": "plain",
+    "cause_code": "bad_flags"
+  },
+  {
+    "code": 80,
+    "ctx": "live",
+    "stderr": "empty",
+    "err": "bridge: launch exit=80: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "repl_boot_timeout"
+  },
+  {
+    "code": 80,
+    "ctx": "live",
+    "stderr": "first-bridge-line",
+    "err": "bridge: launch exit=80: [bridge] launch: missing required (flag or env): --profile: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "repl_boot_timeout"
+  },
+  {
+    "code": 80,
+    "ctx": "live",
+    "stderr": "last-line-only",
+    "err": "bridge: launch exit=80: [claude-tmux] FAIL: completion never signalled: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "repl_boot_timeout"
+  },
+  {
+    "code": 80,
+    "ctx": "live",
+    "stderr": "marker-submit-wedged",
+    "err": "bridge: launch exit=80: [bridge] WARN: EVOLVE_SANDBOX=on but inner sandbox not applied: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "repl_boot_timeout"
+  },
+  {
+    "code": 80,
+    "ctx": "live",
+    "stderr": "marker-prose",
+    "err": "bridge: launch exit=80: [bridge] artifact-timeout: phase=build reason=\"quoted cause=submit_wedged text\" waited=20s: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "repl_boot_timeout"
+  },
+  {
+    "code": 80,
+    "ctx": "live",
+    "stderr": "long-line",
+    "err": "bridge: launch exit=80: 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界…: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "repl_boot_timeout"
+  },
+  {
+    "code": 80,
+    "ctx": "live",
+    "stderr": "long-marker",
+    "err": "bridge: launch exit=80: [bridge] artifact-timeout: cause=incomplete 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界…: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "repl_boot_timeout"
+  },
+  {
+    "code": 80,
+    "ctx": "cancelled",
+    "stderr": "empty",
+    "err": "bridge: launch exit=80: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "repl_boot_timeout"
+  },
+  {
+    "code": 80,
+    "ctx": "cancelled",
+    "stderr": "first-bridge-line",
+    "err": "bridge: launch exit=80: [bridge] launch: missing required (flag or env): --profile: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "repl_boot_timeout"
+  },
+  {
+    "code": 80,
+    "ctx": "cancelled",
+    "stderr": "last-line-only",
+    "err": "bridge: launch exit=80: [claude-tmux] FAIL: completion never signalled: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "repl_boot_timeout"
+  },
+  {
+    "code": 80,
+    "ctx": "cancelled",
+    "stderr": "marker-submit-wedged",
+    "err": "bridge: launch exit=80: [bridge] WARN: EVOLVE_SANDBOX=on but inner sandbox not applied: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "repl_boot_timeout"
+  },
+  {
+    "code": 80,
+    "ctx": "cancelled",
+    "stderr": "marker-prose",
+    "err": "bridge: launch exit=80: [bridge] artifact-timeout: phase=build reason=\"quoted cause=submit_wedged text\" waited=20s: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "repl_boot_timeout"
+  },
+  {
+    "code": 80,
+    "ctx": "cancelled",
+    "stderr": "long-line",
+    "err": "bridge: launch exit=80: 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界…: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "repl_boot_timeout"
+  },
+  {
+    "code": 80,
+    "ctx": "cancelled",
+    "stderr": "long-marker",
+    "err": "bridge: launch exit=80: [bridge] artifact-timeout: cause=incomplete 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界…: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "repl_boot_timeout"
+  },
+  {
+    "code": 81,
+    "ctx": "live",
+    "stderr": "empty",
+    "err": "bridge: launch exit=81: core: bridge artifact timeout",
+    "sentinel": "artifact_timeout",
+    "cause_code": "artifact_timeout"
+  },
+  {
+    "code": 81,
+    "ctx": "live",
+    "stderr": "first-bridge-line",
+    "err": "bridge: launch exit=81: [bridge] launch: missing required (flag or env): --profile: core: bridge artifact timeout",
+    "sentinel": "artifact_timeout",
+    "cause_code": "artifact_timeout"
+  },
+  {
+    "code": 81,
+    "ctx": "live",
+    "stderr": "last-line-only",
+    "err": "bridge: launch exit=81: [claude-tmux] FAIL: completion never signalled: core: bridge artifact timeout",
+    "sentinel": "artifact_timeout",
+    "cause_code": "artifact_timeout"
+  },
+  {
+    "code": 81,
+    "ctx": "live",
+    "stderr": "marker-submit-wedged",
+    "err": "bridge: launch exit=81: artifact-timeout: cause=submit_wedged reason=\"prompt submit wedged\" phase=build cycle=3 driver=claude-tmux artifact=\"a.md\" waited=300s interval=300s extends_used=0 max_extends=6 last_review=none liveness=hung progressed=false busy=false transient=false detector_error=\"\": core: bridge artifact timeout",
+    "sentinel": "artifact_timeout",
+    "cause_code": "submit_wedged"
+  },
+  {
+    "code": 81,
+    "ctx": "live",
+    "stderr": "marker-prose",
+    "err": "bridge: launch exit=81: artifact-timeout: phase=build reason=\"quoted cause=submit_wedged text\" waited=20s: core: bridge artifact timeout",
+    "sentinel": "artifact_timeout",
+    "cause_code": "artifact_timeout"
+  },
+  {
+    "code": 81,
+    "ctx": "live",
+    "stderr": "long-line",
+    "err": "bridge: launch exit=81: 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界…: core: bridge artifact timeout",
+    "sentinel": "artifact_timeout",
+    "cause_code": "artifact_timeout"
+  },
+  {
+    "code": 81,
+    "ctx": "live",
+    "stderr": "long-marker",
+    "err": "bridge: launch exit=81: artifact-timeout: cause=incomplete 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界…: core: bridge artifact timeout",
+    "sentinel": "artifact_timeout",
+    "cause_code": "incomplete"
+  },
+  {
+    "code": 81,
+    "ctx": "cancelled",
+    "stderr": "empty",
+    "err": "bridge: launch exit=81: core: bridge artifact timeout",
+    "sentinel": "artifact_timeout",
+    "cause_code": "artifact_timeout"
+  },
+  {
+    "code": 81,
+    "ctx": "cancelled",
+    "stderr": "first-bridge-line",
+    "err": "bridge: launch exit=81: [bridge] launch: missing required (flag or env): --profile: core: bridge artifact timeout",
+    "sentinel": "artifact_timeout",
+    "cause_code": "artifact_timeout"
+  },
+  {
+    "code": 81,
+    "ctx": "cancelled",
+    "stderr": "last-line-only",
+    "err": "bridge: launch exit=81: [claude-tmux] FAIL: completion never signalled: core: bridge artifact timeout",
+    "sentinel": "artifact_timeout",
+    "cause_code": "artifact_timeout"
+  },
+  {
+    "code": 81,
+    "ctx": "cancelled",
+    "stderr": "marker-submit-wedged",
+    "err": "bridge: launch exit=81: artifact-timeout: cause=submit_wedged reason=\"prompt submit wedged\" phase=build cycle=3 driver=claude-tmux artifact=\"a.md\" waited=300s interval=300s extends_used=0 max_extends=6 last_review=none liveness=hung progressed=false busy=false transient=false detector_error=\"\": core: bridge artifact timeout",
+    "sentinel": "artifact_timeout",
+    "cause_code": "submit_wedged"
+  },
+  {
+    "code": 81,
+    "ctx": "cancelled",
+    "stderr": "marker-prose",
+    "err": "bridge: launch exit=81: artifact-timeout: phase=build reason=\"quoted cause=submit_wedged text\" waited=20s: core: bridge artifact timeout",
+    "sentinel": "artifact_timeout",
+    "cause_code": "artifact_timeout"
+  },
+  {
+    "code": 81,
+    "ctx": "cancelled",
+    "stderr": "long-line",
+    "err": "bridge: launch exit=81: 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界…: core: bridge artifact timeout",
+    "sentinel": "artifact_timeout",
+    "cause_code": "artifact_timeout"
+  },
+  {
+    "code": 81,
+    "ctx": "cancelled",
+    "stderr": "long-marker",
+    "err": "bridge: launch exit=81: artifact-timeout: cause=incomplete 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界…: core: bridge artifact timeout",
+    "sentinel": "artifact_timeout",
+    "cause_code": "incomplete"
+  },
+  {
+    "code": 85,
+    "ctx": "live",
+    "stderr": "empty",
+    "err": "bridge: launch exit=85: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "unknown_prompt"
+  },
+  {
+    "code": 85,
+    "ctx": "live",
+    "stderr": "first-bridge-line",
+    "err": "bridge: launch exit=85: [bridge] launch: missing required (flag or env): --profile: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "unknown_prompt"
+  },
+  {
+    "code": 85,
+    "ctx": "live",
+    "stderr": "last-line-only",
+    "err": "bridge: launch exit=85: [claude-tmux] FAIL: completion never signalled: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "unknown_prompt"
+  },
+  {
+    "code": 85,
+    "ctx": "live",
+    "stderr": "marker-submit-wedged",
+    "err": "bridge: launch exit=85: [bridge] WARN: EVOLVE_SANDBOX=on but inner sandbox not applied: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "unknown_prompt"
+  },
+  {
+    "code": 85,
+    "ctx": "live",
+    "stderr": "marker-prose",
+    "err": "bridge: launch exit=85: [bridge] artifact-timeout: phase=build reason=\"quoted cause=submit_wedged text\" waited=20s: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "unknown_prompt"
+  },
+  {
+    "code": 85,
+    "ctx": "live",
+    "stderr": "long-line",
+    "err": "bridge: launch exit=85: 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界…: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "unknown_prompt"
+  },
+  {
+    "code": 85,
+    "ctx": "live",
+    "stderr": "long-marker",
+    "err": "bridge: launch exit=85: [bridge] artifact-timeout: cause=incomplete 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界…: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "unknown_prompt"
+  },
+  {
+    "code": 85,
+    "ctx": "cancelled",
+    "stderr": "empty",
+    "err": "bridge: launch exit=85: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "unknown_prompt"
+  },
+  {
+    "code": 85,
+    "ctx": "cancelled",
+    "stderr": "first-bridge-line",
+    "err": "bridge: launch exit=85: [bridge] launch: missing required (flag or env): --profile: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "unknown_prompt"
+  },
+  {
+    "code": 85,
+    "ctx": "cancelled",
+    "stderr": "last-line-only",
+    "err": "bridge: launch exit=85: [claude-tmux] FAIL: completion never signalled: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "unknown_prompt"
+  },
+  {
+    "code": 85,
+    "ctx": "cancelled",
+    "stderr": "marker-submit-wedged",
+    "err": "bridge: launch exit=85: [bridge] WARN: EVOLVE_SANDBOX=on but inner sandbox not applied: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "unknown_prompt"
+  },
+  {
+    "code": 85,
+    "ctx": "cancelled",
+    "stderr": "marker-prose",
+    "err": "bridge: launch exit=85: [bridge] artifact-timeout: phase=build reason=\"quoted cause=submit_wedged text\" waited=20s: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "unknown_prompt"
+  },
+  {
+    "code": 85,
+    "ctx": "cancelled",
+    "stderr": "long-line",
+    "err": "bridge: launch exit=85: 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界…: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "unknown_prompt"
+  },
+  {
+    "code": 85,
+    "ctx": "cancelled",
+    "stderr": "long-marker",
+    "err": "bridge: launch exit=85: [bridge] artifact-timeout: cause=incomplete 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界…: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "unknown_prompt"
+  },
+  {
+    "code": 86,
+    "ctx": "live",
+    "stderr": "empty",
+    "err": "bridge: launch exit=86: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "respond_loop_guard"
+  },
+  {
+    "code": 86,
+    "ctx": "live",
+    "stderr": "first-bridge-line",
+    "err": "bridge: launch exit=86: [bridge] launch: missing required (flag or env): --profile: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "respond_loop_guard"
+  },
+  {
+    "code": 86,
+    "ctx": "live",
+    "stderr": "last-line-only",
+    "err": "bridge: launch exit=86: [claude-tmux] FAIL: completion never signalled: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "respond_loop_guard"
+  },
+  {
+    "code": 86,
+    "ctx": "live",
+    "stderr": "marker-submit-wedged",
+    "err": "bridge: launch exit=86: [bridge] WARN: EVOLVE_SANDBOX=on but inner sandbox not applied: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "respond_loop_guard"
+  },
+  {
+    "code": 86,
+    "ctx": "live",
+    "stderr": "marker-prose",
+    "err": "bridge: launch exit=86: [bridge] artifact-timeout: phase=build reason=\"quoted cause=submit_wedged text\" waited=20s: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "respond_loop_guard"
+  },
+  {
+    "code": 86,
+    "ctx": "live",
+    "stderr": "long-line",
+    "err": "bridge: launch exit=86: 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界…: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "respond_loop_guard"
+  },
+  {
+    "code": 86,
+    "ctx": "live",
+    "stderr": "long-marker",
+    "err": "bridge: launch exit=86: [bridge] artifact-timeout: cause=incomplete 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界…: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "respond_loop_guard"
+  },
+  {
+    "code": 86,
+    "ctx": "cancelled",
+    "stderr": "empty",
+    "err": "bridge: launch exit=86: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "respond_loop_guard"
+  },
+  {
+    "code": 86,
+    "ctx": "cancelled",
+    "stderr": "first-bridge-line",
+    "err": "bridge: launch exit=86: [bridge] launch: missing required (flag or env): --profile: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "respond_loop_guard"
+  },
+  {
+    "code": 86,
+    "ctx": "cancelled",
+    "stderr": "last-line-only",
+    "err": "bridge: launch exit=86: [claude-tmux] FAIL: completion never signalled: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "respond_loop_guard"
+  },
+  {
+    "code": 86,
+    "ctx": "cancelled",
+    "stderr": "marker-submit-wedged",
+    "err": "bridge: launch exit=86: [bridge] WARN: EVOLVE_SANDBOX=on but inner sandbox not applied: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "respond_loop_guard"
+  },
+  {
+    "code": 86,
+    "ctx": "cancelled",
+    "stderr": "marker-prose",
+    "err": "bridge: launch exit=86: [bridge] artifact-timeout: phase=build reason=\"quoted cause=submit_wedged text\" waited=20s: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "respond_loop_guard"
+  },
+  {
+    "code": 86,
+    "ctx": "cancelled",
+    "stderr": "long-line",
+    "err": "bridge: launch exit=86: 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界…: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "respond_loop_guard"
+  },
+  {
+    "code": 86,
+    "ctx": "cancelled",
+    "stderr": "long-marker",
+    "err": "bridge: launch exit=86: [bridge] artifact-timeout: cause=incomplete 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界…: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "respond_loop_guard"
+  },
+  {
+    "code": 99,
+    "ctx": "live",
+    "stderr": "empty",
+    "err": "bridge: launch exit=99",
+    "sentinel": "plain",
+    "cause_code": "required_tier_unavailable"
+  },
+  {
+    "code": 99,
+    "ctx": "live",
+    "stderr": "first-bridge-line",
+    "err": "bridge: launch exit=99: [bridge] launch: missing required (flag or env): --profile",
+    "sentinel": "plain",
+    "cause_code": "required_tier_unavailable"
+  },
+  {
+    "code": 99,
+    "ctx": "live",
+    "stderr": "last-line-only",
+    "err": "bridge: launch exit=99: [claude-tmux] FAIL: completion never signalled",
+    "sentinel": "plain",
+    "cause_code": "required_tier_unavailable"
+  },
+  {
+    "code": 99,
+    "ctx": "live",
+    "stderr": "marker-submit-wedged",
+    "err": "bridge: launch exit=99: [bridge] WARN: EVOLVE_SANDBOX=on but inner sandbox not applied",
+    "sentinel": "plain",
+    "cause_code": "required_tier_unavailable"
+  },
+  {
+    "code": 99,
+    "ctx": "live",
+    "stderr": "marker-prose",
+    "err": "bridge: launch exit=99: [bridge] artifact-timeout: phase=build reason=\"quoted cause=submit_wedged text\" waited=20s",
+    "sentinel": "plain",
+    "cause_code": "required_tier_unavailable"
+  },
+  {
+    "code": 99,
+    "ctx": "live",
+    "stderr": "long-line",
+    "err": "bridge: launch exit=99: 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界…",
+    "sentinel": "plain",
+    "cause_code": "required_tier_unavailable"
+  },
+  {
+    "code": 99,
+    "ctx": "live",
+    "stderr": "long-marker",
+    "err": "bridge: launch exit=99: [bridge] artifact-timeout: cause=incomplete 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界…",
+    "sentinel": "plain",
+    "cause_code": "required_tier_unavailable"
+  },
+  {
+    "code": 99,
+    "ctx": "cancelled",
+    "stderr": "empty",
+    "err": "bridge: launch exit=99",
+    "sentinel": "plain",
+    "cause_code": "required_tier_unavailable"
+  },
+  {
+    "code": 99,
+    "ctx": "cancelled",
+    "stderr": "first-bridge-line",
+    "err": "bridge: launch exit=99: [bridge] launch: missing required (flag or env): --profile",
+    "sentinel": "plain",
+    "cause_code": "required_tier_unavailable"
+  },
+  {
+    "code": 99,
+    "ctx": "cancelled",
+    "stderr": "last-line-only",
+    "err": "bridge: launch exit=99: [claude-tmux] FAIL: completion never signalled",
+    "sentinel": "plain",
+    "cause_code": "required_tier_unavailable"
+  },
+  {
+    "code": 99,
+    "ctx": "cancelled",
+    "stderr": "marker-submit-wedged",
+    "err": "bridge: launch exit=99: [bridge] WARN: EVOLVE_SANDBOX=on but inner sandbox not applied",
+    "sentinel": "plain",
+    "cause_code": "required_tier_unavailable"
+  },
+  {
+    "code": 99,
+    "ctx": "cancelled",
+    "stderr": "marker-prose",
+    "err": "bridge: launch exit=99: [bridge] artifact-timeout: phase=build reason=\"quoted cause=submit_wedged text\" waited=20s",
+    "sentinel": "plain",
+    "cause_code": "required_tier_unavailable"
+  },
+  {
+    "code": 99,
+    "ctx": "cancelled",
+    "stderr": "long-line",
+    "err": "bridge: launch exit=99: 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界…",
+    "sentinel": "plain",
+    "cause_code": "required_tier_unavailable"
+  },
+  {
+    "code": 99,
+    "ctx": "cancelled",
+    "stderr": "long-marker",
+    "err": "bridge: launch exit=99: [bridge] artifact-timeout: cause=incomplete 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界…",
+    "sentinel": "plain",
+    "cause_code": "required_tier_unavailable"
+  },
+  {
+    "code": 124,
+    "ctx": "live",
+    "stderr": "empty",
+    "err": "bridge: launch exit=124: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "command_timeout"
+  },
+  {
+    "code": 124,
+    "ctx": "live",
+    "stderr": "first-bridge-line",
+    "err": "bridge: launch exit=124: [bridge] launch: missing required (flag or env): --profile: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "command_timeout"
+  },
+  {
+    "code": 124,
+    "ctx": "live",
+    "stderr": "last-line-only",
+    "err": "bridge: launch exit=124: [claude-tmux] FAIL: completion never signalled: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "command_timeout"
+  },
+  {
+    "code": 124,
+    "ctx": "live",
+    "stderr": "marker-submit-wedged",
+    "err": "bridge: launch exit=124: [bridge] WARN: EVOLVE_SANDBOX=on but inner sandbox not applied: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "command_timeout"
+  },
+  {
+    "code": 124,
+    "ctx": "live",
+    "stderr": "marker-prose",
+    "err": "bridge: launch exit=124: [bridge] artifact-timeout: phase=build reason=\"quoted cause=submit_wedged text\" waited=20s: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "command_timeout"
+  },
+  {
+    "code": 124,
+    "ctx": "live",
+    "stderr": "long-line",
+    "err": "bridge: launch exit=124: 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界…: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "command_timeout"
+  },
+  {
+    "code": 124,
+    "ctx": "live",
+    "stderr": "long-marker",
+    "err": "bridge: launch exit=124: [bridge] artifact-timeout: cause=incomplete 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界…: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "command_timeout"
+  },
+  {
+    "code": 124,
+    "ctx": "cancelled",
+    "stderr": "empty",
+    "err": "bridge: launch exit=124: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "command_timeout"
+  },
+  {
+    "code": 124,
+    "ctx": "cancelled",
+    "stderr": "first-bridge-line",
+    "err": "bridge: launch exit=124: [bridge] launch: missing required (flag or env): --profile: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "command_timeout"
+  },
+  {
+    "code": 124,
+    "ctx": "cancelled",
+    "stderr": "last-line-only",
+    "err": "bridge: launch exit=124: [claude-tmux] FAIL: completion never signalled: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "command_timeout"
+  },
+  {
+    "code": 124,
+    "ctx": "cancelled",
+    "stderr": "marker-submit-wedged",
+    "err": "bridge: launch exit=124: [bridge] WARN: EVOLVE_SANDBOX=on but inner sandbox not applied: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "command_timeout"
+  },
+  {
+    "code": 124,
+    "ctx": "cancelled",
+    "stderr": "marker-prose",
+    "err": "bridge: launch exit=124: [bridge] artifact-timeout: phase=build reason=\"quoted cause=submit_wedged text\" waited=20s: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "command_timeout"
+  },
+  {
+    "code": 124,
+    "ctx": "cancelled",
+    "stderr": "long-line",
+    "err": "bridge: launch exit=124: 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界…: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "command_timeout"
+  },
+  {
+    "code": 124,
+    "ctx": "cancelled",
+    "stderr": "long-marker",
+    "err": "bridge: launch exit=124: [bridge] artifact-timeout: cause=incomplete 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界…: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "command_timeout"
+  },
+  {
+    "code": 127,
+    "ctx": "live",
+    "stderr": "empty",
+    "err": "bridge: launch exit=127",
+    "sentinel": "plain",
+    "cause_code": "missing_binary"
+  },
+  {
+    "code": 127,
+    "ctx": "live",
+    "stderr": "first-bridge-line",
+    "err": "bridge: launch exit=127: [bridge] launch: missing required (flag or env): --profile",
+    "sentinel": "plain",
+    "cause_code": "missing_binary"
+  },
+  {
+    "code": 127,
+    "ctx": "live",
+    "stderr": "last-line-only",
+    "err": "bridge: launch exit=127: [claude-tmux] FAIL: completion never signalled",
+    "sentinel": "plain",
+    "cause_code": "missing_binary"
+  },
+  {
+    "code": 127,
+    "ctx": "live",
+    "stderr": "marker-submit-wedged",
+    "err": "bridge: launch exit=127: [bridge] WARN: EVOLVE_SANDBOX=on but inner sandbox not applied",
+    "sentinel": "plain",
+    "cause_code": "missing_binary"
+  },
+  {
+    "code": 127,
+    "ctx": "live",
+    "stderr": "marker-prose",
+    "err": "bridge: launch exit=127: [bridge] artifact-timeout: phase=build reason=\"quoted cause=submit_wedged text\" waited=20s",
+    "sentinel": "plain",
+    "cause_code": "missing_binary"
+  },
+  {
+    "code": 127,
+    "ctx": "live",
+    "stderr": "long-line",
+    "err": "bridge: launch exit=127: 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界…",
+    "sentinel": "plain",
+    "cause_code": "missing_binary"
+  },
+  {
+    "code": 127,
+    "ctx": "live",
+    "stderr": "long-marker",
+    "err": "bridge: launch exit=127: [bridge] artifact-timeout: cause=incomplete 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界…",
+    "sentinel": "plain",
+    "cause_code": "missing_binary"
+  },
+  {
+    "code": 127,
+    "ctx": "cancelled",
+    "stderr": "empty",
+    "err": "bridge: launch exit=127",
+    "sentinel": "plain",
+    "cause_code": "missing_binary"
+  },
+  {
+    "code": 127,
+    "ctx": "cancelled",
+    "stderr": "first-bridge-line",
+    "err": "bridge: launch exit=127: [bridge] launch: missing required (flag or env): --profile",
+    "sentinel": "plain",
+    "cause_code": "missing_binary"
+  },
+  {
+    "code": 127,
+    "ctx": "cancelled",
+    "stderr": "last-line-only",
+    "err": "bridge: launch exit=127: [claude-tmux] FAIL: completion never signalled",
+    "sentinel": "plain",
+    "cause_code": "missing_binary"
+  },
+  {
+    "code": 127,
+    "ctx": "cancelled",
+    "stderr": "marker-submit-wedged",
+    "err": "bridge: launch exit=127: [bridge] WARN: EVOLVE_SANDBOX=on but inner sandbox not applied",
+    "sentinel": "plain",
+    "cause_code": "missing_binary"
+  },
+  {
+    "code": 127,
+    "ctx": "cancelled",
+    "stderr": "marker-prose",
+    "err": "bridge: launch exit=127: [bridge] artifact-timeout: phase=build reason=\"quoted cause=submit_wedged text\" waited=20s",
+    "sentinel": "plain",
+    "cause_code": "missing_binary"
+  },
+  {
+    "code": 127,
+    "ctx": "cancelled",
+    "stderr": "long-line",
+    "err": "bridge: launch exit=127: 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界…",
+    "sentinel": "plain",
+    "cause_code": "missing_binary"
+  },
+  {
+    "code": 127,
+    "ctx": "cancelled",
+    "stderr": "long-marker",
+    "err": "bridge: launch exit=127: [bridge] artifact-timeout: cause=incomplete 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界…",
+    "sentinel": "plain",
+    "cause_code": "missing_binary"
+  },
+  {
+    "code": -1,
+    "ctx": "live",
+    "stderr": "empty",
+    "err": "bridge: launch exit=-1",
+    "sentinel": "plain",
+    "cause_code": "driver_error"
+  },
+  {
+    "code": -1,
+    "ctx": "live",
+    "stderr": "first-bridge-line",
+    "err": "bridge: launch exit=-1: [bridge] launch: missing required (flag or env): --profile",
+    "sentinel": "plain",
+    "cause_code": "driver_error"
+  },
+  {
+    "code": -1,
+    "ctx": "live",
+    "stderr": "last-line-only",
+    "err": "bridge: launch exit=-1: [claude-tmux] FAIL: completion never signalled",
+    "sentinel": "plain",
+    "cause_code": "driver_error"
+  },
+  {
+    "code": -1,
+    "ctx": "live",
+    "stderr": "marker-submit-wedged",
+    "err": "bridge: launch exit=-1: [bridge] WARN: EVOLVE_SANDBOX=on but inner sandbox not applied",
+    "sentinel": "plain",
+    "cause_code": "driver_error"
+  },
+  {
+    "code": -1,
+    "ctx": "live",
+    "stderr": "marker-prose",
+    "err": "bridge: launch exit=-1: [bridge] artifact-timeout: phase=build reason=\"quoted cause=submit_wedged text\" waited=20s",
+    "sentinel": "plain",
+    "cause_code": "driver_error"
+  },
+  {
+    "code": -1,
+    "ctx": "live",
+    "stderr": "long-line",
+    "err": "bridge: launch exit=-1: 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界…",
+    "sentinel": "plain",
+    "cause_code": "driver_error"
+  },
+  {
+    "code": -1,
+    "ctx": "live",
+    "stderr": "long-marker",
+    "err": "bridge: launch exit=-1: [bridge] artifact-timeout: cause=incomplete 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界…",
+    "sentinel": "plain",
+    "cause_code": "driver_error"
+  },
+  {
+    "code": -1,
+    "ctx": "cancelled",
+    "stderr": "empty",
+    "err": "bridge: launch exit=-1: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "driver_error"
+  },
+  {
+    "code": -1,
+    "ctx": "cancelled",
+    "stderr": "first-bridge-line",
+    "err": "bridge: launch exit=-1: [bridge] launch: missing required (flag or env): --profile: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "driver_error"
+  },
+  {
+    "code": -1,
+    "ctx": "cancelled",
+    "stderr": "last-line-only",
+    "err": "bridge: launch exit=-1: [claude-tmux] FAIL: completion never signalled: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "driver_error"
+  },
+  {
+    "code": -1,
+    "ctx": "cancelled",
+    "stderr": "marker-submit-wedged",
+    "err": "bridge: launch exit=-1: [bridge] WARN: EVOLVE_SANDBOX=on but inner sandbox not applied: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "driver_error"
+  },
+  {
+    "code": -1,
+    "ctx": "cancelled",
+    "stderr": "marker-prose",
+    "err": "bridge: launch exit=-1: [bridge] artifact-timeout: phase=build reason=\"quoted cause=submit_wedged text\" waited=20s: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "driver_error"
+  },
+  {
+    "code": -1,
+    "ctx": "cancelled",
+    "stderr": "long-line",
+    "err": "bridge: launch exit=-1: 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界…: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "driver_error"
+  },
+  {
+    "code": -1,
+    "ctx": "cancelled",
+    "stderr": "long-marker",
+    "err": "bridge: launch exit=-1: [bridge] artifact-timeout: cause=incomplete 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界…: core: transient bridge failure",
+    "sentinel": "transient",
+    "cause_code": "driver_error"
+  },
+  {
+    "code": 42,
+    "ctx": "live",
+    "stderr": "empty",
+    "err": "bridge: launch exit=42",
+    "sentinel": "plain",
+    "cause_code": "driver_error"
+  },
+  {
+    "code": 42,
+    "ctx": "live",
+    "stderr": "first-bridge-line",
+    "err": "bridge: launch exit=42: [bridge] launch: missing required (flag or env): --profile",
+    "sentinel": "plain",
+    "cause_code": "driver_error"
+  },
+  {
+    "code": 42,
+    "ctx": "live",
+    "stderr": "last-line-only",
+    "err": "bridge: launch exit=42: [claude-tmux] FAIL: completion never signalled",
+    "sentinel": "plain",
+    "cause_code": "driver_error"
+  },
+  {
+    "code": 42,
+    "ctx": "live",
+    "stderr": "marker-submit-wedged",
+    "err": "bridge: launch exit=42: [bridge] WARN: EVOLVE_SANDBOX=on but inner sandbox not applied",
+    "sentinel": "plain",
+    "cause_code": "driver_error"
+  },
+  {
+    "code": 42,
+    "ctx": "live",
+    "stderr": "marker-prose",
+    "err": "bridge: launch exit=42: [bridge] artifact-timeout: phase=build reason=\"quoted cause=submit_wedged text\" waited=20s",
+    "sentinel": "plain",
+    "cause_code": "driver_error"
+  },
+  {
+    "code": 42,
+    "ctx": "live",
+    "stderr": "long-line",
+    "err": "bridge: launch exit=42: 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界…",
+    "sentinel": "plain",
+    "cause_code": "driver_error"
+  },
+  {
+    "code": 42,
+    "ctx": "live",
+    "stderr": "long-marker",
+    "err": "bridge: launch exit=42: [bridge] artifact-timeout: cause=incomplete 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界…",
+    "sentinel": "plain",
+    "cause_code": "driver_error"
+  },
+  {
+    "code": 42,
+    "ctx": "cancelled",
+    "stderr": "empty",
+    "err": "bridge: launch exit=42",
+    "sentinel": "plain",
+    "cause_code": "driver_error"
+  },
+  {
+    "code": 42,
+    "ctx": "cancelled",
+    "stderr": "first-bridge-line",
+    "err": "bridge: launch exit=42: [bridge] launch: missing required (flag or env): --profile",
+    "sentinel": "plain",
+    "cause_code": "driver_error"
+  },
+  {
+    "code": 42,
+    "ctx": "cancelled",
+    "stderr": "last-line-only",
+    "err": "bridge: launch exit=42: [claude-tmux] FAIL: completion never signalled",
+    "sentinel": "plain",
+    "cause_code": "driver_error"
+  },
+  {
+    "code": 42,
+    "ctx": "cancelled",
+    "stderr": "marker-submit-wedged",
+    "err": "bridge: launch exit=42: [bridge] WARN: EVOLVE_SANDBOX=on but inner sandbox not applied",
+    "sentinel": "plain",
+    "cause_code": "driver_error"
+  },
+  {
+    "code": 42,
+    "ctx": "cancelled",
+    "stderr": "marker-prose",
+    "err": "bridge: launch exit=42: [bridge] artifact-timeout: phase=build reason=\"quoted cause=submit_wedged text\" waited=20s",
+    "sentinel": "plain",
+    "cause_code": "driver_error"
+  },
+  {
+    "code": 42,
+    "ctx": "cancelled",
+    "stderr": "long-line",
+    "err": "bridge: launch exit=42: 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界…",
+    "sentinel": "plain",
+    "cause_code": "driver_error"
+  },
+  {
+    "code": 42,
+    "ctx": "cancelled",
+    "stderr": "long-marker",
+    "err": "bridge: launch exit=42: [bridge] artifact-timeout: cause=incomplete 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界…",
+    "sentinel": "plain",
+    "cause_code": "driver_error"
+  }
+]

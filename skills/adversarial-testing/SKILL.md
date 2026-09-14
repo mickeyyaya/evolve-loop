@@ -130,7 +130,7 @@ Every proposal carries a one-sentence `justification`, captured on the `RouterDe
 
 ## 8. Auditor framing extensions
 
-Referenced by `agents/evolve-auditor.md`; rendered by `adversarialAuditFraming()` in `go/internal/subagent/run.go`. Extends the base "guilty until proven innocent" framing with Google's explicit/implicit taxonomy.
+Referenced by `agents/evolve-auditor.md`; rendered by `adversarialAuditFraming()` in `go/internal/subagent/subagentrun/prompt.go` (the `evolve subagent run` execution path, ADR-0103 unit 16). Extends the base "guilty until proven innocent" framing with Google's explicit/implicit taxonomy.
 
 **Hunt list (implicit class — where real defects hide):**
 

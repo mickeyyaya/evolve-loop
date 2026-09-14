@@ -13,46 +13,18 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseobserver"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// runPhaseObserver is the `evolve phase-observer [--enforce] [--scope=...] <ws> <pgid> <cycle> <phase> <agent> [state]` subcommand.
+// RunPhaseObserver is the `evolve phase-observer [--enforce] [--scope=...] <ws> <pgid> <cycle> <phase> <agent> [state]` subcommand.
 // Ports the core stall-detection behavior of legacy/scripts/dispatch/phase-observer.sh.
+// The composition root of ADR-0103 unit 12: it parses argv once, arms the
+// SIGUSR1 shutdown, builds the subprocess's stderr-only Signal Center and
+// hands the engine's host a Config whose accessor reaches it.
 func RunPhaseObserver(args []string, _ io.Reader, stdout, stderr io.Writer) int {
-	enforce := false
-	scope := phaseobserver.ScopePhase
-	var pos []string
-
-	for _, a := range args {
-		switch {
-		case a == "--help" || a == "-h":
-			fmt.Fprintln(stdout, "Usage: evolve phase-observer [--enforce] [--scope=cycle|phase] \\")
-			fmt.Fprintln(stdout, "       <workspace> <pgid> <cycle> <phase> <agent> [cycle-state]")
-			return 0
-		case a == "--enforce":
-			enforce = true
-		case a == "--scope=cycle":
-			scope = phaseobserver.ScopeCycle
-		case a == "--scope=phase":
-			scope = phaseobserver.ScopePhase
-		case strings.HasPrefix(a, "--scope="):
-			fmt.Fprintf(stderr, "[phase-observer] unknown --scope value: %s\n", a)
-			return phaseobserver.ExitInvalidArgs
-		case strings.HasPrefix(a, "--"):
-			fmt.Fprintf(stderr, "[phase-observer] unknown flag: %s\n", a)
-			return phaseobserver.ExitInvalidArgs
-		default:
-			pos = append(pos, a)
-		}
-	}
-	if len(pos) < 5 {
-		fmt.Fprintln(stderr, "[phase-observer] usage: phase-observer [--enforce] [--scope=...] <workspace> <pgid> <cycle> <phase> <agent> [cycle-state]")
-		return phaseobserver.ExitInvalidArgs
-	}
-	pgid, _ := strconv.Atoi(pos[1])
-	cycle, _ := strconv.Atoi(pos[2])
-	cycleState := ""
-	if len(pos) > 5 {
-		cycleState = pos[5]
+	a, rc, handled := parseObserverArgs(args, stdout, stderr)
+	if handled {
+		return rc
 	}
 
 	// SIGUSR1 = "subagent has exited; finalize"
@@ -64,15 +36,72 @@ func RunPhaseObserver(args []string, _ io.Reader, stdout, stderr io.Writer) int 
 		close(shutdown)
 	}()
 
+	signals := observerSignalCenter(stderr)
+	defer signals.Flush()
+	return phaseobserver.Run(observerConfig(a, shutdown, signals), "", stderr)
+}
+
+// observerArgs is argv read once: the two flags and the positionals.
+type observerArgs struct {
+	enforce bool
+	scope   phaseobserver.Scope
+	pos     []string
+}
+
+// parseObserverArgs is the ONE reading of argv. handled reports that the call
+// is over — help printed (rc 0) or a usage error (ExitInvalidArgs) — with the
+// exact lines the subcommand always printed.
+func parseObserverArgs(args []string, stdout, stderr io.Writer) (a observerArgs, rc int, handled bool) {
+	a.scope = phaseobserver.ScopePhase
+	for _, arg := range args {
+		switch {
+		case arg == "--help" || arg == "-h":
+			fmt.Fprintln(stdout, "Usage: evolve phase-observer [--enforce] [--scope=cycle|phase] \\")
+			fmt.Fprintln(stdout, "       <workspace> <pgid> <cycle> <phase> <agent> [cycle-state]")
+			return a, 0, true
+		case arg == "--enforce":
+			a.enforce = true
+		case arg == "--scope=cycle":
+			a.scope = phaseobserver.ScopeCycle
+		case arg == "--scope=phase":
+			a.scope = phaseobserver.ScopePhase
+		case strings.HasPrefix(arg, "--scope="):
+			fmt.Fprintf(stderr, "[phase-observer] unknown --scope value: %s\n", arg)
+			return a, phaseobserver.ExitInvalidArgs, true
+		case strings.HasPrefix(arg, "--"):
+			fmt.Fprintf(stderr, "[phase-observer] unknown flag: %s\n", arg)
+			return a, phaseobserver.ExitInvalidArgs, true
+		default:
+			a.pos = append(a.pos, arg)
+		}
+	}
+	if len(a.pos) < 5 {
+		fmt.Fprintln(stderr, "[phase-observer] usage: phase-observer [--enforce] [--scope=...] <workspace> <pgid> <cycle> <phase> <agent> [cycle-state]")
+		return a, phaseobserver.ExitInvalidArgs, true
+	}
+	return a, 0, false
+}
+
+// observerConfig projects the parsed argv, the policy-resolved thresholds and
+// the root's collaborators onto the host's Config. The pgid and cycle Atoi
+// errors are discarded as they always were (a bogus value parses as 0 and
+// Run's `cycle must be integer` fires downstream).
+func observerConfig(a observerArgs, shutdown <-chan struct{}, signals *signalcenter.Center) phaseobserver.Config {
+	pgid, _ := strconv.Atoi(a.pos[1])
+	cycle, _ := strconv.Atoi(a.pos[2])
+	cycleState := ""
+	if len(a.pos) > 5 {
+		cycleState = a.pos[5]
+	}
 	cfg := observerEnvConfig()
-	cfg.Workspace = pos[0]
+	cfg.Workspace = a.pos[0]
 	cfg.SubagentPGID = pgid
 	cfg.Cycle = cycle
-	cfg.Phase = pos[3]
-	cfg.Agent = pos[4]
+	cfg.Phase = a.pos[3]
+	cfg.Agent = a.pos[4]
 	cfg.CycleState = cycleState
-	cfg.Scope = scope
-	cfg.Enforce = enforce
+	cfg.Scope = a.scope
+	cfg.Enforce = a.enforce
 	cfg.ShutdownSig = shutdown
 	// ADR-0044 C3: the chain-backed stall policy executes ONLY at enforce. For
 	// this standalone subcommand the operator's --enforce flag is the live signal
@@ -80,14 +109,30 @@ func RunPhaseObserver(args []string, _ io.Reader, stdout, stderr io.Writer) int 
 	// off/shadow/unset + no --enforce ⇒ nil policy ⇒ byte-identical legacy Enforce
 	// branch — shadow observability for stalls already exists via the INCIDENT
 	// events themselves.
-	cfg.StallPolicy = resolveStallPolicy(enforce)
+	cfg.StallPolicy = resolveStallPolicy(a.enforce)
 	// R3.4: the process-liveness probe is wired unconditionally — it is
 	// deterministic ground truth (signal-0), not policy; nil in Run means
 	// probe-off (fixture Configs). The ACTION on a dead group stays
 	// policy/Enforce-gated; at shadow the INCIDENT is pure soak telemetry
 	// (pane echo ≠ liveness, cycles 274/277).
 	cfg.ProcessAlive = phaseobserver.DefaultProcessAlive
-	return phaseobserver.Run(cfg, "", stderr)
+	// ADR-0103 unit 12: the engine reports its own faults through the
+	// subprocess's Center (read late; nil = the Null Object).
+	cfg.Signals = func() *signalcenter.Center { return signals }
+	return cfg
+}
+
+// observerSignalCenter is the subprocess's Center: signalcenter.ConsoleSink —
+// the console half of the orchestrator's root topology (cmd_cycle.go
+// newRootSignalCenter), the ONE home of the WARN threshold — on the
+// subcommand's own stderr, where the replaced [phase-observer] lines used to
+// print — and NO file: a second writer into the orchestrator's per-cycle
+// signals.ndjson would interleave a second pid's sequence space (design §4
+// "monotonic seq per file").
+func observerSignalCenter(w io.Writer) *signalcenter.Center {
+	c := signalcenter.New(signalcenter.WithPID(os.Getpid()))
+	c.Subscribe(signalcenter.ConsoleSink(w))
+	return c
 }
 
 // observerEnvConfig resolves observer settings from .evolve/policy.json.

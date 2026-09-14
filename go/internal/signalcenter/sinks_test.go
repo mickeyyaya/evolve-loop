@@ -172,6 +172,30 @@ func TestFilter_PassesAtOrAboveTheThreshold(t *testing.T) {
 	}
 }
 
+// ConsoleSink is the console half of every composition root — the orchestrator
+// roots (newRootSignalCenter) and the `evolve phase-observer` subprocess
+// (ADR-0103 unit 12 review fold) — so the WARN threshold has ONE home: INFO
+// never renders (the contract's "log only" tier), WARN and INCIDENT render in
+// the one line format. Kills a threshold raised to INCIDENT and a dropped Filter.
+func TestConsoleSink_RendersWarnAndAboveInTheOneLineFormat(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	c := New(WithClock(fixedClock()), WithPID(1))
+	c.Subscribe(ConsoleSink(&buf))
+	c.Emit(infoEvent("info stays in the file"))
+	c.Emit(validEvent())
+	inc := validEvent()
+	inc.Kind, inc.Severity, inc.Reason = KindSystemFailure, SeverityIncident, "push rejected for good"
+	c.Emit(inc)
+	lines := strings.Split(strings.TrimRight(buf.String(), "\n"), "\n")
+	if len(lines) != 2 || strings.Contains(buf.String(), "info stays in the file") {
+		t.Fatalf("INFO never reaches the console; WARN and INCIDENT do: %q", buf.String())
+	}
+	if lines[0] != "[ship] ship.error WARN SHIP_GIT_PUSH_REJECTED seq=2 origin=Landing.Land — push rejected class=transient" || lines[1] != "[ship] system.failure INCIDENT SHIP_GIT_PUSH_REJECTED seq=3 origin=Landing.Land — push rejected for good class=transient" {
+		t.Errorf("the console renders FormatLine at WARN and above:\n%s", buf.String())
+	}
+}
+
 // A resumed cycle appends to the same signals.ndjson from a NEW process: fresh
 // pid, fresh seq, same file (O_APPEND). Both orders stay reconstructible by
 // pid+seq — the durable record never needs a lock across processes (design §6.8).

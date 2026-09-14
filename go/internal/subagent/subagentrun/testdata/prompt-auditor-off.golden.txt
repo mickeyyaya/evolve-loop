@@ -1,0 +1,12 @@
+## INVOCATION CONTEXT
+
+- Agent: auditor
+- Cycle: 5
+- Workspace: {WS}
+- Artifact path: {ROOT}/.evolve/runs/cycle-5/audit.md
+- Challenge token: aaaaaaaaaaaaaaaa
+- Profile: auditor.json
+
+--- BEGIN TASK PROMPT ---
+audit body
+--- END TASK PROMPT ---

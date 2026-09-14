@@ -1,0 +1,3 @@
+{"ts":"2026-06-01T09:00:00Z","type":"started","severity":"info","cycle":7,"phase":"build","agent":"build","reason":"observer attached"}
+{"ts":"2026-06-01T11:00:00Z","type":"stall_no_output","severity":"incident","cycle":7,"phase":"build","agent":"build","reason":"no stdout growth for 1h0m0s"}
+{"ts":"2026-06-01T11:00:00Z","type":"stopped","severity":"info","cycle":7,"phase":"build","agent":"build","reason":"stop requested"}

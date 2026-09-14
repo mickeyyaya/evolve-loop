@@ -30,7 +30,7 @@ type Fixture struct {
 // the fixture works from any package's test working directory.
 func registryPath() string {
 	_, self, _, _ := runtime.Caller(0)
-	return filepath.Join(filepath.Dir(self), "..", "..", "..", "docs", "architecture", "phase-registry.json")
+	return config.RegistryPath(filepath.Join(filepath.Dir(self), "..", "..", ".."))
 }
 
 // Load reads the shipped phase registry into a Fixture. Fatal on a load error —

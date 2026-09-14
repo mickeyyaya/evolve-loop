@@ -1,0 +1,2 @@
+{"ts":"2026-05-24T12:00:00Z","cycle":5,"role":"orchestrator","kind":"inbox-lifecycle","exit_code":0,"entry_seq":0,"prev_hash":"{{HASH}}","action":"promote","task_id":"task-a","message":".evolve/inbox/processing/task-a.json → {{ROOT}}/.evolve/inbox/quarantine/task-a.json: ship-promote-quarantine"}
+{"ts":"2026-05-24T12:00:00Z","cycle":5,"role":"orchestrator","kind":"inbox-lifecycle","exit_code":0,"entry_seq":1,"prev_hash":"{{HASH}}","action":"recover","task_id":"task-b","message":".evolve/inbox/processing/cycle-5/task-b.json → .evolve/inbox/task-b.json: cycle-release"}

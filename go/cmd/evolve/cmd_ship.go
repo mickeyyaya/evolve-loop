@@ -9,6 +9,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
 // runShipCmd implements `evolve ship` — the native Go replacement for
@@ -84,6 +85,11 @@ func runShipCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if pluginRoot == "" {
 		pluginRoot = os.Getenv("EVOLVE_PLUGIN_ROOT")
 	}
+	// ADR-0103 unit 07: the manual/release root wires the landing's warnings
+	// like every other root — the tracked-binary reset WARN that used to be a
+	// raw stderr line stays visible on the operator's console here.
+	signals := shipRootSignals(projectRoot, stderr)
+	defer signals.Flush()
 
 	opts := ship.Options{
 		Class:            ship.Class(class),
@@ -97,6 +103,7 @@ func runShipCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		Stdin:            stdin,
 		Stdout:           stdout,
 		Stderr:           stderr,
+		Signals:          signals,
 	}
 
 	res, err := ship.Run(context.Background(), opts)
@@ -117,4 +124,13 @@ func runShipCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return int(ship.ExitFailure)
 	}
 	return int(res.ExitCode)
+}
+
+// shipRootSignals builds the standalone `evolve ship` root's Signal Center —
+// the ONE sink topology every root builds (newRootSignalCenter): fault-only
+// WARNs render on the operator's stderr and persist to
+// <evolveDir>/signals.ndjson (cycle-less; the file is opened on the first
+// event only, so a green manual ship touches no file).
+func shipRootSignals(projectRoot string, stderr io.Writer) *signalcenter.Center {
+	return newRootSignalCenter(projectRoot, paths.EvolveDirOf(projectRoot), stderr)
 }

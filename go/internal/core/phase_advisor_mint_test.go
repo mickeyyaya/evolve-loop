@@ -55,25 +55,6 @@ func TestPhaseAdvisor_PlanNoMint_EmptyMintPhases(t *testing.T) {
 	}
 }
 
-// TestBuildPlanPrompt_DocumentsMinting proves the plan prompt teaches the
-// advisor the optional mint shape (so it can actually propose new phases) and
-// the tier-not-model constraint with the concrete enum, plus the mint JSON
-// example — meaningful instruction, not just the bare word "mint".
-func TestBuildPlanPrompt_DocumentsMinting(t *testing.T) {
-	t.Parallel()
-	got := buildPlanPrompt(baseRouteInput())
-	for _, want := range []string{
-		`"mint":{`,           // the JSON example shape
-		"fast|balanced|deep", // the tier enum
-		"never a raw model",  // the tier-not-model constraint
-		"writes_source",      // so the advisor knows to flag source-writers
-	} {
-		if !strings.Contains(got, want) {
-			t.Errorf("plan prompt missing %q:\n%s", want, got)
-		}
-	}
-}
-
 // TestPhaseAdvisor_MintRunFalse_StillCollected proves a run:false mint entry is
 // still mapped into MintPhases (registration is distinct from dispatch — the
 // routing loop governs whether it runs).
@@ -132,26 +113,5 @@ func TestPhaseAdvisor_PlanMintWithoutMetadata_StaysEmpty(t *testing.T) {
 	}
 	if plan.MintPhases[0].Prompt != "legacy persona" {
 		t.Errorf("legacy mint prompt regressed: %q", plan.MintPhases[0].Prompt)
-	}
-}
-
-// TestPlanPrompt_DocumentsMintMetadata proves the advisor is INSTRUCTED to
-// supply the metadata — an unadvertised field is never emitted. Both
-// prompt-assembly paths must document it: composePlanPrompt (persona,
-// PRODUCTION) and buildPlanPrompt (legacy inline fallback), the pair that
-// diverged at #293.
-func TestPlanPrompt_DocumentsMintMetadata(t *testing.T) {
-	t.Parallel()
-	persona := NewPhaseAdvisor(&fakeBridge{}, WithPersona("You are the evolve router."))
-	prompts := map[string]string{
-		"legacy":  buildPlanPrompt(baseRouteInput()),
-		"persona": persona.composePlanPrompt(baseRouteInput(), "routing-plan.json"),
-	}
-	for name, got := range prompts {
-		for _, want := range []string{`"description"`, `"when_to_use"`} {
-			if !strings.Contains(got, want) {
-				t.Errorf("%s plan prompt missing %s — advisor never told to supply SELECT metadata", name, want)
-			}
-		}
 	}
 }

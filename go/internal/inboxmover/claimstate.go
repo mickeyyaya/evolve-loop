@@ -5,49 +5,19 @@ package inboxmover
 // (Promote's source resolution, the continuation scope readers and the
 // ADR-0100 declared-effects gate all go through it), and it derives the layout
 // from inboxbatch exactly as the writer, Claim, does — so no reader can drift
-// from where a claim actually lands.
+// from where a claim actually lands. The walk lives in the lifecycle leaf
+// since ADR-0103 unit 06; this file keeps the spelling.
 
-import (
-	"errors"
-	"os"
-	"path/filepath"
-
-	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
-)
+import "github.com/mickeyyaya/evolve-loop/go/internal/inboxmover/lifecycle"
 
 // Location is where an inbox item currently lives. Cycle is 0 while the item
 // is pending at the inbox root and the claiming cycle once it sits under
 // processing/cycle-<Cycle>/.
-type Location struct {
-	Path  string
-	Cycle int
-}
+type Location = lifecycle.Location
 
-// Locate resolves an item id to its file. Liveness order is Promote's: a
-// processing claim first (a lane holding the item outranks a stale root copy
-// of the same id), then the pending root. An id with no file in either place —
-// including a project with no inbox at all — is ErrNotFound; only a read fault
-// on an existing directory is returned as itself.
-//
-// The two reads are not one atomic snapshot: a rename of this very id landing
-// between them (a sibling lane claiming it mid-scan) can read as ErrNotFound
-// once. Accepted: every caller re-reads on its next step (the gate's
-// correction ladder re-verifies, Promote re-resolves), and a false "absent"
-// never fails anything closed.
+// Locate resolves an item id to its file — a processing claim first, then the
+// pending root; an id with no file in either place is ErrNotFound; only a read
+// fault on an existing directory is returned as itself.
 func Locate(inboxDir, id string) (Location, error) {
-	for _, dir := range inboxbatch.ProcessingCycleDirs(inboxDir) {
-		if path, ferr := FindFileByTaskID(dir, id); ferr == nil {
-			cycle, _ := inboxbatch.ParseProcessingCycle(filepath.Base(dir))
-			return Location{Path: path, Cycle: cycle}, nil
-		}
-	}
-	path, err := FindFileByTaskID(inboxDir, id)
-	switch {
-	case err == nil:
-		return Location{Path: path}, nil
-	case errors.Is(err, ErrNotFound) || os.IsNotExist(err):
-		return Location{}, ErrNotFound
-	default:
-		return Location{}, err
-	}
+	return lifecycle.Locate(inboxDir, id)
 }

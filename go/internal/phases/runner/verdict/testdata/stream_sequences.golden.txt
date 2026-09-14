@@ -1,0 +1,13 @@
+# module=runner on 8e8f080f: no producer — every scenario's {module,kind,code} sequence is empty
+timeout_wellformed_pass: []
+timeout_sentinel_fail: []
+timeout_malformed_mandatory: []
+transient_malformed_mandatory: []
+timeout_malformed_optional: []
+timeout_stale_mandatory: []
+timeout_stale_optional: []
+teardown_acs_floor: []
+substantive_error: []
+clean_contracted_ok: []
+clean_contracted_unverified: []
+clean_uncontracted_pane: []

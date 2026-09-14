@@ -1,0 +1,16 @@
+{
+  "dispositions": [
+    {
+      "id": "d0f3a7c1e59b246d8a0c4e6f13579bde2",
+      "status": "OPEN",
+      "text": "salvage parser drops fenced JSON",
+      "reason": ""
+    },
+    {
+      "id": "d1111111111111111111111111111111f",
+      "status": "OPEN",
+      "text": "quote parity",
+      "reason": ""
+    }
+  ]
+}

@@ -147,7 +147,7 @@ func TestAuditOrchestration_IntegrationTier_DeadlineKill_MarkerFreeDegradesToWar
 		Code int
 		Out  string
 	}{{1, "--- FAIL: TestSlowRed (0.00s)\nFAIL\tpkg\t1.0s\n"}, {-1, "partial toolchain chatter, no verdict lines\nsignal: killed\n"}})
-	withFakeRunner(t, fn)
+	withFakeRunner(t, killedAtDeadline(fn))
 
 	verdict, diags := classifyThroughProductionIntegrationTierGate(t, req)
 
@@ -176,7 +176,7 @@ func TestAuditOrchestration_IntegrationTier_DeadlineKill_FlushedOffendersStillFa
 		Code int
 		Out  string
 	}{{1, "--- FAIL: TestSlowRed (0.00s)\n"}, {-1, "--- FAIL: TestTruncatedButJudged (0.02s)\nFAIL\tpkg\t3.0s\nsignal: killed\n"}})
-	withFakeRunner(t, fn)
+	withFakeRunner(t, killedAtDeadline(fn))
 
 	verdict, diags := classifyThroughProductionIntegrationTierGate(t, req)
 

@@ -13,7 +13,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
@@ -248,7 +247,7 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 		// ceiling reachable for fleet-dispatched work at all.
 		var clf *core.ErrCycleLevelFailure
 		if errors.As(err, &clf) {
-			warnCycleFailureOutcome(stderr, result.Cycle, applyCycleFailureOutcome(projectRoot, evolveDir, result.Cycle, stderr, lifecycleLedger))
+			warnCycleFailureOutcome(stderr, result.Cycle, applyCycleFailureOutcome(projectRoot, evolveDir, result.Cycle, stderr, lifecycleLedger, signals))
 		}
 		fmt.Fprintf(stderr, "evolve cycle run: %v\n", err)
 		return 1
@@ -270,7 +269,7 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 	// final verdict is FAIL. Same closeout, applied exactly once (the err!=nil
 	// branch above already returned).
 	if result.FinalVerdict == cyclestate.VerdictFAIL {
-		warnCycleFailureOutcome(stderr, result.Cycle, applyCycleFailureOutcome(projectRoot, evolveDir, result.Cycle, stderr, lifecycleLedger))
+		warnCycleFailureOutcome(stderr, result.Cycle, applyCycleFailureOutcome(projectRoot, evolveDir, result.Cycle, stderr, lifecycleLedger, signals))
 	}
 	return cycleRunExitCode(result)
 }
@@ -281,13 +280,17 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 // root and both sequential loop paths). The walk appends its lifecycle lines
 // through the root's ledger so the Signal Center observes them like every
 // other entry (ADR-0101 S4a); a nil ledger (the --simulate root) lets the
-// mover fall back to its own, unobserved file ledger. The error returns for
-// the caller to WARN in its own voice: a lifecycle hiccup never changes a
-// cycle's exit code (the lane's only channel to its parent) or a batch's flow.
-func applyCycleFailureOutcome(projectRoot, evolveDir string, cycle int, stderr io.Writer, lifecycle inboxmover.LedgerAppender) error {
+// mover fall back to its own, unobserved file ledger. The walk's own faults
+// (ADR-0103 unit 06: a park that could not deliver, a double-move, a stamp
+// that could not land) reach the root's Signal Center through signals, so
+// they land in the cycle workspace's signals.ndjson beside the ledger events
+// instead of on stderr alone. The error returns for the caller to WARN in
+// its own voice: a lifecycle hiccup never changes a cycle's exit code (the
+// lane's only channel to its parent) or a batch's flow.
+func applyCycleFailureOutcome(projectRoot, evolveDir string, cycle int, stderr io.Writer, lifecycle inboxmover.LedgerAppender, signals *signalcenter.Center) error {
 	_, err := cycleoutcome.ApplyFailure(cycleoutcome.FailureInputsFor(
 		projectRoot, evolveDir, cycleWorkspace(projectRoot, cycle), cycle, stderr,
-	).WithLedger(lifecycle))
+	).WithLedger(lifecycle).WithSignals(signals))
 	return err
 }
 
@@ -325,6 +328,11 @@ type orchDeps struct {
 	// Bridge is the production Adapter injected into every phase runner; it
 	// carries Signals into each engine it builds (ADR-0101 S3).
 	Bridge *bridge.Adapter
+	// Runners is the phase-runner map the orchestrator was built over — a root
+	// field for the per-runner wiring proof (ADR-0103 unit 11: every
+	// BaseRunner-backed runner's verdict engine reaches Signals through the
+	// Bridge), in the orchDeps.Bridge precedent; no production reader.
+	Runners map[core.Phase]core.PhaseRunner
 }
 
 // rootLedger is what the composition root's ledger offers its consumers: the
@@ -342,8 +350,8 @@ type rootLedger interface {
 // signals.ndjson — per cycle workspace for cycle-scoped signals, and
 // <evolveDir>/signals.ndjson for batch-level (cycle-less) ones: the loop's
 // own halts and wave summaries, a bridge warning before any cycle — and the
-// console at WARN and above (the severity contract's "log only" INFO tier
-// stays in the files).
+// console at WARN and above (signalcenter.ConsoleSink, the one home of that
+// threshold; the severity contract's "log only" INFO tier stays in the files).
 func newRootSignalCenter(projectRoot, evolveDir string, console io.Writer) *signalcenter.Center {
 	signals := signalcenter.New(signalcenter.WithPID(os.Getpid()))
 	signals.Subscribe(signals.NDJSONSink(func(cycle int) string {
@@ -352,7 +360,7 @@ func newRootSignalCenter(projectRoot, evolveDir string, console io.Writer) *sign
 		}
 		return filepath.Join(core.RunWorkspacePath(projectRoot, cycle), "signals.ndjson")
 	}))
-	signals.Subscribe(signalcenter.Filter(signalcenter.StderrSink(console), signalcenter.SeverityWarn))
+	signals.Subscribe(signalcenter.ConsoleSink(console))
 	return signals
 }
 
@@ -395,19 +403,21 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 	})
 	prm := cmdutil.NewPromptsLoader(projectRoot)
 
-	// Composition root: the SOLE reader of routing env+config. config.Load
-	// maps the central registry + contained env overrides into one immutable
-	// RoutingConfig; router.Select picks the brain once. With
+	// Composition root: the SOLE reader of routing env+config. The unit-08
+	// Loader (cmd_cycle_config.go) maps the central registry + contained env
+	// overrides into one RoutingConfig; router.Select picks the brain once. With
 	// dynamic_routing=0 (Stage:Off, the escape hatch; advisory is the
 	// default since 2026-06-06) NewOrchestrator behaves exactly as before. A nil proposer means DynamicLLM degrades to the deterministic
 	// StaticPreset (the bridge-backed Proposer is a tracked follow-on).
 	// Loaded BEFORE the runners map so cfg.PhaseIO can thread into the
 	// build/scout/triage reconcile rung (ADR-0050 §3.10 Slice 1).
-	registryPath := filepath.Join(projectRoot, "docs", "architecture", "phase-registry.json")
-	cfg, warnings := config.Load(registryPath, filterEvolveEnv(os.Environ()))
-	for _, w := range warnings {
-		fmt.Fprintf(os.Stderr, "[config] WARN %s: %s\n", w.Code, w.Message)
-	}
+	// Every warning the Loader resolves rides the Center as config.warning
+	// (the root StderrSink renders WARN; the cycle-less durable sink files it);
+	// the discarded slice is the same data — nothing to print twice. The path
+	// stays a local: phasespec.Load below reads the same file.
+	registryPath := config.RegistryPath(projectRoot)
+	loader := wiredRoutingConfigLoader(signals)
+	cfg, _ := loader.Load(registryPath, filterEvolveEnv(os.Environ()))
 
 	// User policy (.evolve/policy.json): merge mandatory_phases into the routing
 	// spine so the advisor can never drop a user-declared mandatory phase. This
@@ -439,20 +449,10 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 	gatesCfg := pol.GatesConfig()
 	routerCfg := pol.RouterConfig()
 	recoveryCfg := pol.RecoveryConfig()
-	cfg.ContractGate = parseGateStage(gatesCfg.ContractGate)
-	cfg.EvalGate = parseGateStage(gatesCfg.EvalGate)
-	cfg.TriageCapGate = parseGateStage(gatesCfg.TriageCapGate)
-	cfg.TopNGate = parseGateStage(gatesCfg.TopNGate)
-	cfg.ReviewGate = parseGateStage(gatesCfg.ReviewGate)
-	cfg.PhaseRecovery = parseGateStage(recoveryCfg.PhaseRecovery)
-	cfg.SpineFloor = parseGateStage(recoveryCfg.SpineFloor)
-	cfg.RouterReplan = parseRouterStage(routerCfg.RouterReplan)
-	peCfg := pol.ParallelEvaluateConfig()
-	cfg.ParallelEvaluate = parseRouterStage(peCfg.Stage)
-	cfg.ParallelEvaluateConcurrency = peCfg.Concurrency
-	cfg.RoutingJudge = routerCfg.RoutingJudge
-	cfg.ReconDigest = routerCfg.ReconDigest
-	cfg.RePlanMaxDepth = routerCfg.ReplanDepth
+	// The thirteen policy dials resolve through the Loader's ladders (a typo'd
+	// gate word is off WITH a CONFIG_UNKNOWN_VALUE, where the root's hand
+	// copies were silent); recoveryCfg survives solely for this projection.
+	cfg, _ = loader.ApplyPolicyStages(cfg, policyStagesOf(gatesCfg, recoveryCfg, routerCfg, pol.ParallelEvaluateConfig()))
 	// Resolved once here so all phase constructors below share the same value.
 	// Avoids a second pol.WorkflowConfig() call at line ~538.
 	wfCfg := pol.WorkflowConfig()
@@ -507,11 +507,11 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 		core.PhaseTDD:          tdd.New(tdd.Config{Bridge: br, Prompts: prm, CompactPrompts: cfg.CompactPrompts}),
 		core.PhaseBuildPlanner: buildplanner.New(buildplanner.Config{Bridge: br, Prompts: prm}).BaseRunner(),
 		core.PhaseBuild:        swarmrunner.New(build.New(build.Config{Bridge: br, Prompts: prm, PhaseIO: cfg.PhaseIO, CompactPrompts: cfg.CompactPrompts}), br, swarm.ModeWriter, swCfg),
-		core.PhaseAudit:        audit.NewDefaultWithStageCompactSpec(br, prm, cfg.PhaseIO, cfg.CompactPrompts, documentSpecPtr(cfg)),
+		core.PhaseAudit:        audit.NewDefaultWithStageCompactSpec(br, prm, cfg.PhaseIO, cfg.CompactPrompts, documentSpecPtr(cfg), audit.WithSignals(func() *signalcenter.Center { return signals })),
 		// ManifestGate is threaded from policy.json `gates.manifest_gate` (default
 		// "shadow") so the ship-bind manifest gate is operator-activatable — it was
 		// unreachable short of a code edit before cycle-1064.
-		core.PhaseShip:  ship.New(ship.Config{Runner: sysexec.DefaultRunner, PhaseIO: cfg.PhaseIO, ManifestGate: gatesCfg.ManifestGate, RepoContractGate: gatesCfg.RepoContractGate}),
+		core.PhaseShip:  ship.New(ship.Config{Runner: sysexec.DefaultRunner, PhaseIO: cfg.PhaseIO, ManifestGate: gatesCfg.ManifestGate, RepoContractGate: gatesCfg.RepoContractGate, Signals: signals}),
 		core.PhaseRetro: retro.New(retro.Config{Bridge: br, Prompts: prm, Model: "auto", CompactPrompts: cfg.CompactPrompts}),
 		// Ship-error recovery phase (Component #8): the advisor's recovery chain
 		// routes an unknown/novel ShipError here to diagnose + decide RESHIP /
@@ -604,6 +604,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 		core.WithProposerModel(advModel),
 		core.WithPersona(advPersona),
 		core.WithDepthCheck(core.AdvisorDepthExceeded),
+		core.WithAdvisorSignals(signals),
 	)
 	strategy := router.Select(cfg, advisor)
 	// The same advisor also produces the upfront whole-cycle plan the integrity
@@ -655,6 +656,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 	if *observerCfg.Autospawn {
 		ca := observer.NewCoreAdapter(observerCfg)
 		ca.RecoveryStage = cfg.PhaseRecovery.String()
+		ca.Signals = func() *signalcenter.Center { return signals } // ADR-0103 unit 12: the adapter's own faults are observer.warning signals
 		opts = append(opts, core.WithObserver(ca))
 	}
 	// Structural eval gates (internal/evalgate): Gate A (scout eval-file
@@ -808,6 +810,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 		Orchestrator: core.NewOrchestrator(st, ld, runners, opts...),
 		Signals:      signals,
 		Bridge:       br,
+		Runners:      runners,
 	}
 }
 
@@ -950,30 +953,6 @@ func resolveRouterDispatch(evolveDir string, rc policy.RouterPolicy) (cli, model
 		model = rc.Model
 	}
 	return cli, model
-}
-
-func parseGateStage(stage string) config.Stage {
-	switch strings.TrimSpace(stage) {
-	case "shadow":
-		return config.StageShadow
-	case "enforce":
-		return config.StageEnforce
-	default:
-		return config.StageOff
-	}
-}
-
-func parseRouterStage(stage string) config.Stage {
-	switch strings.TrimSpace(stage) {
-	case "shadow":
-		return config.StageShadow
-	case "advisory":
-		return config.StageAdvisory
-	case "enforce":
-		return config.StageEnforce
-	default:
-		return config.StageOff
-	}
 }
 
 // registerBuiltinSpecRunners wires a spec-driven runner for every builtin

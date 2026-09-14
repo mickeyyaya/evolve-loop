@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/launchoutcome"
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
@@ -503,168 +504,209 @@ func launchArgs(req core.BridgeRequest, promptFile, stdoutLog, stderrLog string,
 // success — matching the existing subprocess adapter's behavior so the
 // cutover is a drop-in.
 //
+// The Template Method host, split in place into named steps (ADR-0103 unit
+// 10): the gauntlet → materializeInputs → the argv → runScoped → the attempt
+// record → clearBootStrike → readResult on ExitOK, else persistLaunchError →
+// the unit-10 classifier → recordBootStrike → ONE BRIDGE_EXIT_* event. Each
+// step's name is the fields.step a triage reads; the step order is the
+// on-disk order (the launch-error persist before the strike record).
+//
 // Concurrent-safe on Engine state: Launch captures BootMS via a call-local
-// OnBoot hook installed on a per-call Deps COPY (threaded through
-// launchArgsWithDeps), so it never mutates the shared e.deps. Production still
-// builds a fresh Engine per Launch (adapters/bridge); this makes that contract
-// structural rather than convention. (A caller that injects genuinely shared,
-// non-thread-safe Deps — e.g. a common BootTimeoutStore — still owns that
-// dependency's own concurrency.)
+// OnBoot hook installed on a per-call Deps COPY (runScoped), so it never
+// mutates the shared e.deps. Production still builds a fresh Engine per
+// Launch (adapters/bridge); this makes that contract structural rather than
+// convention. (A caller that injects genuinely shared, non-thread-safe Deps —
+// e.g. a common BootTimeoutStore — still owns that dependency's own
+// concurrency.)
 func (e *Engine) Launch(ctx context.Context, req core.BridgeRequest) (core.BridgeResponse, error) {
-	switch "" {
-	case req.CLI:
-		return core.BridgeResponse{}, errors.New("bridge: CLI required")
-	case req.Profile:
-		return core.BridgeResponse{}, errors.New("bridge: Profile required")
-	case req.Workspace:
-		return core.BridgeResponse{}, errors.New("bridge: Workspace required")
-	case req.ArtifactPath:
-		return core.BridgeResponse{}, errors.New("bridge: ArtifactPath required")
+	if err := ValidateRequest(req); err != nil {
+		return core.BridgeResponse{}, err
 	}
-	if err := os.MkdirAll(req.Workspace, 0o755); err != nil {
-		return core.BridgeResponse{}, fmt.Errorf("bridge: ensure workspace: %w", err)
-	}
-	agent := req.Agent
-	if agent == "" {
-		agent = "agent"
-	}
-	promptFile := filepath.Join(req.Workspace, phasecontract.PromptArtifactFilename(agent))
-	if err := os.WriteFile(promptFile, []byte(req.Prompt), 0o644); err != nil {
-		return core.BridgeResponse{}, fmt.Errorf("bridge: write prompt: %w", err)
-	}
-	stdoutLog := req.StdoutLog
-	if stdoutLog == "" {
-		stdoutLog = filepath.Join(req.Workspace, agent+"-stdout.log")
-	}
-	stderrLog := req.StderrLog
-	if stderrLog == "" {
-		stderrLog = filepath.Join(req.Workspace, agent+"-stderr.log")
+	in, err := materializeInputs(req)
+	if err != nil {
+		return core.BridgeResponse{}, err
 	}
 	model := resolvedModel(req.Model)
-	args := launchArgs(req, promptFile, stdoutLog, stderrLog, e.deps)
+	args := launchArgs(req, in.promptFile, in.stdoutLog, in.stderrLog, e.deps)
+	run := e.runScoped(ctx, args, req.Env)
+	resp := core.BridgeResponse{ExitCode: run.code, Stderr: run.stderr, BootMS: run.bootMS}
+	// The terminal time is frozen before optional token resolution begins. One
+	// orchestration-owned Launch therefore yields one attempt record even when
+	// token enrichment is unavailable or errors.
+	c := e.recordModelAttempt(req, model, run.code, run.start, run.end, run.dispatched, run.stderr, &resp)
+	e.clearBootStrike(c, req.CLI, run.code)
+	if run.code == ExitOK {
+		e.readResult(c, req, in.stdoutLog, &resp)
+		return resp, nil
+	}
+	launchError := e.persistLaunchError(c, req.Workspace, in.agent, run.stderr)
+	// What the exit MEANS — the error chain (wire shape: "bridge: launch
+	// exit=<code>[: <cause>]" + the port sentinel), the ledger cause and the
+	// signal code — is the classifier's ONE table. ctx.Err() is sampled after
+	// the persist: only the signal-death row reads it.
+	out := launchoutcome.Classify(run.code, ctx.Err(), run.stderr)
+	e.recordBootStrike(c, req.CLI, run.code)
+	c.launchWarn("Engine.Launch", "classify", out.Signal, out.Err.Error(), launchFields(out, launchError))
+	return resp, out.Err
+}
 
-	// Capture the cold-boot latency the tmux-REPL driver reports via OnBoot
-	// (ADR-0043 A0) into this call's BridgeResponse, chaining any pre-wired
-	// callback. The hook is installed on a per-call Deps COPY (never e.deps).
-	var bootMS int64
-	var dispatched modelDispatch
+// launchInputs is what materializeInputs derives from the request: the agent
+// label and the three files Launch names in the workspace.
+type launchInputs struct {
+	agent, promptFile, stdoutLog, stderrLog string
+}
+
+// materializeInputs ensures the workspace, writes the prompt to
+// <workspace>/<agent>-prompt.txt and defaults the two log paths.
+func materializeInputs(req core.BridgeRequest) (launchInputs, error) {
+	if err := os.MkdirAll(req.Workspace, 0o755); err != nil {
+		return launchInputs{}, fmt.Errorf("bridge: ensure workspace: %w", err)
+	}
+	in := launchInputs{agent: req.Agent, stdoutLog: req.StdoutLog, stderrLog: req.StderrLog}
+	if in.agent == "" {
+		in.agent = "agent"
+	}
+	in.promptFile = filepath.Join(req.Workspace, phasecontract.PromptArtifactFilename(in.agent))
+	if err := os.WriteFile(in.promptFile, []byte(req.Prompt), 0o644); err != nil {
+		return launchInputs{}, fmt.Errorf("bridge: write prompt: %w", err)
+	}
+	if in.stdoutLog == "" {
+		in.stdoutLog = filepath.Join(req.Workspace, in.agent+"-stdout.log")
+	}
+	if in.stderrLog == "" {
+		in.stderrLog = filepath.Join(req.Workspace, in.agent+"-stderr.log")
+	}
+	return in, nil
+}
+
+// launchRun is what one scoped run of the pipeline yields: the exit, the
+// captured bridge stderr, the wall-clock window and the driver's observations.
+type launchRun struct {
+	code       int
+	stderr     string
+	start, end time.Time
+	bootMS     int64
+	dispatched modelDispatch
+}
+
+// runScoped runs the LaunchArgs pipeline against a scoped Engine holding a
+// per-call Deps COPY: the call-local OnBoot (cold-boot latency, ADR-0043 A0)
+// and onModelDispatch hooks chain any pre-wired callback, so EVERY method in
+// the pipeline (LaunchArgs, runDryRun, requireFullCheck, driver dispatch)
+// reads the call-local hooks by construction and the shared e.deps is never
+// mutated — concurrent Launch on one Engine is race-free, no defer-restore
+// needed. e.deps is already defaulted (NewEngine), so the scoped Engine needs
+// no re-defaulting.
+func (e *Engine) runScoped(ctx context.Context, args []string, env map[string]string) launchRun {
+	var run launchRun
 	callDeps := e.deps
 	prevOnBoot := callDeps.OnBoot
 	callDeps.OnBoot = func(ms int64) {
-		bootMS = ms
+		run.bootMS = ms
 		if prevOnBoot != nil {
 			prevOnBoot(ms)
 		}
 	}
 	previousDispatchObserver := callDeps.onModelDispatch
 	callDeps.onModelDispatch = func(observation modelDispatch) {
-		dispatched = observation
+		run.dispatched = observation
 		if previousDispatchObserver != nil {
 			previousDispatchObserver(observation)
 		}
 	}
-	// Run the pipeline against a scoped Engine holding that per-call copy, so
-	// EVERY method in it (LaunchArgs, runDryRun, requireFullCheck, driver
-	// dispatch) reads the call-local OnBoot by construction and the shared
-	// e.deps is never mutated — concurrent Launch on one Engine is race-free,
-	// no defer-restore needed. e.deps is already defaulted (from NewEngine), so
-	// the scoped Engine needs no re-defaulting.
 	callEngine := &Engine{deps: callDeps}
-
 	var stderrBuf bytes.Buffer
-	start := e.deps.Now()
-	code := callEngine.LaunchArgs(ctx, args, req.Env, io.Discard, &stderrBuf)
-	end := e.deps.Now()
-	resp := core.BridgeResponse{ExitCode: code, Stderr: stderrBuf.String(), BootMS: bootMS}
-	// The terminal time is frozen before optional token resolution begins. One
-	// orchestration-owned Launch therefore yields one attempt record even when
-	// token enrichment is unavailable or errors.
-	e.recordModelAttempt(req, model, code, start, end, dispatched, stderrBuf.String(), &resp)
-	// Any exit code other than ExitREPLBootTimeout means the REPL booted; reset
-	// the consecutive-strike counter so non-adjacent failures never bench.
-	if e.deps.BootTimeoutStore != nil && !clihealth.IsBootTimeoutExitCode(code) {
-		if err := e.deps.BootTimeoutStore.ClearBootStrike(req.CLI); err != nil {
-			_, _ = fmt.Fprintf(e.deps.Stderr, "[engine] boot-strike clear failed for %s: %v\n", req.CLI, err)
-		}
+	run.start = e.deps.Now()
+	run.code = callEngine.LaunchArgs(ctx, args, env, io.Discard, &stderrBuf)
+	run.end = e.deps.Now()
+	run.stderr = stderrBuf.String()
+	return run
+}
+
+// clearBootStrike resets the driver's consecutive-strike counter on any exit
+// other than ExitREPLBootTimeout (the REPL booted), so non-adjacent failures
+// never bench. A store fault is BRIDGE_BOOT_STRIKE_CLEAR_FAILED.
+func (e *Engine) clearBootStrike(c attemptLogContext, cli string, code int) {
+	if e.deps.BootTimeoutStore == nil || clihealth.IsBootTimeoutExitCode(code) {
+		return
 	}
-	if code == ExitOK {
-		// Strategy-aware result read (ADR-0027): the stdout contract writes no
-		// artifact file — its answer is the captured scrollback (stdoutLog), so
-		// reading req.ArtifactPath would always miss. Every other contract reads
-		// the artifact file as before.
-		readPath := req.ArtifactPath
-		if req.Completion == "stdout" {
-			readPath = stdoutLog
-		}
-		if b, err := os.ReadFile(readPath); err == nil {
-			resp.Stdout = string(b)
-		}
-		return resp, nil
+	if err := e.deps.BootTimeoutStore.ClearBootStrike(cli); err != nil {
+		c.launchWarn("Engine.clearBootStrike", "clear_boot_strike", CodeBootStrikeClearFailed,
+			fmt.Sprintf("boot-strike clear failed for %s: %v", cli, err), nil)
 	}
-	// R3.6 (inbox bridge-launch-validation-stderr-lost): a launch dying in
-	// the validate gauntlet fails BEFORE the per-agent stderr-log exists, so
-	// without these two lines the diagnostic evaporates (cycle-270: a bare
-	// "launch exit=10" cost a forensic session; the cause was one missing
-	// profile file). Persist the captured stderr into the run dir and thread
-	// its first line into the error chain so <phase>-failure-diag.json
-	// carries the "[bridge] …" cause. bridgeExitCode's digit scan stops at
-	// the ':', so appending the cause never breaks exit-code parsing.
-	if stderrBuf.Len() > 0 {
-		_ = os.WriteFile(filepath.Join(req.Workspace, agent+"-launch-error.txt"), stderrBuf.Bytes(), 0o644)
+}
+
+// readResult is the strategy-aware result read (ADR-0027): the stdout
+// contract writes no artifact file — its answer is the captured scrollback
+// (stdoutLog), so reading req.ArtifactPath would always miss. Every other
+// contract reads the artifact file. An unreadable result is
+// BRIDGE_RESULT_READ_FAILED, never an error: the on-disk report is the
+// verdict source and Launch still returns nil with an empty Stdout.
+func (e *Engine) readResult(c attemptLogContext, req core.BridgeRequest, stdoutLog string, resp *core.BridgeResponse) {
+	readPath, completion := req.ArtifactPath, completionContractName(req.Completion)
+	if req.Completion == completionStdout {
+		readPath = stdoutLog
 	}
-	msg := fmt.Sprintf("bridge: launch exit=%d", code)
-	cause := firstDiagnosticLine(stderrBuf.String())
-	// An artifact-timeout death must be self-describing (inbox item
-	// deep-phase-artifact-budget-too-small): prefer the driver's marker summary —
-	// waited / extends consumed / last review verdict — over whatever line the
-	// positional firstDiagnosticLine heuristic landed on. For the tmux drivers,
-	// whose notes carry a `[<cli>-tmux]` prefix rather than `[bridge]`, that
-	// heuristic fell through to the LAST non-empty line, which on this path is one
-	// of the workspace file listings the timeout diagnostic prints: the recorded
-	// error_message was a filename. Scoped to 81 so no other exit's cause changes.
-	if code == ExitArtifactTimeout {
-		if summary := artifactTimeoutSummary(stderrBuf.String()); summary != "" {
-			cause = summary
-		}
+	b, err := os.ReadFile(readPath)
+	if err != nil {
+		c.launchWarn("Engine.readResult", "read_result", CodeResultReadFailed,
+			fmt.Sprintf("result read failed: path=%s completion=%s error=%v", readPath, completion, err),
+			map[string]string{"path": readPath, "completion": completion})
+		return
 	}
-	if cause != "" {
-		msg += ": " + cause
+	resp.Stdout = string(b)
+}
+
+// persistLaunchError keeps the captured stderr as <workspace>/<agent>-launch-
+// error.txt and returns the path, or "" when there was nothing to persist or
+// the write failed (BRIDGE_LAUNCH_ERROR_PERSIST_FAILED). R3.6 (inbox
+// bridge-launch-validation-stderr-lost): a launch dying in the validate
+// gauntlet fails BEFORE the per-agent stderr-log exists, so without this file
+// the diagnostic evaporates (cycle-270: a bare "launch exit=10" cost a
+// forensic session; the cause was one missing profile file). The classifier
+// threads the first line into the error chain so <phase>-failure-diag.json
+// carries the "[bridge] …" cause; bridgeExitCode's digit scan stops at the
+// ':', so appending the cause never breaks exit-code parsing.
+func (e *Engine) persistLaunchError(c attemptLogContext, workspace, agent, stderr string) string {
+	if stderr == "" {
+		return ""
 	}
-	// Wrap the artifact-timeout exit with the port-level sentinel so the
-	// generic phase runner can errors.Is-match it (Workstream D soft-fail)
-	// without importing this adapter. Other non-zero codes stay plain.
-	if code == ExitArtifactTimeout {
-		return resp, fmt.Errorf("%s: %w", msg, core.ErrArtifactTimeout)
+	path := filepath.Join(workspace, agent+"-launch-error.txt")
+	if err := os.WriteFile(path, []byte(stderr), 0o644); err != nil {
+		c.launchWarn("Engine.persistLaunchError", "persist_launch_error", CodeLaunchErrorPersistFailed,
+			fmt.Sprintf("launch-error persist failed: path=%s error=%v", path, err), map[string]string{"path": path})
+		return ""
 	}
-	// 124 (advisory-phase-contract-degrade residual): a driver killed by a
-	// command-level timeout is infra weather — the sibling of 81 — so it joins
-	// the transient set: retry backoff, optionalInfraSkip, and the reconcile
-	// IsInfraTeardownError predicate all treat it as interruption, not defect.
-	// 127 (missing binary) deliberately stays PLAIN below: an absent CLI is an
-	// environment defect that must fail loud; its only recovery is the exit-
-	// code-triggered family fallback (llmroute), which sees the raw 127.
-	if code == ExitREPLBootTimeout || code == ExitUnknownPrompt || code == ExitRespondLoopGuard || code == ExitCmdTimeout {
-		if code == ExitREPLBootTimeout && e.deps.BootTimeoutStore != nil {
-			if _, err := e.deps.BootTimeoutStore.RecordBootStrike(req.CLI); err != nil {
-				_, _ = fmt.Fprintf(e.deps.Stderr, "[engine] boot-timeout bench record failed for %s: %v\n", req.CLI, err)
-			}
-		}
-		return resp, fmt.Errorf("%s: %w", msg, core.ErrTransientBridgeFailure)
+	return path
+}
+
+// recordBootStrike counts one boot-timeout strike for the driver on
+// ExitREPLBootTimeout (reaching the bench threshold benches it for
+// llmroute.ApplyDriverBench). A store fault is BRIDGE_BOOT_STRIKE_RECORD_FAILED;
+// the launch error still wraps the transient sentinel.
+func (e *Engine) recordBootStrike(c attemptLogContext, cli string, code int) {
+	if code != ExitREPLBootTimeout || e.deps.BootTimeoutStore == nil {
+		return
 	}
-	// -1 (deliverable-authority-ctxcancel, cycle-859): Go's ExitError.ExitCode()
-	// reports -1 for a signal death, most commonly exec.CommandContext SIGKILLing
-	// the driver on our own cancellation. Gated on ctx.Err(): when our context is
-	// cancelled, treat it as infra teardown — the sibling of the 124 cmd-timeout —
-	// because the driver may already have written its contracted deliverable (a
-	// green-ACS PASS discarded because -1 fell through to a plain hard-FAIL). The
-	// reconcile door this routes to still requires an enforce-verified deliverable,
-	// so a genuine crash (SIGSEGV/OOM) racing the cancel with no valid deliverable
-	// still hard-fails. A -1 with a LIVE context is a start/launch failure and
-	// stays PLAIN below, failing loud.
-	if code == -1 && ctx.Err() != nil {
-		return resp, fmt.Errorf("%s: %w", msg, core.ErrTransientBridgeFailure)
+	if _, err := e.deps.BootTimeoutStore.RecordBootStrike(cli); err != nil {
+		c.launchWarn("Engine.recordBootStrike", "record_boot_strike", CodeBootStrikeRecordFailed,
+			fmt.Sprintf("boot-timeout bench record failed for %s: %v", cli, err), nil)
 	}
-	return resp, errors.New(msg)
+}
+
+// launchFields is the BRIDGE_EXIT_* event's payload: the classification's
+// facts plus the persisted launch-error path when there is one.
+func launchFields(out launchoutcome.Outcome, launchError string) map[string]string {
+	fields := map[string]string{
+		"exit_code":     strconv.Itoa(out.ExitCode),
+		"cause_code":    out.CauseCode,
+		"transient":     strconv.FormatBool(out.Transient),
+		"ctx_cancelled": strconv.FormatBool(out.CtxCancelled),
+	}
+	if launchError != "" {
+		fields["launch_error"] = launchError
+	}
+	return fields
 }
 
 // defaultContextFillWarnPct is the bridge-side built-in context-fill WARN
@@ -679,61 +721,12 @@ const defaultContextFillWarnPct = 60
 // than this can be real work worth building a collector for (cycle-1005).
 const tripwireSuccessThreshold = 60 * time.Second
 
-// firstDiagnosticLine picks the one-line cause threaded into the launch
-// error chain. Validate-gauntlet failures put the cause FIRST and prefix it
-// "[bridge]"; driver failures accumulate launch chatter first and end with
-// the causal line (cycle-286: a timeout's first line was a stream_output
-// NOTE while "FAIL: completion never signalled" sat last). So: the first
-// "[bridge]"-prefixed line wins; otherwise the LAST non-empty line.
-func firstDiagnosticLine(stderr string) string {
-	last := ""
-	for _, line := range strings.Split(stderr, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		if strings.HasPrefix(line, "[bridge]") {
-			return boundCause(line)
-		}
-		last = line
-	}
-	return boundCause(last)
-}
-
-// artifactTimeoutSummary lifts the artifact wait's self-describing summary line
-// out of a launch's stderr. The exact [bridge] prefix identifies marker
-// candidates rather than inline evidence. The final candidate wins because
-// earlier free-form diagnostics are sanitized and closeout emits the
-// authoritative marker last. Returns "" when the driver produced no summary
-// (e.g. a non-tmux driver returning 81), leaving the legacy cause in place.
+// artifactTimeoutSummary is the Strangler Fig facade the driver-output tests
+// keep spelling: the artifact wait's self-describing summary line, mined by
+// the unit-10 classifier (launchoutcome.ArtifactTimeoutSummary) — the cause
+// miners moved with the exit table they feed.
 func artifactTimeoutSummary(stderr string) string {
-	prefix := "[bridge] " + artifactTimeoutMarker
-	summary := ""
-	for _, rawLine := range strings.Split(stderr, "\n") {
-		line := strings.TrimSpace(rawLine)
-		if strings.HasPrefix(line, prefix) {
-			summary = boundArtifactTimeoutSummary(strings.TrimPrefix(line, "[bridge] "))
-		}
-	}
-	return summary
-}
-
-func boundArtifactTimeoutSummary(line string) string {
-	const maxRunes = 1024
-	runes := []rune(line)
-	if len(runes) <= maxRunes {
-		return line
-	}
-	return string(runes[:maxRunes-1]) + "…"
-}
-
-// boundCause caps the cause line rune-safely (never split UTF-8 mid-sequence).
-func boundCause(line string) string {
-	const maxCause = 300
-	if runes := []rune(line); len(runes) > maxCause {
-		return string(runes[:maxCause]) + "…"
-	}
-	return line
+	return launchoutcome.ArtifactTimeoutSummary(stderr)
 }
 
 // randRead is the entropy source for defaultChallengeToken — a package

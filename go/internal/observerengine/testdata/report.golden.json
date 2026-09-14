@@ -1,0 +1,63 @@
+{
+  "agent": "builder",
+  "cache_creation_tokens": 256,
+  "cache_read_tokens": 1024,
+  "cumulative_cost": 0.5,
+  "cycle": 7,
+  "duration_s": 0,
+  "error_count": 1,
+  "event_count": 4,
+  "finished_at": "2026-06-01T09:00:00Z",
+  "incident_count": 2,
+  "incidents": [
+    {
+      "data": {
+        "action": "extend",
+        "action_reason": "deep-thinking phase; extend",
+        "idle_s": 601,
+        "threshold_s": 600
+      },
+      "id": "obs_1780304400000000000_<PID>_4",
+      "schema_version": "1.0",
+      "severity": "INCIDENT",
+      "source": {
+        "agent": "builder",
+        "component": "phase-observer",
+        "cycle": 7,
+        "observer_pid": <PID>,
+        "phase": "build"
+      },
+      "trace_id": "cycle-7-build-1780304400",
+      "ts": "2026-06-01T09:00:00Z",
+      "type": "stuck_no_output"
+    },
+    {
+      "data": {
+        "no_progress_s": 700,
+        "threshold_s": 600,
+        "tool_calls": 1,
+        "tool_results": 1
+      },
+      "id": "obs_1780304400000000000_<PID>_4",
+      "schema_version": "1.0",
+      "severity": "INCIDENT",
+      "source": {
+        "agent": "builder",
+        "component": "phase-observer",
+        "cycle": 7,
+        "observer_pid": <PID>,
+        "phase": "build"
+      },
+      "trace_id": "cycle-7-build-1780304400",
+      "ts": "2026-06-01T09:00:00Z",
+      "type": "stuck_no_progress"
+    }
+  ],
+  "phase": "build",
+  "rate_limit_count": 1,
+  "schema_version": "1.0",
+  "started_at": "2026-06-01T09:00:00Z",
+  "tool_call_count": 1,
+  "tool_result_count": 1,
+  "trace_id": "cycle-7-build-1780304400"
+}

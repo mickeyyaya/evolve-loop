@@ -37,3 +37,25 @@ func TestDecorator_ForwardsPersonaProber(t *testing.T) {
 		t.Fatalf("a wrapped non-prober reports available (nil); got %v", err)
 	}
 }
+
+type wiredRunner struct {
+	plainRunner
+	wired bool
+}
+
+func (w wiredRunner) SignalsWired() bool { return w.wired }
+
+// ADR-0103 unit 11 (test 43): a decorator must not narrow the wiring proof of
+// what it wraps — SignalsWired forwards to the inner runner, false for a
+// runner without the capability.
+func TestSwarmDecorator_ForwardsSignalsWired(t *testing.T) {
+	if !New(wiredRunner{wired: true}, nil, swarm.ModeWriter, Config{}).SignalsWired() {
+		t.Error("a wired inner runner reports wired through the Decorator")
+	}
+	if New(wiredRunner{wired: false}, nil, swarm.ModeWriter, Config{}).SignalsWired() {
+		t.Error("an unwired inner runner reports unwired")
+	}
+	if New(plainRunner{}, nil, swarm.ModeWriter, Config{}).SignalsWired() {
+		t.Error("a runner without the capability reports false")
+	}
+}

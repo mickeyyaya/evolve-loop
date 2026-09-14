@@ -1,0 +1,12 @@
+## INVOCATION CONTEXT
+
+- Agent: scout
+- Cycle: 5
+- Workspace: {WS}
+- Artifact path: {ROOT}/.evolve/runs/cycle-5/scout.md
+- Challenge token: aaaaaaaaaaaaaaaa
+- Profile: scout.json
+
+--- BEGIN TASK PROMPT ---
+no trailing nl
+--- END TASK PROMPT ---

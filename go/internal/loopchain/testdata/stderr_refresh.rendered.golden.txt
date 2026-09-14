@@ -1,0 +1,34 @@
+== ahead_check_failed refreshed=false
+[loop] loop.warning WARN LOOP_BOUNDARY_REFRESH_SKIPPED seq=1 origin=Refresher.Refresh — ahead-check failed (git fetch: network unreachable) — skipping refresh, continuing on the current binary batch=7 commit=cafebabe1234deadbeef error=git fetch: network unreachable step=ahead_check
+== lane_check_unverifiable refreshed=false
+[loop] loop.warning WARN LOOP_BOUNDARY_REFRESH_SKIPPED seq=1 origin=Refresher.Refresh — WARN fleet lane check unverifiable (runlease: parse .lease: unexpected end of JSON input) — cannot prove the plane is idle, refusing to rebuild the shared binary; continuing on the current binary batch=7 commit=cafebabe1234deadbeef error=runlease: parse .lease: unexpected end of JSON input step=lane_check
+== lane_active refreshed=false
+[loop] loop.warning WARN LOOP_BOUNDARY_REFRESH_SKIPPED seq=1 origin=Refresher.Refresh — a sibling fleet lane is active (fresh run lease) — refusing to rebuild the plane binary mid-batch; continuing on the current binary batch=7 commit=cafebabe1234deadbeef step=lane_active
+== breaker_refused refreshed=false
+[loop] loop.warning WARN LOOP_BOUNDARY_REFRESH_SKIPPED seq=1 origin=Refresher.Refresh — REFUSED — a refresh was already performed for build commit cafebabe1234 and the running binary still reports it; the rebuild did not move the binary. Continuing on the current binary rather than re-execing again (see .evolve/boundary-refresh-attempt.json) batch=7 commit=cafebabe1234deadbeef step=breaker
+== rebuild_failed refreshed=false
+[chain] boundary-refresh: HEAD has advanced past the running binary's build commit (cafebabe1234) — rebuilding
+[loop] loop.warning WARN LOOP_BOUNDARY_REFRESH_SKIPPED seq=1 origin=Refresher.Refresh — rebuild failed (make -C go build: exit status 2: build failed: syntax error) — skipping refresh, continuing on the current binary batch=7 commit=cafebabe1234deadbeef error=make -C go build: exit status 2: build failed: syntax error step=rebuild
+== no_target refreshed=false
+[chain] boundary-refresh: HEAD has advanced past the running binary's build commit (cafebabe1234) — rebuilding
+[loop] loop.warning WARN LOOP_BOUNDARY_REFRESH_SKIPPED seq=1 origin=Refresher.Refresh — no re-exec target (rebuilt binary {ROOT}/go/bin/evolve: stat {ROOT}/go/bin/evolve: no such file or directory) — skipping refresh, continuing on the current binary batch=7 commit=cafebabe1234deadbeef error=rebuilt binary {ROOT}/go/bin/evolve: stat {ROOT}/go/bin/evolve: no such file or directory step=target
+== repin_refused refreshed=false
+[chain] boundary-refresh: HEAD has advanced past the running binary's build commit (cafebabe1234) — rebuilding
+[loop] loop.warning WARN LOOP_BOUNDARY_REFRESH_SKIPPED seq=1 origin=Refresher.Refresh — repin refused (phaseintegrity: re-pin refused — binary build-commit "cafebabe1234deadbeef" is not provenance-verified (not an ancestor of HEAD); pass operator authorization (--reset-sha) to override) — skipping refresh, continuing on the current binary batch=7 commit=cafebabe1234deadbeef error=phaseintegrity: re-pin refused — binary build-commit "cafebabe1234deadbeef" is not provenance-verified (not an ancestor of HEAD); pass operator authorization (--reset-sha) to override step=repin
+== audit_log_failed refreshed=true
+[chain] boundary-refresh: HEAD has advanced past the running binary's build commit (cafebabe1234) — rebuilding
+[loop] loop.warning WARN LOOP_BOUNDARY_REFRESH_AUDIT_FAILED seq=1 origin=Refresher.Refresh — WARN: audit log write failed (open boundary-refresh log: open {EVOLVE_DIR}/boundary-refresh-log.jsonl: is a directory) — pin already moved batch=7 error=open boundary-refresh log: open {EVOLVE_DIR}/boundary-refresh-log.jsonl: is a directory path={EVOLVE_DIR}/boundary-refresh-log.jsonl
+[chain] boundary-refresh: re-pinned STALE_PIN -> 7448e675c81e — re-executing {ROOT}/go/bin/evolve to pick up the rebuilt binary
+== empty_argv refreshed=false
+[chain] boundary-refresh: HEAD has advanced past the running binary's build commit (cafebabe1234) — rebuilding
+[loop] loop.warning WARN LOOP_BOUNDARY_REFRESH_SKIPPED seq=1 origin=Refresher.Refresh — empty re-exec argv — skipping refresh batch=7 commit=cafebabe1234deadbeef step=argv
+== arm_failed refreshed=false
+[chain] boundary-refresh: HEAD has advanced past the running binary's build commit (cafebabe1234) — rebuilding
+[loop] loop.warning WARN LOOP_BOUNDARY_REFRESH_SKIPPED seq=1 origin=Refresher.Refresh — cannot arm the re-exec loop breaker (write boundary-refresh attempt marker: open {EVOLVE_DIR}/boundary-refresh-attempt.json: is a directory) — skipping refresh rather than risking an unbounded re-exec loop batch=7 commit=cafebabe1234deadbeef error=write boundary-refresh attempt marker: open {EVOLVE_DIR}/boundary-refresh-attempt.json: is a directory step=arm
+== reexec_failed refreshed=false
+[chain] boundary-refresh: HEAD has advanced past the running binary's build commit (cafebabe1234) — rebuilding
+[chain] boundary-refresh: re-pinned STALE_PIN -> 7448e675c81e — re-executing {ROOT}/go/bin/evolve to pick up the rebuilt binary
+[loop] loop.warning WARN LOOP_BOUNDARY_REFRESH_SKIPPED seq=1 origin=Refresher.Refresh — re-exec failed (exec format error) — continuing on the current binary batch=7 commit=cafebabe1234deadbeef error=exec format error step=reexec
+== refreshed refreshed=true
+[chain] boundary-refresh: HEAD has advanced past the running binary's build commit (cafebabe1234) — rebuilding
+[chain] boundary-refresh: re-pinned STALE_PIN -> 7448e675c81e — re-executing {ROOT}/go/bin/evolve to pick up the rebuilt binary

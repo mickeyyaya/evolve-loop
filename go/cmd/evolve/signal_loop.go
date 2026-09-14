@@ -12,9 +12,8 @@ package main
 
 import (
 	"fmt"
-	"maps"
-	"strconv"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/loopwave"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
@@ -24,7 +23,9 @@ const (
 	CodeLoopFleetLaneHalt       signalcenter.Code = "LOOP_FLEET_LANE_HALT"
 	CodeLoopHalt                signalcenter.Code = "LOOP_HALT"
 	CodeLoopEscalationBoundary  signalcenter.Code = "LOOP_ESCALATION_BOUNDARY"
-	CodeLoopMinWidthRepair      signalcenter.Code = "LOOP_MIN_WIDTH_REPAIR"
+	// CodeLoopMinWidthRepair projects the wave engine's code (ADR-0103 unit
+	// 13): the leaf registers it, once.
+	CodeLoopMinWidthRepair signalcenter.Code = loopwave.CodeMinWidthRepair
 )
 
 func init() {
@@ -33,7 +34,6 @@ func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeLoopFleetLaneHalt, "a fleet lane exited with the system-failure halt code; the lane's own LOOP_SYSTEM_FAILURE_HALT names the failure and the escalation it filed")
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeLoopHalt, "the batch halted at a wave boundary (plane diverged, sync refused); the reason is the halt error")
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeLoopEscalationBoundary, "the escalation boundary staged inbox items (bumped/filed/planned) after a cycle; fields carry the counts and the stage")
-	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeLoopMinWidthRepair, "the fleet shrank below its committed width and one isolated lane was dispatched instead (min-width repair)")
 }
 
 // loopHaltRule is what only the caller of haltOnSystemFailure knows: the
@@ -56,21 +56,12 @@ func emitLoopHalt(signals *signalcenter.Center, cycle int, origin string, code s
 	})
 }
 
-// emitLoopWave is the loop.wave producer: batch-level (no cycle), the wave
+// emitLoopWave is the coordinator's spelling of the ONE loop.wave producer
+// (loopwave.EmitWave, ADR-0103 unit 13): batch-level (no cycle), the wave
 // number stamped on the producer's own copy of the caller's fields; INFO
 // without a code, WARN with one.
 func emitLoopWave(signals *signalcenter.Center, wave int, origin string, code signalcenter.Code, reason string, fields map[string]string) {
-	stamped := make(map[string]string, len(fields)+1)
-	maps.Copy(stamped, fields)
-	stamped["wave"] = strconv.Itoa(wave)
-	e := signalcenter.Event{
-		Module: signalcenter.ModuleLoop, Origin: origin, Kind: signalcenter.KindLoopWave,
-		Severity: signalcenter.SeverityInfo, Reason: reason, Fields: stamped,
-	}
-	if code != "" {
-		e.Severity, e.Code = signalcenter.SeverityWarn, code
-	}
-	signals.Emit(e)
+	loopwave.EmitWave(signals, wave, origin, code, reason, fields)
 }
 
 // emitLoopEscalation is the loop.escalation producer: a WARN that names the

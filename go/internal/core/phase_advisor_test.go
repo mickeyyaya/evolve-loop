@@ -16,6 +16,7 @@ type fakeBridge struct {
 	stdout     string
 	err        error
 	durationMS int64
+	tokens     TokenUsage // ADR-0103 unit 04: the span golden threads token usage
 	gotReq     BridgeRequest
 	calls      int
 }
@@ -26,7 +27,7 @@ func (f *fakeBridge) Launch(_ context.Context, req BridgeRequest) (BridgeRespons
 	if f.err != nil {
 		return BridgeResponse{}, f.err
 	}
-	return BridgeResponse{Stdout: f.stdout, ExitCode: 0, DurationMS: f.durationMS}, nil
+	return BridgeResponse{Stdout: f.stdout, ExitCode: 0, DurationMS: f.durationMS, Tokens: f.tokens}, nil
 }
 func (f *fakeBridge) Probe(_ context.Context) (BridgeProbe, error) { return BridgeProbe{}, nil }
 
@@ -403,78 +404,5 @@ func TestPhaseAdvisor_PlanFailSafe(t *testing.T) {
 	noWs.Workspace = ""
 	if _, err := NewPhaseAdvisor(&fakeBridge{stdout: "[]"}).Plan(noWs); err == nil {
 		t.Error("empty workspace: want error")
-	}
-}
-
-// TestWriteRoutingContext_RendersGoal proves the advisor's prompt surfaces the
-// goal text (RouteInput.GoalText) so the brain can reason about WHAT the cycle is
-// for — the precondition for genuinely selecting a design phase or minting,
-// rather than rubber-stamping the spine blind. Empty goal renders nothing.
-func TestWriteRoutingContext_RendersGoal(t *testing.T) {
-	t.Parallel()
-	const goal = "redesign the auth subsystem with a new token-rotation architecture"
-	got := buildPlanPrompt(router.RouteInput{Cycle: 5, GoalText: goal})
-	if !strings.Contains(got, goal) {
-		t.Errorf("plan prompt must surface the goal text so the advisor reasons from it:\n%s", got)
-	}
-	// No goal ⇒ no goal section (keeps the prompt prefix stable for the empty case).
-	if strings.Contains(buildPlanPrompt(router.RouteInput{Cycle: 5}), "## Goal") {
-		t.Error("empty GoalText must not emit a Goal section")
-	}
-}
-
-func TestWriteRoutingContext_RendersCarryoverTodos(t *testing.T) {
-	t.Parallel()
-	got := buildPlanPrompt(router.RouteInput{
-		Cycle: 5,
-		CarryoverTodos: []router.CarryoverTodo{
-			{
-				ID:             "cycle-4-failed-build",
-				Action:         "Review failed build learning and fix missing audit binding",
-				Priority:       "P0",
-				FirstSeenCycle: 4,
-				CyclesUnpicked: 1,
-			},
-		},
-	})
-	for _, want := range []string{
-		"## Carryover todos from previous cycles",
-		"cycle-4-failed-build",
-		"Review failed build learning",
-		"P0",
-		"cycles_unpicked=1",
-	} {
-		if !strings.Contains(got, want) {
-			t.Errorf("plan prompt missing %q:\n%s", want, got)
-		}
-	}
-}
-
-// TestBuildPlanPrompt_WholeCycleArray proves the plan prompt shares the routing
-// context (rubric) with buildRoutingPrompt but asks for the whole-cycle ARRAY
-// shape, not the per-transition object — the two cadences diverge correctly.
-func TestBuildPlanPrompt_WholeCycleArray(t *testing.T) {
-	t.Parallel()
-	in := router.RouteInput{
-		Current:   "start",
-		Cycle:     3,
-		Completed: []string{},
-		Signals:   router.RoutingSignals{Scout: router.ScoutSignals{CycleSizeEstimate: "medium", Present: true}},
-		Cfg: config.RoutingConfig{Triggers: map[string]config.RoutingBlock{
-			// Phase 4b: rubric lines are registry data (routing.rubric_hint).
-			"scout": {RubricHint: []string{"scout.carryover_count >= 3 → skip scout (work already queued)"}},
-		}},
-	}
-	got := buildPlanPrompt(in)
-	// shared context (rubric line from writeRoutingContext)
-	if !strings.Contains(got, "skip scout (work already queued)") {
-		t.Errorf("plan prompt missing shared rubric:\n%s", got)
-	}
-	// whole-cycle array spec, NOT the per-transition object spec
-	if !strings.Contains(got, `[{"phase":"<phase>","run":true`) {
-		t.Errorf("plan prompt missing array JSON spec:\n%s", got)
-	}
-	if strings.Contains(got, `"next_phase":"<phase>"`) {
-		t.Errorf("plan prompt should not carry the per-transition object spec:\n%s", got)
 	}
 }

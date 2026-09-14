@@ -12,6 +12,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/digest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner/verdict"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 )
@@ -23,7 +24,7 @@ type phasePreparation struct {
 	phase          string
 	prompt         string
 	artifactPath   string
-	preDispatch    artifactSnapshot
+	preDispatch    verdict.Snapshot
 	hadPreDispatch bool
 	profileDir     string
 	profileName    string
@@ -44,10 +45,10 @@ func (b *BaseRunner) preparePhaseExecution(req core.PhaseRequest) (phasePreparat
 	}
 
 	if skipper, ok := b.hooks.(Skipper); ok {
-		if skipped, verdict, nextPhase, diags := skipper.ShouldSkip(req); skipped {
+		if skipped, skipVerdict, nextPhase, diags := skipper.ShouldSkip(req); skipped {
 			resp := core.PhaseResponse{
 				Phase:        prep.phase,
-				Verdict:      verdict,
+				Verdict:      skipVerdict,
 				ArtifactsDir: req.Workspace,
 				NextPhase:    nextPhase,
 				DurationMS:   b.nowFn().Sub(prep.start).Milliseconds(),
@@ -94,7 +95,7 @@ func (b *BaseRunner) preparePhaseExecution(req core.PhaseRequest) (phasePreparat
 
 	prep.prompt = b.hooks.ComposePrompt(body, req)
 	prep.artifactPath = filepath.Join(req.Workspace, b.hooks.ArtifactFilename(req))
-	prep.preDispatch, prep.hadPreDispatch = statArtifactSnapshot(prep.artifactPath)
+	prep.preDispatch, prep.hadPreDispatch = verdict.StatSnapshot(prep.artifactPath)
 	prep.profileDir = filepath.Join(req.ProjectRoot, ".evolve", "profiles")
 	prep.profileName = strings.TrimPrefix(b.hooks.AgentPromptName(), "evolve-")
 	prep.profilePath = filepath.Join(prep.profileDir, prep.profileName+".json")
@@ -118,10 +119,8 @@ func (b *BaseRunner) preparePhaseExecution(req core.PhaseRequest) (phasePreparat
 		prep.prompt += fmt.Sprintf("\n\n## Budget\nAdvisory turn budget for this phase: ~%d turns. Prioritize breadth over depth; write your report as soon as the completion gates are satisfied.\n", prep.profile.TurnBudgetHint)
 	}
 	if contract, ok := phasecontract.For(prep.phase); ok && contract.RequireChallengeToken {
-		if tokenBytes, err := os.ReadFile(filepath.Join(req.Workspace, "challenge-token.txt")); err == nil {
-			if token := strings.TrimSpace(string(tokenBytes)); token != "" {
-				prep.prompt += fmt.Sprintf("\n\n## Challenge Token (proof-of-read — MANDATORY)\nCopy this token verbatim into your report as an HTML comment near the top: <!-- challenge-token: %s -->\nA report without it is rejected and re-dispatched.\n", token)
-			}
+		if token, ok := phasecontract.ChallengeToken(req.Workspace); ok {
+			prep.prompt += fmt.Sprintf("\n\n## Challenge Token (proof-of-read — MANDATORY)\nCopy this token verbatim into your report as an HTML comment near the top: <!-- challenge-token: %s -->\nA report without it is rejected and re-dispatched.\n", token)
 		}
 	}
 	return prep, nil, nil

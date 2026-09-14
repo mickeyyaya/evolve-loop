@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/launchoutcome"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmcalls"
 	evolog "github.com/mickeyyaya/evolve-loop/go/internal/log"
@@ -49,10 +50,12 @@ func (c attemptLogContext) event(origin string, kind signalcenter.Kind, code sig
 }
 
 // warn is the engine's telemetry-warning producer (ADR-0101 S3): one
-// bridge.warning whose code names the rule and whose reason is the detail.
-// The old "[engine] WARN" line is rendered by the root's stderr sink.
+// bridge.warning whose code names the rule and whose reason is the detail —
+// launchWarn under its historical origin with no step (the payload stays
+// exactly the call identity). The old "[engine] WARN" line is rendered by
+// the root's stderr sink.
 func (c attemptLogContext) warn(code signalcenter.Code, detail string) {
-	c.signals.Emit(c.event("attemptLogContext.warn", signalcenter.KindBridgeWarning, code, detail))
+	c.launchWarn("attemptLogContext.warn", "", code, detail, nil)
 }
 
 // tripwire is the bridge.tripwire producer: a successful attempt that ran past
@@ -64,6 +67,23 @@ func (c attemptLogContext) tripwire(durationMS int64) {
 	c.signals.Emit(e)
 }
 
+// launchWarn is the module's ONE bridge.warning producer (ADR-0103 unit 10):
+// one event under the attempt's identity whose fields name the host step
+// (fields.step, omitted when empty) beside the call identity, plus the
+// step's own facts. The origin is the producer's Type.Method — vocabulary,
+// never a hidden default. A nil Center is the Null Object (Emit on nil is a
+// no-op).
+func (c attemptLogContext) launchWarn(origin, step string, code signalcenter.Code, reason string, fields map[string]string) {
+	e := c.event(origin, signalcenter.KindBridgeWarning, code, reason)
+	if step != "" {
+		e.Fields["step"] = step
+	}
+	for k, v := range fields {
+		e.Fields[k] = v
+	}
+	c.signals.Emit(e)
+}
+
 // diagnosticField bounds untrusted text and emits one ASCII-quoted field. It
 // keeps resolver, filesystem, and provider errors on a single parseable line,
 // including strings containing newlines, terminal controls, or bidi marks.
@@ -71,6 +91,10 @@ func diagnosticField(value string) string {
 	return evolog.DiagnosticField(value)
 }
 
+// recordModelAttempt is the ONE attempt-ledger writer: it derives the attempt
+// default and the call_id once and RETURNS the attempt context so every
+// later signal of the same Launch (the unit-10 step failures and the
+// BRIDGE_EXIT_* classification) rides the ledger row's identity.
 func (e *Engine) recordModelAttempt(
 	req core.BridgeRequest,
 	requestedModel string,
@@ -79,7 +103,7 @@ func (e *Engine) recordModelAttempt(
 	dispatched modelDispatch,
 	launchStderr string,
 	resp *core.BridgeResponse,
-) {
+) attemptLogContext {
 	attempt := req.Attempt
 	if attempt <= 0 {
 		attempt = 1
@@ -128,12 +152,13 @@ func (e *Engine) recordModelAttempt(
 		ExitCode:        &exitCode,
 		Tripwire:        tripwire,
 		FillPct:         result.FillPct,
-		CauseCode:       modelAttemptCause(code, launchStderr),
+		CauseCode:       launchoutcome.CauseCode(code, launchStderr),
 	}
 	if err := llmcalls.AppendWorkspace(req.Workspace, rec); err != nil {
 		logContext.warn(CodeTelemetryAppendFailed,
 			fmt.Sprintf("attempt telemetry append failed: path=%s error=%v", llmcalls.Path(req.Workspace), err))
 	}
+	return logContext
 }
 
 func (e *Engine) resolveAttemptTokens(req core.BridgeRequest, start, end time.Time, callID string, attempt int) (tokenusage.Result, llmcalls.UsageStatus) {
@@ -222,61 +247,6 @@ func (e *Engine) emitTokenWarnings(req core.BridgeRequest, code int, start, end 
 func isTelemetryTripwire(cli string, code int, start, end time.Time, source tokenusage.Source) bool {
 	return code == ExitOK && end.Sub(start) > tripwireSuccessThreshold && source == tokenusage.SourceNone &&
 		!strings.HasPrefix(strings.ToLower(cli), "claude")
-}
-
-func modelAttemptCause(code int, stderr string) string {
-	if code == ExitOK {
-		return ""
-	}
-	if code == ExitArtifactTimeout {
-		if cause := artifactTimeoutCauseCode(stderr); cause != "" {
-			return cause
-		}
-	}
-	switch code {
-	case ExitSafetyGate:
-		return "safety_gate"
-	case ExitCostLeak:
-		return "cost_leak"
-	case ExitBadFlags:
-		return "bad_flags"
-	case ExitREPLBootTimeout:
-		return "repl_boot_timeout"
-	case ExitArtifactTimeout:
-		return "artifact_timeout"
-	case ExitUnknownPrompt:
-		return "unknown_prompt"
-	case ExitRespondLoopGuard:
-		return "respond_loop_guard"
-	case ExitRequireFullUnmet:
-		return "required_tier_unavailable"
-	case ExitCmdTimeout:
-		return "command_timeout"
-	case ExitMissingBinary:
-		return "missing_binary"
-	default:
-		return "driver_error"
-	}
-}
-
-func artifactTimeoutCauseCode(stderr string) string {
-	summary := artifactTimeoutSummary(stderr)
-	prefix := artifactTimeoutMarker + "cause="
-	if !strings.HasPrefix(summary, prefix) {
-		return ""
-	}
-	fields := strings.Fields(strings.TrimPrefix(summary, prefix))
-	if len(fields) == 0 {
-		return ""
-	}
-	value := fields[0]
-	switch artifactTimeoutCause(value) {
-	case artifactTimeoutContextCancelled, artifactTimeoutDetectorError, artifactTimeoutSubmitWedged,
-		artifactTimeoutTransientUpstream, artifactTimeoutReviewStop, artifactTimeoutReviewPause,
-		artifactTimeoutIncomplete:
-		return value
-	}
-	return ""
 }
 
 // recordTokenUsage preserves the package-internal test seam while routing it

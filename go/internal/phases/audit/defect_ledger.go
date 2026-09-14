@@ -1,20 +1,16 @@
 package audit
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
-	"github.com/mickeyyaya/evolve-loop/go/internal/core/carryover"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core/defectledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
 // defect_ledger.go — the anti-laundering ledger
@@ -43,240 +39,139 @@ import (
 // MISSING disposition artifact on a real continuation is the defect itself, not
 // an environment gap, so it blocks (unlike probe_quarantine's missing-worktree
 // case, which correctly degrades open).
+//
+// Since ADR-0103 unit 09 the ledger's schema, writer, readers and the gate
+// live in internal/core/defectledger; this file is the audit package's SEAM:
+// the vocabulary projected, the ledger's ONE wired construction, the
+// request/rejection projections, the citation resolver the gate takes as a
+// Strategy, the three production spellings and the Null-Object facades the
+// by-name tests keep. Design: docs/architecture/decomposition/09-defectledger.md.
 
+// The ledger's vocabulary, projected (single source: the leaf).
 const (
-	defectLedgerFile      = "defect-ledger.json"
-	defectDispositionFile = "defect-dispositions.json"
-
-	defectStatusOpen     = "OPEN"
-	defectStatusFixed    = "FIXED"
-	defectStatusDeferred = "DEFERRED"
-
-	// defectLedgerMaxEntries and defectTextMaxRunes bound the ledger against an
-	// agent-authored verdict sentinel carrying thousands of defects or a
-	// megabyte-long defect line (cycle-1282 DEF-6). The ledger is re-read and
-	// re-written on every Classify, so unbounded growth is quadratic work on the
-	// audit hot path as well as an unreadable artifact. Overflow is RECORDED as
-	// a synthetic entry, never silently dropped — a cap that erases defects
-	// would be the laundering primitive wearing a resource-limit costume.
-	defectLedgerMaxEntries = 64
-	defectTextMaxRunes     = 2000
+	defectLedgerFile      = defectledger.LedgerFile
+	defectDispositionFile = defectledger.DispositionsFile
 )
 
-// defectEntry is one tracked defect. Evidence is mandatory on FIXED and Reason
-// on DEFERRED — an unevidenced closure claim is the laundering primitive.
-type defectEntry struct {
-	ID       string `json:"id"`
-	Text     string `json:"text"`
-	Status   string `json:"status"`
-	Evidence string `json:"evidence,omitempty"`
-	Reason   string `json:"reason,omitempty"`
-}
+// The status vocabulary, projected.
+const (
+	defectStatusOpen     = defectledger.StatusOpen
+	defectStatusFixed    = defectledger.StatusFixed
+	defectStatusDeferred = defectledger.StatusDeferred
+)
 
-// defectLedgerDoc is the on-disk <workspace>/defect-ledger.json wire shape.
-// OriginCycle names the cycle that RAISED the defects, so a continuation can
-// trace lineage back past its immediate ancestor.
-type defectLedgerDoc struct {
-	OriginCycle int           `json:"origin_cycle"`
-	Entries     []defectEntry `json:"entries"`
-}
+// The ledger's bounds, projected (audit_report_length_test.go reads them).
+const (
+	defectLedgerMaxEntries = defectledger.MaxEntries
+	defectTextMaxRunes     = defectledger.TextMaxRunes
+)
 
-// defectDispositionDoc is the on-disk <workspace>/defect-dispositions.json the
-// continuation's builder/auditor writes: the claim, per inherited defect id.
-type defectDispositionDoc struct {
-	Dispositions []struct {
-		ID       string              `json:"id"`
-		Status   string              `json:"status"`
-		Evidence dispositionEvidence `json:"evidence"`
-		Reason   string              `json:"reason"`
-	} `json:"dispositions"`
-}
+// The pre-flight markers and the schema example, projected (the bookkeeping
+// regrade, the seed single-source pin and the doc-example tests read them).
+const (
+	dispositionPreflightMissingMarker    = defectledger.PreflightMissingMarker
+	dispositionPreflightIncompleteMarker = defectledger.PreflightIncompleteMarker
+	dispositionSchemaExample             = defectledger.DispositionsSchemaExample
+)
 
-// evidenceSeparator joins a multi-citation `evidence` value into the single
-// string carried by defectEntry.Evidence and written back into
-// defect-ledger.json. It is also the token evidenceResolves splits on, so the
-// join and the resolution can never disagree about what "several citations"
-// means. ";" never appears in a repo-relative path in practice; a citation that
-// contained one was already unresolvable.
-const evidenceSeparator = "; "
+// defectEntry and defectLedgerDoc keep the tests' spellings of the wire
+// shape; an alias carries no second tag set.
+type (
+	defectEntry     = defectledger.Entry
+	defectLedgerDoc = defectledger.Doc
+)
 
-// dispositionEvidence is the wire type of a disposition's `evidence` field: a
-// single citation STRING or a JSON ARRAY of citation strings.
-//
-// cycle-1399. The auditor had done the work and cited it — as
-// `"evidence": ["a.go:1", "b.go:2"]`. The field was typed `string`, so
-// encoding/json refused the whole DOCUMENT ("cannot unmarshal array into Go
-// struct field .dispositions.evidence of type string") and the gate blocked on
-// "unparseable": a correct claim the gate could not read. #419's decorated-cite
-// tolerance is orthogonal — it never touches the JSON type. Two shapes are
-// natural to an authoring agent and both are now read.
-//
-// Tolerance is widened for the SHAPE only, never for the CLAIM: an unrecognised
-// shape (object, number, bool) is still rejected outright rather than degraded
-// to "" (cycle-1285 F2 — a silent degrade is the gate's cheapest bypass), and
-// every citation in an accepted array must still resolve on its own.
-type dispositionEvidence struct {
-	citations []string
-}
-
-// UnmarshalJSON accepts `"a"` and `["a","b"]`; everything else is an error,
-// which surfaces through readDispositions' blocking unparseable branch.
-func (e *dispositionEvidence) UnmarshalJSON(raw []byte) error {
-	var one string
-	if err := json.Unmarshal(raw, &one); err == nil {
-		e.citations = []string{one}
-		return nil
+// defectLedger is the nil-safe accessor: the wired ledger New built, or the
+// Null-Object ledger for a hooks{} literal (the value receivers of Classify
+// and ComposePrompt cannot cache one). Same REAL lane-scope reader and
+// resolver either way; only the Center differs.
+func (h hooks) defectLedger() *defectledger.Ledger {
+	if h.ledger != nil {
+		return h.ledger
 	}
-	var many []string
-	if err := json.Unmarshal(raw, &many); err == nil {
-		e.citations = many
-		return nil
-	}
-	return fmt.Errorf("`evidence` must be a citation string or an array of citation strings, got %s", truncateRunes(strings.TrimSpace(string(raw)), 120))
+	return nullDefectLedger()
 }
 
-// joined renders the citations as the one string the rest of the mechanism
-// carries. An empty array joins to "" — the existing "no evidence" case, not a
-// new pass: `[]` is a FIXED claim with nothing behind it.
-func (e dispositionEvidence) joined() string {
-	return strings.Join(e.citations, evidenceSeparator)
+// wiredDefectLedger is the ONE construction of the ledger
+// (TestDefectLedgerSeam_OneConstructionSite): the real core.LaneScopeIDs (its
+// two stderr WARNs stay in core), the real citation resolver, the Center read
+// live through the accessor.
+func wiredDefectLedger(signals func() *signalcenter.Center) *defectledger.Ledger {
+	return defectledger.New(core.LaneScopeIDs, resolveEvidence, defectledger.WithSignals(signals))
 }
 
-// readDefectLedger loads dir's ledger. Missing file → (zero, false, nil): a
-// cycle with no ledger has nothing to reconcile. Present-but-unparseable is an
-// error — schema drift on the anti-laundering record must be loud.
-func readDefectLedger(dir string) (defectLedgerDoc, bool, error) {
-	raw, err := os.ReadFile(filepath.Join(dir, defectLedgerFile))
-	if err != nil {
-		if os.IsNotExist(err) {
-			return defectLedgerDoc{}, false, nil
-		}
-		return defectLedgerDoc{}, false, fmt.Errorf("read %s: %w", defectLedgerFile, err)
-	}
-	var doc defectLedgerDoc
-	if err := json.Unmarshal(raw, &doc); err != nil {
-		return defectLedgerDoc{}, false, fmt.Errorf("parse %s: %w", defectLedgerFile, err)
-	}
-	return doc, true, nil
+// nullDefectLedger is the ledger with no Center: the registry root (`evolve
+// phase audit`, which carries no Center for any phase) and the test-only
+// facades run on it.
+func nullDefectLedger() *defectledger.Ledger { return wiredDefectLedger(nil) }
+
+// ledgerRequest is the ONE projection of the phase request onto the ledger's:
+// exactly the four fields the gate reads.
+func ledgerRequest(req core.PhaseRequest) defectledger.Request {
+	return defectledger.Request{Cycle: req.Cycle, Workspace: req.Workspace, ProjectRoot: req.ProjectRoot, Worktree: req.Worktree}
 }
 
-// writeDefectLedger persists doc atomically into dir.
-func writeDefectLedger(dir string, doc defectLedgerDoc) error {
-	body, err := json.MarshalIndent(doc, "", "  ")
-	if err != nil {
-		return fmt.Errorf("encode %s: %w", defectLedgerFile, err)
-	}
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return fmt.Errorf("create %s dir: %w", defectLedgerFile, err)
-	}
-	return atomicwrite.Bytes(filepath.Join(dir, defectLedgerFile), body)
-}
-
-// emitDefectLedger records this cycle's rejection as addressable OPEN entries.
-// Sourced from the evolve-verdict sentinel's structured failure block — the
+// rejectionOf parses the verdict sentinel's structured failure block — the
 // same input extractAuditVerdict already parses, never a test-only side
-// channel. A rejection with no structured defects mints nothing: an empty
-// ledger on every cycle would make every later cycle look like a continuation
-// and is the cheapest way to make the reconcile gate vacuous.
-//
-// New defects are APPENDED to any ledger already in the workspace (a
-// continuation that inherits entries and then raises its own must keep both) —
-// merge, never replace, because replacement is deletion by another name.
-func emitDefectLedger(artifact string, req core.PhaseRequest) error {
-	if req.Workspace == "" {
-		return nil
-	}
+// channel; false when the artifact carries no failure block.
+func rejectionOf(artifact string) (defectledger.Rejection, bool) {
 	s, ok := phasecontract.ParseVerdictSentinelFull(artifact)
-	if !ok || s.Failure == nil || (len(s.Failure.Defects) == 0 && len(s.Failure.Prescription) == 0) {
-		return nil
+	if !ok || s.Failure == nil {
+		return defectledger.Rejection{}, false
 	}
-	doc, existed, err := readDefectLedger(req.Workspace)
-	if err != nil {
-		return err
-	}
-	if !existed {
-		doc.OriginCycle = req.Cycle
-	}
-	known := make(map[string]bool, len(doc.Entries))
-	for _, e := range doc.Entries {
-		known[e.Text] = true
-	}
-	added := false
-	overflow := 0
-	appendLedgerEntry := func(text string) {
-		text = truncateRunes(text, defectTextMaxRunes)
-		if known[text] {
-			return // same defect/prescription re-reported on a retry — one row, not two
-		}
-		if len(doc.Entries) >= defectLedgerMaxEntries {
-			overflow++
-			return
-		}
-		known[text] = true
-		doc.Entries = append(doc.Entries, defectEntry{
-			ID:     defectID(text),
-			Text:   text,
-			Status: defectStatusOpen,
-		})
-		added = true
-	}
-	for _, text := range s.Failure.Defects {
-		appendLedgerEntry(text)
-	}
-	for _, text := range s.Failure.Prescription {
-		// Tagged distinguishably from Defects (F3, scout report Hypothesis
-		// 2): a prescription describes a named fix for a foreseen risk, not
-		// something itself wrong — an operator reading defect-ledger.json
-		// must be able to tell the two apart without a second ledger or a
-		// schema-breaking Kind field.
-		appendLedgerEntry(carryover.PrescriptionPrefix + text)
-	}
-	if overflow > 0 {
-		// One OPEN row standing for the truncated tail. It has no per-defect
-		// text, so it can never be dispositioned by a targeted claim — a
-		// continuation inheriting it must widen the cap or fix the emitter,
-		// which is the correct forcing function for an overflowing rejection.
-		text := fmt.Sprintf("%d further defect(s) from cycle-%d were not recorded: the ledger cap of %d entries was reached", overflow, req.Cycle, defectLedgerMaxEntries)
-		if !known[text] {
-			doc.Entries = append(doc.Entries, defectEntry{ID: defectID(text), Text: text, Status: defectStatusOpen})
-			added = true
-		}
-	}
-	if !added {
-		return nil
-	}
-	return writeDefectLedger(req.Workspace, doc)
+	return defectledger.Rejection{Defects: s.Failure.Defects, Prescriptions: s.Failure.Prescription}, true
 }
 
-// defectID derives an entry id from the defect TEXT alone. A positional id
-// ("d"+index) re-binds the same id string to different text as soon as a list
-// is reordered or an entry is added upstream, so a disposition keyed on that id
-// closes something other than what it claims — laundering by renumbering. A
-// content hash is stable across cycles, chains, and re-emissions: the same
-// defect always answers to the same id, and two different defects never share
-// one.
-//
-// SIXTEEN bytes, not four (cycle-1282 DEF-3). The preimage is fully chosen by
-// the agent authoring the verdict sentinel, so a 32-bit id is a ~2^32 brute
-// force away from minting a benign defect that collides with an inherited
-// CRITICAL and shadows it in the merge index. 128 bits puts a second preimage
-// out of reach; readability is not worth an id an adversary can aim. The merge
-// additionally cross-checks TEXT per id, so a collision is loud rather than
-// silent even at this width.
-func defectID(text string) string {
-	sum := sha256.Sum256([]byte(text))
-	return "d" + hex.EncodeToString(sum[:16])
+// resolveEvidence adapts the audit resolver to the ledger's Strategy: the
+// four rules read the project root and this lane's worktree only.
+func resolveEvidence(evidence string, r defectledger.Request) (bool, string) {
+	return evidenceResolves(evidence, core.PhaseRequest{ProjectRoot: r.ProjectRoot, Worktree: r.Worktree})
 }
 
-// truncateRunes bounds s to at most max runes, marking any cut so a reader can
-// tell a clipped defect line from a short one.
-func truncateRunes(s string, max int) string {
-	r := []rune(s)
-	if len(r) <= max {
-		return s
+// The three production spellings (disposition.go, audit.go's ComposePrompt):
+// the wired ledger, handed in by the caller.
+
+func emitDefectLedgerVia(l *defectledger.Ledger, artifact string, req core.PhaseRequest) []core.Diagnostic {
+	r, ok := rejectionOf(artifact)
+	if !ok {
+		return nil
 	}
-	return string(r[:max]) + "…[truncated]"
+	return l.Emit(ledgerRequest(req), r).Diagnostics
 }
+
+func reconcileContinuationDefectsVia(l *defectledger.Ledger, req core.PhaseRequest) ([]core.Diagnostic, bool, []int) {
+	v := l.Reconcile(ledgerRequest(req))
+	return v.Diagnostics, v.Blocked, v.LineageCycles
+}
+
+func inheritedDefectsPromptBlockVia(l *defectledger.Ledger, req core.PhaseRequest) string {
+	return l.PromptBlock(ledgerRequest(req))
+}
+
+// The Null-Object facades: the by-name tests and the ACS predicates keep these
+// spellings; no production caller (TestNullLedgerFacades_HaveNoProductionCaller).
+
+func emitDefectLedger(artifact string, req core.PhaseRequest) []core.Diagnostic {
+	return emitDefectLedgerVia(nullDefectLedger(), artifact, req)
+}
+
+func reconcileContinuationDefects(req core.PhaseRequest) ([]core.Diagnostic, bool, []int) {
+	return reconcileContinuationDefectsVia(nullDefectLedger(), req)
+}
+
+func readDispositions(workspace string, ancestorCycle int) (map[string]defectEntry, []core.Diagnostic, bool) {
+	return nullDefectLedger().ReadDispositions(defectledger.Request{Workspace: workspace}, ancestorCycle)
+}
+
+func dispositionPreflight(req core.PhaseRequest, ancestorCycle int, ancestor []defectEntry, claims map[string]defectEntry) []core.Diagnostic {
+	return nullDefectLedger().Preflight(ledgerRequest(req), ancestorCycle, ancestor, claims)
+}
+
+func defectID(text string) string { return defectledger.ID(text) }
+
+// truncateRunes is the audit rune cap — the ledger's, projected for
+// closure_claim.go's quoteClaim and the evidence-shape error.
+func truncateRunes(s string, max int) string { return defectledger.Truncate(s, max) }
 
 // evidenceResolves reports whether a closure claim's evidence names a file that
 // actually EXISTS, plus the operator-facing reason when it does not. Validating
@@ -362,58 +257,6 @@ func citeShaped(frag string) bool {
 	return strings.ContainsAny(s, "/.")
 }
 
-// inheritedDefectsPromptBlock renders the continuation-disposition duty into
-// the audit dispatch prompt: the ancestor's OPEN ids + texts and the artifact
-// they are owed in. Composed from the SAME records the gate grades against
-// (workspace manifest, registry binding fallback, ancestor ledger) on the
-// happy path — the half of "continuations must be TOLD their inherited
-// defects" the auditor owns. On the tamper corners (corrupt manifest,
-// manifest/registry cycle disagreement) the gate BLOCKS loudly while this
-// block degrades to best-effort/empty — the prompt is context, never
-// enforcement.
-func inheritedDefectsPromptBlock(req core.PhaseRequest) string {
-	if req.Workspace == "" || req.ProjectRoot == "" {
-		return ""
-	}
-	cont, isCont, err := continuation.ReadManifest(req.Workspace)
-	if err != nil || !isCont {
-		if reg, has := laneRegistryBinding(req); has {
-			cont, isCont = reg, true // manifest-less registry binding is still owed dispositions
-		}
-	}
-	if !isCont {
-		return ""
-	}
-	ancestorWS := filepath.Join(req.ProjectRoot, ".evolve", "runs", "cycle-"+strconv.Itoa(cont.Cycle))
-	doc, hasLedger, err := readDefectLedger(ancestorWS)
-	if err != nil || !hasLedger {
-		return ""
-	}
-	var ids strings.Builder
-	for _, e := range doc.Entries {
-		if e.Status != defectStatusOpen {
-			continue
-		}
-		// The ledger Text is AGENT-authored (a prior cycle's verdict sentinel;
-		// this file's threat model, see defectID). Rendered single-line so an
-		// embedded "\n## …" can never masquerade as mechanism-authored prompt
-		// structure beside the MANDATORY heading.
-		text := strings.Map(func(r rune) rune {
-			if r == '\n' || r == '\r' {
-				return ' '
-			}
-			return r
-		}, truncateRunes(e.Text, 200))
-		fmt.Fprintf(&ids, "- %s: %s\n", e.ID, text)
-	}
-	if ids.Len() == 0 {
-		return ""
-	}
-	return fmt.Sprintf("\n## Inherited defect dispositions (MANDATORY)\n"+
-		"This cycle continues cycle-%d. Write <workspace>/%s BEFORE emitting your verdict, one entry per id below — status FIXED (evidence: a bare resolving cite) or DEFERRED (a non-empty reason). Ids are copied verbatim, never renumbered.\n%s",
-		cont.Cycle, defectDispositionFile, ids.String())
-}
-
 // splitEvidence returns the individual fragments of a (possibly joined)
 // evidence value — citations and prose annotations alike; citeShaped decides
 // which get graded. Blanks are dropped, so "", " " and "; " are all "no
@@ -478,7 +321,7 @@ func oneEvidenceResolves(citation string, req core.PhaseRequest) (bool, string) 
 	// only reject a differently-cased name that was never going to be a
 	// legitimate citation anyway.
 	base := filepath.Base(clean)
-	for _, own := range []string{defectLedgerFile, defectDispositionFile, "continuation-manifest.json"} {
+	for _, own := range []string{defectLedgerFile, defectDispositionFile, continuation.ManifestName} {
 		if strings.EqualFold(base, own) {
 			return false, fmt.Sprintf("evidence %q cites the defect-ledger mechanism's own bookkeeping — a closure claim may not vouch for itself", citation)
 		}
@@ -543,340 +386,4 @@ func isAllDigits(s string) bool {
 		}
 	}
 	return true
-}
-
-// reconcileContinuationDefects is the disposition diff. It returns the
-// diagnostics to surface and whether the cycle must be blocked from PASS.
-//
-// Blocking cases are exactly the ones where an inherited defect could otherwise
-// vanish: an unaccounted OPEN entry, an unevidenced closure claim, an
-// unreadable ancestor ledger, or a write-back failure (a disposition that did
-// not reach disk is not visible, which is the whole point of the mechanism).
-func reconcileContinuationDefects(req core.PhaseRequest) (diags []core.Diagnostic, blocked bool, lineageCycles []int) {
-	if req.Workspace == "" || req.ProjectRoot == "" {
-		return nil, false, nil
-	}
-	cont, isContinuation, err := continuation.ReadManifest(req.Workspace)
-	if err != nil {
-		// cycle-1285 F2. This used to degrade OPEN with a warning: one byte of
-		// garbage written into a 0644 file in the graded agent's own workspace
-		// retired every inherited defect and the cycle PASSed. readDispositions
-		// already BLOCKS on an unparseable defect-dispositions.json because
-		// "degrading open there would hand the gate its cheapest bypass" — and
-		// this file decides whether the gate runs AT ALL, so the same argument
-		// applies with more force, not less. A corrupt manifest is now a
-		// blocking error; the cost is that a genuinely corrupt workspace must be
-		// repaired before the cycle can PASS, which is the correct direction to
-		// fail in for a mechanism whose entire job is to make defects visible.
-		return []core.Diagnostic{{Severity: "error",
-			Message: fmt.Sprintf("defect ledger: continuation manifest is unreadable (%s) — a continuation cannot be graded against a lineage it cannot read, and degrading open here is the gate's cheapest bypass", err.Error())}}, true, nil
-	}
-	// cycle-1285 F2, the deletion half. Arming may not depend SOLELY on a file
-	// inside the workspace the graded agent writes: `rm continuation-manifest.json`
-	// closed every inherited OPEN defect with verdict PASS and zero diagnostics.
-	// The lineage is also witnessed out of band, in the root-owned
-	// continuation-registry.json (ADR-0076 slice C G2) keyed by this lane's
-	// scope, so the manifest is a workspace CACHE of a record that survives it.
-	registryCont, hasRegistry := laneRegistryBinding(req)
-	switch {
-	case !isContinuation && !hasRegistry:
-		return nil, false, nil
-	case !isContinuation && hasRegistry:
-		graded, _ := reconcileAgainstAncestor(req, registryCont)
-		return append([]core.Diagnostic{{Severity: "error",
-			Message: fmt.Sprintf("defect ledger: this workspace holds no continuation manifest, but the root-owned %s binds this lane's scope to cycle-%d — the manifest was deleted or never written. Inherited defects are reconciled from the registry binding; the missing manifest is itself the finding.",
-				continuation.RegistryPath(req.ProjectRoot), registryCont.Cycle)}},
-			graded...), true, nil
-	case hasRegistry && registryCont.Cycle != cont.Cycle:
-		// Both records exist and disagree about the ancestor. The workspace copy
-		// is the rewritable one, so it is the suspect; refusing to pick is the
-		// only honest move.
-		return []core.Diagnostic{{Severity: "error",
-			Message: fmt.Sprintf("defect ledger: the workspace continuation manifest names cycle-%d but the root-owned registry binds this lane to cycle-%d — a rewritten manifest would re-point the gate at an ancestor with no open defects; resolve the disagreement before this cycle can PASS",
-				cont.Cycle, registryCont.Cycle)}}, true, nil
-	}
-
-	// A graded, unblocked reconcile is the one path where the lineage's every
-	// inherited defect has been verified against its per-id disposition record
-	// — the condition under which the closure-citation gate's prose-formatting
-	// demand demotes to advisory for claims WITHIN this lineage (cycle-1502: a
-	// WARN summary line restating closures the machine record had already
-	// proven forced a false FAIL). The returned cycle set scopes that demotion:
-	// the immediate ancestor plus the ledger's origin cycle — a prose claim
-	// about any OTHER cycle has no record here vouching for it and keeps the
-	// full gate. The extra readDefectLedger is a duplicated READ (the grade
-	// already loaded it), accepted to keep reconcileAgainstAncestor's signature
-	// stable; the arming/grading logic stays single-sourced above.
-	d, b := reconcileAgainstAncestor(req, cont)
-	if b {
-		return d, b, nil
-	}
-	// Vouch ONLY when the ancestor ledger exists with entries: the unblocked
-	// missing/empty-ledger branch verified NOTHING (its own warning says so),
-	// and a deleted ancestor ledger must not convert the closure gate's
-	// backstop into a demotion (review BLOCK-2). The read duplicates one I/O
-	// the grade already did; lerr is unreachable here (the grade blocks on the
-	// same read erroring) and narrows toward less vouching if it ever fires.
-	ancestorWS := filepath.Join(req.ProjectRoot, ".evolve", "runs", "cycle-"+strconv.Itoa(cont.Cycle))
-	ledger, ok, lerr := readDefectLedger(ancestorWS)
-	if lerr != nil || !ok || len(ledger.Entries) == 0 {
-		return d, b, nil
-	}
-	cycles := []int{cont.Cycle}
-	if ledger.OriginCycle > 0 && ledger.OriginCycle != cont.Cycle {
-		cycles = append(cycles, ledger.OriginCycle)
-	}
-	return d, b, cycles
-}
-
-// laneRegistryBinding returns this lane's continuation binding from the
-// ROOT-OWNED registry, and whether one exists.
-//
-// The lane's identity is its pinned scope (lane-scope.json, materialized before
-// any phase runs), and the binding itself lives at the project root, outside
-// every per-cycle workspace. That split is the point: an agent that deletes its
-// workspace manifest does not thereby delete the record that this lane is a
-// continuation. Scoping the lookup to THIS lane's todo ids — rather than
-// arming on any entry in the registry — is what keeps the fallback from
-// blocking ordinary cycles, whose root registry legitimately still carries
-// other lanes' bindings.
-//
-// Fail-closed is not available here: an unreadable registry cannot manufacture
-// a lineage, so a miss is a miss. The residual is a workspace where BOTH the
-// manifest and the lane-scope pin are destroyed; that is recorded as the
-// mechanism's known ceiling in docs/architecture/continuation-defect-ledger.md
-// rather than papered over.
-func laneRegistryBinding(req core.PhaseRequest) (continuation.Continuation, bool) {
-	// ONE lane-scope reader (core.LaneScopeIDs): absent, malformed or empty pin
-	// ⇒ nil ⇒ no lineage — the same degraded-path policy core applies.
-	for _, id := range core.LaneScopeIDs(req.Workspace) {
-		c, ok, rerr := continuation.ReadRegistryEntry(req.ProjectRoot, id)
-		if rerr == nil && ok {
-			return c, true
-		}
-	}
-	return continuation.Continuation{}, false
-}
-
-// reconcileAgainstAncestor is the disposition diff proper: given an established
-// lineage, it grades this cycle's dispositions against the ancestor's ledger.
-// Split from reconcileContinuationDefects so that ARMING (is this a
-// continuation, and which record establishes that) is one decision with one set
-// of rules, separate from grading — the cycle-1285 F2 defect was entirely in
-// the arming half while every defense lived in this half.
-func reconcileAgainstAncestor(req core.PhaseRequest, cont continuation.Continuation) ([]core.Diagnostic, bool) {
-	ancestorWS := filepath.Join(req.ProjectRoot, ".evolve", "runs", "cycle-"+strconv.Itoa(cont.Cycle))
-	ancestor, hasLedger, err := readDefectLedger(ancestorWS)
-	if err != nil {
-		return []core.Diagnostic{{Severity: "error",
-			Message: fmt.Sprintf("defect ledger: ancestor cycle-%d ledger is unreadable (%s) — a continuation cannot be graded against a ledger it cannot read", cont.Cycle, err.Error())}}, true
-	}
-	if !hasLedger || len(ancestor.Entries) == 0 {
-		// Nothing inherited. Legitimate when the ancestor predates the ledger —
-		// but a DELETED ancestor ledger is indistinguishable from that, and one
-		// `rm` outside the workspace would otherwise disarm the whole gate in
-		// silence. Recording it by ancestor cycle number makes the disarm
-		// visible in the audit's own diagnostics without blocking the many real
-		// continuations whose ancestors ran before the mechanism existed.
-		return []core.Diagnostic{{Severity: "warning",
-			Message: fmt.Sprintf("defect ledger: this cycle continues cycle-%d, which left no reconcilable %s in %s — NO inherited defect is being enforced here. Expected for an ancestor that predates the ledger; a deleted ledger looks identical, so it is recorded rather than assumed benign.",
-				cont.Cycle, defectLedgerFile, ancestorWS)}}, false
-	}
-
-	// D1: reconcile MERGES onto the ledger already in this workspace. Rebuilding
-	// from ancestor.Entries alone and truncate-writing erases the entries emit
-	// appended on a previous Classify in this same cycle — an ordinary audit
-	// retry silently deletes the record of what THIS cycle got wrong. Entries
-	// transition; they are never deleted.
-	current, _, cerr := readDefectLedger(req.Workspace)
-	if cerr != nil {
-		return []core.Diagnostic{{Severity: "error",
-			Message: fmt.Sprintf("defect ledger: this cycle's own %s is unreadable (%s) — reconciling would overwrite a record that cannot be read", defectLedgerFile, cerr.Error())}}, true
-	}
-
-	claims, diags, blocked := readDispositions(req.Workspace, cont.Cycle)
-	if blocked {
-		return diags, true
-	}
-	diags = append(diags, dispositionPreflight(req, cont.Cycle, ancestor.Entries, claims)...)
-
-	// D1 / cycle-1282 DEF-1: the inherited rows are rebuilt from the ANCESTOR on
-	// every pass and their status is derived ONLY from defect-dispositions.json,
-	// never from the row already sitting in this workspace. `current` is a file
-	// the graded phase agent is permitted to write, so reading disposition state
-	// out of it let a pre-planted `{"id":"d1","status":"FIXED"}` satisfy the gate
-	// with no disposition artifact at all — and, because the merge keyed on ID
-	// alone, replace the inherited defect's TEXT with the planted row's. What
-	// `current` still contributes is THIS cycle's own emitted defects, which are
-	// not inherited and are not graded here.
-	//
-	// Idempotency across retries in one cycle does not need the trusted-row
-	// shortcut: defect-dispositions.json persists, so every Classify re-derives
-	// the same dispositions from the same artifact and re-validates them.
-	merged := append([]defectEntry(nil), current.Entries...)
-	pos := make(map[string]int, len(merged)+len(ancestor.Entries))
-	for i, e := range merged {
-		if _, dup := pos[e.ID]; dup {
-			continue // FIRST row wins; a later duplicate must not become the index target
-		}
-		pos[e.ID] = i
-	}
-
-	var unaccounted []string
-	for _, a := range ancestor.Entries {
-		i, carried := pos[a.ID]
-		if !carried {
-			i = len(merged)
-			pos[a.ID] = i
-			merged = append(merged, a)
-		} else if merged[i].Text != a.Text {
-			// Same id, different text: either a defectID collision or a planted
-			// row aimed at an inherited id. Both must be loud, and in both cases
-			// the ANCESTOR's text is the record. Blocking is correct — a shadowed
-			// id means the operator cannot trust any disposition keyed on it.
-			unaccounted = append(unaccounted, fmt.Sprintf("%s (id shadowed: this cycle's ledger holds different text %q for the same id)", a.ID, truncateRunes(merged[i].Text, 120)))
-			merged[i] = defectEntry{ID: a.ID, Text: a.Text, Status: defectStatusOpen}
-			continue
-		}
-		if a.Status != defectStatusOpen {
-			merged[i] = a // dispositioned upstream — carried verbatim, evidence and reason included
-			continue
-		}
-		// Fresh from the ancestor, never from the workspace row.
-		e := defectEntry{ID: a.ID, Text: a.Text, Status: defectStatusOpen}
-		claim, has := claims[a.ID]
-		switch {
-		case !has:
-			unaccounted = append(unaccounted, a.ID+" (no disposition)")
-			e.Status = defectStatusOpen
-		case claim.Status == defectStatusFixed:
-			if ok, why := evidenceResolves(claim.Evidence, req); !ok {
-				unaccounted = append(unaccounted, fmt.Sprintf("%s (FIXED but %s)", a.ID, why))
-				// The written-back artifact must not assert a closure the gate
-				// rejected — an unverifiable FIXED row IS the laundering.
-				e.Status, e.Evidence, e.Reason = defectStatusOpen, "", ""
-			} else {
-				e.Status, e.Evidence, e.Reason = claim.Status, claim.Evidence, claim.Reason
-			}
-		case claim.Status == defectStatusDeferred:
-			if strings.TrimSpace(claim.Reason) == "" {
-				unaccounted = append(unaccounted, a.ID+" (DEFERRED without reason)")
-				e.Status = defectStatusOpen
-			} else {
-				e.Status, e.Evidence, e.Reason = claim.Status, claim.Evidence, claim.Reason
-			}
-		default:
-			unaccounted = append(unaccounted, fmt.Sprintf("%s (status %q is not FIXED or DEFERRED)", a.ID, claim.Status))
-			e.Status = defectStatusOpen
-		}
-		merged[i] = e // an unaccounted entry stays OPEN — it is never dropped
-	}
-
-	originCycle := ancestor.OriginCycle
-	if originCycle == 0 {
-		originCycle = current.OriginCycle
-	}
-
-	// Write back BEFORE grading: the operator must be able to read what this
-	// cycle disposed of even on the run where the gate blocks.
-	if werr := writeDefectLedger(req.Workspace, defectLedgerDoc{OriginCycle: originCycle, Entries: merged}); werr != nil {
-		diags = append(diags, core.Diagnostic{Severity: "error",
-			Message: fmt.Sprintf("defect ledger: could not write back the reconciled ledger (%s) — an invisible disposition is not a disposition", werr.Error())})
-		return diags, true
-	}
-	if len(unaccounted) > 0 {
-		diags = append(diags, core.Diagnostic{Severity: "error",
-			Message: fmt.Sprintf("defect ledger: %d defect(s) inherited from cycle-%d are unaccounted for [%s] — a continuation may not PASS while an ancestor defect is neither FIXED (with evidence) nor DEFERRED (with a reason). Disposition each id in %s.",
-				len(unaccounted), cont.Cycle, strings.Join(unaccounted, ", "), defectDispositionFile)})
-		return diags, true
-	}
-	return diags, false
-}
-
-// The two NAMED markers the disposition pre-flight emits. They are deliberately
-// distinct from the per-id "(no disposition)" switch text: an operator reading a
-// blocked continuation must be able to see that the ARTIFACT as a whole is
-// absent or short, not infer it from N unrelated-looking per-id gripes. MISSING
-// and INCOMPLETE stay separate because the operator action differs — author the
-// file from scratch vs finish the one that exists.
-const (
-	dispositionPreflightMissingMarker    = "disposition-preflight: MISSING"
-	dispositionPreflightIncompleteMarker = "disposition-preflight: INCOMPLETE"
-)
-
-// dispositionPreflight grades the disposition ARTIFACT's completeness against
-// the ancestor's OPEN set, before the per-id reconcile runs (cycle-1342 F4).
-// The per-id switch already blocks correctly; what it never did was fail loudly
-// BY NAME on the file itself, so a future auditor that simply forgets to write
-// it reads N per-id complaints and no statement of the actual gap.
-//
-// It is silent — necessarily, as the anti-no-op half — whenever the ancestor
-// carries no OPEN entries or every one of them is covered. A pre-flight that
-// fires on every continuation proves nothing.
-func dispositionPreflight(req core.PhaseRequest, ancestorCycle int, ancestor []defectEntry, claims map[string]defectEntry) []core.Diagnostic {
-	var open, uncovered []string
-	for _, a := range ancestor {
-		if a.Status != defectStatusOpen {
-			continue // already dispositioned upstream — nothing is owed for it here
-		}
-		open = append(open, a.ID)
-		if _, has := claims[a.ID]; !has {
-			uncovered = append(uncovered, a.ID)
-		}
-	}
-	if len(open) == 0 || len(uncovered) == 0 {
-		return nil
-	}
-	if _, err := os.Stat(filepath.Join(req.Workspace, defectDispositionFile)); err != nil {
-		return []core.Diagnostic{{Severity: "error",
-			Message: fmt.Sprintf("defect ledger: %s — this workspace holds no %s at all, so 0 of %d defect(s) inherited from cycle-%d are dispositioned. This file is re-authored IN FULL every cycle; an ancestor's copy is never inherited. Write one entry per inherited id, status FIXED (with resolvable evidence) or DEFERRED (with a reason).",
-				dispositionPreflightMissingMarker, defectDispositionFile, len(open), ancestorCycle)}}
-	}
-	return []core.Diagnostic{{Severity: "error",
-		Message: fmt.Sprintf("defect ledger: %s — %s covers %d of %d defect(s) inherited from cycle-%d; uncovered: [%s]. Every inherited id needs its own entry in THIS cycle's file.",
-			dispositionPreflightIncompleteMarker, defectDispositionFile, len(open)-len(uncovered), len(open), ancestorCycle, strings.Join(uncovered, ", "))}}
-}
-
-// dispositionSchemaExample is the ONE canonical defect-dispositions.json
-// example. It is surfaced inline on rejection (cycle-1403 Task 3): the agent
-// re-authoring the file on the next dispatch does not read Go, so
-// "cannot unmarshal number into Go struct field …" names the failure without
-// naming the remedy. It is byte-for-byte the same document (as JSON) as the
-// examples in agents/evolve-auditor.md and
-// docs/architecture/continuation-defect-ledger.md — defect_ledger_doc_example_test.go
-// holds the three in sync, so there is one schema with three projections rather
-// than three schemas.
-const dispositionSchemaExample = `{"dispositions": [
-  {"id": "d0f3a7c1e59b246d8a0c4e6f13579bde2", "status": "FIXED",
-   "evidence": "go/internal/phases/audit/defect_ledger.go:267-356"},
-  {"id": "d9c8b7a6958473625140f3e2d1c0b9a87", "status": "DEFERRED",
-   "reason": "out of this lane's scope; queued as disposition-evidence-tolerant-unmarshal"}
-]}`
-
-// readDispositions loads the continuation's disposition claims keyed by defect
-// id. A MISSING file is not an error and not a pass: it yields an empty map, so
-// every inherited OPEN entry falls through to "unaccounted" and is named by id.
-// An unparseable file blocks immediately — degrading open there would hand the
-// gate its cheapest bypass (write garbage, ship).
-func readDispositions(workspace string, ancestorCycle int) (map[string]defectEntry, []core.Diagnostic, bool) {
-	raw, err := os.ReadFile(filepath.Join(workspace, defectDispositionFile))
-	if err != nil {
-		if os.IsNotExist(err) {
-			return map[string]defectEntry{}, []core.Diagnostic{{Severity: "warning",
-				Message: fmt.Sprintf("defect ledger: no %s in the workspace — every defect inherited from cycle-%d is unaccounted for", defectDispositionFile, ancestorCycle)}}, false
-		}
-		return nil, []core.Diagnostic{{Severity: "error",
-			Message: fmt.Sprintf("defect ledger: read %s: %s", defectDispositionFile, err.Error())}}, true
-	}
-	var doc defectDispositionDoc
-	if err := json.Unmarshal(raw, &doc); err != nil {
-		return nil, []core.Diagnostic{{Severity: "error",
-			Message: fmt.Sprintf("defect ledger: %s is unparseable (%s) — a continuation cannot be graded against claims that cannot be read. Expected schema:\n%s\n(`evidence` may also be an array of citation strings; `status` is exactly FIXED — with resolvable evidence — or DEFERRED, with a reason.)",
-				defectDispositionFile, err.Error(), dispositionSchemaExample)}}, true
-	}
-	claims := make(map[string]defectEntry, len(doc.Dispositions))
-	for _, d := range doc.Dispositions {
-		claims[d.ID] = defectEntry{ID: d.ID, Status: d.Status, Evidence: d.Evidence.joined(), Reason: d.Reason}
-	}
-	return claims, nil, false
 }

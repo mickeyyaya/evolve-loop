@@ -42,7 +42,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship/landing"
 )
 
 // shipJournalName is the durable per-commit ship provenance record.
@@ -134,18 +134,11 @@ func runPushOnly(ctx context.Context, opts *Options, res *RunResult) error {
 		return fmt.Errorf("ship --push-only: REFUSED — %d ahead commit(s) lack ship provenance (not in %s, not a sync-main reconcile merge): [%s]. Push-only is a recovery for attested strands, never a guard bypass; land un-provenanced work through a normal `evolve ship`",
 			len(unprovenanced), shipJournalName, strings.Join(unprovenanced, ", "))
 	}
-	// Same push + inline reject-repair policy as the ordinary ship.
-	exit, perr := opts.run(ctx, "git", []string{"push", "origin", branch}, opts.Stdout, opts.Stderr)
-	if perr != nil || exit != 0 {
-		origErr := shipErr(core.CodeGitPushRejected, core.ShipClassTransient, core.StageAtomicShip,
-			fmt.Sprintf("ship --push-only: git push failed (rc=%d): %v", exit, perr),
-			"git_rc", fmt.Sprintf("%d", exit), "git_err", errStr(perr), "branch", branch)
-		if rerr := repairPushRace(ctx, opts, res, branch, origErr); rerr != nil {
-			return rerr
-		}
+	// Same push + inline reject-repair policy as the ordinary ship (the
+	// landing's push step, gitops_landing.go); the landed HEAD is recorded.
+	if err := pushWithRepair(ctx, opts, res, branch, landing.SitePushOnly); err != nil {
+		return err
 	}
-	head, _ := captureGitOutput(ctx, opts, "rev-parse", "HEAD")
-	res.CommitSHA = strings.TrimSpace(head)
 	res.Logs = append(res.Logs, fmt.Sprintf("[ship] PUSH-ONLY: pushed %d attested commit(s) to origin/%s", len(ahead), branch))
 	return nil
 }

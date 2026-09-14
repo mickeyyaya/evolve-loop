@@ -60,8 +60,34 @@ PR, each landing with all of the following — a unit without any of them is not
 | 02 | Failure diagnostics and delivery-failure classification (the failure-diag sidecar writer, the delivery-failure classifier, the wire tokens) | `core/failure_learning.go` | [02-failure-diagnostics.md](../decomposition/02-failure-diagnostics.md) |
 | 03 | Carryover-todo lifecycle (mint admission, the closeout merges, the retirements, the state.json persist; three sibling files collapsed) | `core/failure_learning.go` + `carryover_merge.go`, `prescription_carryover.go`, `carryover_triage_retire.go` | [03-carryover-lifecycle.md](../decomposition/03-carryover-lifecycle.md) |
 | 03b | Failure-learning engine (the failed-approach recorder, the deterministic floor, remediation filing, the recurrence closure; `recordFailureLearning` split in place into a pure gate + four named steps for unit 05) | `core/failure_learning.go` | [03b-failure-learning-engine.md](../decomposition/03b-failure-learning-engine.md) |
+| 12 | Phase observer — stall detection, the incident responder, the envelope/report sinks (the manual subcommand's engine) + the live adapter's Signal Center wiring | `internal/phaseobserver/phaseobserver.go` (+ `adapters/observer/core_adapter.go` wiring) | [12-phaseobserver.md](../decomposition/12-phaseobserver.md) |
 | 04 | Phase advisor | `core/phase_advisor.go` | next |
-| 05 | Orchestrator: composition root vs `RunCycle` engine | `core/orchestrator.go` | after 01–04 |
-| … | inbox mover, ship gitops, config, bridge engine, audit gates | design §12 | later |
 
-Row 03b is a numbering insertion (the engine surfaced while unit 03 was designed), not a §12 reorder: it lands before unit 04 because the advisor's `truncateRunes` read now resolves through carryover, and its `ORCHESTRATOR_*` handoff (its doc §5) must be settled before unit 05 splits `RunCycle`.
+
+| 05 | Orchestrator: composition root vs `RunCycle` engine | `core/orchestrator.go` | after 01–04 |
+| 07 | Ship landing (the fleet ff-merge, the push with its inline push-race repair and its reclassification, the post-push head read, the shared git probes, the ship-binding writer; the rebase engine stays with the orchestrator — unit 05; staging → 07b, run-scope → 07c) | `phases/ship/worktree_ship.go` + `repair.go` + `gitops.go` + `pushonly.go` + `verify.go` | [07-shipgitops.md](../decomposition/07-shipgitops.md) |
+| 08 | Config resolution (the routing-config Loader with an injected reader and Center; the registry/env/policy dials and validators; the malformed-registry and policy-typo blind spots closed; decomposed in place) | `config/config.go` | [08-config.md](../decomposition/08-config.md) |
+| 09 | Defect ledger (schema, writer, readers; the continuation disposition gate with the lane-scope reader and the citation resolver injected; carryover and the adoption seeder decode through it — unit 03 F13 closed) | `phases/audit/defect_ledger.go` | [09-defectledger.md](../decomposition/09-defectledger.md) |
+| 06 | Inbox lifecycle mover (claim, promote, quarantine release, the cycle drain, orphan recovery, the processed-record primitives; outcome.go's door and the continuation trio stay for 06b) | `inboxmover/inboxmover.go` + `claimstate.go` | [06-inboxmover.md](../decomposition/06-inboxmover.md) |
+| 10 | Bridge engine — the launch-outcome classifier (the exit vocabulary as ONE table: sentinel, attempt-ledger cause code, `BRIDGE_EXIT_*` projection; the cause-line miners; the request gauntlet stays in the host as `bridge.ValidateRequest`, shared with the adapter; `Launch` split in place into named steps with four step codes) | `bridge/engine.go` + `bridge/attempt_telemetry.go` | [10-bridgeengine.md](../decomposition/10-bridgeengine.md) |
+| 11 | Phase-runner verdict engine (the settle ladder, the teardown reconcile arms, the stale-leftover gate, the ACS deterministic floor, the verdict-source rule, the ship guard; the first `runner.warning` producer — the dispatch chain follows as 11b) | `phases/runner/runner.go` + `reconciliation.go` + `classification.go` | [11-phaserunner.md](../decomposition/11-phaserunner.md) |
+| 13 | Loop wave/chain engine (the wave gate + one dispatch body, min-width repair, fleet-config reload, the freshness-gated launcher, quota/budget sizing, the plan source → `internal/loopwave`; the chain driver, the boundary binary refresh, the pure chain decisions → `internal/loopchain`) | `cmd/evolve/cmd_loop_wave.go` + `cmd_loop_chain.go` | [13-loopwave.md](../decomposition/13-loopwave.md) |
+| 14 | CI-parity gate (the five local-vs-CI decisions: go vet, acs-durable, the serialized integration tier, apicover -enforce, new-package graduation; two 137/94-line functions split into pure decision tables + thin shells; module `audit` gets its first producers) | `phases/audit/ciparity.go` | [14-ciparity.md](../decomposition/14-ciparity.md) |
+| 16 | Subagent run — the `evolve subagent run` execution path (admission, cli/tier/capability resolution, prompt delivery, the bridge exec port, artifact verification, exit-code mapping, the agent_subprocess ledger record; the second Signal Center root) | `subagent/run.go` + `contract.go` | [16-subagentrun.md](../decomposition/16-subagentrun.md) |
+
+
+
+
+| … | inbox mover, ship gitops, config, audit gates, bridge autorespond (10b) | design §12 | later |
+
+
+
+Row 03b is a numbering insertion (the engine surfaced while unit 03 was designed), not a §12 reorder: it lands before unit 04 because the advisor's `truncateRunes` read now resolves through carryover, and its `ORCHESTRATOR_*` handoff (its doc §5) must be settled before unit 05 splits `RunCycle`. Row 07 is likewise an insertion while 04–06 are unassigned: the ship landing is design §12 row 6 and touches no core file, so it could be built in parallel with the advisor and the orchestrator split; its number is the brief's, not a §12 reorder.
+
+Row 08 (design §12 row 7) landed before units 04-05: it is a leaf with no core dependency, its two blind spots (a malformed registry silently dropping triage, a typo'd policy gate dial silently off) were live risks, and its `Loader` is what unit 05's composition root injects.
+
+Row 12 is likewise a numbering insertion (the observer slice the program named as unit 12): it lands before units 04/05 because its only touch of unit 05's function is one declared line (`ca.Signals = …` inside `wireOrchestratorDeps`, guarded by a count-scan test a unit-05 cut must keep green), and because its module tag `observer` already sat in the closed set with zero codes.
+
+Row 09 is pulled forward from the design's §12 "later wave" (the audit package): unit 03 handed its schema off by name (F13 — three homes for one wire shape), the `audit` module tag had zero producers, and the leaf is importable by audit, core and carryover alike; `acssuite.go` and `ciparity.go` stay in the later wave. It landed 2026-09-14 out of numeric order, before 04 and 05.
+
+Row 13 is the orchestrator's numbering for the loop's two schedulers (cmd/evolve, not core): rows 06–12 are design §12's later slices and stay unassigned until they land. Unit 13 lands before 04/05 because it touches no core file — its leaves sit beside cmd/evolve (`internal/loopwave` is core-tainted through fleet/triagecap and would cycle under `internal/core`; `internal/loopchain` is core-free).

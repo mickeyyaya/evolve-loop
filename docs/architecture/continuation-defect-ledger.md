@@ -41,6 +41,16 @@ addressable record that outlived the cycle that raised it.**
 Both halves hang off `hooks.Classify` — the audit phase's verdict seam, the same
 entry `quarantineProbesForRequest` uses. Nothing is reachable only from a helper.
 
+Where the code lives (ADR-0103 unit 09, 2026-09-14): the schema, the vocabulary
+(`OPEN`/`FIXED`/`DEFERRED`, the `PRESCRIPTION: ` prefix, the pre-flight markers,
+the schema example), the Center-free reader/writer and the gate itself (emit,
+arm, grade, pre-flight, the prompt block) are `go/internal/core/defectledger`;
+`defect_ledger.go` is the audit package's seam onto it (the projections, the one
+wired construction, the citation resolver injected as a Strategy, the facades)
+and its failure modes are the `AUDIT_LEDGER_*` codes in
+[signal-codes.md](signal-codes.md) — design
+[decomposition/09-defectledger.md](decomposition/09-defectledger.md).
+
 **Emit.** A FAIL whose sentinel carries a structured failure block persists
 `<workspace>/defect-ledger.json`:
 

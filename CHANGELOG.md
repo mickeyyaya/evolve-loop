@@ -2,6 +2,34 @@
 
 All notable changes to this project will be documented in this file.
 
+## Changed — the `evolve subagent run` execution path is its own package with eleven Signal Center codes (ADR-0103 unit 16, 2026-09-14)
+
+`internal/subagent/run.go`'s 236-line `Run` moved into `internal/subagent/subagentrun` (a `Dispatcher` over
+ten explicit ports and six stdlib-backed options; 100 % lines, 61/61 exports, every function < 50 lines).
+Byte-identical on the prompt, the adapter env, the Warns channel, every error text and the
+`agent_subprocess` ledger line — goldens captured before the move and replayed. The eighteen failure exits
+that collapsed into one `[subagent-run] FAIL:` line are now eleven `BRIDGE_SUBAGENT_*` WARN codes
+(`origin=Dispatcher.Dispatch`, `fields.step` names the step, `rung` / `op` / `reason_class` the detail), the
+four silently swallowed causes (the profile read error, the LLM router error, the git-state error, the
+artifact hash error) and the dropped integrity rung are on the stream, and `evolve subagent run` is the
+second Signal Center root: its events land in `<runs/cycle-N>/signals.ndjson` and on stderr at WARN, and the
+bridge engine's own producers reach the same Center on this path instead of nil. Console addition only: the
+existing stderr lines stay verbatim.
+
+---
+
+## Changed — config resolution is a unit with a Loader, one module tag and six codes (ADR-0103 unit 08, 2026-09-14)
+
+`internal/config` — the single reader of the phase registry and the routing env — is decomposed in place around a `Loader` with an injected file reader and Signal Center (`config.New(config.WithSignals(…))` at the cycle/loop composition root; the package-level `config.Load` stays as the Center-less facade the per-phase callers keep). Every resolution diagnostic is now a `config.warning` WARN under module `config` with `origin` (`Loader.Load` / `Loader.ApplyPolicyStages`), `fields.step` (`registry` | `env` | `spine` | `inert` | `policy`), `key`, `source`, `path` — rendered by the root's console sink and durable in `<evolveDir>/signals.ndjson` (cycle-less). Two silent kill-paths are closed, so operators may see new WARN lines on the first cycle after landing:
+
+- **`CONFIG_REGISTRY_MALFORMED` / `CONFIG_REGISTRY_UNREADABLE`** — a `docs/architecture/phase-registry.json` that exists but does not parse (a trailing comma) or cannot be read used to run every cycle SILENTLY on the compiled baseline that omits triage, the registry order, the enabled/routing blocks, goal recipes and deliverable kinds. The degrade is unchanged; it is no longer silent. (`evolve solution` prints the same two codes as `registry warning [registry-malformed]: …`.) Until the registry has one reader, a malformed file prints two console lines — the sibling parser's `[phases] WARN builtin registry load failed` and the Center's.
+- **`CONFIG_UNKNOWN_VALUE` from `.evolve/policy.json`** — a typo'd gate/recovery/router stage word (`gates.eval_gate: "enfroce"`, `recovery.spine_floor: "shadwo"`, `router.router_replan: "advisry"`) used to resolve to `off` with no trace; it still resolves to `off` and now warns with the policy key (`key=gates.eval_gate source=policy step=policy`). Check a live runtime's policy.json before the merge train if a silent typo would surprise anyone. `EVOLVE_CONDITIONAL_MANDATORY` without a `:` (ignored before) warns the same way.
+- The hand-written `[config] WARN <code>: <msg>` stderr line at the root is replaced by the module-tagged line `[config] config.warning WARN CONFIG_… origin=Loader.Load — <msg> …`; the ten resolution warnings, `weak-spine`, `spine-order` and `inert-phase-enable` keep their exact sentences as the event reason. Warning ORDER for several deliverable-kind holes or bad conditional rules is now sorted by key (it was map-random).
+
+Record: `docs/architecture/decomposition/08-config.md`. Gates: `internal/config` at 100 % lines and 100 % API; the leaf and the seam (`cmd/evolve/cmd_cycle_config.go`) join the protected surface.
+
+---
+
 ## Added — the declared effect `inbox-claim` is verified at the triage boundary (ADR-0100 slice 2, 2026-09-13)
 
 Triage's persona claims every inbox item it ingests (`evolve inbox-mover claim`) so no sibling lane can select the same item — and nothing judged whether the claim happened. Batch cycle 1631 "claimed" the worktree's tracked copy of the inbox while the plane's item stayed dispatchable; 1630's claim was refused by the sandbox; in both the report and decision looked complete and the spine ran on an unclaimed commitment (1623's shape).

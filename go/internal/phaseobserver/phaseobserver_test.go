@@ -91,68 +91,6 @@ func TestRun_WritesShutdownReport(t *testing.T) {
 	}
 }
 
-func TestProcessLine_AssistantToolUse(t *testing.T) {
-	t.Parallel()
-	o := &Observer{cfg: Config{Now: time.Now}}
-	o.processLine(`{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Bash","input":{"command":"ls"}}]}}`)
-	if o.toolCallCount != 1 {
-		t.Errorf("tool_call_count = %d, want 1", o.toolCallCount)
-	}
-	if o.eventCount != 1 {
-		t.Errorf("event_count = %d, want 1", o.eventCount)
-	}
-	if len(o.loopHistory) != 1 {
-		t.Errorf("loop history not appended")
-	}
-	if o.loopHistory[0].tool != "Bash" {
-		t.Errorf("tool name = %q, want Bash", o.loopHistory[0].tool)
-	}
-}
-
-func TestProcessLine_UserToolResultError(t *testing.T) {
-	t.Parallel()
-	o := &Observer{cfg: Config{Now: time.Now}}
-	o.processLine(`{"type":"user","message":{"content":[{"type":"tool_result","is_error":true}]}}`)
-	if o.toolResultCnt != 1 || o.errorCount != 1 {
-		t.Errorf("expected tool_result and error increments; got tr=%d err=%d",
-			o.toolResultCnt, o.errorCount)
-	}
-}
-
-func TestProcessLine_ResultEventAccumulatesCost(t *testing.T) {
-	t.Parallel()
-	o := &Observer{cfg: Config{Now: time.Now}}
-	o.processLine(`{"type":"result","total_cost_usd":0.45,"usage":{"cache_read_input_tokens":1024,"cache_creation_input_tokens":256}}`)
-	if o.cumulativeCost != 0.45 {
-		t.Errorf("cost = %v, want 0.45", o.cumulativeCost)
-	}
-	if o.cacheReadTok != 1024 || o.cacheCreateTok != 256 {
-		t.Errorf("cache tokens wrong: r=%d c=%d", o.cacheReadTok, o.cacheCreateTok)
-	}
-}
-
-func TestProcessLine_RateLimitEventTracked(t *testing.T) {
-	t.Parallel()
-	o := &Observer{cfg: Config{Now: time.Now}}
-	o.processLine(`{"type":"rate_limit_event","reason":"quota"}`)
-	if o.rateLimitCnt != 1 {
-		t.Errorf("rate_limit_count = %d, want 1", o.rateLimitCnt)
-	}
-	if len(o.rateLimitHist) != 1 {
-		t.Error("rate limit history not appended")
-	}
-}
-
-func TestProcessLine_MalformedJSONSkipped(t *testing.T) {
-	t.Parallel()
-	o := &Observer{cfg: Config{Now: time.Now}}
-	o.processLine("not json at all")
-	o.processLine("")
-	if o.eventCount != 0 {
-		t.Errorf("malformed/empty should not count, got %d", o.eventCount)
-	}
-}
-
 func TestRun_StallDetectionFires(t *testing.T) {
 	t.Parallel()
 	ws := tempWorkspace(t)
@@ -239,36 +177,6 @@ func TestRun_NoEnforceMode_NoKillOnStall(t *testing.T) {
 	}
 	if killCalls > 0 {
 		t.Errorf("non-enforce mode should not kill; got %d calls", killCalls)
-	}
-}
-
-func TestEmit_AppendsToEventsFile(t *testing.T) {
-	t.Parallel()
-	dir := t.TempDir()
-	o := &Observer{
-		cfg:         Config{Now: time.Now, Cycle: 5, Phase: "audit", Agent: "auditor"},
-		traceID:     "trace-x",
-		lastEventTS: time.Now(),
-	}
-	o.cfg.Now = func() time.Time { return time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC) }
-	events := filepath.Join(dir, "events.ndjson")
-	o.emit(events, "test_event", "INCIDENT", map[string]any{"foo": "bar"})
-	body, err := os.ReadFile(events)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var doc map[string]any
-	if err := json.Unmarshal(body, &doc); err != nil {
-		t.Fatalf("invalid JSON: %v\n%s", err, body)
-	}
-	if doc["type"] != "test_event" {
-		t.Errorf("type = %v", doc["type"])
-	}
-	if doc["severity"] != "INCIDENT" {
-		t.Errorf("severity = %v", doc["severity"])
-	}
-	if len(o.incidents) != 1 {
-		t.Errorf("INCIDENT should be tracked, got %d", len(o.incidents))
 	}
 }
 

@@ -1,0 +1,20 @@
+== reload_changed
+[loop] WARN: fleet: fleet.plan_source: unknown value "weird", falling back to "manual"
+[loop] fleet config reloaded: count=5 min_lanes=2
+== reload_unchanged
+== reload_unreadable
+[loop] WARN: fleet: policy.json unreadable at wave boundary (policy: parse {EVOLVE_DIR}/policy.json: invalid character 'n' looking for beginning of object key string) — holding fleet config count=3 min_lanes=2
+== reload_concurrency_only
+== size_nil_budget
+== size_shadow
+[budget] shadow-join: claude 10% remaining; median 1110 tokens/cycle over 5 cycle(s)
+[budget] shadow: would size wave to 1 lane(s) (holding at 3) [budget] — claude 10% remaining resets in 1h0m0s; 10.00 cyc/h/lane, capacity 10 cyc, safety 0.50 ⇒ 1 lane(s)
+== size_enforce
+[budget] enforce: sizing wave to 1 lane(s) [budget] — claude 10% remaining resets in 1h0m0s; 10.00 cyc/h/lane, capacity 10 cyc, safety 0.50 ⇒ 1 lane(s)
+== routed_refused
+[fleet] WARN: plan-time gate refused console-routed item "console-item" (protected fix surface: go/internal/guards/integrity_surface.go) — operator-owned, worked at a batch boundary via manual ship (ADR-0074)
+== prune_dropped
+[loop] WARN: wave plan: pruned consumed top_n id "gamma" from prior decision
+== launcher_all_stale
+[fleet] WARN: freshness gate skipped a: consumed: processed
+[fleet] WARN: freshness gate skipped b: consumed: processed

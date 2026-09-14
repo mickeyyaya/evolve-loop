@@ -73,6 +73,33 @@ func AllCodes() []ShipErrorCode {
 // prefix, nothing clever, so a grep for either spelling finds the other.
 func SignalCode(c ShipErrorCode) signalcenter.Code { return signalcenter.Code("SHIP_" + string(c)) }
 
+// The Debug keys the ONE ship.error producer projects onto the signal line
+// (ADR-0103 unit 07), each spelled ONCE so a producer cannot respell one out
+// of the projection (the field would still reach ship-error.json but vanish
+// from the ship.error event). Homed here, the leaf both the ship phase and
+// core import, so the landing stamps them and core reads them without either
+// importing the other. StepKey names the landing step an error was built in:
+// "integrate" for the ff-merge, "push" for the push and its inline repair,
+// "binding" for the ship-binding witness.
+const (
+	StepKey          = "step"
+	GitRCKey         = "git_rc"
+	WorktreeKey      = "worktree"
+	BranchKey        = "branch"
+	CycleBranchKey   = "cycle_branch"
+	RepairOutcomeKey = "repair_outcome"
+)
+
+// SignalDebugKeys are the Debug keys the ONE ship.error producer (core's
+// emitShipError) projects into Event.Fields when non-empty — the triage
+// whitelist: the step, the git exit code, the worktree, the branches and the
+// repair outcome, built from the constants above. Nothing else in Debug
+// (SHAs, gate output, paths) rides the signal line; it stays in
+// ship-error.json. A key is added as a constant, here and in the vocab test
+// together; the landing leaf's source scan refuses a bare literal of any of
+// them, the host's sites adopt the constants as they move (07b/07c).
+var SignalDebugKeys = []string{StepKey, GitRCKey, WorktreeKey, BranchKey, CycleBranchKey, RepairOutcomeKey}
+
 func init() {
 	for _, c := range AllCodes() {
 		signalcenter.RegisterCode(signalcenter.ModuleShip, SignalCode(c), codeDocs[c])

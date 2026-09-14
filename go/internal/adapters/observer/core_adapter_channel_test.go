@@ -29,7 +29,7 @@ func TestCoreAdapter_NoProducer_WhenChannelOff(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
 	os.WriteFile(filepath.Join(ws, "build-stdout.log"), []byte("{}\n"), 0o644)
-	a := &CoreAdapter{EnvLookup: func(string) string { return "" }}
+	a := &CoreAdapter{}
 	cancel := a.Start(context.Background(), "build", core.PhaseRequest{Workspace: ws, Cycle: 1})
 	time.Sleep(20 * time.Millisecond)
 	cancel()
@@ -44,7 +44,7 @@ func TestCoreAdapter_NoProducer_WhenChannelOff(t *testing.T) {
 func TestChannelSourcePaths_TmuxFamily(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
-	a := &CoreAdapter{EnvLookup: func(string) string { return "" }} // no override → default claude-tmux
+	a := &CoreAdapter{} // no override → default claude-tmux
 
 	cases := []struct {
 		name string
@@ -75,7 +75,7 @@ func TestChannelSourcePaths_TmuxFamily(t *testing.T) {
 func TestChannelSourcePaths_Headless(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
-	a := &CoreAdapter{EnvLookup: func(string) string { return "" }}
+	a := &CoreAdapter{}
 	req := core.PhaseRequest{Workspace: ws, Env: map[string]string{"EVOLVE_BUILD_CLI": "claude-p"}}
 	stdout, stderr := a.channelSourcePaths(req, "build")
 	if stdout != "" || stderr != "" {
@@ -89,12 +89,7 @@ func TestChannelSourcePaths_Headless(t *testing.T) {
 func TestChannelSourcePaths_PerAgentKeyIgnoresProcessEnv(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
-	a := &CoreAdapter{EnvLookup: func(k string) string {
-		if k == "EVOLVE_TDD_ENGINEER_CLI" {
-			return "codex-tmux"
-		}
-		return ""
-	}}
+	a := &CoreAdapter{}
 	req := core.PhaseRequest{
 		Workspace: ws,
 		Env:       map[string]string{"EVOLVE_TDD_ENGINEER_CLI": "claude-p"},

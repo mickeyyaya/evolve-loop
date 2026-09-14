@@ -1,0 +1,19 @@
+{
+  "ADAPTER_EXTRA_FLAGS_OVERRIDE": "",
+  "ADAPTER_TOOLS_OVERRIDE": "",
+  "ARTIFACT_PATH": "{ROOT}/.evolve/runs/cycle-5/scout.md",
+  "CAP_BUDGET_NATIVE": "true",
+  "CHALLENGE_TOKEN": "aaaaaaaaaaaaaaaa",
+  "CLI_RESOLUTION_SOURCE": "profile",
+  "CYCLE": "5",
+  "EVOLVE_PROJECT_ROOT": "{ROOT}",
+  "PROFILE_PATH": "scout.json",
+  "PROMPT_FILE": "{PROMPT_FILE}",
+  "RESOLVED_CLI": "claude",
+  "RESOLVED_MODEL": "sonnet",
+  "STDERR_LOG": "{WS}/scout.stderr.log",
+  "STDOUT_LOG": "{WS}/scout.stdout.log",
+  "VALIDATE_ONLY": "0",
+  "WORKSPACE_PATH": "{WS}",
+  "WORKTREE_PATH": "{WORKTREE}"
+}

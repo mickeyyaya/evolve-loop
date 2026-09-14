@@ -16,56 +16,59 @@
 //	0 — success (or promote no-op for ship.sh compat)
 //	1 — not-found / bad args (claim)
 //	2 — mv failed (claim only)
+//
+// Since ADR-0103 unit 06 this file is the SEAM: the movers, the processed-
+// record primitives and the ledger line live in the lifecycle leaf
+// (internal/inboxmover/lifecycle); this file owns Options and its resolved
+// defaults (the fallback file ledger, the git landing probe, the cycle-state
+// reader), the ONE construction of a Mover per call (mover) and the Strangler
+// facades every production root, the ship phase and the ACS predicates keep.
+// Design: docs/architecture/decomposition/06-inboxmover.md.
 package inboxmover
 
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 	"io"
 	"os"
 	"path/filepath"
-	"sort"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
-	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover/lifecycle"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// Sentinel errors.
+// Sentinel errors — the leaf's own pointers, re-exported so errors.Is at the
+// cmd layer's exit map, the ship consume and the declared-effects gate keep
+// working unchanged.
 var (
-	ErrNotFound = errors.New("inboxmover: task not found")
-	ErrMvFailed = errors.New("inboxmover: mv failed")
-	ErrBadArgs  = errors.New("inboxmover: bad arguments")
-	ErrBadState = errors.New("inboxmover: invalid new_state")
+	ErrNotFound = lifecycle.ErrNotFound
+	ErrMvFailed = lifecycle.ErrMvFailed
+	ErrBadArgs  = lifecycle.ErrBadArgs
+	ErrBadState = lifecycle.ErrBadState
 	// ErrConsoleRouted refuses the lane handoff of an operator-owned item
-	// (ADR-0074 I1): route:"console-*" or a protected fix surface. Prompts
-	// advise; Claim enforces — a triage LLM naming the item cannot move it.
-	ErrConsoleRouted = errors.New("inboxmover: item is console-routed (operator-owned) — refusing lane claim")
+	// (ADR-0074 I1): route:"console-*" or a protected fix surface.
+	ErrConsoleRouted = lifecycle.ErrConsoleRouted
 )
 
-// LedgerAppender is the chained-append seam (interface at point of use);
-// satisfied by *ledger.FileLedger.
-type LedgerAppender interface {
-	AppendLifecycle(ctx context.Context, r ledger.LifecycleRecord) error
-}
-
-// validStates is the set of allowed promote targets. "quarantine" is the
-// ADR-0072 S5 terminal state: a task that has failed task_retry_ceiling times
-// routes here (a sibling dir the triage scanner never walks) instead of being
-// released back to the inbox root every cycle, so a poison todo stops being
-// re-picked forever.
-var validStates = map[string]bool{
-	"processed":  true,
-	"rejected":   true,
-	"retry":      true,
-	"quarantine": true,
-}
+// The leaf's value objects under their historical spellings.
+type (
+	// LedgerAppender is the chained-append seam (interface at point of use);
+	// satisfied by *ledger.FileLedger.
+	LedgerAppender = lifecycle.LedgerAppender
+	// ClaimResult describes what a claim did.
+	ClaimResult = lifecycle.ClaimResult
+	// PromoteOpts gathers the optional flag-bearing promote arguments.
+	PromoteOpts = lifecycle.PromoteOpts
+	// PromoteResult describes what a promote did.
+	PromoteResult = lifecycle.PromoteResult
+	// RecoverResult counts how many files were moved back to inbox/.
+	RecoverResult = lifecycle.RecoverResult
+)
 
 // Options shared by all subcommands.
 type Options struct {
@@ -90,8 +93,9 @@ type Options struct {
 	// nil it defaults to a real `git merge-base --is-ancestor <sha> main`
 	// check rooted at ProjectRoot; it is fail-open (treats the SHA as landed)
 	// on any exec/seam error or non-git ProjectRoot, so a non-repo dir never
-	// regresses existing Promote behavior. Consulted ONLY when a
-	// processed-promotion carries a non-empty CommitSHA.
+	// regresses existing Promote behavior — and the error travels with the
+	// true, so the leaf reports INBOX_LANDED_CHECK_FAILED. Consulted ONLY when
+	// a processed-promotion carries a non-empty CommitSHA.
 	IsLandedFn func(sha string) (bool, error)
 
 	// IsProtectedPath is the control-plane membership predicate for the
@@ -99,28 +103,12 @@ type Options struct {
 	// nil disables only the files-derived rule; an explicit route:"console-*"
 	// field always refuses the claim.
 	IsProtectedPath func(path string) bool
-}
 
-// LedgerEntry is one lifecycle transition, recorded as a CHAINED ledger
-// entry via writeLedger (from/to/reason fold into the message field).
-type LedgerEntry struct {
-	TS     string
-	Action string
-	TaskID string
-	From   string
-	To     string
-	Cycle  *int    // nil when no active cycle
-	GitSHA *string // nil when unknown
-	Reason string
-}
-
-// foldLifecycleMessage renders "from → to: reason", dropping the arrow
-// segment when no paths are involved (release/recover shapes set only Reason).
-func foldLifecycleMessage(from, to, reason string) string {
-	if from == "" && to == "" {
-		return reason
-	}
-	return from + " → " + to + ": " + reason
+	// Signals is the root's Signal Center the mover's inbox.warning events go
+	// to (ADR-0103 unit 06). nil — every literal but the FAIL closeout's today
+	// — is unwired: the leaf prints the legacy [inbox-mover] line instead (the
+	// two-link producer), so nothing goes silent on a Center-less root.
+	Signals *signalcenter.Center
 }
 
 // resolveOpts populates defaults derived from ProjectRoot.
@@ -156,334 +144,167 @@ func (o *Options) resolveOpts() {
 // shaLandedOnMain reports whether sha is an ancestor of main via
 // `git merge-base --is-ancestor <sha> main`. Exit 0 = ancestor (landed),
 // exit 1 = cleanly-not-an-ancestor (unlanded). Any other exit (128 = non-git
-// dir / unknown rev) or seam error is fail-open (treated as landed) so a
-// non-repo ProjectRoot never blocks a promotion — delivery evidence gates,
-// it never manufactures a false negative from missing git.
+// dir / unknown rev / no local main) or seam error is fail-open (treated as
+// landed) so a non-repo ProjectRoot never blocks a promotion — delivery
+// evidence gates, it never manufactures a false negative from missing git —
+// and, since unit 06's review fold, RETURNED as the error so the leaf's
+// landing gate reports INBOX_LANDED_CHECK_FAILED instead of promoting in
+// silence (the hard-coded main is 06-F10's).
 func shaLandedOnMain(root, sha string) (bool, error) {
-	_, _, code, err := gitexec.Default(root).Capture(context.Background(), "merge-base", "--is-ancestor", sha, "main")
-	if err != nil {
+	_, stderr, code, err := gitexec.Default(root).Capture(context.Background(), "merge-base", "--is-ancestor", sha, "main")
+	switch {
+	case err != nil:
+		return true, fmt.Errorf("git merge-base --is-ancestor %s main: %w", sha, err)
+	case code == 0:
 		return true, nil
-	}
-	switch code {
-	case 0:
-		return true, nil
-	case 1:
+	case code == 1:
 		return false, nil
-	default:
-		return true, nil
 	}
+	return true, fmt.Errorf("git merge-base --is-ancestor %s main exit=%d: %s", sha, code, strings.TrimSpace(stderr))
 }
 
-// logf emits a "[inbox-mover] ..." line to the configured stderr.
+// readActiveCycle reads .evolve/cycle-state.json and returns the cycle_id
+// field, or empty string + error if unavailable.
+func readActiveCycle(cycleStatePath string) (string, error) {
+	body, err := os.ReadFile(cycleStatePath)
+	if err != nil {
+		return "", err
+	}
+	var st struct {
+		CycleID json.Number `json:"cycle_id"`
+	}
+	if err := json.Unmarshal(body, &st); err != nil {
+		return "", err
+	}
+	return string(st.CycleID), nil
+}
+
+// logf emits a `[inbox-mover] …` line (the leaf's one LegacyPrefix) to the
+// configured stderr — the voice of the sibling files (outcome, root_failure,
+// the continuation trio) that stay in the host until unit 06b.
 func (o *Options) logf(prefix, format string, args ...any) {
-	fmt.Fprintf(o.Stderr, "[inbox-mover] "+prefix+format+"\n", args...)
+	fmt.Fprintf(o.Stderr, lifecycle.LegacyPrefix+prefix+format+"\n", args...)
 }
 
-// --- Subcommand: claim -----------------------------------------------------
-
-// ClaimResult describes what happened.
-type ClaimResult struct {
-	SrcPath  string
-	DestPath string
+// mover is the ONE lifecycle.New site (TestOptionsMover_OneConstructionSite)
+// and the ONE projection of the resolved Options onto the leaf. Options is a
+// value copied at every entry point, so there is no host object to cache a
+// Mover on: the accessor pair of the other units collapses to this one
+// function, built per call (allocation only — the resolved defaults were
+// re-derived per call before the unit too). The retire hook and the
+// run-workspace spelling close over the RESOLVED copy (releaseContinuationOnRetire
+// reads ProjectRoot, Now and Stderr from it).
+func (o Options) mover() *lifecycle.Mover {
+	o.resolveOpts()
+	return lifecycle.New(o.InboxDir, o.Ledger,
+		lifecycle.WithStderr(o.Stderr),
+		lifecycle.WithNow(o.Now),
+		lifecycle.WithActiveCycle(o.ActiveCycleFn),
+		lifecycle.WithLanded(o.IsLandedFn),
+		lifecycle.WithProtectedPath(o.IsProtectedPath),
+		lifecycle.WithRetire(func(itemPath, taskID, reason string) { releaseContinuationOnRetire(o, itemPath, taskID, reason) }),
+		lifecycle.WithRunWorkspace(func(cycle int) string {
+			return filepath.Join(o.ProjectRoot, ".evolve", "runs", fmt.Sprintf("cycle-%d", cycle))
+		}),
+		lifecycle.WithSignals(func() *signalcenter.Center { return o.Signals }))
 }
+
+// --- Strangler facades — every production and ACS spelling unchanged --------
 
 // Claim moves a file from inbox/ to processing/cycle-N/ atomically.
 // Returns ErrNotFound if no inbox/*.json has matching task_id.
 func Claim(opts Options, taskID, cycle string) (ClaimResult, error) {
-	opts.resolveOpts()
-	res := ClaimResult{}
-	if taskID == "" || cycle == "" {
-		opts.logf("ERROR: ", "usage: claim <task_id> <cycle>")
-		return res, fmt.Errorf("%w: claim requires task_id and cycle", ErrBadArgs)
-	}
-	src, err := FindFileByTaskID(opts.InboxDir, taskID)
-	if err != nil {
-		opts.logf("WARN: ", "claim: task '%s' not found in %s", taskID, opts.InboxDir)
-		return res, fmt.Errorf("%w: %s", ErrNotFound, taskID)
-	}
-	if reason := consoleRoutedReason(src, opts.IsProtectedPath); reason != "" {
-		opts.logf("WARN: ", "claim: task '%s' REFUSED — %s (operator-owned; lanes must not draw it)", taskID, reason)
-		return res, fmt.Errorf("%w: %s (%s)", ErrConsoleRouted, taskID, reason)
-	}
-	cycleNum, convErr := strconv.Atoi(cycle)
-	if convErr != nil || cycleNum < 1 {
-		opts.logf("ERROR: ", "claim: cycle %q is not a positive number", cycle)
-		return res, fmt.Errorf("%w: claim cycle must be a positive number, got %q", ErrBadArgs, cycle)
-	}
-	base := filepath.Base(src)
-	destDir := inboxbatch.ProcessingCycleDir(opts.InboxDir, cycleNum)
-	dest := filepath.Join(destDir, base)
-	if err := os.MkdirAll(destDir, 0o755); err != nil {
-		opts.logf("ERROR: ", "claim: mkdir -p '%s' failed: %v", destDir, err)
-		return res, fmt.Errorf("%w: mkdir: %v", ErrMvFailed, err)
-	}
-	if err := os.Rename(src, dest); err != nil {
-		opts.logf("WARN: ", "claim: mv failed for '%s' (may already be claimed): %v", taskID, err)
-		return res, fmt.Errorf("%w: %v", ErrMvFailed, err)
-	}
-	res.SrcPath = src
-	res.DestPath = dest
-	opts.logf("", "claimed: %s → processing/cycle-%s/", base, cycle)
-	writeLedger(opts, LedgerEntry{
-		Action: "claim",
-		TaskID: taskID,
-		From:   ".evolve/inbox/" + base,
-		To:     ".evolve/inbox/processing/cycle-" + cycle + "/" + base,
-		Cycle:  intPtr(cycle),
-		Reason: "triage-claim",
-	})
-	return res, nil
-}
-
-// consoleRoutedReason parses the item at path and consults the SSOT routing
-// classifier (inboxbatch.ConsoleRouted). Empty reason = dispatchable. A
-// malformed body is fail-open (empty) — routing enforcement must never brick
-// claiming, matching LoadDir's tolerance; the parse failure is the item
-// author's defect and surfaces through LoadDir's warnings elsewhere.
-func consoleRoutedReason(path string, isProtected func(string) bool) string {
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		return ""
-	}
-	var it inboxbatch.Item
-	if json.Unmarshal(raw, &it) != nil {
-		return ""
-	}
-	routed, reason := inboxbatch.ConsoleRouted(it, isProtected)
-	if !routed {
-		return ""
-	}
-	return reason
-}
-
-// --- Subcommand: promote ---------------------------------------------------
-
-// PromoteOpts gathers the optional flag-bearing arguments.
-type PromoteOpts struct {
-	Cycle     string // empty → "0"
-	CommitSHA string // empty → no SHA prefix
-}
-
-// PromoteResult describes what happened.
-type PromoteResult struct {
-	SrcPath  string
-	DestPath string
-	NoOp     bool // true if source was not found (ship.sh compat → exit 0)
+	return opts.mover().Claim(taskID, cycle)
 }
 
 // Promote moves a file from processing/ (or inbox/ fallback) to
 // processed|rejected|retry/. Exits 0-equivalent even when source not found
 // — ship.sh must never block on this.
 func Promote(opts Options, taskID, newState string, p PromoteOpts) (PromoteResult, error) {
-	opts.resolveOpts()
-	res := PromoteResult{}
-	if taskID == "" || newState == "" {
-		opts.logf("ERROR: ", "usage: promote <task_id> <new_state> [<cycle>] [--commit-sha <sha>]")
-		return res, fmt.Errorf("%w: promote requires task_id and new_state", ErrBadArgs)
-	}
-	if !validStates[newState] {
-		opts.logf("ERROR: ", "promote: invalid state '%s'; must be processed|rejected|retry", newState)
-		return res, fmt.Errorf("%w: %s", ErrBadState, newState)
-	}
-
-	// A processing claim first, then the inbox root — Locate is the one walk.
-	src, srcRel := "", ""
-	if loc, err := Locate(opts.InboxDir, taskID); err == nil {
-		src, srcRel = loc.Path, "inbox"
-		if loc.Cycle > 0 {
-			srcRel = "processing"
-		}
-	}
-	if src == "" {
-		opts.logf("WARN: ", "promote: task '%s' not found in processing/ or inbox/ — already moved?", taskID)
-		res.NoOp = true
-		return res, nil // ship.sh compat: NoOp success
-	}
-
-	// Delivery-evidence gate (inbox-promotion-requires-landed-ship): a
-	// processed-promotion carrying a ship SHA must be backed by that commit
-	// actually landing on main. Historically Promote keyed on the caller's
-	// PASS verdict alone, so a push-rejected ship whose recovery still
-	// reported PASS could bury a directive in processed/ under a SHA
-	// git log --all never contained. An unlanded SHA reroutes to retry/
-	// instead. Empty SHA (legacy/ship.sh-compat) and non-processed states
-	// skip the check entirely.
-	reroutedUnlanded := false
-	if newState == "processed" && p.CommitSHA != "" {
-		landed, err := opts.IsLandedFn(p.CommitSHA)
-		if err != nil {
-			landed = true // fail-open: never block a promotion on a gate error
-		}
-		if !landed {
-			newState = "retry"
-			reroutedUnlanded = true
-			opts.logf("WARN: ", "promote: ship SHA %s for '%s' not landed on main — rerouting to retry/ instead of processed/", p.CommitSHA, taskID)
-		}
-	}
-
-	base := filepath.Base(src)
-	destDir, dest := promoteDestPath(opts.InboxDir, base, newState, p)
-	// A destination mkdir failure is an INFRASTRUCTURE non-delivery, not the
-	// ship.sh "source already moved" case: the task is still sitting in
-	// srcRel/ and nothing downstream promoted it. Reporting it as
-	// (NoOp=true, nil) reused the compat contract for a genuine failure, so a
-	// stranded task was indistinguishable from a completed one to every caller
-	// (inboxmover-promote-mkdir-fail-loud). NoOp stays false and the error
-	// carries ErrMvFailed so the cmd layer can map it to a non-zero exit; the
-	// item is deliberately left where it was — a loud error that also lost the
-	// file would be a worse defect than the silent one.
-	if err := os.MkdirAll(destDir, 0o755); err != nil {
-		opts.logf("ERROR: ", "promote: mkdir -p '%s' failed — leaving file in %s/: %v", destDir, srcRel, err)
-		writeLedger(opts, LedgerEntry{
-			Action: "promote-warn",
-			TaskID: taskID,
-			From:   ".evolve/inbox/" + srcRel + "/" + base,
-			To:     dest,
-			Cycle:  intPtr(p.Cycle),
-			GitSHA: strPtr(p.CommitSHA),
-			Reason: "mkdir-failed",
-		})
-		return res, fmt.Errorf("%w: mkdir %s: %v", ErrMvFailed, destDir, err)
-	}
-	if err := os.Rename(src, dest); err != nil {
-		opts.logf("WARN: ", "promote: mv failed for '%s' → %s (leaving in %s/): %v",
-			taskID, newState, srcRel, err)
-		writeLedger(opts, LedgerEntry{
-			Action: "promote-warn",
-			TaskID: taskID,
-			From:   ".evolve/inbox/" + srcRel + "/" + base,
-			To:     dest,
-			Cycle:  intPtr(p.Cycle),
-			GitSHA: strPtr(p.CommitSHA),
-			Reason: "mv-failed",
-		})
-		res.NoOp = true
-		return res, nil
-	}
-	res.SrcPath = src
-	res.DestPath = dest
-	opts.logf("", "promoted: %s → %s/", base, newState)
-	reason := "ship-promote-" + newState
-	// Transactional retire (park-consume-releases-continuation-binding): every
-	// Promote destination — processed/rejected/retry/quarantine — is OUT of the
-	// batch loader's reach, so the item's registry binding must go with it in
-	// this same operation or the parked scope is re-dispatched as an adopted
-	// continuation forever (cycle-1487).
-	// The reason override lands BEFORE the release so the preserved pointer and
-	// the ledger entry below describe the same transaction with the same word
-	// (audit cycle-1507 L1: they used to disagree on the rerouted-unlanded path).
-	if reroutedUnlanded {
-		reason = "ship-promote-retry-unlanded-sha"
-	}
-	releaseContinuationOnRetire(opts, dest, taskID, reason)
-	writeLedger(opts, LedgerEntry{
-		Action: "promote",
-		TaskID: taskID,
-		From:   ".evolve/inbox/" + srcRel + "/" + base,
-		To:     dest,
-		Cycle:  intPtr(p.Cycle),
-		GitSHA: strPtr(p.CommitSHA),
-		Reason: reason,
-	})
-	return res, nil
+	return opts.mover().Promote(taskID, newState, p)
 }
 
-// promoteDestPath computes (destDir, dest) for a given new state.
-// Mirrors bash:
-//
-//	processed: <inbox>/processed/cycle-<cycle|0>/[<sha8>-]<base>
-//	rejected:  <inbox>/rejected/cycle-<cycle|0>/<base>
-//	retry:     <inbox>/retry/<base>
-func promoteDestPath(inboxDir, base, newState string, p PromoteOpts) (string, string) {
-	switch newState {
-	case "processed":
-		effCycle := p.Cycle
-		if effCycle == "" {
-			effCycle = "0"
-		}
-		destDir := filepath.Join(inboxDir, "processed", "cycle-"+effCycle)
-		if p.CommitSHA != "" {
-			sha8 := p.CommitSHA
-			if len(sha8) > 8 {
-				sha8 = sha8[:8]
-			}
-			return destDir, filepath.Join(destDir, sha8+"-"+base)
-		}
-		return destDir, filepath.Join(destDir, base)
-	case "rejected":
-		effCycle := p.Cycle
-		if effCycle == "" {
-			effCycle = "0"
-		}
-		destDir := filepath.Join(inboxDir, "rejected", "cycle-"+effCycle)
-		return destDir, filepath.Join(destDir, base)
-	case "retry":
-		destDir := filepath.Join(inboxDir, "retry")
-		return destDir, filepath.Join(destDir, base)
-	case "quarantine":
-		// Flat sibling dir (no cycle-N subdir): quarantine is terminal, not
-		// per-cycle, and LoadDir skips subdirs so the item vanishes from triage.
-		destDir := filepath.Join(inboxDir, "quarantine")
-		return destDir, filepath.Join(destDir, base)
-	}
-	return "", ""
-}
-
-// ShouldQuarantine is the pure ADR-0072 S5 decision: quarantine a task once its
-// task-level failure count reaches the configured ceiling. A zero (or negative)
-// ceiling disables quarantine entirely, and a system-level failure NEVER
-// quarantines — the S3 floor halt takes precedence (AC4). The caller passes the
-// ceiling (FailureThresholds.TaskRetryCeiling, default 2) and the system-level
-// flag; inboxmover deliberately does not import internal/policy so the package
-// layering stays intact.
+// ShouldQuarantine is the pure ADR-0072 S5 decision (see lifecycle.ShouldQuarantine).
 func ShouldQuarantine(failureCount, ceiling int, systemLevelFailure bool) bool {
-	return ceiling > 0 && !systemLevelFailure && failureCount >= ceiling
+	return lifecycle.ShouldQuarantine(failureCount, ceiling, systemLevelFailure)
 }
 
 // ReleaseFromQuarantine is the operator escape hatch for ADR-0072 S5: it moves
-// an item out of .evolve/inbox/quarantine/ back to the inbox root and resets its
-// failure_count to 0, so the next cycle's triage can re-pick it. Returns
-// ErrNotFound when no quarantined item carries taskID. Idempotent-safe: a
-// basename already present at the inbox root is left untouched (never clobbered)
-// and reported as ErrMvFailed. The counter reset keeps the item JSON the single
-// source of truth for task-level failure memory (no stale count strands it).
+// an item out of .evolve/inbox/quarantine/ back to the inbox root and resets
+// its failure_count to 0, so the next cycle's triage can re-pick it.
 func ReleaseFromQuarantine(opts Options, taskID string) (PromoteResult, error) {
-	opts.resolveOpts()
-	res := PromoteResult{}
-	if taskID == "" {
-		return res, fmt.Errorf("%w: release-from-quarantine requires task_id", ErrBadArgs)
-	}
-	qDir := filepath.Join(opts.InboxDir, "quarantine")
-	src, err := FindFileByTaskID(qDir, taskID)
-	if err != nil {
-		return res, fmt.Errorf("%w: %s (not in quarantine)", ErrNotFound, taskID)
-	}
-	base := filepath.Base(src)
-	dest := filepath.Join(opts.InboxDir, base)
-	if _, statErr := os.Stat(dest); statErr == nil {
-		return res, fmt.Errorf("%w: %s already at inbox root", ErrMvFailed, base)
-	}
-	// Reset the failure counter before re-entry so a released item gets a fresh
-	// retry budget (best-effort — a rewrite failure must not block the release).
-	_ = updateItemJSON(src, func(m map[string]json.RawMessage) {
-		zero, _ := json.Marshal(0)
-		m["failure_count"] = zero
-		delete(m, "last_failure_reason")
-	})
-	if mvErr := os.Rename(src, dest); mvErr != nil {
-		return res, fmt.Errorf("%w: %v", ErrMvFailed, mvErr)
-	}
-	res.SrcPath = src
-	res.DestPath = dest
-	opts.logf("", "released from quarantine: %s → inbox/", base)
-	writeLedger(opts, LedgerEntry{
-		Action: "quarantine-release",
-		TaskID: taskID,
-		From:   ".evolve/inbox/quarantine/" + base,
-		To:     ".evolve/inbox/" + base,
-		Reason: "operator-quarantine-release",
-	})
-	return res, nil
+	return opts.mover().ReleaseFromQuarantine(taskID)
+}
+
+// RecoverOrphans moves files from processing/cycle-X/ back to inbox/ for
+// any cycle X that is no longer active. Idempotent.
+func RecoverOrphans(opts Options) (RecoverResult, error) {
+	return opts.mover().RecoverOrphans()
+}
+
+// ReleaseCycleProcessing moves all *.json files from processing/cycle-<cycle>/
+// back to the inbox root. It is scoped to the single named cycle dir and is
+// idempotent: a missing or already-drained dir is a clean no-op. A file whose
+// basename already exists at the inbox root (double-move race) is warned and
+// skipped — the existing inbox-root copy is never clobbered.
+func ReleaseCycleProcessing(opts Options, cycle int) (RecoverResult, error) {
+	return ReleaseCycleProcessingWithReason(opts, cycle, "")
+}
+
+// ReleaseCycleProcessingWithReason is ReleaseCycleProcessing with an explicit
+// ledger reason for each released item. An empty reason keeps the generic
+// "cycle-release". Callers that drain because delivery failed (e.g. an
+// unlanded ship commit, cycle-598 shape) pass a reason carrying "unlanded" so
+// the ledger durably distinguishes a delivery-failure retry from an ordinary
+// residual drain (inbox-promotion-requires-landed-ship).
+func ReleaseCycleProcessingWithReason(opts Options, cycle int, reason string) (RecoverResult, error) {
+	return releaseCycleProcessing(opts, cycle, reason, nil)
+}
+
+// quarantinePolicy is the drain's historical spelling of the leaf's Policy —
+// the ADR-0072 S5 decision inputs (ceiling, system-level, the committed set
+// with its nil-means-whole-drain contract) are documented ONCE, on
+// lifecycle.Policy; an alias keeps outcome.go's literal and this file's
+// signature on that one struct instead of a hand-projected mirror.
+type quarantinePolicy = lifecycle.Policy
+
+// releaseCycleProcessing is the shared drain core: the plain release-to-root
+// when quar is nil, the ADR-0072 S5 failure drain (bump, quarantine at the
+// ceiling, fail-open) when it is not. It stays UNEXPORTED on purpose (audit
+// D3): ApplyCycleOutcome is the one public door into the cycle-outcome
+// lifecycle, so the PASS-promote and FAIL-bump halves cannot drift apart
+// behind a second entry point (never_duplicate_centralize; the leaf's
+// Mover.Release is reachable only through this file — TestLifecycle_OnlyHostImportsTheLeaf).
+func releaseCycleProcessing(opts Options, cycle int, reason string, quar *quarantinePolicy) (RecoverResult, error) {
+	return opts.mover().Release(cycle, reason, quar)
+}
+
+// ReadFailureCount resolves taskID across the inbox root and processing/
+// cycle-* dirs and returns its durable failure_count. (0,false) = item not
+// found; (0,true) = item present, never failed.
+func ReadFailureCount(opts Options, taskID string) (int, bool) {
+	return opts.mover().ReadFailureCount(taskID)
+}
+
+// FindFileByTaskID resolves a task id to its file within one inbox directory
+// (ids live INSIDE the JSON; filenames carry timestamps). Exported for the
+// ship-side transactional consumption (consumption-rides-landing-ship): the
+// ship needs the same id→file resolution against the WORKTREE's tracked
+// inbox copy that this package uses against the runtime root.
+func FindFileByTaskID(dir, taskID string) (string, error) {
+	return lifecycle.FindFileByTaskID(dir, taskID)
+}
+
+// bumpFailureCount increments the durable "failure_count" on an inbox item
+// (the root-resident twin RecordRootTaskFailure keeps this spelling).
+func bumpFailureCount(path, reason string) (int, error) {
+	return lifecycle.BumpFailureCount(path, reason)
+}
+
+// updateItemJSON rewrites an inbox item atomically (the continuation retire
+// keeps this spelling).
+func updateItemJSON(path string, mutate func(m map[string]json.RawMessage)) error {
+	return lifecycle.UpdateItemJSON(path, mutate)
 }
 
 // --- Reconciliation: retire-by-id (superseded) ----------------------------
@@ -534,11 +355,12 @@ func SupersededInboxIDs(triageDecisionJSON []byte) []string {
 // rest of the lifecycle: never blocks ship.
 func ReconcileSuperseded(opts Options, supersededIDs []string, newState string, p PromoteOpts) ([]string, error) {
 	var retired []string
+	m := opts.mover() // one Mover for the loop — one resolve, one fallback ledger
 	for _, id := range supersededIDs {
 		if id == "" {
 			continue
 		}
-		res, err := Promote(opts, id, newState, p)
+		res, err := m.Promote(id, newState, p)
 		if err != nil {
 			return retired, fmt.Errorf("reconcile-superseded: promote %q → %s: %w", id, newState, err)
 		}
@@ -547,447 +369,4 @@ func ReconcileSuperseded(opts Options, supersededIDs []string, newState string, 
 		}
 	}
 	return retired, nil
-}
-
-// --- Subcommand: recover-orphans ------------------------------------------
-
-// RecoverResult counts how many files were moved back to inbox/.
-type RecoverResult struct {
-	Recovered int
-	Paths     []string
-}
-
-// RecoverOrphans moves files from processing/cycle-X/ back to inbox/ for
-// any cycle X that is no longer active. Idempotent.
-func RecoverOrphans(opts Options) (RecoverResult, error) {
-	opts.resolveOpts()
-	res := RecoverResult{Paths: []string{}}
-
-	procDir := inboxbatch.ProcessingDir(opts.InboxDir)
-	if info, err := os.Stat(procDir); err != nil || !info.IsDir() {
-		opts.logf("", "recover-orphans: no processing/ dir — nothing to do")
-		return res, nil
-	}
-
-	activeCycle, _ := opts.ActiveCycleFn()
-	if activeCycle == "" {
-		activeCycle = "-1"
-	}
-
-	activeNum, _ := strconv.Atoi(activeCycle)
-	for _, dir := range inboxbatch.ProcessingCycleDirs(opts.InboxDir) {
-		cycle, _ := inboxbatch.ParseProcessingCycle(filepath.Base(dir))
-		cycleNum := strconv.Itoa(cycle)
-		if cycle == activeNum {
-			opts.logf("", "recover-orphans: cycle-%s/ is active — skipping", cycleNum)
-			continue
-		}
-		files, _ := os.ReadDir(dir)
-		for _, f := range files {
-			if f.IsDir() || !strings.HasSuffix(f.Name(), ".json") {
-				continue
-			}
-			base := f.Name()
-			src := filepath.Join(dir, base)
-			dest := filepath.Join(opts.InboxDir, base)
-			taskID := readTaskIDOrUnknown(src)
-			if err := os.Rename(src, dest); err != nil {
-				opts.logf("WARN: ", "recover-orphans: mv failed for %s (leaving in processing/): %v", base, err)
-				continue
-			}
-			opts.logf("", "recovered: %s ← processing/cycle-%s/", base, cycleNum)
-			writeLedger(opts, LedgerEntry{
-				Action: "recover",
-				TaskID: taskID,
-				From:   ".evolve/inbox/processing/cycle-" + cycleNum + "/" + base,
-				To:     ".evolve/inbox/" + base,
-				Cycle:  intPtr(cycleNum),
-				Reason: "orphan-recovery-cycle-not-active",
-			})
-			res.Recovered++
-			res.Paths = append(res.Paths, dest)
-		}
-	}
-	opts.logf("", "recover-orphans: %d file(s) recovered", res.Recovered)
-	return res, nil
-}
-
-// --- Subcommand: release-cycle-processing ---------------------------------
-
-// ReleaseCycleProcessing moves all *.json files from processing/cycle-<cycle>/
-// back to the inbox root. It is scoped to the single named cycle dir and is
-// idempotent: a missing or already-drained dir is a clean no-op. A file whose
-// basename already exists at the inbox root (double-move race) is warned and
-// skipped — the existing inbox-root copy is never clobbered.
-func ReleaseCycleProcessing(opts Options, cycle int) (RecoverResult, error) {
-	return ReleaseCycleProcessingWithReason(opts, cycle, "")
-}
-
-// ReleaseCycleProcessingWithReason is ReleaseCycleProcessing with an explicit
-// ledger reason for each released item. An empty reason keeps the generic
-// "cycle-release". Callers that drain because delivery failed (e.g. an
-// unlanded ship commit, cycle-598 shape) pass a reason carrying "unlanded" so
-// the ledger durably distinguishes a delivery-failure retry from an ordinary
-// residual drain (inbox-promotion-requires-landed-ship).
-func ReleaseCycleProcessingWithReason(opts Options, cycle int, reason string) (RecoverResult, error) {
-	return releaseCycleProcessing(opts, cycle, reason, nil)
-}
-
-// quarantinePolicy carries the ADR-0072 S5 decision inputs for a failure drain:
-// the task-level retry ceiling and whether this cycle's failure was
-// system-level (an S3 floor halt), which suppresses quarantine (AC4).
-type quarantinePolicy struct {
-	ceiling     int
-	systemLevel bool
-
-	// committed restricts the failure_count bump (and therefore quarantine) to
-	// the ids triage actually COMMITTED to the cycle. A nil map means "every
-	// item in the drain" — the legacy whole-dir behavior, which an outcome with
-	// no committed ids still selects. Wave lanes claim a whole menu but work
-	// only the committed subset, so bumping the whole dir would quarantine
-	// healthy backlog after N failures of an unrelated task
-	// (wave-lane-task-quarantine-dead, menu semantics).
-	committed map[string]bool
-}
-
-// releaseCycleProcessing is the shared drain core. It is the ADR-0072 S5
-// failure-drain when quar is non-nil: it releases processing/cycle-<cycle>/
-// like ReleaseCycleProcessingWithReason but first increments each item's
-// durable task-level failure_count — the single source of truth that replaces
-// the dead cyclestate.CyclesUnpicked counter — and, once that count reaches
-// quar.ceiling on a task-level failure (systemLevel false, honoring S3
-// precedence), routes the item to .evolve/inbox/quarantine/ instead of back to
-// the inbox root, so a poison todo stops being re-picked every cycle.
-// Fail-open end to end: any per-item read/write error falls back to a normal
-// release so a bookkeeping fault never strands nor wrongly quarantines an item.
-// A ceiling <= 0 is exactly ReleaseCycleProcessingWithReason.
-//
-// It stays UNEXPORTED on purpose (audit D3): ApplyCycleOutcome is the one
-// public door into the cycle-outcome lifecycle, so the PASS-promote and
-// FAIL-bump halves cannot drift apart behind a second entry point
-// (never_duplicate_centralize).
-//
-// quar==nil is the plain release-to-root behavior; a non-nil quar applies the
-// S5 quarantine decision per item before falling back to the release.
-func releaseCycleProcessing(opts Options, cycle int, reason string, quar *quarantinePolicy) (RecoverResult, error) {
-	if reason == "" {
-		reason = "cycle-release"
-	}
-	opts.resolveOpts()
-	res := RecoverResult{Paths: []string{}}
-
-	cycleDir := inboxbatch.ProcessingCycleDir(opts.InboxDir, cycle)
-	info, err := os.Stat(cycleDir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			opts.logf("", "release-cycle: processing/cycle-%d/ absent — nothing to release", cycle)
-			return res, nil
-		}
-		return res, fmt.Errorf("release-cycle: stat processing/cycle-%d: %w", cycle, err)
-	}
-	if !info.IsDir() {
-		return res, nil
-	}
-
-	// ADR-0076 slice C: when the FAILed cycle preserved salvageable work, its
-	// workspace carries a continuation manifest; stamp it onto each released
-	// item IN the release pass (transactional — a separate stamping pass could
-	// be lost between crash and re-claim). Missing manifest ⇒ no-op; a corrupt
-	// one is loud but never blocks the release itself.
-	var contStamp *continuation.Continuation
-	if c, ok, merr := continuation.ReadManifest(filepath.Join(opts.ProjectRoot, ".evolve", "runs", fmt.Sprintf("cycle-%d", cycle))); merr != nil {
-		opts.logf("WARN: ", "release-cycle: continuation manifest unreadable for cycle %d: %v (items release unstamped)", cycle, merr)
-	} else if ok {
-		contStamp = &c
-	}
-
-	files, _ := os.ReadDir(cycleDir)
-	sort.Slice(files, func(i, j int) bool { return files[i].Name() < files[j].Name() })
-	for _, f := range files {
-		if f.IsDir() || !strings.HasSuffix(f.Name(), ".json") {
-			continue
-		}
-		base := f.Name()
-		src := filepath.Join(cycleDir, base)
-		dest := filepath.Join(opts.InboxDir, base)
-		taskID := readTaskIDOrUnknown(src)
-
-		// ADR-0072 S5: bump the durable failure_count and quarantine at the
-		// ceiling instead of releasing back to root. Fail-open — a read/write
-		// error skips quarantine and falls through to the normal release.
-		//
-		// systemLevel gates the BUMP, not just the quarantine decision (AC4 in
-		// full): a quota/infra storm must not walk healthy committed ids toward
-		// TaskRetryCeiling, or a single later task-level FAIL quarantines a
-		// backlog that never failed on its own merits.
-		if quar != nil && !quar.systemLevel && (quar.committed == nil || quar.committed[taskID]) {
-			if count, bumpErr := bumpFailureCount(src, reason); bumpErr == nil &&
-				ShouldQuarantine(count, quar.ceiling, quar.systemLevel) {
-				// Quarantine is terminal parking — shed any continuation stamp
-				// so an operator revival starts fresh (ADR-0076 slice C).
-				_ = updateItemJSON(src, func(m map[string]json.RawMessage) { delete(m, "continuation") })
-				// A non-delivery here is fail-open by design (the item falls
-				// through to the ordinary release below rather than being
-				// stranded in processing/) but it must never be SILENT: an
-				// un-quarantined poison item returns to the inbox root and the
-				// next triage re-picks the exact task the ceiling exists to
-				// park. One line, severity-marked, carrying the task id and the
-				// quarantine attempt (inboxmover-promote-mkdir-fail-loud).
-				pr, pErr := Promote(opts, taskID, "quarantine", PromoteOpts{Cycle: fmt.Sprintf("%d", cycle)})
-				switch {
-				case pErr != nil:
-					opts.logf("ERROR: ", "quarantine failed for '%s' (task-level failure #%d >= ceiling %d) — releasing to inbox root instead, it WILL be re-picked: %v",
-						taskID, count, quar.ceiling, pErr)
-				case pr.NoOp:
-					opts.logf("WARN: ", "quarantine no-op for '%s' (task-level failure #%d >= ceiling %d) — not parked, releasing to inbox root instead",
-						taskID, count, quar.ceiling)
-				default:
-					opts.logf("", "quarantined: %s (task-level failure #%d >= ceiling %d) ← processing/cycle-%d/", base, count, quar.ceiling, cycle)
-					res.Recovered++
-					res.Paths = append(res.Paths, pr.DestPath)
-					continue
-				}
-			}
-		}
-
-		// Double-move race: a concurrent release already landed this file.
-		if _, statErr := os.Stat(dest); statErr == nil {
-			opts.logf("WARN: ", "release-cycle: %s already at inbox root (double-move for %s) — skipping", base, taskID)
-			continue
-		}
-
-		if contStamp != nil {
-			if serr := updateItemJSON(src, func(m map[string]json.RawMessage) {
-				cb, _ := json.Marshal(contStamp)
-				m["continuation"] = cb
-			}); serr != nil {
-				opts.logf("WARN: ", "release-cycle: continuation stamp failed for %s: %v (releasing unstamped)", base, serr)
-			}
-		}
-		if mvErr := os.Rename(src, dest); mvErr != nil {
-			opts.logf("WARN: ", "release-cycle: mv failed for %s (leaving in processing/cycle-%d/): %v", base, cycle, mvErr)
-			continue
-		}
-		opts.logf("", "released: %s ← processing/cycle-%d/", base, cycle)
-		writeLedger(opts, LedgerEntry{
-			Action: "recover",
-			TaskID: taskID,
-			From:   fmt.Sprintf(".evolve/inbox/processing/cycle-%d/%s", cycle, base),
-			To:     ".evolve/inbox/" + base,
-			Cycle:  intPtr(fmt.Sprintf("%d", cycle)),
-			Reason: reason,
-		})
-		res.Recovered++
-		res.Paths = append(res.Paths, dest)
-	}
-	opts.logf("", "release-cycle: %d file(s) released from cycle-%d", res.Recovered, cycle)
-	return res, nil
-}
-
-// bumpFailureCount increments the durable "failure_count" on an inbox item JSON
-// (the single source of truth for ADR-0072 S5 task-level failure memory) and
-// stamps the latest failure reason, preserving every other field. Returns the
-// new count. Atomic (write-tmp + rename) so a crash never leaves a half-written
-// item. Any parse/IO error is returned so the caller can fail open.
-func bumpFailureCount(path, reason string) (int, error) {
-	count := 0
-	err := updateItemJSON(path, func(m map[string]json.RawMessage) {
-		if raw, ok := m["failure_count"]; ok {
-			_ = json.Unmarshal(raw, &count)
-		}
-		count++
-		cb, _ := json.Marshal(count)
-		m["failure_count"] = cb
-		if reason != "" {
-			rb, _ := json.Marshal(reason)
-			m["last_failure_reason"] = rb
-		}
-	})
-	if err != nil {
-		return 0, err
-	}
-	return count, nil
-}
-
-// updateItemJSON reads an inbox item, applies mutate to its top-level field map
-// (preserving every field the loop does not touch), and writes it back
-// atomically (write-tmp + rename). Any parse/IO error is returned so callers can
-// fail open. mutate must not retain the map after returning.
-func updateItemJSON(path string, mutate func(m map[string]json.RawMessage)) error {
-	body, err := os.ReadFile(path)
-	if err != nil {
-		return err
-	}
-	var m map[string]json.RawMessage
-	if err := json.Unmarshal(body, &m); err != nil {
-		return err
-	}
-	mutate(m)
-	out, err := json.Marshal(m)
-	if err != nil {
-		return err
-	}
-	tmp := fmt.Sprintf("%s.tmp.%d", path, os.Getpid())
-	if err := os.WriteFile(tmp, out, 0o644); err != nil {
-		return err
-	}
-	if err := os.Rename(tmp, path); err != nil {
-		_ = os.Remove(tmp)
-		return err
-	}
-	return nil
-}
-
-// --- Helpers ---------------------------------------------------------------
-
-// findFileByTaskID scans <dir>/*.json and returns the path of the first
-// file whose JSON .id equals taskID.
-// FindFileByTaskID resolves a task id to its file within one inbox directory
-// (ids live INSIDE the JSON; filenames carry timestamps). Exported for the
-// ship-side transactional consumption (consumption-rides-landing-ship): the
-// ship needs the same id→file resolution against the WORKTREE's tracked
-// inbox copy that this package uses against the runtime root.
-func FindFileByTaskID(dir, taskID string) (string, error) {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return "", err
-	}
-	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), ".json") {
-			continue
-		}
-		path := filepath.Join(dir, e.Name())
-		body, err := os.ReadFile(path)
-		if err != nil {
-			continue
-		}
-		var doc struct {
-			ID string `json:"id"`
-		}
-		if err := json.Unmarshal(body, &doc); err != nil {
-			continue
-		}
-		if doc.ID == taskID {
-			return path, nil
-		}
-	}
-	return "", ErrNotFound
-}
-
-// readTaskIDOrUnknown returns the JSON .id of a file, or "unknown" on failure.
-func readTaskIDOrUnknown(path string) string {
-	body, err := os.ReadFile(path)
-	if err != nil {
-		return "unknown"
-	}
-	var doc struct {
-		ID string `json:"id"`
-	}
-	if err := json.Unmarshal(body, &doc); err != nil {
-		return "unknown"
-	}
-	if doc.ID == "" {
-		return "unknown"
-	}
-	return doc.ID
-}
-
-// readActiveCycle reads .evolve/cycle-state.json and returns the cycle_id
-// field, or empty string + error if unavailable.
-func readActiveCycle(cycleStatePath string) (string, error) {
-	body, err := os.ReadFile(cycleStatePath)
-	if err != nil {
-		return "", err
-	}
-	var st struct {
-		CycleID json.Number `json:"cycle_id"`
-	}
-	if err := json.Unmarshal(body, &st); err != nil {
-		return "", err
-	}
-	return string(st.CycleID), nil
-}
-
-// writeLedger records one inbox-lifecycle event through the CHAINED append
-// path. The old raw O_APPEND write (no prev_hash, no flock, no tip update)
-// was the per-cycle chain-break generator under fleet concurrency (item
-// ledger-fleet-concurrency-chain): every unchained line broke the walk at
-// that point AND defeated the Rebaseline seal, which binds the physical
-// predecessor. Best-effort like before — a failed telemetry append must not
-// un-move an item that already moved — but loud now, never silent.
-func writeLedger(opts Options, entry LedgerEntry) {
-	if opts.Ledger == nil {
-		// Unwired seam (a direct call without resolveOpts): nothing to append
-		// into — degrade like the old best-effort path, never panic.
-		return
-	}
-	cycle := 0
-	if entry.Cycle != nil {
-		cycle = *entry.Cycle
-	}
-	gitHead := ""
-	if entry.GitSHA != nil {
-		gitHead = *entry.GitSHA
-	}
-	err := opts.Ledger.AppendLifecycle(context.Background(), ledger.LifecycleRecord{
-		TS:      opts.Now().UTC().Format(time.RFC3339),
-		Action:  entry.Action,
-		TaskID:  entry.TaskID,
-		Cycle:   cycle,
-		GitHead: gitHead,
-		Message: foldLifecycleMessage(entry.From, entry.To, entry.Reason),
-	})
-	if err != nil {
-		opts.logf("WARN: ", "ledger append (inbox-lifecycle %s %s): %v", entry.Action, entry.TaskID, err)
-	}
-}
-
-// intPtr returns a *int from a numeric string, or nil if empty/unparseable.
-// Mirrors bash semantics: empty cycle → null; numeric → numeric.
-func intPtr(s string) *int {
-	if s == "" {
-		return nil
-	}
-	var v int
-	if _, err := fmt.Sscanf(s, "%d", &v); err != nil {
-		return nil
-	}
-	return &v
-}
-
-// strPtr returns a *string, or nil if empty.
-func strPtr(s string) *string {
-	if s == "" {
-		return nil
-	}
-	return &s
-}
-
-// ReadFailureCount resolves taskID across the inbox root and processing/
-// cycle-* dirs and returns its durable failure_count (written by
-// bumpFailureCount on FAIL release). (0,false) = item not found; (0,true) =
-// item present, never failed. Read-only; malformed JSON reads as not-found
-// (the tolerant-reader convention).
-func ReadFailureCount(opts Options, taskID string) (int, bool) {
-	opts.resolveOpts()
-	dirs := []string{opts.InboxDir}
-	dirs = append(dirs, inboxbatch.ProcessingCycleDirs(opts.InboxDir)...)
-	for _, d := range dirs {
-		path, err := FindFileByTaskID(d, taskID)
-		if err != nil {
-			continue
-		}
-		raw, rerr := os.ReadFile(path)
-		if rerr != nil {
-			continue
-		}
-		var doc struct {
-			FailureCount int `json:"failure_count"`
-		}
-		if json.Unmarshal(raw, &doc) != nil {
-			continue
-		}
-		return doc.FailureCount, true
-	}
-	return 0, false
 }

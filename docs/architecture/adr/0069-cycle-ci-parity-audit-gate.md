@@ -72,5 +72,6 @@ any later ship attempt):
   the production `NewDefaultWithStageCompact`.
 
 Key files: `go/internal/ciparity/` (pure intersection helper),
-`go/internal/phases/audit/ciparity.go` (the hooks), `go/internal/phases/audit/audit.go`
-(the seam). Closes the standing `cycle-audit-cycle-scoped-ci-gap` request.
+`go/internal/phases/audit/ciparitygate/` (the five gates — ADR-0103 unit 14, module `audit`, codes `AUDIT_CIPARITY_*`),
+`go/internal/phases/audit/ciparity.go` (the seam: runner/budget vars, the change-set locator, the facades), `go/internal/phases/audit/audit.go`
+(the wiring). Closes the standing `cycle-audit-cycle-scoped-ci-gap` request.

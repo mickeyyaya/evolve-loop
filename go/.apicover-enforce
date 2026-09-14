@@ -229,8 +229,9 @@
 ./internal/retrofile
 
 # Phase 5 gap=5-7 tail batch (2026-06-16): 5 packages (5-7 unnamed exports
-# each, all >=95% cover). phaseobserver: Scope enum + DefaultProcessAlive (live
-# pgid probe) + ExitFatal exit-code-vocabulary contract. deliverable: 4 Verify
+# each, all >=95% cover). phaseobserver: Scope enum (since ADR-0103 unit 12 aliases of the
+# observerengine spellings) + DefaultProcessAlive (live pgid probe); the ExitFatal member was
+# deleted (zero consumers tree-wide). deliverable: 4 Verify
 # error codes via real fixtures + NewVerifier/NewVerifierWithCatalog. subagent:
 # 5 *Result structs bound from their producers + TierHaiku via ResolveModelTier.
 # bridge/recipe: Result/StepResult/StepStatus/SessionDriver/SendKind/AwaitKind/
@@ -585,3 +586,54 @@
 # deterministic floor, the remediation filer and the recurrence closure (internal/core/failurelearning).
 # 100% API + 100% line coverage gated.
 ./internal/core/failurelearning
+
+# ADR-0103 unit 07 (2026-09-14): the ship landing — the fleet ff-merge, the push with its inline
+# push-race repair and the post-push head read, the shared git probes, the ship-binding witness
+# (internal/phases/ship/landing). 100% API + 100% line coverage gated.
+./internal/phases/ship/landing
+# ADR-0103 unit 08 (2026-09-14): config resolution — the routing-config Loader, its registry/env/policy
+# dials, validators and codes; ./internal/config is enforced by the routing-tier row above (the
+# Phase 5 gap=4 tail batch). 100% API + 100% line coverage gated.
+# ADR-0103 unit 12 (2026-09-14): the phase-observer engine — the stream-json tail/decoder, the stall
+# rules, the incident responder and the envelope/report sinks (internal/observerengine).
+# 100% API + 100% line coverage gated.
+./internal/observerengine
+# ADR-0103 unit 09 (2026-09-14): the audit's defect/prescription ledger — schema, writer, readers and
+# the continuation disposition gate (internal/core/defectledger). 100% API + 100% line coverage gated.
+./internal/core/defectledger
+# ADR-0103 unit 06 (2026-09-14): the inbox lifecycle mover — claim, promote, quarantine release, the
+# cycle drain, orphan recovery and the processed-record primitives (internal/inboxmover/lifecycle).
+# 100% API + 100% line coverage gated.
+./internal/inboxmover/lifecycle
+# ADR-0103 unit 10 (2026-09-14): the launch-outcome classifier — the one exit-code table (sentinel, ledger
+# cause code, BRIDGE_EXIT_* projection as Outcome.Signal) and the cause-line miners
+# (internal/bridge/launchoutcome). 100% API + 100% line coverage gated.
+./internal/bridge/launchoutcome
+# ADR-0103 unit 11 (2026-09-14): the phase runner's verdict engine — the settle ladder, the teardown
+# reconcile arms, the stale-leftover gate, the ACS deterministic floor, the verdict-source rule and the
+# ship guard (internal/phases/runner/verdict). 100% API + 100% line coverage gated.
+./internal/phases/runner/verdict
+# ADR-0103 unit 04 (2026-09-14): the two rune-cap text rules the advisor prompt and the carryover
+# lifecycle project (internal/textcap). 100% API + 100% line coverage gated.
+./internal/textcap
+
+# ADR-0103 unit 04 (2026-09-14): the phase advisor — the routing/plan prompt composer, the bridge
+# launcher with its profile fallback chain and redacted captures, and the plan/proposal parser with
+# the mint recursion guard (internal/core/advisor). 100% API + 100% line coverage gated.
+./internal/core/advisor
+# ADR-0103 unit 13 (2026-09-14): the loop wave engine — the wave gate, one dispatch body, the min-width
+# repair, the fleet-config reload, the freshness-gated launcher, quota/budget sizing and the plan source
+# (internal/loopwave). 100% API + 100% line coverage gated.
+./internal/loopwave
+# ADR-0103 unit 13 (2026-09-14): the batch-chaining driver, the boundary binary-refresh engine and the
+# pure chain decisions (internal/loopchain). 100% API + 100% line coverage gated.
+./internal/loopchain
+# ADR-0103 unit 14 (2026-09-14): the CI-parity gates — go vet, acs-durable, the serialized integration
+# tier with its cross-lane lock and clean-env retake, apicover -enforce in-process and new-package
+# graduation (internal/phases/audit/ciparitygate). 100% API + 100% line coverage gated.
+./internal/phases/audit/ciparitygate
+# ADR-0103 unit 16 (2026-09-14): the evolve subagent run execution path — request admission,
+# cli/tier/capability resolution, prompt delivery and staging, the bridge exec port, artifact
+# verification and the agent_subprocess ledger record (internal/subagent/subagentrun).
+# 100% API + 100% line coverage gated.
+./internal/subagent/subagentrun

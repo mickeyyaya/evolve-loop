@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/core/defectledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 )
 
@@ -17,18 +18,6 @@ type memoTodo struct {
 	Action          string `json:"action"`
 	Priority        string `json:"priority"`
 	EvidencePointer string `json:"evidence_pointer"`
-}
-
-// ledgerEntry / ledgerDoc are the audit's <workspace>/defect-ledger.json.
-type ledgerEntry struct {
-	ID     string `json:"id"`
-	Text   string `json:"text"`
-	Status string `json:"status"`
-}
-
-type ledgerDoc struct {
-	OriginCycle int           `json:"origin_cycle"`
-	Entries     []ledgerEntry `json:"entries"`
 }
 
 // MergeMemo merges the memo's queued follow-up todos into the state: trimmed,
@@ -67,14 +56,14 @@ func (l *Lifecycle) MergePrescriptions(state *cyclestate.State, workspace string
 	if state == nil || strings.TrimSpace(workspace) == "" {
 		return
 	}
-	var doc ledgerDoc
-	if !l.decodeDocument(filepath.Join(workspace, "defect-ledger.json"), "defect-ledger.json", cycle, "Lifecycle.MergePrescriptions", &doc) {
+	var doc defectledger.Doc // the ledger's own wire shape (ADR-0103 unit 09); decoded through THIS reader so a fault stays a carryover code
+	if !l.decodeDocument(filepath.Join(workspace, defectledger.LedgerFile), defectledger.LedgerFile, cycle, "Lifecycle.MergePrescriptions", &doc) {
 		return
 	}
 	expiresAt := defaultExpiresAt(now)
 	incoming := make([]cyclestate.CarryoverTodo, 0, len(doc.Entries))
 	for _, e := range doc.Entries {
-		if strings.TrimSpace(e.Status) != "OPEN" || !strings.HasPrefix(e.Text, PrescriptionPrefix) {
+		if strings.TrimSpace(e.Status) != defectledger.StatusOpen || !strings.HasPrefix(e.Text, PrescriptionPrefix) {
 			continue // resolved prescriptions never re-nag; ordinary defects belong to the ancestor reconciliation
 		}
 		id, action := strings.TrimSpace(e.ID), strings.TrimSpace(e.Text)

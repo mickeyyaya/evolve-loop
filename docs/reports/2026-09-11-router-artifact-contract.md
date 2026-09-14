@@ -46,7 +46,10 @@ The recovery separates identity from protocol at the existing bridge boundary:
 - `PhaseAdvisor` chooses the contract next to the artifact and completion mode. Plan uses `router`,
   RePlan uses `router-replan`, and Propose uses `router-proposal`. Filename inference is avoided.
 - The contract registry contains three records with the same `AgentName="router"` and distinct
-  artifact names.
+  artifact names. Since ADR-0103 unit 04 (2026-09-14) the advisor's `decision` table projects those
+  names from `phasecontract.ArtifactName` — the (contract, artifact) pair is spelled once, in the
+  registry; `resume_transition.go` still carries its own `routing-plan.json` literal (unit 05's
+  projection site).
 - `Contract.JSONShape` is the shared top-level shape rule used by prompt rendering and the
   verifier. Its zero value means any valid JSON value for backward compatibility. Required keys
   still imply an object for legacy keyed contracts.
