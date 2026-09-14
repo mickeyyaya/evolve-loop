@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/channel"
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/inbox"
@@ -135,6 +134,8 @@ func injectText(ctx context.Context, cfg *Config, deps Deps, session, body strin
 	if err := deps.Tmux.PasteBuffer(ctx, session); err != nil {
 		return fmt.Errorf("inject paste-buffer: %w", err)
 	}
-	deps.Sleep(time.Second)
-	return deps.Tmux.SendKeys(ctx, session, "", true) // Enter
+	// The same delivery tail as the prompt paste (paste_settle.go): a small
+	// body keeps the old 1 s and no capture; a multi-KB one settles and waits.
+	_, err := settlePasteThenEnter(ctx, deps, "["+session+"]", session, pasteSettleFor(len(body)), len(body))
+	return err
 }
