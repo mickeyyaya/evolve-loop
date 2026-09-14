@@ -1,0 +1,6 @@
+{
+ "title": "TestChannel_EndToEnd is timing-based and reds the Ubuntu Go 1.23 race job — make the producer/normalizer span deterministic",
+ "weight": 0.6,
+ "source": "console-wave2-20260914",
+ "details": "PR #614 (advisor-only change; internal/bridge/channel is not in its dependency graph) went red on `build + test (Go) (ubuntu-latest, 1.23)` with `e2e_test.go:102: answer text = \"\", want substring \"3 bullets\"` while macOS 1.23 and Ubuntu 1.27 passed the same head and the test passes 5x locally under GOTOOLCHAIN=go1.23.12 -race. The test drives a 1 ms Producer ticker with 5 ms / 10 ms sleeps so the assistant envelope lands inside the [inject_applied, idle_reached] span; its own comment says 'run with -race -count=20 to confirm non-flaky'. On the slow Ubuntu race runner the two poll windows collapse and the assistant seq falls outside the span. Fix the class, not the sleeps: make the span correlation independent of poll timing (e.g. the Supervisor collects by corr_id/seq ordering the Normalizer guarantees, or the test drives the Producer's poll explicitly instead of sleeping) and add a -race -count=20 pin in CI-parity. Until then every PR can red on this job at random; classify by re-running the failed job (gh run rerun --failed)."
+}
