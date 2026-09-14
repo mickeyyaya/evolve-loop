@@ -280,7 +280,9 @@ func u13WaveStderrSections(t *testing.T) string {
 	section("launcher_all_stale", func(w io.Writer) {
 		root := t.TempDir()
 		for _, id := range []string{"a", "b"} {
-			u13WriteJSON(t, filepath.Join(root, ".evolve", "inbox", "processed", id+".json"), map[string]any{"id": id, "weight": 0.5, "files": []string{id + ".go"}})
+			// The promoter nests processed/ by cycle (lifecycle.promoteDestPath); the
+			// console names the cycle dir, so the fixture writes the real layout.
+			u13WriteJSON(t, filepath.Join(root, ".evolve", "inbox", "processed", "cycle-9", id+".json"), map[string]any{"id": id, "weight": 0.5, "files": []string{id + ".go"}})
 		}
 		productionWaveLauncher(policy.FleetConfig{Concurrency: 1}, "", root, "", "", io.Discard, w).Run(context.Background(), []fleet.CycleSpec{{Scope: []string{"a"}}, {Scope: []string{"b"}}})
 	})

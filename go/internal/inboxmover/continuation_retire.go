@@ -122,12 +122,11 @@ func appendReleasedContinuation(path string, c continuation.Continuation, reason
 	})
 }
 
-// retirementDirs are the inbox subtrees an item lands in when it LEAVES the
-// pending pool. LoadDir skips subdirs, which is exactly why an item parked here
-// stops being picked — so a binding keyed on an id found only in one of these
-// is a ghost. processed/ and rejected/ nest a cycle-N level (promoteDestPath),
-// so the scan is recursive.
-var retirementDirs = []string{"consumed", "quarantine", "processed", "rejected", "retry"}
+// The retirement subtrees are retirementStates (dispatchstate.go) — the ONE
+// list. LoadDir skips subdirs, which is exactly why an item parked in one
+// stops being picked — so a binding keyed on an id found only there is a
+// ghost. processed/ and rejected/ nest a cycle-N level (promoteDestPath), so
+// the scan is recursive.
 
 // scopeHasLiveItem reports whether scopeID still names an item the batch loader
 // can reach: the inbox ROOT (LoadDir's non-recursive scan) or a
@@ -167,7 +166,7 @@ func scopeRetiredAt(opts Options, scopeID string) (string, string) {
 	if strings.TrimSpace(scopeID) == "" {
 		return "", ""
 	}
-	for _, sub := range retirementDirs {
+	for _, sub := range retirementStates {
 		root := filepath.Join(opts.InboxDir, sub)
 		found := ""
 		_ = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {

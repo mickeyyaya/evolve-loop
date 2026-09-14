@@ -21,8 +21,8 @@ func lifecycleItem(t *testing.T, evolveDir, state, id string, deps ...string) {
 	dir := filepath.Join(evolveDir, "inbox")
 	switch state {
 	case inboxmover.StatePending:
-	case inboxmover.StateProcessing:
-		dir = filepath.Join(dir, "processing", "cycle-9")
+	case inboxmover.StateProcessing, inboxmover.StateProcessed, inboxmover.StateRejected:
+		dir = filepath.Join(dir, state, "cycle-9") // the promoter nests these by cycle (lifecycle.promoteDestPath)
 	default:
 		dir = filepath.Join(dir, state)
 	}
@@ -107,8 +107,8 @@ func TestFreshnessProbe_ResolvesTheInboxLifecycle(t *testing.T) {
 		"blocked-retry":      {Fresh: false, Reason: "deps unmet: needs dep-retry"},
 		"ready":              {Fresh: true},
 		"never-seen":         {Fresh: true},
-		"dep-done":           {Fresh: false, Reason: "consumed: processed"},
-		"rej":                {Fresh: false, Reason: "consumed: rejected"},
+		"dep-done":           {Fresh: false, Reason: "consumed: processed cycle-9"},
+		"rej":                {Fresh: false, Reason: "consumed: rejected cycle-9"},
 		"dep-retry":          {Fresh: false, Reason: "consumed: retry"},
 		"quar":               {Fresh: false, Reason: "consumed: quarantine"},
 		"dep-processing":     {Fresh: false, Reason: "consumed: processing cycle-9"},
@@ -153,15 +153,17 @@ func TestConsumedHasThreeBeliefs(t *testing.T) {
 	if !isConsumed(inboxmover.StateRetry) || isConsumed(inboxmover.StateQuarantine) || isConsumed(inboxmover.StateProcessing) || isConsumed(inboxmover.StatePending) || isConsumed(inboxmover.StateUnknown) {
 		t.Error("plan-time prune: processed|rejected|retry are consumed; quarantine and processing are not (belief 1)")
 	}
-	if !isConsumed(inboxmover.StateProcessed) || !isConsumed(inboxmover.StateRejected) {
-		t.Error("processed and rejected are consumed")
+	if !isConsumed(inboxmover.StateProcessed) || !isConsumed(inboxmover.StateRejected) || !isConsumed(inboxmover.StateConsumed) {
+		t.Error("processed, rejected and consumed (the in-commit landing consumption) are consumed")
 	}
 	h := newHarness(t)
 	lifecycleItem(t, h.evolveDir, inboxmover.StateQuarantine, "q")
 	lifecycleItem(t, h.evolveDir, inboxmover.StateRetry, "r")
-	kept := triagecap.PruneConsumed(h.evolveDir, []triagecap.FleetCandidate{{ID: "q"}, {ID: "r"}})
+	lifecycleItem(t, h.evolveDir, inboxmover.StateConsumed, "c")
+	lifecycleItem(t, h.evolveDir, inboxmover.StateProcessed, "s")
+	kept := triagecap.PruneConsumed(h.evolveDir, []triagecap.FleetCandidate{{ID: "q"}, {ID: "r"}, {ID: "c"}, {ID: "s"}})
 	if len(kept) != 1 || kept[0].ID != "r" {
-		t.Errorf("widen's PruneConsumed drops quarantine and keeps retry (belief 2): %+v", kept)
+		t.Errorf("widen's PruneConsumed drops quarantine, consumed and processed (nested by cycle) and keeps retry (belief 2): %+v", kept)
 	}
 	lifecycleItem(t, h.evolveDir, inboxmover.StateProcessing, "p")
 	if f := h.e.probe()("p"); f.Fresh {

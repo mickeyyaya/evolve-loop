@@ -243,3 +243,7 @@ system-level failures stay inert; 001 and 004 pin the two gaps above, each with
 its fail-open edge asserted). Unit coverage for the new package lives at
 `go/internal/cycleoutcome/cycleoutcome_test.go`; permanent regression evals at
 `.evolve/evals/{wave-lane-task-quarantine-dead,wave-planner-pass-scope-prune}.md`.
+
+## Amendment (2026-09-15) — the readers must see every retirement shape
+
+`processed/cycle-N/` (this ADR) and `consumed/` (`evolve inbox consume`, the in-commit landing consumption) are both retirement states, but `inboxmover.ResolveDispatchState` read `processed/` flat and knew no `consumed/`: a shipped item resolved `unknown`, the plan-time prune / widen prune / launch probe all keep unknown, and cycle 1682 was pinned to work 1679 had shipped. The resolver now scans every retirement dir (the ONE `inboxmover.retirementStates` list, also the retire scan's) flat AND by `cycle-<N>` through one `inboxbatch.CycleDirs`, newest first, with `StateConsumed` added; the writer (`lifecycle.promoteDestPath`) composes `processed/cycle-N` and `rejected/cycle-N` through `inboxbatch.CycleDir`, so the layout has one spelling on both sides. Growth: `processed/cycle-*` and `rejected/cycle-*` gain one directory per cycle and every unresolved id now walks them (three resolvers per planned id per wave); a compaction or archive of old cycle dirs is the follow-up — never a cap on the scan, which would re-open F18. Research F18 in `docs/research/verification-wave-findings-2026-09-14.md`.

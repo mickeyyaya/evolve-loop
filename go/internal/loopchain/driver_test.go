@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -200,9 +201,17 @@ func TestFleetLaneActive_ExcludesOwnPIDLease(t *testing.T) {
 	if active, err := FleetLaneActive(evolveDir); err != nil || active {
 		t.Errorf("our own fresh lease is not a sibling: %v %v", active, err)
 	}
-	liveRun(t, evolveDir, "cycle-sibling", os.Getpid()+1)
+	// A sibling is a DIFFERENT LIVE process: os.Getpid()+1 only happened to
+	// be alive; since liveness is the owner's (2026-09-15) the fixture holds a
+	// real child for the duration.
+	sibling := exec.Command("sleep", "30")
+	if err := sibling.Start(); err != nil {
+		t.Fatalf("spawn a live sibling: %v", err)
+	}
+	t.Cleanup(func() { _ = sibling.Process.Kill(); _ = sibling.Wait() })
+	liveRun(t, evolveDir, "cycle-sibling", sibling.Process.Pid)
 	if active, err := FleetLaneActive(evolveDir); err != nil || !active {
-		t.Errorf("a foreign pid is a sibling: %v %v", active, err)
+		t.Errorf("a foreign LIVE pid is a sibling: %v %v", active, err)
 	}
 	// Live without a lease at all (the current-workspace liveness source) is
 	// deliberately NOT excluded — but only a fresh lease or the current
@@ -504,5 +513,29 @@ func TestDriver_StopLineHasOneProducer(t *testing.T) {
 	const sentence = `"[chain] stopping after %d batch(es): %s (inbox pending=%d, cap=%d)\n"`
 	if n := strings.Count(string(src), sentence); n != 1 {
 		t.Errorf("the stop sentence has %d producers in driver.go, want exactly 1 (Driver.stop)", n)
+	}
+}
+
+// A sealed lane's lease outlives its process: the writer stops heartbeating
+// at exit but the file stays "fresh" for a full TTL (cycle 1679 sealed at
+// 17:03Z; the boundary refresh at 17:03 read its 17:02 heartbeat as an active
+// sibling and refused to rebuild — LOOP_BOUNDARY_REFRESH_SKIPPED step=lane_active
+// with no lane running, twice on 2026-09-15). Liveness is the OWNER, not the
+// timestamp: a fresh lease whose owner pid is gone is not a sibling; a lease
+// with no owner pid stays a sibling (nothing to probe — refuse conservatively).
+func TestFleetLaneActive_DeadOwnerIsNotASibling(t *testing.T) {
+	evolveDir := t.TempDir()
+	cmd := exec.Command("true")
+	if err := cmd.Run(); err != nil {
+		t.Skipf("cannot spawn a process to retire: %v", err)
+	}
+	dead := cmd.Process.Pid
+	liveRun(t, evolveDir, "cycle-sealed", dead)
+	if active, err := FleetLaneActive(evolveDir); err != nil || active {
+		t.Errorf("a fresh lease whose owner pid %d has exited is a sealed lane, not a sibling: active=%v err=%v", dead, active, err)
+	}
+	liveRun(t, evolveDir, "cycle-unowned", 0)
+	if active, err := FleetLaneActive(evolveDir); err != nil || !active {
+		t.Errorf("a fresh lease with no owner pid cannot be proven dead — still a sibling: active=%v err=%v", active, err)
 	}
 }

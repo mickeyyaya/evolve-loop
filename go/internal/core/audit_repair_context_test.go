@@ -13,6 +13,7 @@ package core
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -114,5 +115,53 @@ func TestAuditRepairBrief_SeededOnBothDispatchSurfaces(t *testing.T) {
 			!strings.Contains(string(body), "seedAuditRepairContext(phaseCtx, next, cr.cs)") {
 			t.Errorf("%s calls seedAuditRepairContext with something other than the DISPATCHED phase; presence is not correctness", f)
 		}
+	}
+}
+
+// Cycle 1679 (2026-09-15): audit round 4 PASSED with WARN (three MEDIUM
+// defects) and the cycle went to ship; GIT_FLEET_REBASE_NEEDED sent it back
+// to build, and that rebuild's brief carried no audit section — the repair
+// brief seeds only behind a rejection grant — so round 5 found the same
+// defects standing. A recovery rebuild is re-audited by the same rubric: the
+// last audit's actionable findings ride the brief under their own key, and a
+// rejection grant (the repair path) still outranks them.
+func TestSeedAuditRepairContext_ShipRecoveryRebuildCarriesStandingFindings(t *testing.T) {
+	dir := t.TempDir()
+	report := "# Audit Report\n\n## Verdict\nWARN\n\n## Issues\n\n### M1 (MEDIUM) — claim-discrepancy: the record says five cycle predicates while the tree carries eight\nb\n\n### L1 (LOW) — a nit the builder may ignore\nb\n"
+	if err := os.WriteFile(filepath.Join(dir, "audit-report.md"), []byte(report), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cs := CycleState{WorkspacePath: dir, AuditDispatches: 4, ShipRecoveryCode: "GIT_FLEET_REBASE_NEEDED"}
+	base := map[string]string{"keep": "me"} // a resumed dispatch: no ship_error_code snapshot
+
+	got := seedAuditRepairContext(base, PhaseBuild, cs)
+
+	findings := got[CtxKeyStandingAuditFindings]
+	if !strings.Contains(findings, "claim-discrepancy") {
+		t.Fatalf("a rebuild after a ship error carries the last audit's actionable findings, got %q", findings)
+	}
+	if strings.Contains(findings, "nit the builder may ignore") {
+		t.Errorf("LOW findings are not actionable and stay out of the brief: %q", findings)
+	}
+	if got["keep"] != "me" || base[CtxKeyStandingAuditFindings] != "" {
+		t.Error("seeding copies on write and preserves the existing entries")
+	}
+	if got[CtxKeyShipErrorCode] != "GIT_FLEET_REBASE_NEEDED" {
+		t.Errorf("the prompt names the code from persisted state when the snapshot lacks it, got %q", got[CtxKeyShipErrorCode])
+	}
+	if _, ok := seedAuditRepairContext(base, PhaseBuild, CycleState{WorkspacePath: dir, AuditDispatches: 4})[CtxKeyStandingAuditFindings]; ok {
+		t.Error("no ship-error recovery in flight → an ordinary build is not seeded with standing findings")
+	}
+	latched := cs
+	if !latchShippedState(&latched, PhaseShip, VerdictPASS) || latched.ShipRecoveryCode != "" {
+		t.Errorf("the ship latch ends the recovery: ShipRecoveryCode=%q", latched.ShipRecoveryCode)
+	}
+	if _, ok := seedAuditRepairContext(base, PhaseAudit, cs)[CtxKeyStandingAuditFindings]; ok {
+		t.Error("the audit re-reads its own report; it is never seeded")
+	}
+	writeAuditFailReason(t, dir, "audit", "EGPS: red_count=1 [x]")
+	rejected := seedAuditRepairContext(base, PhaseBuild, CycleState{WorkspacePath: dir, AuditDispatches: 4, AuditRepairActive: true, AuditRepairAttempts: 1, ShipRecoveryCode: "GIT_FLEET_REBASE_NEEDED"})
+	if rejected[CtxKeyAuditRepairFindings] == "" || rejected[CtxKeyStandingAuditFindings] != "" {
+		t.Errorf("a rejection grant is the repair path and outranks standing findings: %v", rejected)
 	}
 }

@@ -25,7 +25,15 @@ func ProcessingDir(inboxDir string) string {
 
 // ProcessingCycleDir is the directory a claim by cycle moves an item into.
 func ProcessingCycleDir(inboxDir string, cycle int) string {
-	return filepath.Join(ProcessingDir(inboxDir), cycleDirPrefix+strconv.Itoa(cycle))
+	return CycleDir(ProcessingDir(inboxDir), strconv.Itoa(cycle))
+}
+
+// CycleDir is the ONE spelling of a cycle-nested lifecycle directory:
+// <parent>/cycle-<cycle>. The promoter composes its processed/ and rejected/
+// destinations through it and CycleDirs/ParseProcessingCycle read them back,
+// so a respelling on either side cannot hide a retired item from the readers.
+func CycleDir(parent, cycle string) string {
+	return filepath.Join(parent, cycleDirPrefix+cycle)
 }
 
 // ParseProcessingCycle inverts ProcessingCycleDir's basename: the claiming
@@ -48,7 +56,15 @@ func ParseProcessingCycle(dirName string) (cycle int, ok bool) {
 // recovery, dispatch state, failure counts). Anything that is not a parseable
 // cycle dir is skipped; a missing processing/ is an empty list.
 func ProcessingCycleDirs(inboxDir string) []string {
-	entries, err := os.ReadDir(ProcessingDir(inboxDir))
+	return CycleDirs(ProcessingDir(inboxDir))
+}
+
+// CycleDirs lists the cycle-<N> subdirectories of parent in ascending cycle
+// order — the ONE scan for every lifecycle directory the promoter nests by
+// cycle (processing/, processed/, rejected/). A missing parent is an empty
+// list, never an error: an absent lifecycle dir means no item ever reached it.
+func CycleDirs(parent string) []string {
+	entries, err := os.ReadDir(parent)
 	if err != nil {
 		return nil
 	}
@@ -56,7 +72,7 @@ func ProcessingCycleDirs(inboxDir string) []string {
 	var cycles []int
 	for _, e := range entries {
 		if cycle, ok := ParseProcessingCycle(e.Name()); ok && e.IsDir() {
-			byCycle[cycle] = ProcessingCycleDir(inboxDir, cycle)
+			byCycle[cycle] = filepath.Join(parent, e.Name())
 			cycles = append(cycles, cycle)
 		}
 	}

@@ -165,12 +165,13 @@ func marshalOr(data []byte, v any) []byte {
 }
 
 // isConsumed reports whether a lifecycle state means the item is done with
-// at plan time: processed, rejected or retry. StateProcessing is NOT
+// at plan time: processed, consumed (the in-commit landing consumption),
+// rejected or retry. StateProcessing is NOT
 // consumed: it is in flight, and its own claim keeps a second lane off it;
 // quarantine is not in this set either (belief 1 of 3 — Q-W5).
 func isConsumed(state string) bool {
 	switch state {
-	case inboxmover.StateProcessed, inboxmover.StateRejected, inboxmover.StateRetry:
+	case inboxmover.StateProcessed, inboxmover.StateConsumed, inboxmover.StateRejected, inboxmover.StateRetry:
 		return true
 	}
 	return false

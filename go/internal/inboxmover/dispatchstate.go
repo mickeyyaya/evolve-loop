@@ -21,11 +21,23 @@ const (
 	StatePending    = "pending"
 	StateProcessing = "processing"
 	StateProcessed  = "processed"
+	StateConsumed   = "consumed" // `evolve inbox consume`: the in-commit landing consumption (tracked, rides the ship)
 	StateRejected   = "rejected"
 	StateRetry      = "retry"
 	StateQuarantine = "quarantine"
 	StateUnknown    = "unknown"
 )
+
+// retirementStates are the lifecycle states an item lands in when it LEAVES
+// the pending pool, in resolution order (first hit wins when an id sits in
+// two dirs). The ONE list for every reader that asks "has this id retired?":
+// ResolveDispatchState here and scopeRetiredAt (continuation_retire.go).
+// processed/ and rejected/ nest a cycle-<N> level (lifecycle.promoteDestPath);
+// every state is scanned flat AND nested so no layout change can hide a
+// retired item from one reader but not the other (cycle 1682: a shipped item
+// resolved unknown, survived both prunes and the launch probe, and was
+// re-pinned to a lane).
+var retirementStates = []string{StateConsumed, StateQuarantine, StateProcessed, StateRejected, StateRetry}
 
 // DispatchState is one task id's current lifecycle position.
 type DispatchState struct {
@@ -63,9 +75,18 @@ func ResolveDispatchState(opts Options, taskID string) DispatchState {
 			return DispatchState{State: StateProcessing, Detail: filepath.Base(dir)}
 		}
 	}
-	for _, state := range []string{StateProcessed, StateRejected, StateRetry, StateQuarantine} {
-		if _, err := FindFileByTaskID(filepath.Join(opts.InboxDir, state), taskID); err == nil {
+	for _, state := range retirementStates {
+		stateDir := filepath.Join(opts.InboxDir, state)
+		if _, err := FindFileByTaskID(stateDir, taskID); err == nil {
 			return DispatchState{State: state}
+		}
+		// Newest cycle first: a hit is almost always recent (1682 chased
+		// 1679) while the nested trees grow one dir per cycle for good.
+		dirs := inboxbatch.CycleDirs(stateDir)
+		for i := len(dirs) - 1; i >= 0; i-- {
+			if _, err := FindFileByTaskID(dirs[i], taskID); err == nil {
+				return DispatchState{State: state, Detail: filepath.Base(dirs[i])}
+			}
 		}
 	}
 	return DispatchState{State: StateUnknown}

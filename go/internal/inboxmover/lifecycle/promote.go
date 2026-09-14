@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 )
 
 // PromoteOpts gathers the optional flag-bearing arguments.
@@ -176,7 +178,7 @@ func (m *Mover) deliver(pr promotion) (noop bool, err error) {
 func promoteDestPath(inboxDir, base, newState string, p PromoteOpts) (string, string) {
 	switch newState {
 	case "processed":
-		destDir := filepath.Join(inboxDir, "processed", "cycle-"+cycleOrZero(p.Cycle))
+		destDir := inboxbatch.CycleDir(filepath.Join(inboxDir, "processed"), cycleOrZero(p.Cycle))
 		if p.CommitSHA != "" {
 			sha8 := p.CommitSHA
 			if len(sha8) > 8 {
@@ -186,7 +188,7 @@ func promoteDestPath(inboxDir, base, newState string, p PromoteOpts) (string, st
 		}
 		return destDir, filepath.Join(destDir, base)
 	case "rejected":
-		destDir := filepath.Join(inboxDir, "rejected", "cycle-"+cycleOrZero(p.Cycle))
+		destDir := inboxbatch.CycleDir(filepath.Join(inboxDir, "rejected"), cycleOrZero(p.Cycle))
 		return destDir, filepath.Join(destDir, base)
 	case "retry":
 		destDir := filepath.Join(inboxDir, "retry")

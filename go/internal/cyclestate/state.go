@@ -143,6 +143,13 @@ type CycleState struct {
 	// hand a failing cycle unlimited retries. Additive omitempty: pre-field
 	// checkpoints decode as 0, which is exactly "no repair attempted yet".
 	AuditRepairAttempts int `json:"audit_repair_attempts,omitempty"`
+	// ShipRecoveryCode is the ship error code a recovery is rebuilding from
+	// (set when recoverFromShipError routes back to tdd/build, cleared by the
+	// ship latch). It lives in cycle state so the standing-audit-findings
+	// brief seeds identically on the live loop and on crash-resume — the
+	// in-process context snapshot that also carries the code does not
+	// survive a resume. Additive omitempty.
+	ShipRecoveryCode string `json:"ship_recovery_code,omitempty"`
 	// AuditDispatches counts audit DISPATCHES (not completions) this cycle. It
 	// is the round-supersession index for retiring the previous audit round's
 	// verdict artifacts (cycle-1603): CompletedPhases records only successes,
