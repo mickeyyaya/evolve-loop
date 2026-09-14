@@ -116,7 +116,24 @@ type TokenUsage struct {
 type Diagnostic struct {
 	Severity string `json:"severity"`
 	Message  string `json:"message"`
+	// Code is the machine-readable reason a phase's OWN deterministic gate
+	// stamps beside its prose (the DiagCode* vocabulary below) so the closeout
+	// and the classifier act on the class of a FAIL without regexing the
+	// sentence; empty on an agent's diagnostic. Subject names the item the
+	// code is about (a top_n card id) when there is one.
+	Code    string `json:"code,omitempty"`
+	Subject string `json:"subject,omitempty"`
 }
+
+// The triage gate's refusal codes — the reasons triage.Classify itself FAILs a
+// cycle (not the agent's verdict). TRIAGE_PROTECTED_SURFACE is the one that is
+// deterministic AND operator-owned: the FAIL closeout routes its Subject to
+// console-manual on the first hit (docs/incidents/2026-09-14-triage-refusal-poison-loop.md).
+const (
+	DiagCodeTriageProtectedSurface  = "TRIAGE_PROTECTED_SURFACE"
+	DiagCodeTriageTopNEmpty         = "TRIAGE_TOPN_EMPTY"
+	DiagCodeTriageCommitmentInvalid = "TRIAGE_COMMITMENT_INVALID"
+)
 
 // Severity vocabulary of Diagnostic — the wire values producers emit. Only
 // SeverityError entries are a phase's REASONS for a FAIL verdict; everything
@@ -140,4 +157,44 @@ func ErrorMessages(diags []Diagnostic) []string {
 		}
 	}
 	return msgs
+}
+
+// ErrorCodes is the ONE projection of a diagnostics list onto its error-severity
+// codes — deduped, order-preserving, blanks dropped — as ErrorMessages is for
+// the prose; the C1 chokepoint's signal field and the classifier read it.
+func ErrorCodes(diags []Diagnostic) []string {
+	var codes []string
+	seen := map[string]bool{}
+	for _, d := range diags {
+		if d.Severity != SeverityError || d.Code == "" || seen[d.Code] {
+			continue
+		}
+		seen[d.Code] = true
+		codes = append(codes, d.Code)
+	}
+	return codes
+}
+
+// Disposition is whose fault a coded refusal is — the ONE place that answers
+// it, beside the vocabulary (a fourth code added here decides its own fate):
+// TaskLevel charges the item's failure_count toward the ADR-0072 S5 ceiling;
+// RouteConsole hands the refused Subject to the operator on the first hit.
+type Disposition struct {
+	TaskLevel    bool
+	RouteConsole bool
+}
+
+// RefusalDisposition maps a refusal code to its disposition. A code that names
+// an item is the item's fault; TRIAGE_COMMITMENT_INVALID is stamped on pure
+// I/O faults reading the decision and must never charge the queue; an unknown
+// or empty code charges nobody (system-level, the AC4 default).
+func RefusalDisposition(code string) Disposition {
+	switch code {
+	case DiagCodeTriageProtectedSurface:
+		return Disposition{TaskLevel: true, RouteConsole: true}
+	case DiagCodeTriageTopNEmpty:
+		return Disposition{TaskLevel: true}
+	default:
+		return Disposition{}
+	}
 }

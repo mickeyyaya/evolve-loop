@@ -24,6 +24,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cycleclassify"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
@@ -34,13 +35,20 @@ import (
 // (triage-decision.json), so the seam bumps exactly the ids triage worked and
 // never a lane's whole claimed menu (PR #366 menu semantics).
 type FailureInputs struct {
-	ProjectRoot string    // repo root containing .evolve/
-	Workspace   string    // .evolve/runs/cycle-N
-	Cycle       int       // cycle number
-	Ceiling     int       // FailureThresholds.TaskRetryCeiling; <=0 disables quarantine
-	SystemLevel bool      // ADR-0072 S3: releases, never bumps, never quarantines
-	Reason      string    // ledger reason ("" = default)
-	Stderr      io.Writer // nil = discard
+	ProjectRoot string // repo root containing .evolve/
+	Workspace   string // .evolve/runs/cycle-N
+	Cycle       int    // cycle number
+	Ceiling     int    // FailureThresholds.TaskRetryCeiling; <=0 disables quarantine
+	SystemLevel bool   // ADR-0072 S3: releases, never bumps, never quarantines
+	// Refusal is the C1 record's diagnostic code when the cycle stopped on a
+	// phase gate's own refusal (cycleclassify.ClassPhaseRefusal), with the
+	// refusing message and the item it named; empty otherwise. A
+	// TRIAGE_PROTECTED_SURFACE refusal routes its Subject console-manual.
+	Refusal        string
+	RefusalDetail  string
+	RefusalSubject string
+	Reason         string    // ledger reason ("" = default)
+	Stderr         io.Writer // nil = discard
 	// Ledger is the chained-append seam the lifecycle lines go through — the
 	// root's Signal-Center-observed ledger (ADR-0101 S4a). nil lets the inbox
 	// mover fall back to its own, unobserved file ledger over the same file.
@@ -92,18 +100,40 @@ func ApplyFailure(in FailureInputs) (inboxmover.OutcomeResult, error) {
 			committed = LaneScopeIDs(in.Workspace)
 		}
 	}
-	res, err := inboxmover.ApplyCycleOutcome(inboxmover.Options{
+	opts := inboxmover.Options{
 		ProjectRoot: in.ProjectRoot,
 		Ledger:      in.Ledger,
 		Stderr:      stderr,
 		Signals:     in.Signals,
-	}, inboxmover.CycleOutcome{
+	}
+	// The per-item breaker (docs/incidents/2026-09-14-triage-refusal-poison-loop.md):
+	// a protected-surface refusal is deterministic AND operator-owned, so the
+	// refused card is routed console-manual in place — wherever the lane's
+	// claim left it — BEFORE the drain releases it, and the claim floor refuses
+	// every later lane. The route is that item's disposition and the cycle's
+	// other committed ids were never worked (triage stopped the cycle), so the
+	// drain then runs with Routed set (no bump, no park — SystemLevel stays the
+	// fact it is). A route that cannot happen has said so on the stream and
+	// falls back to the task-level bump — the S5 ceiling is the second breaker.
+	routed := false
+	if cyclestate.RefusalDisposition(in.Refusal).RouteConsole && in.RefusalSubject != "" {
+		if !containsID(committed, in.RefusalSubject) {
+			// An agent-authored id never widens what an agent may do (ADR-0073):
+			// a Subject outside this cycle's committed set is a mis-copy, not a
+			// disposition — say so and let the task-level bump run.
+			fmt.Fprintf(stderr, "[cycleoutcome] WARN: route-console skipped: refused subject %q is not in the committed set %v — task-level bump instead\n", in.RefusalSubject, committed)
+		} else if _, rerr := inboxmover.RouteConsole(opts, in.RefusalSubject, in.RefusalDetail, in.Cycle); rerr == nil {
+			routed = true
+		}
+	}
+	res, err := inboxmover.ApplyCycleOutcome(opts, inboxmover.CycleOutcome{
 		Cycle:        in.Cycle,
 		Passed:       false,
 		CommittedIDs: committed,
 		Reason:       in.Reason,
 		Ceiling:      in.Ceiling,
 		SystemLevel:  in.SystemLevel,
+		Routed:       routed,
 	})
 	if err != nil {
 		return res, fmt.Errorf("apply cycle %d failure outcome: %w", in.Cycle, err)
@@ -122,15 +152,20 @@ func FailureInputsFor(projectRoot, evolveDir, workspace string, cycle int, stder
 			failPol = fp
 		}
 	}
-	return FailureInputs{
+	cls := cycleclassify.Classify(workspace)
+	in := FailureInputs{
 		ProjectRoot: projectRoot,
 		Workspace:   workspace,
 		Cycle:       cycle,
 		Ceiling:     failPol.Thresholds.TaskRetryCeiling,
-		SystemLevel: !IsTaskLevelFailure(cycleclassify.Classify(workspace).Class),
+		SystemLevel: !IsTaskLevelResult(cls),
 		Reason:      "cycle-failure-release",
 		Stderr:      stderr,
 	}
+	if cls.Class == cycleclassify.ClassPhaseRefusal {
+		in.Refusal, in.RefusalDetail, in.RefusalSubject = cls.Marker, cls.Detail, cls.Subject
+	}
+	return in
 }
 
 // IsTaskLevelFailure reports whether the classification blames the TASK (and so
@@ -170,4 +205,27 @@ func CommittedIDsFor(workspace string) []string {
 // Delegates to the same projection used by the TDD and Build contracts.
 func LaneScopeIDs(workspace string) []string {
 	return core.LaneScopeIDs(workspace)
+}
+
+// IsTaskLevelResult is IsTaskLevelFailure over the whole classification: a
+// phase-refusal blames the task only per its code's disposition
+// (cyclestate.RefusalDisposition — the table beside the vocabulary), so an
+// I/O fault stamped TRIAGE_COMMITMENT_INVALID never charges the queue while a
+// card that named a protected surface does. Callers holding only the class
+// keep IsTaskLevelFailure, where a refusal is not task-level by default.
+func IsTaskLevelResult(cls cycleclassify.Result) bool {
+	if cls.Class == cycleclassify.ClassPhaseRefusal {
+		return cyclestate.RefusalDisposition(cls.Marker).TaskLevel
+	}
+	return IsTaskLevelFailure(cls.Class)
+}
+
+// containsID reports whether id is one of the committed ids.
+func containsID(ids []string, id string) bool {
+	for _, c := range ids {
+		if c == id {
+			return true
+		}
+	}
+	return false
 }
