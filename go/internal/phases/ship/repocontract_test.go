@@ -274,16 +274,11 @@ func TestRepoContractGate_NewlyAddedFailingTestBlocksShip(t *testing.T) {
 	}
 }
 
-// TestRepoContractGate_AddedTestSelectionIgnoresModifiedAndNonTestFiles is the
-// bounded-scope half of the same AC: the added-test detector must select
-// ONLY newly added Go `_test.go` files. A pre-existing tracked test that was
-// merely MODIFIED to go red (the fixed four packages already own modified-test
-// regressions in their own scope), a newly added NON-test `.go` file, and an
-// empty candidate set (a shipping diff that adds nothing) must never trip the
-// gate — a scanner that over-selects would false-RED an honest ship exactly as
-// badly as under-selecting lets a red one through.
-func TestRepoContractGate_AddedTestSelectionIgnoresModifiedAndNonTestFiles(t *testing.T) {
-	t.Run("modified test and non-test additions are excluded", func(t *testing.T) {
+// TestRepoContractGate_RepoWideSuiteCoversModifiedTestsAndIgnoresGreenDiffs
+// pins both sides of the widened gate: a modified tracked test is visible to
+// the repo-wide suite, while a green diff still proceeds.
+func TestRepoContractGate_RepoWideSuiteCoversModifiedTestsAndIgnoresGreenDiffs(t *testing.T) {
+	t.Run("modified tracked red test is blocked", func(t *testing.T) {
 		repo := makeRepo(t)
 		goDir := filepath.Join(repo, "go")
 		mustWrite(t, filepath.Join(goDir, "go.mod"), "module example.com/lane\n\ngo 1.24\n")
@@ -295,8 +290,8 @@ func TestRepoContractGate_AddedTestSelectionIgnoresModifiedAndNonTestFiles(t *te
 		runGit(t, repo, "add", "go")
 		runGit(t, repo, "commit", "-qm", "baseline: green suites + tracked test")
 
-		// MODIFY the already-tracked test to go red. Modified files are NOT
-		// "newly added" and must be excluded from this detector.
+		// MODIFY the already-tracked test to go red. The added-test backstop
+		// excludes it, but the repo-wide suite must still block it.
 		mustWrite(t, trackedTest, "package tracked\n\nimport \"testing\"\n\nfunc TestTracked(t *testing.T) { t.Fatal(\"now red via modification, not addition\") }\n")
 		runGit(t, repo, "add", "go/internal/tracked/tracked_test.go")
 
@@ -309,8 +304,9 @@ func TestRepoContractGate_AddedTestSelectionIgnoresModifiedAndNonTestFiles(t *te
 		mustWrite(t, filepath.Join(goDir, "internal", "reproduction", "green_test.go"), "package reproduction\n\nimport \"testing\"\n\nfunc TestNewlyAddedGreen(t *testing.T) {}\n")
 		runGit(t, repo, "add", "go/internal/reproduction/green_test.go")
 
-		if err := runRepoContractGate(context.Background(), "enforce", repo, t.TempDir(), io.Discard); err != nil {
-			t.Fatalf("a modified (not added) red test and a non-test addition must not gate the ship, got %v", err)
+		err := runRepoContractGate(context.Background(), "enforce", repo, t.TempDir(), io.Discard)
+		if err == nil || !strings.Contains(err.Error(), "TestTracked") {
+			t.Fatalf("repo-wide suite must block and name the modified tracked red test, got %v", err)
 		}
 	})
 
@@ -406,6 +402,65 @@ func TestRunNative_RepoContractGateReceivesRunWorkspace(t *testing.T) {
 	}
 }
 
+func TestRepoContractGate_ScansLaneWorktreeNotProjectRoot(t *testing.T) {
+	dirs := swapRepoContractTest(t, greenPack())
+	projectRoot, worktree := t.TempDir(), t.TempDir()
+	p := New(Config{Runner: execRunner, RepoContractGate: "enforce"})
+	_, _ = p.Run(context.Background(), core.PhaseRequest{
+		Cycle:       1673,
+		ProjectRoot: projectRoot,
+		Worktree:    worktree,
+		Workspace:   t.TempDir(),
+	})
+
+	if len(*dirs) != 1 || (*dirs)[0] != filepath.Join(worktree, "go") {
+		t.Fatalf("repo-contract gate ran in %v, want lane worktree %s", *dirs, filepath.Join(worktree, "go"))
+	}
+}
+
+func TestRepoContractGate_FallsBackToProjectRootWhenWorktreeEmpty(t *testing.T) {
+	dirs := swapRepoContractTest(t, greenPack())
+	projectRoot := t.TempDir()
+	p := New(Config{Runner: execRunner, RepoContractGate: "enforce"})
+	_, _ = p.Run(context.Background(), core.PhaseRequest{
+		Cycle:       1673,
+		ProjectRoot: projectRoot,
+		Workspace:   t.TempDir(),
+	})
+
+	if len(*dirs) != 1 || (*dirs)[0] != filepath.Join(projectRoot, "go") {
+		t.Fatalf("repo-contract gate ran in %v, want project-root fallback %s", *dirs, filepath.Join(projectRoot, "go"))
+	}
+}
+
+func TestRepoContractGate_ProjectRootRedDoesNotBlockAGreenWorktree(t *testing.T) {
+	projectRoot, worktree := t.TempDir(), t.TempDir()
+	var dirs []string
+	prev := repoContractTestFn
+	t.Cleanup(func() { repoContractTestFn = prev })
+	repoContractTestFn = func(_ context.Context, moduleDir string, _ io.Writer) packOutcome {
+		dirs = append(dirs, moduleDir)
+		if moduleDir == filepath.Join(projectRoot, "go") {
+			return redPack("project.TestPreExistingRed")
+		}
+		return greenPack()
+	}
+
+	p := New(Config{Runner: execRunner, RepoContractGate: "enforce"})
+	_, err := p.Run(context.Background(), core.PhaseRequest{
+		Cycle:       1673,
+		ProjectRoot: projectRoot,
+		Worktree:    worktree,
+		Workspace:   t.TempDir(),
+	})
+	if se, ok := core.AsShipError(err); ok && se.Code == core.CodeRepoContractGate {
+		t.Fatalf("project-root-only red blocked a green lane: %v", err)
+	}
+	if len(dirs) != 1 || dirs[0] != filepath.Join(worktree, "go") {
+		t.Fatalf("repo-contract gate ran in %v, want only green lane worktree %s", dirs, filepath.Join(worktree, "go"))
+	}
+}
+
 // TestPhaseRunNative_NewlyAddedFailingTestPreventsRun is the production-path
 // proof for the added-test-red-gate: a REAL newly added failing test, driven
 // through Phase.runNative (not runRepoContractGate directly), must stop the
@@ -451,6 +506,40 @@ func TestPhaseRunNative_NewlyAddedFailingTestPreventsRun(t *testing.T) {
 	}
 	if _, statErr := os.Stat(filepath.Join(ws, scanLogName)); statErr != nil {
 		t.Fatalf("scan log must land in the run workspace even on the real-repo path: %v", statErr)
+	}
+}
+
+func TestRepoContractGate_UsesRepoWideSuite(t *testing.T) {
+	if len(repoContractPackages) != 1 || repoContractPackages[0] != "./..." {
+		t.Fatalf("repo-contract packages = %v, want the CI-equivalent ./... suite", repoContractPackages)
+	}
+}
+
+func TestRepoContractGate_RepoWideSuiteBlocksUntouchedPackageRegression(t *testing.T) {
+	repo := makeRepo(t)
+	goDir := filepath.Join(repo, "go")
+	mustWrite(t, filepath.Join(goDir, "go.mod"), "module example.com/lane\n\ngo 1.24\n")
+	for _, pkg := range []string{"phasespec", "profiles", "phasecoherence", "routingtest"} {
+		mustWrite(t, filepath.Join(goDir, "internal", pkg, "pass_test.go"), "package "+pkg+"\n\nimport \"testing\"\n\nfunc TestPass(t *testing.T) {}\n")
+	}
+	mustWrite(t, filepath.Join(goDir, "internal", "deliverable", "contract.go"), "package deliverable\n\nconst Contract = \"new\"\n")
+	mustWrite(t, filepath.Join(goDir, "internal", "deliverable", "contract_test.go"), "package deliverable\n\nimport \"testing\"\n\nfunc TestUntouchedPackageAssertsSupersededContract(t *testing.T) { if Contract != \"old\" { t.Fatal(\"superseded contract\") } }\n")
+	runGit(t, repo, "add", "go")
+	runGit(t, repo, "commit", "-qm", "commit tracked red regression")
+
+	mustWrite(t, filepath.Join(goDir, "internal", "phasespec", "lane.go"), "package phasespec\n")
+	runGit(t, repo, "add", "go/internal/phasespec/lane.go")
+
+	err := runRepoContractGate(context.Background(), "enforce", repo, t.TempDir(), io.Discard)
+	if err == nil {
+		t.Fatal("repo-contract gate passed despite a tracked red test in untouched internal/deliverable")
+	}
+	se, ok := shiperr.AsShipError(err)
+	if !ok || se.Code != shiperr.CodeRepoContractGate {
+		t.Fatalf("gate error = %v, want code %q", err, shiperr.CodeRepoContractGate)
+	}
+	if !strings.Contains(err.Error(), "TestUntouchedPackageAssertsSupersededContract") {
+		t.Fatalf("gate error does not name the untouched failing test: %v", err)
 	}
 }
 

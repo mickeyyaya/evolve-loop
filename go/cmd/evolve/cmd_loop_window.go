@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -49,6 +50,9 @@ func (b *loopBatchCoordinator) prepareIteration(
 	runUsageProbe(b.cfg.ProjectRoot, b.cfg.EvolveDir, b.cycleEnv, b.stderr)
 	if _, halt := syncMainFromOriginAtWaveBoundary(b.ctx, b.cfg.ProjectRoot, b.stderr); halt != nil {
 		b.result.StopReason = "plane_diverged_halt"
+		if errors.Is(halt, errMainCIRed) {
+			b.result.StopReason = "main_ci_red_halt"
+		}
 		emitLoopHalt(b.deps.Signals, 0, "loopBatchCoordinator.prepareIteration", CodeLoopHalt, halt.Error(), map[string]string{"stop_reason": b.result.StopReason})
 		b.result.emitFatal(b.stdout, b.stderr, b.cfg, 0)
 		return batchDecision{flow: batchReturn, exitCode: 2}

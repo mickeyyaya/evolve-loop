@@ -14,6 +14,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 func gitrun(t *testing.T, dir string, args ...string) string {
@@ -32,6 +34,7 @@ func gitrun(t *testing.T, dir string, args ...string) string {
 // syncFixture: bare origin with one commit on main; runtime clone on main.
 func syncFixture(t *testing.T) (origin, runtime string) {
 	t.Helper()
+	installCheckRunsGH(t, `{"total_count":1,"check_runs":[{"name":"build+test","status":"completed","conclusion":"success"}]}`, false)
 	seed := t.TempDir()
 	gitrun(t, seed, "init", "-q", "-b", "main")
 	if err := os.WriteFile(filepath.Join(seed, "f.txt"), []byte("v1"), 0o644); err != nil {
@@ -58,6 +61,99 @@ func originAdvance(t *testing.T, origin string) {
 	gitrun(t, c, "add", "g.txt")
 	gitrun(t, c, "commit", "-q", "-m", "c2")
 	gitrun(t, c, "push", "-q", "origin", "main")
+}
+
+func installCheckRunsGH(t *testing.T, response string, unavailable bool) string {
+	t.Helper()
+	dir := t.TempDir()
+	marker := filepath.Join(dir, "called")
+	body := "#!/bin/sh\nprintf called > \"$GH_CALL_MARKER\"\n"
+	if unavailable {
+		body += "printf unavailable >&2\nexit 1\n"
+	} else {
+		body += "printf '%s' \"$GH_CHECK_RUNS_RESPONSE\"\n"
+	}
+	path := filepath.Join(dir, "gh")
+	if err := os.WriteFile(path, []byte(body), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GH_CALL_MARKER", marker)
+	t.Setenv("GH_CHECK_RUNS_RESPONSE", response)
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	return marker
+}
+
+func TestMainCIAtWaveBoundary_RedCheckRunHalts(t *testing.T) {
+	_, runtime := syncFixture(t)
+	installCheckRunsGH(t, `{"total_count":1,"check_runs":[{"name":"build+test","status":"completed","conclusion":"failure"}]}`, false)
+
+	var warn bytes.Buffer
+	_, halt := syncMainFromOriginAtWaveBoundary(context.Background(), runtime, &warn)
+	if halt == nil || !strings.Contains(halt.Error(), "main CI red") {
+		t.Fatalf("completed failing origin/main check-run must halt, got halt=%v warn=%q", halt, warn.String())
+	}
+}
+
+func TestMainCIAtWaveBoundary_GreenProceeds(t *testing.T) {
+	_, runtime := syncFixture(t)
+	marker := installCheckRunsGH(t, `{"total_count":1,"check_runs":[{"name":"build+test","status":"completed","conclusion":"success"}]}`, false)
+
+	var warn bytes.Buffer
+	_, halt := syncMainFromOriginAtWaveBoundary(context.Background(), runtime, &warn)
+	if halt != nil {
+		t.Fatalf("green origin/main must proceed: %v", halt)
+	}
+	if _, err := os.Stat(marker); err != nil {
+		t.Fatalf("wave boundary did not query origin/main check-runs: %v", err)
+	}
+}
+
+func TestMainCIAtWaveBoundary_UnavailableWarnsWithoutFalseRed(t *testing.T) {
+	_, runtime := syncFixture(t)
+	installCheckRunsGH(t, "", true)
+
+	var warn bytes.Buffer
+	_, halt := syncMainFromOriginAtWaveBoundary(context.Background(), runtime, &warn)
+	if halt != nil {
+		t.Fatalf("unavailable check-run API is not evidence main is red: %v", halt)
+	}
+	if !strings.Contains(warn.String(), "main CI status unavailable") {
+		t.Fatalf("unavailable check-run API must warn distinctly, got %q", warn.String())
+	}
+}
+
+func TestMainCIAtWaveBoundary_RedHaltsBeforeAnyLaneDispatch(t *testing.T) {
+	_, runtime := syncFixture(t)
+	evolveDir := filepath.Join(runtime, ".evolve")
+	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	installCheckRunsGH(t, `{"total_count":1,"check_runs":[{"name":"build+test","status":"completed","conclusion":"failure"}]}`, false)
+
+	var stdout, stderr bytes.Buffer
+	b := &loopBatchCoordinator{
+		ctx:      context.Background(),
+		cfg:      loopConfig{ProjectRoot: runtime, EvolveDir: evolveDir},
+		cycleEnv: map[string]string{"EVOLVE_CLI_HEALTH": "0"},
+		result:   &loopResult{},
+		stdout:   &stdout,
+		stderr:   &stderr,
+	}
+	b.deps.Signals = newRootSignalCenter(runtime, evolveDir, &stderr)
+	fleetConfig := policy.FleetConfig{Count: 2, Concurrency: 2, Scheduling: "wave"}
+	waveBinary := ""
+	decision := b.prepareIteration(0, &fleetConfig, &waveBinary, 0)
+	b.deps.Signals.Flush()
+
+	if decision.flow != batchReturn || decision.exitCode != 2 {
+		t.Fatalf("red main must return before dispatch, got decision=%+v stderr=%q", decision, stderr.String())
+	}
+	if b.result.StopReason != "main_ci_red_halt" {
+		t.Fatalf("stop reason = %q, want main_ci_red_halt", b.result.StopReason)
+	}
+	if waveBinary != "" {
+		t.Fatalf("red-main boundary initialized a lane binary before halt: %q", waveBinary)
+	}
 }
 
 func TestSyncMainAtWaveBoundary_FastForwards(t *testing.T) {

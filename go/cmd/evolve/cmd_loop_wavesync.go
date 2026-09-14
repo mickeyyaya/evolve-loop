@@ -20,8 +20,11 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -33,6 +36,50 @@ import (
 // waveSyncTimeout bounds the fetch — a wedged network must delay one wave by
 // at most this, never hang the boundary.
 const waveSyncTimeout = 60 * time.Second
+
+var errMainCIRed = errors.New("main CI red")
+
+type mainCheckRuns struct {
+	CheckRuns []struct {
+		Name       string `json:"name"`
+		Status     string `json:"status"`
+		Conclusion string `json:"conclusion"`
+	} `json:"check_runs"`
+}
+
+// mainCIRedForSHA reads the latest origin/main check-runs through the gh CLI.
+// An unavailable API is returned as an error for the caller's loud fail-open
+// path; only a completed failing conclusion is positive evidence of RED.
+func mainCIRedForSHA(ctx context.Context, projectRoot, sha string) (bool, []string, error) {
+	cmd := exec.CommandContext(ctx, "gh", "api", "--method", "GET",
+		"repos/{owner}/{repo}/commits/"+sha+"/check-runs", "-f", "filter=latest", "-f", "per_page=100")
+	cmd.Dir = projectRoot
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return false, nil, fmt.Errorf("gh api check-runs: %w: %s", err, strings.TrimSpace(string(out)))
+	}
+	var payload mainCheckRuns
+	if err := json.Unmarshal(out, &payload); err != nil {
+		return false, nil, fmt.Errorf("decode check-runs: %w", err)
+	}
+	completed := 0
+	var failed []string
+	for _, run := range payload.CheckRuns {
+		if run.Status != "completed" {
+			continue
+		}
+		completed++
+		switch run.Conclusion {
+		case "success", "neutral", "skipped":
+		default:
+			failed = append(failed, run.Name+"="+run.Conclusion)
+		}
+	}
+	if completed == 0 {
+		return false, nil, fmt.Errorf("no completed check-runs visible for %.12s", sha)
+	}
+	return len(failed) > 0, failed, nil
+}
 
 // syncMainFromOriginAtWaveBoundary fetches origin and fast-forwards a
 // checked-out `main` onto origin/main. synced is true only when the tree
@@ -63,6 +110,15 @@ func syncMainFromOriginAtWaveBoundary(ctx context.Context, projectRoot string, w
 	if err != nil {
 		fmt.Fprintf(warn, "[loop] WARN: wave-boundary sync: %v — planning against the local main\n", err)
 		return false, nil
+	}
+	if rel.Kind != gitexec.RelationDiverged {
+		red, failed, err := mainCIRedForSHA(sctx, projectRoot, rel.Remote)
+		switch {
+		case err != nil:
+			fmt.Fprintf(warn, "[loop] WARN: wave-boundary sync: main CI status unavailable (%v) — proceeding without false-green or false-red classification\n", err)
+		case red:
+			return false, fmt.Errorf("%w at origin/main %.12s: %s", errMainCIRed, rel.Remote, strings.Join(failed, ", "))
+		}
 	}
 	switch rel.Kind {
 	case gitexec.RelationCurrent:

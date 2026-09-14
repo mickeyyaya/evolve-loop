@@ -11,9 +11,8 @@ package ship
 // catch them — the guard suites scan repo-wide state (on-disk catalogs,
 // tracked profiles, rendering parity) that a config-only diff never selects.
 //
-// The pack runs the four guard packages in the lane worktree BEFORE the ship
-// binds/pushes. They are existing deterministic tests with FP≈0 by
-// construction: if one fails here, main's next run fails identically. A RED
+// The pack runs CI's exact Go suite in the lane worktree BEFORE the ship
+// binds/pushes. If it fails here, main's next run fails identically. A RED
 // pack fails the ship closed with the dedicated CodeRepoContractGate
 // (mirroring CodeManifestGate, cycle-1064) so the lane FAILs honestly in
 // place instead of redding main. Dial: policy.json gates.repo_contract_gate
@@ -52,14 +51,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/shiperr"
 )
 
-// repoContractPackages are the repo-wide guard suites whose breakage turned
-// main red. Kept to the incident-proven set deliberately: every addition
-// costs every ship wall-time and must carry the same FP≈0 property.
+// repoContractPackages is CI's exact Go test selection. Lane-local changed
+// package tests cannot prove that an untouched package still compiles or that
+// its tests accept a changed cross-package contract.
 var repoContractPackages = []string{
-	"./internal/phasespec/...",
-	"./internal/profiles/...",
-	"./internal/phasecoherence/...",
-	"./internal/routingtest/...",
+	"./...",
 }
 
 // scanLogName is the run-dir artifact every scanner-pack run is teed to —
@@ -217,36 +213,36 @@ func runRepoContractGate(ctx context.Context, gate, projectRoot, workspace strin
 		defer func() { _ = scan.Close() }()
 		out = io.MultiWriter(stderr, scan)
 	}
-	// Header first, so the artifact is non-empty and self-identifying even on
-	// a green run — the green baseline is what disproves a false RED.
+	groups, excluded, discoveryErr := addedTestPackageGroups(projectRoot)
+	if discoveryErr != nil {
+		fmt.Fprintf(out, "[ship] repo-contract added-test backstop: discovery unavailable (%v) — skipped; no added tests were scanned\n", discoveryErr)
+	} else {
+		for _, path := range excluded {
+			fmt.Fprintf(out, "[ship] repo-contract gate: EXCLUDED %s (requires_tmux or another build constraint unavailable on this host; backstop required)\n", path)
+		}
+		for _, group := range groups {
+			fmt.Fprintf(out, "[ship] repo-contract added-test backstop: go test -json -count=1")
+			if len(group.tags) > 0 {
+				fmt.Fprintf(out, " -tags %s", strings.Join(group.tags, ","))
+			}
+			fmt.Fprintf(out, " %s\n", strings.Join(group.packages, " "))
+			if err := runClassifiedPack(ctx, out, workspace, "added-test backstop", func() packOutcome {
+				return runRepoContractPackagesWithTags(ctx, moduleDir, out, group.packages, group.tags)
+			}); err != nil {
+				return err
+			}
+		}
+	}
+
+	// The repo-wide suite follows the added-test backstop so a newly added RED
+	// keeps its specific attribution instead of being reported as a generic CI
+	// failure. The header makes even a green scan artifact self-identifying.
 	fmt.Fprintf(out, "[ship] repo-contract scanner pack: go test -json -count=1 %s (module %s)\n",
 		strings.Join(repoContractPackages, " "), moduleDir)
-
 	if err := runClassifiedPack(ctx, out, workspace, "scanner pack", func() packOutcome {
 		return repoContractTestFn(ctx, moduleDir, out)
 	}); err != nil {
 		return err
-	}
-
-	groups, excluded, discoveryErr := addedTestPackageGroups(projectRoot)
-	if discoveryErr != nil {
-		fmt.Fprintf(out, "[ship] repo-contract added-test backstop: discovery unavailable (%v) — skipped; no added tests were scanned\n", discoveryErr)
-		return nil
-	}
-	for _, path := range excluded {
-		fmt.Fprintf(out, "[ship] repo-contract gate: EXCLUDED %s (requires_tmux or another build constraint unavailable on this host; backstop required)\n", path)
-	}
-	for _, group := range groups {
-		fmt.Fprintf(out, "[ship] repo-contract added-test backstop: go test -json -count=1")
-		if len(group.tags) > 0 {
-			fmt.Fprintf(out, " -tags %s", strings.Join(group.tags, ","))
-		}
-		fmt.Fprintf(out, " %s\n", strings.Join(group.packages, " "))
-		if err := runClassifiedPack(ctx, out, workspace, "added-test backstop", func() packOutcome {
-			return runRepoContractPackagesWithTags(ctx, moduleDir, out, group.packages, group.tags)
-		}); err != nil {
-			return err
-		}
 	}
 	return nil
 }
@@ -414,7 +410,7 @@ func collectBuildTags(expr constraint.Expr, tags map[string]bool) {
 func contractRed(packName string, o packOutcome) error {
 	detail := "added-test backstop"
 	if packName == "scanner pack" {
-		detail = "fixed scanner pack (phasespec, profiles, phasecoherence, routingtest)"
+		detail = "repo-wide scanner pack (go test -count=1 ./...)"
 	}
 	return shiperr.NewShipError(shiperr.CodeRepoContractGate, shiperr.ShipClassPrecondition, shiperr.StageAtomicShip,
 		fmt.Sprintf("repo-contract %s RED in the lane worktree (%v) — failing: %s — pushing would red main; land the green fix or use an explicit t.Skip for an intentionally red-first reproducer",

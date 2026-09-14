@@ -185,7 +185,11 @@ func (p *Phase) runNative(ctx context.Context, req core.PhaseRequest, msg string
 	// (ship-repocontract-scan.log) on green AND red runs. Threading it here is
 	// the load-bearing half — a log seam reachable only from a test is dead
 	// code (the cycle-1064 manifest-gate anti-trap, applied to this parameter).
-	if gerr := runRepoContractGate(ctx, p.repoContractGate, req.ProjectRoot, req.Workspace, os.Stderr); gerr != nil {
+	gateRoot := req.Worktree
+	if gateRoot == "" {
+		gateRoot = req.ProjectRoot
+	}
+	if gerr := runRepoContractGate(ctx, p.repoContractGate, gateRoot, req.Workspace, os.Stderr); gerr != nil {
 		return core.PhaseResponse{}, fmt.Errorf("ship repo-contract gate: %w", gerr)
 	}
 	opts := p.shipOptions(req, msg)
