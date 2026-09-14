@@ -3,7 +3,9 @@ package fixtures_test
 import (
 	"context"
 	"errors"
+	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 
@@ -137,6 +139,81 @@ func TestFakeBridge_MaterializesArtifact(t *testing.T) {
 	fixtures.WantFileContains(t, art, "hello")
 }
 
+func TestFakeBridge_ArtifactWriteFailureIsReported(t *testing.T) {
+	t.Parallel()
+	scriptedErr := errors.New("scripted bridge failure")
+	for _, tc := range []struct {
+		name         string
+		parentIsFile bool
+		err          error
+	}{
+		{"parent_is_file", true, nil},
+		{"target_is_directory", false, nil},
+		{"parent_is_file_with_scripted_error", true, scriptedErr},
+		{"target_is_directory_with_scripted_error", false, scriptedErr},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "blocked")
+			if tc.parentIsFile {
+				fixtures.MustWrite(t, path, "keep")
+				path = filepath.Join(path, "report.md")
+			} else {
+				fixtures.RequireNoErr(t, os.Mkdir(path, 0o755), "mkdir target")
+			}
+			want := core.BridgeResponse{Stdout: "scripted", ExitCode: 3}
+			fb := &fixtures.FakeBridge{Resp: want, Err: tc.err, WriteArtifact: "undelivered"}
+
+			got, err := fb.Launch(context.Background(), core.BridgeRequest{ArtifactPath: path})
+
+			var pathErr *os.PathError
+			if !errors.As(err, &pathErr) {
+				t.Fatalf("artifact materialization error = %v, want filesystem error", err)
+			}
+			if tc.err != nil && !errors.Is(err, tc.err) {
+				t.Errorf("artifact materialization error = %v, want scripted error %v too", err, tc.err)
+			}
+			if !reflect.DeepEqual(got, want) || !reflect.DeepEqual(fb.Resp, want) {
+				t.Errorf("failed delivery changed response: returned %+v, stored %+v, want %+v", got, fb.Resp, want)
+			}
+		})
+	}
+}
+
+func TestFakeBridge_ScriptedResponsePreserved(t *testing.T) {
+	t.Parallel()
+	for _, mode := range []string{"empty_artifact", "empty_path", "artifact_with_error"} {
+		t.Run(mode, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "report.md")
+			fixtures.MustWrite(t, path, "existing")
+			scriptedErr := errors.New("scripted bridge failure")
+			want := core.BridgeResponse{Stdout: "scripted", ExitCode: 3}
+			fb := &fixtures.FakeBridge{Resp: want, Err: scriptedErr, WriteArtifact: "# exact\n\n"}
+			req := core.BridgeRequest{ArtifactPath: path}
+			switch mode {
+			case "empty_artifact":
+				fb.WriteArtifact = ""
+			case "empty_path":
+				req.ArtifactPath = ""
+			case "artifact_with_error":
+				want.Stdout = fb.WriteArtifact
+			}
+
+			got, err := fb.Launch(context.Background(), req)
+
+			if !errors.Is(err, scriptedErr) || !reflect.DeepEqual(got, want) {
+				t.Fatalf("Launch = (%+v, %v), want (%+v, %v)", got, err, want, scriptedErr)
+			}
+			wantFile := "existing"
+			if mode == "artifact_with_error" {
+				wantFile = fb.WriteArtifact
+			}
+			if gotFile := fixtures.MustRead(t, path); gotFile != wantFile {
+				t.Errorf("artifact bytes = %q, want %q", gotFile, wantFile)
+			}
+		})
+	}
+}
+
 func TestWorkspaceBuilder_SeedsStateCycleStateAndFiles(t *testing.T) {
 	t.Parallel()
 	ws := fixtures.NewWorkspace(t).
@@ -158,11 +235,10 @@ func TestFixedClock_AdvancesLinearly(t *testing.T) {
 	t.Parallel()
 	start := time.Unix(1_700_000_000, 0)
 	clock := fixtures.FixedClock(start, 200*time.Millisecond)
-	if !clock().Equal(start) {
-		t.Fatal("first call should equal start")
-	}
-	if got := clock(); !got.Equal(start.Add(200 * time.Millisecond)) {
-		t.Fatalf("second call = %v, want start+200ms", got)
+	for call, offset := range []time.Duration{0, 200 * time.Millisecond, 400 * time.Millisecond, 600 * time.Millisecond} {
+		if got, want := clock(), start.Add(offset); !got.Equal(want) {
+			t.Fatalf("call %d = %v, want %v", call+1, got, want)
+		}
 	}
 }
 

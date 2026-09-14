@@ -100,7 +100,7 @@ func TestC672_004_GenuineSignalsSurvive(t *testing.T) {
 		"TestC672_004_TickGenuineExhaustionStillEscalates|TestC654_004_EchoedExhaustionStrippedGenuineSurvives"); !ok {
 		t.Errorf("genuine CLI exhaustion no longer escalates — the echo-veto wiring over-corrected (bridge):\n%s", out)
 	}
-	if ok, out := runGoTest(t, phasestreamPkg, "TestC654_003_PromptEchoNotEmittedGenuineEmitted"); !ok {
+	if ok, out := runGoTest(t, phasestreamPkg, "TestClassifier_SetInjectedPrompt"); !ok {
 		t.Errorf("cycle-654 normalizer regression arm broke (phasestream):\n%s", out)
 	}
 	if ok, out := runGoTest(t, classifyPkg, "TestC654_002_GenuineInfraStillVetoes"); !ok {

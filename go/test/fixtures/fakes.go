@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
@@ -62,7 +63,7 @@ func (f *FakeStorage) ReadState(context.Context) (core.State, error) {
 	if f.ReadStateErr != nil {
 		return core.State{}, f.ReadStateErr
 	}
-	return f.State, nil
+	return cloneState(f.State), nil
 }
 
 func (f *FakeStorage) WriteState(_ context.Context, s core.State) error {
@@ -71,8 +72,8 @@ func (f *FakeStorage) WriteState(_ context.Context, s core.State) error {
 	if f.WriteStateErr != nil {
 		return f.WriteStateErr
 	}
-	f.State = s
-	f.StateLog = append(f.StateLog, s)
+	f.State = cloneState(s)
+	f.StateLog = append(f.StateLog, cloneState(s))
 	return nil
 }
 
@@ -82,7 +83,7 @@ func (f *FakeStorage) ReadCycleState(context.Context) (core.CycleState, error) {
 	if f.ReadCycleStateErr != nil {
 		return core.CycleState{}, f.ReadCycleStateErr
 	}
-	return f.CycleState, nil
+	return cloneCycleState(f.CycleState), nil
 }
 
 func (f *FakeStorage) WriteCycleState(_ context.Context, cs core.CycleState) error {
@@ -95,12 +96,34 @@ func (f *FakeStorage) WriteCycleState(_ context.Context, cs core.CycleState) err
 	if f.WriteCycleStateFailAt > 0 && f.writeCSCalls == f.WriteCycleStateFailAt {
 		return errors.New("fixtures: WriteCycleState forced fail at N")
 	}
-	f.CycleState = cs
-	// Defensive copy of the slice — the orchestrator keeps mutating cs.
-	csCopy := cs
-	csCopy.CompletedPhases = append([]string(nil), cs.CompletedPhases...)
-	f.CycleStateLog = append(f.CycleStateLog, csCopy)
+	f.CycleState = cloneCycleState(cs)
+	f.CycleStateLog = append(f.CycleStateLog, cloneCycleState(cs))
 	return nil
+}
+
+// Match the filesystem adapter's independent values without JSON-normalizing
+// the fake's scripted state or sharing mutable slices with its write history.
+func cloneState(s core.State) core.State {
+	s.FailedAt = cloneFailures(s.FailedAt)
+	s.CarryoverTodos = slices.Clone(s.CarryoverTodos)
+	s.TriageThroughput = slices.Clone(s.TriageThroughput)
+	return s
+}
+
+func cloneCycleState(cs core.CycleState) core.CycleState {
+	cs.CompletedPhases = slices.Clone(cs.CompletedPhases)
+	cs.AuditFailReasons = slices.Clone(cs.AuditFailReasons)
+	cs.ShipFailReasons = slices.Clone(cs.ShipFailReasons)
+	cs.FailedAt = cloneFailures(cs.FailedAt)
+	return cs
+}
+
+func cloneFailures(failures []core.FailedRecord) []core.FailedRecord {
+	cloned := slices.Clone(failures)
+	for i := range cloned {
+		cloned[i].Defects = slices.Clone(cloned[i].Defects)
+	}
+	return cloned
 }
 
 func (f *FakeStorage) AcquireLock(context.Context) (func() error, error) {
@@ -256,8 +279,12 @@ func (f *FakeBridge) Launch(_ context.Context, req core.BridgeRequest) (core.Bri
 	defer f.mu.Unlock()
 	f.GotReq = req
 	if f.WriteArtifact != "" && req.ArtifactPath != "" {
-		_ = os.MkdirAll(filepath.Dir(req.ArtifactPath), 0o755)
-		_ = os.WriteFile(req.ArtifactPath, []byte(f.WriteArtifact), 0o644)
+		if err := os.MkdirAll(filepath.Dir(req.ArtifactPath), 0o755); err != nil {
+			return f.Resp, errors.Join(err, f.Err)
+		}
+		if err := os.WriteFile(req.ArtifactPath, []byte(f.WriteArtifact), 0o644); err != nil {
+			return f.Resp, errors.Join(err, f.Err)
+		}
 		f.Resp.Stdout = f.WriteArtifact
 	}
 	return f.Resp, f.Err
