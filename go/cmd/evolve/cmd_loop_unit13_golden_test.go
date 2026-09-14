@@ -37,6 +37,7 @@ const (
 )
 
 var u13RFC3339 = regexp.MustCompile(`\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z`)
+var u13ReadDirOp = regexp.MustCompile(`\b[a-z_]+ (\S+): not a directory`)
 
 func u13Golden(t *testing.T, dir, name string) string {
 	t.Helper()
@@ -51,9 +52,10 @@ func u13Golden(t *testing.T, dir, name string) string {
 func u13Template(s, root, evolveDir string) string {
 	s = strings.ReplaceAll(s, evolveDir, "{EVOLVE_DIR}")
 	s = strings.ReplaceAll(s, root, "{ROOT}")
-	// The linux ReadDir verb → the darwin spelling the goldens keep (see
+	// The os.ReadDir fault's PathError Op is Go-version- and OS-dependent
+	// (`open` / `fdopendir` / `readdirent`); the goldens keep `open` (see
 	// loopchain's template).
-	s = strings.ReplaceAll(s, "readdirent ", "open ")
+	s = u13ReadDirOp.ReplaceAllString(s, "open $1: not a directory")
 	return u13RFC3339.ReplaceAllString(s, "{TS}")
 }
 

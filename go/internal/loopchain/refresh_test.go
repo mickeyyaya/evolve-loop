@@ -19,8 +19,9 @@ import (
 )
 
 var (
-	fixedNow = time.Date(2026, 9, 14, 10, 0, 0, 0, time.UTC)
-	rfc3339  = regexp.MustCompile(`\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z`)
+	fixedNow  = time.Date(2026, 9, 14, 10, 0, 0, 0, time.UTC)
+	rfc3339   = regexp.MustCompile(`\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z`)
+	readDirOp = regexp.MustCompile(`\b[a-z_]+ (\S+): not a directory`)
 )
 
 const commit = "cafebabe1234deadbeef"
@@ -68,11 +69,11 @@ func golden(t *testing.T, name string) string {
 func template(s, root, evolveDir string) string {
 	s = strings.ReplaceAll(s, evolveDir, "{EVOLVE_DIR}")
 	s = strings.ReplaceAll(s, root, "{ROOT}")
-	// os.ReadDir on a file spells the fault `open <p>: not a directory` on
-	// darwin and `readdirent <p>: not a directory` on linux; the goldens keep
-	// the darwin verb (CI red on ubuntu-latest, PR #599). Same map as
-	// cmd/evolve's u13Template.
-	s = strings.ReplaceAll(s, "readdirent ", "open ")
+	// The os.ReadDir fault is a *fs.PathError whose Op is Go-version- and
+	// OS-dependent (`open` darwin/Go 1.27, `fdopendir` darwin/Go 1.23,
+	// `readdirent` linux — PR #599 CI); the goldens keep `open`. Same
+	// canonicalization as cmd/evolve's u13Template.
+	s = readDirOp.ReplaceAllString(s, "open $1: not a directory")
 	return rfc3339.ReplaceAllString(s, "{TS}")
 }
 
