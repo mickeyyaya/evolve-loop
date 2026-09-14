@@ -34,10 +34,48 @@ func (g materializationGate) check(in core.ReviewInput) (string, bool) {
 		parts = append(parts, "scout materialized evals without a [code] grader for selected slug(s): "+strings.Join(ungraded, ", ")+
 			" — an eval that only asserts existence caps nothing, and the lane's own durability test refuses it at the ship gate (cycle 1679)")
 	}
+	// Only a CERTAIN violation blocks. The advisory below is appended AFTER this
+	// is latched so a parse-miss can never turn into a hard block, and a real
+	// missing eval can never be downgraded by one.
+	block := len(parts) > 0
+	if adv := g.parseMissAdvisory(in); adv != "" {
+		parts = append(parts, adv)
+	}
 	if len(parts) == 0 {
 		return "", false
 	}
-	return strings.Join(parts, "; "), true
+	return strings.Join(parts, "; "), block
+}
+
+// parseMissAdvisory returns a non-blocking note when scout-report.md has a
+// "## Selected Tasks" section holding real content that yielded zero slugs.
+//
+// missingSlugs cannot see this: zero slugs is its fail-open path, byte-identical
+// to a converged cycle that claimed nothing. Surfacing it here is the only
+// channel that reaches an operator or agent at all — Gate A's emitted log line —
+// and it stays advisory on purpose: a hard block on every zero-slug report would
+// false-block every genuine convergence cycle (see SelectedTasksParseMiss).
+func (materializationGate) parseMissAdvisory(in core.ReviewInput) string {
+	report, ok := readScoutReport(in.Workspace)
+	if !ok || !SelectedTasksParseMiss(report) {
+		return ""
+	}
+	// What Gate A actually checked depends on whether the "## Decision Trace"
+	// still yielded slugs. On a parse-miss the Selected Tasks body contributes
+	// none, so a non-empty union here came from the trace alone and the gate did
+	// check those — measured 2026-09-15, 3 of the 59 real cycle-16* fires. Saying
+	// it checked NOTHING there is simply false (audit L1, cycle 1685).
+	scope := "Gate A therefore checked NOTHING this cycle: a selected task with no eval file " +
+		"would pass here and surface at audit instead (cycle-1570)"
+	if traced := SelectedSlugs(report); len(traced) > 0 {
+		scope = "Gate A therefore checked ONLY the slug(s) the \"## Decision Trace\" supplied (" +
+			strings.Join(traced, ", ") + "); anything claimed solely in the drifted section went " +
+			"unchecked and would surface at audit instead (cycle-1570)"
+	}
+	return "ADVISORY (non-blocking): scout-report.md's \"## Selected Tasks\" section has content but " +
+		"NO slug parsed out of it — a parse-miss, not convergence. " + scope + ". " +
+		"Restate each slug as a \"- **Slug:** <kebab-case>\" bullet inside that section, " +
+		"or as a \"## Decision Trace\" entry with finalDecision \"selected\""
 }
 
 // ungradedSlugs returns the SELECTED slugs whose eval exists but carries no
