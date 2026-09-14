@@ -416,24 +416,37 @@ type Config struct {
 	// never set to a bare literal here (standing rule: phase-settings-from-config).
 	CompactPrompts bool
 	// Signals is the accessor of the root's Signal Center the defect ledger
-	// reports through (ADR-0103 unit 09); nil keeps the ledger's Null Object.
+	// (ADR-0103 unit 09) and the CI-parity gates (unit 14) report through, read
+	// at every use. nil = the Null Object: the registry root (evolve phase
+	// audit), New(Config{}) and the tests emit nothing; the loop root passes
+	// WithSignals.
 	Signals func() *signalcenter.Center
 }
 
-// Option configures the production Config the tail constructor builds
-// (functional options); WithSignals is the one the composition root passes.
+// Option configures the production Config before the phase is built.
 type Option func(*Config)
 
-// WithSignals installs the Signal Center accessor the defect ledger reports
-// through — read live at every use.
+// WithSignals installs the Signal Center accessor the defect ledger and the
+// CI-parity gates report through (the loop root's Center; deliverable.WithSignals
+// precedent).
 func WithSignals(c func() *signalcenter.Center) Option {
 	return func(cfg *Config) { cfg.Signals = c }
 }
 
-type Phase struct{ *runner.BaseRunner }
+type Phase struct {
+	*runner.BaseRunner
+	signals func() *signalcenter.Center // unit 14 (ADR-0103): the CI-parity gates' Center accessor
+}
+
+// SignalsWired reports whether the CI-parity gates of this phase reach a
+// Signal Center — the roots' wiring proof, through the leaf.
+func (p *Phase) SignalsWired() bool {
+	return ciParity{signals: p.signals}.wiredGates().SignalsWired()
+}
 
 func New(c Config) *Phase {
 	return &Phase{
+		signals: c.Signals,
 		BaseRunner: runner.New(runner.Options{
 			Hooks:          newHooks(c),
 			Bridge:         c.Bridge,
@@ -503,25 +516,25 @@ func NewDefaultWithStageCompact(br core.Bridge, prm *prompts.Loader, stage confi
 // without touching the other callers.
 func NewDefaultWithStageCompactSpec(br core.Bridge, prm *prompts.Loader, stage config.Stage, compact bool, spec *config.DeliverableKindSpec, opts ...Option) *Phase {
 	cfg := Config{
-		SolutionSpec:                  spec,
-		Bridge:                        br,
-		Prompts:                       prm,
-		GenerateVerdict:               generateACSVerdict,
-		BeginPredicateEvidence:        beginPredicateEvidence,
-		CheckExplanation:              verifyExplanationDocumentation,
-		CheckGofmt:                    gofmtCheckDefault,
-		CheckSkillsDrift:              skillsDriftCheckDefault,
-		CheckGoVet:                    goVetCheckDefault,
-		CheckACSDurable:               acsDurableCheckDefault,
-		CheckIntegrationTier:          integrationTierCheckDefault,
-		CheckApicoverEnforce:          apicoverEnforceChangedDefault,
-		CheckApicoverNewPkgGraduation: apicoverNewPackageGraduationDefault,
-		PhaseIO:                       stage,
-		CompactPrompts:                compact,
+		SolutionSpec:           spec,
+		Bridge:                 br,
+		Prompts:                prm,
+		GenerateVerdict:        generateACSVerdict,
+		BeginPredicateEvidence: beginPredicateEvidence,
+		CheckExplanation:       verifyExplanationDocumentation,
+		CheckGofmt:             gofmtCheckDefault,
+		CheckSkillsDrift:       skillsDriftCheckDefault,
+		PhaseIO:                stage,
+		CompactPrompts:         compact,
 	}
-	for _, opt := range opts {
-		opt(&cfg)
+	for _, o := range opts {
+		o(&cfg)
 	}
+	// The CI-parity gates (ADR-0103 unit 14) are wired through the seam's
+	// per-Phase adapter so the loop root's Center reaches them — filling only
+	// the hooks no Option set, so an Option over Config is honoured in full;
+	// the five *Default facades stay Center-less for the by-name tests.
+	ciParity{signals: cfg.Signals}.wire(&cfg)
 	return New(cfg)
 }
 

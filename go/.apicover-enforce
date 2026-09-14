@@ -628,3 +628,7 @@
 # ADR-0103 unit 13 (2026-09-14): the batch-chaining driver, the boundary binary-refresh engine and the
 # pure chain decisions (internal/loopchain). 100% API + 100% line coverage gated.
 ./internal/loopchain
+# ADR-0103 unit 14 (2026-09-14): the CI-parity gates — go vet, acs-durable, the serialized integration
+# tier with its cross-lane lock and clean-env retake, apicover -enforce in-process and new-package
+# graduation (internal/phases/audit/ciparitygate). 100% API + 100% line coverage gated.
+./internal/phases/audit/ciparitygate

@@ -7,6 +7,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
 // TestNewDefaultWithStage_NamedPhase names the concrete audit.Phase type
@@ -97,5 +98,23 @@ func TestNewDefaultWithStageCompact_NamedPhase(t *testing.T) {
 	}
 	if strings.Contains(stripped, "Reference Index") || strings.Contains(stripped, "tail-only reference content") {
 		t.Fatalf("compact=true must strip the on-demand tail before dispatch; dispatched prompt=%q", stripped)
+	}
+}
+
+// TestWithSignals_NamedOptionReachesTheGates names the unit-14 exports
+// (Option, WithSignals, SignalsWired, Config.Signals): an Option applied to
+// the production constructor is what makes the CI-parity gates report.
+func TestWithSignals_NamedOptionReachesTheGates(t *testing.T) {
+	var opt Option = WithSignals(func() *signalcenter.Center { return signalcenter.New() })
+	var cfg Config
+	opt(&cfg)
+	if cfg.Signals == nil || cfg.Signals() == nil {
+		t.Fatal("WithSignals stores the accessor on the Config")
+	}
+	if !New(cfg).SignalsWired() {
+		t.Fatal("a Config with Signals builds a Phase whose gates reach the Center")
+	}
+	if NewDefaultWithStageCompactSpec(&fakeBridge{}, fakePromptsFS("body"), config.StageOff, false, nil).SignalsWired() {
+		t.Fatal("without the option the gates are the Null Object")
 	}
 }

@@ -30,6 +30,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/loopchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/loopwave"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/audit/ciparitygate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
@@ -586,5 +587,65 @@ func TestWireSimulateOrchestrator_LoopWaveAndChainWarningsRender(t *testing.T) {
 		if !strings.Contains(string(data), code) {
 			t.Errorf("the cycle-less signal is durable in <evolveDir>/signals.ndjson; lacks %s", code)
 		}
+	}
+}
+
+// ADR-0103 unit 14: the loop root passes its Center to the audit phase's
+// CI-parity gates through audit.WithSignals on the ONE production
+// construction chain (D6) — a source pin, the TestNilSignalCenterRootsArePinned
+// idiom; the behavioural chain option → gates → Center → sinks is proven by
+// audit's TestNewDefaultWithStageCompactSpec_WithSignalsReachesTheGates_* and
+// TestWireSimulateOrchestrator_CIParityWarningRenders below.
+func TestAuditRootPassesTheCenter(t *testing.T) {
+	src, err := os.ReadFile("cmd_cycle.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	re := regexp.MustCompile(`(?s)audit\.NewDefaultWithStageCompactSpec\(.{0,240}?audit\.WithSignals\(`) // the option belongs to THIS call (gofmt wraps it onto the next line)
+	if n := len(re.FindAll(src, -1)); n != 1 {
+		t.Fatalf("the audit runner must be built with audit.WithSignals(…) exactly once in cmd_cycle.go, found %d", n)
+	}
+}
+
+// ADR-0103 unit 14: a CI-parity gate WARN reaches the --simulate root's
+// console sink and the cycle workspace's durable stream — the ≤ 3-line triage
+// path: signals.ndjson and integration-tier.log sit in the SAME directory.
+func TestWireSimulateOrchestrator_CIParityWarningRenders(t *testing.T) {
+	root := t.TempDir()
+	evolveDir := filepath.Join(root, ".evolve")
+	if err := os.MkdirAll(filepath.Join(root, "go"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "go", "go.mod"), []byte("module ciparitytest\n\ngo 1.23\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var console bytes.Buffer
+	d := wireSimulateOrchestrator(root, evolveDir, &console)
+	runs := 0
+	redThenGreen := func(_ context.Context, _, _ string, _, _ []string, _ io.Reader, so, _ io.Writer) (int, error) {
+		runs++
+		if runs == 1 {
+			_, _ = io.WriteString(so, "--- FAIL: TestFlaky (0.00s)\nFAIL\tpkg\t1.0s\n")
+			return 1, nil
+		}
+		return 0, nil
+	}
+	changed := func(string, int) ([]string, bool) { return []string{"./internal/p/..."}, true }
+	g := ciparitygate.New(redThenGreen, changed, ciparitygate.WithSignals(func() *signalcenter.Center { return d.Signals }))
+	ws := core.RunWorkspacePath(root, 3)
+	if err := os.MkdirAll(ws, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := g.IntegrationTier(ciparitygate.Request{Cycle: 3, ProjectRoot: root, Worktree: root, Workspace: ws}); err == nil {
+		t.Fatal("red-then-green must surface the flake WARN")
+	}
+	if out := console.String(); !strings.Contains(out, "[audit]") || !strings.Contains(out, "AUDIT_CIPARITY_TIER_FLAKE_ABSORBED") {
+		t.Fatalf("the console sink renders the unit's WARN under --simulate: %q", out)
+	}
+	if data, err := os.ReadFile(filepath.Join(ws, "signals.ndjson")); err != nil || !strings.Contains(string(data), `"code":"AUDIT_CIPARITY_TIER_FLAKE_ABSORBED"`) {
+		t.Errorf("the cycle-stamped signal is durable in the cycle workspace: %v %s", err, data)
+	}
+	if _, err := os.Stat(filepath.Join(ws, "integration-tier.log")); err != nil {
+		t.Errorf("integration-tier.log sits beside signals.ndjson: %v", err)
 	}
 }

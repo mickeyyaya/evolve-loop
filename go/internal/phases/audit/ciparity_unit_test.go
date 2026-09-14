@@ -2,13 +2,11 @@ package audit
 
 import (
 	"context"
-	"errors"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
@@ -42,143 +40,6 @@ func goWorktree(t *testing.T) (root, goDir string) {
 		t.Fatal(err)
 	}
 	return root, goDir
-}
-
-// runCIGate maps the runner result to the hook contract: exit 0 → clean; any
-// non-zero exit → offenders (FAIL); an exec-start error → fail-open WARN.
-func TestRunCIGate_ExitCodeMapping(t *testing.T) {
-	root, _ := goWorktree(t)
-	req := core.PhaseRequest{Worktree: root}
-
-	withFakeRunner(t, fakeRunFunc(0, "", "", nil))
-	if off, err := runCIGate(req, "x", time.Second, "go", "vet"); off != nil || err != nil {
-		t.Errorf("exit 0: (%v,%v), want (nil,nil)", off, err)
-	}
-
-	withFakeRunner(t, fakeRunFunc(1, "", "bad.go:5: import cycle not allowed", nil))
-	if off, err := runCIGate(req, "x", time.Second, "go", "vet"); err != nil || len(off) == 0 {
-		t.Errorf("exit 1: (%v,%v), want offenders+nil", off, err)
-	}
-
-	withFakeRunner(t, fakeRunFunc(2, "", "", nil)) // non-zero, no output → synthesized line
-	if off, err := runCIGate(req, "x", time.Second, "go", "vet"); err != nil || len(off) == 0 {
-		t.Errorf("exit 2 no-output: (%v,%v), want a synthesized offender", off, err)
-	}
-
-	withFakeRunner(t, fakeRunFunc(-1, "", "", errors.New("executable file not found")))
-	if off, err := runCIGate(req, "x", time.Second, "go", "vet"); off != nil || err == nil {
-		t.Errorf("start error: (%v,%v), want (nil,err) fail-open", off, err)
-	}
-}
-
-func TestRunCIGate_NoModule_NoOp(t *testing.T) {
-	if off, err := runCIGate(core.PhaseRequest{Worktree: t.TempDir()}, "x", time.Second, "go", "vet"); off != nil || err != nil {
-		t.Errorf("no go/ dir: (%v,%v), want (nil,nil)", off, err)
-	}
-	if off, err := runCIGate(core.PhaseRequest{}, "x", time.Second, "go", "vet"); off != nil || err != nil {
-		t.Errorf("empty root: (%v,%v), want (nil,nil)", off, err)
-	}
-}
-
-func TestOffenderLines(t *testing.T) {
-	got := offenderLines("noise\nbad.go:1: import cycle not allowed\nmore\n--- FAIL: X")
-	if len(got) != 2 {
-		t.Errorf("marker extraction: %v, want 2", got)
-	}
-	if got := offenderLines("a\nb\nc"); len(got) == 0 {
-		t.Errorf("no-marker fallback returned empty")
-	}
-	long := strings.Repeat("FAIL line\n", 40)
-	if got := offenderLines(long); len(got) > 12 {
-		t.Errorf("cap: %d lines, want <=12", len(got))
-	}
-}
-
-// TestOffenderLines_DropsPassingTestChatter — the cycle-930/931/932 false-FAIL
-// diagnostic corruption: the old substring heuristics ("error"/"FAIL" anywhere in
-// the line) kept PASSING tests' verbose chatter — in-test orchestrator WARN lines
-// and a git usage dump — while the last-12 cap pushed the REAL failure lines out.
-// The verdict then cited 12 lines of noise and the true offender was unknowable.
-// Only line-anchored failure markers may survive.
-func TestOffenderLines_DropsPassingTestChatter(t *testing.T) {
-	out := strings.Join([]string{
-		"[orchestrator] WARN phase scout attempt 1/2 hit a transient bridge error or timeout; relaunching (self-heal)", // chatter: mid-line "error"
-		"    --check               warn if changes introduce conflict markers or whitespace errors",                    // git usage dump chatter
-		"    highlight whitespace errors in the 'context', 'old' or 'new' lines in the diff",                           // git usage dump chatter
-		"audit verdict=FAIL: something quoted by a passing test",                                                       // chatter: mid-line "FAIL"
-		"--- FAIL: TestRealThing (0.03s)",                                 // real: test failure header
-		"panic: runtime error: index out of range",                        // real: panic
-		"FAIL\tgithub.com/mickeyyaya/evolve-loop/go/internal/core\t55.2s", // real: package summary
-		"apicover -enforce measurement error: go.mod not found above /x",  // real: apicover infra line (go-review LOW)
-	}, "\n")
-	got := offenderLines(out)
-	if len(got) != 4 {
-		t.Fatalf("got %d offender lines %v, want exactly the 4 real failure markers", len(got), got)
-	}
-	for _, ln := range got {
-		if strings.Contains(ln, "orchestrator") || strings.Contains(ln, "whitespace") || strings.HasPrefix(ln, "audit verdict") {
-			t.Errorf("chatter survived into the verdict diagnostic: %q", ln)
-		}
-	}
-}
-
-// TestIntegrationTierScope_EnvExclusiveSkipped — the skip semantics, now
-// scoped to the one remaining exclusive (internal/bridge, requireTmux — no CI
-// backstop, retake can't vouch): all-excluded → (nil, error) so applyCIGate
-// surfaces a visible WARN instead of a false FAIL; mixed → the runnable
-// remainder proceeds. internal/core, cmd/evolve and internal/phases/ship left
-// the list 2026-09-01 (fossilized 2026-07-19 exclusion, superseded by the
-// 2026-07-20 serialized retake; cycle-1594 red-main cost) — see
-// TestIntegrationTierScope_CoversCoreCmdShip_Cycle1594.
-func TestIntegrationTierScope_EnvExclusiveSkipped(t *testing.T) {
-	ctx := context.Background()
-	// All touched packages env-exclusive → explicit WARN-carrying error, no run.
-	pkgs, err := integrationTierScope(ctx, nil, "", []string{"./internal/bridge/..."})
-	if err == nil || pkgs != nil {
-		t.Fatalf("bridge-only scope: got (%v, %v), want (nil, env-exclusive error → WARN)", pkgs, err)
-	}
-	if !strings.Contains(err.Error(), "env-exclusive") {
-		t.Errorf("the WARN must explain the skip; got %q", err.Error())
-	}
-	// Mixed → env-exclusive dropped, runnable remainder kept.
-	pkgs, err = integrationTierScope(ctx, nil, "", []string{"./internal/bridge/...", "./internal/prompts/..."})
-	if err != nil {
-		t.Fatalf("mixed scope must run the remainder, got err %v", err)
-	}
-	if len(pkgs) != 1 || pkgs[0] != "./internal/prompts/..." {
-		t.Errorf("pkgs = %v, want only ./internal/prompts/...", pkgs)
-	}
-	// Non-exclusive packages pass through untouched.
-	pkgs, err = integrationTierScope(ctx, nil, "", []string{"./internal/skilloverlay/..."})
-	if err != nil || len(pkgs) != 1 {
-		t.Errorf("plain package: (%v, %v), want it kept", pkgs, err)
-	}
-}
-
-// TestChangedScopeForGate_TouchedDecision is the "did this cycle build Go?" half
-// of changedScopeForGate (the derivability half lives in
-// ciparity_touchedgo_derivability_test.go). A worktree with no go module is
-// nothing-to-check; a handoff naming a changed Go package makes the gates run.
-func TestChangedScopeForGate_TouchedDecision(t *testing.T) {
-	if _, run, err := changedScopeForGate(core.PhaseRequest{Worktree: t.TempDir(), Cycle: 1}); run || err != nil {
-		t.Errorf("no go module / no build handoff → (run=%v, %v), want (false, nil)", run, err)
-	}
-	root, _ := goWorktree(t)
-	runDir := filepath.Join(root, ".evolve", "runs", "cycle-1")
-	if err := os.MkdirAll(runDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(runDir, "handoff-build.json"),
-		[]byte(`{"thrusts":[{"files_modified":["go/internal/p/x.go"]}]}`), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	pkgs, run, err := changedScopeForGate(core.PhaseRequest{ProjectRoot: root, Cycle: 1})
-	if !run || err != nil {
-		t.Errorf("handoff with a changed Go package → (run=%v, %v), want (true, nil)", run, err)
-	}
-	if len(pkgs) != 1 || pkgs[0] != "./internal/p/..." {
-		t.Errorf("pkgs = %v, want the handoff's package", pkgs)
-	}
 }
 
 // apicover enforced-package sources: the exported-symbol content decides whether
@@ -396,6 +257,19 @@ func seqRunFunc(t *testing.T, script []struct {
 	return fn, &calls, &envs
 }
 
+// killedAtDeadline makes a scripted runner faithful to a process the ctx
+// deadline KILLED: it returns only once ctx is done — a real SIGKILL follows
+// the deadline, never precedes it — so the 1 ns budgets below reach the
+// deadline arms deterministically. Without it context.WithTimeout(…, 1ns) may
+// arm a timer instead of expiring synchronously and an instant fake is
+// observed before ctx.Err() is set (the leaf saw 2/40 such runs, 2026-09-14).
+func killedAtDeadline(fn sysexec.RunFunc) sysexec.RunFunc {
+	return func(ctx context.Context, name, dir string, args, env []string, in io.Reader, so, se io.Writer) (int, error) {
+		<-ctx.Done()
+		return fn(ctx, name, dir, args, env, in, so, se)
+	}
+}
+
 // tierFixture builds a root with a go module, a build handoff naming a
 // NON-env-exclusive package, and a workspace dir — everything
 // integrationTierCheckDefault needs to reach the run seam.
@@ -504,36 +378,4 @@ func TestIntegrationTier_RedThenRed_GenuineOffendersFromRetake(t *testing.T) {
 	if !strings.Contains(joined, "integration-tier.log") {
 		t.Errorf("offenders must carry the log pointer; got %v", off)
 	}
-}
-
-// TestAcquireTierLock_SerializesAndReleases — the retake lock is a real mutual
-// exclusion: while held, a second acquire blocks (bounded by its ctx); after
-// release, it succeeds immediately. Uses two distinct fds on the same lock file
-// (flock is per-fd), exactly like two fleet lanes.
-func TestAcquireTierLock_SerializesAndReleases(t *testing.T) {
-	root := t.TempDir()
-	req := core.PhaseRequest{ProjectRoot: root}
-	// Shrink the independent lock-wait budget so the held-lock case times out
-	// fast (the budget is deliberately NOT a caller ctx — go-review HIGH: the
-	// attempt-1 ctx is already consumed exactly when contention is worst).
-	origWait := tierLockWait
-	tierLockWait = 50 * time.Millisecond
-	t.Cleanup(func() { tierLockWait = origWait })
-
-	release1, note1 := acquireTierLock(req)
-	if note1 != "" {
-		t.Fatalf("first acquire must succeed cleanly, note=%q", note1)
-	}
-	// Second acquire while held must NOT get the lock (bounded wait, then note).
-	_, note2 := acquireTierLock(req)
-	if !strings.Contains(note2, "lock wait timed out") {
-		t.Fatalf("second acquire while held must time out (serialization), note=%q", note2)
-	}
-	release1()
-	// After release, acquisition succeeds again.
-	release3, note3 := acquireTierLock(req)
-	if note3 != "" {
-		t.Fatalf("post-release acquire must succeed, note=%q", note3)
-	}
-	release3()
 }
