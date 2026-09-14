@@ -115,6 +115,62 @@ type CycleSummary struct {
 	HasDossier   bool `json:"has_dossier"`
 	// CurrentPhase is set only on the running/incomplete cycle.
 	CurrentPhase string `json:"current_phase,omitempty"`
+	// Plan is the cycle's required sequence at a glance (nil without a run
+	// workspace: a dossier-only cycle has nothing left to project).
+	Plan *PhasePlan `json:"plan,omitempty"`
+}
+
+// PhasePlan is a cycle's phase sequence as the operator reads it: the
+// registry's mandatory set, every phase the cycle ran, each step with a
+// status, the counts, what is ongoing and what remains, and how the advisor's
+// proposal fared against what ran.
+type PhasePlan struct {
+	// Mandatory is config.mandatory_phases — the set the router's floor
+	// enforces — in order.
+	Mandatory []string `json:"mandatory"`
+	// Steps is the sequence in run order: executed phases, the ongoing one,
+	// then the mandatory phases not yet reached.
+	Steps []PlanStep `json:"steps"`
+	// Required counts the mandatory steps plus the conditional-mandatory ones
+	// that ran; PassedRequired how many of those passed ("passed 3/5 required").
+	// Total is the sequence length and Passed how many of all steps passed.
+	Required       int `json:"required"`
+	PassedRequired int `json:"passed_required"`
+	Total          int `json:"total"`
+	Passed         int `json:"passed"`
+	// Ongoing is the running phase (running cycles only) and OngoingSince its
+	// start; Remaining lists the pending phases in order.
+	Ongoing      string    `json:"ongoing,omitempty"`
+	OngoingSince time.Time `json:"ongoing_since"`
+	Remaining    []string  `json:"remaining,omitempty"`
+	// AdvisorProposed are phases the advisor proposed to run that have not
+	// run (not yet, on a running cycle; never, on a sealed one).
+	// AdvisorSkips are phases it proposed to skip that did not run;
+	// AdvisorOverridden the ones it proposed to skip that ran anyway — the
+	// mandatory floor overrode the proposal.
+	AdvisorProposed   []string `json:"advisor_proposed,omitempty"`
+	AdvisorSkips      []string `json:"advisor_skips,omitempty"`
+	AdvisorOverridden []string `json:"advisor_overridden,omitempty"`
+}
+
+// PlanStep is one phase in a PhasePlan.
+type PlanStep struct {
+	Phase string `json:"phase"`
+	// Status is one of pass, warn, fail (the last run's verdict), ongoing,
+	// pending (a mandatory phase a running cycle has not reached), unreached
+	// (a mandatory phase a sealed cycle never ran) or skipped (a mandatory
+	// phase the cycle went past without running).
+	Status string `json:"status"`
+	// Optional is true for a phase outside the mandatory and
+	// conditional-mandatory sets; Conditional for a conditional-mandatory one.
+	Optional    bool `json:"optional,omitempty"`
+	Conditional bool `json:"conditional,omitempty"`
+	// GateVerified is true when the contract gate recorded
+	// GATE_CONTRACT_VERIFIED for the phase in the cycle's signal stream.
+	GateVerified bool `json:"gate_verified,omitempty"`
+	// DurationMS is the last run's wall clock; Rounds its occurrence count.
+	DurationMS int64 `json:"duration_ms,omitempty"`
+	Rounds     int   `json:"rounds,omitempty"`
 }
 
 // PhaseRun is one phase dispatch inside a cycle.

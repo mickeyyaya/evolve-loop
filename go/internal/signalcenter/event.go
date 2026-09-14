@@ -210,6 +210,11 @@ var originRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9
 // ValidOrigin reports whether s is a Func or Type.Method name as Go spells it.
 func ValidOrigin(s string) bool { return originRE.MatchString(s) }
 
+// StreamFileName is the per-cycle (or per-root) NDJSON stream the sink writes
+// and readers such as the dashboard open — one spelling, composed onto its
+// directory by the root.
+const StreamFileName = "signals.ndjson"
+
 // Event is the ONE schema (design §4). Emit stamps SchemaVersion, Seq, PID and
 // TS; producers fill the rest. No nested structs: one event is one greppable
 // line; structured detail belongs in the artifact named by fields.path.

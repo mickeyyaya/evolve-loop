@@ -357,9 +357,9 @@ func newRootSignalCenter(projectRoot, evolveDir string, console io.Writer) *sign
 	signals := signalcenter.New(signalcenter.WithPID(os.Getpid()))
 	signals.Subscribe(signals.NDJSONSink(func(cycle int) string {
 		if cycle == 0 {
-			return filepath.Join(evolveDir, "signals.ndjson")
+			return filepath.Join(evolveDir, signalcenter.StreamFileName)
 		}
-		return filepath.Join(core.RunWorkspacePath(projectRoot, cycle), "signals.ndjson")
+		return filepath.Join(core.RunWorkspacePath(projectRoot, cycle), signalcenter.StreamFileName)
 	}))
 	signals.Subscribe(signalcenter.ConsoleSink(console))
 	return signals
