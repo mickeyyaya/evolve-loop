@@ -59,6 +59,7 @@ func latchShippedState(cs *CycleState, phase Phase, verdict string) bool {
 		return false
 	}
 	cs.Shipped = true
-	cs.ShipRecoveryCode = "" // the recovery (if any) has landed; later re-entries are unrelated work
+	cs.ShipRecoveryCode = ""   // the recovery (if any) has landed; later re-entries are unrelated work
+	cs.AuditDeclineReason = "" // the retro-routed retry (if any) shipped; the decline is spent
 	return true
 }

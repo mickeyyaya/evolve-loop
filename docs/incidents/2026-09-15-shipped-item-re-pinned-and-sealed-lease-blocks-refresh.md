@@ -30,3 +30,7 @@ Red-first tests per fix (`dispatchstate_test.go`, `cycledirs_test.go`, `launcher
 
 - The loop is completion-driven: a boundary is the ~40 s `lanes=0` window after `[loop] wave N: x/y lanes ok`; bounce only when a fix PR is parked (`feedback_no_pr_merges_mid_wave`).
 - A test that mutates tracked repo config, or walks an operator-private directory, is the defect — never a sandbox exemption.
+
+## Addendum — lane 1684 (research F19)
+
+1684's audit FAILed with an invented class (`superseded-predicate-contradiction`); the gate accepted it, the envelope declined the direct repair with no line anywhere, a retrospective (deep tier, ~10 min) adjudicated a retry, and the retry's build brief carried none of the audit's findings. Fixed at the class: the gate validates the audit's class and the prompt names the vocabulary; the decision is a coded signal; a retro-routed re-entry carries the standing findings.

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
 )
 
 // Rendering of the Deliverable Contract into the prompt (ADR-0034, Layer 2).
@@ -63,8 +65,8 @@ func RenderContractBlockStage(c Contract, includePhaseIO bool) string {
 				bracketJoin(c.Verdicts), RenderVerdictSentinel(c.Phase, c.Verdicts[0]))
 		}
 		if c.RequireFailureContext {
-			fmt.Fprintf(&b, "- On FAIL or WARN, the sentinel MUST carry your structured failure context (one defect per list entry; evidence_paths are workspace-relative artifacts that prove it):\n  %s\n",
-				RenderVerdictSentinelWithFailure(c.Phase, "FAIL", failureExemplar(c.Phase)))
+			fmt.Fprintf(&b, "- On FAIL or WARN, the sentinel MUST carry your structured failure context (one defect per list entry; evidence_paths are workspace-relative artifacts that prove it). \"class\" MUST be one of [%s] — it drives the retry envelope, so an invented class forfeits the repair round; put your judgment in defects/prescription:\n  %s\n",
+				failurelog.VocabularyList(), RenderVerdictSentinelWithFailure(c.Phase, "FAIL", failureExemplar(c.Phase)))
 		} else if c.RequireFailureContextPhaseIO && includePhaseIO {
 			// build/scout/triage emit no verdict by default. When the PhaseIO
 			// rollout activates (stage>=advisory), give them a self-report-failure
@@ -193,7 +195,7 @@ func selfCheckCommand(phase string) string {
 // PhaseIO (build/scout/triage) instruction branches so they can never drift.
 func failureExemplar(phase string) *FailureBlock {
 	return &FailureBlock{
-		Class:         "code-" + phase + "-fail",
+		Class:         exemplarClass(phase),
 		Defects:       []string{"<one line per defect>"},
 		EvidencePaths: []string{"<artifact path>"},
 	}
@@ -226,4 +228,17 @@ func bracketJoin(vs []string) string {
 // location the gate checks cannot drift.
 func OwedPath(workspace, name string) string {
 	return filepath.Join(workspace, filepath.Base(name))
+}
+
+// exemplarClass is the failure class the prompt's exemplar shows: a word from
+// the failurelog vocabulary, never a synthesized "code-<phase>-fail" — the
+// gate (failure_class_unknown) would refuse the block's own example for any
+// verdict phase whose synthesized name is not a class (architecture review of
+// F19). The audit's rejection is code-audit-fail; every other phase's
+// self-reported failure is the build class it interrupts.
+func exemplarClass(phase string) string {
+	if phase == "audit" {
+		return string(failurelog.CodeAuditFail)
+	}
+	return string(failurelog.CodeBuildFail)
 }

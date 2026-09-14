@@ -64,6 +64,7 @@ var additiveCycleStateKeys = []string{
 	"final_verdict",                     // recovery: preserve the host floor disposition across pauses
 	"shipped",                           // ADR-0100 PR-3: this cycle's own ship latch, persisted so a pause/resume after Ship keeps it; read by the outcome label + post-ship observer degrade on both roots,
 	"ship_recovery_code",                // 2026-09-15: the ship-error recovery marker the standing-audit-findings brief keys on (research F16)
+	"audit_decline_reason",              // 2026-09-15: the audit-fail decline marker a retro-routed re-entry keys on (research F19)
 }
 
 func jsonKeysOf(t *testing.T, v any) []string {

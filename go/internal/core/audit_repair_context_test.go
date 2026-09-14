@@ -165,3 +165,59 @@ func TestSeedAuditRepairContext_ShipRecoveryRebuildCarriesStandingFindings(t *te
 		t.Errorf("a rejection grant is the repair path and outranks standing findings: %v", rejected)
 	}
 }
+
+// Cycle 1684 (2026-09-15): the audit FAILed with a class outside the
+// vocabulary, the envelope declined the direct grant, the retrospective
+// adjudicated a retry, and the tdd/build re-entry carried NONE of the audit's
+// findings (only a generic "audit.failure_class" label) — the builder rebuilt
+// blind to "retire the superseded predicate". A retro-routed re-entry is
+// re-audited by the same rubric, so it carries the standing findings exactly
+// as a ship-error recovery does; the intro names which route brought it back.
+func TestSeedAuditRepairContext_RetroRoutedReentryCarriesStandingFindings(t *testing.T) {
+	dir := t.TempDir()
+	report := "# Audit Report\n\n## Verdict\nFAIL\n\n## Issues\n\n### M1 (MEDIUM) — superseded predicate: TestC1515_006 contradicts the commissioned change; retire it in-phase\nb\n"
+	if err := os.WriteFile(filepath.Join(dir, "audit-report.md"), []byte(report), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	declined := CycleState{WorkspacePath: dir, AuditDispatches: 1, CompletedPhases: []string{"scout", "triage", "tdd", "build", "audit", "retro"}}
+	consumeAuditRepairGrant(&declined, auditDeclineReasonPrefix+"audit declared an unrecognised class superseded-predicate-contradiction")
+	if declined.AuditDeclineReason == "" || declined.AuditRepairActive {
+		t.Fatalf("a decline records its reason on persisted state without granting: %+v", declined)
+	}
+	got := seedAuditRepairContext(map[string]string{"keep": "me"}, PhaseTDD, declined)
+	if !strings.Contains(got[CtxKeyStandingAuditFindings], "retire it in-phase") {
+		t.Fatalf("a retro-routed tdd re-entry after a decline carries the last audit's actionable findings, got %q", got[CtxKeyStandingAuditFindings])
+	}
+	if got[CtxKeyShipErrorCode] != "" {
+		t.Errorf("no ship error was involved; the code must not be fabricated: %q", got[CtxKeyShipErrorCode])
+	}
+	if !strings.Contains(got[CtxKeyAuditDeclineReason], "unrecognised class") {
+		t.Errorf("the envelope's decline reason rides the context for the prompt: %q", got[CtxKeyAuditDeclineReason])
+	}
+	if intro := StandingFindingsIntro(got); !strings.Contains(intro, "retrospective") || !strings.Contains(intro, "unrecognised class") || strings.Contains(intro, "ship-time error") {
+		t.Errorf("the intro names the retro route and the envelope's reason, not a ship error: %q", intro)
+	}
+	// A retro reached from a dispatch error or an exhausted correction ladder
+	// (no audit decline) is not re-audited work: nothing is seeded, and the
+	// prompt never claims an audit FAIL that did not happen.
+	viaDispatchError := CycleState{WorkspacePath: dir, AuditDispatches: 1, CompletedPhases: []string{"scout", "triage", "tdd", "build", "retro"}}
+	if _, ok := seedAuditRepairContext(map[string]string{}, PhaseBuild, viaDispatchError)[CtxKeyStandingAuditFindings]; ok {
+		t.Error("a retro re-entry without an audit decline is not seeded")
+	}
+	granted := declined
+	consumeAuditRepairGrant(&granted, auditRepairReasonPrefix+"retry-build: within budget")
+	if granted.AuditDeclineReason != "" || !granted.AuditRepairActive {
+		t.Errorf("a later grant clears the decline: %+v", granted)
+	}
+	latched := declined
+	if !latchShippedState(&latched, PhaseShip, VerdictPASS) || latched.AuditDeclineReason != "" {
+		t.Errorf("the ship latch spends the decline: %q", latched.AuditDeclineReason)
+	}
+	if intro := StandingFindingsIntro(map[string]string{CtxKeyShipErrorCode: "GIT_FLEET_REBASE_NEEDED"}); !strings.Contains(intro, "GIT_FLEET_REBASE_NEEDED") {
+		t.Errorf("the intro names the ship error when one brought the cycle back: %q", intro)
+	}
+	ordinary := CycleState{WorkspacePath: dir, AuditDispatches: 1, CompletedPhases: []string{"scout", "triage", "tdd"}}
+	if _, ok := seedAuditRepairContext(map[string]string{}, PhaseBuild, ordinary)[CtxKeyStandingAuditFindings]; ok {
+		t.Error("a first-pass build (no retro, no ship error) is not seeded")
+	}
+}

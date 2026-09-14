@@ -32,6 +32,10 @@ const legitRejection = "legit-rejection"
 // silently disable the bound, granting repairs that nothing counts.
 const auditRepairReasonPrefix = "audit-repair: "
 
+// auditDeclineReasonPrefix tags the branch reason decideAfterAuditFail emits
+// when the envelope declines a direct repair and the cycle goes to retro.
+const auditDeclineReasonPrefix = "audit-fail-decline: "
+
 // CtxKeyAuditRepairFindings is the PhaseRequest.Context key carrying the audit's
 // own fail-reason text into a repair re-dispatch. Exported and single-sourced
 // because the SETTER lives in core and the READERS live in internal/phases/*:
@@ -51,16 +55,26 @@ const CtxKeyShipErrorCode = "ship_error_code"
 // again as standing (cycle 1679, rounds 4→5). A rejection grant outranks it.
 const CtxKeyStandingAuditFindings = "standing_audit_findings"
 
-// consumeAuditRepairGrant spends one repair attempt when the retro branch
-// granted one. It mirrors consumeBookkeepingRegradeGrant exactly — the ONE
-// primitive every branch surface calls (the live loop in cyclerun_record and
-// the crash-resume path in resume.go), so the bound cannot drift out of one of
-// them. A resume that skipped this would hand a resumed cycle a fresh,
-// unbounded repair budget.
+// CtxKeyAuditDeclineReason carries the envelope's decline reason into a
+// retro-routed re-entry so the prompt can name why no direct repair ran.
+const CtxKeyAuditDeclineReason = "audit_decline_reason"
+
+// consumeAuditRepairGrant records decideAfterAuditFail's disposition on
+// persisted cycle state — it is the ONE latch for both branches: a grant
+// ("audit-repair: …") spends a retry attempt and marks the repair round
+// active, so the audit's own findings are seeded into the re-dispatched
+// tdd/build prompts; a decline ("audit-fail-decline: …") keeps the envelope's
+// reason so a retro-routed re-entry can be told why no direct repair ran
+// (retroRouted). Named for the grant it started as; both dispatch roots call
+// it right after the decision.
 func consumeAuditRepairGrant(cs *CycleState, reason string) {
-	if strings.HasPrefix(reason, auditRepairReasonPrefix) {
+	switch {
+	case strings.HasPrefix(reason, auditRepairReasonPrefix):
 		cs.AuditRepairAttempts++
 		cs.AuditRepairActive = true
+		cs.AuditDeclineReason = ""
+	case strings.HasPrefix(reason, auditDeclineReasonPrefix):
+		cs.AuditDeclineReason = strings.TrimPrefix(reason, auditDeclineReasonPrefix)
 	}
 }
 
@@ -76,10 +90,12 @@ func repairSeededPhase(p Phase) bool { return p == PhaseTDD || p == PhaseBuild }
 // (CycleState.ShipRecoveryCode), the last audit's actionable findings as
 // STANDING findings: the recovery rebuild is re-audited by the same rubric.
 //
-// Both halves derive from PERSISTED cycle state (AuditRepairActive /
-// AuditRepairAttempts, ShipRecoveryCode) rather than being pushed at grant
-// time, so the live dispatch loop and the crash-resume path cannot diverge:
-// one rule, reading fields that survive both. Copying rather
+// All three routes derive from PERSISTED cycle state (AuditRepairActive /
+// AuditRepairAttempts for a repair grant, ShipRecoveryCode for a ship-error
+// recovery, AuditDeclineReason + a retro as the last completed phase for a
+// retro-routed re-entry) rather than being pushed at decision time, so the
+// live dispatch loop and the crash-resume path cannot diverge: one rule,
+// reading fields that survive both. Copying rather
 // than mutating matters — the dispatch loop reuses one ctxSnap map across every
 // iteration of the cycle, so an in-place write would leak a stale repair brief
 // into phases that never asked for it.
@@ -98,14 +114,42 @@ func seedAuditRepairContext(base map[string]string, next Phase, cs CycleState) m
 	if cs.AuditRepairActive {
 		return withContext(base, CtxKeyAuditRepairFindings, composeRepairBrief(cs))
 	}
-	if cs.ShipRecoveryCode == "" {
+	if cs.ShipRecoveryCode == "" && !retroRouted(cs) {
 		return base
 	}
 	out := withContext(base, CtxKeyStandingAuditFindings, auditorFindingsBrief(cs.WorkspacePath, cs.AuditDispatches))
-	if out[CtxKeyShipErrorCode] == "" { // a resumed dispatch has no snapshot of the code; the prompt names it from state
+	if cs.ShipRecoveryCode != "" && out[CtxKeyShipErrorCode] == "" { // a resumed dispatch has no snapshot of the code; the prompt names it from state
 		out = withContext(out, CtxKeyShipErrorCode, cs.ShipRecoveryCode)
 	}
+	if cs.ShipRecoveryCode == "" {
+		out = withContext(out, CtxKeyAuditDeclineReason, cs.AuditDeclineReason)
+	}
 	return out
+}
+
+// retroRouted reports whether the phase about to be dispatched re-enters the
+// cycle straight after a retrospective that followed an audit-fail DECLINE —
+// the envelope refused a direct repair (unrecognised class, budget,
+// system-level class) and the retro's floor gates then adjudicated a retry
+// (cycle 1684). Both halves are required: a retro reached from a dispatch
+// error or an exhausted correction ladder is not re-audited work owed the
+// audit's findings (AuditDeclineReason is empty there), and a decline whose
+// retro sealed the cycle never re-enters. Such a re-entry is re-audited by
+// the same rubric, so it carries the standing findings exactly as a
+// ship-error recovery does.
+func retroRouted(cs CycleState) bool {
+	n := len(cs.CompletedPhases)
+	return cs.AuditDeclineReason != "" && n > 0 && cs.CompletedPhases[n-1] == string(PhaseRetro)
+}
+
+// StandingFindingsIntro is the ONE sentence the tdd and build prompts open the
+// "Standing Audit Findings" section with: which route brought the cycle back
+// to this phase after its audit had already spoken.
+func StandingFindingsIntro(ctx map[string]string) string {
+	if code := ctx[CtxKeyShipErrorCode]; code != "" {
+		return "A ship-time error (" + code + ") sent this cycle back after its audit passed with findings."
+	}
+	return "A retrospective routed this cycle back after its audit FAILed and the retry envelope declined a direct repair (" + ctx[CtxKeyAuditDeclineReason] + ")."
 }
 
 // withContext returns base unchanged when value is empty, else a COPY of base

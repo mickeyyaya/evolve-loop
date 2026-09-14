@@ -209,6 +209,8 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 
 | Code | Meaning |
 |---|---|
+| `ORCHESTRATOR_AUDIT_REPAIR_DECLINED` | an audit FAIL earned no repair round and the cycle goes to retro; fields.reason is the retry envelope's verdict (unrecognised class, budget spent, system-level or non-retry class, no class declared), fields.declared_class the audit's own class |
+| `ORCHESTRATOR_AUDIT_REPAIR_GRANTED` | an audit FAIL earned a repair round; fields.next is the re-entry phase (tdd | build), fields.attempt the repair attempt about to be spent, fields.reason the envelope's basis |
 | `ORCHESTRATOR_CYCLE_FAILED` | the cycle sealed with final verdict FAIL; fields carry the termination reason and retro decision |
 | `ORCHESTRATOR_GATE_CORRECTION` | the correction ladder ran a rung after a gate rejection — fields name the correction ordinal, the budget (max), the rung, the CLI re-dispatched on and whether that CLI was escalated; the reason is the rejection being corrected |
 | `ORCHESTRATOR_PHASE_ABORTED` | the cycle aborted after this phase's outcome (review reject, guard, persistence); the abort reason is in fields.abort_reason |

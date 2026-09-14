@@ -1,8 +1,11 @@
 package core
 
 import (
+	"strconv"
+
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
 // audit_fail_decision.go — the disposition of an audit FAIL, decided AT THE AUDIT
@@ -96,9 +99,32 @@ func (o *Orchestrator) decideAfterAuditFail(cs CycleState) (Phase, string, *Syst
 	}
 
 	if next, isRetry := reentryPhase(action); isRetry {
+		o.emitAuditRepairDecision(cs, next, declared, env.Reason+suffix)
 		return next, auditRepairReasonPrefix + string(action) + ": " + env.Reason + suffix, nil
 	}
-	return PhaseRetro, "audit-fail-decline: " + env.Reason + suffix, nil
+	o.emitAuditRepairDecision(cs, PhaseRetro, declared, env.Reason+suffix)
+	return PhaseRetro, auditDeclineReasonPrefix + env.Reason + suffix, nil
+}
+
+// emitAuditRepairDecision makes the audit-fail decision one readable line:
+// WARN when the repair round is declined (the cycle goes to retro), INFO
+// when it is granted. Both dispatch roots reach it through decideAfterAuditFail.
+func (o *Orchestrator) emitAuditRepairDecision(cs CycleState, next Phase, declared, reason string) {
+	e := signalcenter.Event{
+		Cycle: cs.CycleID, RunID: o.signalRunID(), Phase: string(PhaseAudit), Attempt: cs.AuditDispatches,
+		Module: signalcenter.ModuleOrchestrator, Origin: "Orchestrator.decideAfterAuditFail",
+		Kind:   signalcenter.KindPhaseOutcome,
+		Fields: map[string]string{"next": string(next), "reason": reason, "declared_class": declared},
+	}
+	if next == PhaseRetro {
+		e.Severity, e.Code = signalcenter.SeverityWarn, CodeAuditRepairDeclined
+		e.Reason = "audit FAIL earned no repair round: " + reason
+	} else {
+		e.Severity, e.Code = signalcenter.SeverityInfo, CodeAuditRepairGranted
+		e.Fields["attempt"] = strconv.Itoa(cs.AuditRepairAttempts + 1)
+		e.Reason = "audit FAIL → repair round via " + string(next) + " (attempt " + e.Fields["attempt"] + "): " + reason
+	}
+	o.signals.Emit(e)
 }
 
 // firstNonEmpty returns the first non-empty string, or "" if all are empty.

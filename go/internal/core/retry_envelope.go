@@ -94,14 +94,22 @@ func computeRetryEnvelope(in retryEnvelopeInput) retryEnvelope {
 	// "audit-fail"/"FAIL" both mean code-audit-fail. Every sibling consumer
 	// normalizes; skipping it here would silently decline a retryable class
 	// (architect review M4).
-	declared := string(failurelog.NormalizeLegacy(in.DeclaredClass))
-
-	cat, known := in.Policy.RetryPolicyFor(declared)
-	if !known {
-		if declared == "" {
+	class := failurelog.NormalizeLegacy(in.DeclaredClass)
+	if class == failurelog.UnknownClassification {
+		if strings.TrimSpace(in.DeclaredClass) == "" {
 			return declineOnly("audit declared no failure class; nothing to base a retry on")
 		}
-		return declineOnly("audit declared an unrecognised class " + declared)
+		// Unreachable behind the deliverables gate (failure_class_unknown) for
+		// the audit; kept as the second line of defense for every other caller.
+		return declineOnly("audit declared a class outside the vocabulary: " + in.DeclaredClass)
+	}
+	declared := policyCategoryFor(class)
+	if declared == "" {
+		return declineOnly("no retry policy row for declared class " + string(class) + " — it names a failure no rebuild repairs")
+	}
+	cat, known := in.Policy.RetryPolicyFor(declared)
+	if !known {
+		return declineOnly("policy table has no row for category " + declared + " (declared class " + string(class) + ")")
 	}
 	// NOTE: a system-level declared class does NOT halt here (architect review H4).
 	// Both pre-existing floor gates require IsFloor, and gate 2 was deliberately
@@ -183,4 +191,29 @@ func clampAdjudication(env retryEnvelope, adj *adjudication) (retryAction, bool)
 		}
 	}
 	return fallback, true
+}
+
+// policyCategoryFor is the ONE join between the two failure vocabularies: the
+// failurelog Classification an agent declares (13 classes; the vocabulary the
+// audit contract block renders and the deliverables gate enforces) and the
+// policy category the failure_policy table is keyed by (7 categories). Every
+// KnownClassification either joins to a category the default table knows or
+// to "" — a failure no rebuild repairs (human abort, operator reset, an
+// integrity breach, a ship-gate config, a transient outage, a rejected intent,
+// a fatal loop), which the envelope declines by name rather than as
+// "unrecognised". Pinned by TestPolicyCategoryFor_JoinsEveryKnownClassificationOrSaysNone.
+func policyCategoryFor(c failurelog.Classification) string {
+	switch c {
+	case failurelog.InfrastructureSystemic:
+		return policy.CategoryInfraSystemic
+	case failurelog.ExitTransportHang:
+		return policy.CategoryTransportHang
+	case failurelog.CodeBuildFail:
+		return policy.CategoryCodeBuildFail
+	case failurelog.CodeAuditFail, failurelog.CodeAuditWarn:
+		return policy.CategoryCodeAuditFail
+	case failurelog.IntentMalformed:
+		return policy.CategoryIntentMalformed
+	}
+	return ""
 }
