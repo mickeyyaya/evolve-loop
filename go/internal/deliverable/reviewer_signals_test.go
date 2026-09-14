@@ -243,7 +243,7 @@ func TestVerify_ResultCarriesTheOwedFilesAndEffectsItChecked(t *testing.T) {
 // constructor is not clobbered by a trailing assignment.
 func TestNewReviewerWithCatalogStageReportSize_OptionsApplyAfterTheReportSizeSettings(t *testing.T) {
 	opts := []Option{func(r *Reviewer) { r.reportSizeBudgetTokens = 7 }}
-	r := NewReviewerWithCatalogStageReportSize(config.StageEnforce, phasespec.Catalog{}, config.StageOff, config.StageAdvisory, 500, opts...).(*Reviewer)
+	r := NewReviewerWithCatalogStageReportSize(config.StageEnforce, phasespec.Catalog{}, config.StageOff, config.StageAdvisory, 500, opts...)
 	if r.reportSizeGate != config.StageAdvisory || r.reportSizeBudgetTokens != 7 {
 		t.Fatalf("the constructor's report-size settings are options applied before the caller's: gate=%v budget=%d", r.reportSizeGate, r.reportSizeBudgetTokens)
 	}

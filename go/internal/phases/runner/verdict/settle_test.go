@@ -24,7 +24,7 @@ import (
 func TestSettle_BoundedAt1PlusRetries_StopsOnOKOrError_CountsReprobes(t *testing.T) {
 	var intervals []time.Duration
 	never := newHarness(t, probe{codes: []string{deliverable.CodeMissingArtifact}}, WithSleep(func(d time.Duration) { intervals = append(intervals, d) }))
-	s := never.e.settle(context.Background(), "audit", phasecontract.Roots{Workspace: never.ws})
+	s := never.e.settle(context.Background(), Identity{}, "audit", phasecontract.Roots{Workspace: never.ws})
 	if s.err != nil || s.res.OK || s.attempts != SettleRetries || never.n.verify != 1+SettleRetries || len(intervals) != SettleRetries {
 		t.Errorf("never-OK: attempts=%d probes=%d sleeps=%d, want %d/%d/%d", s.attempts, never.n.verify, len(intervals), SettleRetries, 1+SettleRetries, SettleRetries)
 	}
@@ -34,12 +34,12 @@ func TestSettle_BoundedAt1PlusRetries_StopsOnOKOrError_CountsReprobes(t *testing
 		}
 	}
 	fourth := newHarness(t, probe{okFrom: 4, codes: []string{deliverable.CodeMissingArtifact}})
-	s = fourth.e.settle(context.Background(), "audit", phasecontract.Roots{Workspace: fourth.ws})
+	s = fourth.e.settle(context.Background(), Identity{}, "audit", phasecontract.Roots{Workspace: fourth.ws})
 	if !s.res.OK || s.err != nil || s.attempts != 3 || *fourth.n != (counts{verify: 4, sleep: 3}) {
 		t.Errorf("OK on the 4th probe: attempts=%d %+v, want 3 re-probes, 4 probes, 3 sleeps", s.attempts, *fourth.n)
 	}
 	verr := newHarness(t, probe{err: errors.New("no deliverable contract")})
-	s = verr.e.settle(context.Background(), "audit", phasecontract.Roots{Workspace: verr.ws})
+	s = verr.e.settle(context.Background(), Identity{}, "audit", phasecontract.Roots{Workspace: verr.ws})
 	if s.err == nil || s.attempts != 0 || *verr.n != (counts{verify: 1}) {
 		t.Errorf("an error ends the ladder at once (uncontracted phases pay zero retries): attempts=%d %+v", s.attempts, *verr.n)
 	}
@@ -50,12 +50,12 @@ func TestSettle_BoundedAt1PlusRetries_StopsOnOKOrError_CountsReprobes(t *testing
 func TestSettle_HonoursCancellationBeforeAndAfterTheSleep(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	during := newHarness(t, probe{codes: []string{deliverable.CodeMissingArtifact}}, WithSleep(func(time.Duration) { cancel() }))
-	s := during.e.settle(ctx, "audit", phasecontract.Roots{Workspace: during.ws})
+	s := during.e.settle(ctx, Identity{}, "audit", phasecontract.Roots{Workspace: during.ws})
 	if s.attempts != 0 || during.n.verify != 1 {
 		t.Errorf("cancelled during the sleep: one probe, zero re-probes (attempts=%d probes=%d)", s.attempts, during.n.verify)
 	}
 	before := newHarness(t, probe{codes: []string{deliverable.CodeMissingArtifact}})
-	s = before.e.settle(ctx, "audit", phasecontract.Roots{Workspace: before.ws})
+	s = before.e.settle(ctx, Identity{}, "audit", phasecontract.Roots{Workspace: before.ws})
 	if s.attempts != 0 || *before.n != (counts{verify: 1, sleep: 0}) {
 		t.Errorf("cancelled before entry: one probe, no sleep (attempts=%d %+v)", s.attempts, *before.n)
 	}

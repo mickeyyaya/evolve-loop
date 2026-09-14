@@ -276,11 +276,16 @@ func SalvageVerdict(res Result) (Result, bool) {
 	return salvageVerdictWith(res, phasecontract.BuiltinResolver{}, phasecontract.Roots{}, config.StageOff)
 }
 
-// salvageVerdictWith is SalvageVerdict with the resolver, roots and PhaseIO
-// stage threaded from the caller — the seam the Reviewer uses so the re-verify
-// pass (below) runs the SAME contract resolution and the SAME roots the
-// original Verify ran.
-func salvageVerdictWith(res Result, resolver phasecontract.Resolver, roots phasecontract.Roots, phaseIO config.Stage) (Result, bool) {
+// RepairedVerdictContent returns res.Content with its SOLE recoverable
+// bad_verdict repaired to the canonical sentinel line — the pure half of the
+// salvage, shared by the two consumers that must agree on the same bytes: the
+// Reviewer (which re-verifies, persists the repaired artifact and reports the
+// salvage) and the runner's verdict engine (which classifies). Cycle 1685
+// (2026-09-15): the engine classified the unrepaired bytes ("no parseable
+// verdict → FAIL") while the gate approved the repaired file, and a
+// red_count=0 cycle sealed FAIL with no failure class. Nothing is written
+// here.
+func RepairedVerdictContent(res Result) (string, bool) {
 	// SOLE violation, never membership. hasCode ("is a bad_verdict in there
 	// anywhere") let a bad_verdict co-occurring with missing_section or
 	// missing_challenge_token be salvaged wholesale — OK forced true and ALL
@@ -288,21 +293,30 @@ func salvageVerdictWith(res Result, resolver phasecontract.Resolver, roots phase
 	// check. That is a report-forgery bypass on the gate's own decision seam
 	// (cycle-1392 audit CRITICAL-1, probe-confirmed). Salvage repairs the
 	// VERDICT and nothing else, so it may only ever act when the verdict is
-	// the one and only thing wrong. Negative predicate:
-	// go/acs/cycle1397/predicates_test.go TestC1397_001_SalvageVerdict_MultiViolationNeverSalvaged.
-	if !res.onlyViolation(CodeBadVerdict) {
-		return res, false
+	// the one and only thing wrong (the cycle-1397 negative predicate package
+	// has since been retired; the sole-violation cases live in this package's
+	// salvage tests and TestRepairedVerdictContent_…).
+	if res.OK || !res.onlyViolation(CodeBadVerdict) {
+		return "", false
 	}
 	cls := ClassifyBadVerdict(res.Content)
 	if !cls.Recoverable {
-		return res, false
+		return "", false
 	}
 	if candidateCount(res.Content) > 1 {
 		// Genuine ambiguity: refuse rather than silently pick one candidate —
 		// the item's explicit hard constraint (scout Hypothesis 2).
-		return res, false
+		return "", false
 	}
-	repaired, ok := repairVerdict(res.Content, cls)
+	return repairVerdict(res.Content, cls)
+}
+
+// salvageVerdictWith is SalvageVerdict with the resolver, roots and PhaseIO
+// stage threaded from the caller — the seam the Reviewer uses so the re-verify
+// pass (below) runs the SAME contract resolution and the SAME roots the
+// original Verify ran.
+func salvageVerdictWith(res Result, resolver phasecontract.Resolver, roots phasecontract.Roots, phaseIO config.Stage) (Result, bool) {
+	repaired, ok := RepairedVerdictContent(res)
 	if !ok {
 		return res, false
 	}

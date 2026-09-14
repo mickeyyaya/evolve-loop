@@ -59,3 +59,25 @@ func TestSwarmDecorator_ForwardsSignalsWired(t *testing.T) {
 		t.Error("a runner without the capability reports false")
 	}
 }
+
+type contractWiredRunner struct {
+	plainRunner
+	wired bool
+}
+
+func (w contractWiredRunner) ContractVerifierWired() bool { return w.wired }
+
+// Research F22: the verifier-wiring proof forwards through the Decorator the
+// same way SignalsWired does — wrapping never reports a wired runner unwired,
+// and never invents the capability for a runner without it.
+func TestSwarmDecorator_ForwardsContractVerifierWired(t *testing.T) {
+	if !New(contractWiredRunner{wired: true}, nil, swarm.ModeWriter, Config{}).ContractVerifierWired() {
+		t.Error("a wired inner runner reports wired through the Decorator")
+	}
+	if New(contractWiredRunner{wired: false}, nil, swarm.ModeWriter, Config{}).ContractVerifierWired() {
+		t.Error("an unwired inner runner reports unwired")
+	}
+	if New(plainRunner{}, nil, swarm.ModeWriter, Config{}).ContractVerifierWired() {
+		t.Error("a runner without the capability reports false")
+	}
+}

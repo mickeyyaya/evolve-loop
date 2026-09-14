@@ -7,6 +7,8 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
@@ -116,5 +118,25 @@ func TestWithSignals_NamedOptionReachesTheGates(t *testing.T) {
 	}
 	if NewDefaultWithStageCompactSpec(&fakeBridge{}, fakePromptsFS("body"), config.StageOff, false, nil).SignalsWired() {
 		t.Fatal("without the option the gates are the Null Object")
+	}
+}
+
+// TestWithContractVerifier_NamedOptionReachesTheEngine names the F22 export:
+// the Option stores the gate's verifier accessor on the Config, and a Phase
+// built from it reports the wiring the same way Signals does — the engine
+// classifies through the gate's own verify+salvage, not a second verifier.
+func TestWithContractVerifier_NamedOptionReachesTheEngine(t *testing.T) {
+	verifier := deliverable.PlainVerifier{PhaseIO: config.StageOff}
+	var opt Option = WithContractVerifier(func() runner.ContractVerifier { return verifier })
+	var cfg Config
+	opt(&cfg)
+	if cfg.ContractVerifier == nil || cfg.ContractVerifier() != verifier {
+		t.Fatal("WithContractVerifier stores the accessor on the Config")
+	}
+	if !New(cfg).ContractVerifierWired() {
+		t.Fatal("a Config with ContractVerifier builds a Phase whose engine verifies through it")
+	}
+	if NewDefaultWithStageCompactSpec(&fakeBridge{}, fakePromptsFS("body"), config.StageOff, false, nil).ContractVerifierWired() {
+		t.Fatal("without the option the engine keeps its catalog-aware default")
 	}
 }

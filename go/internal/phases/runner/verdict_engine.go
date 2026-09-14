@@ -12,6 +12,7 @@ package runner
 import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable"
+	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable/gatesignal"
 	"github.com/mickeyyaya/evolve-loop/go/internal/logfilter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner/verdict"
@@ -49,19 +50,24 @@ func resolveSignals(opts Options) func() *signalcenter.Center {
 // or logfilter.Process, nil (the engine's Null Object) when disabled; the
 // optional flag; the live Center accessor.
 func wiredVerdictEngine(opts Options) *verdict.Engine {
-	verify := opts.VerifyFn
-	if verify == nil {
+	verify := func(id verdict.Identity, phase string, roots phasecontract.Roots) (deliverable.Result, error) {
+		switch {
+		case opts.VerifyFn != nil:
+			return opts.VerifyFn(phase, roots)
+		case opts.ContractVerifier != nil:
+			if v := opts.ContractVerifier(); v != nil {
+				// The gate's own verifier: ONE verifier for gate and engine (F22).
+				return v.VerifyForClassification(gatesignal.Check{Cycle: id.Cycle, RunID: id.RunID, Phase: id.Phase}, phase, roots)
+			}
+		}
 		// Catalog-aware so the reconcile check resolves user/minted phases
 		// under the SAME policy as the host gate and the agent self-check —
 		// a builtin-only default left an inserted phase's surviving artifact
 		// unresolvable on timeout, synthesizing FAIL. Stage-threaded (3.10
 		// Slice 1) so the rung also reaches the host gate's verdict at enforce;
-		// opts.PhaseIO's zero value (StageOff) is byte-identical to the prior
-		// VerifyCatalogAware default.
-		stage := opts.PhaseIO
-		verify = func(phase string, roots phasecontract.Roots) (deliverable.Result, error) {
-			return deliverable.VerifyCatalogAwareStage(phase, roots, stage)
-		}
+		// no salvage here — the gate alone repairs, and only when it is the
+		// engine's verifier does the classification see the repair.
+		return deliverable.VerifyCatalogAwareStage(phase, roots, opts.PhaseIO)
 	}
 	sleep := opts.SleepFn
 	if sleep == nil {
@@ -104,6 +110,14 @@ func (b *BaseRunner) classifyWith(req core.PhaseRequest, bres core.BridgeRespons
 // SignalsWired reports whether this runner's verdict engine reaches a Signal
 // Center — the root-wiring proof (the swarmrunner Decorator forwards it).
 func (b *BaseRunner) SignalsWired() bool { return b.judge.SignalsWired() }
+
+// ContractVerifierWired reports whether the composition root SUPPLIED the
+// engine's verifier — the gate's Reviewer when the contract gate is on, its
+// Null-Object PlainVerifier when off — i.e. the root made the choice; it is
+// not a gate-liveness proof (ADR-0103 unit 11 shape).
+func (b *BaseRunner) ContractVerifierWired() bool {
+	return !b.verifyInjected && b.contractVerifier != nil && b.contractVerifier() != nil
+}
 
 // The settle bounds under their old names — Strangler projections for the
 // settle tests that read them (the values are the engine's).

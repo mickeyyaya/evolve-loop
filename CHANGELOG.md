@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — the verdict engine verifies through the contract gate's own Reviewer, so a salvaged verdict is classified as the gate approves it (2026-09-15)
+
+Cycle 1685 sealed FAIL with red_count=0: the auditor's verdict was fenced JSON without the sentinel wrapper, the gate salvaged and approved the repaired report, but the verdict engine had verified with the plain verifier and classified the unrepaired bytes ("no parseable verdict"), and the audit-fail envelope declined a repair for want of a class. There is now ONE verifier: `deliverable.Reviewer.VerifyForClassification` salvages, persists and reports a sole recoverable bad_verdict before classification and returns the repaired OK result; the composition root hands every BaseRunner an accessor to the gate's Reviewer (`runner.Options.ContractVerifier`, through each phase Config); the engine stays a leaf with its own `verdict.Identity`. Research F22.
+
 ## Fixed — cycle 1679's added-test predicate is green on a merged tree (2026-09-15)
 
 `acs/cycle1679` `TestC1679_007` fataled on an empty added-test seed, which is what every clean checkout of main has once the lane's commit is merged — a durable predicate red on main in every whole-module floor. It now verifies its recorded added set (the two files the lane added) the same way when the live seed is empty. Research F21.

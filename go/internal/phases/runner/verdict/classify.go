@@ -71,7 +71,7 @@ func (e *Engine) selectVerdictBytes(ctx context.Context, d Dispatch, r reconcili
 	if r.reconciled {
 		return verdictSource{artifact: classifiedArtifact(r.verified, d.ArtifactPath, pane), attempts: r.attempts}
 	}
-	s := e.settle(ctx, d.Phase, rootsFor(d))
+	s := e.settle(ctx, identityOf(d), d.Phase, rootsFor(d))
 	if s.err != nil {
 		return verdictSource{artifact: pane, attempts: s.attempts}
 	}

@@ -50,8 +50,8 @@ type settled struct {
 // context.WithoutCancel (see reconcileTeardown): there a cancelled ctx is
 // frequently the CAUSE of the teardown; on the clean-exit path the agent
 // already exited 0, so cancellation genuinely means nothing more is coming.
-func (e *Engine) settle(ctx context.Context, phase string, roots phasecontract.Roots) settled {
-	res, err := e.verify(phase, roots)
+func (e *Engine) settle(ctx context.Context, id Identity, phase string, roots phasecontract.Roots) settled {
+	res, err := e.verify(id, phase, roots)
 	s := settled{res: res, err: err}
 	for attempt := 0; attempt < SettleRetries && s.err == nil && !s.res.OK; attempt++ {
 		if ctx.Err() != nil {
@@ -61,7 +61,7 @@ func (e *Engine) settle(ctx context.Context, phase string, roots phasecontract.R
 		if ctx.Err() != nil {
 			return s
 		}
-		s.res, s.err = e.verify(phase, roots)
+		s.res, s.err = e.verify(id, phase, roots)
 		s.attempts++
 	}
 	return s

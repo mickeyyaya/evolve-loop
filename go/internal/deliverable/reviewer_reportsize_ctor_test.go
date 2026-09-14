@@ -33,7 +33,7 @@ func TestNewReviewerWithCatalogStageReportSize_ThreadsGate(t *testing.T) {
 			ws := t.TempDir()
 			writeFile(t, ws, "build-report.md", report)
 			rev := NewReviewerWithCatalogStageReportSize(
-				config.StageEnforce, userCatalogWithFoo(), config.StageOff, tc.reportSizeGate, 2000).(*Reviewer)
+				config.StageEnforce, userCatalogWithFoo(), config.StageOff, tc.reportSizeGate, 2000)
 			rev.breakerPath = filepath.Join(t.TempDir(), "breaker.json")
 			rev.logf = func(string, ...any) {}
 			got := rev.Review(context.Background(), core.ReviewInput{Phase: "build", Workspace: ws, ProjectRoot: t.TempDir()})
