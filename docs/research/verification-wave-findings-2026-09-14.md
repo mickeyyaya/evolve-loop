@@ -81,10 +81,35 @@ Where the design was **not yet enough**: the triage gate's refusal was structure
 
 ## 5. Open items for the next wave
 
-1. Re-launch on a plane carrying #606 and the wedge fix; count consecutive ships from that wave (goal: 5).
-2. `AUDIT_CIPARITY_GATE_STEP_FAILED` inside lane worktrees (F4) — needs a second occurrence to classify.
+1. ~~Re-launch on a plane carrying #606 and the wedge fix; count consecutive ships from that wave (goal: 5).~~ Done: wave 2 ran 16:11–21:05 on plane 83a019aa and shipped 0/2 (§6); wave 3 launched 21:06 on plane e2819460 (#613–#617). The count toward 5 restarts there.
+2. ~~`AUDIT_CIPARITY_GATE_STEP_FAILED` inside lane worktrees (F4) — needs a second occurrence to classify.~~ Classified on the second wave (every audit): the apicover coverage run inherited the lane env — F9, fixed #617.
 6. **Done the same day (F6):** the acs/cycle8 `--simulate` walk that littered every checkout it ran in (dossier commits, salvage snapshots, cycle worktrees/branches, live CLI probes) — the simulate root never mutates git now; record [2026-09-14-simulate-runs-against-the-checkout](../incidents/2026-09-14-simulate-runs-against-the-checkout.md). The two console-first P1 items lanes 1673/1674 burned on were routed `console-manual`; lanes must not draw pipeline-integrity work (operating-policy §1).
 3. ~~`ADVISOR_RESPONSE_UNPARSEABLE` (F4)~~ — **root-caused and fixed 2026-09-14:** not a non-JSON reply — the proposal decision read the REPL scrollback while its prompt asked the model to write `routing-proposal.json` (which it did); the decision now uses the artifact contract; record [2026-09-14-router-proposal-read-the-scrollback](../incidents/2026-09-14-router-proposal-read-the-scrollback.md).
 4. The re-send WARN signal (F2 follow-up) and the chip `+N lines` positive signal if the stability wait proves insufficient.
 5. The memo's remaining recommendations: the Center-less operator roots unit before unit 05, unit 05 as a series, the four deferred "what happened" signals.
 7. **Done the same day (F7):** the lane ship that redded main from 4db205a8 until #590 — the ship gate ran in the project root (a tree without the lane's changes), seeded from an index the ship had not yet populated, and never looked at importers. The gate now runs in the lane worktree against its base, seeds from the working tree, and runs the reverse-dependency closure (test imports included) before the push; record [2026-09-14-lane-ship-gate-package-scoped-tests](../incidents/2026-09-14-lane-ship-gate-package-scoped-tests.md).
+8. **Operator decision:** codex's `deep`/`top` tiers are pinned to `gpt-5.6-sol`, which this account rejects (F7); the `balanced`/`fast` pins are accepted. Until re-pinned, every codex deep dispatch fails over to Claude — in seconds since #616, not after the artifact window.
+9. acs baseline drift on main, not from any wave change: `acs/cycle1253` (`TestC1253_003_NewExportCovered` — the `ImporterClosure` coverage line after #612) and `acs/cycle1632` (`TestC1632_008` — a tokenopt-handoff inbox item no longer present) fail on a clean `origin/main`; `acs/cycle764` is a two-floors-at-once contention flake. The console floor baseline now carries the first two; both need a re-anchor.
+10. `TestChannel_EndToEnd` (bidirectional channel) is timing-based and redded PR #614 once on the Ubuntu Go 1.23 race runner; queued as inbox item `2026-09-14T10-20-00Z-channel-e2e-timing-flake`.
+11. A FAIL retrospective dispatched on a walled CLI costs a full artifact window (both wave-2 retros: 30 min each on codex's dead deep model). With #616 that is seconds; the retro's CLI choice should still avoid a family whose tier just walled the cycle.
+
+## 6. Wave 2 — 2026-09-14 16:11–21:05, plane 83a019aa (#606, #609, #611, #612), width 3, 2 lanes dispatched
+
+**Outcome: 0 ships of 2 lanes.** Both lanes built green and audited (WARN) and then lost every ship attempt to one pipeline defect that was latent until #612 — the ship gate's `go test` ran in the lane's IPC environment (F6). The wave also met two walls the bridge did not recognise (F7 codex, F8 Claude) and a second site of the F6 leak in the audit (F9). All four are fixed on main (#615, #616, #617); the loop halted itself at the boundary (`LOOP_HALT plane_diverged_halt`, the plane 2 dossier commits ahead and 4 fixes behind), the plane was reconciled (e2819460) and wave 3 launched at 21:06.
+
+| Cycle | Item | Phases (verdict, minutes) | Seal |
+|---|---|---|---|
+| 1676 | crossartifact-invariant-stack (0.85) | scout PASS 3.3 · triage PASS 1.8 · tdd PASS 17.0 · build PASS 64.5 (25 of it idle on codex's rejected model, then Claude) · audit WARN 9.6 · ship FAIL · audit PASS 13.3 · ship FAIL · audit PASS 3.4 · ship FAIL · retro FAIL 30.6 (codex wall) | FAIL, 11 phases |
+| 1677 | ledger-verify-seal-anchor (0.7) | scout PASS 2.2 · triage PASS 2.3 · tdd PASS 9.4 · build PASS 56.6 (same stall) · audit WARN 9.2 · ship FAIL · audit WARN 2.8 · ship FAIL · audit WARN 25.2 (session wall, two 40-min timeouts across the recovery audits) · ship FAIL · retro FAIL 30.5 | FAIL, 11 phases |
+
+Every `ship FAIL` is `SHIP_REPO_CONTRACT_GATE`: the importer backstop (1677) or the added-test backstop (1676) RED on twenty-odd env-sensitive tests in `cmd/evolve`, `guards`, `ship`, `core` that pass in the same worktree under `env -i PATH HOME`.
+
+**Signals since launch (per-cycle `signals.ndjson`, module × severity):** ledger INFO 278 · bridge WARN 44 · orchestrator WARN 14 / INFO 14 · gate.contract INFO 14 / WARN 4 · loop INFO 11 / INCIDENT 4 · liveness INFO 9 · ship WARN 6 · runner WARN 4 · audit WARN 4 · advisor WARN 4.
+
+**Top coded lines:** `BRIDGE_EXIT_ARTIFACT_TIMEOUT` 8 (codex 400 ×2, Claude session wall ×4, retros ×2) · `SHIP_REPO_CONTRACT_GATE` 6 · `ORCHESTRATOR_PHASE_ABORTED` 6 · `RUNNER_TEARDOWN_FAIL` 4 · `ADVISOR_RESPONSE_UNPARSEABLE` 4 (F4, fixed #614 mid-wave — the plane never carried it) · `GATE_CONTRACT_REJECTED` 4 (audits written without a verdict/section while walled) · `AUDIT_CIPARITY_GATE_STEP_FAILED` 3 (F9) · `LOOP_HALT` 4.
+
+**What the stream bought.** Each of F6–F9 was one readable line to the console: `SHIP_REPO_CONTRACT_GATE … failing: TestRunCycleReset_LeaseFencing…` named the class of test (environment-sensitive) before any log was opened; `POSSIBLE EXHAUSTION-REGEX DRIFT` in the bridge stderr named F8's cause outright; `AUDIT_CIPARITY_GATE_STEP_FAILED gate=apicover_enforce step=cover_run` named F9's step. The gaps were in the reactions, not the signals: a 4xx model rejection had no rule, a wall with a non-breaking space in it had no match, and a `go test` spawned by a gate had no scrubbed environment.
+
+**Cost.** Two builds of ~60 min (each with a 25-min idle stall on the dead codex model), six ship attempts, six audits (three of them 40-min session-wall timeouts), two 30-min retros on the dead model; the Claude session limit was reached 19:03–19:50 during the recovery audits. No tokens were spent while walled; the wall-clock was.
+
+**Carried into wave 3:** #613 (dashboard phase plan), #614 (proposal artifact), #615 (ship-gate env scrub + tee race), #616 (codex model rule, Claude session-wall regex), #617 (apicover env scrub). Open: items 8–11 above.
