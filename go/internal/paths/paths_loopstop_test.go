@@ -6,7 +6,7 @@ import (
 )
 
 // TestLoopStopPath pins the brake marker's single home: the chain driver's
-// `chainBrakeEngaged` and the dashboard's LoopStatus.BrakeEngaged both stat
+// `loopchain.BrakeEngaged` and the dashboard's LoopStatus.BrakeEngaged both stat
 // exactly this path.
 func TestLoopStopPath(t *testing.T) {
 	t.Parallel()
@@ -29,5 +29,20 @@ func TestEvolveDirOf(t *testing.T) {
 	l := Resolve(func(string) string { return "" }, "/root")
 	if l.EvolveDir != EvolveDirOf("/root") {
 		t.Fatalf("Layout.EvolveDir %q must derive from EvolveDirOf %q", l.EvolveDir, EvolveDirOf("/root"))
+	}
+}
+
+// TestPolicyPath pins the policy file's single home: the loop's wave and
+// chain engines (internal/loopwave, internal/loopchain) both resolve
+// `.evolve/policy.json` through exactly this path.
+func TestPolicyPath(t *testing.T) {
+	t.Parallel()
+	got := PolicyPath(filepath.Join("root", ".evolve"))
+	want := filepath.Join("root", ".evolve", PolicyFile)
+	if got != want {
+		t.Fatalf("PolicyPath = %q, want %q", got, want)
+	}
+	if PolicyFile != "policy.json" {
+		t.Fatalf("PolicyFile = %q; operators edit `.evolve/policy.json` — renaming breaks the documented layout", PolicyFile)
 	}
 }

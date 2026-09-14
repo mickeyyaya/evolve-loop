@@ -621,3 +621,10 @@
 # launcher with its profile fallback chain and redacted captures, and the plan/proposal parser with
 # the mint recursion guard (internal/core/advisor). 100% API + 100% line coverage gated.
 ./internal/core/advisor
+# ADR-0103 unit 13 (2026-09-14): the loop wave engine — the wave gate, one dispatch body, the min-width
+# repair, the fleet-config reload, the freshness-gated launcher, quota/budget sizing and the plan source
+# (internal/loopwave). 100% API + 100% line coverage gated.
+./internal/loopwave
+# ADR-0103 unit 13 (2026-09-14): the batch-chaining driver, the boundary binary-refresh engine and the
+# pure chain decisions (internal/loopchain). 100% API + 100% line coverage gated.
+./internal/loopchain

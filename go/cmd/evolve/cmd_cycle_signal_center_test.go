@@ -27,8 +27,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core/failurediag"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core/failurelearning"
 	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable"
+	"github.com/mickeyyaya/evolve-loop/go/internal/loopchain"
+	"github.com/mickeyyaya/evolve-loop/go/internal/loopwave"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
@@ -153,13 +156,15 @@ func TestSignalCenterRegistry_EveryLinkedModuleRegistersCleanly(t *testing.T) {
 // that finds a drain in progress returns before delivery, so an exit path
 // without a Flush could lose the last events of a cycle or a batch.
 func TestSignalCenterFlush_IsWiredAtBothRoots(t *testing.T) {
-	for _, file := range []string{"cmd_cycle.go", "cmd_loop.go"} {
+	// The chain root (ADR-0103 unit 13) builds its own batch-level Center
+	// and flushes it at exit too.
+	for file, needle := range map[string]string{"cmd_cycle.go": "Signals.Flush()", "cmd_loop.go": "Signals.Flush()", "cmd_loop_chain.go": "signals.Flush()"} {
 		src, err := os.ReadFile(file)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !strings.Contains(string(src), "Signals.Flush()") {
-			t.Errorf("%s: the root must defer Signals.Flush() after wiring the orchestrator", file)
+		if !strings.Contains(string(src), needle) {
+			t.Errorf("%s: the root must defer %s after wiring its Center", file, needle)
 		}
 	}
 }
@@ -541,5 +546,45 @@ func TestWireSimulateOrchestrator_RunnerWarningRenders(t *testing.T) {
 	}
 	if data, err := os.ReadFile(filepath.Join(ws, "signals.ndjson")); err != nil || !strings.Contains(string(data), `"code":"RUNNER_STDOUT_FILTER_FAILED"`) {
 		t.Errorf("the cycle-stamped signal is durable in the cycle workspace: %v %s", err, data)
+	}
+}
+
+// ADR-0103 unit 13: the wave engine's and the chain engine's WARNs reach the
+// --simulate root's console sink and the durable batch-level stream.
+func TestWireSimulateOrchestrator_LoopWaveAndChainWarningsRender(t *testing.T) {
+	root := t.TempDir()
+	evolveDir := filepath.Join(root, ".evolve")
+	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var console bytes.Buffer
+	d := wireSimulateOrchestrator(root, evolveDir, &console)
+	wave := newWaveEngine(loopConfig{ProjectRoot: root, EvolveDir: evolveDir}, d.Storage, io.Discard, func() *signalcenter.Center { return d.Signals })
+	wave.RepairMinWidth(context.Background(), policy.FleetConfig{Count: 1}, policy.FleetConfig{Count: 1}, loopwave.DispatchRequest{Wave: 2})
+	if err := os.WriteFile(filepath.Join(evolveDir, "inbox"), []byte("not a dir"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	chain := loopchain.NewDriver(loopchain.Roots{ProjectRoot: root, EvolveDir: evolveDir}, policy.ChainConfig{MaxBatches: 1}, loopchain.DriverDeps{
+		Batch: func() int { return 0 }, Refresh: func(int) bool { return false }, LastRefresh: func() (*loopchain.RefreshLogEntry, error) { return nil, nil },
+		FleetWidth: func() int { return 1 }, QuotaPause: func() (loopchain.QuotaPause, bool) { return loopchain.QuotaPause{}, false },
+	}, io.Discard, loopchain.WithSignals(func() *signalcenter.Center { return d.Signals }))
+	if r := chain.Run(); r.StopReason != loopchain.StopInboxUnreadable {
+		t.Fatalf("the chain stops on an unreadable inbox: %+v", r)
+	}
+	d.Signals.Flush()
+	out := console.String()
+	for _, want := range []string{"[loop] loop.wave WARN LOOP_WAVE_EMPTY_PLAN", "origin=Engine.RepairMinWidth", "[loop] loop.halt INCIDENT LOOP_CHAIN_INBOX_UNREADABLE", "origin=Driver.Run"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("the console sink renders the unit's signals under --simulate; lacks %q:\n%s", want, out)
+		}
+	}
+	data, err := os.ReadFile(filepath.Join(evolveDir, "signals.ndjson"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, code := range []string{`"code":"LOOP_WAVE_EMPTY_PLAN"`, `"code":"LOOP_CHAIN_INBOX_UNREADABLE"`} {
+		if !strings.Contains(string(data), code) {
+			t.Errorf("the cycle-less signal is durable in <evolveDir>/signals.ndjson; lacks %s", code)
+		}
 	}
 }

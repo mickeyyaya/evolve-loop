@@ -1,0 +1,6 @@
+{
+  "chain_mode": true,
+  "max_batches": 5,
+  "batches": null,
+  "chain_stop_reason": "chain_operator_brake"
+}

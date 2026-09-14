@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
+	"github.com/mickeyyaya/evolve-loop/go/internal/loopwave"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
@@ -48,13 +49,13 @@ func (b *loopBatchCoordinator) prepareIteration(
 	runUsageProbe(b.cfg.ProjectRoot, b.cfg.EvolveDir, b.cycleEnv, b.stderr)
 	if _, halt := syncMainFromOriginAtWaveBoundary(b.ctx, b.cfg.ProjectRoot, b.stderr); halt != nil {
 		b.result.StopReason = "plane_diverged_halt"
-		emitLoopHalt(b.deps.Signals, 0, "runWaveIteration", CodeLoopHalt, halt.Error(), map[string]string{"stop_reason": b.result.StopReason})
+		emitLoopHalt(b.deps.Signals, 0, "loopBatchCoordinator.prepareIteration", CodeLoopHalt, halt.Error(), map[string]string{"stop_reason": b.result.StopReason})
 		b.result.emitFatal(b.stdout, b.stderr, b.cfg, 0)
 		return batchDecision{flow: batchReturn, exitCode: 2}
 	}
 
-	*fleetConfig = reloadFleetConfigAtWaveBoundary(b.cfg.EvolveDir, *fleetConfig, b.stderr)
-	if maybeRefreshChainBoundary(b.cfg, iteration+1, b.stderr) {
+	*fleetConfig = loopwave.ReloadFleetConfig(b.cfg.EvolveDir, *fleetConfig, b.stderr)
+	if maybeRefreshChainBoundaryWithSignals(b.cfg, iteration+1, b.stderr, b.deps.Signals) {
 		b.result.StopReason = "loop_boundary_refresh_reexec"
 		if entry, err := lastChainBoundaryRefreshLogEntry(b.cfg.EvolveDir); err == nil {
 			b.result.BoundaryRefresh = entry
@@ -114,22 +115,23 @@ func (b *loopBatchCoordinator) dispatchFleetIteration(
 		return batchDecision{flow: batchProceed}
 	}
 	waveConfig, pace := budgetAwareWaveConfig(b.ctx, fleetConfig, b.cfg.ProjectRoot, b.cfg.EvolveDir, b.deps.Storage, b.stderr)
-	launcher := productionWaveLauncher(waveConfig, waveBinary, b.cfg.ProjectRoot, b.cfg.GoalHash, b.cfg.GoalText, b.stdout, b.stderr)
-	ran, _, results, err := dispatchIteration(
-		b.ctx,
-		waveConfig,
-		productionWavePreflight(b.cfg.ProjectRoot),
-		productionWavePlanFn(b.cfg, b.deps.Storage, waveConfig.Count, b.stderr),
-		launcher,
-		consoleRoutedResolver(b.cfg.ProjectRoot, b.stderr),
-		iteration,
-	)
+	launcher := b.wave().Launcher(iteration, waveConfig.Concurrency, execCycleLaunch(waveBinary, false, b.cfg.ProjectRoot, b.cfg.GoalHash, b.cfg.GoalText, b.stdout, b.stderr))
+	out, err := b.wave().Dispatch(b.ctx, loopwave.DispatchRequest{
+		Config:    waveConfig,
+		Wave:      iteration,
+		Preflight: productionWavePreflight(b.cfg.ProjectRoot),
+		Plan:      b.wave().PlanFn(waveConfig.Count),
+		Launcher:  launcher,
+		Routed:    b.wave().RoutedResolver(),
+	})
+	ran, results := out.Ran, out.Results
 	switch {
 	case err != nil:
-		fmt.Fprintf(b.stderr, "[loop] WARN: fleet: wave %d dispatch failed, falling back to sequential: %v\n", iteration, err)
+		// The engine reported LOOP_WAVE_DISPATCH_FAILED (rendered by the root
+		// sink); the batch falls through to the sequential body.
 	case ran:
 		fmt.Fprintf(b.stderr, "[loop] wave %d: %d/%d lanes ok\n", iteration, len(results)-failedLaneCount(results), len(results))
-		emitLoopWave(b.deps.Signals, iteration, "runWaveIteration", "",
+		emitLoopWave(b.deps.Signals, iteration, "loopBatchCoordinator.dispatchFleetIteration", "",
 			fmt.Sprintf("wave %d: %d/%d lanes ok", iteration, len(results)-failedLaneCount(results), len(results)),
 			map[string]string{"lanes_ok": strconv.Itoa(len(results) - failedLaneCount(results)), "lanes": strconv.Itoa(len(results))})
 		if decision := b.fleetHaltDecision("wave", iteration, results); decision.flow == batchReturn {
@@ -152,19 +154,15 @@ func (b *loopBatchCoordinator) dispatchFleetIteration(
 		paceBeforeNextWave(b.ctx, pace, b.stderr)
 		return batchDecision{flow: batchNextIteration}
 	default:
-		oneLauncher := productionWaveLauncher(fleetConfig, waveBinary, b.cfg.ProjectRoot, b.cfg.GoalHash, b.cfg.GoalText, b.stdout, b.stderr)
-		if minWidthRepair(
-			b.ctx,
-			fleetConfig,
-			waveConfig,
-			productionWavePreflight(b.cfg.ProjectRoot),
-			productionWavePlanFn(b.cfg, b.deps.Storage, fleetConfig.Count, b.stderr),
-			oneLauncher,
-			consoleRoutedResolver(b.cfg.ProjectRoot, b.stderr),
-			iteration,
-			b.stderr,
-			b.deps.Signals,
-		) {
+		oneLauncher := b.wave().Launcher(iteration, fleetConfig.Concurrency, execCycleLaunch(waveBinary, false, b.cfg.ProjectRoot, b.cfg.GoalHash, b.cfg.GoalText, b.stdout, b.stderr))
+		if b.wave().RepairMinWidth(b.ctx, fleetConfig, waveConfig, loopwave.DispatchRequest{
+			Config:    fleetConfig,
+			Wave:      iteration,
+			Preflight: productionWavePreflight(b.cfg.ProjectRoot),
+			Plan:      b.wave().PlanFn(fleetConfig.Count),
+			Launcher:  oneLauncher,
+			Routed:    b.wave().RoutedResolver(),
+		}) {
 			return batchDecision{flow: batchNextIteration}
 		}
 	}
@@ -184,12 +182,8 @@ func (b *loopBatchCoordinator) fleetHaltDecision(kind string, iteration int, res
 	return batchDecision{flow: batchReturn, exitCode: exitCode}
 }
 
+// failedLaneCount projects the leaf's ONE declaration of the failed-lane
+// belief (loopwave.FailedLanes) onto the coordinator's spelling.
 func failedLaneCount(results []fleet.Result) int {
-	failed := 0
-	for _, result := range results {
-		if result.Err != nil || result.ExitCode != 0 {
-			failed++
-		}
-	}
-	return failed
+	return loopwave.FailedLanes(results)
 }

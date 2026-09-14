@@ -8,6 +8,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclebudget"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
+	"github.com/mickeyyaya/evolve-loop/go/internal/loopwave"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
@@ -23,6 +24,8 @@ type loopBatchCoordinator struct {
 	lastBeforeGCHook int
 	stdout           io.Writer
 	stderr           io.Writer
+	// waveEngine is the unit-13 wave engine (ADR-0103), lazily built by wave().
+	waveEngine *loopwave.Engine
 }
 
 func (b *loopBatchCoordinator) run() int {

@@ -1,0 +1,13 @@
+{
+  "chain_mode": true,
+  "max_batches": 5,
+  "batches": [
+    {
+      "batch": 1,
+      "rc": 0,
+      "fleet_count": 1,
+      "inbox_pending": 0
+    }
+  ],
+  "chain_stop_reason": "chain_inbox_empty"
+}
