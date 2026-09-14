@@ -51,6 +51,9 @@ func u13Golden(t *testing.T, dir, name string) string {
 func u13Template(s, root, evolveDir string) string {
 	s = strings.ReplaceAll(s, evolveDir, "{EVOLVE_DIR}")
 	s = strings.ReplaceAll(s, root, "{ROOT}")
+	// The linux ReadDir verb → the darwin spelling the goldens keep (see
+	// loopchain's template).
+	s = strings.ReplaceAll(s, "readdirent ", "open ")
 	return u13RFC3339.ReplaceAllString(s, "{TS}")
 }
 

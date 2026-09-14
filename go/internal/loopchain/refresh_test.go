@@ -68,6 +68,11 @@ func golden(t *testing.T, name string) string {
 func template(s, root, evolveDir string) string {
 	s = strings.ReplaceAll(s, evolveDir, "{EVOLVE_DIR}")
 	s = strings.ReplaceAll(s, root, "{ROOT}")
+	// os.ReadDir on a file spells the fault `open <p>: not a directory` on
+	// darwin and `readdirent <p>: not a directory` on linux; the goldens keep
+	// the darwin verb (CI red on ubuntu-latest, PR #599). Same map as
+	// cmd/evolve's u13Template.
+	s = strings.ReplaceAll(s, "readdirent ", "open ")
 	return rfc3339.ReplaceAllString(s, "{TS}")
 }
 
