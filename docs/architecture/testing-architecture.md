@@ -64,7 +64,7 @@ One session surfaced 15 regressions. Fixing each instance is table stakes; this 
 
 | Question | State |
 |---|---|
-| Tests per module? | 128 packages under apicover; coverage 82.9% (core) → 100% (ciparity, modelquery). `acs/regression/` holds 170 regression predicates + 6 red-team. |
+| Tests per module? | 128 packages under apicover; coverage 82.9% (core) → 100% (ciparity, modelquery, and the ADR-0103 leaves under `.cover-strict` — `phases/audit/ciparitygate` among them). `acs/regression/` holds 170 regression predicates + 6 red-team. |
 | Public APIs covered? | `apicover -enforce`: every exported symbol must be named in a test AST (gate-enforced). Naming ≠ behavior; behavioral floor is `core` 82.9%. |
 | Dependencies broken for layered testing? | Strong seams where recent work landed: `runCmd` var (audit), `PromptDispatcher` (modelquery), `Deps`+`fakeTmux` (bridge), `SetModelCatalogDirFn` (catalog). **Weakest: `core`** — fewest injectable seams; that is why it is the coverage floor. |
 | Best practices? | TDD red-first (gated), table-driven idiom, `-race` in CI, golden corpora (routingeval), adversarial phases, mutation gate. Blind spots this session exposed: gate-infra failure modes (G/H), fake fidelity (E). |

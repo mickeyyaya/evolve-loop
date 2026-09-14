@@ -97,43 +97,6 @@ func TestWholeRepoGates_NoGoModule_StaySilent(t *testing.T) {
 	}
 }
 
-// TestChangedScopeForGate_SingleOwnerOfTouchedAndDerivable pins the replacement
-// for cycleTouchedGo as the SINGLE source of the decision the three gates
-// consult, across all three input classes. It returns the change-set itself so
-// the integration tier scopes from it rather than re-deriving (acceptance bullet
-// 2: "no gate re-derives independently").
-func TestChangedScopeForGate_SingleOwnerOfTouchedAndDerivable(t *testing.T) {
-	t.Run("underivable: git failed → run=false with a WARN error", func(t *testing.T) {
-		root := enforceFixtureNonGit(t)
-		pkgs, run, err := changedScopeForGate(core.PhaseRequest{ProjectRoot: root, Worktree: root, Cycle: 1})
-		if run || err == nil {
-			t.Fatalf("= (%v, run=%v, %v), want (nil, false, error)", pkgs, run, err)
-		}
-		if pkgs != nil {
-			t.Errorf("an underivable set must yield no packages, got %v", pkgs)
-		}
-	})
-
-	t.Run("derivable and empty: clean tree → run=false, no error", func(t *testing.T) {
-		root := enforceFixtureCleanGit(t)
-		pkgs, run, err := changedScopeForGate(core.PhaseRequest{ProjectRoot: root, Worktree: root, Cycle: 1})
-		if run || err != nil || pkgs != nil {
-			t.Fatalf("= (%v, run=%v, %v), want (nil, false, nil) — a silent no-op", pkgs, run, err)
-		}
-	})
-
-	t.Run("derivable and touched: handoff → run=true with the change-set", func(t *testing.T) {
-		req := tierFixture(t) // go module + handoff naming go/internal/widget/w.go
-		pkgs, run, err := changedScopeForGate(req)
-		if !run || err != nil {
-			t.Fatalf("= (%v, run=%v, %v), want (pkgs, true, nil)", pkgs, run, err)
-		}
-		if len(pkgs) != 1 || pkgs[0] != "./internal/widget/..." {
-			t.Errorf("pkgs = %v, want the handoff's package so the tier need not re-derive", pkgs)
-		}
-	})
-}
-
 // TestWholeRepoGates_DerivableAndTouched_StillRun — the fix must not smother the
 // happy path: a derivable, Go-touching cycle still reaches the command seam and
 // maps its exit code as before.

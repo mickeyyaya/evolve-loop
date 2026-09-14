@@ -72,7 +72,12 @@ PR, each landing with all of the following — a unit without any of them is not
 | 10 | Bridge engine — the launch-outcome classifier (the exit vocabulary as ONE table: sentinel, attempt-ledger cause code, `BRIDGE_EXIT_*` projection; the cause-line miners; the request gauntlet stays in the host as `bridge.ValidateRequest`, shared with the adapter; `Launch` split in place into named steps with four step codes) | `bridge/engine.go` + `bridge/attempt_telemetry.go` | [10-bridgeengine.md](../decomposition/10-bridgeengine.md) |
 | 11 | Phase-runner verdict engine (the settle ladder, the teardown reconcile arms, the stale-leftover gate, the ACS deterministic floor, the verdict-source rule, the ship guard; the first `runner.warning` producer — the dispatch chain follows as 11b) | `phases/runner/runner.go` + `reconciliation.go` + `classification.go` | [11-phaserunner.md](../decomposition/11-phaserunner.md) |
 | 13 | Loop wave/chain engine (the wave gate + one dispatch body, min-width repair, fleet-config reload, the freshness-gated launcher, quota/budget sizing, the plan source → `internal/loopwave`; the chain driver, the boundary binary refresh, the pure chain decisions → `internal/loopchain`) | `cmd/evolve/cmd_loop_wave.go` + `cmd_loop_chain.go` | [13-loopwave.md](../decomposition/13-loopwave.md) |
+| 14 | CI-parity gate (the five local-vs-CI decisions: go vet, acs-durable, the serialized integration tier, apicover -enforce, new-package graduation; two 137/94-line functions split into pure decision tables + thin shells; module `audit` gets its first producers) | `phases/audit/ciparity.go` | [14-ciparity.md](../decomposition/14-ciparity.md) |
+
+
 | … | inbox mover, ship gitops, config, audit gates, bridge autorespond (10b) | design §12 | later |
+
+
 
 Row 03b is a numbering insertion (the engine surfaced while unit 03 was designed), not a §12 reorder: it lands before unit 04 because the advisor's `truncateRunes` read now resolves through carryover, and its `ORCHESTRATOR_*` handoff (its doc §5) must be settled before unit 05 splits `RunCycle`. Row 07 is likewise an insertion while 04–06 are unassigned: the ship landing is design §12 row 6 and touches no core file, so it could be built in parallel with the advisor and the orchestrator split; its number is the brief's, not a §12 reorder.
 
