@@ -140,7 +140,7 @@ func TestLaunch_ThreadsWorktreeArtifactContractCompletionAgentCycleEnv(t *testin
 	}{
 		{"plan", planJSON(), "router", "routing-plan.json", "artifact", func(a *Advisor, in router.RouteInput) error { _, err := a.Plan(in); return err }},
 		{"replan", `[{"phase":"audit","run":true}]`, "router-replan", "routing-replan.json", "artifact", func(a *Advisor, in router.RouteInput) error { _, err := a.RePlan(in); return err }},
-		{"proposal", `{"next_phase":"audit"}`, "router-proposal", "routing-proposal.json", "stdout", func(a *Advisor, in router.RouteInput) error { _, err := a.Propose(in); return err }},
+		{"proposal", `{"next_phase":"audit"}`, "router-proposal", "routing-proposal.json", "artifact", func(a *Advisor, in router.RouteInput) error { _, err := a.Propose(in); return err }},
 	} {
 		for _, active := range []string{"", "/wt/cycle-7"} {
 			fl := &fakeLauncher{stdout: c.stdout}
