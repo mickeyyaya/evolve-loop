@@ -368,19 +368,22 @@ func Run(ctx context.Context, opts Options) (RunResult, error) {
 // dry-run journal if applicable. Returns the result + a (possibly nil)
 // error suitable for the caller.
 func finalize(ctx context.Context, opts *Options, res *RunResult, err error, exitReason string) (RunResult, error) {
+	// Durable per-commit ship provenance (pushonly.go): every MINTED commit is
+	// journaled — on the success path AND on a failure after the commit (a
+	// rejected push). The journal records that a sanctioned ship minted the
+	// commit, not that its push succeeded: the GIT_PUSH_REJECTED strand is the
+	// very case `evolve ship --push-only` completes, and it refused lane 1678's
+	// commit by name (2026-09-14) because the journal was written only on
+	// success. Push-only itself is exempt (review MEDIUM): it mints nothing,
+	// and journaling its HEAD would record commits this plane never shipped
+	// (e.g. a console-merged commit after a nothing-to-push clean exit) into
+	// the very trust anchor future pushes consult.
+	if res.CommitSHA != "" && !opts.DryRun && !opts.PushOnly {
+		appendShipJournal(opts.ProjectRoot, res.CommitSHA, opts.Class)
+	}
 	if err == nil {
 		res.ExitCode = ExitOK
 		writeDryRunJournal(ctx, opts, res, exitReason)
-		// Durable per-commit ship provenance (pushonly.go): every minted
-		// commit is journaled so a later GIT_PUSH_REJECTED strand can be
-		// completed by `evolve ship --push-only` with verified provenance.
-		// Push-only itself is exempt (review MEDIUM): it mints nothing, and
-		// journaling its HEAD would record commits this plane never shipped
-		// (e.g. a console-merged commit after a nothing-to-push clean exit)
-		// into the very trust anchor future pushes consult.
-		if !opts.DryRun && !opts.PushOnly {
-			appendShipJournal(opts.ProjectRoot, res.CommitSHA, opts.Class)
-		}
 		return *res, err
 	}
 	// The exit code is keyed off the structured error's Class, not the Go

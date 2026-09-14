@@ -71,6 +71,17 @@ The `cover_run` half of F4: `coverageProfile` spawned its scoped `go test -tags 
 ### F10 — the retro never entered the fallback walk, and eleven profiles had no chain (P1, fixed — ADR-0104)
 
 Both wave-2 retrospectives timed out on codex's dead deep model and the cycles sealed with no disposition, while the same exit on the same CLI in build had fallen back to Claude: the runner walks `DispatchTiered`, the retro (and the failure advisor, phase judge, retry adjudicator, swarm launcher) called the bridge directly. Behind it: the universal tail was appended only when the configured chain was *absent*, and eleven claude-primary profiles (auditor, tdd-engineer among them) had no `cli_fallback`. Fixed by making the walk a property of the bridge handle (`bridgechain.Walking`, wrapped once at the composition root), appending the tail unconditionally, moving the agy ban to `workflow.universal_fallback_exclude`, and giving every agent a chain (in-family only on the five Claude-family-floor agents). Records: ADR-0104, `docs/incidents/2026-09-14-retro-timeout-sealed-the-cycle.md`.
+### F11 — push-only could not recover the strand it exists for (P1, fixed — this change)
+
+Lane 1678's push was rejected after its gate passed and its commit was minted (a console PR had been merged mid-wave — now a standing rule); `evolve ship --push-only` refused the commit by name ("lack ship provenance") because the ship journal was appended only on finalize's success path, after the push. The journal now records every MINTED commit. Recovery until then: a normal `evolve ship --class manual` on the plane after merging origin. Record: `docs/incidents/2026-09-14-ship-gate-found-what-the-audit-could-not.md`.
+
+### F12 — the ship gate found a red the floor and the audit could not see, and the repair ladder had no owner for the fix (P1, fixed — this change)
+
+Lane 1679's added `//go:build acs` package was invisible to the floor's default-context run and first executed by the ship's added-test backstop — red on the eval the scout had materialized without a `[code]` grader, a rule the scout gate advertised but never checked. The builder's sandbox denies `.evolve/evals`, so two repair rounds burned before the tdd phase applied the builder's own remedy file. Fixed: `internal/addedtests` shared by floor and ship (tag-gated added packages run at the floor under their tags), the scout gate enforces the grader rule, and the remedy routing for "unappliable by this phase" is recorded as F13. Record: same incident.
+
+### F13 — a builder-declared "unappliable by this phase" failure is re-run instead of routed to the path's owner (P2, open — design)
+
+Round 2 of cycle 1679 declared class `infrastructure-systemic` with the remedy written to `eval-append.crossartifact-invariant-stack.md`; the orchestrator re-audited and rebuilt. The retry envelope should route such a failure to the phase whose sandbox owns the named path (`.evolve/evals` → scout/tdd) with the remedy attached. With F12's two gates the eval case cannot recur; the routing stays open for the general class.
 
 ## 4. Verdict on the design
 

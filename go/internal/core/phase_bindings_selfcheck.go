@@ -42,6 +42,11 @@ type selfCheckFailure struct {
 // the pass/fail branches without spawning `go test`.
 var buildSelfCheckRunner = realGoUnitTest
 
+// buildSelfCheckTaggedRunner runs one ADDED package under the build tags its
+// files declare (addedtests.Groups) — the floor's twin of the ship gate's
+// added-test backstop. Same seam shape as buildSelfCheckRunner.
+var buildSelfCheckTaggedRunner = realGoUnitTestTagged
+
 // changedWorktreePathsSince lists paths changed relative to baseSHA (committed
 // work included — the build-floor reviewer's axis) plus untracked additions.
 func changedWorktreePathsSince(ctx context.Context, worktree, baseSHA string) []string {
@@ -104,6 +109,17 @@ func runBuildSelfCheck(ctx context.Context, moduleDir string, pkgs []string, run
 // goTestExcludedByBuildTags). The subprocess env is scrubbed (ipcenv.Scrub)
 // so the campaign's runtime flags don't flip env-sensitive tests. A bounded
 // timeout keeps a wedged test from hanging the build phase.
+// realGoUnitTestTagged is realGoUnitTest with `-tags`: a tag-gated package is
+// invisible to the default context, so its tests run only when asked for by
+// the tags its files declare.
+func realGoUnitTestTagged(ctx context.Context, moduleDir, pkg string, tags []string) (output string, passed bool) {
+	cmd := exec.CommandContext(ctx, "go", "test", "-count=1", "-timeout", "120s", "-tags", strings.Join(tags, ","), pkg)
+	cmd.Dir = moduleDir
+	cmd.Env = ipcenv.Scrub(os.Environ())
+	out, err := cmd.CombinedOutput()
+	return string(out), err == nil
+}
+
 func realGoUnitTest(ctx context.Context, moduleDir, pkg string) (output string, passed bool) {
 	cmd := exec.CommandContext(ctx, "go", "test", "-count=1", "-timeout", "120s", pkg)
 	cmd.Dir = moduleDir

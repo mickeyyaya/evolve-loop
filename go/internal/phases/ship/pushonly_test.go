@@ -7,6 +7,7 @@ package ship
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -206,5 +207,36 @@ func TestFinalize_SuccessAppendsShipJournal(t *testing.T) {
 	}
 	if journalHasSHA(root, res2.CommitSHA) {
 		t.Fatal("dry-run journaled a commit it never made")
+	}
+}
+
+// TestFinalize_MintedCommitIsJournaledEvenWhenThePushFailed — the strand
+// push-only exists for (GIT_PUSH_REJECTED after the commit was minted) must be
+// journaled, or push-only refuses the very commit it was built to complete:
+// lane 1678 (2026-09-14) passed its gate, committed, had its push rejected,
+// and push-only then answered "1 ahead commit(s) lack ship provenance". The
+// journal is the record of a MINTED commit, not of a successful push.
+func TestFinalize_MintedCommitIsJournaledEvenWhenThePushFailed(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	opts := Options{ProjectRoot: root, Class: ClassCycle}
+	res := RunResult{CommitSHA: "38d3a41100000000000000000000000000001678"}
+	rejected := errors.New("ship: push rejected and origin/main diverged — local commit preserved")
+	if _, err := finalize(context.Background(), &opts, &res, rejected, "test"); err == nil {
+		t.Fatal("the push failure must still be returned")
+	}
+	if !journalHasSHA(root, res.CommitSHA) {
+		t.Fatal("a minted commit whose push was rejected was not journaled — push-only would refuse the strand it exists to complete")
+	}
+	// A failure BEFORE any commit was minted journals nothing.
+	none := RunResult{}
+	if _, err := finalize(context.Background(), &opts, &none, errors.New("gate red"), "test"); err == nil {
+		t.Fatal("expected the error back")
+	}
+	raw, _ := os.ReadFile(shipJournalPath(root))
+	if strings.Contains(string(raw), `"sha":""`) {
+		t.Fatalf("an empty SHA was journaled:\n%s", raw)
 	}
 }
