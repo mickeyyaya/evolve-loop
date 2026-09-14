@@ -2,9 +2,6 @@ package runner
 
 import (
 	"strings"
-
-	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
-	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
 // DefaultDiscoverCLIsFn / DefaultUniversalFallback are the composition-root
@@ -18,34 +15,6 @@ var (
 	DefaultDiscoverCLIsFn    func() []string
 	DefaultUniversalFallback bool
 )
-
-// allowedDiscovered filters system-discovered driver names (e.g. "agy-tmux")
-// to those the phase profile's allowlist permits, for the universal-fallback
-// last-resort tier. An empty/absent allowlist permits every family (the profile
-// imposes no CLI restriction); otherwise a discovered driver survives only when
-// its FAMILY (llmroute.Family: "agy-tmux" → "agy") is in AllowedCLIs. This
-// preserves per-phase security pins (e.g. tester allowed_clis=["claude"]) —
-// discovery can never route a phase to a family its operator forbade.
-func allowedDiscovered(discovered []string, prof *profiles.Profile) []string {
-	if prof == nil || len(prof.AllowedCLIs) == 0 {
-		return discovered
-	}
-	allow := make(map[string]struct{}, len(prof.AllowedCLIs))
-	for _, a := range prof.AllowedCLIs {
-		a = strings.TrimSpace(a)
-		if a == "all" { // the wildcard permits every family (policy.allowedBaseSet convention)
-			return discovered
-		}
-		allow[a] = struct{}{}
-	}
-	var out []string
-	for _, d := range discovered {
-		if _, ok := allow[llmroute.Family(d)]; ok {
-			out = append(out, d)
-		}
-	}
-	return out
-}
 
 // cli_chain.go — dispatch-log helpers for the per-phase CLI fallback chain.
 //

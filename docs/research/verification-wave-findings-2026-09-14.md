@@ -68,6 +68,10 @@ The account's rolling session limit hit at 19:03 (reset 19:50). Both lanes' reco
 
 The `cover_run` half of F4: `coverageProfile` spawned its scoped `go test -tags "integration acs" -coverprofile … ./internal/core` through the gate's raw runner while the tier step beside it scrubs, so the lane's `EVOLVE_CYCLE_STATE_FILE`/`EVOLVE_FLEET` flipped core's env-sensitive tests and the step failed on every audit of both waves (fail-open → WARN + a ~7-minute coverage run each). Reproduced with the two variables in a clean worktree. Fixed by running the step under `scrubbedRun`, red-first with the gate's fake runner (it received a nil env = inherit). Record: `docs/incidents/2026-09-14-ship-gate-inherits-the-lane-ipc-env.md` (second-site section).
 
+### F10 — the retro never entered the fallback walk, and eleven profiles had no chain (P1, fixed — ADR-0104)
+
+Both wave-2 retrospectives timed out on codex's dead deep model and the cycles sealed with no disposition, while the same exit on the same CLI in build had fallen back to Claude: the runner walks `DispatchTiered`, the retro (and the failure advisor, phase judge, retry adjudicator, swarm launcher) called the bridge directly. Behind it: the universal tail was appended only when the configured chain was *absent*, and eleven claude-primary profiles (auditor, tdd-engineer among them) had no `cli_fallback`. Fixed by making the walk a property of the bridge handle (`bridgechain.Walking`, wrapped once at the composition root), appending the tail unconditionally, moving the agy ban to `workflow.universal_fallback_exclude`, and giving every agent a chain (in-family only on the five Claude-family-floor agents). Records: ADR-0104, `docs/incidents/2026-09-14-retro-timeout-sealed-the-cycle.md`.
+
 ## 4. Verdict on the design
 
 | Claim (memo §4) | Evidence from the wave |

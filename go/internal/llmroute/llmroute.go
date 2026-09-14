@@ -260,48 +260,24 @@ func Probe(p Plan, lookPath func(string) (string, error)) Plan {
 	return out
 }
 
-// hasAvailableCandidate reports whether any candidate's binary is on PATH. An
-// unknown candidate name (not in cliBinaryFor) is treated as available — it
-// matches Probe's "unknown name keeps position" and means an
-// operator-configured novel CLI is trusted over discovery.
-func hasAvailableCandidate(candidates []string, lookPath func(string) (string, error)) bool {
-	for _, cli := range candidates {
-		bin := cliBinaryFor[cli]
-		if bin == "" {
-			return true
-		}
-		if _, err := lookPath(bin); err == nil {
-			return true
-		}
-	}
-	return false
-}
-
-// ApplyUniversalFallback is the LAST-RESORT dispatch tier (any_cli_any_phase
-// invariant): when EVERY candidate in the static chain (primary +
-// profile.cli_fallback) has an absent binary — e.g. an isolated agy-only host
-// whose profiles still name claude/codex — it appends the caller-DISCOVERED
-// CLIs so the loop routes to whatever LLM is actually installed instead of
-// halting the batch. Discovered CLIs (already filtered by the caller to
-// binary-present + auth-configured + phase-allowlist + policy) are appended
-// AFTER the configured chain, so an operator CLI merely not-yet-on-PATH still
-// leads, and are deduped against it.
+// ApplyUniversalFallback appends the discovered CLIs (installed + authed on
+// this host, already filtered by the profile's allowed_clis and the operator's
+// universal_fallback_exclude) AFTER the configured chain, deduped against it.
+// The configured chain keeps precedence — it runs first, in order — and the
+// appended tail is the last resort every launch walks before a phase gives up.
 //
-// It is a NO-OP when any static candidate is available (operator config is
-// authoritative — universal fallback never overrides a working configured CLI)
-// or when discovered is empty (fail-loud preserved: the classifier still sees a
-// real ExitMissingBinary on the absent chain, never a silent green). lookPath is
-// the seam (nil ⇒ exec.LookPath). Non-Candidates Plan fields are carried through.
+// Until 2026-09-14 the tail was added only when EVERY configured CLI's binary
+// was absent; a configured CLI that was present but walled (quota, a rejected
+// model, a boot timeout) ended the walk with the phase and, at the last phase,
+// the cycle. Operator policy since wave 2: try every available CLI before
+// giving up. Empty discovered ⇒ untouched (fail-loud preserved: the classifier
+// still sees a real ExitMissingBinary on an absent chain). lookPath is kept as
+// the seam for callers that probe. Non-Candidates Plan fields are carried through.
 func ApplyUniversalFallback(p Plan, discovered []string, lookPath func(string) (string, error)) Plan {
 	if len(discovered) == 0 {
 		return p
 	}
-	if lookPath == nil {
-		lookPath = exec.LookPath
-	}
-	if hasAvailableCandidate(p.Candidates, lookPath) {
-		return p // a configured CLI is usable → last resort not needed
-	}
+	_ = lookPath // the seam stays for callers; presence no longer suppresses the tail
 	seen := make(map[string]struct{}, len(p.Candidates))
 	for _, c := range p.Candidates {
 		seen[c] = struct{}{}

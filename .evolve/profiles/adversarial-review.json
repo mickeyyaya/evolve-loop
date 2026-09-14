@@ -6,7 +6,9 @@
   "allowed_clis": [
     "claude"
   ],
-  "cli_fallback": [],
+  "cli_fallback": [
+    "claude-p"
+  ],
   "model_tier_default": "deep",
   "allowed_tools": [
     "Read",

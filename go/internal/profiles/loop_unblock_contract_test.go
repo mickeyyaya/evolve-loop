@@ -89,8 +89,10 @@ func TestAdversarialReviewRoutesToClaudeDeep(t *testing.T) {
 	if p.CLI != "claude-tmux" {
 		t.Fatalf("CLI=%q, want claude-tmux (the contract-compliant reviewer)", p.CLI)
 	}
-	if len(p.CLIFallback) != 0 {
-		t.Fatalf("CLIFallback=%v, want [] (agy is banned from fallback; claude is already primary)", p.CLIFallback)
+	for _, fb := range p.CLIFallback {
+		if !strings.HasPrefix(fb, "claude") {
+			t.Fatalf("CLIFallback=%v: an entry outside the claude family (agy is banned from fallback; codex is the builder's family — the floor)", p.CLIFallback)
+		}
 	}
 	if p.ModelTierDefault != "deep" {
 		t.Fatalf("ModelTierDefault=%q, want deep (adversarial work is opus-class)", p.ModelTierDefault)

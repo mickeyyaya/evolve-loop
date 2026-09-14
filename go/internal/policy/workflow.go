@@ -30,6 +30,10 @@ type WorkflowPolicy struct {
 	// and everything after it). Absent/nil = default ON; explicit false opts out.
 	CompactPrompts    *bool `json:"compact_prompts,omitempty"`
 	UniversalFallback *bool `json:"universal_fallback,omitempty"`
+	// UniversalFallbackExclude lists CLI families never appended as a last
+	// resort (workflow.universal_fallback_exclude). Absent = ["agy"]; an
+	// explicit [] lifts the ban.
+	UniversalFallbackExclude []string `json:"universal_fallback_exclude,omitempty"`
 	// RemediationRounds/RemediablePhases configure graduated remediation
 	// (workflow.remediation_rounds / workflow.remediable_phases).
 	RemediationRounds *int `json:"remediation_rounds,omitempty"`
@@ -88,9 +92,15 @@ type WorkflowConfig struct {
 	// installed+authed CLIs via bridge.Doctor and appends the phase-allowlisted
 	// ones to the chain instead of halting (any_cli_any_phase invariant). Set
 	// workflow.universal_fallback=false to hard-pin to the configured chain.
-	UniversalFallback   bool
-	InteractivePolicy   string
-	InteractivePolicies map[string]string
+	UniversalFallback bool
+	// UniversalFallbackExclude (default ["agy"]): families the last-resort tail
+	// never contains — the 2026-06-07 operator judgment that gemini-3.5-flash is
+	// error-prone, and fallbacks fire exactly when things are already going
+	// wrong. A banned family may still be a profile's configured primary.
+	// workflow.universal_fallback_exclude=[] lifts it.
+	UniversalFallbackExclude []string
+	InteractivePolicy        string
+	InteractivePolicies      map[string]string
 }
 
 // WorkflowConfig returns workflow configuration with built-in defaults resolved.
@@ -102,12 +112,13 @@ func (p Policy) WorkflowConfig() WorkflowConfig {
 		// how many cycles the goal needs — completion-driven (stop when the
 		// backlog drains), bounded by MaxCyclesCap. Override with
 		// workflow.cycle_budget="off" in policy.json to restore a fixed count.
-		CycleBudget:           "enforce",
-		AutoPrune:             true,
-		BackfillEnabled:       true,
-		ConsensusAuditEnabled: true,
-		CompactPrompts:        true, // default ON: strips ~23 KB/cycle of reference tails
-		UniversalFallback:     true, // default ON: discover+route to an installed CLI when the configured chain is absent
+		CycleBudget:              "enforce",
+		AutoPrune:                true,
+		BackfillEnabled:          true,
+		ConsensusAuditEnabled:    true,
+		CompactPrompts:           true, // default ON: strips ~23 KB/cycle of reference tails
+		UniversalFallback:        true, // default ON: every launch's chain ends with the remaining available CLIs
+		UniversalFallbackExclude: []string{"agy"},
 		// Graduated remediation (2026-07-21): default ON at 1 round for the
 		// coverage gate — the measured waste class (983/992/1007/1019/1020).
 		RemediationRounds:     1,
@@ -151,6 +162,9 @@ func (p Policy) WorkflowConfig() WorkflowConfig {
 	}
 	if p.Workflow.UniversalFallback != nil {
 		c.UniversalFallback = *p.Workflow.UniversalFallback
+	}
+	if p.Workflow.UniversalFallbackExclude != nil {
+		c.UniversalFallbackExclude = append([]string(nil), p.Workflow.UniversalFallbackExclude...)
 	}
 	for k, v := range p.Workflow.SizeBudgetMultipliers {
 		if v > 0 {

@@ -637,3 +637,8 @@
 # verification and the agent_subprocess ledger record (internal/subagent/subagentrun).
 # 100% API + 100% line coverage gated.
 ./internal/subagent/subagentrun
+
+# bridgechain — the CLI/tier fallback chain as a property of the bridge handle
+# (Decorator over core.Bridge, wrapped once at the composition root); the runner's
+# cli-health projections live here so both walks share one implementation.
+./internal/bridgechain

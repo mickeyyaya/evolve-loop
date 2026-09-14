@@ -2,6 +2,7 @@ package llmroute
 
 import (
 	"errors"
+	"strings"
 	"testing"
 )
 
@@ -37,14 +38,19 @@ func TestApplyUniversalFallback_AllStaticMissing_AppendsDiscovered(t *testing.T)
 	}
 }
 
-// TestApplyUniversalFallback_AConfiguredCLIAvailable_NoOp — the configured chain
-// wins: if ANY static candidate's binary is present, discovery must not touch
-// the plan (operator config is authoritative; universal fallback is last-resort).
-func TestApplyUniversalFallback_AConfiguredCLIAvailable_NoOp(t *testing.T) {
+// TestApplyUniversalFallback_AConfiguredCLIAvailable_AppendsTheRestAsLastResort
+// — operator policy (2026-09-14, wave 2): a phase must try EVERY available CLI
+// before it gives up, because one CLI's quota wall must never fail a cycle at
+// its last phase. The configured chain keeps precedence (it runs first, in
+// order); the discovered CLIs the profile allows are appended after it even
+// when a configured CLI is present — that tail is what the walk reaches when
+// the configured chain is present but walled.
+func TestApplyUniversalFallback_AConfiguredCLIAvailable_AppendsTheRestAsLastResort(t *testing.T) {
 	p := Plan{Candidates: []string{"claude-tmux", "codex-tmux"}}
 	got := ApplyUniversalFallback(p, []string{"agy-tmux"}, lookPathStub("codex")) // codex present
-	if len(got.Candidates) != 2 {
-		t.Fatalf("a present configured CLI must suppress universal fallback; got %v", got.Candidates)
+	want := []string{"claude-tmux", "codex-tmux", "agy-tmux"}
+	if strings.Join(got.Candidates, " ") != strings.Join(want, " ") {
+		t.Fatalf("a present configured CLI keeps precedence and the discovered rest is appended; got %v", got.Candidates)
 	}
 }
 
@@ -84,13 +90,13 @@ func TestApplyUniversalFallback_DedupesAndPreservesOtherFields(t *testing.T) {
 	}
 }
 
-// TestApplyUniversalFallback_UnknownCandidateName_ConfiguredWins — an unknown
-// candidate name (not in cliBinaryFor) is treated as available (matches Probe's
-// "unknown name keeps position"), so discovery does not override it.
-func TestApplyUniversalFallback_UnknownCandidateName_ConfiguredWins(t *testing.T) {
+// TestApplyUniversalFallback_UnknownCandidateName_ConfiguredStaysFirst — an
+// unknown candidate name (not in cliBinaryFor) keeps its position (matches
+// Probe's "unknown name keeps position"); discovery is appended after it.
+func TestApplyUniversalFallback_UnknownCandidateName_ConfiguredStaysFirst(t *testing.T) {
 	p := Plan{Candidates: []string{"some-future-cli"}}
 	got := ApplyUniversalFallback(p, []string{"agy-tmux"}, lookPathStub())
-	if len(got.Candidates) != 1 {
-		t.Fatalf("an unknown (assumed-available) candidate must suppress fallback; got %v", got.Candidates)
+	if strings.Join(got.Candidates, " ") != "some-future-cli agy-tmux" {
+		t.Fatalf("configured first, discovered appended; got %v", got.Candidates)
 	}
 }

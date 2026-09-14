@@ -119,6 +119,7 @@ func (b *BaseRunner) dispatchPhaseAttempts(
 			Skills:              overlaySkills,
 			CorrectionDirective: req.CorrectionDirective,
 			OperatorDirectives:  req.OperatorDirectives,
+			ChainAttempt:        true, // one attempt of THIS walk — a chain-walking handle passes it through
 		})
 		// Normalize per attempt so the final events file reflects the
 		// final CLI's stdout — cycleclassify reads <phase>-events.ndjson
