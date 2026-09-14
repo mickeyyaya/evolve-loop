@@ -52,6 +52,10 @@ Cycle 1673's audit CI-parity apicover step failed inside the lane worktree and t
 
 Ledger `recover` actions since cycle 1640 named eight ids; only `verdict-sentinel-as-tool-call` (9×) was still pending at the inbox root — routed `console-manual` by hand as the mitigation before F1 landed. The others had already been consumed or routed.
 
+### F6 — the repo-contract gate ran `go test` in the lane's IPC environment (P1, fixed — this change)
+
+Lane 1677's importer backstop (the layer #612 added) went RED on twenty-odd tests in `cmd/evolve`, `guards`, `ship` and `core` — every one env-sensitive (cycle-reset lease fencing, "outside a cycle", seal role, fleet-off goldens) and every one green in the same worktree under `env -i PATH HOME`. The gate's `go test` inherited `EVOLVE_FLEET=1` and `EVOLVE_CYCLE_STATE_FILE=<the lane's run dir>` from the lane process; core already scrubbed those for its own `go test` spawns with a private `sanitizeEnv`, the ship gate never did. Fixed by `ipcenv.Scrub` (the namespace owner projects the scrub) wired into the ship runner and the four core sites. Cost on this wave: 1677's ship aborted and a recovery audit + re-ship are spent under the running plane. Record: `docs/incidents/2026-09-14-ship-gate-inherits-the-lane-ipc-env.md`.
+
 ## 4. Verdict on the design
 
 | Claim (memo §4) | Evidence from the wave |

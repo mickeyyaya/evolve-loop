@@ -31,6 +31,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/codequality"
 	"github.com/mickeyyaya/evolve-loop/go/internal/docsfloor"
 	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/verifylock"
 )
@@ -265,7 +266,7 @@ func buildTagVisiblePackages(ctx context.Context, moduleDir string, pkgs []strin
 	args := append([]string{"list", "-e", "-f", "{{.Dir}}\t{{len .GoFiles}}\t{{len .TestGoFiles}}\t{{len .XTestGoFiles}}"}, pkgs...)
 	cmd := exec.CommandContext(ctx, "go", args...)
 	cmd.Dir = moduleDir
-	cmd.Env = sanitizeEnv(os.Environ())
+	cmd.Env = ipcenv.Scrub(os.Environ())
 	out, err := cmd.Output()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[build-floor] WARN: go list failed (%v) — build-tag visibility filter skipped this handoff\n", err)
@@ -378,14 +379,14 @@ func scopedCoverFunc(ctx context.Context, moduleDir string, pkgs []string) (path
 	args := append([]string{"test", "-count=1", "-timeout", "300s", "-coverprofile", profile}, pkgs...)
 	cmd := exec.CommandContext(ctx, "go", args...)
 	cmd.Dir = moduleDir
-	cmd.Env = sanitizeEnv(os.Environ())
+	cmd.Env = ipcenv.Scrub(os.Environ())
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return tmpDir + "/", string(out), coverStatusTestsFailed
 	}
 	funcOut := filepath.Join(tmpDir, "cover.func.txt")
 	cmd2 := exec.CommandContext(ctx, "go", "tool", "cover", "-func="+profile)
 	cmd2.Dir = moduleDir
-	cmd2.Env = sanitizeEnv(os.Environ())
+	cmd2.Env = ipcenv.Scrub(os.Environ())
 	fo, err := cmd2.Output()
 	if err != nil {
 		return tmpDir + "/", "go tool cover: " + err.Error(), coverStatusPlumbingError

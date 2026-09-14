@@ -17,6 +17,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/mickeyyaya/evolve-loop/go/internal/committedset"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -343,7 +344,7 @@ func listACSPredicates(ctx context.Context, worktree string, cycle int) acsPredi
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "go", "test", "-list", ".", "-tags", "acs", pkg)
 	cmd.Dir = moduleDir
-	cmd.Env = sanitizeEnv(os.Environ())
+	cmd.Env = ipcenv.Scrub(os.Environ())
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		tail := strings.TrimSpace(string(out))
