@@ -84,7 +84,7 @@ func (b *BaseRunner) resolveDispatchPlan(req core.PhaseRequest, prep phasePrepar
 	}
 	resolved.plan = b.applyBenchToPlan(req.ProjectRoot, prep.phase, resolved.plan, pin != nil && pin.CLI != "", req.Env)
 	if (pin == nil || pin.CLI == "") && b.universalFallback && b.discoverCLIsFn != nil {
-		discovered := allowedDiscovered(b.discoverCLIsFn(), prep.profile)
+		discovered := llmroute.AllowedDiscovered(b.discoverCLIsFn(), prep.profile)
 		before := resolved.plan.Candidates
 		resolved.plan = llmroute.ApplyUniversalFallback(resolved.plan, discovered, nil)
 		if !sameCandidates(before, resolved.plan.Candidates) {

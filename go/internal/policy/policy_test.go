@@ -393,3 +393,21 @@ func TestLoad_ParsesCatalogAllowedFamilies(t *testing.T) {
 		t.Errorf("codex allowed_families = %v, want [gpt]", got["codex"])
 	}
 }
+
+// TestWorkflowConfig_UniversalFallbackExcludeDefaultsToAgy — the last-resort
+// tail every launch walks (2026-09-14 policy: try every available CLI before
+// giving up) never contains the agy family unless the operator lifts the
+// 2026-06-07 ban explicitly with workflow.universal_fallback_exclude=[].
+func TestWorkflowConfig_UniversalFallbackExcludeDefaultsToAgy(t *testing.T) {
+	if got := (Policy{}).WorkflowConfig().UniversalFallbackExclude; len(got) != 1 || got[0] != "agy" {
+		t.Fatalf("default = %v, want [agy]", got)
+	}
+	lifted := Policy{Workflow: &WorkflowPolicy{UniversalFallbackExclude: []string{}}}
+	if got := lifted.WorkflowConfig().UniversalFallbackExclude; len(got) != 0 {
+		t.Fatalf("an explicit empty list lifts the ban: %v", got)
+	}
+	custom := Policy{Workflow: &WorkflowPolicy{UniversalFallbackExclude: []string{"agy", "ollama"}}}
+	if got := custom.WorkflowConfig().UniversalFallbackExclude; len(got) != 2 {
+		t.Fatalf("custom = %v", got)
+	}
+}

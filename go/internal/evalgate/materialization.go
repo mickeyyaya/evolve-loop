@@ -25,10 +25,43 @@ func (materializationGate) appliesTo(phase string) bool { return phase == string
 
 func (g materializationGate) check(in core.ReviewInput) (string, bool) {
 	missing := g.missingSlugs(in)
-	if len(missing) == 0 {
+	ungraded := g.ungradedSlugs(in)
+	var parts []string
+	if len(missing) > 0 {
+		parts = append(parts, "scout did not materialize evals for selected slug(s): "+strings.Join(missing, ", "))
+	}
+	if len(ungraded) > 0 {
+		parts = append(parts, "scout materialized evals without a [code] grader for selected slug(s): "+strings.Join(ungraded, ", ")+
+			" — an eval that only asserts existence caps nothing, and the lane's own durability test refuses it at the ship gate (cycle 1679)")
+	}
+	if len(parts) == 0 {
 		return "", false
 	}
-	return "scout did not materialize evals for selected slug(s): " + strings.Join(missing, ", "), true
+	return strings.Join(parts, "; "), true
+}
+
+// ungradedSlugs returns the SELECTED slugs whose eval exists but carries no
+// `[code]` grader — the rule the remediation below has always stated. The
+// scout owns the eval and is the only phase whose sandbox may write it (the
+// builder's denies .evolve/evals on purpose), so this is where a graderless
+// eval must fail: at ship it costs a repair round the builder cannot apply.
+func (materializationGate) ungradedSlugs(in core.ReviewInput) []string {
+	report, ok := readScoutReport(in.Workspace)
+	if !ok {
+		return nil
+	}
+	var out []string
+	for _, s := range SelectedSlugs(report) {
+		p, found := evalFilePath(in.ProjectRoot, in.Workspace, s)
+		if !found {
+			continue // reported by missingSlugs
+		}
+		body, err := os.ReadFile(p)
+		if err != nil || !strings.Contains(string(body), "[code]") {
+			out = append(out, s)
+		}
+	}
+	return out
 }
 
 // missingSlugs returns the SELECTED slugs with no eval file on disk. Single
@@ -100,17 +133,31 @@ func evalFilePath(projectRoot, workspace, slug string) (string, bool) {
 // is both writable and sufficient on its own to satisfy the gate.
 func (g materializationGate) remediation(in core.ReviewInput) string {
 	missing := g.missingSlugs(in)
-	if len(missing) == 0 {
+	ungraded := g.ungradedSlugs(in)
+	if len(missing) == 0 && len(ungraded) == 0 {
 		return ""
 	}
-	paths := make([]string, 0, len(missing))
-	for _, s := range missing {
-		paths = append(paths, filepath.Join(in.Workspace, ".evolve", "evals", s+".md"))
+	var b strings.Builder
+	if len(missing) > 0 {
+		paths := make([]string, 0, len(missing))
+		for _, s := range missing {
+			paths = append(paths, filepath.Join(in.Workspace, ".evolve", "evals", s+".md"))
+		}
+		b.WriteString("Create the missing eval file(s) — this requires writing NEW files, which is required here:\n  " +
+			strings.Join(paths, "\n  ") + "\n")
 	}
-	return "Create the missing eval file(s) — this requires writing NEW files, which is required here:\n  " +
-		strings.Join(paths, "\n  ") +
-		"\nEach must contain at least one `[code]` grader and test BEHAVIOR, not existence. " +
+	if len(ungraded) > 0 {
+		paths := make([]string, 0, len(ungraded))
+		for _, s := range ungraded {
+			p, _ := evalFilePath(in.ProjectRoot, in.Workspace, s)
+			paths = append(paths, p)
+		}
+		b.WriteString("Add at least one `[code]` grader to the eval file(s) that have none:\n  " +
+			strings.Join(paths, "\n  ") + "\n")
+	}
+	b.WriteString("Each must contain at least one `[code]` grader and test BEHAVIOR, not existence. " +
 		"Write them at exactly those paths: an eval written only into the cycle worktree is NOT " +
 		"visible to this gate. " +
-		"Leave scout-report.md's selected slugs unchanged — the report itself is not the defect."
+		"Leave scout-report.md's selected slugs unchanged — the report itself is not the defect.")
+	return b.String()
 }

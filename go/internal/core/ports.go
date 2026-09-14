@@ -288,6 +288,12 @@ type BridgeRequest struct {
 	// distinguished so the double-dispatch waste class is measurable. Zero
 	// (unset, existing callers) is treated as attempt 1.
 	Attempt int `json:"attempt,omitempty"`
+	// ChainAttempt marks one attempt of a chain walk (llmroute.DispatchTiered in
+	// the runner, the advisor's Dispatch, bridgechain.Walking itself). A
+	// chain-walking bridge handle passes such a request straight through instead
+	// of resolving and walking the chain again; a launch WITHOUT it is a caller
+	// that never heard of the chain and gets the walk by construction.
+	ChainAttempt bool `json:"chain_attempt,omitempty"`
 	// BudgetScale scales the launch's artifact-wait budget (ADR-0076 slice A:
 	// difficulty-conditioned budgets — a large cycle's build gets a longer
 	// deadline). 0 or 1 = unscaled; <1 never shrinks. The engine applies it to

@@ -33,7 +33,8 @@ func TestBridgeRequestOf_ProjectsEveryLaunchField(t *testing.T) {
 		ProjectRoot: "/root", ArtifactPath: "/ws/routing-plan.json", Completion: "artifact", Agent: "router", Contract: "router-replan", Cycle: 7, Env: env}
 	got := bridgeRequestOf(req)
 	want := BridgeRequest{CLI: "claude-tmux", Profile: "/p.json", Model: "deep", Skills: []string{"fable"}, Prompt: "prompt", Workspace: "/ws", Worktree: "/wt",
-		ProjectRoot: "/root", ArtifactPath: "/ws/routing-plan.json", Completion: "artifact", Agent: "router", Contract: "router-replan", Cycle: 7, Env: env}
+		ProjectRoot: "/root", ArtifactPath: "/ws/routing-plan.json", Completion: "artifact", Agent: "router", Contract: "router-replan", Cycle: 7, Env: env,
+		ChainAttempt: true} // the advisor walks its own chain: every launch is one attempt of it
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("bridgeRequestOf:\n got %+v\nwant %+v", got, want)
 	}

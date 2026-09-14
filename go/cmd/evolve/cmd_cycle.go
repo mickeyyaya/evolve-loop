@@ -22,6 +22,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/observer"
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/storage"
 	gobridge "github.com/mickeyyaya/evolve-loop/go/internal/bridge"
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridgechain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
@@ -490,34 +491,58 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 					seenFam[fam] = true
 					discovered = append(discovered, fam+"-tmux")
 				}
+				// The operator's family ban applies to the last-resort tail only
+				// (policy workflow.universal_fallback_exclude, default agy).
+				discovered = llmroute.ExcludeFamilies(discovered, wfCfg.UniversalFallbackExclude)
 			})
 			return discovered
 		}
 	}
 
+	// bridgechain: the CLI/tier fallback chain is a property of the bridge HANDLE
+	// (Decorator, wrapped once here). Every consumer below launches through
+	// `walked`: the retro, the debugger, the spec runners, the registrar, the
+	// failure advisor and the swarm launcher get the walk by construction; the
+	// runner and the advisor walk their own chains and mark each attempt, so
+	// they pass straight through. Lanes 1676/1677 (2026-09-14): the retro's
+	// direct launch had no chain and one codex timeout sealed the cycle.
+	diagf := func(format string, args ...any) { fmt.Fprintf(os.Stderr, format, args...) }
+	discover := func() []string {
+		if runner.DefaultDiscoverCLIsFn == nil {
+			return nil
+		}
+		return runner.DefaultDiscoverCLIsFn()
+	}
+	walked := bridgechain.New(br,
+		bridgechain.DefaultPlanResolver(filepath.Join(evolveDir, "profiles"), discover, nil, time.Now, diagf),
+		bridgechain.WithBench(func(root, ws, cli string, start time.Time, env map[string]string) {
+			bridgechain.BenchOnEscalation(root, ws, cli, start, env, time.Now, diagf)
+		}),
+		bridgechain.WithLog(diagf))
+
 	runners := map[core.Phase]core.PhaseRunner{
-		core.PhaseIntent: intent.New(intent.Config{Bridge: br, Prompts: prm, CompactPrompts: cfg.CompactPrompts}),
+		core.PhaseIntent: intent.New(intent.Config{Bridge: walked, Prompts: prm, CompactPrompts: cfg.CompactPrompts}),
 		// Scout + Build are swarm-eligible (ADR-0032): wrapped in the swarmRunner
 		// Decorator so stage=advisory|enforce (policy.json "swarm.stage") dispatches
 		// them across N parallel workers (reader fan-out / writer merge-train).
 		// Default (stage absent/shadow) = byte-identical delegate — zero behavior change.
 		// PhaseIO threads cfg.PhaseIO into the reconcile rung (3.10 Slice 1); StageOff
 		// (the shipping default) keeps these byte-identical.
-		core.PhaseScout:        swarmrunner.New(scout.New(scout.Config{Bridge: br, Prompts: prm, PhaseIO: cfg.PhaseIO, CompactPrompts: cfg.CompactPrompts}), br, swarm.ModeReader, swCfg),
-		core.PhaseTriage:       triage.New(triage.Config{Bridge: br, Prompts: prm, PhaseIO: cfg.PhaseIO, CompactPrompts: cfg.CompactPrompts}),
-		core.PhaseTDD:          tdd.New(tdd.Config{Bridge: br, Prompts: prm, CompactPrompts: cfg.CompactPrompts}),
-		core.PhaseBuildPlanner: buildplanner.New(buildplanner.Config{Bridge: br, Prompts: prm}).BaseRunner(),
-		core.PhaseBuild:        swarmrunner.New(build.New(build.Config{Bridge: br, Prompts: prm, PhaseIO: cfg.PhaseIO, CompactPrompts: cfg.CompactPrompts}), br, swarm.ModeWriter, swCfg),
-		core.PhaseAudit:        audit.NewDefaultWithStageCompactSpec(br, prm, cfg.PhaseIO, cfg.CompactPrompts, documentSpecPtr(cfg), audit.WithSignals(func() *signalcenter.Center { return signals })),
+		core.PhaseScout:        swarmrunner.New(scout.New(scout.Config{Bridge: walked, Prompts: prm, PhaseIO: cfg.PhaseIO, CompactPrompts: cfg.CompactPrompts}), walked, swarm.ModeReader, swCfg),
+		core.PhaseTriage:       triage.New(triage.Config{Bridge: walked, Prompts: prm, PhaseIO: cfg.PhaseIO, CompactPrompts: cfg.CompactPrompts}),
+		core.PhaseTDD:          tdd.New(tdd.Config{Bridge: walked, Prompts: prm, CompactPrompts: cfg.CompactPrompts}),
+		core.PhaseBuildPlanner: buildplanner.New(buildplanner.Config{Bridge: walked, Prompts: prm}).BaseRunner(),
+		core.PhaseBuild:        swarmrunner.New(build.New(build.Config{Bridge: walked, Prompts: prm, PhaseIO: cfg.PhaseIO, CompactPrompts: cfg.CompactPrompts}), walked, swarm.ModeWriter, swCfg),
+		core.PhaseAudit:        audit.NewDefaultWithStageCompactSpec(walked, prm, cfg.PhaseIO, cfg.CompactPrompts, documentSpecPtr(cfg), audit.WithSignals(func() *signalcenter.Center { return signals })),
 		// ManifestGate is threaded from policy.json `gates.manifest_gate` (default
 		// "shadow") so the ship-bind manifest gate is operator-activatable — it was
 		// unreachable short of a code edit before cycle-1064.
 		core.PhaseShip:  ship.New(ship.Config{Runner: sysexec.DefaultRunner, PhaseIO: cfg.PhaseIO, ManifestGate: gatesCfg.ManifestGate, RepoContractGate: gatesCfg.RepoContractGate, Signals: signals}),
-		core.PhaseRetro: retro.New(retro.Config{Bridge: br, Prompts: prm, Model: "auto", CompactPrompts: cfg.CompactPrompts}),
+		core.PhaseRetro: retro.New(retro.Config{Bridge: walked, Prompts: prm, Model: "auto", CompactPrompts: cfg.CompactPrompts}),
 		// Ship-error recovery phase (Component #8): the advisor's recovery chain
 		// routes an unknown/novel ShipError here to diagnose + decide RESHIP /
 		// RERUN_PHASE / BLOCK. Optional — never on the mandatory spine.
-		core.PhaseDebugger: debugger.New(debugger.Config{Bridge: br, Prompts: prm, CompactPrompts: cfg.CompactPrompts}),
+		core.PhaseDebugger: debugger.New(debugger.Config{Bridge: walked, Prompts: prm, CompactPrompts: cfg.CompactPrompts}),
 	}
 
 	// User-defined phases ("Lego" overlays): merge .evolve/phases/<name>/phase.json
@@ -567,13 +592,13 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 			continue // ApplyUserRouting already warned + skipped it; no dead runner
 		}
 		if _, exists := runners[core.Phase(s.Name)]; !exists {
-			runners[core.Phase(s.Name)] = specrunner.New(s, specrunner.Config{Bridge: br, Prompts: prm})
+			runners[core.Phase(s.Name)] = specrunner.New(s, specrunner.Config{Bridge: walked, Prompts: prm})
 		}
 	}
 	// Spec-runner fallback for BUILTIN registry phases the advisor can SELECT
 	// (see registerBuiltinSpecRunners) — makes the invariant "every
 	// advisor-selectable phase is dispatchable" hold.
-	registerBuiltinSpecRunners(runners, builtinCat, prm, br, os.Stderr)
+	registerBuiltinSpecRunners(runners, builtinCat, prm, walked, os.Stderr)
 	// DynamicLLM brain: the routing advisor, defined like every phase agent —
 	// persona (agents/evolve-router.md) + profile (router.json) + artifact. Its
 	// {cli, model} resolve from the profile + EVOLVE_ROUTER_CLI/_MODEL env (the
@@ -600,7 +625,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 	} else {
 		fmt.Fprintf(os.Stderr, "[router] WARN persona evolve-router.md not loaded (%v); advisor uses legacy inline framing\n", perr)
 	}
-	advisor := core.NewPhaseAdvisor(br,
+	advisor := core.NewPhaseAdvisor(walked,
 		core.WithProposerCLI(advCLI),
 		core.WithProposerModel(advModel),
 		core.WithPersona(advPersona),
@@ -623,7 +648,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 		// dispatches; at enforce it turns one unclassified fatal pane into a
 		// validated promotion (each promotion saves ~20 min of maxExtends
 		// burn on every future occurrence).
-		core.WithFailureAdviser(core.NewFailureAdvisor(br, failureAdvisorOpts(projectRoot)...)),
+		core.WithFailureAdviser(core.NewFailureAdvisor(walked, failureAdvisorOpts(projectRoot)...)),
 		// R9.1 triage-capacity: record shipped cycles' committed-floor counts
 		// into the rolling throughput window (state.json:triageThroughput) —
 		// the observed-capacity signal the R9.2 clamp bounds triage with.
@@ -641,7 +666,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 		// in the SAME cycle (cycle-1429; the miss #429 only made safe).
 		core.WithCatalogPublisher(catalogPublisher(br)),
 		core.WithRegistrar(registrarMinter{r: phaseregistrar.Registrar{
-			Bridge:       br,
+			Bridge:       walked,
 			Prompts:      prm,
 			ProfilesDir:  filepath.Join(evolveDir, "profiles"),
 			PhasesDir:    filepath.Join(evolveDir, "phases"),

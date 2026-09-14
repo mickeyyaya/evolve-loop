@@ -42,8 +42,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"go/build"
-	"go/build/constraint"
 	"io"
 	"os"
 	"os/exec"
@@ -52,6 +50,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/addedtests"
 	"github.com/mickeyyaya/evolve-loop/go/internal/changedpkgs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/shiperr"
@@ -306,7 +305,7 @@ func runAddedTestBackstop(ctx context.Context, out io.Writer, root, baseRef, mod
 	if err != nil {
 		return nil, nil, err
 	}
-	groups, excluded, inspectErr := addedTestPackageGroups(root, files)
+	groups, excluded, inspectErr := addedtests.Groups(root, files)
 	if inspectErr != nil {
 		return nil, nil, shiperr.NewShipError(shiperr.CodeRepoContractInfra, shiperr.ShipClassPrecondition, shiperr.StageAtomicShip,
 			fmt.Sprintf("repo-contract added-test backstop: could not inspect an added test's build constraints (%v) — INFRA fault, not a contract violation; safe to re-dispatch", inspectErr))
@@ -316,17 +315,17 @@ func runAddedTestBackstop(ctx context.Context, out io.Writer, root, baseRef, mod
 	}
 	for _, group := range groups {
 		fmt.Fprintf(out, "[ship] repo-contract added-test backstop: go test -json -count=1 -timeout %s", repoContractTestTimeout)
-		if len(group.tags) > 0 {
-			fmt.Fprintf(out, " -tags %s", strings.Join(group.tags, ","))
+		if len(group.Tags) > 0 {
+			fmt.Fprintf(out, " -tags %s", strings.Join(group.Tags, ","))
 		}
-		fmt.Fprintf(out, " %s\n", strings.Join(group.packages, " "))
+		fmt.Fprintf(out, " %s\n", strings.Join(group.Packages, " "))
 		if err := runClassifiedPack(ctx, out, workspace, "added-test backstop", func() packOutcome {
-			return runRepoContractPackagesWithTags(ctx, moduleDir, out, group.packages, group.tags)
+			return runRepoContractPackagesWithTags(ctx, moduleDir, out, group.Packages, group.Tags)
 		}); err != nil {
 			return nil, nil, err
 		}
-		if len(group.tags) == 0 {
-			for _, pkg := range group.packages {
+		if len(group.Tags) == 0 {
+			for _, pkg := range group.Packages {
 				untagged = append(untagged, pkg+"/...")
 			}
 		}
@@ -367,133 +366,6 @@ func runClassifiedPackRetrying(ctx context.Context, out io.Writer, workspace, na
 	return shiperr.NewShipError(shiperr.CodeRepoContractInfra, shiperr.ShipClassPrecondition, shiperr.StageAtomicShip,
 		fmt.Sprintf("repo-contract %s exited nonzero TWICE with no test-level failure (attempt 1: %v; attempt 2: %v) — INFRA fault, not a contract violation; safe to re-dispatch. Scanner output: %s",
 			name, first.err, second.err, scanLogHint(workspace)))
-}
-
-type addedTestGroup struct {
-	tags     []string
-	packages []string
-}
-
-// addedTestPackageGroups selects, from the gate's seed, the Go `_test.go`
-// files the tree ADDS (index-added or untracked — a lane's new test is
-// untracked until the ship stages it) and groups their packages by the build
-// tags each file declares, so a tag-guarded reproducer runs under its own
-// tags. Modified tests are not candidates here; the importer backstop runs
-// their packages.
-func addedTestPackageGroups(root string, files []changedpkgs.ChangedFile) (groups []addedTestGroup, excluded []string, retErr error) {
-	packagesByTags := map[string]map[string]bool{}
-	tagsByKey := map[string][]string{}
-	for _, f := range files {
-		path := f.Path
-		if !f.Added || !strings.HasPrefix(path, "go/") || !strings.HasSuffix(path, "_test.go") {
-			continue
-		}
-		tags, runnable, matchErr := addedTestBuildTags(filepath.Join(root, path))
-		if matchErr != nil {
-			return nil, nil, fmt.Errorf("inspect %s: %w", path, matchErr)
-		}
-		if !runnable {
-			excluded = append(excluded, path)
-			continue
-		}
-		pkg := "./" + filepath.ToSlash(filepath.Dir(strings.TrimPrefix(path, "go/")))
-		key := strings.Join(tags, ",")
-		if packagesByTags[key] == nil {
-			packagesByTags[key] = map[string]bool{}
-			tagsByKey[key] = tags
-		}
-		packagesByTags[key][pkg] = true
-	}
-	keys := make([]string, 0, len(packagesByTags))
-	for key := range packagesByTags {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	for _, key := range keys {
-		group := addedTestGroup{tags: tagsByKey[key]}
-		for pkg := range packagesByTags[key] {
-			group.packages = append(group.packages, pkg)
-		}
-		sort.Strings(group.packages)
-		groups = append(groups, group)
-	}
-	sort.Strings(excluded)
-	return groups, excluded, nil
-}
-
-func addedTestBuildTags(path string) ([]string, bool, error) {
-	dir, name := filepath.Dir(path), filepath.Base(path)
-	match, err := build.Default.MatchFile(dir, name)
-	if err != nil || match {
-		return nil, match, err
-	}
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, false, err
-	}
-	defer func() { _ = f.Close() }()
-
-	var expr constraint.Expr
-	sc := bufio.NewScanner(f)
-	for sc.Scan() {
-		line := strings.TrimSpace(sc.Text())
-		if constraint.IsGoBuild(line) {
-			expr, err = constraint.Parse(line)
-			break
-		}
-		if line != "" && !strings.HasPrefix(line, "//") {
-			break
-		}
-	}
-	if err := sc.Err(); err != nil {
-		return nil, false, err
-	}
-	if err != nil || expr == nil {
-		return nil, false, err
-	}
-	tagSet := map[string]bool{}
-	collectBuildTags(expr, tagSet)
-	// minimal: exhaustive tag selection is capped at 12 tags; upgrade to a
-	// constraint solver if real added tests exceed that ceiling.
-	if tagSet["requires_tmux"] || len(tagSet) > 12 {
-		return nil, false, nil
-	}
-	tags := make([]string, 0, len(tagSet))
-	for tag := range tagSet {
-		tags = append(tags, tag)
-	}
-	sort.Strings(tags)
-	for mask := 1; mask < 1<<len(tags); mask++ {
-		candidate := make([]string, 0, len(tags))
-		for i, tag := range tags {
-			if mask&(1<<i) != 0 {
-				candidate = append(candidate, tag)
-			}
-		}
-		ctx := build.Default
-		ctx.BuildTags = candidate
-		if match, matchErr := ctx.MatchFile(dir, name); matchErr != nil {
-			return nil, false, matchErr
-		} else if match {
-			return candidate, true, nil
-		}
-	}
-	return nil, false, nil
-}
-
-func collectBuildTags(expr constraint.Expr, tags map[string]bool) {
-	switch x := expr.(type) {
-	case *constraint.TagExpr:
-		tags[x.Tag] = true
-	case *constraint.NotExpr:
-		collectBuildTags(x.X, tags)
-	case *constraint.AndExpr:
-		collectBuildTags(x.X, tags)
-		collectBuildTags(x.Y, tags)
-	case *constraint.OrExpr:
-		collectBuildTags(x.X, tags)
-		collectBuildTags(x.Y, tags)
-	}
 }
 
 // contractRed builds the genuine-violation ship error, naming the parsed

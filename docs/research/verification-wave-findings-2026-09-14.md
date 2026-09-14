@@ -68,6 +68,21 @@ The account's rolling session limit hit at 19:03 (reset 19:50). Both lanes' reco
 
 The `cover_run` half of F4: `coverageProfile` spawned its scoped `go test -tags "integration acs" -coverprofile … ./internal/core` through the gate's raw runner while the tier step beside it scrubs, so the lane's `EVOLVE_CYCLE_STATE_FILE`/`EVOLVE_FLEET` flipped core's env-sensitive tests and the step failed on every audit of both waves (fail-open → WARN + a ~7-minute coverage run each). Reproduced with the two variables in a clean worktree. Fixed by running the step under `scrubbedRun`, red-first with the gate's fake runner (it received a nil env = inherit). Record: `docs/incidents/2026-09-14-ship-gate-inherits-the-lane-ipc-env.md` (second-site section).
 
+### F10 — the retro never entered the fallback walk, and eleven profiles had no chain (P1, fixed — ADR-0104)
+
+Both wave-2 retrospectives timed out on codex's dead deep model and the cycles sealed with no disposition, while the same exit on the same CLI in build had fallen back to Claude: the runner walks `DispatchTiered`, the retro (and the failure advisor, phase judge, retry adjudicator, swarm launcher) called the bridge directly. Behind it: the universal tail was appended only when the configured chain was *absent*, and eleven claude-primary profiles (auditor, tdd-engineer among them) had no `cli_fallback`. Fixed by making the walk a property of the bridge handle (`bridgechain.Walking`, wrapped once at the composition root), appending the tail unconditionally, moving the agy ban to `workflow.universal_fallback_exclude`, and giving every agent a chain (in-family only on the five Claude-family-floor agents). Records: ADR-0104, `docs/incidents/2026-09-14-retro-timeout-sealed-the-cycle.md`.
+### F11 — push-only could not recover the strand it exists for (P1, fixed — this change)
+
+Lane 1678's push was rejected after its gate passed and its commit was minted (a console PR had been merged mid-wave — now a standing rule); `evolve ship --push-only` refused the commit by name ("lack ship provenance") because the ship journal was appended only on finalize's success path, after the push. The journal now records every MINTED commit. Recovery until then: a normal `evolve ship --class manual` on the plane after merging origin. Record: `docs/incidents/2026-09-14-ship-gate-found-what-the-audit-could-not.md`.
+
+### F12 — the ship gate found a red the floor and the audit could not see, and the repair ladder had no owner for the fix (P1, fixed — this change)
+
+Lane 1679's added `//go:build acs` package was invisible to the floor's default-context run and first executed by the ship's added-test backstop — red on the eval the scout had materialized without a `[code]` grader, a rule the scout gate advertised but never checked. The builder's sandbox denies `.evolve/evals`, so two repair rounds burned before the tdd phase applied the builder's own remedy file. Fixed: `internal/addedtests` shared by floor and ship (tag-gated added packages run at the floor under their tags), the scout gate enforces the grader rule, and the remedy routing for "unappliable by this phase" is recorded as F13. Record: same incident.
+
+### F13 — a builder-declared "unappliable by this phase" failure is re-run instead of routed to the path's owner (P2, open — design)
+
+Round 2 of cycle 1679 declared class `infrastructure-systemic` with the remedy written to `eval-append.crossartifact-invariant-stack.md`; the orchestrator re-audited and rebuilt. The retry envelope should route such a failure to the phase whose sandbox owns the named path (`.evolve/evals` → scout/tdd) with the remedy attached. With F12's two gates the eval case cannot recur; the routing stays open for the general class.
+
 ## 4. Verdict on the design
 
 | Claim (memo §4) | Evidence from the wave |
@@ -91,7 +106,7 @@ Where the design was **not yet enough**: the triage gate's refusal was structure
 8. **Operator decision:** codex's `deep`/`top` tiers are pinned to `gpt-5.6-sol`, which this account rejects (F7); the `balanced`/`fast` pins are accepted. Until re-pinned, every codex deep dispatch fails over to Claude — in seconds since #616, not after the artifact window.
 9. acs baseline drift on main, not from any wave change: `acs/cycle1253` (`TestC1253_003_NewExportCovered` — the `ImporterClosure` coverage line after #612) and `acs/cycle1632` (`TestC1632_008` — a tokenopt-handoff inbox item no longer present) fail on a clean `origin/main`; `acs/cycle764` is a two-floors-at-once contention flake. The console floor baseline now carries the first two; both need a re-anchor.
 10. `TestChannel_EndToEnd` (bidirectional channel) is timing-based and redded PR #614 once on the Ubuntu Go 1.23 race runner; queued as inbox item `2026-09-14T10-20-00Z-channel-e2e-timing-flake`.
-11. A FAIL retrospective dispatched on a walled CLI costs a full artifact window (both wave-2 retros: 30 min each on codex's dead deep model). With #616 that is seconds; the retro's CLI choice should still avoid a family whose tier just walled the cycle.
+11. ~~A FAIL retrospective dispatched on a walled CLI costs a full artifact window (both wave-2 retros: 30 min each on codex's dead deep model).~~ Root-caused as F10: the retro had no fallback walk at all. Fixed — ADR-0104 (#619).
 
 ## 6. Wave 2 — 2026-09-14 16:11–21:05, plane 83a019aa (#606, #609, #611, #612), width 3, 2 lanes dispatched
 
