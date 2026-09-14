@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
@@ -196,3 +197,11 @@ func LoopStopPath(evolveDir string) string { return filepath.Join(evolveDir, Loo
 // across cmd/ and internal/ still spell the join inline; migrate them here as
 // they are touched — this is the intended home, not yet the only one.
 func EvolveDirOf(projectRoot string) string { return filepath.Join(projectRoot, ".evolve") }
+
+// RunWorkspace returns <projectRoot>/.evolve/runs/cycle-<cycle>, the per-cycle
+// run workspace — the ONE home of that layout (ADR-0103 unit 09).
+// core.RunWorkspacePath projects it for the orchestrator's callers; the defect
+// ledger, which lives below core, reads it directly.
+func RunWorkspace(projectRoot string, cycle int) string {
+	return filepath.Join(EvolveDirOf(projectRoot), "runs", "cycle-"+strconv.Itoa(cycle))
+}

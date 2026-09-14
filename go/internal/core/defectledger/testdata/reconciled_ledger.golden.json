@@ -1,0 +1,39 @@
+{
+  "origin_cycle": 1250,
+  "entries": [
+    {
+      "id": "own1",
+      "text": "this cycle's own defect",
+      "status": "OPEN"
+    },
+    {
+      "id": "d4",
+      "text": "shadowed one",
+      "status": "OPEN"
+    },
+    {
+      "id": "d1",
+      "text": "fixed one",
+      "status": "FIXED",
+      "evidence": "go/x.go:12; go/y.go"
+    },
+    {
+      "id": "d2",
+      "text": "deferred one",
+      "status": "DEFERRED",
+      "reason": "out of scope"
+    },
+    {
+      "id": "d3",
+      "text": "unaccounted one",
+      "status": "OPEN"
+    },
+    {
+      "id": "d5",
+      "text": "closed upstream",
+      "status": "FIXED",
+      "evidence": "docs/x.md",
+      "reason": "done"
+    }
+  ]
+}

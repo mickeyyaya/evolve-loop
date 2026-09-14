@@ -12,3 +12,4 @@
 ./internal/phases/ship/landing 100
 ./internal/config 100
 ./internal/observerengine 100
+./internal/core/defectledger 100

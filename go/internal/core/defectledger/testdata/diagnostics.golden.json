@@ -1,0 +1,210 @@
+{
+  "ancestor_absent": {
+    "diagnostics": [
+      {
+        "severity": "warning",
+        "message": "defect ledger: this cycle continues cycle-1255, which left no reconcilable defect-ledger.json in {{ROOT}}/.evolve/runs/cycle-1255 — NO inherited defect is being enforced here. Expected for an ancestor that predates the ledger; a deleted ledger looks identical, so it is recorded rather than assumed benign."
+      }
+    ],
+    "blocked": false,
+    "lineage": null
+  },
+  "ancestor_empty": {
+    "diagnostics": [
+      {
+        "severity": "warning",
+        "message": "defect ledger: this cycle continues cycle-1255, which left no reconcilable defect-ledger.json in {{ROOT}}/.evolve/runs/cycle-1255 — NO inherited defect is being enforced here. Expected for an ancestor that predates the ledger; a deleted ledger looks identical, so it is recorded rather than assumed benign."
+      }
+    ],
+    "blocked": false,
+    "lineage": null
+  },
+  "ancestor_unreadable_parse": {
+    "diagnostics": [
+      {
+        "severity": "error",
+        "message": "defect ledger: ancestor cycle-1255 ledger is unreadable (parse defect-ledger.json: invalid character 'g' looking for beginning of value) — a continuation cannot be graded against a ledger it cannot read"
+      }
+    ],
+    "blocked": true,
+    "lineage": null
+  },
+  "ancestor_unreadable_read": {
+    "diagnostics": [
+      {
+        "severity": "error",
+        "message": "defect ledger: ancestor cycle-1255 ledger is unreadable (read defect-ledger.json: read {{ROOT}}/.evolve/runs/cycle-1255/defect-ledger.json: is a directory) — a continuation cannot be graded against a ledger it cannot read"
+      }
+    ],
+    "blocked": true,
+    "lineage": null
+  },
+  "corrupt_manifest": {
+    "diagnostics": [
+      {
+        "severity": "error",
+        "message": "defect ledger: continuation manifest is unreadable (continuation: parse manifest: unexpected end of JSON input) — a continuation cannot be graded against a lineage it cannot read, and degrading open here is the gate's cheapest bypass"
+      }
+    ],
+    "blocked": true,
+    "lineage": null
+  },
+  "dispositions_missing": {
+    "diagnostics": [
+      {
+        "severity": "warning",
+        "message": "defect ledger: no defect-dispositions.json in the workspace — every defect inherited from cycle-1255 is unaccounted for"
+      },
+      {
+        "severity": "error",
+        "message": "defect ledger: disposition-preflight: MISSING — this workspace holds no defect-dispositions.json at all, so 0 of 1 defect(s) inherited from cycle-1255 are dispositioned. This file is re-authored IN FULL every cycle; an ancestor's copy is never inherited. Write one entry per inherited id, status FIXED (with resolvable evidence) or DEFERRED (with a reason)."
+      },
+      {
+        "severity": "error",
+        "message": "defect ledger: 1 defect(s) inherited from cycle-1255 are unaccounted for [d1 (no disposition)] — a continuation may not PASS while an ancestor defect is neither FIXED (with evidence) nor DEFERRED (with a reason). Disposition each id in defect-dispositions.json."
+      }
+    ],
+    "blocked": true,
+    "lineage": null
+  },
+  "dispositions_missing_nothing_owed": {
+    "diagnostics": [
+      {
+        "severity": "warning",
+        "message": "defect ledger: no defect-dispositions.json in the workspace — every defect inherited from cycle-1255 is unaccounted for"
+      }
+    ],
+    "blocked": false,
+    "lineage": [
+      1255
+    ]
+  },
+  "dispositions_read_error": {
+    "diagnostics": [
+      {
+        "severity": "error",
+        "message": "defect ledger: read defect-dispositions.json: read {{WS}}/defect-dispositions.json: is a directory"
+      }
+    ],
+    "blocked": true,
+    "lineage": null
+  },
+  "dispositions_unparseable": {
+    "diagnostics": [
+      {
+        "severity": "error",
+        "message": "defect ledger: defect-dispositions.json is unparseable (`evidence` must be a citation string or an array of citation strings, got {\"a\":1}) — a continuation cannot be graded against claims that cannot be read. Expected schema:\n{\"dispositions\": [\n  {\"id\": \"d0f3a7c1e59b246d8a0c4e6f13579bde2\", \"status\": \"FIXED\",\n   \"evidence\": \"go/internal/phases/audit/defect_ledger.go:267-356\"},\n  {\"id\": \"d9c8b7a6958473625140f3e2d1c0b9a87\", \"status\": \"DEFERRED\",\n   \"reason\": \"out of this lane's scope; queued as disposition-evidence-tolerant-unmarshal\"}\n]}\n(`evidence` may also be an array of citation strings; `status` is exactly FIXED — with resolvable evidence — or DEFERRED, with a reason.)"
+      }
+    ],
+    "blocked": true,
+    "lineage": null
+  },
+  "emit_read_fault": {
+    "diagnostics": [
+      {
+        "severity": "warning",
+        "message": "defect ledger: could not record this cycle's defects (read defect-ledger.json: read {{WS}}/defect-ledger.json: is a directory) — a later continuation will have nothing to reconcile against"
+      }
+    ],
+    "blocked": false,
+    "lineage": null
+  },
+  "graded_clean": {
+    "diagnostics": null,
+    "blocked": false,
+    "lineage": [
+      1255,
+      1250
+    ]
+  },
+  "incomplete_unaccounted": {
+    "diagnostics": [
+      {
+        "severity": "error",
+        "message": "defect ledger: disposition-preflight: INCOMPLETE — defect-dispositions.json covers 1 of 2 defect(s) inherited from cycle-1255; uncovered: [d2]. Every inherited id needs its own entry in THIS cycle's file."
+      },
+      {
+        "severity": "error",
+        "message": "defect ledger: 1 defect(s) inherited from cycle-1255 are unaccounted for [d2 (no disposition)] — a continuation may not PASS while an ancestor defect is neither FIXED (with evidence) nor DEFERRED (with a reason). Disposition each id in defect-dispositions.json."
+      }
+    ],
+    "blocked": true,
+    "lineage": null
+  },
+  "manifest_registry_disagree": {
+    "diagnostics": [
+      {
+        "severity": "error",
+        "message": "defect ledger: the workspace continuation manifest names cycle-1255 but the root-owned registry binds this lane to cycle-1200 — a rewritten manifest would re-point the gate at an ancestor with no open defects; resolve the disagreement before this cycle can PASS"
+      }
+    ],
+    "blocked": true,
+    "lineage": null
+  },
+  "own_unreadable": {
+    "diagnostics": [
+      {
+        "severity": "error",
+        "message": "defect ledger: this cycle's own defect-ledger.json is unreadable (parse defect-ledger.json: invalid character 'g' looking for beginning of value) — reconciling would overwrite a record that cannot be read"
+      }
+    ],
+    "blocked": true,
+    "lineage": null
+  },
+  "reconciled_writeback": {
+    "diagnostics": [
+      {
+        "severity": "error",
+        "message": "defect ledger: disposition-preflight: INCOMPLETE — defect-dispositions.json covers 3 of 4 defect(s) inherited from cycle-1255; uncovered: [d3]. Every inherited id needs its own entry in THIS cycle's file."
+      },
+      {
+        "severity": "error",
+        "message": "defect ledger: 2 defect(s) inherited from cycle-1255 are unaccounted for [d3 (no disposition), d4 (id shadowed: this cycle's ledger holds different text \"planted different text\" for the same id)] — a continuation may not PASS while an ancestor defect is neither FIXED (with evidence) nor DEFERRED (with a reason). Disposition each id in defect-dispositions.json."
+      }
+    ],
+    "blocked": true,
+    "lineage": null
+  },
+  "registry_binds_manifest_missing": {
+    "diagnostics": [
+      {
+        "severity": "error",
+        "message": "defect ledger: this workspace holds no continuation manifest, but the root-owned {{ROOT}}/.evolve/continuation-registry.json binds this lane's scope to cycle-1255 — the manifest was deleted or never written. Inherited defects are reconciled from the registry binding; the missing manifest is itself the finding."
+      },
+      {
+        "severity": "warning",
+        "message": "defect ledger: no defect-dispositions.json in the workspace — every defect inherited from cycle-1255 is unaccounted for"
+      },
+      {
+        "severity": "error",
+        "message": "defect ledger: disposition-preflight: MISSING — this workspace holds no defect-dispositions.json at all, so 0 of 1 defect(s) inherited from cycle-1255 are dispositioned. This file is re-authored IN FULL every cycle; an ancestor's copy is never inherited. Write one entry per inherited id, status FIXED (with resolvable evidence) or DEFERRED (with a reason)."
+      },
+      {
+        "severity": "error",
+        "message": "defect ledger: 1 defect(s) inherited from cycle-1255 are unaccounted for [d1 (no disposition)] — a continuation may not PASS while an ancestor defect is neither FIXED (with evidence) nor DEFERRED (with a reason). Disposition each id in defect-dispositions.json."
+      }
+    ],
+    "blocked": true,
+    "lineage": null
+  },
+  "status_table": {
+    "diagnostics": [
+      {
+        "severity": "error",
+        "message": "defect ledger: 4 defect(s) inherited from cycle-1255 are unaccounted for [d1 (FIXED but evidence \"nowhere/none.go\" resolves to no file under the project root), d2 (DEFERRED without reason), d3 (status \"WONTFIX\" is not FIXED or DEFERRED), d4 (status \"OPEN\" is not FIXED or DEFERRED)] — a continuation may not PASS while an ancestor defect is neither FIXED (with evidence) nor DEFERRED (with a reason). Disposition each id in defect-dispositions.json."
+      }
+    ],
+    "blocked": true,
+    "lineage": null
+  },
+  "writeback_failed": {
+    "diagnostics": [
+      {
+        "severity": "error",
+        "message": "defect ledger: could not write back the reconciled ledger (atomicwrite: create temp in {{WS}}: open {{WS}}/.defect-ledger.json.N.tmp: permission denied) — an invisible disposition is not a disposition"
+      }
+    ],
+    "blocked": true,
+    "lineage": null
+  }
+}

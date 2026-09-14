@@ -17,6 +17,24 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 
 <!-- GENERATED:signal-codes BEGIN — do not edit by hand; run `evolve signals codes generate` -->
 
+### audit
+
+| Code | Meaning |
+|---|---|
+| `AUDIT_LEDGER_ANCESTOR_EMPTY` | the ancestor left no reconcilable defect-ledger.json (absent or empty), so NO inherited defect is enforced this cycle; expected for an ancestor that predates the ledger, but a deleted ledger looks identical — recorded, never assumed benign; fields.step=grade, ancestor_cycle, path |
+| `AUDIT_LEDGER_DEFECTS_UNACCOUNTED` | inherited defects are neither FIXED with resolving evidence nor DEFERRED with a reason (fields.count; the first ids in fields.ids, ids_truncated when more); the cycle is blocked — disposition each id in defect-dispositions.json (the per-id reasons are in the diagnostic and the written-back ledger); fields.step=grade, ancestor_cycle, path |
+| `AUDIT_LEDGER_DISPOSITIONS_INCOMPLETE` | defect-dispositions.json covers only some inherited OPEN ids (fields.open, covered, the first uncovered ids, uncovered_truncated when more); the cycle is blocked — finish the file that exists; fields.step=preflight, ancestor_cycle, path |
+| `AUDIT_LEDGER_DISPOSITIONS_MISSING` | a continuation owing dispositions holds no defect-dispositions.json at all (fields.open inherited OPEN ids); the cycle is blocked — author the file from scratch, one entry per inherited id; fields.step=preflight, ancestor_cycle, path |
+| `AUDIT_LEDGER_DISPOSITIONS_UNREADABLE` | defect-dispositions.json is present but cannot be read or parsed (fields.op = read | parse; an object, number or bool evidence shape is a parse fault); the cycle is blocked — the diagnostic carries the expected schema; fields.step=read, path |
+| `AUDIT_LEDGER_EMIT_FAILED` | a rejecting audit's defect ledger could not be read or written while recording this cycle's defects (fields.op = read | parse | write); the verdict stands, a later continuation has nothing to reconcile against — repair the workspace ledger; fields.step=emit, path |
+| `AUDIT_LEDGER_LINEAGE_DISAGREES` | the workspace manifest and the root-owned registry name different ancestors; the rewritable copy is the suspect and the cycle is blocked until the disagreement is resolved; fields.step=arm, manifest_cycle, registry_cycle |
+| `AUDIT_LEDGER_MANIFEST_MISSING` | the root-owned continuation registry binds this lane's scope to an ancestor but the workspace holds no manifest — it was deleted or never written; inherited defects are reconciled from the registry binding and the cycle is blocked; the missing manifest is the finding; fields.step=arm, registry_path, ancestor_cycle |
+| `AUDIT_LEDGER_MANIFEST_UNREADABLE` | the workspace continuation-manifest.json is present but unreadable, so the continuation cannot be graded against its lineage; the cycle is blocked from PASS (cycle-1285 F2) — repair the manifest; fields.step=arm, workspace |
+| `AUDIT_LEDGER_OVERFLOW` | a rejecting audit carried more defects than the ledger cap; the first rows are recorded and ONE synthetic OPEN row stands for the truncated tail (fields.overflow, cap) — fix the emitter or widen the cap; fields.step=emit, path |
+| `AUDIT_LEDGER_PROMPT_DEGRADED` | while composing the audit prompt the continuation manifest (fields.reason=manifest; fallback = registry | none) or the ancestor ledger (fields.reason=ledger, op = read | parse) could not be read, so the auditor was NOT told its inherited ids; stream-only — the same fault blocks at Classify under its own WARN code; fields.step=prompt, path |
+| `AUDIT_LEDGER_UNREADABLE` | the ancestor's or this cycle's own defect-ledger.json is present but unreadable (fields.which = ancestor | own, op = read | parse); the continuation is blocked — repair the file named by fields.path; fields.step=grade, ancestor_cycle |
+| `AUDIT_LEDGER_WRITEBACK_FAILED` | the reconciled ledger could not be written back into the workspace; an invisible disposition is not a disposition, so the cycle is blocked; fields.step=grade, path |
+
 ### bridge
 
 | Code | Meaning |

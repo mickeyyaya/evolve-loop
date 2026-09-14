@@ -10,7 +10,10 @@
 // Design: docs/architecture/decomposition/03-carryover-lifecycle.md.
 package carryover
 
-import "github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
+import (
+	"github.com/mickeyyaya/evolve-loop/go/internal/core/defectledger"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
+)
 
 // The unit's codes (commit 1: the three WARN conditions that replaced six
 // hand-written stderr lines), registered with their reasons.
@@ -34,8 +37,9 @@ const (
 	PriorityPrescription = "high"   // an unenforced audit prescription
 	PriorityMemoDefault  = "medium" // a memo todo naming no priority
 	// PrescriptionPrefix tags the defect-ledger rows an audit's WARN
-	// prescriptions carry; the audit phase projects it when it writes them.
-	PrescriptionPrefix = "PRESCRIPTION: "
+	// prescriptions carry — the LEDGER's belief, projected from its home
+	// (internal/core/defectledger, ADR-0103 unit 09).
+	PrescriptionPrefix = defectledger.PrescriptionPrefix
 	// MaxActionRunes caps a todo's action (the former maxAdoptedDefectRunes).
 	MaxActionRunes = 500
 	// MaxSummaryRunes caps a failure summary's message (the former maxFailureLearningSummaryChars).
