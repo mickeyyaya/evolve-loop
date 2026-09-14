@@ -6,28 +6,21 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
+	"github.com/mickeyyaya/evolve-loop/go/internal/textcap"
 )
 
-// CapRunes truncates s to maxRunes with a trailing ellipsis rune.
-func CapRunes(s string, maxRunes int) string {
-	if r := []rune(s); len(r) > maxRunes {
-		return string(r[:maxRunes]) + "…"
-	}
-	return s
-}
+// CapRunes truncates s to maxRunes with a trailing ellipsis rune — a
+// projection of textcap.CapRunes, the rule's ONE home since ADR-0103 unit 04
+// (the advisor prompt reads the same rule there instead of importing the
+// todo lifecycle for a string helper).
+func CapRunes(s string, maxRunes int) string { return textcap.CapRunes(s, maxRunes) }
 
 // TruncateRunes trims surrounding whitespace and caps s at max runes, marking
-// truncation with " …[truncated]" — the advisor prompt's and the remediation
-// title's rule (ADR-0103 unit 03b), the third cap beside CapRunes ("…") and
-// Summary (" ...[truncated]"). Three rules, one file.
-func TruncateRunes(s string, max int) string {
-	s = strings.TrimSpace(s)
-	r := []rune(s)
-	if len(r) <= max {
-		return s
-	}
-	return string(r[:max]) + " …[truncated]"
-}
+// truncation with " …[truncated]" — the remediation title's rule (ADR-0103
+// unit 03b), the third cap beside CapRunes ("…") and Summary
+// (" ...[truncated]"); since unit 04 a projection of textcap.TruncateRunes.
+// Three rules, one file enumerates them.
+func TruncateRunes(s string, max int) string { return textcap.TruncateRunes(s, max) }
 
 // Summary is the failure-born todo's action and the FailedRecord's summary:
 // the message capped at MaxSummaryRunes with the truncation marker (a

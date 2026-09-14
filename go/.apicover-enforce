@@ -613,3 +613,11 @@
 # reconcile arms, the stale-leftover gate, the ACS deterministic floor, the verdict-source rule and the
 # ship guard (internal/phases/runner/verdict). 100% API + 100% line coverage gated.
 ./internal/phases/runner/verdict
+# ADR-0103 unit 04 (2026-09-14): the two rune-cap text rules the advisor prompt and the carryover
+# lifecycle project (internal/textcap). 100% API + 100% line coverage gated.
+./internal/textcap
+
+# ADR-0103 unit 04 (2026-09-14): the phase advisor — the routing/plan prompt composer, the bridge
+# launcher with its profile fallback chain and redacted captures, and the plan/proposal parser with
+# the mint recursion guard (internal/core/advisor). 100% API + 100% line coverage gated.
+./internal/core/advisor

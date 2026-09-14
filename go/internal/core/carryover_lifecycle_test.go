@@ -89,12 +89,10 @@ func TestWriteFailureLearningState_RMWBranchIsByteIdenticalToTheGolden(t *testin
 	}
 }
 
-// The consumer pin of the unit's priority vocabulary: the advisor's rank
-// table (the consumer) ranks exactly what the producers spell.
+// The consumer pin of the unit's priority vocabulary: core's consts project
+// the unit's (the advisor's rank table — the other consumer — pins the same
+// vocabulary from its own package since ADR-0103 unit 04).
 func TestCarryoverPriorityRank_RanksTheUnitsVocabulary(t *testing.T) {
-	if carryoverPriorityRank(carryover.PriorityBlocking) != 6 || carryoverPriorityRank(carryover.PriorityLesson) != 5 || carryoverPriorityRank(carryover.PriorityPrescription) != 5 || carryoverPriorityRank(carryover.PriorityMemoDefault) != 3 {
-		t.Fatal("P0 > P1 == high > medium in the advisor's rank table")
-	}
 	if carryoverPriorityBlocking != carryover.PriorityBlocking || carryoverPriorityLesson != carryover.PriorityLesson {
 		t.Fatal("core's priority consts are projections of the unit's")
 	}

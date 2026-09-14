@@ -604,6 +604,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 		core.WithProposerModel(advModel),
 		core.WithPersona(advPersona),
 		core.WithDepthCheck(core.AdvisorDepthExceeded),
+		core.WithAdvisorSignals(signals),
 	)
 	strategy := router.Select(cfg, advisor)
 	// The same advisor also produces the upfront whole-cycle plan the integrity

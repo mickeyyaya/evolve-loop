@@ -23,7 +23,6 @@ var (
 	_ = (*cycleRun).selectNext               // next-phase selection (re-plan precedes it)
 	_ = (*Orchestrator).registerMintedPhases // WS2-S6 mint-registration idempotency target
 	_ = mintConfigsFrom                      // WS1-S2 recursion-guard / denylist target
-	_ = writeRubricLines                     // WS5-S1 recipe-projection pattern
 	_ = (*StateMachine).SpineSatisfiedUpTo   // floor's artifact-backed spine check
 	_ = router.ClampPlanToFloorWith          // the sole trust boundary (integrity floor)
 )

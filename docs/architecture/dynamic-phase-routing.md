@@ -139,7 +139,7 @@ Triggers are honored only at `Stage >= Advisory`; in `Shadow` they are forensic-
 
 ## The LLM proposer
 
-`core.PhaseAdvisor` (`go/internal/core/phase_advisor.go`) is the bridge-backed `DynamicLLM` brain:
+`core.PhaseAdvisor` (`go/internal/core/phase_advisor.go` — since ADR-0103 unit 04 the seam; the brain is `go/internal/core/advisor`, see [decomposition/04-advisor.md](decomposition/04-advisor.md)) is the bridge-backed `DynamicLLM` brain:
 
 - Asks an LLM, via the `core.Bridge` port, which optional phases to insert/skip given the objective digest (`router.Digest`).
 - Defaults to a cheap/fast model (`haiku`) on the `claude-tmux` driver — routing is a lightweight read-only judgment, not heavy generation. Override with `WithProposerCLI` / `WithProposerModel`.

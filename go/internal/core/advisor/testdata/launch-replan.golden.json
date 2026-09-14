@@ -1,0 +1,20 @@
+{
+  "cli": "claude-tmux",
+  "profile": "{{ROOT}}/.evolve/profiles/router.json",
+  "model": "deep",
+  "prompt": "# evolve-router\nYou are the ROUTER persona stub (PERSONA_MARKER_42).\n\n---\n# This cycle\n\n## Cycle\n- cycle: 7\n- just_completed: build\n- last_verdict: PASS\n- completed_phases: scout, build\n- mandatory_spine: scout, build, audit, ship\n- max_optional_insertions: 2\n\n## Goal\nrotate the leaked key sk-livesecret0123456789ABCDEF across the fleet\n\n## Objective signals (digested from handoff artifacts)\n- scout: cycle_size_estimate=large goal_type= deliverable_kind= item_count=5 carryover=0 backlog=0\n\n## Decision rubric (justify each optional phase by an objective signal)\nFORBIDDEN: never propose reaching ship without audit. Any justification for skipping audit is rejected by the kernel.\n\n## Optionally MINT a new phase\nIf an objective signal calls for work no existing phase covers, you MAY add an entry for a brand-new phase by attaching a \"mint\" block. Give it a kebab-case phase name, an inline persona prompt, and a TIER (fast|balanced|deep — never a raw model name). Minted phases are always optional and clamped by the kernel; they can never reach ship without audit. Omit \"mint\" for existing phases. Minted phases default to writes_source:true; set \"writes_source\":false only for phases that never edit source.\nALSO supply \"description\" (one line: what the phase produces) and \"when_to_use\" (the signal that should trigger SELECTing it) — this is the SELECT metadata a later cycle reads to reuse your phase instead of minting a duplicate.\n\nYou MAY also propose a dispatch \"cli\" and abstract \"tier\" (fast|balanced|deep — never a raw model name) for an EXISTING phase, honoring its allowed_clis/model_tier_envelope above when shown. Omit both to leave the phase's profile-pinned default unchanged.\n\n## Operator model-tier policy (apply when proposing a tier)\n- deep: judgment-heavy phases — build, tdd, audit, architecture/design, adversarial review.\n- balanced: review/scan/triage-class phases — the safe default for anything not covered below.\n- fast: ONLY mechanical phases (doc-sync, changelog-sync, locale-format-check, close-checklist) — NEVER for a phase that writes source, renders a verdict, or scopes work. When in doubt, propose HIGHER.\n- Judgment phases usually carry a min=balanced envelope above — don't fight the clamp with a low-tier proposal; propose a CLI only when deviating from the phase's profile default is justified.\n\n## Respond with STRICT JSON only (a bare array, no prose, no markdown fence):\n[{\"phase\":\"\u003cphase\u003e\",\"run\":true,\"justification\":\"\u003cone sentence\u003e\",\"cli\":\"\u003ccli\u003e\",\"tier\":\"balanced\"},{\"phase\":\"\u003cnew-phase\u003e\",\"run\":true,\"justification\":\"\u003cwhy\u003e\",\"mint\":{\"prompt\":\"\u003cpersona\u003e\",\"tier\":\"balanced\",\"cli\":\"claude\",\"description\":\"\u003cwhat it produces\u003e\",\"when_to_use\":\"\u003cwhen to select it\u003e\"}}]\n\nNow write your whole-cycle plan as a strict JSON array to {{WS}}/routing-replan.json (no prose, no fence).\n",
+  "workspace": "{{WS}}",
+  "worktree": "{{WT}}",
+  "project_root": "{{ROOT}}",
+  "artifact_path": "{{WS}}/routing-replan.json",
+  "completion": "artifact",
+  "agent": "router",
+  "contract": "router-replan",
+  "cycle": 7,
+  "env": {
+    "EVOLVE_CLI": "claude-tmux"
+  },
+  "skills": [
+    "fable"
+  ]
+}

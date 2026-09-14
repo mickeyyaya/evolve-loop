@@ -89,42 +89,6 @@ func TestPhaseCardsFromCatalog_ControlStillExcluded(t *testing.T) {
 	}
 }
 
-// HIDDEN, NOT REMOVED. The declined set must still be named in the prompt, or
-// this fix trades one invisibility problem for another — the advisor would have
-// no way to learn the phase exists, and neither would an operator reading the
-// prompt.
-func TestWriteCatalog_OnDemandPhasesAreStillIndexed(t *testing.T) {
-	var b strings.Builder
-	writeCatalogWithOnDemand(&b, []router.PhaseCard{{Name: "scout", Optional: true}},
-		[]string{"market-sizing", "okr-draft"})
-	out := b.String()
-
-	if !strings.Contains(out, "market-sizing") || !strings.Contains(out, "okr-draft") {
-		t.Fatalf("declined phases must still be discoverable by name; got:\n%s", out)
-	}
-	if !strings.Contains(out, "scout") {
-		t.Fatalf("the SELECT menu itself must still render; got:\n%s", out)
-	}
-	// One line, not 53 cards — the whole point.
-	idx := out[strings.Index(out, "market-sizing"):]
-	if n := strings.Count(idx, "\n"); n > 3 {
-		t.Fatalf("the on-demand index must be compact, not a second catalog (%d lines):\n%s", n, idx)
-	}
-}
-
-// No on-demand phases ⇒ no index line at all, so the common repo is unchanged.
-func TestWriteCatalog_NoIndexLineWhenNothingDeclined(t *testing.T) {
-	var b strings.Builder
-	writeCatalogWithOnDemand(&b, []router.PhaseCard{{Name: "scout", Optional: true}}, nil)
-	// Case matters: the emitted marker is "ON REQUEST". An earlier version of
-	// this assertion searched for lowercase "on request" and therefore could
-	// never fail — it passed against an implementation that always printed the
-	// line. Match the real token.
-	if strings.Contains(b.String(), "ON REQUEST") {
-		t.Fatalf("no declined phases means no index line; got:\n%s", b.String())
-	}
-}
-
 // THE WIRING TEST. Everything above proves the pieces; this proves the ADVISOR
 // PROMPT changes. Three separate fixes this week shipped a correct component
 // that nothing called, so the assertion is on the rendered prompt built from a
@@ -214,10 +178,10 @@ func TestRepoPhaseCatalog_CatalogWordIsKnown(t *testing.T) {
 	t.Logf("tracked phases: %d, declined a SELECT slot: %d, on the menu: %d", checked, onDemand, checked-onDemand)
 }
 
-// M9's kill: through composePlanPrompt / buildPlanPrompt — the functions that
-// actually render the advisor prompt in production. The earlier test called the
-// catalog writer directly and so could not see a call site passing nil, which is
-// exactly the mutation that survived.
+// M9's kill: through the persona-less composer — the legacy inline plan prompt
+// (buildPlanPrompt in the advisor leaf) that renders in production without a
+// persona. The earlier test called the catalog writer directly and so could
+// not see a call site passing nil, which is exactly the mutation that survived.
 func TestBuildPlanPrompt_CarriesTheOnDemandIndex(t *testing.T) {
 	cat := catalogOf(t,
 		specWith("scout", "plan", ""),
@@ -228,7 +192,7 @@ func TestBuildPlanPrompt_CarriesTheOnDemandIndex(t *testing.T) {
 		OnDemandPhases: onDemandCatalogNames(cat),
 	}
 
-	prompt := buildPlanPrompt(in)
+	prompt := NewPhaseAdvisor(nil).composePlanPrompt(in, "routing-plan.json")
 
 	if !strings.Contains(prompt, "ON REQUEST") {
 		t.Fatalf("the production plan prompt must carry the on-request index:\n%s", prompt)
