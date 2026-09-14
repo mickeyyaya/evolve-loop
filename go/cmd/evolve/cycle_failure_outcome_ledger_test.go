@@ -58,7 +58,7 @@ func TestApplyCycleFailureOutcome_AppendsLifecycleThroughTheGivenLedger(t *testi
 	root := t.TempDir()
 	evolveDir, _ := seedFailedCycleInbox(t, root, "poison", 7)
 	fake := newFakeLedger()
-	if err := applyCycleFailureOutcome(root, evolveDir, 7, io.Discard, fake); err != nil {
+	if err := applyCycleFailureOutcome(root, evolveDir, 7, io.Discard, fake, nil); err != nil {
 		t.Fatalf("applyCycleFailureOutcome: %v", err)
 	}
 	assertLifecycleWentThroughTheRootLedger(t, evolveDir, fake)

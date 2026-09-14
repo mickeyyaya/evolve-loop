@@ -1,0 +1,1 @@
+{"ts":"2026-05-24T12:00:00Z","cycle":1,"role":"orchestrator","kind":"inbox-lifecycle","exit_code":0,"entry_seq":0,"prev_hash":"{{HASH}}","action":"recover","task_id":"task-a","message":".evolve/inbox/processing/cycle-1/task-a.json → .evolve/inbox/task-a.json: orphan-recovery-cycle-not-active"}

@@ -70,7 +70,7 @@ Transport: **mem** in-memory func/option field · **ws** file under `.evolve/run
 | 39 | `dashboard` | `go/internal/dashboard/` (2059 lines) | — | HTTP/SSE `server.go:191` | polls files | `dashboard.Model` | `cmd_dashboard.go:34` | polls, no push |
 | 41 | `soakreport` | `soakreport.go:61,160` | — | operator | reads ndjson | `Report` | reader | no |
 | 42 | `subagent.AppendAbnormalEvent` | `subagent/helpers.go:32` | subagent-run, fan-out | none | ws | hand-rolled `fmt.Sprintf` JSON (`:44`) | UNWIRED | no |
-| 43–48 | `guardslog.Append`, `sessionrecord.Append`, `clihealth.RecordBootStrike`, `recurrence.RecordClosure`, `checkpoint.RecordPhaseIntegrity`, `inboxmover.RecordRootTaskFailure` | see agent report | various | various | file | ad hoc | UNWIRED | no |
+| 43–48 | `guardslog.Append`, `sessionrecord.Append`, `clihealth.RecordBootStrike`, `recurrence.RecordClosure`, `checkpoint.RecordPhaseIntegrity`, `inboxmover.RecordRootTaskFailure` | see agent report | various | various | file | ad hoc | UNWIRED (still unwired after ADR-0103 unit 06 — its `:9` doc comment "called by the loop" is false; follow-up 06-F2) | no |
 | 50 | `contractResolverSink` | `cmd_cycle_catalog_publisher.go:12` | `WithCatalogPublisher` | bridge resolver | mem | `func(Catalog)` | **WIRED** `cmd_cycle.go:583` | fan-out of one, catalog only |
 | 51 | `panestream.SignalCenter` | §1 | tmux driver | none | mem | `SignalEvent{SessionKey, State}` | UNWIRED | no |
 
@@ -132,13 +132,13 @@ Three severity vocabularies coexist: `cyclestate` (`error`/`warning`), `dispatch
 | `[orchestrator]` | 287 (284 are `Fprint*(os.Stderr, …)` sites) | `core/failure_learning.go` (31) |
 | `[loop]` | 132 | `cmd/evolve/cmd_loop*.go` |
 | `[ship]` | 130 | `phases/ship/gitops.go` (989 lines) |
-| `[bridge]` | 40 · `[chain]` 24 · `[runner]` 23 · `[skills]` 20 · `[gc]` 16 · `[changelog-gen]` 16 · `[ledger]` 14 · `[doctor]` 14 · `[codex]` 13 · `[subagent-run]` 12 · `[contract-gate]` 12 · `[release-pipeline]` 11 · `[marketplace-poll]` 11 · `[agy]` 10 · `[claude-p]` 9 · `[inbox-mover]` 8 · `[commit-prefix-gate]` 8 · `[build-floor]` 8 · ~30 more prefixes at ≤ 7 each · `[engine]` 5 · `[graduated-enforcement SHADOW]` 1 · `[verdict-cache SHADOW]` 1 | | |
+| `[bridge]` | 40 · `[chain]` 24 · `[runner]` 23 · `[skills]` 20 · `[gc]` 16 · `[changelog-gen]` 16 · `[ledger]` 14 · `[doctor]` 14 · `[codex]` 13 · `[subagent-run]` 12 · `[contract-gate]` 12 · `[release-pipeline]` 11 · `[marketplace-poll]` 11 · `[agy]` 10 · `[claude-p]` 9 · `[inbox-mover]` 8 (a prefix-literal count: the file wrote 31 lines through one `logf` — ADR-0103 unit 06 replaced 15 of them with `INBOX_*` codes) · `[commit-prefix-gate]` 8 · `[build-floor]` 8 · ~30 more prefixes at ≤ 7 each · `[engine]` 5 · `[graduated-enforcement SHADOW]` 1 · `[verdict-cache SHADOW]` 1 | | |
 
 Bounded-field helpers that could seed a structured encoder: `log.DiagnosticField` (`log/field.go:13`) and its bridge alias `diagnosticField` (`bridge/attempt_telemetry.go:37`).
 
 ## 7. Sizes (decomposition order)
 
-Top non-test files under `go/internal`: `core/orchestrator.go` 1158 · `core/phase_advisor.go` 1144 · `core/failure_learning.go` 1070 · `inboxmover/inboxmover.go` 1006 · `phases/ship/gitops.go` 989 · `config/config.go` 962 · `core/cyclerun.go` 904 · `phases/audit/defect_ledger.go` 881 · `acssuite/acssuite.go` 866 · `phases/audit/ciparity.go` 801 · `bridge/engine.go` 791 · `bridge/autorespond.go` 787 · `router/router.go` 755 · `explanationdocs/explanationdocs.go` 745 · `phases/runner/runner.go` 719.
+Top non-test files under `go/internal`: `core/orchestrator.go` 1158 · `core/phase_advisor.go` 1144 · `core/failure_learning.go` 1070 · `inboxmover/inboxmover.go` 1006 (993 on 8e8f080f; the 372-line seam of ADR-0103 unit 06 since 2026-09-14) · `phases/ship/gitops.go` 989 · `config/config.go` 962 · `core/cyclerun.go` 904 · `phases/audit/defect_ledger.go` 881 · `acssuite/acssuite.go` 866 · `phases/audit/ciparity.go` 801 · `bridge/engine.go` 791 · `bridge/autorespond.go` 787 · `router/router.go` 755 · `explanationdocs/explanationdocs.go` 745 · `phases/runner/runner.go` 719.
 
 Top packages by non-test lines (with tests): `core` 23,763 (78,284) · `bridge` 11,233 (41,116) · `phases/ship` 6,106 (21,860) · `phases/audit` 3,292 (13,320) · `policy` 2,985 · `subagent` 2,924 · `router` 2,828 · `deliverable` 2,247 · then `inboxmover` 2,089 · `dashboard` 2,059 · `triagecap` 1,968 · `phases/runner` 1,846. `go/cmd/evolve` is 17,602 non-test lines; its largest file is the composition root `cmd_cycle.go` (1,000).
 

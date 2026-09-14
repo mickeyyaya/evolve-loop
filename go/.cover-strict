@@ -13,3 +13,4 @@
 ./internal/config 100
 ./internal/observerengine 100
 ./internal/core/defectledger 100
+./internal/inboxmover/lifecycle 100

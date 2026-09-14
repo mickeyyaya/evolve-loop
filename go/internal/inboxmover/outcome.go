@@ -111,9 +111,9 @@ func ApplyCycleOutcome(opts Options, oc CycleOutcome) (OutcomeResult, error) {
 		}
 	}
 	rr, err := releaseCycleProcessing(opts, oc.Cycle, oc.Reason, &quarantinePolicy{
-		ceiling:     oc.Ceiling,
-		systemLevel: oc.SystemLevel,
-		committed:   committedSet,
+		Ceiling:     oc.Ceiling,
+		SystemLevel: oc.SystemLevel,
+		Committed:   committedSet,
 	})
 	for _, p := range rr.Paths {
 		if strings.Contains(p, filepath.Join(opts.InboxDir, "quarantine")+string(filepath.Separator)) {

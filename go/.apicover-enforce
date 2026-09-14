@@ -601,3 +601,7 @@
 # ADR-0103 unit 09 (2026-09-14): the audit's defect/prescription ledger — schema, writer, readers and
 # the continuation disposition gate (internal/core/defectledger). 100% API + 100% line coverage gated.
 ./internal/core/defectledger
+# ADR-0103 unit 06 (2026-09-14): the inbox lifecycle mover — claim, promote, quarantine release, the
+# cycle drain, orphan recovery and the processed-record primitives (internal/inboxmover/lifecycle).
+# 100% API + 100% line coverage gated.
+./internal/inboxmover/lifecycle

@@ -425,55 +425,9 @@ func TestFindFileByTaskID_IgnoresNonJSON(t *testing.T) {
 	}
 }
 
-// === promoteDestPath table =================================================
-func TestPromoteDestPath(t *testing.T) {
-	base := "task-x.json"
-	cases := []struct {
-		name     string
-		state    string
-		opts     PromoteOpts
-		wantPath string
-	}{
-		{"processed default cycle", "processed", PromoteOpts{}, "processed/cycle-0/task-x.json"},
-		{"processed with cycle", "processed", PromoteOpts{Cycle: "12"}, "processed/cycle-12/task-x.json"},
-		{"processed with sha", "processed", PromoteOpts{Cycle: "12", CommitSHA: "deadbeef1234567890"}, "processed/cycle-12/deadbeef-task-x.json"},
-		{"processed short sha (no truncate)", "processed", PromoteOpts{Cycle: "12", CommitSHA: "abc"}, "processed/cycle-12/abc-task-x.json"},
-		{"rejected default cycle", "rejected", PromoteOpts{}, "rejected/cycle-0/task-x.json"},
-		{"retry no cycle", "retry", PromoteOpts{}, "retry/task-x.json"},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			_, dest := promoteDestPath("/inbox", base, tc.state, tc.opts)
-			if !strings.HasSuffix(dest, tc.wantPath) {
-				t.Errorf("dest = %q, want suffix %q", dest, tc.wantPath)
-			}
-		})
-	}
-}
-
-// === intPtr / strPtr edge cases ===========================================
-func TestIntPtr(t *testing.T) {
-	if intPtr("") != nil {
-		t.Errorf("intPtr('') = non-nil")
-	}
-	if intPtr("garbage") != nil {
-		t.Errorf("intPtr('garbage') = non-nil")
-	}
-	v := intPtr("42")
-	if v == nil || *v != 42 {
-		t.Errorf("intPtr('42') = %v", v)
-	}
-}
-
-func TestStrPtr(t *testing.T) {
-	if strPtr("") != nil {
-		t.Errorf("strPtr('') = non-nil")
-	}
-	v := strPtr("hi")
-	if v == nil || *v != "hi" {
-		t.Errorf("strPtr('hi') = %v", v)
-	}
-}
+// === promoteDestPath / intPtr / strPtr — moved to the lifecycle leaf with the
+// code (ADR-0103 unit 06: lifecycle/promote_test.go TestPromoteDestPath_AndCycleOrZero,
+// lifecycle/ledger_test.go TestIntPtr_StrPtr_FoldLifecycleMessage).
 
 // === readActiveCycle: missing file ========================================
 func TestReadActiveCycle_MissingFile(t *testing.T) {

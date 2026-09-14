@@ -1,0 +1,5 @@
+[inbox-mover] claimed: task-1.json → processing/cycle-7/
+[inbox-mover] claimed: task-2.json → processing/cycle-7/
+[inbox-mover] promoted: task-1.json → processed/
+[inbox-mover] released: task-2.json ← processing/cycle-7/
+[inbox-mover] release-cycle: 1 file(s) released from cycle-7
