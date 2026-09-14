@@ -206,20 +206,6 @@ func TestGoTestExcludedByBuildTags(t *testing.T) {
 	}
 }
 
-// TestSanitizeEnv_StripsEvolveRuntimeFlags is the pure classifier for the env
-// the self-check's `go test` subprocess runs under: the campaign's per-run
-// EVOLVE_* flags (EVOLVE_FLEET etc.) must be removed so tests run in their
-// default (CI-like) config, while everything else is preserved. Prefix match,
-// not substring (NOTEVOLVE_X is kept).
-func TestSanitizeEnv_StripsEvolveRuntimeFlags(t *testing.T) {
-	in := []string{"EVOLVE_FLEET=1", "PATH=/bin", "EVOLVE_FLEET_SCOPE=a,b", "HOME=/h", "NOTEVOLVE_FLEET=keep"}
-	got := sanitizeEnv(in)
-	want := []string{"PATH=/bin", "HOME=/h", "NOTEVOLVE_FLEET=keep"}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("sanitizeEnv = %v, want %v (drop EVOLVE_* by prefix, keep the rest)", got, want)
-	}
-}
-
 // TestRealGoUnitTest_SanitizesCampaignEnv proves end-to-end that the self-check
 // does NOT leak the campaign's runtime env into its `go test` subprocess. A live
 // cycle surfaced this: the self-check inherited EVOLVE_FLEET=1, which flips
