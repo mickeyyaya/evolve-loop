@@ -63,3 +63,22 @@ func TestChangedFilesChecked_NotDerivable(t *testing.T) {
 		t.Errorf("clean tree: files=%v ok=%v, want none,true", files, ok)
 	}
 }
+
+// PackagesOf is the file→package projection every consumer of the seed
+// shares: Go files under go/ map to their package's test pattern, deduped and
+// sorted; anything else contributes nothing; no Go file at all is nil.
+func TestPackagesOf_ProjectsGoFilesOntoSortedPatterns(t *testing.T) {
+	got := PackagesOf([]ChangedFile{
+		{Path: "go/internal/user/user_test.go", Added: true},
+		{Path: "go/internal/base/base.go"},
+		{Path: "go/internal/user/user.go"},
+		{Path: "docs/note.md", Added: true},
+		{Path: "go/main.go"},
+	})
+	if want := []string{"./...", "./internal/base/...", "./internal/user/..."}; !reflect.DeepEqual(got, want) {
+		t.Errorf("PackagesOf = %v, want %v", got, want)
+	}
+	if got := PackagesOf([]ChangedFile{{Path: "README.md"}}); got != nil {
+		t.Errorf("no Go file: PackagesOf = %v, want nil", got)
+	}
+}

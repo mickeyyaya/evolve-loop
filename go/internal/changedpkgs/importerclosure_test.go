@@ -217,3 +217,25 @@ func TestImporterClosureChecked_NotDerivableOutsideAModule(t *testing.T) {
 		t.Errorf("nil input: ok=%v closure=%+v", ok, c)
 	}
 }
+
+// Closure's two views are one walk: Testable is always a subset of Patterns
+// (never a pattern the walk did not produce), and the zero value is the empty
+// closure both ways.
+func TestClosure_TestableIsASubsetOfPatterns(t *testing.T) {
+	c, ok := ImporterClosureChecked(repoRootForTest(t), []string{"./internal/gitexec/..."})
+	if !ok || len(c.Patterns) == 0 {
+		t.Fatalf("closure = %+v ok=%v", c, ok)
+	}
+	for _, p := range c.Testable {
+		if !contains(c.Patterns, p) {
+			t.Errorf("Testable %q is not in Patterns %v", p, c.Patterns)
+		}
+	}
+	if len(c.Testable) == 0 || !contains(c.Testable, "./internal/gitexec/...") {
+		t.Errorf("the changed package itself is testable: %v", c.Testable)
+	}
+	var zero Closure
+	if len(zero.Patterns) != 0 || len(zero.Testable) != 0 {
+		t.Errorf("zero Closure is empty both ways: %+v", zero)
+	}
+}
