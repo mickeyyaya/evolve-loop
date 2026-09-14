@@ -163,6 +163,10 @@ Examples (what cycles 1636 and 1630 would have produced):
 `orchestrator`, `advisor`, `runner`, `bridge`, `liveness` (the renamed pane center), `ship`, `audit`,
 `triage`, `scout`, `build`, `tdd`, `gate.contract`, `gate.eval`, `gate.repo`, `inbox`, `config` (the routing-config loader — registry, env and policy-stage resolution; breakdown unit 08),
 `loop`, `watchdog`, `observer` (the phase observer's own faults — the manual subcommand's engine `internal/observerengine` and the live adapter's sink; breakdown unit 12), `dashboard`, `signalcenter` (self-reports), `ledger` (the file ledger's append observer, S4a), `outcome` (the phase-outcome recorder, breakdown unit 01), `failurediag` (the failure-diag sidecar writer and the delivery-failure classifier, breakdown unit 02), `carryover` (the carryover-todo lifecycle, breakdown unit 03), `failurelearning` (the failure-learning engine — the failed-approach recorder, the deterministic floor, the recurrence closure; breakdown unit 03b); `ship` also carries the landing's warnings (the ff-merge, the push with its inline repair, the ship-binding witness; breakdown unit 07 — `internal/phases/ship/landing`, `ship.warning`). A module is added by
+`orchestrator`, `advisor`, `runner`, `bridge`, `liveness` (the renamed pane center), `ship`, `audit`
+(the defect-ledger gate, breakdown unit 09 — the tag is shared by the audit package's later units;
+the `AUDIT_LEDGER_` family prefix and `origin=Ledger.<Method>` name the producer), `triage`, `scout`, `build`, `tdd`, `gate.contract`, `gate.eval`, `gate.repo`, `inbox`, `config`,
+`loop`, `watchdog`, `observer`, `dashboard`, `signalcenter` (self-reports), `ledger` (the file ledger's append observer, S4a), `outcome` (the phase-outcome recorder, breakdown unit 01), `failurediag` (the failure-diag sidecar writer and the delivery-failure classifier, breakdown unit 02), `carryover` (the carryover-todo lifecycle, breakdown unit 03), `failurelearning` (the failure-learning engine — the failed-approach recorder, the deterministic floor, the recurrence closure; breakdown unit 03b). A module is added by
 editing the closed set and its test; an unknown module is stamped `SIGNALCENTER_UNKNOWN_MODULE` and
 raised to WARN — never dropped. *(review 21: `advisor` and `config` added to match §12.)*
 
@@ -188,6 +192,7 @@ raised to WARN — never dropped. *(review 21: `advisor` and `config` added to m
 | `failurelearning.warning` | the failure-learning engine could not load policy, write the deterministic floor artifacts or update the recurrence ledger, or truncated a self-reported defect list; the FailedRecord and P0 todo stand, the cycle proceeds (unit 03b) | non-terminal |
 | `config.warning` | the routing-config loader took a fail-safe default: a dial outside its vocabulary (registry, env or policy.json), a weak or misordered spine, an inert enable, or a phase registry that exists but could not be read or parsed (the loader degrades to the compiled baseline — which omits triage); the cycle proceeds on the resolved value (unit 08) | WARN | non-terminal |
 | `observer.warning` | the phase observer could not append an event, tail the stdout log, append the nudge, write the report, open the live events sink or reclaim its watcher — or it sent a stall SIGTERM (INCIDENT `OBSERVER_STALL_KILL_SENT`); the phase proceeds unobserved or as decided (unit 12) | WARN / INCIDENT for the kill | |
+| `audit.warning` | the defect-ledger gate recorded a rejection it could not persist or an overflow, could not arm/read/write-back a continuation's lineage, found inherited defects unaccounted, or (INFO) could not tell the auditor its inherited ids; the diagnostics stay the graded wire, the verdict is decided by the audit phase (unit 09) | WARN; INFO for `AUDIT_LEDGER_PROMPT_DEGRADED` | |
 | `cycle.sealed` | final verdict decided (after `finalizeOutcome`) | INFO (FAIL → WARN) | ✓ on FAIL |
 | `loop.wave` / `loop.halt` / `loop.escalation` | batch-level events (today's `dispatchevents`) | INFO / INCIDENT / WARN | / ✓ / |
 | `signalcenter.listener_panicked` / `signalcenter.sink_dropped` | self-reports: a panicking listener was dropped / the NDJSON sink could not write (count in `fields.dropped`) | INCIDENT / WARN | |
@@ -467,7 +472,8 @@ The Center is the enabler: an extracted unit gets its `Module` tag, its code nam
 producer tests and its place on the prefix allowlist on day one. **Cut criterion** *(review 21)*:
 `core` first (the orchestrator is where every fact converges and where the mutex now lives), then
 by size, with the audit package deferred to a later wave because its files are gate logic under
-ADR-0072's coherence floor and need their own campaign note.
+ADR-0072's coherence floor and need their own campaign note — except the defect ledger, pulled
+forward as unit 09 (its schema was spelled in three homes and the `audit` tag had no producer).
 
 | Order | Unit to extract (from) | Size today | Module tag | Notes |
 |---|---|---|---|---|
@@ -479,8 +485,8 @@ ADR-0072's coherence floor and need their own campaign note.
 | 6 | **unit 07 landed 2026-09-14** ([decomposition/07-shipgitops.md](decomposition/07-shipgitops.md)): the landing (the ff-merge, the push with its inline repair and the post-push head read, the shared git probes, the binding writer) → `internal/phases/ship/landing` behind the seam `gitops_landing.go`; `gitops.go` 989 → 935, `repair.go` 474 → 402, `worktree_ship.go` 205 → 184; the staging guard and the run-scope policy remain (07b / 07c) | 989 | `ship` | landing vs binding writer vs staging guard |
 | 7 | **landed 2026-09-14 as unit 08** ([decomposition/08-config.md](decomposition/08-config.md)): `config/config.go` (962 → 229) decomposed in place — `Loader` with an injected reader and Center, `config.warning`, six `CONFIG_*` codes | 962 | `config` | typed policy structs (`PolicyStages`); the "retire env flags" by-product is OUT of scope (the nine keys are prose-contracted in the protected flagregistry table — its own slice) |
 | 8 | `bridge/engine.go` (791) + `autorespond.go` (787) | 1578 | `bridge` | rides S3 |
+| 9 | **landed 2026-09-14 as unit 09** ([decomposition/09-defectledger.md](decomposition/09-defectledger.md)): `phases/audit/defect_ledger.go` (882) → `internal/core/defectledger` (882 → 392 — the seam and the citation resolver stay) | 882 | `audit` | pulled forward from the later wave: unit 03 F13's three schema homes collapse onto one leaf; 13 `AUDIT_LEDGER_*` codes on `audit.warning` |
 | 12 | **landed 2026-09-14 as unit 12** ([decomposition/12-phaseobserver.md](decomposition/12-phaseobserver.md)): the phase observer — `internal/phaseobserver/phaseobserver.go` (601) → the clock-stepped engine `internal/observerengine` (tail/decoder, stall rules, incident responder, envelope/report sinks) with the host as a Strangler seam; the live `adapters/observer.CoreAdapter` wired to the Center for its own two faults; the layout projected from `observerengine.PathsFor` | 601 | `observer` | eight `OBSERVER_*` codes; the adapter's detection stream stays S4b's |
-| later wave | `phases/audit/defect_ledger.go` (881), `acssuite.go` (866), `phases/audit/ciparity.go` (801) | 2548 | `audit`, `acs` | gate logic under the ADR-0072 floor; own campaign note |
 
 Method per unit (named): **Strangler Fig** (new unit beside the old, callers moved one by one, old
 deleted), **Extract Class / Extract Function** (Fowler), **Facade** for the remaining public surface,

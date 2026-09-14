@@ -18,8 +18,10 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
+	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core/carryover"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core/defectledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core/failurediag"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core/failurelearning"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
@@ -377,5 +379,59 @@ func TestConsoleSinkThresholdHasOneHome(t *testing.T) {
 		if !strings.Contains(string(src), "signalcenter.ConsoleSink(") {
 			t.Errorf("%s: a composition root consumes signalcenter.ConsoleSink", root)
 		}
+	}
+}
+
+// ADR-0103 unit 09: the defect ledger's WARN reaches the --simulate root's
+// console sink under the audit tag and the cycle workspace's durable stream —
+// a directory at <ws>/defect-ledger.json on a continuation is an unreadable
+// own ledger the grade blocks on.
+func TestWireSimulateOrchestrator_AuditLedgerWarningRenders(t *testing.T) {
+	root := t.TempDir()
+	evolveDir := filepath.Join(root, ".evolve")
+	ws := core.RunWorkspacePath(root, 1)
+	ancestorWS := core.RunWorkspacePath(root, 0)
+	if err := os.MkdirAll(filepath.Join(ws, defectledger.LedgerFile), 0o755); err != nil { // a directory at the path: a read fault, not absence
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(ancestorWS, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := defectledger.Write(ancestorWS, defectledger.Doc{Entries: []defectledger.Entry{{ID: "d1", Text: "inherited", Status: defectledger.StatusOpen}}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := continuation.WriteManifest(ws, continuation.Continuation{Cycle: 0, SnapshotSHA: "deadbeef"}); err != nil {
+		t.Fatal(err)
+	}
+	var console bytes.Buffer
+	d := wireSimulateOrchestrator(root, evolveDir, &console)
+	l := defectledger.New(func(string) []string { return nil }, func(string, defectledger.Request) (bool, string) { return false, "stub" },
+		defectledger.WithSignals(func() *signalcenter.Center { return d.Signals }))
+	if v := l.Reconcile(defectledger.Request{Cycle: 1, Workspace: ws, ProjectRoot: root}); !v.Blocked {
+		t.Fatalf("an unreadable own ledger blocks: %+v", v)
+	}
+	if out := console.String(); !strings.Contains(out, "[audit] audit.warning WARN AUDIT_LEDGER_UNREADABLE cycle=1 phase=audit") || !strings.Contains(out, "origin=Ledger.Reconcile") {
+		t.Fatalf("the console sink renders the unit's WARN under --simulate: %q", out)
+	}
+	if data, err := os.ReadFile(filepath.Join(ws, "signals.ndjson")); err != nil || !strings.Contains(string(data), `"code":"AUDIT_LEDGER_UNREADABLE"`) || !strings.Contains(string(data), `"module":"audit"`) {
+		t.Errorf("the cycle-stamped signal is durable in the cycle workspace: %v %s", err, data)
+	}
+}
+
+// ADR-0103 unit 09: the loop root hands the audit phase the Signal Center —
+// the one production site where AUDIT_LEDGER_* codes can reach a sink.
+func TestAuditRoot_PassesTheSignalCenter(t *testing.T) {
+	src, err := os.ReadFile("cmd_cycle.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var auditLine string
+	for _, line := range strings.Split(string(src), "\n") {
+		if strings.Contains(line, "core.PhaseAudit:") {
+			auditLine = line
+		}
+	}
+	if auditLine == "" || !strings.Contains(auditLine, "audit.WithSignals(") {
+		t.Fatalf("the core.PhaseAudit runner must be built with audit.WithSignals(…): %q", auditLine)
 	}
 }

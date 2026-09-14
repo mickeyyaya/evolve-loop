@@ -498,7 +498,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 		core.PhaseTDD:          tdd.New(tdd.Config{Bridge: br, Prompts: prm, CompactPrompts: cfg.CompactPrompts}),
 		core.PhaseBuildPlanner: buildplanner.New(buildplanner.Config{Bridge: br, Prompts: prm}).BaseRunner(),
 		core.PhaseBuild:        swarmrunner.New(build.New(build.Config{Bridge: br, Prompts: prm, PhaseIO: cfg.PhaseIO, CompactPrompts: cfg.CompactPrompts}), br, swarm.ModeWriter, swCfg),
-		core.PhaseAudit:        audit.NewDefaultWithStageCompactSpec(br, prm, cfg.PhaseIO, cfg.CompactPrompts, documentSpecPtr(cfg)),
+		core.PhaseAudit:        audit.NewDefaultWithStageCompactSpec(br, prm, cfg.PhaseIO, cfg.CompactPrompts, documentSpecPtr(cfg), audit.WithSignals(func() *signalcenter.Center { return signals })),
 		// ManifestGate is threaded from policy.json `gates.manifest_gate` (default
 		// "shadow") so the ship-bind manifest gate is operator-activatable — it was
 		// unreachable short of a code edit before cycle-1064.

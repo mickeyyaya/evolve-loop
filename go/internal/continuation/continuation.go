@@ -30,9 +30,12 @@ type Continuation struct {
 	Cycle        int    `json:"cycle"`         // FAILed cycle that produced it
 }
 
-// manifestName is the per-cycle workspace artifact the orchestrator writes at
-// the preserve decision and the inbox mover reads at release time.
-const manifestName = "continuation-manifest.json"
+// ManifestName is the per-cycle workspace artifact the orchestrator writes at
+// the preserve decision and the inbox mover reads at release time. Exported
+// (ADR-0103 unit 09) so the audit teardown hold, the citation self-cite
+// denylist and the defect ledger name this file through the owner, never by
+// a literal of their own.
+const ManifestName = "continuation-manifest.json"
 
 // WriteManifest atomically persists c as workspace's continuation manifest.
 func WriteManifest(workspace string, c Continuation) error {
@@ -40,7 +43,7 @@ func WriteManifest(workspace string, c Continuation) error {
 	if err != nil {
 		return fmt.Errorf("continuation: marshal manifest: %w", err)
 	}
-	path := filepath.Join(workspace, manifestName)
+	path := filepath.Join(workspace, ManifestName)
 	tmp := path + ".tmp"
 	if err := os.WriteFile(tmp, body, 0o644); err != nil {
 		return fmt.Errorf("continuation: write manifest: %w", err)
@@ -55,7 +58,7 @@ func WriteManifest(workspace string, c Continuation) error {
 // clean (Continuation{}, false); a present-but-unparseable file is an error —
 // schema drift must be loud, never a silent fresh start.
 func ReadManifest(workspace string) (Continuation, bool, error) {
-	body, err := os.ReadFile(filepath.Join(workspace, manifestName))
+	body, err := os.ReadFile(filepath.Join(workspace, ManifestName))
 	if err != nil {
 		if os.IsNotExist(err) {
 			return Continuation{}, false, nil

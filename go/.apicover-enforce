@@ -598,3 +598,6 @@
 # rules, the incident responder and the envelope/report sinks (internal/observerengine).
 # 100% API + 100% line coverage gated.
 ./internal/observerengine
+# ADR-0103 unit 09 (2026-09-14): the audit's defect/prescription ledger — schema, writer, readers and
+# the continuation disposition gate (internal/core/defectledger). 100% API + 100% line coverage gated.
+./internal/core/defectledger

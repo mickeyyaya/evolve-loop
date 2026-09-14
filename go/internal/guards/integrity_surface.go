@@ -121,6 +121,8 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/internal/observerengine/", Rationale: "the phase-observer engine — the stream-json tail/decoder, the stall rules, the incident responder and the envelope/report sinks the manual phase-observer subcommand runs (ADR-0103 unit 12)"},
 	{Fragment: "/go/internal/phaseobserver/phaseobserver.go", Rationale: "the unit-12 seam: the engine's one wired construction, the Config→Settings projection and the Run facade phasecmd and the by-name tests keep (ADR-0103)"},
 	{Fragment: "/go/internal/adapters/observer/core_adapter.go", Rationale: "the live core.Observer adapter: the Signal Center accessor, the layout projection and the two observer fault codes on the auto-spawn path (ADR-0103 unit 12)"},
+	{Fragment: "/go/internal/core/defectledger/", Rationale: "the defect ledger — the anti-laundering schema, writer and readers, and the continuation disposition gate the audit phase, carryover and the adoption seeder project from (ADR-0103 unit 09)"},
+	{Fragment: "/go/internal/phases/audit/defect_ledger.go", Rationale: "the unit-09 seam: the ledger's one wired construction, the request/rejection projections, the citation resolver and the facades disposition.go, the prompt builder and the ACS-named tests keep (ADR-0103)"},
 	{Fragment: "/go/internal/core/outcome/", Rationale: "the C1 phase-outcome recorder the failed-cycle handoff projects from (ADR-0103 unit 01)"},
 	{Fragment: "/go/internal/core/ship_recovery.go", Rationale: "rebase recovery must invalidate stale explanation and route through Build"},
 	{Fragment: "/go/internal/core/resume.go", Rationale: "resume entry point (RunCycleFromPhase) and resumed-deliverable explanation review parity (reviewResumedDeliverable)"},

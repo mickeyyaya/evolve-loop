@@ -1,0 +1,330 @@
+{
+  "origin_cycle": 1285,
+  "entries": [
+    {
+      "id": "d3d1b5e31c84d7c9b455a660d49a17b0e",
+      "text": "defect 0",
+      "status": "OPEN"
+    },
+    {
+      "id": "dab94d92a86894e2829fa716a99863f47",
+      "text": "defect 1",
+      "status": "OPEN"
+    },
+    {
+      "id": "df4c06a801bb7fe783fb83e6fefab1c6e",
+      "text": "defect 2",
+      "status": "OPEN"
+    },
+    {
+      "id": "d8867f8bb3075e6beaf1dd6b9934d6d85",
+      "text": "defect 3",
+      "status": "OPEN"
+    },
+    {
+      "id": "d3c0c3291cfb418c1290b4c6ea2394031",
+      "text": "defect 4",
+      "status": "OPEN"
+    },
+    {
+      "id": "dc31ac53fbf54953037a0d6b5e3f97492",
+      "text": "defect 5",
+      "status": "OPEN"
+    },
+    {
+      "id": "d04a410c2f037cea36057e950b9779e3e",
+      "text": "defect 6",
+      "status": "OPEN"
+    },
+    {
+      "id": "d308d66f13bbc10864995e33c9da695f0",
+      "text": "defect 7",
+      "status": "OPEN"
+    },
+    {
+      "id": "d2c6a921f0fdbac45d50a6a9a91fc26a0",
+      "text": "defect 8",
+      "status": "OPEN"
+    },
+    {
+      "id": "d06c82531409533c160ee6cea6a01889c",
+      "text": "defect 9",
+      "status": "OPEN"
+    },
+    {
+      "id": "d35d4f8cf1c7ede06061404d2607fff15",
+      "text": "defect 10",
+      "status": "OPEN"
+    },
+    {
+      "id": "d4cee3ba7f8d4f04447e6a062536c2e2f",
+      "text": "defect 11",
+      "status": "OPEN"
+    },
+    {
+      "id": "d2d909c6ec9818877a95a0417cfdd4980",
+      "text": "defect 12",
+      "status": "OPEN"
+    },
+    {
+      "id": "da08127ed51210d7735177a6aaa46d095",
+      "text": "defect 13",
+      "status": "OPEN"
+    },
+    {
+      "id": "dc41e5964e52a37eef321c9fb16727625",
+      "text": "defect 14",
+      "status": "OPEN"
+    },
+    {
+      "id": "d63c4418da6620a5ffb370895d8884eb6",
+      "text": "defect 15",
+      "status": "OPEN"
+    },
+    {
+      "id": "dcb7c2d6597b972bb73847ceeb7e4e778",
+      "text": "defect 16",
+      "status": "OPEN"
+    },
+    {
+      "id": "d863302f7282c9a19fee95077c6431201",
+      "text": "defect 17",
+      "status": "OPEN"
+    },
+    {
+      "id": "d78c4fbe77e9aa2b1b0411af7a7d50458",
+      "text": "defect 18",
+      "status": "OPEN"
+    },
+    {
+      "id": "db1f47fa18a68693d684e483642ed5b77",
+      "text": "defect 19",
+      "status": "OPEN"
+    },
+    {
+      "id": "dd1517836eaf6da7456ec39e6484a3db7",
+      "text": "defect 20",
+      "status": "OPEN"
+    },
+    {
+      "id": "d1ca525c07bba35e7e4c5100add33d0f9",
+      "text": "defect 21",
+      "status": "OPEN"
+    },
+    {
+      "id": "d258dd366405014c2813bb731922ff01c",
+      "text": "defect 22",
+      "status": "OPEN"
+    },
+    {
+      "id": "d29d3bc01ab9ba6c9901f0ee94c1715cf",
+      "text": "defect 23",
+      "status": "OPEN"
+    },
+    {
+      "id": "d590228bd836cddee43fed2010841dbf7",
+      "text": "defect 24",
+      "status": "OPEN"
+    },
+    {
+      "id": "dd4130c6dcf63450520f73512373315a7",
+      "text": "defect 25",
+      "status": "OPEN"
+    },
+    {
+      "id": "d7d54eae6d9da936d6fda5f7815c5c8fb",
+      "text": "defect 26",
+      "status": "OPEN"
+    },
+    {
+      "id": "d14132ba7411f1d0e395e3ebeb7d45782",
+      "text": "defect 27",
+      "status": "OPEN"
+    },
+    {
+      "id": "d71eaeede4373e403c66d2606b1af30e7",
+      "text": "defect 28",
+      "status": "OPEN"
+    },
+    {
+      "id": "de24d63298a1991469b9477dcabcc1d3e",
+      "text": "defect 29",
+      "status": "OPEN"
+    },
+    {
+      "id": "dc60254e32b1a6f2650b6a2c2f367fde6",
+      "text": "defect 30",
+      "status": "OPEN"
+    },
+    {
+      "id": "d4c5ac893241dcfae15cf4e9555b59f7b",
+      "text": "defect 31",
+      "status": "OPEN"
+    },
+    {
+      "id": "d68672219a659a064cfdb8c3d4f7e28af",
+      "text": "defect 32",
+      "status": "OPEN"
+    },
+    {
+      "id": "d39f6cf6a84a184014fa4e68cb243afec",
+      "text": "defect 33",
+      "status": "OPEN"
+    },
+    {
+      "id": "ddac488135103a3d5df430bbb8587f41b",
+      "text": "defect 34",
+      "status": "OPEN"
+    },
+    {
+      "id": "d41844ce8f8548759d412359446bee168",
+      "text": "defect 35",
+      "status": "OPEN"
+    },
+    {
+      "id": "dd0b7e2dcd914818d70c713a5f9896073",
+      "text": "defect 36",
+      "status": "OPEN"
+    },
+    {
+      "id": "dee01bed8cd1cd91b3b4860f92beb532f",
+      "text": "defect 37",
+      "status": "OPEN"
+    },
+    {
+      "id": "dcd438d4673574a5552e153ca55b8f7aa",
+      "text": "defect 38",
+      "status": "OPEN"
+    },
+    {
+      "id": "d90f366e396fc90f78269e1cb88633ad3",
+      "text": "defect 39",
+      "status": "OPEN"
+    },
+    {
+      "id": "d497691fc73a567a5a5fdb4d9d63a2af1",
+      "text": "defect 40",
+      "status": "OPEN"
+    },
+    {
+      "id": "dd7042ab4f34993950ac3cfb95de0f2ad",
+      "text": "defect 41",
+      "status": "OPEN"
+    },
+    {
+      "id": "d7c488d632a7a8e8787cc4ecd3543fb96",
+      "text": "defect 42",
+      "status": "OPEN"
+    },
+    {
+      "id": "d8ebbceedaf21aab6cd2ecbf992ed1fc6",
+      "text": "defect 43",
+      "status": "OPEN"
+    },
+    {
+      "id": "d6fbaa919175d5ea08cd1a5ed942926c8",
+      "text": "defect 44",
+      "status": "OPEN"
+    },
+    {
+      "id": "dc94e5549eb4143174fd689876a73e121",
+      "text": "defect 45",
+      "status": "OPEN"
+    },
+    {
+      "id": "d5b5aa361bd8924424b3ec03b00d0b93a",
+      "text": "defect 46",
+      "status": "OPEN"
+    },
+    {
+      "id": "d41edb6eccd05ab64f86aa0c206e9470f",
+      "text": "defect 47",
+      "status": "OPEN"
+    },
+    {
+      "id": "dec44814af51171217b5a052fb0529b1f",
+      "text": "defect 48",
+      "status": "OPEN"
+    },
+    {
+      "id": "dc9c27e7f71ac281fdfb629d1b1e89077",
+      "text": "defect 49",
+      "status": "OPEN"
+    },
+    {
+      "id": "d35d9a812b4b7b0b7a70a5f2efe04deb0",
+      "text": "defect 50",
+      "status": "OPEN"
+    },
+    {
+      "id": "dd288b4385629b802741f23aefe49f3b6",
+      "text": "defect 51",
+      "status": "OPEN"
+    },
+    {
+      "id": "dca2dcc75cf105cde5fb5b37810253c62",
+      "text": "defect 52",
+      "status": "OPEN"
+    },
+    {
+      "id": "d4a881260adce0c3d9b2bae05fa582844",
+      "text": "defect 53",
+      "status": "OPEN"
+    },
+    {
+      "id": "dbc153c5ba8612c06db4186badd9b28f1",
+      "text": "defect 54",
+      "status": "OPEN"
+    },
+    {
+      "id": "db5fc357245ff4d953848c85335cee058",
+      "text": "defect 55",
+      "status": "OPEN"
+    },
+    {
+      "id": "da0c65eccae479df2456f0b2dbfeda77d",
+      "text": "defect 56",
+      "status": "OPEN"
+    },
+    {
+      "id": "d4cd0143f30760d014abe0887ef4f20cc",
+      "text": "defect 57",
+      "status": "OPEN"
+    },
+    {
+      "id": "d30494f6173471236c2c054e1cb6ba0a4",
+      "text": "defect 58",
+      "status": "OPEN"
+    },
+    {
+      "id": "d0401fea98dcbef92c5d1b53484ee811f",
+      "text": "defect 59",
+      "status": "OPEN"
+    },
+    {
+      "id": "d08a4398c08c18714b28c6da89d286415",
+      "text": "defect 60",
+      "status": "OPEN"
+    },
+    {
+      "id": "d4b725a78a696abb329d64b4b2595ba05",
+      "text": "defect 61",
+      "status": "OPEN"
+    },
+    {
+      "id": "d7b8ea48499cd183235e9bc467defc0f5",
+      "text": "defect 62",
+      "status": "OPEN"
+    },
+    {
+      "id": "de4cebd535ab7f10475ef7e7bd59e2f7f",
+      "text": "defect 63",
+      "status": "OPEN"
+    },
+    {
+      "id": "d72a786d9515944deb61b371204f120fc",
+      "text": "1 further defect(s) from cycle-1285 were not recorded: the ledger cap of 64 entries was reached",
+      "status": "OPEN"
+    }
+  ]
+}

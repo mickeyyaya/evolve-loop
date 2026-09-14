@@ -1,7 +1,6 @@
 package audit
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
@@ -11,7 +10,7 @@ import (
 // reconcileContinuation verifies inherited defect dispositions and checks that
 // prose closure claims cite the records that make those claims auditable.
 func (a *auditClassification) reconcileContinuation() {
-	ledgerDiagnostics, ledgerBlocked, lineageCycles := reconcileContinuationDefects(a.req)
+	ledgerDiagnostics, ledgerBlocked, lineageCycles := reconcileContinuationDefectsVia(a.hooks.defectLedger(), a.req)
 	a.diagnostics = append(a.diagnostics, ledgerDiagnostics...)
 	if ledgerBlocked {
 		a.override("continuation defect-ledger")
@@ -78,9 +77,9 @@ func (a *auditClassification) finalize() {
 	}
 
 	if a.verdict == core.VerdictFAIL || a.verdict == core.VerdictWARN {
-		if err := emitDefectLedger(a.artifact, a.req); err != nil {
-			a.warn(fmt.Sprintf("defect ledger: could not record this cycle's defects (%s) — a later continuation will have nothing to reconcile against", err.Error()))
-		}
+		// The ledger authors its own wire (an emit fault is ONE warning; the
+		// verdict stands); the seam appends it verbatim, as reconcile's.
+		a.diagnostics = append(a.diagnostics, emitDefectLedgerVia(a.hooks.defectLedger(), a.artifact, a.req)...)
 	}
 	if a.sealPredicate != nil && a.predicateErr == nil {
 		if err := a.sealPredicate(); err != nil {
