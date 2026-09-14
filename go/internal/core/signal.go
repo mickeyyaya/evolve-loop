@@ -11,7 +11,9 @@ package core
 
 import (
 	"strconv"
+	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
@@ -81,6 +83,9 @@ func (o *Orchestrator) emitPhaseOutcome(cycle int, out recovery.PhaseOutcome) {
 		Fields: map[string]string{
 			"verdict": out.Verdict, "archetype": out.Archetype, "duration_ms": strconv.FormatInt(out.DurationMS, 10),
 		},
+	}
+	if codes := cyclestate.ErrorCodes(out.Diagnostics); len(codes) > 0 {
+		e.Fields["diagnostic_codes"] = strings.Join(codes, ",") // the phase's own gate codes (cyclestate.DiagCode*)
 	}
 	switch {
 	case out.AbortReason != "":

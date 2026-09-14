@@ -25,6 +25,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
@@ -275,6 +276,7 @@ func (hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRespo
 		return core.VerdictFAIL, []core.Diagnostic{{
 			Severity: "error",
 			Message:  "## top_n section has no list items",
+			Code:     cyclestate.DiagCodeTriageTopNEmpty,
 		}}, string(core.PhaseTDD)
 	}
 	// F4 (docs/operations/batch-integrity-review-2026-08-04.md): the prompt-side
@@ -290,6 +292,8 @@ func (hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRespo
 			Message: fmt.Sprintf(
 				"top_n card %q names protected surface %q — control-plane changes go through the console route (operator-gated), not lane top_n",
 				id, path),
+			Code:    cyclestate.DiagCodeTriageProtectedSurface,
+			Subject: id,
 		}}, string(core.PhaseTDD)
 	}
 	unifiedDiags, err := processUnifiedCommitment(req)
@@ -297,6 +301,7 @@ func (hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRespo
 		return core.VerdictFAIL, []core.Diagnostic{{
 			Severity: "error",
 			Message:  "unified_commitment processing failed: " + err.Error(),
+			Code:     cyclestate.DiagCodeTriageCommitmentInvalid,
 		}}, string(core.PhaseTDD)
 	}
 	return core.VerdictPASS, unifiedDiags, string(core.PhaseTDD)

@@ -1,7 +1,7 @@
 // Package cycleclassify ports classify_cycle_failure from
 // archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh:548-637. Given a
 // cycle workspace it inspects orchestrator-report.md plus the unified
-// *-events.ndjson stream (ADR-0020) and returns one of five canonical
+// *-events.ndjson stream (ADR-0020) and returns one of six canonical
 // classifications. The result feeds the failure-adapter (M3) and
 // drives the cmd_loop dispatcher policy decision (RETRY vs STOP).
 //
@@ -28,10 +28,12 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmcalls"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasetiming"
 )
 
 // hangClassifierFn reports whether the exit-transport-hang reclassifier is
@@ -73,6 +75,13 @@ const (
 	// only when EVOLVE_HANG_CLASSIFIER=1. 1h retention (vs 7d for
 	// integrity-breach) because the underlying cycle succeeded.
 	ClassExitTransportHang Classification = "exit-transport-hang"
+	// ClassPhaseRefusal: the LAST recorded phase outcome is a FAIL carrying a
+	// diagnostic Code — the phase's own deterministic gate stopped the cycle
+	// (triage refusing a protected-surface card). Task-attributable: it
+	// re-occurs on every retry of the same item. Read from phase-timing.json
+	// (the C1 record), never from prose; Marker is the code, Detail the
+	// message, Subject the item it names.
+	ClassPhaseRefusal Classification = "phase-refusal"
 )
 
 // MarkerQuotaLikelyEmptyOutput is the Result.Marker set when the empty-output
@@ -101,11 +110,26 @@ type Result struct {
 	// Source is the file path where the marker was found, or "" for
 	// integrity-breach. Relative to workspace.
 	Source string `json:"source,omitempty"`
+	// Detail, Subject and Phase are set only by the C1-record pass (ClassPhaseRefusal):
+	// the refusing diagnostic's message, the item it names and the phase that refused.
+	Detail  string `json:"detail,omitempty"`
+	Subject string `json:"subject,omitempty"`
+	Phase   string `json:"phase,omitempty"`
 }
 
 // Classify scans the cycle workspace and returns the resolved
 // classification. The workspace path is .evolve/runs/cycle-<N>/ —
 // caller is responsible for constructing it.
+//
+// Pass order (the ordering contract, stated once): 0b's record is read first
+// so that 0 can be recency-aware — (0) the stopping phase's own classed FAIL
+// sentinel; (0b) a coded FAIL on the LAST outcome of the C1 record
+// (phase-timing.json) ⇒ phase-refusal; (1) infrastructure in the
+// orchestrator report; (2) infrastructure in the typed events stream; (3) the
+// post-audit ship gate; (4) the audit verdict; (5) build never GREEN; (6) the
+// hang reclassifier; then the fallbacks below. Structured passes precede
+// prose; a sentinel from an EARLIER phase than the record's last outcome is
+// stale and yields to 0b.
 //
 // Scanning order per cycle:
 //
@@ -132,8 +156,24 @@ func Classify(workspace string) Result {
 	// into the canonical taxonomy are trusted; an out-of-taxonomy agent
 	// string falls through to the regex passes (never UnknownClassification,
 	// never blind trust).
-	if cls, ok := classifyFromSentinels(workspace); ok {
+	// Pass 0b is read first because pass 0 must be recency-aware: the record
+	// (phase-timing.json, the C1 chokepoint's own ledger) names the phase the
+	// cycle STOPPED on; a classed FAIL sentinel from an earlier phase (a scout
+	// that wedged, retried and passed) is stale evidence once a later gate
+	// refused the cycle with a code. A sentinel from the stopping phase itself
+	// keeps its authority (the phase's own class beats the gate's code).
+	record, recordOK := classifyFromRecord(workspace)
+	// No record, or the sentinel is the stopping phase's own: the sentinel stands.
+	if cls, ok := classifyFromSentinels(workspace); ok && (!recordOK || sentinelPhase(cls.Source) == record.Phase) {
 		return cls
+	}
+	// Pass 0b: a coded FAIL on the LAST recorded outcome is why the cycle
+	// stopped — structured and task-attributable per its code. It precedes the
+	// typed infra pass (pass 2) deliberately: a quota wall or infra marker
+	// BEFORE the refusal did not stop the cycle (the phase still ran and
+	// refused), and one AFTER it cannot exist (the cycle ended there).
+	if recordOK {
+		return record
 	}
 
 	// Pass 1: infrastructure in orchestrator-report.md.
@@ -512,4 +552,37 @@ func firstInfraMarker(workspace, logPath string) (marker string, ok bool) {
 		return "", false
 	}
 	return "", false
+}
+
+// classifyFromRecord reads the C1 record (phase-timing.json) and reports a
+// phase-refusal when the LAST outcome is a FAIL whose error-severity
+// diagnostics carry a Code (cyclestate.DiagCode*). An absent or corrupt record,
+// a PASS tail, or an uncoded FAIL all fall through to the prose passes.
+func classifyFromRecord(workspace string) (Result, bool) {
+	entries, err := phasetiming.Read(workspace)
+	if err != nil || len(entries) == 0 {
+		return Result{}, false
+	}
+	last := entries[len(entries)-1]
+	if last.Verdict != "FAIL" {
+		return Result{}, false
+	}
+	codes := cyclestate.ErrorCodes(last.Diagnostics)
+	if len(codes) == 0 {
+		return Result{}, false
+	}
+	res := Result{Class: ClassPhaseRefusal, Marker: codes[0], Source: phasetiming.FileName, Phase: last.Phase}
+	for _, d := range last.Diagnostics {
+		if d.Severity == cyclestate.SeverityError && d.Code == codes[0] {
+			res.Detail, res.Subject = d.Message, d.Subject
+			break
+		}
+	}
+	return res, true
+}
+
+// sentinelPhase derives the phase a sentinel report belongs to from its file
+// name ("<phase>-report.md" — the ONE spelling the sentinel pass reads).
+func sentinelPhase(source string) string {
+	return strings.TrimSuffix(filepath.Base(source), "-report.md")
 }

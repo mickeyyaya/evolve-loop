@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — a triage refusal is a task-level failure; a protected-surface refusal routes the item to console on the first hit (2026-09-14)
+
+One inbox item (`verdict-sentinel-as-tool-call`) drew nine lanes in a row (cycles 1650–1675) — scout, then a triage FAIL for "top_n card names protected surface", then a closeout that put it straight back for the next wave. Root cause: the triage gate's own refusal had no failure class, `cycleclassify` fell through to system-level, and the ADR-0072 S5 drain never bumped `failure_count` — the quarantine ceiling was unreachable and the closeout's re-claim of the already-claimed id even raised a false `INBOX_CLAIM_NOT_FOUND` on every cycle.
+
+- `cyclestate.Diagnostic` gains `code` and `subject` (both `omitempty`): the phase's own gate stamps a machine-readable reason (`TRIAGE_PROTECTED_SURFACE` / `TRIAGE_TOPN_EMPTY` / `TRIAGE_COMMITMENT_INVALID`) and the card it names; `cyclestate.ErrorCodes` is the one projection.
+- The C1 chokepoint's `ORCHESTRATOR_PHASE_VERDICT_FAIL` carries `diagnostic_codes=…` — the console line says WHY, structurally.
+- `cycleclassify` reads the C1 record (`phase-timing.json`) before any prose pass: a coded FAIL on the last outcome is the new task-level class `phase-refusal` (marker = the code, detail, subject).
+- Whose fault a refusal is lives in ONE table beside the vocabulary (`cyclestate.RefusalDisposition`): protected-surface = the item's, and routed; empty top_n = the item's (bump toward the ceiling); commitment-invalid = the pipeline's (an I/O fault charges nobody).
+- The FAIL closeout routes a `TRIAGE_PROTECTED_SURFACE` subject — only one in this cycle's committed set — to `route: console-manual` in place (`inboxmover.RouteConsole` → `INBOX_ITEM_ROUTED_CONSOLE` WARN; `INBOX_ROUTE_NOT_FOUND` when it cannot or when another cycle holds the item) before the drain, then the drain runs with `Routed` set (no bump, no park for that cycle). `ClaimLaneScope` no longer re-claims an id the lane already holds in `processing/`.
+
+Record: `docs/incidents/2026-09-14-triage-refusal-poison-loop.md`. Three inbox-mover goldens were re-captured (the two false WARN lines per already-claimed id are gone).
+
+---
+
 ## Changed — the `evolve subagent run` execution path is its own package with eleven Signal Center codes (ADR-0103 unit 16, 2026-09-14)
 
 `internal/subagent/run.go`'s 236-line `Run` moved into `internal/subagent/subagentrun` (a `Dispatcher` over

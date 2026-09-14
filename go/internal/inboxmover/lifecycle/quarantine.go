@@ -33,6 +33,11 @@ type Policy struct {
 	Ceiling     int
 	SystemLevel bool
 	Committed   map[string]bool
+	// Routed: the closeout already routed the refused item console-manual, so
+	// this cycle's disposition is taken — the drain bumps and parks nothing,
+	// without pretending the failure was system-level (a separate knob so the
+	// next behaviour keyed to SystemLevel never applies to a routed refusal).
+	Routed bool
 }
 
 // ReleaseFromQuarantine is the operator escape hatch for ADR-0072 S5: it moves

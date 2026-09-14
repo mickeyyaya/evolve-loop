@@ -26,6 +26,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover/lifecycle"
 )
 
 // CycleOutcome is the verdict-shaped input to the lifecycle seam: what the
@@ -38,6 +40,7 @@ type CycleOutcome struct {
 	Reason       string   // ledger reason ("" = default)
 	Ceiling      int      // FailureThresholds.TaskRetryCeiling (FAIL only; <=0 disables quarantine)
 	SystemLevel  bool     // ADR-0072 S3 system failure: NEVER quarantines (AC4)
+	Routed       bool     // the closeout already routed the refused item console-manual: no bump, no park this cycle (FAIL only)
 }
 
 // OutcomeResult reports what the seam moved, by task id or destination path.
@@ -113,6 +116,7 @@ func ApplyCycleOutcome(opts Options, oc CycleOutcome) (OutcomeResult, error) {
 	rr, err := releaseCycleProcessing(opts, oc.Cycle, oc.Reason, &quarantinePolicy{
 		Ceiling:     oc.Ceiling,
 		SystemLevel: oc.SystemLevel,
+		Routed:      oc.Routed,
 		Committed:   committedSet,
 	})
 	for _, p := range rr.Paths {
@@ -147,6 +151,13 @@ func ClaimLaneScope(opts Options, cycle int, ids []string) ([]string, error) {
 	cycleStr := strconv.Itoa(cycle)
 	var claimed []string
 	for _, id := range dedupeIDs(ids) {
+		// The lane's own claim already put it in processing/cycle-N/: it is where
+		// the drain needs it, and re-claiming it from the root would only raise a
+		// false INBOX_CLAIM_NOT_FOUND (cycle 1675, the 2026-09-14 poison-loop incident).
+		if loc, lerr := lifecycle.Locate(opts.InboxDir, id); lerr == nil && loc.Cycle == cycle {
+			claimed = append(claimed, id)
+			continue
+		}
 		if _, err := Claim(opts, id, cycleStr); err != nil {
 			opts.logf("WARN: ", "claim-lane-scope: '%s' not claimed (%v) — lane continues", id, err)
 			continue

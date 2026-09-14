@@ -30,7 +30,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// The unit's codes — twelve WARN conditions that replaced fifteen hand-written
+// The unit's codes — fourteen WARN conditions (twelve at the unit, two from the 2026-09-14 poison-loop breaker) that replaced fifteen hand-written
 // stderr lines and gave three silent arms a voice — registered with their docs.
 const (
 	CodeClaimNotFound                  signalcenter.Code = "INBOX_CLAIM_NOT_FOUND"
@@ -45,6 +45,8 @@ const (
 	CodeQuarantineFailed               signalcenter.Code = "INBOX_QUARANTINE_FAILED"
 	CodeContinuationManifestUnreadable signalcenter.Code = "INBOX_CONTINUATION_MANIFEST_UNREADABLE"
 	CodeItemRewriteFailed              signalcenter.Code = "INBOX_ITEM_REWRITE_FAILED"
+	CodeItemRoutedConsole              signalcenter.Code = "INBOX_ITEM_ROUTED_CONSOLE"
+	CodeRouteNotFound                  signalcenter.Code = "INBOX_ROUTE_NOT_FOUND"
 )
 
 func init() {
@@ -59,7 +61,9 @@ func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleInbox, CodeReleaseMoveFailed, "an item could not be renamed back to the inbox root — by the cycle drain (fields.step=release_cycle, origin Mover.Release) or by orphan recovery (fields.step=recover_orphans, origin Mover.RecoverOrphans); the item stays in processing/cycle-N/ and the walk continues; fields.task_id, base, err")
 	signalcenter.RegisterCode(signalcenter.ModuleInbox, CodeQuarantineFailed, "an item at the ADR-0072 S5 retry ceiling could not be parked in quarantine/ (fields.outcome=error: the park's promote errored; outcome=noop: the park's rename failed) and falls open to a root release — the poison item WILL be re-picked; the preceding INBOX_PROMOTE_MOVE_FAILED from Mover.Promote names the cause; fields.step=quarantine, task_id, failure_count, ceiling")
 	signalcenter.RegisterCode(signalcenter.ModuleInbox, CodeContinuationManifestUnreadable, "the FAILed cycle's continuation manifest exists but could not be read or parsed; every item of the drain releases unstamped (a later claim starts fresh instead of resuming the salvage); fields.step=manifest, workspace, err")
-	signalcenter.RegisterCode(signalcenter.ModuleInbox, CodeItemRewriteFailed, "an item record could not be rewritten atomically: the quarantine release's counter reset (fields.step=counter_reset — the item releases with its stale count), the drain's failure_count bump (fields.step=failure_bump — quarantine is skipped, the item releases to the root) or the drain's continuation stamp (fields.step=continuation_stamp — the item releases unstamped); fields.task_id, path, err")
+	signalcenter.RegisterCode(signalcenter.ModuleInbox, CodeItemRewriteFailed, "an item record could not be rewritten atomically: the closeout's route-console rewrite (step=route), the quarantine release's counter reset (fields.step=counter_reset — the item releases with its stale count), the drain's failure_count bump (fields.step=failure_bump — quarantine is skipped, the item releases to the root) or the drain's continuation stamp (fields.step=continuation_stamp — the item releases unstamped); fields.task_id, path, err")
+	signalcenter.RegisterCode(signalcenter.ModuleInbox, CodeItemRoutedConsole, "the FAIL closeout routed an item to console-manual because a phase gate refused it deterministically (a top_n card naming a protected surface): fields.task_id, path, reason, step=route — the item is operator-owned from here on and no lane claims it again (the per-item breaker of the 2026-09-14 poison-loop incident)")
+	signalcenter.RegisterCode(signalcenter.ModuleInbox, CodeRouteNotFound, "the FAIL closeout could not find the item it was told to route (fields.task_id, inbox_dir, step=locate) — or found it held by another cycle's claim (fields.held_by_cycle) — the refusal is NOT recorded on it and it WILL be re-picked; neither processing/cycle-*/ nor the inbox root holds the id")
 }
 
 // LegacyPrefix is the console voice of every line the mover prints — the
