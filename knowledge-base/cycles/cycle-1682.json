@@ -1,0 +1,95 @@
+{
+  "schema_version": 2,
+  "cycle": 1682,
+  "run_id": "01M2GF47PB4WBH0742D04PTTJQ",
+  "goal": "Pipeline-health verification, wave 4 (2026-09-15): work the highest-weight queued inbox items end-to-end — claim, tdd, build, audit, ship — with full phase integrity on the fixed plane: everything wave 3 verified (#606, #609, #611, #612, #614, #615, #616, #617) plus every LLM launch walking the CLI/tier fallback chain and every chain ending with every available CLI so no phase seals on one CLI's timeout or quota wall (ADR-0104, #619), the build floor running a lane's own build-tagged added tests, the scout refused a graderless eval, and a rejected push still journaling its commit (#620), and the ship gate's 20-minute go test deadline (cycle 1679). Every cycle must commit to a claimed inbox item (an empty top_n must not run the spine), bind its audit to the changes tree it ships, disposition the cycle's OWN defect ledger as well as inherited ids, record a terminal outcome on every exit, and leave no stale worktree behind. Pipeline-integrity items are console-owned (routed console-manual) and are not lane work; ADR-0099 document deliverables are eligible. The measure of this wave is consecutive shipped cycles.",
+  "final_verdict": "FAIL",
+  "tasks": [
+    "crossartifact-invariant-stack"
+  ],
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 119392,
+      "started_at": "2026-09-14T17:24:10Z",
+      "ended_at": "2026-09-14T17:26:11Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 18,
+        "output": 5260,
+        "cache_read": 522417,
+        "cache_write": 71746
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 47617,
+      "started_at": "2026-09-14T17:26:46Z",
+      "ended_at": "2026-09-14T17:27:34Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 16,
+        "output": 2512,
+        "cache_read": 510473,
+        "cache_write": 33145
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 1682",
+      "priority": "high"
+    }
+  ],
+  "timing": {
+    "total_ms": 167009,
+    "phase_count": 2,
+    "retried_count": 0,
+    "longest_phase": "scout",
+    "longest_ms": 119392,
+    "by_archetype_ms": {
+      "plan": 167009
+    },
+    "total_tokens": {
+      "input": 34,
+      "output": 7772,
+      "cache_read": 1032890,
+      "cache_write": 104891
+    },
+    "tokens_by_archetype": {
+      "plan": {
+        "input": 34,
+        "output": 7772,
+        "cache_read": 1032890,
+        "cache_write": 104891
+      }
+    },
+    "wasted_tokens": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "cache_hit_ratio": 0.9999670837351053,
+    "hot_phase_count": 2,
+    "hot_phases": [
+      "scout",
+      "triage"
+    ]
+  }
+}
