@@ -11,8 +11,10 @@ package ship
 // catch them — the guard suites scan repo-wide state (on-disk catalogs,
 // tracked profiles, rendering parity) that a config-only diff never selects.
 //
-// The pack runs the four guard packages in the lane worktree BEFORE the ship
-// binds/pushes. They are existing deterministic tests with FP≈0 by
+// The pack runs the four guard packages in the tree the ship will land — the
+// lane worktree for a cycle ship (repoContractGateRoot; until 2026-09-14 the
+// gate ran in the PROJECT ROOT, i.e. main's pre-landing tree, and could not
+// see a lane's changes at all) — BEFORE the ship binds/pushes. They are existing deterministic tests with FP≈0 by
 // construction: if one fails here, main's next run fails identically. A RED
 // pack fails the ship closed with the dedicated CodeRepoContractGate
 // (mirroring CodeManifestGate, cycle-1064) so the lane FAILs honestly in
@@ -49,6 +51,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/changedpkgs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/shiperr"
 )
 
@@ -192,16 +195,27 @@ func writeTee(tee io.Writer, s string) {
 	_, _ = io.WriteString(tee, s)
 }
 
-// runRepoContractGate executes the scanner pack per the resolved dial.
-// Returns nil when the dial is off/empty-off, the pack is green, or an
-// unclassifiable first failure cleared on the single retry. A genuine RED
-// returns CodeRepoContractGate naming the failing tests; a twice-ambiguous
-// failure returns the distinct CodeRepoContractInfra.
+// runRepoContractGate is the test-facing projection of runRepoContractGateAt:
+// the given root is the tree under test and its changes are measured against
+// HEAD. No production caller today — runNative resolves both through
+// repoContractGateRoot.
+func runRepoContractGate(ctx context.Context, gate, root, workspace string, stderr io.Writer) error {
+	return runRepoContractGateAt(ctx, gate, root, "HEAD", workspace, stderr)
+}
+
+// runRepoContractGateAt executes the three gate layers per the resolved dial,
+// in root — the tree the ship will land: the lane worktree for a cycle ship
+// (repoContractGateRoot), the project root otherwise — against baseRef, the
+// base the tree's changes are measured from. Returns nil when the dial is
+// off/empty-off, every layer is green, or an unclassifiable first failure
+// cleared on the single retry. A genuine RED returns CodeRepoContractGate
+// naming the failing tests; a twice-ambiguous failure (a pack run, or the
+// change discovery itself) returns the distinct CodeRepoContractInfra.
 //
 // workspace is the run dir (`req.Workspace`); the scanner output is teed to
 // <workspace>/ship-repocontract-scan.log. Empty workspace degrades to
 // stderr-only diagnostics — a missing run dir must never block a ship.
-func runRepoContractGate(ctx context.Context, gate, projectRoot, workspace string, stderr io.Writer) error {
+func runRepoContractGateAt(ctx context.Context, gate, root, baseRef, workspace string, stderr io.Writer) error {
 	if gate != "enforce" {
 		if gate != "" && gate != "off" {
 			fmt.Fprintf(stderr, "[ship] repo-contract gate: unknown stage %q — treating as enforce (a typo must not silently disable a red-main guard)\n", gate)
@@ -209,7 +223,7 @@ func runRepoContractGate(ctx context.Context, gate, projectRoot, workspace strin
 			return nil
 		}
 	}
-	moduleDir := filepath.Join(projectRoot, "go")
+	moduleDir := filepath.Join(root, "go")
 	out := stderr
 	if scan := openScanLog(workspace, stderr); scan != nil {
 		// Close error deliberately dropped: the scan log is best-effort
@@ -219,8 +233,8 @@ func runRepoContractGate(ctx context.Context, gate, projectRoot, workspace strin
 	}
 	// Header first, so the artifact is non-empty and self-identifying even on
 	// a green run — the green baseline is what disproves a false RED.
-	fmt.Fprintf(out, "[ship] repo-contract scanner pack: go test -json -count=1 %s (module %s)\n",
-		strings.Join(repoContractPackages, " "), moduleDir)
+	fmt.Fprintf(out, "[ship] repo-contract scanner pack: go test -json -count=1 %s (module %s, changes vs %s)\n",
+		strings.Join(repoContractPackages, " "), moduleDir, baseRef)
 
 	if err := runClassifiedPack(ctx, out, workspace, "scanner pack", func() packOutcome {
 		return repoContractTestFn(ctx, moduleDir, out)
@@ -228,10 +242,27 @@ func runRepoContractGate(ctx context.Context, gate, projectRoot, workspace strin
 		return err
 	}
 
-	groups, excluded, discoveryErr := addedTestPackageGroups(projectRoot)
-	if discoveryErr != nil {
-		fmt.Fprintf(out, "[ship] repo-contract added-test backstop: discovery unavailable (%v) — skipped; no added tests were scanned\n", discoveryErr)
-		return nil
+	files, untagged, err := runAddedTestBackstop(ctx, out, root, baseRef, moduleDir, workspace)
+	if err != nil {
+		return err
+	}
+	return runImporterBackstop(ctx, out, root, moduleDir, workspace, files, untagged)
+}
+
+// runAddedTestBackstop is the second gate layer: it derives the gate's seed
+// (the tree's changes vs baseRef) and runs every ADDED test package under the
+// build tags its files declare. Returns the seed and the untagged groups'
+// patterns so the importer backstop (the third layer) neither re-derives the
+// seed nor re-runs those packages in the same build context.
+func runAddedTestBackstop(ctx context.Context, out io.Writer, root, baseRef, moduleDir, workspace string) (files []changedpkgs.ChangedFile, untagged []string, err error) {
+	files, err = changedFilesTwice(out, root, baseRef)
+	if err != nil {
+		return nil, nil, err
+	}
+	groups, excluded, inspectErr := addedTestPackageGroups(root, files)
+	if inspectErr != nil {
+		return nil, nil, shiperr.NewShipError(shiperr.CodeRepoContractInfra, shiperr.ShipClassPrecondition, shiperr.StageAtomicShip,
+			fmt.Sprintf("repo-contract added-test backstop: could not inspect an added test's build constraints (%v) — INFRA fault, not a contract violation; safe to re-dispatch", inspectErr))
 	}
 	for _, path := range excluded {
 		fmt.Fprintf(out, "[ship] repo-contract gate: EXCLUDED %s (requires_tmux or another build constraint unavailable on this host; backstop required)\n", path)
@@ -245,19 +276,37 @@ func runRepoContractGate(ctx context.Context, gate, projectRoot, workspace strin
 		if err := runClassifiedPack(ctx, out, workspace, "added-test backstop", func() packOutcome {
 			return runRepoContractPackagesWithTags(ctx, moduleDir, out, group.packages, group.tags)
 		}); err != nil {
-			return err
+			return nil, nil, err
+		}
+		if len(group.tags) == 0 {
+			for _, pkg := range group.packages {
+				untagged = append(untagged, pkg+"/...")
+			}
 		}
 	}
-	return nil
+	return files, untagged, nil
 }
 
 func runClassifiedPack(ctx context.Context, out io.Writer, workspace, name string, run func() packOutcome) error {
+	return runClassifiedPackRetrying(ctx, out, workspace, name, true, run)
+}
+
+// runClassifiedPackRetrying is runClassifiedPack with the ambiguous-exit
+// retry as a decision: a pack too large to run twice inside one ship classes
+// an ambiguous exit infra straight away (re-dispatchable) instead of paying
+// for the second run.
+func runClassifiedPackRetrying(ctx context.Context, out io.Writer, workspace, name string, retry bool, run func() packOutcome) error {
 	first := run()
 	switch {
 	case first.green():
 		return nil
 	case first.realRed():
 		return contractRed(name, first)
+	}
+	if !retry {
+		return shiperr.NewShipError(shiperr.CodeRepoContractInfra, shiperr.ShipClassPrecondition, shiperr.StageAtomicShip,
+			fmt.Sprintf("repo-contract %s exited nonzero with no test-level failure (%v) — not retried: the pack is too large to run twice inside one ship; INFRA fault, not a contract violation; safe to re-dispatch. Scanner output: %s",
+				name, first.err, scanLogHint(workspace)))
 	}
 	fmt.Fprintf(out, "[ship] repo-contract %s exited nonzero with NO test-level failure (%v) — retrying once before classing it infra (cycle-1402/1403/1405 false-RED class)\n", name, first.err)
 	second := run()
@@ -278,29 +327,21 @@ type addedTestGroup struct {
 	packages []string
 }
 
-func addedTestPackages(projectRoot string) (packages, excluded []string) {
-	groups, excluded, _ := addedTestPackageGroups(projectRoot)
-	for _, group := range groups {
-		packages = append(packages, group.packages...)
-	}
-	sort.Strings(packages)
-	return packages, excluded
-}
-
-func addedTestPackageGroups(projectRoot string) (groups []addedTestGroup, excluded []string, retErr error) {
-	cmd := exec.Command("git", "-C", projectRoot, "diff", "--cached", "--name-only", "--diff-filter=A")
-	output, err := cmd.Output()
-	if err != nil {
-		return nil, nil, fmt.Errorf("git diff --cached: %w", err)
-	}
+// addedTestPackageGroups selects, from the gate's seed, the Go `_test.go`
+// files the tree ADDS (index-added or untracked — a lane's new test is
+// untracked until the ship stages it) and groups their packages by the build
+// tags each file declares, so a tag-guarded reproducer runs under its own
+// tags. Modified tests are not candidates here; the importer backstop runs
+// their packages.
+func addedTestPackageGroups(root string, files []changedpkgs.ChangedFile) (groups []addedTestGroup, excluded []string, retErr error) {
 	packagesByTags := map[string]map[string]bool{}
 	tagsByKey := map[string][]string{}
-	for _, path := range strings.Fields(string(output)) {
-		if !strings.HasPrefix(path, "go/") || !strings.HasSuffix(path, "_test.go") {
+	for _, f := range files {
+		path := f.Path
+		if !f.Added || !strings.HasPrefix(path, "go/") || !strings.HasSuffix(path, "_test.go") {
 			continue
 		}
-		file := filepath.Join(projectRoot, path)
-		tags, runnable, matchErr := addedTestBuildTags(file)
+		tags, runnable, matchErr := addedTestBuildTags(filepath.Join(root, path))
 		if matchErr != nil {
 			return nil, nil, fmt.Errorf("inspect %s: %w", path, matchErr)
 		}
@@ -412,9 +453,12 @@ func collectBuildTags(expr constraint.Expr, tags map[string]bool) {
 // failing tests so ship-error.json carries them directly instead of the bare
 // "exit status 1" that made cycle-1402/1403 undiagnosable.
 func contractRed(packName string, o packOutcome) error {
-	detail := "added-test backstop"
-	if packName == "scanner pack" {
+	detail := packName
+	switch packName {
+	case "scanner pack":
 		detail = "fixed scanner pack (phasespec, profiles, phasecoherence, routingtest)"
+	case "importer backstop":
+		detail = "importer backstop (the packages that import what this ship changes)"
 	}
 	return shiperr.NewShipError(shiperr.CodeRepoContractGate, shiperr.ShipClassPrecondition, shiperr.StageAtomicShip,
 		fmt.Sprintf("repo-contract %s RED in the lane worktree (%v) — failing: %s — pushing would red main; land the green fix or use an explicit t.Skip for an intentionally red-first reproducer",

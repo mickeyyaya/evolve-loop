@@ -185,10 +185,14 @@ func (p *Phase) runNative(ctx context.Context, req core.PhaseRequest, msg string
 	// (ship-repocontract-scan.log) on green AND red runs. Threading it here is
 	// the load-bearing half — a log seam reachable only from a test is dead
 	// code (the cycle-1064 manifest-gate anti-trap, applied to this parameter).
-	if gerr := runRepoContractGate(ctx, p.repoContractGate, req.ProjectRoot, req.Workspace, os.Stderr); gerr != nil {
+	opts := p.shipOptions(req, msg)
+	gateRoot, baseRef, rerr := repoContractGateRoot(&opts)
+	if rerr != nil {
+		return core.PhaseResponse{}, fmt.Errorf("ship repo-contract gate: %w", rerr)
+	}
+	if gerr := runRepoContractGateAt(ctx, p.repoContractGate, gateRoot, baseRef, req.Workspace, os.Stderr); gerr != nil {
 		return core.PhaseResponse{}, fmt.Errorf("ship repo-contract gate: %w", gerr)
 	}
-	opts := p.shipOptions(req, msg)
 	res, err := Run(ctx, opts)
 	durationMS := p.nowFn().Sub(start).Milliseconds()
 
@@ -266,4 +270,23 @@ func init() {
 	registry.Register(string(core.PhaseShip), func(_ core.PhaseRequest) core.PhaseRunner {
 		return NewWithDefaultRunner()
 	})
+}
+
+// repoContractGateRoot is the gate's projection of landingTree — the tree the
+// ship will land, tested against the base its changes are measured from: the
+// worktree's base SHA when the ship lands from a worktree and knows it, else
+// HEAD. Until 2026-09-14 the gate ran in req.ProjectRoot, main's pre-landing
+// tree, so on every lane ship it tested a tree without the lane's changes.
+// An unresolvable typed worktree fails closed here with the same
+// CodeWorktreeResolve atomicShip raises: the gate never tests the project
+// root in the lane's stead and reports a misleading green.
+func repoContractGateRoot(opts *Options) (root, baseRef string, err error) {
+	tree, fromWorktree, err := landingTree(opts)
+	if err != nil {
+		return "", "", err
+	}
+	if fromWorktree && opts.WorktreeBaseSHA != "" {
+		return tree, opts.WorktreeBaseSHA, nil
+	}
+	return tree, "HEAD", nil
 }

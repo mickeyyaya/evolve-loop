@@ -269,3 +269,17 @@ func containsStr(xs []string, want string) bool {
 	}
 	return false
 }
+
+// TestChangedScope_SelectsTestOnlyImporters pins the 2026-09-14 widening at
+// this consumer: internal/routingeval's tests import internal/core (its build
+// deps do not), so a change confined to core selects routingeval's scope —
+// a build-deps-only closure left that regression class skippable.
+func TestChangedScope_SelectsTestOnlyImporters(t *testing.T) {
+	got := ChangedScope(repoRootForTest(t), []string{"./internal/core/..."})
+	for _, p := range got {
+		if p == "./internal/routingeval/..." {
+			return
+		}
+	}
+	t.Errorf("ChangedScope(./internal/core/...) omits the test-only importer ./internal/routingeval/...; got %d patterns", len(got))
+}

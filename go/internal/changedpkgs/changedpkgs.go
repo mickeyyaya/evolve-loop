@@ -12,14 +12,11 @@
 package changedpkgs
 
 import (
-	"context"
 	"encoding/json"
 	"os"
 	"path"
 	"sort"
 	"strings"
-
-	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 )
 
 // FileToPackage maps a repo path to its go-module-relative test pattern
@@ -124,39 +121,9 @@ func FromGit(repoRoot, baseRef string) []string {
 // must FAIL loud on an underivable set uses this; the CHANGED_PACKAGES predicate
 // path keeps FromGit's best-effort empty-on-error contract.
 func FromGitChecked(repoRoot, baseRef string) ([]string, bool) {
-	if repoRoot == "" || baseRef == "" {
+	files, ok := ChangedFilesChecked(repoRoot, baseRef)
+	if !ok {
 		return nil, false
 	}
-	g := gitexec.Default(repoRoot)
-	ctx := context.Background()
-	set := map[string]struct{}{}
-	add := func(out string) {
-		for _, f := range strings.Split(out, "\n") {
-			if f = strings.TrimSpace(f); f == "" {
-				continue
-			}
-			if pkg, ok := FileToPackage(f); ok {
-				set[pkg] = struct{}{}
-			}
-		}
-	}
-	out, err := g.Output(ctx, "diff", "--name-only", baseRef)
-	if err != nil {
-		return nil, false // git failed → underivable, not "nothing changed"
-	}
-	add(out)
-	out, err = g.Output(ctx, "ls-files", "--others", "--exclude-standard")
-	if err != nil {
-		return nil, false
-	}
-	add(out)
-	if len(set) == 0 {
-		return nil, true // git succeeded, tree genuinely clean
-	}
-	res := make([]string, 0, len(set))
-	for p := range set {
-		res = append(res, p)
-	}
-	sort.Strings(res)
-	return res, true
+	return PackagesOf(files), true // nil when the tree is genuinely clean
 }

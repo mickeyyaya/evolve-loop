@@ -17,13 +17,28 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
+	"sort"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/changedpkgs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/shiperr"
 )
+
+// addedTestPackages is the tests' projection of the added-test seed: the
+// candidates of root's changes vs HEAD, flattened and sorted.
+func addedTestPackages(root string) (packages, excluded []string) {
+	files, _ := changedpkgs.ChangedFilesChecked(root, "HEAD")
+	groups, excluded, _ := addedTestPackageGroups(root, files)
+	for _, group := range groups {
+		packages = append(packages, group.packages...)
+	}
+	sort.Strings(packages)
+	return packages, excluded
+}
 
 // scanChatter is written by every fake pack run so the scan-log assertions
 // prove real scanner output reached the artifact, not just that a file was
@@ -78,11 +93,12 @@ func TestRepoContractGate_OffSkips(t *testing.T) {
 }
 
 func TestRepoContractGate_EnforceGreenPasses(t *testing.T) {
+	repo := makeRepo(t) // the seed reads the tree; a fake path is an INFRA discovery failure
 	dirs := swapRepoContractTest(t, greenPack())
-	if err := runRepoContractGate(context.Background(), "enforce", "/lane/worktree", "", io.Discard); err != nil {
+	if err := runRepoContractGate(context.Background(), "enforce", repo, "", io.Discard); err != nil {
 		t.Fatalf("green pack must pass: %v", err)
 	}
-	if len(*dirs) != 1 || (*dirs)[0] != "/lane/worktree/go" {
+	if len(*dirs) != 1 || (*dirs)[0] != filepath.Join(repo, "go") {
 		t.Fatalf("pack must run in the lane worktree module dir, got %v", *dirs)
 	}
 }
@@ -103,9 +119,10 @@ func TestRepoContractGate_EnforceRedFailsWithDedicatedCode(t *testing.T) {
 }
 
 func TestRepoContractGate_UnknownStageFailsTowardEnforce(t *testing.T) {
+	repo := makeRepo(t) // the seed reads the tree; a fake path is an INFRA discovery failure
 	dirs := swapRepoContractTest(t, greenPack())
 	var warn strings.Builder
-	if err := runRepoContractGate(context.Background(), "shadwo", "/lane", "", &warn); err != nil {
+	if err := runRepoContractGate(context.Background(), "shadwo", repo, "", &warn); err != nil {
 		t.Fatalf("unknown stage with green pack: %v", err)
 	}
 	if len(*dirs) != 1 {
@@ -159,8 +176,9 @@ func TestRepoContractGate_RealTestFailureIsContractRedWithoutRetry(t *testing.T)
 // MUST proceed. This is exactly what would have unblocked the audit-green
 // cycles 1402/1403/1405.
 func TestRepoContractGate_TransientFailureRetriesOnceThenShips(t *testing.T) {
+	repo := makeRepo(t) // the seed reads the tree; a fake path is an INFRA discovery failure
 	dirs := swapRepoContractTest(t, ambiguousPack(), greenPack())
-	if err := runRepoContractGate(context.Background(), "enforce", "/lane", "", io.Discard); err != nil {
+	if err := runRepoContractGate(context.Background(), "enforce", repo, "", io.Discard); err != nil {
 		t.Fatalf("an unclassifiable failure that clears on retry must NOT block the ship, got %v", err)
 	}
 	if len(*dirs) != 2 {
@@ -198,6 +216,7 @@ func TestRepoContractGate_PersistentAmbiguityIsInfraClassedExactlyTwoRuns(t *tes
 // persistence is the exact gap that made cycle-1403 undiagnosable: proving a
 // RED false needs the green baseline from the same artifact path.
 func TestRepoContractGate_ScanLogPersistedOnGreenAndRedRuns(t *testing.T) {
+	repo := makeRepo(t) // the seed reads the tree; a fake path is an INFRA discovery failure
 	for _, tc := range []struct {
 		name    string
 		outcome packOutcome
@@ -209,7 +228,7 @@ func TestRepoContractGate_ScanLogPersistedOnGreenAndRedRuns(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			swapRepoContractTest(t, tc.outcome)
 			ws := t.TempDir()
-			err := runRepoContractGate(context.Background(), "enforce", "/lane", ws, io.Discard)
+			err := runRepoContractGate(context.Background(), "enforce", repo, ws, io.Discard)
 			if (err != nil) != tc.wantErr {
 				t.Fatalf("err = %v, wantErr = %v", err, tc.wantErr)
 			}
@@ -275,15 +294,14 @@ func TestRepoContractGate_NewlyAddedFailingTestBlocksShip(t *testing.T) {
 }
 
 // TestRepoContractGate_AddedTestSelectionIgnoresModifiedAndNonTestFiles is the
-// bounded-scope half of the same AC: the added-test detector must select
-// ONLY newly added Go `_test.go` files. A pre-existing tracked test that was
-// merely MODIFIED to go red (the fixed four packages already own modified-test
-// regressions in their own scope), a newly added NON-test `.go` file, and an
-// empty candidate set (a shipping diff that adds nothing) must never trip the
-// gate — a scanner that over-selects would false-RED an honest ship exactly as
-// badly as under-selecting lets a red one through.
+// bounded-scope half of the same AC: the added-test DETECTOR selects ONLY
+// newly added Go `_test.go` files — a modified tracked test and a newly added
+// non-test `.go` file are not its candidates, and an empty candidate set runs
+// nothing. (A modified tracked test that goes red is still caught — by the
+// importer backstop, which runs every package the staged diff touches; that
+// is pinned below, so the two layers' scopes stay distinct and complete.)
 func TestRepoContractGate_AddedTestSelectionIgnoresModifiedAndNonTestFiles(t *testing.T) {
-	t.Run("modified test and non-test additions are excluded", func(t *testing.T) {
+	t.Run("modified test and non-test additions are not added-test candidates", func(t *testing.T) {
 		repo := makeRepo(t)
 		goDir := filepath.Join(repo, "go")
 		mustWrite(t, filepath.Join(goDir, "go.mod"), "module example.com/lane\n\ngo 1.24\n")
@@ -295,9 +313,9 @@ func TestRepoContractGate_AddedTestSelectionIgnoresModifiedAndNonTestFiles(t *te
 		runGit(t, repo, "add", "go")
 		runGit(t, repo, "commit", "-qm", "baseline: green suites + tracked test")
 
-		// MODIFY the already-tracked test to go red. Modified files are NOT
-		// "newly added" and must be excluded from this detector.
-		mustWrite(t, trackedTest, "package tracked\n\nimport \"testing\"\n\nfunc TestTracked(t *testing.T) { t.Fatal(\"now red via modification, not addition\") }\n")
+		// MODIFY the already-tracked test. Modified files are NOT "newly added"
+		// and must be excluded from this detector.
+		mustWrite(t, trackedTest, "package tracked\n\nimport \"testing\"\n\nfunc TestTracked(t *testing.T) { t.Log(\"modified, not added\") }\n")
 		runGit(t, repo, "add", "go/internal/tracked/tracked_test.go")
 
 		// A newly ADDED non-test Go file: never a test-selection target.
@@ -309,8 +327,35 @@ func TestRepoContractGate_AddedTestSelectionIgnoresModifiedAndNonTestFiles(t *te
 		mustWrite(t, filepath.Join(goDir, "internal", "reproduction", "green_test.go"), "package reproduction\n\nimport \"testing\"\n\nfunc TestNewlyAddedGreen(t *testing.T) {}\n")
 		runGit(t, repo, "add", "go/internal/reproduction/green_test.go")
 
+		packages, excluded := addedTestPackages(repo)
+		if want := []string{"./internal/reproduction"}; !reflect.DeepEqual(packages, want) || len(excluded) != 0 {
+			t.Fatalf("added-test candidates = %v (excluded %v), want %v — the modified tracked test and the non-test file are not candidates", packages, excluded, want)
+		}
 		if err := runRepoContractGate(context.Background(), "enforce", repo, t.TempDir(), io.Discard); err != nil {
-			t.Fatalf("a modified (not added) red test and a non-test addition must not gate the ship, got %v", err)
+			t.Fatalf("a green modified test, a non-test addition and a green added test must not gate the ship, got %v", err)
+		}
+	})
+
+	t.Run("a modified tracked test that goes red is caught by the importer backstop", func(t *testing.T) {
+		repo := makeRepo(t)
+		goDir := filepath.Join(repo, "go")
+		mustWrite(t, filepath.Join(goDir, "go.mod"), "module example.com/lane\n\ngo 1.24\n")
+		for _, pkg := range []string{"phasespec", "profiles", "phasecoherence", "routingtest"} {
+			mustWrite(t, filepath.Join(goDir, "internal", pkg, "pass_test.go"), "package "+pkg+"\n\nimport \"testing\"\n\nfunc TestPass(t *testing.T) {}\n")
+		}
+		trackedTest := filepath.Join(goDir, "internal", "tracked", "tracked_test.go")
+		mustWrite(t, trackedTest, "package tracked\n\nimport \"testing\"\n\nfunc TestTracked(t *testing.T) {}\n")
+		runGit(t, repo, "add", "go")
+		runGit(t, repo, "commit", "-qm", "baseline: green suites + tracked test")
+		mustWrite(t, trackedTest, "package tracked\n\nimport \"testing\"\n\nfunc TestTracked(t *testing.T) { t.Fatal(\"now red via modification, not addition\") }\n")
+		runGit(t, repo, "add", "go/internal/tracked/tracked_test.go")
+
+		if packages, _ := addedTestPackages(repo); len(packages) != 0 {
+			t.Fatalf("a modified test is not an added-test candidate, got %v", packages)
+		}
+		err := runRepoContractGate(context.Background(), "enforce", repo, t.TempDir(), io.Discard)
+		if err == nil || !strings.Contains(err.Error(), "importer backstop") || !strings.Contains(err.Error(), "TestTracked") {
+			t.Fatalf("shipping a red modified test would red main; the importer backstop must block it naming TestTracked, got %v", err)
 		}
 	})
 

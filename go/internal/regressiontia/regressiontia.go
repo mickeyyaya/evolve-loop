@@ -96,7 +96,10 @@ func Select(patterns, scope []string, deps map[string][]string) (selected, would
 // Best-effort, inheriting changedpkgs.ImporterClosure's contract: an empty
 // repoRoot or any `go list` failure degrades to the input set unchanged.
 // Closure only ever widens; narrowing below the forward-only baseline would be
-// strictly worse than having no selection at all.
+// strictly worse than having no selection at all. Since 2026-09-14 the closure
+// also follows the DIRECT imports of each package's tests (an untouched test
+// asserting a changed package's contract is the ship-gate incident), so a
+// change selects more predicates — and skips fewer — than before.
 func ChangedScope(repoRoot string, changed []string) []string {
 	if len(changed) == 0 {
 		return nil

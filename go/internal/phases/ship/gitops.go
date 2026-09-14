@@ -46,10 +46,9 @@ func (o *Options) acquireShipLock() (release func(), err error) {
 // Returns nil on success (commit + push completed, or DryRun skipped them).
 // Returns *IntegrityError on tree-SHA binding mismatch.
 func atomicShip(ctx context.Context, opts *Options, res *RunResult) error {
-	worktree, typedWorktree, err := activeWorktreeForShip(opts)
+	tree, fromWorktree, err := landingTree(opts)
 	if err != nil {
-		return shipErr(core.CodeWorktreeResolve, core.ShipClassPrecondition, core.StageAtomicShip,
-			"ship: resolve host-bound active worktree: "+err.Error())
+		return err
 	}
 
 	// Branch detection — refuse detached HEAD.
@@ -62,23 +61,41 @@ func atomicShip(ctx context.Context, opts *Options, res *RunResult) error {
 			"ship: detached HEAD — refuse to ship; checkout a branch first")
 	}
 
-	// Decide worktree path: only for --class cycle with active_worktree set.
-	if opts.Class == ClassCycle && worktree != "" && worktree != opts.ProjectRoot {
-		info, statErr := os.Stat(worktree)
-		if statErr == nil && info.IsDir() {
-			return shipFromWorktree(ctx, opts, res, branch, worktree)
-		}
-		if typedWorktree {
-			if statErr == nil {
-				statErr = fmt.Errorf("not a directory")
-			}
-			return shipErr(core.CodeWorktreeResolve, core.ShipClassPrecondition, core.StageAtomicShip,
-				fmt.Sprintf("ship: host-bound active worktree %s is unavailable: %v", worktree, statErr),
-				"worktree", worktree)
-		}
+	if fromWorktree {
+		return shipFromWorktree(ctx, opts, res, branch, tree)
 	}
-
 	return shipDirect(ctx, opts, res, branch)
+}
+
+// landingTree is the ONE decision of which tree a ship lands from: the
+// cycle's active worktree when the class is cycle, it is set, differs from
+// the project root and is a directory on disk; the project root otherwise. A
+// typed (host-bound) worktree that cannot be resolved or is missing is
+// CodeWorktreeResolve — never a silent fall-through to the root. atomicShip
+// lands from it and the repo-contract gate tests it (repoContractGateRoot),
+// so the tree the gate proves is the tree the ship pushes.
+func landingTree(opts *Options) (tree string, fromWorktree bool, err error) {
+	worktree, typed, err := activeWorktreeForShip(opts)
+	if err != nil {
+		return "", false, shipErr(core.CodeWorktreeResolve, core.ShipClassPrecondition, core.StageAtomicShip,
+			"ship: resolve host-bound active worktree: "+err.Error())
+	}
+	if opts.Class != ClassCycle || worktree == "" || worktree == opts.ProjectRoot {
+		return opts.ProjectRoot, false, nil
+	}
+	info, statErr := os.Stat(worktree)
+	if statErr == nil && info.IsDir() {
+		return worktree, true, nil
+	}
+	if typed {
+		if statErr == nil {
+			statErr = fmt.Errorf("not a directory")
+		}
+		return "", false, shipErr(core.CodeWorktreeResolve, core.ShipClassPrecondition, core.StageAtomicShip,
+			fmt.Sprintf("ship: host-bound active worktree %s is unavailable: %v", worktree, statErr),
+			"worktree", worktree)
+	}
+	return opts.ProjectRoot, false, nil // an untyped hint that is gone: the ship lands from the root
 }
 
 // activeWorktreeForShip returns the PhaseRunner's typed host identity when it

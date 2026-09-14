@@ -75,7 +75,10 @@ func TestImporterClosure_RouterRoutingtest(t *testing.T) {
 // reproducer above while making selection useless. internal/gitexec is a leaf
 // (its only module dep is internal/sysexec) — it cannot import router
 // transitively, so it MUST NOT appear in router's closure. Depending on a
-// changed package is not the same relation as importing it.
+// changed package is not the same relation as importing it. Since the walk
+// follows a test's direct imports, this negative is load-bearing against the
+// test-import hop too: gitexec's tests import shared fixtures whose deps reach
+// router, and following THOSE would widen every closure to the module.
 func TestImporterClosure_ExcludesNonImporters(t *testing.T) {
 	got := ImporterClosure(repoRootForTest(t), []string{"./internal/router/..."})
 
@@ -167,5 +170,72 @@ func TestImporterClosure_SortedDedupedAndModuleRoot(t *testing.T) {
 	rootGot := ImporterClosure(root, []string{"./..."})
 	if len(rootGot) != 1 || rootGot[0] != "./..." {
 		t.Errorf("closure of module-root ./... must be the identity; got %v", rootGot)
+	}
+}
+
+// TestImporterClosure_TestOnlyImporter is the 2026-09-14 ship-gate shape: a
+// package whose NON-test code never imports the changed package, but whose
+// tests do, is linked into a test binary the change can break. internal/
+// routingeval's tests import internal/core (its build deps do not), so a
+// change confined to core must select routingeval; a .Deps-only walk cannot.
+func TestImporterClosure_TestOnlyImporter(t *testing.T) {
+	got := ImporterClosure(repoRootForTest(t), []string{"./internal/core/..."})
+	if !contains(got, "./internal/routingeval/...") {
+		t.Errorf("closure of ./internal/core/... omits the test-only importer ./internal/routingeval/... (build-deps-only walk?); got %d patterns", len(got))
+	}
+}
+
+// TestImporterClosureChecked_TestableExcludesTagOnlyDirs: go/acs/cycle8 holds
+// only `//go:build acs` files, so it is in Patterns (an importer of what it
+// names would break) but not Testable (`go test ./acs/cycle8/...` without the
+// tag is "matched no packages", exit 1 — a false RED for a ship gate).
+func TestImporterClosureChecked_TestableExcludesTagOnlyDirs(t *testing.T) {
+	c, ok := ImporterClosureChecked(repoRootForTest(t), []string{"./acs/cycle8/...", "./internal/gitexec/..."})
+	if !ok {
+		t.Fatal("the real module lists")
+	}
+	if !contains(c.Patterns, "./acs/cycle8/...") || contains(c.Testable, "./acs/cycle8/...") {
+		t.Errorf("tag-only dir: Patterns=%v Testable=%v", contains(c.Patterns, "./acs/cycle8/..."), contains(c.Testable, "./acs/cycle8/..."))
+	}
+	if !contains(c.Testable, "./internal/gitexec/...") {
+		t.Errorf("a plain package is testable; Testable=%v", c.Testable)
+	}
+	if !sort.StringsAreSorted(c.Testable) {
+		t.Errorf("Testable is sorted: %v", c.Testable)
+	}
+}
+
+// The checked form says when the module could not be listed; the unchecked
+// form keeps its input-preserving contract on the same input.
+func TestImporterClosureChecked_NotDerivableOutsideAModule(t *testing.T) {
+	in := []string{"./internal/router/..."}
+	c, ok := ImporterClosureChecked(t.TempDir(), in)
+	if ok || len(c.Patterns) != 1 || c.Patterns[0] != in[0] || len(c.Testable) != 0 {
+		t.Errorf("non-module root: ok=%v closure=%+v", ok, c)
+	}
+	if c, ok := ImporterClosureChecked(repoRootForTest(t), nil); !ok || len(c.Patterns) != 0 {
+		t.Errorf("nil input: ok=%v closure=%+v", ok, c)
+	}
+}
+
+// Closure's two views are one walk: Testable is always a subset of Patterns
+// (never a pattern the walk did not produce), and the zero value is the empty
+// closure both ways.
+func TestClosure_TestableIsASubsetOfPatterns(t *testing.T) {
+	c, ok := ImporterClosureChecked(repoRootForTest(t), []string{"./internal/gitexec/..."})
+	if !ok || len(c.Patterns) == 0 {
+		t.Fatalf("closure = %+v ok=%v", c, ok)
+	}
+	for _, p := range c.Testable {
+		if !contains(c.Patterns, p) {
+			t.Errorf("Testable %q is not in Patterns %v", p, c.Patterns)
+		}
+	}
+	if len(c.Testable) == 0 || !contains(c.Testable, "./internal/gitexec/...") {
+		t.Errorf("the changed package itself is testable: %v", c.Testable)
+	}
+	var zero Closure
+	if len(zero.Patterns) != 0 || len(zero.Testable) != 0 {
+		t.Errorf("zero Closure is empty both ways: %+v", zero)
 	}
 }
