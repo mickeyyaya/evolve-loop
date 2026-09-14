@@ -34,3 +34,7 @@ Red-first tests per fix (`dispatchstate_test.go`, `cycledirs_test.go`, `launcher
 ## Addendum — lane 1684 (research F19)
 
 1684's audit FAILed with an invented class (`superseded-predicate-contradiction`); the gate accepted it, the envelope declined the direct repair with no line anywhere, a retrospective (deep tier, ~10 min) adjudicated a retry, and the retry's build brief carried none of the audit's findings. Fixed at the class: the gate validates the audit's class and the prompt names the vocabulary; the decision is a coded signal; a retro-routed re-entry carries the standing findings.
+
+## Addendum — the boundary halt (research F20)
+
+Stopping the loop at the wave-4 boundary took SIGINT ×2, SIGTERM and finally SIGKILL: the pre-wave usage probe and CLI-health canary ran on `context.Background()`, so the loop's interrupt never reached them, and a wave was still dispatched (and cancelled at spawn) after the interrupt. Fixed at the class: both probes take the loop's context, the prober's wait is bounded by it, and the coordinator re-checks the interrupt after the probes.

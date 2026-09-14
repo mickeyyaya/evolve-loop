@@ -14,9 +14,9 @@ import (
 // defaultLiveProbe is the production canary probe: a bounded LiveSmokeTest of the
 // driver. Shared by the loop and the campaign runner so the probe semantics (and
 // its 4-minute bound) cannot drift between them.
-func defaultLiveProbe(projectRoot string, stderr io.Writer) liveProbe {
+func defaultLiveProbe(ctx context.Context, projectRoot string, stderr io.Writer) liveProbe {
 	return func(driver string) (int, string, string) {
-		probeCtx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
+		probeCtx, cancel := context.WithTimeout(ctx, 4*time.Minute) // the loop's interrupt wins over the 4-minute bound
 		defer cancel()
 		return bridge.LiveSmokeTest(probeCtx, driver,
 			&bridge.Config{ProjectRoot: projectRoot}, bridge.Deps{Stderr: stderr})
@@ -37,14 +37,26 @@ type liveProbe func(driver string) (rc int, pattern, scrollback string)
 // have their own machinery (capability probe, fallback chain), and looping
 // the canary on them would re-probe every cycle forever. ACTIVE benches are
 // untouched. Disabled by EVOLVE_CLI_HEALTH=0.
-func runCLIHealthCanary(projectRoot string, env map[string]string, probe liveProbe, stderr io.Writer) {
+func runCLIHealthCanary(ctx context.Context, projectRoot string, env map[string]string, probe liveProbe, stderr io.Writer) {
 	if !envchain.BoolValue(envchain.Resolve("EVOLVE_CLI_HEALTH", env, "", "1"), true) {
+		return
+	}
+	// A cancelled probe is not evidence: once the loop's interrupt is in, a
+	// smoke test that returns "not a wall" would clear a bench that is still
+	// walled (F20 review). The canary's one cancellation disposition is to
+	// touch no bench.
+	if ctx.Err() != nil {
+		fmt.Fprintf(stderr, "[loop] cli-health canary: cancelled (%v) — benches untouched\n", ctx.Err())
 		return
 	}
 	store := clihealth.NewStore(projectRoot, nil)
 	for family := range store.Expired() {
 		driver := family + "-tmux"
 		rc, pattern, scrollback := probe(driver)
+		if ctx.Err() != nil {
+			fmt.Fprintf(stderr, "[loop] cli-health canary: cancelled (%v) during the %s probe — bench untouched\n", ctx.Err(), family)
+			return
+		}
 		switch {
 		case rc == 0:
 			_ = store.Clear(family)

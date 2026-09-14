@@ -424,18 +424,14 @@ func cycleFromWorkspace(workspace string) int {
 	return n
 }
 
-// campaignBeforeWave is the per-wave hook of a REAL run: clear recovered quota
-// benches before each wave so a wave doesn't re-hit a wall that already lifted
-// (and re-bench ones still walled), then proactively bench families that are
-// already capped before the wave's cycles boot them (opt-in via policy.json
-// cli_health). Both launch real CLIs, so a --simulate walk (no-LLM plumbing
-// check) installs no hook at all.
-func campaignBeforeWave(simulate bool, projectRoot string, stderr io.Writer) func() {
+// campaignBeforeWave is the per-wave hook of a REAL run: the one pre-wave probe
+// protocol (runPreWaveProbes) over the executor's live context. It launches
+// real CLIs, so a --simulate walk (no-LLM plumbing check) installs no hook.
+func campaignBeforeWave(simulate bool, projectRoot string, stderr io.Writer) func(context.Context) error {
 	if simulate {
 		return nil
 	}
-	return func() {
-		runCLIHealthCanary(projectRoot, nil, defaultLiveProbe(projectRoot, stderr), stderr)
-		runUsageProbe(projectRoot, filepath.Join(projectRoot, ".evolve"), nil, stderr)
+	return func(ctx context.Context) error {
+		return runPreWaveProbes(ctx, projectRoot, filepath.Join(projectRoot, ".evolve"), nil, stderr)
 	}
 }
