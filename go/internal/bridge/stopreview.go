@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/launchoutcome"
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
 )
 
@@ -96,9 +97,10 @@ type StopReviewer interface {
 // from "the pane was wedged" (fix the wedge). Marker-driven rather than
 // position-driven on purpose — real launches emit `[bridge] WARN:` sandbox
 // chatter BEFORE the wait, which a first-`[bridge]`-line heuristic would report
-// as the timeout's cause. Hyphenated + colon-space so it can never collide with
-// the StopArtifactTimeout kind string ("artifact_timeout").
-const artifactTimeoutMarker = "artifact-timeout: "
+// as the timeout's cause. The marker's ONE spelling is the parser's
+// (launchoutcome.ArtifactTimeoutMarker, ADR-0103 unit 10); the emitters here
+// project it.
+const artifactTimeoutMarker = launchoutcome.ArtifactTimeoutMarker
 
 // reviewActionOrNone renders a review action for the timeout summary, naming the
 // case where the wait ended before any review checkpoint (ctx cancel) instead of

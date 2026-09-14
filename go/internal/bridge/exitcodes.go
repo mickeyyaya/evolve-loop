@@ -6,7 +6,7 @@
 //
 // Architecture (see docs/architecture/adr/ — bridge-go-port):
 //
-//   - Engine (bridge.go): Template Method — Launch() runs the fixed flow
+//   - Engine (engine.go): Template Method — Launch() runs the fixed flow
 //     validate → resolveConfig → preflight → dispatch(driver) → report.
 //   - Driver (driver.go): Strategy + self-registering Registry, one per
 //     --cli target. Mirrors internal/phases/registry.
@@ -17,11 +17,15 @@
 // and the EVOLVE_BRIDGE_GO selector toggle were removed in the v12 cutover.
 package bridge
 
-// Bridge exit codes — the single source of truth for the numeric
-// contract. These mirror the EC_* constants in
-// tools/agent-bridge/bin/bridge exactly; docs, skills, and the
-// dispatcher's failure classifier depend on these values, so they are
-// load-bearing and must not drift.
+// Bridge exit codes — the numeric contract the drivers, cmd/evolve and the
+// ACS predicates read (acs/cycle1580 regex-scans this table, so the literals
+// stay here). These mirror the EC_* constants in tools/agent-bridge/bin/bridge
+// exactly; docs, skills, and the dispatcher's failure classifier depend on
+// these values, so they are load-bearing and must not drift. What each exit
+// MEANS (its sentinel, ledger cause and BRIDGE_EXIT_* code) is the unit-10
+// classifier's table (internal/bridge/launchoutcome), which spells the same
+// numbers; TestExitCodes_HostAliasesAreTheLeafValues pins the two spellings
+// as one belief.
 const (
 	ExitOK               = 0   // success
 	ExitSafetyGate       = 2   // safety-gate (e.g. --human-input without host opt-in)

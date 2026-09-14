@@ -183,7 +183,7 @@ raised to WARN — never dropped. *(review 21: `advisor` and `config` added to m
 | `ship.warning` | the landing could not reset the tracked binary before the ff-merge, declined the inline push-race repair, could not read HEAD after the push, or could not write ship-binding.json; the commit/push stands and the ship's own error (if any) is the `ship.error` that follows, whose `fields.step` names the landing step (unit 07) | WARN | |
 | `system.failure` | ADR-0072 signal (halt-class) | INCIDENT | ✓ |
 | `quota.paused` | all families exhausted, cycle paused | WARN | ✓ |
-| `bridge.warning` / `bridge.tripwire` | engine telemetry warnings, tripwires | WARN | |
+| `bridge.warning` / `bridge.tripwire` | engine telemetry warnings, tripwires; the launch-exit classification (`BRIDGE_EXIT_*`, one per non-zero `Engine.Launch` exit, origin `Engine.Launch`, `fields.step=classify`) and the four Launch step failures (`BRIDGE_BOOT_STRIKE_CLEAR_FAILED` / `_RECORD_FAILED`, `BRIDGE_LAUNCH_ERROR_PERSIST_FAILED`, `BRIDGE_RESULT_READ_FAILED`; origin `Engine.<step>`) — breakdown unit 10 | WARN | |
 | `pane.liveness` | liveness edge from the LivenessCenter | INFO; WARN with a `LIVENESS_PANE_*` code — the registry (rendered in `signal-codes.md`) is the one list of which states warn | |
 | `ledger.appended` | a ledger entry was appended (the file ledger's append observer; `fields.entry_seq` names the line) | INFO | |
 | `outcome.warning` | the phase-outcome recorder could not persist a record (sidecar or timing log skipped or failed); the in-memory record stands (unit 01) | WARN | |
@@ -238,7 +238,7 @@ therefore **not** the triage entry point (§9) *(review 8)*.
   `IsRegistered(code)` answers which module owns a code; `RegisteredCodes()` is exported so
   `docs/architecture/signal-codes.md` is generated from it (S2).
 - Existing vocabularies map by projection, not by copy: `shiperr.ShipErrorCode` (42) → `SHIP_<code>`
-  (one function `shiperr.SignalCode(code)`); bridge exit codes → `BRIDGE_EXIT_81`/`_85`/`_86`;
+  (one function `shiperr.SignalCode(code)`); bridge exit codes → `BRIDGE_EXIT_<class>` as `launchoutcome.Classify(code, …).Signal` (a column of the one Outcome) — spelled by class name (`BRIDGE_EXIT_ARTIFACT_TIMEOUT`, `_UNKNOWN_PROMPT`, `_RESPOND_LOOP_GUARD`, …; `fields.exit_code` carries the number; landed as breakdown unit 10);
   `failureadapter.Classification` → `LOOP_CLASSIFICATION_<value>` — and `failurelog.Classification`
   is folded into `failureadapter`'s in S2 (one vocabulary, one home); `dispatchevents.EventType` →
   `LOOP_<TYPE>`; the contract-gate codes (`missing_effect`, `unbound_effect`, `MISSING_SECONDARY`,
@@ -485,7 +485,7 @@ forward as unit 09 (its schema was spelled in three homes and the `audit` tag ha
 | 5 | **landed 2026-09-14 as unit 06** ([decomposition/06-inboxmover.md](decomposition/06-inboxmover.md)): the inbox lifecycle mover → `internal/inboxmover/lifecycle` as ONE leaf of eight files (the "three units" became three files of one package sharing the ledger line and the item primitives); `inboxmover.go` 993 → 372 (the seam: Options, the resolved defaults, the one construction, the facades) | 1006 | `inbox` | claim/release/promote as three units |
 | 6 | **unit 07 landed 2026-09-14** ([decomposition/07-shipgitops.md](decomposition/07-shipgitops.md)): the landing (the ff-merge, the push with its inline repair and the post-push head read, the shared git probes, the binding writer) → `internal/phases/ship/landing` behind the seam `gitops_landing.go`; `gitops.go` 989 → 935, `repair.go` 474 → 402, `worktree_ship.go` 205 → 184; the staging guard and the run-scope policy remain (07b / 07c) | 989 | `ship` | landing vs binding writer vs staging guard |
 | 7 | **landed 2026-09-14 as unit 08** ([decomposition/08-config.md](decomposition/08-config.md)): `config/config.go` (962 → 229) decomposed in place — `Loader` with an injected reader and Center, `config.warning`, six `CONFIG_*` codes | 962 | `config` | typed policy structs (`PolicyStages`); the "retire env flags" by-product is OUT of scope (the nine keys are prose-contracted in the protected flagregistry table — its own slice) |
-| 8 | `bridge/engine.go` (791) + `autorespond.go` (787) | 1578 | `bridge` | rides S3 |
+| 8 | `bridge/engine.go` (791) + `autorespond.go` (787) — **unit 10 landed 2026-09-14** ([decomposition/10-bridgeengine.md](decomposition/10-bridgeengine.md)): the launch-outcome classifier → `internal/bridge/launchoutcome` (the exit table, the cause miners), `Launch` split in place, the request gauntlet kept in the host as `bridge.ValidateRequest`; `autorespond.go` and the remaining `[bridge]` lines are unit 10b | 1578 | `bridge` | rides S3 |
 | 9 | **landed 2026-09-14 as unit 09** ([decomposition/09-defectledger.md](decomposition/09-defectledger.md)): `phases/audit/defect_ledger.go` (882) → `internal/core/defectledger` (882 → 392 — the seam and the citation resolver stay) | 882 | `audit` | pulled forward from the later wave: unit 03 F13's three schema homes collapse onto one leaf; 13 `AUDIT_LEDGER_*` codes on `audit.warning` |
 | 12 | **landed 2026-09-14 as unit 12** ([decomposition/12-phaseobserver.md](decomposition/12-phaseobserver.md)): the phase observer — `internal/phaseobserver/phaseobserver.go` (601) → the clock-stepped engine `internal/observerengine` (tail/decoder, stall rules, incident responder, envelope/report sinks) with the host as a Strangler seam; the live `adapters/observer.CoreAdapter` wired to the Center for its own two faults; the layout projected from `observerengine.PathsFor` | 601 | `observer` | eight `OBSERVER_*` codes; the adapter's detection stream stays S4b's |
 
@@ -648,6 +648,8 @@ tests and the S4b/S5 fleet fixture is the follow-up.
 | `bridge.warning` | `attemptLogContext.warn` — the ONE telemetry-warning writer the engine had (resolver failed, usage caveat, context fill over the threshold, ledger append failed) | WARN `BRIDGE_TOKEN_RESOLVER_FAILED` / `BRIDGE_TOKEN_USAGE_WARNING` / `BRIDGE_CONTEXT_FILL_HIGH` / `BRIDGE_TELEMETRY_APPEND_FAILED`; the old line's detail is the reason | `call_id`, `cli`, `agent` (+ cycle/run/phase/attempt on the event) |
 | `bridge.tripwire` | `attemptLogContext.tripwire` from `emitTokenWarnings` — a successful non-claude attempt past the threshold with no measurable usage | WARN `BRIDGE_TELEMETRY_TRIPWIRE` | `call_id`, `cli`, `agent`, `duration_ms` |
 | `pane.liveness` | `paneLivenessHandler`, registered on the dispatch's `LivenessCenter` in `newReplWaitState` — one event per liveness EDGE (the center is edge-triggered) | INFO, or WARN with the `LIVENESS_PANE_*` code the registry lists (`signal-codes.md` is the one list of which states warn) | `session`, `state` (`LivenessState.String`, the vocabulary's one spelling — the timeout summary's snake_case word is a projection of it) |
+| `bridge.warning` | `Engine.Launch` — the unit-10 chokepoint: exactly ONE event per non-zero launch exit, after the launch-error persist and the boot-strike record (breakdown unit 10, 2026-09-14) | WARN `BRIDGE_EXIT_<class>` — the exit table's signal column (`launchoutcome.Outcome.Signal`): `_SAFETY_GATE` (2), `_COST_LEAK` (3), `_BAD_FLAGS` (10), `_REPL_BOOT_TIMEOUT` (80), `_ARTIFACT_TIMEOUT` (81, one code whatever the sub-cause), `_UNKNOWN_PROMPT` (85), `_RESPOND_LOOP_GUARD` (86), `_REQUIRED_TIER_UNAVAILABLE` (99), `_COMMAND_TIMEOUT` (124), `_MISSING_BINARY` (127), `_SIGNAL_DEATH` (-1), `_DRIVER_ERROR` (unknown); the reason is the classified error string the outcome record and the retry backoff parse | `call_id`, `cli`, `agent`, `step=classify`, `exit_code`, `cause_code` (the llm-calls.ndjson value, incl. an 81 sub-cause), `transient`, `ctx_cancelled`, `launch_error` (the persisted `<agent>-launch-error.txt` when written) |
+| `bridge.warning` | `Engine.clearBootStrike` / `Engine.recordBootStrike` / `Engine.persistLaunchError` / `Engine.readResult` — the Launch spine's four best-effort steps (unit 10); the first two replaced the module's last two `[engine]` stderr lines 1:1, the last two were silent `_ =` / `err == nil` sites | WARN `BRIDGE_BOOT_STRIKE_CLEAR_FAILED` / `BRIDGE_BOOT_STRIKE_RECORD_FAILED` / `BRIDGE_LAUNCH_ERROR_PERSIST_FAILED` / `BRIDGE_RESULT_READ_FAILED`; the launch's classified error is unchanged by any of them | `call_id`, `cli`, `agent`, `step` (`clear_boot_strike` / `record_boot_strike` / `persist_launch_error` / `read_result`), `path` (persist, read), `completion` (read) |
 
 Wiring: `bridge.Deps.Signals` (nil = Null Object, tests only) → `Engine.SignalsWired()`; the production
 Adapter is `adapters/bridge.NewDefault(projectRoot, signals)` — explicit DI at construction, no setter
@@ -667,9 +669,11 @@ them, the sink renders plain, so a resolver error can no longer reorder a termin
 (commit 1) is mechanical and reviewed on its own: `panestream.SignalCenter` → `LivenessCenter`
 (`NewLivenessCenter`, `LivenessEvent`, `LivenessHandler`, `RegisterLivenessHandler`), files moved,
 ADR-0068/0070 carry an "Amended by ADR-0101" note. Remaining hand-written lines in the module —
-`[bridge]` (sandbox, launch validation, dry-run, wall corroboration) and two `[engine]` lines
-(boot-strike clear failed, boot-timeout bench record failed) — are S5's per-module migration; none
-of them is a fact this slice signals. Folded from the S3 architecture review (Block → fixed): the
+`[bridge]` (sandbox, launch validation, dry-run, wall corroboration) — are unit 10b's (the launch-validation
+and driver lines are the DATA the unit-10 classifier mines, so they stay verbatim); the two `[engine]` lines
+(boot-strike clear failed, boot-timeout bench record failed) landed as unit 10's
+`BRIDGE_BOOT_STRIKE_CLEAR_FAILED` / `BRIDGE_BOOT_STRIKE_RECORD_FAILED` (2026-09-14); none of them was a fact
+S3 signalled. Folded from the S3 architecture review (Block → fixed): the
 §5.2 severity cell above now defers to the registry instead of restating which states warn (the
 copy had already diverged); every bridge signal of one dispatch carries ONE derived
 `dispatchIdentity` (cycle, run, phase = the agent role) with no workspace-path fallback — a request

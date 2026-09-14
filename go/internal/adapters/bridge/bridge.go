@@ -11,7 +11,6 @@ package bridge
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -265,19 +264,10 @@ func (a *Adapter) Probe(ctx context.Context) (core.BridgeProbe, error) {
 	return a.engineFactory(nil).Probe(ctx)
 }
 
-func validate(req core.BridgeRequest) error {
-	switch "" {
-	case req.CLI:
-		return errors.New("bridge: CLI required")
-	case req.Profile:
-		return errors.New("bridge: Profile required")
-	case req.Workspace:
-		return errors.New("bridge: Workspace required")
-	case req.ArtifactPath:
-		return errors.New("bridge: ArtifactPath required")
-	}
-	return nil
-}
+// validate is the required-field gauntlet, projected from the engine's ONE
+// rule (gobridge.ValidateRequest) so the adapter and the engine's Launch
+// reject the same request with the same string.
+func validate(req core.BridgeRequest) error { return gobridge.ValidateRequest(req) }
 
 // resolvePolicy returns the effective interactive policy for the given agent.
 // policy.json is the explicit override surface and profilePolicy is

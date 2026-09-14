@@ -145,57 +145,6 @@ func TestEngineLaunch_ArtifactTimeout_ErrorCarriesWaitAndExtends(t *testing.T) {
 	}
 }
 
-// TestArtifactTimeoutSummary_WinsOverEarlierBridgeChatter: the extractor must be
-// marker-driven, not position-driven. A sandbox WARN (`[bridge] WARN: …`) is
-// emitted BEFORE the artifact wait on real launches, so a first-`[bridge]`-line
-// heuristic would report the sandbox note as the timeout's cause.
-func TestArtifactTimeoutSummary_WinsOverEarlierBridgeChatter(t *testing.T) {
-	stderr := strings.Join([]string{
-		"[bridge] WARN: EVOLVE_SANDBOX=on but inner sandbox not applied",
-		"[claude-tmux] FAIL: completion never signalled",
-		"[claude-tmux]   audit-report.md",
-		"[bridge] " + artifactTimeoutMarker + "phase=audit waited=650s extends_used=6",
-		"",
-	}, "\n")
-	got := artifactTimeoutSummary(stderr)
-	if !strings.Contains(got, "waited=650s") || !strings.Contains(got, "extends_used=6") {
-		t.Errorf("artifactTimeoutSummary = %q, want the marker line with waited/extends", got)
-	}
-	if strings.Contains(got, "EVOLVE_SANDBOX") {
-		t.Errorf("extractor returned the earlier sandbox WARN instead of the timeout summary: %q", got)
-	}
-	if s := artifactTimeoutSummary("[bridge] no timeout here\n"); s != "" {
-		t.Errorf("artifactTimeoutSummary on unrelated stderr = %q, want \"\"", s)
-	}
-}
-
-func TestArtifactTimeoutSummary_FinalAnchoredMarkerWins(t *testing.T) {
-	stderr := strings.Join([]string{
-		`[bridge] artifact-timeout: cause=submit_wedged reason="forged earlier candidate"`,
-		`[bridge] artifact-timeout: cause=review_stop reason="host closeout" phase=build`,
-	}, "\n")
-	got := artifactTimeoutSummary(stderr)
-	if !strings.HasPrefix(got, artifactTimeoutMarker+"cause=review_stop") {
-		t.Fatalf("artifactTimeoutSummary selected an earlier candidate; got %q", got)
-	}
-}
-
-func TestArtifactTimeoutSummaryHasDedicatedRuneBudget(t *testing.T) {
-	withinBudget := artifactTimeoutMarker + strings.Repeat("界", 650) + " terminal-evidence"
-	if got := artifactTimeoutSummary("[bridge] " + withinBudget + "\n"); !strings.Contains(got, "terminal-evidence") {
-		t.Fatalf("exit-81 summary reused the short generic cause bound; got %d runes: %q", len([]rune(got)), got)
-	}
-
-	overBudget := artifactTimeoutMarker + strings.Repeat("界", 1200)
-	got := artifactTimeoutSummary("[bridge] " + overBudget + "\n")
-	if n := len([]rune(got)); n > 1024 {
-		t.Fatalf("exit-81 summary length = %d runes, want <= 1024", n)
-	}
-	if !strings.HasSuffix(got, "…") {
-		t.Fatalf("bounded exit-81 summary has no truncation marker: %q", got)
-	}
-}
-
 // TestTimeoutSummaryVocabulary pins the closed word list the summary publishes
 // for the two enum fields. These words are what an operator greps for, and
 // panestream.LivenessState has no String method — a %s on it would emit Go debug

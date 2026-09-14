@@ -588,21 +588,6 @@ func TestModelDispatchFromREPLRecognizesOnlyModelCommand(t *testing.T) {
 	}
 }
 
-func TestModelAttemptCause_UsesTypedArtifactCauseOnly(t *testing.T) {
-	stderr := "reviewer said cause=submit_wedged\n" +
-		"[bridge] artifact-timeout: cause=completion_detector_error reason=\"detector failed\" phase=audit\n"
-	if got := modelAttemptCause(ExitArtifactTimeout, stderr); got != "completion_detector_error" {
-		t.Fatalf("modelAttemptCause = %q", got)
-	}
-	if got := modelAttemptCause(ExitArtifactTimeout, "cause=submit_wedged only in prose"); got != "artifact_timeout" {
-		t.Fatalf("free-form cause escaped authority boundary: %q", got)
-	}
-	quoted := `[bridge] artifact-timeout: phase=build reason="quoted cause=submit_wedged text"`
-	if got := modelAttemptCause(ExitArtifactTimeout, quoted); got != "artifact_timeout" {
-		t.Fatalf("quoted reason manufactured typed cause: %q", got)
-	}
-}
-
 func TestLaunchArgs_DirectDiagnosticEntryDoesNotClaimAttemptLedgerCoverage(t *testing.T) {
 	fx := newFixture(t, "claude-p", "")
 	fr := &fakeRunner{writeArtifactPath: fx.artifact, writeArtifactBody: "OK\n"}
