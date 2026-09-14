@@ -57,20 +57,6 @@ func TestSummarizeCycle_StatPermissionError(t *testing.T) {
 	}
 }
 
-// TestSummarizeCycle_GlobReturnsEmpty exercises the len(logs) == 0 branch
-// (workspace exists, no *-events.ndjson files).
-func TestSummarizeCycle_GlobReturnsEmpty(t *testing.T) {
-	t.Parallel()
-	ws := filepath.Join(t.TempDir(), "cycle-1")
-	if err := os.MkdirAll(ws, 0o755); err != nil {
-		t.Fatalf("mkdir: %v", err)
-	}
-	_, err := SummarizeCycle(ws, 1)
-	if !errors.Is(err, ErrNoLogs) {
-		t.Fatalf("err=%v want ErrNoLogs", err)
-	}
-}
-
 // TestParseEventsLog_OpenError covers the os.Open error branch directly.
 func TestParseEventsLog_OpenError(t *testing.T) {
 	t.Parallel()

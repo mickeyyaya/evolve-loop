@@ -4,7 +4,7 @@ package phasestream
 // (third cycle on this defect class: 654 landed the leaf helpers, 656's
 // wiring attempt was quota-killed, 672 completes the consumption wiring).
 //
-// TestC654_003 already proves Classifier.SetInjectedPrompt works when called
+// TestClassifier_SetInjectedPrompt proves the echo veto works when called
 // directly — but grep shows ZERO production call sites: Produce() constructs
 // the Classifier (produce.go) and never threads the phase prompt in, so the
 // live emit path still classifies echoed prompt text as infra_failure

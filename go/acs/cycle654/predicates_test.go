@@ -82,7 +82,7 @@ func TestC654_002_GenuineInfraStillVetoes(t *testing.T) {
 // TestC654_003_NormalizerPromptEchoGate — AC1': the normalizer must not emit an
 // infra_failure INCIDENT for a verbatim echo of the injected prompt.
 func TestC654_003_NormalizerPromptEchoGate(t *testing.T) {
-	ok, out := runGoTest(t, phasestreamPkg, "TestC654_003_PromptEchoNotEmittedGenuineEmitted")
+	ok, out := runGoTest(t, phasestreamPkg, "TestClassifier_SetInjectedPrompt")
 	if !ok {
 		t.Errorf("normalizer still emits infra_failure for echoed prompt text (SetInjectedPrompt gate missing):\n%s", out)
 	}
