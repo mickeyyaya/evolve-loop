@@ -138,6 +138,8 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/internal/phaseio/handoffs.go", Rationale: "typed cross-phase explanation handoff schema"},
 	{Fragment: "/go/internal/phases/runner/runner.go", Rationale: "requiresExplanationSandbox decision (the assignment call site now lives in dispatch.go)"},
 	{Fragment: "/go/internal/phases/runner/dispatch.go", Rationale: "mandatory versioned-Build sandbox propagation call site (dispatchPhaseAttempts sets RequireSandbox from requiresExplanationSandbox); carved out of runner.go by #549"},
+	{Fragment: "/go/internal/phases/runner/verdict/", Rationale: "the phase runner's verdict engine — the settle ladder, the teardown reconcile arms, the stale-leftover gate, the ACS deterministic floor, the verdict-source rule and the ship guard every contracted phase's verdict passes through (ADR-0103 unit 11)"},
+	{Fragment: "/go/internal/phases/runner/verdict_engine.go", Rationale: "the unit-11 seam: the engine's one wired construction, the Dispatch projection, the Center derivation from the Bridge and the settle-bound projections the settle tests keep (ADR-0103)"},
 	{Fragment: "/go/internal/bridge/", Rationale: "Bridge registry, drivers, and OS sandbox fail-closed enforcement for versioned Build"},
 	{Fragment: "/go/internal/adapters/bridge/", Rationale: "Bridge request adapter preserving mandatory Build sandbox propagation"},
 	{Fragment: "/go/internal/adapters/sandbox/", Rationale: "OS-specific confinement policy and generated write boundary"},

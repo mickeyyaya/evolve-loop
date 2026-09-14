@@ -8,6 +8,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io"
 	"os"
@@ -15,6 +16,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"testing/fstest"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
@@ -24,6 +26,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core/defectledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core/failurediag"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core/failurelearning"
+	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner"
+	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
@@ -382,6 +388,43 @@ func TestConsoleSinkThresholdHasOneHome(t *testing.T) {
 	}
 }
 
+// ADR-0103 unit 11 (test 44): the production root's Center reaches every
+// BaseRunner-backed phase runner — through the bridge Adapter it injects
+// (Signals() is the carrier's read seam) and, for scout/build, through the
+// swarmrunner Decorator's forward. Ship and retro are not BaseRunner-backed.
+func TestWireOrchestratorDeps_SignalCenterReachesEveryPhaseRunner(t *testing.T) {
+	root := t.TempDir()
+	evolveDir := filepath.Join(root, ".evolve")
+	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	d := wireOrchestratorDeps(root, evolveDir, io.Discard)
+	if d.Bridge == nil || d.Bridge.Signals() != d.Signals {
+		t.Fatal("the production Adapter carries the root's Center (Signals() == orchDeps.Signals)")
+	}
+	if len(d.Runners) == 0 {
+		t.Fatal("orchDeps.Runners must expose the phase-runner map the orchestrator was built over")
+	}
+	for phase, r := range d.Runners {
+		if phase == core.PhaseShip || phase == core.PhaseRetro {
+			continue
+		}
+		w, ok := r.(interface{ SignalsWired() bool })
+		if !ok {
+			t.Errorf("phase %s: runner %T exposes no SignalsWired()", phase, r)
+			continue
+		}
+		if !w.SignalsWired() {
+			t.Errorf("phase %s: the verdict engine reaches no Center — built off a Center-less bridge?", phase)
+		}
+	}
+	for _, phase := range []core.Phase{core.PhaseScout, core.PhaseBuild, core.PhaseBuildPlanner, core.PhaseAudit, core.PhaseTriage} {
+		if _, ok := d.Runners[phase]; !ok {
+			t.Errorf("phase %s missing from the root's runner map", phase)
+		}
+	}
+}
+
 // ADR-0103 unit 09: the defect ledger's WARN reaches the --simulate root's
 // console sink under the audit tag and the cycle workspace's durable stream —
 // a directory at <ws>/defect-ledger.json on a continuation is an unreadable
@@ -433,5 +476,70 @@ func TestAuditRoot_PassesTheSignalCenter(t *testing.T) {
 	}
 	if auditLine == "" || !strings.Contains(auditLine, "audit.WithSignals(") {
 		t.Fatalf("the core.PhaseAudit runner must be built with audit.WithSignals(…): %q", auditLine)
+	}
+}
+
+// inlineHooks is a minimal runner.Hooks whose prompt ships as data (no agent
+// doc on disk) — the --simulate twin's phase.
+type inlineHooks struct{}
+
+func (inlineHooks) PhaseName() string                         { return "audit" }
+func (inlineHooks) AgentPromptName() string                   { return "evolve-auditor" }
+func (inlineHooks) ArtifactFilename(core.PhaseRequest) string { return "audit-report.md" }
+func (inlineHooks) DefaultModel() string                      { return "opus" }
+func (inlineHooks) ComposePrompt(body string, _ core.PhaseRequest) string {
+	return body
+}
+func (inlineHooks) Classify(string, core.PhaseRequest, core.BridgeResponse) (string, []core.Diagnostic, string) {
+	return core.VerdictPASS, nil, ""
+}
+func (inlineHooks) InlinePromptBody() (string, bool) { return "inline body", true }
+
+// writingBridge writes the contracted artifact and exits cleanly.
+type writingBridge struct{}
+
+func (writingBridge) Launch(_ context.Context, req core.BridgeRequest) (core.BridgeResponse, error) {
+	if req.ArtifactPath != "" {
+		_ = os.MkdirAll(filepath.Dir(req.ArtifactPath), 0o755)
+		_ = os.WriteFile(req.ArtifactPath, []byte("# audit\n<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"PASS\"} -->\n"), 0o644)
+	}
+	return core.BridgeResponse{}, nil
+}
+func (writingBridge) Probe(context.Context) (core.BridgeProbe, error) { return core.BridgeProbe{}, nil }
+
+// ADR-0103 unit 11 (test 45): the verdict engine's WARN reaches the --simulate
+// root's console sink and the cycle-stamped durable stream.
+func TestWireSimulateOrchestrator_RunnerWarningRenders(t *testing.T) {
+	root := t.TempDir()
+	evolveDir := filepath.Join(root, ".evolve")
+	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var console bytes.Buffer
+	d := wireSimulateOrchestrator(root, evolveDir, &console)
+	r := runner.New(runner.Options{
+		Hooks: inlineHooks{}, Bridge: writingBridge{}, Prompts: prompts.NewFromFS(fstest.MapFS{}),
+		VerifyFn: func(phase string, roots phasecontract.Roots) (deliverable.Result, error) {
+			return deliverable.Result{OK: true, Phase: phase}, nil
+		},
+		StdoutFilter: func(string, string) error { return errors.New("synthetic filter blowup") },
+		Signals:      func() *signalcenter.Center { return d.Signals },
+	})
+	if !r.SignalsWired() {
+		t.Fatal("Options.Signals wires the runner's verdict engine")
+	}
+	ws := core.RunWorkspacePath(root, 7)
+	if err := os.MkdirAll(ws, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	resp, err := r.Run(context.Background(), core.PhaseRequest{Cycle: 7, ProjectRoot: root, Workspace: ws})
+	if err != nil || resp.Verdict != core.VerdictPASS {
+		t.Fatalf("a failing filter never blocks the phase: %+v %v", resp, err)
+	}
+	if out := console.String(); !strings.Contains(out, "[runner] runner.warning WARN RUNNER_STDOUT_FILTER_FAILED cycle=7 phase=audit") {
+		t.Fatalf("the console sink renders the unit's WARN under --simulate: %q", out)
+	}
+	if data, err := os.ReadFile(filepath.Join(ws, "signals.ndjson")); err != nil || !strings.Contains(string(data), `"code":"RUNNER_STDOUT_FILTER_FAILED"`) {
+		t.Errorf("the cycle-stamped signal is durable in the cycle workspace: %v %s", err, data)
 	}
 }

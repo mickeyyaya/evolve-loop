@@ -1,0 +1,70 @@
+{
+  "cancelled_clean_never_settles": {
+    "verify": 1,
+    "sleep": 0
+  },
+  "cancelled_teardown_never_settles": {
+    "verify": 16,
+    "sleep": 15
+  },
+  "clean_contracted_ok": {
+    "verify": 1,
+    "sleep": 0
+  },
+  "clean_contracted_unverified": {
+    "verify": 16,
+    "sleep": 15
+  },
+  "clean_never_settles": {
+    "verify": 16,
+    "sleep": 15
+  },
+  "clean_settles_on_third": {
+    "verify": 3,
+    "sleep": 2
+  },
+  "clean_uncontracted_pane": {
+    "verify": 1,
+    "sleep": 0
+  },
+  "substantive_error": {
+    "verify": 0,
+    "sleep": 0
+  },
+  "teardown_acs_floor": {
+    "verify": 16,
+    "sleep": 15
+  },
+  "timeout_malformed_mandatory": {
+    "verify": 16,
+    "sleep": 15
+  },
+  "timeout_malformed_optional": {
+    "verify": 16,
+    "sleep": 15
+  },
+  "timeout_sentinel_fail": {
+    "verify": 1,
+    "sleep": 0
+  },
+  "timeout_settles_on_third": {
+    "verify": 3,
+    "sleep": 2
+  },
+  "timeout_stale_mandatory": {
+    "verify": 1,
+    "sleep": 0
+  },
+  "timeout_stale_optional": {
+    "verify": 1,
+    "sleep": 0
+  },
+  "timeout_wellformed_pass": {
+    "verify": 1,
+    "sleep": 0
+  },
+  "transient_malformed_mandatory": {
+    "verify": 16,
+    "sleep": 15
+  }
+}

@@ -25,22 +25,20 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/coherence"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable"
 	"github.com/mickeyyaya/evolve-loop/go/internal/digest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/log"
-	"github.com/mickeyyaya/evolve-loop/go/internal/logfilter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner/verdict"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasestream"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 	"github.com/mickeyyaya/evolve-loop/go/internal/resolvellm"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
 // Hooks captures the per-phase variation points BaseRunner delegates
@@ -161,10 +159,11 @@ type Options struct {
 	// defaults to deliverable.Verify. Per-instance (not a package global) so
 	// t.Parallel() tests stay race-free, mirroring StdoutFilter.
 	VerifyFn func(phase string, roots phasecontract.Roots) (deliverable.Result, error)
-	// SleepFn is the seam for the delay between verifyReconcileDeliverable's
-	// bounded settle-retry attempts (see its doc for the cycles 824/825
-	// rationale). When nil, defaults to time.Sleep. Per-instance so
-	// t.Parallel() tests can inject a no-op for determinism, mirroring NowFn.
+	// SleepFn is the seam for the delay between the verdict engine's bounded
+	// settle-retry attempts (verdict.Engine.settle — see its doc for the
+	// cycles 824/825 rationale). When nil, defaults to settleSleep (time.Sleep).
+	// Per-instance so t.Parallel() tests can inject a no-op for determinism,
+	// mirroring NowFn.
 	SleepFn func(time.Duration)
 	// PhaseIO is the EVOLVE_PHASE_IO rollout stage (ADR-0050 §3.10). When VerifyFn
 	// is nil, it is threaded into the catalog-aware reconcile default so the
@@ -199,26 +198,30 @@ type Options struct {
 	// (both sinks nil) defaults to log.Diag() — production behavior is
 	// unchanged.
 	Diag log.Console
+	// Signals is the Signal Center accessor the verdict engine reports through
+	// (ADR-0103 unit 11). Nil ⇒ New adopts the Center the injected Bridge
+	// carries when it exposes one (the production Adapter), else the Null
+	// Object. Explicit so tests and foreign roots can inject one.
+	Signals func() *signalcenter.Center
 }
 
 // BaseRunner is the Template Method implementation. Construct one per
 // phase via New(); use it as a core.PhaseRunner.
 type BaseRunner struct {
-	hooks               Hooks
-	bridge              core.Bridge
-	prompts             *prompts.Loader
-	nowFn               func() time.Time
-	resolveLLM          func(phase string, opts resolvellm.Options) (resolvellm.Result, error)
-	stdoutFilter        func(workspace, phase string) error
-	eventsProducer      func(workspace, phase, cli string, cycle int, prompt string) error
-	optional            bool
-	verifyFn            func(phase string, roots phasecontract.Roots) (deliverable.Result, error)
-	sleepFn             func(time.Duration)
-	compactPrompts      bool
-	disableStdoutFilter bool
-	universalFallback   bool
-	discoverCLIsFn      func() []string
-	diag                log.Console
+	hooks             Hooks
+	bridge            core.Bridge
+	prompts           *prompts.Loader
+	nowFn             func() time.Time
+	resolveLLM        func(phase string, opts resolvellm.Options) (resolvellm.Result, error)
+	eventsProducer    func(workspace, phase, cli string, cycle int, prompt string) error
+	compactPrompts    bool
+	universalFallback bool
+	discoverCLIsFn    func() []string
+	diag              log.Console
+	// judge is unit 11's (ADR-0103): the verdict engine, built ONCE by New over
+	// the resolved probe, clock, stdout filter, optional flag and Center
+	// accessor — which live in the engine only (wiredVerdictEngine).
+	judge *verdict.Engine
 }
 
 // New constructs a BaseRunner. Panics if Hooks is nil — that's a
@@ -235,10 +238,6 @@ func New(opts Options) *BaseRunner {
 	if resolveLLM == nil {
 		resolveLLM = resolvellm.Resolve
 	}
-	stdoutFilter := opts.StdoutFilter
-	if stdoutFilter == nil {
-		stdoutFilter = logfilter.Process
-	}
 	eventsProducer := opts.EventsProducer
 	if eventsProducer == nil {
 		eventsProducer = func(workspace, phase, cli string, cycle int, prompt string) error {
@@ -247,24 +246,6 @@ func New(opts Options) *BaseRunner {
 				InjectedPrompt: prompt,
 			})
 		}
-	}
-	verifyFn := opts.VerifyFn
-	if verifyFn == nil {
-		// Catalog-aware so the reconcile check resolves user/minted phases
-		// under the SAME policy as the host gate and the agent self-check —
-		// a builtin-only default left an inserted phase's surviving artifact
-		// unresolvable on timeout, synthesizing FAIL. Stage-threaded (3.10
-		// Slice 1) so the rung also reaches the host gate's verdict at enforce;
-		// opts.PhaseIO's zero value (StageOff) is byte-identical to the prior
-		// VerifyCatalogAware default.
-		stage := opts.PhaseIO
-		verifyFn = func(phase string, roots phasecontract.Roots) (deliverable.Result, error) {
-			return deliverable.VerifyCatalogAwareStage(phase, roots, stage)
-		}
-	}
-	sleepFn := opts.SleepFn
-	if sleepFn == nil {
-		sleepFn = settleSleep
 	}
 	diag := opts.Diag
 	if diag.Out == nil && diag.Err == nil {
@@ -281,269 +262,47 @@ func New(opts Options) *BaseRunner {
 	if discoverCLIsFn == nil {
 		discoverCLIsFn = DefaultDiscoverCLIsFn
 	}
-	return &BaseRunner{
-		hooks:               opts.Hooks,
-		bridge:              opts.Bridge,
-		prompts:             opts.Prompts,
-		nowFn:               nowFn,
-		resolveLLM:          resolveLLM,
-		stdoutFilter:        stdoutFilter,
-		eventsProducer:      eventsProducer,
-		optional:            opts.Optional,
-		verifyFn:            verifyFn,
-		sleepFn:             sleepFn,
-		compactPrompts:      opts.CompactPrompts,
-		disableStdoutFilter: opts.DisableStdoutFilter,
-		universalFallback:   universalFallback,
-		discoverCLIsFn:      discoverCLIsFn,
-		diag:                diag,
+	b := &BaseRunner{
+		hooks:             opts.Hooks,
+		bridge:            opts.Bridge,
+		prompts:           opts.Prompts,
+		nowFn:             nowFn,
+		resolveLLM:        resolveLLM,
+		eventsProducer:    eventsProducer,
+		compactPrompts:    opts.CompactPrompts,
+		universalFallback: universalFallback,
+		discoverCLIsFn:    discoverCLIsFn,
+		diag:              diag,
 	}
+	b.judge = wiredVerdictEngine(opts)
+	return b
 }
 
-// reconcileSettleRetries / reconcileSettleInterval bound the settle-WAIT for a
-// contracted deliverable that has not finished flushing to disk yet. A clean-exit
-// agent can return control before its `Write <phase>-report.md` lands, so the first
-// verify probe can miss a report that is moments from valid. This wait is a pure
-// LIVENESS ceiling, NOT the verdict-correctness mechanism: correctness comes from the
-// file-authoritative rule in Run (the lossy terminal pane is never a verdict source
-// for a contracted phase), so the window width can no longer flip a valid PASS into a
-// scrollback FAIL — at worst an extreme over-run degrades to a COHERENT "deliverable
-// not produced" FAIL, never a fabricated contradicting verdict. ~3s comfortably covers
-// observed clean-exit flush latency under CPU/disk contention (the prior ~600ms did
-// not — cycle-921, the ADR-0072 verdict-incoherence that motivated the file-authoritative
-// rule).
-const (
-	reconcileSettleRetries  = 15
-	reconcileSettleInterval = 200 * time.Millisecond
-)
-
-// settleSleep is the process clock for verifyReconcileDeliverable's inter-attempt
-// wait — time.Sleep in production; a test init flips it to a no-op so the settle
-// window costs zero wall-clock in the package's test suite (the retry now sits on
+// settleSleep is the process clock for the verdict engine's settle ladder
+// (the default behind Options.SleepFn, handed to the engine as WithSleep) —
+// time.Sleep in production; a test init flips it to a no-op so the settle
+// window costs zero wall-clock in the package's test suite (the retry sits on
 // the common clean-exit path, so real sleeps would balloon package test time).
 var settleSleep = time.Sleep
-
-// verifyReconcileDeliverable waits (bounded) for a contracted deliverable to become
-// well-formed, re-probing verifyFn up to reconcileSettleRetries times with
-// reconcileSettleInterval between attempts. It serves BOTH the reconcile-on-timeout
-// path (cycles 824/825: a next-phase context-cancel laundered into ErrArtifactTimeout
-// fires while the deliverable is still being written) AND the clean-exit artifact-read
-// path (cycle-603/899/921: a cleanly-exited agent idles while its `Write` flush lands).
-//
-// It retries ONLY while the report is contracted-but-not-yet-well-formed
-// (verr == nil && !res.OK) — the state a late flush passes through (a missing file is
-// CodeMissingArtifact, verr==nil). An ERROR (verr != nil) means "no contract for this
-// phase" or an IO fault; neither resolves by waiting, so those return immediately —
-// uncontracted phases pay ZERO retries (no wasted settle window). Waiting can only
-// UPGRADE toward the agent's real on-disk verdict; a never-settling deliverable still
-// returns not-OK.
-//
-// CANCELLATION (verifyreconcile-ctx-cancel-unconditional-sleep): the wait observes
-// ctx, so a cancelled phase stops waiting instead of sleeping out the ladder —
-// reconcileSettleRetries intervals PLUS a verify probe per rung, each probe nesting
-// deliverable's 500ms write-in-flight grace window. The first probe always runs (a
-// deliverable already on disk is still caught); cancellation then stops both the
-// sleeping and the re-probing, and the last result stands. The bounded retry count
-// remains the ceiling while ctx is live, and the OK/not-OK decision and fail-closed
-// fallback are untouched — only the waiting is dropped.
-//
-// SCOPE — this is the CLEAN-EXIT path's guard, and the reconcile-on-teardown call
-// site deliberately passes context.WithoutCancel (see there): on that path a
-// cancelled ctx is frequently the CAUSE of the teardown (the tmux driver launders a
-// ctx-cancel into ExitArtifactTimeout after one final poll —
-// driver_tmux_repl.go's "the runner's settle-retry was the only thing standing
-// between that mislabel and a false FAIL"), so honoring cancellation there would
-// re-open the cycles-824/825 class. On the clean-exit path the agent already exited 0,
-// so cancellation genuinely means nothing more is coming.
-//
-// REACHABILITY — the honored-cancel case is OPERATOR-INTERRUPT only. cmd_cycle.go
-// hands RunCycle a context.Background(), so a fleet lane never observes cancel and
-// this branch is inert in the standing mode; the one cancellable root is cmd_loop.go's
-// signal.NotifyContext. The residual it accepts: a SIGINT landing between the driver's
-// clean return and this call, on a phase whose deliverable is still flushing, bails
-// after one probe and FAILs where the full settle window would have PASSed. Bounded by
-// deliverable's 500ms grace nested in that first probe, and the loop is terminating
-// anyway — a wrong verdict on a cycle nobody will ship.
-//
-// The ctx check straddles the sleep (before and after) rather than racing a timer
-// against it: sleepFn is an injected, uninterruptible seam, so selecting on ctx.Done()
-// would mean calling the seam from a spawned goroutine and racing tests that count its
-// invocations. Post-cancel cost is therefore bounded at ONE interval with no further
-// probe — the amplification this fix targets.
-func (b *BaseRunner) verifyReconcileDeliverable(ctx context.Context, phase string, roots phasecontract.Roots) (deliverable.Result, error) {
-	res, verr := b.verifyFn(phase, roots)
-	for attempt := 0; attempt < reconcileSettleRetries && verr == nil && !res.OK; attempt++ {
-		if ctx.Err() != nil {
-			return res, verr
-		}
-		b.sleepFn(reconcileSettleInterval)
-		if ctx.Err() != nil {
-			return res, verr
-		}
-		res, verr = b.verifyFn(phase, roots)
-	}
-	return res, verr
-}
-
-// forensicSnapshot / forensicCodes render a file's + a violation set's state as a single
-// log-safe token for the teardown-reconcile decision log (the retro's cycle-3 ask: today a
-// teardown false-FAIL records no reasoning, so a recurrence is a 30-minute forensic dig).
-// forensicSnapshot reports a file's existence, byte size, and last tailN bytes (where the
-// audit-report.md verdict sentinel lives).
-func forensicSnapshot(path string, tailN int) string {
-	fi, err := os.Stat(path)
-	if err != nil {
-		return "absent"
-	}
-	data, _ := os.ReadFile(path)
-	tail := string(data)
-	if len(tail) > tailN {
-		tail = tail[len(tail)-tailN:]
-	}
-	return fmt.Sprintf("size=%d tail=%q", fi.Size(), tail)
-}
-
-func forensicCodes(vs []deliverable.Violation) string {
-	parts := make([]string, 0, len(vs))
-	for _, v := range vs {
-		parts = append(parts, string(v.Code))
-	}
-	return strings.Join(parts, ",")
-}
-
-// acsFloorRescues reports whether a teardown-time deliverable.Verify not-OK should
-// be OVERRIDDEN by the deterministic ACS ground truth (verdict-incoherence family:
-// cycles 603/921/924/931/3). report is the VERIFIED deliverable content (the bytes
-// Verify read — Result.Content), never a fresh read: the rescue decision and the
-// subsequent Classify must judge the SAME snapshot, or a rescue could fire on bytes
-// the classify step never sees. True iff ALL hold:
-//   - the phase is audit (the acs-verdict.json + coherence floor are audit-scoped);
-//   - the acssuite verdict is PASS — a NON-LLM signal a session stall cannot corrupt;
-//   - the report declares a PASS-class verdict sentinel (via the canonical
-//     ParseVerdictSentinel, with its placeholder-echo guard — read by ReadCycleVerdicts);
-//   - the report echoes THIS cycle's minted challenge token (anti-gaming: a stale,
-//     forged, or cross-cycle report cannot be laundered to PASS by the ACS verdict alone).
-//
-// This is precisely the (audit==PASS && acs==PASS) condition the ADR-0072 coherence
-// floor flags as incoherent — reusing coherence.ReadCycleVerdicts keeps a single
-// definition of "both verdicts agree on PASS", so the teardown floor rescues exactly
-// what the post-hoc floor would otherwise HALT on. It never manufactures a PASS: a
-// malformed/verdict-less/token-missing report, or a non-ship-eligible suite, declines.
-func acsFloorRescues(phase, workspace, report string) bool {
-	if phase != string(core.PhaseAudit) {
-		return false
-	}
-	audit, acs, auditRan := coherence.ReadCycleVerdicts(workspace)
-	if !auditRan || audit != "PASS" || acs != "PASS" {
-		return false
-	}
-	tokRaw, err := os.ReadFile(filepath.Join(workspace, "challenge-token.txt"))
-	if err != nil {
-		return false
-	}
-	tok := strings.TrimSpace(string(tokRaw))
-	if tok == "" {
-		return false
-	}
-	return strings.Contains(report, tok)
-}
-
-// classifiedArtifact returns the content Classify must judge for a CONTRACTED
-// phase, given the deliverable's Verify result, the artifact path THIS run
-// dispatched, and the terminal pane as the last resort.
-//
-// SINGLE READ (deliverable-verified-bytes-single-read): when the Verify result
-// describes the same file the bridge was told to write, its Content IS the
-// classified content — verdict and content come from ONE read, so a writer racing
-// the just-finished launch cannot slip bytes past the gate that judged them.
-//
-// The path-skew half of the fallback is now STRUCTURALLY CLOSED at THIS seam
-// (intent-delta-contract-path-skew): the runner threads the dispatched path
-// through Roots.DispatchedArtifact, so Verify always judges the file this run
-// dispatched — intent in DELTA mode included — and res.ArtifactPath ==
-// artifactPath for every contracted phase driven by the REAL verify. The
-// no-override seams (host contract gate's rootsFor, `evolve phase verify`)
-// still judge the contract path — correct for their callers, but in delta
-// mode the gate seam remains open (queued: gate-seam dispatched-path
-// threading). The fallback remains for what it still covers: an
-// errored/path-less Result, a NoArtifact contract (ArtifactPath "") were one
-// ever routed through BaseRunner (ship's is not), and test fakes that verify
-// other paths.
-//
-// The fallback reads the dispatched artifact exactly as the pre-single-read code
-// did, including the "absent + !OK ⇒ empty artifact" rule that makes an unwritten
-// deliverable a coherent FAIL instead of a pane-scraped one. NOTE that rule now also
-// applies on the reconciled call site, which previously could only keep the pane;
-// unreachable in practice (it needs a path skew AND a read failure AND !res.OK, and
-// the pane is empty on any teardown anyway), but it is a real unification of two
-// call sites that had slightly different rules.
-// The snapshot is authoritative only when it is BOTH of the same file AND
-// non-empty. Empty is not evidence of absence: an infra read fault returns an
-// empty Result, and a deliverable that materialises after the ladder's last
-// probe verifies absent — in either case the snapshot would classify "" for a
-// file that is on disk right now. Falling through costs one syscall on a path
-// that was already headed for FAIL, and it rescues the case named above (an
-// intent-delta phase deriving [intent-unchanged] → SKIPPED from a late file).
-// This is also what makes the two call sites symmetric: the ACS-rescue branch
-// does its own late-bytes read for the rescue's own evidence, and without this
-// clause the clean-exit site would be the only one without that liveness.
-func classifiedArtifact(res deliverable.Result, artifactPath, pane string) string {
-	if res.ArtifactPath == artifactPath && res.Content != "" {
-		return res.Content
-	}
-	if data, err := os.ReadFile(artifactPath); err == nil {
-		return string(data)
-	}
-	if !res.OK {
-		return "" // contracted file genuinely absent → Classify sees no sentinel → FAIL
-	}
-	return pane
-}
 
 // Name implements core.PhaseRunner.
 func (b *BaseRunner) Name() string { return b.hooks.PhaseName() }
 
 // Run implements core.PhaseRunner. The template:
 //
-//  1. validate deps (bridge, prompts)
-//  2. load agent prompt body
-//  3. compose final prompt via hook
-//  4. resolve cli / model / extraFlags from env-chain + profile
-//  5. dispatch bridge.Launch
-//  6. read artifact (stdout, then file fallback)
-//  7. classify via hook
-//  8. package PhaseResponse
+//  1. validate deps (bridge, prompts), load the agent prompt body and compose
+//     the final prompt via the hooks; snapshot the artifact pre-dispatch
+//  2. resolve the dispatch plan (policy pin / profile / advisor overlay, the
+//     CLI chain, the tier)
+//  3. dispatch through the bridge across the fallback chain, inside the
+//     worktree fence
+//  4. judge the outcome through the verdict engine (ADR-0103 unit 11): the
+//     bounded settle ladder, the teardown reconcile arms, the verdict-source
+//     rule (the contracted file, never the pane), Classify via hook, the ship
+//     guard, the response
 //
 // Bridge errors and missing-prompts errors short-circuit to a FAIL
 // response with the error attached as a diagnostic.
-// artifactSnapshot is the (size, mtime) identity of the canonical artifact at
-// one instant — the same key the bridge's stability window and baseline use,
-// so the runner's and the bridge's notion of "unchanged" cannot drift.
-type artifactSnapshot struct {
-	size    int64
-	modTime time.Time
-}
-
-// statArtifactSnapshot snapshots path if it is a non-empty regular file.
-func statArtifactSnapshot(path string) (artifactSnapshot, bool) {
-	fi, err := os.Lstat(path)
-	if err != nil || !fi.Mode().IsRegular() || fi.Size() == 0 {
-		return artifactSnapshot{}, false
-	}
-	return artifactSnapshot{size: fi.Size(), modTime: fi.ModTime()}, true
-}
-
-// artifactUnchangedSince reports whether path is still byte-identical (by the
-// size+mtime key) to the given pre-dispatch snapshot. Any error reads as
-// changed — fail-open toward the pre-existing reconcile behavior.
-func artifactUnchangedSince(path string, snap artifactSnapshot) bool {
-	fi, err := os.Lstat(path)
-	if err != nil || !fi.Mode().IsRegular() {
-		return false
-	}
-	return fi.Size() == snap.size && fi.ModTime().Equal(snap.modTime)
-}
-
 func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseResponse, error) {
 	req.WorktreeVerified = false
 	prep, early, err := b.preparePhaseExecution(req)
@@ -567,18 +326,7 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	dispatchResult := b.dispatchPhaseAttempts(ctx, req, prep, dispatchPlan)
 	req.WorktreeVerified = dispatchResult.worktreeVerified
 
-	reconciliation, early, err := b.reconcileDeliverable(ctx, req, prep, dispatchResult)
-	if err != nil {
-		if early != nil {
-			return *early, err
-		}
-		return core.PhaseResponse{}, err
-	}
-	if early != nil {
-		return *early, nil
-	}
-
-	return b.classifyPhaseOutcome(ctx, req, prep, dispatchPlan, dispatchResult, reconciliation)
+	return b.judge.Judge(ctx, dispatchOf(req, prep, dispatchPlan, dispatchResult), b.classifyWith(req, dispatchResult.bridgeResponse))
 }
 
 func (b *BaseRunner) withExplanationContract(body, phase string) (string, error) {

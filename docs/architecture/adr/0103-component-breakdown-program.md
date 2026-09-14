@@ -68,12 +68,8 @@ PR, each landing with all of the following — a unit without any of them is not
 | 09 | Defect ledger (schema, writer, readers; the continuation disposition gate with the lane-scope reader and the citation resolver injected; carryover and the adoption seeder decode through it — unit 03 F13 closed) | `phases/audit/defect_ledger.go` | [09-defectledger.md](../decomposition/09-defectledger.md) |
 | 06 | Inbox lifecycle mover (claim, promote, quarantine release, the cycle drain, orphan recovery, the processed-record primitives; outcome.go's door and the continuation trio stay for 06b) | `inboxmover/inboxmover.go` + `claimstate.go` | [06-inboxmover.md](../decomposition/06-inboxmover.md) |
 | 10 | Bridge engine — the launch-outcome classifier (the exit vocabulary as ONE table: sentinel, attempt-ledger cause code, `BRIDGE_EXIT_*` projection; the cause-line miners; the request gauntlet stays in the host as `bridge.ValidateRequest`, shared with the adapter; `Launch` split in place into named steps with four step codes) | `bridge/engine.go` + `bridge/attempt_telemetry.go` | [10-bridgeengine.md](../decomposition/10-bridgeengine.md) |
+| 11 | Phase-runner verdict engine (the settle ladder, the teardown reconcile arms, the stale-leftover gate, the ACS deterministic floor, the verdict-source rule, the ship guard; the first `runner.warning` producer — the dispatch chain follows as 11b) | `phases/runner/runner.go` + `reconciliation.go` + `classification.go` | [11-phaserunner.md](../decomposition/11-phaserunner.md) |
 | … | inbox mover, ship gitops, config, audit gates, bridge autorespond (10b) | design §12 | later |
-
-
-
-
-| … | inbox mover, bridge engine, audit gates | design §12 | later |
 
 Row 03b is a numbering insertion (the engine surfaced while unit 03 was designed), not a §12 reorder: it lands before unit 04 because the advisor's `truncateRunes` read now resolves through carryover, and its `ORCHESTRATOR_*` handoff (its doc §5) must be settled before unit 05 splits `RunCycle`. Row 07 is likewise an insertion while 04–06 are unassigned: the ship landing is design §12 row 6 and touches no core file, so it could be built in parallel with the advisor and the orchestrator split; its number is the brief's, not a §12 reorder.
 

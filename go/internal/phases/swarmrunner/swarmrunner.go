@@ -307,3 +307,15 @@ func (d *Decorator) PersonaAvailable() error {
 	}
 	return nil
 }
+
+// SignalsWired forwards the verdict engine's root-wiring proof (ADR-0103 unit
+// 11) to the decorated runner: a decorator must not narrow the capability of
+// what it wraps, or the composition root's per-runner proof would read a
+// wrapped scout/build as unwired. A wrapped runner without the method
+// reports false.
+func (d *Decorator) SignalsWired() bool {
+	if w, ok := d.inner.(interface{ SignalsWired() bool }); ok {
+		return w.SignalsWired()
+	}
+	return false
+}

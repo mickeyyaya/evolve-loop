@@ -328,6 +328,11 @@ type orchDeps struct {
 	// Bridge is the production Adapter injected into every phase runner; it
 	// carries Signals into each engine it builds (ADR-0101 S3).
 	Bridge *bridge.Adapter
+	// Runners is the phase-runner map the orchestrator was built over — a root
+	// field for the per-runner wiring proof (ADR-0103 unit 11: every
+	// BaseRunner-backed runner's verdict engine reaches Signals through the
+	// Bridge), in the orchDeps.Bridge precedent; no production reader.
+	Runners map[core.Phase]core.PhaseRunner
 }
 
 // rootLedger is what the composition root's ledger offers its consumers: the
@@ -804,6 +809,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 		Orchestrator: core.NewOrchestrator(st, ld, runners, opts...),
 		Signals:      signals,
 		Bridge:       br,
+		Runners:      runners,
 	}
 }
 
