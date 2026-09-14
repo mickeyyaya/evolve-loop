@@ -31,6 +31,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable"
+	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable/gatesignal"
 	"github.com/mickeyyaya/evolve-loop/go/internal/digest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/log"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
@@ -159,6 +160,18 @@ type Options struct {
 	// defaults to deliverable.Verify. Per-instance (not a package global) so
 	// t.Parallel() tests stay race-free, mirroring StdoutFilter.
 	VerifyFn func(phase string, roots phasecontract.Roots) (deliverable.Result, error)
+	// ContractVerifier is the deliverables gate's own verifier offered to the
+	// verdict engine so there is ONE verifier: the bytes the engine classifies
+	// are the bytes the gate will approve (a sole recoverable bad_verdict is
+	// salvaged, persisted and reported before classification — cycle 1685
+	// sealed FAIL on the unrepaired bytes while the gate approved the
+	// repaired file). The composition root injects the same Reviewer it
+	// appends to the orchestrator's reviewers; it is an accessor because the
+	// Reviewer is built after the runners (it needs the merged phase
+	// catalog) — the Signals precedent. nil, or an accessor returning nil
+	// (tests, gate off), falls back to the catalog-aware verify. VerifyFn
+	// (tests) outranks it.
+	ContractVerifier func() ContractVerifier
 	// SleepFn is the seam for the delay between the verdict engine's bounded
 	// settle-retry attempts (verdict.Engine.settle — see its doc for the
 	// cycles 824/825 rationale). When nil, defaults to settleSleep (time.Sleep).
@@ -207,6 +220,14 @@ type Options struct {
 
 // BaseRunner is the Template Method implementation. Construct one per
 // phase via New(); use it as a core.PhaseRunner.
+// ContractVerifier is what the deliverables gate offers the verdict engine
+// (deliverable.Reviewer implements it): the gate's verification, salvage
+// included, keyed by the dispatch identity so a salvage is reported under its
+// cycle. Defined here, at the consumer.
+type ContractVerifier interface {
+	VerifyForClassification(check gatesignal.Check, phase string, roots phasecontract.Roots) (deliverable.Result, error)
+}
+
 type BaseRunner struct {
 	hooks             Hooks
 	bridge            core.Bridge
@@ -221,7 +242,9 @@ type BaseRunner struct {
 	// judge is unit 11's (ADR-0103): the verdict engine, built ONCE by New over
 	// the resolved probe, clock, stdout filter, optional flag and Center
 	// accessor — which live in the engine only (wiredVerdictEngine).
-	judge *verdict.Engine
+	contractVerifier func() ContractVerifier
+	verifyInjected   bool
+	judge            *verdict.Engine
 }
 
 // New constructs a BaseRunner. Panics if Hooks is nil — that's a
@@ -275,6 +298,8 @@ func New(opts Options) *BaseRunner {
 		diag:              diag,
 	}
 	b.judge = wiredVerdictEngine(opts)
+	b.contractVerifier = opts.ContractVerifier
+	b.verifyInjected = opts.VerifyFn != nil
 	return b
 }
 

@@ -152,7 +152,11 @@ func classify(content, strategy string) string {
 type Config struct {
 	Bridge  core.Bridge
 	Prompts *prompts.Loader
-	NowFn   func() time.Time
+	// ContractVerifier is the deliverables gate's verifier accessor for the
+	// verdict engine (runner.Options.ContractVerifier): one verifier for gate
+	// and engine (research F22). nil = the catalog-aware default.
+	ContractVerifier func() runner.ContractVerifier
+	NowFn            func() time.Time
 	// PhaseIO threads the EVOLVE_PHASE_IO stage into the reconcile rung (ADR-0050
 	// §3.10 Slice 1). Zero value (StageOff) = byte-identical.
 	PhaseIO config.Stage
@@ -171,12 +175,13 @@ type Phase struct{ *runner.BaseRunner }
 func New(c Config) *Phase {
 	return &Phase{
 		BaseRunner: runner.New(runner.Options{
-			Hooks:          hooks{},
-			Bridge:         c.Bridge,
-			Prompts:        c.Prompts,
-			NowFn:          c.NowFn,
-			PhaseIO:        c.PhaseIO,
-			CompactPrompts: c.CompactPrompts,
+			Hooks:            hooks{},
+			Bridge:           c.Bridge,
+			ContractVerifier: c.ContractVerifier,
+			Prompts:          c.Prompts,
+			NowFn:            c.NowFn,
+			PhaseIO:          c.PhaseIO,
+			CompactPrompts:   c.CompactPrompts,
 		}),
 	}
 }

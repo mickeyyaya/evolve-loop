@@ -68,7 +68,7 @@ func verifiedFrom(res deliverable.Result, phase string, roots phasecontract.Root
 }
 
 func (p probe) fn() Verify {
-	return func(phase string, roots phasecontract.Roots) (deliverable.Result, error) {
+	return func(_ Identity, phase string, roots phasecontract.Roots) (deliverable.Result, error) {
 		p.n.verify++
 		if p.err != nil {
 			return deliverable.Result{}, p.err

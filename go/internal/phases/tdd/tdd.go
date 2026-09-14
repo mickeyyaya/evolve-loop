@@ -112,7 +112,11 @@ func classify(content string) string {
 type Config struct {
 	Bridge  core.Bridge
 	Prompts *prompts.Loader
-	NowFn   func() time.Time
+	// ContractVerifier is the deliverables gate's verifier accessor for the
+	// verdict engine (runner.Options.ContractVerifier): one verifier for gate
+	// and engine (research F22). nil = the catalog-aware default.
+	ContractVerifier func() runner.ContractVerifier
+	NowFn            func() time.Time
 	// CompactPrompts strips the on-demand reference tail from the disk-loaded agent
 	// doc before dispatch. Value flows from workflow.compact_prompts (policy.json);
 	// never set to a bare literal here (standing rule: phase-settings-from-config).
@@ -124,11 +128,12 @@ type Phase struct{ *runner.BaseRunner }
 func New(c Config) *Phase {
 	return &Phase{
 		BaseRunner: runner.New(runner.Options{
-			Hooks:          hooks{},
-			Bridge:         c.Bridge,
-			Prompts:        c.Prompts,
-			NowFn:          c.NowFn,
-			CompactPrompts: c.CompactPrompts,
+			Hooks:            hooks{},
+			Bridge:           c.Bridge,
+			ContractVerifier: c.ContractVerifier,
+			Prompts:          c.Prompts,
+			NowFn:            c.NowFn,
+			CompactPrompts:   c.CompactPrompts,
 		}),
 	}
 }

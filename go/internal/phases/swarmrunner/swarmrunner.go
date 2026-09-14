@@ -319,3 +319,12 @@ func (d *Decorator) SignalsWired() bool {
 	}
 	return false
 }
+
+// ContractVerifierWired forwards the verdict engine's verifier-wiring proof
+// (research F22) the same way SignalsWired does.
+func (d *Decorator) ContractVerifierWired() bool {
+	if w, ok := d.inner.(interface{ ContractVerifierWired() bool }); ok {
+		return w.ContractVerifierWired()
+	}
+	return false
+}

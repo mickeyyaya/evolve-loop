@@ -60,7 +60,7 @@ const (
 // judges bytes it never reads itself and a verdict rule it never owns
 // (Strategy), and never sees core.PhaseRequest or the host's Hooks.
 type (
-	Verify   func(phase string, roots phasecontract.Roots) (deliverable.Result, error)
+	Verify   func(id Identity, phase string, roots phasecontract.Roots) (deliverable.Result, error)
 	Classify func(artifact string) (verdict string, diags []core.Diagnostic, nextPhase string)
 )
 
@@ -178,4 +178,18 @@ func (e *Engine) Judge(ctx context.Context, d Dispatch, classify Classify) (core
 		return *early, err
 	}
 	return e.classify(ctx, d, r, classify), nil
+}
+
+// Identity is the dispatch's identity handed to the verifier: a salvage the
+// verifier performs before classification is reported under the cycle and
+// run it belongs to. The engine's own type — the engine is a leaf and does
+// not import the gate reporter; the host adapts it.
+type Identity struct {
+	Cycle int
+	RunID string
+	Phase string
+}
+
+func identityOf(d Dispatch) Identity {
+	return Identity{Cycle: d.Cycle, RunID: d.RunID, Phase: d.Phase}
 }

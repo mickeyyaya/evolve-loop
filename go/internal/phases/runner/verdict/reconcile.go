@@ -71,7 +71,12 @@ func (e *Engine) reconcile(ctx context.Context, d Dispatch) (reconciliation, *co
 // would re-open the cycles-824/825 false-FAIL class. Then the arms, in order.
 func (e *Engine) reconcileTeardown(ctx context.Context, d Dispatch) (reconciliation, *core.PhaseResponse, error) {
 	roots := rootsFor(d)
-	s := staleGate(d, e.settle(context.WithoutCancel(ctx), d.Phase, roots))
+	// The verifier may WRITE (the contract gate salvages a sole recoverable
+	// bad_verdict and persists the repaired artifact — F22), so the
+	// pre-dispatch identity is read BEFORE the probe: a leftover the probe
+	// repairs must still be refused as a prior attempt's report (cycle-1550).
+	stale := staleOf(d)
+	s := staleGate(d, stale, e.settle(context.WithoutCancel(ctx), identityOf(d), d.Phase, roots))
 	switch {
 	case s.err == nil && s.res.OK:
 		// Deliverable survived the teardown — fall through to Classify.
@@ -94,14 +99,20 @@ func (e *Engine) reconcileTeardown(ctx context.Context, d Dispatch) (reconciliat
 // well-formed fall-through and the ACS floor) and let the optional/fatal arms
 // handle it as untrustworthy, with the cause on record. The refusal fires
 // only on an OK probe; a stale but malformed leftover stays malformed.
-func staleGate(d Dispatch, s settled) settled {
-	s.stale = d.HadPreDispatch && unchangedSince(d.ArtifactPath, d.PreDispatch)
+func staleGate(d Dispatch, stale bool, s settled) settled {
+	s.stale = stale
 	if s.stale && s.err == nil && s.res.OK {
 		s.err = fmt.Errorf("deliverable at %s is byte-identical to the pre-dispatch leftover (a prior attempt's report) — reconcile refused (cycle-1550)", d.ArtifactPath)
 		s.res = deliverable.Result{}
 		s.refused = true
 	}
 	return s
+}
+
+// staleOf reports whether the deliverable is byte-identical (size+mtime) to
+// the pre-dispatch leftover — read before any probe that may rewrite it.
+func staleOf(d Dispatch) bool {
+	return d.HadPreDispatch && unchangedSince(d.ArtifactPath, d.PreDispatch)
 }
 
 // degradeOptional is the optional-phase soft-fail (Workstream D / cycle-120):

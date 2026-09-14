@@ -520,20 +520,30 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 		}),
 		bridgechain.WithLog(diagf))
 
+	// The contract gate's Reviewer is built after the runners (it needs the
+	// merged phase catalog); every BaseRunner's verdict engine reaches it
+	// through this accessor so gate and engine share ONE verifier — the bytes
+	// the engine classifies are the bytes the gate approves (research F22:
+	// cycle 1685 classified the unrepaired bytes the gate then salvaged).
+	// Gate OFF keeps the Null-Object PlainVerifier (no salvage) so the choice
+	// is explicit; the gate's Reviewer replaces it below when the gate is on.
+	var contractVerifier runner.ContractVerifier = deliverable.PlainVerifier{PhaseIO: cfg.PhaseIO}
+	verifierOf := func() runner.ContractVerifier { return contractVerifier }
+
 	runners := map[core.Phase]core.PhaseRunner{
-		core.PhaseIntent: intent.New(intent.Config{Bridge: walked, Prompts: prm, CompactPrompts: cfg.CompactPrompts}),
+		core.PhaseIntent: intent.New(intent.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, CompactPrompts: cfg.CompactPrompts}),
 		// Scout + Build are swarm-eligible (ADR-0032): wrapped in the swarmRunner
 		// Decorator so stage=advisory|enforce (policy.json "swarm.stage") dispatches
 		// them across N parallel workers (reader fan-out / writer merge-train).
 		// Default (stage absent/shadow) = byte-identical delegate — zero behavior change.
 		// PhaseIO threads cfg.PhaseIO into the reconcile rung (3.10 Slice 1); StageOff
 		// (the shipping default) keeps these byte-identical.
-		core.PhaseScout:        swarmrunner.New(scout.New(scout.Config{Bridge: walked, Prompts: prm, PhaseIO: cfg.PhaseIO, CompactPrompts: cfg.CompactPrompts}), walked, swarm.ModeReader, swCfg),
-		core.PhaseTriage:       triage.New(triage.Config{Bridge: walked, Prompts: prm, PhaseIO: cfg.PhaseIO, CompactPrompts: cfg.CompactPrompts}),
-		core.PhaseTDD:          tdd.New(tdd.Config{Bridge: walked, Prompts: prm, CompactPrompts: cfg.CompactPrompts}),
-		core.PhaseBuildPlanner: buildplanner.New(buildplanner.Config{Bridge: walked, Prompts: prm}).BaseRunner(),
-		core.PhaseBuild:        swarmrunner.New(build.New(build.Config{Bridge: walked, Prompts: prm, PhaseIO: cfg.PhaseIO, CompactPrompts: cfg.CompactPrompts}), walked, swarm.ModeWriter, swCfg),
-		core.PhaseAudit:        audit.NewDefaultWithStageCompactSpec(walked, prm, cfg.PhaseIO, cfg.CompactPrompts, documentSpecPtr(cfg), audit.WithSignals(func() *signalcenter.Center { return signals })),
+		core.PhaseScout:        swarmrunner.New(scout.New(scout.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, PhaseIO: cfg.PhaseIO, CompactPrompts: cfg.CompactPrompts}), walked, swarm.ModeReader, swCfg),
+		core.PhaseTriage:       triage.New(triage.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, PhaseIO: cfg.PhaseIO, CompactPrompts: cfg.CompactPrompts}),
+		core.PhaseTDD:          tdd.New(tdd.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, CompactPrompts: cfg.CompactPrompts}),
+		core.PhaseBuildPlanner: buildplanner.New(buildplanner.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf}).BaseRunner(),
+		core.PhaseBuild:        swarmrunner.New(build.New(build.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, PhaseIO: cfg.PhaseIO, CompactPrompts: cfg.CompactPrompts}), walked, swarm.ModeWriter, swCfg),
+		core.PhaseAudit:        audit.NewDefaultWithStageCompactSpec(walked, prm, cfg.PhaseIO, cfg.CompactPrompts, documentSpecPtr(cfg), audit.WithContractVerifier(verifierOf), audit.WithSignals(func() *signalcenter.Center { return signals })),
 		// ManifestGate is threaded from policy.json `gates.manifest_gate` (default
 		// "shadow") so the ship-bind manifest gate is operator-activatable — it was
 		// unreachable short of a code edit before cycle-1064.
@@ -542,7 +552,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 		// Ship-error recovery phase (Component #8): the advisor's recovery chain
 		// routes an unknown/novel ShipError here to diagnose + decide RESHIP /
 		// RERUN_PHASE / BLOCK. Optional — never on the mandatory spine.
-		core.PhaseDebugger: debugger.New(debugger.Config{Bridge: walked, Prompts: prm, CompactPrompts: cfg.CompactPrompts}),
+		core.PhaseDebugger: debugger.New(debugger.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, CompactPrompts: cfg.CompactPrompts}),
 	}
 
 	// User-defined phases ("Lego" overlays): merge .evolve/phases/<name>/phase.json
@@ -592,7 +602,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 			continue // ApplyUserRouting already warned + skipped it; no dead runner
 		}
 		if _, exists := runners[core.Phase(s.Name)]; !exists {
-			runners[core.Phase(s.Name)] = specrunner.New(s, specrunner.Config{Bridge: walked, Prompts: prm})
+			runners[core.Phase(s.Name)] = specrunner.New(s, specrunner.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf})
 		}
 	}
 	// Spec-runner fallback for BUILTIN registry phases the advisor can SELECT
@@ -723,9 +733,11 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 		// report-size gate (cycle-565 S1) rides the same reviewer as its own
 		// dial: default shadow (observe-only) so it is byte-identical until an
 		// operator promotes gates.report_size_gate to enforce.
-		reviewers = append(reviewers, deliverable.NewReviewerWithCatalogStageReportSize(
+		rev := deliverable.NewReviewerWithCatalogStageReportSize(
 			cfg.ContractGate, catalog, cfg.PhaseIO,
-			parseGateStage(gatesCfg.ReportSizeGate), pol.ReportBudgetConfig().HandoffTokens, deliverable.WithSignals(signals)))
+			parseGateStage(gatesCfg.ReportSizeGate), pol.ReportBudgetConfig().HandoffTokens, deliverable.WithSignals(signals))
+		contractVerifier = rev
+		reviewers = append(reviewers, rev)
 	}
 	if cfg.TriageCapGate != config.StageOff {
 		// R9.2 triage capacity clamp (internal/triagecap): committed coverage

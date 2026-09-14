@@ -68,6 +68,12 @@ func NewReviewer(stage config.Stage, opts ...Option) core.DeliverableReviewer {
 // first and falling back to spec-derived contracts (FromSpec) for the catalog's
 // user/minted phases. PhaseIO defaults to StageOff (byte-identical); production
 // wires the real dial via NewReviewerWithCatalogStage.
+// NewReviewerStage is NewReviewer with the PhaseIO stage threaded — the
+// concrete *Reviewer, so a runner can take it as its ContractVerifier.
+func NewReviewerStage(stage, phaseIO config.Stage, opts ...Option) *Reviewer {
+	return newReviewer(stage, phasecontract.BuiltinResolver{}, phaseIO, opts...)
+}
+
 func NewReviewerWithCatalog(stage config.Stage, cat phasespec.Catalog, opts ...Option) core.DeliverableReviewer {
 	return newReviewer(stage, phasecontract.NewCatalogResolver(cat.Get), config.StageOff, opts...)
 }
@@ -88,7 +94,7 @@ func NewReviewerWithCatalogStage(stage config.Stage, cat phasespec.Catalog, phas
 // only at StageEnforce; budgetTokens is the budget it enforces. Zero-value
 // (StageOff/0) ⇒ byte-identical to NewReviewerWithCatalogStage, so wiring it in
 // changes nothing until the report-size gate is deliberately promoted.
-func NewReviewerWithCatalogStageReportSize(stage config.Stage, cat phasespec.Catalog, phaseIO, reportSizeGate config.Stage, budgetTokens int, opts ...Option) core.DeliverableReviewer {
+func NewReviewerWithCatalogStageReportSize(stage config.Stage, cat phasespec.Catalog, phaseIO, reportSizeGate config.Stage, budgetTokens int, opts ...Option) *Reviewer {
 	return newReviewer(stage, phasecontract.NewCatalogResolver(cat.Get), phaseIO, append([]Option{withReportSize(reportSizeGate, budgetTokens)}, opts...)...)
 }
 
@@ -134,6 +140,56 @@ func WithSignals(c *signalcenter.Center) Option {
 // wiring proof; core asks for it as a capability beside
 // VerifiesDeclaredDeliverables (it cannot name this type).
 func (r *Reviewer) SignalsWired() bool { return r.signals.Wired() }
+
+// persistSalvage is the ONE effect of a verdict salvage: the repaired
+// artifact persisted over the judged bytes (compare-and-swap, fail-closed),
+// the salvage recorded and reported. Both consumers of the salvage — Review
+// (the gate) and VerifyForClassification (the engine) — reach it here, so a
+// salvage is persisted and reported exactly once whichever runs first.
+func (r *Reviewer) persistSalvage(check gatesignal.Check, phase string, roots phasecontract.Roots, res, salvaged Result) bool {
+	if err := persistSalvagedArtifact(res.ArtifactPath, res.Content, salvaged.Content); err != nil {
+		r.logf("[contract-gate] %s: salvage recovered the verdict but the repaired artifact could not be persisted; refusing the salvage: %v", phase, err)
+		return false
+	}
+	pattern := ClassifyBadVerdict(res.Content).Pattern
+	recordSalvageApplied(roots, phase, pattern, r.logf)
+	r.signals.Salvaged(check, filepath.Base(res.ArtifactPath), string(pattern))
+	if line := SalvageSummaryLine(roots.EvolveDir); line != "" {
+		r.logf("[contract-gate] %s: %s", phase, line)
+	}
+	return true
+}
+
+// VerifyForClassification is the gate's own verification offered to the
+// runner's verdict engine, so there is ONE verifier: the bytes the engine
+// classifies are the bytes this Reviewer will approve. At enforce a sole
+// recoverable bad_verdict is salvaged, persisted and reported HERE (before
+// classification), and the repaired, OK result is returned; Review then
+// meets a clean file. Below enforce nothing is persisted (the gate would only
+// would-block), so the verified bytes come back as they are. Cycle 1685
+// (2026-09-15): with two verifiers the engine classified the unrepaired
+// bytes as "no parseable verdict → FAIL" while the gate approved the
+// repaired file, and a red_count=0 cycle sealed FAIL with no failure class.
+func (r *Reviewer) VerifyForClassification(check gatesignal.Check, phase string, roots phasecontract.Roots) (Result, error) {
+	res, err := VerifyWithReportSize(phase, roots, r.resolver, r.phaseIO, r.reportSizeGate, r.reportSizeBudgetTokens)
+	if err != nil || res.OK || r.stage != config.StageEnforce {
+		return res, err
+	}
+	// The baseline (salvage_instrument.go: one append-only record per
+	// bad_verdict block) is recorded here only for the salvage this path
+	// persists — the gate never sees that block. A non-salvageable block is
+	// left to Review, which the settle loop does not repeat; recording it per
+	// probe would sample the baseline by the ladder's retry count.
+	salvaged, applied := salvageVerdictWith(res, r.resolver, roots, r.phaseIO)
+	if !applied {
+		return res, nil
+	}
+	if !r.persistSalvage(check, phase, roots, res, salvaged) {
+		return res, nil // a refused CAS re-probes; nothing recorded until a salvage lands
+	}
+	recordBadVerdictBaseline(roots, phase, res, r.logf)
+	return salvaged, nil
+}
 
 // Review adjudicates one finished phase's deliverable.
 func (r *Reviewer) Review(_ context.Context, in core.ReviewInput) core.ReviewResult {
@@ -208,32 +264,7 @@ func (r *Reviewer) Review(_ context.Context, in core.ReviewInput) core.ReviewRes
 		// is the one place the gate must not fail open: failing open here
 		// reinstates the defect (approval over bytes nobody downstream will
 		// ever see) instead of merely declining a recovery.
-		if err := persistSalvagedArtifact(res.ArtifactPath, res.Content, salvaged.Content); err != nil {
-			r.logf("[contract-gate] %s: salvage recovered the verdict but the repaired artifact could not be persisted; refusing the salvage: %v", in.Phase, err)
-		} else {
-			pattern := ClassifyBadVerdict(res.Content).Pattern
-			recordSalvageApplied(roots, in.Phase, pattern, r.logf)
-			r.signals.Salvaged(check, filepath.Base(res.ArtifactPath), string(pattern))
-			// Surfaced, not just logged to a sidecar nobody reads: README §8 promises
-			// operators that every coercion is "logged + surfaced", and a salvage
-			// silently approving a phase is exactly the false-confidence failure the
-			// research memo (§3.3) is written against. Rendered AFTER the sidecar
-			// append so the running total includes this salvage, and read back FROM
-			// that sidecar so the count is single-sourced, never a second counter
-			// (cycle-1392 audit LOW dd17d798e155571ecd91be63e14050ab6). Empty at zero
-			// records or an unreadable/absent sidecar — no zero-noise, and the gate's
-			// decision never depends on it.
-			if line := SalvageSummaryLine(roots.EvolveDir); line != "" {
-				r.logf("[contract-gate] %s: %s", in.Phase, line)
-			}
-			// Breaker-NEUTRAL, not breaker-clearing (cycle-1441 audit M2b; the
-			// repo rule for every salvage rung). Resetting here pinned the
-			// consecutive-block counter at zero for any phase that kept
-			// emitting recoverable-malformed reports, so neither the
-			// second-block escalation ladder nor the third-block breaker could
-			// ever fire on a persistently malformed producer. Leave the count
-			// exactly as the gate found it: a salvage is neither a block nor a
-			// clean pass.
+		if r.persistSalvage(check, in.Phase, roots, res, salvaged) {
 			return core.ReviewResult{Approve: true}
 		}
 	}
@@ -399,4 +430,15 @@ func persistSalvagedArtifact(path, judged, content string) error {
 		return fmt.Errorf("artifact changed under the gate between verify and write-back (judged %d bytes, on disk %d) — refusing to overwrite a newer report with a repair of the older one", len(judged), len(current))
 	}
 	return atomicwrite.Bytes(path, []byte(content))
+}
+
+// PlainVerifier is the contract verifier the composition root hands the
+// verdict engine when the contract gate is OFF: the catalog-aware verify with
+// no salvage — the same probe the engine would default to, made explicit so
+// "wired" means the root chose, not that something was set (Null Object).
+type PlainVerifier struct{ PhaseIO config.Stage }
+
+// VerifyForClassification verifies without salvaging.
+func (v PlainVerifier) VerifyForClassification(_ gatesignal.Check, phase string, roots phasecontract.Roots) (Result, error) {
+	return VerifyCatalogAwareStage(phase, roots, v.PhaseIO)
 }

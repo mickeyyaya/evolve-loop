@@ -31,18 +31,22 @@ import (
 type Config struct {
 	Bridge  core.Bridge
 	Prompts *prompts.Loader
+	// ContractVerifier is the deliverables gate's verifier accessor for the
+	// verdict engine (one verifier for gate and engine, research F22).
+	ContractVerifier func() runner.ContractVerifier
 }
 
 // Phase implements runner.Hooks and runner.Skipper for the build-planner
 // phase. Construct via New; obtain a core.PhaseRunner via BaseRunner.
 type Phase struct {
-	bridge  core.Bridge
-	prompts *prompts.Loader
+	bridge           core.Bridge
+	prompts          *prompts.Loader
+	contractVerifier func() runner.ContractVerifier
 }
 
 // New returns a Phase ready to be wired into the orchestrator.
 func New(cfg Config) *Phase {
-	return &Phase{bridge: cfg.Bridge, prompts: cfg.Prompts}
+	return &Phase{bridge: cfg.Bridge, prompts: cfg.Prompts, contractVerifier: cfg.ContractVerifier}
 }
 
 // BaseRunner wraps the phase in a runner.BaseRunner so it satisfies
@@ -53,7 +57,7 @@ func (p *Phase) BaseRunner() *runner.BaseRunner {
 	// its artifact never appears (ExitArtifactTimeout — e.g. cycle-120 quota
 	// exhaustion), it degrades to WARN and the cycle advances to build instead
 	// of aborting. See Workstream D.
-	return runner.New(runner.Options{Hooks: p, Bridge: p.bridge, Prompts: p.prompts, Optional: true})
+	return runner.New(runner.Options{Hooks: p, Bridge: p.bridge, Prompts: p.prompts, Optional: true, ContractVerifier: p.contractVerifier})
 }
 
 // ShouldSkip implements runner.Skipper. Delegates to the central PhasePolicy

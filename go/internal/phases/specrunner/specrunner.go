@@ -234,7 +234,11 @@ func stripHeadingMarker(s string) string {
 type Config struct {
 	Bridge  core.Bridge
 	Prompts *prompts.Loader
-	NowFn   func() time.Time
+	// ContractVerifier is the deliverables gate's verifier accessor for the
+	// verdict engine (runner.Options.ContractVerifier): one verifier for gate
+	// and engine (research F22). nil = the catalog-aware default.
+	ContractVerifier func() runner.ContractVerifier
+	NowFn            func() time.Time
 	// PromptBody, when non-empty, is forwarded as the inline prompt body;
 	// empty (the default) loads agents/<AgentName>.md from disk — see the
 	// hooks.promptBody field for the full contract.
@@ -248,10 +252,11 @@ type Phase struct{ *runner.BaseRunner }
 func New(spec phasespec.PhaseSpec, c Config) *Phase {
 	return &Phase{
 		BaseRunner: runner.New(runner.Options{
-			Hooks:   hooks{spec: spec, promptBody: c.PromptBody},
-			Bridge:  c.Bridge,
-			Prompts: c.Prompts,
-			NowFn:   c.NowFn,
+			Hooks:            hooks{spec: spec, promptBody: c.PromptBody},
+			Bridge:           c.Bridge,
+			ContractVerifier: c.ContractVerifier,
+			Prompts:          c.Prompts,
+			NowFn:            c.NowFn,
 		}),
 	}
 }

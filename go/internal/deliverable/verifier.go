@@ -12,7 +12,7 @@ package deliverable
 import (
 	"context"
 	"fmt"
-	"path/filepath"
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
@@ -55,7 +55,10 @@ func rootsFor(in core.ReviewInput) phasecontract.Roots {
 	return phasecontract.Roots{
 		Workspace: in.Workspace,
 		Worktree:  in.Worktree,
-		EvolveDir: filepath.Join(in.ProjectRoot, ".evolve"),
+		// One spelling with the engine's rootsFor (verdict/settle.go): the ONE
+		// deliberate difference between the two projections is the engine's
+		// DispatchedArtifact, which only a dispatch knows.
+		EvolveDir: paths.EvolveDirOf(in.ProjectRoot),
 		// The gate's request context, so the conditional sections are judged here
 		// exactly as `evolve phase verify` judges them from cycle-state.json.
 		ExplanationDocumentationVersion: in.ExplanationDocumentationVersion,

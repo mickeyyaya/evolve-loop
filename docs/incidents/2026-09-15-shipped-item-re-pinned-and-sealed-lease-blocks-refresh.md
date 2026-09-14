@@ -38,3 +38,7 @@ Red-first tests per fix (`dispatchstate_test.go`, `cycledirs_test.go`, `launcher
 ## Addendum — the boundary halt (research F20)
 
 Stopping the loop at the wave-4 boundary took SIGINT ×2, SIGTERM and finally SIGKILL: the pre-wave usage probe and CLI-health canary ran on `context.Background()`, so the loop's interrupt never reached them, and a wave was still dispatched (and cancelled at spawn) after the interrupt. Fixed at the class: both probes take the loop's context, the prober's wait is bounded by it, and the coordinator re-checks the interrupt after the probes.
+
+## Addendum — lane 1685 (research F22)
+
+A red_count=0 audit with every criterion evidenced sealed FAIL: the auditor's verdict was fenced JSON without the sentinel wrapper; the gate salvaged and approved the repaired report while the runner had classified the unrepaired bytes, and the audit-fail envelope declined a repair for want of a class (the F19 signal named it in one line). Fixed at the class: one verifier — the gate's own Reviewer verifies for the engine (`VerifyForClassification`), salvaging, persisting and reporting before classification; every BaseRunner is handed an accessor to it at the composition root.

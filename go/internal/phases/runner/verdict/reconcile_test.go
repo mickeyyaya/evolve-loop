@@ -18,6 +18,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
@@ -250,8 +251,8 @@ func TestRescueViaACSFloor_RescuesOnlyAudit_PassPass_TokenEchoed_LateReadOnce(t 
 	stray := probe{codes: []string{deliverable.CodeStrayInWorktree}}
 	rescued := func(t *testing.T, h *harness, phase string) (reconciliation, bool) {
 		t.Helper()
-		s := h.e.settle(context.Background(), phase, rootsFor(h.dispatch(phase, timeoutErr())))
-		return rescueViaACSFloor(h.dispatch(phase, timeoutErr()), staleGate(h.dispatch(phase, timeoutErr()), s))
+		s := h.e.settle(context.Background(), Identity{}, phase, rootsFor(h.dispatch(phase, timeoutErr())))
+		return rescueViaACSFloor(h.dispatch(phase, timeoutErr()), staleGate(h.dispatch(phase, timeoutErr()), staleOf(h.dispatch(phase, timeoutErr())), s))
 	}
 	h := newHarness(t, stray)
 	h.writeACSFloor(t, "PASS")
@@ -395,4 +396,28 @@ func readGolden(t *testing.T, name string) string {
 		t.Fatalf("golden %s: %v", name, err)
 	}
 	return string(b)
+}
+
+// F22: the verifier may now WRITE (the contract gate salvages a sole
+// recoverable bad_verdict and persists the repaired artifact). The
+// pre-dispatch identity is read before the probe, so a leftover the probe
+// repairs is still refused as a prior attempt's report — cycle-1550's guard
+// must not be defeated by our own rewrite.
+func TestReconcileTeardown_LeftoverRepairedByTheProbeIsStillRefused(t *testing.T) {
+	h := newHarness(t, probe{okFrom: 1})
+	d := h.dispatch("audit", timeoutErr())
+	fenced := "# audit\n\n## Verdict\n**PASS**\n\n```json\n{\"verdict\": \"PASS\"}\n```\n"
+	d.PreDispatch, d.HadPreDispatch = seedStale(t, d.ArtifactPath, fenced), true
+	repairing := func(_ Identity, phase string, roots phasecontract.Roots) (deliverable.Result, error) {
+		repaired := "# audit\n\n## Verdict\n**PASS**\n\n<!-- evolve-verdict: {\"verdict\": \"PASS\"} -->\n"
+		if err := os.WriteFile(d.ArtifactPath, []byte(repaired), 0o644); err != nil { // the gate's salvage persists
+			t.Fatal(err)
+		}
+		return deliverable.Result{OK: true, Phase: phase, ArtifactPath: d.ArtifactPath, Content: repaired}, nil
+	}
+	e := New(repairing, WithSleep(func(time.Duration) {}))
+	r, early, err := e.reconcile(context.Background(), d)
+	if early == nil || err == nil || r.reconciled {
+		t.Fatalf("a pre-dispatch leftover the probe itself repaired is still a stale leftover — refused, not reconciled: %+v %+v %v", r, early, err)
+	}
 }

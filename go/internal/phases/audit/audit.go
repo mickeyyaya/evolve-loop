@@ -357,7 +357,11 @@ func phantomBindingClause(phantomBindings []string) string {
 type Config struct {
 	Bridge  core.Bridge
 	Prompts *prompts.Loader
-	NowFn   func() time.Time
+	// ContractVerifier is the deliverables gate's verifier accessor for the
+	// verdict engine (runner.Options.ContractVerifier): one verifier for gate
+	// and engine (research F22). nil = the catalog-aware default.
+	ContractVerifier func() runner.ContractVerifier
+	NowFn            func() time.Time
 	// GenerateVerdict, when set, produces <workspace>/acs-verdict.json from
 	// the cycle's ACS predicates on every classification. Candidates never
 	// suppress execution. A nil generator supports isolated phase tests.
@@ -429,6 +433,12 @@ type Option func(*Config)
 // WithSignals installs the Signal Center accessor the defect ledger and the
 // CI-parity gates report through (the loop root's Center; deliverable.WithSignals
 // precedent).
+// WithContractVerifier hands the audit runner the deliverables gate's
+// verifier accessor (one verifier for gate and engine, research F22).
+func WithContractVerifier(fn func() runner.ContractVerifier) Option {
+	return func(c *Config) { c.ContractVerifier = fn }
+}
+
 func WithSignals(c func() *signalcenter.Center) Option {
 	return func(cfg *Config) { cfg.Signals = c }
 }
@@ -448,11 +458,12 @@ func New(c Config) *Phase {
 	return &Phase{
 		signals: c.Signals,
 		BaseRunner: runner.New(runner.Options{
-			Hooks:          newHooks(c),
-			Bridge:         c.Bridge,
-			Prompts:        c.Prompts,
-			NowFn:          c.NowFn,
-			CompactPrompts: c.CompactPrompts,
+			Hooks:            newHooks(c),
+			Bridge:           c.Bridge,
+			ContractVerifier: c.ContractVerifier,
+			Prompts:          c.Prompts,
+			NowFn:            c.NowFn,
+			CompactPrompts:   c.CompactPrompts,
 		}),
 	}
 }
