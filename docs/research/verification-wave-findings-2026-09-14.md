@@ -95,7 +95,7 @@ Where the design was **not yet enough**: the triage gate's refusal was structure
 8. **Operator decision:** codex's `deep`/`top` tiers are pinned to `gpt-5.6-sol`, which this account rejects (F7); the `balanced`/`fast` pins are accepted. Until re-pinned, every codex deep dispatch fails over to Claude — in seconds since #616, not after the artifact window.
 9. acs baseline drift on main, not from any wave change: `acs/cycle1253` (`TestC1253_003_NewExportCovered` — the `ImporterClosure` coverage line after #612) and `acs/cycle1632` (`TestC1632_008` — a tokenopt-handoff inbox item no longer present) fail on a clean `origin/main`; `acs/cycle764` is a two-floors-at-once contention flake. The console floor baseline now carries the first two; both need a re-anchor.
 10. `TestChannel_EndToEnd` (bidirectional channel) is timing-based and redded PR #614 once on the Ubuntu Go 1.23 race runner; queued as inbox item `2026-09-14T10-20-00Z-channel-e2e-timing-flake`.
-11. A FAIL retrospective dispatched on a walled CLI costs a full artifact window (both wave-2 retros: 30 min each on codex's dead deep model). With #616 that is seconds; the retro's CLI choice should still avoid a family whose tier just walled the cycle.
+11. ~~A FAIL retrospective dispatched on a walled CLI costs a full artifact window (both wave-2 retros: 30 min each on codex's dead deep model).~~ Root-caused as F10: the retro had no fallback walk at all. Fixed — ADR-0104 (#619).
 
 ## 6. Wave 2 — 2026-09-14 16:11–21:05, plane 83a019aa (#606, #609, #611, #612), width 3, 2 lanes dispatched
 
