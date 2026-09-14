@@ -18,7 +18,7 @@ func dispatchTmuxPrompt(
 	prep replPreparation,
 	human bool,
 	phaseName string,
-) (artifactBaseline, int, error) {
+) (artifactBaseline, pasteOutcome, int, error) {
 	capture := deps.CaptureBaseline
 	if capture == nil {
 		capture = captureArtifactBaseline
@@ -45,12 +45,13 @@ func dispatchTmuxPrompt(
 	if human {
 		humanBootPause(deps)
 	}
-	if err := pastePrompt(ctx, deps, lp.session, prep.resolvedPromptFile, human); err != nil {
+	paste, err := pastePrompt(ctx, deps, prep.prefix, lp.session, prep.resolvedPromptFile, human)
+	if err != nil {
 		fmt.Fprintf(deps.Stderr, "[bridge] %sphase=%s waited=0s transient=true reason=%q\n",
 			artifactTimeoutMarker, phaseName, err.Error())
-		return artifactBase, ExitArtifactTimeout, err
+		return artifactBase, paste, ExitArtifactTimeout, err
 	}
 	deps.Sleep(submitVerifySettle)
 	fmt.Fprintf(deps.Stderr, "%s prompt delivered\n", prep.prefix)
-	return artifactBase, ExitOK, nil
+	return artifactBase, paste, ExitOK, nil
 }

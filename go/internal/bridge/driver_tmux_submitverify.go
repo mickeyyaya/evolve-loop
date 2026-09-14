@@ -166,7 +166,9 @@ func verifySubmitted(ctx context.Context, deps Deps, lp tmuxLaunch, pfx, site, p
 			return submitVerifyOutcome{Resends: resends, Result: interaction.ResultNotVerified}
 		}
 		resends++
-		deps.Sleep(submitVerifySettle)
+		// Back off — a TUI that needed a moment gets it before the driver calls
+		// it wedged (three re-sends span seconds, not 1.5 s).
+		deps.Sleep(submitVerifyBackoff[resends-1])
 		next, err := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
 		if err != nil {
 			// Never silent: without this line an operator sees a re-send start
@@ -229,15 +231,29 @@ func firstNonEmptyLine(s string) string {
 // Recorded on the clean path too. Without the denominator a recovered stall is
 // an anecdote, not a rate, and the cycles 1505/1510/1517 class cannot be tracked.
 // Nil-recorder-safe by Recorder's own contract.
-func recordSubmitVerify(rec *interaction.Recorder, phase string, cycle int, site string, o submitVerifyOutcome) {
+func recordSubmitVerify(rec *interaction.Recorder, phase string, cycle int, site string, o submitVerifyOutcome, paste pasteOutcome) {
+	payload := fmt.Sprintf("site=%s resends=%d", site, o.Resends)
+	if paste.Stability != "" {
+		// The delivery's own evidence rides the success path too (the
+		// stderr lines survive only the failure path): what the settle cost and
+		// how the stability wait ended.
+		payload += fmt.Sprintf(" paste_settle=%s stability=%s", paste.Settle, paste.Stability)
+	}
 	rec.Record(interaction.Outcome{
 		Event: interaction.Event{
 			Kind:    interaction.KindSubmitVerify,
 			Phase:   phase,
 			Cycle:   cycle,
 			Trigger: "driver_submission",
-			Payload: fmt.Sprintf("site=%s resends=%d", site, o.Resends),
+			Payload: payload,
 		},
 		Result: o.Result,
 	})
 }
+
+// submitVerifyBackoff is the settle after re-send n (one entry per allowed
+// re-send, so the cap and the table are the same fact): 500 ms, 1.5 s, 2.5 s.
+// Arithmetic on purpose — no entry equals artifactWaitInterval, which the wedge
+// short-circuit pin counts by value (TestPasteTiming_NeverEqualsTheArtifactWaitInterval),
+// and the sum (4.5 s) is the budget a slow TUI gets.
+var submitVerifyBackoff = [submitVerifyMaxResends]time.Duration{submitVerifySettle, 3 * submitVerifySettle, 5 * submitVerifySettle}

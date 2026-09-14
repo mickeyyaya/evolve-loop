@@ -183,7 +183,7 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 		return ExitOK, nil
 	}
 
-	artifactBase, code, err := dispatchTmuxPrompt(ctx, cfg, deps, lp, prep, human, phaseName)
+	artifactBase, paste, code, err := dispatchTmuxPrompt(ctx, cfg, deps, lp, prep, human, phaseName)
 	if code != ExitOK || err != nil {
 		return code, err
 	}
@@ -194,7 +194,7 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	waitResult, code := (replWaiter{
 		ctx: ctx, cfg: cfg, deps: deps, launch: lp,
 		prefix: pfx, phaseName: phaseName, resolvedPrompt: resolvedPrompt,
-		artifactBase: artifactBase, responder: ar, recorder: irec, cursor: cursor, channel: channel,
+		artifactBase: artifactBase, paste: paste, responder: ar, recorder: irec, cursor: cursor, channel: channel,
 	}).wait()
 	if code != ExitOK {
 		return code, nil
