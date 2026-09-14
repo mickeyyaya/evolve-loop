@@ -67,7 +67,7 @@ function renderLoop() {
   const kv = (k, v) => dl.append(h('dt', null, k), h('dd', null, v));
   kv('status', pill(state, label));
   const active = snap.cycles.filter(c => c.state === 'running');
-  if (active.length > 1) kv('active lanes', active.map(c => '#' + c.id + ' · ' + c.current_phase).join(', '));
+  if (active.length > 1) kv('active lanes', active.map(c => '#' + c.id + ' · ' + c.current_phase + (c.plan ? ` (${c.plan.passed_required}/${c.plan.required})` : '')).join(', '));
   if (l.cycle_id) {
     kv('cycle', h('button', { class: 'link', onclick: () => go('#cycle/' + l.cycle_id) }, '#' + l.cycle_id));
     kv('phase', h('span', null, l.phase || '—', ' ', h('span', { class: 'muted' }, l.phase_started_at ? '· since ' + ago(l.phase_started_at) : '')));
@@ -95,12 +95,68 @@ function renderTrend() {
   }
 }
 
+function stepTitle(st) {
+  const bits = [st.phase, st.status];
+  if (st.rounds > 1) bits.push('r' + st.rounds);
+  if (st.duration_ms) bits.push(fmtDur(st.duration_ms));
+  if (st.gate_verified) bits.push('gate ✓');
+  if (st.optional) bits.push('(optional)');
+  if (st.conditional) bits.push('(conditional)');
+  return bits.join(' ');
+}
+
+// stepper renders the cycle's plan: filled = ran (verdict colour), pulsing =
+// ongoing, hollow = pending, faded = unreached on a sealed cycle; a ring marks
+// a contract-gate verification. Cycles without a plan (dossier-only) fall back
+// to the run-order strip.
 function stepper(c) {
   const s = h('div', { class: 'stepper' });
+  if (c.plan) {
+    for (const st of c.plan.steps || []) s.append(h('span', { class: 'step ' + (st.status === 'ongoing' ? 'cur' : st.status) + (st.gate_verified ? ' gate' : '') + (st.optional ? ' opt' : ''), title: stepTitle(st) }));
+    return s;
+  }
   for (const p of c.phases || []) s.append(h('span', { class: 'step ' + verdictClass(p.verdict), title: `${p.phase}${p.round > 1 ? ' r' + p.round : ''} ${p.verdict} ${fmtDur(p.duration_ms)}` }));
   if (c.state === 'running') s.append(h('span', { class: 'step cur', title: c.current_phase }));
   return s;
 }
+
+// planCaptionText is the one-line count: "passed 3/5 required · +1 optional · build 23m · left: audit, ship".
+// live adds the ongoing phase's elapsed time (the table row); the panel header omits it.
+function planCaptionText(p, live) {
+  const bits = [`passed ${p.passed_required}/${p.required} required`];
+  if (p.passed > p.passed_required) bits.push(`+${p.passed - p.passed_required} optional`);
+  if (p.ongoing) bits.push(p.ongoing + (live && p.ongoing_since && !p.ongoing_since.startsWith('0001') ? ' ' + fmtDur(Date.now() - new Date(p.ongoing_since).getTime()) : ''));
+  if ((p.remaining || []).length) bits.push('left: ' + p.remaining.join(', '));
+  return bits.join(' · ');
+}
+
+function planCaption(p) { return p ? h('div', { class: 'plan-cap small muted' }, planCaptionText(p, true)) : ''; }
+
+// planPanel is the detail view's structured sequence: one row per step with
+// status, duration, rounds, the gate mark, and the advisor's proposal.
+function planPanel(p) {
+  const box = h('div', { class: 'panel plan' }, h('h2', null, 'phase plan', h('small', null, `mandatory: ${(p.mandatory || []).join(' → ')} · ${planCaptionText(p, false)}`)));
+  const tbl = h('table', null, h('tr', null, h('th', null, 'phase'), h('th', null, 'status'), h('th', null, 'gate'), h('th', { class: 'right' }, 'took'), h('th', { class: 'right' }, 'rounds')));
+  for (const st of p.steps || []) {
+    tbl.append(h('tr', null,
+      h('td', null, st.phase, st.optional ? h('span', { class: 'muted small' }, ' optional') : '', st.conditional ? h('span', { class: 'muted small' }, ' conditional') : ''),
+      h('td', null, pill(st.status === 'ongoing' ? 'running' : ['pending', 'unreached', 'skipped'].includes(st.status) ? 'neutral' : st.status, st.status)),
+      h('td', null, st.gate_verified ? h('span', { class: 'gate-ok' }, '✓ verified') : ''),
+      h('td', { class: 'right mono' }, st.duration_ms ? fmtDur(st.duration_ms) : ''),
+      h('td', { class: 'right mono' }, st.rounds > 1 ? String(st.rounds) : '')));
+  }
+  box.append(tbl);
+  const notes = [];
+  if ((p.advisor_proposed || []).length) notes.push(`proposed to run, ${p.ongoing ? 'not run yet' : 'never ran'}: ${p.advisor_proposed.join(', ')}`);
+  if ((p.advisor_skips || []).length) notes.push(`proposed to skip: ${p.advisor_skips.join(', ')}`);
+  if ((p.advisor_overridden || []).length) {
+    const mand = new Set(p.mandatory || []);
+    notes.push(`proposed to skip but ran: ${p.advisor_overridden.map((ph) => ph + (mand.has(ph) ? ' (mandatory floor)' : '')).join(', ')}`);
+  }
+  if (notes.length) box.append(h('p', { class: 'small muted' }, 'advisor · ' + notes.join(' · ')));
+  return box;
+}
+
 
 function renderCycles() {
   const box = clear($('cycles'));
@@ -110,7 +166,7 @@ function renderCycles() {
     const f = c.failure;
     const wrong = f ? [f.category || f.pre_class || '', f.fingerprint ? h('span', { class: 'mono muted' }, ' ' + f.fingerprint.split('|').pop()) : ''] : (c.commit_sha ? [h('span', { class: 'mono muted' }, 'shipped ' + short(c.commit_sha))] : '');
     tbl.append(h('tr', { class: 'click', onclick: () => go('#cycle/' + c.id) },
-      h('td', { class: 'mono' }, '#' + c.id), h('td', null, pill(c.state, c.state_name)), h('td', null, stepper(c)),
+      h('td', { class: 'mono' }, '#' + c.id), h('td', null, pill(c.state, c.state_name)), h('td', null, stepper(c), planCaption(c.plan)),
       h('td', null, c.audit_rounds ? String(c.audit_rounds) : ''), h('td', { class: 'small' }, (c.tasks || []).join(', ')),
       h('td', { class: 'small' }, wrong), h('td', { class: 'small muted' }, c.ended_at && !c.ended_at.startsWith('0001') ? ago(c.ended_at) : '')));
   }
@@ -196,6 +252,7 @@ async function openDetail(id, silent) {
   kv('window', `${fmtTime(c.started_at)} → ${fmtTime(c.ended_at)}`);
   kv('sources', [c.has_workspace ? 'run workspace' : null, c.has_dossier ? 'committed dossier' : null].filter(Boolean).join(' + ') || 'none');
   box.append(dl);
+  if (c.plan) box.append(planPanel(c.plan));
   if (c.failure) box.append(failurePanel(c.failure, snap.fingerprints || [], c.state === 'halted'));
   box.append(timeline(c));
   box.append(artifactBrowser(c.id, d.artifacts || [], d.primary_report || ''));

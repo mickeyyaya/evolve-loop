@@ -181,3 +181,21 @@ func TestClaudeSessionWallUsesGuardedExhaustion(t *testing.T) {
 		})
 	}
 }
+
+// TestClaudeSessionWall_NBSPIndentIsRecognised pins the wording drift lanes
+// 1676 and 1677 hit (2026-09-14): tmux renders Claude Code's "⎿" indentation
+// with U+00A0, and the session-wall branch of exhausted_regex allowed only
+// [ \t] between the glyph and the sentence — so the live wall never
+// classified, the guarded fast-fail never armed, and both audits ran the full
+// 40-minute artifact window with "POSSIBLE EXHAUSTION-REGEX DRIFT" in the
+// bridge stderr. Concatenation keeps agents reading this test from matching.
+func TestClaudeSessionWall_NBSPIndentIsRecognised(t *testing.T) {
+	for _, live := range []string{
+		"  ⎿ \u00a0You've hit your session li" + "mit · resets 7:50pm (Asia/Taipei)",
+		"\u00a0\u00a0⎿\u00a0\u00a0You’ve hit your session li" + "mit · resets 7:50pm (Asia/Taipei)",
+	} {
+		if !ClassifyExhausted("claude", live) {
+			t.Errorf("live wall with U+00A0 indentation not classified: %q", live)
+		}
+	}
+}

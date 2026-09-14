@@ -21,7 +21,7 @@ func TestDecision_TableProjectsTheContractRegistry(t *testing.T) {
 	}{
 		{decisionPlan, "router", "routing-plan.json", "plan", "artifact", "phase advisor", "Advisor.Plan", 0},
 		{decisionRePlan, "router-replan", "routing-replan.json", "replan", "artifact", "phase advisor", "Advisor.RePlan", 1},
-		{decisionProposal, "router-proposal", "routing-proposal.json", "proposal", "stdout", "routing proposer", "Advisor.Propose", 0},
+		{decisionProposal, "router-proposal", "routing-proposal.json", "proposal", "artifact", "routing proposer", "Advisor.Propose", 0},
 	}
 	for _, r := range rows {
 		if r.d.contractID() != r.contract || r.d.artifactFile() != r.artifact || r.d.captureKind() != r.kind ||

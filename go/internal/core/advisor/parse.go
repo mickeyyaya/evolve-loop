@@ -37,13 +37,13 @@ func (a *Advisor) warnUnparseable(in router.RouteInput, d decision, err error, r
 	})
 }
 
-// ParseProposal extracts the strict-JSON proposal from the LLM stdout. Under
-// the ADR-0027 stdout contract the "stdout" is the captured REPL scrollback,
-// which echoes the PROMPT — and the prompt carries a JSON example. A naive
-// first-'{'/last-'}' slice would span the example through the real answer, so
-// we take the LAST balanced object (the agent's reply is last). Tolerant of a
-// ```json fence / surrounding prose. Empty/unparseable → error (caller
-// degrades to static). PURE and Center-free.
+// ParseProposal extracts the strict-JSON proposal from the response the
+// bridge read back — since 2026-09-14 the routing-proposal.json artifact's
+// content (a bare object), before that the REPL scrollback, which echoed the
+// PROMPT and its JSON example. The LAST balanced object is taken either way
+// (an answer is last; a prompt echo is not), tolerant of a ```json fence /
+// surrounding prose. Empty/unparseable → error (caller degrades to static).
+// PURE and Center-free.
 func ParseProposal(stdout string) (*router.Proposal, error) {
 	start, end, ok := LastBalancedSpan(stdout, '{', '}')
 	if !ok {

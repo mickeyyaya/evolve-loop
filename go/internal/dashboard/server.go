@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
 )
 
@@ -41,6 +42,10 @@ type Options struct {
 	MaxCycles int
 	// KeepAlive is the SSE comment-ping period (default 15s).
 	KeepAlive time.Duration
+	// Env is the operator's environment as the loop's floor reads it
+	// (EVOLVE_MANDATORY_PHASES, EVOLVE_USE_PHASE_REGISTRY, …): injected by the
+	// command, never read from the process here. nil reflects no overrides.
+	Env map[string]string
 }
 
 func (o Options) withDefaults() Options {
@@ -90,11 +95,19 @@ type Server struct {
 func New(root string, opts Options) *Server {
 	opts = opts.withDefaults()
 	col := newCollector(root)
-	col.maxCycles = opts.MaxCycles
+	col.maxCycles, col.env = opts.MaxCycles, opts.Env
 	s := &Server{root: root, opts: opts, col: col, subs: map[chan uint64]struct{}{}, hosts: map[string]bool{}}
 	s.mux = http.NewServeMux()
 	s.routes()
 	return s
+}
+
+// Snapshot is the whole picture at now through this server's collector — the
+// `--snapshot` form, so the printed model reflects the same injected
+// environment the served one does.
+func (s *Server) Snapshot(now time.Time) *Snapshot {
+	snap, _ := s.col.collect(now)
+	return snap
 }
 
 func (s *Server) routes() {
@@ -304,9 +317,16 @@ func (s *Server) handleCycle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	cs = assignState(cs, snap.Loop)
+	mandatory, mw := readMandatory(s.root, s.col.env)
+	warns = append(warns, mw...)
+	var pw []string
+	cs.Plan, pw = readPlan(mandatory, core.RunWorkspacePath(s.root, id), cs, snap.Loop, s.col.streams)
+	warns = append(warns, pw...)
+	// The board's summary carries the per-lane status (and so the plan's
+	// ongoing phase and its start); a cap-excluded cycle keeps the fresh read.
 	for _, summary := range snap.Cycles {
 		if summary.ID == id {
-			cs.State, cs.StateName, cs.CurrentPhase = summary.State, summary.StateName, summary.CurrentPhase
+			cs.State, cs.StateName, cs.CurrentPhase, cs.Plan = summary.State, summary.StateName, summary.CurrentPhase, summary.Plan
 			break
 		}
 	}

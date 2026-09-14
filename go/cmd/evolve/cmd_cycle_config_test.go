@@ -73,6 +73,7 @@ func TestCenterlessConfigLoadSitesArePinned(t *testing.T) {
 		"internal/cli/phasecmd/phase_verify.go": true, // the agent's self-check
 		"cmd/evolve/cmd_solution.go":            true, // hand-rendered, no Center (F7)
 		"internal/kerneltest/fixture.go":        true, // test machinery
+		"internal/dashboard/plan.go":            true, // the read-only board's registry read: no Center, registry warnings ride the snapshot's Warnings
 	}
 	hits := nonTestSourcesMatching(t, regexp.MustCompile(`\bconfig\.Load\(`))
 	got := map[string]bool{}

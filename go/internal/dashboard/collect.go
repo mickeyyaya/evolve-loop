@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 )
@@ -27,16 +28,19 @@ var workspaceDir = regexp.MustCompile(`^cycle-(\d+)$`)
 type collector struct {
 	root      string
 	cache     *dossierCache
+	streams   *streamReader
 	maxCycles int
+	env       map[string]string // the operator's environment (Options.Env); nil = no overrides
 }
 
 func newCollector(root string) *collector {
-	return &collector{root: root, cache: newDossierCache(), maxCycles: defaultMaxCycles}
+	return &collector{root: root, cache: newDossierCache(), streams: newStreamReader(), maxCycles: defaultMaxCycles}
 }
 
-// Collect reads the project root once and returns the whole picture. It is the
-// one-shot form (`evolve dashboard --snapshot`); the server keeps a collector so
-// unchanged dossiers are not re-parsed on every tick.
+// Collect reads the project root once and returns the whole picture with no
+// operator environment injected (the mandatory set is the registry's alone);
+// the server keeps a collector so unchanged dossiers are not re-parsed on
+// every tick, and Server.Snapshot is the one-shot form that carries the env.
 func Collect(root string, now time.Time) *Snapshot {
 	snap, _ := newCollector(root).collect(now)
 	return snap
@@ -84,12 +88,17 @@ func (c *collector) collect(now time.Time) (*Snapshot, map[int]*dossier.Dossier)
 		snap.Warnings = append(snap.Warnings, warn)
 	}
 	snap.Cycles = make([]CycleSummary, 0, len(ids))
+	mandatory, w := readMandatory(c.root, c.env)
+	snap.Warnings = append(snap.Warnings, w...)
 	for _, id := range ids {
 		cs, w := readCycle(c.root, id, h.Dossiers[id])
 		snap.Warnings = append(snap.Warnings, w...)
 		status := runs[id]
 		status.BrakeEngaged = snap.Loop.BrakeEngaged
-		snap.Cycles = append(snap.Cycles, assignState(cs, status))
+		cs = assignState(cs, status)
+		cs.Plan, w = readPlan(mandatory, core.RunWorkspacePath(c.root, id), cs, status, c.streams)
+		snap.Warnings = append(snap.Warnings, w...)
+		snap.Cycles = append(snap.Cycles, cs)
 	}
 	snap.Trend.RoundHistogram = roundHistogram(snap.Cycles)
 	return snap, h.Dossiers

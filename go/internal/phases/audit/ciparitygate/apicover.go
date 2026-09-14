@@ -120,12 +120,17 @@ func (g *Gates) coverageProfile(ctx context.Context, req Request, dir string, to
 	covPath := filepath.Join(binDir, "ciparity-cover.txt")
 	scratch = append(scratch, covPath)
 	testArgs := ciparity.CoverageTestArgs(covPath, touched)
-	if _, err := sysexec.Output(ctx, g.run, dir, "go", testArgs...); err != nil {
+	// CI-parity env scrub, the tier step's contract (tier.go): this `go test`
+	// runs in the lane process, whose EVOLVE_CYCLE_STATE_FILE / EVOLVE_FLEET
+	// flip core's env-sensitive tests — the step failed on every wave-2 audit
+	// (cycles 1673, 1676) until it ran under the same allowlist as the tier.
+	run := scrubbedRun(g.run)
+	if _, err := sysexec.Output(ctx, run, dir, "go", testArgs...); err != nil {
 		return fail(stepCoverRun, fmt.Errorf("apicover gate: scoped coverage run: %w", err), "go "+strings.Join(testArgs, " "))
 	}
 	funcPath = covPath + ".func.txt"
 	scratch = append(scratch, funcPath)
-	funcOut, err := sysexec.Output(ctx, g.run, dir, "go", "tool", "cover", "-func="+covPath)
+	funcOut, err := sysexec.Output(ctx, run, dir, "go", "tool", "cover", "-func="+covPath)
 	if err != nil {
 		return fail(stepCoverFunc, fmt.Errorf("apicover gate: cover -func: %w", err), "go tool cover -func="+covPath)
 	}
@@ -133,7 +138,7 @@ func (g *Gates) coverageProfile(ctx context.Context, req Request, dir string, to
 		return fail(stepWriteFuncCover, fmt.Errorf("apicover gate: write func cover: %w", werr), "")
 	}
 	listArgs := append([]string{"list", "-e", "-f", "{{.Dir}}"}, touched...)
-	dirsOut, err := sysexec.Output(ctx, g.run, dir, "go", listArgs...)
+	dirsOut, err := sysexec.Output(ctx, run, dir, "go", listArgs...)
 	if err != nil {
 		return fail(stepPkgDirs, fmt.Errorf("apicover gate: go list: %w", err), "go "+strings.Join(listArgs, " "))
 	}

@@ -50,8 +50,10 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/changedpkgs"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/shiperr"
 )
 
@@ -98,6 +100,7 @@ func runRepoContractPackages(ctx context.Context, moduleDir string, out io.Write
 }
 
 func runRepoContractPackagesWithTags(ctx context.Context, moduleDir string, out io.Writer, packages, tags []string) packOutcome {
+	out = &lockedWriter{w: out} // the child's stderr and the event tee share it
 	args := []string{"test", "-json", "-count=1"}
 	if len(tags) > 0 {
 		args = append(args, "-tags", strings.Join(tags, ","))
@@ -105,6 +108,7 @@ func runRepoContractPackagesWithTags(ctx context.Context, moduleDir string, out 
 	args = append(args, packages...)
 	cmd := exec.CommandContext(ctx, "go", args...)
 	cmd.Dir = moduleDir
+	cmd.Env = ipcenv.Scrub(os.Environ()) // the lane's IPC state must not reach env-sensitive tests
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return packOutcome{err: fmt.Errorf("go test stdout pipe: %w", err)}
@@ -186,6 +190,25 @@ func classifyPackEvents(r io.Reader, tee io.Writer) []string {
 		failed = append(failed, "[build failed] (package unattributed)")
 	}
 	return failed
+}
+
+// lockedWriter serializes the two writers the pack runner points at ONE
+// io.Writer: the child's stderr (copied by exec's own goroutine) and the tee of
+// the JSON event stream (classifyPackEvents, on the caller's goroutine).
+// Without it a bytes.Buffer out is a data race — and its ReadFrom, which
+// io.Copy picks for the stderr goroutine, re-slices to the length it captured
+// before its blocking read, dropping every tee write made meanwhile — while an
+// *os.File out merely interleaves by luck. It deliberately implements Write
+// only (no io.ReaderFrom), so exec's io.Copy takes the lock per chunk.
+type lockedWriter struct {
+	mu sync.Mutex
+	w  io.Writer
+}
+
+func (l *lockedWriter) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.w.Write(p)
 }
 
 func writeTee(tee io.Writer, s string) {

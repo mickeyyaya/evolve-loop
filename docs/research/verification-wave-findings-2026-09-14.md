@@ -44,13 +44,29 @@ Two of three scouts (attempt 1) and one recovery build timed out with `cause=sub
 
 Cycle 1673's ship found main advanced (four PRs from a parallel operator session landed during the wave) and took the documented recovery (`ship aborted after verdict=FAIL: … recovering via build (attempt 1/4)`). The recovery then hit F2. Nothing to fix in the ship path; the cost was the re-dispatch, which F2's fix reduces. Standing rule confirmed: tracked-path landings from operators belong at batch boundaries.
 
-### F4 — `AUDIT_CIPARITY_GATE_STEP_FAILED` and `ADVISOR_RESPONSE_UNPARSEABLE` (observed, open)
+### F4 — `AUDIT_CIPARITY_GATE_STEP_FAILED` and `ADVISOR_RESPONSE_UNPARSEABLE` (both fixed: advisor half #614, apicover half = F9)
 
 Cycle 1673's audit CI-parity apicover step failed inside the lane worktree and the advisor's replan proposal was not JSON (`invalid character '.'`). Both are now single, coded stream lines (units 14 and 04 respectively) — they were the ones the memo predicted would become readable first. Neither blocked the cycle by itself; both are queued as inbox items for the next wave rather than fixed by hand, because neither is deterministic on its own evidence yet.
 
 ### F5 — the poison set on the plane
 
 Ledger `recover` actions since cycle 1640 named eight ids; only `verdict-sentinel-as-tool-call` (9×) was still pending at the inbox root — routed `console-manual` by hand as the mitigation before F1 landed. The others had already been consumed or routed.
+
+### F6 — the repo-contract gate ran `go test` in the lane's IPC environment (P1, fixed — this change)
+
+Lane 1677's importer backstop (the layer #612 added) went RED on twenty-odd tests in `cmd/evolve`, `guards`, `ship` and `core` — every one env-sensitive (cycle-reset lease fencing, "outside a cycle", seal role, fleet-off goldens) and every one green in the same worktree under `env -i PATH HOME`. The gate's `go test` inherited `EVOLVE_FLEET=1` and `EVOLVE_CYCLE_STATE_FILE=<the lane's run dir>` from the lane process; core already scrubbed those for its own `go test` spawns with a private `sanitizeEnv`, the ship gate never did. Fixed by `ipcenv.Scrub` (the namespace owner projects the scrub) wired into the ship runner and the four core sites. Cost on this wave: 1677's ship aborted and a recovery audit + re-ship are spent under the running plane. Record: `docs/incidents/2026-09-14-ship-gate-inherits-the-lane-ipc-env.md`.
+
+### F7 — codex's deep tier is pinned to a model the account rejects, and the bridge had no rule for it (P1, fixed — this change; pin = operator's call)
+
+Both wave-2 lanes dispatched build on `codex-tmux@deep`, got `400 invalid_request_error: The 'gpt-5.6-sol' model is not supported when using Codex with a ChatGPT account`, and idled for the full 1500 s artifact window before the runner fell back to Claude (exit 81) — the operator read it as "codex limit reached". Not a limit: a dead model, unrecognised because the auto-responder knows walls only by manifest rule. Fixed with a `model_unsupported` escalate rule (exit 85 → immediate family fallback, no clihealth bench). Codex launched fine for scout, triage and tdd in the same wave (the balanced/fast pins are accepted), so the dead pin is the deep/top row alone; the re-pin needs the operator's cost decision. Record: `docs/incidents/2026-09-14-codex-deep-tier-model-rejected.md`.
+
+### F8 — Claude's session wall went unrecognised: tmux indents it with U+00A0 (P1, fixed — this change)
+
+The account's rolling session limit hit at 19:03 (reset 19:50). Both lanes' recovery audits parked on `⎿  You've hit your session limit · resets 7:50pm` and the guarded fast-fail never armed — the captured line carries a NO-BREAK SPACE after `⎿`, and the session-wall branch of claude's `exhausted_regex` admitted only `[ \t]`, so `ClassifyExhausted` said no while the broad `drift_probe_regex` said yes (`POSSIBLE EXHAUSTION-REGEX DRIFT` at teardown). Each dispatch ran the full 2400 s artifact window and was re-dispatched into the same wall. Fixed by `[\t\p{Zs}]` in that regex, red-first with the live bytes. The memory rule from 2026-07-18 (validate regexes against the REAL pane) applied verbatim. Record: `docs/incidents/2026-09-14-claude-session-wall-nbsp-drift.md`.
+
+### F9 — the audit's CI-parity apicover step inherited the lane env too (P2, fixed — this change)
+
+The `cover_run` half of F4: `coverageProfile` spawned its scoped `go test -tags "integration acs" -coverprofile … ./internal/core` through the gate's raw runner while the tier step beside it scrubs, so the lane's `EVOLVE_CYCLE_STATE_FILE`/`EVOLVE_FLEET` flipped core's env-sensitive tests and the step failed on every audit of both waves (fail-open → WARN + a ~7-minute coverage run each). Reproduced with the two variables in a clean worktree. Fixed by running the step under `scrubbedRun`, red-first with the gate's fake runner (it received a nil env = inherit). Record: `docs/incidents/2026-09-14-ship-gate-inherits-the-lane-ipc-env.md` (second-site section).
 
 ## 4. Verdict on the design
 
@@ -68,7 +84,7 @@ Where the design was **not yet enough**: the triage gate's refusal was structure
 1. Re-launch on a plane carrying #606 and the wedge fix; count consecutive ships from that wave (goal: 5).
 2. `AUDIT_CIPARITY_GATE_STEP_FAILED` inside lane worktrees (F4) — needs a second occurrence to classify.
 6. **Done the same day (F6):** the acs/cycle8 `--simulate` walk that littered every checkout it ran in (dossier commits, salvage snapshots, cycle worktrees/branches, live CLI probes) — the simulate root never mutates git now; record [2026-09-14-simulate-runs-against-the-checkout](../incidents/2026-09-14-simulate-runs-against-the-checkout.md). The two console-first P1 items lanes 1673/1674 burned on were routed `console-manual`; lanes must not draw pipeline-integrity work (operating-policy §1).
-3. `ADVISOR_RESPONSE_UNPARSEABLE` (F4) — the advisor's non-JSON replan; the unit-04 leaf already falls back; decide whether the fallback should be INFO.
+3. ~~`ADVISOR_RESPONSE_UNPARSEABLE` (F4)~~ — **root-caused and fixed 2026-09-14:** not a non-JSON reply — the proposal decision read the REPL scrollback while its prompt asked the model to write `routing-proposal.json` (which it did); the decision now uses the artifact contract; record [2026-09-14-router-proposal-read-the-scrollback](../incidents/2026-09-14-router-proposal-read-the-scrollback.md).
 4. The re-send WARN signal (F2 follow-up) and the chip `+N lines` positive signal if the stability wait proves insufficient.
 5. The memo's remaining recommendations: the Center-less operator roots unit before unit 05, unit 05 as a series, the four deferred "what happened" signals.
 7. **Done the same day (F7):** the lane ship that redded main from 4db205a8 until #590 — the ship gate ran in the project root (a tree without the lane's changes), seeded from an index the ship had not yet populated, and never looked at importers. The gate now runs in the lane worktree against its base, seeds from the working tree, and runs the reverse-dependency closure (test imports included) before the push; record [2026-09-14-lane-ship-gate-package-scoped-tests](../incidents/2026-09-14-lane-ship-gate-package-scoped-tests.md).

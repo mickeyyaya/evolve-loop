@@ -119,7 +119,7 @@ func TestPhaseAdvisor_SelectsContractForEachRouterProtocol(t *testing.T) {
 		},
 		{
 			name: "proposal", stdout: `{"next_phase":"audit"}`,
-			contract: "router-proposal", artifact: "routing-proposal.json", completion: "stdout",
+			contract: "router-proposal", artifact: "routing-proposal.json", completion: "artifact",
 			launch: func(p *PhaseAdvisor, in router.RouteInput) error { _, err := p.Propose(in); return err },
 		},
 	}
