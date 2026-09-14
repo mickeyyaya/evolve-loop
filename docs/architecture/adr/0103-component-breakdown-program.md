@@ -62,6 +62,8 @@ PR, each landing with all of the following — a unit without any of them is not
 | 03b | Failure-learning engine (the failed-approach recorder, the deterministic floor, remediation filing, the recurrence closure; `recordFailureLearning` split in place into a pure gate + four named steps for unit 05) | `core/failure_learning.go` | [03b-failure-learning-engine.md](../decomposition/03b-failure-learning-engine.md) |
 | 12 | Phase observer — stall detection, the incident responder, the envelope/report sinks (the manual subcommand's engine) + the live adapter's Signal Center wiring | `internal/phaseobserver/phaseobserver.go` (+ `adapters/observer/core_adapter.go` wiring) | [12-phaseobserver.md](../decomposition/12-phaseobserver.md) |
 | 04 | Phase advisor | `core/phase_advisor.go` | next |
+
+
 | 05 | Orchestrator: composition root vs `RunCycle` engine | `core/orchestrator.go` | after 01–04 |
 | 07 | Ship landing (the fleet ff-merge, the push with its inline push-race repair and its reclassification, the post-push head read, the shared git probes, the ship-binding writer; the rebase engine stays with the orchestrator — unit 05; staging → 07b, run-scope → 07c) | `phases/ship/worktree_ship.go` + `repair.go` + `gitops.go` + `pushonly.go` + `verify.go` | [07-shipgitops.md](../decomposition/07-shipgitops.md) |
 | 08 | Config resolution (the routing-config Loader with an injected reader and Center; the registry/env/policy dials and validators; the malformed-registry and policy-typo blind spots closed; decomposed in place) | `config/config.go` | [08-config.md](../decomposition/08-config.md) |

@@ -382,62 +382,6 @@ func TestPhaseAdvisorOptions(t *testing.T) {
 	}
 }
 
-// TestBuildRoutingPrompt_FullSignalsAndTriggers covers writeSignals' four
-// present-branches and buildRoutingPrompt's optional-triggers block.
-func TestBuildRoutingPrompt_FullSignalsAndTriggers(t *testing.T) {
-	t.Parallel()
-	in := router.RouteInput{
-		Current:   "build",
-		Verdict:   VerdictPASS,
-		Cycle:     9,
-		Completed: []string{"scout", "build"},
-		Signals: router.RoutingSignals{
-			Scout:  router.ScoutSignals{Present: true, CycleSizeEstimate: "medium", ItemCount: 3, CarryoverCount: 1},
-			Triage: router.TriageSignals{Present: true, CycleSize: "small", PhaseSkip: []string{"plan-review"}},
-			Build:  router.BuildSignals{Present: true, Verdict: "PASS", ACSGreen: 5, ACSRed: 1, FilesTouched: 4},
-			Audit:  router.AuditSignals{Present: true, Verdict: "PASS", Confidence: 0.9, RedCount: 0},
-		},
-		Cfg: config.RoutingConfig{
-			Mandatory:     []string{"scout", "build", "audit", "ship"},
-			MaxInsertions: 4,
-			Triggers: map[string]config.RoutingBlock{
-				// Phase 4b: the rubric's "insert tester" line derives from
-				// the structured insert_when — the same data the walk uses.
-				"tester": {InsertWhen: []config.Condition{
-					{Field: "build.acs_red", Op: "gt", Value: 0},
-				}},
-				"plan-review": {},
-			},
-		},
-	}
-	got := buildRoutingPrompt(in)
-	for _, want := range []string{
-		"scout: cycle_size_estimate=medium",
-		"triage: cycle_size=small",
-		"build: verdict=PASS",
-		"audit: verdict=PASS",
-		"- plan-review",
-		"- tester",
-		// Decision rubric + the explicit forbidden-attack line (SKILL §7).
-		"## Decision rubric",
-		"insert tester",
-		"FORBIDDEN: never propose reaching ship without audit",
-	} {
-		if !strings.Contains(got, want) {
-			t.Errorf("prompt missing %q\n---\n%s", want, got)
-		}
-	}
-}
-
-// TestParseProposal_MalformedJSON covers the json.Unmarshal error branch: a
-// JSON object that is syntactically broken between the braces.
-func TestParseProposal_MalformedJSON(t *testing.T) {
-	t.Parallel()
-	if _, err := parseProposal(`prefix {"next_phase": } suffix`); err == nil {
-		t.Error("expected unmarshal error for malformed JSON object")
-	}
-}
-
 // --- statemachine pure spine-floor functions --------------------------------
 
 // TestAnchorArtifactPresent covers each anchor branch including the audit

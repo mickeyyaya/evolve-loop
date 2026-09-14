@@ -4,7 +4,7 @@
 
 ## Context
 
-The evolve-loop kernel already runs a live-by-default LLM router — the **PhaseAdvisor** (`go/internal/core/phase_advisor.go`, persona `agents/evolve-router.md`, profile `.evolve/profiles/router.json`, artifact `routing-plan.json`). "Model proposes, kernel disposes": the advisor emits an advisory whole-cycle plan, and a non-LLM clamp (`router.ClampPlanToFloorWith`, `go/internal/router/floor.go`) enforces the integrity floor (`scout→build→audit→ship` + TDD-pin + ship-needs-real-audit). Live data confirms real need-matching (cycle-294 inserted `fault-localization`+`bug-reproduction` on a bugfix goal; `bug-reproduction` advisor-inserted across 60+ cycles).
+The evolve-loop kernel already runs a live-by-default LLM router — the **PhaseAdvisor** (`go/internal/core/phase_advisor.go` — since ADR-0103 unit 04 the seam; the brain is `go/internal/core/advisor`, persona `agents/evolve-router.md`, profile `.evolve/profiles/router.json`, artifact `routing-plan.json`). "Model proposes, kernel disposes": the advisor emits an advisory whole-cycle plan, and a non-LLM clamp (`router.ClampPlanToFloorWith`, `go/internal/router/floor.go`) enforces the integrity floor (`scout→build→audit→ship` + TDD-pin + ship-needs-real-audit). Live data confirms real need-matching (cycle-294 inserted `fault-localization`+`bug-reproduction` on a bugfix goal; `bug-reproduction` advisor-inserted across 60+ cycles).
 
 Four verified capability gaps cap the advisor:
 

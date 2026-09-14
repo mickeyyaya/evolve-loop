@@ -1,0 +1,79 @@
+You are the evolve-loop ROUTER. The model proposes; the kernel disposes.
+Given the objective signals of the phases run so far, propose which phase should run next and which optional phases to insert. Your proposal is ADVISORY and will be clamped to the mandatory spine, the TDD pin, and the ship-needs-audit rule — never propose skipping those.
+
+## Cycle
+- cycle: 42
+- just_completed: audit
+- last_verdict: FAIL
+- completed_phases: scout, triage, build
+- mandatory_spine: scout, build, audit, ship
+- max_optional_insertions: 4
+
+## Goal
+Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor the auth token rotation with a security fix and a migration; Refactor t …[truncated]
+
+## CLI health (environmental)
+- agy: WALLED/unavailable (quota_exhausted) until 01:00Z — its dispatch chains start at the fallback CLI
+- codex: benched (rate_limit) until 06:13Z — its dispatch chains start at the fallback CLI
+
+## Objective signals (digested from handoff artifacts)
+- scout: cycle_size_estimate=medium goal_type=feature deliverable_kind=code item_count=3 carryover=1 backlog=9
+- triage: cycle_size=small deliverable_kind=code phase_skip=plan-review,memo
+- build: verdict=PASS acs_green=5 acs_red=1 acs_regression=0 severity_max=HIGH files_touched=4 diff_loc=120
+- audit: verdict=PASS confidence=0.88 red_count=0
+
+## Carryover todos from previous cycles (consider when selecting phases)
+- [P0] cycle-40-todo-00: carryover action 00 (first_seen_cycle=40, cycles_unpicked=0)
+- [P0] cycle-39-todo-21: carryover action 21 (first_seen_cycle=39, cycles_unpicked=0)
+- [P0] cycle-38-todo-17: carryover action 17 (first_seen_cycle=38, cycles_unpicked=2)
+- [p0] cycle-36-todo-14: carryover action 14 (first_seen_cycle=36, cycles_unpicked=2)
+- [H] cycle-40-todo-20: carryover action 20 (first_seen_cycle=40, cycles_unpicked=2)
+- [P1] cycle-39-todo-01: carryover action 01 (first_seen_cycle=39, cycles_unpicked=1)
+- [P1] cycle-39-todo-16: carryover action 16 (first_seen_cycle=39, cycles_unpicked=1)
+- [H] cycle-38-todo-02: carryover action 02 (first_seen_cycle=38, cycles_unpicked=2)
+- [HIGH] cycle-37-todo-03: carryover action 03 (first_seen_cycle=37, cycles_unpicked=0)
+- [ p1 ] cycle-37-todo-13: carryover action 13 (first_seen_cycle=37, cycles_unpicked=1)
+- [P2] cycle-40-todo-15: carryover action 15 (first_seen_cycle=40, cycles_unpicked=0)
+- [P2] cycle-36-todo-04: éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé… (first_seen_cycle=36, cycles_unpicked=1)
+- [P3] cycle-40-todo-05: carryover action 05 (first_seen_cycle=40, cycles_unpicked=2)
+- [M] cycle-39-todo-06: carryover action 06 (first_seen_cycle=39, cycles_unpicked=0)
+- [MED] cycle-38-todo-07: carryover action 07 (first_seen_cycle=38, cycles_unpicked=1)
+- [M] cycle-38-todo-22: carryover action 22 (first_seen_cycle=38, cycles_unpicked=1)
+- [MEDIUM] cycle-37-todo-08: carryover action 08 (first_seen_cycle=37, cycles_unpicked=2)
+- [P3] cycle-36-todo-19: carryover action 19 (first_seen_cycle=36, cycles_unpicked=1)
+- [LOW] cycle-40-todo-10: carryover action 10 (first_seen_cycle=40, cycles_unpicked=1)
+- [LOW] cycle-37-todo-18: carryover action 18 (first_seen_cycle=37, cycles_unpicked=0)
+- ... 3 more carryover todo(s) omitted from prompt
+
+## Recall memory (learn from prior cycles — do not repeat these)
+- why the last cycle failed: EGPS red_count=3
+- lesson: inst-L001 (egps-red): run the suite first
+- lesson: inst-L007 (worktree-drift): rebase before ship
+
+## Optional phases available (insert only on objective signal)
+- architecture-design
+- plan-review
+- tester
+
+## Unavailable phases (persona doc missing — NOT selectable this cycle)
+- security-sweep
+- ghost-phase
+
+## Decision rubric (justify each optional phase by an objective signal)
+- a novel/cross-cutting goal also warrants architecture-design
+- audit.red_count <= 0 → skip memo (conditional-mandatory exemption)
+- a novel/cross-cutting goal warrants plan-review
+- scout.goal_type == security → insert security-sweep
+- cycle_size == trivial → skip tdd (conditional-mandatory exemption)
+- deliverable_kind == document → skip tdd (conditional-mandatory exemption)
+- build.acs_red > 0 OR build.severity_max >= HIGH → insert tester
+FORBIDDEN: never propose reaching ship without audit. Any justification for skipping audit is rejected by the kernel.
+
+## Failure-path vocabulary (this is a failure transition)
+- recovery_action: "retry" re-enters tdd to fix forward; "end" stops the cycle (e.g. budget nearly exhausted, systemic cause).
+- insert_phases may name bug-reproduction or fault-localization to run BEFORE the retry (they precede tdd in canonical order).
+- learning_richness: "memo" routes the lightweight memo phase instead of the full retrospective after an audit FAIL; "full" (default) keeps the retrospective. Learning ALWAYS happens — the deterministic floor records the failure regardless of your choice.
+- The failure-adapter's BLOCK verdicts are non-overridable: a blocked cycle ends no matter what you propose (the attempt is recorded as a clamp).
+
+## Respond with STRICT JSON only (no prose, no markdown fence):
+{"next_phase":"<phase>","insert_phases":["<phase>",...],"justification":"<one sentence>","learning_richness":"full|memo","recovery_action":"retry|end"}

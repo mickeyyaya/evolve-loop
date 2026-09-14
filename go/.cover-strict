@@ -16,3 +16,5 @@
 ./internal/inboxmover/lifecycle 100
 ./internal/bridge/launchoutcome 100
 ./internal/phases/runner/verdict 100
+./internal/textcap 100
+./internal/core/advisor 100

@@ -17,6 +17,17 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 
 <!-- GENERATED:signal-codes BEGIN — do not edit by hand; run `evolve signals codes generate` -->
 
+### advisor
+
+| Code | Meaning |
+|---|---|
+| `ADVISOR_CAPTURE_WRITE_FAILED` | a redacted capture artifact (advisor-prompt-, advisor-response- or advisor-span-<kind>) could not be persisted (fields.artifact = prompt / response / span; fields.op = marshal / write — marshal is dormant, a Span always marshals); the decision still returns and the remaining artifacts are still attempted; the ledger binds nothing for an absent capture; fields.step=capture, path, decision, contract |
+| `ADVISOR_LAUNCH_FAILED` | the routing/plan dispatch produced no response — the preflight refused (nil bridge, empty workspace, the depth guard; fields.step=preflight) or every CLI in the router profile's fallback chain failed (fields.step=dispatch, cli, chain, exit_code, profile); the error is still returned and the caller degrades to the static spine or keeps the initial plan; fields.decision, contract |
+| `ADVISOR_MINT_REJECTED` | a plan entry minted a reserved control-plane identity (router/advisor/failure-advisor and their aliases) and was dropped by the recursion guard; the rest of the plan stands, one event per drop at decision time (never on resume or replay); fields.step=mint, minted_phase, decision, contract |
+| `ADVISOR_PROFILE_LOAD_FAILED` | .evolve/profiles/router.json exists but could not be read or parsed (absence is silent); the dispatch degrades to the single primary CLI exactly as before, so a configured fallback chain is silently narrower than the operator believes; fields.step=dispatch, path, decision, contract |
+| `ADVISOR_RECON_GIT_FAILED` | the pre-plan recon's recent-files reader (git log over the project root) failed while the recon digest was on; the digest is composed without file facts and planning proceeds; fields.step=compose, project_root, decision, contract |
+| `ADVISOR_RESPONSE_UNPARSEABLE` | the launch returned but no decision decoded from its output (fields.cause = no_json / invalid_json / empty); the wrapped error is still returned and the caller degrades — on the per-transition Propose path this is the first visibility the fault ever had; fields.step=parse, stdout_bytes, artifact, decision, contract |
+
 ### audit
 
 | Code | Meaning |

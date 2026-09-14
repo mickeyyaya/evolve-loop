@@ -1,0 +1,20 @@
+{
+  "cli": "claude-tmux",
+  "profile": "{{ROOT}}/.evolve/profiles/router.json",
+  "model": "deep",
+  "prompt": "You are the evolve-loop ROUTER. The model proposes; the kernel disposes.\nGiven the objective signals of the phases run so far, propose which phase should run next and which optional phases to insert. Your proposal is ADVISORY and will be clamped to the mandatory spine, the TDD pin, and the ship-needs-audit rule — never propose skipping those.\n\n## Cycle\n- cycle: 7\n- just_completed: build\n- last_verdict: PASS\n- completed_phases: scout, build\n- mandatory_spine: scout, build, audit, ship\n- max_optional_insertions: 2\n\n## Goal\nrotate the leaked key sk-livesecret0123456789ABCDEF across the fleet\n\n## Objective signals (digested from handoff artifacts)\n- scout: cycle_size_estimate=large goal_type= deliverable_kind= item_count=5 carryover=0 backlog=0\n\n## Decision rubric (justify each optional phase by an objective signal)\nFORBIDDEN: never propose reaching ship without audit. Any justification for skipping audit is rejected by the kernel.\n\n## Respond with STRICT JSON only (no prose, no markdown fence):\n{\"next_phase\":\"\u003cphase\u003e\",\"insert_phases\":[\"\u003cphase\u003e\",...],\"justification\":\"\u003cone sentence\u003e\"}\n",
+  "workspace": "{{WS}}",
+  "worktree": "{{WT}}",
+  "project_root": "{{ROOT}}",
+  "artifact_path": "{{WS}}/routing-proposal.json",
+  "completion": "stdout",
+  "agent": "router",
+  "contract": "router-proposal",
+  "cycle": 7,
+  "env": {
+    "EVOLVE_CLI": "claude-tmux"
+  },
+  "skills": [
+    "fable"
+  ]
+}

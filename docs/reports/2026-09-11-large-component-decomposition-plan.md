@@ -94,6 +94,8 @@ runs `./acs/regression/...` only. Queued as inbox item
 ### Supplemental rescan: PhaseAdvisor plan stage
 
 The post-campaign rescan found one small, cohesive value object embedded in
+> Stewardship note (2026-09-14): unit 04 landed — `planStage` and the mappings below folded into the advisor leaf's `decision` enum (`go/internal/core/advisor/decision.go`), the artifact names now projected from `phasecontract.ArtifactName`; see [architecture/decomposition/04-advisor.md](../architecture/decomposition/04-advisor.md).
+
 `phase_advisor.go`: `planStage` owns the three mappings that distinguish the
 initial plan from the post-Scout re-plan. It is not a new package or public
 abstraction. Moving it to `plan_stage.go` gives that decision table one local

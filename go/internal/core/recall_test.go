@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/research"
-	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
 // fakeKB is a test double for research.KB capturing the query it received.
@@ -68,30 +67,6 @@ func TestRecallForPlan(t *testing.T) {
 		}
 		if lessons != nil {
 			t.Errorf("lessons must be nil on KB error, got %v", lessons)
-		}
-	})
-}
-
-func TestWriteRecallMemory(t *testing.T) {
-	t.Parallel()
-	t.Run("empty recall renders nothing", func(t *testing.T) {
-		var b strings.Builder
-		writeRecallMemory(&b, router.RouteInput{})
-		if b.Len() != 0 {
-			t.Errorf("empty recall must render nothing, got %q", b.String())
-		}
-	})
-	t.Run("reason + lessons render under a recall heading", func(t *testing.T) {
-		var b strings.Builder
-		writeRecallMemory(&b, router.RouteInput{
-			LastReason: "EGPS red_count=3",
-			Lessons:    []string{"inst-L001 (egps-red): Run the suite first"},
-		})
-		out := b.String()
-		for _, want := range []string{"Recall memory", "EGPS red_count=3", "inst-L001"} {
-			if !strings.Contains(out, want) {
-				t.Errorf("recall output missing %q; got:\n%s", want, out)
-			}
 		}
 	})
 }
