@@ -116,7 +116,9 @@ window therefore closes after **one** cycle without operator action; it cannot
 accumulate into a permanently invisible item.
 
 **Bound 2 — the dest-exists double-move guard.** The drain skips an item whose
-destination already exists at the root (`inboxmover.go:706-710`) instead of
+destination already exists at the root (`inboxmover/lifecycle/release.go`,
+`releaseOne`'s stat guard — since ADR-0103 unit 06; `inboxmover.go:706-710` on
+the pre-unit tree) instead of
 renaming over it, so a concurrent release that already landed the root copy is
 never clobbered by a second lane's drain. The concurrent case degrades to a
 no-op, not to data loss.
@@ -135,7 +137,8 @@ describes), so the prose and the behaviour cannot drift apart silently.
 `go/acs/cycle1156/predicates_test.go` — 8 predicates asserting the filesystem
 end state (where each item lands, what its durable `failure_count` says) plus a
 real-subprocess exit-code check. Permanent regression evals live at
-`.evolve/evals/{inboxmover-promote-mkdir-fail-loud,wave-lane-task-quarantine-dead,menu-pass-promotes-committed-ids}.md`.
+`.evolve/evals/{inboxmover-promote-mkdir-fail-loud,wave-lane-task-quarantine-dead,menu-pass-promotes-committed-ids}.md`
+(runtime-plane artefacts, not tracked in the repository tree).
 
 ## Amendment (cycle 1157) — fail-loud on the consumer side
 

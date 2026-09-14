@@ -124,6 +124,8 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/internal/core/defectledger/", Rationale: "the defect ledger — the anti-laundering schema, writer and readers, and the continuation disposition gate the audit phase, carryover and the adoption seeder project from (ADR-0103 unit 09)"},
 	{Fragment: "/go/internal/phases/audit/defect_ledger.go", Rationale: "the unit-09 seam: the ledger's one wired construction, the request/rejection projections, the citation resolver and the facades disposition.go, the prompt builder and the ACS-named tests keep (ADR-0103)"},
 	{Fragment: "/go/internal/core/outcome/", Rationale: "the C1 phase-outcome recorder the failed-cycle handoff projects from (ADR-0103 unit 01)"},
+	{Fragment: "/go/internal/inboxmover/lifecycle/", Rationale: "the inbox lifecycle mover — claim, promote, quarantine release, the cycle drain, orphan recovery and the processed-record primitives every root, the ship post-ship and the triage sandbox move through (ADR-0103 unit 06)"},
+	{Fragment: "/go/internal/inboxmover/inboxmover.go", Rationale: "the unit-06 seam: Options, the resolved defaults, the ledger fallback, the one wired construction and the facades every production root, the ship phase and the ACS predicates keep (ADR-0103)"},
 	{Fragment: "/go/internal/core/ship_recovery.go", Rationale: "rebase recovery must invalidate stale explanation and route through Build"},
 	{Fragment: "/go/internal/core/resume.go", Rationale: "resume entry point (RunCycleFromPhase) and resumed-deliverable explanation review parity (reviewResumedDeliverable)"},
 	{Fragment: "/go/internal/core/resume_execution.go", Rationale: "resume sealing, projection, and post-Build refresh call sites (resumeExecution.run); carved out of resume.go by #549"},

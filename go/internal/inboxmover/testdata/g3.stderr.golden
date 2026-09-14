@@ -1,0 +1,3 @@
+[inbox-mover] recovered: task-a.json ← processing/cycle-1/
+[inbox-mover] recover-orphans: cycle-2/ is active — skipping
+[inbox-mover] recover-orphans: 1 file(s) recovered

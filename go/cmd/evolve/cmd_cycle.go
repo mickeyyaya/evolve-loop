@@ -247,7 +247,7 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 		// ceiling reachable for fleet-dispatched work at all.
 		var clf *core.ErrCycleLevelFailure
 		if errors.As(err, &clf) {
-			warnCycleFailureOutcome(stderr, result.Cycle, applyCycleFailureOutcome(projectRoot, evolveDir, result.Cycle, stderr, lifecycleLedger))
+			warnCycleFailureOutcome(stderr, result.Cycle, applyCycleFailureOutcome(projectRoot, evolveDir, result.Cycle, stderr, lifecycleLedger, signals))
 		}
 		fmt.Fprintf(stderr, "evolve cycle run: %v\n", err)
 		return 1
@@ -269,7 +269,7 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 	// final verdict is FAIL. Same closeout, applied exactly once (the err!=nil
 	// branch above already returned).
 	if result.FinalVerdict == cyclestate.VerdictFAIL {
-		warnCycleFailureOutcome(stderr, result.Cycle, applyCycleFailureOutcome(projectRoot, evolveDir, result.Cycle, stderr, lifecycleLedger))
+		warnCycleFailureOutcome(stderr, result.Cycle, applyCycleFailureOutcome(projectRoot, evolveDir, result.Cycle, stderr, lifecycleLedger, signals))
 	}
 	return cycleRunExitCode(result)
 }
@@ -280,13 +280,17 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 // root and both sequential loop paths). The walk appends its lifecycle lines
 // through the root's ledger so the Signal Center observes them like every
 // other entry (ADR-0101 S4a); a nil ledger (the --simulate root) lets the
-// mover fall back to its own, unobserved file ledger. The error returns for
-// the caller to WARN in its own voice: a lifecycle hiccup never changes a
-// cycle's exit code (the lane's only channel to its parent) or a batch's flow.
-func applyCycleFailureOutcome(projectRoot, evolveDir string, cycle int, stderr io.Writer, lifecycle inboxmover.LedgerAppender) error {
+// mover fall back to its own, unobserved file ledger. The walk's own faults
+// (ADR-0103 unit 06: a park that could not deliver, a double-move, a stamp
+// that could not land) reach the root's Signal Center through signals, so
+// they land in the cycle workspace's signals.ndjson beside the ledger events
+// instead of on stderr alone. The error returns for the caller to WARN in
+// its own voice: a lifecycle hiccup never changes a cycle's exit code (the
+// lane's only channel to its parent) or a batch's flow.
+func applyCycleFailureOutcome(projectRoot, evolveDir string, cycle int, stderr io.Writer, lifecycle inboxmover.LedgerAppender, signals *signalcenter.Center) error {
 	_, err := cycleoutcome.ApplyFailure(cycleoutcome.FailureInputsFor(
 		projectRoot, evolveDir, cycleWorkspace(projectRoot, cycle), cycle, stderr,
-	).WithLedger(lifecycle))
+	).WithLedger(lifecycle).WithSignals(signals))
 	return err
 }
 

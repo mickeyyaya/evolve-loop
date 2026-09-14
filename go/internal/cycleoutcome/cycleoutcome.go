@@ -26,6 +26,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cycleclassify"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
 // FailureInputs is one failed cycle's closeout context. Workspace is the
@@ -44,12 +45,23 @@ type FailureInputs struct {
 	// root's Signal-Center-observed ledger (ADR-0101 S4a). nil lets the inbox
 	// mover fall back to its own, unobserved file ledger over the same file.
 	Ledger inboxmover.LedgerAppender
+	// Signals is the root's Signal Center the inbox mover's inbox.warning
+	// events go to (ADR-0103 unit 06). nil = unwired: the mover prints its
+	// legacy [inbox-mover] line instead.
+	Signals *signalcenter.Center
 }
 
 // WithLedger returns the inputs with the lifecycle ledger set (the receiver
 // is left untouched).
 func (in FailureInputs) WithLedger(l inboxmover.LedgerAppender) FailureInputs {
 	in.Ledger = l
+	return in
+}
+
+// WithSignals returns the inputs with the Signal Center set (the receiver is
+// left untouched).
+func (in FailureInputs) WithSignals(c *signalcenter.Center) FailureInputs {
+	in.Signals = c
 	return in
 }
 
@@ -84,6 +96,7 @@ func ApplyFailure(in FailureInputs) (inboxmover.OutcomeResult, error) {
 		ProjectRoot: in.ProjectRoot,
 		Ledger:      in.Ledger,
 		Stderr:      stderr,
+		Signals:     in.Signals,
 	}, inboxmover.CycleOutcome{
 		Cycle:        in.Cycle,
 		Passed:       false,

@@ -1,43 +1,17 @@
 package inboxmover
 
+// extra_coverage_test.go — the readTaskIDOrUnknown fallbacks and the
+// writeLedger tests moved to the lifecycle leaf with the code (ADR-0103 unit
+// 06: lifecycle/item_test.go TestReadTaskIDOrUnknown_Fallbacks,
+// lifecycle/ledger_test.go TestLedgerLine_NilLedgerIsSilent_AppendFailureIsTheVerbatimLine).
+
 import (
-	"context"
 	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
-
-	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
 )
-
-// --- readTaskIDOrUnknown: the three "unknown" fallbacks --------------------
-
-func TestReadTaskIDOrUnknown_Fallbacks(t *testing.T) {
-	t.Parallel()
-	dir := t.TempDir()
-
-	if got := readTaskIDOrUnknown(filepath.Join(dir, "missing.json")); got != "unknown" {
-		t.Errorf("missing file: got %q, want unknown", got)
-	}
-
-	malformed := filepath.Join(dir, "malformed.json")
-	if err := os.WriteFile(malformed, []byte("{not json"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if got := readTaskIDOrUnknown(malformed); got != "unknown" {
-		t.Errorf("malformed: got %q, want unknown", got)
-	}
-
-	noID := filepath.Join(dir, "no-id.json")
-	if err := os.WriteFile(noID, []byte(`{"payload":"x"}`), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if got := readTaskIDOrUnknown(noID); got != "unknown" {
-		t.Errorf("empty id: got %q, want unknown", got)
-	}
-}
 
 // --- findFileByTaskID: ReadDir error + skip-continue branches --------------
 
@@ -91,49 +65,6 @@ func TestReadActiveCycle_MalformedJSON(t *testing.T) {
 	if _, err := readActiveCycle(p); err == nil {
 		t.Error("expected unmarshal error for malformed cycle-state.json")
 	}
-}
-
-// --- writeLedger: best-effort silent-drop branches -------------------------
-
-func TestWriteLedger_MkdirFails(t *testing.T) {
-	t.Parallel()
-	dir := t.TempDir()
-	blocker := filepath.Join(dir, "blocker")
-	if err := os.WriteFile(blocker, []byte("x"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	// LedgerPath under a regular file → MkdirAll(dir) fails; writeLedger drops.
-	ledger := filepath.Join(blocker, "ledger.jsonl")
-	opts := Options{LedgerPath: ledger, Now: time.Now}
-	writeLedger(opts, LedgerEntry{Action: "claim"}) // must not panic
-	if _, err := os.Stat(ledger); err == nil {
-		t.Error("ledger should not exist after mkdir failure")
-	}
-}
-
-func TestWriteLedger_OpenFileFails(t *testing.T) {
-	t.Parallel()
-	// Unwired seam (no resolveOpts): must degrade like the old best-effort
-	// path — no panic, no write.
-	writeLedger(Options{Now: time.Now}, LedgerEntry{Action: "claim"})
-
-	// A failing appender must WARN loudly and never fail the move path.
-	var buf strings.Builder
-	opts := Options{
-		Now:    time.Now,
-		Stderr: &buf,
-		Ledger: failingAppender{},
-	}
-	writeLedger(opts, LedgerEntry{Action: "claim", TaskID: "t1"})
-	if !strings.Contains(buf.String(), "WARN") || !strings.Contains(buf.String(), "t1") {
-		t.Errorf("append failure must warn with the task named, got: %q", buf.String())
-	}
-}
-
-type failingAppender struct{}
-
-func (failingAppender) AppendLifecycle(context.Context, ledger.LifecycleRecord) error {
-	return errors.New("disk on fire")
 }
 
 // --- Claim: mkdir + rename failure branches --------------------------------

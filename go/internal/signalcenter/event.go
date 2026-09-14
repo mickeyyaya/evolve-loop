@@ -147,6 +147,7 @@ const (
 	KindConfigWarning          Kind = "config.warning"
 	KindObserverWarning        Kind = "observer.warning"
 	KindAuditWarning           Kind = "audit.warning"
+	KindInboxWarning           Kind = "inbox.warning"
 	KindCycleSealed            Kind = "cycle.sealed"
 	KindLoopWave               Kind = "loop.wave"
 	KindLoopHalt               Kind = "loop.halt"
@@ -160,7 +161,7 @@ var knownKinds = map[Kind]bool{
 	KindPhaseDispatched: true, KindPhaseOutcome: true, KindPhaseAborted: true, KindGateRejected: true,
 	KindGatePassed: true, KindGateCorrected: true, KindShipLanded: true, KindShipError: true, KindShipWarning: true, KindSystemFailure: true,
 	KindQuotaPaused: true, KindBridgeWarning: true, KindBridgeTripwire: true, KindPaneLiveness: true,
-	KindLedgerAppended: true, KindOutcomeWarning: true, KindFailureDiagWarning: true, KindCarryoverWarning: true, KindFailureLearningWarning: true, KindConfigWarning: true, KindAuditWarning: true, KindObserverWarning: true, KindCycleSealed: true, KindLoopWave: true, KindLoopHalt: true,
+	KindLedgerAppended: true, KindOutcomeWarning: true, KindFailureDiagWarning: true, KindCarryoverWarning: true, KindFailureLearningWarning: true, KindConfigWarning: true, KindInboxWarning: true, KindAuditWarning: true, KindObserverWarning: true, KindCycleSealed: true, KindLoopWave: true, KindLoopHalt: true,
 	KindLoopEscalation: true, KindListenerPanicked: true, KindRegistryDrift: true, KindSinkDropped: true,
 }
 

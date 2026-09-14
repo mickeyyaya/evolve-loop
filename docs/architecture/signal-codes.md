@@ -91,6 +91,23 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `GATE_CONTRACT_VERIFIED` | the phase's declared deliverables were found in place (fields name the artifact, its size, the agent-owed files and the effects verified) and the phase advanced |
 | `GATE_CONTRACT_WOULD_BLOCK` | the deliverable violated its contract but the stage (shadow/advisory, or the report-size gate's) lets the phase advance; the reason is what enforce would have refused |
 
+### inbox
+
+| Code | Meaning |
+|---|---|
+| `INBOX_CLAIM_MOVE_FAILED` | a claim could not create processing/cycle-N/ (fields.step=mkdir, dest_dir) or could not rename the item into it (fields.step=rename — the item may already be claimed); ErrMvFailed (exit 2), the item stays where it was; fields.task_id, err |
+| `INBOX_CLAIM_NOT_FOUND` | a lane claim named an id the inbox root does not hold (absent, already claimed into processing/, or parked); the claim returns ErrNotFound (exit 1) and moves nothing — the FAIL closeout's lane-scope claim of an id the triage persona already claimed reports this for an expected state; fields.step=locate, task_id, inbox_dir |
+| `INBOX_CLAIM_REFUSED` | a lane claim named an operator-owned item (route:console-* or a protected fix surface, ADR-0074 I1); the claim returns ErrConsoleRouted (exit 3) and the item stays at the root; fields.step=route, task_id, reason |
+| `INBOX_CONTINUATION_MANIFEST_UNREADABLE` | the FAILed cycle's continuation manifest exists but could not be read or parsed; every item of the drain releases unstamped (a later claim starts fresh instead of resuming the salvage); fields.step=manifest, workspace, err |
+| `INBOX_ITEM_REWRITE_FAILED` | an item record could not be rewritten atomically: the quarantine release's counter reset (fields.step=counter_reset — the item releases with its stale count), the drain's failure_count bump (fields.step=failure_bump — quarantine is skipped, the item releases to the root) or the drain's continuation stamp (fields.step=continuation_stamp — the item releases unstamped); fields.task_id, path, err |
+| `INBOX_LANDED_CHECK_FAILED` | the landing probe could not answer for a processed-promotion's sha — in production the host's git probe (shaLandedOnMain) on an exec fault or a git exit outside {0,1}: an unknown sha, no local main, a non-git ProjectRoot; the promote fails OPEN (the sha is treated as landed) so a gate fault never blocks a promotion, and the item lands in processed/ with this line as the only trace; fields.step=landing, task_id, sha, err |
+| `INBOX_PROMOTE_MOVE_FAILED` | a promote could not create its destination dir (fields.step=mkdir — ErrMvFailed, NoOp false, ledger promote-warn/mkdir-failed) or could not rename the item into it (fields.step=rename — the compat NoOp success, ledger promote-warn/mv-failed); the item stays where it was; fields.task_id, state, src_rel, dest, err |
+| `INBOX_PROMOTE_NOT_FOUND` | a promote named an id neither processing/cycle-*/ nor the inbox root holds — already moved; the ship.sh-compat NoOp success is returned; fields.step=locate, task_id, state |
+| `INBOX_PROMOTE_UNLANDED_SHA` | a processed-promotion carried a ship sha the landing probe says is not on main; the item is rerouted to retry/ under reason ship-promote-retry-unlanded-sha instead of buried in processed/; fields.step=landing, task_id, sha, state=retry |
+| `INBOX_QUARANTINE_FAILED` | an item at the ADR-0072 S5 retry ceiling could not be parked in quarantine/ (fields.outcome=error: the park's promote errored; outcome=noop: the park's rename failed) and falls open to a root release — the poison item WILL be re-picked; the preceding INBOX_PROMOTE_MOVE_FAILED from Mover.Promote names the cause; fields.step=quarantine, task_id, failure_count, ceiling |
+| `INBOX_RELEASE_DOUBLE_MOVE` | the cycle drain found the item's basename already at the inbox root (a concurrent release landed it first); the root copy is never clobbered, the processing copy stays and is not counted; fields.step=release_cycle, task_id, base |
+| `INBOX_RELEASE_MOVE_FAILED` | an item could not be renamed back to the inbox root — by the cycle drain (fields.step=release_cycle, origin Mover.Release) or by orphan recovery (fields.step=recover_orphans, origin Mover.RecoverOrphans); the item stays in processing/cycle-N/ and the walk continues; fields.task_id, base, err |
+
 ### ledger
 
 | Code | Meaning |

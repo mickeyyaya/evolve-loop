@@ -1,0 +1,6 @@
+[inbox-mover] WARN: claim: task 'task-a' not found in {{ROOT}}/.evolve/inbox
+[inbox-mover] WARN: claim-lane-scope: 'task-a' not claimed (inboxmover: task not found: task-a) — lane continues
+[inbox-mover] promoted: task-a.json → quarantine/
+[inbox-mover] quarantined: task-a.json (task-level failure #2 >= ceiling 2) ← processing/cycle-5/
+[inbox-mover] released: task-b.json ← processing/cycle-5/
+[inbox-mover] release-cycle: 2 file(s) released from cycle-5
