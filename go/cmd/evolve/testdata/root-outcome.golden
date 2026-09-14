@@ -1,0 +1,1 @@
+[subagent-run] verdict=INTEGRITY_FAIL agent=auditor cycle=7 artifact=/r/.evolve/runs/cycle-7/audit.md exit=0 duration_ms=1999

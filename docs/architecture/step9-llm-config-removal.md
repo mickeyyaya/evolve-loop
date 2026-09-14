@@ -89,7 +89,7 @@ that pointed the wrong way; the target is removal, not promotion.
 | `internal/phases/runner/runner.go` | consumes resolvellm via the AutoModel seam |
 | `internal/setup/setup.go` | `Validate` reads `llm_config.json` — drop or repoint |
 | `internal/paths/paths.go` | `LLMConfigFile` constant — remove |
-| `internal/subagent/run.go`, `validateprofile.go` | resolvellm consumers |
+| `internal/subagent/run.go` (since ADR-0103 unit 16 the seam over `internal/subagent/subagentrun`), `validateprofile.go` | resolvellm consumers |
 | `cmd/evolve/cmd_resolve_llm.go`, `cmd_setup.go` | CLI surfaces referencing llm_config |
 | `examples/llm_config.example.json` | delete; update docs |
 

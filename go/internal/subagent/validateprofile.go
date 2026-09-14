@@ -7,15 +7,12 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 
-	gobridge "github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/capability"
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/detectcli"
 	"github.com/mickeyyaya/evolve-loop/go/internal/resolvellm"
-	"github.com/mickeyyaya/evolve-loop/go/internal/tokenusage"
+	"github.com/mickeyyaya/evolve-loop/go/internal/subagent/subagentrun"
 )
 
 // ValidateProfileRequest captures every input cmd_validate_profile reads
@@ -222,13 +219,9 @@ func ValidateProfile(ctx context.Context, req ValidateProfileRequest, opts Valid
 	return res, nil
 }
 
-// capBoolEnv mirrors bash's `"true"`/`"false"` env emission for booleans.
-func capBoolEnv(v bool) string {
-	if v {
-		return "true"
-	}
-	return "false"
-}
+// capBoolEnv mirrors bash's `"true"`/`"false"` env emission for booleans
+// (the leaf's BoolEnv).
+func capBoolEnv(v bool) string { return subagentrun.BoolEnv(v) }
 
 // adapterOverridesRE captures `"adapter_overrides":{ ... }` and inside that
 // the entry for the resolved cli. Bash uses jq:
@@ -298,101 +291,13 @@ func defaultResolveLLM(agent string) (resolvellm.Result, error) {
 	return resolvellm.Resolve(agent, resolvellm.Options{})
 }
 
-// defaultAdapterExists reports whether the resolved CLI has a registered
-// bridge driver. The dispatch path no longer shells `bash <cli>.sh`, so the
-// pre-flight "is this dispatchable?" check is now driver presence, not the
-// adapter script's executable bit. path is the legacy adapter path
-// (<dir>/<cli>.sh); we recover <cli> from its base name, project it onto a
-// driver via bridge.DriverFor, and confirm the driver is registered. Kept
-// injectable (the ExecAdapter/AdapterExists seam is unchanged) so tests can
-// still stub it.
+// defaultAdapterExists is the validate pipeline's path-shaped seam default:
+// ValidateProfile still composes the legacy <AdaptersDir>/<cli>.sh path
+// (:146) and this default recovers <cli> from its base name before asking
+// driverExists — the one place a file name is still decoded. The run path's
+// seam receives the cli itself (RunOptions.AdapterExists → driverExists);
+// folding this twin onto that shape is unit-16 follow-up 16-9. Kept
+// injectable so tests can still stub it.
 func defaultAdapterExists(path string) bool {
-	cli := strings.TrimSuffix(filepath.Base(path), ".sh")
-	_, ok := gobridge.LookupDriver(gobridge.DriverFor(cli))
-	return ok
-}
-
-// defaultExecAdapter dispatches the subagent through the in-process Go bridge
-// instead of shelling `bash <cli>.sh`. The bridge owns the same contract the
-// bash adapter had: it materializes the prompt, dispatches the driver, and
-// writes the artifact at ArtifactPath. A VALIDATE_ONLY=1 entry in env is
-// honored by the bridge's launch path (it prints the resolved config and
-// returns ExitOK without invoking an LLM), so ValidateProfile's dry-validate
-// keeps working (same ExitOK contract; no LLM invoked).
-//
-// adapterPath is retained for the injectable ExecAdapter seam (tests stub the
-// whole function), but the default no longer reads the .sh file — it reads
-// RESOLVED_CLI from env and projects it onto a registered driver via
-// bridge.DriverFor.
-// execAdapterDeps builds the gobridge.Deps for the subagent composition
-// root, wiring TokenResolver via tokenusage.DefaultResolver against the
-// env's HOME — the same configRoot-resolution convention as
-// internal/adapters/bridge's productionEngineDeps (env["HOME"] falling back
-// to os.Getenv("HOME"), joined with ".claude"). The two production
-// composition roots (adapters/bridge, this package) share the single
-// tokenusage.DefaultResolver helper, each resolving configRoot identically.
-func execAdapterDeps(env map[string]string) gobridge.Deps {
-	home := env["HOME"]
-	if home == "" {
-		home = os.Getenv("HOME")
-	}
-	configRoot := filepath.Join(home, ".claude")
-	return gobridge.Deps{
-		Env:           env,
-		TokenResolver: tokenusage.DefaultResolver(configRoot),
-	}
-}
-
-func defaultExecAdapter(ctx context.Context, _ string, env map[string]string) (int, error) {
-	cli := gobridge.DriverFor(env["RESOLVED_CLI"])
-	prompt := ""
-	if pf := env["PROMPT_FILE"]; pf != "" {
-		b, err := os.ReadFile(pf)
-		if err != nil {
-			return -1, fmt.Errorf("subagent: read prompt file %q: %w", pf, err)
-		}
-		prompt = string(b)
-	}
-	// Contract bridge: the bash adapter accepted an empty prompt under
-	// VALIDATE_ONLY=1 (ValidateProfile sets PROMPT_FILE=""), but the bridge's
-	// launch guard fails fast on an empty prompt (an empty prompt would hang a
-	// real launch at the artifact timeout). Validate-only never reads the prompt
-	// — it prints the resolved config and returns ExitOK — so a placeholder
-	// satisfies the guard without changing behavior. A real run (VALIDATE_ONLY=0)
-	// always carries a non-empty PROMPT_FILE, so this never masks a missing prompt.
-	if prompt == "" {
-		prompt = "(validate-only: no prompt)"
-	}
-	eng := gobridge.NewEngine(execAdapterDeps(env))
-	resp, err := eng.Launch(ctx, core.BridgeRequest{
-		CLI:          cli,
-		Profile:      env["PROFILE_PATH"],
-		Model:        env["RESOLVED_MODEL"],
-		Prompt:       prompt,
-		Workspace:    env["WORKSPACE_PATH"],
-		Worktree:     env["WORKTREE_PATH"],
-		ArtifactPath: env["ARTIFACT_PATH"],
-		StdoutLog:    env["STDOUT_LOG"],
-		StderrLog:    env["STDERR_LOG"],
-		Cycle:        atoiOrZero(env["CYCLE"]),
-		Env:          env,
-	})
-	if err != nil {
-		// Infra error from the bridge itself (guard failure, prompt write, …):
-		// resp is the zero value (ExitCode 0), and "exit 0 + error" misleads
-		// VerifyArtifact. Mirror the old bash defaultExecAdapter: -1 on error.
-		return -1, err
-	}
-	return resp.ExitCode, nil
-}
-
-// atoiOrZero parses a base-10 integer, returning 0 on any error or for
-// negative values (the bridge treats Cycle<=0 as "no cycle", matching the
-// bash adapter's unset-CYCLE path).
-func atoiOrZero(s string) int {
-	n, err := strconv.Atoi(s)
-	if err != nil || n < 0 {
-		return 0
-	}
-	return n
+	return driverExists(strings.TrimSuffix(filepath.Base(path), ".sh"))
 }

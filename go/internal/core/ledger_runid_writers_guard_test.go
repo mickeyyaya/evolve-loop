@@ -38,7 +38,7 @@ import (
 // which is the point: the addition is where you decide how it gets its run id.
 var agentSubprocessWriters = map[string]string{
 	"internal/core/phase_bindings.go":           "orchestrator bindings — stamped centrally, see centrallyStamped",
-	"internal/subagent/run.go":                  "out-of-process `evolve subagent run` — the cycle-1571 H1 writer",
+	"internal/subagent/subagentrun/ledger.go":   "out-of-process `evolve subagent run` — the cycle-1571 H1 writer, since ADR-0103 unit 16 the dispatcher's ledger step; stamped through a port, see centrallyStamped",
 	"internal/subagent/subagent.go":             "in-process Runner.Run",
 	"internal/cyclesimulator/cyclesimulator.go": "simulator",
 }
@@ -49,7 +49,8 @@ var agentSubprocessWriters = map[string]string{
 // referencing the field directly it no longer needs the exemption and this test
 // fails until it is delisted, so the list cannot rot into a blanket excuse.
 var centrallyStamped = map[string]string{
-	"internal/core/phase_bindings.go": "appends via o.ledger == stampingLedger (core/runid.go stamps run_id)",
+	"internal/core/phase_bindings.go":         "appends via o.ledger == stampingLedger (core/runid.go stamps run_id)",
+	"internal/subagent/subagentrun/ledger.go": "a leaf that cannot import core: its Dispatcher takes the resolver as the Deps.RunID port, which the ONE wired construction in internal/subagent/run.go (wiredDispatcher) binds to core.RunIDFromWorkspace, resolved once after admission; subagentrun/ledger_test.go and resolve_test.go are the behavioural pins (the run id reaches the emitted bytes)",
 }
 
 func TestAgentSubprocessWriters_AllStampRunID(t *testing.T) {

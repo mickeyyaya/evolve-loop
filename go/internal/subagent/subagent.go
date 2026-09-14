@@ -31,7 +31,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -42,6 +41,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
+	"github.com/mickeyyaya/evolve-loop/go/internal/subagent/subagentrun"
 )
 
 // Request is the typed input to Runner.Run. Caller is responsible for
@@ -76,21 +76,20 @@ type Result struct {
 	Diagnostics    []core.Diagnostic
 }
 
-// Verdict constants returned by Run.
+// Verdict constants returned by Run — the unit-16 leaf's vocabulary,
+// projected by name (ADR-0103).
 const (
-	VerdictPASS          = "PASS"
-	VerdictFAIL          = "FAIL"
-	VerdictIntegrityFail = "INTEGRITY_FAIL"
+	VerdictPASS          = subagentrun.VerdictPASS
+	VerdictFAIL          = subagentrun.VerdictFAIL
+	VerdictIntegrityFail = subagentrun.VerdictIntegrityFail
 )
 
-// ArtifactMaxAge mirrors verify_artifact() at subagent-run.sh:451 — the
-// artifact must have been written within the last 5 minutes to be
-// considered fresh.
-const ArtifactMaxAge = 5 * time.Minute
+// ArtifactMaxAge is the artifact freshness window (the leaf's).
+const ArtifactMaxAge = subagentrun.ArtifactMaxAge
 
 // ChallengeTokenBytes is the size of the random source used for the
-// 16-hex token (8 bytes → 16 hex chars).
-const ChallengeTokenBytes = 8
+// 16-hex token (8 bytes → 16 hex chars) — the leaf's.
+const ChallengeTokenBytes = subagentrun.ChallengeTokenBytes
 
 // Config wires in all the injectable seams. Production constructs the
 // runner with NewDefault() which fills in real implementations; tests
@@ -328,17 +327,10 @@ func (r *Runner) generateToken() (string, error) {
 }
 
 // resolveArtifactPath expands {cycle} in the profile's output_artifact
-// template and returns an absolute path under projectRoot. Returns ""
-// when the template is empty (profile has no defined artifact).
+// template under projectRoot ("" for an empty template) — the leaf's rule,
+// the three host callers' spelling.
 func resolveArtifactPath(template string, cycle int, projectRoot string) string {
-	if template == "" {
-		return ""
-	}
-	expanded := strings.ReplaceAll(template, "{cycle}", strconv.Itoa(cycle))
-	if filepath.IsAbs(expanded) {
-		return expanded
-	}
-	return filepath.Join(projectRoot, expanded)
+	return subagentrun.ResolveArtifactPath(template, cycle, projectRoot)
 }
 
 // composePrompt prepends the CHALLENGE TOKEN context block to the user
@@ -400,24 +392,8 @@ func runGit(ctx context.Context, dir string, args ...string) (string, error) {
 }
 
 // defaultHashFile streams the file at path through sha256 and returns
-// the hex digest. Empty path or missing file returns ("", err).
-func defaultHashFile(path string) (string, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return "", err
-	}
-	defer func() { _ = f.Close() }()
-	h := sha256.New()
-	if _, err := io.Copy(h, f); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(h.Sum(nil)), nil
-}
+// the hex digest (the leaf's HashFile).
+func defaultHashFile(path string) (string, error) { return subagentrun.HashFile(path) }
 
-func defaultStatMTime(path string) (time.Time, error) {
-	info, err := os.Stat(path)
-	if err != nil {
-		return time.Time{}, err
-	}
-	return info.ModTime(), nil
-}
+// defaultStatMTime is the leaf's StatMTime.
+func defaultStatMTime(path string) (time.Time, error) { return subagentrun.StatMTime(path) }

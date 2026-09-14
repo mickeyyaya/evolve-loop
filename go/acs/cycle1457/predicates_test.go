@@ -230,8 +230,8 @@ func TestC1457_003_MarkerLabelDriftDoesNotAttribute(t *testing.T) {
 	if !acsassert.LineContainsAll(filepath.Join(root, "go/internal/subagent/subagent.go"), `"Artifact path: %s\n"`) {
 		t.Errorf("subagent.go no longer stamps %q — the scanner's anchor and the assembler have drifted apart", canonicalMarker)
 	}
-	if !acsassert.LineContainsAll(filepath.Join(root, "go/internal/subagent/run.go"), `"- Artifact path: %s\n"`) {
-		t.Errorf("run.go no longer stamps %q — the scanner's anchor and the assembler have drifted apart", canonicalMarker)
+	if !acsassert.LineContainsAll(filepath.Join(root, "go/internal/subagent/subagentrun/prompt.go"), `"- Artifact path: %s\n"`) {
+		t.Errorf("subagentrun/prompt.go no longer stamps %q — the scanner's anchor and the assembler have drifted apart", canonicalMarker)
 	}
 }
 

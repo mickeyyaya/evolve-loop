@@ -7,8 +7,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/subagent/subagentrun"
 )
 
 // AbnormalEvent mirrors the JSONL schema bash _append_abnormal_event writes
@@ -165,46 +166,17 @@ func WriteFanoutLedgerEntry(ledgerPath string, e FanoutLedgerEntry, now func() t
 
 // --- internal helpers ---
 
-const ledgerZeroSeed = "0000000000000000000000000000000000000000000000000000000000000000"
+// The chained-append primitives are the unit-16 leaf's (ADR-0103): the fan-out
+// writer above keeps its own append skeleton beside the run path's — the
+// duplicated belief "a chained ledger append", named, folded by the fan-out
+// unit (follow-up 16-1).
 
-// readChainLink mirrors _ledger_chain_link at subagent-run.sh:355. Same
-// semantics as the cyclesimulator copy — kept local to avoid widening the
-// internal/cyclesimulator export surface.
+const ledgerZeroSeed = subagentrun.LedgerZeroSeed
+
 func readChainLink(ledgerPath string) (prevHash string, entrySeq int, err error) {
-	prevHash = ledgerZeroSeed
-	entrySeq = 0
-	info, statErr := os.Stat(ledgerPath)
-	if statErr != nil || info.Size() == 0 {
-		return prevHash, entrySeq, nil
-	}
-	data, rerr := os.ReadFile(ledgerPath)
-	if rerr != nil {
-		return "", 0, rerr
-	}
-	lines := strings.Split(strings.TrimRight(string(data), "\n"), "\n")
-	if len(lines) == 0 || lines[0] == "" {
-		return prevHash, entrySeq, nil
-	}
-	last := lines[len(lines)-1]
-	prevHash = sha256Hex(last)
-	entrySeq = len(lines)
-	return prevHash, entrySeq, nil
+	return subagentrun.ChainLink(ledgerPath)
 }
 
-func sha256Hex(s string) string {
-	sum := sha256.Sum256([]byte(s))
-	return hex.EncodeToString(sum[:])
-}
+func sha256Hex(s string) string { return subagentrun.SHA256Hex(s) }
 
-// jsonStringEscape handles the subset bash escapes (only "). We expand to
-// quote + backslash for safety. Newlines are unlikely in event fields; if
-// callers do supply them, Go's json.Marshal of a string would be the right
-// answer — keeping this for one-line JSONL determinism.
-func jsonStringEscape(s string) string {
-	s = strings.ReplaceAll(s, `\`, `\\`)
-	s = strings.ReplaceAll(s, `"`, `\"`)
-	s = strings.ReplaceAll(s, "\n", `\n`)
-	s = strings.ReplaceAll(s, "\r", `\r`)
-	s = strings.ReplaceAll(s, "\t", `\t`)
-	return s
-}
+func jsonStringEscape(s string) string { return subagentrun.JSONStringEscape(s) }

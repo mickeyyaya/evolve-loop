@@ -1,0 +1,1 @@
+[subagent-run] WARN agent=scout cycle=7: WorktreePath not propagated — WORKTREE_PATH falls back to the project root {ROOT}; this agent will run against the main tree
