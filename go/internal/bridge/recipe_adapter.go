@@ -216,6 +216,9 @@ func captureControl(ctx context.Context, cfg *Config, deps Deps, cli, command st
 	}
 	var pane string
 	for i := 0; i < settleTicks; i++ {
+		if ctx.Err() != nil { // the caller's interrupt wins over the settle ticks (F20: the usage probe sat here)
+			return pane, ctx.Err()
+		}
 		deps.Sleep(time.Second)
 		if drv.ar != nil {
 			drv.ar.tick(ctx, drv.session) // dismiss any modal; harmless otherwise

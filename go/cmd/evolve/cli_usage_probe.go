@@ -22,10 +22,23 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/usageprobe"
 )
 
+// runPreWaveProbes is the ONE pre-wave probe protocol both runners follow
+// (the loop's prepareIteration and the campaign's BeforeWave hook): the
+// CLI-health canary first (clear benches that lifted, re-bench walls), then
+// the proactive usage probe (bench families already capped). Both take the
+// runner's interrupt context; the returned error is that context's, so a
+// caller can stop before dispatching a wave that would be cancelled at spawn
+// (F20: "wave 2: 0/2 lanes ok" after the boundary SIGINT).
+func runPreWaveProbes(ctx context.Context, projectRoot, evolveDir string, env map[string]string, stderr io.Writer) error {
+	runCLIHealthCanary(ctx, projectRoot, env, defaultLiveProbe(ctx, projectRoot, stderr), stderr)
+	runUsageProbe(ctx, projectRoot, evolveDir, env, stderr)
+	return ctx.Err()
+}
+
 // runUsageProbe probes every installed interactive family for a current quota
 // cap and benches the capped ones BEFORE the cycle's first phase boots. No-op
 // when disabled. Fail-open throughout — advisory, never blocks a cycle.
-func runUsageProbe(projectRoot, evolveDir string, env map[string]string, stderr io.Writer) {
+func runUsageProbe(ctx context.Context, projectRoot, evolveDir string, env map[string]string, stderr io.Writer) {
 	if !usageProbeEnabled(env, evolveDir) {
 		return
 	}
@@ -44,7 +57,7 @@ func runUsageProbe(projectRoot, evolveDir string, env map[string]string, stderr 
 		Log:      stderr,
 	}
 	fmt.Fprintf(stderr, "[loop] usage-probe: checking %v for quota caps before dispatch\n", families)
-	p.Run(context.Background())
+	p.Run(ctx)
 }
 
 // bridgeUsageProbe adapts a per-family controller factory into the (ctx, family)

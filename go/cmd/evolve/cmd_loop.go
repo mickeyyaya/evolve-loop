@@ -97,7 +97,14 @@ type loopConfig struct {
 // completion (a ~µs window) only yields a harmless extra --resume hint: the
 // next fresh run finds no unfinished cycle (it was finalized) and proceeds.
 func emitSignalStop(stdout, stderr io.Writer, lr *loopResult, cycle int) {
-	fmt.Fprintf(stderr, "[loop] received interrupt (SIGINT/SIGTERM) at cycle %d — checkpointed; resume with: evolve loop --resume\n", cycle)
+	signalStop(stdout, stderr, lr, fmt.Sprintf("at cycle %d — checkpointed", cycle))
+}
+
+// signalStop is the ONE interrupt disposition (stop reason "signal", the
+// resume hint, the result emit); callers supply only where the interrupt
+// landed. prepareIteration's interruptReturn shares it (F20 review).
+func signalStop(stdout, stderr io.Writer, lr *loopResult, where string) {
+	fmt.Fprintf(stderr, "[loop] received interrupt (SIGINT/SIGTERM) %s; resume with: evolve loop --resume\n", where)
 	lr.StopReason = "signal"
 	lr.emit(stdout)
 }

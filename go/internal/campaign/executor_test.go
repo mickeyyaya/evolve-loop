@@ -2,6 +2,7 @@ package campaign
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -248,11 +249,31 @@ func TestRunWaves_BeforeWaveCalledPerRunWave(t *testing.T) {
 	calls := 0
 	if err := RunWaves(context.Background(), waves, r.run, RunOptions{
 		ProgressPath: path, PlanSHA: "P",
-		BeforeWave: func() { calls++ },
+		BeforeWave: func(context.Context) error { calls++; return nil },
 	}); err != nil {
 		t.Fatal(err)
 	}
 	if calls != 2 {
 		t.Errorf("BeforeWave called %d times, want 2 (once per run wave)", calls)
+	}
+}
+
+// F20 (2026-09-15): the pre-wave probes run inside BeforeWave; an interrupt
+// that lands there must abort BEFORE the wave is dispatched (the loop runner
+// printed "wave 2: 0/2 lanes ok" for a wave cancelled at spawn). The hook
+// takes the live context and its error aborts the run.
+func TestRunWaves_BeforeWaveErrorAbortsBeforeTheWave(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "prog.json")
+	waves := [][]fleet.CycleSpec{mkwave("a")}
+	r := &recordingRunner{}
+	err := RunWaves(context.Background(), waves, r.run, RunOptions{
+		ProgressPath: path, PlanSHA: "P",
+		BeforeWave: func(ctx context.Context) error { return context.Canceled },
+	})
+	if err == nil || !errors.Is(err, context.Canceled) {
+		t.Fatalf("a pre-wave interrupt aborts the run with the cause: %v", err)
+	}
+	if r.calls != 0 {
+		t.Errorf("no wave is dispatched after a pre-wave interrupt, got %d call(s)", r.calls)
 	}
 }

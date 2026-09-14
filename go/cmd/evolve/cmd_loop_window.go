@@ -35,10 +35,7 @@ func (b *loopBatchCoordinator) prepareIteration(
 	batchStartCycle int,
 ) batchDecision {
 	if b.ctx.Err() != nil {
-		fmt.Fprintf(b.stderr, "[loop] received interrupt (SIGINT/SIGTERM) before cycle %d — stopping; resume with: evolve loop --resume\n", iteration+1)
-		b.result.StopReason = "signal"
-		b.result.emit(b.stdout)
-		return batchDecision{flow: batchReturn, exitCode: 130}
+		return b.interruptReturn(iteration, "")
 	}
 	if exitCode, halted := blockerBreakerHalt(b.cfg.EvolveDir, b.cfg.ProjectRoot, batchStartCycle, b.stderr, b.deps.Signals); halted {
 		b.result.StopReason = "pipeline_blocker_halt"
@@ -46,8 +43,12 @@ func (b *loopBatchCoordinator) prepareIteration(
 		return batchDecision{flow: batchReturn, exitCode: exitCode}
 	}
 
-	runCLIHealthCanary(b.cfg.ProjectRoot, b.cycleEnv, defaultLiveProbe(b.cfg.ProjectRoot, b.stderr), b.stderr)
-	runUsageProbe(b.cfg.ProjectRoot, b.cfg.EvolveDir, b.cycleEnv, b.stderr)
+	// An interrupt that landed during the probes must not dispatch a wave
+	// that is cancelled at spawn (2026-09-15: "wave 2: 0/2 lanes ok" printed
+	// after the boundary SIGINT).
+	if err := runPreWaveProbes(b.ctx, b.cfg.ProjectRoot, b.cfg.EvolveDir, b.cycleEnv, b.stderr); err != nil {
+		return b.interruptReturn(iteration, "during the pre-wave probes ")
+	}
 	if _, halt := syncMainFromOriginAtWaveBoundary(b.ctx, b.cfg.ProjectRoot, b.stderr); halt != nil {
 		b.result.StopReason = "plane_diverged_halt"
 		if errors.Is(halt, errMainCIRed) {
@@ -78,6 +79,14 @@ func (b *loopBatchCoordinator) prepareIteration(
 		}
 	}
 	return batchDecision{flow: batchProceed}
+}
+
+// interruptReturn reports a SIGINT/SIGTERM caught at one of prepareIteration's
+// two check points ("" at entry, or "during the pre-wave probes " after them)
+// and returns the batchDecision that stops the batch cleanly.
+func (b *loopBatchCoordinator) interruptReturn(iteration int, when string) batchDecision {
+	signalStop(b.stdout, b.stderr, b.result, fmt.Sprintf("%sbefore cycle %d — stopping", when, iteration+1))
+	return batchDecision{flow: batchReturn, exitCode: 130}
 }
 
 // dispatchFleetIteration runs one rolling pool or barrier wave. A failed plan

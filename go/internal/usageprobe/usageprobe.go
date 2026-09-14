@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/clicontrol"
@@ -52,33 +53,61 @@ type Prober struct {
 // capped ones. It blocks until all probes settle. Already-active benches are
 // skipped (the family is already pre-skipped; re-probing would re-boot a capped
 // REPL). Safe for concurrent fleet cycles: the bench write is flock-protected.
+// Run's lifetime contract: it returns when every probe has answered OR when
+// ctx is done — whichever comes first. On cancel the probe goroutines are
+// deliberately abandoned (they end when their bridge call returns; the
+// bridge's settle loop now honors ctx) and neither benches nor logs after
+// the interrupt; the per-family `usage-probe` tmux session they drove is
+// reaped by the tmux session GC, not here.
 func (p *Prober) Run(ctx context.Context) {
+	if ctx.Err() != nil {
+		fmt.Fprintf(p.Log, "[usage-probe] cancelled before any probe ran (%v) — the loop's interrupt wins\n", ctx.Err())
+		return
+	}
 	active := p.Store.Active() // snapshot: skip families already benched
 	var wg sync.WaitGroup
+	var launched, completed atomic.Int32
 	for _, family := range p.Families {
 		if _, benched := active[family]; benched {
 			continue
 		}
 		family := family
+		launched.Add(1)
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			defer completed.Add(1)
 			p.probeOne(ctx, family)
 		}()
 	}
-	wg.Wait()
+	// A probe over the bridge may not return on cancel (a pane that never
+	// answers); the loop's interrupt must not wait for it — 2026-09-15, the
+	// wave-4 boundary needed SIGKILL after SIGINT ×2 and SIGTERM sat here.
+	done := make(chan struct{})
+	go func() { wg.Wait(); close(done) }()
+	select {
+	case <-done:
+	case <-ctx.Done():
+		fmt.Fprintf(p.Log, "[usage-probe] cancelled (%v) — abandoning %d in-flight probe(s); the loop's interrupt wins\n", ctx.Err(), launched.Load()-completed.Load())
+	}
 }
 
 // probeOne runs the full probe→classify→bench for one family. Fail-open at every
 // step: unsupported and errored probes return without benching.
 func (p *Prober) probeOne(ctx context.Context, family string) {
 	pane, err := p.Probe(ctx, family)
+	if ctx.Err() != nil {
+		return // cancelled while probing: never bench on a pane read after the interrupt
+	}
 	if errors.Is(err, clicontrol.ErrUnsupported) {
 		return // family has no usage command (e.g. ollama) — silent skip
 	}
 	if err != nil {
 		fmt.Fprintf(p.Log, "[usage-probe] %s probe error: %v (skip, advisory)\n", family, err)
 		return
+	}
+	if ctx.Err() != nil {
+		return // never author a bench after the interrupt, even from a pane read just before it
 	}
 	if !p.Classify(family, pane) {
 		return // healthy (or unclassifiable) — never a false bench

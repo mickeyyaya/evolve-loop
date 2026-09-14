@@ -41,7 +41,10 @@ type RunOptions struct {
 	Sleep func(d time.Duration)
 	// BeforeWave runs before each non-skipped wave — e.g. a CLI-health canary that
 	// clears expired benches so the wave doesn't re-hit a recovered wall. nil = no-op.
-	BeforeWave func()
+	// It takes the run's live context and its error aborts the run before the
+	// wave is dispatched (F20: an interrupt during the probes must not spawn a
+	// wave that is cancelled at birth).
+	BeforeWave func(context.Context) error
 	// AfterWaveComplete is the merge-to-main gate's seam: it runs once per
 	// newly-completed wave, AFTER the wave's progress is durably saved, so a
 	// promotion attempt always runs against a checkpointed boundary. The
@@ -78,7 +81,9 @@ func RunWaves(ctx context.Context, waves [][]fleet.CycleSpec, run WaveRunner, op
 			continue
 		}
 		if opts.BeforeWave != nil {
-			opts.BeforeWave()
+			if err := opts.BeforeWave(ctx); err != nil {
+				return fmt.Errorf("campaign: wave %d: pre-wave probes: %w", i+1, err)
+			}
 		}
 		skipped, err := runWaveWithRetry(ctx, run, w, opts)
 		if err != nil {
