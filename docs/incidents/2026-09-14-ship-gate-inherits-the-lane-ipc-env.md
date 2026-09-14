@@ -103,3 +103,19 @@ before the change.
   to the length it captured before its blocking read, dropping every concurrent tee
   write at EOF. The runner now wraps `out` in a `lockedWriter` (Write only, so
   `io.Copy` takes the lock per chunk); the new test pins both the scrub and the tee.
+
+## Second site (later the same day): the audit's CI-parity apicover step
+
+Every wave-2 audit raised `AUDIT_CIPARITY_GATE_STEP_FAILED` (`gate=apicover_enforce
+step=cover_run`): the scoped coverage run `go test -tags "integration acs"
+-coverprofile=… ./internal/coherence ./internal/core` exited 1 in the lane worktree. Same
+leak, second spawn site — `coverageProfile` called the gate's raw runner (`g.run`) while
+the tier step beside it wraps the runner in `scrubbedRun` (the CI-shell allowlist).
+Reproduced in a clean worktree: `EVOLVE_FLEET=1 EVOLVE_CYCLE_STATE_FILE=/tmp/x go test
+-tags "integration acs" -run TestRunCycle_InterruptCheckpointSelectsActivePhaseOnResume
+./internal/core/` fails; without the two variables it passes. The step is fail-open, so
+the cost was a WARN on every audit and one ~7-minute core coverage run per audit, not a
+blocked ship — and a coded line that cried wolf on every cycle since 1673 (wave 1, F4).
+Fixed by running the coverage step's three `go` invocations under `scrubbedRun`, red
+first (`TestCoverageProfile_RunsGoTestUnderTheScrubbedEnv`: the fake runner received a
+nil env, i.e. inherit).

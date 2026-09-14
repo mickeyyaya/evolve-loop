@@ -44,7 +44,7 @@ Two of three scouts (attempt 1) and one recovery build timed out with `cause=sub
 
 Cycle 1673's ship found main advanced (four PRs from a parallel operator session landed during the wave) and took the documented recovery (`ship aborted after verdict=FAIL: … recovering via build (attempt 1/4)`). The recovery then hit F2. Nothing to fix in the ship path; the cost was the re-dispatch, which F2's fix reduces. Standing rule confirmed: tracked-path landings from operators belong at batch boundaries.
 
-### F4 — `AUDIT_CIPARITY_GATE_STEP_FAILED` and `ADVISOR_RESPONSE_UNPARSEABLE` (observed, open)
+### F4 — `AUDIT_CIPARITY_GATE_STEP_FAILED` and `ADVISOR_RESPONSE_UNPARSEABLE` (both fixed: advisor half #614, apicover half = F9)
 
 Cycle 1673's audit CI-parity apicover step failed inside the lane worktree and the advisor's replan proposal was not JSON (`invalid character '.'`). Both are now single, coded stream lines (units 14 and 04 respectively) — they were the ones the memo predicted would become readable first. Neither blocked the cycle by itself; both are queued as inbox items for the next wave rather than fixed by hand, because neither is deterministic on its own evidence yet.
 
@@ -63,6 +63,10 @@ Both wave-2 lanes dispatched build on `codex-tmux@deep`, got `400 invalid_reques
 ### F8 — Claude's session wall went unrecognised: tmux indents it with U+00A0 (P1, fixed — this change)
 
 The account's rolling session limit hit at 19:03 (reset 19:50). Both lanes' recovery audits parked on `⎿  You've hit your session limit · resets 7:50pm` and the guarded fast-fail never armed — the captured line carries a NO-BREAK SPACE after `⎿`, and the session-wall branch of claude's `exhausted_regex` admitted only `[ \t]`, so `ClassifyExhausted` said no while the broad `drift_probe_regex` said yes (`POSSIBLE EXHAUSTION-REGEX DRIFT` at teardown). Each dispatch ran the full 2400 s artifact window and was re-dispatched into the same wall. Fixed by `[\t\p{Zs}]` in that regex, red-first with the live bytes. The memory rule from 2026-07-18 (validate regexes against the REAL pane) applied verbatim. Record: `docs/incidents/2026-09-14-claude-session-wall-nbsp-drift.md`.
+
+### F9 — the audit's CI-parity apicover step inherited the lane env too (P2, fixed — this change)
+
+The `cover_run` half of F4: `coverageProfile` spawned its scoped `go test -tags "integration acs" -coverprofile … ./internal/core` through the gate's raw runner while the tier step beside it scrubs, so the lane's `EVOLVE_CYCLE_STATE_FILE`/`EVOLVE_FLEET` flipped core's env-sensitive tests and the step failed on every audit of both waves (fail-open → WARN + a ~7-minute coverage run each). Reproduced with the two variables in a clean worktree. Fixed by running the step under `scrubbedRun`, red-first with the gate's fake runner (it received a nil env = inherit). Record: `docs/incidents/2026-09-14-ship-gate-inherits-the-lane-ipc-env.md` (second-site section).
 
 ## 4. Verdict on the design
 
