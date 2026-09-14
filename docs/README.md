@@ -45,7 +45,7 @@ docs/
 | **Comparing evolve-loop to /goal / superpowers / etc.** | [comparisons/long-running-claude-skills.md](comparisons/long-running-claude-skills.md) |
 | **About to run your first cycle** | [getting-started/your-first-cycle.md](getting-started/your-first-cycle.md) |
 | **Reviewing the architecture as an engineer/security reviewer** | [concepts/trust-architecture.md](concepts/trust-architecture.md) → [architecture/egps-v10.md](architecture/egps-v10.md) → [architecture/phase-architecture.md](architecture/phase-architecture.md) |
-| **Maintaining tests or reviewing AI harness and CI coverage** | [Test refactoring design (2026-09-14)](architecture/test-refactoring-design-2026-09-14.md) → [inventory, case catalog, research and CI audit](research/testing-review-2026-09-14/README.md) |
+| **Maintaining tests or reviewing AI harness and CI coverage** | [Test refactoring design (2026-09-14)](architecture/test-refactoring-design-2026-09-14.md) → [inventory, case catalog, research and CI audit](research/testing-review-2026-09-14/README.md) → [implementation and validation](reports/test-refactoring-integration-2026-09-14.md) |
 | **Mixing LLMs across phases for cost/quality** | [concepts/pluggability.md](concepts/pluggability.md) |
 | **Recovering from a failed cycle** | [concepts/error-recovery.md](concepts/error-recovery.md) → [architecture/checkpoint-resume.md](architecture/checkpoint-resume.md) |
 | **Why a gate keeps false-FAILing honest work** | [incidents/2026-08-12-proxy-as-verdict-findings.md](incidents/2026-08-12-proxy-as-verdict-findings.md) — the recurring proxy-as-verdict defect, 15 findings with root causes, and the two ADRs that replace it |

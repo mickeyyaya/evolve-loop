@@ -1,6 +1,6 @@
 # Test architecture and refactoring design
 
-Status: **design and review complete; implementation not started**. Review date: 2026-09-14. Source: `80b348e6943b08b3bfc4e2d30f06f42db69c1db9` (remote main, PR #601). This is a documentation-first proposal. It changes no production code, tests, coverage thresholds, workflow selection, or gate semantics.
+Status: **design reviewed and merged; implementation tracked separately**. Review date: 2026-09-14. Baseline source: `80b348e6943b08b3bfc4e2d30f06f42db69c1db9` (remote main, PR #601). The original documentation-first proposal merged in PR #602 before code changes. The [integration record](../reports/test-refactoring-integration-2026-09-14.md) distinguishes implemented slices, validation receipts and remaining work. Findings and inventories below describe the pinned baseline unless stated otherwise.
 
 The objective is to make tests easier to understand and maintain while preserving every existing behavior contract and measured coverage. Consolidation follows verification of the harness itself. Strict TDD, clean code, and restrained use of design patterns govern every implementation slice.
 
@@ -114,7 +114,7 @@ Coverage is necessary, not sufficient. Two tests can execute the same lines and 
 | Core local fakes | Retain documented local implementations for now | Avoid import cycle and keep package-private behavior tests |
 | Coverage/API-named tests | Review case by case, never blanket-delete | Export identifier visibility is itself consumed by `apicover`; add or retain meaningful assertions |
 
-The [candidate index](../research/testing-review-2026-09-14/duplicate-candidates.tsv) includes all 59 identical-body groups. Most remain **unreviewed candidates**, especially historical cycle wrappers whose globals, helpers, selection, or provenance can differ. Similarity tooling must never authorize deletion.
+The baseline [candidate index](../research/testing-review-2026-09-14/duplicate-candidates.tsv) includes all 59 identical-body groups and initially marked most unreviewed. The [subsequent disposition review](../reports/test-duplicate-dispositions-2026-09-14.md) inspects every group and records concrete retention/consolidation decisions. Historical cycle wrappers can differ through globals, helpers, selection or provenance; similarity tooling must never authorize deletion.
 
 ## AI-driven testing workflow
 
@@ -175,10 +175,10 @@ These are independent, reviewable changes, not one bulk rewrite. Correctness com
 | S6 — expand by owner | Phase setup/scanner consumers/ACS wrappers, one family at a time | Fake contracts already proven; static refs and executed identities preserved | Full affected tier + required CI; all deletion maps complete |
 | S7 — sustained robustness | Fuzz corpus, fake/real transport conformance, measured mutation, live calibration | Known-good/bad/gaming controls and retained failure corpora | Reproducible telemetry and documented ownership; no guessed coverage claims |
 
-S1 and S2 are prerequisites for relying on shared harness evidence. Independent documentation and landing selection work can proceed concurrently in separate worktrees. Preserve single-writer ownership per file, merge one family at a time, and stop expansion when coverage, case identity, mutation sensitivity, or required skip behavior changes unexpectedly. Use the repository's review/commit-gate/ship process for later commits; this design is uncommitted and unpublished.
+S1 and S2 are prerequisites for relying on shared harness evidence. Independent documentation and landing selection work can proceed concurrently in separate worktrees. Preserve single-writer ownership per file, merge one family at a time, and stop expansion when coverage, case identity, mutation sensitivity, or required skip behavior changes unexpectedly. Use the repository's review/commit-gate/ship process for implementation commits; record each outcome in the linked integration record.
 
 ## Completion standard for the campaign
 
 The campaign is complete only when every removed test has a reviewed semantic replacement, preserved per-environment block/API coverage, no unclassified new skip, and the same or stronger fault detection. New harness behavior must have witnessed RED-to-GREEN evidence. CI and release must execute the declared contract on the exact revision; design text, workflow labels and aggregate percentages cannot substitute for execution proof.
 
-The present step delivers the design and evidence, not a claim that all tests have been refactored or all gaps fixed. Baseline local tests passed, but there was no full local Go suite, full local cross-OS coverage comparison, paid-model evaluation, or measured repository-wide mutation run. Existing tests remain byte-for-byte intact.
+The original S0 step delivered the design and evidence, with existing tests byte-for-byte intact and only the selected local suites executed. Subsequent full-suite results and code changes are recorded in the [integration record](../reports/test-refactoring-integration-2026-09-14.md). Neither the design nor the first implementation slices claim that all tests have been refactored, every gap fixed, or paid-model and repository-wide mutation evaluations completed.
