@@ -35,9 +35,14 @@ main { padding: 12px 16px; display: grid; gap: 12px; }
 table { border-collapse: collapse; width: 100%; } th, td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
 th { color: var(--muted); font-weight: 600; font-size: 12px; } tr.click { cursor: pointer; } tr.click:hover { background: var(--bg); }
 .muted { color: var(--muted); } .right { text-align: right; } .small { font-size: 12px; }
-.stepper { display: flex; gap: 3px; flex-wrap: wrap; }
+.stepper { display: flex; gap: 3px; flex-wrap: wrap; min-width: 140px; }
+.plan-cap { white-space: nowrap; }
 .step { width: 12px; height: 12px; border-radius: 3px; background: var(--inc-bg); display: inline-block; }
 .step.pass { background: var(--pass); } .step.fail { background: var(--fail); } .step.warn { background: var(--warn); } .step.cur { background: var(--run); animation: pulse 1.2s infinite; }
+.step.pending { background: transparent; border: 1px solid var(--inc); } .step.unreached { background: var(--inc-bg); opacity: .4; } .step.skipped { background: transparent; border: 1px dashed var(--inc); opacity: .6; } .step.incomplete { background: var(--inc-bg); }
+.step.gate { box-shadow: 0 0 0 2px var(--card), 0 0 0 3px var(--pass); } .step.opt { border-radius: 50%; }
+.gate-ok { color: var(--pass); font-size: 12px; }
+.panel.plan { border-color: var(--line); background: var(--card); }
 @keyframes pulse { 50% { opacity: .35; } }
 .grid-wrap { overflow-x: auto; } .grid td, .grid th { text-align: center; padding: 3px 4px; }
 .grid td:first-child, .grid th:first-child { text-align: left; white-space: nowrap; }

@@ -97,3 +97,16 @@ func (l *Loader) center() *signalcenter.Center {
 	}
 	return l.signals()
 }
+
+// IsRegistryFault reports whether w questions the registry itself or the
+// mandatory set it declares — the registry could not be read or parsed (the
+// compiled baseline stood in), or the spine it declares is weak. Readers that
+// print the mandatory set (the dashboard) forward exactly these; the other
+// registry-step warnings are about individual dials and phases.
+func IsRegistryFault(w Warning) bool {
+	switch w.Code {
+	case codeRegistryUnreadable, codeRegistryMalformed, codeWeakSpine:
+		return true
+	}
+	return false
+}

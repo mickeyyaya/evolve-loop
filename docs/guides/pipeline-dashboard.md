@@ -39,6 +39,8 @@ short fingerprint hash. Click a row for the detail view.
 
 **inbox** — pending items by weight (kind, route), plus lifecycle counts.
 
+**phase plan** — under every cycle's stepper: `passed 3/5 required · +1 optional · build 23m · left: audit, ship`. The stepper itself is the cycle's *plan*, not just its history: filled squares are phases that ran (coloured by their last verdict), the pulsing square is the ongoing phase, hollow squares are mandatory phases the running cycle has not reached, dashed squares are mandatory phases the cycle went past without running, faded squares are phases a sealed cycle never reached; a ring marks a phase whose contract gate recorded `GATE_CONTRACT_VERIFIED` in the cycle's signal stream, and a round square is an optional phase the cycle ran (retro, …). "Required" is the registry's answer, read through `internal/config`: `config.mandatory_phases` (scout, triage, build, audit, ship — the set the router's floor never skips) plus the `conditional_mandatory` phases (tdd, plan-review, build-planner) that ran; a malformed registry degrades to the compiled baseline and says so in the warnings, and the operator's own overrides (`EVOLVE_MANDATORY_PHASES`, `EVOLVE_USE_PHASE_REGISTRY`, …) shape the set exactly as they shape the loop's floor. A conditional-mandatory phase appears only once it runs — the board does not evaluate the rule — so `left:` names only the mandatory phases still ahead, and the required count grows by one when such a phase runs. What ran comes from `phase-timing.json` on a sealed cycle and from the cycle's Signal Center stream (`phase.outcome` events) on a running one — the timing file is flushed at closeout, so the stream is the live record.
+
 **phase × cycle** — Airflow-style grid: rows are phases in first-seen order, columns the
 last 24 cycles with workspaces, cell colour the phase's last verdict, `rN` when the phase ran
 N times. Click a column header for that cycle.
@@ -48,6 +50,8 @@ count, first/last cycle, `REGRESSED` when the identity came back after a later s
 `recurring`, or `new`. Click to open the last cycle carrying it.
 
 ## Reading a cycle (detail view)
+
+**phase plan** — the same sequence as a table: phase (with its optional / conditional mark), status (`pass` / `warn` / `fail` / `incomplete` for a run whose verdict was not recorded / `ongoing` / `pending` / `unreached` / `skipped`), the gate mark, wall clock, rounds; below it, how the advisor's proposal fared against what ran: proposed to run and not run (yet, on a running cycle), proposed to skip, and proposed to skip but run anyway (the mandatory floor overrode it). Source: `phase-timing.json` or the signal stream for what ran, `signals.ndjson` for the gate marks, `phase-replan.json` (else `phase-plan.json`) for the proposal; a torn newer proposal is reported, never replaced by the older file.
 
 Top to bottom is the triage order:
 
