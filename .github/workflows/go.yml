@@ -9,7 +9,8 @@ on:
       - 'agents/**'  # TestPersonaStopCriterionDedupe (go/internal/prompts) pins a combined size budget on agents/evolve-*.md; a persona-doc change can break it invisibly otherwise (2026-07-23: happened twice in one day).
       - '.evolve/phases/**'  # TestPhaseCatalog_* (go/internal/phasespec) scans the on-disk phase catalog; a phases-only change broke main invisibly (2026-08-04: cycle-1262 minted a metadata-less stub, #404 fixed it, and NEITHER triggered this workflow).
       - '.evolve/profiles/**'  # TestSmoke_RealProfiles + TestRepoPersonaProfilePairing (go/internal/{profiles,phasecoherence}) validate the tracked on-disk profiles; tracked stubs broke the v22.13.0 release suite and #406's fix ALSO minted no run (2026-08-04, same day as the phases gap).
-      - '.github/workflows/go.yml'
+      - '.github/workflows/**'
+      - '.goreleaser.yml'
   pull_request:
     paths:
       - 'go/**'
@@ -17,7 +18,10 @@ on:
       - 'agents/**'  # TestPersonaStopCriterionDedupe (go/internal/prompts) pins a combined size budget on agents/evolve-*.md; a persona-doc change can break it invisibly otherwise (2026-07-23: happened twice in one day).
       - '.evolve/phases/**'  # TestPhaseCatalog_* (go/internal/phasespec) scans the on-disk phase catalog; a phases-only change broke main invisibly (2026-08-04: cycle-1262 minted a metadata-less stub, #404 fixed it, and NEITHER triggered this workflow).
       - '.evolve/profiles/**'  # TestSmoke_RealProfiles + TestRepoPersonaProfilePairing (go/internal/{profiles,phasecoherence}) validate the tracked on-disk profiles; tracked stubs broke the v22.13.0 release suite and #406's fix ALSO minted no run (2026-08-04, same day as the phases gap).
-      - '.github/workflows/go.yml'
+      - '.github/workflows/**'
+      - '.goreleaser.yml'
+
+  workflow_call:
 
 permissions:
   contents: read
@@ -31,11 +35,16 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
         go: ['1.23']
+        include:
+          - os: ubuntu-latest
+            go: '1.27'
     defaults:
       run:
         working-directory: go
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Shared with release validation; preserve tag/history tests.
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.go }}
@@ -56,13 +65,7 @@ jobs:
         # Boot timeout is configured via BridgePolicy.BootTimeoutS in
         # .evolve/policy.json (bridge.boot_timeout_s) — no env override needed.
         run: |
-          # Exclude acs/ — per-cycle ACS predicate evals that read runtime
-          # artifacts (.evolve/runs/cycle-N/...) absent in CI; they run in the
-          # live cycle context, not the unit gate (matches the Makefile).
-          # -tags integration pulls in the real-FS/git/tmux tier so internal/*
-          # coverage reflects it. The e2e tier (subprocess-heavy, no -race) runs
-          # in the separate step below. See go/docs/testing.md (cost × granularity).
-          go test -race -count=1 -tags integration -coverprofile=coverage.txt $(go list ./... | grep -v '/acs/')
+          make test-integration
           go tool cover -func=coverage.txt
       - name: e2e tier (no race; live sub-tier self-skips without live flag)
         # `evolve_test_phases` is added alongside `e2e` so the serve-phase
@@ -77,16 +80,14 @@ jobs:
         # with build+publish SKIPPED, publishing an assetless tag. One recipe,
         # one budget; a future bump cannot reach one workflow and miss the other.
         run: make test-e2e
-      - name: coverage gate (>=85% per internal/* package)
+      - name: function coverage warnings (<85%; advisory)
         run: |
-          fail=0
           while IFS=$'\t' read -r pkg pct; do
             case "$pkg" in
               *internal/*|*/pkg/acsassert*|*/pkg/version*)
                 num=${pct%.*}
                 if [ "$num" -lt 85 ]; then
                   echo "::warning::coverage gate: $pkg at $pct (<85%)"
-                  fail=1
                 fi
                 ;;
             esac
@@ -104,7 +105,9 @@ jobs:
         run: |
           go build -o bin/apicover ./cmd/apicover
           go tool cover -func=coverage.txt > coverage.func.txt
-          bin/apicover -cover coverage.func.txt $(go list -f '{{.Dir}}' ./internal/...) > apicover-report.txt || true
+          dirs=()
+          while IFS= read -r dir; do dirs+=("$dir"); done < <(go list -f '{{.Dir}}' ./internal/...)
+          bin/apicover -cover coverage.func.txt "${dirs[@]}" > apicover-report.txt || true
           grep -E '^(== |summary:)' apicover-report.txt | tail -80 || true
           echo "::notice::apicover is warning-only in Phase 0 (full report in the coverage artifact)"
           exit 0
@@ -114,22 +117,11 @@ jobs:
         # build. Self-contained: rebuilds apicover + coverage.func.txt from the
         # test step's coverage.txt (the warning step above is best-effort and
         # must not gate this). The warning sweep still reports everything else.
-        run: |
-          pkgs=$(grep -vE '^[[:space:]]*(#|$)' .apicover-enforce || true)
-          if [ -z "$pkgs" ]; then echo "no enforced packages — skipping"; exit 0; fi
-          go build -o bin/apicover ./cmd/apicover
-          go tool cover -func=coverage.txt > coverage.func.txt
-          # -e: tolerate build-tag-gated packages (e.g. acs/cycleN need -tags acs).
-          # Without it, `go list` exits non-zero on those and `set -e` aborts the
-          # step before apicover even runs. Their dirs still resolve; apicover
-          # finds 0 exported symbols in the test-only acs packages and passes.
-          dirs=$(echo "$pkgs" | xargs go list -e -f '{{.Dir}}')
-          echo "enforcing apicover (-enforce) on:"; echo "$dirs"
-          echo "$dirs" | xargs bin/apicover -enforce -cover coverage.func.txt
+        run: make apicover-check
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: coverage-${{ matrix.os }}
+          name: coverage-${{ matrix.os }}-go${{ matrix.go }}
           path: |
             go/coverage.txt
             go/apicover-report.txt
@@ -139,4 +131,3 @@ jobs:
         # `make cover-strict`, both reading the same file — never by a test that
         # reads its own coverage profile (that would skip silently).
         run: make cover-strict
-

@@ -21,37 +21,19 @@ permissions:
   contents: write
 
 jobs:
-  # check #3 — "all tests performed": gate publishing on the full suite passing
-  # on the exact tagged commit. Calls the project's own Makefile targets (no
-  # re-listed `go test` commands) and mirrors go.yml's structure (integration
-  # tier with race; e2e tier without race).
+  # Reusable workflows run their checkout on this exact tagged revision. The
+  # same Linux/macOS test, coverage, plugin, and durable-ACS gates protect main.
   test:
     name: full suite (tagged commit)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: go
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.23'
-          cache-dependency-path: go/go.sum
-      - run: go mod download
-      - name: lint (vet + gofmt)
-        run: make lint
-      - name: build
-        run: make build
-      - name: test (race + integration tier)
-        run: make test-integration
-      - name: e2e tier (no race)
-        run: make test-e2e
+    uses: ./.github/workflows/go.yml
+
+  validate:
+    name: plugin and durable ACS (tagged commit)
+    uses: ./.github/workflows/ci.yml
 
   goreleaser:
     name: build + publish binaries
-    needs: test
+    needs: [test, validate]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -59,7 +41,7 @@ jobs:
           fetch-depth: 0 # goreleaser needs full history + tags
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
+          go-version: '1.27'
       - uses: goreleaser/goreleaser-action@v6
         with:
           version: latest
@@ -80,7 +62,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
+          go-version: '1.27'
           cache-dependency-path: go/go.sum
       - name: build evolve binary
         run: go -C go build -o "$GITHUB_WORKSPACE/evolve" ./cmd/evolve
@@ -104,7 +86,7 @@ jobs:
   # re-promoting after a successful re-run is one PATCH.
   demote-on-failure:
     name: demote assetless release so latest keeps binaries
-    needs: [test, goreleaser, verify]
+    needs: [test, validate, goreleaser, verify]
     if: ${{ always() && contains(needs.*.result, 'failure') }}
     runs-on: ubuntu-latest
     steps:
