@@ -261,28 +261,43 @@ func (l *FileLedger) appendChainedFromTail(fill func(seq int, prevHash string) a
 // but their SHA is still computed so the first v8.37+ entry can chain
 // from the last pre-v8.37 line. If the entire file is pre-v8.37 the
 // tip file is optional.
-func (l *FileLedger) Verify(_ context.Context) error {
+func (l *FileLedger) Verify(ctx context.Context) error {
+	_, err := l.VerifyScope(ctx)
+	return err
+}
+
+// VerifyScope is Verify plus the scope the walk actually validated — the epoch
+// anchor strict validation resumed from, or the zero VerifiedScope when every
+// line was validated from genesis. It is the same single walk, so the reported
+// scope is the one that was verified and not a second, separately resolved
+// answer that could disagree with it.
+func (l *FileLedger) VerifyScope(_ context.Context) (VerifiedScope, error) {
 	raw, err := os.ReadFile(l.ledgerPath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return nil
+			return VerifiedScope{}, nil
 		}
-		return fmt.Errorf("ledger read: %w", err)
+		return VerifiedScope{}, fmt.Errorf("ledger read: %w", err)
 	}
 	lines := splitLines(raw)
 	if len(lines) == 0 {
-		return nil
+		return VerifiedScope{}, nil
 	}
 
-	lastSeq, lastSha, sawV837, err := walkChain(lines, effectiveAnchorSHA(lines, l.loadAnchorSHA()))
+	anchorSHA, anchorSeq := effectiveAnchorSHA(lines, l.loadAnchorSHA())
+	lastSeq, lastSha, sawV837, err := walkChain(lines, anchorSHA)
 	if err != nil {
-		return err
+		return VerifiedScope{}, err
 	}
+	scope := VerifiedScope{AnchorLineSHA: anchorSHA, AnchorSeq: anchorSeq}
 	// If no v8.37 entries exist, tip file is optional.
 	if !sawV837 {
-		return nil
+		return scope, nil
 	}
-	return l.checkTip(lastSeq, lastSha)
+	if err := l.checkTip(lastSeq, lastSha); err != nil {
+		return VerifiedScope{}, err
+	}
+	return scope, nil
 }
 
 // walkChain is THE chain walk, shared by Verify (live file only) and

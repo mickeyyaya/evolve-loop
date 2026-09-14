@@ -60,16 +60,32 @@ func runLedgerVerify(args []string, stderr io.Writer) int {
 		return 10
 	}
 	l := ledger.New(evolveDir)
-	verify, scope := l.Verify, "chain intact"
+	verify, scope := l.VerifyScope, "chain intact"
 	if deep {
-		verify, scope = l.VerifyDeep, "chain intact incl. sealed segments"
+		verify, scope = l.VerifyDeepScope, "chain intact incl. sealed segments"
 	}
-	if err := verify(context.Background()); err != nil {
+	verified, err := verify(context.Background())
+	if err != nil {
 		fmt.Fprintf(stderr, "[ledger] BROKEN: %v\n", err)
 		return 2
 	}
-	fmt.Fprintf(stderr, "[ledger] OK: %s (%s/ledger.jsonl)\n", scope, evolveDir)
+	fmt.Fprintf(stderr, "[ledger] OK: %s (%s/ledger.jsonl) — %s\n", scope, evolveDir, verifiedFrom(verified))
 	return 0
+}
+
+// verifiedFrom states WHICH history the verification just accepted. A success
+// over a full-strict chain and a success that deliberately trusted an
+// adjudicated prefix (ADR-0048's epoch anchor) are different claims, and
+// printing one string for both is what let the ledger-1740 damage stay
+// invisible. The anchor is named by its own identity — read from the ledger,
+// never a literal — so two ledgers sealed at different lines read differently
+// and an operator can carry the pair straight to `evolve ledger anchor`.
+func verifiedFrom(s ledger.VerifiedScope) string {
+	if s.AnchorLineSHA == "" {
+		return "verified strictly from genesis (no epoch anchor)"
+	}
+	return fmt.Sprintf("verified strictly from epoch anchor entry_seq=%d line-sha %s; the preserved prefix before it is operator-adjudicated, NOT chain-validated",
+		s.AnchorSeq, s.AnchorLineSHA)
 }
 
 func runLedgerSeal(args []string, stderr io.Writer) int {

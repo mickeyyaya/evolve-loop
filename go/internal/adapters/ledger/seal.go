@@ -249,15 +249,24 @@ func (l *FileLedger) gatherAllLines() ([][]byte, error) {
 	return full, nil
 }
 
-func (l *FileLedger) VerifyDeep(_ context.Context) error {
+func (l *FileLedger) VerifyDeep(ctx context.Context) error {
+	_, err := l.VerifyDeepScope(ctx)
+	return err
+}
+
+// VerifyDeepScope is VerifyDeep plus the scope the walk actually validated —
+// the deep counterpart of VerifyScope. Both production verification paths
+// report the SAME provenance: an operator whose two commands disagreed about
+// what had been verified would be worse off than one told nothing.
+func (l *FileLedger) VerifyDeepScope(_ context.Context) (VerifiedScope, error) {
 	evolveDir := filepath.Dir(l.ledgerPath)
 	segs, err := segmentFiles(filepath.Join(evolveDir, segmentsDirName))
 	if err != nil {
-		return err
+		return VerifiedScope{}, err
 	}
 	liveRaw, err := os.ReadFile(l.ledgerPath)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("ledger read: %w", err)
+		return VerifiedScope{}, fmt.Errorf("ledger read: %w", err)
 	}
 	liveLines := splitLines(liveRaw)
 
@@ -266,26 +275,27 @@ func (l *FileLedger) VerifyDeep(_ context.Context) error {
 	for _, s := range segs {
 		segLines, segSHA, err := readSegment(s)
 		if err != nil {
-			return err
+			return VerifiedScope{}, err
 		}
 		// Residue check on EVERY segment (not just the newest): a segment
 		// whose first line is still the live file's first line means a seal
 		// truncation never completed.
 		if len(segLines) > 0 && len(liveLines) > 0 && bytes.Equal(segLines[0], liveLines[0]) {
-			return fmt.Errorf("%w: segment %s written but live file not truncated", ErrSealResidue, filepath.Base(s))
+			return VerifiedScope{}, fmt.Errorf("%w: segment %s written but live file not truncated", ErrSealResidue, filepath.Base(s))
 		}
 		rel, rerr := filepath.Rel(evolveDir, s)
 		if rerr != nil {
-			return fmt.Errorf("ledger verify: rel: %w", rerr)
+			return VerifiedScope{}, fmt.Errorf("ledger verify: rel: %w", rerr)
 		}
 		segSHAs[filepath.ToSlash(rel)] = segSHA
 		full = append(full, segLines...)
 	}
 	full = append(full, liveLines...)
 
-	lastSeq, lastSha, sawV837, err := walkChain(full, effectiveAnchorSHA(full, l.loadAnchorSHA()))
+	anchorSHA, anchorSeq := effectiveAnchorSHA(full, l.loadAnchorSHA())
+	lastSeq, lastSha, sawV837, err := walkChain(full, anchorSHA)
 	if err != nil {
-		return err
+		return VerifiedScope{}, err
 	}
 
 	// Anchor binding: every segment must have a segment_seal entry whose
@@ -298,19 +308,23 @@ func (l *FileLedger) VerifyDeep(_ context.Context) error {
 		}
 	}
 	for rel, sha := range segSHAs {
-		anchorSHA, ok := anchors[rel]
+		segAnchorSHA, ok := anchors[rel]
 		if !ok {
-			return fmt.Errorf("%w: segment %s has no segment_seal anchor", ErrSealResidue, rel)
+			return VerifiedScope{}, fmt.Errorf("%w: segment %s has no segment_seal anchor", ErrSealResidue, rel)
 		}
-		if anchorSHA != sha {
-			return fmt.Errorf("%w: segment %s content does not match its anchor (have %s want %s)", core.ErrLedgerChainBroken, rel, sha, anchorSHA)
+		if segAnchorSHA != sha {
+			return VerifiedScope{}, fmt.Errorf("%w: segment %s content does not match its anchor (have %s want %s)", core.ErrLedgerChainBroken, rel, sha, segAnchorSHA)
 		}
 	}
 
+	scope := VerifiedScope{AnchorLineSHA: anchorSHA, AnchorSeq: anchorSeq}
 	if !sawV837 {
-		return nil
+		return scope, nil
 	}
-	return l.checkTip(lastSeq, lastSha)
+	if err := l.checkTip(lastSeq, lastSha); err != nil {
+		return VerifiedScope{}, err
+	}
+	return scope, nil
 }
 
 // --- helpers ---

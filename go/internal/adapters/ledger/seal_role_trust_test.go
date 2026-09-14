@@ -31,7 +31,7 @@ func operatorSealLine(prevSHA string) string {
 func TestEffectiveAnchorSHA_AutosealRole_DoesNotMoveAnchor(t *testing.T) {
 	lines, _ := chainLines()
 	extended := append(append([]string(nil), lines...), autosealLine(sha256Of(lines[len(lines)-1])))
-	got := effectiveAnchorSHA(bytesLines(extended), "")
+	got, _ := effectiveAnchorSHA(bytesLines(extended), "")
 	if got != "" {
 		t.Errorf("an operator-autoseal line must not move the anchor; got %q", got)
 	}
@@ -45,7 +45,7 @@ func TestEffectiveAnchorSHA_OperatorRole_MovesAnchor(t *testing.T) {
 	last := sha256Of(lines[len(lines)-1])
 	sealLine := operatorSealLine(last)
 	extended := append(append([]string(nil), lines...), sealLine)
-	got := effectiveAnchorSHA(bytesLines(extended), "")
+	got, _ := effectiveAnchorSHA(bytesLines(extended), "")
 	if want := sha256Of(sealLine); got != want {
 		t.Errorf("an operator-role seal must move the anchor to itself; got %q want %q", got, want)
 	}

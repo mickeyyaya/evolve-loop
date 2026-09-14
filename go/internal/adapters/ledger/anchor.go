@@ -101,16 +101,42 @@ func sealChainsFromPrev(hasPrev bool, e core.LedgerEntry, prevLineSHA string) bo
 	return e.PrevHash == prevLineSHA
 }
 
+// VerifiedScope names WHICH history a successful verification actually
+// validated. The two outcomes are very different claims — every byte from
+// genesis, or a strict walk that resumed at an epoch anchor whose preserved
+// prefix an operator adjudicated (ADR-0048) — and until cycle-1677 both ended
+// at the same `OK: chain intact` string, which is the shape that let the
+// ledger-1740 damage stay invisible for as long as it did. The anchor is named
+// by its OWN identity, read out of the ledger, so no literal can stand in for
+// it: two ledgers sealed at different lines report differently.
+//
+// The zero value means full-strict verification (no anchor in play).
+type VerifiedScope struct {
+	// AnchorLineSHA is the SHA of the epoch-anchor line strict validation
+	// resumed from; "" when the walk validated the chain from genesis.
+	AnchorLineSHA string
+	// AnchorSeq is that line's own entry_seq — the identifier
+	// `evolve ledger anchor` speaks. Meaningless when AnchorLineSHA is "".
+	AnchorSeq int
+}
+
 // effectiveAnchorSHA resolves the epoch anchor the chain walk should start
 // from: the LAST of (the out-of-band ledger-anchor.json line, any self-valid
-// in-band operator seal at or after it). Returns "" when neither exists, which
-// is full-strict verification.
+// in-band operator seal at or after it), plus that line's own entry_seq for
+// the scope report. Returns "" when neither exists, which is full-strict
+// verification.
+//
+// The seq is taken from the resolved LINE rather than from ledger-anchor.json's
+// anchor_seq field: an in-band seal that moves the anchor past the sidecar is
+// recorded nowhere else, so the sidecar's number would be stale exactly when
+// the operator most needs the real one.
 //
 // When fileAnchorSHA is set but no line carries it, it is returned unchanged so
 // walkChain still reports "anchor not found" — a stale or tampered sidecar must
-// fail loudly, never silently degrade to "no anchor, verify everything".
-func effectiveAnchorSHA(lines [][]byte, fileAnchorSHA string) string {
-	anchor := fileAnchorSHA
+// fail loudly, never silently degrade to "no anchor, verify everything". Its
+// seq is then unknown (0) and never surfaces: such a walk cannot succeed.
+func effectiveAnchorSHA(lines [][]byte, fileAnchorSHA string) (anchorSHA string, anchorSeq int) {
+	anchorSHA = fileAnchorSHA
 	// Seals BEFORE the sidecar anchor are already inside the untrusted prefix,
 	// so only seals at/after it may move the anchor forward.
 	reached := fileAnchorSHA == ""
@@ -120,17 +146,20 @@ func effectiveAnchorSHA(lines [][]byte, fileAnchorSHA string) string {
 		switch {
 		case !reached && sha == fileAnchorSHA:
 			reached = true
+			if _, e, err := decodeLedgerLine(line); err == nil {
+				anchorSeq = e.EntrySeq
+			}
 		case !reached:
 			// still inside the untrusted prefix
 		default:
 			if hasPrev, e, err := decodeLedgerLine(line); err == nil &&
 				isOperatorSeal(e) && sealChainsFromPrev(hasPrev, e, prevLineSHA) {
-				anchor = sha
+				anchorSHA, anchorSeq = sha, e.EntrySeq
 			}
 		}
 		prevLineSHA = sha
 	}
-	return anchor
+	return anchorSHA, anchorSeq
 }
 
 // ledgerAnchor is the on-disk shape of <evolveDir>/ledger-anchor.json.
