@@ -54,7 +54,7 @@ func (w replWaiter) deliverArtifactNudge(state *replWaitState, elapsed int) chec
 		fmt.Fprintf(w.deps.Stderr, "%s submit-verify: nudge NOT verified — capture failed, input-line state unknown: %v\n", w.prefix, captureErr)
 	}
 	outcome := verifySubmitted(w.ctx, w.deps, w.launch, w.prefix, "nudge", nudgePane, nudgeMsg)
-	recordSubmitVerify(w.recorder, w.phaseName, w.cfg.Cycle, "nudge", outcome)
+	recordSubmitVerify(w.recorder, w.phaseName, w.cfg.Cycle, "nudge", outcome, pasteOutcome{}) // a nudge is a SendKeys, not a paste
 	if outcome.Result == interaction.ResultSubmitWedged {
 		state.submitWedged = true
 		state.lastVerdict.Reason = fmt.Sprintf("nudge %s (resends=%d)", outcome.Result, outcome.Resends)

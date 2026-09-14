@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — the tmux driver no longer declares a large codex prompt "wedged" 2.5 s after pasting it (2026-09-14)
+
+Every codex-tmux phase of the first post-decomposition wave needed two or three Enter re-sends to submit its prompt, and the two largest (scout 17.7 KB, build 35 KB) hit the re-send cap: the TUI was still ingesting the paste when the fixed 1 s settle and three 500 ms re-sends had all fired, so the dispatch was discarded as `submit_wedged`. The delivery tail now has ONE home (`paste_settle.go`, shared by the prompt paste and `injectText`): it settles by paste size (1 s + 1.5 s/10 KB, cap 6 s — never the 2 s artifact-wait interval), waits for the pane to stop changing before the first Enter (≥ 2 KB pastes, bounded to 8 polls; an unreadable prompt is treated as a large one, loudly), and records the settle and the stability outcome in the submit-verify ledger on the success path; `verifySubmitted` backs off between re-sends (500 ms → 1.5 s → 2.5 s). Vocabulary, stderr lines, the re-send cap and the wedge short-circuit are unchanged. Record: `docs/incidents/2026-09-14-codex-prompt-submit-wedge.md`.
+
+---
+
 ## Changed — the `evolve subagent run` execution path is its own package with eleven Signal Center codes (ADR-0103 unit 16, 2026-09-14)
 
 `internal/subagent/run.go`'s 236-line `Run` moved into `internal/subagent/subagentrun` (a `Dispatcher` over

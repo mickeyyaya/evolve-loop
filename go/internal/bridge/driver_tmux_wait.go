@@ -13,6 +13,11 @@ import (
 // replWaiter owns the completion wait state machine after prompt dispatch. Its
 // dependencies are fixed for one launch, which keeps the state transitions
 // testable without widening the package API.
+// artifactWaitInterval is the artifact-wait poll cadence — named once so the
+// paste timing can prove it never coincides with it (the wedge short-circuit
+// pins count Sleeps of this exact value as polls).
+const artifactWaitInterval = 2 * time.Second
+
 type replWaiter struct {
 	ctx            context.Context
 	cfg            *Config
@@ -22,6 +27,7 @@ type replWaiter struct {
 	phaseName      string
 	resolvedPrompt string
 	artifactBase   artifactBaseline
+	paste          pasteOutcome // what the prompt delivery learned — recorded beside the submit verdict
 	responder      *autoResponder
 	recorder       *interaction.Recorder
 	cursor         *inbox.Cursor
@@ -52,7 +58,7 @@ func (w replWaiter) wait() (replWaitResult, int) {
 	}
 	ar.transientDwellEnabled = true
 	for elapsed := 0; ; elapsed += 2 {
-		deps.Sleep(2 * time.Second)
+		deps.Sleep(artifactWaitInterval)
 		state.waitedS = elapsed
 		if err := ctx.Err(); err != nil {
 			// Context cancelled (orchestrator timeout / SIGTERM / the next phase

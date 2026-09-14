@@ -1,0 +1,72 @@
+# Verification wave 1 after the decomposition train — findings (2026-09-14)
+
+> **Purpose.** The research record of the first loop wave run on the merged Signal Center + ADR-0103
+> decomposition train (15 units, PRs #587–#601; main `80b348e6`, runtime plane `292cc033`, loop pid
+> 3105, log `runtime/.evolve/loop-20260914-1140-verify.log`). It answers the program's own test —
+> *can the root cause of a failed cycle be read from a few signal lines?* — and records what the
+> wave found, what was fixed the same day, and what is still open. Companion docs:
+> [program review memo](../architecture/decomposition/00-program-review-2026-09-14.md) ·
+> [Pipeline Factory Rules](../operations/pipeline-factory-rules.md) ·
+> incidents [triage-refusal poison loop](../incidents/2026-09-14-triage-refusal-poison-loop.md) and
+> [codex prompt submit wedge](../incidents/2026-09-14-codex-prompt-submit-wedge.md).
+> Operator goal for the wave: *"continue to fix the pipeline issues until we see 5 consecutive shipped results"* — this wave contributed **0 ships**, and two of the three reasons are now fixed.
+
+## 1. Method
+
+- Reconcile the runtime plane onto main at a wave boundary (`git merge origin/main` → rebuild → `evolve reset-sha -operator` → fresh launch with the plane's `goal.txt`), fleet width 3.
+- Measure with `measure-wave.sh` (memo §6): lanes/ships per wave from the loop log; every `signals.ndjson` written since launch grouped by module × severity and by code; registry-drift events; console WARN/INCIDENT lines by module tag; suite litter on the plane.
+- For every FAIL, triage from the stream first, then the durable artifacts (`phase-timing.json`, `*-interactions.ndjson`, `.evolve/ledger.jsonl`), and only then the code.
+
+## 2. What the stream showed (first 25 minutes)
+
+| Module × severity | Events | Notable codes |
+|---|---|---|
+| ledger INFO | 133 | `ledger.appended` (kind-only) |
+| bridge WARN | 30 | `BRIDGE_TOKEN_USAGE_WARNING` 17 · `BRIDGE_TELEMETRY_TRIPWIRE` 9 · `BRIDGE_EXIT_ARTIFACT_TIMEOUT` 2 · `BRIDGE_CONTEXT_FILL_HIGH` 2 |
+| gate.contract INFO | 13 | `GATE_CONTRACT_VERIFIED` |
+| orchestrator INFO / WARN | 12 / 2 | `phase.outcome`; `ORCHESTRATOR_PHASE_VERDICT_FAIL`, `ORCHESTRATOR_CYCLE_FAILED` |
+| liveness WARN · inbox WARN | 1 · 1 | `LIVENESS_PANE_STAGNANT` · `INBOX_CLAIM_NOT_FOUND` |
+| registry drift / unknown module | **0** | every producer registered — the closed vocabularies held |
+
+Console lines carried the module tag and code in every case; no Center-less emit was observed on the lane path.
+
+## 3. Findings
+
+### F1 — one item drew nine lanes: a triage refusal had no failure class (P1, fixed — PR #606)
+
+Cycle 1675's story was four stream lines: `BRIDGE_EXIT_ARTIFACT_TIMEOUT cause=submit_wedged` (scout) → `ORCHESTRATOR_PHASE_VERDICT_FAIL phase=triage … names protected surface go/internal/bridge/streamjson_verdict.go` → `ORCHESTRATOR_CYCLE_FAILED phases_run=2` → `INBOX_CLAIM_NOT_FOUND` for an item that was right there. The ledger then showed the same item recovered untouched on cycles 1650, 1653, 1655, 1658, 1661, 1665, 1669, 1672 and 1675 — nine waves of scout + triage tokens with zero progress. Mechanism: the triage gate's own refusal carried a prose-only diagnostic; `cycleclassify` had no class for it; the closeout read system-level; the ADR-0072 S5 drain never bumped `failure_count`; and the closeout's re-claim of an already-claimed id raised the false not-found. Fix (same day): a structured refusal code and subject on the C1 record and in the signal (`diagnostic_codes=`), the task-level class `phase-refusal`, a per-code disposition table, and a first-hit route of the refused card to `console-manual` (`INBOX_ITEM_ROUTED_CONSOLE`). **Design goal verified:** the root cause was read from the stream and the ledger before any code was opened.
+
+### F2 — "submit_wedged": the driver declared a 35 KB codex prompt wedged 2.5 s after pasting it (P1, fixed — this change)
+
+Two of three scouts (attempt 1) and one recovery build timed out with `cause=submit_wedged`; every other codex-tmux phase in the wave needed 2–3 Enter re-sends to land. Mechanism: a fixed 1 s settle plus three 500 ms re-sends while the TUI was still ingesting the paste. Fix: one delivery tail (`paste_settle.go`) with a size-scaled settle, a bounded wait for the pane to stop changing, backoff between re-sends, and the paste evidence recorded in the submit-verify ledger on the success path. Follow-up filed in the incident doc: a WARN signal when re-sends ≥ 2 so the next timing regression is one grep away.
+
+### F3 — a peer moved main mid-pipeline: `SHIP_GIT_FLEET_REBASE_NEEDED` (observed, by design)
+
+Cycle 1673's ship found main advanced (four PRs from a parallel operator session landed during the wave) and took the documented recovery (`ship aborted after verdict=FAIL: … recovering via build (attempt 1/4)`). The recovery then hit F2. Nothing to fix in the ship path; the cost was the re-dispatch, which F2's fix reduces. Standing rule confirmed: tracked-path landings from operators belong at batch boundaries.
+
+### F4 — `AUDIT_CIPARITY_GATE_STEP_FAILED` and `ADVISOR_RESPONSE_UNPARSEABLE` (observed, open)
+
+Cycle 1673's audit CI-parity apicover step failed inside the lane worktree and the advisor's replan proposal was not JSON (`invalid character '.'`). Both are now single, coded stream lines (units 14 and 04 respectively) — they were the ones the memo predicted would become readable first. Neither blocked the cycle by itself; both are queued as inbox items for the next wave rather than fixed by hand, because neither is deterministic on its own evidence yet.
+
+### F5 — the poison set on the plane
+
+Ledger `recover` actions since cycle 1640 named eight ids; only `verdict-sentinel-as-tool-call` (9×) was still pending at the inbox root — routed `console-manual` by hand as the mitigation before F1 landed. The others had already been consumed or routed.
+
+## 4. Verdict on the design
+
+| Claim (memo §4) | Evidence from the wave |
+|---|---|
+| root cause from a few signal lines | F1: four lines + one ledger grep; F2: two lines + the per-phase `submit_verify` ledger; F3/F4: one line each |
+| module-tagged console with registered codes | every WARN in §2 carried `[module] kind SEVERITY CODE`; drift 0 |
+| the closed vocabularies survive the train | 192 → 194 registered codes with F1's two inbox codes (`evolve signals codes check` green); F2 adds evidence to an existing ledger payload, no new code |
+| efficiency-neutral at the leaf | no new cost measured; the two fixes remove the wave's two largest token sinks |
+
+Where the design was **not yet enough**: the triage gate's refusal was structured on the stream but not on the classifier's input (fixed by F1's `Diagnostic.Code`), and the driver's timing evidence lived only on stderr, which survives the failure path only (fixed by F2's ledger payload). Both are instances of the same rule the memo already stated: *every producer that stamps a code retires a regex; every diagnostic that matters must reach a durable record on the success path too.*
+
+## 5. Open items for the next wave
+
+1. Re-launch on a plane carrying #606 and the wedge fix; count consecutive ships from that wave (goal: 5).
+2. `AUDIT_CIPARITY_GATE_STEP_FAILED` inside lane worktrees (F4) — needs a second occurrence to classify.
+3. `ADVISOR_RESPONSE_UNPARSEABLE` (F4) — the advisor's non-JSON replan; the unit-04 leaf already falls back; decide whether the fallback should be INFO.
+4. The re-send WARN signal (F2 follow-up) and the chip `+N lines` positive signal if the stability wait proves insufficient.
+5. The memo's remaining recommendations: the Center-less operator roots unit before unit 05, unit 05 as a series, the four deferred "what happened" signals.
