@@ -95,7 +95,9 @@ func (r *materializationScoutRunner) Run(_ context.Context, req core.PhaseReques
 		if err := os.MkdirAll(filepath.Dir(evalPath), 0o755); err != nil {
 			return core.PhaseResponse{}, err
 		}
-		body := "# Eval " + r.slug + "\n\n```bash\ngo test ./internal/widget/...\n```\n"
+		// A complying scout writes the [code] grader the remediation now requires
+		// (cycle 1679), not only the legacy bash fence.
+		body := "# Eval " + r.slug + "\n\n- [code] `go test ./internal/widget/...`\n\n```bash\ngo test ./internal/widget/...\n```\n"
 		if err := os.WriteFile(evalPath, []byte(body), 0o644); err != nil {
 			return core.PhaseResponse{}, err
 		}

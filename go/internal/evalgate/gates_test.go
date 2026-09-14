@@ -31,7 +31,9 @@ func writeEval(t *testing.T, projectRoot, slug, bashBody string) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatalf("mkdir evals: %v", err)
 	}
-	body := "# Eval " + slug + "\n\n```bash\n" + bashBody + "\n```\n"
+	// A [code] grader bullet: the form the materialization gate requires of a
+	// scout-written eval (cycle 1679) — the bash fence below is the legacy form.
+	body := "# Eval " + slug + "\n\n- [code] `" + bashBody + "`\n\n```bash\n" + bashBody + "\n```\n"
 	if err := os.WriteFile(filepath.Join(dir, slug+".md"), []byte(body), 0o644); err != nil {
 		t.Fatalf("write eval: %v", err)
 	}

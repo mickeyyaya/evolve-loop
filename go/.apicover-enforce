@@ -642,3 +642,6 @@
 # (Decorator over core.Bridge, wrapped once at the composition root); the runner's
 # cli-health projections live here so both walks share one implementation.
 ./internal/bridgechain
+# addedtests — the ONE derivation of "which test packages did this tree add and
+# under which build tags"; consumers: the ship repo-contract gate and the build floor.
+./internal/addedtests

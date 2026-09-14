@@ -26,7 +26,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/addedtests"
 	"github.com/mickeyyaya/evolve-loop/go/internal/apicover"
+	"github.com/mickeyyaya/evolve-loop/go/internal/changedpkgs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
 	"github.com/mickeyyaya/evolve-loop/go/internal/codequality"
 	"github.com/mickeyyaya/evolve-loop/go/internal/docsfloor"
@@ -180,8 +182,13 @@ func changedPackageFloorChecks(ctx context.Context, in ReviewInput, paths []stri
 	pkgs := changedGoTestPackages(paths)
 	moduleDir := codequality.ModuleDir(in.Worktree)
 	pkgs = buildTagVisiblePackages(ctx, moduleDir, pkgs)
+	// Added tag-gated packages are invisible to the default-context run above
+	// (no GoFiles in that context) and were first executed at SHIP until
+	// 2026-09-14 (cycle 1679). They run here under their own tags regardless
+	// of whether anything default-visible changed.
+	taggedFails := addedTaggedTestFailures(ctx, in, moduleDir)
 	if len(pkgs) == 0 {
-		return nil
+		return floorLinesFor(nil, taggedFails, nil)
 	}
 	// Split the changed set: ENFORCED packages run once under the coverage-
 	// instrumented pass inside apicoverNamingFailures (their test run doubles
@@ -214,12 +221,60 @@ func changedPackageFloorChecks(ctx context.Context, in ReviewInput, paths []stri
 	if len(fails) > 0 {
 		writeBuildSelfCheckArtifact(in.Worktree, fails)
 	}
-	out := make([]string, 0, len(fails)+len(namingFails))
+	return floorLinesFor(fails, taggedFails, namingFails)
+}
+
+// floorLinesFor renders the floor's failures one line per failing package —
+// the default-context run, then the added tag-gated packages, then the
+// apicover naming failures. The tagged failures name their tags so the
+// builder re-runs exactly what the floor ran.
+func floorLinesFor(fails, taggedFails []selfCheckFailure, namingFails []string) []string {
+	out := make([]string, 0, len(fails)+len(taggedFails)+len(namingFails))
 	for _, f := range fails {
+		out = append(out, fmt.Sprintf("%s: unit tests FAIL\n%s", f.Pkg, floorFailureDiagnostic(f.Output)))
+	}
+	for _, f := range taggedFails {
 		out = append(out, fmt.Sprintf("%s: unit tests FAIL\n%s", f.Pkg, floorFailureDiagnostic(f.Output)))
 	}
 	out = append(out, namingFails...)
 	return out
+}
+
+// addedTaggedTestFailures runs every test package the tree ADDS under the
+// build tags its files declare — the ship gate's added-test backstop, at the
+// floor. One seed (changedpkgs.ChangedFilesChecked: the working tree vs the
+// cycle base) and one grouping (addedtests.Groups) for both gates; untagged
+// groups are already covered by the default-context run. Fail-open when the
+// seed cannot be derived (no base SHA, git could not answer): the ship
+// backstop still stands behind it.
+func addedTaggedTestFailures(ctx context.Context, in ReviewInput, moduleDir string) []selfCheckFailure {
+	if in.Worktree == "" || in.WorktreeBaseSHA == "" {
+		return nil
+	}
+	files, ok := changedpkgs.ChangedFilesChecked(in.Worktree, in.WorktreeBaseSHA)
+	if !ok {
+		return nil
+	}
+	groups, excluded, err := addedtests.Groups(in.Worktree, files)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[build-floor] WARN: added-test grouping failed (%v) — tag-gated added packages not run at the floor; the ship backstop still stands\n", err)
+		return nil
+	}
+	for _, p := range excluded {
+		fmt.Fprintf(os.Stderr, "[build-floor] EXCLUDED %s (requires_tmux or another build constraint unavailable on this host)\n", p)
+	}
+	var fails []selfCheckFailure
+	for _, g := range groups {
+		if len(g.Tags) == 0 {
+			continue
+		}
+		for _, pkg := range g.Packages {
+			if out, ok := buildSelfCheckTaggedRunner(ctx, moduleDir, pkg, g.Tags); !ok {
+				fails = append(fails, selfCheckFailure{Pkg: pkg + " (-tags " + strings.Join(g.Tags, ",") + ")", Output: out})
+			}
+		}
+	}
+	return fails
 }
 
 // floorFailureDiagnosticMax bounds one failing package's recorded output. The

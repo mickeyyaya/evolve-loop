@@ -14,6 +14,7 @@ package ship
 import (
 	"context"
 	"errors"
+	"github.com/mickeyyaya/evolve-loop/go/internal/addedtests"
 	"io"
 	"os"
 	"path/filepath"
@@ -32,9 +33,9 @@ import (
 // candidates of root's changes vs HEAD, flattened and sorted.
 func addedTestPackages(root string) (packages, excluded []string) {
 	files, _ := changedpkgs.ChangedFilesChecked(root, "HEAD")
-	groups, excluded, _ := addedTestPackageGroups(root, files)
+	groups, excluded, _ := addedtests.Groups(root, files)
 	for _, group := range groups {
-		packages = append(packages, group.packages...)
+		packages = append(packages, group.Packages...)
 	}
 	sort.Strings(packages)
 	return packages, excluded
