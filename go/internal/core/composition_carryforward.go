@@ -105,7 +105,7 @@ func (o *Orchestrator) CompositionFastPathWired() bool {
 // seam, patch-id drift, red gate, or writer error returns false — the
 // pre-existing full re-audit route is untouched (this can only narrow, never
 // widen, what ships).
-func (o *Orchestrator) compositionCarryForward(ctx context.Context, cycle int, cs CycleState) bool {
+func (o *Orchestrator) compositionCarryForward(ctx context.Context, cycle int, cs CycleState, projectRoot string) bool {
 	if o.compositionSnapshot == nil || o.compositionGateRunner == nil || o.compositionVerdictWriter == nil {
 		return false
 	}
@@ -144,7 +144,7 @@ func (o *Orchestrator) compositionCarryForward(ctx context.Context, cycle int, c
 		PatchID:      patchID,
 		AuditedBase:  snap.AuditedBase,
 		GitHead:      strings.TrimSpace(gitHead),
-		TreeStateSHA: worktreeContentSHA(ctx, worktree),
+		TreeStateSHA: worktreeContentSHA(ctx, projectRoot, worktree),
 		GateResults:  gateResults,
 		AuditedDiff:  snap.Diff,
 		ComposedDiff: []byte(composedDiff),
@@ -182,7 +182,7 @@ func (o *Orchestrator) ScopedMergeReviewWired() bool {
 // red gate, an unverified resolution, or a writer error returns false — the
 // pre-existing full re-audit route is untouched (this can only narrow, never
 // widen, what ships).
-func (o *Orchestrator) scopedMergeCarryForward(ctx context.Context, cycle int, cs CycleState) bool {
+func (o *Orchestrator) scopedMergeCarryForward(ctx context.Context, cycle int, cs CycleState, projectRoot string) bool {
 	if o.scopedMergeReviewer == nil || o.compositionSnapshot == nil ||
 		o.compositionGateRunner == nil || o.compositionVerdictWriter == nil {
 		return false
@@ -245,7 +245,7 @@ func (o *Orchestrator) scopedMergeCarryForward(ctx context.Context, cycle int, c
 		PatchID:      snap.PatchID,
 		AuditedBase:  snap.AuditedBase,
 		GitHead:      strings.TrimSpace(gitHead),
-		TreeStateSHA: worktreeContentSHA(ctx, worktree),
+		TreeStateSHA: worktreeContentSHA(ctx, projectRoot, worktree),
 		GateResults:  gateResults,
 		AuditedDiff:  snap.Diff,
 		ComposedDiff: resolution,

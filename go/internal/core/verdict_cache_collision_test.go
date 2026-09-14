@@ -37,7 +37,7 @@ func TestVerdictCacheCollisionRegression(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			sha := worktreeContentSHA(context.Background(), repo)
+			sha := worktreeContentSHA(context.Background(), "", repo)
 			if sha == "" {
 				t.Fatal("worktree content SHA is empty")
 			}

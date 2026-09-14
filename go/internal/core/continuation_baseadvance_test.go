@@ -18,7 +18,7 @@ func TestAdvanceContinuationBase_HealsStaleBase(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(wt, "lane.go"), []byte("package x\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := snapshotPreservedWorktree(context.Background(), wt); err != nil {
+	if _, err := snapshotPreservedWorktree(context.Background(), "", wt); err != nil {
 		t.Fatal(err)
 	}
 	// Main advances with the cycle-1365-shape fix: a .gitignore carve-out.
@@ -69,7 +69,7 @@ func TestAdvanceContinuationBase_ConflictReturnsErrorAndAborts(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(wt, "a.txt"), []byte("lane\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := snapshotPreservedWorktree(context.Background(), wt); err != nil {
+	if _, err := snapshotPreservedWorktree(context.Background(), "", wt); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(root, "a.txt"), []byte("main\n"), 0o644); err != nil {

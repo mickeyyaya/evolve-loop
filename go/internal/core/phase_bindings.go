@@ -126,7 +126,7 @@ func (o *Orchestrator) recordAuditBinding(ctx context.Context, cycle int, projec
 	// tree → INTEGRITY_TREE_DRIFT every cycle (cycle-152). Ship prefers this
 	// over the auditor's comment. Best-effort: empty ⇒ ship falls back to the
 	// auditor's value. No commit is made (write-tree only); ship re-stages anyway.
-	worktreeTree := worktreeContentSHA(ctx, worktree)
+	worktreeTree := worktreeContentSHA(ctx, projectRoot, worktree)
 	// `git diff HEAD` returns exit 1 when differences exist — not an error;
 	// only exit >1 (e.g. 128) is fatal. Match computeTreeStateSHA semantics.
 	diff, code, err := gitCapture(ctx, projectRoot, "diff", "HEAD")
@@ -225,8 +225,10 @@ func (o *Orchestrator) recordAuditBinding(ctx context.Context, cycle int, projec
 // recorded and the value looked up are computed identically. Best-effort:
 // returns "" when worktree is empty or git fails (callers degrade — ship falls
 // back to the auditor comment; the cache simply does not record/match).
-func worktreeContentSHA(ctx context.Context, worktree string) string {
-	if worktree == "" {
+func worktreeContentSHA(ctx context.Context, projectRoot, worktree string) string {
+	// The operator's index is never staged by a cycle (inPlaceWorktree): the
+	// binding degrades to empty and ship falls back to the auditor's value.
+	if worktree == "" || inPlaceWorktree(worktree, projectRoot) {
 		return ""
 	}
 	if _, _, aerr := gitCapture(ctx, worktree, "add", "-u"); aerr != nil {
@@ -399,8 +401,11 @@ func normalizeWorktreeToBase(ctx context.Context, worktree, baseSHA string) {
 //  2. gofmt -s normalize (cycle-352): runs after EVERY worktree phase, because
 //     tdd, build, AND test-amplification all author .go that the audit gofmt
 //     gate scans. Cheap no-op when the worktree is already clean.
-func (o *Orchestrator) normalizeBuildWorktree(ctx context.Context, completed Phase, cs CycleState) {
-	if cs.ActiveWorktree == "" {
+func (o *Orchestrator) normalizeBuildWorktree(ctx context.Context, completed Phase, cs CycleState, projectRoot string) {
+	// An in-place worktree is the operator's tree: no soft reset, no gofmt -w,
+	// no projection regen — the review sees the root exactly as the operator
+	// left it (announced once at provisioning; inPlaceWorktree).
+	if cs.ActiveWorktree == "" || inPlaceWorktree(cs.ActiveWorktree, projectRoot) {
 		return
 	}
 	// The build-commit soft-reset (cycle-156) is build-ONLY: it re-exposes a

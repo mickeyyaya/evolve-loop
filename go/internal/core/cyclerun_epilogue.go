@@ -83,10 +83,6 @@ func (cr *cycleRun) abnormalEpilogue(cause error) {
 	cr.o.ensureFailureDigest(cr.cycle, cr.req.ProjectRoot, cr.cs.WorkspacePath,
 		cr.cs.Phase, reason)
 	// Record floor: exactly one dossier per started cycle, on every path.
-	dossierGoal := cr.req.Context["goal"]
-	if dossierGoal == "" {
-		dossierGoal = cr.req.GoalHash
-	}
 	// closeout genuinely did NOT run here (the cycle died mid-phase), so this is a
 	// TRUE skipped_phases entry with a skip cause — distinct from the ran-but-
 	// declined records the floor guard collects in result.VerdictsNotAdopted. Recorded
@@ -100,19 +96,7 @@ func (cr *cycleRun) abnormalEpilogue(cause error) {
 	sealed := cr.result
 	sealed.FinalVerdict, sealed.TerminationReason = VerdictFAIL, reason
 	cr.emitCycleClose(sealed, "cycleRun.abnormalEpilogue")
-	if derr := writeCycleDossier(cr.o.gitMutationLock, cycleDossierParams{
-		ProjectRoot:        cr.req.ProjectRoot,
-		WorkspacePath:      cr.cs.WorkspacePath,
-		Cycle:              cr.cycle,
-		Goal:               dossierGoal,
-		RunID:              cr.cs.RunID,
-		Outcome:            VerdictFAIL,
-		SystemFailure:      cr.result.SystemFailure,
-		SkippedPhases:      cr.result.SkippedPhases,
-		VerdictsNotAdopted: cr.result.VerdictsNotAdopted,
-		SpineFailOpens:     cr.result.SpineFailOpens,
-		PhaseTimings:       cr.flushPhaseTimings(),
-	}); derr != nil {
+	if derr := writeCycleDossier(cr.o.gitMutationLock, cr.dossierParams(VerdictFAIL)); derr != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d: abnormal-epilogue dossier not written: %v\n", cr.cycle, derr)
 	}
 	// ADR-0076 slice C (G1, cycle-1078): error-path aborts never reach

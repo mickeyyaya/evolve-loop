@@ -320,7 +320,7 @@ func (gitWorktree) Cleanup(projectRoot, worktree string) error {
 	if worktree == "" {
 		return nil
 	}
-	if sameDirectory(worktree, projectRoot) {
+	if inPlaceWorktree(worktree, projectRoot) {
 		// NEVER dispose of the live repository. Every worktree this
 		// provisioner mints lives under the runscope base, but Cleanup is a
 		// public seam and a resumed cycle's checkpoint can name the project
@@ -425,4 +425,19 @@ func sameDirectory(a, b string) bool {
 		return filepath.Clean(p)
 	}
 	return lexical(a) == lexical(b)
+}
+
+// inPlaceWorktree reports whether worktree IS the project root — the
+// --simulate provisioner reads the root in place, and a resume checkpoint can
+// name it. Every host mutator of a worktree asks this ONE predicate INSIDE
+// itself and stands down (normalizeBuildWorktree, recoverBuildLeak,
+// worktreeContentSHA, snapshotPreservedWorktree, rebaseCycleBranchOntoMain;
+// the provisioner's Cleanup and the teardown message): the operator's tree is
+// never normalized, reverted, staged, committed, rebased or removed by a
+// cycle, whichever path — dispatch, resume, composition — reaches the
+// mutator. sameDirectory is the package's refusal predicate (errs toward
+// "same"; symlink aliases and relative spellings of the root are the root).
+// An empty projectRoot is unknown, not the root.
+func inPlaceWorktree(worktree, projectRoot string) bool {
+	return worktree != "" && projectRoot != "" && sameDirectory(worktree, projectRoot)
 }

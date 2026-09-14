@@ -379,7 +379,7 @@ func TestRebaseWithDerivedRegen_GitAddFails_Aborts(t *testing.T) {
 }
 
 func TestRebaseCycleBranchOntoMain_EmptyWorktree(t *testing.T) {
-	ok, conflict := rebaseCycleBranchOntoMain(context.Background(), "")
+	ok, conflict := rebaseCycleBranchOntoMain(context.Background(), "", "")
 	if ok || conflict {
 		t.Fatalf("empty worktree must return (false,false), got (%v,%v)", ok, conflict)
 	}
@@ -391,7 +391,7 @@ func TestRebaseCycleBranchOntoMain_EmptyWorktree(t *testing.T) {
 // rebaseCycleBranchOntoMain end-to-end against real git.
 func TestRebaseCycleBranchOntoMain_RealGit_NonDerivedConflict(t *testing.T) {
 	dir := initConflictRepo(t, "foo.go")
-	ok, conflict := rebaseCycleBranchOntoMain(context.Background(), dir)
+	ok, conflict := rebaseCycleBranchOntoMain(context.Background(), "", dir)
 	if ok || !conflict {
 		t.Fatalf("a non-derived conflict must route to the debugger: got (%v,%v)", ok, conflict)
 	}

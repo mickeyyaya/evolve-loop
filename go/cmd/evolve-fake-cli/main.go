@@ -27,6 +27,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
@@ -335,7 +336,7 @@ func artifactsFor(phase, mainPath, verdict string) (map[string]string, error) {
 		// this subprocess fake — the one every e2e cycle actually drives — was
 		// left without, hanging every e2e build at the deliverable floor.
 		out[mainPath] = "# Build Report\n\n## Files Modified\n- file.go (synthetic)\n\n" +
-			"## Explanation Documentation\n- Status: NOT_APPLICABLE\n- Reason: synthetic e2e build; the base-bound diff contains no material changes\n"
+			explanationdocs.RenderNotApplicableDeclaration("synthetic e2e build; the base-bound diff contains no material changes")
 	case "audit":
 		redCount := 0
 		if verdict == "FAIL" {

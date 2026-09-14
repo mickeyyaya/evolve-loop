@@ -67,6 +67,7 @@ Where the design was **not yet enough**: the triage gate's refusal was structure
 
 1. Re-launch on a plane carrying #606 and the wedge fix; count consecutive ships from that wave (goal: 5).
 2. `AUDIT_CIPARITY_GATE_STEP_FAILED` inside lane worktrees (F4) — needs a second occurrence to classify.
+6. **Done the same day (F6):** the acs/cycle8 `--simulate` walk that littered every checkout it ran in (dossier commits, salvage snapshots, cycle worktrees/branches, live CLI probes) — the simulate root never mutates git now; record [2026-09-14-simulate-runs-against-the-checkout](../incidents/2026-09-14-simulate-runs-against-the-checkout.md). The two console-first P1 items lanes 1673/1674 burned on were routed `console-manual`; lanes must not draw pipeline-integrity work (operating-policy §1).
 3. `ADVISOR_RESPONSE_UNPARSEABLE` (F4) — the advisor's non-JSON replan; the unit-04 leaf already falls back; decide whether the fallback should be INFO.
 4. The re-send WARN signal (F2 follow-up) and the chip `+N lines` positive signal if the stability wait proves insufficient.
 5. The memo's remaining recommendations: the Center-less operator roots unit before unit 05, unit 05 as a series, the four deferred "what happened" signals.

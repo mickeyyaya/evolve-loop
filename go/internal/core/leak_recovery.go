@@ -50,6 +50,9 @@ func recoverBuildLeak(ctx context.Context, projectRoot, worktree string, baselin
 	if worktree == "" {
 		return true // no worktree to relocate into → degrade (caller guards this anyway)
 	}
+	if inPlaceWorktree(worktree, projectRoot) {
+		return true // the tree IS the worktree: nothing to relocate, nothing to check out (inPlaceWorktree)
+	}
 	// -uall lists untracked FILES individually (never a bare dir), so each leaked
 	// path is a file: os.Rename has no dir-collision and is overwrite-safe.
 	out, code, err := gitCapture(ctx, projectRoot, "status", "--porcelain", "-uall")

@@ -467,7 +467,7 @@ func (o *Orchestrator) reviewResumedDeliverable(
 		}
 		// Correction output is a fresh worktree mutation. Normalize it before
 		// re-running the reviewer so a newly sealed snapshot is final.
-		o.normalizeBuildWorktree(ctx, phase, cs)
+		o.normalizeBuildWorktree(ctx, phase, cs, projectRoot)
 		review = o.reviewer.Review(ctx, reviewInput(resp))
 	}
 	if !review.Approve {

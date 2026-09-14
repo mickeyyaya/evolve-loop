@@ -67,7 +67,7 @@ func setupDivergedRepo(t *testing.T, conflict bool) (worktree string) {
 // re-audit + re-ship the merged tree.
 func TestRebaseCycleBranchOntoMain_CleanDisjoint_Succeeds(t *testing.T) {
 	wt := setupDivergedRepo(t, false)
-	ok, conflict := rebaseCycleBranchOntoMain(context.Background(), wt)
+	ok, conflict := rebaseCycleBranchOntoMain(context.Background(), "", wt)
 	if !ok || conflict {
 		t.Fatalf("clean disjoint rebase: ok=%v conflict=%v, want ok=true conflict=false", ok, conflict)
 	}
@@ -78,7 +78,7 @@ func TestRebaseCycleBranchOntoMain_CleanDisjoint_Succeeds(t *testing.T) {
 // routes to the debugger (G13a) instead of a silent abort.
 func TestRebaseCycleBranchOntoMain_Conflict(t *testing.T) {
 	wt := setupDivergedRepo(t, true)
-	ok, conflict := rebaseCycleBranchOntoMain(context.Background(), wt)
+	ok, conflict := rebaseCycleBranchOntoMain(context.Background(), "", wt)
 	if ok || !conflict {
 		t.Fatalf("conflicting rebase: ok=%v conflict=%v, want ok=false conflict=true", ok, conflict)
 	}
@@ -94,7 +94,7 @@ func TestRebaseCycleBranchOntoMain_Conflict(t *testing.T) {
 // TestRebaseCycleBranchOntoMain_EmptyWorktree_False: a degraded (no-worktree)
 // run must not attempt a rebase.
 func TestRebaseCycleBranchOntoMain_EmptyWorktree_False(t *testing.T) {
-	if ok, conflict := rebaseCycleBranchOntoMain(context.Background(), ""); ok || conflict {
+	if ok, conflict := rebaseCycleBranchOntoMain(context.Background(), "", ""); ok || conflict {
 		t.Fatalf("empty worktree: ok=%v conflict=%v, want both false", ok, conflict)
 	}
 }

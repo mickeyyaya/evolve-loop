@@ -215,8 +215,9 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 	}
 
 	// Both roots share the deps shape and the signal topology
-	// (newRootSignalCenter); --simulate differs only in its runners and has no
-	// bridge. Unit 01 (ADR-0103): a Center-less simulate root had silenced the
+	// (newRootSignalCenter); --simulate differs in its runners (stubs), its
+	// worktree provisioner (the root, in place) and its dossier-commit knob
+	// (files only), and has no bridge. Unit 01 (ADR-0103): a Center-less simulate root had silenced the
 	// recorder's warnings, so the Null-Object root is gone.
 	var d orchDeps
 	if simulate {
