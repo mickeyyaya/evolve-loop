@@ -609,3 +609,7 @@
 # cause code, BRIDGE_EXIT_* projection as Outcome.Signal) and the cause-line miners
 # (internal/bridge/launchoutcome). 100% API + 100% line coverage gated.
 ./internal/bridge/launchoutcome
+# ADR-0103 unit 11 (2026-09-14): the phase runner's verdict engine — the settle ladder, the teardown
+# reconcile arms, the stale-leftover gate, the ACS deterministic floor, the verdict-source rule and the
+# ship guard (internal/phases/runner/verdict). 100% API + 100% line coverage gated.
+./internal/phases/runner/verdict

@@ -425,3 +425,14 @@ func SetModelCatalogDirFn(fn func() string) {
 // SignalsWired reports whether a Signal Center was injected at construction —
 // the composition root's wiring proof (ADR-0101 S3).
 func (a *Adapter) SignalsWired() bool { return a.signals != nil }
+
+// Signals is the carrier's read seam (ADR-0103 unit 11): the phase runner
+// adopts the Center the injected Adapter carries, so every runner built over
+// the production bridge reports into the root's Center without a fifteen-site
+// wiring change. Nil for the Null Object; a nil receiver reads the same way.
+func (a *Adapter) Signals() *signalcenter.Center {
+	if a == nil {
+		return nil
+	}
+	return a.signals
+}

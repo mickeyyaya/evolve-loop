@@ -36,3 +36,21 @@ func TestNewDefault_NilCenterIsTheNullObjectAndSaysSo(t *testing.T) {
 		t.Error("nil is the Null Object for tests and the pinned Center-less roots — reported unwired, never silently wired")
 	}
 }
+
+// ADR-0103 unit 11 (test 42): Signals() is the carrier's read seam — the phase
+// runner adopts the Center the injected Adapter carries. It returns exactly the
+// injected Center (never a fresh one), nil for the Null Object, and survives a
+// nil receiver (the typed-nil hazard of an optional-interface adoption).
+func TestAdapter_SignalsReturnsTheInjectedCenter(t *testing.T) {
+	c := signalcenter.New()
+	if a := NewDefault(t.TempDir(), c); a.Signals() != c {
+		t.Error("Signals() must be the injected Center")
+	}
+	if a := NewDefault(t.TempDir(), nil); a.Signals() != nil || a.SignalsWired() {
+		t.Error("nil in ⇒ nil out, unwired")
+	}
+	var none *Adapter
+	if none.Signals() != nil {
+		t.Error("a nil receiver reads as the Null Object")
+	}
+}
