@@ -262,7 +262,7 @@ Three dispatch entry points share one profile-derived resolution. Their authorit
 
 **Alias SSOT.** `detectcli.Canonical(cli)` (`go/internal/detectcli/detectcli.go`) is the only place the
 `antigravity` → `agy` rewrite lives — the CLI is *declared* as `antigravity` but its adapter, capability
-manifest and PATH binary are all named `agy`. It is called from `subagent/run.go` (Step 3),
+manifest and PATH binary are all named `agy`. It is called from `subagent/subagentrun/resolve.go` (the run path's cli resolution, ADR-0103 unit 16),
 `subagent/validateprofile.go` and `subagent/dispatchparallel.go` (Step 4), replacing three inline copies of
 the same `if cli == "antigravity"` block. Every other name, including `""`, passes through unchanged so the
 callers' `cli unresolved` guards keep firing.

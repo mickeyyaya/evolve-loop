@@ -632,3 +632,8 @@
 # tier with its cross-lane lock and clean-env retake, apicover -enforce in-process and new-package
 # graduation (internal/phases/audit/ciparitygate). 100% API + 100% line coverage gated.
 ./internal/phases/audit/ciparitygate
+# ADR-0103 unit 16 (2026-09-14): the evolve subagent run execution path — request admission,
+# cli/tier/capability resolution, prompt delivery and staging, the bridge exec port, artifact
+# verification and the agent_subprocess ledger record (internal/subagent/subagentrun).
+# 100% API + 100% line coverage gated.
+./internal/subagent/subagentrun

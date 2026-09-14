@@ -1,0 +1,12 @@
+## INVOCATION CONTEXT
+
+- Agent: scout-worker-codebase
+- Cycle: 3
+- Workspace: {WS}
+- Artifact path: {WS}/workers/scout-worker-codebase.md
+- Challenge token: aaaaaaaaaaaaaaaa
+- Profile: scout.json
+
+--- BEGIN TASK PROMPT ---
+worker body
+--- END TASK PROMPT ---

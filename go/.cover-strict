@@ -21,3 +21,4 @@
 ./internal/loopwave 100
 ./internal/loopchain 100
 ./internal/phases/audit/ciparitygate 100
+./internal/subagent/subagentrun 100

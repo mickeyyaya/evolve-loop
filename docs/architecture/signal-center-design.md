@@ -166,6 +166,8 @@ Examples (what cycles 1636 and 1630 would have produced):
 `orchestrator`, `advisor`, `runner`, `bridge`, `liveness` (the renamed pane center), `ship`, `audit`
 (the defect-ledger gate, breakdown unit 09 — the tag is shared by the audit package's later units;
 the `AUDIT_LEDGER_` family prefix and `origin=Ledger.<Method>` name the producer), `triage`, `scout`, `build`, `tdd`, `gate.contract`, `gate.eval`, `gate.repo`, `inbox`, `config`,
+`orchestrator`, `advisor`, `runner`, `bridge` (the engine, and since breakdown unit 16 the `evolve subagent run` execution path's `BRIDGE_SUBAGENT_*` codes — one module, two producers told apart by `origin` and the sub-prefix), `liveness` (the renamed pane center), `ship`, `audit`,
+`triage`, `scout`, `build`, `tdd`, `gate.contract`, `gate.eval`, `gate.repo`, `inbox`, `config`,
 `loop`, `watchdog`, `observer`, `dashboard`, `signalcenter` (self-reports), `ledger` (the file ledger's append observer, S4a), `outcome` (the phase-outcome recorder, breakdown unit 01), `failurediag` (the failure-diag sidecar writer and the delivery-failure classifier, breakdown unit 02), `carryover` (the carryover-todo lifecycle, breakdown unit 03), `failurelearning` (the failure-learning engine — the failed-approach recorder, the deterministic floor, the recurrence closure; breakdown unit 03b). A module is added by
 editing the closed set and its test; an unknown module is stamped `SIGNALCENTER_UNKNOWN_MODULE` and
 raised to WARN — never dropped. *(review 21: `advisor` and `config` added to match §12.)*
@@ -184,6 +186,7 @@ raised to WARN — never dropped. *(review 21: `advisor` and `config` added to m
 | `system.failure` | ADR-0072 signal (halt-class) | INCIDENT | ✓ |
 | `quota.paused` | all families exhausted, cycle paused | WARN | ✓ |
 | `bridge.warning` / `bridge.tripwire` | engine telemetry warnings, tripwires; the launch-exit classification (`BRIDGE_EXIT_*`, one per non-zero `Engine.Launch` exit, origin `Engine.Launch`, `fields.step=classify`) and the four Launch step failures (`BRIDGE_BOOT_STRIKE_CLEAR_FAILED` / `_RECORD_FAILED`, `BRIDGE_LAUNCH_ERROR_PERSIST_FAILED`, `BRIDGE_RESULT_READ_FAILED`; origin `Engine.<step>`) — breakdown unit 10 | WARN | |
+| `bridge.warning` / `bridge.tripwire` | engine telemetry warnings, tripwires; the `evolve subagent run` execution path's admission, resolution, preparation, execution, verification and ledger faults (`BRIDGE_SUBAGENT_*`, `origin=Dispatcher.Dispatch`, breakdown unit 16) | WARN | |
 | `pane.liveness` | liveness edge from the LivenessCenter | INFO; WARN with a `LIVENESS_PANE_*` code — the registry (rendered in `signal-codes.md`) is the one list of which states warn | |
 | `ledger.appended` | a ledger entry was appended (the file ledger's append observer; `fields.entry_seq` names the line) | INFO | |
 | `outcome.warning` | the phase-outcome recorder could not persist a record (sidecar or timing log skipped or failed); the in-memory record stands (unit 01) | WARN | |
@@ -243,6 +246,7 @@ therefore **not** the triage entry point (§9) *(review 8)*.
   `docs/architecture/signal-codes.md` is generated from it (S2).
 - Existing vocabularies map by projection, not by copy: `shiperr.ShipErrorCode` (42) → `SHIP_<code>`
   (one function `shiperr.SignalCode(code)`); bridge exit codes → `BRIDGE_EXIT_<class>` as `launchoutcome.Classify(code, …).Signal` (a column of the one Outcome) — spelled by class name (`BRIDGE_EXIT_ARTIFACT_TIMEOUT`, `_UNKNOWN_PROMPT`, `_RESPOND_LOOP_GUARD`, …; `fields.exit_code` carries the number; landed as breakdown unit 10);
+  (one function `shiperr.SignalCode(code)`); bridge exit codes → `BRIDGE_EXIT_81`/`_85`/`_86` (owner: the bridge-engine unit; the run path stamps the number as `fields.exit_code` on `BRIDGE_SUBAGENT_VERDICT_FAIL` / `_ADAPTER_EXEC_FAILED` — breakdown unit 16);
   `failureadapter.Classification` → `LOOP_CLASSIFICATION_<value>` — and `failurelog.Classification`
   is folded into `failureadapter`'s in S2 (one vocabulary, one home); `dispatchevents.EventType` →
   `LOOP_<TYPE>`; the contract-gate codes (`missing_effect`, `unbound_effect`, `MISSING_SECONDARY`,

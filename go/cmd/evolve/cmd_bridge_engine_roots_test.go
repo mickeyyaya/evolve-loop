@@ -35,12 +35,12 @@ var bridgeEngineRoots = map[string]struct {
 	calls  int
 	wiring string
 }{
-	"cmd/evolve/cmd_bridge.go":             {1, "center-less: `evolve bridge launch`, bare Deps{}"},
-	"cmd/evolve/cmd_cycle.go":              {1, "center-less: the pre-cycle Doctor probe, bare Deps{}"},
-	"cmd/evolve/cmd_models_live.go":        {1, "center-less: the models-live probe, bare Deps{}"},
-	"internal/adapters/bridge/bridge.go":   {3, "center-bearing: New()'s default factory (Env only), NewDefault's factory and Launch's onStopReview branch through productionEngineDeps (Deps.Signals = the Adapter's Center; nil when NewDefault was given nil)"},
-	"internal/setup/setup.go":              {1, "center-less: the setup Doctor default, bare Deps{}"},
-	"internal/subagent/validateprofile.go": {1, "center-less: the subagent runner (execAdapterDeps)"},
+	"cmd/evolve/cmd_bridge.go":           {1, "center-less: `evolve bridge launch`, bare Deps{}"},
+	"cmd/evolve/cmd_cycle.go":            {1, "center-less: the pre-cycle Doctor probe, bare Deps{}"},
+	"cmd/evolve/cmd_models_live.go":      {1, "center-less: the models-live probe, bare Deps{}"},
+	"internal/adapters/bridge/bridge.go": {3, "center-bearing: New()'s default factory (Env only), NewDefault's factory and Launch's onStopReview branch through productionEngineDeps (Deps.Signals = the Adapter's Center; nil when NewDefault was given nil)"},
+	"internal/setup/setup.go":            {1, "center-less: the setup Doctor default, bare Deps{}"},
+	"internal/subagent/bridgeadapter.go": {1, "center-bearing: the `evolve subagent run` root (ADR-0103 unit 16) — execAdapterDepsWith(env, signals) hands the Dispatcher's Center to the engine"},
 }
 
 // bridgeNewEngineCalls counts the bridge.NewEngine call expressions in one

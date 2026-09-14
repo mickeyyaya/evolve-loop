@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## Changed — the `evolve subagent run` execution path is its own package with eleven Signal Center codes (ADR-0103 unit 16, 2026-09-14)
+
+`internal/subagent/run.go`'s 236-line `Run` moved into `internal/subagent/subagentrun` (a `Dispatcher` over
+ten explicit ports and six stdlib-backed options; 100 % lines, 61/61 exports, every function < 50 lines).
+Byte-identical on the prompt, the adapter env, the Warns channel, every error text and the
+`agent_subprocess` ledger line — goldens captured before the move and replayed. The eighteen failure exits
+that collapsed into one `[subagent-run] FAIL:` line are now eleven `BRIDGE_SUBAGENT_*` WARN codes
+(`origin=Dispatcher.Dispatch`, `fields.step` names the step, `rung` / `op` / `reason_class` the detail), the
+four silently swallowed causes (the profile read error, the LLM router error, the git-state error, the
+artifact hash error) and the dropped integrity rung are on the stream, and `evolve subagent run` is the
+second Signal Center root: its events land in `<runs/cycle-N>/signals.ndjson` and on stderr at WARN, and the
+bridge engine's own producers reach the same Center on this path instead of nil. Console addition only: the
+existing stderr lines stay verbatim.
+
+---
+
 ## Changed — config resolution is a unit with a Loader, one module tag and six codes (ADR-0103 unit 08, 2026-09-14)
 
 `internal/config` — the single reader of the phase registry and the routing env — is decomposed in place around a `Loader` with an injected file reader and Signal Center (`config.New(config.WithSignals(…))` at the cycle/loop composition root; the package-level `config.Load` stays as the Center-less facade the per-phase callers keep). Every resolution diagnostic is now a `config.warning` WARN under module `config` with `origin` (`Loader.Load` / `Loader.ApplyPolicyStages`), `fields.step` (`registry` | `env` | `spine` | `inert` | `policy`), `key`, `source`, `path` — rendered by the root's console sink and durable in `<evolveDir>/signals.ndjson` (cycle-less). Two silent kill-paths are closed, so operators may see new WARN lines on the first cycle after landing:

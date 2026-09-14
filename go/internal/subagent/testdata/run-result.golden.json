@@ -1,0 +1,14 @@
+{
+  "Verdict": "PASS",
+  "CLI": "claude",
+  "Model": "sonnet",
+  "ArtifactPath": "{ROOT}/.evolve/runs/cycle-5/scout.md",
+  "ArtifactSHA256": "0c4268214b46f03632650c81236483757aeb91efddee78ccda8e3512795b7005",
+  "ChallengeToken": "aaaaaaaaaaaaaaaa",
+  "ExitCode": 0,
+  "DurationMS": 0,
+  "Warns": [
+    "[subagent-run] WARN agent=scout cycle=5: WorktreePath not propagated — WORKTREE_PATH falls back to the project root {ROOT}; this agent will run against the main tree"
+  ],
+  "Stderr": ""
+}
