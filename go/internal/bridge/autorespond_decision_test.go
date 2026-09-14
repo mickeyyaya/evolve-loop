@@ -59,6 +59,18 @@ func TestAutoRespond_RealManifestDecisionMatrix(t *testing.T) {
 		{"codex trust → 1,Enter", "codex-tmux", "Do you trust the contents of this directory?", "send:1,Enter", 1},
 		{"codex auth → escalate", "codex-tmux", "Please sign in to ChatGPT to continue", "escalate:auth_recheck", 85},
 		{"codex rate-limit → escalate", "codex-tmux", "quota exceeded — too many requests", "escalate:rate_limit", 85},
+		// Lane 1676 (2026-09-14): the account rejected the deep-tier model with a
+		// 400 and the pane sat idle for the whole 20-minute artifact window before
+		// the runner fell back to claude (exit 81). A dead model is a wall like a
+		// quota wall — escalate at once so the family fallback runs in seconds.
+		{"codex model-unsupported 400 → escalate", "codex-tmux",
+			"⚠ Model metadata for gpt-5.6-sol not found. Using default model metadata.\n■ {\"type\":\"error\",\"status\":400,\"error\":{\"type\":\"invalid_request_error\",\"message\":\"The 'gpt-5.6-sol' model is not supported when using Codex with a ChatGPT account.\"}}\n\n›",
+			"escalate:model_unsupported", 85},
+		// The same JSON quoted by an agent that is READING an incident record must
+		// not fire: the rule matches the pane tail only, and the busy gate holds.
+		{"codex model-unsupported quoted far above the tail → noop", "codex-tmux",
+			"■ {\"type\":\"error\",\"status\":400,\"error\":{\"type\":\"invalid_request_error\",\"message\":\"The 'x' model is not supported when using Codex with a ChatGPT account.\"}}\n" + strings.Repeat("  reading docs/incidents/...\n", 40) + "›",
+			"noop", 0},
 		// Cycle-144: a ChatGPT-account codex auditor hit its quota mid-audit. The
 		// actual banner ("You've hit your usage limit. Upgrade to Plus to
 		// continue…") did NOT match the original (usage|rate)[ -]limit

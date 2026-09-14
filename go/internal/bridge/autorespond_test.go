@@ -241,3 +241,29 @@ func TestClaudeTmux_AutoRespond_StuckPromptTripsLoopGuard(t *testing.T) {
 		t.Fatalf("auto_respond should have sent keys before the guard tripped; sentKeys=%v", tmux.sentKeys)
 	}
 }
+
+// TestDecideAutoRespond_CodexModelUnsupportedIsIdleGated pins the busy gate for
+// the model_unsupported rule: the 400 printed while codex is still "Working"
+// (an agent quoting it, or the CLI mid-retry) is not a wall; the same text on
+// an idle pane is, and must escalate so the runner falls back at once.
+func TestDecideAutoRespond_CodexModelUnsupportedIsIdleGated(t *testing.T) {
+	m, err := LoadManifest("codex-tmux")
+	if err != nil {
+		t.Fatalf("manifest: %v", err)
+	}
+	wall := "■ {\"type\":\"error\",\"status\":400,\"error\":{\"type\":\"invalid_request_error\",\"message\":\"The 'gpt-5.6-sol' model is not supported when using Codex with a ChatGPT account.\"}}"
+	busyPane := wall + "\nWorking (0m 04s · esc to interrupt)"
+	if !panestream.PaneBusy(busyPane, panestream.Profiles["codex"]) {
+		t.Fatal("fixture invalid: the Working frame must read busy")
+	}
+	if a, rc := decideAutoRespond(busyPane, m.InteractivePrompts, map[string]int{}, true); rc != 0 {
+		t.Errorf("busy pane must not escalate: got %q/%d", a, rc)
+	}
+	idlePane := wall + "\n\n›"
+	if panestream.PaneBusy(idlePane, panestream.Profiles["codex"]) {
+		t.Fatal("fixture invalid: the idle prompt must not read busy")
+	}
+	if a, rc := decideAutoRespond(idlePane, m.InteractivePrompts, map[string]int{}, false); a != "escalate:model_unsupported" || rc != 85 {
+		t.Errorf("idle pane with the 400 must escalate model_unsupported/85: got %q/%d", a, rc)
+	}
+}
