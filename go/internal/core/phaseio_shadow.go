@@ -123,7 +123,7 @@ func assembleCycleInputs(ctx map[string]string) phaseio.CycleInputs {
 // assembleErrorContext builds the typed ErrorContext from the ship_error_* keys
 // the recovery path injects, or nil when none are present (no upstream error).
 func assembleErrorContext(ctx map[string]string) *phaseio.ErrorContext {
-	code, class := ctx["ship_error_code"], ctx["ship_error_class"]
+	code, class := ctx[CtxKeyShipErrorCode], ctx["ship_error_class"]
 	stage, debug := ctx["ship_error_stage"], ctx["ship_error_debug"]
 	if code == "" && class == "" && stage == "" && debug == "" {
 		return nil
@@ -155,7 +155,7 @@ func compareCycleInputsShadow(ci phaseio.CycleInputs, ec *phaseio.ErrorContext, 
 	if ec != nil {
 		gotCode, gotClass, gotStage, gotDebug = ec.Code, ec.Class, ec.Stage, ec.Debug
 	}
-	add("error_context.code", ctx["ship_error_code"], gotCode)
+	add("error_context.code", ctx[CtxKeyShipErrorCode], gotCode)
 	add("error_context.class", ctx["ship_error_class"], gotClass)
 	add("error_context.stage", ctx["ship_error_stage"], gotStage)
 	add("error_context.debug", ctx["ship_error_debug"], gotDebug)

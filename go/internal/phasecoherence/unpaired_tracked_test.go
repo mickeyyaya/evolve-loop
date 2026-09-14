@@ -70,28 +70,64 @@ func TestTrackedProfiles_NonRepoDirFailsLoudly(t *testing.T) {
 // .evolve/profiles must not enter the Direction-B binding set, while the set
 // keeps binding the tracked catalog.
 func TestTrackedProfiles_RealTreePlantedDecoyNotBound(t *testing.T) {
-	root := repoRootForPairing(t)
-	if pre, err := trackedProfiles(root); err != nil || len(pre) == 0 {
+	real := repoRootForPairing(t)
+	pre, err := trackedProfiles(real)
+	if err != nil || len(pre) == 0 {
 		t.Skipf("no usable git context (tracked=%d err=%v) — pairing test binds all profiles, nothing to prove", len(pre), err)
 	}
+	// The live tree is never mutated: a phase sandbox denies writes under
+	// .evolve/profiles (cycles 1676/1679 red on EPERM here — an instrument
+	// fault charged as a defect), and a test that writes into tracked repo
+	// config is a hygiene defect regardless. The real tracked set is mirrored
+	// into a temp git repo and the decoy is planted THERE.
+	root := mirrorTrackedProfiles(t, real, pre)
 	const decoy = "zz-decoy-mint-phasecoherence"
-	path := filepath.Join(root, ".evolve", "profiles", decoy+".json")
-	if _, err := os.Stat(path); err == nil {
-		t.Fatalf("%s already exists — refusing to clobber", path)
-	}
-	if err := os.WriteFile(path, []byte("{}\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(root, ".evolve", "profiles", decoy+".json"), []byte("{}\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { os.Remove(path) })
 
 	tracked, err := trackedProfiles(root)
 	if err != nil {
 		t.Fatalf("trackedProfiles: %v", err)
 	}
-	if len(tracked) == 0 {
-		t.Fatal("tracked set went empty after planting a decoy — the gate would go dark")
+	if len(tracked) != len(pre) {
+		t.Fatalf("mirror tracked set = %d, want the live set's %d — the mirror must carry every real profile", len(tracked), len(pre))
 	}
 	if tracked[decoy] {
 		t.Fatalf("untracked decoy %q entered the Direction-B binding set — the cd49274beab2 ship-block class is re-armed", decoy)
 	}
+}
+
+// mirrorTrackedProfiles copies the live tree's git-tracked .evolve/profiles
+// into a fresh git repo (committed), so a test can plant untracked decoys
+// beside REAL profile content without touching the live tree.
+func mirrorTrackedProfiles(t *testing.T, real string, tracked map[string]bool) string {
+	t.Helper()
+	root := t.TempDir()
+	git := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", append([]string{"-C", root}, args...)...)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	git("init", "-q")
+	git("config", "user.email", "t@example.com")
+	git("config", "user.name", "t")
+	profDir := filepath.Join(root, ".evolve", "profiles")
+	if err := os.MkdirAll(profDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for name := range tracked {
+		body, err := os.ReadFile(filepath.Join(real, ".evolve", "profiles", name+".json"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(profDir, name+".json"), body, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	git("add", ".evolve/profiles")
+	git("commit", "-q", "-m", "mirror tracked profiles")
+	return root
 }

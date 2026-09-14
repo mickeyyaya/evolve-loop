@@ -29,6 +29,7 @@ package main
 import (
 	"bytes"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -85,7 +86,14 @@ func TestDefaultChainBoundaryFleetLaneActive_OwnLeasePlusRealSiblingStillDetecte
 	}
 	brflWriteRunMarker(t, siblingDir)
 	// A different pid — never our own os.Getpid() — so it must still count.
-	siblingPID := os.Getpid() + 1
+	// A sibling is a different LIVE process (since 2026-09-15 liveness is the
+	// lease owner's, not the heartbeat's): hold a real child for the duration.
+	sibling := exec.Command("sleep", "30")
+	if err := sibling.Start(); err != nil {
+		t.Fatalf("spawn a live sibling: %v", err)
+	}
+	t.Cleanup(func() { _ = sibling.Process.Kill(); _ = sibling.Wait() })
+	siblingPID := sibling.Process.Pid
 	if err := runlease.Write(siblingDir, runlease.Lease{RunID: "cycle-sibling-live", OwnerPID: siblingPID}, time.Now()); err != nil {
 		t.Fatal(err)
 	}

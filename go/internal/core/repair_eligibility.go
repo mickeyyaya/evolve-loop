@@ -39,6 +39,18 @@ const auditRepairReasonPrefix = "audit-repair: "
 // packages, which is a drift waiting to happen — this one cannot drift.
 const CtxKeyAuditRepairFindings = "audit_repair_findings"
 
+// CtxKeyShipErrorCode is the dispatch-context key carrying the ship error
+// code a recovery is rebuilding from (retry_opts.go writes it; the debugger,
+// the phaseio shadow and the standing-findings prompts read it).
+const CtxKeyShipErrorCode = "ship_error_code"
+
+// CtxKeyStandingAuditFindings carries the last audit's actionable findings
+// into a tdd/build re-entry that follows a SHIP-error recovery: the audit
+// passed (WARN) so no repair grant exists, yet the recovery rebuild is
+// re-audited by the same rubric and every finding left unaddressed is named
+// again as standing (cycle 1679, rounds 4→5). A rejection grant outranks it.
+const CtxKeyStandingAuditFindings = "standing_audit_findings"
+
 // consumeAuditRepairGrant spends one repair attempt when the retro branch
 // granted one. It mirrors consumeBookkeepingRegradeGrant exactly — the ONE
 // primitive every branch surface calls (the live loop in cyclerun_record and
@@ -59,11 +71,15 @@ func consumeAuditRepairGrant(cs *CycleState, reason string) {
 func repairSeededPhase(p Phase) bool { return p == PhaseTDD || p == PhaseBuild }
 
 // seedAuditRepairContext returns a COPY of ctx carrying the audit's own
-// fail-reason text when a repair is in flight and the next phase can act on it.
+// fail-reason text when a repair is in flight and the next phase can act on
+// it — or, when no repair grant is active but a ship-error recovery is
+// (CycleState.ShipRecoveryCode), the last audit's actionable findings as
+// STANDING findings: the recovery rebuild is re-audited by the same rubric.
 //
-// It derives from PERSISTED cycle state (AuditRepairAttempts) rather than being
-// pushed at grant time, so the live dispatch loop and the crash-resume path
-// cannot diverge: one rule, reading a field that survives both. Copying rather
+// Both halves derive from PERSISTED cycle state (AuditRepairActive /
+// AuditRepairAttempts, ShipRecoveryCode) rather than being pushed at grant
+// time, so the live dispatch loop and the crash-resume path cannot diverge:
+// one rule, reading fields that survive both. Copying rather
 // than mutating matters — the dispatch loop reuses one ctxSnap map across every
 // iteration of the cycle, so an in-place write would leak a stale repair brief
 // into phases that never asked for it.
@@ -76,17 +92,33 @@ func repairSeededPhase(p Phase) bool { return p == PhaseTDD || p == PhaseBuild }
 // the rejecting round's auditor findings and the ones that persisted from the
 // previous round — the half of the rejection that used to be dropped (R2).
 func seedAuditRepairContext(base map[string]string, next Phase, cs CycleState) map[string]string {
-	if !cs.AuditRepairActive || !repairSeededPhase(next) {
+	if !repairSeededPhase(next) {
 		return base
 	}
-	findings := composeRepairBrief(cs)
-	if findings == "" {
+	if cs.AuditRepairActive {
+		return withContext(base, CtxKeyAuditRepairFindings, composeRepairBrief(cs))
+	}
+	if cs.ShipRecoveryCode == "" {
+		return base
+	}
+	out := withContext(base, CtxKeyStandingAuditFindings, auditorFindingsBrief(cs.WorkspacePath, cs.AuditDispatches))
+	if out[CtxKeyShipErrorCode] == "" { // a resumed dispatch has no snapshot of the code; the prompt names it from state
+		out = withContext(out, CtxKeyShipErrorCode, cs.ShipRecoveryCode)
+	}
+	return out
+}
+
+// withContext returns base unchanged when value is empty, else a COPY of base
+// carrying key=value (copy-on-write: the snapshot the dispatch loop keeps must
+// never inherit a round's brief).
+func withContext(base map[string]string, key, value string) map[string]string {
+	if value == "" {
 		return base
 	}
 	out := make(map[string]string, len(base)+1)
 	for k, v := range base {
 		out[k] = v
 	}
-	out[CtxKeyAuditRepairFindings] = findings
+	out[key] = value
 	return out
 }

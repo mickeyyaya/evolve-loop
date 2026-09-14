@@ -19,6 +19,7 @@ package profiles
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -65,13 +66,25 @@ func TrackedRealProfileNames(t *testing.T) map[string]bool {
 // fallback). New real-tree tests must iterate via this helper.
 func RealTreeProfiles(t *testing.T) (*Loader, []string) {
 	t.Helper()
-	l := NewFromDir(realProfilesDir(t))
+	return treeProfiles(t, filepath.Join(realProfilesDir(t), "..", ".."))
+}
+
+// treeProfiles is RealTreeProfiles over any repo root: a Loader over
+// <root>/.evolve/profiles plus its List() names filtered to git-tracked
+// profiles (nil filter ⇒ bind-all fallback, as TrackedRealProfileNames).
+func treeProfiles(t *testing.T, root string) (*Loader, []string) {
+	t.Helper()
+	l := NewFromDir(filepath.Join(root, ".evolve", "profiles"))
 	names, err := l.List()
 	if err != nil {
-		t.Fatalf("List real profiles: %v", err)
+		t.Fatalf("List profiles under %s: %v", root, err)
 	}
-	tracked := TrackedRealProfileNames(t)
-	if tracked == nil {
+	tracked, err := repostate.TrackedSet(root, ".evolve/profiles", ".json")
+	if err == nil && len(tracked) == 0 {
+		err = fmt.Errorf("empty tracked-profile set at %s — pathspec matched nothing (misresolved root or sparse checkout)", root)
+	}
+	if err != nil {
+		t.Logf("TrackedSet: %v — binding all on-disk profiles", err)
 		return l, names
 	}
 	kept := make([]string, 0, len(names))
@@ -92,27 +105,62 @@ func RealTreeProfiles(t *testing.T) (*Loader, []string) {
 // running concurrently would not red on it; the assertion here is purely
 // about exclusion.
 func TestRealTreeProfiles_ExcludesUntrackedDecoy(t *testing.T) {
-	if TrackedRealProfileNames(t) == nil {
+	tracked := TrackedRealProfileNames(t)
+	if tracked == nil {
 		t.Skip("no usable git context — filter disabled (bind-all fallback), nothing to prove")
 	}
+	// The live tree is never mutated (a phase sandbox denies writes under
+	// .evolve/profiles — cycles 1676/1679 red on EPERM here): the real tracked
+	// profiles are mirrored into a temp git repo and the decoy is planted THERE.
+	root := mirrorTrackedProfiles(t, filepath.Join(realProfilesDir(t), "..", ".."), tracked)
 	const decoy = "zz-decoy-mint-profiles-funnel"
-	path := filepath.Join(realProfilesDir(t), decoy+".json")
-	if _, err := os.Stat(path); err == nil {
-		t.Fatalf("%s already exists — refusing to clobber", path)
-	}
 	payload := `{"name":"` + decoy + `","role":"decoy","cli":"claude","model_tier_default":"fast"}`
-	if err := os.WriteFile(path, []byte(payload), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(root, ".evolve", "profiles", decoy+".json"), []byte(payload), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { os.Remove(path) })
 
-	_, names := RealTreeProfiles(t)
-	if len(names) == 0 {
-		t.Fatal("filtered real-tree profile list is empty — the funnel went dark instead of filtering")
+	_, live := RealTreeProfiles(t)
+	_, names := treeProfiles(t, root)
+	if len(names) != len(live) || len(names) == 0 {
+		t.Fatalf("filtered mirror list = %d, want the live funnel's %d — the funnel went dark or the mirror lost a profile", len(names), len(live))
 	}
 	for _, n := range names {
 		if n == decoy {
-			t.Fatalf("untracked decoy %q bound by RealTreeProfiles — the cd49274beab2 false-RED class is re-armed", decoy)
+			t.Fatalf("untracked decoy %q bound by the funnel — the cd49274beab2 false-RED class is re-armed", decoy)
 		}
 	}
+}
+
+// mirrorTrackedProfiles copies the live tree's git-tracked .evolve/profiles
+// into a fresh, committed git repo so a test can plant untracked decoys
+// beside REAL profile content without touching the live tree.
+func mirrorTrackedProfiles(t *testing.T, real string, tracked map[string]bool) string {
+	t.Helper()
+	root := t.TempDir()
+	git := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", append([]string{"-C", root}, args...)...)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	git("init", "-q")
+	git("config", "user.email", "t@example.com")
+	git("config", "user.name", "t")
+	profDir := filepath.Join(root, ".evolve", "profiles")
+	if err := os.MkdirAll(profDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for name := range tracked {
+		body, err := os.ReadFile(filepath.Join(real, ".evolve", "profiles", name+".json"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(profDir, name+".json"), body, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	git("add", ".evolve/profiles")
+	git("commit", "-q", "-m", "mirror tracked profiles")
+	return root
 }

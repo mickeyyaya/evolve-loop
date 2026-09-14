@@ -16,6 +16,6 @@
 == prune_dropped
 [loop] WARN: wave plan: pruned consumed top_n id "gamma" from prior decision
 == launcher_all_stale
-[fleet] WARN: freshness gate skipped a: consumed: processed
-[fleet] WARN: freshness gate skipped b: consumed: processed
+[fleet] WARN: freshness gate skipped a: consumed: processed cycle-9
+[fleet] WARN: freshness gate skipped b: consumed: processed cycle-9
 [fleet] freshness gate: all 2 planned lane(s) stale (2 skip(s)), nothing to launch

@@ -218,6 +218,14 @@ func scanTextTree(root string, exts map[string]bool, hasRow func(string) bool, o
 			if os.IsNotExist(err) {
 				return nil
 			}
+			// A directory the phase sandbox denies (docs/private under the
+			// audit profile) is outside this scan's surface, not a scan
+			// failure: skip it visibly rather than red the whole gate
+			// (cycles 1676/1679 — an instrument fault charged as a defect).
+			if os.IsPermission(err) && info != nil && info.IsDir() {
+				fmt.Fprintf(os.Stderr, "[flagreaders] NOTE: %s denied by the sandbox — skipped\n", path)
+				return filepath.SkipDir
+			}
 			return err
 		}
 		if info.IsDir() {

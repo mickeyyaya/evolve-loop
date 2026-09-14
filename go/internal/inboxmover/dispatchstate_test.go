@@ -33,6 +33,8 @@ func TestResolveDispatchState(t *testing.T) {
 	writeTask(t, inbox, "task-pending", []string{"dep-a"})
 	writeTask(t, filepath.Join(inbox, "processing", "cycle-748"), "task-inflight", nil)
 	writeTask(t, filepath.Join(inbox, "processed"), "task-done", nil)
+	writeTask(t, filepath.Join(inbox, "processed", "cycle-1679"), "task-shipped", nil) // production layout: promoteDestPath nests processed/ by cycle
+	writeTask(t, filepath.Join(inbox, "consumed"), "task-consumed", nil)               // `evolve inbox consume` (the in-commit landing consumption)
 	writeTask(t, filepath.Join(inbox, "rejected"), "task-nope", nil)
 	writeTask(t, filepath.Join(inbox, "retry"), "task-again", nil)
 	writeTask(t, filepath.Join(inbox, "quarantine"), "task-poison", nil)
@@ -47,6 +49,8 @@ func TestResolveDispatchState(t *testing.T) {
 		{"task-pending", StatePending, "", "dep-a"},
 		{"task-inflight", StateProcessing, "cycle-748", ""},
 		{"task-done", StateProcessed, "", ""},
+		{"task-shipped", StateProcessed, "cycle-1679", ""},
+		{"task-consumed", StateConsumed, "", ""},
 		{"task-nope", StateRejected, "", ""},
 		{"task-again", StateRetry, "", ""},
 		// A todo parked by the ADR-0072 S5 retry ceiling must classify as

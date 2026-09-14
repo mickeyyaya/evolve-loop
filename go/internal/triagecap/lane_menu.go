@@ -126,7 +126,7 @@ func SelectWaveSeedMenus(evolveDir string, committed []FleetCandidate, count, pe
 // than reimplement it — this is the single source for "is a committed id still
 // live", not a seed-path-only helper.
 //
-// Only TERMINAL states prune: processed/rejected/quarantine. pending and
+// Only TERMINAL states prune: processed/consumed/rejected/quarantine. pending and
 // processing stay (still live work), and — load-bearing — an id with no
 // lifecycle evidence at all stays too. A prune that dropped what it cannot
 // resolve would starve every wave of non-inbox-backed cards.
@@ -138,7 +138,7 @@ func PruneConsumed(evolveDir string, committed []FleetCandidate) []FleetCandidat
 	kept := make([]FleetCandidate, 0, len(committed))
 	for _, c := range committed {
 		switch inboxmover.ResolveDispatchState(opts, c.ID).State {
-		case inboxmover.StateProcessed, inboxmover.StateRejected, inboxmover.StateQuarantine:
+		case inboxmover.StateProcessed, inboxmover.StateConsumed, inboxmover.StateRejected, inboxmover.StateQuarantine:
 			continue
 		}
 		kept = append(kept, c)

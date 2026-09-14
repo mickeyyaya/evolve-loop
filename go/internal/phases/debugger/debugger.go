@@ -163,13 +163,13 @@ func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	// channel replaces those keys (byte-identical — Active() is false unless
 	// enforce, and the zero ErrorContext renders nothing, matching an empty map).
 	b.WriteString("\n## Ship Failure Envelope\n")
-	code, class, stage, dbg := req.Context["ship_error_code"], req.Context["ship_error_class"], req.Context["ship_error_stage"], req.Context["ship_error_debug"]
+	code, class, stage, dbg := req.Context[core.CtxKeyShipErrorCode], req.Context["ship_error_class"], req.Context["ship_error_stage"], req.Context["ship_error_debug"]
 	if req.Input.Active() {
 		ec, _ := req.Input.ErrorContext() // zero ErrorContext when no upstream error
 		code, class, stage, dbg = ec.Code, ec.Class, ec.Stage, ec.Debug
 	}
 	for _, f := range []struct{ k, v string }{
-		{"ship_error_code", code},
+		{core.CtxKeyShipErrorCode, code},
 		{"ship_error_class", class},
 		{"ship_error_stage", stage},
 		{"ship_error_debug", dbg},

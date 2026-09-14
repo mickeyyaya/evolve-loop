@@ -1,20 +1,10 @@
-// reap_orphans_unix.go — pid-liveness probe via signal 0 (unix). The repo
-// targets macOS/Linux only (bash 3.2 / CLAUDE.md; same constraint as
-// swarmrunner/kill_unix.go); no Windows build, so no portable fallback is
-// needed and the _unix filename keeps the syscall out of any non-unix build.
+// reap_orphans_unix.go — the reaper's pid-liveness probe. The signal-0 probe
+// itself lives in runlease (PIDAlive, with its own build-tagged files); this
+// file keeps the reaper's name and injected-probe seam intact.
 package swarm
 
-import "syscall"
+import "github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 
-// ExecPidAlive reports whether a PID is alive without affecting it. Signal 0
-// performs error checking only: ESRCH ⇒ no such process (dead); nil ⇒ alive and
-// signalable; EPERM ⇒ alive but owned by another user (still alive, so its
-// session must NOT be reaped). PID ≤ 0 is treated as dead — never signal 0
-// (whole group), -1 (everything), or negatives (process groups) here.
-func ExecPidAlive(pid int) bool {
-	if pid <= 0 {
-		return false
-	}
-	err := syscall.Kill(pid, 0)
-	return err == nil || err == syscall.EPERM
-}
+// ExecPidAlive delegates to runlease.PIDAlive — the ONE owner-liveness probe
+// (nil/EPERM ⇒ alive, ESRCH ⇒ dead, pid ≤ 0 never signalled).
+func ExecPidAlive(pid int) bool { return runlease.PIDAlive(pid) }

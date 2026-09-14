@@ -88,6 +88,7 @@ func (r *buildFloorReviewer) Review(ctx context.Context, in ReviewInput) ReviewR
 // is the standing floor rule.
 func DefaultBuildFloorChecks(ctx context.Context, in ReviewInput) []string {
 	out := RemovalClaimFailures(ctx, in)
+	out = append(out, PlaceholderTokenFailures(ctx, in)...)
 	paths := changedFloorPaths(ctx, in)
 	out = append(out, personaBudgetFailures(ctx, in.Worktree, paths)...)
 	// ADR-0077 docs floor: WARN-only, so it rides the SAME derived change set

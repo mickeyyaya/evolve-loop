@@ -141,7 +141,8 @@ func (cr *cycleRun) recoverShipError(next Phase, err error, resp PhaseResponse, 
 	if !recovering {
 		return false
 	}
-	cr.ctxSnap["ship_error_code"] = string(se.Code)
+	cr.cs.ShipRecoveryCode = string(se.Code) // persisted at the next checkpoint; the ship latch clears it
+	cr.ctxSnap[CtxKeyShipErrorCode] = string(se.Code)
 	cr.ctxSnap["ship_error_class"] = string(se.Class)
 	cr.ctxSnap["ship_error_stage"] = string(se.Stage)
 	cr.ctxSnap["ship_error_debug"] = se.DebugString()

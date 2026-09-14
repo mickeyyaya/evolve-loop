@@ -26,6 +26,7 @@
 package noorphan
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -60,6 +61,14 @@ func findOrphanScripts(root string) ([]string, error) {
 	var offenders []string
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
+			// A directory the phase sandbox denies (docs/private under the
+			// audit profile) holds no repo scripts this gate guards: skip it
+			// visibly instead of failing the gate on an instrument fault
+			// (cycles 1676/1679).
+			if os.IsPermission(err) && info != nil && info.IsDir() {
+				fmt.Fprintf(os.Stderr, "[noorphan] NOTE: %s denied by the sandbox — skipped\n", path)
+				return filepath.SkipDir
+			}
 			return err
 		}
 		if info.IsDir() {
