@@ -37,7 +37,7 @@ DIST_CHECKSUMS := $(DIST_DIR)/checksums.txt
 
 .PHONY: build test test-component test-integration test-e2e test-acs-durable test-all \
         test-latency cover apicover lint tidy clean help dist dist-clean \
-        cover-strict \
+        cover-strict apicover-enforce apicover-check \
         dist-darwin-amd64 dist-darwin-arm64 dist-linux-amd64 dist-linux-arm64 \
         dist-darwin-universal dist-checksums
 
@@ -99,8 +99,10 @@ test: ## FAST layer: co-located unit/functional/component tests, race on (exclud
 test-component: ## Component tier: several internal packages wired against temp FS (no subprocess)
 	$(GO) test -race -count=1 ./test/component/...
 
-test-integration: ## Integration tier: real FS/git/tmux subprocess tests (//go:build integration)
-	$(GO) test -race -count=1 -tags integration ./internal/... ./cmd/... ./test/integration/...
+test-integration: ## Full non-ACS runtime suite with integration, race, and coverage (shared by CI and release)
+	@pkgs=$$($(GO) list -tags integration ./...) || exit $$?; \
+	pkgs=$$(printf '%s\n' "$$pkgs" | grep -v '/acs/') || exit $$?; \
+	$(GO) test -race -count=1 -tags integration -coverprofile=coverage.txt $$pkgs
 
 test-e2e: ## E2E tier: full-cycle subprocess paths (//go:build e2e + evolve_test_phases); live sub-tier self-skips without its opt-in
 	$(GO) test -count=1 -timeout 45m -tags "e2e evolve_test_phases" ./cmd/... ./test/e2e/...
@@ -108,15 +110,15 @@ test-e2e: ## E2E tier: full-cycle subprocess paths (//go:build e2e + evolve_test
 test-acs-durable: ## Durable ACS regression tier (//go:build acs); artifact-free predicates, mirrors the ci.yml acs-durable gate
 	$(GO) test -count=1 -tags acs ./acs/regression/...
 
-test-all: ## All tiers in one race run (local superset of CI; CI runs e2e WITHOUT -race in a separate step)
-	$(GO) test -race -count=1 -tags "integration e2e" $(FAST_PKGS)
+test-all: test-integration ## All runtime tiers, preserving no-race E2E and its test-only phase tag
+	$(MAKE) -f "$(firstword $(MAKEFILE_LIST))" test-e2e
+	$(MAKE) -f "$(firstword $(MAKEFILE_LIST))" test-acs-durable
 
 test-latency: ## Render the fast-suite latency report to test/latency-report.md
 	@$(GO) test -json $(FAST_PKGS) | $(GO) run ./cmd/testlatency -title "Fast suite latency" > test/latency-report.md
 	@echo "Latency report: test/latency-report.md"
 
-cover: ## Per-package coverage report (incl. integration tier); fails if any internal/* package <85%
-	@$(GO) test -race -count=1 -tags integration -coverprofile=coverage.txt $(FAST_PKGS)
+cover: test-integration ## Coverage report; hard package floors are enforced separately by cover-strict
 	@$(GO) tool cover -func=coverage.txt | tee coverage.func.txt
 	@$(GO) tool cover -html=coverage.txt -o coverage.html
 	@echo "Coverage HTML: coverage.html"
@@ -133,21 +135,43 @@ apicover: ## Public-API coverage report (warning-only; APICOVER_PKGS=... to scop
 	@$(BIN_DIR)/apicover -cover coverage.func.txt $$($(GO) list -f '{{.Dir}}' $(APICOVER_PKGS))
 
 cover-strict: ## Per-package line-coverage hard-fail over go/.cover-strict (ADR-0101 §11: `<pkg> <min%>` per line; mirrors the go.yml strict step)
-	@fail=0; while read -r pkg min; do \
+	@test -f .cover-strict && test -r .cover-strict || { echo "cover-strict: cannot read regular file .cover-strict" >&2; exit 1; }
+	@fail=0; while read -r pkg min || [ -n "$$pkg" ]; do \
 		case "$$pkg" in ""|\#*) continue;; esac; \
-		got=$$($(GO) test -count=1 -tags integration -cover $$pkg 2>/dev/null | sed -n 's/.*coverage: \([0-9.]*\)%.*/\1/p'); \
+		out=$$($(GO) test -count=1 -tags integration -cover $$pkg 2>&1) || { printf 'cover-strict: %s: test failed\n%s\n' "$$pkg" "$$out" >&2; fail=1; continue; }; \
+		got=$$(printf '%s\n' "$$out" | sed -n 's/.*coverage: \([0-9.]*\)%.*/\1/p') || { echo "cover-strict: $$pkg: coverage parsing failed" >&2; fail=1; continue; }; \
 		if [ -z "$$got" ]; then echo "cover-strict: $$pkg: no coverage figure (build or test failure)"; fail=1; continue; fi; \
-		if awk -v g="$$got" -v m="$$min" 'BEGIN{exit !(g+0 < m+0)}'; then echo "cover-strict: $$pkg: $$got% < $$min% FAIL"; fail=1; else echo "cover-strict: $$pkg: $$got% >= $$min% ok"; fi; \
+		if awk -v g="$$got" -v m="$$min" 'BEGIN{if (g !~ /^[0-9]+([.][0-9]+)?$$/ || m !~ /^[0-9]+([.][0-9]+)?$$/ || g+0 > 100 || m+0 > 100) exit 2; exit !(g+0 >= m+0)}'; then echo "cover-strict: $$pkg: $$got% >= $$min% ok"; else echo "cover-strict: $$pkg: invalid or unsatisfied floor ($$got% / $$min%) FAIL"; fail=1; fi; \
 	done < .cover-strict; exit $$fail
 
+# Test-only ACS enrollments have no production API, and their artifact-dependent
+# predicates belong to the cycle runner. Inspect those dirs without running them.
 apicover-enforce: ## Per-package hard-fail over go/.apicover-enforce (mirrors go.yml Phase-5; the composed-gate recipe — a red here means an uncovered/false-green EXPORT, and it must fail the tree)
+	@pkgs="$${APICOVER_PKGS}"; \
+	if [ -z "$$pkgs" ]; then pkgs=$$(sed '/^[[:space:]]*\#/d; /^[[:space:]]*$$/d' .apicover-enforce) || exit $$?; fi; \
+	if [ -z "$$pkgs" ]; then echo "apicover-enforce: no enforced packages — skipping"; exit 0; fi; \
+	set --; for pkg in $$pkgs; do \
+		case "$$pkg" in */acs/*|acs/*) continue;; esac; \
+		set -- "$$@" "$$pkg"; \
+	done; \
+	if [ "$$#" -eq 0 ]; then printf 'mode: set\n' > coverage.txt; \
+	else $(GO) test -count=1 -tags integration -coverprofile=coverage.txt "$$@" || exit $$?; fi
+	$(MAKE) -f "$(firstword $(MAKEFILE_LIST))" apicover-check
+
+apicover-check: ## Enforce public API coverage from the successful integration run's coverage.txt
 	@mkdir -p $(BIN_DIR)
 	@$(GO) build -o $(BIN_DIR)/apicover ./cmd/apicover
-	@pkgs="$${APICOVER_PKGS:-$$(grep -vE '^[[:space:]]*(#|$$)' .apicover-enforce)}"; \
+	@pkgs="$${APICOVER_PKGS}"; \
+	if [ -z "$$pkgs" ]; then pkgs=$$(sed '/^[[:space:]]*\#/d; /^[[:space:]]*$$/d' .apicover-enforce) || exit $$?; fi; \
 	if [ -z "$$pkgs" ]; then echo "apicover-enforce: no enforced packages — skipping"; exit 0; fi; \
-	$(GO) test -count=1 -tags integration -coverprofile=coverage.txt $$pkgs >/dev/null; \
-	$(GO) tool cover -func=coverage.txt > coverage.func.txt; \
-	echo "$$pkgs" | xargs $(GO) list -e -f '{{.Dir}}' | xargs $(BIN_DIR)/apicover -enforce -cover coverage.func.txt
+	$(GO) tool cover -func=coverage.txt > coverage.func.txt || exit $$?; \
+	$(GO) list -e -f '{{if .Dir}}{{.Dir}}{{else}}MISSING_PACKAGE{{end}}' $$pkgs > $(BIN_DIR)/apicover-dirs.txt || exit $$?; \
+	set --; while IFS= read -r dir; do \
+		test -d "$$dir" || { echo "apicover-check: missing package directory: $$dir" >&2; exit 1; }; \
+		set -- "$$@" "$$dir"; \
+	done < $(BIN_DIR)/apicover-dirs.txt; \
+	test "$$#" -gt 0 || { echo "apicover-check: no package directories" >&2; exit 1; }; \
+	$(BIN_DIR)/apicover -enforce -cover coverage.func.txt "$$@"
 
 lint: ## go vet + format diff (read-only)
 	$(GO) vet $(PKG)
