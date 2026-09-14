@@ -11,6 +11,7 @@ package ship
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -65,7 +66,8 @@ func TestRepoContractGate_ImporterOfAChangedPackageBlocksShip(t *testing.T) {
 	if !strings.Contains(err.Error(), "TestUserContract") || !strings.Contains(err.Error(), "importer backstop") {
 		t.Fatalf("the gate names the layer and the importer's failing test: %q", err)
 	}
-	if !strings.Contains(out.String(), "[ship] repo-contract importer backstop: go test -json -count=1 ./internal/base/... ./internal/user/... ./internal/xonly/...") {
+	wantRun := fmt.Sprintf("[ship] repo-contract importer backstop: go test -json -count=1 -timeout %s ./internal/base/... ./internal/user/... ./internal/xonly/...", repoContractTestTimeout)
+	if !strings.Contains(out.String(), wantRun) {
 		t.Errorf("the backstop runs the changed package, its importer and its test-only importer: %q", out.String())
 	}
 }
@@ -81,7 +83,8 @@ func TestRepoContractGate_UnimportedChangeRunsOnlyItself(t *testing.T) {
 	if strings.Contains(out.String(), "./internal/user") {
 		t.Errorf("user does not import other and must not run: %q", out.String())
 	}
-	if !strings.Contains(out.String(), "importer backstop: go test -json -count=1 ./internal/other/... (1 changed → 1 in closure") {
+	wantRun := fmt.Sprintf("importer backstop: go test -json -count=1 -timeout %s ./internal/other/... (1 changed → 1 in closure", repoContractTestTimeout)
+	if !strings.Contains(out.String(), wantRun) {
 		t.Errorf("the changed package itself runs: %q", out.String())
 	}
 }

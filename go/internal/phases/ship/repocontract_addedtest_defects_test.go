@@ -36,6 +36,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/shiperr"
 )
@@ -224,4 +225,66 @@ func TestRepoContractGate_RedMessagesDistinguishFixedPackFromAddedTests(t *testi
 			t.Errorf("added-test RED must name %s, got %q", failingTest, err)
 		}
 	})
+}
+
+// TestRepoContractTestArgs_CarriesAnExplicitTimeout pins cycle-1679's ship
+// defect: the gate handed `go test` no -timeout, so every pack ran on Go's 10m
+// default. ./internal/core — which this lane's own wiring test enrolled into
+// the added-test backstop for the first time — measured 355.8s under fleet
+// load, and when the deadline wins, the timeout panic makes `go test -json`
+// emit a fail event for the running test plus every paused t.Parallel() one.
+// classifyPackEvents then sees named test failures and classes it a real
+// contract RED: a false RED on green code, which is exactly what blocked this
+// cycle's first ship (19 named internal/core "failures", 18 of them parallel).
+//
+// The assertion is on the argv rather than on an observed timeout because the
+// defect IS the missing flag; a test that actually waited out a deadline would
+// have to burn one.
+func TestRepoContractTestArgs_CarriesAnExplicitTimeout(t *testing.T) {
+	args := repoContractTestArgs([]string{"./internal/core"}, nil)
+
+	i := indexOfArg(args, "-timeout")
+	if i < 0 {
+		t.Fatalf("the gate must not leave `go test` on its 10m default — a slow-but-green pack "+
+			"times out under fleet load and the panic reads as a real contract RED. args=%v", args)
+	}
+	if i+1 >= len(args) || args[i+1] != repoContractTestTimeout {
+		t.Fatalf("-timeout must carry %q, got args=%v", repoContractTestTimeout, args)
+	}
+	if d, err := time.ParseDuration(repoContractTestTimeout); err != nil {
+		t.Fatalf("repoContractTestTimeout %q is not a duration go test accepts: %v", repoContractTestTimeout, err)
+	} else if d <= 10*time.Minute {
+		t.Fatalf("repoContractTestTimeout %v is no headroom over Go's 10m default — ./internal/core "+
+			"already measured 355.8s at ship, and the whole point is to clear it under load", d)
+	}
+	// The flag must precede the package list, or `go test` reads it as a package.
+	if p := indexOfArg(args, "./internal/core"); p >= 0 && p < i {
+		t.Fatalf("-timeout must come before the package operands, got args=%v", args)
+	}
+}
+
+// TestRepoContractTestArgs_KeepsTagsAndPackagesAfterTheTimeout pins that
+// extracting the argv builder did not disturb the flags the backstop's
+// tag-grouped run depends on (the `//go:build acs` predicate packages).
+func TestRepoContractTestArgs_KeepsTagsAndPackagesAfterTheTimeout(t *testing.T) {
+	args := repoContractTestArgs([]string{"./acs/cycle1679"}, []string{"acs"})
+
+	want := []string{"test", "-json", "-count=1", "-timeout", repoContractTestTimeout, "-tags", "acs", "./acs/cycle1679"}
+	if len(args) != len(want) {
+		t.Fatalf("argv shape changed: got %v, want %v", args, want)
+	}
+	for i := range want {
+		if args[i] != want[i] {
+			t.Fatalf("argv[%d] = %q, want %q (full: %v)", i, args[i], want[i], args)
+		}
+	}
+}
+
+func indexOfArg(args []string, want string) int {
+	for i, a := range args {
+		if a == want {
+			return i
+		}
+	}
+	return -1
 }

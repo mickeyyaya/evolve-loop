@@ -232,6 +232,14 @@ func (o *Orchestrator) finalizeCycle(ctx context.Context, cs CycleState, cycle i
 	// No FAIL without a reason — see failreasons_backfill.go.
 	backfillFailReasons(result, timings)
 
+	// Cross-artifact invariant stack (cycle-1676): four weak deterministic
+	// verifiers over this cycle's own artifacts, bound to the LANE worktree
+	// (#612), recorded beside them. Purely ADVISORY — it runs before the
+	// ADR-0072 floor below precisely so a finding can be read next to the
+	// floor's decision without ever influencing it. See
+	// crossartifact_invariants.go.
+	recordCrossArtifactInvariants(cycle, cs.WorkspacePath, cs.ActiveWorktree)
+
 	// ADR-0072 Go floor: verdict-coherence. If the cycle recorded a negative
 	// verdict but the phases' own on-disk artifacts (audit-report + acs-verdict)
 	// are green, the pipeline forged the verdict — a SYSTEM-level failure, not a

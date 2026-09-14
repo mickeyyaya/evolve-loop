@@ -86,7 +86,8 @@ func runImporterBackstop(ctx context.Context, out io.Writer, root, moduleDir, wo
 		fmt.Fprintf(out, "[ship] repo-contract importer backstop: closure of %s already run by an earlier layer or not testable — nothing more to run\n", strings.Join(changed, " "))
 		return nil
 	}
-	fmt.Fprintf(out, "[ship] repo-contract importer backstop: go test -json -count=1 %s (%d changed → %d in closure, %d already run by an earlier layer)\n",
+	fmt.Fprintf(out, "[ship] repo-contract importer backstop: go test -json -count=1 -timeout %s %s (%d changed → %d in closure, %d already run by an earlier layer)\n",
+		repoContractTestTimeout,
 		strings.Join(targets, " "), len(changed), len(closure.Patterns), len(closure.Testable)-len(targets))
 	bctx, cancel := context.WithTimeout(ctx, importerBackstopTimeout)
 	defer cancel()

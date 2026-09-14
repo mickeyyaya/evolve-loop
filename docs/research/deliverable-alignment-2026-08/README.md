@@ -121,7 +121,7 @@ Fusing §2's measured record with §3's literature:
 |---|---|---|---|
 | **L1 Generation-point** (prompt contracts, tail restatement, in-session hooks) | format/placement classes | ADR-0034 + RenderContractTail (shipped, working) | Correct and near-ceiling; the remaining lever is per-CLI: Claude hooks, Ollama grammar |
 | **L2 Transport & salvage** (file-authoritative verdicts, grace windows, lenient extraction) | harness-side losses (~65% of failures), partial writes, malformed-but-recoverable output | file-authoritative + backfill (shipped); **schema-aligned salvage layer MISSING** | Highest-leverage gap — every salvage is a whole cycle saved |
-| **L3 Verification** (predicates, gates, adversarial audit, metamorphic invariants) | semantic wrongness, gaming, vacuous work | EGPS + adversarial audit (shipped, best-in-system); cross-artifact invariant stack partial (`coherence`) | Keep; extend with the weak-verifier invariant stack; every gate needs FP≈0 evidence |
+| **L3 Verification** (predicates, gates, adversarial audit, metamorphic invariants) | semantic wrongness, gaming, vacuous work | EGPS + adversarial audit (shipped, best-in-system); cross-artifact invariant stack landed ADVISORY (`internal/coherence`, recorded from `internal/core`, §6.4) | Keep; the weak-verifier stack now runs advisory on every cycle — graduate an invariant to blocking only on its own FP≈0 evidence |
 | **L4 Process/accounting supervision** (fingerprint breaker, defect ledgers, disposition artifacts, §3.9) | cross-cycle laundering, status fiction, fix latency, lost prescriptions | ADR-0072 (shipped) + continuation-defect-ledger (landed cycle-1286) + §3.8/§3.9 (policy) | The open frontier; mechanize dispositions pipeline-wide |
 
 "Find one, solve one" is L3/L4's *operating mode* — correct there. The
@@ -137,7 +137,7 @@ layer needs a mechanism, not another patch.
 | 2 | **Schema-aligned salvage layer** (BAML-SAP pattern, in-harness Go): lenient, *logged*, bounded extraction of fenced/mislabeled JSON, displaced sentinels, trailing commas — before any retry/rejection | L2 | Converts whole-cycle losses to zero-cost saves across all four CLIs; no constraint tax; production data says 8–15% of calls are recoverable-malformed | Coercion masking semantic drift — every coercion logged + surfaced in audit; never invent values | **NEW — filed 0.9** |
 | 3 | **Two-stage verdict minting**: phase writes free-form report; a cheap constrained extractor (headless `claude -p --json-schema`, or Ollama grammar-constrained = hard guarantee at zero API cost) mints the machine JSON from report+workspace | L2 | The decoder-free realization of "reason free, constrain the envelope"; removes sentinel burden from reasoning agents entirely; subsumes `verdict-sentinel-as-tool-call` (0.86) | A faithful extractor can mint a well-formed *wrong* verdict — must fail-on-ambiguity and cross-check against artifacts (move 5) | extend existing 0.86 item |
 | 4 | **Retry ladder economics alignment**: keep cap=2; on 2nd failure escalate the *critic/diagnoser*, not just the generator; integrate with the fingerprint breaker so identical failures don't burn the cap | L1/L3 | Directly from the repair-economics literature; our ladder is right-shaped, mis-aimed | Double-billing curves; budget per cycle | fold into item #1's landing |
-| 5 | **Cross-artifact metamorphic invariant stack** as a distinct deterministic verdict authority: sentinel == standalone JSON; claimed counts == parsed runner output; referenced paths exist; provenance chains intact | L3 | Weak-verifier aggregation ≈ strong verifier at near-zero cost; immune to judge bias; several invariants exist scattered (`internal/coherence`) — unify them | SWE-agent rule: an invariant without proven FP≈0 becomes a flake generator — advisory until evidenced | **NEW — filed 0.85** |
+| 5 | **Cross-artifact metamorphic invariant stack** as a distinct deterministic verdict authority: sentinel == standalone JSON; claimed counts == parsed runner output; referenced paths exist; provenance chains intact | L3 | Weak-verifier aggregation ≈ strong verifier at near-zero cost; immune to judge bias; several invariants exist scattered (`internal/coherence`) — unify them | SWE-agent rule: an invariant without proven FP≈0 becomes a flake generator — advisory until evidenced | **landed** — advisory aggregate cycle-1676 (`go/internal/coherence/crossartifact.go`), wired at `go/internal/core/cyclerun.go:241`; DOCS half closed cycle-1679 (§6.4) |
 | 6 | **Claude Code Stop-hook finish-gate** (in-session): refuse turn-end until deliverables exist and validate; tmux re-prompt equivalent for other CLIs | L1 | Only in-session enforcement any of our CLIs offers; one turn cheaper than post-hoc correction | Enforcement asymmetry across CLIs skews per-CLI stats; needs the `stop_hook_active` escape | **NEW — filed 0.8** |
 | 7 | **Accounting-layer mechanization** — per-defect dispositions enforced pipeline-wide, ledger writes from diffs + runtime artifacts | L4 | The integrity review's frontier; first mechanism landed cycle-1286 after a 5-round hardening that proved the need | Its own gameability (cycle-1282's pre-planted-ledger POC — fixed) | in flight (0.95 landed; residuals queued) |
 
@@ -267,6 +267,76 @@ finding narrowed the portfolio rather than confirming it: one shape dominates
 the recoverable set and the extraction pass stays deferred on evidence — see
 **§7** for the counts, the caveat about the counterfactual sweep, and the
 consequence for the rank-2 item.
+
+### 6.4 Landed — cross-artifact metamorphic invariant stack, advisory (cycle-1676 code, cycle-1679 record, item rank 5)
+
+**Issue.** The rank-5 move was filed on 2026-08-04 (`629ba575`) and its code half
+landed in cycle-1676: `go/internal/coherence/crossartifact.go` aggregates the four
+weak verifiers the record names — the embedded `<!-- evolve-verdict -->` sentinel
+must agree with the standalone `acs-verdict.json` verdict; the claimed suite counts
+must survive an independent recount of that file's own parsed runner results; every
+`evidence_path` the audit sentinel cites must resolve on disk; and
+`phase-timing.json`'s recorded chain must run forward and respect the
+scout→tdd→build→audit floor. Nothing was written here, so this README kept
+describing a mechanism that existed as unbuilt work: the L3 row in §4 called the
+stack `partial (coherence)` and the rank-5 row in §5 still read **NEW — filed
+0.85**.
+
+**Gap.** The gap was not the code — it was that the item's acceptance has two
+halves and only one was deliverable-checked. The record's `fix` field carries
+*"DOCS per 3.8 into docs/research/deliverable-alignment-2026-08/README.md"* and its
+`connects_to` names both `go/internal/coherence/` and this file, so an item whose
+implementation is green and whose experience record is absent is an item whose
+acceptance is still unmet: the record was live and unconsumed when cycle-1679
+claimed it, three cycles after the code it asks for shipped. A landed mechanism
+that no one can find from the portfolio it was filed against is also how the
+scattered-invariant problem this move was supposed to end reappears.
+
+**Solution.** Two parts, both in this cycle.
+
+1. This record, plus the two stale rows above it — the §4 L3 row and the §5
+   rank-5 queue state now say what is on disk. The stack is recorded by
+   `go/internal/core/crossartifact_invariants.go` and reached from exactly one
+   production caller, `go/internal/core/cyclerun.go:241`, inside `finalizeCycle`
+   and deliberately *before* the ADR-0072 verdict-coherence floor, so a finding can
+   be read next to the floor's decision without ever influencing it. The aggregate
+   is bound to `cs.ActiveWorktree`, never the project-root argument: in fleet mode a
+   project-root snapshot names a tree the lane did not write, which is the #612
+   lesson.
+2. The invariant obeys the rule the record itself imposes — **advisory until
+   FP≈0 is evidenced** (the 1054/1060 breaker lesson). A finding changes no
+   verdict, raises no system failure, and is written to
+   `<workspace>/crossartifact-invariants.json` on *every* cycle including all-ok
+   ones, because a false-positive rate that is never recorded can never be
+   evidenced, and that evidence is the only door to graduating any of these four to
+   blocking. Absence is the third status: an artifact that is missing or malformed
+   reports `indeterminate`, never `violated` — an advisory that fires on absence
+   manufactures its own flake rate.
+
+   The referenced-paths verifier carried one real defect into this cycle, found by
+   the cycle-1676 adversarial audit (L1) and fixed here: the containment check
+   joined a cited path to a root without rejecting `../` escapes, so a citation with
+   enough climbing segments cleaned down to a real file *outside* both roots and
+   read as resolved. `resolvesUnder` in
+   `go/internal/coherence/crossartifact.go` now rejects an escaping citation
+   before the `os.Stat`, since a path the lane did not write is not evidence the
+   lane produced however real the file is.
+
+**Measured before/after.** The four classes are pinned behaviourally, not by
+presence: `go/internal/coherence/crossartifact_test.go` drives real on-disk
+workspace fixtures through the aggregate — 14/14 PASS, including NEGATIVE cases
+that break each class one at a time and demand that class be named in
+`Violations()`, the EDGE empty-workspace case that demands `indeterminate`, and the
+escape case above, which is RED against the pre-fix `resolvesUnder`
+("status = ok, want violated") and green after it. The seam is pinned separately by
+`go/internal/core/crossartifact_invariants_wiring_test.go` — 4/4 PASS through the
+real `finalizeCycle`: the artifact is emitted, violations never block the cycle,
+the lane worktree is bound rather than the project root, and the ADR-0072 floor
+keeps its behaviour with the advisory running beside it. `go/acs/cycle1679/predicates_test.go`
+holds the acceptance as five cycle predicates. What remains unmeasured is the only
+figure that can graduate any of these to blocking: the live false-positive rate over
+a run of cycles, which the per-cycle `crossartifact-invariants.json` records exist to
+accumulate. Until that number is counted, all four stay advisory.
 
 ## 7. Baseline — the recoverable-malformed `bad_verdict` rate, measured (cycle-1389)
 

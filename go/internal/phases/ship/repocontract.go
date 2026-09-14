@@ -99,14 +99,37 @@ func runRepoContractPackages(ctx context.Context, moduleDir string, out io.Write
 	return runRepoContractPackagesWithTags(ctx, moduleDir, out, packages, nil)
 }
 
-func runRepoContractPackagesWithTags(ctx context.Context, moduleDir string, out io.Writer, packages, tags []string) packOutcome {
-	out = &lockedWriter{w: out} // the child's stderr and the event tee share it
-	args := []string{"test", "-json", "-count=1"}
+// repoContractTestTimeout is the per-binary deadline the gate hands `go test`.
+//
+// Go's default is 10m, and that default is what red-lined cycle-1679's first
+// ship: this lane's added wiring test enrolled ./internal/core into the
+// added-test backstop for the first time, and that package measured 355.8s
+// under fleet load in the run that did pass (106.8s standalone). A package at
+// 59% of the deadline is a coin flip, and when the deadline wins the panic
+// makes `go test -json` emit a fail event for the running test AND every
+// t.Parallel() test still paused — 19 named "failures" the gate then classes a
+// real contract RED. That is a false RED on green code: the exact
+// cycle-1173/1175/1178 shape.
+//
+// 20m is ~3.4x the measured worst case, so slow-but-green survives fleet load,
+// while a genuine deadlock is still bounded rather than left to the ship's own
+// context. Raising a deadline can only turn a timeout into a real verdict; it
+// can never turn a failing test green.
+const repoContractTestTimeout = "20m"
+
+// repoContractTestArgs builds the gate's `go test` argv. Split out from the
+// runner so the flags the gate depends on are assertable without exec'ing go.
+func repoContractTestArgs(packages, tags []string) []string {
+	args := []string{"test", "-json", "-count=1", "-timeout", repoContractTestTimeout}
 	if len(tags) > 0 {
 		args = append(args, "-tags", strings.Join(tags, ","))
 	}
-	args = append(args, packages...)
-	cmd := exec.CommandContext(ctx, "go", args...)
+	return append(args, packages...)
+}
+
+func runRepoContractPackagesWithTags(ctx context.Context, moduleDir string, out io.Writer, packages, tags []string) packOutcome {
+	out = &lockedWriter{w: out} // the child's stderr and the event tee share it
+	cmd := exec.CommandContext(ctx, "go", repoContractTestArgs(packages, tags)...)
 	cmd.Dir = moduleDir
 	cmd.Env = ipcenv.Scrub(os.Environ()) // the lane's IPC state must not reach env-sensitive tests
 	stdout, err := cmd.StdoutPipe()
@@ -256,7 +279,8 @@ func runRepoContractGateAt(ctx context.Context, gate, root, baseRef, workspace s
 	}
 	// Header first, so the artifact is non-empty and self-identifying even on
 	// a green run — the green baseline is what disproves a false RED.
-	fmt.Fprintf(out, "[ship] repo-contract scanner pack: go test -json -count=1 %s (module %s, changes vs %s)\n",
+	fmt.Fprintf(out, "[ship] repo-contract scanner pack: go test -json -count=1 -timeout %s %s (module %s, changes vs %s)\n",
+		repoContractTestTimeout,
 		strings.Join(repoContractPackages, " "), moduleDir, baseRef)
 
 	if err := runClassifiedPack(ctx, out, workspace, "scanner pack", func() packOutcome {
@@ -291,7 +315,7 @@ func runAddedTestBackstop(ctx context.Context, out io.Writer, root, baseRef, mod
 		fmt.Fprintf(out, "[ship] repo-contract gate: EXCLUDED %s (requires_tmux or another build constraint unavailable on this host; backstop required)\n", path)
 	}
 	for _, group := range groups {
-		fmt.Fprintf(out, "[ship] repo-contract added-test backstop: go test -json -count=1")
+		fmt.Fprintf(out, "[ship] repo-contract added-test backstop: go test -json -count=1 -timeout %s", repoContractTestTimeout)
 		if len(group.tags) > 0 {
 			fmt.Fprintf(out, " -tags %s", strings.Join(group.tags, ","))
 		}
