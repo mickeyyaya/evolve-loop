@@ -297,6 +297,11 @@ type Orchestrator struct {
 	// to defaultGitMutationLock; a test seam swaps in a deterministic spy.
 	gitMutationLock gitMutationLocker
 
+	// dossierCommit: whether the closeout dossier is git-committed (default true).
+	// The --simulate root sets false — its walk writes records but never touches
+	// the operator's history (WithDossierCommit).
+	dossierCommit bool
+
 	// gitDirtyPaths returns the set of modified tracked paths in the main
 	// repo's working directory (`git diff --name-only HEAD` in repoRoot).
 	// Workstream B's tree-diff guard snapshots this before each source-
@@ -845,6 +850,7 @@ func NewOrchestrator(storage Storage, ledger Ledger, runners map[Phase]PhaseRunn
 		now:                        time.Now,
 		gitHEAD:                    defaultGitHEAD,
 		gitMutationLock:            defaultGitMutationLock,
+		dossierCommit:              true,
 		gitDirtyPaths:              defaultGitDirtyPaths,
 		worktree:                   gitWorktree{},
 		strategy:                   router.StaticPreset{},
@@ -1029,7 +1035,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (_ CycleR
 	// richer post-build probe (same-tree-already-audited within a normal cycle)
 	// is an enforce-stage decision, deliberately out of the shadow increment.
 	if cr.cs.ActiveWorktree != "" {
-		if sha := worktreeContentSHA(ctx, cr.cs.ActiveWorktree); sha != "" {
+		if sha := worktreeContentSHA(ctx, cr.req.ProjectRoot, cr.cs.ActiveWorktree); sha != "" {
 			baseTree := worktreeBaseTreeSHA(ctx, cr.cs.ActiveWorktree, cr.cs.WorktreeBaseSHA)
 			if !verdictcache.ProbeEligible(baseTree, sha) {
 				// Untouched/fresh worktree (no changes compared to the base commit),
@@ -1181,4 +1187,12 @@ OuterLoop:
 	}
 
 	return cr.result, nil
+}
+
+// WithDossierCommit decides whether each cycle's closeout dossier is
+// git-committed into the project root (the production default) or only
+// written (the --simulate root: a no-LLM plumbing walk must never mutate the
+// operator's repository — docs/incidents/2026-09-14-simulate-runs-against-the-checkout.md).
+func WithDossierCommit(commit bool) Option {
+	return func(o *Orchestrator) { o.dossierCommit = commit }
 }

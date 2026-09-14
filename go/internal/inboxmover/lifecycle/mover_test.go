@@ -358,15 +358,17 @@ var codeSteps = map[signalcenter.Code][]string{
 	CodeReleaseMoveFailed:              {"release_cycle", "recover_orphans"},
 	CodeQuarantineFailed:               {"quarantine"},
 	CodeContinuationManifestUnreadable: {"manifest"},
-	CodeItemRewriteFailed:              {"counter_reset", "failure_bump", "continuation_stamp"},
+	CodeItemRewriteFailed:              {"counter_reset", "failure_bump", "continuation_stamp", "route"},
+	CodeItemRoutedConsole:              {"route"},
+	CodeRouteNotFound:                  {"locate"},
 }
 
 // Test 21 — every code is registered under module inbox with a doc that names
 // its fields.step values; the real registry is conflict-free; no INBOX_ code
 // doubles the ledger adapter's LEDGER_APPEND_FAILED.
 func TestMover_Codes_RegisteredUnderInbox_DocsNameTheirSteps_NoLedgerDouble(t *testing.T) {
-	if len(codeSteps) != 12 {
-		t.Fatalf("the unit registers 12 codes, the table names %d", len(codeSteps))
+	if len(codeSteps) != 14 {
+		t.Fatalf("the unit registers 14 codes, the table names %d", len(codeSteps))
 	}
 	docs := map[signalcenter.Code]string{}
 	for _, cd := range signalcenter.RegisteredCodes()[signalcenter.ModuleInbox] {

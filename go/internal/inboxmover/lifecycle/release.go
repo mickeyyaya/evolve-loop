@@ -109,7 +109,7 @@ func (m *Mover) readStamp(cycle int) *continuation.Continuation {
 // and says so: a bump that cannot rewrite, a park that cannot deliver — the
 // un-parked poison item returns to the root and WILL be re-picked.
 func (m *Mover) parkAtCeiling(d drained, reason string, cycle int, q *Policy) (bool, string) {
-	if q == nil || q.SystemLevel || (q.Committed != nil && !q.Committed[d.taskID]) {
+	if q == nil || q.SystemLevel || q.Routed || (q.Committed != nil && !q.Committed[d.taskID]) {
 		return false, ""
 	}
 	count, bumpErr := bumpWith(d.src, reason, func(n int) bool { return ShouldQuarantine(n, q.Ceiling, q.SystemLevel) })

@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — a `--simulate` walk never mutates the operator's repository (2026-09-14)
+
+`evolve campaign run --simulate` and `evolve cycle --simulate` used the production closeout: every walk committed a `dossier: cycle-N closeout`, snapshot-committed its "worktree" on FAIL, provisioned real `cycle-*` worktrees and branches, and launched real CLIs for the per-wave health probes — so the acs/cycle8 gate test, run from the repo root on every whole-module floor, dirtied the dev branch and left `.evolve/ledger.jsonl`, `runs/` and `worktrees/` behind (and passed only because that litter supplied the `build-report.md` the floor demanded). The simulate root now reads the project root in place, writes its dossier without committing (`core.WithDossierCommit(false)`), and every host mutator of a worktree asks ONE predicate — `inPlaceWorktree` — inside itself: the salvage snapshot, the per-phase gofmt normalize and leak recovery, the index-staging content SHA and the fleet rebase all stand down for an in-place root on every path (dispatch, resume, composition) (symlink aliases and relative spellings included; a resume checkpoint can name the root under the production provisioner too). The simulate runner writes each phase's contracted report stub through the grammar owners (`phasecontract.RenderVerdictSentinel`, `explanationdocs.RenderNotApplicableDeclaration` — the e2e fake CLI and the in-process fake runner now render through the same function), and `--simulate` installs no live-probe hook; the gate test runs in a detached scratch worktree and pins HEAD, porcelain status (untracked included), `cycle-*` branches and the worktree list byte-identical before and after. Record: `docs/incidents/2026-09-14-simulate-runs-against-the-checkout.md`.
+
+---
+
+## Fixed — the tmux driver no longer declares a large codex prompt "wedged" 2.5 s after pasting it (2026-09-14)
+
+Every codex-tmux phase of the first post-decomposition wave needed two or three Enter re-sends to submit its prompt, and the two largest (scout 17.7 KB, build 35 KB) hit the re-send cap: the TUI was still ingesting the paste when the fixed 1 s settle and three 500 ms re-sends had all fired, so the dispatch was discarded as `submit_wedged`. The delivery tail now has ONE home (`paste_settle.go`, shared by the prompt paste and `injectText`): it settles by paste size (1 s + 1.5 s/10 KB, cap 6 s — never the 2 s artifact-wait interval), waits for the pane to stop changing before the first Enter (≥ 2 KB pastes, bounded to 8 polls; an unreadable prompt is treated as a large one, loudly), and records the settle and the stability outcome in the submit-verify ledger on the success path; `verifySubmitted` backs off between re-sends (500 ms → 1.5 s → 2.5 s). Vocabulary, stderr lines, the re-send cap and the wedge short-circuit are unchanged. Record: `docs/incidents/2026-09-14-codex-prompt-submit-wedge.md`.
+
+---
+
+## Fixed — a triage refusal is a task-level failure; a protected-surface refusal routes the item to console on the first hit (2026-09-14)
+
+One inbox item (`verdict-sentinel-as-tool-call`) drew nine lanes in a row (cycles 1650–1675) — scout, then a triage FAIL for "top_n card names protected surface", then a closeout that put it straight back for the next wave. Root cause: the triage gate's own refusal had no failure class, `cycleclassify` fell through to system-level, and the ADR-0072 S5 drain never bumped `failure_count` — the quarantine ceiling was unreachable and the closeout's re-claim of the already-claimed id even raised a false `INBOX_CLAIM_NOT_FOUND` on every cycle.
+
+- `cyclestate.Diagnostic` gains `code` and `subject` (both `omitempty`): the phase's own gate stamps a machine-readable reason (`TRIAGE_PROTECTED_SURFACE` / `TRIAGE_TOPN_EMPTY` / `TRIAGE_COMMITMENT_INVALID`) and the card it names; `cyclestate.ErrorCodes` is the one projection.
+- The C1 chokepoint's `ORCHESTRATOR_PHASE_VERDICT_FAIL` carries `diagnostic_codes=…` — the console line says WHY, structurally.
+- `cycleclassify` reads the C1 record (`phase-timing.json`) before any prose pass: a coded FAIL on the last outcome is the new task-level class `phase-refusal` (marker = the code, detail, subject).
+- Whose fault a refusal is lives in ONE table beside the vocabulary (`cyclestate.RefusalDisposition`): protected-surface = the item's, and routed; empty top_n = the item's (bump toward the ceiling); commitment-invalid = the pipeline's (an I/O fault charges nobody).
+- The FAIL closeout routes a `TRIAGE_PROTECTED_SURFACE` subject — only one in this cycle's committed set — to `route: console-manual` in place (`inboxmover.RouteConsole` → `INBOX_ITEM_ROUTED_CONSOLE` WARN; `INBOX_ROUTE_NOT_FOUND` when it cannot or when another cycle holds the item) before the drain, then the drain runs with `Routed` set (no bump, no park for that cycle). `ClaimLaneScope` no longer re-claims an id the lane already holds in `processing/`.
+
+Record: `docs/incidents/2026-09-14-triage-refusal-poison-loop.md`. Three inbox-mover goldens were re-captured (the two false WARN lines per already-claimed id are gone).
+
+---
+
 ## Changed — the `evolve subagent run` execution path is its own package with eleven Signal Center codes (ADR-0103 unit 16, 2026-09-14)
 
 `internal/subagent/run.go`'s 236-line `Run` moved into `internal/subagent/subagentrun` (a `Dispatcher` over

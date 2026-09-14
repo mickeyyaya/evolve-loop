@@ -370,3 +370,14 @@ func ReconcileSuperseded(opts Options, supersededIDs []string, newState string, 
 	}
 	return retired, nil
 }
+
+// RouteResult is the leaf's route receipt (the rewritten item's path).
+type RouteResult = lifecycle.RouteResult
+
+// RouteConsole is the FAIL closeout's per-item breaker: the item is rewritten
+// in place — wherever the lane's claim left it — with route:console-manual
+// and the refusal as routed_reason, so the ADR-0074 claim floor refuses every
+// later lane (docs/incidents/2026-09-14-triage-refusal-poison-loop.md).
+func RouteConsole(opts Options, taskID, reason string, cycle int) (RouteResult, error) {
+	return opts.mover().RouteConsole(taskID, reason, cycle)
+}

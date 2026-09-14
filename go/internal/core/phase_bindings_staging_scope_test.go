@@ -17,7 +17,7 @@ package core
 // The contract these tests pin is a SELECTION boundary, deliberately expressed
 // in observable git terms so the Builder keeps design freedom (no new exported
 // symbol, parameter, or carrier is frozen here — the current signature
-// `worktreeContentSHA(ctx, worktree)` stays valid):
+// `worktreeContentSHA(ctx, "", worktree)` stays valid):
 //
 //	declared     = content already in the lane's git index (tracked files, plus
 //	               anything the builder explicitly `git add`ed) + tracked
@@ -113,7 +113,7 @@ func TestWorktreeContentSHA_ExcludesUnrelatedUntrackedResidue(t *testing.T) {
 	// classes that burned cycles 1572/1574 were precisely the ones it did not.
 	writeFile(t, filepath.Join(repo, "foreign-residue.txt"), "must not enter the audit binding\n")
 
-	tree := worktreeContentSHA(context.Background(), repo)
+	tree := worktreeContentSHA(context.Background(), "", repo)
 	if tree == "" {
 		t.Fatal("worktreeContentSHA returned an empty tree — the identity must still resolve")
 	}
@@ -136,7 +136,7 @@ func TestWorktreeContentSHA_StagesDeclaredNewFile(t *testing.T) {
 	// Declared = the builder put it in the lane's index.
 	gitOut(t, repo, "add", declared)
 
-	tree := worktreeContentSHA(context.Background(), repo)
+	tree := worktreeContentSHA(context.Background(), "", repo)
 	if tree == "" {
 		t.Fatal("worktreeContentSHA returned an empty tree")
 	}
@@ -158,7 +158,7 @@ func TestWorktreeContentSHA_CapturesUnstagedTrackedModification(t *testing.T) {
 	repo := stagingScopeRepo(t)
 	writeFile(t, filepath.Join(repo, "base.txt"), "base\nunstaged tracked edit\n")
 
-	tree := worktreeContentSHA(context.Background(), repo)
+	tree := worktreeContentSHA(context.Background(), "", repo)
 	if tree == "" {
 		t.Fatal("worktreeContentSHA returned an empty tree")
 	}
@@ -183,7 +183,7 @@ func TestWorktreeContentSHA_ResidueOnlyWorktreeKeepsBaseIdentity(t *testing.T) {
 	writeFile(t, filepath.Join(repo, "coverage.core476.func.txt"), "regenerated build output\n")
 	writeFile(t, filepath.Join(repo, ".evolve-scratch-residue.txt"), "another lane's scratch\n")
 
-	tree := worktreeContentSHA(context.Background(), repo)
+	tree := worktreeContentSHA(context.Background(), "", repo)
 	if tree == "" {
 		t.Fatal("worktreeContentSHA returned an empty tree — residue-only must still resolve an identity")
 	}
@@ -207,16 +207,20 @@ func TestEmitPhaseBindings_AuditBindingTreeExcludesUnrelatedResidue(t *testing.T
 	base := gitOut(t, repo, "rev-parse", "HEAD")
 	ws := filepath.Join(repo, ".evolve", "runs", "cycle-1594")
 	writeFile(t, filepath.Join(ws, "audit-report.md"), "## Verdict\n**PASS**\n")
+	// The cycle's ISOLATED worktree, as production provisions it: the binding
+	// stages the worktree's index, never the project root's (inPlaceWorktree).
+	wt := filepath.Join(t.TempDir(), "cycle-1594")
+	gitOut(t, repo, "worktree", "add", "--detach", "-q", wt, "HEAD")
 
 	declared := filepath.Join("go", "internal", "newpkg", "newpkg.go")
-	writeFile(t, filepath.Join(repo, declared), "package newpkg\n")
-	gitOut(t, repo, "add", declared)
-	writeFile(t, filepath.Join(repo, "foreign-residue.txt"), "must not enter the audit binding\n")
+	writeFile(t, filepath.Join(wt, declared), "package newpkg\n")
+	gitOut(t, wt, "add", declared)
+	writeFile(t, filepath.Join(wt, "foreign-residue.txt"), "must not enter the audit binding\n")
 
 	led := &fakeLedger{}
 	o := NewOrchestrator(nil, led, nil)
 	o.now = func() time.Time { return time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC) }
-	cs := CycleState{CycleID: 1594, WorkspacePath: ws, ActiveWorktree: repo, WorktreeBaseSHA: base}
+	cs := CycleState{CycleID: 1594, WorkspacePath: ws, ActiveWorktree: wt, WorktreeBaseSHA: base}
 	o.emitPhaseBindings(context.Background(), 1594, repo, cs, PhaseAudit, VerdictPASS)
 
 	if len(led.entries) != 1 {

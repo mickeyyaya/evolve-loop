@@ -39,7 +39,7 @@ func (w replWaiter) admitPrompt(state *replWaitState) int {
 	// Preserve the pane heuristic in the interaction ledger even when stronger
 	// disk evidence below recovers it. Consumers use the phase result as the
 	// disposition and the ledger outcome as diagnostic evidence.
-	recordSubmitVerify(w.recorder, w.phaseName, w.cfg.Cycle, "prompt", outcome)
+	recordSubmitVerify(w.recorder, w.phaseName, w.cfg.Cycle, "prompt", outcome, w.paste)
 	if outcome.Result != interaction.ResultSubmitWedged {
 		return ExitOK
 	}

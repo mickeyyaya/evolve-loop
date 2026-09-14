@@ -12,6 +12,7 @@ package core
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -32,7 +33,12 @@ var snapshotIdentity = []string{"-c", "user.name=evolve-loop", "-c", "user.email
 // The scoped `add -A` is intentional here — a salvage snapshot's job is to
 // preserve EVERYTHING the attempt produced in its isolated worktree; the
 // declared-manifest staging discipline applies to SHIP binding, not salvage.
-func snapshotPreservedWorktree(ctx context.Context, worktree string) (string, error) {
+func snapshotPreservedWorktree(ctx context.Context, projectRoot, worktree string) (string, error) {
+	// A salvage snapshot is `add -A` + commit of a cycle's ISOLATED worktree;
+	// the operator's own tree is never committed (inPlaceWorktree).
+	if inPlaceWorktree(worktree, projectRoot) {
+		return "", errors.New("the active worktree is the project root — no salvage snapshot (never commit the operator's tree)")
+	}
 	g := gitexec.Git{Dir: worktree, Exec: gitRunner}
 	porcelain, stderr, code, err := g.Capture(ctx, "status", "--porcelain", "-uall")
 	if err != nil || code != 0 {
@@ -63,7 +69,7 @@ func (o *Orchestrator) stampContinuationManifest(ctx context.Context, cs CycleSt
 	if cs.ActiveWorktree == "" {
 		return
 	}
-	sha, err := snapshotPreservedWorktree(ctx, cs.ActiveWorktree)
+	sha, err := snapshotPreservedWorktree(ctx, projectRoot, cs.ActiveWorktree)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d continuation: snapshot failed (%v) — preserved work stays dirty-only, no continuation stamped\n", cycle, err)
 		return

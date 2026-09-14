@@ -221,8 +221,9 @@ func TestFacades_KeepEverySpelling(t *testing.T) {
 // Test 50 — the FAIL drain through Options.Signals: the quarantine failure
 // renders in the Center (origin Mover.Release, the cycle), the fallback line
 // does not print, the INFO lines still do, and the FAIL closeout's lane-scope
-// claim of an already-claimed id reports INBOX_CLAIM_NOT_FOUND (the declared
-// benign WARN — outcome.go:151's console duplicate stays, 06-F7/06-F11).
+// pass leaves an already-claimed id alone — no INBOX_CLAIM_NOT_FOUND, no
+// console duplicate (the false not-found of the 2026-09-14 poison-loop
+// incident; 06-F7/06-F11 retired with it).
 func TestApplyCycleOutcome_FailDrain_EmitsInboxCodesThroughOptionsSignals(t *testing.T) {
 	repo := makeRepo(t)
 	inbox := filepath.Join(repo, ".evolve", "inbox")
@@ -239,19 +240,19 @@ func TestApplyCycleOutcome_FailDrain_EmitsInboxCodesThroughOptionsSignals(t *tes
 	for _, e := range rc.events {
 		codes = append(codes, e.Code)
 	}
-	want := []signalcenter.Code{lifecycle.CodeClaimNotFound, lifecycle.CodePromoteMoveFailed, lifecycle.CodeQuarantineFailed}
+	want := []signalcenter.Code{lifecycle.CodePromoteMoveFailed, lifecycle.CodeQuarantineFailed}
 	if fmt.Sprint(codes) != fmt.Sprint(want) {
 		t.Fatalf("codes = %v, want %v", codes, want)
 	}
-	if rc.events[2].Origin != "Mover.Release" || rc.events[2].Cycle != 11 || rc.events[2].Fields["outcome"] != "error" {
-		t.Errorf("the quarantine failure: %+v", rc.events[2])
+	if rc.events[1].Origin != "Mover.Release" || rc.events[1].Cycle != 11 || rc.events[1].Fields["outcome"] != "error" {
+		t.Errorf("the quarantine failure: %+v", rc.events[1])
 	}
 	out := stderr.String()
 	if strings.Contains(out, "[inbox-mover] ERROR: ") || strings.Contains(out, "[inbox-mover] WARN: claim: ") {
 		t.Errorf("a wired root prints no fallback line for a coded fault: %q", out)
 	}
-	if !strings.Contains(out, "[inbox-mover] WARN: claim-lane-scope: 't7' not claimed") || !strings.Contains(out, "[inbox-mover] released: t7.json ← processing/cycle-11/\n") {
-		t.Errorf("the host's own line and the INFO lines stay on stderr: %q", out)
+	if strings.Contains(out, "claim-lane-scope: 't7' not claimed") || !strings.Contains(out, "[inbox-mover] released: t7.json ← processing/cycle-11/\n") {
+		t.Errorf("no lane-scope line for an already-claimed id; the INFO lines stay on stderr: %q", out)
 	}
 }
 
@@ -285,8 +286,8 @@ func TestGolden_LifecycleSequence_WiredRootStderr(t *testing.T) {
 			added++
 		}
 	}
-	if replaced != added || replaced != 20 {
-		t.Errorf("the wired golden replaces every coded fallback line one-for-one: %d replaced, %d rendered (the script provokes the 15 replaced sites; :201 fires four times, :336 and :349 twice)", replaced, added)
+	if replaced != added || replaced != 18 {
+		t.Errorf("the wired golden replaces every coded fallback line one-for-one: %d replaced, %d rendered (the script provokes the 15 replaced sites; :201 fires twice since the 2026-09-14 breaker stopped re-claiming already-claimed ids, :336 and :349 twice)", replaced, added)
 	}
 	if strings.Count(plain, "\n")-replaced != strings.Count(wired, "\n")-added {
 		t.Error("every other line is byte-identical between the two goldens")

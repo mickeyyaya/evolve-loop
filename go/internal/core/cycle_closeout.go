@@ -31,23 +31,7 @@ func (cr *cycleRun) completeCycle() error {
 	// (presence is enforced separately by `evolve dossier verify` against the
 	// policy floor). Goal text comes from Context["goal"]; falls back to the goal
 	// hash so the dossier's required Goal is never blank.
-	dossierGoal := cr.req.Context["goal"]
-	if dossierGoal == "" {
-		dossierGoal = cr.req.GoalHash
-	}
-	if derr := writeCycleDossier(cr.o.gitMutationLock, cycleDossierParams{
-		ProjectRoot:        cr.req.ProjectRoot,
-		WorkspacePath:      cr.cs.WorkspacePath,
-		Cycle:              cr.cycle,
-		Goal:               dossierGoal,
-		RunID:              cr.cs.RunID,
-		Outcome:            cr.result.FinalVerdict,
-		SystemFailure:      cr.result.SystemFailure,
-		SkippedPhases:      cr.result.SkippedPhases,
-		VerdictsNotAdopted: cr.result.VerdictsNotAdopted,
-		SpineFailOpens:     cr.result.SpineFailOpens,
-		PhaseTimings:       cr.flushPhaseTimings(),
-	}); derr != nil {
+	if derr := writeCycleDossier(cr.o.gitMutationLock, cr.dossierParams(cr.result.FinalVerdict)); derr != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d: closeout dossier not written (non-fatal): %v\n", cr.cycle, derr)
 	}
 	return nil
@@ -71,4 +55,30 @@ func (cr *cycleRun) recordPlannedNoWorkOutcome() {
 		return
 	}
 	cr.result.FinalVerdict = VerdictSKIPPED
+}
+
+// dossierParams is the ONE projection of a cycleRun into the closeout
+// dossier's inputs — the normal closeout and the abnormal epilogue differ
+// only in the outcome they record. Goal text comes from Context["goal"] and
+// falls back to the goal hash so the dossier's required Goal is never blank;
+// the root's WithDossierCommit decision becomes the producer's FilesOnly.
+func (cr *cycleRun) dossierParams(outcome string) cycleDossierParams {
+	goal := cr.req.Context["goal"]
+	if goal == "" {
+		goal = cr.req.GoalHash
+	}
+	return cycleDossierParams{
+		ProjectRoot:        cr.req.ProjectRoot,
+		WorkspacePath:      cr.cs.WorkspacePath,
+		Cycle:              cr.cycle,
+		Goal:               goal,
+		RunID:              cr.cs.RunID,
+		Outcome:            outcome,
+		SystemFailure:      cr.result.SystemFailure,
+		SkippedPhases:      cr.result.SkippedPhases,
+		VerdictsNotAdopted: cr.result.VerdictsNotAdopted,
+		SpineFailOpens:     cr.result.SpineFailOpens,
+		PhaseTimings:       cr.flushPhaseTimings(),
+		FilesOnly:          !cr.o.dossierCommit,
+	}
 }

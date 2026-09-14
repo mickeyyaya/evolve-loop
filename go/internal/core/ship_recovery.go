@@ -70,7 +70,7 @@ func (o *Orchestrator) recoverFromShipError(ctx context.Context, projectRoot str
 				// Clean & not landed — the replay is worthwhile; fall through.
 			}
 		}
-		ok, conflict := rebaseCycleBranchOntoMain(ctx, cs.ActiveWorktree)
+		ok, conflict := rebaseCycleBranchOntoMain(ctx, projectRoot, cs.ActiveWorktree)
 		switch {
 		case ok:
 			// The explanation is bound to the pre-rebase base SHA. A peer's
@@ -103,7 +103,7 @@ func (o *Orchestrator) recoverFromShipError(ctx context.Context, projectRoot str
 			// and reship directly. Any rejection falls through unchanged to
 			// the pre-existing route below (router routes RebaseNeeded to
 			// audit, re-binding the merged tree).
-			if o.compositionCarryForward(ctx, cycle, *cs) {
+			if o.compositionCarryForward(ctx, cycle, *cs, projectRoot) {
 				return PhaseShip, true
 			}
 			// RUNG 2 (cycle-941): a RUNG 0 miss means the composed patch-id
@@ -112,7 +112,7 @@ func (o *Orchestrator) recoverFromShipError(ctx context.Context, projectRoot str
 			// patch-id-verified overlap composes directly with a
 			// composition-verdict{method:"scoped-review"} and reships.
 			// Entangled (or a dark reviewer) falls through unchanged.
-			if o.scopedMergeCarryForward(ctx, cycle, *cs) {
+			if o.scopedMergeCarryForward(ctx, cycle, *cs, projectRoot) {
 				return PhaseShip, true
 			}
 		case conflict:
@@ -266,8 +266,12 @@ const maxRebaseContinueSteps = 100
 // regenerations return (false,false). The in-progress rebase is always aborted on
 // a non-ok return so the worktree is left clean. An empty worktree returns
 // (false,false) — a degraded run never rebases.
-func rebaseCycleBranchOntoMain(ctx context.Context, worktree string) (ok bool, conflict bool) {
+func rebaseCycleBranchOntoMain(ctx context.Context, projectRoot, worktree string) (ok bool, conflict bool) {
 	if worktree == "" {
+		return false, false
+	}
+	if inPlaceWorktree(worktree, projectRoot) {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN fleet rebase refused: the active worktree is the project root — a cycle never rebases the operator's tree\n")
 		return false, false
 	}
 	return rebaseWithDerivedRegen(ctx, worktree, gitCapture, regenerateDerivedArtifact, isDerivedArtifact)

@@ -221,7 +221,7 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 		}
 		// Resume parity with reviewAndGuard: host normalization must finish
 		// before Build's explanation is reviewed and sealed.
-		o.normalizeBuildWorktree(ctx, next, cs)
+		o.normalizeBuildWorktree(ctx, next, cs, req.ProjectRoot)
 		resp, err = o.reviewResumedDeliverable(ctx, req.ProjectRoot, cycle, cs, next, runner, phaseReq, resp, mainDirtyBaseline)
 		if err != nil {
 			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempts, err.Error(), cs.PhaseStartedAt))

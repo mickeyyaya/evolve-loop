@@ -94,7 +94,7 @@ func TestAuditBindingPut_FreshBaseSuppressedWhenMainAdvances(t *testing.T) {
 	}
 	o.emitPhaseBindings(ctx, 7, projectRoot, cs, PhaseAudit, VerdictPASS)
 
-	sha := worktreeContentSHA(ctx, worktree)
+	sha := worktreeContentSHA(ctx, "", worktree)
 	if sha == "" {
 		t.Fatal("worktree content SHA is empty")
 	}
@@ -129,7 +129,7 @@ func TestAuditBindingPut_ChangedWorktreeStillRecords(t *testing.T) {
 	}
 	o.emitPhaseBindings(ctx, 8, projectRoot, cs, PhaseAudit, VerdictPASS)
 
-	sha := worktreeContentSHA(ctx, worktree)
+	sha := worktreeContentSHA(ctx, "", worktree)
 	if sha == "" {
 		t.Fatal("worktree content SHA is empty")
 	}
@@ -154,7 +154,7 @@ func TestAuditBindingPut_NoBaseIdentityFailsClosed(t *testing.T) {
 	cs := CycleState{WorkspacePath: ws, ActiveWorktree: worktree} // WorktreeBaseSHA absent
 	o.emitPhaseBindings(ctx, 9, projectRoot, cs, PhaseAudit, VerdictPASS)
 
-	sha := worktreeContentSHA(ctx, worktree)
+	sha := worktreeContentSHA(ctx, "", worktree)
 	if _, ok := verdictcache.NewStore(projectRoot, now).Lookup(sha); ok {
 		t.Fatal("cache write happened with NO base identity — the Put side must fail closed")
 	}

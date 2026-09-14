@@ -204,8 +204,22 @@ func TestC1_005_RunSimulateExitsZero(t *testing.T) {
 	if err := os.WriteFile(planFile, planData, 0o644); err != nil {
 		t.Fatalf("write plan fixture: %v", err)
 	}
+	// The simulate walk runs against a SCRATCH project root, never the checkout:
+	// a plumbing check that wrote runs/ledger/dossiers into the repo and committed
+	// closeouts onto the dev branch was the 2026-09-14 suite-litter incident
+	// (docs/incidents/2026-09-14-simulate-runs-against-the-checkout.md). The
+	// checkout's history and tree must be byte-identical before and after.
+	repo := acsassert.RepoRoot(t)
+	scratch := scratchWorktree(t, repo)
+	headBefore := gitHeadAndStatus(t, repo)
 
-	combined, code := runEvolve(t, "campaign", "run", "--plan", planFile, "--simulate")
+	combined, code := runEvolve(t, "campaign", "run", "--plan", planFile, "--simulate", "--project-root", scratch)
+	if headAfter := gitHeadAndStatus(t, repo); headAfter != headBefore {
+		t.Errorf("RED: the simulate walk mutated the checkout (HEAD/status before vs after):\n%s\n---\n%s", headBefore, headAfter)
+	}
+	if entries, _ := os.ReadDir(filepath.Join(scratch, ".evolve")); len(entries) == 0 {
+		t.Errorf("the walk must run in the scratch root (no .evolve written under %s)", scratch)
+	}
 	if code != 0 {
 		t.Errorf("RED: `evolve campaign run --plan <valid> --simulate` exited %d.\n"+
 			"Builder must implement cmd_campaign.go: load plan, verify, iterate waves with "+
@@ -225,7 +239,9 @@ func TestC1_005_RunSimulateExitsZero(t *testing.T) {
 // not exist ("unknown command: campaign"). After Builder: exits non-zero because
 // campaign.Load fails on empty input.
 func TestC1_005neg_RunWithInvalidPlanExitsNonZero(t *testing.T) {
-	combined, code := runEvolve(t, "campaign", "run", "--plan", "/dev/null", "--simulate")
+	// No walk ever points at the checkout, even one that fails before its
+	// first wave: the rule holds without an argument about ordering.
+	combined, code := runEvolve(t, "campaign", "run", "--plan", "/dev/null", "--simulate", "--project-root", t.TempDir())
 	if code == 0 {
 		t.Errorf("FAIL: `evolve campaign run --plan /dev/null --simulate` exited 0.\n"+
 			"An empty/invalid plan must be rejected by campaign.Load/campaign.Verify.\n"+
@@ -397,4 +413,54 @@ func TestC2_005_NoPlaceholderURLsInADR(t *testing.T) {
 		t.Errorf("RED: ADR-0056 contains \"TODO\" — unresolved placeholder.\n"+
 			"Builder must replace all TODO-tagged content with verified information.\nFile: %s", adrPath)
 	}
+}
+
+// gitHeadAndStatus renders the checkout's HEAD plus its porcelain status — the
+// "did the walk touch the repo" fingerprint C1_005 compares before and after.
+func gitHeadAndStatus(t *testing.T, repo string) string {
+	t.Helper()
+	// Untracked files count: a dossier written (not committed) into the
+	// checkout's knowledge-base/ is exactly the litter this guards against.
+	// A failed git call fails the test — two empty fingerprints must never
+	// compare equal and pass vacuously.
+	head, errOut, code, err := acsassert.SubprocessOutput("git", "-C", repo, "rev-parse", "HEAD")
+	if err != nil || code != 0 {
+		t.Fatalf("git rev-parse HEAD in %s: exit %d %v: %s", repo, code, err, errOut)
+	}
+	status, errOut, code, err := acsassert.SubprocessOutput("git", "-C", repo, "status", "--porcelain")
+	if err != nil || code != 0 {
+		t.Fatalf("git status in %s: exit %d %v: %s", repo, code, err, errOut)
+	}
+	// Three of the incident's five mutations were out-of-tree: cycle-* branches
+	// and registered worktrees — both immune to build-artifact noise, both part
+	// of the fingerprint.
+	branches, errOut, code, err := acsassert.SubprocessOutput("git", "-C", repo, "branch", "--list", "cycle-*")
+	if err != nil || code != 0 {
+		t.Fatalf("git branch --list in %s: exit %d %v: %s", repo, code, err, errOut)
+	}
+	worktrees, errOut, code, err := acsassert.SubprocessOutput("git", "-C", repo, "worktree", "list", "--porcelain")
+	if err != nil || code != 0 {
+		t.Fatalf("git worktree list in %s: exit %d %v: %s", repo, code, err, errOut)
+	}
+	return strings.Join([]string{strings.TrimSpace(head), strings.TrimSpace(status), strings.TrimSpace(branches), strings.TrimSpace(worktrees)}, "\n")
+}
+
+// scratchWorktree is a detached git worktree of the checkout's HEAD under a
+// temp dir — a buildable project root the simulate walk can run in (its build
+// handoff floor needs a real tree) that is not the checkout; removed and pruned
+// on cleanup so the checkout's worktree list is byte-identical afterwards.
+func scratchWorktree(t *testing.T, repo string) string {
+	t.Helper()
+	dir := filepath.Join(t.TempDir(), "scratch")
+	// Self-heal first: a prior run killed before its t.Cleanup (go test
+	// -timeout, SIGKILL) leaves a stale admin entry in the hub's SHARED store.
+	acsassert.SubprocessOutput("git", "-C", repo, "worktree", "prune")
+	if _, errOut, code, _ := acsassert.SubprocessOutput("git", "-C", repo, "worktree", "add", "--detach", "-q", dir, "HEAD"); code != 0 {
+		t.Fatalf("scratch worktree: %s", errOut)
+	}
+	t.Cleanup(func() {
+		acsassert.SubprocessOutput("git", "-C", repo, "worktree", "remove", "--force", dir)
+		acsassert.SubprocessOutput("git", "-C", repo, "worktree", "prune")
+	})
+	return dir
 }

@@ -4,9 +4,10 @@
 > bash→Go parity plan). Once the Go-only consolidation lands, `docs/TEST_PLAN.md`
 > is historical.
 
-The Go binary is the only runtime. Tests are named for the **behavior** they pin
-— never `TestCycle<N>_*` / `TestC<N>_*`. They are organized along **two
-independent axes**:
+The Go binary is the only runtime. Name new permanent tests for the **behavior**
+they pin. Existing cycle/ACS identities remain compatibility contracts until a
+reviewed replacement preserves their selectors and provenance. Tests are
+organized along **two independent axes**:
 
 - **Cost axis** (enforced by Go **build tags**) — controls what the default
   suite runs and therefore wall-clock time: `default` (fast) → `integration` →
@@ -24,11 +25,11 @@ cost is how it's *selected*.
 
 | Cost layer | Build tag | What runs | Command |
 |---|---|---|---|
-| **fast** (default) | _(none)_ | All co-located tests NOT tagged integration/e2e + `test/component`. Sub-10s. | `make test` |
-| **integration** | `//go:build integration` | Real FS / git / tmux subprocess tests + `test/integration`. | `make test-integration` |
+| **fast** (default) | _(none)_ | All buildable non-ACS packages, including co-located untagged tests, component, fixtures, trustkernel, public packages and examples. | `make test` |
+| **integration** | `//go:build integration` | Complete non-ACS runtime selection, including untagged tests and real FS / git / tmux cases; race detection and `coverage.txt`. Shared by CI and release. | `make test-integration` |
 | **e2e** | `//go:build e2e` (+ `evolve_test_phases`) | Full-cycle subprocess paths (`cmd/evolve/e2e_*`) + `test/e2e`. Live sub-tier self-skips without `EVOLVE_E2E_LIVE`. CI passes `evolve_test_phases` alongside `e2e` so the serve-phase subprocess round-trip test (which registers a test-only `echo` phase into the phases registry) compiles + runs — it was previously orphaned (no runner passed its tag). | `make test-e2e` |
 | **durable-acs** | `//go:build acs` | Artifact-free ACS regression predicates under `acs/regression/...` — flag ceilings/readers/progress, doc-comment coverage, no-orphan-scripts, per-cycle source invariants. A standing push/PR gate (ci.yml `acs-durable` job, **`fetch-depth:0`** for the git-diffing flag predicates) that complements the per-cycle EGPS run (`internal/acssuite`). Artifact-dependent predicates (`buildselfcheck`, `cycle57/80/99`) `t.Skip` cleanly; `acs/redteam` is excluded (needs a live ledger). | `make test-acs-durable` |
-| **everything** | both | Fast + integration + e2e (what the `go.yml` matrix runs; **durable-acs** is its own `ci.yml` job). | `make test-all` |
+| **everything** | composed tiers | Integration with race, then E2E without race using `e2e evolve_test_phases`, then durable ACS. CI runs durable ACS in its own `ci.yml` job. | `make test-all` |
 | **spike** (manual diagnostic) | `//go:build spike` | Live-LLM diagnostics (e.g. `TestSpikeAdvisorLive` — the real advisor on Opus). **Not in CI**: expensive (real quota) and never asserts failure — a developer probe, run on demand. | `go test ./cmd/evolve/ -tags spike -run TestSpikeAdvisorLive -v -timeout 300s` |
 
 A file's build tag must sit at the very top, followed by a blank line:
@@ -187,17 +188,14 @@ the integration tier.
 
 ### Known: real-tmux integration tests are load-sensitive
 
-The `internal/bridge` `TestRealTmux_*` integration tests (`//go:build
-integration`) drive a real `tmux` session and poll for a REPL prompt. They pass
-reliably **in isolation** (`make test-integration`, or `go test -race -tags
-integration ./internal/bridge/`), but can flake (`exit 80`, "REPL prompt never
-appeared") inside a single `make test-all` invocation on a high-core machine,
-where ~100 packages run concurrently (`go test -p`) and starve the prompt
-detection. This is **pre-existing** (the test bodies predate the cost-axis split
-and are unchanged) and **CI-neutral** (CI runners' lower parallelism tolerates
-it, as they did before tagging). Triage a tmux failure by re-running
-`make test-integration` alone before suspecting a code change. Hardening these
-tests against load (retry / longer prompt timeout) is tracked as bridge follow-up.
+The `internal/bridge` `TestRealTmux_*` integration tests drive real `tmux`
+sessions and poll for a REPL prompt. Package/process concurrency can starve
+prompt detection and produce `exit 80` ("REPL prompt never appeared"). Preserve
+the failing run and diagnose with `go test -race -count=1 -tags integration
+./internal/bridge/`; `make test-integration` now runs the complete runtime suite,
+so it is not an isolated bridge probe. A passing diagnostic rerun does not erase
+the original failure or establish its cause. Load hardening remains separate
+from test consolidation.
 
 ### Where the legacy ACS predicates live
 
@@ -210,8 +208,14 @@ retired at Stage 5. See `go/test/trustkernel/PORTING-LEDGER.md`.
 
 ## Coverage targets
 
-- **Floor: ≥85% per `internal/*` package**, enforced in CI (`.github/workflows/go.yml`,
-  "coverage gate" step).
+- **Strict package floors:** `make cover-strict` enforces the thresholds in
+  `go/.cover-strict` and rejects failed tests even when they emit high coverage.
+- **Public API coverage:** `make apicover-enforce` measures and enforces the
+  packages in `go/.apicover-enforce`. CI calls `make apicover-check` after its
+  successful integration run to inspect that run's fresh `coverage.txt`.
+- **Advisory diagnostics:** the ordinary 85% sweep reports function-level
+  warnings; it does not enforce an 85% floor on every internal package.
+  `make cover` produces reports; the strict/API targets supply the hard gates.
 - **Intent over surface (AGENTS.md Rule 9).** A test must probe the *behavior under
   change*, not merely re-walk lines for a coverage number. A passing test that
   would still pass if the invariant were broken is a no-op and is rejected in review.
@@ -221,10 +225,9 @@ retired at Stage 5. See `go/test/trustkernel/PORTING-LEDGER.md`.
 ## Test-design conventions
 
 1. **AAA** — Arrange, Act, Assert. Keep the three phases visually distinct.
-2. **Behavior-naming** — `TestShipGate_BlocksWhenRedCountNonZero`, not
-   `TestC102_003_*`. The name states the invariant and the condition. **No
-   cycle-pegging** — a test name must never encode a cycle number; cycle context
-   belongs in git history, not the permanent test surface.
+2. **Behavior-naming** — prefer `TestShipGate_BlocksWhenRedCountNonZero` for new
+   permanent cases. Keep incident context in comments/history. Preserve existing
+   ACS names and migrate every selecting caller before renaming a legacy case.
 3. **No live-repo / runtime-state dependence.** A test must construct its own
    isolated state (`t.TempDir()` + `git init`) rather than reading the live
    repository or `.evolve/runs/`. Determinism is non-negotiable.
@@ -276,9 +279,24 @@ schema-filter enforcement) are tracked in `PORTING-LEDGER.md` and map to
 
 `.github/workflows/go.yml`:
 
-- `go test -race -count=1 -tags integration -coverprofile=… $(go list ./... | grep -v '/acs/')`
-  — fast + integration tiers + trustkernel, race detector on, coverage captured.
-- `go test -count=1 -tags e2e ./cmd/... ./test/e2e/...` — e2e tier, no race
-  (subprocess-heavy); live sub-tier self-skips without `EVOLVE_E2E_LIVE`.
-- `go test ./internal/commitgate/...` — commit-gate tier (Go; unit + golden).
-- Per-package `internal/*` coverage gate at ≥85% (computed on the integration run).
+- Linux/macOS Go 1.23 compatibility lanes plus Linux Go 1.27; the module language
+  baseline remains Go 1.23. Checkout includes full history.
+- `make test-integration` — all non-ACS runtime packages with integration,
+  race detection, uncached execution and coverage. This includes commit-gate,
+  component, fixtures, public-package and trustkernel tests.
+- `make test-e2e` — existing no-race, uncached E2E tier with
+  `e2e evolve_test_phases` and its 45-minute timeout. Live cases retain their
+  individual explicit opt-ins and skip behavior.
+- `make apicover-check` and `make cover-strict` — hard API and enrolled package
+  coverage gates; the separate 85% function diagnostics remain advisory.
+
+`ci.yml` runs plugin validation and durable ACS. `release.yml` calls both reusable
+Go and general CI workflows on the tagged revision, and publication depends on
+both succeeding. `landing-pages.yml` tests/vets the separate landing module
+before building; pull requests build without publishing Pages. Go workflow
+filters include release configuration and workflow definitions consumed by tests.
+
+For test refactors, follow the [design and preservation protocol](../../docs/architecture/test-refactoring-design-2026-09-14.md):
+new defect assertions fail first, existing behavior stays green, renamed cases
+have a selector map, unchanged source retains hit-block coverage, and isolated
+fault experiments verify that replacement assertions detect the same failures.

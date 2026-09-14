@@ -37,14 +37,15 @@ func TestVerdictCacheProbeEligibilityWiring(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			repo, _ := initVerdictCacheProbeRepo(t)
+			wt := detachedWorktree(t, repo)
 			if tt.dirty {
-				if err := os.WriteFile(filepath.Join(repo, "f.txt"), []byte("changes"), 0o644); err != nil {
+				if err := os.WriteFile(filepath.Join(wt, "f.txt"), []byte("changes"), 0o644); err != nil {
 					t.Fatal(err)
 				}
 			}
 			ctx := context.Background()
-			candidate := worktreeContentSHA(ctx, repo)
-			base := worktreeBaseTreeSHA(ctx, repo, "")
+			candidate := worktreeContentSHA(ctx, repo, wt)
+			base := worktreeBaseTreeSHA(ctx, wt, "")
 			if candidate == "" || base == "" {
 				t.Fatalf("content identities unresolved: candidate=%q base=%q", candidate, base)
 			}
@@ -66,7 +67,7 @@ func TestVerdictCacheProbeEligibilityWiring(t *testing.T) {
 			var got verdictCacheLookupObservation
 			calls := 0
 			o := NewOrchestrator(&fakeStorage{state: State{LastCycleNumber: 100}}, &fakeLedger{}, buildRunners(nil),
-				WithWorktreeProvisioner(fixedWorktree{dir: repo}),
+				WithWorktreeProvisioner(fixedWorktree{dir: wt}),
 				WithVerdictCacheLookupHook(func(sha string, skipped bool, matched bool, _ verdictcache.Entry) {
 					calls++
 					got = verdictCacheLookupObservation{sha, skipped, matched}

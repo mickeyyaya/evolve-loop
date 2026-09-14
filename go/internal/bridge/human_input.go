@@ -48,31 +48,37 @@ func humanBootPause(deps Deps) {
 
 // pastePrompt delivers one complete prompt. Human mode changes only the review
 // pause; both cadences stop on the first failed transport operation.
-func pastePrompt(ctx context.Context, deps Deps, session, promptFile string, human bool) error {
+func pastePrompt(ctx context.Context, deps Deps, pfx, session, promptFile string, human bool) (pasteOutcome, error) {
 	if err := deps.Tmux.LoadBuffer(ctx, session, promptFile); err != nil {
-		return fmt.Errorf("prompt load-buffer: %w", err)
+		return pasteOutcome{}, fmt.Errorf("prompt load-buffer: %w", err)
 	}
 	if err := deps.Tmux.PasteBuffer(ctx, session); err != nil {
-		return fmt.Errorf("prompt paste-buffer: %w", err)
+		return pasteOutcome{}, fmt.Errorf("prompt paste-buffer: %w", err)
 	}
+	// Size only. tmux's load-buffer is another process, so a Go-side read can
+	// still fail after it succeeded; assuming size 0 would skip the stability
+	// wait and silently reproduce the wedge — say so and assume a LARGE paste.
+	data, readErr := os.ReadFile(promptFile)
+	size := len(data)
+	if readErr != nil {
+		fmt.Fprintf(deps.Stderr, "%s paste settle: prompt file unreadable (%v) — assuming a large paste\n", pfx, readErr)
+		size = pasteSettleMaxBytes
+	}
+	settle := pasteSettleFor(size)
 	if human {
-		lines := 1
-		if data, err := os.ReadFile(promptFile); err == nil {
-			lines = strings.Count(string(data), "\n") + 1
-		}
+		lines := strings.Count(string(data), "\n") + 1
 		mean := lines * 80
 		if mean < 200 {
 			mean = 200
 		}
 		fmt.Fprintf(deps.Stderr, "[human-input] paste review (%d lines)\n", lines)
-		deps.Sleep(humanSampleMS(mean, mean/4))
-	} else {
-		deps.Sleep(time.Second)
+		settle = humanSampleMS(mean, mean/4)
 	}
-	if err := deps.Tmux.SendKeys(ctx, session, "", true); err != nil {
-		return fmt.Errorf("prompt submit: %w", err)
+	out, err := settlePasteThenEnter(ctx, deps, pfx, session, settle, size)
+	if err != nil {
+		return out, fmt.Errorf("prompt submit: %w", err)
 	}
-	return nil
+	return out, nil
 }
 
 // humanSendKeysCSV sends each CSV key token with a human-shaped inter-key

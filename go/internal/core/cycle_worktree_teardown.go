@@ -40,6 +40,11 @@ func (o *Orchestrator) teardownCycleWorktree(projectRoot, wtPath string, preserv
 		return
 	}
 	if preserve || !completedNormally {
+		if inPlaceWorktree(wtPath, projectRoot) {
+			// Nothing to reclaim: the "worktree" is the operator's own tree.
+			fmt.Fprintf(os.Stderr, "[orchestrator] cycle ended abnormally in the project root %s (in-place worktree) — nothing to preserve or reclaim\n", wtPath)
+			return
+		}
 		fmt.Fprintf(os.Stderr, "[orchestrator] preserving worktree %s — cycle ended abnormally; recover via `evolve loop --resume` or reclaim with `evolve cycle reset`\n", wtPath)
 		return
 	}

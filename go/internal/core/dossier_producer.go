@@ -40,6 +40,12 @@ type cycleDossierParams struct {
 	VerdictsNotAdopted []VerdictNotAdopted
 	SpineFailOpens     []SpineFailOpen
 	PhaseTimings       []phaseTimingEntry
+	// FilesOnly: write the two files and leave git untouched — the --simulate
+	// root's choice (a no-LLM plumbing walk must never mutate the operator's
+	// history). The zero value commits, as every production cycle does (a
+	// committed record is the package's promise); decided by the root
+	// (WithDossierCommit), not here.
+	FilesOnly bool
 }
 
 // defaultGitMutationLock is the production locker: a blocking cross-process flock
@@ -111,14 +117,14 @@ func writeCycleDossier(lock gitMutationLocker, p cycleDossierParams) error {
 	// (dossier/write.go), so a concurrent collision there just skips this cycle's
 	// dossier via the caller's non-fatal WARN. A rare lost closeout record beats
 	// failing the cycle.
-	if lock != nil {
+	if lock != nil && !p.FilesOnly {
 		if release, lerr := lock(p.ProjectRoot); lerr != nil {
 			fmt.Fprintf(os.Stderr, "[orchestrator] WARN dossier git-mutation lock: %v (proceeding unserialized; a concurrent index collision would skip this dossier)\n", lerr)
 		} else {
 			defer release()
 		}
 	}
-	if err := dossier.Write(d, dir, true); err != nil {
+	if err := dossier.Write(d, dir, !p.FilesOnly); err != nil {
 		return fmt.Errorf("write dossier: %w", err)
 	}
 	return nil

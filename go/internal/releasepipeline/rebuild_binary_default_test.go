@@ -27,39 +27,28 @@ func TestDefaultRebuildBinary_NonDryRun_BadSourceDir(t *testing.T) {
 	}
 }
 
-// TestDefaultRebuildBinary_NonDryRun_RealRepo: when dryRun=false and the real
-// repo root is provided, `go build -o evolve ./cmd/evolve` succeeds and the
-// binary is written to <repoRoot>/go/evolve.
+// TestDefaultRebuildBinary_NonDryRun_RealRepo: when dryRun=false and a copy of
+// the current Go module is provided, `go build -o evolve ./cmd/evolve` succeeds
+// and the binary is written inside an isolated temporary repository.
 //
 // This is an integration test — it runs a real `go build`. It is skipped when
-// the go toolchain is unavailable. Build time is bounded by the existing binary
-// cache, typically < 5 s.
+// the go toolchain is unavailable.
 func TestDefaultRebuildBinary_NonDryRun_RealRepo(t *testing.T) {
 	if _, err := exec.LookPath("go"); err != nil {
 		t.Skip("go toolchain not on PATH")
 	}
-	repoRoot := findRepoRoot(t)
-
-	// defaultRebuildBinary writes <repoRoot>/go/evolve in place. Snapshot the
-	// tracked binary and restore it afterward so this integration test never
-	// leaves the committed artifact dirty — otherwise every `go test` (commit
-	// gate, CI, make test) silently mutates go/evolve, which then trips the ship
-	// gate's self-SHA check and pollutes unrelated commits.
+	sourceRoot := findRepoRoot(t)
+	repoRoot := initTempRepoWithTag(t, "v0.0.1")
+	// Copy current source (including uncommitted edits), embeds and vendored
+	// dependencies. Build only in the copy: restoring the source binary after
+	// a build still lets concurrent ship commands stage it while the test runs.
+	if err := os.CopyFS(filepath.Join(repoRoot, "go"), os.DirFS(filepath.Join(sourceRoot, "go"))); err != nil {
+		t.Fatalf("copy current Go module: %v", err)
+	}
 	binPath := filepath.Join(repoRoot, "go", "evolve")
-	origInfo, statErr := os.Stat(binPath)
-	orig, readErr := os.ReadFile(binPath)
-	t.Cleanup(func() {
-		if readErr != nil {
-			return // nothing to restore (binary absent before the test)
-		}
-		mode := os.FileMode(0o755)
-		if statErr == nil {
-			mode = origInfo.Mode() // preserve the committed file's exact mode
-		}
-		if err := os.WriteFile(binPath, orig, mode); err != nil {
-			t.Errorf("restore %s: %v", binPath, err)
-		}
-	})
+	if err := os.Remove(binPath); err != nil && !os.IsNotExist(err) {
+		t.Fatalf("remove copied build output: %v", err)
+	}
 
 	if err := defaultRebuildBinary(repoRoot, "9.9.9", false); err != nil {
 		t.Errorf("defaultRebuildBinary on real repo: %v", err)
