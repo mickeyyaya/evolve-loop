@@ -1,0 +1,17 @@
+{
+  "id": "acs-cycle1529-doc-only-predicate-diffs-against-local-main",
+  "title": "acs/cycle1529 TestC1529_004_ClosureStaysDocOnly diffs the checkout against the local `main` ref for go/internal/bridge — it forbids every future bridge change on every branch instead of pinning cycle 1529's own diff",
+  "weight": 0.55,
+  "priority": "P3",
+  "kind": "bug",
+  "injected_by": "console-operator-session",
+  "evidence": [
+    "acs/cycle1529/predicates_test.go:159 runs `git diff --name-only main -- go/internal/bridge` and fails on any change; ADR-0103 unit 10 (the bridge launch-outcome leaf, by design a change under internal/bridge) trips it in its whole-module floor (2026-09-14 07:11).",
+    "CI never runs it (acs-durable runs ./acs/regression/... only), so the predicate only bites local floors; it is excluded from the console floor's ACS baseline as over-broad."
+  ],
+  "acceptance": [
+    "The predicate pins cycle 1529's OWN closure commit range (its base..ship SHAs, or the docs/explain record it belongs to), not `main..worktree`.",
+    "A bridge production change on a later branch no longer fails it; cycle 1529's doc-only property still does."
+  ],
+  "notes": "Same class as the cycle1638 explanation predicate (requires every changed .go since ITS base to be named by the newest record) — cycle-scoped pins that read the live tree."
+}

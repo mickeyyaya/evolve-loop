@@ -181,20 +181,20 @@ func TestRepoContractGate_AddedTestDiscoveryFailureIsRecorded(t *testing.T) {
 	}
 }
 
-// TestRepoContractGate_RedMessagesDistinguishRepoWidePackFromAddedTests pins M2.
+// TestRepoContractGate_RedMessagesDistinguishFixedPackFromAddedTests pins M2.
 // Both packs funnel through one message, so the operator cannot tell which
-// scan went red unless the error names its selection. Both halves are asserted
-// against the real error text.
-func TestRepoContractGate_RedMessagesDistinguishRepoWidePackFromAddedTests(t *testing.T) {
-	t.Run("repo-wide RED names the CI-equivalent suite", func(t *testing.T) {
+// scan went red, and the addition dropped the four fixed-suite names that told
+// them where to look. Both halves are asserted against the real error text.
+func TestRepoContractGate_RedMessagesDistinguishFixedPackFromAddedTests(t *testing.T) {
+	t.Run("fixed pack RED still names the four guard suites", func(t *testing.T) {
 		swapRepoContractTest(t, redPack("internal/phasespec.TestCatalogParity"))
 		err := runRepoContractGate(context.Background(), "enforce", t.TempDir(), t.TempDir(), io.Discard)
 		if err == nil {
-			t.Fatal("repo-wide RED must fail the ship")
+			t.Fatal("fixed-pack RED must fail the ship")
 		}
-		for _, want := range []string{"repo-wide", "./..."} {
-			if !strings.Contains(err.Error(), want) {
-				t.Errorf("repo-wide RED must name %q so the operator knows the selection, got %q", want, err)
+		for _, suite := range []string{"phasespec", "profiles", "phasecoherence", "routingtest"} {
+			if !strings.Contains(err.Error(), suite) {
+				t.Errorf("fixed-pack RED must keep naming the guard suite %q so the operator knows where to look, got %q", suite, err)
 			}
 		}
 	})
@@ -212,7 +212,7 @@ func TestRepoContractGate_RedMessagesDistinguishRepoWidePackFromAddedTests(t *te
 			t.Fatal("added-test RED must fail the ship")
 		}
 		if !containsAny(err.Error(), "added-test", "newly added") {
-			t.Errorf("added-test RED must say the NEWLY ADDED test is what went red, not report it as the repo-wide scanner pack, got %q", err)
+			t.Errorf("added-test RED must say the NEWLY ADDED test is what went red, not report it as the fixed scanner pack, got %q", err)
 		}
 		if !strings.Contains(err.Error(), failingTest) {
 			t.Errorf("added-test RED must name %s, got %q", failingTest, err)

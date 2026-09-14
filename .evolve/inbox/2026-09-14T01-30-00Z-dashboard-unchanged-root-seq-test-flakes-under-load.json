@@ -1,0 +1,17 @@
+{
+  "id": "dashboard-unchanged-root-seq-test-flakes-under-load",
+  "title": "internal/dashboard TestServer_UnchangedRootDoesNotBumpSeq flakes under whole-module load (seq 1 -> 2 without a change): a 60 ms sleep races the poller's first refresh",
+  "weight": 0.62,
+  "priority": "P2",
+  "kind": "bug",
+  "injected_by": "console-operator-session",
+  "evidence": [
+    "2026-09-14 ~06:30 local, unit 12's whole-module floor (machine load ~100, ~89 concurrent go test processes): `seq moved without a change: 1 -> 2`; 3/3 green in isolation for the test and for the package; reproduced again under load by the floor runner.",
+    "Mechanism (read by the floor runner): Run's forced first refresh(true) and currentEpoch's on-demand refresh(true) (taken whenever the poller goroutine has not published yet) BOTH bump seq; the test sleeps 60 ms and compares seq twice, so when the goroutine loses the race under load seq goes 1 -> 2."
+  ],
+  "acceptance": [
+    "The test waits on the poller's first publication (a channel/condition), never a fixed sleep (condition-based waiting), and the two refresh paths cannot both bump seq for the same unchanged root (one bump per epoch).",
+    "The package's tests stay green under `go test -count=20 -race ./internal/dashboard/` while another `go test ./...` runs in parallel."
+  ],
+  "notes": "Filed while landing ADR-0103 units; the failure is a test-design race, not the dashboard's behaviour. Same class as the audit DeadlineKill flake item."
+}

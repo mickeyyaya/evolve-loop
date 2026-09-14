@@ -1,0 +1,23 @@
+{
+  "id": "lane-ship-gate-lands-red-main-package-scoped-tests",
+  "title": "A lane's ship gate runs only the packages it touched, so a contract change can land a RED main — cycle 1657/1659 did (main's go CI red from 4db205a8 until #590)",
+  "weight": 0.95,
+  "priority": "P1",
+  "kind": "bug",
+  "injected_by": "console-operator-session",
+  "evidence": [
+    "2026-09-13 18:30 local: lane commit 4db205a8 (and aaae64e0) landed the operator's P1 'triage-empty-commitment-still-dispatches-spine' — the new named stop triage-empty-commitment-claimable-work. Its own tests (internal/core, cmd/evolve) were green; internal/deliverable/declared_effects_e2e_test.go (ADR-0100, untouched by the lane) asserted the old contract and went red on main's CI (build+test job) on every subsequent main commit: 4db205a8, f3044a3b, … — while the loop kept shipping onto the red main (the loop never reads main's CI).",
+    "Reproduced locally in a clean worktree at f3044a3b: `go test -count=1 -run TestDeclaredEffects_EmptyCommitment_OwesNoClaim ./internal/deliverable/` FAILs with verdict=FAIL termination=triage-empty-commitment-claimable-work — a real contract conflict, not a flake, not the `fatal: empty ident name` line beside it (that is the dossier commit under CI's identity-less git, already non-fatal).",
+    "Hotfix #590 re-pins the e2e to the new contract (test-only). The gate gap remains."
+  ],
+  "acceptance": [
+    "The lane ship gate (or the wave-boundary sync) runs the REPO-WIDE `go test -count=1 ./...` (CI's exact suite) — or at minimum every package that imports a changed package (reverse-dependency closure via `go list -deps` inverted) — before a lane ship may land; a red run blocks the ship with a named ship.error code.",
+    "The loop reads main's CI status at each wave boundary (gh api commits/<sha>/check-runs on origin/main) and HALTs with a named LOOP_HALT reason when main is red, instead of stacking lane ships on a red main (ADR-0072: a red main is SYSTEM-fail evidence).",
+    "A regression test pins that a change which breaks an untouched package's test cannot pass the lane gate."
+  ],
+  "notes": "Pipeline-integrity class (outranks feature work). Found while landing the ADR-0103 parallel units: the merge train's SHA-checked merge refuses to merge on a red head, which is how the red main surfaced. Related: the standing rule that CI reds are classified before retry.",
+  "route": "console-manual",
+  "routed_reason": "the lane ship gate runs package-scoped tests and can land a red main — a ship-path (protected) pipeline-integrity fix; operating-policy §1: console-first. Lane 1673 burned a full cycle (rebase-needed recovery, audit FAIL).",
+  "routed_at": "2026-09-14T05:58:00Z",
+  "routed_by": "console"
+}

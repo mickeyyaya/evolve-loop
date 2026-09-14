@@ -1,0 +1,33 @@
+{
+  "acceptance": [
+    "Identify the test(s) by running the suite in a throwaway worktree with a git hook or a post-run `git log --oneline <base>..HEAD` + `ls .evolve/runs` check, and make every RunCycle/campaign/loop simulate test use t.TempDir() (or an explicit --project-root) as the project root \u2014 never the module root.",
+    "Add a regression guard to the module: a test (or the floor) that fails when the suite leaves commits or .evolve/runs/ or .evolve/worktrees/ behind in the checkout (compare git rev-parse HEAD before/after; the litter class is invisible to green tests).",
+    "Prune the litter: the dossier commits on refactor/decompose-* branches (dropped by soft reset before landing), the .evolve/worktrees/cycle-* worktrees registered by the suite in .repo.git."
+  ],
+  "continuation": {
+    "worktree": "/Users/danleemh/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-1674",
+    "branch": "cycle-cd3ae73e-1674",
+    "snapshot_sha": "68f3542b0718cb254e31e8b817f245779e558030",
+    "base_sha": "292cc033e75abeed3f89dcaa447bd5b0832be835",
+    "findings_path": "/Users/danleemh/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-1674/audit-fail-reason.json",
+    "cycle": 1674
+  },
+  "evidence": [
+    "2026-09-14 05:50 local: during a unit's whole-module floor (go test ./..., -tags acs) in the dev worktree dev/decompose-shipgitops (and again in dev/decompose-config), two cycles 1649 and 1650 ran in ~22 s each (.evolve/runs/cycle-1649/cycle-state.json: phases scout, triage, tdd, build-planner, retro; run_id 01M2EC008RK288Y4G2W3DETJY1; lane-scope.json {todo_ids:[c1], goal_hash:427dc8c4379cf0b01235f6d60a7c993d5fc4f29dbe9c5d5274689e85c0c27164}) and their closeouts committed knowledge-base/cycles/cycle-1649.{json,md} and cycle-1650.{json,md} onto refactor/decompose-shipgitops (6e766695, 8adcc56c) \u2014 the branch HEAD moved under an uncommitted unit build.",
+    "The same class earlier left dev/decompose-{outcome,failure,carryover,gate-signals}/.evolve/worktrees/cycle-*-1633 and -1634 registered in .repo.git (the tracked state.json's last cycle was 1632 then; 1648 now) \u2014 the cycle numbers are minted from the checkout's tracked .evolve/state.json.",
+    "dossier.Write(d, dir, commit=true) commits into 'the repo that contains dir' (internal/dossier/write.go:6-12); the producer is writeCycleDossier (core/dossier_producer.go:106) from the closeout and the abnormal epilogue.",
+    "Prime suspect: a campaign/cycle test that runs `evolve cycle run` in the process cwd \u2014 cmd/evolve/cmd_campaign_test.go:80 writes a plan with cycles [{id:c1}] and goal \"test\"; cycleRunArgs omits --project-root when root is empty (cmd_campaign_test.go:166); the lane scope of the litter cycles is exactly todo_ids [c1]. acs/cycle1647's C1647_007 re-runs every inherited go/acs/cycle* package as a subprocess in the checkout and would amplify any such test.",
+    "CULPRIT IDENTIFIED (unit 08 floor runner, 06:07 local): acs/cycle8 TestC1_005_RunSimulateExitsZero launches a simulate campaign wave against acsassert.RepoRoot (= the checkout it runs in); its fake-runner cycles 1649/1650 (run 01M2ECYYGQYJFX5MHWM5WTQKWH, goal 427dc8c4\u2026, worktree_base_sha = origin/main tip) wrote real dossiers and committed them onto the branch (7ea1b5f9, 7eb4a774) \u2014 414 lines under knowledge-base/cycles/. The campaign runner must take an explicit --project-root (a TempDir git repo), never RepoRoot."
+  ],
+  "id": "test-suite-commits-dossier-closeouts-into-the-checkout",
+  "injected_by": "console-operator-session",
+  "kind": "bug",
+  "notes": "Filed from the console session while landing ADR-0103 units in parallel; the floor script now excludes acs/cycle1647 (the inherited-package re-runner) and the landing helper drops litter commits before shipping. Pipeline-integrity class: a green suite that mutates the tree it runs in.",
+  "priority": "P1",
+  "route": "console-manual",
+  "routed_at": "2026-09-14T06:50:25Z",
+  "routed_by": "console",
+  "routed_reason": "pipeline-integrity item fixed console-first (operating-policy \u00a71): fix/simulate-never-mutates-git in review \u2014 lanes must not draw it",
+  "title": "acs/cycle8 TestC1_005_RunSimulateExitsZero runs a simulate campaign wave against the CHECKOUT and commits its dossiers onto the current branch",
+  "weight": 0.94
+}

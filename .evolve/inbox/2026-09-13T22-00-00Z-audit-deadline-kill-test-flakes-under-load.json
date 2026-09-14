@@ -1,0 +1,7 @@
+{
+  "title": "TestAuditOrchestration_IntegrationTier_DeadlineKill_MarkerFreeDegradesToWarn flakes under whole-module load (seen 2x on 2026-09-13)",
+  "weight": 0.55,
+  "priority": "P2",
+  "source": "console-decomposition-campaign-20260913",
+  "details": "internal/phases/audit: the deadline-kill test failed once inside a commit-gate run (unit 01, ADR-0103) and once inside a whole-module floor (unit 02), both while ~15 go test processes ran concurrently; it passes 3/3 in isolation and neither change touched internal/phases/audit. Failure class: timing-dependent (a deadline kill racing the marker-free degrade path). Fix the test, not the tolerance: derive the deadline from a fake clock or a channel handshake so the kill and the degrade are ordered deterministically, and make the assertion independent of scheduler latency. Acceptance: 50 consecutive runs green under `go test -count=50 -run DeadlineKill ./internal/phases/audit/` while `go test ./...` runs in parallel."
+}

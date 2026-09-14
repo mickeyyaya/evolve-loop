@@ -1,0 +1,15 @@
+{
+  "id": "resume-post-ship-observer-skip-parity",
+  "kind": "bug",
+  "weight": 0.58,
+  "title": "Resume root: post-ship observer failures abort instead of degrading — wire postShipObserverSkip into the resume retry hooks now that the ship latch is on the checkpoint",
+  "summary": "The fresh dispatch loop degrades a best-effort post-ship observer failure (memo / post-ship-monitor) to WARN + advance via retryOpts.postShipObserverSkip (retry_opts.go, mainDispatchRetryOpts), keyed on the cycle's own ship latch. The resume loop's hook set (resume_execution.go, `retryHooks := retryOpts{quotaExhausted, optionalInfraSkip}`) omits that hook, so the same observer failure on a RESUMED cycle aborts the cycle abnormally — a pre-existing parity gap surfaced by ADR-0100 PR-3 (docs/incidents/2026-09-12-shipped-via-build-sibling-landing.md, Follow-ups; architecture re-review LOW). PR-3 moved the latch to the persisted checkpoint (CycleState.Shipped, set by latchShippedState on both roots), so cs.Shipped is available at that line: the fix is one hook in the resume retryOpts (`postShipObserverSkip: func(p Phase) bool { return o.postShipObserverSkip(p, cs.Shipped) }`) plus one integration-tagged parity test mirroring TestDispatchRunnerWithRetry_PostShipObserverSkipParity on the resume root (fixture: resumedLifecycleFixture with CompletedPhases through ship, Shipped=true, resume at memo with an always-failing memo runner → expect SKIPPED + advance, not abort). Do NOT widen the hook set beyond that one entry; the nil fields of evaluateBatchRetryOpts are documented divergence.",
+  "connects_to": [
+    "go/internal/core/resume_execution.go",
+    "go/internal/core/retry_opts.go",
+    "go/internal/core/orchestrator.go",
+    "go/internal/core/evaluate_batch_retry_parity_test.go",
+    "docs/incidents/2026-09-12-shipped-via-build-sibling-landing.md"
+  ],
+  "created_at": "2026-09-13T19:30:00Z"
+}
