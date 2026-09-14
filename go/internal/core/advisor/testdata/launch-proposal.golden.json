@@ -7,7 +7,7 @@
   "worktree": "{{WT}}",
   "project_root": "{{ROOT}}",
   "artifact_path": "{{WS}}/routing-proposal.json",
-  "completion": "stdout",
+  "completion": "artifact",
   "agent": "router",
   "contract": "router-proposal",
   "cycle": 7,

@@ -31,7 +31,7 @@ type decisionRow struct {
 var decisionRows = [...]decisionRow{
 	decisionPlan:     {contract: "router", kind: "plan", completion: "artifact", errPfx: "phase advisor", origin: "Advisor.Plan"},
 	decisionRePlan:   {contract: "router-replan", kind: "replan", completion: "artifact", errPfx: "phase advisor", origin: "Advisor.RePlan", depth: 1},
-	decisionProposal: {contract: "router-proposal", kind: "proposal", completion: "stdout", errPfx: "routing proposer", origin: "Advisor.Propose"},
+	decisionProposal: {contract: "router-proposal", kind: "proposal", completion: "artifact", errPfx: "routing proposer", origin: "Advisor.Propose"},
 }
 
 // contractID is the deliverable protocol selected for the decision. It stays
@@ -48,9 +48,14 @@ func (d decision) artifactFile() string { return phasecontract.ArtifactName(d.co
 // (advisor-{prompt,response,span}-<kind>.*) and the decision field on events.
 func (d decision) captureKind() string { return decisionRows[d].kind }
 
-// completion is the bridge completion contract: the plans use the uniform
-// artifact contract (the brain WRITES its artifact and the bridge reads it
-// back); the proposal still completes on REPL-idle stdout (ADR-0027).
+// completion is the bridge completion contract: every decision uses the
+// uniform artifact contract — the brain WRITES its artifact and the bridge
+// reads it back. The proposal completed on REPL-idle stdout (ADR-0027) until
+// 2026-09-14: its prompt carries the same deliverable contract as the plans
+// ("write routing-proposal.json"), so the model wrote the file while the
+// kernel read the scrollback, found only the prompt's echoed JSON example,
+// and raised ADVISOR_RESPONSE_UNPARSEABLE on every proposal (cycles
+// 1673–1677; docs/incidents/2026-09-14-router-proposal-read-the-scrollback.md).
 func (d decision) completion() string { return decisionRows[d].completion }
 
 // errPfx prefixes every error the decision returns — the texts the
