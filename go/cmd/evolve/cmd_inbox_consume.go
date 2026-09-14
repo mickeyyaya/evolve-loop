@@ -171,7 +171,7 @@ func releaseConsumedItemBinding(projectRoot, itemPath string, stderr io.Writer) 
 		return false
 	}
 	_, released, err := inboxmover.ReleaseContinuationBinding(
-		inboxmover.Options{ProjectRoot: projectRoot, Stderr: stderr}, id, "inbox-consume")
+		inboxmover.Options{ProjectRoot: projectRoot, Stderr: stderr}, id, "inbox-consume", "operator (evolve inbox consume)")
 	if err != nil {
 		fmt.Fprintf(stderr, "[inbox] WARN: binding release %q: %v\n", id, err)
 		return false

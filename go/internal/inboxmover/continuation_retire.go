@@ -41,7 +41,20 @@ type releasedContinuation struct {
 	continuation.Continuation
 	ReleasedAt string `json:"released_at"`
 	Reason     string `json:"reason"`
+	// ReleasedBy names the authority the release was made under — the WHO a
+	// lineage erasure must answer for alongside the WHEN (ReleasedAt) and the
+	// WHY (Reason). Runtime lifecycle paths name themselves; the operator
+	// surface names the authority path that unlocked it (-operator or
+	// continuation.OperatorConfirmEnv). Omitted on records written before the
+	// field existed, which is why it is not required by any reader.
+	ReleasedBy string `json:"released_by,omitempty"`
 }
+
+// retireAuthority is the ReleasedBy this path records. Retirement is a
+// RUNTIME lifecycle transition — the item left the pending pool and its
+// binding went with it — not an operator erasure, and the record must say so
+// plainly rather than leave the authority blank.
+const retireAuthority = "runtime (inbox retirement)"
 
 // releaseContinuationOnRetire releases taskID's registry binding as part of the
 // SAME operation that took the item out of the pending pool, preserving the
@@ -69,7 +82,7 @@ func releaseContinuationOnRetire(opts Options, itemPath, taskID, reason string) 
 	// item on a public remote, so the absolute host paths are collapsed to "~"
 	// first (audit cycle-1507 M1). Only Worktree/FindingsPath change; the
 	// snapshot/base/branch refs salvage actually resumes from are untouched.
-	if perr := appendReleasedContinuation(itemPath, continuation.RedactHostPaths(c), reason, opts.Now().UTC()); perr != nil {
+	if perr := appendReleasedContinuation(itemPath, continuation.RedactHostPaths(c), reason, retireAuthority, opts.Now().UTC()); perr != nil {
 		opts.logf("WARN: ", "retire '%s': preserved pointer (snapshot %s) NOT written to %s: %v — releasing the binding anyway", taskID, c.SnapshotSHA, itemPath, perr)
 	}
 	released, derr := continuation.DeleteRegistryEntryIfCycle(opts.ProjectRoot, taskID, c.Cycle)
@@ -87,11 +100,12 @@ func releaseContinuationOnRetire(opts Options, itemPath, taskID, reason string) 
 // preserving every other field (updateItemJSON is atomic write-tmp + rename).
 // An existing array that is not an array is replaced rather than dropped
 // silently — the entry that matters is the one being written now.
-func appendReleasedContinuation(path string, c continuation.Continuation, reason string, at time.Time) error {
+func appendReleasedContinuation(path string, c continuation.Continuation, reason, releasedBy string, at time.Time) error {
 	entry, err := json.Marshal(releasedContinuation{
 		Continuation: c,
 		ReleasedAt:   at.Format(time.RFC3339),
 		Reason:       reason,
+		ReleasedBy:   releasedBy,
 	})
 	if err != nil {
 		return err

@@ -62,7 +62,7 @@ func TestReleaseContinuationBinding(t *testing.T) {
 		releaseFixtureBind(t, root, "unrelated-live-scope", continuation.Continuation{SnapshotSHA: "snap1490", Cycle: 1490})
 
 		var errBuf bytes.Buffer
-		got, released, err := ReleaseContinuationBinding(Options{ProjectRoot: root, Stderr: &errBuf}, "scope-under-release", "unit-test")
+		got, released, err := ReleaseContinuationBinding(Options{ProjectRoot: root, Stderr: &errBuf}, "scope-under-release", "unit-test", "unit-test-authority")
 		if err != nil {
 			t.Fatalf("ReleaseContinuationBinding: %v (stderr %s)", err, errBuf.String())
 		}
@@ -88,12 +88,20 @@ func TestReleaseContinuationBinding(t *testing.T) {
 				t.Errorf("released_continuations[] in %s does not preserve %q — pointer loss on release\n%s", itemPath, want, raw)
 			}
 		}
+		// WHO, beside the WHEN and WHY the record already carried: an erasure
+		// of the lineage the defect-ledger gate reads as anti-tamper evidence
+		// must name the authority it was made under (cycle-1684).
+		for _, want := range []string{`"released_by":"unit-test-authority"`, `"released_at":`} {
+			if !strings.Contains(string(raw), want) {
+				t.Errorf("released_continuations[] in %s carries no %s — the release record does not answer who/when\n%s", itemPath, want, raw)
+			}
+		}
 	})
 
 	t.Run("an unbound scope is a clean miss, not a failure", func(t *testing.T) {
 		root := t.TempDir()
 		var errBuf bytes.Buffer
-		_, released, err := ReleaseContinuationBinding(Options{ProjectRoot: root, Stderr: &errBuf}, "never-bound", "unit-test")
+		_, released, err := ReleaseContinuationBinding(Options{ProjectRoot: root, Stderr: &errBuf}, "never-bound", "unit-test", "unit-test-authority")
 		if err != nil || released {
 			t.Fatalf("want (released=false, err=nil) for an unbound scope, got released=%v err=%v", released, err)
 		}
@@ -101,7 +109,7 @@ func TestReleaseContinuationBinding(t *testing.T) {
 
 	t.Run("an empty scope id is refused rather than interpreted", func(t *testing.T) {
 		var errBuf bytes.Buffer
-		if _, _, err := ReleaseContinuationBinding(Options{ProjectRoot: t.TempDir(), Stderr: &errBuf}, "  ", "unit-test"); err == nil {
+		if _, _, err := ReleaseContinuationBinding(Options{ProjectRoot: t.TempDir(), Stderr: &errBuf}, "  ", "unit-test", "unit-test-authority"); err == nil {
 			t.Fatalf("want an error for an empty scope id, got nil")
 		}
 	})

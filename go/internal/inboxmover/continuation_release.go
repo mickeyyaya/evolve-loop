@@ -30,7 +30,15 @@ import (
 // nothing is not a failure. The delete is DeleteRegistryEntryIfCycle, so a
 // sibling lane that rebound the scope between the read and the delete keeps its
 // fresh binding (released=false, no error).
-func ReleaseContinuationBinding(opts Options, scopeID, reason string) (continuation.Continuation, bool, error) {
+//
+// releasedBy names the AUTHORITY the release was made under and is recorded
+// beside the reason and the timestamp. Every caller declares it rather than
+// inheriting a blank: a binding is the lineage the defect-ledger gate reads as
+// anti-tamper evidence, so an erasure that names no actor is itself the defect
+// (the gap the cycle-1684 operator-authority gate closes). Runtime lifecycle
+// paths name themselves; the operator surface names the authority path that
+// unlocked it.
+func ReleaseContinuationBinding(opts Options, scopeID, reason, releasedBy string) (continuation.Continuation, bool, error) {
 	opts.resolveOpts()
 	if strings.TrimSpace(scopeID) == "" {
 		return continuation.Continuation{}, false, fmt.Errorf("inboxmover: empty scope id is not releasable")
@@ -43,7 +51,7 @@ func ReleaseContinuationBinding(opts Options, scopeID, reason string) (continuat
 		return continuation.Continuation{}, false, nil
 	}
 	if path := FindScopeItemFile(opts, scopeID); path != "" {
-		if perr := appendReleasedContinuation(path, continuation.RedactHostPaths(c), reason, opts.Now().UTC()); perr != nil {
+		if perr := appendReleasedContinuation(path, continuation.RedactHostPaths(c), reason, releasedBy, opts.Now().UTC()); perr != nil {
 			opts.logf("WARN: ", "release '%s': preserved pointer (snapshot %s) NOT written to %s: %v — releasing the binding anyway", scopeID, c.SnapshotSHA, path, perr)
 		}
 	} else {
@@ -191,7 +199,7 @@ func ReconcileConsumedBindings(opts Options) (released []string) {
 			opts.logf("WARN: ", "consumed copy of %q is from cycle %d but its binding is NEWER (cycle %d) — stale evidence, not releasing (cycle-1507 recency guard)", id, rc, c.Cycle)
 			continue
 		}
-		if _, rel, relErr := ReleaseContinuationBinding(opts, id, "consumed-reconcile"); relErr != nil {
+		if _, rel, relErr := ReleaseContinuationBinding(opts, id, "consumed-reconcile", "runtime (consumed-corpus reconciler)"); relErr != nil {
 			opts.logf("WARN: ", "consumed-reconcile release %q: %v", id, relErr)
 		} else if rel {
 			released = append(released, id)

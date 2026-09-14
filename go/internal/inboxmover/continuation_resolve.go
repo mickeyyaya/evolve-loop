@@ -154,7 +154,7 @@ func ResolveContinuationForScope(opts Options, cycle int, scopeIDs []string) *co
 					return &resolved
 				}
 				fmt.Fprintf(opts.Stderr, "[inbox] WARN cycle %d refusing continuation binding for scope %q: its item is retired in inbox/%s/ with no live pending copy (not in the inbox root, not claimed in processing/) — releasing the dead binding (snapshot %s, cycle %d)\n", cycle, id, retiredIn, c.SnapshotSHA, c.Cycle)
-				if _, _, derr := ReleaseContinuationBinding(opts, id, fmt.Sprintf("scope-read-guard-cycle-%d", cycle)); derr != nil {
+				if _, _, derr := ReleaseContinuationBinding(opts, id, fmt.Sprintf("scope-read-guard-cycle-%d", cycle), "runtime (scope read guard)"); derr != nil {
 					fmt.Fprintf(opts.Stderr, "[inbox] WARN cycle %d could not release dead binding for scope %q: %v\n", cycle, id, derr)
 				}
 				continue

@@ -19,9 +19,12 @@ import (
 	"io"
 	"os"
 	"sort"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
+	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
 func runContinuation(args []string, _ io.Reader, stdout, stderr io.Writer) int {
@@ -99,12 +102,21 @@ func runContinuationList(args []string, stdout, stderr io.Writer) int {
 }
 
 // runContinuationRelease drops exactly one binding through the shared
-// preserve-then-delete transaction. A scope holding no binding is an ERROR, not
-// a silent success: a typo'd id must never read as a completed release.
+// preserve-then-delete transaction, behind the operator-authority gate. A scope
+// holding no binding is an ERROR, not a silent success: a typo'd id must never
+// read as a completed release.
+//
+// Three refusals, in order of cheapness, and each one leaves the registry
+// exactly as it found it: no authority (continuation.RequireOperatorAuthority),
+// no such binding, and a binding whose lane is still LIVE. The authority check
+// runs FIRST, before the registry is even read, so an unauthorized caller
+// neither learns what is bound nor changes anything.
 func runContinuationRelease(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("continuation release", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	rootFlag := fs.String("project-root", "", "project root (default: the working directory)")
+	operator := fs.Bool("operator", false, "authorize this release as the operator (or set "+continuation.OperatorConfirmEnv+"=1)")
+	force := fs.Bool("force", false, "release even while the binding's cycle still holds a live lease")
 	root, ok := continuationRoot(fs, args, rootFlag, stderr)
 	if !ok {
 		return 10
@@ -116,19 +128,42 @@ func runContinuationRelease(args []string, stdout, stderr io.Writer) int {
 	}
 	scopeID := rest[0]
 
+	if err := continuation.RequireOperatorAuthority(*operator); err != nil {
+		fmt.Fprintf(stderr, "evolve continuation release: refusing to release %q: %v\n", scopeID, err)
+		return 10
+	}
+
 	// Read first purely to tell "no such binding" (operator error, non-zero)
 	// apart from "released" — ReleaseContinuationBinding reports both as a
 	// clean miss because releasing nothing is not a failure for the runtime.
-	if _, bound, err := continuation.ReadRegistryEntry(root, scopeID); err != nil {
+	// The value is also what names the lane whose liveness is checked next.
+	bound, isBound, err := continuation.ReadRegistryEntry(root, scopeID)
+	if err != nil {
 		fmt.Fprintf(stderr, "evolve continuation release: registry unreadable while looking up %q: %v\n", scopeID, err)
 		return 1
-	} else if !bound {
+	}
+	if !isBound {
 		fmt.Fprintf(stderr, "evolve continuation release: scope %q holds no continuation binding in %s — nothing released\n", scopeID, continuation.RegistryPath(root))
 		return 1
 	}
 
+	if !*force && continuationLaneIsLive(root, bound, time.Now(), stderr) {
+		fmt.Fprintf(stderr, "evolve continuation release: scope %q is bound to cycle %d, whose lane is still LIVE (lease heartbeat in %s is fresher than %s) — refusing to drop a running lane's lineage out from under it; wait for the lane to finish, or pass -force to override\n",
+			scopeID, bound.Cycle, runlease.PathIn(paths.RunWorkspace(root, bound.Cycle)), runlease.DefaultTTL)
+		return 10
+	}
+
+	authority := "operator via -operator"
+	if !*operator {
+		authority = "operator via " + continuation.OperatorConfirmEnv + "=1"
+	}
+	reason := "operator-release"
+	if *force {
+		reason = fmt.Sprintf("operator-release (-force override of cycle %d's live lease)", bound.Cycle)
+	}
+
 	c, released, err := inboxmover.ReleaseContinuationBinding(
-		inboxmover.Options{ProjectRoot: root, Stderr: stderr}, scopeID, "operator-release")
+		inboxmover.Options{ProjectRoot: root, Stderr: stderr}, scopeID, reason, authority)
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve continuation release: %q: %v\n", scopeID, err)
 		return 1
@@ -138,7 +173,27 @@ func runContinuationRelease(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	safe := continuation.RedactHostPaths(c)
-	fmt.Fprintf(stdout, "released continuation binding for scope %q (snapshot_sha=%s base_sha=%s branch=%s cycle=%d); pointer preserved in the scope's inbox item where one exists\n",
-		scopeID, safe.SnapshotSHA, safe.BaseSHA, safe.Branch, safe.Cycle)
+	fmt.Fprintf(stdout, "released continuation binding for scope %q by %s (snapshot_sha=%s base_sha=%s branch=%s cycle=%d); pointer preserved in the scope's inbox item where one exists\n",
+		scopeID, authority, safe.SnapshotSHA, safe.BaseSHA, safe.Branch, safe.Cycle)
 	return 0
+}
+
+// continuationLaneIsLive reports whether the cycle a binding names is still
+// running. Heartbeat freshness is the ONLY liveness signal runlease.Lease
+// documents, so a lease left behind by a cycle that has since died does NOT
+// block a release: were it to, every dead lane's leftover .lease would brick
+// its scope permanently and this gate would become a worse stall than the gap
+// it closes. An unreadable lease is loud but likewise non-blocking, for the
+// same reason — a corrupt file must not be able to lock a scope forever.
+func continuationLaneIsLive(root string, c continuation.Continuation, now time.Time, stderr io.Writer) bool {
+	if c.Cycle <= 0 {
+		return false
+	}
+	runDir := paths.RunWorkspace(root, c.Cycle)
+	lease, ok, err := runlease.Read(runDir)
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve continuation release: WARN: the lease at %s is unreadable (%v) — treating cycle %d as not live\n", runlease.PathIn(runDir), err, c.Cycle)
+		return false
+	}
+	return ok && runlease.Fresh(lease, now, 0)
 }

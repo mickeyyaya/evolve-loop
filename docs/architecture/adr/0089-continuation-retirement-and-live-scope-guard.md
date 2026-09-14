@@ -93,3 +93,60 @@ belt that holds when a release call is missed, not a replacement for it.
   (`carryover-lane-retirement-verifiableby`), and `evolve continuation
   list/release` (this item's third acceptance criterion) is deferred to the next
   cycle.
+
+## Amendment (2026-09-15, cycle-1684) — the operator release surface is gated
+
+`evolve continuation release <scope-id>` — the CLI this ADR's closing section
+deferred — shipped in cycle 1515 with **no authority gate at all**: its FlagSet
+declared only `-project-root`, and the command dropped from arg-parsing straight
+to an unconditional `inboxmover.ReleaseContinuationBinding` under a hardcoded
+`"operator-release"` reason that named no actual caller. Its sibling sensitive
+surface `evolve reset-sha` has had `--operator` since ADR-0065.
+
+That is a widening of decision 1's authority invariant by omission rather than
+by decision. `DeleteRegistryEntry`'s contract says callers are ORCHESTRATOR-side
+only — which is what keeps the defect-ledger gate's cycle-1285 anti-tamper
+property intact — and the phase guard (`internal/guards/phase.go`) denies
+in-process `Agent`/`Task` dispatch during a cycle but says nothing about a
+**Bash invocation of the `evolve` binary**. Any Bash-capable process, an
+in-cycle agent included, could therefore drop a live scope's binding and erase
+the lineage the ledger gate reads as evidence.
+
+The gate that closes it, in the order the command applies it:
+
+1. **Authority is explicit.** `continuation.RequireOperatorAuthority` (the
+   shared helper, not a private copy in `cmd/evolve`, so a future in-process
+   caller cannot route around it) requires `-operator` or an affirmative
+   `EVOLVE_OPERATOR_CONFIRM`. The value is read through `envchain.Bool`, never
+   as mere presence: `=0` is a refusal, and a variable exported empty in a
+   lane's environment never consents on the operator's behalf. The check runs
+   FIRST, before the registry is read, so an unauthorized caller neither learns
+   what is bound nor changes anything.
+2. **A live lane is not releasable.** A binding whose cycle still holds a fresh
+   `.lease` refuses even for a fully authorized operator, and the refusal names
+   `-force`. Authority alone must not drop a running lane's lineage out from
+   under it.
+3. **Staleness is not liveness.** `runlease.Lease` documents heartbeat freshness
+   as the only liveness signal, so a lease aged past `runlease.DefaultTTL` does
+   NOT block. Were it to, every dead cycle's leftover `.lease` would brick its
+   scope permanently — the gate would become a worse stall than the gap it
+   closes. An unreadable lease is loud but likewise non-blocking.
+4. **The erasure is itself evidenced.** Every release records who/when/why:
+   `released_continuations[]` gained a `released_by` field carrying the
+   authority the release was made under, beside the `released_at` stamp and the
+   `reason` it already had. `-force` is recorded distinguishably, so an
+   overridden live lease can never read as a routine release. The field is
+   declared by every caller — runtime lifecycle paths name themselves — because
+   an erasure that names no actor is itself the defect.
+
+`EVOLVE_OPERATOR_CONFIRM` is registered `StatusInternal` in `flagregistry`: it
+is a per-invocation **consent token**, not an operator feature dial. It
+configures no behavior and cannot be consolidated into `policy.json` the way the
+flag-reduction campaign consolidates dials — a persisted "the operator agrees"
+value would permanently disarm this gate — so the campaign's live-flag metric
+correctly excludes it (`-operator` is the primary surface; the env path exists
+for scripts, following the `EVOLVE_LANE` precedent).
+
+`evolve inbox consume` also releases a binding, deliberately and as part of the
+documented consumption transaction rather than as a bare lineage erasure; it now
+records its authority alongside the rest, but is NOT gated by this amendment.

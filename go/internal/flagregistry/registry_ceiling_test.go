@@ -49,7 +49,17 @@ import "testing"
 // re-green the FORBIDDEN-REPEAT guard acs/cycle29 TestC29_007 (cycles 17/18
 // fail history pins that row's registry membership). StatusInternal row, not
 // an operator dial - LiveFeatureFlagCeiling (the real ratchet) is unchanged.
-const FlagCeiling = 25
+// 25 -> 26 (2026-09-15, cycle-1684): EVOLVE_OPERATOR_CONFIRM registered — the
+// non-interactive spelling of `evolve continuation release -operator`
+// (ADR-0089). This is the completeness bump this ceiling explicitly allows, NOT
+// a net-new feature flag masked by a raise: the row is StatusInternal, so
+// LiveFeatureFlagCeiling (the campaign's real ratchet) and the ACS baseline
+// guard are both UNCHANGED at 11. A per-invocation consent token configures no
+// behavior and cannot be consolidated into policy.json — persisting "the
+// operator agrees" would permanently disarm the gate it guards — so it is
+// outside the campaign metric by that metric's own exclusion criterion
+// ("driving them to zero is neither possible nor desirable").
+const FlagCeiling = 26
 
 // TestRegistry_FlagCeiling enforces a one-way bound on TOTAL registry rows.
 //

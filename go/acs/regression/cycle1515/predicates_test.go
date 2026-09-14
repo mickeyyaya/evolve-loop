@@ -409,6 +409,18 @@ func TestC1515_005_ContinuationListOnEmptyRegistryIsCleanExit(t *testing.T) {
 // the scope's item file — the same preserve-then-release contract predicate 001
 // pins for the park path, reached from the operator surface rather than
 // duplicated inside it.
+//
+// The -operator flag is cycle 1684's authority precondition, not a relaxation
+// of this predicate. Release shipped in cycle 1515 with no gate at all, so this
+// predicate's ungated invocation incidentally pinned "ungated release exits 0"
+// — a contract cycle 1684 was commissioned to supersede, because dropping a
+// binding erases the lineage the defect-ledger gate reads as anti-tamper
+// evidence (ADR-0085/0089). That negative contract is now pinned explicitly and
+// far more strongly by go/acs/cycle1684 TestC1684_001, which asserts the
+// ungated call is non-zero, leaves the binding intact, names both authority
+// paths, and writes no release record. What THIS predicate pins is unchanged:
+// preserve-then-release, and unrelated-sibling isolation. Only the precondition
+// for reaching that behavior is new.
 func TestC1515_006_ContinuationReleaseReleasesAndAnnotates(t *testing.T) {
 	root := newProject(t)
 	inbox := filepath.Join(root, ".evolve", "inbox")
@@ -418,9 +430,9 @@ func TestC1515_006_ContinuationReleaseReleasesAndAnnotates(t *testing.T) {
 	bind(t, root, scopeID, c)
 	bind(t, root, liveSibling, binding(1490))
 
-	stdout, stderr, code := runCLI(t, root, "continuation", "release", scopeID)
+	stdout, stderr, code := runCLI(t, root, "continuation", "release", "-operator", scopeID)
 	if code != 0 {
-		t.Fatalf("RED: `evolve continuation release %s` exited %d — no operator release path exists.\nstdout: %s\nstderr: %s", scopeID, code, stdout, stderr)
+		t.Fatalf("RED: `evolve continuation release -operator %s` exited %d — authority was granted, so the release path itself is broken.\nstdout: %s\nstderr: %s", scopeID, code, stdout, stderr)
 	}
 	if bound(t, root, scopeID) {
 		t.Errorf("RED: `evolve continuation release %s` reported success but the binding is still in the registry", scopeID)
