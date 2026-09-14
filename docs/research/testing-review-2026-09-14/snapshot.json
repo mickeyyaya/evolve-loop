@@ -1,0 +1,89 @@
+{
+  "review_date": "2026-09-14",
+  "source_revision": "80b348e6943b08b3bfc4e2d30f06f42db69c1db9",
+  "source_branch": "origin/main (fetched 2026-09-14)",
+  "go_toolchain": "go version go1.27.1 darwin/arm64",
+  "test_files": 2902,
+  "package_directories": 700,
+  "entry_points": {
+    "Test": 14496,
+    "TestMain": 11,
+    "Benchmark": 8,
+    "Fuzz": 2
+  },
+  "test_file_build_constraints": {
+    "acs": 475,
+    "default": 2292,
+    "integration": 113,
+    "e2e": 14,
+    "e2e && evolve_test_phases": 1,
+    "spike": 1,
+    "integration && darwin": 3,
+    "darwin || linux": 2,
+    "!windows": 1
+  },
+  "identical_body_candidate_groups": 59,
+  "dynamic_run_functions": 770,
+  "method": "Go parser AST over git-tracked *_test.go excluding vendor; TestMain separate; literal t.Run/b.Run labels are static hints, dynamic cases not enumerated; matching normalized formatted bodies are similarity only",
+  "validation_runs": [
+    {
+      "log_name": "evolve-testing-baseline-2026-09-14.jsonl",
+      "log_sha256": "2e413a63f455cc7abc823d3222dcac26833b940f918327ea9e6b26b00e5d9ff5",
+      "package_results": {
+        "pass": 13
+      },
+      "test_and_subtest_results": {
+        "pass": 406
+      },
+      "top_level_results": {
+        "pass": 329
+      },
+      "package_summaries": [
+        "ok  \tgithub.com/mickeyyaya/evolve-loop/go/test/fixtures\t7.929s\tcoverage: 77.4% of statements",
+        "ok  \tgithub.com/mickeyyaya/evolve-loop/go/test/component\t9.025s\tcoverage: [no statements]",
+        "ok  \tgithub.com/mickeyyaya/evolve-loop/go/internal/cyclesimulator\t9.926s\tcoverage: 96.4% of statements",
+        "ok  \tgithub.com/mickeyyaya/evolve-loop/go/pkg/naminguard\t10.144s\tcoverage: 93.4% of statements",
+        "ok  \tgithub.com/mickeyyaya/evolve-loop/go/pkg/acsassert\t10.409s\tcoverage: 96.7% of statements",
+        "ok  \tgithub.com/mickeyyaya/evolve-loop/go/internal/cyclecost\t10.754s\tcoverage: 96.2% of statements",
+        "ok  \tgithub.com/mickeyyaya/evolve-loop/go/internal/evalqualitycheck\t11.456s\tcoverage: 96.3% of statements",
+        "ok  \tgithub.com/mickeyyaya/evolve-loop/go/internal/auditcalibration\t11.767s\tcoverage: 87.3% of statements",
+        "ok  \tgithub.com/mickeyyaya/evolve-loop/go/pkg/version\t12.118s\tcoverage: 100.0% of statements",
+        "ok  \tgithub.com/mickeyyaya/evolve-loop/go/pkg/phaseproto\t12.569s\tcoverage: 96.9% of statements",
+        "ok  \tgithub.com/mickeyyaya/evolve-loop/go/internal/ciparity\t17.613s\tcoverage: 97.1% of statements",
+        "ok  \tgithub.com/mickeyyaya/evolve-loop/go/internal/acssuite\t18.196s\tcoverage: 86.3% of statements",
+        "ok  \tgithub.com/mickeyyaya/evolve-loop/go/test/trustkernel\t28.106s\tcoverage: [no statements]"
+      ]
+    },
+    {
+      "log_name": "evolve-landing-baseline-2026-09-14.jsonl",
+      "log_sha256": "5bd2aec3692248a964f0ed8e8f68902b5d6fbcc66dc2f38502bdf1a726db29bd",
+      "package_results": {
+        "pass": 6
+      },
+      "test_and_subtest_results": {
+        "pass": 103
+      },
+      "top_level_results": {
+        "pass": 94
+      },
+      "package_summaries": [
+        "ok  \tevolve-loop-landing/cmd/build\t5.637s",
+        "ok  \tevolve-loop-landing/cmd/genimage\t6.178s",
+        "ok  \tevolve-loop-landing/cmd/serve\t6.520s",
+        "ok  \tevolve-loop-landing/internal/render\t6.883s",
+        "ok  \tevolve-loop-landing/internal/content\t7.369s",
+        "ok  \tevolve-loop-landing/internal/buildsite\t7.734s"
+      ]
+    }
+  ],
+  "inventory_artifact_sha256": {
+    "duplicate-candidates.tsv": "fa604afa6835b29d312d27644c72e5215d667875ce7077d30adbaa7122267768",
+    "package-inventory.tsv": "f255736389060147f5ef460628af8d9b0cf1d02f61e71f2d86ffc7fe0914b90e",
+    "test-files.tsv": "c4150e28ee4b8eb481c85830b4f79674a072a70329ea6415350bad6ff02ab369",
+    "test-inventory.tsv": "548684a42dd5577a12418c52d0e736e5fd90d58c1ca056bb6849e737d2a4806a"
+  },
+  "evidence_artifact_sha256": {
+    "execution-results.tsv": "e085512e97db6f248e3b5d1f0d1b290f4053f5730d5fcc36ea425c010330a630",
+    "runtime-sample.cover": "c148dad621d0e2c7478d6d59660359bd1fde2b8671e048a2efefaaf8688f580e"
+  }
+}
