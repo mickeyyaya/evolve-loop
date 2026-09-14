@@ -1,6 +1,6 @@
 # Testing review and refactoring dossier — 2026-09-14
 
-Start with the [test architecture and refactoring design](../../architecture/test-refactoring-design-2026-09-14.md). This dossier contains its evidence. The requested first step is documentation: no production code, existing tests, workflows, gates, or GitHub settings have been changed. All proposals require the design's strict TDD and preservation checks before implementation.
+Start with the [test architecture and refactoring design](../../architecture/test-refactoring-design-2026-09-14.md). This dossier preserves the baseline evidence from the documentation-only first step, merged in PR #602. Subsequent code changes and validation are tracked in the [integration record](../../reports/test-refactoring-integration-2026-09-14.md); all implementation follows the design's strict TDD and preservation checks. Baseline findings below are historical, not a current claim that the reproduced defects remain unfixed.
 
 ## Read in this order
 
@@ -13,6 +13,8 @@ Start with the [test architecture and refactoring design](../../architecture/tes
 | [CI/CD audit](ci-review.md) | All four workflows, actual current GitHub results, release selection, coverage defects, exact reproductions and target matrix |
 | [Online research](research.md) | Primary sources and repository-specific applications |
 | [Verification and review](verification.md) | Executed checks, independent-review corrections, unchanged-test proof and measurement limits |
+| [Implementation and integration](../../reports/test-refactoring-integration-2026-09-14.md) | Implemented slices, full-suite results, review corrections and merge receipts |
+| [All duplicate-candidate dispositions](../../reports/test-duplicate-dispositions-2026-09-14.md) | Subsequent semantic review of all 59 indexed groups, with retention and consolidation decisions |
 
 The high-priority reproduced findings are two coverage targets that lose test failure status and a clean-code scanner that misses else-branch nesting. These must be addressed before relying on shared graders to validate broad test consolidation. Other findings distinguish inspected risks from runtime-proven defects. Latest main CI was green; this does not negate independently reproduced gaps in standalone gates.
 
