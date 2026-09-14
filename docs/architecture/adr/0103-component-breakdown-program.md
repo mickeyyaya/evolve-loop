@@ -67,6 +67,10 @@ PR, each landing with all of the following — a unit without any of them is not
 | 08 | Config resolution (the routing-config Loader with an injected reader and Center; the registry/env/policy dials and validators; the malformed-registry and policy-typo blind spots closed; decomposed in place) | `config/config.go` | [08-config.md](../decomposition/08-config.md) |
 | 09 | Defect ledger (schema, writer, readers; the continuation disposition gate with the lane-scope reader and the citation resolver injected; carryover and the adoption seeder decode through it — unit 03 F13 closed) | `phases/audit/defect_ledger.go` | [09-defectledger.md](../decomposition/09-defectledger.md) |
 | 06 | Inbox lifecycle mover (claim, promote, quarantine release, the cycle drain, orphan recovery, the processed-record primitives; outcome.go's door and the continuation trio stay for 06b) | `inboxmover/inboxmover.go` + `claimstate.go` | [06-inboxmover.md](../decomposition/06-inboxmover.md) |
+| 10 | Bridge engine — the launch-outcome classifier (the exit vocabulary as ONE table: sentinel, attempt-ledger cause code, `BRIDGE_EXIT_*` projection; the cause-line miners; the request gauntlet stays in the host as `bridge.ValidateRequest`, shared with the adapter; `Launch` split in place into named steps with four step codes) | `bridge/engine.go` + `bridge/attempt_telemetry.go` | [10-bridgeengine.md](../decomposition/10-bridgeengine.md) |
+| … | inbox mover, ship gitops, config, audit gates, bridge autorespond (10b) | design §12 | later |
+
+
 
 
 | … | inbox mover, bridge engine, audit gates | design §12 | later |

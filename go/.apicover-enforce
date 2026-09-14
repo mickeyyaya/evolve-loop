@@ -605,3 +605,7 @@
 # cycle drain, orphan recovery and the processed-record primitives (internal/inboxmover/lifecycle).
 # 100% API + 100% line coverage gated.
 ./internal/inboxmover/lifecycle
+# ADR-0103 unit 10 (2026-09-14): the launch-outcome classifier — the one exit-code table (sentinel, ledger
+# cause code, BRIDGE_EXIT_* projection as Outcome.Signal) and the cause-line miners
+# (internal/bridge/launchoutcome). 100% API + 100% line coverage gated.
+./internal/bridge/launchoutcome

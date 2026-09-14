@@ -14,3 +14,4 @@
 ./internal/observerengine 100
 ./internal/core/defectledger 100
 ./internal/inboxmover/lifecycle 100
+./internal/bridge/launchoutcome 100

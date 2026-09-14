@@ -6,18 +6,25 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/launchoutcome"
 )
 
-type artifactTimeoutCause string
+// artifactTimeoutCause is the artifact-timeout sub-cause vocabulary — the
+// classifier's closed set (launchoutcome.TimeoutCause, ADR-0103 unit 10),
+// projected here so the emitter and the parser read ONE list: a token added
+// on one side without the other is caught by the driver → classifier
+// round-trip pin (TestTimeoutCauseVocabulary_DriverAndClassifierAgree).
+type artifactTimeoutCause = launchoutcome.TimeoutCause
 
 const (
-	artifactTimeoutContextCancelled  artifactTimeoutCause = "context_cancelled"
-	artifactTimeoutDetectorError     artifactTimeoutCause = "completion_detector_error"
-	artifactTimeoutSubmitWedged      artifactTimeoutCause = "submit_wedged"
-	artifactTimeoutTransientUpstream artifactTimeoutCause = "transient_upstream"
-	artifactTimeoutReviewStop        artifactTimeoutCause = "review_stop"
-	artifactTimeoutReviewPause       artifactTimeoutCause = "review_pause"
-	artifactTimeoutIncomplete        artifactTimeoutCause = "incomplete"
+	artifactTimeoutContextCancelled  = launchoutcome.TimeoutContextCancelled
+	artifactTimeoutDetectorError     = launchoutcome.TimeoutDetectorError
+	artifactTimeoutSubmitWedged      = launchoutcome.TimeoutSubmitWedged
+	artifactTimeoutTransientUpstream = launchoutcome.TimeoutTransientUpstream
+	artifactTimeoutReviewStop        = launchoutcome.TimeoutReviewStop
+	artifactTimeoutReviewPause       = launchoutcome.TimeoutReviewPause
+	artifactTimeoutIncomplete        = launchoutcome.TimeoutIncomplete
 )
 
 type artifactTimeoutEvidence struct {

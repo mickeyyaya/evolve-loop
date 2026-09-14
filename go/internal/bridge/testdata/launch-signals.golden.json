@@ -1,0 +1,48 @@
+{
+  "-1-cancelled": [
+    "bridge/bridge.warning/BRIDGE_TOKEN_RESOLVER_MISSING",
+    "bridge/bridge.warning/BRIDGE_EXIT_SIGNAL_DEATH"
+  ],
+  "-1-live": [
+    "bridge/bridge.warning/BRIDGE_TOKEN_RESOLVER_MISSING",
+    "bridge/bridge.warning/BRIDGE_EXIT_SIGNAL_DEATH"
+  ],
+  "0-readable": [
+    "bridge/bridge.warning/BRIDGE_TOKEN_RESOLVER_MISSING"
+  ],
+  "0-unreadable": [
+    "bridge/bridge.warning/BRIDGE_TOKEN_RESOLVER_MISSING",
+    "bridge/bridge.warning/BRIDGE_RESULT_READ_FAILED"
+  ],
+  "10": [
+    "bridge/bridge.warning/BRIDGE_TOKEN_RESOLVER_MISSING",
+    "bridge/bridge.warning/BRIDGE_EXIT_BAD_FLAGS"
+  ],
+  "10-launch-error-unwritable": [
+    "bridge/bridge.warning/BRIDGE_TOKEN_RESOLVER_MISSING",
+    "bridge/bridge.warning/BRIDGE_LAUNCH_ERROR_PERSIST_FAILED",
+    "bridge/bridge.warning/BRIDGE_EXIT_BAD_FLAGS"
+  ],
+  "10-store-unwritable": [
+    "bridge/bridge.warning/BRIDGE_TOKEN_RESOLVER_MISSING",
+    "bridge/bridge.warning/BRIDGE_BOOT_STRIKE_CLEAR_FAILED",
+    "bridge/bridge.warning/BRIDGE_EXIT_BAD_FLAGS"
+  ],
+  "124": [
+    "bridge/bridge.warning/BRIDGE_TOKEN_RESOLVER_MISSING",
+    "bridge/bridge.warning/BRIDGE_EXIT_COMMAND_TIMEOUT"
+  ],
+  "80-store-ok": [
+    "bridge/bridge.warning/BRIDGE_TOKEN_RESOLVER_MISSING",
+    "bridge/bridge.warning/BRIDGE_EXIT_REPL_BOOT_TIMEOUT"
+  ],
+  "80-store-unwritable": [
+    "bridge/bridge.warning/BRIDGE_TOKEN_RESOLVER_MISSING",
+    "bridge/bridge.warning/BRIDGE_BOOT_STRIKE_RECORD_FAILED",
+    "bridge/bridge.warning/BRIDGE_EXIT_REPL_BOOT_TIMEOUT"
+  ],
+  "81": [
+    "bridge/bridge.warning/BRIDGE_TOKEN_RESOLVER_MISSING",
+    "bridge/bridge.warning/BRIDGE_EXIT_ARTIFACT_TIMEOUT"
+  ]
+}
