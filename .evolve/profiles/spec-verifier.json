@@ -5,7 +5,9 @@
   "allowed_clis": [
     "claude"
   ],
-  "cli_fallback": [],
+  "cli_fallback": [
+    "claude-p"
+  ],
   "model_tier_default": "balanced",
   "max_turns": 10,
   "output_artifact": ".evolve/runs/cycle-{cycle}/spec-verify-report.md",

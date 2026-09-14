@@ -113,8 +113,14 @@ precedence (high → low):
 
 - `pin.cli` replaces the resolved primary CLI (dispatch log shows
   `source=policy.pin`). The profile's `cli_fallback` chain is still appended, so
-  a pinned phase keeps CLI-failure resilience — empty `cli_fallback` in the
-  profile if you want a strict single-CLI phase.
+  a pinned phase keeps CLI-failure resilience. Since ADR-0104 (2026-09-14) every
+  agent profile that names a `cli` MUST name a non-empty `cli_fallback`
+  (`TestEveryAgentProfileHasAFallbackChain` guards the tracked tree; the five
+  Claude-family-floor agents keep theirs in-family, `["claude-p"]`), and the
+  universal tail (`workflow.universal_fallback`, the remaining available CLIs the
+  profile's `allowed_clis` permits) is appended after it unconditionally — a
+  strict single-CLI phase is `allowed_clis: ["<family>"]` plus a single-driver
+  chain, not an empty one.
 - `pin.model` replaces the resolved model verbatim, bypassing the
   env/profile/default chain **and** the `"auto"` → model-catalog expansion (a
   pinned exact model never triggers a catalog lookup).

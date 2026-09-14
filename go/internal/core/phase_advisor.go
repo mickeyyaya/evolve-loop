@@ -179,6 +179,9 @@ func bridgeRequestOf(r advisor.LaunchRequest) BridgeRequest {
 		// the cycle
 		Cycle: r.Cycle,
 		Env:   r.Env,
+		// one attempt of the advisor's own chain walk (llmroute.Dispatch): a
+		// chain-walking bridge handle must pass it through, not walk it again.
+		ChainAttempt: true,
 	}
 }
 

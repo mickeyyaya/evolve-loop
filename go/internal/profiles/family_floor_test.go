@@ -23,12 +23,15 @@ import (
 // adversarial judgment. The classify.require_sections("Verdict") discriminator
 // exists in phase.json but deliberately does NOT map onto this floor.
 //
-// Every floor entry keeps cli_fallback [] ON PURPOSE: a claude-quota halt on
-// a floored phase must fail loudly, because the "obvious" operator remedy —
-// adding a codex fallback to the auditor — silently puts codex in judgment
-// of codex on every fallback dispatch. The guard binds cli, cli_fallback,
-// AND allowed_clis (the policy-pin validator's enforcement surface, mirrored
-// per the tdd-engineer precedent) so no plane can breach the floor quietly.
+// Every floor entry keeps its cli_fallback INSIDE the floor family ON PURPOSE
+// (claude-p behind claude-tmux — a driver-level rescue for a boot or artifact
+// timeout, 2026-09-14 operator policy "try every available CLI before giving
+// up"): a claude-quota halt on a floored phase still fails loudly, because the
+// "obvious" operator remedy — adding a codex fallback to the auditor — silently
+// puts codex in judgment of codex on every fallback dispatch. The guard binds
+// cli, cli_fallback, AND allowed_clis (the policy-pin validator's enforcement
+// surface, mirrored per the tdd-engineer precedent) so no plane can breach the
+// floor quietly.
 //
 // Tier and effort facts live with their own guards
 // (deep_tier_family_arrangement_test.go, effort_defaults_test.go), never
@@ -102,8 +105,10 @@ func TestClaudeFamilyFloor(t *testing.T) {
 		if family(p.CLI) == builderFam {
 			t.Errorf("floor entry %s runs on the builder's own family %q — the floor (%s) is broken", name, p.CLI, why)
 		}
-		if len(p.CLIFallback) != 0 {
-			t.Errorf("floor entry %s: cli_fallback=%v, want [] — a floored phase fails LOUDLY on quota rather than silently handing %s to the builder's family (see the floor doc)", name, p.CLIFallback, why)
+		for _, fb := range p.CLIFallback {
+			if family(fb) != family(p.CLI) {
+				t.Errorf("floor entry %s: cli_fallback %q leaves the %s family — a floored phase fails LOUDLY on quota rather than silently handing %s to another family (see the floor doc)", name, fb, family(p.CLI), why)
+			}
 		}
 		for _, allowed := range p.AllowedCLIs {
 			if allowed == "all" || family(allowed) == builderFam {
