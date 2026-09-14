@@ -18,3 +18,5 @@
 ./internal/phases/runner/verdict 100
 ./internal/textcap 100
 ./internal/core/advisor 100
+./internal/loopwave 100
+./internal/loopchain 100

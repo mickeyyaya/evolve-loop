@@ -205,3 +205,13 @@ func EvolveDirOf(projectRoot string) string { return filepath.Join(projectRoot, 
 func RunWorkspace(projectRoot string, cycle int) string {
 	return filepath.Join(EvolveDirOf(projectRoot), "runs", "cycle-"+strconv.Itoa(cycle))
 }
+
+// PolicyFile is the operator policy under .evolve/ (`.evolve/policy.json`:
+// gates, fleet, chain, pins). The loop's wave and chain engines
+// (internal/loopwave, internal/loopchain) resolve it through PolicyPath so the
+// name has one home; the older inline joins across cmd/ and internal/ migrate
+// here as they are touched.
+const PolicyFile = "policy.json"
+
+// PolicyPath returns the policy file's path under evolveDir.
+func PolicyPath(evolveDir string) string { return filepath.Join(evolveDir, PolicyFile) }

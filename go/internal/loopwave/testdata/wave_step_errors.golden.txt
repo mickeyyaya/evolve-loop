@@ -1,0 +1,3 @@
+preflight	wave 3: control-plane preflight: dirty control plane
+plan	wave 3: triage plan: plan exploded
+adapt	wave 3: adapt triage plan: fleet: parse triage-decision.json: invalid character 'n' looking for beginning of object key string

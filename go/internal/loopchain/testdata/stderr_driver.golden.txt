@@ -1,0 +1,28 @@
+== brake
+[chain] stopping after 0 batch(es): chain_operator_brake (inbox pending=2, cap=5)
+== inbox_empty
+[chain] batch 1/5 starting — inbox pending=0, fleet lanes=1
+[chain] stopping after 1 batch(es): chain_inbox_empty (inbox pending=0, cap=5)
+== max_batches
+[chain] batch 1/2 starting — inbox pending=3, fleet lanes=1
+[chain] batch 2/2 starting — inbox pending=3, fleet lanes=1
+[chain] stopping after 2 batch(es): chain_max_batches (inbox pending=3, cap=2)
+== quota_defer
+[chain] batch 1/5 starting — inbox pending=3, fleet lanes=1
+[chain] batch 1 hit the quota wall (cycle=7 wake-at={TS} source=probe) — DEFERRING, not relaunching
+[chain]   the checkpoint is intact; resume when quota resets: evolve loop --resume
+== batch_error
+[chain] batch 1/5 starting — inbox pending=3, fleet lanes=1
+[chain] batch 1 exited rc=2 — stopping the chain (chain_batch_error)
+== inbox_unreadable
+[chain] cannot read the inbox (read inbox: open {EVOLVE_DIR}/inbox: not a directory) — stopping the chain rather than looping blind
+== boundary_refresh_reexec
+[chain] batch 1/5 starting — inbox pending=3, fleet lanes=1
+[chain] boundary-refresh: HEAD has advanced past the running binary's build commit (cafebabe1234) — rebuilding
+[chain] boundary-refresh: re-pinned STALE_PIN -> 7448e675c81e — re-executing {ROOT}/go/bin/evolve to pick up the rebuilt binary
+[chain] stopping after 1 batch(es): chain_boundary_refresh_reexec — re-exec is terminal, the new process resumes the chain
+== invalid_item_then_quota_defer_no_block
+[chain] skipping .evolve/inbox/typo-item.json — not a valid inbox item (no parseable object with an `id`); it is NOT counted as pending work
+[chain] batch 1/5 starting — inbox pending=1, fleet lanes=1
+[chain] batch 1 hit the quota wall (no checkpoint block on disk) — DEFERRING, not relaunching
+[chain]   the checkpoint is intact; resume when quota resets: evolve loop --resume

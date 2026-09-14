@@ -195,21 +195,23 @@ func TestLoopResult_MarshalOmitsBoundaryRefreshWhenNil(t *testing.T) {
 
 // --- T6/T7: wiring proofs (structural, config-check waived) ---
 
-// T6: runLoopChain must populate res.BoundaryRefresh at the same call site
+// T6: the chain must populate res.BoundaryRefresh at the same call site
 // that already sets res.StopReason = "chain_boundary_refresh_reexec" —
 // otherwise the durable audit record the mechanism already writes to
 // boundary-refresh-log.jsonl stays permanently invisible to the JSON
-// summary an operator/dossier consumer actually reads.
+// summary an operator/dossier consumer actually reads. Since ADR-0103 unit 13
+// that call site is loopchain.(*Driver).boundary (the Result runLoopChain
+// prints IS the summary schema), so the proof reads the leaf.
 //
 // acs-predicate: config-check — lastChainBoundaryRefreshLogEntry's own
-// correctness is proven by T1-T3; this only proves runLoopChain calls it.
+// correctness is proven by T1-T3; this only proves the chain calls it.
 func TestRunLoopChain_SetsBoundaryRefreshOnReExecStop(t *testing.T) {
-	n, err := acsassert.CountInGoFunc("cmd_loop_chain.go", "runLoopChain", "BoundaryRefresh")
+	n, err := acsassert.CountInGoFunc(filepath.Join("..", "..", "internal", "loopchain", "driver.go"), "boundary", "res.BoundaryRefresh")
 	if err != nil {
-		t.Fatalf("CountInGoFunc(runLoopChain, BoundaryRefresh): %v", err)
+		t.Fatalf("CountInGoFunc(Driver.boundary, res.BoundaryRefresh): %v", err)
 	}
 	if n < 1 {
-		t.Errorf("runLoopChain does not reference BoundaryRefresh (count=%d); the boundary-refresh-log.jsonl audit record stays invisible to the chain summary JSON", n)
+		t.Errorf("Driver.boundary does not set res.BoundaryRefresh (count=%d); the boundary-refresh-log.jsonl audit record stays invisible to the chain summary JSON", n)
 	}
 }
 
@@ -237,9 +239,10 @@ func TestRunLoopBatch_SetsBoundaryRefreshOnWaveBoundaryReExecStop(t *testing.T) 
 // implementation slipping past T4/T5 (which only assert absence-when-nil,
 // not the exact field name): confirm the json tag string itself is present
 // verbatim in the struct source, so a rename in one place (struct tag) but
-// not the other (T6/T7's population call) cannot both silently pass.
+// not the other (T6/T7's population call) cannot both silently pass. The
+// chain summary's struct is loopchain.Result (chainResult aliases it).
 func TestChainResultAndLoopResult_BoundaryRefreshJSONTagPresent(t *testing.T) {
-	for _, f := range []string{"cmd_loop_chain.go", "cmd_loop_outcome.go"} {
+	for _, f := range []string{filepath.Join("..", "..", "internal", "loopchain", "driver.go"), "cmd_loop_outcome.go"} {
 		if !strings.Contains(mustReadFile(t, f), `json:"boundary_refresh,omitempty"`) {
 			t.Errorf("%s: expected a `json:\"boundary_refresh,omitempty\"` struct tag (nil-when-clean, mirrors spine_fail_opens)", f)
 		}
