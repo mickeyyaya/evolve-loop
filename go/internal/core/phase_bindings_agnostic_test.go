@@ -34,7 +34,7 @@ func fixedNowFn() func() time.Time {
 func TestEmitPhaseBindings_AuditBuild_CorrectMapping(t *testing.T) {
 	t.Parallel()
 	repo, ws := initBindingRepo(t, "cycle-9")
-	cs := CycleState{CycleID: 9, WorkspacePath: ws, ActiveWorktree: repo}
+	cs := CycleState{CycleID: 9, WorkspacePath: ws, ActiveWorktree: detachedWorktree(t, repo)}
 
 	// --- audit, PASS ---
 	ledA := &fakeLedger{}
@@ -101,7 +101,7 @@ func TestEmitPhaseBindings_AuditBuild_CorrectMapping(t *testing.T) {
 func TestEmitPhaseBindings_UserPhase_OnlyAtEnforce(t *testing.T) {
 	t.Parallel()
 	repo, ws := initBindingRepo(t, "cycle-11")
-	cs := CycleState{CycleID: 11, WorkspacePath: ws, ActiveWorktree: repo}
+	cs := CycleState{CycleID: 11, WorkspacePath: ws, ActiveWorktree: detachedWorktree(t, repo)}
 
 	// default (StageOff): user phase scout does NOT bind; audit still binds.
 	ledOff := &fakeLedger{}
