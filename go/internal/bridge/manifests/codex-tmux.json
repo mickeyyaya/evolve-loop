@@ -18,7 +18,7 @@
       "codex"
     ]
   },
-  "prompt_marker": "\u203a",
+  "prompt_marker": "›",
   "transient_regex": "(?i)(stream error|server_error|\\b5\\d{2}\\b\\s*(bad gateway|service unavailable|internal server error)|the server had an error)",
   "default_model": "",
   "default_args": [
@@ -114,14 +114,14 @@
       "response_keys": "1,Enter",
       "policy": "auto_respond",
       "once": true,
-      "note": "codex 0.134+ asks to trust dir on first launch; '1' = yes/trust. Regex broadened per cycle-121 research dossier (codex-cli-0.134-repl-boot-timeout-2026-05-28.md) to also catch the 'Working with untrusted contents' / 'Yes, continue' phrasings emitted on worktree paths not pre-trusted in ~/.codex/config.toml. `once`: a one-time boot dialog \u2014 after a single auto-response it must not re-fire, since its dismissed text lingers in the bootScrollback=200 capture during the artifact-wait loop and would otherwise re-match every poll and trip the loop guard (the codex-tmux abandon observed 2026-06-03)."
+      "note": "codex 0.134+ asks to trust dir on first launch; '1' = yes/trust. Regex broadened per cycle-121 research dossier (codex-cli-0.134-repl-boot-timeout-2026-05-28.md) to also catch the 'Working with untrusted contents' / 'Yes, continue' phrasings emitted on worktree paths not pre-trusted in ~/.codex/config.toml. `once`: a one-time boot dialog — after a single auto-response it must not re-fire, since its dismissed text lingers in the bootScrollback=200 capture during the artifact-wait loop and would otherwise re-match every poll and trip the loop guard (the codex-tmux abandon observed 2026-06-03)."
     },
     {
       "name": "per_edit_approval",
       "regex": "Would you like to make the following edits|Press enter to confirm or esc to cancel|Yes, proceed",
       "response_keys": "1,Enter",
       "policy": "auto_respond",
-      "note": "Cycle-124 G1b (defense-in-depth for G1a's `--yolo`): codex per-edit-approval modal that hung cycle-123 tdd. The modal lists 3 numbered options ('1. Yes, proceed' / '2. Yes, and don't ask again' / '3. No, and tell Codex what to do differently'); response_keys '1,Enter' selects 'Yes, proceed' explicitly (the default highlight is option 1 so a bare 'Enter' would also work, but the explicit '1' is robust to future UX shifts in default selection). With G1a's `--yolo` in default_args, this modal should not fire \u2014 it's the regex backstop for the case where `--yolo` regresses (codex renames the flag, operator overrides default_args, OR the modal appears via a different code path codex's approval=never doesn't cover). Source: docs/incidents/cycle-123-codex-edit-approval-modal-and-empty-fallback-chain.md."
+      "note": "Cycle-124 G1b (defense-in-depth for G1a's `--yolo`): codex per-edit-approval modal that hung cycle-123 tdd. The modal lists 3 numbered options ('1. Yes, proceed' / '2. Yes, and don't ask again' / '3. No, and tell Codex what to do differently'); response_keys '1,Enter' selects 'Yes, proceed' explicitly (the default highlight is option 1 so a bare 'Enter' would also work, but the explicit '1' is robust to future UX shifts in default selection). With G1a's `--yolo` in default_args, this modal should not fire — it's the regex backstop for the case where `--yolo` regresses (codex renames the flag, operator overrides default_args, OR the modal appears via a different code path codex's approval=never doesn't cover). Source: docs/incidents/cycle-123-codex-edit-approval-modal-and-empty-fallback-chain.md."
     },
     {
       "name": "auth_recheck",
@@ -135,6 +135,14 @@
       "regex": "(usage|rate)[ -]limit (reached|exceeded|hit)|hit your (usage|rate) limit|too many requests|quota exceeded",
       "response_keys": null,
       "policy": "escalate"
+    },
+    {
+      "name": "model_unsupported",
+      "regex": "\"status\":4\\d\\d,\"error\":\\{\"type\":\"invalid_request_error\"|The '[^']+' model is not supported when using Codex",
+      "response_keys": null,
+      "tail_lines": 30,
+      "policy": "escalate",
+      "note": "Lane 1676 (2026-09-14): the ChatGPT account rejected the pinned deep-tier model (gpt-5.6-sol) with a 400 invalid_request_error; codex printed it and sat idle for the full 20-minute artifact window before the runner fell back to claude (exit 81). A dead model is a wall like a quota wall: escalate at once (exit 85) so the family fallback runs in seconds. tail_lines keeps the rule to the live screen; the busy gate keeps an agent quoting the JSON from firing it. Not a rate_limit pattern, so clihealth does not bench the family — the other tiers still work."
     },
     {
       "name": "plan_question",

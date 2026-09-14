@@ -56,6 +56,14 @@ Ledger `recover` actions since cycle 1640 named eight ids; only `verdict-sentine
 
 Lane 1677's importer backstop (the layer #612 added) went RED on twenty-odd tests in `cmd/evolve`, `guards`, `ship` and `core` — every one env-sensitive (cycle-reset lease fencing, "outside a cycle", seal role, fleet-off goldens) and every one green in the same worktree under `env -i PATH HOME`. The gate's `go test` inherited `EVOLVE_FLEET=1` and `EVOLVE_CYCLE_STATE_FILE=<the lane's run dir>` from the lane process; core already scrubbed those for its own `go test` spawns with a private `sanitizeEnv`, the ship gate never did. Fixed by `ipcenv.Scrub` (the namespace owner projects the scrub) wired into the ship runner and the four core sites. Cost on this wave: 1677's ship aborted and a recovery audit + re-ship are spent under the running plane. Record: `docs/incidents/2026-09-14-ship-gate-inherits-the-lane-ipc-env.md`.
 
+### F7 — codex's deep tier is pinned to a model the account rejects, and the bridge had no rule for it (P1, fixed — this change; pin = operator's call)
+
+Both wave-2 lanes dispatched build on `codex-tmux@deep`, got `400 invalid_request_error: The 'gpt-5.6-sol' model is not supported when using Codex with a ChatGPT account`, and idled for the full 1500 s artifact window before the runner fell back to Claude (exit 81) — the operator read it as "codex limit reached". Not a limit: a dead model, unrecognised because the auto-responder knows walls only by manifest rule. Fixed with a `model_unsupported` escalate rule (exit 85 → immediate family fallback, no clihealth bench). Codex launched fine for scout, triage and tdd in the same wave (the balanced/fast pins are accepted), so the dead pin is the deep/top row alone; the re-pin needs the operator's cost decision. Record: `docs/incidents/2026-09-14-codex-deep-tier-model-rejected.md`.
+
+### F8 — Claude's session wall went unrecognised: tmux indents it with U+00A0 (P1, fixed — this change)
+
+The account's rolling session limit hit at 19:03 (reset 19:50). Both lanes' recovery audits parked on `⎿  You've hit your session limit · resets 7:50pm` and the guarded fast-fail never armed — the captured line carries a NO-BREAK SPACE after `⎿`, and the session-wall branch of claude's `exhausted_regex` admitted only `[ \t]`, so `ClassifyExhausted` said no while the broad `drift_probe_regex` said yes (`POSSIBLE EXHAUSTION-REGEX DRIFT` at teardown). Each dispatch ran the full 2400 s artifact window and was re-dispatched into the same wall. Fixed by `[\t\p{Zs}]` in that regex, red-first with the live bytes. The memory rule from 2026-07-18 (validate regexes against the REAL pane) applied verbatim. Record: `docs/incidents/2026-09-14-claude-session-wall-nbsp-drift.md`.
+
 ## 4. Verdict on the design
 
 | Claim (memo §4) | Evidence from the wave |

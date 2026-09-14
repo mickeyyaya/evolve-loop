@@ -18,7 +18,7 @@
       "claude"
     ]
   },
-  "prompt_marker": "\u276f",
+  "prompt_marker": "❯",
   "transient_regex": "(?i)(api error:\\s*5\\d{2}\\b|server-side issue,? usually temporary)",
   "default_model": "haiku",
   "default_args": [],
@@ -30,7 +30,11 @@
   },
   "model_freshness": {
     "prefer": "alias",
-    "alias_ids": ["opus", "sonnet", "haiku"],
+    "alias_ids": [
+      "opus",
+      "sonnet",
+      "haiku"
+    ],
     "note": "claude resolves the bare family alias to that family's newest release at LAUNCH (verified 2026-07-27: --model opus -> canonicalModel claude-opus-5). The alias is strictly fresher than any concrete id the catalog could cache; caching opus-4.6 would FREEZE the version."
   },
   "params": {
@@ -89,13 +93,31 @@
     }
   },
   "controls": {
-    "usage":     { "send": "/usage",   "await": "prompt_marker", "exhausted_regex": "(?i)((?:reached|hit) your (usage|weekly) limit|you(?:.?ve| have) reached your .{1,40}? limit\\b.{0,40}?/usage-credits|usage limit reached|\\b0%\\s*(left|remaining)|out of (usage|credits)|upgrade to (a paid plan|continue))|(?im:^[ \\t]*(?:⎿[ \\t]*)?you(?:[’']ve| have) (?:hit|reached) your session limit[ \\t]*[·—][ \\t]*resets\\b)", "drift_probe_regex": "(?i)(/usage-credits|(?:reached|hit) your|usage limit|weekly limit|rate.?limit|out of (usage|credits)|upgrade to|switch models with /model)" },
-    "status":    { "send": "/status",  "await": "prompt_marker" },
-    "clean_ctx": { "send": "/clear" },
-    "compact":   { "send": "/compact" },
-    "model":     { "send": "/model" },
-    "help":      { "send": "/help" },
-    "exit":      { "send": "/exit" }
+    "usage": {
+      "send": "/usage",
+      "await": "prompt_marker",
+      "exhausted_regex": "(?i)((?:reached|hit) your (usage|weekly) limit|you(?:.?ve| have) reached your .{1,40}? limit\\b.{0,40}?/usage-credits|usage limit reached|\\b0%\\s*(left|remaining)|out of (usage|credits)|upgrade to (a paid plan|continue))|(?im:^[\\t\\p{Zs}]*(?:⎿[\\t\\p{Zs}]*)?you(?:[’']ve| have) (?:hit|reached) your session limit[\\t\\p{Zs}]*[·—][\\t\\p{Zs}]*resets\\b)",
+      "drift_probe_regex": "(?i)(/usage-credits|(?:reached|hit) your|usage limit|weekly limit|rate.?limit|out of (usage|credits)|upgrade to|switch models with /model)"
+    },
+    "status": {
+      "send": "/status",
+      "await": "prompt_marker"
+    },
+    "clean_ctx": {
+      "send": "/clear"
+    },
+    "compact": {
+      "send": "/compact"
+    },
+    "model": {
+      "send": "/model"
+    },
+    "help": {
+      "send": "/help"
+    },
+    "exit": {
+      "send": "/exit"
+    }
   },
   "interactive_prompts": [
     {
@@ -129,14 +151,14 @@
       "regex": "(?s)\\[ \\].*Enter to select",
       "response_keys": "Enter,Right,Enter",
       "policy": "auto_respond",
-      "note": "claude AskUserQuestion multiSelect: '[ ]' checkboxes + the 'Enter to select' menu footer. Verified 2026-05-26: Enter toggles the highlighted checkbox, Right moves to the Submit tab, Enter submits \u2192 recommended_or_first (keystrokes are PACED \u2014 see autoRespondInterKeyPause). Requires BOTH a '[ ]' checkbox AND the menu footer so a bare markdown checklist in agent output ('1. [ ] do thing') does NOT false-match, and so the rule keeps matching after the first checkbox toggles (other rows stay '[ ]') \u2014 enabling a retry if the first submit misses. MUST precede askuserquestion_select: a multi-select pane also contains that footer, so the checkbox rule must win (first-match). --dangerously-skip-permissions does NOT suppress this (a question is not a permission)."
+      "note": "claude AskUserQuestion multiSelect: '[ ]' checkboxes + the 'Enter to select' menu footer. Verified 2026-05-26: Enter toggles the highlighted checkbox, Right moves to the Submit tab, Enter submits → recommended_or_first (keystrokes are PACED — see autoRespondInterKeyPause). Requires BOTH a '[ ]' checkbox AND the menu footer so a bare markdown checklist in agent output ('1. [ ] do thing') does NOT false-match, and so the rule keeps matching after the first checkbox toggles (other rows stay '[ ]') — enabling a retry if the first submit misses. MUST precede askuserquestion_select: a multi-select pane also contains that footer, so the checkbox rule must win (first-match). --dangerously-skip-permissions does NOT suppress this (a question is not a permission)."
     },
     {
       "name": "askuserquestion_select",
       "regex": "Enter to select.*navigate",
       "response_keys": "Enter",
       "policy": "auto_respond",
-      "note": "claude AskUserQuestion single-select: first option pre-highlighted ('\u276f 1.'); footer 'Enter to select \u00b7 \u2191/\u2193 to navigate \u00b7 Esc to cancel'. Verified 2026-05-26: a single Enter selects the highlighted first option = recommended_or_first. Layer-2 net behind the prompt-prefix interactive policy (Layer 1)."
+      "note": "claude AskUserQuestion single-select: first option pre-highlighted ('❯ 1.'); footer 'Enter to select · ↑/↓ to navigate · Esc to cancel'. Verified 2026-05-26: a single Enter selects the highlighted first option = recommended_or_first. Layer-2 net behind the prompt-prefix interactive policy (Layer 1)."
     },
     {
       "name": "auth_recheck",
@@ -176,6 +198,6 @@
     }
   ],
   "_notes_on_removed_patterns": {
-    "fact_forcing_gate": "REMOVED v12.1.5 after live-smoke forensics (workspace bridge-t7-G3mPzn). The ECC gateguard PreToolUse hook fires once per Write attempt and Claude recovers natively \u2014 it presents the 4 requested facts and retries the Write. Neither extend_timeout nor auto_respond is appropriate: extend_timeout doesn't help (Claude isn't slow, it's just sequencing tool calls), and auto_respond stacks identical messages at the prompt every poll-tick because the gate error remains visible in pane scrollback, interfering with Claude's own recovery. The correct bridge behavior is no rule \u2014 let Claude handle the hook natively. Re-introduce only with dedupe logic that suppresses re-fires within a single agent turn (v12.1.6+ design)."
+    "fact_forcing_gate": "REMOVED v12.1.5 after live-smoke forensics (workspace bridge-t7-G3mPzn). The ECC gateguard PreToolUse hook fires once per Write attempt and Claude recovers natively — it presents the 4 requested facts and retries the Write. Neither extend_timeout nor auto_respond is appropriate: extend_timeout doesn't help (Claude isn't slow, it's just sequencing tool calls), and auto_respond stacks identical messages at the prompt every poll-tick because the gate error remains visible in pane scrollback, interfering with Claude's own recovery. The correct bridge behavior is no rule — let Claude handle the hook natively. Re-introduce only with dedupe logic that suppresses re-fires within a single agent turn (v12.1.6+ design)."
   }
 }
