@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — the idle nudge says why a deliverable that is already right must still be rewritten (F39 part 1, 2026-09-26)
+
+Cycle 1691's correction round fixed an explanation document and correctly left `build-report.md` untouched. The bridge's completion baseline (the deliverable's size and mtime at dispatch, the cycle-1550 stale-leftover guard) refused the unchanged report, and the one idle nudge said only "Please write the deliverable". The agent re-verified the report, found it correct, and stopped, and the phase would have closed as exit 81 on a correct cycle. The operator unblocked it by touching the report.
+
+- `bridge.idleNudgeFor` words the reminder by what the host sees. It locates the deliverable through the completion poll's own resolution. When the deliverable still matches the dispatch baseline, the nudge says it was not rewritten during this attempt and that completion means writing it after this dispatch. It binds carrying it forward to a re-check against this attempt's work: a markdown report takes an appended line recording what changed and that it was re-verified, and any other format is written again in full. It is logged as `idle with an unrewritten deliverable` with trigger `idle_unrewritten_deliverable`. An absent deliverable keeps the plain reminder.
+- Record `docs/incidents/2026-09-26-correction-stalled-on-an-unrewritten-deliverable.md`. Part 2, deterministic completion for correction rounds whose worktree changed, stays open as `correction-completion-needs-deliverable-rewrite`.
+
 ## Fixed — the build handoff floor refuses a protected control-plane edit, and a ship refusal for one goes back to build (F37, 2026-09-26)
 
 Cycle 1689's builder rewrote the protected `go/internal/core/cyclerun.go` through a shell tool, which the Edit/Write role guard never sees. The build floor approved the diff, and only ship's integrity check (ADR-0064 P2) would have refused it, after a full audit. That refusal would then have recovered into a re-audit of the same diff until the budget aborted the cycle. The operator stopped the lane first.
