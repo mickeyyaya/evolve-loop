@@ -7,6 +7,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/launchoutcome"
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
+	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
 )
 
 // stopreview.go — Stage-0 of the self-healing review layer (the "vertical
@@ -75,10 +76,13 @@ const (
 )
 
 // ReviewVerdict is a reviewer's decision plus a human-readable justification,
-// which the caller logs to the self-healing trail.
+// which the caller logs to the self-healing trail. Cause is the typed terminal
+// cause of a fatal-pane fast-fail (empty for every other verdict) — what the
+// engine's fresh-session retry keys on (F31), never the Reason prose.
 type ReviewVerdict struct {
 	Action ReviewAction
 	Reason string
+	Cause  recovery.TerminalCause
 }
 
 // StopReviewer adjudicates a StopEvent into a verdict. Stage 0 ships

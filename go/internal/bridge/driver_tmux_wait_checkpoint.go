@@ -83,7 +83,9 @@ func (w replWaiter) reviewCheckpoint(state *replWaitState, elapsed int, curPane 
 		w.deps.Stderr,
 		w.prefix,
 	)
-	if !preempted {
+	if preempted {
+		observeFatalPane(w.deps, fatalPaneObservation{cause: verdict.Cause, named: w.launch.named, intervalS: state.intervalS})
+	} else {
 		verdict = state.reviewer.Review(state.lastEvent)
 	}
 	state.lastVerdict = verdict

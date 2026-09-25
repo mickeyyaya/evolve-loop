@@ -48,6 +48,25 @@ func recoveryStageFromEnv(deps Deps) string {
 	return channel.ResolveStage(deps.RecoveryStage)
 }
 
+// fatalPaneObservation is what the wait loop reports about a preempting fatal
+// verdict (F31): the typed cause, whether the session is NAMED (the driver's
+// one resolution of the flag/env/profile session name — resolveSession) and
+// the wait interval it actually used. The engine's fresh-session gate reads
+// these facts from the driver instead of re-deriving them.
+type fatalPaneObservation struct {
+	cause     recovery.TerminalCause
+	named     bool
+	intervalS int
+}
+
+// observeFatalPane hands the observation to the call-local observer Launch
+// installs — nil-safe, and silent for an empty cause.
+func observeFatalPane(deps Deps, obs fatalPaneObservation) {
+	if deps.onFatalPane != nil && obs.cause != "" {
+		deps.onFatalPane(obs)
+	}
+}
+
 // fatalPaneStageOf resolves the fatal-pane fast-fail's OWN stage (F27) through
 // the same normalizer as the program dial — unset → shadow, typo → off — and
 // reads ONLY Deps.FatalPaneStage, so the two dials can never borrow each other.
@@ -118,6 +137,7 @@ func fatalPaneVerdict(det *recovery.FatalPaneDetector, ev StopEvent, stage strin
 		return ReviewVerdict{
 			Action: ReviewStop,
 			Reason: fmt.Sprintf("fatal pane state (%s): matched %q — fast-fail instead of burning the maxExtends backstop (ADR-0044 C2)", cause, sig),
+			Cause:  cause,
 		}, true
 	}
 	record("would_fast_fail")

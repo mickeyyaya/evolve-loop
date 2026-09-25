@@ -174,3 +174,24 @@ func TestFatalPaneStageOf(t *testing.T) {
 		}
 	}
 }
+
+// TestFatalPaneVerdict_EnforceCarriesTheTypedCause (F31): a preempting verdict
+// carries the detector's TYPED cause — the fresh-session retry keys on it,
+// never on the Reason prose — and a non-preempting one carries none.
+func TestFatalPaneVerdict_EnforceCarriesTheTypedCause(t *testing.T) {
+	t.Parallel()
+	for tail, want := range map[string]recovery.TerminalCause{
+		fatalTail: recovery.CauseModelInvalid,
+		"user@host evolve-loop %\nzsh: command not found: Please\nuser@host evolve-loop %": recovery.CauseDeadShell,
+	} {
+		var buf bytes.Buffer
+		v, preempted := fatalPaneVerdict(recovery.SeedDetector(), fatalEv(tail, false), "enforce", nil, &buf, "[t]")
+		if !preempted || v.Cause != want {
+			t.Errorf("tail %q: preempted=%v cause=%q, want a preempting verdict with cause %q", tail, preempted, v.Cause, want)
+		}
+	}
+	var buf bytes.Buffer
+	if v, preempted := fatalPaneVerdict(recovery.SeedDetector(), fatalEv(fatalTail, false), "shadow", nil, &buf, "[t]"); preempted || v.Cause != "" {
+		t.Errorf("shadow never preempts and carries no cause: preempted=%v cause=%q", preempted, v.Cause)
+	}
+}

@@ -105,6 +105,12 @@ type Record struct {
 	Tripwire    bool                  `json:"tripwire"`
 	FillPct     float64               `json:"fill_pct"`
 	CauseCode   string                `json:"cause_code,omitempty"`
+	// FreshSessionRetry marks a dispatch whose pane died with a session-
+	// recoverable cause and was followed by ONE fresh session of the same CLI
+	// inside the same Launch (bridge F31). The two rows share Attempt; this
+	// flag — with the BRIDGE_FRESH_SESSION_RETRY signal's call_id — tells the
+	// dead dispatch from the one that followed.
+	FreshSessionRetry bool `json:"fresh_session_retry,omitempty"`
 
 	// First-output timing is intentionally optional. The current bridge has no
 	// source that means the same thing across headless and REPL drivers.

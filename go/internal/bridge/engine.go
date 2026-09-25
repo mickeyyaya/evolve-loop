@@ -19,6 +19,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/llmcalls"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/tokenusage"
@@ -168,6 +169,12 @@ type Deps struct {
 	// process/session, or when an existing named session is resumed. It is
 	// deliberately package-private: model-attempt persistence has one owner.
 	onModelDispatch func(modelDispatch)
+	// onFatalPane is a call-local observation hook installed by Launch: the wait
+	// loop reports a preempting fatal-pane verdict's cause, the session's
+	// named-ness and the interval it waited on — the one channel the
+	// fresh-session retry reads (F31). Package-private like onModelDispatch:
+	// the retry decision has one owner.
+	onFatalPane func(fatalPaneObservation)
 	// KeychainProbe reports whether a macOS login-Keychain generic-password
 	// item exists for the given service. doctorAuth consults it for claude,
 	// whose OAuth token Claude Code stores in the Keychain (service
@@ -511,8 +518,9 @@ func launchArgs(req core.BridgeRequest, promptFile, stdoutLog, stderrLog string,
 // cutover is a drop-in.
 //
 // The Template Method host, split in place into named steps (ADR-0103 unit
-// 10): the gauntlet → materializeInputs → the argv → runScoped → the attempt
-// record → clearBootStrike → readResult on ExitOK, else persistLaunchError →
+// 10): the gauntlet → materializeInputs → the argv → runScoped (at most twice:
+// freshSessionRetry, F31) → the attempt record → clearBootStrike → readResult
+// on ExitOK, else persistLaunchError →
 // the unit-10 classifier → recordBootStrike → ONE BRIDGE_EXIT_* event. Each
 // step's name is the fields.step a triage reads; the step order is the
 // on-disk order (the launch-error persist before the strike record).
@@ -534,11 +542,12 @@ func (e *Engine) Launch(ctx context.Context, req core.BridgeRequest) (core.Bridg
 	}
 	model := resolvedModel(req.Model)
 	args := launchArgs(req, in.promptFile, in.stdoutLog, in.stderrLog, e.deps)
-	run := e.runScoped(ctx, args, req.Env)
+	run := e.freshSessionRetry(ctx, req, model, func() launchRun { return e.runScoped(ctx, args, req.Env) })
 	resp := core.BridgeResponse{ExitCode: run.code, Stderr: run.stderr, BootMS: run.bootMS}
 	// The terminal time is frozen before optional token resolution begins. One
-	// orchestration-owned Launch therefore yields one attempt record even when
-	// token enrichment is unavailable or errors.
+	// dispatch therefore yields one attempt record even when token enrichment
+	// is unavailable or errors — a Launch that ran a fresh session (F31) holds
+	// two: the dead one (fresh_session_retry) and this one.
 	c := e.recordModelAttempt(req, model, run.code, run.start, run.end, run.dispatched, run.stderr, &resp)
 	e.clearBootStrike(c, req.CLI, run.code)
 	if run.code == ExitOK {
@@ -586,14 +595,64 @@ func materializeInputs(req core.BridgeRequest) (launchInputs, error) {
 }
 
 // launchRun is what one scoped run of the pipeline yields: the exit, the
-// captured bridge stderr, the wall-clock window and the driver's observations.
+// captured bridge stderr, the wall-clock window and the driver's observations
+// (including a fatal-pane fast-fail's observation, F31).
 type launchRun struct {
 	code       int
 	stderr     string
 	start, end time.Time
 	bootMS     int64
 	dispatched modelDispatch
+	fatal      fatalPaneObservation
 }
+
+// freshSessionRetry runs the launch and, when the run ended on a SESSION-
+// recoverable terminal cause (recovery.TerminalCause.SessionRecoverable: the
+// REPL process is gone, the CLI and account are fine) and freshSessionAllowed
+// holds, records the dead dispatch (its ledger row marked fresh_session_retry),
+// clears the boot strike it earned by booting, reports
+// BRIDGE_FRESH_SESSION_RETRY and runs ONE fresh session of the same CLI before
+// the caller's chain walks on (F31: cycle 1687's triage pane died with codex
+// quota-walled and ollama unable to write source — the chain had nowhere to
+// go). At most one retry: the second run's cause is never read. The caller
+// records the returned run.
+func (e *Engine) freshSessionRetry(ctx context.Context, req core.BridgeRequest, model string, run func() launchRun) launchRun {
+	first := run()
+	if !e.freshSessionAllowed(ctx, first) {
+		return first
+	}
+	dead := core.BridgeResponse{ExitCode: first.code, Stderr: first.stderr, BootMS: first.bootMS}
+	c := e.recordModelAttempt(req, model, first.code, first.start, first.end, first.dispatched, first.stderr, &dead, markFreshSessionRetry)
+	e.clearBootStrike(c, req.CLI, first.code)
+	c.launchWarn("Engine.freshSessionRetry", "", CodeFreshSessionRetry,
+		fmt.Sprintf("%s pane died (%s): the REPL process is gone, not the CLI — one fresh %s session before the chain moves on", req.Agent, first.fatal.cause, req.CLI), nil)
+	return run()
+}
+
+// freshSessionAllowed is the retry's one gate (F31, architecture review):
+//   - the cause is session-recoverable, on the exit the fast-fail closes with
+//     (a run that delivered is never run twice);
+//   - the session is EPHEMERAL — a named session is kept alive for resume, so a
+//     re-run would reattach to the dead pane, skip boot and the sandbox, and
+//     paste the prompt into a bare shell; its lifecycle belongs to its owner
+//     (resume, the swarm reaper). Named-ness is the DRIVER's resolution
+//     (resolveSession: flag, env or profile), reported on the observation —
+//     never re-derived from the request;
+//   - the launch is live and the caller's deadline leaves room for one more
+//     of the waits the driver actually used (the observation's interval) —
+//     otherwise the chain gets a clean exit 81 in time to walk.
+func (e *Engine) freshSessionAllowed(ctx context.Context, first launchRun) bool {
+	if !first.fatal.cause.SessionRecoverable() || first.fatal.named || first.code != ExitArtifactTimeout || ctx.Err() != nil {
+		return false
+	}
+	if deadline, ok := ctx.Deadline(); ok && deadline.Sub(e.deps.Now()) < time.Duration(first.fatal.intervalS)*time.Second {
+		return false
+	}
+	return true
+}
+
+// markFreshSessionRetry tags the dead dispatch's ledger row (F31).
+func markFreshSessionRetry(rec *llmcalls.Record) { rec.FreshSessionRetry = true }
 
 // runScoped runs the LaunchArgs pipeline against a scoped Engine holding a
 // per-call Deps COPY: the call-local OnBoot (cold-boot latency, ADR-0043 A0)
@@ -618,6 +677,13 @@ func (e *Engine) runScoped(ctx context.Context, args []string, env map[string]st
 		run.dispatched = observation
 		if previousDispatchObserver != nil {
 			previousDispatchObserver(observation)
+		}
+	}
+	previousFatalObserver := callDeps.onFatalPane
+	callDeps.onFatalPane = func(observation fatalPaneObservation) {
+		run.fatal = observation
+		if previousFatalObserver != nil {
+			previousFatalObserver(observation)
 		}
 	}
 	callEngine := &Engine{deps: callDeps}
