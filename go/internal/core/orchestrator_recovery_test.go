@@ -236,6 +236,35 @@ func TestRunCycle_ShipPreconditionError_ReRunsAuditThenShips(t *testing.T) {
 	_ = res
 }
 
+// F37 (architecture review M3): a control-plane refusal (CONTROL_PLANE_VIOLATION,
+// class precondition) recovers into BUILD — the phase that owns the diff —
+// then audit re-binds and ship succeeds, through the real orchestrator. The
+// generic precondition route would re-audit the same diff instead (the
+// cycle-230 audit↔ship loop).
+func TestRunCycle_ShipControlPlaneViolation_RebuildsThenShips(t *testing.T) {
+	t.Parallel()
+	ship := &shipErrorStub{
+		name:      "ship",
+		failFirst: 1,
+		errOnFail: core.NewShipError(core.CodeControlPlaneViolation, core.ShipClassPrecondition, core.StageVerifyClass, "INTEGRITY VIOLATION: go/internal/core/cyclerun.go"),
+	}
+	// The re-entered Build authors its Explanation Documentation again,
+	// exactly as a real builder does (ship_recovery_composition_test.go's
+	// explanationWritingRunner; countingRunner counts the audits).
+	build := &explanationWritingRunner{}
+	audit := &countingRunner{name: "audit"}
+	_, err, ld := runRecoveryCycle(t, map[core.Phase]core.PhaseRunner{core.PhaseShip: ship, core.PhaseBuild: build, core.PhaseAudit: audit})
+	if err != nil {
+		t.Fatalf("a control-plane refusal is recoverable by the builder, got: %v", err)
+	}
+	if build.calls != 2 || audit.calls != 2 || ship.calls != 2 {
+		t.Fatalf("ship refusal → build → audit → ship: build=%d audit=%d ship=%d, want 2/2/2", build.calls, audit.calls, ship.calls)
+	}
+	if !containsKind(ld, "ship_error") {
+		t.Fatalf("expected a ship_error ledger entry; kinds=%v", ld.entryKinds())
+	}
+}
+
 // Transient-class ShipError (e.g. GIT_PUSH_REJECTED) → retry ship directly.
 func TestRunCycle_ShipTransientError_RetriesShip(t *testing.T) {
 	t.Parallel()

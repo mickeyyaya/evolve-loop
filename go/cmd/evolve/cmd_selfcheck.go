@@ -2,14 +2,16 @@ package main
 
 // cmd_selfcheck.go — ADR-0076 slice B (green-before-handoff): `evolve
 // selfcheck build` runs the build handoff floor's EXACT deterministic checks
-// (core.DefaultBuildFloorChecks) as an in-session pre-flight, so the builder
+// (productionBuildFloorChecks: the protected-surface floor, then
+// core.DefaultBuildFloorChecks) as an in-session pre-flight, so the builder
 // fixes findings inside its own loop and budget instead of post-hoc
 // correction windows. The floor itself is unchanged — it remains the
 // trust-boundary backstop; this is the same check moved to where fixing is
 // cheap. Exit codes: 0 green, 1 findings, 2 usage. This mirrors the CODE floor
 // only; a document cycle's deliverable self-checks with `evolve solution check`
 // (ADR-0099 slice 2), whose engine the cycle composition root chains after
-// DefaultBuildFloorChecks.
+// productionBuildFloorChecks. It diffs against HEAD (no --base yet), so a
+// builder that already committed sees less than the floor (follow-up F38).
 
 import (
 	"context"
@@ -22,9 +24,10 @@ import (
 )
 
 // buildFloorChecksFn is the DI seam holding the floor's check function —
-// tests inject stubs; the wiring pin holds the default to the REAL floor so
-// the CLI and the reviewer can never drift apart.
-var buildFloorChecksFn = core.DefaultBuildFloorChecks
+// tests inject stubs; the wiring pin holds the default to the REAL floor
+// (productionBuildFloorChecks, cmd_cycle_config.go) so the CLI and the
+// reviewer can never drift apart.
+var buildFloorChecksFn = productionBuildFloorChecks
 
 func runSelfcheck(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 || args[0] != "build" {

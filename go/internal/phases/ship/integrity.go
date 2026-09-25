@@ -45,9 +45,12 @@ func verifyNoControlPlaneEdits(ctx context.Context, opts *Options, res *RunResul
 
 // cycleChangedPaths returns every path the cycle would commit: tracked changes vs
 // HEAD (modified/deleted/renamed) unioned with untracked new files — so the
-// protected-path check sees the file no matter how it was introduced.
+// protected-path check sees the file no matter how it was introduced. Rename
+// detection is OFF: with it on, --name-only prints only a rename's NEW path, so
+// a protected file moved to an unprotected name would pass (architecture review
+// F37 M1; the build handoff floor judges the same way).
 func cycleChangedPaths(ctx context.Context, opts *Options) ([]string, error) {
-	tracked, err := captureGitOutput(ctx, opts, "diff", "--name-only", "HEAD")
+	tracked, err := captureGitOutput(ctx, opts, "diff", "--name-only", "--no-renames", "HEAD")
 	if err != nil {
 		return nil, err
 	}

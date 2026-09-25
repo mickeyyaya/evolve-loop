@@ -38,6 +38,10 @@ func TestRecover_Branches(t *testing.T) {
 		{"ship-local commit prefix gate", &Blocker{Code: "COMMIT_PREFIX_GATE", Class: "precondition", Stage: "ship"}, "debugger", "recover:ship-local-debugger"},
 		{"ship-local detached head", &Blocker{Code: "GIT_DETACHED_HEAD", Class: "precondition", Stage: "ship"}, "debugger", "recover:ship-local-debugger"},
 		{"ship-local worktree resolve", &Blocker{Code: "WORKTREE_RESOLVE", Class: "precondition", Stage: "ship"}, "debugger", "recover:ship-local-debugger"},
+		// F37: a cycle diff touching the protected control plane is the BUILD's
+		// to reshape — a re-audit re-verifies the same diff and the debugger
+		// cannot change what a cycle may write.
+		{"control-plane violation → rebuild", &Blocker{Code: "CONTROL_PLANE_VIOLATION", Class: "precondition", Stage: "verify_class"}, "build", "recover:control-plane-rebuild"},
 		// Push rejection already declined by ship's in-Run fetch+ff-retry and
 		// reclassified precondition (needs-reaudit) → re-audit is correct.
 		{"push rejected needs-reaudit", &Blocker{Code: "GIT_PUSH_REJECTED", Class: "precondition", Stage: "ship"}, "audit", "recover:precondition-reaudit"},

@@ -98,6 +98,51 @@ func DefaultBuildFloorChecks(ctx context.Context, in ReviewInput) []string {
 	return append(out, changedPackageFloorChecks(ctx, in, paths)...)
 }
 
+// ProtectedSurfaceFloorChecks is the handoff floor's copy of the ship
+// tripwire's question (ship/integrity.go verifyNoControlPlaneEdits, ADR-0064),
+// asked at the one phase that can act on it: every changed path on the
+// protected control plane is a failure the builder undoes in-phase, through the
+// correction ladder. The role guard sees only Edit/Write; a shell tool reaches
+// the tree unseen (F37: cycle 1689's builder rewrote core/cyclerun.go that
+// way), and before this floor the violation surfaced only at ship — after the
+// audit. member is the membership predicate (guards.IsProtectedSurface,
+// injected by the composition root: guards imports core). The paths are the
+// floor's axis — the cycle-base diff (HEAD when no base is recorded) plus
+// untracked files, which is the set ship judges once the post-record
+// soft-reset puts HEAD back at the base — with rename detection OFF on both
+// sides: with it on, `git diff --name-only` prints only a rename's NEW path,
+// so a file moved out of a protected path would be judged by its new name
+// alone (architecture review F37 M1).
+func ProtectedSurfaceFloorChecks(member func(string) bool) BuildFloorCheckFn {
+	return func(ctx context.Context, in ReviewInput) []string {
+		if in.Worktree == "" {
+			return nil
+		}
+		base := in.WorktreeBaseSHA
+		if base == "" {
+			base = "HEAD"
+		}
+		return protectedSurfaceFailures(changedWorktreePathsSince(ctx, in.Worktree, base, "--no-renames"), member, base)
+	}
+}
+
+// protectedSurfaceFailures is one actionable line per protected changed path;
+// a nil predicate fails open like every floor (ship's tripwire stays armed).
+// The fix is always the same — restore the path — because the check reads
+// only paths: a note in build-report.md never clears it.
+func protectedSurfaceFailures(paths []string, member func(string) bool, base string) []string {
+	if member == nil {
+		return nil
+	}
+	var out []string
+	for _, p := range paths {
+		if member(p) {
+			out = append(out, fmt.Sprintf("protected control-plane path changed: %s — a cycle may not edit the gate/metric/guard/contract that grades it (ADR-0064; ship refuses this diff). Restore it: `git checkout %s -- %s` (or delete it if it is new), then reshape the change so it does not need the path. If the task cannot be completed without changing it, still restore it and record that in build-report.md — the item is console work.", p, base, p))
+		}
+	}
+	return out
+}
+
 // NewBuildExplanationReviewer returns the mandatory, inexpensive Build
 // explanation floor. Core composes it outside the optional reviewer seam, so a
 // caller cannot disable or replace the contract.

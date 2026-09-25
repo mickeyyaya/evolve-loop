@@ -49,9 +49,10 @@ var buildSelfCheckTaggedRunner = realGoUnitTestTagged
 
 // changedWorktreePathsSince lists paths changed relative to baseSHA (committed
 // work included — the build-floor reviewer's axis) plus untracked additions.
-func changedWorktreePathsSince(ctx context.Context, worktree, baseSHA string) []string {
+// diffFlags extend the diff (the protected-surface floor passes --no-renames).
+func changedWorktreePathsSince(ctx context.Context, worktree, baseSHA string, diffFlags ...string) []string {
 	var out []string
-	if diff, code, err := gitCapture(ctx, worktree, "diff", baseSHA, "--name-only"); err == nil && code == 0 {
+	if diff, code, err := gitCapture(ctx, worktree, append([]string{"diff", baseSHA, "--name-only"}, diffFlags...)...); err == nil && code == 0 {
 		for _, l := range strings.Split(diff, "\n") {
 			if l = strings.TrimSpace(l); l != "" {
 				out = append(out, l)

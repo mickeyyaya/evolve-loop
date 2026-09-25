@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — the build handoff floor refuses a protected control-plane edit, and a ship refusal for one goes back to build (F37, 2026-09-26)
+
+Cycle 1689's builder rewrote the protected `go/internal/core/cyclerun.go` through a shell tool, which the Edit/Write role guard never sees. The build floor approved the diff, and only ship's integrity check (ADR-0064 P2) would have refused it, after a full audit. That refusal would then have recovered into a re-audit of the same diff until the budget aborted the cycle. The operator stopped the lane first.
+
+- `core.ProtectedSurfaceFloorChecks`: the build handoff floor fails the handoff for every changed path on the control-plane manifest. It judges the cycle-base diff plus untracked files, the set ship judges once HEAD is back at the base. The correction ladder then has the builder restore the file in-phase; the message gives the exact `git checkout <base> -- <path>`. The membership predicate (`guards.IsProtectedSurface`) is injected at the root. The one composition, `productionBuildFloorChecks`, is a named function in the protected `cmd_cycle_config.go` that runs the protected check first; the cycle reviewer and `evolve selfcheck build` both run it.
+- Rename detection is off in both the floor and ship's check. A protected file moved to an unprotected name used to pass both, because `--name-only` printed only the new path.
+- `router` recovery: `CONTROL_PLANE_VIOLATION` routes to **build** (`recover:control-plane-rebuild`), not to a futile re-audit. End-to-end pin: ship → build → audit → ship.
+- ADR-0064 amendment; record `docs/incidents/2026-09-26-lane-edited-the-control-plane-through-a-shell-tool.md`. Remaining gaps are filed as F38.
+
 ## Fixed — no route override or line locator lets a declared protected file reach a lane, and the wave plan drops console-routed ids before it widens (F34, F35, 2026-09-26)
 
 Wave 7 dispatched one lane of two. The plan's prior decision still carried an id the operator had since routed to the console. It filled the fleet width, so the widen had nothing to refill, and the plan-time gate refused it only after the lanes were cut. A census of the live queue then found two dispatchable items that declared protected FILES under an operator `route:"lane"`. Triage's breaker and the ship tripwire both judge membership of each file and ignore the route, so each item was a guaranteed triage FAIL.
