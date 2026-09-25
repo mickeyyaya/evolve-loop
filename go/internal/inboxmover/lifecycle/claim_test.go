@@ -33,12 +33,14 @@ func TestMover_Claim_NotFound_EmitsClaimNotFound(t *testing.T) {
 
 // Test 23 — the ADR-0074 claim floor through the leaf: route:console-* refuses
 // with a nil predicate; a protected fix surface refuses only when a predicate
-// is injected; route:lane on an operator-authored item claims.
+// is injected; route:lane on an operator-authored item claims a declared
+// directory scope but never a declared protected FILE (F35).
 func TestMover_Claim_Refused_EmitsClaimRefused(t *testing.T) {
 	inbox := newInbox(t)
 	writeItem(t, filepath.Join(inbox, "x.json"), `{"id":"task-x","route":"console-manual"}`)
 	writeItem(t, filepath.Join(inbox, "y.json"), `{"id":"task-y","files":["go/internal/guards/role.go (fix)"]}`)
-	writeItem(t, filepath.Join(inbox, "z.json"), `{"id":"task-z","route":"lane","files":["go/internal/guards/role.go"]}`)
+	writeItem(t, filepath.Join(inbox, "z.json"), `{"id":"task-z","route":"lane","files":["go/internal/guards/"]}`)
+	writeItem(t, filepath.Join(inbox, "w.json"), `{"id":"task-w","route":"lane","files":["go/internal/guards/role.go"]}`)
 	rc := newRecordingCenter()
 	plain := New(inbox, nil, WithSignals(rc.accessor()))
 	if _, err := plain.Claim("task-x", "7"); !errors.Is(err, ErrConsoleRouted) {
@@ -50,12 +52,15 @@ func TestMover_Claim_Refused_EmitsClaimRefused(t *testing.T) {
 	if len(rc.events) != 1 || rc.events[0].Code != CodeClaimRefused || rc.events[0].Fields["reason"] != "route:console-manual" || rc.events[0].Fields["step"] != "route" {
 		t.Errorf("events = %+v", rc.events)
 	}
-	protected := New(inbox, nil, WithSignals(rc.accessor()), WithProtectedPath(func(p string) bool { return p == "go/internal/guards/role.go" }))
+	protected := New(inbox, nil, WithSignals(rc.accessor()), WithProtectedPath(func(p string) bool { return p == "go/internal/guards/role.go" || p == "go/internal/guards/" }))
 	if _, err := protected.Claim("task-y", "7"); !errors.Is(err, ErrConsoleRouted) {
 		t.Errorf("a protected fix surface refuses with a predicate: %v", err)
 	}
 	if res, err := protected.Claim("task-z", "7"); err != nil || res.DestPath == "" {
-		t.Errorf("route:lane claims: %+v %v", res, err)
+		t.Errorf("route:lane claims a declared directory scope: %+v %v", res, err)
+	}
+	if _, err := protected.Claim("task-w", "7"); !errors.Is(err, ErrConsoleRouted) {
+		t.Errorf("route:lane cannot relax a declared protected file: %v", err)
 	}
 	writeItem(t, filepath.Join(inbox, "y2.json"), `{"id":"task-y2","files":["go/internal/guards/role.go (fix)"]}`)
 	if _, err := plain.Claim("task-y2", "7"); err != nil {

@@ -713,12 +713,12 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 	// the advisory post-build selfcheck skips its duplicate run when this
 	// floor is enforced, so each build pays the go-test cost exactly once.
 	if pol.WorkflowConfig().BuildFloorEnforced {
-		checks := core.DefaultBuildFloorChecks
+		checks := productionBuildFloorChecks
 		// ADR-0099 slice 2: a document cycle's solutions/<slug>/ is judged by the
 		// same deterministic floor seam (internal/solutioncheck over the
 		// registry's deliverable_kinds.document contract); silent for code cycles.
 		if spec, ok := cfg.DocumentSpec(); ok {
-			checks = core.ChainBuildFloorChecks(core.DefaultBuildFloorChecks, core.SolutionFloorChecks(spec))
+			checks = core.ChainBuildFloorChecks(productionBuildFloorChecks, core.SolutionFloorChecks(spec))
 		}
 		reviewers = append(reviewers, core.NewBuildFloorReviewer(checks))
 	}

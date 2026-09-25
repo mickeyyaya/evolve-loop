@@ -4,10 +4,12 @@ package main
 // build` is the builder's in-session pre-flight running the EXACT build-floor
 // checks, so fixing happens inside the builder's loop and budget instead of
 // post-hoc correction windows. DI seam (buildFloorChecksFn) so tests inject a
-// stub; a wiring pin holds the seam to core.DefaultBuildFloorChecks.
+// stub; a wiring pin holds the seam to productionBuildFloorChecks (the ONE
+// composition: the engine plus the protected-surface floor, F37).
 
 import (
 	"context"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -56,9 +58,39 @@ func TestRunSelfcheck_UsageOnBadArgs(t *testing.T) {
 }
 
 func TestSelfcheckSeam_DefaultsToBuildFloorChecks(t *testing.T) {
-	want := reflect.ValueOf(core.DefaultBuildFloorChecks).Pointer()
+	want := reflect.ValueOf(productionBuildFloorChecks).Pointer()
 	got := reflect.ValueOf(buildFloorChecksFn).Pointer()
 	if want != got {
-		t.Fatal("seam must default to core.DefaultBuildFloorChecks — the CLI and the floor must run the SAME checks")
+		t.Fatal("seam must default to productionBuildFloorChecks — the CLI and the floor must run the SAME checks")
+	}
+}
+
+// TestBuildFloorRoots_ComposeOnlyThroughTheProductionFloor (F37): the only
+// non-test reference to core.DefaultBuildFloorChecks in this root is the ONE
+// production composition, so no root can wire the engine without the
+// protected-surface floor beside it.
+func TestBuildFloorRoots_ComposeOnlyThroughTheProductionFloor(t *testing.T) {
+	entries, err := os.ReadDir(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var refs []string
+	for _, e := range entries {
+		name := e.Name()
+		if e.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		src, err := os.ReadFile(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, line := range strings.Split(string(src), "\n") {
+			if strings.Contains(line, "core.DefaultBuildFloorChecks") && !strings.HasPrefix(strings.TrimSpace(line), "//") {
+				refs = append(refs, name+": "+strings.TrimSpace(line))
+			}
+		}
+	}
+	if len(refs) != 1 || !strings.HasPrefix(refs[0], "cmd_cycle_config.go: ") || !strings.Contains(refs[0], "return append(core.ProtectedSurfaceFloorChecks(guards.IsProtectedSurface)(ctx, in), core.DefaultBuildFloorChecks(ctx, in)...)") {
+		t.Fatalf("core.DefaultBuildFloorChecks must be referenced only by the production composition; got %v", refs)
 	}
 }

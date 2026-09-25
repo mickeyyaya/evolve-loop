@@ -8,10 +8,16 @@ package main
 // (cmd_cycle.go) and the nested-sandbox fallback (cmd_loop_preflight.go)
 // keep — their dials are not RoutingConfig fields yet (unit doc F2) — and
 // (F27) the ONE forwarding of the resolved bridge dials into the adapter
-// (wireBridgeStages).
+// (wireBridgeStages), and (F37) the ONE composition of the build handoff
+// floor (productionBuildFloorChecks) — on the protected manifest, so no cycle
+// can drop the protected-surface check from its own floor.
 
 import (
+	"context"
+
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
@@ -53,6 +59,18 @@ func wireBridgeStages(br bridgeStageSink, cfg config.RoutingConfig) {
 	br.SetPhaseIOStage(cfg.PhaseIO)
 	br.SetRecoveryStage(cfg.PhaseRecovery.String())
 	br.SetFatalPaneStage(cfg.FatalPane.String())
+}
+
+// productionBuildFloorChecks is the ONE composition of the code-cycle build
+// handoff floor both roots run — the cycle reviewer (cmd_cycle.go) and the
+// in-session pre-flight (`evolve selfcheck build`): the protected-surface floor
+// with the control-plane membership predicate injected (F37 — core cannot
+// import guards), judged FIRST, before go test can leave untracked files
+// behind, then the deterministic engine. A named function, so the wiring pin's
+// pointer identifies it (every ChainBuildFloorChecks closure shares one code
+// pointer).
+func productionBuildFloorChecks(ctx context.Context, in core.ReviewInput) []string {
+	return append(core.ProtectedSurfaceFloorChecks(guards.IsProtectedSurface)(ctx, in), core.DefaultBuildFloorChecks(ctx, in)...)
 }
 
 // parseGateStage maps a policy gate word onto the off/shadow/enforce

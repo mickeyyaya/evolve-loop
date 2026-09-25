@@ -12,10 +12,11 @@ package inboxbatch
 
 import "strings"
 
-// routeLane is the explicit operator override: forces dispatchability when the
-// protected-files derivation would route the item out (e.g. the item only
-// READS a protected surface). Clamped for agent-autofiled items — see
-// ConsoleRouted.
+// routeLane is the explicit operator override: forces dispatchability when a
+// HEURISTIC derivation would route the item out — the pipeline-* kind, a
+// declared directory that merely holds protected files, a file the text only
+// names. It cannot relax a declared protected FILE (see ConsoleRouted).
+// Clamped for agent-autofiled items.
 const routeLane = "lane"
 
 // consoleRoutePrefix marks operator-owned routing values (console-manual,
@@ -39,16 +40,23 @@ const KindPipelineRepair = pipelineKindPrefix + "repair"
 // dispatchable) and why. isProtected is the control-plane SCOPE predicate the
 // routing roots inject (guards.IsProtectedScope — a path that is, or a
 // directory that contains, protected surface; nil disables only the derived
-// rules — the explicit route field and the kind always bind).
+// surface rules — the explicit route field and the kind still apply).
 //
-// Precedence: route "console-*" always routes; a pipeline-* kind or a
-// protected surface routes unless route:"lane" AND the item is
-// operator-authored (InjectedBy empty) — agent-autofiled items cannot
-// widen agent authority by self-declaring lane dispatch of control-plane
-// work (ADR-0073 clamp-parity: the field is unauthenticated, so the
-// achievable floor is that an agent-authored override never *widens* what an
-// agent may do; a hand-forged override at most forces a doomed pipeline,
-// since the ship-time protectedsurface tripwire still blocks the merge).
+// Precedence: route "console-*" always routes; a declared protected FILE (a
+// file spelling the scope predicate judges protected — for a file spelling
+// scope IS membership) always routes — triage's breaker and the ship tripwire
+// judge membership of each file with no route exception, so no override can
+// make it lane work, only a doomed lane (F35: two live operator overrides,
+// 2026-09-26). Residual (F35c): a declared DIRECTORY that is itself inside a
+// protected directory fragment ("go/internal/bridge/") still reads as scope
+// here and stays overridable — binding it needs membership injected beside
+// scope. Any other
+// derivation (a pipeline-* kind, a protected directory scope, a mention)
+// routes unless route:"lane" AND the item is operator-authored (InjectedBy
+// empty) — agent-autofiled items cannot widen agent authority by
+// self-declaring lane dispatch of control-plane work (ADR-0073 clamp-parity:
+// the field is unauthenticated, so the achievable floor is that an
+// agent-authored override never *widens* what an agent may do).
 //
 // The surface: every whitespace token of each files[] entry (real items write
 // "path (why)" and "(see path)" shapes) is judged in scope — a declared
@@ -62,20 +70,34 @@ func ConsoleRouted(it Item, isProtected func(string) bool) (bool, string) {
 	if strings.HasPrefix(route, consoleRoutePrefix) {
 		return true, "route:" + route
 	}
+	surface := protectedDerivation(it, isProtected)
 	derived, reason := pipelineKindDerivation(it)
 	if !derived {
-		derived, reason = protectedDerivation(it, isProtected)
+		derived, reason = surface.routed, surface.reason
 	}
 	if !derived {
 		return false, ""
 	}
 	if route == routeLane {
-		if strings.TrimSpace(it.InjectedBy) == "" {
+		switch {
+		case surface.binding:
+			return true, surface.reason + " (route:lane cannot relax a declared protected file: triage's breaker and the ship tripwire refuse it whatever the route)"
+		case strings.TrimSpace(it.InjectedBy) == "":
 			return false, "" // operator-authored override honored
+		default:
+			return true, reason + " (route:lane ignored: agent-autofiled item cannot override a console derivation)"
 		}
-		return true, reason + " (route:lane ignored: agent-autofiled item cannot override a console derivation)"
 	}
 	return true, reason
+}
+
+// surfaceDerivation is the protected-surface judgment of one item: whether it
+// routes, why, and whether the hit BINDS — a declared FILE on the manifest,
+// which the downstream membership checks refuse whatever the route says (for a
+// file spelling the injected scope predicate reduces to membership).
+type surfaceDerivation struct {
+	routed, binding bool
+	reason          string
 }
 
 // pipelineKindDerivation reports whether the item's kind marks it as
@@ -88,32 +110,39 @@ func pipelineKindDerivation(it Item) (bool, string) {
 	return true, "kind:" + kind + " (pipeline-integrity work is console-owned)"
 }
 
-// protectedDerivation reports whether any declared fix-surface token is on the
-// protected manifest.
-func protectedDerivation(it Item, isProtected func(string) bool) (bool, string) {
+// protectedDerivation judges the item's surface: a declared FILE on the
+// manifest binds (and wins over a declared directory for the reason); a
+// declared directory holding protected files, or — with no declared surface —
+// a protected file the text names, routes without binding.
+func protectedDerivation(it Item, isProtected func(string) bool) surfaceDerivation {
 	if isProtected == nil {
-		return false, ""
+		return surfaceDerivation{}
 	}
+	var scope surfaceDerivation
 	for _, tok := range declaredTokens(it.Files) {
-		if isProtected(tok) {
-			return true, "protected fix surface: " + tok
+		switch {
+		case !isProtected(tok):
+		case isFileSpelling(tok):
+			return surfaceDerivation{routed: true, binding: true, reason: "protected fix surface: " + tok}
+		case !scope.routed:
+			scope = surfaceDerivation{routed: true, reason: "protected fix surface: " + tok}
 		}
 	}
-	if it.DeclaredSurface() {
-		return false, "" // a declared surface wins: prose mentions are context
+	if scope.routed || it.DeclaredSurface() {
+		return scope // a declared surface wins: prose mentions are context
 	}
 	// F29: with no declared surface, the FILES the record's own text names ARE
 	// its surface — the one triage's breaker would otherwise derive only after
 	// a lane paid for scout and triage (18 of ~60 cycles died that way). A
 	// mention can only move an item TO the console, never widen lane authority,
 	// and it is a file spelling, so the injected scope predicate reduces to
-	// membership for it.
+	// membership for it. It never binds: the text may only cite the file.
 	for _, p := range it.mentions {
 		if isProtected(p) {
-			return true, "mentions protected path: " + p + " (no declared files[]: the surface is derived from the item's own text)"
+			return surfaceDerivation{routed: true, reason: "mentions protected path: " + p + " (no declared files[]: the surface is derived from the item's own text)"}
 		}
 	}
-	return false, ""
+	return surfaceDerivation{}
 }
 
 // PartitionConsole splits items into lane-dispatchable and console-routed,

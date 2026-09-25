@@ -1,0 +1,24 @@
+{
+  "id": "protected-surface-leaf-and-floor-gaps",
+  "created_at": "2026-09-26T03:45:00Z",
+  "weight": 0.62,
+  "title": "F38: the control-plane manifest in a leaf package, and the build floor's remaining protected-surface gaps",
+  "kind": "pipeline-repair",
+  "priority": "P3",
+  "summary": "F37 (fix/build-floor-protected-surface) shifted ship's control-plane question into the build handoff floor and routed CONTROL_PLANE_VIOLATION to build. Its architecture review left five gaps: (m6) the membership predicate is injected only because guards imports core — guards/integrity_surface.go imports only the standard library, so the manifest could live in a leaf package both core and inboxbatch import directly (retiring this injection AND the F35c Surface port); (m1) a clean fleet rebase of an explanation-version-0 cycle does not persist the new base, so a later return to Build diffs against the old base and would prescribe reverting main's own changes; (m3) with workflow.build_floor off, a CONTROL_PLANE_VIOLATION rebuild is blind — ship passes the builder nothing; (m5) `evolve selfcheck build` diffs against HEAD, not the cycle base, so a committed protected edit reads GREEN in the pre-flight and REJECT at the floor; (m8) with no base recorded both the floor and ship diff against HEAD and miss committed edits.",
+  "fix": "(1) Move ProtectedSurfaceManifest + IsProtectedSurface + IsProtectedScope into a leaf package (e.g. internal/protectedsurface; stdlib only), keep guards' exported names as thin forwarders, add the leaf to the manifest; core's floor and inboxbatch's classifier call membership directly — drop ProtectedSurfaceFloorChecks' injected predicate and the F35c port. (2) Persist WorktreeBaseSHA on every successful fleet rebase, not only the explanation branch. (3) recoverFromShipError aborts loudly on CONTROL_PLANE_VIOLATION when the build floor is not enforced (or carries protected_paths into the rebuilt Build's context). (4) `evolve selfcheck build --base` defaulting to the cycle state's base. (5) Decide and pin the no-base behavior for committed edits.",
+  "acceptance": [
+    "core and inboxbatch judge membership through the leaf package with no injected predicate; guards' exported names forward; the leaf is on the manifest; the F35c manifest-walk test (every fragment, operator route:lane, routes) passes.",
+    "A clean fleet rebase of an explanation-version-0 cycle persists the new base (test: a later Build re-entry diffs against the rebased base).",
+    "With workflow.build_floor off, a CONTROL_PLANE_VIOLATION does not route to a blind rebuild (test).",
+    "`evolve selfcheck build` in a worktree with committed builder work and a recorded cycle base names a committed protected edit (test)."
+  ],
+  "files": [
+    "go/internal/guards/integrity_surface.go",
+    "go/internal/core/build_floor_reviewer.go",
+    "go/internal/core/ship_recovery.go",
+    "go/cmd/evolve/cmd_selfcheck.go",
+    "go/internal/inboxbatch/consoleroute.go"
+  ],
+  "notes": "Console-owned by kind (pipeline-*): the fix surface is the control plane. Evidence: docs/incidents/2026-09-26-lane-edited-the-control-plane-through-a-shell-tool.md (Not fixed here) and the F37 architecture review."
+}

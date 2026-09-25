@@ -21,5 +21,11 @@
       "text": "PRESCRIPTION: Add a deterministic no-work disposition after triage so mutation phases skip when triage-decision.json top_n is empty, without weakening the mandatory spine."
     }
   ],
-  "created_at": "2026-08-27T21:00:00Z"
+  "created_at": "2026-08-27T21:00:00Z",
+  "files": [
+    ".evolve/phases/defect-disposition-preflight/phase.json"
+  ],
+  "surface_note": "2026-09-26 console curation (F29 follow-up): files[] typed from a read-only classification against guards.ProtectedSurfaceManifest — protected=false, confidence=high. Only the missing final newline remains (this tracked file ends in '}'): the registry binding is already released and the empty-triage stop already exists in triage_termination.go.",
+  "route": "console-manual",
+  "routed_reason": "2026-09-26 console readiness audit (read-only, against main): STALE — 2 of 3 prescriptions already landed (continuation-registry has no defect-disposition-contract-unsatisfiable entry; triage_termination.go:10 defines cycleTerminationTriageClaimFailed); only a trailing-newline nit in .evolve/phases/defect-disposition-preflight/phase.json remains — not lane work (a lane would ship a near-empty diff). Retire at a boundary."
 }

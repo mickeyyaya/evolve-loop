@@ -1,0 +1,20 @@
+{
+  "id": "tokenopt-handoff-digests-per-edge-remainder",
+  "kind": "feature",
+  "title": "Complete per-edge handoff digest routing for every remaining phase prompt",
+  "created_at": "2026-09-12T23:00:00Z",
+  "weight": 0.87,
+  "summary": "Finish the original handoff-digest objective after cycle 1632 landed only the typed cap and one TDD prompt consumer.",
+  "acceptance": [
+    "Artifact flow per edge — every remaining ComposePrompt phase edge — is explicit config.",
+    "Each remaining phase prompt consumes its configured bounded digest instead-of reading full prior artifacts or adding a second context block."
+  ],
+  "connects_to": [
+    "tokenopt-handoff-digests"
+  ],
+  "files": [
+    "go/internal/core/",
+    "go/internal/phases/runner/",
+    "go/internal/phases/"
+  ]
+}

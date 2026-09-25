@@ -5,7 +5,9 @@ package ship
 import (
 	"context"
 	"errors"
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
@@ -59,6 +61,29 @@ func TestVerifyNoControlPlaneEdits_AllowsNormalSource(t *testing.T) {
 	}
 	if !containsLog(res, "no control-plane") {
 		t.Errorf("expected an OK log line, got %v", res.Logs)
+	}
+}
+
+// TestVerifyNoControlPlaneEdits_RejectsARenameOutOfTheSurface (architecture
+// review F37 M1): a staged `git mv` of a protected file to an unprotected name
+// is judged by its OLD path — with rename detection on, `git diff --name-only`
+// printed only the new one and the tripwire passed.
+func TestVerifyNoControlPlaneEdits_RejectsARenameOutOfTheSurface(t *testing.T) {
+	repo := makeRepo(t)
+	gate := filepath.Join(repo, "go/acs/regression/flagreaders/readers_test.go")
+	mustWrite(t, gate, "package flagreaders\n"+strings.Repeat("// a pinned assertion\n", 20))
+	runGit(t, repo, "add", "-A")
+	runGit(t, repo, "-c", "commit.gpgsign=false", "commit", "-q", "-m", "add gate")
+	if err := os.MkdirAll(filepath.Join(repo, "go/acs/cycle9"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	runGit(t, repo, "mv", "go/acs/regression/flagreaders/readers_test.go", "go/acs/cycle9/readers_test.go")
+	opts := &Options{ProjectRoot: repo, Class: ClassCycle, Runner: execRunner}
+	var res RunResult
+	err := verifyNoControlPlaneEdits(context.Background(), opts, &res)
+	var se *core.ShipError
+	if !errors.As(err, &se) || se.Code != core.CodeControlPlaneViolation || !strings.Contains(err.Error(), "go/acs/regression/flagreaders/readers_test.go") {
+		t.Fatalf("a rename out of the protected surface must be refused by its old path, got %v", err)
 	}
 }
 

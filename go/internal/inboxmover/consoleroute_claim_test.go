@@ -52,10 +52,12 @@ func TestClaim_RefusesProtectedFixSurfaceItem(t *testing.T) {
 	}
 }
 
-// route:"lane" override claims normally even with a protected file declared.
+// route:"lane" override claims normally over a declared directory scope that
+// holds protected files (a declared protected FILE binds — F35, pinned in
+// lifecycle's claim test).
 func TestClaim_LaneOverrideClaims(t *testing.T) {
 	root := t.TempDir()
-	writeClaimItem(t, root, "z.json", `{"id":"task-z","route":"lane","files":["go/internal/guards/role.go"]}`)
+	writeClaimItem(t, root, "z.json", `{"id":"task-z","route":"lane","files":["go/internal/guards/"]}`)
 	opts := Options{ProjectRoot: root, Stderr: io.Discard,
 		IsProtectedPath: func(p string) bool { return true }}
 	res, err := Claim(opts, "task-z", "7")

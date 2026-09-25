@@ -21,5 +21,12 @@
       "text": "PRESCRIPTION: Derive build-report.md's ## Changes from git diff --cached --name-status rather than authored prose, so the table cannot diverge from the commit"
     }
   ],
-  "created_at": "2026-08-27T21:00:00Z"
+  "created_at": "2026-08-27T21:00:00Z",
+  "files": [
+    "agents/evolve-builder.md",
+    "agents/evolve-builder-reference.md",
+    "go/internal/phasecontract/contract.go",
+    "go/internal/changedpkgs/changedfiles.go"
+  ],
+  "surface_note": "2026-09-26 console curation (F29 follow-up): files[] typed from a read-only classification against guards.ProtectedSurfaceManifest — protected=true (/agents/evolve-builder.md, /agents/evolve-builder-reference.md), confidence=medium. POSTHOC exists only in the builder and auditor personas (no Go code substitutes the results), so deriving Changes from the staged diff means editing the protected builder persona and adding a step at the protected build-to-audit handoff in core."
 }

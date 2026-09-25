@@ -73,6 +73,21 @@ var recoveryChain = []recoveryHandler{
 		},
 	},
 	{
+		// F37: a cycle diff touching the protected control plane (ADR-0064,
+		// ship's verifyNoControlPlaneEdits) is the BUILD's to reshape. A
+		// re-audit re-verifies the same diff — the cycle-230 audit↔ship loop —
+		// and the debugger cannot change what a cycle may write; the build
+		// handoff floor names the path on re-entry. Ordered BEFORE
+		// precondition-reaudit (it carries the precondition class).
+		name: "control-plane-rebuild",
+		match: func(b Blocker) (string, bool) {
+			if b.Code == "CONTROL_PLANE_VIOLATION" {
+				return "build", true
+			}
+			return "", false
+		},
+	},
+	{
 		// Ship-local precondition (repair ladder already declined) → debugger.
 		// Ordered AFTER integrity-block (integrity always wins) and BEFORE
 		// precondition-reaudit (these codes must never loop back to audit).
