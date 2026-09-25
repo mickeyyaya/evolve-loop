@@ -304,8 +304,11 @@ func SealCycle(ctx context.Context, ledger ledgerAppender, opts SealOptions) (Se
 	// final authority on lastCycleNumber / currentBatch / lastUpdated. A missing
 	// state.json is soft-skipped (preflight owns creating it; the seal's own
 	// write below creates it fresh).
+	// The lock sits on the RESOLVED path: a worktree's state.json is a link to
+	// canonical, and a sidecar beside the link is one no canonical-path writer
+	// ever contends on (cross-tree lost update).
 	statePath := filepath.Join(opts.EvolveDir, "state.json")
-	if err := flock.WithPathLock(statePath, func() error {
+	if err := flock.WithPathLock(statemap.ResolveWriteTarget(statePath), func() error {
 		if _, recErr := failurelog.Record(statePath, "", failurelog.RecordRequest{
 			Cycle:          cycleID,
 			Classification: string(failurelog.OperatorReset),

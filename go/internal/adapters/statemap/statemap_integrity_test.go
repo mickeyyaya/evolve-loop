@@ -215,3 +215,53 @@ func TestUpdateStateMap_CrossTreeWritersSerializeOnCanonical(t *testing.T) {
 		t.Fatalf("statemapRevision=%v, want %d", got[statemapRevisionKey], n)
 	}
 }
+
+// TestResolveWriteTarget pins the exported chain walk every linked-state
+// writer locks and renames on (cycle 1690): it returns the FINAL target of
+// absolute, relative and multi-hop chains, returns a dangling tail and a
+// missing path as-is (never errors), and stays bounded on a link loop.
+func TestResolveWriteTarget(t *testing.T) {
+	root := t.TempDir()
+	canonical := filepath.Join(root, "canon", "state.json")
+	writeJSON(t, canonical, map[string]any{"k": "v"})
+	link := func(target, at string) string {
+		t.Helper()
+		if err := os.MkdirAll(filepath.Dir(at), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(target, at); err != nil {
+			t.Fatal(err)
+		}
+		return at
+	}
+	relative := filepath.Join("..", "canon", "state.json")
+	mid := link(relative, filepath.Join(root, "mid", "state.json"))
+	loopA := filepath.Join(root, "loop", "a")
+	link(loopA, filepath.Join(root, "loop", "b"))
+	link(filepath.Join(root, "loop", "b"), loopA)
+
+	cases := []struct {
+		name, path, want string
+	}{
+		{"regular-file", canonical, canonical},
+		{"missing-path", filepath.Join(root, "nope.json"), filepath.Join(root, "nope.json")},
+		{"absolute-link", link(canonical, filepath.Join(root, "abs", "state.json")), canonical},
+		{"relative-link", link(relative, filepath.Join(root, "rel", "state.json")), canonical},
+		{"two-hop-chain", link(mid, filepath.Join(root, "wt", "state.json")), canonical},
+		{"dangling-tail", link(filepath.Join(root, "canon", "absent.json"), filepath.Join(root, "dang", "state.json")), filepath.Join(root, "canon", "absent.json")},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := ResolveWriteTarget(tc.path); filepath.Clean(got) != tc.want {
+				t.Errorf("ResolveWriteTarget(%s) = %s, want %s", tc.path, got, tc.want)
+			}
+		})
+	}
+
+	t.Run("loop-is-bounded", func(t *testing.T) {
+		got := ResolveWriteTarget(loopA)
+		if got != loopA && got != filepath.Join(root, "loop", "b") {
+			t.Errorf("ResolveWriteTarget(loop) = %s, want one of the loop's own hops", got)
+		}
+	})
+}

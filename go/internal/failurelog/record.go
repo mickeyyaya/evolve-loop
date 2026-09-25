@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/statemap"
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 )
 
@@ -229,9 +230,12 @@ func mustMarshalToAny(v any) map[string]any {
 // atomicWriteJSON serializes state and writes it atomically (mv-of-tmp,
 // POSIX rename is atomic on the same filesystem; no partial file on
 // failure). Delegates to the shared internal/atomicwrite implementation.
+// The rename lands on statemap.ResolveWriteTarget(path): renaming over a
+// worktree's state.json link would replace the link with a regular file and
+// strand every later write in a detached copy (cycle-999).
 //
 // Exposed via this seam so tests can drive the write-error branch
 // without contriving filesystem permissions.
 var atomicWriteJSON = func(path string, state map[string]any) error {
-	return atomicwrite.JSON(path, state)
+	return atomicwrite.JSON(statemap.ResolveWriteTarget(path), state)
 }

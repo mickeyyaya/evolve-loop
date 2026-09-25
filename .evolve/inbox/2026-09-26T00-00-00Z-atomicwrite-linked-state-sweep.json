@@ -1,0 +1,25 @@
+{
+  "id": "atomicwrite-linked-state-sweep",
+  "title": "Sweep atomicwrite users that tmp+rename linkable .evolve/ state files without resolving the worktree symlink (cycle-999 sever class)",
+  "weight": 0.8,
+  "kind": "bug",
+  "class": "shared-state-integrity",
+  "created": "2026-09-26T00:00:00Z",
+  "parent": "statejson-latent-unresolved-writers",
+  "injected_by": "cycle-1690-build",
+  "files": [
+    "go/internal/atomicwrite/",
+    "go/internal/adapters/statemap/"
+  ],
+  "evidence": [
+    "Follow-up of statejson-latent-unresolved-writers how_to_apply step (3). Cycle 1690 delivered steps (1) and (2): statemap.ResolveWriteTarget is exported, core.SealCycle locks the resolved <canonical>.lock, and failurelog's atomicWriteJSON seam renames onto the resolved target.",
+    "Step (3) was deferred in scout prose only (triage-decision.json deferred: []), and a PASS landing consumes the whole lane item through ship/postship.go committedInboxIDs. This record carries step (3) forward so it does not vanish with the parent (cycle-1690 audit M1).",
+    "Cycle-1690 Discovery Scan: other atomicwrite callers write .evolve/ state-adjacent files. Any of them reached with a worktree-linked path would replace the link with a regular file, the cycle-999 sever."
+  ],
+  "how_to_apply": "(1) Enumerate every atomicwrite caller whose target can be a worktree-linked .evolve/ file (state.json and its siblings the worktree provisioner symlinks). (2) For each one, route the write through statemap.ResolveWriteTarget, or add an opt-in resolve-symlinks mode to atomicwrite and use it at those sites. (3) Pin each migrated writer with a symlink regression test that mirrors statemap_integrity_test.go.",
+  "acceptance": [
+    "A written inventory lists every atomicwrite caller in go/ whose target path can be a worktree-linked .evolve/ state file, and marks each one migrated or not-linkable with a reason.",
+    "Every caller marked linkable writes through the resolved target (statemap.ResolveWriteTarget or an atomicwrite resolve mode): after the write the symlink is still a symlink and the canonical file holds the new bytes.",
+    "Each migrated writer has a regression test that fails on the pre-fix code, covering an absolute link, a relative link and a dangling link."
+  ]
+}

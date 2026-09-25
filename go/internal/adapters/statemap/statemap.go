@@ -57,13 +57,17 @@ func ReadStateMap(path string) (map[string]any, error) {
 	return m, nil
 }
 
-// resolveWriteTarget follows a symlink chain (bounded, dangling-tolerant) to
+// ResolveWriteTarget follows a symlink chain (bounded, dangling-tolerant) to
 // the FINAL write target. Rename-over-a-symlink replaces the LINK with a
 // regular file — exactly how worktree .evolve/state.json links to canonical
 // were severed and mutations stranded in detached copies (cycle-999/1000).
 // Writing through to the resolved target keeps the link intact and every
-// mutation visible on the canonical file.
-func resolveWriteTarget(path string) string {
+// mutation visible on the canonical file. Every writer of a possibly-linked
+// state file must also LOCK the resolved path, so its "<target>.lock" sidecar
+// is the one canonical-path writers contend on. A regular file, a missing
+// path, or a dangling tail returns as-is; a chain deeper than 8 hops returns
+// the hop reached.
+func ResolveWriteTarget(path string) string {
 	const maxDepth = 8
 	cur := path
 	for i := 0; i < maxDepth; i++ {
@@ -116,7 +120,7 @@ func todosLen(m map[string]any) int {
 // flock.PathLock; standalone callers use UpdateStateMap.
 //
 // Two integrity floors (cycle-1001 lost-write / cycle-999 stranded-write):
-//   - symlink write-through: the rename lands on resolveWriteTarget(path), so
+//   - symlink write-through: the rename lands on ResolveWriteTarget(path), so
 //     a worktree's state.json link to canonical survives and the bytes reach
 //     the live file;
 //   - stateRevision CAS: when both the incoming map and the on-disk target
@@ -128,7 +132,7 @@ func todosLen(m map[string]any) int {
 // carryoverTodos by more than half from >20 entries — the cycle-1001
 // signature — so a legal-but-suspicious mass drop is loud in the log.
 func WriteStateMap(path string, m map[string]any) error {
-	path = resolveWriteTarget(path)
+	path = ResolveWriteTarget(path)
 	if onDisk, err := ReadStateMap(path); err == nil {
 		// CAS floor on BOTH lineage counters: stateRevision is
 		// storage.UpdateState's EXCLUSIVE OCC audit trail (cyclestate CA.3 —
@@ -213,7 +217,7 @@ var writeHooks = struct {
 // and must NOT call UpdateStateMap on the same path (the blocking flock would
 // deadlock). A malformed file aborts before the write, leaving it untouched.
 func UpdateStateMap(path string, mutate func(map[string]any)) error {
-	path = resolveWriteTarget(path)
+	path = ResolveWriteTarget(path)
 	return flock.WithPathLock(path, func() error {
 		m, err := ReadStateMap(path)
 		if err != nil {
