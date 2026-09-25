@@ -94,3 +94,22 @@ func TestDetect_EmptyPane_NotFatal(t *testing.T) {
 		t.Fatal("empty pane must not classify as fatal")
 	}
 }
+
+// TestTerminalCause_SessionRecoverable (F31): a cause means "the REPL process
+// is gone, the CLI and account are fine" — a fresh session of the SAME family
+// can succeed — only for a dead shell and a self-updated CLI. A model/config
+// cause, an unknown one and the zero value are not: a fresh session of the same
+// configuration fails the same way.
+func TestTerminalCause_SessionRecoverable(t *testing.T) {
+	for cause, want := range map[TerminalCause]bool{
+		CauseDeadShell:      true,
+		CauseCLISelfUpdated: true,
+		CauseModelInvalid:   false,
+		CauseUnknown:        false,
+		"":                  false,
+	} {
+		if got := cause.SessionRecoverable(); got != want {
+			t.Errorf("%q.SessionRecoverable() = %v, want %v", cause, got, want)
+		}
+	}
+}

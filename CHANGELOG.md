@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — a dead agent pane gets one fresh session of the same CLI before the fallback chain moves on (F31, 2026-09-26)
+
+F27 made the fatal-pane fast-fail act, so a dead pane leaves the wait in one interval. But the launch still exited 81 into the fallback chain. With codex quota-walled and ollama unable to write source, cycle 1687's triage had nowhere to go and aborted. A dead shell means the REPL process died, not the CLI or the account.
+
+- `recovery.TerminalCause.SessionRecoverable` names the causes a fresh session can fix: `dead_shell` and `cli_self_updated`. A model/config cause fails the same way in a new session.
+- The fast-fail verdict carries its typed cause (`ReviewVerdict.Cause`). The wait loop reports it through a call-local hook, and `Engine.Launch` records the dead dispatch (its ledger row marked `fresh_session_retry`; the pair shares `Attempt`), emits `BRIDGE_FRESH_SESSION_RETRY` and runs ONE fresh session of the same CLI. It never retries a named session (kept alive for resume, so a re-run would reattach to the dead pane outside the sandbox), a run that delivered, a canceled launch or one whose deadline has no room for another wait interval, and a second death returns exit 81 to the chain. Worst case for one chain attempt: the fast-fail plus one full wait budget.
+- Pinned end to end through the real `Engine.Launch`: a first tmux session that dies to a bare shell and a second that completes return OK. ADR-0044 amendment; inbox item `dead-shell-same-family-fresh-session` consumed.
+
 ## Fixed — the build handoff floor refuses a protected control-plane edit, and a ship refusal for one goes back to build (F37, 2026-09-26)
 
 Cycle 1689's builder rewrote the protected `go/internal/core/cyclerun.go` through a shell tool, which the Edit/Write role guard never sees. The build floor approved the diff, and only ship's integrity check (ADR-0064 P2) would have refused it, after a full audit. That refusal would then have recovered into a re-audit of the same diff until the budget aborted the cycle. The operator stopped the lane first.
