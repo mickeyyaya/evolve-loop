@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## Changed — the fatal-pane fast-fail has its own dial and acts by default (F27, 2026-09-26)
+
+Wave 6 lane 1687's claude-tmux triage pane went dead (`: command not found`) and idled 900 s: the ADR-0044 C2 detector classified it (`dead_shell`, recorded `would_fast_fail` twice) but could only observe, because its one rollout dial, `recovery.phase_recovery`, also arms the live channel, the ask-broker and the failure adviser and so stays at shadow. The fast-fail now rides its OWN policy dial, `recovery.fatal_pane`, default **enforce**. It was split out exactly as `recovery.spine_floor` was (R8.5), so `phase_recovery` stays shadow and nothing else is armed. Flip evidence: every shadow match on record (cycles 1595 build / codex-tmux and 1687 triage / claude-tmux) was a dead pane that then idled 1200 s / 900 s. `"shadow"` in `.evolve/policy.json` is the no-recompile escape hatch.
+
+The dial reaches the bridge through one pinned path: `wireBridgeStages` (the root's one forwarding of the bridge dials, `cmd/evolve/cmd_cycle_config.go`) → `Adapter.SetFatalPaneStage` → `productionEngineDeps` → `Deps.FatalPaneStage` → `fatalPaneStageOf`. Both recovery dials now live in `productionEngineDeps`, the builder both `Launch` branches share. That closes a branch-local `RecoveryStage` assignment the engine-factory path skipped. `NewDefault` and the `evolve subagent run` root (which set neither dial before) seed both from policy through one accessor, `policy.Policy.BridgeRecoveryStages`, using the Loader's own parser. ADR-0044 carries the amendment; `docs/operations/runtime-reference.md` has the dial row.
+
 ## Fixed — a pipeline-repair inbox item routes to the console at plan time, before a lane claims it (2026-09-15)
 
 Wave 6, lane 1688 claimed a `pipeline-repair` item that carried no files list; scout and triage ran before the triage breaker refused its card for naming a protected surface, and the cycle sealed FAIL. The ADR-0074 routing classifier now reads the item's kind: a `pipeline-*` kind is console-owned work (the ADR-0072 halt autofiles the same kind for the operator), so the wave seed skips it, the claim refuses it, and `evolve inbox` lists it under console with its reason — under the same override clamp as the files-derived rule. Fifteen queued items move out of lane reach without burning a cycle each (research F25).

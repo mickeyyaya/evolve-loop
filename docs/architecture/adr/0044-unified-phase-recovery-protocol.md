@@ -188,6 +188,56 @@ C4, and finally the C3 chain refactor that composes them.
   `WithFailureAdviser` yet — flipping enforce + wiring `NewFailureAdvisor` at cmd-level is the
   post-soak step, deliberately separate from this slice.
 
+### Amendment — F27 (2026-09-26): the C2 fatal-pane fast-fail gets its OWN dial
+
+**Problem.** The one-dial discipline above left C2 unable to act on its own soak evidence:
+`recovery.phase_recovery` also arms the live channel (`channel.Enabled`, ADR-0045 I6), the ask-broker and
+the failure-adviser promotion, so flipping it to let the fast-fail act would have armed three unsoaked
+subsystems. The fast-fail therefore stayed at shadow while dead panes burned the backstop.
+
+**Evidence (the soak).** Every `fatal_pane_shadow` record in the live ledger — 3 records, 2 cycles, both
+CLI families, trigger `dead_shell` (`: command not found`) — was a dead pane: cycle 1595 build (codex-tmux)
+then idled 1200 s to `stop-review → pause: no output`; cycle 1687 triage (claude-tmux) recorded
+`would_fast_fail` twice, idled 900 s, then exhausted its fallback chain. No record sits on a phase that later
+completed on the same pane.
+
+**Decision.** Split the dial exactly as R8.5 split `SpineFloor`: `recovery.fatal_pane` (policy-only, no env
+var) gates ONE behavior — whether a persisted, non-Busy fatal-pane match at the stop-review checkpoint
+preempts the reviewer. Default **enforce**; `"shadow"` is the no-recompile escape hatch; `"off"` skips the
+detector. `recovery.phase_recovery` stays **shadow** and keeps the channel, ask-broker, transient-dwell,
+the failure adviser and the observer's stall policy.
+
+**Wiring (one path, pinned).** `policy.RecoveryConfig().FatalPane` → `config.PolicyStages.FatalPane` →
+`Loader.ApplyPolicyStages` (`recovery.fatal_pane`, typo → off + `CONFIG_UNKNOWN_VALUE`) →
+`config.RolloutStages.FatalPane` → `wireBridgeStages` (the root's ONE forwarding of the bridge dials,
+`cmd_cycle_config.go`) → `Adapter.SetFatalPaneStage` → `productionEngineDeps` (the builder BOTH `Launch`
+branches share — `RecoveryStage` moved there too, closing a branch-local assignment that could drift) →
+`Deps.FatalPaneStage` → `fatalPaneStageOf` (the same `channel.ResolveStage` normalizer: unset → shadow,
+typo → off, and `"0"` — `config.StageOff.String()` — accepted explicitly as off) → the wait state's
+detector seeding and the checkpoint's persistence gate. The production roots that build engine `Deps`
+without the cycle root's setters — `adapters/bridge.NewDefault` (the per-phase registry factories,
+`cmd_campaign.go`) and the `evolve subagent run` root (`internal/subagent.execAdapterDeps`, which before
+this amendment set neither dial) — seed both from `policy.json` through ONE accessor,
+`policy.Policy.BridgeRecoveryStages`, which parses each word with `config.GateStage` (the Loader's own
+trichotomy — no root-specific case-folding), so every root turns the same policy word into the same stage;
+the cycle root overrides with the Loader-validated values (`wireBridgeStages`, pinned as called by
+`cmd_cycle.go`).
+
+**Routing is unchanged, only timing.** A fatal preemption (`ReviewStop`) and the reviewer's old
+`ReviewPause` close out identically — escalation report, `ExitArtifactTimeout` (81) — so the fast-failed
+phase enters the fallback chain at the same rung as before, 900–1200 s sooner. Whether that rung can
+SAVE a `dead_shell` phase (a fresh session of the same CLI family) is a separate, cause-keyed follow-up —
+with codex quota-walled, the chain's later rungs could not in cycle 1687.
+
+**Tests.** `TestRunTmuxREPL_FatalPaneDialIsIndependentOfPhaseRecovery` (the two dials crossed both ways;
+red against the mutant that re-points the wait state at the program dial), `TestFatalPaneStageOf`,
+`TestWireBridgeStages_ForwardsEachDialOnItsOwnSetter` + `TestWireBridgeStages_IsTheRootsOnlyStageForwarding`,
+`TestProductionEngineDeps_CarriesBothRecoveryDials`, `TestNewDefault_SeedsRecoveryDialsFromPolicy`,
+`TestSetFatalPaneStage_WiresField`, `TestExecAdapterDeps_CarriesThePolicyRecoveryDials` (the subagent root),
+`TestBridgeRecoveryStages_ParsesThroughTheLoaderTrichotomy` (one parser), `TestLoad_FatalPaneStage` (no env
+vocabulary), the policy/config resolution tables, the defaults goldens and
+`TestDefaults_GateDialsMatchPolicyCompiledDefaults`.
+
 ## Consequences
 
 - **Positive:** a successful recovery is *structurally* recorded (D1 can't recur); self-describing fatal states

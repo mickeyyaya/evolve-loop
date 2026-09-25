@@ -21,7 +21,7 @@ type replWaitState struct {
 	livenessCenter  *panestream.LivenessCenter
 	paneProfile     panestream.PaneProfile
 	livenessProfile panestream.PaneProfile
-	recoveryStage   string
+	fatalPaneStage  string
 	fatalDetector   *recovery.FatalPaneDetector
 	detector        completionDetector
 
@@ -100,9 +100,9 @@ func newReplWaitState(w replWaiter) *replWaitState {
 	// gate. It must not override the liveness evidence given to the reviewer.
 	livenessProfile.ExhaustedRegex = ""
 
-	recoveryStage := recoveryStageFromEnv(w.deps)
+	fatalPaneStage := fatalPaneStageOf(w.deps)
 	var fatalDetector *recovery.FatalPaneDetector
-	if recoveryStage != "off" {
+	if fatalPaneStage != "off" {
 		fatalDetector = recovery.SeedDetectorWithPromotions(
 			filepath.Join(w.cfg.ProjectRoot, ".evolve", "instincts", "fatal-signatures"))
 	}
@@ -114,7 +114,7 @@ func newReplWaitState(w replWaiter) *replWaitState {
 		livenessCenter:  livenessCenter,
 		paneProfile:     paneProfile,
 		livenessProfile: livenessProfile,
-		recoveryStage:   recoveryStage,
+		fatalPaneStage:  fatalPaneStage,
 		fatalDetector:   fatalDetector,
 		detector:        newCompletionDetector(w.cfg.Completion, w.cfg, w.deps, w.launch, w.artifactBase),
 		// The fast-poll and checkpoint paths run at different cadences. This

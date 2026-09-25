@@ -11,6 +11,7 @@
   "SandboxMode": "auto",
   "PhaseRecovery": 1,
   "SpineFloor": 3,
+  "FatalPane": 3,
   "PhaseIO": 3,
   "RouterReplan": 1,
   "MergeGate": 1,

@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"strings"
 	"testing"
@@ -145,14 +146,14 @@ func TestCmdCycle_NoHandWrittenConfigWarnLineAndLaddersLiveInTheSeam(t *testing.
 func TestPolicyStagesOf_ProjectsThePolicyAccessors(t *testing.T) {
 	pol := policy.Policy{
 		Gates:            &policy.GatesPolicy{ContractGate: "shadow", EvalGate: "off", TriageCapGate: "shadow", ReviewGate: "enforce", TopNGate: "off"},
-		Recovery:         &policy.RecoveryPolicy{PhaseRecovery: "enforce", SpineFloor: "shadow"},
+		Recovery:         &policy.RecoveryPolicy{PhaseRecovery: "enforce", SpineFloor: "shadow", FatalPane: "shadow"},
 		Router:           &policy.RouterPolicy{RouterReplan: "advisory", RoutingJudge: true, ReconDigest: true, ReplanDepth: 4},
 		ParallelEvaluate: &policy.ParallelEvaluatePolicy{Stage: "shadow", Concurrency: 7},
 	}
 	got := policyStagesOf(pol.GatesConfig(), pol.RecoveryConfig(), pol.RouterConfig(), pol.ParallelEvaluateConfig())
 	want := config.PolicyStages{
 		ContractGate: "shadow", EvalGate: "off", TriageCapGate: "shadow", TopNGate: "off", ReviewGate: "enforce",
-		PhaseRecovery: "enforce", SpineFloor: "shadow", RouterReplan: "advisory", ParallelEvaluate: "shadow",
+		PhaseRecovery: "enforce", SpineFloor: "shadow", FatalPane: "shadow", RouterReplan: "advisory", ParallelEvaluate: "shadow",
 		ParallelEvaluateConcurrency: 7, RoutingJudge: true, ReconDigest: true, RePlanMaxDepth: 4,
 	}
 	if got != want {
@@ -241,5 +242,51 @@ func TestSolutionCmd_MalformedRegistryPrintsTheRegistryWarning(t *testing.T) {
 	code := dispatch([]string{"solution", "check", "some-slug", "--project-root", root}, nil, &out, &errb)
 	if code != 2 || !strings.Contains(errb.String(), "evolve solution: registry warning [registry-malformed]: phase registry malformed") || !strings.Contains(errb.String(), "declares no config.deliverable_kinds.document") {
 		t.Fatalf("exit %d, stderr:\n%s", code, errb.String())
+	}
+}
+
+// fakeBridgeStageSink records what the root forwards into the bridge adapter.
+type fakeBridgeStageSink struct {
+	phaseIO             config.Stage
+	recovery, fatalPane string
+}
+
+func (f *fakeBridgeStageSink) SetPhaseIOStage(s config.Stage) { f.phaseIO = s }
+func (f *fakeBridgeStageSink) SetRecoveryStage(s string)      { f.recovery = s }
+func (f *fakeBridgeStageSink) SetFatalPaneStage(s string)     { f.fatalPane = s }
+
+// TestWireBridgeStages_ForwardsEachDialOnItsOwnSetter (F27 wiring proof): the
+// root forwards the RESOLVED rollout dials into the bridge adapter, the
+// fatal-pane dial on its OWN setter — crossed values prove no dial borrows
+// another's (the fatal-pane stage never rides PhaseRecovery's).
+func TestWireBridgeStages_ForwardsEachDialOnItsOwnSetter(t *testing.T) {
+	var cfg config.RoutingConfig
+	cfg.PhaseIO, cfg.PhaseRecovery, cfg.FatalPane = config.StageAdvisory, config.StageShadow, config.StageEnforce
+	var sink fakeBridgeStageSink
+	wireBridgeStages(&sink, cfg)
+	if sink.phaseIO != config.StageAdvisory || sink.recovery != "shadow" || sink.fatalPane != "enforce" {
+		t.Fatalf("wireBridgeStages forwarded phaseIO=%v recovery=%q fatalPane=%q, want advisory/shadow/enforce",
+			sink.phaseIO, sink.recovery, sink.fatalPane)
+	}
+}
+
+// TestWireBridgeStages_IsTheRootsOnlyStageForwarding pins the seam: the bridge
+// stage setters are called from cmd_cycle_config.go alone, so no root can
+// forward one rollout dial and forget its twin (the F27 defect class: a dial
+// resolved by the Loader that never reaches its consumer).
+func TestWireBridgeStages_IsTheRootsOnlyStageForwarding(t *testing.T) {
+	for _, re := range []string{`\.SetPhaseIOStage\(`, `\.SetRecoveryStage\(`, `\.SetFatalPaneStage\(`} {
+		hits := nonTestSourcesMatching(t, regexp.MustCompile(re))
+		if len(hits) != 1 || hits[0] != "cmd/evolve/cmd_cycle_config.go" {
+			t.Errorf("%s belongs to cmd/evolve/cmd_cycle_config.go alone, found in %v", re, hits)
+		}
+	}
+	// ...and the cycle root actually calls the forwarder: dropping the call
+	// would be masked by NewDefault's policy seeding (same default words) while
+	// silently losing the Loader's validation and CONFIG_UNKNOWN_VALUE warning.
+	hits := nonTestSourcesMatching(t, regexp.MustCompile(`\bwireBridgeStages\(`))
+	want := []string{"cmd/evolve/cmd_cycle.go", "cmd/evolve/cmd_cycle_config.go"}
+	if !reflect.DeepEqual(hits, want) {
+		t.Errorf("wireBridgeStages( must be defined in cmd_cycle_config.go and called by cmd_cycle.go, found in %v", hits)
 	}
 }

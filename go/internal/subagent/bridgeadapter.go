@@ -9,6 +9,7 @@ import (
 
 	gobridge "github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/subagent/subagentrun"
 	"github.com/mickeyyaya/evolve-loop/go/internal/tokenusage"
@@ -49,17 +50,35 @@ func driverExists(cli string) bool {
 // internal/adapters/bridge's productionEngineDeps (env["HOME"] falling back
 // to os.Getenv("HOME"), joined with ".claude"). The two production
 // composition roots (adapters/bridge, this package) share the single
-// tokenusage.DefaultResolver helper, each resolving configRoot identically.
+// tokenusage.DefaultResolver helper, each resolving configRoot identically —
+// and, since F27, the single policy.BridgeRecoveryStages accessor for the two
+// ADR-0044 recovery dials, so a dead pane fast-fails on this root exactly as
+// on the cycle root (it built Deps with neither dial, pinning both to shadow).
 func execAdapterDeps(env map[string]string) gobridge.Deps {
 	home := env["HOME"]
 	if home == "" {
 		home = os.Getenv("HOME")
 	}
 	configRoot := filepath.Join(home, ".claude")
+	recoveryStage, fatalPaneStage := projectPolicy(env).BridgeRecoveryStages()
 	return gobridge.Deps{
-		Env:           env,
-		TokenResolver: tokenusage.DefaultResolver(configRoot),
+		Env:            env,
+		TokenResolver:  tokenusage.DefaultResolver(configRoot),
+		RecoveryStage:  recoveryStage,
+		FatalPaneStage: fatalPaneStage,
 	}
+}
+
+// projectPolicy loads the dispatched project's policy.json, fail-open like
+// adapters/bridge.NewDefault: no EVOLVE_PROJECT_ROOT or an unreadable file
+// yields the zero Policy, whose accessors resolve the compiled defaults.
+func projectPolicy(env map[string]string) policy.Policy {
+	root := env["EVOLVE_PROJECT_ROOT"]
+	if root == "" {
+		return policy.Policy{}
+	}
+	pol, _ := policy.Load(filepath.Join(root, ".evolve", "policy.json"))
+	return pol
 }
 
 // execAdapterDepsWith is execAdapterDeps carrying the root's Signal Center —

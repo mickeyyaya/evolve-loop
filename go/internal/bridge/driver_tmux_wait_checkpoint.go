@@ -78,7 +78,7 @@ func (w replWaiter) reviewCheckpoint(state *replWaitState, elapsed int, curPane 
 	verdict, preempted := state.checkpointFatal.verdict(
 		state.fatalDetector,
 		state.lastEvent,
-		state.recoveryStage,
+		state.fatalPaneStage,
 		w.recorder,
 		w.deps.Stderr,
 		w.prefix,
