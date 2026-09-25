@@ -1,0 +1,202 @@
+{
+  "schema_version": 2,
+  "cycle": 1693,
+  "run_id": "01M3DCTBBMADJSB3PTAS5MPD93",
+  "goal": "Pipeline-health verification, wave 8 (2026-09-26, on main b9553b9b): work the highest-weight lane-eligible inbox items end-to-end — claim, tdd, build, audit, ship — with full phase integrity on the fixed plane: everything waves 3–7 verified (#606, #609, #611, #612, #614–#617, #619–#628) plus the seed refusing a declared protected file whatever an operator route says, reading a cited path:line as its path, and the wave plan pruning console-routed ids before it widens (#629, F34/F35); and the build handoff floor refusing any change to a protected control-plane path so the builder restores it in-phase, with a ship refusal for one returning to build instead of a re-audit (#631, F37). Every cycle must commit to a claimed inbox item (an empty top_n must not run the spine), bind its audit to the changes tree it ships, disposition the cycle's OWN defect ledger as well as inherited ids, record a terminal outcome on every exit, never modify a protected control-plane file by any tool, and leave no stale worktree behind. Pipeline-integrity items and items whose fix surface is protected are console-owned and are not lane work; ADR-0099 document deliverables are eligible. The measure of this wave is consecutive shipped cycles; the target is six.",
+  "final_verdict": "PASS",
+  "commit_sha": "3ce14dd0007dc8957a824a47d878f27a7f9e6649",
+  "tree_sha": "7d9a639e490768b699d92e4e46a9260b411d180c",
+  "tasks": [
+    "iteration-state-coherence-sentinel"
+  ],
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 110414,
+      "started_at": "2026-09-25T23:01:54Z",
+      "ended_at": "2026-09-25T23:03:45Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 14,
+        "output": 8101,
+        "cache_read": 441534,
+        "cache_write": 83506
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 46822,
+      "started_at": "2026-09-25T23:04:12Z",
+      "ended_at": "2026-09-25T23:05:40Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 22,
+        "output": 2816,
+        "cache_read": 789440,
+        "cache_write": 30353
+      }
+    },
+    {
+      "name": "fault-localization",
+      "verdict": "PASS",
+      "duration_ms": 136781,
+      "started_at": "2026-09-25T23:05:40Z",
+      "ended_at": "2026-09-25T23:07:58Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 30,
+        "output": 9644,
+        "cache_read": 805045,
+        "cache_write": 77133
+      }
+    },
+    {
+      "name": "bug-reproduction",
+      "verdict": "PASS",
+      "duration_ms": 297281,
+      "started_at": "2026-09-25T23:07:58Z",
+      "ended_at": "2026-09-25T23:12:58Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 54,
+        "output": 28331,
+        "cache_read": 2894379,
+        "cache_write": 139494
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 808545,
+      "started_at": "2026-09-25T23:12:58Z",
+      "ended_at": "2026-09-25T23:26:27Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 136,
+        "output": 83534,
+        "cache_read": 11138019,
+        "cache_write": 233190
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 727251,
+      "started_at": "2026-09-25T23:26:27Z",
+      "ended_at": "2026-09-25T23:39:56Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 66,
+        "output": 24456,
+        "cache_read": 3497869,
+        "cache_write": 98361
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "PASS",
+      "duration_ms": 376676,
+      "started_at": "2026-09-25T23:40:22Z",
+      "ended_at": "2026-09-25T23:49:13Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 64,
+        "output": 27876,
+        "cache_read": 3253185,
+        "cache_write": 94291
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "PASS",
+      "duration_ms": 94242,
+      "started_at": "2026-09-25T23:49:51Z",
+      "ended_at": "2026-09-25T23:51:26Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "timing": {
+    "total_ms": 2598012,
+    "phase_count": 8,
+    "retried_count": 0,
+    "longest_phase": "tdd",
+    "longest_ms": 808545,
+    "by_archetype_ms": {
+      "build": 727251,
+      "control": 94242,
+      "evaluate": 673957,
+      "plan": 1102562
+    },
+    "total_tokens": {
+      "input": 386,
+      "output": 184758,
+      "cache_read": 22819471,
+      "cache_write": 756328
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 66,
+        "output": 24456,
+        "cache_read": 3497869,
+        "cache_write": 98361
+      },
+      "control": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "evaluate": {
+        "input": 118,
+        "output": 56207,
+        "cache_read": 6147564,
+        "cache_write": 233785
+      },
+      "plan": {
+        "input": 202,
+        "output": 104095,
+        "cache_read": 13174038,
+        "cache_write": 424182
+      }
+    },
+    "wasted_tokens": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "cache_hit_ratio": 0.999983084907149,
+    "hot_phase_count": 7,
+    "hot_phases": [
+      "scout",
+      "triage",
+      "fault-localization",
+      "bug-reproduction",
+      "tdd",
+      "build",
+      "audit"
+    ]
+  }
+}
