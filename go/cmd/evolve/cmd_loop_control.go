@@ -8,12 +8,14 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cycleclassify"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sessionreaper"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sessionrecord"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
@@ -209,6 +211,94 @@ func readBatchWindowFloor(ctx context.Context, st core.Storage) (int, error) {
 // tree has cs.CycleID == 0. Only a genuinely stuck cycle (id > last) trips it.
 func unfinishedCycle(cs core.CycleState, lastCycleNumber int) bool {
 	return cs.CycleID != 0 && cs.CycleID > lastCycleNumber
+}
+
+// reconcileStaleCycleState is the iteration-top coherence sentinel: a canonical
+// record claiming a live phase for a dead cycle the batch already passed is
+// WARNed and reconciled with abnormalEpilogue's state floor (Phase="aborted",
+// ActiveAgent cleared, identity kept). A fleet lane SIGKILLed by cmd_fleet.go's
+// WaitDelay escalation dies before that floor runs, and once its id is <=
+// lastCycleNumber unfinishedCycle (the once-per-batch boot guard) cannot see
+// it. Everything it cannot prove stale is left untouched: the resumable
+// unfinishedCycle shape, a record whose lease owner is live, a completed
+// phase, and any record or lease it could not read (surfaced, never clobbered).
+func reconcileStaleCycleState(ctx context.Context, st core.Storage, projectRoot string, now time.Time, stderr io.Writer) {
+	if st == nil {
+		return
+	}
+	cs, err := st.ReadCycleState(ctx)
+	if err != nil {
+		fmt.Fprintf(stderr, "[loop] WARN: state-coherence: canonical cycle-state unreadable, left untouched: %v\n", err)
+		return
+	}
+	if !claimsLivePhase(cs) {
+		return
+	}
+	last, err := readLastCycleNumber(ctx, st)
+	if err != nil {
+		fmt.Fprintf(stderr, "[loop] WARN: state-coherence: cycle %d phase=%s not checked, state.json unreadable: %v\n", cs.CycleID, cs.Phase, err)
+		return
+	}
+	if unfinishedCycle(cs, last) {
+		return // resumable — owned by `evolve loop --resume` / `evolve cycle reset`
+	}
+	owner, dead, err := cycleOwnerDead(cs, projectRoot, now)
+	if err != nil {
+		fmt.Fprintf(stderr, "[loop] WARN: state-coherence: cycle %d phase=%s not reconciled, owner liveness unknown: %v\n", cs.CycleID, cs.Phase, err)
+		return
+	}
+	if !dead {
+		return
+	}
+	stalePhase := cs.Phase
+	cs.Phase = "aborted"
+	cs.ActiveAgent = ""
+	if err := st.WriteCycleState(ctx, cs); err != nil {
+		fmt.Fprintf(stderr, "[loop] WARN: state-coherence: stale cycle %d phase=%s (%s) — reconcile write failed: %v\n", cs.CycleID, stalePhase, owner, err)
+		return
+	}
+	fmt.Fprintf(stderr, "[loop] WARN: state-coherence: canonical cycle-state claimed live phase=%s for dead cycle %d (%s; last completed cycle %d) — reconciled to phase=aborted\n",
+		stalePhase, cs.CycleID, owner, last)
+}
+
+// claimsLivePhase reports whether the record asserts an in-flight phase: not a
+// fresh tree, not terminal, and not a phase the cycle already completed (both
+// completion paths — phaseCompletionRecord.persist and completeRetro — append
+// the phase to CompletedPhases while leaving Phase on it, so a cleanly
+// finished cycle's record is history, not residue).
+func claimsLivePhase(cs core.CycleState) bool {
+	switch cs.Phase {
+	case "", "aborted", string(core.PhaseEnd):
+		return false
+	}
+	return cs.CycleID != 0 && !slices.Contains(cs.CompletedPhases, cs.Phase)
+}
+
+// cycleOwnerDead reads the cycle's run lease and reports whether its owner is
+// provably gone (no lease, or runlease.OwnerLive false — a SIGKILLed lane has a
+// fresh heartbeat but a dead pid). owner describes the evidence for the WARN.
+// An unreadable lease is an error: liveness unknown means never reconcile.
+func cycleOwnerDead(cs core.CycleState, projectRoot string, now time.Time) (owner string, dead bool, err error) {
+	runDir := cs.WorkspacePath
+	if runDir == "" {
+		runDir = cycleWorkspace(projectRoot, cs.CycleID)
+	} else if !filepath.IsAbs(runDir) {
+		runDir = filepath.Join(projectRoot, runDir)
+	}
+	lease, ok, err := runlease.Read(runDir)
+	if err != nil {
+		return "", false, err
+	}
+	if !ok {
+		return "no run lease", true, nil
+	}
+	if runlease.OwnerLive(lease, now, runlease.DefaultTTL, runlease.PIDAlive) {
+		return "", false, nil
+	}
+	if !runlease.Fresh(lease, now, runlease.DefaultTTL) {
+		return "run lease heartbeat stale", true, nil
+	}
+	return fmt.Sprintf("run lease owner pid %d not running", lease.OwnerPID), true, nil
 }
 
 // cycleWorkspace returns .evolve/runs/cycle-<N>/ for verify/classify.

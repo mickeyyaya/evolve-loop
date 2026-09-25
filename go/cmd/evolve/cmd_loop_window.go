@@ -37,6 +37,10 @@ func (b *loopBatchCoordinator) prepareIteration(
 	if b.ctx.Err() != nil {
 		return b.interruptReturn(iteration, "")
 	}
+	// Every iteration, sequential and fleet: a SIGKILLed lane's live-phase
+	// residue is invisible to the once-per-batch unfinishedCycle guard.
+	// Before the breaker, so even a halted batch leaves a coherent record.
+	reconcileStaleCycleState(b.ctx, b.deps.Storage, b.cfg.ProjectRoot, time.Now(), b.stderr)
 	if exitCode, halted := blockerBreakerHalt(b.cfg.EvolveDir, b.cfg.ProjectRoot, batchStartCycle, b.stderr, b.deps.Signals); halted {
 		b.result.StopReason = "pipeline_blocker_halt"
 		b.result.emitFatal(b.stdout, b.stderr, b.cfg, 0)
