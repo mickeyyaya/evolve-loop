@@ -152,6 +152,37 @@ func TestPlanFn_PriorDecisionIsPrunedThenWidened(t *testing.T) {
 	}
 }
 
+// TestPlanFn_ConsoleRoutedPriorIDsArePrunedBeforeWidening (F34, wave 7,
+// 2026-09-26): the prior cycle's triage committed ids the classifier NOW
+// routes to the console — an operator stamp landed after that triage, or the
+// declared surface is protected. Kept, they filled the fleet width, the widen
+// short-circuited, and the plan-time gate refused them only after the lanes
+// were cut: the wave ran 1 of 2 lanes. Pruned BEFORE the widen (the same
+// ordering the consumed prune keeps), their slots refill from the backlog.
+func TestPlanFn_ConsoleRoutedPriorIDsArePrunedBeforeWidening(t *testing.T) {
+	h := newHarness(t)
+	h.ports.LastCycle = func(context.Context) (int, error) { return 3, nil }
+	e := New(Roots{ProjectRoot: h.root, EvolveDir: h.evolveDir}, h.ports, h.stderr)
+	writeJSON(t, filepath.Join(h.ports.Workspace(3), triagecap.TriageDecisionName()),
+		map[string]any{"top_n": []map[string]any{{"id": "stamped", "files": []string{"s.go"}}, {"id": "guarded", "files": []string{"g.go"}}, {"id": "alpha", "files": []string{"a.go"}}}})
+	writeJSON(t, filepath.Join(h.evolveDir, "inbox", "stamped.json"), map[string]any{"id": "stamped", "route": "console-manual", "files": []string{"pkg/stamped.go"}})
+	writeJSON(t, filepath.Join(h.evolveDir, "inbox", "guarded.json"), map[string]any{"id": "guarded", "files": []string{"pkg/protected/guarded.go"}})
+	lifecycleItem(t, h.evolveDir, inboxmover.StatePending, "alpha")
+	lifecycleItem(t, h.evolveDir, inboxmover.StatePending, "beta")
+	data, _, err := e.PlanFn(2)(context.Background(), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s := string(data); strings.Contains(s, `"stamped"`) || strings.Contains(s, `"guarded"`) || !strings.Contains(s, `"alpha"`) || !strings.Contains(s, `"beta"`) {
+		t.Errorf("both console-routed ids pruned, their slots refilled from the backlog: %s", s)
+	}
+	for _, id := range []string{"stamped", "guarded"} {
+		if !strings.Contains(h.stderr.String(), `pruned console-routed top_n id "`+id+`"`) {
+			t.Errorf("the %s prune is loud: %q", id, h.stderr.String())
+		}
+	}
+}
+
 func TestPlanFn_AbsentDecisionSeedsFromInbox(t *testing.T) {
 	h := newHarness(t)
 	h.ports.LastCycle = func(context.Context) (int, error) { return 5, nil } // no workspace on disk

@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — no route override or line locator lets a declared protected file reach a lane, and the wave plan drops console-routed ids before it widens (F34, F35, 2026-09-26)
+
+Wave 7 dispatched one lane of two. The plan's prior decision still carried an id the operator had since routed to the console. It filled the fleet width, so the widen had nothing to refill, and the plan-time gate refused it only after the lanes were cut. A census of the live queue then found two dispatchable items that declared protected FILES under an operator `route:"lane"`. Triage's breaker and the ship tripwire both judge membership of each file and ignore the route, so each item was a guaranteed triage FAIL.
+
+- `inboxbatch.ConsoleRouted`: a declared protected FILE binds. `route:"lane"` still relaxes the heuristic derivations (the pipeline-* kind, a declared directory that merely holds protected files, a file the text names), never a manifest file. The reason says why. Run `evolve inbox`: any "route:lane cannot relax" line is an item to re-author (declare the files it changes). Residual, filed as F35c: a declared directory that is itself inside a protected directory fragment (`go/internal/bridge/`) still reads as scope and stays overridable.
+- `files[]` tokens drop a trailing source locator (`x.go:178`, `x.go:178:5`, `:10-20`, `#L10-L20`) before judgment. The breaker's substring match already saw through it. This also means a `files[]` of only located paths now declares a surface, so, as F29 set out, protected files named in its prose no longer route it.
+- `loopwave.Engine.pruneRouted` drops the prior decision's console-routed ids (one WARN each, through the gate's own resolver) before `WidenNarrowDecision`, so their slots refill from the backlog. The plan-time gate stays the backstop.
+- ADR-0074 and research F34/F35 carry the evidence. The two live items were re-routed `console-manual` in the same session.
+
 ## Fixed — the wave seed refuses at least everything triage's breaker would, so lanes stop drawing doomed work (F29, 2026-09-26)
 
 Triage was the pipeline's dominant failure. 18 of ~60 recent cycles sealed FAIL with `TRIAGE_PROTECTED_SURFACE` after a full scout and triage spend, and a lane's fleet scope is one item, so a refusal had nothing to fall back on. All 18 traced to five items whose protected surface was visible in their own record: the kind (routed since F25), a declared *directory* holding protected files, or a protected file named in the item's own text when it declared no surface.
