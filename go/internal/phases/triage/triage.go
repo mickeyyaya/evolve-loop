@@ -229,10 +229,11 @@ func inboxBatchesSection(projectRoot string) string {
 	if err != nil || len(items) == 0 {
 		return ""
 	}
-	// ADR-0074 I1: console-routed items (route:"console-*" or a protected fix
-	// surface) are operator-owned — lanes must never see them as selectable.
-	// The exclusion is loud (ids listed) so triage knows the work exists;
-	// inboxmover.Claim is the enforcement backstop if a pick slips through.
+	// ADR-0074 I1: console-routed items (route:"console-*", a pipeline-* kind,
+	// or a protected fix surface) are operator-owned — lanes must never see
+	// them as selectable. The exclusion is loud (ids listed) so triage knows
+	// the work exists; inboxmover.Claim is the enforcement backstop if a pick
+	// slips through.
 	dispatchable, console, _ := inboxbatch.PartitionConsole(items, guards.IsProtectedSurface)
 	var sect strings.Builder
 	if rendered := inboxbatch.RenderMarkdown(inboxbatch.Classify(dispatchable, inboxbatch.Config{})); rendered != "" {
@@ -246,7 +247,7 @@ func inboxBatchesSection(projectRoot string) string {
 		for i, it := range console {
 			ids[i] = it.ID
 		}
-		fmt.Fprintf(&sect, "- console_routed_excluded: %d operator-owned item(s) NOT selectable (route/protected fix surface; the claim floor refuses them): %s\n",
+		fmt.Fprintf(&sect, "- console_routed_excluded: %d operator-owned item(s) NOT selectable (route, pipeline-* kind, or protected fix surface; the claim floor refuses them): %s\n",
 			len(console), strings.Join(ids, ", "))
 	}
 	return sect.String()

@@ -116,6 +116,15 @@ item consumed ⇒ work landed (transactional consumption); dossier phase records
   disposition router's structured operator handoff (I2), not by routing.
 - The pass-rate metric stops being polluted by structurally-doomed draws; the
   remaining FAIL budget is reserved for honest rejections.
+- Amendment 2026-09-15 (research F25, wave 6 cycle 1688): the item's `kind` is
+  a routing input beside `route` and `files[]`. A `pipeline-*` kind
+  (`pipeline-repair`, `pipeline-integrity`) is pipeline-integrity work the
+  operator owns — the ADR-0072 halt autofiles that kind for the console — so
+  it console-routes even with no files list, under the same override clamp
+  (operator-authored `route:"lane"` honored, agent-autofiled ignored). The
+  halt autofiler stamps `injected_by`, so its records sit under that clamp.
+  `class` (the archetype, e.g. `pipeline-architecture`) is deliberately NOT a
+  routing input — it names a shape of work, not its owner.
 
 ## Slice map (implementation tracking)
 

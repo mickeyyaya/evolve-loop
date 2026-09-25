@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — a pipeline-repair inbox item routes to the console at plan time, before a lane claims it (2026-09-15)
+
+Wave 6, lane 1688 claimed a `pipeline-repair` item that carried no files list; scout and triage ran before the triage breaker refused its card for naming a protected surface, and the cycle sealed FAIL. The ADR-0074 routing classifier now reads the item's kind: a `pipeline-*` kind is console-owned work (the ADR-0072 halt autofiles the same kind for the operator), so the wave seed skips it, the claim refuses it, and `evolve inbox` lists it under console with its reason — under the same override clamp as the files-derived rule. Fifteen queued items move out of lane reach without burning a cycle each (research F25).
+
 ## Fixed — the verdict engine verifies through the contract gate's own Reviewer, so a salvaged verdict is classified as the gate approves it (2026-09-15)
 
 Cycle 1685 sealed FAIL with red_count=0: the auditor's verdict was fenced JSON without the sentinel wrapper, the gate salvaged and approved the repaired report, but the verdict engine had verified with the plain verifier and classified the unrepaired bytes ("no parseable verdict"), and the audit-fail envelope declined a repair for want of a class. There is now ONE verifier: `deliverable.Reviewer.VerifyForClassification` salvages, persists and reports a sole recoverable bad_verdict before classification and returns the repaired OK result; the composition root hands every BaseRunner an accessor to the gate's Reviewer (`runner.Options.ContractVerifier`, through each phase Config); the engine stays a leaf with its own `verdict.Identity`. Research F22.
