@@ -112,6 +112,12 @@ func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	if section := inboxBatchesSection(req.ProjectRoot); section != "" {
 		b.WriteString(section)
 	}
+	// F40 (cycle 1691): the drift since each fleet-scoped item was filed, so a
+	// stale premise is dropped here rather than built. Lane-only (a sequential
+	// cycle stays byte-identical); bounded and fail-open (premise_drift.go).
+	if section := premiseDriftSection(context.Background(), req.ProjectRoot, runner.LaneScope(req)); section != "" {
+		b.WriteString(section)
+	}
 	// Carry-forward candidate filter (cycle 1325, inbox item
 	// scout-carryforward-real-cherrypick-filter): cycle-962 built a
 	// deterministic, zero-LLM landability screen
