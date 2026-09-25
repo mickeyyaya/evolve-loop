@@ -86,10 +86,14 @@ type Adapter struct {
 	// self-report failure via a structured sentinel; default StageOff keeps the
 	// dispatched prompt byte-identical to pre-3.8b.
 	phaseIO config.Stage
-	// recoveryStage is the ADR-0044 Unified Phase Recovery stage, injected from
-	// cfg.PhaseRecovery (policy-resolved). Passed to Deps.RecoveryStage on each
-	// engine creation so fatalpane.go never reads the env var directly.
+	// recoveryStage is the ADR-0044 Unified Phase Recovery stage (channel,
+	// ask-broker, transient-dwell), seeded from policy.json by NewDefault and
+	// overridden by the cycle root with the Loader-resolved cfg.PhaseRecovery.
 	recoveryStage string
+	// fatalPaneStage is the C2 fatal-pane fast-fail's OWN stage (F27), seeded
+	// and overridden the same way from cfg.FatalPane. Both stages reach the
+	// engine through productionEngineDeps, the builder every path shares.
+	fatalPaneStage string
 	// bridgeConfig carries the timing overrides loaded from policy.json at
 	// construction time. Zero values mean "use bridge built-in defaults".
 	bridgeConfig policy.BridgePolicy
@@ -119,12 +123,23 @@ func New() *Adapter {
 func NewDefault(projectRoot string, signals *signalcenter.Center) *Adapter {
 	a := New()
 	a.signals = signals
-	if pol, err := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json")); err == nil {
+	pol, err := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
+	if err == nil {
 		a.bridgeConfig = pol.BridgeConfig()
 		// Resolve through policy's validating resolver, never off the raw
 		// field: an out-of-range operator value must arrive as the built-in.
 		a.contextFillWarnPct = pol.ContextFillConfig().WarnThresholdPct
 	}
+	// A failed load leaves pol zero, so the recovery dials resolve to their
+	// compiled defaults — the same fail-open as the timings above — parsed by
+	// the Loader's own trichotomy (policy.BridgeRecoveryStages). Roots that
+	// never call the setters (the per-phase registry factories) still carry
+	// policy's dials; the cycle root overrides them via wireBridgeStages.
+	// Deliberately BOTH dials: before F27 such roots pinned the program dial
+	// to shadow whatever policy.json said, so an operator's explicit
+	// `recovery.phase_recovery` now reaches them too (one source for every
+	// production path) — the compiled default is still shadow.
+	a.recoveryStage, a.fatalPaneStage = pol.BridgeRecoveryStages()
 	a.bootTimeoutStore = clihealth.NewStore(projectRoot, nil)
 	a.engineFactory = func(env map[string]string) core.Bridge {
 		return gobridge.NewEngine(a.productionEngineDeps(env))
@@ -152,6 +167,8 @@ func (a *Adapter) productionEngineDeps(env map[string]string) gobridge.Deps {
 		ScrollbackLines:       a.bridgeConfig.ScrollbackLines,
 		TokenResolver:         tokenusage.DefaultResolver(configRoot(env)),
 		ContextFillWarnPct:    a.contextFillWarnPct,
+		RecoveryStage:         a.recoveryStage,
+		FatalPaneStage:        a.fatalPaneStage,
 		Signals:               a.signals,
 		// Wall corroboration (2026-08-15 false-wall incident): a pane
 		// exhaustion match escalates rc 85 only after a live one-token probe
@@ -207,12 +224,19 @@ func (a *Adapter) SetPhaseIOStage(stage config.Stage) {
 	a.phaseIO = stage
 }
 
-// SetRecoveryStage wires the ADR-0044 Unified Phase Recovery stage so
-// the bridge engine's fatalpane detector reads the policy-resolved value
-// instead of the retired EVOLVE_PHASE_RECOVERY env var. Default (unset) is
-// "" which channel.ResolveStage normalizes to "shadow" (behavior-neutral).
+// SetRecoveryStage wires the ADR-0044 Unified Phase Recovery stage (channel,
+// ask-broker, transient-dwell) so the engine reads the policy-resolved value
+// instead of the retired EVOLVE_PHASE_RECOVERY env var. "" normalizes to
+// "shadow" (behavior-neutral) in channel.ResolveStage.
 func (a *Adapter) SetRecoveryStage(stage string) {
 	a.recoveryStage = stage
+}
+
+// SetFatalPaneStage wires the C2 fatal-pane fast-fail's OWN stage (F27) —
+// independent of SetRecoveryStage, so arming the fast-fail never arms the
+// channel. "" normalizes to "shadow" in the engine (an unwired stage observes).
+func (a *Adapter) SetFatalPaneStage(stage string) {
+	a.fatalPaneStage = stage
 }
 
 // Launch injects the resolved interactive policy into the prompt body and
@@ -252,7 +276,6 @@ func (a *Adapter) Launch(ctx context.Context, req core.BridgeRequest) (core.Brid
 		cb := a.onStopReview
 		onSR := func(phase, action, reason string) { cb(cycle, phase, action, reason) }
 		deps := a.productionEngineDeps(req.Env)
-		deps.RecoveryStage = a.recoveryStage
 		deps.OnStopReview = onSR
 		return gobridge.NewEngine(deps).Launch(ctx, inproc)
 	}

@@ -586,8 +586,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 	// ADR-0050 §3.8b: at EVOLVE_PHASE_IO>=advisory the injected contract block
 	// instructs build/scout/triage to self-report failure via a structured
 	// sentinel; default (off) leaves the dispatched prompt byte-identical.
-	br.SetPhaseIOStage(cfg.PhaseIO)
-	br.SetRecoveryStage(cfg.PhaseRecovery.String())
+	wireBridgeStages(br, cfg)
 	for _, w := range phasespec.ApplyUserRouting(&cfg, userSpecs, builtinCat) {
 		fmt.Fprintf(os.Stderr, "[phases] WARN %s\n", w)
 	}

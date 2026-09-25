@@ -151,3 +151,26 @@ func TestRecoveryStageFromEnv(t *testing.T) {
 		}
 	}
 }
+
+// TestFatalPaneStageOf (F27) pins the fatal-pane dial's resolution through the
+// SAME normalizer as the program dial — and reads ONLY Deps.FatalPaneStage:
+// with the program dial at enforce, an unset fatal-pane dial still resolves to
+// shadow (an unwired Deps stays observe-only; the composition root injects the
+// policy default), and a typo resolves to off (never a silent kill-path).
+func TestFatalPaneStageOf(t *testing.T) {
+	t.Parallel()
+	cases := []struct{ in, want string }{
+		{"", "shadow"},
+		{"shadow", "shadow"},
+		{"enforce", "enforce"},
+		{" ENFORCE ", "enforce"},
+		{"off", "off"},
+		{"enforec", "off"},
+	}
+	for _, tc := range cases {
+		deps := Deps{RecoveryStage: "enforce", FatalPaneStage: tc.in}
+		if got := fatalPaneStageOf(deps); got != tc.want {
+			t.Errorf("FatalPaneStage=%q (RecoveryStage=enforce) → %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}

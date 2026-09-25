@@ -39,6 +39,7 @@ func TestWireOrchestratorDeps_EveryConsumerGetsTheChainWalkingBridge(t *testing.
 		regexp.MustCompile(`^\s*br\.Set[A-Za-z]+\(`),
 		regexp.MustCompile(`bridgechain\.New\(br,`),
 		regexp.MustCompile(`catalogPublisher\(br\)`),   // the concrete adapter's contract-resolver sink — configured, never launched
+		regexp.MustCompile(`wireBridgeStages\(br, `),   // F27: takes a bridgeStageSink (three setters, no Launch) — a configurer by type
 		regexp.MustCompile(`^\s*Bridge:\s{2,}br,\s*$`), // orchDeps.Bridge (*bridge.Adapter): the host's own Set* handle — never launched
 	}
 	for i, line := range strings.Split(fn, "\n") {

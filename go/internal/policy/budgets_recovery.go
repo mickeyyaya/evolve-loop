@@ -1,5 +1,7 @@
 package policy
 
+import "github.com/mickeyyaya/evolve-loop/go/internal/config"
+
 type ReportBudgetPolicy struct {
 	HandoffTokens int `json:"handoff_tokens,omitempty"`
 }
@@ -134,7 +136,9 @@ func (p Policy) SandboxConfig() SandboxPolicy {
 // (R8.5, 2026-07-16) the artifact-backed spine floor's OWN dial — split from
 // phase_recovery because that stage ALSO arms the bidirectional channel
 // (ADR-0045 I6) and the failure-adviser promotion path (see
-// config.RolloutStages.SpineFloor for the full decoupling rationale).
+// config.RolloutStages.SpineFloor for the full decoupling rationale), and
+// (F27, 2026-09-26) the ADR-0044 C2 fatal-pane fast-fail's OWN dial, split
+// the same way (see config.RolloutStages.FatalPane).
 type RecoveryPolicy struct {
 	PhaseRecovery string `json:"phase_recovery,omitempty"`
 	// SpineFloor gates ONLY the clean-absence handoff-gap abort:
@@ -142,14 +146,21 @@ type RecoveryPolicy struct {
 	// no-recompile escape hatch); anything else parses to off ≡ shadow (the
 	// gate never acts below enforce).
 	SpineFloor string `json:"spine_floor,omitempty"`
+	// FatalPane gates ONLY the stop-review checkpoint's fatal-pane fast-fail:
+	// "enforce" (default) ends the wait in one interval on a persisted,
+	// non-Busy fatal pane match; "shadow" records would_fast_fail and lets
+	// the reviewer decide (the no-recompile escape hatch); "off" skips the
+	// detector entirely.
+	FatalPane string `json:"fatal_pane,omitempty"`
 }
 
 // RecoveryConfig returns recovery configuration with built-in defaults resolved.
 // Empty/absent PhaseRecovery ⇒ "shadow" (behavior-neutral first-ship default);
 // empty/absent SpineFloor ⇒ "enforce" (the R8.5 flip — replay-evidenced; see
-// config.defaults()).
+// config.defaults()); empty/absent FatalPane ⇒ "enforce" (the F27 flip —
+// soak-evidenced: every shadow match was a dead pane; see config.defaults()).
 func (p Policy) RecoveryConfig() RecoveryPolicy {
-	c := RecoveryPolicy{PhaseRecovery: "shadow", SpineFloor: "enforce"}
+	c := RecoveryPolicy{PhaseRecovery: "shadow", SpineFloor: "enforce", FatalPane: "enforce"}
 	if p.Recovery == nil {
 		return c
 	}
@@ -159,7 +170,23 @@ func (p Policy) RecoveryConfig() RecoveryPolicy {
 	if p.Recovery.SpineFloor != "" {
 		c.SpineFloor = p.Recovery.SpineFloor
 	}
+	if p.Recovery.FatalPane != "" {
+		c.FatalPane = p.Recovery.FatalPane
+	}
 	return c
+}
+
+// BridgeRecoveryStages returns the two ADR-0044 recovery dials as the canonical
+// stage words every production bridge Deps builder that does not go through the
+// Loader injects (adapters/bridge.NewDefault, the subagent root). Each word is
+// parsed by config.GateStage — the Loader's own trichotomy parser — so a policy
+// word resolves to the SAME stage on every root (F27 architecture review: one
+// parser, no root-specific case-folding; an unknown word is off, never enforce).
+func (p Policy) BridgeRecoveryStages() (recovery, fatalPane string) {
+	rc := p.RecoveryConfig()
+	r, _ := config.GateStage(rc.PhaseRecovery)
+	f, _ := config.GateStage(rc.FatalPane)
+	return r.String(), f.String()
 }
 
 // DocsFloorPolicy is the .evolve/policy.json "docs_floor" block — the

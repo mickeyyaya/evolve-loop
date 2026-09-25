@@ -47,6 +47,7 @@ func TestPolicyStages_KeysMatchPolicyJSONTags(t *testing.T) {
 		{"ReviewGate", "Gates", "ReviewGate", reflect.TypeOf(policy.GatesPolicy{})},
 		{"PhaseRecovery", "Recovery", "PhaseRecovery", reflect.TypeOf(policy.RecoveryPolicy{})},
 		{"SpineFloor", "Recovery", "SpineFloor", reflect.TypeOf(policy.RecoveryPolicy{})},
+		{"FatalPane", "Recovery", "FatalPane", reflect.TypeOf(policy.RecoveryPolicy{})},
 		{"RouterReplan", "Router", "RouterReplan", reflect.TypeOf(policy.RouterPolicy{})},
 		{"ParallelEvaluate", "ParallelEvaluate", "Stage", reflect.TypeOf(policy.ParallelEvaluatePolicy{})},
 	}
@@ -54,7 +55,7 @@ func TestPolicyStages_KeysMatchPolicyJSONTags(t *testing.T) {
 		wantKey := jsonTag(t, policyType, d.section) + "." + jsonTag(t, d.block, d.blockField)
 		// Every stage word valid ("off") except the one under test, so exactly
 		// one warning fires and it must carry policy.json's own spelling.
-		ps := config.PolicyStages{ContractGate: "off", EvalGate: "off", TriageCapGate: "off", TopNGate: "off", ReviewGate: "off", PhaseRecovery: "off", SpineFloor: "off", RouterReplan: "off", ParallelEvaluate: "off"}
+		ps := config.PolicyStages{ContractGate: "off", EvalGate: "off", TriageCapGate: "off", TopNGate: "off", ReviewGate: "off", PhaseRecovery: "off", SpineFloor: "off", FatalPane: "off", RouterReplan: "off", ParallelEvaluate: "off"}
 		reflect.ValueOf(&ps).Elem().FieldByName(d.stagesField).SetString("typo")
 		_, ws := config.New().ApplyPolicyStages(config.RoutingConfig{}, ps)
 		if len(ws) != 1 || ws[0].Fields["key"] != wantKey || !strings.HasPrefix(ws[0].Message, wantKey+`="typo"`) {
@@ -80,6 +81,7 @@ func TestDefaults_GateDialsMatchPolicyCompiledDefaults(t *testing.T) {
 		"ReviewGate":       {cfg.ReviewGate, gate(gates.ReviewGate)},
 		"PhaseRecovery":    {cfg.PhaseRecovery, gate(recovery.PhaseRecovery)},
 		"SpineFloor":       {cfg.SpineFloor, gate(recovery.SpineFloor)},
+		"FatalPane":        {cfg.FatalPane, gate(recovery.FatalPane)},
 		"RouterReplan":     {cfg.RouterReplan, route(router.RouterReplan)},
 		"ParallelEvaluate": {cfg.ParallelEvaluate, route(pe.Stage)},
 	} {

@@ -12,6 +12,7 @@ func TestResolveStage(t *testing.T) {
 		{"", "shadow"},         // unset → shadow default
 		{"shadow", "shadow"},   // canonical
 		{"off", "off"},         // canonical
+		{"0", "off"},           // config.StageOff.String(): the word the cycle root forwards for off (F27)
 		{"enforce", "enforce"}, // canonical
 		{"SHADOW", "shadow"},   // case-insensitive
 		{"OFF", "off"},

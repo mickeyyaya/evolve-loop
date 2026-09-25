@@ -81,20 +81,22 @@ type RolloutStages struct {
 	// subprocess hot path). Setting this field in code without also propagating
 	// EVOLVE_SANDBOX into the bridge's env map has no effect.
 	SandboxMode string
-	// PhaseRecovery is the ADR-0044 Unified Phase Recovery rollout stage —
-	// the ONE dial for the whole program (fatal-pane fast-fail, the
-	// observer's chain-backed StallPolicy, the orchestrator's failure-advisor
-	// hook):
+	// PhaseRecovery is the ADR-0044 Unified Phase Recovery program dial. It
+	// gates the live bidirectional channel (channel.Enabled, ADR-0045 I6),
+	// the ask-broker, the transient-dwell fast-fail, the observer's
+	// chain-backed StallPolicy, the orchestrator's failure-adviser promotion
+	// and the misplaced-deliverable salvage. Two behaviors were SPLIT OUT onto
+	// their own dials so they could act without arming the rest: SpineFloor
+	// (R8.5) and FatalPane (F27) — never flip this dial to get either.
 	//   StageOff     — recovery components inert; byte-identical legacy.
 	//   StageShadow  — classify + log would-be actions only (DEFAULT).
-	//   StageEnforce — corrective actions execute (fast-fail, stall policy,
-	//                  advise+promote). Classification is always-on above off;
-	//                  only ACTING is staged.
-	// PRECEDENCE NOTE: the bridge and observer subprocesses read
-	// EVOLVE_PHASE_RECOVERY from their own env (the actual hot-path signal,
-	// same pattern as CommitEvidence/SandboxMode); this field is the
-	// composition-root/orchestrator view, set from the same env var by
-	// applyEnv. Default StageShadow per ADR-0044 (behavior-neutral first ship).
+	//   StageEnforce — the corrective actions above execute. Classification
+	//                  is always-on above off; only ACTING is staged.
+	// Resolution: policy `recovery.phase_recovery` through ApplyPolicyStages;
+	// the composition root forwards it to the bridge (wireBridgeStages →
+	// Deps.RecoveryStage) and the observer (its IPC stage key) — no process
+	// reads an EVOLVE_PHASE_RECOVERY env var any more. Default StageShadow per
+	// ADR-0044 (behavior-neutral first ship).
 	PhaseRecovery Stage
 
 	// SpineFloor is the artifact-backed spine floor's OWN rollout dial (the
@@ -108,6 +110,20 @@ type RolloutStages struct {
 	// default) or WARN-and-proceeds (StageShadow). Degraded reads fail open at
 	// every stage. Policy override: `recovery.spine_floor` (no env var).
 	SpineFloor Stage
+
+	// FatalPane is the ADR-0044 C2 fatal-pane fast-fail's OWN rollout dial
+	// (F27, 2026-09-26), split out of PhaseRecovery for the SpineFloor reason:
+	// that dial also arms the live channel (channel.Enabled), the ask-broker
+	// and the failure-adviser promotion, so flipping it for the fast-fail
+	// would arm three unsoaked subsystems. This dial gates EXACTLY ONE
+	// behavior — whether a persisted, non-Busy fatal-pane match at the
+	// stop-review checkpoint ends the wait in one interval (StageEnforce, the
+	// default) or only records would_fast_fail and lets the reviewer decide
+	// (StageShadow). Soak evidence for the flip: every shadow match
+	// (cycles 1595 build, 1687 triage — trigger dead_shell) was a dead pane
+	// that then idled 1200s / 900s. Policy override: `recovery.fatal_pane`
+	// (no env var).
+	FatalPane Stage
 
 	// PhaseIO is the ADR-0050 Phase-3 unified-phase-I/O rollout dial. Unlike the
 	// gate dials above (off/shadow/enforce trichotomy) it uses the FULL

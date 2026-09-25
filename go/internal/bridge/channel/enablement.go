@@ -10,17 +10,21 @@ package channel
 
 import "strings"
 
-// ResolveStage normalizes a raw EVOLVE_PHASE_RECOVERY value to the canonical
-// stage vocabulary, the SINGLE home of that rule (the bridge's
-// recoveryStageFromEnv and the observer adapter both delegate here, so the
-// "unset → shadow, typo → off" policy can never drift between the subprocess
-// and in-process readers). Unset/empty → "shadow" (the behavior-neutral first-
-// ship default); off|shadow|enforce → as-is; anything else → "off" (a typo
-// must never silently enable a kill-path).
+// ResolveStage normalizes a raw recovery stage word to the canonical stage
+// vocabulary, the SINGLE home of that rule for BOTH ADR-0044 recovery dials —
+// the program dial (the bridge's recoveryStageFromEnv and the observer adapter)
+// and, since F27, the fatal-pane dial (fatalPaneStageOf) — so the
+// "unset → shadow, typo → off" policy can never drift between readers.
+// Unset/empty → "shadow" (an unwired stage observes); off|shadow|enforce →
+// as-is, plus "0" → "off" (config.StageOff.String(), the word the composition
+// root forwards — accepted explicitly, not by the typo rule); anything else →
+// "off" (a typo must never silently enable a kill-path).
 func ResolveStage(raw string) string {
 	switch s := strings.ToLower(strings.TrimSpace(raw)); s {
 	case "":
 		return "shadow"
+	case "0":
+		return "off"
 	case "off", "shadow", "enforce":
 		return s
 	default:

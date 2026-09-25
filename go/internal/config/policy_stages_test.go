@@ -13,24 +13,24 @@ import (
 func sentinelStages() RoutingConfig {
 	cfg := defaults()
 	cfg.ContractGate, cfg.EvalGate, cfg.TriageCapGate, cfg.TopNGate, cfg.ReviewGate = StageAdvisory, StageAdvisory, StageAdvisory, StageAdvisory, StageAdvisory
-	cfg.PhaseRecovery, cfg.SpineFloor = StageAdvisory, StageAdvisory
+	cfg.PhaseRecovery, cfg.SpineFloor, cfg.FatalPane = StageAdvisory, StageAdvisory, StageAdvisory
 	cfg.RouterReplan, cfg.ParallelEvaluate = StageOff, StageEnforce
 	cfg.ParallelEvaluateConcurrency, cfg.RePlanMaxDepth = -1, -1
 	cfg.RoutingJudge, cfg.ReconDigest = false, false
 	return cfg
 }
 
-// Test 28 — the thirteen dials cross by value; a typo'd gate word warns with
+// Test 28 — the fourteen dials cross by value; a typo'd gate word warns with
 // the policy key and resolves to off; the input is untouched.
 func TestApplyPolicyStages_ProjectsEveryDialAndWarnsOnTypos(t *testing.T) {
 	l, events := observed(t)
 	in := sentinelStages()
 	before := sentinelStages()
-	ps := PolicyStages{"enforce", "enfroce", "shadow", "off", "enforce", "shadow", "enforce", "advisory", "shadow", 5, true, true, 2}
+	ps := PolicyStages{"enforce", "enfroce", "shadow", "off", "enforce", "shadow", "enforce", "off", "advisory", "shadow", 5, true, true, 2}
 	got, ws := l.ApplyPolicyStages(in, ps)
 	want := sentinelStages()
 	want.ContractGate, want.EvalGate, want.TriageCapGate, want.TopNGate, want.ReviewGate = StageEnforce, StageOff, StageShadow, StageOff, StageEnforce
-	want.PhaseRecovery, want.SpineFloor = StageShadow, StageEnforce
+	want.PhaseRecovery, want.SpineFloor, want.FatalPane = StageShadow, StageEnforce, StageOff
 	want.RouterReplan, want.ParallelEvaluate = StageAdvisory, StageShadow
 	want.ParallelEvaluateConcurrency, want.RePlanMaxDepth = 5, 2
 	want.RoutingJudge, want.ReconDigest = true, true
@@ -51,7 +51,7 @@ func TestApplyPolicyStages_ProjectsEveryDialAndWarnsOnTypos(t *testing.T) {
 
 // Test 29 — the gate dials use the trichotomy, the router dials the full ladder.
 func TestApplyPolicyStages_GateLadderRejectsAdvisoryRouterLadderAcceptsIt(t *testing.T) {
-	ps := PolicyStages{"advisory", "enforce", "enforce", "enforce", "off", "shadow", "enforce", "advisory", "off", 3, false, false, 1}
+	ps := PolicyStages{"advisory", "enforce", "enforce", "enforce", "off", "shadow", "enforce", "enforce", "advisory", "off", 3, false, false, 1}
 	got, ws := New().ApplyPolicyStages(defaults(), ps)
 	if got.ContractGate != StageOff || got.RouterReplan != StageAdvisory {
 		t.Errorf("ContractGate=%v (want Off) RouterReplan=%v (want Advisory)", got.ContractGate, got.RouterReplan)
