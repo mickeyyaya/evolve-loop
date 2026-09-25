@@ -126,3 +126,54 @@ func TestLoadDir_RouteFieldParsedAndSanitized(t *testing.T) {
 		t.Error("sanitization must be loud (warning expected)")
 	}
 }
+
+// Kind form (wave 6, cycle 1688, 2026-09-15): a `pipeline-*` item is
+// pipeline-integrity work, which the operator owns (pipeline_fixes_console_first;
+// the wave goal names it console-owned). The queue held 15 such items lane-eligible,
+// 8 with no files[] list at all, so the files-derived rule had nothing to match:
+// a lane claimed one, scout and triage ran, and the triage breaker refused the
+// card for naming a protected surface — a full FAIL seal for work no lane may do.
+// The kind is a first-class field the classifier must read, not prose.
+func TestConsoleRouted_PipelineKindRoutesConsole(t *testing.T) {
+	for _, kind := range []string{"pipeline-repair", "pipeline-integrity", "Pipeline-Repair", " pipeline-repair "} {
+		routed, reason := ConsoleRouted(Item{ID: "x", Kind: kind}, nil)
+		if !routed {
+			t.Errorf("kind %q is pipeline-integrity work and must console-route", kind)
+		}
+		if !strings.Contains(reason, "kind:pipeline-") {
+			t.Errorf("reason must carry the kind provenance, got %q", reason)
+		}
+	}
+	for _, kind := range []string{"bug", "feature", "sweep", "", "loop-reliability"} {
+		if routed, reason := ConsoleRouted(Item{ID: "x", Kind: kind}, nil); routed {
+			t.Errorf("kind %q is lane work, got routed (%s)", kind, reason)
+		}
+	}
+	// Provenance precedence: the explicit route names itself first, then the
+	// kind, then a protected file — callers print the reason verbatim.
+	it := Item{ID: "x", Kind: "pipeline-repair", Files: []string{"go/internal/guards/role.go"}}
+	if _, reason := ConsoleRouted(it, protectedStub("go/internal/guards/role.go")); !strings.HasPrefix(reason, "kind:pipeline-repair") {
+		t.Errorf("the kind reason outranks the files derivation, got %q", reason)
+	}
+	if _, reason := ConsoleRouted(Item{ID: "x", Kind: "pipeline-repair", Route: "console-manual"}, nil); !strings.HasPrefix(reason, "route:") {
+		t.Errorf("the explicit route outranks the kind, got %q", reason)
+	}
+}
+
+// The operator's explicit route:"lane" override applies to the kind rule
+// exactly as it applies to the files rule: honored for an operator-authored
+// item, ignored for an agent-autofiled one (the ADR-0072 halt escalation
+// autofiles pipeline-repair items — those stay console-owned however they
+// are annotated).
+func TestConsoleRouted_PipelineKindHonorsOperatorLaneOverrideOnly(t *testing.T) {
+	if routed, _ := ConsoleRouted(Item{ID: "x", Kind: "pipeline-repair", Route: "lane"}, nil); routed {
+		t.Error("operator-authored route:lane override must dispatch a pipeline-repair item")
+	}
+	routed, reason := ConsoleRouted(Item{ID: "x", Kind: KindPipelineRepair, Route: "lane", InjectedBy: "loop-escalation"}, nil)
+	if !routed {
+		t.Fatal("an agent-autofiled pipeline-repair item cannot widen its own dispatch with route:lane")
+	}
+	if !strings.Contains(reason, "route:lane ignored") {
+		t.Errorf("reason must say the override was ignored, got %q", reason)
+	}
+}

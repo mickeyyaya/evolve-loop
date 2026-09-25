@@ -92,7 +92,7 @@ func TestRunTmuxREPL_PersistentFatalCheckpointPreservesTheWholeDecisionChain(t *
 		CaptureBaseline:  zeroBaselineCapture,
 		Reviewer:         reviewer,
 		ArtifactTimeoutS: 2,
-		RecoveryStage:    "enforce",
+		FatalPaneStage:   "enforce",
 	}
 	deps.OnStopReview = func(phase, action, reason string) {
 		callbacks = append(callbacks, stopReviewRec{phase: phase, action: action, reason: reason})
@@ -150,5 +150,62 @@ func TestRunTmuxREPL_PersistentFatalCheckpointPreservesTheWholeDecisionChain(t *
 	summary := artifactTimeoutSummary(stderr.String())
 	if !strings.Contains(summary, "last_review=stop") || !strings.Contains(summary, "fatal pane state (model_invalid)") {
 		t.Errorf("exit-81 summary lost the fatal stop evidence: %q", summary)
+	}
+}
+
+// TestRunTmuxREPL_FatalPaneDialIsIndependentOfPhaseRecovery (F27): the C2
+// fatal-pane fast-fail rides its OWN dial. Crossing the two dials proves the
+// checkpoint reads Deps.FatalPaneStage and never the program dial: arming the
+// fast-fail cannot arm the channel / ask-broker / advisor that PhaseRecovery
+// gates, and the program's shadow cannot silence a soak-proven fast-fail
+// (cycles 1595 and 1687 idled 1200s / 900s on dead panes it had classified).
+func TestRunTmuxREPL_FatalPaneDialIsIndependentOfPhaseRecovery(t *testing.T) {
+	cases := []struct {
+		name, fatalStage, recoveryStage string
+		wantResult                      string
+		wantReviewerCalls               int
+	}{
+		{"fatal-enforce-under-program-shadow-fast-fails", "enforce", "shadow", "fast_failed", 1},
+		{"fatal-shadow-under-program-enforce-only-observes", "shadow", "enforce", "would_fast_fail", 2},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			fx := newFixture(t, "claude-tmux", "")
+			fatalPane := tmuxPromptMarkerDefault + "\n" + fatalTail + "\n" + tmuxPromptMarkerDefault
+			reviewer := &scriptedReviewer{verdicts: []ReviewVerdict{
+				{Action: ReviewExtend, Reason: "first observation has not crossed the persistence gate"},
+				{Action: ReviewStop, Reason: "the reviewer decides when the fatal dial only observes"},
+			}}
+			deps := Deps{
+				Tmux:             &fakeTmux{paneSeq: checkpointPaneSeq(fatalPane, fatalPane)},
+				Sleep:            func(time.Duration) {},
+				LookupEnv:        mapLookup(nil),
+				CaptureBaseline:  zeroBaselineCapture,
+				Reviewer:         reviewer,
+				ArtifactTimeoutS: 2,
+				RecoveryStage:    tc.recoveryStage,
+				FatalPaneStage:   tc.fatalStage,
+			}
+			var stdout, stderr bytes.Buffer
+			code := newTestEngine(deps).LaunchArgs(context.Background(),
+				fx.args("claude-tmux", "--allow-bypass", "--agent=build", "--cycle=1687"),
+				nil, &stdout, &stderr)
+
+			if code != ExitArtifactTimeout {
+				t.Fatalf("exit = %d, want ExitArtifactTimeout (%d); stderr=%q", code, ExitArtifactTimeout, stderr.String())
+			}
+			if len(reviewer.events) != tc.wantReviewerCalls {
+				t.Errorf("reviewer calls = %d, want %d (fatal=%s program=%s)", len(reviewer.events), tc.wantReviewerCalls, tc.fatalStage, tc.recoveryStage)
+			}
+			var results []string
+			for _, outcome := range readInteractionLedger(t, fx.ws, "build") {
+				if outcome.Kind == "fatal_pane_shadow" {
+					results = append(results, outcome.Result)
+				}
+			}
+			if len(results) != 1 || results[0] != tc.wantResult {
+				t.Errorf("fatal outcomes = %v, want exactly [%s]", results, tc.wantResult)
+			}
+		})
 	}
 }

@@ -6,7 +6,9 @@ package main
 // the ONE projection of policy's four accessors onto the leaf's Parameter
 // Object, and the two silent stage forwarders the report-size gate
 // (cmd_cycle.go) and the nested-sandbox fallback (cmd_loop_preflight.go)
-// keep — their dials are not RoutingConfig fields yet (unit doc F2).
+// keep — their dials are not RoutingConfig fields yet (unit doc F2) — and
+// (F27) the ONE forwarding of the resolved bridge dials into the adapter
+// (wireBridgeStages).
 
 import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
@@ -28,10 +30,29 @@ func wiredRoutingConfigLoader(signals *signalcenter.Center) *config.Loader {
 func policyStagesOf(g policy.GatesConfig, r policy.RecoveryPolicy, rt policy.RouterPolicy, pe policy.ParallelEvaluateConfig) config.PolicyStages {
 	return config.PolicyStages{
 		ContractGate: g.ContractGate, EvalGate: g.EvalGate, TriageCapGate: g.TriageCapGate, TopNGate: g.TopNGate, ReviewGate: g.ReviewGate,
-		PhaseRecovery: r.PhaseRecovery, SpineFloor: r.SpineFloor,
+		PhaseRecovery: r.PhaseRecovery, SpineFloor: r.SpineFloor, FatalPane: r.FatalPane,
 		RouterReplan: rt.RouterReplan, ParallelEvaluate: pe.Stage, ParallelEvaluateConcurrency: pe.Concurrency,
 		RoutingJudge: rt.RoutingJudge, ReconDigest: rt.ReconDigest, RePlanMaxDepth: rt.ReplanDepth,
 	}
+}
+
+// bridgeStageSink is the slice of the bridge adapter the root's resolved
+// rollout dials flow into — the root depends on the three setters, not on the
+// adapter, so the forwarding is testable without a live engine.
+type bridgeStageSink interface {
+	SetPhaseIOStage(config.Stage)
+	SetRecoveryStage(string)
+	SetFatalPaneStage(string)
+}
+
+// wireBridgeStages is the ONE forwarding of the resolved rollout dials into
+// the bridge adapter (TestWireBridgeStages_IsTheRootsOnlyStageForwarding):
+// each dial rides its OWN setter — the fatal-pane fast-fail never borrows
+// PhaseRecovery's (F27; TestWireBridgeStages_ForwardsEachDialOnItsOwnSetter).
+func wireBridgeStages(br bridgeStageSink, cfg config.RoutingConfig) {
+	br.SetPhaseIOStage(cfg.PhaseIO)
+	br.SetRecoveryStage(cfg.PhaseRecovery.String())
+	br.SetFatalPaneStage(cfg.FatalPane.String())
 }
 
 // parseGateStage maps a policy gate word onto the off/shadow/enforce

@@ -1,0 +1,13 @@
+{
+  "id": "lane-alternates-on-refusal",
+  "kind": "pipeline-repair",
+  "priority": "P2",
+  "weight": 0.7,
+  "title": "F32: a lane refused at triage has no alternative — seed lanes with in-scope alternates",
+  "summary": "A fleet lane's scope is ONE item, so when triage's breaker refuses its card (TRIAGE_PROTECTED_SURFACE) or the item turns out already done, the lane has nothing to fall back on and the cycle ends without shipping. F29 moves most doomed items to the console at seed time, but an undeclared item whose surface only the LLM derives can still reach a lane.",
+  "fix": "Give each lane an ordered menu of in-scope alternates (triagecap.ExpandWithClusterMates already builds menus) so triage can re-select within scope; prefer this over a correction-loop re-dispatch of triage (the orchestrator files that path runs through are protected). Measure first: count refusals and no-work ends per wave after F29 lands.",
+  "notes": "Architecture review of F29 (2026-09-26): re-selection is recovery, not admission; in-lane alternates fit better than reviewWithCorrections re-dispatch.",
+  "created_at": "2026-09-26T02:02:00Z",
+  "source": "console-f29-architecture-review",
+  "connects_to": ["go/internal/triagecap/lane_menu.go", "go/internal/phases/triage/triage.go", "go/internal/core/triage_termination.go"]
+}

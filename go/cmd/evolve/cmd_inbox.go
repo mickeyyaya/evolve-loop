@@ -71,7 +71,7 @@ func runInbox(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	// (inboxmover.Claim) already use — console-routed work is operator-owned
 	// and is never a batch a lane may draw. Classifying the whole backlog
 	// presented it as selectable, with no reason and no separation.
-	dispatchable, console, reasons := inboxbatch.PartitionConsole(items, guards.IsProtectedSurface)
+	dispatchable, console, reasons := inboxbatch.PartitionConsole(items, guards.IsProtectedScope)
 	batches := inboxbatch.Classify(dispatchable, cfg)
 	if asJSON {
 		enc := json.NewEncoder(stdout)

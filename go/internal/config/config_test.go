@@ -249,6 +249,25 @@ func TestLoad_SpineFloorStage(t *testing.T) {
 	}
 }
 
+// TestLoad_FatalPaneStage pins the F27 flip the same way: the ADR-0044 C2
+// fatal-pane fast-fail defaults ENFORCE on its OWN dial, with no env-var
+// override (policy-only: `recovery.fatal_pane`) — neither a would-be
+// EVOLVE_FATAL_PANE nor the program dial's old env name moves it.
+func TestLoad_FatalPaneStage(t *testing.T) {
+	absent := filepath.Join(t.TempDir(), "absent.json")
+	if cfg, _ := Load(absent, map[string]string{}); cfg.FatalPane != StageEnforce {
+		t.Errorf("default FatalPane = %v, want StageEnforce (F27 flip)", cfg.FatalPane)
+	}
+	for _, key := range []string{"EVOLVE_FATAL_PANE", "EVOLVE_PHASE_RECOVERY"} {
+		for _, v := range []string{"off", "shadow", "banana"} {
+			cfg, _ := Load(absent, map[string]string{key: v})
+			if cfg.FatalPane != StageEnforce {
+				t.Errorf("%s=%q must be inert for the policy-only fatal-pane dial; got %v, want StageEnforce", key, v, cfg.FatalPane)
+			}
+		}
+	}
+}
+
 // TestPhaseIOStage pins the EVOLVE_PHASE_IO dial (ADR-0050 Phase 3): the unified
 // phase I/O rollout uses the FULL off→shadow→advisory→enforce ladder (4-value,
 // unlike the 3-value gate dials), defaults ENFORCE as of the 3.10 cutover (the

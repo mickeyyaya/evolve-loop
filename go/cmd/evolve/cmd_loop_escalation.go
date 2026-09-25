@@ -8,7 +8,11 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 )
+
+// escalationInjectedBy stamps halt-autofiled inbox items with their producer.
+const escalationInjectedBy = "loop-escalation"
 
 // pipelineEscalation is the diagnostic dossier written on an ADR-0072
 // system-failure halt. It is the operator's (and the resumed loop's) starting
@@ -80,11 +84,15 @@ func writePipelineEscalation(evolveDir, projectRoot string, cycle int, workspace
 		"created_at": now.Format(time.RFC3339),
 		"weight":     0.99,
 		"title":      fmt.Sprintf("PIPELINE DEFECT (%s): the loop halted — %s", sf.Category, sf.Evidence),
-		"kind":       "pipeline-repair",
+		"kind":       inboxbatch.KindPipelineRepair,
 		"priority":   "P0",
-		"summary":    summary,
-		"root_cause": rootCause,
-		"fix":        fix,
+		// Autofile provenance: the classifier's route:"lane" clamp treats an
+		// item with injected_by as agent-authored (ADR-0073 clamp-parity), so
+		// a halt record can never be widened into lane work by annotation.
+		"injected_by": escalationInjectedBy,
+		"summary":     summary,
+		"root_cause":  rootCause,
+		"fix":         fix,
 		"connects_to": []string{
 			"docs/architecture/adr/0072-system-failure-policy-and-halt.md",
 			filepath.Join(".evolve", "pipeline-escalation.json"),

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 )
 
 // ADR-0072 S6: the halt writes a diagnostic dossier AND auto-files a P0
@@ -53,8 +54,14 @@ func TestWritePipelineEscalation_WritesDossierAndInboxItem(t *testing.T) {
 	if err := json.Unmarshal(itemB, &item); err != nil {
 		t.Fatalf("inbox item not valid JSON: %v", err)
 	}
-	if item["kind"] != "pipeline-repair" {
-		t.Errorf("inbox kind = %v, want pipeline-repair", item["kind"])
+	if item["kind"] != inboxbatch.KindPipelineRepair {
+		t.Errorf("inbox kind = %v, want %s", item["kind"], inboxbatch.KindPipelineRepair)
+	}
+	// Research F25: the halt record carries its producer, so the ADR-0074
+	// classifier's route:"lane" clamp keeps it console-owned however it is
+	// later annotated.
+	if item["injected_by"] != escalationInjectedBy {
+		t.Errorf("inbox injected_by = %v, want %q", item["injected_by"], escalationInjectedBy)
 	}
 	if item["priority"] != "P0" {
 		t.Errorf("inbox priority = %v, want P0", item["priority"])

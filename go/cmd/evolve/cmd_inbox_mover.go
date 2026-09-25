@@ -28,7 +28,7 @@ func runInboxMover(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	opts := inboxmover.Options{
 		ProjectRoot:     projectRoot,
 		Stderr:          stderr,
-		IsProtectedPath: guards.IsProtectedSurface,
+		IsProtectedPath: guards.IsProtectedScope,
 	}
 
 	switch subcmd {

@@ -110,12 +110,59 @@ item consumed ⇒ work landed (transactional consumption); dossier phase records
   work) are bounded the same way: they bury an item in the loud, operator-
   reviewed exclusion list rather than making anything mergeable.
 - The derivation matches only surfaces **already on the manifest** and scans
-  every token of each `files[]` entry. A task that will *create* a new
-  gate-shaped file (the cycle-1034 shape) is out of the derivation's reach by
-  construction — that class is handled by the ship tripwire plus the
+  every token of each `files[]` entry (in SCOPE since F29 — a declared
+  directory holding protected files counts; with no declared surface, the
+  files the item's own text names are read — see the F29 amendment). A task
+  that will *create* a new gate-shaped file (the cycle-1034 shape) is out of
+  the derivation's reach by construction — that class is handled by the ship tripwire plus the
   disposition router's structured operator handoff (I2), not by routing.
 - The pass-rate metric stops being polluted by structurally-doomed draws; the
   remaining FAIL budget is reserved for honest rejections.
+- Amendment 2026-09-15 (research F25, wave 6 cycle 1688): the item's `kind` is
+  a routing input beside `route` and `files[]`. A `pipeline-*` kind
+  (`pipeline-repair`, `pipeline-integrity`) is pipeline-integrity work the
+  operator owns — the ADR-0072 halt autofiles that kind for the console — so
+  it console-routes even with no files list, under the same override clamp
+  (operator-authored `route:"lane"` honored, agent-autofiled ignored). The
+  halt autofiler stamps `injected_by`, so its records sit under that clamp.
+  `class` (the archetype, e.g. `pipeline-architecture`) is deliberately NOT a
+  routing input — it names a shape of work, not its owner.
+- Amendment 2026-09-26 (research F29): **for every surface the record itself
+  states, the seed-time classifier refuses at least what triage's breaker
+  would** (surfaces triage derives beyond the record remain the residual —
+  `lane-alternates-on-refusal`, F32). 18 of the ~60 cycles before this
+  date died at triage with `TRIAGE_PROTECTED_SURFACE` after a full
+  scout+triage spend, and a lane's fleet scope is ONE item, so a refusal has no
+  fallback. All 18 traced to five items whose protected surface was visible in
+  their own record: the kind (F25, 11 refusals), a declared DIRECTORY holding
+  protected files (4 — `"files": ["go/internal/core/"]` evaded the file-level
+  manifest), or — with no declared `files[]` — a protected FILE the item's own
+  text names (3). (1) **Two projections of the one manifest:**
+  `guards.IsProtectedSurface` stays MEMBERSHIP (its one fix: a path naming a
+  protected directory without the trailing slash is a member of it), used by
+  the ship tripwire, the role write-guard, the fleet preflight and the breaker;
+  `guards.IsProtectedScope` adds "a directory CONTAINS protected surface" and
+  is what the routing roots inject (the wave seed, the widen seam, the plan-time
+  resolver, the claim floor, the prompt partition, `evolve inbox`). Membership
+  implies scope (pinned), so the seed never admits a stated surface the
+  breaker refuses; the breaker's only change is the slashless-directory
+  membership fix. (2) **A declared surface wins; an
+  undeclared one is read from the item's text:** `Item.DeclaredSurface` — the
+  ONE home of that belief — is the set of path-shaped tokens (not every segment a single character — a
+  placeholder like `TBD`/`N/A`, a bare `role.go` or an annotation word like the
+  `go` of "(go test)" declares nothing, and only these tokens are judged); with none, the FILES the
+  record's author-written fields name are judged (derived at decode in
+  `Item.UnmarshalJSON`, because the wave seed, the claim floor and `LoadFile`
+  each decode records; machine-written fields are skipped; a directory mention
+  is context, not surface). This is a typed, deterministic derivation that can
+  only move an item TO the console — never widen lane authority — so it keeps
+  this ADR's rule that prose never GRANTS routing. (3) **The weight stays the
+  priority:** `triagecap.rankForDispatch`, the one ordering the seed paths
+  share, breaks EQUAL weights toward the verified-admissible candidate
+  (`FleetCandidate.Declared`, set from the same belief). Live queue: 65 → 47
+  lane-dispatchable. Follow-ups filed console-owned: scope-aware triage
+  termination (`triage-termination-scope-aware`, cycle 1682), in-lane
+  alternates on refusal (`lane-alternates-on-refusal`).
 
 ## Slice map (implementation tracking)
 

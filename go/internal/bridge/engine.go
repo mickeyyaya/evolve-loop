@@ -77,6 +77,12 @@ type Deps struct {
 	// injected by the orchestrator from the policy-resolved cfg.PhaseRecovery.
 	// Empty ⇒ channel.ResolveStage returns "shadow" (behavior-neutral default).
 	RecoveryStage string
+	// FatalPaneStage is the ADR-0044 C2 fatal-pane fast-fail's OWN rollout
+	// stage (F27), injected from the policy-resolved cfg.FatalPane. It gates
+	// ONLY the stop-review checkpoint's fatal-pane preemption; RecoveryStage
+	// keeps the channel, ask-broker and transient-dwell. Empty ⇒ "shadow"
+	// (an unwired Deps observes; only the composition root arms the kill path).
+	FatalPaneStage string
 	// ContextFillWarnPct is the policy-resolved context-fill WARN threshold
 	// (percent of the driver family's effective context window), injected by
 	// the composition root from Policy.ContextFillConfig(). Zero = not

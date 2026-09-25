@@ -167,8 +167,12 @@ func defaults() RoutingConfig {
 // (ADR-0045 I6 folded the bidirectional channel into it, and the
 // failure-adviser promotion path also keys on it), so arming the floor via
 // PhaseRecovery would have armed two unsoaked subsystems. PhaseRecovery itself
-// stays shadow. The gate dials (EvalGate, ContractGate, TriageCapGate,
-// TopNGate, PhaseRecovery, SpineFloor, RouterReplan, ParallelEvaluate) are
+// stays shadow. FatalPane=StageEnforce (the F27 flip, 2026-09-26, split out
+// the same way): the stop-review checkpoint's fatal-pane fast-fail ACTS —
+// every shadow match on record was a dead pane that then idled 900-1200s;
+// `recovery.fatal_pane: "shadow"` is its escape hatch. The gate dials
+// (EvalGate, ContractGate, TriageCapGate, TopNGate, PhaseRecovery,
+// SpineFloor, FatalPane, RouterReplan, ParallelEvaluate) are
 // re-resolved from policy's compiled accessors by ApplyPolicyStages at the
 // composition root — a two-source belief TestDefaults_GateDialsMatchPolicyCompiledDefaults
 // pins equal (F6 in the unit doc unifies them).
@@ -182,6 +186,7 @@ func defaultRollout() RolloutStages {
 		TopNGate:         StageEnforce,
 		PhaseRecovery:    StageShadow,
 		SpineFloor:       StageEnforce,
+		FatalPane:        StageEnforce,
 		PhaseIO:          StageEnforce,
 		RouterReplan:     StageShadow,
 		MergeGate:        StageShadow,
