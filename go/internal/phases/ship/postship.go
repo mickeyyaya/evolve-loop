@@ -432,9 +432,9 @@ func committedInboxIDs(cycleDir string, body []byte, landedPASS bool) []string {
 	//     empty commitment; see TestPromoteInbox_EmptyCommittedDeclinedMenuStaysOpen)
 	ids := inboxmover.CommittedIDs(body)
 	if !landedPASS {
-		// WARN ships under the fluent posture: partial work must stay pickable
-		// (consume.go's own contract), so the NEW scope/dropped widening is
-		// PASS-only. The long-standing nil-body fallback (continuation/lane
+		// A non-PASS verdict (FAIL, an unfinished suite, or unknown evidence)
+		// leaves work pickable (consume.go's own contract), so the NEW
+		// scope/dropped widening is PASS-only. The long-standing nil-body fallback (continuation/lane
 		// cycles carry no decision at all) predates the verdict gate and is
 		// preserved verbatim — it was never verdict-conditioned.
 		if body == nil {

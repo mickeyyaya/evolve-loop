@@ -18,6 +18,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/acsrunner"
 )
 
 func consumeScenario(t *testing.T, acsVerdict string) (repo, wt, ws, itemRel string) {
@@ -83,8 +85,13 @@ func TestShipFromWorktree_ConsumesCommittedItemInTheShipCommit(t *testing.T) {
 	}
 }
 
-// WARN cycles ship under the fluent posture but the work may be partial —
-// consumption stays gated on a PASS verdict; the item survives for re-pick.
+// Consumption is authorized by the verdict string PASS alone — never WARN.
+// Neither verdict writer (acssuite, acsrunner) emits WARN, and on the cycle
+// path acssuite.ReadVerdict refuses a WARN + red_count:0 artifact before
+// consumption can run (pinned by
+// TestCheckEGPSGate_WarnWithZeroRedCountNeverReachesConsumption). A WARN file
+// is therefore unknown evidence, and unknown evidence must leave the item
+// pickable (warn-ship-consumption-gap, cycle-1691 audit H1/H2).
 func TestShipFromWorktree_WarnVerdictDoesNotConsume(t *testing.T) {
 	repo, wt, ws, itemRel := consumeScenario(t, "WARN")
 	opts := &Options{
@@ -98,6 +105,25 @@ func TestShipFromWorktree_WarnVerdictDoesNotConsume(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(wt, filepath.FromSlash(itemRel))); err != nil {
 		t.Error("a WARN ship must NOT consume the item — the work may be partial")
+	}
+}
+
+// WARN with red_count>0 is doubly unconsumable: not PASS, and a RED is present.
+func TestShipFromWorktree_WarnWithRedsDoesNotConsume(t *testing.T) {
+	repo, wt, ws, itemRel := consumeScenarioWith(t, func(ws string) {
+		mustWrite(t, filepath.Join(ws, "acs-verdict.json"), `{"verdict":"WARN","red_count":2}`)
+	})
+	opts := &Options{
+		Class:         ClassCycle,
+		CommitMessage: "feat: widget attempt",
+		ProjectRoot:   repo, PluginRoot: repo,
+		WorkspacePath: ws, Stdout: io.Discard, Stderr: io.Discard,
+	}
+	if err := shipFromWorktree(context.Background(), opts, &RunResult{}, "main", wt); err != nil {
+		t.Fatalf("shipFromWorktree: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(wt, filepath.FromSlash(itemRel))); err != nil {
+		t.Error("a WARN ship with red_count>0 must NOT consume the item — the work is genuinely partial")
 	}
 }
 
@@ -282,5 +308,170 @@ func shipConsumeAndAssert(t *testing.T, repo, wt, ws, itemRel, consumedRel, why 
 	}
 	if !strings.Contains(strings.Join(res.Logs, "\n"), "consumed") {
 		t.Errorf("%s\nconsumption must be LOUD in ship logs: %v", why, res.Logs)
+	}
+}
+
+// --- Which acs-verdict.json may retire an inbox item in the landing commit
+// (warn-ship-consumption-gap, cycle-1691 audit H1/M1). The verdict string
+// PASS is the only authority: both writers derive it from their own counts
+// (acssuite: red_count==0; acsrunner: red_count==0 AND incomplete_count==0),
+// so red_count alone is a weaker key — acsrunner writes red_count:0 beside
+// verdict FAIL for a suite that never finished.
+
+// TestManualShip_NonShippableVerdictKeepsItemPickable (H1): a reviewed manual
+// ship whose workspace holds the verdict acsrunner writes for an unfinished
+// suite — verdict FAIL, ship_eligible false, red_count 0 — must land the code
+// but leave the inbox item tracked and pickable. The verdict comes from the
+// real producer, so the fixture cannot drift from what production writes.
+func TestManualShip_NonShippableVerdictKeepsItemPickable(t *testing.T) {
+	t.Parallel() // self-contained temp repo; see TestConsumeGate_OnlyVerdictPASSConsumes
+	repo := makeRepo(t)
+	excludeCommitGate(t, repo)
+	addRemote(t, repo)
+
+	mustWrite(t, filepath.Join(repo, ".gitignore"),
+		".evolve/\n!.evolve/\n.evolve/*\n!.evolve/inbox/\n.evolve/inbox/processed/\n.evolve/inbox/processing/\n.evolve/inbox/rejected/\n.commit-gate/\n")
+	itemRel := ".evolve/inbox/2026-09-26T00-00-00Z-unfinished-widget.json"
+	mustWrite(t, filepath.Join(repo, filepath.FromSlash(itemRel)),
+		`{"id":"unfinished-widget","title":"Fix the unfinished widget","weight":0.5}`)
+	runGit(t, repo, "add", ".gitignore", itemRel)
+	runGit(t, repo, "commit", "-m", "seed tracked inbox item")
+	mustWrite(t, filepath.Join(repo, "fixture.txt"), "landed by a reviewed console ship\n")
+
+	// A killed/timed-out predicate run: the test started and never reported.
+	stream := strings.NewReader(`{"Action":"run","Test":"TestC1691_001_Widget"}` + "\n")
+	v, err := acsrunner.ParseTestJSON(stream, 1691)
+	if err != nil {
+		t.Fatalf("acsrunner.ParseTestJSON: %v", err)
+	}
+	verdictPath, err := acsrunner.WriteVerdict(filepath.Join(t.TempDir(), ".evolve"), v)
+	if err != nil {
+		t.Fatalf("acsrunner.WriteVerdict: %v", err)
+	}
+	workspace := filepath.Dir(verdictPath)
+	requireNonShippableZeroRed(t, verdictPath)
+	mustWrite(t, filepath.Join(workspace, "triage-decision.json"),
+		`{"schema_version":1,"top_n":[{"id":"unfinished-widget"}],"deferred":[],"dropped":[]}`)
+
+	writeAttestation(t, repo, treeStateSHA(t, repo))
+	res, err := runShip(t, repo, Options{
+		Class: ClassManual, CommitMessage: "fix: unfinished widget",
+		WorkspacePath: workspace, Stdout: io.Discard, Stderr: io.Discard,
+		Env: map[string]string{"EVOLVE_SHIP_AUTO_CONFIRM": "1"},
+	})
+	if err != nil || res.ExitCode != ExitOK {
+		t.Fatalf("manual ship must still land (the code was reviewed): exit=%d err=%v logs=%v", res.ExitCode, err, res.Logs)
+	}
+
+	files := commitFileList(t, repo, "main")
+	if !strings.Contains(files, "fixture.txt") {
+		t.Fatalf("the landing commit must carry the shipped change; files=%q", files)
+	}
+	if strings.Contains(files, "inbox/consumed/") {
+		t.Errorf("an unfinished suite (verdict FAIL, ship_eligible false, red_count 0) must not retire its inbox item; files=%q", files)
+	}
+	if _, err := os.Stat(filepath.Join(repo, filepath.FromSlash(itemRel))); err != nil {
+		t.Errorf("the inbox item must stay pickable in the tree: %v", err)
+	}
+	if strings.TrimSpace(runGitOut(t, repo, "ls-files", "--", itemRel)) != itemRel {
+		t.Errorf("the inbox item must stay tracked after the landing commit")
+	}
+	if !strings.Contains(strings.Join(res.Logs, "\n"), "inbox consumption skipped") {
+		t.Errorf("a refused consumption must be LOUD in ship logs: %v", res.Logs)
+	}
+}
+
+// requireNonShippableZeroRed guards the fixture: the H1 quadrant is exactly
+// red_count 0 beside an explicit non-shippable verdict. If the producer ever
+// stops writing that shape, this test must say so instead of passing vacuously.
+func requireNonShippableZeroRed(t *testing.T, path string) {
+	t.Helper()
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read produced verdict: %v", err)
+	}
+	var doc struct {
+		Verdict         string `json:"verdict"`
+		ShipEligible    *bool  `json:"ship_eligible"`
+		RedCount        *int   `json:"red_count"`
+		IncompleteCount int    `json:"incomplete_count"`
+	}
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		t.Fatalf("parse produced verdict: %v", err)
+	}
+	if doc.Verdict != "FAIL" || doc.ShipEligible == nil || *doc.ShipEligible ||
+		doc.RedCount == nil || *doc.RedCount != 0 || doc.IncompleteCount == 0 {
+		t.Fatalf("fixture precondition: acsrunner must write verdict FAIL, ship_eligible false, red_count 0, incomplete_count>0; got %s", raw)
+	}
+}
+
+// TestConsumeGate_OnlyVerdictPASSConsumes (H1/H2/M1): across every verdict
+// shape a workspace can hold, the in-commit consumption fires exactly when
+// workspaceACSVerdict(ws) == "PASS" — the expression postship.go keys its
+// landedPASS scope widening on. One contract, both gates; a gate keyed on
+// red_count instead diverges on the FAIL/WARN red_count:0 rows and on a PASS
+// record that carries no red_count.
+//
+// Rows run in parallel: each builds its own temp repo/worktree/workspace, and
+// run serially the 20 real-git ships add ~11s to a package whose serial
+// integration tier already sits at the build floor's 120s per-package timeout.
+func TestConsumeGate_OnlyVerdictPASSConsumes(t *testing.T) {
+	t.Parallel()
+	acssuitePass, err := json.Marshal(predicateVerdictFixture(1691, 3, 0, 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	acssuiteFail, err := json.Marshal(predicateVerdictFixture(1691, 2, 1, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct {
+		name        string
+		body        string // "" = no acs-verdict.json at all
+		wantConsume bool
+	}{
+		{"acssuite PASS", string(acssuitePass), true},
+		{"PASS red_count 0", `{"verdict":"PASS","red_count":0,"ship_eligible":true}`, true},
+		{"PASS without red_count", `{"verdict":"PASS"}`, true},
+		{"acsrunner unfinished: FAIL red_count 0", `{"verdict":"FAIL","red_count":0,"incomplete_count":2,"ship_eligible":false}`, false},
+		{"FAIL red_count 0 ship_eligible false", `{"verdict":"FAIL","red_count":0,"ship_eligible":false}`, false},
+		{"acssuite FAIL", string(acssuiteFail), false},
+		{"WARN red_count 0", `{"verdict":"WARN","red_count":0}`, false},
+		{"WARN red_count 2", `{"verdict":"WARN","red_count":2}`, false},
+		{"missing verdict file", "", false},
+		{"unparseable verdict file", `{broken`, false},
+	}
+	for _, class := range []Class{ClassCycle, ClassManual} {
+		for _, tc := range cases {
+			t.Run(string(class)+"/"+tc.name, func(t *testing.T) {
+				t.Parallel()
+				repo, wt, ws, itemRel := consumeScenarioWith(t, func(ws string) {
+					path := filepath.Join(ws, "acs-verdict.json")
+					if tc.body == "" {
+						mustRemove(t, path)
+						return
+					}
+					mustWrite(t, path, tc.body)
+				})
+				opts := &Options{
+					Class:         class,
+					CommitMessage: "feat: widget attempt",
+					ProjectRoot:   repo, PluginRoot: repo,
+					WorkspacePath: ws, Stdout: io.Discard, Stderr: io.Discard,
+				}
+				res := &RunResult{}
+				if err := shipFromWorktree(context.Background(), opts, res, "main", wt); err != nil {
+					t.Fatalf("shipFromWorktree: %v", err)
+				}
+				_, statErr := os.Stat(filepath.Join(wt, filepath.FromSlash(itemRel)))
+				consumed := os.IsNotExist(statErr)
+				if consumed != tc.wantConsume {
+					t.Errorf("verdict %q: consumed=%v, want %v; logs=%v", tc.body, consumed, tc.wantConsume, res.Logs)
+				}
+				if landedPASS := workspaceACSVerdict(ws) == "PASS"; consumed != landedPASS {
+					t.Errorf("verdict %q: in-commit consumption (%v) drifted from postship's landedPASS gate (%v)", tc.body, consumed, landedPASS)
+				}
+			})
+		}
 	}
 }

@@ -34,10 +34,16 @@ import (
 
 // consumeCommittedItems moves this cycle's committed inbox items into the
 // tracked consumed/ dir INSIDE the ship tree and stages the moves, so they
-// ride the ship commit. Gated on ClassCycle + a PASS acs verdict (WARN ships
-// under the fluent posture but the work may be partial — the item must stay
-// pickable). Every step is per-item fail-open and LOUD: a consumption problem
-// must never block a ship that already earned its verdict.
+// ride the ship commit. Gated on the verdict string PASS — the sole
+// authority, shared with postship's landedPASS gate. Both writers derive it
+// from their own counts (acssuite: red_count==0; acsrunner: red_count==0 AND
+// incomplete_count==0), so red_count alone is weaker: acsrunner writes
+// red_count:0 beside verdict FAIL for a suite that never finished. On the
+// cycle path acssuite.ReadVerdict already refuses a non-PASS verdict with
+// red_count:0 before this runs; the manual path has no such reader, so this
+// gate is its only guard (warn-ship-consumption-gap, cycle-1691). Every step
+// is per-item fail-open and LOUD: a consumption problem must never block a
+// ship that already earned its verdict.
 func consumeCommittedItems(ctx context.Context, opts *Options, res *RunResult, dir string) {
 	switch opts.Class {
 	case ClassCycle:
