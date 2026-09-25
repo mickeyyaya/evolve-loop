@@ -36,23 +36,27 @@ const pipelineKindPrefix = "pipeline-" // every pipeline-* kind, present and fut
 const KindPipelineRepair = pipelineKindPrefix + "repair"
 
 // ConsoleRouted reports whether the item is operator-owned (not lane-
-// dispatchable) and why. isProtected is the control-plane membership predicate
-// (guards.IsProtectedSurface at composition roots; nil disables only the
-// files-derived rule — the explicit route field always binds).
+// dispatchable) and why. isProtected is the control-plane SCOPE predicate the
+// routing roots inject (guards.IsProtectedScope — a path that is, or a
+// directory that contains, protected surface; nil disables only the derived
+// rules — the explicit route field and the kind always bind).
 //
 // Precedence: route "console-*" always routes; a pipeline-* kind or a
-// protected fix surface in files[] routes unless route:"lane" AND the item
-// is operator-authored (InjectedBy empty) — agent-autofiled items cannot
+// protected surface routes unless route:"lane" AND the item is
+// operator-authored (InjectedBy empty) — agent-autofiled items cannot
 // widen agent authority by self-declaring lane dispatch of control-plane
 // work (ADR-0073 clamp-parity: the field is unauthenticated, so the
 // achievable floor is that an agent-authored override never *widens* what an
 // agent may do; a hand-forged override at most forces a doomed pipeline,
 // since the ship-time protectedsurface tripwire still blocks the merge).
 //
-// The derivation scans every whitespace token of each files[] entry (real
-// items write "path (why)" and "(see path)" shapes) and only matches surfaces
-// ALREADY on the manifest — a task that will CREATE a new gate-shaped file is
-// caught later by the ship tripwire + disposition handoff, not here.
+// The surface: every whitespace token of each files[] entry (real items write
+// "path (why)" and "(see path)" shapes) is judged in scope — a declared
+// directory holding protected files routes (F29); with no DECLARED surface
+// (Item.DeclaredSurface: no path-shaped token), the files the record's own
+// text names are judged instead. Only surfaces ALREADY on the manifest match —
+// a task that will CREATE a new gate-shaped file is caught later by the ship
+// tripwire + disposition handoff, not here.
 func ConsoleRouted(it Item, isProtected func(string) bool) (bool, string) {
 	route := strings.ToLower(strings.TrimSpace(it.Route))
 	if strings.HasPrefix(route, consoleRoutePrefix) {
@@ -90,12 +94,23 @@ func protectedDerivation(it Item, isProtected func(string) bool) (bool, string) 
 	if isProtected == nil {
 		return false, ""
 	}
-	for _, f := range it.Files {
-		for _, tok := range strings.Fields(f) {
-			tok = strings.Trim(tok, "()[]{},;:'\"")
-			if tok != "" && isProtected(tok) {
-				return true, "protected fix surface: " + tok
-			}
+	for _, tok := range declaredTokens(it.Files) {
+		if isProtected(tok) {
+			return true, "protected fix surface: " + tok
+		}
+	}
+	if it.DeclaredSurface() {
+		return false, "" // a declared surface wins: prose mentions are context
+	}
+	// F29: with no declared surface, the FILES the record's own text names ARE
+	// its surface — the one triage's breaker would otherwise derive only after
+	// a lane paid for scout and triage (18 of ~60 cycles died that way). A
+	// mention can only move an item TO the console, never widen lane authority,
+	// and it is a file spelling, so the injected scope predicate reduces to
+	// membership for it.
+	for _, p := range it.mentions {
+		if isProtected(p) {
+			return true, "mentions protected path: " + p + " (no declared files[]: the surface is derived from the item's own text)"
 		}
 	}
 	return false, ""

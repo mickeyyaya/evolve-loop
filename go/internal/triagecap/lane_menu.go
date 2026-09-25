@@ -14,7 +14,6 @@ package triagecap
 import (
 	"io"
 	"path/filepath"
-	"sort"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 )
@@ -52,9 +51,7 @@ func ExpandWithClusterMates(selection, backlog []FleetCandidate, perLane int) []
 	if perLane < 2 {
 		return menus
 	}
-	sorted := make([]FleetCandidate, len(backlog))
-	copy(sorted, backlog)
-	sort.SliceStable(sorted, func(i, j int) bool { return sorted[i].Weight > sorted[j].Weight })
+	sorted := rankForDispatch(backlog)
 	for _, c := range sorted {
 		if inMenu[c.ID] {
 			continue

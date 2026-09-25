@@ -98,8 +98,8 @@ type Options struct {
 	// a processed-promotion carries a non-empty CommitSHA.
 	IsLandedFn func(sha string) (bool, error)
 
-	// IsProtectedPath is the control-plane membership predicate for the
-	// ADR-0074 claim floor (guards.IsProtectedSurface at composition roots).
+	// IsProtectedPath is the control-plane SCOPE predicate for the
+	// ADR-0074 claim floor (guards.IsProtectedScope at composition roots — F29).
 	// nil disables only the files-derived rule; an explicit route:"console-*"
 	// field always refuses the claim.
 	IsProtectedPath func(path string) bool

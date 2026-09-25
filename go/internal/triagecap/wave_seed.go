@@ -36,7 +36,7 @@ func SelectWaveSeedTopN(evolveDir string, count int, isProtected func(string) bo
 // It is the single source for "inbox backlog as fleet candidates," shared by the
 // wave-seed fallback (SelectWaveSeedTopN) and the widen-narrow-decision seam
 // (WidenTopNToFleetWidth's caller).
-// isProtected is the ADR-0074 control-plane predicate (guards.IsProtectedSurface
+// isProtected is the ADR-0074 control-plane scope predicate (guards.IsProtectedScope
 // at composition roots; nil disables only the files-derived routing rule).
 // Console-routed items are EXCLUDED at read time — batch-7 wave-0 starved
 // ("planned zero lanes") because the raw top-N seeded exclusively console
@@ -58,7 +58,7 @@ func ReadInboxBacklog(evolveDir string, isProtected func(string) bool) []FleetCa
 		if routed, _ := inboxbatch.ConsoleRouted(doc, isProtected); routed {
 			continue
 		}
-		candidates = append(candidates, FleetCandidate{ID: doc.ID, Weight: doc.Weight, Files: doc.Files})
+		candidates = append(candidates, FleetCandidate{ID: doc.ID, Weight: doc.Weight, Files: doc.Files, Declared: doc.DeclaredSurface()})
 	}
 	return candidates
 }

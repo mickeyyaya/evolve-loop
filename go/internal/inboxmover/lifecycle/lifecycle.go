@@ -182,7 +182,7 @@ func WithLanded(fn func(sha string) (bool, error)) Option {
 	}
 }
 
-// WithProtectedPath installs the control-plane membership predicate of the
+// WithProtectedPath installs the control-plane scope predicate of the
 // ADR-0074 claim floor; nil keeps what is installed (the default nil disables
 // only the files-derived rule — an explicit route:"console-*" field always
 // refuses).

@@ -234,7 +234,7 @@ func inboxBatchesSection(projectRoot string) string {
 	// them as selectable. The exclusion is loud (ids listed) so triage knows
 	// the work exists; inboxmover.Claim is the enforcement backstop if a pick
 	// slips through.
-	dispatchable, console, _ := inboxbatch.PartitionConsole(items, guards.IsProtectedSurface)
+	dispatchable, console, _ := inboxbatch.PartitionConsole(items, guards.IsProtectedScope)
 	var sect strings.Builder
 	if rendered := inboxbatch.RenderMarkdown(inboxbatch.Classify(dispatchable, inboxbatch.Config{})); rendered != "" {
 		sect.WriteString("- inbox_batches: the backlog below is pre-grouped by campaign/file-area/links; " +
