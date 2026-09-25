@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — the idle nudge says why a deliverable that is already right must still be rewritten (F39 part 1, 2026-09-26)
+
+Cycle 1691's correction round fixed an explanation document and correctly left `build-report.md` untouched. The bridge's completion baseline (the deliverable's size and mtime at dispatch, the cycle-1550 stale-leftover guard) refused the unchanged report, and the one idle nudge said only "Please write the deliverable". The agent re-verified the report, found it correct, and stopped, and the phase would have closed as exit 81 on a correct cycle. The operator unblocked it by touching the report.
+
+- `bridge.idleNudgeFor` words the reminder by what the host sees. It locates the deliverable through the completion poll's own resolution. When the deliverable still matches the dispatch baseline, the nudge says it was not rewritten during this attempt and that completion means writing it after this dispatch. It binds carrying it forward to a re-check against this attempt's work: a markdown report takes an appended line recording what changed and that it was re-verified, and any other format is written again in full. It is logged as `idle with an unrewritten deliverable` with trigger `idle_unrewritten_deliverable`. An absent deliverable keeps the plain reminder.
+- Record `docs/incidents/2026-09-26-correction-stalled-on-an-unrewritten-deliverable.md`. Part 2, deterministic completion for correction rounds whose worktree changed, stays open as `correction-completion-needs-deliverable-rewrite`.
+
 ## Fixed — a dead agent pane gets one fresh session of the same CLI before the fallback chain moves on (F31, 2026-09-26)
 
 F27 made the fatal-pane fast-fail act, so a dead pane leaves the wait in one interval. But the launch still exited 81 into the fallback chain. With codex quota-walled and ollama unable to write source, cycle 1687's triage had nowhere to go and aborted. A dead shell means the REPL process died, not the CLI or the account.

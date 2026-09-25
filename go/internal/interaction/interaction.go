@@ -119,7 +119,8 @@ type Event struct {
 	// Cycle is the loop cycle the interaction belongs to (0 outside a cycle).
 	Cycle int `json:"cycle"`
 	// Trigger names what provoked the interaction ("idle_no_artifact",
-	// "contract_reject", "unknown_prompt", ...).
+	// "idle_unrewritten_deliverable" — F39: present but not rewritten since
+	// dispatch — "contract_reject", "unknown_prompt", ...).
 	Trigger string `json:"trigger"`
 	// Rung is the correction-ladder rung that produced this event
 	// ("salvage"|"live_fix"|"redispatch"|"") — load-bearing for the

@@ -1,0 +1,27 @@
+{
+  "id": "correction-completion-needs-deliverable-rewrite",
+  "created_at": "2026-09-26T05:20:00Z",
+  "weight": 0.8,
+  "title": "F39 part 2: a correction round whose fix lives outside the deliverable must complete deterministically (part 1, the explaining nudge, has landed)",
+  "kind": "pipeline-repair",
+  "priority": "P1",
+  "summary": "Cycle 1691 (wave 8, 2026-09-26): the build handoff floor rejected the build (one Changed Areas path needed a what/why line in the explanation doc) and correction 1/2 re-dispatched at 04:37:58. The builder fixed the explanation doc at 04:39 — correctly: build-report.md needed no change and `evolve phase verify build` reported it well-formed. But the bridge's completion check (completion.go artifactBaseline: size+mtime of the deliverable captured at dispatch) requires the deliverable to CHANGE after dispatch, so it treated the phase as incomplete, sent the one-shot nudge ('Please write the deliverable…'), and the agent — correctly seeing the report was already right — re-verified and answered 'Phase is complete' without rewriting. The phase sat idle until the operator touched build-report.md at 05:16 (content unchanged, verified) — otherwise the stop-review would have closed it as exit 81 and failed a correct cycle on a pipeline defect.",
+  "root_cause": "The stale-leftover guard (cycle-1550: never accept a pre-dispatch artifact as this attempt's result) is right for EVERY dispatch — its founding case was itself a correction re-dispatch. What is missing is a second, honest evidence source for a deliverable legitimately CARRIED FORWARD: a correction whose fix lives in another file leaves the previous attempt's accurate deliverable untouched, and nothing asks the agent to re-check and re-affirm it (part 1, the explaining nudge, now does).",
+  "fix": "Keep the guard for every dispatch. Add a deterministic second path for a carried-forward deliverable: for a correction re-dispatch of a SOURCE-writing phase, the host completes the phase when the agent goes idle with the deliverable present and well-formed AND the worktree changed since the correction dispatch through the AGENT's own edits. Promote the correction-prompt instruction into the protocol: the correction directive asks the agent to append a `## Correction N` section to the deliverable recording what it fixed (works up front — 1691 lost ~20 min between the fix at 04:39 and the nudge reply at 04:58).",
+  "acceptance": [
+    "Replay of the 1691 shape: a correction re-dispatch whose agent fixes a non-deliverable file and leaves a well-formed deliverable untouched completes without operator action.",
+    "A correction re-dispatch where the agent changes NOTHING still does not complete on the stale deliverable (the cycle-1550 guard holds).",
+    "A first dispatch still refuses a pre-dispatch leftover deliverable.",
+    "Host-made writes (challenge token, telemetry, .evolve/ state) never count as evidence that the agent acted.",
+    "Read-only phases (audit, adversarial-review) never qualify: their stale verdict completes only by being rewritten after dispatch.",
+    "The bridge REPORTS the evidence (a worktree snapshot at dispatch vs at idle); core runs `phase verify` — the bridge does not import phase verifiers.",
+    "The correction directive asks for an appended `## Correction N` section (pinned in the correction-prompt composition)."
+  ],
+  "files": [
+    "go/internal/bridge/completion.go",
+    "go/internal/bridge/engine.go",
+    "go/internal/core/cyclerun_correction.go",
+    "go/internal/adapters/bridge/bridge.go"
+  ],
+  "notes": "Console-owned by kind (the fix surface is the protected bridge + orchestrator). Evidence: runs/cycle-1691 (build-report.md mtime 04:37:45 < correction dispatch 04:37:58; the builder pane at 04:58 said 'Phase is complete'); operator touch 05:16:07 recorded in the campaign memory. Frequency risk: every build-floor correction whose fix is an explanation doc or source-only change. | 2026-09-26: PART 1 landed (fix/correction-completion-nudge): the idle nudge names an unrewritten deliverable and why a rewrite is needed (bridge.nudgeMessage). PART 2 REMAINS: deterministic completion for a correction re-dispatch whose worktree changed and whose deliverable verifies."
+}
