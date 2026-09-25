@@ -15,10 +15,11 @@ import (
 
 // PlanFn is the wave's single-writer plan source. Preferred: the immediately
 // prior cycle's committed triage-decision.json (LastCycle → Workspace), pruned
-// of consumed ids and THEN widened to fleet width from the inbox backlog (an
-// id consumed during an earlier wave is dead work; dropping it first frees the
-// slot for the widening to refill — pruning after would leave the wave a lane
-// short). A prior decision absent (fresh start, a sealed run dir, a cycle that
+// of consumed and console-routed ids and THEN widened to fleet width from the
+// inbox backlog (an id consumed during an earlier wave, or one the plan-time
+// gate would refuse, is dead work; dropping it first frees the slot for the
+// widening to refill — pruning after would leave the wave a lane short). A
+// prior decision absent (fresh start, a sealed run dir, a cycle that
 // failed before triage) or a failed last-cycle read falls through to the inbox
 // seed, so 2-wide starts on the FIRST cycle; a seed too narrow errors and the
 // caller falls back to sequential. cardPackages is always nil (no dedicated
@@ -30,7 +31,7 @@ func (e *Engine) PlanFn(count int) PlanFn {
 		if lastCycle, err := e.ports.LastCycle(ctx); err == nil && lastCycle > 0 {
 			companion := filepath.Join(e.ports.Workspace(lastCycle), triagecap.TriageDecisionName())
 			if data, rerr := os.ReadFile(companion); rerr == nil {
-				data = e.pruneConsumed(data)
+				data = e.pruneRouted(e.pruneConsumed(data))
 				return WidenNarrowDecision(data, e.roots.EvolveDir, count, e.ports.Protected), nil, nil
 			}
 		}
@@ -115,22 +116,49 @@ func cards(menus [][]triagecap.FleetCandidate) []map[string]any {
 // "consumed" beliefs (TestConsumedHasThreeBeliefs): this prune's set, widen's
 // triagecap.PruneConsumed and the dispatch probe's differ deliberately.
 func (e *Engine) pruneConsumed(data []byte) []byte {
+	opts := inboxmover.Options{ProjectRoot: e.roots.ProjectRoot, Stderr: io.Discard, Signals: e.center()}
+	return e.pruneTopN(data, func(id string) (string, bool) {
+		return fmt.Sprintf("pruned consumed top_n id %q from prior decision", id),
+			isConsumed(inboxmover.ResolveDispatchState(opts, id).State)
+	})
+}
+
+// pruneRouted drops every top_n id the plan-time gate would refuse — the
+// ADR-0074 classifier NOW routes it to the console (an operator stamp or a
+// protected surface landed after the prior cycle's triage committed it) —
+// before the widen, for the consumed prune's reason: kept, a routed id holds a
+// lane slot the widen will not refill, and the gate refuses it only after the
+// lanes are cut (F34: wave 7 ran 1 of 2 lanes, 2026-09-26). Same fidelity and
+// passthroughs as pruneConsumed; routedBase is the gate's own authority.
+func (e *Engine) pruneRouted(data []byte) []byte {
+	routed := e.routedBase()
+	return e.pruneTopN(data, func(id string) (string, bool) {
+		r, reason := routed(id)
+		return fmt.Sprintf("pruned console-routed top_n id %q from prior decision before widening (%s)", id, reason), r
+	})
+}
+
+// pruneTopN is the prunes' one skeleton: drop every non-empty top_n id dead
+// reports, one WARN line each, keeping every other key of the decision. An
+// unparseable decision, one carrying committed_floors (dispatched ahead of
+// top_n, which is ignored), an empty top_n or nothing dropped returns the
+// original bytes.
+func (e *Engine) pruneTopN(data []byte, dead func(id string) (line string, drop bool)) []byte {
 	d, ok := parseDecision(data)
 	if !ok || len(d.CommittedFloors) > 0 || len(d.TopN) == 0 {
 		return data
 	}
-	opts := inboxmover.Options{ProjectRoot: e.roots.ProjectRoot, Stderr: io.Discard, Signals: e.center()}
 	kept := make([]map[string]any, 0, len(d.TopN))
-	dropped := 0
 	for _, c := range d.TopN {
-		if c.ID != "" && isConsumed(inboxmover.ResolveDispatchState(opts, c.ID).State) {
-			fmt.Fprintf(e.stderr, "[loop] WARN: wave plan: pruned consumed top_n id %q from prior decision\n", c.ID)
-			dropped++
-			continue
+		if c.ID != "" {
+			if line, drop := dead(c.ID); drop {
+				fmt.Fprintf(e.stderr, "[loop] WARN: wave plan: %s\n", line)
+				continue
+			}
 		}
 		kept = append(kept, cardOf(c.ID, c.Files))
 	}
-	if dropped == 0 {
+	if len(kept) == len(d.TopN) {
 		return data
 	}
 	return remarshalFull(data, kept)

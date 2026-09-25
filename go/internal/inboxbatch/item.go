@@ -124,18 +124,27 @@ func declaredTokens(files []string) []string {
 }
 
 // surfaceTokens splits files[] entries into bare tokens (the loose shapes
-// authors write: "a.go b.go", "(a.go)", "a.go;").
+// authors write: "a.go b.go", "(a.go)", "a.go;", "a.go:178").
 func surfaceTokens(files []string) []string {
 	var out []string
 	for _, f := range files {
 		for _, tok := range strings.Fields(f) {
-			if tok = strings.Trim(tok, "()[]{},;:'\""); tok != "" {
+			tok = lineLocatorRE.ReplaceAllString(strings.Trim(tok, "()[]{},;:'\""), "")
+			if tok != "" {
 				out = append(out, tok)
 			}
 		}
 	}
 	return out
 }
+
+// lineLocatorRE matches the source locator authors append when citing a file
+// ("a.go:178", "a.go:178:5", "a.go:189,205,221", "a.go:10-20", "a.go#L10-L20")
+// — any trailing ":<digits>" run joined by "-", "," or ":", so a date-shaped suffix
+// ("x.md:2026-09-26") strips too, equally not part of the path. It is how the
+// file is cited, not part of its path — kept, the ":" failed the path shape
+// and the file went unjudged while triage's breaker still matched it (F35).
+var lineLocatorRE = regexp.MustCompile(`(?::\d+(?:[-,:]\d+)*|#L\d+(?:-L?\d+)?)$`)
 
 // repoPathRE matches a WHOLE slash-bearing token: segments of path characters
 // joined by slashes, or one segment with a trailing slash ("go/", "skills/").

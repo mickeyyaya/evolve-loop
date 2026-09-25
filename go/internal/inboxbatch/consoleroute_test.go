@@ -64,14 +64,19 @@ func TestConsoleRouted_AnnotatedFileEntryFirstToken(t *testing.T) {
 	}
 }
 
-// route:"lane" is the operator override for false positives — it forces
-// dispatchability even when a declared file is protected (e.g. the item only
-// READS the surface). Explicit human routing beats the derivation.
+// route:"lane" is the operator override for a heuristic's false positives — a
+// declared directory that only holds protected files is lane work when the
+// change avoids them. It cannot relax a declared protected FILE (F35): the
+// breaker and the tripwire refuse that whatever the route; an item that only
+// READS the surface declares the files it changes, not the ones it reads.
 func TestConsoleRouted_ExplicitLaneOverrideWins(t *testing.T) {
-	it := Item{ID: "x", Route: "lane", Files: []string{"go/internal/guards/role.go"}}
-	routed, _ := ConsoleRouted(it, protectedStub("go/internal/guards/role.go"))
-	if routed {
-		t.Fatal("route:lane must override the protected-files derivation")
+	it := Item{ID: "x", Route: "lane", Files: []string{"go/internal/guards/"}}
+	if routed, _ := ConsoleRouted(it, protectedStub("go/internal/guards/")); routed {
+		t.Fatal("route:lane must override a directory-scope derivation")
+	}
+	it.Files = []string{"go/internal/guards/role.go"}
+	if routed, _ := ConsoleRouted(it, protectedStub("go/internal/guards/role.go")); !routed {
+		t.Fatal("route:lane must not relax a declared protected file")
 	}
 }
 

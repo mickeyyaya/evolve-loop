@@ -98,8 +98,12 @@ item consumed ⇒ work landed (transactional consumption); dossier phase records
   protectedsurface tripwire (the security floor is untouched) — but the
   disposition router (I2) turns that into a structured operator handoff
   instead of a discarded cycle.
-- False-positive derivations (an item that only *reads* a protected file) are
-  overridden explicitly with `route: "lane"` — with an ADR-0073 clamp-parity
+- False-positive derivations (a file the text only names, a declared
+  directory that merely holds protected files, the pipeline-* kind) are
+  overridden explicitly with `route: "lane"` (narrowed 2026-09-26 by the F35
+  amendment below: never over a declared protected FILE — an item that only
+  *reads* a protected file declares the files it changes and names the read
+  in prose) — with an ADR-0073 clamp-parity
   floor: an **agent-autofiled** item (`injected_by` set) cannot lane-override a
   protected derivation, so agent-authored fields never widen agent authority.
   The `route` field itself is unauthenticated (sandbox-off, nothing on disk is
@@ -163,6 +167,33 @@ item consumed ⇒ work landed (transactional consumption); dossier phase records
   lane-dispatchable. Follow-ups filed console-owned: scope-aware triage
   termination (`triage-termination-scope-aware`, cycle 1682), in-lane
   alternates on refusal (`lane-alternates-on-refusal`).
+- Amendment 2026-09-26 (research F34, F35): **the same parity, for the two
+  paths F29 left open.** (1) **A declared protected FILE binds:** the
+  `route:"lane"` override relaxes only the HEURISTIC derivations: a
+  `pipeline-*` kind, a declared directory that merely holds protected files,
+  and a file the text only names. It never relaxes a declared file on the
+  manifest, because triage's breaker and the ship tripwire judge MEMBERSHIP
+  of each file with no route exception, so the override could only force a
+  doomed lane. Two live operator overrides did exactly that
+  (`cyclerun-seat-helper`, `bwrap-bind-requires-existing-write-dir`, set
+  after their files joined the manifest). An item that only reads a
+  protected file declares the files it changes. For a file spelling the
+  injected scope predicate IS membership, so FILE spellings need no second
+  predicate. Residual (F35c, filed console-owned): a declared DIRECTORY that
+  is itself inside a protected directory fragment (`go/internal/bridge/`,
+  `.evolve/build-explanation-contracts/`) or an extensionless member prefix
+  (`go/internal/phases/audit/probe_quarantine`) still reads as scope and
+  stays overridable; binding it needs membership injected beside scope
+  (both projections as one port), pinned by a manifest-walk test.
+  A trailing source locator (`x.go:178`, `#L10-L20`) is how a file is
+  cited, not part of its path: it is stripped before judgment, because the
+  breaker's substring match saw through it and the classifier did not.
+  (2) **The plan prunes what the gate would refuse, before the widen:** the
+  prior decision's top_n loses its console-routed ids (one WARN each,
+  through the gate's own resolver) before `WidenNarrowDecision`. Kept, they
+  filled the fleet width, the widen short-circuited, and the gate refused
+  them only after the lanes were cut (wave 7 ran 1 of 2 lanes). The
+  plan-time gate stays the binding backstop.
 
 ## Slice map (implementation tracking)
 

@@ -188,7 +188,7 @@ func stepFields(err error, path string) map[string]string {
 // is refused — kept as a line because the pool scheduler reaches it with no
 // Center (F6).
 func (e *Engine) RoutedResolver() fleet.RoutedFn {
-	base := inboxbatch.RoutedResolver(filepath.Join(paths.EvolveDirOf(e.roots.ProjectRoot), "inbox"), e.ports.Protected)
+	base := e.routedBase()
 	return func(id string) (bool, string) {
 		routed, reason := base(id)
 		if routed {
@@ -196,6 +196,15 @@ func (e *Engine) RoutedResolver() fleet.RoutedFn {
 		}
 		return routed, reason
 	}
+}
+
+// routedBase is the ONE plan-time routing authority: a fresh inbox load under
+// the injected scope predicate. The dispatch gate (RoutedResolver) and the
+// plan prune (pruneRouted) both consult it — the same logic, each its own
+// fresh read — so the prune drops what the gate would refuse; an inbox write
+// landing between the two reads is caught by the gate, the backstop.
+func (e *Engine) routedBase() fleet.RoutedFn {
+	return inboxbatch.RoutedResolver(filepath.Join(paths.EvolveDirOf(e.roots.ProjectRoot), "inbox"), e.ports.Protected)
 }
 
 // Preflight is the S3 dirty-control-plane guard: a closure over
