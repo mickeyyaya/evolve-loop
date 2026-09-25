@@ -7,6 +7,8 @@ import (
 	"io"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
 // runResumeBatch owns the resume-only protocol. A resume executes exactly one
@@ -15,6 +17,8 @@ func runResumeBatch(
 	ctx context.Context,
 	cfg loopConfig,
 	orch loopCycleRunner,
+	lifecycle inboxmover.LedgerAppender,
+	signals *signalcenter.Center,
 	cycleEnv, cycleCtx map[string]string,
 	lr *loopResult,
 	stdout, stderr io.Writer,
@@ -54,6 +58,21 @@ func runResumeBatch(
 	if errors.Is(err, core.ErrAllFamiliesExhausted) {
 		lr.emitQuotaPause(cfg, result.Cycle, stdout, stderr)
 		return 5
+	}
+	// A resumed cycle — possibly a fleet lane's checkpoint, with its lane pin —
+	// reaches the inbox lifecycle like every other root (F30 architecture
+	// review M1): the failure walk for a FAIL (a cycle-level failure error
+	// included, as at the cycle-run root), the planned-no-work hand-off for a
+	// lane that answered for its scope.
+	closeout := result
+	var clf *core.ErrCycleLevelFailure
+	if errors.As(err, &clf) {
+		closeout.FinalVerdict = core.VerdictFAIL
+	}
+	if err == nil || clf != nil {
+		if applied, cerr := closeoutCycleOutcome(closeout, cfg.ProjectRoot, cfg.EvolveDir, stderr, lifecycle, signals); cerr != nil {
+			fmt.Fprintf(stderr, "evolve loop: resume: WARN: could not apply cycle %d %s to the inbox: %v\n", result.Cycle, applied, cerr)
+		}
 	}
 	if err != nil {
 		lr.StopReason = "error"

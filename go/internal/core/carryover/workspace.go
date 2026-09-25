@@ -125,8 +125,11 @@ func (l *Lifecycle) RetireTriageDropped(state *cyclestate.State, workspace strin
 }
 
 // triageDroppedIDs reads the non-blank ids of triage-decision.json's dropped[];
-// nil on absence or any decode failure (the reader core cannot share with
-// inboxmover without an import cycle — follow-up F8).
+// nil on absence or any decode failure. One of three readers of dropped[]
+// (inboxmover.ClosedDroppedIDs, committedset.DispositionsFrom — see the note on
+// ClosedDroppedIDs); unifying them behind one declaration in the stdlib-only
+// committedset leaf is follow-up decision-document-single-declaration (the
+// import cycle F8 cited no longer applies).
 func triageDroppedIDs(workspace string) []string {
 	body, err := os.ReadFile(filepath.Join(workspace, "triage-decision.json"))
 	if err != nil {

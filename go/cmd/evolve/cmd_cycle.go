@@ -267,13 +267,50 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 	if sf := result.SystemFailure; sf != nil && sf.Halt {
 		return haltOnSystemFailure(evolveDir, projectRoot, result.Cycle, cycleWorkspace(projectRoot, result.Cycle), sf, stderr, signals, systemFailureRule)
 	}
-	// The other shape of a FAIL: RunCycle returned no error but the cycle's
-	// final verdict is FAIL. Same closeout, applied exactly once (the err!=nil
-	// branch above already returned).
-	if result.FinalVerdict == cyclestate.VerdictFAIL {
-		warnCycleFailureOutcome(stderr, result.Cycle, applyCycleFailureOutcome(projectRoot, evolveDir, result.Cycle, stderr, lifecycleLedger, signals))
+	// The other shape of a FAIL — RunCycle returned no error but the cycle's
+	// final verdict is FAIL — and the planned-no-work hand-off: each applied
+	// exactly once (the err!=nil branch above already returned).
+	if applied, err := closeoutCycleOutcome(result, projectRoot, evolveDir, stderr, lifecycleLedger, signals); err != nil {
+		fmt.Fprintf(stderr, "evolve cycle run: WARN: could not apply cycle %d %s to the inbox: %v\n", result.Cycle, applied, err)
 	}
 	return cycleRunExitCode(result)
+}
+
+// closeoutCycleOutcome applies a completed cycle's verdict to the inbox: the
+// failure walk for a FAIL, the planned-no-work hand-off for a lane that
+// answered for its scope without committing it (F30), nothing otherwise. It
+// is the ONE post-result closeout every root makes — the cycle-run root every
+// fleet lane runs, the sequential loop and `evolve loop --resume`, which can
+// resume a fleet lane's checkpoint with its lane pin (F30 architecture review
+// M1) — and it returns what it applied ("failure outcome" / "no-work
+// hand-off") and the walk's error for the caller to WARN in its own voice: a
+// lifecycle hiccup never changes a cycle's exit code or a batch's flow. One
+// known asymmetry: a quota wall (ErrAllFamiliesExhausted) pauses a resume
+// BEFORE this call — its claims wait for the resumed attempt — while the
+// cycle-run root and the sequential loop walk (and charge) it as a cycle-level
+// failure; which is right is filed as quota-pause-closeout-parity.
+func closeoutCycleOutcome(result core.CycleResult, projectRoot, evolveDir string, stderr io.Writer, lifecycle inboxmover.LedgerAppender, signals *signalcenter.Center) (applied string, err error) {
+	switch {
+	case result.FinalVerdict == cyclestate.VerdictFAIL:
+		return "failure outcome", applyCycleFailureOutcome(projectRoot, evolveDir, result.Cycle, stderr, lifecycle, signals)
+	case core.IsTriageNoWorkResult(result):
+		return "no-work hand-off", applyCycleNoWorkOutcome(projectRoot, result.Cycle, stderr, lifecycle, signals)
+	}
+	return "", nil
+}
+
+// applyCycleNoWorkOutcome hands a planned-no-work lane's answered scoped items
+// to the console and releases its claims (cycleoutcome.ApplyNoWork — F30's
+// loop breaker) on the root's ledger and Signal Center, like the failure walk.
+// A cycle without a lane pin has nothing to hand over.
+func applyCycleNoWorkOutcome(projectRoot string, cycle int, stderr io.Writer, lifecycle inboxmover.LedgerAppender, signals *signalcenter.Center) error {
+	_, err := cycleoutcome.ApplyNoWork(cycleoutcome.NoWorkInputs{
+		ProjectRoot: projectRoot,
+		Workspace:   cycleWorkspace(projectRoot, cycle),
+		Cycle:       cycle,
+		Stderr:      stderr,
+	}.WithLedger(lifecycle).WithSignals(signals))
+	return err
 }
 
 // applyCycleFailureOutcome walks the failed cycle's triage-committed ids

@@ -22,7 +22,7 @@ func (c *resumeCursor) next(o *Orchestrator, cs CycleState, projectRoot string) 
 		return c.current, nil
 	}
 	if c.current == PhaseTriage {
-		c.termination = o.triageTermination(projectRoot, cs.WorkspacePath, cs.CompletedPhases, c.lastVerdict)
+		c.termination = o.triageTermination(projectRoot, cs.WorkspacePath, cs.CycleID, cs.CompletedPhases, c.lastVerdict)
 		if c.termination.stop {
 			return PhaseEnd, nil
 		}
