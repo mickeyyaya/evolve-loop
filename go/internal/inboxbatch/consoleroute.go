@@ -22,19 +22,32 @@ const routeLane = "lane"
 // console-salvage, and future console-* refinements).
 const consoleRoutePrefix = "console"
 
+// pipelineKindPrefix marks pipeline-integrity work (pipeline-repair,
+// pipeline-integrity, …): fixed hands-on in the console by operator policy
+// (ADR-0072 halt autofiles this kind), so the kind alone routes the item out
+// of lane reach — no files[] entry required. Provenance: wave 6, cycle 1688
+// (2026-09-15) surfaced 15 lane-eligible pipeline-* items (8 with no files[]
+// at all); one was claimed and failed triage before the breaker caught it.
+const pipelineKindPrefix = "pipeline-" // every pipeline-* kind, present and future, is the pipeline's own work
+
+// KindPipelineRepair is the kind the ADR-0072 halt autofiles for the operator
+// (cmd_loop_escalation.go) — the one symbol the writer and this classifier
+// share, so the two can never drift apart.
+const KindPipelineRepair = pipelineKindPrefix + "repair"
+
 // ConsoleRouted reports whether the item is operator-owned (not lane-
 // dispatchable) and why. isProtected is the control-plane membership predicate
 // (guards.IsProtectedSurface at composition roots; nil disables only the
 // files-derived rule — the explicit route field always binds).
 //
-// Precedence: route "console-*" always routes; a protected fix surface in
-// files[] routes unless route:"lane" AND the item is operator-authored
-// (InjectedBy empty) — agent-autofiled items cannot widen agent authority by
-// self-declaring lane dispatch of control-plane work (ADR-0073 clamp-parity:
-// the field is unauthenticated, so the achievable floor is that an agent-
-// authored override never *widens* what an agent may do; a hand-forged
-// override at most forces a doomed pipeline, since the ship-time
-// protectedsurface tripwire still blocks the merge).
+// Precedence: route "console-*" always routes; a pipeline-* kind or a
+// protected fix surface in files[] routes unless route:"lane" AND the item
+// is operator-authored (InjectedBy empty) — agent-autofiled items cannot
+// widen agent authority by self-declaring lane dispatch of control-plane
+// work (ADR-0073 clamp-parity: the field is unauthenticated, so the
+// achievable floor is that an agent-authored override never *widens* what an
+// agent may do; a hand-forged override at most forces a doomed pipeline,
+// since the ship-time protectedsurface tripwire still blocks the merge).
 //
 // The derivation scans every whitespace token of each files[] entry (real
 // items write "path (why)" and "(see path)" shapes) and only matches surfaces
@@ -45,7 +58,10 @@ func ConsoleRouted(it Item, isProtected func(string) bool) (bool, string) {
 	if strings.HasPrefix(route, consoleRoutePrefix) {
 		return true, "route:" + route
 	}
-	derived, reason := protectedDerivation(it, isProtected)
+	derived, reason := pipelineKindDerivation(it)
+	if !derived {
+		derived, reason = protectedDerivation(it, isProtected)
+	}
 	if !derived {
 		return false, ""
 	}
@@ -53,9 +69,19 @@ func ConsoleRouted(it Item, isProtected func(string) bool) (bool, string) {
 		if strings.TrimSpace(it.InjectedBy) == "" {
 			return false, "" // operator-authored override honored
 		}
-		return true, reason + " (route:lane ignored: agent-autofiled item cannot override a protected derivation)"
+		return true, reason + " (route:lane ignored: agent-autofiled item cannot override a console derivation)"
 	}
 	return true, reason
+}
+
+// pipelineKindDerivation reports whether the item's kind marks it as
+// pipeline-integrity work (console-owned by policy).
+func pipelineKindDerivation(it Item) (bool, string) {
+	kind := strings.ToLower(strings.TrimSpace(it.Kind))
+	if !strings.HasPrefix(kind, pipelineKindPrefix) {
+		return false, ""
+	}
+	return true, "kind:" + kind + " (pipeline-integrity work is console-owned)"
 }
 
 // protectedDerivation reports whether any declared fix-surface token is on the

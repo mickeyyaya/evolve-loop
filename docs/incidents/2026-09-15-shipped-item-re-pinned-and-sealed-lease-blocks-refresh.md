@@ -42,3 +42,7 @@ Stopping the loop at the wave-4 boundary took SIGINT ×2, SIGTERM and finally SI
 ## Addendum — lane 1685 (research F22)
 
 A red_count=0 audit with every criterion evidenced sealed FAIL: the auditor's verdict was fenced JSON without the sentinel wrapper; the gate salvaged and approved the repaired report while the runner had classified the unrepaired bytes, and the audit-fail envelope declined a repair for want of a class (the F19 signal named it in one line). Fixed at the class: one verifier — the gate's own Reviewer verifies for the engine (`VerifyForClassification`), salvaging, persisting and reporting before classification; every BaseRunner is handed an accessor to it at the composition root.
+
+## Addendum — lane 1688 (research F25)
+
+The first wave on v22.24.0 burned its first seal on a `pipeline-repair` item with no files list: the plan-time classifier could not see its surface, the triage breaker could, and the refusal came after two LLM phases. The kind is now a routing input in the one ADR-0074 classifier, so pipeline-integrity items never reach a lane.
