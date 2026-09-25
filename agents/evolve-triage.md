@@ -36,7 +36,11 @@ Items in carryoverTodos with `defer_count >= 3` get a WARN flag in your decision
 
 ### 3. Drop with a reason, never silently
 
-If an item shouldn't be in the backlog at all (duplicate, stale, no longer applicable), put it in `dropped[]` with a `reason` field. Don't just leave it out — silent drops lose audit trail.
+If an item shouldn't be in the backlog at all (duplicate, stale, no longer applicable), put it in `dropped[]` with a `reason` field. Don't just leave it out — silent drops lose audit trail. The reason's leading tag decides what the host does with the item:
+- **Retires on a PASS landing:** `already-shipped: <sha>` (the work is at HEAD), `duplicate: <id>`, `superseded: <id or sha>`, `obsolete: <why>`.
+- **Never retires on its own:** `stale: <evidence>` (the premise no longer holds; the console confirms), `requires-split`, `out-of-scope`.
+
+Lead with the tag. `stale-completed` is not a tag: write `already-shipped: <sha>` for done work.
 
 ### 4. Priorities flow from intent + evidence pointers
 
@@ -263,6 +267,20 @@ For each `.evolve/inbox/*.json` (maxdepth 1):
 
 Emit machine-readable arrays in the companion `triage-decision.json` (see Step 4):
 `skip_shipped[]`, `skip_rejected[]`, `escalate_block[]`, `top_n[]`, `committed_floors[]`.
+
+### 0b. Premise re-check (F40)
+
+A queued item states its premise as of the day it was filed, and the code may have moved since. Re-verify its premise at HEAD **before you claim it** (Step 0a.4) and before you commit it to `top_n`; never claim an item you are about to drop. Always do this when the prompt's `premise_drift` section lists the item (it shows the filing date and what changed since), and for any bug filed more than about three weeks ago. Drift is evidence to check, not a verdict: most drifted items still hold.
+
+1. **Read the drift.** Inspect the commits `premise_drift` names (`git show --stat <sha>`, then the diff of the item's files). Did one of them fix, replace or supersede what the item describes?
+2. **For a bug, trace reachability.** Follow the triggering state from a **production** writer, through every reader and gate on the production path, to the defect site. A unit fixture that feeds the state straight into an inner function is not evidence, because an upstream reader may already reject that state. In cycle 1691, `acssuite.ReadVerdict` had made the item's WARN + `red_count:0` case unreachable 17 days before a lane built a "fix" for it.
+3. **For a feature, confirm it is still absent.** Grep for the capability under other names.
+
+What to do with the result:
+- **The premise no longer holds:** put the item in `dropped[]` with reason `stale: <file:line or sha evidence>`. Never commit it; building against a stale premise is how cycle 1691 opened a fail-open.
+- **It partly holds:** commit it, and narrow the card's action to what is still true, citing the evidence.
+- **In a fleet lane you answer for without committing anything:** your reasoned drop ends the lane as planned no-work, and the host hands the item to the console with your reason. That is the correct outcome, not a failure.
+- **A `stale:` drop never retires an item on its own.** The console confirms it, even when a sibling item in your lane ships.
 
 ### 0. Inbox ingestion (v9.5.0+)
 

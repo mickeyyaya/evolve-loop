@@ -33,6 +33,10 @@ Fault Localization → [Bug Reproduction] → (build)
 2. **Draft a reproducer.** 
    - Write a new unit test or standalone script (e.g., in Python, Go, or shell) that triggers the buggy code path under the exact scenario described in the issue.
    - The reproducer should run cleanly and exit with 0 if the bug is absent (or fixed), but fail/panic/exit non-zero if the bug is present.
+   - **Reproduce through production (F40).** Drive a state that a **production** writer emits, through the production entry point the issue names (the cycle ship path, say, not the inner function behind it).
+     - A fixture that constructs a state no production path delivers is **not** a reproduction. One that bypasses an upstream reader or gate is the common case.
+     - If the state cannot reach the site, report `repro.failing=false` and cite the gate that rejects it in `## Reproduction`.
+     - Cycle 1691 "reproduced" a bug by feeding `{"verdict":"WARN","red_count":0}` straight to `shipFromWorktree`, although `acssuite.ReadVerdict` rejects that artifact on the cycle path. The build then "fixed" a non-bug and opened a fail-open.
 3. **Execute and verify the failure.** Run the reproducer test/script in the current workspace. Ensure it actually fails, and capture the output (stdout/stderr).
 4. **Report reproduction.** Under `## Reproduction`, document the file path of the reproducer, its contents, and the reasoning behind its design.
 5. **Verify the failure.** Under `## Verification`, paste the execution command and its verbatim output showing the failure.

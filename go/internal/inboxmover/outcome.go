@@ -223,7 +223,13 @@ func DeferredIDs(body []byte) []string {
 // reason — "forgetting a live todo is worse than carrying a stale one"
 // (the carryover unit's governing preference, applied to the durable
 // queue where the stakes are higher, not lower).
-var closedDropReasons = []string{"already-shipped", "already-done", "already-landed", "duplicate", "superseded", "stale", "obsolete"}
+//
+// A STALE drop is deliberately NOT close-class (F40 architecture review C1): a
+// premise re-check (triage Step 0b) is a judgment the console confirms, never
+// an automatic retirement — "stale" was in this list before triage was told to
+// look for stale premises, which would have let a lane's PASS ship consume a
+// stale-dropped menu-mate unverified.
+var closedDropReasons = []string{"already-shipped", "already-done", "already-landed", "duplicate", "superseded", "obsolete"}
 
 // ClosedDroppedIDs returns the ids triage dropped WITH a close-class reason —
 // an affirmative statement the work is landed or the item is dead. The
@@ -247,15 +253,28 @@ func ClosedDroppedIDs(body []byte) []string {
 	}
 	out := []string{}
 	for _, e := range d.Dropped {
-		reason := strings.ToLower(e.Reason)
+		tag := dropReasonTag(e.Reason)
 		for _, tok := range closedDropReasons {
-			if strings.Contains(reason, tok) {
+			if strings.HasPrefix(tag, tok) {
 				out = append(out, e.ID)
 				break
 			}
 		}
 	}
 	return dedupeIDs(out)
+}
+
+// dropReasonTag is a drop reason's leading tag — the text before its first
+// ':' — lowercased and trimmed. A reason is classified by what it LEADS with:
+// "stale: superseded by #535" is a stale drop, not a superseded one, and
+// "requires-split (stale)" is a split request (F40 architecture review C1 —
+// the former substring match read any mention of a close-class word as the
+// item's retirement).
+func dropReasonTag(reason string) string {
+	if i := strings.IndexByte(reason, ':'); i >= 0 {
+		reason = reason[:i]
+	}
+	return strings.ToLower(strings.TrimSpace(reason))
 }
 
 // dedupeIDs drops empties and duplicates, preserving first-seen order.

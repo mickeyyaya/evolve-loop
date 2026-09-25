@@ -20,6 +20,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 )
@@ -67,6 +68,9 @@ type Item struct {
 	// and a recommendation). Projected into the Task Contract block; the cycle's
 	// authoritative kind is what triage declares in its report header.
 	DeliverableKind string `json:"deliverable_kind,omitempty"`
+	// CreatedAt is the item's filing timestamp as authored (RFC3339 or a bare
+	// date); FiledAt is the parsed view, with the filename prefix as fallback.
+	CreatedAt string `json:"created_at,omitempty"`
 	// Path is the source file (relative name inside the inbox dir) — operator
 	// affordance for `evolve inbox batches` output; not part of grouping.
 	Path string `json:"-"`
@@ -107,6 +111,38 @@ func (it *Item) UnmarshalJSON(raw []byte) error {
 // triage LLM would resolve into the tree) declares nothing.
 func (it Item) DeclaredSurface() bool {
 	return len(declaredTokens(it.Files)) > 0
+}
+
+// DeclaredPaths returns the item's declared fix surface — the path-shaped
+// files[] tokens (declaredTokens, the ONE token set the console classifier
+// judges) — for evidence gathering such as triage's premise drift (F40).
+func (it Item) DeclaredPaths() []string {
+	return declaredTokens(it.Files)
+}
+
+// filedAtLayouts are the created_at shapes authors write, most specific first.
+var filedAtLayouts = []string{time.RFC3339, "2006-01-02"}
+
+// filenameStampLayout is the timestamp prefix inbox filenames carry
+// ("2026-08-16T19-30-00Z-<id>.json") — colons are not filename-safe.
+const filenameStampLayout = "2006-01-02T15-04-05Z"
+
+// FiledAt is when the item was filed: its created_at (RFC3339 or a bare
+// date), else the timestamp prefix of its filename; zero when neither parses —
+// a missing date is never guessed (F40: premise drift measures from it).
+func (it Item) FiledAt() time.Time {
+	created := strings.TrimSpace(it.CreatedAt)
+	for _, layout := range filedAtLayouts {
+		if t, err := time.Parse(layout, created); err == nil {
+			return t
+		}
+	}
+	if base := filepath.Base(it.Path); len(base) >= len(filenameStampLayout) {
+		if t, err := time.Parse(filenameStampLayout, base[:len(filenameStampLayout)]); err == nil {
+			return t
+		}
+	}
+	return time.Time{}
 }
 
 // declaredTokens is the ONE token set a declared surface consists of: the
@@ -332,15 +368,23 @@ func sanitizeItem(it *Item) bool {
 	return changed
 }
 
-// cleanBounded strips control characters and bounds s to max bytes, flagging
-// changed when either applied.
-func cleanBounded(s string, max int, changed *bool) string {
-	mapped := strings.Map(func(r rune) rune {
+// StripControl replaces control characters (C0 and DEL) with spaces — the ONE
+// control-character rule for agent-authorable text entering a prompt: a
+// newline in an id, a title or a commit subject would forge a new context
+// bullet (prompt injection through the data channel).
+func StripControl(s string) string {
+	return strings.Map(func(r rune) rune {
 		if r < 0x20 || r == 0x7f {
 			return ' '
 		}
 		return r
 	}, s)
+}
+
+// cleanBounded strips control characters and bounds s to max bytes, flagging
+// changed when either applied.
+func cleanBounded(s string, max int, changed *bool) string {
+	mapped := StripControl(s)
 	if len(mapped) > max {
 		mapped = mapped[:max]
 	}

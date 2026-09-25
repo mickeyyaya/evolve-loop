@@ -1,0 +1,27 @@
+{
+  "id": "stale-premise-reaches-build",
+  "kind": "pipeline-repair",
+  "priority": "P1",
+  "weight": 0.85,
+  "title": "F40 remainder: a prompt-regression replay proves triage drops cycle 1691's stale item",
+  "summary": "F40 landed the deterministic premise_drift section for fleet-lane triage, triage persona Step 0b (re-verify a drifted premise at HEAD; drop a stale one with reason stale: <evidence>) and production-reachability requirements in the fault-localization and bug-reproduction personas; F30 turns such a drop into planned no-work plus a console hand-off. What is NOT pinned is the judgment itself: that a triage given 1691's real input (the item, its drift, base 3c096262) drops it as stale citing acssuite.ReadVerdict. Record: docs/incidents/2026-09-26-stale-premise-reached-build.md.",
+  "root_cause": "The pipeline trusts an item's premise from filing time. premise-challenge exists and its goal-is-wrong attack names 'the bug is already fixed' (agents/evolve-premise-challenge.md), but it is inserted only when scout.cycle_size == large, its categories are [feature], and its verdict is verdict_from_sentinel=shadow (.evolve/phases/premise-challenge/phase.json) — so it never ran on 1691 and would not have gated if it had. fault-localization and bug-reproduction take 'the exact scenario described in the issue' on trust (agents/evolve-fault-localization.md, agents/evolve-bug-reproduction.md): neither asks whether a PRODUCTION writer and entry path can deliver the triggering state to the defect site, so a fixture that constructs an unreachable state passes as a reproduction.",
+  "fix": "Add a prompt-regression replay (the prompt-regression-eval machinery or an ACS eval) that runs the triage persona on cycle 1691's recorded input and asserts a stale drop that cites the upstream gate; keep it out of the per-cycle hot path.",
+  "acceptance": [
+    "A replay of cycle 1691's triage input (item + premise_drift + base 3c096262) yields dropped[] with a stale: reason citing acssuite/evidence.go ReadVerdict — pinned as a prompt-regression eval",
+    "The eval runs outside the per-cycle hot path (scheduled or on persona change)"
+  ],
+  "files": [
+    "agents/evolve-triage.md"
+  ],
+  "connects_to": [
+    "triage-termination-scope-aware (F30: the no-work terminal a stale-premise lane ends on)",
+    "warn-ship-consumption-gap (cycle 1691, the founding case)",
+    "go/internal/acssuite/evidence.go (#535 ReadVerdict — the upstream gate the reproduction bypassed)",
+    ".evolve/runs/cycle-1691/audit-report.md (H1/H2, the auditor's own probes)",
+    "Observed in passing: .evolve/phases/bug-reproduction/agent.md duplicates agents/evolve-bug-reproduction.md with drifted text — personas load from agents/; retire the copy (single source).",
+    "Observed in passing: inboxbatch.Classify / the wave planner count an item with a pending console-owned dep (artifact-bytes-signal-dual-rendering → egps-regression-tia-selection) as dispatchable while the launcher's freshness probe refuses it (loopwave/launcher.go:74-80) — one dispatchability belief should include deps."
+  ],
+  "created_at": "2026-09-26T06:00:00Z",
+  "source": "console-wave8-1691-postmortem"
+}

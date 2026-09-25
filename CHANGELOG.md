@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — triage re-checks a queued item's premise against what changed since it was filed (F40, 2026-09-26)
+
+Cycle 1691 picked an item filed on 2026-08-16. #535 had made its premise unreachable on 2026-09-09. Fault-localization and bug-reproduction accepted a unit fixture that fed the unreachable state straight to an inner function, and the builder "fixed" a non-bug and opened a fail-open. The audit caught it a full cycle later. A console audit of the next ten queued items found six whose premise or scope was wrong.
+
+- `premise_drift` in a fleet lane's triage prompt (`phases/triage/premise_drift.go`). The item is found wherever triage's claim left it. For each scoped item the section lists:
+  - the commits since it was filed that name its id;
+  - those that touched its declared paths;
+  - by subject, those that touched only their packages;
+  - declared paths not at HEAD, checked with `git cat-file`, never the filesystem.
+
+  It is framed as evidence, not a verdict. It is bounded and fail-open, a git failure shows as a visible line, and a sequential prompt is byte-identical. New `inboxbatch.Item.FiledAt` / `DeclaredPaths` / `StripControl`.
+- Triage persona Step 0b: re-verify a drifted or older item's premise at HEAD before claiming it, and drop a stale one with `stale: <evidence>`. With F30, that drop ends the lane as planned no-work and hands the item to the console.
+- A stale drop never retires an item: `inboxmover.ClosedDroppedIDs` no longer counts `stale` and classifies a reason by its leading tag. A lane's PASS ship can no longer consume a stale-dropped menu-mate.
+- The fault-localization and bug-reproduction personas require production reachability. A fixture that bypasses an upstream reader is not a reproduction.
+- Record: `docs/incidents/2026-09-26-stale-premise-reached-build.md`. The replay eval stays open on `stale-premise-reaches-build`, and the re-verification anchor, evidence checks and planner pre-filters on `premise-verification-anchor`.
+
 ## Fixed — the build handoff floor refuses a protected control-plane edit, and a ship refusal for one goes back to build (F37, 2026-09-26)
 
 Cycle 1689's builder rewrote the protected `go/internal/core/cyclerun.go` through a shell tool, which the Edit/Write role guard never sees. The build floor approved the diff, and only ship's integrity check (ADR-0064 P2) would have refused it, after a full audit. That refusal would then have recovered into a re-audit of the same diff until the budget aborted the cycle. The operator stopped the lane first.

@@ -142,6 +142,11 @@ func TestCommittedInboxIDs_DropReasonGate(t *testing.T) {
 		{"out-of-scope for this lane", false},
 		{"needs redesign first", false},
 		{"", false},
+		// F40 architecture review C1: a premise re-check (triage Step 0b) is a
+		// judgment the console confirms — a PASS landing never consumes a
+		// stale-dropped menu-mate, whatever words follow the tag.
+		{"stale: superseded by #535 (acssuite.ReadVerdict)", false},
+		{"stale", false},
 	} {
 		t.Run(tc.reason, func(t *testing.T) {
 			ws := t.TempDir()
