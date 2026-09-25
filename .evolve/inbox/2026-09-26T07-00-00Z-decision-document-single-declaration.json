@@ -1,0 +1,16 @@
+{
+  "id": "decision-document-single-declaration",
+  "kind": "pipeline-refactor",
+  "priority": "P2",
+  "weight": 0.6,
+  "title": "One declaration of triage-decision.json's wire shape — three readers of dropped[] and two meanings of skip_shipped drift today",
+  "summary": "F30 architecture review M2. triage-decision.json is parsed by committedset (Committed/DecisionTopN/Deferred, and since F30 DispositionsFrom), inboxmover (CommittedIDs: top_n ∪ skip_shipped as the WORKED set; DeferredIDs; ClosedDroppedIDs: close-class drops), and core/carryover (triageDroppedIDs, reason-blind). skip_shipped is 'committed' to inboxmover.CommittedIDs but an 'answer, not committed' to DispositionsFrom. The import cycle that justified the copies no longer binds: committedset is a stdlib-only leaf.",
+  "fix": "Declare the decision document ONCE in committedset — Decision{TopN, Deferred, Dropped{ID,Reason}, SkipShipped{TaskID,GitSHA}, SkipRejected{TaskID}, EscalateBlock{TaskID,Reason,FailCount}} — and make Dispositions, ClosedDroppedIDs, triageDroppedIDs and CommittedIDs (renamed for what it is: the set that rides the landing) projections of it.",
+  "acceptance": [
+    "Exactly one non-test declaration of the dropped[] / skip_shipped[] wire tags (a single-declaration pin like cycleoutcome's TestLaneScopeProjection_SingleWireShapeDeclaration)",
+    "Each projection keeps its policy byte-for-byte (existing tests stay green unchanged)"
+  ],
+  "files": ["go/internal/committedset/committedset.go", "go/internal/inboxmover/outcome.go", "go/internal/core/carryover/workspace.go"],
+  "created_at": "2026-09-26T07:00:00Z",
+  "source": "console-f30-architecture-review"
+}

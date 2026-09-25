@@ -66,7 +66,7 @@ func (cr *cycleRun) selectNext() (Phase, loopAction, error) {
 	// A failed contract stops as FAIL. An explicit empty commitment stops too;
 	// closeout distinguishes legitimate no-work from unclaimed inbox work.
 	if cr.current == PhaseTriage {
-		terminal := cr.o.triageTermination(cr.req.ProjectRoot, cr.cs.WorkspacePath, cr.cs.CompletedPhases, cr.lastVerdict)
+		terminal := cr.o.triageTermination(cr.req.ProjectRoot, cr.cs.WorkspacePath, cr.cs.CycleID, cr.cs.CompletedPhases, cr.lastVerdict)
 		if terminal.stop {
 			cr.result.TerminationReason = terminal.reason
 			return PhaseEnd, loopBreak, nil

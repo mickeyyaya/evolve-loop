@@ -230,11 +230,16 @@ var closedDropReasons = []string{"already-shipped", "already-done", "already-lan
 // carryover twin is retired reason-blind (carryover.Lifecycle.RetireTriageDropped, a
 // soft 20-slot advisory store); the durable tracked queue gets the stricter
 // reason gate. Parses the "id" key only, matching the core sibling reader.
-// SIBLING READER: triageDroppedIDs (internal/core/carryover/workspace.go, ADR-0103 unit 03)
-// parses the SAME dropped[] field for the carryover twin — kept apart only by
-// the inboxmover→adapters/ledger→core import cycle. A schema change to
-// dropped[] must land in BOTH readers or consumption and carryover retirement
-// drift apart on the same document.
+// SIBLING READERS: triageDroppedIDs (internal/core/carryover/workspace.go,
+// ADR-0103 unit 03 — reason-blind, for the carryover twin) and
+// committedset.DispositionsFrom (F30 — a drop with a reason is an ANSWER that
+// ends a fleet lane as planned no-work) parse the SAME dropped[] field with
+// three deliberately different policies. A schema change to dropped[] must
+// land in ALL THREE or consumption, carryover retirement and the no-work
+// terminal drift apart on the same document. The import cycle that once kept
+// them apart no longer binds — committedset is a stdlib-only leaf every one of
+// them can import — so the follow-up (decision-document-single-declaration)
+// is ONE declaration of the decision's wire shape with three projections.
 func ClosedDroppedIDs(body []byte) []string {
 	var d struct {
 		Dropped []struct {
