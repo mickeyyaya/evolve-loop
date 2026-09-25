@@ -7,8 +7,14 @@
   "fix": "Wire deliverable.Verify into a Stop hook for claude-tmux phase profiles (with the stop_hook_active escape); measure per-CLI enforcement asymmetry so stats stay comparable. DOCS per 3.8 into docs/research/deliverable-alignment-2026-08/README.md.",
   "id": "claude-stop-hook-finish-gate",
   "kind": "feature",
-  "notes": "Ranked #6; also note Ollama grammar enforcement (format=json-schema) is available TODAY for the local leg \u2014 fold into the two-stage extractor item (verdict-sentinel-as-tool-call 0.86).",
+  "notes": "Ranked #6; also note Ollama grammar enforcement (format=json-schema) is available TODAY for the local leg — fold into the two-stage extractor item (verdict-sentinel-as-tool-call 0.86).",
   "summary": "Claude Code is the only CLI of our four with in-session enforcement: a Stop hook exiting 2 blocks turn-end with a stderr reason the agent must act on; PostToolUse can validate tool output. One turn cheaper than post-hoc correction. Codex/agy/ollama legs get the behavioral equivalent as a harness re-prompt through the pane.",
   "title": "Claude Code Stop-hook finish-gate: refuse turn-end until contracted deliverables exist and validate (tmux re-prompt equivalent for other CLIs)",
-  "weight": 0.8
+  "weight": 0.8,
+  "files": [
+    ".claude/settings.json",
+    "go/internal/deliverable/deliverable.go",
+    "docs/research/deliverable-alignment-2026-08/README.md"
+  ],
+  "surface_note": "2026-09-26 console curation (F29 follow-up): files[] typed from a read-only classification against guards.ProtectedSurfaceManifest — protected=true (/.claude/settings.json), confidence=high. The only Stop hook today runs 'evolve prune-ephemeral', and deliverable.Verify has no non-test callers, so the gate has to be wired through the protected hook file (or through the bridge's claude-tmux launch, which is also protected)."
 }

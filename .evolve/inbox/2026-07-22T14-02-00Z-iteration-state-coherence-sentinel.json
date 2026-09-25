@@ -11,7 +11,15 @@
     "RED: seeded stale in-flight canonical state + iteration top → WARN emitted + phase reconciled to aborted; a genuinely resumable unfinished cycle (boot-guard shape) is NOT touched",
     "go test -race; wiring test at the cmd_loop call site"
   ],
-  "files": ["go/cmd/evolve/cmd_loop.go (iteration top)", "go/cmd/evolve/cmd_loop_control.go:178 (unfinishedCycle predicate)", "go/internal/core/cyclerun_epilogue.go (state-floor semantics to reuse)"],
-  "connects_to": ["cycle-1048 investigation", "blocker breaker (same chokepoint)"],
-  "source": "console ultrathink investigation 2026-07-22"
+  "files": [
+    "go/cmd/evolve/cmd_loop.go",
+    "go/cmd/evolve/cmd_loop_control.go",
+    "go/internal/core/cyclerun_epilogue.go"
+  ],
+  "connects_to": [
+    "cycle-1048 investigation",
+    "blocker breaker (same chokepoint)"
+  ],
+  "source": "console ultrathink investigation 2026-07-22",
+  "surface_note": "2026-09-26 console readiness audit (read-only, against main): READY — no iteration-top coherence check exists (cmd_loop.go); the unfinishedCycle predicate drifted to cmd_loop_control.go:210."
 }
