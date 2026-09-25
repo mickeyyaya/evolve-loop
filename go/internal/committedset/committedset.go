@@ -13,13 +13,16 @@
 //
 // This package is a LEAF (stdlib only) so every consumer can project from it:
 // internal/core owns the orchestrator and internal/dossier cannot import core.
-// It parses; it does not decide policy beyond the documented precedence.
+// It parses; the only policy it owns is the documented precedence (Committed)
+// and what counts as triage ANSWERING for an id it did not commit
+// (DispositionsFrom — F30).
 package committedset
 
 import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -125,6 +128,94 @@ func Deferred(workspace string) []string {
 	for _, t := range decision.Deferred {
 		if id := strings.TrimSpace(t.ID); id != "" {
 			out = append(out, id)
+		}
+	}
+	return out
+}
+
+// Disposition is one id triage ANSWERED for without committing to it: the
+// bucket it placed the id in and that bucket's evidence (a drop's reason, a
+// skip's sha, an escalation's reason).
+type Disposition struct {
+	ID     string // the answered task id
+	Bucket string // escalate_block | skip_rejected | skip_shipped | dropped
+	Reason string // the bucket's evidence (never empty for an answer)
+}
+
+// Dispositions reads the workspace's decision through DispositionsFrom. An
+// absent or unreadable decision answers for nothing.
+func Dispositions(workspace string) []Disposition {
+	body, err := os.ReadFile(filepath.Join(workspace, DecisionFile))
+	if err != nil {
+		return nil
+	}
+	return DispositionsFrom(body)
+}
+
+// DispositionsFrom returns every id a triage decision answered for, one entry
+// per id, the most severe bucket first: escalate_block → skip_rejected →
+// skip_shipped → dropped (an integrity escalation is never masked by a drop's
+// reason). An answer is a statement a reader can act on (F30, cycle 1682), so
+// every answer carries evidence: an escalation its reason, else its
+// fail_count, else an explicit "escalated without a stated reason" (an
+// escalation is still a disposition); a rejection triage's report of the
+// rejected-dir match; a skip its sha; a drop its reason — a skip without a sha
+// or a drop without a reason answers for nothing. A DEFERRAL is never an answer: cycle 1623's triage narrated a claim
+// failure as a deferral, so a deferred id is still owed work. A malformed
+// decision answers for nothing.
+func DispositionsFrom(body []byte) []Disposition {
+	var decision struct {
+		EscalateBlock []struct {
+			TaskID    string `json:"task_id"`
+			Reason    string `json:"reason"`
+			FailCount int    `json:"fail_count"`
+		} `json:"escalate_block"`
+		SkipRejected []struct {
+			TaskID string `json:"task_id"`
+		} `json:"skip_rejected"`
+		SkipShipped []struct {
+			TaskID string `json:"task_id"`
+			GitSHA string `json:"git_sha"`
+		} `json:"skip_shipped"`
+		Dropped []struct {
+			ID     string `json:"id"`
+			Reason string `json:"reason"`
+		} `json:"dropped"`
+	}
+	if json.Unmarshal(body, &decision) != nil {
+		return nil
+	}
+	var out []Disposition
+	seen := map[string]bool{}
+	add := func(id, bucket, evidence string) {
+		if id = strings.TrimSpace(id); id == "" || seen[id] {
+			return
+		}
+		seen[id] = true
+		out = append(out, Disposition{ID: id, Bucket: bucket, Reason: strings.TrimSpace(evidence)})
+	}
+	for _, e := range decision.EscalateBlock {
+		evidence := strings.TrimSpace(e.Reason)
+		switch {
+		case evidence != "":
+		case e.FailCount > 0:
+			evidence = "fail_count " + strconv.Itoa(e.FailCount)
+		default:
+			evidence = "escalated without a stated reason"
+		}
+		add(e.TaskID, "escalate_block", evidence)
+	}
+	for _, e := range decision.SkipRejected {
+		add(e.TaskID, "skip_rejected", "triage reported an earlier rejection (inbox/rejected)")
+	}
+	for _, e := range decision.SkipShipped {
+		if sha := strings.TrimSpace(e.GitSHA); sha != "" {
+			add(e.TaskID, "skip_shipped", "git_sha "+sha)
+		}
+	}
+	for _, e := range decision.Dropped {
+		if strings.TrimSpace(e.Reason) != "" {
+			add(e.ID, "dropped", e.Reason)
 		}
 	}
 	return out

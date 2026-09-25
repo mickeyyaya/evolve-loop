@@ -214,7 +214,7 @@ func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) int {
 	// --resume short-circuits the loop: load the checkpoint, run one
 	// cycle from the paused phase, then exit. M3 protocol.
 	if cfg.Resume {
-		return runResumeBatch(ctx, cfg, orch, cycleEnv, cycleCtx, &lr, stdout, stderr)
+		return runResumeBatch(ctx, cfg, orch, deps.Ledger, deps.Signals, cycleEnv, cycleCtx, &lr, stdout, stderr)
 	}
 
 	lastBeforeGCHook, exitCode, halt := prepareFreshBatch(ctx, cfg, deps, &lr, stdout, stderr)

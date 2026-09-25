@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — a fleet lane whose triage answers for its scoped item ends as planned no-work and hands the item to the console (F30, 2026-09-26)
+
+Cycle 1682's lane was scoped to one item that 1679 had already shipped. Its triage dropped the item with a reason, and the lane still sealed FAIL. The empty-commitment termination asked whether the *whole inbox* held claimable work, found other lanes' items, and relabelled the honest no-work end as a claim failure. The dropped item also stayed pending, so the next wave could draw it into another lane.
+
+- `committedset.Dispositions` / `DispositionsFrom`: one reader of what triage *answered* for without committing it. An answer is an escalation, a rejection, a shipped skip with its sha, or a reasoned drop; the most severe bucket wins. A deferral is never an answer: cycle 1623 narrated a claim failure as one.
+- `core` termination (`unansweredClaimableWork`, now given the cycle): a fleet lane is a claim failure only when a scoped item is still pending in the root **or claimed into this cycle's `processing/`** and answered nowhere. Otherwise it ends as planned no-work (SKIPPED). A load warning fails it closed only for a scoped item it cannot find. Sequential cycles keep the whole-inbox check.
+- `cycleoutcome.ApplyNoWork` hands each scoped item the lane answered for to the console in place, with the lane's reason. It keeps an existing console route's evidence, then releases the cycle's claims to the root with no failure bump. An unshipped lane never retires work.
+- Every root makes the one `closeoutCycleOutcome`: the cycle-run root, the sequential loop, and `evolve loop --resume`. Resumed FAILs now reach the inbox lifecycle too.
+- Record: an addendum to `docs/incidents/2026-09-15-shipped-item-re-pinned-and-sealed-lease-blocks-refresh.md`. Follow-ups are filed: `decision-document-single-declaration`, `console-route-stamps-block-wave-sync` and `no-work-hand-off-rate-alarm`. The sequential nil-predicate half stays open on `triage-termination-scope-aware`.
+
 ## Fixed — the idle nudge says why a deliverable that is already right must still be rewritten (F39 part 1, 2026-09-26)
 
 Cycle 1691's correction round fixed an explanation document and correctly left `build-report.md` untouched. The bridge's completion baseline (the deliverable's size and mtime at dispatch, the cycle-1550 stale-leftover guard) refused the unchanged report, and the one idle nudge said only "Please write the deliverable". The agent re-verified the report, found it correct, and stopped, and the phase would have closed as exit 81 on a correct cycle. The operator unblocked it by touching the report.
