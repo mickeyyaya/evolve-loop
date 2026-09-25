@@ -1,0 +1,22 @@
+{
+  "id": "triage-inbox-claim-host-effect",
+  "created_at": "2026-09-26T03:00:00Z",
+  "weight": 0.7,
+  "title": "Triage's inbox claim is a deterministic effect the agent keeps skipping — the host should perform it",
+  "kind": "pipeline-repair",
+  "priority": "P2",
+  "summary": "3 of ~45 recent cycles (1647, 1671, 1689) hit GATE_CONTRACT_REJECTED [missing_effect] declared effect inbox-claim at triage: the agent committed its top_n but never ran `evolve inbox-mover claim <id> <cycle>`. Each recovered on correction 1/2 (one extra triage dispatch and a full prompt's tokens); none sealed FAIL, but a correction budget spent here is one a real contract miss cannot use.",
+  "root_cause": "The claim is deterministic — move the committed item's file to processing/cycle-N under the ADR-0074 claim floor — yet it is delegated to the LLM and only verified after the fact by the contract gate's declared-effect check (rule 5: deterministic work belongs in code, not a prompt).",
+  "fix": "After triage's deliverable verifies, the host performs the claim for each committed id through inboxmover.Claim (the same floor; an ErrConsoleRouted refusal surfaces exactly as the triage FAIL it is today). The declared effect stays as the verification the host's own action satisfies; the persona's claim step becomes advisory. Keep it transactional with the commit: a crash between the commit and the claim must be recoverable by the gate's re-check.",
+  "acceptance": [
+    "A triage that commits top_n without running the claim command no longer produces missing_effect inbox-claim: the host claims each committed id, and the gate's effect check passes on the host's move.",
+    "A console-routed committed id is refused by the same claim floor and surfaces as today's triage refusal (no new failure mode).",
+    "Replay: the cycle-1689 triage-report + inbox state claims lost-ship-closeout-universal-landing-witness with zero corrections."
+  ],
+  "files": [
+    "go/internal/phases/triage/",
+    "go/internal/inboxmover/",
+    "agents/evolve-triage.md"
+  ],
+  "notes": "Filed from the console 2026-09-26 during wave 7 (research F36 candidate). Evidence: runs/cycle-{1647,1671,1689}/signals.ndjson (grep missing_effect). Console-owned by kind (pipeline-*)."
+}
