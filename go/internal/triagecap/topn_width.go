@@ -24,6 +24,11 @@ type FleetCandidate struct {
 	ID     string
 	Weight float64
 	Files  []string
+	// Declared is inboxbatch.Item.DeclaredSurface as the backlog read found it —
+	// the item declares a path-shaped surface the console classifier already
+	// cleared (F29). Candidates built from a triage decision keep the zero
+	// value: unverified.
+	Declared bool
 }
 
 // SelectFleetWidthTopN returns up to `count` mutually file-disjoint top_n
@@ -32,18 +37,17 @@ type FleetCandidate struct {
 // duplicating it, then lifts one representative — the highest-weight member —
 // out of each non-empty bucket.
 //
-// count<2 reproduces the legacy single-focus behavior byte-identically: exactly
-// the single highest-weight candidate, independent of file overlap. When the
+// count<2 reproduces the legacy single-focus behavior: exactly the single
+// highest-weight candidate, independent of file overlap (among equal weights,
+// rankForDispatch prefers the verified-admissible one — F29). When the
 // backlog cannot fill `count` disjoint lanes, the widest disjoint set (>=1) is
 // returned — never a fabricated/overlapping pairing.
 func SelectFleetWidthTopN(candidates []FleetCandidate, count int) []FleetCandidate {
 	if len(candidates) == 0 {
 		return nil
 	}
-	// Highest weight first; stable so equal-weight ties preserve input order.
-	sorted := make([]FleetCandidate, len(candidates))
-	copy(sorted, candidates)
-	sort.SliceStable(sorted, func(i, j int) bool { return sorted[i].Weight > sorted[j].Weight })
+	// Highest weight first; equal weights prefer verified-admissible work (rankForDispatch).
+	sorted := rankForDispatch(candidates)
 
 	if count < 2 {
 		return []FleetCandidate{sorted[0]}
@@ -108,9 +112,7 @@ func WidenTopNToFleetWidth(committed, backlog []FleetCandidate, count int) []Fle
 		return out
 	}
 
-	sorted := make([]FleetCandidate, len(backlog))
-	copy(sorted, backlog)
-	sort.SliceStable(sorted, func(i, j int) bool { return sorted[i].Weight > sorted[j].Weight })
+	sorted := rankForDispatch(backlog)
 
 	for _, c := range sorted {
 		if len(out) >= count {
@@ -139,4 +141,25 @@ func overlapsClaimed(files []string, claimed map[string]bool) bool {
 		}
 	}
 	return false
+}
+
+// rankForDispatch is the ONE ordering every seed path shares — the wave seed
+// (SelectFleetWidthTopN), the per-wave widen seam (WidenTopNToFleetWidth) and
+// the lane menus (ExpandWithClusterMates): highest operator weight first — the
+// weight IS the priority, and admissibility never silently overrides it — then,
+// among equal weights (common: the queue clusters at 0.80/0.84/0.85), a
+// candidate whose declared surface the console classifier already cleared
+// before one whose surface is unknown (F29), then input order. A lane's fleet
+// scope is one item, so among otherwise-equal work prefer the proven kind.
+// Returns a new slice; the input is never reordered.
+func rankForDispatch(cands []FleetCandidate) []FleetCandidate {
+	sorted := make([]FleetCandidate, len(cands))
+	copy(sorted, cands)
+	sort.SliceStable(sorted, func(i, j int) bool {
+		if sorted[i].Weight != sorted[j].Weight {
+			return sorted[i].Weight > sorted[j].Weight
+		}
+		return sorted[i].Declared && !sorted[j].Declared
+	})
+	return sorted
 }

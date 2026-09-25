@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — the wave seed refuses at least everything triage's breaker would, so lanes stop drawing doomed work (F29, 2026-09-26)
+
+Triage was the pipeline's dominant failure. 18 of ~60 recent cycles sealed FAIL with `TRIAGE_PROTECTED_SURFACE` after a full scout and triage spend, and a lane's fleet scope is one item, so a refusal had nothing to fall back on. All 18 traced to five items whose protected surface was visible in their own record: the kind (routed since F25), a declared *directory* holding protected files, or a protected file named in the item's own text when it declared no surface.
+
+- The manifest now has two projections. `guards.IsProtectedSurface` stays membership, and additionally treats a path naming a protected directory without its trailing slash as a member. `guards.IsProtectedScope` adds "a directory contains protected surface" and is what the routing roots inject (seed, widen, plan-time resolver, claim floor, prompt partition, `evolve inbox`). The ship tripwire, the role guard, the fleet preflight and triage's breaker keep membership. Membership implies scope, so the seed is never looser than the breaker.
+- `inboxbatch.Item.DeclaredSurface` is the one home of "this item declares its surface"; a placeholder or bare file name declares nothing. With no declared surface, the files the item's author-written text names are judged. They are derived at decode, so the wave seed, the claim floor and `LoadFile` all see them; directory mentions are context.
+- Among equal weights, the seed prefers verified-admissible work (`triagecap.rankForDispatch`). The operator's weight stays the priority.
+- On the live queue, lane-dispatchable goes from 65 to 47. `TestConsoleRouted_ReplaysTheEighteenRefusals` pins the historical shapes. ADR-0074 carries the amendment, and follow-ups F30 and F32 are filed as console-owned inbox items.
+
 ## Changed — the fatal-pane fast-fail has its own dial and acts by default (F27, 2026-09-26)
 
 Wave 6 lane 1687's claude-tmux triage pane went dead (`: command not found`) and idled 900 s: the ADR-0044 C2 detector classified it (`dead_shell`, recorded `would_fast_fail` twice) but could only observe, because its one rollout dial, `recovery.phase_recovery`, also arms the live channel, the ask-broker and the failure adviser and so stays at shadow. The fast-fail now rides its OWN policy dial, `recovery.fatal_pane`, default **enforce**. It was split out exactly as `recovery.spine_floor` was (R8.5), so `phase_recovery` stays shadow and nothing else is armed. Flip evidence: every shadow match on record (cycles 1595 build / codex-tmux and 1687 triage / claude-tmux) was a dead pane that then idled 1200 s / 900 s. `"shadow"` in `.evolve/policy.json` is the no-recompile escape hatch.

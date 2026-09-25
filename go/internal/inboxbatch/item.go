@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -69,6 +70,161 @@ type Item struct {
 	// Path is the source file (relative name inside the inbox dir) — operator
 	// affordance for `evolve inbox batches` output; not part of grouping.
 	Path string `json:"-"`
+	// mentions are the FILES the record's own text names, derived at decode
+	// (UnmarshalJSON). With no declared surface they are the item's surface for
+	// the console classifier (F29) — the surface triage's breaker would
+	// otherwise derive only after a lane has paid for scout and triage.
+	mentions []string
+}
+
+// UnmarshalJSON decodes an inbox record and derives the files its own text
+// names. Deriving at DECODE, not in one loader, is deliberate: the wave seed,
+// the claim floor and LoadFile each unmarshal records themselves, and the
+// console classifier must see the same surface from every one of them. The
+// walk reads DECODED strings (so an escaped "\/" is still a slash) from every
+// author-written field — authors spread paths across summary, fix, notes,
+// root_cause, problem, details and the rest — skipping the declared surface
+// and the machine-written fields (mentionSkip).
+func (it *Item) UnmarshalJSON(raw []byte) error {
+	type record Item // the same fields without this method: default decoding
+	var r record
+	if err := json.Unmarshal(raw, &r); err != nil {
+		return err
+	}
+	*it = Item(r)
+	var doc map[string]any
+	if err := json.Unmarshal(raw, &doc); err == nil {
+		it.mentions = mentionedFiles(doc)
+	}
+	return nil
+}
+
+// DeclaredSurface reports whether the item DECLARES its fix surface: at least
+// one files[] token shaped like a repo path (a slash-separated path). It is the
+// ONE home of that belief — the console classifier's "a declared surface wins"
+// rule and the seed's admissibility tie-break both read it (F29) — and a
+// placeholder ("TBD", "N/A", "()") or a bare file name ("role.go", which the
+// triage LLM would resolve into the tree) declares nothing.
+func (it Item) DeclaredSurface() bool {
+	return len(declaredTokens(it.Files)) > 0
+}
+
+// declaredTokens is the ONE token set a declared surface consists of: the
+// path-shaped files[] tokens. The console classifier judges exactly these in
+// scope and DeclaredSurface asks whether any exist, so an annotation word
+// ("(go test)" yields "go") is never read as a directory (F29 review).
+func declaredTokens(files []string) []string {
+	var out []string
+	for _, tok := range surfaceTokens(files) {
+		if isPathShaped(tok) {
+			out = append(out, tok)
+		}
+	}
+	return out
+}
+
+// surfaceTokens splits files[] entries into bare tokens (the loose shapes
+// authors write: "a.go b.go", "(a.go)", "a.go;").
+func surfaceTokens(files []string) []string {
+	var out []string
+	for _, f := range files {
+		for _, tok := range strings.Fields(f) {
+			if tok = strings.Trim(tok, "()[]{},;:'\""); tok != "" {
+				out = append(out, tok)
+			}
+		}
+	}
+	return out
+}
+
+// repoPathRE matches a WHOLE slash-bearing token: segments of path characters
+// joined by slashes, or one segment with a trailing slash ("go/", "skills/").
+var repoPathRE = regexp.MustCompile(`^[A-Za-z0-9_.@-]+(?:/[A-Za-z0-9_.@-]+)*/$|^[A-Za-z0-9_.@-]+(?:/[A-Za-z0-9_.@-]+)+$`)
+
+// isPathShaped reports whether a files[] token names a repo path rather than a
+// placeholder: wholly slash-separated path characters, not every segment a
+// single character — "go/internal/core", "docs/x.md", "skills/audit", "go/" and
+// "go/internal/x/y.go" declare a surface while "N/A", "w/o", "I/O", "TBD" and a
+// bare "role.go" do not.
+func isPathShaped(tok string) bool {
+	if !repoPathRE.MatchString(tok) {
+		return false
+	}
+	for _, seg := range strings.Split(strings.TrimSuffix(tok, "/"), "/") {
+		if len(seg) > 1 {
+			return true
+		}
+	}
+	return false
+}
+
+// pathInProseRE finds slash-separated path tokens inside prose.
+var pathInProseRE = regexp.MustCompile(`[A-Za-z0-9_.@-]+(?:/[A-Za-z0-9_.@-]+)+/?`)
+
+// mentionSkip are the fields the mention walk never reads: the declared surface
+// (judged on its own) and machine-written provenance/routing state. Every field
+// the console router stamps starts with "routed_" (inboxmover/lifecycle
+// route.go), so skipMention matches that prefix rather than copying its names.
+var mentionSkip = map[string]bool{
+	"files": true, "continuation": true, "route": true, "injected_by": true,
+}
+
+// skipMention reports whether the walk skips field k.
+func skipMention(k string) bool {
+	return mentionSkip[k] || strings.HasPrefix(k, "routed_")
+}
+
+// maxMentions bounds the walk so a runaway record cannot make routing costly.
+const maxMentions = 64
+
+// mentionedFiles returns the distinct FILE paths (a last segment with an
+// extension) the record's author-written fields name, in walk order, at most
+// maxMentions. Directory mentions are context, not surface: "the stall shows
+// in go/internal/core" names no file a lane would change.
+func mentionedFiles(doc map[string]any) []string {
+	var out []string
+	seen := map[string]bool{}
+	var walk func(v any)
+	walk = func(v any) {
+		switch x := v.(type) {
+		case string:
+			for _, p := range pathInProseRE.FindAllString(x, -1) {
+				if len(out) < maxMentions && !seen[p] && isFileSpelling(p) {
+					seen[p] = true
+					out = append(out, p)
+				}
+			}
+		case []any:
+			for _, e := range x {
+				walk(e)
+			}
+		case map[string]any:
+			for _, k := range sortedKeys(x) {
+				if !skipMention(k) {
+					walk(x[k])
+				}
+			}
+		}
+	}
+	walk(doc)
+	return out
+}
+
+// isFileSpelling reports whether p's last segment carries an extension after
+// its first character ("runner.go" yes; "core", ".evolve", "evolve/" no).
+func isFileSpelling(p string) bool {
+	last := p[strings.LastIndex(p, "/")+1:]
+	return len(last) > 1 && strings.Contains(last[1:], ".")
+}
+
+// sortedKeys keeps the walk deterministic.
+func sortedKeys(m map[string]any) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 // LoadDir parses every *.json under dir into Items, sorted by ID for

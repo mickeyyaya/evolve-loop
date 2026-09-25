@@ -38,6 +38,12 @@ type ProtectedSurfaceEntry struct {
 // legitimate cycle behavior: a cycle still writes its own go/acs/cycleN/
 // predicates and ordinary source.
 //
+// The same manifest has a second projection, IsProtectedScope (F29), used only
+// to ROUTE inbox work: an item that DECLARES a directory holding protected files
+// (go/internal/core/) is console work at seed time. It never changes what a
+// cycle may write — the role guard, the ship tripwire, the fleet preflight and
+// triage's breaker all keep membership (IsProtectedSurface).
+//
 // The manifest is deliberately a COMPILED Go value, not config: the boundary
 // must not be config-softenable (a .evolve/policy.json knob here would let a
 // cycle write the knob that disarms the guard). Two durable tripwires check it
@@ -189,20 +195,90 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 // plane. path may be absolute or repo-relative; matching is on a slash-normalized
 // fragment, so the boundary holds regardless of the file's physical root.
 func IsProtectedSurface(path string) bool {
-	if path == "" {
+	p, ok := normalizeSurfacePath(path)
+	if !ok {
 		return false
 	}
+	// p+"/" lets a path that NAMES a protected directory without its trailing
+	// slash ("go/internal/bridge", a package or import path) match that
+	// directory's fragment; for every other fragment it matches exactly what
+	// p does, because the appended slash can only complete a slash-ending one.
+	pd := p + "/"
+	for _, e := range ProtectedSurfaceManifest {
+		if strings.Contains(pd, e.Fragment) {
+			return true
+		}
+	}
+	return false
+}
+
+// IsProtectedScope reports whether path IS, or CONTAINS, protected surface — the
+// question a DECLARED fix surface poses (F29): an inbox item declaring
+// `"files": ["go/internal/core/"]` will change files inside that directory, and
+// the file-level fragments IsProtectedSurface matches can never be contained in
+// the directory's own spelling. Only a directory spelling (a trailing slash, or
+// a last segment with no extension) widens beyond membership, so
+// IsProtectedSurface(p) ⇒ IsProtectedScope(p) always holds
+// (TestIsProtectedScope_ImpliedByMembership). It is a second PROJECTION of the
+// one manifest, used where a declared surface is judged — the seed-time console
+// classifier's routing roots — while the ship tripwire, the role write-guard,
+// the fleet preflight and triage's breaker keep membership: the seed must
+// refuse at least everything the breaker would, never make the breaker stricter.
+func IsProtectedScope(path string) bool {
+	if IsProtectedSurface(path) {
+		return true
+	}
+	p, ok := normalizeSurfacePath(path)
+	if !ok {
+		return false
+	}
+	if dir, isDir := directorySpelling(p); isDir {
+		for _, e := range ProtectedSurfaceManifest {
+			if fragmentInside(dir, e.Fragment) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// normalizeSurfacePath is the one spelling both projections match: slash-
+// separated, a leading slash so a leading segment ("go/acs/regression/...")
+// still matches its "/go/acs/..." fragment, and case-folded (macOS/Windows
+// filesystems are case-insensitive; fragments are already lower-case).
+func normalizeSurfacePath(path string) (string, bool) {
+	if path == "" {
+		return "", false
+	}
 	p := filepath.ToSlash(path)
-	// Ensure a leading slash so a leading segment ("go/acs/regression/...") still
-	// matches a "/go/acs/regression/" fragment.
 	if !strings.HasPrefix(p, "/") {
 		p = "/" + p
 	}
-	// Case-fold: macOS/Windows filesystems are case-insensitive, so "Go/ACS/..."
-	// is the same path as "go/acs/..."; fragments are already lower-case.
-	p = strings.ToLower(p)
-	for _, e := range ProtectedSurfaceManifest {
-		if strings.Contains(p, e.Fragment) {
+	return strings.ToLower(p), true
+}
+
+// directorySpelling reports whether the normalized path p is spelled as a
+// directory — a trailing slash, or a last segment with no extension after its
+// first character (".evolve" and "core" are directories, "runner.go" is not) —
+// returning it with exactly one trailing slash.
+func directorySpelling(p string) (string, bool) {
+	if strings.HasSuffix(p, "/") {
+		return p, true
+	}
+	last := p[strings.LastIndex(p, "/")+1:]
+	if last == "" || strings.Contains(last[1:], ".") {
+		return "", false
+	}
+	return p + "/", true
+}
+
+// fragmentInside reports whether fragment lies under dir wherever dir sits: some
+// suffix of dir that starts at a path separator (the worktree/root prefix
+// dropped) is a prefix of the repo-relative fragment. The bare root "/" is
+// excluded — every fragment starts with it.
+func fragmentInside(dir, fragment string) bool {
+	for i := 0; i < len(dir)-1; i++ {
+		if dir[i] == '/' && strings.HasPrefix(fragment, dir[i:]) {
 			return true
 		}
 	}

@@ -272,9 +272,16 @@ func TestWidenNarrow_PrunedDisarmsBothShortcutsAndRemarshalsTopNOnly(t *testing.
 	if got := string(WidenNarrowDecision([]byte(`{"top_n":[{"id":""}]}`), evolveDir, 2, nil)); !strings.Contains(got, "alpha") {
 		t.Errorf("an empty id is not a committed lane: %s", got)
 	}
-	// The predicate excludes protected backlog items from the widening.
-	protected := func(p string) bool { return p == "b.go" }
-	if got := string(WidenNarrowDecision(narrow, evolveDir, 2, protected)); strings.Contains(got, "beta") {
+	// The predicate excludes protected backlog items from the widening. It
+	// judges the DECLARED surface — path-shaped files[] tokens (F29) — so the
+	// protected item declares a path; the heavier gamma would win the lane
+	// without the predicate, so the exclusion is observable.
+	writeJSON(t, filepath.Join(evolveDir, "inbox", "gamma.json"), map[string]any{"id": "gamma", "weight": 0.95, "files": []string{"pkg/c.go"}})
+	protected := func(p string) bool { return p == "pkg/c.go" }
+	if got := string(WidenNarrowDecision(narrow, evolveDir, 2, protected)); strings.Contains(got, "gamma") || !strings.Contains(got, "beta") {
 		t.Errorf("a protected backlog item never widens a lane: %s", got)
+	}
+	if got := string(WidenNarrowDecision(narrow, evolveDir, 2, nil)); !strings.Contains(got, "gamma") {
+		t.Errorf("without the predicate the heavier gamma widens the lane: %s", got)
 	}
 }

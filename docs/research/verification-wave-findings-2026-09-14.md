@@ -127,6 +127,29 @@ Wave 6 opened on v22.24.0 and lane 1688 claimed `explanation-identity-belief-rem
 
 Wave 6 lane 1687: the claude-tmux triage pane went dead (`: command not found`). The ADR-0044 C2 detector classified it at two checkpoints (`fatal_pane_shadow`, trigger `dead_shell`, `would_fast_fail`), but it runs under `recovery.phase_recovery`, which stays shadow because the same dial arms the live channel, the ask-broker and the failure adviser. The phase idled 900 s, then the fallback hit codex's quota wall (F26) and ollama, which cannot write source, and the phase aborted. The ledger holds exactly one other match, cycle 1595 build on codex-tmux (`dead_shell`, then 1200 s to `stop-review → pause`), so every shadow match on record is a true positive, across both CLI families. **Fix:** the fast-fail rides its OWN dial, `recovery.fatal_pane` (policy-only), default **enforce**, split exactly as R8.5 split `recovery.spine_floor`. `phase_recovery` stays shadow and keeps everything else. The dial reaches the bridge through one pinned path: `wireBridgeStages` → `Adapter.SetFatalPaneStage` → `productionEngineDeps` → `Deps.FatalPaneStage` → `fatalPaneStageOf`. `RecoveryStage` moved into `productionEngineDeps` too: it had been assigned on one `Launch` branch only, the drift the builder exists to prevent. `NewDefault` and the `evolve subagent run` root seed both dials from policy through one accessor (`policy.Policy.BridgeRecoveryStages`, the Loader's parser). Tests: `TestRunTmuxREPL_FatalPaneDialIsIndependentOfPhaseRecovery` (dials crossed both ways; red against the mutant that re-points the wait state at the program dial), `TestWireBridgeStages_*`, `TestProductionEngineDeps_CarriesBothRecoveryDials`, `TestNewDefault_SeedsRecoveryDialsFromPolicy`. ADR-0044 carries the amendment.
 
+### F29 — triage's protected-surface breaker was the pipeline's dominant failure, and the seed could have seen every one of them (P0, fixed — this change)
+
+A census of the closeout dossiers (cycles 1620–1688) put triage at the top of the failure table: 18 cycles sealed FAIL with `TRIAGE_PROTECTED_SURFACE` ("top_n card X names protected surface Y"), against single digits for audit and ship. Each refusal cost a full scout+triage spend and reset the ship streak. A lane's fleet scope is ONE item (`fleet_scope: … select ONLY tasks whose id is in this assigned set`), so a refusal has nothing to fall back on: the "deferred" cards in those decisions sat outside the lane's scope. All 18 traced to five items, re-claimed until an operator hand-routed them (verdict-sentinel ×9, tokenopt ×4, settle-wait ×3, integration-tier ×1, explanation-identity ×1). The protected surface of every one was visible in its own record:
+- the kind, for three of them (F25 now routes these);
+- a declared DIRECTORY holding protected files, for tokenopt (`go/internal/core/`, `go/internal/phases/runner/`). The file-level manifest could never contain these.
+- for settle-wait, no `files[]` at all, but a protected FILE named in its own `fix` text (`go/internal/phases/runner/runner.go`).
+
+**Fix — the seed refuses at least everything the breaker would.**
+1. Two projections of the one manifest:
+   - `guards.IsProtectedSurface` stays membership. Its one fix: a path naming a protected directory without the trailing slash is a member. The ship tripwire, the role write-guard, the fleet preflight and the breaker keep using it.
+   - `guards.IsProtectedScope` adds "a directory contains protected surface". The routing roots inject this one: the seed, the widen seam, the plan-time resolver, the claim floor, the prompt partition and `evolve inbox`.
+   - Membership implies scope (pinned), so the breaker is never stricter than the seed.
+2. `Item.DeclaredSurface` is the one home of "declares a surface" and needs a path-shaped token. Placeholders and bare names declare nothing. With no declared surface, the FILES named in the record's author-written fields are judged; they are derived at decode, skipping machine fields. Directory mentions are context.
+3. The seed ranks by weight, and only equal weights prefer the verified-admissible candidate (`triagecap.rankForDispatch`, `FleetCandidate.Declared`).
+
+The architecture review reshaped the first version: it had widened the shared predicate, which would have made the breaker stricter and over-routed directory mentions, and it had let admissibility override weight. Pinned by:
+- `TestConsoleRouted_ReplaysTheEighteenRefusals` (the five record shapes under the real scope predicate);
+- `TestIsProtectedScope_*`, `TestIsProtectedSurface_MembershipStaysMembership`, `TestIsProtectedScope_ImpliedByMembership`;
+- `TestConsoleRouted_{UndeclaredSurfaceIsTheFilesTheTextNames, DirectoryMentionsAreContextNotSurface, MachineFieldsAreNotTheItemsText, DeclaredSurfaceWinsOverMentions, PlaceholdersDeclareNothing, MentionDerivationKeepsTheClamp}`;
+- `TestItem_DeclaredSurface`, `TestRankForDispatch_WeightFirstThenVerifiedAdmissible`, `TestReadInboxBacklog_CarriesTheDeclaredSurfaceBelief`.
+
+Live queue: 65 → 47 lane-dispatchable. Follow-ups filed as console-owned: `triage-termination-scope-aware` (F30, cycle 1682: a lane whose one scoped item was already shipped committed empty and sealed FAIL, because the claimable-work check reads the whole inbox) and `lane-alternates-on-refusal` (F32).
+
 ### Review follow-ups from F14–F18 (architecture review 2026-09-15, non-blocking)
 
 - A resumed tdd/build re-entry seeds `ship_error_code` alone, so `assembleErrorContext` (phaseio shadow) sees a code-only envelope where the live path carries code/class/stage/debug — persist class/stage beside `ShipRecoveryCode`, or give the prompt-facing code its own key.

@@ -38,7 +38,7 @@ func newWaveEngine(cfg loopConfig, storage core.Storage, warn io.Writer, signals
 	ports := loopwave.Ports{
 		LastCycle: func(ctx context.Context) (int, error) { return readLastCycleNumber(ctx, storage) },
 		Workspace: func(cycle int) string { return cycleWorkspace(cfg.ProjectRoot, cycle) },
-		Protected: guards.IsProtectedSurface,
+		Protected: guards.IsProtectedScope, // routing roots judge declared surfaces in SCOPE (F29)
 		Shrink:    fleet.QuotaAwareCount,
 	}
 	return loopwave.New(roots, ports, warn, loopwave.WithSignals(signals))
@@ -109,12 +109,12 @@ func quotaAwareWaveConfig(fc policy.FleetConfig, projectRoot string, warn io.Wri
 
 // seedWavePlanFromInbox seeds a wave plan from the inbox backlog.
 func seedWavePlanFromInbox(evolveDir string, count int) ([]byte, error) {
-	return loopwave.SeedWavePlanFromInbox(evolveDir, count, guards.IsProtectedSurface)
+	return loopwave.SeedWavePlanFromInbox(evolveDir, count, guards.IsProtectedScope)
 }
 
 // widenNarrowDecision widens a narrow prior decision to fleet width.
 func widenNarrowDecision(data []byte, evolveDir string, count int) []byte {
-	return loopwave.WidenNarrowDecision(data, evolveDir, count, guards.IsProtectedSurface)
+	return loopwave.WidenNarrowDecision(data, evolveDir, count, guards.IsProtectedScope)
 }
 
 // --- test/ACS-only facades: ZERO production callers (TestWaveEngine_OneConstructionSite); the coordinator drives the engine ---
