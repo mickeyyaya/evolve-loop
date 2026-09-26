@@ -133,6 +133,7 @@ type Config struct {
 	// verdict engine (runner.Options.ContractVerifier): one verifier for gate
 	// and engine (research F22). nil = the catalog-aware default.
 	ContractVerifier func() runner.ContractVerifier
+	HostEffects      func() core.HostEffects
 	NowFn            func() time.Time
 	// CompactPrompts strips the on-demand reference tail from the disk-loaded agent
 	// doc before dispatch. Value flows from workflow.compact_prompts (policy.json);
@@ -152,6 +153,7 @@ func New(c Config) *Phase {
 			Hooks:            hooks{},
 			Bridge:           c.Bridge,
 			ContractVerifier: c.ContractVerifier,
+			HostEffects:      c.HostEffects,
 			Prompts:          c.Prompts,
 			NowFn:            c.NowFn,
 			CompactPrompts:   c.CompactPrompts,

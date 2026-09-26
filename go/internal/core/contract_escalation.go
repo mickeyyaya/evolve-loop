@@ -482,7 +482,7 @@ func (cr *cycleRun) noteContractGateDemotion(phase Phase, d contractDispatch, bl
 // deliverable came from. A demotion is reported even when a LATER gate in the
 // chain rejected the same deliverable — the gate still stopped enforcing.
 func (cr *cycleRun) reviewDeliverable(phase Phase, in ReviewInput, d contractDispatch) ReviewResult {
-	rr := cr.o.reviewer.Review(cr.ctx, in)
+	rr := cr.o.performEffectsAndReview(cr.ctx, in)
 	if rr.Demoted {
 		cr.noteContractGateDemotion(phase, d, rr.Blocks, rr.Reason)
 	}

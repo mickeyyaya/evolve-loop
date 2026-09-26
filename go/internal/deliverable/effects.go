@@ -10,45 +10,40 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// effects.go — ADR-0100 slice 2: a declared EFFECT is verified at the phase
-// boundary exactly as a declared output is.
-//
-// A phase's persona can be instructed to do something outside its workspace
-// that later phases and sibling lanes depend on. Triage's inbox claim is the
-// one that exists today: `evolve inbox-mover claim` moves the item into
-// processing/cycle-N/ so no other lane's triage can select it. Batch cycles
-// 1630 (claim refused by the sandbox) and 1631 (the worktree's tracked COPY
-// of the inbox was claimed, the plane's item stayed dispatchable) showed the
-// report and the decision looking complete while the effect had not happened,
-// and nothing judged it — the spine ran on an unclaimed commitment.
-//
-// The registry declares effects by name; effectChecks binds each name to one
-// deterministic check (a registry lookup, not a strategy hierarchy — one
-// entry today). A declared name with no binding is a registry defect and is
-// reported as such: re-dispatching an agent cannot bind a check.
-
 // effectCheck appends violations for one declared effect, or returns an
-// error when it cannot decide (infra ambiguity ⇒ the caller fails OPEN).
+// error when it cannot decide (the caller then fails open).
 type effectCheck func(res *Result, roots phasecontract.Roots) error
 
-var effectChecks = map[string]effectCheck{
-	"inbox-claim": checkInboxClaim,
+// effectPerform is the host's performance of an effect before the review;
+// nil leaves the effect to the agent.
+type effectPerform func(h *HostEffects, roots phasecontract.Roots) error
+
+type effect struct {
+	check   effectCheck
+	perform effectPerform
 }
 
-// verifyEffects runs the check bound to each declared effect.
+var effects = map[string]effect{
+	phasecontract.EffectInboxClaim: {check: checkInboxClaim, perform: claimCommitted},
+}
+
 func verifyEffects(res *Result, c phasecontract.Contract, roots phasecontract.Roots) error {
 	for _, name := range c.Effects {
-		res.Effects = append(res.Effects, name) // what this verdict checked, for the gate's verified signal
-		check, bound := effectChecks[name]
+		res.Effects = append(res.Effects, name)
+		e, bound := effects[name]
 		if !bound {
 			res.add(CodeUnboundEffect, fmt.Sprintf("declared effect %q has no deterministic check — a phase-registry defect, not something this agent can correct", name))
 			continue
 		}
-		if err := check(res, roots); err != nil {
+		if err := e.check(res, roots); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func inboxDir(roots phasecontract.Roots) string {
+	return filepath.Join(roots.EvolveDir, "inbox")
 }
 
 // checkInboxClaim owes a claim for every committed id that is an inbox item:
@@ -64,9 +59,8 @@ func checkInboxClaim(res *Result, roots phasecontract.Roots) error {
 	if !recorded {
 		return nil
 	}
-	inboxDir := filepath.Join(roots.EvolveDir, "inbox")
 	for _, id := range committed {
-		loc, err := inboxmover.Locate(inboxDir, id)
+		loc, err := inboxmover.Locate(inboxDir(roots), id)
 		if errors.Is(err, inboxmover.ErrNotFound) {
 			continue
 		}
@@ -77,7 +71,7 @@ func checkInboxClaim(res *Result, roots phasecontract.Roots) error {
 		case roots.Cycle:
 			// claimed by this cycle — the effect happened
 		case 0:
-			res.add(CodeMissingEffect, fmt.Sprintf("declared effect inbox-claim not performed for committed item %q — it is still pending at %s; run exactly: evolve inbox-mover claim %q %d", id, loc.Path, id, roots.Cycle))
+			res.add(CodeMissingEffect, fmt.Sprintf("declared effect inbox-claim not performed for committed item %q — the host's claim did not land and it is still pending at %s; `evolve inbox-mover claim %q %d` shows why (exit 3 = console-routed): defer or drop it", id, loc.Path, id, roots.Cycle))
 		default:
 			res.add(CodeMissingEffect, fmt.Sprintf("declared effect inbox-claim not performed for committed item %q — it is held by cycle-%d (%s); a committed item must be claimed by THIS cycle or not committed", id, loc.Cycle, loc.Path))
 		}
