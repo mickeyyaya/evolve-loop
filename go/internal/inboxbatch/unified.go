@@ -5,16 +5,13 @@ import (
 	"strings"
 )
 
-// UnifiedMember binds one known inbox item to the evidence that it instantiates
-// the commitment's shared root cause.
+// UnifiedMember names one inbox item and its evidence for the shared root cause.
 type UnifiedMember struct {
 	ID       string `json:"id"`
 	Evidence string `json:"evidence"`
 }
 
-// UnifiedCommitment is a triage-authored claim that several inbox items can be
-// closed by one shared design. It is validated after mechanical classification;
-// it never changes the default grouping rules.
+// UnifiedCommitment is triage's claim that several items close through one shared design; it never alters grouping.
 type UnifiedCommitment struct {
 	RootCauseHypothesis string          `json:"root_cause_hypothesis"`
 	SharedSeam          string          `json:"shared_seam"`
@@ -22,8 +19,7 @@ type UnifiedCommitment struct {
 	Members             []UnifiedMember `json:"members"`
 }
 
-// Validate rejects incomplete, unsupported, duplicated, or heterogeneous
-// commitments. Callers fail open to the original independent selection.
+// Validate rejects incomplete, unknown, duplicated or mixed-campaign/kind members; callers fall back to independent selection.
 func (c UnifiedCommitment) Validate(items []Item) error {
 	if strings.TrimSpace(c.RootCauseHypothesis) == "" {
 		return fmt.Errorf("unified commitment: root cause hypothesis is empty")

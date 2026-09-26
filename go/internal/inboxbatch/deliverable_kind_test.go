@@ -6,9 +6,6 @@ import (
 	"testing"
 )
 
-// TestLoadFile_DeliverableKind — ADR-0099 slice 2: an inbox item declares the
-// kind of thing it wants built; the harness projects it into the Task Contract
-// block (the same single-source discipline as acceptance[]).
 func TestLoadFile_DeliverableKind(t *testing.T) {
 	dir := t.TempDir()
 	p := filepath.Join(dir, "netflix-margin.json")

@@ -5,10 +5,6 @@ import (
 	"testing"
 )
 
-// TestItem_FiledAt: an item's filing time is its created_at (RFC3339 or a bare
-// date), else the timestamp prefix inbox filenames carry — the "since" a
-// premise-drift check measures from (F40). No date anywhere is zero, never a
-// guess.
 func TestItem_FiledAt(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -36,10 +32,6 @@ func TestItem_FiledAt(t *testing.T) {
 	}
 }
 
-// TestItem_DeclaredPaths exposes the ONE declared-surface token set (the
-// path-shaped files[] tokens the console classifier judges): annotations,
-// placeholders and bare file names declare nothing; a cited line locator is
-// stripped; a directory keeps its slash.
 func TestItem_DeclaredPaths(t *testing.T) {
 	it := Item{Files: []string{"go/internal/ship/consume.go (gate condition)", "go/internal/x.go:178", "N/A", "role.go", "go/internal/inboxbatch/"}}
 	want := []string{"go/internal/ship/consume.go", "go/internal/x.go", "go/internal/inboxbatch/"}
@@ -48,8 +40,6 @@ func TestItem_DeclaredPaths(t *testing.T) {
 	}
 }
 
-// TestStripControl is the one control-character rule for text entering a
-// prompt: C0 controls and DEL become spaces, everything else is kept.
 func TestStripControl(t *testing.T) {
 	if got := StripControl("fix\nnew bullet\t\x1b[31m\x7fok ✓"); got != "fix new bullet  [31m ok ✓" {
 		t.Fatalf("StripControl = %q", got)

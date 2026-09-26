@@ -1,21 +1,11 @@
 package inboxbatch
 
-// consoleroute_revise_test.go — RED contracts for the architect-review
-// revisions (ADR-0074): (F4) route:"lane" override provenance clamp — an
-// agent-autofiled item may not override a protected derivation; (F5) the
-// derivation scans ALL tokens of a files entry, not just the first; plus the
-// id-resolver the plan-time gate (fleet.TodosFromTriage) consumes.
-
 import (
 	"os"
 	"path/filepath"
 	"testing"
 )
 
-// F4: autofiled provenance (injected_by set) ignores the lane override when a
-// protected surface is declared — clamp-parity with ADR-0073: agent-authored
-// fields cannot widen agent authority; only operator-authored items may force
-// lane dispatch of a protected-surface task.
 func TestConsoleRouted_AutofiledLaneOverrideIgnored(t *testing.T) {
 	it := Item{ID: "x", Route: "lane", InjectedBy: "chronicle-escalation",
 		Files: []string{"go/internal/guards/role.go"}}
@@ -28,8 +18,6 @@ func TestConsoleRouted_AutofiledLaneOverrideIgnored(t *testing.T) {
 	}
 }
 
-// F4 boundary: an autofiled item with route:"lane" and NO protected surface
-// stays dispatchable — the clamp binds only where the derivation fires.
 func TestConsoleRouted_AutofiledLaneNoProtectedStaysDispatchable(t *testing.T) {
 	it := Item{ID: "x", Route: "lane", InjectedBy: "retrofile", Files: []string{"go/internal/other/ok.go"}}
 	if routed, _ := ConsoleRouted(it, protectedStub("go/internal/guards/role.go")); routed {
@@ -37,8 +25,6 @@ func TestConsoleRouted_AutofiledLaneNoProtectedStaysDispatchable(t *testing.T) {
 	}
 }
 
-// F5: a protected path ANYWHERE in a files entry routes the item — real items
-// write "(see go/internal/guards/role.go)" and similar shapes.
 func TestConsoleRouted_ProtectedPathAnyToken(t *testing.T) {
 	it := Item{ID: "x", Files: []string{"allowance fix (see go/internal/guards/role.go)"}}
 	routed, _ := ConsoleRouted(it, protectedStub("go/internal/guards/role.go"))
@@ -47,9 +33,6 @@ func TestConsoleRouted_ProtectedPathAnyToken(t *testing.T) {
 	}
 }
 
-// RoutedResolver adapts a loaded inbox dir into the id→(routed, reason)
-// closure fleet.TodosFromTriage consumes. Unknown ids (scout-originated work
-// with no inbox item) are dispatchable.
 func TestRoutedResolver_ClassifiesByID(t *testing.T) {
 	dir := t.TempDir()
 	write := func(name, body string) {
