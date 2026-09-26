@@ -8,14 +8,14 @@ import (
 )
 
 func TestDocDelete_Name(t *testing.T) {
-	g := NewDocDelete(false)
+	g := NewDocDelete(false, nil)
 	if g.Name() != "docdelete" {
 		t.Errorf("name=%q", g.Name())
 	}
 }
 
 func TestDocDelete_AllowsNonRm(t *testing.T) {
-	g := NewDocDelete(false)
+	g := NewDocDelete(false, nil)
 	cases := []string{
 		"ls docs/",
 		"cat docs/README.md",
@@ -33,7 +33,7 @@ func TestDocDelete_AllowsNonRm(t *testing.T) {
 }
 
 func TestDocDelete_DeniesRmDocs(t *testing.T) {
-	g := NewDocDelete(false)
+	g := NewDocDelete(false, nil)
 	cases := []string{
 		"rm docs/foo.md",
 		"rm -rf docs/architecture",
@@ -52,7 +52,7 @@ func TestDocDelete_DeniesRmDocs(t *testing.T) {
 }
 
 func TestDocDelete_BypassPolicyAllows(t *testing.T) {
-	g := NewDocDelete(true)
+	g := NewDocDelete(true, nil)
 	dec := g.Decide(context.Background(), core.GuardInput{
 		ToolName:  "Bash",
 		ToolInput: map[string]any{"command": "rm -rf docs/old"},
@@ -63,7 +63,7 @@ func TestDocDelete_BypassPolicyAllows(t *testing.T) {
 }
 
 func TestDocDelete_DeniesMvOutOfDocs(t *testing.T) {
-	g := NewDocDelete(false)
+	g := NewDocDelete(false, nil)
 	dec := g.Decide(context.Background(), core.GuardInput{
 		ToolName:  "Bash",
 		ToolInput: map[string]any{"command": "mv docs/old.md /tmp/"},
@@ -74,7 +74,7 @@ func TestDocDelete_DeniesMvOutOfDocs(t *testing.T) {
 }
 
 func TestDocDelete_AllowsMvToArchive(t *testing.T) {
-	g := NewDocDelete(false)
+	g := NewDocDelete(false, nil)
 	dec := g.Decide(context.Background(), core.GuardInput{
 		ToolName:  "Bash",
 		ToolInput: map[string]any{"command": "mv docs/old.md docs/private/research/archived-2026-05-22/old.md"},
@@ -85,7 +85,7 @@ func TestDocDelete_AllowsMvToArchive(t *testing.T) {
 }
 
 func TestDocDelete_AllowsConsolidationIntoDocs(t *testing.T) {
-	g := NewDocDelete(false)
+	g := NewDocDelete(false, nil)
 	cases := []string{
 		"git mv knowledge-base/research/x.md docs/research/x.md",
 		"git mv knowledge-base/research/token-optimization-2026 docs/research/token-optimization-2026",
@@ -103,7 +103,7 @@ func TestDocDelete_AllowsConsolidationIntoDocs(t *testing.T) {
 }
 
 func TestDocDelete_DeniesMvToLegacyArchiveHome(t *testing.T) {
-	g := NewDocDelete(false)
+	g := NewDocDelete(false, nil)
 	dec := g.Decide(context.Background(), core.GuardInput{
 		ToolName:  "Bash",
 		ToolInput: map[string]any{"command": "mv docs/old.md knowledge-base/research/archived-2026-09-01/old.md"},
@@ -114,7 +114,7 @@ func TestDocDelete_DeniesMvToLegacyArchiveHome(t *testing.T) {
 }
 
 func TestDocDelete_PassThroughForEditWrite(t *testing.T) {
-	g := NewDocDelete(false)
+	g := NewDocDelete(false, nil)
 	for _, tool := range []string{"Edit", "Write", "Read"} {
 		dec := g.Decide(context.Background(), core.GuardInput{ToolName: tool})
 		if !dec.Allow {
@@ -124,7 +124,7 @@ func TestDocDelete_PassThroughForEditWrite(t *testing.T) {
 }
 
 func TestDocDelete_MissingCommandIsAllow(t *testing.T) {
-	g := NewDocDelete(false)
+	g := NewDocDelete(false, nil)
 	dec := g.Decide(context.Background(), core.GuardInput{
 		ToolName:  "Bash",
 		ToolInput: map[string]any{},
