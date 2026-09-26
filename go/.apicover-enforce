@@ -556,6 +556,8 @@
 ./internal/dashboard
 # treefence — the read-only phase worktree fence (ADR-0097). Consumer: phases/runner.
 ./internal/treefence
+# recoveryguard — the recovery agent's kernel fence (ADR-0106). Consumer: core correction ladder.
+./internal/recoveryguard
 # triagedecision — the host derivation of triage's decision from its report (ADR-0106 H1). Consumer: deliverable.HostEffects.
 ./internal/triagedecision
 
