@@ -333,7 +333,7 @@ func TestRunPreflight_Modes(t *testing.T) {
 // paths, on empty tool input against a fresh .evolve dir.
 func TestRunGuard_BuildGuardBranches(t *testing.T) {
 	dir := t.TempDir()
-	for _, name := range []string{"phase", "role", "chain", "docdelete", "quota"} {
+	for _, name := range []string{"phase", "role", "chain", "docdelete"} {
 		var out, errb bytes.Buffer
 		rc := RunGuard([]string{"--evolve-dir", dir, name}, strings.NewReader(""), &out, &errb)
 		if rc != 0 && rc != 2 {

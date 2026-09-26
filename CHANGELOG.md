@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## Removed — the research quota guard, which never denied (2026-09-26)
+
+`evolve guard quota` built a fresh counter for every hook call, so its caps never outlived one call. It also keyed them on an `agent` field that no Claude Code tool input carries. Its hook matched `WebSearch|WebFetch|Bash`, so every Bash call paid for a process and a `policy.json` read that decided nothing.
+
+- The guard, its `.claude/settings.json` hook, its `guards.log` tag and `workflow.allow_deep_research` are removed. `policy.Load` ignores the key in an existing `policy.json`.
+- `TestHookWiring_EveryWiredGuardIsAGuardTheBinaryBuilds` keeps every wired `evolve guard <name>` buildable, so a future removal cannot leave a hook calling a guard the binary lacks. A hook that did would exit 10, which Claude Code shows but does not treat as a deny.
+- The guards suite's `TestMain` unset three bypass variables nothing reads. It is replaced by `TestGuards_ReadNoEnvironmentButHome`, which pins that the guards read no environment but `$HOME`.
+
 ## Fixed — the guards judge the clean path, and an `evolve ship` allows only itself (P1, 2026-09-26)
 
 Reading the guards during comment-reduction batch 19 found three ways past them, none of which needed an exploit to see. A build or tdd Write to `<worktree>/go/internal/core/../guards/role.go` missed the protected-surface fragment and was allowed. `/tmp/../x` counted as always-safe scratch. The ship guard allowed any line that mentioned `evolve ship`, so `git push origin main; echo evolve ship` passed, and a quoted or arithmetic `<<` hid the next line from it.

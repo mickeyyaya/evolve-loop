@@ -4,11 +4,11 @@
 
 ## Purpose
 
-`internal/guards` is the in-process trust kernel. It holds the six `core.Guard` implementations that `evolve guard <name>` runs as Claude Code PreToolUse hooks, and `ProtectedSurfaceManifest`, the single list of the pipeline control plane that no autonomous cycle may modify. Other packages (the ship tripwire, the build floor, the fleet preflight, triage's breaker and the inbox router) inject `IsProtectedSurface` or `IsProtectedScope` rather than keeping their own list.
+`internal/guards` is the in-process trust kernel. It holds the five `core.Guard` implementations that `evolve guard <name>` runs as Claude Code PreToolUse hooks, and `ProtectedSurfaceManifest`, the single list of the pipeline control plane that no autonomous cycle may modify. Other packages (the ship tripwire, the build floor, the fleet preflight, triage's breaker and the inbox router) inject `IsProtectedSurface` or `IsProtectedScope` rather than keeping their own list.
 
 ## Design
 
-- **One decision per process.** `internal/cli/guardcmd` builds one guard (`buildGuard`), reads the PreToolUse JSON from stdin, calls `Decide` once, appends to `.evolve/guards.log`, writes an `Alarm` decision to `.evolve/integrity-alarm.jsonl`, and exits 2 on deny. `.claude/settings.json` wires `ship`, `phase`, `role`, `docdelete` and `quota`. `chain` is run by hand (`evolve guard chain`, the same check as `evolve ledger verify`).
+- **One decision per process.** `internal/cli/guardcmd` builds one guard (`buildGuard`), reads the PreToolUse JSON from stdin, calls `Decide` once, appends to `.evolve/guards.log`, writes an `Alarm` decision to `.evolve/integrity-alarm.jsonl`, and exits 2 on deny. `.claude/settings.json` wires `ship`, `phase`, `role` and `docdelete`. `chain` is run by hand (`evolve guard chain`, the same check as `evolve ledger verify`).
 - **The guards.**
 
 | Guard | Tool | Rule | Off switch |
@@ -18,7 +18,6 @@
 | `role` | `Edit`, `Write` | per-phase write allowlist plus the control-plane boundary | `--bypass` (still alarms on a protected path) |
 | `ship` | `Bash` | deny `git commit`, `git push` and `gh release create/edit` unless that simple command itself runs `evolve ship`; each command on the line is judged on its own | `--bypass` |
 | `docdelete` | `Bash` | deny an `rm` naming `docs/` or `knowledge-base/`, and an `mv` of doc content to a destination outside `docs/` | `workflow.allow_doc_delete` |
-| `quota` | `WebSearch`, `WebFetch`, `kb-search.sh` via `Bash` | per agent and bucket caps, default 3, 5 and 20; zero takes the default, a negative cap always denies | `workflow.allow_deep_research` |
 
 - **The role guard's order.** A tool other than Edit/Write, or an empty `file_path`, is allowed. The path is cleaned once, so every later rule judges the file the write lands on. Then: `--bypass` allows (with an alarm on a protected path). An always-safe path (`/tmp/`, `<home>/.claude/`) is allowed unless it is protected. Missing storage or a cycle-state read error denies. Outside a cycle (`CycleID == 0`) everything is allowed. Inside a cycle a protected path is denied with an alarm; then retro may write the lesson corpus `.evolve/instincts/lessons/`; then any phase may write under its workspace; then a worktree phase (`core.WorktreePhase`: tdd and build) may write under the active worktree. Everything else is denied.
 - **Run-scoped state.** A lane's guard reads `<worktree>/.evolve/cycle-state.json`, which `core.linkGuardDeps` links to the run's own `run.json` (the mirror `WriteCycleState` writes, [ADR-0049](../adr/0049-concurrent-multi-cycle-execution.md) CB.4). The host-global `cycle-state.json` can hold a different concurrent run's phase.
@@ -66,7 +65,7 @@
 - **Every decision judges the clean path.** `..` cannot reach a protected file past its fragment, nor leave `/tmp` or `<home>/.claude` while keeping their always-safe standing. Pinned by `TestRole_DeniesADotDotPathIntoTheControlPlane`, `TestRole_ADotDotOutOfAnAlwaysSafeDirIsNotAlwaysSafe` and `TestIsProtectedSurface_JudgesTheCleanPath`.
 - **A doc move is a deletion unless it lands under `docs/`.** `knowledge-base/` is not a destination: its `research/` subtree is retired and `cycles/` is runtime state. Pinned by `TestDocDelete_DeniesMvToLegacyArchiveHome`, `TestDocDelete_DeniesMvOutOfDocs` and `TestDocDelete_AllowsConsolidationIntoDocs`.
 - **A guard decides on its own run's state.** Pinned by `TestRoleAndPhaseGuards_ReadOwnRunState`, which also checks the global view would have denied.
-- **The suite is hermetic.** `TestMain` unsets `EVOLVE_BYPASS_ROLE_GATE`, `EVOLVE_BYPASS_SHIP_GATE` and `EVOLVE_BYPASS_PHASE_GATE`, pinned by `TestGuardsSuiteIsHermetic`. Role fixtures use non-`/tmp` paths such as `/work/wt/cycle-20`, because on Linux `t.TempDir()` sits under `/tmp`, where the always-safe rule decides before cycle state is read. A fixture whose workspace must not exist on disk serves its cycle state from the `cycleStateOnly` stub, since `WriteCycleState` mirrors run state into the workspace.
+- **The suite is hermetic because the guards read no environment.** A guard's decision comes from its constructor arguments and cycle state; the one read is `$HOME`, taken once by `NewRole`. No shell the suite runs from can turn a deny into an allow. Pinned by `TestGuards_ReadNoEnvironmentButHome`, an AST scan of the package's non-test files. Role fixtures use non-`/tmp` paths such as `/work/wt/cycle-20`, because on Linux `t.TempDir()` sits under `/tmp`, where the always-safe rule decides before cycle state is read. A fixture whose workspace must not exist on disk serves its cycle state from the `cycleStateOnly` stub, since `WriteCycleState` mirrors run state into the workspace.
 
 ## Findings
 
@@ -92,4 +91,8 @@
   - The fix cleans at both boundaries and replaces the line-based heredoc stripper with the per-command scanner. It also drops the `ship.sh` allowance: `scripts/lifecycle/ship.sh` no longer exists, and an allowance keyed to a path an agent can write is itself a bypass.
   - Review of the fix found one more way past, older than it: the heredoc marker was read with an identifier regex, so `<<EOF-MARKER` waited for a line `EOF` that never came and hid everything after the real close, a `git push` included. The old line-based stripper had the same regex. The marker is now the whole shell word after quote removal (`TestShip_AHeredocMarkerIsTheWholeShellWord`).
   - Three tests had passed for the wrong reason and were rewritten: `TestRole_BuilderWritesInWorktree` and `TestRole_AuditPhaseRestricted` sat under `/tmp`, and `TestShip_Decide_VerbInHeredocBody` ran `evolve ship`, whose substring allowance decided it. Each rule was mutation-checked: removing it turns its named test red.
-- **The quota guard counts per process.** `evolve guard quota` builds a fresh `Quota` for each hook call, so its in-memory counters never pass one call, and `buildGuard` sets only `AllowDeepResearch`. As wired, the caps never deny.
+- **The quota guard never denied, and is removed** (2026-09-26, part of `guards-path-traversal-and-ship-bypass`).
+  - `evolve guard quota` built a fresh `Quota` for each hook call, so its in-memory counters never outlived one call. It keyed them on an `agent` field that no Claude Code tool input carries.
+  - Its hook matched `WebSearch|WebFetch|Bash`, so it started a process and read `policy.json` on every Bash call for nothing.
+  - The guard, its hook entry, its `guards.log` tag and `workflow.allow_deep_research` are gone. `TestHookWiring_EveryWiredGuardIsAGuardTheBinaryBuilds` (guardcmd) keeps the hook wiring and the binary in step.
+  - The old `TestMain` also went: it unset three `EVOLVE_BYPASS_*` variables that nothing reads, and `testing-strategy.md` counted five.
