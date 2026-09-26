@@ -1,9 +1,5 @@
 package policy_test
 
-// QuotaResetConfig — the typed parameter that replaced EVOLVE_QUOTA_RESET_AT /
-// EVOLVE_QUOTA_RESET_HOURS. Driven only through Policy.QuotaResetConfig() and
-// policy.Load (explicit path), never env.
-
 import (
 	"testing"
 

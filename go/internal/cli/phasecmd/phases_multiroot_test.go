@@ -8,9 +8,6 @@ import (
 	"testing"
 )
 
-// TestPhasesList_MultiRootShowsProvenance is the WP5 integration check: a
-// phase shipped by a plugin root (EVOLVE_PHASE_ROOTS) must appear in `phases
-// list` with its discovery root, alongside the project-local one.
 func TestPhasesList_MultiRootShowsProvenance(t *testing.T) {
 	root := createFixtureProject(t)
 	writeUserPhase(t, root, "local-check", `{"name":"local-check","optional":true}`)
@@ -43,7 +40,6 @@ func TestPhasesList_MultiRootShowsProvenance(t *testing.T) {
 		}
 	}
 
-	// validate must see the plugin phase too.
 	out.Reset()
 	if code := RunPhases([]string{"validate", "plugin-check"}, nil, &out, &errb); code != 0 {
 		t.Fatalf("validate exit = %d (stdout=%q)", code, out.String())

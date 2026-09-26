@@ -9,8 +9,7 @@ import (
 	"testing"
 )
 
-// createFixtureProject writes a minimal registry so collision checks against
-// built-ins are exercised, and returns the project root.
+// createFixtureProject writes a minimal registry so the collision check against built-ins is exercised.
 func createFixtureProject(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
@@ -35,7 +34,7 @@ const validCreateSpec = `{
   "classify": { "require_sections": ["Threats", "Mitigations"], "verdict_on_pass": "PASS" }
 }`
 
-// envelope mirrors the machine-parseable create contract.
+// createEnvelope decodes the wire contract independently of createEnvelopeOut.
 type createEnvelope struct {
 	OK               bool     `json:"ok"`
 	Phase            string   `json:"phase"`
@@ -88,7 +87,6 @@ func TestPhasesCreate_HappyPathFromStdin(t *testing.T) {
 		t.Error("create must force-rebuild the phase inventory")
 	}
 
-	// Files on disk: phase.json under the default root, persona under agents/.
 	if _, err := os.Stat(filepath.Join(root, ".evolve", "phases", "threat-model", "phase.json")); err != nil {
 		t.Errorf("phase.json not written: %v", err)
 	}
@@ -101,7 +99,6 @@ func TestPhasesCreate_HappyPathFromStdin(t *testing.T) {
 		t.Errorf("persona body lost: %q", body)
 	}
 
-	// Inventory actually contains the phase.
 	inv, err := os.ReadFile(filepath.Join(root, ".evolve", "phase-inventory.json"))
 	if err != nil {
 		t.Fatalf("inventory missing: %v", err)
@@ -231,7 +228,6 @@ func TestPhasesCreate_MintPromotion(t *testing.T) {
 
 func TestPhasesCreate_RejectsTraversalAgentName(t *testing.T) {
 	root := createFixtureProject(t)
-	// A crafted agent field must not escape agents/ (path traversal).
 	spec := `{"name": "sneaky-agent", "optional": true, "agent": "../../outside/evil"}`
 	persona := filepath.Join(root, "p.md")
 	if err := os.WriteFile(persona, []byte("evil"), 0o644); err != nil {
@@ -261,7 +257,6 @@ func TestPhasesCreate_RejectsRootOutsideProjectAndRoots(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(outside, "threat-model")); !os.IsNotExist(err) {
 		t.Error("nothing may be written outside configured roots")
 	}
-	// But a configured plugin root IS a valid target.
 	pluginRoot := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
 		t.Fatal(err)
@@ -282,8 +277,7 @@ func TestPhasesCreate_RejectsRootOutsideProjectAndRoots(t *testing.T) {
 
 func TestPhasesCreate_RollbackPreservesPreexistingDir(t *testing.T) {
 	root := createFixtureProject(t)
-	// A directory with the phase's name exists but has no phase.json (invisible
-	// to the collision check) and holds unrelated content.
+	// A same-named directory without phase.json is invisible to the collision check.
 	dir := filepath.Join(root, ".evolve", "phases", "threat-model")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
@@ -292,8 +286,7 @@ func TestPhasesCreate_RollbackPreservesPreexistingDir(t *testing.T) {
 	if err := os.WriteFile(keep, []byte("operator notes"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// Force the persona write to fail AFTER phase.json is written: pre-create
-	// agents/ as a FILE so the persona's parent mkdir fails.
+	// agents/ as a file makes the persona write fail after phase.json is written.
 	if err := os.WriteFile(filepath.Join(root, "agents"), []byte("not a dir"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -324,13 +317,6 @@ func TestPhasesCreate_UsageErrors(t *testing.T) {
 	}
 }
 
-// TestPhasesCreate_VerifyRoundtrip — test-plan P0 #3 (leg A→B consistency):
-// a phase minted by `phases create` must be RESOLVABLE and VERIFIABLE by
-// `evolve phase verify` against the same project root — generation and
-// check may never disagree about where the contract lives or what it
-// requires. Would catch any drift between the create-side spec write and
-// the verify-side merged-catalog discovery (registry path, phase roots,
-// FromSpec derivation).
 func TestPhasesCreate_VerifyRoundtrip(t *testing.T) {
 	root := createFixtureProject(t)
 	code, out, errb := runCreate(t, validCreateSpec, "--spec", "-")
@@ -342,9 +328,7 @@ func TestPhasesCreate_VerifyRoundtrip(t *testing.T) {
 		t.Fatalf("create envelope not OK: %+v", env)
 	}
 
-	// 1. The minted phase must RESOLVE: a missing artifact is exit 1 (a
-	// confirmed violation naming the expected path), never exit 10
-	// (unknown phase — resolution drift between create and verify).
+	// Exit 1, not 10: a missing-artifact violation proves the created phase resolved.
 	ws := filepath.Join(root, ".evolve", "runs", "cycle-1")
 	if err := os.MkdirAll(ws, 0o755); err != nil {
 		t.Fatal(err)
@@ -354,8 +338,6 @@ func TestPhasesCreate_VerifyRoundtrip(t *testing.T) {
 		t.Fatalf("verify(minted phase, no artifact) exit=%d want 1; stderr=%s", code, verr)
 	}
 
-	// 2. A conforming artifact (the sections + verdict sentinel the create
-	// envelope advertised) must verify clean: exit 0.
 	report := "## Threats\n- spoofing\n\n## Mitigations\n- authn\n\n" +
 		"<!-- evolve-verdict: {\"phase\":\"threat-model\",\"verdict\":\"PASS\"} -->\n"
 	if err := os.WriteFile(filepath.Join(ws, "threat-model-report.md"), []byte(report), 0o644); err != nil {

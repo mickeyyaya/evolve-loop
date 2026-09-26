@@ -9,9 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// TestPhaseVerify_UserPhaseParity proves the agent self-check resolves a
-// config-only phase through the merged catalog (same contract the host gate
-// derives), with zero Go change to add the phase.
 func TestPhaseVerify_UserPhaseParity(t *testing.T) {
 	project := t.TempDir()
 	// Minimal registry so mergedCatalog's built-in Load succeeds.
@@ -22,7 +19,6 @@ func TestPhaseVerify_UserPhaseParity(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(reg, "phase-registry.json"), []byte(`{"schema_version":4,"phases":[]}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// A config-only user phase.
 	phaseDir := filepath.Join(project, ".evolve", "phases", "widget-check")
 	if err := os.MkdirAll(phaseDir, 0o755); err != nil {
 		t.Fatal(err)
@@ -38,14 +34,11 @@ func TestPhaseVerify_UserPhaseParity(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(phaseDir, "phase.json"), []byte(phaseJSON), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// The deliverable, well-formed.
 	ws := filepath.Join(project, "ws")
 	if err := os.MkdirAll(ws, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	// 3.10 cutover: at the enforce default a verdict-declaring deliverable must
-	// carry the machine-readable sentinel — the prose-verdict fallback is gated off
-	// (parity with built-in evaluate phases, which all emit the sentinel).
+	// At the enforce default a verdict-declaring deliverable needs the machine-readable sentinel.
 	deliverable := "## Findings\n- ok\n" + phasecontract.RenderVerdictSentinel("widget-check", "PASS") + "\n"
 	if err := os.WriteFile(filepath.Join(ws, "widget-check-report.md"), []byte(deliverable), 0o644); err != nil {
 		t.Fatal(err)
@@ -58,7 +51,6 @@ func TestPhaseVerify_UserPhaseParity(t *testing.T) {
 		t.Fatalf("verify user phase: exit=%d stdout=%q stderr=%q", code, out.String(), errb.String())
 	}
 
-	// Missing-section variant blocks (exit 1).
 	if err := os.WriteFile(filepath.Join(ws, "widget-check-report.md"), []byte("no heading\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}

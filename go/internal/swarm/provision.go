@@ -11,63 +11,30 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/runscope"
 )
 
-// WorkerProvisioner creates and removes the per-worker git worktrees + the
-// shared integration branch a WRITER swarm needs. It is defined HERE (in the
-// swarm package, consumed here) rather than widening core.WorktreeProvisioner —
-// accept-interface-where-used keeps the swarm self-contained with zero blast
-// radius on the core per-cycle provisioner. Readers need no provisioning, so the
-// dispatcher only calls this for writer swarms.
+// WorkerProvisioner creates and removes a writer swarm's integration and per-worker worktrees.
 type WorkerProvisioner interface {
-	// CreateIntegration provisions the shared integration branch+worktree
-	// (cycle-<N>-integration off HEAD). Idempotent. Returns its path.
+	// CreateIntegration idempotently provisions the integration branch and worktree off HEAD and returns its path.
 	CreateIntegration(ctx context.Context, projectRoot string, cycle int) (string, error)
-	// CreateWorker provisions a worker worktree (cycle-<N>-<workerID>) branched
-	// off the integration branch, so workers start from the agreed base.
-	// Idempotent. Returns its path.
+	// CreateWorker idempotently provisions a worker worktree branched off integrationBranch and returns its path.
 	CreateWorker(ctx context.Context, projectRoot string, cycle int, workerID, integrationBranch string) (string, error)
-	// Cleanup removes a worktree (best-effort; missing is not an error).
+	// Cleanup removes a worktree best-effort; a missing one is not an error.
 	Cleanup(ctx context.Context, projectRoot, worktree string) error
 }
 
-// gitWorkerProvisioner is the production WorkerProvisioner. It mirrors the proven
-// `git worktree add -B <branch> <wt> <base>` flow from core.gitWorktree (-B is
-// idempotent + concurrency-safe) and uses NAMED branches (not --detach) so the
-// merge-train and ship can resolve them via `git symbolic-ref --short HEAD`.
-//
-// Branch/worktree naming:
-//   - integration: branch cycle-<N>-integration, worktree <base>/cycle-<N>-integration
-//   - worker:      branch cycle-<N>-<workerID>,  worktree <base>/cycle-<N>-<workerID>
-//
-// base = baseOverride (policy.json worktree.base) or <root>/.evolve/worktrees (same as core).
+// gitWorkerProvisioner uses named branches, not --detach, so the merge train and ship can resolve them with symbolic-ref.
 type gitWorkerProvisioner struct {
-	// LinkGuardDeps is an optional hook to make a fresh worktree self-sufficient
-	// for the trust-kernel hooks (symlink binary + .evolve state). Injected so
-	// the swarm package does not import core; cmd wiring supplies core's
-	// equivalent. Nil = skip (tests / non-hooked environments).
+	// LinkGuardDeps readies a fresh worktree for the trust-kernel hooks; nil skips it.
 	LinkGuardDeps func(worktree, projectRoot string)
 
-	// newGit builds the gitexec.Git for a given -C dir. Nil => production
-	// gitexec.Default. Injected by tests to fake every git call. A factory (not a
-	// single Git) because one provision op spans two dirs: the worktree's own dir
-	// for the reuse rev-parse probe, the project root for worktree add/remove.
+	// newGit is a factory because one provision spans two -C dirs: the worktree and the project root.
 	newGit func(dir string) gitexec.Git
 
-	// baseOverride is the operator override for the worktree base, resolved once
-	// from policy.json (worktree.base) and injected via NewGitWorkerProvisioner.
-	// Empty ⇒ the built-in <root>/.evolve/worktrees default. Replaces the former
-	// EVOLVE_WORKTREE_BASE env read (flag-reduction, ADR-0064).
-	baseOverride string
+	baseOverride string // policy.json worktree.base; empty means <root>/.evolve/worktrees
 
-	// retry carries the knobs of the SHARED `git worktree add` retry loop
-	// (gitexec.WorktreeAddRetry). This is the highest-contention site in the
-	// tree — N workers provision concurrently against the same .git — so the
-	// bound and backoff come from gitexec rather than a swarm-local copy of the
-	// constants. Zero value = production defaults (real sleep).
+	// retry takes gitexec's shared bound and backoff rather than a swarm-local copy.
 	retry gitexec.WorktreeAddRetry
 }
 
-// git returns the gitexec.Git rooted at dir, defaulting to the production
-// runner when newGit is unset.
 func (g gitWorkerProvisioner) git(dir string) gitexec.Git {
 	if g.newGit != nil {
 		return g.newGit(dir)
@@ -75,9 +42,6 @@ func (g gitWorkerProvisioner) git(dir string) gitexec.Git {
 	return gitexec.Default(dir)
 }
 
-// gitFailReason renders a one-line failure reason from a gitexec.Capture result
-// known to be a failure (err != nil || code != 0): the unrecoverable error if
-// present, else the non-zero exit code. Shared by provision + mergetrain.
 func gitFailReason(code int, err error) string {
 	if err != nil {
 		return err.Error()
@@ -85,18 +49,13 @@ func gitFailReason(code int, err error) string {
 	return fmt.Sprintf("exit %d", code)
 }
 
-// NewGitWorkerProvisioner returns the production provisioner. linkGuardDeps may
-// be nil (skipped) — supply core.LinkGuardDeps at the composition root.
-// baseOverride is the resolved policy.json worktree.base ("" ⇒ default location).
+// NewGitWorkerProvisioner returns the production provisioner; linkGuardDeps may be nil and an empty baseOverride means the default base.
 func NewGitWorkerProvisioner(linkGuardDeps func(worktree, projectRoot string), baseOverride string) WorkerProvisioner {
 	return gitWorkerProvisioner{
 		LinkGuardDeps: linkGuardDeps,
 		baseOverride:  baseOverride,
 		retry: gitexec.WorktreeAddRetry{
-			// Same shared classifier core and the operator CLI pass: N
-			// concurrent workers make this the highest-contention site, so it
-			// must keep absorbing collisions — but a permanent failure here
-			// costs 6s per worker for nothing.
+			// N concurrent workers must keep absorbing lock collisions, but a permanent failure must not pay the backoff.
 			Retryable: gitexec.RetryableWorktreeAddFailure,
 			OnRetry: func(attempt, attempts, code int, _ string) {
 				fmt.Fprintf(os.Stderr, "[swarm] retry %d/%d: git worktree add after retryable rc=%d\n", attempt, attempts-1, code)
@@ -105,9 +64,7 @@ func NewGitWorkerProvisioner(linkGuardDeps func(worktree, projectRoot string), b
 	}
 }
 
-// worktreeBase resolves the worker worktree base. An absolute baseOverride
-// (policy.json worktree.base) wins; a relative override is refused. Empty ⇒
-// <root>/.evolve/worktrees. Replaces the former EVOLVE_WORKTREE_BASE env read.
+// worktreeBase refuses a relative base, which git would resolve against an unintended cwd.
 func worktreeBase(baseOverride, projectRoot string) (string, error) {
 	if baseOverride != "" {
 		if !filepath.IsAbs(baseOverride) {
@@ -122,8 +79,7 @@ func worktreeBase(baseOverride, projectRoot string) (string, error) {
 }
 
 func (g gitWorkerProvisioner) CreateIntegration(ctx context.Context, projectRoot string, cycle int) (string, error) {
-	// runscope lane-namespaces the integration branch+dir so concurrent sibling
-	// worktrees of one repo never collide on a global "cycle-<N>-integration".
+	// Lane-scoped so sibling worktrees of one repo never collide on a global branch name.
 	branch := runscope.New(runscope.LaneFromRoot(projectRoot), "", cycle).IntegrationBranch()
 	return g.addWorktree(ctx, projectRoot, branch, "HEAD")
 }
@@ -137,8 +93,6 @@ func (g gitWorkerProvisioner) CreateWorker(ctx context.Context, projectRoot stri
 	return g.addWorktree(ctx, projectRoot, branch, base)
 }
 
-// addWorktree runs the idempotent `git worktree add -B <branch> <wt> <base>`,
-// reusing an existing valid worktree (and tearing down a stale stub first).
 func (g gitWorkerProvisioner) addWorktree(ctx context.Context, projectRoot, branch, base string) (string, error) {
 	root, err := worktreeBase(g.baseOverride, projectRoot)
 	if err != nil {
@@ -149,11 +103,7 @@ func (g gitWorkerProvisioner) addWorktree(ctx context.Context, projectRoot, bran
 	}
 	wt := filepath.Join(root, branch)
 
-	// Reuse an existing VALID worktree; tear down a stale stub git rejects.
-	// Validity needs BOTH probes: a `.git` entry at the worktree root (a plain
-	// stub dir inside the parent repo passes rev-parse by walking up to the
-	// parent's .git, silently "reusing" a non-worktree — cycle-283 finding) and
-	// a rev-parse to reject a corrupt/orphaned .git entry.
+	// Reuse needs a .git entry at the root too: a stub dir inside the parent repo passes rev-parse via the parent's .git.
 	if fi, err := os.Stat(wt); err == nil && fi.IsDir() {
 		_, gitEntryErr := os.Stat(filepath.Join(wt, ".git"))
 		if gitEntryErr == nil && g.git(wt).Run(ctx, "rev-parse", "--git-dir") == nil {
@@ -182,7 +132,6 @@ func (g gitWorkerProvisioner) Cleanup(ctx context.Context, projectRoot, worktree
 		return nil
 	}
 	if _, stderr, code, err := g.git(projectRoot).Capture(ctx, "worktree", "remove", "--force", worktree); err != nil || code != 0 {
-		// Best-effort but surfaced: a failed remove leaves an orphan worktree.
 		fmt.Fprintf(os.Stderr, "[swarm] WARN worktree remove %s failed: %s: %s\n", worktree, gitFailReason(code, err), strings.TrimSpace(stderr))
 	}
 	_ = os.RemoveAll(worktree)
@@ -190,14 +139,8 @@ func (g gitWorkerProvisioner) Cleanup(ctx context.Context, projectRoot, worktree
 	return nil
 }
 
-// deleteBranch mirrors core.gitWorktree's deleteCycleBranch: deletes the
-// worktree's leaf-named branch AFTER removal, via non-force `git branch -d`
-// (git's merged-check is the only safety net, never escalated to `-D`). This
-// package cannot depend on core (import direction), so the guard is
-// independently mirrored per the plan's stated design (S3,
-// workspace-hygiene-2026-07). Gated on the "cycle-" leaf prefix — every
-// worktree this provisioner mints (integration + worker) is runscope-named
-// "cycle-<lane>-<N>[-integration|-<workerID>]".
+// deleteBranch never escalates to -D: git's merged check is what keeps unshipped work.
+// The cycle- prefix limits it to branches this provisioner mints.
 func (g gitWorkerProvisioner) deleteBranch(ctx context.Context, projectRoot, worktree string) {
 	branch := filepath.Base(worktree)
 	if !strings.HasPrefix(branch, "cycle-") {

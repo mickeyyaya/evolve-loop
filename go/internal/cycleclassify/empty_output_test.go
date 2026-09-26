@@ -6,20 +6,10 @@ import (
 	"testing"
 )
 
-// Workstream D2: an empty-output model session (the subscription-quota-wall
-// signature — a phase launched but the model returned nothing) must be
-// reclassified from integrity-breach to recoverable infrastructure, so the
-// dispatcher QUOTA-PAUSEs/retries instead of treating the quota wall as a
-// 7-day-retention breach. These tests pin both the positive signal and the
-// guards that keep it from masking a genuine silent skip.
-
-// emptyOutputWS seeds an unclassifiable orchestrator-report.md (so Classify
-// reaches the final passes) plus the supplied per-phase files.
+// emptyOutputWS seeds an unclassifiable orchestrator-report.md so Classify reaches the final passes.
 func emptyOutputWS(t *testing.T) string {
 	t.Helper()
 	ws := t.TempDir()
-	// A report that matches none of the infra/ship/audit/build patterns →
-	// without pass 6 this would be ClassIntegrityBreach.
 	if err := os.WriteFile(filepath.Join(ws, "orchestrator-report.md"), []byte("## Summary\nnothing classifiable here\n"), 0o644); err != nil {
 		t.Fatalf("write report: %v", err)
 	}
@@ -28,7 +18,6 @@ func emptyOutputWS(t *testing.T) string {
 
 func TestClassify_EmptyStdoutLog_QuotaLikely(t *testing.T) {
 	ws := emptyOutputWS(t)
-	// build-planner WAS launched (stdout.log exists) but produced nothing.
 	if err := os.WriteFile(filepath.Join(ws, "build-planner-stdout.log"), []byte("   \n\n"), 0o644); err != nil {
 		t.Fatalf("write stdout: %v", err)
 	}
@@ -45,8 +34,6 @@ func TestClassify_EmptyStdoutLog_QuotaLikely(t *testing.T) {
 }
 
 func TestClassify_NoStdoutLog_StaysBreach(t *testing.T) {
-	// No stdout.log at all = a phase that never ran = silent skip = breach.
-	// The empty-output pass must NOT fire (the EXISTS guard).
 	ws := emptyOutputWS(t)
 	r := Classify(ws)
 	if r.Class != ClassIntegrityBreach {
@@ -55,8 +42,6 @@ func TestClassify_NoStdoutLog_StaysBreach(t *testing.T) {
 }
 
 func TestClassify_NonEmptyStdoutLog_StaysBreach(t *testing.T) {
-	// A phase that DID produce output but the cycle is still unclassifiable is
-	// a real breach, not a quota wall — the pass must not fire.
 	ws := emptyOutputWS(t)
 	if err := os.WriteFile(filepath.Join(ws, "build-stdout.log"), []byte("ran fine, wrote code\n"), 0o644); err != nil {
 		t.Fatalf("write stdout: %v", err)
@@ -68,8 +53,6 @@ func TestClassify_NonEmptyStdoutLog_StaysBreach(t *testing.T) {
 }
 
 func TestClassify_EmptyStdoutButAssistantEvents_StaysBreach(t *testing.T) {
-	// Empty stdout.log BUT the events stream captured assistant output → the
-	// log was merely truncated, not a quota wall. Guard must keep it a breach.
 	ws := emptyOutputWS(t)
 	if err := os.WriteFile(filepath.Join(ws, "build-stdout.log"), []byte(""), 0o644); err != nil {
 		t.Fatalf("write stdout: %v", err)
@@ -85,9 +68,6 @@ func TestClassify_EmptyStdoutButAssistantEvents_StaysBreach(t *testing.T) {
 }
 
 func TestClassify_NoReportButEmptyOutput_QuotaLikely(t *testing.T) {
-	// The cycle-120 signature: a mid-cycle quota abort never writes an
-	// orchestrator-report.md. The pass must still recover, from per-phase
-	// artifacts alone, instead of short-circuiting to breach.
 	ws := t.TempDir()
 	if err := os.WriteFile(filepath.Join(ws, "build-planner-stdout.log"), []byte(""), 0o644); err != nil {
 		t.Fatalf("write stdout: %v", err)
@@ -100,10 +80,6 @@ func TestClassify_NoReportButEmptyOutput_QuotaLikely(t *testing.T) {
 }
 
 func TestClassify_EmptyStdoutButEventsTruncated_StaysBreach(t *testing.T) {
-	// A single events line exceeds maxScannerBufBytes → scanner.Err() fires →
-	// hasAssistantEvents conservatively returns TRUE (assume output present) so
-	// the empty-output pass does NOT misfire on a truncation. Shrinking the
-	// cap drives the same branch deterministically.
 	orig := maxScannerBufBytes
 	maxScannerBufBytes = 32
 	defer func() { maxScannerBufBytes = orig }()
@@ -112,8 +88,7 @@ func TestClassify_EmptyStdoutButEventsTruncated_StaysBreach(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(ws, "build-stdout.log"), []byte(""), 0o644); err != nil {
 		t.Fatalf("write stdout: %v", err)
 	}
-	// One line that exceeds both the 1024-byte initial scanner buffer AND
-	// the 32-byte cap, forcing bufio.ErrTooLong → scanner.Err() non-nil.
+	// The line must exceed the 1024-byte initial scanner buffer as well as the shrunk cap.
 	if err := os.WriteFile(filepath.Join(ws, "build-events.ndjson"),
 		[]byte(`{"kind":"tool_use","data":{"text":"`+stringRepeat("x", 2000)+`"}}`+"\n"), 0o644); err != nil {
 		t.Fatalf("write events: %v", err)
@@ -124,8 +99,6 @@ func TestClassify_EmptyStdoutButEventsTruncated_StaysBreach(t *testing.T) {
 	}
 }
 
-// stringRepeat is a local helper since this package doesn't already import
-// strings just for tests (avoids touching the import list).
 func stringRepeat(s string, n int) string {
 	out := make([]byte, 0, len(s)*n)
 	for i := 0; i < n; i++ {
@@ -135,8 +108,6 @@ func stringRepeat(s string, n int) string {
 }
 
 func TestClassify_EmptyOutputNeverBeatsClassifiableMarker(t *testing.T) {
-	// The pass runs LAST. A report with a real infra/build marker must keep its
-	// specific classification even if an empty stdout.log is also present.
 	ws := t.TempDir()
 	if err := os.WriteFile(filepath.Join(ws, "orchestrator-report.md"),
 		[]byte("Build status: FAIL — tests RED\n"), 0o644); err != nil {

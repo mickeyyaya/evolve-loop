@@ -1,10 +1,5 @@
 package policy
 
-// retry_policy_for_test.go — the accessor that finally consumes ADR-0072's
-// declarative retry policy. Action, MaxRetries and FixType have been declared in
-// the category table since the policy shipped and were read by nothing; the retry
-// decision used a parallel knob instead. This pins the table as the one authority.
-
 import "testing"
 
 func TestRetryPolicyFor(t *testing.T) {
@@ -40,7 +35,6 @@ func TestRetryPolicyFor(t *testing.T) {
 			wantAction: ActionDeferOrQuarantine,
 		},
 		{
-			// ok=false must be treated as "no retry" by callers, never default-allow.
 			name: "an unknown category is not known", category: "nobody-declared-this",
 		},
 	}

@@ -1,13 +1,5 @@
 package recovery
 
-// promote_test.go — ADR-0044 Slice 5 RED tests: the Reflexion-style promotion
-// loop. When the LLM failure-advisor classifies a NOVEL fatal pane state, its
-// classification is promoted into the deterministic registry — in-memory (the
-// same batch's later phases get the fast catch) and durably
-// (.evolve/instincts/fatal-signatures/<id>.yaml, replayed at startup) — so
-// the deterministic frontier grows and the LLM never re-pays for a known
-// failure. Judgment at the frontier, determinism in the core.
-
 import (
 	"os"
 	"path/filepath"
@@ -32,8 +24,6 @@ func TestPromote_InMemory_DetectsImmediately(t *testing.T) {
 func TestPromote_SeedsKeepPrecedence(t *testing.T) {
 	t.Parallel()
 	d := SeedDetector()
-	// A promoted signature that ALSO matches a seeded pane must not shadow
-	// the vetted seed: promotions append after seeds (first match wins).
 	d.Promote(FatalSignature{Substr: "issue with the selected model", Cause: CauseDeadShell, Note: "malicious shadow attempt"})
 	cause, _, ok := d.Detect("⏺ There's an issue with the selected model (auto).")
 	if !ok || cause != CauseModelInvalid {
@@ -52,8 +42,6 @@ func TestPromoteSignature_DurableAbsentOnly(t *testing.T) {
 	if id1 == "" {
 		t.Fatal("promotion must return a stable id")
 	}
-	// Second promotion of the same substring is idempotent: same id, no
-	// clobber (absent-only — an operator-edited file wins).
 	id2, err := PromoteSignature(dir, FatalSignature{Substr: sig.Substr, Cause: CauseModelInvalid, Note: "different note"})
 	if err != nil {
 		t.Fatalf("re-promote: %v", err)
@@ -81,12 +69,9 @@ func TestSeedDetectorWithPromotions_Replays(t *testing.T) {
 		t.Fatal(err)
 	}
 	d := SeedDetectorWithPromotions(dir)
-	// Seeds still present…
 	if cause, _, ok := d.Detect("zsh: command not found: x"); !ok || cause != CauseDeadShell {
 		t.Fatalf("seeds must survive replay; got %v ok=%v", cause, ok)
 	}
-	// …and the durable promotion is caught deterministically (zero advisor
-	// calls — the Slice-5 acceptance).
 	cause, _, ok := d.Detect("⚠ credential vault locked")
 	if !ok || cause != CauseCLISelfUpdated {
 		t.Fatalf("replayed promotion must catch; got %v ok=%v", cause, ok)
@@ -95,13 +80,10 @@ func TestSeedDetectorWithPromotions_Replays(t *testing.T) {
 
 func TestSeedDetectorWithPromotions_MissingOrCorruptDirSafe(t *testing.T) {
 	t.Parallel()
-	// Absent dir → seeds only, no error.
 	d := SeedDetectorWithPromotions(filepath.Join(t.TempDir(), "nope"))
 	if _, _, ok := d.Detect("zsh: command not found: x"); !ok {
 		t.Fatal("absent promotions dir must degrade to seeds")
 	}
-	// Corrupt file → skipped, seeds + valid files still load (a bad
-	// promotion must never brick boot).
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "corrupt.yaml"), []byte(":::not yaml:::"), 0o644); err != nil {
 		t.Fatal(err)
@@ -147,11 +129,6 @@ func TestPromoteAdvice_ValidatesBeforePromoting(t *testing.T) {
 	}
 }
 
-// TestPromoteAdvice_RejectsNeutralizationArtifacts — ADR-0045 I5 backstop:
-// the advisor reads a NEUTRALIZED pane digest, but Detect matches RAW panes.
-// A pane_substr quoting a neutralization artifact ([REDACTED], [untrusted],
-// fence-softened ”') would promote a signature that can never fire — reject
-// it loudly so the caller escalates instead of silently planting dead rules.
 func TestPromoteAdvice_RejectsNeutralizationArtifacts(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -168,7 +145,6 @@ func TestPromoteAdvice_RejectsNeutralizationArtifacts(t *testing.T) {
 			t.Errorf("substr %q carries a neutralization artifact and must be rejected", substr)
 		}
 	}
-	// Control: a clean substring still promotes.
 	if err := PromoteAdvice(d, dir, FailureAdvice{
 		Cause: "dead_shell", PaneSubstr: "Please restart your terminal now", Justification: "j",
 	}); err != nil {

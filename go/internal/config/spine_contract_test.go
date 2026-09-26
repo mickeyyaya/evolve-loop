@@ -1,11 +1,5 @@
 package config_test
 
-// External test (config_test package) so it can import core. Pins the
-// config-local staticSpinePhases set against the actual state machine — if
-// someone adds a new built-in phase to core but forgets to extend the spine
-// set, this fails loudly. Encoded here rather than inside config because the
-// production config package must not import core (leaf invariant).
-
 import (
 	"testing"
 
@@ -13,11 +7,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// TestStaticSpineMatchesStateMachine is the cross-package contract: every
-// runnable built-in phase the state machine drives must appear in
-// config.StaticSpinePhases (exported via the test seam below), and vice versa.
-// Sentinel phases (start, end) are excluded — they're not agent runs.
 func TestStaticSpineMatchesStateMachine(t *testing.T) {
+	// start and end are sentinels, not agent runs, so want omits them.
 	want := map[string]struct{}{
 		string(core.PhaseIntent):       {},
 		string(core.PhaseScout):        {},

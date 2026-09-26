@@ -1,15 +1,5 @@
 package bridge
 
-// bridge_contract_tail_test.go — WIRING proof for the generation-point
-// deliverable contract (inbox contract-requirements-at-generation-point, 0.90).
-//
-// A renderer nobody calls is dead plumbing (the caller-proof class:
-// builder-persona-requires-caller-proof). These tests assert the block reaches
-// the prompt the ENGINE receives, through the production Launch path — the same
-// seam TestLaunch_InjectsDeliverableContract already guards for the prefix
-// block — and that it lands in the TAIL, after the persona body, which is the
-// entire point of the change.
-
 import (
 	"context"
 	"strings"
@@ -19,11 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// TestLaunch_AppendsDeliverableContractTailBlock — the production caller of
-// phasecontract.RenderContractTail is Adapter.injectContract (bridge.go), which
-// Launch invokes for every contracted phase. The XML block must appear AFTER the
-// persona body and carry the exact path, the verbatim section heading, and the
-// sentinel template for a verdict-bearing phase.
 func TestLaunch_AppendsDeliverableContractTailBlock(t *testing.T) {
 	fe := &fakeEngine{}
 	artifact := "/abs/.evolve/runs/cycle-1218/audit-report.md"
@@ -56,17 +41,11 @@ func TestLaunch_AppendsDeliverableContractTailBlock(t *testing.T) {
 			t.Errorf("tail block must restate required section %q verbatim; got:\n%s", s.Canonical, tail)
 		}
 	}
-	// audit declares RequireFailureContext, and a FAIL/WARN sentinel WITHOUT the
-	// structured failure block is a contract violation (deliverable.go). The tail
-	// is the recency-dominant copy, so its exemplar must be the failure-bearing
-	// one — a bare PASS exemplar here is the version the auditor would follow,
-	// on the one phase whose verdict gates ship (review HIGH).
+	// The tail is the copy the agent follows, so audit's exemplar there must carry the failure block.
 	if !c.RequireFailureContext {
 		t.Fatal("test premise: the audit contract must declare RequireFailureContext")
 	}
-	// Asserted on the observable SHAPE, not via a new exported accessor: adding
-	// an export whose only caller is this test is the dead-seam pattern this
-	// very change forbids.
+	// Asserted on the rendered shape: an export whose only caller is a test would be a dead seam.
 	for _, want := range []string{
 		`"phase":"audit"`, `"schema_version":2`, `"failure"`, `"class"`, `"defects"`, `"evidence_paths"`,
 	} {
@@ -77,10 +56,7 @@ func TestLaunch_AppendsDeliverableContractTailBlock(t *testing.T) {
 	if !strings.Contains(tail, "MUST carry the failure block") {
 		t.Errorf("tail must say the failure block is mandatory for FAIL/WARN; got:\n%s", tail)
 	}
-	// ONE tail restatement, not two. The prefix block legitimately quotes the
-	// marker as a cross-reference ("the path shown under DELIVERABLE PATH:"), so
-	// only the region AFTER the persona body is counted: exactly one path
-	// declaration and exactly one contract block live there.
+	// Count only after the body: the prefix block quotes the footer marker as a cross-reference.
 	after := got[strings.Index(got, "PERSONA-BODY"):]
 	if n := strings.Count(after, phasecontract.FooterMarker); n != 1 {
 		t.Errorf("the tail must declare the path exactly once, got %d occurrences", n)
@@ -90,11 +66,6 @@ func TestLaunch_AppendsDeliverableContractTailBlock(t *testing.T) {
 	}
 }
 
-// TestLaunch_UnregisteredAgentGetsPathDisclosureNotPrefix — an unregistered
-// agent no longer passes through naked (that was the cycle-1424 halt: the
-// engine polls ArtifactPath while the agent is never told it). It gets the
-// SYNTHESIZED minimal tail (path disclosure), but not the registered-contract
-// prefix block, and the body still leads the prompt.
 func TestLaunch_UnregisteredAgentGetsPathDisclosureNotPrefix(t *testing.T) {
 	fe := &fakeEngine{}
 	_, err := withEngine(fe).Launch(context.Background(), core.BridgeRequest{

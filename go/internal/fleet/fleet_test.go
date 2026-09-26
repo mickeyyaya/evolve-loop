@@ -10,8 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
-// TestSupervisor_Validate: a misconfigured supervisor (nil LaunchFn) is caught
-// by Validate BEFORE any work is scheduled — one loud error, not N late ones.
 func TestSupervisor_Validate(t *testing.T) {
 	if err := (&Supervisor{}).Validate(); !errors.Is(err, errNoLaunch) {
 		t.Errorf("Validate() nil Launch = %v, want errNoLaunch", err)
@@ -22,9 +20,6 @@ func TestSupervisor_Validate(t *testing.T) {
 	}
 }
 
-// TestSupervisor_LaunchesAllWithFleetEnv: every spec is launched, in input order,
-// each forced to EVOLVE_FLEET=1 (so the orchestrator skips the global lock), and
-// its exit code is collected.
 func TestSupervisor_LaunchesAllWithFleetEnv(t *testing.T) {
 	var mu sync.Mutex
 	gotFleet := map[string]string{}
@@ -57,7 +52,6 @@ func TestSupervisor_LaunchesAllWithFleetEnv(t *testing.T) {
 	}
 }
 
-// TestSupervisor_BoundedConcurrency: at most Concurrency cycles run at once.
 func TestSupervisor_BoundedConcurrency(t *testing.T) {
 	var inFlight, maxSeen int32
 	release := make(chan struct{})
@@ -82,8 +76,6 @@ func TestSupervisor_BoundedConcurrency(t *testing.T) {
 	specs := make([]CycleSpec, 5)
 	done := make(chan []Result, 1)
 	go func() { done <- s.Run(context.Background(), specs) }()
-	// With limit 2, only 2 can be in-flight; the other 3 block on the semaphore.
-	// Give the 2 a moment to peak, then release.
 	for atomic.LoadInt32(&inFlight) < 2 {
 	}
 	close(release)
@@ -93,8 +85,6 @@ func TestSupervisor_BoundedConcurrency(t *testing.T) {
 	}
 }
 
-// TestSupervisor_NilLaunch_ErrorsPerSpec: a misconfigured supervisor surfaces an
-// error per spec rather than silently doing nothing.
 func TestSupervisor_NilLaunch_ErrorsPerSpec(t *testing.T) {
 	s := &Supervisor{}
 	res := s.Run(context.Background(), []CycleSpec{{GoalHash: "x"}, {GoalHash: "y"}})
@@ -108,8 +98,6 @@ func TestSupervisor_NilLaunch_ErrorsPerSpec(t *testing.T) {
 	}
 }
 
-// TestSupervisor_DoesNotMutateCallerEnv: the EVOLVE_FLEET forcing must not leak
-// into the caller's spec.Env map.
 func TestSupervisor_DoesNotMutateCallerEnv(t *testing.T) {
 	callerEnv := map[string]string{"EVOLVE_CLI": "codex"}
 	s := &Supervisor{Launch: func(_ context.Context, _ CycleSpec) (int, error) { return 0, nil }}
@@ -119,7 +107,6 @@ func TestSupervisor_DoesNotMutateCallerEnv(t *testing.T) {
 	}
 }
 
-// TestSupervisor_EmptySpecs: no specs → no launches, empty results.
 func TestSupervisor_EmptySpecs(t *testing.T) {
 	var launched int32
 	s := &Supervisor{Launch: func(_ context.Context, _ CycleSpec) (int, error) {

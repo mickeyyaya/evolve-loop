@@ -6,11 +6,6 @@ import (
 	"testing"
 )
 
-// TestInteractivePolicy_DefaultAndOverride locks the policy.json "workflow.interactive_policy"
-// and "workflow.interactive_policies" fields that replace the EVOLVE_INTERACTIVE_POLICY and
-// EVOLVE_<AGENT>_INTERACTIVE_POLICY env reads (flag-reduction).
-// Absent ⇒ "recommended_or_first" (default-on autonomy posture);
-// a present value flows the operator's posture through.
 func TestInteractivePolicy_DefaultAndOverride(t *testing.T) {
 	if got := (Policy{}).WorkflowConfig().InteractivePolicy; got != "recommended_or_first" {
 		t.Errorf("absent workflow block: WorkflowConfig().InteractivePolicy = %v, want recommended_or_first", got)
@@ -26,8 +21,6 @@ func TestInteractivePolicy_DefaultAndOverride(t *testing.T) {
 	}
 }
 
-// TestInteractivePolicyFor_LoadsFromDisk covers the fail-open loader the bridge uses
-// to source interactive policy from policy.json.
 func TestInteractivePolicyFor_LoadsFromDisk(t *testing.T) {
 	dir := t.TempDir()
 
@@ -54,7 +47,6 @@ func TestInteractivePolicyFor_LoadsFromDisk(t *testing.T) {
 		t.Errorf("InteractivePolicyFor (empty agent) = %v, want escalate", got)
 	}
 
-	// Fail-open: a malformed policy must NOT arm overrides.
 	if err := os.WriteFile(policyPath, []byte(`{not json`), 0o644); err != nil {
 		t.Fatal(err)
 	}

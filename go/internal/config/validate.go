@@ -1,10 +1,5 @@
 package config
 
-// validate.go — the two post-resolution validators: the audit-before-ship
-// spine (weak-spine, spine-order) and the inert force-enable (a phase enabled
-// below advisory that the static state machine never reaches). Pure over the
-// resolved value; each appends its warning with the fields a triage reads.
-
 import (
 	"fmt"
 	"sort"
@@ -12,13 +7,8 @@ import (
 	"strings"
 )
 
-// staticSpinePhases is the set of phases the legacy state machine drives as
-// agent runs (excluding the start/end sentinels). When Stage==StageOff the
-// router is off and ONLY these phases get a turn — so a PhaseEnable[p]=On for
-// any other phase is silently inert. Encoded as a local set rather than
-// imported from core because config is a leaf package; the
-// TestStaticSpineMatchesStateMachine cross-package contract test pins this
-// against the actual state machine's edge map.
+// staticSpinePhases are the agent phases the static state machine drives. It is a local copy
+// because config cannot import core; TestStaticSpineMatchesStateMachine pins it.
 var staticSpinePhases = map[string]struct{}{
 	"intent":        {},
 	"scout":         {},
@@ -31,19 +21,12 @@ var staticSpinePhases = map[string]struct{}{
 	"retro":         {},
 }
 
-// validateInertEnables warns when PhaseEnable[p]=EnableOn but p is neither
-// mandatory, in the static spine, nor reachable via the router (Stage<Advisory).
-// The classic trigger is plan-review enabled via policy.json with default routing:
-// plan-review only runs at Stage>=Advisory, so the enable is silently inert at
-// Stage=Off AND at Stage=Shadow (per the Stage docstring, shadow computes+logs but
-// the STATIC state machine still drives execution — so non-spine phases remain
-// unreachable). Surfacing this prevents the operator-confusion failure mode
-// from cycle 120.
+// validateInertEnables warns on a force-enabled phase that is neither mandatory nor in the static
+// spine while the router is below advisory: the static state machine drives there, so it never runs.
 func validateInertEnables(cfg RoutingConfig, ws *[]Warning) {
 	if cfg.Stage >= StageAdvisory {
-		return // router drives; enable is effective
+		return
 	}
-	// Sort for deterministic warning order — map iteration is randomized.
 	phases := make([]string, 0, len(cfg.PhaseEnable))
 	for p := range cfg.PhaseEnable {
 		phases = append(phases, p)
@@ -65,7 +48,6 @@ func validateInertEnables(cfg RoutingConfig, ws *[]Warning) {
 	}
 }
 
-// containsPhase reports whether slice contains p.
 func containsPhase(slice []string, p string) bool {
 	for _, s := range slice {
 		if s == p {
@@ -87,11 +69,8 @@ func validateSpine(cfg RoutingConfig, ws *[]Warning) {
 		warn(ws, codeWeakSpine, "mandatory_phases omits "+strings.Join(missing, "+")+" — audit-before-ship guarantee weakened",
 			map[string]string{"missing": strings.Join(missing, "+")})
 	}
-	// The artifact-backed floor (core.SpineSatisfiedUpTo) walks the mandatory
-	// anchors in their configured-order position, so a scrambled order that places
-	// ship before audit would let ship's gate skip the shippable-audit check. The
-	// legality graph + audit verdict branch still independently block it, but
-	// surface the misordering loudly so it is never the sole guard.
+	// The spine floor positions anchors by configured order, so ship before audit would skip the
+	// shippable-audit check; the legality graph still blocks it, but the order must not be the only guard.
 	auditPos, shipPos := -1, -1
 	for i, p := range cfg.Order {
 		switch p {

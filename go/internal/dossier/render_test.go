@@ -5,9 +5,6 @@ import (
 	"testing"
 )
 
-// TestRender verifies RenderJSON produces valid round-trip JSON and
-// RenderMarkdown produces non-empty output. RED: RenderJSON/RenderMarkdown
-// don't exist yet.
 func TestRender(t *testing.T) {
 	d := &Dossier{
 		Cycle:        3,

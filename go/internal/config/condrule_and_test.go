@@ -6,11 +6,6 @@ import (
 	"testing"
 )
 
-// TestParseCondRule_AndClauses — ADR-0099: a conditional-mandatory rule may
-// AND several clauses (`a!=b && c!=d`). The head clause keeps the legacy
-// single-clause shape byte-identical (And nil) so every existing consumer is
-// untouched; the extra clauses ride in And. A malformed clause fails the whole
-// rule (never a silently-shorter rule).
 func TestParseCondRule_AndClauses(t *testing.T) {
 	got, err := parseCondRule("cycle_size!=trivial && deliverable_kind!=document")
 	if err != nil {
@@ -29,7 +24,6 @@ func TestParseCondRule_AndClauses(t *testing.T) {
 	if _, err := parseCondRule("cycle_size!=trivial && nonsense"); err == nil {
 		t.Errorf("a malformed AND clause must fail the whole rule")
 	}
-	// The env-var form carries the same grammar.
 	cfg, _ := Load(filepath.Join(t.TempDir(), "absent.json"), map[string]string{
 		"EVOLVE_CONDITIONAL_MANDATORY": "tdd:cycle_size!=trivial&&deliverable_kind!=document",
 	})
@@ -38,10 +32,6 @@ func TestParseCondRule_AndClauses(t *testing.T) {
 	}
 }
 
-// TestLoad_RegistryTddRule_ReleasesDocumentCycles pins the tracked registry
-// (docs/architecture/phase-registry.json — the file cmd_cycle.go loads): the
-// tdd conditional carries the document release, and the solution goal types
-// have recipes the advisor can compose from.
 func TestLoad_RegistryTddRule_ReleasesDocumentCycles(t *testing.T) {
 	cfg, ws := Load(filepath.Join("..", "..", "..", "docs", "architecture", "phase-registry.json"), map[string]string{})
 	for _, w := range ws {
@@ -69,10 +59,6 @@ func TestLoad_RegistryTddRule_ReleasesDocumentCycles(t *testing.T) {
 	}
 }
 
-// TestDefaults_TddRuleMatchesRegistry pins the compiled default (the rule
-// registry-less projects run on) to the registry's parsed rule — one belief,
-// two homes, bound by a test since the ADR-0099 release lived only in the
-// registry for one review round.
 func TestDefaults_TddRuleMatchesRegistry(t *testing.T) {
 	want := DefaultTddRule()
 	cfg, _ := Load(filepath.Join("..", "..", "..", "docs", "architecture", "phase-registry.json"), map[string]string{})
@@ -85,7 +71,6 @@ func TestDefaults_TddRuleMatchesRegistry(t *testing.T) {
 	}
 }
 
-// TestCondRule_Clauses: head then And, in order; a single-clause rule is one clause.
 func TestCondRule_Clauses(t *testing.T) {
 	r := DefaultTddRule()
 	cs := r.Clauses()

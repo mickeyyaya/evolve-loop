@@ -11,18 +11,9 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// Digest is the observe→digest boundary: the ONLY code that knows the on-disk
-// handoff JSON shapes. It reads the handoff artifact of each completed phase
-// from workspace and folds the objective fields into RoutingSignals.
-//
-// Fail-open contract: a missing or unparseable artifact yields Present:false
-// and zero-value signals — a corrupt handoff must never FORCE an optional phase.
-// A role's signals are marked Present only when its phase is in `completed` AND
-// a real artifact exists on disk (artifact-backed, so the kernel's spine gate
-// cannot be satisfied by a fabricated completed-list alone).
-//
-// Naming tolerance: build/builder and audit/auditor handoff filenames coexist
-// across cycle ages; Digest tries each candidate in order.
+// Digest folds the artifacts of each completed phase in workspace into RoutingSignals; it is the only
+// reader of on-disk handoff shapes. A role is Present only when its phase completed and an artifact
+// exists, and a missing or corrupt artifact fails open to Present:false.
 func Digest(workspace string, completed []string) (RoutingSignals, error) {
 	var sig RoutingSignals
 	done := toSet(completed)
@@ -69,17 +60,13 @@ func Digest(workspace string, completed []string) (RoutingSignals, error) {
 			sig.Audit = auditFromACSVerdictFallback(workspace, &sig.DigestDegraded)
 		}
 	}
-	// ADR-0039 §7: lift each completed phase's structured failure context
-	// (report-sentinel v2 failure block) onto the generic plane — this is
-	// what lets failure-phase insertion be DATA-driven via insert_when.
 	for _, phase := range completed {
 		sig.foldFailureSentinel(workspace, phase)
 	}
 	return sig, nil
 }
 
-// triageDecisionDigest is the validated routing projection plus the independent
-// task count read from triage's authoritative decision artifact.
+// triageDecisionDigest is what routing reads from triage-decision.json.
 type triageDecisionDigest struct {
 	committedCount     int
 	unifiedSize        string
@@ -130,20 +117,8 @@ func digestTriageDecision(workspace string, degraded *[]string) (triageDecisionD
 	return result, true
 }
 
-// unwrapPayload returns the inner `payload` object bytes of the canonical
-// ADR-0050 Phase-3 envelope (schema_version 2: a wrapper carrying the exact
-// per-phase payload bytes plus promoted top-level verdict/signals/failure), or
-// the input unchanged when there is no payload wrapper — the Postel-compatible
-// flat fallback. This keeps Digest reading byte-identically whether a handoff is
-// written flat (legacy/today) or payload-wrapped (the unified envelope), which
-// is the golden-equivalence invariant the shadow stage relies on.
-//
-// AUTHORITY CONTRACT: the inner payload is the single source of truth. Digest
-// (and foldGeneric) read the UNWRAPPED payload, so the wrapper's promoted
-// top-level signals/verdict/failure are defined to be a COPY of the payload's,
-// never an independent source — a wrapper that carried signals absent from its
-// payload would have them ignored. The envelope writer (Phase 3.4+) must uphold
-// this; TestDigest_PayloadWrapped_FoldsInnerSignals pins the read side.
+// unwrapPayload returns the `payload` of a schema-2 handoff envelope, or raw unchanged for a flat handoff.
+// The payload is the authority: the envelope's promoted top-level fields must be a copy of it.
 func unwrapPayload(raw []byte) []byte {
 	var env struct {
 		Payload json.RawMessage `json:"payload"`
@@ -154,11 +129,8 @@ func unwrapPayload(raw []byte) []byte {
 	return raw
 }
 
-// foldFailureSentinel surfaces a phase's self-reported failure as
-// <phase>.failure_class + <phase>.defect_count generic signals, via the ONE
-// shared reader (phasecontract.ReadFailureBlock). Fail-open: no report/block
-// is a no-op — crash-class failures are the supervisor's to synthesize, not
-// the router's.
+// foldFailureSentinel surfaces a phase's report failure block as <phase>.failure_class and
+// <phase>.defect_count; crash-class failures are the supervisor's to synthesize, not the router's.
 func (s *RoutingSignals) foldFailureSentinel(workspace, phase string) {
 	fb, ok := phasecontract.ReadFailureBlock(workspace, phase)
 	if !ok {
@@ -167,19 +139,13 @@ func (s *RoutingSignals) foldFailureSentinel(workspace, phase string) {
 	if s.Generic == nil {
 		s.Generic = make(map[string]any, 2)
 	}
-	// float64 matches the generic plane's JSON-number convention
-	// (GenericValue doc: numeric callers assert float64).
+	// float64 matches the generic plane's JSON-number convention.
 	s.Generic[phase+".failure_class"] = fb.Class
 	s.Generic[phase+".defect_count"] = float64(len(fb.Defects))
 }
 
-// foldGeneric merges a handoff's uniform top-level "signals" object into
-// sig.Generic, namespacing bare keys with the phase (keys already containing a
-// "." are taken as-is, letting a phase emit a cross-namespace signal). This is
-// the uniform signal plane that makes user-phase signals routable without a
-// bespoke extractor. Absent/unparseable "signals" is a no-op (fail-open).
-// Collisions are last-write-wins (Digest folds in phase order); built-ins never
-// collide since they don't use the dotted-key form.
+// foldGeneric merges a handoff's top-level "signals" into s.Generic, prefixing bare keys with the
+// phase; a dotted key is kept as-is so a phase can emit a cross-namespace signal. Last write wins.
 func (s *RoutingSignals) foldGeneric(phase string, raw []byte) {
 	var doc struct {
 		Signals map[string]any `json:"signals"`
@@ -206,10 +172,8 @@ func toSet(xs []string) map[string]bool {
 	return m
 }
 
-// readFirstTracked is the sole file-reader for the ANCHOR handoffs: a read failure that
-// is NOT a clean absence (EISDIR, permission, transient IO) is appended to
-// degraded — the R5 read-miss vs genuine-gap distinction the spine gate keys
-// on. Absence stays silent (Present:false is the signal).
+// readFirstTracked reads the first candidate that exists. A failure other than absence is appended
+// to degraded, because the spine gate must tell a read miss from a genuine gap.
 func readFirstTracked(dir string, degraded *[]string, candidates ...string) ([]byte, bool) {
 	for _, name := range candidates {
 		raw, err := os.ReadFile(filepath.Join(dir, name))
@@ -223,16 +187,8 @@ func readFirstTracked(dir string, degraded *[]string, candidates ...string) ([]b
 	return nil, false
 }
 
-// buildFromGitFallback derives BuildSignals from git when neither
-// handoff-build.json nor handoff-builder.json is present on disk — both have
-// been extinct since ~cycle 215 (warnship_apicover_ci_gap, 3rd recurrence),
-// which otherwise leaves sig.Build silently zero-value on every real cycle.
-// It reuses changedpkgs.FromGitChecked — the same helper
-// internal/phases/audit.changedPackagesForAudit already uses — rather than
-// re-implementing git-diff logic. A git-underivable tree (no repo, git
-// failure) degrades LOUDLY via DigestDegraded instead of silently returning
-// Present:false with no trace, mirroring the read-miss vs genuine-gap
-// distinction readFirstTracked already applies to handoff read errors.
+// buildFromGitFallback derives BuildSignals from the git change set when no build handoff exists;
+// an underivable tree degrades loudly.
 func buildFromGitFallback(workspace string, degraded *[]string) BuildSignals {
 	root, ok := projectRootFromWorkspace(workspace)
 	if !ok {
@@ -244,22 +200,11 @@ func buildFromGitFallback(workspace string, degraded *[]string) BuildSignals {
 		*degraded = append(*degraded, "build: handoff absent and git-derived changed-package set is underivable (no repo / git failure)")
 		return BuildSignals{}
 	}
-	// pkgs are deduped package patterns, not raw file paths (FromGitChecked's
-	// contract), so FilesTouched here is a package-count floor rather than the
-	// handoff's exact file tally — still non-zero on any real change, which is
-	// what closes the silent-gap hole this fallback exists for.
+	// pkgs are package patterns, not files, so FilesTouched is a package count.
 	return BuildSignals{Present: true, FilesTouched: len(pkgs)}
 }
 
-// scoutFromReportFallback derives ScoutSignals from the artifact scout
-// actually writes every cycle — scout-report.md — when handoff-scout.json is
-// absent (handoffs have been extinct since ~cycle 215; buildFromGitFallback
-// closed the same gap for build). Presence is the only signal the spine floor
-// gates on, so the richer handoff fields stay zero — the router's digest
-// degrades in richness, never in floor truth. A missing report is a CLEAN
-// absence (Present:false, no degrade entry — the enforce gate's fail-closed
-// signal); a report that exists but cannot be read is a read-miss and degrades
-// LOUDLY (R5), matching readFirstTracked's distinction.
+// scoutFromReportFallback derives ScoutSignals from scout-report.md when no scout handoff exists.
 func scoutFromReportFallback(workspace string, degraded *[]string) ScoutSignals {
 	md, present := readReportFallback(filepath.Join(workspace, phasecontract.ArtifactName("scout")), "scout", degraded)
 	if !present {
@@ -272,45 +217,32 @@ func scoutFromReportFallback(workspace string, degraded *[]string) ScoutSignals 
 	}
 }
 
-// Report header keys the kernel READS (ADR-0099) and the scout/triage personas
-// WRITE — exported so the persona templates are pinned to these exact words
-// (TestPersonaTemplates_CarryTheHeaderLines) instead of carrying a second
-// literal that could drift.
+// Report header keys the kernel reads and the scout and triage personas write.
 const (
 	HeaderGoalType        = "goal_type:"
 	HeaderDeliverableKind = "deliverable_kind:"
 	HeaderCycleSize       = "cycle_size_estimate:"
 )
 
-// readReportFallback is the ONE report-fallback ladder (R5) the scout and triage
-// fallbacks share: a non-empty report ⇒ (body, present); an empty report or a
-// clean absence ⇒ not present with no degrade entry (the phase did not really
-// deliver / never ran — the enforce gate's fail-closed signal); any other read
-// failure is a read-miss and degrades LOUDLY (never a silent Present:false).
+// readReportFallback returns a non-empty report's body. An empty or absent report is not present
+// and not degraded; any other read failure degrades loudly.
 func readReportFallback(path, role string, degraded *[]string) (string, bool) {
 	raw, err := os.ReadFile(path)
 	switch {
 	case err == nil && len(raw) > 0:
 		return string(raw), true
 	case err == nil:
-		return "", false // empty report: the phase did not really deliver
+		return "", false // an empty report did not deliver
 	case os.IsNotExist(err):
-		return "", false // clean absence
+		return "", false
 	default:
 		*degraded = append(*degraded, role+": report fallback read: "+err.Error())
 		return "", false
 	}
 }
 
-// triageFromReportFallback derives TriageSignals from triage-report.md — the
-// artifact triage actually writes every cycle — when handoff-triage.json is
-// absent (handoffs extinct since ~cycle 215; same gap scoutFromReportFallback
-// closed for scout). Richer than scout's: it extracts the report header's
-// `cycle_size_estimate: <size>` line so RoutingSignals.CycleSize() carries a
-// real value on the live path (ADR-0076 slice A's budget signal). No size
-// vocabulary validation here — the multiplier lookup treats unknown sizes as
-// 1.0, so tolerance is safe and single-sourced at the consumer. Absence and
-// read-miss semantics mirror scoutFromReportFallback exactly.
+// triageFromReportFallback derives TriageSignals from triage-report.md when no triage handoff exists.
+// The size is not validated here: the budget multiplier treats an unknown size as 1.0.
 func triageFromReportFallback(workspace string, degraded *[]string) TriageSignals {
 	md, present := readReportFallback(filepath.Join(workspace, "triage-report.md"), "triage", degraded)
 	if !present {
@@ -323,8 +255,7 @@ func triageFromReportFallback(workspace string, degraded *[]string) TriageSignal
 	}
 }
 
-// reportHeaderValue returns the trimmed value of the first report line starting
-// with prefix (e.g. "cycle_size_estimate:"), or "" when no line matches.
+// reportHeaderValue returns the trimmed value of the first line starting with prefix, or "".
 func reportHeaderValue(md, prefix string) string {
 	for _, line := range strings.Split(md, "\n") {
 		if rest, ok := strings.CutPrefix(strings.TrimSpace(line), prefix); ok {
@@ -334,20 +265,15 @@ func reportHeaderValue(md, prefix string) string {
 	return ""
 }
 
-// auditFromACSVerdictFallback derives AuditSignals from acs-verdict.json — the
-// DETERMINISTIC verdict artifact generateACSVerdict writes every audited cycle
-// — when handoff-audit.json is absent. Its top-level verdict/red_count keys
-// are exactly what extractAudit reads, so the extraction is shared, and a FAIL
-// verdict flows through honestly (the spine's audit anchor then refuses ship —
-// that is the floor working, not a gap). Corrupt-but-present degrades LOUDLY
-// (fail-open at enforce); genuinely absent stays a clean absence.
+// auditFromACSVerdictFallback derives AuditSignals from acs-verdict.json when no audit handoff exists.
+// A FAIL verdict flows through, so the spine's audit anchor refuses ship.
 func auditFromACSVerdictFallback(workspace string, degraded *[]string) AuditSignals {
 	raw, err := os.ReadFile(filepath.Join(workspace, "acs-verdict.json"))
 	if err != nil {
 		if !os.IsNotExist(err) {
 			*degraded = append(*degraded, "audit: acs-verdict fallback read: "+err.Error())
 		}
-		return AuditSignals{} // clean absence (or loudly-degraded read-miss)
+		return AuditSignals{}
 	}
 	a := extractAudit(raw)
 	if !a.Present {
@@ -355,19 +281,14 @@ func auditFromACSVerdictFallback(workspace string, degraded *[]string) AuditSign
 		return a
 	}
 	if a.Verdict == "" {
-		// Parses but carries no verdict — a legacy/schema-drifted artifact
-		// (the 2c0559a5 e2e red: Present:true + Verdict:"" is an UNSATISFIABLE
-		// audit anchor that read as a clean absence and hard-blocked at
-		// enforce). Schema drift is a DEGRADED read, never a clean gap.
+		// A verdict-less artifact is an unsatisfiable anchor; report it as degraded, not as a clean gap.
 		*degraded = append(*degraded, "audit: acs-verdict.json has no verdict field (schema drift?) — degraded, not clean")
 		return AuditSignals{}
 	}
 	return a
 }
 
-// projectRootFromWorkspace inverts core.RunWorkspacePath's
-// <root>/.evolve/runs/cycle-<N> layout without importing internal/core (router
-// is a leaf package by design — see this file's package doc).
+// projectRootFromWorkspace inverts core.RunWorkspacePath's <root>/.evolve/runs/cycle-<N> layout.
 func projectRootFromWorkspace(workspace string) (string, bool) {
 	dir := filepath.Clean(workspace)
 	if !strings.HasPrefix(filepath.Base(dir), "cycle-") {
@@ -398,7 +319,7 @@ func extractScout(raw []byte) ScoutSignals {
 	_ = json.Unmarshal(top["carryover_count"], &s.CarryoverCount)
 	_ = json.Unmarshal(top["backlog_size"], &s.BacklogSize)
 	for k := range top {
-		// itemN_* blocks measure scope breadth (cycle-56: item1_..item6_).
+		// itemN_* blocks measure scope breadth.
 		if strings.HasPrefix(k, "item") && hasDigitAfterPrefix(k, "item") {
 			s.ItemCount++
 		}
@@ -406,8 +327,7 @@ func extractScout(raw []byte) ScoutSignals {
 	return s
 }
 
-// hasDigitAfterPrefix reports whether the rune right after prefix is a digit,
-// so "item3_foo" counts but "items" or "itemize" does not.
+// hasDigitAfterPrefix reports whether the byte after prefix is a digit: "item3_foo" yes, "items" no.
 func hasDigitAfterPrefix(s, prefix string) bool {
 	if len(s) <= len(prefix) {
 		return false

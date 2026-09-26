@@ -13,17 +13,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sessionreaper"
 )
 
-// minFreeDiskBytes is the low-disk warning threshold (500 MiB). Below this the
-// bridge's per-cycle worktrees + scrollback logs risk an ENOSPC mid-cycle.
+// Below minFreeDiskBytes, per-cycle worktrees and scrollback logs risk ENOSPC mid-cycle.
 const minFreeDiskBytes uint64 = 500 << 20
 
-// checkPipelineStructure (Halt) verifies the loop's static wiring is intact:
-//   - every spine phase has BOTH a registered factory and a deliverable contract
-//   - the profiles directory lists and each profile loads
-//   - every profile's CLI and cli_fallback entries resolve to a known driver
-//
-// It accumulates ALL gaps into one CheckResult so the operator sees every
-// problem at once, then halts if any were found.
+// checkPipelineStructure halts on a spine phase without a factory or contract, an
+// unloadable profile, or a profile CLI with no known driver, listing every gap.
 func checkPipelineStructure(o resolved) CheckResult {
 	const name = "pipeline-structure"
 	var gaps []string
@@ -69,17 +63,13 @@ func checkPipelineStructure(o resolved) CheckResult {
 	}
 }
 
-// checkLLMCLIStatus (Halt) confirms each distinct CLI binary the profiles use is
-// actually installed. Driver names are mapped to their binary (claude-tmux and
-// claude-p both → claude) and probed once each; a missing binary halts with the
-// probe's checked-paths trail so the operator sees where it looked.
+// checkLLMCLIStatus halts when a CLI binary the profiles use is missing; each binary is probed once.
 func checkLLMCLIStatus(o resolved) CheckResult {
 	const name = "llm-cli-status"
 	seen := map[string]struct{}{}
 	var bins []string
 	for _, d := range distinctDrivers(o.profileLister, o.profileGetter) {
-		// driverBinary never returns "" here: distinctDrivers only yields the
-		// non-empty CLI/fallback names profileCLIs collected.
+		// Never "": distinctDrivers yields only the non-empty names profileCLIs collected.
 		b := driverBinary(d)
 		if _, dup := seen[b]; dup {
 			continue
@@ -115,11 +105,8 @@ func checkLLMCLIStatus(o resolved) CheckResult {
 	}
 }
 
-// checkHostCapabilities verifies the host can host the bridge. Halts: tmux
-// absent, or .evolve/ (and .evolve/runs/) not writable — the bridge cannot run
-// at all without these. A required sandbox that the host cannot provide also
-// halts before phase spend. Warns cover low disk and orphan-sweep degradation.
-// All accumulate; a halt outranks warnings in the verdict.
+// checkHostCapabilities halts on missing tmux, an unwritable .evolve or runs dir, or a
+// required sandbox the host lacks; low disk and a failed orphan reap only warn.
 func checkHostCapabilities(o resolved) CheckResult {
 	const name = "host-capabilities"
 	var halts, warns []string
@@ -151,8 +138,7 @@ func checkHostCapabilities(o resolved) CheckResult {
 			free>>20, minFreeDiskBytes>>20, o.evolveDir))
 	}
 
-	// Deadline-bound the boot sweep: a wedged tmux must abandon the kill, not
-	// hang loop boot forever (cycle-769 incident; orphanGCTimeout discipline).
+	// A wedged tmux must abandon the kill, not hang loop boot.
 	reapCtx, cancel := context.WithTimeout(context.Background(), sessionreaper.DefaultReapTimeout)
 	defer cancel()
 	if _, err := sessionreaper.ReapOrphans(reapCtx, o.evolveDir, sessionreaper.Options{
@@ -165,7 +151,6 @@ func checkHostCapabilities(o resolved) CheckResult {
 
 	switch {
 	case len(halts) > 0:
-		// On a halt, surface the warnings too — the operator fixes everything at once.
 		all := make([]string, 0, len(halts)+len(warns))
 		all = append(all, halts...)
 		all = append(all, warns...)
@@ -187,14 +172,8 @@ func checkHostCapabilities(o resolved) CheckResult {
 	}
 }
 
-// checkCLIVersionDrift (Warn) detects silent CLI version changes between
-// batches. It compares the current version inventory (via o.versionInventory)
-// against the last-seen versions persisted at .evolve/cli-versions.json.
-// A version change on any inventoried CLI is a WARN — the operator should
-// validate the change was intentional (incident: claude 2.1.173→2.1.175 despite
-// autoUpdates:false, invisible because no version was recorded). First-batch
-// (no prior cache) is always PASS and establishes the baseline. The updated
-// inventory is persisted at the end of each run so the NEXT batch can compare.
+// checkCLIVersionDrift warns when a CLI's version differs from .evolve/cli-versions.json,
+// then saves the current inventory there; a first batch only records the baseline.
 func checkCLIVersionDrift(o resolved) CheckResult {
 	const name = "cli-version-drift"
 
@@ -216,7 +195,7 @@ func checkCLIVersionDrift(o resolved) CheckResult {
 	}
 	sort.Strings(warns)
 
-	// Persist current inventory for next batch.
+	// Best-effort: a failed save only costs the next batch its comparison.
 	_ = saveVersionCache(cachePath, current)
 
 	if len(warns) > 0 {
@@ -241,9 +220,8 @@ func checkCLIVersionDrift(o resolved) CheckResult {
 	}
 }
 
-// sandboxUnavailableIssue projects the same fail-closed decision as bridge
-// dispatch. A nested session does not prove the requested profile's policy;
-// only an explicit host opt-out permits an unwrapped mandatory launch.
+// sandboxUnavailableIssue applies bridge dispatch's fail-closed decision: a nested session
+// proves nothing, and only the EVOLVE_SANDBOX=off opt-out permits an unconfined launch.
 func sandboxUnavailableIssue(host preflight.Profile, mode string) (halt, warn string) {
 	ok, optOut, reason := sandbox.ConfinementSatisfied(host.ClaudeCode.Nested, mode)
 	switch {

@@ -6,8 +6,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 )
 
-// ShouldRunPhase must be flag-faithful below Enforce (legacy Stage:Off path)
-// and apply the kernel pin from Enforce up.
 func TestShouldRunPhase_StageAware(t *testing.T) {
 	base := func(stage config.Stage, enable map[string]config.Enable) config.RoutingConfig {
 		c := config.RoutingConfig{
@@ -44,8 +42,6 @@ func TestShouldRunPhase_StageAware(t *testing.T) {
 	}
 }
 
-// PolicyForProject falls back to config defaults when the registry is absent,
-// so a phase's enablement resolves correctly without a registry file present.
 func TestPolicyForProject_FallsBackToDefaults(t *testing.T) {
 	p := PolicyForProject("/nonexistent", map[string]string{})
 	if !p.ShouldRunPhase("triage") {

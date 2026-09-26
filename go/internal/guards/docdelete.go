@@ -7,23 +7,23 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// DocDelete denies rm/mv operations that would remove docs/** or
-// knowledge-base/** content. Port of scripts/hooks/doc-deletion-guard.sh.
+// DocDelete denies Bash rm and mv commands that would remove content from docs/ or knowledge-base/.
 type DocDelete struct {
 	allow bool
 }
 
+// NewDocDelete returns a DocDelete guard; allow (workflow.allow_doc_delete) disables it.
 func NewDocDelete(allow bool) *DocDelete { return &DocDelete{allow: allow} }
 
+// Name reports "docdelete".
 func (d *DocDelete) Name() string { return "docdelete" }
 
-// rmDocsRe matches an `rm` invocation (with optional flags) that
-// references docs/ or knowledge-base/ as a path component.
 var (
 	rmDocsRe = regexp.MustCompile(`(?m)\brm\b[^\n]*\b(docs|knowledge-base)/`)
 	mvDocsRe = regexp.MustCompile(`(?m)\bmv\b[ \t]+([^\s]+)[ \t]+([^\s]+)`)
 )
 
+// Decide denies an rm that names docs/ or knowledge-base/, and an mv that moves doc content outside docs/.
 func (d *DocDelete) Decide(_ context.Context, in core.GuardInput) core.GuardDecision {
 	if d.allow {
 		return core.GuardDecision{Allow: true}
@@ -57,13 +57,8 @@ func isDocPath(p string) bool {
 	return regexp.MustCompile(`(^|/)(docs|knowledge-base)/`).MatchString(p)
 }
 
-// isDocsDest reports whether the mv destination stays inside the single
-// documentation root. Since the 2026-08-05 doc-root consolidation, any move
-// whose destination is under docs/ is a reorganization, not a deletion — this
-// includes the archive home docs/private/research/archived-YYYY-MM-DD/.
-// knowledge-base/ is deliberately NOT a valid destination: its research/
-// subtree is retired (content lives in docs/research), and cycles/ is a
-// runtime write surface, not documentation.
+// isDocsDest reports whether an mv destination stays under docs/, the single documentation root.
+// knowledge-base/ is not a destination: its research/ subtree is retired and cycles/ is runtime state.
 func isDocsDest(p string) bool {
 	return regexp.MustCompile(`(^|/)docs/`).MatchString(p)
 }

@@ -7,17 +7,6 @@ import (
 	"testing"
 )
 
-// router_compaction_test.go — RED contract for cycle-417 task router-catalog-prose-compaction.
-//
-// RED state (before builder):
-//   - evolve-router.md "## Phase Catalog — Core Values" section is ~10507B (want <8000B)
-//   - StripOnDemandSections is NOT used for the router (catalog is the working menu);
-//     compaction is in-place prose trimming, not marker-based removal.
-
-// TestRouterCompaction_CoreValuesSectionUnder8000Bytes asserts that the
-// "## Phase Catalog — Core Values" section in evolve-router.md is <8000 bytes.
-// RED: current section is ~10507B — builder must compact the per-row justification
-// prose to a tight one-clause trigger per row while keeping all 66 names.
 func TestRouterCompaction_CoreValuesSectionUnder8000Bytes(t *testing.T) {
 	root := repoRoot(t)
 	raw, err := os.ReadFile(filepath.Join(root, "agents", "evolve-router.md"))
@@ -32,7 +21,6 @@ func TestRouterCompaction_CoreValuesSectionUnder8000Bytes(t *testing.T) {
 		t.Fatalf("evolve-router.md missing '## Phase Catalog — Core Values' section")
 	}
 
-	// Measure from the heading to the next top-level ## heading or EOF.
 	rest := body[idx+len(heading):]
 	nextSection := strings.Index(rest, "\n## ")
 	var sectionBytes int
@@ -50,10 +38,6 @@ func TestRouterCompaction_CoreValuesSectionUnder8000Bytes(t *testing.T) {
 	}
 }
 
-// TestRouterCompaction_66RowsRetained asserts that the router catalog retains exactly
-// 66 phase rows after prose compaction (no row may be deleted during the trim).
-// Pre-existing GREEN: catalog currently has 66 rows.
-// Anti-gaming sentinel: catches any builder who shrinks the byte count by dropping rows.
 func TestRouterCompaction_66RowsRetained(t *testing.T) {
 	root := repoRoot(t)
 	raw, err := os.ReadFile(filepath.Join(root, "agents", "evolve-router.md"))
@@ -68,13 +52,11 @@ func TestRouterCompaction_66RowsRetained(t *testing.T) {
 		t.Fatalf("evolve-router.md missing '## Phase Catalog — Core Values' section")
 	}
 	section := body[idx:]
-	// Find end of catalog section (next ## heading or EOF)
 	nextSection := strings.Index(section[len(heading):], "\n## ")
 	if nextSection >= 0 {
 		section = section[:len(heading)+nextSection]
 	}
 
-	// Count data rows: lines that start with "| `" (backtick phase names)
 	count := 0
 	for _, line := range strings.Split(section, "\n") {
 		trimmed := strings.TrimSpace(line)
@@ -90,10 +72,6 @@ func TestRouterCompaction_66RowsRetained(t *testing.T) {
 	}
 }
 
-// TestRouterCompaction_NoEmptyTriggerRows_Negative asserts that no phase row in the
-// catalog has an empty or whitespace-only trigger (i.e., second column).
-// Pre-existing GREEN: all rows currently have substantive trigger text.
-// Anti-gaming sentinel: catches over-trimming that leaves bare "| `name` | |" entries.
 func TestRouterCompaction_NoEmptyTriggerRows_Negative(t *testing.T) {
 	root := repoRoot(t)
 	raw, err := os.ReadFile(filepath.Join(root, "agents", "evolve-router.md"))
@@ -118,7 +96,6 @@ func TestRouterCompaction_NoEmptyTriggerRows_Negative(t *testing.T) {
 		if !strings.HasPrefix(trimmed, "| `") || !strings.Contains(trimmed, "` |") {
 			continue
 		}
-		// Split on " | " to extract columns
 		parts := strings.SplitN(trimmed, "` | ", 2)
 		if len(parts) < 2 {
 			t.Errorf("row has no second column: %q", trimmed)

@@ -1,8 +1,5 @@
 package policy_test
 
-// ACSConfig — the ACS timeout config that replaced EVOLVE_ACS_GO_TIMEOUT_S.
-// GoTimeoutS defaults 0 (absent block → use DefaultTimeout in acssuite).
-
 import (
 	"testing"
 

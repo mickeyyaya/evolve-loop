@@ -6,11 +6,6 @@ import (
 	"testing"
 )
 
-// CycleDirs is the ONE scan for every lifecycle directory the promoter nests
-// by cycle (processing/, processed/, rejected/): ascending cycle order, files
-// and non-cycle names ignored, a missing parent an empty list — the layout
-// the dispatch-state resolver was blind to when cycle 1682 re-pinned a lane
-// to an item cycle 1679 had already shipped.
 func TestCycleDirs_ListsCycleSubdirsAscendingAndTolerantOfAbsence(t *testing.T) {
 	parent := filepath.Join(t.TempDir(), "processed")
 	for _, name := range []string{"cycle-10", "cycle-2", "cycle-x", "notes"} {
@@ -32,7 +27,6 @@ func TestCycleDirs_ListsCycleSubdirsAscendingAndTolerantOfAbsence(t *testing.T) 
 	if got := ProcessingCycleDirs(filepath.Dir(parent)); got != nil {
 		t.Fatalf("ProcessingCycleDirs shares the scan (no processing/ here → nil), got %v", got)
 	}
-	// The writer's spelling round-trips through the reader's parser.
 	if n, ok := ParseProcessingCycle(filepath.Base(CycleDir(parent, "1679"))); !ok || n != 1679 {
 		t.Fatalf("CycleDir(parent, \"1679\") must parse back as cycle 1679, got %d %v", n, ok)
 	}

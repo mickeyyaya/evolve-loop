@@ -6,8 +6,6 @@ import (
 	"strings"
 )
 
-// checkResultWire is the JSON shape for a CheckResult — Level renders as its
-// stable lowercase string token, and an empty Detail is omitted.
 type checkResultWire struct {
 	Name    string `json:"name"`
 	Level   string `json:"level"`
@@ -15,9 +13,7 @@ type checkResultWire struct {
 	Detail  string `json:"detail,omitempty"`
 }
 
-// MarshalJSON emits the level as a string ("pass"|"warn"|"halt") rather than
-// the underlying int, so the persisted .evolve/loop-preflight.json is
-// self-describing.
+// MarshalJSON renders Level as its string token so loop-preflight.json is self-describing.
 func (c CheckResult) MarshalJSON() ([]byte, error) {
 	return json.Marshal(checkResultWire{
 		Name:    c.Name,
@@ -27,8 +23,6 @@ func (c CheckResult) MarshalJSON() ([]byte, error) {
 	})
 }
 
-// resultWire is the JSON shape for a Result; OverallLevel renders as a string
-// and Checks marshal via CheckResult.MarshalJSON.
 type resultWire struct {
 	Checks       []CheckResult     `json:"checks"`
 	ChecksPassed int               `json:"checks_passed"`
@@ -38,7 +32,7 @@ type resultWire struct {
 	CLIVersions  map[string]string `json:"cli_versions,omitempty"`
 }
 
-// MarshalJSON emits the persisted readiness payload.
+// MarshalJSON renders OverallLevel as its string token, as persisted in loop-preflight.json.
 func (r Result) MarshalJSON() ([]byte, error) {
 	return json.Marshal(resultWire{
 		Checks:       r.Checks,
@@ -50,21 +44,17 @@ func (r Result) MarshalJSON() ([]byte, error) {
 	})
 }
 
-// PrettyJSON returns the readiness payload as 2-space-indented JSON (the bytes
-// persisted to .evolve/loop-preflight.json).
+// PrettyJSON returns the indented payload persisted to .evolve/loop-preflight.json.
 func (r Result) PrettyJSON() []byte {
 	b, err := json.MarshalIndent(r, "", "  ")
 	if err != nil {
-		// Result holds only strings/ints/[]CheckResult, so this is unreachable;
-		// surface it rather than return a silent empty payload.
+		// Unreachable for these field types; surfaced rather than returned as an empty payload.
 		return []byte(fmt.Sprintf("{\"overall_level\":\"halt\",\"error\":%q}", err.Error()))
 	}
 	return b
 }
 
-// Summary is the human-readable block printed to stderr before the loop starts
-// (mirrors preflight.Profile.Summary). Halt/warn details are indented beneath
-// their check so the operator sees exactly what to fix.
+// Summary is the human-readable block printed to stderr before the loop starts.
 func (r Result) Summary() string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Loop readiness: %s (%d/%d checks passed)\n",

@@ -21,7 +21,6 @@ func TestCheckResult_MarshalJSON_LevelIsString(t *testing.T) {
 	}
 }
 
-// A pass-level check omits the empty detail.
 func TestCheckResult_MarshalJSON_OmitsEmptyDetail(t *testing.T) {
 	b, _ := json.Marshal(CheckResult{Name: "x", Level: LevelPass, Message: "ok"})
 	if strings.Contains(string(b), "detail") {
@@ -40,7 +39,6 @@ func TestResult_PrettyJSON_Shape(t *testing.T) {
 			t.Fatalf("PrettyJSON missing %q; got:\n%s", want, out)
 		}
 	}
-	// overall_level must be a string token, never a raw int.
 	if strings.Contains(out, `"overall_level": 0`) {
 		t.Fatalf("overall_level must serialize as a string, not an int; got:\n%s", out)
 	}

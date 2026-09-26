@@ -1,25 +1,11 @@
 package recovery
 
-// recovery_adversarial_test.go — cycle-281 test amplification.
-// Targets uncovered branches:
-//   - Recover with zero-valued input (kind="", CauseUnknown) → unknown-advise
-//   - Recover with stuck_no_progress kind (alternative to stuck_no_output)
-//   - Recover at exact budget boundary (Attempts == MaxAttempts) → advise
-//   - NewChainStallPolicy(0) → defaults maxExtends to 6
-//   - NewChainStallPolicy(-1) → also defaults to 6
-//   - Promote(nil) / Promote(empty-substr) guard clauses
-//   - PromoteSignature(empty-substr) → error
-//   - PromoteAdvice: neutralization artifact rejections ([untrusted], ''')
-
 import (
 	"errors"
 	"strings"
 	"testing"
 )
 
-// TestRecover_ZeroValuedInput — adversarial: a zero-valued RecoverInput (no
-// integrity, no busy, no known cause, no stall kind) falls through to the
-// unknown-advise terminal handler.
 func TestRecover_ZeroValuedInput(t *testing.T) {
 	t.Parallel()
 	d := Recover(RecoverInput{})
@@ -34,9 +20,6 @@ func TestRecover_ZeroValuedInput(t *testing.T) {
 	}
 }
 
-// TestRecover_StuckNoProgressKind — adversarial: "stuck_no_progress" (the
-// second kind alias) must be handled by stall-budget-extend, same as
-// "stuck_no_output".
 func TestRecover_StuckNoProgressKind(t *testing.T) {
 	t.Parallel()
 	d := Recover(RecoverInput{Kind: "stuck_no_progress", Cause: CauseUnknown, Attempts: 1, MaxAttempts: 6})
@@ -45,9 +28,6 @@ func TestRecover_StuckNoProgressKind(t *testing.T) {
 	}
 }
 
-// TestRecover_AtExactBudgetBoundary — adversarial: Attempts == MaxAttempts is
-// NOT < MaxAttempts, so stall-budget-extend does not fire; the terminal
-// unknown-advise handler must claim it.
 func TestRecover_AtExactBudgetBoundary(t *testing.T) {
 	t.Parallel()
 	d := Recover(RecoverInput{Kind: "stuck_no_output", Cause: CauseUnknown, Attempts: 6, MaxAttempts: 6})
@@ -56,8 +36,6 @@ func TestRecover_AtExactBudgetBoundary(t *testing.T) {
 	}
 }
 
-// TestRecover_BusyWithNoKind — adversarial: busy flag with empty kind and
-// no cause → busy-extend fires before the terminal.
 func TestRecover_BusyWithNoKind(t *testing.T) {
 	t.Parallel()
 	d := Recover(RecoverInput{Busy: true})
@@ -66,14 +44,11 @@ func TestRecover_BusyWithNoKind(t *testing.T) {
 	}
 }
 
-// TestNewChainStallPolicy_ZeroAndNegativeDefaultToSix — adversarial: the guard
-// clause that sets maxExtends=6 when the caller passes ≤0.
 func TestNewChainStallPolicy_ZeroAndNegativeDefaultToSix(t *testing.T) {
 	t.Parallel()
 	for _, input := range []int{0, -1, -100} {
 		p := NewChainStallPolicy(input)
-		// A policy with effective maxExtends=6 will extend on 5 elapsed thresholds
-		// (Attempts=5 < 6) and escalate at 6 elapsed (Attempts=6 == 6, not <).
+		// IdleS/ThresholdS is the attempt count: 5 is within the default budget of 6, 6 is not.
 		a5, _ := p.Decide(StallEvent{Kind: "stuck_no_output", IdleS: 5, ThresholdS: 1})
 		if a5 != StallExtend {
 			t.Errorf("NewChainStallPolicy(%d) at 5 extends must extend (defaulted to 6); got %s", input, a5)
@@ -85,9 +60,6 @@ func TestNewChainStallPolicy_ZeroAndNegativeDefaultToSix(t *testing.T) {
 	}
 }
 
-// TestChainStallPolicy_ZeroThresholdNoAttempts — adversarial: when ThresholdS=0
-// the policy must not divide-by-zero; Attempts defaults to 0 and the within-
-// budget extend fires.
 func TestChainStallPolicy_ZeroThresholdNoAttempts(t *testing.T) {
 	t.Parallel()
 	p := NewChainStallPolicy(6)
@@ -97,17 +69,12 @@ func TestChainStallPolicy_ZeroThresholdNoAttempts(t *testing.T) {
 	}
 }
 
-// TestPromote_NilReceiverNoOp — adversarial: calling Promote on a nil
-// *FatalPaneDetector must not panic (the nil guard must fire and return).
 func TestPromote_NilReceiverNoOp(t *testing.T) {
 	t.Parallel()
 	var nilD *FatalPaneDetector
-	// Must not panic.
 	nilD.Promote(FatalSignature{Substr: "something", Cause: CauseDeadShell, Note: "test"})
 }
 
-// TestPromote_EmptySubstrNoOp — adversarial: promoting an empty substring is
-// a no-op; the detector state must be unchanged.
 func TestPromote_EmptySubstrNoOp(t *testing.T) {
 	t.Parallel()
 	d := SeedDetector()
@@ -121,9 +88,6 @@ func TestPromote_EmptySubstrNoOp(t *testing.T) {
 	}
 }
 
-// TestPromoteSignature_EmptySubstrErrors — adversarial: PromoteSignature with
-// an empty substring must return an error (caller must not promote a
-// degenerate signature durably).
 func TestPromoteSignature_EmptySubstrErrors(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -133,8 +97,6 @@ func TestPromoteSignature_EmptySubstrErrors(t *testing.T) {
 	}
 }
 
-// TestPromoteAdvice_NeutralizationArtifactsRejected — adversarial: each of the
-// three neutralization artifacts must independently cause rejection.
 func TestPromoteAdvice_NeutralizationArtifactsRejected(t *testing.T) {
 	t.Parallel()
 	d := SeedDetector()
@@ -153,8 +115,6 @@ func TestPromoteAdvice_NeutralizationArtifactsRejected(t *testing.T) {
 	}
 }
 
-// TestPromoteAdvice_SubstrTooShortRejected — adversarial: a substring shorter
-// than minPromotedSubstrLen must be rejected to prevent false-positive bombs.
 func TestPromoteAdvice_SubstrTooShortRejected(t *testing.T) {
 	t.Parallel()
 	d := SeedDetector()
@@ -170,8 +130,6 @@ func TestPromoteAdvice_SubstrTooShortRejected(t *testing.T) {
 	}
 }
 
-// TestPromoteAdvice_OutOfVocabularyCauseRejected — adversarial: a cause string
-// not in the typed vocabulary must be rejected (hallucinated judgment guard).
 func TestPromoteAdvice_OutOfVocabularyCauseRejected(t *testing.T) {
 	t.Parallel()
 	d := SeedDetector()
@@ -190,9 +148,6 @@ func TestPromoteAdvice_OutOfVocabularyCauseRejected(t *testing.T) {
 	}
 }
 
-// TestPromoteAdvice_ValidHappyPath — adversarial (positive): a well-formed
-// advice with a valid cause, long-enough substring, and no artifacts must
-// promote without error and register in-memory.
 func TestPromoteAdvice_ValidHappyPath(t *testing.T) {
 	t.Parallel()
 	d := SeedDetector()
@@ -209,12 +164,11 @@ func TestPromoteAdvice_ValidHappyPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("PromoteAdvice(valid) = %v, want nil", err)
 	}
-	// Must be detectable in-memory immediately after promotion.
 	if _, _, ok := d.Detect(paneSubstr); !ok {
 		t.Error("promoted signature must be immediately detectable in-memory")
 	}
 }
 
-// Ensure PromoteAdvice is accessible (compilation canary).
+// Keeps the errors import referenced.
 var _ = PromoteAdvice
 var _ = errors.New

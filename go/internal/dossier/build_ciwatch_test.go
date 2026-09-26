@@ -6,9 +6,6 @@ import (
 	"testing"
 )
 
-// TestBuild_IngestsCIWatchVerdict pins AC3 of push-ci-watch-remote-parity
-// (cycle-748): the CI verdict recorded by the post-push watch round-trips
-// into the cycle dossier, and an absent verdict is never fabricated.
 func TestBuild_IngestsCIWatchVerdict(t *testing.T) {
 	t.Run("verdict artifact round-trips into the dossier", func(t *testing.T) {
 		ws := t.TempDir()

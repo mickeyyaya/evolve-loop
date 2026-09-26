@@ -6,27 +6,16 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// exitQuotaExhausted is the bridge exit for a provider quota wall (see the
-// defaultFallbackOnExit doc: 85 = ExitUnknownPrompt incl. rate-limit
-// escalations). It is the ONLY exit that promotes a tier step-down: other
-// trigger exits (80/81/124/127) are CLI-level problems, not tier-availability
-// problems.
+// exitQuotaExhausted is the only exit that steps a tier down; the other triggers are CLI problems, not tier availability.
 const exitQuotaExhausted = 85
 
-// universalTierFloorMin is the lowest tier DispatchTiered will ever step down
-// to when the phase's ModelTierEnvelope.Min is empty or unclassifiable —
-// mirror of the router's cycle-480 universalTierFloor{Min:"balanced"}.
+// universalTierFloorMin mirrors the router's universalTierFloor Min.
 const universalTierFloorMin = "balanced"
 
-// tierNameByRank inverts policy.TierRank onto the canonical tier vocabulary
-// (fast < balanced < deep < top) for stepping down one rank at a time.
+// tierNameByRank inverts policy.TierRank.
 var tierNameByRank = map[int]string{1: "fast", 2: "balanced", 3: "deep", 4: "top"}
 
-// TierChain builds the ordered tier fallback list for Plan.Tiers: the resolved
-// tier first, then one policy.TierRank rank down at a time, never below
-// envelopeMin. An empty or unclassifiable envelopeMin means the universal
-// "balanced" floor. An unclassifiable resolved tier (rank 0, e.g. an exact
-// model id) yields a single-element chain — no bogus step-down.
+// TierChain steps down from resolved one rank at a time to envelopeMin (default "balanced"); an exact model id stays alone.
 func TierChain(resolved, envelopeMin string) []string {
 	chain := []string{resolved}
 	rank := policy.TierRank(resolved)
@@ -43,9 +32,7 @@ func TierChain(resolved, envelopeMin string) []string {
 	return chain
 }
 
-// TieredDispatchResult is the outcome of walking a Plan's tier×CLI grid: the
-// CLI and tier that produced the terminal result, every launch in order
-// ("cli@tier"), and the terminal error (nil on success).
+// TieredDispatchResult is the outcome of walking a Plan's tier×CLI grid.
 type TieredDispatchResult struct {
 	CLI      string   // the CLI that produced the terminal result
 	Tier     string   // the tier the terminal result ran at
@@ -53,18 +40,7 @@ type TieredDispatchResult struct {
 	Err      error    // nil on success; the terminal attempt's error otherwise
 }
 
-// DispatchTiered walks plan.Tiers outer, plan.Candidates inner. Within a tier
-// it behaves exactly like Dispatch: a nil error stops on success, a trigger
-// exit advances the CLI chain, and a non-trigger exit (a legitimate FAIL)
-// stops the walk immediately. It steps down to the next tier ONLY when EVERY
-// attempt at the current tier exited 85 (quota) — the full CLI chain is
-// drained at that tier, so a lower tier is the only remaining capacity. Each
-// step-down invokes onStepDown(from, to) (nil-safe) so the downgrade is never
-// silent. An empty plan.Tiers degrades to a single-tier walk at plan.Model.
-//
-// The terminal quota error is therefore only reachable after the LOWEST tier
-// in the chain is also exhausted — the precondition for the DEFERRED /
-// all-families-exhausted classification (core/quota_exhaustion.go).
+// DispatchTiered runs Dispatch per tier, stepping down (via optional onStepDown) only when every attempt exited 85.
 func DispatchTiered(plan Plan, launch func(cli, tier string) (exitCode int, err error), onStepDown func(from, to string)) TieredDispatchResult {
 	if len(plan.Candidates) == 0 {
 		return TieredDispatchResult{Err: errors.New("llmroute: DispatchTiered called with no candidates")}

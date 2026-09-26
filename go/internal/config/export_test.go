@@ -1,8 +1,6 @@
 package config
 
-// StaticSpinePhasesForTesting exposes the package-private staticSpinePhases
-// set to external (package config_test) tests for the cross-package contract
-// check against core.Phase*. Not part of the public API.
+// StaticSpinePhasesForTesting returns a copy of staticSpinePhases for the external contract test.
 func StaticSpinePhasesForTesting() map[string]struct{} {
 	out := make(map[string]struct{}, len(staticSpinePhases))
 	for k, v := range staticSpinePhases {

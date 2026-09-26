@@ -1,9 +1,5 @@
 package inboxbatch
 
-// layout_test.go — the processing/cycle-N naming is ONE belief: the writer
-// (inboxmover.Claim), every reader (inboxmover.Locate, core's claim scan) and
-// the parser agree by construction, not by four hand-typed literals.
-
 import (
 	"os"
 	"path/filepath"
@@ -30,18 +26,12 @@ func TestProcessingCycleDir_RoundTripsWithParse(t *testing.T) {
 	}
 }
 
-// cycles start at 1 (core/alloc.go), and Location.Cycle == 0 means "pending at
-// the root" — so "cycle-0" must never parse as a claim, and Claim must refuse
-// to write it.
 func TestParseProcessingCycle_RejectsZero(t *testing.T) {
 	if _, ok := ParseProcessingCycle("cycle-0"); ok {
 		t.Fatal("cycle-0 would collide with the pending sentinel; the parser must reject it")
 	}
 }
 
-// ProcessingCycleDirs is the one walk every reader of the claim dirs uses
-// (Locate, RecoverOrphans, dispatch state, failure counts): only parseable
-// cycle dirs, ascending by cycle, never a stray file or note.
 func TestProcessingCycleDirs_ListsOnlyClaimDirsInCycleOrder(t *testing.T) {
 	inbox := t.TempDir()
 	for _, name := range []string{"cycle-10", "cycle-9", "cycle-x", "notes"} {

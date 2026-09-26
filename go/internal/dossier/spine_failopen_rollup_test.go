@@ -1,40 +1,5 @@
 package dossier
 
-// spine_failopen_rollup_test.go — RED contract for cycle-1166 Task 3
-// (spine-failopen-telemetry, inbox weight 0.85), dossier half. The core half
-// (recording the events) lives in internal/core/spine_failopen_telemetry_test.go.
-//
-// The item names two RED tests verbatim:
-//   - TestSpineFailOpen_CountedInDossierWithPhaseAndArtifact
-//   - TestLoopSummary_RollsUpSpineFailOpensPerBatch
-//
-// …plus "WARN escalation when a single cycle exceeds a threshold (e.g. 3)".
-//
-// The wiring follows the EXISTING SkippedPhases precedent exactly
-// (cyclestate.SkippedPhase → BuildOpts.SkippedPhases → Dossier.SkippedPhases,
-// build.go:78/113) rather than inventing a new shape — the scout report flags
-// that precedent, and single-source-with-projection is the standing rule.
-//
-// RED today: cyclestate.SpineFailOpen, BuildOpts.SpineFailOpens,
-// Dossier.SpineFailOpens and RollupSpineFailOpens do not exist — this file does
-// not compile.
-//
-// Contract Builder must satisfy:
-//
-//	type cyclestate.SpineFailOpen struct {
-//	    Phase           string `json:"phase"`
-//	    MissingArtifact string `json:"missing_artifact"`
-//	    Reason          string `json:"reason,omitempty"`
-//	}
-//	BuildOpts.SpineFailOpens []cyclestate.SpineFailOpen
-//	Dossier.SpineFailOpens   []cyclestate.SpineFailOpen `json:"spine_fail_opens,omitempty"`
-//	type SpineFailOpenRollup struct {
-//	    Total               int
-//	    ByPhase             map[string]int
-//	    OverThresholdCycles []int   // cycles whose OWN count exceeded threshold
-//	}
-//	func RollupSpineFailOpens(ds []*Dossier, threshold int) SpineFailOpenRollup
-
 import (
 	"encoding/json"
 	"strings"
@@ -53,11 +18,6 @@ func spineFailOpenBuildOpts(t *testing.T, events []cyclestate.SpineFailOpen) Bui
 	}
 }
 
-// TestSpineFailOpen_CountedInDossierWithPhaseAndArtifact — the item's first
-// named RED test. A cycle's fail-open events must reach the committed dossier
-// with BOTH the phase that proceeded and the predecessor artifact that was
-// missing, and must survive the JSON round-trip (the dossier's on-disk form is
-// the only surface an operator or a later sweep can read).
 func TestSpineFailOpen_CountedInDossierWithPhaseAndArtifact(t *testing.T) {
 	events := []cyclestate.SpineFailOpen{
 		{Phase: "ship", MissingArtifact: "build", Reason: "would-block at enforce"},
@@ -91,10 +51,6 @@ func TestSpineFailOpen_CountedInDossierWithPhaseAndArtifact(t *testing.T) {
 	}
 }
 
-// TestSpineFailOpen_HealthyCycleOmitsTheField is the NEGATIVE twin. A cycle with
-// zero fail-opens must serialize with NO spine_fail_opens key (omitempty), so an
-// operator scanning dossiers sees the field only where there is something to see
-// — and so a degenerate always-emit implementation cannot pass the test above.
 func TestSpineFailOpen_HealthyCycleOmitsTheField(t *testing.T) {
 	d, err := Build(1166, spineFailOpenBuildOpts(t, nil))
 	if err != nil {
@@ -113,10 +69,6 @@ func TestSpineFailOpen_HealthyCycleOmitsTheField(t *testing.T) {
 	}
 }
 
-// TestLoopSummary_RollsUpSpineFailOpensPerBatch — the item's second named RED
-// test. A width-N batch's summary must state the batch TOTAL, the breakdown by
-// phase, and which cycles individually breached the WARN threshold ("e.g. 3").
-// Per-cycle records alone do not surface an epidemic; the rollup is the dashboard.
 func TestLoopSummary_RollsUpSpineFailOpensPerBatch(t *testing.T) {
 	quiet, err := Build(1160, spineFailOpenBuildOpts(t, []cyclestate.SpineFailOpen{
 		{Phase: "ship", MissingArtifact: "build", Reason: "would-block at enforce"},
@@ -154,10 +106,6 @@ func TestLoopSummary_RollsUpSpineFailOpensPerBatch(t *testing.T) {
 	}
 }
 
-// TestRollupSpineFailOpens_CleanBatchIsSilent is the NEGATIVE twin of the
-// rollup: a batch where no cycle fails open must produce a zero rollup with NO
-// escalation. An alarm that fires on a clean batch is noise, and it is exactly
-// how a "measurement-first" change gets rolled back before it can measure anything.
 func TestRollupSpineFailOpens_CleanBatchIsSilent(t *testing.T) {
 	a, err := Build(1162, spineFailOpenBuildOpts(t, nil))
 	if err != nil {
@@ -181,9 +129,6 @@ func TestRollupSpineFailOpens_CleanBatchIsSilent(t *testing.T) {
 	}
 }
 
-// TestSpineFailOpenRollup_ZeroValueIsSafeToRead names the rollup type itself and
-// pins that a zero value is readable without a nil-map panic guard at every call
-// site — an operator surface that panics on an empty batch reports nothing.
 func TestSpineFailOpenRollup_ZeroValueIsSafeToRead(t *testing.T) {
 	var zero SpineFailOpenRollup
 	if zero.Total != 0 || len(zero.OverThresholdCycles) != 0 || zero.ByPhase["ship"] != 0 {

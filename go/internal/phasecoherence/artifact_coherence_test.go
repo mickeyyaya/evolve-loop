@@ -1,26 +1,3 @@
-// artifact_coherence_test.go — cycle-238 task
-// `persona-output-artifact-coherence` (RED first). API contract for Builder
-// (architecture blueprint B11, reuses Options/Violation from coherence.go):
-//
-//	func CheckArtifactNames(opts Options) ([]Violation, error)
-//
-// Semantics pinned by these tests (architecture R7 + eval
-// persona-output-artifact-coherence C2/C3/C4):
-//   - persona side: FIRST whitespace/quote-delimited token ending in .md on
-//     the `output-format:` frontmatter line; no output-format: line → skip
-//     (eval C3).
-//   - profile side: path.Base(output_artifact) with {cycle}-style template
-//     segments stripped (they live in the dir part).
-//   - basename mismatch ⇒ Severity WARN Violation whose Message carries BOTH
-//     names (eval vocabulary "mismatch").
-//   - persona declares output-format but the paired profile has NO
-//     output_artifact ⇒ WARN (eval C4 pins "flagged as WARN"; this
-//     deliberately overrides blueprint B11's "skip" — the eval is the audit
-//     authority, and a persona promising an artifact nobody contracts for is
-//     exactly the I-3(d) incoherence class).
-//
-// Forward-protection for the I-3(d) incident: persona said plan-review.md,
-// profile said plan-review-report.md → batch-fatal exit=81 ×2.
 package phasecoherence
 
 import (
@@ -46,8 +23,6 @@ func TestArtifactCoherence_MatchedPairNoMismatch(t *testing.T) {
 	}
 }
 
-// TestArtifactCoherence_Mismatch — eval C2 (name pinned): exact replica of
-// the I-3(d) incident shape.
 func TestArtifactCoherence_Mismatch(t *testing.T) {
 	agents, profs := fixtures(
 		map[string]string{"evolve-plan-review": personaMD("plan-review",
@@ -68,8 +43,6 @@ func TestArtifactCoherence_Mismatch(t *testing.T) {
 	if v.Severity != "WARN" {
 		t.Errorf("Severity = %q, want %q", v.Severity, "WARN")
 	}
-	// The WARN must carry BOTH names — that is the whole diagnostic value
-	// (and "mismatch" is eval-C4-class vocabulary).
 	if !strings.Contains(v.Message, "plan-review.md") {
 		t.Errorf("Message %q missing persona artifact plan-review.md", v.Message)
 	}
@@ -82,8 +55,6 @@ func TestArtifactCoherence_Mismatch(t *testing.T) {
 }
 
 func TestArtifactCoherence_FirstMdTokenWins(t *testing.T) {
-	// The output-format prose may mention other .md names later; only the
-	// FIRST .md token is the declared artifact (architecture risk table).
 	agents, profs := fixtures(
 		map[string]string{"evolve-scout": personaMD("scout",
 			`output-format: "scout-report.md — Gap Analysis table, Handoff JSON (see agent-templates.md)"`)},
@@ -98,8 +69,6 @@ func TestArtifactCoherence_FirstMdTokenWins(t *testing.T) {
 	}
 }
 
-// TestArtifactCoherence_NoFrontmatter — eval C3 (name pinned): personas
-// without an output-format: line (non-output phases) are silently skipped.
 func TestArtifactCoherence_NoFrontmatter(t *testing.T) {
 	agents, profs := fixtures(
 		map[string]string{"evolve-debugger": personaMD("debugger", `tools: ["Read", "Bash"]`)},
@@ -114,9 +83,6 @@ func TestArtifactCoherence_NoFrontmatter(t *testing.T) {
 	}
 }
 
-// TestArtifactCoherence_ProfileMissingField — eval C4 (name pinned): persona
-// declares output-format but the profile has no output_artifact → WARN.
-// (Eval C4 wins over blueprint B11's "skip" — see package comment.)
 func TestArtifactCoherence_ProfileMissingField(t *testing.T) {
 	agents, profs := fixtures(
 		map[string]string{"evolve-observer": personaMD("observer",
@@ -171,11 +137,6 @@ func TestArtifactCoherence_OverrideReadErrorReturnsError(t *testing.T) {
 	}
 }
 
-// TestArtifactCoherence_SkipsNonMdProfileArtifact — a phase whose contract
-// deliverable is JSON (memo → carryover-todos.json) may legitimately mention
-// a SECONDARY .md artifact in its output-format prose (memo.md). Comparing
-// that .md token against a .json deliverable guarantees a false mismatch;
-// the check must skip when the profile artifact is not .md.
 func TestArtifactCoherence_SkipsNonMdProfileArtifact(t *testing.T) {
 	agents, profs := fixtures(
 		map[string]string{"evolve-memo": personaMD("memo",
@@ -191,11 +152,6 @@ func TestArtifactCoherence_SkipsNonMdProfileArtifact(t *testing.T) {
 	}
 }
 
-// TestArtifactCoherence_DirQualifiedPersonaTokenMatchesBasename — the
-// reflector persona declares "learn/reflector-synthesis.md" while the
-// profile's output_artifact ends .../learn/reflector-synthesis.md: same
-// file, but the persona token keeps the dir prefix and the profile side is
-// path.Base'd. Both sides must be compared by basename.
 func TestArtifactCoherence_DirQualifiedPersonaTokenMatchesBasename(t *testing.T) {
 	agents, profs := fixtures(
 		map[string]string{"evolve-reflector": personaMD("reflector",

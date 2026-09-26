@@ -1,16 +1,5 @@
 package dossier
 
-// read.go — the committed-corpus reader. Write/commitPair put each cycle's
-// dossier in <projectRoot>/knowledge-base/cycles/cycle-N.{json,md}; this is the
-// counterpart that reads a WINDOW of them back.
-//
-// It exists because a fleet batch's lane cycles are separate `evolve cycle run`
-// subprocesses: their CycleResults never return to the parent loop, so the
-// committed dossier is the ONLY channel through which a batch-level surface can
-// see what its lanes recorded. A batch summary that folds only the parent's
-// in-memory results reports zero for every fleet batch — which is exactly the
-// silence such a summary is built to end.
-
 import (
 	"bufio"
 	"encoding/json"
@@ -27,15 +16,18 @@ import (
 type SkipEvidence string
 
 const (
-	SkipEvidenceNone         SkipEvidence = "none"
-	SkipEvidenceTrusted      SkipEvidence = "trusted"
+	// SkipEvidenceNone means the dossier has no skipped_phases entry for the phase.
+	SkipEvidenceNone SkipEvidence = "none"
+	// SkipEvidenceTrusted means a versioned dossier's skip entry is taken at face value.
+	SkipEvidenceTrusted SkipEvidence = "trusted"
+	// SkipEvidenceContradicted means an execution receipt proves the phase ran.
 	SkipEvidenceContradicted SkipEvidence = "contradicted"
-	SkipEvidenceUnverified   SkipEvidence = "unverified"
+	// SkipEvidenceUnverified means a legacy skip entry has no receipt either way.
+	SkipEvidenceUnverified SkipEvidence = "unverified"
 )
 
-// PhaseSkipEvidence interprets a skipped_phases entry without trusting the
-// ambiguous, unversioned corpus. A surviving execution receipt contradicts a
-// legacy skip claim; without one, the claim remains unverified.
+// PhaseSkipEvidence interprets a skipped_phases entry. It trusts only a
+// versioned record; a surviving receipt contradicts a legacy claim.
 func PhaseSkipEvidence(projectRoot string, d *Dossier, phase string) SkipEvidence {
 	if d == nil || phase == "" || !dossierNamesSkippedPhase(d, phase) {
 		return SkipEvidenceNone
@@ -89,16 +81,10 @@ func phaseExecutionReceiptExists(projectRoot string, cycle int, phase string) bo
 	return false
 }
 
-// ReadCommitted reads the committed dossiers for cycles >= minCycle from
-// <projectRoot>/knowledge-base/cycles/, ascending by cycle number. The cycle
-// number is taken from the FILENAME so the window is applied before any file is
-// opened (a batch reads its own handful of dossiers, never the whole history).
-//
-// Best-effort by design: an absent directory, an unreadable file, or a dossier
-// that does not parse is skipped, not an error. Callers are reporting surfaces —
-// one corrupt dossier must degrade the report, never break the caller. minCycle
-// <= 0 reads the whole corpus, so callers that cannot establish a window must
-// decide for themselves whether that is what they want.
+// ReadCommitted returns the committed dossiers for cycles >= minCycle in
+// ascending order, windowing by filename before opening any file. It is
+// best-effort: unreadable or unparsable files are skipped, and minCycle <= 0
+// reads the whole corpus.
 func ReadCommitted(projectRoot string, minCycle int) []*Dossier {
 	dir := CyclesDir(projectRoot)
 	entries, err := os.ReadDir(dir)

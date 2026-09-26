@@ -7,7 +7,6 @@ import (
 	"testing"
 )
 
-// scriptMerger fails the merge for the named branches (until a resolver flips them).
 type scriptMerger struct {
 	failBranch map[string]bool
 	merged     []string
@@ -64,7 +63,7 @@ func TestRunMergeTrain_ConflictResolvedOnRetry(t *testing.T) {
 	m := &scriptMerger{failBranch: map[string]bool{"cycle-1-w1": true}}
 	resolver := func(_ context.Context, workerID, _ string) error {
 		if workerID == "w1" {
-			m.failBranch["cycle-1-w1"] = false // "fix" so the retry merges
+			m.failBranch["cycle-1-w1"] = false
 		}
 		return nil
 	}

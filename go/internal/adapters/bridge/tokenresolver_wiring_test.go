@@ -1,31 +1,5 @@
 package bridge
 
-// tokenresolver_wiring_test.go — RED contract for cycle-623 task
-// token-resolver-production-wiring (inbox
-// 2026-07-08T02-10-00Z-token-resolver-production-wiring.json, weight 0.96).
-//
-// Confirmed bug: `grep -rn TokenResolver go/internal/adapters/bridge/bridge.go`
-// returns zero non-test hits — NewDefault's production engineFactory builds a
-// gobridge.Deps that never sets TokenResolver, so recordTokenUsage's
-// `if e.deps.TokenResolver == nil { return }` guard (internal/bridge/
-// engine.go:527) fires on every real launch: token telemetry has been
-// silently all-zero since at least cycle 612 (fail-open masks the gap).
-//
-// Fix contract (Builder implements): a new unexported method
-//
-//	func (a *Adapter) productionEngineDeps(env map[string]string) gobridge.Deps
-//
-// that sets TokenResolver: tokenusage.DefaultResolver(configRoot) (configRoot
-// resolved from env["HOME"], falling back to os.Getenv("HOME") — same
-// precedent as internal/bridge/doctor.go's doctorHome() + ".claude", see
-// internal/bridge/billing.go:47 for the exact join). NewDefault's
-// engineFactory closure must build its gobridge.Deps via this method (in
-// place of the current hand-rolled literal) so the two IDENTICAL DI wiring
-// call sites in this file collapse to one. This file — and the
-// HasTokenResolver accessor from internal/bridge/hastokenresolver_test.go —
-// are both undefined today, so `go vet`/`go build` fails on this package:
-// the intended RED signal. DO NOT modify this file; implement production
-// code only.
 import (
 	"os"
 	"path/filepath"
@@ -36,8 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/tokenusage"
 )
 
-// mustParseRFC3339 is a local test helper (this package has no existing
-// RFC3339 fixture-time helper to reuse).
 func mustParseRFC3339(t *testing.T, s string) time.Time {
 	t.Helper()
 	ts, err := time.Parse(time.RFC3339, s)
@@ -47,10 +19,6 @@ func mustParseRFC3339(t *testing.T, s string) time.Time {
 	return ts
 }
 
-// TestProductionEngineDeps_WiresNonNilTokenResolver — AC: "Both composition
-// roots wire a non-nil resolver via one shared helper" (scout-report.md
-// Acceptance Criteria Summary). NewDefault's Deps-building helper must never
-// leave TokenResolver nil for a resolvable HOME.
 func TestProductionEngineDeps_WiresNonNilTokenResolver(t *testing.T) {
 	a := NewDefault(t.TempDir(), nil)
 	d := a.productionEngineDeps(map[string]string{"HOME": t.TempDir()})
@@ -59,12 +27,6 @@ func TestProductionEngineDeps_WiresNonNilTokenResolver(t *testing.T) {
 	}
 }
 
-// TestEngineFactory_WiresTokenResolver is the exact predicate scout-report.md
-// names for this task's verifiableBy: "asserts production-built Engine has
-// non-nil Deps.TokenResolver". Exercises the REAL engineFactory closure (not
-// just the Deps-building helper in isolation) via the HasTokenResolver
-// accessor, so a Builder that wires productionEngineDeps into the helper but
-// forgets to route engineFactory through it cannot pass by coincidence.
 func TestEngineFactory_WiresTokenResolver(t *testing.T) {
 	a := NewDefault(t.TempDir(), nil)
 	built := a.engineFactory(map[string]string{"HOME": t.TempDir()})
@@ -77,13 +39,6 @@ func TestEngineFactory_WiresTokenResolver(t *testing.T) {
 	}
 }
 
-// TestProductionEngineDeps_ResolverAppliesRealFixture is the anti-gaming
-// counterpart to the two tests above (predicate-quality rule: a wiring check
-// that only proves "the field is non-nil" would pass a stub func that always
-// returns SourceNone). It proves the wired resolver is genuinely
-// tokenusage.DefaultResolver — i.e. it recovers real usage from a real
-// on-disk transcript fixture placed under HOME/.claude/projects/... — not a
-// disconnected placeholder.
 func TestProductionEngineDeps_ResolverAppliesRealFixture(t *testing.T) {
 	home := t.TempDir()
 	worktree := "/repo/worktrees/cycle-623"

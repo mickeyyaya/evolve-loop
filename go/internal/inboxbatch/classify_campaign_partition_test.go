@@ -1,22 +1,10 @@
 package inboxbatch
 
-// classify_campaign_partition_test.go — campaign is a PARTITION, not a signal.
-// The operator's campaign field is the explicit "this is one initiative"
-// declaration; an inferred file-area or dep edge must never merge two DISTINCT
-// non-empty campaigns into one cluster. Measured on the live 84-item backlog
-// (2026-07-28): a chain of small shared areas fused 17 campaigns into one
-// ~37-item cluster rendered as batches 1-9, each marked "run the previous
-// batch first" — a 9-cycle serialized chain over unrelated initiatives.
-
 import (
 	"strings"
 	"testing"
 )
 
-// TestClassify_TwoCampaignsSharingAreaNeverMerge pins the partition core: two
-// items in DIFFERENT non-empty campaigns sharing a deep (>= minAreaDepth) file
-// area stay in separate batches — the operator's declaration dominates the
-// inferred signal.
 func TestClassify_TwoCampaignsSharingAreaNeverMerge(t *testing.T) {
 	items := []Item{
 		item("a", 0.9, withCampaign("camp-x"), withFiles("go/internal/router/a.go")),
@@ -28,9 +16,6 @@ func TestClassify_TwoCampaignsSharingAreaNeverMerge(t *testing.T) {
 	}
 }
 
-// TestClassify_SameCampaignStillClustersAcrossAreas guards the other half: the
-// partition must not weaken campaign binding itself — same-campaign items with
-// no shared files still cluster.
 func TestClassify_SameCampaignStillClustersAcrossAreas(t *testing.T) {
 	items := []Item{
 		item("a", 0.9, withCampaign("camp-x"), withFiles("go/internal/router/a.go")),
@@ -42,9 +27,6 @@ func TestClassify_SameCampaignStillClustersAcrossAreas(t *testing.T) {
 	}
 }
 
-// TestClassify_CampaignlessItemsKeepAreaClustering pins the no-regression
-// acceptance: items with NO campaign keep clustering on file-area/dep exactly
-// as today — the partition constrains only distinct non-empty campaigns.
 func TestClassify_CampaignlessItemsKeepAreaClustering(t *testing.T) {
 	items := []Item{
 		item("a", 0.9, withFiles("go/internal/subagent/a.go")),
@@ -56,11 +38,6 @@ func TestClassify_CampaignlessItemsKeepAreaClustering(t *testing.T) {
 	}
 }
 
-// TestClassify_CampaignlessBridgeCannotFuseTwoCampaigns closes the transitive
-// hole a pairwise edge filter would leave open: a campaign-less item M sharing
-// an area with BOTH camp-x's A and camp-y's B must not become the bridge that
-// unions the two campaigns. M joins exactly one of them; every batch holds
-// items from at most ONE non-empty campaign.
 func TestClassify_CampaignlessBridgeCannotFuseTwoCampaigns(t *testing.T) {
 	items := []Item{
 		item("a", 0.9, withCampaign("camp-x"), withFiles("go/internal/router/a.go")),
@@ -84,12 +61,6 @@ func TestClassify_CampaignlessBridgeCannotFuseTwoCampaigns(t *testing.T) {
 	}
 }
 
-// TestClassify_CampaignPartitionIsDeterministic pins determinism under the
-// partition: the guard makes union outcomes ORDER-dependent (which cluster a
-// campaign-less bridge joins depends on which edge unions first), and two of
-// the three rules emit edges from map iteration — so Classify must impose a
-// deterministic edge order itself. Same items, same config, same batches,
-// every run.
 func TestClassify_CampaignPartitionIsDeterministic(t *testing.T) {
 	items := []Item{
 		item("a", 0.9, withCampaign("camp-x"), withFiles("go/internal/router/a.go")),

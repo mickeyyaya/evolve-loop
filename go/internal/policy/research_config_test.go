@@ -7,10 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// TestResearchConfig_AbsentDefaults pins the behaviour-preservation contract:
-// an install with no "research" block must resolve to the values the compiled
-// constants carry today, so introducing the knobs cannot narrow advisor recall
-// or arm the novelty gate differently anywhere.
 func TestResearchConfig_AbsentDefaults(t *testing.T) {
 	got := policy.Policy{}.ResearchConfig()
 	want := policy.ResearchConfig{RecallK: 5, NoveltyThreshold: 0.9}
@@ -19,8 +15,6 @@ func TestResearchConfig_AbsentDefaults(t *testing.T) {
 	}
 }
 
-// TestResearchConfig_EmptyBlockDefaults covers the operator who writes
-// "research": {} — an empty block is an absent block, not zero-valued config.
 func TestResearchConfig_EmptyBlockDefaults(t *testing.T) {
 	got := policy.Policy{Research: &policy.ResearchPolicy{}}.ResearchConfig()
 	want := policy.ResearchConfig{RecallK: 5, NoveltyThreshold: 0.9}
@@ -29,10 +23,6 @@ func TestResearchConfig_EmptyBlockDefaults(t *testing.T) {
 	}
 }
 
-// TestResearchConfig_RecallKRangeResolution is the load-bearing negative half:
-// out-of-range recall must fall back to the visible built-in. 0/-1 would
-// otherwise silently DISABLE the advisor's recall memory, and an absurd value
-// would flood the plan prompt with weak matches.
 func TestResearchConfig_RecallKRangeResolution(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -54,9 +44,6 @@ func TestResearchConfig_RecallKRangeResolution(t *testing.T) {
 	}
 }
 
-// TestResearchConfig_NoveltyThresholdRangeResolution pins the second knob's
-// range. 0 would suppress every lesson write (evidence loss) and >1 would
-// disarm the gate; both must resolve to the built-in instead.
 func TestResearchConfig_NoveltyThresholdRangeResolution(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -76,10 +63,6 @@ func TestResearchConfig_NoveltyThresholdRangeResolution(t *testing.T) {
 	}
 }
 
-// TestResearchConfig_JSONTagsBindOperatorBlock proves the operator-facing wire
-// shape actually reaches the resolver: a policy.json "research" block with
-// snake_case keys must populate the typed fields (a renamed tag would leave the
-// operator's tuning silently at the default).
 func TestResearchConfig_JSONTagsBindOperatorBlock(t *testing.T) {
 	var p policy.Policy
 	if err := json.Unmarshal([]byte(`{"research":{"recall_k":7,"novelty_threshold":0.8}}`), &p); err != nil {

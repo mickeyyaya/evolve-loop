@@ -11,27 +11,23 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 )
 
-// Violation is one persona/profile coherence drift finding, carrying the
-// affected persona, the drift Kind, a Severity, and an eval-vocabulary Message.
+// Violation is one drift finding from Check, CheckArtifactNames or CheckProvenance.
 type Violation struct {
-	Persona  string // base name, e.g. "builder" (evolve- prefix stripped)
-	Kind     string // "disallowed" | "undeclared" (tools checks) | "unpaired" (missing profile)
-	Severity string // "WARN" for both drift directions
-	Message  string // eval vocabulary: contradiction|mismatch|disallowed|undeclared
+	Persona  string // base name without the evolve- prefix, e.g. "builder"; empty for provenance findings
+	Kind     string // "unpaired" | "disallowed" | "undeclared" | "mismatch" | "missing-provenance" | "provenance-mismatch"
+	Severity string // "WARN" for persona drift and a missing header; "error" for a provenance mismatch
+	Message  string // persona drift uses the eval vocabulary: contradiction|mismatch|disallowed|undeclared
 }
 
-// Options configures a coherence check: the filesystem containing agents/,
-// the profiles filesystem, and optional per-persona path overrides.
+// Options names the persona and profile roots a check reads.
 type Options struct {
 	AgentsFS   fs.FS             // root CONTAINING agents/ (prompts.Loader layout)
 	ProfilesFS fs.FS             // profiles dir root: <name>.json at top level (profiles.Loader layout)
 	Overrides  map[string]string // persona name → OS file path substituting agents/evolve-<name>.md
 }
 
-// Check verifies that each evolve-<name>.md persona is paired with a profile
-// and that the persona's declared tools agree with the profile's allowed_tools.
-// It returns one Violation per drift (unpaired profile, disallowed tool, or
-// undeclared tool) and a non-nil error only on configuration or I/O failure.
+// Check reports each evolve-<name>.md persona that lacks a profile or whose tools disagree
+// with the profile's allowed_tools; it errors only on configuration or I/O failure.
 func Check(opts Options) ([]Violation, error) {
 	if opts.AgentsFS == nil {
 		return nil, errors.New("missing AgentsFS")
@@ -58,20 +54,11 @@ func Check(opts Options) ([]Violation, error) {
 		}
 		name := strings.TrimPrefix(strings.TrimSuffix(n, ".md"), "evolve-")
 
-		// Check if profile exists
 		profile, err := loader.Get(name)
 		if err != nil {
 			if errors.Is(err, fs.ErrNotExist) {
-				// "-reference" personas are documentation (auditor-reference
-				// etc.), never dispatched — no profile expected. Likewise a
-				// persona whose frontmatter declares `dispatch: none`
-				// (operator: monitoring persona driven outside the
-				// profile/subagent system) is intentionally unpaired.
-				// Everything else unpaired is a visibility WARN, not a silent
-				// skip: cycle-270's debugger died at launch (exit=10) because
-				// its persona existed and its profile didn't, and nothing said
-				// so until the route fired (inbox
-				// dispatchable-agent-profile-completeness).
+				// -reference personas are documentation and dispatch: none personas run
+				// outside the profile system; every other unpaired persona WARNs.
 				if !strings.HasSuffix(name, "-reference") && !dispatchNone(opts, name) {
 					violations = append(violations, Violation{
 						Persona:  name,
@@ -86,11 +73,10 @@ func Check(opts Options) ([]Violation, error) {
 		}
 
 		if len(profile.AllowedTools) == 0 {
-			// profile without allowed_tools -> no constraint -> skip.
+			// An absent or empty allowed_tools means no constraint, not "nothing allowed".
 			continue
 		}
 
-		// Read persona file
 		persona, err := personaContents(opts, name)
 		if err != nil {
 			if errors.Is(err, fs.ErrNotExist) && opts.Overrides[name] == "" {
@@ -99,7 +85,6 @@ func Check(opts Options) ([]Violation, error) {
 			return nil, err
 		}
 
-		// Parse persona frontmatter
 		fm, _, err := prompts.ParseFrontmatter(persona)
 		if err != nil {
 			return nil, err
@@ -110,11 +95,9 @@ func Check(opts Options) ([]Violation, error) {
 
 		toolsVal, ok := fm["tools"]
 		if !ok {
-			// No tools: line -> skip
 			continue
 		}
 
-		// toolsVal parsed by parseValue is a []string if it was an array
 		toolsSlice, ok := toolsVal.([]string)
 		if !ok {
 			continue
@@ -126,9 +109,8 @@ func Check(opts Options) ([]Violation, error) {
 	return violations, nil
 }
 
-// dispatchNone reports whether the persona's frontmatter opts out of profile
-// pairing with `dispatch: none`. Best-effort: unreadable/unparsable personas
-// return false so the unpaired WARN still fires.
+// dispatchNone reports whether the persona opts out of profile pairing with `dispatch: none`.
+// An unreadable or unparsable persona returns false, so the unpaired WARN still fires.
 func dispatchNone(opts Options, name string) bool {
 	raw, err := personaContents(opts, name)
 	if err != nil {
@@ -162,19 +144,16 @@ func normalizeToolName(name string) string {
 func checkToolsCoherence(name string, personaTools, allowedTools []string) []Violation {
 	var vs []Violation
 
-	// Normalize allowedTools
 	allowedSet := make(map[string]bool)
 	for _, t := range allowedTools {
 		allowedSet[normalizeToolName(t)] = true
 	}
 
-	// Normalize personaTools
 	personaSet := make(map[string]bool)
 	for _, t := range personaTools {
 		personaSet[normalizeToolName(t)] = true
 	}
 
-	// 1. Check for disallowed tools (persona has, profile allowedTools doesn't have)
 	for _, pt := range personaTools {
 		normPt := normalizeToolName(pt)
 		if !allowedSet[normPt] {
@@ -187,7 +166,6 @@ func checkToolsCoherence(name string, personaTools, allowedTools []string) []Vio
 		}
 	}
 
-	// 2. Check for undeclared tools (profile allowedTools has, persona doesn't have)
 	reportedUndeclared := make(map[string]bool)
 	for _, at := range allowedTools {
 		normAt := normalizeToolName(at)

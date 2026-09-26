@@ -12,9 +12,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 )
 
-// ProvenanceFields are the expected values CheckProvenance asserts an
-// artifact's evolve:provenance header against: phase, cycle, tree SHA, and
-// inputs digest.
+// ProvenanceFields holds the expected header values; an empty TreeSHA or InputsDigest is not checked.
 type ProvenanceFields struct {
 	Phase        string
 	Cycle        int
@@ -25,11 +23,8 @@ type ProvenanceFields struct {
 var provenanceRegex = regexp.MustCompile(`<!--\s*evolve:provenance\s+([^>]+)\s*-->`)
 var kvRegex = regexp.MustCompile(`(\w+)=(\S+)`)
 
-// CheckProvenance parses the artifact's evolve:provenance header and returns
-// a Violation for each field (phase, cycle, inputs_digest, tree_sha) that
-// disagrees with expected, plus a missing-provenance Violation when the header
-// is absent. When a ledger is present, tree_sha is also cross-checked against
-// the matching ledger entry.
+// CheckProvenance reports each evolve:provenance header field that disagrees with expected,
+// and cross-checks tree_sha against the ledger that the process environment resolves.
 func CheckProvenance(artifact string, expected ProvenanceFields) []Violation {
 	var violations []Violation
 
@@ -90,7 +85,6 @@ func CheckProvenance(artifact string, expected ProvenanceFields) []Violation {
 		})
 	}
 
-	// cross-check tree_sha against ledger when available
 	layout := paths.Resolve(os.Getenv, "")
 	ledgerFile := layout.LedgerFile
 	if _, err := os.Stat(ledgerFile); err == nil {

@@ -9,12 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
-// TestLaunchFn_InvokedWithFleetEnvForced names the fleet.LaunchFn func type
-// (assigned to Supervisor.Launch but the bare type is never named in a test) and
-// pins the contract between Supervisor.Run and the function it drives: the
-// supervisor calls the LaunchFn once per spec with EVOLVE_FLEET=1 forced into
-// spec.Env (so the launched cycle skips the global project lock), and propagates
-// the returned exit code.
 func TestLaunchFn_InvokedWithFleetEnvForced(t *testing.T) {
 	var mu sync.Mutex
 	var calls int
@@ -39,11 +33,6 @@ func TestLaunchFn_InvokedWithFleetEnvForced(t *testing.T) {
 	}
 }
 
-// TestFreshnessGateFnTypes_Named names the dispatch freshness gate's bare
-// contract types (FreshnessProbeFn, RefillFn, FreshnessSkip — assigned inline
-// in freshness_test.go but never named there) and pins their contract: a probe
-// verdict of stale flows into a FreshnessSkip carrying the probe's reason, and
-// an ok=false RefillFn leaves the freed slot empty.
 func TestFreshnessGateFnTypes_Named(t *testing.T) {
 	var probe FreshnessProbeFn = func(string) TaskFreshness {
 		return TaskFreshness{Fresh: false, Reason: "consumed: processed"}

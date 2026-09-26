@@ -10,10 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasetiming"
 )
 
-// TestBuild_ProjectsPhaseTokens — S6, token-telemetry. Build must project each
-// timed phase's terminal token usage (Entry.Tokens, S4) onto the durable
-// PhaseRecord, so the committed dossier records per-phase token counts beside
-// duration — not just dollars.
 func TestBuild_ProjectsPhaseTokens(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()

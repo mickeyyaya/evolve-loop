@@ -1,10 +1,5 @@
 package observer
 
-// core_adapter_signals_test.go — ADR-0103 unit 12 §6 tests 43-46: the live
-// adapter's two faults reach the Signal Center through the engine's Reporter
-// (module observer, kind observer.warning), its paths project from the
-// engine's layout, and it writes neither os.Stderr nor reads the environment.
-
 import (
 	"context"
 	"go/parser"
@@ -45,8 +40,6 @@ func (r *recordingCenter) all() []signalcenter.Event {
 	return append([]signalcenter.Event(nil), r.events...)
 }
 
-// captureStderr swaps os.Stderr for a pipe around fn and returns what was
-// written to it.
 func captureStderr(t *testing.T, fn func()) string {
 	t.Helper()
 	r, w, err := os.Pipe()
@@ -63,12 +56,7 @@ func captureStderr(t *testing.T, fn func()) string {
 	return string(b)
 }
 
-// TestCoreAdapter_SinkOpenFailureIsASignalAndTheAdapterIsWired — the
-// workspace path is a FILE: cancel is a no-op, exactly one
-// OBSERVER_EVENTS_SINK_OPEN_FAILED with step/path and the cycle/phase, ZERO
-// bytes on os.Stderr; SignalsWired reports the accessor; a nil accessor is
-// the Null Object. Kills M62 (a dropped field), M49 (a nil deref), M63 (the
-// stderr line kept).
+// The workspace path is a regular file, so opening the events sink fails.
 func TestCoreAdapter_SinkOpenFailureIsASignalAndTheAdapterIsWired(t *testing.T) {
 	wsFile := filepath.Join(t.TempDir(), "not-a-dir")
 	if err := os.WriteFile(wsFile, []byte("x"), 0o644); err != nil {
@@ -106,12 +94,6 @@ func TestCoreAdapter_SinkOpenFailureIsASignalAndTheAdapterIsWired(t *testing.T) 
 	unwired.Start(context.Background(), "tdd", core.PhaseRequest{Workspace: wsFile, Cycle: 3})() // must not panic
 }
 
-// TestCoreAdapter_WatcherLeakIsASignal — a wedged watcher (a WaitGroup that
-// never reaches zero) past a 50 ms bound: cancel returns promptly,
-// OBSERVER_WATCHER_LEAKED {step cancel, timeout_s} is recorded, the sink is
-// NOT closed (the closeSinkAfterWait contract), a second cancel is a no-op,
-// and os.Stderr gets nothing. Kills M64 (the leak unreported), M65 (a close
-// on the timeout arm), M66 (once.Do dropped).
 func TestCoreAdapter_WatcherLeakIsASignal(t *testing.T) {
 	rc := newRecordingCenter()
 	a := &CoreAdapter{Signals: func() *signalcenter.Center { return rc.c }}
@@ -147,9 +129,6 @@ func TestCoreAdapter_WatcherLeakIsASignal(t *testing.T) {
 	wg.Done()
 }
 
-// TestCoreAdapter_UsesTheLayoutProjection — Start writes the events file at
-// observerengine.PathsFor(ws, phase).Events and the workspace-scan exclusion
-// is the engine's suffix (D7's consumer pin). Kills M67 (a re-spelled suffix).
 func TestCoreAdapter_UsesTheLayoutProjection(t *testing.T) {
 	ws := t.TempDir()
 	a := NewCoreAdapter(fastObserverPolicy())
@@ -171,12 +150,6 @@ func TestCoreAdapter_UsesTheLayoutProjection(t *testing.T) {
 	}
 }
 
-// TestCoreAdapter_StdoutLayoutAgreesWithTheBridgePIDFileConvention — the
-// engine's StdoutSuffix and core.BridgePIDFile's private "-stdout.log" are
-// two named homes of one spelling (architecture review fold): Start hands
-// PathsFor(ws, phase).Stdout to core.BridgePIDFile for the CPU liveness probe,
-// so if either drifts the probe reads no pid file and silently reports dead.
-// This package imports both; the pin is here. Kills a re-spelled StdoutSuffix.
 func TestCoreAdapter_StdoutLayoutAgreesWithTheBridgePIDFileConvention(t *testing.T) {
 	t.Parallel()
 	p := observerengine.PathsFor("/ws", "build")
@@ -185,10 +158,6 @@ func TestCoreAdapter_StdoutLayoutAgreesWithTheBridgePIDFileConvention(t *testing
 	}
 }
 
-// TestCoreAdapter_HasNoStderrLinesAndNoEnvReads — a parser scan of this
-// package's non-test sources: zero os.Stderr, zero os.Getenv, zero EnvLookup
-// (the retired env readers, D6; flagregistry pins the EVOLVE_OBSERVER_* names
-// retired). Kills M63, M68 (a resurrected env toggle).
 func TestCoreAdapter_HasNoStderrLinesAndNoEnvReads(t *testing.T) {
 	t.Parallel()
 	entries, err := os.ReadDir(".")
@@ -216,11 +185,6 @@ func TestCoreAdapter_HasNoStderrLinesAndNoEnvReads(t *testing.T) {
 	}
 }
 
-// TestCoreAdapter_OriginHasOneHome — the adapter stamps its two faults with
-// ONE origin constant (originAdapterStart), spelled once in the package's
-// production sources (architecture review fold): the queued five-way Start
-// split (F1) renames one home, never one of two literals. The two signal
-// tests above pin the value; this pins the count.
 func TestCoreAdapter_OriginHasOneHome(t *testing.T) {
 	t.Parallel()
 	entries, err := os.ReadDir(".")
@@ -244,9 +208,6 @@ func TestCoreAdapter_OriginHasOneHome(t *testing.T) {
 	}
 }
 
-// TestDefaultNudgeS_MatchesPolicyCompiledDefault — the adapter's DefaultNudgeS
-// (the KNOWN-GAP scaffolding kept for the fold, question 5) and policy's
-// compiled NudgeS are one belief: 300 s.
 func TestDefaultNudgeS_MatchesPolicyCompiledDefault(t *testing.T) {
 	t.Parallel()
 	if want := time.Duration(*policy.Policy{}.ObserverConfig().NudgeS) * time.Second; DefaultNudgeS != want {

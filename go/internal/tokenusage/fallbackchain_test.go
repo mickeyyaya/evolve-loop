@@ -1,34 +1,5 @@
 package tokenusage
 
-// fallbackchain_test.go — RED contract for cycle-754 task
-// token-resolver-production-wiring (inbox id token-resolver-production-wiring,
-// weight 0.96; scout-report.md Task 1 `token-resolver-fallback-chain`).
-//
-// Confirmed live gap: 124 llm-calls.ndjson files under .evolve/runs/ all show
-// "source":"none" for tmux-driven launches. DefaultResolver chains ONLY the
-// transcript tier (defaultresolver.go:14) even though EventsResultCollector and
-// ScrollbackPeakCollector are fully implemented in chain.go — the S2 fallback
-// chain was built but never connected end-to-end.
-//
-// This contract extends Window with the context the lower tiers need:
-//
-//	EventsLogPath string // path to the launch's *-events.ndjson (tier 2 input)
-//	Scrollback    string // captured pane scrollback CONTENT (tier 3 input —
-//	                     // ScrollbackPeakCollector takes content, not a pane id)
-//
-// and requires DefaultResolver(configRoot) to chain, in fidelity order:
-//
-//	TranscriptCollector(configRoot, w) > EventsResultCollector(w.EventsLogPath)
-//	  > ScrollbackPeakCollector(w.Scrollback)
-//
-// Window.EventsLogPath / Window.Scrollback are undefined today, so package
-// tokenusage fails to compile — the intended RED signal (the same strategy
-// scanner_test.go's S1 and chain_test.go's S2 contracts used). Builder makes
-// these compile AND pass; DO NOT modify these tests.
-//
-// Reuses same-package helpers: writeFile (chain_test.go), mustParse /
-// launchWindowStart / launchWindowEnd (scanner_test.go).
-
 import (
 	"os"
 	"path/filepath"
@@ -37,8 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 )
 
-// eventsLogFixture writes a *-events.ndjson with one result envelope carrying
-// the given token counts and returns its path.
 func eventsLogFixture(t *testing.T, in, out, cacheR, cacheC int) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -61,9 +30,7 @@ func itoa(n int) string {
 	return digits
 }
 
-// transcriptFixture materializes a Claude Code transcript under root that
-// ScanConfigRoot resolves for worktree within [launchWindowStart,
-// launchWindowEnd], reporting Input=200 Output=40.
+// transcriptFixture writes a cwd-attributed, in-window transcript reporting Input=200 Output=40.
 func transcriptFixture(t *testing.T, root, worktree string) {
 	t.Helper()
 	sessionDir := filepath.Join(root, "projects", "-repo-worktrees-cycle-754")
@@ -78,13 +45,8 @@ func transcriptFixture(t *testing.T, root, worktree string) {
 	}
 }
 
-// TestDefaultResolver_EventsLogTier_WinsWhenNoTranscript — AC2 (and AC1 tier-2
-// reachability). The production shape of the bug: a tmux-driven launch has NO
-// Claude Code transcript, but its workspace holds a *-events.ndjson with a
-// result envelope. DefaultResolver must recover the envelope's exact counts via
-// the eventsResult tier instead of falling through to SourceNone.
 func TestDefaultResolver_EventsLogTier_WinsWhenNoTranscript(t *testing.T) {
-	root := t.TempDir() // no projects/ dir → transcript tier is empty
+	root := t.TempDir()
 	log := eventsLogFixture(t, 1200, 340, 80, 16)
 
 	resolver := DefaultResolver(root)
@@ -107,11 +69,6 @@ func TestDefaultResolver_EventsLogTier_WinsWhenNoTranscript(t *testing.T) {
 	}
 }
 
-// TestDefaultResolver_ScrollbackTier_OutputOnlyFloor — AC1 tier-3 reachability.
-// With no transcript and no events log, a scrollback capture carrying the
-// "↓ N tokens" marker must resolve via the scrollbackPeak tier as an
-// OUTPUT-ONLY floor: Output equals the extracted peak; the input/cache fields
-// the pane cannot show stay zero (no fabrication).
 func TestDefaultResolver_ScrollbackTier_OutputOnlyFloor(t *testing.T) {
 	root := t.TempDir()
 
@@ -137,11 +94,6 @@ func TestDefaultResolver_ScrollbackTier_OutputOnlyFloor(t *testing.T) {
 	}
 }
 
-// TestDefaultResolver_TranscriptTier_StillWinsOverLowerTiers — AC1 fidelity
-// ordering pin. When ALL THREE tiers have data, the transcript (highest
-// fidelity) must win — wiring the new tiers must not reorder or shadow the
-// existing tier-1 behavior. A regression that consults eventsResult first
-// passes the tier-reachability tests and must fail here.
 func TestDefaultResolver_TranscriptTier_StillWinsOverLowerTiers(t *testing.T) {
 	worktree := "/repo/worktrees/cycle-754"
 	root := t.TempDir()
@@ -168,11 +120,6 @@ func TestDefaultResolver_TranscriptTier_StillWinsOverLowerTiers(t *testing.T) {
 	}
 }
 
-// TestDefaultResolver_AllTiersEmpty_SourceNoneNilError — AC3 (negative /
-// anti-fabrication). No transcript, an EventsLogPath that does not exist, and
-// an empty scrollback: the resolver must fail OPEN — SourceNone, zero usage,
-// nil error. It must never invent tokens and never surface an error for the
-// ordinary nothing-to-recover case.
 func TestDefaultResolver_AllTiersEmpty_SourceNoneNilError(t *testing.T) {
 	root := t.TempDir()
 
@@ -195,9 +142,6 @@ func TestDefaultResolver_AllTiersEmpty_SourceNoneNilError(t *testing.T) {
 	}
 }
 
-// TestDefaultResolver_MalformedEventsLog_FallsThroughCleanly — AC4. A corrupt
-// events log must neither error nor poison the result: the chain falls through
-// to the scrollback tier when it has data, and to SourceNone when it does not.
 func TestDefaultResolver_MalformedEventsLog_FallsThroughCleanly(t *testing.T) {
 	dir := t.TempDir()
 	garbage := filepath.Join(dir, "scout-events.ndjson")

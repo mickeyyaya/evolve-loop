@@ -1,14 +1,5 @@
 package inboxbatch
 
-// consoleroute_test.go — RED contract for ADR-0074 I1 (typed routing authority).
-// Cycles 1034/1035/1036 (2026-07-22, one wave) each burned a full pipeline on a
-// task whose fix surface is the pipeline's own control plane
-// (ProtectedSurfaceManifest paths a cycle may not write). The routing signal
-// existed only as prose annotations no component consumed. This file pins the
-// SINGLE deterministic classifier both consumers (triage prompt composition and
-// inboxmover.Claim) must share: route-field plumbing plus a protected-fix-surface
-// derivation, with an explicit operator override.
-
 import (
 	"os"
 	"path/filepath"
@@ -24,9 +15,6 @@ func protectedStub(protected ...string) func(string) bool {
 	return func(path string) bool { return set[path] }
 }
 
-// A route field with the console prefix routes the item to the operator,
-// regardless of files — this is the explicit form (console-manual,
-// console-salvage, future console-* refinements).
 func TestConsoleRouted_RoutePrefixConsole(t *testing.T) {
 	for _, route := range []string{"console-manual", "console-salvage", "CONSOLE-MANUAL", " console-manual "} {
 		routed, reason := ConsoleRouted(Item{ID: "x", Route: route}, nil)
@@ -39,9 +27,6 @@ func TestConsoleRouted_RoutePrefixConsole(t *testing.T) {
 	}
 }
 
-// Derived form: any declared fix-surface file on the protected manifest routes
-// the item out of lane reach even without a route field — the statically
-// blocked class (1035 guard-phase-hook, 1036 role.go, cycle-858 policy.json).
 func TestConsoleRouted_ProtectedFilesAutoRoute(t *testing.T) {
 	it := Item{ID: "x", Files: []string{"go/internal/other/ok.go", "go/internal/guards/role.go"}}
 	routed, reason := ConsoleRouted(it, protectedStub("go/internal/guards/role.go"))
@@ -53,9 +38,6 @@ func TestConsoleRouted_ProtectedFilesAutoRoute(t *testing.T) {
 	}
 }
 
-// Real inbox items annotate files entries with prose suffixes
-// ("go/internal/guards/role.go (implement allowance)") — the classifier must
-// consult the path token, not the whole annotated string.
 func TestConsoleRouted_AnnotatedFileEntryFirstToken(t *testing.T) {
 	it := Item{ID: "x", Files: []string{"go/internal/guards/role.go (implement the documented allowance)"}}
 	routed, _ := ConsoleRouted(it, protectedStub("go/internal/guards/role.go"))
@@ -64,11 +46,7 @@ func TestConsoleRouted_AnnotatedFileEntryFirstToken(t *testing.T) {
 	}
 }
 
-// route:"lane" is the operator override for a heuristic's false positives — a
-// declared directory that only holds protected files is lane work when the
-// change avoids them. It cannot relax a declared protected FILE (F35): the
-// breaker and the tripwire refuse that whatever the route; an item that only
-// READS the surface declares the files it changes, not the ones it reads.
+// The override wins only over a directory-scope derivation; a declared protected file still routes.
 func TestConsoleRouted_ExplicitLaneOverrideWins(t *testing.T) {
 	it := Item{ID: "x", Route: "lane", Files: []string{"go/internal/guards/"}}
 	if routed, _ := ConsoleRouted(it, protectedStub("go/internal/guards/")); routed {
@@ -80,8 +58,6 @@ func TestConsoleRouted_ExplicitLaneOverrideWins(t *testing.T) {
 	}
 }
 
-// A nil predicate disables only the derivation — the explicit route field still
-// binds (inboxmover callers that cannot import guards still honor routing).
 func TestConsoleRouted_NilPredicateRouteFieldStillBinds(t *testing.T) {
 	if routed, _ := ConsoleRouted(Item{ID: "x", Route: "console-manual"}, nil); !routed {
 		t.Fatal("nil predicate must not disable explicit route routing")
@@ -91,8 +67,6 @@ func TestConsoleRouted_NilPredicateRouteFieldStillBinds(t *testing.T) {
 	}
 }
 
-// PartitionConsole splits preserving input order and reports one reason line
-// per routed item (loud exclusion — silent narrowing reads as full coverage).
 func TestPartitionConsole_SplitsWithReasons(t *testing.T) {
 	items := []Item{
 		{ID: "a"},
@@ -112,8 +86,6 @@ func TestPartitionConsole_SplitsWithReasons(t *testing.T) {
 	}
 }
 
-// LoadDir must parse + sanitize the route field like every other rendered
-// field (it reaches prompts and logs).
 func TestLoadDir_RouteFieldParsedAndSanitized(t *testing.T) {
 	dir := t.TempDir()
 	body := `{"id":"r1","route":"console-manual\u0007extra"}`
@@ -132,13 +104,6 @@ func TestLoadDir_RouteFieldParsedAndSanitized(t *testing.T) {
 	}
 }
 
-// Kind form (wave 6, cycle 1688, 2026-09-15): a `pipeline-*` item is
-// pipeline-integrity work, which the operator owns (pipeline_fixes_console_first;
-// the wave goal names it console-owned). The queue held 15 such items lane-eligible,
-// 8 with no files[] list at all, so the files-derived rule had nothing to match:
-// a lane claimed one, scout and triage ran, and the triage breaker refused the
-// card for naming a protected surface — a full FAIL seal for work no lane may do.
-// The kind is a first-class field the classifier must read, not prose.
 func TestConsoleRouted_PipelineKindRoutesConsole(t *testing.T) {
 	for _, kind := range []string{"pipeline-repair", "pipeline-integrity", "Pipeline-Repair", " pipeline-repair "} {
 		routed, reason := ConsoleRouted(Item{ID: "x", Kind: kind}, nil)
@@ -154,8 +119,6 @@ func TestConsoleRouted_PipelineKindRoutesConsole(t *testing.T) {
 			t.Errorf("kind %q is lane work, got routed (%s)", kind, reason)
 		}
 	}
-	// Provenance precedence: the explicit route names itself first, then the
-	// kind, then a protected file — callers print the reason verbatim.
 	it := Item{ID: "x", Kind: "pipeline-repair", Files: []string{"go/internal/guards/role.go"}}
 	if _, reason := ConsoleRouted(it, protectedStub("go/internal/guards/role.go")); !strings.HasPrefix(reason, "kind:pipeline-repair") {
 		t.Errorf("the kind reason outranks the files derivation, got %q", reason)
@@ -165,11 +128,6 @@ func TestConsoleRouted_PipelineKindRoutesConsole(t *testing.T) {
 	}
 }
 
-// The operator's explicit route:"lane" override applies to the kind rule
-// exactly as it applies to the files rule: honored for an operator-authored
-// item, ignored for an agent-autofiled one (the ADR-0072 halt escalation
-// autofiles pipeline-repair items — those stay console-owned however they
-// are annotated).
 func TestConsoleRouted_PipelineKindHonorsOperatorLaneOverrideOnly(t *testing.T) {
 	if routed, _ := ConsoleRouted(Item{ID: "x", Kind: "pipeline-repair", Route: "lane"}, nil); routed {
 		t.Error("operator-authored route:lane override must dispatch a pipeline-repair item")

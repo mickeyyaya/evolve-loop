@@ -57,12 +57,8 @@ func TestLoad_ParsesMandatoryAndPins(t *testing.T) {
 	}
 }
 
-// TestLoad_ReadErrorNotMissing covers the non-ErrNotExist read failure: a path
-// that exists but cannot be read as a file. A directory yields EISDIR from
-// os.ReadFile (not os.ErrNotExist) so the loud-error branch fires rather than
-// the absent-is-empty one.
 func TestLoad_ReadErrorNotMissing(t *testing.T) {
-	dir := t.TempDir() // a directory: exists, but os.ReadFile fails on it
+	dir := t.TempDir() // exists, but os.ReadFile fails on a directory
 	p, err := Load(dir)
 	if err == nil {
 		t.Fatalf("reading a directory as policy must error, got policy %+v", p)
@@ -75,34 +71,24 @@ func TestLoad_ReadErrorNotMissing(t *testing.T) {
 	}
 }
 
-// TestTierRank covers every classification branch: canonical tiers, legacy
-// aliases, exact-model substring matches, and the unclassifiable rank-0 case.
 func TestTierRank(t *testing.T) {
 	cases := []struct {
 		in   string
 		want int
 	}{
-		// canonical tier names
 		{"fast", 1},
 		{"balanced", 2},
 		{"deep", 3},
-		// cycle-516: "top" is the 4th canonical tier (modelcatalog.CanonicalTiers),
-		// must rank strictly above deep/opus (3) so an envelope ceiling of "deep"
-		// still excludes it.
 		{"top", 4},
-		// legacy aliases
 		{"haiku", 1},
 		{"sonnet", 2},
 		{"opus", 3},
-		// case / whitespace insensitivity on the canonical switch
 		{"  FAST  ", 1},
 		{"Balanced", 2},
 		{"DEEP", 3},
-		// exact-model identifiers fall through to substring matching
 		{"claude-haiku-4-5", 1},
 		{"claude-sonnet-4-6", 2},
 		{"claude-opus-4-8", 3},
-		// unclassifiable → rank 0 (envelope check is skipped for these)
 		{"gpt-5.5", 0},
 		{"", 0},
 	}
@@ -138,8 +124,6 @@ func TestMergeMandatory(t *testing.T) {
 	}
 }
 
-// TestMergeMandatory_DoesNotMutateBase guards the slice-copy invariant: the
-// caller's base (e.g. a shared cfg.Mandatory) must never be mutated.
 func TestMergeMandatory_DoesNotMutateBase(t *testing.T) {
 	base := []string{"scout", "audit"}
 	pol := Policy{MandatoryPhases: []string{"security-scan", "scout"}}
@@ -186,7 +170,6 @@ func TestValidatePin_AllowedAllPasses(t *testing.T) {
 }
 
 func TestValidatePin_ModelTierWithinEnvelope(t *testing.T) {
-	// envelope deep..deep — exact model claude-opus-4-8 classifies to deep (3).
 	prof := &profiles.Profile{ModelTierEnvelope: &profiles.ModelTierEnvelope{Min: "deep", Max: "deep"}}
 	if err := ValidatePin("audit", Pin{Model: "claude-opus-4-8"}, prof); err != nil {
 		t.Errorf("opus pin must sit within deep..deep: %v", err)
@@ -194,7 +177,6 @@ func TestValidatePin_ModelTierWithinEnvelope(t *testing.T) {
 }
 
 func TestValidatePin_ModelTierOutsideEnvelope(t *testing.T) {
-	// envelope deep..deep — a haiku/fast model is rank 1, outside → reject.
 	prof := &profiles.Profile{ModelTierEnvelope: &profiles.ModelTierEnvelope{Min: "deep", Max: "deep"}}
 	if err := ValidatePin("audit", Pin{Model: "claude-haiku-4-5"}, prof); err == nil {
 		t.Error("haiku pin must be rejected when envelope=deep..deep")
@@ -202,21 +184,12 @@ func TestValidatePin_ModelTierOutsideEnvelope(t *testing.T) {
 }
 
 func TestValidatePin_UnclassifiableModelSkipsEnvelope(t *testing.T) {
-	// A model tierRank can't classify (rank 0) skips the envelope check rather
-	// than spuriously rejecting.
 	prof := &profiles.Profile{ModelTierEnvelope: &profiles.ModelTierEnvelope{Min: "deep", Max: "deep"}}
 	if err := ValidatePin("audit", Pin{Model: "gpt-5.5"}, prof); err != nil {
 		t.Errorf("unclassifiable model must skip envelope check, got %v", err)
 	}
 }
 
-// TestValidatePin_TopTierOutsideDeepEnvelope pins the cycle-516 wiring
-// contract: once "top" ranks above "deep" (4 > 3), a profile whose ceiling is
-// still the pre-4-tier "deep" must keep rejecting a "top" pin. Before TierRank
-// learns "top", it classifies as rank 0 (unclassifiable) and
-// TestValidatePin_UnclassifiableModelSkipsEnvelope's own rule silently exempts
-// it from the envelope check — the vocabulary addition must not leave a
-// deep-ceilinged profile suddenly wide open to the frontier tier.
 func TestValidatePin_TopTierOutsideDeepEnvelope(t *testing.T) {
 	prof := &profiles.Profile{ModelTierEnvelope: &profiles.ModelTierEnvelope{Min: "deep", Max: "deep"}}
 	if err := ValidatePin("audit", Pin{Model: "top"}, prof); err == nil {
@@ -224,10 +197,6 @@ func TestValidatePin_TopTierOutsideDeepEnvelope(t *testing.T) {
 	}
 }
 
-// TestPolicy_QuotaResetConfig pins the accessor that replaced the
-// EVOLVE_QUOTA_RESET_AT / EVOLVE_QUOTA_RESET_HOURS env reads (flag-reduction
-// drift repair): absent ⇒ zero value (quotareset built-in defaults apply),
-// present ⇒ the operator-supplied config is returned verbatim.
 func TestPolicy_QuotaResetConfig(t *testing.T) {
 	if got := (Policy{}).QuotaResetConfig(); got != (QuotaResetConfig{}) {
 		t.Errorf("absent QuotaReset must yield zero config, got %+v", got)
@@ -238,20 +207,13 @@ func TestPolicy_QuotaResetConfig(t *testing.T) {
 	}
 }
 
-// TestPolicy_ConfigAccessors pins the bridge/fanout/observer sub-config
-// accessors: absent ⇒ built-in defaults (the zero Policy is always safe to
-// read). Typed-var declarations name the *Policy return types so apicover
-// counts the type coverage, not just the method.
 func TestPolicy_ConfigAccessors(t *testing.T) {
-	// BridgeConfig: absent ⇒ zero value (each subsystem uses its .evolve dir).
-	// DeepEqual rather than !=: BridgePolicy carries the PhaseArtifactTimeoutS
-	// map, so the struct is no longer comparable. Same assertion, same strength.
+	// The typed var declarations name each *Policy type for apicover.
 	var bridge BridgePolicy = (Policy{}).BridgeConfig()
 	if !reflect.DeepEqual(bridge, BridgePolicy{}) {
 		t.Errorf("absent Bridge must yield zero BridgePolicy, got %+v", bridge)
 	}
 
-	// FanoutConfig: absent ⇒ built-in defaults (concurrency 2, tracking on).
 	var fanout FanoutPolicy = (Policy{}).FanoutConfig()
 	if fanout.Concurrency != 2 {
 		t.Errorf("default FanoutPolicy.Concurrency = %d, want 2", fanout.Concurrency)
@@ -260,7 +222,6 @@ func TestPolicy_ConfigAccessors(t *testing.T) {
 		t.Error("default FanoutPolicy.TrackWorkers must be true")
 	}
 
-	// ObserverConfig: absent ⇒ built-in defaults (autospawn on, stall 600s).
 	var observer ObserverPolicy = (Policy{}).ObserverConfig()
 	if observer.Autospawn == nil || !*observer.Autospawn {
 		t.Error("default ObserverPolicy.Autospawn must be true")
@@ -289,16 +250,12 @@ func TestWorkflowConfig(t *testing.T) {
 		t.Fatalf("WorkflowConfig() defaults = %+v, want max fails=1 max cycles=25 auto prune=true", defaults)
 	}
 
-	// Cycle count is optional: the default cycle budget is "enforce" so that a
-	// loop with no explicit --cycles is advisor-decided (completion-driven up to
-	// MaxCyclesCap). This holds whether the workflow block is empty or absent.
 	if defaults.CycleBudget != "enforce" {
 		t.Errorf("default CycleBudget = %q, want enforce (advisor decides when --cycles omitted)", defaults.CycleBudget)
 	}
 	if nilWF := (Policy{}).WorkflowConfig(); nilWF.CycleBudget != "enforce" {
 		t.Errorf("nil-workflow CycleBudget = %q, want enforce", nilWF.CycleBudget)
 	}
-	// An explicit policy.json value still overrides the default.
 	if off := (Policy{Workflow: &WorkflowPolicy{CycleBudget: "off"}}).WorkflowConfig(); off.CycleBudget != "off" {
 		t.Errorf("explicit CycleBudget=off was not honored, got %q", off.CycleBudget)
 	}
@@ -344,20 +301,11 @@ func TestRetryConfig(t *testing.T) {
 	}
 }
 
-// TestCatalogConfig_AllowedFamilies pins D7 (FAMILY CONSTRAINT) of the
-// latest-model-preference feature at the policy layer: `.evolve/policy.json`
-// `catalog.allowed_families` (per-CLI family allow-list, e.g. agy:[gemini])
-// round-trips through CatalogConfig(), and an absent/unconfigured block
-// resolves to a nil map — "no constraint", byte-identical to today's shipped
-// behavior (every existing cycle without this key must be unaffected). RED
-// today: CatalogPolicy has no AllowedFamilies field (compile failure).
 func TestCatalogConfig_AllowedFamilies(t *testing.T) {
-	// Absent Catalog block entirely.
 	if got := (Policy{}).CatalogConfig(); got.AllowedFamilies != nil {
 		t.Errorf("absent catalog policy must yield nil AllowedFamilies (no constraint), got %+v", got.AllowedFamilies)
 	}
 
-	// Catalog block present but AllowedFamilies unset.
 	if got := (Policy{Catalog: &CatalogPolicy{}}).CatalogConfig(); got.AllowedFamilies != nil {
 		t.Errorf("catalog policy with no allowed_families must yield nil (no constraint), got %+v", got.AllowedFamilies)
 	}
@@ -369,13 +317,6 @@ func TestCatalogConfig_AllowedFamilies(t *testing.T) {
 	}
 }
 
-// TestLoad_ParsesCatalogAllowedFamilies pins the JSON schema round-trip: the
-// `catalog.allowed_families` key in `.evolve/policy.json` must parse into
-// Policy.Catalog.AllowedFamilies via the ordinary Load() path (no bespoke
-// parser) — the live-evidence scenario is "agy must not have Claude models",
-// i.e. a per-CLI family allow-list, not a single global list. RED today: the
-// field does not exist, so this key is silently dropped by json.Unmarshal
-// (compile failure once the assertion below references the field).
 func TestLoad_ParsesCatalogAllowedFamilies(t *testing.T) {
 	dir := t.TempDir()
 	path := writePolicy(t, dir, `{
@@ -394,10 +335,6 @@ func TestLoad_ParsesCatalogAllowedFamilies(t *testing.T) {
 	}
 }
 
-// TestWorkflowConfig_UniversalFallbackExcludeDefaultsToAgy — the last-resort
-// tail every launch walks (2026-09-14 policy: try every available CLI before
-// giving up) never contains the agy family unless the operator lifts the
-// 2026-06-07 ban explicitly with workflow.universal_fallback_exclude=[].
 func TestWorkflowConfig_UniversalFallbackExcludeDefaultsToAgy(t *testing.T) {
 	if got := (Policy{}).WorkflowConfig().UniversalFallbackExclude; len(got) != 1 || got[0] != "agy" {
 		t.Fatalf("default = %v, want [agy]", got)

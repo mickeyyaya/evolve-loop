@@ -5,17 +5,6 @@ import (
 	"testing"
 )
 
-// consoleroute_parity_test.go — F35 (2026-09-26): the seed refuses at least
-// everything triage's breaker would. The breaker and the ship tripwire judge
-// MEMBERSHIP of each file with no route exception, so two spellings let a
-// declared protected FILE through the seed classifier only for a lane to die
-// at triage after paying for scout: an operator route:"lane" on a declared
-// protected file (two live items on 2026-09-26, reduced below to their routing
-// fields), and a path:line locator ("x.go:178") the path-shape check refused
-// to read as a path at all. These tests use the real routing predicate.
-
-// TestConsoleRouted_LaneOverrideCannotRelaxAProtectedFile: a declared protected
-// FILE binds whatever the route — the override is refused, loudly.
 func TestConsoleRouted_LaneOverrideCannotRelaxAProtectedFile(t *testing.T) {
 	for _, rec := range []string{
 		`{"id":"cyclerun-seat-helper","kind":"techdebt","route":"lane","files":["go/internal/core/resume.go","go/internal/core/cyclerun.go"]}`,
@@ -31,11 +20,6 @@ func TestConsoleRouted_LaneOverrideCannotRelaxAProtectedFile(t *testing.T) {
 	}
 }
 
-// TestConsoleRouted_LaneOverrideStillRelaxesTheHeuristics: scope, mentions and
-// kind are derivations a human can correct — a declared DIRECTORY holding
-// protected files (triage's card then names the unprotected files the change
-// touches, which the breaker passes), a file the text only names, and the
-// pipeline-* kind stay overridable by an operator.
 func TestConsoleRouted_LaneOverrideStillRelaxesTheHeuristics(t *testing.T) {
 	for _, rec := range []string{
 		`{"id":"d","kind":"feature","route":"lane","files":["go/internal/core/"]}`,
@@ -48,8 +32,6 @@ func TestConsoleRouted_LaneOverrideStillRelaxesTheHeuristics(t *testing.T) {
 	}
 }
 
-// TestConsoleRouted_LineLocatorsDeclareTheirPath: a trailing source locator is
-// part of how authors cite a file, not part of its path.
 func TestConsoleRouted_LineLocatorsDeclareTheirPath(t *testing.T) {
 	for _, file := range []string{
 		"go/internal/core/cyclerun.go:178",

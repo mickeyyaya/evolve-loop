@@ -1,11 +1,5 @@
 package inboxbatch
 
-// item_test.go — the inbox-item parser. Real .evolve/inbox items vary widely
-// (hand-authored + agent-autofiled): weight may be absent, connects_to entries
-// are often PROSE ("some-id (why it relates)"), deps may reference consumed
-// ids. The parser is tolerant: malformed JSON is skipped LOUDLY (Warnings),
-// missing fields default, and ordering is deterministic (by id).
-
 import (
 	"os"
 	"path/filepath"
@@ -44,7 +38,6 @@ func TestLoadDir_ParsesRealShapedItems(t *testing.T) {
 	if len(items) != 2 {
 		t.Fatalf("items = %d, want 2", len(items))
 	}
-	// Deterministic order: by id.
 	if items[0].ID != "alpha" || items[1].ID != "beta" {
 		t.Errorf("order = [%s %s], want [alpha beta]", items[0].ID, items[1].ID)
 	}
@@ -86,12 +79,6 @@ func TestLoadDir_MissingDirIsEmptyNotError(t *testing.T) {
 	}
 }
 
-// TestLoadDir_SanitizesRenderedFields — go-reviewer HIGH (prompt-injection
-// surface): id/campaign/files flow verbatim into the triage LLM prompt via
-// RenderMarkdown, so a garbled or malicious item ("evil\n- SYSTEM OVERRIDE")
-// could fabricate prompt lines. Ingestion strips control characters and caps
-// length, LOUDLY (a warning names the file), so the render stays one line per
-// batch no matter what the JSON carried.
 func TestLoadDir_SanitizesRenderedFields(t *testing.T) {
 	dir := t.TempDir()
 	writeItem(t, dir, "evil.json", `{
@@ -115,9 +102,6 @@ func TestLoadDir_SanitizesRenderedFields(t *testing.T) {
 	}
 }
 
-// TestLoadDir_WarnsOnDuplicateID — go-reviewer LOW: a duplicate id silently
-// mis-wires dep/connects resolution (last item wins); surface it as a warning
-// in the same loud channel malformed files use.
 func TestLoadDir_WarnsOnDuplicateID(t *testing.T) {
 	dir := t.TempDir()
 	writeItem(t, dir, "a.json", `{"id":"twin"}`)

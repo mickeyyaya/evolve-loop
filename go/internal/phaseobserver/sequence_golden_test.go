@@ -1,21 +1,5 @@
 package phaseobserver
 
-// sequence_golden_test.go — ADR-0103 unit 12 step 0, G3: the ordered event
-// sequence of one idle scenario driven through Run with a count-stepping
-// clock, captured on 8e8f080f. The clock is indexed by CALL: construction (1),
-// observer_started (2), one tick that ingests four lines (3-6: one read per
-// line; 7: the idle rule; 8: the no-progress rule; 9: the heartbeat), a tick
-// at +400 s (10: idle → the nudge; 11: inbox.Append's own read — the SEVENTH
-// clock site, host-side; 12: soft_stall_nudge; 13: no-progress; 14: heartbeat),
-// a tick at +700 s (15: idle → stuck_no_output under an extend policy; 16: the
-// INCIDENT emit; 17: no-progress; 18: heartbeat — the clock closes ShutdownSig
-// here), the shutdown (19) and the report (20). One extra or missing clock
-// read shifts the shutdown point and every `ts` after it — the clock-parity
-// tripwire the leaf's replay (its test 31) must match call for call.
-//
-// Q12 note: under a frozen clock two emits in one tick share an `id` —
-// eventCount is a line count, not an emit sequence; the golden documents it.
-
 import (
 	"encoding/json"
 	"os"
@@ -28,7 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
 )
 
-// goldenAt is the fixed instant every step-0 pin starts from.
 var goldenAt = time.Date(2026, 6, 1, 9, 0, 0, 0, time.UTC)
 
 func readGolden(t *testing.T, name string) string {
@@ -54,9 +37,8 @@ type sequenceGolden struct {
 	Report map[string]any  `json:"report"`
 }
 
-// scenarioClock is the G3 clock: t0 for calls 1-9, +400 s for 10-14, +700 s
-// from 15; onClose is invoked once at call closeAt (the host test closes the
-// shutdown channel there; the leaf's replay passes nil).
+// scenarioClock returns t0 for calls 1-9, t0+400 s for 10-14 and t0+700 s after, calling onClose at call closeAt.
+// The scenario makes exactly 20 reads; one more or fewer shifts the shutdown and every ts after it.
 func scenarioClock(t0 time.Time, closeAt int, onClose func()) func() time.Time {
 	var mu sync.Mutex
 	calls := 0
@@ -109,7 +91,7 @@ func sequenceOf(t *testing.T, ws string) sequenceGolden {
 	if err := json.Unmarshal(raw, &report); err != nil {
 		t.Fatal(err)
 	}
-	delete(report, "incidents") // pinned by G2; here only the counters
+	delete(report, "incidents") // observerengine's report golden pins these; this one keeps the counters
 	delete(report, "trace_id")
 	g.Report = report
 	return g
@@ -124,9 +106,6 @@ func marshalSequence(t *testing.T, g sequenceGolden) string {
 	return string(b) + "\n"
 }
 
-// TestGolden_IdleScenarioSequence — G3 through Run. Kills any dropped or
-// reordered emit in the move and any clock-read drift that crosses a threshold
-// or shifts a `ts`.
 func TestGolden_IdleScenarioSequence(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()

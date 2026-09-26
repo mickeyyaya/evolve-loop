@@ -11,10 +11,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 )
 
-// CheckArtifactNames verifies that each persona's declared output-artifact
-// (its first .md token) matches the output_artifact named in the paired
-// profile. It returns a "mismatch" Violation per disagreement and a non-nil
-// error only on configuration or I/O failure.
+// CheckArtifactNames reports each persona whose first output-format .md token disagrees with
+// its profile's output_artifact; it errors only on configuration or I/O failure.
 func CheckArtifactNames(opts Options) ([]Violation, error) {
 	if opts.AgentsFS == nil {
 		return nil, errors.New("missing AgentsFS")
@@ -41,7 +39,6 @@ func CheckArtifactNames(opts Options) ([]Violation, error) {
 		}
 		name := strings.TrimPrefix(strings.TrimSuffix(n, ".md"), "evolve-")
 
-		// Check if profile exists
 		profile, err := loader.Get(name)
 		if err != nil {
 			if errors.Is(err, fs.ErrNotExist) {
@@ -50,7 +47,6 @@ func CheckArtifactNames(opts Options) ([]Violation, error) {
 			return nil, err
 		}
 
-		// Read persona file
 		persona, err := personaContents(opts, name)
 		if err != nil {
 			if errors.Is(err, fs.ErrNotExist) && opts.Overrides[name] == "" {
@@ -59,7 +55,6 @@ func CheckArtifactNames(opts Options) ([]Violation, error) {
 			return nil, err
 		}
 
-		// Parse persona frontmatter
 		fm, _, err := prompts.ParseFrontmatter(persona)
 		if err != nil {
 			return nil, err
@@ -70,7 +65,6 @@ func CheckArtifactNames(opts Options) ([]Violation, error) {
 
 		outputFormatVal, ok := fm["output-format"]
 		if !ok {
-			// No output-format: line -> skip
 			continue
 		}
 
@@ -79,9 +73,8 @@ func CheckArtifactNames(opts Options) ([]Violation, error) {
 			continue
 		}
 
-		// Compare by basename on BOTH sides: persona tokens may be
-		// dir-qualified (reflector's "learn/reflector-synthesis.md") while
-		// the profile side is already path.Base'd.
+		// Both sides compare by basename: a persona token may be dir-qualified
+		// ("learn/reflector-synthesis.md").
 		declared := path.Base(firstMdToken(outputFormatStr))
 		if declared == "." {
 			continue
@@ -99,9 +92,8 @@ func CheckArtifactNames(opts Options) ([]Violation, error) {
 
 		profileArtifact := path.Base(profile.OutputArtifact)
 
-		// A non-.md contract deliverable (memo → carryover-todos.json) can
-		// never match the persona's first .md token — that token is a
-		// legitimate SECONDARY artifact, not the contract one. Skip.
+		// Beside a non-.md deliverable (memo's carryover-todos.json), the persona's
+		// first .md token names a secondary artifact, so there is nothing to compare.
 		if path.Ext(profile.OutputArtifact) != ".md" {
 			continue
 		}

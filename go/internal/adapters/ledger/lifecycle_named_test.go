@@ -10,13 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// TestFileLedger_AppendLifecycle_ChainsAndMapsRecord names
-// ledger.AppendLifecycle and ledger.LifecycleRecord (apicover) and pins the
-// full mapping contract: the record lands as a CHAINED entry (prev_hash from
-// the predecessor, tip moved) with Kind "inbox-lifecycle", operator-side Role
-// "orchestrator", and every LifecycleRecord field routed to its LedgerEntry
-// home — the whole point of the seam is that inboxmover's lifecycle telemetry
-// became a chain participant (item ledger-fleet-concurrency-chain).
 func TestFileLedger_AppendLifecycle_ChainsAndMapsRecord(t *testing.T) {
 	dir := t.TempDir()
 	l := New(dir)

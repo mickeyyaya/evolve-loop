@@ -2,82 +2,46 @@ package recovery
 
 import "strings"
 
-// TerminalCause is the typed classification of a fatal terminal state
-// (ADR-0044 C2). "exit 81" is not a cause; "claude booted into an
-// inaccessible-model error" is — recovery decisions are made on typed causes,
-// never on raw exit codes or untyped pane text (design principle #2,
-// classify-before-you-handle).
+// TerminalCause is the typed classification of a fatal terminal state.
 type TerminalCause string
 
 const (
-	// CauseModelInvalid: the CLI booted into its invalid/inaccessible-model
-	// error (cycle-262 retro: `claude --model auto`). The REPL is unusable;
-	// no amount of waiting produces an artifact.
+	// CauseModelInvalid means the CLI booted into its invalid-model error.
 	CauseModelInvalid TerminalCause = "model_invalid"
-	// CauseCLISelfUpdated: the CLI updated its own binary mid-launch and asked
-	// for a restart (cycle-262 build: codex self-upgrade). The REPL exited;
-	// the pane is (or is about to become) a bare shell.
+	// CauseCLISelfUpdated means the CLI updated its own binary and exited.
 	CauseCLISelfUpdated TerminalCause = "cli_self_updated"
-	// CauseDeadShell: the pane is a plain shell, not an agent REPL — the
-	// telltale is the shell rejecting agent-directed input (the bridge's
-	// nudge echoing back as "command not found").
+	// CauseDeadShell means the pane is a plain shell, not an agent REPL.
 	CauseDeadShell TerminalCause = "dead_shell"
-	// CauseUnknown: no seeded signature matched. The deterministic layer
-	// classifies nothing here — escalation (the LLM failure-advisor tail,
-	// Slice 5) owns novel states.
+	// CauseUnknown means no signature matched; the LLM failure-advisor owns it.
 	CauseUnknown TerminalCause = "unknown"
 )
 
-// SessionRecoverable reports whether the cause means the REPL process is gone
-// while the CLI and the account are fine, so ONE fresh session of the same
-// family can succeed where waiting cannot (F31: cycle 1687's triage pane went
-// dead with codex quota-walled and ollama unable to write source — the chain
-// had nowhere to go). A model/config cause is not: a fresh session of the same
-// configuration fails the same way, and the chain must move on.
+// SessionRecoverable reports whether one fresh session of the same CLI can
+// succeed: the REPL is gone while the CLI and account are fine. A model or
+// config cause fails the same way again, so the chain must move on.
 func (c TerminalCause) SessionRecoverable() bool {
 	return c == CauseDeadShell || c == CauseCLISelfUpdated
 }
 
-// FatalSignature is one entry in the deterministic fatal-pane registry: a
-// pane substring that self-describes an unrecoverable terminal state, and the
-// typed cause it maps to. Substring matching (not regex) keeps the hot-loop
-// check trivially cheap and the registry trivially promotable — the Slice-5
-// LLM advisor promotes novel signatures as plain substrings.
+// FatalSignature maps a pane substring to the terminal cause it identifies.
 type FatalSignature struct {
 	Substr string
 	Cause  TerminalCause
-	// Note documents provenance (which incident taught us this signature) —
-	// carried into the justification trail when the signature matches.
+	// Note records provenance and is carried into the justification trail.
 	Note string
 }
 
-// FatalPaneDetector is the ordered deterministic registry consulted by the
-// bridge's stop-review checkpoint. Classification is side-effect-free and
-// always-on; ACTING on a classification (fast-fail instead of burning the
-// maxExtends backstop) is the caller's stage-gated decision
-// (EVOLVE_PHASE_RECOVERY: off | shadow | enforce).
-//
-// False-positive posture: a working agent's pane can mention any of these
-// strings (an editor showing this very file, a test log). Three independent
-// defenses bound the risk: (1) the caller consults the detector only at a
-// stop-review checkpoint (the artifact is already missing), (2) the caller
-// skips fatal handling while the pane is visibly Busy (a working agent is
-// never killed), and (3) the kill action itself is stage-gated, shipping in
-// shadow (log-only) first.
+// FatalPaneDetector is the ordered, first-match-wins registry of fatal signatures.
 type FatalPaneDetector struct {
 	sigs []FatalSignature
 }
 
-// NewFatalPaneDetector builds a detector over an ordered signature list.
-// First match wins — order entries most-specific first.
+// NewFatalPaneDetector builds a detector; order sigs most specific first, since the first match wins.
 func NewFatalPaneDetector(sigs []FatalSignature) *FatalPaneDetector {
 	return &FatalPaneDetector{sigs: sigs}
 }
 
-// SeedDetector returns the registry seeded with the known-fatal signatures,
-// all three taught by cycle-262 (2026-06-09; forensics in
-// docs/architecture/phase-recovery.md §2). Slice 5 adds durable promotion of
-// advisor-classified novel signatures on top of these seeds.
+// SeedDetector returns the registry seeded with the known fatal signatures.
 func SeedDetector() *FatalPaneDetector {
 	return NewFatalPaneDetector([]FatalSignature{
 		{
@@ -91,11 +55,8 @@ func SeedDetector() *FatalPaneDetector {
 			Note:   "codex self-upgrade mid-launch (cycle-262 build)",
 		},
 		{
-			// The colon-prefixed form is the shell's OWN error rendering —
-			// zsh emits it mid-line ("zsh: command not found: X"), bash at
-			// line end ("bash: X: command not found") — and is far harder to
-			// false-positive than the bare phrase, which can appear in a
-			// healthy agent's debugging output.
+			// The colon-prefixed form is the shell's own error rendering; the bare
+			// phrase can appear in a healthy agent's debugging output.
 			Substr: ": command not found",
 			Cause:  CauseDeadShell,
 			Note:   "shell rejecting agent-directed input — the REPL is gone (cycle-262: nudged bare zsh)",
@@ -123,13 +84,7 @@ func SeedDetector() *FatalPaneDetector {
 	})
 }
 
-// Signatures reports the substrings the detector currently fires on, in
-// registry order. It reads the LIVE registry rather than a construction-time
-// snapshot, so a Promote-d signature is reported too — callers that protect
-// signature-bearing text from a stripper (bridge.strippedForFatalPaneScan)
-// must never work from a hand-copied literal that rots when Slice-5 promotes
-// a new entry. Empty substrings are omitted: they match everything in a
-// Contains-keyed consumer and would protect the whole pane. Nil-receiver safe.
+// Signatures reports the live registry's non-empty substrings in order, promotions included; nil-receiver safe.
 func (d *FatalPaneDetector) Signatures() []string {
 	if d == nil {
 		return nil
@@ -143,10 +98,7 @@ func (d *FatalPaneDetector) Signatures() []string {
 	return out
 }
 
-// Detect scans a recent pane tail for a seeded fatal signature. It returns
-// the typed cause plus the matched substring (for the justification trail),
-// or ok=false when nothing matches. Pure classification — no action, no
-// side effects, nil-receiver safe (a nil detector classifies nothing).
+// Detect returns the cause and substring of the first signature found in pane; nil-receiver safe.
 func (d *FatalPaneDetector) Detect(pane string) (TerminalCause, string, bool) {
 	if d == nil || pane == "" {
 		return CauseUnknown, "", false

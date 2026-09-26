@@ -1,12 +1,3 @@
-// flakyshape_test.go — Gate D (flaky-predicate-shape) behavior + the wiring pin
-// that proves it has a PRODUCTION caller.
-//
-// The review finding this gate exists to answer: the flaky-shape lint shipped
-// reachable only from `evolve eval quality-check`, whose one pipeline invocation
-// runs in DISCOVER, before go/acs/cycle<N>/predicates_test.go exists. So the
-// tests below do two distinct jobs — exercise the rule, and bind it to
-// NewReviewer's composed slice so deleting the wire fails the build.
-
 package evalgate
 
 import (
@@ -22,8 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// writeCyclePredicates writes src as <worktree>/go/acs/cycle<N>/predicates_test.go
-// — the exact path the tdd phase authors and Gate D reads.
 func writeCyclePredicates(t *testing.T, worktree string, cycle int, src string) {
 	t.Helper()
 	dir := filepath.Join(worktree, "go", "acs", "cycle"+strconv.Itoa(cycle))
@@ -35,9 +24,7 @@ func writeCyclePredicates(t *testing.T, worktree string, cycle int, src string) 
 	}
 }
 
-// cycleWorkspace returns a workspace dir named "cycle-<N>" so
-// cycleNumFromWorkspace resolves the cycle the way the orchestrator's real
-// WorkspacePath does.
+// cycleWorkspace names the dir "cycle-<N>", the only shape cycleNumFromWorkspace accepts.
 func cycleWorkspace(t *testing.T, cycle int) string {
 	t.Helper()
 	ws := filepath.Join(t.TempDir(), "cycle-"+strconv.Itoa(cycle))
@@ -80,8 +67,6 @@ func TestC4242_ScopedGreen(t *testing.T) {
 }
 `
 
-// TestFlakyShapeGate_FlagsFlakyShapeAdvisory — a suite-scope predicate produces a
-// reason naming the offending function AND the file receipt, with block=false.
 func TestFlakyShapeGate_FlagsFlakyShapeAdvisory(t *testing.T) {
 	wt := t.TempDir()
 	writeCyclePredicates(t, wt, 4242, flakyPredicateSrc)
@@ -102,11 +87,6 @@ func TestFlakyShapeGate_FlagsFlakyShapeAdvisory(t *testing.T) {
 	}
 }
 
-// TestFlakyShapeGate_CleanPredicatesStateTheReceipt — clean predicates must NOT
-// be silent. Reserving silence for "clean" is the H2 silent-clean class at the
-// production seam: a cycle log could not then distinguish "Gate D ran and the
-// predicates are clean" from "Gate D silently no-opped", which is the H1
-// dead-code failure mode itself. The clean line names the files it read.
 func TestFlakyShapeGate_CleanPredicatesStateTheReceipt(t *testing.T) {
 	wt := t.TempDir()
 	writeCyclePredicates(t, wt, 4242, cleanPredicateSrc)
@@ -124,9 +104,6 @@ func TestFlakyShapeGate_CleanPredicatesStateTheReceipt(t *testing.T) {
 	}
 }
 
-// TestFlakyShapeGate_NoGoACsSaysSo — a cycle with no go/acs/cycle<N> dir is a
-// legitimate non-event, but it must still read differently from "the gate never
-// ran": nothing-to-lint is stated, not implied by silence.
 func TestFlakyShapeGate_NoGoACsSaysSo(t *testing.T) {
 	reason, block := flakyShapeGate{}.check(core.ReviewInput{
 		Phase: "tdd", Workspace: cycleWorkspace(t, 4242), Worktree: t.TempDir(),
@@ -139,10 +116,6 @@ func TestFlakyShapeGate_NoGoACsSaysSo(t *testing.T) {
 	}
 }
 
-// TestFlakyShapeGate_EveryOutcomeIsObservable is the HIGH-1 forcing pin: check
-// must return a non-empty reason on EVERY path, so exactly one Gate D line lands
-// in each tdd phase's log and no outcome can hide in silence. A future edit that
-// re-adds an early `return "", false` trips this.
 func TestFlakyShapeGate_EveryOutcomeIsObservable(t *testing.T) {
 	flaky, clean, empty, unparseable, noacs := t.TempDir(), t.TempDir(), t.TempDir(), t.TempDir(), t.TempDir()
 	writeCyclePredicates(t, flaky, 4242, flakyPredicateSrc)
@@ -175,8 +148,6 @@ func TestFlakyShapeGate_EveryOutcomeIsObservable(t *testing.T) {
 	}
 }
 
-// TestFlakyShapeGate_UnparseableSourceIsLoudButAdvisory — the silent-clean class:
-// a predicate dir the lint could NOT read must say so, never pass as clean.
 func TestFlakyShapeGate_UnparseableSourceIsLoudButAdvisory(t *testing.T) {
 	wt := t.TempDir()
 	writeCyclePredicates(t, wt, 4242, "package cycle4242\nfunc {{{")
@@ -195,9 +166,6 @@ func TestFlakyShapeGate_UnparseableSourceIsLoudButAdvisory(t *testing.T) {
 	}
 }
 
-// TestFlakyShapeGate_EmptyPredicateDirIsLoud — a cycle<N> dir with no .go files
-// linted ZERO files; reporting that as clean is exactly the byte-indistinguishable
-// silence the review flagged.
 func TestFlakyShapeGate_EmptyPredicateDirIsLoud(t *testing.T) {
 	wt := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(wt, "go", "acs", "cycle4242"), 0o755); err != nil {
@@ -214,8 +182,6 @@ func TestFlakyShapeGate_EmptyPredicateDirIsLoud(t *testing.T) {
 	}
 }
 
-// TestFlakyShapeGate_OnlyAtTDD — the gate reads a tdd-phase artifact, so it must
-// not fire at other phases (scout has no predicates; build/audit would re-report).
 func TestFlakyShapeGate_OnlyAtTDD(t *testing.T) {
 	g := flakyShapeGate{}
 	if !g.appliesTo(string(core.PhaseTDD)) {
@@ -228,12 +194,6 @@ func TestFlakyShapeGate_OnlyAtTDD(t *testing.T) {
 	}
 }
 
-// TestFlakyShapeGate_NoAuthorityIsLoudNotSilent — no worktree or a non-cycle
-// workspace basename means no authority to locate predicates. Both should be
-// unreachable in production (WorkspacePath is always .evolve/runs/cycle-<N> and
-// the worktree is provisioned at cycle start), so if either DOES happen the gate
-// is inert and must say so — a silent stand-down here is indistinguishable from
-// a working gate over clean predicates.
 func TestFlakyShapeGate_NoAuthorityIsLoudNotSilent(t *testing.T) {
 	wt := t.TempDir()
 	writeCyclePredicates(t, wt, 4242, flakyPredicateSrc)
@@ -248,8 +208,6 @@ func TestFlakyShapeGate_NoAuthorityIsLoudNotSilent(t *testing.T) {
 	}
 }
 
-// TestFlakyShapeGate_ReasonTruncatesWithVisibleCount — a predicate file with many
-// findings gets a bounded reason, and the elision is stated, never silent.
 func TestFlakyShapeGate_ReasonTruncatesWithVisibleCount(t *testing.T) {
 	var b strings.Builder
 	b.WriteString("//go:build acs\n\npackage cycle4242\n\nimport (\n\t\"os/exec\"\n\t\"testing\"\n)\n")
@@ -267,11 +225,6 @@ func TestFlakyShapeGate_ReasonTruncatesWithVisibleCount(t *testing.T) {
 	}
 }
 
-// --- wiring pins -------------------------------------------------------------
-
-// TestFlakyShapeGate_WiredIntoReviewer pins flakyShapeGate into the production
-// gate list (reviewer.go). Registered in pinnedGateWirings — this is the pin the
-// registry forcing-function (TestAllReviewerGates_HaveWiringPin) demands.
 func TestFlakyShapeGate_WiredIntoReviewer(t *testing.T) {
 	for _, g := range newGatesForTest() {
 		if g.name() == "flaky-predicate-shape" {
@@ -281,11 +234,6 @@ func TestFlakyShapeGate_WiredIntoReviewer(t *testing.T) {
 	t.Fatal("flakyShapeGate is not wired into NewReviewer's gate list — the lint would be dead code again")
 }
 
-// TestNewReviewer_FlakyShapeSurfacesButNeverBlocksAtEnforce drives the REAL
-// NewReviewer(StageEnforce).Review() end-to-end at the tdd phase over a
-// suite-scope predicate: the advisory line reaches the log AND Approve stays
-// true. This is the H3 pin at the gate layer — the enforce stage is the one where
-// a mis-set block flag would abort a cycle on a shape smell.
 func TestNewReviewer_FlakyShapeSurfacesButNeverBlocksAtEnforce(t *testing.T) {
 	ws, wt := cycleWorkspace(t, 4242), t.TempDir()
 	writeCyclePredicates(t, wt, 4242, flakyPredicateSrc)

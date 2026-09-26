@@ -2,14 +2,9 @@ package policy
 
 import "testing"
 
-// Names the ADR-0072 failure-policy exported surface (apicover graduation) by
-// exercising the floor/level predicates and the category/level/action vocab —
-// meaningful assertions, not bare symbol references.
-
 func TestSystemFailurePolicy_FloorAndLevelPredicates(t *testing.T) {
 	fp := DefaultSystemFailurePolicy()
 
-	// IsFloor: the two non-negotiable categories are floor; task categories are not.
 	if !fp.IsFloor(CategoryVerdictIncoherence) || !fp.IsFloor(CategoryInfraSystemic) {
 		t.Error("verdict-incoherence and infra-systemic must be floor categories")
 	}
@@ -17,7 +12,6 @@ func TestSystemFailurePolicy_FloorAndLevelPredicates(t *testing.T) {
 		t.Error("task categories must not be floor")
 	}
 
-	// IsSystemLevel: system categories halt; task categories don't.
 	for _, sys := range []string{CategoryVerdictIncoherence, CategoryInfraSystemic, CategoryTransportHang, CategoryNonProgress} {
 		if !fp.IsSystemLevel(sys) {
 			t.Errorf("%q must be system-level", sys)
@@ -29,9 +23,9 @@ func TestSystemFailurePolicy_FloorAndLevelPredicates(t *testing.T) {
 		}
 	}
 
-	// Name the value types + level/action vocab via a constructed category row.
+	// These lines name the value types and the level/action vocabulary for apicover.
 	var _ SystemFailurePolicy = fp
-	_ = fp.Thresholds // FailureThresholds
+	_ = fp.Thresholds
 	system := FailureCategory{Level: LevelSystem, Action: ActionHaltAndDiagnose}
 	taskRetry := FailureCategory{Level: LevelTask, Action: ActionRetryWithFix}
 	taskDefer := FailureCategory{Level: LevelTask, Action: ActionDeferOrQuarantine}

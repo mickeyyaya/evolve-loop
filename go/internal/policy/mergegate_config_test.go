@@ -1,14 +1,5 @@
 package policy_test
 
-// MergeGatePolicy / MergeGateConfig — the typed parameter block for the
-// merge-to-main gate (config-as-code, no flags). MergeGateConfig() encodes the
-// non-obvious default rules, mirroring RouterConfig/SwarmConfig: Stage→"shadow"
-// (byte-neutral first deploy over the riskiest action), BatchWaveCount→1,
-// BatchChurnLOC→800, BlockSeverity→"HIGH", CarryoverStallCycles→8 — each numeric
-// override applies only when > 0, each string override only when non-empty, so a
-// partial or absent block can never silently produce an unsafe zero threshold.
-// Black-box: drives only the exported accessor + explicit inputs, zero env.
-
 import (
 	"testing"
 

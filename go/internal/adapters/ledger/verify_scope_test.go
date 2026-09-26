@@ -1,12 +1,5 @@
 package ledger
 
-// verify_scope_test.go — cycle-1677: a successful verification must state
-// WHICH history it accepted. `OK: chain intact` was one string for two very
-// different claims — every byte from genesis, or a strict walk that resumed at
-// an operator-adjudicated epoch anchor — and that ambiguity is what let the
-// ledger-1740 damage stay invisible. These tests pin the scope VerifyScope /
-// VerifyDeepScope report, including the part a sidecar file cannot answer.
-
 import (
 	"context"
 	"fmt"
@@ -15,10 +8,7 @@ import (
 	"testing"
 )
 
-// sealedFixture builds the shape the epoch-anchor remedy exists for: a valid
-// genesis + one line, then PRESERVED historical damage, then a hash-valid
-// operator seal (entry_seq 4), then a valid tail. Returns the lines and the
-// seal's own SHA.
+// sealedFixture: genesis, one line, preserved damage, a hash-valid operator seal (entry_seq 4), a valid tail.
 func sealedFixture() (lines []string, sealSHA string) {
 	base, _ := chainLines()
 	g, a := base[0], base[1]
@@ -28,7 +18,6 @@ func sealedFixture() (lines []string, sealSHA string) {
 	return []string{g, a, damaged, seal, tail}, sha256Of(seal)
 }
 
-// writeLedgerDir materialises lines as a ledger directory with a matching tip.
 func writeLedgerDir(t *testing.T, lines []string, lastSeq int) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -46,7 +35,6 @@ func writeLedgerDir(t *testing.T, lines []string, lastSeq int) string {
 	return dir
 }
 
-// writeSidecarAnchor records an out-of-band ledger-anchor.json bound to lineSHA.
 func writeSidecarAnchor(t *testing.T, dir string, seq int, lineSHA string) {
 	t.Helper()
 	body := fmt.Sprintf(`{"anchor_seq":%d,"anchor_line_sha256":%q,"recorded_at":"2026-05-01T00:00:00Z","note":"test"}`, seq, lineSHA)
@@ -55,9 +43,6 @@ func writeSidecarAnchor(t *testing.T, dir string, seq int, lineSHA string) {
 	}
 }
 
-// TestVerifyScope_FullStrictChainReportsNoAnchor: a chain with no anchor
-// anywhere validated every byte, so it must claim no sealed prefix. The zero
-// VerifiedScope is how "I checked everything" is said.
 func TestVerifyScope_FullStrictChainReportsNoAnchor(t *testing.T) {
 	lines, _ := chainLines()
 	dir := writeLedgerDir(t, lines, 3)
@@ -71,9 +56,6 @@ func TestVerifyScope_FullStrictChainReportsNoAnchor(t *testing.T) {
 	}
 }
 
-// TestVerifyScope_ReportsTheSealItResumedFrom: the walk resumed at the in-band
-// operator seal, so that is the line the scope must name — by the seal's own
-// SHA and its own entry_seq, both read out of the ledger.
 func TestVerifyScope_ReportsTheSealItResumedFrom(t *testing.T) {
 	lines, sealSHA := sealedFixture()
 	dir := writeLedgerDir(t, lines, 5)
@@ -90,12 +72,6 @@ func TestVerifyScope_ReportsTheSealItResumedFrom(t *testing.T) {
 	}
 }
 
-// TestVerifyScope_SeqIsReadFromTheAnchorLineNotTheSidecar is the regression
-// this cycle's provenance turns on, and it is not hypothetical: on the live
-// 141k-line ledger the sidecar records anchor_seq=113890 while an in-band seal
-// has since moved the effective anchor to entry_seq=136212. Reporting the
-// sidecar's number would misname the trusted prefix by ~22k lines — in the
-// reassuring direction — so the seq must come from the resolved LINE.
 func TestVerifyScope_SeqIsReadFromTheAnchorLineNotTheSidecar(t *testing.T) {
 	lines, sealSHA := sealedFixture()
 	dir := writeLedgerDir(t, lines, 5)
@@ -114,9 +90,6 @@ func TestVerifyScope_SeqIsReadFromTheAnchorLineNotTheSidecar(t *testing.T) {
 	}
 }
 
-// TestVerifyScope_SidecarOnlyAnchorReportsThatLine: with no in-band seal the
-// sidecar line IS the anchor, and its seq still comes from the line's own
-// entry_seq rather than the JSON field beside it.
 func TestVerifyScope_SidecarOnlyAnchorReportsThatLine(t *testing.T) {
 	lines, _ := chainLines()
 	dir := writeLedgerDir(t, lines, 3)
@@ -135,9 +108,6 @@ func TestVerifyScope_SidecarOnlyAnchorReportsThatLine(t *testing.T) {
 	}
 }
 
-// TestVerifyDeepScope_ReportsTheSameScopeAsVerifyScope: an operator's two
-// verification commands must not disagree about what was verified (#373, the
-// wired-into-one-path-only defect).
 func TestVerifyDeepScope_ReportsTheSameScopeAsVerifyScope(t *testing.T) {
 	lines, sealSHA := sealedFixture()
 	dir := writeLedgerDir(t, lines, 5)
@@ -159,10 +129,6 @@ func TestVerifyDeepScope_ReportsTheSameScopeAsVerifyScope(t *testing.T) {
 	}
 }
 
-// TestVerifyScope_BrokenChainClaimsNoScope: a break one line PAST the seal is
-// still a break — a seal covers the prefix behind it, never the tail ahead of
-// it — and a rejected chain must not hand back a sealed-prefix claim that a
-// caller could print as reassurance.
 func TestVerifyScope_BrokenChainClaimsNoScope(t *testing.T) {
 	lines, _ := sealedFixture()
 	lines[4] = fmt.Sprintf(`{"ts":"2026-05-01T00:05:00Z","cycle":1,"role":"auditor","kind":"phase","exit_code":0,"entry_seq":5,"prev_hash":"%s"}`, sha256Of("forged-tail"))

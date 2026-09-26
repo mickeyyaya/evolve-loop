@@ -7,17 +7,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
-// PlanWaves turns a dependency-annotated backlog into an ordered list of waves.
-// Wave k holds cycle specs whose todos depend only on todos in waves < k (the
-// depends_on DAG, leveled via internal/dag). Within a wave, todos are grouped
-// into FILE-DISJOINT cycles: todos that (transitively) share a file cluster into
-// one cycle that runs them sequentially in a single worktree — safe — while
-// distinct cycles in a wave touch disjoint files and run concurrently. This is
-// the campaign analogue of fleet.Partition, but it MERGES file-sharing todos
-// (correct within one wave) rather than deferring them to a later wave.
-//
-// It returns an error if the depends_on graph is cyclic or references an unknown
-// todo (dag.Levels surfaces both) — a campaign that can't be ordered must not run.
+// PlanWaves levels todos by depends_on into waves of file-disjoint specs, merging file-sharing todos into one spec.
 func PlanWaves(todos []Todo) ([][]CycleSpec, error) {
 	ids := make([]string, len(todos))
 	byID := make(map[string]Todo, len(todos))
@@ -42,7 +32,7 @@ func PlanWaves(todos []Todo) ([][]CycleSpec, error) {
 		var specs []CycleSpec
 		for _, group := range groupByFiles(levelTodos) {
 			specIDs := make([]string, len(group))
-			optional := true // a group is skippable only if EVERY todo in it is optional
+			optional := true
 			for i, td := range group {
 				specIDs[i] = td.ID
 				if !td.Optional {
@@ -61,13 +51,7 @@ func PlanWaves(todos []Todo) ([][]CycleSpec, error) {
 	return waves, nil
 }
 
-// combinedContract is the cycle's binding objective built from its group's
-// todos. A single-todo cycle carries that todo's contract verbatim; a cycle that
-// merged several file-sharing todos preserves each, labeled by id, so no todo's
-// objective is lost when they share a worktree. A todo with no contract is still
-// owned by the cycle (it stays in Scope / EVOLVE_FLEET_SCOPE) — only contracts
-// with text appear in the goal prose; an all-empty group yields "" (the cycle
-// keeps the generic goal, goal-hash only).
+// combinedContract keeps a lone todo's contract verbatim and labels each non-empty one "[id] " in a merged group.
 func combinedContract(group []Todo) string {
 	if len(group) == 1 {
 		return strings.TrimSpace(group[0].OutputContract)
@@ -81,18 +65,13 @@ func combinedContract(group []Todo) string {
 	return strings.Join(parts, "\n")
 }
 
-// groupByFiles partitions todos into file-disjoint groups: two todos share a
-// group iff they (transitively) share a normalized file. Each group becomes one
-// cycle (its todos run sequentially in one worktree — file-safe); distinct groups
-// touch disjoint files and may run concurrently. Union-find over the
-// shares-a-file relation. Deterministic: groups are ordered by their
-// earliest-appearing member, and todos within a group keep input order.
+// groupByFiles union-finds todos that transitively share a file; groups follow their earliest member.
 func groupByFiles(todos []Todo) [][]Todo {
 	parent := make([]int, len(todos))
 	for i := range parent {
 		parent[i] = i
 	}
-	find := func(x int) int { // iterative path-halving (no self-reference → no split decl needed)
+	find := func(x int) int {
 		for parent[x] != x {
 			parent[x] = parent[parent[x]] // path-halving
 			x = parent[x]

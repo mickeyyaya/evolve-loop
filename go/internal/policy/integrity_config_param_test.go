@@ -2,10 +2,6 @@ package policy
 
 import "testing"
 
-// IntegrityMode resolves the integrity sub-policy (ADR-0065) with safe
-// defaults: absent/partial/unknown ⇒ pipeline + shadow + provenance-required.
-// The default is byte-neutral with today's behavior (pipeline mode = the
-// existing single-pin check; shadow stage = log-only).
 func TestIntegrityMode(t *testing.T) {
 	bptr := func(b bool) *bool { return &b }
 	cases := []struct {

@@ -1,24 +1,5 @@
 package swarm
 
-// provision_retry_test.go — RED contract for cycle-1268 task
-// `worktree-provisioning-retry-consolidate`, adoption site #2:
-// gitWorkerProvisioner.addWorktree (provision.go:147).
-//
-// This is the HIGHEST-contention site in the tree: a writer swarm provisions N
-// worker worktrees concurrently against the SAME shared .git, which is exactly
-// the lock window PR #401 documented. It is also structurally identical to
-// pre-fix core.gitWorktree.Create — same reuse/stale-stub probe, then a single
-// unretried Capture("worktree","add","-B",...) with no attempt loop.
-//
-// Both production entry points are driven (CreateWorker AND CreateIntegration):
-// wiring the retry into one path only is the same defect, just narrower (#373).
-//
-// The knobs arrive as a struct field carrying gitexec.WorktreeAddRetry rather
-// than a swarm-local copy of the attempt/backoff constants — a second private
-// copy is precisely the copy-paste the "consolidate" in this task's name
-// forbids. swarm still does not import core (provision.go:14-19); gitexec is
-// the shared floor both already depend on.
-
 import (
 	"context"
 	"io"
@@ -30,10 +11,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// swarmAddFailRunner mirrors the live incident at the swarm seam: the first
-// *failures `worktree add` calls return rc=255 with only "Preparing worktree"
-// on stderr; every other git call (the reuse rev-parse probe, later attempts)
-// succeeds so the provisioner's own control flow is what is under test.
+// swarmAddFailRunner fails the first *failures worktree adds with the transient shape (rc=255, only "Preparing worktree" on stderr).
 func swarmAddFailRunner(failures, attempts *int) sysexec.RunFunc {
 	return func(ctx context.Context, name, dir string, args, env []string, stdin io.Reader, stdout, stderr io.Writer) (int, error) {
 		if len(args) >= 2 && args[0] == "worktree" && args[1] == "add" {
@@ -76,10 +54,6 @@ func TestSwarmCreateWorker_RetriesTransientAddFailure(t *testing.T) {
 	}
 }
 
-// CreateIntegration provisions the shared integration worktree that every
-// worker branches off — it runs through the same addWorktree seam and must
-// inherit the same retry. Covering only CreateWorker would leave the swarm's
-// first provisioning act exposed.
 func TestSwarmCreateIntegration_RetriesTransientAddFailure(t *testing.T) {
 	failures, attempts := 1, 0
 	var slept []time.Duration
@@ -114,8 +88,6 @@ func TestSwarmCreateWorker_PersistentFailureStillFailsLoudly(t *testing.T) {
 	}
 }
 
-// N workers provisioning cleanly must not each pay a backoff: the retry is a
-// collision absorber, not a rate limiter.
 func TestSwarmCreateWorker_CleanRunCostsOneAttemptAndNoSleep(t *testing.T) {
 	failures, attempts := 0, 0
 	var slept []time.Duration

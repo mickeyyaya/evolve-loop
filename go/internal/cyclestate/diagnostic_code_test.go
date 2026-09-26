@@ -1,11 +1,5 @@
 package cyclestate
 
-// diagnostic_code_test.go — Diagnostic.Code: the C1 record's machine-readable
-// reason. A phase's deterministic gate (triage refusing a protected-surface
-// card) stamps a stable code beside its prose so the closeout and the
-// classifier can act on the CLASS of failure without regexing the sentence
-// (docs/incidents/2026-09-14-triage-refusal-poison-loop.md).
-
 import (
 	"encoding/json"
 	"reflect"
@@ -40,10 +34,6 @@ func TestDiagCodes_TriageRefusalVocabulary(t *testing.T) {
 	}
 }
 
-// ErrorCodes is the ONE projection of a diagnostics list onto its error-severity
-// codes (deduped, order-preserving, blanks dropped) — the C1 chokepoint's
-// signal field and the classifier read through it, as ErrorMessages is for the
-// prose.
 func TestErrorCodes_ProjectsErrorSeverityCodesOnce(t *testing.T) {
 	diags := []Diagnostic{
 		{Severity: SeverityError, Message: "a", Code: DiagCodeTriageProtectedSurface},
@@ -60,10 +50,6 @@ func TestErrorCodes_ProjectsErrorSeverityCodesOnce(t *testing.T) {
 	}
 }
 
-// RefusalDisposition is the ONE table that says whose fault a coded refusal is
-// (architecture review HIGH-2): a code that names an item is the item's;
-// TRIAGE_COMMITMENT_INVALID is stamped on pure I/O faults and must never
-// charge the queue; an unknown code charges nobody.
 func TestRefusalDisposition_TableBesideTheVocabulary(t *testing.T) {
 	cases := []struct {
 		code        string
@@ -75,7 +61,7 @@ func TestRefusalDisposition_TableBesideTheVocabulary(t *testing.T) {
 		{"", false, false},
 		{"SOMETHING_NEW", false, false},
 	}
-	var _ Disposition = RefusalDisposition(DiagCodeTriageProtectedSurface) // the table's value type
+	var _ Disposition = RefusalDisposition(DiagCodeTriageProtectedSurface) // names Disposition for apicover
 	for _, c := range cases {
 		d := RefusalDisposition(c.code)
 		if d.TaskLevel != c.task || d.RouteConsole != c.route {

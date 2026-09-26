@@ -1,10 +1,5 @@
 package router_test
 
-// Unit proof of the ADR-0024 §2 hybrid cadence: LLMProposal.Decide invokes the
-// Proposer on EVERY transition when no upfront plan drives (legacy/Shadow), but
-// ONLY at branch transitions (post-build, post-audit) once a clamped plan is
-// threaded in — removing the per-transition double-spend at Stage>=Advisory.
-
 import (
 	"testing"
 
@@ -12,8 +7,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// countingProposer records every Current it is asked to propose at; its proposal
-// is harmless (agrees with Current, so applyProposal records no clamp).
+// countingProposer records each Current it sees; its proposal agrees with Current, so it never clamps.
 type countingProposer struct{ seen []string }
 
 func (c *countingProposer) Propose(in router.RouteInput) (*router.Proposal, error) {
@@ -23,8 +17,7 @@ func (c *countingProposer) Propose(in router.RouteInput) (*router.Proposal, erro
 
 func TestHybridCadence_ProposeGatedByPlanAndBranch(t *testing.T) {
 	t.Parallel()
-	// A clamped-shape plan (the orchestrator always threads a floor-clamped plan
-	// that runs at least the ship-chain) — only its non-nil-ness gates shouldPropose.
+	// Only the plan's non-nil-ness gates shouldPropose.
 	plan := &router.PhasePlan{Entries: []router.PhasePlanEntry{
 		{Phase: "scout", Run: true}, {Phase: "tdd", Run: true}, {Phase: "build", Run: true},
 		{Phase: "audit", Run: true}, {Phase: "ship", Run: true},

@@ -8,10 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
-// TestValidatePlan_RejectsMalformedAndRegressive pins WS2-S1 (ADR-0052, research
-// principle P6 "validate before clamp"): ValidatePlan is a pure, report-only
-// pre-floor check. Case table — empty→reject, canonical→accept, unknown→reject,
-// duplicate→reject, ship-while-skipping-audit→reject.
 func TestValidatePlan_RejectsMalformedAndRegressive(t *testing.T) {
 	t.Parallel()
 	in := RouteInput{} // canonicalOrder is the known-set fallback when Cfg is empty
@@ -42,8 +38,6 @@ func TestValidatePlan_RejectsMalformedAndRegressive(t *testing.T) {
 	}
 }
 
-// TestValidatePlan_DoesNotRejectFreshlyMintedPhase is the must-fix mint-aware
-// case: a phase minted IN THIS PLAN is a known phase, never "unknown".
 func TestValidatePlan_DoesNotRejectFreshlyMintedPhase(t *testing.T) {
 	t.Parallel()
 	plan := &PhasePlan{
@@ -57,8 +51,6 @@ func TestValidatePlan_DoesNotRejectFreshlyMintedPhase(t *testing.T) {
 	}
 }
 
-// TestValidatePlan_DoesNotMutateOrWiden proves ValidatePlan is report-only — it
-// never edits the plan or widens the run-set (the floor stays the sole disposer).
 func TestValidatePlan_DoesNotMutateOrWiden(t *testing.T) {
 	t.Parallel()
 	plan := &PhasePlan{Entries: []PhasePlanEntry{{Phase: "ship", Run: true}, {Phase: "frobnicate", Run: true}}}

@@ -1,12 +1,5 @@
 package config
 
-// registry.go — the phase-registry half of resolution: the subset of
-// docs/architecture/phase-registry.json the loader reads, the injected read
-// with its three outcomes (absent — silent; unreadable; malformed), and the
-// four independent registry steps (the dials, the deliverable kinds, the
-// conditional rules, the phases[] walk). Map-driven warnings are emitted in
-// key order so the sequence is deterministic.
-
 import (
 	"encoding/json"
 	"errors"
@@ -23,7 +16,6 @@ type registryDoc struct {
 	Phases []registryPhase `json:"phases"`
 }
 
-// registryConfig is the registry's config{} block.
 type registryConfig struct {
 	DynamicRouting        string                         `json:"dynamic_routing"`
 	RoutingMode           string                         `json:"routing_mode"`
@@ -38,14 +30,10 @@ type registryConfig struct {
 	Workflow              registryWorkflow               `json:"workflow"`
 }
 
-// registryWorkflow is the registry's config.workflow block.
 type registryWorkflow struct {
-	// CompactPrompts enables/disables on-demand reference-section stripping.
-	// Absent = use RoutingConfig default (true). Explicit false opts out.
 	CompactPrompts *bool `json:"compact_prompts,omitempty"`
 }
 
-// registryPhase is one phases[] entry.
 type registryPhase struct {
 	Name     string        `json:"name"`
 	Optional bool          `json:"optional"`
@@ -53,16 +41,10 @@ type registryPhase struct {
 	Routing  *RoutingBlock `json:"routing"`
 }
 
-// baselineNote is the consequence every registry fault shares: the loop runs
-// on the compiled defaults, which omit triage and carry no registry order.
 const baselineNote = "running on the built-in baseline — no triage, no registry order"
 
-// readRegistry reads the registry through the injected reader. Absence
-// (fs.ErrNotExist — the ordinary silent case: registry-less projects, tests,
-// EVOLVE_USE_PHASE_REGISTRY off) yields ok=false with no warning; any other
-// read error and a decode error each yield ok=false WITH their registry code,
-// because the loop would otherwise run on the triage-less baseline with no
-// trace (the class of a trailing comma in phase-registry.json).
+// readRegistry is silent only on absence. An unreadable or malformed registry warns, because the
+// loop would otherwise run on the triage-less baseline with no trace.
 func (l *Loader) readRegistry(path string, ws *[]Warning) (registryDoc, bool) {
 	raw, err := l.readFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -82,8 +64,6 @@ func (l *Loader) readRegistry(path string, ws *[]Warning) (registryDoc, bool) {
 	return doc, true
 }
 
-// applyRegistry overlays a parsed registry onto cfg in four independent steps;
-// the warning order is the step order.
 func applyRegistry(cfg *RoutingConfig, doc registryDoc, ws *[]Warning) {
 	applyRegistryDials(cfg, doc.Config, ws)
 	applyDeliverableKinds(cfg, doc.Config.DeliverableKinds, ws)
@@ -91,9 +71,8 @@ func applyRegistry(cfg *RoutingConfig, doc registryDoc, ws *[]Warning) {
 	applyPhases(cfg, doc.Phases, ws)
 }
 
-// applyRegistryDials overlays the scalar and list dials of the config block:
-// a value the registry omits keeps the compiled default (the *int and *bool
-// distinguish an explicit 0/false from absence).
+// applyRegistryDials keeps the compiled default for any value the registry omits; the pointer
+// fields tell an explicit 0 or false from absence.
 func applyRegistryDials(cfg *RoutingConfig, c registryConfig, ws *[]Warning) {
 	if c.DynamicRouting != "" {
 		cfg.Stage = parseStage(c.DynamicRouting, "dynamic_routing", ws)
@@ -124,10 +103,8 @@ func applyRegistryDials(cfg *RoutingConfig, c registryConfig, ws *[]Warning) {
 	}
 }
 
-// applyDeliverableKinds installs the per-kind contracts. The registry is the
-// SSOT for a contract's root and floor — a consumer must never default them —
-// so a hole is a load warning, but the spec is installed regardless (the
-// consumer sees the hole, never a silent default).
+// applyDeliverableKinds installs a spec even when it warns: the registry owns root and
+// min_options, so a consumer must see the hole rather than a silent default.
 func applyDeliverableKinds(cfg *RoutingConfig, kinds map[string]DeliverableKindSpec, ws *[]Warning) {
 	if len(kinds) == 0 {
 		return
@@ -142,9 +119,7 @@ func applyDeliverableKinds(cfg *RoutingConfig, kinds map[string]DeliverableKindS
 	}
 }
 
-// applyConditional MERGES the registry's conditional-mandatory rules over the
-// compiled ones (the tdd default survives a registry that omits it); a rule
-// that does not parse is skipped with a warning.
+// applyConditional merges over the compiled rules, so the tdd default survives a registry that omits it.
 func applyConditional(cfg *RoutingConfig, rules map[string]string, ws *[]Warning) {
 	for _, phase := range slices.Sorted(maps.Keys(rules)) {
 		expr := rules[phase]
@@ -158,9 +133,6 @@ func applyConditional(cfg *RoutingConfig, rules map[string]string, ws *[]Warning
 	}
 }
 
-// applyPhases walks phases[] in registry order: the Order, each declared
-// enable (its warning stamped with the phase's own key) and each routing
-// block. An entry without a name is skipped whole.
 func applyPhases(cfg *RoutingConfig, phases []registryPhase, ws *[]Warning) {
 	for _, p := range phases {
 		if p.Name == "" {

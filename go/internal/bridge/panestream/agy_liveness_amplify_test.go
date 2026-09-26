@@ -5,31 +5,13 @@ import (
 	"testing"
 )
 
-// agy_liveness_amplify_test.go — adversarial amplification for AgyDetector (cycle-425).
-// Written by the Test Amplifier — black-box view, spec-only, no implementation reading.
-//
-// Coverage gaps targeted beyond C425_004–C425_006 and the ACS predicates:
-//
-//	A1  Prime call on generating frame returns base behavior (not Converging uplift)
-//	A2  Partial spinner text ("⣯ Generat") is NOT a convergence signal
-//	A3  Spinner embedded mid-line (not standalone) is NOT detected
-//	A4  "esc to cancel" alone (no spinner) is NOT a convergence signal
-//	A5  Spinner→answer→spinner oscillation: Converging correctly re-fires on spinner return
-//	A6  Multiple consecutive generating frames each return Converging (signal persists)
-//	A7  Malformed edge cases: no panic, confidence never meaningfully above DefaultDetector
-//	A8  AgyDetector with non-agy profile: no panic, graceful fallback
-//	A9  Spinner overrides high stallThreshold — Converging is independent of stall config
-//	A10 Confidence strictly > DefaultDetector on generating frame (direct construction path)
-//	A11 Extended answer-frame parity across 10+ iterations (long-run composition stability)
-
 const (
-	agyBoundaryLine = ">"               // exact boundary marker for agy profile (BoundaryExact=true)
-	agySpinnerText  = "⣯ Generating..." // the complete spinner signal per spec
-	agyEscText      = "esc to cancel"   // agy busy affordance (busyAffordanceRE match)
+	agyBoundaryLine = ">"
+	agySpinnerText  = "⣯ Generating..."
+	agyEscText      = "esc to cancel"
 )
 
-// agyFrame constructs a minimal agy pane frame from content lines.
-// Appends the exact boundary marker ">" as the final prompt line (BoundaryExact=true).
+// agyFrame appends the empty ">" input box to the content lines.
 func agyFrame(contentLines ...string) string {
 	var sb strings.Builder
 	for _, line := range contentLines {
@@ -41,11 +23,6 @@ func agyFrame(contentLines ...string) string {
 	return sb.String()
 }
 
-// TestAmp_AgyDetector_PrimeCallReturnsBaseBehavior verifies the "prime: returns base"
-// invariant: the FIRST Assess call on ANY frame — including a generating frame — must
-// return the same (state, confidence) as DefaultDetector on the same first call.
-// C425_004 only tests the second call (after prime establishes baseline); this pins the
-// prime contract. A bug here would cause spurious Converging on the very first frame.
 func TestAmp_AgyDetector_PrimeCallReturnsBaseBehavior(t *testing.T) {
 	p := Profiles["agy"]
 	generating := testdataFrame(t, "agy/thinking.txt")
@@ -66,10 +43,6 @@ func TestAmp_AgyDetector_PrimeCallReturnsBaseBehavior(t *testing.T) {
 	}
 }
 
-// TestAmp_AgyDetector_PartialSpinnerNotConverging verifies that a truncated spinner
-// ("⣯ Generat" without the trailing "ing...") is NOT treated as a convergence signal.
-// Partial match would be a gaming vulnerability: a frame whose content happens to start
-// with the spinner's rune prefix could fake convergence. The full token is required.
 func TestAmp_AgyDetector_PartialSpinnerNotConverging(t *testing.T) {
 	p := Profiles["agy"]
 	const partialSpinner = "⣯ Generat" // deliberately truncated — missing "ing..."
@@ -84,22 +57,15 @@ func TestAmp_AgyDetector_PartialSpinnerNotConverging(t *testing.T) {
 	detState, detConf := det.Assess(partialFrame, p)
 	_, baseConf := base.Assess(partialFrame, p)
 
-	// If AgyDetector fires Converging AND has meaningfully higher confidence than
-	// DefaultDetector, the spinner layer incorrectly matched the partial token.
 	if detState == LivenessConverging && detConf > baseConf+0.15 {
 		t.Errorf("partial spinner %q: AgyDetector returned Converging (conf=%.2f > default+0.15=%.2f); "+
 			"incomplete spinner text must not trigger the ⣯ Generating... convergence signal", partialSpinner, detConf, baseConf+0.15)
 	}
 }
 
-// TestAmp_AgyDetector_SpinnerEmbeddedMidLineNotDetected verifies that the spinner
-// token embedded within a longer line ("prefix ⣯ Generating... suffix") is NOT treated
-// as a convergence signal. Spec: "complete trimmed line" — the spinner must stand alone
-// on the line after trimming. A naive strings.Contains implementation would fail here.
 func TestAmp_AgyDetector_SpinnerEmbeddedMidLineNotDetected(t *testing.T) {
 	p := Profiles["agy"]
 	primeFrame := agyFrame("> what is tmux?")
-	// Spinner embedded mid-line — not a standalone line when trimmed.
 	embeddedFrame := agyFrame("> what is tmux?", "prefix text "+agySpinnerText+" suffix text")
 
 	det := NewAgyDetector(3)
@@ -121,11 +87,6 @@ func TestAmp_AgyDetector_SpinnerEmbeddedMidLineNotDetected(t *testing.T) {
 	}
 }
 
-// TestAmp_AgyDetector_EscToCancelAloneNotConverging verifies that agy's busy affordance
-// "esc to cancel" alone — without "⣯ Generating..." — does NOT trigger AgyDetector's
-// Converging uplift. PaneBusy and AgyDetector's convergence signal are independent:
-// the spinner is the required signal, not any busy chrome. A bug here could cause
-// false-positive convergence on any agy busy-but-stagnant turn that lacks the spinner.
 func TestAmp_AgyDetector_EscToCancelAloneNotConverging(t *testing.T) {
 	p := Profiles["agy"]
 	primeFrame := agyFrame("> what is tmux?")
@@ -150,11 +111,6 @@ func TestAmp_AgyDetector_EscToCancelAloneNotConverging(t *testing.T) {
 	}
 }
 
-// TestAmp_AgyDetector_OscillationSpinnerAnswerSpinner verifies that AgyDetector
-// correctly oscillates between Converging (generating) and non-Converging (answer)
-// across a realistic turn lifecycle. The key invariant: on answer frames, AgyDetector
-// must be BYTE-IDENTICAL to DefaultDetector (AC2); on spinner frames, it must upgrade
-// to Converging while DefaultDetector does not.
 func TestAmp_AgyDetector_OscillationSpinnerAnswerSpinner(t *testing.T) {
 	p := Profiles["agy"]
 	det := NewAgyDetector(3)
@@ -165,7 +121,6 @@ func TestAmp_AgyDetector_OscillationSpinnerAnswerSpinner(t *testing.T) {
 	det.Assess(answerFrame, p)  // prime
 	base.Assess(answerFrame, p) // prime (oracle)
 
-	// Step 1: spinner → AgyDetector must Converge with uplift; base must not.
 	s1, c1 := det.Assess(thinkingFrame, p)
 	bs1, _ := base.Assess(thinkingFrame, p)
 	if s1 != LivenessConverging {
@@ -176,9 +131,7 @@ func TestAmp_AgyDetector_OscillationSpinnerAnswerSpinner(t *testing.T) {
 			"AgyDetector must upgrade to Converging on spinner while DefaultDetector does not", s1)
 	}
 
-	// Step 2: answer frame — must be BYTE-IDENTICAL to DefaultDetector (AC2).
-	// DefaultDetector legitimately returns Converging here (content changed); the invariant is
-	// parity with DefaultDetector, not a fixed expected state.
+	// DefaultDetector itself reads Converging here, so the check is parity, not a fixed state.
 	s2Det, c2Det := det.Assess(answerFrame, p)
 	s2Base, c2Base := base.Assess(answerFrame, p)
 	if s2Det != s2Base {
@@ -189,7 +142,6 @@ func TestAmp_AgyDetector_OscillationSpinnerAnswerSpinner(t *testing.T) {
 		t.Errorf("oscillation [step 2]: conf %.2f != DefaultDetector %.2f; must be byte-identical", c2Det, c2Base)
 	}
 
-	// Step 3: spinner again — must STILL Converge (no persistent state corruption).
 	s3, c3 := det.Assess(thinkingFrame, p)
 	if s3 != LivenessConverging {
 		t.Errorf("oscillation [step 3, spinner again after answer]: got %v (conf %.2f), want LivenessConverging; "+
@@ -200,9 +152,6 @@ func TestAmp_AgyDetector_OscillationSpinnerAnswerSpinner(t *testing.T) {
 	}
 }
 
-// TestAmp_AgyDetector_RepeatedSpinnerFramesAllConverging verifies that K consecutive
-// generating frames each return Converging after prime. The signal must persist across
-// repeated calls, not fire only on the first observation or degrade over time.
 func TestAmp_AgyDetector_RepeatedSpinnerFramesAllConverging(t *testing.T) {
 	p := Profiles["agy"]
 	det := NewAgyDetector(3)
@@ -223,9 +172,6 @@ func TestAmp_AgyDetector_RepeatedSpinnerFramesAllConverging(t *testing.T) {
 	}
 }
 
-// TestAmp_AgyDetector_MalformedEdgeCasesNoPanic verifies that malformed, partial,
-// or degenerate frames do not panic and do not significantly elevate confidence
-// above DefaultDetector. Mirrors TestOllamaDetector_Malformed for the agy strategy.
 func TestAmp_AgyDetector_MalformedEdgeCasesNoPanic(t *testing.T) {
 	p := Profiles["agy"]
 	cases := []struct {
@@ -269,10 +215,6 @@ func TestAmp_AgyDetector_MalformedEdgeCasesNoPanic(t *testing.T) {
 	}
 }
 
-// TestAmp_AgyDetector_WithNonAgyProfile verifies that an AgyDetector used with a
-// non-agy profile (codex) does not panic and behaves byte-identically to DefaultDetector.
-// Codex pane frames do not contain "⣯ Generating...", so the agy spinner layer must
-// never fire, and all assessments must fall through to the default path.
 func TestAmp_AgyDetector_WithNonAgyProfile(t *testing.T) {
 	codexProfile := Profiles["codex"]
 	det := NewAgyDetector(3)
@@ -299,11 +241,6 @@ func TestAmp_AgyDetector_WithNonAgyProfile(t *testing.T) {
 	}
 }
 
-// TestAmp_AgyDetector_SpinnerOverridesHighStallThreshold verifies that the spinner
-// convergence signal fires regardless of the underlying stallThreshold. With a very high
-// threshold (100), the DefaultDetector would almost never reach LivenessHung — but the
-// spinner layer must still independently classify LivenessConverging. This ensures the
-// two classification paths (spinner-based vs stall-based) are orthogonal.
 func TestAmp_AgyDetector_SpinnerOverridesHighStallThreshold(t *testing.T) {
 	p := Profiles["agy"]
 	det := NewAgyDetector(100) // extreme threshold: DefaultDetector almost never Hung
@@ -321,11 +258,6 @@ func TestAmp_AgyDetector_SpinnerOverridesHighStallThreshold(t *testing.T) {
 	}
 }
 
-// TestAmp_AgyDetector_GeneratingConfidenceStrictlyAboveDefault directly verifies
-// the confidence uplift via fresh AgyDetector construction (not via DetectorFor).
-// C425_004 checks conf≥0.9; C425_006 checks uplift via DetectorFor registry path.
-// This test confirms the uplift applies when using NewAgyDetector directly — the
-// improvement must not require going through the registry path.
 func TestAmp_AgyDetector_GeneratingConfidenceStrictlyAboveDefault(t *testing.T) {
 	p := Profiles["agy"]
 	thinkingFrame := testdataFrame(t, "agy/thinking.txt")
@@ -345,11 +277,6 @@ func TestAmp_AgyDetector_GeneratingConfidenceStrictlyAboveDefault(t *testing.T) 
 	}
 }
 
-// TestAmp_AgyDetector_ExtendedAnswerFrameParityManyIterations verifies that AgyDetector
-// and DefaultDetector remain byte-identical across 10+ consecutive non-generating frames.
-// C425_005 uses 4 calls; this extends it to catch drift that only manifests over many
-// iterations — e.g. a stall counter that diverges due to a composition wiring bug where
-// the stallThreshold isn't correctly forwarded to the underlying DefaultDetector.
 func TestAmp_AgyDetector_ExtendedAnswerFrameParityManyIterations(t *testing.T) {
 	p := Profiles["agy"]
 	answerFrame := testdataFrame(t, "agy/answer.txt")

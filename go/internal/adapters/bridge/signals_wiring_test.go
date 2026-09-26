@@ -1,11 +1,5 @@
 package bridge
 
-// signals_wiring_test.go — ADR-0101 S3: the production Adapter receives the
-// Signal Center at construction (explicit DI, never a setter that can be
-// forgotten) and threads it into EVERY engine it builds, so bridge.warning /
-// bridge.tripwire / pane.liveness from any phase dispatch reach the Center the
-// orchestrator listens to. Mirrors the TokenResolver wiring proofs.
-
 import (
 	"testing"
 
@@ -37,10 +31,6 @@ func TestNewDefault_NilCenterIsTheNullObjectAndSaysSo(t *testing.T) {
 	}
 }
 
-// ADR-0103 unit 11 (test 42): Signals() is the carrier's read seam — the phase
-// runner adopts the Center the injected Adapter carries. It returns exactly the
-// injected Center (never a fresh one), nil for the Null Object, and survives a
-// nil receiver (the typed-nil hazard of an optional-interface adoption).
 func TestAdapter_SignalsReturnsTheInjectedCenter(t *testing.T) {
 	c := signalcenter.New()
 	if a := NewDefault(t.TempDir(), c); a.Signals() != c {

@@ -2,8 +2,6 @@ package dossier
 
 import "testing"
 
-// TestBuild verifies Build returns a populated Dossier with Cycle+Goal from
-// BuildOpts and at least one phase.
 func TestBuild(t *testing.T) {
 	d, err := Build(1, BuildOpts{WorkspacePath: t.TempDir(), Goal: "reduce flags"})
 	if err != nil {
@@ -23,8 +21,6 @@ func TestBuild(t *testing.T) {
 	}
 }
 
-// TestBuild_Errors verifies Build returns an error for cycle <= 0 (edge/OOD
-// cases — the strongest anti-no-op signal for the validation path).
 func TestBuild_Errors(t *testing.T) {
 	cases := []struct {
 		name  string

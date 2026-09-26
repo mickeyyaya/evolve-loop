@@ -1,25 +1,5 @@
 package looppreflight
 
-// freeze.go — ADR-0044 C5: the CLI-version-freeze readiness check
-// (Specification pattern).
-//
-// cycle-262 D6: codex self-upgraded its own binary mid-phase — its updater
-// ran `brew upgrade` on the TUI launch, printed "Update ran successfully!
-// Please restart Codex.", and exited the REPL to a bare shell, which the
-// bridge then nudged for ~20 minutes. The host fix was `brew pin codex`: a
-// CONVERGENT STEADY STATE (survives reboots and crashed batches), not a
-// per-cycle pin/unpin toggle (an unpin-on-exit leaks on any SIGKILL/OOM —
-// see the ADR's alternatives-considered). This check verifies the steady
-// state at batch start: any *-tmux CLI with self-update evidence on the host
-// must be pinned, or the batch Halts with the exact convergent action.
-//
-// Scope: interactive *-tmux drivers only — the incident vector is the TUI
-// launch path; headless `codex exec` does not run the updater. Probes are
-// read-only (stat an evidence file, list brew pins) so the check is
-// idempotent by construction. Ambiguity (pin listing failed: brew absent,
-// exec error) WARNs with manual guidance — only CONFIRMED risk halts, the
-// same fail-open posture as the eval gate.
-
 import (
 	"context"
 	"encoding/json"
@@ -33,21 +13,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 )
 
-// pinnedListerTimeout bounds the brew exec: a hung brew (lock contention, tap
-// refresh) must degrade to the WARN-on-ambiguity path, never hang every batch
-// start. Mirrors the package's BootBudget posture of deadlining real-host work.
+// pinnedListerTimeout sends a hung brew to the Warn-on-ambiguity path instead of stalling batch start.
 const pinnedListerTimeout = 5 * time.Second
 
-// defaultSelfUpdateEvidence reports whether bin is known to self-update on
-// launch, based on host evidence. Registry-style: codex maintains
-// ~/.codex/version.json (the file that recorded dismissed_version=0.137.0 <
-// latest=0.138.0 right before the cycle-262 mid-phase upgrade), and claude
-// maintains ~/.claude/settings.json. A CLI without evidence is not
-// freeze-checked; new self-updaters are added here as incidents reveal them.
-// Assumption: these CLIs keep updater state under their default home
-// directories (no CODEX_HOME/CLAUDE_HOME-style override is documented today).
-// A failed home-dir lookup is AMBIGUITY (error), not absence of evidence —
-// the caller WARNs instead of silently passing (fail loudly).
+// defaultSelfUpdateEvidence is the known-updater registry, keyed by the updater-state file
+// under the default home dir. A failed home lookup is ambiguity (error), not absence.
 func defaultSelfUpdateEvidence(bin string) (bool, string, error) {
 	var rel string
 	var label string
@@ -69,13 +39,8 @@ func defaultSelfUpdateEvidence(bin string) (bool, string, error) {
 	if _, err := os.Stat(p); err != nil {
 		return false, "", nil
 	}
-	// claude's NATIVE freeze: settings.json {"autoUpdates": false} disables
-	// the updater at the source — the same convergent steady state as a brew
-	// pin (survives reboots and crashed batches). It is also the ONLY freeze
-	// available on hosts where claude is not brew-installed (the ~/.local/bin
-	// native installer): without this branch the brew-pin remedy is
-	// impossible there and the HALT is permanent. An unreadable/unparsable
-	// settings file is AMBIGUITY (error → WARN), never a silent pass.
+	// autoUpdates:false freezes claude at the source: the only freeze where claude is
+	// not brew-installed, so without it the halt would be permanent there.
 	if bin == "claude" {
 		raw, err := os.ReadFile(p)
 		if err != nil {
@@ -88,14 +53,13 @@ func defaultSelfUpdateEvidence(bin string) (bool, string, error) {
 			return false, "", fmt.Errorf("claude settings unparsable (freeze state unverifiable): %w", err)
 		}
 		if s.AutoUpdates != nil && !*s.AutoUpdates {
-			return false, "", nil // frozen at the source — nothing to pin
+			return false, "", nil
 		}
 	}
 	return true, p + " present (" + label + ")", nil
 }
 
-// defaultPinnedLister lists brew-pinned formulae. An error (brew absent, exec
-// failure, timeout) flows to the caller, which treats it as ambiguity (WARN).
+// defaultPinnedLister lists brew-pinned formulae; the caller treats an error as ambiguity.
 func defaultPinnedLister() ([]string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), pinnedListerTimeout)
 	defer cancel()
@@ -112,14 +76,12 @@ func defaultPinnedLister() ([]string, error) {
 	return pins, nil
 }
 
-// checkCLIVersionFreeze (Halt on confirmed risk / Warn on ambiguity) is the
-// Specification: risky(bin) ∧ tmuxDriven(bin) ⇒ pinned(bin). risky = host
-// evidence of a self-updater; tmuxDriven = some profile routes the binary
-// through a *-tmux driver.
+// checkCLIVersionFreeze is the Specification risky(bin) ∧ tmuxDriven(bin) ⇒ pinned(bin); ambiguity only warns.
+// See ADR-0044.
 func checkCLIVersionFreeze(o resolved) CheckResult {
 	const name = "cli-version-freeze"
 
-	// Distinct binaries reached via interactive *-tmux drivers.
+	// Only *-tmux drivers: a headless launch does not run the updater.
 	seen := map[string]struct{}{}
 	var bins []string
 	for _, d := range distinctDrivers(o.profileLister, o.profileGetter) {
@@ -136,15 +98,13 @@ func checkCLIVersionFreeze(o resolved) CheckResult {
 
 	type riskyEntry struct {
 		bin    string
-		detail string // "bin (evidence)" for the detail trail
+		detail string
 	}
 	var risky []riskyEntry
 	var evidenceErrs []string
 	for _, b := range bins {
 		ok, evidence, err := o.selfUpdateEvidence(b)
 		if err != nil {
-			// Ambiguity, not absence: surface as WARN below (fail loudly),
-			// never silently pass a binary whose evidence was unverifiable.
 			evidenceErrs = append(evidenceErrs, fmt.Sprintf("%s: %v", b, err))
 			continue
 		}
@@ -206,10 +166,7 @@ func checkCLIVersionFreeze(o resolved) CheckResult {
 	}, evidenceErrs)
 }
 
-// withEvidenceWarnings folds unverifiable-evidence ambiguity into an already-
-// decided result: the detail gains the error trail and a Pass demotes to Warn
-// (fail loudly — an unverifiable binary must never silently pass). A Halt
-// stays a Halt: confirmed risk outranks ambiguity.
+// withEvidenceWarnings appends unverifiable-evidence errors: a Pass demotes to Warn, and a Halt stays a Halt.
 func withEvidenceWarnings(res CheckResult, errs []string) CheckResult {
 	if len(errs) == 0 {
 		return res

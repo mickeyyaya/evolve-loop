@@ -1,38 +1,3 @@
-// Package phasecoherence cross-checks the parallel hand-authored phase
-// surfaces (agents/evolve-<name>.md persona frontmatter vs
-// .evolve/profiles/<name>.json) for contradictions — Invariant-1 meta-gate
-// (campaign retro §4, migration step 4; architecture-design Option B).
-//
-// coherence_test.go — cycle-238 task `persona-tools-coherence-gate`
-// (RED first). API contract for Builder (architecture blueprint B6):
-//
-//	type Violation struct {
-//	    Persona  string // base name, e.g. "builder" (evolve- prefix stripped)
-//	    Kind     string // "disallowed" | "undeclared" (tools checks)
-//	    Severity string // "WARN" for both drift directions
-//	    Message  string // eval vocabulary: contradiction|mismatch|disallowed|undeclared
-//	}
-//	type Options struct {
-//	    AgentsFS   fs.FS             // root CONTAINING agents/ (prompts.Loader layout)
-//	    ProfilesFS fs.FS             // profiles dir root: <name>.json at top level (profiles.Loader layout)
-//	    Overrides  map[string]string // persona name → OS file path substituting agents/evolve-<name>.md
-//	}
-//	func Check(opts Options) ([]Violation, error)
-//
-// Semantics pinned by these tests (architecture R4/R5/R6/R11):
-//   - persona agents/evolve-<name>.md pairs with <name>.json; a missing
-//     profile → "unpaired" WARN (cycle-270 fix; "-reference" docs exempt —
-//     see unpaired_test.go); a missing persona side is silent (Check
-//     iterates personas); non `evolve-`-prefixed .md ignored.
-//   - `tools:` frontmatter only; `tools-gemini:`/`tools-generic:` are NOT the
-//     tools line (multi-CLI coherence is out of scope). No tools: line → skip.
-//   - profile without allowed_tools → no constraint → skip.
-//   - normalization: base name before "(" — "Bash" ↔ "Bash(x:*)", "Skill" ↔
-//     "Skill(code-review-simplify)"; disallowed_tools is NOT consulted.
-//   - Kind "disallowed": persona declares a tool absent from allowed_tools.
-//   - Kind "undeclared": profile allows a tool the persona omits (live
-//     builder drift, scout F1).
-//   - both directions are Severity WARN (eval C1 needs exit 0 on live tree).
 package phasecoherence
 
 import (
@@ -44,8 +9,6 @@ import (
 	"testing/fstest"
 )
 
-// personaMD renders an agents/evolve-<name>.md body in the real frontmatter
-// format.
 func personaMD(name string, fmLines ...string) string {
 	b := "---\nname: evolve-" + name + "\ndescription: test fixture\n"
 	for _, l := range fmLines {
@@ -54,9 +17,7 @@ func personaMD(name string, fmLines ...string) string {
 	return b + "---\n\n# " + name + "\n"
 }
 
-// fixtures builds the two fs.FS roots: agentsFS keys are persona base names →
-// frontmatter lines already rendered via personaMD (placed under agents/);
-// profilesFS keys are profile base names → raw JSON.
+// fixtures keys personas by file stem (evolve-<name>), placed under agents/, and profiles by name.
 func fixtures(personas map[string]string, profilesJSON map[string]string) (fstest.MapFS, fstest.MapFS) {
 	agents := fstest.MapFS{}
 	for name, body := range personas {
@@ -83,8 +44,6 @@ func TestCoherence_CleanPairNoViolations(t *testing.T) {
 	}
 }
 
-// TestCoherence_PersonaDeclares_Disallowed — eval persona-tools-coherence-gate
-// C2 (name pinned): persona lists "Write", profile allowed_tools lacks Write.
 func TestCoherence_PersonaDeclares_Disallowed(t *testing.T) {
 	agents, profs := fixtures(
 		map[string]string{"evolve-widget": personaMD("widget", `tools: ["Read", "Write"]`)},
@@ -107,8 +66,6 @@ func TestCoherence_PersonaDeclares_Disallowed(t *testing.T) {
 	if v.Severity != "WARN" {
 		t.Errorf("Severity = %q, want %q", v.Severity, "WARN")
 	}
-	// Eval C4 greps "contradiction|mismatch|disallowed" — the Message must
-	// carry the vocabulary and name the drifting tool.
 	if !strings.Contains(v.Message, "Write") {
 		t.Errorf("Message %q does not name the drifting tool Write", v.Message)
 	}
@@ -117,8 +74,6 @@ func TestCoherence_PersonaDeclares_Disallowed(t *testing.T) {
 	}
 }
 
-// TestCoherence_ProfileAllows_UndeclaredTool — eval C3 (name pinned): profile
-// allows WebSearch, persona tools: omits it (the live builder drift, F1).
 func TestCoherence_ProfileAllows_UndeclaredTool(t *testing.T) {
 	agents, profs := fixtures(
 		map[string]string{"evolve-widget": personaMD("widget", `tools: ["Read"]`)},
@@ -141,8 +96,6 @@ func TestCoherence_ProfileAllows_UndeclaredTool(t *testing.T) {
 }
 
 func TestCoherence_BashParenNormalization(t *testing.T) {
-	// R6: bare "Bash" in the persona covers scoped "Bash(...)" in the
-	// profile in BOTH directions (no disallowed AND no undeclared report).
 	agents, profs := fixtures(
 		map[string]string{"evolve-widget": personaMD("widget", `tools: ["Read", "Bash"]`)},
 		map[string]string{"widget": `{"name":"widget","role":"widget","cli":"claude-tmux","model_tier_default":"sonnet","allowed_tools":["Read","Bash(scripts/research/kb-search.sh:*)"]}`},
@@ -171,8 +124,6 @@ func TestCoherence_SkillParenNormalization(t *testing.T) {
 }
 
 func TestCoherence_ToolsGeminiLineIsNotTheToolsLine(t *testing.T) {
-	// Persona has only the multi-CLI variants and NO bare tools: line → no
-	// constraint declared → skip (architecture non-goal: claude line only).
 	agents, profs := fixtures(
 		map[string]string{"evolve-widget": personaMD("widget",
 			`tools-gemini: ["ReadFile", "RunShell"]`,
@@ -203,12 +154,8 @@ func TestCoherence_ProfileWithoutAllowedToolsSkipped(t *testing.T) {
 }
 
 func TestCoherence_UnpairedAndNonPersonaFilesSkipped(t *testing.T) {
-	// Contract updated for inbox dispatchable-agent-profile-completeness
-	// (cycle-270): a persona without a profile is now an "unpaired" WARN —
-	// see unpaired_test.go for its pins. Still SILENT here: a profile
-	// without a persona (Check iterates personas only) and the
-	// certain-to-exist non-persona .md files in agents/ (AGENTS.md,
-	// agent-templates.md — architecture risk table).
+	// Despite the name, the unpaired persona WARNs; only a profile without a persona and
+	// the non-persona .md files stay silent.
 	agents, profs := fixtures(
 		map[string]string{
 			"evolve-orphan": personaMD("orphan", `tools: ["Read"]`),
@@ -238,9 +185,6 @@ func TestCoherence_UnpairedAndNonPersonaFilesSkipped(t *testing.T) {
 }
 
 func TestCoherence_OverrideSubstitutesPersona(t *testing.T) {
-	// R5: Overrides["widget"] = <os path> replaces agents/evolve-widget.md
-	// content. The on-FS persona is clean; the override drifts → the drift
-	// must be reported (proving the override content was used).
 	agents, profs := fixtures(
 		map[string]string{"evolve-widget": personaMD("widget", `tools: ["Read"]`)},
 		map[string]string{"widget": `{"name":"widget","role":"widget","cli":"claude-tmux","model_tier_default":"sonnet","allowed_tools":["Read"]}`},
@@ -267,8 +211,6 @@ func TestCoherence_OverrideSubstitutesPersona(t *testing.T) {
 }
 
 func TestCoherence_MissingAgentsDirErrors(t *testing.T) {
-	// Fail loudly: an FS with no agents/ directory is an operator error
-	// (wrong root), not an empty result.
 	_, profs := fixtures(nil, map[string]string{"widget": `{"name":"widget","role":"widget","cli":"claude-tmux","model_tier_default":"sonnet"}`})
 	if _, err := Check(Options{AgentsFS: fstest.MapFS{}, ProfilesFS: profs}); err == nil {
 		t.Error("Check(no agents/ dir) = nil error, want error (fail loudly)")
@@ -367,11 +309,6 @@ func TestCoherence_SkippedEntriesDoNotMaskValidViolations(t *testing.T) {
 	}
 }
 
-// TestCoherence_DispatchNonePersonaExempt — a persona explicitly marked
-// `dispatch: none` (operator: monitoring persona driven outside the
-// profile/subagent system) is intentionally unpaired; it must not WARN.
-// Contrast: an unmarked unpaired persona still WARNs (cycle-270 debugger
-// died exit=10 at launch precisely because nothing surfaced the gap).
 func TestCoherence_DispatchNonePersonaExempt(t *testing.T) {
 	agents, profs := fixtures(
 		map[string]string{

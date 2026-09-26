@@ -1,10 +1,5 @@
 package policy_test
 
-// ObserverPolicy — the typed parameters that replaced EVOLVE_OBSERVER_*. Pointer
-// fields exist precisely to distinguish "omitted" (nil → built-in default) from
-// "explicit zero/false" (e.g. nudge_s:0 DISABLES nudging). The accessor must
-// never return a nil pointer; cmd_phase_observer dereferences each directly.
-
 import (
 	"testing"
 
@@ -95,8 +90,6 @@ func TestObserverConfig_Resolution(t *testing.T) {
 }
 
 func TestLoad_ObserverBlock(t *testing.T) {
-	// Explicit zero/false JSON values must survive (nudge_s:0 disables nudging,
-	// autospawn:false disables spawn, watchdog_disabled:true).
 	json := `{"observer":{"autospawn":false,"poll_s":10,"stall_s":900,"nudge_s":0,` +
 		`"nudge_body":"wake up","eof_grace_s":3,"watchdog_poll_s":20,` +
 		`"watchdog_warn_pct":150,"watchdog_grace_s":5,"watchdog_disabled":true}}`
@@ -109,7 +102,6 @@ func TestLoad_ObserverBlock(t *testing.T) {
 		watchdogPollS: 20, watchdogWarnPct: 150, watchdogGraceS: 5, watchdogDisabled: true,
 	})
 
-	// Absent observer block → all built-in defaults.
 	def, err := policy.Load(writeTempPolicy(t, `{}`))
 	if err != nil {
 		t.Fatalf("Load: %v", err)
@@ -117,9 +109,6 @@ func TestLoad_ObserverBlock(t *testing.T) {
 	assertObserver(t, def.ObserverConfig(), defaultObserverWant())
 }
 
-// TestObserverConfig_WiringToPhaseObserver documents the cmd_phase_observer
-// mapping: ObserverConfig() feeds phaseobserver.Config by dereferencing each
-// *int pointer. The never-nil guarantee is what makes those derefs panic-free.
 func TestObserverConfig_WiringToPhaseObserver(t *testing.T) {
 	oc := policy.Policy{}.ObserverConfig()
 	cfg := phaseobserver.Config{

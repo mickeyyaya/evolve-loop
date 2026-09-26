@@ -6,9 +6,7 @@ import (
 	"path/filepath"
 )
 
-// defaultDirWritable reports whether dir can be created and written to, using
-// the same mkdir → touch sentinel → remove probe as preflight.probeWritable
-// (which is unexported there). Best-effort: any failure means "not writable".
+// defaultDirWritable mirrors preflight's unexported mkdir, touch, remove probe; any failure means not writable.
 func defaultDirWritable(dir string) bool {
 	if dir == "" {
 		return false

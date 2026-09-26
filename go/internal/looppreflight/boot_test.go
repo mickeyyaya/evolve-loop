@@ -67,7 +67,6 @@ func TestRun_BridgeBoot_Timeout_Halts(t *testing.T) {
 	}
 }
 
-// Only *-tmux drivers have a bootable REPL; a -p driver must be skipped.
 func TestRun_BridgeBoot_OnlyTmuxDrivers(t *testing.T) {
 	opts := goodPipelineOptions(t)
 	opts.SkipBoot = false

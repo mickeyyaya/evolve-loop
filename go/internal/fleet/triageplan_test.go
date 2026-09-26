@@ -1,14 +1,5 @@
 package fleet
 
-// triageplan_test.go — RED-first contract for PlanFromTriage (FLEET-AS-POLICY
-// S2, salvaged from cycle 465's preserved worktree per cycle-466's operator
-// T1: fix D1 empty-plan livelock + nil cardPackages). See scout-report.md
-// Task 1 and .evolve/evals/s2-wave-salvage-fix-d1.md for the acceptance
-// criteria this file materializes. PlanFromTriage does not exist yet in this
-// worktree; every test below fails to COMPILE until Builder adds it — that
-// compile failure IS the RED evidence (mirrors cycle-465's precedent, and
-// cycle-464's C464_001-004 before it).
-
 import (
 	"strings"
 	"testing"
@@ -16,9 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
-// scopeIDs splits a launched spec's EVOLVE_FLEET_SCOPE into the set of todo
-// IDs it carries, so tests can assert cross-spec disjointness without caring
-// about PlanFromTriage's internal file-scope string choice.
 func scopeIDs(spec CycleSpec) map[string]bool {
 	ids := map[string]bool{}
 	for _, id := range strings.Split(spec.Env[ipcenv.FleetScopeKey], ",") {
@@ -29,11 +17,6 @@ func scopeIDs(spec CycleSpec) map[string]bool {
 	return ids
 }
 
-// TestPlanFromTriage_DisjointScopesAcrossLanes (AC1, positive): 3 committed
-// floors partitioned over count=2 lanes must yield exactly 2 specs (PlanCycles
-// spreads 3 disjoint todos across 2 buckets — never 3, never 0), every spec
-// scoped (non-empty EVOLVE_FLEET_SCOPE), and no todo id repeated across
-// specs. Kills a stub that returns `count` empty/identical specs.
 func TestPlanFromTriage_DisjointScopesAcrossLanes(t *testing.T) {
 	decisionJSON := []byte(`{"committed_floors":["bridge","core","audit"]}`)
 	specs, _, err := PlanFromTriage(decisionJSON, nil, 2, nil)
@@ -63,9 +46,6 @@ func TestPlanFromTriage_DisjointScopesAcrossLanes(t *testing.T) {
 	}
 }
 
-// TestPlanFromTriage_FallsBackToCardPackagesWhenFloorsAbsent (AC1, positive):
-// an absent committed_floors field must fall back to the caller-supplied
-// committed-card target packages, not zero specs.
 func TestPlanFromTriage_FallsBackToCardPackagesWhenFloorsAbsent(t *testing.T) {
 	decisionJSON := []byte(`{}`)
 	specs, _, err := PlanFromTriage(decisionJSON, []string{"core", "audit"}, 2, nil)
@@ -86,10 +66,6 @@ func TestPlanFromTriage_FallsBackToCardPackagesWhenFloorsAbsent(t *testing.T) {
 	}
 }
 
-// TestPlanFromTriage_MalformedDecisionJSON_RejectsNotGuesses (AC3, negative):
-// truncated/invalid JSON must return a non-nil error and zero specs — never a
-// silently-guessed unscoped launch. Gaming fake it kills: an adapter that
-// swallows the parse error and schedules `count` unscoped identical lanes.
 func TestPlanFromTriage_MalformedDecisionJSON_RejectsNotGuesses(t *testing.T) {
 	truncated := []byte(`{"committed_floors":[`)
 	specs, _, err := PlanFromTriage(truncated, []string{"core"}, 3, nil)
@@ -101,10 +77,6 @@ func TestPlanFromTriage_MalformedDecisionJSON_RejectsNotGuesses(t *testing.T) {
 	}
 }
 
-// TestPlanFromTriage_EmptyInputsNeverOverSchedule (AC3, edge/OOD): empty
-// floors AND empty cards yield zero specs (never a panic); a single floor with
-// count=3 yields exactly ONE spec, not three — empty buckets yield NO spec,
-// matching PlanCycles' existing contract (partition.go:17-34).
 func TestPlanFromTriage_EmptyInputsNeverOverSchedule(t *testing.T) {
 	t.Run("empty-floors-and-empty-cards-yields-zero-specs", func(t *testing.T) {
 		specs, _, err := PlanFromTriage([]byte(`{"committed_floors":[]}`), nil, 3, nil)
@@ -126,17 +98,8 @@ func TestPlanFromTriage_EmptyInputsNeverOverSchedule(t *testing.T) {
 	})
 }
 
-// TestPlanFromTriage_ProductionFixtureTopNOnlyFallback (AC2): a
-// triage-decision.json shaped like the REAL cycle-464 artifact — top_n[].id
-// cards, NO committed_floors field — with the caller-supplied cardPackages
-// left nil (production's productionWavePlanFn never threads a package list)
-// must still yield >=1 non-empty lane. This is the scout report's severity
-// amplifier: real triage decisions commonly carry no committed_floors at
-// all, so the floorless+cardless livelock is the COMMON path, not an edge
-// case — D1 fires on the first wave of any real batch without this
-// fallback. Gaming fake this kills: a fixture doctored WITH committed_floors
-// (dodges the real-world shape that triggered D1).
 func TestPlanFromTriage_ProductionFixtureTopNOnlyFallback(t *testing.T) {
+	// A real triage-decision.json shape: top_n cards only, no committed_floors, and nil cardPackages.
 	decisionJSON := []byte(`{
 		"cycle": 464,
 		"top_n": [
@@ -167,10 +130,6 @@ func TestPlanFromTriage_ProductionFixtureTopNOnlyFallback(t *testing.T) {
 	}
 }
 
-// TestPlanFromTriage_SingleTopNCardCountFourYieldsOneLane (AC6, edge/OOD): a
-// triage-decision.json with exactly one top_n card and fc.Count=4 must
-// produce EXACTLY 1 lane spec — PlanCycles' empty-bucket contract must hold
-// through the top_n fallback path too (never pad unused lanes to fc.Count).
 func TestPlanFromTriage_SingleTopNCardCountFourYieldsOneLane(t *testing.T) {
 	decisionJSON := []byte(`{"top_n":[{"id":"fleet-policy-block","action":"x"}]}`)
 	specs, _, err := PlanFromTriage(decisionJSON, nil, 4, nil)

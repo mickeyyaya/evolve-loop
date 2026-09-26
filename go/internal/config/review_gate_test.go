@@ -2,9 +2,6 @@ package config
 
 import "testing"
 
-// Workstream E2 defaults. Runtime overrides are applied from policy.GatesConfig
-// at the composition root rather than by config.Load.
-
 func TestLoad_ReviewGate_DefaultsOff(t *testing.T) {
 	cfg, _ := Load("", map[string]string{})
 	if cfg.ReviewGate != StageOff {

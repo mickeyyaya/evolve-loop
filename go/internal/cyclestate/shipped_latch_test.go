@@ -6,10 +6,6 @@ import (
 	"testing"
 )
 
-// Shipped is the cycle's own ship latch, persisted so a pause/resume after
-// ship cannot lose the fact (the outcome label and the post-ship observer
-// degrade both read it). It rides the checkpoint under `shipped` and is
-// omitted when false, so pre-latch cycle-state files decode unchanged.
 func TestCycleState_ShippedRoundTripsAndIsOmittedWhenFalse(t *testing.T) {
 	t.Parallel()
 	raw, err := json.Marshal(CycleState{CycleID: 7, Shipped: true})

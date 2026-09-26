@@ -10,15 +10,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// bridge_skilloverlay_test.go — the config-driven skill-overlay injection: a
-// BridgeRequest.Skills (the policy-resolved names) is materialized from
-// <ProjectRoot>/skills/<name>/SKILL.md and prepended at the persona altitude, so
-// a phase agent on ANY CLI begins with the configured discipline preloaded.
-// These prove the producer→adapter contract end-to-end (guarding the codebase's
-// recurring "green unit test, absent integration" trap).
-
-// writeSkillDir plants a minimal skills/<name>/SKILL.md under a fresh root and
-// returns the root (a valid BridgeRequest.ProjectRoot).
+// writeSkillDir writes skills/<name>/SKILL.md under a fresh root and returns the root, not the skill dir.
 func writeSkillDir(t *testing.T, name, body string) string {
 	t.Helper()
 	root := t.TempDir()
@@ -33,11 +25,9 @@ func writeSkillDir(t *testing.T, name, body string) string {
 }
 
 func TestInjectSkillOverlays_NoopPaths(t *testing.T) {
-	// No Skills ⇒ passthrough.
 	if got := injectSkillOverlays("BODY", core.BridgeRequest{ProjectRoot: "/x"}); got != "BODY" {
 		t.Errorf("no Skills must pass through, got %q", got)
 	}
-	// Skills but no ProjectRoot (cannot resolve the skills dir) ⇒ passthrough.
 	if got := injectSkillOverlays("BODY", core.BridgeRequest{Skills: []string{"fable"}}); got != "BODY" {
 		t.Errorf("no ProjectRoot must pass through, got %q", got)
 	}
@@ -56,8 +46,6 @@ func TestInjectSkillOverlays_PrependsPersonaAboveBody(t *testing.T) {
 	}
 }
 
-// TestLaunch_InjectsSkillOverlay proves the REAL Adapter.Launch path materializes
-// BridgeRequest.Skills into the launched prompt — the whole point of the feature.
 func TestLaunch_InjectsSkillOverlay(t *testing.T) {
 	root := writeSkillDir(t, "fable", "---\nname: fable\n---\n\nATTACK YOUR OWN PREMISES.\n")
 	fe := &fakeEngine{}
@@ -80,8 +68,6 @@ func TestLaunch_InjectsSkillOverlay(t *testing.T) {
 	}
 }
 
-// TestLaunch_NoSkills_ByteIdenticalDefault — no Skills ⇒ no overlay block (the
-// off path is byte-identical to a pre-feature launch).
 func TestLaunch_NoSkills_ByteIdenticalDefault(t *testing.T) {
 	fe := &fakeEngine{}
 	_, err := withEngine(fe).Launch(context.Background(), core.BridgeRequest{
@@ -96,10 +82,8 @@ func TestLaunch_NoSkills_ByteIdenticalDefault(t *testing.T) {
 	}
 }
 
-// TestLaunch_MissingSkill_StillDispatches — a configured-but-absent skill must
-// not abort the launch (loud WARN + proceed without it, never a hard fail).
 func TestLaunch_MissingSkill_StillDispatches(t *testing.T) {
-	root := t.TempDir() // no skills/ dir
+	root := t.TempDir()
 	fe := &fakeEngine{}
 	_, err := withEngine(fe).Launch(context.Background(), core.BridgeRequest{
 		CLI: "claude-tmux", Profile: "/p", Prompt: "TASK-BODY",

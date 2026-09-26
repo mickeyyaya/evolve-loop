@@ -24,15 +24,13 @@ func writeScoutReport(t *testing.T, workspace string, slugs ...string) {
 	}
 }
 
-// writeEval writes <projectRoot>/.evolve/evals/<slug>.md with a bash grader body.
 func writeEval(t *testing.T, projectRoot, slug, bashBody string) {
 	t.Helper()
 	dir := filepath.Join(projectRoot, ".evolve", "evals")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatalf("mkdir evals: %v", err)
 	}
-	// A [code] grader bullet: the form the materialization gate requires of a
-	// scout-written eval (cycle 1679) — the bash fence below is the legacy form.
+	// The [code] bullet is what Gate A requires; the bash fence is the legacy grader form.
 	body := "# Eval " + slug + "\n\n- [code] `" + bashBody + "`\n\n```bash\n" + bashBody + "\n```\n"
 	if err := os.WriteFile(filepath.Join(dir, slug+".md"), []byte(body), 0o644); err != nil {
 		t.Fatalf("write eval: %v", err)
@@ -54,7 +52,7 @@ func TestMaterializationGate(t *testing.T) {
 	t.Run("missing eval → certain block, names the slug", func(t *testing.T) {
 		ws, root := t.TempDir(), t.TempDir()
 		writeScoutReport(t, ws, "a", "b")
-		writeEval(t, root, "a", "go test ./internal/a/...") // b missing
+		writeEval(t, root, "a", "go test ./internal/a/...")
 		reason, block := materializationGate{}.check(core.ReviewInput{Phase: "scout", Workspace: ws, ProjectRoot: root})
 		if !block {
 			t.Fatalf("want block; got reason=%q block=%v", reason, block)
@@ -67,7 +65,7 @@ func TestMaterializationGate(t *testing.T) {
 	t.Run("eval found in workspace fallback → pass", func(t *testing.T) {
 		ws, root := t.TempDir(), t.TempDir()
 		writeScoutReport(t, ws, "a")
-		writeEval(t, ws, "a", "go test ./...") // eval lives under workspace, not project root
+		writeEval(t, ws, "a", "go test ./...")
 		reason, block := materializationGate{}.check(core.ReviewInput{Phase: "scout", Workspace: ws, ProjectRoot: root})
 		if reason != "" || block {
 			t.Errorf("workspace-fallback eval should pass; got reason=%q block=%v", reason, block)
@@ -146,7 +144,7 @@ func TestQualityGate(t *testing.T) {
 
 	t.Run("missing eval is Gate A's job → fail-open here", func(t *testing.T) {
 		ws, root := t.TempDir(), t.TempDir()
-		writeScoutReport(t, ws, "gone") // no eval written
+		writeScoutReport(t, ws, "gone")
 		reason, block := qualityGate{}.check(core.ReviewInput{Phase: "tdd", Workspace: ws, ProjectRoot: root})
 		if reason != "" || block {
 			t.Errorf("missing eval must fail open in Gate B; got reason=%q block=%v", reason, block)

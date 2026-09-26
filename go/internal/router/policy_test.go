@@ -38,9 +38,6 @@ func TestPhasePolicy_Enabled(t *testing.T) {
 	}
 }
 
-// FailureRouteFromPolicy is the policy→router fold (Phase 4a). The
-// always_learn=false downgrade applies to the DEFAULT route only — an
-// explicitly written audit_fail_routes_to wins (explicit beats derived).
 func TestFailureRouteFromPolicy(t *testing.T) {
 	f := func(b bool) *bool { return &b }
 	cases := []struct {

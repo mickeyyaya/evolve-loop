@@ -1,30 +1,3 @@
-// seal.go — chain-preserving ledger segmentation (L3.3, concurrency
-// campaign). The live ledger.jsonl grows forever (6,345 lines / years of
-// history at the time of writing); Seal moves the oldest lines VERBATIM
-// into a compressed segment so the hot file stays small while the hash
-// chain stays verifiable end-to-end:
-//
-//	<evolveDir>/ledger-segments/seg-0001.jsonl.gz   (gzip of lines 1..N, byte-identical)
-//	<evolveDir>/ledger.jsonl                        (lines N+1.. — the live tail)
-//	a chained "segment_seal" anchor entry            (ArtifactPath = segment rel path,
-//	                                                  ArtifactSHA256 = sha256 of the
-//	                                                  UNCOMPRESSED segment bytes)
-//
-// History is never rewritten: concat(gunzip(segments...), live tail) is
-// byte-identical to the pre-seal file, which is exactly what VerifyDeep
-// checks (same chain walk as Verify, plus per-segment anchor binding).
-//
-// DELIBERATE DEVIATION from the plan's ".jsonl.zst": the stdlib has no
-// zstd and this repo has no production dependencies — gzip keeps it that
-// way at a compression ratio that's ample for JSONL text.
-//
-// Crash windows (each detectable, each recoverable by re-running Seal):
-//   - segment written, live file NOT truncated → VerifyDeep reports seal
-//     residue (segment's first line still present live); Seal resumes by
-//     completing the truncation (the segment is trusted only after its
-//     bytes re-verify against the live prefix).
-//   - truncated, anchor entry NOT appended → VerifyDeep reports a missing
-//     anchor; Seal resumes by appending it.
 package ledger
 
 import (
@@ -44,31 +17,21 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// segmentsDirName is the segments directory under the evolve dir.
 const segmentsDirName = "ledger-segments"
 
-// SealKind is the Kind of the chained anchor entry.
+// SealKind is the Kind of the chained entry that binds a segment to its uncompressed SHA.
 const SealKind = "segment_seal"
 
-// ErrSealResidue marks an interrupted seal (segment written, live file not
-// yet truncated, or anchor not yet appended). Re-running Seal completes it.
+// ErrSealResidue marks an interrupted seal; re-running Seal completes it.
 var ErrSealResidue = errors.New("ledger seal residue — re-run `evolve ledger seal` to complete")
 
-// Seal moves all but the newest keepTail lines of ledger.jsonl into the
-// next ledger-segments/seg-NNNN.jsonl.gz and appends the chained
-// segment_seal anchor. No-op (nil) when there is nothing to seal.
-// keepTail < 1 is coerced to 1 — the live file always keeps its last line
-// so a plain Verify retains a non-empty chain to check against the tip.
+// Seal moves all but the newest keepTail (at least 1) lines into the next gzip segment and appends its anchor.
 func (l *FileLedger) Seal(ctx context.Context, keepTail int) error {
 	if keepTail < 1 {
 		keepTail = 1
 	}
-	// One seal at a time, host-wide: a dedicated flock held across segment
-	// write + truncation + anchor append. Without it, two concurrent Seals
-	// could both anchor the same segment (B's resume path finds A's not-yet-
-	// anchored segment while A is between truncation and Append). Lock order
-	// is seal.lock → ledger.lock and Append only ever takes ledger.lock, so
-	// there is no inversion.
+	// seal.lock stops a second Seal's resume path anchoring a segment this one has not anchored yet.
+	// Order is seal.lock then ledger.lock, and Append takes only ledger.lock, so there is no inversion.
 	sealRelease, err := flock.Lock(l.lockPath + ".seal")
 	if err != nil {
 		return fmt.Errorf("ledger seal: %w", err)
@@ -88,9 +51,7 @@ func (l *FileLedger) Seal(ctx context.Context, keepTail int) error {
 	if err != nil || anchor == nil {
 		return err
 	}
-	// The anchor goes through the normal Append (own lock acquisition, the
-	// inner locks above are released) so it is chained like every other
-	// entry; the seal flock still guards against a sibling Seal.
+	// The anchor goes through Append once the inner locks drop, so it chains like any entry.
 	if err := l.Append(ctx, *anchor); err != nil {
 		return fmt.Errorf("ledger seal: anchor append: %w", err)
 	}
@@ -109,9 +70,8 @@ func (l *FileLedger) sealLocked(keepTail int) (*core.LedgerEntry, error) {
 	}
 	lines := splitLines(raw)
 
-	// Resume case A: the newest segment's first line is still the live
-	// file's first line → a prior seal crashed before truncation. Verify
-	// the whole segment matches the live prefix, then truncate.
+	// Resume case A: the newest segment's first line is still live, so a seal crashed before truncation.
+	// Truncate only after the whole segment matches the live prefix.
 	segs, err := segmentFiles(segDir)
 	if err != nil {
 		return nil, err
@@ -139,7 +99,7 @@ func (l *FileLedger) sealLocked(keepTail int) (*core.LedgerEntry, error) {
 	}
 
 	if len(lines) <= keepTail {
-		return nil, nil // nothing to seal
+		return nil, nil
 	}
 	n := len(lines) - keepTail
 	prefix := raw[:prefixLen(raw, n)]
@@ -155,9 +115,7 @@ func (l *FileLedger) sealLocked(keepTail int) (*core.LedgerEntry, error) {
 	return l.anchorFor(segPath, sha256Hex(prefix), n)
 }
 
-// anchorFor builds the chained segment_seal anchor entry. The artifact
-// path is stored relative to the evolve dir so the ledger stays portable
-// across checkouts.
+// anchorFor builds the segment_seal entry; its path is relative to the evolve dir so the ledger stays portable.
 func (l *FileLedger) anchorFor(segPath, uncompressedSHA string, lineCount int) (*core.LedgerEntry, error) {
 	rel, err := filepath.Rel(filepath.Dir(l.ledgerPath), segPath)
 	if err != nil {
@@ -214,19 +172,7 @@ func (l *FileLedger) unanchoredSegment(segs []string, liveLines [][]byte) (path,
 	return "", "", 0, nil
 }
 
-// VerifyDeep reconstructs the full history — gunzip(segments, in order) +
-// live tail — and runs the SAME chain walk Verify uses, plus:
-//   - every segment must re-hash to its chained segment_seal anchor;
-//   - seal residue (segment whose first line is still live) is an error
-//     naming the recovery (re-run Seal).
-//
-// gatherAllLines returns every ledger line in chain order: each sealed segment
-// (oldest first) followed by the live tail. Anchor uses it to locate a line by
-// entry_seq across SEALED history — the ledger-1740 damage is old enough to have
-// been sealed, so reading only the live ledger.jsonl would miss it. VerifyDeep
-// does the same reconstruction inline because it additionally needs the
-// per-segment residue check and segment-SHA anchor binding; this is the plain
-// "all lines in order" projection without those verify-only concerns.
+// gatherAllLines returns every line in chain order: sealed segments, oldest first, then the live tail.
 func (l *FileLedger) gatherAllLines() ([][]byte, error) {
 	evolveDir := filepath.Dir(l.ledgerPath)
 	segs, err := segmentFiles(filepath.Join(evolveDir, segmentsDirName))
@@ -249,15 +195,13 @@ func (l *FileLedger) gatherAllLines() ([][]byte, error) {
 	return full, nil
 }
 
+// VerifyDeep walks segments plus live tail with Verify's chain walk and checks each segment against its anchor.
 func (l *FileLedger) VerifyDeep(ctx context.Context) error {
 	_, err := l.VerifyDeepScope(ctx)
 	return err
 }
 
-// VerifyDeepScope is VerifyDeep plus the scope the walk actually validated —
-// the deep counterpart of VerifyScope. Both production verification paths
-// report the SAME provenance: an operator whose two commands disagreed about
-// what had been verified would be worse off than one told nothing.
+// VerifyDeepScope is VerifyDeep plus the verified scope, which must match what VerifyScope reports.
 func (l *FileLedger) VerifyDeepScope(_ context.Context) (VerifiedScope, error) {
 	evolveDir := filepath.Dir(l.ledgerPath)
 	segs, err := segmentFiles(filepath.Join(evolveDir, segmentsDirName))
@@ -277,9 +221,7 @@ func (l *FileLedger) VerifyDeepScope(_ context.Context) (VerifiedScope, error) {
 		if err != nil {
 			return VerifiedScope{}, err
 		}
-		// Residue check on EVERY segment (not just the newest): a segment
-		// whose first line is still the live file's first line means a seal
-		// truncation never completed.
+		// Every segment, not just the newest: a first line still live means a truncation never completed.
 		if len(segLines) > 0 && len(liveLines) > 0 && bytes.Equal(segLines[0], liveLines[0]) {
 			return VerifiedScope{}, fmt.Errorf("%w: segment %s written but live file not truncated", ErrSealResidue, filepath.Base(s))
 		}
@@ -298,8 +240,6 @@ func (l *FileLedger) VerifyDeepScope(_ context.Context) (VerifiedScope, error) {
 		return VerifiedScope{}, err
 	}
 
-	// Anchor binding: every segment must have a segment_seal entry whose
-	// ArtifactSHA256 matches the segment's uncompressed bytes.
 	anchors := map[string]string{}
 	for _, line := range full {
 		var e core.LedgerEntry
@@ -327,10 +267,7 @@ func (l *FileLedger) VerifyDeepScope(_ context.Context) (VerifiedScope, error) {
 	return scope, nil
 }
 
-// --- helpers ---
-
-// segmentFiles lists seg-*.jsonl.gz in lexical order (we mint the names
-// with a fixed-width counter, so lexical == chronological).
+// segmentFiles lists seg-*.jsonl.gz sorted; the fixed-width counter makes lexical order chronological.
 func segmentFiles(segDir string) ([]string, error) {
 	entries, err := os.ReadDir(segDir)
 	if errors.Is(err, os.ErrNotExist) {
@@ -386,8 +323,7 @@ func writeSegment(path string, raw []byte) error {
 	return nil
 }
 
-// readSegment gunzips a segment and returns its lines plus the sha256 of
-// the uncompressed bytes.
+// readSegment gunzips a segment and returns its lines and the sha256 of the uncompressed bytes.
 func readSegment(path string) ([][]byte, string, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -408,9 +344,8 @@ func readSegment(path string) ([][]byte, string, error) {
 	return splitLines(raw), sha256Hex(raw), nil
 }
 
-// rewriteLive atomically replaces ledger.jsonl with the given lines.
-// The bytes are the ORIGINAL line bytes — never re-marshaled — so the
-// hash chain over them is untouched.
+// rewriteLive atomically replaces ledger.jsonl with lines as their original bytes, never re-marshaled,
+// so the hash chain over them is untouched.
 func (l *FileLedger) rewriteLive(lines [][]byte) error {
 	var buf bytes.Buffer
 	for _, line := range lines {
@@ -443,8 +378,7 @@ func (l *FileLedger) rewriteLive(lines [][]byte) error {
 	return nil
 }
 
-// prefixLen returns the byte length of the first n lines of raw
-// (including their trailing newlines).
+// prefixLen returns the byte length of the first n lines of raw, newlines included.
 func prefixLen(raw []byte, n int) int {
 	off := 0
 	for i := 0; i < n; i++ {

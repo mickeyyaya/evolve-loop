@@ -5,7 +5,6 @@ import (
 	"testing"
 )
 
-// fileWorker builds a worker that owns the given target files.
 func fileWorker(id string, files ...string) WorkerSpec {
 	return WorkerSpec{WorkerID: id, TargetFiles: files}
 }
@@ -35,7 +34,7 @@ func TestValidate_WriterDisjoint_OK(t *testing.T) {
 func TestValidate_WriterOverlap_CollapsesToN1(t *testing.T) {
 	plan := writerPlan(
 		fileWorker("w0", "go/internal/foo/a.go"),
-		fileWorker("w1", "go/internal/foo/a.go"), // same file → conflict
+		fileWorker("w1", "go/internal/foo/a.go"),
 	)
 	got := Validate(plan)
 	if got.OK || !got.Collapse {
@@ -49,7 +48,6 @@ func TestValidate_WriterOverlap_CollapsesToN1(t *testing.T) {
 	}
 }
 
-// Overlap must be caught even when the two spellings differ (./a.go vs a.go).
 func TestValidate_WriterOverlap_NormalizedPaths(t *testing.T) {
 	plan := writerPlan(
 		fileWorker("w0", "./go/internal/foo/a.go"),
@@ -72,7 +70,6 @@ func TestValidate_WriterCyclicDAG_Collapses(t *testing.T) {
 }
 
 func TestValidate_ReaderOverlap_Allowed(t *testing.T) {
-	// Two readers focused on the same region — legal, no collapse.
 	plan := readerPlan(
 		fileWorker("w0", "go/internal/core/"),
 		fileWorker("w1", "go/internal/core/"),
@@ -108,15 +105,13 @@ func TestValidate_Fallback_SingleWorker(t *testing.T) {
 func TestValidate_DuplicateWorkerID_Collapses(t *testing.T) {
 	plan := writerPlan(
 		fileWorker("w0", "a.go"),
-		fileWorker("w0", "b.go"), // same ID → silent dedupe hazard
+		fileWorker("w0", "b.go"),
 	)
 	if got := Validate(plan); !got.Collapse || !strings.Contains(got.Reason, "duplicate worker_id") {
 		t.Errorf("duplicate worker_id must collapse: %+v", got)
 	}
 }
 
-// Case-insensitive filesystems: two workers claiming the same file with
-// different casing must collide (macOS/Windows treat them as one file).
 func TestValidate_WriterOverlap_CaseInsensitive(t *testing.T) {
 	plan := writerPlan(
 		fileWorker("w0", "go/internal/Foo/A.go"),
@@ -152,11 +147,6 @@ func TestSwarmPlan_IsFallback(t *testing.T) {
 	}
 }
 
-// ——— adversarial edge cases ———
-
-// Reader plans with a cyclic DependsOn DAG must collapse — the planner authored a
-// dependency cycle that is unreachable (readers rarely declare deps), which is a
-// bug worth surfacing rather than silently ignoring.
 func TestValidate_ReaderCyclicDAG_Collapses(t *testing.T) {
 	plan := readerPlan(
 		WorkerSpec{WorkerID: "w0", TargetFiles: []string{"a.go"}, DependsOn: []string{"w1"}},
@@ -171,8 +161,6 @@ func TestValidate_ReaderCyclicDAG_Collapses(t *testing.T) {
 	}
 }
 
-// fallbackReason coverage: three branches — non-partitionable with rationale,
-// non-partitionable without rationale, and "too few workers".
 func TestFallbackReason_WithRationale(t *testing.T) {
 	plan := SwarmPlan{Partitionable: false, Rationale: "inherently sequential"}
 	r := fallbackReason(plan)
@@ -188,7 +176,6 @@ func TestFallbackReason_NoRationale(t *testing.T) {
 		t.Errorf("fallbackReason without rationale must say non-partitionable, got %q", r)
 	}
 	if strings.Contains(r, ":") {
-		// No colon suffix since there's no rationale to append.
 		t.Errorf("fallbackReason without rationale should not have a colon, got %q", r)
 	}
 }

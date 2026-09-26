@@ -8,15 +8,6 @@ import (
 	"testing"
 )
 
-// TestSlugParserContract pins SelectedSlugs to the scout report format: every
-// token the parser greps for must still be declared by the scout producer
-// templates. This matters because Gate A (materialization) BLOCKS at enforce
-// based on the slugs this parser extracts — so if the scout template renamed
-// "## Selected Tasks" or the "- **Slug:**" bullet, enforce-mode could hard-block
-// a HEALTHY cycle with no alarm. This is the slug-extraction analogue of
-// phasecontract's TestProducersDeclareCanonical (the verdict-heading drift
-// alarm): it closes the asymmetry where the verdict-heading proxy got a contract
-// test but the slug-extraction proxy did not.
 func TestSlugParserContract(t *testing.T) {
 	union := scoutProducerUnion(t)
 	for _, tok := range []string{
@@ -33,9 +24,8 @@ func TestSlugParserContract(t *testing.T) {
 	}
 }
 
-// scoutProducerUnion returns the concatenated text of the scout agent templates,
-// located from this test file's path (robust to cwd). evalgate lives at
-// go/internal/evalgate/, so agents/ is three levels up.
+// scoutProducerUnion reads agents/evolve-scout*.md relative to this file, so it
+// does not depend on the working directory.
 func scoutProducerUnion(t *testing.T) string {
 	t.Helper()
 	_, thisFile, _, ok := runtime.Caller(0)

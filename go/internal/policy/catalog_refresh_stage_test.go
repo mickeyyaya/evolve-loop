@@ -2,12 +2,6 @@ package policy
 
 import "testing"
 
-// TestCatalogConfig_RefreshStageResolution pins the refresh_stage dial's
-// resolution: explicit value wins; absent derives from AutoRefresh so every
-// existing deployment keeps its exact behavior (true ⇒ enforce, the live
-// write path; false ⇒ off); an unknown value maps to "off" — the closed-
-// vocabulary fail-safe every stage dial in this repo uses (merge_gate
-// precedent): a typo must disable the write, never silently arm one.
 func TestCatalogConfig_RefreshStageResolution(t *testing.T) {
 	t.Parallel()
 	boolPtr := func(b bool) *bool { return &b }

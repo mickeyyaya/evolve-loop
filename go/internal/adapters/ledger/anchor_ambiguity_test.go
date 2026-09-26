@@ -11,15 +11,12 @@ import (
 	"testing"
 )
 
-// siblingLedger writes a chain in which entry_seq=2 is carried by TWO distinct
-// lines — the fork-sibling shape a pre-CA.1 concurrent Append produced — and
-// returns the evolve dir plus every line's SHA (index-aligned).
+// siblingLedger has two fork-sibling lines carrying entry_seq=2 and returns each line's SHA, index-aligned.
 func siblingLedger(t *testing.T) (dir string, sha []string) {
 	t.Helper()
 	dir = t.TempDir()
 	g := `{"ts":"2026-05-01T00:00:00Z","cycle":1,"role":"orchestrator","kind":"phase","exit_code":0,"entry_seq":0,"prev_hash":"` + ZeroSeed + `"}`
 	a := fmt.Sprintf(`{"ts":"2026-05-01T00:01:00Z","cycle":1,"role":"scout","kind":"phase","exit_code":0,"entry_seq":1,"prev_hash":"%s"}`, sha256Of(g))
-	// Two racers off the SAME parent, both stamped entry_seq=2.
 	b1 := fmt.Sprintf(`{"ts":"2026-05-01T00:02:00Z","cycle":1,"role":"builder","kind":"phase","exit_code":0,"entry_seq":2,"prev_hash":"%s"}`, sha256Of(a))
 	b2 := fmt.Sprintf(`{"ts":"2026-05-01T00:02:01Z","cycle":1,"role":"auditor","kind":"phase","exit_code":0,"entry_seq":2,"prev_hash":"%s"}`, sha256Of(a))
 	c := fmt.Sprintf(`{"ts":"2026-05-01T00:03:00Z","cycle":1,"role":"ship","kind":"phase","exit_code":0,"entry_seq":3,"prev_hash":"%s"}`, sha256Of(b2))
@@ -59,10 +56,6 @@ func readAnchorRec(t *testing.T, dir string) ledgerAnchor {
 	return rec
 }
 
-// TestAnchor_RejectsAmbiguousSeq: a seq carried by two distinct lines is refused
-// with ErrAmbiguousAnchorSeq, naming both candidates, and writes NO anchor file.
-// Before cycle-1433 this bound the FIRST sibling and exited 0, silently moving
-// the epoch anchor backward past a line the operator believed was sealed.
 func TestAnchor_RejectsAmbiguousSeq(t *testing.T) {
 	dir, sha := siblingLedger(t)
 	err := New(dir).Anchor(context.Background(), 2, "ambiguous")
@@ -82,10 +75,7 @@ func TestAnchor_RejectsAmbiguousSeq(t *testing.T) {
 	}
 }
 
-// TestAnchor_RejectsAmbiguousSeq_ByteIdenticalLinesAreNotAmbiguous: distinctness
-// is by SHA, not by line count. Two byte-identical lines are one set of bytes to
-// bind, so the anchor still resolves — otherwise a duplicated line would make an
-// anchor permanently unreachable.
+// This anchor must resolve: byte-identical lines share one SHA, so they are one line to bind.
 func TestAnchor_RejectsAmbiguousSeq_ByteIdenticalLinesAreNotAmbiguous(t *testing.T) {
 	dir := t.TempDir()
 	lines, sha := chainLines()
@@ -101,9 +91,6 @@ func TestAnchor_RejectsAmbiguousSeq_ByteIdenticalLinesAreNotAmbiguous(t *testing
 	}
 }
 
-// TestAnchor_LineSHABindsNamedSibling: --line-sha resolves the ambiguity by
-// binding the exact line named — here the SECOND sibling, the one a first-match
-// anchor would never have chosen — and the anchored chain verifies forward.
 func TestAnchor_LineSHABindsNamedSibling(t *testing.T) {
 	dir, sha := siblingLedger(t)
 	l := New(dir)
@@ -119,9 +106,6 @@ func TestAnchor_LineSHABindsNamedSibling(t *testing.T) {
 	}
 }
 
-// TestAnchor_LineSHANegatives: the flag must not become a way to bind an
-// arbitrary line. A SHA carrying a different seq, and a SHA present in no line,
-// are both refused with no residue.
 func TestAnchor_LineSHANegatives(t *testing.T) {
 	tests := []struct {
 		name    string

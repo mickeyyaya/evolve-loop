@@ -1,28 +1,5 @@
 package tokenusage
 
-// fillpct_multiturn_test.go — RED contract for cycle-1455 task
-// `contextfill-ratio-over-100pct` (inbox 2026-08-12, weight 0.75,
-// pipeline-repair; observed twice in one monitored wave: scout 566.9%, triage
-// 114.3%).
-//
-// The defect, in one line: ScanConfigRoot sums EVERY assistant turn's
-// Input+CacheRead+CacheWrite into one grand total (scanner.go:147-153), and
-// DefaultResolver feeds that summed total straight into FillPct against a
-// SINGLE-turn 200K window (defaultresolver.go:38). Each turn's own
-// cache_read_input_tokens already carries that turn's entire prior context, so
-// summing turn N with turn N+1 re-counts the same context once per turn. A
-// 12-turn phase near the ceiling therefore reports several hundred percent.
-//
-// The contract is BEHAVIOURAL and implementation-agnostic — it never names a
-// new symbol. Every fixture below grows monotonically (real transcripts do:
-// context only accumulates within a phase), so the terminal turn IS the peak
-// turn and either extraction satisfies these tests. What the fixtures DO rule
-// out is the sum, the first turn, and the mean.
-//
-// The two invariants the fix must not break: Result.Usage stays the SUM (it is
-// the cost/spend number, and correct as-is), and an honest over-100% reading
-// stays unclamped and legible (fillpct.go's own documented promise).
-
 import (
 	"math"
 	"path/filepath"
@@ -33,14 +10,9 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 )
 
-// pctTolerance is the float comparison slack for percentage assertions.
 const pctTolerance = 0.05
 
-// multiTurnFixture writes a transcript whose first user message carries
-// artifactPath (the primary attribution key) followed by the given assistant
-// turns, and returns the config root to hand ScanConfigRoot/DefaultResolver.
-// Turns carry no timestamp, so withinWindow admits them all — these fixtures
-// exercise the fill arithmetic, not the window filter.
+// multiTurnFixture's turns carry no timestamp, so withinWindow admits all of them.
 func multiTurnFixture(t *testing.T, artifactPath string, turns []string) string {
 	t.Helper()
 	root := t.TempDir()
@@ -52,8 +24,6 @@ func multiTurnFixture(t *testing.T, artifactPath string, turns []string) string 
 	return root
 }
 
-// assistantTurn renders one assistant transcript line with the four usage
-// counters a real Claude Code transcript reports.
 func assistantTurn(id string, input, output, cacheRead, cacheWrite int) string {
 	return `{"type":"assistant","message":{"id":"` + id + `","usage":{` +
 		`"input_tokens":` + strconv.Itoa(input) +
@@ -62,10 +32,7 @@ func assistantTurn(id string, input, output, cacheRead, cacheWrite int) string {
 		`,"cache_creation_input_tokens":` + strconv.Itoa(cacheWrite) + `}}}`
 }
 
-// inflatedTurns is the 566.9%-class reproducer: three turns whose prompt-side
-// totals are 70_000 / 130_000 / 180_000. Summed they are 380_000 (190% of the
-// 200K claude window — the bug). The terminal (== peak) turn is 180_000, a
-// plausible 90%.
+// inflatedTurns' prompt sides are 70K, 130K and 180K: 190% of the window summed, 90% at the peak.
 func inflatedTurns() []string {
 	return []string{
 		assistantTurn("m1", 5_000, 1_000, 60_000, 5_000),
@@ -74,10 +41,7 @@ func inflatedTurns() []string {
 	}
 }
 
-// TestFillPct_UsesTerminalTurnNotSumOfTurns is the load-bearing predicate for
-// the defect. 90% is the terminal turn's own occupancy; 190% is the summed
-// artefact this cycle removes. The intermediate assertions name the specific
-// wrong answers so a failure diagnoses itself.
+// The fill reads the peak turn; these fixtures grow monotonically, as real transcripts do, so the terminal turn is the peak.
 func TestFillPct_UsesTerminalTurnNotSumOfTurns(t *testing.T) {
 	const artifact = "/ws/cycle-1455/scout-report.md"
 	root := multiTurnFixture(t, artifact, inflatedTurns())
@@ -101,10 +65,6 @@ func TestFillPct_UsesTerminalTurnNotSumOfTurns(t *testing.T) {
 	}
 }
 
-// TestScanConfigRoot_MultiTurnTranscript_UsageStaysTheSum is the anti-overfit
-// half: Result.Usage is the COST number and summing turns is correct for it.
-// A fix that repairs fill% by making the scanner stop summing would silently
-// under-report every cycle's spend.
 func TestScanConfigRoot_MultiTurnTranscript_UsageStaysTheSum(t *testing.T) {
 	const artifact = "/ws/cycle-1455/scout-report.md"
 	root := multiTurnFixture(t, artifact, inflatedTurns())
@@ -119,12 +79,6 @@ func TestScanConfigRoot_MultiTurnTranscript_UsageStaysTheSum(t *testing.T) {
 	}
 }
 
-// TestFillWarn_OverHundredPercent_StaysLegible is the negative/edge case the
-// eval pins as `over-100-still-legible`. A genuine single-turn overrun (240_000
-// prompt-side tokens against the deliberately-conservative 200K effective
-// window) is a REAL signal — fillpct.go promises over-full readings are not
-// clamped. The fix must remove the summation inflation without also flattening
-// honest overruns to 100%.
 func TestFillWarn_OverHundredPercent_StaysLegible(t *testing.T) {
 	const artifact = "/ws/cycle-1455/build-report.md"
 	root := multiTurnFixture(t, artifact, []string{
@@ -151,10 +105,6 @@ func TestFillWarn_OverHundredPercent_StaysLegible(t *testing.T) {
 	}
 }
 
-// TestFillWarn_CorrectedFixtureDoesNotFalsePositive is the anti-false-positive
-// edge case. Three modest turns (42_000 / 62_000 / 94_000) sum to 198_000 —
-// 99%, comfortably past the 60% warn line — while the terminal turn is only
-// 47%. Today this launch warns spuriously; after the fix it must be silent.
 func TestFillWarn_CorrectedFixtureDoesNotFalsePositive(t *testing.T) {
 	const artifact = "/ws/cycle-1455/audit-report.md"
 	root := multiTurnFixture(t, artifact, []string{
@@ -175,12 +125,7 @@ func TestFillWarn_CorrectedFixtureDoesNotFalsePositive(t *testing.T) {
 	}
 }
 
-// TestFillPct_ZeroObservedTurns_IsUnmeasured is the sentinel-preservation edge
-// (scout Key Finding #3). A transcript that attributes to the launch but whose
-// assistant turns all fall OUTSIDE the launch window observed no context at
-// all. Reading that as a measured 0% would make the launch look like an empty
-// context forever; it must degrade to the documented negative sentinel, in the
-// same vocabulary the uncovered-driver path already uses.
+// The only assistant turn is timestamped outside the launch window.
 func TestFillPct_ZeroObservedTurns_IsUnmeasured(t *testing.T) {
 	const artifact = "/ws/cycle-1455/test-report.md"
 	root := t.TempDir()

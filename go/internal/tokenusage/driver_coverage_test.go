@@ -1,13 +1,5 @@
 package tokenusage
 
-// driver_coverage_test.go — cycle-779 AC2 contract (named by ACS predicates
-// C779_003/C779_004): per-driver fail-open extraction with an explicit
-// uncovered/WARN signal. The 2026-07-13 baseline recorded agy/codex-driven
-// launches as zero-usage-as-if-covered; these tests pin the fix — a driver
-// whose sources carry no usage yields Source==SourceNone WITH a per-driver
-// Warn (unmeasured, not free), a driver whose driver-agnostic tiers do carry
-// data is extracted normally, and an unknown driver never errors a launch.
-
 import (
 	"os"
 	"path/filepath"
@@ -17,14 +9,9 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 )
 
-// TestScanner_PerDriverCoverageWarnsNotZeros: a codex-driven launch with no
-// observable sources resolves uncovered WITH an explicit per-driver Warn —
-// never a silent zero attributed as covered — while the same driver WITH an
-// events-log envelope is extracted through the fail-open generic tier.
 func TestScanner_PerDriverCoverageWarnsNotZeros(t *testing.T) {
-	resolver := DefaultResolver(t.TempDir()) // no transcripts anywhere
+	resolver := DefaultResolver(t.TempDir())
 
-	// Uncovered: codex driver, no events log, no scrollback.
 	res, err := resolver(Window{
 		Driver:   "codex",
 		Worktree: "/repo/worktrees/cycle-779-codex",
@@ -47,7 +34,6 @@ func TestScanner_PerDriverCoverageWarnsNotZeros(t *testing.T) {
 		t.Errorf("Warn %q does not name the uncovered driver — coverage signal must be per-driver", res.Warn)
 	}
 
-	// Covered via the fail-open generic tier: codex driver with an events log.
 	ws := t.TempDir()
 	logPath := filepath.Join(ws, "build-events.ndjson")
 	envelope := `{"kind":"result","data":{"cost_usd":0.4,"tokens":{"in":900,"out":210,"cache_r":30,"cache_c":7}}}` + "\n"
@@ -75,9 +61,6 @@ func TestScanner_PerDriverCoverageWarnsNotZeros(t *testing.T) {
 	}
 }
 
-// TestScanner_UnknownDriverFailsOpenNoError: a driver identity the resolver
-// has never heard of fails OPEN — nil error (telemetry must never fail a
-// launch), zero usage, and an explicit uncovered Warn naming the driver.
 func TestScanner_UnknownDriverFailsOpenNoError(t *testing.T) {
 	resolver := DefaultResolver(t.TempDir())
 	res, err := resolver(Window{

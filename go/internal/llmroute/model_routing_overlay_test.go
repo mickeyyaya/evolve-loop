@@ -7,9 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
-// TestApplySoftOverlay_ZeroValueIsNoop (mr4-projection AC3, I8 byte-identical
-// regression floor): a zero-value Overlay ({CLI:"",Tier:""} — the static/
-// advisory no-proposal case) returns the input Plan unchanged.
 func TestApplySoftOverlay_ZeroValueIsNoop(t *testing.T) {
 	in := Plan{Candidates: []string{"claude-tmux", "codex-tmux"}, Model: "sonnet", Triggers: []int{80, 81}}
 	out := ApplySoftOverlay(in, Overlay{}, nil)
@@ -21,11 +18,6 @@ func TestApplySoftOverlay_ZeroValueIsNoop(t *testing.T) {
 	}
 }
 
-// TestApplySoftOverlay_CLIPromotedToPrimaryChainPreserved (mr4-projection
-// AC1/AC5, I3): a non-empty overlay.CLI becomes the chain PRIMARY, but every
-// existing candidate — including the pre-overlay primary — survives in the
-// chain (deduped, order preserved). This is what distinguishes a SOFT
-// overlay from a HARD pin: the chain never shrinks to a single candidate.
 func TestApplySoftOverlay_CLIPromotedToPrimaryChainPreserved(t *testing.T) {
 	in := Plan{Candidates: []string{"claude-tmux", "codex-tmux"}, Triggers: []int{80, 81}}
 	out := ApplySoftOverlay(in, Overlay{CLI: "codex"}, nil)
@@ -44,9 +36,6 @@ func TestApplySoftOverlay_CLIPromotedToPrimaryChainPreserved(t *testing.T) {
 	}
 }
 
-// TestApplySoftOverlay_CLIAlreadyPrimaryDeduped: when the overlay CLI is
-// already the plan's primary, promoting it must not duplicate it in the
-// chain.
 func TestApplySoftOverlay_CLIAlreadyPrimaryDeduped(t *testing.T) {
 	in := Plan{Candidates: []string{"claude-tmux", "codex-tmux"}}
 	out := ApplySoftOverlay(in, Overlay{CLI: "claude"}, nil)
@@ -58,9 +47,6 @@ func TestApplySoftOverlay_CLIAlreadyPrimaryDeduped(t *testing.T) {
 	}
 }
 
-// TestApplySoftOverlay_TierReplacesModel (mr4-projection AC1): a non-empty
-// overlay.Tier replaces plan.Model outright (no catalog translation here —
-// that happens later at bridge dispatch via the manifest's ModelTierMap).
 func TestApplySoftOverlay_TierReplacesModel(t *testing.T) {
 	in := Plan{Candidates: []string{"claude-tmux"}, Model: "sonnet"}
 	out := ApplySoftOverlay(in, Overlay{Tier: "deep"}, nil)
@@ -69,11 +55,6 @@ func TestApplySoftOverlay_TierReplacesModel(t *testing.T) {
 	}
 }
 
-// TestApplySoftOverlay_TierChainHonorsPhaseEnvelopeFloor (WS-876): an overlaid
-// tier's fallback chain must NOT step below the phase's OWN envelope Min under a
-// quota wall. A phase declaring min:deep (auditor.json/intent.json) must floor
-// the chain at deep, not the universal balanced — else an overlaid auditor would
-// silently drop below its configured quality floor when its tier is fully walled.
 func TestApplySoftOverlay_TierChainHonorsPhaseEnvelopeFloor(t *testing.T) {
 	in := Plan{Candidates: []string{"claude-tmux"}, Model: "sonnet"}
 	prof := &profiles.Profile{ModelTierEnvelope: &profiles.ModelTierEnvelope{Min: "deep"}}
@@ -90,8 +71,7 @@ func TestApplySoftOverlay_TierChainHonorsPhaseEnvelopeFloor(t *testing.T) {
 		}
 	}
 
-	// Contrast: with NO profile the universal balanced floor applies, so the
-	// chain is allowed to step down to balanced (proving the floor is what changed).
+	// Control: without a profile the universal balanced floor applies.
 	uni := ApplySoftOverlay(in, Overlay{Tier: "top"}, nil)
 	sawBalanced := false
 	for _, tr := range uni.Tiers {
@@ -104,8 +84,6 @@ func TestApplySoftOverlay_TierChainHonorsPhaseEnvelopeFloor(t *testing.T) {
 	}
 }
 
-// TestApplySoftOverlay_PureDoesNotMutateInput: ApplySoftOverlay returns a NEW
-// Plan; the input plan.Candidates slice is never mutated in place.
 func TestApplySoftOverlay_PureDoesNotMutateInput(t *testing.T) {
 	inCandidates := []string{"claude-tmux", "codex-tmux"}
 	in := Plan{Candidates: inCandidates}
@@ -115,19 +93,6 @@ func TestApplySoftOverlay_PureDoesNotMutateInput(t *testing.T) {
 	}
 }
 
-// TestApplySoftOverlay_PromotesAnExistingCandidateWithoutRewritingItsTransport
-// is the regression pin for the contract-escalation transport crossing found on
-// CI macOS (PR #390): a headless phase (chain [claude-p codex]) whose contract
-// block escalated to "codex" was dispatched to codex-TMUX, because the overlay
-// normalized the bare family to its default driver even though the chain already
-// held a concrete, correct entry for it. On a host without tmux that is a hard
-// exit=10 cycle failure; on a host WITH tmux it silently moves a headless-
-// configured phase onto a different transport with different cost and quota
-// behaviour. The same string resolved two ways in one phase's own chain: the
-// fallback ladder ran driver "codex", the escalation ran "codex-tmux".
-//
-// Rule: an overlay naming something the chain ALREADY contains promotes that
-// exact entry; only a CLI the chain lacks is normalized to its family default.
 func TestApplySoftOverlay_PromotesAnExistingCandidateWithoutRewritingItsTransport(t *testing.T) {
 	in := Plan{Candidates: []string{"claude-p", "codex"}, Triggers: []int{80, 81}}
 	out := ApplySoftOverlay(in, Overlay{CLI: "codex"}, nil)

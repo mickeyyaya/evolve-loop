@@ -8,11 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// TestParseModelRouting_ZeroValueStatic (mr4d AC2, config-driven-not-a-
-// Go-literal regression floor): an EMPTY/absent model_routing key in the
-// registry resolves to ModelRoutingStatic — the compiled Go zero value, never
-// a literal flip. This must hold regardless of what the checked-in
-// .evolve policy ships (AC3 flips only the CHECKED-IN file's value).
 func TestParseModelRouting_ZeroValueStatic(t *testing.T) {
 	dir := t.TempDir()
 	regPath := filepath.Join(dir, "phase-registry.json")
@@ -26,12 +21,8 @@ func TestParseModelRouting_ZeroValueStatic(t *testing.T) {
 	}
 }
 
-// TestParseModelRouting_EscapeHatchStaticOff (mr4d AC4): once auto becomes
-// the checked-in default (AC1/AC3), an operator must still be able to opt
-// back out. Both an explicit "static" and an unrecognized "off" value parse
-// to ModelRoutingStatic — the escape hatch is a policy edit, never an env
-// var (I7).
 func TestParseModelRouting_EscapeHatchStaticOff(t *testing.T) {
+	// "off" is not a model_routing word; it falls back to static.
 	for _, value := range []string{"static", "off"} {
 		dir := t.TempDir()
 		regPath := filepath.Join(dir, "phase-registry.json")
@@ -46,22 +37,7 @@ func TestParseModelRouting_EscapeHatchStaticOff(t *testing.T) {
 	}
 }
 
-// TestCheckedInPolicyDefaultsModelRoutingAuto (mr4d AC3): loading the repo's
-// OWN checked-in docs/architecture/phase-registry.json — the file
-// config.Load actually reads at every real call site (cmd_cycle.go,
-// phase_verify.go, router/policy.go all build registryPath from
-// "docs/architecture/phase-registry.json", never from .evolve/policy.json)
-// — must resolve to ModelRoutingAuto once Task C lands.
-//
-// NOTE (TDD-engineer, cycle-440): the scout report / api-contract / eval
-// mr4d-default-model-routing-auto.md all say the default flip belongs in
-// ".evolve/policy.json". Reading the actual producer (config.go's
-// registryDoc + every registryPath call site) shows model_routing is parsed
-// EXCLUSIVELY from docs/architecture/phase-registry.json's `config.model_routing`
-// key; .evolve/policy.json is a separate file (policy.Load) that never feeds
-// RoutingConfig.ModelRouting. This test targets the file the code actually
-// reads (Rule 8: read first, don't invent an API from context) — see
-// test-report.md for the full discrepancy note to Builder/Auditor.
+// Despite "Policy" in its name, this reads the checked-in phase registry, the only source of model_routing.
 func TestCheckedInPolicyDefaultsModelRoutingAuto(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	regPath := filepath.Join(root, "docs", "architecture", "phase-registry.json")

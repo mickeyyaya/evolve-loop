@@ -1,21 +1,5 @@
-// Package prompts loads agent and skill markdown with YAML frontmatter.
-//
-// The loader is fs.FS-backed so it can serve from three sources
-// without API churn:
-//
-//  1. fstest.MapFS — unit tests
-//  2. os.DirFS    — dev override at $EVOLVE_PROMPTS_DIR
-//  3. embed.FS    — Phase 3 vendored copy of agents/ + skills/
-//
-// Plan §1 decision #13 wires the embed path; this Phase 2 layer
-// commits to the fs.FS surface so the Phase 3 swap is one line at the
-// orchestrator wire-up site.
-//
-// The frontmatter parser is intentionally minimal — it handles only
-// the shapes observed in agents/*.md and skills/*/SKILL.md (flat
-// key-value, inline bracketed arrays, quoted strings). Loading any of
-// the existing 25 agent files must succeed; adding a full YAML
-// dependency would inflate the binary for no gain.
+// Package prompts loads agent and skill markdown docs, parses their
+// frontmatter, and strips their on-demand reference tails.
 package prompts
 
 import (
@@ -28,11 +12,7 @@ import (
 	"strings"
 )
 
-// Loader resolves agent/skill names to parsed Prompt values.
-//
-// A zero loader is valid; every read returns fs.ErrNotExist. Construct
-// via NewFromFS (any filesystem) or NewFromDir (a directory path; empty
-// path yields the zero loader).
+// Loader resolves agent and skill names to parsed Prompts; a zero Loader finds nothing.
 type Loader struct {
 	fs fs.FS
 }
@@ -45,13 +25,10 @@ type Prompt struct {
 	Raw         string
 }
 
-// NewFromFS constructs a Loader backed by any fs.FS. Pass nil to get
-// the zero loader (every read returns fs.ErrNotExist).
+// NewFromFS returns a Loader backed by fsys; a nil fsys gives the zero Loader.
 func NewFromFS(fsys fs.FS) *Loader { return &Loader{fs: fsys} }
 
-// NewFromDir constructs a Loader rooted at the given directory. Empty
-// path returns the zero loader — caller is responsible for combining
-// with an embed.FS fallback in Phase 3.
+// NewFromDir returns a Loader rooted at dir; an empty dir gives the zero Loader.
 func NewFromDir(dir string) *Loader {
 	if dir == "" {
 		return &Loader{}
@@ -59,11 +36,7 @@ func NewFromDir(dir string) *Loader {
 	return &Loader{fs: os.DirFS(dir)}
 }
 
-// NewForProject is the canonical loader-resolution helper for phase
-// registrations: honors the EVOLVE_PROMPTS_DIR dev override, otherwise
-// loads from the project root (where agents/ and skills/ live in the
-// repo layout). Replaces the duplicated `newPromptsLoader` helper that
-// previously lived in cmd_phase.go.
+// NewForProject returns a Loader rooted at $EVOLVE_PROMPTS_DIR when set, else at projectRoot.
 func NewForProject(projectRoot string) *Loader {
 	if d := os.Getenv("EVOLVE_PROMPTS_DIR"); d != "" {
 		return NewFromDir(d)
@@ -81,7 +54,7 @@ func (l *Loader) Skill(name string) (Prompt, error) {
 	return l.load(path.Join("skills", name, "SKILL.md"), name)
 }
 
-// Agents enumerates agent file names (without .md extension), sorted.
+// Agents lists agent names (file names without .md), sorted.
 func (l *Loader) Agents() ([]string, error) {
 	if l.fs == nil {
 		return nil, nil
@@ -102,8 +75,7 @@ func (l *Loader) Agents() ([]string, error) {
 	return out, nil
 }
 
-// Skills enumerates skill directory names that contain a SKILL.md,
-// sorted. Directories without SKILL.md are omitted.
+// Skills lists the skill directories that contain a SKILL.md, sorted.
 func (l *Loader) Skills() ([]string, error) {
 	if l.fs == nil {
 		return nil, nil
@@ -117,7 +89,6 @@ func (l *Loader) Skills() ([]string, error) {
 		if !e.IsDir() {
 			continue
 		}
-		// Only include directories that contain SKILL.md.
 		if _, err := fs.Stat(l.fs, path.Join("skills", e.Name(), "SKILL.md")); err != nil {
 			continue
 		}
@@ -127,21 +98,13 @@ func (l *Loader) Skills() ([]string, error) {
 	return out, nil
 }
 
-// load reads, parses, and packages a single prompt.
-// ErrNoSource marks a Loader with NO configured filesystem — a wiring defect
-// (empty/misresolved prompts root), categorically different from a single
-// missing doc even though the zero-loader contract also reports
-// fs.ErrNotExist. errors.Is(err, ErrNoSource) is the discriminator.
+// ErrNoSource marks a read from a Loader with no filesystem: a wiring defect, not one missing doc.
 var ErrNoSource = errors.New("prompts: no source configured")
 
 func (l *Loader) load(p, name string) (Prompt, error) {
 	if l.fs == nil {
-		// Both sentinels, deliberately: fs.ErrNotExist preserves the documented
-		// zero-loader contract (NewFromFS(nil): "every read returns
-		// fs.ErrNotExist"), while ErrNoSource lets callers distinguish a WIRING
-		// defect (misresolved prompts root — EVERY doc "missing") from one
-		// genuinely absent doc, so a nil loader can never masquerade as a
-		// skippable missing-persona (cycle-1551 class must stay narrow).
+		// Both sentinels: fs.ErrNotExist keeps the zero-Loader contract, and ErrNoSource
+		// keeps a misresolved prompts root from passing as one skippable missing persona.
 		return Prompt{}, fmt.Errorf("prompts: %w (%w)", fs.ErrNotExist, ErrNoSource)
 	}
 	raw, err := fs.ReadFile(l.fs, p)
@@ -160,13 +123,7 @@ func (l *Loader) load(p, name string) (Prompt, error) {
 	}, nil
 }
 
-// StripOnDemandSections removes the static reference tail from prompt bodies
-// when compact prompt mode is explicitly enabled by the caller.
-//
-// Match is line-anchored and prefix-based so that both the bare "## Reference Index"
-// heading (used in fixtures/tests) and the production form "## Reference Index (Layer 3,
-// on-demand)" are stripped. An inline prose mention ("see ## Reference Index below")
-// is never matched because the trimmed line does not start with the heading prefix.
+// StripOnDemandSections drops everything from the first line that is a "## Reference Index" heading onward.
 func StripOnDemandSections(body string) string {
 	offset := 0
 	for _, line := range strings.SplitAfter(body, "\n") {
@@ -179,31 +136,13 @@ func StripOnDemandSections(body string) string {
 	return body
 }
 
-// ParseFrontmatter splits a raw .md file into (frontmatter map, body).
-//
-// Behavior:
-//
-//   - No leading "---\n"            → (nil, full content, nil)
-//   - "---\n...\n---\n"             → (parsed map, content after fence, nil)
-//   - Opening fence with no close   → (nil, "", error)
-//
-// The parser handles three line shapes inside the block:
-//
-//   - "key: value"
-//   - "key: \"quoted value\"" / "key: 'quoted'"
-//   - "key: [a, b, \"c\"]"  (inline array → []string)
-//
-// Blank lines and lines starting with '#' are skipped. The first ':'
-// on each line splits the key from the value; remaining colons are
-// preserved (so "description: Phase 2: do Y" parses correctly).
+// ParseFrontmatter splits raw into its "---"-fenced frontmatter map and the body after the fence.
 func ParseFrontmatter(raw string) (map[string]any, string, error) {
 	if !strings.HasPrefix(raw, "---\n") && !strings.HasPrefix(raw, "---\r\n") {
 		return nil, raw, nil
 	}
-	// Skip the opening fence.
 	rest := strings.TrimPrefix(raw, "---\n")
 	rest = strings.TrimPrefix(rest, "---\r\n")
-	// Find the closing fence: a line that is exactly "---".
 	end := -1
 	lines := strings.Split(rest, "\n")
 	for i, line := range lines {
@@ -238,12 +177,11 @@ func ParseFrontmatter(raw string) (map[string]any, string, error) {
 	return fm, body, nil
 }
 
-// parseValue interprets a single frontmatter value.
+// parseValue returns an inline array as []string and any other value as an unquoted string.
 func parseValue(v string) any {
 	if v == "" {
 		return ""
 	}
-	// Inline array.
 	if strings.HasPrefix(v, "[") && strings.HasSuffix(v, "]") {
 		inner := strings.TrimSpace(v[1 : len(v)-1])
 		if inner == "" {
@@ -259,7 +197,6 @@ func parseValue(v string) any {
 	return unquote(v)
 }
 
-// unquote strips matched outer quotes (single or double).
 func unquote(s string) string {
 	if len(s) >= 2 {
 		first, last := s[0], s[len(s)-1]
@@ -270,9 +207,7 @@ func unquote(s string) string {
 	return s
 }
 
-// splitArray splits an inline-array body on commas, respecting quoted
-// elements. Minimal — covers the patterns in the existing agent files;
-// not a full CSV parser.
+// splitArray splits s on commas outside quotes, keeping the quotes; it has no escape handling.
 func splitArray(s string) []string {
 	out := []string{}
 	cur := strings.Builder{}

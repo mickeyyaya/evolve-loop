@@ -9,21 +9,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// fixtureHome is the HERMETIC operator home every $HOME/.claude test resolves
-// against. Deliberately NOT the machine's real home and deliberately NOT under
-// /tmp: the old helper fell back to "/tmp" when HOME was unset, which made every
-// "$HOME/.claude" assertion actually exercise the /tmp always-safe rule instead
-// — the test passed for the wrong reason in HOME-less sandboxes and CI
-// (guards-role-hermetic-home). isAlwaysSafe is pure string logic (it never
-// touches the filesystem), so a synthetic path is the strongest fixture: it
-// cannot exist, cannot be /tmp, and cannot vary by machine.
+// fixtureHome is a synthetic operator home: it cannot exist, cannot be under /tmp and cannot vary by
+// machine, so a <home>/.claude test exercises that rule and never the /tmp one.
 const fixtureHome = "/fixture-home/operator"
 
-// TestIsAlwaysSafe_DecidesAgainstTheGivenHome pins the predicate itself: the
-// always-safe rule applies to the home it was GIVEN and to no other. The
-// t.Setenv is a tripwire, not the subject — the predicate takes home as a
-// parameter and cannot read the environment, so these assertions fail only if a
-// future edit re-introduces an env read inside it (the wound this seam removed).
+// The t.Setenv is a tripwire: these assertions fail only if isAlwaysSafe starts reading the environment.
 func TestIsAlwaysSafe_DecidesAgainstTheGivenHome(t *testing.T) {
 	if !isAlwaysSafe(filepath.Join(fixtureHome, ".claude", "somefile"), fixtureHome) {
 		t.Errorf("%s/.claude/somefile is not always-safe against its OWN home", fixtureHome)
@@ -37,11 +27,6 @@ func TestIsAlwaysSafe_DecidesAgainstTheGivenHome(t *testing.T) {
 	}
 }
 
-// TestIsAlwaysSafe_UnsetHomeNeverMatchesClaude is the item's named RED: with NO
-// home resolved, the $HOME/.claude rule must match NOTHING. The dangerous shape
-// is filepath.Join("", ".claude") == ".claude", which would turn every
-// relative ".claude/..." path (and, once prefixed, plenty of others) into
-// always-safe scratch space on any HOME-less runner.
 func TestIsAlwaysSafe_UnsetHomeNeverMatchesClaude(t *testing.T) {
 	for _, path := range []string{
 		".claude/settings.json",
@@ -52,16 +37,11 @@ func TestIsAlwaysSafe_UnsetHomeNeverMatchesClaude(t *testing.T) {
 			t.Errorf("isAlwaysSafe(%q, home=\"\") = true — with no home there is no $HOME/.claude rule to apply", path)
 		}
 	}
-	// /tmp is home-independent and must keep working with no home at all.
 	if !isAlwaysSafe("/tmp/scratch/foo.go", "") {
 		t.Error("/tmp scratch must stay always-safe regardless of home")
 	}
 }
 
-// TestNewRole_ResolvesHomeFromEnv is the production-wiring proof: the exported
-// constructor the composition root calls (guardcmd.buildGuard → NewRole) is the
-// ONE place that reads $HOME, so the guard's decision is reproducible for the
-// life of the process instead of re-reading a mutable env at every Decide.
 func TestNewRole_ResolvesHomeFromEnv(t *testing.T) {
 	t.Setenv("HOME", fixtureHome)
 	g := NewRole(nil, false)
@@ -74,16 +54,6 @@ func TestNewRole_ResolvesHomeFromEnv(t *testing.T) {
 	}
 }
 
-// Role is the port of scripts/guards/role-gate.sh — per-phase write
-// allowlists for the Edit/Write tools. Phase-1 subset of rules:
-//   - calibrate/research/discover: workspace only
-//   - build: workspace + active_worktree/**
-//   - audit: workspace + audit-* artifacts at evolve dir
-//   - learn/retrospective: orchestrator-report.md, lessons/*.yaml,
-//     state.json
-//   - Always-safe: /tmp/**, $HOME/.claude/**
-//   - Read/Bash tools pass through (different guards handle them)
-//   - Constructor-injected bypass=true bypasses
 func TestRole_Name(t *testing.T) {
 	g := NewRole(nil, false)
 	if g.Name() != "role" {
@@ -98,13 +68,10 @@ func TestRole_BuilderWritesInWorktree(t *testing.T) {
 		Phase:          "build",
 		ActiveAgent:    "builder",
 		ActiveWorktree: worktree,
-		// Writable: WriteCycleState mirrors the state to <workspace>/run.json
-		// (CB.4). The role decisions below never reference this path.
-		WorkspacePath: filepath.Join(t.TempDir(), ".evolve", "runs", "cycle-42"),
+		WorkspacePath:  filepath.Join(t.TempDir(), ".evolve", "runs", "cycle-42"),
 	})
 	g := NewRole(s, false)
 
-	// In worktree: allow.
 	dec := g.Decide(context.Background(), core.GuardInput{
 		ToolName:  "Edit",
 		ToolInput: map[string]any{"file_path": filepath.Join(worktree, "src/foo.go")},
@@ -113,7 +80,6 @@ func TestRole_BuilderWritesInWorktree(t *testing.T) {
 		t.Errorf("builder write in worktree denied: %s", dec.Reason)
 	}
 
-	// Outside worktree, outside workspace: deny.
 	dec = g.Decide(context.Background(), core.GuardInput{
 		ToolName:  "Edit",
 		ToolInput: map[string]any{"file_path": "/Users/x/some/other/file.go"},
@@ -123,10 +89,6 @@ func TestRole_BuilderWritesInWorktree(t *testing.T) {
 	}
 }
 
-// TestRole_TDDWritesTestsInWorktree is the kernel proof of the worktree-
-// provisioning fix: tdd (a source-writing phase) may now write *_test.go into
-// the per-cycle worktree. Before, only phase=="build" got this allowance, so
-// tdd's RED tests were denied ("may not write outside workspace") → exit 81.
 func TestRole_TDDWritesTestsInWorktree(t *testing.T) {
 	worktree := "/work/wt/cycle-50" // non-/tmp so isAlwaysSafe doesn't short-circuit
 	s, _ := setupStorageWithCS(t, core.CycleState{
@@ -134,10 +96,7 @@ func TestRole_TDDWritesTestsInWorktree(t *testing.T) {
 		Phase:          "tdd",
 		ActiveAgent:    "tdd-engineer",
 		ActiveWorktree: worktree,
-		// Writable: WriteCycleState mirrors the state to <workspace>/run.json
-		// (CB.4). The decided path below is under the (fake) worktree, so the
-		// workspace location plays no part in the decision.
-		WorkspacePath: filepath.Join(t.TempDir(), ".evolve", "runs", "cycle-50"),
+		WorkspacePath:  filepath.Join(t.TempDir(), ".evolve", "runs", "cycle-50"),
 	})
 	g := NewRole(s, false)
 
@@ -150,17 +109,13 @@ func TestRole_TDDWritesTestsInWorktree(t *testing.T) {
 	}
 }
 
-// TestRole_NonWorktreePhaseDeniedWorktreeWrite confirms the allowance is scoped:
-// a read-mostly phase (scout) cannot write source into the worktree even when
-// one exists — the source/non-source separation is preserved.
 func TestRole_NonWorktreePhaseDeniedWorktreeWrite(t *testing.T) {
 	worktree := "/work/wt/cycle-51" // non-/tmp so isAlwaysSafe doesn't short-circuit
 	s, _ := setupStorageWithCS(t, core.CycleState{
 		CycleID:        51,
 		Phase:          "scout",
 		ActiveWorktree: worktree,
-		// Writable for the CB.4 run.json mirror; not referenced by the decision.
-		WorkspacePath: filepath.Join(t.TempDir(), ".evolve", "runs", "cycle-51"),
+		WorkspacePath:  filepath.Join(t.TempDir(), ".evolve", "runs", "cycle-51"),
 	})
 	g := NewRole(s, false)
 
@@ -174,8 +129,6 @@ func TestRole_NonWorktreePhaseDeniedWorktreeWrite(t *testing.T) {
 }
 
 func TestRole_AuditPhaseRestricted(t *testing.T) {
-	// t.TempDir()-rooted (not a fixed /tmp path): the CB.4 run.json mirror
-	// writes into the workspace, so it must be cleaned up with the test.
 	ws := filepath.Join(t.TempDir(), ".evolve", "runs", "cycle-7")
 	s, _ := setupStorageWithCS(t, core.CycleState{
 		CycleID:       7,
@@ -184,7 +137,6 @@ func TestRole_AuditPhaseRestricted(t *testing.T) {
 	})
 	g := NewRole(s, false)
 
-	// audit-report.md inside workspace: allow.
 	dec := g.Decide(context.Background(), core.GuardInput{
 		ToolName:  "Edit",
 		ToolInput: map[string]any{"file_path": filepath.Join(ws, "audit-report.md")},
@@ -193,7 +145,6 @@ func TestRole_AuditPhaseRestricted(t *testing.T) {
 		t.Errorf("audit-report write denied: %s", dec.Reason)
 	}
 
-	// random source file outside workspace: deny.
 	dec = g.Decide(context.Background(), core.GuardInput{
 		ToolName:  "Edit",
 		ToolInput: map[string]any{"file_path": "/repo/src/foo.go"},
@@ -203,11 +154,6 @@ func TestRole_AuditPhaseRestricted(t *testing.T) {
 	}
 }
 
-// TestRole_AlwaysSafeDirs asserts BOTH halves of an always-safe verdict: Allow
-// AND !Alarm. Without the alarm assertion a regression that alarms on every /tmp
-// write is undetectable, and a flood of false alarms is how a real violation
-// hides. The home is the hermetic fixture, so the second case exercises the
-// $HOME/.claude rule itself rather than /tmp's (guards-role-hermetic-home).
 func TestRole_AlwaysSafeDirs(t *testing.T) {
 	s, _ := setupStorageWithCS(t, core.CycleState{CycleID: 1, Phase: "build"})
 	g := newRoleWithHome(s, false, fixtureHome)
@@ -240,7 +186,6 @@ func TestRole_NonEditWriteToolsPass(t *testing.T) {
 }
 
 func TestRole_BypassAllows(t *testing.T) {
-	// t.TempDir()-rooted for the CB.4 run.json mirror; not referenced below.
 	s, _ := setupStorageWithCS(t, core.CycleState{CycleID: 1, Phase: "build",
 		WorkspacePath: filepath.Join(t.TempDir(), ".evolve", "runs", "cycle-1")})
 	g := NewRole(s, true)
@@ -311,9 +256,7 @@ func TestRole_BuildPhaseNoWorktree_DeniesNonWorkspace(t *testing.T) {
 		CycleID:        1,
 		Phase:          "build",
 		ActiveWorktree: "",
-		// t.TempDir()-rooted for the CB.4 run.json mirror; not referenced
-		// by the decision below.
-		WorkspacePath: filepath.Join(t.TempDir(), ".evolve", "runs", "cycle-1"),
+		WorkspacePath:  filepath.Join(t.TempDir(), ".evolve", "runs", "cycle-1"),
 	})
 	g := NewRole(s, false)
 	dec := g.Decide(context.Background(), core.GuardInput{
@@ -330,7 +273,7 @@ func TestRole_MissingFilePathAllows(t *testing.T) {
 	g := NewRole(s, false)
 	dec := g.Decide(context.Background(), core.GuardInput{
 		ToolName:  "Edit",
-		ToolInput: map[string]any{}, // no file_path
+		ToolInput: map[string]any{},
 	})
 	if !dec.Allow {
 		t.Errorf("missing file_path must allow, got: %s", dec.Reason)
@@ -338,9 +281,8 @@ func TestRole_MissingFilePathAllows(t *testing.T) {
 }
 
 func TestRoleGuard_RelativeWorkspacePath(t *testing.T) {
-	// Run from a temp cwd: the relative WorkspacePath below is the point of
-	// the test, and since CB.4 WriteCycleState mirrors run.json into it —
-	// without the chdir that mirror would land in the package source tree.
+	// Run from a temp cwd: WriteCycleState mirrors run.json into the relative workspace, which would
+	// otherwise land in the package source tree.
 	orig, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)

@@ -6,19 +6,19 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// Phase blocks the Agent tool when a cycle is in progress (cycle-state.json
-// has a non-empty cycle_id). Port of the phase-gate-precondition.sh
-// agent-tool-during-cycle rule (one of several rules in the original;
-// the rest land in Phase 2).
+// Phase denies the in-process Agent tool during an active cycle, so phase agents go through the native bridge.
 type Phase struct {
 	storage core.Storage
 	bypass  bool
 }
 
+// NewPhase returns a Phase guard that reads cycle state from s; bypass allows every call.
 func NewPhase(s core.Storage, bypass bool) *Phase { return &Phase{storage: s, bypass: bypass} }
 
+// Name reports "phase".
 func (p *Phase) Name() string { return "phase" }
 
+// Decide denies Agent while a cycle is active, and fails closed when cycle state cannot be read.
 func (p *Phase) Decide(ctx context.Context, in core.GuardInput) core.GuardDecision {
 	if p.bypass {
 		return core.GuardDecision{Allow: true}

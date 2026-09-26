@@ -1,16 +1,5 @@
 package router
 
-// router_memo_disabled_test.go — cycle-563 fix-memo-phase-dispatch, criterion 3
-// (negative case): whatever fixes the silent post-ship memo-dispatch drop must
-// not force memo to run unconditionally. With memo explicitly disabled via
-// policy (PhaseEnable["memo"]==EnableOff), the exact same post-ship routing
-// input that cycle-561's routing-decision-12.json shows resolving to "memo"
-// must instead clamp to the next legal phase (here: "end", since retrospective
-// is untriggered on a plain PASS cycle and memo is last in canonicalOrder) —
-// and must NEVER return "memo". TestRoute_PostShip_MemoEnabled_RoutesToMemo is
-// the contrasting positive case, proving the negative isn't vacuously true
-// because memo was already unreachable from this input.
-
 import (
 	"testing"
 

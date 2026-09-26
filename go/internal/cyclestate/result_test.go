@@ -6,8 +6,6 @@ import (
 	"testing"
 )
 
-// TestSystemFailureSignal_Wire pins the ADR-0072 system-failure signal JSON
-// shape (serialized into the escalation dossier) and names the type (apicover).
 func TestSystemFailureSignal_Wire(t *testing.T) {
 	b, err := json.Marshal(SystemFailureSignal{Category: "verdict-incoherence", Level: "system", Evidence: "e", Halt: true})
 	if err != nil {
@@ -18,15 +16,12 @@ func TestSystemFailureSignal_Wire(t *testing.T) {
 			t.Errorf("SystemFailureSignal JSON missing %s: %s", want, b)
 		}
 	}
-	// CycleResult carries the signal by pointer.
 	r := CycleResult{SystemFailure: &SystemFailureSignal{Category: "verdict-incoherence", Halt: true}}
 	if r.SystemFailure == nil || !r.SystemFailure.Halt {
 		t.Error("CycleResult.SystemFailure not wired")
 	}
 }
 
-// TestTokenUsage_Wire pins the snake_case JSON wire shape (cost telemetry is
-// serialized into ledger/phase artifacts).
 func TestTokenUsage_Wire(t *testing.T) {
 	b, err := json.Marshal(TokenUsage{Input: 1, Output: 2, CacheRead: 3, CacheWrite: 4})
 	if err != nil {
@@ -39,7 +34,6 @@ func TestTokenUsage_Wire(t *testing.T) {
 	}
 }
 
-// TestDiagnostic_Wire pins the diagnostic wire shape.
 func TestDiagnostic_Wire(t *testing.T) {
 	b, err := json.Marshal(Diagnostic{Severity: "error", Message: "boom"})
 	if err != nil {
@@ -52,9 +46,6 @@ func TestDiagnostic_Wire(t *testing.T) {
 	}
 }
 
-// TestSkippedPhase_Wire pins the SkippedPhase wire shape — a phase that did NOT
-// run, with its skip CAUSE (closeout after an abnormal mid-cycle exit). Its
-// snake-case JSON tags are the dossier contract.
 func TestSkippedPhase_Wire(t *testing.T) {
 	b, err := json.Marshal(SkippedPhase{Phase: "closeout", Reason: "abnormal exit in phase build"})
 	if err != nil {
@@ -67,13 +58,6 @@ func TestSkippedPhase_Wire(t *testing.T) {
 	}
 }
 
-// TestVerdictNotAdopted_Wire pins the ran-but-declined record (cycle-802
-// retro-bridge-timeout-width10 guard): a non-floor phase's non-PASS verdict is
-// preserved in the cycle dossier instead of clobbering a floor-derived
-// FinalVerdict. It is DISTINCT from SkippedPhase — the field names the phase's
-// VERDICT, so the dossier can never claim retro was skipped on a cycle where retro
-// ran (dossier-retro-skipped-mislabel). The tags are the dossier contract, so a
-// drift here silently drops the audit trail.
 func TestVerdictNotAdopted_Wire(t *testing.T) {
 	b, err := json.Marshal(VerdictNotAdopted{Phase: "retro", Verdict: "FAIL"})
 	if err != nil {
@@ -87,7 +71,6 @@ func TestVerdictNotAdopted_Wire(t *testing.T) {
 	if strings.Contains(string(b), `"reason"`) {
 		t.Errorf("VerdictNotAdopted must not carry a skip-shaped \"reason\" key: %s", b)
 	}
-	// CycleResult carries the records; SkippedPhases stays reserved for real skips.
 	r := CycleResult{VerdictsNotAdopted: []VerdictNotAdopted{{Phase: "retro", Verdict: "FAIL"}}}
 	if len(r.VerdictsNotAdopted) != 1 || r.VerdictsNotAdopted[0].Phase != "retro" {
 		t.Errorf("CycleResult.VerdictsNotAdopted not wired: %+v", r)
@@ -97,8 +80,6 @@ func TestVerdictNotAdopted_Wire(t *testing.T) {
 	}
 }
 
-// TestCycleResult constructs the cycle-summary value and checks PhasesRun uses
-// the Phase type (so it composes with the rest of the leaf vocabulary).
 func TestCycleResult(t *testing.T) {
 	r := CycleResult{
 		Cycle:         7,

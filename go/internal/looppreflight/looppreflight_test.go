@@ -14,16 +14,9 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
-// fixedNow is a deterministic clock for tests.
 func fixedNow() time.Time { return time.Unix(0, 0).UTC() }
 
-// goodPipelineOptions returns an Options on which EVERY check passes: each spine
-// phase has a factory + contract, the one profile loads and its CLI resolves to
-// a known driver, every binary probes found, the host has full capabilities,
-// disk is ample, and no stale bridge sessions linger. Every external lookup is a
-// seam so the test needs no real registry/driver/profile-dir/host state.
-// SkipBoot keeps the real bridge boot inert. Tests override individual seams to
-// exercise one failure at a time.
+// goodPipelineOptions returns Options on which no check halts (bridge-boot warns: SkipBoot is set).
 func goodPipelineOptions(t *testing.T) Options {
 	t.Helper()
 	return Options{
@@ -46,9 +39,8 @@ func goodPipelineOptions(t *testing.T) Options {
 			return preflight.Profile{Sandbox: preflight.Sandbox{ExpectedToWork: true, SandboxExecAvailable: true}}
 		},
 		DirWritable:   func(string) bool { return true },
-		DiskFreeBytes: func(string) (uint64, error) { return 50 << 30, nil }, // 50 GiB
-		// Freeze seams (ADR-0044 C5): benign defaults so unrelated tests
-		// never stat the real ~/.codex or exec real brew.
+		DiskFreeBytes: func(string) (uint64, error) { return 50 << 30, nil },
+		// Freeze seams stubbed so tests never read the real home dir or run brew.
 		SelfUpdateEvidence: func(string) (bool, string, error) { return false, "", nil },
 		PinnedLister:       func() ([]string, error) { return nil, nil },
 	}
@@ -162,8 +154,6 @@ func TestRun_PipelineStructure_UnknownCLI_Halts(t *testing.T) {
 	}
 }
 
-// A single check accumulates ALL gaps — the operator sees every problem at once,
-// not just the first.
 func TestRun_PipelineStructure_AccumulatesAllGaps(t *testing.T) {
 	opts := goodPipelineOptions(t)
 	opts.ContractKnown = func(name string) bool { return name != "build" }
@@ -206,10 +196,6 @@ func TestNewDefaultBootTester_InvalidDriverReturnsBadFlags(t *testing.T) {
 	}
 }
 
-// TestResolve_NilDefaults verifies that resolve() fills every function seam
-// when Options contains only the required ProjectRoot. This is the binding
-// test for the nil-branch logic at looppreflight.go:resolve() — a missed nil
-// check would leave a function field nil and panic at batch start.
 func TestResolve_NilDefaults(t *testing.T) {
 	o, err := resolve(Options{ProjectRoot: t.TempDir()})
 	if err != nil {

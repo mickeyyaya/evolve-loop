@@ -5,10 +5,6 @@ import (
 	"testing"
 )
 
-// TestMintSpec_CarriesSelectMetadata pins the advisor-facing wire contract
-// (cycle-1275): MintSpec must decode description/when_to_use under the SAME
-// JSON keys phasespec.PhaseSpec already uses, so the minter can thread the
-// advisor's SELECT metadata straight through without a vocabulary translation.
 func TestMintSpec_CarriesSelectMetadata(t *testing.T) {
 	t.Parallel()
 	var spec MintSpec
@@ -24,9 +20,6 @@ func TestMintSpec_CarriesSelectMetadata(t *testing.T) {
 	}
 }
 
-// TestMintSpec_MetadataOmitEmpty is the negative case: a MintSpec with unset
-// metadata must marshal byte-identically to the pre-cycle-1275 wire form, so
-// today's advisor output and every recorded plan artifact round-trip unchanged.
 func TestMintSpec_MetadataOmitEmpty(t *testing.T) {
 	t.Parallel()
 	got, err := json.Marshal(MintSpec{Prompt: "p", Tier: "deep", CLI: "claude"})

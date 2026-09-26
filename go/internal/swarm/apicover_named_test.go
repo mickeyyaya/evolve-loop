@@ -1,22 +1,5 @@
 package swarm
 
-// apicover_named_test.go — public-API coverage (ADR-0050 Phase 5).
-//
-// apicover flags an exported symbol UNCOVERED unless a _test.go in this package
-// NAMES the identifier (and, for funcs/methods, also executes it >0%). The 14
-// types below were exercised only INDIRECTLY by the existing suite (fakes
-// implement the interfaces structurally; producers return the report structs)
-// but their bare identifiers never appeared in test source, so apicover could
-// not see them. Each test here NAMES the type via a meaningful use:
-//   - interface seams: a compile-time `var _ Iface = concreteImpl` satisfaction
-//     assertion, then a real method call through the interface variable;
-//   - report/result structs: bind the value the REAL producer returns to a typed
-//     variable and assert on its fields (no bare literals, no `_ = pkg.X`);
-//   - the SessionStatus enum: asserted through the SessionRegistry it lives on.
-//
-// Rule 9: every assertion probes intent (a contract the type guarantees), not
-// the mere existence of the symbol.
-
 import (
 	"context"
 	"errors"
@@ -26,13 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 )
 
-// ——— mergetrain.go interface seams ———
-
-// TestGitMerger_SatisfiedByExecGitMerger pins the production GitMerger impl to
-// the interface (compile-time) and proves the seam routes a Merge call through.
-// ExecGitMerger.Merge against a non-existent worktree must fail wrapping
-// ErrMergeConflict (its abort-on-failure contract) — that is the interface
-// method actually doing work, not a no-op.
 func TestGitMerger_SatisfiedByExecGitMerger(t *testing.T) {
 	var merger GitMerger = ExecGitMerger{IntegrationWorktree: filepath.Join(t.TempDir(), "no-such-worktree")}
 	err := merger.Merge(context.Background(), "cycle-1-integration", "cycle-1-w0")
@@ -44,11 +20,6 @@ func TestGitMerger_SatisfiedByExecGitMerger(t *testing.T) {
 	}
 }
 
-// TestAcceptanceChecker_GatesMerge binds a real AcceptanceChecker value and
-// proves the merge-train honours its verdict: a checker that fails worker w1
-// stops the train at w1 (acceptance gating is the "~80% fewer broken
-// integrations" rule). Naming the AcceptanceChecker type on the var is what
-// apicover keys on; the assertion proves the gate fires.
 func TestAcceptanceChecker_GatesMerge(t *testing.T) {
 	var accept AcceptanceChecker = func(_ context.Context, workerID, _ string) error {
 		if workerID == "w1" {
@@ -67,15 +38,11 @@ func TestAcceptanceChecker_GatesMerge(t *testing.T) {
 	}
 }
 
-// TestConflictResolver_ResolvesAndRetries binds a real ConflictResolver value
-// and proves the merge-train re-invokes it on a conflict, then retries the
-// merge: the resolver "fixes" w1's branch so the second merge attempt lands and
-// the outcome is marked Resolved.
 func TestConflictResolver_ResolvesAndRetries(t *testing.T) {
 	m := &scriptMerger{failBranch: map[string]bool{"cycle-1-w1": true}}
 	var resolver ConflictResolver = func(_ context.Context, workerID, _ string) error {
 		if workerID == "w1" {
-			m.failBranch["cycle-1-w1"] = false // resolve so the retry merges
+			m.failBranch["cycle-1-w1"] = false
 		}
 		return nil
 	}
@@ -90,10 +57,6 @@ func TestConflictResolver_ResolvesAndRetries(t *testing.T) {
 	}
 }
 
-// TestMergeReport_ProducedByRunMergeTrain binds the MergeReport that the real
-// producer (RunMergeTrain) returns to a typed variable and asserts its
-// aggregate field: a clean two-worker train sets AllMerged and records one
-// MergeOutcome per worker.
 func TestMergeReport_ProducedByRunMergeTrain(t *testing.T) {
 	var rep MergeReport = RunMergeTrain(context.Background(), "cycle-1-integration",
 		[]string{"w0", "w1"}, branchMap("w0", "w1"), MergeTrainDeps{Merger: &scriptMerger{}})
@@ -105,11 +68,6 @@ func TestMergeReport_ProducedByRunMergeTrain(t *testing.T) {
 	}
 }
 
-// ——— kill.go interface seams ———
-
-// TestSessionKiller_SatisfiedByExecSessionKiller pins ExecSessionKiller to the
-// SessionKiller interface and exercises the seam: a handle with a kill-able pgid
-// and tmux session must drive both injected steps through the interface.
 func TestSessionKiller_SatisfiedByExecSessionKiller(t *testing.T) {
 	var gotPGID int
 	var gotTmux string
@@ -125,9 +83,6 @@ func TestSessionKiller_SatisfiedByExecSessionKiller(t *testing.T) {
 	}
 }
 
-// TestProcessGroupKiller_InvokedByExecSessionKiller binds a real
-// ProcessGroupKiller value and proves ExecSessionKiller calls it with the
-// handle's pgid (the negative-pgid group-kill seam).
 func TestProcessGroupKiller_InvokedByExecSessionKiller(t *testing.T) {
 	var got int
 	var pgKiller ProcessGroupKiller = func(pgid int) error { got = pgid; return nil }
@@ -140,24 +95,16 @@ func TestProcessGroupKiller_InvokedByExecSessionKiller(t *testing.T) {
 	}
 }
 
-// TestTmuxKiller_SatisfiedByExecTmuxKill pins the production ExecTmuxKill to the
-// TmuxKiller signature and exercises its SAFETY contract: an empty session name
-// must be REFUSED (tmux resolves "" to the caller's own session — the killer-B
-// suicide class), while a real name is accepted best-effort.
 func TestTmuxKiller_SatisfiedByExecTmuxKill(t *testing.T) {
 	var killer TmuxKiller = ExecTmuxKill
 	if err := killer(context.Background(), ""); err == nil {
 		t.Error("TmuxKiller (ExecTmuxKill) must refuse an empty session name")
 	}
-	// A real name is accepted (best-effort; tmux exit code ignored).
 	if err := killer(context.Background(), "evolve-bridge-test"); err != nil {
 		t.Errorf("TmuxKiller must accept a real session name best-effort, got %v", err)
 	}
 }
 
-// TestReapReport_ProducedByReap binds the ReapReport that the real producer
-// (Reap) returns and asserts its fields: reaping two live sessions where one
-// killer errors records the kill in Killed and the failure in Errors.
 func TestReapReport_ProducedByReap(t *testing.T) {
 	reg := NewSessionRegistry(filepath.Join(t.TempDir(), "s.json"), 1, "build", 1)
 	_ = reg.Register(handle("w0"))
@@ -171,11 +118,6 @@ func TestReapReport_ProducedByReap(t *testing.T) {
 	}
 }
 
-// ——— reap_runsessions.go report struct ———
-
-// TestReapRunReport_ProducedByReapRunSessions binds the ReapRunReport that the
-// real producer (ReapRunSessions) returns and asserts its accounting: one
-// evolve-bridge session is Killed, the empty + foreign names are Skipped.
 func TestReapRunReport_ProducedByReapRunSessions(t *testing.T) {
 	dir := t.TempDir()
 	path := writeRegistry(t, dir, "evolve-bridge-rZZZZ9999-c1-build-pid1-1")
@@ -188,12 +130,6 @@ func TestReapRunReport_ProducedByReapRunSessions(t *testing.T) {
 	}
 }
 
-// ——— provision.go interface seam ———
-
-// TestWorkerProvisioner_SatisfiedByGitProvisioner pins the production
-// provisioner (NewGitWorkerProvisioner) to the WorkerProvisioner interface and
-// exercises a no-op method through it: Cleanup of an empty worktree path is the
-// documented best-effort no-op (returns nil without shelling out to git).
 func TestWorkerProvisioner_SatisfiedByGitProvisioner(t *testing.T) {
 	var prov WorkerProvisioner = NewGitWorkerProvisioner(nil, "")
 	if err := prov.Cleanup(context.Background(), t.TempDir(), ""); err != nil {
@@ -201,15 +137,10 @@ func TestWorkerProvisioner_SatisfiedByGitProvisioner(t *testing.T) {
 	}
 }
 
-// ——— types.go value types ———
-
-// TestConflict_ProducedByValidate binds the Conflict value that the real
-// producer (Validate) emits for an overlapping writer plan and asserts its
-// fields: the contended file and both claiming worker IDs.
 func TestConflict_ProducedByValidate(t *testing.T) {
 	plan := writerPlan(
 		fileWorker("w0", "go/internal/foo/a.go"),
-		fileWorker("w1", "go/internal/foo/a.go"), // same file → one Conflict
+		fileWorker("w1", "go/internal/foo/a.go"),
 	)
 	res := Validate(plan)
 	if len(res.Conflicts) != 1 {
@@ -224,9 +155,6 @@ func TestConflict_ProducedByValidate(t *testing.T) {
 	}
 }
 
-// TestValidationResult_ProducedByValidate binds the ValidationResult that the
-// real producer (Validate) returns for a disjoint writer plan and asserts its
-// verdict fields: OK with no Collapse and a full merge order.
 func TestValidationResult_ProducedByValidate(t *testing.T) {
 	plan := writerPlan(
 		fileWorker("w0", "go/internal/foo/a.go"),
@@ -241,12 +169,6 @@ func TestValidationResult_ProducedByValidate(t *testing.T) {
 	}
 }
 
-// ——— registry.go status enum ———
-
-// TestSessionStatus_LifecycleThroughRegistry names the SessionStatus type and
-// both its values (StatusLive / StatusReaped) and asserts the registry drives
-// the lifecycle: a freshly Registered handle is StatusLive; after MarkReaped its
-// persisted status is StatusReaped.
 func TestSessionStatus_LifecycleThroughRegistry(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "sessions.json")
 	reg := NewSessionRegistry(path, 1, "build", 1)
@@ -267,9 +189,6 @@ func TestSessionStatus_LifecycleThroughRegistry(t *testing.T) {
 	}
 }
 
-// TestSessionRegistry_TypeNamedAndExercised names the SessionRegistry type on a
-// typed variable (apicover keys on the named identifier) and exercises a
-// round-trip: Register then Live reflects exactly the live work-list.
 func TestSessionRegistry_TypeNamedAndExercised(t *testing.T) {
 	var reg *SessionRegistry = NewSessionRegistry(filepath.Join(t.TempDir(), "s.json"), 1, "build", 1)
 	_ = reg.Register(handle("w0"))
@@ -279,9 +198,6 @@ func TestSessionRegistry_TypeNamedAndExercised(t *testing.T) {
 	}
 }
 
-// TestSwarmResult_TotalTokens names SwarmResult.TotalTokens and pins its
-// contract: the field-wise sum of per-worker token usage — the token twin of
-// TotalCostUSD, so per-worker counts survive the N→1 merge into the ledger.
 func TestSwarmResult_TotalTokens(t *testing.T) {
 	s := SwarmResult{Workers: []WorkerResult{
 		{Tokens: cyclestate.TokenUsage{Input: 10, Output: 3, CacheRead: 7, CacheWrite: 2}},

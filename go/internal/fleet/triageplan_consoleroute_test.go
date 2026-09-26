@@ -1,12 +1,5 @@
 package fleet
 
-// triageplan_consoleroute_test.go — RED contract for ADR-0074 I1 at the REAL
-// dispatch chokepoint (architect review finding 2): triage-decision.json's
-// top_n is the load-bearing selection→build handoff, consumed here by BOTH
-// schedulers (wave PlanFromTriage, pool TodosFromTriage) and by the
-// wave-seed-inbox fallback. A console-routed id must be refused at plan time
-// — loudly (refusals list) — never silently planned into a lane.
-
 import (
 	"strings"
 	"testing"
@@ -33,8 +26,6 @@ func TestTodosFromTriage_RefusesConsoleRoutedIds(t *testing.T) {
 	}
 }
 
-// committed_floors ids pass through the same gate — the precedence source must
-// not be a bypass.
 func TestTodosFromTriage_RefusesRoutedCommittedFloor(t *testing.T) {
 	decision := []byte(`{"committed_floors":["operator-work","lane-work"]}`)
 	todos, refused, err := TodosFromTriage(decision, nil, stubRouted(map[string]string{"operator-work": "protected fix surface: go/internal/guards/role.go"}))
@@ -49,9 +40,6 @@ func TestTodosFromTriage_RefusesRoutedCommittedFloor(t *testing.T) {
 	}
 }
 
-// nil resolver = no routing context (unit tests, legacy callers) — everything
-// dispatchable, zero refusals; unknown ids under a real resolver behave the
-// same (scout-originated work has no inbox item and must not be blocked).
 func TestTodosFromTriage_NilResolverKeepsAll(t *testing.T) {
 	decision := []byte(`{"top_n":[{"id":"a"},{"id":"b"}]}`)
 	todos, refused, err := TodosFromTriage(decision, nil, nil)

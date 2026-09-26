@@ -7,46 +7,21 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 )
 
-// topn_width.go — fleet-width-aware, file-disjoint top_n selection (inbox
-// triage-supply-disjoint-topn-for-fleet-width). Cycle-503 triage committed
-// exactly 1 top_n task and starved the fleet wave planner of the >=2 disjoint
-// tasks it needs to fan out 2 concurrent lanes. SelectFleetWidthTopN is the
-// SSOT: it greedily packs the highest-weight candidates into up to `count`
-// mutually FILE-DISJOINT lanes and returns one representative per non-empty
-// lane, so the returned set is always safe to fan out 1:1 into concurrent
-// `evolve cycle run` lanes without a cross-lane file collision.
-
-// FleetCandidate is one triage backlog item eligible for top_n: its id, its
-// selection weight (higher = preferred), and the repo files its cycle would
-// touch. Files drive cross-lane disjointness — two candidates sharing a file
-// cannot run as concurrent lanes without colliding on the shared tree.
+// FleetCandidate is a backlog item eligible for top_n; candidates sharing a file cannot run as concurrent lanes.
 type FleetCandidate struct {
 	ID     string
 	Weight float64
 	Files  []string
-	// Declared is inboxbatch.Item.DeclaredSurface as the backlog read found it —
-	// the item declares a path-shaped surface the console classifier already
-	// cleared (F29). Candidates built from a triage decision keep the zero
-	// value: unverified.
+	// Declared is inboxbatch.Item.DeclaredSurface from the backlog read; candidates built from a decision stay false.
 	Declared bool
 }
 
-// SelectFleetWidthTopN returns up to `count` mutually file-disjoint top_n
-// representatives, highest-weight first. It delegates the disjoint packing to
-// fleet.Partition (the SSOT greedy file-ownership algorithm) rather than
-// duplicating it, then lifts one representative — the highest-weight member —
-// out of each non-empty bucket.
-//
-// count<2 reproduces the legacy single-focus behavior: exactly the single
-// highest-weight candidate, independent of file overlap (among equal weights,
-// rankForDispatch prefers the verified-admissible one — F29). When the
-// backlog cannot fill `count` disjoint lanes, the widest disjoint set (>=1) is
-// returned — never a fabricated/overlapping pairing.
+// SelectFleetWidthTopN returns one representative per mutually file-disjoint lane, up to count, via fleet.Partition.
+// count<2 returns the single top-ranked candidate regardless of overlap.
 func SelectFleetWidthTopN(candidates []FleetCandidate, count int) []FleetCandidate {
 	if len(candidates) == 0 {
 		return nil
 	}
-	// Highest weight first; equal weights prefer verified-admissible work (rankForDispatch).
 	sorted := rankForDispatch(candidates)
 
 	if count < 2 {
@@ -66,33 +41,14 @@ func SelectFleetWidthTopN(candidates []FleetCandidate, count int) []FleetCandida
 		if len(b) == 0 {
 			continue
 		}
-		// Partition preserves input order and the input was weight-sorted, so
-		// b[0] is the highest-weight member of the bucket: the lane's rep.
+		// Partition keeps input order, so b[0] is the bucket's top-ranked member.
 		out = append(out, byID[b[0].ID])
 	}
 	return out
 }
 
-// WidenTopNToFleetWidth backfills an already-committed (but NARROW) top_n
-// selection up to `count` mutually file-disjoint lanes from the inbox backlog.
-// It is the seam that un-starves the wave planner when the prior cycle's
-// triage-decision.json is present but committed fewer than `fleet.count`
-// disjoint items (the primary path — SelectWaveSeedTopN already covers the
-// absent-decision fallback): productionWavePlanFn calls this before
-// fleet.PlanFromTriage partitions the decision, so a 1-item prior decision
-// becomes a `count`-wide disjoint set instead of collapsing the fleet to 1 lane.
-//
-// Contract:
-//   - Every committed candidate is preserved verbatim (already-selected work is
-//     never dropped, never reordered) — even if committed items overlap each
-//     other; committed intent is authoritative.
-//   - count<2 returns committed unchanged (legacy single-focus — no widening).
-//   - Otherwise backfill from backlog, highest-weight first, skipping any
-//     duplicate ID and any candidate whose files overlap a file already claimed
-//     by the running selection, until the selection reaches `count` or the
-//     backlog is exhausted. An overlapping candidate is NEVER added to pad to
-//     `count` — two lanes sharing a file cannot run concurrently.
-//   - The backfilled tail is always mutually file-disjoint and len(out) <= count.
+// WidenTopNToFleetWidth keeps every committed candidate verbatim, even overlapping ones, and backfills
+// top-ranked backlog candidates that touch no claimed file, up to count. count<2 returns committed unchanged.
 func WidenTopNToFleetWidth(committed, backlog []FleetCandidate, count int) []FleetCandidate {
 	if count < 2 {
 		return committed
@@ -130,10 +86,7 @@ func WidenTopNToFleetWidth(committed, backlog []FleetCandidate, count int) []Fle
 	return out
 }
 
-// overlapsClaimed reports whether any of files is already claimed by the
-// selection. filepath.Clean mirrors fleet.normalizeFiles so "./a.go" and "a.go"
-// collide identically to fleet.Partition (that helper is unexported, and reusing
-// fleet.Partition here would violate the preserve-every-committed contract).
+// overlapsClaimed cleans paths as fleet.Partition does; Partition itself would drop overlapping committed items.
 func overlapsClaimed(files []string, claimed map[string]bool) bool {
 	for _, f := range files {
 		if claimed[filepath.Clean(f)] {
@@ -143,15 +96,9 @@ func overlapsClaimed(files []string, claimed map[string]bool) bool {
 	return false
 }
 
-// rankForDispatch is the ONE ordering every seed path shares — the wave seed
-// (SelectFleetWidthTopN), the per-wave widen seam (WidenTopNToFleetWidth) and
-// the lane menus (ExpandWithClusterMates): highest operator weight first — the
-// weight IS the priority, and admissibility never silently overrides it — then,
-// among equal weights (common: the queue clusters at 0.80/0.84/0.85), a
-// candidate whose declared surface the console classifier already cleared
-// before one whose surface is unknown (F29), then input order. A lane's fleet
-// scope is one item, so among otherwise-equal work prefer the proven kind.
-// Returns a new slice; the input is never reordered.
+// rankForDispatch is the one ordering every seed path shares: weight, then a verified declared surface,
+// then input order. The weight stays the priority; admissibility only breaks ties.
+// See ADR-0074.
 func rankForDispatch(cands []FleetCandidate) []FleetCandidate {
 	sorted := make([]FleetCandidate, len(cands))
 	copy(sorted, cands)

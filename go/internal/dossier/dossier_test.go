@@ -59,9 +59,6 @@ func TestValidate_Errors(t *testing.T) {
 	}
 }
 
-// TestValidate_FailMustCarryExperience is the load-bearing invariant: a FAILED
-// cycle cannot be recorded without WHY (>=1 defect) and the fix work (>=1
-// carryover) — so failed verdicts are first-class, compounding experience.
 func TestValidate_FailMustCarryExperience(t *testing.T) {
 	noDefects := failDossier()
 	noDefects.Defects = nil

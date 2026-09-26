@@ -8,8 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// tddRuleCfg is the default TDD-pin (EVOLVE_CONDITIONAL_MANDATORY): tdd is
-// mandatory unless the cycle is trivial.
 func tddRuleCfg() config.RoutingConfig {
 	return config.RoutingConfig{
 		Conditional: map[string]config.CondRule{
@@ -36,8 +34,6 @@ func clampsHave(clamps []Clamp, rule string) bool {
 	return false
 }
 
-// TestClampPlanToFloor_NoShipIsUnconstrained proves a no-ship plan is left
-// untouched — a scout-only investigation cycle is legitimate (ADR-0024 §1).
 func TestClampPlanToFloor_NoShipIsUnconstrained(t *testing.T) {
 	in := nonTrivialIn()
 	p := &PhasePlan{Entries: []PhasePlanEntry{pe("scout", true), pe("build", false), pe("ship", false)}}
@@ -50,9 +46,6 @@ func TestClampPlanToFloor_NoShipIsUnconstrained(t *testing.T) {
 	}
 }
 
-// TestClampPlanToFloor_ShipWithoutAuditRejected is the keystone adversarial case:
-// a plan that reaches ship while skipping the whole chain must have build, audit,
-// and (non-trivial) tdd forced on, each recorded as a clamp.
 func TestClampPlanToFloor_ShipWithoutAuditRejected(t *testing.T) {
 	in := nonTrivialIn()
 	p := &PhasePlan{Entries: []PhasePlanEntry{pe("scout", true), pe("ship", true)}}
@@ -67,8 +60,6 @@ func TestClampPlanToFloor_ShipWithoutAuditRejected(t *testing.T) {
 	}
 }
 
-// TestClampPlanToFloor_ForcesOnlyMissing proves the clamp completes (not
-// rewrites): an already-running chain phase is not re-clamped.
 func TestClampPlanToFloor_ForcesOnlyMissing(t *testing.T) {
 	in := nonTrivialIn()
 	p := &PhasePlan{Entries: []PhasePlanEntry{pe("scout", true), pe("tdd", true), pe("build", true), pe("audit", false), pe("ship", true)}}
@@ -76,15 +67,12 @@ func TestClampPlanToFloor_ForcesOnlyMissing(t *testing.T) {
 	if !planRuns(out, "audit") {
 		t.Errorf("audit must be forced on; plan=%+v", out.Entries)
 	}
-	// Since the 2026-06-11 review-floor policy, the converse implication
-	// (build-requires-audit) fires first and claims the single clamp.
+	// build-requires-audit fires before the ship floor, so it claims the single clamp.
 	if len(clamps) != 1 || clamps[0].Rule != "build-requires-audit" {
 		t.Errorf("expected exactly build-requires-audit, got %+v", clamps)
 	}
 }
 
-// TestClampPlanToFloor_TrivialExemptsTDD proves the trivial-cycle TDD exemption:
-// build+audit are still forced, but tdd is not.
 func TestClampPlanToFloor_TrivialExemptsTDD(t *testing.T) {
 	in := trivialIn()
 	p := &PhasePlan{Entries: []PhasePlanEntry{pe("scout", true), pe("ship", true)}}
@@ -103,7 +91,6 @@ func TestClampPlanToFloor_TrivialExemptsTDD(t *testing.T) {
 	}
 }
 
-// TestClampPlanToFloor_CompleteChainNoClamp: a fully-scheduled chain is untouched.
 func TestClampPlanToFloor_CompleteChainNoClamp(t *testing.T) {
 	in := nonTrivialIn()
 	p := &PhasePlan{Entries: []PhasePlanEntry{pe("scout", true), pe("tdd", true), pe("build", true), pe("audit", true), pe("ship", true)}}
@@ -113,8 +100,6 @@ func TestClampPlanToFloor_CompleteChainNoClamp(t *testing.T) {
 	}
 }
 
-// TestClampPlanToFloor_AbsentPhaseAppended: a chain phase missing from the plan
-// entirely (not just run:false) is appended with run=true + a floor justification.
 func TestClampPlanToFloor_AbsentPhaseAppended(t *testing.T) {
 	in := nonTrivialIn()
 	p := &PhasePlan{Entries: []PhasePlanEntry{pe("scout", true), pe("tdd", true), pe("build", true), pe("ship", true)}}
@@ -136,10 +121,6 @@ func TestClampPlanToFloor_AbsentPhaseAppended(t *testing.T) {
 	}
 }
 
-// TestClampPlanToFloor_ShipFalseWithBuildOverridden: POLICY CHANGE
-// (2026-06-11, repeals the former ShipFalseNotReached expectation): an
-// explicit ship veto in a BUILDING plan is overridden — built work may not
-// strand unshipped. Only no-build plans may decline ship.
 func TestClampPlanToFloor_ShipFalseWithBuildOverridden(t *testing.T) {
 	in := nonTrivialIn()
 	p := &PhasePlan{Entries: []PhasePlanEntry{pe("scout", true), pe("build", true), pe("ship", false)}}
@@ -152,10 +133,6 @@ func TestClampPlanToFloor_ShipFalseWithBuildOverridden(t *testing.T) {
 	}
 }
 
-// TestClampPlanToFloor_ShipAbsentWithBuildAppended: POLICY CHANGE
-// (2026-06-11, repeals the former ShipAbsentNotReached expectation): ship
-// missing entirely from a BUILDING plan is appended run=true — same rationale
-// as the explicit-veto override.
 func TestClampPlanToFloor_ShipAbsentWithBuildAppended(t *testing.T) {
 	in := nonTrivialIn()
 	p := &PhasePlan{Entries: []PhasePlanEntry{pe("scout", true), pe("build", true)}}
@@ -168,8 +145,6 @@ func TestClampPlanToFloor_ShipAbsentWithBuildAppended(t *testing.T) {
 	}
 }
 
-// TestClampPlanToFloor_TrivialViaTriagePath: the trivial exemption fires via the
-// AUTHORITATIVE triage signal (the common runtime shape), not just scout's estimate.
 func TestClampPlanToFloor_TrivialViaTriagePath(t *testing.T) {
 	in := RouteInput{
 		Cfg:     tddRuleCfg(),
@@ -188,8 +163,6 @@ func TestClampPlanToFloor_TrivialViaTriagePath(t *testing.T) {
 	}
 }
 
-// TestClampPlanToFloor_DoesNotMutateInput: the clamp is pure — the caller's plan
-// is never mutated (it returns a fresh copy).
 func TestClampPlanToFloor_DoesNotMutateInput(t *testing.T) {
 	in := nonTrivialIn()
 	orig := []PhasePlanEntry{pe("scout", true), pe("ship", true)}
@@ -201,7 +174,6 @@ func TestClampPlanToFloor_DoesNotMutateInput(t *testing.T) {
 	}
 }
 
-// TestClampPlanToFloor_NilPlan: a nil plan degrades to (nil, nil).
 func TestClampPlanToFloor_NilPlan(t *testing.T) {
 	out, clamps := ClampPlanToFloor(nonTrivialIn(), nil)
 	if out != nil || clamps != nil {
@@ -209,10 +181,8 @@ func TestClampPlanToFloor_NilPlan(t *testing.T) {
 	}
 }
 
-// TestClampPlanToFloor_NoTDDRuleDefaultsPinned: with no configured TDD-pin rule,
-// tdd defaults to pinned (the safer, more-mandatory side).
 func TestClampPlanToFloor_NoTDDRuleDefaultsPinned(t *testing.T) {
-	in := RouteInput{} // empty cfg: no Conditional rule
+	in := RouteInput{}
 	p := &PhasePlan{Entries: []PhasePlanEntry{pe("scout", true), pe("ship", true)}}
 	out, clamps := ClampPlanToFloor(in, p)
 	if !planRuns(out, "tdd") {
@@ -223,15 +193,7 @@ func TestClampPlanToFloor_NoTDDRuleDefaultsPinned(t *testing.T) {
 	}
 }
 
-// TestEvaluatorFloorPhase_SingleSource: router.EvaluatorFloorPhase and
-// policy's unexported twin are deliberate defense-in-depth (the reverse
-// import would cycle: router/policy.go imports policy), so the usual
-// never-duplicate rule is satisfied by this tripwire instead — divergence
-// between the two consts must be loud, not silent. policy.FloorPhases
-// re-appends ITS evaluator const LAST to any floor that omits it; the
-// appended phase must be the one router's clamp re-asserts. (The fixture
-// must omit the evaluator so the append branch is taken — an
-// evaluator-containing fixture would false-green.)
+// The fixture floor must omit the evaluator so policy takes its append branch; otherwise this false-greens.
 func TestEvaluatorFloorPhase_SingleSource(t *testing.T) {
 	t.Parallel()
 	floor, _ := policy.Policy{ShipFloor: []string{"build"}}.FloorPhases()
@@ -240,12 +202,6 @@ func TestEvaluatorFloorPhase_SingleSource(t *testing.T) {
 	}
 }
 
-// TestClampPlanToFloorWith_DropsUnknownPhaseEntry is the in-package regression
-// for the cycle-1151/1152 incident: the advisor hallucinated "gate-wiring-proof"
-// out of policy prose, ValidatePlan flagged it unknown-phase (report-only), and
-// the entry survived into dispatch ("profile not found"). The clamp must now
-// remove it — recording the removal under DropUnknownPhaseRule — while leaving
-// the known phases and the integrity floor intact.
 func TestClampPlanToFloorWith_DropsUnknownPhaseEntry(t *testing.T) {
 	const bogus = "gate-wiring-proof"
 	in := nonTrivialIn()
@@ -275,17 +231,11 @@ func TestClampPlanToFloorWith_DropsUnknownPhaseEntry(t *testing.T) {
 			t.Errorf("known phase %q is not running after the drop: %+v", want, out.Entries)
 		}
 	}
-	// PURE: the caller's plan is untouched.
 	if len(p.Entries) != 4 || p.Entries[1].Phase != bogus {
 		t.Errorf("input plan was mutated: %+v", p.Entries)
 	}
 }
 
-// TestClampPlanToFloorWith_KeepsCatalogOfferedPhase: a phase the advisor was
-// OFFERED in the plan prompt (RouteInput.Catalog) is legitimate by
-// construction, so the unknown-phase drop must never remove it — deleting a
-// phase we advertised would be a worse failure than the hallucination the drop
-// exists to catch.
 func TestClampPlanToFloorWith_KeepsCatalogOfferedPhase(t *testing.T) {
 	const offered = "bug-reproduction"
 	in := nonTrivialIn()

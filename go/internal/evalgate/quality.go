@@ -7,12 +7,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/evalqualitycheck"
 )
 
-// qualityGate (Gate B) enforces that the selected slugs' eval predicates are
-// behavioral, not tautological no-ops (cycle-204). It fires after the tdd
-// phase, by which point the eval files exist, and reuses the working
-// evalqualitycheck classifier (LevelPass/Warn/Halt). A definite tautology
-// (LevelHalt) blocks at enforce; a weak predicate (LevelWarn) is advisory only
-// (CLAUDE.md item-7's "block persistent WARN after a soak" is left as a TODO).
+// qualityGate (Gate B) blocks a selected slug whose eval predicate is a definite
+// tautology; a weak predicate is advisory only.
 type qualityGate struct{}
 
 func (qualityGate) name() string                { return "predicate-quality" }
@@ -25,17 +21,17 @@ func (qualityGate) check(in core.ReviewInput) (string, bool) {
 	}
 	slugs := SelectedSlugs(report)
 	if len(slugs) == 0 {
-		return "", false // convergence / parse-empty → fail-open
+		return "", false
 	}
 	var halts, warns []string
 	for _, s := range slugs {
 		path, found := evalFilePath(in.ProjectRoot, in.Workspace, s)
 		if !found {
-			continue // a missing eval is Gate A's concern; fail-open here
+			continue
 		}
 		res, err := evalqualitycheck.Check(evalqualitycheck.Options{Path: path})
 		if err != nil {
-			continue // unreadable → fail-open
+			continue
 		}
 		switch res.Overall {
 		case evalqualitycheck.LevelHalt:
@@ -48,7 +44,6 @@ func (qualityGate) check(in core.ReviewInput) (string, bool) {
 		return "tautological (no-op) eval predicate(s) for slug(s): " + strings.Join(halts, ", "), true
 	}
 	if len(warns) > 0 {
-		// Advisory: surfaced but never blocks (TODO item-7: escalate persistent WARN after a soak).
 		return "weak eval predicate(s) for slug(s): " + strings.Join(warns, ", "), false
 	}
 	return "", false

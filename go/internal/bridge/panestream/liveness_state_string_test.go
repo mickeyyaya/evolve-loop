@@ -2,8 +2,6 @@ package panestream
 
 import "testing"
 
-// LivenessState renders as the word the Signal Center's pane.liveness event
-// carries in fields.state (ADR-0101 S3): one spelling, owned by the vocabulary.
 func TestLivenessState_StringNamesEveryState(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {

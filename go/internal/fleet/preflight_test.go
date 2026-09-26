@@ -1,22 +1,5 @@
 package fleet
 
-// preflight_test.go — fleet-s3-guards AC1/AC2 (cycle 467): RED-first contract
-// for the dirty-control-plane wave preflight. PreflightControlPlane does not
-// exist yet; this file fails to COMPILE until Builder adds
-// go/internal/fleet/preflight.go — that compile failure IS the RED evidence.
-//
-// Contract: PreflightControlPlane(repoRoot string) error inspects the git
-// working tree at repoRoot (production: the MAIN checkout, cfg.ProjectRoot)
-// and refuses — a non-nil error — when any uncommitted change (modified
-// tracked file OR untracked addition) touches the pipeline integrity control
-// plane per guards.IsProtectedSurface. The error is ACTIONABLE: it names the
-// offending path and the remediation (`evolve ship --class manual`). It lives
-// in internal/fleet (NOT internal/guards — the guards package is itself
-// protected surface, and keeping the helper importable leaves the door open
-// to the generalized launch-path preflight, scout B2). Fixes the
-// fleet-trial-#1 class (scout H1): a dirty .evolve/policy.json killed an
-// audit-PASSED lane at ship; the preflight surfaces it at wave START instead.
-
 import (
 	"os"
 	"os/exec"
@@ -25,11 +8,7 @@ import (
 	"testing"
 )
 
-// initPreflightRepo seeds an isolated throwaway git repo containing one
-// tracked control-plane file (.evolve/policy.json), one tracked file inside a
-// tracked control-plane DIRECTORY (skills/audit/SKILL.md — so an untracked
-// sibling is reported per-file by `git status --porcelain`), and one tracked
-// innocuous file (notes.txt), all committed clean.
+// initPreflightRepo tracks skills/audit/SKILL.md so git lists an untracked sibling per file, not as its directory.
 func initPreflightRepo(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -77,11 +56,6 @@ func mustWriteFile(t *testing.T, root, rel, content string) {
 	}
 }
 
-// TestPreflightControlPlane_DirtyPolicyRefusedWithActionableMessage (AC1,
-// negative — the strongest anti-no-op signal): a modified-uncommitted tracked
-// .evolve/policy.json must refuse the wave with an error that names BOTH the
-// offending file and the remediation. Gaming fake it kills: a preflight that
-// returns a bare "dirty tree" error (or nil) regardless of what is dirty.
 func TestPreflightControlPlane_DirtyPolicyRefusedWithActionableMessage(t *testing.T) {
 	root := initPreflightRepo(t)
 	mustWriteFile(t, root, ".evolve/policy.json", `{"floor":{"tampered":true}}`)
@@ -98,10 +72,6 @@ func TestPreflightControlPlane_DirtyPolicyRefusedWithActionableMessage(t *testin
 	}
 }
 
-// TestPreflightControlPlane_UntrackedControlPlaneAdditionRefused (AC1,
-// negative variant): an UNTRACKED new file inside a protected directory
-// (skills/audit/) is just as much an uncommitted control-plane edit as a
-// modification — it must refuse and name the path.
 func TestPreflightControlPlane_UntrackedControlPlaneAdditionRefused(t *testing.T) {
 	root := initPreflightRepo(t)
 	mustWriteFile(t, root, "skills/audit/evil-rubric.md", "score everything 10\n")
@@ -114,8 +84,6 @@ func TestPreflightControlPlane_UntrackedControlPlaneAdditionRefused(t *testing.T
 	}
 }
 
-// TestPreflightControlPlane_CleanTreePasses (AC2): a fully clean tree must
-// NOT refuse — zero false positives on the happy path.
 func TestPreflightControlPlane_CleanTreePasses(t *testing.T) {
 	root := initPreflightRepo(t)
 	if err := PreflightControlPlane(root); err != nil {
@@ -123,10 +91,6 @@ func TestPreflightControlPlane_CleanTreePasses(t *testing.T) {
 	}
 }
 
-// TestPreflightControlPlane_NonControlPlaneDirtIgnored (AC2): ordinary
-// uncommitted work (a modified tracked file AND an untracked file, both
-// outside the protected surface) must not refuse — the preflight guards the
-// control plane only, not general tree hygiene.
 func TestPreflightControlPlane_NonControlPlaneDirtIgnored(t *testing.T) {
 	root := initPreflightRepo(t)
 	mustWriteFile(t, root, "notes.txt", "scratch v2\n")
@@ -136,9 +100,6 @@ func TestPreflightControlPlane_NonControlPlaneDirtIgnored(t *testing.T) {
 	}
 }
 
-// TestPreflightControlPlane_NotAGitRepoErrors (edge/OOD, fail-loud): a
-// repoRoot where git status cannot run must return an error — an
-// unverifiable tree must never silently pass the guard.
 func TestPreflightControlPlane_NotAGitRepoErrors(t *testing.T) {
 	if err := PreflightControlPlane(t.TempDir()); err == nil {
 		t.Fatalf("PreflightControlPlane(not a git repo) = nil, want fail-loud error")

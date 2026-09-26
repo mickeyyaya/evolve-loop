@@ -1,21 +1,5 @@
 package triagecap
 
-// lane_menu_prune_export_test.go — cycle-1182 RED contract for
-// wave-planner-pass-scope-prune.
-//
-// pruneConsumed already implements the terminal-state prune, but it is
-// package-private, so the PRIMARY per-wave planning seam
-// (widenNarrowDecision in package main, go/cmd/evolve/cmd_loop_wave.go) cannot
-// reach it and carries consumed ids forward verbatim (cycle-1116 re-pinned
-// tdd-topn-binding-gate after cycle-1113 consumed it).
-//
-// CONTRACT for Builder (do NOT modify these tests — implement production code):
-//   - triagecap exports PruneConsumed(evolveDir string, committed []FleetCandidate) []FleetCandidate
-//     with pruneConsumed's exact semantics (terminal states drop; everything
-//     else, including no-evidence ids, is retained — fail open).
-//   - The existing seed path keeps its behaviour; this is a single-source
-//     export, not a second implementation (never_duplicate_centralize).
-
 import (
 	"encoding/json"
 	"os"
@@ -25,9 +9,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 )
 
-// writeLifecycleTodo places an inbox todo in a lifecycle dir so
-// inboxmover.ResolveDispatchState classifies id as that state. state=="pending"
-// is the inbox root; state=="processing" lives under processing/cycle-N/.
+// writeLifecycleTodo places id where inboxmover.ResolveDispatchState classifies it as state.
 func writeLifecycleTodo(t *testing.T, evolveDir, state, id string) {
 	t.Helper()
 	dir := filepath.Join(evolveDir, "inbox")
@@ -51,12 +33,6 @@ func writeLifecycleTodo(t *testing.T, evolveDir, state, id string) {
 	}
 }
 
-// TestPruneConsumed_ExportedTerminalDropNonTerminalKeep is the export AC: the
-// prune primitive must be callable from outside the package AND keep its
-// fail-open contract. Terminal lifecycle states drop; pending/processing/retry
-// and — load-bearing — an id with NO lifecycle evidence at all are retained (a
-// prune that dropped what it cannot resolve would starve every wave of
-// non-inbox-backed cards).
 func TestPruneConsumed_ExportedTerminalDropNonTerminalKeep(t *testing.T) {
 	cases := []struct {
 		state    string
@@ -68,7 +44,7 @@ func TestPruneConsumed_ExportedTerminalDropNonTerminalKeep(t *testing.T) {
 		{inboxmover.StatePending, true},
 		{inboxmover.StateProcessing, true},
 		{inboxmover.StateRetry, true},
-		{"no-evidence", true}, // nothing written anywhere — fail open
+		{"no-evidence", true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.state, func(t *testing.T) {
@@ -94,8 +70,6 @@ func TestPruneConsumed_ExportedTerminalDropNonTerminalKeep(t *testing.T) {
 	}
 }
 
-// TestPruneConsumed_ExportedEmptyInputIsIdentity pins the trivial edge: an empty
-// committed prefix returns empty, no inbox read required.
 func TestPruneConsumed_ExportedEmptyInputIsIdentity(t *testing.T) {
 	if got := PruneConsumed(t.TempDir(), nil); len(got) != 0 {
 		t.Errorf("PruneConsumed(empty) = %v, want empty", got)

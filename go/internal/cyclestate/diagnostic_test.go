@@ -5,11 +5,6 @@ import (
 	"testing"
 )
 
-// ErrorMessages is the ONE projection from a phase's diagnostics to its reasons
-// for a FAIL verdict: error-severity messages, in order; warnings are a trail,
-// never a reason; nil in, nil out. core (the FailedRecord, the floor fail
-// reasons, the chokepoint log line, the seal's backfill, judgment lessons) and
-// cyclehealth all call it, so the rule cannot fork (cycles 1634/1636).
 func TestErrorMessages_ProjectsOnlyErrorSeverityInOrder(t *testing.T) {
 	t.Parallel()
 	got := ErrorMessages([]Diagnostic{

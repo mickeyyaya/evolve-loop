@@ -8,22 +8,6 @@ import (
 	"testing"
 )
 
-// Test Amplification (cycle 435, black-box adversarial pass on top of the
-// TDD-authored dispatch_test.go). These tests were designed from the
-// contract only (Plan/DispatchResult shapes + Dispatch/ChainFor signatures,
-// pinned by the pre-existing RED-turned-GREEN suite) without reading
-// dispatch.go's actual walk implementation, per the amplifier's black-box
-// mandate. They target basic/edge/null/negative/large-scale inputs the
-// original suite didn't cover: the full default trigger set, chain length
-// != 2, empty input, and concurrent independent use.
-
-// TestDispatch_EmptyCandidatesNeverCallsLaunchOrClaimsSuccess (null/empty):
-// a Plan with zero candidates has nothing to dispatch. Rule 12 (fail loudly)
-// means Dispatch must surface an error rather than silently returning a
-// zero-value DispatchResult{CLI:"", Err:nil} that a caller could mistake for
-// "dispatched successfully to CLI ”" -- a silent-success gap would be far
-// worse than a stopped chain, since the advisor/runner would think a plan
-// or phase response actually exists.
 func TestDispatch_EmptyCandidatesNeverCallsLaunchOrClaimsSuccess(t *testing.T) {
 	sl := &scriptedLaunch{seq: []scriptedAttempt{{exitCode: 0, err: nil}}}
 	plan := Plan{Candidates: nil, Triggers: defaultFallbackOnExit}
@@ -38,11 +22,6 @@ func TestDispatch_EmptyCandidatesNeverCallsLaunchOrClaimsSuccess(t *testing.T) {
 	}
 }
 
-// TestDispatch_AllDefaultTriggerCodesAdvanceChain (basic, table-driven): the
-// cycle-435 goal names five standard fallback triggers [80 81 85 124 127].
-// The pre-existing suite only exercises 81 end-to-end; this pins the other
-// four so a future edit to the trigger set (or a partial implementation that
-// special-cased 81) can't silently regress the other codes.
 func TestDispatch_AllDefaultTriggerCodesAdvanceChain(t *testing.T) {
 	for _, code := range defaultFallbackOnExit {
 		code := code
@@ -69,13 +48,8 @@ func TestDispatch_AllDefaultTriggerCodesAdvanceChain(t *testing.T) {
 	}
 }
 
-// TestDispatch_NonTriggerBoundaryCodesNeverReroute (negative, table-driven,
-// boundary values): codes immediately adjacent to the default trigger set
-// (79/82, 84/86, 123/126, 128) plus a couple of common "genuine failure"
-// codes (1, 2) must NEVER advance the chain -- a fuzzy "is it close to a
-// trigger" implementation would leak on these boundaries even though the
-// existing suite's single non-trigger case (exit=1) passes.
 func TestDispatch_NonTriggerBoundaryCodesNeverReroute(t *testing.T) {
+	// Neighbors of each default trigger, plus two common genuine-failure codes.
 	for _, code := range []int{79, 82, 84, 86, 123, 126, 128, 1, 2} {
 		code := code
 		t.Run(fmt.Sprintf("exit=%d", code), func(t *testing.T) {
@@ -96,11 +70,6 @@ func TestDispatch_NonTriggerBoundaryCodesNeverReroute(t *testing.T) {
 	}
 }
 
-// TestDispatch_SingleCandidateTriggerExitStillDegrades (edge): a one-element
-// chain (no fallback declared) that hits a trigger exit has nowhere to
-// advance to. Dispatch must still surface the error with exactly one
-// attempt recorded -- not hang, not panic on an out-of-range fallback index,
-// and not misreport success.
 func TestDispatch_SingleCandidateTriggerExitStillDegrades(t *testing.T) {
 	plan := Plan{Candidates: []string{"only-cli"}, Triggers: defaultFallbackOnExit}
 	sl := &scriptedLaunch{seq: []scriptedAttempt{{exitCode: 81, err: errors.New("only-cli: exit=81")}}}
@@ -115,10 +84,6 @@ func TestDispatch_SingleCandidateTriggerExitStillDegrades(t *testing.T) {
 	}
 }
 
-// TestDispatch_LongChainWalksEveryCandidateInOrder (large-scale): a 25-CLI
-// chain where every candidate but the last exhausts a trigger exit. Proves
-// the walk isn't hardcoded to a 1-or-2-candidate assumption and doesn't
-// short-circuit or reorder partway through a long chain.
 func TestDispatch_LongChainWalksEveryCandidateInOrder(t *testing.T) {
 	const n = 25
 	candidates := make([]string, n)
@@ -150,12 +115,6 @@ func TestDispatch_LongChainWalksEveryCandidateInOrder(t *testing.T) {
 	}
 }
 
-// TestDispatch_ConcurrentIndependentCallsStayIsolated (concurrency, the
-// "go test -race green" requirement the cycle-435 goal names explicitly):
-// many goroutines call Dispatch concurrently, each with its own Plan and
-// scriptedLaunch closure. Dispatch must not share any mutable state across
-// calls (e.g. a package-level counter or cache) -- every goroutine's result
-// must reflect only its own scripted sequence.
 func TestDispatch_ConcurrentIndependentCallsStayIsolated(t *testing.T) {
 	const workers = 20
 	var wg sync.WaitGroup

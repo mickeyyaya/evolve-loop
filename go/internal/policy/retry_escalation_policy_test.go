@@ -1,10 +1,5 @@
 package policy
 
-// retry_escalation_policy_test.go — ADR-0076 slice D policy knob: the
-// failure-count threshold at which a retried item's build escalates to deep.
-// Compiled default 1 (first retry escalates); positive-override merge (the
-// TaskRetryCeiling idiom — 0 keeps the default, documented convention).
-
 import "testing"
 
 func TestBuildDeepEscalateAtFailures_CompiledDefault(t *testing.T) {

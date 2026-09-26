@@ -24,7 +24,6 @@ func TestSessionRegistry_RegisterSnapshotRoundTrip(t *testing.T) {
 	if len(snap) != 2 {
 		t.Fatalf("want 2 sessions, got %d", len(snap))
 	}
-	// Snapshot is sorted by WorkerID for determinism.
 	if snap[0].WorkerID != "w0" || snap[1].WorkerID != "w1" {
 		t.Errorf("snapshot not sorted: %v", []string{snap[0].WorkerID, snap[1].WorkerID})
 	}
@@ -34,7 +33,7 @@ func TestSessionRegistry_RegisterSnapshotRoundTrip(t *testing.T) {
 }
 
 func TestSessionRegistry_ManifestPersistsAndLoads(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "nested", "sessions.json") // dir auto-created
+	path := filepath.Join(t.TempDir(), "nested", "sessions.json")
 	r := NewSessionRegistry(path, 7, "build", 99)
 	if err := r.Register(handle("w0")); err != nil {
 		t.Fatal(err)
@@ -63,7 +62,6 @@ func TestSessionRegistry_MarkReaped(t *testing.T) {
 	if len(live) != 1 || live[0].WorkerID != "w1" {
 		t.Errorf("after reaping w0, only w1 should be live: %+v", live)
 	}
-	// Persisted state reflects the reap.
 	_, _, _, sessions, _ := LoadManifest(path)
 	var w0 SessionHandle
 	for _, s := range sessions {
@@ -80,7 +78,7 @@ func TestSessionRegistry_RegisterIdempotent(t *testing.T) {
 	r := NewSessionRegistry(filepath.Join(t.TempDir(), "s.json"), 1, "build", 1)
 	_ = r.Register(handle("w0"))
 	h := handle("w0")
-	h.PGID = 5555 // re-register same ID with new pgid (retry)
+	h.PGID = 5555
 	_ = r.Register(h)
 	snap := r.Snapshot()
 	if len(snap) != 1 {
@@ -112,18 +110,15 @@ func TestLoadManifest_CorruptJSON(t *testing.T) {
 	}
 }
 
-// TestPersistLocked_InMemoryMode covers the empty-manifestPath fast path.
 func TestPersistLocked_InMemoryMode(t *testing.T) {
-	// empty path → in-memory mode; persist is a no-op and must return nil
 	r := NewSessionRegistry("", 1, "build", 1)
 	if err := r.Register(handle("w0")); err != nil {
 		t.Fatalf("in-memory register must not error: %v", err)
 	}
 }
 
-// TestPersistLocked_UnwritableDir covers the MkdirAll error path.
 func TestPersistLocked_UnwritableDir(t *testing.T) {
-	// Create a read-only parent directory so MkdirAll on the subdir fails.
+	// A read-only parent makes MkdirAll of the manifest's subdirectory fail.
 	parent := t.TempDir()
 	if err := os.Chmod(parent, 0o555); err != nil {
 		t.Skip("cannot set read-only dir on this system")

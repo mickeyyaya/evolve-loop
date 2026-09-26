@@ -7,10 +7,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 )
 
-// checkSandboxNestedFallback samples an out-of-allowlist write under a nested
-// session. Off leaves the diagnostic disabled, shadow warns, and enforce halts
-// on an unsuccessful probe. Even a denied write does not attest the full
-// profile's read/write restrictions and never waives the launch-time gate.
+// checkSandboxNestedFallback samples one out-of-allowlist write in a nested session: off skips,
+// shadow warns, enforce halts. A denied write never waives the launch-time gate.
 func checkSandboxNestedFallback(o resolved) CheckResult {
 	const name = "sandbox-nested-fallback"
 	if o.nestedFallbackStage == config.StageOff {
@@ -32,24 +30,15 @@ func checkSandboxNestedFallback(o resolved) CheckResult {
 	return CheckResult{Name: name, Level: LevelWarn, Message: "nested fallback UNVERIFIED (shadow)", Detail: detail}
 }
 
-// defaultSandboxCanary returns the production canary: it attempts a write
-// OUTSIDE the inner sandbox's write allow-list (a sentinel in the project's
-// PARENT directory — the inner sandbox makes the repo read-only and confines
-// writes to the worktree/workspace/tmp) and reports whether the OUTER
-// environment denied this single write. False includes both a successful
-// write and an inconclusive setup failure.
-//
-// Only a permission-denied result counts as a sampled write denial. Missing
-// parents, descriptor exhaustion, and other setup failures remain unverified.
-// Even a permission denial can be ordinary DAC, not proof of the full policy.
+// defaultSandboxCanary writes a sentinel in the project's parent, outside the inner sandbox's
+// allow-list. Only a permission error returns true; any other setup failure stays unverified.
 func defaultSandboxCanary(projectRoot string) func() bool {
 	return func() bool {
 		f, err := os.CreateTemp(filepath.Dir(projectRoot), ".evolve-sandbox-canary-*")
 		if err != nil {
 			return os.IsPermission(err)
 		}
-		// Best-effort cleanup: the sentinel is unlinked regardless of the Close
-		// outcome on POSIX, so both errors are intentionally discarded.
+		// Best-effort: POSIX unlinks the sentinel whatever Close returns.
 		name := f.Name()
 		_ = f.Close()
 		_ = os.Remove(name)

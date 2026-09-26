@@ -1,18 +1,5 @@
 package phasecoherence
 
-// persona_strip_operational_test.go — pins that CompactPrompts stripping
-// (prompts.StripOnDemandSections, default ON since policy.go CompactPrompts=true)
-// never removes OPERATIONAL directives from a dispatched persona.
-//
-// Incident (2026-08-10, cycles 1390-1429): agents/evolve-auditor.md carried its
-// "## Reference Index" marker at line 75 of 272 — every section appended after
-// it over months (Verdict Rules, STOP CRITERION, completion gates, POSTHOC,
-// the MANDATORY continuation-disposition contract) was silently stripped from
-// every dispatched audit prompt. Result: 15/30 FAILs on disposition-preflight,
-// 0/11 continuation passes, auditors approving work the gate then force-FAILed.
-// The compaction test suite guarded only that stripping REMOVED bytes
-// (compaction_coverage_test.go), never that it KEPT the load-bearing ones.
-
 import (
 	"os"
 	"path/filepath"
@@ -24,15 +11,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/repostate"
 )
 
-// operationalSentinelRE marks a line as an operational directive that must
-// survive prompt compaction. Deliberately coarse: a false positive costs a
-// persona author a relocation above the marker; a false negative re-arms the
-// cycle-1390-1429 lobotomy class.
+// operationalSentinelRE is deliberately coarse: a false positive costs a relocation above the
+// strip marker, while a false negative strips a directive from every dispatched prompt.
 var operationalSentinelRE = regexp.MustCompile(`MANDATORY|STOP CRITERION|Completion Gates|force-FAIL|REQUIRED|POSTHOC|Verdict Rules|Constitutional audit`)
 
-// strippedPersonaBody loads a persona from the repo and returns (full body,
-// stripped body) exactly as the production dispatch path derives them
-// (runner.go: ParseFrontmatter then StripOnDemandSections under CompactPrompts).
+// strippedPersonaBody returns (body, stripped body) as the runner's dispatch path derives them.
 func strippedPersonaBody(t *testing.T, root, name string) (string, string) {
 	t.Helper()
 	raw, err := os.ReadFile(filepath.Join(root, "agents", name))
@@ -46,23 +29,17 @@ func strippedPersonaBody(t *testing.T, root, name string) (string, string) {
 	return body, prompts.StripOnDemandSections(body)
 }
 
-// TestAuditorStripKeepsOperationalContract is the incident's direct regression
-// pin: the exact anchors whose loss caused the 2026-08 zero-ship batches must
-// survive compaction of the REAL auditor persona.
 func TestAuditorStripKeepsOperationalContract(t *testing.T) {
 	root := repoRootForPairing(t)
 	_, stripped := strippedPersonaBody(t, root, "evolve-auditor.md")
 
 	anchors := []string{
-		// The #1 killer: continuation disposition duty + its literal example.
 		"defect-dispositions.json",
 		"Continuation dispositions",
 		`"status": "FIXED"`,
-		// Verdict semantics and termination contract.
 		"## Verdict Rules",
 		"## STOP CRITERION",
 		"acs-verdict.json",
-		// Post-verdict integrity layers.
 		"## POSTHOC verification",
 		"## Constitutional audit checklist",
 	}
@@ -73,17 +50,8 @@ func TestAuditorStripKeepsOperationalContract(t *testing.T) {
 	}
 }
 
-// TestPersonaStripKeepsOperationalSentinels generalizes the pin: for every
-// tracked persona, no line carrying an operational sentinel may sit below the
-// ## Reference Index strip marker.
-//
-// Exceptions are personas known-broken at pin time, queued for curation in the
-// follow-up landing (their below-marker tails need floor-respecting
-// reorganization, see compact_marker_gate_test.go savings floors). This list
-// may only SHRINK.
 func TestPersonaStripKeepsOperationalSentinels(t *testing.T) {
-	// Curation complete 2026-08-10: every dispatched persona's marker sits at
-	// EOF. New entries here need an incident-grade justification.
+	// pendingCuration may only shrink; adding an entry needs a written justification.
 	pendingCuration := map[string]bool{}
 
 	root := repoRootForPairing(t)
@@ -108,8 +76,6 @@ func TestPersonaStripKeepsOperationalSentinels(t *testing.T) {
 				}
 			}
 			if pendingCuration[name] {
-				// Self-pruning: the moment a persona's tail is curated clean,
-				// its exception entry must be deleted so the guard arms.
 				if len(strippedSentinels) == 0 {
 					t.Errorf("%s is now clean — remove it from pendingCuration so the sentinel guard arms for it", name)
 				}

@@ -8,8 +8,6 @@ import (
 	"testing"
 )
 
-// initGitRepo makes dir a git working tree with a commit identity configured,
-// so Write(..., true) can add+commit inside it.
 func initGitRepo(t *testing.T, dir string) {
 	t.Helper()
 	for _, args := range [][]string{
@@ -25,7 +23,6 @@ func initGitRepo(t *testing.T, dir string) {
 	}
 }
 
-// gitStatus returns `git status --porcelain` output for dir (empty == clean).
 func gitStatus(t *testing.T, dir string) string {
 	t.Helper()
 	cmd := exec.Command("git", "status", "--porcelain", "-uall")
@@ -37,9 +34,6 @@ func gitStatus(t *testing.T, dir string) string {
 	return strings.TrimSpace(string(out))
 }
 
-// TestWrite_Commit is the core of the tree-diff-guard fix: Write(d, dir, true)
-// commits both files, leaving the working tree clean (no untracked pair for a
-// later phase's guard to flag as a leak).
 func TestWrite_Commit(t *testing.T) {
 	dir := t.TempDir()
 	initGitRepo(t, dir)
@@ -52,7 +46,6 @@ func TestWrite_Commit(t *testing.T) {
 	if s := gitStatus(t, dir); s != "" {
 		t.Fatalf("tree not clean after commit; git status:\n%s", s)
 	}
-	// Idempotent re-write of identical content must not error or make an empty commit.
 	if err := Write(d, dir, true); err != nil {
 		t.Fatalf("Write(commit=true) rewrite: %v", err)
 	}
@@ -61,8 +54,6 @@ func TestWrite_Commit(t *testing.T) {
 	}
 }
 
-// TestWrite verifies Write creates cycle-N.json and cycle-N.md in the
-// target directory (no git commit path). RED: Write doesn't exist yet.
 func TestWrite(t *testing.T) {
 	d := &Dossier{
 		Cycle:        42,

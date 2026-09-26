@@ -16,7 +16,7 @@ func writeFile(t *testing.T, dir, name, body string) {
 	}
 }
 
-// buildHandoff mirrors the real cycle-55 handoff-build.json shape.
+// buildHandoff mirrors a real handoff-build.json shape.
 const buildHandoff = `{
   "schema_version": 1, "cycle": 55, "phase": "build", "verdict": "PASS",
   "acs_result": {"green": 30, "red": 2, "total": 32, "this_cycle": 4, "regression": 26},
@@ -48,7 +48,6 @@ func TestDigest_AllRolesExtracted(t *testing.T) {
 		t.Fatalf("Digest error: %v", err)
 	}
 
-	// Build
 	if !sig.Build.Present || sig.Build.Verdict != "PASS" {
 		t.Errorf("build = %+v", sig.Build)
 	}
@@ -61,21 +60,18 @@ func TestDigest_AllRolesExtracted(t *testing.T) {
 	if sig.Build.FilesTouched != 3 { // a.go,b.go,c.go (a.go deduped)
 		t.Errorf("build FilesTouched = %d, want 3 (deduped union)", sig.Build.FilesTouched)
 	}
-	// Audit (auditor filename variant resolved)
 	if !sig.Audit.Present || sig.Audit.Confidence != 0.88 {
 		t.Errorf("audit = %+v", sig.Audit)
 	}
 	if sig.Audit.DefectsBySeverity[SevMedium] != 1 || sig.Audit.DefectsBySeverity[SevLow] != 1 {
 		t.Errorf("audit defects = %+v", sig.Audit.DefectsBySeverity)
 	}
-	// Scout: 3 itemN_ blocks, "items_not_a_block" excluded
 	if !sig.Scout.Present || sig.Scout.ItemCount != 3 {
 		t.Errorf("scout ItemCount = %d, want 3", sig.Scout.ItemCount)
 	}
 	if sig.Scout.CycleSizeEstimate != "medium" {
 		t.Errorf("scout size = %q", sig.Scout.CycleSizeEstimate)
 	}
-	// Triage + authoritative CycleSize precedence
 	if !sig.Triage.Present || sig.Triage.CycleSize != "medium" || len(sig.Triage.PhaseSkip) != 1 {
 		t.Errorf("triage = %+v", sig.Triage)
 	}
@@ -112,7 +108,6 @@ func TestDigest_FailOpenOnMissingAndCorrupt(t *testing.T) {
 func TestDigest_CompletedGating(t *testing.T) {
 	ws := t.TempDir()
 	writeFile(t, ws, "handoff-build.json", buildHandoff)
-	// build artifact exists on disk, but build NOT in completed → not Present.
 	sig, _ := Digest(ws, []string{"scout"})
 	if sig.Build.Present {
 		t.Errorf("build not in completed → Present must be false even if artifact exists")
@@ -129,13 +124,8 @@ func TestCycleSize_FallbackToScout(t *testing.T) {
 	}
 }
 
-// TestDigest_GenericSignalFold verifies the uniform signal plane: a handoff's
-// top-level "signals" block is folded into sig.Generic, bare keys namespaced by
-// phase and already-dotted keys taken as-is. This is what makes a user phase's
-// signal routable without a bespoke typed extractor.
 func TestDigest_GenericSignalFold(t *testing.T) {
 	ws := t.TempDir()
-	// A build handoff that ALSO carries a uniform signals block (bare + dotted).
 	writeFile(t, ws, "handoff-build.json", `{
 	  "phase": "build", "verdict": "PASS",
 	  "acs_result": {"green": 1, "red": 0, "total": 1},
@@ -153,14 +143,11 @@ func TestDigest_GenericSignalFold(t *testing.T) {
 	if s, isS := got.(string); !ok || !isS || s != "clean" {
 		t.Errorf("Generic[security.precheck] = %v (%T, ok=%v), want \"clean\" (dotted key kept as-is)", got, got, ok)
 	}
-	// Typed extraction is unaffected (additive).
 	if !sig.Build.Present || sig.Build.Verdict != "PASS" {
 		t.Errorf("typed Build extraction regressed: %+v", sig.Build)
 	}
 }
 
-// TestDigest_NoSignalsBlock_GenericNil confirms a handoff without a signals
-// block leaves Generic nil (fail-open, no allocation).
 func TestDigest_NoSignalsBlock_GenericNil(t *testing.T) {
 	ws := t.TempDir()
 	writeFile(t, ws, "handoff-scout.json", scoutHandoff)
@@ -183,12 +170,7 @@ func TestDigest_FailOpenOnTruncatedJSON(t *testing.T) {
 	}
 }
 
-// --- ADR-0039 §7 item 3: failure-sentinel signal lifting ---
-
-// A FAIL report carrying a v2 failure block surfaces <phase>.failure_class +
-// <phase>.defect_count on the generic plane, so failure-phase insertion can be
-// DATA-driven via insert_when. Artifact names resolve through the
-// phasecontract registry (single source — tdd writes test-report.md).
+// tdd's contract artifact is test-report.md, resolved through the phasecontract registry.
 func TestDigest_LiftsFailureSentinelSignals(t *testing.T) {
 	ws := t.TempDir()
 	writeFile(t, ws, "audit-report.md", "## Verdict\nFAIL\n"+
@@ -212,14 +194,11 @@ func TestDigest_LiftsFailureSentinelSignals(t *testing.T) {
 		t.Errorf("tdd.failure_class = %v, want code-build-fail (contract artifact name test-report.md)", got)
 	}
 
-	// The lifted signal drives structured conditions (the registry failure
-	// cards key on exactly this).
 	if !evalCondition(sig, config.Condition{Field: "audit.defect_count", Op: "gte", Value: 1}) {
 		t.Error("condition audit.defect_count gte 1 must match the lifted signal")
 	}
 }
 
-// PASS artifacts (v1 sentinel, no failure block) contribute nothing.
 func TestDigest_NoFailureSignalsOnPass(t *testing.T) {
 	ws := t.TempDir()
 	writeFile(t, ws, "audit-report.md", "## Verdict\nPASS\n"+

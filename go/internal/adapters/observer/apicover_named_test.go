@@ -6,10 +6,6 @@ import (
 	"time"
 )
 
-// TestObserver_NewReturnsTypedHandleWithStopContract names the observer.Observer
-// type (New returns *Observer but the bare type is never named in a test) and
-// pins its lifecycle contract: New returns a usable *Observer and Stop is
-// idempotent (the once-guard at observer.go:222 never double-closes quit).
 func TestObserver_NewReturnsTypedHandleWithStopContract(t *testing.T) {
 	t.Parallel()
 	var o *Observer = New(Config{StallS: time.Hour, PollS: 10 * time.Millisecond}, &bytes.Buffer{})

@@ -8,16 +8,7 @@ import (
 	"testing"
 )
 
-// session_accounting_test.go — the two session-accounting persistence failures
-// must FAIL LOUD, not be swallowed (inbox: swarm-session-accounting-fail-loud).
-// Both use the same real-contract error injection: a registry whose manifest
-// path has a regular FILE as its parent directory makes persistLocked's
-// os.MkdirAll(filepath.Dir(path)) genuinely fail — no mock, the production
-// persist path actually errors.
-
-// blockedRegistry returns a SessionRegistry whose persistence is guaranteed to
-// fail: its manifest's parent path is a regular file, so MkdirAll cannot create
-// the directory. Every Register / MarkReaped on it returns a real error.
+// blockedRegistry's manifest parent is a regular file, so every persist fails for real, with no mock.
 func blockedRegistry(t *testing.T) *SessionRegistry {
 	t.Helper()
 	blocker := filepath.Join(t.TempDir(), "not-a-dir")
@@ -27,10 +18,6 @@ func blockedRegistry(t *testing.T) *SessionRegistry {
 	return NewSessionRegistry(filepath.Join(blocker, "s.json"), 1, "build", os.Getpid())
 }
 
-// A worker whose pre-registration fails must be ABORTED before any spawn: the
-// crash-safe reaper's manifest is its only record of live sessions, so
-// launching an unregistered session would leak an invisible orphan. The
-// dispatcher must return wr.Err and NEVER call the launcher.
 func TestLaunchWorker_RegisterFailure_AbortsBeforeLaunch(t *testing.T) {
 	fk := &fakeLauncher{}
 	deps := Deps{Launcher: fk, Registry: blockedRegistry(t)}
@@ -46,18 +33,13 @@ func TestLaunchWorker_RegisterFailure_AbortsBeforeLaunch(t *testing.T) {
 	}
 }
 
-// When MarkReaped's persist fails during a sweep, the kill itself still
-// succeeded (the process is dead) — so the worker stays in rep.Killed — but the
-// stale-Live manifest entry (which would make the next sweep re-target a corpse)
-// must be surfaced in rep.Errors, not swallowed.
 func TestReap_MarkReapedFailure_SurfacedInErrors(t *testing.T) {
 	dir := t.TempDir()
 	reg := NewSessionRegistry(filepath.Join(dir, "sub", "s.json"), 1, "build", os.Getpid())
 	if err := reg.Register(handle("w0")); err != nil {
 		t.Fatalf("setup register (should succeed): %v", err)
 	}
-	// Now break persistence: replace the manifest's parent dir with a file so the
-	// MarkReaped inside Reap fails.
+	// Replace the manifest's parent dir with a file so the next persist fails.
 	if err := os.RemoveAll(filepath.Join(dir, "sub")); err != nil {
 		t.Fatal(err)
 	}
@@ -81,10 +63,6 @@ func TestReap_MarkReapedFailure_SurfacedInErrors(t *testing.T) {
 	}
 }
 
-// A Register whose persist fails must NOT leave a phantom entry in memory: the
-// on-disk manifest (the reaper's source of truth) never recorded it, so an
-// in-memory Live entry would be a divergence the disk contradicts. The mutation
-// rolls back to the pre-Register state.
 func TestRegister_PersistFailure_RollsBackInMemory(t *testing.T) {
 	reg := blockedRegistry(t)
 	if err := reg.Register(handle("w0")); err == nil {
@@ -98,16 +76,13 @@ func TestRegister_PersistFailure_RollsBackInMemory(t *testing.T) {
 	}
 }
 
-// A MarkReaped whose persist fails must roll back the status flip: the on-disk
-// manifest still shows the session Live, so memory must too (consistent), not
-// claim a Reaped state that never reached disk.
 func TestMarkReaped_PersistFailure_RollsBackStatus(t *testing.T) {
 	dir := t.TempDir()
 	reg := NewSessionRegistry(filepath.Join(dir, "sub", "s.json"), 1, "build", os.Getpid())
 	if err := reg.Register(handle("w0")); err != nil {
 		t.Fatalf("setup register (should succeed): %v", err)
 	}
-	// Break persistence: replace the manifest's parent dir with a file.
+	// Replace the manifest's parent dir with a file so the next persist fails.
 	if err := os.RemoveAll(filepath.Join(dir, "sub")); err != nil {
 		t.Fatal(err)
 	}
@@ -123,16 +98,13 @@ func TestMarkReaped_PersistFailure_RollsBackStatus(t *testing.T) {
 	}
 }
 
-// Re-registering an existing WorkerID takes upsertLocked's in-place-replace
-// branch; if that persist fails, the rollback must restore the ORIGINAL entry,
-// not leave the half-applied replacement in memory.
 func TestRegister_ReplacePersistFailure_RollsBackToOriginal(t *testing.T) {
 	dir := t.TempDir()
 	reg := NewSessionRegistry(filepath.Join(dir, "sub", "s.json"), 1, "build", os.Getpid())
 	if err := reg.Register(handle("w0")); err != nil { // original Branch: cycle-1-w0
 		t.Fatalf("setup register (should succeed): %v", err)
 	}
-	// Break persistence, then re-register w0 with a changed field.
+	// Replace the manifest's parent dir with a file so the next persist fails.
 	if err := os.RemoveAll(filepath.Join(dir, "sub")); err != nil {
 		t.Fatal(err)
 	}

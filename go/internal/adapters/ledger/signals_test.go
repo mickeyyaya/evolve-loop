@@ -1,17 +1,5 @@
 package ledger
 
-// signals_test.go — ADR-0101 S4a: the Signal Center observes the file ledger
-// at its ONE append chokepoint. Every core.LedgerEntry written through Append
-// — the orchestrator's records, the bridge's stop_review, the inbox mover's
-// lifecycle lines (AppendLifecycle), the seal's segment anchor — is also a
-// ledger.appended INFO signal naming its ledger line; a failed Append is a
-// WARN LEDGER_APPEND_FAILED and the error still returns. The observer is
-// installed by the WithSignals construction option, not by a wrapper type:
-// Go embedding promotes methods without virtual dispatch, so a Decorator over
-// *FileLedger let AppendLifecycle and Seal append unobserved (S4a
-// architecture review HIGH-1). The go/ast guard at the end keeps every line
-// writer either on the chokepoint or on the documented exempt inventory.
-
 import (
 	"context"
 	"go/ast"
@@ -35,8 +23,6 @@ func recordingLedgerSignals() (*signalcenter.Center, *[]signalcenter.Event) {
 	return c, got
 }
 
-// entriesBySeq reads the whole chain back (sealed segments + live tail) so a
-// signal can be matched to the line it names.
 func entriesBySeq(t *testing.T, l *FileLedger) map[int]core.LedgerEntry {
 	t.Helper()
 	lines, err := l.gatherAllLines()
@@ -66,8 +52,6 @@ func TestWithSignals_EveryEntryThroughAppendIsALedgerAppendedSignal(t *testing.T
 	if err := l.AppendLifecycle(ctx, LifecycleRecord{TS: "2026-09-13T00:00:01Z", Action: "claim", TaskID: "poison", Cycle: 1632}); err != nil {
 		t.Fatalf("AppendLifecycle: %v", err)
 	}
-	// Sealing the first line into a segment appends the segment anchor through
-	// the same chokepoint.
 	if err := l.Seal(ctx, 1); err != nil {
 		t.Fatalf("Seal: %v", err)
 	}
@@ -89,8 +73,6 @@ func TestWithSignals_EveryEntryThroughAppendIsALedgerAppendedSignal(t *testing.T
 	if anchor := (*got)[2]; anchor.Fields["kind"] != SealKind || anchor.Fields["role"] != "operator" {
 		t.Errorf("the seal's segment anchor is observed too: %+v", anchor)
 	}
-	// Every signal names the ledger line it reports: fields.entry_seq is the
-	// line's chained sequence number.
 	lines := entriesBySeq(t, l)
 	for _, e := range *got {
 		seq, err := strconv.Atoi(e.Fields["entry_seq"])
@@ -128,8 +110,6 @@ func TestWithSignals_AppendFailureIsAWarnAndTheErrorStillReturns(t *testing.T) {
 	}
 }
 
-// Options apply in order at construction: the later observer wins, so a root
-// that composes options cannot end up with two Centers observing one ledger.
 func TestOption_AppliesInOrderTheLaterObserverWins(t *testing.T) {
 	t.Parallel()
 	first, gotFirst := recordingLedgerSignals()
@@ -159,11 +139,6 @@ func TestWithSignals_NilCenterIsTheNullObject(t *testing.T) {
 	}
 }
 
-// Every function in this package that writes a ledger line either reaches
-// the Append chokepoint (where the observer sits) or is on this inventory
-// with its reason — so the next promoted or self-constructed writer cannot
-// be forgotten silently. The inventory is the honest list of lines the
-// Signal Center does NOT see; shrinking it is S4b work.
 func TestFileLedger_EveryLineWriterReachesTheAppendChokepointOrIsInventoried(t *testing.T) {
 	t.Parallel()
 	exempt := map[string]string{
@@ -178,7 +153,7 @@ func TestFileLedger_EveryLineWriterReachesTheAppendChokepointOrIsInventoried(t *
 	}
 	type writer struct {
 		raw     bool            // calls a raw chained-line writer directly
-		callees map[string]bool // same-receiver method calls
+		callees map[string]bool // every other call, by bare name
 	}
 	writers := map[string]*writer{}
 	rawWriters := map[string]bool{"appendChained": true, "appendChainedFromTail": true, "appendLineAndReplaceTip": true}
@@ -196,9 +171,9 @@ func TestFileLedger_EveryLineWriterReachesTheAppendChokepointOrIsInventoried(t *
 				}
 				name := ""
 				switch fn := call.Fun.(type) {
-				case *ast.SelectorExpr: // l.method(…) / pkg.Func(…)
+				case *ast.SelectorExpr:
 					name = fn.Sel.Name
-				case *ast.Ident: // a plain helper(…) of this package (re-review MEDIUM-A)
+				case *ast.Ident:
 					name = fn.Name
 				}
 				switch {
@@ -213,8 +188,7 @@ func TestFileLedger_EveryLineWriterReachesTheAppendChokepointOrIsInventoried(t *
 			writers[fd.Name.Name] = w
 		}
 	}
-	// reachesRaw walks same-package calls (methods and functions share the
-	// name space here) without passing through Append.
+	// Calls are keyed by bare name, so methods and functions share one name space here.
 	var reachesRaw func(name string, seen map[string]bool) bool
 	reachesRaw = func(name string, seen map[string]bool) bool {
 		if seen[name] {

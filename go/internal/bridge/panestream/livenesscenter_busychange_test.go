@@ -1,14 +1,5 @@
 package panestream
 
-// livenesscenter_busychange_test.go — RED tests for cycle-432 slice S4, Task 1
-// (s4-center-busy-change-projection): fold panestream.PaneBusy and
-// bridge.PaneHasSubstantiveChange into panestream.LivenessCenter as per-session
-// projections Busy(sessionKey) bool and Changed(sessionKey) bool, so the
-// driver checkpoint (Task 2) stops parsing CLI chrome a second time itself.
-// TDD contract: these tests are written BEFORE Busy/Changed exist. They
-// compile-fail (Busy/Changed undefined) until Builder implements them.
-// DO NOT MODIFY THESE TESTS — Builder implements to make them GREEN.
-
 import (
 	"fmt"
 	"os"
@@ -20,11 +11,6 @@ import (
 	"testing"
 )
 
-// TestSignalCenter_BusyProjection (AC1, positive): after Observe with a pane
-// carrying the live-turn affordance, Busy(key) reads true; after Observe with
-// a quiet pane it reads false. Both verdicts must match the standalone
-// panestream.PaneBusy(pane, profile) for the SAME pane — the projection is the
-// existing function folded in, not a reimplementation that can drift.
 func TestSignalCenter_BusyProjection(t *testing.T) {
 	sc := NewLivenessCenter()
 	p := Profiles["claude"]
@@ -48,9 +34,6 @@ func TestSignalCenter_BusyProjection(t *testing.T) {
 	}
 }
 
-// TestSignalCenter_ChangedProjection (AC2, positive): Changed(key) reads true
-// when the CLEANED content of the most recent Observe differs from the prior
-// one, and false when two consecutive Observes carry identical content.
 func TestSignalCenter_ChangedProjection(t *testing.T) {
 	sc := NewLivenessCenter()
 	p := Profiles["claude"]
@@ -67,10 +50,6 @@ func TestSignalCenter_ChangedProjection(t *testing.T) {
 	}
 }
 
-// TestSignalCenter_ChangedIgnoresChrome (AC3, chrome-only delta — edge/OOD):
-// two Observes that differ ONLY in volatile chrome (a ticking spinner-stats
-// line) must NOT read as Changed — the ticking-clock hole cleanPane closes
-// today must stay closed after the fold.
 func TestSignalCenter_ChangedIgnoresChrome(t *testing.T) {
 	sc := NewLivenessCenter()
 	p := Profiles["claude"]
@@ -82,8 +61,6 @@ func TestSignalCenter_ChangedIgnoresChrome(t *testing.T) {
 	}
 }
 
-// TestSignalCenter_UnknownKeyIsQuiet (AC4, negative): Busy/Changed on an empty
-// or never-observed session key must return false and must not panic.
 func TestSignalCenter_UnknownKeyIsQuiet(t *testing.T) {
 	sc := NewLivenessCenter()
 	if sc.Busy("") {
@@ -100,9 +77,6 @@ func TestSignalCenter_UnknownKeyIsQuiet(t *testing.T) {
 	}
 }
 
-// TestSignalCenter_ProjectionsConcurrent (AC5, -race): concurrent Observe,
-// Busy, Changed, and Aggregate calls on overlapping session keys must be
-// -race clean under the existing RWMutex model.
 func TestSignalCenter_ProjectionsConcurrent(t *testing.T) {
 	const numProducers = 8
 	sc := NewLivenessCenter()
@@ -136,12 +110,8 @@ func TestSignalCenter_ProjectionsConcurrent(t *testing.T) {
 	<-readerDone
 }
 
-// funcDefRE matches a package-level (no-receiver) func definition for
-// cleanPane or PaneHasSubstantiveChange.
 var funcDefRE = regexp.MustCompile(`(?m)^func\s+(cleanPane|PaneHasSubstantiveChange)\s*\(`)
 
-// countChromeParseFuncDefs counts non-test .go files in dir that define
-// cleanPane or PaneHasSubstantiveChange at package level.
 func countChromeParseFuncDefs(t *testing.T, dir string) int {
 	t.Helper()
 	entries, err := os.ReadDir(dir)
@@ -162,12 +132,6 @@ func countChromeParseFuncDefs(t *testing.T, dir string) int {
 	return n
 }
 
-// TestSignalCenter_SingleDefinitionAntiDuplication (AC7, anti-duplication):
-// cleanPane and PaneHasSubstantiveChange must be relocated into panestream as
-// their SOLE home — zero copies left in bridge/stopreview.go. Currently they
-// live only in bridge (pre-relocation), so this fails until Builder moves
-// them: panestream must gain exactly 2 defs (cleanPane + PaneHasSubstantiveChange)
-// and bridge must lose both.
 func TestSignalCenter_SingleDefinitionAntiDuplication(t *testing.T) {
 	_, thisFile, _, ok := runtime.Caller(0)
 	if !ok {

@@ -7,10 +7,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
-// TestAllProfilesModelTierDefaultIsNonEmpty guards against profiles with an
-// empty model_tier_default. TestAllProfilesSubstitutabilityAtParity silently
-// skips empty tiers (checkTier returns early), so a missing default would pass
-// the parity check without detection.
+// The parity test skips empty tiers, so an empty default needs its own guard.
 func TestAllProfilesModelTierDefaultIsNonEmpty(t *testing.T) {
 	t.Parallel()
 
@@ -30,11 +27,7 @@ func TestAllProfilesModelTierDefaultIsNonEmpty(t *testing.T) {
 	}
 }
 
-// TestAllProfilesModelTierOverridesValuesAreCanonical checks that override
-// values are explicitly in modelcatalog.CanonicalTiers, not just resolvable in
-// the current driver manifests. Manifest-only resolution could silently accept a
-// non-canonical tier that was added to a manifest without being added to
-// CanonicalTiers.
+// Manifest resolution alone would accept a tier added to a manifest but not to CanonicalTiers.
 func TestAllProfilesModelTierOverridesValuesAreCanonical(t *testing.T) {
 	t.Parallel()
 
@@ -55,11 +48,6 @@ func TestAllProfilesModelTierOverridesValuesAreCanonical(t *testing.T) {
 	}
 }
 
-// TestEnvelopeTierHierarchyOrdering validates that when a profile declares a
-// ModelTierEnvelope, the min/default/max fields are in non-decreasing order
-// in the canonical tier hierarchy (fast < balanced < deep). Individual field
-// resolution against driver manifests does not catch a semantically inverted
-// envelope like {min: "deep", default: "balanced", max: "fast"}.
 func TestEnvelopeTierHierarchyOrdering(t *testing.T) {
 	t.Parallel()
 
@@ -94,11 +82,8 @@ func TestEnvelopeTierHierarchyOrdering(t *testing.T) {
 	}
 }
 
-// TestRestrictedClisProfilesTiersAreDriverAgnostic explicitly tests the policy
-// invariant documented in model-routing-policy.md: profiles with intentional
-// allowed_clis restrictions (builder, tdd-engineer, tester) constrain dispatch
-// eligibility but must still express tier vocabulary that resolves in ALL
-// swappable driver manifests. Dispatch restriction ≠ tier vocabulary restriction.
+// allowed_clis restricts dispatch, not tier vocabulary: these profiles' tiers
+// must still resolve on every swappable driver.
 func TestRestrictedClisProfilesTiersAreDriverAgnostic(t *testing.T) {
 	t.Parallel()
 
@@ -128,9 +113,6 @@ func TestRestrictedClisProfilesTiersAreDriverAgnostic(t *testing.T) {
 	}
 }
 
-// TestSubstitutabilityParityCoversMinimumProfiles guards against a reduced
-// profiles directory silently weakening substitutability coverage. If fewer than
-// 80 profiles are loaded, the parity test passes with less than full coverage.
 func TestSubstitutabilityParityCoversMinimumProfiles(t *testing.T) {
 	t.Parallel()
 
@@ -143,21 +125,6 @@ func TestSubstitutabilityParityCoversMinimumProfiles(t *testing.T) {
 	}
 }
 
-// TestModelTierOverridesWithinEnvelope is the permanent regression guard added
-// in cycle-974 (envelope-floor-guard-model-tier-overrides). It asserts that
-// every model_tier_overrides value ranks within its OWN profile's
-// model_tier_envelope [min,max] on the canonical ladder fast<balanced<deep<top.
-//
-// The two pre-existing envelope tests leave a gap this closes:
-// TestAllProfilesModelTierOverridesValuesAreCanonical checks an override value
-// is a canonical tier name; TestEnvelopeTierHierarchyOrdering checks a
-// profile's own min/default/max are non-decreasing. Neither cross-checks an
-// override value against its own envelope bounds — the exact drift that let a
-// below-floor ("fast" under min="balanced") and above-ceiling ("deep" over
-// max="balanced") override ship undetected across six profiles.
-//
-// Profiles without an envelope (or with an empty/non-canonical min/max) are
-// skipped, matching the conventions of the tests above.
 func TestModelTierOverridesWithinEnvelope(t *testing.T) {
 	t.Parallel()
 
@@ -183,15 +150,13 @@ func TestModelTierOverridesWithinEnvelope(t *testing.T) {
 		minR, okMin := tierRank[env.Min]
 		maxR, okMax := tierRank[env.Max]
 		if !okMin || !okMax {
-			// Non-canonical envelope bounds are TestEnvelopeTierHierarchyOrdering's
-			// concern; isolate the override-vs-envelope range here.
+			// Non-canonical bounds are TestAllProfilesAreDriverAgnostic's concern.
 			continue
 		}
 		for key, tier := range profile.ModelTierOverrides {
 			r, ok := tierRank[tier]
 			if !ok {
-				// Non-canonical override value → covered by
-				// TestAllProfilesModelTierOverridesValuesAreCanonical.
+				// Non-canonical values are TestAllProfilesModelTierOverridesValuesAreCanonical's concern.
 				continue
 			}
 			if r < minR || r > maxR {

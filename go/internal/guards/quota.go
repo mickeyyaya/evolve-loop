@@ -8,18 +8,14 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// Quota enforces per-agent web-research caps. Phase-1: in-memory
-// counters; Phase 2 persists into cycle-state.json:research_usage.
-// Port of scripts/hooks/research-quota-gate.sh.
+// Quota caps research tool calls per agent and bucket, counting in memory for the life of the value.
 type Quota struct {
 	cfg      QuotaConfig
 	mu       sync.Mutex
 	counters map[string]int // key = "agent|bucket"
 }
 
-// QuotaConfig defines per-bucket caps. Zero means use the bash defaults
-// (web_search=3, web_fetch=5, kb_search=20). A negative value disables
-// the bucket (always deny).
+// QuotaConfig sets per-bucket caps: zero takes the default (3, 5, 20) and a negative cap always denies.
 type QuotaConfig struct {
 	WebSearch         int
 	WebFetch          int
@@ -27,6 +23,7 @@ type QuotaConfig struct {
 	AllowDeepResearch bool
 }
 
+// NewQuota returns a Quota guard with zero caps replaced by their defaults.
 func NewQuota(cfg QuotaConfig) *Quota {
 	if cfg.WebSearch == 0 {
 		cfg.WebSearch = 3
@@ -40,8 +37,10 @@ func NewQuota(cfg QuotaConfig) *Quota {
 	return &Quota{cfg: cfg, counters: map[string]int{}}
 }
 
+// Name reports "quota".
 func (q *Quota) Name() string { return "quota" }
 
+// Decide counts a research call against its agent's bucket and denies once the cap is reached.
 func (q *Quota) Decide(_ context.Context, in core.GuardInput) core.GuardDecision {
 	if q.cfg.AllowDeepResearch {
 		return core.GuardDecision{Allow: true}

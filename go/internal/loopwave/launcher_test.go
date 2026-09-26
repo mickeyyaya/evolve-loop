@@ -13,9 +13,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/triagecap"
 )
 
-// lifecycleItem plants an inbox todo where inboxmover resolves `state`:
-// pending at the inbox root, processing under processing/cycle-9/, every
-// other state under inbox/<state>/.
+// lifecycleItem plants an inbox todo in the directory inboxmover resolves to state.
 func lifecycleItem(t *testing.T, evolveDir, state, id string, deps ...string) {
 	t.Helper()
 	dir := filepath.Join(evolveDir, "inbox")
@@ -32,8 +30,6 @@ func lifecycleItem(t *testing.T, evolveDir, state, id string, deps ...string) {
 	}
 	writeJSON(t, filepath.Join(dir, id+".json"), doc)
 }
-
-// --- 23. the freshness-gated launcher ---
 
 func TestLauncher_AllStaleLaunchesNothingAndSignals(t *testing.T) {
 	h := newHarness(t)
@@ -86,8 +82,6 @@ func (r *ctxRecorder) Run(ctx context.Context, specs []fleet.CycleSpec) []fleet.
 	return make([]fleet.Result, len(specs))
 }
 
-// --- 24. the probe ---
-
 func TestFreshnessProbe_ResolvesTheInboxLifecycle(t *testing.T) {
 	h := newHarness(t)
 	lifecycleItem(t, h.evolveDir, inboxmover.StatePending, "dep-pending")
@@ -120,12 +114,8 @@ func TestFreshnessProbe_ResolvesTheInboxLifecycle(t *testing.T) {
 	}
 }
 
-// --- 25. the refill ---
-
 func TestRefill_PicksHighestWeightNotExcludedWithFleetScopeEnv(t *testing.T) {
 	h := newHarness(t)
-	// Q-W8: the refill reads <ProjectRoot>/.evolve/inbox — pinned by a
-	// harness whose EvolveDir is that path and a decoy elsewhere.
 	writeJSON(t, filepath.Join(h.evolveDir, "inbox", "low.json"), map[string]any{"id": "low", "weight": 0.2, "files": []string{"l.go"}})
 	writeJSON(t, filepath.Join(h.evolveDir, "inbox", "high.json"), map[string]any{"id": "high", "weight": 0.9, "files": []string{"h.go"}})
 	writeJSON(t, filepath.Join(h.evolveDir, "inbox", "mid.json"), map[string]any{"id": "mid", "weight": 0.5, "files": []string{"m.go"}})
@@ -146,8 +136,6 @@ func TestRefill_PicksHighestWeightNotExcludedWithFleetScopeEnv(t *testing.T) {
 		t.Error("the refill reads ProjectRoot/.evolve, not EvolveDir (Q-W8 held)")
 	}
 }
-
-// --- 27. the three "consumed" beliefs, characterised ---
 
 func TestConsumedHasThreeBeliefs(t *testing.T) {
 	if !isConsumed(inboxmover.StateRetry) || isConsumed(inboxmover.StateQuarantine) || isConsumed(inboxmover.StateProcessing) || isConsumed(inboxmover.StatePending) || isConsumed(inboxmover.StateUnknown) {
@@ -170,8 +158,6 @@ func TestConsumedHasThreeBeliefs(t *testing.T) {
 		t.Error("the dispatch probe marks processing stale (belief 3)")
 	}
 }
-
-// --- Preflight ---
 
 func TestPreflight_RefusesANonGitRoot(t *testing.T) {
 	if err := Preflight(t.TempDir())(); err == nil || !strings.Contains(err.Error(), "control-plane preflight") {

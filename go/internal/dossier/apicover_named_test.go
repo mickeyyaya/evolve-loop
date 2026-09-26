@@ -1,12 +1,5 @@
 package dossier
 
-// apicover_named_test.go — named coverage for every exported symbol in the
-// dossier package (ADR-0050 Phase 5 requirement). One named test per export
-// that is not already covered by build_test.go / render_test.go / write_test.go.
-//
-// These are minimal behavioural assertions (not mere presence checks) so they
-// also serve as regression guards.
-
 import (
 	"encoding/json"
 	"strings"
@@ -15,8 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 )
 
-// TestDefect_Named ensures the Defect type and all its fields are reachable by
-// a same-package named test (apicover requires composite-literal or typed-var usage).
 func TestDefect_Named(t *testing.T) {
 	d := Defect{
 		ID:       "d-001",
@@ -32,7 +23,6 @@ func TestDefect_Named(t *testing.T) {
 	}
 }
 
-// TestLesson_Named covers the Lesson type.
 func TestLesson_Named(t *testing.T) {
 	l := Lesson{
 		ID:               "l-001",
@@ -44,7 +34,6 @@ func TestLesson_Named(t *testing.T) {
 	}
 }
 
-// TestCarryover_Named covers the Carryover type.
 func TestCarryover_Named(t *testing.T) {
 	c := Carryover{
 		ID:       "c-001",
@@ -56,7 +45,6 @@ func TestCarryover_Named(t *testing.T) {
 	}
 }
 
-// TestParseJSON_Named covers ParseJSON (round-trip through RenderJSON).
 func TestParseJSON_Named(t *testing.T) {
 	original := &Dossier{
 		Cycle:        7,
@@ -81,14 +69,11 @@ func TestParseJSON_Named(t *testing.T) {
 	if parsed.Goal != original.Goal {
 		t.Errorf("ParseJSON Goal: got %q, want %q", parsed.Goal, original.Goal)
 	}
-	// Verify ParseJSON rejects invalid JSON.
 	if _, err := ParseJSON([]byte("not-json")); err == nil {
 		t.Error("ParseJSON: want error for invalid JSON, got nil")
 	}
 }
 
-// TestFailureRecord_Named covers the FailureRecord type (apicover typed-var
-// check) and its JSON tags — the FAIL cycle's committed failure identity.
 func TestFailureRecord_Named(t *testing.T) {
 	fr := FailureRecord{
 		Fingerprint: "audit|gate-block|ab12cd34ef56",
@@ -117,8 +102,6 @@ func TestFailureRecord_Named(t *testing.T) {
 	}
 }
 
-// TestBuildOpts_SystemFailureNamed covers the exported BuildOpts and Dossier
-// fields while asserting that Build preserves the complete signal.
 func TestBuildOpts_SystemFailureNamed(t *testing.T) {
 	sig := &cyclestate.SystemFailureSignal{Category: "landing-lost", Level: "system", Evidence: "ship ran but did not land"}
 	d, err := Build(1, BuildOpts{WorkspacePath: t.TempDir(), Goal: "preserve system failure", SystemFailure: sig})
@@ -130,7 +113,6 @@ func TestBuildOpts_SystemFailureNamed(t *testing.T) {
 	}
 }
 
-// TestVerdicts_Named covers the VerdictPass / VerdictWarn / VerdictFail constants.
 func TestVerdicts_Named(t *testing.T) {
 	for _, v := range []string{VerdictPass, VerdictWarn, VerdictFail} {
 		if v == "" {
@@ -142,8 +124,6 @@ func TestVerdicts_Named(t *testing.T) {
 	}
 }
 
-// TestSchemaVersionAndSkipEvidence_Named executes the forward-only schema
-// discriminator and every result in the sanctioned skipped-phase read seam.
 func TestSchemaVersionAndSkipEvidence_Named(t *testing.T) {
 	d := &Dossier{
 		SchemaVersion: CurrentSchemaVersion,
@@ -166,7 +146,6 @@ func TestSchemaVersionAndSkipEvidence_Named(t *testing.T) {
 	}
 }
 
-// TestPhaseRecord_Named covers the PhaseRecord type (apicover typed-var check).
 func TestPhaseRecord_Named(t *testing.T) {
 	pr := PhaseRecord{
 		Name:        "scout",
@@ -180,7 +159,6 @@ func TestPhaseRecord_Named(t *testing.T) {
 	}
 }
 
-// TestBuildOpts_Named covers BuildOpts (apicover typed-var check).
 func TestBuildOpts_Named(t *testing.T) {
 	opts := BuildOpts{
 		WorkspacePath: "/tmp/ws",
@@ -193,9 +171,6 @@ func TestBuildOpts_Named(t *testing.T) {
 	}
 }
 
-// TestDossier_JSONRoundTrip covers the Dossier type with all optional fields
-// populated, including fields not exercised by other tests (Decisions, CommitSHA,
-// TreeSHA, StartedAt, EndedAt) — ensures JSON tags are correct.
 func TestDossier_JSONRoundTrip(t *testing.T) {
 	d := &Dossier{
 		Cycle:        1,
@@ -225,12 +200,8 @@ func TestDossier_JSONRoundTrip(t *testing.T) {
 	}
 }
 
-// TestCommitmentAccessors_NamedAndExercised: HasCommitment and CommitmentLine
-// are reached in production only through text/template reflection, so the
-// apicover gate (an AST identifier scan over _test.go) cannot see them via the
-// render test. Name and exercise them directly — and assert the contract that
-// matters: "committed to nothing" must be sayable, and "we never asked" must
-// stay silent rather than render as a claim.
+// Production reaches these accessors only through text/template reflection,
+// which apicover's AST scan cannot see.
 func TestCommitmentAccessors_NamedAndExercised(t *testing.T) {
 	var unrecorded Dossier
 	if unrecorded.HasCommitment() || unrecorded.CommitmentLine() != "" {

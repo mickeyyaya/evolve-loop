@@ -1,13 +1,5 @@
-// Package topngate implements the build->audit BLOCKING gate that enforces the
-// Builder's task-slug binding to triage-report.md's ## top_n commitment (inbox
-// builder-task-binding-topn-gate, 8th recurrence of the wrong-task-build
-// defect: cycles 282, 310, 522, 575, 577, 599, 640, 645). The root cause is two
-// competing task-identity sources — scout-report.md's ## Selected Tasks vs
-// triage-report.md's ## top_n — that can diverge; when Builder binds to the
-// wrong one, audit grades the delivered (wrong) diff while the committed task's
-// ACS suite fails, burning a whole audit+ship phase pair on a doomed cycle.
-// This gate makes triage ## top_n the single authority at the build->audit
-// transition. It mirrors internal/evalgate's gate/reviewer shape.
+// Package topngate checks the TDD and build deliverables against the task set
+// triage committed. See docs/architecture/packages/internal-topngate.md.
 package topngate
 
 import (
@@ -21,10 +13,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// The four report filenames this gate reads, resolved from the phasecontract
-// registry (the artifact-name SSOT) instead of re-typed here. This gate exists
-// to stop two task-identity sources from diverging; it must not itself be a
-// second declaration of what those sources are NAMED.
+// Report names come from the phasecontract registry so this gate never re-declares them.
 var (
 	triageReportName = phasecontract.ArtifactName("triage")
 	buildReportName  = phasecontract.ArtifactName("build")
@@ -32,148 +21,90 @@ var (
 	scoutReportName  = phasecontract.ArtifactName(string(core.PhaseScout))
 )
 
-// gate is one structural inter-phase check. appliesTo selects the phase whose
-// deliverable it inspects; check returns a non-empty reason on a violation and
-// block=true only when the violation is CERTAIN (a delivered slug provably
-// outside a non-empty committed top_n set). Any ambiguity (missing report,
-// empty top_n, unparseable header) returns block=false so enforce never
-// false-blocks a healthy cycle. Mirrors internal/evalgate.gate.
+// gate is one inter-phase check. check returns a reason for every finding and
+// block=true only for a certain violation; any ambiguity fails open.
 type gate interface {
 	name() string
 	appliesTo(phase string) bool
 	check(in core.ReviewInput) (reason string, block bool)
 }
 
-// topNBindingGate reviews the build phase's build-report.md right after build
-// completes, before audit. It reads the ## Task: slug Builder claims and the
-// ## top_n slugs triage committed, and blocks only when the claimed slug is a
-// CERTAIN out-of-lane build (a non-empty top_n set that does not contain it).
+// topNBindingGate compares build-report.md's ## Task: slug with triage's
+// ## top_n. It never blocks.
 type topNBindingGate struct{}
 
 func (topNBindingGate) name() string { return "topn-task-binding" }
 
-// appliesTo scopes the gate to the build phase's deliverable only — the
-// transition where the wrong-task divergence becomes observable and cheap to
-// abort (before audit/ship spend).
 func (topNBindingGate) appliesTo(phase string) bool { return phase == string(core.PhaseBuild) }
 
 func (topNBindingGate) check(in core.ReviewInput) (string, bool) {
 	topN, ok := readTopNSlugs(in.Workspace)
 	if !ok || len(topN) == 0 {
-		return "", false // no committed top_n to bind against → fail open
+		return "", false
 	}
 	claimed, ok := readClaimedSlug(in.Workspace)
 	if !ok || claimed == "" {
-		return "", false // no claimed slug to check → fail open
+		return "", false
 	}
 	for _, s := range topN {
 		if s == claimed {
-			return "", false // in-lane → pass
+			return "", false
 		}
 	}
-	// Label drift is ADVISORY, not fatal (2026-07-22, cycles 916 + 1012): both
-	// recorded rejections discarded CORRECT work whose report merely described
-	// the committed task under a different label — two LLM outputs string-
-	// compared. The dispatch is plan-driven by construction (the lane exists
-	// BECAUSE triage committed these ids), so the binding authority is the
-	// committed set, not the prose. The non-empty reason with block=false
-	// routes through the reviewer's single structured logf seam (testable);
-	// real fraud protection (deliverable file-scope vs the committed item's
-	// declared scope) is the queued construction-level check.
+	// Label drift is advisory: the lane exists because triage committed these
+	// ids, so the committed set binds, not the report's label.
 	return "label drift (advisory since 2026-07-22): build-report labels its task '" + claimed + "' but triage committed {" + strings.Join(topN, ", ") + "} — binding to the committed set", false
 }
 
-// tddScopeGate binds the TDD phase's AUTHORED set to triage's ## top_n
-// commitment (inbox tdd-topn-binding-gate; cycle-660, 3rd recurrence). The
-// defect: triage commits an empty ## top_n, TDD reads scout-report.md instead
-// of triage-report.md and still authors RED scaffolds for a slug triage
-// explicitly declined; build then honours the empty top_n correctly and chokes
-// on the orphan scaffolds. topNBindingGate covers build->audit; this covers
-// TDD->Build, the transition one phase earlier.
+// tddScopeGate checks the TDD phase's declared members and authored test files
+// against the committed task set.
 type tddScopeGate struct{}
 
 func (tddScopeGate) name() string { return "topn-tdd-scope" }
 
-// appliesTo scopes the gate to the TDD phase's deliverable only.
 func (tddScopeGate) appliesTo(phase string) bool { return phase == string(core.PhaseTDD) }
 
-// check reconciles complete multi-member declarations first. For legacy
-// zero/single-member commitments it blocks certain orphan authoring and fails open on every
-// ambiguity (missing/unparseable report, no claimed slug, nothing authored):
-//
-//  1. empty committed top_n + a non-empty authored set — triage committed
-//     nothing, so the only compliant TDD deliverable is a no-op. FATAL.
-//  2. non-empty committed top_n + an authored set claimed for a slug with zero
-//     overlap against it — ADVISORY, mirroring the build-side gate's
-//     label-drift carve-out (see topNBindingGate.check).
-//
-// The two cases differ in kind, not degree: under an empty top_n there is no
-// committed item the authored files could be a differently-labelled response
-// to, so case 1 is unambiguous and stays fatal. Case 2 compares two
-// LLM-authored strings for equality against a set that is non-empty by
-// construction — the same false-rejection risk #348 closed one phase later.
+// check requires exact set equality for a multi-member lane. For a zero- or
+// single-member lane it blocks only files authored under an empty top_n;
+// label drift and file-scope drift are advisory.
 func (tddScopeGate) check(in core.ReviewInput) (string, bool) {
 	topN, ok := readTopNSlugs(in.Workspace)
 	if !ok {
-		return "", false // no triage-report.md → nothing to bind against → fail open
+		return "", false
 	}
 	claimed, declared, authored, ok := readTDDScope(in.Workspace)
 	if !ok {
-		return "", false // no test-report.md → nothing to bind → fail open (cycle-1620 audit L1)
+		return "", false
 	}
-	// Multi-member lanes need complete set equality before Build starts; a
-	// single matching label cannot account for the second member (cycle-1480).
-	// The committed set is the CONTRACT's (core.ContractTaskIDs: the lane pin,
-	// else the triage decision's top_n, minus deferrals) — the same ids the
-	// Task Contract handed TDD — never triage-report.md's markdown ## top_n,
-	// whose working-id decomposition sub-ids would falsely block a lane whose
-	// TDD declared exactly what it was contracted for. The markdown top_n
-	// stays the authority for the legacy zero/single-member paths below. Known
-	// asymmetry: a complete multi-member reconciliation returns here, before
-	// the single-member file-scope advisory (inbox
-	// multi-member-file-scope-advisory).
+	// Multi-member lanes bind to the contract's ids, not the markdown top_n,
+	// whose decomposition sub-ids would block a lane that declared its contract.
 	if committed := normalizedSlugs(core.ContractTaskIDs(in.Workspace)); len(committed) > 1 {
 		return reconcileMemberSets(committed, normalizedSlugs(declared))
 	}
 	if len(authored) == 0 {
-		return "", false // no deliverable, or TDD authored nothing → fail open / no-op PASS
+		return "", false
 	}
 	if len(topN) == 0 {
 		return "triage committed an EMPTY ## top_n so the TDD phase must author nothing, but test-report.md claims '" +
 			claimed + "' and declares authored test file(s) {" + strings.Join(authored, ", ") + "}", true
 	}
 	if claimed == "" {
-		return "", false // authored files but no parseable claim → ambiguous → fail open
+		return "", false
 	}
 	for _, s := range topN {
 		if s == claimed {
-			// In-lane by label. The construction-level check runs ALONGSIDE the
-			// label check on exactly this path (cycle-1111): the label proves
-			// nothing about what was actually authored, so compare the authored
-			// files against the committed item's declared scope. Advisory only.
+			// A matching label proves nothing about the files authored, so check their scope too.
 			return fileScopeAdvisory(in.Workspace, claimed, authored), false
 		}
 	}
-	// Label drift is ADVISORY here for the same reason it is on the build side
-	// (cycles 916 + 1012): the lane exists BECAUSE triage committed these ids, so
-	// the committed set — not the TDD report's prose — is the binding authority,
-	// and a differently-labelled RED scaffold for the committed item is correct
-	// work. The non-empty reason at block=false still routes through the
-	// reviewer's single structured logf seam. (Out-of-lane labels keep reporting
-	// label drift; the file-scope advisory below covers the in-lane path.)
+	// Label drift is advisory here for the same reason as in topNBindingGate.
 	return "label drift (advisory since 2026-07-23): TDD authored test file(s) {" + strings.Join(authored, ", ") +
 		"} labelled '" + claimed + "' but triage committed {" + strings.Join(topN, ", ") +
 		"} — binding to the committed set", false
 }
 
-// fileScopeAdvisory compares the files TDD actually authored against the file
-// scope the committed item declares in scout-report.md, and returns a non-empty
-// ADVISORY reason only when both sets are non-empty and share nothing. Every
-// ambiguity — no scout-report.md, the committed slug absent from it, no
-// declared scope, nothing authored — returns "" (fail open), matching this
-// gate family's convention. It is advisory rather than fatal because a
-// legitimate deliverable can touch a shared helper or an incidental file that
-// scout never named; shadow evidence decides whether it ever becomes fatal.
+// fileScopeAdvisory returns a reason when no authored file shares a scope with
+// the committed item's scout targetFiles, and "" on any ambiguity.
 func fileScopeAdvisory(workspace, slug string, authored []string) string {
 	declared := readScoutTargetFiles(workspace, slug)
 	if len(declared) == 0 || len(authored) == 0 {
@@ -182,7 +113,7 @@ func fileScopeAdvisory(workspace, slug string, authored []string) string {
 	for _, a := range authored {
 		for _, d := range declared {
 			if pathsOverlap(a, d) {
-				return "" // ANY overlap is in-scope
+				return ""
 			}
 		}
 	}
@@ -191,22 +122,15 @@ func fileScopeAdvisory(workspace, slug string, authored []string) string {
 		"} — zero path overlap"
 }
 
-// pathsOverlap reports whether two declared paths cover the same scope: the
-// same file, or two files in the same directory. Directory-level equality is
-// load-bearing, not slack — scout names the PRODUCTION file (gate.go) while TDD
-// authors its sibling (gate_test.go), so an exact-equality rule would fire on
-// every healthy cycle and make the advisory worthless.
+// pathsOverlap treats one directory as one scope: scout names the production
+// file while TDD authors its sibling _test.go.
 func pathsOverlap(a, b string) bool {
 	a, b = filepath.Clean(a), filepath.Clean(b)
 	return a == b || filepath.Dir(a) == filepath.Dir(b)
 }
 
-// readScoutTargetFiles returns the paths declared by the "- **targetFiles:**"
-// line inside scout-report.md's "### Task N: <slug>" block whose slug equals
-// the given one — never a sibling task's line. It returns nil when the report
-// is absent, the slug is not described, or the block declares no targetFiles
-// (callers fail open). Paths are the backticked tokens of the line; the
-// trailing prose annotations scout writes beside them are ignored.
+// readScoutTargetFiles returns the backticked paths on the "- **targetFiles:**"
+// line of scout-report.md's "### Task N: <slug>" block for slug, or nil.
 func readScoutTargetFiles(workspace, slug string) []string {
 	body, ok := readWorkspaceFile(workspace, scoutReportName)
 	if !ok {
@@ -220,7 +144,7 @@ func readScoutTargetFiles(workspace, slug string) []string {
 			current = taskHeaderSlug(trimmed)
 			continue
 		case strings.HasPrefix(trimmed, "## "):
-			current = "" // a section boundary ends the task block
+			current = ""
 			continue
 		}
 		if current != slug || !strings.HasPrefix(trimmed, "- **targetFiles:**") {
@@ -233,9 +157,7 @@ func readScoutTargetFiles(workspace, slug string) []string {
 	return nil
 }
 
-// taskHeaderSlug extracts the slug from a "### Task N: <slug>" header, or ""
-// when the header carries no slug (matching agents/evolve-scout.md's
-// ## Selected Tasks shape).
+// taskHeaderSlug returns the slug of a "### Task N: <slug>" header, or "".
 func taskHeaderSlug(trimmed string) string {
 	rest := strings.TrimSpace(strings.TrimPrefix(trimmed, "### "))
 	i := strings.Index(rest, ":")
@@ -245,7 +167,6 @@ func taskHeaderSlug(trimmed string) string {
 	return strings.TrimSpace(rest[i+1:])
 }
 
-// backtickedPaths returns the `backtick-quoted` tokens of a line in order.
 func backtickedPaths(line string) []string {
 	var paths []string
 	parts := strings.Split(line, "`")
@@ -257,9 +178,7 @@ func backtickedPaths(line string) []string {
 	return paths
 }
 
-// reconcileMemberSets is the multi-member TDD->Build seam: the declared set
-// must equal the committed set exactly; any missing or unexpected member is a
-// fatal scope-mismatch naming both sides.
+// reconcileMemberSets blocks unless declared equals committed as a set.
 func reconcileMemberSets(committed, declared []string) (string, bool) {
 	var missing, extra []string
 	for _, id := range committed {
@@ -290,8 +209,7 @@ func normalizedSlugs(slugs []string) []string {
 	return slices.Compact(out)
 }
 
-// readTDDScope uses the structured handoff's slugs when present, with the
-// Task header as the legacy fallback. Missing reports remain distinguishable.
+// readTDDScope parses test-report.md; ok is false only when the report is unreadable.
 func readTDDScope(workspace string) (slug string, slugs, testFiles []string, ok bool) {
 	body, ok := readWorkspaceFile(workspace, tddReportName)
 	if !ok {
@@ -301,9 +219,10 @@ func readTDDScope(workspace string) (slug string, slugs, testFiles []string, ok 
 	return slug, slugs, testFiles, true
 }
 
-// parseTDDReport reads declarations only outside example fences. The handoff
-// JSON must belong to the actual Handoff to Builder section. Track delimiter
-// kind and length so nested backticks inside a tilde/long fence stay examples.
+// parseTDDReport takes slugs from the first declaring JSON fence under
+// "## Handoff to Builder", else from the comma-separated ## Task: header.
+// A fence closes only on its own delimiter character, at least as long as the
+// opener, so a fence nested inside an example stays part of the example.
 func parseTDDReport(body string) (slug string, slugs, testFiles []string) {
 	var fence string
 	var block []string
@@ -318,10 +237,7 @@ func parseTDDReport(body string) (slug string, slugs, testFiles []string) {
 						Slugs     []string `json:"slugs"`
 						TestFiles []string `json:"testFiles"`
 					}
-					// The declaration is the first fence that DECLARES something: a
-					// JSON fence carrying neither slugs nor testFiles (RED-run output,
-					// a status object) is not the handoff and must not shadow the
-					// real one that follows (cycle-1620 audit M1).
+					// A fence declaring neither slugs nor testFiles must not shadow a later declaration.
 					if json.Unmarshal([]byte(strings.Join(block, "\n")), &payload) == nil && (len(payload.Slugs) > 0 || len(payload.TestFiles) > 0) {
 						slugs, testFiles, found = payload.Slugs, payload.TestFiles, true
 					}
@@ -352,9 +268,8 @@ func parseTDDReport(body string) (slug string, slugs, testFiles []string) {
 	return slug, slugs, testFiles
 }
 
-// readTopNSlugs reads <workspace>/triage-report.md and returns the slugs listed
-// under the "## top_n" section. ok is false when the file is absent/unreadable
-// (callers fail open). A present-but-empty section returns (nil, true).
+// readTopNSlugs returns the slugs under triage-report.md's ## top_n. ok is
+// false only when the report is unreadable, so an empty top_n stays visible.
 func readTopNSlugs(workspace string) ([]string, bool) {
 	body, ok := readWorkspaceFile(workspace, triageReportName)
 	if !ok {
@@ -365,7 +280,6 @@ func readTopNSlugs(workspace string) ([]string, bool) {
 	for _, line := range strings.Split(body, "\n") {
 		trimmed := strings.TrimSpace(line)
 		if strings.HasPrefix(trimmed, "## ") {
-			// A "## top_n ..." header opens the section; any other ## closes it.
 			inSection = strings.HasPrefix(trimmed, "## top_n")
 			continue
 		}
@@ -379,9 +293,7 @@ func readTopNSlugs(workspace string) ([]string, bool) {
 	return slugs, true
 }
 
-// listItemSlug extracts the slug from a "- <slug>: description" bullet, or ""
-// when the line is not such a bullet. The slug is the text between the bullet
-// marker and the first colon (matching agents/evolve-triage.md's top_n shape).
+// listItemSlug returns the slug of a "- <slug>: description" bullet, or "".
 func listItemSlug(trimmed string) string {
 	if !strings.HasPrefix(trimmed, "- ") {
 		return ""
@@ -393,9 +305,8 @@ func listItemSlug(trimmed string) string {
 	return strings.TrimSpace(rest)
 }
 
-// readClaimedSlug reads <workspace>/build-report.md and returns the slug from
-// its "## Task: <slug>" header (the contracted Builder header shape). ok is
-// false when the file is absent/unreadable (callers fail open).
+// readClaimedSlug returns build-report.md's "## Task: <slug>" value; ok is
+// false only when the report is unreadable.
 func readClaimedSlug(workspace string) (string, bool) {
 	body, ok := readWorkspaceFile(workspace, buildReportName)
 	if !ok {
@@ -410,8 +321,7 @@ func readClaimedSlug(workspace string) (string, bool) {
 	return "", true
 }
 
-// readWorkspaceFile reads <workspace>/<name>; ok is false when workspace is
-// empty or the file is absent/unreadable.
+// readWorkspaceFile refuses an empty workspace, which would resolve name against the cwd.
 func readWorkspaceFile(workspace, name string) (string, bool) {
 	if workspace == "" {
 		return "", false
