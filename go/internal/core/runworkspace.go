@@ -10,22 +10,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 )
 
-// ResolveCycleStatePath returns the absolute cycle-state file path THIS process
-// must read/write. Under the fleet supervisor each concurrent lane sets
-// ipcenv.CycleStateFileKey to its OWN per-run file (runs/cycle-N/cycle-state.json)
-// so two lockstep lanes never share the host-global singleton — the Phase/CycleID
-// clobber that made a lane's phase-gate (guards.Phase reads cycle state) see the
-// wrong phase and stall before audit. Unset ⇒ <evolveDir>/cycle-state.json,
-// byte-identical to the sequential loop.
-//
-// This is the SINGLE resolver every cycle-state reader/writer MUST call
-// (storage, checkpoint, resume, reset, quota-pause) so no path re-derives the
-// location with a raw filepath.Join and silently reopens the isolation hole.
+// ResolveCycleStatePath is the cycle-state file this process reads and writes for evolveDir: a fleet
+// lane's own per-run file when its override lies inside evolveDir, else <evolveDir>/cycle-state.json.
+// Every cycle-state reader and writer calls it; see paths.CycleStateFileFor.
 func ResolveCycleStatePath(evolveDir string) string {
-	if p := os.Getenv(ipcenv.CycleStateFileKey); p != "" {
-		return p
-	}
-	return filepath.Join(evolveDir, CycleStateFile)
+	return paths.CycleStateFileFor(evolveDir, os.Getenv(ipcenv.CycleStateFileKey))
 }
 
 // RunStateFile is the per-run mirror of cycle-state.json inside the run

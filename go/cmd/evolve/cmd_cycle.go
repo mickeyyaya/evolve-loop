@@ -206,6 +206,10 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 	if evolveDir == "" {
 		evolveDir = filepath.Join(projectRoot, ".evolve")
 	}
+	if err := fleetLaneEvolveDirOK(projectRoot, evolveDir); err != nil {
+		fmt.Fprintf(stderr, "evolve cycle run: %v\n", err)
+		return 10
+	}
 
 	if !simulate {
 		// Crash-recovery GC before the cycle: reap dead-owner tmux sessions left

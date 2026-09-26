@@ -15,6 +15,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
@@ -100,10 +101,10 @@ func LoadResumeState(_ context.Context, projectRoot, evolveDir string, opts Resu
 	// Scope, deliberately narrow:
 	//   - only on ErrNoCheckpoint (a stale PRIMARY checkpoint is a real answer
 	//     about a real checkpoint — never scan past it);
-	//   - only when NO env override is set: inside a lane the override IS the
-	//     authority, and scanning siblings would let one lane resume another's
-	//     cycle.
-	if !errors.Is(err, ErrNoCheckpoint) || os.Getenv(ipcenv.CycleStateFileKey) != "" {
+	//   - only when no lane override governs this evolve dir: inside a lane the
+	//     override IS the authority, and scanning siblings would let one lane
+	//     resume another's cycle.
+	if !errors.Is(err, ErrNoCheckpoint) || statePath != paths.CycleStateFileFor(evolveDir, "") {
 		return nil, err
 	}
 	rp, derr := discoverPerRunResumeState(evolveDir, projectRoot, opts)

@@ -15,12 +15,7 @@ const WorktreeRootKey = "EVOLVE_WORKTREE_ROOT" // SSOT IPC-protocol-allowed
 // fleet siblings cannot leak width into each other. Unset/garbage ⇒ solo (1).
 const FleetWidthKey = "EVOLVE_FLEET_WIDTH" // SSOT IPC-protocol-allowed
 
-// CycleStateFileKey overrides the absolute path a process reads/writes cycle
-// state at, replacing the host-global <evolveDir>/cycle-state.json default.
-// Under the fleet supervisor each concurrent lane sets this to its OWN per-run
-// file (runs/cycle-N/cycle-state.json), so two lockstep lanes never clobber a
-// shared singleton's Phase/CycleID — the race that stalled a lane's phase-gate
-// (guards.Phase.Decide reads cycle state) before it could reach audit. Child
-// guard subprocesses inherit it, so the orchestrator and its gate checks agree
-// on THIS lane's phase. Unset ⇒ host-global default (sequential loop unchanged).
+// CycleStateFileKey names a fleet lane's own per-run cycle-state file (runs/cycle-N/cycle-state.json),
+// so two concurrent lanes never share <evolveDir>/cycle-state.json. It applies only to the evolve dir
+// that holds it; see paths.CycleStateFileFor.
 const CycleStateFileKey = "EVOLVE_CYCLE_STATE_FILE" // SSOT IPC-protocol-allowed
