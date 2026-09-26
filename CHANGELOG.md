@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — a lane's cycle-state override no longer reaches the test fixtures it spawns (cycle 1700, 2026-09-26)
+
+A fleet lane sets `EVOLVE_CYCLE_STATE_FILE` process-wide so its orchestrator and hooks share the lane's own state, and the resolver honored it for any evolve dir. Every `go test` the lane spawned therefore wrote its fixtures into the lane's live cycle state. That covered the EGPS predicates, the CI-parity gates and the tests agents run in their panes. Tests read each other's fixtures, which is why cycle 1700's "dashboard flakes under load" item and its audit went red. With the override exported, main's guards suite also replaced the live file with a fixture (`cycle_id 107`).
+
+- `paths.CycleStateFileFor(evolveDir, override)` is the one rule, and `core.ResolveCycleStatePath` and `paths.Resolve` delegate to it. The override applies only when it lies inside the evolve dir being resolved, so a lane's own reads are unchanged, and a test's `t.TempDir()` evolve dir always gets its own file.
+- Resume's per-run checkpoint discovery now stands down only for an override that governs its evolve dir, not whenever the variable is set.
+- `evolve cycle run` refuses a fleet lane whose `--evolve-dir` is not `<project-root>/.evolve`, the one dir its override governs, instead of letting it fall back to the shared file.
+- The whole module passes with a lane override exported, and the exported file is left untouched.
+- Record: `docs/incidents/2026-09-26-lane-cycle-state-override-reached-test-fixtures.md`. Follow-ups are filed: `acssuite-lane-env-policy` and `audit-gate-forced-fail-earns-no-repair`.
+
 ## Fixed — triage re-checks a queued item's premise against what changed since it was filed (F40, 2026-09-26)
 
 Cycle 1691 picked an item filed on 2026-08-16. #535 had made its premise unreachable on 2026-09-09. Fault-localization and bug-reproduction accepted a unit fixture that fed the unreachable state straight to an inner function, and the builder "fixed" a non-bug and opened a fail-open. The audit caught it a full cycle later. A console audit of the next ten queued items found six whose premise or scope was wrong.
