@@ -11,7 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasestream"
 )
 
-// writeReport seeds a workspace with an orchestrator-report.md.
 func writeReport(t *testing.T, body string) string {
 	t.Helper()
 	ws := t.TempDir()
@@ -21,12 +20,7 @@ func writeReport(t *testing.T, body string) string {
 	return ws
 }
 
-// seedEvents runs raw CLI output through the REAL phasestream.Classifier —
-// exactly as the live normalizer does — and writes the resulting envelope
-// stream to <name> in ws. This is the migration contract: cycleclassify must
-// recover the same infrastructure verdict the legacy raw-log regex produced,
-// now sourced from the clean events stream. stdoutLines feed Line(), stderr
-// lines feed Stderr().
+// seedEvents writes the envelopes the real phasestream.Classifier emits for raw stdout and stderr lines, as the live normalizer does.
 func seedEvents(t *testing.T, ws, name string, stdoutLines, stderrLines []string) {
 	t.Helper()
 	clf := phasestream.NewClassifier(
@@ -104,9 +98,6 @@ func TestClassify_Infrastructure(t *testing.T) {
 
 func TestClassify_InfraInEventsStdout(t *testing.T) {
 	t.Parallel()
-	// Report is clean; the events stream carries a stdout-borne 429. Per
-	// cycle-61 forensics the classifier must catch infra on stdout — now
-	// sourced from the unified events stream, not raw *-stdout.log.
 	ws := writeReport(t, "## Verdict\nNo errors detected")
 	seedEvents(t, ws, "memo-events.ndjson", []string{"429 Too Many Requests"}, nil)
 	r := Classify(ws)
@@ -123,7 +114,6 @@ func TestClassify_InfraInEventsStdout(t *testing.T) {
 
 func TestClassify_InfraInEventsStderr(t *testing.T) {
 	t.Parallel()
-	// A stderr-borne timeout, normalized into the events stream.
 	ws := writeReport(t, "OK")
 	seedEvents(t, ws, "builder-events.ndjson", nil, []string{"ETIMEDOUT"})
 	r := Classify(ws)
@@ -138,11 +128,6 @@ func TestClassify_InfraInEventsStderr(t *testing.T) {
 	}
 }
 
-// TestClassify_ParityInfraRawVsEvents is the hard-switch migration guarantee:
-// raw CLI output that the legacy regex would have flagged as infrastructure,
-// when fed through the real phasestream.Classifier, still yields a
-// ClassInfrastructure verdict from the events stream. Covers both the stdout
-// (Line) and stderr (Stderr) channels in one events file.
 func TestClassify_ParityInfraRawVsEvents(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
@@ -169,11 +154,6 @@ func TestClassify_ParityInfraRawVsEvents(t *testing.T) {
 	}
 }
 
-// TestClassify_ParityViaProduce is the ADR-0020 cutover gate for failure
-// classification: a raw <phase>-stderr.log written by the bridge, run through
-// the actual production path (phasestream.Produce as runner.go calls it),
-// yields an events.ndjson from which cycleclassify recovers ClassInfrastructure
-// — the end-to-end parity guarantee for the no-runtime-fallback collapse.
 func TestClassify_ParityViaProduce(t *testing.T) {
 	t.Parallel()
 	ws := writeReport(t, "## Verdict\nclean report, no markers")
@@ -222,7 +202,6 @@ func TestClassify_ShipGateConfig(t *testing.T) {
 
 func TestClassify_ShipGateBeatsAuditFail(t *testing.T) {
 	t.Parallel()
-	// Both markers present on their own lines — ship-gate-config must win.
 	body := `
 Verdict: FAIL
 But actually SHIP_GATE_DENIED — the audit was PASS originally.
@@ -235,10 +214,6 @@ But actually SHIP_GATE_DENIED — the audit was PASS originally.
 
 func TestClassify_AuditFail(t *testing.T) {
 	t.Parallel()
-	// Markers must hit on a single line — bash grep -qiE is line-by-line
-	// and Go regex with the default `.` (no newline) replicates that.
-	// The split-line "## Verdict\n**FAIL**" form belongs to audit
-	// reports, not orchestrator-report.md.
 	for _, body := range []string{
 		"**Verdict: FAIL** — defects above threshold\n",
 		"Verdict: WARN — defects above threshold",
@@ -289,7 +264,6 @@ EPERM: sandbox blocked write
 
 func TestClassify_UnclassifiableReport_Breach(t *testing.T) {
 	t.Parallel()
-	// Report exists but has no recognized markers.
 	body := "Cycle completed. Nothing surprising to report.\nVerdict: SHIPPED"
 	r := Classify(writeReport(t, body))
 	if r.Class != ClassIntegrityBreach {
@@ -299,8 +273,6 @@ func TestClassify_UnclassifiableReport_Breach(t *testing.T) {
 
 func TestClassify_SortedEventsScan(t *testing.T) {
 	t.Parallel()
-	// Two events files both carry an infra_failure; classifier picks the
-	// alphabetically-first one for a stable Source value.
 	ws := writeReport(t, "OK")
 	seedEvents(t, ws, "zeta-events.ndjson", nil, []string{"EPERM"})
 	seedEvents(t, ws, "alpha-events.ndjson", nil, []string{"EPERM"})
@@ -313,13 +285,8 @@ func TestClassify_SortedEventsScan(t *testing.T) {
 	}
 }
 
-// --- ADR-0039 §7 item 6: Pass 0 — structured sentinel beats regex guess ---
-
-// A phase that self-reported a structured failure class (sentinel v2) is the
-// authority on WHY it failed; the regex passes are heuristics over prose and
-// must not override it.
 func TestClassify_Pass0_StructuredClassBeatsRegex(t *testing.T) {
-	// Prose alone would regex-classify audit-fail (Pass 4).
+	// Prose alone would regex-classify audit-fail.
 	ws := writeReport(t, "# Cycle Report\nVerdict: FAIL\n")
 	line := phasecontract.RenderVerdictSentinelWithFailure("tdd", "FAIL",
 		&phasecontract.FailureBlock{Class: "code-build-fail", Defects: []string{"red suite"}})
@@ -335,8 +302,6 @@ func TestClassify_Pass0_StructuredClassBeatsRegex(t *testing.T) {
 	}
 }
 
-// An out-of-taxonomy structured class falls through to the regex passes —
-// never UnknownClassification, never a blind trust of arbitrary agent strings.
 func TestClassify_Pass0_UnknownClassFallsThroughToRegex(t *testing.T) {
 	ws := writeReport(t, "# Cycle Report\nVerdict: FAIL\n")
 	line := phasecontract.RenderVerdictSentinelWithFailure("tdd", "FAIL",
@@ -350,7 +315,6 @@ func TestClassify_Pass0_UnknownClassFallsThroughToRegex(t *testing.T) {
 	}
 }
 
-// A PASS sentinel (or no failure block) leaves every pass untouched.
 func TestClassify_Pass0_PassSentinelInert(t *testing.T) {
 	ws := writeReport(t, "# Cycle Report\nVerdict: FAIL\n")
 	if err := os.WriteFile(filepath.Join(ws, "scout-report.md"),
@@ -362,9 +326,6 @@ func TestClassify_Pass0_PassSentinelInert(t *testing.T) {
 	}
 }
 
-// Pass 0 is FAIL-only: a WARN sentinel is not necessarily the reason the
-// cycle stopped — a later infra crash must keep winning (the established
-// pass-ordering invariant: infrastructure beats audit-fail).
 func TestClassify_Pass0_WarnDoesNotSuppressInfra(t *testing.T) {
 	ws := writeReport(t, "# Cycle Report\nsandbox-exec: Operation not permitted\n")
 	line := phasecontract.RenderVerdictSentinelWithFailure("audit", "WARN",
@@ -377,8 +338,6 @@ func TestClassify_Pass0_WarnDoesNotSuppressInfra(t *testing.T) {
 	}
 }
 
-// The floor's own retrospective-report.md is learning ABOUT a failure, not
-// the failure itself — never a Pass-0 source.
 func TestClassify_Pass0_SkipsRetrospectiveReport(t *testing.T) {
 	ws := writeReport(t, "# Cycle Report\nVerdict: FAIL\n")
 	line := phasecontract.RenderVerdictSentinelWithFailure("retrospective", "FAIL",
