@@ -65,7 +65,10 @@ undiagnosable. Its blast radius is every subsequent cycle.
 2. **Dual review before commit** (simplifier + language reviewer via
    commit-gate); architecture changes additionally get an adversarial
    architect review, and must land with the ADR or design doc that explains
-   them. Pure-docs diffs may skip the simplifier.
+   them. Pure-docs diffs may skip the simplifier. A comment removal needs no
+   reviewer: when every changed Go file is proven comment-only and every other
+   file is Markdown under `docs/`, the commit gate accepts the proof instead
+   ([code comments](../conventions/code-comments.md)).
    *Mechanized: the docs floor (`internal/docsfloor`, ADR-0077) WARNs at the
    build handoff when an architecture-labeled change touches no `docs/` file.
    WARN, not block — "is there a doc at all" is mechanical, "is this doc

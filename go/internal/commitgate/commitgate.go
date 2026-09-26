@@ -3,7 +3,8 @@
 //
 // It detects the languages of the changed files, validates that a simplifier
 // AND one reviewer (general code-reviewer OR the matching language reviewer)
-// were declared via --reviewers, runs lint + TARGETED tests for each changed
+// were declared via --reviewers unless the change is a proven comment removal
+// (comment_only.go), runs lint + TARGETED tests for each changed
 // language, and on a full pass writes <root>/.commit-gate/attestation.json bound
 // to sha256(`git diff HEAD`).
 //
@@ -166,7 +167,12 @@ func (o Options) Run(ctx context.Context) *Result {
 	langs := detectLangs(files)
 	res.Langs = langs
 
-	if !o.reviewersSatisfied(langs, res) {
+	waived, refused := o.reviewWaiver(ctx)
+	switch {
+	case waived != "":
+		res.log("reviewers not required: %s", waived)
+	case !o.reviewersSatisfied(langs, res):
+		res.log("no review waiver: %s", refused)
 		res.ExitCode = ExitFail
 		return res
 	}

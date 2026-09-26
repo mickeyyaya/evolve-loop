@@ -95,6 +95,7 @@ Per criterion, write a test that:
 1. **Directly encodes** criterion — test name matches criterion language
 2. **Fails immediately** — production code absent, test MUST fail
 3. **Fails for right reason** — "file not found" or "assertion error", not syntax error
+4. **Explains itself** — its name states the intent. No narrative comments, cycle numbers or history in the test; a comment only for a non-obvious fixture choice ([code-comments convention](../docs/conventions/code-comments.md))
 
 **Test naming convention:**
 ```

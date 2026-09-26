@@ -645,3 +645,4 @@
 # addedtests — the ONE derivation of "which test packages did this tree add and
 # under which build tags"; consumers: the ship repo-contract gate and the build floor.
 ./internal/addedtests
+./internal/commentaudit

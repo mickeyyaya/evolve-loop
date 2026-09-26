@@ -42,7 +42,7 @@ The auditor profile defaults to Opus, but the native diff-complexity check (`go/
 
 ### 9. Knowledge Stewardship Rule (Day-One)
 
-> **Knowledge Stewardship Rule (Day-One):** Every research finding, discovery, cycle learning, or tried-and-failed approach MUST be documented before the cycle ships. All documentation lives under `docs/` — research notes in `docs/research/` (the former `knowledge-base/research/` tree moved there 2026-08-05; see [docs/MOVED.md](docs/MOVED.md)). `knowledge-base/` is a runtime write surface only (`cycles/` dossiers), not documentation. **Never delete; always archive.** When superseding a doc, MOVE it to `docs/private/research/archived-YYYY-MM-DD/` with a one-line note in the replacement pointing to the archive. Failing to document is a HIGH-severity audit defect.
+> **Knowledge Stewardship Rule (Day-One):** Every research finding, discovery, cycle learning, or tried-and-failed approach MUST be documented before the cycle ships. All documentation lives under `docs/`, never in code comments ([code-comments convention](docs/conventions/code-comments.md)) — research notes in `docs/research/` (the former `knowledge-base/research/` tree moved there 2026-08-05; see [docs/MOVED.md](docs/MOVED.md)). `knowledge-base/` is a runtime write surface only (`cycles/` dossiers), not documentation. **Never delete; always archive.** When superseding a doc, MOVE it to `docs/private/research/archived-YYYY-MM-DD/` with a one-line note in the replacement pointing to the archive. Failing to document is a HIGH-severity audit defect.
 
 Enforced by the doc-deletion guard (`evolve guard docdelete`, `go/internal/guards/docdelete.go`; PreToolUse kernel hook): blocks `rm`/`mv` targeting `docs/**` or `knowledge-base/**` unless the destination lands under `docs/` (archive home: `docs/private/research/archived-YYYY-MM-DD/`; `knowledge-base/` is deliberately NOT a valid destination). Operator escape: set `workflow.allow_doc_delete=true` in `.evolve/policy.json` (logged; emergency only).
 
@@ -130,6 +130,9 @@ When a cycle converts an `EVOLVE_*` env flag into a typed input parameter, the c
 
 ### 4. Minimalism (always-on)
 Every coding change takes the laziest solution that actually works — the ladder (YAGNI → stdlib → native/`policy.json` config → already-present dependency → one line → minimum), no unrequested abstraction, deletion over addition, shortest working diff; mark a deliberate shortcut with a `minimal:` comment naming the ceiling + upgrade path. The cut is in scope, NEVER in safety: input validation, error handling, security, accessibility, explicit requests, and the pipeline gates (RED test / safety invariants / eval+contract gates / ship floor) are never simplified away. Full ruleset: **[skills/minimalism/SKILL.md](skills/minimalism/SKILL.md)** (adapted from ponytail, MIT).
+
+### 5. Code comments (always-on)
+Code explains itself. A comment states only what the code cannot: a directive, a one-line contract on an export, or the *why* behind a non-obvious invariant. No history — cycle numbers, incidents, F-ids, dates — ever goes in code; it goes to `docs/`. Full rule: **[docs/conventions/code-comments.md](docs/conventions/code-comments.md)**.
 
 ## Where to file issues
 

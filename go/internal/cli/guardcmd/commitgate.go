@@ -4,7 +4,8 @@ package guardcmd
 // commit-gate/commit-gate-runner.sh (bash->Go migration Wave B1).
 //
 // Detects the languages of the changed files, validates the --reviewers
-// precondition (simplify + one review capability), runs lint + targeted tests,
+// precondition (simplify + one review capability, waived for a proven comment
+// removal), runs lint + targeted tests,
 // and on a full pass writes .commit-gate/attestation.json bound to
 // sha256(`git diff HEAD`) — the attestation `evolve ship --class manual`
 // verifies. Exit codes mirror the bash runner verbatim: 0 pass, 1 fail/precond,
