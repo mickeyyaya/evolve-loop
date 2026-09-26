@@ -545,3 +545,109 @@ func TestCountInGoFunc_MissingFileHintsAtRelocation(t *testing.T) {
 		t.Errorf("directory read: want a plain error without moved hint, got %v", err)
 	}
 }
+
+// FileContainsAnyChecked / CountOccurrencesAnyChecked / LineContainsAllChecked
+// are the message-carrying siblings of the value-only readers above.
+// acsassert-silent-readers-cannot-name-a-moved-file: a moved predicate path
+// used to come back as a bare false/0 indistinguishable from "file present,
+// content absent" — these (value, error) forms name the path and the moved
+// hint on a not-exist read, exactly like CountInGoFunc, while an existing
+// path that merely lacks the content still returns a nil error.
+func TestFileContainsAnyChecked_MissingFileHintsAtRelocation(t *testing.T) {
+	dir := t.TempDir()
+	gone := filepath.Join(dir, "cmd_gone.go")
+	hit, err := FileContainsAnyChecked(gone, "anything")
+	if hit {
+		t.Error("missing file must not report a hit")
+	}
+	if err == nil {
+		t.Fatal("FileContainsAnyChecked(missing file) = nil error, want error")
+	}
+	if !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("error chain lost fs.ErrNotExist: %v", err)
+	}
+	if msg := err.Error(); !strings.Contains(msg, gone) || !strings.Contains(msg, "may have moved") {
+		t.Errorf("error lacks path or moved hint: %q", msg)
+	}
+}
+
+func TestFileContainsAnyChecked_ExistingFileNoHintOnMiss(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "x")
+	if err := os.WriteFile(p, []byte("alpha"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	hit, err := FileContainsAnyChecked(p, "beta", "gamma")
+	if hit {
+		t.Error("expected miss")
+	}
+	if err != nil {
+		t.Errorf("existing file lacking content must not error, got %v", err)
+	}
+}
+
+func TestCountOccurrencesAnyChecked_MissingFileHintsAtRelocation(t *testing.T) {
+	dir := t.TempDir()
+	gone := filepath.Join(dir, "cmd_gone.go")
+	n, err := CountOccurrencesAnyChecked(gone, "x")
+	if n != 0 {
+		t.Errorf("missing file must count 0, got %d", n)
+	}
+	if err == nil {
+		t.Fatal("CountOccurrencesAnyChecked(missing file) = nil error, want error")
+	}
+	if !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("error chain lost fs.ErrNotExist: %v", err)
+	}
+	if msg := err.Error(); !strings.Contains(msg, gone) || !strings.Contains(msg, "may have moved") {
+		t.Errorf("error lacks path or moved hint: %q", msg)
+	}
+}
+
+func TestCountOccurrencesAnyChecked_ExistingFileNoHintOnZero(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "x")
+	if err := os.WriteFile(p, []byte("unrelated\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	n, err := CountOccurrencesAnyChecked(p, "predicates-run")
+	if n != 0 {
+		t.Errorf("got %d, want 0", n)
+	}
+	if err != nil {
+		t.Errorf("existing file lacking content must not error, got %v", err)
+	}
+}
+
+func TestLineContainsAllChecked_MissingFileHintsAtRelocation(t *testing.T) {
+	dir := t.TempDir()
+	gone := filepath.Join(dir, "cmd_gone.go")
+	hit, err := LineContainsAllChecked(gone, "x")
+	if hit {
+		t.Error("missing file must not report a hit")
+	}
+	if err == nil {
+		t.Fatal("LineContainsAllChecked(missing file) = nil error, want error")
+	}
+	if !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("error chain lost fs.ErrNotExist: %v", err)
+	}
+	if msg := err.Error(); !strings.Contains(msg, gone) || !strings.Contains(msg, "may have moved") {
+		t.Errorf("error lacks path or moved hint: %q", msg)
+	}
+}
+
+func TestLineContainsAllChecked_ExistingFileNoHintOnMiss(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "x")
+	if err := os.WriteFile(p, []byte("P-NEW-20\nDONE\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	hit, err := LineContainsAllChecked(p, "P-NEW-20", "DONE")
+	if hit {
+		t.Error("two needles on different lines must not match")
+	}
+	if err != nil {
+		t.Errorf("existing file lacking content must not error, got %v", err)
+	}
+}

@@ -254,27 +254,52 @@ func RepoRoot(t *testing.T) string {
 // FileContainsAny reports whether path's content contains at least one of
 // the substring variants. Returns false if the file is missing or no
 // variant matches. Pure boolean (no TB) so callers control failure mode.
+// A lenient wrapper over FileContainsAnyChecked for callers that don't need
+// to distinguish "file missing" from "content absent"; prefer the Checked
+// form in a predicate that reports its own failure message.
 func FileContainsAny(path string, variants ...string) bool {
+	hit, _ := FileContainsAnyChecked(path, variants...)
+	return hit
+}
+
+// FileContainsAnyChecked is FileContainsAny's message-carrying sibling: on a
+// missing path it returns a non-nil error naming the path and the moved-file
+// hint (wrapping fs.ErrNotExist), instead of silently returning false —
+// indistinguishable, in the bool-only form, from "file present, content
+// absent".
+func FileContainsAnyChecked(path string, variants ...string) (bool, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		return false
+		return false, fmt.Errorf("acsassert: read %s: %w%s", path, err, movedHint(err))
 	}
 	s := string(raw)
 	for _, v := range variants {
 		if strings.Contains(s, v) {
-			return true
+			return true, nil
 		}
 	}
-	return false
+	return false, nil
 }
 
 // CountOccurrencesAny returns the count of lines in path that match any
 // of the given substring variants. Used by "at least N named gates"
 // predicates. Returns 0 if the file is missing.
+// A lenient wrapper over CountOccurrencesAnyChecked; prefer the Checked form
+// in a predicate that reports its own failure message.
 func CountOccurrencesAny(path string, variants ...string) int {
+	n, _ := CountOccurrencesAnyChecked(path, variants...)
+	return n
+}
+
+// CountOccurrencesAnyChecked is CountOccurrencesAny's message-carrying
+// sibling: on a missing path it returns a non-nil error naming the path and
+// the moved-file hint (wrapping fs.ErrNotExist), instead of silently
+// returning 0 — indistinguishable, in the int-only form, from "file
+// present, zero matches".
+func CountOccurrencesAnyChecked(path string, variants ...string) (int, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		return 0
+		return 0, fmt.Errorf("acsassert: read %s: %w%s", path, err, movedHint(err))
 	}
 	count := 0
 	for _, line := range strings.Split(string(raw), "\n") {
@@ -285,16 +310,28 @@ func CountOccurrencesAny(path string, variants ...string) int {
 			}
 		}
 	}
-	return count
+	return count, nil
 }
 
 // LineContainsAll reports whether at least one line of path contains
 // every substring in needles. Useful for table-row predicates like
 // "row containing `P-NEW-20` AND `DONE`".
+// A lenient wrapper over LineContainsAllChecked; prefer the Checked form in
+// a predicate that reports its own failure message.
 func LineContainsAll(path string, needles ...string) bool {
+	hit, _ := LineContainsAllChecked(path, needles...)
+	return hit
+}
+
+// LineContainsAllChecked is LineContainsAll's message-carrying sibling: on a
+// missing path it returns a non-nil error naming the path and the
+// moved-file hint (wrapping fs.ErrNotExist), instead of silently returning
+// false — indistinguishable, in the bool-only form, from "file present, no
+// matching line".
+func LineContainsAllChecked(path string, needles ...string) (bool, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		return false
+		return false, fmt.Errorf("acsassert: read %s: %w%s", path, err, movedHint(err))
 	}
 	for _, line := range strings.Split(string(raw), "\n") {
 		hit := true
@@ -305,10 +342,10 @@ func LineContainsAll(path string, needles ...string) bool {
 			}
 		}
 		if hit {
-			return true
+			return true, nil
 		}
 	}
-	return false
+	return false, nil
 }
 
 // CountInGoFunc returns the count of lines INSIDE the named top-level
