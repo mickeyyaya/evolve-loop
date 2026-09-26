@@ -169,6 +169,27 @@ The design keeps everything F30 built and moves the decision one step earlier, i
 
 `RefusalDisposition(TRIAGE_PROTECTED_SURFACE)` stays as it was (task-level, route console): it now governs only the fail-closed case, where the code still travels on a FAIL.
 
+### 5.8 The carry: a byte-identical rebase ships without a second audit (P1 = ADR-0105 B3 and B4)
+
+Cycles 1712 and 1715 each passed their audit, met a moved plane `main` at ship (a sibling's `dossier: cycle-N closeout` commit, the dominant contention with two or more lanes), unwound (B1), rebased byte-identically, rebound their explanation (B2), and then re-audited an unchanged tree for seven to ten minutes, with a second chance for the verdict to flip. The re-audit is the rule today, not an accident:
+
+- `routeRebasedExplanation` returns Audit after the rebind and never consults the carry-forward rungs; they run only for a cycle without the explanation contract, which no cycle is any more.
+- The existing RUNG 0 (`compositionCarryForward`) diffs commits (`git diff main...HEAD`), and after B1 the change is pended in the index, so the composed diff is empty and the patch-id can never match.
+- Ship has no reader of carry records: `internalAuditBoundTreeSHA` must equal the staged tree (or differ only by sanctioned inbox consumption), so even a carried verdict would be refused as tree drift.
+
+The design is ADR-0105's, in four components, each its own commit, unwired before wiring:
+
+| Id | Component | What it proves or does |
+|---|---|---|
+| C1 | `treedelta.Delta(base, tree)` and `treedelta.Identical(base0, T0, base1, T1)`, a leaf both core and ship use (core's `treeDelta`/`identicalChange` delegate) | the byte-exact change (`diff --binary --full-index --no-ext-diff --no-textconv --no-renames`) of the audited tree on its base equals the pended tree's change on the new base, and is not empty |
+| C2 | the carry record: `composition-verdict{method:"identical-rebase"}` gains `AuditedTreeSHA` beside `TreeStateSHA` (the composed tree) | ship can match the record to the audit it carries (`LaneAuditRef` = the audit artifact's SHA), the audited tree it binds and the tree it will commit |
+| C3 | `identityCarryForward` after the rebind (B3): the auditor row of the run names T0 and the audit artifact (`latestAuditEntry`), base0 = the base before the rebind, T1 = `git write-tree`, base1 = `HEAD`; C1 holds; the composed-tree gates run under `treefence` and the index must still be T1 afterwards; the record goes to the root ledger ship reads; return Ship, else Audit | a rebase that changed no byte of the change ships on the verdict it already earned |
+| C4 | ship accepts a carry (B4): inside the one binding rule (`auditBindingSatisfied`), when the tree ship holds is not the bound tree, the newest `identical-rebase` record for this audit (`LaneAuditRef` = the audit artifact's SHA) whose `AuditedTreeSHA` is the bound tree and whose `TreeStateSHA` is the tree held is re-proven: the ledger chain verifies (0.4 s on a 147K-line ledger), both bases' ancestry in the tree's own directory, C1's byte equality, and the record's patch-id is the proven bytes'; the plane-HEAD comparison stays for the resume detection | ship never trusts the writer, and a carry cannot launder a change |
+
+What it does not change: a rebase the proof declines still returns to Audit (or Build when the change is not identical), and the audit-bound tree of a cycle that never rebased is checked exactly as today.
+
+One scoping, stated: ship re-proves the ancestry and the bytes itself and verifies the ledger chain the record sits in, but does not re-run the composed gates (build, test, acs, apicover) a second time; the writer refuses a record whose gates are not green, and the chain proves the record came through the writer, so a ship-side gate check would be dead code. The orchestrator also declines a carry when the auditor row was bound on another base than the one the change was authored on. Re-running the gates in ship (C4b) is a follow-up if a forged, re-chained ledger is ever a credible threat.
+
 ## 6. Decision tables
 
 ### 6.1 Routing by violation code (`deliverable`, beside the codes)
@@ -211,7 +232,7 @@ Status: **shipped** (commit on a branch, PR open or merged) · **built** (green 
 | Id | Component | Status | Where |
 |---|---|---|---|
 | D0 | operating-policy §0 + ADR-0106 + this document | merged, #655 | `docs/` |
-| P1 | ADR-0105 B1 unwind-rebase-pend; then the resume heal, B3, B4 | B2 merged (#649); B1 merged (#652); the resume heal, B3 and B4 designed | `core/ship_recovery*.go` |
+| P1 | ADR-0105 B1 unwind-rebase-pend; then the resume heal, B3, B4 | B2 merged (#649); B1 merged (#652); B3 and B4 shipped (§5.8 C1–C4); the resume heal designed | `core/ship_recovery*.go`, `core/identity_carry*.go`, `phases/ship/carry.go`, `internal/treedelta` |
 | P2 | a fleet lane's closeout dossier waits for the wave boundary | built, parked (`fix/dossier-commits-at-wave-boundary`; architect N1–N5 applied) | `dossier/publish_pending.go`, `cmd_loop_dossiers.go` |
 | P3 | the pasted prompt ends by stating who the agent is (phase, cycle, session, prompt files, sole writer); phase panes export the manifest's `default_env`, and claude-tmux turns prompt suggestions off | shipped, PR pending (`feat/phase-identity`, four commits) | `bridge/phaseidentity`, `driver_tmux_prepare.go`, `driver_tmux_boot.go`, `manifests/claude-tmux.json` |
 | P4 | an exit-85 escalation names its pattern in `cause_code` and the cause line, anchored to the line start | merged, #656 | `bridge/launchoutcome/cause.go` |
@@ -328,6 +349,17 @@ func (m *Mover) RetireUnbacked(taskID, newState string, p PromoteOpts, reason st
 func RetireUnbacked(opts Options, cycle int, state, reason, commitSHA string, ids []string) ([]string, error) // only ids whose dispatch state is unknown
 OutcomeResult.RetiredUnbacked []string // the PASS seam: committed ids Promote could not move and no inbox item backs
 // X1 — internal/explanationdocs (shipped): nonMaterialPrefixes gains ".evolve/inbox/"
+// P1 — internal/treedelta (shipped)
+func Args(base, tree string) []string // diff --binary --full-index --no-ext-diff --no-textconv --no-renames
+func Delta(ctx, git Git, dir, base, tree string) ([]byte, error)
+func Identical(ctx, git Git, dir, base0, tree0, base1, tree1 string) (audited, composed []byte, ok bool, err error)
+// P1 — internal/adapters/ledger (shipped)
+const IdenticalRebaseMethod = "identical-rebase"; CompositionVerdictInput.AuditedTreeSHA
+func LatestCompositionVerdict(ledgerPath, method, laneAuditRef string) (CompositionVerdict, bool, error) // newest wins
+// P1 — internal/core (shipped)
+func (o *Orchestrator) identityCarryForward(ctx, cycle int, cs CycleState, base0, projectRoot string) bool // after the rebind: Ship on a proven carry
+// P1 — internal/phases/ship (shipped)
+func carrySatisfied(ctx, opts *Options, dir, actual string) (bool, string) // inside auditBindingSatisfied; Options.internalAuditArtifactSHA
 // R1 — internal/phases/triage (shipped)
 type protectedCard struct{ ID, Path string }
 func protectedTopNCards(body string, forbidden func(string) bool) []protectedCard // every card, report order; nil forbidden = manifest membership
@@ -428,6 +460,7 @@ Merges happen only at wave boundaries. Each step is its own PR; each component i
 | 2026-09-27 | code-simplifier, go-reviewer, code-reviewer (Q2) | no edits; WARNING → fixed; WARNING → fixed | a login pane's stale reset hint never sets the bench; the fix names no login command (the families' logins differ); a credential bench holds for routing until a probe clears it; the fix is durable on the bench entry; the design rows state the shipped shape and its trade-offs |
 | 2026-09-27 | code-simplifier, go-reviewer, code-reviewer (W1, H1b) | one gofmt alignment; PASS with three MINORs → applied; PASS with two MINORs → one applied | a present item whose move fails is never stamped unbacked (regression test); the lock-free write is an idempotent create, said in one line; the no-work closeout logs what it routed and retired; the plain-id guard is the one place a path is built from a caller's id |
 | 2026-09-27 | code-simplifier, go-reviewer, code-reviewer (R1, R2) | the rewrite split into two helpers; BLOCK → fixed; BLOCK → fixed | an id-less card and a card the decision never committed both fail closed (the removal set can never hold an empty key; a report-versus-decision mismatch is a fault, not a silent commit); the ACS predicate that pins the admission tests by name follows the renames; the package's atomic JSON writer replaces an inline copy |
+| 2026-09-27 | code-simplifier, go-reviewer, code-reviewer (P1: B3/B4) | two redundant rebinds; PASS with a MAJOR → fixed; WARNING with the same MAJOR → fixed | ship trusted the record's gate results from an unchained ledger read: ship now verifies the chain (0.4 s on 147K lines) and binds the record's patch-id to the bytes it proved, the ship-side gate check goes (the writer refuses red gates and the chain proves the writer), the git adapter forwards the real exit code, and the orchestrator declines a carry whose auditor row was bound on another base; the reviewers confirmed the full-index byte identity subsumes B2's lineage check at ship |
 | 2026-09-27 | code-simplifier, go-reviewer, code-reviewer (Q1) | one closure; APPROVE-WITH-MINOR → applied; WARNING → justified and fixed | the one-sample reading of a walled `Run` stated in code and §12; the deferral records the phase's total dispatches; the digest assertion made non-vacuous |
 | 2026-09-27 | code-simplifier, go-reviewer, code-reviewer, security-reviewer (P3) | no edits; APPROVE; WARNING → fixed; APPROVE-WITH-MINOR → hardened | the sole-writer line was false for stdout-completion phases (fixed); a manifest `default_env` could set credential or loop variables the guards never see (refused at parse); facts rendered into the block are sanitized; no manifest pattern may match the block (pinned) |
 | 2026-09-26 | consistency audit (every doc vs the design vs the shipped code) | INCONSISTENCIES-FOUND → fixed | three stale package pages, one stale sentence in phase-architecture.md, one imprecise ADR sentence; two new package pages |
@@ -447,3 +480,5 @@ Merges happen only at wave boundaries. Each step is its own PR; each component i
 | 2026-09-27 | P3 shipped: §5.4 records the design (driver-appended statement; environment channel over a settings flag; what it does not fix); §8 signatures; §12 the other-CLIs question. Wave 14 (1708, 1709) failed on capacity — every CLI family walled (`auth_recheck`, `rate_limit`, `model_unsupported`) — with `cause_code` naming each pattern, the live proof of P4. |
 | 2026-09-27 | §5.6 and §7.7: the wave-15 deep-dive (1713 planned no-work on a pin shipped by 1706 and carried through 1709 and 1710) designs and ships W1, the retirement record for an id no inbox item backs, and H1b, an empty optional bucket read as no cards, and X1, the inbox record made non-material to the explanation document (1712's verified build sealed FAIL on one sentence about a host-stamped file); §8 signatures; W2 and X2 designed |
 | 2026-09-27 | §5.7 and §7.8: wave 16's first cycle (1714) sealed FAIL on a top_n card naming a protected surface; R1 moves such a card into `escalate_block` by the host's hand and lets the planned no-work closeout route it (never a verdict); R2 tells the agent the surfaces and the drop reason; §8 signatures; the evidence row |
+| 2026-09-27 | §5.8: the carry (P1 = ADR-0105 B3/B4) designed as four components after 1712 and 1715 each re-audited a byte-identical rebase; the P1 row points at it |
+| 2026-09-27 | §5.8 C1–C4 shipped: a byte-identical rebase ships on its audited verdict (`treedelta` leaf; the carry record names the audited tree; `identityCarryForward` after the rebind; ship re-proves the carry inside its one binding rule); the P1 row and §8 updated; the gate re-run in ship scoped out as C4b |

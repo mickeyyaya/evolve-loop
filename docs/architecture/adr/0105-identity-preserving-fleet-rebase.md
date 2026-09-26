@@ -123,13 +123,28 @@ B1 opens two crash windows. After the carrier reset and before the rebase, a res
 
 Ship's comparison of the plane's HEAD is load-bearing for a worktree ship: a resumed ship detects "merged locally, push pending" through it (`phases/ship/repair_resume_test.go`). Dropping the check for worktree ships turns that resume into a false "shipped". B4 must keep that detection, for example by asking whether the plane already contains the lane's tip, before it stops treating a sibling's closeout commit as a moved HEAD (cycle 1704, 2026-09-26).
 
-B3 and B4 get their own tables when they are built, in the same shape.
+### B3 — the carry (`internal/treedelta`, `internal/adapters/ledger`, `internal/core`), in commit order
+
+| # | Component | Step it implements | Tests |
+|---|---|---|---|
+| 1 | `treedelta.Delta`, `treedelta.Identical` | the byte-exact change (`diff --binary --full-index --no-ext-diff --no-textconv --no-renames`) of `T0` on `base0` equals that of `T1` on `base1`, and is not empty; a leaf, so ship re-proves with the same bytes | `TestIdentical_HoldsForTheSameBytesOnTwoBasesAndDeclinesOneByte`, `TestDelta_KeepsWhitespaceAndArgsAreTheOneInvocation`, `TestIdenticalChange_HoldsAcrossACleanRebaseAndDeclinesAnyByte` |
+| 2 | `IdenticalRebaseMethod`, `AuditedTreeSHA`, `LatestCompositionVerdict` | the carry record names the audit artifact, the audited tree and the composed tree; the newest record for an audit wins | `TestWriteCompositionVerdict_IdenticalRebaseRecordsTheAuditedTreeAndReadsBack`, `TestLatestCompositionVerdict_AbsentLedgerIsNoCarry` |
+| 3 | `identityCarryForward` after `routeRebasedExplanation`'s rebind | the auditor row names `T0` and the artifact; `T1` is the index; the proof holds; the composed gates run under the fence and the index is still `T1`; the record goes to the root ledger; Ship, else Audit | `TestRouteRebasedExplanation_AByteIdenticalRebaseShipsOnTheCarriedVerdict`, `TestRouteRebasedExplanation_ACarryThatCannotBeProvenReturnsToAudit` (six declines) |
+
+### B4 — ship accepts a carry (`internal/phases/ship`)
+
+| # | Component | Step it implements | Tests |
+|---|---|---|---|
+| 1 | `Options.internalAuditArtifactSHA` | the binding remembers which audit artifact it bound, beside the audited tree | `TestAuditBindingSatisfied_AcceptsAReProvenCarry` |
+| 2 | `carrySatisfied` inside `auditBindingSatisfied` | when the tree ship holds is not the bound tree: the newest `identical-rebase` record for that artifact must name the bound tree and the held tree, the ledger chain must verify, both bases' ancestry holds in the tree's own directory, the bytes are identical (B3 step 1, recomputed) and the record's patch-id is theirs; the consumption explanation stays the next rule; the success log names the reason | `TestAuditBindingSatisfied_DeclinesACarryItCannotReProve`, `TestAuditBindingSatisfied_DeclinesACarryWhoseRecordLies`, `TestAuditBindingSatisfied_ReProvesTheRecordsClaimsIndependently` |
+
+Ship does not re-run the composed gates a second time: the writer refuses a record whose gates are not green and the verified chain proves the record came through the writer. Re-running them in ship is the follow-up the design doc names C4b.
 ## Rollout, rung by rung, each test-first and merged at a boundary
 
 0. **Done.** The worktree-mode tree binding: ship binds a worktree ship to the worktree it lands from, not to the plane's bookkeeping. This removes 1701's second bounce.
 1. **Done.** B2 with its `Verify` lineage and the tests in its component table above (`rebind_identical_rebase_test.go`). Nothing calls it until B1 wires the recovery.
 2. **Done.** B1 (the unwind) and the reordered recovery, returning Audit, not Build, when the change is identical.
-3. B3 (the repaired RUNG 0) together with the F5 artifact relocation.
-4. B4 (ship accepts a carry) and the end-to-end test `TestFleetRebase_Cycle1701Shape_ShipsWithoutBuildOrAudit`.
+3. **Done (2026-09-27).** B3, built as the carry after the rebind rather than a repair of the commit-based RUNG 0, which a pended change can never satisfy; the F5 artifact relocation stays separate.
+4. **Done (2026-09-27).** B4, ship re-proving the carry inside its one binding rule; the end-to-end lane test named above is still to be written against the real recovery.
 
 The evidence, the full test list (33 named tests), the crash windows and the mutation map are in the [design review](../../research/2026-09-26-identity-preserving-rebase-design-review.md).
