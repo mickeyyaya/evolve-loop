@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## Changed — phase panes run without prompt suggestions (ADR-0106 P3, 2026-09-27)
+
+- The tmux boot sends a manifest's `default_env` as `export` lines after `cd` and `EVOLVE_PROJECT_ROOT` and before the launch command, because a pane inherits the tmux server's environment, not the bridge's. `claude-tmux` declares `CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false`: a suggestion is a background model request per turn and dim text under the input box that reads like agent output (cycle 1707 rendered "Yes, kill that session first." there). The environment variable takes precedence over the setting, and unlike a `--settings` flag it is honoured under `--setting-sources project`.
+
 ## Changed — the pasted prompt ends by stating who the agent is (ADR-0106 P3, 2026-09-27)
 
 - `prepareTmuxREPL` appends `phaseidentity.Block` to the bytes it writes to `resolved-prompt.txt`, after the engine's composed prompt, which stays a byte-identical prefix; the deliverable path stays the last thing the agent reads. Only the driver knows the session, so the statement is finished here, for every tmux CLI. A launch without an agent name pastes the prompt alone. The real-tmux transit test now compares against the file the driver pastes.
