@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/statemap"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
@@ -39,7 +40,9 @@ import (
 // must NOT call UpdateState (the blocking flock would deadlock the
 // re-entrant call). A panicking mutate still releases the lock (deferred).
 func (s *FilesystemStorage) UpdateState(_ context.Context, mutate func(*core.State)) (core.State, error) {
-	path := filepath.Join(s.evolveDir, "state.json")
+	// Resolve a worktree symlink first: the lock sidecar is then the canonical
+	// one statemap writers contend on, and the rename keeps the link intact.
+	path := statemap.ResolveWriteTarget(filepath.Join(s.evolveDir, "state.json"))
 	release, err := flock.PathLock(path) // CA.3: "<state.json>.lock" sidecar
 	if err != nil {
 		return core.State{}, fmt.Errorf("update state: %w", err)

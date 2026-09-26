@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/statemap"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
@@ -47,9 +48,12 @@ func (s *FilesystemStorage) ReadState(_ context.Context) (core.State, error) {
 	return st, nil
 }
 
-// WriteState atomically replaces .evolve/state.json.
+// WriteState atomically replaces .evolve/state.json. A cycle worktree's
+// state.json is a symlink to the canonical file (core/worktree.go
+// linkGuardDeps); the rename lands on the resolved target so the link survives
+// (cycle-999 sever).
 func (s *FilesystemStorage) WriteState(_ context.Context, st core.State) error {
-	path := filepath.Join(s.evolveDir, "state.json")
+	path := statemap.ResolveWriteTarget(filepath.Join(s.evolveDir, "state.json"))
 	return writeJSONAtomic(path, st)
 }
 
@@ -72,7 +76,9 @@ func (s *FilesystemStorage) ReadCycleState(_ context.Context) (core.CycleState, 
 // inside a cycle worktree read this run's phase — not whichever concurrent
 // run last wrote the global file.
 func (s *FilesystemStorage) WriteCycleState(_ context.Context, cs core.CycleState) error {
-	path := s.cycleStatePath()
+	// A worktree's cycle-state.json links to the run's run.json: lock, read and
+	// rename on the resolved target so the link survives (cycle-999 sever).
+	path := statemap.ResolveWriteTarget(s.cycleStatePath())
 	// ADR-0049 G7: serialize the whole read-modify-write (and the run.json
 	// mirror) on the cycle-state.json sidecar lock. checkpoint.ApplyToStateFile
 	// (the other read-modify-writer of this file) holds the SAME lock, so a
