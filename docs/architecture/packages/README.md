@@ -36,3 +36,4 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/phaseobserver` | watches one running phase for stalls and dead processes | [internal-phaseobserver.md](internal-phaseobserver.md) |
 | `internal/loopwave` | plans, gates and launches each fleet wave | [internal-loopwave.md](internal-loopwave.md) |
 | `internal/dossier` | writes, commits and reads the per-cycle dossier record | [internal-dossier.md](internal-dossier.md) |
+| `internal/phasecontract` | the single registry of each phase's deliverable contract: artifact, sections, verdicts and owed files | [internal-phasecontract.md](internal-phasecontract.md) |

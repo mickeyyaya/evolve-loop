@@ -6,11 +6,6 @@ import (
 	"testing"
 )
 
-// TestChallengeToken_TrimsAndRejectsEmpty — ChallengeToken is the reader of
-// <workspace>/challenge-token.txt the runner's prompt preparation and the
-// verdict engine's ACS floor share (ADR-0103 unit 11, review fold F1): trimmed,
-// and only a non-empty token counts. Moved verbatim from the verdict leaf's
-// test 31a. Kills `TrimSpace dropped`, `empty token accepted`.
 func TestChallengeToken_TrimsAndRejectsEmpty(t *testing.T) {
 	ws := t.TempDir()
 	if _, ok := ChallengeToken(ws); ok {

@@ -8,41 +8,15 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
 )
 
-// Rendering of the Deliverable Contract into the prompt (ADR-0034, Layer 2).
-// Split into two pieces for prompt-cache safety AND instruction recency:
-//
-//   - RenderContractBlock: the INVARIANT instruction block. Identical across
-//     cycles for a given phase, so it stays in the cacheable prompt prefix
-//     (injected alongside the rules/policy blocks). Carries NO absolute path.
-//   - RenderContractFooter: the VOLATILE one-line path declaration, appended as
-//     the LAST line of the prompt. The per-cycle path therefore never pollutes
-//     the cache prefix, and lands where recency bias makes the model most likely
-//     to obey it.
-//
-// Why this fixes the bug: today the agent must infer its output path (read the
-// workspace from cycle context, recall the filename from prose, join them). The
-// footer states the exact absolute path; the block tells it to use exactly that
-// path, emit the verdict sentinel, and self-check with `evolve phase verify`
-// before finishing.
-
-// FooterMarker prefixes the volatile path line so the agent (and any tooling)
-// can locate it unambiguously at the end of the prompt.
+// FooterMarker prefixes the volatile path line at the end of the prompt.
 const FooterMarker = "DELIVERABLE PATH:"
 
-// RenderContractBlock returns the invariant instruction block for a contract.
-// Deterministic; contains no absolute path (cache-safety). It is
-// RenderContractBlockStage with the PhaseIO instruction OFF — the byte-identical
-// default that keeps non-loop callers (and EVOLVE_PHASE_IO=off) unchanged.
+// RenderContractBlock returns the invariant, cache-safe instruction block: deterministic and free of absolute paths.
 func RenderContractBlock(c Contract) string {
 	return RenderContractBlockStage(c, false)
 }
 
-// RenderContractBlockStage renders the contract block, optionally adding the
-// PhaseIO self-report-failure instruction (ADR-0050 §3.8b). includePhaseIO is
-// set by the dispatch path when EVOLVE_PHASE_IO>=advisory; it instructs
-// build/scout/triage — phases that emit no verdict by default — to self-report a
-// FAIL/WARN via a sentinel carrying a structured failure block. A false value is
-// byte-identical to the pre-3.8b block, so production (off) prompts never change.
+// RenderContractBlockStage renders the block, adding the PhaseIO self-report-failure instruction when includePhaseIO is set.
 func RenderContractBlockStage(c Contract, includePhaseIO bool) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "## Deliverable Contract (%s)\n\n", c.Phase)
@@ -68,11 +42,7 @@ func RenderContractBlockStage(c Contract, includePhaseIO bool) string {
 			fmt.Fprintf(&b, "- On FAIL or WARN, the sentinel MUST carry your structured failure context (one defect per list entry; evidence_paths are workspace-relative artifacts that prove it). \"class\" MUST be one of [%s] — it drives the retry envelope, so an invented class forfeits the repair round; put your judgment in defects/prescription:\n  %s\n",
 				failurelog.VocabularyList(), RenderVerdictSentinelWithFailure(c.Phase, "FAIL", failureExemplar(c.Phase)))
 		} else if c.RequireFailureContextPhaseIO && includePhaseIO {
-			// build/scout/triage emit no verdict by default. When the PhaseIO
-			// rollout activates (stage>=advisory), give them a self-report-failure
-			// channel: a FAIL/WARN sentinel carrying a structured block. A
-			// successful run emits nothing — no forced verdict (matching the gate,
-			// which only bites on a FAIL/WARN sentinel that lacks the block).
+			// A successful run emits no verdict: the gate bites only on a FAIL/WARN sentinel without the block.
 			fmt.Fprintf(&b, "- If this phase fails or you must flag a blocking problem, emit a machine-readable verdict line declaring FAIL (or WARN) that ALSO carries your structured failure context (one defect per list entry; evidence_paths are workspace-relative artifacts that prove it):\n  %s\n  A successful run needs no verdict line.\n",
 				RenderVerdictSentinelWithFailure(c.Phase, "FAIL", failureExemplar(c.Phase)))
 		}
@@ -89,35 +59,12 @@ func RenderContractBlockStage(c Contract, includePhaseIO bool) string {
 	return b.String()
 }
 
-// RenderContractFooter returns the volatile one-line path declaration to append
-// as the last line of the prompt.
+// RenderContractFooter returns the volatile path line appended as the last line of the prompt.
 func RenderContractFooter(c Contract, artifactPath string) string {
 	return fmt.Sprintf("\n\n%s %s\n", FooterMarker, artifactPath)
 }
 
-// RenderContractTail is the tail-most region of a dispatch prompt: the footer
-// path line plus one compact XML-tagged <deliverable-contract> block restating
-// the MACHINE half of the contract at the generation point.
-//
-// Why a second placement of the same facts is not duplication: Anthropic's
-// guidance is that Claude follows instructions in the USER TURN better than in a
-// system-ish preamble, and XML-tagged sections parse unambiguously. Our required
-// sections and sentinel live in RenderContractBlockStage, which by design sits in
-// the CACHEABLE PREFIX — far from generation — yet the correction prompt, which
-// restates the identical requirements in the turn tail, is what actually gets
-// compliance. This closes that asymmetry without touching the cache prefix.
-//
-// Every string here is PROJECTED from the same sources the prefix block and the
-// verdict detector read (Contract.Sections, Contract.RequiredKeys,
-// RenderVerdictSentinel) — there is no second template to drift. The sentinel is
-// gated on len(Verdicts)>0 exactly as the prefix block gates it, so build/scout/
-// triage (which emit no verdict by default) gain no sentinel the always-on
-// classifier has never seen. A NoArtifact contract (ship: the deliverable is a
-// pushed commit) gets the footer alone — instructing it to write a file would
-// invent an artifact the verifier must not find.
-// workspace is the cycle workspace the gate reads the agent-owed files from
-// (phasecontract.OwedPath, the ONE join) — not the artifact's directory, which
-// a dispatched-artifact override can move elsewhere.
+// RenderContractTail returns the footer plus an XML <deliverable-contract> block; owed files resolve against workspace.
 func RenderContractTail(c Contract, artifactPath, workspace string) string {
 	footer := RenderContractFooter(c, artifactPath)
 	if c.NoArtifact {
@@ -146,12 +93,8 @@ func RenderContractTail(c Contract, artifactPath, workspace string) string {
 			b.WriteString("  </required-sections>\n")
 		}
 		if len(c.Verdicts) > 0 {
-			// The exemplar MUST carry the failure block wherever a FAIL/WARN
-			// sentinel without one is a contract violation (review HIGH): the
-			// tail is the recency-dominant copy, so a bare PASS exemplar is the
-			// one the agent follows — and audit is the phase whose verdict gates
-			// ship. Same failureExemplar the prefix projects, so the two cannot
-			// drift.
+			// The tail is the copy the agent follows, so where a FAIL/WARN without a
+			// failure block is a violation, the exemplar must carry the block.
 			if c.RequireFailureContext || c.RequireFailureContextPhaseIO {
 				fmt.Fprintf(&b, "  <verdict-sentinel verdicts=%q note=\"a FAIL or WARN verdict MUST carry the failure block shown here\">%s</verdict-sentinel>\n",
 					bracketJoin(c.Verdicts), RenderVerdictSentinelWithFailure(c.Phase, "FAIL", failureExemplar(c.Phase)))
@@ -175,24 +118,18 @@ func RenderContractTail(c Contract, artifactPath, workspace string) string {
 		}
 		b.WriteString("  </effects>\n")
 	}
-	// Placeholders stay LITERAL like the prefix's: this text is read by an
-	// agent, not an XML parser, and an entity-escaped placeholder gets pasted
-	// into a shell verbatim (review MEDIUM).
+	// Placeholders stay literal, not XML-escaped: an agent pastes this into a shell verbatim.
 	fmt.Fprintf(&b, "  <self-check>%s</self-check>\n", selfCheckCommand(c.Phase))
 	b.WriteString("</deliverable-contract>\n")
 	return b.String()
 }
 
-// selfCheckCommand is the ONE rendering of the phase self-check invocation,
-// shared by the prefix instruction and the tail block so a flag change cannot
-// drift one copy (review MEDIUM).
+// selfCheckCommand is the one rendering of the self-check invocation, shared by the block and the tail.
 func selfCheckCommand(phase string) string {
 	return fmt.Sprintf("evolve phase verify %s --workspace <your workspace dir>", phase)
 }
 
-// failureExemplar is the placeholder failure block shown in the prompt so the
-// agent sees the exact shape to emit. Shared by the audit (unconditional) and
-// PhaseIO (build/scout/triage) instruction branches so they can never drift.
+// failureExemplar is the placeholder failure block every failure instruction shows.
 func failureExemplar(phase string) *FailureBlock {
 	return &FailureBlock{
 		Class:         exemplarClass(phase),
@@ -221,21 +158,12 @@ func bracketJoin(vs []string) string {
 	return strings.Join(vs, "|")
 }
 
-// OwedPath is the ONE join for an agent-owed secondary: the registry declares
-// basenames, and a declared separator never steers a read outside the
-// workspace. The gate (deliverable.verifySecondaries) reads through it and the
-// prompt tail renders through it, so the location the agent is told and the
-// location the gate checks cannot drift.
+// OwedPath joins an agent-owed file's basename to the workspace; the gate and the prompt tail both use it.
 func OwedPath(workspace, name string) string {
 	return filepath.Join(workspace, filepath.Base(name))
 }
 
-// exemplarClass is the failure class the prompt's exemplar shows: a word from
-// the failurelog vocabulary, never a synthesized "code-<phase>-fail" — the
-// gate (failure_class_unknown) would refuse the block's own example for any
-// verdict phase whose synthesized name is not a class (architecture review of
-// F19). The audit's rejection is code-audit-fail; every other phase's
-// self-reported failure is the build class it interrupts.
+// exemplarClass draws the exemplar's class from the failurelog vocabulary, which the gate validates against.
 func exemplarClass(phase string) string {
 	if phase == "audit" {
 		return string(failurelog.CodeAuditFail)

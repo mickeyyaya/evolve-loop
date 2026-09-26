@@ -7,10 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/reportdoc"
 )
 
-// TestAuditContract_ExplanationSectionIsConditional pins the declaration the
-// deliverable reviewer projects: the audit report owes "## Explanation
-// Documentation" only while the explanation contract is active, so it must
-// live under ExplanationSections and never under the always-on Sections.
 func TestAuditContract_ExplanationSectionIsConditional(t *testing.T) {
 	t.Parallel()
 	c, ok := For("audit")
@@ -30,9 +26,6 @@ func TestAuditContract_ExplanationSectionIsConditional(t *testing.T) {
 	}
 }
 
-// TestExplanationDocumentation_TitleAndProducerDeclaration — the heading the
-// deliverable gate matches (Title, exact) is the one the auditor's reference
-// template declares, so a template rename fails here, not in a live cycle.
 func TestExplanationDocumentation_TitleAndProducerDeclaration(t *testing.T) {
 	if ExplanationDocumentation.Title() != "Explanation Documentation" {
 		t.Fatalf("Title() = %q", ExplanationDocumentation.Title())

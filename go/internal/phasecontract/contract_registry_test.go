@@ -7,16 +7,11 @@ import (
 	"testing"
 )
 
-// Layer 1 of the deliverable-contract feature (ADR-0034): the Contract registry
-// is the single source of truth for WHERE each agent writes its deliverable,
-// WHAT kind it is (markdown report vs JSON artifact), and the well-formedness
-// rules. These RED tests pin the contract before the implementation exists.
-
 func TestFor_CoversAllEightAgents(t *testing.T) {
 	want := []string{
-		"build", "scout", "tdd", "audit", "intent", "triage", // 6 phase agents
-		"router",       // the LLM routing brain (a.k.a. advisor) — routing-plan.json
-		"orchestrator", // host-side driver — cycle-state.json
+		"build", "scout", "tdd", "audit", "intent", "triage",
+		"router",
+		"orchestrator",
 	}
 	for _, phase := range want {
 		c, ok := For(phase)
@@ -33,11 +28,6 @@ func TestFor_CoversAllEightAgents(t *testing.T) {
 	}
 }
 
-// ship's deliverable is the pushed commit, not a file — but it must still
-// resolve a contract so the contract gate is EXPLICIT (PASS) rather than
-// fail-open-on-unknown, which logged "no contract registered for phase
-// \"ship\"" every cycle. The contract declares NoArtifact so the verifier
-// treats it as trivially well-formed.
 func TestFor_Ship_NoArtifactContract(t *testing.T) {
 	c, ok := For("ship")
 	if !ok {
@@ -51,10 +41,6 @@ func TestFor_Ship_NoArtifactContract(t *testing.T) {
 	}
 }
 
-// Completeness: every mandatory spine phase (scout/build/audit/ship) and the
-// conditional-mandatory tdd must have a registered contract, so a phase added
-// to the spine can never again silently lack one — the exact ship gap that let
-// the contract gate fail open every cycle.
 func TestMandatoryPhasesHaveContracts(t *testing.T) {
 	for _, p := range []string{"scout", "build", "audit", "ship", "tdd"} {
 		if _, ok := For(p); !ok {
@@ -88,7 +74,7 @@ func TestContract_ArtifactNames(t *testing.T) {
 	cases := map[string]string{
 		"build":        "build-report.md",
 		"scout":        "scout-report.md",
-		"tdd":          "test-report.md", // NOT tdd-report.md — runtime truth (hook)
+		"tdd":          "test-report.md", // not tdd-report.md
 		"audit":        "audit-report.md",
 		"intent":       "intent.md",
 		"triage":       "triage-report.md",
@@ -112,7 +98,6 @@ func TestContract_ArtifactPath_WorkspaceTarget(t *testing.T) {
 }
 
 func TestContract_ArtifactPath_EvolveDirTarget(t *testing.T) {
-	// orchestrator's cycle-state.json lives in .evolve/, not the cycle workspace.
 	c, _ := For("orchestrator")
 	r := Roots{Workspace: "/ws", Worktree: "/wt", EvolveDir: "/ev"}
 	if got, want := c.ArtifactPath(r), filepath.Join("/ev", "cycle-state.json"); got != want {
@@ -150,9 +135,7 @@ func TestContracts_ReturnsWholeRegistry(t *testing.T) {
 }
 
 func TestContract_JSONContractsDeclareRequiredKeys(t *testing.T) {
-	// router/advisor writes a BARE JSON ARRAY (routing-plan.json) — no required
-	// keys (router-contract-bare-array-vs-plan-key). The alias must still
-	// resolve to the canonical router contract.
+	// router writes a bare JSON array, so only orchestrator declares keys.
 	advisor, _ := For("advisor")
 	if len(advisor.RequiredKeys) != 0 {
 		t.Errorf("advisor/router RequiredKeys=%v, want none (bare array)", advisor.RequiredKeys)
@@ -216,16 +199,8 @@ func TestRouterArtifactContractsAreDistinct(t *testing.T) {
 	}
 }
 
-// TestArtifactNameMatchesProfileOutput is the DRIFT-DETECTOR (mirrors
-// TestProducersDeclareCanonical): the contract's ArtifactName must equal the
-// basename of the agent profile's output_artifact, so the two path-resolution
-// mechanisms (the in-process runner hook AND subagent.resolveArtifactPath which
-// reads profile.output_artifact) can never disagree again. advisor (no standard
-// profile) and orchestrator (host-side machine state, not a persona report) are
-// exempt and checked separately.
 func TestArtifactNameMatchesProfileOutput(t *testing.T) {
 	profileDir := filepath.Join("..", "..", "..", ".evolve", "profiles")
-	// contract phase -> profile basename (profile name = agent name)
 	profileOf := map[string]string{
 		"build":  "builder",
 		"scout":  "scout",

@@ -2,9 +2,6 @@ package phasecontract
 
 import "testing"
 
-// TestRoundArchiveFilename pins the archive rule the writer and both readers
-// share: stem + ".round<N>" + original extension, for the two artifacts the
-// audit-repair loop retires.
 func TestRoundArchiveFilename(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -23,8 +20,6 @@ func TestRoundArchiveFilename(t *testing.T) {
 	}
 }
 
-// TestParseRoundArchive pins the inverse: round-trips every archive name,
-// rejects the live file, other artifacts, padded or non-numeric indices.
 func TestParseRoundArchive(t *testing.T) {
 	t.Parallel()
 	live := ArtifactFilename("audit")
