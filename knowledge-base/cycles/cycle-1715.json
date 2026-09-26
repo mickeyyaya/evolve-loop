@@ -1,0 +1,216 @@
+{
+  "schema_version": 2,
+  "cycle": 1715,
+  "run_id": "01M3FVE82JAE5G9M7MAJCV7EGH",
+  "goal": "Pipeline-health verification, wave 16 (2026-09-27, on main cb36eae6, the first wave with ADR-0106 W1, H1b and X1 live beside P3, Q1 and Q2: a shipped or declined id no inbox item backs leaves a retirement record (processed/ or rejected/cycle-N) and is never re-pinned; an empty optional bucket in triage-report.md is no cards; .evolve/inbox/ records are non-material to the explanation document, so no floor asks a builder to describe the ship's consumption stamp; and every tmux phase pane's resolved-prompt.txt ends with the identity statement (\"## Who you are (stated by the evolve bridge)\") and its pane exports CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false before the launch; a quota wall met on a correction re-dispatch, a remediation re-run or a resumed review leaves the cycle DEFERRED (all_families_exhausted in the ledger, no failure digest, no retrospective), never FAIL; a login prompt benches the family with operator_action in cli-health.json and no second dispatch goes into it). Work the highest-weight lane-eligible inbox items end-to-end — claim, tdd, build, audit, ship — with full phase integrity, on the fixed plane. That includes everything waves 3–14 verified, and the fixes on this main:\n- (P3) an agent that inspects its pane finds its own session, its prompt files and the sole-writer fact stated in the prompt it was given; a stdout-completion phase is told the bridge reads its pane;\n- (Q1) a walled correction re-dispatch is the same deferral as a walled first dispatch;\n- (Q2) a credential wall is benched until a probe after the operator's login clears it; the bench lines name the fix;\n- (P4, H1, H2, from wave 14) an exit-85 escalation carries its pattern in cause_code; the host derives triage-decision.json from the report before any judge;\n- (W1, H1b, X1, from wave 15) a lane pinned to an id no inbox item backs ends once, with a record; a `## superseded` with nothing under it derives to []; the explanation floor never names an inbox record as a material path.\n\nEarlier fixes still in force: a worktree ship binds its own tree (#648); routing never sends a lane work its builder's sandbox forbids; a lane's cycle-state override applies only inside its own evolve dir; a Build may `git rm` its own never-committed explanation draft (#651); the explanation contract can move base without a Build when the host proves the change byte-identical (#649).\n\nEvery cycle must:\n- commit to a claimed inbox item (an empty top_n must not run the spine);\n- bind its audit to the changes tree it ships;\n- disposition the cycle's OWN defect ledger as well as inherited ids;\n- record a terminal outcome on every exit;\n- never modify a protected control-plane file by any tool;\n- leave no stale worktree behind.\n\nPipeline-integrity items and items whose fix surface is protected are console-owned, not lane work. ADR-0099 document deliverables are eligible. The measure of this wave is consecutive shipped cycles: 1712 shipped (its code verified on the first audit; one explanation sentence about a host-stamped inbox record cost it a round), 1713 ended planned no-work on a pin already shipped; the streak stands at one; six in a row is the goal.",
+  "final_verdict": "PASS",
+  "commit_sha": "85af083f743525e51448aa053b4acfff5e7fd1e9",
+  "tree_sha": "0b75d520e009ee02204e9b8cc1ae687eedc64bcc",
+  "tasks": [
+    "acs-cycle1529-doc-only-predicate-diffs-against-local-main"
+  ],
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 104277,
+      "started_at": "2026-09-26T21:55:49Z",
+      "ended_at": "2026-09-26T21:57:35Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 18,
+        "output": 6906,
+        "cache_read": 596991,
+        "cache_write": 82538
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 57520,
+      "started_at": "2026-09-26T21:58:06Z",
+      "ended_at": "2026-09-26T21:59:05Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 12,
+        "output": 1918,
+        "cache_read": 435726,
+        "cache_write": 34045
+      }
+    },
+    {
+      "name": "bug-reproduction",
+      "verdict": "PASS",
+      "duration_ms": 275049,
+      "started_at": "2026-09-26T21:59:05Z",
+      "ended_at": "2026-09-26T22:03:41Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 30,
+        "output": 22019,
+        "cache_read": 1256206,
+        "cache_write": 107210
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 414461,
+      "started_at": "2026-09-26T22:03:41Z",
+      "ended_at": "2026-09-26T22:10:36Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 56,
+        "output": 42223,
+        "cache_read": 2888500,
+        "cache_write": 103763
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 257538,
+      "started_at": "2026-09-26T22:10:36Z",
+      "ended_at": "2026-09-26T22:14:57Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 48,
+        "output": 10405,
+        "cache_read": 1956928,
+        "cache_write": 59559
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "PASS",
+      "duration_ms": 295580,
+      "started_at": "2026-09-26T22:15:29Z",
+      "ended_at": "2026-09-26T22:21:17Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 50,
+        "output": 19131,
+        "cache_read": 2171409,
+        "cache_write": 75933
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "FAIL",
+      "duration_ms": 10419,
+      "started_at": "2026-09-26T22:21:44Z",
+      "ended_at": "2026-09-26T22:21:57Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "PASS",
+      "duration_ms": 222555,
+      "started_at": "2026-09-26T22:21:57Z",
+      "ended_at": "2026-09-26T22:26:28Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 38,
+        "output": 16577,
+        "cache_read": 1552362,
+        "cache_write": 69899
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "PASS",
+      "duration_ms": 10857,
+      "started_at": "2026-09-26T22:27:00Z",
+      "ended_at": "2026-09-26T22:27:11Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "timing": {
+    "total_ms": 1648256,
+    "phase_count": 9,
+    "retried_count": 0,
+    "longest_phase": "tdd",
+    "longest_ms": 414461,
+    "by_archetype_ms": {
+      "build": 257538,
+      "control": 21276,
+      "evaluate": 793184,
+      "plan": 576258
+    },
+    "total_tokens": {
+      "input": 252,
+      "output": 119179,
+      "cache_read": 10858122,
+      "cache_write": 532947
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 48,
+        "output": 10405,
+        "cache_read": 1956928,
+        "cache_write": 59559
+      },
+      "control": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "evaluate": {
+        "input": 118,
+        "output": 57727,
+        "cache_read": 4979977,
+        "cache_write": 253042
+      },
+      "plan": {
+        "input": 86,
+        "output": 51047,
+        "cache_read": 3921217,
+        "cache_write": 220346
+      }
+    },
+    "wasted_tokens": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "cache_hit_ratio": 0.9999767921053373,
+    "hot_phase_count": 7,
+    "hot_phases": [
+      "scout",
+      "triage",
+      "bug-reproduction",
+      "tdd",
+      "build",
+      "audit",
+      "audit"
+    ]
+  }
+}
