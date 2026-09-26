@@ -1,7 +1,5 @@
 package lifecycle
 
-// claim.go — inbox/ → processing/cycle-N/ (inboxmover.go:185-257 on the base).
-
 import (
 	"encoding/json"
 	"fmt"
@@ -18,10 +16,7 @@ type ClaimResult struct {
 	DestPath string
 }
 
-// Claim moves a file from inbox/ to processing/cycle-N/ atomically. Returns
-// ErrNotFound if no inbox/*.json has matching task_id. The console-routing
-// check precedes the cycle-number check (a preserved quirk: a bad cycle on a
-// console-routed item reports ErrConsoleRouted).
+// Claim moves taskID's item from the inbox root into processing/cycle-<cycle>/; an absent id is ErrNotFound.
 func (m *Mover) Claim(taskID, cycle string) (ClaimResult, error) {
 	res := ClaimResult{}
 	if taskID == "" || cycle == "" {
@@ -49,8 +44,6 @@ func (m *Mover) Claim(taskID, cycle string) (ClaimResult, error) {
 	return m.claimInto(taskID, src, cycle, cycleNum)
 }
 
-// claimInto performs the move: mkdir the cycle dir, rename, the INFO line, the
-// ledger line.
 func (m *Mover) claimInto(taskID, src, cycle string, cycleNum int) (ClaimResult, error) {
 	res := ClaimResult{}
 	base := filepath.Base(src)
@@ -82,11 +75,8 @@ func (m *Mover) claimInto(taskID, src, cycle string, cycleNum int) (ClaimResult,
 	return res, nil
 }
 
-// consoleRoutedReason parses the item at path and consults the SSOT routing
-// classifier (inboxbatch.ConsoleRouted). Empty reason = dispatchable. A
-// malformed body is fail-open (empty) — routing enforcement must never brick
-// claiming, matching LoadDir's tolerance; the parse failure is the item
-// author's defect and surfaces through LoadDir's warnings elsewhere.
+// consoleRoutedReason returns why the item is operator-owned, or "" when it is dispatchable.
+// An unreadable or malformed item fails open so routing never bricks claiming; LoadDir reports it.
 func consoleRoutedReason(path string, isProtected func(string) bool) string {
 	raw, err := os.ReadFile(path)
 	if err != nil {

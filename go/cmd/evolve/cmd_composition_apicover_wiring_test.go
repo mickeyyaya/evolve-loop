@@ -1,17 +1,5 @@
 package main
 
-// The composed-gate "apicover" entry must name an ENFORCING Makefile recipe.
-// Six recurrences of warnship-apicover-ci-gap trace to this one map entry
-// pointing at the Phase-0 warning-only target: apicover.Run exits non-zero
-// ONLY under -enforce, so the composed-gate re-check reported "apicover: pass"
-// unconditionally and the fleet-rebase carry-forward reshipped uncovered
-// exports to main, where repo-wide CI (the delayed detector) went RED.
-//
-// The pin is on the RECIPE TEXT, not a live run: it proves the wiring without
-// mutating the tree (the cycle-998 reproduction poisoned CI's coverage profile
-// doing that) and fails if the map is ever repointed at a non-enforcing
-// target, or the target's -enforce flag is "simplified" away.
-
 import (
 	"os"
 	"path/filepath"
@@ -20,6 +8,7 @@ import (
 	"testing"
 )
 
+// Pinned on the recipe text, not a live run, so the test never mutates the tree.
 func TestComposedApicoverGate_TargetRecipeEnforces(t *testing.T) {
 	target, ok := composedGateTargets["apicover"]
 	if !ok {

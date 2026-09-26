@@ -1,10 +1,5 @@
 package deliverable
 
-// reviewer_signals_test.go — ADR-0101 S2b: every decision Reviewer.Review
-// reaches is reported through the Signal Center (gatesignal.Reporter), so the
-// orchestrator's listener and the triage reader see "checked → advanced" or
-// "checked → rejected: <file>" for every phase boundary. RED first.
-
 import (
 	"context"
 	"os"
@@ -175,8 +170,6 @@ func TestReviewerSignals_OffAndUnwiredAreSilent(t *testing.T) {
 	}
 }
 
-// The root's wiring proof asks the chain for the capability, not the type
-// (core cannot import deliverable).
 func TestReviewer_ExposesTheSignalsWiredCapabilityThroughTheCoreInterface(t *testing.T) {
 	c := signalcenter.New()
 	var rev core.DeliverableReviewer = NewReviewerWithCatalogStageReportSize(config.StageEnforce, phasespec.Catalog{}, config.StageOff, config.StageOff, 0, WithSignals(c))
@@ -189,7 +182,7 @@ func TestReviewer_ExposesTheSignalsWiredCapabilityThroughTheCoreInterface(t *tes
 	}
 }
 
-// ownedResolver overlays ADR-0100's declared secondaries and effects onto a
+// ownedResolver overlays declared secondaries and effects onto a
 // built-in contract, the way CatalogResolver overlays the registry's.
 type ownedResolver struct{ owed, effects []string }
 
@@ -216,9 +209,6 @@ func TestReviewerSignals_VerifiedNamesTheOwedFilesAndEffects(t *testing.T) {
 	}
 }
 
-// Architecture review of S2b (MEDIUM): the verified event must report what
-// the verifier CHECKED, not a second resolution of what is declared now —
-// the single-read seam Result.Content already established for the bytes.
 func TestVerify_ResultCarriesTheOwedFilesAndEffectsItChecked(t *testing.T) {
 	ws := t.TempDir()
 	writeFile(t, ws, "build-report.md", "## Changes\n- x\nVerdict: PASS\n")
@@ -238,9 +228,6 @@ func TestVerify_ResultCarriesTheOwedFilesAndEffectsItChecked(t *testing.T) {
 	}
 }
 
-// Architecture review of S2b (MEDIUM): every construction-time setting is an
-// Option applied at ONE point, so an option passed through the report-size
-// constructor is not clobbered by a trailing assignment.
 func TestNewReviewerWithCatalogStageReportSize_OptionsApplyAfterTheReportSizeSettings(t *testing.T) {
 	opts := []Option{func(r *Reviewer) { r.reportSizeBudgetTokens = 7 }}
 	r := NewReviewerWithCatalogStageReportSize(config.StageEnforce, phasespec.Catalog{}, config.StageOff, config.StageAdvisory, 500, opts...)
@@ -249,9 +236,6 @@ func TestNewReviewerWithCatalogStageReportSize_OptionsApplyAfterTheReportSizeSet
 	}
 }
 
-// The gate reads an owed file through phasecontract.OwedPath — the ONE join
-// the prompt tail also renders — so a declared separator never steers the
-// read outside the workspace, and what was checked is recorded by basename.
 func TestVerify_OwedFileDeclaredWithADirectoryIsReadAtTheWorkspaceRoot(t *testing.T) {
 	ws := t.TempDir()
 	writeFile(t, ws, "build-report.md", "## Changes\n- x\nVerdict: PASS\n")

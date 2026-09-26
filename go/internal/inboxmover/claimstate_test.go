@@ -1,9 +1,5 @@
 package inboxmover
 
-// claimstate_test.go — the read-only lifecycle reader the ADR-0100
-// declared-effects gate consumes (deliverable/effects.go). This package owns
-// the processing/cycle-N/ layout; the gate never re-derives it.
-
 import (
 	"errors"
 	"path/filepath"
@@ -31,17 +27,12 @@ func TestLocate_RootClaimedAndAbsent(t *testing.T) {
 	}
 }
 
-// No inbox at all is "nothing to claim", not an IO fault: the gate must not
-// fail open on a project that never had an inbox.
 func TestLocate_MissingInboxIsNotFound(t *testing.T) {
 	if _, err := Locate(filepath.Join(t.TempDir(), "absent"), "x"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("missing inbox dir must be ErrNotFound, got %v", err)
 	}
 }
 
-// The property this slice exists for: the gate sees the effect the persona's
-// `evolve inbox-mover claim` performs. Proved against the production writer,
-// not a hand-built copy of its layout.
 func TestLocate_FindsWhatClaimWrote(t *testing.T) {
 	root, inbox := seedInbox(t, "x")
 	if _, err := Claim(Options{ProjectRoot: root}, "x", "7"); err != nil {
@@ -56,8 +47,6 @@ func TestLocate_FindsWhatClaimWrote(t *testing.T) {
 	}
 }
 
-// Liveness order matches Promote's: a claim outranks a stale root copy of the
-// same id, so the gate never reads "pending" for an item a lane holds.
 func TestLocate_PrefersTheClaimOverAStaleRootCopy(t *testing.T) {
 	root := t.TempDir()
 	inbox := filepath.Join(root, ".evolve", "inbox")

@@ -1,13 +1,5 @@
 package inboxmover
 
-// continuation_lanescope_test.go — ADR-0076 slice C, G2 (cycle-1104) resolve
-// side. G1's ResolveContinuation reads ONLY this cycle's inbox processing
-// claims, so a lane whose scope came from the wave planner (no claim file) can
-// never resolve a binding — cycle-1078's preserved snapshot was orphaned for
-// exactly that reason. ResolveContinuationForScope adds the second identity
-// class: claims FIRST (G1 semantics untouched), then the scope-id-keyed
-// registry for the lane's todo ids.
-
 import (
 	"encoding/json"
 	"os"
@@ -18,7 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 )
 
-// seedRegistry stamps a registry binding for scopeID under root.
 func seedRegistry(t *testing.T, root, scopeID, sha string, cycle int) continuation.Continuation {
 	t.Helper()
 	c := continuation.Continuation{
@@ -34,7 +25,6 @@ func seedRegistry(t *testing.T, root, scopeID, sha string, cycle int) continuati
 	return c
 }
 
-// seedClaim writes a processing claim for cycle, optionally carrying a stamp.
 func seedClaim(t *testing.T, root string, cycle int, taskID, stampSHA string) {
 	t.Helper()
 	dir := filepath.Join(root, ".evolve", "inbox", "processing", "cycle-"+strconv.Itoa(cycle))
@@ -53,9 +43,6 @@ func seedClaim(t *testing.T, root string, cycle int, taskID, stampSHA string) {
 	}
 }
 
-// TestResolveContinuationForScope_FallsBackToLaneScopeRegistry — the headline
-// AC: a cycle with NO processing claim at all still resolves the binding its
-// lane-scope todo id carries. This is the cycle-1078 case, end to end.
 func TestResolveContinuationForScope_FallsBackToLaneScopeRegistry(t *testing.T) {
 	root := t.TempDir()
 	want := seedRegistry(t, root, "chain-boundary-loop", "5555555555555555555555555555555555555555", 1078)
@@ -67,26 +54,12 @@ func TestResolveContinuationForScope_FallsBackToLaneScopeRegistry(t *testing.T) 
 	if got.SnapshotSHA != want.SnapshotSHA || got.Cycle != want.Cycle {
 		t.Errorf("resolved %+v, want snapshot %q cycle %d", got, want.SnapshotSHA, want.Cycle)
 	}
-	// Proof the fallback is real and not an accident of the claim path: the
-	// claim-only resolver still finds nothing for the same cycle.
 	if c := ResolveContinuation(Options{ProjectRoot: root}, 1102); c != nil {
 		t.Errorf("claim-only resolution must still be nil here, got %+v", c)
 	}
 }
 
-// TestResolveContinuationForScope_ClaimWinsOverRegistry — G1 is unaffected:
-// when a claim carries a stamp, that stamp is returned even though the lane
-// scope also has a registry binding. Ordering, not replacement.
-//
-// The claim is seeded under the lane's OWN id. It previously used a different
-// id ("task-a" against scope "scope-a"), which made the assertion pass only
-// because the claim path ignored lane scope entirely — the defect that let
-// cycle-1536 adopt cycle-1535's continuation, ship its eval file, and destroy
-// that lane's landing. Claim ids and lane scope ids are ONE namespace (both are
-// inbox item ids: seedClaim writes {"id": …}, lane-scope.json carries todo_ids),
-// so a claim outside the lane's scope is a PEER's work, and the out-of-scope
-// case is pinned by TestResolveContinuationForScope_DoesNotAdoptAPeerLanesClaim.
-// The ordering rule this test exists for is unchanged.
+// The claim uses the lane's own id: a claim outside the lane scope is a peer's and is skipped.
 func TestResolveContinuationForScope_ClaimWinsOverRegistry(t *testing.T) {
 	root := t.TempDir()
 	seedRegistry(t, root, "scope-a", "6666666666666666666666666666666666666666", 1078)
@@ -101,10 +74,6 @@ func TestResolveContinuationForScope_ClaimWinsOverRegistry(t *testing.T) {
 	}
 }
 
-// TestResolveContinuationForScope_UnstampedClaimStillFallsBack — the subtle
-// half of the ordering rule: a claim EXISTING is not the condition; a claim
-// carrying a STAMP is. An unstamped claim (the ordinary case) must not block
-// the lane-scope fallback.
 func TestResolveContinuationForScope_UnstampedClaimStillFallsBack(t *testing.T) {
 	root := t.TempDir()
 	seedRegistry(t, root, "scope-a", "8888888888888888888888888888888888888888", 1078)
@@ -116,10 +85,6 @@ func TestResolveContinuationForScope_UnstampedClaimStillFallsBack(t *testing.T) 
 	}
 }
 
-// TestResolveContinuationForScope_NoBindingIsNil — NEGATIVE. Unknown scope
-// ids, an empty scope list, nil scopes, and blank ids all resolve to nil. A
-// resolver that returned "some" binding for an unrelated scope would adopt
-// another lane's work into this one.
 func TestResolveContinuationForScope_NoBindingIsNil(t *testing.T) {
 	root := t.TempDir()
 	seedRegistry(t, root, "scope-a", "9999999999999999999999999999999999999999", 1078)
@@ -141,9 +106,6 @@ func TestResolveContinuationForScope_NoBindingIsNil(t *testing.T) {
 	}
 }
 
-// TestResolveContinuationForScope_ScopeOrderIsDeterministic — a multi-id lane
-// resolves the FIRST id that carries a binding, in the order the lane scope
-// declares. Deterministic resolution is what makes a re-run reproducible.
 func TestResolveContinuationForScope_ScopeOrderIsDeterministic(t *testing.T) {
 	root := t.TempDir()
 	seedRegistry(t, root, "scope-b", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", 1078)
@@ -159,10 +121,6 @@ func TestResolveContinuationForScope_ScopeOrderIsDeterministic(t *testing.T) {
 	}
 }
 
-// TestResolveContinuationForScope_EmptySnapshotIsNotABinding — NEGATIVE: a
-// registry entry with no snapshot ref is not resumable work; returning it
-// would send the orchestrator into validateContinuation with an empty binding
-// every cycle.
 func TestResolveContinuationForScope_EmptySnapshotIsNotABinding(t *testing.T) {
 	root := t.TempDir()
 	if err := continuation.WriteRegistryEntry(root, "scope-a", continuation.Continuation{Cycle: 1078}); err != nil {
@@ -173,10 +131,6 @@ func TestResolveContinuationForScope_EmptySnapshotIsNotABinding(t *testing.T) {
 	}
 }
 
-// TestResolveContinuation_ClaimOnlyPathUnchanged — REGRESSION on G1. The
-// original claim-only entry point must keep ignoring the registry entirely, so
-// callers that deliberately want claim semantics (and PR #363's behaviour) are
-// byte-identical after this extension.
 func TestResolveContinuation_ClaimOnlyPathUnchanged(t *testing.T) {
 	root := t.TempDir()
 	seedRegistry(t, root, "scope-a", "dddddddddddddddddddddddddddddddddddddddd", 1078)
@@ -191,10 +145,6 @@ func TestResolveContinuation_ClaimOnlyPathUnchanged(t *testing.T) {
 	}
 }
 
-// TestResolveContinuationForScope_CorruptRegistryIsNilNotPanic — a corrupt
-// registry must degrade to "no continuation" (fresh start) rather than crash
-// the orchestrator mid-cycle; the loudness lives in the registry reader's
-// error, which this resolver surfaces to the log, not to a panic.
 func TestResolveContinuationForScope_CorruptRegistryIsNilNotPanic(t *testing.T) {
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {

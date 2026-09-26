@@ -1,12 +1,5 @@
 package phasespec
 
-// activating_fields_test.go — PA-BIG S4 (ADR-0058): the load-time validator for
-// the transition-activating fields. ValidateActivatingFields enforces
-// well-formedness (a known branching_strategy; on_pass/on_fail declared as a
-// pair), and Load rejects a malformed registry — the registry is a contract, so
-// a half-declared verdict branch or an unknown strategy fails loudly at load
-// rather than silently degrading to the literal kernel.
-
 import (
 	"os"
 	"path/filepath"
@@ -14,9 +7,6 @@ import (
 	"testing"
 )
 
-// TestValidateActivatingFields pins the well-formedness rules: a known (or empty)
-// branching_strategy passes; an unknown one is rejected; on_pass/on_fail must be
-// declared together or not at all (a half-set is dead config Next ignores).
 func TestValidateActivatingFields(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -42,9 +32,6 @@ func TestValidateActivatingFields(t *testing.T) {
 	}
 }
 
-// TestLoad_RejectsMalformedActivatingFields proves Load wires the validator: a
-// registry with a half-declared verdict branch is a hard load error, not a
-// silent degrade.
 func TestLoad_RejectsMalformedActivatingFields(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -62,12 +49,6 @@ func TestLoad_RejectsMalformedActivatingFields(t *testing.T) {
 	}
 }
 
-// TestDiscoverUserSpecs_StripsActivatingFields enforces the ADR-0058 trust
-// boundary at the real user-file ingestion point: a user phase.json may NOT
-// inject a transition branch into the kernel. Activating fields on a discovered
-// user spec are stripped (with a warning) so the verdict/history/signal
-// vocabulary stays built-in-only — a user phase that is a `current` in the flow
-// can never route via injected on_pass/on_fail.
 func TestDiscoverUserSpecs_StripsActivatingFields(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -112,9 +93,6 @@ func TestDiscoverUserSpecs_StripsActivatingFields(t *testing.T) {
 	}
 }
 
-// TestLoad_RealRegistry_ActivatingFieldsWellFormed loads the SHIPPED registry and
-// asserts every spec passes the well-formedness validator — guards against a
-// typo'd strategy or a half-declared branch landing in the runtime contract.
 func TestLoad_RealRegistry_ActivatingFieldsWellFormed(t *testing.T) {
 	t.Parallel()
 	path := filepath.Join("..", "..", "..", "docs", "architecture", "phase-registry.json")

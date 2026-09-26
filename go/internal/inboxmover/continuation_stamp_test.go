@@ -1,13 +1,5 @@
 package inboxmover
 
-// continuation_stamp_test.go — ADR-0076 slice C (S3): the FAIL-release stamps
-// each released item with the cycle's continuation manifest, TRANSACTIONALLY
-// with the release itself (pipeline-forensics lesson: item consumption must be
-// transactional with landing — a stamp that happens in a separate pass can be
-// lost to a crash between them). No manifest ⇒ byte-identical release.
-// Quarantine is terminal parking: a quarantined item sheds any stamp so a
-// later operator revival starts fresh.
-
 import (
 	"encoding/json"
 	"os"
@@ -89,8 +81,7 @@ func TestReleaseCycleProcessing_NoManifestNoStamp(t *testing.T) {
 }
 
 func TestQuarantinePromotion_ShedsContinuationStamp(t *testing.T) {
-	// failure_count 2 + ceiling 3 → the bump inside release reaches 3 and
-	// quarantines. The quarantined item must NOT carry a stamp.
+	// failure_count 2 against ceiling 3: the drain's bump reaches the ceiling and quarantines.
 	opts, cycle, _ := stampFixture(t, true, 2)
 	if _, err := failDrain(opts, cycle, 3, false); err != nil {
 		t.Fatalf("release: %v", err)

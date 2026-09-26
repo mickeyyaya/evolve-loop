@@ -10,11 +10,9 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// TestResolveRouting_AdvisorOverlayPreservesFamilyTransport covers the
-// advisor projection through BaseRunner.Run -> resolveDispatchPlan
-// (routing.go). This is distinct from the contract-escalation projection,
-// which also sets ModelRoutingCLI but is covered in
-// TestRunner_ContractEscalation_RedispatchesOnEscalatedCLIWithDirective.
+// TestResolveRouting_AdvisorOverlayPreservesFamilyTransport drives the advisor projection through
+// BaseRunner.Run -> resolveDispatchPlan (routing.go); the contract-escalation projection, which also sets
+// ModelRoutingCLI, is TestRunner_ContractEscalation_RedispatchesOnEscalatedCLIWithDirective.
 func TestResolveRouting_AdvisorOverlayPreservesFamilyTransport(t *testing.T) {
 	tests := []struct {
 		name, primary, overlay, failCLI string
@@ -50,13 +48,6 @@ func TestResolveRouting_AdvisorOverlayPreservesFamilyTransport(t *testing.T) {
 	}
 }
 
-// TestRunner_ModelRoutingAuto_SoftOverlayAppliesAsPrimary (mr4-projection
-// AC1): with req.ModelRoutingCLI/Tier set (the cyclerun_dispatch seam's
-// auto-mode projection, already clamped upstream), the runner's dispatch
-// resolves the advisor's CLI as the chain PRIMARY and its tier as the
-// dispatched model — NOT the profile's static default (profile.cli =
-// claude-tmux, model_tier_default = sonnet; both would be dispatched absent
-// the overlay).
 func TestRunner_ModelRoutingAuto_SoftOverlayAppliesAsPrimary(t *testing.T) {
 	root := writeFallbackProfile(t, "evolve-scout", "claude-tmux", nil)
 	hooks := &fakeHooks{phase: "scout", agent: "evolve-scout", model: "auto", prompt: "x", verdict: core.VerdictPASS}
@@ -79,11 +70,6 @@ func TestRunner_ModelRoutingAuto_SoftOverlayAppliesAsPrimary(t *testing.T) {
 	}
 }
 
-// TestRunner_ModelRoutingAuto_ZeroOverlayByteIdentical (mr4-projection AC3
-// counterpart, at the runner layer): a PhaseRequest with both overlay fields
-// empty (static/advisory mode, or auto mode's no-proposal-for-this-phase
-// case) dispatches EXACTLY the profile's static default — no soft overlay is
-// constructed or applied.
 func TestRunner_ModelRoutingAuto_ZeroOverlayByteIdentical(t *testing.T) {
 	root := writeFallbackProfile(t, "evolve-scout", "claude-tmux", nil)
 	hooks := &fakeHooks{phase: "scout", agent: "evolve-scout", model: "auto", prompt: "x", verdict: core.VerdictPASS}
@@ -102,13 +88,6 @@ func TestRunner_ModelRoutingAuto_ZeroOverlayByteIdentical(t *testing.T) {
 	}
 }
 
-// TestRunner_ModelRoutingAuto_BenchedOverlayPrimaryFallsBack (mr4-projection
-// AC5, I3): the advisor proposes codex-tmux as the overlay CLI, but codex-tmux
-// is ACTIVELY BENCHED (2-strike boot-timeout bench, same mechanism as
-// cycle-426 driver bench). Because the overlay is SOFT (pin==nil), the
-// dispatch chain must still fall back to the profile's original primary
-// (claude-tmux) — a benched advisor choice must never collapse the chain to
-// a single, unavailable candidate the way an absolute policy.Pin would.
 func TestRunner_ModelRoutingAuto_BenchedOverlayPrimaryFallsBack(t *testing.T) {
 	root := writeFallbackProfile(t, "evolve-auditor", "claude-tmux", []string{"codex-tmux"})
 	store := clihealth.NewStore(root, nil)

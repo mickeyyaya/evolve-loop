@@ -13,12 +13,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/channel"
 )
 
-// cmd_bridge_watch_test.go — TDD tests for `evolve bridge watch`,
-// the read-only live channel feed tail for human debugging.
-
-// lockedBuffer is a bytes.Buffer safe for the follow tests' shape: the follow
-// loop writes from its own goroutine while the test polls String() waiting for
-// the rendered line. Without the mutex that poll is a data race under -race.
+// lockedBuffer lets the test poll String() while the follow loop writes from
+// its own goroutine without a data race.
 type lockedBuffer struct {
 	mu sync.Mutex
 	b  bytes.Buffer
@@ -36,8 +32,6 @@ func (l *lockedBuffer) String() string {
 	return l.b.String()
 }
 
-// --- renderFeedLine tests ---
-
 func TestRenderFeedLine_Correlation(t *testing.T) {
 	e := map[string]any{
 		"kind": "correlation",
@@ -47,14 +41,12 @@ func TestRenderFeedLine_Correlation(t *testing.T) {
 	if !strings.Contains(got, "correlation") || !strings.Contains(got, "request") || !strings.Contains(got, "c1") {
 		t.Fatalf("render = %q; want to contain 'correlation', 'request', 'c1'", got)
 	}
-	// Must match format: "correlation: request corr_id=c1"
 	if !strings.Contains(got, "corr_id=c1") {
 		t.Fatalf("render = %q; want corr_id=c1", got)
 	}
 }
 
 func TestRenderFeedLine_CorrelationMissingData(t *testing.T) {
-	// Guard: nil data field — should not panic
 	e := map[string]any{"kind": "correlation"}
 	got := renderFeedLine(e)
 	if !strings.Contains(got, "correlation") {
@@ -63,7 +55,6 @@ func TestRenderFeedLine_CorrelationMissingData(t *testing.T) {
 }
 
 func TestRenderFeedLine_CorrelationWrongDataType(t *testing.T) {
-	// Guard: data is a string not a map — should not panic
 	e := map[string]any{"kind": "correlation", "data": "not-a-map"}
 	got := renderFeedLine(e)
 	if !strings.Contains(got, "correlation") {
@@ -114,8 +105,6 @@ func TestRenderFeedLine_SeqPresent(t *testing.T) {
 	}
 }
 
-// --- runBridgeWatchOnce tests ---
-
 func TestRunBridgeWatchOnce_RendersFeed(t *testing.T) {
 	ws := t.TempDir()
 	feedContent := `{"seq":1,"kind":"assistant_text","data":{"text":"hello"}}` + "\n" +
@@ -155,7 +144,6 @@ func TestRunBridgeWatchOnce_MalformedLinesSkipped(t *testing.T) {
 		t.Fatalf("malformed lines should not error: %v", err)
 	}
 	s := out.String()
-	// Only the valid JSON line should appear
 	if !strings.Contains(s, "ping") {
 		t.Fatalf("valid line 'ping' missing in:\n%s", s)
 	}
@@ -180,8 +168,7 @@ func TestRunBridgeWatchOnce_EmptyFeedNoOutput(t *testing.T) {
 }
 
 func TestRunBridgeWatchOnce_ReadError(t *testing.T) {
-	// Pass a workspace path whose feed path is a directory (not a file) →
-	// triggers the non-ErrNotExist error branch.
+	// A directory at the feed path is a read error other than ErrNotExist.
 	ws := t.TempDir()
 	feedPath := channel.FeedPath(ws, "build")
 	if err := os.MkdirAll(feedPath, 0o755); err != nil {
@@ -194,8 +181,7 @@ func TestRunBridgeWatchOnce_ReadError(t *testing.T) {
 }
 
 func TestRenderFeedLine_SeqIntType(t *testing.T) {
-	// Cover the int branch of the seq type-switch (JSON gives float64 normally,
-	// but internal callers may pass int directly).
+	// JSON decodes numbers as float64; an int seq comes only from in-process callers.
 	e := map[string]any{"seq": 7, "kind": "ping"}
 	got := renderFeedLine(e)
 	if !strings.Contains(got, "seq=7") {
@@ -203,10 +189,7 @@ func TestRenderFeedLine_SeqIntType(t *testing.T) {
 	}
 }
 
-// --- cmdBridgeWatch (subcommand dispatch) tests ---
-
 func TestRunBridge_Watch_FeedReadError(t *testing.T) {
-	// Feed path is a directory → runBridgeWatchOnce returns error → exit 1.
 	ws := t.TempDir()
 	feedPath := channel.FeedPath(ws, "build")
 	if err := os.MkdirAll(feedPath, 0o755); err != nil {
@@ -248,7 +231,6 @@ func TestRunBridge_Watch_NoFollowRendersAndReturns(t *testing.T) {
 		t.Fatalf("setup: %v", err)
 	}
 	var out, errb bytes.Buffer
-	// --follow=false (or no --follow) → one-shot, must not block
 	code := runBridge([]string{"watch", "--workspace=" + ws, "--agent=build"}, nil, &out, &errb)
 	if code != 0 {
 		t.Fatalf("watch exit=%d, want 0; stderr=%q", code, errb.String())
@@ -277,21 +259,17 @@ func TestRunBridge_Watch_UnknownFlag(t *testing.T) {
 	}
 }
 
-// --- renderFeedLine missing-kind test ---
-
 func TestRenderFeedLine_MissingKind(t *testing.T) {
 	if got := renderFeedLine(map[string]any{}); !strings.Contains(got, "unknown") {
 		t.Fatalf("render = %q; want 'unknown'", got)
 	}
 }
 
-// --- runBridgeWatchFollow tests (Fix 1: context seam) ---
-
 func TestRunBridgeWatchFollow_CancelledCtxExits(t *testing.T) {
 	ws := t.TempDir()
 	os.WriteFile(channel.FeedPath(ws, "scout"), []byte(`{"seq":3,"kind":"tick_event"}`+"\n"), 0o644)
 	ctx, cancel := context.WithCancel(context.Background())
-	cancel() // already cancelled → loop exits on first select
+	cancel()
 	var out, errb bytes.Buffer
 	if code := runBridgeWatchFollow(ctx, &out, &errb, ws, "scout"); code != 0 {
 		t.Fatalf("exit=%d want 0", code)
@@ -299,7 +277,6 @@ func TestRunBridgeWatchFollow_CancelledCtxExits(t *testing.T) {
 }
 
 func TestRunBridgeWatchFollow_TailsNewLines(t *testing.T) {
-	// Speed up polling so the test completes quickly.
 	orig := watchFollowInterval
 	watchFollowInterval = 20 * time.Millisecond
 	t.Cleanup(func() { watchFollowInterval = orig })
@@ -307,14 +284,8 @@ func TestRunBridgeWatchFollow_TailsNewLines(t *testing.T) {
 	ws := t.TempDir()
 	path := channel.FeedPath(ws, "scout")
 	os.WriteFile(path, []byte(`{"seq":1,"kind":"assistant_text","data":{"text":"first"}}`+"\n"), 0o644)
-	// The follow loop seeds its start offset from the file size ASYNCHRONOUSLY,
-	// so an append that lands before it is seeded is skipped forever. The old
-	// shape — a fixed 10ms sleep inside a 200ms deadline — lost that race on a
-	// loaded macOS runner and reported a hard failure. Wait on the EVENT (the
-	// rendered line) under a deadline generous enough that scheduler jitter can
-	// never decide the outcome, re-appending each tick until the loop is up.
-	// The happy path still finishes in ~one tick; the deadline is only ever
-	// spent by a genuine regression.
+	// The loop seeds its offset asynchronously and skips an earlier append, so
+	// the test re-appends each tick and waits on the rendered line.
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	out := &lockedBuffer{}
@@ -337,21 +308,17 @@ func TestRunBridgeWatchFollow_TailsNewLines(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit=%d want 0", code)
 	}
-	// the tailed second line should have rendered
 	if !strings.Contains(out.String(), "second") {
 		t.Fatalf("expected tailed line in output:\n%s", out.String())
 	}
 }
 
-// TestRunBridgeWatchFollow_NoGrowthNoOutput verifies the size<=offset path:
-// when the feed doesn't grow between ticks, nothing is printed.
 func TestRunBridgeWatchFollow_NoGrowthNoOutput(t *testing.T) {
 	orig := watchFollowInterval
 	watchFollowInterval = 20 * time.Millisecond
 	t.Cleanup(func() { watchFollowInterval = orig })
 
 	ws := t.TempDir()
-	// Write a line before follow starts → offset seeded to EOF, no new writes.
 	os.WriteFile(channel.FeedPath(ws, "scout"), []byte(`{"seq":1,"kind":"ping"}`+"\n"), 0o644)
 	ctx, cancel := context.WithTimeout(context.Background(), 80*time.Millisecond)
 	defer cancel()
@@ -364,15 +331,12 @@ func TestRunBridgeWatchFollow_NoGrowthNoOutput(t *testing.T) {
 	}
 }
 
-// TestRunBridgeWatchFollow_MissingFeedContinues verifies ErrNotExist is
-// silently retried (not fatal).
 func TestRunBridgeWatchFollow_MissingFeedContinues(t *testing.T) {
 	orig := watchFollowInterval
 	watchFollowInterval = 20 * time.Millisecond
 	t.Cleanup(func() { watchFollowInterval = orig })
 
 	ws := t.TempDir()
-	// No feed file at all; loop should continue polling until context cancels.
 	ctx, cancel := context.WithTimeout(context.Background(), 80*time.Millisecond)
 	defer cancel()
 	var out, errb bytes.Buffer
@@ -381,8 +345,6 @@ func TestRunBridgeWatchFollow_MissingFeedContinues(t *testing.T) {
 	}
 }
 
-// TestRunBridgeWatchFollow_SkipsMalformedAndEmptyLines verifies that empty
-// and non-JSON lines appended after seeding are silently skipped.
 func TestRunBridgeWatchFollow_SkipsMalformedAndEmptyLines(t *testing.T) {
 	orig := watchFollowInterval
 	watchFollowInterval = 20 * time.Millisecond
@@ -390,16 +352,10 @@ func TestRunBridgeWatchFollow_SkipsMalformedAndEmptyLines(t *testing.T) {
 
 	ws := t.TempDir()
 	path := channel.FeedPath(ws, "scout")
-	// Seed with one byte so offset starts at 1 (non-zero; forces a seek+read).
+	// One byte makes the seeded offset non-zero, which forces a seek.
 	os.WriteFile(path, []byte("\n"), 0o644)
-	// The follow loop seeds its start offset from the file size ASYNCHRONOUSLY,
-	// so an append that lands before it is seeded is skipped forever. The old
-	// shape — a fixed 10ms sleep inside a 200ms deadline — lost that race on a
-	// loaded macOS runner and reported a hard failure. Wait on the EVENT (the
-	// rendered line) under a deadline generous enough that scheduler jitter can
-	// never decide the outcome, re-appending each tick until the loop is up.
-	// The happy path still finishes in ~one tick; the deadline is only ever
-	// spent by a genuine regression.
+	// The loop seeds its offset asynchronously and skips an earlier append, so
+	// the test re-appends each tick and waits on the rendered line.
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	out := &lockedBuffer{}
@@ -413,7 +369,6 @@ func TestRunBridgeWatchFollow_SkipsMalformedAndEmptyLines(t *testing.T) {
 		if err != nil {
 			t.Fatalf("open feed for append: %v", err)
 		}
-		// Append: one empty line, one malformed JSON line, one valid line.
 		f.WriteString("\nnot-json\n" + `{"seq":5,"kind":"ping"}` + "\n")
 		f.Close()
 		time.Sleep(watchFollowInterval)
@@ -423,27 +378,22 @@ func TestRunBridgeWatchFollow_SkipsMalformedAndEmptyLines(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit=%d want 0", code)
 	}
-	// Only the valid JSON line should render.
 	if !strings.Contains(out.String(), "ping") {
 		t.Fatalf("expected 'ping' in output, got: %q", out.String())
 	}
-	// The malformed and empty lines must have been skipped, not rendered.
 	if strings.Contains(out.String(), "not-json") {
 		t.Fatalf("malformed line leaked into output: %q", out.String())
 	}
 }
 
-// TestCmdBridgeWatch_FollowFlagParsed covers lines 29 (follow=true) and 58
-// (signal.NotifyContext + runBridgeWatchFollow call) in cmdBridgeWatch.
-// It sends SIGINT to the current process after a short delay so the signal
-// context created inside cmdBridgeWatch cancels cleanly.
 func TestCmdBridgeWatch_FollowFlagParsed(t *testing.T) {
 	orig := watchFollowInterval
 	watchFollowInterval = 20 * time.Millisecond
 	t.Cleanup(func() { watchFollowInterval = orig })
 
 	ws := t.TempDir()
-	// Send SIGINT to self after 60ms so signal.NotifyContext fires → exit 0.
+	// A SIGINT to this process is the only way to end the follow loop that
+	// cmdBridgeWatch wires to the signal context.
 	go func() {
 		time.Sleep(60 * time.Millisecond)
 		syscall.Kill(syscall.Getpid(), syscall.SIGINT) //nolint:errcheck

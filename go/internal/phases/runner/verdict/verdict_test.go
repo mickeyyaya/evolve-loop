@@ -1,10 +1,5 @@
 package verdict
 
-// verdict_test.go — construction, the closed set, the shapes and the Judge
-// contract (ADR-0103 unit 11 §6 tests 11, 14, 15, 18-20, 32-34). Every export
-// is named and exercised in this package's own tests (apicover, cover-strict
-// count package-local tests only). Every test injects WithSleep: no real sleep.
-
 import (
 	"context"
 	"errors"
@@ -26,8 +21,7 @@ var bridgeResp = core.BridgeResponse{ExitCode: 81, CostUSD: 1.5, Tokens: core.To
 const (
 	reportPASS     = "# audit\n<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"PASS\"} -->\n"
 	challengeToken = "chal-tok-verdict-0001"
-	// reportWithToken is a PASS report echoing THIS cycle's challenge token —
-	// the anti-gaming anchor the ACS floor requires.
+	// reportWithToken echoes challengeToken, which the ACS floor requires.
 	reportWithToken = "<!-- challenge-token: " + challengeToken + " -->\n# Audit Report\n**Verdict:** PASS\n" +
 		"<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"PASS\",\"schema_version\":1} -->\n"
 )
@@ -40,13 +34,12 @@ func transientErr() error {
 	return fmt.Errorf("bridge: launch exit=%d: %w", 85, core.ErrTransientBridgeFailure)
 }
 
-// counts records what the injected seams saw.
 type counts struct {
 	verify, sleep int
 }
 
-// probe scripts the deliverable probe: not-OK with the given codes until the
-// okFrom-th call (0 = never OK); err, when set, is returned on every call.
+// probe scripts the deliverable probe: OK from the okFrom-th call (0 = never), else the given
+// codes; err, when set, wins on every call.
 type probe struct {
 	okFrom int
 	codes  []string
@@ -55,8 +48,7 @@ type probe struct {
 	n      *counts
 }
 
-// verifiedFrom stamps the path and the bytes exactly as deliverable.Verify
-// does (the single-read seam): the runner classifies these bytes.
+// verifiedFrom stamps the path and the bytes as deliverable.Verify does.
 func verifiedFrom(res deliverable.Result, phase string, roots phasecontract.Roots) deliverable.Result {
 	path := filepath.Join(roots.Workspace, phase+"-report.md")
 	data, err := os.ReadFile(path)
@@ -141,7 +133,6 @@ func codesOf(events []signalcenter.Event) []signalcenter.Code {
 	return out
 }
 
-// Test 11 — every code is registered under module runner with a doc.
 func TestRunnerCodes_AreRegisteredWithDocsUnderModuleRunner(t *testing.T) {
 	for _, c := range []signalcenter.Code{CodeTeardownFail, CodeOptionalPhaseDegraded, CodeReconciled, CodeDeliverableUnverified, CodeStdoutFilterFailed} {
 		if m, ok := signalcenter.IsRegistered(c); !ok || m != signalcenter.ModuleRunner {
@@ -162,9 +153,7 @@ func TestRunnerCodes_AreRegisteredWithDocsUnderModuleRunner(t *testing.T) {
 	}
 }
 
-// Test 14 — the input shape is constructed positionally so a new field breaks
-// this test at compile time and the host's one projection (dispatchOf) is
-// revisited instead of silently zeroing.
+// Positional on purpose: a new field breaks this literal, so the host's dispatchOf is revisited.
 func TestDispatch_HasExactlyTheDeclaredFields(t *testing.T) {
 	d := Dispatch{7, "run", "audit", "ws", "wt", "root", 2, "ws/audit-report.md", Snapshot{}, false, bridgeResp, nil, 200, "opus", "profile", nil}
 	if d.Cycle != 7 || d.ModelSource != "profile" || d.ExplanationDocumentationVersion != 2 {
@@ -172,8 +161,6 @@ func TestDispatch_HasExactlyTheDeclaredFields(t *testing.T) {
 	}
 }
 
-// Test 15 — construction contract: a nil probe panics at first use (no guard),
-// the Null Object, the live accessor, SignalsWired.
 func TestNew_PanicsAtFirstUseWithoutVerify(t *testing.T) {
 	defer func() {
 		if recover() == nil {
@@ -191,7 +178,6 @@ func TestWithSignals_NilIsTheNullObject(t *testing.T) {
 		if e.SignalsWired() {
 			t.Fatal("no Center ⇒ not wired")
 		}
-		// a provoked fault (teardown, malformed) emits into nothing and still FAILs
 		resp, err := e.Judge(context.Background(), Dispatch{Phase: "audit", Workspace: t.TempDir(), BridgeErr: timeoutErr()}, classifyAs(core.VerdictPASS, ""))
 		if err == nil || resp.Verdict != core.VerdictFAIL {
 			t.Fatalf("the Null Object never changes the verdict: %v %+v", err, resp)
@@ -225,9 +211,6 @@ func TestSignalsWired(t *testing.T) {
 	}
 }
 
-// Test 18 — two cancellation policies for ONE ladder: the teardown reconcile
-// runs the full window under a dead ctx (the cancel IS the teardown), the
-// clean-exit path bails after the first probe.
 func TestJudge_TeardownLadderIsCancellationImmune_CleanExitLadderIsNot(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -248,8 +231,6 @@ func TestJudge_TeardownLadderIsCancellationImmune_CleanExitLadderIsNot(t *testin
 	}
 }
 
-// Test 19 — no bridge error ⇒ reconcile is a pass-through (no probe, no
-// event); through Judge the clean path then probes exactly once.
 func TestJudge_PassThroughWhenNoBridgeError(t *testing.T) {
 	h := newHarness(t, probe{okFrom: 1})
 	r, early, err := h.e.reconcile(context.Background(), h.dispatch("audit", nil))
@@ -284,7 +265,6 @@ func TestJudge_SubstantiveBridgeError_FailsWithoutTheDeliverableOrTheStream(t *t
 	}
 }
 
-// Test 20 — the sentinel survives the wrap on both FAIL arms.
 func TestJudge_TeardownErrorChainSurvivesTheWrap(t *testing.T) {
 	for _, tc := range []struct {
 		err      error
@@ -298,7 +278,6 @@ func TestJudge_TeardownErrorChainSurvivesTheWrap(t *testing.T) {
 	}
 }
 
-// Test 32 — the response base carries exactly the six shared fields.
 func TestResponseBase_CarriesExactlyTheSixFields(t *testing.T) {
 	h := newHarness(t, probe{})
 	d := h.dispatch("audit", nil)
@@ -309,7 +288,6 @@ func TestResponseBase_CarriesExactlyTheSixFields(t *testing.T) {
 	}
 }
 
-// Test 34 — the constants and settle bounds are named and load-bearing.
 func TestAPICover_EveryExportIsNamedAndExercised(t *testing.T) {
 	if SettleRetries != 15 || SettleInterval != 200*time.Millisecond {
 		t.Fatalf("the settle bounds are runner.go's verbatim: %d × %s", SettleRetries, SettleInterval)

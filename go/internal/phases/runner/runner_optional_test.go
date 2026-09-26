@@ -10,17 +10,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// artifactTimeoutErr mimics exactly what bridge.Engine.Launch returns on exit
-// 81 — a wrapped core.ErrArtifactTimeout — so the runner's errors.Is match is
-// exercised against the real wire shape, not a hand-rolled sentinel.
+// artifactTimeoutErr wraps core.ErrArtifactTimeout as bridge.Engine.Launch does on exit 81, so errors.Is sees the real shape.
 func artifactTimeoutErr() error {
 	return fmt.Errorf("bridge: launch exit=%d: %w", 81, core.ErrArtifactTimeout)
 }
 
-// TestRun_OptionalPhase_ArtifactTimeout_DegradesToWarn is the cycle-120 fix
-// (Workstream D): an OPTIONAL phase (build-planner) whose artifact never
-// appears must degrade to WARN with a NIL error so the orchestrator advances
-// the cycle, instead of the unconditional FAIL+error that aborted cycle-120.
 func TestRun_OptionalPhase_ArtifactTimeout_DegradesToWarn(t *testing.T) {
 	hooks := &fakeHooks{phase: "build-planner", agent: "evolve-build-planner", model: "opus", prompt: "x"}
 	fb := &fakeBridge{err: artifactTimeoutErr()}
@@ -47,9 +41,6 @@ func TestRun_OptionalPhase_ArtifactTimeout_DegradesToWarn(t *testing.T) {
 	}
 }
 
-// TestRun_OptionalPhase_OtherBridgeError_StillFails proves the soft-fail is
-// SCOPED to artifact-timeout: any other bridge error on an optional phase
-// still hard-fails (we don't want to silently swallow a real crash).
 func TestRun_OptionalPhase_OtherBridgeError_StillFails(t *testing.T) {
 	hooks := &fakeHooks{phase: "build-planner", agent: "evolve-build-planner", model: "opus", prompt: "x"}
 	fb := &fakeBridge{err: errors.New("bridge: launch exit=2")} // safety-gate, not a timeout
@@ -69,9 +60,6 @@ func TestRun_OptionalPhase_OtherBridgeError_StillFails(t *testing.T) {
 	}
 }
 
-// TestRun_MandatoryPhase_ArtifactTimeout_StillFails proves the soft-fail is
-// SCOPED to optional phases: a mandatory phase (Optional unset) timing out
-// still hard-fails — unchanged behavior, so no mandatory phase silently skips.
 func TestRun_MandatoryPhase_ArtifactTimeout_StillFails(t *testing.T) {
 	hooks := &fakeHooks{phase: "build", agent: "evolve-builder", model: "sonnet", prompt: "x"}
 	fb := &fakeBridge{err: artifactTimeoutErr()}
@@ -79,7 +67,6 @@ func TestRun_MandatoryPhase_ArtifactTimeout_StillFails(t *testing.T) {
 		Hooks:   hooks,
 		Bridge:  fb,
 		Prompts: fakePromptsFS("evolve-builder", "x"),
-		// Optional: false (default)
 		SleepFn: func(time.Duration) {}, // skip the real settle-retry delay on the miss path
 	})
 

@@ -11,8 +11,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// mutatingBridge plays the cycle-1603 auditor: it rewrites a material file in
-// place and drops a probe test into the package, then writes its report.
+// mutatingBridge plays a probing auditor: it rewrites a material file, drops a probe test, then writes its report.
 type mutatingBridge struct{ launches int }
 
 func (b *mutatingBridge) Launch(_ context.Context, req core.BridgeRequest) (core.BridgeResponse, error) {
@@ -52,7 +51,7 @@ func fenceRepo(t *testing.T) string {
 	}
 	run("add", "-A")
 	run("commit", "-q", "-m", "base")
-	// The builder's pending (uncommitted) change — what the audit must judge.
+	// The builder's uncommitted change, which the audit must judge.
 	if err := os.WriteFile(filepath.Join(dir, "src", "mat.go"), []byte("package src // builder change\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -64,9 +63,8 @@ func runFenced(t *testing.T, phase string, readOnly bool) (dir string, resp core
 	return dir, resp
 }
 
-// runFencedObserving also returns what src/mat.go held when Classify ran —
-// the audit's explanation binding runs inside Classify, so the restore must
-// precede it, not merely happen.
+// runFencedObserving also returns what src/mat.go held when Classify ran: the audit's explanation binding runs
+// inside Classify, so the restore must precede it, not merely happen.
 func runFencedObserving(t *testing.T, phase string, readOnly bool) (dir string, resp core.PhaseResponse, atClassify string) {
 	t.Helper()
 	dir = fenceRepo(t)
@@ -93,8 +91,6 @@ func fenceDiagnostic(resp core.PhaseResponse) string {
 	return ""
 }
 
-// TestRun_ReadOnlyPhaseWorktreeIsRestoredAndReported — the auditor's probes
-// are undone before the response is classified, and the write is named.
 func TestRun_ReadOnlyPhaseWorktreeIsRestoredAndReported(t *testing.T) {
 	t.Parallel()
 	dir, resp, atClassify := runFencedObserving(t, "audit", true)
@@ -112,14 +108,11 @@ func TestRun_ReadOnlyPhaseWorktreeIsRestoredAndReported(t *testing.T) {
 	if !strings.Contains(msg, "read-only phase audit wrote 2 path(s)") || !strings.Contains(msg, "src/mat.go") || !strings.Contains(msg, "src/zz_probe_test.go") {
 		t.Errorf("the write must be reported on the response with the restored paths, got %q (diags=%+v)", msg, resp.Diagnostics)
 	}
-	// The fence reports; it never decides. Same fixture unfenced ⇒ same verdict.
 	if _, unfenced := runFenced(t, "audit", false); unfenced.Verdict != resp.Verdict {
 		t.Errorf("the fence changed the verdict: fenced=%s unfenced=%s", resp.Verdict, unfenced.Verdict)
 	}
 }
 
-// TestRun_SourceWriterIsNotFenced — build/tdd keep their writes and get no
-// fence diagnostic (byte-identical to before the fence).
 func TestRun_SourceWriterIsNotFenced(t *testing.T) {
 	t.Parallel()
 	dir, resp := runFenced(t, "build", false)
@@ -135,8 +128,6 @@ func TestRun_SourceWriterIsNotFenced(t *testing.T) {
 	}
 }
 
-// TestRun_FenceUnavailableWarnsAndProceeds — a worktree that is not a
-// repository cannot be fenced: the phase runs, and the response says so.
 func TestRun_FenceUnavailableWarnsAndProceeds(t *testing.T) {
 	t.Parallel()
 	hooks := &fakeHooks{phase: "audit", agent: "evolve-audit", model: "sonnet", prompt: "body", verdict: core.VerdictPASS}

@@ -1,13 +1,5 @@
 package lifecycle
 
-// route_test.go — RouteConsole's contract through the leaf: the FAIL closeout's
-// per-item breaker for a deterministic triage refusal (a top_n card naming a
-// protected surface). The item is rewritten IN PLACE — at the inbox root or
-// inside processing/cycle-N/ where the lane's claim left it — with
-// route:console-manual and the refusal as routed_reason, so the drain
-// releases it already operator-owned and the ADR-0074 claim floor refuses
-// every later lane. Incident: docs/incidents/2026-09-14-triage-refusal-poison-loop.md.
-
 import (
 	"encoding/json"
 	"errors"
@@ -31,10 +23,6 @@ func readItem(t *testing.T, path string) map[string]any {
 	return m
 }
 
-// Test 25 — a root-resident item is routed in place: the four route fields
-// are written atomically, the INFO line and the chained ledger line name the
-// reason, and the Center receives INBOX_ITEM_ROUTED_CONSOLE WARN with the
-// cycle, the reason and the path.
 func TestMover_RouteConsole_RootItem_RewritesInPlaceAndReports(t *testing.T) {
 	inbox := newInbox(t)
 	path := filepath.Join(inbox, "2026-07-30T13-04-00Z-poison.json")
@@ -75,9 +63,6 @@ func TestMover_RouteConsole_RootItem_RewritesInPlaceAndReports(t *testing.T) {
 	}
 }
 
-// Test 26 — the closeout case: the lane's claim already moved the item into
-// processing/cycle-N/; RouteConsole finds it there (Locate is the one walk)
-// and rewrites it in place — it does NOT move it; the drain still does.
 func TestMover_RouteConsole_ProcessingItem_RewrittenWhereItLies(t *testing.T) {
 	inbox := newInbox(t)
 	path := procPath(inbox, 1675, "poison.json")
@@ -95,9 +80,6 @@ func TestMover_RouteConsole_ProcessingItem_RewrittenWhereItLies(t *testing.T) {
 	}
 }
 
-// Test 27 — an id nowhere in the inbox is ErrNotFound and reports
-// INBOX_ROUTE_NOT_FOUND (step=locate) — a closeout that cannot find the item
-// must say so rather than let the poison loop continue silently.
 func TestMover_RouteConsole_NotFound_EmitsRouteNotFound(t *testing.T) {
 	inbox := newInbox(t)
 	rc := newRecordingCenter()
@@ -118,9 +100,6 @@ func TestMover_RouteConsole_NotFound_EmitsRouteNotFound(t *testing.T) {
 	}
 }
 
-// Test 28 — a rewrite that cannot happen (the located file is replaced by a
-// directory between Locate and the rewrite) reports INBOX_ITEM_REWRITE_FAILED
-// with step=route and returns the fault; nothing is claimed to be routed.
 func TestMover_RouteConsole_RewriteFault_ReportsAndFails(t *testing.T) {
 	inbox := newInbox(t)
 	path := filepath.Join(inbox, "p.json")
@@ -144,9 +123,6 @@ func TestMover_RouteConsole_RewriteFault_ReportsAndFails(t *testing.T) {
 	}
 }
 
-// Test 29 — the breaker closes: once routed, the very next lane claim is
-// refused by the ADR-0074 floor (INBOX_CLAIM_REFUSED, reason
-// route:console-manual) and the item stays at the root.
 func TestMover_RouteConsole_ThenClaimIsRefused(t *testing.T) {
 	inbox := newInbox(t)
 	path := filepath.Join(inbox, "p.json")
@@ -167,9 +143,6 @@ func TestMover_RouteConsole_ThenClaimIsRefused(t *testing.T) {
 	}
 }
 
-// Test 30 — a Location held by ANOTHER cycle's claim is not this closeout's to
-// route (a mis-copied id could name a live lane's item): INBOX_ROUTE_NOT_FOUND
-// with the holding cycle, ErrNotFound, the file untouched.
 func TestMover_RouteConsole_RefusesAnotherCyclesClaim(t *testing.T) {
 	inbox := newInbox(t)
 	path := procPath(inbox, 42, "live.json")
@@ -187,9 +160,6 @@ func TestMover_RouteConsole_RefusesAnotherCyclesClaim(t *testing.T) {
 	}
 }
 
-// Test 31 — Policy.Routed: the closeout already routed the refused item, so
-// the drain releases the cycle's items plain — no bump, no park — without
-// pretending the failure was system-level (architecture review MEDIUM-1).
 func TestMover_Release_RoutedPolicyReleasesPlain(t *testing.T) {
 	inbox := newInbox(t)
 	writeItem(t, procPath(inbox, 7, "a.json"), `{"id":"a","route":"console-manual"}`)

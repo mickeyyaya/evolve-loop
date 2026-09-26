@@ -1,7 +1,5 @@
 package lifecycle
 
-// promote_test.go — Promote's contract through the leaf (§6 tests 25-30).
-
 import (
 	"encoding/json"
 	"errors"
@@ -12,8 +10,6 @@ import (
 	"time"
 )
 
-// Test 25 — a promote of an id nobody holds is (NoOp=true, nil): the code
-// fires with task_id/state, no ledger line, no retire call.
 func TestMover_Promote_NotFound_NoOp_EmitsPromoteNotFound(t *testing.T) {
 	inbox := newInbox(t)
 	rc := newRecordingCenter()
@@ -32,8 +28,6 @@ func TestMover_Promote_NotFound_NoOp_EmitsPromoteNotFound(t *testing.T) {
 	}
 }
 
-// Test 26 — an unlanded sha reroutes to retry/ with the overridden reason on
-// both the ledger and the retire hook; the code carries sha and state=retry.
 func TestMover_Promote_Unlanded_ReroutesToRetry_RetireGetsTheOverriddenReason(t *testing.T) {
 	inbox := newInbox(t)
 	writeItem(t, procPath(inbox, 598, "t1.json"), `{"id":"t1"}`)
@@ -60,9 +54,6 @@ func TestMover_Promote_Unlanded_ReroutesToRetry_RetireGetsTheOverriddenReason(t 
 	}
 }
 
-// Test 27 — an erroring landing probe fails OPEN (the item lands in processed/)
-// and reports INBOX_LANDED_CHECK_FAILED once; the gate is not consulted for a
-// non-processed state or a promote without a sha.
 func TestMover_Promote_LandedCheckError_FailsOpenWithACode(t *testing.T) {
 	inbox := newInbox(t)
 	writeItem(t, filepath.Join(inbox, "t1.json"), `{"id":"t1"}`)
@@ -93,9 +84,6 @@ func TestMover_Promote_LandedCheckError_FailsOpenWithACode(t *testing.T) {
 	}
 }
 
-// Test 28 — a destination mkdir failure is ErrMvFailed with NoOp false and a
-// promote-warn/mkdir-failed ledger line; a rename failure is (NoOp=true, nil)
-// with promote-warn/mv-failed; neither retires.
 func TestMover_Promote_MkdirFails_ErrMvFailed_RenameFails_NoOp(t *testing.T) {
 	inbox := newInbox(t)
 	writeItem(t, procPath(inbox, 5, "t1.json"), `{"id":"t1"}`)
@@ -134,8 +122,6 @@ func TestMover_Promote_MkdirFails_ErrMvFailed_RenameFails_NoOp(t *testing.T) {
 	}
 }
 
-// Test 29 — the promote tail's order: the INFO line, the retire hook, the
-// ledger append.
 func TestMover_Promote_Order_InfoThenRetireThenLedger(t *testing.T) {
 	inbox := newInbox(t)
 	writeItem(t, filepath.Join(inbox, "t1.json"), `{"id":"t1"}`)
@@ -150,8 +136,6 @@ func TestMover_Promote_Order_InfoThenRetireThenLedger(t *testing.T) {
 	}
 }
 
-// Test 30 — the destination layout per state (moved from
-// inboxmover_test.go:429-453) plus cycleOrZero and the unreachable default.
 func TestPromoteDestPath_AndCycleOrZero(t *testing.T) {
 	cases := []struct {
 		name     string
@@ -183,9 +167,6 @@ func TestPromoteDestPath_AndCycleOrZero(t *testing.T) {
 	}
 }
 
-// The usage and bad-state arms keep their verbatim lines; the ledger From path
-// keeps its quirks (Q1); a happy promote ledgers the sha, the cycle and the
-// state-derived reason.
 func TestMover_Promote_UsageBadStateAndLedgerShape(t *testing.T) {
 	inbox := newInbox(t)
 	writeItem(t, filepath.Join(inbox, "r.json"), `{"id":"r"}`)

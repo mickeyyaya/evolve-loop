@@ -1,25 +1,5 @@
 package main
 
-// cmd_branches_test.go — TDD red-first unit contract for the `evolve branches`
-// subcommand (cycle-969, wire-carryforward-prune-cli). These tests call
-// runBranches directly against a real temp git repo (no remote), so they run in
-// the normal suite (`go test ./cmd/evolve/...`) with no `acs` build tag and no
-// binary build — the fast red/green loop the Builder codes against. The
-// worktree-gating, durable predicates live in go/acs/cycle969/predicates_test.go.
-//
-// RED before the Builder acts: runBranches is undefined, so this file fails to
-// COMPILE — the whole package test reds for the right reason (the SUT is absent).
-//
-// The Builder must NOT modify this file; it adds go/cmd/evolve/cmd_branches.go
-// (runBranches) and the registry.go row. Contract mirrored from the ACS package:
-//   - audit  → read-only; per branch prints `superseded=<t|f> landable=<t|f>`
-//              (dispatching to core.PruneSupersededOrphans AND
-//              core.CarryforwardCandidateLandable).
-//   - prune  → default dry-run (deletes nothing, flags `would-prune`);
-//              --dry-run=false deletes each superseded ref whose hasOpenPR is
-//              false. With no remote configured hasOpenPR MUST degrade to
-//              (false, nil) (verify_remote_pr_before_branch_delete).
-
 import (
 	"bytes"
 	"os"
@@ -46,8 +26,8 @@ func brCommit(t *testing.T, dir, name, content, msg string) {
 	brGit(t, dir, "commit", "-q", "-m", msg)
 }
 
-// brFixture builds a remote-less repo on `main` with a superseded (ancestor)
-// cycle-100 and a divergent-clean cycle-200 — same shape as the ACS fixture.
+// brFixture builds a remote-less repo with one branch that main already
+// contains (superseded) and one that diverges cleanly.
 func brFixture(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -98,8 +78,6 @@ func brLine(stdout, ref string, needles ...string) bool {
 	return false
 }
 
-// TestBranchesAudit_ReportsSupersededAndLandable exercises BOTH core functions
-// through the audit dispatcher and confirms audit is read-only.
 func TestBranchesAudit_ReportsSupersededAndLandable(t *testing.T) {
 	dir := brFixture(t)
 	stdout, code := brRun(t, dir, "audit")
@@ -117,7 +95,6 @@ func TestBranchesAudit_ReportsSupersededAndLandable(t *testing.T) {
 	}
 }
 
-// TestBranchesPruneDryRunDefault_KeepsSuperseded: default prune deletes nothing.
 func TestBranchesPruneDryRunDefault_KeepsSuperseded(t *testing.T) {
 	dir := brFixture(t)
 	stdout, code := brRun(t, dir, "prune")
@@ -132,8 +109,6 @@ func TestBranchesPruneDryRunDefault_KeepsSuperseded(t *testing.T) {
 	}
 }
 
-// TestBranchesPruneForce_DeletesSupersededKeepsDivergent: --dry-run=false prunes
-// the superseded ref (no remote → hasOpenPR false) and leaves the divergent one.
 func TestBranchesPruneForce_DeletesSupersededKeepsDivergent(t *testing.T) {
 	dir := brFixture(t)
 	stdout, code := brRun(t, dir, "prune", "--dry-run=false")
@@ -148,7 +123,6 @@ func TestBranchesPruneForce_DeletesSupersededKeepsDivergent(t *testing.T) {
 	}
 }
 
-// TestBranchesUnknownSubcommand_Errors: an unknown subcommand is a non-zero exit.
 func TestBranchesUnknownSubcommand_Errors(t *testing.T) {
 	var out, errb bytes.Buffer
 	if code := runBranches([]string{"bogus"}, nil, &out, &errb); code == 0 {

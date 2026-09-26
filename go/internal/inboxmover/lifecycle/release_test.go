@@ -1,8 +1,5 @@
 package lifecycle
 
-// release_test.go — the cycle drain, the quarantine park and orphan recovery
-// through the leaf (§6 tests 31-37).
-
 import (
 	"encoding/json"
 	"errors"
@@ -27,8 +24,6 @@ func readJSON(t *testing.T, path string) map[string]json.RawMessage {
 	return doc
 }
 
-// Test 31 — a root twin is never clobbered: the release is skipped, not
-// counted, and reported with base/task_id at the cycle.
 func TestMover_Release_DoubleMove_EmitsReleaseDoubleMove(t *testing.T) {
 	inbox := newInbox(t)
 	writeItem(t, filepath.Join(inbox, "dup.json"), `{"id":"dup-original"}`)
@@ -48,10 +43,6 @@ func TestMover_Release_DoubleMove_EmitsReleaseDoubleMove(t *testing.T) {
 	}
 }
 
-// Test 32 — the ADR-0072 S5 park at the ceiling replays the FAIL-drain
-// golden's shape: count 2, the reason, the continuation shed, the promote
-// ledger line; a Policy whose Committed excludes the id releases it un-bumped;
-// SystemLevel bumps nothing.
 func TestMover_Release_QuarantineAtCeiling_ReplaysG2(t *testing.T) {
 	inbox := newInbox(t)
 	writeItem(t, procPath(inbox, 5, "task-a.json"), `{"id":"task-a","title":"A","failure_count":1,"continuation":{"snapshot_sha":"abc123","cycle":4},"zeta":true}`)
@@ -78,7 +69,6 @@ func TestMover_Release_QuarantineAtCeiling_ReplaysG2(t *testing.T) {
 		rec.records[1].Action != "recover" || rec.records[1].Message != ".evolve/inbox/processing/cycle-5/task-b.json → .evolve/inbox/task-b.json: cycle-release" {
 		t.Errorf("ledger = %+v", rec.records)
 	}
-	// SystemLevel: nothing bumps, everything releases.
 	writeItem(t, procPath(inbox, 6, "task-c.json"), `{"id":"task-c","failure_count":5}`)
 	if res, err := m.Release(6, "sys", &Policy{Ceiling: 1, SystemLevel: true}); err != nil || res.Recovered != 1 {
 		t.Fatalf("res = %+v, err = %v", res, err)
@@ -86,7 +76,6 @@ func TestMover_Release_QuarantineAtCeiling_ReplaysG2(t *testing.T) {
 	if c := readJSON(t, filepath.Join(inbox, "task-c.json")); string(c["failure_count"]) != "5" {
 		t.Errorf("a system-level failure never bumps: %s", c["failure_count"])
 	}
-	// Below the ceiling: bumped and released with the caller's reason.
 	writeItem(t, procPath(inbox, 7, "task-d.json"), `{"id":"task-d"}`)
 	if res, err := m.Release(7, "cycle-failure-release", &Policy{Ceiling: 3}); err != nil || res.Recovered != 1 {
 		t.Fatalf("res = %+v, err = %v", res, err)
@@ -96,10 +85,6 @@ func TestMover_Release_QuarantineAtCeiling_ReplaysG2(t *testing.T) {
 	}
 }
 
-// Test 33 — a park that cannot deliver falls open to a root release and says
-// so: outcome=error after the inner Promote's mkdir fails (a FILE at
-// quarantine/), outcome=noop after its rename fails (a DIRECTORY at
-// quarantine/<base>); the preceding INBOX_PROMOTE_MOVE_FAILED names the cause.
 func TestMover_Release_QuarantineFailed_OutcomeErrorAndNoop(t *testing.T) {
 	inbox := newInbox(t)
 	writeItem(t, procPath(inbox, 11, "t7.json"), `{"id":"t7"}`)
@@ -140,9 +125,6 @@ func TestMover_Release_QuarantineFailed_OutcomeErrorAndNoop(t *testing.T) {
 	}
 }
 
-// Test 34 — INBOX_ITEM_REWRITE_FAILED names its step on the drain: a bump that
-// cannot rewrite (step=failure_bump, the item releases un-parked) and a stamp
-// that cannot rewrite (step=continuation_stamp, the item releases unstamped).
 func TestMover_Release_ItemRewriteFailed_Steps(t *testing.T) {
 	inbox := newInbox(t)
 	item := procPath(inbox, 4, "poison.json")
@@ -168,7 +150,6 @@ func TestMover_Release_ItemRewriteFailed_Steps(t *testing.T) {
 	if lines := faultLines(stderr.String()); len(lines) != 1 || lines[0] != "[inbox-mover] WARN: release-cycle: failure_count bump failed for poison.json (open "+tmpPathOf(item)+": is a directory) — quarantine skipped, releasing to inbox root" {
 		t.Errorf("legacy line: %q", lines)
 	}
-	// The stamp arm: a valid manifest, a directory at the tmp path.
 	ws := filepath.Join(inbox, "..", "runs", "cycle-9")
 	writeItem(t, filepath.Join(ws, "continuation-manifest.json"), `{"snapshot_sha":"abc123","cycle":9}`)
 	stamped := procPath(inbox, 9, "t5.json")
@@ -187,9 +168,6 @@ func TestMover_Release_ItemRewriteFailed_Steps(t *testing.T) {
 	}
 }
 
-// Test 35 — a counter reset that cannot rewrite the item does not block the
-// release: the item returns to the root with its stale count and the code
-// names step=counter_reset.
 func TestMover_ReleaseFromQuarantine_CounterResetFails_EmitsItemRewriteFailed(t *testing.T) {
 	inbox := newInbox(t)
 	src := filepath.Join(inbox, "quarantine", "q.json")
@@ -213,7 +191,6 @@ func TestMover_ReleaseFromQuarantine_CounterResetFails_EmitsItemRewriteFailed(t 
 	}
 }
 
-// ReleaseFromQuarantine's guards: bad args, not in quarantine/, a root twin.
 func TestMover_ReleaseFromQuarantine_Guards(t *testing.T) {
 	inbox := newInbox(t)
 	m := New(inbox, nil)
@@ -231,8 +208,7 @@ func TestMover_ReleaseFromQuarantine_Guards(t *testing.T) {
 	if body, _ := os.ReadFile(filepath.Join(inbox, "q.json")); !strings.Contains(string(body), "q-root") {
 		t.Error("the root twin is never clobbered")
 	}
-	// The rename into a read-only root fails AFTER the counter reset (Q4):
-	// ErrMvFailed, the item still quarantined with failure_count 0.
+	// A read-only root fails the rename after the counter reset, a preserved quirk.
 	if err := os.Remove(filepath.Join(inbox, "q.json")); err != nil {
 		t.Fatal(err)
 	}
@@ -253,9 +229,6 @@ func TestMover_ReleaseFromQuarantine_Guards(t *testing.T) {
 	}
 }
 
-// Test 36 — an orphan whose root destination is a directory reports
-// INBOX_RELEASE_MOVE_FAILED from Mover.RecoverOrphans (step=recover_orphans)
-// and the loop continues to the next item.
 func TestMover_RecoverOrphans_MoveFailed_EmitsReleaseMoveFailed_StepRecoverOrphans(t *testing.T) {
 	inbox := newInbox(t)
 	writeItem(t, procPath(inbox, 3, "a.json"), `{"id":"a"}`)
@@ -272,8 +245,6 @@ func TestMover_RecoverOrphans_MoveFailed_EmitsReleaseMoveFailed_StepRecoverOrpha
 	}
 }
 
-// RecoverOrphans' other arms: no processing/ (absent or a FILE), the active
-// cycle skipped with its INFO line, the ledger reason, the clobbering rename.
 func TestMover_RecoverOrphans_SkipsActiveAndLedgersRecoveries(t *testing.T) {
 	inbox := newInbox(t)
 	var stderr strings.Builder
@@ -308,8 +279,6 @@ func TestMover_RecoverOrphans_SkipsActiveAndLedgersRecoveries(t *testing.T) {
 	}
 }
 
-// Test 37 — a directory at the continuation manifest path is a read fault: the
-// code fires with workspace/err, every item releases unstamped.
 func TestMover_Release_ManifestUnreadable_EmitsContinuationManifestUnreadable(t *testing.T) {
 	inbox := newInbox(t)
 	ws := filepath.Join(inbox, "..", "runs", "cycle-8")
@@ -328,7 +297,6 @@ func TestMover_Release_ManifestUnreadable_EmitsContinuationManifestUnreadable(t 
 	}
 }
 
-// The stamp lands when the manifest is present; absent ⇒ no stamp.
 func TestMover_Release_StampsFromTheManifest(t *testing.T) {
 	inbox := newInbox(t)
 	ws := filepath.Join(inbox, "..", "runs", "cycle-8")
@@ -350,10 +318,6 @@ func TestMover_Release_StampsFromTheManifest(t *testing.T) {
 	}
 }
 
-// Release's dir arms: absent (INFO, no error), a FILE at processing/ (a stat
-// error that is not absence — returned), a FILE at processing/cycle-N (not a
-// dir — a silent no-op); the release-cycle rename failure through a read-only
-// cycle dir (asserted, not assumed).
 func TestMover_Release_DirArmsAndMoveFailed(t *testing.T) {
 	inbox := newInbox(t)
 	var stderr strings.Builder
@@ -395,7 +359,6 @@ func TestMover_Release_DirArmsAndMoveFailed(t *testing.T) {
 	}
 }
 
-// ShouldQuarantine is the pure S5 decision.
 func TestShouldQuarantine_PureDecision(t *testing.T) {
 	if ShouldQuarantine(2, 2, false) != true || ShouldQuarantine(1, 2, false) != false || ShouldQuarantine(5, 0, false) != false || ShouldQuarantine(5, 2, true) != false {
 		t.Error("ceiling > 0 && !systemLevel && count >= ceiling")

@@ -5,10 +5,6 @@ import (
 	"testing"
 )
 
-// claudeperm_test.go — the claude-tmux manifest must realize EVERY valid
-// claude permission mode (not just bypass+plan), so a per-phase
-// EVOLVE_<AGENT>_PERMISSION_MODE override never silently no-ops. Regression
-// guard for the Phase 2c gap where acceptEdits/default fell through to no flag.
 func TestRealizeFor_ClaudeTmux_AllPermissionModes(t *testing.T) {
 	cases := map[string][]string{
 		"bypass":      {"--dangerously-skip-permissions"},

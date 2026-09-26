@@ -1,24 +1,11 @@
 package core
 
-// catalog_refresh_ledger_test.go — chain-summary-refresh-event-field: the
-// cycle-start live-model-catalog refresh (cyclerun.go:586-593) is currently
-// silent on success and stderr-only WARN on failure — no ledger entry, no
-// summary field, unlike its sibling six lines below (operator_directives,
-// cyclerun.go:599-613). The catalog.refresh_stage=shadow soak (memory:
-// model_latest_selection) needs a queryable audit trail, not stderr
-// scrollback. These tests pin a "catalog_refresh" ledger entry mirroring the
-// operator_directives append pattern.
-
 import (
 	"context"
 	"errors"
 	"testing"
 )
 
-// TestOrchestrator_CatalogRefresh_LedgerStampsOkOutcome pins AC1: a
-// successful refresh (nil error) appends exactly one catalog_refresh ledger
-// entry stamped Action="ok", with the resolved catalog.refresh_stage carried
-// in Message (via the WithCatalogRefreshStage accessor).
 func TestOrchestrator_CatalogRefresh_LedgerStampsOkOutcome(t *testing.T) {
 	t.Parallel()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
@@ -54,10 +41,6 @@ func TestOrchestrator_CatalogRefresh_LedgerStampsOkOutcome(t *testing.T) {
 	}
 }
 
-// TestOrchestrator_CatalogRefresh_LedgerStampsFailedOutcome pins AC2: a
-// failed refresh still appends exactly one catalog_refresh entry, stamped
-// Action="failed" — and, matching the existing best-effort contract, the
-// cycle itself must NOT fail (RunCycle error nil, verdict PASS).
 func TestOrchestrator_CatalogRefresh_LedgerStampsFailedOutcome(t *testing.T) {
 	t.Parallel()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
@@ -89,12 +72,6 @@ func TestOrchestrator_CatalogRefresh_LedgerStampsFailedOutcome(t *testing.T) {
 	}
 }
 
-// TestOrchestrator_CatalogRefresh_NilRefresherNoLedgerEntry pins AC3: when
-// no catalog refresher is wired (nil, the composition-root-optional default)
-// planCycle must append ZERO catalog_refresh entries — a nil refresher never
-// ran, so there is no outcome to stamp (distinct from a "skipped" outcome,
-// which would require the refresher itself to signal a skip; the injected
-// closure's contract is func(ctx) error and carries no skip signal).
 func TestOrchestrator_CatalogRefresh_NilRefresherNoLedgerEntry(t *testing.T) {
 	t.Parallel()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
@@ -113,10 +90,6 @@ func TestOrchestrator_CatalogRefresh_NilRefresherNoLedgerEntry(t *testing.T) {
 	}
 }
 
-// TestOrchestrator_CatalogRefresh_NoStageAccessorLeavesStageEmpty pins AC4:
-// WithCatalogRefreshStage is optional — when unset, the entry is still
-// appended (outcome is independent of stage observability) with an empty
-// Message rather than a fabricated stage value.
 func TestOrchestrator_CatalogRefresh_NoStageAccessorLeavesStageEmpty(t *testing.T) {
 	t.Parallel()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}

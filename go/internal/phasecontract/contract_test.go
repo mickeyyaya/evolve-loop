@@ -28,7 +28,6 @@ func TestSectionPresent(t *testing.T) {
 }
 
 func TestReportComplete(t *testing.T) {
-	// TDD has two sections (AND across them).
 	cases := []struct {
 		name    string
 		content string
@@ -53,12 +52,6 @@ func TestReportComplete_NoSectionsTriviallyComplete(t *testing.T) {
 	}
 }
 
-// TestProducersDeclareCanonical is the drift alarm: every phase contract's
-// canonical heading must still be declared by the union of its producer agent
-// templates. When a template author renames a section, this fails at CI instead
-// of silently false-FAILing a valid report at cycle time (cycle-192). To fix a
-// failure, update BOTH the producer template AND the Section.Canonical/Accepted
-// in contract.go together — that is the single-source discipline this enforces.
 func TestProducersDeclareCanonical(t *testing.T) {
 	agentsDir := agentsDir(t)
 	for _, r := range All {
@@ -82,9 +75,6 @@ func TestProducersDeclareCanonical(t *testing.T) {
 	}
 }
 
-// agentsDir resolves the repo-root agents/ directory from this test file's
-// location (robust to the test's cwd). contract_test.go lives at
-// go/internal/phasecontract/, so agents/ is three levels up.
 func agentsDir(t *testing.T) string {
 	t.Helper()
 	_, thisFile, _, ok := runtime.Caller(0)

@@ -9,15 +9,6 @@ import (
 	"testing"
 )
 
-// TestChangedPackageFloorChecks_RunsAddedTagGatedPackagesUnderTheirTags
-// reproduces cycle 1679 (2026-09-14): the lane ADDED go/acs/cycle1676
-// (`//go:build acs`), the floor's default-context run could not see it
-// (buildTagVisiblePackages drops a package with no GoFiles in that context),
-// the audit passed, and the ship's added-test backstop was the first to run
-// it — red, after the builder had handed the tree over. The floor now runs
-// every added tag-gated package under its own tags, through the same seed
-// and grouping the ship gate uses, and reports a red like any other floor
-// failure, so the builder fixes it while it still owns the tree.
 func TestChangedPackageFloorChecks_RunsAddedTagGatedPackagesUnderTheirTags(t *testing.T) {
 	wt := initGitWorktree(t)
 	head := exec.Command("git", "rev-parse", "HEAD")

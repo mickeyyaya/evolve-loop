@@ -1,10 +1,5 @@
 package lifecycle
 
-// hostonly_test.go — ADR-0079 D3 preserved by a pin (§6 test 44): Mover.Release
-// is exported here (the compiler cannot hide it from the host), so the ONE
-// public door into the cycle-outcome lifecycle — inboxmover.ApplyCycleOutcome —
-// stays the only door by keeping internal/inboxmover the leaf's only importer.
-
 import (
 	"go/parser"
 	"go/token"

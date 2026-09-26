@@ -1,18 +1,5 @@
 package main
 
-// cmd_continuation.go — `evolve continuation list` / `evolve continuation
-// release <scope-id>`: the operator surface for the scope-keyed continuation
-// registry.
-//
-// The registry is written under a flock sidecar by the runtime, and until now
-// the only way for console to inspect or drop a stale binding was to hand-edit
-// .evolve/continuation-registry.json — outside that lock, with no preservation
-// of the salvage pointer it destroyed. Both subcommands reach the SAME paths
-// the runtime uses (continuation.ListRegistryEntries for the read,
-// inboxmover.ReleaseContinuationBinding for the preserve-then-delete
-// transaction) rather than re-implementing them here; a second copy of the
-// release order is exactly the drift that produced audit cycle-1507's H2.
-
 import (
 	"flag"
 	"fmt"
@@ -43,10 +30,8 @@ func runContinuation(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	}
 }
 
-// continuationRoot resolves the project root from the flag, else the process
-// working directory. Deliberately NOT $EVOLVE_PROJECT_ROOT: an operator running
-// this inside a lane's environment would otherwise release bindings in a
-// different tree than the one they are standing in.
+// continuationRoot resolves the project root from the flag, else the working
+// directory. Never $EVOLVE_PROJECT_ROOT: inside a lane it names another tree.
 func continuationRoot(fs *flag.FlagSet, args []string, rootFlag *string, stderr io.Writer) (string, bool) {
 	if err := fs.Parse(args); err != nil {
 		return "", false
@@ -62,9 +47,8 @@ func continuationRoot(fs *flag.FlagSet, args []string, rootFlag *string, stderr 
 	return wd, true
 }
 
-// runContinuationList prints every scope→binding pair. An absent registry is
-// the normal state of a healthy project, so it is a clean exit-0 empty report,
-// never an error.
+// runContinuationList prints every scope→binding pair. An absent registry is a
+// healthy project's normal state, so it exits 0.
 func runContinuationList(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("continuation list", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -101,16 +85,10 @@ func runContinuationList(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
-// runContinuationRelease drops exactly one binding through the shared
-// preserve-then-delete transaction, behind the operator-authority gate. A scope
-// holding no binding is an ERROR, not a silent success: a typo'd id must never
-// read as a completed release.
-//
-// Three refusals, in order of cheapness, and each one leaves the registry
-// exactly as it found it: no authority (continuation.RequireOperatorAuthority),
-// no such binding, and a binding whose lane is still LIVE. The authority check
-// runs FIRST, before the registry is even read, so an unauthorized caller
-// neither learns what is bound nor changes anything.
+// runContinuationRelease drops one binding through the shared
+// preserve-then-delete transaction. Its refusals, cheapest first, leave the
+// registry untouched: no authority (checked before any read), no such binding,
+// and a live lane.
 func runContinuationRelease(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("continuation release", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -133,10 +111,8 @@ func runContinuationRelease(args []string, stdout, stderr io.Writer) int {
 		return 10
 	}
 
-	// Read first purely to tell "no such binding" (operator error, non-zero)
-	// apart from "released" — ReleaseContinuationBinding reports both as a
-	// clean miss because releasing nothing is not a failure for the runtime.
-	// The value is also what names the lane whose liveness is checked next.
+	// Read first to tell "no such binding" from a release, which the runtime
+	// reports as the same clean miss; the value also names the lane checked next.
 	bound, isBound, err := continuation.ReadRegistryEntry(root, scopeID)
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve continuation release: registry unreadable while looking up %q: %v\n", scopeID, err)
@@ -178,13 +154,9 @@ func runContinuationRelease(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
-// continuationLaneIsLive reports whether the cycle a binding names is still
-// running. Heartbeat freshness is the ONLY liveness signal runlease.Lease
-// documents, so a lease left behind by a cycle that has since died does NOT
-// block a release: were it to, every dead lane's leftover .lease would brick
-// its scope permanently and this gate would become a worse stall than the gap
-// it closes. An unreadable lease is loud but likewise non-blocking, for the
-// same reason — a corrupt file must not be able to lock a scope forever.
+// continuationLaneIsLive judges by lease heartbeat freshness alone. A dead
+// lane's stale or unreadable lease must not block a release, or it would brick
+// the scope for good.
 func continuationLaneIsLive(root string, c continuation.Continuation, now time.Time, stderr io.Writer) bool {
 	if c.Cycle <= 0 {
 		return false

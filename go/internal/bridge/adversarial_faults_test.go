@@ -59,12 +59,6 @@ func adversarialFaultCases() []adversarialFaultCase {
 				panes:    []string{f.marker, "!!! malformed terminal frame !!!"},
 				wantCode: ExitArtifactTimeout,
 			},
-			// rate-limit-wall: the cycle-283 quota wall — the REPL boots, work
-			// is submitted, then the provider wall appears. The autoresponder
-			// must CLASSIFY (pattern rate_limit), persist the escalation
-			// report (the artifact the runner's bench-writer consumes), and
-			// escalate with ExitUnknownPrompt instead of stalling to the
-			// artifact timeout.
 			adversarialFaultCase{
 				family: f.family, cli: f.cli, marker: f.marker, fault: "rate-limit-wall",
 				panes:    []string{f.marker, rateLimitWallFor(f.family)},
@@ -86,9 +80,7 @@ func adversarialFaultCases() []adversarialFaultCase {
 	return out
 }
 
-// rateLimitWallFor returns each family's real wall phrasing (matching that
-// family's manifest rate_limit regex). The codex text is verbatim from the
-// cycle-283 escalation report — the incident this fault replays.
+// rateLimitWallFor returns each family's real wall phrasing; the codex text is verbatim from a real escalation report.
 func rateLimitWallFor(family string) string {
 	switch family {
 	case "codex":

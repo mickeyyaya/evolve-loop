@@ -8,38 +8,18 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/textcap"
 )
 
-// MaxEnrichedCatalogCards bounds how many cards render with full metadata
-// (categories + when-to-use hint) so a large plugin ecosystem cannot crowd the
-// rubric out of the context window. Overflow phases stay SELECTable via a
-// name-only line — a phase absent from the prompt cannot be selected at all.
-// Core projects it for the by-name catalog tests.
+// MaxEnrichedCatalogCards bounds how many catalog cards render with full metadata.
 const MaxEnrichedCatalogCards = 12
 
-// maxCardHintRunes caps a single card's when-to-use hint.
 const maxCardHintRunes = 140
 
-// WriteCatalog renders the pre-defined phases the advisor may SELECT (WS3)
-// with no on-demand index — WriteCatalogWithOnDemand over a nil index.
+// WriteCatalog renders the SELECT menu of pre-defined phases with no on-demand index.
 func WriteCatalog(b *strings.Builder, cards []router.PhaseCard) {
 	WriteCatalogWithOnDemand(b, cards, nil)
 }
 
-// WriteCatalogWithOnDemand renders the SELECT menu, biasing toward reuse over
-// minting: a selectable phase already has a tuned persona + profile, so
-// minting should be the exception (YAGNI for new phases). Cards carry the
-// spec's advisor-facing metadata (ADR-0038); relevance judgment is the
-// advisor LLM's job — Go only bounds the token cost. When the catalog exceeds
-// the enriched cap, Optional (SELECTable) phases take the enriched slots —
-// spine phases run via the mandatory config regardless. Deterministic order
-// (catalog order, stable partition) ⇒ prompt-prefix-cache friendly. Emits
-// nothing when the catalog is empty (legacy built-in-only path). The phases
-// that declined a slot are then named in a single line.
-//
-// The index is the difference between HIDING a phase and REMOVING it. Declining
-// exists so 53 never-selected cards stop crowding out 12 enriched slots; if the
-// declined set then vanished from the prompt entirely, the advisor could not
-// learn those phases exist and the fix would trade one invisibility defect for
-// another — the exact class this repo has spent the week removing.
+// WriteCatalogWithOnDemand renders the SELECT menu, then names the on-demand phases in one line.
+// The index hides a declined phase without removing it: a phase absent from the prompt cannot be selected.
 func WriteCatalogWithOnDemand(b *strings.Builder, cards []router.PhaseCard, onDemand []string) {
 	if len(cards) == 0 {
 		return
@@ -66,10 +46,7 @@ func WriteCatalogWithOnDemand(b *strings.Builder, cards []router.PhaseCard, onDe
 
 }
 
-// partitionCards is the stable three-bucket priority for the enriched slots:
-// a SELECTable card with metadata has something to show; a metadata-less
-// optional card renders the same either way; spine cards run via the
-// mandatory config regardless of rendering.
+// partitionCards puts spine cards last: they run via the mandatory config however they render.
 func partitionCards(cards []router.PhaseCard) []router.PhaseCard {
 	var withMeta, opt, rest []router.PhaseCard
 	for _, c := range cards {
@@ -86,11 +63,6 @@ func partitionCards(cards []router.PhaseCard) []router.PhaseCard {
 	return append(ordered, rest...)
 }
 
-// writeCard renders one enriched catalog line:
-//
-//   - bug-reproduction [evaluate] (bugfix) — when: bugfix cycles, before tdd/build
-//
-// Metadata-less cards degrade to the legacy "- name [role]" form.
 func writeCard(b *strings.Builder, c router.PhaseCard) {
 	ws := ""
 	if c.WritesSource {
@@ -108,10 +80,7 @@ func writeCard(b *strings.Builder, c router.PhaseCard) {
 		fmt.Fprintf(b, " — when: %s", hint)
 	}
 	b.WriteString("\n")
-	// Project this phase's own dispatch guardrails (cycle-436 MR1) so an
-	// advisor proposing {cli,tier} for it has the legal bounds in hand instead
-	// of guessing blind. Omitted entirely when the phase carries no per-phase
-	// guardrail (the common case today).
+	// The phase's own guardrails give an advisor proposing {cli,tier} the legal bounds.
 	if len(c.AllowedCLIs) > 0 {
 		fmt.Fprintf(b, "  allowed_clis: %s\n", strings.Join(c.AllowedCLIs, ", "))
 	}

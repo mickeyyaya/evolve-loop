@@ -53,9 +53,7 @@ func TestWriteBreaker_TmpWriteFailure_WARNsAndLeavesPriorStateUnchanged(t *testi
 func TestWriteBreaker_RenameOntoExistingDir_WARNsDistinctFromWriteFailure(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "breaker-as-dir")
-	// path is an existing NON-EMPTY directory: the atomic tmp-write succeeds
-	// (its sibling ".tmp" file has no conflict), but os.Rename(tmp, path)
-	// must fail because path is not a plain file.
+	// A non-empty directory at path lets the tmp write succeed and fails only the rename.
 	if err := os.Mkdir(path, 0o755); err != nil {
 		t.Fatalf("setup mkdir: %v", err)
 	}

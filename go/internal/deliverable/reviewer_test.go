@@ -10,12 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// Layer 4 (ADR-0034): the host-side contract gate. Same verifier as the agent
-// self-check, wired behind core.DeliverableReviewer. Fail-open on ambiguity,
-// fail-closed on confirmed violation at enforce, with a circuit breaker that
-// demotes enforce→advisory after N consecutive blocks so a miscalibrated gate
-// cannot brick the loop.
-
 func reviewInput(phase, workspace, projectRoot string) core.ReviewInput {
 	return core.ReviewInput{Phase: phase, Workspace: workspace, ProjectRoot: projectRoot}
 }
@@ -34,11 +28,6 @@ func newTestReviewerPhaseIO(stage, phaseIO config.Stage, breakerPath string, thr
 	return r
 }
 
-// Phase 3.8 (ADR-0050): the generalized failure-context check blocks at the
-// gate ONLY when BOTH ContractGate==enforce AND PhaseIO==enforce. A build report
-// that self-reports FAIL without a structured failure block is blocked there,
-// and approved (dormant) at every lower PhaseIO stage even while ContractGate
-// enforces — so the rollout cannot false-block before the cutover.
 func TestReviewer_FailureContextPhaseIO_BlocksOnlyAtBothEnforce(t *testing.T) {
 	report := failReport("build", "## Changes", false)
 	for _, tc := range []struct {
@@ -66,7 +55,6 @@ func TestReviewer_FailureContextPhaseIO_BlocksOnlyAtBothEnforce(t *testing.T) {
 }
 
 func TestReviewer_Off_ApprovesEverything(t *testing.T) {
-	// Even a missing artifact is approved when the gate is off.
 	r := newTestReviewer(config.StageOff, filepath.Join(t.TempDir(), "b.json"), 3)
 	got := r.Review(context.Background(), reviewInput("build", t.TempDir(), t.TempDir()))
 	if !got.Approve {
@@ -105,7 +93,6 @@ func TestReviewer_Enforce_ValidArtifact_Approves(t *testing.T) {
 }
 
 func TestReviewer_Ambiguity_FailsOpen(t *testing.T) {
-	// Unknown phase → Verify returns error → gate fails OPEN even at enforce.
 	r := newTestReviewer(config.StageEnforce, filepath.Join(t.TempDir(), "b.json"), 3)
 	if got := r.Review(context.Background(), reviewInput("not-a-phase", t.TempDir(), t.TempDir())); !got.Approve {
 		t.Errorf("ambiguity must fail open; got %+v", got)
@@ -114,16 +101,14 @@ func TestReviewer_Ambiguity_FailsOpen(t *testing.T) {
 
 func TestReviewer_CircuitBreaker_DemotesAfterN(t *testing.T) {
 	ws := t.TempDir() // empty → always violates
-	pr := t.TempDir() // project root
+	pr := t.TempDir()
 	bp := filepath.Join(t.TempDir(), "breaker.json")
 	r := newTestReviewer(config.StageEnforce, bp, 3)
-	// First (threshold-1) violations BLOCK.
 	for i := 1; i < 3; i++ {
 		if got := r.Review(context.Background(), reviewInput("build", ws, pr)); got.Approve {
 			t.Fatalf("block %d: enforce should still reject before the breaker opens", i)
 		}
 	}
-	// The Nth consecutive violation OPENS the breaker → demote to approve.
 	if got := r.Review(context.Background(), reviewInput("build", ws, pr)); !got.Approve {
 		t.Errorf("circuit breaker should demote enforce→advisory at threshold; got %+v", got)
 	}

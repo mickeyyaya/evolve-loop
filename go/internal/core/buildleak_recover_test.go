@@ -56,9 +56,6 @@ func (r *correctionLeakReviewer) Review(_ context.Context, in ReviewInput) Revie
 	return ReviewResult{Approve: true}
 }
 
-// A correction is a fresh Builder dispatch and therefore has the same sandbox
-// escape risk as the initial dispatch. The corrected deliverable must be
-// recovered before its reviewer sees or seals it.
 func TestCorrectionRedispatch_RecoversLeakBeforeReview(t *testing.T) {
 	repo, wt := realWorktree(t)
 	workspace := t.TempDir()
@@ -106,21 +103,7 @@ func gitInRepoNoFatal(repo string, args ...string) string {
 	return strings.TrimSpace(string(out))
 }
 
-// buildleak_recover_test.go — Option A for the cycle-160 incident
-// (docs/operations/multicli-validation-run-2026-05-31.md §"Implementation plan for A").
-//
-// A non-Claude builder (agy/codex in tmux) is not bound by the Claude-only role-gate,
-// and the OS sandbox is off on nested-macOS, so it can write its build output to the
-// MAIN tree instead of its worktree. recoverBuildLeak relocates that leaked output into
-// the worktree (staging ONLY the relocated paths, so the auditor's `git diff HEAD` sees
-// it without pollution) and restores the main tree.
-//
-// These tests use a REAL `git worktree add` (not two independent repos) so the worktree
-// shares the main repo's tracked directory structure — the production topology where an
-// earlier independent-repo test masked a directory-rename bug.
-
-// realWorktree provisions repo (one base commit + a nested tracked dir) and a linked
-// worktree off it, returning (repo, worktree).
+// realWorktree uses a real `git worktree add`, because two independent repos masked a directory-rename bug.
 func realWorktree(t *testing.T) (string, string) {
 	t.Helper()
 	repo, _ := newRepoWithBaseCommit(t)
@@ -138,8 +121,6 @@ func realWorktree(t *testing.T) (string, string) {
 	return repo, wt
 }
 
-// Relocate a leaked NEW file written into an EXISTING tracked directory in main —
-// the real cycle-160 shape (agy wrote go/internal/phases/backfill/* into main).
 func TestRecoverBuildLeak_RelocatesIntoRealWorktree(t *testing.T) {
 	t.Parallel()
 	repo, wt := realWorktree(t)
@@ -167,12 +148,9 @@ func TestRecoverBuildLeak_RelocatesIntoRealWorktree(t *testing.T) {
 	}
 }
 
-// Staging must be SCOPED to the relocated paths — pre-existing untracked worktree
-// content must NOT be swept into the audit's `git diff HEAD` (CRITICAL: not `git add -A`).
 func TestRecoverBuildLeak_StagesOnlyRelocatedPaths(t *testing.T) {
 	t.Parallel()
 	repo, wt := realWorktree(t)
-	// Pre-existing untracked leftover already in the worktree.
 	if err := os.WriteFile(filepath.Join(wt, "leftover.txt"), []byte("not part of this build\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -193,13 +171,6 @@ func TestRecoverBuildLeak_StagesOnlyRelocatedPaths(t *testing.T) {
 	}
 }
 
-// A modified TRACKED file leaked into main, where the worktree has NOT independently
-// touched that file (its copy is still at HEAD), is the real cycle-162 shape: a
-// non-Claude builder edited an existing tracked source file (orchestrator.go) in the
-// MAIN tree instead of the worktree. The builder's real work must be PRESERVED — the
-// leaked content is relocated into the worktree (overwriting its HEAD copy) and the
-// main tree restored. Covers the staged-only ("M ") case that `git checkout -- p`
-// would no-op.
 func TestRecoverBuildLeak_RelocatesTrackedEditWhenWorktreeClean(t *testing.T) {
 	t.Parallel()
 	repo, wt := realWorktree(t)
@@ -227,19 +198,14 @@ func TestRecoverBuildLeak_RelocatesTrackedEditWhenWorktreeClean(t *testing.T) {
 	}
 }
 
-// When the worktree ALSO modified the same tracked file (it diverged from HEAD), the
-// main-tree leak is DISCARDED and the worktree's own version is left untouched —
-// relocating would clobber legitimate in-worktree work. The worktree is authoritative.
 func TestRecoverBuildLeak_DiscardsTrackedEditWhenWorktreeDiverged(t *testing.T) {
 	t.Parallel()
 	repo, wt := realWorktree(t)
-	// The worktree independently edits base.txt (legitimate in-worktree builder work).
 	if err := os.WriteFile(filepath.Join(wt, "base.txt"), []byte("WORKTREE-EDIT\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	baseline := porcelainDirtySet(context.Background(), repo) // main still clean here
 
-	// A conflicting leak of the same file lands in the main tree.
 	if err := os.WriteFile(filepath.Join(repo, "base.txt"), []byte("MAIN-LEAK\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -255,11 +221,6 @@ func TestRecoverBuildLeak_DiscardsTrackedEditWhenWorktreeDiverged(t *testing.T) 
 	}
 }
 
-// A gitignored build artifact (e.g. go/evolve) rebuilt into the main tree must NOT be
-// treated as a leak: `git status --porcelain -uall` excludes ignored paths, so it never
-// reaches recoverBuildLeak's loop — the gitignore IS the build-artifact-discard
-// mechanism (no hardcoded path list). The artifact is left in place, untouched, and the
-// tracked-only tree-diff guard ignores it too.
 func TestRecoverBuildLeak_IgnoresGitignoredArtifact(t *testing.T) {
 	t.Parallel()
 	repo, wt := realWorktree(t)
@@ -286,9 +247,6 @@ func TestRecoverBuildLeak_IgnoresGitignoredArtifact(t *testing.T) {
 	}
 }
 
-// A rebuilt tracked release binary (go/evolve) leaked into main must be DISCARDED even
-// when the worktree's copy is at HEAD — relocating it would commit binary drift
-// (cycle-153). go/evolve is re-committed only by the release pipeline, never a cycle.
 func TestRecoverBuildLeak_DiscardsRebuiltArtifactEvenWhenWorktreeClean(t *testing.T) {
 	t.Parallel()
 	repo, wt := realWorktree(t)
@@ -300,7 +258,6 @@ func TestRecoverBuildLeak_DiscardsRebuiltArtifactEvenWhenWorktreeClean(t *testin
 	gitInRepo(t, repo, "worktree", "prune")
 	baseline := porcelainDirtySet(context.Background(), repo)
 
-	// Builder rebuilds the binary into the main tree mid-cycle.
 	if err := os.WriteFile(filepath.Join(repo, "go/evolve"), []byte("REBUILT BINARY\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -316,14 +273,6 @@ func TestRecoverBuildLeak_DiscardsRebuiltArtifactEvenWhenWorktreeClean(t *testin
 	}
 }
 
-// recoverBuildLeak must SKIP the orchestrator's own runtime state under .evolve/ —
-// it is never build output. In the live repo .evolve/ is gitignored (invisible to
-// `git status`); a minimal fixture without that .gitignore exposed recoverBuildLeak
-// (a) relocating .evolve/ledger.tip into the worktree (pollutes the audit diff) and
-// (b) CHOKING on the nested worktree dir .evolve/worktrees/cycle-1/ — `git status
-// -uall` reports a nested working tree as a bare directory, which moveFile cannot
-// relocate, so it returned false and aborted the cycle (415a9a7 regression caught by
-// the e2e ship-path tests). Both must be skipped; the cycle proceeds.
 func TestRecoverBuildLeak_SkipsEvolveRuntimeStateAndNestedWorktreeDir(t *testing.T) {
 	t.Parallel()
 	repo, wt := realWorktree(t)
@@ -349,16 +298,11 @@ func TestRecoverBuildLeak_SkipsEvolveRuntimeStateAndNestedWorktreeDir(t *testing
 	}
 }
 
-// Issue #11 (cycle-176): guard hooks run with cwd set to subdirectories and write
-// NESTED `<subdir>/.evolve/guards.log`. The top-level-only skip missed these, so
-// recoverBuildLeak relocated them and the gitignored `git add` failed → batch abort.
-// Nested `.evolve/` paths (path contains `/.evolve/`) must be skipped like top-level.
 func TestRecoverBuildLeak_SkipsNestedEvolveRuntimeState(t *testing.T) {
 	t.Parallel()
 	repo, wt := realWorktree(t)
 	baseline := porcelainDirtySet(context.Background(), repo) // clean
 
-	// Nested .evolve/ runtime state under tracked subdirs (mirrors cycle-176).
 	for _, d := range []string{"go", "go/internal/phases"} {
 		if err := os.MkdirAll(filepath.Join(repo, d, ".evolve"), 0o755); err != nil {
 			t.Fatal(err)
@@ -371,7 +315,6 @@ func TestRecoverBuildLeak_SkipsNestedEvolveRuntimeState(t *testing.T) {
 	if !recoverBuildLeak(context.Background(), repo, wt, baseline, true) {
 		t.Fatal("recoverBuildLeak must SKIP nested .evolve/ runtime state and return true, not abort")
 	}
-	// Left in place (not relocated into the worktree).
 	if _, err := os.Stat(filepath.Join(repo, "go/.evolve/guards.log")); err != nil {
 		t.Fatalf("nested go/.evolve/guards.log must be left untouched in main: %v", err)
 	}
@@ -380,7 +323,6 @@ func TestRecoverBuildLeak_SkipsNestedEvolveRuntimeState(t *testing.T) {
 	}
 }
 
-// Pre-existing operator dirt (in the baseline) is left untouched; only build-introduced leaks move.
 func TestRecoverBuildLeak_LeavesBaselineDirtUntouched(t *testing.T) {
 	t.Parallel()
 	repo, wt := realWorktree(t)
@@ -407,15 +349,6 @@ func TestRecoverBuildLeak_LeavesBaselineDirtUntouched(t *testing.T) {
 	}
 }
 
-// cycle-268 (and the cycle-262 carryover the loop kept dying on): `.evolve/`
-// DELIVERABLE locations — eval files, phase configs, profiles, the tracked
-// prefix-scope/policy configs — are repo content that legitimately ships
-// with cycles, not runtime state. The blanket `.evolve/` skip made any agent
-// that wrote one into the MAIN tree unrecoverable (relocation refused → the
-// tree-diff guard aborted the cycle; cycle-268's tdd died writing its OWN
-// eval). Deliverable subpaths now relocate exactly like any other repo path;
-// runtime state (runs/, worktrees/, ledger, state.json…) stays skipped —
-// pinned by the two Skips tests above.
 func TestRecoverBuildLeak_RelocatesUntrackedEvalDeliverable(t *testing.T) {
 	t.Parallel()
 	repo, wt := realWorktree(t)
@@ -440,12 +373,9 @@ func TestRecoverBuildLeak_RelocatesUntrackedEvalDeliverable(t *testing.T) {
 	}
 }
 
-// The cycle-262 shape: a TRACKED `.evolve/` config edited in main (worktree
-// clean for that path) must relocate via the existing tracked-edit branch.
 func TestRecoverBuildLeak_RelocatesTrackedEvolveConfigEdit(t *testing.T) {
 	t.Parallel()
 	repo, wt := realWorktree(t)
-	// Track a config under .evolve/ (the commit-prefix-scope shape).
 	if err := os.MkdirAll(filepath.Join(repo, ".evolve"), 0o755); err != nil {
 		t.Fatal(err)
 	}

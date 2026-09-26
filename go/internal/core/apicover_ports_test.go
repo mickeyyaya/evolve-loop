@@ -1,26 +1,12 @@
 package core
 
-// apicover_ports_test.go — public-API coverage (ADR-0050 Phase 5). Names and
-// exercises the exported port symbols in ports.go that apicover flags
-// UNCOVERED: the Bridge/Guard/Ledger/Storage interfaces, the
-// GuardDecision/GuardInput/BatchAccrual/TriageThroughputEntry DTOs, and the
-// LedgerEntry.UnmarshalJSON method. Each test reuses the existing in-package
-// fakes (fakeStorage, fakeLedger, fakeBridge) and asserts a real contract
-// (Rule 9): satisfaction is proven by binding the fake to the port AND driving
-// one method through it.
-
 import (
 	"context"
 	"encoding/json"
 	"testing"
 )
 
-// apicoverGuard is the one new double this file introduces: there is no Guard
-// implementation inside package core (the concrete guards live in
-// internal/guards, which imports core, so core cannot import them back). It
-// records the GuardInput it received and returns a caller-supplied
-// GuardDecision, letting the test prove the Guard port end-to-end without the
-// import cycle.
+// apicoverGuard is a Guard double, because core cannot import internal/guards, which imports core.
 type apicoverGuard struct {
 	gotIn    GuardInput
 	decision GuardDecision
@@ -32,13 +18,9 @@ func (g *apicoverGuard) Decide(_ context.Context, in GuardInput) GuardDecision {
 	return g.decision
 }
 
-// TestStoragePort_SatisfiedByFakeAndRoundTrips names the Storage interface in a
-// typed declaration (binding the existing fakeStorage to it), then drives one
-// method — WriteState/ReadState — to prove the port is exercised, not just
-// declared. Contract: a State written through Storage reads back equal.
 func TestStoragePort_SatisfiedByFakeAndRoundTrips(t *testing.T) {
 	t.Parallel()
-	var s Storage = &fakeStorage{} // *fakeStorage must satisfy the Storage port.
+	var s Storage = &fakeStorage{}
 	ctx := context.Background()
 	want := State{LastCycleNumber: 41, Version: 2}
 	if err := s.WriteState(ctx, want); err != nil {
@@ -53,13 +35,10 @@ func TestStoragePort_SatisfiedByFakeAndRoundTrips(t *testing.T) {
 	}
 }
 
-// TestLedgerPort_SatisfiedByFakeAndAppends names the Ledger interface, binds the
-// existing fakeLedger to it, and drives Append to prove the method runs.
-// Contract: an appended entry is observable in the fake's record.
 func TestLedgerPort_SatisfiedByFakeAndAppends(t *testing.T) {
 	t.Parallel()
 	led := &fakeLedger{}
-	var l Ledger = led // *fakeLedger must satisfy the Ledger port.
+	var l Ledger = led
 	ctx := context.Background()
 	if err := l.Verify(ctx); err != nil {
 		t.Fatalf("Ledger.Verify: %v", err)
@@ -72,13 +51,10 @@ func TestLedgerPort_SatisfiedByFakeAndAppends(t *testing.T) {
 	}
 }
 
-// TestBridgePort_SatisfiedByFakeAndLaunches names the Bridge interface, binds
-// the existing fakeBridge to it, and drives Launch + Probe. Contract: Launch
-// returns the bridge's stdout and the BridgeRequest reaches the impl.
 func TestBridgePort_SatisfiedByFakeAndLaunches(t *testing.T) {
 	t.Parallel()
 	fb := &fakeBridge{stdout: "ok"}
-	var b Bridge = fb // *fakeBridge must satisfy the Bridge port.
+	var b Bridge = fb
 	ctx := context.Background()
 	resp, err := b.Launch(ctx, BridgeRequest{CLI: "claude-tmux", Cycle: 7})
 	if err != nil {
@@ -95,16 +71,11 @@ func TestBridgePort_SatisfiedByFakeAndLaunches(t *testing.T) {
 	}
 }
 
-// TestGuardPort_DecideBindsInputAndDecision covers THREE flagged symbols in one
-// pass: the Guard interface (satisfaction + Decide exercised), GuardInput (the
-// typed Decide argument, fields read by the impl), and GuardDecision (the typed
-// return, fields asserted). Contract: the GuardInput the caller passes reaches
-// Decide, and the GuardDecision it returns flows back unchanged.
 func TestGuardPort_DecideBindsInputAndDecision(t *testing.T) {
 	t.Parallel()
 	want := GuardDecision{Allow: false, Reason: "blocked by apicover guard"}
 	impl := &apicoverGuard{decision: want}
-	var g Guard = impl // Guard port satisfaction.
+	var g Guard = impl
 	in := GuardInput{
 		ToolName:       "Bash",
 		ToolInput:      map[string]any{"command": "danger"},
@@ -123,10 +94,6 @@ func TestGuardPort_DecideBindsInputAndDecision(t *testing.T) {
 	}
 }
 
-// TestBatchAccrual_BoundViaState binds BatchAccrual through a real producer/
-// consumer: State.CurrentBatch round-tripped through the Storage port. Contract:
-// the BatchAccrual written in State survives the write/read and its
-// CycleAccruedCostUSD/GoalHash fields are intact.
 func TestBatchAccrual_BoundViaState(t *testing.T) {
 	t.Parallel()
 	var s Storage = &fakeStorage{}
@@ -144,10 +111,6 @@ func TestBatchAccrual_BoundViaState(t *testing.T) {
 	}
 }
 
-// TestTriageThroughputEntry_BoundViaJSON binds TriageThroughputEntry through the
-// State JSON schema it lives in (State.TriageThroughput). Contract: a
-// throughput entry serialized inside State decodes back with its Cycle/Floors
-// fields intact and the documented json tags.
 func TestTriageThroughputEntry_BoundViaJSON(t *testing.T) {
 	t.Parallel()
 	in := State{TriageThroughput: []TriageThroughputEntry{{Cycle: 281, Floors: 5}}}
@@ -167,10 +130,6 @@ func TestTriageThroughputEntry_BoundViaJSON(t *testing.T) {
 	}
 }
 
-// TestLedgerEntry_UnmarshalJSON_NamedDirectCall invokes the UnmarshalJSON method
-// by NAME on a LedgerEntry value (not via json.Unmarshal), so the identifier is
-// both named and executed. Contract: it parses a real ledger line, routing the
-// numeric cycle to Cycle and populating the scalar fields.
 func TestLedgerEntry_UnmarshalJSON_NamedDirectCall(t *testing.T) {
 	t.Parallel()
 	line := []byte(`{"ts":"2026-06-16T00:00:00Z","cycle":312,"role":"ship","kind":"phase","exit_code":0,"entry_seq":2100,"prev_hash":"feed"}`)
@@ -185,7 +144,6 @@ func TestLedgerEntry_UnmarshalJSON_NamedDirectCall(t *testing.T) {
 		t.Errorf("scalar fields not parsed: %+v", e)
 	}
 
-	// String-cycle form routes to CycleLabel via the same named call.
 	var legacy LedgerEntry
 	if err := legacy.UnmarshalJSON([]byte(`{"cycle":"manual-release-v19.0.0","role":"auditor"}`)); err != nil {
 		t.Fatalf("UnmarshalJSON string cycle: %v", err)

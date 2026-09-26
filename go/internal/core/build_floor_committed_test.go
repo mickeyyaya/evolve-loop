@@ -2,11 +2,6 @@
 
 package core
 
-// build_floor_committed_test.go — the reviewer-caught near-no-op, pinned with
-// real git: the builder's mandated protocol COMMITS its work, so a HEAD-based
-// diff at review time is EMPTY and a HEAD-based floor approves vacuously. The
-// floor must diff against the CYCLE BASE and catch a committed failing test.
-
 import (
 	"context"
 	"os"
@@ -50,13 +45,12 @@ func TestDefaultBuildFloorChecks_SeesCommittedBuilderWork(t *testing.T) {
 	}
 	base := strings.TrimSpace(string(baseOut))
 
-	// The builder adds a package whose test FAILS, and COMMITS (its protocol).
+	// The builder adds a package whose test fails and commits it, as its protocol requires.
 	write("go/bad/bad.go", "package bad\n\nfunc Two() int { return 3 }\n")
 	write("go/bad/bad_test.go", "package bad\n\nimport \"testing\"\n\nfunc TestTwo(t *testing.T) {\n\tif Two() != 2 {\n\t\tt.Fatal(\"Two() != 2\")\n\t}\n}\n")
 	run("add", "-A")
 	run("commit", "-q", "-m", "builder work")
 
-	// HEAD-diff sees nothing — the vacuous-approve trap this test pins shut.
 	if ps := changedGoTestPackages(changedWorktreePaths(context.Background(), wt)); len(ps) != 0 {
 		t.Fatalf("precondition: HEAD-diff must be empty after the builder commit; got %v", ps)
 	}
@@ -66,14 +60,11 @@ func TestDefaultBuildFloorChecks_SeesCommittedBuilderWork(t *testing.T) {
 	if len(fails) != 1 || !strings.Contains(fails[0], "bad") {
 		t.Fatalf("base-diff floor must catch the committed failing package; got %v", fails)
 	}
-	// RED-2 (the 5-instance apicover parity class, cycle-1022 et al.): an
-	// ENFORCED package gaining an unnamed export must be caught AT HANDOFF —
-	// the floor runs the same AST naming check CI's api-coverage-enforce runs.
 	write("go/.apicover-enforce", "./bad\n")
 	write("go/bad/extra.go", "package bad\n\n// Unnamed is exported but no test names it.\nfunc Unnamed() int { return 1 }\n")
 	run("add", "-A")
 	run("commit", "-q", "-m", "unnamed export")
-	// First make the unit test pass so ONLY the naming defect remains.
+	// Make the unit test pass so only the naming defect remains.
 	write("go/bad/bad.go", "package bad\n\nfunc Two() int { return 2 }\n")
 	run("add", "-A")
 	run("commit", "-q", "-m", "fix Two")
@@ -83,12 +74,10 @@ func TestDefaultBuildFloorChecks_SeesCommittedBuilderWork(t *testing.T) {
 	if len(fails) != 1 || !strings.Contains(fails[0], "Unnamed") {
 		t.Fatalf("floor must catch the unnamed export in an enforced changed package; got %v", fails)
 	}
-	// Naming it turns the floor green.
 	write("go/bad/extra_test.go", "package bad\n\nimport \"testing\"\n\nfunc TestUnnamed(t *testing.T) {\n\tif Unnamed() != 1 {\n\t\tt.Fatal()\n\t}\n}\n")
 	run("add", "-A")
 	run("commit", "-q", "-m", "name it")
 
-	// Fully green committed work approves.
 	if fails := DefaultBuildFloorChecks(context.Background(), ReviewInput{
 		Phase: string(PhaseBuild), Worktree: wt, WorktreeBaseSHA: base,
 	}); len(fails) != 0 {

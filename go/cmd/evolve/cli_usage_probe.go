@@ -1,13 +1,5 @@
 package main
 
-// cli_usage_probe.go wires the proactive per-cycle usage probe into the loop and
-// campaign runners. It is the production assembly: enumerate installed
-// interactive families, build a per-family-isolated bridge Controller, and run
-// the usageprobe.Prober (which benches capped families into the shared clihealth
-// store so the dispatcher's existing pre-skip demotes them). All of it is gated
-// off by default — opt-in via policy.json cli_health.proactive_probe, with
-// EVOLVE_CLI_HEALTH=0 as the master kill switch.
-
 import (
 	"context"
 	"fmt"
@@ -22,22 +14,17 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/usageprobe"
 )
 
-// runPreWaveProbes is the ONE pre-wave probe protocol both runners follow
-// (the loop's prepareIteration and the campaign's BeforeWave hook): the
-// CLI-health canary first (clear benches that lifted, re-bench walls), then
-// the proactive usage probe (bench families already capped). Both take the
-// runner's interrupt context; the returned error is that context's, so a
-// caller can stop before dispatching a wave that would be cancelled at spawn
-// (F20: "wave 2: 0/2 lanes ok" after the boundary SIGINT).
+// runPreWaveProbes is the one pre-wave probe protocol of the loop and the
+// campaign runner. It returns the context's error so a caller stops before
+// dispatching a wave that would be cancelled at spawn.
 func runPreWaveProbes(ctx context.Context, projectRoot, evolveDir string, env map[string]string, stderr io.Writer) error {
 	runCLIHealthCanary(ctx, projectRoot, env, defaultLiveProbe(ctx, projectRoot, stderr), stderr)
 	runUsageProbe(ctx, projectRoot, evolveDir, env, stderr)
 	return ctx.Err()
 }
 
-// runUsageProbe probes every installed interactive family for a current quota
-// cap and benches the capped ones BEFORE the cycle's first phase boots. No-op
-// when disabled. Fail-open throughout — advisory, never blocks a cycle.
+// runUsageProbe benches every installed family already at a quota cap before
+// the first phase boots. It is advisory and fails open.
 func runUsageProbe(ctx context.Context, projectRoot, evolveDir string, env map[string]string, stderr io.Writer) {
 	if !usageProbeEnabled(env, evolveDir) {
 		return
@@ -46,8 +33,6 @@ func runUsageProbe(ctx context.Context, projectRoot, evolveDir string, env map[s
 	if len(families) == 0 {
 		return
 	}
-	// The factory owns per-family bridge.Config assembly + workspace isolation,
-	// so this wiring stays agnostic of how a probe session is built.
 	factory := bridge.NewControllerFactory(projectRoot, filepath.Join(evolveDir, "usage-probe"), "usage-probe", bridge.Deps{})
 	p := &usageprobe.Prober{
 		Families: families,
@@ -60,10 +45,8 @@ func runUsageProbe(ctx context.Context, projectRoot, evolveDir string, env map[s
 	p.Run(ctx)
 }
 
-// bridgeUsageProbe adapts a per-family controller factory into the (ctx, family)
-// → captured-pane probe seam shared by the boolean usage probe (usageprobe.
-// Prober) and the budget quota probe (usageprobe.ProbeQuota) — the single way to
-// send a family's usage command over the bridge and read its pane.
+// bridgeUsageProbe is the single way to send a family's usage command over the
+// bridge and read its pane, shared by the cap probe and the quota probe.
 func bridgeUsageProbe(factory *bridge.ControllerFactory) func(ctx context.Context, family string) (string, error) {
 	return func(ctx context.Context, family string) (string, error) {
 		resp, err := factory.For(family).Do(ctx, family, clicontrol.EventUsage)
@@ -71,8 +54,6 @@ func bridgeUsageProbe(factory *bridge.ControllerFactory) func(ctx context.Contex
 	}
 }
 
-// usageProbeEnabled reports whether the proactive probe should run: the
-// EVOLVE_CLI_HEALTH master switch must not be 0 AND policy.json must opt in.
 func usageProbeEnabled(env map[string]string, evolveDir string) bool {
 	if !envchain.BoolValue(envchain.Resolve("EVOLVE_CLI_HEALTH", env, "", "1"), true) {
 		return false
@@ -80,8 +61,8 @@ func usageProbeEnabled(env map[string]string, evolveDir string) bool {
 	return loadCLIHealthConfig(evolveDir).ProactiveProbe
 }
 
-// loadCLIHealthConfig loads .evolve/policy.json and returns the CLI-health
-// config. Absent or malformed policy ⇒ zero value (probe off).
+// loadCLIHealthConfig returns the zero config, probe off, for an absent or
+// malformed policy.
 func loadCLIHealthConfig(evolveDir string) policy.CLIHealthConfig {
 	pol, err := policy.Load(filepath.Join(evolveDir, "policy.json"))
 	if err != nil {

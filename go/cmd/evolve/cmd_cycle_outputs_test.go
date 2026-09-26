@@ -1,11 +1,5 @@
 package main
 
-// cmd_cycle_outputs_test.go — `evolve cycle outputs [N]`: the operator's answer
-// to "did every phase this cycle ran leave enough data to review?", plus the
-// chain status with its one-meaning-per-state totalization. Driven through the
-// real entry point with a real on-disk workspace, because the defect class here
-// is a renderer that diverges from what the phases actually wrote.
-
 import (
 	"encoding/json"
 	"os"
@@ -72,8 +66,6 @@ func TestRunCycleOutputs_NamesEveryGapAndTheChainState(t *testing.T) {
 	}
 }
 
-// The state that fixes the measurement flaw: an audit that never ran is
-// reported as exactly that — never as non-compliance.
 func TestRunCycleOutputs_AuditNotRunIsItsOwnState(t *testing.T) {
 	root := cycleOutputsFixture(t, "43", false, nil)
 	var out, errBuf strings.Builder
@@ -114,10 +106,6 @@ func TestRunCycleOutputs_JSONCarriesTheSameFacts(t *testing.T) {
 	}
 }
 
-// An existing-but-unparseable shadow record is a recorder defect, not a
-// missing record — the review finding that classifying a truncated
-// best-effort write as "record-missing" re-created the exact conflation the
-// totalization was built to end.
 func TestRunCycleOutputs_CorruptShadowRecordIsItsOwnState(t *testing.T) {
 	root := cycleOutputsFixture(t, "45", true, nil)
 	ws := filepath.Join(root, ".evolve", "runs", "cycle-45")

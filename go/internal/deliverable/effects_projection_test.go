@@ -1,9 +1,5 @@
 package deliverable
 
-// effects_projection_test.go — the registry and the effect-check table are
-// one belief in two places; this pins them equal in both directions. Reads
-// docs/architecture/phase-registry.json, so run with -count=1.
-
 import (
 	"path/filepath"
 	"testing"

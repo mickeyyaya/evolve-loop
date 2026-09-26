@@ -7,7 +7,6 @@ import (
 	"testing"
 )
 
-// writeUserPhase creates <phasesDir>/<name>/phase.json with body.
 func writeUserPhase(t *testing.T, phasesDir, name, body string) {
 	t.Helper()
 	dir := filepath.Join(phasesDir, name)
@@ -33,7 +32,6 @@ func TestDiscoverUserSpecs(t *testing.T) {
 	if len(specs) != 2 {
 		t.Fatalf("got %d specs, want 2: %v", len(specs), names(specs))
 	}
-	// Sorted by dir name: lint-pass, security-scan
 	if specs[0].Name != "lint-pass" || specs[1].Name != "security-scan" {
 		t.Errorf("specs order = %v, want [lint-pass security-scan]", names(specs))
 	}
@@ -50,7 +48,7 @@ func TestDiscoverUserSpecs_MissingDir(t *testing.T) {
 }
 
 func TestCatalog_Merge(t *testing.T) {
-	builtin, err := Load(writeRegistry(t, fullRegistry)) // scout (builtin), security-scan (builtin in fixture)
+	builtin, err := Load(writeRegistry(t, fullRegistry)) // scout, security-scan (built-in)
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -70,11 +68,9 @@ func TestCatalog_Merge(t *testing.T) {
 	if merged.IsUser("scout") {
 		t.Error("scout is built-in, must not be flagged user")
 	}
-	// clash + empty-name → 2 warnings
 	if len(warnings) != 2 {
 		t.Errorf("warnings = %v, want 2 (clash + empty name)", warnings)
 	}
-	// receiver not mutated
 	if _, ok := builtin.Get("lint-pass"); ok {
 		t.Error("Merge mutated the receiver catalog")
 	}

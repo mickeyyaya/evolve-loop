@@ -1,12 +1,5 @@
 package verdict
 
-// classify.go — the classify step: select the authoritative verdict bytes,
-// write the clean-stdout companion, run the phase's Classify, apply the ship
-// guard, surface the contract violations, assemble the response and — on a
-// reconciled teardown — the reconcile trail. Diagnostics ORDER is preserved
-// verbatim: Classify's own → the fence → the violations → the reconcile
-// warning → the ACS override.
-
 import (
 	"context"
 	"fmt"
@@ -16,9 +9,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable"
 )
 
-// verdictSource is what selectVerdictBytes decided: the bytes Classify judges,
-// the contract violations of an unverified contracted deliverable, and the
-// re-probe count of the ladder that judged it.
+// verdictSource is what selectVerdictBytes chose, with the ladder's re-probe count.
 type verdictSource struct {
 	artifact   string
 	violations []deliverable.Violation
@@ -26,7 +17,8 @@ type verdictSource struct {
 	attempts   int
 }
 
-// classify is the coordinator of the sixth step.
+// classify is the judge's second step. Diagnostics append in a pinned order:
+// Classify's own, the fence's, the violations, then the reconcile trail.
 func (e *Engine) classify(ctx context.Context, d Dispatch, r reconciliation, classify Classify) core.PhaseResponse {
 	src := e.selectVerdictBytes(ctx, d, r)
 	e.writeCleanStdout(d)
@@ -46,26 +38,10 @@ func (e *Engine) classify(ctx context.Context, d Dispatch, r reconciliation, cla
 	return resp
 }
 
-// selectVerdictBytes applies the VERDICT SOURCE rule (ADR-0072 coherence).
-// For a phase that HAS a deliverable contract, the on-disk report is the SOLE
-// verdict source — the terminal pane (bres.Stdout) is never classified: the
-// pane is bridge scrollback that can lose the real sentinel to a TUI `Write`
-// collapse AND carry the contract's own prompt-echoed EXAMPLE sentinels, so
-// classifying it fabricates a verdict the agent never emitted (cycle-603,
-// recurring 877→921). SINGLE READ: the classified bytes ARE the verified
-// bytes (Result.Content); the path is never re-read here.
-//   - err != nil  → no contract (or an IO fault): the pane stays the source.
-//   - res.OK      → contracted + well-formed: classify the VERIFIED bytes.
-//   - !res.OK     → contracted + malformed/absent after the settle WAIT: a
-//     COHERENT deliverable-production FAIL. The bytes still reach Classify (a
-//     phase may derive a legitimate NON-SHIP verdict from partial content —
-//     intent delta's "[intent-unchanged]" → SKIPPED); the ship guard then
-//     stops a verification-FAILED deliverable from laundering a ship-eligible
-//     verdict, and the contract codes are surfaced as diagnostics.
-//
-// The reconcile step already verified the deliverable, so its probe's bytes
-// are reused instead of verifying — or reading — again. This ladder honours
-// ctx (the agent exited 0; nothing more is coming).
+// selectVerdictBytes applies the verdict-source rule: a contracted phase is judged on its deliverable,
+// never the pane, whose scrollback can echo the contract's example sentinels. A probe error means no
+// contract, so the pane stays the source; unverified bytes still reach Classify and the ship guard.
+// See ADR-0072.
 func (e *Engine) selectVerdictBytes(ctx context.Context, d Dispatch, r reconciliation) verdictSource {
 	pane := d.Bridge.Stdout
 	if r.reconciled {
@@ -82,12 +58,8 @@ func (e *Engine) selectVerdictBytes(ctx context.Context, d Dispatch, r reconcili
 	return src
 }
 
-// writeCleanStdout writes the clean-stdout companion next to the raw log,
-// best-effort: a failure NEVER blocks the phase — the raw log stays the
-// forensic source and cyclecost / phaseobserver read it directly. A nil
-// filter (the host's DisableStdoutFilter) writes nothing. The event names the
-// workspace and (through Event.Phase) the phase; the companion's filename is
-// the injected writer's belief (logfilter), never re-spelled here.
+// writeCleanStdout is best-effort: a failure never blocks the phase, because the raw log stays the
+// forensic source. The companion's filename belongs to the writer and is never spelled here.
 func (e *Engine) writeCleanStdout(d Dispatch) {
 	if e.stdoutFilter == nil {
 		return
@@ -98,15 +70,8 @@ func (e *Engine) writeCleanStdout(d Dispatch) {
 	}
 }
 
-// applyShipGuard (anti-gaming): a deliverable that FAILED its well-formedness
-// contract must NEVER launder a CLEAN-ship verdict past the failed contract —
-// the missing-challenge-token case. PASS is the only clean-ship claim;
-// downgrade it (and any non-canonical verdict) to a coherent FAIL.
-// FAIL/SKIPPED/WARN pass through: FAIL and SKIPPED are non-ship, and WARN is
-// NOT a clean ship — whether it ships is the orchestrator's policy call
-// (workflow.strict_audit promotes WARN→FAIL there), not the runner's to
-// preempt. Routing is verdict-driven, so downgrading re-routes without
-// touching nextPhase.
+// applyShipGuard turns a clean-ship claim (PASS or a non-canonical verdict) into FAIL when the
+// deliverable failed its contract. WARN passes through: whether WARN ships is the orchestrator's policy.
 func applyShipGuard(verdict string, unverified bool) string {
 	if !unverified {
 		return verdict
@@ -118,9 +83,7 @@ func applyShipGuard(verdict string, unverified bool) string {
 	return core.VerdictFAIL
 }
 
-// violationDiagnostics surfaces the contract codes behind a coherent
-// deliverable-production FAIL, so the retro/operator sees WHY the deliverable
-// was rejected — empty on the happy path.
+// violationDiagnostics surfaces the contract codes behind a rejected deliverable.
 func violationDiagnostics(vs []deliverable.Violation) []core.Diagnostic {
 	var out []core.Diagnostic
 	for _, v := range vs {
@@ -129,15 +92,8 @@ func violationDiagnostics(vs []deliverable.Violation) []core.Diagnostic {
 	return out
 }
 
-// reconcileTrail records that a bridge infra teardown was a red herring: the
-// deliverable was well-formed (via Verify) or rescued by the ACS floor, so the
-// phase COMPLETED — nil error, the agent's own Classify verdict authoritative
-// (a reconciled FAIL routes as a real audit-fail, not an infra retry).
-// Reconciled=true is the ledger's reconciled_timeout disposition; the ONE
-// RUNNER_RECONCILED event carries the reason, emitted here with the verdict
-// known. An ACS-floor rescue also surfaces the OVERRIDDEN violations on the
-// response, never a silent bypass (a hygiene flag such as stray_in_worktree
-// that shipped on the deterministic verdict's authority stays visible).
+// reconcileTrail marks a teardown the deliverable overrode; the agent's own verdict stands, so a
+// reconciled FAIL routes as a real FAIL. A floor rescue lists what it overrode, never a silent bypass.
 func (e *Engine) reconcileTrail(resp *core.PhaseResponse, d Dispatch, r reconciliation, verdict string) {
 	resp.Reconciled = true
 	via := "verify"
@@ -156,11 +112,8 @@ func (e *Engine) reconcileTrail(resp *core.PhaseResponse, d Dispatch, r reconcil
 	})
 }
 
-// unverifiedSignal is FAULT-ONLY: a contracted deliverable still not OK after
-// the settle window whose FINAL verdict is FAIL — the guard downgraded a
-// clean-ship verdict, or Classify itself returned FAIL on the malformed or
-// absent bytes. A legitimate WARN/SKIPPED pass-through emits nothing (the
-// violation codes still reach the response diagnostics).
+// unverifiedSignal is fault-only: it fires when an unverified deliverable ends in FAIL, never on a
+// WARN or SKIPPED pass-through.
 func (e *Engine) unverifiedSignal(d Dispatch, before, after string, src verdictSource) {
 	if after != core.VerdictFAIL {
 		return

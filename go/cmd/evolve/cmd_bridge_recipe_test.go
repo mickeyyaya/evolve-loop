@@ -81,7 +81,6 @@ func TestRecipeCLI_RunHelp(t *testing.T) {
 }
 
 func TestRecipeCLI_RunUnknownRecipe(t *testing.T) {
-	// LoadRecipe fails before any tmux interaction → exit 1, no spawn.
 	tmp := t.TempDir()
 	code, _, errs := runRecipeCLI("run", "no-such-recipe", "--cli=claude-tmux", "--workspace="+tmp)
 	if code != 1 {
@@ -90,7 +89,7 @@ func TestRecipeCLI_RunUnknownRecipe(t *testing.T) {
 }
 
 func TestRecipeCLI_RunUnsupportedCLI(t *testing.T) {
-	// stepsFor rejects ollama before EnsureSession → exit 1, no tmux spawn.
+	// ollama has no recipe steps, so the run fails before any tmux spawn.
 	tmp := t.TempDir()
 	code, _, _ := runRecipeCLI("run", "plugin-install", "--cli=ollama-tmux", "--workspace="+tmp,
 		"--param=marketplace=x", "--param=plugin=y")
@@ -100,8 +99,7 @@ func TestRecipeCLI_RunUnsupportedCLI(t *testing.T) {
 }
 
 func TestRecipeCLI_RunAllFlagsParsed(t *testing.T) {
-	// Exercises every optional flag branch; fails at the unsupported-CLI step
-	// (before any tmux spawn) so the parse is fully covered deterministically.
+	// ollama fails after the parse and before any tmux spawn.
 	tmp := t.TempDir()
 	code, _, _ := runRecipeCLI("run", "plugin-install", "--cli=ollama-tmux", "--workspace="+tmp,
 		"--agent=installer", "--session-name=sess", "--worktree="+tmp,

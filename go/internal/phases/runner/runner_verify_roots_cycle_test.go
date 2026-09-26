@@ -1,13 +1,5 @@
 package runner
 
-// runner_verify_roots_cycle_test.go — ADR-0100 slice 2: the runner's own
-// verify (the classification check and the teardown reconcile) hands the
-// verifier the SAME cycle the host gate and the agent self-check use, so a
-// declared effect (judged under processing/cycle-N/) is decided by all three
-// with one belief. A runner that omitted it would make the verifier fail OPEN
-// on every effect-declaring phase — silently keeping the pane as the verdict
-// source.
-
 import (
 	"context"
 	"path/filepath"

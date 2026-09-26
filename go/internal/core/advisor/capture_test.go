@@ -1,8 +1,5 @@
 package advisor
 
-// capture_test.go — the redacted capture (ADR-0103 unit 04 §6 tests 3, 20,
-// 21; the core capture/span tests moved verbatim in intent).
-
 import (
 	"encoding/json"
 	"errors"
@@ -14,7 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 )
 
-// Test 3 (leaf copy) — the capture lands BEFORE the parse.
 func TestLaunch_CapturesEvenWhenTheResponseIsUnparseable(t *testing.T) {
 	in := tempInput(t)
 	if _, err := New(&fakeLauncher{stdout: "no json here"}, defaultIdentity(), plainWriter).Plan(in); err == nil {
@@ -27,9 +23,6 @@ func TestLaunch_CapturesEvenWhenTheResponseIsUnparseable(t *testing.T) {
 	readArtifact(t, filepath.Join(in.Workspace, "advisor-span-plan.json"))
 }
 
-// Test 20 — redaction, persistence per artifact, one WARN per failed write
-// with the rest still attempted, the decision still returned; a nil writer is
-// the Null Object.
 func TestCapture_RedactsPersistsAndWarnsPerFailedArtifact(t *testing.T) {
 	const secret = "sk-livesecret0123456789ABCDEF"
 	in := tempInput(t)
@@ -104,9 +97,6 @@ func TestCapture_RedactsPersistsAndWarnsPerFailedArtifact(t *testing.T) {
 	})
 }
 
-// Test 21 — the span's marshal|write fold routes through ONE warn: a
-// span-only write fault reports op=write (op=marshal is dormant — a Span
-// always marshals — and documented as such).
 func TestCapture_SpanOpChainRoutesMarshalAndWriteThroughOneWarn(t *testing.T) {
 	in := tempInput(t)
 	a, got := observed(t, &fakeLauncher{stdout: planJSON()}, defaultIdentity())
@@ -123,8 +113,6 @@ func TestCapture_SpanOpChainRoutesMarshalAndWriteThroughOneWarn(t *testing.T) {
 	readArtifact(t, filepath.Join(in.Workspace, "advisor-prompt-plan.txt"))
 }
 
-// The span carries the OTel-GenAI keys, the CLI family, the duration, the
-// token usage and the SHAs of the REDACTED capture files (moved from core).
 func TestPlan_RecordsDecisionSpanMetadata(t *testing.T) {
 	in := tempInput(t)
 	want := cyclestate.TokenUsage{Input: 1200, Output: 340, CacheRead: 80, CacheWrite: 16}
@@ -158,8 +146,6 @@ func TestPlan_RecordsDecisionSpanMetadata(t *testing.T) {
 	}
 }
 
-// The <kind> token distinguishes the decisions so a plan capture never
-// clobbers a proposal capture in the same workspace (moved from core).
 func TestCapture_KindPerDecision(t *testing.T) {
 	in := tempInput(t)
 	if _, err := New(&fakeLauncher{stdout: `{"next_phase":"audit","justification":"build green"}`}, defaultIdentity(), plainWriter).Propose(in); err != nil {

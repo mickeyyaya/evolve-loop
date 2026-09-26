@@ -1,16 +1,5 @@
 package core
 
-// audit_repair_context_test.go — the other half of the wiring proof.
-//
-// audit_repair_prompt_test.go (build + tdd) proves the prompts RENDER the key.
-// This proves the dispatch SETS it. Both halves are required: a rendered key
-// nobody sets, or a set key nobody renders, are each silently inert — and an
-// inert repair rebuilds blind and re-earns the same verdict at full cost.
-//
-// Derived from PERSISTED cycle state rather than pushed at grant time, so the
-// live loop and the crash-resume path cannot diverge: there is one rule, and it
-// reads a field that survives both.
-
 import (
 	"os"
 	"path/filepath"
@@ -29,16 +18,9 @@ func TestSeedAuditRepairContext(t *testing.T) {
 		{name: "an active repair seeds the builder", next: PhaseBuild, active: true, attempts: 1, wantSet: true},
 		{name: "an active repair seeds the test-first phase", next: PhaseTDD, active: true, attempts: 1, wantSet: true},
 		{name: "no repair in flight seeds nothing", next: PhaseBuild, active: false, attempts: 0, wantSet: false},
-		// THE LEAK (adversarial review, MEDIUM). AuditRepairAttempts is a
-		// monotonic COUNTER, not a "currently repairing" flag. Gating on it meant
-		// that once a cycle had ever repaired, ANY later re-entry into tdd/build —
-		// Ship->Build or Debugger->TDD, both legal edges — re-injected a stale,
-		// possibly already-resolved rejection with the prose "this cycle's audit
-		// REJECTED your previous build", misdirecting an agent doing unrelated
-		// ship-error recovery.
+		// AuditRepairAttempts is a monotonic counter, not a currently-repairing flag.
 		{name: "a FINISHED repair does not leak into a later unrelated dispatch", next: PhaseBuild, active: false, attempts: 2, wantSet: false},
-		// Audit re-reads its own artifacts; re-injecting its own rejection would
-		// be circular. Retro already holds the full dossier.
+		// Audit re-reads its own artifacts, so re-injecting its own rejection would be circular.
 		{name: "audit is not seeded", next: PhaseAudit, active: true, attempts: 1, wantSet: false},
 		{name: "retro is not seeded", next: PhaseRetro, active: true, attempts: 1, wantSet: false},
 		{name: "ship is not seeded", next: PhaseShip, active: true, attempts: 1, wantSet: false},
@@ -62,8 +44,6 @@ func TestSeedAuditRepairContext(t *testing.T) {
 	}
 }
 
-// A repair whose fail-reason artifact is missing must not fabricate one, and
-// must not crash the dispatch — it degrades to today's blind rebuild, loudly.
 func TestSeedAuditRepairContext_MissingArtifactDegradesQuietly(t *testing.T) {
 	cs := CycleState{WorkspacePath: t.TempDir(), AuditRepairAttempts: 1, AuditRepairActive: true}
 
@@ -74,9 +54,6 @@ func TestSeedAuditRepairContext_MissingArtifactDegradesQuietly(t *testing.T) {
 	}
 }
 
-// The caller's map must not be mutated — the dispatch loop reuses ctxSnap across
-// iterations, so an in-place write would leak a stale repair brief into every
-// later phase of the cycle.
 func TestSeedAuditRepairContext_DoesNotMutateCallerMap(t *testing.T) {
 	dir := t.TempDir()
 	writeAuditFailReason(t, dir, "audit", "x")
@@ -89,14 +66,6 @@ func TestSeedAuditRepairContext_DoesNotMutateCallerMap(t *testing.T) {
 	}
 }
 
-// BOTH dispatch surfaces must seed the repair brief. cyclerun_dispatch.go is the
-// live loop; resume_execution.go is the crash-resume path. The code claimed this symmetry
-// in two separate comments ("cannot diverge from the resume path", "the live
-// dispatch loop and the crash-resume path cannot diverge") while resume.go built
-// its PhaseRequest without ever calling the seeder — so a cycle that crashed
-// mid-repair burned an attempt and rebuilt BLIND, in exactly the crash-resilience
-// case the persisted counter was designed for. The budget half was mirrored; the
-// findings half was not.
 func TestAuditRepairBrief_SeededOnBothDispatchSurfaces(t *testing.T) {
 	for _, f := range []string{"cyclerun_dispatch.go", "resume_execution.go"} {
 		body, err := os.ReadFile(f)
@@ -106,11 +75,7 @@ func TestAuditRepairBrief_SeededOnBothDispatchSurfaces(t *testing.T) {
 		if !strings.Contains(string(body), "seedAuditRepairContext(") {
 			t.Errorf("%s never calls seedAuditRepairContext; a repair dispatched from this surface rebuilds blind", f)
 		}
-		// ARGUMENT, not just presence. The first version of this guard checked
-		// only that the call existed, and passed while resume.go passed the
-		// PREVIOUS phase (`current`) instead of the one being dispatched — so the
-		// seeding was wired and inert. Both surfaces name the dispatched phase
-		// `next`; a call keyed on anything else is the same bug returning.
+		// Both surfaces must pass the dispatched phase `next`, not merely call the seeder.
 		if !strings.Contains(string(body), "seedAuditRepairContext(ctxSnap, next, cs)") &&
 			!strings.Contains(string(body), "seedAuditRepairContext(phaseCtx, next, cr.cs)") {
 			t.Errorf("%s calls seedAuditRepairContext with something other than the DISPATCHED phase; presence is not correctness", f)
@@ -118,13 +83,6 @@ func TestAuditRepairBrief_SeededOnBothDispatchSurfaces(t *testing.T) {
 	}
 }
 
-// Cycle 1679 (2026-09-15): audit round 4 PASSED with WARN (three MEDIUM
-// defects) and the cycle went to ship; GIT_FLEET_REBASE_NEEDED sent it back
-// to build, and that rebuild's brief carried no audit section — the repair
-// brief seeds only behind a rejection grant — so round 5 found the same
-// defects standing. A recovery rebuild is re-audited by the same rubric: the
-// last audit's actionable findings ride the brief under their own key, and a
-// rejection grant (the repair path) still outranks them.
 func TestSeedAuditRepairContext_ShipRecoveryRebuildCarriesStandingFindings(t *testing.T) {
 	dir := t.TempDir()
 	report := "# Audit Report\n\n## Verdict\nWARN\n\n## Issues\n\n### M1 (MEDIUM) — claim-discrepancy: the record says five cycle predicates while the tree carries eight\nb\n\n### L1 (LOW) — a nit the builder may ignore\nb\n"
@@ -166,13 +124,6 @@ func TestSeedAuditRepairContext_ShipRecoveryRebuildCarriesStandingFindings(t *te
 	}
 }
 
-// Cycle 1684 (2026-09-15): the audit FAILed with a class outside the
-// vocabulary, the envelope declined the direct grant, the retrospective
-// adjudicated a retry, and the tdd/build re-entry carried NONE of the audit's
-// findings (only a generic "audit.failure_class" label) — the builder rebuilt
-// blind to "retire the superseded predicate". A retro-routed re-entry is
-// re-audited by the same rubric, so it carries the standing findings exactly
-// as a ship-error recovery does; the intro names which route brought it back.
 func TestSeedAuditRepairContext_RetroRoutedReentryCarriesStandingFindings(t *testing.T) {
 	dir := t.TempDir()
 	report := "# Audit Report\n\n## Verdict\nFAIL\n\n## Issues\n\n### M1 (MEDIUM) — superseded predicate: TestC1515_006 contradicts the commissioned change; retire it in-phase\nb\n"
@@ -197,9 +148,7 @@ func TestSeedAuditRepairContext_RetroRoutedReentryCarriesStandingFindings(t *tes
 	if intro := StandingFindingsIntro(got); !strings.Contains(intro, "retrospective") || !strings.Contains(intro, "unrecognised class") || strings.Contains(intro, "ship-time error") {
 		t.Errorf("the intro names the retro route and the envelope's reason, not a ship error: %q", intro)
 	}
-	// A retro reached from a dispatch error or an exhausted correction ladder
-	// (no audit decline) is not re-audited work: nothing is seeded, and the
-	// prompt never claims an audit FAIL that did not happen.
+	// A retro reached without an audit decline is not re-audited work, so nothing is seeded.
 	viaDispatchError := CycleState{WorkspacePath: dir, AuditDispatches: 1, CompletedPhases: []string{"scout", "triage", "tdd", "build", "retro"}}
 	if _, ok := seedAuditRepairContext(map[string]string{}, PhaseBuild, viaDispatchError)[CtxKeyStandingAuditFindings]; ok {
 		t.Error("a retro re-entry without an audit decline is not seeded")

@@ -1,19 +1,5 @@
 package phasecontract
 
-// resolver_native_skip_test.go — RED contract for the cycle-281 ship-contract
-// noise: ship is a pure NATIVE executor (no LLM agent writes markdown), yet the
-// spec-derived fallback invented a `ship-report.md` contract for it, so every
-// shipping cycle hit 3 enforce-stage [missing_artifact] BLOCKs and survived
-// only because the circuit breaker demoted enforce→advisory. The operator
-// policy this pins: audit-PASS ⇒ ship must complete WITHOUT depending on a
-// safety valve.
-//
-// Rule (single home: SynthesizesContract): a derived contract exists only when
-// an LLM agent actually writes the artifact (kind "llm", the default) OR the
-// spec explicitly declares outputs.files. Native/command executors with no
-// declared outputs resolve to NO contract — the gate skips them, exactly like
-// any other phase the resolver misses.
-
 import (
 	"testing"
 
@@ -31,16 +17,6 @@ func lookupFor(specs ...phasespec.PhaseSpec) func(string) (phasespec.PhaseSpec, 
 	}
 }
 
-// TestResolveNativeExecutorWithoutOutputsHasNoContract: the SYNTHESIS-skip rule
-// (cycle-281). A native-kind spec with no outputs.files must NOT get a
-// convention-invented `<name>-report.md` contract — a deterministic executor
-// has no agent to write it, and the enforce gate would block a phase that can
-// never satisfy it. Example uses a non-built-in native phase: ship — the
-// original cycle-281 case — now resolves to its EXPLICIT built-in NoArtifact
-// contract (TestFor_Ship_NoArtifactContract). That is a strict improvement over
-// fail-open: it satisfies the same operator policy (audit-PASS ⇒ ship completes
-// without depending on a safety valve) by affirmatively knowing ship has no
-// file deliverable, rather than failing open on ambiguity.
 func TestResolveNativeExecutorWithoutOutputsHasNoContract(t *testing.T) {
 	t.Parallel()
 	r := NewCatalogResolver(lookupFor(phasespec.PhaseSpec{
@@ -53,9 +29,6 @@ func TestResolveNativeExecutorWithoutOutputsHasNoContract(t *testing.T) {
 	}
 }
 
-// TestResolveNativeExecutorWithDeclaredOutputsKeepsContract: a native phase
-// that EXPLICITLY declares its output file keeps a derived contract — the rule
-// only kills convention-invented artifacts, never declared ones.
 func TestResolveNativeExecutorWithDeclaredOutputsKeepsContract(t *testing.T) {
 	t.Parallel()
 	r := NewCatalogResolver(lookupFor(phasespec.PhaseSpec{
@@ -71,13 +44,10 @@ func TestResolveNativeExecutorWithDeclaredOutputsKeepsContract(t *testing.T) {
 	}
 }
 
-// TestResolveLLMPhaseWithoutOutputsKeepsConventionContract: the default LLM
-// convention (<name>-report.md) is unchanged — user/minted agent phases still
-// get the derived well-formedness contract.
 func TestResolveLLMPhaseWithoutOutputsKeepsConventionContract(t *testing.T) {
 	t.Parallel()
 	r := NewCatalogResolver(lookupFor(phasespec.PhaseSpec{
-		Name: "smell-scan", // Kind empty → defaults to "llm"
+		Name: "smell-scan", // empty Kind defaults to llm
 	}))
 	c, ok := r.Resolve("smell-scan")
 	if !ok {
@@ -88,13 +58,10 @@ func TestResolveLLMPhaseWithoutOutputsKeepsConventionContract(t *testing.T) {
 	}
 }
 
-// TestResolveBuiltinStaysAuthoritative: built-in contracts are untouched by
-// the synthesis rule (audit resolves from the hardcoded map regardless of any
-// catalog spec shape).
 func TestResolveBuiltinStaysAuthoritative(t *testing.T) {
 	t.Parallel()
 	r := NewCatalogResolver(lookupFor(phasespec.PhaseSpec{
-		Name: "audit", Kind: "native", // adversarial: catalog lies about audit
+		Name: "audit", Kind: "native", // contradicts the built-in audit contract
 	}))
 	c, ok := r.Resolve("audit")
 	if !ok || c.ArtifactName != "audit-report.md" {

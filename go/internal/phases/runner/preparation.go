@@ -17,8 +17,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 )
 
-// phasePreparation is the immutable output of the pre-dispatch stage. It
-// carries only inputs needed by routing, dispatch, and reconciliation.
+// phasePreparation is the pre-dispatch stage's immutable output for routing, dispatch and judging.
 type phasePreparation struct {
 	start          time.Time
 	phase          string

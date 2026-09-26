@@ -1,9 +1,5 @@
 package advisor
 
-// golden_test.go — the goldens captured on 8e8f080f (the pre-extraction
-// code) replayed through the leaf: every prompt shape, the launch request per
-// decision, the capture artifacts (ADR-0103 unit 04 §6 tests 4-8).
-
 import (
 	"encoding/json"
 	"path/filepath"
@@ -16,14 +12,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// goldenRecentFiles is exactly what `git log -n 30 --name-only` printed for
-// the two-commit history the recon golden was captured over (duplicates
-// kept — frequency = churn).
+// goldenRecentFiles is what `git log --name-only` printed for the recon golden's history; duplicates count churn.
 func goldenRecentFiles(string) ([]string, error) {
 	return []string{"a.go", "c.py", "docs/README.md", "a.go", "b_test.go"}, nil
 }
 
-// Test 4 — G1/G2/G3: the per-transition prompt, byte for byte.
 func TestBuildRoutingPrompt_MatchesGolden(t *testing.T) {
 	rich := richRouteInput()
 	assertGolden(t, "prompt-routing-happy.golden.txt", buildRoutingPrompt(rich))
@@ -35,14 +28,10 @@ func TestBuildRoutingPrompt_MatchesGolden(t *testing.T) {
 	assertGolden(t, "prompt-routing-retro.golden.txt", buildRoutingPrompt(retro))
 }
 
-// Test 5 — G4: the legacy inline plan prompt.
 func TestBuildPlanPrompt_MatchesGolden(t *testing.T) {
 	assertGolden(t, "prompt-plan-legacy.golden.txt", buildPlanPrompt(richRouteInput()))
 }
 
-// Test 6 — G5/G6/G7: the persona-composed plan prompt with the recon off, on
-// (the injected reader standing in for the git history) and for the re-plan
-// artifact.
 func TestComposePlanPrompt_MatchesGolden(t *testing.T) {
 	rich := richRouteInput()
 	a := New(nil, Identity{Persona: goldenPersona}, nil, WithRecentFiles(goldenRecentFiles))
@@ -54,8 +43,6 @@ func TestComposePlanPrompt_MatchesGolden(t *testing.T) {
 	assertGolden(t, "prompt-plan-persona-recon.golden.txt", a.ComposePlanPrompt(recon, "routing-plan.json"))
 }
 
-// Test 7 — G8: the launch request per decision, every one of the fourteen
-// fields (the golden was captured as the bridge request; its json keys match).
 func TestLaunchRequest_GoldenPerDecision(t *testing.T) {
 	ws, root, wt := t.TempDir(), t.TempDir(), t.TempDir()
 	for _, d := range []struct {
@@ -83,9 +70,6 @@ func TestLaunchRequest_GoldenPerDecision(t *testing.T) {
 	}
 }
 
-// Test 8 — G9: the three capture artifacts, byte for byte (the persisted
-// prompt redacted, the response raw, the span's keys/order/values with the
-// token usage and the re-plan depth).
 func TestCaptureArtifacts_MatchGolden(t *testing.T) {
 	for _, d := range []struct {
 		kind   string

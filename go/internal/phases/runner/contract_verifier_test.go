@@ -13,13 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// Cycle 1685 (2026-09-15): the engine verified with the plain verifier and
-// classified the unrepaired bytes ("no parseable verdict → FAIL"); the gate
-// then salvaged, persisted and approved the repaired file, and a red_count=0
-// cycle sealed FAIL with no failure class. With the gate's own Reviewer as the
-// engine's verifier there is ONE verifier: the salvage happens before
-// classification, the classifier sees the repaired sentinel, the result is
-// OK (no ship-guard downgrade), and the file on disk is what was judged.
 func TestRun_ContractVerifierSalvagesBeforeClassification(t *testing.T) {
 	root := writeFallbackProfile(t, "evolve-auditor", "claude-tmux", nil)
 	hooks := &fakeHooks{phase: "audit", agent: "evolve-auditor", model: "opus", prompt: "x", verdict: core.VerdictPASS}

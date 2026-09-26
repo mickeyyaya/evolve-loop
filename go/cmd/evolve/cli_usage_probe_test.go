@@ -15,9 +15,6 @@ func writeProbePolicy(t *testing.T, json string) string {
 	return dir
 }
 
-// TestUsageProbeEnabled gates the proactive probe on BOTH the policy dial and
-// the EVOLVE_CLI_HEALTH master switch: enabled only when policy turns it on AND
-// the master switch is not 0. Default (no policy) is off — opt-in.
 func TestUsageProbeEnabled(t *testing.T) {
 	on := writeProbePolicy(t, `{"cli_health":{"proactive_probe":true}}`)
 	off := writeProbePolicy(t, `{}`)

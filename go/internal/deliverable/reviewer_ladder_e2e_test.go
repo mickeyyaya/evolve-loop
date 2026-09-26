@@ -32,8 +32,7 @@ func (s *stubPhase) Run(_ context.Context, req core.PhaseRequest) (core.PhaseRes
 	return core.PhaseResponse{Phase: s.name, Verdict: core.VerdictPASS, ArtifactsDir: req.Workspace}, nil
 }
 
-// auditOnly scopes the real contract reviewer to the audit deliverable so the
-// stub phases (which write no artifacts) are not what this proof is about.
+// auditOnly scopes the real reviewer to audit; the stub phases write no artifacts.
 type auditOnly struct{ inner core.DeliverableReviewer }
 
 func (a auditOnly) Review(ctx context.Context, in core.ReviewInput) core.ReviewResult {
@@ -43,22 +42,13 @@ func (a auditOnly) Review(ctx context.Context, in core.ReviewInput) core.ReviewR
 	return a.inner.Review(ctx, in)
 }
 
-// TestLadder_AuditWithoutExplanationSectionIsCorrectedNotFailed is the
-// end-to-end proof: a REAL cycle (production storage + ledger, the explanation
-// contract active by default) whose auditor first writes a report without
-// "## Explanation Documentation" is rejected by the REAL contract reviewer at
-// enforce, re-dispatched once with the section named in its directive, and —
-// the second report carrying the section — proceeds to ship. Remove the
-// registry's ExplanationSections entry or the Roots plumbing and this goes red.
 func TestLadder_AuditWithoutExplanationSectionIsCorrectedNotFailed(t *testing.T) {
 	root := gitRepoWithOneCommit(t) // the explanation contract seals against a real base SHA
 	evolveDir := filepath.Join(root, ".evolve")
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	// The builder changes nothing, so its explanation declaration is
-	// NOT_APPLICABLE — that satisfies the mandatory build explanation floor and
-	// activates the contract for the audit that follows.
+	// A no-change build declares NOT_APPLICABLE, which meets the build explanation floor and activates the audit's contract.
 	build := &stubPhase{name: string(core.PhaseBuild)}
 	build.onRun = func(_ int, req core.PhaseRequest) {
 		report := "# Build Report\n\n## Changes\nnone\n\n## Explanation Documentation\n- Status: NOT_APPLICABLE\n- Reason: no material change in this fixture cycle\n"
@@ -100,8 +90,7 @@ func TestLadder_AuditWithoutExplanationSectionIsCorrectedNotFailed(t *testing.T)
 func gitRepoWithOneCommit(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
-	// The real repo ignores its runtime state and build outputs; without these
-	// rules the orchestrator's own files would read as a material Build diff.
+	// Mirror the real repo's ignores, or the orchestrator's own files read as a material Build diff.
 	if err := os.WriteFile(filepath.Join(dir, ".gitignore"), []byte(".evolve/\ngo/bin/\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}

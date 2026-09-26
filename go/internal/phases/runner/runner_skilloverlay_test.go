@@ -9,10 +9,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// skillsCapturingBridge records the (tier, skills) of every dispatch attempt and
-// always returns exit=85 so the runner walks the WHOLE tier-fallback chain. It
-// lets a test assert the overlay skill set is recomputed PER ATTEMPT (differs
-// between the resolved tier and the stepped-down tier), not resolved once.
+// skillsCapturingBridge records each attempt's tier and skills and always exits 85, so the whole tier chain is walked.
 type skillsCapturingBridge struct {
 	attempts []skillsAttempt
 }
@@ -31,18 +28,6 @@ func (b *skillsCapturingBridge) Probe(_ context.Context) (core.BridgeProbe, erro
 	return core.BridgeProbe{}, nil
 }
 
-// runner_skilloverlay_test.go — the PRODUCER half of the config-driven
-// skill-overlay: the runner resolves policy overlays (which skill for which
-// phase-agent dispatch) onto BridgeRequest.Skills so the adapter can preload
-// them. These guard the "green resolver, inert dispatch" dormancy the feature
-// was stuck in — they assert the resolved names actually reach the launch AND
-// that the tier string at the dispatch site is the value the rule keys on.
-
-// TestRunner_DeepTierDispatch_ResolvesFableOverlay: a phase dispatched at the
-// deep tier carries the compiled-default overlay skill (fable) on
-// BridgeRequest.Skills. Precondition Model=="deep" proves the dispatched tier
-// string is literally "deep" (not a concrete model), the value the compiled
-// {tiers:[deep,top]}→[fable] rule matches on.
 func TestRunner_DeepTierDispatch_ResolvesFableOverlay(t *testing.T) {
 	root := writeFallbackProfile(t, "evolve-auditor", "claude-tmux", nil)
 	hooks := &fakeHooks{phase: "auditor", agent: "evolve-auditor", model: "auto", prompt: "x", verdict: core.VerdictPASS}
@@ -64,9 +49,6 @@ func TestRunner_DeepTierDispatch_ResolvesFableOverlay(t *testing.T) {
 	}
 }
 
-// TestRunner_BalancedTierDispatch_NoOverlay: the negative — the profile-default
-// (sonnet) dispatch carries no overlay skills, since the compiled default is
-// deep/top only. Lower-tier dispatches stay byte-identical (Skills nil).
 func TestRunner_BalancedTierDispatch_NoOverlay(t *testing.T) {
 	root := writeFallbackProfile(t, "evolve-scout", "claude-tmux", nil)
 	hooks := &fakeHooks{phase: "scout", agent: "evolve-scout", model: "auto", prompt: "x", verdict: core.VerdictPASS}
@@ -85,14 +67,6 @@ func TestRunner_BalancedTierDispatch_NoOverlay(t *testing.T) {
 	}
 }
 
-// TestRunner_TierStepDown_RecomputesOverlayPerAttempt locks the CENTRAL claim:
-// overlay resolution lives INSIDE the tier-fallback closure, so a quota-wall
-// step-down (deep→balanced) recomputes the skill set for the NEW tier. A profile
-// with model_tier_default="deep" and the universal "balanced" floor walks the
-// single-CLI chain twice — deep, then balanced — under an all-exit-85 bridge.
-// The deep attempt must carry [fable]; the balanced attempt must carry none.
-// A refactor that hoisted overlay resolution ABOVE the closure (resolving once
-// for the first tier) would give both attempts the same skills and fail here.
 func TestRunner_TierStepDown_RecomputesOverlayPerAttempt(t *testing.T) {
 	root := writeQuotaExhaustionProfile(t, "evolve-auditor", "claude-tmux", "deep", nil)
 	hooks := &fakeHooks{phase: "auditor", agent: "evolve-auditor", model: "deep", prompt: "x"}

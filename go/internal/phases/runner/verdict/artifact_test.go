@@ -1,9 +1,5 @@
 package verdict
 
-// artifact_test.go — the on-disk helpers (ADR-0103 unit 11 §6 tests 28-31): the
-// single-read decision, the forensic renderers, the (size, mtime) snapshot, the
-// challenge-token reader.
-
 import (
 	"os"
 	"path/filepath"
@@ -14,10 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable"
 )
 
-// Test 28 — the four branches of classifiedArtifact: the verified bytes when
-// they are this artifact's, else ONE read, else "" for an absent contracted
-// file, else the pane. Kills `pane returned for an absent contracted file`,
-// `re-read when the snapshot matches`.
 func TestClassifiedArtifact_VerifiedBytesThenOneReadThenPaneOrEmpty(t *testing.T) {
 	ws := t.TempDir()
 	path := filepath.Join(ws, "audit-report.md")
@@ -42,10 +34,6 @@ func TestClassifiedArtifact_VerifiedBytesThenOneReadThenPaneOrEmpty(t *testing.T
 	}
 }
 
-// Test 29 — forensicSnapshot renders absent / size + the LAST tailN bytes
-// quoted / a directory as size=N tail="" (the discarded ReadFile error, Q2);
-// forensicCodes joins with a comma. Kills `head instead of tail`, `absent on
-// read error`.
 func TestForensicSnapshot_AbsentSizeTailAndDirectory(t *testing.T) {
 	ws := t.TempDir()
 	if got := forensicSnapshot(filepath.Join(ws, "absent"), 160); got != "absent" {
@@ -80,10 +68,6 @@ func TestForensicCodes_JoinsWithComma(t *testing.T) {
 	}
 }
 
-// Test 30 — StatSnapshot needs a non-empty regular file; unchangedSince keys
-// on size AND mtime and reads any error or non-regular file as changed
-// (fail-open toward the pre-existing reconcile). Kills `size-only key`, `error
-// reads as unchanged`, `Stat instead of Lstat`.
 func TestStatSnapshot_RequiresNonEmptyRegularFile(t *testing.T) {
 	ws := t.TempDir()
 	empty := filepath.Join(ws, "empty.md")
@@ -159,11 +143,6 @@ func TestUnchangedSince_FailsOpenOnErrorAndNonRegular(t *testing.T) {
 	}
 }
 
-// Test 31a moved verbatim to phasecontract/challenge_token_test.go (review
-// fold F1: the token reader is the contract's, beside RequireChallengeToken).
-// Test 31b — the leaf reads the token through phasecontract.ChallengeToken and
-// never spells the token file itself (a source scan, like test 31's `.evolve`).
-// Kills `token read inline`.
 func TestChallengeToken_ReadThroughPhasecontract(t *testing.T) {
 	for _, name := range nonTestSources(t) {
 		src, err := os.ReadFile(name)

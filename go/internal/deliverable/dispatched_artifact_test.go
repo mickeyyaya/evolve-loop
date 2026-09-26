@@ -1,13 +1,5 @@
 package deliverable
 
-// dispatched_artifact_test.go — pin for the intent-delta contract-path skew
-// fix (inbox intent-delta-contract-path-skew 0.88): the runner threads the
-// EXACT dispatched artifact path through Roots.DispatchedArtifact, so Verify
-// judges the file the phase was ASKED to write — intent in DELTA mode
-// dispatches intent-delta.md while its registry contract names intent.md,
-// and Verify previously judged the wrong file (found by PR #389's
-// single-read work, deliberately not papered over there).
-
 import (
 	"os"
 	"path/filepath"
@@ -20,8 +12,7 @@ import (
 func TestVerify_DispatchedArtifactOverridesContractPath(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
-	// The registry contract for intent names intent.md — leave it ABSENT and
-	// write the DISPATCHED delta artifact instead (the delta-mode shape).
+	// Leave the contract's intent.md absent and write the dispatched delta artifact.
 	delta := filepath.Join(ws, "intent-delta.md")
 	if err := os.WriteFile(delta, []byte("[intent-unchanged]\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -38,9 +29,7 @@ func TestVerify_DispatchedArtifactOverridesContractPath(t *testing.T) {
 		t.Fatalf("verified bytes are not the dispatched file's: %q", res.Content)
 	}
 
-	// Without the override, the contract path stays authoritative (CLI/gate
-	// callers): intent.md is absent, so the verify reports the miss AT the
-	// contract path.
+	// Without the override the contract path stays authoritative, so the miss is reported there.
 	res2, err := Verify("intent", phasecontract.Roots{Workspace: ws})
 	if err != nil {
 		t.Fatalf("Verify (no override): %v", err)

@@ -1,11 +1,5 @@
 package lifecycle
 
-// release.go — the cycle drain (inboxmover.go:653-785 on the base): every
-// *.json under processing/cycle-<cycle>/ back to the inbox root, with the
-// ADR-0072 S5 bump-and-park when a Policy is given and the ADR-0076 slice-C
-// continuation stamp when the cycle's workspace carries a manifest. Split
-// into the dir open, the stamp read, the park and the single release.
-
 import (
 	"encoding/json"
 	"fmt"
@@ -18,20 +12,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 )
 
-// drained is one item of the drain: where it sits, where it goes, what it is.
 type drained struct {
 	src, dest, base, taskID string
 }
 
-// Release drains processing/cycle-<cycle>/ back to the inbox root. It is
-// scoped to the single named cycle dir and idempotent: a missing or already-
-// drained dir is a clean no-op. A basename already at the root (double-move
-// race) is skipped — the root copy is never clobbered. An empty reason is
-// "cycle-release". With a non-nil Policy it is the S5 failure drain: each
-// committed item's durable failure_count is bumped first and, at the ceiling
-// on a task-level failure, the item is parked in quarantine/ instead of
-// released. Fail-open end to end: a per-item read/write fault falls back to a
-// plain release so a bookkeeping fault never strands nor wrongly quarantines.
+// Release drains processing/cycle-<cycle>/ to the inbox root; a non-nil Policy bumps failures and parks at the ceiling.
 func (m *Mover) Release(cycle int, reason string, q *Policy) (RecoverResult, error) {
 	if reason == "" {
 		reason = "cycle-release"
@@ -61,8 +46,6 @@ func (m *Mover) Release(cycle int, reason string, q *Policy) (RecoverResult, err
 	return res, nil
 }
 
-// openCycleDir resolves the cycle dir: absent is a logged no-op, a stat fault
-// that is not absence is returned, a non-directory is a silent no-op.
 func (m *Mover) openCycleDir(cycle int) (string, bool, error) {
 	cycleDir := inboxbatch.ProcessingCycleDir(m.inboxDir, cycle)
 	info, err := os.Stat(cycleDir)
@@ -79,10 +62,7 @@ func (m *Mover) openCycleDir(cycle int) (string, bool, error) {
 	return cycleDir, true, nil
 }
 
-// readStamp reads the cycle's continuation manifest (ADR-0076 slice C): when
-// the FAILed cycle preserved salvageable work, every released item carries
-// the stamp IN the release pass (transactional). Missing manifest ⇒ no-op; a
-// corrupt one is reported and the items release unstamped.
+// readStamp reads the cycle's continuation manifest so the drain stamps each item in the same pass.
 func (m *Mover) readStamp(cycle int) *continuation.Continuation {
 	if m.runWorkspace == nil {
 		return nil
@@ -101,13 +81,8 @@ func (m *Mover) readStamp(cycle int) *continuation.Continuation {
 	return &c
 }
 
-// parkAtCeiling is the ADR-0072 S5 half of the drain: bump the committed
-// item's durable failure_count (shedding its continuation stamp in the same
-// atomic rewrite once the ceiling is reached — quarantine is terminal parking)
-// and park it in quarantine/ at the ceiling. systemLevel gates the BUMP, not
-// just the decision (AC4 in full). Every fault falls open to the plain release
-// and says so: a bump that cannot rewrite, a park that cannot deliver — the
-// un-parked poison item returns to the root and WILL be re-picked.
+// parkAtCeiling bumps a committed item's failure_count and parks it in quarantine/ at the ceiling.
+// Every fault falls open to a plain release and is reported: the item WILL be re-picked.
 func (m *Mover) parkAtCeiling(d drained, reason string, cycle int, q *Policy) (bool, string) {
 	if q == nil || q.SystemLevel || q.Routed || (q.Committed != nil && !q.Committed[d.taskID]) {
 		return false, ""
@@ -140,9 +115,7 @@ func (m *Mover) parkAtCeiling(d drained, reason string, cycle int, q *Policy) (b
 	return true, pr.DestPath
 }
 
-// releaseOne moves one item back to the root: the double-move guard, the
-// continuation stamp (best-effort, reported), the rename, the INFO line and
-// the ledger line. Reports whether the item moved.
+// releaseOne moves one item to the inbox root, never over a root twin, and reports whether it moved.
 func (m *Mover) releaseOne(d drained, reason string, cycle int, stamp *continuation.Continuation) bool {
 	if _, statErr := os.Stat(d.dest); statErr == nil {
 		m.warn(fault{code: CodeReleaseDoubleMove, origin: "Mover.Release", cycle: cycle, legacy: "WARN: ",

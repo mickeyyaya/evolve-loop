@@ -8,12 +8,6 @@ import (
 	"testing"
 )
 
-// Cycle 1679 (2026-09-15): round 5's build-report.md carried the literal
-// template token FULLSUITE_PLACEHOLDER where the mandatory full-suite result
-// belongs, inside a section headed "every number below was executed this
-// round"; the handoff floor passed it and the audit spent a round naming it
-// (M3 verification-gap). An unsubstituted template token is a deterministic
-// fact about the report, so the floor refuses it before handoff.
 func TestPlaceholderTokenFailures_RefusesAnUnsubstitutedTemplateToken(t *testing.T) {
 	ws := t.TempDir()
 	body := "# Build Report\n\n## Full suite\n`go test -count=1 ./...` → FULLSUITE_PLACEHOLDER\n\nok: ACS_RESULT_PLACEHOLDER\n"

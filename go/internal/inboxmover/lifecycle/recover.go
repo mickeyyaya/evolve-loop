@@ -1,8 +1,5 @@
 package lifecycle
 
-// recover.go — processing/cycle-X/ → inbox/ for every cycle X that is no
-// longer active (inboxmover.go:552-613 on the base).
-
 import (
 	"fmt"
 	"os"
@@ -12,16 +9,13 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 )
 
-// RecoverResult counts how many files were moved back to inbox/.
+// RecoverResult counts the items a drain or recovery moved and lists their new paths.
 type RecoverResult struct {
 	Recovered int
 	Paths     []string
 }
 
-// RecoverOrphans moves files from processing/cycle-X/ back to inbox/ for
-// any cycle X that is no longer active. Idempotent. An unreadable active
-// cycle reads as "-1" (every dir recovers, the live one included) and a root
-// twin is overwritten by the processing copy — both preserved quirks.
+// RecoverOrphans moves the claims of every inactive cycle back to the inbox root, overwriting a root twin.
 func (m *Mover) RecoverOrphans() (RecoverResult, error) {
 	res := RecoverResult{Paths: []string{}}
 	procDir := inboxbatch.ProcessingDir(m.inboxDir)
@@ -48,9 +42,7 @@ func (m *Mover) RecoverOrphans() (RecoverResult, error) {
 	return res, nil
 }
 
-// recoverDir moves every *.json of one dead cycle dir back to the root — with
-// no double-move guard (the clobbering rename is the preserved quirk) — and
-// ledgers each recovery.
+// recoverDir has no double-move guard on purpose: the clobbering rename is a pinned, preserved quirk.
 func (m *Mover) recoverDir(dir string, cycle int) (int, []string) {
 	cycleNum := strconv.Itoa(cycle)
 	files, _ := jsonEntries(dir) // an unreadable dir recovers nothing (preserved)

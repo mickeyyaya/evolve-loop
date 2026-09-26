@@ -1,10 +1,5 @@
 package core
 
-// continuation_baseadvance_test.go — pins for the worktree-base heal at
-// continuation adoption; incident narrative and degrade contract: see
-// continuation_baseadvance.go. The heal fixture reproduces the live
-// cycle-1365 shape (stale base predating a landed .gitignore carve-out).
-
 import (
 	"context"
 	"os"
@@ -21,9 +16,7 @@ func TestAdvanceContinuationBase_HealsStaleBase(t *testing.T) {
 	if _, err := snapshotPreservedWorktree(context.Background(), "", wt); err != nil {
 		t.Fatal(err)
 	}
-	// Main advances with the cycle-1365-shape fix: a .gitignore carve-out.
-	// The real #418 ladder shape: parent excluded by glob (not by directory,
-	// which would make re-inclusion impossible), evals carved back in.
+	// Main lands a carve-out; the parent is excluded by glob, since an excluded directory cannot be re-included.
 	if err := os.WriteFile(filepath.Join(root, ".gitignore"), []byte(".evolve/*\n!.evolve/evals/\ngo/bin/\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -38,7 +31,6 @@ func TestAdvanceContinuationBase_HealsStaleBase(t *testing.T) {
 	if healed != mainTip {
 		t.Fatalf("advanceContinuationBase = %q, want main tip %s — the stale base was not healed", healed, mainTip)
 	}
-	// The worktree now carries the landed fix: .evolve/evals is stageable.
 	evalsDir := filepath.Join(wt, ".evolve", "evals")
 	if err := os.MkdirAll(evalsDir, 0o755); err != nil {
 		t.Fatal(err)
@@ -49,7 +41,6 @@ func TestAdvanceContinuationBase_HealsStaleBase(t *testing.T) {
 	if out := gitOut(t, wt, "add", ".evolve/evals/x.md"); out != "" {
 		t.Fatalf("git add of the carved-out path failed post-heal: %s", out)
 	}
-	// Lane work survived the merge.
 	if _, err := os.Stat(filepath.Join(wt, "lane.go")); err != nil {
 		t.Error("lane work lost by the base advance")
 	}
@@ -64,8 +55,7 @@ func TestAdvanceContinuationBase_NoOpWhenCurrent(t *testing.T) {
 
 func TestAdvanceContinuationBase_ConflictReturnsErrorAndAborts(t *testing.T) {
 	root, wt := initContinuationRepo(t, 83)
-	// Lane and main edit the SAME file divergently (the raced-conflict shape
-	// the adopt-time Clean screen normally excludes).
+	// A raced conflict, the shape the adopt-time Clean screen normally excludes.
 	if err := os.WriteFile(filepath.Join(wt, "a.txt"), []byte("lane\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}

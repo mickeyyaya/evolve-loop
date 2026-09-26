@@ -7,18 +7,8 @@ import (
 	"testing"
 )
 
-// Cycle-230 test-amplification adversarial tests for task acs-suite-root-autosolve.
-// Written from spec only (no implementation read) — anti-bias isolation.
-//
-// Coverage gaps addressed:
-//   - JSON null and type-mismatch for active_worktree: graceful fallback to ""
-//   - Path values with spaces/special chars: resolver must return verbatim
-//   - Wrong cycle number passed: resolver constructs path from cycle param; if
-//     the state file for the requested cycle doesn't exist, it must return ""
-
-// writeCycleStateN writes a cycle-state.json for an arbitrary cycle number.
-// Unlike writeCycleState (TDD helper hardcoded to cycle-230), this respects the
-// cycle parameter — needed to test that the resolver uses the cycle param correctly.
+// writeCycleStateN honors its cycle argument, unlike writeCycleState, so a test
+// can prove the resolver reads the requested cycle's file.
 func writeCycleStateN(t *testing.T, evolveDir string, cycle int, body string) {
 	t.Helper()
 	dir := filepath.Join(evolveDir, "runs", "cycle-"+strconv.Itoa(cycle))
@@ -30,9 +20,6 @@ func writeCycleStateN(t *testing.T, evolveDir string, cycle int, body string) {
 	}
 }
 
-// TestACSSuiteRootAutosolve_NullAndTypeMismatch_Amp: JSON null and type-mismatch
-// values for active_worktree must all produce "" (graceful fallback), not panic
-// or return a non-empty string.
 func TestACSSuiteRootAutosolve_NullAndTypeMismatch_Amp(t *testing.T) {
 	cases := []struct {
 		name string
@@ -54,9 +41,6 @@ func TestACSSuiteRootAutosolve_NullAndTypeMismatch_Amp(t *testing.T) {
 	}
 }
 
-// TestACSSuiteRootAutosolve_PathPreservation_Amp: when active_worktree contains
-// a valid path string (including spaces or multiple path segments), the resolver
-// must return it verbatim without normalization or truncation.
 func TestACSSuiteRootAutosolve_PathPreservation_Amp(t *testing.T) {
 	cases := []struct {
 		name string
@@ -78,13 +62,8 @@ func TestACSSuiteRootAutosolve_PathPreservation_Amp(t *testing.T) {
 	}
 }
 
-// TestACSSuiteRootAutosolve_WrongCycle_Amp: the resolver constructs its file path
-// from the cycle parameter. When cycle=230 is requested but only cycle=229's
-// state file exists, the resolver must return "" (file-not-found fallback), NOT
-// bleed the cycle-229 active_worktree value.
 func TestACSSuiteRootAutosolve_WrongCycle_Amp(t *testing.T) {
 	evolveDir := t.TempDir()
-	// Write state only for cycle 229 — cycle 230 has no file
 	writeCycleStateN(t, evolveDir, 229, `{"active_worktree":"/tmp/worktrees/cycle-229"}`)
 
 	got := resolveACSSuiteRoot(evolveDir, 230)

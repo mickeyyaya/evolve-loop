@@ -6,13 +6,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// Research F22 (cycle 1685): the verdict engine and the deliverables gate
-// must be ONE verifier, so the bytes a phase's classification judges are the
-// bytes the gate approves (a sole recoverable bad_verdict salvaged, persisted
-// and reported before classification). The composition root builds the
-// gate's Reviewer after the runners and hands every BaseRunner an accessor
-// to it — this is the wiring proof, in the SignalCenterReachesEveryPhaseRunner
-// shape.
 func TestWireOrchestratorDeps_ContractVerifierReachesEveryPhaseRunner(t *testing.T) {
 	d := wiredWithRealPhases(t)
 	if len(d.Runners) == 0 {

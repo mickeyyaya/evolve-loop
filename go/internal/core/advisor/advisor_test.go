@@ -1,11 +1,5 @@
 package advisor
 
-// advisor_test.go — the construction contract (ADR-0103 unit 04 §6 tests 1,
-// 2, 9, 38): the depth guard, the twelve error texts, the happy-path silence,
-// the live Center accessor and its Null Object, the registered codes and the
-// positional request shapes. Every export is named here or in a sibling file
-// (apicover counts package-local tests only).
-
 import (
 	"context"
 	"errors"
@@ -20,7 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// Test 1 (leaf copy) — the depth guard's TRUE branch refuses BEFORE the launch.
 func TestLaunch_DepthGuardRefusesBeforeLaunch(t *testing.T) {
 	a := New(refusingLauncher{t}, defaultIdentity(), nil, WithDepthCheck(func(map[string]string) bool { return true }))
 	if _, err := a.Plan(baseRouteInput()); err == nil || err.Error() != "phase advisor: recursion guard: depth check failed" {
@@ -31,7 +24,6 @@ func TestLaunch_DepthGuardRefusesBeforeLaunch(t *testing.T) {
 	}
 }
 
-// Test 2 (leaf copy) — the twelve error texts the orchestrator prints.
 func TestAdvisor_ErrorTextsAreTheOrchestratorsStderrText(t *testing.T) {
 	noWs := baseRouteInput()
 	noWs.Workspace = ""
@@ -68,8 +60,6 @@ func TestAdvisor_ErrorTextsAreTheOrchestratorsStderrText(t *testing.T) {
 	}
 }
 
-// Test 9 / 38 — a successful Propose/Plan/RePlan emits nothing on the stream
-// and writes nothing to stderr.
 func TestAdvisor_HappyPathsEmitNoSignal(t *testing.T) {
 	in := tempInput(t)
 	orig := os.Stderr
@@ -110,7 +100,7 @@ func TestWithSignals_NilAccessorAndNilCenterAreTheNullObject(t *testing.T) {
 		if a.SignalsWired() {
 			t.Fatal("no Center ⇒ not wired")
 		}
-		if _, err := a.Plan(baseRouteInput()); err == nil { // a provoked fault emits into nothing
+		if _, err := a.Plan(baseRouteInput()); err == nil {
 			t.Fatal("a nil launcher still fails")
 		}
 	}
@@ -148,12 +138,6 @@ func TestAdvisorCodes_AreRegisteredWithDocsUnderModuleAdvisor(t *testing.T) {
 	}
 }
 
-// Review fold (arch LOW-5) — the field vocabulary the events carry is the
-// vocabulary the registered reasons document: every emitted fields.step /
-// fields.cause / fields.op value is named by its code's registered doc, and
-// all six steps are exercised. The constants make the two one spelling; this
-// pin catches a new emit site or a literal that bypasses them (killed by
-// `"step": "pre-flight"` at the preflight emit).
 func TestAdvisorEvents_FieldVocabularyMatchesTheRegisteredReasons(t *testing.T) {
 	docs := map[signalcenter.Code]string{}
 	for _, cd := range signalcenter.RegisteredCodes()[signalcenter.ModuleAdvisor] {
@@ -202,9 +186,7 @@ func TestAdvisorEvents_FieldVocabularyMatchesTheRegisteredReasons(t *testing.T) 
 	}
 }
 
-// Every request shape is constructed POSITIONALLY so a new field breaks the
-// build here and the core adapter is revisited; every collaborator type is
-// named for apicover.
+// Positional literals on purpose: a new field breaks the build here, so the core adapter is revisited.
 func TestRequestShapes_HaveExactlyTheDeclaredFields(t *testing.T) {
 	req := LaunchRequest{"claude-tmux", "/p.json", "deep", []string{"fable"}, "prompt", "/ws", "/wt", "/root", "/ws/routing-plan.json", "artifact", "router", "router", 7, map[string]string{"k": "v"}}
 	resp := LaunchResponse{0, "out", 12, cyclestate.TokenUsage{Input: 1}}

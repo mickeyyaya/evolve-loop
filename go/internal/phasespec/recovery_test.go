@@ -6,8 +6,6 @@ import (
 	"testing"
 )
 
-// TestRecoveryMap_JSONRoundTrip pins the PA-DDK DDK-6 recovery descriptor's wire
-// contract and omitempty behavior.
 func TestRecoveryMap_JSONRoundTrip(t *testing.T) {
 	var r RecoveryMap = RecoveryMap{Targets: map[string]string{"PASS": "ship"}}
 	raw, err := json.Marshal(PhaseSpec{Name: "retrospective", Recovery: &r})

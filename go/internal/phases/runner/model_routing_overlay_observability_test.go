@@ -11,9 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/log"
 )
 
-// writePolicyPin writes a minimal .evolve/policy.json pinning phase to
-// {cli,model} under root, mirroring the shape internal/policy/policy_test.go
-// uses ("pins": {"<phase>": {"cli":..., "model":...}}).
 func writePolicyPin(t *testing.T, root, phase, cli, model string) {
 	t.Helper()
 	dir := filepath.Join(root, ".evolve")
@@ -26,14 +23,6 @@ func writePolicyPin(t *testing.T, root, phase, cli, model string) {
 	}
 }
 
-// TestRunner_AdvisorOverlayAppliedLogsLine (T3 AC1): when pin==nil and the
-// advisor's {cli,tier} overlay is threaded via PhaseRequest.ModelRoutingCLI/
-// Tier (the MR4c seam, runner.go:425), the runner must emit a diagnostic log
-// line naming the phase, the overlay cli, and the overlay tier — so a
-// dormant/absent overlay is a grep-able fact, matching the logged precedent
-// already set for the capability-probe reorder (runner.go:442). RED today:
-// runner.Options carries no injectable diag logger, and the MR4c seam logs
-// nothing at all.
 func TestRunner_AdvisorOverlayAppliedLogsLine(t *testing.T) {
 	root := writeFallbackProfile(t, "evolve-scout", "claude-tmux", nil)
 	hooks := &fakeHooks{phase: "scout", agent: "evolve-scout", model: "auto", prompt: "x", verdict: core.VerdictPASS}
@@ -55,11 +44,6 @@ func TestRunner_AdvisorOverlayAppliedLogsLine(t *testing.T) {
 	}
 }
 
-// TestRunner_NoAdvisorOverlayLogsProfileDefault (T3 AC2): when the overlay
-// fields are empty (static/advisory mode, or no proposal for this phase), the
-// runner must emit an explicit "no advisor overlay (profile default)" line
-// for the phase — absence is now a grep-able fact too, not silence. RED
-// today: nothing is logged at the MR4c seam either way.
 func TestRunner_NoAdvisorOverlayLogsProfileDefault(t *testing.T) {
 	root := writeFallbackProfile(t, "evolve-scout", "claude-tmux", nil)
 	hooks := &fakeHooks{phase: "scout", agent: "evolve-scout", model: "auto", prompt: "x", verdict: core.VerdictPASS}
@@ -77,15 +61,6 @@ func TestRunner_NoAdvisorOverlayLogsProfileDefault(t *testing.T) {
 	}
 }
 
-// TestRunner_PolicyPinWinsOverAdvisorOverlay_SourceIsPin (T3 AC3, NEGATIVE):
-// with a policy pin present AND overlay fields set, the EXISTING contract
-// (pin always wins; the soft overlay never applies alongside one,
-// runner.go:425 `if pin == nil && ...`) must hold, AND the recorded model
-// source for this phase's response must be "pin", never "advisor" — even
-// though ModelRoutingCLI/Tier are non-empty. A gaming fake that logs/records
-// "advisor overlay" whenever the fields are merely non-empty (ignoring the
-// pin branch) must fail this test. RED today: core.PhaseResponse carries no
-// ModelSource field at all (compile-fails until added).
 func TestRunner_PolicyPinWinsOverAdvisorOverlay_SourceIsPin(t *testing.T) {
 	root := writeFallbackProfile(t, "evolve-scout", "claude-tmux", nil)
 	writePolicyPin(t, root, "scout", "claude-tmux", "opus")
@@ -113,12 +88,6 @@ func TestRunner_PolicyPinWinsOverAdvisorOverlay_SourceIsPin(t *testing.T) {
 	}
 }
 
-// TestRun_ModelSourceReflectsResolutionPath (T3 AC4 support): resp.
-// ModelSource + resp.ResolvedModel must name WHICH resolution path won —
-// profile (neither pin nor overlay), pin (policy pin present), or advisor
-// (soft overlay applied) — so the per-phase provenance the dossier records
-// (AC4) has a single, correct source to read from. RED today: PhaseResponse
-// has no ModelSource/ResolvedModel fields.
 func TestRun_ModelSourceReflectsResolutionPath(t *testing.T) {
 	cases := []struct {
 		name       string

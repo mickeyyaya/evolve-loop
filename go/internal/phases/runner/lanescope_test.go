@@ -1,9 +1,5 @@
 package runner
 
-// Cycle-776 — direct contract for the shared LaneScope resolver (consumed by
-// scout/build/tdd/triage ComposePrompt; phase-level rendering is pinned in
-// each phase's lanescope_prompt_test.go).
-
 import (
 	"testing"
 

@@ -9,33 +9,18 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// reportsize.go — cycle-565 Slice S1 of report-size-contracts-jit-artifacts: a
-// per-artifact token/size budget on the never-evict "## Handoff Summary" section
-// (phasecontract.HandoffSummary). The section's PRESENCE rides the normal
-// contract gate (CodeMissingSection); its SIZE rides a separate shadow-first
-// rollout dial so a miscalibrated budget can be observed before it can ever
-// block a cycle.
-
-// CodeHandoffBudgetExceeded is the stable violation code for a Handoff Summary
-// section that estimates over its token budget.
+// CodeHandoffBudgetExceeded is the stable code for a Handoff Summary estimated over its token budget.
 const CodeHandoffBudgetExceeded = "handoff_budget_exceeded"
 
-// tokensPerChar approximates the common ~4-chars-per-token heuristic (no
-// tokenizer dependency exists in this repo's go.mod; the same byte-length
-// heuristic backs other budgets like core.salvageMaxBytes).
+// charsPerToken is the common ~4-characters-per-token heuristic; the repo carries no tokenizer.
 const charsPerToken = 4
 
-// EstimateTokens returns a deterministic, monotonic token estimate for s using
-// the ~4-chars-per-token heuristic (integer division rounds down). It is pure
-// and allocation-free — same input always yields the same estimate.
+// EstimateTokens returns a deterministic token estimate for s at ~4 characters per token.
 func EstimateTokens(s string) int {
 	return len(s) / charsPerToken
 }
 
-// HandoffSectionContent returns the body of the "## Handoff Summary" section —
-// everything after the heading line up to (but not including) the next "## "
-// heading, or to EOF if none follows. ok is false when the section is absent
-// (its absence is CodeMissingSection's job, not the budget check's).
+// HandoffSectionContent returns the "## Handoff Summary" body up to the next "## " heading; ok is false when it is absent.
 func HandoffSectionContent(content string) (string, bool) {
 	const heading = "## Handoff Summary"
 	lines := strings.Split(content, "\n")
@@ -52,16 +37,14 @@ func HandoffSectionContent(content string) (string, bool) {
 	var body []string
 	for _, ln := range lines[start+1:] {
 		if strings.HasPrefix(ln, "## ") {
-			break // next section heading — the summary ends here
+			break
 		}
 		body = append(body, ln)
 	}
 	return strings.Join(body, "\n"), true
 }
 
-// CheckHandoffBudget reports whether the Handoff Summary section's estimated
-// token count exceeds budgetTokens. An absent section is never a violation
-// (violated=false, estimated=0) — that is CodeMissingSection's responsibility.
+// CheckHandoffBudget reports whether the Handoff Summary exceeds budgetTokens; an absent section is never a violation.
 func CheckHandoffBudget(content string, budgetTokens int) (violated bool, estimated int) {
 	body, ok := HandoffSectionContent(content)
 	if !ok {
@@ -71,32 +54,18 @@ func CheckHandoffBudget(content string, budgetTokens int) (violated bool, estima
 	return estimated > budgetTokens, estimated
 }
 
-// VerifyWithReportSize is VerifyWithStage threaded with the report-size gate's
-// own rollout stage (cycle-565 Slice S1) — exactly as VerifyWithStage was added
-// as a new layer over VerifyWith rather than changing an existing signature, so
-// no existing call site (cmd_phase_verify.go, reviewer.go, verifier.go,
-// catalogaware.go) churns. The reportSizeGate dial is INDEPENDENT of the
-// ContractGate stage: dormant at off/shadow (byte-identical Violations to
-// VerifyWithStage), blocking only at enforce.
+// VerifyWithReportSize is VerifyWithStage plus the Handoff Summary budget, recorded from advisory; the Reviewer blocks on it only at enforce.
 func VerifyWithReportSize(phase string, roots phasecontract.Roots, resolver phasecontract.Resolver, phaseIO, reportSizeGate config.Stage, budgetTokens int) (Result, error) {
 	res, err := VerifyWithStage(phase, roots, resolver, phaseIO)
 	if err != nil {
 		return res, err
 	}
-	// Off/shadow: fully dormant. Leave Violations byte-identical to
-	// VerifyWithStage so wiring the layer in cannot change existing behavior for
-	// any cycle that has not opted the gate above shadow. Advisory is the WARN
-	// rung (cycle-646): it RECORDS CodeHandoffBudgetExceeded so the host-side
-	// Reviewer can log a would-block warning, but the Reviewer keeps it
-	// non-blocking until reportSizeGate==enforce — the size dial's own staged
-	// rollout, independent of the ContractGate stage.
 	if reportSizeGate < config.StageAdvisory {
 		return res, nil
 	}
 	data, readErr := os.ReadFile(res.ArtifactPath)
 	if readErr != nil {
-		// An absent/unreadable artifact is already reported by VerifyWithStage
-		// (CodeMissingArtifact); there is nothing to budget-check.
+		// VerifyWithStage already reported the missing artifact.
 		return res, nil
 	}
 	if violated, estimated := CheckHandoffBudget(string(data), budgetTokens); violated {

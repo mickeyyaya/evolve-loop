@@ -7,11 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// Test 12 — the decision table projects the contract registry (the artifact
-// the model writes is spelled ONCE, in phasecontract), the capture kind is a
-// confined token (the former isSafeArtifactKind intent), and every per-call
-// literal sits in one row. The zero value is the initial Plan (the former
-// planStage's zero value).
 func TestDecision_TableProjectsTheContractRegistry(t *testing.T) {
 	safeKind := regexp.MustCompile(`^[a-z0-9_-]{1,32}$`)
 	rows := []struct {

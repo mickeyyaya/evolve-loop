@@ -1,10 +1,5 @@
 package bridge
 
-// askbroker_rung_test.go — ADR-0045 I3 (§8): the pre-85 AskBroker rung inside
-// the auto-respond escalate branch. White-box: drives a real autoResponder
-// with a manifest rule whose policy is `escalate` (so a matching pane yields
-// rc 85), and a KernelAnswerer whose facts cover the question.
-
 import (
 	"context"
 	"testing"
@@ -13,8 +8,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
 )
 
-// escalatePrompt is a manifest rule that escalates (no response keys) — the
-// pre-fix path returns rc 85 straight to ExitUnknownPrompt.
+// escalatePrompt is a manifest rule with no response keys, so a matching pane escalates with rc 85.
 var escalatePrompt = []ManifestPrompt{{
 	Name:   "unknown_path_question",
 	Regex:  "Which absolute path should I write the deliverable to\\?",
@@ -37,14 +31,10 @@ func brokerResponder(t *testing.T, panes []string, stage string, facts interacti
 
 const blockedQ = "Which absolute path should I write the deliverable to?"
 
-// TestPre85Rung_KernelHitInjectsOnce_ClearedContinues — enforce: the kernel
-// knows the artifact path, so the rung injects it (rc 1, not 85) exactly once;
-// a second escalation (brokerTried) falls through to rc 85.
 func TestPre85Rung_KernelHitInjectsOnce_ClearedContinues(t *testing.T) {
 	t.Parallel()
 	facts := interaction.KernelFacts{ArtifactPath: "/ws/cycle-7/build-report.md"}
-	// Tick 1 pane: the blocking question (escalates). Tick 2 pane: same
-	// question still present (agent hasn't moved) → second escalation.
+	// Both panes hold the same blocking question, so the second tick escalates again.
 	ar, tmux, rec := brokerResponder(t, []string{blockedQ, blockedQ}, "enforce", facts)
 	ctx := context.Background()
 
@@ -72,9 +62,6 @@ func TestPre85Rung_KernelHitInjectsOnce_ClearedContinues(t *testing.T) {
 	}
 }
 
-// TestPre85Rung_MissFallsThroughToFallbackChainUnchanged — the kernel does
-// NOT know the answer ⇒ the rung returns false and the escalation fires
-// (rc 85), the 85 → fallback chain untouched (B1, the unconditional floor).
 func TestPre85Rung_MissFallsThroughToFallbackChainUnchanged(t *testing.T) {
 	t.Parallel()
 	// Empty facts → every question misses.
@@ -87,8 +74,6 @@ func TestPre85Rung_MissFallsThroughToFallbackChainUnchanged(t *testing.T) {
 	}
 }
 
-// TestPre85Rung_ShadowDoesNotInject — shadow records a would-act soak signal
-// but injects nothing and still escalates (byte-identical behavior).
 func TestPre85Rung_ShadowDoesNotInject(t *testing.T) {
 	t.Parallel()
 	facts := interaction.KernelFacts{ArtifactPath: "/ws/cycle-7/build-report.md"}
@@ -110,10 +95,6 @@ func TestPre85Rung_ShadowDoesNotInject(t *testing.T) {
 	}
 }
 
-// TestPre85Rung_ShadowSoakRecordsEachTick — the once-budget bounds INJECTION
-// (enforce), not soak recording: a still-stuck shadow pane records a would_act
-// on each reaching tick (so the I1 soak signal isn't capped at one), and never
-// injects.
 func TestPre85Rung_ShadowSoakRecordsEachTick(t *testing.T) {
 	t.Parallel()
 	facts := interaction.KernelFacts{ArtifactPath: "/ws/cycle-7/build-report.md"}
@@ -138,8 +119,6 @@ func TestPre85Rung_ShadowSoakRecordsEachTick(t *testing.T) {
 	}
 }
 
-// TestPre85Rung_OffStageInert — off: no broker action at all, escalates as
-// today with no would-act noise.
 func TestPre85Rung_OffStageInert(t *testing.T) {
 	t.Parallel()
 	facts := interaction.KernelFacts{ArtifactPath: "/ws/cycle-7/build-report.md"}

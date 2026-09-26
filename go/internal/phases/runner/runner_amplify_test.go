@@ -11,13 +11,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// divergentBridge writes one string to the contracted artifact file and
-// returns a DIFFERENT string as bridge stdout — simulating a driver that
-// captured noisy tmux scrollback (e.g. a Deliverable Contract's own
-// prompt-echoed example verdict sentinels) instead of, or alongside, the
-// agent's genuine on-disk deliverable. Unlike fakeBridge (runner_test.go),
-// which forces Stdout to equal the written file content, this type lets a
-// test assert exactly which of the two sources Classify actually receives.
+// divergentBridge writes one string to the artifact and returns another as stdout, so a test sees which one Classify gets.
 type divergentBridge struct {
 	fileContent   string // written to req.ArtifactPath when non-empty; left unwritten when empty
 	stdoutContent string
@@ -42,21 +36,11 @@ func (f *divergentBridge) Probe(ctx context.Context) (core.BridgeProbe, error) {
 	return core.BridgeProbe{}, nil
 }
 
-// alwaysOKVerify is an Options.VerifyFn stub that unconditionally reports the
-// deliverable as well-formed, regardless of what (if anything) is on disk —
-// used to isolate the runner's own file-vs-stdout selection logic from
-// deliverable.Verify's real parsing rules (covered separately in
-// internal/deliverable and internal/phasecontract tests).
+// alwaysOKVerify reports every deliverable well-formed, isolating the runner's file-versus-stdout choice from parsing.
 func alwaysOKVerify(phase string, roots phasecontract.Roots) (deliverable.Result, error) {
 	return verifiedFrom(deliverable.Result{OK: true, Phase: phase}, phase, roots), nil
 }
 
-// TestRun_NonTimeout_BuildPhase_PrefersWellFormedFileOverDivergentStdout
-// amplifies runner-classify-prefer-deliverable-file beyond the audit-only RED
-// test: the build-report explicitly claims the fix is "phase-agnostic ...
-// not just audit". A regression that re-hardcodes the audit phase name, or
-// only wires the fallback into the audit Hooks, would pass the original test
-// but fail this one.
 func TestRun_NonTimeout_BuildPhase_PrefersWellFormedFileOverDivergentStdout(t *testing.T) {
 	root := writeFallbackProfile(t, "evolve-builder", "claude-tmux", nil)
 	hooks := &fakeHooks{phase: "build", agent: "evolve-builder", model: "sonnet", prompt: "x", verdict: core.VerdictPASS}
@@ -84,14 +68,6 @@ func TestRun_NonTimeout_BuildPhase_PrefersWellFormedFileOverDivergentStdout(t *t
 	}
 }
 
-// TestRun_NonTimeout_ContractedDeliverableFailsVerification_ShipVerdictDowngraded guards
-// the anti-gaming half of the verdict-source rule (ADR-0072). A CONTRACTED deliverable
-// that FAILS its well-formedness/anti-gaming contract (here: a missing challenge token)
-// carries a PASS sentinel in the file, and the pane also shows PASS. Classify would
-// extract PASS — the exact laundering vector the earlier sentinel-authoritative attempt
-// was blocked for. The ship-guard must downgrade the ship-eligible verdict to a coherent
-// FAIL, and the contract Codes must surface as diagnostics. (Previously this fell back to
-// the pane, leaving a fabricated verdict reachable.)
 func TestRun_NonTimeout_ContractedDeliverableFailsVerification_ShipVerdictDowngraded(t *testing.T) {
 	root := writeFallbackProfile(t, "evolve-auditor", "claude-tmux", nil)
 	hooks := &fakeHooks{phase: "audit", agent: "evolve-auditor", model: "opus", prompt: "x", verdict: core.VerdictPASS}
@@ -118,12 +94,6 @@ func TestRun_NonTimeout_ContractedDeliverableFailsVerification_ShipVerdictDowngr
 	}
 }
 
-// TestRun_NonTimeout_DeliverableFileNeverWritten_FallsBackToStdout covers the
-// "absent" branch of the fail-open guarantee: verifyFn (lying, or checking a
-// stale cache) reports OK=true, but the agent's contracted file was never
-// actually written to disk (a clean exit that skipped the write, not a
-// timeout). The runner must fall back to stdout rather than erroring out or
-// silently classifying against an empty/missing artifact.
 func TestRun_NonTimeout_DeliverableFileNeverWritten_FallsBackToStdout(t *testing.T) {
 	root := writeFallbackProfile(t, "evolve-scout", "claude-tmux", nil)
 	hooks := &fakeHooks{phase: "scout", agent: "evolve-scout", model: "auto", prompt: "x", verdict: core.VerdictPASS}
