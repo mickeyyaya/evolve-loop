@@ -72,7 +72,7 @@ func phaseExecutionReceiptExists(projectRoot string, cycle int, phase string) bo
 	if err != nil {
 		return false
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	type receipt struct {
 		Cycle int    `json:"cycle"`
