@@ -1,31 +1,10 @@
 package prompts
 
-// cycle420_amplified_test.go — Adversarial amplification for cycle-420 task T2.
-//
-// Probes gaps NOT covered by router_persona_test.go (AC1–AC5):
-//
-//   - GENERATED block markers: <!-- GENERATED:goal-recipes BEGIN/END --> must survive TSC
-//     (build-report: "NOT touched" — no regression guard existed before this test).
-//   - Section headings: ## Your job, ## Output contract, ## Goal-Type Recipes must be present
-//     after TSC (headings are the structural skeleton, distinct from prose content).
-//   - Prose floor: prose region must be >2500 bytes (prevents over-deletion gaming that
-//     preserves domain tokens while stripping all decision logic context).
-//   - Extended vocab — run: field: domain token "run:" preserved (build-report vocab list
-//     item not covered by the 4-token TestRouterPersona_DomainVocabPreserved test).
-
 import (
 	"strings"
 	"testing"
 )
 
-// TestRouterPersona_GeneratedBlockMarkersPreserved asserts that the GENERATED block
-// markers <!-- GENERATED:goal-recipes BEGIN --> and <!-- GENERATED:goal-recipes END -->
-// are present in agents/evolve-router.md after the TSC pass.
-//
-// Amplification angle: the build-report states "NOT touched: <!-- GENERATED:goal-recipes
-// BEGIN/END --> block". No existing test guards this contract. If TSC accidentally
-// deleted or altered the markers, the code generator that re-fills the block would
-// fail silently on the next generation pass.
 func TestRouterPersona_GeneratedBlockMarkersPreserved(t *testing.T) {
 	_, body := routerContent(t)
 	for _, marker := range []string{
@@ -40,14 +19,6 @@ func TestRouterPersona_GeneratedBlockMarkersPreserved(t *testing.T) {
 	}
 }
 
-// TestRouterPersona_SectionHeadingsPreserved asserts that the key section headings
-// in agents/evolve-router.md are still present after TSC prose compression.
-//
-// Amplification angle: AC2 checks byte count; AC4 checks code-span tokens; neither
-// verifies that the structural headings (## Your job, ## Output contract,
-// ## Goal-Type Recipes) still exist. A builder who deletes a heading and inlines its
-// content under another section could pass byte-count and vocab tests while breaking
-// the router's semantic structure.
 func TestRouterPersona_SectionHeadingsPreserved(t *testing.T) {
 	_, body := routerContent(t)
 	for _, heading := range []string{
@@ -63,17 +34,6 @@ func TestRouterPersona_SectionHeadingsPreserved(t *testing.T) {
 	}
 }
 
-// TestRouterPersona_ProseFloor asserts that the prose region of agents/evolve-router.md
-// (from end of frontmatter to ## Phase Catalog — Core Values, EXCLUDING the
-// generated goal-recipes table — see routerProseBytes) is at least 1200 bytes.
-//
-// Amplification angle: AC2 asserts an upper bound (<5243 bytes, ≥15% reduction).
-// Without a floor, a builder could game the byte limit by stripping all prose content
-// except domain tokens, passing AC2 while destroying all decision-routing context.
-// 1200 bytes ≈ 50% of the 2349-byte prose-only region measured on main at the
-// 2026-09-09 re-baseline (ADR-0099; before that the region included the table
-// and the floor was 2500 ≈ 48% of 5235) — a generous floor that
-// catches catastrophic over-deletion without constraining legitimate future compression.
 func TestRouterPersona_ProseFloor(t *testing.T) {
 	_, body := routerContent(t)
 	got := routerProseBytes(t, body)
@@ -85,13 +45,6 @@ func TestRouterPersona_ProseFloor(t *testing.T) {
 	}
 }
 
-// TestRouterPersona_ExtendedVocabRunField asserts that the "run:" domain token is
-// preserved in agents/evolve-router.md after TSC.
-//
-// Amplification angle: TestRouterPersona_DomainVocabPreserved covers 4 tokens
-// (routing-plan.json, fast|balanced|deep, writes_source, ClampPlanToFloor).
-// The build-report spec lists a 5th token: "run: true/false" — the JSON field that
-// controls whether a phase executes. This token is critical for routing-plan semantics.
 func TestRouterPersona_ExtendedVocabRunField(t *testing.T) {
 	_, body := routerContent(t)
 	if !strings.Contains(body, "run:") {

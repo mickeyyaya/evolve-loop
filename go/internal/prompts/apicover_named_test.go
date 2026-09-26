@@ -6,15 +6,7 @@ import (
 	"testing"
 )
 
-// apicover_named_test.go — public-API coverage (ADR-0050 Phase 5). Names and
-// exercises exported symbols apicover flagged uncovered in this package:
-//   - func NewForProject (prompts.go)
-//   - type Loader (prompts.go)
-//   - type Prompt (prompts.go)
-// Each test asserts a real contract (Rule 9), not a no-op reference.
-
-// seedAgentDir writes a project layout (agents/<name>.md) on disk and returns
-// the project root.
+// seedAgentDir writes agents/<name>.md under a temp root and returns the root.
 func seedAgentDir(t *testing.T, name, contents string) string {
 	t.Helper()
 	root := t.TempDir()
@@ -39,8 +31,6 @@ model: tier-2
 Body content.
 `
 
-// TestNewForProject_OverrideBranch exercises the EVOLVE_PROMPTS_DIR-override
-// branch: the loader resolves agents from the override dir, not projectRoot.
 func TestNewForProject_OverrideBranch(t *testing.T) {
 	overrideRoot := seedAgentDir(t, "evolve-scout", namedAgent)
 	emptyProject := t.TempDir() // no agents/ here — proves the override wins
@@ -59,8 +49,6 @@ func TestNewForProject_OverrideBranch(t *testing.T) {
 	}
 }
 
-// TestNewForProject_UnsetBranch exercises the unset branch: with
-// EVOLVE_PROMPTS_DIR cleared, the loader resolves from projectRoot.
 func TestNewForProject_UnsetBranch(t *testing.T) {
 	root := seedAgentDir(t, "evolve-builder", "---\nname: evolve-builder\ndescription: builder\n---\nBody.")
 	os.Unsetenv("EVOLVE_PROMPTS_DIR")
@@ -78,9 +66,6 @@ func TestNewForProject_UnsetBranch(t *testing.T) {
 	}
 }
 
-// TestLoaderAndPrompt_PublicFields binds a *Loader and a Prompt and asserts the
-// Prompt's public fields (Name/Body/Raw/Frontmatter) are populated from the
-// parsed source.
 func TestLoaderAndPrompt_PublicFields(t *testing.T) {
 	dir := seedAgentDir(t, "evolve-scout", namedAgent)
 
@@ -107,11 +92,9 @@ func TestLoaderAndPrompt_PublicFields(t *testing.T) {
 	if p.Body == "" {
 		t.Error("Prompt.Body empty; want content after the frontmatter fence")
 	}
-	// Body is the content after the closing fence — must not retain the fence.
 	if want := "# Evolve Scout"; !contains(p.Body, want) {
 		t.Errorf("Prompt.Body = %q, want it to contain %q", p.Body, want)
 	}
-	// Raw is the verbatim file — must retain the frontmatter fence.
 	if !contains(p.Raw, "---") || !contains(p.Raw, "name: evolve-scout") {
 		t.Errorf("Prompt.Raw = %q, want verbatim source including frontmatter", p.Raw)
 	}
