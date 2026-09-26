@@ -18,3 +18,4 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/recovery` | the decisions of the Phase Recovery Pipeline | [internal-recovery.md](internal-recovery.md) |
 | `internal/router` | the deterministic phase-routing kernel | [internal-router.md](internal-router.md) |
 | `internal/triagecap` | bounds the coverage floors triage may commit per cycle | [internal-triagecap.md](internal-triagecap.md) |
+| `internal/cli/phasecmd` | the `evolve phase` and `evolve phases` commands | [internal-cli-phasecmd.md](internal-cli-phasecmd.md) |

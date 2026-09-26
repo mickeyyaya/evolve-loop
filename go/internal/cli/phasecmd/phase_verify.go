@@ -19,24 +19,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/reachabilityprobe"
 )
 
-// runPhaseVerify implements `evolve phase verify <phase> --workspace DIR
-// [--worktree DIR] [--evolve-dir DIR] [--json]`. It is the agent-callable
-// self-check (the Deliverable Contract block tells each agent to run it before
-// finishing) and shares its verifier with the host-side contract gate so the
-// two run byte-identical logic. ADR-0034.
-//
-// Exit codes:
-//
-//	0  — deliverable well-formed
-//	1  — confirmed contract violation (agent must fix)
-//	10 — usage error (missing/unknown phase)
-//	2  — ambiguity/infra (e.g. unreadable dir) — caller should fail OPEN
+// runPhaseVerify is the agent's deliverable self-check; it shares the host gate's verifier.
+// Exit: 0 well-formed, 1 confirmed violation, 2 infra ambiguity (callers fail open), 10 usage error.
+// See ADR-0034.
 func runPhaseVerify(args []string, stdout, stderr io.Writer) int {
-	// Pull the positional phase name out FIRST (it precedes the flags in the
-	// natural form `verify build --workspace X`), then flag-parse the remainder.
-	// This supports both `--flag value` and `--flag=value` — unlike reorderArgs,
-	// which groups flags together and lets a space-separated flag swallow the
-	// next flag as its value.
+	// Take the phase positional first, then flag-parse the rest, so both --flag value and --flag=value work.
 	var phaseArg string
 	var flags []string
 	for _, a := range args {
@@ -61,9 +48,6 @@ func runPhaseVerify(args []string, stdout, stderr io.Writer) int {
 		return 10
 	}
 	phase := strings.ToLower(phaseArg)
-	// Resolve through the SAME merged catalog the host-side contract gate uses, so
-	// the agent's self-check and the gate agree on user/minted phases (no drift —
-	// ADR-0034). A catalog-load failure degrades to built-in-only resolution.
 	resolver := phaseVerifyResolver()
 	contract, ok := resolver.Resolve(phase)
 	if !ok {
@@ -71,21 +55,13 @@ func runPhaseVerify(args []string, stdout, stderr io.Writer) int {
 		return 10
 	}
 
-	// The project .evolve dir defaults from the same root the resolver used, so
-	// orchestrator-target deliverables, the persisted cycle state and the inbox
-	// a declared effect is judged in all resolve against ONE project.
+	// Default from the resolver's root so deliverables, cycle state and inbox resolve against one project.
 	if *evolveDir == "" {
 		*evolveDir = filepath.Join(cmdutil.EnvOrCwd("EVOLVE_PROJECT_ROOT"), ".evolve")
 	}
 	roots := phasecontract.Roots{Workspace: *workspace, Worktree: *worktree, EvolveDir: *evolveDir}
-	// Self-check ≡ gate (ADR-0034): the host gate judges the conditional
-	// explanation-documentation sections with the cycle's contract version and a
-	// declared effect under this cycle's processing/cycle-N/, so the self-check
-	// takes both from the persisted cycle state — or it would print OK on a
-	// report the gate blocks. Only contracts that declare either pay the read,
-	// and each consumer states its own consequence when the state is missing:
-	// the section check is skipped (0 = not active), while an effect cannot be
-	// judged at all and the verify aborts (fail open) rather than deciding blind.
+	// The gate judges explanation sections and declared effects from the cycle state, so the self-check
+	// must too. Without it the section check is skipped, and an effect cannot be judged: verify exits 2.
 	needsSections, needsEffects := len(contract.ExplanationSections) > 0, len(contract.Effects) > 0
 	if needsSections || needsEffects {
 		state, problem := persistedCycleState(*workspace, *evolveDir)
@@ -100,7 +76,6 @@ func runPhaseVerify(args []string, stdout, stderr io.Writer) int {
 	}
 	res, err := verifyDeliverable(phase, roots, resolver)
 	if err != nil {
-		// Ambiguity/infra — fail OPEN at the call site.
 		fmt.Fprintf(stderr, "evolve phase verify: %v\n", err)
 		return 2
 	}
@@ -122,17 +97,9 @@ func runPhaseVerify(args []string, stdout, stderr io.Writer) int {
 	return 1
 }
 
-// verifyDeliverable runs the well-formedness checks, adding the ADR-0077
-// documentation floor when — and only when — this invocation has a diff to
-// judge: phase `build` with a `--worktree`. That is exactly the shape the
-// host-side docs-floor reviewer sees, and the changed-path set comes from the
-// same derivation it uses (core.ChangedWorktreePaths), so the agent's
-// self-check and the gate cannot drift (ADR-0034).
-//
-// Fail-open everywhere else, byte-identical to before: no `--worktree` means no
-// diff to classify, and the floor is build-scoped (ADR-0077) so no other
-// phase's deliverable is taxed by it. A non-architecture-class diff never
-// yields the violation, so ordinary cycles are unaffected.
+// verifyDeliverable adds the architecture docs floor for build and the frozen-pin gate for tdd, each only
+// with --worktree: the worktree is the one place the diff and the import graph exist.
+// See ADR-0077.
 func verifyDeliverable(phase string, roots phasecontract.Roots, resolver phasecontract.Resolver) (deliverable.Result, error) {
 	stage := phaseVerifyPhaseIO()
 	if phase == "build" && roots.Worktree != "" {
@@ -146,25 +113,11 @@ func verifyDeliverable(phase string, roots phasecontract.Roots, resolver phaseco
 	return withFrozenPinViolations(res, roots.Worktree), nil
 }
 
-// codeUnreachableFrozenPin is the stable violation code the tdd reachability
-// gate emits, so an agent reading stderr knows WHICH gate failed.
+// codeUnreachableFrozenPin is the stable violation code of the tdd reachability gate.
 const codeUnreachableFrozenPin = "unreachable_frozen_pin"
 
-// withFrozenPinViolations adds the cycle-644 reachability gate to a tdd
-// verdict: every call site frozen by this deliverable (`doNotModifyTests:
-// true`) that would require its pinning package to import a package already
-// importing it back is a permanently unsatisfiable acceptance criterion, and
-// cycle-644 proved that costs a whole cycle to discover from the build side.
-// Catching it here — the self-check every tdd agent runs before handing off,
-// sharing its verifier with the host-side contract gate (ADR-0034) — makes the
-// check deterministic instead of a doc obligation the agent may forget
-// (agents/evolve-tdd-engineer.md:132).
-//
-// Placement mirrors the ADR-0077 docs-floor precedent: phase-scoped and
-// `--worktree`-scoped, because the worktree is the only place the pinned
-// production files and their import graph exist. Fail-open on every infra
-// ambiguity (unparseable handoff, no module, `go list` failure) — only a
-// compiler-provable cycle turns a well-formed deliverable red.
+// withFrozenPinViolations fails a tdd verdict whose frozen tests pin a call that could only build by
+// closing an import cycle. Infra ambiguity fails open; only a compiler-provable cycle turns it red.
 func withFrozenPinViolations(res deliverable.Result, worktree string) deliverable.Result {
 	frozen, err := reachabilityprobe.FrozenTestFiles(res.ArtifactPath)
 	if err != nil || len(frozen) == 0 {
@@ -184,20 +137,16 @@ func withFrozenPinViolations(res deliverable.Result, worktree string) deliverabl
 	return res
 }
 
-// phaseVerifyPhaseIO resolves the EVOLVE_PHASE_IO rollout stage the SAME way the
-// host gate does (config.Load over the phase registry + env), so the agent's
-// self-check and the gate apply identical PhaseIO-gated checks — the package's
-// no-drift invariant (ADR-0050 §3.8). A registry that cannot be read degrades to
-// env + code defaults, never a hard failure.
+// phaseVerifyPhaseIO resolves the PhaseIO stage exactly as the host gate does; an unreadable
+// registry falls back to env and code defaults.
+// See ADR-0050.
 func phaseVerifyPhaseIO() config.Stage {
 	cfg, _ := config.Load(config.RegistryPath(cmdutil.EnvOrCwd("EVOLVE_PROJECT_ROOT")), cmdutil.FilterEvolveEnv(os.Environ()))
 	return cfg.PhaseIO
 }
 
-// phaseVerifyResolver builds a contract resolver from the merged phase catalog
-// (built-in registry + .evolve/phases overlays). A load failure degrades to
-// built-in-only resolution so the self-check never hard-fails on a catalog
-// glitch — built-in phases always verify.
+// phaseVerifyResolver resolves contracts from the merged phase catalog the host gate uses; a load
+// failure falls back to built-ins, so built-in phases always verify.
 func phaseVerifyResolver() phasecontract.Resolver {
 	project := cmdutil.EnvOrCwd("EVOLVE_PROJECT_ROOT")
 	cat, _, _, err := mergedCatalog(project)
@@ -207,18 +156,9 @@ func phaseVerifyResolver() phasecontract.Resolver {
 	return phasecontract.NewCatalogResolver(cat.Get)
 }
 
-// persistedCycleState reads the cycle state the self-check judges context-
-// dependent checks from — the explanation-documentation version and the
-// cycle number — through the repo's own resolvers: the run workspace's per-run mirror (core.RunStateFile — the
-// authoritative copy under concurrent fleet lanes, where the global file holds
-// whichever run wrote last) when a workspace is given, else the global path
-// core.ResolveCycleStatePath honours (EVOLVE_CYCLE_STATE_FILE included). No
-// state file, or an unreadable one, is reported on stderr — never silently
-// reported to the CALLER as a problem description (never silently treated as
-// "not active"), so each consumer prints its own consequence.
+// persistedCycleState prefers the workspace's per-run mirror, authoritative under fleet lanes, over the
+// global state file. A missing or unparseable file returns a problem description, never a silent zero state.
 func persistedCycleState(workspace, evolveDir string) (state core.CycleState, problem string) {
-	// evolveDir is never empty here (runPhaseVerify defaults it), so a run
-	// workspace's per-run mirror wins and the global path is the fallback.
 	path := core.ResolveCycleStatePath(evolveDir)
 	if workspace != "" {
 		path = filepath.Join(workspace, core.RunStateFile)

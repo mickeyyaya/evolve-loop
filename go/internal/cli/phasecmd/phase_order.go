@@ -12,10 +12,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseorder"
 )
 
-// runPhaseOrder is the `evolve phase-order` subcommand. Ports
-// legacy/scripts/dispatch/list-phase-order.sh — emits the phase names
-// in order from phase-registry.json, falling back to a hardcoded order
-// when EVOLVE_USE_PHASE_REGISTRY=0 or registry is missing.
+// RunPhaseOrder prints the registry's phase order, or the hardcoded order when the registry is off or missing.
 func RunPhaseOrder(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	for _, a := range args {
 		switch a {
@@ -29,8 +26,7 @@ func RunPhaseOrder(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 
 	projectRoot := os.Getenv("EVOLVE_PROJECT_ROOT")
 	if projectRoot != "" {
-		// Absolutize a relative env root (cycle-119 class). The git/cwd
-		// fallbacks below already yield absolute paths.
+		// Only the env root can be relative; the git and cwd fallbacks are absolute.
 		projectRoot = paths.AbsoluteRoot("EVOLVE_PROJECT_ROOT", projectRoot, func(m string) {
 			fmt.Fprintf(stderr, "[phase-order] WARN: %s\n", m)
 		})

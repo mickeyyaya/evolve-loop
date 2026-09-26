@@ -12,11 +12,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseinventory"
 )
 
-// runPhaseInventory implements `evolve phase-inventory <subcommand>` — the
-// phase counterpart of skill-inventory (ADR-0038). Exit codes:
-//   - 0  success (cache hit or fresh build)
-//   - 10 bad args / unknown subcommand
-//   - 1  internal error
+// RunPhaseInventory implements `evolve phase-inventory build`, the phase counterpart of skill-inventory.
 func RunPhaseInventory(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
 		fmt.Fprintln(stderr, "evolve phase-inventory: missing subcommand (build)")

@@ -11,16 +11,9 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
-// runPhaseLint implements `evolve phase lint <name>` — a developer aid that
-// checks an operator-authored phase descriptor against the unified phase
-// descriptor (ADR-0035) and reports what the runtime WILL derive from it. It
-// reuses the exact runtime path (DiscoverUserSpecsFromRoots → ValidateUserSpec
-// → FromSpec) so the lint reflects production behavior, not a parallel schema.
-//
-// It is FAIL-OPEN by contract: every finding is a warning and the command
-// always exits 0 (except a usage error: missing name → 10). Linting must never
-// block a developer — the runtime gates (ValidateUserSpec floor, contract gate)
-// are where enforcement lives.
+// runPhaseLint implements `evolve phase lint <name>`. It is fail-open by contract:
+// every finding is a warning and only a missing name exits non-zero.
+// See ADR-0035.
 func runPhaseLint(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 || strings.TrimSpace(args[0]) == "" {
 		fmt.Fprintln(stderr, "usage: evolve phase lint <name>")
@@ -43,7 +36,6 @@ func runPhaseLint(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 	if !found {
-		// Fail-open: a missing phase is a warning, not an error.
 		fmt.Fprintf(stdout, "WARN: no user phase named %q in any phase root of %s\n", name, project)
 		return 0
 	}
@@ -59,13 +51,9 @@ func runPhaseLint(args []string, stdout, stderr io.Writer) int {
 	for _, w := range warnings {
 		fmt.Fprintf(stdout, "        - %s\n", w)
 	}
-	return 0 // fail-open
+	return 0
 }
 
-// lintSpec collects descriptor warnings: the hard ValidateUserSpec floor plus
-// the soft best-practice checks shared with `phases create` (an evaluate phase
-// with no required sections produces a contract that verifies nothing; an
-// undefined artifact name; unknown categories).
 func lintSpec(s phasespec.PhaseSpec) []string {
 	warnings := append([]string(nil), phasespec.ValidateUserSpec(s)...)
 	return append(warnings, softLintWarnings(s)...)

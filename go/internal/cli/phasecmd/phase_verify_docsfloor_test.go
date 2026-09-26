@@ -10,24 +10,9 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable"
 )
 
-// RED contract for cycle-1150 / wire-docsfloor-verify-cli.
-//
-// `evolve phase verify build` is the exact self-check every phase prompt's
-// Deliverable Contract tells the agent to run before declaring done. It calls
-// deliverable.VerifyWithStage, which never sees the build's diff — so the
-// ADR-0077 blocking-grade classifier (deliverable.VerifyBuildWithChangedPaths,
-// added cycle-1144) has zero production callers and an architecture-class build
-// with no docs delta passes the agent's own self-check.
-//
-// These tests drive the REAL CLI entry point (runPhaseVerify) over a REAL git
-// worktree, so they assert on exit codes and stderr the operator actually sees
-// — not on an internal seam that is already green in isolation.
-
-// docsFloorBuildReport is a well-formed build deliverable: the floor must be
-// the ONLY thing that can turn these cases red, never a well-formedness gap.
+// docsFloorBuildReport is well-formed, so only the docs floor can turn a case red.
 const docsFloorBuildReport = "## Changes\n- go/internal/policy/policy.go\nVerdict: PASS\n"
 
-// docsFloorGit runs git in dir, failing the test on error.
 func docsFloorGit(t *testing.T, dir string, args ...string) {
 	t.Helper()
 	cmd := exec.Command("git", args...)
@@ -37,9 +22,7 @@ func docsFloorGit(t *testing.T, dir string, args ...string) {
 	}
 }
 
-// newDocsFloorWorktree builds a git repo with one base commit and then
-// materialises `changed` as new files on top of it — the shape a cycle's build
-// worktree has at verify time (new work is untracked or diffs against HEAD).
+// newDocsFloorWorktree commits a base, then adds changed as untracked files, as a build worktree looks at verify time.
 func newDocsFloorWorktree(t *testing.T, changed ...string) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -63,7 +46,6 @@ func newDocsFloorWorktree(t *testing.T, changed ...string) string {
 	return dir
 }
 
-// newDocsFloorWorkspace returns a workspace holding a well-formed build report.
 func newDocsFloorWorkspace(t *testing.T) string {
 	t.Helper()
 	ws := t.TempDir()
@@ -73,11 +55,6 @@ func newDocsFloorWorkspace(t *testing.T) string {
 	return ws
 }
 
-// TestPhaseVerify_ArchitectureClassDiffWithoutDocs_Exit1 — AC1, the primary
-// rejection contract. A worktree diff that touches a trust-kernel surface
-// (go/internal/policy/) and carries no docs delta must be a CONFIRMED violation
-// on the live CLI path: exit 1, with the stable `missing_architecture_docs`
-// code named in stderr so the agent knows what to fix.
 func TestPhaseVerify_ArchitectureClassDiffWithoutDocs_Exit1(t *testing.T) {
 	wt := newDocsFloorWorktree(t, "go/internal/policy/policy.go")
 	ws := newDocsFloorWorkspace(t)
@@ -92,9 +69,6 @@ func TestPhaseVerify_ArchitectureClassDiffWithoutDocs_Exit1(t *testing.T) {
 	}
 }
 
-// TestPhaseVerify_ArchitectureClassDiffWithoutDocs_JSONCarriesCode — AC1, the
-// machine-readable half. The host gate and the agent read the same verdict, so
-// --json must carry the floor code too, not only the human stderr rendering.
 func TestPhaseVerify_ArchitectureClassDiffWithoutDocs_JSONCarriesCode(t *testing.T) {
 	wt := newDocsFloorWorktree(t, "go/internal/core/phase_bindings.go")
 	ws := newDocsFloorWorkspace(t)
@@ -108,11 +82,6 @@ func TestPhaseVerify_ArchitectureClassDiffWithoutDocs_JSONCarriesCode(t *testing
 	}
 }
 
-// TestPhaseVerify_ArchitectureClassDiffWithDocs_Exit0 — AC2, the
-// anti-false-positive half. The SAME architecture-class diff must pass once a
-// qualifying docs delta rides along. A floor that rejects correctly-documented
-// work would block every architecture cycle; a fake that always emits the
-// violation dies here.
 func TestPhaseVerify_ArchitectureClassDiffWithDocs_Exit0(t *testing.T) {
 	for _, doc := range []string{
 		"docs/architecture/adr/0099-cycle-1150-wiring.md",
@@ -130,11 +99,6 @@ func TestPhaseVerify_ArchitectureClassDiffWithDocs_Exit0(t *testing.T) {
 	}
 }
 
-// TestPhaseVerify_NonArchitectureDiffInWorktree_Exit0 — AC3, fail-open inside a
-// worktree. Ordinary cycles (bugfix, test-only, docs-only) must be untouched by
-// the wiring: `_test.go` files never label, and nothing outside the declared
-// architecture surfaces does either. This is the regression guard that keeps
-// the new code path from taxing every non-architecture cycle.
 func TestPhaseVerify_NonArchitectureDiffInWorktree_Exit0(t *testing.T) {
 	cases := map[string][]string{
 		"test-only":      {"go/internal/policy/policy_test.go"},
@@ -154,11 +118,6 @@ func TestPhaseVerify_NonArchitectureDiffInWorktree_Exit0(t *testing.T) {
 	}
 }
 
-// TestPhaseVerify_NoWorktree_ByteIdentical — AC3, the fail-open contract when
-// there is no diff source at all. With no --worktree there is nothing to
-// classify, so behaviour must be byte-identical to today's VerifyWithStage
-// path: a well-formed report passes, a missing one still fails naming its path.
-// Rejects an implementation that panics or hard-fails on an empty Worktree.
 func TestPhaseVerify_NoWorktree_ByteIdentical(t *testing.T) {
 	t.Run("well-formed report still passes", func(t *testing.T) {
 		ws := newDocsFloorWorkspace(t)
@@ -183,16 +142,11 @@ func TestPhaseVerify_NoWorktree_ByteIdentical(t *testing.T) {
 	})
 }
 
-// TestPhaseVerify_NonBuildPhase_UnaffectedByDocsFloor — AC3, the scope guard.
-// The docs floor is a BUILD-phase contract (ADR-0077). Threading the changed
-// path set through verify must not leak the floor into other phases'
-// deliverables, even when the same architecture-class worktree is supplied.
 func TestPhaseVerify_NonBuildPhase_UnaffectedByDocsFloor(t *testing.T) {
 	wt := newDocsFloorWorktree(t, "go/internal/policy/policy.go")
 	ws := t.TempDir()
 
-	// An empty workspace fails the tdd contract on well-formedness alone; the
-	// point is WHICH violation surfaces — never the build-only floor code.
+	// The empty workspace fails tdd on well-formedness; the point is which code surfaces.
 	code, _, errb := runVerify(t, "tdd", "--workspace="+ws, "--worktree="+wt)
 	if code != 1 {
 		t.Fatalf("exit=%d want 1 (missing tdd artifact); stderr=%s", code, errb)

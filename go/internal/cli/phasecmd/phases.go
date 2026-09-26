@@ -1,7 +1,3 @@
-// cmd_phases.go implements `evolve phases <list|validate|add>` — the operator
-// surface for the user-definable-phases framework. It is READ-ONLY except for
-// `add`, which scaffolds a new .evolve/phases/<name>/ skeleton. Distinct from
-// `evolve phase` (run one phase in-process) and `evolve phase-order`.
 package phasecmd
 
 import (
@@ -20,8 +16,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
-// runPhases dispatches the phases subcommands. Exit codes: 0 ok, 2 validation
-// failure, 10 usage error, 1 I/O error.
+// RunPhases implements `evolve phases`; it exits 0 ok, 1 I/O error, 2 validation failure, 10 usage error.
 func RunPhases(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve phases", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -55,9 +50,6 @@ func RunPhases(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 }
 
-// mergedCatalog delegates to the single merged-catalog loader in phasespec
-// (built-in registry + EVOLVE_PHASE_ROOTS overlays) — kept as a local name
-// for the eight cmd call sites.
 func mergedCatalog(project string) (phasespec.Catalog, map[string]string, []string, error) {
 	return phasespec.MergedCatalog(project)
 }
@@ -88,9 +80,7 @@ func phasesList(project string, stdout, stderr io.Writer) int {
 	return 0
 }
 
-// phasesValidate validates operator-authored phases. Discovery warnings go to
-// stderr; the per-phase OK/FAIL verdicts + violations go to stdout (the
-// machine-readable result). Exit 2 if any phase has violations.
+// phasesValidate prints per-phase verdicts on stdout (machine-readable) and discovery warnings on stderr.
 func phasesValidate(project, profileDir string, args []string, stdout, stderr io.Writer) int {
 	strictProvenance := false
 	var cleanArgs []string
@@ -103,7 +93,6 @@ func phasesValidate(project, profileDir string, args []string, stdout, stderr io
 	}
 	args = cleanArgs
 
-	// Provenance check
 	if profileDir == "" {
 		profileDir = filepath.Join(project, ".evolve", "profiles")
 	}

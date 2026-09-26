@@ -1,23 +1,3 @@
-// cmd_phases_coherence_test.go — RED tests for migration step 4
-// (projection-generation-and-meta-gates; cycle-239 retry of cycle-238, test
-// contract salvaged verbatim from 878df21 per intent non-goal "salvage,
-// don't rewrite"). Three CLI surfaces (architecture blueprint B3/B8/B9/B12):
-//
-//  1. `evolve phases validate [--strict-provenance]` — profiles missing
-//     `generated_from` emit `WARN: profile <name> missing generated_from`
-//     (eval profile-provenance-field C4 greps `missing.*generated_from`);
-//     advisory exit 0 by default, --strict-provenance ⇒ exit 2. Profile dir
-//     resolution: EVOLVE_PROFILE_DIR env → paths default
-//     (<project>/.evolve/profiles).
-//  2. `evolve phases check-coherence [--strict]` — persona tools: frontmatter
-//     vs profile allowed_tools; WARN advisory exit 0, --strict ⇒ exit 2;
-//     EVOLVE_PERSONA_OVERRIDE="<path>:<name>" substitutes one persona file
-//     (eval persona-tools-coherence-gate C4).
-//  3. `evolve phases check-artifact-coherence [--strict]` — persona
-//     output-format: artifact basename vs profile output_artifact basename.
-//
-// Layout: agents at <project>/agents/evolve-<name>.md, profiles at
-// <project>/.evolve/profiles/<name>.json, project = EVOLVE_PROJECT_ROOT.
 package phasecmd
 
 import (
@@ -28,9 +8,7 @@ import (
 	"testing"
 )
 
-// newCoherenceProject builds a temp project root with agents/ and
-// .evolve/profiles/ dirs, points EVOLVE_PROJECT_ROOT at it, and neutralizes
-// the env overrides that would redirect dir resolution.
+// newCoherenceProject also blanks the env overrides that would redirect directory resolution.
 func newCoherenceProject(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
@@ -72,8 +50,6 @@ func writeCoherenceProfile(t *testing.T, root, name, body string) {
 	}
 }
 
-// --- Task 1: provenance check wired into `phases validate` (B3) ---
-
 func TestRunPhases_ProvenanceWarnsByDefault(t *testing.T) {
 	root := newCoherenceProject(t)
 	writeCoherenceProfile(t, root, "naked",
@@ -84,7 +60,7 @@ func TestRunPhases_ProvenanceWarnsByDefault(t *testing.T) {
 		t.Fatalf("rc = %d, want 0 (default mode is advisory); stderr=%s", rc, errb.String())
 	}
 	combined := out.String() + errb.String()
-	// Eval C4 greps `missing.*generated_from`.
+	// An eval greps `missing.*generated_from`, so both words are part of the output contract.
 	if !strings.Contains(combined, "missing") || !strings.Contains(combined, "generated_from") {
 		t.Errorf("validate output must match missing.*generated_from, got:\n%s", combined)
 	}
@@ -121,11 +97,6 @@ func TestRunPhases_ProvenanceStrictPassesWhenAllStamped(t *testing.T) {
 }
 
 func TestRunPhases_ProvenanceHonorsProfileDir(t *testing.T) {
-	// --profile-dir flag routes validate to the alternate profiles dir;
-	// the unstamped profile there must be detected even though the
-	// project-root profiles dir is clean.
-	// (Renamed from TestRunPhases_ProvenanceHonorsProfileDirEnv — cycle-16
-	// migrates EVOLVE_PROFILE_DIR to the --profile-dir CLI flag.)
 	root := newCoherenceProject(t)
 	writeCoherenceProfile(t, root, "stamped",
 		`{"name":"stamped","role":"stamped","cli":"claude-tmux","model_tier_default":"sonnet","generated_from":"hand-authored"}`)
@@ -134,7 +105,6 @@ func TestRunPhases_ProvenanceHonorsProfileDir(t *testing.T) {
 		[]byte(`{"name":"scout","role":"scout","cli":"claude-tmux","model_tier_default":"sonnet"}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// Pass --profile-dir as a CLI flag before the subcommand verb (not env var).
 	var out, errb bytes.Buffer
 	if rc := RunPhases([]string{"--profile-dir", alt, "validate"}, nil, &out, &errb); rc != 0 {
 		t.Fatalf("rc = %d, want 0; stderr=%s", rc, errb.String())
@@ -146,17 +116,11 @@ func TestRunPhases_ProvenanceHonorsProfileDir(t *testing.T) {
 }
 
 func TestRunPhases_UnknownFlagReturnsNonZero(t *testing.T) {
-	// Passing an unknown flag must return exit != 0 (usage error).
-	// PRE-EXISTING GREEN: current default case already returns exit 10 for
-	// unrecognised args; after the flag.FlagSet migration it returns 10 via
-	// flag parse error. Both paths exit non-zero.
 	var out, errb bytes.Buffer
 	if rc := RunPhases([]string{"--unknown-flag-xyz"}, nil, &out, &errb); rc == 0 {
 		t.Errorf("RunPhases([--unknown-flag-xyz]) exit 0; want non-zero (usage error)")
 	}
 }
-
-// --- Task 2: `phases check-coherence` (B8/B9) ---
 
 func TestRunPhases_CheckCoherenceCleanExitsZero(t *testing.T) {
 	root := newCoherenceProject(t)
@@ -204,10 +168,7 @@ func TestRunPhases_CheckCoherenceStrictExitsTwoOnDrift(t *testing.T) {
 }
 
 func TestRunPhases_CheckCoherencePersonaOverride(t *testing.T) {
-	// --persona-override <path>:<name> substitutes the named persona's file.
-	// On-disk pair is clean; the override adds a contradicting tool → WARN.
-	// (Renamed from TestRunPhases_CheckCoherencePersonaOverrideEnv — cycle-16
-	// migrates EVOLVE_PERSONA_OVERRIDE to the --persona-override CLI flag.)
+	// The on-disk pair is clean; only the override adds a contradicting tool.
 	root := newCoherenceProject(t)
 	writeCoherencePersona(t, root, "widget", `tools: ["Read"]`)
 	writeCoherenceProfile(t, root, "widget",
@@ -217,7 +178,6 @@ func TestRunPhases_CheckCoherencePersonaOverride(t *testing.T) {
 		[]byte("---\nname: evolve-widget\ndescription: fixture\ntools: [\"Read\", \"git-commit\"]\n---\n\n# widget\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// Pass --persona-override as a CLI flag before the subcommand verb (not env var).
 	var out, errb bytes.Buffer
 	if rc := RunPhases([]string{"--persona-override", override + ":widget", "check-coherence"}, nil, &out, &errb); rc != 0 {
 		t.Fatalf("rc = %d, want 0; stderr=%s", rc, errb.String())
@@ -230,8 +190,6 @@ func TestRunPhases_CheckCoherencePersonaOverride(t *testing.T) {
 		t.Errorf("override drift must name the contradicting tool git-commit, got:\n%s", s)
 	}
 }
-
-// --- Task 3: `phases check-artifact-coherence` (B12) ---
 
 func TestRunPhases_CheckArtifactCoherenceCleanExitsZero(t *testing.T) {
 	root := newCoherenceProject(t)
@@ -251,7 +209,6 @@ func TestRunPhases_CheckArtifactCoherenceCleanExitsZero(t *testing.T) {
 
 func TestRunPhases_CheckArtifactCoherenceReportsMismatch(t *testing.T) {
 	root := newCoherenceProject(t)
-	// I-3(d) incident replica.
 	writeCoherencePersona(t, root, "plan-review",
 		`output-format: "plan-review.md — ## Findings, ## Verdict"`)
 	writeCoherenceProfile(t, root, "plan-review",

@@ -16,18 +16,14 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// RunPhaseObserver is the `evolve phase-observer [--enforce] [--scope=...] <ws> <pgid> <cycle> <phase> <agent> [state]` subcommand.
-// Ports the core stall-detection behavior of legacy/scripts/dispatch/phase-observer.sh.
-// The composition root of ADR-0103 unit 12: it parses argv once, arms the
-// SIGUSR1 shutdown, builds the subprocess's stderr-only Signal Center and
-// hands the engine's host a Config whose accessor reaches it.
+// RunPhaseObserver implements `evolve phase-observer`, the composition root of the manual stall observer.
 func RunPhaseObserver(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	a, rc, handled := parseObserverArgs(args, stdout, stderr)
 	if handled {
 		return rc
 	}
 
-	// SIGUSR1 = "subagent has exited; finalize"
+	// SIGUSR1 means the subagent has exited: finalize.
 	shutdown := make(chan struct{})
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGUSR1, syscall.SIGINT, syscall.SIGTERM)
@@ -41,16 +37,13 @@ func RunPhaseObserver(args []string, _ io.Reader, stdout, stderr io.Writer) int 
 	return phaseobserver.Run(observerConfig(a, shutdown, signals), "", stderr)
 }
 
-// observerArgs is argv read once: the two flags and the positionals.
 type observerArgs struct {
 	enforce bool
 	scope   phaseobserver.Scope
 	pos     []string
 }
 
-// parseObserverArgs is the ONE reading of argv. handled reports that the call
-// is over — help printed (rc 0) or a usage error (ExitInvalidArgs) — with the
-// exact lines the subcommand always printed.
+// parseObserverArgs reads argv once; handled reports that help or a usage error already ended the call.
 func parseObserverArgs(args []string, stdout, stderr io.Writer) (a observerArgs, rc int, handled bool) {
 	a.scope = phaseobserver.ScopePhase
 	for _, arg := range args {
@@ -82,11 +75,9 @@ func parseObserverArgs(args []string, stdout, stderr io.Writer) (a observerArgs,
 	return a, 0, false
 }
 
-// observerConfig projects the parsed argv, the policy-resolved thresholds and
-// the root's collaborators onto the host's Config. The pgid and cycle Atoi
-// errors are discarded as they always were (a bogus value parses as 0 and
-// Run's `cycle must be integer` fires downstream).
+// observerConfig projects the parsed argv, the policy thresholds and the root's collaborators onto the host's Config.
 func observerConfig(a observerArgs, shutdown <-chan struct{}, signals *signalcenter.Center) phaseobserver.Config {
+	// Atoi errors are dropped on purpose: a bogus value parses as 0, and Run rejects a zero cycle.
 	pgid, _ := strconv.Atoi(a.pos[1])
 	cycle, _ := strconv.Atoi(a.pos[2])
 	cycleState := ""
@@ -103,32 +94,16 @@ func observerConfig(a observerArgs, shutdown <-chan struct{}, signals *signalcen
 	cfg.Scope = a.scope
 	cfg.Enforce = a.enforce
 	cfg.ShutdownSig = shutdown
-	// ADR-0044 C3: the chain-backed stall policy executes ONLY at enforce. For
-	// this standalone subcommand the operator's --enforce flag is the live signal
-	// (the IPC stage env key is an accepted fallback for an injecting parent).
-	// off/shadow/unset + no --enforce ⇒ nil policy ⇒ byte-identical legacy Enforce
-	// branch — shadow observability for stalls already exists via the INCIDENT
-	// events themselves.
 	cfg.StallPolicy = resolveStallPolicy(a.enforce)
-	// R3.4: the process-liveness probe is wired unconditionally — it is
-	// deterministic ground truth (signal-0), not policy; nil in Run means
-	// probe-off (fixture Configs). The ACTION on a dead group stays
-	// policy/Enforce-gated; at shadow the INCIDENT is pure soak telemetry
-	// (pane echo ≠ liveness, cycles 274/277).
+	// The liveness probe is ground truth, not policy, so it is always wired.
+	// Acting on a dead group stays Enforce-gated.
 	cfg.ProcessAlive = phaseobserver.DefaultProcessAlive
-	// ADR-0103 unit 12: the engine reports its own faults through the
-	// subprocess's Center (read late; nil = the Null Object).
 	cfg.Signals = func() *signalcenter.Center { return signals }
 	return cfg
 }
 
-// observerSignalCenter is the subprocess's Center: signalcenter.ConsoleSink —
-// the console half of the orchestrator's root topology (cmd_cycle.go
-// newRootSignalCenter), the ONE home of the WARN threshold — on the
-// subcommand's own stderr, where the replaced [phase-observer] lines used to
-// print — and NO file: a second writer into the orchestrator's per-cycle
-// signals.ndjson would interleave a second pid's sequence space (design §4
-// "monotonic seq per file").
+// observerSignalCenter renders on stderr only: a file sink would interleave a second
+// process's sequence space into the orchestrator's per-cycle signals.ndjson.
 func observerSignalCenter(w io.Writer) *signalcenter.Center {
 	c := signalcenter.New(signalcenter.WithPID(os.Getpid()))
 	c.Subscribe(signalcenter.ConsoleSink(w))
@@ -136,7 +111,6 @@ func observerSignalCenter(w io.Writer) *signalcenter.Center {
 }
 
 // observerEnvConfig resolves observer settings from .evolve/policy.json.
-// The name is retained to avoid widening this mechanical configuration change.
 func observerEnvConfig() phaseobserver.Config {
 	cfg := loadObserverPolicy()
 	return phaseobserver.Config{
@@ -156,24 +130,13 @@ func loadObserverPolicy() policy.ObserverPolicy {
 	return pol.ObserverConfig()
 }
 
-// envIPCPhaseRecoveryStage is the IPC key the parent orchestrator injects into
-// the subprocess env to communicate the policy-resolved ADR-0044 stage.
-// The split-const form keeps "EVOLVE_PHASE_RECOVERY" out of this file as a
-// string literal (the retired key), which the flagreaders guard checks.
+// envIPCPhaseRecoveryStage is the env key through which a parent may inject the phase-recovery stage.
+// The split spelling keeps the whole key out of string literals, where the flagreaders guard would flag it.
 const envIPCPhaseRecoveryStage = "EVOLVE_" + "PHASE_RECOVERY_STAGE" // SSOT IPC-protocol-allowed
 
-// resolveStallPolicy resolves the ADR-0044 chain-backed stall policy for the
-// observer subprocess. It activates ONLY at enforce, from EITHER source:
-//   - enforce: the operator's --enforce flag on the manual `evolve phase-observer`
-//     command. This is the live signal for the standalone subcommand — the
-//     orchestrator's auto-spawn path uses the in-process observer adapter
-//     (adapters/observer.CoreAdapter, which reads its own RecoveryStage field),
-//     not this subprocess, so nothing injects the IPC stage key here.
-//   - envIPCPhaseRecoveryStage == "enforce": a parent that DOES inject the stage
-//     (kept as an accepted IPC channel for forward-compat).
-//
-// Any other state (off, shadow, unset, typo, --enforce absent) ⇒ nil policy ⇒
-// byte-identical legacy behavior. A typo never enables a kill-path.
+// resolveStallPolicy returns the chain-backed stall policy only for --enforce or an injected stage of
+// exactly "enforce"; anything else returns nil, so a typo never arms the kill path.
+// See ADR-0044.
 func resolveStallPolicy(enforce bool) recovery.StallPolicy {
 	if !enforce && strings.ToLower(strings.TrimSpace(os.Getenv(envIPCPhaseRecoveryStage))) != "enforce" {
 		return nil

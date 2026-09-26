@@ -36,7 +36,6 @@ func TestPhaseLint_CleanPhaseExitsZeroNoWarnings(t *testing.T) {
 
 func TestPhaseLint_AlwaysFailOpenExitZero(t *testing.T) {
 	root := t.TempDir()
-	// Evaluate archetype with NO require_sections → a warning, but still exit 0.
 	writeUserPhase(t, root, "weak-eval", `{
   "name": "weak-eval", "kind": "llm", "optional": true, "archetype": "evaluate",
   "outputs": { "files": ["weak-eval-report.md"] }
@@ -55,8 +54,6 @@ func TestPhaseLint_AlwaysFailOpenExitZero(t *testing.T) {
 
 func TestPhaseLint_InvalidSpecWarnsButExitsZero(t *testing.T) {
 	root := t.TempDir()
-	// Non-optional user phase is a hard ValidateUserSpec violation — surfaced as a
-	// warning, but lint never blocks.
 	writeUserPhase(t, root, "bad-floor", `{
   "name": "bad-floor", "kind": "llm", "optional": false,
   "outputs": { "files": ["bad-floor-report.md"] }
