@@ -1,10 +1,5 @@
 package ledger
 
-// L3.3 seal contract: history is never rewritten — gunzip(segments) +
-// live tail is byte-identical to the pre-seal file; VerifyDeep runs the
-// SAME chain walk as Verify plus per-segment anchor binding; tampering
-// with a segment fails; interrupted seals are detected and resumable.
-
 import (
 	"bytes"
 	"context"
@@ -43,26 +38,20 @@ func TestSeal_ChainStaysVerifiableEndToEnd(t *testing.T) {
 		t.Fatalf("Seal: %v", err)
 	}
 
-	// Live file shrank to the tail + the anchor entry.
 	liveRaw, err := os.ReadFile(filepath.Join(dir, "ledger.jsonl"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	live := splitLines(liveRaw)
-	if len(live) != 6 { // 5 kept + 1 segment_seal anchor
+	if len(live) != 6 {
 		t.Fatalf("live tail = %d lines, want 6 (5 kept + anchor)", len(live))
 	}
 
-	// Plain Verify (live only) still passes: the first kept line chains
-	// from the sealed prefix, which plain Verify cannot see — it treats the
-	// pre-boundary hash like the soft v8.37 boundary. Deep verify covers
-	// the full chain.
+	// Only VerifyDeep can pass here: the first kept line chains from a sealed line plain Verify cannot see.
 	if err := l.VerifyDeep(context.Background()); err != nil {
 		t.Fatalf("VerifyDeep after seal: %v", err)
 	}
 
-	// History preserved byte-identically: gunzip(segment) + live-tail
-	// (minus the appended anchor) == pre-seal bytes.
 	segs, err := segmentFiles(filepath.Join(dir, segmentsDirName))
 	if err != nil || len(segs) != 1 {
 		t.Fatalf("want exactly 1 segment, got %v (err=%v)", segs, err)
@@ -76,7 +65,7 @@ func TestSeal_ChainStaysVerifiableEndToEnd(t *testing.T) {
 		rebuilt.Write(ln)
 		rebuilt.WriteByte('\n')
 	}
-	for _, ln := range live[:len(live)-1] { // drop the anchor (post-seal entry)
+	for _, ln := range live[:len(live)-1] { // drop the anchor
 		rebuilt.Write(ln)
 		rebuilt.WriteByte('\n')
 	}
@@ -84,7 +73,6 @@ func TestSeal_ChainStaysVerifiableEndToEnd(t *testing.T) {
 		t.Error("gunzip(segment)+tail must be byte-identical to the pre-seal ledger (history rewritten!)")
 	}
 
-	// And the ledger still accepts appends afterwards.
 	if err := l.Append(context.Background(), core.LedgerEntry{Role: "auditor", Kind: "phase_complete"}); err != nil {
 		t.Fatalf("Append after seal: %v", err)
 	}
@@ -154,7 +142,6 @@ func TestVerifyDeep_TamperedSegmentFails(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Rewrite the segment with one byte of one line flipped.
 	tampered := bytes.Join(segLines, []byte("\n"))
 	tampered = append(tampered, '\n')
 	tampered = bytes.Replace(tampered, []byte(`"entry-0"`), []byte(`"entry-X"`), 1)
@@ -383,9 +370,6 @@ func TestLinesEqual(t *testing.T) {
 	}
 }
 
-// Interrupted-seal recovery, case A: segment written, live file never
-// truncated. VerifyDeep names the residue; a re-run Seal completes the
-// truncation and the chain deep-verifies again.
 func TestSeal_ResumeAfterCrashBeforeTruncate(t *testing.T) {
 	l, dir := seedLedger(t, 10)
 	raw, err := os.ReadFile(filepath.Join(dir, "ledger.jsonl"))
@@ -413,8 +397,6 @@ func TestSeal_ResumeAfterCrashBeforeTruncate(t *testing.T) {
 	}
 }
 
-// Interrupted-seal recovery, case B: truncated but the anchor entry never
-// landed. VerifyDeep names the missing anchor; re-run Seal appends it.
 func TestSeal_ResumeAfterCrashBeforeAnchor(t *testing.T) {
 	l, dir := seedLedger(t, 10)
 	raw, err := os.ReadFile(filepath.Join(dir, "ledger.jsonl"))
@@ -440,23 +422,12 @@ func TestSeal_ResumeAfterCrashBeforeAnchor(t *testing.T) {
 	}
 }
 
-// Acceptance (plan L3.3, adjusted to reality): the plan asked for "deep
-// verify green on a copy of the real ledger before/after seal" — but the
-// REAL ledger has genuine pre-hardening damage (line 1740, 2026-05-26:
-// entry 1740 chains from a hash matching nothing — its predecessor's
-// bytes were rewritten post-hoc; the same line the Iter regression test
-// memorializes). Blessing that class would gut the verifier, so the
-// honest chain-preservation property is VERDICT preservation: sealing
-// never changes what verification says — green stays green (covered by
-// the synthetic tests above), and a broken ledger stays broken at the
-// SAME line with the SAME hashes. Skips when the real ledger is not
-// reachable (CI sandboxes) — same convention as TestIter_RealLedger.
+// Asserts verdict preservation: sealing a real ledger never changes what VerifyDeep says about it.
 func TestSeal_RealLedgerCopy(t *testing.T) {
 	candidates := []string{
 		filepath.Join("..", "..", "..", "..", ".evolve"),
 		filepath.Join("..", "..", "..", "..", "..", ".evolve"),
-		// Interactive kernel worktrees live at <root>/.claude/worktrees/<name>,
-		// three levels below the main checkout that owns the real ledger.
+		// A worktree at <root>/.claude/worktrees/<name> sits three levels below the real ledger's checkout.
 		filepath.Join("..", "..", "..", "..", "..", "..", "..", ".evolve"),
 	}
 	var src string

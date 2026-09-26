@@ -12,9 +12,7 @@ import (
 
 const rebaselineNote = "operator sign-off: pre-CA.1 fleet-concurrency damage accepted"
 
-// damagedLedger writes a chain with THREE distinct prev_hash breaks in the
-// prefix — the console-plane shape in miniature, where per-line `anchor` calls
-// do not scale — and returns the evolve dir.
+// damagedLedger has three distinct prev_hash breaks, a shape one per-line anchor cannot repair.
 func damagedLedger(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -37,15 +35,10 @@ func damagedLedger(t *testing.T) string {
 	return dir
 }
 
-// TestRebaseline_SealsDamagedPrefix: ONE call turns a three-break chain from RED
-// to GREEN under VerifyDeep, and the appended record is auditable — it carries
-// the operator's note and identifies itself as a rebaseline rather than passing
-// for an ordinary anchor.
 func TestRebaseline_SealsDamagedPrefix(t *testing.T) {
 	dir := damagedLedger(t)
 	l := New(dir)
 
-	// Pre-state: without this the test could pass against an already-green chain.
 	if err := l.VerifyDeep(context.Background()); err == nil {
 		t.Fatal("fixture precondition failed: a chain with three planted breaks verified GREEN")
 	}
@@ -84,10 +77,6 @@ func TestRebaseline_SealsDamagedPrefix(t *testing.T) {
 	}
 }
 
-// TestRebaseline_PreservesDamagedPrefixBytes: the repair is append-only. A
-// rebaseline that greened the chain by rewriting or truncating history would
-// destroy the auditable record — the outcome ADR-0048 rejects in favour of the
-// epoch anchor.
 func TestRebaseline_PreservesDamagedPrefixBytes(t *testing.T) {
 	dir := damagedLedger(t)
 	path := filepath.Join(dir, "ledger.jsonl")
@@ -110,9 +99,6 @@ func TestRebaseline_PreservesDamagedPrefixBytes(t *testing.T) {
 	}
 }
 
-// TestRebaseline_RefusesUngatedAndEmptyChain: a command that seals whatever it is
-// pointed at, whenever it is invoked, is a chain-integrity bypass rather than a
-// repair tool. Both refusals must write nothing at all.
 func TestRebaseline_RefusesUngatedAndEmptyChain(t *testing.T) {
 	t.Run("missing_operator_note", func(t *testing.T) {
 		for _, note := range []string{"", "   "} {

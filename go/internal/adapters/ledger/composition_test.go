@@ -1,7 +1,3 @@
-// composition_test.go — unit pins for the composition-verdict kernel
-// checker (cycle-786). The end-to-end `evolve ledger verify` exit-code
-// contract lives in cmd/evolve/cmd_ledger_composition_test.go; these tests
-// name the exported API (apicover) and exercise Verify directly.
 package ledger
 
 import (
@@ -32,9 +28,6 @@ const compTestDriftedDiff = `diff --git a/fixture.txt b/fixture.txt
 +semantically different change
 `
 
-// TestPatchID_StableContentIdentity pins ledger.PatchID: equal diffs share a
-// patch-id, semantically different diffs do not, and an empty diff errors
-// rather than returning an empty (forgeable) identity.
 func TestPatchID_StableContentIdentity(t *testing.T) {
 	a, err := PatchID([]byte(compTestDiff))
 	if err != nil {
@@ -59,9 +52,6 @@ func TestPatchID_StableContentIdentity(t *testing.T) {
 	}
 }
 
-// compositionLedger writes a ledger whose single entry is a
-// CompositionVerdictKind line over two persisted diffs claiming
-// claimedPatchID, and returns the FileLedger.
 func compositionLedger(t *testing.T, auditedDiff, composedDiff, claimedPatchID string) *FileLedger {
 	t.Helper()
 	dir := t.TempDir()
@@ -91,11 +81,6 @@ func compositionLedger(t *testing.T, auditedDiff, composedDiff, claimedPatchID s
 	return New(dir)
 }
 
-// TestVerify_CompositionVerdictKind_KernelRecompute names
-// ledger.CompositionVerdictKind and pins the Verify-side contract: an honest
-// entry (recorded patch_id == recomputed patch-id of both diffs) verifies;
-// a drifted composed diff and a forged patch_id both break the chain with
-// core.ErrLedgerChainBroken.
 func TestVerify_CompositionVerdictKind_KernelRecompute(t *testing.T) {
 	honestID, err := PatchID([]byte(compTestDiff))
 	if err != nil {
@@ -129,9 +114,6 @@ func TestVerify_CompositionVerdictKind_KernelRecompute(t *testing.T) {
 	}
 }
 
-// TestVerify_CompositionVerdict_MissingArtifactBreaksChain: deleting a
-// persisted diff artifact defeats kernel recompute — tampering by removal
-// must break verify, not silently pass.
 func TestVerify_CompositionVerdict_MissingArtifactBreaksChain(t *testing.T) {
 	honestID, err := PatchID([]byte(compTestDiff))
 	if err != nil {

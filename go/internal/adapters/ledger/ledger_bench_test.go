@@ -8,14 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// Phase 4 task #19: ledger append throughput. The ledger is the
-// hot-path on every phase boundary — orchestrator, role-gate, and
-// phase-gate all record entries. Bash baseline is roughly 10-20 ms per
-// append (jq + tee + flock + sha256sum). Go target ≤ 0.6× per parent
-// plan §6 item 8.
-//
-// Run: go test -bench=. -benchmem -run=^$ ./internal/adapters/ledger/
-
 func benchEntry(seq int) core.LedgerEntry {
 	return core.LedgerEntry{
 		TS:             "2026-05-23T04:30:00Z",
@@ -35,9 +27,6 @@ func benchEntry(seq int) core.LedgerEntry {
 	}
 }
 
-// BenchmarkAppendSerial measures single-writer append throughput.
-// Each iteration writes one entry through the full hash-chain pipeline
-// (readTip + marshal + sha256 + atomic append).
 func BenchmarkAppendSerial(b *testing.B) {
 	dir := b.TempDir()
 	evolveDir := filepath.Join(dir, ".evolve")
@@ -52,8 +41,7 @@ func BenchmarkAppendSerial(b *testing.B) {
 	}
 }
 
-// BenchmarkVerify measures whole-chain verify time. Realistic cycles
-// produce 30-80 entries; benchmarking with 100 entries.
+// 100 entries: a realistic cycle writes 30-80.
 func BenchmarkVerify(b *testing.B) {
 	dir := b.TempDir()
 	evolveDir := filepath.Join(dir, ".evolve")
