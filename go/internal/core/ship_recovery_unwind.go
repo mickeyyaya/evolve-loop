@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"path"
 	"regexp"
 	"strings"
@@ -20,6 +21,31 @@ var objectIDRe = regexp.MustCompile(`^([0-9a-f]{40}|[0-9a-f]{64})$`)
 // label that names the cycle and run in the carrier commit's trailer.
 type auditedChange struct {
 	base, tree, label string
+}
+
+// unwindBeforeFleetRebase is ADR-0105 rung B1: it takes ship's inbox consumption out of the change a
+// fleet rebase replays, so the rebased change is the one Audit reviewed. It reports whether it unwound.
+func (o *Orchestrator) unwindBeforeFleetRebase(ctx context.Context, projectRoot string, cycle int, cs CycleState) bool {
+	if cs.ActiveWorktree == "" || inPlaceWorktree(cs.ActiveWorktree, projectRoot) {
+		return false
+	}
+	tree, err := o.latestAuditedTree(ctx, cs.RunID)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d ship unwind skipped: read the audited tree: %v\n", cycle, err)
+		return false
+	}
+	audited := auditedChange{base: cs.WorktreeBaseSHA, tree: tree, label: fmt.Sprintf("cycle-%d/%s", cycle, cs.RunID)}
+	declined, err := unwindShipCommit(ctx, cs.ActiveWorktree, audited, gitCapture)
+	switch {
+	case err != nil:
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d ship unwind skipped: %v\n", cycle, err)
+		return false
+	case declined != "":
+		fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d ship unwind declined: %s\n", cycle, declined)
+		return false
+	}
+	fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d unwound its ship commit to the audited tree %s on %s before the fleet rebase\n", cycle, tree, cs.WorktreeBaseSHA)
+	return true
 }
 
 // unwindShipCommit replaces the lane's commits with one carrier commit of the audited tree on the audited

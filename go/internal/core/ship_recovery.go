@@ -55,6 +55,7 @@ func (o *Orchestrator) recoverFromShipError(ctx context.Context, projectRoot str
 		// itself replays a clean candidate and routes a real conflict to the
 		// debugger). A pre-screen git-infra error is non-fatal here: log it and let
 		// the rebase below run and report its own infra failure loudly.
+		predictedConflict := false
 		if cs.ActiveWorktree != "" {
 			switch verdict, perr := ClassifyFleetRebaseCandidate(ctx, cs.ActiveWorktree, "HEAD", "main"); {
 			case perr != nil:
@@ -63,6 +64,7 @@ func (o *Orchestrator) recoverFromShipError(ctx context.Context, projectRoot str
 				fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d fleet-rebase candidate already landed on main (superseded); short-circuiting with no wasted replay/re-audit (948 duplicate-work fix)\n", cycle)
 				return "", false
 			case verdict == FleetRebaseConflict:
+				predictedConflict = true
 				// A genuine conflict the rebase would also detect. Fall through to
 				// rebaseCycleBranchOntoMain, which performs the real replay and
 				// reclassifies to the debugger route below — keeping a single
@@ -71,7 +73,16 @@ func (o *Orchestrator) recoverFromShipError(ctx context.Context, projectRoot str
 				// Clean & not landed — the replay is worthwhile; fall through.
 			}
 		}
+		unwound := cs.ExplanationDocumentationVersion > 0 && !predictedConflict && o.unwindBeforeFleetRebase(ctx, projectRoot, cycle, *cs)
 		ok, conflict := rebaseCycleBranchOntoMain(ctx, projectRoot, cs.ActiveWorktree)
+		// Pend whatever the replay did: an aborted replay leaves the carrier, and pending it restores the
+		// audited shape the debugger and a re-ship expect.
+		if unwound {
+			if err := pendRebasedChange(ctx, cs.ActiveWorktree, gitCapture); err != nil {
+				fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d pend the audited change failed: %v\n", cycle, err)
+				return "", false
+			}
+		}
 		switch {
 		case ok:
 			if cs.ExplanationDocumentationVersion > 0 {
