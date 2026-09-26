@@ -8,16 +8,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// bridge_correction_test.go — contract-correction retry: the "## Correction"
-// prompt block carrying the orchestrator's re-dispatch directive. Applied at
-// the same CLI-agnostic seam as injectRulesPrefix, OUTERMOST.
-
 func TestInjectCorrectionPrefix(t *testing.T) {
-	// Empty directive = identity (off path byte-identical).
 	if got := injectCorrectionPrefix("BODY", ""); got != "BODY" {
 		t.Errorf("empty directive must pass through, got %q", got)
 	}
-	// Non-empty prepends a ## Correction block above the body.
 	got := injectCorrectionPrefix("BODY", "fix the Verdict section")
 	if !strings.HasPrefix(got, "## Correction\n\n") {
 		t.Errorf("missing Correction header: %q", got)
@@ -27,14 +21,11 @@ func TestInjectCorrectionPrefix(t *testing.T) {
 	}
 }
 
-// End-to-end: a BridgeRequest's CorrectionDirective rides through the same
-// prompt-assembly seam as SystemPrompt, landing OUTERMOST (above ## Rules).
 func TestCorrectionDirectiveComposesWithRules(t *testing.T) {
 	var req core.BridgeRequest
 	req.SystemPrompt = "RULE TEXT"
 	req.CorrectionDirective = "rewrite the Verdict section"
 
-	// Mirror the adapter's :125 assembly order.
 	withRules := injectRulesPrefix("BODY", req.SystemPrompt)
 	composed := injectCorrectionPrefix(withRules, req.CorrectionDirective)
 
@@ -51,7 +42,6 @@ func TestCorrectionDirectiveComposesWithRules(t *testing.T) {
 		t.Fatalf("directive text missing: %q", composed)
 	}
 
-	// Off path: empty CorrectionDirective leaves the assembly unchanged.
 	var off core.BridgeRequest
 	off.SystemPrompt = "RULE TEXT"
 	if got := injectCorrectionPrefix(injectRulesPrefix("BODY", off.SystemPrompt), off.CorrectionDirective); got != withRules {
@@ -59,9 +49,6 @@ func TestCorrectionDirectiveComposesWithRules(t *testing.T) {
 	}
 }
 
-// TestLaunch_InjectsCorrectionBlock proves the REAL Adapter.Launch assembly path
-// (not just the helper) injects the ## Correction block OUTERMOST when the
-// BridgeRequest carries a CorrectionDirective.
 func TestLaunch_InjectsCorrectionBlock(t *testing.T) {
 	fe := &fakeEngine{}
 	_, err := withEngine(fe).Launch(context.Background(), core.BridgeRequest{
@@ -84,8 +71,6 @@ func TestLaunch_InjectsCorrectionBlock(t *testing.T) {
 	}
 }
 
-// TestLaunch_NoCorrectionBlock_WhenDirectiveEmpty — the default path: no
-// CorrectionDirective ⇒ no block (byte-identical to pre-feature launches).
 func TestLaunch_NoCorrectionBlock_WhenDirectiveEmpty(t *testing.T) {
 	fe := &fakeEngine{}
 	_, err := withEngine(fe).Launch(context.Background(), core.BridgeRequest{
