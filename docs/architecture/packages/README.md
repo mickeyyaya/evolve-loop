@@ -21,3 +21,4 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/cli/phasecmd` | the `evolve phase` and `evolve phases` commands | [internal-cli-phasecmd.md](internal-cli-phasecmd.md) |
 | `internal/topngate` | holds a build to the tasks triage selected | [internal-topngate.md](internal-topngate.md) |
 | `internal/tokenusage` | measures a phase launch's token usage and context fill | [internal-tokenusage.md](internal-tokenusage.md) |
+| `internal/adapters/observer` | the stall observer's core adapter and liveness probes | [internal-adapters-observer.md](internal-adapters-observer.md) |

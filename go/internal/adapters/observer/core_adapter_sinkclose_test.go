@@ -1,42 +1,11 @@
 package observer
 
-// core_adapter_sinkclose_test.go — unit contract for the fable5 deep-scan
-// finding observer-sink-close-race (inbox weight 0.92, cycle-618 scout;
-// fix landed cycle 669).
-//
-// Context. Start's returned cancel closure (core_adapter.go) historically
-// waited for the watcher goroutine with a bounded 10s timeout, then
-// UNCONDITIONALLY closed the events sink regardless of which select arm
-// fired. When the watcher goroutine is genuinely wedged (e.g. a hung
-// liveness probe or a stuck sink write) past the 10s bound, the timeout arm
-// fires but the leaked goroutine is still running and may still be mid-write
-// to the sink. Closing the sink out from under it is a use-after-close race
-// — the leaked goroutine's next Write can return an error, or (on some
-// platforms/sink implementations) corrupt concurrent state, and the returned
-// error is swallowed, so the race is invisible until it manifests as a flake.
-//
-// The landed fix extracts the wait+close decision into an isolated, directly
-// testable primitive:
-//
-//	func closeSinkAfterWait(done <-chan struct{}, timeout time.Duration, closer io.Closer) bool
-//
-// which closes `closer` ONLY when `done` fires within `timeout` — never on
-// the timeout arm, so a still-running leaked goroutine's sink is never
-// closed under it (the accepted fd leak is documented by Start's WARN log;
-// the OS reclaims the fd at process exit). Start's cancel closure delegates
-// to this helper with the real done channel, sinkCloser, and the production
-// 10s bound. These tests pin that contract against regression.
-
 import (
 	"sync"
 	"testing"
 	"time"
 )
 
-// countingCloser is a goroutine-safe io.Closer that records how many times
-// Close was called, so a test can assert on close COUNT rather than just
-// absence-of-panic (the cheapest gaming fake — a closer that does nothing
-// observable — would pass a weaker assertion regardless of the fix).
 type countingCloser struct {
 	mu    sync.Mutex
 	calls int
@@ -55,16 +24,10 @@ func (c *countingCloser) Count() int {
 	return c.calls
 }
 
-// TestCoreAdapter_SinkClosedOnNormalDone is the positive/regression twin: when
-// the watcher goroutine finishes within the bound (the overwhelmingly common
-// case — a healthy phase completing), the sink MUST still be closed exactly
-// once so file descriptors/handles do not leak on the normal path. This twin
-// stops a degenerate "never close" fix (which would trivially satisfy the
-// timeout test below) from passing.
 func TestCoreAdapter_SinkClosedOnNormalDone(t *testing.T) {
 	t.Parallel()
 	done := make(chan struct{})
-	close(done) // watcher already finished before the wait begins
+	close(done) // the watcher has already exited
 	closer := &countingCloser{}
 
 	start := time.Now()
@@ -79,15 +42,9 @@ func TestCoreAdapter_SinkClosedOnNormalDone(t *testing.T) {
 	}
 }
 
-// TestCoreAdapter_NoSinkCloseRaceOnTimeout is the negative test proving the
-// race is closed: when the watcher goroutine is still running past the bound
-// (done never fires — the genuinely-wedged/leaked-goroutine scenario the 10s
-// comment describes), the sink must NEVER be closed underneath it. A
-// no-op-that-always-closes implementation (the pre-fix behavior) fails this
-// assertion.
 func TestCoreAdapter_NoSinkCloseRaceOnTimeout(t *testing.T) {
 	t.Parallel()
-	done := make(chan struct{}) // never closed — simulates a wedged watcher
+	done := make(chan struct{}) // never closed: a wedged watcher
 	closer := &countingCloser{}
 
 	timeout := 30 * time.Millisecond
@@ -104,13 +61,9 @@ func TestCoreAdapter_NoSinkCloseRaceOnTimeout(t *testing.T) {
 	}
 }
 
-// TestCoreAdapter_CloseSinkAfterWait_NilCloserSafe guards the existing
-// `if sinkCloser != nil` contract Start relies on (a.Sink caller-supplied
-// writer with no Closer capability) — the extracted helper must preserve it
-// rather than panicking on a nil closer.
 func TestCoreAdapter_CloseSinkAfterWait_NilCloserSafe(t *testing.T) {
 	t.Parallel()
 	done := make(chan struct{})
 	close(done)
-	closeSinkAfterWait(done, 200*time.Millisecond, nil) // must not panic
+	closeSinkAfterWait(done, 200*time.Millisecond, nil)
 }

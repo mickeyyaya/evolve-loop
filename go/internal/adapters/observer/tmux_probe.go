@@ -1,13 +1,5 @@
 package observer
 
-// tmux_probe.go — cycle-190 fix: a concrete LivenessProbe for tmux-driver
-// phases. The auto-spawn observer's filesystem signals (stdout-log size,
-// workspace mtime) both go flat while a tmux agent is in a long single
-// "Incubating" turn — extended thinking plus one large tool call that commits
-// no scrollback lines and writes no artifact until the turn ends. The live
-// tmux pane is the only liveness signal in that window (its spinner /
-// token-counter advances every second). This probe reads it.
-
 import (
 	"crypto/sha256"
 	"fmt"
@@ -18,12 +10,9 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sessionrecord"
 )
 
-// anyProbe composes liveness probes: the agent is alive if ANY sub-probe says
-// so. ALL sub-probes are consulted every call (no short-circuit) so each keeps
-// its internal last-sample state consistent across calls. Nil sub-probes are
-// skipped; an all-nil/empty set yields a probe that always returns false. Lives
-// here (not in cpu_probe.go) because it is a generic combinator over the probe
-// type, not CPU-specific.
+// anyProbe reports alive if any probe does. Every probe runs on every call, with
+// no short-circuit, so each stateful probe keeps its last sample current. Nil
+// probes are skipped.
 func anyProbe(probes ...func() bool) func() bool {
 	return func() bool {
 		alive := false
@@ -36,8 +25,7 @@ func anyProbe(probes ...func() bool) func() bool {
 	}
 }
 
-// tmuxRunner runs a tmux subcommand and returns its stdout. Injectable so the
-// probe is unit-testable without a real tmux server. Nil → realTmuxRunner.
+// tmuxRunner runs a tmux subcommand and returns its stdout; tests inject it.
 type tmuxRunner func(args ...string) ([]byte, error)
 
 func realTmuxRunner(args ...string) ([]byte, error) {
@@ -48,39 +36,27 @@ func realTmuxRunner(args ...string) ([]byte, error) {
 	return exec.Command(path, args...).Output()
 }
 
-// socketTmuxRunner wraps a tmuxRunner so every invocation targets the bridge's
-// isolated socket (bridge.TmuxSocket) via the global -L selector. The production
-// probe wraps realTmuxRunner with this so it queries the same socket the driver
-// created the agent panes on; a default-socket query would never see them and
-// the probe would falsely report every agent dead.
+// socketTmuxRunner points every call at the bridge's isolated socket
+// (bridge.TmuxSocket). A default-socket query never sees the agent panes, so
+// the probe would report every agent dead.
 func socketTmuxRunner(run tmuxRunner) tmuxRunner {
 	return func(args ...string) ([]byte, error) {
 		return run(bridge.TmuxSocketArgs(args...)...)
 	}
 }
 
-// newTmuxPaneProbe returns a LivenessProbe that reports the agent alive when
-// the live tmux pane for this cycle/phase changed since the last call.
-//
-// It locates the bridge session by the deterministic infix "-c<cycle>-<phase>-"
-// (sessions are named evolve-bridge-<cli>-c<cycle>-<phase>-pid<pid>-<ts>, e.g.
-// evolve-bridge-agy-c190-build-pid90464-1780402698) and hashes `capture-pane
-// -p`. A changed hash means the pane is animating (the agent is mid-turn, not
-// hung); the first sighting returns true to grant one more window. No matching
-// session, tmux absent, or a capture error → false: the probe makes no
-// liveness claim and the caller's stall logic proceeds unchanged.
-//
-// The returned closure holds the last-seen hash, so it must be called from a
-// single goroutine (the observer's Watch loop — which it is).
+// newTmuxPaneProbe returns a LivenessProbe that reports the agent alive when its
+// tmux pane changed since the last call. It finds the bridge session by the
+// "-c<cycle>-<phase>-" infix and hashes `capture-pane -p`; the first sighting
+// grants one window. No session, no tmux or a capture error makes no liveness
+// claim. The closure keeps the last hash, so only one goroutine may call it.
 func newTmuxPaneProbe(cycle int, phase, runID string, run tmuxRunner) func() bool {
 	if run == nil {
 		run = socketTmuxRunner(realTmuxRunner)
 	}
 	infix := fmt.Sprintf("-c%d-%s-", cycle, phase)
-	// CB.6: a probe that knows its run id asserts the run token before
-	// claiming liveness — matching ANOTHER run's session would keep a dead
-	// agent's stall clock fresh (the cross-run false-liveness class).
-	// runID="" (legacy single-driver dispatch) keeps the infix-only match.
+	// A known run id also requires the run token: matching another run's session
+	// would keep a dead agent's stall clock fresh. An empty runID matches the infix alone.
 	runInfix := ""
 	if runID != "" {
 		runInfix = "-" + sessionrecord.RunScopeToken(runID) + "-"
@@ -100,7 +76,7 @@ func newTmuxPaneProbe(cycle int, phase, runID string, run tmuxRunner) func() boo
 		if !observed {
 			observed = true
 			lastHash = sum
-			return true // first sighting: the pane exists; grant one window
+			return true
 		}
 		changed := sum != lastHash
 		lastHash = sum
@@ -108,9 +84,8 @@ func newTmuxPaneProbe(cycle int, phase, runID string, run tmuxRunner) func() boo
 	}
 }
 
-// findBridgeSession returns the first tmux session whose name is an
-// evolve-bridge session containing infix (and runInfix, when non-empty — the
-// CB.6 run-ownership assertion), or "" when none match / tmux errors.
+// findBridgeSession returns the first evolve-bridge session whose name contains
+// infix and, when set, runInfix; it returns "" when none match or tmux fails.
 func findBridgeSession(run tmuxRunner, infix, runInfix string) string {
 	out, err := run("ls", "-F", "#{session_name}")
 	if err != nil {
@@ -122,7 +97,7 @@ func findBridgeSession(run tmuxRunner, infix, runInfix string) string {
 			continue
 		}
 		if runInfix != "" && !strings.Contains(s, runInfix) {
-			continue // another run's session: never a liveness claim for ours
+			continue
 		}
 		return s
 	}

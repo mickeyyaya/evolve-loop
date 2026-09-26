@@ -27,7 +27,7 @@ func TestProcessCPUProbe_AdvancingCPUIsAlive(t *testing.T) {
 		}
 		s := samples[i]
 		i++
-		return "  " + s + "\n", nil // ps pads + newlines; probe must trim
+		return "  " + s + "\n", nil // ps pads its output
 	}
 	probe := newProcessCPUProbe(pidFile, run)
 
@@ -110,8 +110,6 @@ func TestAnyProbe(t *testing.T) {
 		t.Error("any true → true")
 	}
 
-	// All sub-probes are consulted every call (no short-circuit), so stateful
-	// probes keep consistent internal state.
 	calls := 0
 	counting := func() bool { calls++; return false }
 	combined := anyProbe(tru, counting) // tru first would short-circuit a lazy OR

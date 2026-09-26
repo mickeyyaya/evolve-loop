@@ -1,13 +1,5 @@
 package observer
 
-// events_golden_test.go — ADR-0103 unit 12 step 0, G4: the live adapter's
-// events file (started / stall_no_output / stopped, its OWN lowercase
-// envelope — observer.go:57-66, :249-269) byte-equal to a golden captured on
-// 8e8f080f BEFORE core_adapter.go / observer.go were edited. The stall is
-// scripted: no stdout growth, no workspace activity, a liveness probe that
-// answers false, a clock that jumps past StallS from the third read on. Kills
-// M20 (a severity uppercased), M21 (an Event field added or renamed).
-
 import (
 	"context"
 	"os"
