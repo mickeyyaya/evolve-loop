@@ -295,7 +295,7 @@ func buildGuard(name, evolveDir string, bypass bool) (core.Guard, error) {
 	case "role":
 		return guards.NewRole(storage.New(evolveDir), bypass), nil
 	case "docdelete":
-		return guards.NewDocDelete(workflow.AllowDocDelete), nil
+		return guards.NewDocDelete(workflow.AllowDocDelete, storage.New(evolveDir)), nil
 	case "chain":
 		return guards.NewChain(ledger.New(evolveDir)), nil
 	default:

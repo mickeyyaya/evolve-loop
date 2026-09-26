@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — a Build may retract a draft it never committed (cycle 1705, 2026-09-26)
+
+Cycle 1705 passed audit and still failed. `guard:docdelete` denied the Builder's removal of its own never-committed explanation draft, and its deny message prescribed a plain `mv` into the archive home. That left the draft untracked, and the host predicate gate refuses untracked inputs. So it forced FAIL over the auditor's PASS.
+
+- `docdelete` lets a Build `rm`/`git rm` exactly one path: the active cycle's own explanation document, from the repository root, when `HEAD` never held it (compared case-folded) and no parent directory is a symlink. Any other operand, spelling, expansion or pathspec is denied as before.
+- The deny also closes older holes: the doc roots match case-folded and as bare words (`rm -rf docs`), and an `rm` or `mv` after `cd`/`pushd` into a doc root, under `git -C docs`, or from a shell already inside one is judged.
+- The deny message advises `git mv`, so an archived copy stays staged.
+- Record: `docs/incidents/2026-09-26-the-doc-guard-sent-a-draft-where-the-predicate-gate-refuses-it.md`.
+
 ## Added — an identity-preserving rebind for the Build explanation (ADR-0105 rung B2, 2026-09-26)
 
 A clean fleet rebase re-runs Build and Audit today for every cycle, even when the change is byte-identical (cycles 1698 and 1701). The first rung that lets a passed audit survive is the explanation rebind; nothing calls it yet. B1 (unwind), B3 (the repaired trivial-rebase rung) and B4 (ship accepts the carry) follow.
