@@ -127,7 +127,7 @@ func TestC11_001_AllObserverInactivityFlagsAbsentFromRegistry(t *testing.T) {
 func TestC11_004_ObserverEnvReadsGoneFromPhaseObserverCmd(t *testing.T) {
 	// acs-predicate: config-check
 	root := acsassert.RepoRoot(t)
-	observerCmd := filepath.Join(root, "go", "cmd", "evolve", "cmd_phase_observer.go")
+	observerCmd := filepath.Join(root, "go", "internal", "cli", "phasecmd", "phase_observer.go")
 	// Check that the key envchain sentinel read for OBSERVER_POLL_S is gone
 	// (proxy for all 5 env reads in observerEnvConfig being removed).
 	if !acsassert.FileNotContains(t, observerCmd, `envchain.Int("EVOLVE_OBSERVER_POLL_S"`) {
@@ -164,7 +164,7 @@ func TestC11_004_ObserverEnvReadsGoneFromPhaseObserverCmd(t *testing.T) {
 func TestC11_005_InactivityEnvReadsGoneFromPhaseWatchdogCmd(t *testing.T) {
 	// acs-predicate: config-check
 	root := acsassert.RepoRoot(t)
-	watchdogCmd := filepath.Join(root, "go", "cmd", "evolve", "cmd_phase_watchdog.go")
+	watchdogCmd := filepath.Join(root, "go", "internal", "cli", "phasecmd", "phase_watchdog.go")
 	if !acsassert.FileNotContains(t, watchdogCmd, `envchain.Int("EVOLVE_INACTIVITY_THRESHOLD_S"`) {
 		t.Errorf("RED: cmd_phase_watchdog.go still reads EVOLVE_INACTIVITY_THRESHOLD_S via envchain.\n"+
 			"Builder must remove watchdogEnvConfig()'s 5 env reads (lines 56-60) and\n"+

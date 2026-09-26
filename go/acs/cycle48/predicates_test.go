@@ -267,7 +267,7 @@ func TestC48B_001_GuardsLog_AbsentFromRegistry(t *testing.T) {
 func TestC48B_002_GuardsLog_AbsentFromProdSource(t *testing.T) {
 	// acs-predicate: config-check
 	root := acsassert.RepoRoot(t)
-	f := filepath.Join(root, "go", "cmd", "evolve", "cmd_guard.go")
+	f := filepath.Join(root, "go", "internal", "cli", "guardcmd", "guard.go")
 	if !acsassert.FileNotContains(t, f, `"EVOLVE_GUARDS_LOG"`) {
 		t.Errorf("RED: cmd_guard.go still contains the env read \"EVOLVE_GUARDS_LOG\".\n"+
 			"Builder must delete line 45: logPath := os.Getenv(\"EVOLVE_GUARDS_LOG\")\n"+
@@ -293,7 +293,7 @@ func TestC48B_002_GuardsLog_AbsentFromProdSource(t *testing.T) {
 func TestC48B_003_AppendGuardsLog_HasLogPathParam(t *testing.T) {
 	// acs-predicate: config-check
 	root := acsassert.RepoRoot(t)
-	f := filepath.Join(root, "go", "cmd", "evolve", "cmd_guard.go")
+	f := filepath.Join(root, "go", "internal", "cli", "guardcmd", "guard.go")
 	if !acsassert.FileMatchesRegex(t, f, `func appendGuardsLog\(logPath[^)]*\)`) {
 		t.Errorf("RED: cmd_guard.go does not contain an appendGuardsLog signature with logPath param.\n"+
 			"Builder must change the signature from:\n"+
@@ -318,7 +318,7 @@ func TestC48B_003_AppendGuardsLog_HasLogPathParam(t *testing.T) {
 func TestC48B_004_GuardTest_NoSetenvGuardsLog(t *testing.T) {
 	// acs-predicate: config-check
 	root := acsassert.RepoRoot(t)
-	f := filepath.Join(root, "go", "cmd", "evolve", "cmd_guard_test.go")
+	f := filepath.Join(root, "go", "internal", "cli", "guardcmd", "guard_test.go")
 	if !acsassert.FileNotContains(t, f, `"EVOLVE_GUARDS_LOG"`) {
 		t.Errorf("RED: cmd_guard_test.go still references \"EVOLVE_GUARDS_LOG\".\n"+
 			"Builder must replace t.Setenv(\"EVOLVE_GUARDS_LOG\", ...) with direct path injection:\n"+

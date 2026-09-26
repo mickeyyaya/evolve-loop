@@ -15,6 +15,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -42,12 +43,21 @@ type TB interface {
 // binary cannot be located on PATH.
 var ErrSubprocessNotFound = errors.New("acsassert: subprocess binary not found")
 
+// movedHint names the relocation possibility when a predicate's path does not
+// exist, since a stale path after a file move is the usual cause.
+func movedHint(err error) string {
+	if errors.Is(err, fs.ErrNotExist) {
+		return " (the file may have moved or been renamed; repoint the predicate at its current location)"
+	}
+	return ""
+}
+
 // FileExists reports whether path is a regular file (or symlink to one)
 // that os.Stat can read. Logs an Errorf when it isn't.
 func FileExists(tb TB, path string) bool {
 	tb.Helper()
 	if _, err := os.Stat(path); err != nil {
-		tb.Errorf("FileExists(%q): %v", path, err)
+		tb.Errorf("FileExists(%q): %v%s", path, err, movedHint(err))
 		return false
 	}
 	return true
@@ -58,7 +68,7 @@ func FileContains(tb TB, path, substring string) bool {
 	tb.Helper()
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		tb.Errorf("FileContains(%q): %v", path, err)
+		tb.Errorf("FileContains(%q): %v%s", path, err, movedHint(err))
 		return false
 	}
 	if !strings.Contains(string(raw), substring) {
@@ -82,7 +92,7 @@ func FileNotContains(tb TB, path, substring string) bool {
 	tb.Helper()
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		tb.Errorf("FileNotContains(%q): %v", path, err)
+		tb.Errorf("FileNotContains(%q): %v%s", path, err, movedHint(err))
 		return false
 	}
 	if strings.Contains(string(raw), substring) {
@@ -98,7 +108,7 @@ func FileMatchesRegex(tb TB, path, pattern string) bool {
 	tb.Helper()
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		tb.Errorf("FileMatchesRegex(%q): %v", path, err)
+		tb.Errorf("FileMatchesRegex(%q): %v%s", path, err, movedHint(err))
 		return false
 	}
 	re, err := regexp.Compile(pattern)
@@ -121,7 +131,7 @@ func JSONFieldEquals(tb TB, path, dotPath string, want any) bool {
 	tb.Helper()
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		tb.Errorf("JSONFieldEquals(%q): %v", path, err)
+		tb.Errorf("JSONFieldEquals(%q): %v%s", path, err, movedHint(err))
 		return false
 	}
 	var doc any
@@ -313,7 +323,7 @@ func LineContainsAll(path string, needles ...string) bool {
 func CountInGoFunc(path, funcName string, variants ...string) (int, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		return 0, fmt.Errorf("acsassert: read %s: %w", path, err)
+		return 0, fmt.Errorf("acsassert: read %s: %w%s", path, err, movedHint(err))
 	}
 	fset := token.NewFileSet()
 	f, err := parser.ParseFile(fset, path, raw, 0)

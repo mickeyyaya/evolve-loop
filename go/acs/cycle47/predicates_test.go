@@ -156,7 +156,7 @@ func TestC47A_002_OllamaBase_AbsentFromRegistry(t *testing.T) {
 func TestC47A_003_ReleasePreflight_AbsentFromProdSource(t *testing.T) {
 	// acs-predicate: config-check
 	root := acsassert.RepoRoot(t)
-	f := filepath.Join(root, "go", "cmd", "evolve", "cmd_release_pipeline.go")
+	f := filepath.Join(root, "go", "internal", "cli", "opscmd", "release_pipeline.go")
 	if !acsassert.FileNotContains(t, f, `"EVOLVE_RELEASE_REQUIRE_PREFLIGHT"`) {
 		t.Errorf("RED: cmd_release_pipeline.go still contains the env alias \"EVOLVE_RELEASE_REQUIRE_PREFLIGHT\".\n"+
 			"Builder must delete:\n"+
@@ -202,7 +202,7 @@ func TestC47A_004_OllamaBase_AbsentFromProdSource(t *testing.T) {
 func TestC47A_005_ReleasePipelineTest_NoEnvKey(t *testing.T) {
 	// acs-predicate: config-check
 	root := acsassert.RepoRoot(t)
-	f := filepath.Join(root, "go", "cmd", "evolve", "cmd_release_pipeline_test.go")
+	f := filepath.Join(root, "go", "internal", "cli", "opscmd", "release_pipeline_test.go")
 	if !acsassert.FileNotContains(t, f, `"EVOLVE_RELEASE_REQUIRE_PREFLIGHT"`) {
 		t.Errorf("RED: cmd_release_pipeline_test.go still references \"EVOLVE_RELEASE_REQUIRE_PREFLIGHT\".\n"+
 			"Builder must replace: t.Setenv(\"EVOLVE_RELEASE_REQUIRE_PREFLIGHT\", \"1\") (line 79)\n"+

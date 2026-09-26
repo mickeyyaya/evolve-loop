@@ -274,7 +274,7 @@ func TestC50B_001_ReleaseStrictPass_AbsentFromRegistry(t *testing.T) {
 func TestC50B_002_ReleaseStrictPass_AbsentFromReleasePreflight(t *testing.T) {
 	// acs-predicate: config-check
 	root := acsassert.RepoRoot(t)
-	f := filepath.Join(root, "go", "cmd", "evolve", "cmd_release_preflight.go")
+	f := filepath.Join(root, "go", "internal", "cli", "opscmd", "release_preflight.go")
 	if !acsassert.FileNotContains(t, f, `"EVOLVE_RELEASE_STRICT_PASS"`) {
 		t.Errorf("RED: cmd_release_preflight.go still contains os.Getenv(\"EVOLVE_RELEASE_STRICT_PASS\").\n"+
 			"Builder must:\n"+
@@ -330,7 +330,7 @@ func TestC50B_003_ReleaseStrictPass_AbsentFromBridges(t *testing.T) {
 func TestC50B_005_StrictPassFlag_RegisteredInPreflight(t *testing.T) {
 	// acs-predicate: config-check
 	root := acsassert.RepoRoot(t)
-	f := filepath.Join(root, "go", "cmd", "evolve", "cmd_release_preflight.go")
+	f := filepath.Join(root, "go", "internal", "cli", "opscmd", "release_preflight.go")
 	if !acsassert.FileContains(t, f, `"strict-pass"`) {
 		t.Errorf("RED: cmd_release_preflight.go does not contain the --strict-pass flag registration.\n"+
 			"Builder must add a --strict-pass flag to the arg-parsing loop in cmd_release_preflight.go.\n"+

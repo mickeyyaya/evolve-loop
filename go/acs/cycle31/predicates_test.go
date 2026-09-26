@@ -164,11 +164,11 @@ func TestC31_004_NoEnvBypassReadsInProductionGo(t *testing.T) {
 			[]string{"EVOLVE_BYPASS_SHIP_GATE"},
 		},
 		{
-			filepath.Join(root, "go", "cmd", "evolve", "cmd_postedit_validate.go"),
+			filepath.Join(root, "go", "internal", "cli", "guardcmd", "postedit_validate.go"),
 			[]string{"EVOLVE_BYPASS_POSTEDIT_VALIDATE"},
 		},
 		{
-			filepath.Join(root, "go", "cmd", "evolve", "cmd_commit_prefix_gate.go"),
+			filepath.Join(root, "go", "internal", "cli", "guardcmd", "commit_prefix_gate.go"),
 			[]string{"EVOLVE_BYPASS_PREFIX_GATE"},
 		},
 		{

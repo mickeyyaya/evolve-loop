@@ -2,8 +2,11 @@ package acsassert
 
 import (
 	"errors"
+	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -486,5 +489,59 @@ func (r myT) method(s string) bool { return len(s) > 0 }
 	}
 	if n, err := CountInGoFunc(path, "method", "len(s)"); err != nil || n != 1 {
 		t.Errorf("CountInGoFunc(method receiver) = %d, %v; want 1, nil", n, err)
+	}
+}
+
+// fmtT records fully formatted failure messages (fakeT keeps only formats).
+type fmtT struct{ msgs []string }
+
+func (f *fmtT) Errorf(format string, args ...any) {
+	f.msgs = append(f.msgs, fmt.Sprintf(format, args...))
+}
+func (f *fmtT) Helper() {}
+
+func TestSourceReaders_MovedHintOnlyForNotExist(t *testing.T) {
+	dir := t.TempDir()
+	gone := filepath.Join(dir, "cmd_gone.go")
+	readers := map[string]func(TB, string) bool{
+		"FileExists":       func(tb TB, p string) bool { return FileExists(tb, p) },
+		"FileContains":     func(tb TB, p string) bool { return FileContains(tb, p, "x") },
+		"FileNotContains":  func(tb TB, p string) bool { return FileNotContains(tb, p, "x") },
+		"FileMatchesRegex": func(tb TB, p string) bool { return FileMatchesRegex(tb, p, "x") },
+		"JSONFieldEquals":  func(tb TB, p string) bool { return JSONFieldEquals(tb, p, "a", "v") },
+	}
+	for name, read := range readers {
+		t.Run(name+"/missing", func(t *testing.T) {
+			ft := &fmtT{}
+			if read(ft, gone) || len(ft.msgs) != 1 {
+				t.Fatalf("want false with one message, got %q", ft.msgs)
+			}
+			msg := ft.msgs[0]
+			if !strings.Contains(msg, gone) || !strings.Contains(msg, "no such file") || !strings.Contains(msg, "may have moved") {
+				t.Errorf("message lacks path, OS error or moved hint: %q", msg)
+			}
+		})
+	}
+	ft := &fmtT{}
+	if FileContains(ft, dir, "x") || len(ft.msgs) != 1 || strings.Contains(ft.msgs[0], "moved") {
+		t.Errorf("directory read: want one plain failure without moved hint, got %q", ft.msgs)
+	}
+}
+
+func TestCountInGoFunc_MissingFileHintsAtRelocation(t *testing.T) {
+	dir := t.TempDir()
+	gone := filepath.Join(dir, "cmd_gone.go")
+	_, err := CountInGoFunc(gone, "Handler", "x")
+	if err == nil {
+		t.Fatal("CountInGoFunc(missing file) = nil error, want error")
+	}
+	if !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("error chain lost fs.ErrNotExist: %v", err)
+	}
+	if msg := err.Error(); !strings.Contains(msg, gone) || !strings.Contains(msg, "may have moved") {
+		t.Errorf("error lacks path or moved hint: %q", msg)
+	}
+	if _, err := CountInGoFunc(dir, "Handler", "x"); err == nil || strings.Contains(err.Error(), "moved") {
+		t.Errorf("directory read: want a plain error without moved hint, got %v", err)
 	}
 }
