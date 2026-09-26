@@ -1,17 +1,5 @@
 package core
 
-// build_floor_acs_enrollment_test.go — regression pin for the cycle-1145
-// gate-block (fingerprint build|gate-block|866df5da1e50), which recurred into
-// cycle-1147 and blocked the lane for three attempts.
-//
-// Mechanism: cycles 1141/1144/1145 added ./acs/cycle<N> lines to
-// go/.apicover-enforce under an invented "completeness invariant". Enrollment
-// routes a package into the build floor's ENFORCED coverage run, which reads
-// the untagged "build constraints exclude all Go files … [setup failed]" SETUP
-// result as a TEST failure — so every subsequent cycle whose base diff carried
-// those packages rejected its own handoff. These tests pin both halves of the
-// fix: the enrollment file itself, and the floor's tag-visibility filter.
-
 import (
 	"bufio"
 	"context"
@@ -23,8 +11,6 @@ import (
 	"testing"
 )
 
-// repoModuleDir returns the go/ module directory of the checkout this test runs
-// in, located by walking up from the package dir until go.mod appears.
 func repoModuleDir(t *testing.T) string {
 	t.Helper()
 	dir, err := os.Getwd()
@@ -45,8 +31,7 @@ func repoModuleDir(t *testing.T) string {
 	return ""
 }
 
-// enrolledPatterns reads the REAL go/.apicover-enforce (not a fixture — the
-// point is to gate the checked-in file) and returns its pattern lines.
+// enrolledPatterns reads the real go/.apicover-enforce, because the point is to gate the checked-in file.
 func enrolledPatterns(t *testing.T, moduleDir string) []string {
 	t.Helper()
 	f, err := os.Open(filepath.Join(moduleDir, ".apicover-enforce"))
@@ -69,9 +54,7 @@ func enrolledPatterns(t *testing.T, moduleDir string) []string {
 	return out
 }
 
-// legacyACSCeiling is the highest cycle number whose acs package predates the
-// handoff-time enforced coverage run. Entries at or below it are grandfathered
-// (removing them is a CI-scope change); anything above is the regression.
+// legacyACSCeiling is the highest grandfathered acs cycle enrollment; anything above it is the regression.
 const legacyACSCeiling = 661
 
 func TestAPICoverEnforceDoesNotEnrollModernACSPackages(t *testing.T) {
@@ -95,10 +78,6 @@ func TestAPICoverEnforceDoesNotEnrollModernACSPackages(t *testing.T) {
 	}
 }
 
-// TestBuildTagVisiblePackagesDropsACSPackages exercises the floor's second line
-// of defense against the same class, using the real toolchain over the real
-// checkout: an `//go:build acs` package must be dropped before the enforced
-// split, while an ordinary package must survive.
 func TestBuildTagVisiblePackagesDropsACSPackages(t *testing.T) {
 	if _, err := exec.LookPath("go"); err != nil {
 		t.Skip("go toolchain unavailable")
@@ -123,9 +102,6 @@ func TestBuildTagVisiblePackagesDropsACSPackages(t *testing.T) {
 	}
 }
 
-// TestBuildTagVisiblePackagesFailsOpen pins the fail-open contract: with no
-// packages to inspect the filter narrows nothing, so a plumbing edge can never
-// silently empty the floor's work list.
 func TestBuildTagVisiblePackagesFailsOpen(t *testing.T) {
 	if got := buildTagVisiblePackages(context.Background(), "", nil); len(got) != 0 {
 		t.Fatalf("buildTagVisiblePackages(nil) = %v, want empty", got)

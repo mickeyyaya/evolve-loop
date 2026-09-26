@@ -1,12 +1,5 @@
 package core
 
-// bookkeeping_apicover_named_test.go — apicover named binding for the two
-// exported bookkeeping-reason classifiers (issue #433 class: a new exported
-// surface needs a NAMED covering test in its OWNING package; the
-// phases/audit singlesource pin exercises them cross-package, which apicover
-// does not count). Semantics are pinned by bookkeeping_regrade_test.go and
-// the audit-package producer pin; this test binds the exported names.
-
 import "testing"
 
 func TestApicoverNamed_BookkeepingReasonClassifiers(t *testing.T) {

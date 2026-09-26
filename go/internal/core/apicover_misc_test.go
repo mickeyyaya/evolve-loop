@@ -1,31 +1,5 @@
 package core
 
-// apicover_misc_test.go — ADR-0050 Phase 5 public-API coverage: white-box
-// (`package core`) tests that NAME + EXERCISE the last exported symbols in
-// internal/core the apicover gate still flags uncovered. Each test asserts a
-// real behavior of the symbol it covers (Rule 9 — no `_ = pkg.X` padding):
-//
-//   - FailureAdvisor / FailureAdvisorOption (failure_advisor.go) — option EFFECT
-//     reaches the bridge request via a real Advise call.
-//   - PhaseAdvisor / PhaseAdvisorOption (phase_advisor.go) — option EFFECT reaches
-//     BridgeRequest.{CLI,Model} via a real Plan call.
-//   - Observer (observer.go) — compile-time conformance + a real Start/cancel.
-//   - StateUpdater (alloc.go) — compile-time conformance + a real allocate RMW.
-//   - WorktreeProvisioner (worktree.go) — compile-time conformance + Create/Cleanup.
-//   - ThroughputRecorder (throughput_hook.go) — the func-typed seam fires on a
-//     shipped cycle and mutates the State it is handed.
-//   - SealResult (reset.go) — every field, via a SealCycle dry-run.
-//   - StateMachine (statemachine.go) — Next / CanTransition over the spine.
-//   - VerdictReason (verdict.go) — ReasonFromDiagnostics folds a FAIL diagnostic.
-//   - Orchestrator.FailureAdviserWired (failure_hook.go) — true with the adviser
-//     option, false on a bare orchestrator (executed, not just named).
-//   - PhaseBoundaryCheckpointer (orchestrator.go) — the package var the
-//     checkpoint package sets via init(); core cannot import checkpoint
-//     (circular), so we assign a recording closure, drive a full RunCycle (the
-//     real consumer in cyclerun_record.go invokes it), and assert it fired.
-//   - CycleStateFile (runworkspace.go) — the constant SealCycle reads from.
-//   - PhaseSwarmPlan (phase.go) — Phase.IsValid()/String() over the const.
-
 import (
 	"context"
 	"testing"
@@ -35,13 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
 )
 
-// --- FailureAdvisor + FailureAdvisorOption --------------------------------
-
-// TestFailureAdvisorOption_EffectReachesBridge names FailureAdvisor +
-// FailureAdvisorOption and proves the option is FUNCTIONAL: a typed
-// FailureAdvisorOption built by WithFailureAdvisorCLI changes the CLI that
-// actually reaches the bridge request on a real Advise call (not just a struct
-// field). WithFailureAdvisorModel is asserted the same way.
 func TestFailureAdvisorOption_EffectReachesBridge(t *testing.T) {
 	t.Parallel()
 	fb := &fakeBridge{stdout: `{"cause":"dead_shell","pane_substr":"locked vault prompt here","justification":"the REPL exited to a locked vault"}`}
@@ -53,7 +20,6 @@ func TestFailureAdvisorOption_EffectReachesBridge(t *testing.T) {
 	if _, err := adv.Advise(context.Background(), baseFailureInput()); err != nil {
 		t.Fatalf("Advise: %v", err)
 	}
-	// The option's EFFECT — the configured CLI/model flow to the bridge.
 	if fb.gotReq.CLI != "codex-tmux" {
 		t.Errorf("WithFailureAdvisorCLI ineffective: BridgeRequest.CLI=%q, want codex-tmux", fb.gotReq.CLI)
 	}
@@ -62,12 +28,6 @@ func TestFailureAdvisorOption_EffectReachesBridge(t *testing.T) {
 	}
 }
 
-// --- PhaseAdvisor + PhaseAdvisorOption ------------------------------------
-
-// TestPhaseAdvisorOption_EffectReachesBridge names PhaseAdvisor +
-// PhaseAdvisorOption and proves the option type is functional: typed
-// PhaseAdvisorOptions (WithProposerCLI / WithProposerModel) change the
-// {CLI,Model} that reach BridgeRequest on a real Plan launch.
 func TestPhaseAdvisorOption_EffectReachesBridge(t *testing.T) {
 	t.Parallel()
 	fb := &fakeBridge{stdout: `[{"phase":"scout","run":true,"justification":"x"}]`}
@@ -87,15 +47,9 @@ func TestPhaseAdvisorOption_EffectReachesBridge(t *testing.T) {
 	}
 }
 
-// --- Observer -------------------------------------------------------------
-
-// recordingObserver (observer_test.go) already implements Observer; assert
-// conformance at compile time and exercise the contract directly.
 var _ Observer = (*recordingObserver)(nil)
 var _ Observer = noopObserver{}
 
-// TestObserver_StartReturnsCancel names the Observer interface and exercises a
-// real implementation: Start records the phase and returns a callable cancel.
 func TestObserver_StartReturnsCancel(t *testing.T) {
 	t.Parallel()
 	var obs Observer = &recordingObserver{}
@@ -115,14 +69,8 @@ func TestObserver_StartReturnsCancel(t *testing.T) {
 	}
 }
 
-// --- StateUpdater ---------------------------------------------------------
-
-// memUpdater (alloc_test.go) implements StateUpdater; pin it.
 var _ StateUpdater = (*memUpdater)(nil)
 
-// TestStateUpdater_AllocatesThroughRMW names the StateUpdater interface and
-// exercises it through AllocateCycleNumber — the serialized RMW mints the next
-// number and persists the lease.
 func TestStateUpdater_AllocatesThroughRMW(t *testing.T) {
 	t.Parallel()
 	var su StateUpdater = &memUpdater{st: State{LastCycleNumber: 41}}
@@ -135,16 +83,9 @@ func TestStateUpdater_AllocatesThroughRMW(t *testing.T) {
 	}
 }
 
-// --- WorktreeProvisioner --------------------------------------------------
-
-// fakeWorktree (worktree_test.go) and gitWorktree both implement
-// WorktreeProvisioner; pin both.
 var _ WorktreeProvisioner = (*fakeWorktree)(nil)
 var _ WorktreeProvisioner = gitWorktree{}
 
-// TestWorktreeProvisioner_CreateAndCleanup names the WorktreeProvisioner
-// interface and exercises both methods on the fake: Create returns the scripted
-// path and records the cycle; Cleanup records the removed path.
 func TestWorktreeProvisioner_CreateAndCleanup(t *testing.T) {
 	t.Parallel()
 	var wp WorktreeProvisioner = &fakeWorktree{path: "/tmp/wt/cycle-7"}
@@ -167,11 +108,6 @@ func TestWorktreeProvisioner_CreateAndCleanup(t *testing.T) {
 	}
 }
 
-// --- ThroughputRecorder ---------------------------------------------------
-
-// TestThroughputRecorder_FiresAndMutatesState names the ThroughputRecorder
-// func type and exercises it: a recorder mutates the State it is handed, and
-// the value satisfies the WithThroughputRecorder seam.
 func TestThroughputRecorder_FiresAndMutatesState(t *testing.T) {
 	t.Parallel()
 	var gotCycle int
@@ -179,7 +115,7 @@ func TestThroughputRecorder_FiresAndMutatesState(t *testing.T) {
 	var rec ThroughputRecorder = func(state *State, cycle int, workspacePath string) {
 		gotCycle = cycle
 		gotWs = workspacePath
-		state.LastCycleNumber = cycle // prove it can mutate in place
+		state.LastCycleNumber = cycle
 	}
 
 	st := &State{LastCycleNumber: 0}
@@ -190,21 +126,14 @@ func TestThroughputRecorder_FiresAndMutatesState(t *testing.T) {
 	if st.LastCycleNumber != 99 {
 		t.Errorf("recorder must mutate state in place: LastCycleNumber=%d, want 99", st.LastCycleNumber)
 	}
-	// The recorder is a valid seam value — the option accepts it without panic.
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil), WithThroughputRecorder(rec))
 	if !o.ThroughputRecorderWired() {
 		t.Error("WithThroughputRecorder did not wire the recorder")
 	}
 }
 
-// --- SealResult + CycleStateFile ------------------------------------------
-
-// TestSealResult_FullFieldFromDryRun names SealResult and CycleStateFile.
-// SealCycle reads <EvolveDir>/CycleStateFile; a dry-run populates every
-// SealResult field without mutating anything.
 func TestSealResult_FullFieldFromDryRun(t *testing.T) {
 	t.Parallel()
-	// CycleStateFile is the filename SealCycle reads; pin its value.
 	if CycleStateFile != "cycle-state.json" {
 		t.Fatalf("CycleStateFile=%q, want cycle-state.json", CycleStateFile)
 	}
@@ -219,7 +148,6 @@ func TestSealResult_FullFieldFromDryRun(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SealCycle dry-run: %v", err)
 	}
-	// Every SealResult field.
 	if res.SealedCycleID != 108 {
 		t.Errorf("SealedCycleID=%d, want 108", res.SealedCycleID)
 	}
@@ -240,15 +168,10 @@ func TestSealResult_FullFieldFromDryRun(t *testing.T) {
 	}
 }
 
-// --- StateMachine ---------------------------------------------------------
-
-// TestStateMachine_NextAndCanTransition names StateMachine and exercises both
-// the verdict-driven Next() and the structural CanTransition() over the spine.
 func TestStateMachine_NextAndCanTransition(t *testing.T) {
 	t.Parallel()
 	var sm *StateMachine = NewStateMachine()
 
-	// Verdict-driven successor: audit PASS → ship.
 	nxt, err := sm.Next(PhaseAudit, VerdictPASS)
 	if err != nil {
 		t.Fatalf("Next(audit, PASS): %v", err)
@@ -256,11 +179,9 @@ func TestStateMachine_NextAndCanTransition(t *testing.T) {
 	if nxt != PhaseShip {
 		t.Errorf("Next(audit, PASS)=%s, want ship", nxt)
 	}
-	// audit FAIL → retro.
 	if nxt, _ := sm.Next(PhaseAudit, VerdictFAIL); nxt != PhaseRetro {
 		t.Errorf("Next(audit, FAIL)=%s, want retro", nxt)
 	}
-	// Structural legality.
 	if !sm.CanTransition(PhaseBuild, PhaseAudit) {
 		t.Error("CanTransition(build, audit) must be legal")
 	}
@@ -269,11 +190,6 @@ func TestStateMachine_NextAndCanTransition(t *testing.T) {
 	}
 }
 
-// --- PhaseSwarmPlan -------------------------------------------------------
-
-// TestPhaseSwarmPlan_ValidAndStringer names the PhaseSwarmPlan const and
-// exercises Phase.IsValid()/String() over it: swarm-plan is a recognized phase
-// and stringifies to its wire value.
 func TestPhaseSwarmPlan_ValidAndStringer(t *testing.T) {
 	t.Parallel()
 	if PhaseSwarmPlan.String() != "swarm-plan" {
@@ -284,11 +200,6 @@ func TestPhaseSwarmPlan_ValidAndStringer(t *testing.T) {
 	}
 }
 
-// --- VerdictReason --------------------------------------------------------
-
-// TestVerdictReason_FromDiagnostics names VerdictReason and exercises
-// ReasonFromDiagnostics: a FAIL with an error diagnostic folds into a
-// VerdictReason carrying the error message as Summary and the supplied Taxonomy.
 func TestVerdictReason_FromDiagnostics(t *testing.T) {
 	t.Parallel()
 	tax := Taxonomy{Source: "audit", FailureMode: "egps-red", Consequence: failureadapter.CodeAuditFail}
@@ -311,11 +222,6 @@ func TestVerdictReason_FromDiagnostics(t *testing.T) {
 	}
 }
 
-// --- Orchestrator.FailureAdviserWired -------------------------------------
-
-// TestOrchestrator_FailureAdviserWired covers the FailureAdviserWired method
-// (named AND executed >0%): true when the WithFailureAdviser option injected an
-// adviser, false on a bare orchestrator.
 func TestOrchestrator_FailureAdviserWired(t *testing.T) {
 	t.Parallel()
 	bare := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
@@ -329,16 +235,7 @@ func TestOrchestrator_FailureAdviserWired(t *testing.T) {
 	}
 }
 
-// --- PhaseBoundaryCheckpointer --------------------------------------------
-
-// TestPhaseBoundaryCheckpointer_FiresDuringRunCycle names the package var
-// PhaseBoundaryCheckpointer and proves the real consumer (cyclerun_record.go's
-// recordAndBranch) invokes it at every phase boundary. core cannot import the
-// checkpoint package that normally sets it (circular import), so the test
-// assigns its own recording closure, runs a full RunCycle, and asserts the hook
-// fired with the just-completed phases. The saved value is restored in
-// t.Cleanup. NOT parallel: the var is package-global and shared with the other
-// RunCycle tests in this package.
+// Not parallel: PhaseBoundaryCheckpointer is package-global, and core cannot import the checkpoint package that sets it.
 func TestPhaseBoundaryCheckpointer_FiresDuringRunCycle(t *testing.T) {
 	saved := PhaseBoundaryCheckpointer
 	t.Cleanup(func() { PhaseBoundaryCheckpointer = saved })
@@ -356,14 +253,12 @@ func TestPhaseBoundaryCheckpointer_FiresDuringRunCycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RunCycle: %v", err)
 	}
-	// The hook fires once per completed phase boundary.
 	if fired != len(res.PhasesRun) {
 		t.Errorf("PhaseBoundaryCheckpointer fired %d time(s), want one per phase (%d)", fired, len(res.PhasesRun))
 	}
 	if fired == 0 {
 		t.Fatal("PhaseBoundaryCheckpointer never fired during a full RunCycle")
 	}
-	// It is handed the live cycle-state, carrying the completed phases.
 	if len(lastCS.CompletedPhases) == 0 {
 		t.Error("checkpointer received an empty CycleState — expected the completed phases")
 	}
@@ -372,14 +267,6 @@ func TestPhaseBoundaryCheckpointer_FiresDuringRunCycle(t *testing.T) {
 	}
 }
 
-// --- Orchestrator.ModelCatalogLookupWired ---------------------------------
-
-// TestOrchestrator_ModelCatalogLookupWired covers the ModelCatalogLookupWired
-// method (named AND executed >0%): true when WithModelCatalogLookup injected a
-// resolver, false on a bare orchestrator. The accessor exists because
-// router.ClampPlanModelRouting short-circuits on a nil lookup, so an unwired
-// resolvability gate is indistinguishable from a passing one at runtime — the
-// composition root proves its wiring through this seam.
 func TestOrchestrator_ModelCatalogLookupWired(t *testing.T) {
 	t.Parallel()
 	bare := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))

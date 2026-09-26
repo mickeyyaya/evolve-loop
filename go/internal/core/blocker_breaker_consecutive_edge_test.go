@@ -1,13 +1,5 @@
 package core
 
-// blocker_breaker_consecutive_edge_test.go — edge-case pins for the #423
-// consecutive-failures rule, added with the 2026-08-09 zero-ship batch
-// postmortem (docs/incidents/2026-08-09-zero-ship-batch.md). The base suite
-// pins the core semantics; these close the reviewer-flagged corners: rule
-// precedence against guard-class, ceiling-1 hair trigger, duplicate digests
-// for one cycle, and an ack that splits a long run into two sub-ceiling
-// halves versus one that leaves an independently-tripping half.
-
 import "testing"
 
 func TestConsecutiveFailures_GuardClassRuleWinsOnOverlap(t *testing.T) {
@@ -33,8 +25,6 @@ func TestConsecutiveFailures_CeilingOneHaltsOnSingleFailure(t *testing.T) {
 }
 
 func TestConsecutiveFailures_DuplicateDigestsForOneCycleCountOnce(t *testing.T) {
-	// Defense-in-depth: two digests claiming the same cycle must not
-	// fabricate a streak of three out of two real cycles.
 	digests := []FailureDigest{
 		{Cycle: 5, Fingerprint: "a|x|1", PreClass: "x"},
 		{Cycle: 5, Fingerprint: "a|x|1-dup", PreClass: "x"},
@@ -46,7 +36,7 @@ func TestConsecutiveFailures_DuplicateDigestsForOneCycleCountOnce(t *testing.T) 
 }
 
 func TestConsecutiveFailures_AckSplittingLongRunBelowCeilingNoHalt(t *testing.T) {
-	// 5-run with the middle acked → two 2-runs, ceiling 3 not reached.
+	// A 5-run with the middle acked leaves two 2-runs below the ceiling of 3.
 	cfg := consecCfg(3)
 	cfg.AckedFingerprints = map[string]bool{"mid|fixed|x": true}
 	digests := []FailureDigest{
@@ -62,7 +52,7 @@ func TestConsecutiveFailures_AckSplittingLongRunBelowCeilingNoHalt(t *testing.T)
 }
 
 func TestConsecutiveFailures_AckCannotMaskAnIndependentlyTrippingHalf(t *testing.T) {
-	// 7-run with one ack still leaves a 3-run on one side — must halt.
+	// A 7-run with one ack still leaves a 3-run on one side.
 	cfg := consecCfg(3)
 	cfg.AckedFingerprints = map[string]bool{"mid|fixed|x": true}
 	digests := []FailureDigest{

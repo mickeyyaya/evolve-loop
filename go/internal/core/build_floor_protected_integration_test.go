@@ -2,11 +2,6 @@
 
 package core
 
-// build_floor_protected_integration_test.go — F37 with real git: the cycle
-// 1689 shape. The builder's committed work changes an unprotected file AND a
-// protected one; the floor names exactly the protected path, judged on the
-// cycle-base diff (so committing the work cannot hide it) plus untracked files.
-
 import (
 	"context"
 	"os"
@@ -61,9 +56,7 @@ func TestProtectedSurfaceFloorChecks_RefusesTheCycle1689Shape(t *testing.T) {
 	if len(got) != 1 || !strings.Contains(got[0], "go/internal/core/cyclerun.go") {
 		t.Fatalf("the committed protected change is named, alone: %v", got)
 	}
-	// No cycle base recorded: the floor falls back to the HEAD diff plus
-	// untracked files (changedWorktreePaths) — an UNCOMMITTED protected edit
-	// is still named.
+	// No cycle base recorded: the floor falls back to the HEAD diff plus untracked files.
 	write("go/internal/core/cyclerun.go", "package core\n\n// an uncommitted shell edit\n")
 	got = ProtectedSurfaceFloorChecks(member)(context.Background(), ReviewInput{Phase: string(PhaseBuild), Worktree: wt})
 	if len(got) != 1 || !strings.Contains(got[0], "go/internal/core/cyclerun.go") {
@@ -71,10 +64,6 @@ func TestProtectedSurfaceFloorChecks_RefusesTheCycle1689Shape(t *testing.T) {
 	}
 }
 
-// TestProtectedSurfaceFloorChecks_SeesARenameOutOfTheSurface (architecture
-// review F37 M1): with rename detection on, `git diff --name-only` prints only
-// the NEW path of a committed `git mv`, so a protected file moved to an
-// unprotected name — and weakened while it stays >50% similar — would pass.
 func TestProtectedSurfaceFloorChecks_SeesARenameOutOfTheSurface(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")
