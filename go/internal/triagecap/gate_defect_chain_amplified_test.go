@@ -11,21 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 )
 
-// gate_defect_chain_amplified_test.go — cycle-459 test-amplification lane for
-// the F1–F5 gate-defect-chain contract (inbox triagecap-prose-counter-defect).
-// Authored black-box from the inbox spec, the TDD contract
-// (gate_defect_chain_test.go), and the package's exported doc surface — not
-// from the implementation. The TDD tests replay the cycle-448/449 incident;
-// these probe the boundaries the incident did not exercise: alternate target
-// markers, clause cut-off on either side of a target, per-item dedup, the
-// ## dropped section, artifact scale, the ShouldDemote window/template
-// bounds, the declaration-primary reject reason, the undeclared-companion
-// WARN, and relief idempotency under re-review.
-
-// TestCountCommittedFloors_TargetScopeAmplified probes the F1 target-scoping
-// boundaries: a package counts only when named in the clause leading up to a
-// target-marked percent; evidence percents on either side of the target must
-// not pull their packages into the count.
 func TestCountCommittedFloors_TargetScopeAmplified(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -92,11 +77,6 @@ func largeTriageArtifact() string {
 	return b.String()
 }
 
-// TestShouldDemote_WindowAndTemplateBoundsAmplified probes the F4 predicate
-// directly at its documented bounds: the two most recently RECORDED
-// rejections must be an adjacent same-template pair with the newer within
-// the demotion window of the current cycle. gapSummary448/449 collapse to
-// one template (digit runs normalize); the other template differs in words.
 func TestShouldDemote_WindowAndTemplateBoundsAmplified(t *testing.T) {
 	const otherTemplate = "cycle 446 failed during build: tmux pane vanished before prompt delivery"
 	pair := []FailEntry{{Cycle: 448, Summary: gapSummary448}, {Cycle: 449, Summary: gapSummary449}}
@@ -128,11 +108,6 @@ func TestShouldDemote_WindowAndTemplateBoundsAmplified(t *testing.T) {
 	}
 }
 
-// TestCapReviewer_DeclarationPathRejectListsDeclaredPackages (F5 on the
-// declaration-primary path): the counted-package list in the reject reason
-// must reflect what the counter actually counted. With a committed_floors
-// declaration present, counting is declaration-primary, so the reason must
-// list the DECLARED packages — the prose here resolves to none.
 func TestCapReviewer_DeclarationPathRejectListsDeclaredPackages(t *testing.T) {
 	ws := writeTriageWorkspace(t, "## top_n\n- coverage-agg: push total coverage toward 93%\n")
 	decl := `{"committed_floors":["swarmrunner","bridge","evalgate"]}`
@@ -151,10 +126,6 @@ func TestCapReviewer_DeclarationPathRejectListsDeclaredPackages(t *testing.T) {
 	}
 }
 
-// TestCapReviewer_CompanionWithoutCommittedFloorsStillWarns (F3): the
-// producer check is about the DECLARATION, not the file — a companion that
-// exists but carries no committed_floors field leaves a floor-bearing report
-// undeclared and must WARN exactly like a missing companion.
 func TestCapReviewer_CompanionWithoutCommittedFloorsStillWarns(t *testing.T) {
 	ws := writeTriageWorkspace(t, "## top_n\n- coverage-one: Push bridge coverage to ≥98%\n")
 	if err := os.WriteFile(filepath.Join(ws, TriageDecisionName()), []byte(`{"note":"no declaration here"}`), 0o644); err != nil {
@@ -176,11 +147,6 @@ func TestCapReviewer_CompanionWithoutCommittedFloorsStillWarns(t *testing.T) {
 	}
 }
 
-// TestCapReviewer_ReliefIsIdempotentForTheRelievedCycle (F4): a crash-resume
-// re-review of the SAME relieved cycle must keep the relief (one cycle means
-// that cycle, not one Review call) and must not file a second defect —
-// otherwise a resume after the demotion would burn the cycle the relief was
-// granted to.
 func TestCapReviewer_ReliefIsIdempotentForTheRelievedCycle(t *testing.T) {
 	root := newGapRoot(t)
 	pair := []FailEntry{{Cycle: 448, Summary: gapSummary448}, {Cycle: 449, Summary: gapSummary449}}

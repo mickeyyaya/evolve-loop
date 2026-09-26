@@ -2,11 +2,6 @@ package config
 
 import "testing"
 
-// commit_evidence_test.go — EVOLVE_COMMIT_EVIDENCE (ADR-0027) flag parsing.
-// Default off (byte-identical legacy path-poll); shadow/enforce recognized;
-// "advisory" and typos default to off with a warning (a typo must never
-// silently enable phase commits).
-
 func TestCommitEvidence_Default(t *testing.T) {
 	cfg, _ := Load("", nil)
 	if cfg.CommitEvidence != StageOff {

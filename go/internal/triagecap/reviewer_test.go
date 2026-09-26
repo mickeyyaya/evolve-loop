@@ -11,8 +11,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// newTestReviewer builds the clamp with seam overrides: a fixed package
-// vocabulary and a fixed throughput window (no real state.json needed).
+// newTestReviewer fixes the package vocabulary and window, and logs only format strings.
 func newTestReviewer(stage config.Stage, window []core.TriageThroughputEntry, logs *[]string) *CapReviewer {
 	r := newCapReviewer(stage)
 	r.pkgsFn = func(string) []string { return knownPkgsFixture }
@@ -39,9 +38,6 @@ func reviewIn(ws string) core.ReviewInput {
 	return core.ReviewInput{Phase: "triage", Workspace: ws, ProjectRoot: ws}
 }
 
-// TestCapReviewer_Cycle283ShapeRejected — the R9.2 acceptance replay: the
-// overpacked cycle-283 artifact (12 floors) against the empty-window seed
-// (K=5, cap=7) must reject at enforce with an actionable cap directive.
 func TestCapReviewer_Cycle283ShapeRejected(t *testing.T) {
 	ws := writeTriageWorkspace(t, readFixture(t, "triage-cycle283.md"))
 	r := newTestReviewer(config.StageEnforce, nil, nil)
@@ -56,8 +52,6 @@ func TestCapReviewer_Cycle283ShapeRejected(t *testing.T) {
 	}
 }
 
-// TestCapReviewer_Cycle281ShapePasses — the PASS baseline (1 floor) is
-// approved untouched.
 func TestCapReviewer_Cycle281ShapePasses(t *testing.T) {
 	ws := writeTriageWorkspace(t, readFixture(t, "triage-cycle281.md"))
 	r := newTestReviewer(config.StageEnforce, nil, nil)
@@ -66,8 +60,6 @@ func TestCapReviewer_Cycle281ShapePasses(t *testing.T) {
 	}
 }
 
-// TestCapReviewer_ObservedWindowTightensCap: a window of lean cycles lowers
-// K below the seed — the clamp follows observed throughput, not the constant.
 func TestCapReviewer_ObservedWindowTightensCap(t *testing.T) {
 	// K = mean(2,2,2) = 2 → cap = ceil(2.5) = 3; a 4-floor commit rejects.
 	window := []core.TriageThroughputEntry{

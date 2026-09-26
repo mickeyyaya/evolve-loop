@@ -1,16 +1,5 @@
 package triagecap
 
-// lane_menu_test.go — fleet lanes consume a MENU, not a single todo
-// (fleet-lane-batch-menu). Live wave-1 of batch-14 (cycles 1127/1128): both
-// lane scopes carried a single-element todo_ids while the triage prompt's
-// "prefer selecting a whole batch as top_n" guidance sat unreachable —
-// SelectFleetWidthTopN kept only b[0] per partition bucket, discarding the
-// bucket-mates that share the lane's files. Expansion deepens each lane with
-// its SAME-FILE cluster mates (one worktree, one build, one audit amortized)
-// while never touching width: independent work stays width-material, a
-// bridge candidate joins nothing, and cross-lane file-disjointness is
-// preserved by construction.
-
 import (
 	"encoding/json"
 	"os"
@@ -23,9 +12,6 @@ func cand(id string, weight float64, files ...string) FleetCandidate {
 	return FleetCandidate{ID: id, Weight: weight, Files: files}
 }
 
-// TestExpandWithClusterMates_AddsSameFileMatesUpToCap pins the core: a lane's
-// rep pulls its highest-weight same-file mates in, capped at perLane members
-// including the rep.
 func TestExpandWithClusterMates_AddsSameFileMatesUpToCap(t *testing.T) {
 	sel := []FleetCandidate{cand("rep", 0.9, "go/internal/x/a.go")}
 	backlog := []FleetCandidate{
@@ -44,9 +30,6 @@ func TestExpandWithClusterMates_AddsSameFileMatesUpToCap(t *testing.T) {
 	}
 }
 
-// TestExpandWithClusterMates_BridgeNeverJoins: a candidate whose files overlap
-// TWO lanes would bridge two concurrent worktrees into a ship-time collision —
-// it joins neither (same rule as fleet.Partition's deferred case).
 func TestExpandWithClusterMates_BridgeNeverJoins(t *testing.T) {
 	sel := []FleetCandidate{
 		cand("lane-a", 0.9, "go/internal/x/a.go"),
@@ -62,9 +45,6 @@ func TestExpandWithClusterMates_BridgeNeverJoins(t *testing.T) {
 	}
 }
 
-// TestExpandWithClusterMates_IndependentWorkNeverPads: a candidate sharing no
-// file with any lane is WIDTH material (its own future lane), not depth — the
-// menu must stay a coherent same-area unit, never a bag of filler.
 func TestExpandWithClusterMates_IndependentWorkNeverPads(t *testing.T) {
 	sel := []FleetCandidate{cand("rep", 0.9, "go/internal/x/a.go")}
 	backlog := []FleetCandidate{
@@ -77,10 +57,6 @@ func TestExpandWithClusterMates_IndependentWorkNeverPads(t *testing.T) {
 	}
 }
 
-// TestExpandWithClusterMates_CrossLaneFilesStayDisjoint asserts the invariant
-// the whole fleet rests on: after expansion no file is owned by two lanes, and
-// no id appears twice. Mates claim their OWN files for the lane they join, so
-// a later candidate touching those files cannot join another lane.
 func TestExpandWithClusterMates_CrossLaneFilesStayDisjoint(t *testing.T) {
 	sel := []FleetCandidate{
 		cand("lane-a", 0.9, "go/internal/x/a.go"),
@@ -88,8 +64,7 @@ func TestExpandWithClusterMates_CrossLaneFilesStayDisjoint(t *testing.T) {
 	}
 	backlog := []FleetCandidate{
 		cand("m1", 0.7, "go/internal/x/a.go", "go/internal/x/extra.go"),
-		// m2 shares m1's EXTRA file: once m1 joined lane-a, m2 belongs to
-		// lane-a's cluster too — and must never reach lane-b.
+		// m2 touches m1's extra file (claimed once m1 joins lane-a) and lane-b's file.
 		cand("m2", 0.6, "go/internal/x/extra.go", "go/internal/y/b.go"),
 	}
 	menus := ExpandWithClusterMates(sel, backlog, 4)
@@ -110,15 +85,11 @@ func TestExpandWithClusterMates_CrossLaneFilesStayDisjoint(t *testing.T) {
 			}
 		}
 	}
-	// m2 bridges lane-a's grown cluster and lane-b: it must be in NEITHER.
 	if idSeen["m2"] {
 		t.Fatalf("m2 joined a lane despite bridging lane-a's grown file set and lane-b: %v", menus)
 	}
 }
 
-// TestSelectWaveSeedMenus_EndToEnd drives the real inbox-dir read: two
-// same-file clusters in the backlog become two lanes, each carrying its whole
-// cluster as the menu, mutually file-disjoint.
 func TestSelectWaveSeedMenus_EndToEnd(t *testing.T) {
 	evolveDir := t.TempDir()
 	writeInboxTodo(t, evolveDir, "a1", 0.9, "go/internal/x/a.go")
@@ -136,7 +107,6 @@ func TestSelectWaveSeedMenus_EndToEnd(t *testing.T) {
 	}
 }
 
-// TestSelectWaveSeedMenus_IsDeterministic: same inbox, same menus, every run.
 func TestSelectWaveSeedMenus_IsDeterministic(t *testing.T) {
 	evolveDir := t.TempDir()
 	writeInboxTodo(t, evolveDir, "a1", 0.9, "go/internal/x/a.go")
@@ -181,16 +151,10 @@ func writeInboxTodo(t *testing.T, evolveDir, id string, weight float64, files ..
 	}
 }
 
-// TestExpandWithClusterMates_OverlappingSelectionFirstLaneKeepsFile
-// (diff-review MEDIUM-3): WidenTopNToFleetWidth's committed prefix may
-// overlap ITSELF (committed intent is authoritative). The first lane touching
-// a file must keep it — a later overlapping rep must not steal the claim, or
-// a mate would attach to the thief while the first lane still touches the
-// same file (a cross-lane collision this function's contract forbids).
 func TestExpandWithClusterMates_OverlappingSelectionFirstLaneKeepsFile(t *testing.T) {
 	sel := []FleetCandidate{
 		cand("first", 0.9, "go/internal/x/a.go"),
-		cand("second", 0.8, "go/internal/x/a.go"), // overlaps first — allowed for committed intent
+		cand("second", 0.8, "go/internal/x/a.go"), // a committed prefix may overlap itself
 	}
 	backlog := []FleetCandidate{cand("mate", 0.7, "go/internal/x/a.go")}
 	menus := ExpandWithClusterMates(sel, backlog, 4)
@@ -202,31 +166,6 @@ func TestExpandWithClusterMates_OverlappingSelectionFirstLaneKeepsFile(t *testin
 	}
 }
 
-// --- cycle 1159: menu-pass-preserve-committed-ids ------------------------
-//
-// RED tests for the committed-prefix gap: SelectWaveSeedMenus seeded its base
-// selection with SelectFleetWidthTopN(backlog, count) — a FRESH top-N pick with
-// no committed input — while the sibling seam WidenTopNToFleetWidth(committed,
-// backlog, count) exists precisely to preserve an already-committed prefix while
-// widening to fleet width. A menu-pass invocation could therefore silently drop
-// or reorder ids a caller had already committed to.
-//
-// CONTRACT for Builder (do NOT modify these tests — implement production code):
-//   - SelectWaveSeedMenus gains a `committed []FleetCandidate` parameter:
-//     SelectWaveSeedMenus(evolveDir string, committed []FleetCandidate,
-//                         count, perLane int, isProtected func(string) bool)
-//   - It seeds via WidenTopNToFleetWidth(committed, backlog, count) instead of
-//     SelectFleetWidthTopN(backlog, count), then deepens with
-//     ExpandWithClusterMates as before.
-//   - committed == nil must reproduce today's behavior byte-identically (the
-//     one production caller, seedWavePlanFromInbox, has no committed prefix).
-//   - ExpandWithClusterMates keeps its signature: it already honors an
-//     overlapping committed prefix ("first lane keeps the file").
-
-// TestSelectWaveSeedMenus_PreservesCommittedPrefix: a LOW-weight committed
-// candidate must lead the menus even though the backlog holds higher-weight
-// work. This is the defect — the committed-blind selector would rank a1 first
-// and drop c1 entirely once the fleet width was filled.
 func TestSelectWaveSeedMenus_PreservesCommittedPrefix(t *testing.T) {
 	evolveDir := t.TempDir()
 	writeInboxTodo(t, evolveDir, "a1", 0.9, "go/internal/x/a.go")
@@ -248,9 +187,6 @@ func TestSelectWaveSeedMenus_PreservesCommittedPrefix(t *testing.T) {
 	}
 }
 
-// TestSelectWaveSeedMenus_CommittedNotInBacklogStillSeeded is the edge case:
-// a committed id whose todo has already been consumed out of the inbox must
-// still seed its lane. Reading the backlog alone would lose it.
 func TestSelectWaveSeedMenus_CommittedNotInBacklogStillSeeded(t *testing.T) {
 	evolveDir := t.TempDir()
 	writeInboxTodo(t, evolveDir, "a1", 0.9, "go/internal/x/a.go")
@@ -264,10 +200,6 @@ func TestSelectWaveSeedMenus_CommittedNotInBacklogStillSeeded(t *testing.T) {
 	}
 }
 
-// TestSelectWaveSeedMenus_CommittedOverlapNeverDropped: committed intent is
-// authoritative even when two committed items share a file — WidenTopNToFleetWidth
-// preserves every committed candidate verbatim, and neither may be dropped by the
-// disjointness rule that governs BACKFILLED lanes only.
 func TestSelectWaveSeedMenus_CommittedOverlapNeverDropped(t *testing.T) {
 	evolveDir := t.TempDir()
 	writeInboxTodo(t, evolveDir, "a1", 0.9, "go/internal/x/a.go")
@@ -291,11 +223,6 @@ func TestSelectWaveSeedMenus_CommittedOverlapNeverDropped(t *testing.T) {
 	}
 }
 
-// TestSelectWaveSeedMenus_NilCommittedMatchesLegacySelection is the negative /
-// anti-no-op case: with NO committed prefix the menus must be exactly what the
-// legacy committed-blind path produced. A naive "always prepend committed"
-// implementation passes the positive tests above but breaks the sole production
-// caller (seedWavePlanFromInbox), which passes no prefix.
 func TestSelectWaveSeedMenus_NilCommittedMatchesLegacySelection(t *testing.T) {
 	evolveDir := t.TempDir()
 	writeInboxTodo(t, evolveDir, "a1", 0.9, "go/internal/x/a.go")
@@ -308,7 +235,7 @@ func TestSelectWaveSeedMenus_NilCommittedMatchesLegacySelection(t *testing.T) {
 	if got := renderMenus(SelectWaveSeedMenus(evolveDir, nil, 2, 4, nil)); got != want {
 		t.Errorf("nil committed = %q, want legacy %q — an empty prefix must not change the selection", got, want)
 	}
-	if want != "a1,a2 | b1,b2" { // guard the guard: the legacy shape itself is pinned
+	if want != "a1,a2 | b1,b2" {
 		t.Errorf("legacy baseline drifted: %q", want)
 	}
 }

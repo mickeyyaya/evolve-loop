@@ -8,9 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// TestRecorder_ShippedCycleAppendsWindow: the recorder closure reads the
-// cycle's triage artifact from the workspace and appends the committed-floor
-// count to state.TriageThroughput.
 func TestRecorder_ShippedCycleAppendsWindow(t *testing.T) {
 	ws := t.TempDir()
 	artifact := "## top_n\n- coverage-x: Push swarmrunner, swarmplan coverage ≥98%\n"
@@ -28,8 +25,6 @@ func TestRecorder_ShippedCycleAppendsWindow(t *testing.T) {
 	}
 }
 
-// TestRecorder_MissingArtifactIsNoOp: a shipped cycle without a triage
-// artifact (triage skipped) carries no throughput signal.
 func TestRecorder_MissingArtifactIsNoOp(t *testing.T) {
 	rec := Recorder(repoRoot(t))
 	st := core.State{TriageThroughput: []core.TriageThroughputEntry{{Cycle: 281, Floors: 5}}}
@@ -39,8 +34,6 @@ func TestRecorder_MissingArtifactIsNoOp(t *testing.T) {
 	}
 }
 
-// TestRecorder_ZeroFloorCycleIsNoOp: a shipped non-coverage cycle must not
-// drag K toward zero.
 func TestRecorder_ZeroFloorCycleIsNoOp(t *testing.T) {
 	ws := t.TempDir()
 	artifact := "## top_n\n- fix-bug: Fix the dispatch worktree bug\n"

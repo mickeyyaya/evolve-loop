@@ -1,35 +1,5 @@
 package triagecap
 
-// malformed_floors_test.go — RED tests for cycle-308 task
-// `companion-malformed-must-surface` (inbox item 2026-06-12T16-13-51Z; cycle-305
-// audit M1).
-//
-// Both CommittedFloorCount (floors.go) and DeferredFloorPackagesDecl
-// (deferred.go) read the triage-decision.json companion with the pattern
-// `if declared, ok, err := Read...; err == nil && ok { ... }`. When err != nil
-// (the companion is present but its JSON is malformed) the count SILENTLY falls
-// through to the prose scanner — indistinguishable from a missing file. A
-// corrupt companion that the agent THINKS is governing the cycle therefore has
-// zero effect with no signal.
-//
-// The fix separates three cases:
-//
-//	absent file            → silent fallback (backward compat)
-//	present, field absent  → silent fallback (backward compat)
-//	present-but-malformed  → SURFACE a non-empty correction string carrying the
-//	                         JSON parse error
-//
-// New API this file pins (Builder implements):
-//
-//	MalformedCommittedFloorWarning(companionPath string) string   (floors.go)
-//	MalformedDeferredFloorWarning(companionPath string) string    (deferred.go)
-//
-// — each returns a non-empty parse-error detail ONLY when the companion is
-// present-but-malformed; "" for absent file, absent field, and well-formed.
-// CommittedFloorCount / DeferredFloorPackagesDecl keep their fail-open prose
-// fallback unchanged (no regression). writeCompanion lives in
-// declarative_floors_test.go (same package).
-
 import (
 	"os"
 	"path/filepath"
@@ -37,7 +7,6 @@ import (
 	"testing"
 )
 
-// writeMalformedCompanion writes a triage-decision.json whose JSON is corrupt.
 func writeMalformedCompanion(t *testing.T, dir string) string {
 	t.Helper()
 	path := filepath.Join(dir, triageDecisionFile)
@@ -47,17 +16,8 @@ func writeMalformedCompanion(t *testing.T, dir string) string {
 	return path
 }
 
-// ---------------------------------------------------------------------------
-// committed_floors (floors.go)
-// ---------------------------------------------------------------------------
-
-// TestCommittedFloorCount_MalformedFieldSurfaces: a present-but-malformed
-// companion must SURFACE via MalformedCommittedFloorWarning (non-empty, naming
-// the parse failure), while a well-formed companion stays silent (""). The
-// well-formed assertion is the anti-no-op guard: a function that always returned
-// non-empty would fail it. CommittedFloorCount itself still fails open to prose.
 func TestCommittedFloorCount_MalformedFieldSurfaces(t *testing.T) {
-	wantProse := CountCommittedFloors(proseFloors3, knownPkgsFixture) // 3
+	wantProse := CountCommittedFloors(proseFloors3, knownPkgsFixture)
 	if wantProse != 3 {
 		t.Fatalf("fixture precondition: prose count = %d, want 3", wantProse)
 	}
@@ -68,7 +28,6 @@ func TestCommittedFloorCount_MalformedFieldSurfaces(t *testing.T) {
 		if warn == "" {
 			t.Fatal("present-but-malformed companion must surface a non-empty warning (not silently fall through)")
 		}
-		// The parse error detail must be carried so the agent can fix the JSON.
 		if !strings.Contains(strings.ToLower(warn), "committed_floors") {
 			t.Errorf("warning must name the committed_floors companion; got %q", warn)
 		}
@@ -89,14 +48,11 @@ func TestCommittedFloorCount_MalformedFieldSurfaces(t *testing.T) {
 	})
 }
 
-// TestCommittedFloorCount_AbsentCompanionFallsBackSilently: an absent companion
-// (and a present companion without the committed_floors field) must NOT surface
-// a warning and must fall back to the prose count — backward compatibility.
 func TestCommittedFloorCount_AbsentCompanionFallsBackSilently(t *testing.T) {
-	wantProse := CountCommittedFloors(proseFloors3, knownPkgsFixture) // 3
+	wantProse := CountCommittedFloors(proseFloors3, knownPkgsFixture)
 
 	t.Run("absent file is silent", func(t *testing.T) {
-		missing := filepath.Join(t.TempDir(), triageDecisionFile) // not created
+		missing := filepath.Join(t.TempDir(), triageDecisionFile)
 		if warn := MalformedCommittedFloorWarning(missing); warn != "" {
 			t.Errorf("absent companion must be silent; got %q", warn)
 		}
@@ -106,7 +62,7 @@ func TestCommittedFloorCount_AbsentCompanionFallsBackSilently(t *testing.T) {
 	})
 
 	t.Run("present file without the field is silent", func(t *testing.T) {
-		comp := writeCompanion(t, t.TempDir(), nil) // {"cycle":304,"top_n":[]}
+		comp := writeCompanion(t, t.TempDir(), nil)
 		if warn := MalformedCommittedFloorWarning(comp); warn != "" {
 			t.Errorf("companion without committed_floors must be silent (not malformed); got %q", warn)
 		}
@@ -116,19 +72,10 @@ func TestCommittedFloorCount_AbsentCompanionFallsBackSilently(t *testing.T) {
 	})
 }
 
-// ---------------------------------------------------------------------------
-// deferred_floors (deferred.go)
-// ---------------------------------------------------------------------------
-
-// (writeDeferredCompanion — a well-formed deferred_floors companion writer —
-// already lives in deferred_test.go and is reused here.)
-
-// TestDeferredFloorPackagesDecl_MalformedFieldSurfaces: same three-case
-// separation for the deferred_floors companion read.
 func TestDeferredFloorPackagesDecl_MalformedFieldSurfaces(t *testing.T) {
 	candidates := []string{"clihealth", "ledger"}
 	artifact := "## deferred\n- coverage-clihealth: raise clihealth coverage ≥95% — priority=L, source=scout\n"
-	wantProse := DeferredFloorPackages(artifact, candidates) // ["clihealth"]
+	wantProse := DeferredFloorPackages(artifact, candidates)
 	if len(wantProse) != 1 || wantProse[0] != "clihealth" {
 		t.Fatalf("fixture precondition: prose deferred = %v, want [clihealth]", wantProse)
 	}
@@ -160,14 +107,12 @@ func TestDeferredFloorPackagesDecl_MalformedFieldSurfaces(t *testing.T) {
 	})
 }
 
-// TestDeferredFloorPackagesDecl_AbsentFieldFallsBackSilently: absent file and
-// present-without-field must be silent and fall back to the prose scanner.
 func TestDeferredFloorPackagesDecl_AbsentFieldFallsBackSilently(t *testing.T) {
 	candidates := []string{"clihealth", "ledger"}
 	artifact := "## deferred\n- coverage-clihealth: raise clihealth coverage ≥95% — priority=L, source=scout\n"
 
 	t.Run("absent file is silent", func(t *testing.T) {
-		missing := filepath.Join(t.TempDir(), triageDecisionFile) // not created
+		missing := filepath.Join(t.TempDir(), triageDecisionFile)
 		if warn := MalformedDeferredFloorWarning(missing); warn != "" {
 			t.Errorf("absent companion must be silent; got %q", warn)
 		}
@@ -178,7 +123,7 @@ func TestDeferredFloorPackagesDecl_AbsentFieldFallsBackSilently(t *testing.T) {
 	})
 
 	t.Run("present file without the field is silent", func(t *testing.T) {
-		comp := writeCompanion(t, t.TempDir(), nil) // no deferred_floors field
+		comp := writeCompanion(t, t.TempDir(), nil)
 		if warn := MalformedDeferredFloorWarning(comp); warn != "" {
 			t.Errorf("companion without deferred_floors must be silent (not malformed); got %q", warn)
 		}

@@ -1,10 +1,5 @@
 package config
 
-// importgraph_test.go — the package is the routing-config leaf (ADR-0103 unit 08
-// §2): stdlib plus the two named internal packages — never internal/core,
-// never internal/policy (policy imports config: the compiler is the cycle
-// guard; this is the leaf-ness declaration — signalcenter/importgraph_test.go idiom).
-
 import (
 	"go/parser"
 	"go/token"

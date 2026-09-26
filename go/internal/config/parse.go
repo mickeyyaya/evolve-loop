@@ -1,19 +1,11 @@
 package config
 
-// parse.go — the dial parsers: two pure, exported stage ladders (the ONE
-// spelling the composition root's forwarders keep) and the warning parsers
-// over them and over the mode, model-routing and enable vocabularies. An
-// unknown value always resolves to the fail-safe side WITH an unknown-value
-// warning — a typo must never silently enable a kill-path or a staged rollout.
-
 import (
 	"fmt"
 	"strings"
 )
 
-// GateStage is the off/shadow/enforce trichotomy the gate and recovery dials
-// use (no advisory middle state — these axes are compute-and-log vs act).
-// Trims; "0" and "off" are off; ok=false with StageOff for anything else.
+// GateStage parses the off/shadow/enforce trichotomy of the gate and recovery dials; anything else is StageOff, false.
 func GateStage(v string) (Stage, bool) {
 	switch strings.TrimSpace(v) {
 	case "0", "off":
@@ -26,9 +18,7 @@ func GateStage(v string) (Stage, bool) {
 	return StageOff, false
 }
 
-// RouterStage is the full off→shadow→advisory→enforce ladder dynamic routing,
-// unified phase I/O, the router re-plan and the parallel-evaluate dispatcher
-// use. Trims; ok=false with StageOff for anything outside it.
+// RouterStage parses the full off/shadow/advisory/enforce ladder; anything else is StageOff, false.
 func RouterStage(v string) (Stage, bool) {
 	switch strings.TrimSpace(v) {
 	case "0", "off":
@@ -43,10 +33,8 @@ func RouterStage(v string) (Stage, bool) {
 	return StageOff, false
 }
 
-// parseStage parses a full off→shadow→advisory→enforce dial (RouterStage).
-// varName names the offending key in the unknown-value warning; an unknown
-// value defaults to off. Shared by dynamic routing, unified phase I/O and the
-// router-ladder policy dials.
+// parseStage and the parsers below resolve an unknown value to the fail-safe side with a
+// warning: a typo must never silently enable a kill path or a staged rollout.
 func parseStage(v, varName string, ws *[]Warning) Stage {
 	s, ok := RouterStage(v)
 	if !ok {
@@ -56,9 +44,6 @@ func parseStage(v, varName string, ws *[]Warning) Stage {
 	return s
 }
 
-// parseEvidenceStage parses an off/shadow/enforce dial (GateStage). Used by
-// the environment-backed commit-evidence stage and the gate/recovery policy
-// dials; varName names the offending env var or policy key in the warning.
 func parseEvidenceStage(v, varName string, ws *[]Warning) Stage {
 	s, ok := GateStage(v)
 	if !ok {
@@ -68,9 +53,7 @@ func parseEvidenceStage(v, varName string, ws *[]Warning) Stage {
 	return s
 }
 
-// parseMode parses the routing brain; an unknown value keeps the locked
-// default (llm). The message names the registry key (the env arm restamps
-// fields.key with the env var — the message spelling is pinned).
+// parseMode's message names the registry key even for the env dial, whose stamp rewrites only fields.key.
 func parseMode(v string, ws *[]Warning) Mode {
 	switch strings.TrimSpace(v) {
 	case "llm", "dynamic", "dynamic-llm":
@@ -84,10 +67,6 @@ func parseMode(v string, ws *[]Warning) Mode {
 	}
 }
 
-// parseModelRouting parses the cycle-436 model-authority axis. Unknown values
-// fall back to the SAFE static side (never silently enable auto) with a
-// warning — mirroring parseStage/parseMode's fail-safe-with-warning contract.
-// varName names the offending key in the warning.
 func parseModelRouting(v, varName string, ws *[]Warning) ModelRouting {
 	switch strings.TrimSpace(v) {
 	case "static":
@@ -103,9 +82,6 @@ func parseModelRouting(v, varName string, ws *[]Warning) ModelRouting {
 	}
 }
 
-// parseEnable parses a phases[].enabled word; an unknown value is content
-// (trigger-decided). The message spelling is pinned; applyPhases restamps
-// fields.key with the phase's own key.
 func parseEnable(v string, ws *[]Warning) Enable {
 	switch strings.TrimSpace(v) {
 	case "on":

@@ -1,10 +1,5 @@
 package config
 
-// loader_pins_test.go — ADR-0103 unit 08 step 1: the pre-move pins and the
-// goldens captured on 8e8f080f before any code moved. Every test here was
-// green on the unsplit config.go and proven red against its named mutant;
-// they replay byte-for-byte through the Loader after the split.
-
 import (
 	"encoding/json"
 	"os"
@@ -14,10 +9,8 @@ import (
 	"testing"
 )
 
-// kitchenSinkEnv is the env half of the kitchen-sink fixture (the registry half
-// is testdata/kitchen_sink_registry.json): every env arm that can warn does,
-// EVOLVE_USE_PHASE_REGISTRY=false keeps the registry ON (Q1), and the spine is
-// weakened so validateSpine fires.
+// kitchenSinkEnv makes every env arm that can warn do so, keeps the registry on with a
+// non-"0" EVOLVE_USE_PHASE_REGISTRY, and weakens the spine so validateSpine fires.
 func kitchenSinkEnv() map[string]string {
 	return map[string]string{
 		"EVOLVE_SANDBOX":                 "bogus",
@@ -57,8 +50,6 @@ func codesOf(ws []Warning) []string {
 	return out
 }
 
-// Test 1 — the pipeline order registry → env → spine → inert is what the range
-// stamper depends on; the literal messages pin each producer.
 func TestLoad_WarningOrderIsRegistryThenEnvThenSpineThenInert(t *testing.T) {
 	reg := writeRegistry(t, `{"config":{"dynamic_routing":"bogus"},"phases":[{"name":"plan-review","enabled":"on"}]}`)
 	_, ws := Load(reg, map[string]string{
@@ -83,8 +74,6 @@ func TestLoad_WarningOrderIsRegistryThenEnvThenSpineThenInert(t *testing.T) {
 	}
 }
 
-// Test 2 — the inert-enable validator's first POSITIVE pin: force-enabled
-// non-spine phases warn in sorted order below advisory, never at advisory.
 func TestValidateInertEnables_FiresForForceEnabledNonSpinePhasesInSortedOrder(t *testing.T) {
 	reg := writeRegistry(t, `{"config":{"mandatory_phases":["scout","build","audit","ship","custom-mandatory"]},
 		"phases":[{"name":"zz-custom","enabled":"on"},{"name":"plan-review","enabled":"on"},{"name":"triage","enabled":"on"},{"name":"custom-mandatory","enabled":"on"}]}`)
@@ -107,8 +96,6 @@ func TestValidateInertEnables_FiresForForceEnabledNonSpinePhasesInSortedOrder(t 
 	}
 }
 
-// Test 3 — a malformed EVOLVE_CONDITIONAL_MANDATORY expression warns and keeps
-// the compiled rule (covers the :766 branch).
 func TestApplyEnv_ConditionalMandatoryParseErrorWarns(t *testing.T) {
 	cfg, ws := Load("/nonexistent/phase-registry.json", map[string]string{"EVOLVE_CONDITIONAL_MANDATORY": "tdd:nonsense"})
 	if got := codesOf(ws); !reflect.DeepEqual(got, []string{"unknown-value"}) {
@@ -122,7 +109,6 @@ func TestApplyEnv_ConditionalMandatoryParseErrorWarns(t *testing.T) {
 	}
 }
 
-// Test 4 — an unknown routing_mode warns and defaults to llm (covers :872).
 func TestParseMode_UnknownWarnsAndDefaultsToLLM(t *testing.T) {
 	cfg, ws := Load("/nonexistent/phase-registry.json", map[string]string{"EVOLVE_ROUTING_MODE": "bogus"})
 	if cfg.Mode != ModeDynamicLLM {
@@ -133,7 +119,6 @@ func TestParseMode_UnknownWarnsAndDefaultsToLLM(t *testing.T) {
 	}
 }
 
-// Test 5 — a phases[] entry without a name is skipped whole (covers :715).
 func TestApplyRegistry_PhaseWithoutNameIsSkipped(t *testing.T) {
 	reg := writeRegistry(t, `{"config":{},"phases":[{"name":"","enabled":"on"},{"name":"scout"}]}`)
 	cfg, _ := Load(reg, map[string]string{})
@@ -145,8 +130,6 @@ func TestApplyRegistry_PhaseWithoutNameIsSkipped(t *testing.T) {
 	}
 }
 
-// Test 6 — registry conditional rules MERGE over the compiled tdd default; the
-// live registry's empty-RHS rule is accepted.
 func TestLoad_RegistryConditionalMergesOverTheTddDefault(t *testing.T) {
 	reg := writeRegistry(t, `{"config":{"conditional_mandatory":{"plan-review":"triage.unified_size!="}},"phases":[]}`)
 	cfg, ws := Load(reg, map[string]string{})
@@ -161,8 +144,6 @@ func TestLoad_RegistryConditionalMergesOverTheTddDefault(t *testing.T) {
 	}
 }
 
-// Test 7 — characterisation: a malformed registry runs on the compiled baseline
-// (the same value an absent registry yields). Step 2 adds the WARN (D2).
 func TestLoad_MalformedRegistryFallsBackToTheCompiledBaseline(t *testing.T) {
 	reg := writeRegistry(t, `{`)
 	cfg, _ := Load(reg, map[string]string{})
@@ -175,10 +156,8 @@ func TestLoad_MalformedRegistryFallsBackToTheCompiledBaseline(t *testing.T) {
 	}
 }
 
-// Test 8 — golden G1: the resolved value for the FROZEN registry copy
-// (testdata/frozen_registry.json, the live file at 8e8f080f) is byte-identical
-// to the golden captured before the split. The live file is guarded by the
-// property-style TestLoad_RealRegistry; cycles edit it, so it is never golden'd.
+// Despite its name, this loads the frozen copy in testdata: cycles edit the live registry,
+// which TestLoad_RealRegistry guards instead.
 func TestLoad_RealRegistry_MatchesTheGolden(t *testing.T) {
 	cfg, ws := Load(filepath.Join("testdata", "frozen_registry.json"), map[string]string{})
 	if len(ws) != 0 {
@@ -189,8 +168,6 @@ func TestLoad_RealRegistry_MatchesTheGolden(t *testing.T) {
 	}
 }
 
-// Test 9 — golden G2: the compiled defaults through the DEFAULT reader on a real
-// absent path — zero warnings (absence is the ordinary silent case).
 func TestLoad_BuiltinDefaults_MatchTheGoldenThroughTheDefaultReader(t *testing.T) {
 	cfg, ws := Load("/nonexistent/phase-registry.json", nil)
 	if len(ws) != 0 {
@@ -201,10 +178,9 @@ func TestLoad_BuiltinDefaults_MatchTheGoldenThroughTheDefaultReader(t *testing.T
 	}
 }
 
-// Test 10 — golden G3: the kitchen sink's twelve {Code, Message} pairs, in
-// order. A projection, not the Warning itself: step 2 adds Fields.
 func TestLoad_KitchenSink_WarningsMatchTheGolden(t *testing.T) {
 	_, ws := Load(kitchenSinkRegistry(), kitchenSinkEnv())
+	// The golden projects {Code, Message}: Fields would otherwise marshal into it.
 	type cm struct{ Code, Message string }
 	got := make([]cm, 0, len(ws))
 	for _, w := range ws {
@@ -218,8 +194,6 @@ func TestLoad_KitchenSink_WarningsMatchTheGolden(t *testing.T) {
 	}
 }
 
-// Test 11 — a domain.json that exists but cannot be read is an error, not
-// absence (covers domain.go's non-ENOENT branch).
 func TestLoadDomain_ReadErrorOtherThanAbsenceIsReturned(t *testing.T) {
 	root := t.TempDir()
 	path := filepath.Join(root, ".evolve", "domain.json")
@@ -232,8 +206,6 @@ func TestLoadDomain_ReadErrorOtherThanAbsenceIsReturned(t *testing.T) {
 	}
 }
 
-// Test 12 — a deliverable-kind hole warns but the spec is still installed
-// (the registry is the SSOT; the consumer sees the hole, never a default).
 func TestApplyRegistry_DeliverableKindHoleWarnsButKeepsTheSpec(t *testing.T) {
 	reg := writeRegistry(t, `{"config":{"deliverable_kinds":{"document":{"root":"","min_options":0}}},"phases":[]}`)
 	cfg, ws := Load(reg, map[string]string{})
@@ -245,7 +217,6 @@ func TestApplyRegistry_DeliverableKindHoleWarnsButKeepsTheSpec(t *testing.T) {
 	}
 }
 
-// Test 13 — Q1: only the literal "0" disables the registry read.
 func TestLoad_UsePhaseRegistry_OnlyTheLiteralZeroDisables(t *testing.T) {
 	reg := writeRegistry(t, `{"config":{},"phases":[{"name":"scout"}]}`)
 	if cfg, _ := Load(reg, map[string]string{"EVOLVE_USE_PHASE_REGISTRY": "0"}); len(cfg.Order) != 0 {
@@ -258,7 +229,6 @@ func TestLoad_UsePhaseRegistry_OnlyTheLiteralZeroDisables(t *testing.T) {
 	}
 }
 
-// diffLines renders the first differing line of two texts for a failure message.
 func diffLines(want, got string) string {
 	w, g := strings.Split(want, "\n"), strings.Split(got, "\n")
 	for i := 0; i < len(w) && i < len(g); i++ {

@@ -7,13 +7,6 @@ import (
 	"testing"
 )
 
-// dispatch_rank_test.go — F29: among equal operator weights, the seed commits
-// lanes to work whose admissibility is PROVEN before work whose admissibility is
-// unknown. A lane's fleet scope is ONE item, so an item whose surface triage
-// later derives as protected has no alternative to fall back on. The weight
-// stays the priority (architecture review: admissibility must never silently
-// override it); the queue clusters at equal weights, so the tie-break matters.
-
 func ids(cs []FleetCandidate) []string {
 	out := make([]string, len(cs))
 	for i, c := range cs {
@@ -22,8 +15,6 @@ func ids(cs []FleetCandidate) []string {
 	return out
 }
 
-// TestRankForDispatch_WeightFirstThenVerifiedAdmissible pins the one ranking
-// every seed path shares: weight, then declared surface, then input order.
 func TestRankForDispatch_WeightFirstThenVerifiedAdmissible(t *testing.T) {
 	in := []FleetCandidate{
 		{ID: "unknown-085", Weight: 0.85},
@@ -42,9 +33,6 @@ func TestRankForDispatch_WeightFirstThenVerifiedAdmissible(t *testing.T) {
 	}
 }
 
-// TestSelectFleetWidthTopN_EqualWeightsSeedVerifiedFirst: the live queue's shape
-// — the heaviest item stays first whatever its surface; among the tied 0.85s
-// the declared one takes the next lane.
 func TestSelectFleetWidthTopN_EqualWeightsSeedVerifiedFirst(t *testing.T) {
 	cands := []FleetCandidate{
 		{ID: "resume-stale-base", Weight: 0.86},
@@ -56,8 +44,6 @@ func TestSelectFleetWidthTopN_EqualWeightsSeedVerifiedFirst(t *testing.T) {
 	}
 }
 
-// TestWidenTopNToFleetWidth_BackfillsByWeightThenVerified: the primary per-wave
-// seam keeps the committed prefix verbatim and backfills by the same ranking.
 func TestWidenTopNToFleetWidth_BackfillsByWeightThenVerified(t *testing.T) {
 	committed := []FleetCandidate{{ID: "kept", Weight: 0.5, Files: []string{"go/internal/k/k.go"}, Declared: true}}
 	tied := []FleetCandidate{
@@ -76,9 +62,6 @@ func TestWidenTopNToFleetWidth_BackfillsByWeightThenVerified(t *testing.T) {
 	}
 }
 
-// TestReadInboxBacklog_CarriesTheDeclaredSurfaceBelief: the backlog read sets
-// Declared from inboxbatch.Item.DeclaredSurface — the ONE home of the belief —
-// so a placeholder files[] is unverified here exactly as in the classifier.
 func TestReadInboxBacklog_CarriesTheDeclaredSurfaceBelief(t *testing.T) {
 	dir := t.TempDir()
 	inbox := filepath.Join(dir, "inbox")

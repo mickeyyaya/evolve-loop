@@ -2,9 +2,7 @@ package config
 
 import "testing"
 
-// Locks the default per-phase enable values from defaults() when no env overrides apply.
-// Env-based overrides (EVOLVE_TRIAGE_DISABLE, EVOLVE_TEST_PHASE_ENABLED, EVOLVE_BUILD_PLANNER)
-// were removed in cycle-39: phase enables are now configured via WorkflowPolicy.PhaseEnables.
+// Despite its name, this pins the compiled phase-enable defaults; the legacy env flags are gone.
 func TestLoad_LegacyPhaseFlags(t *testing.T) {
 	cases := []struct {
 		name  string
@@ -23,8 +21,6 @@ func TestLoad_LegacyPhaseFlags(t *testing.T) {
 	}
 }
 
-// The stale EVOLVE_TDD_PHASE key must NOT influence tdd anymore (the phase
-// reads EVOLVE_TEST_PHASE_ENABLED; config now binds that one).
 func TestLoad_EVOLVE_TDD_PHASE_NoLongerBound(t *testing.T) {
 	cfg, _ := Load("/nonexistent/phase-registry.json", map[string]string{"EVOLVE_TDD_PHASE": "0"})
 	if got := cfg.PhaseEnable["tdd"]; got != EnableOn {

@@ -6,9 +6,7 @@ import (
 	"testing"
 )
 
-// realReport mirrors a production triage-report.md (cycle-322 shape): the
-// canonical headings, the "- {id}: {action} — metadata" item format, and a
-// dropped section with reason= tails.
+// realReport is a production-shaped report: canonical headings, "- {id}: {action} — metadata" items, reason= tails.
 const realReport = `<!-- challenge-token: abc -->
 <!-- ANCHOR:triage_decision -->
 # Triage Decision — Cycle 322
@@ -31,10 +29,6 @@ phase_skip: []
 Single coverage floor this cycle for package variety.
 `
 
-// TestProjectDecisionJSON_ParsesSupersededSection pins that a `## superseded`
-// section projects into the top-level "superseded" array (deduped, order-
-// preserving) which ship's inboxmover.ReconcileSuperseded consumes, and that an
-// absent section yields an empty (never null) array.
 func TestProjectDecisionJSON_ParsesSupersededSection(t *testing.T) {
 	report := realReport + `
 ## superseded (retire an inbox item by id)
@@ -60,7 +54,6 @@ func TestProjectDecisionJSON_ParsesSupersededSection(t *testing.T) {
 		}
 	}
 
-	// Absent section → empty array, never null (consumer expects an array).
 	base, _ := ProjectDecisionJSON(realReport, 322)
 	var noSec projectedDecision
 	_ = json.Unmarshal(base, &noSec)
@@ -110,12 +103,6 @@ func TestProjectDecisionJSON_ParsesAllSections(t *testing.T) {
 	}
 }
 
-// TestProjectDecisionJSON_ExtractIDsPromotesOnlyTopN is the load-bearing safety
-// property: a projected companion must promote (= move out of inbox) ONLY the
-// top_n ids, never the deferred/dropped ids. deferred items carry to the next
-// cycle; dropped items were rejected — promoting either would silently lose an
-// unresolved inbox item. The projection emits an EMPTY skip_shipped, so the
-// union extractIDs walks is exactly top_n.
 func TestProjectDecisionJSON_ExtractIDsPromotesOnlyTopN(t *testing.T) {
 	body, err := ProjectDecisionJSON(realReport, 322)
 	if err != nil {
@@ -135,8 +122,6 @@ func TestProjectDecisionJSON_ExtractIDsPromotesOnlyTopN(t *testing.T) {
 	if len(d.SkipShipped) != 0 {
 		t.Errorf("skip_shipped must be empty in a projection (needs Step-0a git-log judgment), got %d", len(d.SkipShipped))
 	}
-	// Deferred/dropped ids must be parsed (proves the test fixture is real) but
-	// must NOT leak into a promotion-eligible field.
 	if len(d.Deferred) == 0 || len(d.Dropped) == 0 {
 		t.Fatal("fixture invalid: deferred/dropped not parsed")
 	}
@@ -154,9 +139,6 @@ func TestProjectDecisionJSON_ExtractIDsPromotesOnlyTopN(t *testing.T) {
 	}
 }
 
-// TestProjectDecisionJSON_SkipsMalformedIDs guards against a free-form prose
-// line producing a bogus id that would promote (delete) a non-existent inbox
-// item. Only kebab-slug leading tokens are accepted.
 func TestProjectDecisionJSON_SkipsMalformedIDs(t *testing.T) {
 	report := `# Triage Decision — Cycle 5
 
@@ -182,15 +164,6 @@ func TestProjectDecisionJSON_SkipsMalformedIDs(t *testing.T) {
 	}
 }
 
-// TestProjectDecisionJSON_EmptySectionsYieldEmptyArraysNotNull pins the JSON
-// contract: an artifact whose top_n/deferred/dropped sections are all present
-// but carry zero list items must still marshal each field as [], never null.
-// project.go:66-72's projectedDecision struct fields start as nil Go slices
-// and are only appended to when parseItems finds a real item — a report with
-// nothing to project today leaves all three nil, and json.MarshalIndent
-// serializes a nil slice as null. The consumer (ship/postship.go:169) reads
-// this companion; a null top_n is a live regression once disjoint packing
-// (triage-fleet-width-disjoint-topn) can legitimately narrow top_n to zero.
 func TestProjectDecisionJSON_EmptySectionsYieldEmptyArraysNotNull(t *testing.T) {
 	report := `# Triage Decision — Cycle 9
 
@@ -219,10 +192,6 @@ func TestProjectDecisionJSON_EmptySectionsYieldEmptyArraysNotNull(t *testing.T) 
 	}
 }
 
-// TestProjectDecisionJSON_SectionsEntirelyAbsent_StillYieldEmptyArrays covers
-// the OTHER null-producing path (section headings absent altogether, not just
-// empty) — sectionBody returns ok=false and the field is never touched, same
-// nil-slice-to-null failure mode as the present-but-empty case above.
 func TestProjectDecisionJSON_SectionsEntirelyAbsent_StillYieldEmptyArrays(t *testing.T) {
 	report := "# Triage Decision — Cycle 9\n\nNo top_n/deferred/dropped sections at all.\n"
 	body, err := ProjectDecisionJSON(report, 9)
@@ -240,10 +209,6 @@ func TestProjectDecisionJSON_SectionsEntirelyAbsent_StillYieldEmptyArrays(t *tes
 	}
 }
 
-// TestProjectDecisionJSON_FloorFieldsOmitted pins that the projection never
-// emits committed_floors/deferred_floors — their absence is what makes the
-// floor readers fall back to the prose counter, keeping gate behaviour
-// identical to the no-companion production baseline.
 func TestProjectDecisionJSON_FloorFieldsOmitted(t *testing.T) {
 	body, err := ProjectDecisionJSON(realReport, 322)
 	if err != nil {
@@ -259,8 +224,6 @@ func TestProjectDecisionJSON_FloorFieldsOmitted(t *testing.T) {
 	if _, ok := raw["deferred_floors"]; ok {
 		t.Error("deferred_floors must be OMITTED so floor readers fall back to prose")
 	}
-	// committed_floors absent ⇒ ReadDeclaredFloors reports not-declared.
-	// (Companion written to a temp file to exercise the real reader.)
 	dir := t.TempDir()
 	p := dir + "/triage-decision.json"
 	if err := os.WriteFile(p, body, 0o644); err != nil {

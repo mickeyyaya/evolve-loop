@@ -7,9 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// Test 24 — signalCodes is the ONE projection from the legacy Warning.Code
-// vocabulary onto the registered signal codes: six pairs, every value owned by
-// module config with a doc that names fields.step, no phantoms.
 func TestSignalCodes_TableIsTheOneProjectionWithNoPhantoms(t *testing.T) {
 	want := map[string]signalcenter.Code{
 		codeUnknownValue:       CodeUnknownValue,

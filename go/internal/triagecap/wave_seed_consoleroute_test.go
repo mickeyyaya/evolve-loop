@@ -1,11 +1,5 @@
 package triagecap
 
-// wave_seed_consoleroute_test.go — batch-7 wave-0 pin: the inbox seed must
-// skip console-routed items and backfill from the next dispatchable
-// candidates. The raw top-N seeded exclusively console items, the plan-time
-// gate rightly refused them all, and the wave "planned zero lanes" —
-// starvation by correct refusal.
-
 import (
 	"os"
 	"path/filepath"
