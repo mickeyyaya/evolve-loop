@@ -114,6 +114,12 @@ agy `model_tier` → `{"channel":"noop"}` (no model selector). codex `model_tier
   `--dangerously-skip-permissions`) and the realized `permission=bypass` flag are the SAME flag from
   two sources. The wiring must apply ONE — drop `default_args` for the realized launch (the realizer
   is the single source of launch flags) or dedup — never emit both.
+- **`default_env` (ADR-0106 P3, 2026-09-26):** a manifest may declare the environment its CLI process
+  runs in, as `default_args` declares its flags. The realizer copies it into `Realization.Env`; a tmux
+  driver exports it in the pane shell before the launch (a pane inherits the tmux server's environment),
+  a headless driver passes it to the process under the request's overrides. Keys must be shell
+  identifiers; the parser refuses a manifest whose key is not, whose key is the loop's, the bridge's or
+  a credential variable, or whose value carries a control byte.
 - **RealizeFor empty-result caveat:** an empty `Realization` is indistinguishable from a missing
   manifest. Validate the CLI (driver registry / LoadManifest) before trusting an empty result;
   don't infer "no flags needed" from emptiness (a typo'd CLI would launch bare).

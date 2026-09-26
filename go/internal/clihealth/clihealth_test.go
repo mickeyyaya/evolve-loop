@@ -132,7 +132,8 @@ func TestBenchable(t *testing.T) {
 		want    bool
 	}{
 		{pattern: "rate_limit", want: true},
-		{pattern: "auth_recheck", want: false},
+		{pattern: "auth_recheck", want: true},
+		{pattern: "trust_prompt", want: false},
 		{pattern: "quota", want: false},
 		{pattern: "", want: false},
 	}

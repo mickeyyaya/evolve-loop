@@ -171,6 +171,9 @@ func (cr *cycleRun) maybeRemediate(next Phase, dr *dispatchResult) (loopAction, 
 		obsCancel()
 	}
 	if rerr != nil {
+		if isQuotaWall(rerr) {
+			return loopAbort, cr.pauseForQuota(next, dr.resp, dr.attemptCount+round)
+		}
 		note := fmt.Sprintf("%s: round %d re-run dispatch-failed", next, round)
 		cr.result.Remediations = append(cr.result.Remediations, note)
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN remediation: gate re-run dispatch failed (%v) — original FAIL stands\n", rerr)

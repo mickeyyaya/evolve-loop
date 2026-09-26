@@ -36,6 +36,7 @@
 ./internal/binaryguard
 ./internal/bridge/keyspec
 ./internal/bridge/panestream
+./internal/bridge/phaseidentity
 ./internal/changedpkgs
 ./internal/ciparity
 ./internal/codequality

@@ -65,6 +65,9 @@ func bootTmuxREPL(
 	if cfg.ProjectRoot != "" {
 		_ = deps.Tmux.SendKeys(ctx, lp.session, "export EVOLVE_PROJECT_ROOT="+shellQuotePOSIX(cfg.ProjectRoot), true)
 	}
+	for _, line := range exportLines(cfg.Realization.Env) {
+		_ = deps.Tmux.SendKeys(ctx, lp.session, line, true)
+	}
 	deps.Sleep(time.Second)
 	launchCmd := lp.launchCmd
 	if len(cfg.ExtraFlags) > 0 {

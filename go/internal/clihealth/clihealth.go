@@ -35,6 +35,8 @@ type Entry struct {
 	BenchedUntil time.Time `json:"benched_until"`
 	Evidence     string    `json:"evidence,omitempty"` // truncated wall line from pane_tail
 	Strikes      int       `json:"strikes"`            // consecutive re-benches; doubles cooldown
+	// OperatorAction names the fix for a wall no canary clears on its own; empty for a wall that resets.
+	OperatorAction string `json:"operator_action,omitempty"`
 }
 
 // DefaultCooldown is the bench duration when no reset hint parses; doubled
@@ -59,13 +61,24 @@ const DefaultBootBenchThreshold = 2
 // literal to avoid an import cycle (bridge imports clihealth, not vice versa).
 func IsBootTimeoutExitCode(exitCode int) bool { return exitCode == 80 }
 
-// Benchable reports whether an escalation pattern name marks a classified
-// transient outage worth benching for. Deliberately a tiny closed set (single
-// home — runner bench-writer and loop canary both consult it): re-dispatching a
-// walled resource is guaranteed waste, while most escalations (trust prompts,
-// auth rechecks) are situational. auth_recheck is the documented next candidate.
+// Benchable reports whether an escalation pattern name marks a wall worth benching for. Deliberately a
+// tiny closed set (single home — runner bench-writer and loop canary both consult it): re-dispatching a
+// walled resource is guaranteed waste, while most escalations (trust prompts) are situational.
 func Benchable(pattern string) bool {
-	return pattern == "rate_limit" || pattern == ExhaustedPattern || pattern == BootTimeoutPattern
+	return pattern == "rate_limit" || pattern == ExhaustedPattern || pattern == BootTimeoutPattern || pattern == CredentialPattern
+}
+
+// CredentialPattern is the classifier pattern of a login prompt ("Please log in", "Login expired"): a wall
+// only the operator clears, so the family is benched until a canary probe succeeds after the login.
+const CredentialPattern = "auth_recheck"
+
+// OperatorAction names the fix for a wall no canary can clear on its own; "" for every wall that clears
+// itself when its window resets.
+func OperatorAction(family, pattern string) string {
+	if pattern != CredentialPattern {
+		return ""
+	}
+	return fmt.Sprintf("operator: the %s CLI needs to be logged in again; the bench clears itself once a probe succeeds", family)
 }
 
 // ExhaustedPattern is the OTHER vocabulary a classified quota wall arrives in.
@@ -108,13 +121,18 @@ func CooldownForStrikes(strikes int) time.Duration {
 // strike/cooldown/evidence logic can never drift between them.
 func NewBenchEntry(prev Entry, family, pattern, paneText string, now time.Time) Entry {
 	strikes := prev.Strikes + 1
-	until, parsed := ParseResetHint(paneText, now)
+	// A login pane carries no reset time of its own; a hint there is a stale wall in the same scrollback.
+	until, parsed := time.Time{}, false
+	if pattern != CredentialPattern {
+		until, parsed = ParseResetHint(paneText, now)
+	}
 	if !parsed {
 		until = now.Add(CooldownForStrikes(strikes))
 	}
 	return Entry{
 		Family: family, Reason: pattern, BenchedAt: now, BenchedUntil: until,
 		Evidence: truncateRunes(evidenceLine(paneText), 160), Strikes: strikes,
+		OperatorAction: OperatorAction(family, pattern),
 	}
 }
 
@@ -283,12 +301,14 @@ func (s *Store) withLock(fn func() error) error {
 	return flock.WithPathLock(s.path, fn)
 }
 
-// Active returns entries still within their bench window (now < BenchedUntil).
+// Active returns the entries routing must still avoid: those within their bench window, and a credential
+// wall until a probe clears it, because time says nothing about whether the operator logged in.
 func (s *Store) Active() map[string]Entry {
-	return s.filter(func(e Entry) bool { return s.now().Before(e.BenchedUntil) })
+	return s.filter(func(e Entry) bool { return e.Reason == CredentialPattern || s.now().Before(e.BenchedUntil) })
 }
 
-// Expired returns entries past their bench window — canary candidates.
+// Expired returns entries past their bench window — canary candidates; a lapsed credential wall is both
+// active and due for its probe.
 func (s *Store) Expired() map[string]Entry {
 	return s.filter(func(e Entry) bool { return !s.now().Before(e.BenchedUntil) })
 }

@@ -2,8 +2,10 @@ package bridge
 
 import (
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -34,15 +36,28 @@ func resolveBinary(deps Deps, defaultName string) string {
 	return defaultName
 }
 
-// driverEnv returns the environment for the inner CLI: the process env
-// plus the request-local Deps.Env overrides (later entries win, matching
-// the adapter's env-merge).
-func driverEnv(deps Deps) []string {
+// driverEnv returns the environment for the inner CLI: the process env, the CLI's own variables
+// (manifest default_env, sorted), then the request-local Deps.Env overrides (later entries win,
+// matching the adapter's env-merge).
+func driverEnv(deps Deps, cliEnv map[string]string) []string {
 	env := os.Environ()
+	for _, k := range slices.Sorted(maps.Keys(cliEnv)) {
+		env = append(env, k+"="+cliEnv[k])
+	}
 	for k, v := range deps.Env {
 		env = append(env, k+"="+v)
 	}
 	return env
+}
+
+// exportLines renders env as the `export KEY=value` lines a tmux driver sends to the pane shell before
+// the launch command, sorted so the pane transcript is stable.
+func exportLines(env map[string]string) []string {
+	var lines []string
+	for _, k := range slices.Sorted(maps.Keys(env)) {
+		lines = append(lines, "export "+k+"="+shellQuotePOSIX(env[k]))
+	}
+	return lines
 }
 
 // preparePrompt reads the prompt file and applies the bridge's two

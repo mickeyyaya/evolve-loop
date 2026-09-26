@@ -2,6 +2,38 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — a credential wall benches the family and names the operator's fix (ADR-0106 Q2, 2026-09-27)
+
+- `clihealth.Benchable` admits `auth_recheck` (`CredentialPattern`): wave 14 re-dispatched claude fourteen times into "Please log in". Unlike a quota bench it stays active for routing after its cooldown (the cooldown only schedules the canary's next probe; a succeeding probe after the operator's login clears it), a login pane's stale reset hint never sets it, and while it stands, `clihealth.OperatorAction` names the fix on the chain walker's bench line and the canary's re-bench line.
+
+## Fixed — a quota wall on a correction, a remediation re-run or a resumed review defers the cycle (ADR-0106 Q1, 2026-09-27)
+
+Cycle 1708 met every CLI family walled on its build correction re-dispatch and was sealed FAIL; cycle 1709 met the same wall on a first dispatch and was deferred.
+
+- `isQuotaWall` is the one classification of a walled dispatch: the runner walks its whole family chain inside a single `Run` and returns exit 85 only when every family it may use answered with a wall. The correction loop, the remediation re-run and the resumed review gate now return through `pauseForQuota` — the quota checkpoint, the `all_families_exhausted` ledger kind, the DEFERRED abort reason, no failure learning, no retrospective, no digest for the consecutive-failure breaker to count. The interaction ledger records the correction as `quota_deferred`.
+
+## Docs — ADR-0106 P3 landed; the design document, the bridge pages and the manifest channel (2026-09-27)
+
+- `logic-first-delivery-design.md` §5.4 records the P3 decisions (the statement is finished by the driver and appended; the environment channel over a settings flag; what the block does not fix), the P3 row reads shipped, §8 carries its signatures, §12 the open question on other CLIs' suggestion features. `internal-bridge-phaseidentity.md` is new; `internal-bridge.md`, the packages index, `full-tmux-control.md` §9, ADR-0022 and ADR-0106 describe `default_env` and the identity statement. The F3 routing bullet that a replay placed above its heading sits under it again.
+
+## Changed — phase panes run without prompt suggestions (ADR-0106 P3, 2026-09-27)
+
+- The tmux boot sends a manifest's `default_env` as `export` lines after `cd` and `EVOLVE_PROJECT_ROOT` and before the launch command, because a pane inherits the tmux server's environment, not the bridge's. `claude-tmux` declares `CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false`: a suggestion is a background model request per turn and dim text under the input box that reads like agent output (cycle 1707 rendered "Yes, kill that session first." there). The environment variable takes precedence over the setting, and unlike a `--settings` flag it is honoured under `--setting-sources project`.
+
+## Changed — the pasted prompt ends by stating who the agent is (ADR-0106 P3, 2026-09-27)
+
+- `prepareTmuxREPL` appends `phaseidentity.Block` to the bytes it writes to `resolved-prompt.txt`, after the engine's composed prompt, which stays a byte-identical prefix; the deliverable path stays the last thing the agent reads. Only the driver knows the session, so the statement is finished here, for every tmux CLI. A launch without an agent name pastes the prompt alone. The real-tmux transit test now compares against the file the driver pastes.
+
+## Added — a CLI manifest declares its process environment (`default_env`, ADR-0106 P3, unwired, 2026-09-27)
+
+- `default_env` is to variables what `default_args` is to flags. The realizer copies it into `Realization.Env`; `driverEnv` layers it between the process environment and the request's `Deps.Env` overrides (the last value of a key wins); `exportLines` renders the `export KEY=value` lines a tmux driver will send, sorted and shell-quoted. The parser refuses a key that is not a shell identifier, a key that belongs to the loop (`EVOLVE_`), the bridge (`BRIDGE_`) or a credential (the guards read the process environment before a launch and never see a manifest's map), and a value carrying a control byte.
+
+## Added — `internal/bridge/phaseidentity`, the statement of who the agent is (ADR-0106 P3, unwired, 2026-09-27)
+
+Cycle 1707's tdd agent listed the tmux sessions, found its own, read its own prompt file, and refused the phase as a prompt injection racing "the real agent"; an operator's one-line identity clarification resumed it an hour later.
+
+- `Block(Facts)` renders five lines a tmux driver appends to the bytes it pastes: the phase and cycle; the tmux session and the command that prints it; the two prompt files and that finding them, or the session in `tmux ls`, is expected; the sole-writer fact and the standing instruction not to kill, pause or hand off the session or wait for an operator; and that instruction files addressed to the console operator describe the operator's sessions, not this one. `""` without an agent name or a session; every fact is stripped of control bytes and backticks before it is rendered. Pure, standard library only, golden-pinned, in `.apicover-enforce`.
+
 - The profile runs on the codex family with claude as its fallback, as the other helpers do: the balanced-tier floor (`TestClaudeFamilyFloor`) reserves claude for judgment phases with a justification, and the recovery agent decides nothing. The first ship routed it to claude and the full floor caught it.
 ## Added — the recovery agent's profile and persona (ADR-0106 F3, unwired, 2026-09-26)
 
