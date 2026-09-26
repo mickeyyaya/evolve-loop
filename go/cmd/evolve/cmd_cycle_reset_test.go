@@ -13,12 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
-// cmd_cycle_reset_test.go — F2/F5: `evolve cycle reset` must consult the run
-// lease (via SealCycle) and, on a LIVE owner, refuse with an actionable message
-// that names the owner and steers to --resume / a clean SIGTERM — never to
-// `pkill`. --force overrides a live owner with a loud WARN; a stale/absent
-// lease seals normally.
-
 // seedReset writes <root>/.evolve/{cycle-state.json,state.json,runs/cycle-N/...}.
 func seedReset(t *testing.T, root string, cycleID int) (evolveDir, workspace string) {
 	t.Helper()
@@ -42,11 +36,8 @@ func seedReset(t *testing.T, root string, cycleID int) (evolveDir, workspace str
 }
 
 func TestRunCycleReset_LeaseFencing(t *testing.T) {
-	// A genuinely-alive owner pid: cycle-554's PID-aware fence (runlease.OwnerLive,
-	// wired via SealOptions.PidAlive) now demands BOTH a fresh heartbeat AND a
-	// live process to treat a cycle as owned. This test process's own pid is a
-	// guaranteed-live owner; an arbitrary pid (84055) is almost certainly dead
-	// and would now correctly seal — see the dead-owner subtest below.
+	// The fence needs a fresh heartbeat and a live pid; this process's own pid is
+	// a guaranteed-live owner.
 	livePID := os.Getpid()
 
 	t.Run("fresh lease with a live owner refuses with owner message", func(t *testing.T) {
@@ -72,11 +63,6 @@ func TestRunCycleReset_LeaseFencing(t *testing.T) {
 	})
 
 	t.Run("dead owner with a fresh lease seals WITHOUT --force", func(t *testing.T) {
-		// The cycle-554 fix's payoff at the CLI level: a crashed owner whose
-		// heartbeat is still fresh (the 2-6min post-crash window) used to force
-		// `evolve cycle reset --force` at every batch boundary; now a plain reset
-		// seals it because the owning pid is dead. Exercises the cmd_cycle.go
-		// PidAlive wiring end to end.
 		root := t.TempDir()
 		ev, ws := seedReset(t, root, 395)
 		if err := runlease.Write(ws, runlease.Lease{RunID: "01RUN9", OwnerPID: 999999}, time.Now()); err != nil {

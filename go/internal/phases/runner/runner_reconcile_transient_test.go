@@ -12,30 +12,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// Reconcile-on-transient (cycle-835): a TRANSIENT bridge failure (exit 80/85/86 —
-// quota exhaustion, liveness-exhaustion) is an infra teardown, NOT a verdict, in
-// exactly the same way an artifact-wait timeout (exit 81) is. The agent may have
-// written its contracted deliverable before the infra tore the session down. The
-// classic case: agy+codex are quota-walled, so the deep-tier Opus auditor runs on
-// an overloaded claude and hits its OWN exit=85 at the tail — AFTER writing a
-// complete PASS audit report. Before this fix that report was discarded (the
-// non-timeout `else` branch hard-failed without consulting disk) and a genuinely
-// PASS-audited cycle was recorded FAIL. The reconcile trigger must cover both
-// infra-teardown shapes so a well-formed deliverable is trusted regardless of
-// WHICH infra event ended the session.
-
-// transientBridgeErr mimics exactly what bridge.Engine.Launch returns on a
-// transient exit code — a wrapped core.ErrTransientBridgeFailure — so the
-// runner's errors.Is match is exercised against the real wire shape.
+// transientBridgeErr wraps core.ErrTransientBridgeFailure as bridge.Engine.Launch does, so errors.Is sees the real shape.
 func transientBridgeErr(code int) error {
 	return fmt.Errorf("bridge: launch exit=%d: %w", code, core.ErrTransientBridgeFailure)
 }
 
-// TestRun_TransientError_WellFormedPASS_ReconcilesToPass — the core cycle-835
-// fix: a transient (exit 85 quota) teardown + a well-formed PASS deliverable →
-// reconcile to PASS with a nil error, Reconciled=true, and Classify actually ran
-// (proves the fall-through, not a bare sentinel read). RED before the fix: the
-// non-timeout `else` branch hard-fails, so err != nil and Classify never runs.
 func TestRun_TransientError_WellFormedPASS_ReconcilesToPass(t *testing.T) {
 	hooks := &fakeHooks{phase: "audit", agent: "evolve-auditor", model: "opus", prompt: "x", verdict: core.VerdictPASS}
 	fb := &fakeBridge{err: transientBridgeErr(85), writeArtifact: "# audit\n<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"PASS\"} -->\n"}
@@ -64,11 +45,6 @@ func TestRun_TransientError_WellFormedPASS_ReconcilesToPass(t *testing.T) {
 	}
 }
 
-// TestRun_TransientError_SentinelFAIL_StaysFail — reconciliation only UPGRADES
-// toward the agent's real verdict; it never invents a PASS. A well-formed
-// deliverable whose Classify verdict is FAIL stays FAIL, and because the
-// deliverable is COMPLETE the phase is a normal completed FAIL (nil error → routes
-// as a real audit-fail, not an infra-transient retry).
 func TestRun_TransientError_SentinelFAIL_StaysFail(t *testing.T) {
 	hooks := &fakeHooks{phase: "audit", agent: "evolve-auditor", model: "opus", prompt: "x", verdict: core.VerdictFAIL}
 	fb := &fakeBridge{err: transientBridgeErr(85), writeArtifact: "# audit\nFAIL\n"}
@@ -91,11 +67,6 @@ func TestRun_TransientError_SentinelFAIL_StaysFail(t *testing.T) {
 	}
 }
 
-// TestRun_TransientError_NotWellFormed_Mandatory_StaysFail — a transient teardown
-// where the agent left NO trustworthy deliverable (hung / partial / malformed) on
-// a MANDATORY phase → hard-FAIL, Classify NOT reached, error wraps the transient
-// sentinel. This is the guard that reconciliation can't ship a hung agent just
-// because the teardown was infra-shaped.
 func TestRun_TransientError_NotWellFormed_Mandatory_StaysFail(t *testing.T) {
 	hooks := &fakeHooks{phase: "audit", agent: "evolve-auditor", model: "opus", prompt: "x", verdict: core.VerdictPASS}
 	fb := &fakeBridge{err: transientBridgeErr(85)} // no artifact written
@@ -126,13 +97,6 @@ func TestRun_TransientError_NotWellFormed_Mandatory_StaysFail(t *testing.T) {
 	}
 }
 
-// TestRun_TransientError_NotWellFormed_Optional_DegradesToWarn — an OPTIONAL
-// phase hitting a transient teardown with no trustworthy deliverable degrades to
-// WARN+advance (its successor is verdict-unconditional), mirroring the timeout
-// optional-degrade path. NOTE: this is the INFRA-shaped branch; a NON-infra
-// (launch/safety) error on an optional phase still stays cycle-fatal — that
-// invariant lives in TestRun_NonTimeoutError_StaysFail_Unchanged /
-// TestRun_OptionalPhase_OtherBridgeError_StillFails and is unaffected here.
 func TestRun_TransientError_NotWellFormed_Optional_DegradesToWarn(t *testing.T) {
 	hooks := &fakeHooks{phase: "build-planner", agent: "evolve-build-planner", model: "opus", prompt: "x"}
 	fb := &fakeBridge{err: transientBridgeErr(85)}
@@ -158,8 +122,6 @@ func TestRun_TransientError_NotWellFormed_Optional_DegradesToWarn(t *testing.T) 
 	}
 }
 
-// TestRun_TransientError_WellFormedPASS_Optional_ReconcilesToPass — an optional
-// phase reconciles UP past the WARN degrade when the deliverable is clean.
 func TestRun_TransientError_WellFormedPASS_Optional_ReconcilesToPass(t *testing.T) {
 	hooks := &fakeHooks{phase: "build-planner", agent: "evolve-build-planner", model: "opus", prompt: "x", verdict: core.VerdictPASS}
 	fb := &fakeBridge{err: transientBridgeErr(80), writeArtifact: "# plan\n"}
@@ -183,10 +145,6 @@ func TestRun_TransientError_WellFormedPASS_Optional_ReconcilesToPass(t *testing.
 	}
 }
 
-// TestRun_TransientError_DeliverableSettlesOnRetry_ReconcilesToPass — the bounded
-// settle-retry applies to transient teardowns too: a deliverable still settling to
-// disk (first verifies miss, a later one within the window catches the PASS) must
-// reconcile, exactly as on the timeout path (cycles 824/825 settle-race).
 func TestRun_TransientError_DeliverableSettlesOnRetry_ReconcilesToPass(t *testing.T) {
 	hooks := &fakeHooks{phase: "audit", agent: "evolve-auditor", model: "opus", prompt: "x", verdict: core.VerdictPASS}
 	fb := &fakeBridge{err: transientBridgeErr(86), writeArtifact: "# audit\n<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"PASS\"} -->\n"}

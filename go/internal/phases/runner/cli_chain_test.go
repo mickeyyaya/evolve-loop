@@ -2,10 +2,6 @@ package runner
 
 import "testing"
 
-// Chain resolution + capability-probe tests moved to internal/llmroute (the
-// logic now lives there). What remains in the runner are the two dispatch-log
-// helpers, tested here.
-
 func TestSameCandidates(t *testing.T) {
 	cases := []struct {
 		a, b []string

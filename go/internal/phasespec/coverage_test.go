@@ -8,18 +8,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 )
 
-// NOTE: these are white-box tests in `package phasespec`. They CANNOT import
-// go/test/fixtures because that package (transitively) pulls in internal/core,
-// and core imports phasespec — a white-box phasespec test importing fixtures
-// would create an import cycle. Local helpers (writeUserPhase, writeRegistry)
-// already defined in the sibling test files are reused instead.
-
-// TestDiscoverUserSpecs_BadDirNameNoName covers the discover.go guard where a
-// phase.json carries no "name" and its directory name is not valid kebab-case:
-// the spec is skipped with a warning rather than admitting a malformed name.
 func TestDiscoverUserSpecs_BadDirNameNoName(t *testing.T) {
 	phasesDir := t.TempDir()
-	// Directory name "Bad_Name" fails ^[a-z][a-z0-9-]*$ and the body has no name.
 	writeUserPhase(t, phasesDir, "Bad_Name", `{"optional":true}`)
 
 	specs, warnings := DiscoverUserSpecs(phasesDir)
@@ -35,14 +25,11 @@ func TestDiscoverUserSpecs_BadDirNameNoName(t *testing.T) {
 	}
 }
 
-// TestCatalog_Merge_DuplicateUserPhase covers the Merge branch where two user
-// specs share a name (neither clashes with a built-in): the first is kept and
-// the second is dropped with a "duplicate user phase" warning.
 func TestCatalog_Merge_DuplicateUserPhase(t *testing.T) {
-	builtin := Catalog{} // empty built-in catalog: no built-in clash
+	builtin := Catalog{}
 	user := []PhaseSpec{
 		{Name: "lint-pass", Optional: true, Model: "first"},
-		{Name: "lint-pass", Optional: true, Model: "second"}, // duplicate → dropped
+		{Name: "lint-pass", Optional: true, Model: "second"},
 	}
 
 	merged, warnings := builtin.Merge(user)
@@ -62,8 +49,6 @@ func TestCatalog_Merge_DuplicateUserPhase(t *testing.T) {
 	}
 }
 
-// TestCatalog_UserPhases covers UserPhases (0% before): only operator-overlay
-// phases are returned, in registry-insertion order, and built-ins are excluded.
 func TestCatalog_UserPhases(t *testing.T) {
 	builtin, err := Load(writeRegistry(t, fullRegistry)) // scout, security-scan (built-in)
 	if err != nil {
@@ -75,15 +60,12 @@ func TestCatalog_UserPhases(t *testing.T) {
 	})
 
 	got := names(merged.UserPhases())
-	// Insertion order from the user slice, NOT sorted.
 	want := []string{"zeta-check", "alpha-check"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("UserPhases = %v, want %v (insertion order, built-ins excluded)", got, want)
 	}
 }
 
-// TestCatalog_UserPhases_NoneWhenAllBuiltin covers UserPhases returning an empty
-// (non-nil) slice when the catalog has no operator overlays.
 func TestCatalog_UserPhases_NoneWhenAllBuiltin(t *testing.T) {
 	cat, err := Load(writeRegistry(t, fullRegistry))
 	if err != nil {
@@ -94,8 +76,6 @@ func TestCatalog_UserPhases_NoneWhenAllBuiltin(t *testing.T) {
 	}
 }
 
-// TestLoad_EmptyNameSkipped covers the Load branch that drops a spec whose name
-// is empty (it is silently skipped, no error, and absent from the catalog).
 func TestLoad_EmptyNameSkipped(t *testing.T) {
 	body := `{ "phases": [
 		{ "name": "" , "model": "ghost" },
@@ -111,13 +91,10 @@ func TestLoad_EmptyNameSkipped(t *testing.T) {
 	}
 }
 
-// TestApplyUserRouting_InitsNilTriggers covers the cfg.Triggers==nil init branch:
-// a valid spec carrying Routing is applied to a config whose Triggers map is nil,
-// so ApplyUserRouting must allocate the map before registering the trigger.
 func TestApplyUserRouting_InitsNilTriggers(t *testing.T) {
 	cfg := config.RoutingConfig{
 		Order:    []string{"scout", "build", "audit", "ship"},
-		Triggers: nil, // not yet allocated
+		Triggers: nil,
 	}
 	specs := []PhaseSpec{{
 		Name:     "security-scan",
@@ -139,8 +116,6 @@ func TestApplyUserRouting_InitsNilTriggers(t *testing.T) {
 	}
 }
 
-// TestSpliceAfter_NamePresentNoOp covers the spliceAfter guard that returns the
-// order untouched when the phase name is already present (idempotent splice).
 func TestSpliceAfter_NamePresentNoOp(t *testing.T) {
 	order := []string{"scout", "security-scan", "audit"}
 	got := spliceAfter(order, "security-scan", "scout")
@@ -150,10 +125,8 @@ func TestSpliceAfter_NamePresentNoOp(t *testing.T) {
 	}
 }
 
-// TestSpliceAfter_NoAnchorNoAudit covers the spliceAfter fallthrough where the
-// anchor is absent AND "audit" is absent: the name is appended at the end.
 func TestSpliceAfter_NoAnchorNoAudit(t *testing.T) {
-	order := []string{"scout", "build"} // no audit
+	order := []string{"scout", "build"}
 	got := spliceAfter(order, "x-check", "nonexistent-anchor")
 	want := []string{"scout", "build", "x-check"}
 	if !reflect.DeepEqual(got, want) {
@@ -161,5 +134,4 @@ func TestSpliceAfter_NoAnchorNoAudit(t *testing.T) {
 	}
 }
 
-// contains is a tiny substring helper local to this test file.
 func contains(haystack, needle string) bool { return strings.Contains(haystack, needle) }

@@ -1,12 +1,5 @@
 package lifecycle
 
-// importgraph_test.go — the package is a leaf under inboxmover (ADR-0103 unit
-// 06 §2): stdlib plus the four named internal packages — the ledger adapter
-// (the LifecycleRecord type), continuation (the manifest reader), inboxbatch
-// (the claim layout and the routing classifier) and the Signal Center — never
-// gitexec, core, verifylock, guards or the host (the failurelearning/
-// importgraph_test.go idiom).
-
 import (
 	"go/parser"
 	"go/token"

@@ -1,14 +1,5 @@
 package core
 
-// carryover_fingerprint_test.go — RED contract for the carryoverTodos P0-flood
-// dedupe (2026-08-10 investigation, agent C): 124 of 254 live entries were
-// near-identical per-FAIL generic P0s ("cycle N failed during audit: …"),
-// distinct only by the cycle number baked into their IDs — carryoverTodoExists
-// dedupes by ID, so every FAIL minted a fresh duplicate, and the 20-slot
-// router window (phase_advisor) was 100% saturated by them, permanently
-// shadowing memo/product carryovers. Dedupe key: the Action text with cycle
-// tokens normalized — same defect, different cycle ⇒ ONE entry.
-
 import (
 	"strings"
 	"testing"
@@ -30,9 +21,6 @@ func TestAdoptDefects_CrossCycleFingerprintDedupe(t *testing.T) {
 	}
 }
 
-// A suppressed re-mint refreshes the survivor's TTL — a class failing every
-// cycle must not ride its FIRST occurrence's ExpiresAt into the boot prune
-// (diff-review MEDIUM: TTL-blind dedupe erased still-live signal).
 func TestAdoptDefects_SuppressedRemintRefreshesExpiry(t *testing.T) {
 	t.Parallel()
 	var state State

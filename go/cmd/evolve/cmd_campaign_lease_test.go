@@ -14,8 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 )
 
-// writeLeaseTestPlan writes a minimal two-cycle plan and returns its path + the
-// loaded plan, mirroring the resume test's fixture.
 func writeLeaseTestPlan(t *testing.T, dir string) (string, *campaign.Plan) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Join(dir, ".evolve"), 0o755); err != nil {
@@ -50,9 +48,6 @@ func fakeLaunchTracking(t *testing.T) *[][]string {
 	return launched
 }
 
-// TestCampaignRun_RefusesWhenLeaseHeld proves the cross-session lease: with an
-// incumbent owner holding the goal-hash lease, a second `campaign run` refuses
-// (non-zero, names the owner) WITHOUT launching any cycle — the reap-loop fix.
 func TestCampaignRun_RefusesWhenLeaseHeld(t *testing.T) {
 	dir := t.TempDir()
 	planPath, plan := writeLeaseTestPlan(t, dir)
@@ -79,10 +74,6 @@ func TestCampaignRun_RefusesWhenLeaseHeld(t *testing.T) {
 	}
 }
 
-// TestCampaignRun_SimulateSkipsOwnershipLease proves --simulate (a dry plumbing
-// check, not an owned run) does NOT take the lease: it runs to completion even
-// when an incumbent holds the goal-hash lease. Guards the ADR-0059 decision
-// against a refactor that moves the `if !*simulate` guard.
 func TestCampaignRun_SimulateSkipsOwnershipLease(t *testing.T) {
 	dir := t.TempDir()
 	planPath, plan := writeLeaseTestPlan(t, dir)
@@ -105,8 +96,6 @@ func TestCampaignRun_SimulateSkipsOwnershipLease(t *testing.T) {
 	}
 }
 
-// TestCampaignRun_AcquiresAndReleasesLease proves the normal path takes the
-// lease for the run and releases it on exit (so a later run can acquire).
 func TestCampaignRun_AcquiresAndReleasesLease(t *testing.T) {
 	dir := t.TempDir()
 	planPath, plan := writeLeaseTestPlan(t, dir)
@@ -117,7 +106,6 @@ func TestCampaignRun_AcquiresAndReleasesLease(t *testing.T) {
 		t.Fatalf("runCampaignRun rc=%d, stderr=%s", rc, errBuf.String())
 	}
 
-	// The lease must be free after the run returned.
 	leaseDir := campaignLeaseDir(dir)
 	lease, err := campaign.AcquireOwnership(leaseDir, campaignGoalHash(plan), campaign.Owner{PID: 1})
 	if err != nil {

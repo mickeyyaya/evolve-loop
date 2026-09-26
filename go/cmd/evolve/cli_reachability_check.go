@@ -1,9 +1,3 @@
-// cli_reachability_check.go wires reachabilityprobe.BuildImportGraph/
-// CheckCallSite (landed cycle-1226) into a callable `evolve reachability
-// check-pin` subcommand. Before this file, the library had zero non-test
-// callers repo-wide, so the cycle-644 failure mode it detects — freezing a
-// doNotModifyTests:true structural test pin that is an unbuildable import
-// cycle — remained fully reproducible: nothing in the CLI ever ran the check.
 package main
 
 import (
@@ -15,7 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/reachabilityprobe"
 )
 
-// runReachability implements `evolve reachability <check-pin>`.
 func runReachability(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
 		fmt.Fprintln(stderr, "evolve reachability: missing subcommand (check-pin)")
@@ -30,10 +23,8 @@ func runReachability(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	}
 }
 
-// runReachabilityCheckPin answers whether freezing a structural test pin
-// (a call to --referenced-package.--symbol( written inside a file belonging
-// to --pinning-package) would create an unbuildable import cycle, given the
-// real toolchain's import graph for --pkgs scoped under --root.
+// runReachabilityCheckPin reports whether pinning a call to the referenced
+// symbol inside the pinning package would close an import cycle.
 func runReachabilityCheckPin(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve reachability check-pin", flag.ContinueOnError)
 	fs.SetOutput(stderr)

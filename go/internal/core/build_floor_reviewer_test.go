@@ -1,14 +1,5 @@
 package core
 
-// build_floor_reviewer_test.go — the shift-left half of the 2026-07-21
-// operator directive ("shift deterministic gate to the front as part of build
-// phase verification"): the build deliverable is REJECTED while the changed
-// packages' deterministic self-check fails, so the EXISTING E2 correction
-// ladder fixes it in-phase — instead of the defect surfacing at a later gate
-// (or worse: cycle-1008's builder recorded ./cmd/evolve failing in
-// build-selfcheck.json and handed off anyway; the FAIL then cost 4 more
-// phases + the cycle).
-
 import (
 	"context"
 	"strings"
@@ -55,9 +46,6 @@ func TestBuildFloorReviewer_NonBuildPhasesUntouched(t *testing.T) {
 }
 
 func TestBuildFloorReviewer_ChecksErrorFailsOpen(t *testing.T) {
-	// A selfcheck INFRASTRUCTURE error (cannot even run) must fail OPEN with a
-	// loud reason-free approve — the deterministic gates downstream stay armed;
-	// the floor must never false-block a build over its own plumbing.
 	r := NewBuildFloorReviewer(nil) // nil fn = engine unavailable
 	if res := r.Review(context.Background(), ReviewInput{Phase: string(PhaseBuild)}); !res.Approve {
 		t.Fatalf("nil engine must fail open; got %+v", res)

@@ -1,9 +1,3 @@
-// cmd_cycle_signal_center_test.go — ADR-0101 S1 wiring proofs. The production
-// composition root constructs ONE Signal Center, attaches the durable NDJSON
-// sink and the WARN-filtered stderr sink, and registers the orchestrator as a
-// listener; the only roots allowed to build an orchestrator WITHOUT a Center
-// are pinned here, so a forgotten wiring can never be silent again (the way
-// bridge.Deps.LivenessCenter stayed unset in production).
 package main
 
 import (
@@ -60,11 +54,7 @@ func TestWireOrchestratorDeps_SignalCenterWired(t *testing.T) {
 	}
 }
 
-// Every production call site of core.NewOrchestrator must pass
-// core.WithSignalCenter, except the one pinned nil root: the routing-test
-// engine, test machinery that takes a *testing.T. The --simulate root builds
-// the production topology since unit 01 (ADR-0103);
-// TestWireSimulateOrchestrator_SignalCenterWired proves it.
+// The one pinned nil root, internal/routingtest, is test machinery that takes a *testing.T.
 func TestNilSignalCenterRootsArePinned(t *testing.T) {
 	allowed := map[string]bool{
 		"internal/routingtest/engine.go": true,
@@ -90,8 +80,7 @@ func TestNilSignalCenterRootsArePinned(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		// Every construction in a file needs its own wiring: a second, unwired
-		// core.NewOrchestrator( beside a wired one is caught by the count.
+		// Counted per file, so an unwired call beside a wired one still fails.
 		calls := len(callRE.FindAll(src, -1))
 		if calls == 0 || strings.Count(string(src), "WithSignalCenter(") >= calls {
 			return nil
@@ -110,10 +99,6 @@ func TestNilSignalCenterRootsArePinned(t *testing.T) {
 	}
 }
 
-// The console listener is WARN-filtered (severity contract: INFO is "log only",
-// it lives in signals.ndjson); a green cycle prints nothing, a WARN prints the
-// one line format. os.Stderr is captured around the wiring because the sink
-// binds the writer at construction.
 func TestWireOrchestratorDeps_SignalCenterConsoleSinkIsFilteredAtWarn(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
@@ -133,17 +118,14 @@ func TestWireOrchestratorDeps_SignalCenterConsoleSinkIsFilteredAtWarn(t *testing
 	}
 }
 
-// captureConsole runs fn with a buffer as the root's console writer and
-// returns what the Signal Center's WARN-filtered sink rendered into it.
+// captureConsole returns what the root's WARN-filtered console sink rendered.
 func captureConsole(fn func(console io.Writer)) string {
 	var buf bytes.Buffer
 	fn(&buf)
 	return buf.String()
 }
 
-// The signalcenter package's own registry test is blind to producer modules
-// (it is a leaf); this binary links every module, so THIS is where "the real
-// registry is clean" is asserted (architecture review, S1).
+// Only this binary links every producer module, so the real registry is checked here.
 func TestSignalCenterRegistry_EveryLinkedModuleRegistersCleanly(t *testing.T) {
 	if conflicts := signalcenter.RegistryConflicts(); len(conflicts) != 0 {
 		t.Errorf("code registry conflicts across linked modules: %+v", conflicts)
@@ -153,12 +135,7 @@ func TestSignalCenterRegistry_EveryLinkedModuleRegistersCleanly(t *testing.T) {
 	}
 }
 
-// Both production roots flush the Center before they return (S2a): an Emit
-// that finds a drain in progress returns before delivery, so an exit path
-// without a Flush could lose the last events of a cycle or a batch.
 func TestSignalCenterFlush_IsWiredAtBothRoots(t *testing.T) {
-	// The chain root (ADR-0103 unit 13) builds its own batch-level Center
-	// and flushes it at exit too.
 	for file, needle := range map[string]string{"cmd_cycle.go": "Signals.Flush()", "cmd_loop.go": "Signals.Flush()", "cmd_loop_chain.go": "signals.Flush()"} {
 		src, err := os.ReadFile(file)
 		if err != nil {
@@ -170,9 +147,6 @@ func TestSignalCenterFlush_IsWiredAtBothRoots(t *testing.T) {
 	}
 }
 
-// ADR-0101 S3: the production root hands the Center to the bridge Adapter it
-// injects into every phase runner, so bridge.warning / bridge.tripwire /
-// pane.liveness from any dispatch reach the orchestrator's Center.
 func TestWireOrchestratorDeps_SignalCenterReachesTheBridge(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
@@ -185,9 +159,6 @@ func TestWireOrchestratorDeps_SignalCenterReachesTheBridge(t *testing.T) {
 	}
 }
 
-// Every bridge.NewDefault call site outside the production root passes an
-// explicit nil — the Center-less registry defaults are visible, never
-// implicit — and the production root passes its Center.
 func TestNilSignalBridgeRootsAreExplicit(t *testing.T) {
 	callRE := regexp.MustCompile(`bridge\.NewDefault\(\s*([^,)]+)\s*,\s*([^)]+)\)`)
 	moduleRoot := filepath.Join("..", "..")
@@ -229,8 +200,6 @@ func TestNilSignalBridgeRootsAreExplicit(t *testing.T) {
 	}
 }
 
-// ADR-0101 S4a: the production root decorates the ledger so every appended
-// entry is also a ledger.appended signal (Decorator over the file ledger).
 func TestWireOrchestratorDeps_LedgerIsObservedByTheSignalCenter(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
@@ -244,10 +213,6 @@ func TestWireOrchestratorDeps_LedgerIsObservedByTheSignalCenter(t *testing.T) {
 	}
 }
 
-// Unit 01 (ADR-0103), architecture review HIGH-1: the --simulate root builds
-// the production signal topology — Center, observed ledger, console sink at
-// WARN, durable cycle-less sink — so the recorder's warnings render there as
-// the deleted stderr lines did.
 func TestWireSimulateOrchestrator_SignalCenterWired(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
@@ -274,9 +239,6 @@ func TestWireSimulateOrchestrator_SignalCenterWired(t *testing.T) {
 	}
 }
 
-// Unit 02 (ADR-0103): the failurediag module tag renders at the --simulate
-// root too — a writer built on the root's Center, writing into a file used as
-// a workspace, reaches the console sink and the durable cycle-less sink.
 func TestWireSimulateOrchestrator_FailureDiagWarningRenders(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
@@ -299,7 +261,6 @@ func TestWireSimulateOrchestrator_FailureDiagWarningRenders(t *testing.T) {
 	}
 }
 
-// Unit 03 (ADR-0103): the carryover module tag renders at the --simulate root.
 func TestWireSimulateOrchestrator_CarryoverWarningRenders(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
@@ -323,8 +284,6 @@ func TestWireSimulateOrchestrator_CarryoverWarningRenders(t *testing.T) {
 	}
 }
 
-// ADR-0103 unit 03b: the failure-learning engine's WARN reaches the --simulate
-// root's console sink and the durable stream.
 func TestWireSimulateOrchestrator_FailureLearningWarningRenders(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
@@ -343,12 +302,6 @@ func TestWireSimulateOrchestrator_FailureLearningWarningRenders(t *testing.T) {
 	}
 }
 
-// ADR-0103 unit 12 (architecture review fold): the console threshold — "the
-// operator console renders WARN and above" — has ONE home,
-// signalcenter.ConsoleSink. Both composition roots (newRootSignalCenter and
-// the `evolve phase-observer` subprocess) consume it; no production source
-// outside the sink's own file re-spells Filter(StderrSink(…), SeverityWarn),
-// so a console-policy change at one root can never leave the other behind.
 func TestConsoleSinkThresholdHasOneHome(t *testing.T) {
 	const home = "internal/signalcenter/sinks.go"
 	moduleRoot := filepath.Join("..", "..")
@@ -394,10 +347,7 @@ func TestConsoleSinkThresholdHasOneHome(t *testing.T) {
 	}
 }
 
-// ADR-0103 unit 11 (test 44): the production root's Center reaches every
-// BaseRunner-backed phase runner — through the bridge Adapter it injects
-// (Signals() is the carrier's read seam) and, for scout/build, through the
-// swarmrunner Decorator's forward. Ship and retro are not BaseRunner-backed.
+// Ship and retro are not BaseRunner-backed, so they carry no verdict engine.
 func TestWireOrchestratorDeps_SignalCenterReachesEveryPhaseRunner(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
@@ -431,10 +381,6 @@ func TestWireOrchestratorDeps_SignalCenterReachesEveryPhaseRunner(t *testing.T) 
 	}
 }
 
-// ADR-0103 unit 09: the defect ledger's WARN reaches the --simulate root's
-// console sink under the audit tag and the cycle workspace's durable stream —
-// a directory at <ws>/defect-ledger.json on a continuation is an unreadable
-// own ledger the grade blocks on.
 func TestWireSimulateOrchestrator_AuditLedgerWarningRenders(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
@@ -467,8 +413,6 @@ func TestWireSimulateOrchestrator_AuditLedgerWarningRenders(t *testing.T) {
 	}
 }
 
-// ADR-0103 unit 09: the loop root hands the audit phase the Signal Center —
-// the one production site where AUDIT_LEDGER_* codes can reach a sink.
 func TestAuditRoot_PassesTheSignalCenter(t *testing.T) {
 	src, err := os.ReadFile("cmd_cycle.go")
 	if err != nil {
@@ -485,8 +429,7 @@ func TestAuditRoot_PassesTheSignalCenter(t *testing.T) {
 	}
 }
 
-// inlineHooks is a minimal runner.Hooks whose prompt ships as data (no agent
-// doc on disk) — the --simulate twin's phase.
+// inlineHooks is a minimal runner.Hooks whose prompt ships as data, with no agent doc on disk.
 type inlineHooks struct{}
 
 func (inlineHooks) PhaseName() string                         { return "audit" }
@@ -513,8 +456,6 @@ func (writingBridge) Launch(_ context.Context, req core.BridgeRequest) (core.Bri
 }
 func (writingBridge) Probe(context.Context) (core.BridgeProbe, error) { return core.BridgeProbe{}, nil }
 
-// ADR-0103 unit 11 (test 45): the verdict engine's WARN reaches the --simulate
-// root's console sink and the cycle-stamped durable stream.
 func TestWireSimulateOrchestrator_RunnerWarningRenders(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
@@ -550,8 +491,6 @@ func TestWireSimulateOrchestrator_RunnerWarningRenders(t *testing.T) {
 	}
 }
 
-// ADR-0103 unit 13: the wave engine's and the chain engine's WARNs reach the
-// --simulate root's console sink and the durable batch-level stream.
 func TestWireSimulateOrchestrator_LoopWaveAndChainWarningsRender(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
@@ -590,12 +529,6 @@ func TestWireSimulateOrchestrator_LoopWaveAndChainWarningsRender(t *testing.T) {
 	}
 }
 
-// ADR-0103 unit 14: the loop root passes its Center to the audit phase's
-// CI-parity gates through audit.WithSignals on the ONE production
-// construction chain (D6) — a source pin, the TestNilSignalCenterRootsArePinned
-// idiom; the behavioural chain option → gates → Center → sinks is proven by
-// audit's TestNewDefaultWithStageCompactSpec_WithSignalsReachesTheGates_* and
-// TestWireSimulateOrchestrator_CIParityWarningRenders below.
 func TestAuditRootPassesTheCenter(t *testing.T) {
 	src, err := os.ReadFile("cmd_cycle.go")
 	if err != nil {
@@ -607,9 +540,6 @@ func TestAuditRootPassesTheCenter(t *testing.T) {
 	}
 }
 
-// ADR-0103 unit 14: a CI-parity gate WARN reaches the --simulate root's
-// console sink and the cycle workspace's durable stream — the ≤ 3-line triage
-// path: signals.ndjson and integration-tier.log sit in the SAME directory.
 func TestWireSimulateOrchestrator_CIParityWarningRenders(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")

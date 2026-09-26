@@ -6,9 +6,6 @@ import (
 	"testing"
 )
 
-// TestWriteReportAtomicRefusesASymlink is the D3 regression: --out must not
-// follow a pre-planted symlink and truncate whatever it points at. The victim
-// file's content is asserted intact, which is the part that actually matters.
 func TestWriteReportAtomicRefusesASymlink(t *testing.T) {
 	dir := t.TempDir()
 	victim := filepath.Join(dir, "victim.txt")
@@ -33,8 +30,6 @@ func TestWriteReportAtomicRefusesASymlink(t *testing.T) {
 	}
 }
 
-// TestWriteReportAtomicWritesAndReplaces pins the happy path and the replace
-// path, and asserts the temp file does not survive either.
 func TestWriteReportAtomicWritesAndReplaces(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "report.md")
 

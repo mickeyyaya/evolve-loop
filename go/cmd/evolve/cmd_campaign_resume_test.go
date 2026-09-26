@@ -14,10 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 )
 
-// TestCampaignRun_AutoResumeSkipsCompletedWaves drives the full cmd wiring
-// (goal-hash, .evolve progress path, PlanSHA binding, RunWaves call) through the
-// campaignLaunchFactory DI seam: with wave 0 pre-recorded complete, only wave 1
-// should launch, and the status command should report both waves done afterward.
 func TestCampaignRun_AutoResumeSkipsCompletedWaves(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(dir, ".evolve"), 0o755); err != nil {
@@ -31,7 +27,6 @@ func TestCampaignRun_AutoResumeSkipsCompletedWaves(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Pre-seed progress: wave 0 (cycle a) already shipped, bound to THIS plan.
 	plan, err := loadVerifiedCampaignPlan(planPath)
 	if err != nil {
 		t.Fatal(err)
@@ -70,7 +65,6 @@ func TestCampaignRun_AutoResumeSkipsCompletedWaves(t *testing.T) {
 		t.Fatalf("launched %v, want only wave-1 cycle [b] (wave 0 should be skipped)", launched)
 	}
 
-	// status now reports both waves done.
 	var sout, serr bytes.Buffer
 	if rc := runCampaignStatus([]string{"--plan", planPath, "--project-root", dir}, &sout, &serr); rc != 0 {
 		t.Fatalf("runCampaignStatus rc=%d, stderr=%s", rc, serr.String())

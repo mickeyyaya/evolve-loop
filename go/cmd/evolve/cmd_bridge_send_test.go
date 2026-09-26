@@ -8,9 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/inbox"
 )
 
-// cmd_bridge_send_test.go — tests `evolve bridge send`, the deterministic
-// CLI that appends one envelope to an agent inbox for live injection.
-
 func TestRunBridge_Send_AppendsEnvelope(t *testing.T) {
 	ws := t.TempDir()
 	var out, errb bytes.Buffer
@@ -52,9 +49,9 @@ func TestRunBridge_Send_KindAndSource(t *testing.T) {
 
 func TestRunBridge_Send_MissingRequired(t *testing.T) {
 	cases := [][]string{
-		{"send", "--agent=build", "body"},           // no workspace
-		{"send", "--workspace=/tmp/x", "body"},      // no agent
-		{"send", "--workspace=/tmp/x", "--agent=b"}, // no body
+		{"send", "--agent=build", "body"},
+		{"send", "--workspace=/tmp/x", "body"},
+		{"send", "--workspace=/tmp/x", "--agent=b"},
 	}
 	for _, args := range cases {
 		var out, errb bytes.Buffer

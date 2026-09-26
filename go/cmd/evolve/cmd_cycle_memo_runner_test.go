@@ -1,24 +1,3 @@
-// cmd_cycle_memo_runner_test.go — cycle-563 fix-memo-phase-dispatch, criterion 1
-// (the regression test that would have caught the silent drop). Root cause
-// (fault-localization-report.md, confidence 0.97): the runner-registration
-// loop in wireOrchestratorDeps (cmd_cycle.go:406) validates each discovered
-// user-overlay PhaseSpec with the non-catalog-aware phasespec.ValidateUserSpec,
-// which re-imposes the two-tier single-word naming floor that
-// phasespec.ApplyUserRouting (three lines above, cmd_cycle.go:399) already
-// exempted for "memo" via ValidateUserSpecWithCatalog (memo is a reserved
-// single-word name, but the built-in registry marks it optional:true, which is
-// exactly the exemption ValidateUserSpecWithCatalog grants). So the ROUTER
-// legitimately plans "memo" after "ship" (cycle-561 routing-decision-12.json),
-// but no PhaseRunner is ever registered for it — cyclerun_dispatch.go's
-// missing-runner escape hatch then WARNs and silently advances past memo
-// without ever running it or recording it in completed_phases.
-//
-// This test wires the ACTUAL composition root (wireOrchestratorDeps) against
-// the real repo's real built-in registry (docs/architecture/phase-registry.json,
-// which declares memo optional:true) and the real user overlay
-// (.evolve/phases/memo/phase.json, a bare single-word name) and asserts a
-// PhaseRunner was registered for "memo" — i.e. the dispatcher would actually
-// attempt to launch it, not just that Route() nominates its name.
 package main
 
 import (
@@ -31,9 +10,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// repoRootForMemoRunnerTest locates the repo root from this file's location
-// (go/cmd/evolve/ → three levels up) and skips if the real memo overlay
-// fixture this test depends on is absent (e.g. a partial/vendored checkout).
+// repoRootForMemoRunnerTest locates the repo root three levels up and skips
+// when the real memo overlay fixture is absent.
 func repoRootForMemoRunnerTest(t *testing.T) string {
 	t.Helper()
 	_, thisFile, _, ok := runtime.Caller(0)
@@ -52,13 +30,8 @@ func repoRootForMemoRunnerTest(t *testing.T) string {
 	return root
 }
 
-// TestWireOrchestrator_MemoRunnerRegistered is the RED regression test for the
-// silent drop: the composition root must register a PhaseRunner for "memo"
-// whenever the built-in registry marks it optional AND a (validly-shaped,
-// single-word) user overlay activates it — mirroring cycle-561's live state.
-// Uses a fresh temp evolveDir (storage/ledger) so this never touches real
-// .evolve state; the projectRoot stays the real repo so the real registry +
-// overlay + policy pins are exercised, not synthetic fixtures.
+// A temp evolveDir keeps real .evolve state untouched, while projectRoot stays
+// the real repo so the real registry, overlay and policy pins are exercised.
 func TestWireOrchestrator_MemoRunnerRegistered(t *testing.T) {
 	root := repoRootForMemoRunnerTest(t)
 	evolveDir := t.TempDir()

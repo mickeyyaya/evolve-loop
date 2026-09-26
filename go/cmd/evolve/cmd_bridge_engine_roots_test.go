@@ -1,9 +1,3 @@
-// cmd_bridge_engine_roots_test.go — ADR-0103 unit 10 (design §6 tests 49-50):
-// every non-test bridge.NewEngine call in the module is enumerated with its
-// Signal Center wiring, so the roots where the unit's BRIDGE_EXIT_* and step
-// codes fall into the nil Null Object are on record rather than implicit; and
-// the --simulate root renders a launch death on the console and in the
-// cycle-workspace signals.ndjson.
 package main
 
 import (
@@ -25,12 +19,8 @@ import (
 
 const bridgeImportPath = "github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 
-// bridgeEngineRoots is the allowlist: module-relative file → the number of
-// bridge.NewEngine CALL EXPRESSIONS it holds and how each is wired.
-// "center-bearing" roots thread a Signal Center into Deps (nil only when the
-// caller passed nil — the eight phase-registry NewDefault(root, nil) defaults
-// and cmd_campaign); "center-less" roots build a bare Deps{} and drop every
-// bridge signal (operator question 1 — the S4 sink topology, follow-up F2).
+// bridgeEngineRoots maps each file that builds a bridge Engine to its call count
+// and Signal Center wiring; a center-less root drops every bridge signal.
 var bridgeEngineRoots = map[string]struct {
 	calls  int
 	wiring string
@@ -43,9 +33,8 @@ var bridgeEngineRoots = map[string]struct {
 	"internal/subagent/bridgeadapter.go": {1, "center-bearing: the `evolve subagent run` root (ADR-0103 unit 16) — execAdapterDepsWith(env, signals) hands the Dispatcher's Center to the engine"},
 }
 
-// bridgeNewEngineCalls counts the bridge.NewEngine call expressions in one
-// file, resolving the package through its import alias (never a comment, a
-// doc string or a same-named local).
+// bridgeNewEngineCalls counts call expressions through the import alias, so a
+// comment or a same-named local never counts.
 func bridgeNewEngineCalls(t *testing.T, path string) int {
 	t.Helper()
 	fset := token.NewFileSet()
@@ -82,9 +71,6 @@ func bridgeNewEngineCalls(t *testing.T, path string) int {
 	return calls
 }
 
-// Test 49 — every non-test NewEngine root is in the allowlist with the right
-// call count; a new root fails until it is classified center-bearing or
-// center-less.
 func TestBridgeEngineRootsAreEnumerated(t *testing.T) {
 	moduleRoot := filepath.Join("..", "..")
 	found := map[string]int{}
@@ -126,9 +112,6 @@ func TestBridgeEngineRootsAreEnumerated(t *testing.T) {
 	}
 }
 
-// Test 50 — the --simulate root renders a launch death: the console sink
-// prints the module tag and the BRIDGE_EXIT_* code, and the cycle-stamped
-// event is durable in the cycle workspace's signals.ndjson.
 func TestWireSimulateOrchestrator_BridgeExitWarningRenders(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")

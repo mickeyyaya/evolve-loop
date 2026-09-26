@@ -2,36 +2,26 @@ package phasecontract
 
 import "path/filepath"
 
-// This file extends the phasecontract SSOT (see contract.go) from "report
-// section headings" to a full per-protocol Contract: WHERE the deliverable is
-// written, WHAT kind it is, and the well-formedness rules. It is consumed by
-// the shared go/internal/deliverable package (the `evolve phase verify`
-// self-check AND the host-side contract gate run the SAME checks against this
-// registry), and by the bridge prompt-injection that tells each agent its exact
-// output path. Design: ADR-0034.
-
-// Kind distinguishes the two deliverable shapes the verifier knows how to
-// validate. Markdown deliverables are checked for required Sections + a parseable
-// verdict; JSON deliverables are checked for valid JSON + RequiredKeys (a
-// tolerant reader — unknown/future keys are ignored).
+// Kind is the deliverable shape the verifier validates: markdown sections and verdict, or JSON.
 type Kind int
 
+// Kind values.
 const (
 	KindMarkdown Kind = iota
 	KindJSON
 )
 
-// JSONShape constrains the top-level value of a JSON deliverable. JSONShapeAny
-// is the zero value so existing and user-defined contracts retain their legacy
-// behavior unless they opt into an object or array protocol.
+// JSONShape constrains a JSON deliverable's top-level value; the zero value accepts any value.
 type JSONShape int
 
+// JSONShape values.
 const (
 	JSONShapeAny JSONShape = iota
 	JSONShapeObject
 	JSONShapeArray
 )
 
+// String names the shape as the prompt describes it: object, array, or value.
 func (s JSONShape) String() string {
 	switch s {
 	case JSONShapeObject:
@@ -43,107 +33,49 @@ func (s JSONShape) String() string {
 	}
 }
 
-// Roots carries the three real directories an artifact can live in. A Contract's
-// WriteTarget selects which one ArtifactPath joins against. EvolveDir is the
-// project's .evolve/ dir (where cycle-state.json lives); Workspace is the
-// per-cycle .evolve/runs/cycle-N/ dir (where phase reports live); Worktree is
-// the isolated build worktree.
+// Roots carries the directories an artifact path resolves against, plus the verifying cycle's context.
 type Roots struct {
 	Workspace string
 	Worktree  string
 	EvolveDir string
-	// DispatchedArtifact, when non-empty, is the exact artifact path the
-	// runner told the bridge to write — the verify override that makes the
-	// dispatched filename and the contract filename derive from ONE source
-	// (intent-delta-contract-path-skew: intent in DELTA mode dispatches
-	// intent-delta.md while the registry contract names intent.md, so
-	// deliverable.Verify judged a file the phase was never asked to write).
-	// Only the runner sets it; CLI/gate callers verify the contract path.
+	// DispatchedArtifact overrides the contract path with the exact path the runner dispatched; only the runner sets it.
 	DispatchedArtifact string
-	// ExplanationDocumentationVersion is the cycle's explanation-documentation
-	// contract version (0 = not active). Contract.ExplanationSections are owed
-	// only when it is non-zero. Every verifier — the host gate (from
-	// ReviewInput), the runner (from the request), the salvage re-check and the
-	// agent's own `evolve phase verify` (from cycle-state.json) — carries it
-	// here, so the self-check and the gate cannot disagree about the section.
+	// ExplanationDocumentationVersion is the cycle's explanation-documentation contract version; 0 means inactive.
 	ExplanationDocumentationVersion int
-	// Cycle is the verifying cycle number. Declared EFFECTS (ADR-0100 slice 2)
-	// are judged against per-cycle lifecycle state — the inbox claim lives in
-	// <EvolveDir>/inbox/processing/cycle-<Cycle>/ — so every production
-	// verifier (gate, runner, self-check) carries it; 0 means unknown and a
-	// declared effect then fails OPEN with an error rather than deciding blind.
+	// Cycle is the verifying cycle number; 0 means unknown, and a declared effect then fails open with an error.
 	Cycle int
 }
 
-// WriteTarget values. Every deliverable currently lands in either the per-cycle
-// workspace (phase reports, routing-plan.json) or the .evolve dir
-// (cycle-state.json). Roots.Worktree exists for the "report must NOT be stray in
-// the worktree" check in the verifier, not as a deliverable target.
+// WriteTarget values; Roots.Worktree is only checked for stray reports, never a target.
 const (
 	TargetWorkspace = "workspace"
 	TargetEvolveDir = "evolve_dir"
 )
 
-// Contract is the deliverable contract for one agent: the SSOT for its output
-// location, kind, and well-formedness rules. For markdown kinds, Sections and
-// Verdicts mirror the phase's Report (no duplication — they are wired from the
-// same vars in contract.go). For JSON kinds, RequiredKeys lists the minimal
-// stable top-level keys the verifier requires.
+// Contract is one deliverable protocol: its output location, kind and well-formedness rules.
 type Contract struct {
 	Phase        string
 	AgentName    string // profile/persona basename (e.g. "builder", "tdd-engineer")
-	ArtifactName string // runtime-truth filename (matches the in-process runner hook)
+	ArtifactName string
 	Kind         Kind
 	Sections     []Section // markdown only
-	// ExplanationSections are required ONLY while the cycle's explanation-
-	// documentation contract is active (Roots.ExplanationDocumentationVersion !=
-	// 0); every verifier — the deliverable reviewer and Verify/VerifyWithStage
-	// alike — checks them against that field, so they agree regardless of which
-	// one is asked. Markdown only.
+	// ExplanationSections are owed only while Roots.ExplanationDocumentationVersion != 0. Markdown only.
 	ExplanationSections []Section
 	Verdicts            []string // markdown only — allowed verdict tokens
 	RequiredKeys        []string // json only — minimal required top-level keys
 	JSONShape           JSONShape
 	WriteTarget         string // one of Target*
-	// RequireFailureContext makes a FAIL/WARN verdict sentinel without a
-	// structured failure block a violation (ADR-0039 §7) — the correction
-	// loop then re-dispatches with the exact fix. Applies only to
-	// sentinel-declared verdicts: legacy prose-only artifacts stay legal
-	// forever. Set for built-ins that extract a verdict; user phases opt in
-	// via classify.require_failure_context.
+	// RequireFailureContext makes a FAIL/WARN sentinel without a failure block a violation; prose-only verdicts stay legal.
 	RequireFailureContext bool
-	// RequireFailureContextPhaseIO is the PhaseIO-gated generalization of
-	// RequireFailureContext to phases that classify on section presence and emit
-	// no verdict today (build/scout/triage). The SAME FAIL/WARN-sentinel-without-
-	// failure-block check applies, but ONLY at EVOLVE_PHASE_IO>=enforce
-	// (ADR-0050 §3.8): off/shadow/advisory stay byte-identical, so a phase that
-	// has not yet adopted the structured sentinel cannot be false-blocked before
-	// the cutover. Distinct from RequireFailureContext (unconditional, audit) so
-	// audit's existing enforcement is untouched.
+	// RequireFailureContextPhaseIO applies the same check to verdict-less phases, only at EVOLVE_PHASE_IO>=enforce.
 	RequireFailureContextPhaseIO bool
-	// RequireChallengeToken makes a report that fails to echo the minted
-	// <workspace>/challenge-token.txt token a violation (cycle-269: the
-	// proof-of-read protocol was audit-enforced only — unrecoverable — and
-	// the bash→Go migration had dropped the prompt-side injection entirely).
-	// The runner injects the token block at dispatch; the deliverable gate
-	// checks the echo so the correction loop re-dispatches with the exact
-	// fix BEFORE audit. Fail-open when no token was minted. scout (the
-	// minter) must never set this — echoing yourself is circular.
+	// RequireChallengeToken makes a report that does not echo the minted token a violation; fails open with no token.
+	// scout mints the token, so it must never set this.
 	RequireChallengeToken bool
-	// NoArtifact marks a phase that produces NO file deliverable — its result
-	// is a side effect, not a report (ship: the pushed commit, verified by the
-	// ship-gate + commit-gate attestation, not a file). The verifier treats
-	// such a contract as trivially well-formed. Without ANY registered contract
-	// the gate logged `no contract registered for phase "ship"` and failed open
-	// every cycle; an explicit NoArtifact contract resolves that ambiguity
-	// intentionally (PASS) instead.
+	// NoArtifact marks a phase whose result is a side effect, not a file; the verifier passes it.
 	NoArtifact bool
 
-	// AgentOwedFiles and Effects are projected from the registry's declaration
-	// ONLY (spec.Outputs.AgentOwed, spec.Effects) — never from a built-in
-	// literal — so the persona's instructions, the sandbox grant, and the
-	// declared-deliverables gate (ADR-0100) all read one word. A built-in
-	// contract receives them as an overlay in CatalogResolver.Resolve.
+	// AgentOwedFiles and Effects come only from the registry declaration, never a built-in literal. See ADR-0100.
 	AgentOwedFiles []string
 	Effects        []string
 }
@@ -151,8 +83,7 @@ type Contract struct {
 // EffectInboxClaim names the effect of claiming a cycle's committed inbox items.
 const EffectInboxClaim = "inbox-claim"
 
-// TopLevelJSONShape returns the explicit shape, or object for legacy keyed
-// contracts because top-level keys can only be enforced on an object.
+// TopLevelJSONShape returns JSONShape, or object when RequiredKeys are set, since keys apply only to an object.
 func (c Contract) TopLevelJSONShape() JSONShape {
 	if c.JSONShape == JSONShapeAny && len(c.RequiredKeys) > 0 {
 		return JSONShapeObject
@@ -160,8 +91,7 @@ func (c Contract) TopLevelJSONShape() JSONShape {
 	return c.JSONShape
 }
 
-// ArtifactPath resolves the absolute path the agent must write to, joining the
-// ArtifactName against the root selected by WriteTarget.
+// ArtifactPath joins ArtifactName to the root that WriteTarget selects.
 func (c Contract) ArtifactPath(r Roots) string {
 	if c.WriteTarget == TargetEvolveDir {
 		return filepath.Join(r.EvolveDir, c.ArtifactName)
@@ -169,24 +99,13 @@ func (c Contract) ArtifactPath(r Roots) string {
 	return filepath.Join(r.Workspace, c.ArtifactName)
 }
 
-// markdownVerdicts is the standard verdict-token vocabulary for phases that
-// declare a verdict. Audit additionally emits SKIPPED.
-// verdictsPassFailWarnSkp is audit's verdict vocabulary — audit is the only
-// phase whose classifier extracts a verdict token (the others classify on
-// section presence, so their contracts leave Verdicts nil).
+// verdictsPassFailWarnSkp is audit's verdict vocabulary; audit is the only built-in that extracts a verdict token.
 var verdictsPassFailWarnSkp = []string{"PASS", "FAIL", "WARN", "SKIPPED"}
 
-// contracts is the registry for built-in deliverable protocols. A shared agent
-// can own multiple protocols (the router's plan, replan, and proposal), while
-// each protocol keeps one exact artifact and shape. Section sets are wired from
-// the Report vars in contract.go so the headings stay single-sourced.
+// contracts is the built-in registry; Sections are wired from the Report vars so headings stay single-sourced.
 var contracts = map[string]Contract{
-	// build/scout/tdd/intent/triage classify on SECTION presence, not a verdict
-	// token (only audit extracts a verdict). Leaving Verdicts nil keeps the
-	// contract gate strictly additive — it requires the same sections the
-	// existing classifiers do, plus correct location, without inventing a
-	// verdict requirement those phases never emitted (which would false-block at
-	// enforce).
+	// These phases classify on section presence, so Verdicts stays nil: a verdict
+	// requirement they never emit would false-block at enforce.
 	"build": {
 		Phase: "build", AgentName: "builder", ArtifactName: "build-report.md",
 		Kind: KindMarkdown, Sections: alwaysOn(Build.Sections), Verdicts: nil,
@@ -219,16 +138,11 @@ var contracts = map[string]Contract{
 		Kind: KindMarkdown, Sections: Triage.Sections, Verdicts: nil,
 		WriteTarget: TargetWorkspace, RequireFailureContextPhaseIO: true,
 	},
-	// The routing brain (PhaseAdvisor) keeps AgentName="router" for its shared
-	// persona and model policy, while each protocol has its own contract identity
-	// and artifact. Keeping those identities distinct prevents a proposal or
-	// replan self-check from validating a stale whole-cycle plan.
+	// The three router protocols share one persona but keep distinct contracts, so a
+	// proposal or replan self-check never validates a stale whole-cycle plan.
 	"router": {
 		Phase: "router", AgentName: "router", ArtifactName: "routing-plan.json",
-		// routing-plan.json is a BARE JSON ARRAY (PhaseAdvisor.Plan writes "a
-		// strict JSON array"; the consumer parses an array). No required keys —
-		// an array has none. The prior RequiredKeys=["plan"] expected an object
-		// and failed `evolve phase verify router` every cycle.
+		// PhaseAdvisor writes a bare JSON array, which has no keys to require.
 		Kind: KindJSON, JSONShape: JSONShapeArray,
 		WriteTarget: TargetWorkspace,
 	},
@@ -247,13 +161,8 @@ var contracts = map[string]Contract{
 		Kind: KindJSON, RequiredKeys: []string{"cycle_id", "phase"}, JSONShape: JSONShapeObject,
 		WriteTarget: TargetEvolveDir,
 	},
-	// retro and build-planner have real artifacts and real backfill paths but
-	// were absent from this registry, so their filenames were declared only in
-	// backfill.phaseHeaders and core.backfillArtifactPath — two independent
-	// vocabularies with nothing pinning them together. Registered with nil
-	// Sections/Verdicts: the contract gate gains location/well-formedness for
-	// these phases without inventing section requirements they never emitted
-	// (which would false-block at enforce).
+	// Registered for location and well-formedness only; nil Sections/Verdicts invent
+	// no requirement these phases never emitted.
 	"retro": {
 		Phase: "retro", AgentName: "retrospective", ArtifactName: "retrospective-report.md",
 		Kind: KindMarkdown, Sections: nil, Verdicts: nil,
@@ -264,35 +173,19 @@ var contracts = map[string]Contract{
 		Kind: KindMarkdown, Sections: nil, Verdicts: nil,
 		WriteTarget: TargetWorkspace,
 	},
-	// ship is a native host-side phase (not an LLM agent): its deliverable is
-	// the pushed commit, not a file. NoArtifact makes the contract gate resolve
-	// it explicitly (PASS) instead of fail-open-on-unknown — the real ship
-	// invariant (commit pushed) is enforced by the ship-gate + commit-gate
-	// attestation, not this well-formedness check.
+	// ship's deliverable is the pushed commit, which the ship-gate and commit-gate
+	// attestation enforce; the explicit contract passes instead of failing open.
 	"ship": {
 		Phase: "ship", AgentName: "ship", ArtifactName: "",
-		NoArtifact: true, // no file deliverable → WriteTarget is irrelevant (verifier short-circuits)
+		NoArtifact: true,
 	},
 }
 
-// stagedSections are declared contract sections whose ENFORCEMENT rolls out
-// through a dedicated gate rather than the always-on contract gate — so the
-// always-on gate stays byte-identical until that gate graduates (the same
-// off→shadow→enforce staging every other gate in this repo uses). HandoffSummary
-// (cycle-565 Slice S1) is declared on the build/scout/audit Report contracts —
-// producers MUST document it (contract_test.go) and each report SHOULD carry it —
-// but its presence/size is observed via the report-size gate
-// (deliverable.VerifyWithReportSize), which defaults to shadow per the S1
-// "shadow/warn first" spec. Keeping it out of the always-on enforced set means
-// the new section cannot false-block a report before the report-size gate is
-// deliberately promoted, and keeps it decoupled from unrelated contract checks
-// (challenge-token, failure-context, circuit-breaker).
+// stagedSections are declared sections whose enforcement rolls out through their own gate
+// (HandoffSummary: the report-size gate), so they cannot block before that gate is promoted.
 var stagedSections = map[string]bool{HandoffSummary.Canonical: true}
 
-// alwaysOn returns the sections the always-on contract gate hard-requires:
-// every declared section except those in stagedSections. It derives from the
-// Report vars (single-sourced — headings are never re-typed here), so a heading
-// change in contract.go still propagates to the registry.
+// alwaysOn returns the declared sections minus stagedSections.
 func alwaysOn(sections []Section) []Section {
 	out := make([]Section, 0, len(sections))
 	for _, s := range sections {
@@ -304,17 +197,10 @@ func alwaysOn(sections []Section) []Section {
 	return out
 }
 
-// aliases maps human-facing names to the canonical wire identity used as the
-// registry key. "advisor" is the conceptual name for the routing brain whose
-// agent identity on the wire is "router".
+// aliases maps human-facing names to the registry key.
 var aliases = map[string]string{"advisor": "router"}
 
-// RegistryKey maps a core or human-facing phase name to the registry's key:
-// the human aliases first ("advisor" → "router"), then the one place the
-// built-in table and the registry disagree ("retro" → "retrospective"). It is
-// the ONE home of that rule — core.canonicalCatalogName delegates to it —
-// so an alias added here reaches every overlay lookup and every catalog
-// lookup at once.
+// RegistryKey maps a core or human-facing phase name to its phase-registry key (advisor→router, retro→retrospective).
 func RegistryKey(name string) string {
 	if canon, ok := aliases[name]; ok {
 		name = canon
@@ -325,8 +211,7 @@ func RegistryKey(name string) string {
 	return name
 }
 
-// For returns the contract for a phase/agent and whether one is registered.
-// Human-facing aliases (e.g. "advisor") resolve to their canonical key.
+// For returns the built-in contract for a phase, resolving human-facing aliases.
 func For(phase string) (Contract, bool) {
 	if canon, ok := aliases[phase]; ok {
 		phase = canon
@@ -335,16 +220,7 @@ func For(phase string) (Contract, bool) {
 	return c, ok
 }
 
-// ArtifactName returns the deliverable filename a phase writes, resolved from
-// the registry — the SSOT for artifact names — so no consumer has to re-declare
-// the literal. Before cycle-1145 five packages (evalgate, topngate,
-// phases/scout, router, cyclesimulator) each carried their own copy of
-// "scout-report.md"; a rename in the registry silently left them behind.
-//
-// Returns "" when the phase is not registered, and "" for a NoArtifact phase
-// (ship), whose result is a pushed commit rather than a file — callers that
-// need a fallback filename should test for the empty string, exactly as
-// core.backfillArtifactPath does.
+// ArtifactName returns a phase's registered filename, or "" when the phase is unregistered or NoArtifact.
 func ArtifactName(phase string) string {
 	c, ok := For(phase)
 	if !ok || c.NoArtifact {
@@ -353,17 +229,7 @@ func ArtifactName(phase string) string {
 	return c.ArtifactName
 }
 
-// ArtifactFilename returns the deliverable filename for a phase, falling back
-// to the "<phase>-report.md" convention when the registry has no answer —
-// either the phase is unregistered (user/inserted phases) or it is NoArtifact.
-//
-// This is the SSOT form of the fallback every call site was hand-rolling:
-// core.backfillArtifactPath, core/routing_dispatch and three more sites each
-// re-declared `phase + "-report.md"` beside their own [For] lookup, which is
-// how the retro-phase path mismatch survived cycle-1145's backfill (the
-// registry moved, the literals did not). Callers that must DISTINGUISH "no
-// registered artifact" from "conventional name" keep using [ArtifactName],
-// whose empty return carries that distinction.
+// ArtifactFilename returns ArtifactName, falling back to "<phase>-report.md"; use ArtifactName when "" is meaningful.
 func ArtifactFilename(phase string) string {
 	if name := ArtifactName(phase); name != "" {
 		return name
@@ -371,18 +237,10 @@ func ArtifactFilename(phase string) string {
 	return phase + "-report.md"
 }
 
-// requiredPhases is the SSOT for "what a completed cycle must have produced":
-// the three spine phases every cycle ledgers and whose reports every downstream
-// completeness consumer requires. Roles and artifact names are DERIVED from
-// these phases' registry contracts (AgentName / ArtifactName) rather than
-// re-typed, so cyclehealth, redteamcheck and ledgerverify cannot drift from the
-// registry — four independent declarations of the same vocabulary were one
-// disease, not four bugs (campaign_retrospective_215_231).
+// requiredPhases are the spine phases every completed cycle must have produced.
 var requiredPhases = []string{"scout", "build", "audit"}
 
-// RequiredRoles returns the canonical subagent roles whose ledger entries every
-// completed cycle must carry, derived from the registry's AgentName vocabulary
-// (scout → "scout", build → "builder", audit → "auditor").
+// RequiredRoles returns the registry AgentName of each phase a completed cycle must have run.
 func RequiredRoles() []string {
 	out := make([]string, 0, len(requiredPhases))
 	for _, p := range requiredPhases {
@@ -393,9 +251,7 @@ func RequiredRoles() []string {
 	return out
 }
 
-// RequiredArtifacts returns the report filenames a completed cycle must have
-// written, derived from the same registry entries as RequiredRoles so the role
-// and artifact halves of "complete" can never disagree.
+// RequiredArtifacts returns the registry ArtifactName of each phase a completed cycle must have run.
 func RequiredArtifacts() []string {
 	out := make([]string, 0, len(requiredPhases))
 	for _, p := range requiredPhases {
@@ -406,8 +262,7 @@ func RequiredArtifacts() []string {
 	return out
 }
 
-// Contracts returns every registered contract (stable order not guaranteed;
-// callers that need order should sort by Phase).
+// Contracts returns every built-in contract in unspecified order.
 func Contracts() []Contract {
 	out := make([]Contract, 0, len(contracts))
 	for _, c := range contracts {

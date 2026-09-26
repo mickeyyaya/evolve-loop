@@ -9,36 +9,11 @@ import (
 	"testing"
 )
 
-// cmd_cycle_health_dossier_commitment_test.go — cycle 1652 RED contract, AC3 of
-// triage-empty-commitment-still-dispatches-spine: "a cycle 1623-shaped dossier
-// (empty top_n + full PhasesRun) … cyclehealth classifies such a historical
-// dossier as an anomaly if it appears."
-//
-// Driven through the PRODUCTION caller (`evolve cycle-health <N> <workspace>`
-// → runCycleHealth → cyclehealth.Check) rather than cyclehealth.Options
-// directly, so the Builder is free to shape how the dossier reaches the check
-// (an Options field threaded from projectRoot, or a derivation) while the
-// contract stays: the CLI, given EVOLVE_PROJECT_ROOT, reads
-// <root>/knowledge-base/cycles/cycle-N.json and reports the anomaly.
-//
-// Vocabulary pinned (the Builder implements it; the ACS predicates bind it):
-//
-//	signal   "dossier_commitment"
-//	message  names at least one implementation phase the dossier recorded
-//	          (tdd|build|audit|ship) so the operator sees WHAT ran against nothing
-//
-// The historical record is the DOSSIER, not the run dir — run dirs are
-// gitignored and pruned, the dossier is committed — so the fixtures carry ONLY
-// a dossier plus an empty workspace directory. Other signals (missing
-// scout-report.md, …) will fire on that empty workspace; they are irrelevant
-// here and deliberately not asserted on.
-
 const dossierCommitmentSignal = "dossier_commitment"
 
-// dossierFixture writes <root>/knowledge-base/cycles/cycle-<n>.json with the
-// given committed task set (nil ⇒ the field is omitted: a pre-Tasks legacy
-// record) and phase names, and <root>/.evolve/runs/cycle-<n>/ as the workspace
-// the CLI's fallback root derivation (three Dir hops) resolves back to root.
+// dossierFixture writes cycle n's dossier (nil tasks omits the field, as a
+// legacy record does) and an empty workspace the CLI's fallback resolves back
+// to root. Other signals fire on that empty workspace; they are not asserted.
 func dossierFixture(t *testing.T, cycle int, tasks []string, phases []string) (root, workspace string) {
 	t.Helper()
 	root = t.TempDir()
@@ -79,8 +54,7 @@ func itoa(n int) string {
 	return string(raw)
 }
 
-// cycleHealthAnomalyLines runs the CLI against the fixture and returns the
-// stdout lines that carry the dossier_commitment signal.
+// cycleHealthAnomalyLines runs the CLI and returns its dossier_commitment lines.
 func cycleHealthAnomalyLines(t *testing.T, root, workspace string, cycle int) (lines []string, stdout string, code int) {
 	t.Helper()
 	t.Setenv("EVOLVE_PROJECT_ROOT", root)
@@ -99,9 +73,6 @@ func cycleHealthAnomalyLines(t *testing.T, root, workspace string, cycle int) (l
 
 var cycle1623Phases = []string{"scout", "triage", "tdd", "build", "audit", "tdd", "build", "audit", "tdd", "build", "audit", "ship"}
 
-// TestCycleHealth_EmptyCommitmentDossierWithImplementationIsAnomaly — the
-// defect shape: tasks [] and twelve phases. The report must carry the
-// dossier_commitment signal and its message must name an implementation phase.
 func TestCycleHealth_EmptyCommitmentDossierWithImplementationIsAnomaly(t *testing.T) {
 	cases := []struct {
 		name   string
@@ -136,10 +107,6 @@ func TestCycleHealth_EmptyCommitmentDossierWithImplementationIsAnomaly(t *testin
 	}
 }
 
-// TestCycleHealth_DossierCommitmentSignalStaysQuietOnHealthyShapes — the
-// NEGATIVE / edge rows. A check that fires on every empty commitment, on every
-// legacy record without the tasks field, or on a missing dossier would page
-// the operator on healthy history.
 func TestCycleHealth_DossierCommitmentSignalStaysQuietOnHealthyShapes(t *testing.T) {
 	cases := []struct {
 		name    string

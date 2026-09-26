@@ -41,6 +41,8 @@ func (r *Role) Decide(ctx context.Context, in core.GuardInput) core.GuardDecisio
 	if path == "" {
 		return core.GuardDecision{Allow: true}
 	}
+	// Every decision below judges the path the write lands on: .. and . are resolved once, here.
+	path = filepath.Clean(path)
 	if r.bypass {
 		// Even an emergency --bypass of the control plane is alarmed, never silent.
 		if IsProtectedSurface(path) {

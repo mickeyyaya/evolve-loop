@@ -5,12 +5,6 @@ import (
 	"testing"
 )
 
-// Normal-suite (untagged) coverage for the rung-2 scoped-review primitives so
-// the apicover gate sees the four exported symbols exercised outside the
-// `//go:build acs` predicate suite. Fixtures mirror go/acs/cycle942 so this
-// file and the ACS predicates prove the same contract from both the internal
-// and external test packages.
-
 // foo.go: audited touches func A() around new line 10; composed touches BOTH
 // func A() (overlap) and func B() around new line 51 (disjoint).
 const auditedFoo = "diff --git a/foo.go b/foo.go\n" +
@@ -43,7 +37,6 @@ func TestIntersectingHunks_KeepsOverlapDropsDisjoint(t *testing.T) {
 	if strings.Contains(scoped, "HUNK_B") {
 		t.Errorf("disjoint hunk HUNK_B leaked into scoped payload:\n%s", scoped)
 	}
-	// Header preserved so the payload is a valid unified diff.
 	if !strings.Contains(scoped, "diff --git a/foo.go b/foo.go") {
 		t.Errorf("scoped payload missing file header:\n%s", scoped)
 	}

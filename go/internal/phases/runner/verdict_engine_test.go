@@ -1,11 +1,5 @@
 package runner
 
-// verdict_engine_test.go — the unit-11 seam (ADR-0103 §6 tests 35-41): the
-// ONE construction of the verdict engine, the lazy accessor for a literal
-// runner, the ONE projection onto the engine's input, the Center derivation
-// (explicit → the bridge's → Null Object), the stream per scenario, and the
-// consumer pins on the two beliefs preparation.go now reads from the leaf.
-
 import (
 	"context"
 	"errors"
@@ -21,7 +15,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// Test 35 — verdict.New( is spelled in exactly one non-test file of the module.
 func TestVerdictEngine_OneConstructionSite(t *testing.T) {
 	const onlySite = "internal/phases/runner/verdict_engine.go"
 	if offenders := nonTestSourcesMentioning(t, "verdict.New(", onlySite); len(offenders) > 0 {
@@ -29,9 +22,6 @@ func TestVerdictEngine_OneConstructionSite(t *testing.T) {
 	}
 }
 
-// nonTestSourcesMentioning lists the module's non-test Go files outside the
-// verdict leaf and the one allowed site whose source contains needle
-// (core/carryover_lifecycle_test.go idiom; the module root is three levels up).
 func nonTestSourcesMentioning(t *testing.T, needle, allowed string) []string {
 	t.Helper()
 	moduleRoot, err := filepath.Abs(filepath.Join("..", "..", ".."))
@@ -69,11 +59,6 @@ func nonTestSourcesMentioning(t *testing.T, needle, allowed string) []string {
 	return offenders
 }
 
-// Test 36 — the engine has ONE moment of truth: New builds it eagerly and no
-// other non-test line of the package assigns it (no lazy accessor — a
-// BaseRunner has no production literal, so a lazy branch would be dead code
-// with an unsynchronised write; review fold). Kills `a second construction`,
-// `New leaves judge nil`.
 func TestNew_BuildsTheEngineOnceEagerly(t *testing.T) {
 	eager := New(Options{Hooks: &fakeHooks{phase: "audit"}, Bridge: &fakeBridge{}, Prompts: fakePromptsFS("evolve-auditor", "x")})
 	if eager.judge == nil {
@@ -94,7 +79,6 @@ func TestNew_BuildsTheEngineOnceEagerly(t *testing.T) {
 	}
 }
 
-// Test 37 — dispatchOf carries every engine input from its ONE source.
 func TestDispatchOf_IsTheOneProjection(t *testing.T) {
 	req := core.PhaseRequest{Cycle: 9, RunID: "r9", Workspace: "ws", Worktree: "wt", ProjectRoot: "root", ExplanationDocumentationVersion: 2}
 	snap, ok := verdict.StatSnapshot(writeTemp(t, "body"))
@@ -112,8 +96,6 @@ func TestDispatchOf_IsTheOneProjection(t *testing.T) {
 	}
 }
 
-// packageNonTestSources lists this package's non-test Go files (the leaf's
-// nonTestSources idiom) for the source-scan pins.
 func packageNonTestSources(t *testing.T) []string {
 	t.Helper()
 	entries, err := os.ReadDir(".")
@@ -138,8 +120,6 @@ func writeTemp(t *testing.T, body string) string {
 	return path
 }
 
-// signalBridge is a bridge double that carries a Center, like the production
-// Adapter (Signals() beside SignalsWired()).
 type signalBridge struct {
 	fakeBridge
 	center *signalcenter.Center
@@ -154,10 +134,6 @@ func recordingCenter() (*signalcenter.Center, *[]signalcenter.Event) {
 	return c, got
 }
 
-// Test 38 — the Center derivation: Options.Signals wins, else the bridge's
-// when it exposes one, else the Null Object; read live, never snapshotted;
-// the event carries the request's identity. Names SignalsWired for the host
-// apicover row.
 func TestNew_SignalsResolveExplicitThenBridgeThenNull(t *testing.T) {
 	hooks := &fakeHooks{phase: "audit", agent: "evolve-auditor", model: "opus", prompt: "x", verdict: core.VerdictPASS}
 	failing := func(string, string) error { return errors.New("filter blowup") }
@@ -196,7 +172,6 @@ func TestNew_SignalsResolveExplicitThenBridgeThenNull(t *testing.T) {
 	}
 }
 
-// Test 39 — no Center anywhere: a provoked fault runs silently, no panic.
 func TestNew_NoCenterIsTheNullObject(t *testing.T) {
 	hooks := &fakeHooks{phase: "audit", agent: "evolve-auditor", model: "opus", prompt: "x", verdict: core.VerdictPASS}
 	r := New(Options{Hooks: hooks, Bridge: &fakeBridge{writeArtifact: verifiedPASS}, Prompts: fakePromptsFS("evolve-auditor", "x"),
@@ -207,10 +182,6 @@ func TestNew_NoCenterIsTheNullObject(t *testing.T) {
 	}
 }
 
-// Test 40 — the ordered {module, kind, code} sequence per scenario of the
-// harness: empty on the happy, uncontracted, substantive and pass-through
-// paths; exactly one code per fault path (RECONCILED after the filter's WARN
-// when both fire — the declared fold D2).
 func TestRun_StreamIsEmptyOnTheHappyPathAndCarriesOneCodePerFaultPath(t *testing.T) {
 	want := map[string][]signalcenter.Code{
 		"timeout_wellformed_pass":       {verdict.CodeReconciled},
@@ -285,12 +256,6 @@ func eventCodes(events []signalcenter.Event) []signalcenter.Code {
 	return out
 }
 
-// Test 41 — the consumer pins on the two beliefs preparation.go reads from
-// outside the package: the prompt's challenge-token tail carries exactly
-// phasecontract.ChallengeToken(ws) (whitespace-padded fixture; the reader the
-// verdict engine's ACS floor shares — review fold F1), and the pre-dispatch
-// snapshot follows verdict.StatSnapshot's rule (empty file ⇒ none). The
-// package never spells the token file itself (source scan).
 func TestPreparation_ChallengeTokenAndSnapshotProjectTheLeaf(t *testing.T) {
 	for _, name := range packageNonTestSources(t) {
 		if src, err := os.ReadFile(name); err != nil {

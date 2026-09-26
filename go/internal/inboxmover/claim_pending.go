@@ -6,9 +6,7 @@ import (
 	"strconv"
 )
 
-// ClaimPending claims the ids still pending at the inbox root. Absent,
-// already-held and console-routed ids are left for the effects gate to judge;
-// every other failure is returned.
+// ClaimPending claims the root-pending ids, leaving absent, held and console-routed ones for the effects gate.
 func ClaimPending(opts Options, cycle int, ids []string) error {
 	opts.resolveOpts()
 	cycleStr := strconv.Itoa(cycle)

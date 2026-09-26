@@ -8,12 +8,6 @@ import (
 	"time"
 )
 
-// codex_model_clamp_test.go — cycle-142 incident: the auditor ran codex-tmux
-// with model gpt-5.4 (resolved from tier "sonnet"), which a ChatGPT/
-// subscription codex account rejects (400 invalid_request_error → model-switch
-// modal → 10-min hang → ExitArtifactTimeout). The clamp substitutes a
-// ChatGPT-safe model on subscription auth; API-key auth keeps the big model.
-
 func TestCodexAuthMode(t *testing.T) {
 	cases := []struct {
 		name string
@@ -156,9 +150,7 @@ func TestClampCodexModelForAuth(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Snapshot the ENTIRE input to detect any in-place mutation,
-			// regardless of where the -m value sits in the slice (NUL-joined so
-			// element boundaries can't alias). \x00 never appears in a flag.
+			// Snapshot the whole input, NUL-joined so element boundaries cannot alias, to catch any in-place mutation.
 			before := strings.Join(tc.flags, "\x00")
 			got, from, to := clampCodexModelForAuth(tc.flags, m, tc.auth)
 			if strings.Join(got, " ") != strings.Join(tc.wantFlags, " ") {
@@ -175,8 +167,6 @@ func TestClampCodexModelForAuth(t *testing.T) {
 }
 
 func TestClampCodexModelForAuth_NoPolicyNoClamp(t *testing.T) {
-	// A manifest without a ChatGPT-safe set must never clamp (e.g. API-key-only
-	// CLIs, or a manifest predating the policy).
 	m := Manifest{}
 	got, from, to := clampCodexModelForAuth([]string{"-m", "gpt-5.4"}, m, "chatgpt")
 	if from != "" || to != "" || strings.Join(got, " ") != "-m gpt-5.4" {
@@ -184,9 +174,6 @@ func TestClampCodexModelForAuth_NoPolicyNoClamp(t *testing.T) {
 	}
 }
 
-// TestCodexTmuxManifest_HasChatGPTClampPolicy pins the data contract: the real
-// embedded manifest must declare a ChatGPT-safe set + default, or the clamp is
-// inert and cycle-142 regresses silently.
 func TestCodexTmuxManifest_HasChatGPTClampPolicy(t *testing.T) {
 	m, err := LoadManifest("codex-tmux")
 	if err != nil {
@@ -198,8 +185,7 @@ func TestCodexTmuxManifest_HasChatGPTClampPolicy(t *testing.T) {
 	if m.ChatGPTDefaultModel == "" {
 		t.Fatal("codex-tmux manifest must declare chatgpt_default_model")
 	}
-	// The default must itself be in the safe set (else the clamp produces an
-	// unsafe model).
+	// The default must itself be safe, or the clamp would produce an unsafe model.
 	safe := false
 	for _, s := range m.ChatGPTSafeModels {
 		if s == m.ChatGPTDefaultModel {
@@ -211,7 +197,6 @@ func TestCodexTmuxManifest_HasChatGPTClampPolicy(t *testing.T) {
 	}
 }
 
-// TestEffectiveModelSelector_TrailingFlag covers incomplete selector forms.
 func TestEffectiveModelSelector_TrailingFlag(t *testing.T) {
 	if got, ok := effectiveCodexModelSelector([]string{"-m"}); ok {
 		t.Errorf("effectiveCodexModelSelector([\"-m\"]) = %+v, want unavailable", got)

@@ -49,8 +49,8 @@ func TestCapabilitiesCLI_Errors(t *testing.T) {
 	}
 }
 
-// writeOverrideCatalog configures a policy-backed temp directory holding a tiny
-// deterministic catalog, so drift tests don't depend on the embedded list.
+// writeOverrideCatalog points policy at a tiny catalog so drift tests do not
+// depend on the embedded list.
 func writeOverrideCatalog(t *testing.T, cmds string) {
 	t.Helper()
 	dir := t.TempDir()
@@ -79,7 +79,6 @@ func TestIntrospectCLI_OfflineClean(t *testing.T) {
 func TestIntrospectCLI_OfflineDrift(t *testing.T) {
 	writeOverrideCatalog(t, `{"name":"/help"},{"name":"/model"}`)
 	paneFile := filepath.Join(t.TempDir(), "pane.txt")
-	// Live has a new command and is missing /model → drift in both directions.
 	if err := os.WriteFile(paneFile, []byte("/help  Show help\n/newcmd  New\n❯"), 0o644); err != nil {
 		t.Fatal(err)
 	}

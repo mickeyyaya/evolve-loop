@@ -7,24 +7,12 @@ import (
 	"testing"
 )
 
-// codexDeepModel is the 2026-09-10 operator directive: codex's high (deep/top)
-// tiers run gpt-5.6-sol at the high reasoning rung — the 2026-09-09 gpt-6-astra
-// cutover was withdrawn the next day for token cost (astra burned the
-// subscription far faster; the operator keeps sol for codex and opus for
-// claude). The reasoning rung is unchanged (the rung is
-// pinned by profiles/effort_defaults_test.go — codexDeepTopRung — not here).
-// HISTORICAL (superseded): astra was verified live before the 2026-09-09
-// cutover — `codex exec -m gpt-6-astra -c
-// model_reasoning_effort=high` on the ChatGPT subscription answered. This is
-// the ONE value pin for the directive; every other codex tier test asserts
-// relationally against the family manifest.
+// codexDeepModel is the one value pin for codex's deep and top tiers; every other codex tier test asserts
+// relationally against the family manifest. The reasoning rung is pinned in profiles/effort_defaults_test.go.
 const codexDeepModel = "gpt-5.6-sol"
 
-// codexFamilyManifest loads the codex FAMILY manifest raw — WITHOUT the
-// live-catalog overlay, so a stale .evolve/model-catalog.json cannot mask a
-// manifest regression. codex-tmux.json is the family's single tier table: the
-// tmux realization, the headless driver (codex.json points here via model_tier_map_from),
-// setup's presets and the advisor clamp probe all resolve through it.
+// codexFamilyManifest loads the codex family manifest without the live-catalog overlay, so a stale catalog
+// cannot mask a manifest regression. codex-tmux.json is the family's one tier table.
 func codexFamilyManifest(t *testing.T) Manifest {
 	t.Helper()
 	m, err := loadManifestRaw("codex-tmux")
@@ -34,12 +22,7 @@ func codexFamilyManifest(t *testing.T) Manifest {
 	return m
 }
 
-// TestCodexManifest_DeepTopTiers_ValuePin pins the directive on the family
-// manifest: deep and top resolve to gpt-5.6-sol, the ChatGPT clamp's default
-// is gpt-5.6-sol, and the clamp's safe set admits it (otherwise the clamp would
-// silently rewrite every deep launch back to the default — the cycle-142
-// mechanism working against the directive). The fast/balanced rows are
-// untouched by the directive.
+// The clamp's safe set must admit the deep model, or the clamp would rewrite every deep launch to its default.
 func TestCodexManifest_DeepTopTiers_ValuePin(t *testing.T) {
 	m := codexFamilyManifest(t)
 	for _, tier := range []string{"deep", "top"} {
@@ -64,13 +47,7 @@ func TestCodexManifest_DeepTopTiers_ValuePin(t *testing.T) {
 	}
 }
 
-// TestCodexHeadlessManifest_PointsAtFamilyTable: the family has ONE tier
-// table. codex.json (the headless transport) declares no map of its own — its
-// copy sat three model generations stale while the driver carried its own
-// switch — and instead POINTS at the family manifest (`model_tier_map_from`),
-// which LoadManifest resolves. A second copy here would be drift waiting to
-// happen; the pointer is explicit so a headless manifest that legitimately
-// declares no map (claude-p: the tiers ARE its selectors) is never changed.
+// The pointer is explicit, so a headless manifest that legitimately declares no map (claude-p) is never changed.
 func TestCodexHeadlessManifest_PointsAtFamilyTable(t *testing.T) {
 	raw, err := loadManifestRaw("codex")
 	if err != nil {
@@ -97,9 +74,6 @@ func TestCodexHeadlessManifest_PointsAtFamilyTable(t *testing.T) {
 	}
 }
 
-// TestLoadManifest_ModelTierMapFrom_UnresolvableIsAnError: a pointer that
-// names a manifest which is absent or corrupt is a manifest error — loud,
-// never an empty map that silently degrades every launch to the CLI default.
 func TestLoadManifest_ModelTierMapFrom_UnresolvableIsAnError(t *testing.T) {
 	dir := t.TempDir()
 	headless := `{"schema_version":1,"cli":"zz-headless","binary":"zz","transport":"headless","model_tier_map_from":"zz-tmux"}`
@@ -118,14 +92,6 @@ func TestLoadManifest_ModelTierMapFrom_UnresolvableIsAnError(t *testing.T) {
 	}
 }
 
-// TestResolveTierModel_FollowsManifest is the single-source proof for inbox
-// `codex-tier-map-single-source`: there is ONE tier→model ladder
-// (resolveTierModel) and both transports go through it — the realizer's
-// flag emit (Realize) and the headless driver's -m composition. Wiring proof:
-// a fixture manifest with a different map is followed on both paths with no
-// code edit; legacy aliases (haiku/sonnet/opus) resolve through their canonical
-// tier; native ids and genuinely unknown values pass through unchanged (the
-// cycle-378 contract).
 func TestResolveTierModel_FollowsManifest(t *testing.T) {
 	fixture := Manifest{
 		ModelTierMap: map[string]string{"fast": "m-fast", "balanced": "m-bal", "deep": "m-deep", "top": "m-top"},
@@ -140,23 +106,16 @@ func TestResolveTierModel_FollowsManifest(t *testing.T) {
 			t.Errorf("ladder: resolveTierModel(%q) = %q, want %q", tc.in, got, tc.want)
 		}
 	}
-	// The realizer path emits exactly what the ladder resolves (same function).
 	r := Realize(fixture, LaunchIntent{ModelTier: "opus"})
 	if !containsToken(r.LaunchFlags, "-m") || !containsToken(r.LaunchFlags, "m-deep") {
 		t.Errorf("Realize(opus) LaunchFlags = %v, want -m m-deep via the shared ladder", r.LaunchFlags)
 	}
-	// Coherence against the REAL family manifest: the legacy alias and the
-	// canonical tier resolve identically, to the value the manifest declares.
 	real := codexFamilyManifest(t)
 	if a, b := resolveTierModel(real, "opus"), resolveTierModel(real, "deep"); a != b || a != real.ModelTierMap["deep"] {
 		t.Errorf("real manifest: opus→%q deep→%q map→%q; all three must agree", a, b, real.ModelTierMap["deep"])
 	}
 }
 
-// TestLaunch_Codex_ResolvesTierViaFamilyManifest: the headless driver's -m is
-// the FAMILY manifest's model for the requested tier (relational — the value
-// itself is pinned once, above). Both the canonical tier and its legacy alias
-// launch the same model.
 func TestLaunch_Codex_ResolvesTierViaFamilyManifest(t *testing.T) {
 	want := codexFamilyManifest(t).ModelTierMap["deep"]
 	for _, tier := range []string{"deep", "opus"} {
@@ -174,13 +133,8 @@ func TestLaunch_Codex_ResolvesTierViaFamilyManifest(t *testing.T) {
 	}
 }
 
-// TestLaunch_Codex_ManifestUnavailable_OmitsModelFlag covers the driver's
-// degradation when the family manifest cannot load — the realistic trigger is
-// a corrupt operator override in bridgeManifestDir() (`bridge add-rule` writes
-// there and loadManifestRaw does NOT fall back to the embedded copy on a parse
-// error). The tier then stays untranslated, the vocabulary guard omits -m (the
-// CLI default beats a fatal `-m deep` boot — the cycle-378 class), and the
-// WARN names the cause.
+// The realistic trigger is a corrupt operator override in bridgeManifestDir(): loadManifestRaw does not fall
+// back to the embedded copy on a parse error. The CLI default beats a fatal `-m deep` boot.
 func TestLaunch_Codex_ManifestUnavailable_OmitsModelFlag(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "codex-tmux.json"), []byte("{not json"), 0o644); err != nil {
@@ -206,10 +160,7 @@ func TestLaunch_Codex_ManifestUnavailable_OmitsModelFlag(t *testing.T) {
 	}
 }
 
-// TestCodexFamilyManifest_AstraIsNotSelectable — 2026-09-10 cost directive:
-// gpt-6-astra must not be reachable by accident. It is out of the tier table
-// AND out of the subscription clamp's safe set, so even a stray pin to it is
-// rewritten to the family default instead of burning the subscription.
+// gpt-6-astra is out of the tier table and the clamp's safe set, so even a stray pin is rewritten to the family default.
 func TestCodexFamilyManifest_AstraIsNotSelectable(t *testing.T) {
 	m := codexFamilyManifest(t) // raw: a stale live catalog must not mask a manifest regression
 	for tier, model := range m.ModelTierMap {

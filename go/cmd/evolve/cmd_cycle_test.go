@@ -15,10 +15,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// cmd_cycle_test.go — `evolve cycle reset` seals an unfinished cycle
-// (history preserved) and advances the cycle number. Mirrors the
-// flag-parsing + temp-dir conventions of the other cmd_*_test.go files.
-
 func TestParseGateStage(t *testing.T) {
 	for input, want := range map[string]config.Stage{
 		"off":     config.StageOff,
@@ -56,10 +52,6 @@ func seedResetDir(t *testing.T, cycleID, lastCycle int) (projectRoot, evolveDir 
 	return projectRoot, evolveDir
 }
 
-// TestResolveRouterDispatch_Precedence pins the advisor's {cli,model} resolution
-// order — policy.RouterPolicy (rc) > profile (router.json) > opus/claude-tmux
-// fallback — the same precedence a phase uses, so the routing brain is configurable
-// to any LLM CLI via policy.json rather than env vars.
 func TestResolveRouterDispatch_Precedence(t *testing.T) {
 	t.Parallel()
 	writeRouterProfile := func(t *testing.T, dir, cli, tier string) {
@@ -128,10 +120,6 @@ func TestResolveRouterDispatch_Precedence(t *testing.T) {
 	})
 }
 
-// TestCycleContext_GoalOnlyWhenGiven pins that a supplied --goal becomes
-// Context["goal"] (the convention Scout + the routing advisor read; NOT
-// Context["strategy"], the strategy mode), while omitting it preserves the prior
-// behavior (no goal key). commit_message is always present.
 func TestCycleContext_GoalOnlyWhenGiven(t *testing.T) {
 	t.Parallel()
 	withGoal := cycleContext("abc12345", "redesign the auth subsystem")
@@ -200,13 +188,6 @@ func TestRunCycleReset_Seals(t *testing.T) {
 	}
 }
 
-// TestRunCycleReset_HeldLockAloneDoesNotBlock pins the cycle-395 fix direction:
-// holding the coarse .evolve/.lock WITHOUT a fresh run lease must NOT block a
-// reset. The old lock pre-check was a false negative — the dispatcher's lock is
-// per-CYCLE (released between cycles), so a sibling acquired it in the gap and
-// sealed a running loop. Liveness is now the per-run lease (the FRESH-lease
-// refusal is covered by TestRunCycleReset_LeaseFencing); a held lock with no
-// proof-of-life owner does not gate the seal.
 func TestRunCycleReset_HeldLockAloneDoesNotBlock(t *testing.T) {
 	projectRoot, evolveDir := seedResetDir(t, 108, 107)
 	// Hold the .evolve lock; write NO lease (no live owner is proven).
@@ -242,8 +223,6 @@ func TestRunCycleReset_NothingToReset(t *testing.T) {
 	}
 }
 
-// --- helpers (test-local) ---
-
 func itoaT(n int) string {
 	return strconv.Itoa(n)
 }
@@ -269,10 +248,6 @@ func readJSONT(t *testing.T, path string) map[string]any {
 	return m
 }
 
-// TestParseRouterStage_LadderAndUnknown is the missing twin of TestParseGateStage
-// (ADR-0103 unit 08): the router ladder accepts advisory, trims, and maps an
-// unknown word to off silently — the mapping cmd_cycle.go:700 and
-// cmd_loop_preflight.go:32 keep through the seam's forwarders.
 func TestParseRouterStage_LadderAndUnknown(t *testing.T) {
 	for input, want := range map[string]config.Stage{
 		"off":      config.StageOff,

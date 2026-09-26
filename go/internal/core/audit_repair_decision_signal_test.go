@@ -9,12 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// Cycle 1684 (2026-09-15): the audit FAILed with an invented class, the retry
-// envelope declined the repair round ("unrecognised class"), and the cycle
-// went to retro with NO line anywhere — the decision that costs a full
-// retrospective before any retry was invisible. The decision is a coded signal on
-// both branches: WARN when declined (the reason is the envelope's), INFO when
-// a repair round is granted (which phase, which attempt).
 func TestDecideAfterAuditFail_EmitsTheRepairDecision(t *testing.T) {
 	auditReport := func(class string) string {
 		return "# Audit\n\n## Verdict\nFAIL\n\n" + phasecontract.RenderVerdictSentinelWithFailure("audit", "FAIL",

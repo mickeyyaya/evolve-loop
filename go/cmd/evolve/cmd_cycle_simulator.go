@@ -10,7 +10,6 @@ import (
 )
 
 // runCycleSimulator is the `evolve cycle-simulator <cycle> <workspace>` subcommand.
-// Ports legacy/scripts/dispatch/cycle-simulator.sh.
 func runCycleSimulator(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	var pos []string
 	for _, a := range args {
@@ -32,7 +31,6 @@ func runCycleSimulator(args []string, _ io.Reader, stdout, stderr io.Writer) int
 		fmt.Fprintf(stderr, "[simulator] cycle must be integer, got: %s\n", pos[0])
 		return cyclesimulator.ExitRuntimeErr
 	}
-	// envOrCwd absolutizes a relative $EVOLVE_PROJECT_ROOT (cycle-119 class).
 	projectRoot := envOrCwd("EVOLVE_PROJECT_ROOT")
 	pluginRoot := os.Getenv("EVOLVE_PLUGIN_ROOT")
 	if pluginRoot == "" {

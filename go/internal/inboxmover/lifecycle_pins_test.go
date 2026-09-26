@@ -1,12 +1,5 @@
 package inboxmover
 
-// lifecycle_pins_test.go — ADR-0103 unit 06 step 0: the order invariants and
-// preserved quirks of the lifecycle movers, pinned on the pre-extraction code
-// (green on 8e8f080f, each proven red by its named mutant) and kept green
-// through the leaf's facades. Every fixture that needs a filesystem fault uses
-// a FILE where a directory is expected or a DIRECTORY where a file is expected
-// (root-proof); the one chmod fixture asserts the fault actually happened.
-
 import (
 	"bytes"
 	"context"
@@ -38,9 +31,6 @@ func readItemFailureCount(t *testing.T, path string) int {
 	return doc.FailureCount
 }
 
-// Test 6 — Claim checks console routing BEFORE the cycle number (Q5): a bad
-// cycle on a console-routed item reports ErrConsoleRouted; on a dispatchable
-// item it reports ErrBadArgs and leaves the file where it was.
 func TestClaim_ConsoleRouteCheckPrecedesCycleValidation(t *testing.T) {
 	repo := makeRepo(t)
 	inbox := filepath.Join(repo, ".evolve", "inbox")
@@ -58,10 +48,7 @@ func TestClaim_ConsoleRouteCheckPrecedesCycleValidation(t *testing.T) {
 	}
 }
 
-// Test 7 — ReleaseFromQuarantine resets the counter BEFORE the rename (Q4): a
-// failed rename leaves a zeroed item in quarantine/. The inbox root is made
-// non-writable AFTER the stat guard can pass; the tmp write of the reset lives
-// in quarantine/, which stays writable.
+// The locked root fails only the rename: the reset's tmp write lives in quarantine/, which stays writable.
 func TestReleaseFromQuarantine_CounterResetPrecedesRename(t *testing.T) {
 	repo := makeRepo(t)
 	inbox := filepath.Join(repo, ".evolve", "inbox")
@@ -81,7 +68,6 @@ func TestReleaseFromQuarantine_CounterResetPrecedesRename(t *testing.T) {
 	}
 }
 
-// recordingAppender captures every lifecycle record it is handed.
 type recordingAppender struct {
 	records  []ledger.LifecycleRecord
 	onAppend func()
@@ -95,8 +81,6 @@ func (r *recordingAppender) AppendLifecycle(_ context.Context, rec ledger.Lifecy
 	return nil
 }
 
-// Test 8 — a promote whose rename fails is (NoOp=true, nil) and ledgers ONE
-// promote-warn line with reason mv-failed and the sha as git head.
 func TestPromote_RenameFails_NoOpNil_LedgersPromoteWarnMvFailed(t *testing.T) {
 	repo := makeRepo(t)
 	dropProcessingFile(t, repo, "5", "task-1.json", "task-1")
@@ -112,8 +96,6 @@ func TestPromote_RenameFails_NoOpNil_LedgersPromoteWarnMvFailed(t *testing.T) {
 	}
 }
 
-// Test 9 — the ledger From path keeps its two quirks (Q1): a root item records
-// .evolve/inbox/inbox/<base>; a processing item drops its cycle-N segment.
 func TestPromote_LedgerFromPath_PreservesInboxInboxQuirk(t *testing.T) {
 	repo := makeRepo(t)
 	dropInboxFile(t, repo, "r.json", "r")
@@ -137,7 +119,6 @@ func TestPromote_LedgerFromPath_PreservesInboxInboxQuirk(t *testing.T) {
 	}
 }
 
-// Test 11 — RecoverOrphans clobbers a root twin (Q6): no double-move guard.
 func TestRecoverOrphans_ClobbersExistingRootCopy(t *testing.T) {
 	repo := makeRepo(t)
 	dropInboxFile(t, repo, "dup.json", "dup-original")
@@ -152,8 +133,6 @@ func TestRecoverOrphans_ClobbersExistingRootCopy(t *testing.T) {
 	}
 }
 
-// Test 12 — an erroring ActiveCycleFn is swallowed into "-1": every processing
-// dir recovers, the live one included (Q6).
 func TestRecoverOrphans_UnreadableCycleState_RecoversTheLiveDir(t *testing.T) {
 	repo := makeRepo(t)
 	dropProcessingFile(t, repo, "1", "a.json", "a")
@@ -164,9 +143,7 @@ func TestRecoverOrphans_UnreadableCycleState_RecoversTheLiveDir(t *testing.T) {
 	}
 }
 
-// Test 13 — a bump that cannot rewrite the item (a directory at the atomic
-// rewrite's tmp path, so the item's id still resolves) falls open to a plain
-// release: not quarantined, no promote ledger line.
+// A directory at the rewrite's tmp path fails the bump while the item's id still resolves.
 func TestDrain_BumpFailure_FallsOpenToRelease(t *testing.T) {
 	repo := makeRepo(t)
 	inbox := filepath.Join(repo, ".evolve", "inbox")
@@ -191,8 +168,6 @@ func TestDrain_BumpFailure_FallsOpenToRelease(t *testing.T) {
 	}
 }
 
-// Test 15 — the stale usage text omits quarantine (Q2) while validStates
-// accepts it.
 func TestPromote_BadState_MessageStillOmitsQuarantine_AndQuarantineIsValid(t *testing.T) {
 	repo := makeRepo(t)
 	dropProcessingFile(t, repo, "5", "task-1.json", "task-1")
@@ -209,10 +184,6 @@ func TestPromote_BadState_MessageStillOmitsQuarantine_AndQuarantineIsValid(t *te
 	}
 }
 
-// Test 16 — the promote tail's order: the INFO line, then the retire hook's
-// line, then the ledger append; the reason override lands BEFORE the hook so
-// the preserved pointer and the ledger carry one word; a NoOp promote prints
-// no retire line.
 func TestPromote_InfoThenRetireThenLedger_Order(t *testing.T) {
 	root := t.TempDir()
 	seedRootItem(t, root, "task-r")
@@ -250,9 +221,6 @@ func TestPromote_InfoThenRetireThenLedger_Order(t *testing.T) {
 	}
 }
 
-// Test 17 — ProjectRoot-less Options (lane_menu.go's PruneConsumed shape and
-// the failure-count probe) never write under the working directory: every
-// default is derived lazily and nothing is created on a read-only path.
 func TestReadFailureCount_ProjectRootlessOptionsNeverWriteUnderCwd(t *testing.T) {
 	cwd, err := os.Getwd()
 	if err != nil {

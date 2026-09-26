@@ -1,18 +1,5 @@
 package phasespec
 
-// repo_phaseconfigs_test.go — authoring-time guard for the repo's tracked
-// phase catalog (cycle-263 incident). The cycle-241 declared-semantics
-// rejection deliberately FAILs any phase whose classify rules carry
-// fail_if_signal (the Stage-3 signal bus does not exist, so the gate is
-// inert — silently passing it would let an authoring mistake reach runtime
-// undetected). Correct invariant, wrong enforcement boundary: 15 catalog
-// phases shipped WITH the inert gate, so the rejection fired mid-cycle on
-// first router insertion (adversarial-review in cycle-263 — a perfect PASS
-// report recorded as FAIL, cycle dead, ~$ and ~30 min burned). This test
-// moves the same invariant to CI: a mis-authored phase config fails the
-// BUILD, never a production cycle. Delete this test when the Stage-3 signal
-// bus lands and EvaluateClassify actually evaluates the gate.
-
 import (
 	"encoding/json"
 	"os"
@@ -28,9 +15,6 @@ func TestRepoPhaseCatalog_NoInertFailIfSignal(t *testing.T) {
 	if err != nil {
 		t.Skipf("phase catalog not present at %s: %v", dir, err)
 	}
-	// Bind only git-TRACKED phase dirs: untracked dirs are runtime/local
-	// state that can never reach a CI checkout (cd49274beab2 class); nil
-	// tracked set = no usable git context = bind all (stricter fallback).
 	tracked := TrackedPhaseDirs(t, root)
 	checked := 0
 	for _, e := range entries {
@@ -44,7 +28,7 @@ func TestRepoPhaseCatalog_NoInertFailIfSignal(t *testing.T) {
 		path := filepath.Join(dir, e.Name(), "phase.json")
 		data, rerr := os.ReadFile(path)
 		if rerr != nil {
-			continue // phase dirs without phase.json are someone else's problem
+			continue
 		}
 		var cfg struct {
 			Classify *ClassifyRules `json:"classify"`
@@ -63,19 +47,9 @@ func TestRepoPhaseCatalog_NoInertFailIfSignal(t *testing.T) {
 	}
 }
 
-// TestRepoPhaseCatalog_VerdictFromSentinelStageIsKnown catches a typo'd rollout
-// stage at AUTHORING time rather than mid-cycle.
-//
-// EvaluateClassify hard-FAILs an unknown verdict_from_sentinel word on purpose
-// (an inert gate must fail loudly, cycle-241) — but discovering that from a
-// dead cycle costs a dispatch and an operator's afternoon. This is the same
-// belt-and-braces pairing the fail_if_signal guard above already uses: the
-// runtime rejection is the floor, this is the tripwire.
 func TestRepoPhaseCatalog_VerdictFromSentinelStageIsKnown(t *testing.T) {
 	t.Parallel()
-	// Mirrors specrunner's stage words. Duplicated as literals rather than
-	// imported because phasespec is the LEAF here — specrunner imports it, so
-	// importing back would cycle.
+	// Copies specrunner's stage words: specrunner imports phasespec, so importing them back would cycle.
 	known := map[string]bool{"": true, "shadow": true, "enforce": true}
 	eachTrackedPhaseClassify(t, func(path string, c *ClassifyRules) {
 		if c != nil && !known[c.VerdictFromSentinel] {
@@ -84,9 +58,7 @@ func TestRepoPhaseCatalog_VerdictFromSentinelStageIsKnown(t *testing.T) {
 	})
 }
 
-// eachTrackedPhaseClassify calls fn for every git-TRACKED phase.json in the repo
-// catalog, skipping the run when the catalog is absent (layout moved) — the walk
-// the catalog guards share instead of copying.
+// eachTrackedPhaseClassify calls fn with each git-tracked phase.json's classify rules, skipping when the catalog is absent.
 func eachTrackedPhaseClassify(t *testing.T, fn func(path string, c *ClassifyRules)) {
 	t.Helper()
 	root := filepath.Join("..", "..", "..")

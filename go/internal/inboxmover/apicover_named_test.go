@@ -19,9 +19,6 @@ func seedInbox(t *testing.T, taskID string) (root, inboxDir string) {
 	return root, inboxDir
 }
 
-// TestClaimResult_NamesAndMovesToProcessing names the ClaimResult type and pins
-// that Claim records the src/dest paths AND physically relocates the task into
-// processing/cycle-N/.
 func TestClaimResult_NamesAndMovesToProcessing(t *testing.T) {
 	root, inboxDir := seedInbox(t, "task-a")
 
@@ -45,9 +42,6 @@ func TestClaimResult_NamesAndMovesToProcessing(t *testing.T) {
 	}
 }
 
-// TestPromoteResult_NamesNoOpWhenMissing names PromoteResult and pins the
-// ship.sh-compat contract: promoting a missing task is a no-op (NoOp=true, no
-// error, empty paths) rather than a failure.
 func TestPromoteResult_NamesNoOpWhenMissing(t *testing.T) {
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, ".evolve", "inbox"), 0o755); err != nil {
@@ -67,9 +61,6 @@ func TestPromoteResult_NamesNoOpWhenMissing(t *testing.T) {
 	}
 }
 
-// TestSupersededInboxIDs_NamesDedupAndTolerance names SupersededInboxIDs and
-// pins that it dedups/order-preserves the top-level "superseded" array and
-// returns empty (never panics) on an absent field or invalid JSON.
 func TestSupersededInboxIDs_NamesDedupAndTolerance(t *testing.T) {
 	got := SupersededInboxIDs([]byte(`{"superseded":["a","b","a"]}`))
 	if len(got) != 2 || got[0] != "a" || got[1] != "b" {
@@ -83,9 +74,6 @@ func TestSupersededInboxIDs_NamesDedupAndTolerance(t *testing.T) {
 	}
 }
 
-// TestReconcileSuperseded_NamesRetireByIDAndNoOp names ReconcileSuperseded and
-// pins its two load-bearing properties: a present id is retired by id alone
-// (file leaves the inbox root), and an absent id is a clean idempotent no-op.
 func TestReconcileSuperseded_NamesRetireByIDAndNoOp(t *testing.T) {
 	root, inboxDir := seedInbox(t, "orphan-x")
 
@@ -109,8 +97,6 @@ func TestReconcileSuperseded_NamesRetireByIDAndNoOp(t *testing.T) {
 	}
 }
 
-// TestRecoverResult_NamesAndCountsOrphans names RecoverResult and pins that an
-// orphan under an inactive cycle is recovered back to the inbox root and counted.
 func TestRecoverResult_NamesAndCountsOrphans(t *testing.T) {
 	root := t.TempDir()
 	inboxDir := filepath.Join(root, ".evolve", "inbox")

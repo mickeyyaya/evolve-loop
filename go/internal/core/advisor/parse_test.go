@@ -1,8 +1,5 @@
 package advisor
 
-// parse_test.go — the pure parsers (ADR-0103 unit 04 §6 tests 22-24, 26, 36,
-// 37; the core scrollback/failure/replay/tier tests moved verbatim in intent).
-
 import (
 	"os"
 	"path/filepath"
@@ -14,10 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// Test 22 — the proposal parser takes the LAST balanced object (the reply,
-// not the prompt's echoed example), tolerates a fence and prose, accepts a
-// failure-fields-only proposal, and rejects the empty/absent/malformed ones
-// with the pre-extraction texts.
 func TestParseProposal_LastBalancedObjectFenceProseAndEmptyRules(t *testing.T) {
 	scrollback := `Respond with STRICT JSON:
 {"next_phase":"<phase>","insert_phases":["<phase>"],"justification":"<one sentence>"}
@@ -54,10 +47,6 @@ func TestParseProposal_LastBalancedObjectFenceProseAndEmptyRules(t *testing.T) {
 	}
 }
 
-// Test 23 — the plan parser sanitizes tiers, defaults writes_source, collects
-// run:false mints, reports the reserved-name drops as DATA (the original name
-// quoted in the reason) and rejects the empty/absent/malformed bodies; the
-// routing-eval corpus parses exactly as before.
 func TestParsePhasePlan_SanitizesTiersAndReportsRejectedMintsAsData(t *testing.T) {
 	raw := `[
 	  {"phase":"scout","run":true,"justification":"fresh","tier":"opus","cli":"claude"},
@@ -126,13 +115,7 @@ func TestParsePhasePlan_SanitizesTiersAndReportsRejectedMintsAsData(t *testing.T
 	})
 }
 
-// Test 24 — exactly the four canonical tiers survive; aliases, raw models and
-// garbage drop to "". SanitizeTier PROJECTS modelcatalog.CanonicalTiers (the
-// vocabulary's one home — the catalog is stdlib-only, so the import is
-// free); the literal lists here are the consumer pin: a tier added to or
-// removed from the catalog turns this red instead of silently widening or
-// narrowing what the advisor may propose. The source pin keeps the leaf from
-// growing a second spelling of the four (review fold, arch HIGH-1).
+// The literal tier lists are deliberate: a catalog change turns this red instead of silently changing what the advisor may propose.
 func TestSanitizeTier_KeepsExactlyTheFourCanonicalTiers(t *testing.T) {
 	for _, good := range []string{"fast", "balanced", "deep", "top"} {
 		if SanitizeTier(good) != good {
@@ -156,9 +139,6 @@ func TestSanitizeTier_KeepsExactlyTheFourCanonicalTiers(t *testing.T) {
 	}
 }
 
-// Test 36 — the last-balanced-span scanner is string-literal aware and
-// returns the LAST top-level span; the plan parser ignores the prompt's
-// echoed example and leaves a clean body unchanged.
 func TestLastBalancedSpan_StringLiteralAwareLastSpanWins(t *testing.T) {
 	cases := []struct {
 		name               string
@@ -212,8 +192,6 @@ func TestParsePhasePlan_CleanBodyUnchanged(t *testing.T) {
 	}
 }
 
-// Test 37 — replay equals parse + the real floor clamp; an unparseable
-// capture is a loud error; a reserved-name mint is dropped silently.
 func TestReplayPlanFromResponse_EqualsParsePlusClampAndDropsAreSilent(t *testing.T) {
 	raw := `[{"phase":"audit","run":false,"justification":"skip"},{"phase":"ship","run":true,"justification":"done"},{"phase":"router","run":true,"mint":{"prompt":"x"}}]`
 	in := router.RouteInput{}

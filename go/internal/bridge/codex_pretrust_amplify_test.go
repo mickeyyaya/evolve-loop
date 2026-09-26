@@ -1,14 +1,3 @@
-// codex_pretrust_amplify_test.go — Cycle-1 test-amplification adversarial tests.
-//
-// These probe invariants orthogonal to the TDD 2-goroutine regression guard:
-//   - 3-goroutine concurrent pretrust (all entries survive, not just 2)
-//   - Pre-seeded file preservation under concurrent writes
-//   - Same-path idempotency under concurrent writes (no duplicate sections)
-//   - High-stress 10-goroutine scenario under -race
-//
-// Anti-bias: written from the specification only; implementation not read.
-// Run with -race to exercise the flock.WithPathLock serialization path.
-
 package bridge
 
 import (
@@ -20,11 +9,6 @@ import (
 	"testing"
 )
 
-// TestPretrustCodexProjects_Concurrent_ThreeGoroutines_AllSurvive verifies
-// that a third goroutine's entry is not dropped under the 2-goroutine flock
-// pattern. The 2-goroutine test guards against the original lost-update race;
-// this test guards against a hypothetical "second writer wins, third ignored"
-// regression that a 2-goroutine test would miss.
 func TestPretrustCodexProjects_Concurrent_ThreeGoroutines_AllSurvive(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.toml")
@@ -72,7 +56,6 @@ func TestPretrustCodexProjects_Concurrent_ThreeGoroutines_AllSurvive(t *testing.
 			t.Errorf("entry %q missing from final file:\n%s", h, content)
 		}
 	}
-	// Guard against duplicated sections (another failure mode).
 	for _, h := range wantHeaders {
 		if n := strings.Count(content, h); n != 1 {
 			t.Errorf("entry %q appears %d times (want 1):\n%s", h, n, content)
@@ -80,22 +63,16 @@ func TestPretrustCodexProjects_Concurrent_ThreeGoroutines_AllSurvive(t *testing.
 	}
 }
 
-// TestPretrustCodexProjects_Concurrent_PreSeededFileSurvives asserts that
-// a pre-existing trust entry is not evicted when two goroutines concurrently
-// add new entries. A lost-update regression in the read-modify-write cycle
-// would silently drop the pre-seeded entry.
 func TestPretrustCodexProjects_Concurrent_PreSeededFileSurvives(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.toml")
 
-	// Seed a single entry first, outside the concurrent section.
 	seed := &Config{Worktree: "/amp/wt-seed", codexConfigPath: path}
 	if err := pretrustCodexProjects(seed); err != nil {
 		t.Fatalf("seed pretrustCodexProjects: %v", err)
 	}
 	seedHeader := codexProjectHeader(seed.Worktree)
 
-	// Now concurrently add two more entries.
 	concurrent := []*Config{
 		{Worktree: "/amp/wt-concurrent-A", codexConfigPath: path},
 		{Worktree: "/amp/wt-concurrent-B", codexConfigPath: path},
@@ -127,11 +104,9 @@ func TestPretrustCodexProjects_Concurrent_PreSeededFileSurvives(t *testing.T) {
 	}
 	content := string(got)
 
-	// Original seeded entry must survive.
 	if !strings.Contains(content, seedHeader) {
 		t.Errorf("pre-seeded entry %q lost from file after concurrent writes:\n%s", seedHeader, content)
 	}
-	// Both concurrent entries must also survive.
 	for _, c := range concurrent {
 		h := codexProjectHeader(c.Worktree)
 		if !strings.Contains(content, h) {
@@ -140,10 +115,6 @@ func TestPretrustCodexProjects_Concurrent_PreSeededFileSurvives(t *testing.T) {
 	}
 }
 
-// TestPretrustCodexProjects_Concurrent_SamePath_NoDuplicateSection verifies
-// idempotency under contention: two goroutines pretrustCodexProjects the
-// SAME worktree path. The flock-protected RMW must produce exactly ONE
-// [projects."<path>"] section — not zero (lost-update) and not two (double-write).
 func TestPretrustCodexProjects_Concurrent_SamePath_NoDuplicateSection(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.toml")
@@ -184,11 +155,6 @@ func TestPretrustCodexProjects_Concurrent_SamePath_NoDuplicateSection(t *testing
 	}
 }
 
-// TestPretrustCodexProjects_Concurrent_HighStress_TenGoroutines runs 10
-// goroutines with distinct worktree paths under a start-barrier, then asserts
-// all 10 entries are present in the final file exactly once. This stresses
-// the flock serialization queue beyond the 2- and 3-goroutine scenarios and
-// exercises the OS file-lock fairness properties.
 func TestPretrustCodexProjects_Concurrent_HighStress_TenGoroutines(t *testing.T) {
 	const n = 10
 	dir := t.TempDir()
@@ -234,10 +200,6 @@ func TestPretrustCodexProjects_Concurrent_HighStress_TenGoroutines(t *testing.T)
 	}
 }
 
-// TestPretrustCodexProjects_Concurrent_MultiRoundTwoGoroutines runs the
-// 2-goroutine scenario for 20 rounds, each with a fresh temp file, amplifying
-// the probability of exposing a non-deterministic lost-update that the
-// original 5-count single-file run might miss in favorable scheduling windows.
 func TestPretrustCodexProjects_Concurrent_MultiRoundTwoGoroutines(t *testing.T) {
 	const rounds = 20
 	for round := range rounds {

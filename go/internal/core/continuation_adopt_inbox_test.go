@@ -1,19 +1,12 @@
 package core_test
 
-// continuation_adopt_inbox_test.go — injects the REAL inboxmover functions
-// into package core's continuation-adopt tests (RealInboxForTest). The
-// external test package is the legal home for this import: core_test →
-// inboxmover → adapters/ledger → core is acyclic, while the same import from
-// an in-package test file is a cycle (the chained-ledger fix made inboxmover
-// depend on core transitively). init runs before any test in the shared test
-// binary, so the hooks are always set.
-
 import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 )
 
+// Only this external test package can import inboxmover without an import cycle.
 func init() {
 	core.RealInboxForTest.Resolve = func(root string, cycle int) *continuation.Continuation {
 		return inboxmover.ResolveContinuation(inboxmover.Options{ProjectRoot: root}, cycle)

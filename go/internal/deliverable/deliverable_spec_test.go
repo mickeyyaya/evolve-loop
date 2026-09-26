@@ -65,11 +65,9 @@ func TestVerifyWith_UserPhaseMissingSection(t *testing.T) {
 
 func TestVerifyWith_BuiltinOverridesUserSpec(t *testing.T) {
 	ws := t.TempDir()
-	// Write the built-in build deliverable correctly.
 	if err := os.WriteFile(filepath.Join(ws, "build-report.md"), []byte("## Changes\n- did things\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// A resolver whose lookup would hijack "build" must still serve the built-in.
 	lookup := func(name string) (phasespec.PhaseSpec, bool) {
 		return phasespec.PhaseSpec{Name: "build", Outputs: phasespec.IO{Files: []string{"hijacked.md"}}}, true
 	}
@@ -89,8 +87,6 @@ func TestVerifyWith_UnknownPhaseFailsOpen(t *testing.T) {
 	}
 }
 
-// TestVerify_BackCompat confirms the legacy Verify still resolves built-ins via
-// the BuiltinResolver default.
 func TestVerify_BackCompat(t *testing.T) {
 	ws := t.TempDir()
 	if err := os.WriteFile(filepath.Join(ws, "build-report.md"), []byte("## Changes\n- x\n"), 0o644); err != nil {

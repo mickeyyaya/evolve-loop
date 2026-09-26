@@ -7,17 +7,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// Phase 3.8 (ADR-0050): the structured-failure-block requirement — enforced
-// today only for audit via the unconditional Contract.RequireFailureContext —
-// is generalized to build/scout/triage, but gated on the EVOLVE_PHASE_IO dial
-// so it is byte-identical (dormant) until enforce. A non-audit phase that
-// self-reports a FAIL/WARN verdict sentinel WITHOUT a structured failure block
-// is a violation ONLY at PhaseIO>=enforce; at off/shadow/advisory it does not
-// fire. PASS sentinels and legacy prose-only artifacts stay legal forever.
-
-// phaseioFailFixtures maps each generalized phase to its artifact name and one
-// required section, so a fixture report is section-complete and the ONLY
-// possible violation is the failure-context one.
+// phaseioFailFixtures give each phase one required section, so the failure-context check is the only possible violation.
 var phaseioFailFixtures = map[string]struct {
 	artifact string
 	section  string
@@ -27,9 +17,7 @@ var phaseioFailFixtures = map[string]struct {
 	"triage": {"triage-report.md", "## top_n"},
 }
 
-// failReport returns a section-complete <phase> report whose verdict sentinel
-// declares FAIL. withBlock controls whether the structured failure block is
-// present.
+// failReport returns a section-complete FAIL report, with or without the structured failure block.
 func failReport(phase, section string, withBlock bool) string {
 	var line string
 	if withBlock {
@@ -75,9 +63,6 @@ func TestVerifyWithStage_NonAuditFailWithoutBlock_DormantBelowEnforce(t *testing
 	}
 }
 
-// WARN is a first-class gated verdict too — the clause checks (FAIL || WARN), so
-// a WARN-without-block sentinel must also block at enforce. Without this, the
-// `|| s.Verdict == "WARN"` disjunction is an untested surviving mutant.
 func TestVerifyWithStage_NonAuditWarnWithoutBlock_BlocksAtEnforce(t *testing.T) {
 	for phase, fx := range phaseioFailFixtures {
 		t.Run(phase, func(t *testing.T) {
@@ -111,8 +96,6 @@ func TestVerifyWithStage_NonAuditFailWithBlock_OKAtEnforce(t *testing.T) {
 	}
 }
 
-// PASS sentinels never require a failure block, even at enforce — only FAIL/WARN
-// bites (the registry comment's "never false-block" invariant for these phases).
 func TestVerifyWithStage_NonAuditPass_OKAtEnforce(t *testing.T) {
 	for phase, fx := range phaseioFailFixtures {
 		t.Run(phase, func(t *testing.T) {
@@ -130,9 +113,6 @@ func TestVerifyWithStage_NonAuditPass_OKAtEnforce(t *testing.T) {
 	}
 }
 
-// VerifyWith is exactly VerifyWithStage at StageOff — the byte-identical default
-// that keeps every existing caller (and the `evolve phase verify` self-check)
-// unchanged.
 func TestVerifyWith_EqualsStageOff(t *testing.T) {
 	ws := t.TempDir()
 	writeFile(t, ws, "build-report.md", failReport("build", "## Changes", false))
@@ -150,8 +130,6 @@ func TestVerifyWith_EqualsStageOff(t *testing.T) {
 	}
 }
 
-// Audit's unconditional RequireFailureContext is independent of the PhaseIO dial
-// — it still fires at StageOff (byte-identical to pre-3.8).
 func TestVerifyWithStage_AuditFailWithoutBlock_FiresRegardlessOfStage(t *testing.T) {
 	for _, stage := range []config.Stage{config.StageOff, config.StageEnforce} {
 		ws := t.TempDir()

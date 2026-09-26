@@ -12,24 +12,9 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 )
 
-// runCompose implements `evolve compose --phases <list>`. v12.1
-// Capability 2: ad-hoc phase composition that bypasses
-// core.StateMachine.CanTransition for re-audit / mix-and-match runs.
-//
-// Each phase in --phases is run sequentially via the same factory the
-// orchestrator uses. The state machine is NOT consulted; the kernel
-// `evolve guard phase` hook downgrades from BLOCK to WARN when
-// PhaseRequest.ComposePhases is true (set automatically by this subcommand).
-//
-// Ship safety: if "ship" appears in --phases without --ship-anyway,
-// refuse early (the ship gate still enforces at the OS layer, but
-// catching it here gives a friendlier error).
-//
-// Exit codes:
-//   - 0  every phase PASS
-//   - 1  at least one phase FAIL
-//   - 2  invalid composition (e.g., ship without --ship-anyway)
-//   - 10 bad args
+// runCompose runs the named phases in order through the orchestrator's
+// factories without consulting the state machine. It exits 1 when any phase
+// fails, 2 for ship without --ship-anyway, and 10 on bad arguments.
 func runCompose(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("compose", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -49,7 +34,6 @@ func runCompose(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "evolve compose: --phases produced empty list after trimming")
 		return 10
 	}
-	// Validate every phase name is registered.
 	known := registry.Names()
 	knownSet := map[string]bool{}
 	for _, n := range known {
@@ -62,7 +46,7 @@ func runCompose(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			return 10
 		}
 	}
-	// Ship-safety guard.
+	// The ship gate still enforces; refusing here gives a clearer error.
 	for _, p := range phases {
 		if p == string(core.PhaseShip) && !*shipAnyway {
 			fmt.Fprintln(stderr, "evolve compose: refusing to compose 'ship' without --ship-anyway")
@@ -70,8 +54,7 @@ func runCompose(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		}
 	}
 
-	// Parse the phase-request envelope from stdin (same shape as
-	// `evolve phase`).
+	// stdin carries the same request envelope as `evolve phase`.
 	body, err := io.ReadAll(stdin)
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve compose: read stdin: %v\n", err)
@@ -85,7 +68,7 @@ func runCompose(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		}
 	}
 
-	// Signal compose mode via the DI field so the kernel guard can soft-WARN instead of BLOCK.
+	// In compose mode the kernel phase guard warns instead of blocking.
 	req.ComposePhases = true
 
 	fmt.Fprintf(stdout, "[compose] sequence: %s\n", strings.Join(phases, " -> "))
@@ -100,7 +83,6 @@ func runCompose(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		runner := factory(req)
 		fmt.Fprintf(stdout, "[compose] %d/%d running %s\n", i+1, len(phases), p)
 		resp, runErr := runner.Run(context.Background(), req)
-		// Marshal the per-phase response for operator inspection.
 		out, _ := json.MarshalIndent(resp, "  ", "  ")
 		fmt.Fprintf(stdout, "  %s\n", out)
 		if runErr != nil {
@@ -120,8 +102,6 @@ func runCompose(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	return overall
 }
 
-// splitNonEmptyPhases trims each element and drops empties so the
-// caller can be loose with whitespace.
 func splitNonEmptyPhases(csv string) []string {
 	parts := strings.Split(csv, ",")
 	out := make([]string, 0, len(parts))

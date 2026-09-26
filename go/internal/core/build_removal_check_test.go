@@ -1,29 +1,5 @@
 package core
 
-// build_removal_check_test.go — RED contract for the cycle-1076 task
-// `build-selfcheck-removal-claim-check` (inbox item `tdd-topn-binding-gate`,
-// acceptance criterion 2: "a build report claiming a removal that did not
-// happen fails build-selfcheck deterministically").
-//
-// The cycle-660 incident this pins: build-report.md asserted that orphaned RED
-// scaffolds were "already removed by a concurrent actor" while the files were
-// still present in the worktree, and the false claim passed review undetected.
-//
-// Contract under test (production code is Builder's job — none of it exists at
-// RED time):
-//
-//	func RemovalClaimFailures(ctx context.Context, in ReviewInput) []string
-//
-// It is a BuildFloorCheckFn: it reads the build report from
-// <workspace>/build-report.md (falling back to
-// <workspace>/deliverables/build-report.md), parses every fenced ```json block
-// for an object carrying a "removedPaths" string array, and returns one failure
-// line per claimed path that STILL EXISTS under the worktree. Every ambiguity
-// is fail-open (nil): no workspace/worktree, no report, no parseable block,
-// malformed JSON, empty list, or a path escaping the worktree. It must also be
-// composed into DefaultBuildFloorChecks so a false claim actually REJECTs the
-// build deliverable — the wiring proof, not just the unit.
-
 import (
 	"context"
 	"os"
@@ -32,9 +8,7 @@ import (
 	"testing"
 )
 
-// removalFixture materialises a workspace + worktree pair: report is written to
-// <workspace>/build-report.md (unless empty), and each entry of present is
-// created as a real file under the worktree.
+// removalFixture writes report (unless empty) and creates each present path in the worktree.
 func removalFixture(t *testing.T, report string, present []string) ReviewInput {
 	t.Helper()
 	root := t.TempDir()
@@ -71,9 +45,6 @@ func claimBlock(paths ...string) string {
 		strings.Join(quoted, ", ") + "]}\n```\n"
 }
 
-// TestRemovalClaimFailures covers the whole disposition surface: the negative
-// case (false claim MUST produce a failure — the anti-no-op signal), the
-// positive case (honest removal is silent), and every fail-open edge.
 func TestRemovalClaimFailures(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -169,9 +140,6 @@ func TestRemovalClaimFailures(t *testing.T) {
 	}
 }
 
-// TestRemovalClaimFailures_MissingRootsFailOpen pins the plumbing floor: an
-// unset workspace or worktree can never produce a finding (the reviewer must
-// not false-block a build over its own wiring).
 func TestRemovalClaimFailures_MissingRootsFailOpen(t *testing.T) {
 	for _, in := range []ReviewInput{
 		{Phase: string(PhaseBuild)},
@@ -184,9 +152,6 @@ func TestRemovalClaimFailures_MissingRootsFailOpen(t *testing.T) {
 	}
 }
 
-// TestRemovalClaimFailures_DeliverablesFallback pins the second lookup location:
-// after the correction ladder promotes the report, it lives under
-// <workspace>/deliverables/build-report.md.
 func TestRemovalClaimFailures_DeliverablesFallback(t *testing.T) {
 	in := removalFixture(t, "", []string{"x.go"})
 	dir := filepath.Join(in.Workspace, "deliverables")
@@ -202,10 +167,7 @@ func TestRemovalClaimFailures_DeliverablesFallback(t *testing.T) {
 	}
 }
 
-// TestDefaultBuildFloorChecks_IncludesRemovalClaimCheck is the WIRING proof: the
-// check must run inside the PRODUCTION engine, and must not be short-circuited
-// by the changed-package early returns (a non-git fixture worktree derives zero
-// changed packages, which is exactly the path a false claim would hide behind).
+// A non-git worktree derives zero changed packages, the early return a false claim could hide behind.
 func TestDefaultBuildFloorChecks_IncludesRemovalClaimCheck(t *testing.T) {
 	in := removalFixture(t, claimBlock("go/acs/cycle660/predicates_test.go"), []string{"go/acs/cycle660/predicates_test.go"})
 	got := DefaultBuildFloorChecks(context.Background(), in)
@@ -217,9 +179,6 @@ func TestDefaultBuildFloorChecks_IncludesRemovalClaimCheck(t *testing.T) {
 	}
 }
 
-// TestBuildFloorReviewer_RemovalClaimNotActuallyRemoved is the end-to-end
-// deterministic-failure requirement from the acceptance text: a false removal
-// claim REJECTs the build deliverable, an honest report approves.
 func TestBuildFloorReviewer_RemovalClaimNotActuallyRemoved(t *testing.T) {
 	r := NewBuildFloorReviewer(DefaultBuildFloorChecks)
 

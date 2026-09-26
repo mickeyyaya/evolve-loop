@@ -1,20 +1,5 @@
 package bridge
 
-// apicover_named_test.go — public-API coverage closure (ADR-0050 Phase 5) for
-// the test-support + DTO surface of internal/bridge that no prior test NAMED:
-//
-//   - FakeTmuxController.PaneCommand  — invoked + asserted (was UNCOVERED)
-//   - FakeTmuxController.JiggleWindow — actually CALLED + effect asserted
-//     (was FALSE-GREEN: only mentioned in a render_wedge_test.go comment)
-//   - PaneCommander interface         — satisfaction proven + exercised
-//   - Report / ArtifactRef / FileRef  — bound via the real BuildReport producer
-//   - DoctorReport / DoctorResult / AuthInfo / BinaryInfo / DeepProbe — bound
-//     via the real (*Engine).Doctor producer
-//
-// Each DTO is bound to a producer's OUTPUT (not a bare literal) and the
-// producer-set fields are asserted, so the test verifies real wiring, not type
-// shape alone. The methods are executed so they cannot regress to a false-green.
-
 import (
 	"context"
 	"path/filepath"
@@ -22,10 +7,6 @@ import (
 	"time"
 )
 
-// TestFakeTmuxController_PaneCommand_ReturnsScriptedAndRecords invokes
-// PaneCommand (the previously UNCOVERED PaneCommander method): it must return
-// the scripted PaneCmd value and append a "panecmd" event so callers that drive
-// the boot handshake / post-paste spill check observe the probe in Events.
 func TestFakeTmuxController_PaneCommand_ReturnsScriptedAndRecords(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -43,10 +24,6 @@ func TestFakeTmuxController_PaneCommand_ReturnsScriptedAndRecords(t *testing.T) 
 	}
 }
 
-// TestPaneCommander_SatisfiedAndExercised proves *FakeTmuxController satisfies
-// the exported PaneCommander interface (the optional capability the handshake
-// type-asserts for) and exercises it THROUGH the interface, so a controller
-// that silently dropped the method would fail to compile here.
 func TestPaneCommander_SatisfiedAndExercised(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -61,10 +38,6 @@ func TestPaneCommander_SatisfiedAndExercised(t *testing.T) {
 	}
 }
 
-// TestFakeTmuxController_JiggleWindow_RecordsEffect CALLS JiggleWindow (the
-// previously FALSE-GREEN windowJiggler method — named only in a comment before)
-// and asserts its observable effect: a "jiggle:<session>" event, the signal the
-// blank-pane render-wedge recovery path relies on.
 func TestFakeTmuxController_JiggleWindow_RecordsEffect(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -78,11 +51,6 @@ func TestFakeTmuxController_JiggleWindow_RecordsEffect(t *testing.T) {
 	}
 }
 
-// TestReport_BoundByBuildReport binds Report + ArtifactRef + FileRef to the
-// REAL producer (BuildReport) over a constructed workspace and asserts the
-// producer-derived fields: a present artifact containing the challenge token
-// yields verdict "complete", ArtifactRef.HasChallengeToken true, and a present
-// log file's FileRef carries Exists + a positive SizeBytes.
 func TestReport_BoundByBuildReport(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
@@ -122,10 +90,6 @@ func TestReport_BoundByBuildReport(t *testing.T) {
 	}
 }
 
-// TestReport_TokenMismatchVerdict binds Report + ArtifactRef again through the
-// producer for the negative branch: an artifact present but NOT containing the
-// token file's value yields "incomplete-token-mismatch" with HasChallengeToken
-// false — proving the DTO carries the producer's discriminating state.
 func TestReport_TokenMismatchVerdict(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
@@ -147,10 +111,6 @@ func TestReport_TokenMismatchVerdict(t *testing.T) {
 	}
 }
 
-// TestDoctorReport_BoundByDoctor binds DoctorReport + DoctorResult + AuthInfo +
-// BinaryInfo + DeepProbe to the REAL producer ((*Engine).Doctor) for a single
-// fully-configured claude-p CLI (binary present, credentials file, deep probe
-// passing) and asserts the producer-populated fields of each DTO.
 func TestDoctorReport_BoundByDoctor(t *testing.T) {
 	t.Parallel()
 	home := t.TempDir()
@@ -194,9 +154,6 @@ func TestDoctorReport_BoundByDoctor(t *testing.T) {
 	}
 }
 
-// TestAuthInfo_OllamaOptional binds AuthInfo through the producer for the
-// auth-optional branch: local-only ollama reports Configured=false yet
-// AuthOptional=true, which is exactly what keeps it OFF the "blocked" verdict.
 func TestAuthInfo_OllamaOptional(t *testing.T) {
 	t.Parallel()
 	eng := doctorEngine(map[string]string{"HOME": t.TempDir()}, nil, 0, nil)

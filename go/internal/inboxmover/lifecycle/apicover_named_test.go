@@ -1,11 +1,5 @@
 package lifecycle
 
-// apicover_named_test.go — every export of the leaf named in a package-local
-// test (the apicover gate reads names from _test.go files and executed
-// coverage from the package's own tests): the constructor, the eight Options,
-// SignalsWired, the six Mover methods, the value objects, the sentinels, the
-// fourteen codes, RouteConsoleValue, the console prefix and the four exported primitives.
-
 import (
 	"context"
 	"encoding/json"

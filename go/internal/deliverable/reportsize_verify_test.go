@@ -8,16 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// reportsize_verify_test.go — RED contract for the VerifyWithStage→next-layer
-// threading of the new report-size gate, mirroring exactly how PhaseIO was
-// added as a new layer over VerifyWith (deliverable.go's own precedent) rather
-// than changing VerifyWithStage's signature (which would ripple through every
-// existing caller: cmd_phase_verify.go, reviewer.go, verifier.go,
-// catalogaware.go). VerifyWithReportSize is VerifyWithStage plus one more
-// stage-gated check, exactly as VerifyWithStage is VerifyWith plus phaseIO.
-//
-// RED today: VerifyWithReportSize does not exist (compile failure).
-
 func TestVerifyWithReportSize_ShadowDoesNotViolate_EnforceDoes(t *testing.T) {
 	ws := t.TempDir()
 	big := strings.Repeat("word ", 5000)
@@ -57,11 +47,6 @@ func TestVerifyWithReportSize_UnderBudget_NeverViolates(t *testing.T) {
 	}
 }
 
-// TestVerifyWithReportSize_StageOff_EqualsVerifyWithStage pins byte-identical
-// behavior when the new dial is off (default): VerifyWithReportSize must agree
-// exactly with the pre-existing VerifyWithStage on both OK and Violations, so
-// wiring the new layer in cannot silently change existing gate behavior for
-// every cycle that has not opted into the new gate.
 func TestVerifyWithReportSize_StageOff_EqualsVerifyWithStage(t *testing.T) {
 	ws := t.TempDir()
 	writeFile(t, ws, "build-report.md", "## Changes\n- x\nVerdict: PASS\n")

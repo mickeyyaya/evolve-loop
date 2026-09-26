@@ -1,14 +1,5 @@
 package runner
 
-// verdict_scenarios_test.go — the byte-identity harness of ADR-0103 unit 11
-// (the phase runner's verdict engine): one scenario table drives the response
-// goldens, the probe/sleep-count golden and the stream-sequence pins, so the
-// pre-extraction behaviour of every reconcile/classify arm is captured ONCE on
-// 8e8f080f and replayed through the leaf afterwards. The fixtures are the
-// package's own (fakeHooks, verifiedFrom, artifactTimeoutErr, the ACS-floor
-// workspace, the stale leftover); only the bridge double is new, because the
-// goldens pin CostUSD/Tokens/BootMS/ExitCode on every arm.
-
 import (
 	"context"
 	"encoding/json"
@@ -27,13 +18,9 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
-// goldenBridgeResponse is the fixed bridge response every scenario returns —
-// meaningful on the error arms too (the reconcile literals read
-// CostUSD/Tokens/BootMS after bridgeErr != nil).
+// goldenBridgeResponse is returned on the error arms too, because the reconcile arms read its cost, tokens and boot time.
 var goldenBridgeResponse = core.BridgeResponse{ExitCode: 81, CostUSD: 1.5, Tokens: core.TokenUsage{Input: 42}, BootMS: 7}
 
-// goldenBridge writes fileContent to the dispatched artifact path during Launch
-// (the agent's report) and returns the fixed response with the scripted pane.
 type goldenBridge struct {
 	err         error
 	fileContent string
@@ -58,7 +45,6 @@ func transientErr() error {
 	return fmt.Errorf("bridge: launch exit=%d: %w", 85, core.ErrTransientBridgeFailure)
 }
 
-// verifyKind scripts the deliverable probe of one scenario.
 type verifyKind int
 
 const (
@@ -103,8 +89,6 @@ func (v verifySpec) fn(counts *probeCounts) func(string, phasecontract.Roots) (d
 	}
 }
 
-// verdictScenario is one row of the harness: the inputs of a Run and the
-// error contract the row expects.
 type verdictScenario struct {
 	name      string
 	phase     string
@@ -124,15 +108,12 @@ type verdictScenario struct {
 }
 
 const (
-	// unverifiedReport is longer than the 200-byte acs tail so the forensic
-	// report tail (160 bytes) is a real suffix — a wider tail changes the golden.
+	// unverifiedReport outgrows the 160-byte forensic tail, so the tail is a real suffix; a wider tail changes the golden.
 	unverifiedReport = "# audit\n(partial — no verdict sentinel, no challenge token)\n" +
 		"## Findings\n- one\n- two\n- three\n- four\n- five\n- six\n- seven\n- eight\n- nine\n- ten\n- eleven\n- twelve\n- thirteen\n- fourteen\n- fifteen\n- sixteen\n- seventeen\n- eighteen\n- nineteen\n- twenty\n"
 	panePASS = "pane says PASS\n"
 )
 
-// verdictScenarios is the ONE table: every reconcile and classify arm the
-// unit owns, in the order the response goldens are named.
 func verdictScenarios() []verdictScenario {
 	audit := func(sc verdictScenario) verdictScenario {
 		sc.phase, sc.agent = "audit", "evolve-auditor"
@@ -154,7 +135,6 @@ func verdictScenarios() []verdictScenario {
 	}
 }
 
-// scenarioRun is what one Run of a scenario left behind.
 type scenarioRun struct {
 	ws, wt, root string
 	hooks        *fakeHooks
@@ -163,8 +143,6 @@ type scenarioRun struct {
 	err          error
 }
 
-// runVerdictScenario drives one row through runner.New + Run with the fixed
-// clock and the fixed bridge response; extra options are applied last.
 func runVerdictScenario(t *testing.T, sc verdictScenario, extra ...func(*Options)) *scenarioRun {
 	t.Helper()
 	run := &scenarioRun{ws: t.TempDir(), wt: t.TempDir(), root: t.TempDir()}
@@ -191,8 +169,7 @@ func runVerdictScenario(t *testing.T, sc verdictScenario, extra ...func(*Options
 	return run
 }
 
-// templatePaths replaces the three temp roots with stable tokens so a golden
-// captured on one machine compares on another.
+// templatePaths replaces the temp roots with stable tokens, so a golden captured on one machine compares on another.
 func (r *scenarioRun) templatePaths(s string) string {
 	repl := []struct{ path, token string }{{r.ws, "{ws}"}, {r.wt, "{wt}"}, {r.root, "{root}"}}
 	sort.Slice(repl, func(i, j int) bool { return len(repl[i].path) > len(repl[j].path) })
@@ -211,8 +188,6 @@ func (r *scenarioRun) responseJSON(t *testing.T) string {
 	return r.templatePaths(string(raw))
 }
 
-// goldenPath resolves a file of the unit's shared golden set (read by the host
-// harness here and replayed by the leaf's own tests).
 func goldenPath(name string) string { return filepath.Join("verdict", "testdata", name) }
 
 func readGolden(t *testing.T, name string) string {

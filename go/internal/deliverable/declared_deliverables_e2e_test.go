@@ -1,16 +1,5 @@
 package deliverable
 
-// declared_deliverables_e2e_test.go — ADR-0100, the proof at the public seam.
-//
-// A REAL cycle (production storage + ledger, the catalog-aware contract
-// reviewer at enforce) whose builder writes a contract-valid build-report.md
-// and NO handoff-build.json — a secondary the fixture catalog declares the
-// agent owes, the way the registry declares triage-decision.json. Before ADR-0100 the cycle proceeded
-// to audit. Now: the gate rejects, the ladder re-dispatches with the file
-// named in the directive, and either the correction lands (the cycle ships)
-// or the ladder exhausts and the cycle ends FAILED_EXPLAINED naming the file.
-// Both entrypoints, because the resume loop is a separate implementation.
-
 import (
 	"context"
 	"os"
@@ -28,8 +17,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
-// buildOnly scopes the real reviewer to the build deliverable: the stub
-// phases write no artifacts and are not what this proof is about.
+// buildOnly scopes the real reviewer to build; the stub phases write no artifacts.
 type buildOnly struct{ inner core.DeliverableReviewer }
 
 func (b buildOnly) Review(ctx context.Context, in core.ReviewInput) core.ReviewResult {
@@ -47,9 +35,7 @@ func declaredRunners(t *testing.T, handoffFrom int) (map[core.Phase]core.PhaseRu
 	t.Helper()
 	build := &stubPhase{name: string(core.PhaseBuild)}
 	build.onRun = func(n int, req core.PhaseRequest) {
-		// A real cycle mints <workspace>/challenge-token.txt and the Build
-		// contract requires the report to echo it (proof-of-read); a fixture
-		// builder that did not would be rejected for the wrong reason.
+		// Echo the minted challenge token, or the fixture would be rejected for the wrong reason.
 		report := contractValidBuildReport
 		if tok, err := os.ReadFile(filepath.Join(req.Workspace, "challenge-token.txt")); err == nil {
 			report = "<!-- challenge-token: " + strings.TrimSpace(string(tok)) + " -->\n" + report
@@ -70,12 +56,7 @@ func declaredRunners(t *testing.T, handoffFrom int) (map[core.Phase]core.PhaseRu
 	return runners, build
 }
 
-// fixtureCatalog declares, for build alone, a secondary the agent owes. The
-// mechanism is proved against this declaration so the test does not depend on
-// what the checked-in registry happens to declare (the registry's own
-// classification is pinned by the phasecontract projection tests). The
-// built-in Build contract still governs the primary; the overlay adds the
-// owed secondary exactly as the registry would.
+// fixtureCatalog declares an owed secondary for build alone, so the proof does not depend on the checked-in registry.
 func fixtureCatalog(t *testing.T) phasespec.Catalog {
 	t.Helper()
 	cat, warnings := (phasespec.Catalog{}).Merge([]phasespec.PhaseSpec{{
@@ -157,9 +138,7 @@ func TestDeclaredDeliverables_CorrectedHandoff_IsAccepted(t *testing.T) {
 	}
 }
 
-// TestDeclaredDeliverables_Resume_MissingHandoff_IsCorrectedThenFails is the
-// resume twin: RunCycleFromPhase is a separate loop, and this session's
-// resume-parity fixes (#568, #571) are why the twin is not optional.
+// The resume twin: RunCycleFromPhase is a separate loop implementation.
 func TestDeclaredDeliverables_Resume_MissingHandoff_IsCorrectedThenFails(t *testing.T) {
 	root := gitRepoWithOneCommit(t)
 	runners, build := declaredRunners(t, 0)

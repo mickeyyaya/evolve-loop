@@ -8,26 +8,8 @@ import (
 	"testing"
 )
 
-// Cycle-1299 RED contract — tail-anchored verdict-sentinel selection.
-//
-// ParseVerdictSentinelFull used FindStringSubmatch, which returns the FIRST
-// structural match anywhere in the document. A report whose PROSE quotes
-// example `<!-- evolve-verdict: {...} -->` syntax therefore beat the real
-// sentinel at the tail: a quoted decoy that merely unmarshals silently won,
-// and a quoted decoy with elided/unparseable JSON blanked the whole read
-// (unmarshal failure returns ok=false rather than trying the next candidate).
-// Both shapes are live in the cycle-1298 adversarial-review report, which fired
-// [bad_verdict] x3 and circuit-opened the contract gate enforce→advisory.
-//
-// The contract these tests pin: walk candidates from the END and return the
-// LAST one that unmarshals cleanly, carries a non-empty Verdict, and is not a
-// placeholder echo. Single-sentinel documents (the overwhelmingly common case)
-// are unaffected — a one-element candidate list behaves exactly as before.
-
 const tailAnchorFixture = "testdata/cycle1298-quoted-decoys.md"
 
-// AC1 — a malformed/elided decoy earlier in the document must not blank or win
-// over a well-formed sentinel at the tail.
 func TestSentinelTailAnchor_MalformedEarlierDecoyLosesToTail(t *testing.T) {
 	doc := strings.Join([]string{
 		"# Report",
@@ -45,10 +27,6 @@ func TestSentinelTailAnchor_MalformedEarlierDecoyLosesToTail(t *testing.T) {
 	}
 }
 
-// AC1 (semantic sibling) — a decoy that DOES unmarshal cleanly still must not
-// win over the tail sentinel. This separates a real tail-anchor fix from the
-// partial fix "keep scanning until something unmarshals", which would return
-// the earlier PASS decoy here.
 func TestSentinelTailAnchor_ValidEarlierDecoyLosesToTail(t *testing.T) {
 	doc := strings.Join([]string{
 		"Contract example, quoted in prose:",
@@ -69,9 +47,6 @@ func TestSentinelTailAnchor_ValidEarlierDecoyLosesToTail(t *testing.T) {
 	}
 }
 
-// AC2 (negative) — when every sentinel-shaped substring is garbage, the tolerant
-// reader still declines, so the caller's legacy parser runs. Tail-anchoring must
-// not manufacture a verdict out of malformed candidates.
 func TestSentinelTailAnchor_AllMalformedStillNotOK(t *testing.T) {
 	doc := strings.Join([]string{
 		"<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":…} -->",
@@ -84,7 +59,6 @@ func TestSentinelTailAnchor_AllMalformedStillNotOK(t *testing.T) {
 	}
 }
 
-// AC3 (edge) — zero sentinel comments is unchanged behaviour: ok=false.
 func TestSentinelTailAnchor_NoSentinelStillNotOK(t *testing.T) {
 	for _, doc := range []string{"", "# Report\n\nno sentinel here\n", "<!-- evolve-verdict: -->"} {
 		if s, ok := ParseVerdictSentinelFull(doc); ok {
@@ -93,8 +67,6 @@ func TestSentinelTailAnchor_NoSentinelStillNotOK(t *testing.T) {
 	}
 }
 
-// Cycle-603 preservation — a document whose ONLY sentinel is a contract-example
-// placeholder echo must still decline. Tail-anchoring must not weaken this.
 func TestSentinelTailAnchor_LonePlaceholderEchoStillNotOK(t *testing.T) {
 	doc := "prose\n" + RenderVerdictSentinelWithFailure("audit", "FAIL", &FailureBlock{
 		Class:   "<failure class>",
@@ -106,9 +78,6 @@ func TestSentinelTailAnchor_LonePlaceholderEchoStillNotOK(t *testing.T) {
 	}
 }
 
-// Tail placeholder echo + a real sentinel earlier: the walk skips invalid
-// candidates and keeps going backwards to the last VALID one (scout H2 —
-// "last parseable", not "last raw match").
 func TestSentinelTailAnchor_SkipsInvalidTailToLastValid(t *testing.T) {
 	doc := strings.Join([]string{
 		"The real verdict:",
@@ -130,10 +99,6 @@ func TestSentinelTailAnchor_SkipsInvalidTailToLastValid(t *testing.T) {
 	}
 }
 
-// AC4 — the LIVE cycle-1298 report (5 quoted decoys in prose + the real
-// sentinel at the tail), parsed through the same function every gate caller
-// uses. This is the wiring proof against a real captured artifact, not a
-// synthetic string.
 func TestSentinelTailAnchor_LiveCycle1298Fixture(t *testing.T) {
 	raw, err := os.ReadFile(tailAnchorFixture)
 	if err != nil {
@@ -152,10 +117,6 @@ func TestSentinelTailAnchor_LiveCycle1298Fixture(t *testing.T) {
 	}
 }
 
-// AC5 — anti-vacuity. Reconstruct the OLD first-match selection over the same
-// regex and the same fixture, and assert it produces a DIFFERENT (wrong)
-// answer. If this ever fails, the fixture stopped discriminating fixed from
-// broken and the AC4 assertion above would be vacuously true.
 func TestSentinelTailAnchor_FirstMatchSelectionIsGone(t *testing.T) {
 	raw, err := os.ReadFile(tailAnchorFixture)
 	if err != nil {
@@ -163,7 +124,6 @@ func TestSentinelTailAnchor_FirstMatchSelectionIsGone(t *testing.T) {
 	}
 	content := string(raw)
 
-	// The legacy selection, verbatim: first structural match, no fallthrough.
 	legacyVerdict, legacyOK := "", false
 	if m := sentinelRE.FindStringSubmatch(content); m != nil {
 		var legacy VerdictSentinel
@@ -182,10 +142,6 @@ func TestSentinelTailAnchor_FirstMatchSelectionIsGone(t *testing.T) {
 	}
 }
 
-// Wiring proof — drive the production caller. ReadFailureBlock is the ONE
-// reader router signal-lifting, orchestrator faillearn and the classifier go
-// through; it must surface the tail sentinel's failure block off the live
-// fixture laid down as a phase report.
 func TestSentinelTailAnchor_ReadFailureBlockReachesTailSentinel(t *testing.T) {
 	raw, err := os.ReadFile(tailAnchorFixture)
 	if err != nil {

@@ -1,44 +1,5 @@
 package phasespec
 
-// userphases_validate_test.go — ONE table-driven port of the 8 LIVE bash
-// phase-validation suites (Wave C of the bash→Go migration):
-//
-//	tests/test-implement-dependency-audit-phase.sh
-//	tests/test-implement-security-scan-phase.sh
-//	tests/test-phases-quality-gates.sh
-//	tests/test-phases-release-and-memory.sh
-//	tests/test-recover-wave2-phases.sh
-//	tests/test-wave1-bugfix-phases.sh
-//	tests/test-wave1-refactor-phases.sh
-//	tests/test-wave1-router-config.sh
-//
-// The bash suites were authored as TDD RED contracts (cycles 214/217/246/247);
-// the phases they encode have since SHIPPED, so the suites are now permanent
-// regression guards. Each load-bearing bash check ran the real `evolve` binary
-// (`phases list` / `phases validate`) — i.e. the DiscoverUserSpecs → Merge →
-// ValidateUserSpec machinery in THIS package — plus jq/python/grep field reads
-// on the same JSON the loader reads. This test reproduces that exact pipeline
-// in-process: the phase.json rows go through MergedCatalog + ValidateUserSpec
-// (the loader path the binary uses), and the profile / agent.md / router-doc /
-// registry rows are file reads that mirror the bash jq/python/grep checks 1:1.
-//
-// FAITHFULNESS NOTE — stale `classify.fail_if_signal` assertions are NOT ported.
-// Five bash rows assert classify.fail_if_signal keys (benchmark-gate
-// perf.significant, fuzz-probe fuzz.crashers, rollback-plan rollback.ready,
-// bug-reproduction repro.failing, behavior-compare behavior.preserved). The
-// cycle-263 incident STRIPPED every fail_if_signal block from the shipped
-// phase.json files (the Stage-3 signal bus does not exist; an inert gate makes
-// the phase unconditionally FAIL at runtime — see repo_phaseconfigs_test.go,
-// which asserts the ABSENCE of fail_if_signal). Those bash rows would FAIL
-// against today's tree, so faking them green here would be a no-op lie. They are
-// listed in the parity report (this file's package doc + the migration report)
-// as "needs manual review — stale" and deliberately skipped. smell-scan's
-// classify.fail_if_empty literal-JSON assertion is stale the same way (the field
-// is applied by the archetype loader at discovery, not present in the shipped
-// phase.json), so it is likewise not ported. The bash NEGATIVE corruption probes
-// (kind:python / optional:false rejection) are covered by ValidateUserSpec unit
-// tests in phasespec_test.go rather than duplicated here.
-
 import (
 	"encoding/json"
 	"os"
@@ -49,14 +10,9 @@ import (
 	"testing"
 )
 
-// repoRoot is the project root relative to this package directory
-// (go/internal/phasespec → ../../..). Mirrors repo_phaseconfigs_test.go.
 func repoRoot() string { return filepath.Join("..", "..", "..") }
 
-// loadUserCatalog runs the SAME discovery+merge the `evolve phases list/validate`
-// binary runs: MergedCatalog over the project root resolves the built-in
-// registry and overlays .evolve/phases/<name>/phase.json. Returns the merged
-// catalog. A fatal error here means the loader itself is broken.
+// loadUserCatalog runs the same discovery and merge as evolve phases list and validate.
 func loadUserCatalog(t *testing.T) Catalog {
 	t.Helper()
 	cat, _, _, err := MergedCatalog(repoRoot())
@@ -66,11 +22,7 @@ func loadUserCatalog(t *testing.T) Catalog {
 	return cat
 }
 
-// readPhaseSpec returns the discovered, loader-parsed PhaseSpec for name, or
-// fails the subtest if the phase is absent / not a user phase. This is the
-// behavioral anchor: it asserts the loader actually merged the phase as a USER
-// overlay (the bash `SOURCE == user` check) and hands the parsed spec to the
-// field-level assertions (the bash jq checks).
+// readPhaseSpec returns name's spec, failing unless the loader merged it as a user overlay.
 func readPhaseSpec(t *testing.T, cat Catalog, name string) PhaseSpec {
 	t.Helper()
 	s, ok := cat.Get(name)
@@ -83,10 +35,6 @@ func readPhaseSpec(t *testing.T, cat Catalog, name string) PhaseSpec {
 	return s
 }
 
-// hasInsertWhen reports whether spec has an insert_when condition matching
-// field, op (any of the listed ops), and value. Mirrors the bash
-// `jq '.routing.insert_when[]? | select(...)'` checks. The bash suites accept
-// "==" or "eq" interchangeably for equality, so callers pass both.
 func hasInsertWhen(s PhaseSpec, field string, ops []string, value string) bool {
 	if s.Routing == nil {
 		return false
@@ -112,15 +60,12 @@ func hasInsertWhen(s PhaseSpec, field string, ops []string, value string) bool {
 	return false
 }
 
-// condValueEquals compares a routing condition's interface{} value against the
-// string the bash suite asserted. The bash `gt 0` checks accept the value as
-// either number 0 or string "0", so numeric and string forms both match.
+// condValueEquals matches a JSON condition value, number or string, against want.
 func condValueEquals(v interface{}, want string) bool {
 	switch tv := v.(type) {
 	case string:
 		return tv == want
 	case float64:
-		// JSON numbers decode to float64; "0" must match 0, "5" match 5.
 		return formatNum(tv) == want
 	default:
 		return false
@@ -129,14 +74,11 @@ func condValueEquals(v interface{}, want string) bool {
 
 func formatNum(f float64) string {
 	if f == float64(int64(f)) {
-		// integral: render without trailing ".000000"
 		return strconv.FormatInt(int64(f), 10)
 	}
 	return ""
 }
 
-// requireSections reports whether spec.Classify.RequireSections contains every
-// wanted section. Mirrors the bash `jq '.classify.require_sections | index(...)'`.
 func requireSections(s PhaseSpec, want ...string) bool {
 	if s.Classify == nil {
 		return false
@@ -153,8 +95,6 @@ func requireSections(s PhaseSpec, want ...string) bool {
 	return true
 }
 
-// outputSignals reports whether spec.Outputs.Signals contains every wanted
-// signal. Mirrors `jq '.outputs.signals | index(...)'`.
 func outputSignals(s PhaseSpec, want ...string) bool {
 	have := map[string]bool{}
 	for _, sig := range s.Outputs.Signals {
@@ -168,8 +108,7 @@ func outputSignals(s PhaseSpec, want ...string) bool {
 	return true
 }
 
-// fileContains reports whether the repo-relative file contains needle
-// (case-insensitive). Mirrors the bash `grep -qi`.
+// fileContains reports whether the repo-relative file contains needle, ignoring case.
 func fileContains(t *testing.T, rel, needle string) bool {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join(repoRoot(), filepath.FromSlash(rel)))
@@ -179,8 +118,7 @@ func fileContains(t *testing.T, rel, needle string) bool {
 	return strings.Contains(strings.ToLower(string(data)), strings.ToLower(needle))
 }
 
-// fileMatches reports whether the repo-relative file matches the
-// case-insensitive regexp pattern. Mirrors the bash `grep -qiE`.
+// fileMatches reports whether the repo-relative file matches pattern, ignoring case.
 func fileMatches(t *testing.T, rel, pattern string) bool {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join(repoRoot(), filepath.FromSlash(rel)))
@@ -190,10 +128,7 @@ func fileMatches(t *testing.T, rel, pattern string) bool {
 	return regexp.MustCompile("(?i)" + pattern).Match(data)
 }
 
-// profileRequiredKeys are the keys the wave-3 profile schema check
-// (test-phases-release-and-memory.sh AC3) requires. max_budget_usd is NOT a
-// typed Profile field (it lives in the loader's Raw), so we read profiles as
-// raw JSON exactly as the bash python3 snippet did.
+// profileRequiredKeys are checked on raw JSON because max_budget_usd is not a typed Profile field.
 var profileRequiredKeys = []string{
 	"name", "cli", "model_tier_default", "role", "sandbox",
 	"max_turns", "max_budget_usd", "allowed_tools", "output_artifact",
@@ -201,9 +136,6 @@ var profileRequiredKeys = []string{
 
 func loadProfileJSON(t *testing.T, name string) map[string]json.RawMessage {
 	t.Helper()
-	// Only git-TRACKED profiles are repo config; an untracked same-named file
-	// is a runtime mint that can never reach a CI checkout (cd49274beab2
-	// class). Nil tracked set = no usable git context = bind all.
 	if tracked := trackedRepoProfileNames(t, repoRoot()); tracked != nil && !tracked[name] {
 		t.Skipf("profile %s.json is untracked — runtime-minted state, not bound by the schema check", name)
 	}
@@ -219,12 +151,7 @@ func loadProfileJSON(t *testing.T, name string) map[string]json.RawMessage {
 	return m
 }
 
-// TestUserPhases_BashSuiteParity ports the 8 LIVE bash phase-validation suites
-// into one table. Each row names the source bash script + the assertion it
-// reproduces. Phase.json rows run through the real loader (MergedCatalog +
-// ValidateUserSpec); profile/agent.md/router/registry rows are file reads that
-// mirror the bash jq/python/grep checks. Stale fail_if_signal rows are omitted
-// (see package doc).
+// The bash suites' stale fail_if_signal rows are deliberately not ported.
 func TestUserPhases_BashSuiteParity(t *testing.T) {
 	t.Parallel()
 	cat := loadUserCatalog(t)
@@ -233,9 +160,6 @@ func TestUserPhases_BashSuiteParity(t *testing.T) {
 		name   string // <bash-script>/<assertion>
 		assert func(t *testing.T)
 	}{
-		// ============================================================
-		// test-implement-security-scan-phase.sh
-		// ============================================================
 		{"security-scan.sh/validate-OK", func(t *testing.T) {
 			s := readPhaseSpec(t, cat, "security-scan")
 			if v := ValidateUserSpec(s); len(v) != 0 {
@@ -258,9 +182,6 @@ func TestUserPhases_BashSuiteParity(t *testing.T) {
 			}
 		}},
 
-		// ============================================================
-		// test-implement-dependency-audit-phase.sh
-		// ============================================================
 		{"dependency-audit.sh/validate-OK", func(t *testing.T) {
 			s := readPhaseSpec(t, cat, "dependency-audit")
 			if v := ValidateUserSpec(s); len(v) != 0 {
@@ -278,7 +199,6 @@ func TestUserPhases_BashSuiteParity(t *testing.T) {
 			}
 		}},
 		{"dependency-audit.sh/both-user-phases-listed", func(t *testing.T) {
-			// AC2.4: both new user phases present in the merged catalog.
 			for _, n := range []string{"security-scan", "dependency-audit"} {
 				if _, ok := cat.Get(n); !ok || !cat.IsUser(n) {
 					t.Fatalf("%s not present as a user phase", n)
@@ -286,9 +206,6 @@ func TestUserPhases_BashSuiteParity(t *testing.T) {
 			}
 		}},
 
-		// ============================================================
-		// test-wave1-bugfix-phases.sh (fault-localization, bug-reproduction)
-		// ============================================================
 		{"wave1-bugfix.sh/fault-localization-validate-OK", func(t *testing.T) {
 			s := readPhaseSpec(t, cat, "fault-localization")
 			if v := ValidateUserSpec(s); len(v) != 0 {
@@ -333,10 +250,6 @@ func TestUserPhases_BashSuiteParity(t *testing.T) {
 			}
 		}},
 
-		// ============================================================
-		// test-wave1-refactor-phases.sh
-		// (behavior-baseline, behavior-compare, smell-scan)
-		// ============================================================
 		{"wave1-refactor.sh/all-three-validate-OK", func(t *testing.T) {
 			for _, n := range []string{"behavior-baseline", "behavior-compare", "smell-scan"} {
 				s := readPhaseSpec(t, cat, n)
@@ -383,11 +296,6 @@ func TestUserPhases_BashSuiteParity(t *testing.T) {
 			}
 		}},
 
-		// ============================================================
-		// test-phases-quality-gates.sh  (Wave-2:
-		// benchmark-gate, fuzz-probe, cleanup-sweep, rollback-plan)
-		// + test-recover-wave2-phases.sh (same 4 + mutation-gate)
-		// ============================================================
 		{"phases-quality-gates.sh/four-validate-OK", func(t *testing.T) {
 			for _, n := range []string{"benchmark-gate", "fuzz-probe", "cleanup-sweep", "rollback-plan"} {
 				s := readPhaseSpec(t, cat, n)
@@ -415,9 +323,6 @@ func TestUserPhases_BashSuiteParity(t *testing.T) {
 			}
 		}},
 		{"phases-quality-gates.sh/fuzz-probe-routing-parser-decoder-unmarshal", func(t *testing.T) {
-			// Bash AC9 greps the routing JSON for pars|decod|unmarshal; the
-			// shipped fuzz-probe routes on scout.surface_type ==
-			// "parser/decoder/unmarshal".
 			if !hasInsertWhen(readPhaseSpec(t, cat, "fuzz-probe"), "scout.surface_type", []string{"==", "eq"}, "parser/decoder/unmarshal") {
 				t.Fatal("fuzz-probe insert_when missing scout.surface_type == parser/decoder/unmarshal")
 			}
@@ -446,38 +351,26 @@ func TestUserPhases_BashSuiteParity(t *testing.T) {
 			}
 		}},
 		{"phases-quality-gates.sh/benchmark-gate-agent-multi-sample", func(t *testing.T) {
-			// agent.md must instruct multi-sample benchmark collection (bash grep -iE).
 			if !fileMatches(t, ".evolve/phases/benchmark-gate/agent.md", `count=|multi[- ]sample|samples|[0-9]+ (runs|times|iterations)`) {
 				t.Fatal("benchmark-gate agent.md does not instruct multi-sample benchmark collection")
 			}
 		}},
 		{"phases-quality-gates.sh/cleanup-sweep-agent-forbids-edits", func(t *testing.T) {
-			// agent.md must forbid source edits/removals — the detection-only intent (bash grep -iE).
 			if !fileMatches(t, ".evolve/phases/cleanup-sweep/agent.md", `do not.*(edit|remove|delete|modify)|no (file )?(edits|removals|deletions)`) {
 				t.Fatal("cleanup-sweep agent.md does not forbid edits/removals")
 			}
 		}},
 		{"phases-quality-gates.sh/registry-max-optional-insertions-6", func(t *testing.T) {
-			// AC: phase-registry.json config.max_optional_insertions == 6
-			// (shared with test-wave1-router-config.sh AC4.1). Negative side:
-			// the old cap (4) must be gone.
 			if got := registryMaxOptionalInsertions(t); got != 6 {
 				t.Fatalf("phase-registry max_optional_insertions = %d, want 6", got)
 			}
 		}},
 		{"recover-wave2.sh/validate-rejects-unknown-phase", func(t *testing.T) {
-			// AC6 negative: an unknown phase is not in the catalog (the binary
-			// prints "no user phase named …" and exits non-zero).
 			if _, ok := cat.Get("cycle247-no-such-phase"); ok {
 				t.Fatal("unknown phase unexpectedly present in catalog")
 			}
 		}},
 
-		// ============================================================
-		// test-phases-release-and-memory.sh  (Wave-3:
-		// changelog-sync, post-ship-monitor, api-contract-design,
-		// context-condense)
-		// ============================================================
 		{"release-and-memory.sh/four-validate-OK", func(t *testing.T) {
 			for _, n := range wave3 {
 				s := readPhaseSpec(t, cat, n)
@@ -563,13 +456,7 @@ func TestUserPhases_BashSuiteParity(t *testing.T) {
 			}
 		}},
 
-		// ============================================================
-		// test-wave1-router-config.sh
-		// ============================================================
 		{"wave1-router-config.sh/registry-valid-and-loads", func(t *testing.T) {
-			// The registry parses and the merged catalog has >= 15 phases
-			// (bash: `phases list` shows >= 15 rows). Behavioral: the loader
-			// itself produced cat with no error.
 			if got := len(cat.Names()); got < 15 {
 				t.Fatalf("merged catalog has %d phases, want >= 15", got)
 			}
@@ -615,12 +502,9 @@ func TestUserPhases_BashSuiteParity(t *testing.T) {
 	}
 }
 
-// wave3 is the Wave-3 release/feature/memory phase set
-// (test-phases-release-and-memory.sh).
+// wave3 lists the release, feature and memory phases one ported suite covers.
 var wave3 = []string{"changelog-sync", "post-ship-monitor", "api-contract-design", "context-condense"}
 
-// registryMaxOptionalInsertions reads docs/architecture/phase-registry.json and
-// returns config.max_optional_insertions. Mirrors the bash python3 read.
 func registryMaxOptionalInsertions(t *testing.T) int {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join(repoRoot(), "docs", "architecture", "phase-registry.json"))
@@ -638,8 +522,6 @@ func registryMaxOptionalInsertions(t *testing.T) int {
 	return doc.Config.MaxOptionalInsertions
 }
 
-// lineCount returns the number of newline-terminated lines in a repo-relative
-// file (mirrors the bash `wc -l`).
 func lineCount(t *testing.T, rel string) int {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join(repoRoot(), filepath.FromSlash(rel)))

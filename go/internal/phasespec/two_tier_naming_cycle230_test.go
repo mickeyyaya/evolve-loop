@@ -7,17 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
-// Cycle-230 companion tests to TestBugRepro_Cycle229_TwoTierNamingMissing
-// (task phase-naming-lint). The anchor test covers the rejection criterion;
-// these cover the acceptance + edge axes (adversarial-testing SKILL §6) so a
-// fix that over-restricts (rejecting valid multi-word names) is also caught.
-//
-// DO NOT MODIFY (builder contract): make these pass by changing
-// go/internal/phasespec/validate.go only.
-
-// TestTwoTierNaming_MultiWordAccepted: multi-word kebab-case user phase names
-// must NOT receive a "multi-word" naming violation. Pre-existing GREEN at RED
-// baseline (guards against an over-broad fix regex).
 func TestTwoTierNaming_MultiWordAccepted(t *testing.T) {
 	multiWordNames := []string{"bug-reproduction", "my-check", "security-scan", "a-b"}
 	for _, name := range multiWordNames {
@@ -35,10 +24,7 @@ func TestTwoTierNaming_MultiWordAccepted(t *testing.T) {
 	}
 }
 
-// TestTwoTierNaming_MalformedRejected: names that superficially look hyphenated
-// but are not valid <object>-<action> kebab-case must produce at least one
-// violation. "scanner-" passes the legacy nameRE (trailing hyphen allowed by
-// ^[a-z][a-z0-9-]*$) but must fail the two-tier gate ^[a-z]+(-[a-z]+)+$.
+// "scanner-" passes nameRE (a trailing hyphen is allowed), so only twoTierNameRE catches it.
 func TestTwoTierNaming_MalformedRejected(t *testing.T) {
 	malformed := []string{"scanner-", "scan--go"}
 	for _, name := range malformed {

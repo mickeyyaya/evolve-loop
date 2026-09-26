@@ -8,20 +8,6 @@ import (
 	"testing"
 )
 
-// Test-amplification pass for cycle-998 (carryover-decisions-authoring /
-// carryover-sweep-group-filer). Written black-box against the CLI contract
-// documented in tdd-report.md / build-report.md — the `-decisions`/`-state`/
-// `-apply` flag surface (`evolve carryover apply-decisions --help`) and the
-// exported test helpers already established in cmd_carryover_test.go — WITHOUT
-// reading cmd_carryover.go's implementation. Targets adversarial edges the
-// existing suite (registration, happy-path-to-ceiling, missing-reason,
-// locked-RMW) does not: dry-run mutation safety, malformed input shape,
-// duplicate/unknown ids, empty input, and large-scale volume.
-
-// TestCarryoverApplyDecisions_DryRunDoesNotMutateState — omitting --apply is
-// documented (tdd-report.md handoff) as the default, read-only plan mode:
-// "--apply is mandatory, dry-run is the default and does NOT shrink state".
-// No existing test exercises the flag's absence.
 func TestCarryoverApplyDecisions_DryRunDoesNotMutateState(t *testing.T) {
 	statePath := writeFixtureState(t, "todo-keep-me", "todo-drop-me")
 	beforeRaw, err := os.ReadFile(statePath)
@@ -56,13 +42,6 @@ func TestCarryoverApplyDecisions_DryRunDoesNotMutateState(t *testing.T) {
 	}
 }
 
-// TestCarryoverApplyDecisions_RejectsFlatArraySchema — NEGATIVE / regression
-// guard for a documented historical near-miss. tdd-report.md states: "the
-// pre-authored python evidence assumed a flat top-level list and would have
-// errored against the artifact the landed CLI actually consumes" — i.e. a flat
-// array instead of {"source_count":N,"decisions":[...]} was a real risk this
-// cycle had to correct in the eval fixtures. No regression test previously
-// guarded the CLI itself against that wrong shape reaching --apply.
 func TestCarryoverApplyDecisions_RejectsFlatArraySchema(t *testing.T) {
 	statePath := writeFixtureState(t, "todo-a", "todo-b")
 	beforeRaw, err := os.ReadFile(statePath)
@@ -90,11 +69,6 @@ func TestCarryoverApplyDecisions_RejectsFlatArraySchema(t *testing.T) {
 	}
 }
 
-// TestCarryoverApplyDecisions_RejectsDuplicateID — NEGATIVE. AC1
-// (tdd-report.md) requires decision ids to be unique 1:1; a decisions file that
-// lists the same id twice with conflicting decisions is invalid input. Only
-// tested previously at the output-artifact level (predicates_test.go); never as
-// input the CLI itself must validate before mutating state.
 func TestCarryoverApplyDecisions_RejectsDuplicateID(t *testing.T) {
 	statePath := writeFixtureState(t, "todo-dup")
 	beforeRaw, err := os.ReadFile(statePath)
@@ -126,10 +100,6 @@ func TestCarryoverApplyDecisions_RejectsDuplicateID(t *testing.T) {
 	}
 }
 
-// TestCarryoverApplyDecisions_RejectsInvalidDecisionEnum — NEGATIVE. AC1
-// constrains `decision` to the enum keep|drop|cluster. Only the emitted output
-// artifact was previously checked (predicates_test.go TestC998_001); the CLI's
-// own input validation for an out-of-enum value was untested.
 func TestCarryoverApplyDecisions_RejectsInvalidDecisionEnum(t *testing.T) {
 	statePath := writeFixtureState(t, "todo-a")
 	beforeRaw, err := os.ReadFile(statePath)
@@ -160,10 +130,6 @@ func TestCarryoverApplyDecisions_RejectsInvalidDecisionEnum(t *testing.T) {
 	}
 }
 
-// TestCarryoverApplyDecisions_RejectsClusterWithoutGroup — NEGATIVE. AC1
-// requires every `cluster` row to name a non-empty cluster_group. Only the
-// emitted output artifact was previously checked; untested as CLI input
-// validation.
 func TestCarryoverApplyDecisions_RejectsClusterWithoutGroup(t *testing.T) {
 	statePath := writeFixtureState(t, "todo-a")
 	beforeRaw, err := os.ReadFile(statePath)
@@ -194,10 +160,6 @@ func TestCarryoverApplyDecisions_RejectsClusterWithoutGroup(t *testing.T) {
 	}
 }
 
-// TestCarryoverApplyDecisions_UnknownIDIgnoredNotCrash — EDGE. A decisions file
-// authored against a slightly stale snapshot of state.json may reference an id
-// that is no longer (or never was) present live. The apply must not crash and
-// must not disturb unrelated surviving entries.
 func TestCarryoverApplyDecisions_UnknownIDIgnoredNotCrash(t *testing.T) {
 	statePath := writeFixtureState(t, "todo-real")
 	doc := carryoverDecisionsDoc{
@@ -221,9 +183,6 @@ func TestCarryoverApplyDecisions_UnknownIDIgnoredNotCrash(t *testing.T) {
 	t.Logf("unknown-id apply result: %+v", res)
 }
 
-// TestCarryoverApplyDecisions_EmptyDecisionsIsNoOp — EDGE / null input. An
-// empty `decisions` array must be a safe no-op: no error, no drops, no change
-// to the live population.
 func TestCarryoverApplyDecisions_EmptyDecisionsIsNoOp(t *testing.T) {
 	statePath := writeFixtureState(t, "todo-a", "todo-b")
 	doc := carryoverDecisionsDoc{SourceCount: 0, Decisions: nil}
@@ -241,12 +200,8 @@ func TestCarryoverApplyDecisions_EmptyDecisionsIsNoOp(t *testing.T) {
 	}
 }
 
-// TestCarryoverApplyDecisions_CeilingReportedNotEnforced — documents and
-// regression-guards a behavioural claim from build-report.md's Discovery Scan:
-// "The CLI's carryoverApplyCeiling = 25 is reported, not enforced — an apply
-// that keeps >25 items still exits 0 with a WARN." That claim had no test.
 func TestCarryoverApplyDecisions_CeilingReportedNotEnforced(t *testing.T) {
-	const n = 40 // all `keep` -> survivors = 40, well above the ceiling (25).
+	const n = 40
 	ids := make([]string, 0, n)
 	doc := carryoverDecisionsDoc{SourceCount: n}
 	for i := 0; i < n; i++ {
@@ -269,13 +224,9 @@ func TestCarryoverApplyDecisions_CeilingReportedNotEnforced(t *testing.T) {
 	}
 }
 
-// TestCarryoverApplyDecisions_LargeScaleConverges — LIMIT / large-scale. Stress
-// the locked read-modify-write path at a volume ~20x the largest existing
-// fixture (30 entries), well beyond this cycle's real 135-entry population, to
-// confirm the atomic write does not corrupt output or misclassify at scale.
 func TestCarryoverApplyDecisions_LargeScaleConverges(t *testing.T) {
 	const n = 3000
-	const surviveEvery = 50 // ~2% keep
+	const surviveEvery = 50
 	ids := make([]string, 0, n)
 	doc := carryoverDecisionsDoc{SourceCount: n}
 	wantSurvivors := 0
@@ -301,7 +252,7 @@ func TestCarryoverApplyDecisions_LargeScaleConverges(t *testing.T) {
 	if res.After != wantSurvivors {
 		t.Errorf("After = %d, want %d", res.After, wantSurvivors)
 	}
-	surviving := readCarryoverIDs(t, statePath) // fatals on torn/corrupted JSON at scale
+	surviving := readCarryoverIDs(t, statePath)
 	if len(surviving) != wantSurvivors {
 		t.Errorf("surviving id count = %d, want %d", len(surviving), wantSurvivors)
 	}

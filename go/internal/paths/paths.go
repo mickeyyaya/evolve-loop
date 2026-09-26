@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
@@ -78,8 +79,9 @@ type Layout struct {
 // for ProjectRoot when EVOLVE_PROJECT_ROOT is empty.
 //
 // Resolve is total: it never returns an error and never reads the
-// filesystem. Field validation (existence, permissions) is the caller's
-// responsibility — Resolve only constructs the canonical paths.
+// filesystem, though the cycle-state scope check makes a relative evolve dir
+// absolute against the process cwd. Field validation (existence, permissions)
+// is the caller's responsibility — Resolve only constructs the canonical paths.
 //
 // The returned Layout is cwd-bound at construction time: relative
 // fields (when cwd is empty and no env overrides are set) capture the
@@ -121,15 +123,7 @@ func Resolve(lookupEnv func(string) string, cwd string) Layout {
 		ledgerFile = filepath.Join(evolveDir, "ledger.jsonl")
 	}
 
-	// Fleet per-run cycle-state override: under the fleet supervisor each lane
-	// sets ipcenv.CycleStateFileKey to its own per-run file so two lanes never
-	// share the host-global singleton (the clobber that stalled a lane's phase
-	// gate before audit). A consumer reading Layout.CycleStateFile directly then
-	// still gets THIS lane's file. Unset ⇒ <evolveDir>/cycle-state.json.
-	cycleStateFile := lookupEnv(ipcenv.CycleStateFileKey)
-	if cycleStateFile == "" {
-		cycleStateFile = filepath.Join(evolveDir, "cycle-state.json")
-	}
+	cycleStateFile := CycleStateFileFor(evolveDir, lookupEnv(ipcenv.CycleStateFileKey))
 
 	return Layout{
 		ProjectRoot:    projectRoot,
@@ -142,6 +136,26 @@ func Resolve(lookupEnv func(string) string, cwd string) Layout {
 		AdaptersDir:    adaptersDir,
 		CapabilityDir:  capabilityDir,
 	}
+}
+
+// CycleStateFileFor is the one rule for the cycle-state file of evolveDir. A fleet lane names its own
+// per-run file inside its evolve dir through ipcenv.CycleStateFileKey, and every process it spawns
+// inherits that, test binaries included, so the override applies only to the evolve dir holding it.
+// The override is an absolute path; a relative one counts as outside.
+func CycleStateFileFor(evolveDir, override string) string {
+	if override != "" && isInside(evolveDir, override) {
+		return override
+	}
+	return filepath.Join(evolveDir, "cycle-state.json")
+}
+
+func isInside(dir, path string) bool {
+	absDir, err := filepath.Abs(dir)
+	if err != nil {
+		return false
+	}
+	rel, err := filepath.Rel(absDir, path)
+	return err == nil && rel != "." && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 
 // ResolveFromEnv is the production-default convenience: Resolve with

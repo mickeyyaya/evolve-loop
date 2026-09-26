@@ -1,9 +1,5 @@
 package advisor
 
-// mint_test.go — the recursion guard and the mint drops reported at decision
-// time (ADR-0103 unit 04 §6 tests 25, 26; the core mint tests moved verbatim
-// in intent through Plan).
-
 import (
 	"strings"
 	"testing"
@@ -12,9 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// The WS1-S2 recursion guard (ADR-0052 D1, primary defense): a mint whose
-// name is a reserved control-plane identity is dropped with an observable
-// reason; legitimate mints pass through untouched.
 func TestMintConfigsFrom_RejectsAdvisorRoleMint(t *testing.T) {
 	entries := []router.PhasePlanEntry{
 		{Phase: "router", Run: true, Mint: &router.MintSpec{Prompt: "be a router"}},
@@ -43,8 +36,6 @@ func TestMintConfigsFrom_RejectsAdvisorRoleMint(t *testing.T) {
 	}
 }
 
-// Test 25 — one ADVISOR_MINT_REJECTED per drop, emitted by the entry point
-// with the decision stamp; the plan still returns with the legal mint.
 func TestPlan_EmitsMintRejectedOncePerDropWithTheDecisionStamp(t *testing.T) {
 	stdout := `[{"phase":"scout","run":true},{"phase":"router","run":true,"mint":{"prompt":"be a router"}},{"phase":"Advisor","run":true,"mint":{"prompt":"x"}},{"phase":"new-helper","run":true,"mint":{"prompt":"legit"}}]`
 	for _, c := range []struct {
@@ -80,8 +71,6 @@ func TestPlan_EmitsMintRejectedOncePerDropWithTheDecisionStamp(t *testing.T) {
 	}
 }
 
-// Test 26 — an unparseable response is one ADVISOR_RESPONSE_UNPARSEABLE with
-// its cause and the wrapped error the orchestrator prints.
 func TestParse_UnparseableResponseWarnsOnceAndReturnsTheWrappedError(t *testing.T) {
 	for _, c := range []struct {
 		name, stdout, want, cause, decision, contract, artifact string
@@ -117,8 +106,6 @@ func decisionForKind(kind string) decision {
 	return decisionPlan
 }
 
-// The common path is untouched: a plan with no mint sub-objects yields zero
-// MintPhases and no event (moved from core).
 func TestPlan_NoMint_EmptyMintPhases(t *testing.T) {
 	a, got := observed(t, &fakeLauncher{stdout: `[{"phase":"scout","run":true},{"phase":"triage","run":false}]`}, defaultIdentity())
 	plan, err := a.Plan(tempInput(t))

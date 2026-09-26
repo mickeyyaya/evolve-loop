@@ -1,9 +1,5 @@
 package main
 
-// cmd_cycle_config_test.go — ADR-0103 unit 08: the routing-config Loader's
-// one wired construction, the policy-stages projection, the Center-less
-// facade sites pinned by name, and the render proofs at both roots.
-
 import (
 	"bytes"
 	"io"
@@ -19,9 +15,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// nonTestSourcesMatching lists the module's non-test Go files (outside the
-// config leaf, which spells its own New without the package prefix) whose
-// source matches re — a regexp so `\b` excludes phaseconfig.New( / .Load(.
+// nonTestSourcesMatching lists the module's non-test Go files outside
+// internal/config whose source matches re; `\b` excludes phaseconfig.New(.
 func nonTestSourcesMatching(t *testing.T, re *regexp.Regexp) []string {
 	t.Helper()
 	moduleRoot := filepath.Join("..", "..")
@@ -57,8 +52,6 @@ func nonTestSourcesMatching(t *testing.T, re *regexp.Regexp) []string {
 	return hits
 }
 
-// Test 38 — config.New is exported; ONE non-test file constructs the wired
-// Loader (the seam), so a second construction can never bypass the Center.
 func TestRoutingConfigLoader_OneConstructionSite(t *testing.T) {
 	hits := nonTestSourcesMatching(t, regexp.MustCompile(`\bconfig\.New\(`))
 	if len(hits) != 1 || hits[0] != "cmd/evolve/cmd_cycle_config.go" {
@@ -66,8 +59,6 @@ func TestRoutingConfigLoader_OneConstructionSite(t *testing.T) {
 	}
 }
 
-// Test 41 — the silent facade config.Load( is kept by exactly the four
-// Center-less sites; the cycle/loop root is NOT one of them.
 func TestCenterlessConfigLoadSitesArePinned(t *testing.T) {
 	want := map[string]bool{
 		"internal/router/policy.go":             true, // per-phase self-skip policy (Q5)
@@ -91,13 +82,6 @@ func TestCenterlessConfigLoadSitesArePinned(t *testing.T) {
 	}
 }
 
-// Test 45 (architecture-review fold) — the registry's location has ONE
-// non-test spelling, config.RegistryPath: the walker skips internal/config/,
-// so any hit is a re-inlined `"docs", "architecture", "phase-registry.json"`
-// join (the six the review found: cmd_cycle_outputs.go, phaseinventory.go,
-// phases_create.go, phase_order.go, skillcheck.go, kerneltest/fixture.go).
-// phasespec's relative registryRelPath constant is the sibling parser's own
-// belief and goes with the reader unification (unit doc F4).
 func TestRegistryPathSpelling_HasOneNonTestHome(t *testing.T) {
 	hits := nonTestSourcesMatching(t, regexp.MustCompile(`"docs",\s*"architecture",\s*"phase-registry\.json"`))
 	if len(hits) != 0 {
@@ -105,8 +89,6 @@ func TestRegistryPathSpelling_HasOneNonTestHome(t *testing.T) {
 	}
 }
 
-// Test 42 — the hand-written [config] WARN line is gone from the root, and the
-// two stage ladders live only in the seam as forwarders onto the leaf's.
 func TestCmdCycle_NoHandWrittenConfigWarnLineAndLaddersLiveInTheSeam(t *testing.T) {
 	entries, err := os.ReadDir(".")
 	if err != nil {
@@ -140,9 +122,7 @@ func TestCmdCycle_NoHandWrittenConfigWarnLineAndLaddersLiveInTheSeam(t *testing.
 	}
 }
 
-// Test 40 — the projection onto the leaf's Parameter Object carries every
-// accessor value, field for field (keyed: vet's composites check applies to
-// imported struct literals).
+// Keyed fields: vet's composites check applies to imported struct literals.
 func TestPolicyStagesOf_ProjectsThePolicyAccessors(t *testing.T) {
 	pol := policy.Policy{
 		Gates:            &policy.GatesPolicy{ContractGate: "shadow", EvalGate: "off", TriageCapGate: "shadow", ReviewGate: "enforce", TopNGate: "off"},
@@ -161,10 +141,6 @@ func TestPolicyStagesOf_ProjectsThePolicyAccessors(t *testing.T) {
 	}
 }
 
-// Test 39 — the production root: a malformed registry renders the module tag
-// on the root's console (through the Center, not a hand-written line) and is
-// durable in <evolveDir>/signals.ndjson (cycle-less). The sibling parser's
-// `[phases] WARN builtin registry load failed` still goes to real stderr (F4).
 func TestWireOrchestratorDeps_ConfigWarningRendersAndIsDurable(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
@@ -193,13 +169,8 @@ func TestWireOrchestratorDeps_ConfigWarningRendersAndIsDurable(t *testing.T) {
 	}
 }
 
-// Test 39 (twin) — CENTER-TOPOLOGY parity only (Go-review fold): the
-// --simulate root (wireSimulateOrchestrator, cmd_cycle_simulate.go) never
-// resolves a RoutingConfig, so it never loads the registry and no CONFIG_*
-// warning can originate from --simulate today — the first assertion pins
-// that. What the test proves is that a Loader handed the simulate Center
-// (the 02/03/03b twin shape) renders on its console and is durable under
-// <evolveDir>, so a future Loader on that root inherits a working topology.
+// --simulate resolves no RoutingConfig, so no CONFIG_* warning can originate
+// there; this proves the topology a future Loader on that root would inherit.
 func TestWireSimulateOrchestrator_CenterTopologyRendersConfigWarnings(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
@@ -227,8 +198,6 @@ func TestWireSimulateOrchestrator_CenterTopologyRendersConfigWarnings(t *testing
 	}
 }
 
-// Test 43 — `evolve solution` stays on the silent facade and hand-renders the
-// slice, so the registry codes now reach its stderr too (D2b).
 func TestSolutionCmd_MalformedRegistryPrintsTheRegistryWarning(t *testing.T) {
 	root := t.TempDir()
 	reg := config.RegistryPath(root)
@@ -255,10 +224,6 @@ func (f *fakeBridgeStageSink) SetPhaseIOStage(s config.Stage) { f.phaseIO = s }
 func (f *fakeBridgeStageSink) SetRecoveryStage(s string)      { f.recovery = s }
 func (f *fakeBridgeStageSink) SetFatalPaneStage(s string)     { f.fatalPane = s }
 
-// TestWireBridgeStages_ForwardsEachDialOnItsOwnSetter (F27 wiring proof): the
-// root forwards the RESOLVED rollout dials into the bridge adapter, the
-// fatal-pane dial on its OWN setter — crossed values prove no dial borrows
-// another's (the fatal-pane stage never rides PhaseRecovery's).
 func TestWireBridgeStages_ForwardsEachDialOnItsOwnSetter(t *testing.T) {
 	var cfg config.RoutingConfig
 	cfg.PhaseIO, cfg.PhaseRecovery, cfg.FatalPane = config.StageAdvisory, config.StageShadow, config.StageEnforce
@@ -270,10 +235,6 @@ func TestWireBridgeStages_ForwardsEachDialOnItsOwnSetter(t *testing.T) {
 	}
 }
 
-// TestWireBridgeStages_IsTheRootsOnlyStageForwarding pins the seam: the bridge
-// stage setters are called from cmd_cycle_config.go alone, so no root can
-// forward one rollout dial and forget its twin (the F27 defect class: a dial
-// resolved by the Loader that never reaches its consumer).
 func TestWireBridgeStages_IsTheRootsOnlyStageForwarding(t *testing.T) {
 	for _, re := range []string{`\.SetPhaseIOStage\(`, `\.SetRecoveryStage\(`, `\.SetFatalPaneStage\(`} {
 		hits := nonTestSourcesMatching(t, regexp.MustCompile(re))
@@ -281,9 +242,8 @@ func TestWireBridgeStages_IsTheRootsOnlyStageForwarding(t *testing.T) {
 			t.Errorf("%s belongs to cmd/evolve/cmd_cycle_config.go alone, found in %v", re, hits)
 		}
 	}
-	// ...and the cycle root actually calls the forwarder: dropping the call
-	// would be masked by NewDefault's policy seeding (same default words) while
-	// silently losing the Loader's validation and CONFIG_UNKNOWN_VALUE warning.
+	// The cycle root must also call the forwarder: NewDefault's policy seeding
+	// would mask a dropped call while losing the Loader's validation.
 	hits := nonTestSourcesMatching(t, regexp.MustCompile(`\bwireBridgeStages\(`))
 	want := []string{"cmd/evolve/cmd_cycle.go", "cmd/evolve/cmd_cycle_config.go"}
 	if !reflect.DeepEqual(hits, want) {

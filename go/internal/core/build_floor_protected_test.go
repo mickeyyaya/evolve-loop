@@ -1,12 +1,5 @@
 package core
 
-// build_floor_protected_test.go — F37 (2026-09-26): the build handoff floor
-// asks the ship tripwire's question (ship/integrity.go, ADR-0064) at the one
-// phase that can act on it. Cycle 1689's builder rewrote the protected
-// go/internal/core/cyclerun.go through a shell tool the Edit/Write role guard
-// never sees; nothing looked again until ship refused the diff after the
-// audit — and that refusal recovered into a re-audit of the same diff.
-
 import (
 	"context"
 	"strings"

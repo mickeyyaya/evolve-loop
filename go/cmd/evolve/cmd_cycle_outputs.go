@@ -1,16 +1,5 @@
 package main
 
-// `evolve cycle outputs [N]` — the read-only per-phase output accountant: for
-// every phase the cycle completed, did the workspace end up holding the data a
-// reviewer needs (report, prompt, events, usage), and what is the cycle's
-// reasoning-chain status under the one-meaning-per-state totalization?
-//
-// Thin adapter by design: ALL decisions live in internal/phaseoutputs (pure,
-// exhaustively tested) and ALL workspace reading goes through that package's
-// shared loaders — the same ones the loop's post-cycle signal emitter uses, so
-// the CLI and the unified signal stream cannot read the cycle differently.
-// Flags mirror `evolve cycle timing` — same defaults, same resolution helpers.
-
 import (
 	"encoding/json"
 	"flag"
@@ -28,6 +17,9 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
+// runCycleOutputs reports whether each completed phase left what a reviewer
+// needs, and the cycle's reasoning-chain status. Every decision and read lives
+// in internal/phaseoutputs, shared with the loop's post-cycle signal emitter.
 func runCycleOutputs(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve cycle outputs", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -90,19 +82,16 @@ func runCycleOutputs(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
-// catalogAwareResolver assembles the same builtin+user-spec catalog cmd_cycle
-// builds, so the survey resolves report names through the SAME vocabulary the
-// contract gate and bridge use (a builtin-only lookup produced cycle-1452's
-// false memo-report.md gap). Degrades loudly to builtin-only when the registry
-// cannot load.
+// catalogAwareResolver resolves report names through the builtin+user catalog
+// the contract gate and bridge use; a builtin-only lookup reports false gaps.
+// It degrades loudly to builtin-only when the registry cannot load.
 func catalogAwareResolver(projectRoot string, warn func(string)) phasecontract.Resolver {
 	builtinCat, err := phasespec.Load(config.RegistryPath(projectRoot))
 	if err != nil {
 		warn(fmt.Sprintf("builtin registry load failed (%v); resolving builtin-only", err))
 		return phasecontract.BuiltinResolver{}
 	}
-	// The demotion inside the composed path is a no-op for name resolution
-	// (Catalog only hides a spec from the SELECT menu; Get still resolves it),
+	// Demotion only hides a spec from the SELECT menu and Get still resolves it,
 	// so sharing the one path keeps the vocabularies identical.
 	userSpecs, discWarns := discoverUserSpecsClamped(projectRoot, cmdutil.NewPromptsLoader(projectRoot))
 	catalog, mergeWarns := builtinCat.Merge(userSpecs)

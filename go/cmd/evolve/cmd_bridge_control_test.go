@@ -11,9 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/clicontrol"
 )
 
-// TestEmitControl_Outcomes verifies the control command maps each Controller
-// outcome to the right exit code + output: a captured pane prints on success,
-// an unsupported event is a clean distinct exit (3), any other error is exit 1.
 func TestEmitControl_Outcomes(t *testing.T) {
 	t.Run("success prints pane", func(t *testing.T) {
 		var out, errb bytes.Buffer
@@ -52,8 +49,6 @@ func TestEmitControl_Outcomes(t *testing.T) {
 	})
 }
 
-// TestRunBridgeControl_ArgValidation covers the flag/positional parsing without
-// touching tmux: wrong arity, a missing workspace, help, and an unknown flag.
 func TestRunBridgeControl_ArgValidation(t *testing.T) {
 	cases := []struct {
 		name string

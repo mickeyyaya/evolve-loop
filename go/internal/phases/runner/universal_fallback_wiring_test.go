@@ -2,20 +2,13 @@ package runner
 
 import "testing"
 
-// resetUniversalFallbackDefaults restores the composition-root package seams
-// after a test mutates them, guarding against cross-test leakage within the
-// single `go test` process (go-review MEDIUM: these vars, unlike
-// PhaseBoundaryCheckpointer, are re-assigned per wireOrchestratorDeps call).
+// resetUniversalFallbackDefaults restores the package defaults, so a test that sets them cannot leak into the next.
 func resetUniversalFallbackDefaults(t *testing.T) {
 	t.Helper()
 	origFn, origEnabled := DefaultDiscoverCLIsFn, DefaultUniversalFallback
 	t.Cleanup(func() { DefaultDiscoverCLIsFn, DefaultUniversalFallback = origFn, origEnabled })
 }
 
-// TestNew_UniversalFallbackDefaults_PackageVarFallthrough — the wiring
-// precedence: when Options leaves the universal-fallback fields zero, New()
-// falls through to the composition-root package seams (the ~10 phase
-// constructors rely on this instead of each threading the discovery closure).
 func TestNew_UniversalFallbackDefaults_PackageVarFallthrough(t *testing.T) {
 	resetUniversalFallbackDefaults(t)
 	sentinel := []string{"agy-tmux"}
@@ -34,9 +27,6 @@ func TestNew_UniversalFallbackDefaults_PackageVarFallthrough(t *testing.T) {
 	}
 }
 
-// TestNew_UniversalFallbackOptions_OverridePackageVar — per-instance Options
-// win over the package defaults (test-injection precedence), so a test's
-// injected discovery closure is authoritative regardless of composition state.
 func TestNew_UniversalFallbackOptions_OverridePackageVar(t *testing.T) {
 	resetUniversalFallbackDefaults(t)
 	DefaultDiscoverCLIsFn = func() []string { return []string{"package-var"} }
@@ -52,10 +42,6 @@ func TestNew_UniversalFallbackOptions_OverridePackageVar(t *testing.T) {
 	}
 }
 
-// TestNew_UniversalFallbackDefault_OffIsInert — with both Options and the
-// package vars at their zero values, the runner carries no universal fallback:
-// byte-identical to the pre-feature dispatch (the feature is opt-in/default-off
-// at the seam level; production turns it on via the composition root).
 func TestNew_UniversalFallbackDefault_OffIsInert(t *testing.T) {
 	resetUniversalFallbackDefaults(t)
 	DefaultUniversalFallback = false

@@ -10,9 +10,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// runConsensusDispatch is the `evolve consensus-dispatch` subcommand. Ports
-// legacy/scripts/dispatch/consensus-dispatch.sh. Inputs are env-vars to
-// preserve the bash contract; flags are accepted as overrides.
+// runConsensusDispatch is the `evolve consensus-dispatch` subcommand. Its
+// inputs are env vars, the bash contract; --help is the only flag.
 func runConsensusDispatch(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	for _, a := range args {
 		switch a {
@@ -24,9 +23,7 @@ func runConsensusDispatch(args []string, _ io.Reader, stdout, stderr io.Writer) 
 			return 0
 		}
 	}
-	// Resolve script-relative defaults from the legacy/scripts/ tree. envOrCwd
-	// absolutizes a relative $EVOLVE_PROJECT_ROOT (cycle-119 class) + falls back
-	// to cwd.
+	// envOrCwd absolutizes a relative $EVOLVE_PROJECT_ROOT and falls back to cwd.
 	projectRoot := envOrCwd("EVOLVE_PROJECT_ROOT")
 	pol, _ := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
 	in := consensusdispatch.Inputs{

@@ -6,13 +6,7 @@ import (
 	"testing"
 )
 
-// mergedcatalog_test.go — RED contract for moving the merged-catalog loader
-// out of cmd/evolve into phasespec, so cmd, the agent self-check, AND the
-// runner's reconcile default all resolve phases through ONE loader (the
-// timeout-reconcile path resolved via BuiltinResolver only, a second policy).
-
-// seedProject writes a minimal project: a built-in registry with one phase
-// and a user phase under .evolve/phases/<name>/phase.json.
+// seedProject writes a project with one built-in registry phase and one user phase overlay.
 func seedProject(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
@@ -37,9 +31,6 @@ func seedProject(t *testing.T) string {
 	return root
 }
 
-// TestMergedCatalog_ResolvesBuiltinAndUserPhases — the single-loader contract:
-// built-in registry phases AND .evolve/phases user specs resolve through one
-// call, with user provenance reported.
 func TestMergedCatalog_ResolvesBuiltinAndUserPhases(t *testing.T) {
 	root := seedProject(t)
 
@@ -64,8 +55,6 @@ func TestMergedCatalog_ResolvesBuiltinAndUserPhases(t *testing.T) {
 	}
 }
 
-// TestMergedCatalog_MissingRegistryErrors — a project without the built-in
-// registry must error loudly (the caller decides how to degrade).
 func TestMergedCatalog_MissingRegistryErrors(t *testing.T) {
 	if _, _, _, err := MergedCatalog(t.TempDir()); err == nil {
 		t.Error("MergedCatalog(no registry) = nil error, want error")

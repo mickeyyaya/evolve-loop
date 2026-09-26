@@ -7,45 +7,30 @@ import (
 	"slices"
 )
 
-// nameRE constrains a phase name to lowercase kebab-case, matching the built-in
-// phase identifiers (scout, build-planner, …). This keeps a user phase name
-// safe to use as a filename, agent suffix, and routing token.
+// nameRE keeps a phase or agent name safe as a filename, agent suffix and routing token.
 var nameRE = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
 
-// twoTierNameRE enforces the two-tier naming rule: user/optional phases must be
-// multi-word kebab-case. Single-word names are the reserved built-in vocabulary.
+// twoTierNameRE requires user phase names to be multi-word; single words are reserved for built-ins.
 var twoTierNameRE = regexp.MustCompile(`^[a-z]+(-[a-z]+)+$`)
 
-// canonicalVerdicts mirrors core's verdict set. Duplicated here (not imported)
-// because phasespec must not depend on core — core imports phasespec.
+// canonicalVerdicts duplicates core's verdict set because core imports phasespec.
 var canonicalVerdicts = map[string]bool{"PASS": true, "FAIL": true, "WARN": true, "SKIPPED": true}
 
-// knownCategories is the closed goal-type vocabulary for PhaseSpec.Categories.
-// It mirrors the advisor's goal-type classification (micro-phase catalog) so
-// category_index buckets line up with cycle goal types. The check is SOFT: an
-// unknown category is a lint warning (UnknownCategories), never a load or
-// ValidateUserSpec floor violation — metadata must not block execution.
+// knownCategories is the advisor's goal-type vocabulary. An unknown category only warns,
+// because metadata must not block execution.
 var knownCategories = map[string]bool{
 	"bugfix": true, "feature": true, "refactor": true, "security": true,
 	"performance": true, "release": true, "docs": true,
-	// Domain goal types (domain-phase-catalog.md §3 recipe table).
 	"project-management": true, "business-strategy": true, "accounting-close": true,
 	"product-discovery": true, "ops-incident": true,
-	// 2026 adversarial-pipeline goal types (skills-derived wave): each names a
-	// distinct request class the advisor classifies and routes via the
-	// evolve-router.md recipe table.
 	"concurrency": true, "api-design": true, "data-migration": true,
 	"observability": true, "supply-chain": true, "agent-instruction": true,
 	"accessibility": true, "frontend-ui": true, "i18n": true,
-	// Wave 5 (skills-derived coverage expansion + plan/evaluate design pairing):
-	// data/query, cache, fault-tolerance, delivery-semantics, infra-config and
-	// stream/batch request classes the advisor classifies and routes.
 	"database": true, "caching": true, "resilience": true,
 	"messaging": true, "infrastructure": true, "data-pipeline": true,
 }
 
-// UnknownCategories returns the entries of s.Categories that are not in the
-// known goal-type vocabulary, in input order. Empty/nil categories → nil.
+// UnknownCategories returns the entries of s.Categories outside the known vocabulary, in input order.
 func UnknownCategories(s PhaseSpec) []string {
 	var unknown []string
 	for _, c := range s.Categories {
@@ -56,39 +41,23 @@ func UnknownCategories(s PhaseSpec) []string {
 	return unknown
 }
 
-// ValidateUserSpec returns human-readable violations for an operator-authored
-// phase spec, or nil when valid. It enforces the safety floor for user phases:
-// they MUST be optional (a user phase can never displace or satisfy the
-// build→audit→ship spine), and only kind:"llm" is executable today.
+// ValidateUserSpec returns a user spec's safety-floor violations, or nil; a user phase must be optional so it never displaces the spine.
 func ValidateUserSpec(s PhaseSpec) []string {
 	return validateUserSpec(s, false)
 }
 
-// ValidateUserSpecWithCatalog behaves exactly like ValidateUserSpec, except it
-// exempts the two-tier single-word naming floor when s.Name matches an existing
-// built-in catalog entry whose Optional field is true. This lets an operator
-// author an *activation overlay* for an already-optional built-in phase (e.g.
-// the single-word "memo" phase, declared optional in the built-in registry but
-// carrying its routing only in the overlay) — the squatting concern the floor
-// guards against does not apply, because the name is already reserved by the
-// built-in. The exemption consults the BUILT-IN's Optional flag, not the
-// overlay's, so an operator can never hijack a mandatory spine phase's name by
-// marking their own overlay optional:true. Every other floor check still runs.
+// ValidateUserSpecWithCatalog is ValidateUserSpec, except an overlay of an optional built-in may keep its single-word name.
 func ValidateUserSpecWithCatalog(s PhaseSpec, builtin Catalog) []string {
 	return validateUserSpec(s, isOptionalBuiltinName(s.Name, builtin))
 }
 
-// isOptionalBuiltinName reports whether name matches a built-in catalog entry
-// that is itself optional:true — the only case in which the two-tier single-word
-// naming floor is exempted (see ValidateUserSpecWithCatalog).
+// isOptionalBuiltinName consults the built-in's Optional flag, never the overlay's, so an
+// overlay cannot hijack a mandatory spine phase's name.
 func isOptionalBuiltinName(name string, builtin Catalog) bool {
 	spec, ok := builtin.Get(name)
 	return ok && spec.Optional
 }
 
-// validateUserSpec is the shared implementation. When exemptSingleWordFloor is
-// true, the twoTierNameRE (single-word) check is skipped; all other floor checks
-// still apply.
 func validateUserSpec(s PhaseSpec, exemptSingleWordFloor bool) []string {
 	var v []string
 	v = append(v, ValidateOutputsPartition(s)...)
@@ -107,17 +76,15 @@ func validateUserSpec(s PhaseSpec, exemptSingleWordFloor bool) []string {
 
 	switch s.KindOrDefault() {
 	case "llm", "native":
-		// supported — "native" dispatches to an in-process Go phase
-		// implementation (registry-selected per phase name), not a REPL boot.
+		// "native" dispatches to an in-process Go phase, not a REPL.
 	case "command":
 		v = append(v, fmt.Sprintf("kind %q is reserved but not yet executable — use \"llm\"", s.Kind))
 	default:
 		v = append(v, fmt.Sprintf("unknown kind %q (expected llm|native|command)", s.Kind))
 	}
 
-	// The agent name is used as a filename under agents/ (persona write path in
-	// `phases create`), so it gets the same kebab-case floor as the phase name —
-	// a crafted "../../x" agent must never escape the agents/ directory.
+	// The agent name becomes a persona filename under agents/ (phases create), so a
+	// crafted "../../x" must never escape that directory.
 	if s.Agent != "" && !nameRE.MatchString(s.Agent) {
 		v = append(v, fmt.Sprintf("agent %q must be lowercase kebab-case (^[a-z][a-z0-9-]*$)", s.Agent))
 	}
@@ -129,25 +96,16 @@ func validateUserSpec(s PhaseSpec, exemptSingleWordFloor bool) []string {
 	return v
 }
 
-// ValidateActivatingFields returns well-formedness violations for the ADR-0058
-// transition-activating fields on a spec, or nil when valid. It is the load-time
-// validator (Load calls it): the registry is a contract, so a malformed
-// activating field fails loudly rather than silently degrading to the literal
-// kernel. It checks SHAPE, not presence — an empty field is valid (the byte-
-// identical default); requiring a specific field is the registry-guard's job.
-//
-//   - branching_strategy must be a known strategy (verdict/history/signal) or empty.
-//   - on_pass and on_fail are a verdict-branch PAIR: declare both or neither.
-//     Next consults them only when both are set, so a half-set is dead config.
+// ValidateActivatingFields checks the shape, not the presence, of a spec's transition-activating fields.
 func ValidateActivatingFields(s PhaseSpec) []string {
 	var v []string
 	switch s.BranchingStrategy {
 	case "", BranchingVerdict, BranchingHistory, BranchingSignal:
-		// known or unset
 	default:
 		v = append(v, fmt.Sprintf("branching_strategy %q must be one of %s/%s/%s (or empty)",
 			s.BranchingStrategy, BranchingVerdict, BranchingHistory, BranchingSignal))
 	}
+	// Next consults the pair only when both are set, so a half-set pair is dead config.
 	if (s.OnPass == "") != (s.OnFail == "") {
 		v = append(v, fmt.Sprintf("on_pass/on_fail must be declared together (a verdict branch needs both targets); got on_pass=%q on_fail=%q",
 			s.OnPass, s.OnFail))
@@ -155,13 +113,8 @@ func ValidateActivatingFields(s PhaseSpec) []string {
 	return v
 }
 
-// ValidateOutputsPartition returns the violations of the ADR-0100 declaration
-// rule for a spec's outputs: every secondary output (files[1:]) is classified
-// exactly once — owed by the agent (agent_owed) or written by the harness
-// (harness_produced) — and every classification names a basename that is
-// declared. It runs for the registry (Load) and for user/overlay specs
-// (validateUserSpec) alike, because an overlay REPLACES a built-in's spec
-// wholesale (Catalog.Merge) and would otherwise ungate a phase silently.
+// ValidateOutputsPartition checks that every secondary output is classified exactly once, agent-owed or harness-produced.
+// See ADR-0100.
 func ValidateOutputsPartition(s PhaseSpec) []string {
 	var v []string
 	declared := map[string]bool{}

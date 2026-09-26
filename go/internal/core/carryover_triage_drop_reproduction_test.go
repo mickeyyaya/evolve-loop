@@ -7,9 +7,6 @@ import (
 	"testing"
 )
 
-// TestFinalizeCycle_RetiresTriageDroppedCarryover reproduces cycle 1538: a
-// no-ship WARN cycle records a stale carryover in triage-decision.json, but the
-// terminal path persists that same carryover for the next cycle.
 func TestFinalizeCycle_RetiresTriageDroppedCarryover(t *testing.T) {
 	const droppedID = "todo-author-bridge-binding-tests-for-replay-contract-boundary"
 

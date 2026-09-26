@@ -62,15 +62,15 @@ func TestRole_Name(t *testing.T) {
 }
 
 func TestRole_BuilderWritesInWorktree(t *testing.T) {
-	worktree := "/tmp/wt/cycle-42"
-	s, _ := setupStorageWithCS(t, core.CycleState{
+	worktree := "/work/wt/cycle-42"
+	s := cycleStateOnly{cs: core.CycleState{
 		CycleID:        42,
 		Phase:          "build",
 		ActiveAgent:    "builder",
 		ActiveWorktree: worktree,
-		WorkspacePath:  filepath.Join(t.TempDir(), ".evolve", "runs", "cycle-42"),
-	})
-	g := NewRole(s, false)
+		WorkspacePath:  "/work/evolve/runs/cycle-42",
+	}}
+	g := newRoleWithHome(s, false, fixtureHome)
 
 	dec := g.Decide(context.Background(), core.GuardInput{
 		ToolName:  "Edit",
@@ -129,13 +129,13 @@ func TestRole_NonWorktreePhaseDeniedWorktreeWrite(t *testing.T) {
 }
 
 func TestRole_AuditPhaseRestricted(t *testing.T) {
-	ws := filepath.Join(t.TempDir(), ".evolve", "runs", "cycle-7")
-	s, _ := setupStorageWithCS(t, core.CycleState{
+	ws := "/work/evolve/runs/cycle-7"
+	s := cycleStateOnly{cs: core.CycleState{
 		CycleID:       7,
 		Phase:         "audit",
 		WorkspacePath: ws,
-	})
-	g := NewRole(s, false)
+	}}
+	g := newRoleWithHome(s, false, fixtureHome)
 
 	dec := g.Decide(context.Background(), core.GuardInput{
 		ToolName:  "Edit",

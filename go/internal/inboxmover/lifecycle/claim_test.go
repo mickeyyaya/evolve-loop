@@ -1,7 +1,5 @@
 package lifecycle
 
-// claim_test.go — Claim's contract through the leaf (§6 tests 22-24).
-
 import (
 	"errors"
 	"os"
@@ -11,8 +9,6 @@ import (
 	"time"
 )
 
-// Test 22 — a not-found claim emits INBOX_CLAIM_NOT_FOUND with the inbox dir
-// and the cycle parsed leniently from the string (unparseable ⇒ 0).
 func TestMover_Claim_NotFound_EmitsClaimNotFound(t *testing.T) {
 	inbox := newInbox(t)
 	rc := newRecordingCenter()
@@ -31,10 +27,6 @@ func TestMover_Claim_NotFound_EmitsClaimNotFound(t *testing.T) {
 	}
 }
 
-// Test 23 — the ADR-0074 claim floor through the leaf: route:console-* refuses
-// with a nil predicate; a protected fix surface refuses only when a predicate
-// is injected; route:lane on an operator-authored item claims a declared
-// directory scope but never a declared protected FILE (F35).
 func TestMover_Claim_Refused_EmitsClaimRefused(t *testing.T) {
 	inbox := newInbox(t)
 	writeItem(t, filepath.Join(inbox, "x.json"), `{"id":"task-x","route":"console-manual"}`)
@@ -68,9 +60,6 @@ func TestMover_Claim_Refused_EmitsClaimRefused(t *testing.T) {
 	}
 }
 
-// Test 24 — INBOX_CLAIM_MOVE_FAILED names its step: mkdir (a FILE at
-// processing/, legacy ERROR) and rename (a directory at the destination file,
-// legacy WARN); both return ErrMvFailed.
 func TestMover_Claim_MoveFailed_StepMkdirAndRename(t *testing.T) {
 	inbox := newInbox(t)
 	writeItem(t, filepath.Join(inbox, "t1.json"), `{"id":"t1"}`)
@@ -103,8 +92,6 @@ func TestMover_Claim_MoveFailed_StepMkdirAndRename(t *testing.T) {
 	}
 }
 
-// The usage arms keep their verbatim ERROR lines and ErrBadArgs; a claim that
-// succeeds prints the INFO line and ledgers triage-claim with the cycle.
 func TestMover_Claim_UsageAndHappyPath(t *testing.T) {
 	inbox := newInbox(t)
 	writeItem(t, filepath.Join(inbox, "t1.json"), `{"id":"t1"}`)
@@ -135,7 +122,6 @@ func TestMover_Claim_UsageAndHappyPath(t *testing.T) {
 	}
 }
 
-// consoleRoutedReason fails open on an unreadable or malformed item (Q13).
 func TestConsoleRoutedReason_FailsOpenOnUnreadableOrMalformed(t *testing.T) {
 	inbox := newInbox(t)
 	if got := consoleRoutedReason(filepath.Join(inbox, "missing.json"), nil); got != "" {

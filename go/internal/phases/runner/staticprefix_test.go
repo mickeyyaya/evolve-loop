@@ -1,11 +1,5 @@
 package runner
 
-// staticprefix_test.go — behavior + apicover naming tests for StaticPrefix,
-// the read half of the cache-stable prompt-prefix contract (cycle-535 ship).
-// CI's apicover -enforce flagged it UNCOVERED (no test named it); these tests
-// close the gap by pinning the contract from both ends of the shared
-// cycleContextBoundary literal, not by merely naming the identifier.
-
 import (
 	"strings"
 	"testing"
@@ -13,10 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// TestStaticPrefix_RoundTripsBaseCycleContext: StaticPrefix over a
-// BaseCycleContext-composed prompt must return EXACTLY the static body — if
-// any per-cycle dynamic value (cycle, goal_hash, project_root, workspace)
-// leaks above the boundary, the provider prompt-cache misses on every cycle.
 func TestStaticPrefix_RoundTripsBaseCycleContext(t *testing.T) {
 	body := "PERSONA\n\nrules body"
 	req := core.PhaseRequest{Cycle: 42, GoalHash: "abc123", ProjectRoot: "/proj", Workspace: "/ws"}
@@ -32,9 +22,6 @@ func TestStaticPrefix_RoundTripsBaseCycleContext(t *testing.T) {
 	}
 }
 
-// TestStaticPrefix_NoBoundaryIsWholePrompt: a prompt without the canonical
-// "## Cycle Context" boundary is all prefix — StaticPrefix must never
-// truncate a prompt it does not understand.
 func TestStaticPrefix_NoBoundaryIsWholePrompt(t *testing.T) {
 	prompt := "free-form prompt with no cycle context block"
 	if got := StaticPrefix(prompt); got != prompt {
@@ -42,11 +29,6 @@ func TestStaticPrefix_NoBoundaryIsWholePrompt(t *testing.T) {
 	}
 }
 
-// TestBaseRunner_ComposePrompt_DelegatesToHooks executes the public
-// ComposePrompt seam (apicover flagged it false-green: named but never run):
-// it must return the hooks' composition verbatim and pass body+req through
-// untouched — the cache-stable audit relies on this being the SAME assembly
-// Run uses, not a parallel one.
 func TestBaseRunner_ComposePrompt_DelegatesToHooks(t *testing.T) {
 	hooks := &fakeHooks{phase: "scout", agent: "evolve-scout", model: "auto",
 		prompt: "hook-composed prompt"}

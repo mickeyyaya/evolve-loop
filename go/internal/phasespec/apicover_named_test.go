@@ -8,17 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// apicover_named_test.go — public-API coverage (ADR-0050 Phase 5). Names and
-// exercises exported symbols apicover flagged uncovered in this package:
-//   - func ApplyArchetypeDefaults (phasespec.go)
-//   - func Roots (mergedcatalog.go)
-//   - type IO (phasespec.go)
-// Each test asserts a real contract (Rule 9), not a no-op reference.
-
-// TestApplyArchetypeDefaults_EvaluateFillsDefaults asserts the evaluate-archetype
-// overlay gets the conventional defaults filled (optional, prompt_context=[goal],
-// fail_if_empty, verdict_on_pass=PASS), and that a non-evaluate spec is left
-// untouched (the early-return no-op branch).
 func TestApplyArchetypeDefaults_EvaluateFillsDefaults(t *testing.T) {
 	s := &PhaseSpec{Name: "widget-scan", Role: "evaluate"}
 	ApplyArchetypeDefaults(s)
@@ -40,10 +29,7 @@ func TestApplyArchetypeDefaults_EvaluateFillsDefaults(t *testing.T) {
 	}
 }
 
-// TestApplyArchetypeDefaults_NonEvaluateNoOp asserts the early-return branch:
-// a non-evaluate archetype is not mutated (no implicit Optional / Classify).
 func TestApplyArchetypeDefaults_NonEvaluateNoOp(t *testing.T) {
-	// "plan" archetype — defaults must NOT be applied.
 	plan := &PhaseSpec{Name: "scout", Role: "plan"}
 	ApplyArchetypeDefaults(plan)
 	if plan.Optional {
@@ -56,8 +42,7 @@ func TestApplyArchetypeDefaults_NonEvaluateNoOp(t *testing.T) {
 		t.Errorf("plan archetype PromptContext = %v, want empty", plan.PromptContext)
 	}
 
-	// Already-set evaluate spec: ApplyArchetypeDefaults must preserve explicit
-	// values rather than overwrite them.
+	// Also covers an evaluate spec: its explicit values are preserved, not overwritten.
 	preset := &PhaseSpec{
 		Name:          "audit",
 		Role:          "evaluate",
@@ -71,21 +56,16 @@ func TestApplyArchetypeDefaults_NonEvaluateNoOp(t *testing.T) {
 	}
 }
 
-// TestRoots_DefaultAndOverride exercises RootsWithPolicy branches: the empty-cfg
-// default (project-local .evolve/phases joined to projectRoot) and an override
-// (relative entries joined, absolute entries kept, empty segments dropped).
 func TestRoots_DefaultAndOverride(t *testing.T) {
 	root := t.TempDir()
 
-	// Default: empty PathsConfig → single default root joined to projectRoot.
 	got := RootsWithPolicy(root, policy.PathsConfig{})
 	wantDefault := filepath.Join(root, defaultRoot)
 	if len(got) != 1 || got[0] != wantDefault {
 		t.Fatalf("RootsWithPolicy(default) = %v, want [%s]", got, wantDefault)
 	}
 
-	// Override: a relative entry is joined to projectRoot, an absolute entry is
-	// kept verbatim. Empty segments are dropped.
+	// The "::" leaves an empty segment, which must be dropped.
 	abs := filepath.Join(root, "abs-phases")
 	got = RootsWithPolicy(root, policy.PathsConfig{PhaseRoots: "custom/phases::" + abs})
 	wantRel := filepath.Join(root, "custom/phases")
@@ -100,8 +80,6 @@ func TestRoots_DefaultAndOverride(t *testing.T) {
 	}
 }
 
-// TestIO_StructAndRoundTrip binds an IO value via full-struct equality and
-// asserts it round-trips as the Inputs/Outputs fields of a PhaseSpec.
 func TestIO_StructAndRoundTrip(t *testing.T) {
 	want := IO{
 		Files:   []string{"scout-report.md"},

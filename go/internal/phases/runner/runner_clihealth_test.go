@@ -1,11 +1,5 @@
 package runner
 
-// RED contract for the CLI-health bench hooks (cycle-283 forensics): when a
-// candidate exits 85 and the bridge's escalation-report.json classifies a
-// benchable pattern (rate_limit), the runner must REMEMBER it — bench the CLI
-// FAMILY in .evolve/cli-health.json — and the NEXT dispatch must start at a
-// healthy CLI instead of re-burning the benched primary's boot window.
-
 import (
 	"context"
 	"encoding/json"
@@ -19,14 +13,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// cycle283WallTail is the verbatim wall line from the real cycle-283
-// escalation report — the fixture the whole feature was built from.
+// cycle283WallTail is a verbatim wall line from a real escalation report.
 const cycle283WallTail = "■ You've hit your usage limit. Upgrade to Pro (https://chatgpt.com/explore/pro), " +
 	"visit https://chatgpt.com/codex/settings/usage to purchase more credits or try again at 6:11 AM."
 
-// escalatingBridge wraps scriptedBridge and, when the named CLI launches,
-// writes a workspace escalation-report.json the way bridge/autorespond.go
-// does (unprefixed, before rc 85 propagates).
+// escalatingBridge writes escalation-report.json as bridge/autorespond.go does: unprefixed, before rc 85 propagates.
 type escalatingBridge struct {
 	scriptedBridge
 	escalateCLI string // CLI whose launch drops the report
@@ -78,9 +69,6 @@ func runPhase(t *testing.T, root string, bridge core.Bridge) {
 	}
 }
 
-// TestRun_Exit85RateLimitBenchesFamily: the cycle-283 replay. codex exits 85
-// with a fresh rate_limit escalation report → the runner benches family
-// "codex" with reason rate_limit; the fallback completes the phase.
 func TestRun_Exit85RateLimitBenchesFamily(t *testing.T) {
 	root := writeFallbackProfile(t, "evolve-auditor", "codex-tmux", []string{"claude-tmux"})
 	eb := &escalatingBridge{
@@ -110,8 +98,6 @@ func TestRun_Exit85RateLimitBenchesFamily(t *testing.T) {
 	}
 }
 
-// TestRun_ActiveBenchDemotesFamilyOnDispatch: with codex actively benched,
-// the dispatch chain must START at the fallback — zero benched-CLI launches.
 func TestRun_ActiveBenchDemotesFamilyOnDispatch(t *testing.T) {
 	root := writeFallbackProfile(t, "evolve-auditor", "codex-tmux", []string{"claude-tmux"})
 	now := time.Now()
@@ -127,8 +113,6 @@ func TestRun_ActiveBenchDemotesFamilyOnDispatch(t *testing.T) {
 	}
 }
 
-// TestRun_ExpiredBenchDoesNotDemote: lazy expiry — a bench past benched_until
-// no longer reorders the chain (the primary gets its canary shot).
 func TestRun_ExpiredBenchDoesNotDemote(t *testing.T) {
 	root := writeFallbackProfile(t, "evolve-auditor", "codex-tmux", []string{"claude-tmux"})
 	now := time.Now()
@@ -142,8 +126,6 @@ func TestRun_ExpiredBenchDoesNotDemote(t *testing.T) {
 	}
 }
 
-// TestRun_CLIMismatchReportDoesNotBench: a stale report naming a different
-// CLI must not bench the family that just exited 85.
 func TestRun_CLIMismatchReportDoesNotBench(t *testing.T) {
 	root := writeFallbackProfile(t, "evolve-auditor", "codex-tmux", []string{"claude-tmux"})
 	eb := &escalatingBridge{
@@ -160,8 +142,6 @@ func TestRun_CLIMismatchReportDoesNotBench(t *testing.T) {
 	}
 }
 
-// TestRun_StaleReportDoesNotBench: a report captured BEFORE this dispatch
-// started is a leftover from an earlier phase — must not bench.
 func TestRun_StaleReportDoesNotBench(t *testing.T) {
 	root := writeFallbackProfile(t, "evolve-auditor", "codex-tmux", []string{"claude-tmux"})
 	eb := &escalatingBridge{
@@ -178,8 +158,6 @@ func TestRun_StaleReportDoesNotBench(t *testing.T) {
 	}
 }
 
-// TestRun_NonBenchablePatternDoesNotBench: only the benchable set
-// (rate_limit) writes a bench — an arbitrary escalation must not.
 func TestRun_NonBenchablePatternDoesNotBench(t *testing.T) {
 	root := writeFallbackProfile(t, "evolve-auditor", "codex-tmux", []string{"claude-tmux"})
 	eb := &escalatingBridge{
@@ -196,8 +174,6 @@ func TestRun_NonBenchablePatternDoesNotBench(t *testing.T) {
 	}
 }
 
-// TestRun_EnvDisableSkipsBenchAndDemotion: EVOLVE_CLI_HEALTH=0 disables both
-// the write and the consult.
 func TestRun_EnvDisableSkipsBenchAndDemotion(t *testing.T) {
 	root := writeFallbackProfile(t, "evolve-auditor", "codex-tmux", []string{"claude-tmux"})
 	now := time.Now()
@@ -220,8 +196,6 @@ func TestRun_EnvDisableSkipsBenchAndDemotion(t *testing.T) {
 	}
 }
 
-// TestRun_AllFamiliesBenchedNeverStrands: bench is advice, not a veto — with
-// every candidate's family benched, the phase still dispatches.
 func TestRun_AllFamiliesBenchedNeverStrands(t *testing.T) {
 	root := writeFallbackProfile(t, "evolve-auditor", "codex-tmux", []string{"claude-tmux"})
 	now := time.Now()
@@ -230,7 +204,7 @@ func TestRun_AllFamiliesBenchedNeverStrands(t *testing.T) {
 		BenchedAt: now, BenchedUntil: now.Add(time.Hour)})
 	_ = st.Bench(clihealth.Entry{Family: "claude", Reason: "rate_limit",
 		BenchedAt: now.Add(-time.Minute), BenchedUntil: now.Add(time.Hour)})
-	// claude benched EARLIER → least-recently-benched → tried first.
+	// claude was benched earlier, so it is tried first.
 	sb := &scriptedBridge{responses: map[string]scriptedResp{"claude-tmux": {}}}
 	runPhase(t, root, sb)
 	if len(sb.calls) == 0 {

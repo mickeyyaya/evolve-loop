@@ -37,20 +37,16 @@ func TestRunCycleTiming_RendersTableAndRollup(t *testing.T) {
 		t.Fatalf("exit=%d, stderr=%s", code, errb.String())
 	}
 	s := out.String()
-	// Per-phase rows + the archetypes present in the fixture (plan/build/evaluate).
 	for _, want := range []string{"scout", "build", "audit", "plan", "evaluate"} {
 		if !strings.Contains(s, want) {
 			t.Errorf("output missing %q:\n%s", want, s)
 		}
 	}
-	// The longest phase (build) must be surfaced by name in the roll-up.
 	if !strings.Contains(s, "Longest: build") {
 		t.Errorf("roll-up must name the longest phase 'build'; got:\n%s", s)
 	}
 }
 
-// With ≥2 independent (non-audit) evaluate phases, the shadow parallel-evaluate
-// projection line must appear, naming the group and the would-be saving.
 func TestRunCycleTiming_ParallelProjection(t *testing.T) {
 	root := t.TempDir()
 	writeTimingFixture(t, root, "55", []phasetiming.Entry{
@@ -67,14 +63,12 @@ func TestRunCycleTiming_ParallelProjection(t *testing.T) {
 	if !strings.Contains(s, "Parallel-evaluate projection") {
 		t.Errorf("expected the shadow projection line; got:\n%s", s)
 	}
-	// Group is coverage-gate + adversarial-review (audit excluded as the brancher).
+	// audit is excluded as the brancher, so the group is coverage-gate + adversarial-review.
 	if !strings.Contains(s, "coverage-gate") || strings.Contains(s, "audit — ") {
 		t.Errorf("projection group must include checking phases and exclude audit; got:\n%s", s)
 	}
 }
 
-// With no positional cycle, the reporter picks the highest-numbered cycle that
-// has a timing log (reset-suffixed dirs and log-less dirs are ignored).
 func TestRunCycleTiming_DefaultsToLatestCycle(t *testing.T) {
 	root := t.TempDir()
 	writeTimingFixture(t, root, "7", []phasetiming.Entry{{Phase: "scout", DurationMS: 1000, Archetype: "plan", AttemptCount: 1}})

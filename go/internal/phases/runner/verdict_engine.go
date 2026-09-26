@@ -1,14 +1,5 @@
 package runner
 
-// verdict_engine.go — unit 11 (ADR-0103, design decomposition/11-phaserunner.md):
-// the runner's seam onto the verdict engine. Every old caller keeps its
-// spelling: runner.New(Options{…}) at all fifteen production construction
-// sites, the ten embedders, the swarmrunner Decorator and phaseregistrar never
-// learn the unit exists; the three settle tests keep reading the bound under
-// its old names; the engine's ONE construction (which is also the ONE
-// resolution of its seams), the ONE projection onto its input and the Center
-// derivation live here.
-
 import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable"
@@ -19,18 +10,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// signalSource is the optional capability a core.Bridge may expose: the Center
-// it was built with. The production Adapter satisfies it (Signals() beside
-// SignalsWired()); fakeBridge and the registry-factory roots
-// (bridge.NewDefault(root, nil)) do not. Declared where it is consumed (the
-// core.PersonaProber / swarmrunner optional-interface idiom); unexported so the
-// host's apicover row sees no new type.
+// signalSource is the optional Bridge capability exposing its Center.
 type signalSource interface{ Signals() *signalcenter.Center }
 
-// resolveSignals is the ONE derivation of the engine's Center accessor:
-// Options.Signals (tests, the --simulate twin, any foreign root) wins; else
-// the injected Bridge's when it is a signalSource; else nil (the Null Object).
-// The bridge's accessor is a method value read live at every use.
+// resolveSignals is the one derivation of the engine's Center: Options.Signals, else the Bridge's own, else nil.
 func resolveSignals(opts Options) func() *signalcenter.Center {
 	if opts.Signals != nil {
 		return opts.Signals
@@ -41,14 +24,7 @@ func resolveSignals(opts Options) func() *signalcenter.Center {
 	return nil
 }
 
-// wiredVerdictEngine is the ONE construction (TestVerdictEngine_OneConstructionSite)
-// and the ONE resolution of the engine's seams — Options to defaults, handed
-// to the engine and kept nowhere else (the engine is their only home; New
-// stores the result once, eagerly, and nothing builds one lazily). The probe:
-// Options.VerifyFn or the catalog-aware default over Options.PhaseIO; the
-// clock: Options.SleepFn or settleSleep; the stdout filter: Options.StdoutFilter
-// or logfilter.Process, nil (the engine's Null Object) when disabled; the
-// optional flag; the live Center accessor.
+// wiredVerdictEngine is the engine's one construction and the one resolution of its seams; the seams live nowhere else.
 func wiredVerdictEngine(opts Options) *verdict.Engine {
 	verify := func(id verdict.Identity, phase string, roots phasecontract.Roots) (deliverable.Result, error) {
 		switch {
@@ -56,17 +32,12 @@ func wiredVerdictEngine(opts Options) *verdict.Engine {
 			return opts.VerifyFn(phase, roots)
 		case opts.ContractVerifier != nil:
 			if v := opts.ContractVerifier(); v != nil {
-				// The gate's own verifier: ONE verifier for gate and engine (F22).
+				// The gate's own verifier, so the engine classifies the bytes the gate approves.
 				return v.VerifyForClassification(gatesignal.Check{Cycle: id.Cycle, RunID: id.RunID, Phase: id.Phase}, phase, roots)
 			}
 		}
-		// Catalog-aware so the reconcile check resolves user/minted phases
-		// under the SAME policy as the host gate and the agent self-check —
-		// a builtin-only default left an inserted phase's surviving artifact
-		// unresolvable on timeout, synthesizing FAIL. Stage-threaded (3.10
-		// Slice 1) so the rung also reaches the host gate's verdict at enforce;
-		// no salvage here — the gate alone repairs, and only when it is the
-		// engine's verifier does the classification see the repair.
+		// Catalog-aware so user and minted phases resolve as the host gate resolves them. It never
+		// salvages: only the gate repairs, and the engine sees a repair only through the gate's verifier.
 		return deliverable.VerifyCatalogAwareStage(phase, roots, opts.PhaseIO)
 	}
 	sleep := opts.SleepFn
@@ -84,10 +55,7 @@ func wiredVerdictEngine(opts Options) *verdict.Engine {
 		verdict.WithOptional(opts.Optional), verdict.WithSignals(resolveSignals(opts)))
 }
 
-// dispatchOf is the ONE projection from the host's three stage objects onto
-// the engine's input — keyed (go vet's composites check rejects a positional
-// literal of an imported struct; the leaf's own test constructs it
-// positionally so a new field breaks the build there).
+// dispatchOf is the one projection of the host's stage objects onto the engine's input; keyed, as go vet requires.
 func dispatchOf(req core.PhaseRequest, prep phasePreparation, plan phaseDispatchPlan, d phaseDispatchResult) verdict.Dispatch {
 	return verdict.Dispatch{
 		Cycle: req.Cycle, RunID: req.RunID, Phase: prep.phase, Workspace: req.Workspace, Worktree: req.Worktree,
@@ -98,29 +66,22 @@ func dispatchOf(req core.PhaseRequest, prep phasePreparation, plan phaseDispatch
 	}
 }
 
-// classifyWith binds the phase hook over Run's request (WorktreeVerified
-// already stamped) and the terminal bridge response — the Strategy the engine
-// calls without importing the runner or seeing core.PhaseRequest.
+// classifyWith binds the phase hook to Run's request, WorktreeVerified already stamped, and the terminal bridge response.
 func (b *BaseRunner) classifyWith(req core.PhaseRequest, bres core.BridgeResponse) verdict.Classify {
 	return func(artifact string) (string, []core.Diagnostic, string) {
 		return b.hooks.Classify(artifact, req, bres)
 	}
 }
 
-// SignalsWired reports whether this runner's verdict engine reaches a Signal
-// Center — the root-wiring proof (the swarmrunner Decorator forwards it).
+// SignalsWired reports whether this runner's verdict engine reaches a Signal Center.
 func (b *BaseRunner) SignalsWired() bool { return b.judge.SignalsWired() }
 
-// ContractVerifierWired reports whether the composition root SUPPLIED the
-// engine's verifier — the gate's Reviewer when the contract gate is on, its
-// Null-Object PlainVerifier when off — i.e. the root made the choice; it is
-// not a gate-liveness proof (ADR-0103 unit 11 shape).
+// ContractVerifierWired reports whether the composition root supplied the engine's verifier; it does not prove the gate live.
 func (b *BaseRunner) ContractVerifierWired() bool {
 	return !b.verifyInjected && b.contractVerifier != nil && b.contractVerifier() != nil
 }
 
-// The settle bounds under their old names — Strangler projections for the
-// settle tests that read them (the values are the engine's).
+// The engine's settle bounds under the names the settle tests read.
 const (
 	reconcileSettleRetries  = verdict.SettleRetries
 	reconcileSettleInterval = verdict.SettleInterval

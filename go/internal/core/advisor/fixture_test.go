@@ -1,14 +1,5 @@
 package advisor
 
-// fixture_test.go — the ONE rich RouteInput the unit-04 goldens
-// (ADR-0103, docs/architecture/decomposition/04-advisor.md §6 step 1) were
-// captured over on the pre-extraction code and are replayed through the leaf:
-// every prompt section rendered at once — a 13-card catalog spanning the
-// three enrichment buckets, three on-demand names, 23 carryover todos across
-// every priority spelling with one 700-rune action, two benches (one walled),
-// recall memory, two unavailable phases, conditional rules + triggers +
-// rubric hints, a 4100-rune goal and all four signal blocks.
-
 import (
 	"context"
 	"fmt"
@@ -25,13 +16,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// goldenWorkspace is the literal workspace the prompt goldens carry: the
-// composer renders it into the absolute artifact-path instruction and never
-// touches the disk, so no templating is needed.
+// goldenWorkspace needs no templating: the composer only renders it and never touches the disk.
 const goldenWorkspace = "/ws/cycle-42"
 
-// goldenPersona is the stub persona the persona-path goldens compose over —
-// the real agents/evolve-router.md would break on every persona edit.
+// goldenPersona is a stub: the real agents/evolve-router.md would break the goldens on every persona edit.
 const goldenPersona = "# evolve-router\nYou are the ROUTER persona stub (PERSONA_MARKER_42)."
 
 func richRouteInput() router.RouteInput {
@@ -80,9 +68,7 @@ func richRouteInput() router.RouteInput {
 	}
 }
 
-// richCarryoverTodos: 23 todos over every priority spelling the rank table
-// knows plus the malformed ones, with descending/ascending FirstSeenCycle so
-// the rank-then-recency order and the stable ties are all exercised.
+// richCarryoverTodos spans every priority spelling plus malformed ones, with cycling FirstSeenCycle to exercise ties.
 func richCarryoverTodos() []router.CarryoverTodo {
 	priorities := []string{"P0", "P1", "H", "HIGH", "P2", "P3", "M", "MED", "MEDIUM", "L", "LOW", "", "blocking", " p1 ", "p0", "P2", "P1", "P0", "LOW", "P3", "H", "P0", "M"}
 	todos := make([]router.CarryoverTodo, 0, len(priorities))
@@ -102,9 +88,7 @@ func richCarryoverTodos() []router.CarryoverTodo {
 	return todos
 }
 
-// richCatalog: 13 cards — 5 Optional with metadata, 4 Optional without, 4
-// spine — in a deliberately interleaved order so the stable partition is
-// visible in the golden. One card carries every guardrail line.
+// richCatalog interleaves the three enrichment buckets so the stable partition shows in the golden.
 func richCatalog() []router.PhaseCard {
 	return []router.PhaseCard{
 		{Name: "scout", Role: "plan"},
@@ -123,10 +107,7 @@ func richCatalog() []router.PhaseCard {
 	}
 }
 
-// launchRouteInput is the compact input the launch-request and capture
-// goldens use: the fields the launcher threads (workspace, worktree, root,
-// cycle, env) plus a secret-shaped token in the goal so the persisted prompt's
-// redaction is part of the capture golden.
+// launchRouteInput carries a secret-shaped goal so the capture golden covers redaction.
 func launchRouteInput(ws, root, wt string) router.RouteInput {
 	return router.RouteInput{
 		Current:        "build",
@@ -143,8 +124,6 @@ func launchRouteInput(ws, root, wt string) router.RouteInput {
 	}
 }
 
-// baseRouteInput is the compact input the launch tests use (the core
-// helper's shape, so moved tests keep their spelling).
 func baseRouteInput() router.RouteInput {
 	return router.RouteInput{
 		Current:     "build",
@@ -156,15 +135,12 @@ func baseRouteInput() router.RouteInput {
 	}
 }
 
-// scriptedResp is one scripted launcher reply.
 type scriptedResp struct {
 	resp LaunchResponse
 	err  error
 }
 
-// fakeLauncher records every request and replies with the canned stdout, or
-// with one scripted reply per call in order (clamped to the last entry once
-// exhausted) — the core fakeBridge and sequencedBridge folded into one.
+// fakeLauncher replies from seq in order, repeating its last entry once exhausted, else with the canned stdout.
 type fakeLauncher struct {
 	stdout     string
 	err        error
@@ -198,7 +174,6 @@ func (f *fakeLauncher) calledCLIs() []string {
 	return out
 }
 
-// refusingLauncher fails the test if the advisor launches through it.
 type refusingLauncher struct{ t *testing.T }
 
 func (r refusingLauncher) Launch(context.Context, LaunchRequest) (LaunchResponse, error) {
@@ -211,8 +186,7 @@ func defaultIdentity() Identity {
 	return Identity{CLI: "claude-tmux", Model: "opus", AgentLabel: "router"}
 }
 
-// observed builds an advisor reporting into a recording Center; the writer is
-// the plain os.WriteFile (a temp workspace) unless the test injects one.
+// observed builds an advisor whose Center records every event.
 func observed(t *testing.T, l Launcher, id Identity, opts ...Option) (*Advisor, *[]signalcenter.Event) {
 	t.Helper()
 	c := signalcenter.New()
@@ -222,11 +196,9 @@ func observed(t *testing.T, l Launcher, id Identity, opts ...Option) (*Advisor, 
 	return New(l, id, plainWriter, opts...), got
 }
 
-// plainWriter is the os.WriteFile-shaped capture writer the leaf tests use
-// (core injects its atomic writer in production).
+// plainWriter stands in for core's atomic capture writer.
 func plainWriter(path string, data []byte) error { return os.WriteFile(path, data, 0o644) }
 
-// eventsWithCode filters a recording by code.
 func eventsWithCode(got []signalcenter.Event, code signalcenter.Code) []signalcenter.Event {
 	var out []signalcenter.Event
 	for _, e := range got {
@@ -237,8 +209,7 @@ func eventsWithCode(got []signalcenter.Event, code signalcenter.Code) []signalce
 	return out
 }
 
-// tempInput is baseRouteInput over a temp workspace, so a wired Center sees
-// no capture-write faults on the happy path.
+// tempInput uses a temp workspace so a wired Center sees no capture-write faults.
 func tempInput(t *testing.T) router.RouteInput {
 	t.Helper()
 	in := baseRouteInput()
@@ -283,7 +254,6 @@ func firstDiff(a, b string) int {
 	return n
 }
 
-// routingCfg is the enforce-stage config the clamp integration uses.
 func routingCfg() config.RoutingConfig {
 	return config.RoutingConfig{
 		Stage:         config.StageEnforce,
