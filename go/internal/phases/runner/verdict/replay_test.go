@@ -1,11 +1,5 @@
 package verdict
 
-// replay_test.go — ADR-0103 unit 11 §6 test 33: the host's response and probe
-// goldens (captured on 8e8f080f through runner.New + Run, before any code
-// moved) replayed through Judge with equivalent fakes over real temp dirs —
-// byte-identical JSON, identical probe/sleep counts. Any drift in a moved
-// literal shows here.
-
 import (
 	"context"
 	"encoding/json"
@@ -65,9 +59,7 @@ func replayScenarios() []replayScenario {
 	}
 }
 
-// replay drives one row through Judge exactly as the host's Run would have:
-// the pre-dispatch snapshot before the "launch", the agent's report written
-// by the "bridge", then the engine.
+// replay orders a row as the host's Run does: pre-dispatch snapshot, agent write, then Judge.
 func replay(t *testing.T, ctx context.Context, sc replayScenario) (*harness, core.PhaseResponse, error) {
 	t.Helper()
 	h := newHarness(t, sc.probe, WithOptional(sc.optional))

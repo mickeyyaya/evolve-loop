@@ -1,12 +1,5 @@
 package verdict
 
-// importgraph_test.go — the package is a leaf under the runner (ADR-0103 unit
-// 11 §2): stdlib plus the six named internal packages, never the host, never
-// internal/log, the bridge, the env or the process streams (the compiler is
-// the cycle guard; this is the leaf-ness declaration — the
-// signalcenter/importgraph_test.go idiom). Direct imports only: coherence
-// reaches policy transitively, which is fine.
-
 import (
 	"go/parser"
 	"go/token"
@@ -61,9 +54,7 @@ func TestImportGraph_LeafImportsOnlyTheDeclaredPackages(t *testing.T) {
 	}
 }
 
-// Test 13c — the leaf writes no stderr and reads no env: its only voice is the
-// Signal Center. A source scan, because a stray fmt.Fprintf(os.Stderr, …) is
-// invisible to every other test.
+// A source scan, because a stray write to the process streams is invisible to every other test.
 func TestNoStderrNoEnv_InTheLeaf(t *testing.T) {
 	for _, name := range nonTestSources(t) {
 		src, err := os.ReadFile(filepath.Join(".", name))
