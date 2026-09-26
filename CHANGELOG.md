@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## Added — logic-first delivery: phases own the logic, the pipeline owns the form (ADR-0106, operating-policy §0, 2026-09-26)
+
+Over cycles ~1550–1707 a byte-identical change re-ran Build and Audit because a peer landed first (14 cycles), a derivable secondary sent a whole phase back (4 cycles, still recurring), and cycle 1707's TDD agent refused its own task for an hour over a process misunderstanding. None was a defect in the change. The operator's direction, P0: phases focus on logic; a format or process failure is recovered, never blocking.
+
+- Operating policy §0 states the rule (numbered so that no historical citation of §1–§7 moves): three kinds of block (logic, form or process, integrity) and only logic and integrity are final; recovery is layered cheapest first (a host derivation before any judge, deterministic rungs, the recovery agent, a re-dispatch), never launders (the gate re-judges, the verdict is re-earned, the kernel proves the grant), decides between assigning back and recovering on kernel-checkable evidence that the request is fulfilled, and is bounded and loud.
+- [ADR-0106](docs/architecture/adr/0106-logic-first-delivery.md) records the evidence, the decision, the routing of every violation code, the recovery agent's guards, and the evidence decision (`evidence.Sufficient` over kernel inputs; a missing deliverable is always assigned back), and the component table in landing order: the process rungs (ADR-0105, the closeout dossier, agent identity in prompts, exit-85 causes), the host derivations, the evidence decision wired into the re-dispatch, the verdict refresh and the shared ladder, then the recovery agent.
+- Review: architecture review, APPROVE-WITH-CHANGES; every finding is folded in (a helper without a worktree runs unsandboxed unless its profile says otherwise; a verdict-equality guard is unsound for phases whose verdict is their sections; a run-dir grant reaches proof of read; re-derivation belongs before the judges; resume has a separate ladder; extra re-reviews demote the gate; exhaustion must not weaken the ADR-0072 breakers).
+
 ## Added — a fleet rebase replays the audited change, not ship's commit (ADR-0105 rung B1, 2026-09-26)
 
 When a peer moved main between a lane's audit and its landing, recovery rebased ship's own commit, which carried ship's inbox consumption. Every cycle then returned to Build, and the rebuilt explanations had to explain inbox moves. B1 undoes ship's commit before the rebase. It lands as five commits, one component each:
