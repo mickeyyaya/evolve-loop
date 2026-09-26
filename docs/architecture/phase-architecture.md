@@ -180,7 +180,7 @@ Core reviews every non-skipped deliverable before recording success — on both 
 recover escaped writes → host normalization → review → optional correction → recover/normalize again → re-review
 ```
 
-A correction uses `interaction.NextCorrection` to choose a bounded rung: salvage, live fix when supported, or redispatch. A redispatch may use a different CLI family only for the configured repeated-identical contract block. Temporary correction directives and routing overrides are restored before leaving the ladder.
+A correction uses `interaction.NextCorrection` to choose a bounded rung: salvage, live fix when supported, recover (the recovery agent, when the violation is repairable; ADR-0106), or redispatch. A redispatch may use a different CLI family only for the configured repeated-identical contract block. Temporary correction directives and routing overrides are restored before leaving the ladder.
 
 Only after approval does Core refresh explanation evidence when required, latch Ship success, and run the final tree-diff guard. Registered minted paths and sanctioned generated binary churn have explicit handling; an unregistered source leak aborts rather than being converted to a warning.
 
