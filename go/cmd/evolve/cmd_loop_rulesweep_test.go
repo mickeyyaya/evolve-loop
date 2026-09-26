@@ -1,8 +1,3 @@
-// cmd_loop_rulesweep_test.go — R8.2: the batch-end I4 measured auto-enforce
-// sweep. Bar: ≥5 would-fire signals across the batch ∧ zero anomalous
-// outcomes for that rule ∧ the flip's own healthy-corpus re-validation.
-// Until this sweep existed, "measured auto-enforce never fires" was true by
-// construction.
 package main
 
 import (
@@ -18,8 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
 )
 
-// plantFires writes an interaction ledger with n would-fire lines (+ one
-// anomalous line when bad) for ruleID into cycle c's workspace.
 func plantFires(t *testing.T, root string, c, n int, ruleID string, bad bool) {
 	t.Helper()
 	ws := cycleWorkspace(root, c)
@@ -90,7 +83,6 @@ func TestSweepRulePromotions(t *testing.T) {
 			}
 		})
 	}
-	// Sanity: the flip leaves the rule loadable in the enforce set.
 	t.Run("flipped_rule_enters_enforce_set", func(t *testing.T) {
 		t.Parallel()
 		root := t.TempDir()

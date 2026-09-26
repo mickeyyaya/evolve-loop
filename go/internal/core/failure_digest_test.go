@@ -1,28 +1,5 @@
 package core
 
-// failure_digest_test.go — RED contract for the S1 failure-digest-assembler
-// (cycle-1034, item failure-disposition-router slice S1).
-//
-// The assembler is the deterministic post-FAIL / pre-retro step that converts a
-// failed cycle's forensic artifacts into a stable failure IDENTITY the S2
-// disposition gate can cross-check against — closing lesson_to_action_gap (the
-// agent can no longer INVENT the failure's identity in retro).
-//
-// SEAM CHOICE (surfaced per Core Rule 3, "no silent changes"): scout-report.md
-// lists a rich input set (audit-fail-reason.json + CycleResult.FailReasons +
-// phase outcomes + dossier + git state + infra signals). This contract reads the
-// single workspace SSOT artifact `audit-fail-reason.json` (schema:
-// {schema_version, phase, reasons[]}, already emitted by the coherence floor —
-// system_failure_test.go:202) as the fingerprint/bucket source, mirroring
-// readFailureDecision's workspace-file boundary. Folding the other signals into
-// that one artifact keeps the input surface minimal (Rule 2) without weakening
-// the identity — the Builder MAY widen the input later, but the tests below pin
-// only the observable contract (bucket, determinism, recurrence, fail-soft,
-// atomic write), never an internal input shape.
-//
-// RED today: AssembleFailureDigest / FailureDigest / RecurrenceCounter do not
-// exist, so this file fails to COMPILE — the correct RED for a new-surface task.
-
 import (
 	"encoding/json"
 	"os"
@@ -32,9 +9,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/recurrence"
 )
 
-// writeAuditFailReason writes a workspace/audit-fail-reason.json fixture in the
-// coherence-floor schema. Empty reasons + skip=true writes no file at all (the
-// AC4 absent-artifact case).
+// writeAuditFailReason writes a workspace/audit-fail-reason.json fixture in
+// the coherence-floor schema.
 func writeAuditFailReason(t *testing.T, dir, phase string, reasons ...string) {
 	t.Helper()
 	body := map[string]any{"schema_version": 1, "phase": phase, "reasons": reasons}
@@ -47,11 +23,6 @@ func writeAuditFailReason(t *testing.T, dir, phase string, reasons ...string) {
 	}
 }
 
-// AC1 — pre-class buckets derived from REAL artifacts (not a hardcoded string).
-// Fixtures shaped from real cycles: 1028 (EGPS red → gate-block), 999 (statemap
-// guard-abort), 949 (predicate compile → verdict-fail), plus an infra fixture
-// and the unknown default. Each fixture's reason keywords map to exactly one
-// bucket, so the assertion is on the CLASSIFIER output, not on echoed text.
 func TestAssembler_PreClassBucketsFromRealArtifacts(t *testing.T) {
 	cases := []struct {
 		name   string
@@ -63,12 +34,6 @@ func TestAssembler_PreClassBucketsFromRealArtifacts(t *testing.T) {
 		{"c999_statemap_severed", "build", "statemap severed: guard aborted the build->audit transition", "guard-abort"},
 		{"c949_predicate_compile", "audit", "ACS predicates failed to compile (predicates_test.go build error)", "verdict-fail"},
 		{"infra_quota", "build", "bridge quota exhausted (85); infra teardown mid-phase", "infra-error"},
-		// c1329 (pipeline-defect-pipeline-blocker Task 2): the ship-time
-		// repo-contract-gate rejection's actual message vocabulary. Before
-		// this fix no needle matched it, so it fell into "unknown" —
-		// indistinguishable from every other unclassified failure, which let
-		// 3 recurrences trip the identical-fingerprint breaker
-		// (ship|unknown|76d0f4fca190) and false-halt the batch.
 		{"c1329_ship_repo_contract_gate", "ship",
 			"repo-contract scanner pack RED in the lane worktree (exit status 1) — pushing would red main; " +
 				"fix the violation in-lane (the four suites: phasespec, profiles, phasecoherence, routingtest)",
@@ -89,11 +54,6 @@ func TestAssembler_PreClassBucketsFromRealArtifacts(t *testing.T) {
 	}
 }
 
-// AC2 — fingerprint is STABLE and composed such that phase is load-bearing.
-// Determinism: two runs over identical artifacts yield the same fingerprint (a
-// random/timestamp-seeded id — the gaming fake — fails this). Composition: a run
-// differing ONLY in phase yields a DIFFERENT fingerprint (phase is part of the
-// gate+reason-class+phase key), so distinct failures never collapse to one id.
 func TestAssembler_FingerprintComposition(t *testing.T) {
 	dir := t.TempDir()
 	writeAuditFailReason(t, dir, "audit", "EGPS floor blocked ship: red_count=1")
@@ -124,17 +84,10 @@ func TestAssembler_FingerprintComposition(t *testing.T) {
 	}
 }
 
-// AC3 — recurrence count is READ THROUGH the ledger, never invented. An empty
-// ledger reports 0; a real recurrence.Ledger pre-seeded with the SAME fingerprint
-// across two cycles (Count==2) makes the digest report recurrence=2. Using the
-// real ledger (which satisfies RecurrenceCounter via Count(string) int) proves
-// the assembler consults the ledger rather than fabricating the number.
 func TestAssembler_RecurrenceFromLedger(t *testing.T) {
 	dir := t.TempDir()
 	writeAuditFailReason(t, dir, "audit", "EGPS floor blocked ship: red_count=1")
 
-	// First pass with an empty ledger discovers the fingerprint and proves the
-	// unseen-fingerprint path reports 0.
 	base, err := AssembleFailureDigest(1034, dir, recurrence.NewLedger())
 	if err != nil {
 		t.Fatalf("base assemble: %v", err)
@@ -143,8 +96,6 @@ func TestAssembler_RecurrenceFromLedger(t *testing.T) {
 		t.Fatalf("unseen fingerprint recurrence = %d, want 0", base.Recurrence)
 	}
 
-	// Seed the real ledger with that fingerprint across two distinct cycles →
-	// Count == 2, then re-assemble and require the digest to reflect it.
 	led := recurrence.NewLedger()
 	pol := recurrence.DefaultEscalationPolicy()
 	if err := led.RecordClosure(base.Fingerprint, 1001, nil, nil, pol); err != nil {
@@ -166,13 +117,8 @@ func TestAssembler_RecurrenceFromLedger(t *testing.T) {
 	}
 }
 
-// AC4 (negative) — malformed/absent artifacts NEVER abort. With no
-// audit-fail-reason.json at all, the assembler degrades to the "unknown" bucket,
-// still writes the digest, and returns no cycle-aborting error (fail-soft,
-// mirroring readFailureDecision's boundary). This is the strongest anti-brittle
-// signal: a genuinely novel failure must still produce a triage artifact.
 func TestAssembler_MissingArtifactsDegradeToUnknown(t *testing.T) {
-	dir := t.TempDir() // deliberately empty — no audit-fail-reason.json
+	dir := t.TempDir()
 
 	got, err := AssembleFailureDigest(1034, dir, emptyCounter{})
 	if err != nil {
@@ -186,9 +132,6 @@ func TestAssembler_MissingArtifactsDegradeToUnknown(t *testing.T) {
 	}
 }
 
-// AC5 (edge) — the digest is written to a real path as valid JSON carrying the
-// four contract fields. t.TempDir() ONLY — never mutates the live repo tree
-// (the goal invariant).
 func TestAssembler_WritesDigestArtifact(t *testing.T) {
 	dir := t.TempDir()
 	writeAuditFailReason(t, dir, "audit", "EGPS floor blocked ship: red_count=1")
@@ -217,8 +160,7 @@ func TestAssembler_WritesDigestArtifact(t *testing.T) {
 	}
 }
 
-// emptyCounter is a RecurrenceCounter that reports every fingerprint as unseen —
-// isolates the bucket/fingerprint/write ACs from ledger state.
+// emptyCounter is a RecurrenceCounter that reports every fingerprint as unseen.
 type emptyCounter struct{}
 
 func (emptyCounter) Count(string) int { return 0 }

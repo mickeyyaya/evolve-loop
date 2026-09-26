@@ -7,15 +7,10 @@ import (
 	"testing"
 )
 
-// The drift alarm must fire exactly when the pane shows a quota-wall signal the
-// exhausted_regex MISSED (the drift signature that cost 8 cycles), and stay
-// silent otherwise — a genuine stall, a wall the regex DOES match, or no signal.
-// exhausted_regex is passed explicitly so the test is decoupled from whatever
-// wording the manifest currently ships (it will change as walls drift).
+// exhaustedRegex is passed explicitly so the test stays decoupled from the
+// manifest's current wording.
 func TestWarnExhaustionRegexDrift(t *testing.T) {
 	const driftMarker = "POSSIBLE EXHAUSTION-REGEX DRIFT"
-	// A narrow pattern matching only the LEGACY wording — it misses the per-model
-	// wall, reproducing the exact gap the per-model incident hit.
 	const narrowExhausted = `(?i)reached your (usage|weekly) limit`
 	perModelWall := "You've reached your Fable 5 limit. Run /usage-credits to continue or switch models with /model."
 
@@ -40,9 +35,6 @@ func TestWarnExhaustionRegexDrift(t *testing.T) {
 	}
 }
 
-// The claude-tmux manifest must actually carry a drift_probe_regex (the alarm is
-// inert without it), it must compile, and — the load-bearing property — it must
-// match the real captured per-model wall that the pre-fix exhausted_regex missed.
 func TestClaudeTmuxDriftProbe_MatchesRealWall(t *testing.T) {
 	probe := manifestDriftProbePattern("claude-tmux")
 	if probe == "" {
@@ -52,27 +44,16 @@ func TestClaudeTmuxDriftProbe_MatchesRealWall(t *testing.T) {
 	if !matchExhausted(probe, realWall) {
 		t.Errorf("drift_probe_regex %q does not match the real captured wall %q", probe, realWall)
 	}
-	// A benign working pane must NOT match the broad probe (keeps the alarm from
-	// crying wolf on every ordinary exit-81 stall).
 	if matchExhausted(probe, "Writing the audit report now; 3 files reviewed.") {
 		t.Errorf("drift_probe_regex %q false-matched a benign working pane", probe)
 	}
 }
 
-// Every tmux CLI that ships an exhausted_regex must also ship a drift_probe_regex:
-// the watcher is fail-OPEN, so an unconfigured CLI has NO drift diagnostic at all —
-// the same silent-burn class the alarm exists to prevent, one level up. This drives
-// the real warnExhaustionRegexDrift against each newly-armed CLI's own shipped
-// patterns, asserting the full firing condition (probe ∧ ¬exhausted): fire on a
-// drifted wall, silence on a wall exhausted_regex already catches, silence on a
-// benign pane. Subtest names carry the CLI so per-CLI coverage is greppable.
 func TestDriftProbeArmedPerCLI(t *testing.T) {
 	const driftMarker = "POSSIBLE EXHAUSTION-REGEX DRIFT"
 	cases := []struct {
-		cli string
-		// driftedPane: a plausible future wall wording exhausted_regex misses.
+		cli         string
 		driftedPane string
-		// matchedWall: a wall exhausted_regex DOES catch — no drift to report.
 		matchedWall string
 		benignPane  string
 	}{
@@ -102,9 +83,8 @@ func TestDriftProbeArmedPerCLI(t *testing.T) {
 			if exhausted == "" {
 				t.Fatalf("%s has no controls.usage.exhausted_regex — nothing to drift-guard", tc.cli)
 			}
-			// Guard the premise of the positive case: if exhausted_regex already
-			// matched the "drifted" pane there would be no gap to detect and the
-			// fire assertion below would be vacuous.
+			// Guards against a vacuous positive case: if exhausted_regex already
+			// matched driftedPane there would be no gap left to detect.
 			if matchExhausted(exhausted, tc.driftedPane) {
 				t.Fatalf("%s exhausted_regex already matches %q — the drifted fixture no longer models a drift", tc.cli, tc.driftedPane)
 			}
@@ -130,25 +110,8 @@ func TestDriftProbeArmedPerCLI(t *testing.T) {
 	}
 }
 
-// --- Call-site integration: the drift alarm must scan the AGENT-STRIPPED pane.
-//
-// The primary exhaustion detector runs on strippedForExhaustionScan (the
-// fast-poll and the 300s checkpoint both do, so a working agent that merely
-// QUOTES wall text is never benched — cycles 254/255/314/641). The drift alarm
-// one hop downstream (driver_tmux_repl.go, post exit-81 teardown) is fed the RAW
-// lastGoodPane, so the same agent-authored content that the real detector
-// correctly ignored can still trip "POSSIBLE EXHAUSTION-REGEX DRIFT" — a false
-// alarm that sends an operator chasing a regex that is working exactly as
-// intended. These tests drive the REAL driver loop to its exit-81 teardown and
-// assert on what the alarm actually printed, so they pin the call site's pane
-// treatment, not a helper signature.
-
 const driftAlarmMarker = "POSSIBLE EXHAUSTION-REGEX DRIFT"
 
-// Agent DIFF content that matches the broad drift probe (but not the shipped
-// exhausted_regex) must NOT raise the drift alarm: an agent editing this very
-// package renders such lines constantly. RED today — the call site passes the
-// raw pane, so the alarm fires on the agent's own edit.
 func TestTmuxREPL_DriftAlarm_AgentDiffContent_NoFalseAlarm(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
 	// A unified-diff content line the agent is WRITING (quota-wall wording inside
@@ -164,9 +127,6 @@ func TestTmuxREPL_DriftAlarm_AgentDiffContent_NoFalseAlarm(t *testing.T) {
 	}
 }
 
-// Prompt-echo content (the agent's own injected instructions rendered back into
-// the pane) must NOT raise the drift alarm either — the second half of what
-// strippedForExhaustionScan removes (cycle-641/642). RED today.
 func TestTmuxREPL_DriftAlarm_PromptEchoContent_NoFalseAlarm(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
 	// A prompt line that is wall-SHAPED to the broad probe. The pane echoes it
@@ -187,11 +147,8 @@ func TestTmuxREPL_DriftAlarm_PromptEchoContent_NoFalseAlarm(t *testing.T) {
 	}
 }
 
-// Anti-no-op pin: stripping must not silence the alarm's REASON FOR EXISTING.
-// A genuine CLI-chrome wall whose wording drifted ahead of exhausted_regex is
-// neither a diff line nor a prompt echo, so it survives stripping and must still
-// fire. Guards the fix against being "implemented" by deleting the alarm call,
-// blanking the pane, or over-stripping.
+// A genuine drifted CLI-chrome wall is neither a diff line nor a prompt echo,
+// so it survives strippedForExhaustionScan and must still fire the alarm.
 func TestTmuxREPL_DriftAlarm_RealDriftedWallStillFires(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
 	// Plausible future wording: the shipped exhausted_regex misses "hit your

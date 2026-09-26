@@ -154,6 +154,21 @@ What W1 does not fix: a failing authored id still has no durable failure count, 
 
 **X2 (designed): an inaccurate explanation of a verified build is a form failure.** ADR-0102 made the auditor's honest `NEEDS_CORRECTION` force the audit's FAIL so that the document could not be waved through. Under this policy the judgment stays and the verdict changes: when the code is verified and the review names only the document, the correction is a recovery rung on the document (the recovery agent of F4/F6, or the host for a mechanical claim such as a rename's similarity), re-reviewed, and the cycle ships; only a review that names the code blocks. X1 removes the manufactured case; X2 removes the class.
 
+### 5.7 A card on a protected surface is a route, not a verdict (wave 16, cycle 1714)
+
+Wave 16's first cycle on the W1/H1b/X1 main was pinned to `file-size-decomposition-backlog`, an inbox item with no declared files. Its triage named `go/internal/core/orchestrator.go` in the card, the classify hook refused the report with `TRIAGE_PROTECTED_SURFACE`, the cycle sealed FAIL after two phases, and the closeout's per-item breaker (F30) routed the item console-manual. The item did go where it belongs; the verdict did not. Three facts made it a class, not an accident:
+
+- **The planner could not judge it.** The wave planner's protected predicate and the prompt partition judge an item's declared files; an item with none is disjoint with everything and always pickable. The surface is known only once triage names files.
+- **The agent was never told.** The triage persona did not mention protected surfaces, and the prompt listed only the console-routed items excluded from its menu. The agent's only way to learn the rule was the refusal.
+- **The refusal was a verdict.** A deterministic, operator-owned routing fact (the same card refuses every time, and the console decides) ended the cycle as the task's FAIL: no logic was judged, the streak broke, and the item's route came from the failure path.
+
+The design keeps everything F30 built and moves the decision one step earlier, into the host's hands:
+
+- **R1: the classify hook records the route instead of refusing.** Every top_n card whose `files=` names a lane-forbidden path (`protectedTopNCards`, all of them, in report order) leaves `top_n` and joins `escalate_block` with the reason `protected-surface: <path> — control-plane changes go through the console route (operator-gated), not lane top_n` (`routeProtectedCards`, a rewrite of `triage-decision.json` that keeps every other key and is idempotent). The hook returns PASS with one warning per card (`TRIAGE_PROTECTED_SURFACE`, severity warning, subject the card). From there the existing machinery does the rest, unchanged: an emptied `top_n` is the planned no-work end (`HasEmptyTriageCommitment`, F30), the escalation is the lane's answer (`committedset.Dispositions`), and the no-work closeout routes the item console-manual with that reason (`ApplyNoWork`); a `top_n` that still holds other cards continues the cycle on them, so the lane is not wasted. A route that cannot be recorded fails closed with the same code as an error, and so does a card the host cannot name (no id) or one the decision never committed (the report and its derived decision disagree): a protected card must never reach the spine, and the rewrite proves every routed card left `top_n` or was already escalated. The host effects run before the judge, so the decision file exists when the hook rewrites it.
+- **R2: the agent is told.** The triage prompt's inbox section names the protected surfaces (`guards.ProtectedSurfaceManifest`, the one list) and the drop reason `protected-surface: <path>`; the persona's drop rule carries the same sentence. An agent that follows it never produces a card the host has to move; one that does not is corrected without a verdict.
+
+`RefusalDisposition(TRIAGE_PROTECTED_SURFACE)` stays as it was (task-level, route console): it now governs only the fail-closed case, where the code still travels on a FAIL.
+
 ## 6. Decision tables
 
 ### 6.1 Routing by violation code (`deliverable`, beside the codes)
@@ -262,6 +277,13 @@ Status: **shipped** (commit on a branch, PR open or merged) · **built** (green 
 | X1 | `.evolve/inbox/` is non-material to the explanation document: the host claims, moves, stamps and retires those records | shipped | `internal/explanationdocs` |
 | X2 | an explanation review that names only the document of a verified build is a recovery rung, never the audit's FAIL | designed (§5.6) | `phases/audit/explanation_review_gate.go`, the recovery agent (F4/F6) |
 
+### 7.8 Routing at triage (R)
+
+| Id | Component | Status | Where |
+|---|---|---|---|
+| R1 | a top_n card naming a protected surface is moved by the host into `escalate_block` with the console-route reason and the hook returns PASS with a warning per card; the planned no-work closeout routes the item; a route that cannot be recorded fails closed | shipped | `phases/triage/protected_route.go`, `phases/triage/triage.go` |
+| R2 | the triage prompt lists the protected surfaces and the drop reason; the persona carries the rule | shipped | `phases/triage/triage.go` (`inboxBatchesSection`), `agents/evolve-triage.md` |
+
 ## 8. Interfaces
 
 Shipped signatures are exact; designed ones are the contract the component must meet.
@@ -306,6 +328,11 @@ func (m *Mover) RetireUnbacked(taskID, newState string, p PromoteOpts, reason st
 func RetireUnbacked(opts Options, cycle int, state, reason, commitSHA string, ids []string) ([]string, error) // only ids whose dispatch state is unknown
 OutcomeResult.RetiredUnbacked []string // the PASS seam: committed ids Promote could not move and no inbox item backs
 // X1 — internal/explanationdocs (shipped): nonMaterialPrefixes gains ".evolve/inbox/"
+// R1 — internal/phases/triage (shipped)
+type protectedCard struct{ ID, Path string }
+func protectedTopNCards(body string, forbidden func(string) bool) []protectedCard // every card, report order; nil forbidden = manifest membership
+func routeProtectedCards(decisionPath string, cards []protectedCard) error         // top_n -= cards; escalate_block += {task_id, "protected-surface: <path> — …"}; other keys kept; idempotent
+func routedCardDiagnostics(cards []protectedCard) []core.Diagnostic                // one warning per card, code TRIAGE_PROTECTED_SURFACE, subject the card
 // W1 — internal/cycleoutcome (shipped)
 type NoWorkResult struct{ Routed, Retired []string }
 func ApplyNoWork(in NoWorkInputs) (NoWorkResult, error) // every scoped id no inbox item backs is retired as rejected
@@ -353,6 +380,7 @@ Cycles ~1550–1707 (the inventory gathered for ADR-0106):
 | a correction that touched only the explanation document left the primary unrewritten, so the finished phase idled through a review interval (1707 build) | process | ~20 min | F0; completion on the corrected file |
 | a passed build aborted when the explanation floor exhausted its correction budget (1707, after a rebase and a passed re-audit) | form | the cycle | F0, E1/E2 |
 | a verified build (ACS 10/10, EGPS red 0, mutation probe) sealed FAIL because the explanation document's sentence about a host-consumed inbox record contradicted the consumption stamp (1712 audit; the floor demanded the path twelve times across 1707, 1708 and 1712) | form | the cycle | X1 (shipped), X2 |
+| a top_n card naming a protected surface sealed the cycle FAIL, and the item was routed only by the failure path (1714; the item declared no files, the agent was never told the surfaces) | process | the cycle | R1 (shipped), R2 (shipped) |
 
 No `missing_section` or `bad_verdict` rejection is recorded in the range, so the recovery agent (F4/F6) lands last, after H1/H2 and the evidence decision are measured again.
 
@@ -399,6 +427,7 @@ Merges happen only at wave boundaries. Each step is its own PR; each component i
 | 2026-09-26 | security-reviewer (train) | BLOCK → APPROVE-WITH-MINOR | unfenced boundary; allowed-path type check; no network declared; anchored markers; three gaps filed |
 | 2026-09-27 | code-simplifier, go-reviewer, code-reviewer (Q2) | no edits; WARNING → fixed; WARNING → fixed | a login pane's stale reset hint never sets the bench; the fix names no login command (the families' logins differ); a credential bench holds for routing until a probe clears it; the fix is durable on the bench entry; the design rows state the shipped shape and its trade-offs |
 | 2026-09-27 | code-simplifier, go-reviewer, code-reviewer (W1, H1b) | one gofmt alignment; PASS with three MINORs → applied; PASS with two MINORs → one applied | a present item whose move fails is never stamped unbacked (regression test); the lock-free write is an idempotent create, said in one line; the no-work closeout logs what it routed and retired; the plain-id guard is the one place a path is built from a caller's id |
+| 2026-09-27 | code-simplifier, go-reviewer, code-reviewer (R1, R2) | the rewrite split into two helpers; BLOCK → fixed; BLOCK → fixed | an id-less card and a card the decision never committed both fail closed (the removal set can never hold an empty key; a report-versus-decision mismatch is a fault, not a silent commit); the ACS predicate that pins the admission tests by name follows the renames; the package's atomic JSON writer replaces an inline copy |
 | 2026-09-27 | code-simplifier, go-reviewer, code-reviewer (Q1) | one closure; APPROVE-WITH-MINOR → applied; WARNING → justified and fixed | the one-sample reading of a walled `Run` stated in code and §12; the deferral records the phase's total dispatches; the digest assertion made non-vacuous |
 | 2026-09-27 | code-simplifier, go-reviewer, code-reviewer, security-reviewer (P3) | no edits; APPROVE; WARNING → fixed; APPROVE-WITH-MINOR → hardened | the sole-writer line was false for stdout-completion phases (fixed); a manifest `default_env` could set credential or loop variables the guards never see (refused at parse); facts rendered into the block are sanitized; no manifest pattern may match the block (pinned) |
 | 2026-09-26 | consistency audit (every doc vs the design vs the shipped code) | INCONSISTENCIES-FOUND → fixed | three stale package pages, one stale sentence in phase-architecture.md, one imprecise ADR sentence; two new package pages |
@@ -417,3 +446,4 @@ Merges happen only at wave boundaries. Each step is its own PR; each component i
 | 2026-09-27 | §5.5 and §7.5: the wave-14 deep-dive (three consecutive FAILs: 1707 form, 1708 and 1709 capacity) designs Q1–Q4 — capacity is a deferral through the one seam that already exists, a credential wall is an operator halt, and neither counts toward the FAIL streak. |
 | 2026-09-27 | P3 shipped: §5.4 records the design (driver-appended statement; environment channel over a settings flag; what it does not fix); §8 signatures; §12 the other-CLIs question. Wave 14 (1708, 1709) failed on capacity — every CLI family walled (`auth_recheck`, `rate_limit`, `model_unsupported`) — with `cause_code` naming each pattern, the live proof of P4. |
 | 2026-09-27 | §5.6 and §7.7: the wave-15 deep-dive (1713 planned no-work on a pin shipped by 1706 and carried through 1709 and 1710) designs and ships W1, the retirement record for an id no inbox item backs, and H1b, an empty optional bucket read as no cards, and X1, the inbox record made non-material to the explanation document (1712's verified build sealed FAIL on one sentence about a host-stamped file); §8 signatures; W2 and X2 designed |
+| 2026-09-27 | §5.7 and §7.8: wave 16's first cycle (1714) sealed FAIL on a top_n card naming a protected surface; R1 moves such a card into `escalate_block` by the host's hand and lets the planned no-work closeout route it (never a verdict); R2 tells the agent the surfaces and the drop reason; §8 signatures; the evidence row |

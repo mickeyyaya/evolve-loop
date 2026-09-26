@@ -6,9 +6,6 @@ import (
 	"testing"
 )
 
-// effort_overrides: when a tier escalation (model_tier_overrides) lands a
-// profile on a deeper tier, the launch carries that tier's effort rung with it.
-// The tier is the situation — no second plumbing path.
 func TestEffortForTier_OverrideThenDefault(t *testing.T) {
 	p := Profile{EffortLevel: "medium", EffortOverrides: map[string]string{"deep": "high", "top": ""}}
 	cases := map[string]string{"deep": "high", "balanced": "medium", "top": "medium", "": "medium"}

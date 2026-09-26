@@ -6,8 +6,6 @@ import (
 	"testing"
 )
 
-// TestParseLoopArgs_GoalSources covers the three goal sources and
-// their precedence (--goal-hash > --goal-text > positional).
 func TestParseLoopArgs_GoalSources(t *testing.T) {
 	cases := []struct {
 		name     string
@@ -38,7 +36,7 @@ func TestParseLoopArgs_GoalSources(t *testing.T) {
 		{
 			"resume_no_goal_ok",
 			[]string{"--resume"},
-			"", // resume mode allows empty goal hash
+			"",
 			0,
 		},
 		{
@@ -58,8 +56,6 @@ func TestParseLoopArgs_GoalSources(t *testing.T) {
 			if rc != 0 {
 				return
 			}
-			// For explicit hash, exact match required. For text/positional,
-			// just verify some hash got computed.
 			if tc.name == "explicit_goal_hash_wins" {
 				if cfg.GoalHash != "deadbeef" {
 					t.Errorf("GoalHash=%q, want deadbeef", cfg.GoalHash)
@@ -80,8 +76,6 @@ func TestParseLoopArgs_GoalSources(t *testing.T) {
 	}
 }
 
-// TestParseLoopArgs_PositionalCyclesStrategy validates the bash-style
-// positional parsing: [CYCLES] [STRATEGY] [GOAL...].
 func TestParseLoopArgs_PositionalCyclesStrategy(t *testing.T) {
 	cases := []struct {
 		name         string
@@ -136,7 +130,6 @@ func TestParseLoopArgs_PositionalCyclesStrategy(t *testing.T) {
 	}
 }
 
-// TestParseLoopArgs_StrategyValidation rejects unknown strategy values.
 func TestParseLoopArgs_StrategyValidation(t *testing.T) {
 	var stderr bytes.Buffer
 	_, rc := parseLoopArgs([]string{"--strategy", "bogus", "goal"}, &stderr)
@@ -148,13 +141,12 @@ func TestParseLoopArgs_StrategyValidation(t *testing.T) {
 	}
 }
 
-// TestParseLoopArgs_FlagPrecedence verifies explicit flags beat positional.
 func TestParseLoopArgs_FlagPrecedence(t *testing.T) {
 	var stderr bytes.Buffer
 	cfg, rc := parseLoopArgs([]string{
 		"--cycles", "7",
 		"--strategy", "harden",
-		"3", "balanced", "positional goal", // these should all be subordinate
+		"3", "balanced", "positional goal",
 	}, &stderr)
 	if rc != 0 {
 		t.Fatalf("rc=%d, stderr=%q", rc, stderr.String())
@@ -165,18 +157,11 @@ func TestParseLoopArgs_FlagPrecedence(t *testing.T) {
 	if cfg.Strategy != "harden" {
 		t.Errorf("Strategy=%q, want harden (--strategy wins)", cfg.Strategy)
 	}
-	// Goal text becomes "positional goal" (positional goal still applied
-	// when no --goal-text). The 3 is consumed as cycles even though
-	// --cycles overrides; the strategy "balanced" is consumed as
-	// strategy positionally even though --strategy overrides; the rest
-	// is goal.
 	if !strings.Contains(cfg.GoalText, "positional goal") {
 		t.Errorf("GoalText=%q, want substring 'positional goal'", cfg.GoalText)
 	}
 }
 
-// TestParseLoopArgs_DryRun ensures --dry-run is captured (downstream
-// runLoop short-circuits on it).
 func TestParseLoopArgs_DryRun(t *testing.T) {
 	var stderr bytes.Buffer
 	cfg, rc := parseLoopArgs([]string{"--dry-run", "fix bug"}, &stderr)
@@ -188,10 +173,6 @@ func TestParseLoopArgs_DryRun(t *testing.T) {
 	}
 }
 
-// TestParseLoopArgs_BudgetFlagsAreNoOps verifies the removed --budget-usd flag
-// no longer drives behavior: a legacy invocation is stripped (not rejected), so
-// it parses without error and does NOT bump the cycle count (the former
-// budget-mode 50-cycle default is gone — cost is display-only telemetry now).
 func TestParseLoopArgs_BudgetFlagsAreNoOps(t *testing.T) {
 	var stderr bytes.Buffer
 	cfg, rc := parseLoopArgs([]string{"--budget-usd", "5", "fix bug"}, &stderr)
@@ -201,15 +182,11 @@ func TestParseLoopArgs_BudgetFlagsAreNoOps(t *testing.T) {
 	if cfg.MaxCycles != 1 {
 		t.Errorf("MaxCycles=%d, want 1 (--budget-usd must not drive cycle count)", cfg.MaxCycles)
 	}
-	// The goal positional must survive the strip intact.
 	if cfg.GoalText != "fix bug" {
 		t.Errorf("GoalText=%q, want \"fix bug\" (strip must not eat the positional goal)", cfg.GoalText)
 	}
 }
 
-// TestParseLoopArgs_BudgetFlagWarnsRemoved verifies that a legacy --budget-usd
-// emits a visible "removed" notice on stderr pointing operators at --cycles, and
-// that the flag's absence produces no budget noise.
 func TestParseLoopArgs_BudgetFlagWarnsRemoved(t *testing.T) {
 	var withFlag bytes.Buffer
 	parseLoopArgs([]string{"--budget-usd", "5", "fix bug"}, &withFlag)
@@ -218,7 +195,6 @@ func TestParseLoopArgs_BudgetFlagWarnsRemoved(t *testing.T) {
 	if !strings.Contains(got, "--budget-usd") || !strings.Contains(low, "removed") || !strings.Contains(got, "--cycles") {
 		t.Errorf("expected a removal notice mentioning --budget-usd and --cycles; stderr=%q", got)
 	}
-	// And no budget noise when the flag is absent.
 	var noFlag bytes.Buffer
 	parseLoopArgs([]string{"fix bug"}, &noFlag)
 	if strings.Contains(strings.ToLower(noFlag.String()), "budget") {
@@ -226,7 +202,6 @@ func TestParseLoopArgs_BudgetFlagWarnsRemoved(t *testing.T) {
 	}
 }
 
-// TestParsePositional unit-tests the heuristic in isolation.
 func TestParsePositional(t *testing.T) {
 	cases := []struct {
 		name     string
@@ -256,8 +231,6 @@ func TestParsePositional(t *testing.T) {
 	}
 }
 
-// TestJoinArgs spot-checks the joiner — important because the bash
-// dispatcher joins remaining positional args with a single space.
 func TestJoinArgs(t *testing.T) {
 	cases := []struct {
 		in   []string

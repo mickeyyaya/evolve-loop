@@ -1,13 +1,5 @@
 package core_test
 
-// failure_learning_amplify_test.go — Test Amplification phase adversarial
-// cases for ApplyDefectsAsCarryoverTodos. Covers edge cases NOT in the
-// TDD-engineer RED tests: blank defects, idempotency, deterministic IDs,
-// priority/field contracts, and multi-defect isolation.
-//
-// GAP TESTS are marked explicitly; they expose contract requirements
-// the current implementation does not yet satisfy.
-
 import (
 	"strings"
 	"testing"
@@ -15,9 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// TestApplyDefects_BlankDefectIgnored: GAP — contract says "Blank defects are
-// ignored". Current implementation uses a raw index loop without TrimSpace,
-// so blank strings DO produce todos (ID = "cycle-N-defect-0").
 func TestApplyDefects_BlankDefectIgnored(t *testing.T) {
 	state := &core.State{}
 	record := core.FailedRecord{
@@ -32,8 +21,6 @@ func TestApplyDefects_BlankDefectIgnored(t *testing.T) {
 	}
 }
 
-// TestApplyDefects_MixedBlankAndRealDefects: GAP — blank defects should be
-// skipped while real ones produce todos. Current implementation does not filter.
 func TestApplyDefects_MixedBlankAndRealDefects(t *testing.T) {
 	state := &core.State{}
 	record := core.FailedRecord{
@@ -42,7 +29,6 @@ func TestApplyDefects_MixedBlankAndRealDefects(t *testing.T) {
 		Defects: []string{"", "real defect A", "   ", "real defect B"},
 	}
 	core.ApplyDefectsAsCarryoverTodos(state, record)
-	// Expect exactly 2 todos (one per real defect, blanks skipped).
 	if len(state.CarryoverTodos) != 2 {
 		t.Errorf("GAP: want 2 todos (blanks skipped), got %d", len(state.CarryoverTodos))
 	}
@@ -60,9 +46,6 @@ func TestApplyDefects_MixedBlankAndRealDefects(t *testing.T) {
 	}
 }
 
-// TestApplyDefects_Idempotent: calling ApplyDefectsAsCarryoverTodos twice with
-// the same record must not duplicate existing todos.
-// Contract: "Replaying failure learning is idempotent."
 func TestApplyDefects_Idempotent(t *testing.T) {
 	state := &core.State{}
 	record := core.FailedRecord{
@@ -82,10 +65,6 @@ func TestApplyDefects_Idempotent(t *testing.T) {
 	}
 }
 
-// TestApplyDefects_DeterministicIDs: generated todo IDs must be stable
-// functions of cycle + source position.
-// Contract: "Generated identifiers must be stable functions of cycle,
-// source position, and normalized content."
 func TestApplyDefects_DeterministicIDs(t *testing.T) {
 	record := core.FailedRecord{
 		Cycle:   6,
@@ -106,8 +85,6 @@ func TestApplyDefects_DeterministicIDs(t *testing.T) {
 	}
 }
 
-// TestApplyDefects_PriorityIsP0: per-defect todos must carry P0 priority.
-// Contract: "priority is P0".
 func TestApplyDefects_PriorityIsP0(t *testing.T) {
 	state := &core.State{}
 	record := core.FailedRecord{
@@ -129,8 +106,6 @@ func TestApplyDefects_PriorityIsP0(t *testing.T) {
 	}
 }
 
-// TestApplyDefects_CyclesUnpickedStartsAtZero: CyclesUnpicked must start at 0.
-// Contract: "CyclesUnpicked starts at zero".
 func TestApplyDefects_CyclesUnpickedStartsAtZero(t *testing.T) {
 	state := &core.State{}
 	record := core.FailedRecord{
@@ -152,9 +127,6 @@ func TestApplyDefects_CyclesUnpickedStartsAtZero(t *testing.T) {
 	}
 }
 
-// TestApplyDefects_FirstSeenCycleMatchesRecord: FirstSeenCycle must equal
-// the FailedRecord.Cycle.
-// Contract: "FirstSeenCycle is the failed cycle".
 func TestApplyDefects_FirstSeenCycleMatchesRecord(t *testing.T) {
 	const cycle = 9
 	state := &core.State{}
@@ -177,8 +149,6 @@ func TestApplyDefects_FirstSeenCycleMatchesRecord(t *testing.T) {
 	}
 }
 
-// TestApplyDefects_EachDefectGetsOwnTodo: three distinct defects must produce
-// three separate todos with distinct IDs (not collapsed into one).
 func TestApplyDefects_EachDefectGetsOwnTodo(t *testing.T) {
 	state := &core.State{}
 	defects := []string{"defect alpha", "defect beta", "defect gamma"}
@@ -191,7 +161,6 @@ func TestApplyDefects_EachDefectGetsOwnTodo(t *testing.T) {
 	if len(state.CarryoverTodos) < len(defects) {
 		t.Errorf("want >= %d todos (one per defect), got %d", len(defects), len(state.CarryoverTodos))
 	}
-	// IDs must be distinct.
 	ids := make(map[string]bool)
 	for _, todo := range state.CarryoverTodos {
 		if ids[todo.ID] {
@@ -201,8 +170,6 @@ func TestApplyDefects_EachDefectGetsOwnTodo(t *testing.T) {
 	}
 }
 
-// TestApplyDefects_NilDefectsSlice: nil Defects slice must produce zero todos
-// (same semantics as empty slice).
 func TestApplyDefects_NilDefectsSlice(t *testing.T) {
 	state := &core.State{}
 	record := core.FailedRecord{
@@ -216,8 +183,6 @@ func TestApplyDefects_NilDefectsSlice(t *testing.T) {
 	}
 }
 
-// TestApplyDefects_ExistingTodosNotReplaced: pre-existing todos in state must
-// be preserved after applying defects (defect application is additive).
 func TestApplyDefects_ExistingTodosNotReplaced(t *testing.T) {
 	state := &core.State{
 		CarryoverTodos: []core.CarryoverTodo{
@@ -230,7 +195,6 @@ func TestApplyDefects_ExistingTodosNotReplaced(t *testing.T) {
 		Defects: []string{"new defect"},
 	}
 	core.ApplyDefectsAsCarryoverTodos(state, record)
-	// Pre-existing todo must still be present.
 	found := false
 	for _, todo := range state.CarryoverTodos {
 		if todo.ID == "pre-existing" {

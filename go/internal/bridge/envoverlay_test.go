@@ -8,11 +8,6 @@ import (
 	"time"
 )
 
-// TestLookupEnv_DepsEnvOverlay proves the env resolver consults the
-// request-local Deps.Env overlay first — the same map driverEnv exports to
-// the inner CLI subprocess — so the in-process and subprocess env views agree.
-// Before the env-resolution SSOT fix, lookupEnv read only Deps.LookupEnv and
-// silently ignored Deps.Env.
 func TestLookupEnv_DepsEnvOverlay(t *testing.T) {
 	t.Run("overlay is consulted", func(t *testing.T) {
 		if v, ok := lookupEnv(Deps{Env: map[string]string{"K": "x"}}, "K"); !ok || v != "x" {
@@ -33,10 +28,6 @@ func TestLookupEnv_DepsEnvOverlay(t *testing.T) {
 	})
 }
 
-// TestEnvInt_DepsEnvOverlay proves the int reader (which resolves the
-// artifact-wait deadline) honours Deps.Env. This is the unit-level proof that
-// a per-launch env overlay carried on the launch reaches the deadline — the
-// knob-never-applies bug B3 fixes.
 func TestEnvInt_DepsEnvOverlay(t *testing.T) {
 	if got := envInt(Deps{Env: map[string]string{"K": "600"}}, "K", 300); got != 600 {
 		t.Fatalf("envInt from Deps.Env = %d, want 600", got)
@@ -51,10 +42,6 @@ func TestEnvInt_DepsEnvOverlay(t *testing.T) {
 	}
 }
 
-// TestRunTmuxREPL_TimeoutFromDeps is the end-to-end proof: the typed
-// Deps.ArtifactTimeoutS field reaches the artifact-wait interval, observable
-// on the StopEvent the reviewer receives.
-// RED before the fix (Deps field ignored → IntervalS defaults to 300).
 func TestRunTmuxREPL_TimeoutFromDeps(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}} // boots; artifact never appears
@@ -79,10 +66,6 @@ func TestRunTmuxREPL_TimeoutFromDeps(t *testing.T) {
 	}
 }
 
-// TestRunTmuxREPL_CfgTimeoutWinsOverDeps locks the precedence: an explicit
-// per-launch Config.ArtifactTimeoutS (set by livesmoke / integration callers)
-// beats the Deps.ArtifactTimeoutS policy default, so a stray global override
-// cannot lengthen a deliberately-short wait.
 func TestRunTmuxREPL_CfgTimeoutWinsOverDeps(t *testing.T) {
 	ws := t.TempDir()
 	pf := writeJSON(t, filepath.Join(ws, "p.txt"), "hi")

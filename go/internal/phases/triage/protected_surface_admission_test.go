@@ -26,63 +26,73 @@ import (
 // scout-report.md's Key Findings) must FAIL Classify, and the diagnostic
 // must name both the offending task id and the offending path so the
 // operator can act without re-deriving it from the artifact.
-func TestTriageClassify_RejectsProtectedSurfaceTopNCard_BraceSyntax(t *testing.T) {
+func TestTriageClassify_RoutesProtectedSurfaceTopNCard_BraceSyntax(t *testing.T) {
 	if !guards.IsProtectedSurface("go/acs/regression/cycle1/predicates_test.go") {
 		t.Fatal("pin moved: go/acs/regression/ no longer on ProtectedSurfaceManifest — update this test AND the routing rationale")
 	}
+	ws := t.TempDir()
+	path := writeDecision(t, ws, `{"top_n":[{"id":"acs-regression-tamper"}]}`)
 	artifact := "## top_n\n" +
 		"- acs-regression-tamper: rewrite a regression predicate — priority=H, " +
 		"files={go/acs/regression/cycle1/predicates_test.go;go/internal/foo/foo.go}, source=scout\n"
 
-	verdict, diags, _ := hooks{}.Classify(artifact, core.PhaseRequest{}, core.BridgeResponse{})
+	verdict, diags, _ := hooks{}.Classify(artifact, core.PhaseRequest{Workspace: ws}, core.BridgeResponse{})
 
-	if verdict != core.VerdictFAIL {
-		t.Fatalf("verdict = %s, want FAIL for a top_n card naming a protected path", verdict)
+	if verdict != core.VerdictPASS {
+		t.Fatalf("verdict = %s, want PASS: a card naming a protected path is routed, not refused", verdict)
 	}
 	if !diagsContain(diags, "acs-regression-tamper") || !diagsContain(diags, "go/acs/regression/cycle1/predicates_test.go") {
-		t.Fatalf("diagnostics must cite the offending id AND path, got: %+v", diags)
+		t.Fatalf("diagnostics must cite the routed id AND path, got: %+v", diags)
+	}
+	if d := readDecision(t, path); len(d["top_n"].([]any)) != 0 || len(d["escalate_block"].([]any)) != 1 {
+		t.Fatalf("the decision commits nothing and escalates the card: %v", d)
 	}
 }
 
 // Same defect, the bare (unbraced) `files=a;b` encoding real cycle-1312
 // output actually used (.evolve/runs/cycle-1312/triage-report.md) — the
 // admission check must not silently no-op on the brace-less variant.
-func TestTriageClassify_RejectsProtectedSurfaceTopNCard_BareSyntax(t *testing.T) {
+func TestTriageClassify_RoutesProtectedSurfaceTopNCard_BareSyntax(t *testing.T) {
 	if !guards.IsProtectedSurface("go/internal/guards/role.go") {
 		t.Fatal("pin moved: go/internal/guards/role.go no longer on ProtectedSurfaceManifest — update this test AND the routing rationale")
 	}
+	ws := t.TempDir()
+	writeDecision(t, ws, `{"top_n":[{"id":"role-gate-fix"}]}`)
 	artifact := "## top_n\n" +
 		"- role-gate-fix: touch the role gate — priority=H, " +
 		"files=go/internal/guards/role.go;go/internal/foo/foo.go, evidence=x, source=scout\n"
 
-	verdict, diags, _ := hooks{}.Classify(artifact, core.PhaseRequest{}, core.BridgeResponse{})
+	verdict, diags, _ := hooks{}.Classify(artifact, core.PhaseRequest{Workspace: ws}, core.BridgeResponse{})
 
-	if verdict != core.VerdictFAIL {
-		t.Fatalf("verdict = %s, want FAIL for a bare files= card naming a protected path", verdict)
+	if verdict != core.VerdictPASS {
+		t.Fatalf("verdict = %s, want PASS for a bare files= card naming a protected path (routed)", verdict)
 	}
 	if !diagsContain(diags, "role-gate-fix") || !diagsContain(diags, "go/internal/guards/role.go") {
-		t.Fatalf("diagnostics must cite the offending id AND path, got: %+v", diags)
+		t.Fatalf("diagnostics must cite the routed id AND path, got: %+v", diags)
 	}
 }
 
 // Semantic: among several top_n cards, only the one actually naming a
-// protected path must be identified — the diagnostic must not misattribute
-// the rejection to an innocent sibling card.
-func TestTriageClassify_RejectsAmongMultipleCards_NamesOffendingIdOnly(t *testing.T) {
+// protected path is routed — the innocent sibling stays committed and is
+// never named by a diagnostic.
+func TestTriageClassify_RoutesAmongMultipleCards_NamesOffendingIdOnly(t *testing.T) {
+	ws := t.TempDir()
+	path := writeDecision(t, ws, `{"top_n":[{"id":"innocent-task"},{"id":"binaryguard-bypass"}]}`)
 	artifact := "## top_n\n" +
 		"- innocent-task: unrelated fix — priority=M, files={go/internal/foo/foo.go}, source=scout\n" +
 		"- binaryguard-bypass: edit the binary guard — priority=H, files={go/internal/binaryguard/guard.go}, source=scout\n"
 
-	verdict, diags, _ := hooks{}.Classify(artifact, core.PhaseRequest{}, core.BridgeResponse{})
+	verdict, diags, _ := hooks{}.Classify(artifact, core.PhaseRequest{Workspace: ws}, core.BridgeResponse{})
 
-	if verdict != core.VerdictFAIL {
-		t.Fatalf("verdict = %s, want FAIL when any card in the batch names a protected path", verdict)
+	if verdict != core.VerdictPASS {
+		t.Fatalf("verdict = %s, want PASS: the innocent card is still committed", verdict)
 	}
-	if !diagsContain(diags, "binaryguard-bypass") {
-		t.Fatalf("diagnostics must name the actually-offending id binaryguard-bypass, got: %+v", diags)
+	if !diagsContain(diags, "binaryguard-bypass") || diagsContain(diags, "innocent-task") {
+		t.Fatalf("diagnostics name the routed id and never the innocent sibling, got: %+v", diags)
 	}
-	if diagsContain(diags, "innocent-task") {
-		t.Fatalf("diagnostics must not misattribute the rejection to the innocent sibling card, got: %+v", diags)
+	d := readDecision(t, path)
+	if topN := d["top_n"].([]any); len(topN) != 1 || topN[0].(map[string]any)["id"] != "innocent-task" {
+		t.Fatalf("top_n keeps the innocent card only: %v", topN)
 	}
 }
 

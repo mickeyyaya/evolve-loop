@@ -12,8 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
-// forcedHalt is a looppreflight.Result that always halts — the seam value tests
-// inject to drive the gate's abort path without a real environment probe.
 func forcedHalt() looppreflight.Result {
 	return looppreflight.Result{
 		Checks:       []looppreflight.CheckResult{{Name: "bridge-boot", Level: looppreflight.LevelHalt, Message: "forced", Detail: "rc=80"}},
@@ -61,8 +59,6 @@ func TestLoopPreflightHalts_SkipEnv_BypassesSeam(t *testing.T) {
 	}
 }
 
-// End-to-end: a halting gate aborts runLoop BEFORE any cycle, with rc=2 and
-// stop_reason=preflight_failed in the stdout JSON.
 func TestRunLoop_PreflightHalt_AbortsBeforeCycle(t *testing.T) {
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")

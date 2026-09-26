@@ -1,12 +1,5 @@
 package core
 
-// failure_digest_named_test.go — apicover per-symbol naming (the two-signal
-// convention: every exported symbol named by a test with a REAL assertion).
-// RecurrenceCounter is the assembler's read-only ledger seam; this test pins
-// that a custom implementation's count flows through into the digest — the
-// 6th recurrence of the "exported but never named" parity class, caught on
-// PR #350's CI.
-
 import "testing"
 
 // fixedCounter is a minimal RecurrenceCounter: every fingerprint has count n.

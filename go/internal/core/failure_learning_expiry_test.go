@@ -1,26 +1,3 @@
-// failure_learning_expiry_test.go — cycle-516 task
-// `carryover-todo-expiry-never-set` (RED).
-//
-// state.go:87-91 documents CarryoverTodo.ExpiresAt as "inherited from the
-// FailedRecord that created this todo" so PruneExpiredCarryoverTodos
-// (wired into cmd_loop.go, called at every loop start) can age entries out.
-// But recordFailureLearning — the ONLY non-test call site that creates both
-// the initial per-cycle-failure CarryoverTodo and its sibling FailedRecord —
-// never assigns ExpiresAt on either. Live evidence: none of the 71
-// cycle-N-failed-* entries in .evolve/state.json carry an expiresAt key, so
-// the already-wired prune pass is a permanent no-op in production.
-//
-// This isn't a prune-logic bug (PruneExpiredCarryoverTodos and
-// ApplyDefectsAsCarryoverTodos already have full, GREEN coverage — see
-// prune_carryover_test.go and carryover_ttl_stamp_test.go). It's a
-// never-populated-input bug at the creation site. These tests exercise the
-// REAL creation path end-to-end (not a hand-built fixture), which the scout
-// report flags as the actual gap: "no test asserts the two compose correctly
-// on the real creation path".
-//
-// Shares the core_test harness (newRunners / newTestOrchestrator /
-// seedCycleStateFile / alwaysErrRunner / recordingRetroRunner) defined in
-// orchestrator_recovery_test.go and orchestrator_phaseboundary_test.go.
 package core_test
 
 import (
@@ -35,9 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
 )
 
-// AC (positive): the CarryoverTodo recordFailureLearning creates for a failed
-// phase must carry a non-empty, future ExpiresAt — the field the prune pass
-// actually reads.
 func TestRecordFailureLearning_CarryoverTodoStampsExpiresAt(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -74,10 +48,6 @@ func TestRecordFailureLearning_CarryoverTodoStampsExpiresAt(t *testing.T) {
 	}
 }
 
-// AC (positive): the FailedRecord appended to state.FailedAt must also carry
-// a non-empty, future ExpiresAt — ApplyDefectsAsCarryoverTodos already
-// inherits record.ExpiresAt for defect-derived todos (carryover_ttl_stamp_test.go),
-// so an unstamped source record silently poisons that inheritance too.
 func TestRecordFailureLearning_FailedRecordStampsExpiresAt(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -111,13 +81,6 @@ func TestRecordFailureLearning_FailedRecordStampsExpiresAt(t *testing.T) {
 	}
 }
 
-// AC (edge case): a todo created THIS SECOND by the real recordFailureLearning
-// path must survive an immediate run of the real PruneExpiredCarryoverTodos —
-// proving the two halves (creation-time stamp + prune-time read) actually
-// compose on production data, not just on a hand-built fixture. This is the
-// exact regression the scout report's hypothesis calls out: "no test asserts
-// the two compose correctly on the real creation path (only on hand-built
-// fixtures)".
 func TestRecordFailureLearning_CreatedTodoSurvivesImmediatePrune(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -139,8 +102,6 @@ func TestRecordFailureLearning_CreatedTodoSurvivesImmediatePrune(t *testing.T) {
 		t.Fatalf("carryover todos = %+v, want exactly one failure-learning todo", st.state.CarryoverTodos)
 	}
 
-	// Serialize the REAL orchestrator-produced state to a state.json fixture
-	// and run the REAL prune pass against it.
 	statePath := filepath.Join(t.TempDir(), "state.json")
 	raw, err := json.Marshal(st.state)
 	if err != nil {
@@ -176,11 +137,8 @@ func TestRecordFailureLearning_CreatedTodoSurvivesImmediatePrune(t *testing.T) {
 	survivor, _ := todos[0].(map[string]any)
 	expiresAt, _ := survivor["expiresAt"].(string)
 	if expiresAt == "" {
-		// Surviving with Removed==0 is NOT sufficient proof by itself: an
-		// unstamped (legacy, empty expiresAt) todo also survives, by prune's own
-		// "age unknown, never delete" rule — that's the bug, not the fix. The
-		// real fix must produce a todo that survives BECAUSE it carries a real,
-		// not-yet-elapsed TTL stamp.
+		// Surviving with Removed==0 alone is not sufficient proof: an unstamped
+		// todo also survives, by prune's own "age unknown, never delete" rule.
 		t.Fatal("surviving todo has no expiresAt — it survived by the legacy no-stamp rule, " +
 			"not because a real TTL stamp hasn't elapsed yet; recordFailureLearning must stamp ExpiresAt")
 	}

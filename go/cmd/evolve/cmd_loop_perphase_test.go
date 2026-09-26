@@ -7,13 +7,6 @@ import (
 	"testing"
 )
 
-// Workstream G2 — repeatable `--cli` / `--model` launch flags.
-//
-// The flags translate to EVOLVE_<AGENT>_CLI / EVOLVE_<AGENT>_MODEL entries in
-// the cycle env, which the runner picks up via envchain. The flags are
-// syntactic sugar — operators can experiment with combos per-run without
-// editing profiles or constructing the env vars themselves.
-
 func TestParseLoopArgs_PerAgentCLIFlag(t *testing.T) {
 	var stderr bytes.Buffer
 	cfg, rc := parseLoopArgs([]string{
@@ -53,7 +46,6 @@ func TestParseLoopArgs_PerAgentModelFlag(t *testing.T) {
 }
 
 func TestParseLoopArgs_MalformedCLIFlagRejected(t *testing.T) {
-	// Missing '=' is a malformed flag → exit 10 (bad-flags).
 	var stderr bytes.Buffer
 	_, rc := parseLoopArgs([]string{"--cli", "noequals", "--goal-text", "x"}, &stderr)
 	if rc != 10 {
@@ -65,8 +57,6 @@ func TestParseLoopArgs_MalformedCLIFlagRejected(t *testing.T) {
 }
 
 func TestBuildCycleEnv_PerAgentCLI_TranslatesToEvolveEnvKey(t *testing.T) {
-	// --cli auditor=claude-tmux must surface as EVOLVE_AUDITOR_CLI=claude-tmux
-	// so the runner's envchain lookup (G1) finds it.
 	cfg := loopConfig{
 		Strategy: "balanced",
 		PerAgentCLI: map[string]string{
@@ -78,7 +68,6 @@ func TestBuildCycleEnv_PerAgentCLI_TranslatesToEvolveEnvKey(t *testing.T) {
 	if got := env["EVOLVE_AUDITOR_CLI"]; got != "claude-tmux" {
 		t.Errorf("EVOLVE_AUDITOR_CLI=%q, want claude-tmux", got)
 	}
-	// dash → underscore + upcase
 	if got := env["EVOLVE_TDD_ENGINEER_CLI"]; got != "agy-tmux" {
 		t.Errorf("EVOLVE_TDD_ENGINEER_CLI=%q, want agy-tmux (dash→underscore in agent name)", got)
 	}
@@ -102,8 +91,6 @@ func TestBuildCycleEnv_PerAgentModel_TranslatesToEvolveEnvKey(t *testing.T) {
 }
 
 func TestBuildCycleEnv_FlagOverridesInheritedEnv(t *testing.T) {
-	// Pre-existing EVOLVE_AUDITOR_CLI in os.Environ should be overridden by
-	// the --cli flag — the dispatcher's flag is the final say.
 	cfg := loopConfig{
 		Strategy:    "balanced",
 		PerAgentCLI: map[string]string{"auditor": "claude-tmux"},
@@ -115,10 +102,8 @@ func TestBuildCycleEnv_FlagOverridesInheritedEnv(t *testing.T) {
 }
 
 func TestPhaseEnvAgentKey(t *testing.T) {
-	// Mirror of envchain.PhaseEnvKey's normalization: lowercase agent names
-	// upper-cased, dashes → underscores. Whatever envchain.PhaseEnvKey
-	// produces for "tdd-engineer" must equal "TDD_ENGINEER" so the runner's
-	// `EVOLVE_<AGENT>_CLI` lookup matches our prefix here.
+	// phaseEnvAgentKey must mirror envchain.PhaseEnvKey's normalization, or the
+	// runner's EVOLVE_<AGENT>_CLI lookup misses.
 	cases := []struct {
 		in, want string
 	}{

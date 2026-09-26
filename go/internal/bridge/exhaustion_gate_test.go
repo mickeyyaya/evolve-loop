@@ -2,9 +2,6 @@ package bridge
 
 import "testing"
 
-// The gate must fast-fail only after the wall PERSISTS for the threshold, and a
-// single transient match (wall text passing through a working agent's pane) must
-// never cross — that is the whole point (kill a working agent = cardinal sin).
 func TestExhaustionGate_PersistenceSemantics(t *testing.T) {
 	if exhaustionPersistObservations < 2 {
 		t.Fatalf("threshold must be >= 2 to distinguish a transient frame from a persistent wall; got %d", exhaustionPersistObservations)
@@ -12,8 +9,8 @@ func TestExhaustionGate_PersistenceSemantics(t *testing.T) {
 
 	cases := []struct {
 		name    string
-		matches []bool // one entry per observation
-		wantFF  []bool // expected fast-fail signal per observation
+		matches []bool
+		wantFF  []bool
 	}{
 		{
 			name:    "persistent wall crosses on the threshold-th consecutive match",

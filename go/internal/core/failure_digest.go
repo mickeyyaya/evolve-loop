@@ -1,18 +1,5 @@
 package core
 
-// failure_digest.go — S1 failure-digest-assembler (cycle-1034, item
-// failure-disposition-router). The deterministic post-FAIL / pre-retro step that
-// converts a failed cycle's forensic artifacts into a STABLE failure identity the
-// S2 disposition gate cross-checks against, so the retro agent can no longer
-// INVENT the failure's identity (closes lesson_to_action_gap).
-//
-// SEAM (Core Rule 3): the fingerprint/bucket source is the single workspace SSOT
-// artifact audit-fail-reason.json ({schema_version, phase, reasons[]}, emitted by
-// the coherence floor), mirroring readFailureDecision's workspace-file boundary.
-// Reading it is fail-SOFT: an absent/malformed artifact degrades to the "unknown"
-// bucket and STILL writes a digest — a genuinely novel failure must always yield a
-// triage artifact. Only a real write IO failure is returned as an error.
-
 import (
 	"crypto/sha256"
 	"encoding/hex"
@@ -34,13 +21,8 @@ type FailureDigest struct {
 	Fingerprint string `json:"fingerprint"`
 	PreClass    string `json:"pre_class"`
 	Recurrence  int    `json:"recurrence"`
-	// Unexplained marks a digest whose reason set carries NO distinguishing
+	// Unexplained marks a digest whose reason set carries no distinguishing
 	// content (empty, or exactly the content-free agent-graded router line).
-	// Its fingerprint asserts no defect identity: distinct failures collapse
-	// into this bucket by construction, so the blocker breaker must route it
-	// to the diagnosability rule, never the identical-fingerprint rule
-	// (batch-14: cycles 1137/1139/1143 — three DISTINCT auditor findings on
-	// one task, one shared boilerplate fingerprint, false halt).
 	Unexplained bool `json:"unexplained,omitempty"`
 }
 
@@ -66,10 +48,8 @@ type preClassRule struct {
 	needles []string
 }
 
-// preClassRules classify a failure reason into a coarse bucket from REAL reason
-// text (not a hardcoded echo). Order = precedence: infra teardown is checked
-// before the gate/verdict buckets because an infra-severed phase can also mention
-// a floor.
+// preClassRules classify a failure reason into a coarse bucket from real
+// reason text. Order = precedence.
 var preClassRules = []preClassRule{
 	{"infra-error", []string{"infra teardown", "quota", "bridge", "teardown"}},
 	{"guard-abort", []string{"statemap severed", "guard aborted", "guard abort", "statemap"}},
@@ -90,11 +70,11 @@ func classifyPreClass(reasonLower string) string {
 	return "unknown"
 }
 
-// AssembleFailureDigest reads <workspace>/audit-fail-reason.json, derives a stable
+// AssembleFailureDigest reads <workspace>/audit-fail-reason.json fail-soft
+// (absent/malformed degrades to "unknown", never aborts), derives a stable
 // phase-composed fingerprint and pre-class bucket, reads the recurrence count
-// through rc, writes the digest atomically, and returns it. Reading the artifact
-// is fail-soft (absent/malformed → "unknown", no abort); only a write failure is
-// returned as an error.
+// through rc, writes the digest atomically, and returns it. Only a write
+// failure is returned as an error.
 func AssembleFailureDigest(cycle int, workspace string, rc RecurrenceCounter) (FailureDigest, error) {
 	phase, reasons := readAuditFailReason(workspace)
 	joined := strings.ToLower(strings.Join(reasons, "\n"))
@@ -120,9 +100,8 @@ func AssembleFailureDigest(cycle int, workspace string, rc RecurrenceCounter) (F
 	return digest, nil
 }
 
-// readAuditFailReason returns the phase and reasons from the workspace SSOT
-// artifact. Absent or malformed → ("", nil) so the caller degrades to "unknown"
-// rather than aborting (fail-soft boundary, mirrors readFailureDecision).
+// readAuditFailReason returns ("", nil) when the artifact is absent or
+// malformed, so the caller degrades to "unknown" rather than aborting.
 func readAuditFailReason(workspace string) (phase string, reasons []string) {
 	raw, err := os.ReadFile(filepath.Join(workspace, "audit-fail-reason.json"))
 	if err != nil {
@@ -135,11 +114,9 @@ func readAuditFailReason(workspace string) (phase string, reasons []string) {
 	return a.Phase, a.Reasons
 }
 
-// fingerprint composes a DETERMINISTIC, phase-load-bearing identity:
-// "<phase>|<preClass>|<hash>" where the hash also folds in phase+preClass+reasons.
-// Phase is both a prefix and a hash input, so two failures differing only in phase
-// never collapse to one id. No timestamp/random seed — identical artifacts always
-// yield the identical fingerprint.
+// fingerprint composes "<phase>|<preClass>|<hash>". Phase is both a prefix
+// and a hash input, so two failures differing only in phase never collapse to
+// one id.
 func fingerprint(phase, preClass string, reasons []string) string {
 	normalized := make([]string, 0, len(reasons))
 	for _, r := range reasons {
@@ -149,63 +126,31 @@ func fingerprint(phase, preClass string, reasons []string) string {
 	return phase + "|" + preClass + "|" + hex.EncodeToString(sum[:])[:12]
 }
 
-// narrativeVerdictToken matches the audit phase's verdict-conflict record token
-// `narrative=<canonical verdict>` (phases/audit/audit.go). Anchored to the
-// literal prefix and the four-value enum, so no other reason text can match.
+// narrativeVerdictToken matches the audit phase's narrative=<verdict> token
+// (phases/audit/audit.go).
 var narrativeVerdictToken = regexp.MustCompile(`narrative=(?:PASS|FAIL|WARN|SKIPPED)\b`)
 
-// goTestDurationToken matches go-test timing chrome embedded in reason text:
-// the per-test "(0.02s)" and the package summary "\t1.478s". Decimal REQUIRED
-// — go test always prints decimals, while integer second tokens ("-timeout
-// 300s") are configuration and stay identity-bearing. Live pin: cycles
-// 1146/1148 failed the SAME protectedsurface red on the SAME files, split
-// into two fingerprints by "1.478s" vs "1.495s" alone (the third instance of
-// the identity-noise family after cycle tokens and narrative verdicts).
-// Accepted residual: a perf predicate whose message varies only in a measured
-// decimal-seconds value ("p95=2.10s" vs "p95=9.90s") folds to one fingerprint
-// — correct for the breaker (same defect, worsening measurement), documented
-// here so it is not rediscovered as a bug.
+// goTestDurationToken matches go-test timing chrome. Decimal seconds only —
+// an integer-second token like "-timeout 300s" is configuration and stays
+// identity-bearing.
 var goTestDurationToken = regexp.MustCompile(`\b\d+\.\d+s\b`)
 
-// cycleNumberToken matches the cycle-numbered tokens that per-cycle ARTIFACT
-// PATHS bake into reason text — ".evolve/runs/cycle-1365/audit-report.md",
-// ".evolve/worktrees/cycle-42824668-1440/go", and the bare "cycle 1365" of
-// prose reasons. The trailing `(?:-\d+)*` is load-bearing for the worktree
-// shape, whose name carries BOTH a lane hash and a cycle number. Same shape as
-// the carryover unit's cycleTokenRE (internal/core/carryover/identity.go), extended for multi-segment ids.
-// Only the NUMBER folds: the path around it (which dir, which artifact FILE)
-// is untouched, so two different artifacts in one cycle dir stay two defects.
+// cycleNumberToken matches the cycle-numbered tokens per-cycle artifact paths
+// bake into reason text, and the bare "cycle N" of prose reasons; same shape
+// as the carryover unit's cycleTokenRE (internal/core/carryover/identity.go).
+// Only the number folds, so two different artifacts in one cycle dir stay two
+// defects.
 var cycleNumberToken = regexp.MustCompile(`(?i)\bcycle[ -]\d+(?:-\d+)*`)
 
-// attemptDenominatorToken matches a retry loop's attempt index — "(attempt
-// 1/3)", "retry 3 of 4". One unwinnable defect retried N times is ONE defect,
-// but each attempt index minted its own fingerprint, so the identical-
-// fingerprint breaker (IdenticalFingerprintCeiling=3) could never reach its
-// ceiling on exactly the retry storms it exists to halt. The keyword is
-// preserved via ${1} so an "attempt" reason and a "retry" reason — different
-// writers, different failures — cannot collapse into each other.
+// attemptDenominatorToken matches a retry loop's attempt index. The keyword
+// is preserved via ${1} so an "attempt" reason and a "retry" reason cannot
+// collapse into each other.
 var attemptDenominatorToken = regexp.MustCompile(`(?i)\b(attempt|retry)\s+\d+\s*(?:/|of)\s*\d+`)
 
-// normalizeReasonForFingerprint projects a reason onto its DEFECT IDENTITY,
-// dropping tokens that are load-bearing for a human reader but pure noise for
-// identity. Display and identity are two projections of the one reason string:
-// the digest, the dossier and audit-fail-reason.json all keep the reason
+// normalizeReasonForFingerprint projects a reason onto its defect identity.
+// Display and identity are two projections of the one reason string: the
+// digest, the dossier and audit-fail-reason.json all keep the reason
 // verbatim — only the hash input is normalized.
-//
-// Today that is exactly one token. The audit verdict-conflict record names the
-// auditor's own verdict (`narrative=PASS|WARN|SKIPPED`); three canonical values
-// are reachable for ONE recurring defect — the same gate red on three retries —
-// which would split it into three fingerprint buckets against
-// IdenticalFingerprintCeiling=3 and stop the identical-fingerprint breaker from
-// ever halting the batch (cycle-1127 audit C1). Bounding the value (IsVerdict)
-// makes it finite but not STABLE; the cycle-1124 lesson requires both. Same
-// principle as egpsRedIDCycleTokens stripping cycle numbers from ac_ids — with
-// the normalization at the hash boundary instead of the message, because here
-// the varying token is the very fact the operator needs to see.
-//
-// Deliberately narrow: the defect-identifying content of the same reason set
-// (which gate, which predicate) is untouched, so two DIFFERENT defects never
-// collapse into one fingerprint.
 func normalizeReasonForFingerprint(reason string) string {
 	reason = narrativeVerdictToken.ReplaceAllString(reason, "narrative=<verdict>")
 	reason = cycleNumberToken.ReplaceAllString(reason, "cycle-N")
@@ -213,19 +158,10 @@ func normalizeReasonForFingerprint(reason string) string {
 	return goTestDurationToken.ReplaceAllString(reason, "<dur>")
 }
 
-// ensureFailureDigest is the single-source wiring shared by BOTH retro
-// dispatch paths (recordFailureLearning for phase errors; cyclerun dispatch
-// for verdict FAILs — cycle-1046 proved wiring only the first blinds the
-// disposition contract AND the blocker breaker for verdict-path failures).
-// Ledger load is fail-soft (nil counter → recurrence 0); a digest write
-// failure only WARNs — retro must never be blocked by forensics plumbing.
-// Idempotent: identical artifacts yield an identical digest.
-// fallbackPhase/fallbackReason are the caller's own evidence (failed phase +
-// error/verdict text), written INTO audit-fail-reason.json when no floor wrote
-// one — batch-6 cycles 1044/1045/1047 each failed differently with no reason
-// artifact, collapsed to one empty-evidence fingerprint, and false-tripped the
-// identical-fingerprint breaker rule. A floor-written artifact always wins;
-// the fallback never overwrites (F8: one evidence trail for humans + digest).
+// ensureFailureDigest is best-effort: a nil recurrence ledger degrades to
+// recurrence 0, and a digest write failure only WARNs. fallbackPhase and
+// fallbackReason are written into audit-fail-reason.json only when no floor
+// already wrote one; a floor-written artifact always wins.
 func (o *Orchestrator) ensureFailureDigest(cycle int, projectRoot, workspace, fallbackPhase, fallbackReason string) {
 	if workspace == "" {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN: failure digest not written (cycle %d): missing workspace\n", cycle)
@@ -249,29 +185,7 @@ func (o *Orchestrator) ensureFailureDigest(cycle int, projectRoot, workspace, fa
 	}
 }
 
-// verdictFailDistinguisher extracts per-failure content for the verdict-path
-// fallback reason so distinct failures never share a fingerprint (cycles
-// 1054/1060: a constant fallback string collided two different tasks' audit
-// FAILs — a third would have false-tripped the identical-fingerprint breaker
-// rule). Layered, best-effort, deterministic: committed task ids first, then
-// the audit report's first defect-ish line. STABLE across recurrences of the
-// same defect (never cycle numbers — those would blind the breaker to real
-// repeats). Empty when no artifact offers content (documented residual).
 func verdictFailDistinguisher(phase, workspace string) string {
-	// Defect identity FIRST — it is the only layer that separates the common
-	// case of the SAME task re-audited with a DIFFERENT finding each retry
-	// (batch-14: 1137/1139/1143 were three progressing findings on one task;
-	// the task-id layer is constant across them by definition). Task identity
-	// is the weakest signal and therefore the LAST resort, not the first.
-	//
-	// The sentinel read goes through phasecontract.ReadFailureBlock — the SAME
-	// authority the verdict path, dossier and failure-learning consult — not a
-	// hand-rolled parse (diff-review HIGH: a local reader dropped the
-	// placeholder-echo guard, so the Deliverable Contract's printed example
-	// "<one line per defect>" echoed into a report would mint a CONSTANT
-	// cross-task defect identity — the exact false-trip this file exists to
-	// prevent — and it also settles first-sentinel precedence and the
-	// per-phase report name in one call).
 	if fb, ok := phasecontract.ReadFailureBlock(workspace, phase); ok {
 		for _, d := range fb.Defects {
 			if head := defectHead(d); head != "" {
@@ -304,15 +218,10 @@ func verdictFailDistinguisher(phase, workspace string) string {
 	return ""
 }
 
-// freeTextCycleTokens matches cycle-numbered chrome INSIDE prose defect text
-// ("acs/cycle1141", "cycle-1141", "TestC1141_004_…") — the in-text
-// counterpart of the audit phase's anchored egpsRedIDCycleTokens. Both
-// require the literal cycle/TestC prefix plus digits, so two DIFFERENT
-// defects never collapse; only the retry-varying token folds.
+// freeTextCycleTokens matches cycle-numbered chrome inside prose defect text;
+// the in-text counterpart of the audit phase's anchored egpsRedIDCycleTokens.
 var freeTextCycleTokens = regexp.MustCompile(`\b(?:[Cc]ycle[-_ ]?\d+|TestC\d+_)`)
 
-// defectHead projects one defect string onto its stable identity head:
-// cycle-normalized, single-line, truncated.
 func defectHead(d string) string {
 	d = strings.TrimSpace(strings.ReplaceAll(d, "\n", " "))
 	if d == "" {
@@ -330,12 +239,8 @@ func defectHead(d string) string {
 	return d
 }
 
-// causeHead projects an abort-cause error string onto its stable identity:
-// cycle-normalized, single-line, and — unlike defectHead — TAIL-kept when over
-// budget. Error chains grow prefix-first ("phase build: attempt N: bridge:
-// <long path>: <root cause>"), so the distinguishing content lives at the END;
-// a head-kept cut would collapse two different roots under one long shared
-// prefix into one fingerprint (review M1 on the batch-19 cycle-1208 fix).
+// causeHead is tail-kept when over budget, unlike defectHead: an error chain
+// grows prefix-first, so the distinguishing content lives at the end.
 func causeHead(errText string) string {
 	s := strings.TrimSpace(strings.ReplaceAll(errText, "\n", " "))
 	if s == "" {
@@ -353,19 +258,17 @@ func causeHead(errText string) string {
 	return s
 }
 
-// agentGradedRouterReason is the ONE template for the dispatch loop's
-// "verdict FAIL routed to retro" fallback reason. Shared with
+// agentGradedRouterReason is the one template for the dispatch loop's
+// "verdict FAIL routed to retro" fallback reason, shared with
 // isBoilerplateRouterReason so the writer and the content-free detector can
-// never drift apart (pinned by TestAgentGradedRouterReason_MatchesBoilerplateDetector).
+// never drift apart.
 func agentGradedRouterReason(phase string) string {
 	return fmt.Sprintf("phase %s verdict FAIL routed to retro (agent-graded; see the %s report artifact)", phase, phase)
 }
 
-// abnormalEpilogueReason is the ONE template for the abnormal-exit epilogue's
-// fallback reason (cyclerun_epilogue.go) — shared with the content-free
-// detector below for the same no-drift guarantee as the router line. Every
-// abort in the same phase renders identically (a SIGINT-cancelled lane, a
-// wedged bridge, an operator bounce), so this template asserts no identity.
+// abnormalEpilogueReason is the one template for the abnormal-exit epilogue's
+// fallback reason. Every abort in the same phase renders identically, so this
+// template asserts no identity.
 func abnormalEpilogueReason(phase string) string {
 	return "cycle aborted in phase " + phase + " (abnormal-exit epilogue)"
 }
@@ -406,9 +309,7 @@ func reasonsAreContentFree(reasons []string) bool {
 
 // agentGradedFailReason composes the dispatch loop's fallback fail-reason for
 // an agent-graded FAIL: the router line plus the strongest per-failure
-// distinguisher the workspace offers (cycles 1054/1060: a constant fallback
-// collided two different tasks; batch-14: a task-first distinguisher collided
-// three different defects of ONE task).
+// distinguisher the workspace offers.
 func agentGradedFailReason(phase, workspace string) string {
 	reason := agentGradedRouterReason(phase)
 	if d := verdictFailDistinguisher(phase, workspace); d != "" {

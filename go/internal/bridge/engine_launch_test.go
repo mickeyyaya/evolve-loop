@@ -10,11 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// engine_launch_test.go — tests for the core.Bridge entry Engine.Launch
-// (the in-process path the M7 adapter cutover routes to): BridgeRequest →
-// LaunchArgs pipeline, prompt materialization, ExtraFlags pass-through,
-// and artifact-into-response.
-
 func TestEngineLaunch_ClaudeP_MapsToPipeline(t *testing.T) {
 	ws := t.TempDir()
 	prof := writeProfile(t, ws, "eng-test", "")

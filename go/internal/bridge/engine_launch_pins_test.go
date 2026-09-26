@@ -1,12 +1,5 @@
 package bridge
 
-// engine_launch_pins_test.go — ADR-0103 unit 10, the host pins written on
-// the pre-extraction code (8e8f080f) and kept: the four required-field
-// strings, the stdout-completion read path, the boot-strike clear on a
-// non-80 exit, the exit → sentinel table, and the ACS source tokens engine.go
-// must keep spelling. Each was proven red against its named mutant before
-// the launch-outcome classifier moved out (design §6 tests 1-4, 8).
-
 import (
 	"context"
 	"errors"
@@ -20,8 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// Test 1 — the gauntlet: CLI, Profile, Workspace, ArtifactPath in that order,
-// each its exact string, and the Runner is never invoked.
 func TestEngineLaunch_RequiredFields_FourSentinelStrings(t *testing.T) {
 	full := core.BridgeRequest{CLI: "claude-p", Profile: "p", Workspace: "w", ArtifactPath: "a"}
 	for _, tc := range []struct {
@@ -63,8 +54,6 @@ func TestEngineLaunch_RequiredFields_FourSentinelStrings(t *testing.T) {
 	}
 }
 
-// Test 2 — Completion == "stdout" reads the captured scrollback (stdoutLog),
-// every other contract reads the artifact.
 func TestEngineLaunch_StdoutCompletion_ReadsScrollbackNotArtifact(t *testing.T) {
 	script := launchFixtureScript(ExitOK, "", "artifact=both")
 	resp, _, err := launchThroughFixture(t, context.Background(), Deps{}, script, core.BridgeRequest{Completion: "stdout"})
@@ -77,8 +66,6 @@ func TestEngineLaunch_StdoutCompletion_ReadsScrollbackNotArtifact(t *testing.T) 
 	}
 }
 
-// Test 3 — any exit other than 80 clears the driver's boot strike (the REPL
-// booted); exit 80 records one more.
 func TestEngineLaunch_NonBootExit_ClearsBootStrike(t *testing.T) {
 	seeded := func() *clihealth.Store {
 		store := clihealth.NewStore(t.TempDir(), nil)
@@ -108,10 +95,6 @@ func TestEngineLaunch_NonBootExit_ClearsBootStrike(t *testing.T) {
 	}
 }
 
-// Test 4 — the exit → sentinel table through Launch: 81 wraps
-// ErrArtifactTimeout; exactly {80, 85, 86, 124} and -1-under-cancel wrap
-// ErrTransientBridgeFailure; everything else is plain; every error starts
-// with "bridge: launch exit=<code>".
 func TestEngineLaunch_ExitClassificationTable(t *testing.T) {
 	transient := map[int]bool{80: true, 85: true, 86: true, 124: true}
 	for _, code := range []int{2, 3, 10, 80, 81, 85, 86, 99, 124, 127, -1, 42} {
@@ -134,10 +117,6 @@ func TestEngineLaunch_ExitClassificationTable(t *testing.T) {
 	}
 }
 
-// Test 8 — the ACS predicates read engine.go's SOURCE: cycle426 pins the
-// token ClearBootStrike, cycle50 pins `codexConfigPath string`, cycle43 pins
-// the absence of the retired EVOLVE_ARTIFACT_MAX_EXTENDS dial. The unit's
-// split must keep the boot-strike steps and Config in this file.
 func TestEngineSourceKeepsTheACSTokens(t *testing.T) {
 	src, err := os.ReadFile(filepath.Join(".", "engine.go"))
 	if err != nil {

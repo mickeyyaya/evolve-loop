@@ -14,10 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
-// cmd_loop_unfinished_test.go — F1 sibling: a fresh `evolve loop` that finds an
-// unfinished cycle whose run lease is still FRESH must recognize the LIVE owner
-// and steer the operator to --resume / wait — never to `evolve cycle reset`
-// (which would refuse anyway) and never to `pkill`.
 func TestRunLoop_UnfinishedCycle_FreshLeaseHaltsWithLiveOwnerMsg(t *testing.T) {
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
@@ -28,11 +24,8 @@ func TestRunLoop_UnfinishedCycle_FreshLeaseHaltsWithLiveOwnerMsg(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(evolveDir, "policy.json"), []byte(`{"dispatch":{"policy":"off"}}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// Fresh lease AND a genuinely-alive owner pid ⇒ a live loop owns cycle 395.
-	// Use this test process's own pid so the production pid-aware liveness fence
-	// (runlease.OwnerLive, cycle-554) sees a real live owner — a fresh heartbeat
-	// alone is no longer sufficient (a crashed owner's stale-but-fresh lease now
-	// correctly falls through to the resume|reset guidance instead).
+	// Uses this test process's own pid so runlease.OwnerLive sees a genuinely
+	// live owner, not just a fresh heartbeat.
 	livePID := os.Getpid()
 	if err := runlease.Write(ws, runlease.Lease{RunID: "01RUN", OwnerPID: livePID}, time.Now()); err != nil {
 		t.Fatalf("write lease: %v", err)

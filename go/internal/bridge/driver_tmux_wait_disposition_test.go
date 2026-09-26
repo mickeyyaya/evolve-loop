@@ -26,9 +26,6 @@ func (t *reviewBeforeNudgeTmux) SendKeys(ctx context.Context, session, keys stri
 	return t.fakeTmux.SendKeys(ctx, session, keys, enter)
 }
 
-// TestRunTmuxREPL_StopReviewCallbackPrecedesNudge characterizes the seam
-// between checkpoint adjudication and disposition. Consumers must observe the
-// pause verdict before the driver acts on it by nudging the pane.
 func TestRunTmuxREPL_StopReviewCallbackPrecedesNudge(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
 	reviewObserved := false
