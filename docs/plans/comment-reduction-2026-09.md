@@ -71,26 +71,29 @@ Go files is each batch's count of changed Go files. The landing proof's verified
 
 | Batch | Scope | Go files | Comment lines before → after | Narrative before → after | Status |
 |---|---|---|---|---|---|
-| 0 | tooling, convention, plan, persona rules, commit-gate waiver | — | — | — | its own PR; merges first |
-| 1-2 | `internal/recovery`, `internal/profiles` | 28 | 687 → 95, 500 → 63 | 67 → 5, 54 → 5 | landed |
-| 3 | `internal/policy` | 84 | 2,111 → 306 | 107 → 0 | landed |
-| 4 | `internal/router` | 52 | 1,725 → 264 | 105 → 0 | landed |
-| 5-6 | `internal/triagecap`, `internal/config` | 68 | 1,439 → 155, 930 → 147 | 100 → 0, 65 → 0 | landed as one commit |
-| 7 | `internal/prompts` | 20 | 875 → 40 | 71 → 0 | landed |
-| 8 | `internal/bridge/panestream` | 26 | 1,402 → 127 | 57 → 0 | landed |
-| 9 | `internal/inboxbatch` | 24 | 743 → 110 | 57 → 0 | landed |
-| 10 | `internal/fleet` | 30 | 1,106 → 105 | 38 → 0 | landed |
+| 0 | tooling, convention, plan, persona rules, commit-gate waiver | — | — | — | its own PR, which lands before the comment PR |
+| 1-2 | `internal/recovery`, `internal/profiles` | 28 | 687 → 95, 500 → 63 | 67 → 5, 54 → 5 | on the comment PR |
+| 3 | `internal/policy` | 84 | 2,111 → 306 | 107 → 0 | on the comment PR |
+| 4 | `internal/router` | 52 | 1,725 → 264 | 105 → 0 | on the comment PR |
+| 5-6 | `internal/triagecap`, `internal/config` | 68 | 1,439 → 155, 930 → 147 | 100 → 0, 65 → 0 | on the comment PR as one commit |
+| 7 | `internal/prompts` | 20 | 875 → 40 | 71 → 0 | on the comment PR |
+| 8 | `internal/bridge/panestream` | 26 | 1,402 → 127 | 57 → 0 | on the comment PR |
+| 9 | `internal/inboxbatch` | 24 | 743 → 110 | 57 → 0 | on the comment PR |
+| 10 | `internal/fleet` | 30 | 1,106 → 105 | 38 → 0 | on the comment PR |
 | 11 | `internal/dossier` | 33 | 947 → 162 | 41 → 0 | held: the package has lint debt from main, fixed in PR #635 |
-| 12 | `internal/evalgate` | 19 | 690 → 94 | 40 → 3 | landed; the 3 are read by `go/acs/cycle1685` |
-| 13 | `internal/looppreflight` | 29 | 717 → 118 | 37 → 0 | landed |
-| 14 | `internal/phasecoherence` | 15 | 478 → 46 | 37 → 0 | landed |
-| 15 | `internal/cli/phasecmd` | 26 | 551 → 98 | 42 → 0 | proven, waiting to land |
-| 16 | `internal/topngate` | 9 | 370 → 52 | 33 → 0 | proven, waiting to land |
-| 17 | `internal/tokenusage` | 17 | 760 → 66 | 31 → 0 | proven, waiting to land |
-| 18 | `internal/adapters/observer` | 16 | 552 → 119 | 35 → 0 | proven, waiting to land |
-| 19 | `internal/guards` | 30 | 758 → 118 | 30 → 0 | proven, waiting to land |
-| 20 | `internal/llmroute` | 18 | 595 → 51 | 23 → 0 | proven, waiting to land |
-| 21 | `internal/swarm` | 36 | 929 → 145 | 20 → 0 | proven, waiting to land |
+| 12 | `internal/evalgate` | 19 | 690 → 94 | 40 → 3 | on the comment PR; the 3 are read by `go/acs/cycle1685` |
+| 13 | `internal/looppreflight` | 29 | 717 → 118 | 37 → 0 | on the comment PR |
+| 14 | `internal/phasecoherence` | 15 | 478 → 46 | 37 → 0 | on the comment PR |
+| 15 | `internal/cli/phasecmd` | 26 | 551 → 98 | 42 → 0 | on the comment PR |
+| 16 | `internal/topngate` | 9 | 370 → 52 | 33 → 0 | on the comment PR |
+| 17 | `internal/tokenusage` | 17 | 760 → 66 | 31 → 0 | on the comment PR |
+| 18 | `internal/adapters/observer` | 16 | 552 → 119 | 35 → 0 | on the comment PR |
+| 19 | `internal/guards` | 30 | 758 → 118 | 30 → 0 | on the comment PR |
+| 20 | `internal/llmroute` | 18 | 595 → 51 | 23 → 0 | on the comment PR |
+| 21 | `internal/swarm` | 36 | 929 → 145 | 20 → 0 | on the comment PR |
+| 22 | `internal/adapters/ledger` | 26 | 878 → 140 | 29 → 0 | on the comment PR |
+| 23 | `internal/changedpkgs` | 12 | 504 → 43 | 23 → 0 | on the comment PR |
+| 24 | `internal/cyclestate` | 13 | 384 → 100 | 24 → 0 | on the comment PR |
 
 The narrative figures after batches 1-2 predate the pointer fix. The 5 left in each are `See ADR` pointers, which no longer count.
 
@@ -112,5 +115,7 @@ Code problems the editors found are reported, not changed, and filed as inbox it
 - `observer-exec-without-context`
 - `llmroute-default-trigger-aliasing`
 - `swarm-worker-pgid-never-recorded`
+- `ledger-plain-verify-fails-after-seal`
+- `auditchain-scout-report-literal`: found while landing, not by an editor
 - `guards-path-traversal-and-ship-bypass` (P1)
 - `lane-lint-debt-class`: the lint debt that held batch 11.
