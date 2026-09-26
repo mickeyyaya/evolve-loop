@@ -5,6 +5,7 @@
 > **Companion files:**
 > — *Research:* [part1-context-compression.md](part1-context-compression.md) · [part2-multiagent-economics.md](part2-multiagent-economics.md) · [part3-reasoning-efficiency.md](part3-reasoning-efficiency.md) — full per-paper detail + citations.
 > — *Design:* [part4-per-phase-boot-context.md](part4-per-phase-boot-context.md) — the clean-boot / per-phase boot-context minimization design.
+> — *Frontier watch:* [frontier-watch-2026-09-26.md](frontier-watch-2026-09-26.md) — re-check of the two "track, don't build" families (ollama-lane KV/soft-prompt, latent channels) with BUILD/DEFER verdicts and flip triggers.
 > — *Implementation record:* [part5-campaign-implementation-2026-07-17.md](part5-campaign-implementation-2026-07-17.md) — the 2026-07-17 campaign: telemetry fix, clean-boot B-v1/v2/v3, per-CLI investigation, Slice C design, GOTCHAs, measured **−39% cache_read/cycle**. Decision record: [ADR-0071](../../../docs/architecture/adr/0071-token-telemetry-attribution-and-clean-boot.md).
 
 ## Executive summary
@@ -32,7 +33,7 @@ Three independent literature sweeps converge on one hierarchy of leverage for a 
 | 9 | **One-round reflection cap; auditor is the only critic** | reflection value collapses after 1–2 passes; hurts already-correct outputs | adversarial-audit already cross-model; cap builder self-critique + audit iterations |
 | 10 | **Sleep-time consolidation between cycles** (memo/retro pre-digest → warm-start brief; novelty-gate KB writes) | 5× test-time compute cut, +13–18% accuracy (Letta); Mem0/A-MEM 85–93% per-op savings; SAGE novelty gate | memo/retro phases; knowledge-base consolidation pass; scout injects top-k linked notes not whole index |
 
-**Track, don't build:** soft-prompt/KV compression (500xCompressor, gist tokens) — needs model-weight access, inapplicable to closed CLIs; latent inter-agent channels; LLMLingua-2 only for bulky log/diff sections at conservative 2–4×.
+**Track, don't build** (re-checked 2026-09-26, both families still DEFER: [frontier-watch-2026-09-26.md](frontier-watch-2026-09-26.md))**:** soft-prompt/KV compression (500xCompressor, gist tokens) — needs model-weight access, inapplicable to closed CLIs; latent inter-agent channels; LLMLingua-2 only for bulky log/diff sections at conservative 2–4×.
 
 ## Applicability map — evolve-loop specifics
 
