@@ -2,6 +2,33 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — a Build may retract a draft it never committed (cycle 1705, 2026-09-26)
+
+Cycle 1705 passed audit and still failed. `guard:docdelete` denied the Builder's removal of its own never-committed explanation draft, and its deny message prescribed a plain `mv` into the archive home. That left the draft untracked, and the host predicate gate refuses untracked inputs. So it forced FAIL over the auditor's PASS.
+
+- `docdelete` lets a Build `rm`/`git rm` exactly one path: the active cycle's own explanation document, from the repository root, when `HEAD` never held it (compared case-folded) and no parent directory is a symlink. Any other operand, spelling, expansion or pathspec is denied as before.
+- The deny also closes older holes: the doc roots match case-folded and as bare words (`rm -rf docs`), and an `rm` or `mv` after `cd`/`pushd` into a doc root, under `git -C docs`, or from a shell already inside one is judged.
+- The deny message advises `git mv`, so an archived copy stays staged.
+- Record: `docs/incidents/2026-09-26-the-doc-guard-sent-a-draft-where-the-predicate-gate-refuses-it.md`.
+
+## Added — an identity-preserving rebind for the Build explanation (ADR-0105 rung B2, 2026-09-26)
+
+A clean fleet rebase re-runs Build and Audit today for every cycle, even when the change is byte-identical (cycles 1698 and 1701). The first rung that lets a passed audit survive is the explanation rebind; nothing calls it yet. B1 (unwind), B3 (the repaired trivial-rebase rung) and B4 (ship accepts the carry) follow.
+
+- `explanationdocs.RebindIdenticalRebase(ctx, binding, newBase, persist)` moves an approved Build contract to a new base without a Build. The host must first prove, from one read of the worktree:
+  - the new base descends from both the authored and the bound base;
+  - the peer delta touches no lane path (case-folded; any path that is not plain — non-ASCII, containing `:`, `\` or `~`, or with a component ending in a dot or space — counts as touching) and no `.gitattributes` or `.gitignore`;
+  - the lane's paths, modes and bytes equal the sealed digest;
+  - the material digest and the Build report declaration are unchanged;
+  - the document is absent at the new base.
+- On a proof, only derived fields move: `base_sha`, `diff_sha256` and a new `authored_base_sha`, which is set once. Writes go marker, checkpoint, handoff, snapshot. `ErrRebindIncomplete` marks a write-phase error that may leave a split `RecoverRebaseSplit` recognises; any other error means nothing was written.
+- `Verify` accepts the document's authored base only after re-deriving that lineage itself. A view without the field is checked exactly as before.
+- The host never re-seals a rebound handoff. `SealResult` is a no-op on an unchanged one, `RefreshResult` routes any change to Build, and a Builder's re-authored seal replaces the rebind.
+- Reviews:
+  - architect: APPROVE-WITH-MINOR, including a single read for proof and binding;
+  - security-reviewer: BLOCK twice on path aliases a filesystem resolves to a lane file (APFS NFC/NFD; NTFS/exFAT/SMB trailing dots and spaces), fixed by declining every path that is not plain.
+- `build-explanation-contract.md` now defines Build Binding as the authored base.
+
 ## Fixed — plane bookkeeping no longer sends a passed audit back to re-audit (cycle 1701, 2026-09-26)
 
 Cycle 1701 passed audit and was sent back at ship with `AUDIT_BINDING_TREE_MISMATCH`: a git-tracked inbox item in the plane had changed between its audit and its ship. Ship's binding hashed the plane's `git diff HEAD`, although a fleet lane ships from its own worktree. The plane's inbox queue, which operators and sibling lanes move all the time, was never part of what the lane commits.

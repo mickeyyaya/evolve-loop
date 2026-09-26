@@ -147,7 +147,7 @@ func TestExplanationDocsVocabulary_IncludesKnownVerificationFunctions(t *testing
 	}
 	for _, want := range []string{
 		"Verify", "VerifyLanded", "CheckBuild", "RefreshResult",
-		"RecoverRebaseSplit", "SealBuild", "SealResult",
+		"RecoverRebaseSplit", "RebindIdenticalRebase", "SealBuild", "SealResult",
 		"Activate", "RequireActivation",
 		"CrossCheckActivation", "ValidateReviewedHandoff",
 		"ArchiveUnpublishedContinuationRecords",

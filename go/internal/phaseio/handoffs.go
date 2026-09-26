@@ -35,6 +35,9 @@ type ExplanationView struct {
 	DocumentSHA256  string   `json:"document_sha256,omitempty"`
 	DiffSHA256      string   `json:"diff_sha256"`
 	MaterialPaths   []string `json:"material_paths,omitempty"`
+	// AuthoredBaseSHA is the base the Builder's document was written against, set only by an
+	// identity-preserving rebind (ADR-0105); empty means BaseSHA is that base.
+	AuthoredBaseSHA string `json:"authored_base_sha,omitempty"`
 }
 
 // BuildView is the typed projection of a build handoff.
