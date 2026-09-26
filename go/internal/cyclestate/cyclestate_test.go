@@ -2,10 +2,6 @@ package cyclestate
 
 import "testing"
 
-// TestPhaseConstants pins the exact wire string of every Phase constant.
-// These strings are serialized into ledger/state JSON and parsed by the
-// EGPS predicates — a drift here is a trust-kernel break, so the test is a
-// byte-identity guard, not a smoke test.
 func TestPhaseConstants(t *testing.T) {
 	cases := []struct {
 		p    Phase
@@ -35,8 +31,6 @@ func TestPhaseConstants(t *testing.T) {
 	}
 }
 
-// TestPhaseIsValid_Unknown ensures IsValid rejects strings outside the
-// known set (guards against silent typos in routing/plan code).
 func TestPhaseIsValid_Unknown(t *testing.T) {
 	for _, s := range []string{"", "Scout", "buildplanner", "unknown"} {
 		if Phase(s).IsValid() {
@@ -45,11 +39,8 @@ func TestPhaseIsValid_Unknown(t *testing.T) {
 	}
 }
 
-// TestVerdictConstants pins the verdict vocabulary the EGPS gate matches on.
-// Slice-of-struct (not map) so each constant IDENTIFIER is asserted against its
-// expected literal — this catches a typo'd constant (a map keyed by the constant
-// resolves the value first, so key==value and the check is dead).
 func TestVerdictConstants(t *testing.T) {
+	// A slice, not a map keyed by the constant: such a map compares each value with itself.
 	cases := []struct {
 		got  string
 		want string
@@ -69,9 +60,6 @@ func TestVerdictConstants(t *testing.T) {
 	}
 }
 
-// TestCycleTerminationTriageNoWork pins the public cycle-result termination
-// discriminator. Consumers use this exact value to distinguish a planned empty
-// triage commitment from an unexplained skipped cycle.
 func TestCycleTerminationTriageNoWork(t *testing.T) {
 	const want = "triage-empty-commitment"
 	if CycleTerminationTriageNoWork != want {
@@ -79,7 +67,6 @@ func TestCycleTerminationTriageNoWork(t *testing.T) {
 	}
 }
 
-// TestIsVerdict_Rejects guards the case/whitespace sensitivity contract.
 func TestIsVerdict_Rejects(t *testing.T) {
 	for _, s := range []string{"", "pass", " PASS", "OK"} {
 		if IsVerdict(s) {
@@ -88,8 +75,6 @@ func TestIsVerdict_Rejects(t *testing.T) {
 	}
 }
 
-// TestCycleOutcomeConstants pins the cycle-level outcome labels (slice-of-struct
-// so the constant identifier is asserted against its literal — see above).
 func TestCycleOutcomeConstants(t *testing.T) {
 	cases := []struct {
 		got  string
