@@ -63,8 +63,6 @@ func paneLiveCfg(t *testing.T, ws string) *Config {
 	}
 }
 
-// TestRunTmuxREPL_ChannelOff_NoLiveFiles asserts that with EVOLVE_CHANNEL unset
-// the driver creates neither .live file (byte-identical off path).
 func TestRunTmuxREPL_ChannelOff_NoLiveFiles(t *testing.T) {
 	ws := t.TempDir()
 	cfg := paneLiveCfg(t, ws)
@@ -95,9 +93,6 @@ func TestRunTmuxREPL_ChannelOff_NoLiveFiles(t *testing.T) {
 	}
 }
 
-// TestRunTmuxREPL_ChannelOn_StreamsPaneDeltaToFile asserts that with the channel
-// on, the answer content rendered in the pane accrues to <agent>-pane.live via
-// the per-tick PaneDelta extractor.
 func TestRunTmuxREPL_ChannelOn_StreamsPaneDeltaToFile(t *testing.T) {
 	ws := t.TempDir()
 	cfg := paneLiveCfg(t, ws)
@@ -140,9 +135,6 @@ func TestRunTmuxREPL_ChannelOn_StreamsPaneDeltaToFile(t *testing.T) {
 	}
 }
 
-// TestRunTmuxREPL_ChannelOn_BreadcrumbsToFile delivers a correlated command and
-// asserts both breadcrumbs land in <agent>-breadcrumbs.live (in order, exactly
-// once each) and NOT on stderr.
 func TestRunTmuxREPL_ChannelOn_BreadcrumbsToFile(t *testing.T) {
 	ws := t.TempDir()
 	cfg := paneLiveCfg(t, ws)
@@ -174,10 +166,9 @@ func TestRunTmuxREPL_ChannelOn_BreadcrumbsToFile(t *testing.T) {
 			// Idle: answer present, no interrupt affordance → busy→idle transition.
 			tmux.setPane("❯ q\n\n⏺ done\n\n❯\n  ⏵⏵ bypass permissions on · ← for agents")
 		default:
-			// Drop the artifact only after both breadcrumbs are in the file so
-			// the loop cannot exit before idle_reached fires — and write it ONCE.
-			// Under the cycle-1233 cross-poll stability window (completion.go) a
-			// file rewritten every tick bumps its mtime forever and never settles.
+			// Drop the artifact only after both breadcrumbs are recorded, and
+			// write it once — a rewrite every tick would never let the
+			// stability window settle.
 			if _, err := os.Stat(cfg.Artifact); err != nil {
 				if b, _ := os.ReadFile(bcPath); strings.Contains(string(b), "idle_reached") {
 					_ = os.WriteFile(cfg.Artifact, []byte("done"), 0o644)
@@ -215,9 +206,6 @@ func TestRunTmuxREPL_ChannelOn_BreadcrumbsToFile(t *testing.T) {
 	}
 }
 
-// TestRunTmuxREPL_ChannelOn_LiveFileOpenError_WARN forces an unopenable .live
-// path (agent name with a missing parent dir) and asserts the driver WARNs and
-// still completes — channel streaming degrades, it does not abort the phase.
 func TestRunTmuxREPL_ChannelOn_LiveFileOpenError_WARN(t *testing.T) {
 	ws := t.TempDir()
 	cfg := paneLiveCfg(t, ws)

@@ -10,14 +10,6 @@ import (
 	"time"
 )
 
-// driver_claudetmux_test.go — parity tests for the claude-tmux driver.
-// Ports the claude-tmux cases of permission-mode-drivers.bats
-// (T-permmode-drv.2/3/4/11/12) plus the REPL state-machine outcomes
-// (happy path, REPL-boot timeout, artifact timeout). A scriptable
-// fakeTmux replaces real tmux, and a no-op Sleep makes the poll loops
-// iterate instantly — so behaviors the bash BATS could only assert via a
-// 6s timeout are deterministic here.
-
 type fakeTmux struct {
 	existing          map[string]bool
 	sentKeys          []string // recorded SendKeys (keys only)
@@ -105,7 +97,6 @@ func runTmux(t *testing.T, fx launchFixture, tmux *fakeTmux, lookup map[string]s
 // --- safety gate + permission-mode (permission-mode-drivers.bats) ---------
 
 func TestClaudeTmux_SafetyGate_RequiresAllowBypass(t *testing.T) {
-	// T-permmode-drv.4: no permission_mode + no --allow-bypass → gate fires.
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &fakeTmux{}
 	code, stderr := runTmux(t, fx, tmux, nil)
@@ -121,22 +112,17 @@ func TestClaudeTmux_SafetyGate_RequiresAllowBypass(t *testing.T) {
 }
 
 func TestClaudeTmux_PermissionModeRelaxesGate(t *testing.T) {
-	// T-permmode-drv.2: permission_mode set → no --allow-bypass needed.
 	fx := newFixture(t, "claude-tmux", "plan")
 	code, stderr := runTmux(t, fx, &fakeTmux{}, nil)
 	if strings.Contains(stderr, "safety gate: --allow-bypass is required") {
 		t.Fatalf("safety gate must NOT fire when permission_mode is set; got %q", stderr)
 	}
-	// rc is REPL-boot-timeout here (no marker) — the gate behavior is what
-	// this test pins, mirroring the BATS which kill the run at 6s.
 	if code == ExitSafetyGate {
 		t.Fatalf("must not return ExitSafetyGate with permission_mode set")
 	}
 }
 
 func TestClaudeTmux_ClaudeCmd_PermissionModePlan(t *testing.T) {
-	// T-permmode-drv.3: claude_cmd carries --permission-mode plan and NOT
-	// --dangerously-skip-permissions.
 	fx := newFixture(t, "claude-tmux", "plan")
 	tmux := &fakeTmux{}
 	runTmux(t, fx, tmux, nil)
@@ -149,8 +135,6 @@ func TestClaudeTmux_ClaudeCmd_PermissionModePlan(t *testing.T) {
 }
 
 func TestClaudeTmux_ClaudeCmd_BypassWhenNoPermissionMode(t *testing.T) {
-	// T-permmode-drv.11: --allow-bypass + no permission_mode → bypass flag,
-	// NOT --permission-mode.
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &fakeTmux{}
 	runTmux(t, fx, tmux, nil, "--allow-bypass")
@@ -163,7 +147,6 @@ func TestClaudeTmux_ClaudeCmd_BypassWhenNoPermissionMode(t *testing.T) {
 }
 
 func TestClaudeTmux_ClaudeCmd_PlanWinsOverBypass(t *testing.T) {
-	// T-permmode-drv.12: --allow-bypass + permission_mode=plan → plan wins.
 	fx := newFixture(t, "claude-tmux", "plan")
 	tmux := &fakeTmux{}
 	runTmux(t, fx, tmux, nil, "--allow-bypass")
@@ -212,16 +195,10 @@ func TestClaudeTmux_HappyPath_ArtifactAppears(t *testing.T) {
 }
 
 func TestClaudeTmux_TrustDialogDismissedBeforePromptDelivery(t *testing.T) {
-	// Regression, table-ized over BOTH dialog generations (2026-09-02 review):
-	// each renders its selection cursor as ❯ — the same char claude-tmux uses
-	// as its REPL prompt marker — so the boot loop must auto-dismiss the
-	// dialog (tick) BEFORE delivering the prompt, or the paste lands in the
-	// dialog and is lost (rc=81 artifact-timeout). v2.1.193: numbered options,
-	// Yes pre-highlighted, one Enter. v2.1.252: unnumbered, default flipped to
-	// "No, exit", Down+Enter — the dialog that burned all three
-	// wave-20260901b lanes (see docs/incidents/
-	// 2026-09-01-claude-2252-trust-default-flip.md). Same class as the
-	// Cycle-121 codex trust-modal bug.
+	// Table-ized over both trust-dialog generations: each renders its
+	// selection cursor as ❯, the same glyph claude-tmux uses as its REPL
+	// prompt marker, so the boot loop must auto-dismiss the dialog before
+	// delivering the prompt or the paste lands in the dialog and is lost.
 	dialogs := []struct {
 		name string
 		pane string
@@ -290,7 +267,6 @@ func TestClaudeTmux_REPLBootTimeout(t *testing.T) {
 
 func TestClaudeTmux_ArtifactTimeout(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
-	// REPL boots, but the artifact never appears → ExitArtifactTimeout.
 	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}
 	code, _ := runTmux(t, fx, tmux, nil, "--allow-bypass")
 	if code != ExitArtifactTimeout {

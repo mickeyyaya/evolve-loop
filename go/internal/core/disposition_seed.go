@@ -1,30 +1,5 @@
 package core
 
-// disposition_seed.go — the disposition-skeleton preseed (2026-08-10
-// investigation; inbox disposition-skeleton-preseed). At continuation
-// adoption the orchestrator already knows the ancestor's OPEN defect ids, so
-// it writes <workspace>/defect-dispositions.json as a skeleton — one
-// status-OPEN entry per inherited OPEN id — and the auditor only UPGRADES
-// entries to FIXED (resolving evidence) or DEFERRED (reason).
-//
-// Gate semantics are untouched and unweakened: the disposition preflight sees
-// the file as present and covering (never MISSING/INCOMPLETE), while the
-// per-id reconcile rejects status OPEN ("not FIXED or DEFERRED") — a seeded
-// entry the auditor never touches still blocks the cycle by name. A seeded
-// DEFERRED would have been laundering; OPEN is the only honest seed.
-//
-// Known interaction (accepted, documented): the seeded file also satisfies
-// the audit phase's Phase-B secondary-artifact hold immediately, so session
-// teardown no longer waits for the UPGRADE — the per-id gate plus the
-// ADR-0086 bookkeeping regrade cover an auditor that finishes without
-// upgrading.
-//
-// The ancestor ledger is decoded through its owner, internal/core/defectledger
-// (ADR-0103 unit 09): the seeder reads the same Doc and the same OPEN
-// vocabulary the audit gate writes and grades, so the two sides cannot drift.
-// phases/audit/disposition_seed_singlesource_test.go still feeds one real
-// ledger document through both and asserts the same OPEN id set.
-
 import (
 	"fmt"
 	"os"
@@ -34,9 +9,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core/defectledger"
 )
 
-// seededDisposition is one skeleton entry. Text rides along for the auditor
-// (the gate's decoder ignores unknown fields); Reason is pre-created empty so
-// the upgrade is a value edit, not a shape edit.
+// Reason is pre-created empty so the auditor's upgrade is a value edit, not a
+// shape edit.
 type seededDisposition struct {
 	ID     string `json:"id"`
 	Status string `json:"status"`
@@ -44,12 +18,9 @@ type seededDisposition struct {
 	Reason string `json:"reason"`
 }
 
-// SeedDispositionSkeleton writes the skeleton at adoption. Every failure mode
-// is a silent no-op by design: the seed is convenience, the defect-ledger
-// GATE remains the loud enforcement on every one of these conditions
-// (unreadable ledger ⇒ blocking diagnostic; absent skeleton ⇒ MISSING).
-// An existing dispositions file is never clobbered — a prior attempt's or an
-// agent's own file wins.
+// SeedDispositionSkeleton writes a status-OPEN disposition skeleton for a
+// continuation's inherited defects, or no-ops (never clobbering an existing
+// dispositions file); the defect-ledger gate is the loud enforcement.
 func SeedDispositionSkeleton(workspace, projectRoot string, ancestorCycle int) {
 	if workspace == "" || projectRoot == "" {
 		return

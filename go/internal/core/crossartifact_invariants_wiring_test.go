@@ -1,37 +1,5 @@
 package core
 
-// crossartifact_invariants_wiring_test.go — THE WIRING HALF of the cycle-1676
-// RED contract for inbox item `crossartifact-invariant-stack`.
-//
-// internal/coherence/crossartifact_test.go pins WHAT the aggregate computes.
-// This file pins that it FIRES from the real cycle-close path (finalizeCycle,
-// the terminal segment RunCycle always reaches) and that firing it changes
-// nothing about whether the cycle blocks. A checker nothing calls is the same
-// defect class the stack was written to catch (#373: wired into one path only
-// is the same defect); an advisory that quietly gained teeth is the 1054/1060
-// breaker lesson the inbox record explicitly forbids repeating.
-//
-// THE CONTRACT (Builder implements; this file is frozen):
-//  1. finalizeCycle evaluates coherence.CheckCrossArtifactInvariants over the
-//     cycle's workspace and its LANE worktree (cs.ActiveWorktree) — never the
-//     projectRoot argument, which in fleet mode names a tree this lane did not
-//     write (#612).
-//  2. It records the result at <workspace>/crossartifact-invariants.json:
-//     {"advisory":true,"invariants":[{"name","status","evidence"},...]} — always,
-//     including an all-ok cycle, because a false-positive rate that is never
-//     recorded can never be evidenced, and that evidence is the only door to
-//     graduating any of these invariants to blocking.
-//  3. It NEVER mutates result.FinalVerdict or result.SystemFailure, and never
-//     disturbs the ADR-0072 verdict-incoherence floor that runs beside it.
-//
-// ADVERSARIAL DIVERSITY (skills/adversarial-testing §6):
-//   - Wiring/positive: the artifact appears on the real path (anti-no-op: a
-//     helper that exists but is never called fails here and nowhere else).
-//   - NEGATIVE       : four violations must NOT change the verdict, and the
-//     lane-binding case must stay violated when the cited path exists only
-//     under the project root.
-//   - Semantic       : the pre-existing forgery halt is byte-for-byte unchanged.
-
 import (
 	"context"
 	"encoding/json"
@@ -138,10 +106,6 @@ func xaStatusOf(t *testing.T, r xaWireReport, name string) string {
 	return ""
 }
 
-// TestFinalizeCycle_EmitsAdvisoryCrossArtifactInvariantsArtifact — the wiring
-// proof. Through the REAL finalizeCycle, a workspace whose artifacts contradict
-// each other leaves a decodable advisory record naming all four invariants,
-// with the violated ones carrying evidence.
 func TestFinalizeCycle_EmitsAdvisoryCrossArtifactInvariantsArtifact(t *testing.T) {
 	ws := xaIncoherentWorkspace(t)
 	result := &CycleResult{FinalVerdict: VerdictPASS}
@@ -175,10 +139,6 @@ func TestFinalizeCycle_EmitsAdvisoryCrossArtifactInvariantsArtifact(t *testing.T
 	}
 }
 
-// TestFinalizeCycle_CrossArtifactViolationsNeverBlockTheCycle — the NEGATIVE.
-// Four violations on a PASS cycle change nothing: the verdict stays PASS and no
-// system-failure signal is raised. This is the inbox record's advisory ratchet,
-// and it is what a later graduation must deliberately and separately undo.
 func TestFinalizeCycle_CrossArtifactViolationsNeverBlockTheCycle(t *testing.T) {
 	ws := xaIncoherentWorkspace(t)
 	result := &CycleResult{FinalVerdict: VerdictPASS}
@@ -197,12 +157,10 @@ func TestFinalizeCycle_CrossArtifactViolationsNeverBlockTheCycle(t *testing.T) {
 	xaReadWireReport(t, ws) // the finding is still RECORDED; it just does not bite
 }
 
-// TestFinalizeCycle_CrossArtifactBindsTheLaneWorktreeNotTheProjectRoot — AC3 at
-// the seam. The cited evidence path exists ONLY under the projectRoot argument,
-// so an implementation that resolves against the project root reports ok while
-// the lane's own tree never had the file. Binding cs.ActiveWorktree is the
-// #612 lesson: a cross-artifact check must read the tree the lane actually
-// wrote. The second half proves the check is not simply always-violated.
+// The cited evidence path exists only under the projectRoot argument, so an
+// implementation that resolves against the project root would report ok while
+// the lane's own tree never had the file. The second half proves the check is
+// not simply always-violated.
 func TestFinalizeCycle_CrossArtifactBindsTheLaneWorktreeNotTheProjectRoot(t *testing.T) {
 	projectRoot, lane := t.TempDir(), t.TempDir()
 	for _, root := range []string{projectRoot} {
@@ -244,10 +202,6 @@ func TestFinalizeCycle_CrossArtifactBindsTheLaneWorktreeNotTheProjectRoot(t *tes
 	}
 }
 
-// TestFinalizeCycle_VerdictIncoherenceFloorSurvivesTheAdvisory — AC4's
-// no-regression half at the seam. The ADR-0072 forgery halt keeps firing
-// exactly as before with the advisory aggregate running beside it, and the
-// advisory record is still written on that path.
 func TestFinalizeCycle_VerdictIncoherenceFloorSurvivesTheAdvisory(t *testing.T) {
 	ws := t.TempDir()
 	writeVerdicts(t, ws, "PASS", "PASS") // green artifacts, no contract verifier configured

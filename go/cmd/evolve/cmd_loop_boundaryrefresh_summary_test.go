@@ -1,77 +1,5 @@
 package main
 
-// cmd_loop_boundaryrefresh_summary_test.go — RED tests (cycle 1330, inbox
-// item auto-refresh-binary-at-boundary, chronicle
-// docs/chronicle/2026-08-binary-lag.md "Remaining scope" item 2: "surfacing
-// refresh events in the dossier/loop summary").
-//
-// PRIOR STATE (verified live in this worktree, not assumed from the scout
-// report — the scout's own knowledge of "already shipped" traced main, not
-// this worktree, and this worktree's chain-boundary mechanism is a SEPARATE,
-// already-complete lineage from cycles 1314/1320/1323/1325):
-//   - maybeRefreshChainBoundary (cmd_loop_chain.go) is fully implemented,
-//     wired into BOTH runLoopChain (cmd_loop_chain.go:538) and runLoopBatch's
-//     wave/fleet loop (cmd_loop.go:552), and covered by 18 existing GREEN
-//     tests (cmd_loop_chain_boundaryrefresh_test.go,
-//     _hardening_test.go, cmd_loop_wave_boundaryrefresh_wiring_test.go).
-//     Remaining-scope item 1 (the chain-boundary hook itself) is therefore
-//     PRE-EXISTING GREEN — this file adds no coverage for it.
-//   - Every successful boundary refresh already appends a durable audit
-//     record to .evolve/boundary-refresh-log.jsonl
-//     (appendChainBoundaryRefreshLog, cmd_loop_chain.go) BEFORE the re-exec —
-//     the "from stamp / to stamp" data chronicle item 2 asks to surface
-//     already exists on disk. What is missing is the LAST MILE: that record
-//     is never read back into the chain/loop summary JSON an operator (or a
-//     dossier consumer) actually looks at. `chainResult` sets StopReason =
-//     "chain_boundary_refresh_reexec" / loopResult sets StopReason =
-//     "loop_boundary_refresh_reexec", but neither says WHICH commits were
-//     involved without a separate grep of the JSONL file.
-//
-// THE GAP THIS CYCLE CLOSES (undefined until the Builder adds it — every
-// reference below to a not-yet-existing symbol IS this file's RED evidence;
-// no new detection/rebuild logic is invented, per
-// never_duplicate_centralize_via_design_patterns — this is pure plumbing
-// over the log file that already exists):
-//
-//	// lastChainBoundaryRefreshLogEntry reads
-//	// <evolveDir>/boundary-refresh-log.jsonl and returns the LAST
-//	// (most-recently-appended) entry. Best-effort, mirroring
-//	// spineFailOpenRollup's nil-when-clean shape: a missing file, an empty
-//	// file, or a read error all resolve to (nil, nil) — the field is simply
-//	// absent from the summary, never a hard failure (a summary emission must
-//	// not itself become a new failure mode for an already-successful boundary
-//	// refresh).
-//	func lastChainBoundaryRefreshLogEntry(evolveDir string) (*chainBoundaryRefreshLogEntry, error)
-//
-//	// chainResult gains:
-//	BoundaryRefresh *chainBoundaryRefreshLogEntry `json:"boundary_refresh,omitempty"`
-//	// populated at the SAME call site that already sets
-//	// res.StopReason = "chain_boundary_refresh_reexec" (cmd_loop_chain.go).
-//
-//	// loopResult (cmd_loop_outcome.go) gains the identical field, populated
-//	// at the wave-boundary call site that already sets
-//	// lr.StopReason = "loop_boundary_refresh_reexec" (cmd_loop.go).
-//
-// Predicate strategy (cycle-85 degenerate-predicate ban: every predicate
-// below exercises the real system under test, never a source-grep alone):
-//
-//	positive   — the helper returns the LAST of several appended entries
-//	             with its fields intact (T1).
-//	edge       — a missing log file, and an empty-but-present log file, both
-//	             degrade to (nil, nil) rather than an error (T2, T3).
-//	negative   — a nil BoundaryRefresh is OMITTED from marshaled JSON, not
-//	             merely null (exact-omission assertion, T4/T5) — the
-//	             cycle-131-class "the field is technically there but useless"
-//	             failure mode.
-//	wiring     — runLoopChain / runLoopBatch actually populate the new field
-//	             at their respective re-exec-stop call sites, waived per
-//	             acsassert's config-check convention because the field's own
-//	             correctness (does it hold the right OldSHA/NewSHA) is proven
-//	             by T1 above, and WHERE it must be called from is a structural
-//	             fact a behavioral end-to-end drive would just duplicate at
-//	             much higher fixture cost (T6/T7, mirrors
-//	             TestRunLoop_CallsMaybeRefreshChainBoundaryAtWaveBoundary).
-//
 // acs-predicate: config-check — T6/T7 are caller-existence checks; the value
 // they surface is already pinned behaviorally by T1-T5.
 import (
@@ -157,11 +85,11 @@ func TestLastChainBoundaryRefreshLogEntry_EmptyFileIsNilNoError(t *testing.T) {
 
 // --- T4/T5: exact-omission marshal assertions ---
 
-// T4 (negative — the cycle-131-class failure mode): chainResult with a nil
-// BoundaryRefresh must OMIT the "boundary_refresh" key entirely from the
-// marshaled JSON, not emit `"boundary_refresh": null`. A consumer that
-// checks key-presence (not merely non-null) to decide "did a refresh
-// happen this run" must see a clean, absent key on every ordinary run.
+// T4 (negative): chainResult with a nil BoundaryRefresh must OMIT the
+// "boundary_refresh" key entirely from the marshaled JSON, not emit
+// `"boundary_refresh": null`. A consumer that checks key-presence (not
+// merely non-null) to decide "did a refresh happen this run" must see a
+// clean, absent key on every ordinary run.
 func TestChainResult_MarshalOmitsBoundaryRefreshWhenNil(t *testing.T) {
 	res := chainResult{ChainMode: true, MaxBatches: 5, StopReason: "chain_inbox_empty"}
 	buf, err := json.Marshal(res)
@@ -199,9 +127,10 @@ func TestLoopResult_MarshalOmitsBoundaryRefreshWhenNil(t *testing.T) {
 // that already sets res.StopReason = "chain_boundary_refresh_reexec" —
 // otherwise the durable audit record the mechanism already writes to
 // boundary-refresh-log.jsonl stays permanently invisible to the JSON
-// summary an operator/dossier consumer actually reads. Since ADR-0103 unit 13
-// that call site is loopchain.(*Driver).boundary (the Result runLoopChain
-// prints IS the summary schema), so the proof reads the leaf.
+// summary an operator/dossier consumer actually reads. That call site is
+// loopchain.(*Driver).boundary (the Result runLoopChain prints IS the
+// summary schema), so the proof reads the leaf.
+// See ADR-0103.
 //
 // acs-predicate: config-check — lastChainBoundaryRefreshLogEntry's own
 // correctness is proven by T1-T3; this only proves the chain calls it.
@@ -216,13 +145,11 @@ func TestRunLoopChain_SetsBoundaryRefreshOnReExecStop(t *testing.T) {
 }
 
 // T7 mirrors T6 for runLoopBatch's wave/fleet boundary stage
-// (cmd_loop_window.go), the
-// non-chain caller maybeRefreshChainBoundary also fires from (cycle 1325
-// wiring). Both callers of the SAME refresh mechanism must surface the
-// SAME summary field — surfacing only the chain-mode caller would silently
+// (cmd_loop_window.go), the non-chain caller maybeRefreshChainBoundary also
+// fires from. Both callers of the same refresh mechanism must surface the
+// same summary field — surfacing only the chain-mode caller would silently
 // leave the plain `evolve loop --max-cycles N` / fleet path's refresh
-// events unobservable, exactly the asymmetry cycle-1325 closed for the
-// trigger wiring itself.
+// events unobservable.
 //
 // acs-predicate: config-check — see T6.
 func TestRunLoopBatch_SetsBoundaryRefreshOnWaveBoundaryReExecStop(t *testing.T) {

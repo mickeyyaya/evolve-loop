@@ -1,19 +1,5 @@
 package bridge
 
-// driver_tmux_repl_livenesscenter_test.go — RED tests for cycle-431 slice S3
-// (LivenessCenter consolidation): the driver's stop-review checkpoint must
-// route liveness through panestream.LivenessCenter.Observe/Aggregate
-// (ADR-0068), not the bare per-run detectorFor(lp) probe, and the
-// reviewer's pre-S3 Progressed/Busy boolean fallback must be retired —
-// verdict becomes a pure function of StopEvent.State.
-//
-// Seam: Deps.LivenessCenter (optional override; nil ⇒ the driver builds its
-// own panestream.NewLivenessCenter()) — a minimal DI seam (scout BA2) so a
-// test can register a distinctive probe and prove the checkpoint actually
-// consults it, without adding a new apicover-tracked symbol (Deps is
-// already covered elsewhere; a struct field is not a SymbolKind apicover
-// enumerates — see cmd/apicover/enumerate.go).
-
 import (
 	"bytes"
 	"context"
@@ -36,14 +22,8 @@ func (p *fixedStateProbe) Assess(_ string, _ panestream.PaneProfile) (panestream
 	return p.state, 1
 }
 
-// TestRunTmuxREPL_SignalCenterStateWins (AC1, positive): a LivenessProbe
-// registered on an injected LivenessCenter for the "claude" profile name must
-// be the state the checkpoint assigns to StopEvent.State — proof the driver
-// routes through center.Observe + center.Aggregate() (ADR-0068), not a
-// private per-run detectorFor(lp) probe that never learns about the
-// registration. Nothing in a normal claude-tmux boot-only pane sequence
-// classifies as Hung on its own, so seeing Hung here can only come from the
-// registered handler winning.
+// A normal claude-tmux boot-only pane sequence never classifies as Hung on
+// its own, so seeing Hung here can only come from the registered handler.
 func TestRunTmuxREPL_SignalCenterStateWins(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
 	center := panestream.NewLivenessCenter()
@@ -65,11 +45,9 @@ func TestRunTmuxREPL_SignalCenterStateWins(t *testing.T) {
 	}
 }
 
-// TestRunTmuxREPL_SignalCenterProbeActuallyInvoked (AC5, negative): the
-// registered probe's Assess must be CALLED at least once. A driver that
-// still bypasses the center (uses detectorFor(lp) directly) would never
-// touch the registration at all — probe.calls stays 0 forever, which a
-// state-only assertion (AC1) cannot by itself rule out.
+// A state-only assertion (like SignalCenterStateWins) cannot rule out a
+// driver that never calls the registered probe at all; this checks the call
+// directly.
 func TestRunTmuxREPL_SignalCenterProbeActuallyInvoked(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
 	center := panestream.NewLivenessCenter()
@@ -85,15 +63,6 @@ func TestRunTmuxREPL_SignalCenterProbeActuallyInvoked(t *testing.T) {
 	}
 }
 
-// TestStopEvent_BooleanFallbackRetired (AC2, negative): the pre-S3 fallback
-// that derived LivenessState from the coarse Progressed/Busy booleans when
-// StopEvent.State was unset must be RETIRED (removed or provably
-// unreachable), not merely shadowed. A StopEvent with State left at its
-// zero value but Progressed=true/Busy=true — exactly the shape the OLD
-// fallback read as Converging and extended unconditionally — must now
-// PAUSE: the driver always supplies State via the center (S3), so an
-// actually-unset State carries no liveness signal at all, never a
-// boolean-derived extend.
 func TestStopEvent_BooleanFallbackRetired(t *testing.T) {
 	r := newDeterministicReviewer(2)
 	ev := StopEvent{Progressed: true, Busy: true, Attempt: 0} // State left zero
@@ -102,12 +71,6 @@ func TestStopEvent_BooleanFallbackRetired(t *testing.T) {
 	}
 }
 
-// TestRunTmuxREPL_RenderWedgeStillPromotesToBusyStagnant (AC6, edge): the
-// cycle-291 render-wedge override — a blank pane from a LIVE session reads
-// as BusyButStagnant, never Idle — must survive the migration to the
-// center-authoritative State source. The scout keeps this as a post-
-// Aggregate override in the driver (behavior-identical), not a center
-// handler (deferred to S4).
 func TestRunTmuxREPL_RenderWedgeStillPromotesToBusyStagnant(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &jiggleTmux{fakeTmux: fakeTmux{paneSeq: []string{
@@ -117,10 +80,9 @@ func TestRunTmuxREPL_RenderWedgeStillPromotesToBusyStagnant(t *testing.T) {
 	}}}
 	rev := &scriptedReviewer{}
 	// jiggleTmux is a *TmuxController*-satisfying wrapper over fakeTmux, so it
-	// cannot go through runTmuxRev (which is typed to *fakeTmux); drive the
-	// Engine directly instead, exactly as render_wedge_test.go's runTmuxWedge
-	// does, but with the reviewer injected so this test can read StopEvent.State
-	// rather than only the OnStopReview reason string.
+	// cannot go through runTmuxRev (typed to *fakeTmux); drive the Engine
+	// directly instead, with the reviewer injected so this test can read
+	// StopEvent.State rather than only the OnStopReview reason string.
 	eng := newTestEngine(Deps{
 		Tmux:             tmux,
 		Sleep:            func(time.Duration) {},

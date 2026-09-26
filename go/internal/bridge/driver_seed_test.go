@@ -9,10 +9,6 @@ import (
 	"time"
 )
 
-// driver_seed_test.go — Realization.REPLInput seed injection: lines fed into
-// the REPL after the boot marker, before the task prompt. Closes the
-// previously-dead REPLInput field (ADR-0022).
-
 func indexOf(seq []string, want string) int {
 	for i, s := range seq {
 		if s == want {

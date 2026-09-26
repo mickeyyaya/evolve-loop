@@ -10,11 +10,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/launchoutcome"
 )
 
-// artifactTimeoutCause is the artifact-timeout sub-cause vocabulary — the
-// classifier's closed set (launchoutcome.TimeoutCause, ADR-0103 unit 10),
-// projected here so the emitter and the parser read ONE list: a token added
-// on one side without the other is caught by the driver → classifier
-// round-trip pin (TestTimeoutCauseVocabulary_DriverAndClassifierAgree).
+// artifactTimeoutCause aliases launchoutcome.TimeoutCause, so the emitter
+// and the parser read the same closed cause vocabulary.
 type artifactTimeoutCause = launchoutcome.TimeoutCause
 
 const (

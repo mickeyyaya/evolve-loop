@@ -1,17 +1,5 @@
 package core
 
-// Chronicle S3 (chronicle-s3-digest-wiring): seed the recent-outcomes digest
-// into the run workspace at cycle start, per the resolved chronicle policy.
-//
-//	off     → write nothing, inject nothing (byte-identical cycle start).
-//	shadow  → assemble DigestInput and WriteDigest into the run workspace,
-//	          but do NOT inject Context["recent_outcomes"] (compiled default).
-//	enforce → same write, PLUS Context["recent_outcomes"] carries the digest
-//	          bytes into every phase request (scout/triage render it).
-//
-// Best-effort throughout: a digest failure WARNs on stderr and the cycle
-// proceeds (the archivePollutedWorkspace idiom).
-
 import (
 	"encoding/json"
 	"fmt"

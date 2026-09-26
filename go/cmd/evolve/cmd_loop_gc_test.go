@@ -1,26 +1,5 @@
 package main
 
-// cmd_loop_gc_test.go — RED white-box tests for the L3.4 GC loop hook
-// (task gc-shadow-wiring, cycle 298). These call the unexported runGCHook
-// directly so they exercise the real Discover→Plan→(Apply) wiring against a
-// synthetic .evolve tree and assert on observable side effects (manifest file
-// written / not written, run dirs mutated / preserved, live runs excluded).
-//
-// CONTRACT for Builder (do NOT modify these tests — implement production code):
-//   - Add `func runGCHook(cfg loopConfig, workspace string, stderr io.Writer)`
-//     to cmd_loop.go. It reads os.Getenv("EVOLVE_GC") (default "off"):
-//       off            → return immediately, no manifest.
-//       <invalid>      → log a warning to stderr, return; no manifest, no crash.
-//       shadow         → policy.Load + gc.Discover + gc.Plan; write
-//                        <workspace>/gc-shadow-manifest.json (valid JSON,
-//                        decodes to gc.Manifest); NO filesystem mutations.
-//       enforce        → shadow + gc.Apply (run dirs actually archived/deleted).
-//   - The hook is fail-open: a missing runs/ dir yields an empty manifest, no
-//     error, no crash.
-//
-// These tests are currently RED: runGCHook does not exist, so package main
-// fails to compile. They turn GREEN when Builder adds the hook.
-
 import (
 	"bytes"
 	"encoding/json"
@@ -135,10 +114,10 @@ func TestGCShadow(t *testing.T) {
 	}
 }
 
-// TestGCOff: an EXPLICIT off mode writes no manifest and touches nothing.
-// (Cycle 1159 / workspace-hygiene S5: an ABSENT gc.mode no longer means off —
-// it now resolves to shadow, pinned by TestRunGCHook_DefaultModeIsShadow. Only
-// an operator's explicit "off" disables the hook, so this test sets it.)
+// TestGCOff: an explicit off mode writes no manifest and touches nothing.
+// An absent gc.mode no longer means off — it now resolves to shadow (pinned
+// by TestRunGCHook_DefaultModeIsShadow) — only an operator's explicit "off"
+// disables the hook, so this test sets it.
 func TestGCOff(t *testing.T) {
 	evolveDir, workspace, keptPath, targetPath := gcEnv(t)
 	gcSetMode(t, evolveDir, "off")

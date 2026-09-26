@@ -9,27 +9,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
 )
 
-// driver_tmux_submitverify.go — every driver-initiated submission verifies
-// that it was actually SUBMITTED.
-//
-// The hole this closes: the tmux REPL driver fired keys with enter=true and
-// walked away — the prompt paste (driver_tmux_repl.go, "prompt delivered")
-// and the one-shot idle nudge both. In cycles 1505, 1510 and 1517 the nudge
-// was still sitting, unsubmitted, at the pane's `❯` input line in the final
-// capture, and every nudge record in <phase>-interactions.ndjson read
-// "result":"no_effect": the driver had no way to know its own key send did
-// nothing. Fire-and-forget is the defect; one capture-and-confirm is the fix.
-//
-// The pairing matters as much as the re-send. An unconditional second Enter
-// would "fix" the stall while re-submitting whatever the agent typed next —
-// a worse pane desync than the stall. So a re-send fires ONLY when the input
-// line still holds an echo of what THIS driver sent.
-
 const (
-	// submitVerifyMaxResends bounds the re-send loop: a pane whose input line
-	// never clears is wedged, and hammering it is not a recovery strategy. On
-	// exhaustion the driver gives up loudly and the caller routes the classified
-	// outcome through the existing bounded artifact-timeout path.
 	submitVerifyMaxResends = 3
 	// submitVerifyEchoRunes is how much of the sent text must still be visible
 	// at the input line to call it unsubmitted. Long enough that unrelated
@@ -37,10 +17,7 @@ const (
 	submitVerifyEchoRunes = 40
 	// submitVerifyMinEchoRunes is the floor BOTH match directions honour: below
 	// it a fragment is too generic to identify what this driver sent, and a
-	// match would arm re-sends into whatever the agent typed — the double-submit
-	// this guard exists to prevent (cycle-1526 audit M1: the forward direction
-	// had no floor, so a short first line like `---` matched almost any input
-	// line). Single-sourced: the reverse direction used to hardcode this.
+	// match would arm re-sends into whatever the agent typed.
 	submitVerifyMinEchoRunes = 8
 	// submitVerifySettle is the pause between a re-sent Enter and the capture
 	// that judges it — the REPL needs a frame to redraw.
@@ -67,14 +44,10 @@ func echoChunk(s string) string {
 }
 
 // pendingAtInputLine reports whether pane's input line still holds one of the
-// echoes — i.e. the keys were typed into the REPL but never submitted.
-//
-// It reads only the text AFTER the LAST prompt marker: that is the live input
-// line. Text the agent already submitted scrolls ABOVE the marker, so a
-// successful submission reads as "clear" on the very next capture and no
-// re-send is issued. An empty input line, an absent marker, and text that does
-// not match anything this driver sent all mean "not pending" — the anti
-// double-submit floor.
+// echoes — i.e. the keys were typed into the REPL but never submitted. It
+// reads only the text AFTER the LAST prompt marker, which is the live input
+// line; text already submitted scrolls above the marker. An empty input
+// line, an absent marker, or a non-matching echo all mean "not pending".
 func pendingAtInputLine(pane, marker string, echoes []string) bool {
 	if marker == "" {
 		return false
@@ -94,8 +67,6 @@ func pendingAtInputLine(pane, marker string, echoes []string) bool {
 		}
 		// Either direction: the pane shows the head of what we sent (normal),
 		// or the pane truncated it to a shorter fragment of the same text.
-		// Both are floored at submitVerifyMinEchoRunes — a fragment shorter than
-		// that identifies nothing, and matching on it re-sends the agent's text.
 		if chunk := echoChunk(full); len([]rune(chunk)) >= submitVerifyMinEchoRunes && strings.Contains(tail, chunk) {
 			return true
 		}
@@ -108,21 +79,17 @@ func pendingAtInputLine(pane, marker string, echoes []string) bool {
 
 // verifySubmitted confirms a submission cleared the input line and, when it
 // did not, re-sends a bare Enter — bounded by submitVerifyMaxResends and loud
-// on stderr, so an operator reading a stalled cycle's log sees that the driver
-// noticed and acted. Returns the number of re-sends issued.
+// on stderr. Returns the number of re-sends issued.
 //
-// `pane` is the FIRST observation, supplied by the caller: the prompt site
-// hands in the post-paste interval baseline the driver already captured, so
-// the clean path adds no capture and no fixture-frame drift (the same rule the
-// cycle-274 spill check follows). Only a genuinely pending input line — the
-// exceptional path — costs a re-capture per re-send.
+// `pane` is the FIRST observation, supplied by the caller, so the clean path
+// costs no extra capture; only a genuinely pending input line costs a
+// re-capture per re-send.
 //
 // site names the submission ("prompt", "nudge") in the log line; echoes are
 // candidate renderings of what was sent.
-// submitVerifyOutcome is what verifySubmitted learned. Returned rather than
-// logged-and-forgotten: stderr for a phase dispatch is discarded on the success
-// path (engine.go:531-534 returns before the :544 persistence), so the caller
-// must be able to put this somewhere durable.
+
+// submitVerifyOutcome is what verifySubmitted learned, returned so the
+// caller can record it durably.
 type submitVerifyOutcome struct {
 	// Resends is how many bare Enters this call issued (0 on the clean path).
 	Resends int
@@ -131,19 +98,11 @@ type submitVerifyOutcome struct {
 }
 
 func verifySubmitted(ctx context.Context, deps Deps, lp tmuxLaunch, pfx, site, pane string, echoes ...string) submitVerifyOutcome {
-	// No input-line marker ⇒ nothing to anchor a match to. Refuse LOUDLY: the
-	// alternative is matching against whatever follows a boot/footer marker,
-	// which re-sends the agent's own text (cycle-1526 audit — agy's marker is
-	// the footer "? for shortcuts").
 	if lp.inputLineMarker == "" {
 		fmt.Fprintf(deps.Stderr, "%s submit-verify: %s NOT verified — %s declares no input-line marker, "+
 			"so a stalled submission here will not be detected or re-sent\n", pfx, site, lp.name)
 		return submitVerifyOutcome{Result: interaction.ResultNotVerified}
 	}
-	// An empty pane is NOT a clear input line: a failed CapturePane at either
-	// call site yields "", pendingAtInputLine returns false on the absent marker,
-	// and the fall-through would record "verified clean" for a state the code
-	// just logged as unknown — the precise lie this ledger exists to prevent.
 	if strings.TrimSpace(pane) == "" {
 		fmt.Fprintf(deps.Stderr, "%s submit-verify: %s NOT verified — no pane observation, "+
 			"input-line state unknown\n", pfx, site)
@@ -159,21 +118,15 @@ func verifySubmitted(ctx context.Context, deps Deps, lp tmuxLaunch, pfx, site, p
 		fmt.Fprintf(deps.Stderr, "%s submit-verify: %s still parked at the `%s` input line — re-sending Enter (%d/%d)\n",
 			pfx, site, lp.inputLineMarker, resends+1, submitVerifyMaxResends)
 		if err := deps.Tmux.SendKeys(ctx, lp.session, "", true); err != nil {
-			// Without this the loop runs to exhaustion and reports "pane looks
-			// wedged" — a confident WRONG diagnosis that points an operator (and
-			// any log-scraping classifier) at the REPL when tmux is what died.
+			// Without this the loop would exhaust and report "wedged" — a wrong
+			// diagnosis when tmux itself, not the REPL, is what died.
 			fmt.Fprintf(deps.Stderr, "%s submit-verify: %s re-send %d/%d never reached tmux — the session is unreachable, not wedged: %v\n", pfx, site, resends+1, submitVerifyMaxResends, err)
 			return submitVerifyOutcome{Resends: resends, Result: interaction.ResultNotVerified}
 		}
 		resends++
-		// Back off — a TUI that needed a moment gets it before the driver calls
-		// it wedged (three re-sends span seconds, not 1.5 s).
 		deps.Sleep(submitVerifyBackoff[resends-1])
 		next, err := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
 		if err != nil {
-			// Never silent: without this line an operator sees a re-send start
-			// and nothing after it, and cannot tell a cleared input line from a
-			// dead tmux server.
 			fmt.Fprintf(deps.Stderr, "%s submit-verify: %s capture failed after re-send %d/%d — "+
 				"stopping verification, input-line state unknown: %v\n",
 				pfx, site, resends, submitVerifyMaxResends, err)
@@ -187,26 +140,9 @@ func verifySubmitted(ctx context.Context, deps Deps, lp tmuxLaunch, pfx, site, p
 	return submitVerifyOutcome{Result: interaction.ResultSubmitVerified}
 }
 
-// promptSubmitEcho is the FORWARD-direction echo for a pasted prompt: the head
-// of the whole prompt, whitespace-normalized so a wrapped render compares equal.
-//
-// Why the whole prompt and not just its first line: the first line is the only
-// prompt-derived echo the prompt site had, and a prompt whose first non-empty
-// line is short (YAML frontmatter `---`, a stub header) falls under
-// submitVerifyMinEchoRunes — that echo would never match and the guard would
-// silently miss the cycles 1505/1510/1517 stall it exists to catch.
-//
-// It is BOUNDED (echoChunk caps at submitVerifyEchoRunes) and is therefore NOT
-// a drop-in replacement for the first line in BOTH match directions: the
-// reverse direction reads the passed value directly, so a head-only echo would
-// narrow it from "any fragment of the first line" to "any fragment of its first
-// 40 runes" — a silent detection loss on a REPL that horizontally scrolls its
-// input line (ollama readline) rather than wrapping. The prompt site therefore
-// passes this AND firstNonEmptyLine: this one keeps the forward direction above
-// the floor, the first line preserves the reverse direction's original reach.
-// Passing the WHOLE prompt as an echo would be wrong in the other direction —
-// reverse would then match any ≥floor phrase the agent typed that appears
-// anywhere in the prompt body.
+// promptSubmitEcho is the FORWARD-direction echo for a pasted prompt: the
+// bounded head of the whole prompt, whitespace-normalized so a wrapped render
+// compares equal.
 func promptSubmitEcho(prompt string) string { return echoChunk(prompt) }
 
 // firstNonEmptyLine returns the first line of s with content — the line a REPL
@@ -221,22 +157,13 @@ func firstNonEmptyLine(s string) string {
 	return ""
 }
 
-// recordSubmitVerify puts a submit-verify outcome somewhere durable. The
-// Recorder writes through to <workspace>/<phase>-interactions.ndjson on every
-// Record (appendLedgerLine), independent of how the phase ends — which is the
-// whole point: stderr from a phase dispatch survives only the FAILURE path
-// (engine.go:531-534 returns before the :544 persistence), so a guard that
-// recovers a stall and lets the phase succeed erased its own evidence.
-//
-// Recorded on the clean path too. Without the denominator a recovered stall is
-// an anecdote, not a rate, and the cycles 1505/1510/1517 class cannot be tracked.
-// Nil-recorder-safe by Recorder's own contract.
+// recordSubmitVerify puts a submit-verify outcome somewhere durable — the
+// Recorder writes through to the ndjson ledger on every Record, independent
+// of how the phase ends. Nil-recorder-safe by Recorder's own contract.
 func recordSubmitVerify(rec *interaction.Recorder, phase string, cycle int, site string, o submitVerifyOutcome, paste pasteOutcome) {
 	payload := fmt.Sprintf("site=%s resends=%d", site, o.Resends)
 	if paste.Stability != "" {
-		// The delivery's own evidence rides the success path too (the
-		// stderr lines survive only the failure path): what the settle cost and
-		// how the stability wait ended.
+		// Paste evidence rides the success path too.
 		payload += fmt.Sprintf(" paste_settle=%s stability=%s", paste.Settle, paste.Stability)
 	}
 	rec.Record(interaction.Outcome{
@@ -252,8 +179,5 @@ func recordSubmitVerify(rec *interaction.Recorder, phase string, cycle int, site
 }
 
 // submitVerifyBackoff is the settle after re-send n (one entry per allowed
-// re-send, so the cap and the table are the same fact): 500 ms, 1.5 s, 2.5 s.
-// Arithmetic on purpose — no entry equals artifactWaitInterval, which the wedge
-// short-circuit pin counts by value (TestPasteTiming_NeverEqualsTheArtifactWaitInterval),
-// and the sum (4.5 s) is the budget a slow TUI gets.
+// re-send): 500ms, 1.5s, 2.5s — the sum (4.5s) is the budget a slow TUI gets.
 var submitVerifyBackoff = [submitVerifyMaxResends]time.Duration{submitVerifySettle, 3 * submitVerifySettle, 5 * submitVerifySettle}

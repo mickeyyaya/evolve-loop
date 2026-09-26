@@ -1,13 +1,5 @@
 package main
 
-// cmd_loop_blockerbreaker.go — loop wiring of the mid-batch pipeline-blocker
-// breaker (core.EvaluateBlockerBreaker; ADR-0072 extension, operator directive
-// 2026-07-22). Checked at the TOP of every batch iteration, before another
-// cycle is dispatched: a pipeline blocker must be fixed directly, never passed
-// to the following cycles. On a trip it reuses the ADR-0072 halt machinery
-// verbatim — escalation dossier + P0 pipeline-repair inbox item + the
-// system-failure exit code — so operators have ONE halt vocabulary.
-
 import (
 	"fmt"
 	"io"
@@ -19,13 +11,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// blockerBreakerHalt evaluates the batch's failure digests (cycles strictly
-// after batchStartCycle) against the policy ceilings. halted=false means
-// continue dispatching. On halt it writes the escalation + P0 item and returns
-// the loop exit code. Policy is loaded fresh per check (the wave-boundary
-// hot-reload idiom); a missing/malformed policy falls back to compiled
-// defaults via FailurePolicyConfig's own resolution — the breaker never
-// fail-opens to disabled silently.
+// blockerBreakerHalt evaluates the batch's failure digests (cycles after
+// batchStartCycle) against the policy ceilings. halted=false means continue
+// dispatching; on halt it writes the escalation + P0 item and returns the
+// loop exit code. Policy reloads fresh on every check; a missing or
+// malformed policy falls back to compiled defaults rather than disabling
+// the breaker.
 func blockerBreakerHalt(evolveDir, projectRoot string, batchStartCycle int, stderr io.Writer, signals *signalcenter.Center) (rc int, halted bool) {
 	pol, _ := policy.Load(filepath.Join(evolveDir, "policy.json"))
 	fp, err := pol.FailurePolicyConfig()
@@ -34,11 +25,6 @@ func blockerBreakerHalt(evolveDir, projectRoot string, batchStartCycle int, stde
 		fp = policy.DefaultSystemFailurePolicy()
 	}
 	digests := core.CollectBatchFailureDigests(evolveDir, batchStartCycle+1)
-	// The ack ledger is a PROJECTION of the consumed inbox corpus: sweep
-	// .evolve/inbox/consumed/ into it before loading, so a P0 that was consumed
-	// by ANY route (including a bare `mv`, which is how the cycle-1335 P0 got
-	// there) stops re-halting the breaker without an operator remembering the
-	// manual `evolve inbox ack-fingerprint` step.
 	reconcileConsumedFingerprints(evolveDir, stderr)
 	reconcileConsumedBindings(projectRoot, evolveDir, stderr)
 	acked, lerr := core.LoadResolvedFingerprints(evolveDir)
@@ -69,9 +55,9 @@ func blockerBreakerHalt(evolveDir, projectRoot string, batchStartCycle int, stde
 		Evidence: v.Reason + " (rule=" + v.Rule + " fingerprint=" + v.Fingerprint + ")",
 		Halt:     true,
 	}
-	// ADR-0101 S4a: the breaker's rule names the ONE loop.halt INCIDENT the
-	// shared halt action emits (its code + the rule's fields); nothing is
-	// signalled twice.
+	// The rule's fields flow into the one loop.halt INCIDENT the shared halt
+	// action emits, so nothing is signalled twice.
+	// See ADR-0101.
 	rule := loopHaltRule{code: CodeLoopPipelineBlockerHalt, fields: map[string]string{"rule": v.Rule, "fingerprint": v.Fingerprint}}
 	return haltOnSystemFailure(evolveDir, projectRoot, latest, workspace, sf, stderr, signals, rule), true
 }

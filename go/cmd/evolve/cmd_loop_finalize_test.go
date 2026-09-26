@@ -11,20 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
-// cmd_loop_finalize_test.go — RED tests for S2 (workspace-hygiene-2026-07
-// plan): a clean `max_cycles` batch exit must clear the completed cycle's
-// on-disk cycle-state.json marker (core.ClearCompletedCycleMarker, see
-// internal/core/cycle_finalize_test.go), so the operator no longer has to run
-// `evolve cycle reset --force` before every relaunch. A signal-interrupted
-// exit must NOT clear it — the run may be resumed.
-//
-// These tests write a REAL cycle-state.json / state.json to evolveDir: the
-// finalize call site reads the marker straight off disk
-// (core.ResolveCycleStatePath), independent of the in-memory FakeStorage the
-// stubbed orchestrator uses for its own cycle bookkeeping — installStubDeps
-// (cmd_loop_m4_test.go) does not touch this file, so it is a clean channel to
-// assert the new wiring in isolation.
-
 func writeLoopFinalizeFixture(t *testing.T, evolveDir string, cycleID, lastCycleNumber int) {
 	t.Helper()
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {

@@ -1,8 +1,5 @@
 //go:build integration
 
-// cmd_fleet_soak_test.go — TDD RED tests for Slice 5 (fleet soak harness).
-// All tests reference runFleetSoak, soakLaunchFn, and soakKiller which are
-// declared in cmd_fleet_soak.go (not yet created) → compile error → RED.
 package main
 
 import (
@@ -28,26 +25,15 @@ type soakKillRec struct {
 	session string
 }
 
-// TestFleetSoak_AllFourInvariants is the system-level proof that Slices 1–4
-// compose correctly under concurrency. Wires an in-process fake LaunchFn and
-// TmuxKiller (no real LLM, no real tmux) and verifies all four invariants:
-//
-//  1. Distinct branches: N RunScope.CycleBranch() values are pairwise distinct.
-//  2. Distinct+reaped: post-soak ReapOrphans with stale leases finds 0 live
-//     orphans and exactly N reaped sessions.
-//  3. No cross-run reap: every kill resolved to the session's owning runDir.
-//  4. No torn config: TOML file has exactly N [projects.*] entries.
-//
-// Do NOT call t.Parallel(): this test mutates the soakLaunchFn and soakKiller
-// package-level injection vars (declared in cmd_fleet_soak.go) and must not
-// race with TestFleetSoakArgs_* or TestDispatch_FleetSoakRegistered.
+// Do not call t.Parallel(): this test mutates the soakLaunchFn/soakKiller
+// package-level injection vars and would race with TestFleetSoakArgs_* and
+// TestDispatch_FleetSoakRegistered.
 func TestFleetSoak_AllFourInvariants(t *testing.T) {
 	const n = 4
 
 	evolveDir := t.TempDir()
 	tomlPath := filepath.Join(t.TempDir(), "config.toml")
 
-	// Fake TmuxKiller: records (runDir, session) pairs for invariant 3 check.
 	var killMu sync.Mutex
 	var killLog []soakKillRec
 	fakeKiller := swarm.TmuxKiller(func(_ context.Context, session string) error {
@@ -58,8 +44,6 @@ func TestFleetSoak_AllFourInvariants(t *testing.T) {
 		return nil
 	})
 
-	// Fake LaunchFn: creates one "run" (stale lease + session record + TOML entry).
-	// Protected by callMu so concurrent goroutines get distinct indices (race-safe).
 	var (
 		callMu  sync.Mutex
 		callIdx int
@@ -88,14 +72,12 @@ func TestFleetSoak_AllFourInvariants(t *testing.T) {
 		}); err != nil {
 			return 1, fmt.Errorf("append session: %w", err)
 		}
-		// Atomic TOML entry (mutex-serialized to prove atomic-write composes safely).
 		if err := appendSoakTomlEntry(&tomlMu, tomlPath, runID, runDir); err != nil {
 			return 1, fmt.Errorf("toml append: %w", err)
 		}
 		return 0, nil
 	})
 
-	// Wire fakes into the package-level injection points (cmd_fleet_soak.go).
 	soakLaunchFn = fakeLaunch
 	soakKiller = fakeKiller
 	t.Cleanup(func() {
@@ -112,21 +94,12 @@ func TestFleetSoak_AllFourInvariants(t *testing.T) {
 		t.Fatalf("runFleetSoak returned %d\nstdout: %s\nstderr: %s", rc, out.String(), errBuf.String())
 	}
 
-	// AC8: soakreport verdict table printed to stdout — must show 4 PASS rows.
 	stdout := out.String()
 	passCount := strings.Count(stdout, "PASS")
 	if passCount < 4 {
 		t.Errorf("AC8: soakreport should contain 4 PASS rows, got %d; stdout:\n%s", passCount, stdout)
 	}
 
-	// Invariant 2 (tombstone contract — cycle-806 reconcile): runFleetSoak's
-	// in-harness reap (soakCheckReap → ReapOrphans) has ALREADY reaped all N
-	// runs, renaming each registry to its `.reaped` tombstone
-	// (sessionreaper.go:92-95, the cycle-769 bounded-reap contract). So the new
-	// correct assertions are (a) exactly N tombstones exist on disk, and (b) a
-	// SECOND ReapOrphans is an idempotent 0-orphan no-op — a tombstoned registry
-	// is skipped, never re-swept. The pre-806 test wrongly re-expected N orphans
-	// from the second reap, which the tombstone rename made impossible.
 	tombstones := 0
 	runEntries, rderr := os.ReadDir(filepath.Join(evolveDir, "runs"))
 	if rderr != nil {
@@ -160,14 +133,6 @@ func TestFleetSoak_AllFourInvariants(t *testing.T) {
 		t.Errorf("Invariant 2: second reap found %d orphaned runs, want 0 (tombstoned registries must be idempotent no-ops)", len(reapRep.Orphaned))
 	}
 
-	// Invariant 3 (tombstone contract — cycle-806 reconcile): every kill (all N
-	// recorded during the in-harness reap) must still resolve to a runDir whose
-	// registry contains the killed session. After the reap the live registry is
-	// tombstoned, so attribution is discovered through sessionrecord's
-	// tombstone-aware ReadAllResolving (task sweep-tombstone-attribution) rather
-	// than the live-path ReadAll — which now finds nothing. The UNKNOWN /
-	// cross-run-reap failure branch is KEPT (not relaxed): a session that
-	// resolves to no owning run is still a hard failure.
 	killMu.Lock()
 	defer killMu.Unlock()
 	if len(killLog) != n {
@@ -191,7 +156,6 @@ func TestFleetSoak_AllFourInvariants(t *testing.T) {
 		}
 	}
 
-	// Invariant 4 (external behavioral check): TOML has exactly N [projects.*] headers.
 	tomlData, rerr := os.ReadFile(tomlPath)
 	if rerr != nil {
 		t.Fatalf("Invariant 4: read TOML %s: %v", tomlPath, rerr)
@@ -241,8 +205,6 @@ func appendSoakTomlEntry(mu *sync.Mutex, tomlPath, runID, runDir string) error {
 	return os.Rename(tmp, tomlPath)
 }
 
-// TestFleetSoakArgs_RejectsZeroCount is the negative/adversarial test for AC7:
-// --count 0 must be rejected with exit code 1 and an error mentioning "count".
 func TestFleetSoakArgs_RejectsZeroCount(t *testing.T) {
 	var out, errBuf bytes.Buffer
 	rc := runFleetSoak([]string{"--count", "0"}, nil, &out, &errBuf)
@@ -254,8 +216,6 @@ func TestFleetSoakArgs_RejectsZeroCount(t *testing.T) {
 	}
 }
 
-// TestFleetSoakArgs_RejectsNegativeCount is the edge-case adversarial test:
-// negative --count values must also be rejected with exit code 1.
 func TestFleetSoakArgs_RejectsNegativeCount(t *testing.T) {
 	var out, errBuf bytes.Buffer
 	rc := runFleetSoak([]string{"--count", "-1"}, nil, &out, &errBuf)
@@ -264,10 +224,6 @@ func TestFleetSoakArgs_RejectsNegativeCount(t *testing.T) {
 	}
 }
 
-// TestDispatch_FleetSoakRegistered verifies that `evolve fleet soak` routes to
-// runFleetSoak (not the "unknown command" path). A --count 0 call must exit 1
-// with a "count" error from runFleetSoak's validation — not a flag-parse error
-// and not rc=2.
 func TestDispatch_FleetSoakRegistered(t *testing.T) {
 	var out, errBuf bytes.Buffer
 	rc := dispatch([]string{"fleet", "soak", "--count", "0"}, nil, &out, &errBuf)

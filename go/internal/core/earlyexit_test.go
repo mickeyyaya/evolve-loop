@@ -1,9 +1,5 @@
 package core
 
-// earlyexit_test.go — PA-DDK DDK-7 (ADR-0060): the early-exit set is
-// config-driven (per-phase early_exit), with the shipPlanned guard staying Go.
-// Phases resolved via the kerneltest fixture — no hardcoded names.
-
 import (
 	"testing"
 
@@ -11,12 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
-// TestCanTerminateEarly_ConfigOverridesLiteral proves the config path WINS over
-// the literal (not merely agrees with it): the discovery anchor, which the
-// literal switch returns true for, is declared early_exit:false in the catalog
-// and must then be NON-early-exit. If the config branch in CanTerminateEarly were
-// deleted this fails (the literal would still return true). Phase resolved via
-// the fixture — no hardcoded name.
 func TestCanTerminateEarly_ConfigOverridesLiteral(t *testing.T) {
 	t.Parallel()
 	no := false
@@ -48,8 +38,6 @@ func TestCanTerminateEarly_ConfigDriven(t *testing.T) {
 	}
 }
 
-// TestCanTerminateEarly_DegradesToLiteral: a bare SM (no catalog) uses the
-// literal pre-build set — byte-identical to pre-DDK-7.
 func TestCanTerminateEarly_DegradesToLiteral(t *testing.T) {
 	t.Parallel()
 	sm := NewStateMachine()

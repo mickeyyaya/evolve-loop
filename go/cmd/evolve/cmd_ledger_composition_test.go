@@ -1,21 +1,3 @@
-// cmd_ledger_composition_test.go — cycle-786 TDD contract, AC3:
-// "TestCompositionVerdict_KernelRecomputesPatchId (tampered entry rejected);
-// ledger verify covers new entry kind" (inbox
-// merge-rung0-trivial-rebase-carryforward).
-//
-// Contract: `evolve ledger verify` must, for every kind="composition-verdict"
-// entry, kernel-recompute the patch-id of BOTH persisted diff artifacts
-// (audited_diff_path, composed_diff_path — via `git patch-id --stable`) and
-// require each to equal the entry's recorded patch_id. A forged match (the
-// entry claims a patch_id its own recorded diffs do not hash to) is tampering
-// and must break verify with exit 2, exactly like a chain break. Deterministic,
-// zero LLM tokens — re-derivable by anyone from the entry alone.
-//
-// RED status at authoring (cycle 786): the tampered subtests FAIL — today
-// Verify only walks the hash chain and ignores unknown entry kinds, so a
-// tampered composition-verdict entry exits 0. The valid-entry test is a
-// pre-existing GREEN guard pinning that the checker never over-rejects an
-// honest entry.
 package main
 
 import (
@@ -64,10 +46,9 @@ func compPatchID(t *testing.T, dir, diff string) string {
 }
 
 // compFixture writes a .evolve dir whose ledger holds one composition-verdict
-// entry over the two given diff artifacts, claiming claimedPatchID. Entries are
-// written pre-v8.37 style (no prev_hash key) so the hash-chain walk is
-// trivially intact and any verify failure is attributable to the
-// composition-verdict checker alone.
+// entry over the two given diff artifacts, claiming claimedPatchID. Entries
+// omit prev_hash so the hash-chain walk is trivially intact and any verify
+// failure is attributable to the composition-verdict checker alone.
 func compFixture(t *testing.T, auditedDiff, composedDiff, claimedPatchID string) string {
 	t.Helper()
 	root := t.TempDir()
@@ -115,9 +96,7 @@ func runLedgerVerifyRC(t *testing.T, evolveDir string) (int, string) {
 	return rc, stderr.String()
 }
 
-// TestCompositionVerdict_KernelRecomputesPatchId: a composition-verdict entry
-// whose recorded patch_id is NOT what its own persisted diffs recompute to is
-// tampered and must break `evolve ledger verify` (exit 2). Two forgeries:
+// Two forgeries:
 //
 //   - drifted-composed: composed.diff's patch-id differs from the claimed
 //     (audited) patch_id — a drift smuggled past the fast path.
@@ -144,10 +123,8 @@ func TestCompositionVerdict_KernelRecomputesPatchId(t *testing.T) {
 	}
 }
 
-// TestCompositionVerdict_ValidEntryVerifies: an honest entry — recorded
-// patch_id equals the kernel-recomputed patch-id of both persisted diffs —
-// keeps the ledger green (exit 0). Guard against over-rejection: the checker
-// must validate composition-verdict entries, not ban them.
+// Guards against over-rejection: the checker must validate composition-verdict
+// entries, not ban them.
 func TestCompositionVerdict_ValidEntryVerifies(t *testing.T) {
 	honestID := compPatchID(t, t.TempDir(), compAuditedDiff)
 	evolveDir := compFixture(t, compAuditedDiff, compAuditedDiff, honestID)

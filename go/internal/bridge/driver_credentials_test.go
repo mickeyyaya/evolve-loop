@@ -7,14 +7,6 @@ import (
 	"testing"
 )
 
-// driver_credentials_test.go — parity tests for the per-driver
-// credential-isolation cost-leak guards (drivers/claude-p.sh +
-// drivers/codex.sh) and the codex model-tier mapping (mock-cli-drivers.bats
-// T-mock.5/6/7). Uses runLookup to inject a controlled env via the
-// Deps.LookupEnv seam, so guard behavior is deterministic regardless of
-// the host's ambient ANTHROPIC_API_KEY / OPENAI_API_KEY.
-
-// mapLookup adapts a map to the Deps.LookupEnv signature.
 func mapLookup(m map[string]string) func(string) (string, bool) {
 	return func(k string) (string, bool) {
 		v, ok := m[k]
@@ -47,7 +39,7 @@ func codexArgs(fx launchFixture, model string) []string {
 	}
 }
 
-// --- claude-p credential-isolation guards (drivers/claude-p.sh) -----------
+// --- claude-p credential-isolation guards ---------------------------------
 
 func TestLaunchArgs_ClaudeP_AnthropicAPIKey_CostLeak(t *testing.T) {
 	fx := newFixture(t, "claude-p", "")
@@ -77,7 +69,6 @@ func TestLaunchArgs_ClaudeP_AnthropicBaseURL_CostLeak(t *testing.T) {
 }
 
 func TestLaunchArgs_ClaudeP_AnthropicBaseURL_AllowedProceeds(t *testing.T) {
-	// With BRIDGE_ALLOW_ANTHROPIC_BASE_URL=1 the guard is waived.
 	fx := newFixture(t, "claude-p", "")
 	fr := &fakeRunner{writeArtifactPath: fx.artifact, writeArtifactBody: "ok"}
 	code, _ := runLookup(t, fr, fx.args("claude-p"), map[string]string{
@@ -92,7 +83,7 @@ func TestLaunchArgs_ClaudeP_AnthropicBaseURL_AllowedProceeds(t *testing.T) {
 	}
 }
 
-// --- codex credential-isolation guard (drivers/codex.sh) ------------------
+// --- codex credential-isolation guard --------------------------------------
 
 func TestLaunchArgs_Codex_OpenAIKey_CostLeak(t *testing.T) {
 	fx := newFixture(t, "codex", "")
@@ -118,7 +109,7 @@ func TestLaunchArgs_Codex_OpenAIKey_AllowedProceeds(t *testing.T) {
 	}
 }
 
-// --- codex model-tier mapping (mock-cli-drivers.bats T-mock.5/6/7) --------
+// --- codex model-tier mapping ----------------------------------------------
 
 func TestLaunchArgs_Codex_ModelMap(t *testing.T) {
 	fam := codexFamilyManifest(t)
@@ -140,14 +131,12 @@ func TestLaunchArgs_Codex_ModelMap(t *testing.T) {
 			if !fr.argvContainsPair("-m", tc.codexModel) {
 				t.Fatalf("codex argv should map %s → -m %s; calls=%+v", tc.tier, tc.codexModel, fr.calls)
 			}
-			// Codex's SECOND model layer (2026-08-15 operator directive): the
-			// headless path must pin the reasoning effort too, or the model
-			// runs at the CLI's own default.
+			// codex has a second model layer: without -c
+			// model_reasoning_effort=high alongside -m, the model runs at
+			// the CLI's own default effort.
 			if !fr.argvContainsPair("-c", "model_reasoning_effort=high") {
 				t.Fatalf("codex argv must carry -c model_reasoning_effort=high; calls=%+v", fr.calls)
 			}
-			// Exactly once: the headless default and any realized/extra flag
-			// must never stack two effort overrides (argsContainEffort guard).
 			var effortTokens int
 			for _, call := range fr.calls {
 				for _, a := range call.args {

@@ -1,9 +1,5 @@
 package main
 
-// cmd_dossier.go — ADR-0055 D3: `evolve dossier verify` reads every
-// knowledge-base/cycles/cycle-N.json, parses it, and calls dossier.Validate().
-// Pure reader — no state/ledger mutation — safe to run mid-batch.
-
 import (
 	"encoding/json"
 	"flag"
@@ -86,10 +82,9 @@ func runDossierVerify(_ []string, stdout, stderr io.Writer) int {
 	if r := os.Getenv("EVOLVE_PROJECT_ROOT"); r != "" {
 		root = r
 	}
-	// ADR-0055 D3: when the policy floor enrolls "dossier-closeout", an absent or
-	// empty knowledge-base/cycles/ is a FAILURE — the gate exists precisely to
-	// catch the no-dossier-written case. Without enrollment, absence stays a
-	// no-op success (safe to run mid-batch). A malformed policy fails loudly.
+	// Enrolling "dossier-closeout" turns an absent or empty knowledge-base/cycles/
+	// into a FAIL; unenrolled, absence is a no-op success.
+	// See ADR-0055.
 	pol, perr := policy.Load(filepath.Join(root, ".evolve", "policy.json"))
 	if perr != nil {
 		fmt.Fprintf(stderr, "dossier verify: load policy: %v\n", perr)

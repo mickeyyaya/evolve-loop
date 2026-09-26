@@ -10,16 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// cmd_loop_chain_inboxvalidity_test.go — cycle-1098 RED contract tests for
-// chain-inbox-pending-validity: inboxPendingCount counts every root-level
-// `*.json` with no shape validation, so one malformed or non-item file pins
-// pending>0 permanently and the chain burns batches to max_batches consuming
-// nothing — reaching the runaway cap via a FALSE signal. Skips are silent
-// today, which would also hide a real item lost to a typo.
-//
-// Builder makes these pass by changing production code only. Helpers
-// (chainTestEnv/stubBatches/runChain) come from cmd_loop_chain_test.go.
-
 // writeInboxFile is a local fixture helper: it drops a raw body at
 // .evolve/inbox/<name> (bypassing chainTestEnv's well-formed-item seeding so
 // malformed shapes can be planted).
@@ -30,10 +20,10 @@ func writeInboxFile(t *testing.T, evolveDir, name, body string) {
 	}
 }
 
-// TestInboxPendingCount_SkipsMalformedAndNamesThem — AC2.1 + AC2.2. Only files
-// that parse as an inbox item (a JSON object carrying `id`) are pending work;
-// every other root-level `*.json` is SKIPPED and RETURNED BY NAME so the caller
-// can fail loudly instead of swallowing a real item lost to a typo.
+// TestInboxPendingCount_SkipsMalformedAndNamesThem: only files that parse as
+// an inbox item (a JSON object carrying `id`) are pending work; every other
+// root-level `*.json` is skipped and returned by name so the caller can fail
+// loudly instead of swallowing a real item lost to a typo.
 //
 // The signature this pins is:
 //
@@ -58,9 +48,9 @@ func TestInboxPendingCount_SkipsMalformedAndNamesThem(t *testing.T) {
 	}
 }
 
-// TestInboxPendingCount_MissingInboxIsZeroWithNoSkips — AC2.3 (edge, unchanged
-// behaviour). A missing inbox is legitimately zero pending with a nil error and
-// nothing to report — validation must not turn it into a skip or an error.
+// TestInboxPendingCount_MissingInboxIsZeroWithNoSkips: a missing inbox is
+// legitimately zero pending with a nil error and nothing to report —
+// validation must not turn it into a skip or an error.
 func TestInboxPendingCount_MissingInboxIsZeroWithNoSkips(t *testing.T) {
 	n, skipped, err := inboxPendingCount(filepath.Join(t.TempDir(), "nope"))
 	if err != nil || n != 0 || len(skipped) != 0 {
@@ -68,10 +58,10 @@ func TestInboxPendingCount_MissingInboxIsZeroWithNoSkips(t *testing.T) {
 	}
 }
 
-// TestInboxPendingCount_MalformedShapes — AC2.1/AC2.4 (edge/OOD matrix). Each
-// non-item shape must be skipped-and-named; lifecycle subdirectories and
-// non-json files stay invisible (neither pending nor skipped — they were never
-// claimed to be items).
+// TestInboxPendingCount_MalformedShapes: each non-item shape must be
+// skipped-and-named; lifecycle subdirectories and non-json files stay
+// invisible (neither pending nor skipped — they were never claimed to be
+// items).
 func TestInboxPendingCount_MalformedShapes(t *testing.T) {
 	cfg := chainTestEnv(t, 0, "")
 	inbox := filepath.Join(cfg.EvolveDir, "inbox")
@@ -106,11 +96,11 @@ func TestInboxPendingCount_MalformedShapes(t *testing.T) {
 	}
 }
 
-// TestRunLoopChain_MalformedOnlyInboxDoesNotBurnToCap — AC2.2 + the composed
-// contract, end-to-end. An inbox holding nothing but a malformed file has ZERO
-// real pending work: the chain must run the single min-one-batch cycle and stop
-// as drained — NOT relaunch to the cap on a false pending signal — and must name
-// the skipped file on stderr so the operator can fix the typo.
+// TestRunLoopChain_MalformedOnlyInboxDoesNotBurnToCap: an inbox holding
+// nothing but a malformed file has zero real pending work — the chain must
+// run the single min-one-batch cycle and stop as drained, not relaunch to
+// the cap on a false pending signal, and must name the skipped file on
+// stderr so the operator can fix the typo.
 func TestRunLoopChain_MalformedOnlyInboxDoesNotBurnToCap(t *testing.T) {
 	cfg := chainTestEnv(t, 0, "")
 	writeInboxFile(t, cfg.EvolveDir, "typo-item.json", `{"id": `)

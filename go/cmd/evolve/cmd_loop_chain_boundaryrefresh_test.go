@@ -1,86 +1,5 @@
 package main
 
-// cmd_loop_chain_boundaryrefresh_test.go — RED tests (cycle 1314, inbox item
-// auto-refresh-binary-at-boundary, task boundary-binary-refresh).
-//
-// Defect: runLoopChain (cmd_loop_chain.go) relaunches runLoopBatchFn at every
-// boundary but never checks whether the RUNNING binary (version.Commit()) has
-// fallen behind HEAD — fixes that land on main mid-chain (e.g. the sentinel
-// tail-anchor fix at cycle-1301 64f8620e) sit inert until an operator manually
-// rebuilds + `evolve reset-sha -operator` + relaunches. Cycles 1302-1309 kept
-// running the old parser on a stale binary.
-//
-// Contract the Builder implements (TDD-defined seams; mirrors the established
-// bootRecoverFn / shipRepinProvenanceFn package-var seam idiom from
-// cmd_loop_boot_recovery.go):
-//
-//	// chainBoundaryAheadFn reports whether HEAD carries commits beyond
-//	// runningCommit — the "is my binary stale" check. Reuses the EXACT
-//	// ancestor-check idiom runResetSHA already uses (`git merge-base
-//	// --is-ancestor <commit> HEAD`), just inverted: ahead=true means
-//	// runningCommit is a STRICT ancestor of HEAD (HEAD has moved past it).
-//	// An empty runningCommit (unstamped dev binary — nothing to compare) is a
-//	// no-op: ahead=false, err=nil, no git subprocess. Any git/network/repo
-//	// failure returns err!=nil — the caller MUST treat that as "skip this
-//	// boundary's refresh", never halt the chain (AC4).
-//	var chainBoundaryAheadFn = defaultChainBoundaryAhead
-//	func defaultChainBoundaryAhead(projectRoot, runningCommit string) (ahead bool, err error)
-//
-//	// chainRebuildFn runs the sanctioned rebuild recipe (`make -C go build`,
-//	// runtime-reference.md:170) so the on-disk binary catches up to HEAD.
-//	var chainRebuildFn = defaultChainRebuild
-//	func defaultChainRebuild(projectRoot string) error
-//
-//	// chainReExecArgvFn resolves the argv to re-exec — deliberately just
-//	// os.Args, so runLoopChain's SIGNATURE (and every prior call site / frozen
-//	// test) stays byte-identical; only a new package var is added.
-//	var chainReExecArgvFn = func() []string { return os.Args }
-//
-//	// chainReExecFn is the seam over syscall.Exec so tests can assert the
-//	// re-exec was invoked with the right argv without replacing the test
-//	// process. Returns an error only if the exec syscall itself fails to
-//	// launch (e.g. argv0 not executable) — in production a SUCCESSFUL
-//	// syscall.Exec never returns at all.
-//	var chainReExecFn = defaultChainReExec
-//	func defaultChainReExec(argv0 string, argv, envv []string) error
-//
-//	// maybeRefreshChainBoundary runs the ahead-check -> rebuild -> repin ->
-//	// audit-log -> re-exec sequence for boundary `batch`. It is called ONLY
-//	// from runLoopChain between chainStartDecision deciding to continue and
-//	// runLoopBatchFn — the loop body is single-threaded per boundary, so this
-//	// call-site placement is what satisfies "refuse entirely while a batch is
-//	// mid-flight" (AC2); no separate lock is needed. Every failure at every
-//	// stage (ahead-check error, rebuild error, repin error, re-exec error)
-//	// degrades to refreshed=false, logged to stderr, and the CURRENT binary
-//	// keeps running the chain — never halts (AC4). The repin reuses
-//	// phaseintegrity.RepinShipSHA UNCHANGED (protected surface,
-//	// go/internal/phaseintegrity/ — this cycle does not touch it): the
-//	// provenance closure simply re-asserts the freshly-rebuilt commit is HEAD,
-//	// which is trivially true, so RepinShipSHA stamps its own
-//	// Authorized="provenance" as today. The DISTINGUISHABLE "boundary-refresh"
-//	// authorization class the inbox item asks for is a SEPARATE, additive audit
-//	// record — chainBoundaryRefreshLogFile (a JSONL file under evolveDir,
-//	// .evolve/boundary-refresh-log.jsonl) — so a ledger read can tell an
-//	// automatic boundary repin apart from a manual `evolve reset-sha`
-//	// (RepinShipSHA's own two-value Authorized enum is unchanged; the THIRD
-//	// class lives one layer up, in the chain-owned log).
-//	var chainBoundaryRefreshLogFile = "boundary-refresh-log.jsonl"
-//	func maybeRefreshChainBoundary(cfg loopConfig, batch int, stderr io.Writer) (refreshed bool)
-//
-// Wiring: runLoopChain calls maybeRefreshChainBoundary(cfg, n+1, stderr)
-// immediately after chainStartDecision's continue branch and before the
-// existing `width := loadFleetConfig(...)` line; refreshed==true breaks the
-// loop with res.StopReason = "chain_boundary_refresh_reexec", exit 0 (the new
-// process, once re-exec'd, resumes the chain from scratch under the same
-// args). runLoopChain's own SIGNATURE is UNCHANGED — every existing frozen
-// call site (cmd_loop.go:143, cmd_loop_chain_test.go and siblings) keeps
-// compiling untouched.
-//
-// RED now: chainBoundaryAheadFn / chainRebuildFn / chainReExecArgvFn /
-// chainReExecFn / maybeRefreshChainBoundary are all undefined -> this
-// package's test build fails. Do NOT modify this file — implement the seams
-// in cmd_loop_chain.go.
-
 import (
 	"bytes"
 	"encoding/json"
@@ -161,9 +80,8 @@ func brfWriteJSON(t *testing.T, path string, v any) {
 	}
 }
 
-// --- AC1: ahead-check detection, reusing the ancestor-check idiom ---
-
-// AC1 positive: HEAD has moved past the running binary's build commit.
+// TestDefaultChainBoundaryAhead_DetectsRunningCommitBehindHead: HEAD has
+// moved past the running binary's build commit.
 func TestDefaultChainBoundaryAhead_DetectsRunningCommitBehindHead(t *testing.T) {
 	dir, commitA := brfInitRepo(t)
 	brfAdvance(t, dir)
@@ -176,7 +94,8 @@ func TestDefaultChainBoundaryAhead_DetectsRunningCommitBehindHead(t *testing.T) 
 	}
 }
 
-// AC1 negative: the running binary IS the tip — nothing to refresh.
+// TestDefaultChainBoundaryAhead_NoLagWhenRunningCommitIsHead: the running
+// binary is the tip — nothing to refresh.
 func TestDefaultChainBoundaryAhead_NoLagWhenRunningCommitIsHead(t *testing.T) {
 	dir, commitA := brfInitRepo(t)
 	ahead, err := defaultChainBoundaryAhead(dir, commitA)
@@ -188,8 +107,9 @@ func TestDefaultChainBoundaryAhead_NoLagWhenRunningCommitIsHead(t *testing.T) {
 	}
 }
 
-// AC1 edge: an unstamped dev binary (empty build commit) has nothing
-// verifiable to compare — must be a quiet no-op, not an error.
+// TestDefaultChainBoundaryAhead_EmptyRunningCommitIsNoOp: an unstamped dev
+// binary (empty build commit) has nothing verifiable to compare — must be a
+// quiet no-op, not an error.
 func TestDefaultChainBoundaryAhead_EmptyRunningCommitIsNoOp(t *testing.T) {
 	dir, _ := brfInitRepo(t)
 	ahead, err := defaultChainBoundaryAhead(dir, "")
@@ -201,9 +121,9 @@ func TestDefaultChainBoundaryAhead_EmptyRunningCommitIsNoOp(t *testing.T) {
 	}
 }
 
-// AC4: a git failure (not a repo at all) must return an error the caller
-// treats as "skip this boundary" — never panic, never claim ahead=true on
-// bad data.
+// TestDefaultChainBoundaryAhead_GitFailureDegradesToSkip: a git failure (not
+// a repo at all) must return an error the caller treats as "skip this
+// boundary" — never panic, never claim ahead=true on bad data.
 func TestDefaultChainBoundaryAhead_GitFailureDegradesToSkip(t *testing.T) {
 	notARepo := t.TempDir()
 	_, err := defaultChainBoundaryAhead(notARepo, "deadbeef")
@@ -212,10 +132,9 @@ func TestDefaultChainBoundaryAhead_GitFailureDegradesToSkip(t *testing.T) {
 	}
 }
 
-// --- maybeRefreshChainBoundary: the orchestrated sequence ---
-
-// AC6c: no lag detected -> the whole rebuild/repin/re-exec sequence is a
-// provably free no-op — none of the seams fire.
+// TestMaybeRefreshChainBoundary_NoLagIsNoOpFree: no lag detected means the
+// whole rebuild/repin/re-exec sequence is a provably free no-op — none of
+// the seams fire.
 func TestMaybeRefreshChainBoundary_NoLagIsNoOpFree(t *testing.T) {
 	restore := brfStubSeams(t, false, nil, nil)
 	defer restore()
@@ -242,13 +161,10 @@ func TestMaybeRefreshChainBoundary_NoLagIsNoOpFree(t *testing.T) {
 	}
 }
 
-// AC3 + AC6b: lag detected -> rebuild, repin (ledgered under a distinguishable
+// TestMaybeRefreshChainBoundary_LagTriggersRebuildRepinReExecAndLedger: lag
+// detected means rebuild, repin (ledgered under a distinguishable
 // "boundary-refresh" class), and re-exec, in that order.
 func TestMaybeRefreshChainBoundary_LagTriggersRebuildRepinReExecAndLedger(t *testing.T) {
-	// Cycle-1323 fixture update (contract unchanged, setup completed): the
-	// re-pin now hashes the REBUILT <root>/go/bin/evolve and the provenance gate
-	// is real, so the fixture must supply both. Every assertion below is the
-	// cycle-1320 assertion, verbatim.
 	root, evolveDir, _ := brhProject(t, "STALE_PIN", "REBUILT-BINARY-BYTES")
 
 	restore := brfStubSeams(t, true, nil, nil)
@@ -285,8 +201,7 @@ func TestMaybeRefreshChainBoundary_LagTriggersRebuildRepinReExecAndLedger(t *tes
 		t.Error("re-exec must be invoked with a non-empty argv (the original chain invocation)")
 	}
 
-	// The state.json pin moved (RepinShipSHA's own write path — unchanged,
-	// protected surface not touched this cycle).
+	// The state.json pin moved (RepinShipSHA's own write path).
 	raw, err := os.ReadFile(filepath.Join(evolveDir, "state.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -295,10 +210,9 @@ func TestMaybeRefreshChainBoundary_LagTriggersRebuildRepinReExecAndLedger(t *tes
 		t.Errorf("expected_ship_sha must be re-pinned on a successful boundary refresh: %s", raw)
 	}
 
-	// AC3's "auditable... (NOT silent)" requirement: a DISTINGUISHABLE
-	// boundary-refresh record, separate from state.json's own two-value
-	// Authorized enum, so a ledger read can tell this apart from a manual
-	// `evolve reset-sha`.
+	// A distinguishable boundary-refresh record, separate from state.json's
+	// own two-value Authorized enum, so a ledger read can tell this apart
+	// from a manual `evolve reset-sha`.
 	logRaw, err := os.ReadFile(filepath.Join(evolveDir, chainBoundaryRefreshLogFile))
 	if err != nil {
 		t.Fatalf("boundary-refresh must be ledgered (missing %s): %v", chainBoundaryRefreshLogFile, err)
@@ -311,9 +225,10 @@ func TestMaybeRefreshChainBoundary_LagTriggersRebuildRepinReExecAndLedger(t *tes
 	}
 }
 
-// AC4: a rebuild failure must degrade to refreshed=false — repin and re-exec
-// are never reached, and the chain keeps running the CURRENT (un-rebuilt)
-// binary rather than halting.
+// TestMaybeRefreshChainBoundary_RebuildFailureDegradesToNoRefresh: a rebuild
+// failure must degrade to refreshed=false — repin and re-exec are never
+// reached, and the chain keeps running the current (un-rebuilt) binary
+// rather than halting.
 func TestMaybeRefreshChainBoundary_RebuildFailureDegradesToNoRefresh(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
@@ -350,8 +265,9 @@ func TestMaybeRefreshChainBoundary_RebuildFailureDegradesToNoRefresh(t *testing.
 	}
 }
 
-// AC4: an ahead-check error (git/network failure) must degrade to
-// refreshed=false without ever touching rebuild/repin/re-exec.
+// TestMaybeRefreshChainBoundary_AheadCheckErrorDegradesToNoRefresh: an
+// ahead-check error (git/network failure) must degrade to refreshed=false
+// without ever touching rebuild/repin/re-exec.
 func TestMaybeRefreshChainBoundary_AheadCheckErrorDegradesToNoRefresh(t *testing.T) {
 	restore := brfStubSeams(t, false, errors.New("git fetch: network unreachable"), nil)
 	defer restore()
@@ -387,24 +303,21 @@ func brfStubSeams(t *testing.T, ahead bool, aheadErr error, _ any) func() {
 	return func() { chainBoundaryAheadFn = prev }
 }
 
-// --- AC2 + AC6a: boundary refresh is checked ONLY between chainStartDecision
-// and runLoopBatchFn, at every boundary, never mid-batch ---
-
-// AC2/AC6a: over a 3-batch chain, the ahead-check must fire exactly once per
-// boundary, strictly BEFORE that boundary's runLoopBatchFn call — proving the
-// refresh can never interleave with (or interrupt) an in-flight batch, which
-// is single-threaded by construction at this call site.
+// TestRunLoopChain_BoundaryRefreshCheckedBeforeEveryBatchNeverMidBatch: over
+// a 3-batch chain, the ahead-check must fire exactly once per boundary,
+// strictly before that boundary's runLoopBatchFn call — proving the refresh
+// can never interleave with (or interrupt) an in-flight batch, which is
+// single-threaded by construction at this call site.
 func TestRunLoopChain_BoundaryRefreshCheckedBeforeEveryBatchNeverMidBatch(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	// Seed >=3 pending inbox items so chain_inbox_empty (an n>0-gated CONTINUE
-	// condition, cmd_loop_chain.go chainStartDecision) never fires before the
-	// 3rd boundary's [ahead-check, batch] pair is recorded — an empty inbox
-	// would stop the chain after batch 1, making the calls>=3 branch in the
-	// runLoopBatchFn stub below unreachable (cycle-1314/1315 fixture bug).
+	// Seed >=3 pending inbox items so chain_inbox_empty never fires before
+	// the 3rd boundary's [ahead-check, batch] pair is recorded — an empty
+	// inbox would stop the chain after the first batch, making the calls>=3
+	// branch in the runLoopBatchFn stub below unreachable.
 	inboxDir := filepath.Join(evolveDir, "inbox")
 	if err := os.MkdirAll(inboxDir, 0o755); err != nil {
 		t.Fatal(err)
@@ -448,12 +361,11 @@ func TestRunLoopChain_BoundaryRefreshCheckedBeforeEveryBatchNeverMidBatch(t *tes
 	}
 }
 
-// AC6b end-to-end: when the ahead-check trips at a given boundary, the chain
-// stops (re-exec is terminal in production) BEFORE that boundary's
-// runLoopBatchFn runs, and the stop reason names the refresh.
+// TestRunLoopChain_BoundaryRefreshStopsChainBeforeThatBoundarysBatch: when
+// the ahead-check trips at a given boundary, the chain stops (re-exec is
+// terminal in production) before that boundary's runLoopBatchFn runs, and
+// the stop reason names the refresh.
 func TestRunLoopChain_BoundaryRefreshStopsChainBeforeThatBoundarysBatch(t *testing.T) {
-	// Cycle-1323 fixture update (see the sibling test): a rebuilt binary to
-	// re-exec into and a real provenance seam. Assertions are unchanged.
 	root, evolveDir, _ := brhProject(t, "STALE_PIN", "REBUILT-BINARY-BYTES")
 
 	prevCommit, prevProv := chainRunningCommitFn, chainBoundaryRepinProvenanceFn

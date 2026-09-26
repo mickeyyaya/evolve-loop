@@ -1,30 +1,5 @@
 package main
 
-// cmd_loop_boot_recovery_test.go — RED tests (cycle 507, task
-// wire-boot-recovery-functions) for the WIRING of boot-time recovery into
-// runLoop's boot path. THIS is the layer cycle 506 was missing: it built
-// QuarantineDirtyTree / ShipSHAMismatch / AutosealStaleMarker (core, fully unit
-// tested) but never called them from runLoop — audit F1, CRITICAL, "green unit
-// test, absent integration" (the project's own warnship_apicover_ci_gap trap).
-// The cycle was reset, so the functions no longer exist; this cycle reinstates
-// them (core function contract in
-// internal/core/boot_preflight_test.go + stale_marker_autoseal_test.go) AND
-// wires them here.
-//
-// Contract the Builder implements (TDD-defined seam; mirrors the established
-// runLoopPreflightFn / wireOrchestratorDepsFn package-var seam idiom):
-//
-//	type bootRecoveryResult struct { Quarantined, Sealed, SHAMismatch bool }
-//	func defaultBootRecovery(ctx context.Context, cfg loopConfig, ledger core.Ledger, stderr io.Writer) bootRecoveryResult
-//	var bootRecoverFn = defaultBootRecovery
-//	// runLoop calls bootRecoverFn(ctx, cfg, deps.Ledger, stderr) BEFORE the
-//	// readiness gate (loopPreflightHalts), so a dirty/stranded tree self-heals
-//	// before the first cycle's tree-diff guard runs. Best-effort / fail-open:
-//	// a recovery error WARNs but never halts the batch.
-//
-// RED now (undefined symbols → package main test build fails). Do NOT modify
-// this file — implement the seam.
-
 import (
 	"bytes"
 	"context"
@@ -117,8 +92,7 @@ func TestDefaultBootRecovery_QuarantinesDirtyTree(t *testing.T) {
 
 // AC (edge, ship-SHA): with go/bin/evolve on disk and a MISMATCHING
 // expected_ship_sha in state.json, defaultBootRecovery must flag the mismatch —
-// proving ShipSHAMismatch is invoked from the orchestrator (the 498/500/502
-// SELF_SHA_TAMPERED cascade, caught at boot).
+// proving ShipSHAMismatch is invoked from the orchestrator.
 func TestDefaultBootRecovery_DetectsShipSHAMismatch(t *testing.T) {
 	repo := brInitRepo(t)
 	evolveDir := filepath.Join(repo, ".evolve")
@@ -206,11 +180,10 @@ func TestDefaultBootRecovery_CleanStateNoOp(t *testing.T) {
 	}
 }
 
-// AC (the wiring cycle 506 lacked): runLoop must INVOKE bootRecoverFn during
-// its boot path, BEFORE the readiness gate halts. A spy seam records the call;
-// forcing the preflight gate to halt isolates the boot path (no cycle runs).
-// This is the anti-dead-code assertion — a function defined but never called by
-// runLoop fails HERE, exactly the trap 506 fell into.
+// AC (anti-dead-code): runLoop must INVOKE bootRecoverFn during its boot path,
+// BEFORE the readiness gate halts. A spy seam records the call; forcing the
+// preflight gate to halt isolates the boot path (no cycle runs) — a recovery
+// function defined but never called by runLoop fails HERE.
 func TestRunLoop_InvokesBootRecoveryBeforeGate(t *testing.T) {
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")

@@ -1,46 +1,5 @@
 package main
 
-// cmd_loop_chain_boundaryrefresh_repinbranch_test.go — RED test (cycle 1356,
-// inbox item auto-refresh-binary-at-boundary, task
-// pin-boundary-repin-branch-residual).
-//
-// Residual embedded in the inbox item's own live-fire note (2026-08-05
-// 17:24): a boot-time binary refresh healed via the RE-EXEC'D CHILD's
-// boot-recovery auto-repin rather than the PARENT's pre-exec reconcile ("the
-// pin heal fired in the CHILD's auto-repin... verify which parent-repin
-// branch no-op'd and tighten its test").
-//
-// Read-first (rule 8): that boot-time mechanism (a `cmd_loop_boot_refresh.go`
-// file, `bootRefreshRepinFn` seam) does not exist anywhere in this worktree's
-// checked-out source —
-//
-//	grep -rn 'bootRefreshRepinFn|BootBinaryRefresh' go/   -> zero hits
-//	find go -name 'cmd_loop_boot_refresh*.go'             -> no file
-//
-// This worktree's merge-base with origin/main (4dadf62a923640c) is 71 commits
-// behind current main; the boot-time rebuild+re-exec self-heal is a main-line
-// feature this worktree's snapshot predates. Re-litigating the EXACT
-// parent/child split the note describes would mean writing a predicate
-// against code that is not present here — inventing an API, which rule 8
-// forbids.
-//
-// What IS present, and carries the identical shape (a repin that can fire on
-// either side of a re-exec boundary), is THIS SAME inbox item's other half:
-// maybeRefreshChainBoundary (cmd_loop_chain.go) re-pins expected_ship_sha
-// BEFORE it re-execs. The re-exec'd child's own boot path
-// (defaultBootRecovery -> detectShipSHAMismatch -> attemptBootRepin,
-// cmd_loop_boot_recovery.go) is the other candidate healer. Nothing pins
-// which of the two actually performs the heal for a boundary refresh, or
-// proves the other is a documented no-op rather than an accidental race —
-// exactly the ambiguity class the live-fire note flagged, applied to the
-// mechanism this worktree actually has.
-//
-// This predicate proves: (1) maybeRefreshChainBoundary's pre-exec repin is
-// the branch that performs the heal (state.json's pin moves BEFORE the
-// re-exec seam is invoked), and (2) with that pin already moved, the child
-// boot path's detectShipSHAMismatch reports NO mismatch — attemptBootRepin is
-// therefore a documented no-op on the boundary-refresh path, never reached.
-
 import (
 	"bytes"
 	"os"
@@ -51,10 +10,10 @@ import (
 )
 
 // TestMaybeRefreshChainBoundary_PrePinsBeforeReExecSoChildBootRepinIsNoOp
-// pins the parent-vs-child repin-branch split for the boundary-refresh
-// mechanism: the PARENT (maybeRefreshChainBoundary, pre-re-exec) performs the
-// heal; the CHILD's boot-recovery repin (attemptBootRepin, gated on
-// detectShipSHAMismatch) finds nothing left to do.
+// pins the parent-vs-child repin-branch split: the parent
+// (maybeRefreshChainBoundary, pre-re-exec) performs the heal; the child's
+// boot-recovery repin (attemptBootRepin, gated on detectShipSHAMismatch)
+// finds nothing left to do.
 func TestMaybeRefreshChainBoundary_PrePinsBeforeReExecSoChildBootRepinIsNoOp(t *testing.T) {
 	root, evolveDir, _ := brhProject(t, "STALE_PIN", "REBUILT-BINARY-BYTES")
 
@@ -108,11 +67,9 @@ func TestMaybeRefreshChainBoundary_PrePinsBeforeReExecSoChildBootRepinIsNoOp(t *
 }
 
 // TestAttemptBootRepin_NoOpWhenPinAlreadyMatchesOnDiskBinary is the negative
-// counterpart: attemptBootRepin itself, called directly (not merely gated out
-// by detectShipSHAMismatch upstream), must report false — "nothing to heal" —
-// when the pin already matches. This is the "tighten its test" half of the
-// residual note: the no-op branch gets its own direct assertion, not just an
-// inference from detectShipSHAMismatch's gate.
+// counterpart: attemptBootRepin, called directly (not merely gated out by
+// detectShipSHAMismatch upstream), must report false — nothing to heal —
+// when the pin already matches.
 func TestAttemptBootRepin_NoOpWhenPinAlreadyMatchesOnDiskBinary(t *testing.T) {
 	root, evolveDir, binSHA := brhProject(t, "", "ALREADY-CURRENT-BYTES")
 	// Pin already matches the on-disk binary's real hash.

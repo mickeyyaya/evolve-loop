@@ -1,21 +1,5 @@
 package main
 
-// cmd_loop_chain_boundaryrefresh_shortsha_test.go — regression test (cycle
-// 1320, resuming the 1314 boundary-binary-refresh task after an audit FAIL).
-//
-// Defect: defaultChainBoundaryAhead reported ahead=true for an up-to-date
-// binary. version.Commit() is stamped by the Makefile as a 12-char SHORT
-// commit (`git rev-parse --short=12 HEAD`, go/Makefile:16), but the function
-// compared it directly against `git rev-parse HEAD`'s FULL 40-char SHA — a
-// length mismatch that can never be equal even when current — then fell
-// through to `git merge-base --is-ancestor`, which treats equal commits as
-// ancestors too (non-strict), so it returned ahead=true anyway. Fixed by
-// resolving runningCommit to its full SHA (`git rev-parse <short>`) before
-// comparing.
-//
-// cmd_loop_chain_boundaryrefresh_test.go is frozen ("Do NOT modify this
-// file") so this regression lives in a sibling file instead.
-
 import (
 	"testing"
 )

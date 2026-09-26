@@ -12,12 +12,8 @@ import (
 // flow (validate → resolve config → preflight → report); a Driver owns
 // only the CLI-specific invocation: building the inner argv, dispatching
 // the process (or driving a tmux REPL), and waiting for the artifact.
-//
-// This replaces the bash file-dispatch smell — bin/bridge sourced
-// drivers/${cli}.sh and called drv_launch_${cli//-/_} by name-mangling,
-// a stringly-typed lookup with no compile-time guarantee the driver
-// exists. The Strategy + Registry below makes the driver set
-// compile-checked and fail-fast on duplicate registration.
+// The Strategy + Registry below make the driver set compile-checked and
+// fail-fast on duplicate registration.
 type Driver interface {
 	// Name is the --cli value this driver handles (e.g. "claude-p").
 	Name() string
@@ -34,18 +30,15 @@ type Driver interface {
 // must complete BEFORE the inner CLI process is launched. The Engine
 // dispatches it via type assertion (`driver.(CLIPreflight)`) so a driver
 // that needs no prep work simply omits the method — no no-op stubs in every
-// concrete driver. Establishing this seam (cycle-124 G3, redesign of the
-// inline pretrust call at the top of codexTmuxDriver.Launch) gives every
-// CLI a uniform place to mutate config files / refresh credentials / probe
-// the binary BEFORE the user-visible launch path runs. Today only
-// codex-tmux implements it (pre-trust worktree + workspace paths in
-// ~/.codex/config.toml per cycle-122 Fix 1); claude-tmux / agy-tmux /
-// ollama-tmux opt out by not declaring the method.
+// concrete driver. It gives every CLI a uniform place to mutate config
+// files / refresh credentials / probe the binary BEFORE the user-visible
+// launch path runs. Today only codex-tmux implements it (pre-trust
+// worktree + workspace paths in ~/.codex/config.toml); claude-tmux /
+// agy-tmux / ollama-tmux opt out by not declaring the method.
 //
 // Semantics: best-effort. The Engine LOGS a non-nil error to stderr but
-// continues to Launch — this matches the existing inline call's posture
-// (Fix 2's extended fallback trigger list is the downstream defense
-// against any preflight failure). A driver that needs Preflight to be
+// continues to Launch, because a downstream fallback path already defends
+// against a failed preflight. A driver that needs Preflight to be
 // load-bearing (abort launch on failure) MUST encode that in its own
 // Launch body, not here.
 type CLIPreflight interface {
@@ -92,11 +85,8 @@ func LookupDriver(cli string) (Driver, bool) {
 }
 
 // bareDriverMap is the single source of truth for the BARE CLI name →
-// registered driver projection. The dispatch path (subagent.Run /
-// ValidateProfile, consensusdispatch) historically shelled `bash <cli>.sh`
-// for both bare names ("claude") and driver names ("claude-tmux"). Routing
-// through the bridge instead means a bare name must first be projected onto
-// a registered driver, because LookupDriver keys on the exact driver name.
+// registered driver projection. A bare name must first be projected onto
+// a registered driver because LookupDriver keys on the exact driver name.
 //
 // Resolved CLI names (claude-tmux/codex-tmux/agy-tmux) are already driver
 // names and pass through DriverFor unchanged. The bare names:

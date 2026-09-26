@@ -1,14 +1,3 @@
-// cmd_loop_chain.go — the unit-13 chain seam (ADR-0103). The outer
-// batch-chaining loop (cycle 1075; the standing operator directive of
-// 2026-07-11 that lanes keep running until the inbox is empty) and the
-// boundary binary refresh (cycle 1314) live in internal/loopchain as the
-// Driver and the Refresher. This file keeps the eleven package-var test
-// seams (read INSIDE the engines' closures at every construction, so a swap
-// between calls is always seen), the two process adapters the leaf takes as
-// required deps (`make -C go build`, syscall.Exec), the chain's stdout
-// envelope, the chain root's Signal Center and the facades the by-name tests
-// keep. The chain owns no cycle-level logic: the quota wall is the batch's
-// rc=5 contract, which the Driver refuses to relaunch into.
 package main
 
 import (
@@ -71,8 +60,6 @@ type (
 	chainResult                  = loopchain.Result
 )
 
-// --- the git/disk defaults, facaded for the by-name tests ---
-
 func defaultChainBoundaryAhead(projectRoot, runningCommit string) (ahead bool, err error) {
 	return loopchain.GitAhead(projectRoot, runningCommit)
 }
@@ -89,8 +76,6 @@ func defaultChainReExecTarget(projectRoot string) (string, error) {
 func defaultChainBoundaryFleetLaneActive(cfg loopConfig) (active bool, err error) {
 	return loopchain.FleetLaneActive(cfg.EvolveDir)
 }
-
-// --- the two process adapters the leaf takes as REQUIRED deps ---
 
 // defaultChainRebuild runs `make -C go build` (runtime-reference.md) from
 // projectRoot so the on-disk binary catches up to HEAD.
@@ -111,12 +96,8 @@ func defaultChainReExec(argv0 string, argv, envv []string) error {
 	return syscall.Exec(argv0, argv, envv)
 }
 
-// --- the refresh seam ---
-
-// wiredRefresher is the ONE loopchain.NewRefresher( site
-// (TestChainEngines_OneConstructionSite): every package var is read INSIDE
-// its closure, so the tests' swaps between calls are always seen; the
-// Center's Flush is the refresh's flush-before-exec (nil-safe).
+// wiredRefresher is the one loopchain.NewRefresher( site: every package var
+// is read inside its closure, so a swap between calls is always seen.
 func wiredRefresher(cfg loopConfig, stderr io.Writer, signals *signalcenter.Center) *loopchain.Refresher {
 	deps := loopchain.RefreshDeps{
 		RunningCommit: func() string { return chainRunningCommitFn() },
@@ -164,8 +145,6 @@ func lastChainBoundaryRefreshLogEntry(evolveDir string) (*chainBoundaryRefreshLo
 	return loopchain.LastRefreshLogEntry(filepath.Join(evolveDir, chainBoundaryRefreshLogFile))
 }
 
-// --- the pure facades the by-name tests keep ---
-
 func loadChainConfig(evolveDir string) policy.ChainConfig {
 	return loopchain.LoadChainConfig(evolveDir)
 }
@@ -182,16 +161,9 @@ func chainContinueDecision(rc int) (reason string, exit int, stop bool) {
 	return loopchain.ContinueDecision(rc)
 }
 
-// --- the chain root ---
-
-// wiredChain is the ONE loopchain.NewDriver( site: the real batch over the
-// SAME config every time, the Center-bearing refresh, the audit trail, the
-// fleet width read to record it, and the checkpoint's quota-pause block. The
-// chain Center is flushed before EVERY batch: a chained batch can re-exec at
-// a wave boundary and that refresh flushes only the batch's own Center, so
-// what the chain root emitted at the boundary must already be delivered
-// (TestWiredChain_FlushesTheChainCenterBeforeEveryBatch; F4 is the
-// one-Center-per-process fix).
+// wiredChain is the one loopchain.NewDriver( site: the real batch over the
+// same config every time, the Center-bearing refresh, the audit trail, the
+// fleet width read to record it, and the checkpoint's quota-pause block.
 func wiredChain(cfg loopConfig, cc policy.ChainConfig, stdin io.Reader, stdout, stderr io.Writer, signals *signalcenter.Center) *loopchain.Driver {
 	deps := loopchain.DriverDeps{
 		Batch:       func() int { signals.Flush(); return runLoopBatchFn(cfg, stdin, stdout, stderr) },

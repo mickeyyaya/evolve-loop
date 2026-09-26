@@ -1,51 +1,5 @@
 package main
 
-// cmd_loop_boot_selfsha_gate_test.go — RED tests (cycle 639, task
-// self-sha-fail-early-boot-gate; inbox 2026-07-08T03-05-30Z, weight 0.95).
-//
-// Problem this cycle closes: a WITHIN-VERSION ship-binary SHA mismatch
-// (state.json:expected_ship_version == the current plugin version, but
-// expected_ship_sha != the on-disk go/bin/evolve) is a BOOT-time-knowable,
-// cycle-FATAL condition — it is exactly what the terminal ship gate calls
-// SELF_SHA_TAMPERED (internal/phases/ship/verify.go:119-127, the "same version,
-// different SHA" INTEGRITY-FAIL branch). Yet boot only WARNs and proceeds: 8
-// consecutive cycles (625-634) each burned a full ~32-40 min scout→…→ship lane
-// before dying at that terminal gate on a ship structurally doomed from boot.
-//
-// The fix classifies the mismatch at boot the SAME way verifySelfSHA does:
-//
-//   - within-version (expected_ship_version present AND == pluginVersion(root))
-//     + SHA differs  → HALT pre-scout with the operator-unblock recipe
-//     (`make -C go build` → `evolve reset-sha -operator` → relaunch). Do NOT
-//     start scout. The auto-repin is NOT attempted — a within-version SHA change
-//     is tampering/corruption by the ship-gate's own definition, not a legitimate
-//     rebuild (a legit rebuild is version-bumped, or healed by the post-build
-//     repin of cycle 636).
-//   - across-version / legacy-unversioned mismatch → the EXISTING boot auto-repin
-//     path (cycle 514, phaseintegrity.RepinIfDrifted), byte-for-byte unchanged.
-//   - matching SHA → no mismatch, no halt; boot proceeds into scout.
-//
-// Contract the Builder implements (TDD-defined seam; extends the established
-// bootRecoverFn / shipRepinProvenanceFn package-var seam idiom):
-//
-//	type bootRecoveryResult struct {
-//	    Quarantined, Sealed, SHAMismatch, Healed bool
-//	    HaltSelfSHA bool // NEW: a within-version SHA mismatch — boot must HALT pre-scout
-//	}
-//	// defaultBootRecovery: on a detected SHA mismatch, read expected_ship_version
-//	// and compare to pluginVersion(cfg.ProjectRoot). If both non-empty AND equal
-//	// (within-version), set res.HaltSelfSHA=true, print the operator-unblock recipe
-//	// to stderr, and return WITHOUT attempting the auto-repin. Otherwise
-//	// (across-version / legacy) keep today's detect→auto-repin behavior verbatim.
-//	//
-//	// runLoop, immediately after bootRecoverFn returns (BEFORE the unfinished-cycle
-//	// guard and readiness gate — hence pre-scout), checks res.HaltSelfSHA and, if
-//	// set, sets lr.StopReason="self_sha_boot_halt", emits, and returns 2. No scout
-//	// phase, no readiness gate, no LLM budget spent.
-//
-// RED now (HaltSelfSHA field undefined → package main test build fails). Do NOT
-// modify this file — implement the seam.
-
 import (
 	"bytes"
 	"context"
@@ -88,11 +42,9 @@ func bgSeedBinary(t *testing.T, repo string, content string) {
 	}
 }
 
-// AC1 (headline, positive + negative-of-repin): a WITHIN-VERSION ship-SHA
-// mismatch must HALT boot pre-scout with the operator recipe, and must NOT
-// auto-repin (the pin is left untouched so the mismatch is not silently
-// "healed"). This is the anti-no-op signal for the whole cycle: a "fix" that
-// repins the within-version case away, or that lets boot proceed, fails here.
+// TestBootGate_HaltsOnWithinVersionSelfShaMismatch: a within-version ship-SHA
+// mismatch must halt boot pre-scout with the operator recipe, and must not
+// auto-repin — the pin is left untouched so the mismatch is not silently healed.
 func TestBootGate_HaltsOnWithinVersionSelfShaMismatch(t *testing.T) {
 	repo := brInitRepo(t)
 	evolveDir := filepath.Join(repo, ".evolve")
@@ -132,8 +84,8 @@ func TestBootGate_HaltsOnWithinVersionSelfShaMismatch(t *testing.T) {
 	if got := readExpectedShipSHA(t, evolveDir); got != pin {
 		t.Errorf("expected_ship_sha must be UNTOUCHED on a within-version halt; got %q want %q", got, pin)
 	}
-	// The message must carry the operator-unblock recipe verbatim so a human can
-	// act without hunting for it (the 8-cycle waste was partly not-knowing-what-to-do).
+	// The message must carry the operator-unblock recipe verbatim so a human
+	// can act without hunting for it.
 	msg := stderr.String()
 	for _, want := range []string{"make -C go build", "evolve reset-sha -operator"} {
 		if !strings.Contains(msg, want) {
@@ -142,10 +94,10 @@ func TestBootGate_HaltsOnWithinVersionSelfShaMismatch(t *testing.T) {
 	}
 }
 
-// AC2 (regression twin): an ACROSS-VERSION mismatch (expected_ship_version !=
-// the current plugin version — a legitimate plugin/version bump) must stay on the
-// EXISTING boot auto-repin path unchanged: it heals (res.Healed) and re-pins the
-// SHA, and it must NOT trip the new within-version halt.
+// TestBootGate_AcrossVersionMismatchStillAutoRepins: an across-version
+// mismatch (a legitimate plugin/version bump) must stay on the existing boot
+// auto-repin path unchanged — it heals and re-pins the SHA, and must not trip
+// the within-version halt.
 func TestBootGate_AcrossVersionMismatchStillAutoRepins(t *testing.T) {
 	repo := brInitRepo(t)
 	evolveDir := filepath.Join(repo, ".evolve")
@@ -189,10 +141,9 @@ func TestBootGate_AcrossVersionMismatchStillAutoRepins(t *testing.T) {
 	}
 }
 
-// AC3 (negative / matching SHA): when the on-disk binary's SHA MATCHES
-// expected_ship_sha under the same plugin version, there is no mismatch — boot
-// must take ZERO self-SHA action (no halt, no flag, no heal) and fall through to
-// scout. This guards against a gate that halts spuriously on a healthy tree.
+// TestBootGate_MatchingSHABootsIntoScout: when the on-disk binary's SHA
+// matches expected_ship_sha under the same plugin version, boot must take
+// zero self-SHA action and fall through to scout.
 func TestBootGate_MatchingSHABootsIntoScout(t *testing.T) {
 	repo := brInitRepo(t)
 	evolveDir := filepath.Join(repo, ".evolve")
@@ -226,12 +177,11 @@ func TestBootGate_MatchingSHABootsIntoScout(t *testing.T) {
 	}
 }
 
-// AC1 (headline, integration — "no scout phase runs"): runLoop, given a
-// within-version mismatch, must HALT during boot BEFORE the readiness gate — so
-// no cycle, no scout, no LLM budget. Proof of "pre-scout": the readiness-gate
-// seam (runLoopPreflightFn), which runs strictly AFTER the boot self-heal and
-// strictly BEFORE any cycle dispatch, is NEVER invoked. The exit is 2 with the
-// distinct StopReason, and the operator recipe reaches stderr.
+// TestRunLoop_HaltsPreScoutOnWithinVersionSelfShaMismatch: runLoop, given a
+// within-version mismatch, must halt during boot before the readiness gate —
+// no cycle, no scout, no LLM budget. The readiness-gate seam
+// (runLoopPreflightFn) must never be invoked; exit is 2 with a distinct
+// StopReason, and the operator recipe reaches stderr.
 func TestRunLoop_HaltsPreScoutOnWithinVersionSelfShaMismatch(t *testing.T) {
 	repo := brInitRepo(t)
 	evolveDir := filepath.Join(repo, ".evolve")

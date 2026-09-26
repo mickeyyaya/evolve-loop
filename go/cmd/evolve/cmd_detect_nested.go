@@ -7,9 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/detectnested"
 )
 
-// runDetectNested is the `evolve detect-nested-claude` subcommand.
-// Ports legacy/scripts/dispatch/detect-nested-claude.sh. Prints "nested"
-// or "standalone". --quiet suppresses stdout (rc still 0).
 func runDetectNested(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	quiet := false
 	for _, a := range args {

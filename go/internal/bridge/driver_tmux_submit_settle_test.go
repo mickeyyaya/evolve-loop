@@ -1,16 +1,5 @@
 package bridge
 
-// driver_tmux_submit_settle_test.go — the prompt-submission timing contract
-// (verification wave 2026-09-14, cycles 1673–1675): a 17–35 KB prompt pasted
-// into the codex TUI is still being ingested when the driver's fixed 1 s +
-// three 500 ms re-sends have all fired, so the submission is declared
-// "wedged" ~2.5 s after the paste and the whole dispatch is thrown away —
-// while build/tdd/fault-localization in the same wave needed 2–3 re-sends
-// just to land. The driver now (1) settles the first Enter by prompt size,
-// (2) waits for the pane to stop changing before it presses Enter, and
-// (3) backs off between re-sends instead of hammering. Vocabulary, stderr
-// lines and the re-send cap are unchanged.
-
 import (
 	"bytes"
 	"context"
@@ -49,10 +38,6 @@ func enterCount(seq []string) int {
 	return n
 }
 
-// The first Enter waits for the paste to settle: the settle scales with the
-// prompt size (a 35 KB prompt gets longer than a 2 KB one) and the driver then
-// polls the pane until two consecutive captures agree — the TUI has finished
-// rendering what it ingested — before pressing Enter exactly once.
 func TestPastePrompt_WaitsForTheStablePaneBeforeEnter(t *testing.T) {
 	tm := &fakeTmux{paneSeq: []string{
 		"› [Pasted Content 1 +40 lines]",
@@ -83,8 +68,6 @@ func TestPastePrompt_WaitsForTheStablePaneBeforeEnter(t *testing.T) {
 	}
 }
 
-// A pane that never stops changing (a TUI redrawing a spinner) must not hold
-// the Enter forever: the stability wait is bounded and the driver presses on.
 func TestPastePrompt_StabilityWaitIsBounded(t *testing.T) {
 	tm := &countingTmux{}
 	var stderr bytes.Buffer
@@ -104,9 +87,6 @@ func TestPastePrompt_StabilityWaitIsBounded(t *testing.T) {
 	}
 }
 
-// Re-sends back off: each settle is longer than the last (500 ms, 1.5 s,
-// 2.5 s), so three re-sends span seconds, not 1.5 s, and a TUI that needed a
-// moment gets it before the driver calls it wedged.
 func TestVerifySubmitted_BacksOffBetweenResends(t *testing.T) {
 	prompt := guardNudge
 	parked := parkedPane(prompt)
@@ -138,11 +118,6 @@ func (c *countingTmux) CapturePane(_ context.Context, _ string, _ int) (string, 
 	return "› [Pasted Content 1 +" + strings.Repeat("x", c.captures) + "]", nil
 }
 
-// An unreadable prompt file on the Go side (tmux's own load-buffer is another
-// process and may have succeeded) must not silently shrink the paste to size
-// 0 — that would skip the stability wait and reproduce the wedge with no line
-// to say so (go review MAJOR). The driver says it out loud and assumes a LARGE
-// paste: the capped settle and the stability wait both run.
 func TestPastePrompt_UnreadablePromptAssumesALargePaste(t *testing.T) {
 	tm := &fakeTmux{paneSeq: []string{"› [Pasted Content 1 +40 lines]", "› [Pasted Content 1 +40 lines]"}}
 	var stderr bytes.Buffer
@@ -165,11 +140,6 @@ func TestPastePrompt_UnreadablePromptAssumesALargePaste(t *testing.T) {
 	}
 }
 
-// H1 — the timing that precedes the artifact wait must never sleep exactly
-// artifactWaitInterval: the wedge short-circuit pins count Sleeps of that value
-// as artifact-wait polls, so a colliding settle would be counted as a poll and
-// red a pin about an unrelated subsystem (with the 1 s/10 KB formula the
-// 10–20 KB band — the incident's own scout prompt — landed on exactly 2 s).
 func TestPasteTiming_NeverEqualsTheArtifactWaitInterval(t *testing.T) {
 	for size := 0; size <= 120_000; size += 100 {
 		if d := pasteSettleFor(size); d == artifactWaitInterval {
@@ -186,9 +156,6 @@ func TestPasteTiming_NeverEqualsTheArtifactWaitInterval(t *testing.T) {
 	}
 }
 
-// M5 — under the stability floor the delivery is byte-for-byte the old one: the
-// old 1 s settle, no capture at all, Enter once (the no-regression floor every
-// existing fixture relies on).
 func TestPastePrompt_SmallPromptTakesTheCaptureFreePath(t *testing.T) {
 	tm := &fakeTmux{paneSeq: []string{"› [Pasted Content 1 +2 lines]"}}
 	var stderr bytes.Buffer
@@ -207,9 +174,6 @@ func TestPastePrompt_SmallPromptTakesTheCaptureFreePath(t *testing.T) {
 	}
 }
 
-// M5 — a tmux that cannot be read during the stability wait is said out loud
-// and the driver presses Enter anyway (a dead session must become a verify
-// outcome, never a hang).
 func TestPastePrompt_CaptureFaultFailsOpen(t *testing.T) {
 	tm := &captureErrTmux{fakeTmux: &fakeTmux{paneSeq: []string{"› x"}}, errAfter: 1}
 	var stderr bytes.Buffer
@@ -228,9 +192,6 @@ func TestPastePrompt_CaptureFaultFailsOpen(t *testing.T) {
 	}
 }
 
-// L1/L2 — the contract, not the mechanism: the Enter is pressed only after the
-// last two captures AGREED, and the expected settle is computed from the
-// fixture's real size.
 func TestPastePrompt_EnterFollowsTwoAgreeingCaptures(t *testing.T) {
 	tm := &fakeTmux{paneSeq: []string{"› [Pasted Content 1 +40 lines]", "› [Pasted Content 1 +900 lines]", "› [Pasted Content 1 +900 lines]"}}
 	var stderr bytes.Buffer
@@ -249,8 +210,6 @@ func TestPastePrompt_EnterFollowsTwoAgreeingCaptures(t *testing.T) {
 	}
 }
 
-// H2 — the inject path is the same delivery: a multi-KB inject body settles by
-// size and waits for the pane; a small one keeps the old 1 s and no capture.
 func TestInjectText_SharesTheDeliveryTail(t *testing.T) {
 	cfg := fixtureConfig(t)
 	tm := &fakeTmux{paneSeq: []string{"› a", "› a"}}
@@ -275,9 +234,6 @@ func TestInjectText_SharesTheDeliveryTail(t *testing.T) {
 	}
 }
 
-// H3 — the submit-verify ledger carries the paste evidence on the success path
-// (a rate needs a denominator); a nudge, which is a SendKeys and not a paste,
-// carries none.
 func TestRecordSubmitVerify_CarriesThePasteEvidence(t *testing.T) {
 	rec := interaction.NewRecorder(t.TempDir())
 	recordSubmitVerify(rec, "build", 7, "prompt", submitVerifyOutcome{Result: interaction.ResultSubmitVerified}, pasteOutcome{Settle: 4 * time.Second, Stability: pasteStable})

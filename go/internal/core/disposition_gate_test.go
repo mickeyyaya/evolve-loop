@@ -1,22 +1,5 @@
 package core
 
-// disposition_gate_test.go — RED contract for the S2 disposition-contract-gate
-// (cycle-1034, item failure-disposition-router slice S2).
-//
-// The retro phase gains a MANDATORY disposition.json deliverable. VerifyDisposition
-// is the fail-HARD counterpart to readFailureDecision's fail-SOFT boundary: a
-// required deliverable, so absence/invalidity is a LOUD error (retro cannot
-// complete), not a silent (nil,nil) fallback. It also cross-checks the
-// disposition's fingerprint+recurrence against the S1 failure-digest.json so the
-// agent cannot INVENT a failure identity in retro.
-//
-// disposition.json schema: {cycle, fingerprint, recurrence, legitimacy,
-// root_cause:{layer,summary}, salvage:{worktree_has_value,pointer}, urgency,
-// justification, routing, proposed_item}.
-//
-// RED today: VerifyDisposition and (*Orchestrator).finalizeRetroCompletion do
-// not exist → this file fails to COMPILE (correct RED for new surface).
-
 import (
 	"context"
 	"encoding/json"
@@ -71,10 +54,6 @@ func writeMatchingDigest(t *testing.T, dir string) {
 	})
 }
 
-// AC1 — retro fails LOUD without a valid disposition. Absent disposition.json →
-// loud error; a syntactically broken disposition.json → loud error. Contrast
-// readFailureDecision, which returns (nil,nil) on the same inputs: this gate is
-// fail-HARD because the disposition is a required deliverable.
 func TestDispositionGate_RetroFailsLoudWithoutValidDisposition(t *testing.T) {
 	t.Run("absent", func(t *testing.T) {
 		dir := t.TempDir()
@@ -103,10 +82,6 @@ func TestDispositionGate_RetroFailsLoudWithoutValidDisposition(t *testing.T) {
 	})
 }
 
-// AC2 — fingerprint is cross-checked against the digest (anti-invention). A
-// disposition whose fingerprint disagrees with failure-digest.json is rejected;
-// a matching fingerprint (and recurrence) passes. This is what stops the agent
-// from inventing a failure identity that no assembler ever computed.
 func TestDispositionGate_CrossChecksFingerprintAgainstDigest(t *testing.T) {
 	t.Run("mismatch_rejected", func(t *testing.T) {
 		dir := t.TempDir()
@@ -142,10 +117,6 @@ func TestDispositionGate_CrossChecksFingerprintAgainstDigest(t *testing.T) {
 	})
 }
 
-// AC3 (negative) — out-of-vocabulary enum values are rejected, with the
-// offending field named. Table-driven over every enum field. The gaming fake — a
-// gate that only checks the JSON parses — fails here because each of these
-// documents parses cleanly yet carries an illegal enum value.
 func TestDispositionGate_RejectsInvalidEnums(t *testing.T) {
 	cases := []struct {
 		field string
@@ -174,10 +145,6 @@ func TestDispositionGate_RejectsInvalidEnums(t *testing.T) {
 	}
 }
 
-// AC4 (edge) — salvage floor: worktree_has_value=true REQUIRES a non-empty
-// pointer (cycles 984/1000 salvage precedent — preserved worktree value must be
-// pointed at, never silently dropped). worktree_has_value=false with an empty
-// pointer is accepted (nothing to salvage).
 func TestDispositionGate_SalvagePointerRequiredWhenValue(t *testing.T) {
 	t.Run("value_without_pointer_rejected", func(t *testing.T) {
 		dir := t.TempDir()
@@ -205,17 +172,6 @@ func TestDispositionGate_SalvagePointerRequiredWhenValue(t *testing.T) {
 	})
 }
 
-// AC5 (wiring) — the gate is invoked on the COMPOSED retro-completion path, not
-// merely unit-testable in isolation (unit-green != live-green). This drives the
-// real orchestrator seam recordFailureLearning uses: a live-shaped FAIL cycle
-// whose retro runner returns PASS must still route through the disposition gate.
-//   - missing disposition → the completion path surfaces the loud gate error
-//     (recorded in Result.RetroDecision) and does NOT silently record a clean
-//     retro outcome.
-//   - valid disposition + matching digest → the gate passes and the normal
-//     failure-learning outcome is recorded.
-//
-// t.TempDir() only — never mutates the live repo tree.
 func TestDispositionGate_WiredIntoRetroCompletion(t *testing.T) {
 	newFL := func(dir string) failureLearningRequest {
 		return failureLearningRequest{
@@ -246,11 +202,8 @@ func TestDispositionGate_WiredIntoRetroCompletion(t *testing.T) {
 
 	t.Run("valid_disposition_completes", func(t *testing.T) {
 		dir := t.TempDir()
-		// The composed path now runs the S1 assembler pre-retro, which is
-		// AUTHORITATIVE over any pre-seeded digest (anti-invention). Model a
-		// compliant agent: seed the real input artifact, derive the canonical
-		// digest exactly as the assembler will, and copy fingerprint/recurrence
-		// verbatim into the disposition.
+		// Model a compliant agent: seed the real input artifact, derive the
+		// digest as the assembler will, and copy it verbatim into the disposition.
 		writeJSON(t, dir, "audit-fail-reason.json", map[string]any{
 			"schema_version": 1, "phase": "audit",
 			"reasons": []string{"EGPS: red_count=1 (cycle ships only when red_count==0)"},
@@ -272,10 +225,6 @@ func TestDispositionGate_WiredIntoRetroCompletion(t *testing.T) {
 	})
 
 	t.Run("assembler_overwrites_foreign_digest_on_composed_path", func(t *testing.T) {
-		// Regression pin for the I2 wiring (assembler was landed callerless by
-		// cycle-1034): a pre-seeded foreign digest is REPLACED by the assembler
-		// pre-retro, so a disposition copying the foreign identity fails the
-		// cross-check — the digest on disk after completion is the assembler's.
 		dir := t.TempDir()
 		writeMatchingDigest(t, dir) // foreign fixture digest
 		writeJSON(t, dir, "disposition.json", validDisposition())
@@ -288,10 +237,6 @@ func TestDispositionGate_WiredIntoRetroCompletion(t *testing.T) {
 	})
 }
 
-// TestFinalizeRetroCompletion_SeamContract pins the direct completion seam the
-// orchestrator wires (the function under the AC5 wiring). Kept distinct from the
-// orchestrator-level test so a Builder implementing the gate has an isolated
-// target: valid → nil, missing → loud error.
 func TestFinalizeRetroCompletion_SeamContract(t *testing.T) {
 	o := &Orchestrator{}
 

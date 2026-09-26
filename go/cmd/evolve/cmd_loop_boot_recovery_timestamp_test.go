@@ -1,28 +1,5 @@
 package main
 
-// cmd_loop_boot_recovery_timestamp_test.go — RED test (cycle 519, committed
-// ## top_n slice of loop-cannot-selfheal-dirty-main-tree).
-//
-// TRIAGE COMMITTED ONE slice this cycle (triage-decision.json top_n): "implement
-// ONLY the boot pre-flight slice — detect uncommitted tracked-source changes in
-// the main tree at loop boot (git status --porcelain, excluding .evolve/ and
-// knowledge-base/) and auto-quarantine via a TIMESTAMPED `git stash`".
-//
-// Detection, the .evolve/ + knowledge-base/ exclusion, and the non-destructive
-// stash all shipped in cycles 507/514 (pre-existing GREEN — pinned as regression
-// predicates in acs/cycle519). The one behaviour the committed slice ADDS is the
-// TIMESTAMP: cmd_loop_boot_recovery.go:104 currently quarantines under the FIXED
-// constant label "boot-quarantine", so every boot quarantine across every batch
-// collapses under one ambiguous name — an operator cannot tell which stash came
-// from which boot, and `git stash pop` on the wrong one silently restores the
-// wrong leak. A timestamped label makes each boot quarantine individually
-// identifiable and recoverable.
-//
-// RED now: the label is the bare constant, so labelOnly(...) == "boot-quarantine"
-// and the timestamp assertion fails. Builder makes it GREEN by threading a
-// timestamped label into the QuarantineDirtyTree call. Do NOT modify this file —
-// implement the production seam.
-
 import (
 	"bytes"
 	"context"
@@ -74,11 +51,9 @@ func brTopStashMessage(t *testing.T, dir string) string {
 	return lines[0]
 }
 
-// TestDefaultBootRecovery_QuarantineStashLabelIsTimestamped is the headline
-// behavioural test for the committed slice. It drives the REAL boot-recovery
-// seam (bootRecoverFn) against a dirty git repo and inspects the ACTUAL stash git
-// created — not a source grep — so it stays RED until the loop quarantines under
-// a timestamped label AND stays GREEN only while it does.
+// TestDefaultBootRecovery_QuarantineStashLabelIsTimestamped drives the real
+// boot-recovery seam (bootRecoverFn) against a dirty git repo and inspects the
+// actual stash git created, not a source grep.
 func TestDefaultBootRecovery_QuarantineStashLabelIsTimestamped(t *testing.T) {
 	repo := brInitRepo(t)
 	evolveDir := filepath.Join(repo, ".evolve")

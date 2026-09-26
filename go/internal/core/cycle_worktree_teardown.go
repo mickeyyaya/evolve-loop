@@ -6,14 +6,11 @@ import (
 )
 
 // teardownCycleWorktree is the ONE worktree-disposal rule both entrypoints
-// apply at cycle exit. It was previously an anonymous closure inside
-// newCycleRun's cleanup stack, which made it reachable only from RunCycle:
-// RunCycleFromPhase registers the other three exit actions (lock release,
-// run-ID clear, lease stop) by hand and had no counterpart for this one, so
-// every resumed cycle leaked its worktree regardless of verdict.
+// apply at cycle exit, so a resumed cycle disposes its worktree exactly like a
+// fresh one.
 //
-// The decision itself is unchanged, and is deliberately conservative in one
-// direction only — it prunes just the spent trees:
+// The decision is deliberately conservative in one direction only — it prunes
+// just the spent trees:
 //
 //   - preserve (finalizeCycle's preserveOnVerdict, or a recorded ship-stage
 //     failure) means the tree holds audited, possibly uncommitted work that
@@ -24,9 +21,9 @@ import (
 //     so the tree is spent; pruning it is what keeps the checkout count bounded.
 //
 // Erring the other way is not symmetric: a missed prune costs disk, while a
-// wrong prune is the cycle-7 incident (an entire PASS cycle's work destroyed).
-// That asymmetry is why both no-prune conditions stay, and why the resume path
-// gets this exact rule rather than a resume-specific policy.
+// wrong prune destroys real, possibly unmerged, audited work. That asymmetry
+// is why both no-prune conditions stay, and why the resume path gets this
+// exact rule rather than a resume-specific policy.
 //
 // This rule decides WHETHER to dispose; the provisioner decides whether a
 // path is one it may dispose of. gitWorktree.Cleanup refuses the project root

@@ -17,53 +17,13 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// decideAfterRetro consults the failure-adapter over cycle history
-// (state.failedApproaches) to pick the post-retro branch.
-//
-// Mapping (retro verdict × failureadapter action → next phase):
-//   - retro PASS               → ship   (retrospective recovered the cycle)
-//   - retro FAIL/WARN + BLOCK-* → end    (cycle history forbids further work)
-//   - retro FAIL/WARN + RETRY  → tdd    (retry from earlier phase w/ fallback env)
-//   - retro FAIL/WARN + PROCEED → end   (no recovery, no block — exit cleanly)
-//
-// Returned reason is "<action>: <failureadapter reason>" for the
-// CycleResult.RetroDecision audit field.
-// decideAfterRetroRouted is decideAfterRetro for Stage>=Advisory (failure
-// floor Phase 3): the routing strategy decides the failure branch — which
-// applies the advisor's failure vocabulary (RecoveryAction, failure-scoped
-// inserts) above the failure-adapter floor, BLOCK non-overridable — and the
-// decision is recorded as a routing-decision artifact, giving failure
-// branches the same forensic trail as happy-path transitions. extraEnv
-// still comes from the deterministic adapter (SetEnv is kernel-owned).
-//
-// The routed branch is adopted only where the state machine allows
-// (retro→{ship,tdd,end} today); a routed failure-insert (fault-localization
-// / bug-reproduction) is clamped to the legal retry target until the SM
-// opens that edge — kernel disposes, and the clamp is visible in the
-// artifact.
 func (o *Orchestrator) decideAfterRetroRouted(ctx context.Context, cycle int, cs CycleState, seq int, retroVerdict string, history []FailedRecord, in router.RouteInput) (Phase, map[string]string, string, *SystemFailureSignal) {
-	// Deterministic baseline: branch, kernel-owned SetEnv, the operator-facing
-	// reason contract ("proceed:"/"retry-with-fallback:"/…) that dashboards and
-	// scenario pins grep for, and the ADR-0072 S4 floor signal (non-nil ⇒ a
-	// floor category was detected — see decideAfterRetro).
+	// The reason string's prefix ("proceed:"/"retry-with-fallback:"/…) is
+	// grepped by dashboards and scenario pins, so it must stay stable.
 	detNext, extraEnv, detReason, sig := o.decideAfterRetro(cs, retroVerdict, history)
-	// NOTE: there is deliberately no retro-PASS early return here. The previous one
-	// returned `nil` for the signal, DISCARDING a deterministic ADR-0072 floor
-	// candidate whenever the retrospective happened to be well written — a system
-	// failure could escape the "non-bypassable" halt by writing a good post-mortem.
-	// Retro is reached only from an audit FAIL, so a PASS on this arm is the
-	// PHASE's verdict, never the cycle's: it is a failure branch like any other and
-	// takes the same floor → regrade → router path.
-	// ADR-0072 S4 (F1): the Go floor sits ABOVE the router. A floor category
-	// HALTS even when the routing strategy would propose a retry — "orchestrator
-	// decides, Go enforces floor". Enforced here, before o.strategy.Decide, so a
-	// routed tdd upgrade can never survive a floor category.
 	if sig != nil {
 		return PhaseEnd, nil, detReason, sig
 	}
-	// A granted bookkeeping regrade is a deterministic micro-recovery, decided
-	// like the floor — ABOVE the router. Letting the strategy override it to
-	// tdd/end would eat the one bounded re-audit the grant exists to provide.
 	if strings.HasPrefix(detReason, BookkeepingRegradeReasonPrefix) {
 		return detNext, extraEnv, detReason, nil
 	}
@@ -79,10 +39,6 @@ func (o *Orchestrator) decideAfterRetroRouted(ctx context.Context, cycle int, cs
 		branch = Phase(rdec.NextPhase)
 	}
 	if branch != PhaseEnd && !o.sm.CanTransition(PhaseRetro, branch) {
-		// A failure-scoped insert (fault-localization/bug-reproduction)
-		// carries retry intent — clamp to the legal retry target. Any
-		// other illegal phase falls back to the deterministic branch:
-		// the SM clamp must never UPGRADE a proceed-to-end into a retry.
 		forced := detNext
 		if router.IsFailureInsert(string(branch)) {
 			forced = PhaseTDD
@@ -101,19 +57,10 @@ func (o *Orchestrator) decideAfterRetroRouted(ctx context.Context, cycle int, cs
 	return branch, extraEnv, "retro-routed: " + rdec.Reason, nil
 }
 
-// applyFailureDecisionFloor is the ADR-0072 S4 Go floor at the retro-branch
-// chokepoint. It builds the evidence dossier, writes it for per-cycle forensics,
-// and returns a HALTING SystemFailureSignal when EITHER the deterministic dossier
-// candidate OR the orchestrator's own failure-decision.json classifies the cycle
-// into a floor category (verdict-incoherence / infra-systemic). A proposed retry
-// cannot survive a floor category — the deterministic candidate is checked first
-// (caught even with no orchestrator running), then the orchestrator's judgment.
-// Returns nil when no floor bites; the caller then routes / falls back normally.
 func (o *Orchestrator) applyFailureDecisionFloor(cs CycleState, retroVerdict string) *SystemFailureSignal {
 	d := buildFailureDossier(cs, retroVerdict, o.failurePolicy)
 	_ = writeFailureDossier(cs.WorkspacePath, d) // per-cycle forensics; best-effort
 
-	// (1) Deterministic dossier candidate — a broken pipeline cannot dodge it.
 	if d.FloorCandidate != "" && o.failurePolicy.IsFloor(d.FloorCandidate) {
 		return &SystemFailureSignal{
 			Category: d.FloorCandidate,
@@ -123,20 +70,6 @@ func (o *Orchestrator) applyFailureDecisionFloor(cs CycleState, retroVerdict str
 		}
 	}
 
-	// (2) Orchestrator judgment — a floor-category classification halts even when
-	// its own proposed action is a retry (the F2-b cycle-1001 shape).
-	//
-	// NARROWED (wave-3 cycles 1572/1573/1574): this gate consumes PROSE. When the
-	// deterministic gate is silent AND the same agent's own disposition.json says
-	// legit-rejection, the agent has contradicted itself, and prose alone does not
-	// outrank two corroborating deterministic signals. Every other shape — an
-	// uncontradicted claim, or an absent/indeterminate/unverifiable disposition —
-	// halts exactly as before.
-	//
-	// This is the CORROBORATION half of ADR-0092. Its retry half is gone: retries
-	// are now decided at the audit chokepoint from the audit's own declared class
-	// and the ADR-0072 policy table (audit_fail_decision.go), so this gate no
-	// longer gates anything but the halt it was always about.
 	dec, _ := readFailureDecision(cs.WorkspacePath)
 	if dec == nil || !o.failurePolicy.IsFloor(dec.Category) {
 		return nil
@@ -145,16 +78,6 @@ func (o *Orchestrator) applyFailureDecisionFloor(cs CycleState, retroVerdict str
 	if contradicted {
 		return nil
 	}
-	// Cycle-1603: a prose claim of verdict-incoherence is ALSO contradicted when
-	// the recorded FAIL carries persisted substantive fail reasons. The
-	// deterministic detector already adjudicated exactly this question and
-	// declined via its SubstantiveError guard — a diagnosed gate downgrade
-	// (there: the EGPS ship_eligible=false override over a stale repair-round
-	// acs-verdict.json) is a justified negative verdict, not a forgery. Prose
-	// alone does not outrank that deterministic evidence; the cycle stays a
-	// task-level FAIL and routes through retro normally. Loud, not silent —
-	// failure-decision.json still asserts the category on disk, so an operator
-	// tracing a missing halt needs the overrule on record.
 	if dec.Category == policy.CategoryVerdictIncoherence && hasSubstantiveFailReasons(cs) {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN floor: prose %s claim overruled — the recorded FAIL carries persisted substantive fail reasons (diagnosed downgrade, not forgery); treating as task-level FAIL\n", dec.Category)
 		return nil
@@ -172,45 +95,14 @@ func (o *Orchestrator) applyFailureDecisionFloor(cs CycleState, retroVerdict str
 }
 
 func (o *Orchestrator) decideAfterRetro(cs CycleState, retroVerdict string, history []FailedRecord) (next Phase, extraEnv map[string]string, reason string, sig *SystemFailureSignal) {
-	// A retro verdict answers "is the post-mortem deliverable complete?" — retro.go
-	// computes it as "retrospective non-empty AND a failure-lesson exists". It has
-	// never answered "did the cycle recover", and this branch used to read it as if
-	// it did, short-circuiting a retro PASS straight to ship
-	// ("retro-recovered: ship", pinned since 2026-05-23).
-	//
-	// It cannot be recovery. Retro is reached ONLY from an audit FAIL, and the retro
-	// persona is read-only outside its own artifacts — so the tree ship would commit
-	// is BYTE-IDENTICAL to the one the auditor rejected. The route looked viable only
-	// while ship's audit binding could be satisfied by another cycle's PASS entry;
-	// once #503 made ship fail closed with CodeAuditBindingVerdictFail, its only
-	// possible outcome became a guaranteed ShipError. See
-	// retro_verdict_semantics_test.go and
-	// docs/architecture/retry-architecture-review-2026-08-27.md.
-	//
-	// So a retro PASS now falls through to the SAME ladder a retro FAIL takes. The
-	// cycle's verdict is what the floor and the dossier must see: retro is reached
-	// only on failure, so a PASS here is the PHASE's verdict, never the CYCLE's.
-	// Substituting keeps every FAIL/WARN path byte-identical (CheckVerdictCoherence
-	// receives exactly what it received before) and stops a well-written
-	// retrospective from making a failed cycle look coherent.
 	cycleVerdict := retroVerdict
 	if cycleVerdict == VerdictPASS {
 		cycleVerdict = VerdictFAIL
 	}
-	// ADR-0072 S4: the Go floor is the FIRST disposition of a failed cycle — a
-	// floor category (verdict-incoherence / infra-systemic) HALTS before any
-	// adapter or router branch, the non-bypassable "Go enforces floor" boundary
-	// that applies to every stage and the resume path alike.
 	s := o.applyFailureDecisionFloor(cs, cycleVerdict)
 	if s != nil {
 		return PhaseEnd, nil, "system-failure-floor: " + s.Category, s
 	}
-	// Bookkeeping regrade (below the floor, above the adapter/router): a FAIL
-	// whose only explanations are bookkeeping-contract gates while the auditor
-	// narrative was PASS/WARN re-dispatches AUDIT once in the same cycle
-	// instead of dying to a continuation re-drive. The caller
-	// (cyclerun_record) marks cs.BookkeepingRegradeAttempted on the grant, so
-	// a re-audit that fails again falls through here to the normal path.
 	if !cs.BookkeepingRegradeAttempted && BookkeepingRegradeEligible(cs.AuditFailReasons) {
 		return o.recoveryTarget(PhaseRetro, recoveryKeyBookkeepingRegrade, PhaseAudit), nil,
 			BookkeepingRegradeReasonPrefix + "meta-only audit FAIL with non-FAIL narrative; re-dispatching audit once in-cycle", nil
@@ -227,11 +119,6 @@ func (o *Orchestrator) decideAfterRetro(cs CycleState, retroVerdict string, hist
 	}
 }
 
-// recoveryTarget resolves a control phase's recovery successor from its
-// RecoveryMap (PA-DDK DDK-6): spec.Recovery.Targets[key], denormalized through
-// phaseFromRouter. An unmapped key (or no map / catalog) returns the literal
-// fallback. The chosen edge is still gated by CanTransition at the call site —
-// config selects the target, the legality graph constrains it.
 func (o *Orchestrator) recoveryTarget(p Phase, key string, fallback Phase) Phase {
 	if spec, ok := o.specFor(p); ok && spec.Recovery != nil {
 		if t, ok := spec.Recovery.Targets[key]; ok {
@@ -243,31 +130,15 @@ func (o *Orchestrator) recoveryTarget(p Phase, key string, fallback Phase) Phase
 	return fallback
 }
 
-// recoverFromShipError resolves a ship-phase ShipError via the advisor's
-// recovery chain (Strategy + Chain-of-Responsibility, Component #6/#7). Ship is
-// a pure executor: it never rejects a cycle, it returns a structured error and
-// the orchestrator decides what to do. This records the error for forensics,
-// then asks the strategy's Recover() for the recovery phase. Returns
-// (phase, true) to proceed with recovery, or ("", false) to abort the cycle:
-//   - depth >= maxRecoveryDepth  → exhausted, abort loud
-//   - recovery routes to end     → integrity breach / unmapped, abort loud
-//   - illegal ship→cand edge     → defensive abort
-//
-// Recovery is structural (always available via StaticPreset.Recover) and so runs
-// regardless of the dynamic-routing Stage — it is error handling, not routing.
-
 func (o *Orchestrator) decideAfterDebugger(resp PhaseResponse) Phase {
 	action, _ := resp.Signals["debugger.action"].(string)
 	switch action {
 	case "RESHIP":
 		return o.recoveryTarget(PhaseDebugger, "RESHIP", PhaseShip)
 	case "RERUN_PHASE":
-		// Clamp rerun targets to UPSTREAM phases (audit/build/tdd) — re-shipping
-		// is the dedicated RESHIP action, so a "rerun_phase: ship" must not become
-		// a reship that skips re-establishing the precondition. An unrecognized or
-		// non-upstream target falls to the config-declared RERUN_PHASE default.
-		// (Defense-in-depth: the loop's CanTransition gate independently rejects
-		// illegal edges.)
+		// Rerun targets clamp to upstream phases (audit/build/tdd): re-shipping
+		// is the dedicated RESHIP action, so "rerun_phase: ship" must not become
+		// a reship that skips re-establishing the precondition.
 		rerun, _ := resp.Signals["debugger.rerun_phase"].(string)
 		switch o.candidatePhase(rerun) {
 		case PhaseAudit:
@@ -284,11 +155,6 @@ func (o *Orchestrator) decideAfterDebugger(resp PhaseResponse) Phase {
 	}
 }
 
-// recordShipError persists a ShipError to <workspace>/ship-error.json and
-// appends a hash-bound ship_error ledger entry (Component #6 forensics). The
-// tamper-evident trail lets the failure-adapter and operators see every
-// auto-recovery. Best-effort: a marshal/write/append failure WARNs and is
-// swallowed — forensics must never compound a ship failure into a cycle abort.
 func (o *Orchestrator) recordShipError(ctx context.Context, cycle int, cs CycleState, se *ShipError) {
 	ts := o.now().UTC().Format(time.RFC3339)
 	artifactPath := filepath.Join(cs.WorkspacePath, "ship-error.json")
@@ -319,17 +185,10 @@ func (o *Orchestrator) recordShipError(ctx context.Context, cycle int, cs CycleS
 	}); err != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN ship_error ledger append: %v\n", err)
 	}
-	// ADR-0101 S2a: the recorded error is also the ship.error signal.
 	o.emitShipError(cycle, cs, se, artifactPath)
 }
 
-// recordDebuggerDecision appends a hash-bound debugger_decision ledger entry
-// pointing at the debugger's debug-decision.json artifact (Component #6
-// forensics). Best-effort: failures WARN and are swallowed.
 func (o *Orchestrator) recordDebuggerDecision(ctx context.Context, cycle int, cs CycleState, _ PhaseResponse) {
-	// The action + root_cause live in the debug-decision.json artifact; the
-	// ledger entry binds its SHA so the decision is tamper-evident without
-	// duplicating the payload into a field LedgerEntry does not have.
 	artifactPath := filepath.Join(cs.WorkspacePath, "debug-decision.json")
 	sha := ""
 	if buf, err := os.ReadFile(artifactPath); err == nil {
@@ -346,14 +205,6 @@ func (o *Orchestrator) recordDebuggerDecision(ctx context.Context, cycle int, cs
 	}
 }
 
-// recordRoutingDecision marshals the RouterDecision to
-// <workspace>/routing-decision-<seq>.json and appends a hash-bound
-// routing_decision ledger entry, plus one phase_skipped entry per declined
-// optional phase (preserving the PSMAS resume/audit-binding contract).
-//
-// Best-effort: a marshal/write/append failure WARNs and is swallowed —
-// routing forensics must never abort a cycle. Called only when Stage != Off,
-// so the legacy path appends nothing new.
 func (o *Orchestrator) recordRoutingDecision(ctx context.Context, cycle int, cs CycleState, seq int, dec router.RouterDecision) {
 	ts := o.now().UTC().Format(time.RFC3339)
 	artifactPath := filepath.Join(cs.WorkspacePath, fmt.Sprintf("routing-decision-%d.json", seq))
@@ -388,33 +239,10 @@ func (o *Orchestrator) recordRoutingDecision(ctx context.Context, cycle int, cs 
 	}
 }
 
-// recordPlanRejections persists the WS2-S1 ValidatePlan findings to
-// advisor-rejections.json (ADR-0052 WS2-S2). STANDALONE telemetry — decoupled
-// from the WS3-S3 decision span and from phase-plan.json — and best-effort /
-// fail-open: a capture failure WARNs but never affects the cycle. It NEVER
-// mutates the plan; the integrity floor (ClampPlanToFloorWith) remains the sole
-// disposer. An empty finding set still writes ("[]" = validated-clean, distinct
-// from "validation never ran"); nil ⇒ [] so the artifact is always well-formed.
-// The artifact is hash-bound into the ledger like every sibling decision
-// artifact (recordPhasePlan / recordRoutingDecision), so a post-hoc mutation is
-// tamper-evident — "standalone" means a separate file, not outside the chain.
-//
-// This is the back-compat entry point (kind "plan" → advisor-rejections.json);
-// the post-scout re-plan records via recordPlanRejectionsKind with "replan-<n>".
 func (o *Orchestrator) recordPlanRejections(ctx context.Context, cycle int, cs CycleState, rejections []router.PlanRejection) {
 	o.recordPlanRejectionsKind(ctx, cycle, cs, rejections, "plan")
 }
 
-// recordPlanRejectionsKind is recordPlanRejections keyed by PLAN KIND, so the
-// several plans a single cycle can produce (the upfront "plan" plus one
-// "replan-<n>" per post-scout re-plan, up to RePlanMaxDepth) each keep their own
-// record instead of the last writer erasing the rest. Kind "plan" keeps the
-// historical path (advisor-rejections.json); every other kind lands beside it as
-// advisor-rejections-<kind>.json — the same one-artifact-per-decision shape
-// recordPhasePlanKind uses for phase-<kind>.json, so accumulation needs no
-// read-modify-write of a shared file (no lost update under concurrent cycles).
-// The ledger kind stays "plan_rejections" for all kinds; ArtifactPath is what
-// distinguishes them, so existing ledger consumers keep matching.
 func (o *Orchestrator) recordPlanRejectionsKind(ctx context.Context, cycle int, cs CycleState, rejections []router.PlanRejection, kind string) {
 	if cs.WorkspacePath == "" {
 		return
@@ -423,6 +251,8 @@ func (o *Orchestrator) recordPlanRejectionsKind(ctx context.Context, cycle int, 
 	if kind != "" && kind != "plan" {
 		name = "advisor-rejections-" + kind + ".json"
 	}
+	// nil marshals identically to an empty slice, but writing "[]" distinguishes
+	// a validated-clean plan from validation never having run.
 	if rejections == nil {
 		rejections = []router.PlanRejection{}
 	}
@@ -451,22 +281,10 @@ func (o *Orchestrator) recordPlanRejectionsKind(ctx context.Context, cycle int, 
 	}
 }
 
-// recordPhasePlan persists the advisor's CLAMPED INITIAL whole-cycle plan. It is
-// the back-compat entry point (kind "plan" → phase-plan.json); the post-scout
-// re-plan records via recordPhasePlanKind with kind "replan".
 func (o *Orchestrator) recordPhasePlan(ctx context.Context, cycle int, cs CycleState, plan *router.PhasePlan, clamps []router.Clamp) {
 	o.recordPhasePlanKind(ctx, cycle, cs, plan, clamps, "plan")
 }
 
-// recordPhasePlanKind persists a CLAMPED whole-cycle plan to
-// <workspace>/phase-<kind>.json (a bare PhasePlanEntry array, symmetric with the
-// advisor's wire format) and appends a hash-bound phase_<kind> ledger entry, then
-// hash-binds the WS3-S1 capture artifacts for that kind (advisor-{prompt,response}
-// -<kind>.txt). kind is "plan" (the initial Plan) or "replan" (the WS2 post-scout
-// re-plan), so the two decisions land in distinct, separately-diffable artifacts.
-// Any integrity-floor clamps that fired are logged for operator visibility.
-// Best-effort: a marshal/write/append failure WARNs and is swallowed — plan
-// forensics must never abort a cycle.
 func (o *Orchestrator) recordPhasePlanKind(ctx context.Context, cycle int, cs CycleState, plan *router.PhasePlan, clamps []router.Clamp, kind string) {
 	ts := o.now().UTC().Format(time.RFC3339)
 	artifactPath := filepath.Join(cs.WorkspacePath, "phase-"+kind+".json")
@@ -494,11 +312,6 @@ func (o *Orchestrator) recordPhasePlanKind(ctx context.Context, cycle int, cs Cy
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase_%s ledger append: %v\n", kind, err)
 	}
 
-	// WS3-S2: hash-bind the WS3-S1 capture artifacts so a post-hoc mutation of
-	// the persisted routing prompt/response is detectable (the ledger's hash
-	// chain carries the tamper-evidence). One bound entry per artifact, reusing
-	// the ArtifactPath+ArtifactSHA256 shape. Fail-open: a capture that never
-	// landed (WS3-S1 is best-effort, or a pre-WS3 cycle) binds nothing.
 	for _, cap := range []struct{ kind, file string }{
 		{"advisor_prompt", "advisor-prompt-" + kind + ".txt"},
 		{"advisor_response", "advisor-response-" + kind + ".txt"},
@@ -506,7 +319,7 @@ func (o *Orchestrator) recordPhasePlanKind(ctx context.Context, cycle int, cs Cy
 		path := filepath.Join(cs.WorkspacePath, cap.file)
 		capSHA := bindArtifactSHA(path)
 		if capSHA == "" {
-			continue // capture absent — nothing to bind
+			continue
 		}
 		if err := o.ledger.Append(ctx, LedgerEntry{
 			TS: ts, Cycle: cycle, Role: "orchestrator", Kind: cap.kind,
@@ -517,9 +330,6 @@ func (o *Orchestrator) recordPhasePlanKind(ctx context.Context, cycle int, cs Cy
 	}
 }
 
-// bindArtifactSHA returns the hex sha256 of the file at path, or "" if it is
-// absent/unreadable. WS3-S1 capture is best-effort, so a missing artifact is
-// expected and binds nothing — never an error that could abort a cycle.
 func bindArtifactSHA(path string) string {
 	buf, err := os.ReadFile(path)
 	if err != nil {
@@ -529,24 +339,10 @@ func bindArtifactSHA(path string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// enforceNext maps the router's proposed NextPhase back to a core.Phase and
-// returns it ONLY if it differs from the static successor AND survives both
-// kernel gates: a legal edge (CanTransition) and the artifact-backed spine
-// gate (SpineSatisfiedUpTo). Otherwise the static successor stands. This is
-// the non-bypassable "kernel disposes" floor for Enforce mode — neither
-// Strategy can reach Ship without a real PASS/WARN audit artifact.
-
-// escalateRetroReason upgrades a deterministic "proceed:" retro reason to an
-// "adapt:"-with-escalation reason when the failing lesson pattern has recurred
-// (recurrence ledger count>=2). A repeat pattern must never emit a bare
-// "proceed" — the ledger consult is what gives noticing write access to the
-// decision. A nil ledger or non-proceed reason passes through unchanged.
 func escalateRetroReason(reason, pattern string, led *recurrence.Ledger) string {
 	if led == nil || !strings.HasPrefix(reason, "proceed:") {
 		return reason
 	}
-	// Generic classification noise (operator-reset/loop-fatal echo) must never
-	// force-escalate — its count is a corpus artifact, not a recurring defect.
 	if led.IsGenericPattern(pattern) {
 		return reason
 	}
@@ -557,12 +353,6 @@ func escalateRetroReason(reason, pattern string, led *recurrence.Ledger) string 
 	return reason
 }
 
-// escalateRetroReasonForHistory loads the recurrence ledger at projectRoot and
-// applies escalateRetroReason to the most-recent failing lesson pattern. It is
-// the live-loop consult site: RetroDecision routes its reason through here so a
-// count>=2 pattern cannot be recorded as a bare "proceed". Best-effort — an
-// empty root, non-proceed reason, empty history, or unreadable ledger returns
-// reason unchanged (the deterministic branch still stands).
 func (o *Orchestrator) escalateRetroReasonForHistory(projectRoot, reason string, history []FailedRecord) string {
 	if projectRoot == "" || len(history) == 0 || !strings.HasPrefix(reason, "proceed:") {
 		return reason

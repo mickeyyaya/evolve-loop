@@ -1,16 +1,5 @@
 package core
 
-// dossier_producer_failure_test.go — dossier-carries-failure-reason
-// (pipeline-integrity): a FAIL cycle's committed dossier was content-free
-// ("see audit-report.md"), so the knowledge base recorded THAT a cycle failed
-// but not WHY — convergence briefs and cross-batch forensics needed workspace
-// archaeology. The failure identity already exists on disk by dossier-write
-// time (<workspace>/failure-digest.json from ensureFailureDigest +
-// <workspace>/audit-fail-reason.json from the coherence floor / fallback
-// writer), so writeCycleDossier must carry it into
-// knowledge-base/cycles/cycle-N.{json,md}. Best-effort: absent artifacts
-// never block the write; a PASS dossier's shape is untouched.
-
 import (
 	"encoding/json"
 	"fmt"
@@ -73,9 +62,6 @@ func readDossierPair(t *testing.T, root string, cycle int) (map[string]any, stri
 	return m, string(mb)
 }
 
-// TestDossierFailure_FailCarriesIdentity is the core RED of the item: a FAIL
-// dossier carries the digest fingerprint + pre_class + the real reasons[], not
-// just the content-free "see audit-report" pointer.
 func TestDossierFailure_FailCarriesIdentity(t *testing.T) {
 	root := t.TempDir()
 	initDossierRepo(t, root)
@@ -118,9 +104,6 @@ func TestDossierFailure_FailCarriesIdentity(t *testing.T) {
 	}
 }
 
-// TestDossierFailure_ReasonsTruncatedAndCapped bounds the carried evidence:
-// each reason is truncated to ~200 chars and at most 5 reasons are carried, so
-// a pathological reason set can never bloat the committed knowledge base.
 func TestDossierFailure_ReasonsTruncatedAndCapped(t *testing.T) {
 	root := t.TempDir()
 	initDossierRepo(t, root)
@@ -157,9 +140,6 @@ func TestDossierFailure_ReasonsTruncatedAndCapped(t *testing.T) {
 	}
 }
 
-// TestDossierFailure_AbsentArtifactsDegrade proves best-effort: a FAIL cycle
-// whose workspace carries neither artifact still writes a valid dossier — the
-// failure block is simply absent, never a blocked write.
 func TestDossierFailure_AbsentArtifactsDegrade(t *testing.T) {
 	root := t.TempDir()
 	initDossierRepo(t, root)
@@ -173,7 +153,6 @@ func TestDossierFailure_AbsentArtifactsDegrade(t *testing.T) {
 	if strings.Contains(md, "## Failure") {
 		t.Errorf("no artifacts on disk ⇒ no Failure section in md")
 	}
-	// The written pair must still parse + validate as before.
 	jb, err := os.ReadFile(filepath.Join(root, "knowledge-base", "cycles", "cycle-11.json"))
 	if err != nil {
 		t.Fatalf("read dossier: %v", err)
@@ -187,9 +166,6 @@ func TestDossierFailure_AbsentArtifactsDegrade(t *testing.T) {
 	}
 }
 
-// TestDossierFailure_PassKeepsShape proves a PASS dossier's byte-shape is
-// unchanged even when stale failure artifacts linger in the workspace (a
-// retried cycle that eventually passed): no failure block, no md section.
 func TestDossierFailure_PassKeepsShape(t *testing.T) {
 	root := t.TempDir()
 	initDossierRepo(t, root)
@@ -208,7 +184,6 @@ func TestDossierFailure_PassKeepsShape(t *testing.T) {
 	}
 }
 
-// dossierTopLevelKeys lists a decoded object's keys for failure messages.
 func dossierTopLevelKeys(m map[string]any) []string {
 	keys := make([]string, 0, len(m))
 	for k := range m {

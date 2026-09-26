@@ -1,21 +1,5 @@
 package core
 
-// evalgate_escalation_test.go — a remediation-carrying rejection escalates the
-// re-dispatch CLI at the second identical block, exactly as a contract block
-// does.
-//
-// The measured evidence that revises scoping constraint 3 (contract_escalation.go):
-// every eval-materialization failure since cycle-1450 — 1471, 1476, 1504, 1531,
-// 1540, 1545 — was scout on codex-tmux (claude-scout: 0 of 26), and every one
-// burned its full correction budget on the SAME CLI without recovering,
-// INCLUDING after #480 made the correction name the exact writable paths
-// (cycle-1545's directive verified byte-perfect; the agent idled at its prompt
-// without writing the files). For the CREATE-a-missing-artifact class, a
-// different CLI is demonstrably the remedy: constraint 3's "task-binding
-// rejections don't escalate" survives for topngate/triagecap/build-floor —
-// which carry NO remediation — via the typed discriminator
-// ReviewResult.Remediation, set only by evalgate.
-
 import (
 	"context"
 	"strings"
@@ -65,11 +49,9 @@ func (p *evalGateProbe) Review(_ context.Context, in ReviewInput) ReviewResult {
 func runEvalGateCycle(t *testing.T, probe *evalGateProbe) *evalGateProbe {
 	t.Helper()
 	root := t.TempDir()
-	// Pin the phase's profile to a NON-claude family (the live incidents'
-	// shape: scout on codex-tmux) so escalation has a real target — with no
-	// profile the phase resolves to the universal claude family and there is
-	// nowhere to escalate (the constraint-5 salvage-retry arm fires instead,
-	// which is a different behavior with its own tests).
+	// A non-claude profile gives escalation a real target; with no profile the
+	// phase resolves to the universal claude family, and the salvage-retry arm
+	// fires instead (a different behavior, covered by its own tests).
 	writeCLIProfile(t, root, "builder", "codex-tmux", []string{"claude-tmux"})
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	runners := buildRunners(nil)
@@ -81,9 +63,6 @@ func runEvalGateCycle(t *testing.T, probe *evalGateProbe) *evalGateProbe {
 	return probe
 }
 
-// THE headline: second identical remediation-carrying rejection escalates the
-// re-dispatch CLI — and because the probe complies on the escalated family, the
-// cycle RECOVERS, which is the whole point (0-for-14 rounds on the same CLI).
 func TestEvalGateEscalation_SecondIdenticalRejectionEscalatesAndRecovers(t *testing.T) {
 	p := runEvalGateCycle(t, &evalGateProbe{
 		phase:        string(PhaseBuild),
@@ -101,8 +80,6 @@ func TestEvalGateEscalation_SecondIdenticalRejectionEscalatesAndRecovers(t *test
 	}
 }
 
-// Two DIFFERENT rejections are two honest defects, not an incapable-CLI
-// signature — identity gating (constraint 4) applies to this class too.
 func TestEvalGateEscalation_DifferentReasonsDoNotEscalate(t *testing.T) {
 	p := runEvalGateCycle(t, &evalGateProbe{
 		phase: string(PhaseBuild),
@@ -119,8 +96,6 @@ func TestEvalGateEscalation_DifferentReasonsDoNotEscalate(t *testing.T) {
 	}
 }
 
-// A Blocks==0 rejection with NO remediation (topngate / triagecap / build-floor
-// class) keeps constraint 3 exactly: never escalates.
 func TestEvalGateEscalation_RemediationlessRejectionNeverEscalates(t *testing.T) {
 	p := runEvalGateCycle(t, &evalGateProbe{
 		phase:       string(PhaseBuild),
@@ -133,8 +108,6 @@ func TestEvalGateEscalation_RemediationlessRejectionNeverEscalates(t *testing.T)
 	}
 }
 
-// The escalated correction must still carry the remediation text — escalating
-// the CLI must not cost the directive its actionable half.
 func TestEvalGateEscalation_EscalatedDirectiveKeepsTheRemediation(t *testing.T) {
 	seen := []string{}
 	p := &evalGateProbe{
@@ -161,7 +134,6 @@ func TestEvalGateEscalation_EscalatedDirectiveKeepsTheRemediation(t *testing.T) 
 	}
 }
 
-// correctionCapture wraps the probe to record each dispatch's directive.
 type correctionCapture struct {
 	*evalGateProbe
 	directives *[]string

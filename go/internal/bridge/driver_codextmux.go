@@ -5,24 +5,17 @@ import (
 	"fmt"
 )
 
-// codexTmuxDriver drives an interactive `codex` TUI through tmux — the Go
-// port of drivers/codex-tmux.sh. codex uses alt-screen rendering (boot
-// wait must read scrollback, not the visible pane) and the › prompt
-// marker; it has no permission-mode and no named-session support.
+// codexTmuxDriver drives an interactive `codex` TUI through tmux. codex uses
+// alt-screen rendering (boot wait must read scrollback, not the visible
+// pane) and the › prompt marker; it has no permission-mode and no
+// named-session support.
 type codexTmuxDriver struct{}
 
 func (codexTmuxDriver) Name() string { return "codex-tmux" }
 
-// Preflight pre-trusts cfg.Worktree + cfg.Workspace in ~/.codex/config.toml so
-// codex's own permission layer doesn't render the runtime workspace-write
-// modal that hung cycle-122 tdd (incident report + research dossier codex
-// Fix A). This was an inline call at the top of Launch until cycle-124 G3
-// promoted it through the optional CLIPreflight interface (driver.go). Same
-// best-effort semantics — a returned error is logged by Engine.Launch and
-// does NOT abort the phase (Fix 2's extended fallback trigger list defends
-// downstream). ctx + deps are retained for future codex-specific prep work
-// (binary-version probe, OAuth refresh) that may need them; the current
-// implementation only reads cfg.
+// Preflight pre-trusts cfg.Worktree and cfg.Workspace in ~/.codex/config.toml
+// so codex's own permission layer doesn't render the workspace-write modal.
+// A returned error is logged by Engine.Launch and does not abort the phase.
 func (codexTmuxDriver) Preflight(ctx context.Context, cfg *Config, deps Deps) error {
 	_ = ctx // reserved for future timeouts on TOML rewrites
 	_ = deps
@@ -36,7 +29,7 @@ func (codexTmuxDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int,
 	if rc, handled := tmuxNonClaudePreflight("codex-tmux", cfg, deps); handled {
 		return rc, nil
 	}
-	// Credential-isolation guard (after the safety gate, per codex-tmux.sh).
+	// Credential-isolation guard: runs after the safety gate above.
 	if v, ok := lookupEnv(deps, "OPENAI_API_KEY"); ok && v != "" {
 		if allow, _ := lookupEnv(deps, "BRIDGE_ALLOW_OPENAI_API_KEY"); allow != "1" {
 			fmt.Fprintln(deps.Stderr, "[codex-tmux] credential-isolation guard: OPENAI_API_KEY set without BRIDGE_ALLOW_OPENAI_API_KEY=1")
@@ -47,16 +40,15 @@ func (codexTmuxDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int,
 	session, named := resolveSession(cfg, deps, "evolve-bridge-codex-")
 
 	// Launch flags come from the per-CLI Realization (ADR-0022): codex resolves
-	// the model tier via its manifest model_tier_map (tier → the family table's model) and
-	// emits it as -m; permission is a controller no-op (trust handled by the
-	// auto-responder). No claude argv reaches codex.
+	// the model tier via its manifest model_tier_map and emits it as -m;
+	// permission is a controller no-op (trust handled by the auto-responder).
+	// No claude argv reaches codex.
 	flags := cfg.Realization.LaunchFlags
 	dispatched := modelDispatchFromRealization("codex-tmux", defaultModelDispatch(), cfg.Realization)
-	// cycle-142: clamp the model to a ChatGPT-safe one on subscription auth.
-	// A model outside the manifest's chatgpt_safe_models is 400-rejected on
-	// ChatGPT accounts (API-key-only by plan tier), which otherwise hangs the
-	// phase on an undismissable model-switch modal. Best-effort: a manifest load failure leaves flags
-	// untouched (the legacy behavior).
+	// Clamps the model to a ChatGPT-safe one on subscription auth: a model
+	// outside chatgpt_safe_models is 400-rejected on ChatGPT accounts, hanging
+	// the phase on an undismissable model-switch modal. A manifest load
+	// failure leaves flags untouched.
 	if m, err := LoadManifest("codex-tmux"); err == nil {
 		if clamped, from, to := clampCodexModelForAuth(flags, m, codexAuthMode(deps)); from != "" {
 			flags = clamped

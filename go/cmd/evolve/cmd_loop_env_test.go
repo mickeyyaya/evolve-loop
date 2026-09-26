@@ -4,10 +4,9 @@ import (
 	"testing"
 )
 
-// TestBuildCycleEnv_PropagatesRequireIntent is the regression test for
-// the cycle-108 silent-skip bug: EVOLVE_REQUIRE_INTENT=1 in the
-// operator shell MUST land in CycleRequest.Env so the orchestrator's
-// intent gate at orchestrator.go:126 evaluates true.
+// TestBuildCycleEnv_PropagatesRequireIntent is the regression test ensuring
+// EVOLVE_REQUIRE_INTENT=1 in the operator shell lands in CycleRequest.Env so
+// the orchestrator's intent gate evaluates true.
 func TestBuildCycleEnv_PropagatesRequireIntent(t *testing.T) {
 	cfg := loopConfig{Strategy: "balanced"}
 	osEnv := []string{
@@ -68,7 +67,7 @@ func TestBuildCycleEnv_StrategyNotWrittenByDispatcher(t *testing.T) {
 // ConsensusAudit is no longer written to the cycle env; it is configured
 // via policy.json workflow.consensus_audit_enabled instead.
 // EVOLVE_RESET is no longer written: cfg.Reset is consumed at cmd_loop.go
-// before buildCycleEnv is called (dead env write removed, cycle-44).
+// before buildCycleEnv is called.
 func TestBuildCycleEnv_DispatcherFlagsPropagate(t *testing.T) {
 	t.Run("resume set", func(t *testing.T) {
 		cfg := loopConfig{Strategy: "balanced", Resume: true, Reset: true}
@@ -104,11 +103,10 @@ func TestBuildCycleEnv_MalformedEnvIgnored(t *testing.T) {
 	}
 }
 
-// TestBuildCycleContext_PropagatesGoalText is the regression test for
-// the cycle-108 silent-drop bug #3: --goal-text "..." flag value must
-// land in CycleRequest.Context["goal"] so the Intent persona can
-// structure intent.md around the operator's actual goal rather than
-// inferring from leftover workspace artifacts.
+// TestBuildCycleContext_PropagatesGoalText is the regression test ensuring
+// --goal-text's value lands in CycleRequest.Context["goal"] so the Intent
+// persona can structure intent.md around the operator's actual goal rather
+// than inferring from leftover workspace artifacts.
 func TestBuildCycleContext_PropagatesGoalText(t *testing.T) {
 	cfg := loopConfig{
 		Strategy: "ultrathink",

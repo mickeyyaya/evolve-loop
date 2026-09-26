@@ -13,9 +13,8 @@ import (
 // replWaiter owns the completion wait state machine after prompt dispatch. Its
 // dependencies are fixed for one launch, which keeps the state transitions
 // testable without widening the package API.
-// artifactWaitInterval is the artifact-wait poll cadence — named once so the
-// paste timing can prove it never coincides with it (the wedge short-circuit
-// pins count Sleeps of this exact value as polls).
+
+// artifactWaitInterval is the artifact-wait poll cadence.
 const artifactWaitInterval = 2 * time.Second
 
 type replWaiter struct {
@@ -61,25 +60,8 @@ func (w replWaiter) wait() (replWaitResult, int) {
 		deps.Sleep(artifactWaitInterval)
 		state.waitedS = elapsed
 		if err := ctx.Err(); err != nil {
-			// Context cancelled (orchestrator timeout / SIGTERM / the next phase
-			// tearing down this session): before abandoning, ONE final completion
-			// poll — a deliverable already on disk means the session COMPLETED and
-			// the cancel is benign teardown, not a phase timeout. Pre-fix this
-			// break skipped straight to the !completed → ExitArtifactTimeout exit,
-			// laundering a finished session into a timeout (session-lifecycle
-			// residual; the runner's settle-retry was the only thing standing
-			// between that mislabel and a false FAIL). A genuinely unfinished
-			// session still exits ExitArtifactTimeout.
-			//
-			// The poll gets a context DETACHED from the cancellation (cycle-1236):
-			// this line dispatches to all three completionDetector strategies, and
-			// only artifactDetector is a pure file stat. stdoutDetector shells
-			// CapturePane and gitEvidenceDetector shells git — exec.CommandContext
-			// refuses to fork on a dead ctx, both swallow the transport error as
-			// "not ready", and a DELIVERED stdout/git phase exited 81. withFinalPoll
-			// hands them a live, finalPollGrace-bounded context carrying the
-			// explicit finality marker artifactDetector's short-circuit now keys on
-			// (a live ctx alone would have disarmed it — completion.go).
+			// One final completion poll before abandoning: a deliverable already
+			// on disk means the cancel is benign teardown, not a timeout.
 			finalCtx, finalCancel := withFinalPoll(ctx)
 			ready, _, note, detectorErr := state.detector.poll(finalCtx)
 			finalCancel()
@@ -101,10 +83,8 @@ func (w replWaiter) wait() (replWaitResult, int) {
 			state.cancellationErr = err
 			break
 		}
-		// Live channel: stream newly-stabilized rendered content to pane.live.
-		// The first Next() primes the baseline (echoed prompt + boot chrome are
-		// counted, not emitted); later ticks emit only the assistant output that
-		// appeared above the volatile input box. Gated so off adds no capture.
+		// Live channel: stream newly-stabilized rendered content to pane.live;
+		// gated so off adds no capture.
 		var waitPane string
 		channelCaptureOK := true
 		if channel.on {

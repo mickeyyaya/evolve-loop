@@ -1,35 +1,5 @@
 package core
 
-// RED contract for cycle-1267 Task 1 (`scope-test-amplification-context`) —
-// the "no silent caps" half of the inbox item's how_to_apply:
-//
-//	cap corpus bytes with a loud truncation note (no silent caps)
-//
-// Today the cap is enforced and a `TRUNCATED:` note is written INTO the
-// artifact, so the amplification agent can see it. The OPERATOR cannot: nothing
-// reaches the cycle log, so a lane whose corpus was trimmed to 60% is
-// indistinguishable at the console from one that was injected whole — and the
-// item's own success metric is a before/after token measurement, which a silent
-// cap makes uninterpretable ("did the corpus shrink, or did the cap eat it?").
-// A cap that only the consumer of the artifact can see is a silent cap from the
-// operator's seat.
-//
-// Two pins below:
-//
-//  1. renderCoveringTests must REPORT how many paths it dropped, rather than
-//     burying the fact in its own output. That count is the single source for
-//     both the in-artifact note and the operator warning — deriving it twice
-//     (e.g. by re-scanning the rendered string for "TRUNCATED:") would put two
-//     answers to one question in the tree.
-//  2. writeCoveringTests must emit that count to stderr when it is non-zero,
-//     and stay silent when nothing was dropped (a warning on every clean cycle
-//     is noise that trains the operator to ignore the real one).
-//
-// Pin (1) changes an UNEXPORTED signature, so the two existing call sites in
-// covering_tests_artifact_test.go must be updated to the two-value form. That
-// is a mechanical call-site update, not a weakening: their assertions stay
-// byte-identical.
-
 import (
 	"context"
 	"os"
@@ -42,11 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/changedpkgs"
 )
 
-// TestRenderCoveringTests_ReportsOmittedCount — AC7. The renderer is the only
-// place that knows the cap arithmetic, so it is the only place that can report
-// the drop. Under the cap it must report zero; over the cap the reported count
-// must equal the number of paths actually missing from the output, so the
-// warning an operator reads is the truth and not an estimate.
 func TestRenderCoveringTests_ReportsOmittedCount(t *testing.T) {
 	small := []string{"go/internal/foo/foo_test.go", "go/internal/bar/bar_test.go"}
 	out, omitted := renderCoveringTests(small)
@@ -85,11 +50,6 @@ func TestRenderCoveringTests_ReportsOmittedCount(t *testing.T) {
 	}
 }
 
-// TestWriteCoveringTests_WarnsLoudlyOnTruncation — AC8, the operator-visible
-// half, driven through the REAL write seam over a REAL git worktree: a repo
-// whose only changed paths are more covering tests than the cap can hold. The
-// artifact must still be written (a trimmed corpus beats no corpus), AND stderr
-// must carry a warning naming the exact number of omitted paths.
 func TestWriteCoveringTests_WarnsLoudlyOnTruncation(t *testing.T) {
 	repo := t.TempDir()
 	gitInitCoveringFixture(t, repo)
@@ -137,9 +97,6 @@ func TestWriteCoveringTests_WarnsLoudlyOnTruncation(t *testing.T) {
 	}
 }
 
-// TestWriteCoveringTests_SilentWhenNothingTruncated — the negative half. A
-// warning on every clean cycle is noise that trains the operator to ignore the
-// real one, so an untruncated corpus must produce no truncation warning at all.
 func TestWriteCoveringTests_SilentWhenNothingTruncated(t *testing.T) {
 	repo := t.TempDir()
 	gitInitCoveringFixture(t, repo)

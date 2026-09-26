@@ -1,13 +1,5 @@
 package bridge
 
-// controllerfactory.go — the Factory for per-family control Controllers. It owns
-// the bridge.Config assembly (driver name, isolated per-family workspace, bypass
-// posture) so callers (the pipeline / probe) stay agnostic of how a bridge
-// session is built and never duplicate the per-family workspace-isolation
-// invariant. Complements the driver Registry (LookupDriver) and the
-// NewController factory function: this is the one place "construct a probe
-// session for family X" lives.
-
 import (
 	"path/filepath"
 

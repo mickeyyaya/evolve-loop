@@ -1,33 +1,9 @@
 package core
 
-// dossier_verdict_not_adopted_test.go — dossier-retro-skipped-mislabel. Every
-// FAIL dossier from cycles 1028/1035 and 1105-1117 (and on through 1198) carried
-//
-//	"skipped_phases": [{"phase": "retro", "reason": "FAIL"}]
-//
-// while the run dir held a 15-24KB retrospective-report.md: retro RAN. The record
-// contradicted its own artifacts, which is worse than no record — the disposition
-// assembler and recurrence analysis read dossiers to learn which judgment phases
-// executed.
-//
-// Mechanism (final_verdict_floor.go): recordFinalVerdict appends to the list when
-// a non-floor phase that RAN returns non-PASS after the floor verdict is set, so
-// the field always meant "verdict not adopted" and Reason carried the VERDICT, not
-// a skip cause. The fix is naming/semantics — those records get their own field
-// (phases_run_verdict_not_adopted) and skipped_phases is left to phases that
-// genuinely did not run (the abnormal-epilogue closeout entry). NOT "make retro
-// run on FAIL": it already does, and that edit would break the cycle-802 clobber
-// guard this code exists to enforce.
-
 import (
 	"testing"
 )
 
-// TestDossier_RetroThatRanIsNotRecordedAsSkipped is the RED: the exact production
-// chain of a FAIL cycle whose non-floor retro ran and returned FAIL —
-// recordFinalVerdict → writeCycleDossier → knowledge-base/cycles/cycle-N.json.
-// retro must not appear under skipped_phases; it must appear as a phase that RAN
-// whose verdict was not adopted.
 func TestDossier_RetroThatRanIsNotRecordedAsSkipped(t *testing.T) {
 	o := &Orchestrator{}
 	r := &CycleResult{}
@@ -72,10 +48,6 @@ func TestDossier_RetroThatRanIsNotRecordedAsSkipped(t *testing.T) {
 	}
 }
 
-// TestDossier_AbnormalExitStillRecordsATrueSkip is the scope guard: skipped_phases
-// keeps its literal meaning for the one writer that produces a REAL skip — the
-// abnormal epilogue, where closeout never ran because the cycle died mid-phase.
-// Emptying the field entirely would lose that.
 func TestDossier_AbnormalExitStillRecordsATrueSkip(t *testing.T) {
 	root := t.TempDir()
 	initDossierRepo(t, root)

@@ -1,23 +1,5 @@
 package bridge
 
-// driver_tmux_repl_submitverify_test.go — RED contract for cycle-1526 task
-// `submit-verify-retro-paste`.
-//
-// Evidence (premise-challenge-report.md, cycle-1526): in cycles 1505, 1510 and
-// 1517 the one-shot nudge sent at driver_tmux_repl.go:806-818 was still sitting
-// UNSUBMITTED at the pane's `❯` input line in the final capture, and every
-// nudge record in <phase>-interactions.ndjson read "result":"no_effect". The
-// driver sends the keys once, sets nudgeSent=true, and never verifies that the
-// input line cleared — a fire-and-forget Enter.
-//
-// Contract: every driver-initiated submission (the nudge AND the prompt-paste
-// delivery at :368-376) must verify the input line cleared on the next capture
-// and, when it did not, re-send Enter — bounded, and loud on stderr.
-//
-// These tests drive the REAL production entry point (Engine.LaunchArgs ->
-// runTmuxREPL) over a fake tmux; a helper called directly would prove nothing
-// about reachability.
-
 import (
 	"bytes"
 	"context"
@@ -32,24 +14,20 @@ import (
 // see the driver noticed and acted.
 const submitVerifyStderrMarker = "submit-verify"
 
-// maxSubmitVerifyResends bounds the re-send loop. The driver must never spin:
-// after this many attempts it gives up and lets the normal stop-review path
-// run.
+// maxSubmitVerifyResends bounds the re-send loop so it can never spin forever.
 const maxSubmitVerifyResends = 3
 
-// unsubmittedPane renders the recorded cycle-1505/1510/1517 shape: text parked
-// at the `❯` input line, never submitted.
+// unsubmittedPane renders text parked at the input line, never submitted.
 func unsubmittedPane(text string) string {
 	return "● earlier scrollback\n\n" + tmuxPromptMarkerDefault + " " + text
 }
 
 // stickyInputTmux simulates a pane whose input line does NOT clear when keys
-// are sent with enter=true — the recorded delivery-failure shape. `trigger`
-// selects which send to sabotage: the send whose keys contain `trigger`
-// (the nudge names the artifact path; "" means the prompt-paste Enter).
-//
-// When clearOnResend is set, a subsequent bare Enter clears the input line, so
-// the test can observe recovery rather than an unbounded stall.
+// are sent with enter=true. `trigger` selects which send to sabotage: the
+// send whose keys contain `trigger` (the nudge names the artifact path; ""
+// means the prompt-paste Enter). When clearOnResend is set, a subsequent bare
+// Enter clears the input line, so the test can observe recovery rather than
+// an unbounded stall.
 type stickyInputTmux struct {
 	*fakeTmux
 	mu            sync.Mutex
@@ -78,8 +56,9 @@ func (s *stickyInputTmux) SendKeys(ctx context.Context, session, keys string, en
 	return err
 }
 
-// pasteStickyTmux sabotages the prompt-paste delivery instead: the paste lands
-// but the Enter at :376 does not submit it, so the prompt text sits at `❯`.
+// pasteStickyTmux sabotages the prompt-paste delivery instead: the paste
+// lands but the delivery Enter does not submit it, so the prompt text sits
+// at the input line.
 type pasteStickyTmux struct {
 	*fakeTmux
 	mu       sync.Mutex
@@ -147,8 +126,7 @@ func runSubmitVerify(t *testing.T, fx launchFixture, tm TmuxController) (int, st
 }
 
 // bareEnterIdxAfter returns the indices of bare-Enter sends ("" with enter) in
-// sentSeq at or after `from`. A bare Enter is the driver's submit key: the
-// prompt-delivery Enter (driver_tmux_repl.go:376) and any re-send.
+// sentSeq at or after `from` — the driver's submit key.
 func bareEnterIdxAfter(seq []string, from int) []int {
 	var idx []int
 	for i := from; i < len(seq); i++ {
@@ -169,10 +147,6 @@ func nudgeSeqIdx(seq []string, artifact string) int {
 	return -1
 }
 
-// TestTmuxREPL_NudgeUnsubmitted_ResendsEnter — the evidence-licensed case. The
-// nudge is sent, the next capture still shows it parked at `❯`, so the driver
-// must re-send Enter and say so on stderr. Today it sets nudgeSent=true and
-// walks away: RED.
 func TestTmuxREPL_NudgeUnsubmitted_ResendsEnter(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
 	tm := &stickyInputTmux{
@@ -199,10 +173,6 @@ func TestTmuxREPL_NudgeUnsubmitted_ResendsEnter(t *testing.T) {
 	}
 }
 
-// TestTmuxREPL_NudgeSubmitted_NoResend — the anti-double-submit control. When
-// the input line DID clear, the driver must not re-send: a spurious extra
-// Enter re-submits whatever the agent typed next and desyncs the pane (the
-// highest-risk edge flagged by the cycle-1526 premise challenge).
 func TestTmuxREPL_NudgeSubmitted_NoResend(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
 	// Plain fake: every capture is a clean prompt marker, so the nudge is
@@ -222,8 +192,6 @@ func TestTmuxREPL_NudgeSubmitted_NoResend(t *testing.T) {
 	}
 }
 
-// TestTmuxREPL_NudgeUnsubmitted_ResendBounded — an input line that never clears
-// must not spin. Re-sends are bounded and the run still terminates.
 func TestTmuxREPL_NudgeUnsubmitted_ResendBounded(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
 	tm := &stickyInputTmux{
@@ -249,13 +217,9 @@ func TestTmuxREPL_NudgeUnsubmitted_ResendBounded(t *testing.T) {
 	}
 }
 
-// TestTmuxREPL_PromptPasteUnsubmitted_ResendsEnter — the same verification must
-// cover the prompt-delivery site the cycle committed to
-// (driver_tmux_repl.go:368-376): paste, Enter, and if the prompt text is still
-// at the input line on the next capture, re-send. NOTE (cycle-1526 premise
-// challenge, finding #1/#6): no recorded cycle exhibits an unsubmitted PROMPT —
-// this is the generalization of the nudge fix to the shared submit path, and
-// its pane state is stipulated, not replayed.
+// TestTmuxREPL_PromptPasteUnsubmitted_ResendsEnter generalizes the nudge fix
+// to the prompt-paste delivery site; no observed run shows an unsubmitted
+// prompt, so this pane state is stipulated, not replayed.
 func TestTmuxREPL_PromptPasteUnsubmitted_ResendsEnter(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
 	tm := &pasteStickyTmux{fakeTmux: &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}}

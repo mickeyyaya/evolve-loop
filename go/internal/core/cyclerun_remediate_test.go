@@ -1,20 +1,5 @@
 package core
 
-// cyclerun_remediate_test.go — graduated remediation (operator directive
-// 2026-07-21; inbox graduated-remediation-fix-forward): when a configured
-// DETERMINISTIC gate phase FAILs, the orchestrator dispatches the builder ONCE
-// with the gate's report as a correction directive, re-runs the SAME gate, and
-// records the final verdict — instead of discarding a sound cycle over a
-// mechanical, prescribed defect (the 983/992/1007/1019/1020 waste class:
-// cycle-1019's audit-PASSed S5 implementation was thrown away over three
-// missing test files the gate itself had prescribed; 1020 then re-implemented
-// it from scratch and failed the same gate the same way).
-//
-// Integrity properties pinned here: nothing downstream is bypassed (the SAME
-// gate must pass and the spine continues normally); the round cap is hard; a
-// zero-value workflow config means ZERO remediation (byte-identical legacy
-// behavior — compiled defaults live at the composition root, not in core).
-
 import (
 	"context"
 	"strings"
@@ -144,11 +129,11 @@ func TestRemediation_RoundCapIsHard(t *testing.T) {
 	if got := len(remediationDispatches(build)); got != 1 {
 		t.Fatalf("cap=1 must mean exactly 1 remediation dispatch, got %d", got)
 	}
-	// After the capped remediation fails, the cycle proceeds down the SAME
+	// After the capped remediation fails, the cycle proceeds down the same
 	// legacy path as an unremediated FAIL (retro / fluent-vs-strict semantics
-	// own the final verdict — remediation never overrides them). The audit may
-	// re-run additional times via the legacy retry loop; the cap governs
-	// REMEDIATION dispatches only.
+	// own the final verdict, never remediation). The audit may re-run
+	// additional times via the legacy retry loop; the cap governs remediation
+	// dispatches only.
 	if gate.calls < 2 {
 		t.Fatalf("gate calls=%d, want >=2 (original + the one remediation re-run)", gate.calls)
 	}
@@ -206,9 +191,9 @@ func TestRemediation_JudgmentPhasesDeniedRegardlessOfConfig(t *testing.T) {
 	}
 }
 
-// TestRemediation_RecordsFixDispatchInPhaseRecord pins the ADR-0044 C1
-// chokepoint parity: the remediation fix dispatch appears in the phase record
-// under its own label (never clobbering the build phase's own records).
+// TestRemediation_RecordsFixDispatchInPhaseRecord pins that the remediation
+// fix dispatch appears in the phase record under its own label, never
+// clobbering the build phase's own records.
 func TestRemediation_RecordsFixDispatchInPhaseRecord(t *testing.T) {
 	wf := policy.WorkflowConfig{RemediationRounds: 1, RemediablePhases: []string{"tdd"}}
 	_, _, res, err := remediationHarness(t, wf, PhaseTDD, []string{VerdictFAIL, VerdictPASS})
@@ -226,8 +211,8 @@ func TestRemediation_RecordsFixDispatchInPhaseRecord(t *testing.T) {
 	}
 }
 
-// diagRunner returns a FAIL with error-severity diagnostics — the audit
-// in-process override shape (cycle-1022).
+// diagRunner returns a FAIL with error-severity diagnostics, the shape an
+// audit in-process override produces.
 type diagRunner struct{ name Phase }
 
 func (r *diagRunner) Name() string { return string(r.name) }
@@ -236,9 +221,9 @@ func (r *diagRunner) Run(_ context.Context, req PhaseRequest) (PhaseResponse, er
 		Diagnostics: []Diagnostic{{Severity: "error", Message: "apicover -enforce flagged 1 line(s) — unnamed export"}}}, nil
 }
 
-// TestFailReasonsSurfaceInResult pins the cycle-1022 lesson: a floor-override
-// FAIL's explanation must reach the RESULT (summary + dossier surfaces), not
-// just workspace artifacts and orchestrator memory.
+// TestFailReasonsSurfaceInResult pins that a floor-override FAIL's
+// explanation reaches the result (summary + dossier surfaces), not just
+// workspace artifacts and orchestrator memory.
 func TestFailReasonsSurfaceInResult(t *testing.T) {
 	runners := buildRunners(nil)
 	runners[PhaseAudit] = &diagRunner{name: PhaseAudit}
@@ -259,13 +244,14 @@ func TestFailReasonsSurfaceInResult(t *testing.T) {
 }
 
 // TestDispatch_ReadOnlyPhasesAreFencedAndSourceWritersAreNot is the core half
-// of the worktree fence (ADR-0097): every dispatched request carries
-// WorktreeReadOnly derived from the ONE write-permission predicate
-// (worktreePhase) — read-only phases (scout, audit) true, the declared source
-// writers (tdd, build) false — and a remediation builder fix never inherits
-// the fenced gate's flag (a fenced builder would have its fix silently
-// undone). Uses scout as the remediable read-only gate so the inherited-flag
-// path is actually exercised.
+// of the worktree fence: every dispatched request carries WorktreeReadOnly
+// derived from the one write-permission predicate (worktreePhase) —
+// read-only phases (scout, audit) true, the declared source writers (tdd,
+// build) false — and a remediation builder fix never inherits the fenced
+// gate's flag (a fenced builder would have its fix silently undone). Uses
+// scout as the remediable read-only gate so the inherited-flag path is
+// actually exercised.
+// See ADR-0097.
 func TestDispatch_ReadOnlyPhasesAreFencedAndSourceWritersAreNot(t *testing.T) {
 	runners := buildRunners(nil)
 	gate := &scriptedRunner{name: PhaseScout, verdicts: []string{VerdictFAIL, VerdictPASS}}

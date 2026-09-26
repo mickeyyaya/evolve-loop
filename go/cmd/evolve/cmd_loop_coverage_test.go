@@ -76,12 +76,8 @@ func TestRunLoop_DryRun(t *testing.T) {
 
 // TestRunLoop_EnvFlagPropagation drives the ConsensusAudit / Reset env
 // var setters via --dry-run so we exercise the assignment without
-// running a real cycle. Each flag should set its corresponding env key
-// in the cycle invocation context.
-//
-// (The dry-run output doesn't include cycleEnv directly, but the
-// branches at lines 85-93 are still exercised because runLoop builds
-// the map before the dry-run short-circuit.)
+// running a real cycle. The dry-run output doesn't include cycleEnv
+// directly, but buildCycleEnv still runs before the dry-run short-circuit.
 func TestRunLoop_EnvFlagPropagation(t *testing.T) {
 	// Force the env-setting branches to fire by passing the flags.
 	// Dry-run still applies AFTER the env-map build, so all three
@@ -98,10 +94,10 @@ func TestRunLoop_EnvFlagPropagation(t *testing.T) {
 	}
 }
 
-// TestRunLoop_EnvFlagPropagationNonDry covers lines 85-93 (env var
-// assignments) by running with --consensus-audit and --reset against
-// a real (stubbed) cycle. The DryRun-based test exercises parsing but
-// short-circuits before those lines.
+// TestRunLoop_EnvFlagPropagationNonDry covers the env var assignments by
+// running with --consensus-audit and --reset against a real (stubbed)
+// cycle; the dry-run-based test exercises parsing but short-circuits
+// before those branches run.
 func TestRunLoop_EnvFlagPropagationNonDry(t *testing.T) {
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
@@ -149,8 +145,8 @@ func TestReadLastCycleNumber_ReadStateError(t *testing.T) {
 	}
 }
 
-// TestParseLoopArgs_FlagParseError covers parseLoopArgs's fs.Parse
-// error branch (line 443). Passing an unknown flag triggers it.
+// TestParseLoopArgs_FlagParseError covers parseLoopArgs's fs.Parse error
+// branch. Passing an unknown flag triggers it.
 func TestParseLoopArgs_FlagParseError(t *testing.T) {
 	t.Parallel()
 	var stderr bytes.Buffer
@@ -160,8 +156,8 @@ func TestParseLoopArgs_FlagParseError(t *testing.T) {
 	}
 }
 
-// TestParseLoopArgs_MaxCyclesFlag covers the maxCyclesFlag>0 branch in
-// the resolve-cycles switch (line 455). Only --max-cycles set.
+// TestParseLoopArgs_MaxCyclesFlag covers the maxCyclesFlag>0 branch in the
+// resolve-cycles switch. Only --max-cycles set.
 func TestParseLoopArgs_MaxCyclesFlag(t *testing.T) {
 	t.Parallel()
 	var stderr bytes.Buffer
@@ -174,9 +170,9 @@ func TestParseLoopArgs_MaxCyclesFlag(t *testing.T) {
 	}
 }
 
-// TestRunLoop_PolicyUnknownDefaultsToVerify covers the default branch
-// in resolveDispatchPolicy (unknown value → verify with WARN). The
-// WARN line is what we need to see.
+// TestRunLoop_PolicyUnknownLogs covers the default branch in
+// resolveDispatchPolicy (unknown value → verify with WARN). The WARN line
+// is what we need to see.
 func TestRunLoop_PolicyUnknownLogs(t *testing.T) {
 	var stderr bytes.Buffer
 	got := resolveDispatchPolicy("garbage", &stderr)
@@ -187,13 +183,6 @@ func TestRunLoop_PolicyUnknownLogs(t *testing.T) {
 		t.Fatalf("stderr should warn: %q", stderr.String())
 	}
 }
-
-// erroringRunCycleFromPhaseRunner returns an error so the resume
-// branch's err != nil path (line 132-135 + 142-144) fires.
-//
-// Note: we can't easily make RunCycleFromPhase return an error from
-// the orchestrator without driving the state machine through an
-// invalid phase. Easiest: have the phase runner return an error.
 
 // TestRunLoop_ResumePhaseRunnerError exercises the resume err != nil
 // branch by stubbing the build runner to return an error.
@@ -372,9 +361,9 @@ func (f fatalRunner) Run(context.Context, core.PhaseRequest) (core.PhaseResponse
 	return core.PhaseResponse{}, core.ErrLedgerChainBroken
 }
 
-// TestRunLoop_OrchestratorError covers the err != nil branch at line
-// 174-177 (cycle error path). Replace the scout runner with fatalRunner
-// so the orchestrator returns a batch-fatal error on the very first phase.
+// TestRunLoop_OrchestratorError covers the cycle error path: replace the
+// scout runner with fatalRunner so the orchestrator returns a batch-fatal
+// error on the very first phase.
 func TestRunLoop_OrchestratorError(t *testing.T) {
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
@@ -423,9 +412,8 @@ func (l *erroringLedger) Iter(context.Context) (core.LedgerIterator, error) {
 	return nil, errors.New("synthetic ledger iter error")
 }
 
-// TestRunLoop_VerifyIterError covers the vErr != nil branch at line
-// 227-229. VerifyCycle returns an error but the loop continues
-// (verify-error is non-fatal — bash treats it as "log and proceed").
+// TestRunLoop_VerifyIterError covers the vErr != nil branch: VerifyCycle
+// returns an error but the loop continues — verify-error is non-fatal.
 func TestRunLoop_VerifyIterError(t *testing.T) {
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
@@ -497,8 +485,7 @@ func (f failVerdictRunner) Run(_ context.Context, req core.PhaseRequest) (core.P
 }
 
 // TestRunLoop_FailVerdictBreaks covers the result.FinalVerdict == FAIL
-// branch (lines 260-262 + 268-269). Audit returns FAIL, the loop
-// breaks with stop_reason=fail, rc=2.
+// branch: audit returns FAIL, the loop breaks with stop_reason=fail, rc=2.
 func TestRunLoop_FailVerdictBreaks(t *testing.T) {
 	t.Setenv("EVOLVE_LOOP_MAX_CONSECUTIVE_FAILS", "1")
 

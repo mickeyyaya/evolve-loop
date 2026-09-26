@@ -35,22 +35,22 @@ func (cr *cycleRun) applyPostReviewGuards(next Phase, dr *dispatchResult) (loopA
 	}
 
 	// cr.cs.Shipped is also the latch read by postShipObserverSkip on the
-	// dispatch abort path (a post-ship observer failure degrades to WARN rather
-	// than turning a shipped cycle abnormal — cycle-574) and by the outcome
-	// label at closeout; it lives on cr.cs so the next persist checkpoints it.
+	// dispatch abort path (a post-ship observer failure degrades to WARN
+	// rather than turning a shipped cycle abnormal) and by the outcome label
+	// at closeout; it lives on cr.cs so the next persist checkpoints it.
 	if latchShippedState(&cr.cs, next, dr.resp.Verdict) {
 		// Ship landed AND survived the deliverable review gate above — the
 		// worktree is merged, normal exit cleanup applies. Deliberately
 		// AFTER the review gate: a review-rejected ship abort must still
-		// preserve the worktree for triage (ADR-0039 §8 / D10).
+		// preserve the worktree for triage.
 		cr.preserveWorktree = false
 	}
 
-	// Workstream B: post-phase tree-diff check. Runs BEFORE the ledger
-	// append so a leak aborts the cycle without recording the phase as a
-	// success. Snapshot failures (pre OR post) degrade silently — the
-	// guard is belt-and-suspenders to the OS sandbox, so a transient git
-	// read error must never cause a false abort.
+	// The post-phase tree-diff check runs BEFORE the ledger append so a leak
+	// aborts the cycle without recording the phase as a success. Snapshot
+	// failures (pre OR post) degrade silently — the guard is
+	// belt-and-suspenders to the OS sandbox, so a transient git read error
+	// must never cause a false abort.
 	if dr.treeGuard != nil && !dr.snapshotFailed {
 		res := dr.treeGuard.Check(cr.ctx, cr.req.ProjectRoot, dr.beforeDirty)
 		if res.SnapshotMissed {
@@ -64,7 +64,6 @@ func (cr *cycleRun) applyPostReviewGuards(next Phase, dr *dispatchResult) (loopA
 				}
 			}
 
-			// Always discard "go/evolve" and relBin (if set)
 			_ = discardMainLeak(cr.ctx, cr.req.ProjectRoot, "go/evolve")
 			if relBin != "" && relBin != "go/evolve" {
 				if isGitignored(cr.ctx, cr.req.ProjectRoot, relBin) {
@@ -74,42 +73,22 @@ func (cr *cycleRun) applyPostReviewGuards(next Phase, dr *dispatchResult) (loopA
 				}
 			}
 
-			// Re-snapshot and check again
 			res2 := dr.treeGuard.Check(cr.ctx, cr.req.ProjectRoot, dr.beforeDirty)
 			if res2.OK() {
 				fmt.Fprintf(os.Stderr, "[orchestrator] WARN tree-diff: discarded binary rebuild churn in phase %s; continuing\n", next)
 			} else {
-				// Filter the leaked set through isLegitimateMainTreePath for EVERY
-				// phase — the same classification recoverBuildLeak applies (R9: one
-				// shared vocabulary). Non-worktree phases need it for their
-				// .evolve/ workspace writes (R7); worktree phases need it because
-				// orchestrator-side gates write their own untracked runtime state
-				// (.evolve/contract-gate-breaker.json) into the main tree mid-phase
-				// — recovery skips those by design, so a strict guard here turned
-				// every contract-gate trip into a false cycle abort (the cycle-274
-				// salvage CI regression). PLUS a guard-only second classifier,
-				// isScoutEvalMaterialization: scout writes its selected evals to the
-				// main tree by contract (materialization.go), which recoverBuildLeak
-				// never sees (scout is not a WorktreePhase) so it lives only here
-				// (soak-#6 cycle 318→319). PLUS a third guard-only classifier,
-				// isActiveMintPhasePath: in fleet mode a CONCURRENT lane's advisor
-				// mint persists .evolve/phases/<name>/phase.json into the SHARED
-				// tree this lane diffs, charging the mint to an innocent phase
-				// (cycle-967 false-abort). The registrar records minted names in
-				// the shared mintregistry before persisting, so a registered,
-				// TTL-fresh name is mint infrastructure, not a leak; an
-				// UNREGISTERED phase-config write still aborts. A registry read
-				// error only disables the exemption (guard stays armed — the
-				// fail-safe direction). Real escapes stay armed: source files and
-				// non-scout/non-eval deliverable paths classify as leaks, and
-				// porcelainDirtySet emits both rename sides so a deliverable renamed
-				// to a .evolve/evals/ look-alike still aborts via its source path.
+				// isLegitimateMainTreePath, isScoutEvalMaterialization and
+				// isActiveMintPhasePath each exempt one class of legitimate
+				// main-tree write from the leak guard — a phase's own .evolve/
+				// workspace writes, scout's contract-mandated eval writes, and a
+				// concurrent fleet lane's registered mint — so real escapes stay
+				// armed: source files, non-scout/non-eval deliverable paths, and
+				// both sides of a leak-disguising rename still abort.
 				leaked := res2.Leaked
 				mints, mintErr := mintregistry.ActiveNames(mintregistry.Path(cr.req.ProjectRoot), time.Now())
 				if mintErr != nil {
 					// ABNORMAL, not WARN: a corrupt registry is either damage or a
-					// deliberate availability attack (a lane-wide exemption outage
-					// reproduces the cycle-967 false-abort). Quarantine bounds the
+					// deliberate availability attack. Quarantine bounds the
 					// outage to this one check; the guard stays armed either way.
 					fmt.Fprintf(os.Stderr, "[orchestrator] ABNORMAL tree-diff: mint registry unreadable (%v); mint exemption disabled for this check\n", mintErr)
 					if _, qErr := mintregistry.QuarantineCorrupt(mintregistry.Path(cr.req.ProjectRoot)); qErr != nil {
@@ -132,12 +111,11 @@ func (cr *cycleRun) applyPostReviewGuards(next Phase, dr *dispatchResult) (loopA
 				if len(leaked) > 0 {
 					phaseErr := fmt.Errorf("tree-diff guard: phase %q wrote to the main tree outside its worktree %q — leaked paths: %v",
 						string(next), dr.phaseWorktree, leaked)
-					// ADR-0044 C1 — THE cycle-262 path: the build ran, PASSed,
-					// and burned tokens before the guard caught its main-tree
-					// leak. The abort is correct; erasing the outcome was not.
+					// The build ran, PASSed, and burned tokens before the guard
+					// caught its main-tree leak. The abort is correct; erasing
+					// the outcome would not be.
 					cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, dr.resp, dr.attemptCount, phaseErr.Error(), cr.cs.PhaseStartedAt))
 					cr.recordFailureLearning(next, phaseErr, 1)
-					// After abort, check if go/bin/evolve is absent
 					evolveBinPath := filepath.Join(cr.req.ProjectRoot, "go/bin/evolve")
 					if _, err := os.Stat(evolveBinPath); os.IsNotExist(err) {
 						fmt.Fprintf(os.Stderr, "[orchestrator] ABNORMAL: go/bin/evolve absent after cycle abort — trust-kernel guards degraded\n")

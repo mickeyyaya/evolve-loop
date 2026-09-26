@@ -13,18 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
 )
 
-// driver_tmux_submitverify_record_test.go — the guard added in #474 announces
-// itself on stderr only, and Engine.Launch returns on the SUCCESS path
-// (engine.go:531-534) BEFORE it persists stderr to <agent>-launch-error.txt
-// (:544). So a submit-verify that DETECTS a parked prompt and RECOVERS it makes
-// the phase succeed, which discards every line proving it fired. Four waves and
-// eight cycles produced zero observations of the guard working.
-//
-// interactions.ndjson is the durable surface: interaction.Recorder.Record writes
-// through to disk immediately (appendLedgerLine) regardless of phase outcome —
-// cycle-1530's router-interactions.ndjson carries an auto_respond record from a
-// phase that SUCCEEDED.
-
 // readInteractions returns the decoded ndjson ledger for phase in ws.
 func readInteractions(t *testing.T, ws, phase string) []interaction.Outcome {
 	t.Helper()
@@ -49,8 +37,6 @@ func readInteractions(t *testing.T, ws, phase string) []interaction.Outcome {
 	return out
 }
 
-// TestVerifySubmitted_ReportsOutcome pins that verifySubmitted distinguishes the
-// three cases the log currently conflates into silence.
 func TestVerifySubmitted_ReportsOutcome(t *testing.T) {
 	clean := "● done\n\n" + tmuxPromptMarkerDefault
 	lp := tmuxLaunch{name: "claude-tmux", session: "s",
@@ -79,11 +65,6 @@ func TestVerifySubmitted_ReportsOutcome(t *testing.T) {
 	})
 
 	t.Run("an unobservable pane reports not_verified, not clean", func(t *testing.T) {
-		// A failed CapturePane hands verifySubmitted "". pendingAtInputLine then
-		// returns false on the absent marker, so without an explicit guard the
-		// fall-through records "verified clean" for a state the driver just
-		// logged as unknown — a lie in the safe-looking direction, in the very
-		// ledger this change exists to make trustworthy.
 		tm := &fakeTmux{paneSeq: []string{clean}}
 		var stderr bytes.Buffer
 		got := verifySubmitted(context.Background(), submitVerifyDeps(tm, &stderr), lp,
@@ -110,15 +91,11 @@ func TestVerifySubmitted_ReportsOutcome(t *testing.T) {
 	})
 }
 
-// TestTmuxREPL_SubmitVerify_RecordReachesLedger is the WIRING proof: it drives
-// the real production entry point and asserts the record lands in the file an
-// operator would read. PR #474's stderr lines were "loud" and still unreachable;
-// a unit test of the outcome alone would repeat that mistake.
-//
-// BOTH rows matter. The recovered row proves the guard's win is durable; the
-// CLEAN row is the denominator — without it a "don't spam the ledger" early
-// return in recordSubmitVerify passes every other assertion here, and a
-// recovered stall stays an anecdote instead of a rate.
+// TestTmuxREPL_SubmitVerify_RecordReachesLedger drives the real production
+// entry point end to end, so a unit test of the outcome alone can't miss a
+// wiring gap. BOTH subtests matter: the recovered row proves the guard's win
+// is durable, and the clean row is the denominator — without it, an early
+// "don't spam the ledger" return would pass the recovered-row assertion alone.
 func TestTmuxREPL_SubmitVerify_RecordReachesLedger(t *testing.T) {
 	run := func(t *testing.T, tm TmuxController) []interaction.Outcome {
 		t.Helper()

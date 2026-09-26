@@ -1,19 +1,5 @@
 package bridge
 
-// driver_tmux_repl_fleet_accept_test.go — cycle-1270 Task 2
-// (`retro-fleet-worktree-dispatch`), the missing POSITIVE half.
-//
-// Both halves of the fleet-worktree contract are tested today and neither
-// proves the contract holds: retro proves it MINTS a scratch cwd
-// (phases/retro/retro_worktree_fallback_test.go), and this package proves the
-// guard REFUSES an empty one (TestFleetModeRefusesEmptyWorktree). Nothing
-// proves a minted directory actually CLEARS the guard.
-//
-// A future tightening of that guard (e.g. requiring a .git entry) would break
-// every fleet-lane retro with both existing suites still green — the exact
-// silent-regression shape the item exists to close. The pair IS the contract:
-// accepts a real owned cwd, refuses an empty one.
-
 import (
 	"context"
 	"testing"

@@ -1,69 +1,5 @@
 package main
 
-// cmd_loop_chain_boundaryrefresh_fleetlane_test.go — RED tests (cycle 1364,
-// inbox item auto-refresh-binary-at-boundary).
-//
-// Gap found by this cycle's scout (fleet_scope pinned to this one item):
-// maybeRefreshChainBoundary (cmd_loop_chain.go, landed cycles 1314/1320/1323/
-// 1325) already implements the ahead-check -> rebuild -> repin -> ledger ->
-// re-exec sequence and is wired into BOTH the chain loop (cmd_loop_chain.go)
-// and the plain sequential loop (cmd_loop.go ~L552) — the "sequential loop
-// AND fleet mode" caller-proof obligation this very phase's own house rules
-// require is already satisfied for those two paths. What is still MISSING is
-// the one safety check a stranded, never-landed salvage commit
-// (cycle-42824668-1360, e057d1b3, ".../cmd_loop_boot_refresh.go") added for
-// the OLDER boot-time-only healer and this newer boundary healer never
-// inherited: refusing the rebuild while a SIBLING fleet lane holds a live run.
-// `grep -n "FleetLane\|fleet.*lane" cmd_loop_chain_boundaryrefresh*.go` has
-// zero hits in this worktree today — chainRebuildFn currently runs
-// unconditionally once chainBoundaryAheadFn reports stale, even if another
-// lane is mid-batch on the SAME shared go/bin/evolve binary this rebuild
-// overwrites. That is the exact scenario the standing rule "NEVER rebuild
-// plane binary mid-batch (SELF_SHA)" (project memory
-// stale_binary_false_fail) exists to prevent, and it is the AC4 the
-// stranded salvage commit's design already solved for the boot-time path.
-//
-// This file does NOT re-implement the salvage commit's bespoke
-// EvolveDir/runs/* scanner (bootRefreshFleetLaneFn / defaultBootRefreshFleetLane
-// in the stranded commit) — that would duplicate logic gc.Discover
-// (internal/gc/discover.go) already owns and adversarially hardens (L3.2):
-// the SAME lease-aware run-dir scan the retention engine uses to decide a run
-// is untouchable. Reusing it here means one fewer independent .lease reader
-// to keep in sync (never_duplicate_centralize_via_design_patterns).
-//
-// Contract the Builder implements (TDD-defined seam):
-//
-//	// chainBoundaryFleetLaneFn is the test seam for "is a sibling fleet lane
-//	// active" — checked AFTER chainBoundaryAheadFn confirms staleness and
-//	// BEFORE chainBoundaryRefreshAlreadyAttempted/chainRebuildFn are ever
-//	// reached, so an active sibling lane refuses the boundary heal before
-//	// either rebuild or exec (mirrors the boot-time healer's own guard order
-//	// in the stranded salvage design). An error from the check is UNVERIFIABLE
-//	// safety state and must be treated exactly like laneActive=true — "cannot
-//	// prove the plane is idle" refuses the rebuild — while still letting the
-//	// chain continue on the current binary (fail-open for the CHAIN, fail-safe
-//	// for the REBUILD; these are not the same axis).
-//	var chainBoundaryFleetLaneFn = defaultChainBoundaryFleetLaneActive
-//	func defaultChainBoundaryFleetLaneActive(cfg loopConfig) (active bool, err error)
-//
-// defaultChainBoundaryFleetLaneActive wraps gc.Discover(cfg.EvolveDir,
-// gc.DiscoverOptions{}) and reports true iff any returned RunDir has
-// Live==true. At the instant maybeRefreshChainBoundary runs (strictly
-// BETWEEN this lane's own batches — the prior batch's run dir is already
-// terminal, the next one has not been created yet), this lane's own history
-// never surfaces as Live, so no self-exclusion by path is needed; a Live
-// entry unambiguously means a DIFFERENT lane.
-//
-// maybeRefreshChainBoundary MUST call chainBoundaryFleetLaneFn(cfg)
-// immediately after a positive chainBoundaryAheadFn result and log a
-// stderr line containing "fleet lane" before returning refreshed=false,
-// exactly like every other guard in this function (rebuild failure,
-// ahead-check error) — auditable, never a silent no-op.
-//
-// RED now: chainBoundaryFleetLaneFn / defaultChainBoundaryFleetLaneActive are
-// undefined -> this package's test build fails. Do NOT modify this file —
-// implement the seam and wire the call site in cmd_loop_chain.go.
-
 import (
 	"bytes"
 	"errors"
@@ -96,9 +32,10 @@ func brflWriteRunMarker(t *testing.T, runDir string) {
 	}
 }
 
-// AC(fleetlane-1): an active sibling fleet lane (fresh .lease heartbeat under
-// a DIFFERENT run dir) must refuse the boundary heal before either rebuild or
-// re-exec, even though the local binary IS stale.
+// TestMaybeRefreshChainBoundary_FleetLaneActiveRefusesRebuild: an active
+// sibling fleet lane (fresh .lease heartbeat under a different run dir) must
+// refuse the boundary heal before either rebuild or re-exec, even though the
+// local binary is stale.
 func TestMaybeRefreshChainBoundary_FleetLaneActiveRefusesRebuild(t *testing.T) {
 	root, evolveDir, _ := brhProject(t, "STALE_PIN", "REBUILT-BINARY-BYTES")
 
@@ -135,12 +72,10 @@ func TestMaybeRefreshChainBoundary_FleetLaneActiveRefusesRebuild(t *testing.T) {
 	}
 }
 
-// AC(fleetlane-2): an unverifiable fleet-lane check (scan error) is
-// unverifiable SAFETY state, not proof of an idle plane — it must refuse the
-// rebuild exactly like an active lane, while the CHAIN itself still degrades
-// to "no refresh" rather than halting (fail-safe for the rebuild, fail-open
-// for the chain — the same two-axis contract the existing ahead-check-error
-// and rebuild-failure guards already use in this file's sibling tests).
+// TestMaybeRefreshChainBoundary_FleetLaneCheckErrorRefusesRebuild: an
+// unverifiable fleet-lane check (scan error) must refuse the rebuild exactly
+// like an active lane, while the chain itself still degrades to "no refresh"
+// rather than halting.
 func TestMaybeRefreshChainBoundary_FleetLaneCheckErrorRefusesRebuild(t *testing.T) {
 	root, evolveDir, _ := brhProject(t, "STALE_PIN", "REBUILT-BINARY-BYTES")
 
@@ -173,12 +108,10 @@ func TestMaybeRefreshChainBoundary_FleetLaneCheckErrorRefusesRebuild(t *testing.
 	}
 }
 
-// AC(fleetlane-3, regression guard): with NO active sibling lane (the common
-// case — an empty or absent runs/ dir), the boundary heal must proceed
-// exactly as cmd_loop_chain_boundaryrefresh_test.go's own
-// TestMaybeRefreshChainBoundary_LagTriggersRebuildRepinReExecAndLedger already
-// pins — this test exists only to prove the NEW fleet-lane guard does not
-// regress that existing GREEN path once wired in.
+// TestMaybeRefreshChainBoundary_NoFleetLaneActiveStillRefreshes is a
+// regression guard: with no active sibling lane (an empty or absent runs/
+// dir), the boundary heal must proceed exactly as before the fleet-lane
+// guard was added.
 func TestMaybeRefreshChainBoundary_NoFleetLaneActiveStillRefreshes(t *testing.T) {
 	root, evolveDir, _ := brhProject(t, "STALE_PIN", "REBUILT-BINARY-BYTES")
 	// runs/ deliberately left absent — gc.Discover on a missing dir returns an
@@ -187,14 +120,10 @@ func TestMaybeRefreshChainBoundary_NoFleetLaneActiveStillRefreshes(t *testing.T)
 	restore := brfStubSeams(t, true, nil, nil) // stale=true (ahead)
 	defer restore()
 
-	// Same provenance/commit stubs TestMaybeRefreshChainBoundary_
-	// LagTriggersRebuildRepinReExecAndLedger uses (cmd_loop_chain_
-	// boundaryrefresh_test.go) — this regression guard proves the fleet-lane
-	// guard doesn't block that existing GREEN path, so it must reach the SAME
-	// downstream repin success that test's fixture already sets up; without
-	// these two stubs the real defaultChainBoundaryRepinProvenance runs `git
-	// -C <t.TempDir()> merge-base` against a non-repo dir and always refuses,
-	// which is a fixture gap unrelated to the fleet-lane seam this file adds.
+	// Same provenance/commit stubs the existing lag-triggers-rebuild test
+	// uses: without them, the real defaultChainBoundaryRepinProvenance runs
+	// git against a non-repo temp dir and always refuses, an unrelated
+	// fixture gap.
 	prevCommit, prevProv := chainRunningCommitFn, chainBoundaryRepinProvenanceFn
 	defer func() { chainRunningCommitFn, chainBoundaryRepinProvenanceFn = prevCommit, prevProv }()
 	chainRunningCommitFn = func() string { return "cafebabe1234" }
@@ -216,10 +145,10 @@ func TestMaybeRefreshChainBoundary_NoFleetLaneActiveStillRefreshes(t *testing.T)
 	}
 }
 
-// AC(fleetlane-4): defaultChainBoundaryFleetLaneActive itself — the
-// production implementation — reusing gc.Discover, direct unit coverage
-// (not routed through the maybeRefreshChainBoundary seam) so the real
-// scanner, not just the fake, is exercised at least once.
+// TestDefaultChainBoundaryFleetLaneActive_DetectsLiveSiblingDiscoveredByGC
+// exercises the production implementation directly (not through the
+// maybeRefreshChainBoundary seam), so the real gc.Discover scanner, not just
+// the fake, is exercised at least once.
 func TestDefaultChainBoundaryFleetLaneActive_DetectsLiveSiblingDiscoveredByGC(t *testing.T) {
 	evolveDir := t.TempDir()
 	runsDir := brflRunsDir(t, evolveDir)
@@ -241,8 +170,9 @@ func TestDefaultChainBoundaryFleetLaneActive_DetectsLiveSiblingDiscoveredByGC(t 
 	}
 }
 
-// AC(fleetlane-4b): the no-runs-dir baseline for the production function —
-// a plane that has never recorded a run must report inactive, not an error.
+// TestDefaultChainBoundaryFleetLaneActive_NoRunsDirIsInactive is the
+// no-runs-dir baseline: a plane that has never recorded a run must report
+// inactive, not an error.
 func TestDefaultChainBoundaryFleetLaneActive_NoRunsDirIsInactive(t *testing.T) {
 	active, err := defaultChainBoundaryFleetLaneActive(loopConfig{EvolveDir: t.TempDir()})
 	if err != nil {

@@ -1,72 +1,5 @@
 package core
 
-// contract_escalation.go — CONTRACT-BLOCK CLI ESCALATION (inbox
-// contract-block-cli-escalation, P1 weight 0.95).
-//
-// The defect this closes, confirmed live twice: the correction ladder in
-// reviewAndGuard re-dispatches the SAME profile CLI after a deliverable-contract
-// block. The profile's cli_fallback chain fires only on infra exit codes
-// {80,81,85,124,127} — never on a contract violation — so a CLI that
-// systematically mis-formats a deliverable burns every correction and the
-// contract-gate breaker opens, demoting enforce→advisory for the rest of the run.
-// Batch-19 (cycles 1171/1172, adversarial-review) and batch-21 (cycle-1215,
-// triage) both ended that way: a FORMAT-compliance failure silently WEAKENED a
-// gate. The correct escape hatch is CLI escalation, not gate demotion.
-//
-// Three deliberate scoping constraints:
-//
-//  1. ESCALATE THE RE-DISPATCH, NOT THE PHASE (from the inbox item). The
-//     non-compliance lives on the rare failure path (triage's v1 FAIL sentinel,
-//     adversarial-review's section headings) while the same CLI ships the common
-//     path fine. Rerouting the phase would change 99% of dispatches to fix 1%. So
-//     the escalation is applied to PhaseRequest.ModelRoutingCLI on the
-//     re-dispatch only — a SOFT overlay (llmroute.ApplySoftOverlay) that promotes
-//     the target to chain primary while keeping the profile's own chain behind it
-//     — and is reverted when the ladder ends. The profile on disk is never touched.
-//
-//  2. NOT ON THE FIRST BLOCK. One malformed turn is a bad turn, not a CLI
-//     verdict. Escalation starts at the CONTRACT GATE'S OWN second consecutive
-//     block (ReviewResult.Blocks, reported by the breaker that will open the
-//     circuit — never a locally re-counted correction ordinal, which desyncs from
-//     the breaker whenever a prior cycle left the count hot or the salvage rung
-//     consumed a block). That is still before the third strike, so the circuit
-//     stays the last resort.
-//
-//  3. A CONTRACT BLOCK ESCALATES — AND, since 2026-08-23, SO DOES A
-//     REMEDIATION-CARRYING REJECTION (ReviewResult.Remediation, set only by
-//     evalgate) at its second identical in-cycle round. The original constraint
-//     read "a different CLI is not the remedy" for every Blocks==0 rejection;
-//     the measured record disproved that for the CREATE-a-missing-artifact
-//     class: every eval-materialization failure since cycle-1450
-//     (1471/1476/1504/1531/1540/1545) was one CLI family, 0-for-all correction
-//     rounds on that family — including rounds whose directive named the exact
-//     writable paths (cycle-1545, verified) — while the other family never
-//     failed the gate once (0/26). Remediation-LESS Blocks==0 rejections
-//     (topngate / triagecap / the build floor) are capacity or task-binding
-//     failures and keep the original rule: they never escalate.
-//
-//  4. ONLY AN IDENTICAL BLOCK ESCALATES (cycle-1289). ReviewResult.Blocks counts
-//     blocks, not defects: two genuinely DIFFERENT contract violations on one
-//     phase (block 1 misses a section heading, block 2 misses the verdict
-//     sentinel) are two honest defects, not one incapable-CLI signature, and
-//     round 2's budget should not buy a different CLI family for them. The
-//     trigger is therefore gated on failure IDENTITY as well as count — see
-//     contractBlocksShareIdentity.
-//
-//  5. A TRIGGER WITH NO TARGET STILL GETS A REMEDY (cycle-1300, from this item's
-//     LIVE EVIDENCE note of 2026-08-05). When a phase's whole dispatch chain is
-//     one CLI family, contractEscalationCLI returns ok=false and — before this
-//     cycle — the ladder did nothing at all: the same incapable CLI got the same
-//     plain directive a third time and the breaker opened, so the ratchet failed
-//     OPEN purely because there was nowhere to escalate to. The TOP-FAMILY
-//     remedy is a structured re-prompt (composeContractSalvageRetry) on the
-//     re-dispatch the ladder was already performing. It is disjoint from
-//     escalation — a phase WITH a target escalates and does not re-prompt, so one
-//     block's budget is never spent twice — and it is BREAKER-NEUTRAL: no extra
-//     dispatch, no extra correction, no change to ModelRoutingCLI (there is no
-//     other family: that is the whole premise), so the circuit still opens on the
-//     third strike as the last resort.
-
 import (
 	"fmt"
 	"os"
@@ -81,9 +14,8 @@ import (
 )
 
 // contractEscalateAtBlock is the contract gate's consecutive-block count at
-// which a correction re-dispatch escalates its CLI. Two: block 1's correction
-// retries the same CLI (one bad turn is not a CLI verdict), block 2's correction
-// escalates, and block 3 — the breaker's default threshold — stays the last resort.
+// which a correction re-dispatch escalates its CLI, one strike before the
+// breaker's own threshold opens the circuit.
 const contractEscalateAtBlock = 2
 
 // universalContractFallbackCLI is the escalation target for a phase whose chain
@@ -93,25 +25,23 @@ const contractEscalateAtBlock = 2
 const universalContractFallbackCLI = "claude-tmux"
 
 // contractSalvageRetryDirectiveHeading marks a correction directive as a
-// STRUCTURED RE-PROMPT rather than the plain rejection framing composeCorrection
-// emits — the TOP-FAMILY remedy for the case constraint 5 below describes.
+// structured re-prompt rather than the plain rejection framing
+// composeCorrection emits.
 const contractSalvageRetryDirectiveHeading = "## Contract Salvage Retry — verbatim validator output"
 
-// composeContractSalvageRetry is the remedy for a contract block that WOULD have
-// escalated but has nowhere to escalate to (scoping constraint 5). It enriches
-// the correction the ladder was already going to re-dispatch: same CLI, same
+// composeContractSalvageRetry is the remedy for a contract block that would
+// escalate but has no other CLI family to escalate to. It enriches the
+// correction the ladder was already going to re-dispatch — same CLI, same
 // round, same budget — only the directive changes, from a paraphrasable
 // rejection notice into an explicit diagnosis carrying the validator's output
-// VERBATIM under a distinct heading.
+// verbatim under a distinct heading.
 //
 // Breaker-neutral by construction: it adds no dispatch and consumes no extra
 // correction, so ReviewResult.Blocks — the breaker's own counter — is untouched
 // by the remedy itself and the circuit still opens on the third strike as the
-// last resort. The repair-economics rationale (arXiv:2306.09896, cited by the
-// inbox item) is to spend the harder round's budget on the DIAGNOSIS when buying
-// a different CLI family is not on the menu.
-// remediation, when the triggering gate supplied one, is threaded through
-// composeCorrection and changes the closing clause below (see salvageClosing).
+// last resort. remediation, when the triggering gate supplied one, is threaded
+// through composeCorrection and changes the closing clause below (see
+// salvageClosing).
 func composeContractSalvageRetry(reason, remediation string) string {
 	return composeCorrection(reason, remediation) + "\n\n" + contractSalvageRetryDirectiveHeading + "\n\n" +
 		"This is the second consecutive block reporting the SAME defect, and no other CLI family is " +
@@ -127,19 +57,6 @@ func composeContractSalvageRetry(reason, remediation string) string {
 // collateral edits; when the gate supplied a remedy that clause must not fire,
 // because a remediation exists only for violations whose fix is to CREATE
 // something.
-//
-// REACHABILITY, revised 2026-08-23: LIVE. The escalation trigger now admits
-// remediation-carrying rejections (the evalgate class) at their second
-// identical round, so a phase whose whole chain is one CLI family CAN reach
-// this arm with a remediation in hand — the forward-looking parity below is
-// now the production path for that shape. Historical context: before the
-// revision, Blocks was set solely by internal/deliverable and Remediation
-// solely by internal/evalgate, so no gate satisfied the trigger with a
-// remediation; the 0-for-4 Gate A failures were "rejected after 2
-// correction(s)" via maxCorrections exhaustion in the ORDINARY
-// correction loop, which goes through composeCorrection — that is the call that
-// actually closes the gap. This exists so the two directive paths cannot drift
-// if a future gate ever sets both.
 func salvageClosing(remediation string) string {
 	if remediation != "" {
 		return "Change nothing else beyond what the remedy above requires."
@@ -148,9 +65,8 @@ func salvageClosing(remediation string) string {
 }
 
 // ledgerKindContractGateDemoted is the ledger Kind recorded when the contract
-// gate's breaker opens. The demotion used to be one stderr line and therefore
-// invisible in the cycle record; as a ledger entry it is bound to the cycle's
-// audit chain like every other abnormal event.
+// gate's breaker opens, binding the demotion to the cycle's audit chain like
+// any other abnormal event.
 const ledgerKindContractGateDemoted = "contract_gate_demoted"
 
 // contractDispatch describes the dispatch the deliverable under review came from:
@@ -173,10 +89,10 @@ type contractDispatch struct {
 //
 // Two lookups, in precedence order: the built-in phase→agent table, then the
 // `<phase>.json` convention every MINTED/user phase follows. The second is
-// load-bearing, not defensive: phaseAgentName covers only the 10 built-in spine
-// phases, so adversarial-review — the phase in this fix's own batch-19 evidence,
-// which has a real .evolve/profiles/adversarial-review.json — resolves to nil
-// through the built-in table alone and could never have escalated.
+// load-bearing, not defensive: phaseAgentName covers only the built-in spine
+// phases, so a minted phase with a real .evolve/profiles/<phase>.json would
+// otherwise resolve to nil through the built-in table alone and could never
+// escalate.
 func (cr *cycleRun) contractEscalationProfile(phase Phase) (*profiles.Profile, string) {
 	loader := profiles.NewFromDir(filepath.Join(cr.req.ProjectRoot, ".evolve", "profiles"))
 	if loader == nil {
@@ -240,44 +156,28 @@ func (cr *cycleRun) contractEscalationCLI(phase Phase, dispatchedCLI string) (st
 }
 
 // contractBlocksShareIdentity reports whether the contract block now on the
-// ladder is the SAME defect as the block that triggered the previous correction,
-// which is the second half of the escalation trigger (scoping constraint 4).
+// ladder is the same defect as the block that triggered the previous
+// correction — the second half of the escalation trigger.
 //
-// Identity is the block's VIOLATION-CODE SET, not its rendered text (cycle-1291,
-// repairing the cycle-1289 audit defect). The reason under comparison is
-// deliverable.summarize() — a "; "-joined rendering of EVERY violation on the
-// block as "[code] message" — so a whole-string compare reads a PARTIALLY
-// REPAIRED defect set as a different defect: block 1 reports
-// {missing_section, missing_verdict}, the correction closes one, block 2 reports
-// {missing_verdict} alone, the two strings differ, and the escalation is
-// suppressed exactly where the incapable-CLI signature is strongest (the CLI
-// demonstrably cannot close the remaining violation). Superset regressions and
-// re-ordered/re-worded renderings of ONE set fail the same way.
+// Identity is the block's violation-code SET, not its rendered text: a
+// whole-string compare would read a partially repaired violation set as a
+// different defect, exactly where the incapable-CLI signature is strongest.
+// Two blocks are the same defect when their code sets intersect, which covers
+// subset, superset and equal while still separating genuinely disjoint sets.
+// The codes reach here as plain data parsed out of the rendered reason,
+// because internal/deliverable imports internal/core and the reverse would be
+// an import cycle.
 //
-// deliverable.Violation.Code is the stable identity primitive, untouched by
-// prose rewording or violation order, so two blocks are the SAME defect exactly
-// when their code sets INTERSECT — which covers subset, superset and equal, and
-// still separates the disjoint sets constraint 4 exists to keep apart. The codes
-// reach here as plain data parsed out of the rendered reason: internal/deliverable
-// imports internal/core (reviewer.go, verifier.go) and core imports deliverable
-// nowhere, so a []deliverable.Violation field on ReviewResult would be an import
-// cycle.
+// When either block yields no code, identity falls back to
+// failure_digest.go's normalizeReasonForFingerprint (the blocker breaker's own
+// primitive), because reading "no codes on either side" as "different defect"
+// would silently disable the ladder for every non-summarize reason shape.
 //
-// FAIL-SAFE: not every reason on this path is a summarize() rendering. When
-// EITHER block yields no code, identity falls back to failure_digest.go's
-// normalizeReasonForFingerprint — the blocker breaker's own primitive, which
-// projects a reason onto its defect identity by dropping identity-noise tokens
-// (go-test durations, narrative verdicts). Reading "no codes on either side" as
-// "∅ ∩ ∅ ⇒ different defect" would silently delete the ladder for every
-// non-summarize reason shape.
-//
-// The rule is "prior reason known AND differing ⇒ suppress", NOT "equal ⇒
-// escalate". The difference is the hot-breaker edge: the contract-gate breaker is
-// process-global, so a cycle that aborted mid-ladder leaves it hot and the next
-// phase can arrive at Blocks >= contractEscalateAtBlock on its ladder's FIRST
-// block — where no prior block exists to compare. Requiring equality there would
-// silently delete the escape hatch that constraint 2 deliberately keeps open, so
-// the zero-value prev (no block observed yet) reports true.
+// The rule is "prior reason known AND differing ⇒ suppress", never "equal ⇒
+// escalate": the contract-gate breaker is process-global, so a cycle that
+// aborts mid-ladder leaves it hot and the next phase's ladder can start at
+// block 2 with no prior block to compare — the zero-value prev (nothing
+// observed) reports true, keeping that escape hatch open.
 func contractBlocksShareIdentity(prev contractBlockIdentity, reason string) bool {
 	if !prev.observed {
 		return true
@@ -319,38 +219,29 @@ var contractViolationCodeRE = regexp.MustCompile(`\[([A-Za-z0-9_.:-]+)\]`)
 // inference is sound only for violations whose ONLY repair is an edit to the
 // artifact itself.
 //
-// The counter-example the classifier exists for is deliverable.CodeStrayInWorktree
-// (deliverable.go:306), which is repaired by DELETING a stray copy elsewhere in
-// the worktree — the watched artifact is left byte-identical, so an unchanged
-// hash there is not evidence of inaction and a short-circuit reading it that way
-// would turn a repairable contract block into a deterministic ladder abort
-// (inst-L1508a).
+// The counter-example is deliverable.CodeStrayInWorktree, which is repaired by
+// deleting a stray copy elsewhere in the worktree — the watched artifact is
+// left byte-identical, so an unchanged hash there is not evidence of inaction.
 //
-// ALLOWLIST, not denylist, and therefore fail-closed: a code this function has
-// never heard of is one whose repair mechanics are unknown, and the only safe
-// answer for an unknown repair mechanic is false — "do not skip the re-verify".
-// False negatives cost one redundant verification; a false positive silently
-// drops a real repair.
+// Allowlist, not denylist, and therefore fail-closed: a code this function has
+// never heard of has unknown repair mechanics, and the only safe answer is
+// false. A false negative costs one redundant verification; a false positive
+// would silently drop a real repair.
 //
-// Deliberately NARROWER than the criterion in one respect, stated here so the
-// comment is true as written: deliverable.CodeInvalidJSON and
-// deliverable.CodeFailureContextMissing also repair by editing the artifact, and
-// this cycle's contract (triage top_n; the cycle-1510 eval's vocabulary-drift
-// grader) pins the allowlist by membership, not by count. Widening to those two is queued as
-// follow-up work rather than taken here — the omission errs in the fail-closed
-// direction, so it cannot cause the unsound inference above. See the Amendments
-// section of the cycle-1510 build report.
+// Deliberately narrower than the criterion in one respect: CodeInvalidJSON and
+// CodeFailureContextMissing also repair by editing the artifact but are not
+// yet in the allowlist; widening it is follow-up work, and the omission errs
+// in the fail-closed direction.
 //
-// The codes arrive as plain strings, never deliverable.Violation values:
-// internal/deliverable imports internal/core (reviewer.go, verifier.go), so the
-// reverse import would be a cycle — the same constraint documented for
-// contractViolationCodeRE above. That makes drift between the two vocabularies
-// invisible to the compiler, which is why it is asserted in a test instead
-// (TestContractArtifactDetermined_CodesMatchDeliverableVocabulary).
+// The codes arrive as plain strings, never deliverable.Violation values,
+// because internal/deliverable imports internal/core and the reverse would be
+// a cycle; drift between the two vocabularies is therefore asserted in
+// TestContractArtifactDetermined_CodesMatchDeliverableVocabulary rather than
+// caught by the compiler.
 //
-// NO PRODUCTION CALLER YET, by design: the hash short-circuit this classifies
-// for is not scheduled, and building the short-circuit alongside it would be
-// scope creep (Core Rule 2). The exercised caller is the test above.
+// No production caller yet: the hash short-circuit this classifies for is not
+// scheduled, so building it alongside this classifier would be scope creep.
+// The test above is the only exerciser.
 func contractArtifactDetermined(code string) bool {
 	switch code {
 	case "missing_artifact", // the artifact does not exist; repair writes it
@@ -393,11 +284,10 @@ func (cr *cycleRun) escalationAllowed(phase Phase, cli string, prof *profiles.Pr
 	return true
 }
 
-// formatContractGateDemotionWarn renders the operator-facing line for a contract
-// gate that demoted itself. It names the PHASE, the CLI the blocks are
-// attributable to, WHICH remedy actually ran, and the last violation — the
-// batch-19 line named none of the four, which is why the same class recurred
-// twice before anyone noticed.
+// formatContractGateDemotionWarn renders the operator-facing line for a
+// contract gate that demoted itself. It names the phase, the CLI the blocks
+// are attributable to, which remedy actually ran, and the last violation, so
+// an operator can tell a real capacity gap from a CLI that failed twice.
 //
 // It takes the whole contractDispatch rather than a bare escalated bool because
 // there are now two remedies to report and "did NOT run" is a line an operator
@@ -437,8 +327,8 @@ func (cr *cycleRun) noteContractGateDemotion(phase Phase, d contractDispatch, bl
 		Role:  string(phase),
 		Kind:  ledgerKindContractGateDemoted,
 		// Action carries the decision verb + evidence so the demotion survives
-		// beyond transient stderr (a Kind/Role-only entry is the content-free
-		// fingerprint shape that blinded the breaker diagnostics in cycle-1117).
+		// beyond transient stderr; a Kind/Role-only entry would be a
+		// content-free fingerprint shape that blinds breaker diagnostics.
 		//
 		// salvage_attempted rides ALONGSIDE escalated= (never instead of it): the
 		// two remedies are disjoint, so recurrence analytics reading this entry

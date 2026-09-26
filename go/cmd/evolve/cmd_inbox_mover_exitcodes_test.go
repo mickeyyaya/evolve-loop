@@ -1,9 +1,5 @@
 package main
 
-// cmd_inbox_mover_exitcodes_test.go — ADR-0103 unit 06 step 0 (test 14): the
-// exit map's 2 (mv failed) and 3 (console-routed) arms, which the existing
-// cmd tests never reached, pinned before the mover moves.
-
 import (
 	"bytes"
 	"os"

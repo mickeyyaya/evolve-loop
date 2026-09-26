@@ -1,12 +1,5 @@
 package main
 
-// cmd_inbox_signals_test.go — ADR-0103 unit 06 step 4 (tests 54-55): the
-// inbox module tag renders at the --simulate root and lands in the run
-// workspace's signals.ndjson through the FAIL closeout; the Center-less
-// `inboxmover.Options{` literals are an allow-list with reasons (the 06-F1
-// debt), the three applyCycleFailureOutcome( call sites pass a non-nil
-// signals token, and no production package constructs a second Center.
-
 import (
 	"bytes"
 	"os"
@@ -19,8 +12,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 )
 
-// Test 54a — a promote whose destination mkdir fails renders [inbox] on the
-// simulate root's console and lands in the cycle-less signals.ndjson.
+// A promote whose destination mkdir fails renders [inbox] on the simulate
+// root's console and lands in the cycle-less signals.ndjson.
 func TestWireSimulateOrchestrator_InboxWarningRenders(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
@@ -47,8 +40,8 @@ func TestWireSimulateOrchestrator_InboxWarningRenders(t *testing.T) {
 	}
 }
 
-// Test 54b — the FAIL closeout stamps the run workspace's signals.ndjson with
-// the mover's cycle-scoped event through applyCycleFailureOutcome's signals.
+// The FAIL closeout stamps the run workspace's signals.ndjson with the
+// mover's cycle-scoped event through applyCycleFailureOutcome's signals.
 func TestApplyCycleFailureOutcome_StampsRunWorkspaceSignals(t *testing.T) {
 	root := t.TempDir()
 	evolveDir, _ := seedFailedCycleInbox(t, root, "poison", 7)
@@ -80,11 +73,10 @@ func TestApplyCycleFailureOutcome_StampsRunWorkspaceSignals(t *testing.T) {
 	}
 }
 
-// Test 55 — the Center-less roots are pinned: every non-test
-// `inboxmover.Options{` literal without a Signals: field is on the allow-list
-// with its reason (06-F1 threads them root by root); the three package-level
-// applyCycleFailureOutcome( call sites pass a signals token that is not nil;
-// the non-test signalcenter.New( count stays 1 (no library-built Center).
+// TestInboxCenterlessRootsArePinned pins every non-test `inboxmover.Options{`
+// literal without Signals: to an allow-list with its reason, and verifies the
+// applyCycleFailureOutcome( call sites and signalcenter.New( construction
+// sites stay wired to their documented roots.
 func TestInboxCenterlessRootsArePinned(t *testing.T) {
 	allowed := map[string]string{
 		"cmd/evolve/cmd_inbox_mover.go":         "the triage persona's `evolve inbox-mover` root — 06-F1 verifies <run>/signals.ndjson is writable under the triage sandbox first",
@@ -164,8 +156,9 @@ func TestInboxCenterlessRootsArePinned(t *testing.T) {
 		t.Errorf("the three package-level call sites (cmd_cycle.go ×2, cmd_loop_sequential_outcome.go ×1) must be present, found %d", calls)
 	}
 	// Two process roots build a Center: the cycle/loop root (cmd_cycle.go) and
-	// the manual `evolve phase observer` subcommand (its own process; ADR-0103
-	// unit 12). Every other Center reaches a component through an accessor.
+	// the manual `evolve phase observer` subcommand (its own process). Every
+	// other Center reaches a component through an accessor.
+	// See ADR-0103.
 	centerRoots := map[string]bool{"cmd/evolve/cmd_cycle.go": true, "internal/cli/phasecmd/phase_observer.go": true}
 	got := nonTestConstructionsOf(t, moduleRoot, `\bsignalcenter\.New\(`)
 	unexpected := false
