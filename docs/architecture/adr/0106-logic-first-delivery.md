@@ -7,6 +7,7 @@
   - [operating-policy](../../operations/operating-policy.md) §0, which states the rule this ADR implements.
 - **Builds on:** [ADR-0105](0105-identity-preserving-fleet-rebase.md) (the process ladder at ship), [ADR-0072](0072-system-failure-policy-and-halt.md) (the floor this ADR never weakens).
 - **Review:** architecture review 2026-09-26, APPROVE-WITH-CHANGES; every finding is folded in below and listed in the record.
+- **Design document:** [logic-first-delivery-design.md](../logic-first-delivery-design.md) carries the full design, the component catalog with live status, the interfaces, the security model and the rollout, and is kept current with every landing.
 
 ## Context
 
@@ -87,7 +88,7 @@ The route lives in `deliverable`, beside the codes, so the gate and the ladder c
 
 Recovery never launders. These hold on every rung, and a rung that cannot satisfy one declines.
 
-- **The kernel fences the whole run.** Before the rung, the guard hashes every file in the workspace and fences the worktree (`treefence`). After it, only the violated deliverable paths and the agent's report may differ; host-written telemetry the dispatch itself appends is unfenced by name. Anything else changed is restored, the rung is an integrity violation, and the cycle aborts with a P0. Restoring and then re-dispatching onto a touched tree is not safe.
+- **The kernel fences the whole run.** Before the rung, the guard snapshots every file's bytes in the workspace and fences the worktree (`treefence`). After it, only the violated deliverable paths and the agent's report may differ; host-written telemetry the dispatch itself appends is unfenced by name. Anything else changed is restored, the rung is an integrity violation, and the cycle aborts with a P0. Restoring and then re-dispatching onto a touched tree is not safe.
 - **Evidence, not claims.** The decision to recover rests on `evidence.Sufficient`, whose every input is computed or owned by the kernel; a report the agent wrote is never evidence for its own repair.
 - **Recovery never touches the change.** The code, the tests and the explanation document live in the fenced worktree; the audit's explanation review is a judgment and is excluded. A rung that changes a decision-bearing field or the kind signals fails.
 - **Provenance for every added line.** The kernel checks each block the report names against the pre-rung snapshot of the named evidence file, byte for byte. A `## RED Run Output` section may quote only a host-captured log. A block without provenance, or with provenance that does not match, fails the rung.
@@ -125,8 +126,8 @@ Each component is one commit with its own tests, ordered by dependency; unwired 
 | **Verdict and ladder (V, F)** ||||
 | V0 | verdict refresh: re-classify after an approved rung; adopt only under the guard rule | wiring | salvage's approval now routes PASS; a rung on an empty primary keeps FAIL |
 | F1 | `interaction.RungRecover` in `NextCorrection`, after live-fix, before re-dispatch, gated on `Repairable` | pure, unwired | order table; each rung only with budget; a judgment phase never reaches recover; exhausted → abort |
-| F2 | `recoveryguard`: hash the workspace, fence the worktree, allow only the named paths, restore and report the rest; provenance check of a report's blocks | pure, unwired | a forged token, a rewritten sibling report, a planted verdict, a source edit are each restored and reported; an in-grant write passes; a block whose bytes differ from its source fails; host logs are unfenced |
-| F3 | recovery-agent profile (`sandbox.enabled`, no network), persona, phase config | config, unwired | the profile requires the sandbox and no network; no grant reaches the repository beyond the run dir or any worktree |
+| F2 | `recoveryguard`: hash the workspace, fence the worktree, allow only the named paths, restore and report the rest; the provenance check of a report's blocks is its own commit (F2b in the design document) | pure, unwired | a forged token, a rewritten sibling report, a planted verdict, a source edit are each restored and reported; an in-grant write passes; a block whose bytes differ from its source fails; host logs are unfenced |
+| F3 | recovery-agent profile (`sandbox.enabled`, no network, codex family with claude as fallback per the balanced-tier floor), persona, phase config | config, unwired | the profile requires the sandbox and no network; no grant reaches the repository beyond the run dir or any worktree; the family floor accepts it |
 | F3b | a `{cycle}` write-grant template in the sandbox resolver; the recovery profile grants only its own cycle's run dir | trust kernel | a sibling lane's run dir is not writable |
 | F4 | `bridgeDeliverableRecoverer` (dispatch, prompt, strict report parse) | unwired | fake bridge: the prompt names the contract, violations and evidence; a malformed or missing report is a declined rung, never an error that blocks |
 | F5 | `workflow.recovery_rounds`: policy.json → policy → config → orchestrator option | config plumbing | the compiled default is 1; the key is read; an absent block keeps the default |
