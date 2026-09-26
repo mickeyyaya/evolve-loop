@@ -7,10 +7,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 )
 
-// evalCondition is the Specification evaluator: does a single declarative
-// trigger clause hold against the digested signals? Field paths reference
-// OBJECTIVE handoff values only (never an LLM self-score). Unknown fields are
-// false (fail-safe: an unrecognized trigger never fires).
+// evalCondition reports whether one trigger clause holds against the signals; an absent field never holds.
 func evalCondition(sig RoutingSignals, c config.Condition) bool {
 	num, isNum, str, isPresent := resolveField(sig, c.Field)
 	if !isPresent {
@@ -48,9 +45,7 @@ func evalCondition(sig RoutingSignals, c config.Condition) bool {
 	}
 }
 
-// evalCondRule evaluates a conditional-mandatory rule (string value form): the
-// head clause AND every clause in r.And (ADR-0099). A single-clause rule is
-// byte-identical to the legacy evaluation.
+// evalCondRule evaluates a conditional-mandatory rule: its head clause AND every clause in r.And.
 func evalCondRule(sig RoutingSignals, r config.CondRule) bool {
 	for _, c := range r.Clauses() {
 		if !evalCondition(sig, config.Condition{Field: c.Field, Op: c.Op, Value: c.Value}) {
@@ -60,8 +55,8 @@ func evalCondRule(sig RoutingSignals, r config.CondRule) bool {
 	return true
 }
 
-// resolveField maps a field path to its signal value. Returns (numeric value,
-// isNumeric, string value, isPresent). Numeric and string forms are mutually exclusive.
+// resolveField returns (number, isNumber, string, isPresent) for a field path. A typed field is
+// present even at its zero value, so `cycle_size != trivial` holds before any handoff.
 func resolveField(sig RoutingSignals, field string) (float64, bool, string, bool) {
 	switch field {
 	case "cycle_size", "triage.cycle_size":
@@ -69,10 +64,6 @@ func resolveField(sig RoutingSignals, field string) (float64, bool, string, bool
 	case "scout.cycle_size":
 		return 0, false, sig.Scout.CycleSizeEstimate, true
 	case config.SignalDeliverableKind:
-		// Projected (triage > scout > "code") and ALWAYS present: the absent
-		// default "code" is the conservative side, so `deliverable_kind !=
-		// document` holds pre-handoff and the tdd pin is released only by a
-		// digested document signal (ADR-0099).
 		return 0, false, sig.DeliverableKind(), true
 	case config.SignalGoalType:
 		return resolveTypedOrGeneric(sig, field, sig.Scout.GoalType)
@@ -111,20 +102,12 @@ func resolveField(sig RoutingSignals, field string) (float64, bool, string, bool
 	case "audit.verdict":
 		return 0, false, sig.Audit.Verdict, true
 	default:
-		// Fall through to the uniform signal plane: a field not covered by the
-		// typed structs above is resolved from sig.Generic, so a user-defined
-		// phase's emitted signal is routable. Absent → fail-safe false (an
-		// unrecognized trigger never fires).
 		return resolveGeneric(sig, field)
 	}
 }
 
-// resolveTypedOrGeneric returns the typed struct value when the phase declared
-// one, else falls through to the generic signal plane for field — the shared
-// pattern behind scout.goal_type, scout.deliverable_kind and
-// triage.deliverable_kind. An undeclared value keeps the D2 fail-closed
-// trigger semantics (absent ⇒ false, present-empty ⇒ ""), so an `ne` trigger
-// never fires on a cycle that declared nothing for the field.
+// resolveTypedOrGeneric returns the declared typed value, else the generic signal. An undeclared
+// value stays absent, so an `ne` trigger never fires on a cycle that declared nothing.
 func resolveTypedOrGeneric(sig RoutingSignals, field, typed string) (float64, bool, string, bool) {
 	if typed != "" {
 		return 0, false, typed, true
@@ -132,9 +115,7 @@ func resolveTypedOrGeneric(sig RoutingSignals, field, typed string) (float64, bo
 	return resolveGeneric(sig, field)
 }
 
-// resolveGeneric resolves field from the namespaced generic signal bus. JSON
-// numbers arrive as float64; strings stay strings; bools render as
-// "true"/"false" so eq/ne comparisons work. Anything else is fail-safe false.
+// resolveGeneric resolves field from the generic plane; bools render as "true"/"false" so eq and ne work.
 func resolveGeneric(sig RoutingSignals, field string) (float64, bool, string, bool) {
 	v, ok := sig.GenericValue(field)
 	if !ok {
@@ -144,7 +125,7 @@ func resolveGeneric(sig RoutingSignals, field string) (float64, bool, string, bo
 	case float64:
 		return t, true, "", true
 	case int:
-		return float64(t), true, "", true // in-process assignment (encoding/json always emits float64)
+		return float64(t), true, "", true // set in process; encoding/json always yields float64
 	case string:
 		return 0, false, t, true
 	case bool:
@@ -157,8 +138,7 @@ func resolveGeneric(sig RoutingSignals, field string) (float64, bool, string, bo
 	}
 }
 
-// coerceNum converts a condition value to float64. For severity fields a string
-// value is mapped through the severity ordinal (so value:"HIGH" works).
+// coerceNum converts a condition value to float64; a severity field accepts a word such as "HIGH".
 func coerceNum(field string, v interface{}) (float64, bool) {
 	switch t := v.(type) {
 	case float64:

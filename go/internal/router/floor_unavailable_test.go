@@ -6,12 +6,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 )
 
-// TestClampPlanToFloorWith_DropsUnavailablePhases — 2026-09-09 token-waste
-// root cause #2: an advisor plan that schedules a phase whose persona doc is
-// absent is clamped at the floor, so the dispatch/skip/retrospective spend
-// never happens. The drop is recorded under its own rule token, distinct from
-// the unknown-phase drop, so forensics can tell "not in the catalog" from "in
-// the catalog, persona missing".
 func TestClampPlanToFloorWith_DropsUnavailablePhases(t *testing.T) {
 	in := RouteInput{
 		Cfg:               config.RoutingConfig{Order: []string{"scout", "tdd", "build", "amplify-tests", "audit", "ship"}},
@@ -36,7 +30,6 @@ func TestClampPlanToFloorWith_DropsUnavailablePhases(t *testing.T) {
 	if !found {
 		t.Fatalf("drop must be recorded under %q; clamps=%+v", DropUnavailablePhaseRule, clamps)
 	}
-	// Positive control: with nothing unavailable the same plan keeps the phase.
 	in.UnavailablePhases = nil
 	out, _ = ClampPlanToFloorWith(in, plan, []string{"build", "audit"}, false)
 	if !planRuns(out, "amplify-tests") {
@@ -44,9 +37,6 @@ func TestClampPlanToFloorWith_DropsUnavailablePhases(t *testing.T) {
 	}
 }
 
-// TestShouldRun_UnavailablePhaseNeverInserted: the legacy trigger path (below
-// Advisory, or with no plan) honours the same exclusion — a firing insert_when
-// on a persona-less phase records a clamp instead of a dispatch.
 func TestShouldRun_UnavailablePhaseNeverInserted(t *testing.T) {
 	cfg := config.RoutingConfig{
 		Order:         []string{"scout", "build", "amplify-tests", "audit", "ship"},

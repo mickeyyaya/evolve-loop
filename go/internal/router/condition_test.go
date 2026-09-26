@@ -73,14 +73,11 @@ func TestEvalCondition_StringOps(t *testing.T) {
 	}
 }
 
-// TestEvalCondition_GenericSignals verifies routing conditions resolve against
-// the uniform signal plane (sig.Generic) — the path that makes a user-defined
-// phase's emitted signal routable. JSON numbers arrive as float64.
 func TestEvalCondition_GenericSignals(t *testing.T) {
 	sig := RoutingSignals{Generic: map[string]any{
 		"security.cves":         float64(2), // JSON number
-		"security.severity_max": "HIGH",     // string
-		"deploy.ready":          true,       // bool
+		"security.severity_max": "HIGH",
+		"deploy.ready":          true,
 	}}
 	cases := []struct {
 		field, op string
@@ -103,21 +100,14 @@ func TestEvalCondition_GenericSignals(t *testing.T) {
 	}
 }
 
-// TestEvalCondition_AbsentFieldIsAlwaysFalse encodes the cycle-238 defect D2
-// (missing-signal fail-open): an insert_when condition on a generic field that
-// was NEVER EMITTED must evaluate false for EVERY operator. At the defective
-// baseline, `ne` on an absent field returned true ("" != value) and `eq ""`
-// returned true ("" == ""), so catalog phases with `goal_type != <other-goal>`
-// triggers fired when scout.goal_type was simply not emitted.
 func TestEvalCondition_AbsentFieldIsAlwaysFalse(t *testing.T) {
-	// Generic bus exists but the queried fields are absent from it; also covers
-	// the nil-bus case via "unknown.field" (resolveField default branch).
+	// The bus exists but lacks the queried fields; unknown.field covers the default branch.
 	sig := RoutingSignals{Generic: map[string]any{"scout.other": "present"}}
 	cases := []struct {
 		field, op string
 		val       interface{}
 	}{
-		{"scout.goal_type", "ne", "growth"}, // the cycle-238 fail-open shape
+		{"scout.goal_type", "ne", "growth"},
 		{"scout.goal_type", "!=", "growth"},
 		{"scout.goal_type", "eq", ""}, // "" == "" fail-open variant
 		{"scout.goal_type", "ne", ""},
@@ -136,10 +126,6 @@ func TestEvalCondition_AbsentFieldIsAlwaysFalse(t *testing.T) {
 	}
 }
 
-// TestEvalCondition_PresentEmptyString is the over-fix guard for D2: a generic
-// field that IS emitted with an empty-string value is PRESENT and must keep
-// normal string-comparison semantics — fail-closed applies to absence, not to
-// empty values.
 func TestEvalCondition_PresentEmptyString(t *testing.T) {
 	sig := RoutingSignals{Generic: map[string]any{"scout.goal_type": ""}}
 	cases := []struct {
@@ -147,10 +133,10 @@ func TestEvalCondition_PresentEmptyString(t *testing.T) {
 		val       interface{}
 		want      bool
 	}{
-		{"scout.goal_type", "eq", "", true},        // present "" == "" matches
-		{"scout.goal_type", "ne", "growth", true},  // present "" != "growth" fires
-		{"scout.goal_type", "ne", "", false},       // present "" != "" does not
-		{"scout.goal_type", "eq", "growth", false}, // present "" == "growth" does not
+		{"scout.goal_type", "eq", "", true},
+		{"scout.goal_type", "ne", "growth", true},
+		{"scout.goal_type", "ne", "", false},
+		{"scout.goal_type", "eq", "growth", false},
 	}
 	for _, c := range cases {
 		got := evalCondition(sig, config.Condition{Field: c.field, Op: c.op, Value: c.val})
@@ -160,13 +146,6 @@ func TestEvalCondition_PresentEmptyString(t *testing.T) {
 	}
 }
 
-// TestEvalCondition_TypedFieldAbsentKeepsLegacySemantics scopes D2 to the
-// GENERIC signal plane: typed-struct fields keep their legacy semantics even
-// when no handoff has been digested yet. The TDD-pin (`cycle_size != trivial`)
-// DEPENDS on this — with zero signals it must evaluate true so tdd stays
-// pinned on the conservative side (see floor.go tddPinned + shouldRun). A
-// blanket absent⇒false over typed fields would silently unpin tdd at cycle
-// start, weakening the integrity floor.
 func TestEvalCondition_TypedFieldAbsentKeepsLegacySemantics(t *testing.T) {
 	var sig RoutingSignals // no handoffs digested at all
 	if !evalCondition(sig, config.Condition{Field: "cycle_size", Op: "ne", Value: "trivial"}) {
@@ -174,20 +153,13 @@ func TestEvalCondition_TypedFieldAbsentKeepsLegacySemantics(t *testing.T) {
 	}
 }
 
-// TestTriggerFires_AbsentFieldFailsClosed proves D2 at the trigger level — the
-// exact cycle-238 mechanism end-to-end through triggerFires:
-//  1. insert_when `ne` on an absent signal must NOT fire the phase, and
-//  2. skip_when `ne` on an absent signal must NOT suppress an otherwise-firing
-//     insert (fail-closed means absent CONDITIONS are false, in both polarities).
 func TestTriggerFires_AbsentFieldFailsClosed(t *testing.T) {
 	absentNe := config.Condition{Field: "scout.goal_type", Op: "ne", Value: "growth"}
 
-	// (1) insert_when on absent field: must not fire.
 	if triggerFires(RoutingSignals{}, config.RoutingBlock{InsertWhen: []config.Condition{absentNe}}) {
 		t.Errorf("insert_when(absent ne) fired; want quiet (fail-closed)")
 	}
 
-	// (2) skip_when on absent field must not veto a genuinely firing insert.
 	sig := RoutingSignals{Build: BuildSignals{ACSRed: 2, Present: true}}
 	block := config.RoutingBlock{
 		InsertWhen: []config.Condition{{Field: "build.acs_red", Op: "gt", Value: 0}},
@@ -199,12 +171,10 @@ func TestTriggerFires_AbsentFieldFailsClosed(t *testing.T) {
 }
 
 func TestCoerceNum_StringNumber(t *testing.T) {
-	// String numeric value coerces for a numeric field.
 	sig := sigFixture()
 	if !evalCondition(sig, config.Condition{Field: "build.acs_red", Op: "eq", Value: "3"}) {
 		t.Errorf("string '3' should coerce to numeric 3")
 	}
-	// Non-numeric string on numeric field → no match.
 	if evalCondition(sig, config.Condition{Field: "build.acs_red", Op: "gt", Value: "abc"}) {
 		t.Errorf("non-numeric string should not satisfy numeric gt")
 	}

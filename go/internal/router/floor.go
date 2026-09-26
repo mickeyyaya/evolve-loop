@@ -2,90 +2,31 @@ package router
 
 import "slices"
 
-// EvaluatorFloorPhase is the single non-removable floor phase: a plan can never
-// reach ship without an evaluator. It mirrors policy's own constant of the same
-// value — each layer independently guarantees the evaluator (defense in depth;
-// unifying them would create an import cycle, router/policy.go imports policy),
-// so ClampPlanToFloorWith re-asserts it rather than trusting its caller.
-// Divergence trips TestEvaluatorFloorPhase_SingleSource.
+// EvaluatorFloorPhase is the floor phase no configuration can remove; policy holds a pinned twin.
+// See ADR-0060.
 const EvaluatorFloorPhase = "audit"
 
-// floor.go implements the ADR-0024 §1 conditional integrity floor: the SINGLE
-// causal invariant that replaces the fixed mandatory-spine never-skip list when
-// an advisor drives phase selection (Stage>=Advisory). It is a PURE plan-level
-// prefilter — the caller (orchestrator) applies it only when routing is at
-// Advisory or above; below that the legacy static path runs unchanged.
-
-// ClampPlanToFloor enforces the conditional integrity floor on an advisory
-// whole-cycle plan. The floor is two causal implications:
-//
-//	reach(ship) ⇒ build ∧ audit ∧ (tdd, unless the cycle is trivial)
-//	run(build)  ⇒ audit ∧ ship   (operator policy 2026-06-11)
-//
-// If the plan runs ship, the clamp forces build + audit on (and tdd unless the
-// cycle is trivial per the configured TDD-pin), recording one Clamp per forced
-// phase. If the plan BUILDS, review and ship are forced — built work may not
-// strand unreviewed or unshipped. Only a no-build, no-ship plan is left fully
-// unconstrained — such a cycle may legitimately end after scout
-// (investigation/convergence). The clamp can only
-// COMPLETE the set, never weaken it (sequencing across the set is the walk's job,
-// not the floor's). Phase names must be canonical lowercase — the caller
-// normalizes the advisor's parsed output before clamping.
-//
-// This is a plan-level PREFILTER, not the whole safety story: it forces audit to
-// RUN, but the "audit must PASS bound to the built tree" guarantee remains with
-// the ship phase's audit-binding (tree-SHA match + EGPS red_count==0) and the
-// artifact-backed SpineSatisfiedUpTo gate. Defense in depth — never the sole gate.
-//
-// PURE: returns a NEW plan (input unmutated) plus the clamps applied.
-//
-// This is the back-compat entry point: it enforces the SAFE STRUCTURAL DEFAULT
-// floor (DefaultShipFloor). Callers that honor a user-configured floor
-// (.evolve/policy.json:ship_floor) call ClampPlanToFloorWith with the resolved
-// set instead. Keeping this wrapper byte-identical to the historical behavior is
-// what lets the existing floor_test.go suite stand as the default-preserving proof.
+// ClampPlanToFloor enforces the default integrity floor (DefaultShipFloor) on an advisory plan.
 func ClampPlanToFloor(in RouteInput, plan *PhasePlan) (*PhasePlan, []Clamp) {
 	return ClampPlanToFloorWith(in, plan, DefaultShipFloor(), in.IntentRequired)
 }
 
-// DefaultShipFloor is the safe structural default: a plan reaching ship must run
-// tdd (unless the cycle is trivial), build, and audit. The router owns this
-// definition (single source of truth); policy.FloorPhases overrides it only when
-// the user supplies an explicit ship_floor.
+// DefaultShipFloor returns the phases a plan reaching ship must run unless policy sets ship_floor.
 func DefaultShipFloor() []string { return []string{"tdd", "build", "audit"} }
 
-// ClampPlanToFloorWith enforces a CONFIGURABLE integrity floor on an advisory
-// whole-cycle plan: floor is the set of phases a plan reaching ship MUST run.
-// For each floor phase the clamp forces it on (recording one Clamp), EXCEPT
-// "tdd", which carries the trivial-cycle exemption (forced only when tddPinned).
-// Floor order is preserved for deterministic clamp listing. A no-ship plan is
-// unconstrained (the implication's antecedent is false). The evaluator phase is
-// re-asserted into the floor if absent (self-sealing — see EvaluatorFloorPhase),
-// so this function cannot be made to produce a floor without an evaluator even
-// by a caller that bypasses policy.FloorPhases. Same defense-in-depth caveat as
-// ClampPlanToFloor: this forces audit to RUN; the ship phase's audit-binding
-// still guarantees it PASSED.
-//
-// It also DROPS any entry naming a phase outside the plan's known-phase set
-// (see dropUnknownPhases) before applying the floor: ValidatePlan already
-// detects those but is REPORT-ONLY, so the clamp — the sole disposer — is where
-// enforcement belongs.
-//
-// PURE: returns a NEW plan (input unmutated) plus the clamps applied.
+// ClampPlanToFloorWith drops unknown and unavailable entries, then forces intent when required, audit
+// and ship onto a building plan, and floor onto a ship-bound one. It returns a new plan and one Clamp
+// per change; phase names must be canonical.
+// See ADR-0024.
 func ClampPlanToFloorWith(in RouteInput, plan *PhasePlan, floor []string, intentRequired bool) (*PhasePlan, []Clamp) {
 	if plan == nil {
 		return nil, nil
 	}
-	// Self-sealing evaluator guarantee: re-assert the non-removable evaluator
-	// rather than trust the caller, so a future direct caller cannot produce a
-	// floor without it. policy.FloorPhases already guarantees this; we do not
-	// rely on that.
+	// Re-assert the evaluator rather than trust policy.FloorPhases to have added it.
 	if !slices.Contains(floor, EvaluatorFloorPhase) {
 		floor = append([]string(nil), floor...)
 		floor = append(floor, EvaluatorFloorPhase)
 	}
-	// MintPhases carried through unchanged: the clamp governs the run/skip
-	// Entries (the integrity floor), never the set of minted phases.
 	entries, clamps := dropUnknownPhases(in, plan)
 	out := &PhasePlan{
 		Entries:    entries,
@@ -112,7 +53,7 @@ func ClampPlanToFloorWith(in RouteInput, plan *PhasePlan, floor []string, intent
 
 	force := func(phase string, rule string) {
 		if planRuns(out, phase) {
-			return // already running — nothing to clamp
+			return
 		}
 		ensureRun(out, phase)
 		clamps = append(clamps, Clamp{
@@ -126,26 +67,20 @@ func ClampPlanToFloorWith(in RouteInput, plan *PhasePlan, floor []string, intent
 		force("intent", "require-intent")
 	}
 
-	// Converse implication (operator policy 2026-06-11): a cycle that BUILDS
-	// must schedule review and ship — built work may not strand unreviewed or
-	// unshipped (the cycle-283 class: a completed build discarded with
-	// audit/ship unreached). Forcing ship here makes the building plan
-	// ship-bound, so the ship floor below then completes the set. No-build
-	// investigation cycles are untouched (the antecedent is false).
+	// Built work may not strand unreviewed or unshipped. Forcing ship makes the
+	// plan ship-bound, so the ship floor below completes the set.
 	if planRuns(out, "build") {
 		force(EvaluatorFloorPhase, "build-requires-"+EvaluatorFloorPhase)
 		force("ship", "build-requires-ship")
 	}
 
-	// No-ship cycle: the implication's antecedent is false, so the floor imposes
-	// nothing. scout-only / investigation cycles are legitimate.
+	// A no-build, no-ship investigation cycle is legitimate and stays unconstrained.
 	if !planRuns(out, "ship") {
 		return out, clamps
 	}
 
 	for _, phase := range floor {
 		if phase == "tdd" {
-			// tdd carries the trivial exemption — forced only when pinned.
 			if tddPinned(in) {
 				force("tdd", "ship-requires-tdd")
 			}
@@ -156,30 +91,14 @@ func ClampPlanToFloorWith(in RouteInput, plan *PhasePlan, floor []string, intent
 	return out, clamps
 }
 
-// DropUnknownPhaseRule is the clamp rule token recorded when the floor removes
-// a plan entry naming a phase outside the known-phase set.
+// DropUnknownPhaseRule is the clamp rule recorded when the floor removes an entry outside the known-phase set.
 const DropUnknownPhaseRule = "drop-unknown-phase"
 
-// DropUnavailablePhaseRule is the clamp rule token recorded when the floor
-// removes a plan entry naming a phase whose persona doc is absent
-// (RouteInput.UnavailablePhases) — a known configuration absence must never
-// cost a dispatch.
+// DropUnavailablePhaseRule is the clamp rule recorded when the floor removes an entry whose persona doc is absent.
 const DropUnavailablePhaseRule = "drop-unavailable-phase"
 
-// dropUnknownPhases returns a NEW entry slice with every entry whose phase is
-// not in knownPhaseSet removed, plus one Clamp per removal so the drop is never
-// silent (floor.go's "no silent disposition" rule).
-//
-// Why here and not in ValidatePlan: ValidatePlan already flags these as
-// "unknown-phase" but is documented PURE and REPORT-ONLY, so nothing removed
-// them — an advisor-hallucinated phase reached dispatch and crashed the cycle
-// with "profile not found" (cycles 1151, 1152). The clamp is the sole plan
-// disposer, so enforcement belongs here. knownPhaseSet is REUSED rather than
-// re-derived, keeping the drop mint-aware and in lockstep with the walk.
-//
-// Both run:true and run:false entries are dropped: a skipped unknown is still
-// garbage the walk and the telemetry must not see. Removal, not Run=false —
-// dispatch keys off the entry's presence.
+// dropUnknownPhases returns a new entry slice without unavailable or unknown phases, one Clamp per
+// removal. It removes rather than sets Run=false because dispatch keys off an entry's presence.
 func dropUnknownPhases(in RouteInput, plan *PhasePlan) ([]PhasePlanEntry, []Clamp) {
 	known := knownPhaseSet(in, plan)
 	entries := make([]PhasePlanEntry, 0, len(plan.Entries))
@@ -207,8 +126,7 @@ func dropUnknownPhases(in RouteInput, plan *PhasePlan) ([]PhasePlanEntry, []Clam
 	return entries, clamps
 }
 
-// planRuns reports whether the plan has an entry for phase with Run==true. An
-// absent phase counts as not-running (the advisor declined to schedule it).
+// planRuns reports whether the plan runs phase; an absent phase does not run.
 func planRuns(plan *PhasePlan, phase string) bool {
 	for _, e := range plan.Entries {
 		if e.Phase == phase {
@@ -218,8 +136,7 @@ func planRuns(plan *PhasePlan, phase string) bool {
 	return false
 }
 
-// ensureRun sets phase's entry to Run==true, appending a forced entry when the
-// phase is absent from the plan entirely.
+// ensureRun sets phase's entry to run, appending one when the phase is absent.
 func ensureRun(plan *PhasePlan, phase string) {
 	for i := range plan.Entries {
 		if plan.Entries[i].Phase == phase {
@@ -234,10 +151,7 @@ func ensureRun(plan *PhasePlan, phase string) {
 	})
 }
 
-// tddPinned reports whether tdd is mandatory this cycle. It reuses the kernel's
-// existing conditional-mandatory rule (EVOLVE_CONDITIONAL_MANDATORY; default
-// config.DefaultTddRuleExpr — trivial OR a document deliverable releases, ADR-0099)
-// so the floor's exemptions stay consistent with shouldRun's TDD-pin. Absent rule ⇒ pinned (the safer, more-mandatory side).
+// tddPinned evaluates the same conditional rule as shouldRun's TDD pin; with no rule, tdd stays pinned.
 func tddPinned(in RouteInput) bool {
 	if rule, ok := in.Cfg.Conditional["tdd"]; ok {
 		return evalCondRule(in.Signals, rule)
