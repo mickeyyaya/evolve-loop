@@ -96,6 +96,10 @@ func verifyAuditBinding(ctx context.Context, opts *Options, res *RunResult) erro
 		return err
 	}
 
+	testedRoot := opts.ActiveWorktree
+	if testedRoot == "" {
+		testedRoot = opts.ProjectRoot
+	}
 	currentHEAD, err := captureGitOutput(ctx, opts, "rev-parse", "HEAD")
 	if err != nil {
 		return err
@@ -117,7 +121,10 @@ func verifyAuditBinding(ctx context.Context, opts *Options, res *RunResult) erro
 				fmt.Sprintf("git HEAD has moved since audit (audited=%s current=%s) — re-run Auditor on the new state", entry.GitHEAD, currentHEAD),
 				"audited", entry.GitHEAD, "current", currentHEAD)
 		}
-	} else {
+	} else if filepath.Clean(testedRoot) == filepath.Clean(opts.ProjectRoot) {
+		// The plane-wide diff binds a ship only when the plane is the tree it lands from. A worktree
+		// ship is bound by the tree fence below, and the plane's tracked bookkeeping (the inbox
+		// queue) is not part of what it commits.
 		currentTree, err := computeTreeStateSHA(ctx, opts)
 		if err != nil {
 			return err
@@ -129,10 +136,6 @@ func verifyAuditBinding(ctx context.Context, opts *Options, res *RunResult) erro
 		}
 	}
 
-	testedRoot := opts.ActiveWorktree
-	if testedRoot == "" {
-		testedRoot = opts.ProjectRoot
-	}
 	currentExecution, err := treefence.Take(ctx, testedRoot)
 	if err != nil || currentExecution.Tree != entry.WorktreeTreeSHA {
 		return shipErr(core.CodeAuditBindingTreeMismatch, core.ShipClassPrecondition, core.StageVerifyClass,
