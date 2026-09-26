@@ -23,6 +23,9 @@ func TestValidateOutputsPartition(t *testing.T) {
 		{"undeclared classification", spec([]string{"a/r.md"}, []string{"h.json"}, nil), "does not declare"},
 		{"path instead of basename", spec([]string{"a/r.md", "a/h.json"}, []string{"a/h.json"}, nil), "must be the basename"},
 		{"primary is never a secondary", spec([]string{"a/r.md", "a/h.json"}, []string{"r.md", "h.json"}, nil), "does not declare"},
+		{"derived secondary", PhaseSpec{Name: "x", Outputs: IO{Files: []string{"a/r.md", "a/h.json"}, AgentOwed: []string{"h.json"}, DerivedFrom: map[string]string{"h.json": "r.md"}}}, ""},
+		{"derived from a non-primary", PhaseSpec{Name: "x", Outputs: IO{Files: []string{"a/r.md", "a/h.json"}, AgentOwed: []string{"h.json"}, DerivedFrom: map[string]string{"h.json": "h.json"}}}, "only from the primary"},
+		{"derived but not agent-owed", PhaseSpec{Name: "x", Outputs: IO{Files: []string{"a/r.md", "a/v.json"}, HarnessProduced: []string{"v.json"}, DerivedFrom: map[string]string{"v.json": "r.md"}}}, "does not classify"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			v := ValidateOutputsPartition(tc.s)

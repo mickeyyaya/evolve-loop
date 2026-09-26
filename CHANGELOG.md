@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## Added — the host derives a declared secondary before any judge (ADR-0106 H2, 2026-09-26)
+
+- The registry declares what is derivable: `outputs.derived_from` maps an agent-owed secondary to the primary the host derives it from. The partition validator requires the file to be agent-owed and the source to be the primary; the descriptor schema documents the field.
+- `HostEffects.Perform` derives each declared file the agent left absent or empty after the host effects and before the runner's judge and the gate, so both judge a complete deliverable. A file the agent wrote, or is still landing, is never touched: the read waits out a write in flight as the gate's does, and a read fault declines. The lane-pin check therefore guards only the derived file; a decision the agent wrote is judged by the gate as before. A decline is a WARN (`ORCHESTRATOR_HOST_EFFECT_FAILED`) and leaves the absence for the gate. A declaration without a registered deriver fails the deliverable tests.
+- `triage` declares `triage-decision.json` derived from `triage-report.md`. Docs: `deliverable-contract.md`.
+
 ## Added — triage's decision derived from its report (ADR-0106 H1, 2026-09-26)
 
 `triage-decision.json` states the commitment the report already carries in prose. Cycles 1672, 1687, 1697 and 1707 re-ran the whole phase because the agent left the file absent.
