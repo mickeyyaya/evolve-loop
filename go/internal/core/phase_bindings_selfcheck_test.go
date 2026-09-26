@@ -183,6 +183,35 @@ func TestRealGoUnitTest_BuildTagExcludedIsNotFailure(t *testing.T) {
 	}
 }
 
+// TestRealGoUnitTest_DeletedPackageIsNotFailure guards the false RED cycle 1697
+// surfaced: a diff that DELETES a package's only .go files still maps those
+// paths to the package pattern (changedGoTestPackages is pure over paths), and
+// `go test` on the now-missing directory reports "directory not found …
+// [setup failed]". A deleted package has nothing left to unit-test, so it must
+// report ok — while a package whose directory still exists keeps its real
+// verdict (the failing case below must stay not-ok).
+func TestRealGoUnitTest_DeletedPackageIsNotFailure(t *testing.T) {
+	mod := t.TempDir()
+	if err := os.WriteFile(filepath.Join(mod, "go.mod"), []byte("module x\n\ngo 1.23\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if out, ok := realGoUnitTest(context.Background(), mod, "./acs/cycle1257"); !ok {
+		t.Fatalf("a package whose directory was deleted must report ok (nothing to unit-test), output:\n%s", out)
+	}
+
+	dir := filepath.Join(mod, "present")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := "package present\nimport \"testing\"\nfunc TestBad(t *testing.T) { t.Fatal(\"boom\") }\n"
+	if err := os.WriteFile(filepath.Join(dir, "present_test.go"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := realGoUnitTest(context.Background(), mod, "./present"); ok {
+		t.Fatal("an existing failing package must still report not-ok — the deleted-package tolerance must not widen")
+	}
+}
+
 // TestGoTestExcludedByBuildTags asserts the classifier separates a build-tag
 // exclusion (nothing to test) from genuine failures (compile error / assertion)
 // that must still be reported.

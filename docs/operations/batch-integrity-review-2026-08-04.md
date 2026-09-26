@@ -287,6 +287,26 @@ shipped.
 tombstone files citing the redesign (`internal/regressiontia`) or delete;
 verify the EGPS `skipped_count` drops accordingly.
 
+**Closure — cycle 1697 (2026-09-26).** Deleted rather than tombstoned:
+`go/acs/cycle1257/predicates_test.go` and `go/acs/cycle1259/predicates_test.go`
+are removed and both package directories are gone, so `go test -tags acs
+./acs/cycle1257` / `./acs/cycle1259` now resolve to `directory not found`. The
+redesign that actually shipped (`internal/regressiontia`, cycle 1260) already
+carries its own tests, so a tombstone would only be one more file to keep.
+Measured at base `f341bc89` before the deletion, the corpus was red, and it was
+not skip-guarded as the Gap above says: cycle1257 gave 5 FAIL / 1 PASS and
+cycle1259 gave 2 FAIL / 1 PASS, with 0 SKIP in either package. **`skipped_count`
+outcome:** it does not drop. It is unchanged, and it has to be. EGPS
+(`acssuite.goLanePatterns`, `go/internal/acssuite/acssuite.go:379-395`) runs
+only the current cycle's package, `./acs/regression/*` and `./acs/redteam`. It
+never runs a historical cycle directory, so these packages never counted
+toward any cycle's `skipped_count`, or toward its red count. The measurable
+closure is that the dead packages no longer resolve. That is pinned by
+`TestC1697_001_DeadRedPackagesNoLongerResolve` (`go/acs/cycle1697`). The
+point-in-time inventories under `docs/research/testing-review-2026-09-14/`
+still list the deleted tests, because they are dated snapshots and are left
+unchanged.
+
 ### F6 — Ship-claim misattribution and ledger writes from lane labels
 
 **Issue.** `37bc664a` (cycle-1265) claims four items; three have zero files in

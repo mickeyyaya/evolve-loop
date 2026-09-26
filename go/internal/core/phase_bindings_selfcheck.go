@@ -18,7 +18,9 @@ package core
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path"
@@ -122,6 +124,13 @@ func realGoUnitTestTagged(ctx context.Context, moduleDir, pkg string, tags []str
 }
 
 func realGoUnitTest(ctx context.Context, moduleDir, pkg string) (output string, passed bool) {
+	// A changed path whose package directory no longer exists means the diff
+	// DELETED that package (changedGoTestPackages is pure over paths): nothing
+	// is left to unit-test. Checked on the filesystem, not by output text, so a
+	// present package keeps its real verdict.
+	if _, err := os.Stat(filepath.Join(moduleDir, pkg)); errors.Is(err, fs.ErrNotExist) {
+		return fmt.Sprintf("%s: package directory removed — nothing to unit-test\n", pkg), true
+	}
 	cmd := exec.CommandContext(ctx, "go", "test", "-count=1", "-timeout", "120s", pkg)
 	cmd.Dir = moduleDir
 	cmd.Env = ipcenv.Scrub(os.Environ())
