@@ -73,28 +73,8 @@ func (o *Orchestrator) recoverFromShipError(ctx context.Context, projectRoot str
 		ok, conflict := rebaseCycleBranchOntoMain(ctx, projectRoot, cs.ActiveWorktree)
 		switch {
 		case ok:
-			// The explanation is bound to the pre-rebase base SHA. A peer's
-			// newly composed base therefore invalidates the approved snapshot
-			// even when the lane patch-id itself is unchanged. Rebind host state
-			// and return to Build so the Builder, not the host, authors the new
-			// rationale/binding before Audit and Ship run again.
 			if cs.ExplanationDocumentationVersion > 0 {
-				newBase, code, gitErr := gitCapture(ctx, cs.ActiveWorktree, "rev-parse", "main")
-				newBase = strings.TrimSpace(newBase)
-				if gitErr != nil || code != 0 {
-					fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d resolve rebased explanation base failed: %v (exit %d)\n", cycle, gitErr, code)
-					return "", false
-				}
-				rebasedState := *cs
-				rebasedState.WorktreeBaseSHA = newBase
-				if err := explanationdocs.RebaseBuildAndPersist(ctx, explanationBinding(projectRoot, *cs), newBase, func() error {
-					return o.storage.WriteCycleState(ctx, rebasedState)
-				}); err != nil {
-					fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d invalidate rebased Build explanation failed: %v\n", cycle, err)
-					return "", false
-				}
-				*cs = rebasedState
-				return PhaseBuild, true
+				return o.routeRebasedExplanation(ctx, projectRoot, cycle, cs)
 			}
 			// A clean replay MAY carry the audit verdict forward without a
 			// full re-audit (RUNG 0, cycle-801): if the composed diff's
@@ -149,10 +129,41 @@ func (o *Orchestrator) recoverFromShipError(ctx context.Context, projectRoot str
 	return cand, true
 }
 
+// routeRebasedExplanation moves the explanation's base binding to the rebased base, the lane's fork
+// point, and invalidates the snapshot so Build re-authors the explanation.
+func (o *Orchestrator) routeRebasedExplanation(ctx context.Context, projectRoot string, cycle int, cs *CycleState) (Phase, bool) {
+	newBase, err := forkPoint(ctx, gitCapture, cs.ActiveWorktree)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d resolve rebased explanation base failed: %v\n", cycle, err)
+		return "", false
+	}
+	rebasedState := *cs
+	rebasedState.WorktreeBaseSHA = newBase
+	persist := func() error { return o.storage.WriteCycleState(ctx, rebasedState) }
+	binding := explanationBinding(projectRoot, *cs)
+	if err := explanationdocs.RebaseBuildAndPersist(ctx, binding, newBase, persist); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d invalidate rebased Build explanation failed: %v\n", cycle, err)
+		return "", false
+	}
+	*cs = rebasedState
+	return PhaseBuild, true
+}
+
 // gitFn runs a git subcommand in dir and returns (stdout, exitCode, err); it
 // matches gitCapture so production wiring passes gitCapture directly while tests
 // inject a fake — the Humble Object seam for rebaseWithDerivedRegen.
 type gitFn = func(ctx context.Context, dir string, args ...string) (string, int, error)
+
+func gitStdout(ctx context.Context, git gitFn, dir string, args ...string) (string, error) {
+	out, code, err := git(ctx, dir, args...)
+	if err != nil {
+		return "", err
+	}
+	if code != 0 {
+		return "", fmt.Errorf("git %s: exit %d", strings.Join(args, " "), code)
+	}
+	return strings.TrimSpace(out), nil
+}
 
 // regenFn regenerates the derived projection identified by relPath from the
 // worktree's (post-rebase, merged) source-of-truth. relPath identifies WHICH
