@@ -648,3 +648,5 @@
 ./internal/commentaudit
 # auditledger — the one reader of auditor ledger rows; consumers: ship, cmd/evolve composition, releasepreflight.
 ./internal/auditledger
+# lanerouting — the one predicate for "no lane can change this path": protected surface OR the build profile's sandbox deny list.
+./internal/lanerouting

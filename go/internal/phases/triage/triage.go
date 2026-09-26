@@ -47,7 +47,7 @@ var listItemRE = regexp.MustCompile(`(?m)^[-*]\s+\S`)
 // nextHeadingRE finds the next "## " section heading.
 var nextHeadingRE = regexp.MustCompile(`(?m)^## `)
 
-type hooks struct{}
+type hooks struct{ forbidden func(string) bool }
 
 func (hooks) PhaseName() string                           { return string(core.PhaseTriage) }
 func (hooks) AgentPromptName() string                     { return "evolve-triage" }
@@ -65,7 +65,7 @@ func (hooks) ShouldSkip(req core.PhaseRequest) (bool, string, string, []core.Dia
 	return true, core.VerdictSKIPPED, string(core.PhaseTDD), nil
 }
 
-func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
+func (h hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	var b strings.Builder
 	b.WriteString(runner.BaseCycleContext(body, req))
 	// ADR-0050 §3.10 Slice 2: typed envelope at enforce, legacy Context below it
@@ -109,7 +109,7 @@ func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	// prefix cache-friendly); an empty/missing/unreadable inbox keeps the
 	// prompt byte-identical (fail-open: a broken backlog must not block
 	// triage, which still reads the inbox directly).
-	if section := inboxBatchesSection(req.ProjectRoot); section != "" {
+	if section := inboxBatchesSection(req.ProjectRoot, h.forbidden); section != "" {
 		b.WriteString(section)
 	}
 	// F40 (cycle 1691): the drift since each fleet-scoped item was filed, so a
@@ -227,7 +227,7 @@ func CarryforwardCandidatesSection(ctx context.Context, dir, base string) string
 // triage prompt, or "" when there is nothing to group (the byte-identity pin).
 // An empty projectRoot returns "" rather than resolving a CWD-relative path —
 // the dual-root landmine PhaseRequest's own docs warn about.
-func inboxBatchesSection(projectRoot string) string {
+func inboxBatchesSection(projectRoot string, forbidden func(string) bool) string {
 	if projectRoot == "" {
 		return ""
 	}
@@ -240,7 +240,10 @@ func inboxBatchesSection(projectRoot string) string {
 	// them as selectable. The exclusion is loud (ids listed) so triage knows
 	// the work exists; inboxmover.Claim is the enforcement backstop if a pick
 	// slips through.
-	dispatchable, console, _ := inboxbatch.PartitionConsole(items, guards.IsProtectedScope)
+	if forbidden == nil {
+		forbidden = guards.IsProtectedScope
+	}
+	dispatchable, console, _ := inboxbatch.PartitionConsole(items, forbidden)
 	var sect strings.Builder
 	if rendered := inboxbatch.RenderMarkdown(inboxbatch.Classify(dispatchable, inboxbatch.Config{})); rendered != "" {
 		sect.WriteString("- inbox_batches: the backlog below is pre-grouped by campaign/file-area/links; " +
@@ -259,7 +262,7 @@ func inboxBatchesSection(projectRoot string) string {
 	return sect.String()
 }
 
-func (hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeResponse) (string, []core.Diagnostic, string) {
+func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeResponse) (string, []core.Diagnostic, string) {
 	// EvaluateClassify handles the empty-artifact and section-presence checks.
 	verdict, diags := specrunner.EvaluateClassify(artifact, &phasespec.ClassifyRules{
 		RequireSections: []string{phasecontract.Triage.Sections[0].Canonical},
@@ -286,14 +289,9 @@ func (hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRespo
 			Code:     cyclestate.DiagCodeTriageTopNEmpty,
 		}}, string(core.PhaseTDD)
 	}
-	// F4 (docs/operations/batch-integrity-review-2026-08-04.md): the prompt-side
-	// inboxbatch.PartitionConsole screen (inboxBatchesSection above) only ever
-	// sees items sourced from .evolve/inbox — it cannot see a top_n card the LLM
-	// wrote from the fleet-todo/scout route. This is the second, independent,
-	// commit-time admission check guards.IsProtectedSurface needs: any top_n
-	// card whose files={...} (or bare files=...) segment names a protected
-	// control-plane path is refused here, regardless of how the card originated.
-	if id, path, hit := protectedTopNViolation(body); hit {
+	// The prompt partition sees only inbox items, but a top_n card can come from the scout or a
+	// fleet todo, so every card's files are judged again here with the lane predicate.
+	if id, path, hit := protectedTopNViolation(body, h.forbidden); hit {
 		return core.VerdictFAIL, []core.Diagnostic{{
 			Severity: "error",
 			Message: fmt.Sprintf(
@@ -340,12 +338,13 @@ var topNItemIDRE = regexp.MustCompile(`(?m)^[-*]\s+([^:\n]+):`)
 var filesFieldRE = regexp.MustCompile(`files=(?:\{([^}]*)\}|([^,\n]*))`)
 
 // protectedTopNViolation scans body (a ## top_n section's content) line by
-// line for the first list item whose files= segment names a path
-// guards.IsProtectedSurface treats as pipeline control plane. It returns the
-// offending card's id and the offending path; ok is false when no card
-// violates. Only the first hit is reported — Classify FAILs the whole
-// artifact on any single violation, so further scanning adds no value.
-func protectedTopNViolation(body string) (id, path string, ok bool) {
+// line for the first list item whose files= segment names a lane-forbidden path, judged by
+// forbidden, or by manifest membership when forbidden is nil. Only the first hit is reported:
+// one violation fails the whole artifact.
+func protectedTopNViolation(body string, forbidden func(string) bool) (id, path string, ok bool) {
+	if forbidden == nil {
+		forbidden = guards.IsProtectedSurface
+	}
 	for _, line := range strings.Split(body, "\n") {
 		if !listItemRE.MatchString(line) {
 			continue
@@ -364,7 +363,7 @@ func protectedTopNViolation(body string) (id, path string, ok bool) {
 			if idx := strings.Index(f, "("); idx >= 0 {
 				f = strings.TrimSpace(f[:idx])
 			}
-			if f == "" || !guards.IsProtectedSurface(f) {
+			if f == "" || !forbidden(f) {
 				continue
 			}
 			cardID := ""
@@ -396,7 +395,11 @@ type Config struct {
 	// doc before dispatch. Value flows from workflow.compact_prompts (policy.json);
 	// never set to a bare literal here (standing rule: phase-settings-from-config).
 	CompactPrompts bool
+	// LaneForbidden marks the declared paths no lane can change; nil judges protected surface only.
+	LaneForbidden func(string) bool
 }
+
+func hooksFor(c Config) hooks { return hooks{forbidden: c.LaneForbidden} }
 
 // Phase is the triage cycle-scope task-selection phase, a runner.BaseRunner
 // specialized with the triage-specific hooks.
@@ -407,7 +410,7 @@ type Phase struct{ *runner.BaseRunner }
 func New(c Config) *Phase {
 	return &Phase{
 		BaseRunner: runner.New(runner.Options{
-			Hooks:            hooks{},
+			Hooks:            hooksFor(c),
 			Bridge:           c.Bridge,
 			ContractVerifier: c.ContractVerifier,
 			HostEffects:      c.HostEffects,

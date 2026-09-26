@@ -15,8 +15,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/channel"
 )
 
-// cmdBridgeWatch implements `evolve bridge watch --workspace=DIR --agent=NAME [--follow]`.
-// It is READ-ONLY: it never writes the feed or the inbox.
+// cmdBridgeWatch is read-only: it never writes the feed or the inbox.
 func cmdBridgeWatch(args []string, stdout, stderr io.Writer) int {
 	ws, agent := "", ""
 	follow := false
@@ -54,20 +53,17 @@ func cmdBridgeWatch(args []string, stdout, stderr io.Writer) int {
 		return 0
 	}
 
-	// --follow: tail for new lines at 500ms poll until SIGINT/SIGTERM.
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 	return runBridgeWatchFollow(ctx, stdout, stderr, ws, agent)
 }
 
-// runBridgeWatchOnce reads the feed file once and pretty-prints each valid
-// NDJSON line. It is the unit-testable, read-only core. Missing feed → no
-// output, no error.
+// runBridgeWatchOnce prints each valid feed line; a missing feed prints nothing.
 func runBridgeWatchOnce(w io.Writer, workspace, agent string) error {
 	data, err := os.ReadFile(channel.FeedPath(workspace, agent))
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return nil // no feed yet → nothing to print
+			return nil
 		}
 		return err
 	}
@@ -77,27 +73,19 @@ func runBridgeWatchOnce(w io.Writer, workspace, agent string) error {
 		}
 		var e map[string]any
 		if json.Unmarshal([]byte(ln), &e) != nil {
-			continue // skip malformed lines
+			continue
 		}
 		fmt.Fprintln(w, renderFeedLine(e))
 	}
 	return nil
 }
 
-// renderFeedLine formats one parsed feed entry for human consumption.
-//
-//   - correlation envelope → "seq=N correlation: <sub> corr_id=<corr_id>"
-//   - line with data.text  → "seq=N <kind> <text (truncated to 120 chars)>"
-//   - anything else        → "seq=N <kind>"
-//
-// seq= prefix is omitted when seq is absent.
 func renderFeedLine(e map[string]any) string {
 	kind, _ := e["kind"].(string)
 	if kind == "" {
 		kind = "unknown"
 	}
 
-	// Build optional seq prefix.
 	seqPrefix := ""
 	if seqRaw, ok := e["seq"]; ok {
 		switch v := seqRaw.(type) {
@@ -108,7 +96,6 @@ func renderFeedLine(e map[string]any) string {
 		}
 	}
 
-	// Correlation envelope: special-cased for readability.
 	if kind == "correlation" {
 		sub, corrID := "", ""
 		if dataMap, ok := e["data"].(map[string]any); ok {
@@ -118,7 +105,6 @@ func renderFeedLine(e map[string]any) string {
 		return fmt.Sprintf("%scorrelation: %s corr_id=%s", seqPrefix, sub, corrID)
 	}
 
-	// Try data.text for a human-readable summary.
 	if dataMap, ok := e["data"].(map[string]any); ok {
 		if text, ok := dataMap["text"].(string); ok && text != "" {
 			const maxText = 120
@@ -129,23 +115,18 @@ func renderFeedLine(e map[string]any) string {
 		}
 	}
 
-	// Fallback: just kind.
 	return fmt.Sprintf("%s%s", seqPrefix, kind)
 }
 
-// watchFollowInterval is the poll period for runBridgeWatchFollow.
-// Override in tests to avoid multi-second waits.
+// watchFollowInterval is a var so tests can shorten the poll.
 var watchFollowInterval = 500 * time.Millisecond
 
-// runBridgeWatchFollow is the --follow tail loop. It polls the feed every
-// watchFollowInterval, printing only newly-added lines, until ctx is cancelled.
-// Signal wiring (SIGINT/SIGTERM) is the caller's responsibility so this
-// function is fully unit-testable via a cancellable context.
+// runBridgeWatchFollow prints lines appended to the feed until ctx is cancelled.
 func runBridgeWatchFollow(ctx context.Context, stdout, stderr io.Writer, workspace, agent string) int {
 	feedPath := channel.FeedPath(workspace, agent)
 	var offset int64
 
-	// Seed the offset so we don't re-print what runBridgeWatchOnce already showed.
+	// Start at EOF so lines runBridgeWatchOnce already printed are not repeated.
 	if info, err := os.Stat(feedPath); err == nil {
 		offset = info.Size()
 	}

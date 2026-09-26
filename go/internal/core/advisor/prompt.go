@@ -8,10 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// buildRoutingPrompt renders the per-transition routing context into a compact,
-// deterministic prompt. It lists the just-completed phase, the digested
-// signals, the optional phases still available with their declarative triggers,
-// and the non-bypassable kernel rules — then asks for a strict-JSON proposal.
 func buildRoutingPrompt(in router.RouteInput) string {
 	var b strings.Builder
 	b.WriteString("You are the evolve-loop ROUTER. The model proposes; the kernel disposes.\n")
@@ -35,10 +31,7 @@ func buildRoutingPrompt(in router.RouteInput) string {
 	return b.String()
 }
 
-// isFailureTransition reports whether this routing call sits on a failure
-// branch — the post-retro recovery decision or the audit-FAIL learning
-// choice — where the failure vocabulary applies. Happy-path prompts stay
-// byte-identical (prompt-prefix cache friendliness).
+// isFailureTransition is the post-retro recovery decision or the audit-FAIL learning choice.
 func isFailureTransition(in router.RouteInput) bool {
 	switch strings.ToLower(strings.TrimSpace(in.Current)) {
 	case "retrospective", "retro":
@@ -49,9 +42,7 @@ func isFailureTransition(in router.RouteInput) bool {
 	return false
 }
 
-// writeFailureVocabulary renders the failure-path decision space (failure
-// floor Phase 3). The floor is stated explicitly so the model does not
-// waste tokens proposing what the kernel will clamp.
+// writeFailureVocabulary states the floor so the model does not spend tokens proposing what the kernel will clamp.
 func writeFailureVocabulary(b *strings.Builder) {
 	b.WriteString("\n## Failure-path vocabulary (this is a failure transition)\n")
 	b.WriteString("- recovery_action: \"retry\" re-enters tdd to fix forward; \"end\" stops the cycle (e.g. budget nearly exhausted, systemic cause).\n")
@@ -61,12 +52,7 @@ func writeFailureVocabulary(b *strings.Builder) {
 	b.WriteString("- The failure-adapter's BLOCK verdicts are non-overridable: a blocked cycle ends no matter what you propose (the attempt is recorded as a clamp).\n")
 }
 
-// buildPlanPrompt renders the WHOLE-CYCLE planning context (ADR-0024 §2): the
-// same objective digest + rubric as buildRoutingPrompt, but it asks the advisor
-// to decide run/skip for EVERY phase of the cycle in one coherent pass, as a
-// strict-JSON array. The plan is advisory — the kernel clamp re-validates it.
-// It is the legacy inline framing ComposePlanPrompt falls back to without a
-// persona.
+// buildPlanPrompt is the legacy inline framing ComposePlanPrompt falls back to without a persona.
 func buildPlanPrompt(in router.RouteInput) string {
 	var b strings.Builder
 	b.WriteString("You are the evolve-loop PHASE ADVISOR. The model proposes; the kernel disposes.\n")
@@ -83,13 +69,7 @@ func buildPlanPrompt(in router.RouteInput) string {
 	return b.String()
 }
 
-// writePlanResponseSchema renders the whole-cycle plan's response contract —
-// the optional MINT block, the optional per-phase {cli,tier} dispatch
-// proposal with the operator's model-tier policy, and the strict-JSON
-// example — shared by ComposePlanPrompt (persona path, PRODUCTION) and
-// buildPlanPrompt (legacy fallback), so the two prompt-assembly paths can
-// never diverge again the way they did at #293 (the persona path never
-// called this section at all).
+// writePlanResponseSchema is shared by both plan-prompt paths so their response contracts cannot diverge.
 func writePlanResponseSchema(b *strings.Builder) {
 	b.WriteString("\n## Optionally MINT a new phase\n")
 	b.WriteString("If an objective signal calls for work no existing phase covers, you MAY add an entry for a brand-new phase ")
@@ -115,25 +95,12 @@ func writePlanResponseSchema(b *strings.Builder) {
 	b.WriteString("\n")
 }
 
-// ComposePlanPrompt builds the whole-cycle planning prompt the uniform way: the
-// persona body (agents/evolve-router.md — identity, job, mint guidance, output
-// contract) followed by the DYNAMIC per-cycle context (objective digest, recall
-// memory, catalog, decision rubric) appended in Go, exactly as a phase appends
-// its cycle context. When no persona was injected it falls back to the legacy
-// fully-inline framing (buildPlanPrompt) so the advisor still functions.
-// artifactFile is the raw plan artifact the prompt instructs the model to
-// write — the ABSOLUTE workspace path the launch also tells the bridge to
-// watch (a relative path lands in the REPL's cwd, which under claude-tmux is
-// NOT the workspace, so the bridge never sees it — the cycle-210 failure).
-// It is the exported entry the seam's test facade reaches with an arbitrary
-// artifact name, so it does the ONE string→decision map for the compose-time
-// stamp; production (Plan/RePlan) composes from its decision directly.
+// ComposePlanPrompt builds the whole-cycle plan prompt: the persona body, then the per-cycle context, then the
+// instruction to write artifactFile under the workspace.
 func (a *Advisor) ComposePlanPrompt(in router.RouteInput, artifactFile string) string {
 	return a.composePlanPrompt(in, decisionForArtifact(artifactFile), artifactFile)
 }
 
-// composePlanPrompt is the composer both entries share: the decision stamps
-// any compose-time event, the artifact name lands in the closing instruction.
 func (a *Advisor) composePlanPrompt(in router.RouteInput, d decision, artifactFile string) string {
 	if a.identity.Persona == "" {
 		return buildPlanPrompt(in)
@@ -142,26 +109,17 @@ func (a *Advisor) composePlanPrompt(in router.RouteInput, d decision, artifactFi
 	b.WriteString(a.identity.Persona)
 	b.WriteString("\n\n---\n# This cycle\n\n")
 	WriteRoutingContext(&b, in)
-	// WS2-S0b: inject the deterministic pre-plan recon when cfg.ReconDigest is
-	// on. Off (default) ⇒ no gather, no render ⇒ byte-identical prompt. The
-	// gather fails open, so even on, a degraded git only narrows the digest.
 	if in.Cfg.ReconDigest {
 		router.RenderReconDigest(&b, a.gatherRecon(in, d))
 	}
 	WriteCatalogWithOnDemand(&b, in.Catalog, in.OnDemandPhases)
 	writePlanResponseSchema(&b)
+	// Absolute: a relative path lands in the REPL's cwd, which the bridge does not watch.
 	fmt.Fprintf(&b, "\nNow write your whole-cycle plan as a strict JSON array to %s (no prose, no fence).\n", filepath.Join(in.Workspace, artifactFile))
 	return b.String()
 }
 
-// gatherRecon collects the deterministic pre-plan recon (ADR-0052 WS2-S0b)
-// through the injected recent-files reader (core's git reader in production;
-// the Null Object in a git-less environment) and FAILS OPEN: a reader error
-// is one ADVISOR_RECON_GIT_FAILED and yields no changed files, so
-// router.BuildReconDigest simply omits the file-derived facts. The backlog/
-// carryover/goal facts come from the already-threaded RouteInput, so they
-// survive regardless. An empty project root reads nothing (configuration,
-// not a fault).
+// gatherRecon fails open: a reader fault is reported and yields no file facts, while the goal and backlog facts survive.
 func (a *Advisor) gatherRecon(in router.RouteInput, d decision) router.ReconDigest {
 	var files []string
 	if in.ProjectRoot != "" {

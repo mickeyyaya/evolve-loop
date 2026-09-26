@@ -1,23 +1,5 @@
 package bridge
 
-// artifact_timeout_diag_test.go — an artifact-timeout death must be
-// SELF-DESCRIBING.
-//
-// The defect (inbox item deep-phase-artifact-budget-too-small, sub-task 3): exit
-// 81 produced no deliverable and no reason beyond the code, so the reader of a
-// dead cycle could not tell "the agent was still working and ran out of budget"
-// (raise the budget) from "the pane was wedged" (fix the wedge). Worse, the
-// cause line threaded into the error came from firstDiagnosticLine, which — for
-// the tmux driver, whose notes are prefixed `[<cli>-tmux]`, not `[bridge]` —
-// fell through to the LAST non-empty stderr line: one of the workspace file
-// listings the timeout path prints as a diagnostic. The recorded error_message
-// was a filename.
-//
-// Contract: the driver emits ONE self-describing summary line carrying how long
-// it waited and how many extends it consumed, and Engine.Launch lifts exactly
-// that line into the exit-81 error, deterministically, regardless of what other
-// `[bridge]` chatter the launch produced.
-
 import (
 	"context"
 	"fmt"
@@ -30,14 +12,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// TestRunTmuxREPL_ArtifactTimeout_SummaryCarriesWaitedAndExtends: the driver's
-// stderr must carry the marker line with the elapsed wait and the extends
-// consumed, plus the last review verdict that distinguishes slow from wedged.
 func TestRunTmuxREPL_ArtifactTimeout_SummaryCarriesWaitedAndExtends(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}} // boots; artifact never lands
-	// Two extends then a pause: extends_used must be 2, and the pause reason must
-	// survive into the summary.
+	// Two extends then a pause, so extends_used is 2 and the pause reason must survive.
 	rev := &scriptedReviewer{verdicts: []ReviewVerdict{
 		{Action: ReviewExtend, Reason: "still working"},
 		{Action: ReviewExtend, Reason: "still working"},
@@ -71,8 +49,7 @@ func TestRunTmuxREPL_ArtifactTimeout_SummaryCarriesWaitedAndExtends(t *testing.T
 			t.Errorf("summary is missing %q — a reader cannot tell 'too slow' from 'wedged'\n  got: %s", want, summary)
 		}
 	}
-	// The elapsed wait must be a real measurement, not a zero placeholder: with a
-	// 2s interval and three review checkpoints the driver waited at least 4s.
+	// A 2s interval and three review checkpoints mean the driver waited at least 4s.
 	if strings.Contains(summary, "waited=0s") {
 		t.Errorf("waited=0s after three review intervals — the elapsed wait is not being recorded\n  got: %s", summary)
 	}
@@ -103,10 +80,6 @@ func TestRunTmuxREPL_NegativeMaxExtendsReportsDefault(t *testing.T) {
 	}
 }
 
-// TestEngineLaunch_ArtifactTimeout_ErrorCarriesWaitAndExtends is the live-path
-// proof: the summary reaches the ERROR the orchestrator records, not just a log
-// nobody reads. Driven through the real Engine.Launch → LaunchArgs → tmux driver
-// path with a fake tmux, so the assertion is on the production wrapping site.
 func TestEngineLaunch_ArtifactTimeout_ErrorCarriesWaitAndExtends(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "plan")
 	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}
@@ -138,18 +111,13 @@ func TestEngineLaunch_ArtifactTimeout_ErrorCarriesWaitAndExtends(t *testing.T) {
 				"and how many extends it consumed\n  got: %s", want, got)
 		}
 	}
-	// Regression on the real defect: the cause must not be a workspace file
-	// listing line that firstDiagnosticLine happened to land on.
 	if strings.Contains(got, "files present under workspace") {
 		t.Errorf("exit-81 error cause is the workspace file listing, not the timeout summary\n  got: %s", got)
 	}
 }
 
-// TestTimeoutSummaryVocabulary pins the closed word list the summary publishes
-// for the two enum fields. These words are what an operator greps for, and
-// panestream.LivenessState has no String method — a %s on it would emit Go debug
-// chrome instead of a stable token, and the zero value ("no checkpoint observed
-// liveness") must be named rather than blank.
+// panestream.LivenessState has no String method, so the summary publishes its own closed word list;
+// the zero value is named, never blank.
 func TestTimeoutSummaryVocabulary(t *testing.T) {
 	for _, tc := range []struct {
 		in   panestream.LivenessState
@@ -159,7 +127,7 @@ func TestTimeoutSummaryVocabulary(t *testing.T) {
 		{panestream.LivenessBusyButStagnant, "busy_stagnant"},
 		{panestream.LivenessConverging, "converging"},
 		{panestream.LivenessHung, "hung"},
-		{panestream.LivenessExhausted, "exhausted"}, // the one spelling, projected (ADR-0101 S3)
+		{panestream.LivenessExhausted, "exhausted"},
 		{0, "unknown"},
 	} {
 		if got := livenessOrUnknown(tc.in); got != tc.want {
@@ -173,8 +141,7 @@ func TestTimeoutSummaryVocabulary(t *testing.T) {
 		{ReviewExtend, "extend"},
 		{ReviewPause, "pause"},
 		{ReviewStop, "stop"},
-		// The wait ended before any review checkpoint (ctx cancel) — a blank
-		// field would read as a missing measurement rather than a real state.
+		// The wait ended before any checkpoint (ctx cancel); a blank would read as a missing measurement.
 		{"", "none"},
 	} {
 		if got := reviewActionOrNone(tc.in); got != tc.want {
@@ -183,11 +150,8 @@ func TestTimeoutSummaryVocabulary(t *testing.T) {
 	}
 }
 
-// chattyTimeoutDriver reproduces the REAL stderr shape of a timed-out launch:
-// `[bridge]` chatter emitted BEFORE the artifact wait (a sandbox WARN, a codex
-// preflight note), then the driver's own `[<cli>-tmux]`-prefixed diagnostics
-// including the workspace file listing, then the marker summary LAST. Registered
-// as its own CLI so it cannot perturb any other driver's tests.
+// chattyTimeoutDriver reproduces a timed-out launch's real stderr: [bridge] chatter before the wait, the
+// driver's own diagnostics, then the marker summary last. It is its own CLI so no other driver's tests see it.
 type chattyTimeoutDriver struct{}
 
 func (chattyTimeoutDriver) Name() string { return "acs-chatty-timeout" }
@@ -205,12 +169,6 @@ func (chattyTimeoutDriver) Launch(_ context.Context, cfg *Config, deps Deps) (in
 
 func init() { Register(chattyTimeoutDriver{}) }
 
-// TestEngineLaunch_ArtifactTimeout_SummaryBeatsEarlierBridgeChatter is the
-// discriminative proof that the engine's extractor is load-bearing rather than
-// incidental: firstDiagnosticLine returns the FIRST `[bridge]`-prefixed line, so
-// with a sandbox WARN (or a codex preflight note) ahead of the wait the recorded
-// cause is that WARN — a launch-time note that says nothing about why the phase
-// died. Driven through the real Engine.Launch wrapping site.
 func TestEngineLaunch_ArtifactTimeout_SummaryBeatsEarlierBridgeChatter(t *testing.T) {
 	ws := t.TempDir()
 	prof := writeProfile(t, ws, "chatty", "")
@@ -234,9 +192,6 @@ func TestEngineLaunch_ArtifactTimeout_SummaryBeatsEarlierBridgeChatter(t *testin
 	}
 }
 
-// TestEngineLaunch_NonTimeoutExit_CauseUnchanged: the summary preference is
-// SCOPED to exit 81. Any other non-zero exit keeps the existing
-// firstDiagnosticLine cause, so this fix cannot degrade unrelated diagnostics.
 func TestEngineLaunch_NonTimeoutExit_CauseUnchanged(t *testing.T) {
 	ws := t.TempDir()
 	prof := writeProfile(t, ws, "eng-test", "")

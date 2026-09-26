@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 )
 
@@ -28,7 +27,7 @@ func runInboxMover(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	opts := inboxmover.Options{
 		ProjectRoot:     projectRoot,
 		Stderr:          stderr,
-		IsProtectedPath: guards.IsProtectedScope,
+		IsProtectedPath: laneForbidden(projectRoot, stderr),
 	}
 
 	switch subcmd {

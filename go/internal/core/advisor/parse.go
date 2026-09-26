@@ -11,11 +11,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// parseFailure classifies why no decision decoded (fields.cause on the
-// ADVISOR_RESPONSE_UNPARSEABLE event) while its Error text stays the
-// pre-extraction text the orchestrator prints. Unexported: the parsers stay
-// pure and Center-free — resume, replay and the routing-eval corpus call
-// them with no Center and must emit nothing.
+// parseFailure carries fields.cause out of the parsers, which stay Center-free because resume,
+// replay and the routing-eval corpus call them and must emit nothing.
 type parseFailure struct {
 	cause string // no_json | invalid_json | empty
 	err   error
@@ -24,8 +21,6 @@ type parseFailure struct {
 func (p *parseFailure) Error() string { return p.err.Error() }
 func (p *parseFailure) Unwrap() error { return p.err }
 
-// warnUnparseable reports one parse failure with its cause, the response
-// size and the artifact the decision would have read.
 func (a *Advisor) warnUnparseable(in router.RouteInput, d decision, err error, resp LaunchResponse) {
 	cause := causeInvalidJSON
 	var pf *parseFailure
@@ -37,13 +32,7 @@ func (a *Advisor) warnUnparseable(in router.RouteInput, d decision, err error, r
 	})
 }
 
-// ParseProposal extracts the strict-JSON proposal from the response the
-// bridge read back — since 2026-09-14 the routing-proposal.json artifact's
-// content (a bare object), before that the REPL scrollback, which echoed the
-// PROMPT and its JSON example. The LAST balanced object is taken either way
-// (an answer is last; a prompt echo is not), tolerant of a ```json fence /
-// surrounding prose. Empty/unparseable → error (caller degrades to static).
-// PURE and Center-free.
+// ParseProposal decodes the last balanced JSON object in the response; an absent, malformed or empty proposal is an error.
 func ParseProposal(stdout string) (*router.Proposal, error) {
 	start, end, ok := LastBalancedSpan(stdout, '{', '}')
 	if !ok {
@@ -60,28 +49,19 @@ func ParseProposal(stdout string) (*router.Proposal, error) {
 	return &prop, nil
 }
 
-// RejectedMint is one plan entry the recursion guard dropped: the minted
-// name and the reason. Data, not a print — the entry point reports it once
-// with its cycle stamp; resume and replay re-parse silently.
+// RejectedMint is one plan entry the recursion guard dropped, with the reason.
 type RejectedMint struct {
 	Phase  string
 	Reason string
 }
 
-// ParsedPlan is ParsePhasePlan's Result Object: the plan and the mints the
-// guard rejected.
+// ParsedPlan is the parsed plan and the mints the recursion guard rejected.
 type ParsedPlan struct {
 	Plan          *router.PhasePlan
 	RejectedMints []RejectedMint
 }
 
-// ParsePhasePlan extracts the strict-JSON whole-cycle plan from the LLM stdout.
-// The wire format is a bare array of {phase, run, justification}; like
-// ParseProposal it takes the LAST balanced array so the prompt's echoed JSON
-// example (present in the captured scrollback under the ADR-0027 stdout
-// contract) is not mistaken for the answer. An empty or unparseable body is an
-// error (caller degrades to the deterministic static plan). PURE and
-// Center-free.
+// ParsePhasePlan decodes the last balanced JSON array in the response; an absent, malformed or empty plan is an error.
 func ParsePhasePlan(stdout string) (ParsedPlan, error) {
 	start, end, ok := LastBalancedSpan(stdout, '[', ']')
 	if !ok {
@@ -101,16 +81,8 @@ func ParsePhasePlan(stdout string) (ParsedPlan, error) {
 	return ParsedPlan{Plan: &router.PhasePlan{Entries: entries, MintPhases: mints}, RejectedMints: rejected}, nil
 }
 
-// SanitizeTier confines the advisor's OWN emitted tier to the strict
-// canonical vocabulary — modelcatalog.CanonicalTiers (fast/balanced/deep/top,
-// "top" = the frontier tier), PROJECTED rather than copied: the catalog is
-// the vocabulary's one home and the test pins the four — enforcing the
-// driver_agnostic_model_routing invariant: the advisor proposes an ABSTRACT
-// tier, never a raw or legacy model alias. Unlike policy.TierRank (which
-// accepts "opus"/"sonnet"/"haiku" for an OPERATOR pin), an advisor-emitted
-// alias or garbage value is dropped outright rather than translated — the
-// clamp downstream trusts this invariant instead of re-validating it. Empty
-// stays empty (the common no-op case).
+// SanitizeTier keeps only a canonical tier and drops any alias or model name, untranslated;
+// the downstream clamp trusts this instead of re-validating.
 func SanitizeTier(tier string) string {
 	if slices.Contains(modelcatalog.CanonicalTiers, tier) {
 		return tier
@@ -118,16 +90,7 @@ func SanitizeTier(tier string) string {
 	return ""
 }
 
-// ReplayPlanFromResponse reparses a captured advisor response (WS3-S1's
-// advisor-response-<kind>.txt) through the SAME parse + integrity-floor clamp
-// the live planning path runs (ParsePhasePlan → router.ClampPlanToFloorWith,
-// the exact pair cyclerun.go uses), and returns the clamped plan + the clamps
-// that fired. WS3-S5 replay uses it to prove a recorded response still
-// reproduces the recorded phase-plan.json; WS4 builds its golden corpus on the
-// same entry point, so a regression there is caught against the real floor —
-// not a parallel reimplementation. An unparseable response is a loud error
-// (detecting exactly that corruption is the point of replay). Rejected mints
-// are dropped silently here — they were reported at decision time.
+// ReplayPlanFromResponse reparses a captured response through the live parse and floor clamp, returning the clamps that fired.
 func ReplayPlanFromResponse(raw string, in router.RouteInput, floor []string) (*router.PhasePlan, []router.Clamp, error) {
 	parsed, err := ParsePhasePlan(raw)
 	if err != nil {
@@ -137,14 +100,8 @@ func ReplayPlanFromResponse(raw string, in router.RouteInput, floor []string) (*
 	return clamped, clamps, nil
 }
 
-// LastBalancedSpan finds the LAST top-level balanced span delimited by open/
-// close in s, returning [start, end] inclusive indices. It forward-scans while
-// tracking JSON string-literal context (with backslash escapes), so a literal
-// delimiter inside a "justification" value (e.g. `}` or `]`) is not miscounted.
-// It records every top-level span and returns the last, so the agent's reply is
-// extracted even when the scrollback also contains an earlier (prompt-echoed)
-// example of the same shape. Returns ok=false when no balanced span exists.
-// The plan judge and the retry adjudicator read it through core's facade.
+// LastBalancedSpan returns the inclusive bounds of the last top-level open/close span in s, ignoring delimiters
+// inside JSON strings. The last span wins because a reply follows any echoed example.
 func LastBalancedSpan(s string, open, close byte) (start, end int, ok bool) {
 	depth, spanStart := 0, -1
 	inStr, esc := false, false
@@ -173,7 +130,7 @@ func LastBalancedSpan(s string, open, close byte) (start, end int, ok bool) {
 			if depth > 0 {
 				depth--
 				if depth == 0 && spanStart >= 0 {
-					start, end, ok = spanStart, i, true // keep scanning for a later span
+					start, end, ok = spanStart, i, true
 				}
 			}
 		}

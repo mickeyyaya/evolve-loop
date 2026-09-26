@@ -1,16 +1,5 @@
 package core
 
-// audit_fail_decision_test.go — RED contract for the disposition of an audit FAIL,
-// decided AT THE AUDIT CHOKEPOINT instead of after a full retrospective.
-//
-// This is the integration of the envelope (what policy makes legal) with the clamp
-// (what an adjudicator may choose inside it). It is the seam that takes retro off
-// the retry path: retro is now reached only when the disposition is DECLINE.
-//
-// The adjudicator is injected as a Strategy so this decision is testable without a
-// bridge dispatch, and defaults to nil — the Null Object path, which must yield a
-// working decision rather than no decision.
-
 import (
 	"context"
 	"strings"
@@ -19,9 +8,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// stubAdjudicator is a Strategy double. It also records whether it was consulted,
-// so the cost guarantee ("deep tier only where there is a real choice") is pinned
-// rather than assumed.
+// stubAdjudicator records whether it was consulted, so the no-deep-tier-without-a-choice guarantee is pinned.
 type stubAdjudicator struct {
 	give     *adjudication
 	consults int
@@ -52,8 +39,6 @@ func TestDecideAfterAuditFail(t *testing.T) {
 		wantConsults int
 	}{
 		{
-			// The wave-3/4 shape: a task-level rejection now retries, with no
-			// dependency on retro having written anything.
 			name:         "task-level audit fail re-enters the dev cycle",
 			class:        policy.CategoryCodeAuditFail,
 			adj:          &adjudication{Action: retryActionRetryTDD, Justification: "encode the defects as tests first"},
@@ -68,8 +53,6 @@ func TestDecideAfterAuditFail(t *testing.T) {
 			wantConsults: 1,
 		},
 		{
-			// NULL OBJECT: no adjudicator output at all still retries, because
-			// POLICY — not the agent — is what grants the retry.
 			name:         "an absent adjudication still retries at the policy default",
 			class:        policy.CategoryCodeAuditFail,
 			adj:          nil,
@@ -77,8 +60,6 @@ func TestDecideAfterAuditFail(t *testing.T) {
 			wantConsults: 1,
 		},
 		{
-			// Retro is now REACHED, not passed through: it is the terminal
-			// learning step once the budget is spent.
 			name:         "at the policy cap the cycle goes to retro",
 			class:        policy.CategoryCodeAuditFail,
 			attempts:     2,
@@ -86,8 +67,6 @@ func TestDecideAfterAuditFail(t *testing.T) {
 			wantConsults: 0, // one legal action ⇒ no deep-tier dispatch
 		},
 		{
-			// The floor still binds, and binds BEFORE any retry — the whole point
-			// of moving the chokepoint without weakening ADR-0072.
 			name:         "a system-level class halts at audit, before any retry",
 			class:        policy.CategoryInfraSystemic,
 			wantNext:     PhaseRetro,
@@ -133,8 +112,6 @@ func TestDecideAfterAuditFail(t *testing.T) {
 	}
 }
 
-// The safety property at the integration level: an adjudicator cannot talk the
-// cycle out of a floor halt.
 func TestDecideAfterAuditFail_AdjudicatorCannotOverturnTheFloor(t *testing.T) {
 	o := floorOrchestrator(fixedNextStrategy{next: "end"})
 	o.failurePolicy = policy.DefaultSystemFailurePolicy()
@@ -154,8 +131,6 @@ func TestDecideAfterAuditFail_AdjudicatorCannotOverturnTheFloor(t *testing.T) {
 	}
 }
 
-// A nil adjudicator (the production default until the persona is wired) must not
-// panic and must not block retries — policy alone is sufficient authority.
 func TestDecideAfterAuditFail_NilAdjudicatorIsSafe(t *testing.T) {
 	o := floorOrchestrator(fixedNextStrategy{next: "end"})
 	o.failurePolicy = policy.DefaultSystemFailurePolicy()
@@ -169,9 +144,6 @@ func TestDecideAfterAuditFail_NilAdjudicatorIsSafe(t *testing.T) {
 	}
 }
 
-// The graph must permit what the decision produces, or the disposition is computed
-// and then rejected at dispatch — wired and inert, the failure shape that has
-// recurred repeatedly in this subsystem.
 func TestAuditFailReentryEdgesAreLegal(t *testing.T) {
 	sm := NewStateMachine()
 	for _, target := range []Phase{PhaseTDD, PhaseBuild, PhaseRetro, PhaseShip} {
@@ -181,8 +153,6 @@ func TestAuditFailReentryEdgesAreLegal(t *testing.T) {
 	}
 }
 
-// And the live selector must actually TAKE the decision on an audit FAIL, rather
-// than falling through to the static successor.
 func TestSelectNext_AuditFailUsesTheDecision(t *testing.T) {
 	sm := NewStateMachine()
 	staticNext, err := sm.Next(PhaseAudit, VerdictFAIL)
@@ -192,8 +162,7 @@ func TestSelectNext_AuditFailUsesTheDecision(t *testing.T) {
 	if staticNext != PhaseRetro {
 		t.Fatalf("precondition changed: static audit-FAIL successor = %s, want retro", staticNext)
 	}
-	// The decision must be able to disagree with the static successor — that is
-	// the whole point of the chokepoint move.
+	// A static successor of "end" proves the decision, not the strategy, picks the next phase.
 	o := floorOrchestrator(fixedNextStrategy{next: "end"})
 	o.failurePolicy = policy.DefaultSystemFailurePolicy()
 	cs := CycleState{CycleID: 1577, WorkspacePath: auditFailFixture(t, policy.CategoryCodeAuditFail, "H1")}
@@ -205,30 +174,20 @@ func TestSelectNext_AuditFailUsesTheDecision(t *testing.T) {
 	}
 }
 
-// THE LIVE PATH. Everything above tests the decision in isolation; this drives a
-// real cycle and asserts the retry actually happens. A decision computed and never
-// consumed is the failure shape this subsystem keeps producing — a router eating a
-// grant, a config knob reaching no composition root, a seeder called with the wrong
-// phase. Each was green in isolation and inert in production.
 func TestOrchestrator_AuditFailRetriesTheDevCycle(t *testing.T) {
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
-	// Audit always FAILs, so the cycle must exhaust its policy retry budget and
-	// only then reach retro.
+	// Audit always FAILs, so the cycle exhausts its retry budget before reaching retro.
 	runners := buildRunners(map[Phase]string{
 		PhaseAudit: VerdictFAIL,
 		PhaseRetro: VerdictFAIL,
 	})
-	// A real auditor writes a report declaring its failure CLASS — verified
-	// against cycles 1572/1574/1576/1577, all of which declare "code-audit-fail".
-	// The plain fakeRunner writes no artifact, so the disposition would correctly
-	// (but unrealistically) decline for want of a class.
+	// The plain fakeRunner declares no failure class, so the disposition would decline for want of one.
 	runners[PhaseAudit] = &classDeclaringAuditRunner{t: t}
 	o := NewOrchestrator(st, led, runners)
 
 	res, _ := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir()})
 
-	// The dev cycle must be re-entered, not torn down on the first rejection.
 	tdds, audits := 0, 0
 	for _, p := range res.PhasesRun {
 		switch p {
@@ -244,14 +203,13 @@ func TestOrchestrator_AuditFailRetriesTheDevCycle(t *testing.T) {
 	if tdds < 2 {
 		t.Errorf("tdd ran %d time(s); the dev cycle was never re-entered (phases=%v)", tdds, res.PhasesRun)
 	}
-	// And the budget must BIND: MaxRetries is 2 in the policy table.
+	// MaxRetries is 2 in the policy table.
 	if audits > 3 {
 		t.Errorf("audit ran %d times; the policy retry budget did not bind (phases=%v)", audits, res.PhasesRun)
 	}
 }
 
-// classDeclaringAuditRunner emits a FAIL verdict AND the machine-readable failure
-// block a real auditor emits, so the disposition has the class it keys on.
+// classDeclaringAuditRunner emits a FAIL verdict with the failure block a real auditor writes.
 type classDeclaringAuditRunner struct{ t *testing.T }
 
 func (r *classDeclaringAuditRunner) Name() string { return string(PhaseAudit) }
@@ -261,36 +219,18 @@ func (r *classDeclaringAuditRunner) Run(_ context.Context, req PhaseRequest) (Ph
 	return PhaseResponse{Phase: string(PhaseAudit), Verdict: VerdictFAIL, ArtifactsDir: req.Workspace}, nil
 }
 
-// C1 (architect review, CRITICAL). Adding audit→tdd/build to the legality graph
-// made them legal for EVERYONE — including the routing advisor, which validates
-// its proposals through the same graph. With routing at `advisory` (the live
-// default) the advisor could therefore:
-//
-//   - grant a retry the envelope REFUSED, on a path that never calls
-//     consumeAuditRepairGrant, so the budget is bypassed and the only remaining
-//     bound is defaultMaxPhaseIterations (32), not MaxRetries (2);
-//   - route backwards after a halt was signalled;
-//   - override audit→ship on a PASSING audit, discarding the pass.
-//
-// The comment on the new edges claimed they were "legal ONLY through
-// decideAfterAuditFail". This makes that true: the edges stay in the ONE legality
-// graph (so the deterministic decision can schedule them and the SSOT is not
-// forked), but the router may not PROPOSE them.
 func TestRouterCannotProposeTheAuditReentryEdges(t *testing.T) {
 	o := floorOrchestrator(fixedNextStrategy{next: "end"})
 
 	for _, to := range []Phase{PhaseTDD, PhaseBuild} {
-		// The deterministic decision may schedule it...
 		if !o.sm.CanTransition(PhaseAudit, to) {
 			t.Errorf("audit→%s must remain schedulable by decideAfterAuditFail", to)
 		}
-		// ...but the routing advisor may not propose it.
 		if o.transitionLegal(PhaseAudit, to) {
 			t.Errorf("the routing advisor can propose audit→%s; it would bypass the retry budget entirely", to)
 		}
 	}
 
-	// Every other audit edge is unchanged for the router.
 	for _, to := range []Phase{PhaseShip, PhaseRetro} {
 		if !o.transitionLegal(PhaseAudit, to) {
 			t.Errorf("audit→%s must stay router-proposable; only the re-entry edges are decision-only", to)
@@ -298,10 +238,6 @@ func TestRouterCannotProposeTheAuditReentryEdges(t *testing.T) {
 	}
 }
 
-// The adjudicator's REASONING must reach the operator-visible reason. The clamp
-// rejects an unjustified proposal because the justification is this phase's whole
-// deliverable — computing it, requiring it, and discarding it is the defect shape
-// ADR-0092's Incoherent flag had (review finding #6).
 func TestDecideAfterAuditFail_SurfacesTheAdjudicatorsReasoning(t *testing.T) {
 	const why = "the tests assert the wrong contract; rebuilding without re-deriving them re-earns this"
 
@@ -317,8 +253,6 @@ func TestDecideAfterAuditFail_SurfacesTheAdjudicatorsReasoning(t *testing.T) {
 	}
 }
 
-// A clamped proposal must SAY it was clamped, so an operator can tell a followed
-// recommendation from an overridden one.
 func TestDecideAfterAuditFail_RecordsAClamp(t *testing.T) {
 	o := floorOrchestrator(fixedNextStrategy{next: "end"})
 	o.failurePolicy = policy.DefaultSystemFailurePolicy()

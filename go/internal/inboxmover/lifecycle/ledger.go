@@ -1,8 +1,5 @@
 package lifecycle
 
-// ledger.go — the chained inbox-lifecycle ledger line (inboxmover.go:104-124,
-// :911-964 on the base).
-
 import (
 	"context"
 	"fmt"
@@ -11,8 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
 )
 
-// ledgerEntry is one lifecycle transition, recorded as a CHAINED ledger entry
-// via ledgerLine (from/to/reason fold into the message field).
 type ledgerEntry struct {
 	Action string
 	TaskID string
@@ -23,8 +18,6 @@ type ledgerEntry struct {
 	Reason string
 }
 
-// foldLifecycleMessage renders "from → to: reason", dropping the arrow
-// segment when no paths are involved (release/recover shapes set only Reason).
 func foldLifecycleMessage(from, to, reason string) string {
 	if from == "" && to == "" {
 		return reason
@@ -32,14 +25,8 @@ func foldLifecycleMessage(from, to, reason string) string {
 	return from + " → " + to + ": " + reason
 }
 
-// ledgerLine records one inbox-lifecycle event through the CHAINED append
-// path (the old raw O_APPEND write was the per-cycle chain-break generator
-// under fleet concurrency). Best-effort — a failed telemetry append must not
-// un-move an item that already moved — but loud, never silent: the WARN line
-// is kept verbatim because the appender is an interface (fakes and other
-// adapters emit nothing) and the file ledger reports its own
-// LEDGER_APPEND_FAILED. A nil appender is the Null Object: nothing to append
-// into, nothing said.
+// ledgerLine appends e best-effort: a failed append never undoes the move, and it prints
+// a WARN line because an appender need not report its own failure.
 func (m *Mover) ledgerLine(e ledgerEntry) {
 	if m.ledger == nil {
 		return
@@ -65,9 +52,7 @@ func (m *Mover) ledgerLine(e ledgerEntry) {
 	}
 }
 
-// intPtr returns a *int from a numeric string, or nil if empty/unparseable.
-// Mirrors bash semantics: empty cycle → null; numeric → numeric (Sscanf
-// accepts leading digits — a preserved leniency).
+// intPtr parses s's leading digits (Sscanf, so "12x" is 12); empty or non-numeric is nil.
 func intPtr(s string) *int {
 	if s == "" {
 		return nil

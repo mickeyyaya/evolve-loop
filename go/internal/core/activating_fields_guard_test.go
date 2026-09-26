@@ -1,15 +1,5 @@
 package core
 
-// activating_fields_guard_test.go — PA-BIG S4 (ADR-0058): the hard registry
-// guard (trust anchor). ADR-0058 made the kernel config-driven with a
-// byte-identical LITERAL backstop, so dropping an activating field from the
-// shipped registry would silently revert that phase to literal-as-SSOT with NO
-// observable behavior change — invisible to every behavior test. This guard
-// makes the drift LOUD by asserting the shipped registry (and the control seam)
-// AGREE with the literal kernel: config must stay the live source, the literal a
-// pure backstop. Expectations are DERIVED from the literal (not a fresh golden),
-// so the guard catches drops AND divergence.
-
 import (
 	"path/filepath"
 	"testing"
@@ -17,9 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
-// TestRegistryActivatingFields_AgreeWithLiteralKernel loads the shipped registry
-// and asserts the ADR-0058 activating fields are present and resolve to the same
-// successors the literal kernel would pick.
 func TestRegistryActivatingFields_AgreeWithLiteralKernel(t *testing.T) {
 	t.Parallel()
 	cat, err := phasespec.Load(filepath.Join("..", "..", "..", "docs", "architecture", "phase-registry.json"))
@@ -27,8 +14,6 @@ func TestRegistryActivatingFields_AgreeWithLiteralKernel(t *testing.T) {
 		t.Fatalf("load shipped registry: %v", err)
 	}
 
-	// retrospective: the registry's branching_strategy must equal the literal
-	// backstop (history). A dropped/changed field fails here.
 	retro, ok := cat.Get(canonicalCatalogName(PhaseRetro))
 	if !ok {
 		t.Fatalf("shipped registry missing %q", canonicalCatalogName(PhaseRetro))
@@ -38,8 +23,6 @@ func TestRegistryActivatingFields_AgreeWithLiteralKernel(t *testing.T) {
 			retro.BranchingStrategy, want)
 	}
 
-	// audit: the registry must declare BOTH verdict-branch targets, and they must
-	// resolve to the same phases the literal Next() picks for PASS and FAIL.
 	audit, ok := cat.Get(canonicalCatalogName(PhaseAudit))
 	if !ok {
 		t.Fatalf("shipped registry missing %q", canonicalCatalogName(PhaseAudit))
@@ -59,10 +42,6 @@ func TestRegistryActivatingFields_AgreeWithLiteralKernel(t *testing.T) {
 	}
 }
 
-// TestControlSeamActivatingFields_AgreeWithLiteralKernel is the seam half of the
-// guard: the debugger has no registry home, so its branching_strategy lives in
-// the builtinControlSpec seam. That seam value must equal the literal backstop —
-// the two Go sources of the debugger strategy cannot drift apart.
 func TestControlSeamActivatingFields_AgreeWithLiteralKernel(t *testing.T) {
 	t.Parallel()
 	spec, ok := builtinControlSpec(PhaseDebugger)

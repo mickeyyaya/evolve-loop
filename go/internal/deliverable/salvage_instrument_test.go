@@ -1,17 +1,5 @@
 package deliverable
 
-// salvage_instrument_test.go — names AND exercises every exported symbol added
-// by the salvage-instrumentation layer (export-naming floor, ADR-0069):
-//
-//	type  SalvagePattern, BadVerdictClassification
-//	const SalvagePatternNone / SalvagePatternFencedJSON /
-//	      SalvagePatternTrailingComma / SalvagePatternDisplaced
-//	func  ClassifyBadVerdict
-//
-// The ACS predicates (go/acs/cycle1389) drive the same symbols through the real
-// VerifyWithStage/Reviewer path; this suite covers the classifier's PRECEDENCE
-// and negative axes, which the acceptance criteria do not reach.
-
 import (
 	"context"
 	"encoding/json"
@@ -64,24 +52,18 @@ func TestClassifyBadVerdict_Patterns(t *testing.T) {
 			want:        SalvagePatternNone,
 		},
 		{
-			// A fence with no verdict key must NOT be mistaken for a displaced
-			// object by the fence-stripping step, and must not claim fenced-json.
 			name:        "fenced block without a verdict key",
 			content:     "## Notes\n```go\nfoo := bar{baz: 1}\n```\nnothing else\n",
 			recoverable: false,
 			want:        SalvagePatternNone,
 		},
 		{
-			// Precedence: a well-formed-but-out-of-vocabulary sentinel is a real
-			// bad_verdict, but it is NOT one of the three shapes — claiming it
-			// recoverable would inflate the baseline this layer exists to measure.
 			name:        "sentinel parses but verdict is out of vocabulary",
 			content:     "## Verdict\n<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"MAYBE\"} -->\n",
 			recoverable: false,
 			want:        SalvagePatternNone,
 		},
 		{
-			// Precedence: the sentinel branch wins over a fence appearing later.
 			name:        "sentinel takes precedence over a trailing fence",
 			content:     "<!-- evolve-verdict: {\"verdict\":\"PASS\",} -->\n```json\n{\"verdict\":\"FAIL\"}\n```\n",
 			recoverable: true,
@@ -105,10 +87,7 @@ func TestClassifyBadVerdict_Patterns(t *testing.T) {
 	}
 }
 
-// TestClassifyBadVerdict_IsPure guards the layer's defining property: the
-// classifier is measurement, not extraction. It must never be a path by which a
-// verdict is invented — so it returns only a description, and the Result it was
-// derived from is not an input it can mutate.
+// Purity is checked as determinism: the classifier takes no Result it could mutate.
 func TestClassifyBadVerdict_IsPure(t *testing.T) {
 	t.Parallel()
 	const content = "```json\n{\"verdict\":\"PASS\"}\n```\n"
@@ -119,15 +98,10 @@ func TestClassifyBadVerdict_IsPure(t *testing.T) {
 	}
 }
 
-// TestRecordBadVerdictBaseline_OnlyOnBadVerdict is the negative axis of the
-// wiring: a non-verdict violation (a missing section) must write NO baseline
-// record, or the measured rate is a count of every contract failure instead of
-// the salvage layer's addressable population.
 func TestRecordBadVerdictBaseline_OnlyOnBadVerdict(t *testing.T) {
 	t.Parallel()
 	ws, pr := t.TempDir(), t.TempDir()
-	// Well-formed sentinel, but the build contract's required "## Changes"
-	// section is absent ⇒ a block with no bad_verdict.
+	// A well-formed sentinel with the build contract's "## Changes" section absent: a block without bad_verdict.
 	writeFile(t, ws, "build-report.md", "## Something Else\n<!-- evolve-verdict: {\"phase\":\"build\",\"verdict\":\"PASS\"} -->\n")
 
 	r := NewReviewerWithCatalogStageReportSize(config.StageEnforce, phasespec.Catalog{}, config.StageEnforce, config.StageOff, 0)
@@ -141,20 +115,10 @@ func TestRecordBadVerdictBaseline_OnlyOnBadVerdict(t *testing.T) {
 	}
 }
 
-// strayBacktickPreamble is the historical poison: a lone, never-closed backtick
-// sitting in prose ahead of the report's own verdict shape. The cycle-1406/1407
-// defect (`isQuotedEcho`, since removed) read backtick *adjacency* as proof of a
-// quoted echo without requiring the backtick run to close, so this preamble
-// alone flipped a recoverable verdict to "genuinely absent, not recoverable" —
-// poisoning the very baseline this layer exists to measure honestly.
+// strayBacktickPreamble puts a lone, never-closed backtick in prose ahead of the report's own verdict.
 const strayBacktickPreamble = "The auditor noted a stray ` tick in the transcript and moved on.\n\n"
 
-// TestClassifyBadVerdict_UnmatchedBacktickDoesNotMisclassify pins the fixed
-// behaviour by PAIRED CONTROL: every classifier shape is run twice, once as
-// written and once with the stray-backtick preamble prepended, and the two
-// classifications must be identical. "Same as the backtick-free twin" is
-// strictly stronger evidence than asserting today's literal output — it shows
-// the backtick made no difference at all, which is the property that regressed.
+// Each shape is classified as written and behind the preamble; the two results must match.
 func TestClassifyBadVerdict_UnmatchedBacktickDoesNotMisclassify(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -164,7 +128,6 @@ func TestClassifyBadVerdict_UnmatchedBacktickDoesNotMisclassify(t *testing.T) {
 		want        SalvagePattern
 	}{
 		{
-			// The crux shape: the malformed sentinel the old bug misread.
 			name:        "sentinel with trailing comma",
 			content:     "# Audit Report\n\n<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"FAIL\",} -->\n",
 			recoverable: true,
@@ -183,8 +146,6 @@ func TestClassifyBadVerdict_UnmatchedBacktickDoesNotMisclassify(t *testing.T) {
 			want:        SalvagePatternDisplaced,
 		},
 		{
-			// Negative axis: a classifier that blanket-claims recoverability
-			// fails here, so the paired control cannot be satisfied vacuously.
 			name:        "genuinely absent",
 			content:     "# Audit Report\n\nProse only. No verdict payload of any kind was emitted.\n",
 			recoverable: false,
@@ -210,8 +171,6 @@ func TestClassifyBadVerdict_UnmatchedBacktickDoesNotMisclassify(t *testing.T) {
 		})
 	}
 
-	// Edge axis: a backtick with no report body, and an empty deliverable.
-	// Neither carries a verdict object, so neither may be claimed recoverable.
 	for _, content := range []string{"", "`", "```", strayBacktickPreamble} {
 		if got := ClassifyBadVerdict(content); got.Recoverable || got.Pattern != SalvagePatternNone {
 			t.Errorf("content %q classified {recoverable=%v pattern=%q} — a verdict-free deliverable is not recoverable",
@@ -220,16 +179,10 @@ func TestClassifyBadVerdict_UnmatchedBacktickDoesNotMisclassify(t *testing.T) {
 	}
 }
 
-// TestNoQuotedEchoRegression is the tripwire for the removed heuristic itself.
-// The behavioural assertion comes first — it is what actually matters — and the
-// source scan backs it up, because the defect class is broader than the one
-// input above: any future adjacency-as-proof helper anywhere in the package
-// would reintroduce it. Test files are excluded from the scan; this very file
-// names both symbols in prose.
+// The symbol scan skips test files, which name the banned helpers.
 func TestNoQuotedEchoRegression(t *testing.T) {
 	t.Parallel()
 
-	// Behavioural tripwire: the exact historical failure, asserted directly.
 	const poisoned = strayBacktickPreamble + "<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"FAIL\",} -->\n"
 	got := ClassifyBadVerdict(poisoned)
 	if !got.Recoverable || got.Pattern != SalvagePatternTrailingComma {
@@ -237,7 +190,6 @@ func TestNoQuotedEchoRegression(t *testing.T) {
 			"classified {recoverable=%v pattern=%q}, want {true %q}", got.Recoverable, got.Pattern, SalvagePatternTrailingComma)
 	}
 
-	// Symbol tripwire over the package's production sources.
 	entries, err := os.ReadDir(".")
 	if err != nil {
 		t.Fatalf("read package dir: %v", err)
@@ -264,9 +216,6 @@ func TestNoQuotedEchoRegression(t *testing.T) {
 	}
 }
 
-// TestRecordBadVerdictBaseline_RecordShape asserts the JSONL record carries the
-// fields §7's counts are tallied from, so the doc's aggregation can never drift
-// from what the writer emits.
 func TestRecordBadVerdictBaseline_RecordShape(t *testing.T) {
 	t.Parallel()
 	ws, pr := t.TempDir(), t.TempDir()
@@ -298,11 +247,7 @@ func TestRecordBadVerdictBaseline_RecordShape(t *testing.T) {
 	}
 }
 
-// decoyCorpusPath is the ONE canonical cycle-1298 adversarial-review report:
-// five sentinel decoys quoted into prose plus the report's own tail sentinel.
-// It is read from phasecontract's testdata rather than re-typed, so this suite
-// and phasecontract's sentinel_tailanchor_test.go stay bound to the same bytes
-// (single-source-of-truth — a copied excerpt would drift silently).
+// decoyCorpusPath is read rather than re-typed, so this suite and phasecontract's tests share one set of bytes.
 const decoyCorpusPath = "../phasecontract/testdata/cycle1298-quoted-decoys.md"
 
 func readDecoyCorpus(t *testing.T) string {
@@ -316,20 +261,7 @@ func readDecoyCorpus(t *testing.T) string {
 	return string(raw)
 }
 
-// TestClassifyBadVerdict_QuotedDecoyCorpus is the durable regression case for
-// decoy immunity (carryover todo-schema-aligned-salvage-layer-decoy-fixture).
-//
-// The classifier must key off the report's OWN verdict sentinel, never off a
-// sentinel the report merely QUOTES while discussing one — the cycle-641 lesson
-// ("classifiers MUST exclude any span that is a verbatim echo of injected
-// prompt/instruction text"), and the exact bypass this corpus was landed to
-// document. Before cycle-1407 the classifier took the FIRST sentinel-shaped
-// span in the document, which in this corpus is a quoted decoy, so it never
-// reached the real tail sentinel at all.
-//
-// Both directions are pinned, because each guards against the fix for the
-// other: "first wins" fails the middle case, and a naive "last wins" fails the
-// third. Only genuine quote-awareness plus tail anchoring passes all three.
+// First-match selection fails the second subtest and last-match alone fails the third.
 func TestClassifyBadVerdict_QuotedDecoyCorpus(t *testing.T) {
 	t.Parallel()
 	corpus := readDecoyCorpus(t)
@@ -373,27 +305,8 @@ func TestClassifyBadVerdict_QuotedDecoyCorpus(t *testing.T) {
 	})
 }
 
-// TestClassifyBadVerdict_UnmatchedBacktickFalsePositive is the RED reproduction
-// of adversarial-review finding F1 (cycle-1407 adversarial-review-report.md).
-//
-// isQuotedEcho (salvage_instrument.go) treats backtick ADJACENCY alone as proof
-// a sentinel span is a quoted echo — it never checks that the backtick run
-// actually closes. A single stray, unmatched backtick immediately before a
-// report's OWN tail sentinel is therefore indistinguishable from real inline
-// code, and the genuine (malformed-but-recoverable) sentinel is excised as if
-// it were a decoy. That is the opposite failure mode from the corpus above:
-// there the classifier must ignore a real quote; here it must NOT ignore a
-// real sentinel merely because one unmatched backtick sits next to it.
-//
-// This directly widens the error bars on the recoverable-malformed rate the
-// extraction stage (schema-aligned-salvage-layer) is gated on — see F1's
-// "Impact" note — so it is pinned as its own case rather than folded into the
-// decoy-corpus table above, which only covers BALANCED inline-code echoes.
 func TestClassifyBadVerdict_UnmatchedBacktickFalsePositive(t *testing.T) {
 	t.Parallel()
-	// The report's ONLY sentinel: a genuine, malformed (trailing-comma) tail
-	// verdict, immediately preceded by one unmatched backtick left over from an
-	// unrelated inline-code span earlier in the sentence — never closed.
 	const content = "## Verdict\n" +
 		"An unrelated inline code span ends here`" +
 		"<!-- evolve-verdict: {\"phase\":\"build\",\"verdict\":\"FAIL\",} -->\n" +
@@ -411,15 +324,7 @@ func TestClassifyBadVerdict_UnmatchedBacktickFalsePositive(t *testing.T) {
 	}
 }
 
-// TestClassifyBadVerdict_QuotedEchoStillSuppressed is the guard against the
-// cheap cure for F1 — deleting quote-awareness, or weakening it to "backticks
-// on BOTH sides of the sentinel".
-//
-// Each case below is a genuinely CLOSED code span containing a malformed
-// sentinel, while the report's own verdict parses cleanly: there is nothing to
-// salvage. The `padded` and `double-run` cases are the ones flush-adjacency
-// misses — the closing backtick is real but not the byte immediately after the
-// sentinel.
+// The padded and double-run cases are the ones a flush-adjacency check misses.
 func TestClassifyBadVerdict_QuotedEchoStillSuppressed(t *testing.T) {
 	t.Parallel()
 	const decoy = "<!-- evolve-verdict: {\"phase\":\"build\",\"verdict\":\"PASS\",\"schema_version\":1,} -->"
@@ -449,11 +354,6 @@ func TestClassifyBadVerdict_QuotedEchoStillSuppressed(t *testing.T) {
 	}
 }
 
-// TestClassifyBadVerdict_BacktickAtContentBoundary pins the bounds axis: a
-// sentinel flush at offset 0 and one flush at len(content), with and without a
-// trailing backtick. Any delimiter check that peeks at content[start-1] or
-// content[end] without guarding panics here, and a panic in a pure classifier
-// takes down the contract gate that called it as a side effect.
 func TestClassifyBadVerdict_BacktickAtContentBoundary(t *testing.T) {
 	t.Parallel()
 	const malformed = "<!-- evolve-verdict: {\"phase\":\"build\",\"verdict\":\"FAIL\",\"schema_version\":2,} -->"

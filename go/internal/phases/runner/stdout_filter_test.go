@@ -62,7 +62,7 @@ func TestRun_StdoutFilter_ErrorDoesNotBlockPhase(t *testing.T) {
 		Bridge:   &fakeBridge{writeArtifact: "ok\n"},
 		Prompts:  fakePromptsFS("evolve-scout", "body"),
 		NowFn:    fixtures.FixedClock(time.Unix(1, 0), time.Millisecond),
-		VerifyFn: alwaysOKVerify, // plumbing test — isolate from the deliverable hard-gate
+		VerifyFn: alwaysOKVerify,
 		StdoutFilter: func(workspace, phase string) error {
 			return errors.New("synthetic filter blowup")
 		},
@@ -107,10 +107,6 @@ func TestRun_StdoutFilter_OffEnvSkipsFilter(t *testing.T) {
 	}
 }
 
-// TestRun_StdoutFilter_E2E_WritesCompanionFile exercises the real
-// logfilter.Process end-to-end through the runner: bridge writes a
-// stream-json stdout to disk, runner triggers the default-on filter,
-// and a clean.txt companion appears.
 func TestRun_StdoutFilter_E2E_WritesCompanionFile(t *testing.T) {
 	ws := t.TempDir()
 	raw := `{"type":"assistant","message":{"id":"m","role":"assistant","content":[{"type":"text","text":"signal preserved"}]}}` + "\n" +
@@ -128,7 +124,7 @@ func TestRun_StdoutFilter_E2E_WritesCompanionFile(t *testing.T) {
 		Bridge:  &fakeBridge{writeArtifact: "ok\n"},
 		Prompts: fakePromptsFS("evolve-builder", "body"),
 		NowFn:   fixtures.FixedClock(time.Unix(1, 0), time.Millisecond),
-		// StdoutFilter unset → defaults to real logfilter.Process
+		// StdoutFilter is unset, so the real logfilter.Process runs.
 	})
 
 	if _, err := r.Run(context.Background(), core.PhaseRequest{

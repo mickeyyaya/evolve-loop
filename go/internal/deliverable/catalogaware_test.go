@@ -8,15 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// catalogaware_test.go — RED contract for VerifyCatalogAware: ONE verify
-// entry point that derives the merged phase catalog (built-in registry +
-// .evolve/phases user specs) from the call-time roots, so every consumer —
-// host gate, agent self-check, salvage rung, and the runner's
-// timeout-reconcile — resolves contracts under the SAME policy. The
-// reconcile path previously used Verify (BuiltinResolver only): a user
-// phase whose artifact survived a bridge timeout could not be reconciled
-// and synthesized FAIL.
-
 // seedCatalogProject builds a project with a minimal built-in registry and
 // one user phase, returning (projectRoot, evolveDir, workspace).
 func seedCatalogProject(t *testing.T) (string, string, string) {
@@ -47,11 +38,6 @@ func seedCatalogProject(t *testing.T) (string, string, string) {
 	return root, filepath.Join(root, ".evolve"), ws
 }
 
-// TestVerifyCatalogAware_ResolvesUserPhase — a user phase must RESOLVE (the
-// missing artifact is then a normal violation, not a resolution error),
-// exactly as the host gate and `evolve phase verify` see it. Verify
-// (builtin-only) cannot resolve it — pinned here as the contrast that keeps
-// this test honest about what catalog-awareness adds.
 func TestVerifyCatalogAware_ResolvesUserPhase(t *testing.T) {
 	_, evolveDir, ws := seedCatalogProject(t)
 	roots := phasecontract.Roots{Workspace: ws, EvolveDir: evolveDir}
@@ -69,9 +55,6 @@ func TestVerifyCatalogAware_ResolvesUserPhase(t *testing.T) {
 	}
 }
 
-// TestVerifyCatalogAware_WellFormedUserArtifact — with the user phase's
-// artifact on disk, the same call returns OK: the reconcile-on-timeout
-// upgrade path works for user phases.
 func TestVerifyCatalogAware_WellFormedUserArtifact(t *testing.T) {
 	_, evolveDir, ws := seedCatalogProject(t)
 	report := "# widget-scan\n\n## Verdict\nPASS\n"
@@ -87,10 +70,6 @@ func TestVerifyCatalogAware_WellFormedUserArtifact(t *testing.T) {
 	}
 }
 
-// TestVerifyCatalogAware_DegradesToBuiltin — no EvolveDir in roots (or no
-// registry on disk) degrades to built-in-only resolution, mirroring the
-// CLI's phaseVerifyResolver: built-in phases always verify, never hard-fail
-// on a catalog glitch.
 func TestVerifyCatalogAware_DegradesToBuiltin(t *testing.T) {
 	ws := t.TempDir()
 	res, err := VerifyCatalogAware("build", phasecontract.Roots{Workspace: ws})

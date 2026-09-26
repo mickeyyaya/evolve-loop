@@ -55,6 +55,8 @@ All 6 non-Scout persona files (`evolve-intent.md`, `evolve-triage.md`, `evolve-t
 
 ## Hook Contract
 
+> **Removed 2026-09-26.** This section records the cycle-87 design. Its Go port, `evolve guard quota`, built a fresh counter for every hook call, so its caps never outlived one call and it never denied anything. It also named the agent from a hook field Claude Code does not send. The guard, its hook wiring and `workflow.allow_deep_research` were removed rather than rebuilt; research calls are uncapped. See [internal-guards](packages/internal-guards.md#findings).
+
 File: `legacy/scripts/hooks/research-quota-gate.sh`
 
 The hook is a `PreToolUse` gate that intercepts `WebSearch` and `WebFetch` calls.
@@ -106,9 +108,6 @@ Several profiles retain `"WebSearch"` and `"WebFetch"` in both `allowed_tools` a
 
 | Subsystem | Env var | Default | Effect |
 |-----------|---------|---------|--------|
-| Research tool | `workflow.allow_deep_research` | `false` | When `true`, lifts the per-agent quota cap. Does not disable hook telemetry. |
-| Research tool | `EVOLVE_RESEARCH_QUOTA_SOFT` | *(planned)* | Soft quota: allows over-quota calls but emits WARN in guards.log. Not yet implemented in `research-quota-gate.sh` as of cycle-89. |
-| Research tool | `EVOLVE_RESEARCH_HOOK_DISABLED` | `0` | When `1`, hook is a no-op but counters still increment (telemetry-only mode). |
 | Research tool | `EVOLVE_KB_SEARCH_PATHS` | `docs/research/:.evolve/instincts/lessons/:docs/research/` | Colon-separated root paths for `kb-search.sh`. |
 
 ---

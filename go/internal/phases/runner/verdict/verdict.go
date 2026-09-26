@@ -1,18 +1,6 @@
-// Package verdict is unit 11 of the component breakdown (ADR-0103): the phase
-// runner's verdict engine — the fifth and sixth step of BaseRunner.Run's
-// template. One Engine turns (what the bridge did, what preparation
-// snapshotted, the deliverable probe) into the core.PhaseResponse core's
-// dispatch loops route on: the bounded settle ladder, the teardown reconcile
-// arms (stale-leftover refusal → well-formed → optional degrade → ACS
-// deterministic floor → forensic FAIL), the substantive-error FAIL, the
-// verdict-source rule (the contracted file is the sole verdict source, the
-// pane only for an uncontracted phase), the clean-stdout companion, the ship
-// guard and the violation trail. Prompt preparation, routing, the dispatch
-// chain and the worktree fence stay in the host (unit 11b). The Engine holds
-// the probe, a sleep, the stdout filter, the optional flag and the Signal
-// Center accessor; it persists nothing, writes no stderr, reads no env, and
-// reports its five decisions as runner.warning under module runner. Design:
-// docs/architecture/decomposition/11-phaserunner.md.
+// Package verdict is the phase runner's judge: it reconciles a bridge outcome
+// against the contracted deliverable and classifies the phase's verdict.
+// See docs/architecture/packages/internal-phases-runner-verdict.md.
 package verdict
 
 import (
@@ -25,8 +13,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// The unit's codes — the five WARN decisions of the verdict engine, four of
-// which replaced hand-written stderr lines — registered with their reasons.
+// The engine's Signal Center codes, one per WARN decision it reports.
 const (
 	CodeTeardownFail          signalcenter.Code = "RUNNER_TEARDOWN_FAIL"
 	CodeOptionalPhaseDegraded signalcenter.Code = "RUNNER_OPTIONAL_PHASE_DEGRADED"
@@ -43,33 +30,21 @@ func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleRunner, CodeStdoutFilterFailed, "the clean-stdout companion of the phase's raw log (the logfilter writer's <phase>-stdout.clean.txt) could not be written; the phase continues and the raw log stays the forensic source; fields.workspace (the phase is the event's own)")
 }
 
-// The settle ladder's bounds — a pure LIVENESS ceiling (≈ 3 s) for a
-// contracted deliverable that has not finished flushing to disk, never the
-// verdict-correctness mechanism (that is the file-authoritative rule): a
-// clean-exit agent can return control before its `Write <phase>-report.md`
-// lands (cycle-921, the ADR-0072 verdict incoherence). The host projects them
-// under their old names for the settle tests it keeps.
+// The settle ladder's bounds: a liveness ceiling (about 3 s) for a deliverable
+// still flushing to disk, never the verdict-correctness mechanism.
 const (
 	SettleRetries  = 15
 	SettleInterval = 200 * time.Millisecond
 )
 
-// Verify is the deliverable probe as the host resolves it (Options.VerifyFn or
-// the catalog-aware default). Classify is the phase's own verdict hook, bound
-// by the host PER CALL over its request and bridge response — the engine
-// judges bytes it never reads itself and a verdict rule it never owns
-// (Strategy), and never sees core.PhaseRequest or the host's Hooks.
+// Verify is the host's deliverable probe; Classify is the phase's verdict hook, bound per call.
 type (
 	Verify   func(id Identity, phase string, roots phasecontract.Roots) (deliverable.Result, error)
 	Classify func(artifact string) (verdict string, diags []core.Diagnostic, nextPhase string)
 )
 
-// Dispatch is the ONE input shape: the request fields the engine reads, what
-// preparation snapshotted, and what the bridge did. The host projects it ONCE
-// (a keyed literal); the leaf's own test constructs it POSITIONALLY so a new
-// field fails to compile there instead of silently zeroing at the seam.
-// Bridge is meaningful even when BridgeErr != nil: CostUSD/Tokens/BootMS/
-// ExitCode are read on the error arms.
+// Dispatch is the engine's one input: the request fields it reads, the
+// pre-dispatch snapshot and the bridge outcome, which is read even when BridgeErr is set.
 type Dispatch struct {
 	Cycle                           int
 	RunID                           string
@@ -89,8 +64,7 @@ type Dispatch struct {
 	FenceDiagnostics                []core.Diagnostic
 }
 
-// Engine judges one dispatch outcome. The probe is required; the rest are
-// options with the host's defaults. No clock, no store, no stderr.
+// Engine judges one dispatch outcome. The probe is required; every other seam is an Option.
 type Engine struct {
 	verify       Verify
 	sleep        func(time.Duration)
@@ -99,11 +73,10 @@ type Engine struct {
 	signals      func() *signalcenter.Center
 }
 
-// Option configures an Engine at construction (functional options).
+// Option configures an Engine at construction.
 type Option func(*Engine)
 
-// New builds the engine over its required probe; a nil probe is a programming
-// error and panics at first use — no guard.
+// New builds the engine over its required probe; a nil probe panics at first use.
 func New(verify Verify, opts ...Option) *Engine {
 	e := &Engine{verify: verify, sleep: time.Sleep}
 	for _, opt := range opts {
@@ -112,29 +85,22 @@ func New(verify Verify, opts ...Option) *Engine {
 	return e
 }
 
-// WithSleep installs the settle ladder's clock (default time.Sleep); the host
-// passes its resolved sleep seam so its tests count the intervals.
+// WithSleep installs the settle ladder's sleep; the default is time.Sleep.
 func WithSleep(fn func(time.Duration)) Option {
 	return func(e *Engine) { e.sleep = fn }
 }
 
-// WithStdoutFilter installs the clean-stdout companion writer (the host's
-// logfilter.Process by default); nil is the Null Object — no companion is
-// written (the host omits it when the filter is disabled). Where the
-// companion lives is the writer's belief; the engine never spells it.
+// WithStdoutFilter installs the clean-stdout companion writer; nil writes no companion.
 func WithStdoutFilter(fn func(workspace, phase string) error) Option {
 	return func(e *Engine) { e.stdoutFilter = fn }
 }
 
-// WithOptional marks the phase non-essential: a teardown with no trustworthy
-// deliverable degrades to WARN and the cycle advances instead of aborting.
+// WithOptional marks the phase optional: a teardown with no trustworthy deliverable degrades to WARN.
 func WithOptional(optional bool) Option {
 	return func(e *Engine) { e.optional = optional }
 }
 
-// WithSignals installs the accessor of the Signal Center the unit reports
-// through — read at every use, never snapshotted. A nil accessor, or one
-// returning nil, is the Null Object; SignalsWired proves a root wired one.
+// WithSignals installs the Signal Center accessor, read at every use; nil is the Null Object.
 func WithSignals(c func() *signalcenter.Center) Option {
 	return func(e *Engine) { e.signals = c }
 }
@@ -149,10 +115,8 @@ func (e *Engine) center() *signalcenter.Center {
 	return e.signals()
 }
 
-// warn is the unit's one producer: a runner.warning WARN under module runner,
-// stamped with the dispatch's cycle, phase and run id and the emitting method
-// as origin. Empty field values are omitted so every code stays under the
-// Center's field cap. A nil Center is the Null Object (Emit on nil is a no-op).
+// warn is the engine's one producer. Empty field values are dropped so every
+// code stays under the Center's field cap; a nil Center ignores the event.
 func (e *Engine) warn(origin string, d Dispatch, code signalcenter.Code, reason string, fields map[string]string) {
 	for k, v := range fields {
 		if v == "" {
@@ -165,13 +129,8 @@ func (e *Engine) warn(origin string, d Dispatch, code signalcenter.Code, reason 
 	})
 }
 
-// Judge is the fifth and sixth step of the host's Run template: reconcile the
-// bridge outcome against the deliverable, then classify. It returns exactly
-// what the two stage functions returned before the extraction: a populated
-// FAIL response AND fmt.Errorf("%s: bridge: %w", phase, bridgeErr) on the
-// teardown-FAIL and substantive arms (the sentinel survives errors.Is for
-// core's IsInfraTeardownError and bridgeExitCode), (WARN, nil) on the optional
-// arm, (the classified response, nil) otherwise.
+// Judge reconciles the bridge outcome against the deliverable, then classifies.
+// A FAIL arm also returns the bridge error wrapped, so errors.Is still finds the infra sentinel.
 func (e *Engine) Judge(ctx context.Context, d Dispatch, classify Classify) (core.PhaseResponse, error) {
 	r, early, err := e.reconcile(ctx, d)
 	if early != nil {
@@ -180,10 +139,7 @@ func (e *Engine) Judge(ctx context.Context, d Dispatch, classify Classify) (core
 	return e.classify(ctx, d, r, classify), nil
 }
 
-// Identity is the dispatch's identity handed to the verifier: a salvage the
-// verifier performs before classification is reported under the cycle and
-// run it belongs to. The engine's own type — the engine is a leaf and does
-// not import the gate reporter; the host adapts it.
+// Identity names the dispatch to the verifier, so its salvage reports carry the right cycle and run.
 type Identity struct {
 	Cycle int
 	RunID string

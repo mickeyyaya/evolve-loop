@@ -6,9 +6,6 @@ import (
 	"testing"
 )
 
-// campaignEvolveDir must always yield an ABSOLUTE .evolve path so a relative
-// --project-root on the `campaign status` path resolves the same progress file
-// the `campaign run` path wrote (run absolutizes its root; status must too).
 func TestCampaignEvolveDir_AbsolutizesRelativeRoot(t *testing.T) {
 	got := campaignEvolveDir("relative/root")
 	if !filepath.IsAbs(got) {

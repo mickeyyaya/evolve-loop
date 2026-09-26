@@ -11,8 +11,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 )
 
-// composeStub records every Run call and returns scripted responses
-// keyed by phase name.
+// composeStub records every Run call and returns scripted responses by phase.
 type composeStub struct {
 	scripts map[string]core.PhaseResponse
 	calls   []string
@@ -47,7 +46,6 @@ func registerCompose(t *testing.T, stub *composeStub, phaseNames ...string) {
 	}
 }
 
-// TestCompose_HappyPath_AllPhasesPASS — exit 0 + all calls recorded.
 func TestCompose_HappyPath_AllPhasesPASS(t *testing.T) {
 	defer registry.SnapshotForTest()()
 	stub := &composeStub{}
@@ -67,8 +65,6 @@ func TestCompose_HappyPath_AllPhasesPASS(t *testing.T) {
 	}
 }
 
-// TestCompose_FailVerdict_Exit1 — at least one phase returning FAIL
-// flips overall exit to 1; composition still continues past the fail.
 func TestCompose_FailVerdict_Exit1(t *testing.T) {
 	defer registry.SnapshotForTest()()
 	stub := &composeStub{
@@ -90,7 +86,6 @@ func TestCompose_FailVerdict_Exit1(t *testing.T) {
 	}
 }
 
-// TestCompose_MissingPhasesArg_Exit10 — bad args.
 func TestCompose_MissingPhasesArg_Exit10(t *testing.T) {
 	defer registry.SnapshotForTest()()
 	registry.ResetForTesting()
@@ -104,7 +99,6 @@ func TestCompose_MissingPhasesArg_Exit10(t *testing.T) {
 	}
 }
 
-// TestCompose_UnknownPhase_Exit10 — phase not in registry rejected.
 func TestCompose_UnknownPhase_Exit10(t *testing.T) {
 	defer registry.SnapshotForTest()()
 	stub := &composeStub{}
@@ -119,8 +113,6 @@ func TestCompose_UnknownPhase_Exit10(t *testing.T) {
 	}
 }
 
-// TestCompose_ShipWithoutOverride_Exit2 — refuses to compose ship
-// unless --ship-anyway is passed.
 func TestCompose_ShipWithoutOverride_Exit2(t *testing.T) {
 	defer registry.SnapshotForTest()()
 	stub := &composeStub{}
@@ -135,7 +127,6 @@ func TestCompose_ShipWithoutOverride_Exit2(t *testing.T) {
 	}
 }
 
-// TestCompose_ShipWithOverride_Proceeds — --ship-anyway lets it through.
 func TestCompose_ShipWithOverride_Proceeds(t *testing.T) {
 	defer registry.SnapshotForTest()()
 	stub := &composeStub{}
@@ -151,7 +142,6 @@ func TestCompose_ShipWithOverride_Proceeds(t *testing.T) {
 	}
 }
 
-// TestCompose_DryRun_NoExecution — --dry-run prints the plan and exits.
 func TestCompose_DryRun_NoExecution(t *testing.T) {
 	defer registry.SnapshotForTest()()
 	stub := &composeStub{}
@@ -169,9 +159,6 @@ func TestCompose_DryRun_NoExecution(t *testing.T) {
 	}
 }
 
-// TestCompose_ExportsComposeSignal — PhaseRequest.ComposePhases is true
-// when the factory is called from evolve compose (cycle-10: replaced the
-// retired EVOLVE_COMPOSE_PHASES env signal with a DI bool).
 func TestCompose_ExportsComposeSignal(t *testing.T) {
 	defer registry.SnapshotForTest()()
 	var observedDuring bool
@@ -188,7 +175,6 @@ func TestCompose_ExportsComposeSignal(t *testing.T) {
 	}
 }
 
-// TestCompose_MalformedJSONStdin_Exit10 — invalid JSON envelope.
 func TestCompose_MalformedJSONStdin_Exit10(t *testing.T) {
 	defer registry.SnapshotForTest()()
 	stub := &composeStub{}
@@ -200,8 +186,6 @@ func TestCompose_MalformedJSONStdin_Exit10(t *testing.T) {
 	}
 }
 
-// TestCompose_EmptyStdin_OK — empty stdin is treated as empty
-// PhaseRequest (no JSON parse attempted).
 func TestCompose_EmptyStdin_OK(t *testing.T) {
 	defer registry.SnapshotForTest()()
 	stub := &composeStub{}
@@ -213,7 +197,6 @@ func TestCompose_EmptyStdin_OK(t *testing.T) {
 	}
 }
 
-// TestSplitNonEmptyPhases_DirectUnit — direct unit test.
 func TestSplitNonEmptyPhases_DirectUnit(t *testing.T) {
 	cases := []struct {
 		in   string

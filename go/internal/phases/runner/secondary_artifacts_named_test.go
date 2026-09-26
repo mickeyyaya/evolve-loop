@@ -1,11 +1,5 @@
 package runner
 
-// secondary_artifacts_named_test.go — apicover named binding for the exported
-// SecondaryArtifactsProvider seam (Phase B): proves the optional hook is what
-// actually feeds BridgeRequest.SecondaryArtifacts through the resolution
-// glue, and that a Hooks without the interface yields nil (byte-identical
-// legacy dispatch).
-
 import (
 	"path/filepath"
 	"testing"

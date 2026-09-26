@@ -1,11 +1,5 @@
 package inboxmover
 
-// claim_lane_scope_already_claimed_test.go — ClaimLaneScope exists so a
-// committed id the lane never claimed still reaches processing/ before the
-// FAIL drain; an id the lane DID claim (it sits in processing/cycle-N/) is
-// already there, and re-claiming it produced a false INBOX_CLAIM_NOT_FOUND on
-// every closeout (cycle 1675's stream, the 2026-09-14 poison-loop incident).
-
 import (
 	"io"
 	"os"

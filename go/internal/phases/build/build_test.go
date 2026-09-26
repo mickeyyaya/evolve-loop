@@ -243,3 +243,9 @@ func TestName(t *testing.T) {
 		t.Errorf("Name=%q, want build", p.Name())
 	}
 }
+
+func TestProfileName_IsTheProfileTheBuildAgentRunsUnder(t *testing.T) {
+	if got := (hooks{}).AgentPromptName(); got != "evolve-"+ProfileName {
+		t.Fatalf("AgentPromptName = %q, want %q: the runner resolves the profile by trimming evolve-", got, "evolve-"+ProfileName)
+	}
+}

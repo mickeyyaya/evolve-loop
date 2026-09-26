@@ -19,25 +19,17 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
-// TestMain clears EVOLVE_CLI from the process env so runner tests that exercise
-// the profile/default CLI tier are not contaminated by a soak-batch
-// EVOLVE_CLI=claude-p in the operator shell. Tests that need to assert
-// "env beats profile" set EVOLVE_CLI explicitly in core.PhaseRequest.Env
-// (tier 1), which always wins over os.Getenv (tier 2) regardless.
+// TestMain unsets EVOLVE_CLI so an operator shell value cannot leak into the profile and default CLI tiers.
 func TestMain(m *testing.M) {
 	os.Unsetenv("EVOLVE_CLI")
 	os.Exit(m.Run())
 }
 
-// fakeHooks is a minimal Hooks impl that records calls and returns
-// scripted values. The phase name and verdict are configurable so a
-// single fakeHooks covers all the BaseRunner branches.
 type fakeHooks struct {
-	phase    string
-	agent    string
-	artifact string
-	model    string
-	// scripted outputs
+	phase         string
+	agent         string
+	artifact      string
+	model         string
 	prompt        string
 	verdict       string
 	diagnostics   []core.Diagnostic
@@ -45,8 +37,7 @@ type fakeHooks struct {
 	classifyCalls int
 	gotArtifact   string
 	gotComposeReq core.PhaseRequest
-	// onClassify, when set, observes the request at classify time (the fence
-	// tests read the worktree here: Classify must see the restored tree).
+	// onClassify observes the request at classify time, after the fence has restored the tree.
 	onClassify     func(core.PhaseRequest)
 	gotComposeBody string
 }
@@ -54,7 +45,7 @@ type fakeHooks struct {
 func (h *fakeHooks) PhaseName() string       { return h.phase }
 func (h *fakeHooks) AgentPromptName() string { return h.agent }
 func (h *fakeHooks) ArtifactFilename(req core.PhaseRequest) string {
-	_ = req // unused in fake; real hooks may vary by request
+	_ = req
 	if h.artifact == "" {
 		return h.phase + "-report.md"
 	}
@@ -75,8 +66,6 @@ func (h *fakeHooks) Classify(artifact string, req core.PhaseRequest, bres core.B
 	return h.verdict, h.diagnostics, h.nextPhase
 }
 
-// fakeBridge captures the BridgeRequest and writes a scripted artifact
-// to the requested path (mimicking what claude-p does).
 type fakeBridge struct {
 	resp          core.BridgeResponse
 	err           error
@@ -98,7 +87,6 @@ func (f *fakeBridge) Probe(ctx context.Context) (core.BridgeProbe, error) {
 	return core.BridgeProbe{}, nil
 }
 
-// fakePromptsFS wires a prompts.Loader to an in-memory agent doc.
 func fakePromptsFS(agentName, body string) *prompts.Loader {
 	return prompts.NewFromFS(fstest.MapFS{
 		"agents/" + agentName + ".md": &fstest.MapFile{
@@ -107,9 +95,6 @@ func fakePromptsFS(agentName, body string) *prompts.Loader {
 	})
 }
 
-// TestRun_HappyPath_DelegatesToHooksAndBridge — full success path.
-// Asserts every Hook callback fires and BridgeRequest carries the
-// expected per-phase fields.
 func TestRun_HappyPath_DelegatesToHooksAndBridge(t *testing.T) {
 	hooks := &fakeHooks{
 		phase:     "build",
@@ -152,8 +137,6 @@ func TestRun_HappyPath_DelegatesToHooksAndBridge(t *testing.T) {
 	if fb.gotReq.Agent != "build" {
 		t.Errorf("BridgeRequest.Agent=%q, want build", fb.gotReq.Agent)
 	}
-	// CB.5: the run identity must survive the runner hop, or session names
-	// downstream lose their run scope.
 	if fb.gotReq.RunID != "01ARZ3NDEKTSV4RRFFQ69G5FAV" {
 		t.Errorf("BridgeRequest.RunID=%q, want the PhaseRequest's run id", fb.gotReq.RunID)
 	}
@@ -212,8 +195,6 @@ BUILD ONLY
 	}
 }
 
-// writeBudgetProfile writes a scout profile (optionally with a turn_budget_hint)
-// into <root>/.evolve/profiles and returns root.
 func writeBudgetProfile(t *testing.T, profileJSON string) string {
 	t.Helper()
 	root := t.TempDir()
@@ -242,9 +223,6 @@ func runScoutWithProfile(t *testing.T, root string) *fakeBridge {
 	return fb
 }
 
-// TestRun_InjectsAdvisoryBudgetHint: a profile's turn_budget_hint is appended to
-// the composed prompt as an advisory note (activates the dormant field) without
-// replacing the original prompt body.
 func TestRun_InjectsAdvisoryBudgetHint(t *testing.T) {
 	root := writeBudgetProfile(t, `{"name":"scout","role":"scout","cli":"claude-tmux","turn_budget_hint":15}`)
 	fb := runScoutWithProfile(t, root)
@@ -256,8 +234,6 @@ func TestRun_InjectsAdvisoryBudgetHint(t *testing.T) {
 	}
 }
 
-// TestRun_NoBudgetHintWhenProfileOmitsIt: a profile without turn_budget_hint
-// leaves the prompt untouched (the field defaults to 0 → no injection).
 func TestRun_NoBudgetHintWhenProfileOmitsIt(t *testing.T) {
 	root := writeBudgetProfile(t, `{"name":"scout","role":"scout","cli":"claude-tmux"}`)
 	fb := runScoutWithProfile(t, root)
@@ -266,9 +242,6 @@ func TestRun_NoBudgetHintWhenProfileOmitsIt(t *testing.T) {
 	}
 }
 
-// TestRun_InvokesEventsProducer — the runner calls the EventsProducer seam
-// post-phase with (workspace, phase, cli, cycle), so cyclecost/cycleclassify
-// get their <phase>-events.ndjson (ADR-0020 wiring).
 func TestRun_InvokesEventsProducer(t *testing.T) {
 	hooks := &fakeHooks{phase: "build", agent: "evolve-builder", model: "sonnet", verdict: core.VerdictPASS}
 	fb := &fakeBridge{writeArtifact: "x"}
@@ -299,9 +272,6 @@ func TestRun_InvokesEventsProducer(t *testing.T) {
 	}
 }
 
-// TestRun_EventsProducer_RunsOnBridgeError — events MUST be produced even when
-// the bridge errors: a phase that fails on a timeout/429/529 is exactly the
-// infrastructure failure cycleclassify (events-only since task 4) must detect.
 func TestRun_EventsProducer_RunsOnBridgeError(t *testing.T) {
 	hooks := &fakeHooks{phase: "build", agent: "evolve-builder", model: "sonnet"}
 	fb := &fakeBridge{err: errors.New("bridge timeout")}
@@ -324,14 +294,12 @@ func TestRun_EventsProducer_RunsOnBridgeError(t *testing.T) {
 	}
 }
 
-// TestRun_EventsProducerError_NonBlocking — a producer failure WARNs but does
-// not fail the phase (the raw log remains the forensic source of truth).
 func TestRun_EventsProducerError_NonBlocking(t *testing.T) {
 	hooks := &fakeHooks{phase: "scout", agent: "evolve-scout", model: "sonnet", verdict: core.VerdictPASS}
 	fb := &fakeBridge{writeArtifact: "x"}
 	r := New(Options{
 		Hooks: hooks, Bridge: fb, Prompts: fakePromptsFS("evolve-scout", "x"),
-		VerifyFn:       alwaysOKVerify, // plumbing test — isolate from the deliverable hard-gate
+		VerifyFn:       alwaysOKVerify,
 		EventsProducer: func(_, _, _ string, _ int, _ string) error { return errors.New("disk full") },
 	})
 	resp, err := r.Run(context.Background(), core.PhaseRequest{
@@ -345,10 +313,7 @@ func TestRun_EventsProducerError_NonBlocking(t *testing.T) {
 	}
 }
 
-// TestRun_EnvOverridesModel — EVOLVE_<AGENT>_MODEL env beats DefaultModel.
-// (scout is the one phase where PhaseName == profileName, so the agent-keyed
-// env var matches by coincidence; the broader contract for phase != agent
-// pairs is pinned in runner_perphase_env_test.go.)
+// scout is used because its phase and agent names coincide; runner_perphase_env_test.go pins the pairs that differ.
 func TestRun_EnvOverridesModel(t *testing.T) {
 	hooks := &fakeHooks{phase: "scout", agent: "evolve-scout", model: "auto", verdict: core.VerdictPASS}
 	fb := &fakeBridge{writeArtifact: "x"}
@@ -366,9 +331,6 @@ func TestRun_EnvOverridesModel(t *testing.T) {
 	}
 }
 
-// TestRun_BridgeError_ReturnsFAILWithDiagnostic — when bridge.Launch
-// errors, BaseRunner short-circuits to FAIL with the error as a diag.
-// Classify is NOT called on the error path.
 func TestRun_BridgeError_ReturnsFAILWithDiagnostic(t *testing.T) {
 	hooks := &fakeHooks{phase: "build", agent: "evolve-builder", model: "auto"}
 	bridgeErr := errors.New("bridge boom")
@@ -392,8 +354,6 @@ func TestRun_BridgeError_ReturnsFAILWithDiagnostic(t *testing.T) {
 	}
 }
 
-// TestRun_ArtifactFileFallback — when bridge.Stdout is empty,
-// BaseRunner reads the artifact from disk and hands it to Classify.
 func TestRun_ArtifactFileFallback(t *testing.T) {
 	ws := t.TempDir()
 	body := "# from disk\n## Files Modified\n- y.go\n"
@@ -401,7 +361,6 @@ func TestRun_ArtifactFileFallback(t *testing.T) {
 		t.Fatal(err)
 	}
 	hooks := &fakeHooks{phase: "build", agent: "evolve-builder", model: "auto", verdict: core.VerdictPASS}
-	// Bridge succeeds but writes nothing to Stdout (and doesn't write the file).
 	fb := &fakeBridge{}
 	r := New(Options{Hooks: hooks, Bridge: fb, Prompts: fakePromptsFS("evolve-builder", "x")})
 
@@ -416,9 +375,6 @@ func TestRun_ArtifactFileFallback(t *testing.T) {
 	}
 }
 
-// TestRun_MissingDeps_ReturnsErrors — bridge or prompts missing
-// produce immediate, descriptive errors with the phase name in the
-// message.
 func TestRun_MissingDeps_ReturnsErrors(t *testing.T) {
 	hooks := &fakeHooks{phase: "audit"}
 	t.Run("no-bridge", func(t *testing.T) {
@@ -437,8 +393,6 @@ func TestRun_MissingDeps_ReturnsErrors(t *testing.T) {
 	})
 }
 
-// TestRun_AgentLoadFails_ReturnsError — when the agent doc is missing
-// from the prompts loader, Run returns a "load agent" error.
 func TestRun_AgentLoadFails_ReturnsError(t *testing.T) {
 	hooks := &fakeHooks{phase: "build", agent: "evolve-missing"}
 	r := New(Options{
@@ -452,8 +406,6 @@ func TestRun_AgentLoadFails_ReturnsError(t *testing.T) {
 	}
 }
 
-// TestNew_PanicsOnNilHooks — defensive: catch the programmer error at
-// startup instead of NPE later.
 func TestNew_PanicsOnNilHooks(t *testing.T) {
 	defer func() {
 		if recover() == nil {
@@ -463,8 +415,6 @@ func TestNew_PanicsOnNilHooks(t *testing.T) {
 	_ = New(Options{Bridge: &fakeBridge{}, Prompts: fakePromptsFS("x", "y")})
 }
 
-// TestNew_DefaultClockIsTimeNow — when NowFn is nil, BaseRunner uses
-// time.Now (proxy: DurationMS is a non-zero positive number).
 func TestNew_DefaultClockIsTimeNow(t *testing.T) {
 	hooks := &fakeHooks{phase: "build", agent: "evolve-builder", model: "auto", verdict: core.VerdictPASS}
 	r := New(Options{Hooks: hooks, Bridge: &fakeBridge{writeArtifact: "x"}, Prompts: fakePromptsFS("evolve-builder", "x")})
@@ -477,8 +427,6 @@ func TestNew_DefaultClockIsTimeNow(t *testing.T) {
 	}
 }
 
-// TestRun_ArtifactPathDerivedFromHooks — confirm the file path the
-// bridge sees uses the Hook's ArtifactFilename joined with Workspace.
 func TestRun_ArtifactPathDerivedFromHooks(t *testing.T) {
 	hooks := &fakeHooks{phase: "scout", agent: "evolve-scout", artifact: "custom.md", model: "auto", verdict: core.VerdictPASS}
 	ws := t.TempDir()
@@ -494,8 +442,6 @@ func TestRun_ArtifactPathDerivedFromHooks(t *testing.T) {
 	}
 }
 
-// skippingHooks is a fakeHooks that also implements Skipper. Used to
-// verify the optional-interface path of BaseRunner.
 type skippingHooks struct {
 	fakeHooks
 	skip       bool
@@ -509,10 +455,6 @@ func (s *skippingHooks) ShouldSkip(req core.PhaseRequest) (bool, string, string,
 	return true, core.VerdictSKIPPED, "next", []core.Diagnostic{{Severity: "info", Message: s.skipReason}}
 }
 
-// TestRun_SkipperSkipsBeforeBridge — when a Hooks also implements
-// Skipper and returns skipped=true, BaseRunner short-circuits without
-// touching the bridge or prompts. The returned response carries the
-// supplied verdict, nextPhase, and diagnostics.
 func TestRun_SkipperSkipsBeforeBridge(t *testing.T) {
 	h := &skippingHooks{
 		fakeHooks:  fakeHooks{phase: "triage", agent: "evolve-triage", model: "auto"},
@@ -543,8 +485,6 @@ func TestRun_SkipperSkipsBeforeBridge(t *testing.T) {
 	}
 }
 
-// TestRun_SkipperReturnsFalse_BridgeStillRuns — Skipper.ShouldSkip
-// returning false must NOT short-circuit; normal dispatch proceeds.
 func TestRun_SkipperReturnsFalse_BridgeStillRuns(t *testing.T) {
 	h := &skippingHooks{
 		fakeHooks: fakeHooks{phase: "triage", agent: "evolve-triage", model: "auto", verdict: core.VerdictPASS},
@@ -565,16 +505,6 @@ func TestRun_SkipperReturnsFalse_BridgeStillRuns(t *testing.T) {
 	}
 }
 
-// TestRun_PermissionModeOverride — the per-phase permission override
-// (EVOLVE_<AGENT>_PERMISSION_MODE) is resolved with the AGENT name and
-// passed as typed BridgeRequest.PermissionMode, NOT as a raw flag in
-// ExtraFlags (so it never leaks into a non-claude launch command — the
-// bridge realizes it per-CLI via the LaunchIntent).
-//
-// Profile filename uses the AGENT name (builder.json for the build phase
-// whose agent is "evolve-builder"), NOT the phase name. Convention:
-// TrimPrefix(AgentPromptName, "evolve-"). The env key follows the same
-// AGENT convention: EVOLVE_BUILDER_PERMISSION_MODE.
 func TestRun_PermissionModeOverride(t *testing.T) {
 	root := t.TempDir()
 	dir := filepath.Join(root, ".evolve", "profiles")
@@ -668,17 +598,6 @@ func TestRunnerMissingProfileDiagnostic(t *testing.T) {
 	}
 }
 
-// TestRun_CLIResolutionPrecedence pins the precedence chain:
-//
-//	EVOLVE_CLI env var > profile.cli field > "claude-p" default
-//
-// Before this fix the runner only read EVOLVE_CLI and defaulted to
-// claude-p, silently ignoring profile.cli. Operators who edited a
-// phase profile to `"cli": "codex"` got claude-p anyway, and the
-// dispatch log gave no hint why.
-//
-// Source: cycle 107 (2026-05-25) attempted-codex smoke that ran
-// against claude-sonnet-4-6 despite cli=codex in every profile.
 func TestRun_CLIResolutionPrecedence(t *testing.T) {
 	mkProfile := func(t *testing.T, cli string) string {
 		t.Helper()
@@ -729,7 +648,7 @@ func TestRun_CLIResolutionPrecedence(t *testing.T) {
 			if tc.envCLI != "" {
 				env = map[string]string{"EVOLVE_CLI": tc.envCLI}
 			} else {
-				t.Setenv("EVOLVE_CLI", "") // isolate from soak-batch EVOLVE_CLI=claude-p contamination
+				t.Setenv("EVOLVE_CLI", "") // isolate from an operator shell's EVOLVE_CLI
 			}
 			got := runOne(t, tc.profileCLI, env)
 			if got != tc.wantCLI {
@@ -753,8 +672,7 @@ func TestRunnerAutoModel_ResolvesConcreteModel(t *testing.T) {
 		Prompts: fakePromptsFS("evolve-auditor", "body"),
 		ResolveLLM: func(phase string, opts resolvellm.Options) (resolvellm.Result, error) {
 			stubCalled = true
-			// Step 9: resolvellm emits a tier; autoExpand returns it as the model
-			// (the realizer's catalog-overlaid ModelTierMap translates it downstream).
+			// resolvellm yields a tier, which reaches the bridge as the model; the realizer maps it downstream.
 			return resolvellm.Result{ModelTier: wantModel, CLI: "claude-p"}, nil
 		},
 	})

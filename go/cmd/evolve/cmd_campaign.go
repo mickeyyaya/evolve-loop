@@ -165,12 +165,7 @@ func runCampaignRun(args []string, stdout, stderr io.Writer) int {
 			waves[wi][i].GoalHash = goalHash
 		}
 	}
-	// Cross-session ownership lease (ADR-0059): a real run takes the exclusive
-	// goal-hash lease in the git common dir (shared by every worktree) so a
-	// second autonomous session on the SAME plan refuses-or-attaches instead of
-	// clobbering the incumbent. --simulate is a dry plumbing check, not an owned
-	// run, so it does not take ownership. The flock frees on our exit (defer) or
-	// death, so a dead owner never blocks the next run.
+	// --simulate is a plumbing check, not an owned run, so it takes no lease.
 	if !*simulate {
 		lease, lerr := campaign.AcquireOwnership(campaignLeaseDir(*projectRoot), goalHash, campaignOwnerSelf(*projectRoot))
 		if lerr != nil {
@@ -184,9 +179,8 @@ func runCampaignRun(args []string, stdout, stderr io.Writer) int {
 		}
 		defer lease.Release()
 	}
-	// SIGINT/SIGTERM cancels in-flight cycles (exec.CommandContext reaps the
-	// children); RunWaves then returns and the progress checkpoint up to the last
-	// completed wave survives, so --resume picks up where the interrupt hit.
+	// An interrupt reaps in-flight cycles; the checkpoint of completed waves
+	// survives, so a rerun resumes after the last one.
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 	supervisor := &fleet.Supervisor{
@@ -202,7 +196,7 @@ func runCampaignRun(args []string, stdout, stderr io.Writer) int {
 		ProgressPath: progressPath,
 		PlanSHA:      campaign.HashPlan(rawPlan),
 		Resume:       !*ignoreProgress,
-		MaxRetries:   1, // one batched retry of a wave's failed cycles before abort
+		MaxRetries:   1,
 		Cooldown:     campaignQuotaCooldown(*projectRoot),
 		BeforeWave:   campaignBeforeWave(*simulate, *projectRoot, stderr),
 	}); err != nil {
@@ -212,16 +206,14 @@ func runCampaignRun(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
-// campaignGoalHash is the SSOT for the campaign goal hash — used both as each
-// cycle's --goal-hash and as the progress-file key, so run and status agree.
+// campaignGoalHash keys both each cycle's --goal-hash and the progress file, so
+// run and status agree.
 func campaignGoalHash(plan *campaign.Plan) string {
 	return fmt.Sprintf("%x", sha256.Sum256([]byte(plan.Goal)))
 }
 
-// campaignQuotaCooldown returns a Cooldown hook reporting how long to wait before
-// a retry for the longest-active CLI quota bench to expire (capped at MaxCooldown),
-// so a walled wave backs off instead of retrying straight into the wall. 0 when no
-// family is benched (the common, non-quota failure path retries immediately).
+// campaignQuotaCooldown waits out the longest active quota bench, capped, so a
+// walled wave does not retry straight into the wall.
 func campaignQuotaCooldown(projectRoot string) func() time.Duration {
 	return func() time.Duration {
 		store := clihealth.NewStore(projectRoot, nil)
@@ -238,12 +230,8 @@ func campaignQuotaCooldown(projectRoot string) func() time.Duration {
 	}
 }
 
-// campaignEvolveDir resolves the writable .evolve directory that holds campaign
-// progress state, mirroring the projectRoot/.evolve convention used elsewhere.
-// The root is always absolutized so a relative --project-root on the `status`
-// path resolves the SAME progress file the `run` path wrote (run absolutizes its
-// root before this; status calls in with the raw flag) — otherwise --resume reads
-// a different (empty) checkpoint and never sees completed waves.
+// campaignEvolveDir always absolutizes the root, so status, which passes the raw
+// flag, reads the same progress file that run wrote.
 func campaignEvolveDir(projectRoot string) string {
 	root := projectRoot
 	if root == "" {
@@ -254,18 +242,14 @@ func campaignEvolveDir(projectRoot string) string {
 	if abs, err := filepath.Abs(root); err == nil {
 		root = abs
 	} else {
-		// Abs only fails if Getwd fails (cwd deleted mid-run); a relative root here
-		// would silently reproduce the resume/status mismatch this guards against.
 		fmt.Fprintf(os.Stderr, "[campaign] WARN: could not absolutize progress root %q: %v\n", root, err)
 	}
 	return filepath.Join(root, ".evolve")
 }
 
-// campaignLeaseDir resolves the directory that holds the cross-session ownership
-// lease (ADR-0059). It uses the git COMMON dir — shared by every linked worktree
-// of a repo — so two sessions running the same plan from different worktrees
-// contend on the SAME lease file. Off a git repo (tests, non-repo roots) it
-// falls back to the worktree-local .evolve so each isolated root self-contains.
+// campaignLeaseDir puts the ownership lease in the git common dir, so sessions in
+// different worktrees contend on one file.
+// See ADR-0059.
 func campaignLeaseDir(projectRoot string) string {
 	root := projectRoot
 	if root == "" {
@@ -289,9 +273,7 @@ func campaignLeaseDir(projectRoot string) string {
 	return filepath.Join(campaignEvolveDir(projectRoot), "campaign-leases")
 }
 
-// campaignOwnerSelf builds this process's ownership record for the lease — PID,
-// worktree, host, and start time are informational (the flock is the liveness
-// signal), surfaced in the refuse message and `campaign status`.
+// campaignOwnerSelf is informational only; the flock is the liveness signal.
 func campaignOwnerSelf(projectRoot string) campaign.Owner {
 	worktree := projectRoot
 	if worktree == "" {
@@ -308,8 +290,6 @@ func campaignOwnerSelf(projectRoot string) campaign.Owner {
 	}
 }
 
-// runCampaignStatus reports a campaign's wave/cycle progress from the durable
-// checkpoint — the single queryable view an operator needs for a multi-hour run.
 func runCampaignStatus(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve campaign status", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -394,7 +374,7 @@ func runPreliminaryStudy(workspace, feedback string) error {
 	}
 	cfg.Prompt = string(prompt)
 	registered, err := (phaseregistrar.Registrar{
-		Bridge:  bridge.NewDefault(projectRoot, nil), // Center-less registry default (ADR-0101 S3)
+		Bridge:  bridge.NewDefault(projectRoot, nil),
 		Prompts: prompts.NewForProject(worktree),
 	}).Register(cfg)
 	if err != nil {
@@ -424,9 +404,8 @@ func cycleFromWorkspace(workspace string) int {
 	return n
 }
 
-// campaignBeforeWave is the per-wave hook of a REAL run: the one pre-wave probe
-// protocol (runPreWaveProbes) over the executor's live context. It launches
-// real CLIs, so a --simulate walk (no-LLM plumbing check) installs no hook.
+// campaignBeforeWave installs no hook under --simulate, because the probes
+// launch real CLIs.
 func campaignBeforeWave(simulate bool, projectRoot string, stderr io.Writer) func(context.Context) error {
 	if simulate {
 		return nil

@@ -9,22 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// Test Amplification (cycle 435, black-box adversarial pass on top of the
-// TDD-authored runner_dispatch_dedup_test.go). Reuses the scriptedBridge /
-// writeFallbackProfile / fakeHooks / fakePromptsFS fixtures already present
-// in this package (runner_fallback_test.go, runner_test.go) without reading
-// runner.go's Run implementation. Covers the same gaps closed at the
-// llmroute/core layers -- the full default trigger-code set and chains
-// longer than 2 -- but end-to-end through r.Run(), proving the post-dedup
-// delegation to llmroute.Dispatch preserves chain behavior for every
-// trigger code, not just the one (exit=80) the pre-existing suite scripts.
-
-// TestRunnerDispatch_AllDefaultTriggerExitCodesFallBackThroughRun (basic,
-// table-driven, end-to-end): runner_fallback_test.go's canonical case only
-// exercises exit=80. The cycle-435 goal names the full set [80 81 85 124
-// 127] as what the shared llmroute.Dispatch must honor; this proves the
-// runner's delegation carries all five through r.Run(), not just the one
-// pre-existing example.
 func TestRunnerDispatch_AllDefaultTriggerExitCodesFallBackThroughRun(t *testing.T) {
 	for _, code := range []int{80, 81, 85, 124, 127} {
 		code := code
@@ -67,12 +51,6 @@ func TestRunnerDispatch_AllDefaultTriggerExitCodesFallBackThroughRun(t *testing.
 	}
 }
 
-// TestRunnerDispatch_ThreeCLIChainPreservesOrderThroughRun (edge: chain
-// length != 2): the pre-existing dedup test only scripts a 1-fallback
-// chain. A profile with TWO fallback entries must still walk past both
-// failing intermediates in order before landing on the one that succeeds --
-// proving the post-refactor Dispatch delegation isn't hardcoded to a
-// 2-candidate assumption.
 func TestRunnerDispatch_ThreeCLIChainPreservesOrderThroughRun(t *testing.T) {
 	hooks := &fakeHooks{
 		phase: "auditor", agent: "evolve-auditor", model: "sonnet",

@@ -1,13 +1,5 @@
 package main
 
-// cmd_cycle_failureadvisor_test.go — the composition-root half of the
-// failure-advisor identity wiring (2026-08-26 deep-tier review HIGH: the
-// advisor hardcoded claude-tmux/opus and never read its profile; dormant while
-// PhaseRecovery=shadow but wrong the moment it flips to enforce). The option's
-// effect on the dispatched BridgeRequest is pinned in core
-// (apicover_misc_test.go); THIS pins that the root actually resolves the
-// tracked profile into that option.
-
 import (
 	"encoding/json"
 	"os"
@@ -32,11 +24,8 @@ func TestFailureAdvisorOpts_ResolvesProfileCLI(t *testing.T) {
 
 func TestFailureAdvisorOpts_AbsentProfileFailsOpen(t *testing.T) {
 	empty := t.TempDir()
-	// Isolate every resolvellm fallback rung: env roots point at the empty
-	// tree, and failureAdvisorOpts itself pins GitRoot to projectRoot (the
-	// process-cwd git-root fallback would otherwise resolve the REAL repo's
-	// tracked profile and make this test — and worktree production setups —
-	// read the wrong tree).
+	// Point every resolvellm fallback at the empty tree. failureAdvisorOpts pins
+	// GitRoot; the cwd fallback would otherwise read the real repo's profile.
 	t.Setenv("EVOLVE_PROJECT_ROOT", empty)
 	t.Setenv("EVOLVE_PLUGIN_ROOT", empty)
 	if got := len(failureAdvisorOpts(empty)); got != 0 {

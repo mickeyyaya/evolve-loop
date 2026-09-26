@@ -1,6 +1,3 @@
-// cmd_cycle_advisor_signals_test.go — ADR-0103 unit 04: the phase advisor's
-// WARN reaches the --simulate root's console sink and the durable stream, and
-// the production composition root hands its Signal Center to the advisor.
 package main
 
 import (
@@ -24,8 +21,6 @@ func (stubLauncher) Launch(context.Context, advisor.LaunchRequest) (advisor.Laun
 	return advisor.LaunchResponse{Stdout: `[{"phase":"scout","run":true,"justification":"x"}]`}, nil
 }
 
-// Test 49 — the render twin: a capture-write fault under --simulate renders
-// the module tag on the console and lands in the cycle workspace's stream.
 func TestWireSimulateOrchestrator_AdvisorWarningRenders(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
@@ -52,8 +47,6 @@ func TestWireSimulateOrchestrator_AdvisorWarningRenders(t *testing.T) {
 	}
 }
 
-// Test 50 — the production root's ONE construction of the advisor carries the
-// Signal Center option (wiring is non-optional).
 func TestPhaseAdvisorRoot_WiresTheSignalCenter(t *testing.T) {
 	src, err := os.ReadFile("cmd_cycle.go")
 	if err != nil {

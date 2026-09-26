@@ -1,7 +1,3 @@
-// release_reason_test.go — pins ReleaseCycleProcessingWithReason (cycle-752,
-// inbox-promotion-requires-landed-ship): an explicit reason lands verbatim in
-// the ledger entry for each released item; an empty reason keeps the generic
-// "cycle-release" default (byte-compatible with the pre-existing wrapper).
 package inboxmover
 
 import (
@@ -12,8 +8,6 @@ import (
 	"testing"
 )
 
-// writeReasonFixture lays down processing/cycle-<cid>/<id>.json and returns
-// the repo root.
 func writeReasonFixture(t *testing.T, cid int, id string) string {
 	t.Helper()
 	root := t.TempDir()
@@ -37,8 +31,6 @@ func readLedger(t *testing.T, root string) string {
 	return string(body)
 }
 
-// TestReleaseCycleProcessingWithReason_ExplicitReason pins that a caller-
-// supplied reason is written verbatim to the released item's ledger entry.
 func TestReleaseCycleProcessingWithReason_ExplicitReason(t *testing.T) {
 	root := writeReasonFixture(t, 91, "task-a")
 	res, err := ReleaseCycleProcessingWithReason(Options{ProjectRoot: root}, 91, "cycle-release-unlanded-ship-retry")
@@ -54,8 +46,6 @@ func TestReleaseCycleProcessingWithReason_ExplicitReason(t *testing.T) {
 	}
 }
 
-// TestReleaseCycleProcessingWithReason_EmptyReasonKeepsGenericDefault pins
-// backward compatibility: empty reason == the wrapper's "cycle-release".
 func TestReleaseCycleProcessingWithReason_EmptyReasonKeepsGenericDefault(t *testing.T) {
 	root := writeReasonFixture(t, 92, "task-b")
 	if _, err := ReleaseCycleProcessingWithReason(Options{ProjectRoot: root}, 92, ""); err != nil {

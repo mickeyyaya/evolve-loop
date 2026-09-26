@@ -17,8 +17,8 @@ type buildExplanationHandoff struct {
 	Error string
 }
 
-// projectBuildExplanation projects the fully reviewed, host-owned snapshot and
-// makes every absence explicit. It never trusts the mutable workspace copy.
+// projectBuildExplanation projects the reviewed host-owned snapshot, never the mutable workspace copy,
+// and makes every absence explicit.
 func projectBuildExplanation(projectRoot string, cs CycleState) buildExplanationHandoff {
 	if cs.ExplanationDocumentationVersion == 0 {
 		return buildExplanationHandoff{State: BuildExplanationLegacy}
@@ -150,9 +150,7 @@ func explanationBinding(projectRoot string, cs CycleState) explanationdocs.Cycle
 	}
 }
 
-// NewExplanationLifecycleReviewer is the final reviewer in the production
-// chain. It seals a Build output only after every earlier reviewer approved,
-// preserving phase ownership without freezing a rejected attempt.
+// NewExplanationLifecycleReviewer is the final production reviewer; it seals a Build output only after all earlier ones approve.
 func NewExplanationLifecycleReviewer() DeliverableReviewer {
 	return explanationLifecycleReviewer{}
 }

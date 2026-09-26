@@ -11,40 +11,30 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 )
 
-// defaultLiveProbe is the production canary probe: a bounded LiveSmokeTest of the
-// driver. Shared by the loop and the campaign runner so the probe semantics (and
-// its 4-minute bound) cannot drift between them.
+// defaultLiveProbe is the one canary probe the loop and the campaign runner
+// share, so its semantics and bound cannot drift between them.
 func defaultLiveProbe(ctx context.Context, projectRoot string, stderr io.Writer) liveProbe {
 	return func(driver string) (int, string, string) {
-		probeCtx, cancel := context.WithTimeout(ctx, 4*time.Minute) // the loop's interrupt wins over the 4-minute bound
+		probeCtx, cancel := context.WithTimeout(ctx, 4*time.Minute)
 		defer cancel()
 		return bridge.LiveSmokeTest(probeCtx, driver,
 			&bridge.Config{ProjectRoot: projectRoot}, bridge.Deps{Stderr: stderr})
 	}
 }
 
-// liveProbe is the canary's probe seam: production passes a closure over
-// bridge.LiveSmokeTest; tests inject a fake. Returns the bridge exit code,
-// the escalation pattern name (empty unless the launch died on a classified
-// wall), and the captured scrollback (carries the wall's reset hint).
+// liveProbe returns the bridge exit code, the escalation pattern of a
+// classified wall (else empty), and the scrollback that carries its reset hint.
 type liveProbe func(driver string) (rc int, pattern, scrollback string)
 
-// runCLIHealthCanary gives each EXPIRED bench one cheap live probe before a
-// cycle starts (the per-cycle health seam cmd_loop never had): probe OK →
-// the family is re-promoted (Clear) and normal dispatch resumes; walled
-// again → re-benched with strikes+1 (doubled cooldown, or the wall's own
-// reset hint); any other failure → cleared anyway — non-wall failure classes
-// have their own machinery (capability probe, fallback chain), and looping
-// the canary on them would re-probe every cycle forever. ACTIVE benches are
-// untouched. Disabled by EVOLVE_CLI_HEALTH=0.
+// runCLIHealthCanary probes each expired bench once before a cycle: recovered
+// clears it, walled again re-benches it, and any other failure clears it,
+// because non-wall classes belong to the normal dispatch machinery.
 func runCLIHealthCanary(ctx context.Context, projectRoot string, env map[string]string, probe liveProbe, stderr io.Writer) {
 	if !envchain.BoolValue(envchain.Resolve("EVOLVE_CLI_HEALTH", env, "", "1"), true) {
 		return
 	}
-	// A cancelled probe is not evidence: once the loop's interrupt is in, a
-	// smoke test that returns "not a wall" would clear a bench that is still
-	// walled (F20 review). The canary's one cancellation disposition is to
-	// touch no bench.
+	// A cancelled probe reports "not a wall", which would clear a bench that is
+	// still walled, so cancellation touches no bench.
 	if ctx.Err() != nil {
 		fmt.Fprintf(stderr, "[loop] cli-health canary: cancelled (%v) — benches untouched\n", ctx.Err())
 		return

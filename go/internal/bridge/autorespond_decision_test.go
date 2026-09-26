@@ -6,24 +6,13 @@ import (
 	"testing"
 )
 
-// autorespond_decision_test.go — the full interactive-prompt decision matrix,
-// driven by the REAL embedded manifests (LoadManifest) against REAL observed
-// pane text. This is the scenario coverage of "what we learned from each LLM
-// CLI in tmux": every auto_respond / escalate / extend / noop branch that the
-// production rules must classify, encoded as one truth-table row per scenario.
-//
-// Pane fixtures are the actual strings captured 2026-05-26 (claude v2.1.150,
-// codex v0.133.0, agy 1.0.2) — see knowledge-base/research/tmux-repl-cli-
-// behavior-2026-05-26.md. decideAutoRespond is pure (no tmux), so this stays
-// deterministic and fast; the real-tmux delivery + live-CLI proofs live in
-// tmux_repl_interactive_test.go and tmux_repl_interactive_livecli_test.go.
+// Pane fixtures are verbatim captures from claude v2.1.150, codex v0.133.0 and agy 1.0.2.
 func TestAutoRespond_RealManifestDecisionMatrix(t *testing.T) {
 	cases := []struct {
 		name, cli, pane, wantAction string
 		wantRC                      int
 	}{
-		// --- claude-tmux: the dominant CLI; AskUserQuestion menus are the
-		// real hangs that --dangerously-skip-permissions does NOT suppress.
+		// --- claude-tmux: AskUserQuestion menus hang even under --dangerously-skip-permissions.
 		{
 			"claude single-select menu → Enter (recommended/first)", "claude-tmux",
 			"What's your favorite?\n❯ 1. Alpha\n     Option 1\n  2. Beta\n  3. Gamma\nEnter to select · ↑/↓ to navigate · Esc to cancel",
@@ -46,10 +35,7 @@ func TestAutoRespond_RealManifestDecisionMatrix(t *testing.T) {
 		},
 		{"claude auth-recheck → escalate", "claude-tmux", "Please log in to continue", "escalate:auth_recheck", 85},
 		{"claude rate-limit → escalate", "claude-tmux", "Error: rate limit exceeded (429)", "escalate:rate_limit", 85},
-		// Regression: an agent grepping rate-limit DETECTION CODE prints the
-		// token "rate_limit" all over its pane. That must NOT be mistaken for a
-		// real rate-limit banner (the old `rate.?limit` regex false-escalated
-		// here, killing cycle 113 mid-research). Underscore token ≠ banner.
+		// An agent grepping detection code prints the token "rate_limit"; that is not a banner.
 		{"claude rate_limit code-grep → noop (no false escalate)", "claude-tmux",
 			"Bash(grep -rn \"rate_limit|error_spike|cost_anomaly\" internal/phaseobserver)\n  detection rules (infinite_loop, error_spike, cost_anomaly, rate_limit) emit",
 			"noop", 0},
@@ -59,38 +45,24 @@ func TestAutoRespond_RealManifestDecisionMatrix(t *testing.T) {
 		{"codex trust → 1,Enter", "codex-tmux", "Do you trust the contents of this directory?", "send:1,Enter", 1},
 		{"codex auth → escalate", "codex-tmux", "Please sign in to ChatGPT to continue", "escalate:auth_recheck", 85},
 		{"codex rate-limit → escalate", "codex-tmux", "quota exceeded — too many requests", "escalate:rate_limit", 85},
-		// Lane 1676 (2026-09-14): the account rejected the deep-tier model with a
-		// 400 and the pane sat idle for the whole 20-minute artifact window before
-		// the runner fell back to claude (exit 81). A dead model is a wall like a
-		// quota wall — escalate at once so the family fallback runs in seconds.
+		// A rejected model is a wall like a quota wall: escalate at once so the family fallback runs in seconds.
 		{"codex model-unsupported 400 → escalate", "codex-tmux",
 			"⚠ Model metadata for gpt-5.6-sol not found. Using default model metadata.\n■ {\"type\":\"error\",\"status\":400,\"error\":{\"type\":\"invalid_request_error\",\"message\":\"The 'gpt-5.6-sol' model is not supported when using Codex with a ChatGPT account.\"}}\n\n›",
 			"escalate:model_unsupported", 85},
-		// The same JSON quoted by an agent that is READING an incident record must
-		// not fire: the rule matches the pane tail only, and the busy gate holds.
+		// The same JSON quoted by an agent reading a write-up must not fire: the rule matches the
+		// pane tail only, and the busy gate holds.
 		{"codex model-unsupported quoted far above the tail → noop", "codex-tmux",
 			"■ {\"type\":\"error\",\"status\":400,\"error\":{\"type\":\"invalid_request_error\",\"message\":\"The 'x' model is not supported when using Codex with a ChatGPT account.\"}}\n" + strings.Repeat("  reading docs/incidents/...\n", 40) + "›",
 			"noop", 0},
-		// Cycle-144: a ChatGPT-account codex auditor hit its quota mid-audit. The
-		// actual banner ("You've hit your usage limit. Upgrade to Plus to
-		// continue…") did NOT match the original (usage|rate)[ -]limit
-		// (reached|exceeded|hit) regex ("hit" precedes "usage limit"), so codex
-		// sat at the message until the artifact-wait deadline (generic exit 81)
-		// instead of escalating. Must now fail fast.
+		// The real codex banner puts "hit" before "usage limit"; it must fail fast.
 		{"codex usage-limit ChatGPT quota → escalate", "codex-tmux",
 			"■ You've hit your usage limit. Upgrade to Plus to continue using Codex (https://chatgpt.com/explore/plus), or try again at Jun 4th, 2026 3:45 PM.",
 			"escalate:rate_limit", 85},
-		// Negative guard (cycle-144 review HIGH): the real banner is caught by
-		// "hit your usage limit", so we deliberately do NOT match a bare
-		// "Upgrade to Plus to continue" — an agent echoing pricing/doc text with
-		// that phrase (but no limit reached) must stay noop, not falsely abort.
+		// A bare "Upgrade to Plus to continue" is pricing text an agent may echo; it must stay noop.
 		{"codex generic upgrade CTA (no limit) → noop", "codex-tmux",
 			"Doc excerpt: 'Upgrade to Plus to continue using advanced features' — noted for the pricing section.",
 			"noop", 0},
-		// Cycle-124 G1b: per-edit-approval modal that hung cycle-123 tdd.
-		// '1' selects 'Yes, proceed'. Defense-in-depth behind G1a's --yolo
-		// boot flag — covers the case where --yolo is dropped/renamed/
-		// overridden. Pane fragment is the actual cycle-123 capture.
+		// codex's per-edit approval modal: '1' selects 'Yes, proceed'. Defense in depth behind the --yolo boot flag.
 		{"codex per-edit-approval → 1,Enter (cycle-124 G1b)", "codex-tmux",
 			"Would you like to make the following edits?\n  1. Yes, proceed\n  2. Yes, and don't ask again for these files\n  3. No, and tell Codex what to do differently\n\nPress enter to confirm or esc to cancel",
 			"send:1,Enter", 1},
@@ -117,16 +89,6 @@ func TestAutoRespond_RealManifestDecisionMatrix(t *testing.T) {
 	}
 }
 
-// TestAutoRespond_TrustPromptFiresOnce reproduces the codex-tmux loop-guard
-// abandon (exit 86) and pins its fix. A boot-time trust dialog is dismissed by
-// one `1,Enter`, but the artifact-wait loop re-captures bootScrollback=200 lines
-// every poll — so the DISMISSED dialog text lingers in scrollback and re-matches
-// trust_prompt on every subsequent tick. Without a fire-once guard the responder
-// keeps re-sending `1,Enter` until counts>5 trips the loop guard and kills the
-// run. With `"once": true` on the trust rule, it auto-responds exactly once and
-// then noops on later ticks (sharing the live counts map, as ar.counts does
-// across the boot→wait phases). The intentional cycle-121 disjuncts are
-// untouched — this fixes the re-fire, not the detection.
 func TestAutoRespond_TrustPromptFiresOnce(t *testing.T) {
 	for _, cli := range []string{"codex-tmux", "agy-tmux"} {
 		t.Run(cli, func(t *testing.T) {
@@ -142,17 +104,11 @@ func TestAutoRespond_TrustPromptFiresOnce(t *testing.T) {
 			}
 			counts := map[string]int{} // shared across ticks, like the live ar.counts
 
-			// First tick: the real dialog → auto-respond once.
 			a, rc := decideAutoRespond(pane, m.InteractivePrompts, counts, false)
 			if a == "noop" || rc == 0 {
 				t.Fatalf("%s first tick must auto-respond to the trust dialog; got (%q,%d)", cli, a, rc)
 			}
 
-			// Later ticks: the dialog is dismissed but its text lingers in the
-			// captured scrollback. A fire-once trust rule must NOT re-fire (rc 0,
-			// no keys) and must never reach the loop guard (rc 86). It surfaces the
-			// distinct `suppress_once:` sentinel (rc 0) so the caller WARNs once
-			// rather than silently skipping.
 			for i := 0; i < 8; i++ {
 				a, rc := decideAutoRespond(pane, m.InteractivePrompts, counts, false)
 				if rc != 0 || a != "suppress_once:trust_prompt" {
@@ -163,14 +119,6 @@ func TestAutoRespond_TrustPromptFiresOnce(t *testing.T) {
 	}
 }
 
-// TestAutoRespond_FeedbackRatingFiresOnce pins the cli_feedback_rating rule as
-// fire-once, the same loop-guard fix as the trust dialog (see above). The CLI
-// wrappers (claude/agy) print a "How's the CLI experience so far?" rating prompt
-// that is dismissed by one `0,Enter`, but — like the trust dialog — its text
-// lingers in the re-captured scrollback every poll. Without `"once": true` the
-// responder re-fires `0,Enter` until counts>5 trips the loop guard (rc 86) and
-// abandons the very run the rule was added to protect. This guards against the
-// `once` flag being dropped from either manifest.
 func TestAutoRespond_FeedbackRatingFiresOnce(t *testing.T) {
 	for _, cli := range []string{"claude-tmux", "agy-tmux"} {
 		t.Run(cli, func(t *testing.T) {
@@ -181,15 +129,11 @@ func TestAutoRespond_FeedbackRatingFiresOnce(t *testing.T) {
 			pane := "How's the CLI experience so far?\n  Rate 0-9 then Enter"
 			counts := map[string]int{} // shared across ticks, like the live ar.counts
 
-			// First tick: the rating prompt → auto-respond once.
 			a, rc := decideAutoRespond(pane, m.InteractivePrompts, counts, false)
 			if a == "noop" || rc == 0 {
 				t.Fatalf("%s first tick must auto-respond to the feedback prompt; got (%q,%d)", cli, a, rc)
 			}
 
-			// Later ticks: prompt dismissed but its text lingers in scrollback. A
-			// fire-once rule must NOT re-fire (rc 0) and must never reach the loop
-			// guard (rc 86); it surfaces the suppress_once sentinel instead.
 			for i := 0; i < 8; i++ {
 				a, rc := decideAutoRespond(pane, m.InteractivePrompts, counts, false)
 				if rc != 0 || a != "suppress_once:cli_feedback_rating" {
@@ -200,11 +144,6 @@ func TestAutoRespond_FeedbackRatingFiresOnce(t *testing.T) {
 	}
 }
 
-// TestAutoRespond_MultiSelectRuleWinsOverSingleSelect guards the manifest
-// ordering invariant: a multi-select pane contains BOTH the checkbox markers
-// and the single-select footer, so the checkbox rule MUST be listed first or
-// the bridge would send a bare Enter (toggling a checkbox) instead of the full
-// Enter,Right,Enter submit sequence — leaving the REPL stuck mid-menu.
 func TestAutoRespond_MultiSelectRuleWinsOverSingleSelect(t *testing.T) {
 	m, err := LoadManifest("claude-tmux")
 	if err != nil {
@@ -219,13 +158,6 @@ func TestAutoRespond_MultiSelectRuleWinsOverSingleSelect(t *testing.T) {
 	}
 }
 
-// TestAutoRespond_CodexPerEditApprovalRegex covers each disjunct of the
-// cycle-124 G1b regex in isolation. The regex is alternation —
-// "Would you like to make the following edits|Press enter to confirm or
-// esc to cancel|Yes, proceed" — so any of the three strings as a
-// substring should fire `send:1,Enter`. Pinning each branch separately
-// catches a regression where someone narrows the regex (e.g., to require
-// all three substrings).
 func TestAutoRespond_CodexPerEditApprovalRegex(t *testing.T) {
 	m, err := LoadManifest("codex-tmux")
 	if err != nil {
@@ -235,7 +167,6 @@ func TestAutoRespond_CodexPerEditApprovalRegex(t *testing.T) {
 		name, pane, wantAction string
 		wantRC                 int
 	}{
-		// Each disjunct alone — the regex must fire on any one of them.
 		{
 			"branch 1: 'Would you like to make the following edits' alone",
 			"Working... Would you like to make the following edits to foo.go?",
@@ -251,7 +182,7 @@ func TestAutoRespond_CodexPerEditApprovalRegex(t *testing.T) {
 			"What now?\n  1. Yes, proceed\n  2. Refuse",
 			"send:1,Enter", 1,
 		},
-		// Full cycle-123 modal text — all 3 branches present.
+		// The full modal text, with all three disjuncts.
 		{
 			"full modal: all three branches present (cycle-123 reproduction)",
 			"Would you like to make the following edits?\n  1. Yes, proceed\n  2. Yes, and don't ask again for these files\n  3. No, and tell Codex what to do differently\n\nPress enter to confirm or esc to cancel",
@@ -268,11 +199,6 @@ func TestAutoRespond_CodexPerEditApprovalRegex(t *testing.T) {
 	}
 }
 
-// TestAutoRespond_CodexPerEditApproval_PartialDoesNotMatch is the negative
-// counterpart: a TRUNCATED version of any disjunct must NOT match. The
-// regex requires the full substring. A pane that says "Press enter to
-// confirm" alone (without "or esc to cancel") must not fire the per-edit
-// auto-response — that text appears in many other CLI prompts.
 func TestAutoRespond_CodexPerEditApproval_PartialDoesNotMatch(t *testing.T) {
 	m, err := LoadManifest("codex-tmux")
 	if err != nil {
@@ -308,21 +234,13 @@ func TestAutoRespond_CodexPerEditApproval_PartialDoesNotMatch(t *testing.T) {
 	}
 }
 
-// TestAutoRespond_CodexTrustWinsOverPerEditOnOverlap pins the manifest
-// rule ordering: trust_prompt is declared BEFORE per_edit_approval in
-// codex-tmux.json. If a pane contains BOTH "Yes, continue" (trust) AND
-// "Yes, proceed" (per-edit) — unlikely but possible if codex chains
-// dialogs — the first-match-wins semantics should pick trust. Both rules
-// emit the same response_keys ("1,Enter"), so behaviorally this is a
-// no-op even if ordering changed — but pinning it locks in the order so
-// a future manifest reorder doesn't silently shift the auditable
-// "pattern=trust_prompt" log line to "pattern=per_edit_approval".
+// Both rules send "1,Enter", so the order only decides which pattern the log names; pinning it keeps
+// that attribution stable.
 func TestAutoRespond_CodexTrustWinsOverPerEditOnOverlap(t *testing.T) {
 	m, err := LoadManifest("codex-tmux")
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Find the indices of each rule by name.
 	trustIdx, perEditIdx := -1, -1
 	for i, p := range m.InteractivePrompts {
 		switch p.Name {
@@ -342,9 +260,6 @@ func TestAutoRespond_CodexTrustWinsOverPerEditOnOverlap(t *testing.T) {
 		t.Errorf("trust_prompt (idx=%d) MUST precede per_edit_approval (idx=%d) so first-match resolves correctly", trustIdx, perEditIdx)
 	}
 
-	// Behavioral assertion: a pane with BOTH texts still resolves to
-	// "send:1,Enter" (both rules emit it). The win-by-ordering is a
-	// log-attribution invariant; this asserts the response is unchanged.
 	mixed := "Working with untrusted contents — Yes, continue\nWould you like to make the following edits?\n  1. Yes, proceed"
 	gotAction, gotRC := decideAutoRespond(mixed, m.InteractivePrompts, map[string]int{}, false)
 	if gotAction != "send:1,Enter" || gotRC != 1 {
@@ -352,25 +267,12 @@ func TestAutoRespond_CodexTrustWinsOverPerEditOnOverlap(t *testing.T) {
 	}
 }
 
-// TestAutoRespond_CodexPerEditApproval_AgentOutputFalseMatchGuard documents
-// the known footgun: the per_edit_approval regex matches "Yes, proceed"
-// as a substring, so an agent that PRINTS the literal phrase in its
-// output (e.g., echoing a config option name, or in a grep result over a
-// test fixture) would false-match. The loop_guard handles this — repeated
-// failed responses without pane progression escalate to abandon — but
-// the FIRST match still tries to respond. This test pins that contract:
-// false-match IS expected, and the safety net is loop_guard (covered by
-// other tests). A future redesign would need anchoring like
-// "^.*1\\. Yes, proceed.*$" to be safer; tracked as a follow-up.
+// Pins a known footgun: an agent printing "Yes, proceed" still fires once; the loop guard is the safety net.
 func TestAutoRespond_CodexPerEditApproval_AgentOutputFalseMatchGuard(t *testing.T) {
 	m, err := LoadManifest("codex-tmux")
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Agent output that mentions "Yes, proceed" as a string literal in
-	// what looks like a code grep — exactly the cycle-113-style false
-	// match pattern. We expect this to STILL fire send:1,Enter (it's
-	// the documented contract; the safety net is loop_guard).
 	pane := `Bash(grep -rn '"Yes, proceed"' internal/) ` + "\n" +
 		`  cmd/codex_test.go:12:  Body: "Yes, proceed"` + "\n" +
 		`  bridge/codex_test.go:45: "Yes, proceed",`
@@ -379,28 +281,17 @@ func TestAutoRespond_CodexPerEditApproval_AgentOutputFalseMatchGuard(t *testing.
 		t.Logf("DOCUMENTED FOOTGUN: agent code-grep mentioning %q matches per_edit_approval; got (%q, %d); want (send:1,Enter, 1)",
 			"Yes, proceed", gotAction, gotRC)
 		t.Logf("If this test changes behavior to 'noop', tighten the per_edit_approval regex to require the option-list context")
-		// Use t.Fail() (not t.Fatalf) so the test runs visibly even if the
-		// contract intentionally shifts.
+		// t.Fail, not t.Fatalf, so both log lines print when the contract shifts.
 		t.Fail()
 	}
 }
 
-// TestAutoRespond_ClaudeTrustDialog_v2252 pins the claude 2.1.252 folder-trust
-// dialog (live-captured 2026-09-01, fresh dir, --dangerously-skip-permissions).
-// The 2.1.193-era rule is a fossil against this pane twice over: its regex
-// anchors on the NUMBERED option ("1. Yes, I trust this folder") that 2.1.252
-// removed, and its response (Enter) now confirms the NEW default — "❯ No,
-// exit" — killing the REPL. Live cost: wave-20260901b, all three lanes
-// (cycles 1598/1599/1600) teardown-FAILed in triage with artifact-timeout;
-// the phase prompt typed into the modal (submit_wedged resends=3) and the
-// nudge's Enter chose "No, exit". Remedy verified live the same day: Down
-// moves ❯ to "Yes, I trust this folder", Enter boots a trusted REPL.
 func TestAutoRespond_ClaudeTrustDialog_v2252(t *testing.T) {
 	m, err := LoadManifest("claude-tmux")
 	if err != nil {
 		t.Fatalf("LoadManifest: %v", err)
 	}
-	// VERBATIM from the live tmux capture (2026-09-01, claude 2.1.252).
+	// Verbatim live capture from claude 2.1.252.
 	pane := ` Accessing workspace:
  /private/var/folders/11/n1_42bt961s29wjcr9qxj45m0000gn/T/tmp.j6PN2iejzV
  Quick safety check: Is this a project you created or one you trust? (Like your own code, a well-known open source project, or work from your team). If not, take a moment to review what's in this
@@ -415,18 +306,14 @@ func TestAutoRespond_ClaudeTrustDialog_v2252(t *testing.T) {
 	if a != "send:Down,Enter" || rc != 1 {
 		t.Fatalf("2.1.252 trust dialog must answer Down,Enter (select 'Yes, I trust this folder' off the No-default); got (%q,%d)", a, rc)
 	}
-	// Fire-once, same loop-guard discipline as the sibling trust rules
-	// (TestAutoRespond_TrustPromptFiresOnce): pin the exact sentinel, not
-	// just the suppress_once: prefix, so a future rule rename still fails
-	// loudly here.
+	// Pin the exact sentinel, not just the suppress_once: prefix, so a rule rename fails loudly.
 	for i := 0; i < 8; i++ {
 		a, rc = decideAutoRespond(pane, m.InteractivePrompts, counts, false)
 		if rc != 0 || a != "suppress_once:trust_prompt_no_default" {
 			t.Fatalf("tick %d = (%q,%d), want (suppress_once:trust_prompt_no_default, 0) — trust_prompt_no_default is fire-once; re-firing trips the loop guard and abandons the run", i+2, a, rc)
 		}
 	}
-	// The old numbered-dialog rule must still win on the OLD pane (older
-	// claude builds remain launchable), with its pre-highlighted-Yes Enter.
+	// Older claude builds stay launchable, so the numbered-dialog rule must still win on the old pane.
 	oldPane := "Quick safety check: Is this a project you created or one you trust?\n ❯ 1. Yes, I trust this folder\n   2. No, exit\n Enter to confirm"
 	a, rc = decideAutoRespond(oldPane, m.InteractivePrompts, map[string]int{}, false)
 	if a != "send:Enter" || rc != 1 {
@@ -434,16 +321,8 @@ func TestAutoRespond_ClaudeTrustDialog_v2252(t *testing.T) {
 	}
 }
 
-// TestAutoRespond_TrustRulesDoNotMatchThisRepositorysOwnFiles mirrors the
-// plan-mode precedent (TestAutoRespond_PlanModeDoesNotMatchThisRepositorysOwnFiles)
-// for the trust_prompt* family: this repo quotes both trust dialogs verbatim
-// on tracked files (this test's fixtures, the manifest notes, the boot-path
-// fixture, the incident doc), and an agent Reads/cats exactly these files
-// while working on the rules. The 2026-09-02 architecture-review probe showed
-// the UNANCHORED forms firing on them — a stray Enter into a working agent,
-// plus a burned once-budget that would suppress a genuine later dialog. The
-// bottom anchor (footer + \z + tail_lines) is what makes this pass: quoted
-// dialogs sit mid-document, never at end-of-capture.
+// This repo quotes both trust dialogs verbatim in tracked files an agent reads. The bottom anchor
+// (footer, \z and tail_lines) keeps a quoted dialog from firing mid-document.
 func TestAutoRespond_TrustRulesDoNotMatchThisRepositorysOwnFiles(t *testing.T) {
 	t.Parallel()
 	m, err := LoadManifest("claude-tmux")

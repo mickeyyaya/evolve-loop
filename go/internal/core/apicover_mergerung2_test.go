@@ -1,12 +1,5 @@
 package core
 
-// apicover_mergerung2_test.go — ADR-0050 Phase 5 public-API coverage for the
-// RUNG-2 scoped-merge review surface (mergerung2.go): NAMES + EXERCISES the
-// three exports the apicover per-symbol gate flagged uncovered on main
-// (ScopedMergeDisposition, ScopedMergeResult, ScopedMergeReviewer) after cycle
-// ship 6459f9ae landed them without a naming test. Each test asserts real
-// RunScopedMergeReview behavior (Rule 9 — no `_ = pkg.X` padding).
-
 import (
 	"strings"
 	"testing"
@@ -39,10 +32,6 @@ const scopedMergeDisjointDiff = `--- a/pkg/file.go
  psi
 `
 
-// TestRunScopedMergeReview_DisjointHunks_CompatibleWithoutReview — an empty
-// intersection is ScopedMergeCompatible WITHOUT invoking the reviewer (no
-// wasted review): the ScopedMergeReviewer func type is named by the fake, and
-// ScopedMergeResult's Dispatched=false proves the reviewer stayed dark.
 func TestRunScopedMergeReview_DisjointHunks_CompatibleWithoutReview(t *testing.T) {
 	t.Parallel()
 	invoked := false
@@ -70,10 +59,6 @@ func TestRunScopedMergeReview_DisjointHunks_CompatibleWithoutReview(t *testing.T
 	}
 }
 
-// TestRunScopedMergeReview_OverlappingHunks_ReviewerDispositionCarried — a
-// genuine old-side overlap dispatches EXACTLY the intersecting hunks to the
-// reviewer and carries its ScopedMergeDisposition + suggestion-grade
-// ResolutionDiff through verbatim on the ScopedMergeResult.
 func TestRunScopedMergeReview_OverlappingHunks_ReviewerDispositionCarried(t *testing.T) {
 	t.Parallel()
 	var seenHunks []MergeHunk
@@ -101,8 +86,7 @@ func TestRunScopedMergeReview_OverlappingHunks_ReviewerDispositionCarried(t *tes
 	if disp != ScopedMergeEntangled {
 		t.Errorf("disposition = %q, want the reviewer's %q carried verbatim", disp, ScopedMergeEntangled)
 	}
-	// Exactly 2: intersectingHunks appends the audited-side then the composed-side
-	// hunk of the one overlapping pair (go-review nit — pin the count, not just non-empty).
+	// intersectingHunks appends the audited-side then the composed-side hunk of the one overlapping pair.
 	if !res.Dispatched || len(res.DispatchedHunks) != 2 || len(seenHunks) != 2 {
 		t.Fatalf("overlap must dispatch exactly the 2 intersecting hunks (audited+composed): Dispatched=%v result-hunks=%d reviewer-hunks=%d",
 			res.Dispatched, len(res.DispatchedHunks), len(seenHunks))

@@ -1,11 +1,5 @@
 package inboxmover
 
-// failurecount_read_test.go — ADR-0076 slice D: the exported read path from
-// item id → durable failure_count (written by bumpFailureCount on FAIL
-// release). Searches the inbox root AND processing/cycle-*/ (a claimed item
-// mid-cycle still resolves). Absent item / absent field → (0, false/true)
-// per contract below.
-
 import (
 	"os"
 	"path/filepath"

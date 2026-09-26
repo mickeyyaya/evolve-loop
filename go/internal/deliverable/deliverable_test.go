@@ -8,17 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// Layer 3 of the deliverable-contract feature (ADR-0034): the shared verifier
-// both the `evolve phase verify` self-check AND the host-side contract gate
-// call. The fail-open/fail-closed contract is encoded in the return signature:
-//
-//	err != nil          → ambiguity/infra (unknown phase, unreadable dir) → caller fails OPEN
-//	err == nil, !OK     → confirmed agent violation                      → caller fails CLOSED
-//	err == nil, OK      → well-formed deliverable
-//
-// Verify checks WELL-FORMEDNESS ONLY (location, sections, verdict parseable,
-// JSON keys). Semantic correctness stays the auditor's job (anti-Goodhart).
-
 func writeFile(t *testing.T, dir, name, content string) {
 	t.Helper()
 	if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
@@ -57,7 +46,6 @@ func TestVerify_MissingArtifact_ConfirmedViolation(t *testing.T) {
 	if !hasCode(res, "missing_artifact") {
 		t.Errorf("want missing_artifact violation, got %+v", res.Violations)
 	}
-	// Actionable: the message must name the expected path.
 	if msg := firstMsg(res, "missing_artifact"); msg == "" ||
 		!filepathContains(msg, filepath.Join(ws, "build-report.md")) {
 		t.Errorf("missing_artifact message must name the expected path; got %q", msg)
@@ -76,12 +64,6 @@ func TestVerify_MissingSection_NamesIt(t *testing.T) {
 	}
 }
 
-// A sentinel-declared FAIL/WARN buys a phase nothing: verifyMarkdown runs the
-// required-Sections loop unconditionally, ahead of and independent of the
-// verdict/failure-context block, with no early return between them. So "I am
-// reporting FAIL, therefore I need not write the real report" is not — and must
-// never become — a legal reading of the contract. The body is owed on every
-// verdict. This locks that ordering against a future short-circuit.
 func TestVerify_WarnOrFailSentinel_StillRequiresSections(t *testing.T) {
 	for _, verdict := range []string{"FAIL", "WARN"} {
 		sentinel := `<!-- evolve-verdict: {"phase":"build","verdict":"` + verdict + `"} -->` + "\n"
@@ -98,10 +80,7 @@ func TestVerify_WarnOrFailSentinel_StillRequiresSections(t *testing.T) {
 			t.Errorf("verdict %s: want %s, got %+v", verdict, CodeMissingSection, res.Violations)
 		}
 
-		// Control: the check must key off the sections, not off the verdict — the
-		// same FAIL/WARN report WITH its required section is not missing_section.
-		// (Other violations may still fire, e.g. failure_context_missing; only
-		// the section verdict is under test here.)
+		// Control: with its section present the report is not missing_section, though other violations may fire.
 		ws2 := t.TempDir()
 		writeFile(t, ws2, "build-report.md", sentinel+"\n# Build Report\n\n## Changes\n- foo.go\n")
 		res2, err := Verify("build", phasecontract.Roots{Workspace: ws2})
@@ -116,7 +95,6 @@ func TestVerify_WarnOrFailSentinel_StillRequiresSections(t *testing.T) {
 
 func TestVerify_StrayInWorktree(t *testing.T) {
 	ws, wt := t.TempDir(), t.TempDir()
-	// Agent wrote the report into the worktree root instead of the workspace.
 	writeFile(t, wt, "build-report.md", "## Changes\n- x\nVerdict: PASS\n")
 	res, _ := Verify("build", phasecontract.Roots{Workspace: ws, Worktree: wt})
 	if res.OK {
@@ -138,8 +116,6 @@ func TestVerify_EmptyArtifact(t *testing.T) {
 
 func TestVerify_BadVerdict(t *testing.T) {
 	ws := t.TempDir()
-	// audit is the only phase with a required verdict; a report with the Verdict
-	// section heading but no PASS/FAIL/WARN/SKIPPED token must flag bad_verdict.
 	writeFile(t, ws, "audit-report.md", "## Verdict\ninconclusive musings, no token\n")
 	res, _ := Verify("audit", phasecontract.Roots{Workspace: ws})
 	if res.OK || !hasCode(res, CodeBadVerdict) {
@@ -148,8 +124,6 @@ func TestVerify_BadVerdict(t *testing.T) {
 }
 
 func TestCheckStray_SkipsNonWorkspaceTarget(t *testing.T) {
-	// Defensive guard: checkStray is a no-op for a non-workspace-target contract
-	// even if a worktree is supplied.
 	var res Result
 	c := phasecontract.Contract{ArtifactName: "x.json", WriteTarget: phasecontract.TargetEvolveDir}
 	checkStray(&res, c, phasecontract.Roots{Workspace: "/ws", Worktree: "/wt"})
@@ -242,9 +216,7 @@ func TestVerify_InvalidJSON(t *testing.T) {
 	}
 }
 
-// TestVerify_MissingJSONKey: a contract that DOES declare RequiredKeys still
-// requires a JSON object containing them. Uses orchestrator (cycle_id+phase) —
-// the router contract no longer has required keys (it is a bare array now).
+// Uses orchestrator because the router contract declares no required keys.
 func TestVerify_MissingJSONKey(t *testing.T) {
 	ws := t.TempDir()
 	writeFile(t, ws, "cycle-state.json", `{"phase":"build"}`) // missing cycle_id
@@ -268,8 +240,6 @@ func TestVerify_Orchestrator_EvolveDir(t *testing.T) {
 		t.Errorf("want OK for valid cycle-state.json, got %+v", res.Violations)
 	}
 }
-
-// ---- helpers ----
 
 func hasCode(r Result, code string) bool {
 	for _, v := range r.Violations {
@@ -303,11 +273,6 @@ func contains(s, sub string) bool {
 	return false
 }
 
-// --- ADR-0039 §7: failure-context conditionality ---
-
-// A FAIL/WARN sentinel on a RequireFailureContext contract must carry the
-// structured failure block; its absence is a confirmed violation whose message
-// is the correction directive (the retry machinery injects it verbatim).
 func TestVerify_AuditFailWithoutFailureBlock_Violation(t *testing.T) {
 	ws := t.TempDir()
 	writeFile(t, ws, "audit-report.md",
@@ -338,8 +303,6 @@ func TestVerify_AuditFailWithFailureBlock_OK(t *testing.T) {
 	}
 }
 
-// PASS needs no failure block; legacy prose-only FAIL (no sentinel) stays
-// legal forever (v1 artifacts predate the failure contract).
 func TestVerify_FailureContextNotRequiredOnPassOrLegacy(t *testing.T) {
 	for name, content := range map[string]string{
 		"pass":   "## Verdict\nPASS\n" + phasecontract.RenderVerdictSentinel("audit", "PASS") + "\n",
@@ -354,12 +317,6 @@ func TestVerify_FailureContextNotRequiredOnPassOrLegacy(t *testing.T) {
 	}
 }
 
-// TestVerify_RouterBareArray_OK pins the inbox defect
-// router-contract-bare-array-vs-plan-key: PhaseAdvisor.Plan writes
-// routing-plan.json as a BARE JSON ARRAY ("write your whole-cycle plan as a
-// strict JSON array", phase_advisor.go) and the consumer parses an array —
-// producer and consumer agree. The contract wrongly required a {"plan":...}
-// OBJECT, so `evolve phase verify router` failed every fresh cycle.
 func TestVerify_RouterBareArray_OK(t *testing.T) {
 	ws := t.TempDir()
 	writeFile(t, ws, "routing-plan.json", `[{"phase":"build"},{"phase":"audit"}]`)
@@ -372,9 +329,6 @@ func TestVerify_RouterBareArray_OK(t *testing.T) {
 	}
 }
 
-// A NoArtifact contract (ship — its deliverable is the pushed commit, not a
-// file) must verify OK without looking for any file, and WITHOUT the
-// "no contract registered" fail-open error that logged every cycle.
 func TestVerify_NoArtifactContract_OK(t *testing.T) {
 	res, err := Verify("ship", phasecontract.Roots{Workspace: t.TempDir()})
 	if err != nil {

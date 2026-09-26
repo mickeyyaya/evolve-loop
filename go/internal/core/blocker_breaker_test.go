@@ -1,20 +1,5 @@
 package core
 
-// blocker_breaker_test.go — RED contract for the mid-batch pipeline-blocker
-// breaker (operator directive 2026-07-22: a pipeline blocker must be fixed
-// directly, not passed to following cycles). Batch-5 burned SIX cycles on one
-// recurring class with every signal on disk and no mechanism acting mid-batch;
-// the 862–899 storm burned 37 with byte-identical defect strings. Two
-// deterministic rules over the S1 failure digests:
-//
-//	Rule A — guard-abort class ≥ ceiling (default 2): guard aborts are
-//	         pipeline machinery failures by construction, never task-legit.
-//	Rule B — byte-identical fingerprint ≥ ceiling (default 3): three
-//	         identical failure identities cannot be three honest defects.
-//
-// Same-task repeats stay S5 quarantine's job (task_retry_ceiling) — the
-// breaker is batch-scoped and task-agnostic.
-
 import (
 	"encoding/json"
 	"os"
@@ -65,8 +50,6 @@ func TestBlockerBreaker_IdenticalFingerprintHaltsAtCeiling(t *testing.T) {
 }
 
 func TestBlockerBreaker_DistinctHonestFailuresContinue(t *testing.T) {
-	// Batch-2's healthy shape: many FAILs, all distinct task-level catches —
-	// the breaker must never halt a batch of honest, different rejections.
 	v := EvaluateBlockerBreaker([]FailureDigest{
 		dg(10, "audit|gate-block|aaa", "gate-block"),
 		dg(11, "audit|gate-block|bbb", "gate-block"),
@@ -80,8 +63,6 @@ func TestBlockerBreaker_DistinctHonestFailuresContinue(t *testing.T) {
 }
 
 func TestBlockerBreaker_ZeroCeilingsDisable(t *testing.T) {
-	// Explicit zero = rule disabled (policy escape hatch), mirroring the
-	// positive-overrides-win threshold merge.
 	fp := "a|b|c"
 	v := EvaluateBlockerBreaker([]FailureDigest{
 		dg(1, fp, "guard-abort"), dg(2, fp, "guard-abort"), dg(3, fp, "guard-abort"),
@@ -91,8 +72,6 @@ func TestBlockerBreaker_ZeroCeilingsDisable(t *testing.T) {
 	}
 }
 
-// CollectBatchFailureDigests reads only cycles >= fromCycle and tolerates
-// missing/malformed digests (a healthy PASS cycle has none).
 func TestCollectBatchFailureDigests_ScopesAndTolerates(t *testing.T) {
 	evolveDir := t.TempDir()
 	write := func(cycle int, body string) {
@@ -119,15 +98,6 @@ func TestCollectBatchFailureDigests_ScopesAndTolerates(t *testing.T) {
 		}
 	}
 }
-
-// --- Cycle-1332: resolved-fingerprints ack ledger ---
-//
-// Incident: cycle-1329's identical-fingerprint halt (ship|unknown|76d0f4fca190)
-// was diagnosed and fixed (#415), consumed twice, and re-tripped the breaker
-// on every relaunch — the breaker re-scans disk fresh every call with no
-// memory of "already diagnosed and consumed". These tests pin the ack
-// ledger (LoadResolvedFingerprints/AppendResolvedFingerprint) and its
-// exclusion wiring into EvaluateBlockerBreaker's Rule B.
 
 func TestLoadResolvedFingerprints_ReadsLedgerRecords(t *testing.T) {
 	dir := t.TempDir()
@@ -162,8 +132,6 @@ func TestLoadResolvedFingerprints_MissingFileReturnsEmptyNoError(t *testing.T) {
 }
 
 func TestEvaluateBlockerBreaker_ExcludesAckedFingerprint(t *testing.T) {
-	// Literal cycle-1329 reproduction: 3x identical-fingerprint digests, one
-	// of them acked — must NOT halt.
 	fp := "ship|unknown|76d0f4fca190"
 	cfg := defaultBreakerCfg()
 	cfg.AckedFingerprints = map[string]bool{fp: true}
@@ -176,8 +144,6 @@ func TestEvaluateBlockerBreaker_ExcludesAckedFingerprint(t *testing.T) {
 }
 
 func TestEvaluateBlockerBreaker_UnackedIdenticalFingerprintStillHalts(t *testing.T) {
-	// Negative/regression: the SAME shape with NO ack for that fingerprint —
-	// the ack must be fingerprint-scoped, never a blanket Rule B disable.
 	fp := "ship|unknown|76d0f4fca190"
 	cfg := defaultBreakerCfg()
 	cfg.AckedFingerprints = map[string]bool{"a-different-fingerprint": true}
@@ -202,7 +168,6 @@ func TestAppendResolvedFingerprint_WritesRecord(t *testing.T) {
 	if !got["ship|unknown|76d0f4fca190"] {
 		t.Fatalf("appended fingerprint must be readable back, got %+v", got)
 	}
-	// A second append must accumulate, not clobber.
 	if err := AppendResolvedFingerprint(dir, "second-fp", "operator-reset", now); err != nil {
 		t.Fatalf("second AppendResolvedFingerprint: %v", err)
 	}
@@ -220,9 +185,6 @@ func TestAppendResolvedFingerprint_WritesRecord(t *testing.T) {
 	if !strings.Contains(string(raw), "resolved_by") || !strings.Contains(string(raw), "resolved_at") {
 		t.Fatalf("ledger record must carry resolved_by/resolved_at, got %s", raw)
 	}
-	// Exercise the ResolvedFingerprint record type directly (its JSON shape is
-	// the ledger's on-disk contract, not an implementation detail of the
-	// loader/writer pair above).
 	rec := ResolvedFingerprint{Fingerprint: "x", ResolvedAt: "2026-08-05T10:00:00Z", ResolvedBy: "operator-reset"}
 	buf, err := json.Marshal(rec)
 	if err != nil {

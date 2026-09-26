@@ -1,10 +1,5 @@
 package deliverable
 
-// verifier_test.go — ADR-0045 I2: the rung re-check is BREAKER-NEUTRAL
-// (§8 TestLadder_RungRechecksAreBreakerNeutral). White-box (package
-// deliverable) to drive the Reviewer's breakerPath override beside the
-// Verifier on identical inputs.
-
 import (
 	"context"
 	"os"
@@ -17,10 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// TestLadder_RungRechecksAreBreakerNeutral — same violating deliverable, two
-// paths: Reviewer.Review (the gate) increments the persistent breaker;
-// Verifier.VerifyDeliverable (the rung re-check) must leave it untouched, no
-// matter how many times a multi-rung repair re-checks.
 func TestLadder_RungRechecksAreBreakerNeutral(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -56,9 +47,6 @@ func TestLadder_RungRechecksAreBreakerNeutral(t *testing.T) {
 	}
 }
 
-// TestVerifier_ReturnsContractedPathAndViolations — the salvage rung needs
-// the CONTRACTED destination (the only path it may relocate to) and the
-// violation strings for the evidence digest.
 func TestVerifier_ReturnsContractedPathAndViolations(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -77,7 +65,6 @@ func TestVerifier_ReturnsContractedPathAndViolations(t *testing.T) {
 		t.Errorf("violations must carry coded messages; got %v", res.Violations)
 	}
 
-	// Unknown phase ⇒ ambiguity ⇒ error (fail-open contract preserved).
 	if _, err := v.VerifyDeliverable(context.Background(), core.ReviewInput{Phase: "no-such-phase", Workspace: ws, ProjectRoot: root}); err == nil {
 		t.Error("unknown phase must surface the fail-open error, never a silent !OK")
 	}

@@ -94,6 +94,24 @@ Go files is each batch's count of changed Go files. The landing proof's verified
 | 22 | `internal/adapters/ledger` | 26 | 878 → 140 | 29 → 0 | on the comment PR |
 | 23 | `internal/changedpkgs` | 12 | 504 → 43 | 23 → 0 | on the comment PR |
 | 24 | `internal/cyclestate` | 13 | 384 → 100 | 24 → 0 | on the comment PR |
+| 25-32 | eight more packages, one design page each (see the package index) | — | — | — | batches 0-32 merged: #638, then #640 as one squashed commit |
+| 33 | `internal/phasecontract` | 29 | 1,033 → 113 | 71 → 3 | on the comment PR |
+| 34 | `internal/phasespec` | 35 | 1,004 → 125 | 73 → 0 | on the comment PR |
+| 35 | `internal/inboxmover` | 39 | 1,237 → 155 | 108 → 1 | on the comment PR |
+| 36 | `internal/inboxmover/lifecycle` | 20 | 459 → 75 | 29 → 0 | on the comment PR |
+| 37 | `internal/phases/runner` | 62 | 1,681 → 152 | 87 → 0 | on the comment PR |
+| 38 | `internal/deliverable` | 53 | 2,123 → 268 | 138 → 0 | on the comment PR |
+| 39 | `internal/core/advisor` | 24 | 659 → 110 | 36 → 0 | on the comment PR |
+| 40 | `internal/phases/runner/verdict` | 13 | 439 → 106 | 28 → 0 | on the comment PR |
+| 41 | `internal/core`, file group 1 of 13 | 39 | 1,509 → 169 | — | on the comment PR |
+| 42 | `cmd/evolve`, file group 1 of 8 | 39 | 719 → 142 | — | on the comment PR |
+| 43 | `internal/bridge`, file group 1 of 7 | 40 | 1,685 → 275 | — | on the comment PR |
+| 44 | `cmd/evolve`, file group 2 of 8 | 40 | 1,381 → 341 | 137 → 1 | on the comment PR; `cmd_composition_wiring.go` deferred |
+| 45 | `internal/core`, file group 2 of 13 | 39 | 1,167 → 161 | 73 → 0 | on the comment PR |
+
+The three largest packages are split into file groups of about 40 files, taken in name order. Each group is one batch, and the package's design page fills in group by group. Narrative is not measured per group.
+
+Batches 33–45 were rebuilt as one squashed commit on origin/main after cycle 1698 rewrote `cmd_composition_wiring.go` (it deleted `auditLedgerEntry` in favor of `internal/auditledger`). That file keeps main's text for now and is redone in a later batch; batch 44's figures still count it.
 
 The narrative figures after batches 1-2 predate the pointer fix. The 5 left in each are `See ADR` pointers, which no longer count.
 
@@ -119,3 +137,4 @@ Code problems the editors found are reported, not changed, and filed as inbox it
 - `auditchain-scout-report-literal`: found while landing, not by an editor
 - `guards-path-traversal-and-ship-bypass` (P1)
 - `lane-lint-debt-class`: the lint debt that held batch 11.
+- `codex-pretrust-presence-and-escaping` (P2), from batch 43.

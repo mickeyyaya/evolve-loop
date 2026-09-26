@@ -1,8 +1,3 @@
-// budget_flags_test.go pins the behavior of stripRemovedBudgetFlags — the
-// pre-parse shim that removes the retired cost-budget flags
-// (--budget-usd / --budget / --batch-cap-usd) from argv so they are no longer
-// part of the CLI parameter surface, while keeping old invocations from
-// crashing (graceful strip + one-line WARN, not a parse error).
 package main
 
 import (
@@ -79,23 +74,18 @@ func TestStripRemovedBudgetFlags(t *testing.T) {
 			wantWarn: true,
 		},
 		{
-			// A negative value starts with '-' but must be consumed as the flag's
-			// value, not left behind for flag.Parse to choke on.
 			name:     "negative value is consumed",
 			in:       []string{"--budget-usd", "-1", "fix bug"},
 			want:     []string{"fix bug"},
 			wantWarn: true,
 		},
 		{
-			// A following real flag (non-numeric) must NOT be swallowed as a value.
 			name:     "following flag is not eaten as a value",
 			in:       []string{"--budget-usd", "--cycles", "3", "fix bug"},
 			want:     []string{"--cycles", "3", "fix bug"},
 			wantWarn: true,
 		},
 		{
-			// "NaN"/"Inf" parse as floats but are not real budget values; a goal
-			// token of that form must survive (treated as a positional, not a value).
 			name:     "non-finite token is not swallowed as a value",
 			in:       []string{"--budget-usd", "NaN", "fix bug"},
 			want:     []string{"NaN", "fix bug"},

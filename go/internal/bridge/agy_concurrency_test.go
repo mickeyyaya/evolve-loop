@@ -1,11 +1,3 @@
-// agy_concurrency_test.go — the agy-only fleet concurrency contract. In an
-// agy-ONLY environment every lane, every phase, every retry launches an
-// agy-tmux pane; the ONE deterministic invariant that keeps concurrent lanes
-// from fighting over a single tmux session is resolveSession's atomic
-// per-process nonce (ADR-0049 N15). The pre-existing nonce test only mints two
-// sessions SEQUENTIALLY; these tests mint many CONCURRENTLY under a frozen
-// clock (worst case: every lane in the same wall-clock second) and assert with
-// `-race` that the atomic increment is safe and every name is distinct.
 package bridge
 
 import (
@@ -15,13 +7,7 @@ import (
 	"time"
 )
 
-// TestResolveSession_AgyConcurrent_UniqueUnderRace — N concurrent agy launches
-// under an IDENTICAL frozen clock must every one get a distinct, tmux-safe,
-// agy-prefixed session name. Frozen clock is the adversary: the second-
-// granularity timestamp is identical for all N, so only the atomic nonce can
-// separate them. Each goroutine writes its own slice index (no test-induced
-// race), so `-race` exercises resolveSession's OWN concurrency safety —
-// specifically the shared ephemeralSessionNonce.Add across goroutines.
+// A frozen clock gives every lane the same timestamp, so only the atomic nonce can separate the names.
 func TestResolveSession_AgyConcurrent_UniqueUnderRace(t *testing.T) {
 	frozen := time.Unix(1_700_000_000, 0)
 	deps := Deps{Now: func() time.Time { return frozen }}.withDefaults()
@@ -35,8 +21,7 @@ func TestResolveSession_AgyConcurrent_UniqueUnderRace(t *testing.T) {
 		go func(i int) {
 			defer wg.Done()
 			<-start // release all goroutines at once to maximize contention
-			// Same run/cycle/agent for every lane — the realistic worst case
-			// (a fleet dispatching the same phase across lanes in one second).
+			// Same run, cycle and agent for every lane: a fleet dispatching one phase across lanes in one second.
 			cfg := &Config{Cycle: 100, Agent: "audit", RunID: "01ARZ3NDEKTSV4RRFFQ69G5FAV"}
 			names[i], _ = resolveSession(cfg, deps, "evolve-bridge-agy-")
 		}(i)
@@ -62,11 +47,6 @@ func TestResolveSession_AgyConcurrent_UniqueUnderRace(t *testing.T) {
 	}
 }
 
-// TestResolveSession_AgyConcurrent_MixedRunsAndCycles — the multi-run/multi-cycle
-// worst case: concurrent lanes across DIFFERENT runs and cycles must still be
-// unique AND each must carry its own run-scope token (CB.5), so `tmux ls` and
-// the observer watchers can attribute every agy pane to the right run under a
-// live agy-only fleet.
 func TestResolveSession_AgyConcurrent_MixedRunsAndCycles(t *testing.T) {
 	frozen := time.Unix(1_700_000_000, 0)
 	deps := Deps{Now: func() time.Time { return frozen }}.withDefaults()

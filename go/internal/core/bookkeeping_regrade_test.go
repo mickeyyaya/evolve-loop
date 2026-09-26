@@ -1,20 +1,5 @@
 package core
 
-// bookkeeping_regrade_test.go — RED contract for the bookkeeping-regrade
-// micro-cycle (inbox 0.92, three-perspective investigation 2026-08-10).
-//
-// The disease: cycles 1390-1429 show 6 FAILs where the auditor graded the work
-// PASS/WARN and only deterministic bookkeeping gates (continuation-disposition
-// preflight, closure-claim citations) forced FAIL. Each burned a full
-// continuation re-drive (~2M tokens, measured 0/11 continuation pass rate)
-// to author one JSON artifact. The fix: at the retro chokepoint, a FAIL whose
-// ONLY explanations are bookkeeping-class routes to a bounded same-cycle audit
-// re-dispatch (retro→audit, once per cycle) instead of dying to a continuation.
-//
-// Trust boundary: eligibility reads CycleState.AuditFailReasons (orchestrator
-// memory, the ADR-0072 pattern) — never a workspace file an agent could author.
-// Bound: CycleState.BookkeepingRegradeAttempted, also orchestrator-owned.
-
 import (
 	"context"
 	"strings"
@@ -42,15 +27,11 @@ func TestBookkeepingRegradeEligible_Matrix(t *testing.T) {
 		{"conflict+ledger", []string{tConflictPASS, tLedger}, true},
 		{"conflict+closure", []string{tConflictPASS, tClosure}, true},
 		{"warn-narrative+both", []string{tConflictWARN, tLedger, tClosure}, true},
-		// The auditor itself said FAIL (no conflict line): real defects — not ours.
 		{"ledger-only-no-conflict", []string{tLedger}, false},
-		// A conflict line alone names no bookkeeping gate reason to repair.
 		{"conflict-only", []string{tConflictPASS}, false},
-		// ANY non-bookkeeping reason (EGPS red, vet, tier…) disqualifies.
 		{"conflict+ledger+egps", []string{tConflictPASS, tLedger, tEGPS}, false},
 		{"empty", nil, false},
-		// A narrative=FAIL conflict line can't occur (producer guards), but the
-		// matcher must not accept one that an attacker smuggles into a message.
+		// Producers never emit a narrative=FAIL conflict line, but the matcher must reject a smuggled one.
 		{"forged-fail-narrative", []string{"verdict-conflict: auditor narrative=FAIL but 1 deterministic gate(s) forced FAIL [defect-ledger]", tLedger}, false},
 	}
 	for _, tc := range cases {
@@ -62,8 +43,6 @@ func TestBookkeepingRegradeEligible_Matrix(t *testing.T) {
 	}
 }
 
-// The deterministic branch: eligible reasons + not-yet-attempted → retro→audit
-// with the contract reason prefix; the audit edge must be SM-legal.
 func TestDecideAfterRetro_BookkeepingRegradeBranch(t *testing.T) {
 	o := floorOrchestrator(nil)
 	cs := CycleState{CycleID: 1430, WorkspacePath: t.TempDir(),
@@ -84,8 +63,6 @@ func TestDecideAfterRetro_BookkeepingRegradeBranch(t *testing.T) {
 	}
 }
 
-// Bounded: an already-attempted cycle falls through to the normal adapter path
-// (no infinite retro→audit loop when the re-audit fails again).
 func TestDecideAfterRetro_RegradeOncePerCycle(t *testing.T) {
 	o := floorOrchestrator(nil)
 	cs := CycleState{CycleID: 1430, WorkspacePath: t.TempDir(),
@@ -98,8 +75,6 @@ func TestDecideAfterRetro_RegradeOncePerCycle(t *testing.T) {
 	}
 }
 
-// The routed path must treat the regrade like the floor: decided ABOVE the
-// router, non-overridable — a strategy proposing tdd/end cannot eat it.
 func TestDecideAfterRetroRouted_RegradeNotRouterOverridable(t *testing.T) {
 	o := floorOrchestrator(fixedNextStrategy{next: "tdd"})
 	cs := CycleState{CycleID: 1430, WorkspacePath: t.TempDir(),
@@ -117,13 +92,6 @@ func TestDecideAfterRetroRouted_RegradeNotRouterOverridable(t *testing.T) {
 	}
 }
 
-// Consumption WIRING pin (diff-review MEDIUM): a grant driven through the REAL
-// recordAndBranch retro branch must consume the once-per-cycle slot and
-// schedule audit; the immediate second FAIL must fall through — deleting the
-// consumeBookkeepingRegradeGrant call would red this, not just the hand-set
-// unit test above. (Resume-surface parity is the same single-source primitive,
-// called at resume.go's history branch — the recordFloorVerdictFailure
-// precedent for record/resume duplication.)
 func TestRecordAndBranch_RegradeGrantConsumesSlotAndSchedulesAudit(t *testing.T) {
 	t.Parallel()
 	cr := retroGateHarness(t, phasespec.Catalog{})
@@ -144,7 +112,6 @@ func TestRecordAndBranch_RegradeGrantConsumesSlotAndSchedulesAudit(t *testing.T)
 		t.Fatal("grant did not consume the once-per-cycle slot — retro→audit would loop forever")
 	}
 
-	// Second bookkeeping-only FAIL in the same cycle: no second grant.
 	cr.current = PhaseRetro
 	if _, err := cr.recordAndBranch(PhaseRetro, dr); err != nil {
 		t.Fatalf("recordAndBranch (second): %v", err)
@@ -154,15 +121,12 @@ func TestRecordAndBranch_RegradeGrantConsumesSlotAndSchedulesAudit(t *testing.T)
 	}
 }
 
-// Floor supremacy: a floor-category classification still halts an otherwise
-// regrade-eligible cycle — the regrade sits BELOW the ADR-0072 floor.
 func TestDecideAfterRetro_FloorOutranksRegrade(t *testing.T) {
 	o := floorOrchestrator(nil)
 	dir := t.TempDir()
 	writeVerdicts(t, dir, "PASS", "PASS") // green artifacts + recorded FAIL = incoherent
 	cs := CycleState{CycleID: 1430, WorkspacePath: dir}
-	// Deliberately NO AuditFailReasons: an unexplained FAIL with green artifacts
-	// is the forged-verdict floor signature; regrade must not touch it.
+	// No AuditFailReasons: an unexplained FAIL with green artifacts is the forged-verdict floor signature.
 
 	next, _, _, sig := o.decideAfterRetro(cs, VerdictFAIL, nil)
 	if sig == nil || next != PhaseEnd {

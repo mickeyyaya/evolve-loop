@@ -7,19 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// runner_perphase_env_test.go — Bug A regression guard. cmd_loop.go writes
-// per-agent model overrides as `EVOLVE_<AGENT>_MODEL` (e.g. `EVOLVE_BUILDER_
-// MODEL`), matching the same convention as `EVOLVE_<AGENT>_CLI` and
-// `EVOLVE_<AGENT>_PERMISSION_MODE` already use. The runner's model resolver
-// at runner.go:284 had drifted to read `EVOLVE_<PHASE>_MODEL`, which silently
-// dropped the override for every phase where phase ≠ agent (tdd/tdd-engineer,
-// build/builder, audit/auditor, retro/retrospective). Cycle-124 V1 verification
-// proved the drop in production: `--model builder=gpt-5.5` reached the loop
-// dispatcher but never reached the runner, so codex fell back to the profile
-// default (`sonnet` → `gpt-5.4`) and the operator's ChatGPT account 400'd.
-// This table-driven test pins the agent-keyed contract — one row per
-// known-mismatch phase pair.
-
 func TestRun_PerAgentModelEnvKey_AgentKeyedNotPhaseKeyed(t *testing.T) {
 	cases := []struct {
 		name        string
@@ -56,9 +43,6 @@ func TestRun_PerAgentModelEnvKey_AgentKeyedNotPhaseKeyed(t *testing.T) {
 			envKey:      "EVOLVE_RETROSPECTIVE_MODEL",
 			want:        "marker-retro",
 		},
-		// Sanity row: phase == profileName works under BOTH the buggy and
-		// fixed code paths. Kept so future refactors don't accidentally
-		// regress the scout-style happy path.
 		{
 			name:        "scout phase / scout agent (sanity, phase == profileName)",
 			phase:       "scout",

@@ -1,11 +1,5 @@
 package runner
 
-// verdict_golden_test.go — ADR-0103 unit 11, step 1: the characterization
-// goldens of the verdict engine, captured on 8e8f080f before any code moved
-// (verdict/testdata/*.golden.*) and held byte-for-byte across the extraction.
-// GREEN on the pre-extraction code; each named mutant was hand-applied once to
-// prove the pin bites (doc §6).
-
 import (
 	"context"
 	"encoding/json"
@@ -19,9 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// Test 1 — every arm's PhaseResponse (the ledger/dossier/dashboard contract)
-// and error contract equal the golden: kills `BootMS dropped from the
-// substantive literal`, `%w → %v`, `ArtifactsDir from Worktree`.
 func TestRun_VerdictResponses_MatchTheGoldenOnEveryArm(t *testing.T) {
 	for _, sc := range verdictScenarios() {
 		t.Run(sc.name, func(t *testing.T) {
@@ -47,9 +38,6 @@ func TestRun_VerdictResponses_MatchTheGoldenOnEveryArm(t *testing.T) {
 	}
 }
 
-// Test 7 — the verify-probe and sleep counts per scenario pin BOTH
-// cancellation policies and the settle bound: kills `WithoutCancel removed`,
-// `post-sleep ctx check dropped`, `bound off-by-one`.
 func TestRun_VerdictProbeCounts_MatchTheGolden(t *testing.T) {
 	var want map[string]probeCounts
 	if err := json.Unmarshal([]byte(readGolden(t, "probes.golden.json")), &want); err != nil {
@@ -79,10 +67,6 @@ type probeScenario struct {
 	extra []func(*Options)
 }
 
-// probeScenarios adds the cancellation rows to the response table: an
-// already-cancelled ctx cannot be threaded through Run's request, so these rows
-// swap the ctx via a bridge-side hook instead — the runner's Run is called with
-// the cancelled ctx directly by runCancelled.
 func probeScenarios() []probeScenario {
 	var out []probeScenario
 	for _, sc := range verdictScenarios() {
@@ -100,10 +84,6 @@ func probeScenarios() []probeScenario {
 	return out
 }
 
-// TestRun_VerdictProbeCounts_CancelledCtx — the two policies for ONE ladder:
-// the teardown reconcile runs the full window under a dead ctx
-// (context.WithoutCancel — the cancel IS the teardown), the clean-exit path
-// bails after the first probe (the agent exited 0; nothing more is coming).
 func TestRun_VerdictProbeCounts_CancelledCtx(t *testing.T) {
 	var want map[string]probeCounts
 	if err := json.Unmarshal([]byte(readGolden(t, "probes.golden.json")), &want); err != nil {
@@ -123,8 +103,6 @@ func TestRun_VerdictProbeCounts_CancelledCtx(t *testing.T) {
 	}
 }
 
-// runCancelled runs a scenario with an already-cancelled ctx and returns its
-// probe/sleep counts.
 func runCancelled(t *testing.T, sc verdictScenario) probeCounts {
 	t.Helper()
 	var counts probeCounts
@@ -145,10 +123,6 @@ func runCancelled(t *testing.T, sc verdictScenario) probeCounts {
 	return counts
 }
 
-// Test 6 — the dual return on the FAIL arms: a POPULATED response AND an error
-// whose chain core's IsInfraTeardownError still resolves; a substantive error
-// never consults the deliverable. Kills `zero response on the error arm`,
-// `verify consulted on the substantive arm`.
 func TestRun_TeardownFail_ReturnsPopulatedResponseAndAnInfraTeardownError(t *testing.T) {
 	teardown := runVerdictScenario(t, verdictScenario{name: "t", phase: "audit", agent: "evolve-auditor", bridgeErr: artifactTimeoutErr(), verify: verifySpec{kind: verifyNotOK, codes: []string{deliverable.CodeMissingArtifact}}, verdict: core.VerdictPASS})
 	if teardown.err == nil || !core.IsInfraTeardownError(teardown.err) {
@@ -173,9 +147,6 @@ func TestRun_TeardownFail_ReturnsPopulatedResponseAndAnInfraTeardownError(t *tes
 	}
 }
 
-// Test 8 — the ACS-floor arm's ONE late read: a probe that produced no bytes
-// (an infra read fault) falls back to one disk read whose bytes feed BOTH the
-// rescue and Classify. Kills `late read dropped`, `ArtifactPath not adopted`.
 func TestRun_Teardown_VerifyProducedNoBytes_LateReadFeedsBothRescueAndClassify(t *testing.T) {
 	run := runVerdictScenario(t, verdictScenario{name: "late", phase: "audit", agent: "evolve-auditor", bridgeErr: artifactTimeoutErr(), file: reportWithToken, acs: "PASS", verify: verifySpec{kind: verifyEmptyNotOK, codes: []string{deliverable.CodeStrayInWorktree}}, verdict: core.VerdictPASS})
 	if run.err != nil || !run.resp.Reconciled || run.resp.Verdict != core.VerdictPASS {
@@ -186,9 +157,6 @@ func TestRun_Teardown_VerifyProducedNoBytes_LateReadFeedsBothRescueAndClassify(t
 	}
 }
 
-// Test 9 — the stdout filter runs after the verdict bytes are selected and
-// before Classify; DisableStdoutFilter skips it while Classify still runs.
-// Kills `filter after Classify`, `filter before verify`.
 func TestRun_StdoutFilter_RunsAfterVerdictSelectionAndBeforeClassify(t *testing.T) {
 	var seq []string
 	hooks := &fakeHooks{phase: "audit", agent: "evolve-auditor", model: "opus", prompt: "x", verdict: core.VerdictPASS}

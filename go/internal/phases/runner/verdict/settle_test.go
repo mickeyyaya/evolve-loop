@@ -1,9 +1,5 @@
 package verdict
 
-// settle_test.go — the bounded settle ladder (ADR-0103 unit 11 §6 tests 16, 17,
-// 31): the bound, the stop conditions, the re-probe count, both ctx checks,
-// and the ONE translation from a dispatch to the contract roots.
-
 import (
 	"context"
 	"errors"
@@ -18,9 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// Test 16 — 1 + SettleRetries probes at most; OK or an error stops the ladder;
-// attempts counts the RE-probes. Kills `< → <=`, `loop on verr`,
-// `attempts miscounted`, `250ms`.
 func TestSettle_BoundedAt1PlusRetries_StopsOnOKOrError_CountsReprobes(t *testing.T) {
 	var intervals []time.Duration
 	never := newHarness(t, probe{codes: []string{deliverable.CodeMissingArtifact}}, WithSleep(func(d time.Duration) { intervals = append(intervals, d) }))
@@ -45,8 +38,6 @@ func TestSettle_BoundedAt1PlusRetries_StopsOnOKOrError_CountsReprobes(t *testing
 	}
 }
 
-// Test 17 — the ctx is checked before AND after the sleep. Kills `only one
-// ctx check`.
 func TestSettle_HonoursCancellationBeforeAndAfterTheSleep(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	during := newHarness(t, probe{codes: []string{deliverable.CodeMissingArtifact}}, WithSleep(func(time.Duration) { cancel() }))
@@ -61,9 +52,6 @@ func TestSettle_HonoursCancellationBeforeAndAfterTheSleep(t *testing.T) {
 	}
 }
 
-// Test 31b — rootsFor carries Cycle and the explanation version, and the
-// .evolve dir only with a project root, through the ONE spelling of the
-// layout (paths.EvolveDirOf). Kills `guard dropped`, `Cycle dropped`.
 func TestRootsFor_CarriesCycleAndEvolveDirOnlyWithAProjectRoot(t *testing.T) {
 	d := Dispatch{Cycle: 42, Workspace: "ws", Worktree: "wt", ProjectRoot: "root", ExplanationDocumentationVersion: 3, ArtifactPath: "ws/audit-report.md"}
 	got := rootsFor(d)
@@ -75,9 +63,7 @@ func TestRootsFor_CarriesCycleAndEvolveDirOnlyWithAProjectRoot(t *testing.T) {
 	if got := rootsFor(d); got.EvolveDir != "" {
 		t.Errorf("no project root ⇒ no EvolveDir, got %q", got.EvolveDir)
 	}
-	// The value comparison cannot tell paths.EvolveDirOf from an inline join
-	// (they are byte-identical) — the source scan does: the leaf never spells
-	// the layout itself.
+	// A value comparison cannot tell paths.EvolveDirOf from an inline join; only a source scan can.
 	entries, err := os.ReadDir(".")
 	if err != nil {
 		t.Fatal(err)

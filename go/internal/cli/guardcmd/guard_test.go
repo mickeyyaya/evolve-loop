@@ -47,7 +47,6 @@ func TestAppendGuardsLog_TagMapping(t *testing.T) {
 		{"ship", "ship-gate"},
 		{"phase", "phase-gate-pre"},
 		{"role", "role-gate"},
-		{"quota", "research-quota-gate"},
 		{"docdelete", "doc-deletion-guard"},
 		{"chain", "chain"},
 	}

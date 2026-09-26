@@ -1,11 +1,5 @@
 package main
 
-// cmd_cycle_gate_signals_test.go — ADR-0101 S2b wiring proofs: the production
-// root hands its Center to the contract gate (the chain capability proof, the
-// DeclaredDeliverablesGateWired precedent), and the batch report's per-cycle
-// signal line reports the gate's verdict counts so the operator sees the
-// "checked → advanced" record per cycle.
-
 import (
 	"io"
 	"os"

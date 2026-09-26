@@ -11,12 +11,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/clicontrol"
 )
 
-// runBridgeControl implements `evolve bridge control <family> <event>` — the
-// live exerciser for the CLI-control mapping table. It resolves the abstract
-// event to the family's concrete command (via the manifest controls table),
-// drives it through the tmux bridge, and prints the captured pane. Operators use
-// it to verify/refine the table (e.g. `bridge control claude usage`) and to
-// confirm an unsupported pairing fails cleanly (`bridge control ollama usage`).
+// runBridgeControl drives one abstract control event through the family's
+// manifest mapping and prints the captured pane.
 func runBridgeControl(args []string, stdout, stderr io.Writer) int {
 	var positional []string
 	ws := ""
@@ -60,10 +56,8 @@ func runBridgeControl(args []string, stdout, stderr io.Writer) int {
 	return emitControl(ctrl.Do, family, event, stdout, stderr)
 }
 
-// emitControl runs one control event through do and maps the outcome to output
-// + exit code. Split from runBridgeControl so the outcome mapping is unit-
-// testable without a tmux session. Exit codes: 0 ok, 3 unsupported pairing,
-// 1 any other failure.
+// emitControl maps a control outcome to output and exit code: 0 ok, 3 an
+// unsupported pairing, 1 any other failure.
 func emitControl(
 	do func(context.Context, string, clicontrol.Event) (clicontrol.Response, error),
 	family, event string, stdout, stderr io.Writer,

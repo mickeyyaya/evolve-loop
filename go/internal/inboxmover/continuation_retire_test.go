@@ -1,10 +1,5 @@
 package inboxmover
 
-// continuation_retire_test.go — durable regression coverage for the two halves
-// of park-consume-releases-continuation-binding. The cycle-1507 ACS predicates
-// pin the same contract, but they are cycle-scoped and get archived; this is
-// the coverage that travels with the package.
-
 import (
 	"bytes"
 	"encoding/json"
@@ -27,14 +22,11 @@ func retireFixture(t *testing.T, ids ...string) string {
 	return root
 }
 
-// seedRootItem drops a pending item carrying id at the inbox ROOT — the batch
-// loader's own reach, and therefore live.
 func seedRootItem(t *testing.T, root, id string) string {
 	t.Helper()
 	return seedItemIn(t, filepath.Join(root, ".evolve", "inbox"), id)
 }
 
-// seedItemIn writes an item carrying id into an arbitrary inbox subtree.
 func seedItemIn(t *testing.T, dir, id string) string {
 	t.Helper()
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -51,7 +43,6 @@ func seedItemIn(t *testing.T, dir, id string) string {
 	return path
 }
 
-// seedRegistryOnly binds id WITHOUT creating an item.
 func seedRegistryOnly(t *testing.T, root, id string, cycle int) continuation.Continuation {
 	t.Helper()
 	c := continuation.Continuation{
@@ -76,10 +67,6 @@ func stillBound(t *testing.T, root, id string) bool {
 	return ok
 }
 
-// TestPromote_ReleasesBindingAndPreservesPointer covers the write half: every
-// Promote destination is out of the batch loader's reach, so the binding must
-// be released in the same operation — with its VALUE preserved onto the retired
-// item, and an unrelated live lane's binding untouched.
 func TestPromote_ReleasesBindingAndPreservesPointer(t *testing.T) {
 	const parked, sibling = "context-fill-telemetry-and-cap", "some-other-live-todo"
 	for _, state := range []string{"quarantine", "processed", "rejected", "retry"} {
@@ -119,7 +106,6 @@ func TestPromote_ReleasesBindingAndPreservesPointer(t *testing.T) {
 	}
 }
 
-// TestPromote_UnboundItemGainsNoReleasedKey — the ordinary case stays byte-clean.
 func TestPromote_UnboundItemGainsNoReleasedKey(t *testing.T) {
 	root := t.TempDir()
 	seedRootItem(t, root, "plain-todo")
@@ -141,13 +127,10 @@ func TestPromote_UnboundItemGainsNoReleasedKey(t *testing.T) {
 	}
 }
 
-// TestResolveContinuationForScope_GhostScopeRefusedAndReleased covers the read
-// half: a binding whose scope id has no live pending item is refused, logged
-// and released — the cycle-1487/1497 re-dispatch-forever shape.
 func TestResolveContinuationForScope_GhostScopeRefusedAndReleased(t *testing.T) {
 	root := t.TempDir()
 	const ghost = "context-fill-telemetry-and-cap"
-	seedItemIn(t, filepath.Join(root, ".evolve", "inbox", "quarantine"), ghost) // parked
+	seedItemIn(t, filepath.Join(root, ".evolve", "inbox", "quarantine"), ghost)
 	seedRegistryOnly(t, root, ghost, 1484)
 
 	var errBuf bytes.Buffer
@@ -162,16 +145,12 @@ func TestResolveContinuationForScope_GhostScopeRefusedAndReleased(t *testing.T) 
 	}
 }
 
-// TestResolveContinuationForScope_RetiredDirsAreNotLive pins the liveness
-// definition to the batch loader's reach: an item sitting in any retirement dir
-// is NOT live, so its binding is a ghost.
 func TestResolveContinuationForScope_RetiredDirsAreNotLive(t *testing.T) {
 	const id = "parked-scope"
 	for _, dir := range []string{"quarantine", "consumed", "processed", "rejected", "retry"} {
 		t.Run(dir, func(t *testing.T) {
 			root := t.TempDir()
-			// processed/ and rejected/ nest a cycle-N level (promoteDestPath) —
-			// the evidence scan must reach it, not just the flat dirs.
+			// Nested under cycle-N, the layout processed/ and rejected/ use, so the scan must recurse.
 			seedItemIn(t, filepath.Join(root, ".evolve", "inbox", dir, "cycle-1506"), id)
 			seedRegistryOnly(t, root, id, 1484)
 
@@ -182,13 +161,6 @@ func TestResolveContinuationForScope_RetiredDirsAreNotLive(t *testing.T) {
 	}
 }
 
-// TestResolveContinuationForScope_NoItemAnywhereStillAdopts is THE
-// anti-overreach control that shaped the guard: the wave planner also mints
-// lane scopes from carryoverTodos, which never have an inbox file at all
-// (cycle-1078's orphan class — the reason the scope-keyed registry exists).
-// Absence of an item is therefore NOT evidence of retirement; only a copy
-// sitting in a pool-exit dir is. A guard that released here would trade the
-// re-dispatch defect for a salvage-loss defect.
 func TestResolveContinuationForScope_NoItemAnywhereStillAdopts(t *testing.T) {
 	root := t.TempDir()
 	const laneOnly = "carryover-only-scope"
@@ -203,9 +175,6 @@ func TestResolveContinuationForScope_NoItemAnywhereStillAdopts(t *testing.T) {
 	}
 }
 
-// TestResolveContinuationForScope_ClaimedItemIsLive is the anti-overreach
-// control for the in-flight edge: a lane holding the item in processing/cycle-N
-// must keep its binding.
 func TestResolveContinuationForScope_ClaimedItemIsLive(t *testing.T) {
 	root := t.TempDir()
 	const id = "in-flight-scope"

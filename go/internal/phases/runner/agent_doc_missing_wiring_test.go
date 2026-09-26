@@ -1,11 +1,5 @@
 package runner
 
-// agent_doc_missing_wiring_test.go — the runner's REAL load path must wrap a
-// nonexistent persona in core.ErrAgentDocMissing, or the optional-skip
-// admission one layer up never fires (the week's tenth candidate for a correct
-// component nothing calls). Driven through Run with a loader whose FS simply
-// lacks the doc — the exact cycle-1551 shape.
-
 import (
 	"context"
 	"errors"
@@ -32,10 +26,7 @@ func TestRun_MissingAgentDocCarriesTheTypedSentinel(t *testing.T) {
 	}
 }
 
-// An unreadable-but-EXISTING doc must NOT carry the sentinel — only genuine
-// absence has the take-it-off-the-menu remedy. The path exists here (as a
-// directory, so ReadFile fails with a non-NotExist error): classifying THAT as
-// "missing" would let optionalInfraSkip absorb corrupt personas and I/O faults.
+// The doc path is a directory, so ReadFile fails with an error other than NotExist.
 func TestRun_UnreadableAgentDocDoesNotCarryTheSentinel(t *testing.T) {
 	b := New(Options{
 		Hooks:  &fakeHooks{phase: "p", agent: "evolve-p"},
@@ -53,10 +44,7 @@ func TestRun_UnreadableAgentDocDoesNotCarryTheSentinel(t *testing.T) {
 	}
 }
 
-// A NIL prompts source fails every load with fs.ErrNotExist (the documented
-// zero-loader contract) — but that is a WIRING defect, not a missing doc, and
-// must NOT classify as skippable: otherwise a misresolved prompts root turns
-// every optional phase in the cycle into a silent WARN-skip.
+// A nil prompts source fails every load with fs.ErrNotExist, yet that is a wiring defect, not a missing doc.
 func TestRun_NilPromptsSourceDoesNotCarryTheSentinel(t *testing.T) {
 	b := New(Options{
 		Hooks:   &fakeHooks{phase: "p", agent: "evolve-p"},

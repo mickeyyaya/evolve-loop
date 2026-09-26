@@ -7,10 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// TestBaseRunner_TypeNamedAndRuns names the BaseRunner type (every phase's
-// BaseRunner() returns one, but the identifier is never named in runner's own
-// test package) and exercises its Name() + Run() path: a PASS-verdict hooks
-// drives one Classify call and a PASS/next-phase response.
 func TestBaseRunner_TypeNamedAndRuns(t *testing.T) {
 	hooks := &fakeHooks{phase: "scout", agent: "evolve-scout", model: "auto",
 		prompt: "composed", verdict: core.VerdictPASS, nextPhase: "triage"}
@@ -20,7 +16,7 @@ func TestBaseRunner_TypeNamedAndRuns(t *testing.T) {
 		Hooks:    hooks,
 		Bridge:   fb,
 		Prompts:  fakePromptsFS("evolve-scout", "agent body"),
-		VerifyFn: alwaysOKVerify, // plumbing test — isolate from the deliverable hard-gate
+		VerifyFn: alwaysOKVerify,
 	})
 	if br == nil {
 		t.Fatal("New returned nil *BaseRunner")
@@ -43,9 +39,6 @@ func TestBaseRunner_TypeNamedAndRuns(t *testing.T) {
 	}
 }
 
-// TestSkipper_SatisfiedAndExercised names the Skipper interface, proves
-// *skippingHooks satisfies it, and exercises the Run short-circuit: a skipping
-// phase returns SKIPPED without ever calling the bridge.
 func TestSkipper_SatisfiedAndExercised(t *testing.T) {
 	var _ Skipper = (*skippingHooks)(nil)
 
@@ -68,10 +61,6 @@ func TestSkipper_SatisfiedAndExercised(t *testing.T) {
 	}
 }
 
-// TestInlinePromptProvider_SatisfiedAndExercised names the InlinePromptProvider
-// interface, proves inlineHooks satisfies it, and exercises the inline-body
-// branch: the composed prompt uses the inline body and never touches the disk
-// loader (empty FS, no error).
 func TestInlinePromptProvider_SatisfiedAndExercised(t *testing.T) {
 	var _ InlinePromptProvider = inlineHooks{}
 

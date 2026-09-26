@@ -1,14 +1,5 @@
 package inboxmover
 
-// continuation_release.go — the ONE release transaction every retirement path
-// shares (cycle-1515). `releaseContinuationOnRetire` already owned the
-// preserve-then-delete order for the write side (Promote/quarantine); the
-// read-side guard in ResolveContinuationForScope and the new operator surface
-// (`evolve continuation release`) both need the SAME transaction, and a second
-// copy of it is exactly the drift that produced audit cycle-1507's H2 (the
-// read-side delete skipped preservation and sent the salvage pointer to stderr
-// only). So the transaction lives here once and the three callers reach it.
-
 import (
 	"encoding/json"
 	"fmt"
@@ -20,24 +11,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 )
 
-// ReleaseContinuationBinding releases scopeID's registry binding, preserving the
-// released VALUE into the scope's item file FIRST (wherever that item currently
-// lives — pending root, a processing claim, or a retirement subtree). Returns
-// the released value, whether the registry entry was actually deleted, and any
-// registry error.
-//
-// A scope with no binding is a clean miss (zero, false, nil) — releasing
-// nothing is not a failure. The delete is DeleteRegistryEntryIfCycle, so a
-// sibling lane that rebound the scope between the read and the delete keeps its
-// fresh binding (released=false, no error).
-//
-// releasedBy names the AUTHORITY the release was made under and is recorded
-// beside the reason and the timestamp. Every caller declares it rather than
-// inheriting a blank: a binding is the lineage the defect-ledger gate reads as
-// anti-tamper evidence, so an erasure that names no actor is itself the defect
-// (the gap the cycle-1684 operator-authority gate closes). Runtime lifecycle
-// paths name themselves; the operator surface names the authority path that
-// unlocked it.
+// ReleaseContinuationBinding preserves scopeID's binding into its item, then deletes it if still this cycle's.
+// See ADR-0089.
 func ReleaseContinuationBinding(opts Options, scopeID, reason, releasedBy string) (continuation.Continuation, bool, error) {
 	opts.resolveOpts()
 	if strings.TrimSpace(scopeID) == "" {
@@ -57,6 +32,7 @@ func ReleaseContinuationBinding(opts Options, scopeID, reason, releasedBy string
 	} else {
 		opts.logf("WARN: ", "release '%s': no item file found to preserve the pointer into (snapshot %s, branch %s, base %s, cycle %d) — recording it on this line only", scopeID, c.SnapshotSHA, c.Branch, c.BaseSHA, c.Cycle)
 	}
+	// Delete only if still this cycle's, so a sibling lane's fresh rebinding survives.
 	released, derr := continuation.DeleteRegistryEntryIfCycle(opts.ProjectRoot, scopeID, c.Cycle)
 	if derr != nil {
 		return c, false, fmt.Errorf("inboxmover: release %q: %w", scopeID, derr)
@@ -64,11 +40,7 @@ func ReleaseContinuationBinding(opts Options, scopeID, reason, releasedBy string
 	return c, released, nil
 }
 
-// FindScopeItemFile returns the path of the inbox item carrying scopeID, or ""
-// when no copy exists anywhere. Search order is liveness order — a processing
-// claim (the lane holding it), then the pending root, then the retirement
-// subtrees (Locate's order, Promote's) — so the preserved pointer always lands
-// on the copy an operator would actually open.
+// FindScopeItemFile returns scopeID's item path in liveness order (claim, root, retired copy), or "".
 func FindScopeItemFile(opts Options, scopeID string) string {
 	opts.resolveOpts()
 	if strings.TrimSpace(scopeID) == "" {
@@ -81,17 +53,8 @@ func FindScopeItemFile(opts Options, scopeID string) string {
 	return path
 }
 
-// retiredAtCycle returns the cycle a retired item copy was retired in, or 0 when
-// the copy carries no cycle evidence at all.
-//
-// This is the recency half of the read-side guard's evidence test (audit
-// cycle-1507 H1): a retired copy from cycle 900 says NOTHING about a binding
-// minted at cycle 1484 — the item was re-filed and rebound after that
-// retirement, and treating the old copy as proof of death releases live
-// preserved work. Only a retirement that is not older than the binding is
-// evidence of a ghost. Unknown (0) is not "stale": the ordinary quarantine copy
-// carries no stamp, and refusing to act on the common case would disarm the
-// belt entirely.
+// retiredAtCycle returns the cycle a retired copy was retired in, or 0 when unknown.
+// Unknown is not stale: the ordinary quarantine copy carries no stamp.
 func retiredAtCycle(path string) int {
 	if path == "" {
 		return 0
@@ -118,8 +81,7 @@ func retiredAtCycle(path string) int {
 	return cycleOf(doc.Consumed.Cycle)
 }
 
-// cycleOf coerces a cycle field that the inbox schema writes as either a JSON
-// number or a string ("1515") into an int; anything else is 0 (unknown).
+// cycleOf reads a cycle written as a JSON number or string; anything else is 0.
 func cycleOf(v any) int {
 	switch t := v.(type) {
 	case float64:
@@ -134,8 +96,6 @@ func cycleOf(v any) int {
 	return 0
 }
 
-// cycleFromDirName parses the "cycle-N" level promoteDestPath nests under
-// processed/ and rejected/.
 func cycleFromDirName(name string) int {
 	if !strings.HasPrefix(name, "cycle-") {
 		return 0
@@ -147,27 +107,7 @@ func cycleFromDirName(name string) int {
 	return n
 }
 
-// ReconcileConsumedBindings projects inbox/consumed/ into the continuation
-// registry, the way the fingerprint reconciler projects it into the ack
-// ledger: a binding whose item lives ONLY in consumed/ is definitionally dead
-// — leaving it live is the immortal-binding class (cycles 1487/1497; recurred
-// as cycle-1558 through the operator consume, which moved the file but not
-// the binding, and the next wave minted a zero-delivery lane off it).
-//
-// Two guards before any release, both inherited from the audit of cycle-1507
-// (the read-side guard in ResolveContinuationForScope measured 7 of 91 real
-// bindings that a guardless release would have destroyed):
-//   - LIVE COPY: a re-filed item the batch loader can still reach owns the
-//     binding — skip.
-//   - RECENCY: a consumed copy OLDER than the binding is stale evidence (the
-//     id was re-filed and rebound after that retirement) — skip, loudly.
-//
-// The release itself goes through the ONE shared transaction
-// (ReleaseContinuationBinding): preserve-then-delete, loud on a failed
-// preserve, cycle-guarded delete. Per-item failures WARN and never block.
-// Called before every cycle dispatch on the blocker-breaker path — the sweep
-// is O(consumed items) with a registry read per bound id; consumed/ is never
-// pruned, so revisit the cost if the corpus grows an order of magnitude.
+// ReconcileConsumedBindings releases bindings whose item lives only in consumed/ and returns the released ids.
 func ReconcileConsumedBindings(opts Options) (released []string) {
 	opts.resolveOpts()
 	dir := filepath.Join(opts.InboxDir, "consumed")
@@ -195,6 +135,7 @@ func ReconcileConsumedBindings(opts Options) (released []string) {
 		if scopeHasLiveItem(opts, id) {
 			continue // a re-filed live copy owns the binding
 		}
+		// A copy older than its binding was re-filed and rebound since; releasing on it destroys live work.
 		if rc := retiredAtCycle(path); rc > 0 && rc < c.Cycle {
 			opts.logf("WARN: ", "consumed copy of %q is from cycle %d but its binding is NEWER (cycle %d) — stale evidence, not releasing (cycle-1507 recency guard)", id, rc, c.Cycle)
 			continue

@@ -100,9 +100,6 @@ func TestWriteCatalog_TruncatesLongWhenToUse(t *testing.T) {
 func TestWriteCatalog_CapsEnrichedCardsKeepsAllSelectable(t *testing.T) {
 	t.Parallel()
 	// 14 optional cards + 2 spine cards: enriched rendering must cap at 12.
-	// Overflow phases remain selectable via the "## Phase Catalog — Core Values"
-	// table (always present in the router prompt); writeCatalog emits a pointer
-	// instead of enumerating overflow names individually.
 	var cards []router.PhaseCard
 	cards = append(cards,
 		router.PhaseCard{Name: "build", Role: "build"},
@@ -117,24 +114,19 @@ func TestWriteCatalog_CapsEnrichedCardsKeepsAllSelectable(t *testing.T) {
 	writeCatalog(&b, cards)
 	out := b.String()
 
-	// Enriched cap still applies.
 	enriched := strings.Count(out, "— when:")
 	if enriched > 12 {
 		t.Errorf("at most 12 enriched cards, got %d", enriched)
 	}
-	// Optional (SELECTable) cards get the enriched slots ahead of spine cards.
 	if strings.Contains(out, "build — when:") {
 		t.Error("non-optional spine cards must not consume enriched slots")
 	}
-	// Overflow names must NOT be individually enumerated; pointer replaces the list.
-	// (router-catalog-dedup-overflow: overflow names duplicated the catalog table.)
 	for _, overflow := range []string{"p-m", "p-n", "also available"} {
 		if strings.Contains(out, overflow) {
 			t.Errorf("overflow name %q individually listed in writeCatalog output — "+
 				"pointer must replace enumeration; got:\n%s", overflow, out)
 		}
 	}
-	// Pointer must reference the lookup source so the router can SELECT overflow phases.
 	if !strings.Contains(out, "phase-inventory.json") {
 		t.Errorf("writeCatalog must emit a pointer referencing phase-inventory.json for overflow; got:\n%s", out)
 	}

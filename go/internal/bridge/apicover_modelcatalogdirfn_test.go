@@ -2,10 +2,6 @@ package bridge
 
 import "testing"
 
-// TestSetModelCatalogDirFn pins the EVOLVE_MODEL_CATALOG_DIR → DI conversion:
-// SetModelCatalogDirFn installs the resolver the overlay uses to locate
-// model-catalog.json. Saves/restores the package global so other tests are
-// unaffected.
 func TestSetModelCatalogDirFn(t *testing.T) {
 	orig := modelCatalogDirFn
 	t.Cleanup(func() { modelCatalogDirFn = orig })

@@ -8,22 +8,8 @@ import (
 	"testing"
 )
 
-// TestPretrustCodexProjects_ConcurrentTwoGoroutines is the Slice-2 regression
-// test for ADR-0049 N10 (concurrency-arch-slices campaign). Two goroutines each
-// pretrust a DISTINCT worktree path against ONE shared EVOLVE_CODEX_CONFIG_PATH
-// temp file concurrently, then assert the final TOML contains BOTH
-// [projects."..."] entries.
-//
-// Pre-fix behaviour: read-merge-write-RENAME was last-writer-wins — two
-// goroutines that each read the empty initial state before either writes
-// overwrite each other's output, leaving only the last writer's entry.
-// Post-fix: flock.WithPathLock(configPath) at codex_pretrust.go:79 serializes
-// the whole RMW so every append composes losslessly and no entry is dropped.
-//
-// Run with -race to surface unprotected shared state; the start barrier forces
-// both goroutines to read the same (empty) initial state simultaneously,
-// maximising contention. -count=5 (eval grader) repeats the race 5 times to
-// prevent a lucky interleaving from hiding a regression.
+// cfg.codexConfigPath, not EVOLVE_CODEX_CONFIG_PATH, points both goroutines at one shared temp config, so the
+// real ~/.codex is never touched. The start barrier makes both read the same empty file, the lost-update window.
 func TestPretrustCodexProjects_ConcurrentTwoGoroutines(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.toml")

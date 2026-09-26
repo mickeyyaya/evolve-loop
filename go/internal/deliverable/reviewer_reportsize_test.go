@@ -9,15 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 )
 
-// reviewer_reportsize_test.go — RED contract for wiring the new report-size
-// budget check into the host-side contract gate (Reviewer). Mirrors the
-// existing phaseIO threading exactly (TestReviewer_FailureContextPhaseIO_BlocksOnlyAtBothEnforce
-// in reviewer_test.go): a new *Reviewer field pair, set directly in tests the
-// same way newTestReviewerPhaseIO sets r.phaseIO.
-//
-// RED today: Reviewer has no reportSizeGate/reportSizeBudgetTokens fields
-// (compile failure).
-
 func newTestReviewerReportSize(stage, reportSizeGate config.Stage, budgetTokens int, breakerPath string, threshold int) *Reviewer {
 	r := newTestReviewer(stage, breakerPath, threshold)
 	r.reportSizeGate = reportSizeGate
@@ -62,11 +53,6 @@ func TestReviewer_ReportSizeGate_UnderBudgetNeverBlocks(t *testing.T) {
 	}
 }
 
-// TestReviewer_ReportSizeGate_DefaultOff_ByteIdentical pins the rollout
-// safety net: a Reviewer built through the existing constructors (zero-value
-// reportSizeGate == StageOff) must never block on report size, whatever the
-// content — the new dial is opt-in only until explicitly wired to "shadow"/
-// "enforce" via policy.json, exactly like every other gate axis in this repo.
 func TestReviewer_ReportSizeGate_DefaultOff_ByteIdentical(t *testing.T) {
 	big := strings.Repeat("word ", 5000)
 	report := "## Changes\n- x\nVerdict: PASS\n## Handoff Summary\n" + big

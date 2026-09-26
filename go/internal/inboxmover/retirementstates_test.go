@@ -2,8 +2,6 @@ package inboxmover
 
 import "testing"
 
-// retirementStates is the ONE list behind every "has this id retired?" reader;
-// a State* constant added without a row here is the cycle-1682 class again.
 func TestRetirementStates_CoverEveryRetiredStateOnce(t *testing.T) {
 	want := map[string]bool{StateConsumed: true, StateQuarantine: true, StateProcessed: true, StateRejected: true, StateRetry: true}
 	seen := map[string]bool{}

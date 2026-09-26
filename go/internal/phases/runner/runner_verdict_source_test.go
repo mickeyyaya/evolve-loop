@@ -12,13 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// runner_verdict_source_test.go — the file-authoritative verdict-source rule (ADR-0072
-// verdict-incoherence). For a CONTRACTED phase the on-disk deliverable is the SOLE
-// verdict source; the lossy, prompt-contaminated terminal pane is never classified.
-// This closes the incoherence class at the architecture level (not by widening a
-// settle window): timing can no longer flip a valid verdict, and a rejected deliverable
-// can no longer be laundered from either the malformed file or the pane.
-
 func diagsContain(diags []core.Diagnostic, substr string) bool {
 	for _, d := range diags {
 		if strings.Contains(d.Message, substr) {
@@ -28,17 +21,9 @@ func diagsContain(diags []core.Diagnostic, substr string) bool {
 	return false
 }
 
-// TestRun_ContractedPhase_UnverifiedDeliverable_NonShipVerdictPassesThrough is the
-// complement of the ship-guard (see the amplify ShipVerdictDowngraded test): the guard
-// must NOT clobber a legitimate NON-SHIP verdict a phase derives from partial content
-// that fails full verification. The canonical case is intent delta mode — an
-// "[intent-unchanged]" body is not a full intent contract (so Verify fails) yet
-// classifies as SKIPPED, and that SKIPPED must survive. Only a clean PASS (or a
-// non-canonical verdict) is downgraded; FAIL, WARN, and SKIPPED pass through unchanged.
 func TestRun_ContractedPhase_UnverifiedDeliverable_NonShipVerdictPassesThrough(t *testing.T) {
 	root := writeFallbackProfile(t, "evolve-intent", "claude-tmux", nil)
-	// The phase's Classify legitimately returns SKIPPED from partial content; the file is
-	// present but fails full verification (a required section is absent).
+	// Classify returns SKIPPED from partial content; the file is present but lacks a required section.
 	hooks := &fakeHooks{phase: "intent", agent: "evolve-intent", model: "auto", prompt: "x", verdict: core.VerdictSKIPPED}
 	const partial = "[intent-unchanged] goal_hash=abc12345\n"
 	bridge := &divergentBridge{fileContent: partial, stdoutContent: partial}
@@ -62,13 +47,6 @@ func TestRun_ContractedPhase_UnverifiedDeliverable_NonShipVerdictPassesThrough(t
 	}
 }
 
-// TestRun_ContractedPhase_UnverifiedDeliverable_WarnPassesThrough guards fluent-mode
-// WARN-ships (TestE2EPipeline_AuditWarn_FluentShips): a WARN from a deliverable that fails
-// verification must NOT be downgraded. WARN is not a CLEAN ship — it already flags issues,
-// and whether it ships is an orchestrator policy call (workflow.strict_audit promotes
-// WARN→FAIL there), not the runner's to preempt. Only a clean PASS is the laundering vector
-// the ship-guard clamps. Downgrading WARN here would regress origin/main (which ships a
-// failed-verify WARN via the pane) and break the fluent-ships e2e path.
 func TestRun_ContractedPhase_UnverifiedDeliverable_WarnPassesThrough(t *testing.T) {
 	root := writeFallbackProfile(t, "evolve-auditor", "claude-tmux", nil)
 	hooks := &fakeHooks{phase: "audit", agent: "evolve-auditor", model: "opus", prompt: "x", verdict: core.VerdictWARN}
@@ -91,11 +69,6 @@ func TestRun_ContractedPhase_UnverifiedDeliverable_WarnPassesThrough(t *testing.
 	}
 }
 
-// TestRun_UncontractedPhase_PaneRemainsVerdictSource is the scope guard: the file-
-// authoritative rule applies ONLY to phases that HAVE a contract. When verifyFn reports
-// "no contract" (an error), well-formedness is undeterminable, so the pane/Classify must
-// remain the legitimate verdict source — exactly as before. A regression that made ALL
-// phases file-authoritative would blank the artifact for contractless phases.
 func TestRun_UncontractedPhase_PaneRemainsVerdictSource(t *testing.T) {
 	stdout := "# scout\n<!-- evolve-verdict: {\"phase\":\"scout\",\"verdict\":\"PASS\"} -->\n"
 	hooks := &fakeHooks{phase: "scout", agent: "evolve-scout", model: "auto", prompt: "x", verdict: core.VerdictPASS}
@@ -115,11 +88,6 @@ func TestRun_UncontractedPhase_PaneRemainsVerdictSource(t *testing.T) {
 	}
 }
 
-// TestRun_UncontractedPhase_NoWastedSettleSleeps guards the settle-WAIT scoping: an
-// error result (no contract / IO fault) does not resolve by waiting, so the loop must
-// return on the FIRST probe rather than burning the full settle window. Before the fix
-// the loop retried on `verr != nil` too, so every contractless phase paid
-// reconcileSettleRetries pointless re-probes.
 func TestRun_UncontractedPhase_NoWastedSettleSleeps(t *testing.T) {
 	stdout := "raw scrollback\n"
 	hooks := &fakeHooks{phase: "scout", agent: "evolve-scout", model: "auto", prompt: "x", verdict: core.VerdictPASS}

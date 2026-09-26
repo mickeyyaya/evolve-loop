@@ -1,9 +1,5 @@
 package inboxmover
 
-// In-package contract pins for ReconcileConsumedBindings (apicover-enforce:
-// exported surface must be named in-package; the breaker-boot wiring pins
-// live in cmd/evolve).
-
 import (
 	"os"
 	"path/filepath"
@@ -36,7 +32,7 @@ func TestReconcileConsumedBindings(t *testing.T) {
 	// stray: consumed, no live copy, no newer-binding evidence → released
 	write("stray.json", `{"id":"stray"}`)
 	bind("stray", 4)
-	// recency: consumed at cycle 5, rebound at cycle 9 → kept
+	// recency: consumed before its binding was renewed → kept
 	write("refiled.json", `{"id":"refiled","consumed":{"cycle":5}}`)
 	bind("refiled", 9)
 	// live copy in the pending root → kept
@@ -55,7 +51,6 @@ func TestReconcileConsumedBindings(t *testing.T) {
 			t.Errorf("binding %q present=%v, want %v", id, ok, want)
 		}
 	}
-	// released pointer preserved onto the consumed item
 	raw, _ := os.ReadFile(filepath.Join(consumed, "stray.json"))
 	if !strings.Contains(string(raw), "released_continuations") {
 		t.Errorf("stray.json missing the preserved salvage pointer: %s", raw)

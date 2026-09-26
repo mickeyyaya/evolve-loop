@@ -1,12 +1,5 @@
 package deliverable
 
-// verified_bytes_test.go — the single-read seam (deliverable-verified-bytes-
-// single-read). Verify READS the artifact to judge it; the host runner then had
-// to re-read the same path to classify, so the classified bytes were only
-// probably the bytes that passed Verify. Result.Content closes that window: the
-// verdict AND the content come from ONE read, so "the file is the sole verdict
-// source" is literal rather than "the file as of the Verify read".
-
 import (
 	"path/filepath"
 	"testing"
@@ -14,9 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// TestVerify_OKResultCarriesTheVerifiedBytes — a well-formed deliverable's
-// Result must carry the exact bytes Verify judged, alongside the path they came
-// from. This is what BaseRunner.Run classifies (runner.go verdict-source block).
 func TestVerify_OKResultCarriesTheVerifiedBytes(t *testing.T) {
 	ws := t.TempDir()
 	const body = "# Build Report\n\n## Changes\n- foo.go\n\nVerdict: PASS\n"
@@ -37,11 +27,7 @@ func TestVerify_OKResultCarriesTheVerifiedBytes(t *testing.T) {
 	}
 }
 
-// TestVerify_MalformedResultStillCarriesTheBytes — a deliverable that FAILS
-// verification must still surface its content: a phase can derive a legitimate
-// non-ship verdict from partial content (intent delta's "[intent-unchanged]" →
-// SKIPPED), so the runner hands those bytes to Classify and lets the ship-guard
-// clamp any ship-eligible claim. Blanking Content here would break that path.
+// Content survives a failed verify because a phase can derive a legitimate non-ship verdict from partial content.
 func TestVerify_MalformedResultStillCarriesTheBytes(t *testing.T) {
 	ws := t.TempDir()
 	const partial = "# Build Report\n\nno changes section here\nVerdict: PASS\n"
@@ -59,10 +45,6 @@ func TestVerify_MalformedResultStillCarriesTheBytes(t *testing.T) {
 	}
 }
 
-// TestVerify_MissingArtifact_ContentEmptyPathSet — the absent case: ArtifactPath
-// still names the file-backed contract (so the caller knows the deliverable IS a
-// file) while Content is empty, which is exactly the "Classify sees no sentinel →
-// FAIL" input the coherent deliverable-production FAIL relies on.
 func TestVerify_MissingArtifact_ContentEmptyPathSet(t *testing.T) {
 	ws := t.TempDir()
 
@@ -78,11 +60,6 @@ func TestVerify_MissingArtifact_ContentEmptyPathSet(t *testing.T) {
 	}
 }
 
-// TestVerify_NoArtifactContract_NoPathNoContent — ship's deliverable is the
-// pushed commit, not a file. A NoArtifact contract verifies OK with NO path and
-// NO content: an empty ArtifactPath is how a Result says "I describe no file", so a
-// consumer keying on the path (the runner's classifiedArtifact) can never mistake
-// the absence of content for an empty deliverable.
 func TestVerify_NoArtifactContract_NoPathNoContent(t *testing.T) {
 	res, err := Verify("ship", phasecontract.Roots{Workspace: t.TempDir()})
 	if err != nil {

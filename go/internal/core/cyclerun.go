@@ -438,16 +438,10 @@ func (o *Orchestrator) newCycleRun(ctx context.Context, req CycleRequest) (cycle
 		RunID:                           runID,
 		ExplanationDocumentationVersion: o.explanationContractVersion,
 	}
-	// Fleet cycle-state isolation (ADR-0049): under the fleet supervisor two
-	// lanes run concurrently. Point THIS lane's cycle-state reads+writes at its
-	// OWN per-run file so a peer lane's Phase/CycleID write never clobbers this
-	// lane's — the singleton clobber that made a lane's phase-gate (guards.Phase
-	// reads cycle state) see the wrong phase and stall before audit. os.Setenv
-	// propagates to every child guard subprocess this orchestrator spawns, so the
-	// orchestrator and its gate checks agree on this lane's phase. Sequential loop
-	// (EVOLVE_FLEET unset) keeps the host-global singleton, byte-identical. Cleared
-	// on exit for hygiene (each fleet lane is its own process, but a reused process
-	// must not leak a stale override to a later cycle).
+	// Fleet cycle-state isolation (ADR-0049): this lane reads and writes its own per-run file. The
+	// override applies only inside <project-root>/.evolve (paths.CycleStateFileFor), which
+	// fleetLaneEvolveDirOK makes the lane's evolve dir; cleared on exit so a reused process never
+	// carries it into a later cycle.
 	if os.Getenv(ipcenv.FleetKey) != "" && cs.WorkspacePath != "" {
 		if err := os.Setenv(ipcenv.CycleStateFileKey, filepath.Join(cs.WorkspacePath, CycleStateFile)); err != nil {
 			// Loud, not silent: a failed Setenv leaves this lane on the shared

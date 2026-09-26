@@ -7,22 +7,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// mergedcatalog.go — the ONE merged-catalog loader (built-in registry +
-// user phase overlays). Previously cmd/evolve-local, which left non-cmd
-// consumers (the runner's reconcile-on-timeout default) resolving phases
-// under a second, builtin-only policy. Every consumer — CLI subcommands,
-// the agent self-check, the host contract gate, the salvage rung, and the
-// runner default — now derives the catalog from here.
-
-// defaultRoot is the project-local drop-in root, conventionally first.
 const defaultRoot = ".evolve/phases"
 
-// registryRelPath locates the built-in phase registry inside a project.
 const registryRelPath = "docs/architecture/phase-registry.json"
 
-// RootsWithPolicy returns the phase-spec discovery roots using the given PathsConfig.
-// A colon-separated cfg.PhaseRoots overrides; relative entries resolve against
-// projectRoot; absolute entries are kept verbatim. Empty cfg ⇒ defaultRoot.
+// RootsWithPolicy splits cfg.PhaseRoots on ":" (default .evolve/phases), joining relative entries to projectRoot.
 func RootsWithPolicy(projectRoot string, cfg policy.PathsConfig) []string {
 	raw := cfg.PhaseRoots
 	if strings.TrimSpace(raw) == "" {
@@ -42,29 +31,20 @@ func RootsWithPolicy(projectRoot string, cfg policy.PathsConfig) []string {
 	return out
 }
 
-// Roots returns the phase-spec discovery roots for a project, loading
-// phase roots from policy.json (PathsConfig.PhaseRoots) or falling back
-// to the default project-local .evolve/phases. Replaced EVOLVE_PHASE_ROOTS
-// env read (cycle-17).
+// Roots returns the discovery roots configured in the project's .evolve/policy.json.
 func Roots(projectRoot string) []string {
 	pol, _ := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
 	return RootsWithPolicy(projectRoot, pol.PathsConfig())
 }
 
-// MergedCatalog loads the built-in registry and overlays user phases from
-// every discovery root. sources maps user phase name → discovery root
-// (provenance). A missing/unreadable registry errors loudly — the caller
-// decides how to degrade (the CLI and VerifyCatalogAware fall back to
-// built-in-only resolution).
+// MergedCatalog is every consumer's one loader: registry plus clamped overlays; sources maps each user phase to its root.
 func MergedCatalog(projectRoot string) (Catalog, map[string]string, []string, error) {
 	builtin, err := Load(filepath.Join(projectRoot, filepath.FromSlash(registryRelPath)))
 	if err != nil {
 		return Catalog{}, nil, nil, err
 	}
 	user, sources, warns := DiscoverUserSpecsFromRoots(Roots(projectRoot))
-	// Registrar-parity clamp (ADR-0073 — see clamp.go): EVERY admission seam
-	// applies it, so listing/lint consumers report the same writes_source the
-	// dispatch path enforces (they may never disagree about eligibility).
+	// Every admission seam clamps, so listing and lint report the writes_source that dispatch enforces.
 	user, clampWarns := ClampDiscoveredSpecs(user,
 		SandboxedProfilePredicate(filepath.Join(projectRoot, ".evolve", "profiles")))
 	warns = append(warns, clampWarns...)

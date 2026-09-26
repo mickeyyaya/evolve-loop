@@ -1,8 +1,3 @@
-// `evolve cycle timing [N]` is the read-only latency-evidence reporter: it
-// reads a cycle's phase-timing.json and renders the per-phase wall-clock table
-// plus the archetype roll-up (where the cycle spent its time — productive build
-// vs checking/evaluate vs planning vs control/recovery). Default cycle is the
-// latest with a timing log. --json emits the phasetiming.Summary for tooling.
 package main
 
 import (
@@ -20,6 +15,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasetiming"
 )
 
+// runCycleTiming renders a cycle's per-phase wall-clock table and archetype
+// roll-up from its phase-timing.json; --json emits the phasetiming.Summary.
 func runCycleTiming(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve cycle timing", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -70,9 +67,8 @@ func runCycleTiming(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
-// renderParallelProjection prints the SHADOW estimate of parallelizing the
-// independent checking phases (PR2 shadow stage) — operator evidence only when
-// there is a measurable saving.
+// renderParallelProjection prints the shadow estimate of parallelizing the
+// independent checking phases, only when it saves measurable time.
 func renderParallelProjection(w io.Writer, p phasetiming.ParallelProjection) {
 	if p.SavingMS == 0 {
 		return
@@ -82,9 +78,8 @@ func renderParallelProjection(w io.Writer, p phasetiming.ParallelProjection) {
 		phasetiming.HumanMS(p.SequentialMS), phasetiming.HumanMS(p.ProjectedParallelMS), phasetiming.HumanMS(p.SavingMS))
 }
 
-// resolveCycleWorkspace returns the workspace dir and a display label for the
-// requested cycle. A positional arg names the cycle explicitly; otherwise the
-// highest-numbered cycle that has a timing log wins.
+// resolveCycleWorkspace returns the requested cycle's workspace and label,
+// defaulting to the highest-numbered cycle with a timing log.
 func resolveCycleWorkspace(runsDir string, rest []string) (workspace, label string) {
 	if len(rest) > 0 {
 		label = "cycle-" + rest[0]
@@ -97,10 +92,9 @@ func resolveCycleWorkspace(runsDir string, rest []string) (workspace, label stri
 	return filepath.Join(runsDir, label), label
 }
 
-// latestCycleDir scans runsDir for cycle-N directories that contain a timing
-// log and returns the directory name with the highest numeric cycle. A
-// reset-suffixed dir (cycle-382.reset-…) parses on its leading integer, so a
-// completed re-run still wins over an older sealed attempt of a lower number.
+// latestCycleDir returns the highest-numbered cycle dir holding a timing log. A
+// reset-suffixed dir (cycle-N.reset-…) parses on its leading integer, so a
+// completed re-run beats an older sealed attempt.
 func latestCycleDir(runsDir string) string {
 	matches, _ := filepath.Glob(filepath.Join(runsDir, "cycle-*", phasetiming.FileName))
 	best, bestN := "", -1
@@ -144,8 +138,7 @@ func renderTiming(w io.Writer, cycleLabel string, entries []phasetiming.Entry, s
 	fmt.Fprintf(w, "By archetype: %s\n", archetypeBreakdown(s))
 }
 
-// archetypeBreakdown renders the per-archetype share, highest first, naming the
-// productive/checking/planning/control split the evidence turns on.
+// archetypeBreakdown renders the per-archetype share, highest first.
 func archetypeBreakdown(s phasetiming.Summary) string {
 	type kv struct {
 		k string

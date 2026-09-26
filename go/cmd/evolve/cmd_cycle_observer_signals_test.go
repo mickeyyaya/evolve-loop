@@ -1,11 +1,5 @@
 package main
 
-// cmd_cycle_observer_signals_test.go — ADR-0103 unit 12 §6 tests 41-42: every
-// production construction of the live observer adapter hands it the root's
-// Center (the ONE declared line inside wireOrchestratorDeps, unit 05's
-// subject — a unit-05 cut must keep it), and the adapter's WARN renders at
-// the --simulate root and lands in the cycle workspace's signals.ndjson.
-
 import (
 	"bytes"
 	"context"
@@ -20,10 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// TestObserverAdapterConstructionsAreWired — the TestNilSignalCenterRootsArePinned
-// count idiom over `observer.NewCoreAdapter(` vs `.Signals = `: every file
-// that constructs the adapter wires its accessor at least as many times.
-// Kills M59 (the cmd_cycle.go line removed).
 func TestObserverAdapterConstructionsAreWired(t *testing.T) {
 	callRE := regexp.MustCompile(`\bobserver\.NewCoreAdapter\(`)
 	moduleRoot := filepath.Join("..", "..")
@@ -67,13 +57,8 @@ func TestObserverAdapterConstructionsAreWired(t *testing.T) {
 	}
 }
 
-// TestWireSimulateOrchestrator_ObserverWarningRenders — an adapter on the
-// --simulate root's Center, started over a workspace that is a FILE: cancel
-// is a no-op, the console shows the module tag and the code, and the
-// cycle-stamped signal is durable in the cycle workspace (the sink MkdirAll's
-// the directory; Flush before the read — an Emit that finds a drain in
-// progress returns before delivery). Kills M60 (the line surviving as
-// stderr), M61 (a cycle-less stamp).
+// The workspace is a file, so the adapter's WARN fires. Flush before reading:
+// an Emit that finds a drain in progress returns before delivery.
 func TestWireSimulateOrchestrator_ObserverWarningRenders(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")

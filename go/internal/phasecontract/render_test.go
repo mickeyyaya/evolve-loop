@@ -5,11 +5,6 @@ import (
 	"testing"
 )
 
-// Layer 2 (ADR-0034): the Deliverable Contract is rendered into the prompt in
-// two pieces — an INVARIANT instruction block (stable cache prefix, no path) and
-// a VOLATILE path footer (last line; recency-optimal AND it keeps the per-cycle
-// path out of the cacheable prefix).
-
 func TestRenderContractBlock_Markdown_NoPath(t *testing.T) {
 	c, _ := For("build")
 	block := RenderContractBlock(c)
@@ -19,26 +14,18 @@ func TestRenderContractBlock_Markdown_NoPath(t *testing.T) {
 	if !strings.Contains(block, "evolve phase verify build") {
 		t.Errorf("block must instruct the self-check command; got:\n%s", block)
 	}
-	// Cache-safety: the invariant block must NOT embed an absolute path.
 	if strings.Contains(block, "/") && strings.Contains(block, "build-report.md") {
 		t.Errorf("block must not embed the artifact path (cache-safety); got:\n%s", block)
 	}
 }
 
 func TestRenderContractBlock_Audit_MentionsVerdictSentinel(t *testing.T) {
-	// audit is the verdict-bearing phase, so its block instructs the sentinel.
 	block := RenderContractBlock(mustContract(t, "audit"))
 	if !strings.Contains(block, "evolve-verdict") {
 		t.Errorf("audit block must mention the verdict sentinel; got:\n%s", block)
 	}
 }
 
-// Phase 3.8b (ADR-0050): build/scout/triage emit no verdict today. When the
-// PhaseIO rollout activates the instruction (includePhaseIOFailureContext=true,
-// i.e. EVOLVE_PHASE_IO>=advisory), their contract block gains a self-report-
-// failure instruction: on a self-reported FAIL/WARN, emit a sentinel carrying a
-// structured failure block. When false (the default), the block is byte-identical
-// to the pre-3.8b RenderContractBlock — production (off) prompts never change.
 func TestRenderContractBlockStage_BuildFailureInstructionGated(t *testing.T) {
 	c := mustContract(t, "build")
 
@@ -59,8 +46,6 @@ func TestRenderContractBlockStage_BuildFailureInstructionGated(t *testing.T) {
 	}
 }
 
-// Audit's unconditional RequireFailureContext means its block already instructs
-// the failure sentinel; the PhaseIO bool must not change or double-add it.
 func TestRenderContractBlockStage_AuditUnchangedByPhaseIO(t *testing.T) {
 	c := mustContract(t, "audit")
 	if RenderContractBlockStage(c, false) != RenderContractBlock(c) {
@@ -88,8 +73,7 @@ func TestRenderContractBlock_Deterministic(t *testing.T) {
 }
 
 func TestRenderContractBlock_JSON_UsesRequiredKeys(t *testing.T) {
-	// A keyed JSON contract names its required keys in the rendered block. Uses
-	// orchestrator (cycle_id) — router is now a keyless bare JSON array.
+	// Uses orchestrator: router's bare JSON array has no keys.
 	c, _ := For("orchestrator")
 	block := RenderContractBlock(c)
 	if !strings.Contains(block, "cycle_id") {
@@ -134,9 +118,6 @@ func TestRenderContractFooter_CarriesExactPath(t *testing.T) {
 	}
 }
 
-// ADR-0039 §7: a RequireFailureContext contract teaches the failure-block
-// emission in the SAME injected block that teaches the sentinel — one
-// instruction surface for every persona/CLI, no per-agent prose copies.
 func TestRenderContractBlock_FailureContextInstruction(t *testing.T) {
 	audit, _ := For("audit")
 	block := RenderContractBlock(audit)
@@ -146,18 +127,12 @@ func TestRenderContractBlock_FailureContextInstruction(t *testing.T) {
 		}
 	}
 
-	// Phases without the requirement keep their block free of it (cache
-	// prefix stability + no irrelevant instructions).
 	build, _ := For("build")
 	if strings.Contains(RenderContractBlock(build), "schema_version\":2") {
 		t.Error("build contract block must not carry the failure-context teaching")
 	}
 }
 
-// ADR-0100 declared the agent-owed secondaries and the effects the gate
-// verifies; the operator's rule is that the gate's pass criteria reach the
-// agent as input. Before this test they lived only in persona prose — a
-// registry change would have moved the gate without moving the prompt.
 func TestRenderContract_StatesTheAgentOwedFilesAndEffectsTheGateVerifies(t *testing.T) {
 	c := Contract{Phase: "triage", ArtifactName: "triage-report.md", Kind: KindMarkdown,
 		AgentOwedFiles: []string{"triage-decision.json"}, Effects: []string{EffectInboxClaim}}
@@ -178,10 +153,6 @@ func TestRenderContract_StatesTheAgentOwedFilesAndEffectsTheGateVerifies(t *test
 	}
 }
 
-// Architecture review of S2b (HIGH): the owed-file LOCATION had two homes —
-// the gate's filepath.Join in deliverable/secondaries.go and English in the
-// prompt ("in the SAME directory"). OwedPath is the ONE join; the tail renders
-// the exact paths the gate reads, and the cache-safe block points at the tail.
 func TestOwedPath_IsTheOneJoinTheGateReads(t *testing.T) {
 	if got := OwedPath("/ws", "triage-decision.json"); got != "/ws/triage-decision.json" {
 		t.Fatalf("a bare name joins the workspace: %q", got)
@@ -204,9 +175,6 @@ func TestRenderContractTail_RendersTheOwedFilesAtTheExactPathsTheGateReads(t *te
 	}
 }
 
-// The failure class drives the retry envelope (an unknown class declines the
-// repair round — cycle 1684), so the contract block names the vocabulary the
-// gate accepts instead of leaving the auditor to invent one.
 func TestRenderContractBlock_Audit_NamesTheFailureClassVocabulary(t *testing.T) {
 	block := RenderContractBlock(mustContract(t, "audit"))
 	for _, want := range []string{"code-audit-fail", "code-audit-warn", "infrastructure-transient", "infrastructure-systemic"} {

@@ -7,9 +7,6 @@ import (
 	"testing"
 )
 
-// TestOrchestrator_WithCatalogRefresher_CalledOnceBestEffort proves the
-// cycle-start hook: the injected refresher runs exactly once, and an error it
-// returns is best-effort (WARN) — it must NOT fail the cycle.
 func TestOrchestrator_WithCatalogRefresher_CalledOnceBestEffort(t *testing.T) {
 	t.Parallel()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}

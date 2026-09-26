@@ -1,10 +1,5 @@
 package inboxmover
 
-// consoleroute_claim_test.go — RED contract for ADR-0074 I1 enforcement at the
-// physical handoff. Claim is the one operation that hands an inbox item to a
-// lane (inbox/ → processing/cycle-N/); a console-routed item must be REFUSED
-// here even if a triage LLM names it — prompts advise, the mover enforces.
-
 import (
 	"errors"
 	"io"
@@ -26,7 +21,6 @@ func writeClaimItem(t *testing.T, root, name, body string) string {
 	return p
 }
 
-// Explicit route field: refused with the typed sentinel, file NOT moved.
 func TestClaim_RefusesConsoleRoutedItem(t *testing.T) {
 	root := t.TempDir()
 	src := writeClaimItem(t, root, "x.json", `{"id":"task-x","route":"console-manual"}`)
@@ -39,8 +33,6 @@ func TestClaim_RefusesConsoleRoutedItem(t *testing.T) {
 	}
 }
 
-// Derived form: the IsProtectedPath seam routes items whose declared fix
-// surface is control-plane, mirroring inboxbatch.ConsoleRouted exactly.
 func TestClaim_RefusesProtectedFixSurfaceItem(t *testing.T) {
 	root := t.TempDir()
 	writeClaimItem(t, root, "y.json", `{"id":"task-y","files":["go/internal/guards/role.go (fix)"]}`)
@@ -52,9 +44,6 @@ func TestClaim_RefusesProtectedFixSurfaceItem(t *testing.T) {
 	}
 }
 
-// route:"lane" override claims normally over a declared directory scope that
-// holds protected files (a declared protected FILE binds — F35, pinned in
-// lifecycle's claim test).
 func TestClaim_LaneOverrideClaims(t *testing.T) {
 	root := t.TempDir()
 	writeClaimItem(t, root, "z.json", `{"id":"task-z","route":"lane","files":["go/internal/guards/"]}`)
@@ -69,10 +58,6 @@ func TestClaim_LaneOverrideClaims(t *testing.T) {
 	}
 }
 
-// A malformed item was unclaimable BEFORE the routing floor (findFileByTaskID
-// requires parseable JSON to match .id → ErrNotFound) — pin that the floor
-// changes nothing about that contract: still ErrNotFound, never
-// ErrConsoleRouted, never a new failure mode.
 func TestClaim_MalformedItemUnchangedContract(t *testing.T) {
 	root := t.TempDir()
 	writeClaimItem(t, root, "bad.json", `{"id":"task-bad", MALFORMED`)

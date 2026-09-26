@@ -9,11 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
-// TestRun_MarksEveryAttemptAsAChainAttempt — the runner walks its own
-// CLI/tier chain (DispatchTiered); every request it hands the bridge is one
-// attempt of that walk and says so, so the chain-walking bridge handle the
-// composition root installs passes it straight through instead of walking the
-// chain a second time around it.
 func TestRun_MarksEveryAttemptAsAChainAttempt(t *testing.T) {
 	hooks := &fakeHooks{phase: "build", agent: "evolve-builder", model: "sonnet", prompt: "composed body", verdict: core.VerdictPASS, nextPhase: "audit"}
 	fb := &fakeBridge{writeArtifact: "# build artifact\n## Files Modified\n- a.go\n"}

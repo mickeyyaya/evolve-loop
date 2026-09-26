@@ -1,28 +1,3 @@
-// `evolve carryover apply-decisions` applies a reviewed keep/drop/cluster
-// decisions file (authored by the cycle-997 carryover-consolidation-sweep pass)
-// to state.json:carryoverTodos through the SANCTIONED locked read-modify-write
-// path (flock.WithPathLock on the `<statePath>.lock` sidecar) — the same
-// single-writer contract cmd_loop.go's auto-prune block and reset.go already
-// honour. It is the missing link the inbox item names: the TTL prune machinery
-// (failurelog.PruneExpiredCarryoverTodos) can only remove entries whose
-// expiresAt is already past; it cannot act on a semantic keep/drop/cluster
-// judgment. This command does.
-//
-// Semantics:
-//   - `drop`    ids are removed from carryoverTodos (stale failure echoes /
-//     landed duplicate shadows).
-//   - `cluster` ids are ALSO removed — they have been re-filed as amortised
-//     sweep-group inbox items (Task 3), so leaving them in carryoverTodos would
-//     double-count them.
-//   - `keep`    ids stay resident (genuinely-live small items).
-//
-// Guards:
-//   - Every decision row MUST carry a non-empty reason. A single empty-reason
-//     row aborts the whole apply BEFORE any lock is taken or byte is written —
-//     the anti-hand-edit / anti-unjustified-drop contract (state.json is left
-//     exactly as-is).
-//   - The write is atomic (temp + rename) and serialized by the sidecar lock,
-//     so concurrent callers never corrupt the array.
 package main
 
 import (
@@ -36,13 +11,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/statemap"
 )
 
-// carryoverApplyCeiling is the convergence target the inbox item names (135 → ~25).
-// Reported (not enforced by abort) so an apply that legitimately keeps a few
-// extra live items still succeeds; the ceiling is a signal, not a gate.
+// carryoverApplyCeiling is reported, never enforced: an apply that keeps a few
+// extra live items still succeeds.
 const carryoverApplyCeiling = 25
 
-// carryoverDecisionRow mirrors the on-disk schema the decisions artifact emits.
-// ClusterGroup is required only when Decision=="cluster".
 type carryoverDecisionRow struct {
 	ID           string `json:"id"`
 	Decision     string `json:"decision"`
@@ -55,8 +27,6 @@ type carryoverDecisionsDoc struct {
 	Decisions   []carryoverDecisionRow `json:"decisions"`
 }
 
-// carryoverApplyResult reports what the apply did (rendered to the operator and
-// asserted by tests).
 type carryoverApplyResult struct {
 	Before    int
 	After     int
@@ -64,7 +34,8 @@ type carryoverApplyResult struct {
 	Clustered int
 }
 
-// runCarryover implements `evolve carryover <apply-decisions>`.
+// runCarryover applies a reviewed keep/drop/cluster decisions file to the
+// carryover todos, which the TTL prune cannot judge.
 func runCarryover(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
 		fmt.Fprintln(stderr, "evolve carryover: missing subcommand (apply-decisions)")
@@ -96,8 +67,7 @@ func runCarryoverApplyDecisions(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "evolve carryover: %v\n", err)
 		return 10
 	}
-	// Validate BEFORE touching state.json so a bad decisions file never
-	// half-mutates the live array.
+	// Validate before touching state.json so a bad file never half-mutates it.
 	if err := validateCarryoverDecisions(doc); err != nil {
 		fmt.Fprintf(stderr, "evolve carryover: %v\n", err)
 		return 10
@@ -146,9 +116,8 @@ func loadCarryoverDecisions(path string) (carryoverDecisionsDoc, error) {
 	return doc, nil
 }
 
-// validateCarryoverDecisions rejects a decisions file that would license an
-// unjustified or malformed mutation. Runs entirely in memory before any lock or
-// write, so a rejection leaves state.json byte-identical.
+// validateCarryoverDecisions requires a reason on every row, so no drop goes
+// unjustified.
 func validateCarryoverDecisions(doc carryoverDecisionsDoc) error {
 	seen := make(map[string]bool, len(doc.Decisions))
 	for i, d := range doc.Decisions {
@@ -174,27 +143,24 @@ func validateCarryoverDecisions(doc carryoverDecisionsDoc) error {
 	return nil
 }
 
-// applyCarryoverDecisions removes the drop + cluster ids from
-// state.json:carryoverTodos through the sanctioned locked RMW path. The doc is
-// assumed already validated by validateCarryoverDecisions.
+// applyCarryoverDecisions removes drop and cluster ids; cluster ids live on as
+// sweep-group inbox items, so keeping them would count them twice. The doc must
+// already be validated.
 func applyCarryoverDecisions(statePath string, doc carryoverDecisionsDoc) (carryoverApplyResult, error) {
-	remove := make(map[string]string, len(doc.Decisions)) // id -> decision (drop|cluster)
+	remove := make(map[string]string, len(doc.Decisions))
 	for _, d := range doc.Decisions {
 		if d.Decision == "drop" || d.Decision == "cluster" {
 			remove[d.ID] = d.Decision
 		}
 	}
 
-	// Fail loud on a missing state file (an operator command applying against
-	// nothing is a path mistake, not an empty apply).
+	// A missing state file is a path mistake, not an empty apply.
 	if _, err := os.Stat(statePath); err != nil {
 		return carryoverApplyResult{}, fmt.Errorf("read state %s: %w", statePath, err)
 	}
 
-	// Advisory pre-read: skip the write entirely (no revision/mtime churn)
-	// when no decision id is present. statemap.UpdateStateMap re-reads
-	// authoritatively under the CANONICAL lock, so this is purely a
-	// no-op-write optimization, never a correctness gate.
+	// An unlocked pre-read only skips a no-op write; UpdateStateMap re-reads
+	// under the lock, so it is never a correctness gate.
 	if pre, err := statemap.ReadStateMap(statePath); err == nil {
 		found := false
 		entries, _ := pre["carryoverTodos"].([]any)
@@ -211,10 +177,6 @@ func applyCarryoverDecisions(statePath string, doc carryoverDecisionsDoc) (carry
 		}
 	}
 
-	// The locked RMW goes through statemap (cycle-999/1001 fixes): the path is
-	// symlink-resolved so a worktree link writes THROUGH to canonical and
-	// survives; the lock is taken on the resolved path (one lock per data
-	// file, cross-tree); stateRevision auto-bumps and a stale write is refused.
 	var res carryoverApplyResult
 	err := statemap.UpdateStateMap(statePath, func(state map[string]any) {
 		entries, _ := state["carryoverTodos"].([]any)
@@ -223,7 +185,7 @@ func applyCarryoverDecisions(statePath string, doc carryoverDecisionsDoc) (carry
 		for _, e := range entries {
 			m, ok := e.(map[string]any)
 			if !ok {
-				kept = append(kept, e) // preserve un-modeled data
+				kept = append(kept, e)
 				continue
 			}
 			id, _ := m["id"].(string)

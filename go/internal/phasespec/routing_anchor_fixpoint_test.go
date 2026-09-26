@@ -8,14 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 )
 
-// Cycle-1550 (soak-20260824a): DiscoverUserSpecs hands ApplyUserRouting an
-// alphabetically-sorted batch, and a spec anchored to an alphabetically-LATER
-// spec found its anchor absent from cfg.Order at splice time — spliceAfter
-// silently took the before-audit fallback, so bug-reproduction (a red-first
-// Evaluate phase planned at index 3, pre-build) executed EIGHTH, post-build,
-// where its deliberately-failing deliverable can only red the lane. Placement
-// must therefore be a fixpoint over the batch: a spec waits for its anchor as
-// long as any pass still makes progress.
 func TestApplyUserRouting_AnchorToLaterSpecInBatchIsHonored(t *testing.T) {
 	cfg := config.RoutingConfig{Order: []string{"scout", "triage", "tdd", "build", "audit", "ship"}}
 	specs := []PhaseSpec{ // alphabetical, exactly as DiscoverUserSpecs sorts them
@@ -32,8 +24,6 @@ func TestApplyUserRouting_AnchorToLaterSpecInBatchIsHonored(t *testing.T) {
 	}
 }
 
-// A chain of anchors in fully-reversed input order needs one pass per link —
-// the fixpoint must keep iterating while progress is made, not stop after two.
 func TestApplyUserRouting_AnchorChainResolvesRegardlessOfInputOrder(t *testing.T) {
 	cfg := config.RoutingConfig{Order: []string{"scout", "audit", "ship"}}
 	specs := []PhaseSpec{
@@ -50,9 +40,6 @@ func TestApplyUserRouting_AnchorChainResolvesRegardlessOfInputOrder(t *testing.T
 	}
 }
 
-// An anchor that never resolves must still place the phase (before audit, the
-// long-standing fallback) but LOUDLY: silent fallback is what hid cycle-1550's
-// mis-slotting for the life of the catalog.
 func TestApplyUserRouting_UnresolvableAnchorFallsBackWithWarning(t *testing.T) {
 	cfg := config.RoutingConfig{Order: []string{"scout", "build", "audit", "ship"}}
 	warns := ApplyUserRouting(&cfg, []PhaseSpec{{Name: "orphan-check", Optional: true, After: "no-such-phase"}}, Catalog{})
@@ -65,10 +52,6 @@ func TestApplyUserRouting_UnresolvableAnchorFallsBackWithWarning(t *testing.T) {
 	}
 }
 
-// Mutually-anchored specs can never all resolve by anchor. The deadlock break
-// force-places exactly ONE member (warned); the rest then resolve after it on
-// later passes — so only the broken link is loud and every survivor still
-// follows its declared anchor.
 func TestApplyUserRouting_AnchorCycleTerminatesWithOneWarning(t *testing.T) {
 	cfg := config.RoutingConfig{Order: []string{"scout", "audit", "ship"}}
 	warns := ApplyUserRouting(&cfg, []PhaseSpec{
@@ -87,9 +70,6 @@ func TestApplyUserRouting_AnchorCycleTerminatesWithOneWarning(t *testing.T) {
 	}
 }
 
-// Design-review note: a spec anchored to a cycle MEMBER without being on the
-// cycle (a tail) must not be batch-order force-placed ahead of its anchor —
-// the deadlock break picks a dependency TARGET, so tails resolve honorably.
 func TestApplyUserRouting_CycleTailStillFollowsItsAnchor(t *testing.T) {
 	cfg := config.RoutingConfig{Order: []string{"scout", "audit", "ship"}}
 	warns := ApplyUserRouting(&cfg, []PhaseSpec{
@@ -109,8 +89,6 @@ func TestApplyUserRouting_CycleTailStillFollowsItsAnchor(t *testing.T) {
 	}
 }
 
-// An activation overlay whose name is ALREADY in the order must stay silent
-// even with an absent anchor: nothing moves, so no warning may claim otherwise.
 func TestApplyUserRouting_AlreadyPresentSpecWithAbsentAnchorIsSilent(t *testing.T) {
 	cfg := config.RoutingConfig{Order: []string{"scout", "already-here", "audit", "ship"}}
 	warns := ApplyUserRouting(&cfg, []PhaseSpec{
@@ -125,10 +103,6 @@ func TestApplyUserRouting_AlreadyPresentSpecWithAbsentAnchorIsSilent(t *testing.
 	}
 }
 
-// go-reviewer MEDIUM (this PR's review): a spec whose anchor is itself an
-// unresolvable batch-mate is only TRANSITIVELY blocked — after the broken
-// anchor force-places, the dependent must still land AFTER it (its declared
-// order), never before it in batch order, and without its own warning.
 func TestApplyUserRouting_TransitivelyBlockedSpecStillFollowsItsAnchor(t *testing.T) {
 	cfg := config.RoutingConfig{Order: []string{"scout", "audit", "ship"}}
 	warns := ApplyUserRouting(&cfg, []PhaseSpec{

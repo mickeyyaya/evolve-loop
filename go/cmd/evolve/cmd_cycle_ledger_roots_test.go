@@ -1,14 +1,5 @@
 package main
 
-// cmd_cycle_ledger_roots_test.go — ADR-0101 S4a: the code-homed inventory of
-// ledger constructions the Signal Center does NOT observe. Every production
-// `ledger.New(` passes `ledger.WithSignals(` except the pinned roots below,
-// each with its reason and its count — the ledger twin of
-// TestNilSignalCenterRootsArePinned, so the next self-constructed ledger
-// cannot land silently and the design's prose (§15.4) points here instead of
-// restating the list. The ledger package's own guard pins the writers inside
-// the package (Rebaseline, WriteCompositionVerdict).
-
 import (
 	"os"
 	"path/filepath"
@@ -55,8 +46,7 @@ func TestUnobservedLedgerRootsArePinned(t *testing.T) {
 			return nil
 		}
 		rel, _ := filepath.Rel(moduleRoot, path)
-		// Every construction needs its own option: a second, unobserved
-		// ledger.New( beside an observed one is caught by the count.
+		// Counted per file, so an unobserved ledger.New( beside an observed one fails.
 		seen[filepath.ToSlash(rel)] = calls - strings.Count(string(src), "ledger.WithSignals(")
 		return nil
 	})

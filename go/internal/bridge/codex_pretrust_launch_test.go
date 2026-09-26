@@ -1,19 +1,3 @@
-// codex_pretrust_launch_test.go — CB.3 contract (concurrency campaign W4):
-// the first codex launch into a FRESH worktree never renders the trust
-// prompt, because the trust entry is written BEFORE the REPL boots.
-//
-// DELIBERATE PLAN DEVIATION (recorded here per the no-silent-changes rule):
-// the campaign WBS sketched CB.3 as "a hook beside linkGuardDeps calls
-// pretrustCodexProjects at worktree PROVISIONING time". Verified ground truth:
-// the launch chokepoint (Engine.LaunchArgs → CLIPreflight dispatch, cycle-124
-// G3) already runs codexTmuxDriver.Preflight → pretrustCodexProjects(cfg) for
-// the EXACT worktree of every launch — fresh, reused, or resumed — strictly
-// before driver.Launch boots the session. A provisioning-time hook would
-// duplicate the same TOML write through a new core→bridge seam (core cannot
-// import bridge) for zero behavioral gain — the no-duplication command
-// outranks plan literalism. What CB.3 therefore ships is the PIN: these tests
-// fail if either half of the guarantee (preflight-writes-trust, or
-// preflight-before-launch) ever regresses.
 package bridge
 
 import (
@@ -26,10 +10,6 @@ import (
 	"time"
 )
 
-// TestCodexTmuxPreflightTrustsFreshWorktree: the acceptance fixture — a fresh
-// (never-seen) worktree path handed to the codex-tmux driver's Preflight ends
-// up trusted in the codex config, so the boot that follows renders no
-// "Press enter to confirm" modal (the cycle-122 tdd hang).
 func TestCodexTmuxPreflightTrustsFreshWorktree(t *testing.T) {
 	dir := t.TempDir()
 	cfgPath := filepath.Join(dir, "codex", "config.toml")
@@ -57,11 +37,6 @@ func TestCodexTmuxPreflightTrustsFreshWorktree(t *testing.T) {
 	}
 }
 
-// TestRecipeDriverPretrustsCodexWorktree: the recipe path bypasses the engine
-// chokepoint entirely (newRecipeDriver → EnsureSession, no CLIPreflight
-// dispatch), so a codex recipe session in a fresh worktree would boot with no
-// trust entry (review finding on this slice). The recipe builder must pretrust
-// codex-family CLIs itself.
 func TestRecipeDriverPretrustsCodexWorktree(t *testing.T) {
 	cfgPath := filepath.Join(t.TempDir(), "codex", "config.toml")
 	freshWorktree := t.TempDir()
@@ -79,9 +54,6 @@ func TestRecipeDriverPretrustsCodexWorktree(t *testing.T) {
 	}
 }
 
-// TestRecipeDriverSkipsPretrustForNonCodex: trusting paths in ~/.codex/config
-// for a claude session would be pointless config churn — the recipe builder
-// pretrusts codex-family CLIs only.
 func TestRecipeDriverSkipsPretrustForNonCodex(t *testing.T) {
 	cfgPath := filepath.Join(t.TempDir(), "codex", "config.toml")
 
@@ -107,10 +79,7 @@ func (d orderPinDriver) Launch(context.Context, *Config, Deps) (int, error) {
 	return ExitOK, nil
 }
 
-// TestLaunchDispatchesPreflightBeforeDriverLaunch: the chokepoint half of the
-// CB.3 guarantee — EVERY driver implementing CLIPreflight gets it invoked
-// strictly before Launch, with the same resolved Config (so the pretrust sees
-// the launch's actual worktree). Not parallel: mutates the global registry.
+// Not parallel: it mutates the global driver registry.
 func TestLaunchDispatchesPreflightBeforeDriverLaunch(t *testing.T) {
 	var calls []string
 	Register(orderPinDriver{calls: &calls})

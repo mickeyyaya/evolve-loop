@@ -195,6 +195,16 @@ item consumed ⇒ work landed (transactional consumption); dossier phase records
   them only after the lanes were cut (wave 7 ran 1 of 2 lanes). The
   plan-time gate stays the binding backstop.
 
+### Amendment (2026-09-26): the routing floor honors the builder's sandbox
+
+"What a lane can never change" had two sources. The compiled integrity manifest (`guards.IsProtectedScope`) and the build profile's `sandbox.deny_subpaths` both describe it, and the routing floor consulted only the first. An item declaring `.evolve/profiles/historian.json (new)` therefore routed to lanes whose builder the sandbox denies `.evolve/profiles`, and it failed at the build floor in cycles 1696 and 1699 ([incident](../../incidents/2026-09-26-lane-sent-work-its-sandbox-denies.md)).
+
+The routing predicate is now one composition: protected surface, or a path the build profile's enforced sandbox denies (`lanerouting.Forbidden`, over `profiles.SandboxConfig.Denies`). It reads the same deny list the OS sandbox enforces, only when `sandbox.enabled` is true, and never copies it.
+
+`cmd/evolve`'s `laneForbidden` wires it into the loop's routing roots: the wave seed and widen, the host and CLI claim floors, and `evolve inbox batches`. Triage receives it through `triage.Config.LaneForbidden`, for both its prompt partition and its breaker on `top_n` cards. `TestRoutingRoots_JudgeWithTheLanePredicate` pins that no `cmd/evolve` root passes the manifest predicate alone.
+
+The routing reason "protected fix surface" now means lane-forbidden. Two known gaps remain: `core`'s sequential termination check and the triage registry factory (see [internal-lanerouting § Known gaps](../packages/internal-lanerouting.md#known-gaps)).
+
 ## Slice map (implementation tracking)
 
 | Slice | Invariant | Status |
