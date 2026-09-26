@@ -14,24 +14,6 @@ func TestShip_Name(t *testing.T) {
 	}
 }
 
-func TestShip_AllowsCanonicalShipScript(t *testing.T) {
-	g := NewShip(false)
-	cases := []string{
-		"bash scripts/lifecycle/ship.sh 'msg'",
-		"scripts/lifecycle/ship.sh --class manual 'msg'",
-		"bash /Users/x/evolve-loop/scripts/lifecycle/ship.sh --class cycle 'msg'",
-	}
-	for _, cmd := range cases {
-		dec := g.Decide(context.Background(), core.GuardInput{
-			ToolName:  "Bash",
-			ToolInput: map[string]any{"command": cmd},
-		})
-		if !dec.Allow {
-			t.Errorf("%q denied: %s", cmd, dec.Reason)
-		}
-	}
-}
-
 func TestShip_DeniesBareGitCommit(t *testing.T) {
 	g := NewShip(false)
 	cases := []string{

@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — the guards judge the clean path, and an `evolve ship` allows only itself (P1, 2026-09-26)
+
+Reading the guards during comment-reduction batch 19 found three ways past them, none of which needed an exploit to see. A build or tdd Write to `<worktree>/go/internal/core/../guards/role.go` missed the protected-surface fragment and was allowed. `/tmp/../x` counted as always-safe scratch. The ship guard allowed any line that mentioned `evolve ship`, so `git push origin main; echo evolve ship` passed, and a quoted or arithmetic `<<` hid the next line from it.
+
+- `role.go` cleans the path once, before any decision. `normalizeSurfacePath` cleans too, keeping a directory's trailing slash, so every caller of `IsProtectedSurface` / `IsProtectedScope` (routing, the ship tripwire, the build floor) judges the file a path lands on.
+- The ship guard judges each simple command on its own. The new `splitShellCommands` (`guards/shell_commands.go`) is a quote-aware scanner that replaces the line-based heredoc stripper: command substitutions are commands of their own even inside double quotes, and comments and heredoc bodies are dropped. A heredoc opens only at an unquoted `<<` outside parentheses, never at `<<<`, and its delimiter is the whole shell word after quote removal. The old stripper read an identifier prefix, so `<<EOF-MARKER` hid every line after its close, found in review. `git -C dir push` and the other global-option forms are ship-class.
+- The `scripts/lifecycle/ship.sh` allowance is gone. The script no longer exists, and an allowance keyed to a path an agent can write is a bypass.
+- Three tests that passed for the wrong reason were rewritten, and every rule was mutation-checked.
+- Out of reach, and recorded in `docs/architecture/packages/internal-guards.md`: verbs assembled at run time, and a binary an agent names `evolve`. The ship tripwire, the commit gate and ship's self-SHA pin remain the backstops.
+
 ## Fixed — triage re-checks a queued item's premise against what changed since it was filed (F40, 2026-09-26)
 
 Cycle 1691 picked an item filed on 2026-08-16. #535 had made its premise unreachable on 2026-09-09. Fault-localization and bug-reproduction accepted a unit fixture that fed the unreachable state straight to an inner function, and the builder "fixed" a non-bug and opened a fail-open. The audit caught it a full cycle later. A console audit of the next ten queued items found six whose premise or scope was wrong.

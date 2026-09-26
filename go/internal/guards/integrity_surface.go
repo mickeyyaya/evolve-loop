@@ -1,6 +1,7 @@
 package guards
 
 import (
+	"path"
 	"path/filepath"
 	"strings"
 )
@@ -181,15 +182,17 @@ func IsProtectedScope(path string) bool {
 	return false
 }
 
-// normalizeSurfacePath is the one spelling both projections match. The leading slash lets a
-// repo-relative path match its fragment; case-folding covers case-insensitive filesystems.
-func normalizeSurfacePath(path string) (string, bool) {
-	if path == "" {
+// normalizeSurfacePath is the one spelling both projections match: the clean path, so .. cannot step
+// around a fragment, keeping a directory's trailing slash. The leading slash lets a repo-relative path
+// match its fragment; case-folding covers case-insensitive filesystems.
+func normalizeSurfacePath(raw string) (string, bool) {
+	if raw == "" {
 		return "", false
 	}
-	p := filepath.ToSlash(path)
-	if !strings.HasPrefix(p, "/") {
-		p = "/" + p
+	slashed := filepath.ToSlash(raw)
+	p := path.Clean("/" + slashed)
+	if strings.HasSuffix(slashed, "/") && p != "/" {
+		p += "/"
 	}
 	return strings.ToLower(p), true
 }
