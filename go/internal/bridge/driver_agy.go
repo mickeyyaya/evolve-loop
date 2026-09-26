@@ -54,7 +54,7 @@ func (agyDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, error
 
 	// cfg.Worktree is "" for non-source-writing phases → inherits caller cwd.
 	observeModelDispatch(deps, defaultModelDispatch())
-	rc, err := deps.Runner(ctx, name, cfg.Worktree, args, driverEnv(deps), nil, stdoutF, stderrF)
+	rc, err := deps.Runner(ctx, name, cfg.Worktree, args, driverEnv(deps, cfg.Realization.Env), nil, stdoutF, stderrF)
 	if err != nil {
 		return ExitMissingBinary, fmt.Errorf("[agy] %w", err)
 	}

@@ -37,8 +37,9 @@ type LaunchIntent struct {
 type Realization struct {
 	LaunchFlags []string
 	REPLInput   []string
-	Ephemeral   bool   // controller: kill the session on exit
-	SessionName string // controller: named/resumable session ("" = unnamed)
+	Env         map[string]string // the CLI process environment (manifest default_env); exported in a pane, passed to a headless process
+	Ephemeral   bool              // controller: kill the session on exit
+	SessionName string            // controller: named/resumable session ("" = unnamed)
 	// ModelOmitted is the model value the realizer SUPPRESSED because it was
 	// still an abstract vocabulary token (isUnresolvedModelToken) rather than a
 	// concrete model id — empty when nothing was suppressed. Drivers log it so

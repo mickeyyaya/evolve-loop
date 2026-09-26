@@ -1,6 +1,7 @@
 package bridge
 
 import (
+	"maps"
 	"slices"
 	"strings"
 
@@ -112,6 +113,7 @@ func Realize(m Manifest, intent LaunchIntent) Realization {
 	if len(m.DefaultArgs) > 0 {
 		r.LaunchFlags = append(r.LaunchFlags, m.DefaultArgs...)
 	}
+	r.Env = maps.Clone(m.DefaultEnv)
 
 	realizeScalar(&r, m, "model_tier", intent.ModelTier)
 	realizeScalar(&r, m, "permission", intent.Permission)
