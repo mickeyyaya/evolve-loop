@@ -70,12 +70,30 @@ func SealResult(ctx context.Context, binding CycleBinding) error {
 	if !active {
 		return nil
 	}
+	if unchanged, err := reboundUnchanged(ctx, binding); err != nil || unchanged {
+		return err
+	}
 	view, err := revalidateResult(ctx, binding)
 	if err != nil {
 		return err
 	}
 	_, err = sealResultViewExpected(ctx, binding, view, "")
 	return err
+}
+
+// reboundUnchanged reports whether the sealed snapshot is a rebound handoff whose change is still exactly
+// what the rebind proved; the host never re-seals such a handoff. A handoff the Builder re-authored takes
+// the normal seal, which replaces the rebind.
+func reboundUnchanged(ctx context.Context, binding CycleBinding) (bool, error) {
+	prior, err := readResultSnapshot(binding)
+	if err != nil || prior.View.AuthoredBaseSHA == "" {
+		return false, nil
+	}
+	current, err := diffSHA256(ctx, binding.Worktree, binding.BaseSHA)
+	if err != nil {
+		return false, fmt.Errorf("derive post-rebind diff: %w", err)
+	}
+	return current == prior.View.DiffSHA256, nil
 }
 
 // RefreshResult advances the host snapshot after a legitimate post-Build
@@ -91,6 +109,15 @@ func RefreshResult(ctx context.Context, binding CycleBinding) (requiresBuild boo
 	prior, err := readResultSnapshot(binding)
 	if err != nil {
 		return false, err
+	}
+	if prior.View.AuthoredBaseSHA != "" {
+		// A rebound handoff was proven, not re-authored, so the host never re-seals it: an unchanged
+		// tree needs nothing and any change needs the Builder.
+		current, err := diffSHA256(ctx, binding.Worktree, binding.BaseSHA)
+		if err != nil {
+			return false, fmt.Errorf("derive post-rebind diff: %w", err)
+		}
+		return current != prior.View.DiffSHA256, nil
 	}
 	paths, err := changedSince(ctx, binding.Worktree, binding.BaseSHA)
 	if err != nil {
@@ -136,7 +163,7 @@ func revalidateResult(ctx context.Context, binding CycleBinding) (*phaseio.Expla
 	if err != nil {
 		return nil, err
 	}
-	if !supportedArtifactSchema(view.SchemaVersion) || view.ContractVersion != binding.ContractVersion || view.Cycle != binding.Cycle || view.BaseSHA != binding.BaseSHA || view.DiffSHA256 == "" {
+	if !supportedArtifactSchema(view.SchemaVersion) || view.ContractVersion != binding.ContractVersion || view.Cycle != binding.Cycle || view.BaseSHA != binding.BaseSHA || view.DiffSHA256 == "" || view.AuthoredBaseSHA != "" {
 		return nil, fmt.Errorf("builder explanation handoff does not match the sealed host contract")
 	}
 	return view, nil
@@ -192,6 +219,13 @@ func RebaseBuildAndPersist(ctx context.Context, binding CycleBinding, newBaseSHA
 	if _, err := LoadSnapshot(binding); err != nil {
 		return fmt.Errorf("rebase requires an approved Build snapshot: %w", err)
 	}
+	return advanceMarker(binding, newBaseSHA, persist)
+}
+
+// advanceMarker writes the host marker's new base before persisting the matching checkpoint. The marker
+// is the write-ahead authority: a persist failure never rolls it back, because the checkpoint write may
+// already have committed before a secondary mirror failed.
+func advanceMarker(binding CycleBinding, newBaseSHA string, persist func() error) error {
 	marker, err := readActivation(binding.ProjectRoot, binding.Cycle)
 	if err != nil {
 		return err
@@ -200,10 +234,11 @@ func RebaseBuildAndPersist(ctx context.Context, binding CycleBinding, newBaseSHA
 	if err := atomicwrite.JSON(activationPath(binding.ProjectRoot, binding.Cycle), marker); err != nil {
 		return err
 	}
-	if persist != nil {
-		if persistErr := persist(); persistErr != nil {
-			return fmt.Errorf("persist rebased Build checkpoint: %w", persistErr)
-		}
+	if persist == nil {
+		return nil
+	}
+	if err := persist(); err != nil {
+		return fmt.Errorf("persist Build checkpoint for base %s: %w", newBaseSHA, err)
 	}
 	return nil
 }
