@@ -31,10 +31,22 @@ func TestClosedDroppedIDs(t *testing.T) {
 		{"id":"split-me","reason":"requires-split"},
 		{"id":"foreign","reason":"out-of-scope for this lane"},
 		{"id":"mystery","reason":""},
+		{"id":"premise","reason":"stale: superseded by #535"},
+		{"id":"split-stale","reason":"requires-split (stale)"},
+		{"id":"replaced","reason":"superseded: by #535"},
+		{"id":"hyphen-joined","reason":"already-shipped-in-797b8518"},
+		{"id":"invented","reason":"stale-completed"},
 		{"id":"shipped"}
 	]}`)
-	if got := ClosedDroppedIDs(body); !reflect.DeepEqual(got, []string{"shipped", "dupe"}) {
-		t.Fatalf("ClosedDroppedIDs = %v, want [shipped dupe] — close-class reasons only, case-insensitive, deduped", got)
+	// A stale drop never retires (F40 C1: the console confirms a premise
+	// re-check), and a reason is classified by its LEADING tag — "stale:
+	// superseded by #535" is stale, "requires-split (stale)" a split.
+	// Real triage-corpus shapes (F40 re-review MINOR 1): a hyphen-joined
+	// close-class tag still retires (6 of 16 real close-class reasons are
+	// hyphen-joined — an exact-match rule would drop them), while an invented
+	// "stale-completed" leads with stale and stays queued for the console.
+	if got := ClosedDroppedIDs(body); !reflect.DeepEqual(got, []string{"shipped", "dupe", "replaced", "hyphen-joined"}) {
+		t.Fatalf("ClosedDroppedIDs = %v, want [shipped dupe replaced hyphen-joined] — close-class leading tags only, case-insensitive, deduped", got)
 	}
 	if got := ClosedDroppedIDs([]byte("not json")); got != nil {
 		t.Fatalf("unmarshal error must yield nil, got %v", got)

@@ -103,6 +103,7 @@ func (e *Engine) recordModelAttempt(
 	dispatched modelDispatch,
 	launchStderr string,
 	resp *core.BridgeResponse,
+	marks ...func(*llmcalls.Record),
 ) attemptLogContext {
 	attempt := req.Attempt
 	if attempt <= 0 {
@@ -153,6 +154,9 @@ func (e *Engine) recordModelAttempt(
 		Tripwire:        tripwire,
 		FillPct:         result.FillPct,
 		CauseCode:       launchoutcome.CauseCode(code, launchStderr),
+	}
+	for _, mark := range marks {
+		mark(&rec)
 	}
 	if err := llmcalls.AppendWorkspace(req.Workspace, rec); err != nil {
 		logContext.warn(CodeTelemetryAppendFailed,

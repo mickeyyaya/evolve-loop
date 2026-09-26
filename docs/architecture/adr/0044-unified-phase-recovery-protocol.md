@@ -238,6 +238,39 @@ red against the mutant that re-points the wait state at the program dial), `Test
 vocabulary), the policy/config resolution tables, the defaults goldens and
 `TestDefaults_GateDialsMatchPolicyCompiledDefaults`.
 
+**Next (F31, below).** Fast-failing a dead pane saves the wait but not the phase when the chain has nowhere
+to go; F31 gives a session-recoverable cause one fresh session of the same CLI first.
+
+### Amendment — F31 (2026-09-26): a session-recoverable fatal cause gets ONE fresh session of the same CLI
+
+**Problem.** F27 made the C2 fast-fail act. A dead pane now leaves the wait within one interval instead of 900 s, but the launch still exits 81 and the caller's chain walks to the next CLI family. With codex quota-walled and ollama unable to write source, cycle 1687's triage had nowhere to go and aborted. A `dead_shell` means the REPL *process* is gone, not the CLI or the account, so a fresh session of the same family would very likely have finished the phase.
+
+**Decision.** The bridge engine owns sessions, so it owns this retry. Every caller (phases, retro, advisor, judge) shares it without a second implementation in the runner's or `bridgechain`'s walks, and because the retry runs before classify and the boot-strike step, breakers and walkers only ever see the final outcome.
+- **Which causes.** `recovery.TerminalCause.SessionRecoverable` (next to the cause vocabulary) is true for `dead_shell` and `cli_self_updated`. It is false for `model_invalid`, `unknown` and the zero value, because a fresh session of the same configuration fails the same way. (`cli_self_updated` relaunches immediately; if the updater has not finished writing the binary, the relaunch can hit a boot timeout, which the one-retry limit bounds.)
+- **How the cause travels.** A preempting fatal verdict (enforce stage, non-Busy pane) carries its typed `Cause` on `ReviewVerdict`. The checkpoint reports a `fatalPaneObservation` through the call-local, package-private `onFatalPane` hook (the `onModelDispatch` pattern). The observation carries the typed cause, whether the session is named, and the wait interval the driver actually used, and `runScoped` captures it on the `launchRun`. The gate reads these facts from the driver instead of re-deriving them. Shadow and off never report a cause, nor do the quota-wall failover, headless drivers or dry-run.
+- **The gate** (`Engine.freshSessionAllowed`, from the architecture review):
+  - The cause is session-recoverable and the run ended on the fast-fail's exit, `ExitArtifactTimeout`. A run that delivered is never run twice.
+  - The session is **ephemeral**. A named session (resume, the swarm's workers) is kept alive for resume, so re-running would reattach to the dead pane, skip boot and the sandbox, and paste the prompt into a bare shell. Its lifecycle belongs to its owner. Named-ness is the driver's one resolution (`resolveSession`: the request's session name, the `BRIDGE_SESSION_NAME` env or the profile), carried on the observation and never re-derived from the request.
+  - The launch is live, and the caller's deadline leaves room for one more of the waits the driver actually used (the observation's interval). Otherwise the chain gets a clean exit 81 while it still has time to walk.
+- **The retry.** `Engine.freshSessionRetry` records the dead dispatch on the ledger, marked `fresh_session_retry` (the two rows share `Attempt`). It clears the boot strike the dead run earned by booting, emits `BRIDGE_FRESH_SESSION_RETRY` (fields `call_id` of the dead dispatch, `cli`, `agent`), and runs the launch ONCE more as a new tmux session. There is **at most one retry**: the second run's cause is never read, and a second death returns exit 81 to the chain as before. The worst case for one chain attempt is the time to fast-fail plus one full wait budget, bounded by the caller's context.
+
+**Known limits.**
+- The dead run's escalation report and scrollback file are overwritten by the fresh run; its stderr survives on its ledger row.
+- A REPL that dies before the prompt is accepted closes as `submit_wedged`, not `dead_shell`, and is not retried.
+- If the runner also re-dispatches the same CLI on a transient exit, one rung can hold more than two same-CLI sessions; unverified.
+
+**Evidence and pins.** The real `Engine.Launch` → `runScoped` → claude-tmux → checkpoint path is driven by:
+- `TestEngineLaunch_DeadShellGetsOneFreshSessionAndSucceeds`: the dead session, then OK; two rows, the first marked.
+- `TestEngineLaunch_ASecondDeathReturnsExit81ToTheChain`
+- `TestEngineLaunch_NoFreshSessionWithoutEnforceOrForANamedSession`
+
+These go red if `Launch` bypasses the retry, `runScoped` drops the cause, or the named-session guard goes (mutation-checked). Unit pins:
+- `TestFreshSessionRetry_TheGate`: every refusal, including a delivered run and a tight deadline.
+- `TestFreshSessionRetry_OneFreshSessionForASessionRecoverableCause`
+- `TestRunTmuxREPL_FatalCheckpointReportsItsTypedCause`
+- `TestFatalPaneVerdict_EnforceCarriesTheTypedCause`
+- `TestTerminalCause_SessionRecoverable`
+
 ## Consequences
 
 - **Positive:** a successful recovery is *structurally* recorded (D1 can't recur); self-describing fatal states

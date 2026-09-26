@@ -1,0 +1,13 @@
+{
+  "id": "quota-pause-closeout-parity",
+  "kind": "pipeline-repair",
+  "priority": "P3",
+  "weight": 0.45,
+  "title": "A quota wall is walked (and charged) as a cycle-level failure by the cycle-run root and the sequential loop, but paused without a closeout by `evolve loop --resume`",
+  "summary": "F30 re-review MINOR 4. ErrAllFamiliesExhausted arrives wrapped in ErrCycleLevelFailure (the sequential handleCycleError relies on it). The cycle-run root walks any cycle-level failure (cmd_cycle.go) and the sequential loop applies the failure walk BEFORE its quota pause (cmd_loop_sequential_dispatch.go), bumping the item's failure_count for a system limit; the resume root returns exit 5 before its closeout, keeping the claims for the resumed attempt. Resume's order is probably the right one — a quota pause is resumable and charging the item punishes it for a system limit — but the three roots disagree.",
+  "fix": "Decide once (likely: a quota wall is system-level — release, never bump), make all three roots agree through closeoutCycleOutcome, and pin it per root.",
+  "acceptance": ["A quota wall at each root has the same inbox outcome, pinned per root (cycle-run, sequential, resume)"],
+  "files": ["go/cmd/evolve/cmd_cycle.go", "go/cmd/evolve/cmd_loop_sequential_dispatch.go", "go/cmd/evolve/cmd_loop_resume.go"],
+  "created_at": "2026-09-26T07:20:00Z",
+  "source": "console-f30-architecture-rereview"
+}

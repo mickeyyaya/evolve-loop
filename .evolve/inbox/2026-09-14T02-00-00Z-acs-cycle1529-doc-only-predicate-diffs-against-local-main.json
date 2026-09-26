@@ -13,5 +13,9 @@
     "The predicate pins cycle 1529's OWN closure commit range (its base..ship SHAs, or the docs/explain record it belongs to), not `main..worktree`.",
     "A bridge production change on a later branch no longer fails it; cycle 1529's doc-only property still does."
   ],
-  "notes": "Same class as the cycle1638 explanation predicate (requires every changed .go since ITS base to be named by the newest record) — cycle-scoped pins that read the live tree."
+  "notes": "Same class as the cycle1638 explanation predicate (requires every changed .go since ITS base to be named by the newest record) — cycle-scoped pins that read the live tree.",
+  "files": [
+    "go/acs/cycle1529/predicates_test.go"
+  ],
+  "surface_note": "2026-09-26 console readiness audit (read-only, against main b9553b9b): READY — files typed from the audit (test-only fix path: re-pin TestC1529_004 to cycle 1529's own recorded diff instead of the live `main` ref; no production surface is touched)."
 }

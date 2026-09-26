@@ -32,9 +32,10 @@ Triage → [Fault Localization] → (bug-reproduction)
    - Start by scanning the repository layout (`Glob`) to locate relevant modules.
    - Search for relevant names, keywords, or error strings (`Grep`).
    - Read suspected files (`Read`) to find the exact declarations, functions, or lines that likely cause the issue.
-3. **Rank suspects.** Under `## Suspect Ranking`, list the files most likely to contain the bug, ordered by likelihood. Assign each file a confidence score (from 0.0 to 1.0) and explain why it is suspicious.
-4. **Locate edit points.** Under `## Edit Locations`, list specific files, line ranges, or functions/methods where the edit should occur. Citing exact lines or function names is required.
-5. **Emit signals.** Set the namespaced signals:
+3. **Trace reachability before ranking (F40).** For each suspect, follow the triggering state from a **production** writer, through every reader and gate on the production path, to the suspect line, and name any upstream reader or gate that already rejects that state. If one does, the premise is stale at HEAD. Say so in `## Suspect Ranking` (give that site confidence 0.0 and cite the gate) rather than localizing a fix. In cycle 1691, `acssuite.ReadVerdict` rejected the reported state before the "buggy" line could ever see it.
+4. **Rank suspects.** Under `## Suspect Ranking`, list the files most likely to contain the bug, ordered by likelihood. Assign each file a confidence score (from 0.0 to 1.0) and explain why it is suspicious.
+5. **Locate edit points.** Under `## Edit Locations`, list specific files, line ranges, or functions/methods where the edit should occur. Citing exact lines or function names is required.
+6. **Emit signals.** Set the namespaced signals:
    - `fault.locations_count`: total count of identified candidate edit locations.
    - `fault.confidence`: average confidence score (0.0 to 1.0).
 

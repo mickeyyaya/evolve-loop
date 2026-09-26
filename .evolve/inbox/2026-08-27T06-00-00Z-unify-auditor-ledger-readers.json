@@ -7,17 +7,15 @@
   "connects_to": [
     "go/internal/phases/ship/audit.go",
     "go/cmd/evolve/cmd_composition_wiring.go",
-    "go/internal/releasepreflight/releasepreflight.go",
-    "go/internal/redteamcheck/redteamcheck.go"
+    "go/internal/releasepreflight/releasepreflight.go"
   ],
   "created_at": "2026-08-27T06:00:00Z",
   "files": [
     "go/internal/phases/ship/audit.go",
     "go/cmd/evolve/cmd_composition_wiring.go",
     "go/internal/releasepreflight/releasepreflight.go",
-    "go/internal/redteamcheck/redteamcheck.go",
     "go/internal/phases/ship/runscope_test.go",
     "go/cmd/evolve/cmd_composition_runscope_test.go"
   ],
-  "surface_note": "2026-09-26 console readiness audit (read-only, against main): READY — TODO(merge-concurrency-2026) still open at cmd_composition_wiring.go:105; the four readers are independent."
+  "surface_note": "2026-09-26 console readiness audit (read-only, against main): READY — TODO(merge-concurrency-2026) still open at cmd_composition_wiring.go:105; the four readers are independent. | 2026-09-26 console premise audit (read-only, against main 4bd6f2ee): PARTIAL — THREE genuine duplicates of find-latest-auditor-entry + run/cycle scoping: phases/ship/audit.go:195 findLatestAudit, cmd/evolve/cmd_composition_wiring.go:159 latestAuditEntry (TODO :105-106 names the third consumer), releasepreflight/releasepreflight.go:472 checkRecentAudit (regex). redteamcheck is OUT OF SCOPE: it scans ALL roles cycle-scoped (LedgerRoleCompleteness :91, ChallengeTokenIntegrity :183) — no run scoping, no auditor-only miss case; do not fold it into the helper."
 }

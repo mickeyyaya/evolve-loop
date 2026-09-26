@@ -28,6 +28,16 @@ const (
 	CauseUnknown TerminalCause = "unknown"
 )
 
+// SessionRecoverable reports whether the cause means the REPL process is gone
+// while the CLI and the account are fine, so ONE fresh session of the same
+// family can succeed where waiting cannot (F31: cycle 1687's triage pane went
+// dead with codex quota-walled and ollama unable to write source — the chain
+// had nowhere to go). A model/config cause is not: a fresh session of the same
+// configuration fails the same way, and the chain must move on.
+func (c TerminalCause) SessionRecoverable() bool {
+	return c == CauseDeadShell || c == CauseCLISelfUpdated
+}
+
 // FatalSignature is one entry in the deterministic fatal-pane registry: a
 // pane substring that self-describes an unrecoverable terminal state, and the
 // typed cause it maps to. Substring matching (not regex) keeps the hot-loop

@@ -2,6 +2,47 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — triage re-checks a queued item's premise against what changed since it was filed (F40, 2026-09-26)
+
+Cycle 1691 picked an item filed on 2026-08-16. #535 had made its premise unreachable on 2026-09-09. Fault-localization and bug-reproduction accepted a unit fixture that fed the unreachable state straight to an inner function, and the builder "fixed" a non-bug and opened a fail-open. The audit caught it a full cycle later. A console audit of the next ten queued items found six whose premise or scope was wrong.
+
+- `premise_drift` in a fleet lane's triage prompt (`phases/triage/premise_drift.go`). The item is found wherever triage's claim left it. For each scoped item the section lists:
+  - the commits since it was filed that name its id;
+  - those that touched its declared paths;
+  - by subject, those that touched only their packages;
+  - declared paths not at HEAD, checked with `git cat-file`, never the filesystem.
+
+  It is framed as evidence, not a verdict. It is bounded and fail-open, a git failure shows as a visible line, and a sequential prompt is byte-identical. New `inboxbatch.Item.FiledAt` / `DeclaredPaths` / `StripControl`.
+- Triage persona Step 0b: re-verify a drifted or older item's premise at HEAD before claiming it, and drop a stale one with `stale: <evidence>`. With F30, that drop ends the lane as planned no-work and hands the item to the console.
+- A stale drop never retires an item: `inboxmover.ClosedDroppedIDs` no longer counts `stale` and classifies a reason by its leading tag. A lane's PASS ship can no longer consume a stale-dropped menu-mate.
+- The fault-localization and bug-reproduction personas require production reachability. A fixture that bypasses an upstream reader is not a reproduction.
+- Record: `docs/incidents/2026-09-26-stale-premise-reached-build.md`. The replay eval stays open on `stale-premise-reaches-build`, and the re-verification anchor, evidence checks and planner pre-filters on `premise-verification-anchor`.
+
+## Fixed — a fleet lane whose triage answers for its scoped item ends as planned no-work and hands the item to the console (F30, 2026-09-26)
+
+Cycle 1682's lane was scoped to one item that 1679 had already shipped. Its triage dropped the item with a reason, and the lane still sealed FAIL. The empty-commitment termination asked whether the *whole inbox* held claimable work, found other lanes' items, and relabelled the honest no-work end as a claim failure. The dropped item also stayed pending, so the next wave could draw it into another lane.
+
+- `committedset.Dispositions` / `DispositionsFrom`: one reader of what triage *answered* for without committing it. An answer is an escalation, a rejection, a shipped skip with its sha, or a reasoned drop; the most severe bucket wins. A deferral is never an answer: cycle 1623 narrated a claim failure as one.
+- `core` termination (`unansweredClaimableWork`, now given the cycle): a fleet lane is a claim failure only when a scoped item is still pending in the root **or claimed into this cycle's `processing/`** and answered nowhere. Otherwise it ends as planned no-work (SKIPPED). A load warning fails it closed only for a scoped item it cannot find. Sequential cycles keep the whole-inbox check.
+- `cycleoutcome.ApplyNoWork` hands each scoped item the lane answered for to the console in place, with the lane's reason. It keeps an existing console route's evidence, then releases the cycle's claims to the root with no failure bump. An unshipped lane never retires work.
+- Every root makes the one `closeoutCycleOutcome`: the cycle-run root, the sequential loop, and `evolve loop --resume`. Resumed FAILs now reach the inbox lifecycle too.
+- Record: an addendum to `docs/incidents/2026-09-15-shipped-item-re-pinned-and-sealed-lease-blocks-refresh.md`. Follow-ups are filed: `decision-document-single-declaration`, `console-route-stamps-block-wave-sync` and `no-work-hand-off-rate-alarm`. The sequential nil-predicate half stays open on `triage-termination-scope-aware`.
+
+## Fixed — the idle nudge says why a deliverable that is already right must still be rewritten (F39 part 1, 2026-09-26)
+
+Cycle 1691's correction round fixed an explanation document and correctly left `build-report.md` untouched. The bridge's completion baseline (the deliverable's size and mtime at dispatch, the cycle-1550 stale-leftover guard) refused the unchanged report, and the one idle nudge said only "Please write the deliverable". The agent re-verified the report, found it correct, and stopped, and the phase would have closed as exit 81 on a correct cycle. The operator unblocked it by touching the report.
+
+- `bridge.idleNudgeFor` words the reminder by what the host sees. It locates the deliverable through the completion poll's own resolution. When the deliverable still matches the dispatch baseline, the nudge says it was not rewritten during this attempt and that completion means writing it after this dispatch. It binds carrying it forward to a re-check against this attempt's work: a markdown report takes an appended line recording what changed and that it was re-verified, and any other format is written again in full. It is logged as `idle with an unrewritten deliverable` with trigger `idle_unrewritten_deliverable`. An absent deliverable keeps the plain reminder.
+- Record `docs/incidents/2026-09-26-correction-stalled-on-an-unrewritten-deliverable.md`. Part 2, deterministic completion for correction rounds whose worktree changed, stays open as `correction-completion-needs-deliverable-rewrite`.
+
+## Fixed — a dead agent pane gets one fresh session of the same CLI before the fallback chain moves on (F31, 2026-09-26)
+
+F27 made the fatal-pane fast-fail act, so a dead pane leaves the wait in one interval. But the launch still exited 81 into the fallback chain. With codex quota-walled and ollama unable to write source, cycle 1687's triage had nowhere to go and aborted. A dead shell means the REPL process died, not the CLI or the account.
+
+- `recovery.TerminalCause.SessionRecoverable` names the causes a fresh session can fix: `dead_shell` and `cli_self_updated`. A model/config cause fails the same way in a new session.
+- The fast-fail verdict carries its typed cause (`ReviewVerdict.Cause`). The wait loop reports it through a call-local hook, and `Engine.Launch` records the dead dispatch (its ledger row marked `fresh_session_retry`; the pair shares `Attempt`), emits `BRIDGE_FRESH_SESSION_RETRY` and runs ONE fresh session of the same CLI. It never retries a named session (kept alive for resume, so a re-run would reattach to the dead pane outside the sandbox), a run that delivered, a canceled launch or one whose deadline has no room for another wait interval, and a second death returns exit 81 to the chain. Worst case for one chain attempt: the fast-fail plus one full wait budget.
+- Pinned end to end through the real `Engine.Launch`: a first tmux session that dies to a bare shell and a second that completes return OK. ADR-0044 amendment; inbox item `dead-shell-same-family-fresh-session` consumed.
+
 ## Fixed — the build handoff floor refuses a protected control-plane edit, and a ship refusal for one goes back to build (F37, 2026-09-26)
 
 Cycle 1689's builder rewrote the protected `go/internal/core/cyclerun.go` through a shell tool, which the Edit/Write role guard never sees. The build floor approved the diff, and only ship's integrity check (ADR-0064 P2) would have refused it, after a full audit. That refusal would then have recovered into a re-audit of the same diff until the budget aborted the cycle. The operator stopped the lane first.

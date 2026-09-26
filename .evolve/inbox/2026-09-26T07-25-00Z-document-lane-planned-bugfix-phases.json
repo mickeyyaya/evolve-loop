@@ -1,0 +1,28 @@
+{
+  "id": "document-lane-planned-bugfix-phases",
+  "kind": "pipeline-repair",
+  "priority": "P1",
+  "weight": 0.85,
+  "title": "F42: a document-deliverable lane is planned with bugfix phases — the advisor plans from the wave goal, nothing clamps its plan to the lane item's kind, and the shadow replan misreads a document scout report as zero items",
+  "summary": "Cycle 1692 (wave 8, lane netflix-margin-device-experience — the first live ADR-0099 document deliverable, scout goal_type strategy-options, deliverable_kind document) ran scout → triage → premise-challenge → fault-localization → bug-reproduction, with tdd, build, error-handling-scan, audit and retrospective still planned (routing-plan.json). The advisor's initial plan is made before scout from the wave's goal text ('Complex pipeline health items require verifying assumptions…'), although lane-scope.json names the lane's one item before any phase runs. The phase registry's own routing would never insert bug-reproduction here (categories [bugfix], insert_when scout.goal_type == bugfix), but nothing applies those rules as a clamp on the advisor's LLM plan. The post-scout replan (routing-replan.json) computed 'scout.item_count == 0 -> end cycle early' for every phase — it cannot read a document scout report — and only its shadow stage kept that from ending the cycle as no-work. The same cycle's router then force-inserted tdd: routing-decision-6.json reason `forced-on:tdd` (router.reasonFor — `workflow.phase_enables.tdd=on` fires regardless of deliverable_kind), while the lane item's AC5 says tdd is not run for a document; the 1692 audit (FAIL, 2026-09-26) graded AC5 'FAIL (pipeline, not lane-fixable)' and filed it as M3 MEDIUM 'pipeline, console-owned, not lane work'. ADR-0099 exempts a document from the tdd leg of the SHIP floor; nothing says whether tdd may still RUN on one (1692's tdd wrote eval graders RED-first, which the audit used).",
+  "fix": "(1) The advisor's plan prompt carries the lane's scoped item — id, kind, deliverable_kind, acceptance — not just the wave goal. (2) A deterministic, config-driven clamp before dispatch: a planned phase whose phase.json categories / declared deliverable kinds do not admit the cycle's deliverable_kind (bugfix-category phases for a document) is removed with a coded Signal Center line, never dispatched. (3) The replan's item-count derivation reads a document scout report (or is scoped to code deliverables) before its stage can ever be raised above shadow. (4) Decide ONCE, in the registry (ADR-0099 amendment), whether tdd admits deliverable_kind document (graders RED-first, as 1692's tdd did, vs never) and make the forced-on enable, the advisor plan and the item-authoring guidance project that one decision — so an item's acceptance can never contradict routing.",
+  "acceptance": [
+    "RED first: a plan for a lane whose item declares deliverable_kind document never dispatches fault-localization / bug-reproduction (routing test through the real clamp, the plan shape of cycle 1692)",
+    "The advisor plan prompt for a fleet lane contains the scoped item's id and deliverable_kind (prompt-content pin)",
+    "The replan derives a non-zero item count from a document scout report (unit pin on cycle 1692's scout-report.md shape)",
+    "The clamp is phase.json-driven (categories / deliverable kinds), never a Go literal list (phase-settings-from-config)",
+    "A document-kind lane never records `forced-on:<phase>` for a phase the registry says does not admit that kind, and item acceptance about tdd is derived from the same declaration (routing pin on cycle 1692's decision shape)"
+  ],
+  "files": [
+    "go/internal/router/",
+    ".evolve/phases/bug-reproduction/phase.json",
+    ".evolve/phases/fault-localization/phase.json"
+  ],
+  "connects_to": [
+    ".evolve/runs/cycle-1692 (routing-plan.json, routing-replan.json, routing-decision-*.json)",
+    "ADR-0099 deliverable kinds (PR-F soak — this is its first live run)",
+    ".evolve/runs/cycle-1692 audit-report.md (M3, AC5) + routing-decision-6.json (forced-on:tdd)"
+  ],
+  "created_at": "2026-09-26T07:25:00Z",
+  "source": "console-wave8-1692"
+}

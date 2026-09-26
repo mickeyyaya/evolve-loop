@@ -12,9 +12,7 @@ func (b *loopBatchCoordinator) completeSequentialCycle(iteration int, cycle sequ
 	failed := cycle.result.FinalVerdict == core.VerdictFAIL
 	var stop bool
 	state.consecutiveFails, stop = consecutiveFailBreaker(failed, state.consecutiveFails, state.maxConsecutiveFails)
-	if failed {
-		b.applyCycleFailureOutcome(cycle.cycle)
-	}
+	b.closeoutCycleOutcome(cycle.result)
 	if stop {
 		b.result.StopReason = "fail"
 		return batchDecision{flow: batchStopIterations}
@@ -53,6 +51,16 @@ func (b *loopBatchCoordinator) completeSequentialCycle(iteration int, cycle sequ
 	fmt.Fprintf(b.stderr, "[loop] cycle-budget: stopping (%s) after cycle %d (backlog=%d)\n", decision.Reason, cycle.cycle, backlog)
 	b.result.StopReason = decision.Reason
 	return batchDecision{flow: batchStopIterations}
+}
+
+// closeoutCycleOutcome is the loop's voice for the ONE post-result closeout
+// (closeoutCycleOutcome in cmd_cycle.go): the failure walk for a FAIL, the
+// planned-no-work hand-off for a lane that answered for its scope (F30). A
+// lifecycle hiccup WARNs but never changes the batch's flow.
+func (b *loopBatchCoordinator) closeoutCycleOutcome(result core.CycleResult) {
+	if applied, err := closeoutCycleOutcome(result, b.cfg.ProjectRoot, b.cfg.EvolveDir, b.stderr, b.deps.Ledger, b.deps.Signals); err != nil {
+		fmt.Fprintf(b.stderr, "[loop] WARN: could not apply cycle %d %s to the inbox: %v\n", result.Cycle, applied, err)
+	}
 }
 
 // applyCycleFailureOutcome is the loop's voice for the shared failed-cycle
