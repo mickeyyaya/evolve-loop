@@ -11,5 +11,7 @@
       "text": "PRESCRIPTION: Give a premise-challenge BLOCK verdict an enforcement edge into the state machine, and reconcile phase-replan.json against routing-decision-*.json so a degraded replan cannot silently disagree with the executed route."
     }
   ],
-  "created_at": "2026-08-27T21:00:00Z"
+  "created_at": "2026-08-27T21:00:00Z",
+  "route": "console-manual",
+  "routed_reason": "2026-09-26 console premise audit (read-only, against main 4bd6f2ee): SUPERSEDED — a premise-challenge BLOCK is already VerdictFAIL (agents/evolve-premise-challenge.md:39; core/phase.go:38-41) and remediation-denied (core/cyclerun_remediate.go:47); the phase-replan vs routing-decision divergence is intended at StageShadow (config/config.go:191; core/cyclerun_replan.go:108-111), and the survive-a-routed-retry class is closed by the ADR-0072 S4 floor (core/decision_branch.go:200-207) plus ADR-0092/0093 (#507/#508) and the cycle-1603 hardening (#529), all landed after filing. Rescope to 'verify no divergence window under StageAdvisory' or retire."
 }

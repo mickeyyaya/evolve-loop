@@ -1,0 +1,29 @@
+{
+  "id": "fleet-rebase-rebuild-chase",
+  "kind": "pipeline-repair",
+  "priority": "P1",
+  "weight": 0.9,
+  "title": "F41: a clean fleet rebase always re-runs Build + Audit for an explanation-doc cycle — the RUNG 0 carry-forward is unreachable, and the long rebuild window loses the race to the next peer ship",
+  "summary": "When a fleet lane's ship finds main moved by a peer (GIT_FLEET_REBASE_NEEDED), core/ship_recovery.go recoverFromShipError rebases the cycle branch and — for any cycle with explanation documentation (ExplanationDocumentationVersion > 0, i.e. every build since #518) — returns PhaseBuild immediately after explanationdocs.RebaseBuildAndPersist invalidates the approved snapshot. That early return sits BEFORE the carry-forward ladder: RUNG 0 (compositionCarryForward, cycle-801: the composed diff's patch-id still matches what the audit reviewed and every composed-tree gate is green ⇒ composition-verdict + reship) and RUNG 2 (scopedMergeCarryForward, cycle-941). So a clean, disjoint rebase costs an LLM rebuild plus a full re-audit (~30+ min) even when the lane's patch-id is unchanged. Evidence: cycle 1637 (knowledge-base/cycles/cycle-1637.json) went audit PASS → ship FAIL (rebase needed) → build → audit PASS → ship FAIL → build → audit WARN → ship FAIL ×3 more → retro FAIL: five rebuild/re-audit rounds, each long enough for a peer to ship again, sealed FAIL on correct work. Cycle 1691 (wave 8) hit the same path at 06:31 after 1690 shipped (clean rebase: 1690 touched statemap/reset/failurelog, 1691 phases/ship/consume.go) and paid a rebuild + re-audit; it survives only because no peer is in flight. As lanes start shipping together this becomes the dominant cost of every non-first lane in a wave.",
+  "root_cause": "Feature interaction: #518 bound the explanation document to the pre-rebase base SHA and chose Builder re-authoring ('only Builder-authored documentation can bind and explain the rebased diff') for EVERY rebase, including one where the lane's patch-id is unchanged — the case in which the approved, Builder-authored document already explains byte-identical hunks.",
+  "fix": "After a clean rebase, try the carry-forward ladder BEFORE invalidating the explanation: when the lane's patch-id is unchanged (RUNG 0's own precondition) and the explanation snapshot's documented diff matches the rebased diff, carry the approved Builder-authored explanation forward by rebinding it to the new base (a deterministic rebind of an unchanged document — the host authors nothing), then run compositionCarryForward (composed-tree gates) → reship. Only when a rung rejects fall back to RebaseBuildAndPersist → Build. Design points for review: what the snapshot pins (base SHA, diff hash, document sha256) and which of those a rebind may update; crash-safety of the rebind (the existing write-ahead activation marker idiom); the ship-recovery budget.",
+  "acceptance": [
+    "RED first: a fleet lane whose clean rebase leaves its patch-id unchanged reships via the composition carry-forward with NO Build or Audit re-dispatch, its explanation binding re-bound to the new base (the cycle-1691 shape, pinned end to end through recoverFromShipError)",
+    "A rebase that changes the lane's patch-id (overlapping edits) still invalidates the explanation and returns to Build (existing RebaseBuildAndPersist path)",
+    "The rebind never changes the document's bytes or sha256 and is refused when the documented diff does not match the rebased diff",
+    "A replay of cycle 1637's sequence (audit PASS then repeated peer moves) ships on the first recovery instead of chasing to FAIL",
+    "ADR note (explanation documentation × ADR-0049 S5b) + incident record (cycles 1637/1691) + REGRESSION-COVERAGE-INDEX row"
+  ],
+  "files": [
+    "go/internal/core/ship_recovery.go",
+    "go/internal/explanationdocs/contract_state.go"
+  ],
+  "connects_to": [
+    "b83a74d6 (#518 build-explanation deliverables — introduced the early return)",
+    "compositionCarryForward (RUNG 0, cycle-801) / scopedMergeCarryForward (RUNG 2, cycle-941)",
+    "knowledge-base/cycles/cycle-1637.json (5-round chase, FAIL)",
+    ".evolve/runs/cycle-1691 (wave 8, clean rebase → rebuild)"
+  ],
+  "created_at": "2026-09-26T06:40:00Z",
+  "source": "console-wave8-1691-ship-recovery"
+}

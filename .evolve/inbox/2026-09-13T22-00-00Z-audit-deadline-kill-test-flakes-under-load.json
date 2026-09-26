@@ -3,5 +3,10 @@
   "weight": 0.55,
   "priority": "P2",
   "source": "console-decomposition-campaign-20260913",
-  "details": "internal/phases/audit: the deadline-kill test failed once inside a commit-gate run (unit 01, ADR-0103) and once inside a whole-module floor (unit 02), both while ~15 go test processes ran concurrently; it passes 3/3 in isolation and neither change touched internal/phases/audit. Failure class: timing-dependent (a deadline kill racing the marker-free degrade path). Fix the test, not the tolerance: derive the deadline from a fake clock or a channel handshake so the kill and the degrade are ordered deterministically, and make the assertion independent of scheduler latency. Acceptance: 50 consecutive runs green under `go test -count=50 -run DeadlineKill ./internal/phases/audit/` while `go test ./...` runs in parallel."
+  "details": "internal/phases/audit: the deadline-kill test failed once inside a commit-gate run (unit 01, ADR-0103) and once inside a whole-module floor (unit 02), both while ~15 go test processes ran concurrently; it passes 3/3 in isolation and neither change touched internal/phases/audit. Failure class: timing-dependent (a deadline kill racing the marker-free degrade path). Fix the test, not the tolerance: derive the deadline from a fake clock or a channel handshake so the kill and the degrade are ordered deterministically, and make the assertion independent of scheduler latency. Acceptance: 50 consecutive runs green under `go test -count=50 -run DeadlineKill ./internal/phases/audit/` while `go test ./...` runs in parallel.",
+  "files": [
+    "go/internal/phases/audit/integration_tier_orchestration_test.go",
+    "go/internal/phases/audit/ciparity_unit_test.go"
+  ],
+  "surface_note": "2026-09-26 console readiness audit (read-only, against main b9553b9b): READY — files typed from the audit (test-only fix path; a production clock seam would land in the protected ciparity code, which the build floor now refuses)."
 }
