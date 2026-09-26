@@ -279,6 +279,15 @@ func verifyResolvedV1(ctx context.Context, binding CycleBinding, verificationRoo
 	if err != nil {
 		return nil, true, fmt.Errorf("derive base-bound diff: %w", err)
 	}
+	if view.AuthoredBaseSHA != "" {
+		ok, err := lineageHolds(ctx, verificationRoot, view.AuthoredBaseSHA, binding.BaseSHA, paths)
+		if err != nil {
+			return nil, true, fmt.Errorf("verify rebound lineage: %w", err)
+		}
+		if !ok {
+			return nil, true, fmt.Errorf("%s authored base is not a disjoint ancestor of the bound base", manifestFilename)
+		}
+	}
 	material := materialPaths(paths)
 	if !samePaths(view.MaterialPaths, material) {
 		return nil, true, fmt.Errorf("%s material_paths does not match the base-bound diff", manifestFilename)
@@ -305,12 +314,12 @@ func verifyResolvedV1(ctx context.Context, binding CycleBinding, verificationRoo
 		if records := changedCycleRecords(paths); len(records) != 0 {
 			return nil, true, fmt.Errorf("not-applicable Build changed immutable cycle explanation record(s): %s", strings.Join(records, ", "))
 		}
-		if view.Status != statusNA || view.DocumentPath != "" || view.DocumentSHA256 != "" || declaration.Status != "NOT_APPLICABLE" || declaration.Document != "" || declaration.Reason != view.Reason {
+		if view.Status != statusNA || view.DocumentPath != "" || view.DocumentSHA256 != "" || !declares(declaration, view) {
 			return nil, true, fmt.Errorf("not-applicable explanation handoff does not match the Build declaration")
 		}
 		return view, true, nil
 	}
-	if view.Status != statusRequired || declaration.Status != "REQUIRED" || declaration.Document != view.DocumentPath {
+	if view.Status != statusRequired || !declares(declaration, view) {
 		return nil, true, fmt.Errorf("required explanation handoff does not match the Build declaration")
 	}
 	verificationBinding := binding
@@ -403,7 +412,7 @@ func validateRequired(ctx context.Context, binding CycleBinding, changed, materi
 	if err != nil {
 		return append(failures, "Explanation Documentation: "+err.Error())
 	}
-	failures = append(failures, validateDocument(body, binding.Cycle, binding.BaseSHA, changed, material)...)
+	failures = append(failures, validateDocument(body, binding.Cycle, authoredBase(view), changed, material)...)
 	if view.DocumentSHA256 != "" && view.DocumentSHA256 != sha {
 		failures = append(failures, "Explanation Documentation: document SHA256 mismatch")
 	}
@@ -523,6 +532,14 @@ func readBuildReport(workspace string) (string, error) {
 // owner — the validator beside it.
 func RenderNotApplicableDeclaration(reason string) string {
 	return "## Explanation Documentation\n- Status: NOT_APPLICABLE\n- Reason: " + reason + "\n"
+}
+
+// declares holds when the Build report still declares exactly the sealed handoff.
+func declares(declaration reportDeclaration, view *phaseio.ExplanationView) bool {
+	if view.Status == statusRequired {
+		return declaration.Status == "REQUIRED" && declaration.Document == view.DocumentPath
+	}
+	return view.Status == statusNA && declaration.Status == "NOT_APPLICABLE" && declaration.Document == "" && declaration.Reason == view.Reason
 }
 
 func parseDeclaration(report string) (reportDeclaration, bool, error) {

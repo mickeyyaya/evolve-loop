@@ -49,7 +49,9 @@ The run ID prevents two installations that reuse a local cycle number from
 colliding. Published cycle records are immutable. The document contains these
 level-two sections exactly once:
 
-1. `Build Binding` with the exact cycle and full base SHA
+1. `Build Binding` with the exact cycle and full base SHA: the base the Builder
+   wrote against. After an identity-preserving rebind that is the recorded
+   authored base, not the host's current one (see below).
 2. `Summary`
 3. `Rationale`
 4. `Changed Areas`
@@ -119,8 +121,29 @@ change the retry verdict.
   rolls forward on resume from the old-base snapshot witness and re-enters
   Build; it never ambiguously rolls the marker behind an already-committed
   checkpoint.
-- Fleet rebase changes the sealed base, invalidates the old snapshot, and
-  requires Build to regenerate the explanation before Audit.
+- Fleet rebase changes the sealed base. When the host can prove the explained
+  change byte-identical on the new base, `RebindIdenticalRebase` moves the
+  binding without a Build ([ADR-0105](adr/0105-identity-preserving-fleet-rebase.md)).
+  The proof requires:
+  - the new base descends from both the authored and the bound base;
+  - the peer delta between them touches no lane path, compared case-folded,
+    and no `.gitattributes` or `.gitignore`. Any path that is not plain counts
+    as touching, because some filesystem resolves it to a differently spelled
+    file: a non-ASCII path, one containing `:`, `\` or `~`, or one with a
+    component ending in a dot or a space;
+  - the lane's paths, modes and bytes match the sealed digest, read once;
+  - the material digest and the Build report declaration are unchanged;
+  - the document is absent at the new base.
+
+  The host rewrites only the derived binding fields: `base_sha`, `diff_sha256`,
+  and `authored_base_sha`, which is set once. The Builder's document and report
+  are untouched. `Verify` then accepts the document's authored base only after
+  re-deriving that lineage itself.
+
+  A rebound handoff is never re-sealed by the host. Unchanged, it stands; any
+  later change routes to Build, whose re-authored seal replaces it. Otherwise
+  the rebase invalidates the old snapshot and requires Build to regenerate the
+  explanation before Audit.
 - Resume reconciles the checkpoint with the exact host activation and cannot
   downgrade a sealed contract through mutable cycle state.
 - Continuation adoption archives unpublished ancestor cycle records under

@@ -50,37 +50,75 @@ func diffSHA256(ctx context.Context, worktree, baseSHA string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return pathStateSHA256(ctx, worktree, fmt.Sprintf("evolve-build-diff-v3\nbase:%d:%s", len(baseSHA), baseSHA), paths)
+	return pathStateSHA256(ctx, worktree, diffDomain(baseSHA), paths)
 }
 
+func diffDomain(baseSHA string) string {
+	return fmt.Sprintf("evolve-build-diff-v3\nbase:%d:%s", len(baseSHA), baseSHA)
+}
+
+const materialDomain = "evolve-build-material-v1"
+
 func materialSHA256(ctx context.Context, worktree string, paths []string) (string, error) {
-	return pathStateSHA256(ctx, worktree, "evolve-build-material-v1", paths)
+	return pathStateSHA256(ctx, worktree, materialDomain, paths)
+}
+
+// statesOf keeps the states whose path is in paths, in their existing sorted order.
+func statesOf(states []pathState, paths []string) []pathState {
+	keep := stringSet(paths)
+	out := make([]pathState, 0, len(paths))
+	for _, s := range states {
+		if keep[s.rel] {
+			out = append(out, s)
+		}
+	}
+	return out
 }
 
 func pathStateSHA256(ctx context.Context, worktree, domain string, paths []string) (string, error) {
+	states, err := readPathStates(ctx, worktree, paths)
+	if err != nil {
+		return "", err
+	}
+	return foldPathStates(domain, states), nil
+}
+
+// pathState is one changed path's mode and content, read once so several digests can fold the same bytes.
+type pathState struct {
+	rel, mode, contentSHA string
+	contentBytes          int64
+}
+
+func readPathStates(ctx context.Context, worktree string, paths []string) ([]pathState, error) {
 	paths = uniqueSorted(paths)
 	if len(paths) > maxDiffDigestFiles {
-		return "", fmt.Errorf("base-bound diff exceeds the %d-file digest limit", maxDiffDigestFiles)
+		return nil, fmt.Errorf("base-bound diff exceeds the %d-file digest limit", maxDiffDigestFiles)
 	}
-
-	h := sha256.New()
-	fmt.Fprintf(h, "%s\npath-count:%d\n", domain, len(paths))
+	states := make([]pathState, 0, len(paths))
 	var totalBytes int64
 	for _, rel := range paths {
 		if !validRelative(rel) {
-			return "", fmt.Errorf("invalid changed path %q", rel)
+			return nil, fmt.Errorf("invalid changed path %q", rel)
 		}
-		remaining := maxDiffDigestBytes - totalBytes
-		mode, contentSHA, contentBytes, err := currentDiffState(ctx, worktree, rel, remaining)
+		mode, contentSHA, contentBytes, err := currentDiffState(ctx, worktree, rel, maxDiffDigestBytes-totalBytes)
 		if err != nil {
-			return "", fmt.Errorf("hash changed path %s: %w", rel, err)
+			return nil, fmt.Errorf("hash changed path %s: %w", rel, err)
 		}
 		totalBytes += contentBytes
-		fmt.Fprintf(h, "path:%d:", len(rel))
-		_, _ = io.WriteString(h, rel)
-		fmt.Fprintf(h, "\nmode:%s\ncontent-bytes:%d\ncontent-sha256:%s\n", mode, contentBytes, contentSHA)
+		states = append(states, pathState{rel: rel, mode: mode, contentSHA: contentSHA, contentBytes: contentBytes})
 	}
-	return hex.EncodeToString(h.Sum(nil)), nil
+	return states, nil
+}
+
+func foldPathStates(domain string, states []pathState) string {
+	h := sha256.New()
+	fmt.Fprintf(h, "%s\npath-count:%d\n", domain, len(states))
+	for _, s := range states {
+		fmt.Fprintf(h, "path:%d:", len(s.rel))
+		_, _ = io.WriteString(h, s.rel)
+		fmt.Fprintf(h, "\nmode:%s\ncontent-bytes:%d\ncontent-sha256:%s\n", s.mode, s.contentBytes, s.contentSHA)
+	}
+	return hex.EncodeToString(h.Sum(nil))
 }
 
 func splitNUL(body []byte) []string {
