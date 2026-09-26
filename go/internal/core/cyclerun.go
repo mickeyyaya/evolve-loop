@@ -35,16 +35,17 @@ const (
 
 // defaultMaxPhaseIterations bounds RunCycle's dispatch loop against a
 // transition-table cycle (a phase order that keeps re-selecting phases and never
-// reaches PhaseEnd). It is a genuine safety oracle (ADR-0044 C1) — it must exist
-// even when config is absent. WithMaxPhaseIterations overrides it; tests set it
-// low to drive RunCycle into the chokepoint-escape guard deterministically. 0 ⇒
-// this default.
+// reaches PhaseEnd). It is a genuine safety oracle — it must exist even when
+// config is absent. WithMaxPhaseIterations overrides it; tests set it low to
+// drive RunCycle into the chokepoint-escape guard deterministically. 0 ⇒ this
+// default.
+// See ADR-0044.
 const defaultMaxPhaseIterations = 32
 
 // cycleRun is the method object (Replace Method with Method Object) for
 // RunCycle's dispatch loop. ONE addressable struct; every sub-method takes a
 // *cycleRun receiver so late mutations (preserveWorktree, cs, the loop cursors)
-// are visible to RunCycle's exit defers (the R2 late-visibility contract) and to
+// are visible to RunCycle's exit defers (the late-visibility contract) and to
 // the next loop iteration. Field grouping mirrors the original inline locals.
 type cycleRun struct {
 	// engine handles (immutable for the cycle)
@@ -55,8 +56,9 @@ type cycleRun struct {
 	req               CycleRequest
 	cycle             int
 	mainDirtyBaseline map[string]bool
-	// consoleLeased: ADR-0080 S4 operator lease ADOPTED at cycle start (hub-
-	// resident; a mid-cycle write cannot waive the cycle that made it).
+	// consoleLeased: an operator lease ADOPTED at cycle start (hub-resident; a
+	// mid-cycle write cannot waive the cycle that made it).
+	// See ADR-0080.
 	consoleLeased  map[string]bool
 	envSnap        map[string]string     // reference type; MUTATED in-loop (retro extraEnv merge), same map across iterations
 	ctxSnap        map[string]string     // reference type; MUTATED in-loop (ship_error_* keys), same map across iterations
@@ -88,15 +90,15 @@ type cycleRun struct {
 	routingSeq        int           // monotonic per-cycle routing-artifact counter; incremented in selectNext AND recordAndBranch
 	remediationRounds map[Phase]int // graduated-remediation rounds used per gate phase (cyclerun_remediate.go); lazily initialized
 	recoveryDepth     int           // bounds ship-error recovery to maxRecoveryDepth; persists across iterations
-	replanDepth       int           // ADR-0052 WS2-S5: post-scout re-plans run this cycle; capped by cfg.RePlanMaxDepth (check-before-increment)
+	replanDepth       int           // post-scout re-plans run this cycle; capped by cfg.RePlanMaxDepth (check-before-increment). See ADR-0052.
 
-	// shipLease serializes the audit→ship critical section across lanes
-	// (cycle-778): acquired in recordAndBranch just before the audit-binding
-	// HEAD snapshot, released after the next completed phase (normally ship,
-	// post-push) and by RunCycle's exit defer. nil ⇒ not held.
+	// shipLease serializes the audit→ship critical section across lanes:
+	// acquired in recordAndBranch just before the audit-binding HEAD snapshot,
+	// released after the next completed phase (normally ship, post-push) and
+	// by RunCycle's exit defer. nil ⇒ not held.
 	shipLease *shipwindow.Lease
 
-	// late-visibility exit-defer flags (R2 contract; highest hazard)
+	// late-visibility exit-defer flags (highest hazard)
 	preserveWorktree       bool // set on ship-error, cleared on PASS ship, OR'd post-loop; read by RunCycle's cleanup defer at exit
 	cycleCompletedNormally bool // set true only post-loop; read by the same cleanup defer at exit
 	reachedPhaseEnd        bool // set at a loopBreak (PhaseEnd) exit; false post-loop ⇒ the bounded-iteration guard tripped (transition-table cycle) → C1 chokepoint-escape record
@@ -199,24 +201,21 @@ func verdictReason(verdict string, diags []Diagnostic) string {
 	return "verdict=" + verdict + ": " + strings.Join(msgs, "; ")
 }
 
-// recordChokepointEscape closes the ADR-0044 C1 invariant on RunCycle's
+// recordChokepointEscape closes the chokepoint invariant on RunCycle's
 // bounded-loop exit. If the dispatch loop exhausts its iteration budget without
 // reaching PhaseEnd (a transition-table cycle), no phase recorded a terminal
 // outcome, so cyclehealth.ClassifyOutcome would page the cycle FAILED_UNEXPLAINED
-// — the alarm bucket (the cycle-492 escape). Recording an explicit abort here
-// routes the escape through the C1 chokepoint (recordPhaseOutcome) so the outcome
-// is FAILED_EXPLAINED and names the phase the cursor stalled on, and feeds
+// — the alarm bucket. Recording an explicit abort here routes the escape
+// through the chokepoint (recordPhaseOutcome) so the outcome is
+// FAILED_EXPLAINED and names the phase the cursor stalled on, and feeds
 // failure-learning so the loop's retro sees a real, diagnosable failure.
+// See ADR-0044.
 func (cr *cycleRun) recordChokepointEscape(reason string) {
 	cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath,
 		phaseOutcomeFrom(cr.current, PhaseResponse{Phase: string(cr.current)}, 0, reason, ""))
 	cr.recordFailureLearning(cr.current, errors.New(reason), 0)
 	cr.result.FinalVerdict = VerdictFAIL
 }
-
-// cyclerun.go — methods extracted from the RunCycle engine (orchestrator.go) to
-// keep RunCycle a readable coordinator. Each extraction is behavior-preserving;
-// the orchestrator's characterization tests are the safety net.
 
 // finalizeCycle runs RunCycle's post-loop finalization: reclassify a SKIPPED
 // final verdict against this cycle's own ship latch, warn loudly on a silent
@@ -232,46 +231,45 @@ func (o *Orchestrator) finalizeCycle(ctx context.Context, cs CycleState, cycle i
 	// No FAIL without a reason — see failreasons_backfill.go.
 	backfillFailReasons(result, timings)
 
-	// Cross-artifact invariant stack (cycle-1676): four weak deterministic
-	// verifiers over this cycle's own artifacts, bound to the LANE worktree
-	// (#612), recorded beside them. Purely ADVISORY — it runs before the
-	// ADR-0072 floor below precisely so a finding can be read next to the
-	// floor's decision without ever influencing it. See
-	// crossartifact_invariants.go.
+	// Cross-artifact invariant stack: four weak deterministic verifiers over
+	// this cycle's own artifacts, bound to the LANE worktree, recorded beside
+	// them. Purely ADVISORY — it runs before the verdict-coherence floor
+	// below precisely so a finding can be read next to the floor's decision
+	// without ever influencing it. See crossartifact_invariants.go.
 	recordCrossArtifactInvariants(cycle, cs.WorkspacePath, cs.ActiveWorktree)
 
-	// ADR-0072 Go floor: verdict-coherence. If the cycle recorded a negative
-	// verdict but the phases' own on-disk artifacts (audit-report + acs-verdict)
-	// are green, the pipeline forged the verdict — a SYSTEM-level failure, not a
+	// Verdict-coherence floor. If the cycle recorded a negative verdict but
+	// the phases' own on-disk artifacts (audit-report + acs-verdict) are
+	// green, the pipeline forged the verdict — a SYSTEM-level failure, not a
 	// task failure. Mark it so the batch loop HALTS + escalates for pipeline
-	// diagnosis instead of re-selecting the same inbox task (which would just
-	// reproduce the forged verdict — the cycle 862→899 livelock). This floor is
-	// non-negotiable: independent of orchestrator judgment and strict_audit.
+	// diagnosis instead of re-selecting the same inbox task, which would just
+	// reproduce the forged verdict. This floor is non-negotiable: independent
+	// of orchestrator judgment and strict_audit.
+	// See ADR-0072.
 	if result.SystemFailure == nil {
 		sig, reconciled := o.detectVerdictIncoherence(ctx, cs, result.FinalVerdict)
 		switch {
 		case reconciled:
-			// Clean-exit-late-write self-heal: the recorded-negative was contradicted
-			// by green artifacts AND a fully-valid audit-report — a benign timing race,
-			// not a forged verdict. Reconcile the recorded verdict to PASS and do NOT
-			// halt (the alternative was the cycles-930/931/932 false-HALT batch-killer).
+			// Clean-exit-late-write self-heal: the recorded-negative was
+			// contradicted by green artifacts AND a fully-valid audit-report —
+			// a benign timing race, not a forged verdict. Reconcile the
+			// recorded verdict to PASS and do NOT halt.
 			fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d verdict-coherence SELF-HEAL: recorded %s but on-disk audit=PASS, acs=PASS, and the audit-report fully verifies (challenge-token + sections + ADR-0039) — a benign clean-exit-late-write race; reconciled recorded verdict to PASS, not halting (ADR-0072).\n", cycle, result.FinalVerdict)
 			result.FinalVerdict = VerdictPASS
 		case sig != nil:
-			// Announced by the closeout's system.failure INCIDENT (ADR-0101
-			// S2a): one line format on stderr, one line in signals.ndjson.
+			// Announced by the closeout's system.failure INCIDENT: one line
+			// format on stderr, one line in signals.ndjson.
 			result.SystemFailure = sig
 		}
 	}
 
 	// A cycle can also lose its landing OUTRIGHT: ship ran, hit landing-queue
 	// contention, and the recovery correctly routed elsewhere — leaving a PASS
-	// verdict from the audit floor attached to a cycle that delivered nothing
-	// (wave-20260822a-verify: cycle-1535 rebased into a genuine conflict on a
-	// peer lane's file, went to the debugger, and closed out PASS). Runs AFTER
-	// the incoherence block so a self-healed PASS is checked too, and keyed on
-	// the cycle's OWN ship artifacts rather than a HEAD delta, which in fleet
-	// mode belongs to whichever sibling landed last. See lost_landing_floor.go.
+	// verdict from the audit floor attached to a cycle that delivered nothing.
+	// Runs AFTER the incoherence block so a self-healed PASS is checked too,
+	// and keyed on the cycle's OWN ship artifacts rather than a HEAD delta,
+	// which in fleet mode belongs to whichever sibling landed last. See
+	// lost_landing_floor.go.
 	if result.SystemFailure == nil {
 		if sig := detectLostLanding(cs.WorkspacePath, result.FinalVerdict); sig != nil {
 			// Announced by the closeout's system.failure WARN (Halt=false: the
@@ -281,51 +279,51 @@ func (o *Orchestrator) finalizeCycle(ctx context.Context, cs CycleState, cycle i
 		}
 	}
 
-	// Notice the silent no-ship (Fix C): the cycle ran phases but ended without
-	// its own ship landing and without an audit-advisory "would-have-blocked" record —
-	// i.e. work may have been produced and then discarded with the worktree
-	// (cycle-148: a genuine PASS mis-graded FAIL routed audit→retro→end). The
-	// outcome label alone is advisory and easily missed in a batch summary, so
-	// surface it loudly here. Not an error — some cycles legitimately produce no
-	// change — but always worth an operator's eyes.
+	// Notice the silent no-ship: the cycle ran phases but ended without its
+	// own ship landing and without an audit-advisory "would-have-blocked"
+	// record — i.e. work may have been produced and then discarded with the
+	// worktree. The outcome label alone is advisory and easily missed in a
+	// batch summary, so surface it loudly here. Not an error — some cycles
+	// legitimately produce no change — but always worth an operator's eyes.
 	if shouldWarnSkippedUnknown(*result) {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d ended without shipping (%s): phases ran but this cycle's ship never landed and no audit-advisory block was recorded — any worktree changes were discarded. Inspect %s (audit-report.md verdict + acs-verdict.json red_count).\n", cycle, CycleOutcomeSkippedUnknown, cs.WorkspacePath)
 	}
 
-	// R9.1: a shipped cycle's committed floors are observed throughput —
-	// record them into the rolling window before the state write below
-	// persists it (nil seam ⇒ byte-identical no-op). HEAD movement is only
-	// corroborating evidence here (a shipping verdict whose landing left no
-	// commit is not throughput); it never decides the outcome label above.
+	// A shipped cycle's committed floors are observed throughput — record
+	// them into the rolling window before the state write below persists it
+	// (nil seam ⇒ byte-identical no-op). HEAD movement is only corroborating
+	// evidence here (a shipping verdict whose landing left no commit is not
+	// throughput); it never decides the outcome label above.
 	postCycleHEAD, _ := o.gitHEAD()
 	if o.throughputRecorder != nil && !hasThroughputCycle(state.TriageThroughput, cycle) && shippedOutcome(result.FinalVerdict, preCycleHEAD, postCycleHEAD) {
 		o.throughputRecorder(state, cycle, cs.WorkspacePath)
 	}
 
-	// A completed cycle that FAILED its verdict keeps its worktree for salvage
-	// (inbox preserve-worktree-on-verdict-fail). The exit defer prunes only when
-	// !preserveWorktree, so the caller sets the flag from this return before
-	// marking completion. This MUST stay AFTER finalizeOutcome above: it reads
-	// the FINAL verdict, so a SKIPPED/SHIPPED_VIA_BUILD reclassification has
-	// already happened — reading it earlier would preserve on a pre-reclassification
-	// raw FAIL. L3 gc (internal/gc) reclaims preserved worktrees on retention;
-	// `evolve cycle reset` / `evolve loop --resume` reclaim them explicitly.
+	// A completed cycle that FAILED its verdict keeps its worktree for
+	// salvage. The exit defer prunes only when !preserveWorktree, so the
+	// caller sets the flag from this return before marking completion. This
+	// MUST stay AFTER finalizeOutcome above: it reads the FINAL verdict, so a
+	// SKIPPED/SHIPPED_VIA_BUILD reclassification has already happened —
+	// reading it earlier would preserve on a pre-reclassification raw FAIL.
+	// L3 gc (internal/gc) reclaims preserved worktrees on retention; `evolve
+	// cycle reset` / `evolve loop --resume` reclaim them explicitly.
 	preserveWorktree = preserveOnVerdict(result.FinalVerdict)
 
-	// ADR-0076 slice C: a preserved (FAILed) worktree is snapshot-committed and
-	// its continuation manifest stamped NOW — while the worktree is live and
+	// A preserved (FAILed) worktree is snapshot-committed and its
+	// continuation manifest stamped NOW — while the worktree is live and
 	// before the inbox release reads the workspace. Best-effort + loud; a
-	// system-failure halt still stamps (the preserved work is exactly what the
-	// next attempt should resume once the pipeline is healthy again).
+	// system-failure halt still stamps (the preserved work is exactly what
+	// the next attempt should resume once the pipeline is healthy again).
+	// See ADR-0076.
 	if preserveWorktree {
 		o.stampContinuationManifest(ctx, cs, cycle, projectRoot)
 	}
 
-	// The cycle-terminal carryover order — the memo merge, the prescription merge,
-	// then the triage-dropped retirement — lives in the unit (carryover.Closeout)
-	// with its own test: retiring BEFORE the merges let a merge resurrect the very
-	// id triage had just dropped (the cycle-1538 reproduction, pinned at this seam
-	// by TestFinalizeCycle_RetiresTriageDroppedCarryover).
+	// The cycle-terminal carryover order — the memo merge, the prescription
+	// merge, then the triage-dropped retirement — lives in the unit
+	// (carryover.Closeout) with its own test: retiring BEFORE the merges
+	// would let a merge resurrect an id triage had just dropped. Pinned by
+	// TestFinalizeCycle_RetiresTriageDroppedCarryover.
 	o.carryover().Closeout(state, cs.WorkspacePath, cycle, time.Now().UTC())
 
 	state.LastCycleNumber = max(state.LastCycleNumber, cycle)
@@ -353,7 +351,7 @@ type cycleInit struct {
 // workspace, provision the source worktree, persist the cycle state, and start
 // the run lease.
 //
-// Defer contract (R2 late-visibility): the four cleanup actions (lock release,
+// Defer contract (late-visibility): the four cleanup actions (lock release,
 // run-ID clear, worktree cleanup, lease stop) MUST run in RunCycle's frame, not
 // here. So newCycleRun returns a single `cleanup` closure that RunCycle defers;
 // the closure runs the actions LIFO — exactly the order the original five inline
@@ -380,14 +378,14 @@ func (o *Orchestrator) newCycleRun(ctx context.Context, req CycleRequest) (cycle
 	// only later in RunCycle's loop).
 	failClean := func() { run(false, false) }
 
-	// ADR-0049 S6 / root-cause R1: under the fleet supervisor (EVOLVE_FLEET=1)
-	// skip the whole-cycle global project lock (LOCK_NB) so M cycles run
-	// concurrently instead of refusing each other. Safe because every shared
-	// resource is now serialized by its OWN flock — state.json (UpdateState /
-	// withStateLock, S2), the ledger chain (CA.1), the .evolve/ship.lock
-	// integrator (S5) — and each cycle is isolated by its per-run worktree +
-	// workspace with run-scoped ship reads (S3) and audit binding (S4). Default
-	// off → the live sequential loop keeps the global lock, byte-identical.
+	// Under the fleet supervisor (EVOLVE_FLEET=1) skip the whole-cycle global
+	// project lock (LOCK_NB) so M cycles run concurrently instead of refusing
+	// each other. Safe because every shared resource is now serialized by its
+	// OWN flock — state.json (UpdateState / withStateLock), the ledger chain,
+	// the .evolve/ship.lock integrator — and each cycle is isolated by its
+	// per-run worktree + workspace with run-scoped ship reads and audit
+	// binding. Default off → the live sequential loop keeps the global lock,
+	// byte-identical.
 	release := func() error { return nil }
 	if !fleetMode(req.Env) {
 		acquired, err := o.storage.AcquireLock(ctx)
@@ -403,9 +401,9 @@ func (o *Orchestrator) newCycleRun(ctx context.Context, req CycleRequest) (cycle
 		failClean()
 		return cycleInit{}, nil, fmt.Errorf("read state: %w", err)
 	}
-	// CA.4: mint the cycle number through the allocation lease when the
-	// storage supports the serialized RMW, always advancing beyond occupied Go
-	// ACS package identities in the source tree. A crashed run burns its number;
+	// Mint the cycle number through the allocation lease when the storage
+	// supports the serialized RMW, always advancing beyond occupied Go ACS
+	// package identities in the source tree. A crashed run burns its number;
 	// resume re-enters via RunCycleFromPhase with the run record's cycle and
 	// never re-allocates.
 	cycle, err := o.allocateCycle(ctx, &state, req.ProjectRoot)
@@ -420,9 +418,9 @@ func (o *Orchestrator) newCycleRun(ctx context.Context, req CycleRequest) (cycle
 	// from the caller > policy WorkflowConfig.PhaseEnables["intent"]=="on" > false.
 	intentRequired := req.Context["intent_required"] == "true" ||
 		o.workflowConfig.PhaseEnables["intent"] == "on"
-	// CA.5: one ULID per run — persisted in the cycle state; the
-	// construction-time stampingLedger stamps it on every ledger entry for
-	// as long as it is the current id (cleared on every exit path).
+	// One ULID per run — persisted in the cycle state; the construction-time
+	// stampingLedger stamps it on every ledger entry for as long as it is the
+	// current id (cleared on every exit path).
 	runID := MintRunID(o.now())
 	o.currentRunID.Store(runID)
 	stack = append(stack, func(_, _ bool) { o.currentRunID.Store("") })
@@ -459,11 +457,10 @@ func (o *Orchestrator) newCycleRun(ctx context.Context, req CycleRequest) (cycle
 	// killed attempt cause Scout to short-circuit (read pre-existing
 	// artifacts in seconds instead of redoing discovery) and steer
 	// downstream phases via the OLD task selection.
-	// Source incident: cycle-108 meta-loop attempts 1-4 (2026-05-26).
 	// Opt-out via EVOLVE_DISABLE_WORKSPACE_GUARD=1 — used by tests that pre-seed
 	// workspace files to simulate phase state, and by operators via the shell
 	// (captured into req.Env from filterEvolveEnv(os.Environ()) at cycle launch,
-	// cmd_cycle.go). ADR-0049 N9: read ONLY the per-cycle env SNAPSHOT, never live
+	// cmd_cycle.go). Read ONLY the per-cycle env SNAPSHOT, never live
 	// os.Getenv — under concurrent fleet cycles a peer's env (or a mid-flight
 	// mutation) must not flip this cycle's guard. The launch snapshot already
 	// carries the operator's shell value, so this is behavior-preserving for the
@@ -477,8 +474,8 @@ func (o *Orchestrator) newCycleRun(ctx context.Context, req CycleRequest) (cycle
 		}
 	}
 	// Full main-tree dirty baseline (tracked + untracked) captured BEFORE any
-	// phase runs. recoverBuildLeak (cycle-160 / Option A) subtracts it so it only
-	// relocates paths the build introduced, never the operator's pre-existing work.
+	// phase runs. recoverBuildLeak subtracts it so it only relocates paths the
+	// build introduced, never the operator's pre-existing work.
 	mainDirtyBaseline := porcelainDirtySet(ctx, req.ProjectRoot)
 	consoleLeased := adoptConsoleLease(req.ProjectRoot, time.Now(), os.Stderr)
 	// Provision the per-cycle source worktree (ADR-0027): tdd/build write code
@@ -493,15 +490,15 @@ func (o *Orchestrator) newCycleRun(ctx context.Context, req CycleRequest) (cycle
 	// worktree→main).
 	// cs.WorktreeBaseSHA (persisted) is the worktree HEAD at creation == the
 	// cycle base. After the build phase we soft-reset to it so a committing
-	// builder's work becomes pending again (see normalizeWorktreeToBase + the
-	// cycle-156 incident). Persisted in CycleState so the crash-resume path
-	// can run the same normalize.
-	// preserveWorktree (ADR-0039 §8, D10 fix): set when a ship-stage failure
-	// is recorded and cleared only when a later ship attempt succeeds. While
-	// set, the exit cleanup below SKIPS pruning so audited (possibly
-	// uncommitted) work survives for recovery — `evolve loop --resume` or an
-	// explicit `evolve cycle reset` reclaims it. Cycle 7 lost its entire
-	// PASS work to this prune; cycle 12 survived only via operator snapshot.
+	// builder's work becomes pending again (see normalizeWorktreeToBase).
+	// Persisted in CycleState so the crash-resume path can run the same
+	// normalize.
+	// preserveWorktree: set when a ship-stage failure is recorded and cleared
+	// only when a later ship attempt succeeds. While set, the exit cleanup
+	// below SKIPS pruning so audited (possibly uncommitted) work survives for
+	// recovery — `evolve loop --resume` or an explicit `evolve cycle reset`
+	// reclaims it.
+	// See ADR-0039.
 	if wtPath, werr := o.worktree.Create(req.ProjectRoot, cycle); werr != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN worktree provisioning failed (source phases will be blocked): %v\n", werr)
 		if err := os.MkdirAll(cs.WorkspacePath, 0o755); err != nil {
@@ -543,10 +540,12 @@ func (o *Orchestrator) newCycleRun(ctx context.Context, req CycleRequest) (cycle
 		return cycleInit{}, nil, fmt.Errorf("init cycle-state: %w", err)
 	}
 
-	// ADR-0049 G16: write + heartbeat the per-run .lease so gc's liveness check
-	// (runlease.Fresh) never reaps a concurrent fleet sibling's run dir mid-cycle.
-	// startRunLease creates the run dir itself; no-op for worktree-less / test
-	// cycles (empty WorkspacePath). Stopped on every exit (deferred).
+	// Write + heartbeat the per-run .lease so gc's liveness check
+	// (runlease.Fresh) never reaps a concurrent fleet sibling's run dir
+	// mid-cycle. startRunLease creates the run dir itself; no-op for
+	// worktree-less / test cycles (empty WorkspacePath). Stopped on every
+	// exit (deferred).
+	// See ADR-0049.
 	stopLease := startRunLease(cs.WorkspacePath, runID, o.now, leaseRefreshInterval())
 	stack = append(stack, func(_, _ bool) { stopLease() })
 
@@ -560,11 +559,10 @@ func (o *Orchestrator) newCycleRun(ctx context.Context, req CycleRequest) (cycle
 }
 
 // clearActiveWorktree drops a PRUNED worktree path from the persisted cycle
-// state. cs.ActiveWorktree was write-only until cycle-1278: the teardown above
-// deleted the directory but left the record naming it, so the next reader
-// (retro's dispatch, resume, checkpoint) handed a deleted path to the bridge,
-// whose IsDir guard refuses the launch — the cycle-1255 CRITICAL's root cause.
-// Widening retroWorktree's fallback contains that symptom; this removes it.
+// state. Without this, the next reader (retro's dispatch, resume, checkpoint)
+// hands a deleted path to the bridge, whose IsDir guard refuses the launch.
+// Widening retroWorktree's fallback only contains that symptom; this removes
+// the root cause.
 //
 // Read-modify-write against storage rather than rewriting the newCycleRun-era
 // local: by teardown the cycle run has persisted phase progress through its own
@@ -611,12 +609,12 @@ type cyclePlan struct {
 // signal-conditioned call). Single source for the RouteInput shape — a field
 // added here reaches both decisions, so they can never silently diverge.
 func (o *Orchestrator) advisorPlanInput(ctx context.Context, current string, signals router.RoutingSignals, req CycleRequest, state State, cs CycleState, cycle int, env map[string]string, benchedCLIs []router.BenchedCLI) router.RouteInput {
-	// WS2 recall memory: the most recent failure's reason + matching KB lessons,
-	// so the advisor plans WITH the benefit of what went wrong before. No-op when
-	// no KB is wired or no failure history.
+	// Recall memory: the most recent failure's reason + matching KB lessons,
+	// so the advisor plans WITH the benefit of what went wrong before. No-op
+	// when no KB is wired or no failure history.
 	lastReason, lessons := o.recallForPlan(ctx, state.FailedAt, req.Context["goal"])
 	// Phases whose persona doc is absent are excluded from every menu the
-	// advisor sees and listed for the clamp/trigger paths (token-waste #2).
+	// advisor sees and listed for the clamp/trigger paths.
 	unavailable := o.unavailableOptionalPhases()
 	return router.RouteInput{
 		Current: current,
@@ -709,22 +707,20 @@ func (o *Orchestrator) planCycle(ctx context.Context, req CycleRequest, state St
 		ctxSnap[k] = v
 	}
 
-	// ADR-0049 E + lane-scope pin (cycle-640): the fleet scope every phase sees
-	// via Context["fleet_scope"] comes from <workspace>/lane-scope.json when a
-	// supervisor (or a prior attempt of this orchestrator) provisioned one —
-	// the on-disk pin is authoritative over the env snapshot, so cross-lane env
-	// drift can no longer split lane identity. Absent file ⇒ legacy env-snapshot
-	// fallback (sequential loop byte-identical), and an env-scoped run pins its
-	// own lane-scope.json here, BEFORE any phase runs.
+	// The fleet scope every phase sees via Context["fleet_scope"] comes from
+	// <workspace>/lane-scope.json when a supervisor (or a prior attempt of
+	// this orchestrator) provisioned one — the on-disk pin is authoritative
+	// over the env snapshot, so cross-lane env drift can no longer split lane
+	// identity. Absent file ⇒ legacy env-snapshot fallback (sequential loop
+	// byte-identical), and an env-scoped run pins its own lane-scope.json
+	// here, BEFORE any phase runs.
 	if ls := loadLaneScope(cs.WorkspacePath); ls != nil {
 		ctxSnap["fleet_scope"] = strings.Join(ls.TodoIDs, ",")
 	} else if scope := envSnap[ipcenv.FleetScopeKey]; scope != "" {
 		ctxSnap["fleet_scope"] = scope
 		materializeLaneScope(cs.WorkspacePath, scope, req.GoalHash)
 	}
-	// Disclose each scoped id's LIVE inbox record beside the id list
-	// (cycle-1548: a bare name resolved to a two-week-old consumed namesake —
-	// 17 records shared the id — and every phase worked the cured ghost). Only
+	// Disclose each scoped id's LIVE inbox record beside the id list. Only
 	// PENDING ids get an entry; carryover/non-inbox ids resolve to "" and are
 	// silently omitted (fail-open, same as before). Nil resolver = no key,
 	// Context byte-identical.
@@ -750,24 +746,22 @@ func (o *Orchestrator) planCycle(ctx context.Context, req CycleRequest, state St
 		}
 	}
 
-	// PR 6 (cycle-135 followup): mint the cycle's challenge token here —
-	// ONCE per cycle, at orchestrator start, BEFORE any phase runs. Surface
-	// it to every phase via Context["challengeToken"] (scout's ComposePrompt
-	// reads it at scout.go:64) AND persist it to <workspace>/challenge-
-	// token.txt so the agent-templates.md PR 5 fallback source is populated.
-	// Pre-PR-6, no Go code injected the token; scout invented its own
-	// (cycle 134 audit C1: "no-token-manual-run-cycle-134"; cycle 135 audit
-	// C1: scout minted `59576594e2e8d5c3` instead of using `5b96ecb69a0c848f`
-	// from challenge-token.txt). The mint is the same 8-byte-hex shape as
-	// bridge.defaultChallengeToken so post-cycle ledger entries are
-	// indistinguishable from the bridge-minted ones used pre-cycle-135.
+	// Mint the cycle's challenge token here — ONCE per cycle, at orchestrator
+	// start, BEFORE any phase runs. Surface it to every phase via
+	// Context["challengeToken"] (scout's ComposePrompt reads it at
+	// scout.go:64) AND persist it to <workspace>/challenge-token.txt so the
+	// agent-templates.md fallback source is populated. Without this, scout
+	// invents its own token instead of using the one written to
+	// challenge-token.txt. The mint is the same 8-byte-hex shape as
+	// bridge.defaultChallengeToken so post-cycle ledger entries stay
+	// indistinguishable from bridge-minted ones.
 	if _, alreadySet := ctxSnap["challengeToken"]; !alreadySet {
 		var tokBytes [8]byte
 		if _, err := rand.Read(tokBytes[:]); err == nil {
 			tok := hex.EncodeToString(tokBytes[:])
 			ctxSnap["challengeToken"] = tok
 			// Best-effort workspace write — phase agents per agent-templates.md
-			// PR 5 read this as fallback source #2 when inputs.challengeToken
+			// read this as a fallback source when inputs.challengeToken
 			// is empty. Failure is logged but not fatal (the Context path is
 			// the primary route; phases that can't read the file just rely on
 			// Context).
@@ -780,19 +774,19 @@ func (o *Orchestrator) planCycle(ctx context.Context, req CycleRequest, state St
 		}
 	}
 
-	// Chronicle S3: seed <workspace>/recent-outcomes.md from the committed
-	// dossier history + live failure state, per the resolved chronicle policy
-	// (resolved ONCE at the composition root via WithChronicleConfig). At
-	// enforce the digest bytes ride ctxSnap["recent_outcomes"] into every
-	// phase request; shadow writes the artifact only; off is a no-op.
-	// Best-effort — a digest failure WARNs and never blocks the cycle.
+	// Seed <workspace>/recent-outcomes.md from the committed dossier history +
+	// live failure state, per the resolved chronicle policy (resolved ONCE at
+	// the composition root via WithChronicleConfig). At enforce the digest
+	// bytes ride ctxSnap["recent_outcomes"] into every phase request; shadow
+	// writes the artifact only; off is a no-op. Best-effort — a digest
+	// failure WARNs and never blocks the cycle.
 	seedChronicleDigest(req.ProjectRoot, cs, state, o.chronicle, ctxSnap)
 
 	// Capture HEAD before any phase so the throughput hook can corroborate a
 	// shipped cycle's landing (shippedOutcome). The outcome label never reads it.
 	preCycleHEAD, _ := o.gitHEAD()
 
-	// Upfront whole-cycle plan (ADR-0024 §2). At Stage>=Advisory with a planner,
+	// Upfront whole-cycle plan. At Stage>=Advisory with a planner,
 	// ask the advisor once which phases to run, CLAMP the answer to the integrity
 	// floor (ship⇒build∧audit∧tdd), persist it, and thread the clamped plan into
 	// every routing decision below. The clamp is the non-bypassable kernel floor:
@@ -807,35 +801,36 @@ func (o *Orchestrator) planCycle(ctx context.Context, req CycleRequest, state St
 	// has one source of truth rather than two gates that could drift.
 	// CLI-health snapshot, taken ONCE at cycle start and threaded to both the
 	// whole-cycle plan input and every per-transition Decide: the advisor and
-	// the dispatcher must reason from the SAME bench state (review H2 — two
-	// reads could diverge when a bench expires mid-planning).
+	// the dispatcher must reason from the SAME bench state, since two reads
+	// could diverge when a bench expires mid-planning.
+	// See ADR-0024.
 	benchedCLIs := benchedCLIsForRouting(req.ProjectRoot)
 	var clampedPlan *router.PhasePlan
 	if o.cfg.Stage >= config.StageAdvisory && o.cfg.Mode == config.ModeDynamicLLM && o.planner != nil {
 		// The initial plan runs with EMPTY signals (no handoffs exist yet at cycle
-		// start); the post-scout RePlan (WS2-S3) calls the SAME builder with
+		// start); the post-scout RePlan calls the SAME builder with
 		// current="scout" + measured signals, so both reason from the same goal,
 		// recall, catalog, carryover, and bench — one signal-conditioned call apart.
 		planIn := o.advisorPlanInput(ctx, string(PhaseStart), router.RoutingSignals{}, req, state, cs, cycle, envSnap, benchedCLIs)
 		// ClampPlanToFloorWith's tddPinned reads planIn.Signals, empty here (no
 		// handoffs yet) — cycle_size!="trivial" evaluates true, so tdd is pinned on
 		// the conservative (more-mandatory) side at plan time. The floor is the
-		// user-resolved set (WS4) or the safe default; the router self-seals the
+		// user-resolved set or the safe default; the router self-seals the
 		// non-removable evaluator regardless.
 		if raw, perr := o.planner.Plan(planIn); perr != nil {
 			fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase advisor Plan failed (degrading to static spine): %v\n", perr)
 		} else if raw != nil {
-			// WS2-S2: record the WS2-S1 structural validation of the advisor's RAW
-			// plan (pre-clamp, so the advisor's intent is visible) as standalone
+			// Record the structural validation of the advisor's RAW plan
+			// (pre-clamp, so the advisor's intent is visible) as standalone
 			// telemetry. Report-only — it never alters the plan; the clamp below
 			// remains the sole disposer.
 			o.recordPlanRejections(ctx, cycle, cs, router.ValidatePlan(planIn, raw))
 			var clamps []router.Clamp
 			clampedPlan, clamps = router.ClampPlanToFloorWith(planIn, raw, o.resolvedShipFloor(), cs.IntentRequired)
-			// MR4(a): re-validate every entry's {cli,tier} against its phase's
+			// Re-validate every entry's {cli,tier} against its phase's
 			// guardrails + the live catalog, regardless of ModelRouting mode — even
 			// under advisory the clamped proposal is what gets LOGGED to
-			// phase-plan.json (I2); only the projection onto PhaseRequest in
+			// phase-plan.json; only the projection onto PhaseRequest in
 			// dispatch() is gated on ==Auto. Skipped entirely under the static
 			// zero-value (nothing to clamp: static never proposes anything to
 			// dispatch, so there is nothing worth persisting either).
@@ -851,10 +846,10 @@ func (o *Orchestrator) planCycle(ctx context.Context, req CycleRequest, state St
 				clamps = append(clamps, mrClamps...)
 			}
 			o.recordPhasePlan(ctx, cycle, cs, clampedPlan, clamps)
-			// Register advisor-minted phases (Steps 11/12) into runners +
-			// catalog + routing BEFORE the dispatch loop, so a minted phase the
-			// plan selected is dispatchable + routable through the same path as a
-			// built-in. The trust-kernel clamp is enforced inside the registrar.
+			// Register advisor-minted phases into runners + catalog + routing
+			// BEFORE the dispatch loop, so a minted phase the plan selected is
+			// dispatchable + routable through the same path as a built-in. The
+			// trust-kernel clamp is enforced inside the registrar.
 			o.registerMintedPhases(clampedPlan)
 		}
 	}
@@ -869,19 +864,16 @@ func (o *Orchestrator) planCycle(ctx context.Context, req CycleRequest, state St
 	}
 }
 
-// profileForModelRouting resolves a phase's profiles.Profile for the MR4(a)
-// guardrail check by reading .evolve/profiles/<agent>.json from the cycle's
+// profileForModelRouting resolves a phase's profiles.Profile for the
+// model-routing guardrail check by reading .evolve/profiles/<agent>.json from the cycle's
 // ProjectRoot, where <agent> is the phase's AGENT name (phaseAgentName table —
 // the cycle-safe static mirror of each phase package's AgentPromptName(), which
-// core cannot import without an import cycle). This closes the DI seam that
-// previously returned nil for every phase, silently disabling the whole
-// floor/ceiling/universal-floor envelope guard in the composed production path.
-// nil is still returned — the documented ValidatePin "nothing to validate ⇒ ok"
-// pass-through — but now ONLY when the profile is genuinely absent: a phase with
-// no agent name (e.g. native ship), an unconfigured profiles dir, or a missing
-// profile file (mint-only phases). A resolved profile with no explicit
-// model_tier_envelope is returned non-nil so router.ClampPlanModelRouting's
-// universalTierFloor still governs it.
+// core cannot import without an import cycle). nil is returned only when the
+// profile is genuinely absent — the documented ValidatePin "nothing to
+// validate ⇒ ok" pass-through: a phase with no agent name (e.g. native ship),
+// an unconfigured profiles dir, or a missing profile file (mint-only phases).
+// A resolved profile with no explicit model_tier_envelope is returned non-nil
+// so router.ClampPlanModelRouting's universalTierFloor still governs it.
 func (o *Orchestrator) profileForModelRouting(projectRoot, phase string) *profiles.Profile {
 	agent, ok := phaseAgentName[phase]
 	if !ok {

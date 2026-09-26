@@ -11,10 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// coverage_batch2_test.go — error-path branches to drive internal/bridge
-// toward 100%: profile/manifest validation, flag parsing edges, launch
-// guard failures, prompt/dir I/O errors, and tmux resume/working-dir paths.
-
 func writeJSON(t *testing.T, path, body string) string {
 	t.Helper()
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
@@ -62,8 +58,7 @@ func TestLoadProfile_AllBranches(t *testing.T) {
 	}
 }
 
-// TestLoadProfile_NoSandbox pins the back-compat default: an absent sandbox
-// block leaves Sandbox nil (v1 profiles never carried one).
+// An absent sandbox block leaves Sandbox nil: v1 profiles never carried one.
 func TestLoadProfile_NoSandbox(t *testing.T) {
 	p, err := LoadProfile(writeJSON(t, filepath.Join(t.TempDir(), "nosb.json"),
 		`{"name":"n","permission_mode":"default"}`))
@@ -94,12 +89,10 @@ func TestLoadManifest_AndParse_Errors(t *testing.T) {
 }
 
 func TestParseLaunchArgs_Branches(t *testing.T) {
-	// space form
 	r, err := parseLaunchArgs([]string{"--cli", "claude-p", "--model", "haiku", "--agent", "scout"}, nil)
 	if err != nil || r.cli != "claude-p" || r.model != "haiku" || r.agent != "scout" {
 		t.Fatalf("space form: %+v err=%v", r, err)
 	}
-	// = form, bool flags, passthrough
 	r, err = parseLaunchArgs([]string{"--cli=codex", "--validate-only", "--dry-run", "--require-full",
 		"--allow-bypass", "--human-input", "--stream-output", "--", "--bare", "--x"}, nil)
 	if err != nil || !r.validateOnly || !r.dryRun || !r.requireFull || !r.allowBypass || !r.humanInput || r.streamOutput != "true" {
@@ -116,7 +109,6 @@ func TestParseLaunchArgs_Branches(t *testing.T) {
 			t.Fatalf("args %v should error", bad)
 		}
 	}
-	// env fallbacks
 	r, _ = parseLaunchArgs(nil, map[string]string{
 		"BRIDGE_CLI": "agy", "PROFILE_PATH": "/p", "RESOLVED_MODEL": "opus",
 		"BRIDGE_REQUIRE_FULL": "1", "BRIDGE_ALLOW_BYPASS": "1", "VALIDATE_ONLY": "1",
@@ -128,19 +120,15 @@ func TestParseLaunchArgs_Branches(t *testing.T) {
 
 func TestLaunchArgs_ErrorBranches(t *testing.T) {
 	fx := newFixture(t, "claude-p", "")
-	// unknown flag → parse error
 	if code, se := runLookup(t, &fakeRunner{}, fx.args("claude-p", "--bogus"), nil); code != ExitBadFlags || !strings.Contains(se, "unknown flag") {
 		t.Fatalf("unknown flag: code=%d se=%q", code, se)
 	}
-	// invalid permission-mode
 	if code, se := runLookup(t, &fakeRunner{}, fx.args("claude-p", "--permission-mode=bogus"), nil); code != ExitBadFlags || !strings.Contains(se, "invalid --permission-mode") {
 		t.Fatalf("bad perm-mode: code=%d se=%q", code, se)
 	}
-	// bad session-name
 	if code, se := runLookup(t, &fakeRunner{}, fx.args("claude-p", "--session-name=bad/slash"), nil); code != ExitBadFlags || !strings.Contains(se, "invalid --session-name") {
 		t.Fatalf("bad session-name: code=%d se=%q", code, se)
 	}
-	// prompt not readable
 	badPrompt := fx.args("claude-p")
 	for i, a := range badPrompt {
 		if strings.HasPrefix(a, "--prompt-file=") {
@@ -150,7 +138,6 @@ func TestLaunchArgs_ErrorBranches(t *testing.T) {
 	if code, se := runLookup(t, &fakeRunner{}, badPrompt, nil); code != ExitBadFlags || !strings.Contains(se, "not readable") {
 		t.Fatalf("unreadable prompt: code=%d se=%q", code, se)
 	}
-	// profile load fail
 	badProf := fx.args("claude-p")
 	for i, a := range badProf {
 		if strings.HasPrefix(a, "--profile=") {
@@ -193,7 +180,6 @@ func TestPreparePrompt_Branches(t *testing.T) {
 	if b, _ := os.ReadFile(filepath.Join(ws, "challenge-token.txt")); !strings.Contains(string(b), "TOK99") {
 		t.Fatal("challenge-token.txt should hold the minted token")
 	}
-	// read error: prompt file is a directory
 	if _, err := preparePrompt(&Config{PromptFile: ws, Workspace: ws}, deps); err == nil {
 		t.Fatal("reading a directory as prompt should error")
 	}
@@ -259,7 +245,6 @@ func TestRunTmuxREPL_NamedSessionResume(t *testing.T) {
 func TestCodexDriver_UnrecognizedModelOmitsM(t *testing.T) {
 	fx := newFixture(t, "codex", "")
 	fr := &fakeRunner{writeArtifactPath: fx.artifact, writeArtifactBody: "ok"}
-	// --model=weird → not a codex model name → omit -m
 	code, _ := runLookup(t, fr, codexArgs(fx, "weird"), nil)
 	if code != ExitOK {
 		t.Fatalf("exit = %d, want ExitOK", code)

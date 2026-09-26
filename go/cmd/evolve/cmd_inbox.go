@@ -1,7 +1,3 @@
-// cmd_inbox.go routes `evolve inbox batches` to the deterministic backlog
-// classifier (internal/inboxbatch) — the operator view of the SAME grouping
-// the triage prompt receives, so "why did triage batch these?" is answerable
-// from the terminal without reading a prompt transcript.
 package main
 
 import (
@@ -15,6 +11,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 )
 
+// runInbox dispatches `evolve inbox <quarantine|ack-fingerprint|consume|batches>`.
+// The batches path routes to the deterministic backlog classifier
+// (internal/inboxbatch) — the operator view of the SAME grouping the triage
+// prompt receives, so "why did triage batch these?" is answerable from the
+// terminal without reading a prompt transcript.
 func runInbox(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) >= 1 && args[0] == "quarantine" {
 		return runInboxQuarantine(args[1:], stdin, stdout, stderr)
@@ -65,11 +66,10 @@ func runInbox(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	for _, w := range warns {
 		fmt.Fprintf(stderr, "inbox batches: WARN skipped %s\n", w)
 	}
-	// ADR-0074 I1: the operator's own worklist uses the SAME partition triage
-	// (internal/phases/triage/triage.go:236) and the claim floor
-	// (inboxmover.Claim) already use — console-routed work is operator-owned
-	// and is never a batch a lane may draw. Classifying the whole backlog
-	// presented it as selectable, with no reason and no separation.
+	// The operator's own worklist uses the SAME partition triage and the claim
+	// floor (inboxmover.Claim) already use — console-routed work is
+	// operator-owned and is never a batch a lane may draw.
+	// See ADR-0074.
 	dispatchable, console, reasons := inboxbatch.PartitionConsole(items, laneForbidden(envOrCwd("EVOLVE_PROJECT_ROOT"), stderr))
 	batches := inboxbatch.Classify(dispatchable, cfg)
 	if asJSON {

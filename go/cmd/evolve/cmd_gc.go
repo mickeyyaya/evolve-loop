@@ -14,16 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
 )
 
-// cmd_gc.go — `evolve gc`: the operator surface for the crash-recovery tmux
-// session GC. The same liveness sweep runs automatically at loop startup and
-// after every cycle (see gcOrphanSessions); this command exposes it for manual
-// cleanup after a crash and for inspection via --dry-run.
-//
-// SAFETY: reaps only sessions in the evolve namespace whose creator PID is dead.
-// A live concurrent run's sessions (live PIDs) are never touched — the same
-// killer-B guarantee the per-run registry reaper provides, enforced here by
-// process liveness instead of file scoping.
-
 // runGC implements `evolve gc [--dry-run]`.
 func runGC(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve gc", flag.ContinueOnError)
@@ -63,7 +53,7 @@ func runGC(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "evolve gc: error: %s\n", e)
 	}
 
-	// F6: also sweep whole per-run tmux sockets a crashed loop left behind.
+	// Also sweep whole per-run tmux sockets a crashed loop left behind.
 	var srep swarm.OrphanSocketReport
 	if *dryRun {
 		noopKill := func(_ context.Context, _ string) error { return nil }
@@ -80,9 +70,6 @@ func runGC(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "evolve gc: socket error: %s\n", e)
 	}
 
-	// S5: the worktree+branch backlog sweep, which until now had no operator
-	// surface at all (observable only as a JSON manifest written mid-batch by
-	// runGCHook).
 	wrc := gcWorkspaceSweep(*projectRoot, *dryRun, stdout, stderr)
 
 	if len(rep.Errors) > 0 || len(srep.Errors) > 0 || wrc != 0 {
@@ -91,29 +78,20 @@ func runGC(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	return 0
 }
 
-// gcWorkspaceSweep runs the S4/S5 worktree+branch sweep for an operator.
-//
-// The asymmetry with the in-loop hook is deliberate and documented in
-// --project-root's help: an explicit operator invocation is ENFORCE (they
-// typed the command at a named repo), while the loop's own hook defaults to
-// shadow because it fires unattended on every batch. --dry-run is the preview,
-// and it mutates nothing.
+// gcWorkspaceSweep runs the worktree+branch backlog sweep for an operator.
 //
 // Safety is inherited from the planner, not re-implemented here: PlanWorktrees
-// plans deletes only for merged, clean, dead worktrees/branches and emits
-// flag-* items for dirty or UNMERGED ones, which ApplyWorktrees never acts on
-// (it uses `git branch -d`, never -D). Unlanded cycle work is exactly what
-// this backlog protects, so this command prints flags but never upgrades one
-// to a deletion. Returns non-zero only when the plan itself failed.
+// only plans deletes for merged, clean, dead worktrees/branches and flags the
+// rest; this command prints flags but never upgrades one to a deletion.
+// Returns non-zero only when the plan itself failed.
 func gcWorkspaceSweep(projectRoot string, dryRun bool, stdout, stderr io.Writer) int {
 	if projectRoot == "" {
 		if !dryRun {
 			fmt.Fprintf(stderr, "evolve gc: mutating run refused: --project-root must be explicitly set\n")
 			return 1
 		}
-		// For --dry-run only, cwd is allowed. Unlike runWorktreeGC, a mutating
-		// sweep requires explicit aim rather than acting on whatever repo we happen
-		// to be standing in.
+		// For --dry-run only, cwd is allowed: unlike runWorktreeGC, a mutating
+		// sweep requires explicit aim, not whatever repo we happen to be standing in.
 		cwd, err := os.Getwd()
 		if err != nil {
 			fmt.Fprintf(stderr, "evolve gc: workspace sweep skipped: no --project-root and cwd is unreadable: %v\n", err)

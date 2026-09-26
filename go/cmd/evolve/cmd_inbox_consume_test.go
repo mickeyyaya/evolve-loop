@@ -1,23 +1,5 @@
 package main
 
-// cmd_inbox_consume_test.go — RED contract for the operator-facing half of
-// Defect A (fault-localization-report.md E4/E5/E8).
-//
-// The incident's P0 reached .evolve/inbox/consumed/ by an operator `mv`, and
-// the ack never rode along because it is a SEPARATE manual command
-// (`evolve inbox ack-fingerprint`) that nobody remembered to run. `evolve
-// inbox consume <item-path>` makes the move and the ack one transaction, so
-// the toil-and-tamper surface the sanctioned flows exist to avoid disappears.
-//
-// This is the ergonomic seam. The load-bearing self-heal is the reconciler
-// in cmd_loop_blockerbreaker_reconcile_test.go, which covers items consumed
-// by any route (including a bare `mv`) and repairs the CURRENT live tree.
-// Both must share ONE extraction path — do not duplicate the
-// unmarshal+parse+append sequence per call site.
-//
-// Every predicate here drives the REAL production entrypoint (runInbox),
-// never a helper in isolation: a wiring proof is a reachability test.
-
 import (
 	"bytes"
 	"os"
@@ -26,8 +8,6 @@ import (
 	"testing"
 )
 
-// writePendingItem drops one JSON item into .evolve/inbox/ (pending) and
-// returns its path.
 func writePendingItem(t *testing.T, evolveDir, name, body string) string {
 	t.Helper()
 	dir := filepath.Join(evolveDir, "inbox")
@@ -41,21 +21,14 @@ func writePendingItem(t *testing.T, evolveDir, name, body string) string {
 	return p
 }
 
-// withProjectRoot points the command's root resolution (envOrCwd
-// "EVOLVE_PROJECT_ROOT") at the test tree.
 func withProjectRoot(t *testing.T, root string) {
 	t.Helper()
 	t.Setenv("EVOLVE_PROJECT_ROOT", root)
 }
 
-// TestRunInbox_Consume_MovesItemAndAcksFingerprint is the transaction: one
-// invocation must both land the item in consumed/ AND write the ack ledger,
-// with no separate `ack-fingerprint` call.
-//
-// The fixture's kind is "pipeline-repair" — the value the incident's own P0
-// and driving item carry. kind:"pipeline-defect" matches ZERO live items, so
-// an implementation gated on it would pass a synthetic fixture and never
-// fire in production.
+// The fixture's kind is "pipeline-repair": kind:"pipeline-defect" matches ZERO
+// live items, so gating on it would pass a synthetic fixture and never fire
+// in production.
 func TestRunInbox_Consume_MovesItemAndAcksFingerprint(t *testing.T) {
 	root := t.TempDir()
 	withProjectRoot(t, root)
@@ -83,10 +56,6 @@ func TestRunInbox_Consume_MovesItemAndAcksFingerprint(t *testing.T) {
 	}
 }
 
-// TestRunInbox_Consume_ItemWithoutFingerprintStillMoves pins the gate as
-// parse-success: a routine item carrying no fingerprint consumes normally
-// and simply writes no ledger record. Non-defect items no-op naturally —
-// that is why no `kind` vocabulary is needed, and why none can drift.
 func TestRunInbox_Consume_ItemWithoutFingerprintStillMoves(t *testing.T) {
 	root := t.TempDir()
 	withProjectRoot(t, root)
@@ -106,8 +75,6 @@ func TestRunInbox_Consume_ItemWithoutFingerprintStillMoves(t *testing.T) {
 	}
 }
 
-// TestRunInbox_Consume_MissingItemReturnsNonZero (negative): a bad path
-// fails loudly and touches nothing.
 func TestRunInbox_Consume_MissingItemReturnsNonZero(t *testing.T) {
 	root := t.TempDir()
 	withProjectRoot(t, root)
@@ -129,8 +96,6 @@ func TestRunInbox_Consume_MissingItemReturnsNonZero(t *testing.T) {
 	}
 }
 
-// TestRunInbox_Consume_NoArgReturnsUsage (negative/edge): the subcommand is
-// registered and reports usage rather than panicking on an empty arg list.
 func TestRunInbox_Consume_NoArgReturnsUsage(t *testing.T) {
 	root := t.TempDir()
 	withProjectRoot(t, root)

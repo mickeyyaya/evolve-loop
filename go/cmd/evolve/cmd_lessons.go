@@ -1,10 +1,5 @@
 package main
 
-// cmd_lessons.go — `evolve lessons recurrence` renders the deterministic
-// recurrence ledger (internal/recurrence): patterns sorted by descending count
-// with each pattern's fix-item status. Pure reader — no state mutation, safe to
-// run mid-batch.
-
 import (
 	"fmt"
 	"io"
@@ -14,6 +9,9 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/recurrence"
 )
 
+// runLessons implements `evolve lessons recurrence`, which renders the
+// deterministic recurrence ledger (internal/recurrence). It is a pure reader —
+// no state mutation — so it is safe to run mid-batch.
 func runLessons(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
 		fmt.Fprintln(stderr, "evolve lessons: usage: lessons recurrence [--project-root P]")

@@ -1,53 +1,5 @@
 package bridge
 
-// completion_cancel_parity_test.go — the RED contract for cycle-1236's
-// completion-contract-cancel-parity.
-//
-// The defect. When the wait loop's context is cancelled (orchestrator timeout,
-// SIGTERM, the next phase tearing the session down) it takes ONE final
-// completion poll before giving up, so a session that finished at the buzzer is
-// not laundered into ExitArtifactTimeout (driver_tmux_repl.go:565-582, the
-// c2258b72 fix). That final poll is handed the ALREADY-CANCELLED ctx, and the
-// comment says why that was thought safe: "the artifact detector is a pure file
-// stat, so the dead ctx cannot fail this last look".
-//
-// True for exactly ONE of the three completionDetector implementations the same
-// line dispatches to (driver_tmux_repl.go:481 builds the detector from
-// cfg.Completion):
-//
-//	artifactDetector      — os.Stat, ctx-free, plus an explicit short-circuit
-//	stdoutDetector        — deps.Tmux.CapturePane(ctx, …)     (completion.go:266)
-//	gitEvidenceDetector   — deps.Runner(ctx, "git", …)        (completion.go:106)
-//
-// exec.CommandContext REFUSES to start a process on an already-cancelled
-// context, so for the latter two the final look cannot run at all: the transport
-// errors, both detectors correctly swallow that as "not ready" (right policy for
-// a transient mid-wait capture failure), and the finished session exits
-// ExitArtifactTimeout. The benign-teardown grace exists for one contract out of
-// three.
-//
-// The trap this contract also pins. The artifact short-circuit
-// (completion.go:213) is keyed on `ctx.Err() != nil`. Handing the final poll a
-// LIVE context — the obvious fix — silently switches that short-circuit off, and
-// artifactDetector then demands a fresh 2-tick stability window it can never
-// accrue inside one call. So the naive fix regresses the one contract that
-// already works. Finality must be signalled to the detector EXPLICITLY rather
-// than inferred from cancellation; AC-4 below is the guard.
-//
-// Test map (every case drives the REAL production wait loop via
-// Engine.LaunchArgs — a detector polled in isolation proves nothing about the
-// caller that starves it, and the caller IS the fault site):
-//
-//	AC-1 stdout parity — CancelAfterIdle_CompletesNotTimeout (+ negative)
-//	AC-2 git parity    — CancelAfterEvidenceCommit_CompletesNotTimeout (+ negative)
-//	AC-3 transport     — the fakes REFUSE to run on a dead ctx, so a fix that
-//	                     merely re-orders code without supplying a usable context
-//	                     cannot pass. This is the anti-no-op axis.
-//	AC-4 artifact non-regression — the pre-existing guards
-//	                     TestTmuxREPL_CancelAfterDeliverable_CompletesNotTimeout and
-//	                     TestArtifactDetector_CtxCancelledShortCircuitsDebounce must
-//	                     still hold after the finality signal is re-keyed.
-
 import (
 	"bytes"
 	"context"
@@ -61,17 +13,14 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core/evidence"
 )
 
-// waitLoopTickCanceller returns a Deps.Sleep hook that counts WAIT-LOOP ticks
-// and fires at the nth one. Ticks are counted only after "prompt delivered"
-// appears on stderr: the wait loop sleeps exactly once per iteration at the top
-// of its body (driver_tmux_repl.go:562), immediately before the ctx.Err() check,
-// so the nth call lands the cancellation precisely in the gap before poll n —
-// making poll n the loop's one final post-cancel look. Counting ticks rather
-// than tmux captures keeps the timing independent of how many captures boot
-// happens to make.
+// waitLoopTickCanceller returns a Deps.Sleep hook that fires at the nth
+// wait-loop tick after "prompt delivered" appears on stderr, landing the
+// cancellation precisely in the gap before poll n — making poll n the loop's
+// one final post-cancel look. Counting ticks rather than tmux captures keeps
+// the timing independent of how many captures boot happens to make.
 //
-// fired reports whether the injection ever ran; every test asserts it, so a
-// harness that silently never cancelled can never be mistaken for a pass.
+// fired reports whether the injection ever ran, so a harness that silently
+// never cancelled can never be mistaken for a pass.
 func waitLoopTickCanceller(stderr *bytes.Buffer, n int, onFire func()) (sleep func(time.Duration), fired *bool) {
 	var done bool
 	ticks := 0
@@ -86,8 +35,6 @@ func waitLoopTickCanceller(stderr *bytes.Buffer, n int, onFire func()) (sleep fu
 		}
 	}, &done
 }
-
-// --- AC-1 + AC-3: the stdout contract ---------------------------------------
 
 // stdoutParityPanes is the pane script from TestClaudeTmux_StdoutCompletion_
 // NoArtifactNeeded, reused verbatim so the detector's state machine is driven
@@ -104,17 +51,9 @@ func stdoutParityPanes() []string {
 	}
 }
 
-// TestTmuxREPL_StdoutContract_CancelAfterIdle_CompletesNotTimeout pins AC-1.
-// The REPL has gone idle on the prompt marker and the very next poll is the one
-// that would complete the turn — then the orchestrator tears the session down.
-// The stdout contract must get the SAME benign-teardown grace the artifact
-// contract already gets: a finished advisor/router turn is a completed phase,
-// not a timeout.
-//
-// ctxHonoringTmux (driver_tmux_repl_cancel_test.go:29) is what makes this test
-// un-gameable: it reproduces exec.CommandContext's refusal to fork on a dead
-// ctx, so the final capture succeeds ONLY if the fix actually hands the detector
-// a usable context.
+// ctxHonoringTmux reproduces exec.CommandContext's refusal to fork on a dead
+// ctx, so this test's final capture can only succeed if the fix hands the
+// detector a genuinely usable context.
 func TestTmuxREPL_StdoutContract_CancelAfterIdle_CompletesNotTimeout(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &ctxHonoringTmux{&fakeTmux{paneSeq: stdoutParityPanes()}}
@@ -147,12 +86,10 @@ func TestTmuxREPL_StdoutContract_CancelAfterIdle_CompletesNotTimeout(t *testing.
 	}
 }
 
-// TestTmuxREPL_StdoutContract_CancelWhileStreaming_StillTimesOut is AC-1's
-// honest negative. The pane changes on every tick (the agent is mid-stream), so
-// nothing is ready when the teardown lands. A fix that grants the final poll a
-// live context must not thereby invent completion — an unfinished stdout turn
-// still owes ExitArtifactTimeout. Mirrors TestTmuxREPL_CancelWithoutDeliverable_
-// StillTimesOut for the artifact contract.
+// The pane changes on every wait-loop tick to model an agent mid-stream, so
+// nothing is ready when the teardown lands; mirrors
+// TestTmuxREPL_CancelWithoutDeliverable_StillTimesOut for the artifact
+// contract.
 func TestTmuxREPL_StdoutContract_CancelWhileStreaming_StillTimesOut(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
 	streaming := []string{
@@ -180,13 +117,11 @@ func TestTmuxREPL_StdoutContract_CancelWhileStreaming_StillTimesOut(t *testing.T
 	}
 }
 
-// --- AC-2 + AC-3: the git-evidence contract ---------------------------------
-
 // gitEvidenceRunner is a Deps.Runner fake for the git-evidence contract with
 // PRODUCTION ctx semantics: like exec.CommandContext, it refuses to run on an
-// already-cancelled context. That refusal is the whole point — it is exactly
-// what starves gitEvidenceDetector's final poll today, and no reordering of the
-// detector's internals can satisfy it. Only a usable context can.
+// already-cancelled context. That refusal is exactly what starves
+// gitEvidenceDetector's final poll, and no reordering of the detector's
+// internals can satisfy it. Only a usable context can.
 //
 // head is read through a closure so a test can advance HEAD in the same gap it
 // cancels the context, modelling "the phase committed its evidence and the
@@ -221,9 +156,9 @@ func (g *gitEvidenceRunner) run(ctx context.Context, name, _ string, args []stri
 }
 
 // gitFixture prepares the workspace state gitEvidenceDetector reads at
-// construction: the challenge token it verifies commit trailers against
-// (completion.go:93). Without it the detector fail-closes and can never verify,
-// which would make a "still times out" assertion pass for the wrong reason.
+// construction: the challenge token it verifies commit trailers against.
+// Without it the detector fail-closes and can never verify, which would make
+// a "still times out" assertion pass for the wrong reason.
 func gitFixture(t *testing.T, fx launchFixture) string {
 	t.Helper()
 	tok := "gitevi-" + filepath.Base(fx.ws)
@@ -233,13 +168,9 @@ func gitFixture(t *testing.T, fx launchFixture) string {
 	return tok
 }
 
-// TestTmuxREPL_GitContract_CancelAfterEvidenceCommit_CompletesNotTimeout pins
-// AC-2, the git-evidence twin of the original artifact case: the phase commits
-// its deliverable and the orchestrator cancels IN THE SAME POLL GAP, so the
-// final post-cancel poll is the first look that could ever observe the advance.
-// Under a dead ctx `git rev-parse` cannot even start, so the verified evidence
-// commit sitting in the worktree is reported as "no completion" and a delivered
-// phase exits ExitArtifactTimeout.
+// The phase commits its deliverable and the context is cancelled in the same
+// poll gap, so the final post-cancel poll is the first look that could ever
+// observe the advance.
 func TestTmuxREPL_GitContract_CancelAfterEvidenceCommit_CompletesNotTimeout(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
 	tok := gitFixture(t, fx)
@@ -291,10 +222,8 @@ func TestTmuxREPL_GitContract_CancelAfterEvidenceCommit_CompletesNotTimeout(t *t
 	}
 }
 
-// TestTmuxREPL_GitContract_CancelWithoutEvidenceCommit_StillTimesOut is AC-2's
-// honest negative on TWO axes at once: HEAD never advances, AND the commit
-// message carries no verifying trailer. Neither a live final context nor a
-// re-keyed finality signal may turn "the phase committed nothing" into success.
+// The negative on two axes at once: HEAD never advances, and the commit
+// message carries no verifying trailer.
 func TestTmuxREPL_GitContract_CancelWithoutEvidenceCommit_StillTimesOut(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
 	_ = gitFixture(t, fx)

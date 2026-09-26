@@ -9,9 +9,6 @@ import (
 	"testing"
 )
 
-// TestPrefixLineWriter_AttributesAndSerializes: two concurrent writers sharing one
-// sink and mutex produce 100 whole lines, each prefixed with its own tag and none
-// torn/interleaved mid-line.
 func TestPrefixLineWriter_AttributesAndSerializes(t *testing.T) {
 	var mu sync.Mutex
 	var sink bytes.Buffer
@@ -45,8 +42,6 @@ func TestPrefixLineWriter_AttributesAndSerializes(t *testing.T) {
 	}
 }
 
-// TestPrefixLineWriter_BuffersPartialUntilNewline: output without a trailing
-// newline is held until Flush, so a prefix never splits a line.
 func TestPrefixLineWriter_BuffersPartialUntilNewline(t *testing.T) {
 	var mu sync.Mutex
 	var sink bytes.Buffer

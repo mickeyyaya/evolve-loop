@@ -8,14 +8,6 @@ import (
 	"testing"
 )
 
-// driver_artifact_relocate_test.go — artifactReady tolerance for the
-// cycle-108 ExitArtifactTimeout root cause: agents intermittently wrote the
-// report to <workspace>/workspace/<file> (reading the doc's "workspace/"
-// prefix as a literal subdir) while the driver polls only the canonical
-// <workspace>/<file>. artifactReady accepts either location and relocates the
-// non-canonical write so downstream phases — which read the canonical path —
-// still resolve it. See docs/architecture/adr/0024-*.md (Step 0).
-
 func TestArtifactReady_CanonicalPresent(t *testing.T) {
 	ws := t.TempDir()
 	canonical := filepath.Join(ws, "scout-report.md")
@@ -53,7 +45,6 @@ func TestArtifactReady_RelocatesFromWorkspaceSubdir(t *testing.T) {
 	if from != subdir {
 		t.Fatalf("relocatedFrom = %q, want %q", from, subdir)
 	}
-	// The content must now live at the canonical path the driver/runner read.
 	got, err := os.ReadFile(canonical)
 	if err != nil {
 		t.Fatalf("canonical not present after relocation: %v", err)
@@ -61,18 +52,15 @@ func TestArtifactReady_RelocatesFromWorkspaceSubdir(t *testing.T) {
 	if string(got) != string(body) {
 		t.Fatalf("relocated content = %q, want %q", got, body)
 	}
-	// The non-canonical copy must be gone (single source of truth).
 	if _, statErr := os.Stat(subdir); !os.IsNotExist(statErr) {
 		t.Fatalf("subdir copy should be removed after relocation; stat err=%v", statErr)
 	}
-	// No temp file may linger in the workspace after a successful relocate.
 	assertNoTempArtifacts(t, ws)
 }
 
 func TestArtifactReady_RelocatesOverEmptyCanonical(t *testing.T) {
-	// Agent created an empty canonical placeholder but wrote the real content
-	// to the workspace/ subdir. The empty canonical must not count as ready;
-	// the relocation must overwrite it with the real content.
+	// The canonical file is an empty placeholder; the real content lives in
+	// the workspace/ subdir.
 	ws := t.TempDir()
 	canonical := filepath.Join(ws, "scout-report.md")
 	subdir := filepath.Join(ws, "workspace", "scout-report.md")
@@ -133,10 +121,8 @@ func TestArtifactReady_RelocationFailureSurfacesError(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("read-only directory permissions are not enforced for root")
 	}
-	// Fallback artifact exists but the workspace dir is read-only, so the
-	// relocation cannot write the canonical path. The error must surface
-	// (not be swallowed into a silent (false, "")), and no canonical file
-	// may be created.
+	// The workspace dir is read-only, so the relocation cannot write the
+	// canonical path.
 	ws := t.TempDir()
 	canonical := filepath.Join(ws, "scout-report.md")
 	subdir := filepath.Join(ws, "workspace", "scout-report.md")
@@ -164,11 +150,6 @@ func TestArtifactReady_RelocationFailureSurfacesError(t *testing.T) {
 	}
 }
 
-// TestArtifactReady_RelocatesFromWorktreeRoot — cycle-141 ExitArtifactTimeout
-// root cause: the builder runs with cwd=worktree (driver_tmux_repl.go:77) and
-// the prompt names the artifact by bare relative path ("Write build-report.md"),
-// so the agent writes it into the worktree root — a path the driver did not
-// poll. artifactReady must search the worktree cwd and relocate to canonical.
 func TestArtifactReady_RelocatesFromWorktreeRoot(t *testing.T) {
 	ws := t.TempDir()
 	wt := t.TempDir()
@@ -197,9 +178,6 @@ func TestArtifactReady_RelocatesFromWorktreeRoot(t *testing.T) {
 	assertNoTempArtifacts(t, ws)
 }
 
-// TestArtifactReady_RelocatesFromWorktreeWorkspaceSubdir — the agent (cwd=
-// worktree) may also read the doc's "workspace/" prefix as a literal subdir,
-// writing <worktree>/workspace/<file>. That path must also be searched.
 func TestArtifactReady_RelocatesFromWorktreeWorkspaceSubdir(t *testing.T) {
 	ws := t.TempDir()
 	wt := t.TempDir()
@@ -224,10 +202,6 @@ func TestArtifactReady_RelocatesFromWorktreeWorkspaceSubdir(t *testing.T) {
 	}
 }
 
-// TestArtifactReady_WorkspaceSubdirWinsOverWorktree — when the artifact exists
-// in BOTH the workspace/ subdir (cycle-108 path) and the worktree (cycle-141
-// path), the workspace/ subdir is preferred: it is closest to the canonical
-// location and is the path most agents already use. Pins search-order priority.
 func TestArtifactReady_WorkspaceSubdirWinsOverWorktree(t *testing.T) {
 	ws := t.TempDir()
 	wt := t.TempDir()
@@ -258,9 +232,6 @@ func TestArtifactReady_WorkspaceSubdirWinsOverWorktree(t *testing.T) {
 	}
 }
 
-// TestArtifactReady_NoWorktreeConfigured_UnchangedBehavior — when cfg.Worktree
-// is empty (headless drivers, probes), behavior is byte-identical to the
-// pre-cycle-141 code: only the canonical path + the workspace/ subdir count.
 func TestArtifactReady_NoWorktreeConfigured_UnchangedBehavior(t *testing.T) {
 	ws := t.TempDir()
 	cfg := &Config{Workspace: ws, Artifact: filepath.Join(ws, "build-report.md")}

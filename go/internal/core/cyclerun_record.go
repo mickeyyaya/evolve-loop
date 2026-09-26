@@ -10,9 +10,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// recordAndBranch runs the end-of-iteration record + branch step (extracted
-// behavior-preserving from RunCycle): the success "phase" ledger append, phase
-// bindings, CompletedPhases append + cycle-state
+// recordAndBranch runs the end-of-iteration record + branch step: the success
+// "phase" ledger append, phase bindings, CompletedPhases append + cycle-state
 // persist, phase-boundary checkpoint, the success outcome record + cursor
 // advance (current/lastVerdict), and the retro and debugger non-verdict-driven
 // branches that inject cr.scheduledNext.
@@ -30,16 +29,16 @@ func (cr *cycleRun) recordAndBranch(next Phase, dr dispatchResult) (loopAction, 
 		ExitCode: 0,
 	}); err != nil {
 		lerr := fmt.Errorf("ledger append for %s: %w", next, err)
-		// ADR-0044 C1: the phase completed; a persistence failure must
-		// not erase its outcome from the timing/usage record.
+		// The phase completed; a persistence failure must not erase its
+		// outcome from the timing/usage record.
 		cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, dr.resp, dr.attemptCount, lerr.Error(), cr.cs.PhaseStartedAt))
 		return loopAbort, lerr
 	}
 
-	// Cycle-778 ship-window lease: audit's binding snapshot (`git rev-parse
-	// HEAD` inside emitPhaseBindings→recordAuditBinding) opens the window a
-	// sibling landing on main would turn into a deep-tier re-audit — acquire
-	// BEFORE a shippable snapshot; any later completed phase (normally ship, after its
+	// The ship-window lease: audit's binding snapshot (`git rev-parse HEAD`
+	// inside emitPhaseBindings→recordAuditBinding) opens a window a sibling
+	// landing on main would turn into a deep-tier re-audit — acquire before a
+	// shippable snapshot; any later completed phase (normally ship, after its
 	// push) releases below. No-op for every phase but audit; fail-open.
 	if next == PhaseAudit && (dr.resp.Verdict == VerdictPASS || dr.resp.Verdict == VerdictWARN) {
 		cr.acquireShipWindow(next)
@@ -57,21 +56,20 @@ func (cr *cycleRun) recordAndBranch(next Phase, dr dispatchResult) (loopAction, 
 		cr.releaseShipWindow()
 	}
 
-	// Cycle-636 (ship-sha-repin-after-build): close the frozen-pin
-	// SELF_SHA_TAMPERED cascade (denied ship on 625->634). A legitimate in-version
-	// rebuild replaces go/bin/evolve, but the cycle-514 boot healer only re-pins at
-	// boot — so re-pin here too, immediately after a successful build, through the
-	// SAME provenance-gated primitive (phaseintegrity.RepinIfDrifted) the boot path
-	// uses. Fail-open: refusal/error WARNs; the ship gate stays the backstop.
+	// Close the frozen-pin SELF_SHA_TAMPERED cascade: a legitimate in-version
+	// rebuild replaces go/bin/evolve, but the boot healer only re-pins at
+	// boot — so re-pin here too, immediately after a successful build,
+	// through the same provenance-gated primitive
+	// (phaseintegrity.RepinIfDrifted) the boot path uses. Fail-open:
+	// refusal/error WARNs; the ship gate stays the backstop.
 	if next == PhaseBuild {
 		repinShipSHAAfterBuild(cr.req.ProjectRoot)
 
-		// Cycle-675 (new-package-graduation-buildentry-gate, 3rd recurrence):
-		// a go/internal package NEW this cycle and absent from
+		// A go/internal package NEW this cycle and absent from
 		// go/.apicover-enforce fails the build phase HERE, with an explicit
-		// abort_reason — after the pre-review worktree normalize (so a committing
-		// builder's work is pending again) and before the phase is marked
-		// completed. Deliberately abort-capable, unlike the WARN-only
+		// abort_reason — after the pre-review worktree normalize (so a
+		// committing builder's work is pending again) and before the phase is
+		// marked completed. Deliberately abort-capable, unlike the WARN-only
 		// buildSelfCheck: graduation is the builder's own obligation, and the
 		// audit-side twin (apicoverNewPackageGraduationDefault) firing two
 		// attempts later is exactly the recurrence this closes.
@@ -103,16 +101,13 @@ func (cr *cycleRun) recordAndBranch(next Phase, dr dispatchResult) (loopAction, 
 	cr.current = next
 	cr.lastVerdict = dr.resp.Verdict
 
-	// Audit-FAIL disposition (retry + retro redesign). Decided HERE, at the audit
-	// chokepoint, from the audit's OWN declared failure class and the ADR-0072
-	// policy table — not after a full retrospective, and not from agent prose. The
-	// table has always declared code-audit-fail as {task, retry-with-fix,
-	// MaxRetries: 2}; nothing consumed it until now.
+	// Audit-FAIL disposition, decided HERE, at the audit chokepoint, from the
+	// audit's OWN declared failure class and the policy table — not after a
+	// full retrospective, and not from agent prose.
 	//
-	// scheduledNext is the authoritative-injection seam, so the dynamic-routing
-	// override cannot second-guess this decision — the same protection the retro
-	// branch has, and structurally the fix for the class of defect where a router
-	// silently ate a granted repair.
+	// scheduledNext is the authoritative-injection seam, so the
+	// dynamic-routing override cannot second-guess this decision — the same
+	// protection the retro branch has.
 	if cr.current == PhaseAudit && dr.resp.Verdict == VerdictFAIL {
 		branch, reason, sysFail := cr.o.decideAfterAuditFail(cr.cs)
 		// Spends a retry attempt and marks the repair round active, so the audit's
@@ -132,21 +127,21 @@ func (cr *cycleRun) recordAndBranch(next Phase, dr dispatchResult) (loopAction, 
 	// Retro is the one phase whose successor isn't verdict-driven: the
 	// failure-adapter consults cycle history (state.FailedAt) and the retro
 	// verdict to pick {ship | tdd | end}. Set scheduledNext so the next loop
-	// iteration runs the chosen phase. The history-branch gate is config-driven
-	// (ADR-0058) — successorStrategy resolves the completed phase's
+	// iteration runs the chosen phase. The history-branch gate is
+	// config-driven — successorStrategy resolves the completed phase's
 	// branching_strategy and owns the byte-identity degrade.
 	if cr.o.successorStrategy(cr.current) == phasespec.BranchingHistory {
 		var branch Phase
 		var extraEnv map[string]string
 		var reason string
 		var sysFail *SystemFailureSignal
-		// Carry the cross-cycle failure history onto the per-cycle checkpoint so
-		// the ADR-0072 S4 dossier composes its non-progress counters from live
+		// Carry the cross-cycle failure history onto the per-cycle checkpoint
+		// so the dossier composes its non-progress counters from live
 		// evidence (additive; keeps the judgment layer non-inert).
 		cr.cs.FailedAt = cr.state.FailedAt
 		if cr.o.cfg.Stage >= config.StageAdvisory {
-			// Failure floor Phase 3: the failure branch is advisor-
-			// decidable (clamped) and leaves a routing-decision artifact.
+			// The failure branch is advisor-decidable (clamped) and leaves
+			// a routing-decision artifact.
 			cr.routingSeq++
 			branch, extraEnv, reason, sysFail = cr.o.decideAfterRetroRouted(cr.ctx, cr.cycle, cr.cs, cr.routingSeq, dr.resp.Verdict, cr.state.FailedAt, router.RouteInput{
 				Cfg:            cr.o.cfg,
@@ -174,18 +169,19 @@ func (cr *cycleRun) recordAndBranch(next Phase, dr dispatchResult) (loopAction, 
 		consumeBookkeepingRegradeGrant(&cr.cs, reason)
 		consumeAuditRepairGrant(&cr.cs, reason)
 		reason = cr.o.escalateRetroReasonForHistory(cr.req.ProjectRoot, reason, cr.state.FailedAt)
-		// S2 disposition gate, verdict path (mirrors recordFailureLearning's
-		// contract — cycle-1046 live gap): an absent/invalid disposition is
-		// surfaced loudly in RetroDecision, never silently recorded clean.
+		// An absent/invalid disposition is surfaced loudly in RetroDecision
+		// (mirrors recordFailureLearning's contract), never silently
+		// recorded clean.
 		if gateErr := cr.o.finalizeRetroCompletion(cr.cs.WorkspacePath); gateErr != nil {
 			fmt.Fprintf(os.Stderr, "[orchestrator] WARN retro: %v\n", gateErr)
 			reason = gateErr.Error() + "; " + reason
 		}
 		cr.result.RetroDecision = reason
-		// ADR-0072 S4: a floor category classified at the retro chokepoint is a
-		// SYSTEM-level failure — mark it so the batch loop HALTS + escalates for
-		// pipeline diagnosis instead of re-selecting the same task. finalizeCycle
-		// sees SystemFailure already set and skips its own re-detection.
+		// A floor category classified at the retro chokepoint is a
+		// SYSTEM-level failure — mark it so the batch loop HALTS + escalates
+		// for pipeline diagnosis instead of re-selecting the same task.
+		// finalizeCycle sees SystemFailure already set and skips its own
+		// re-detection.
 		if sysFail != nil && cr.result.SystemFailure == nil {
 			cr.result.SystemFailure = sysFail
 		}
@@ -202,7 +198,7 @@ func (cr *cycleRun) recordAndBranch(next Phase, dr dispatchResult) (loopAction, 
 	// verdict-driven — mirror the retro branch. The debugger runner surfaces its
 	// decision on PhaseResponse.Signals; decideAfterDebugger maps it to the next
 	// phase, which the next iteration runs via scheduledNext. The signal-branch
-	// gate is config-driven (ADR-0058) — successorStrategy resolves the debugger's
+	// gate is config-driven — successorStrategy resolves the debugger's
 	// branching_strategy from the builtinControlSpec seam and owns the degrade.
 	if cr.o.successorStrategy(cr.current) == phasespec.BranchingSignal {
 		branch := cr.o.decideAfterDebugger(dr.resp)

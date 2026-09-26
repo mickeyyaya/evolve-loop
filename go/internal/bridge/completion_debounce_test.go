@@ -11,40 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
-// completion_debounce_test.go — the RED contract for cycle-1233's
-// artifact-ready-crosspoll-debounce.
-//
-// The defect (cycle-1198, observed): artifactDetector.poll completes on the
-// FIRST non-empty read of the deliverable. An agent that writes a file and then
-// fixes it up with a follow-up Edit seconds later gets its half-written
-// intermediate accepted — the gate rejected a scout-report.md that parsed
-// perfectly moments afterwards. The deliverable-side grace window that already
-// shipped (deliverable.go:180) covers absence/emptiness only; a
-// "parses fine, wrong content" read is not retried, by design.
-//
-// The fix is the artifact twin of stdoutDetector's stdoutIdlePolls debounce:
-// artifactDetector must observe the SAME (size, mtime) across
-// artifactStableTicks consecutive poll ticks (~2s apart, driven by the wait
-// loop at driver_tmux_repl.go:562) before declaring ready. mtime participates
-// because size alone is content-blind to a same-length rewrite.
-//
-// Explicitly NOT the fix (rejected, HIGH review of the cycle-1212 attempt): an
-// in-poll settle sleep. A tens-of-ms sleep inside one poll() call cannot span
-// the multi-second gap between an agent's Write and its Edit. The state must be
-// carried ACROSS calls, on the detector.
-//
-// Test map:
-//
-//	AC-1 stability  → ReadyOnlyAfterCrossPollStability (positive) +
-//	                  NotReadyWhileArtifactStillGrowing (negative, size axis) +
-//	                  NotReadyOnSameSizeRewrite (negative, mtime axis)
-//	AC-2 ctx-cancel → CtxCancelledShortCircuitsDebounce (+ its absent-file negative)
-//	AC-3 relocation → RelocationNoteSurvivesUntilStable
-//	AC-4 wiring     → TestRunTmuxREPL_ArtifactDebounceWiredIntoWaitLoop (drives the
-//	                  REAL production wait loop; a detector-only test proves nothing
-//	                  about the caller) + the untouched fixture-budget regression
-//	                  guard TestRunTmuxREPL_ExtendNoEscalationReport.
-
 // fixedMTime is an arbitrary but STABLE modification time. Tests set it
 // explicitly with os.Chtimes rather than relying on the host filesystem's
 // timestamp granularity, so a debounce keyed on mtime is exercised
@@ -91,25 +57,17 @@ func newArtifactDetectorAt(ws, artifact string) *artifactDetector {
 	return &artifactDetector{cfg: &Config{Workspace: ws, Artifact: artifact}}
 }
 
-// --- AC-1: cross-poll stability ---------------------------------------------
-
-// TestArtifactDetector_ReadyOnlyAfterCrossPollStability pins the positive half
-// of AC-1: a settled file completes, but never on the tick it is first seen.
-// The first-sighting assertion is the whole point — cycle-1198's truncated
-// deliverable was a perfectly non-empty file on exactly that tick.
 func TestArtifactDetector_ReadyOnlyAfterCrossPollStability(t *testing.T) {
 	ws := t.TempDir()
 	canonical := filepath.Join(ws, "report.md")
 	d := newArtifactDetectorAt(ws, canonical)
 
-	// Absent → not ready, no note, no error (unchanged legacy behavior).
 	if ready, _, note, err := d.poll(context.Background()); ready || err != nil || note != "" {
 		t.Fatalf("absent artifact: got (ready=%v, note=%q, err=%v), want (false, \"\", nil)", ready, note, err)
 	}
 
 	writeArtifact(t, canonical, "# report\n\nDONE\n", fixedMTime)
 
-	// First sighting must NOT complete: the file may still be mid Write→Edit.
 	ready, _, _, err := d.poll(context.Background())
 	if err != nil {
 		t.Fatalf("first sighting: unexpected error %v", err)
@@ -119,7 +77,6 @@ func TestArtifactDetector_ReadyOnlyAfterCrossPollStability(t *testing.T) {
 			"a mid-Write→Edit deliverable is accepted exactly here (cycle-1198)")
 	}
 
-	// Nothing changes afterwards → ready within the stability window.
 	got, note := pollUntilReady(t, d, artifactStableTicks+2, nil)
 	if got < 0 {
 		t.Fatalf("a file that never changed again was never accepted within %d further polls — "+
@@ -130,11 +87,6 @@ func TestArtifactDetector_ReadyOnlyAfterCrossPollStability(t *testing.T) {
 	}
 }
 
-// TestArtifactDetector_NotReadyWhileArtifactStillGrowing is the negative half of
-// AC-1 on the SIZE axis: a deliverable still being appended to must never
-// complete, no matter how many ticks pass. This is the anti-no-op assertion —
-// an implementation that keeps returning ready on first sight passes the
-// positive test above and fails here.
 func TestArtifactDetector_NotReadyWhileArtifactStillGrowing(t *testing.T) {
 	ws := t.TempDir()
 	canonical := filepath.Join(ws, "report.md")
@@ -151,11 +103,6 @@ func TestArtifactDetector_NotReadyWhileArtifactStillGrowing(t *testing.T) {
 	}
 }
 
-// TestArtifactDetector_NotReadyOnSameSizeRewrite is the negative half of AC-1 on
-// the MTIME axis, and the reason mtime is in the key at all: an agent's fix-up
-// Edit that swaps equal-length text (a typo, a flipped verdict word) leaves the
-// size identical. A size-only debounce silently degrades back to the cycle-1198
-// bug for exactly that shape.
 func TestArtifactDetector_NotReadyOnSameSizeRewrite(t *testing.T) {
 	ws := t.TempDir()
 	canonical := filepath.Join(ws, "report.md")
@@ -172,15 +119,6 @@ func TestArtifactDetector_NotReadyOnSameSizeRewrite(t *testing.T) {
 	}
 }
 
-// --- AC-2: ctx-cancel short-circuit -----------------------------------------
-
-// TestArtifactDetector_CtxCancelledShortCircuitsDebounce pins AC-2. The wait
-// loop makes ONE final poll after its context is cancelled
-// (driver_tmux_repl.go:576) precisely so a finished session is not laundered
-// into ExitArtifactTimeout. If that last look still demands a fresh stability
-// window the detector will never get another tick to complete, the debounce
-// converts every teardown-at-the-finish-line into a false timeout — turning a
-// truncated-read fix into a worse false-FAIL generator.
 func TestArtifactDetector_CtxCancelledShortCircuitsDebounce(t *testing.T) {
 	ws := t.TempDir()
 	canonical := filepath.Join(ws, "report.md")
@@ -190,8 +128,8 @@ func TestArtifactDetector_CtxCancelledShortCircuitsDebounce(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	// A brand-new detector with NO stability history at all: the cancelled ctx
-	// must make this single poll authoritative.
+	// A brand-new detector with no stability history at all: the cancelled ctx
+	// must still make this single poll authoritative.
 	ready, _, note, err := d.poll(ctx)
 	if err != nil {
 		t.Fatalf("cancelled ctx with artifact present: unexpected error %v", err)
@@ -204,7 +142,6 @@ func TestArtifactDetector_CtxCancelledShortCircuitsDebounce(t *testing.T) {
 		t.Error("short-circuit completion carried no note; the operator log line must survive the fast path")
 	}
 
-	// Negative: cancellation must not manufacture completion out of nothing.
 	empty := t.TempDir()
 	d2 := newArtifactDetectorAt(empty, filepath.Join(empty, "report.md"))
 	if ready, _, _, err := d2.poll(ctx); ready || err != nil {
@@ -213,14 +150,6 @@ func TestArtifactDetector_CtxCancelledShortCircuitsDebounce(t *testing.T) {
 	}
 }
 
-// --- AC-3: relocation-note survival -----------------------------------------
-
-// TestArtifactDetector_RelocationNoteSurvivesUntilStable pins AC-3. artifactReady
-// returns relocatedFrom exactly ONCE — on the tick it moves a non-canonical
-// write into place (cycle-108/141 tolerance). Every later tick sees the file at
-// the canonical path and returns from == "". A debounce that discards the note
-// of a not-yet-stable tick therefore permanently swallows the "the agent wrote
-// to the wrong place" diagnostic. The detector must stash it.
 func TestArtifactDetector_RelocationNoteSurvivesUntilStable(t *testing.T) {
 	ws := t.TempDir()
 	canonical := filepath.Join(ws, "report.md")
@@ -246,8 +175,6 @@ func TestArtifactDetector_RelocationNoteSurvivesUntilStable(t *testing.T) {
 	}
 }
 
-// --- AC-4: the debounce is WIRED into the production wait loop --------------
-
 // churningReviewer models an agent that keeps rewriting its deliverable: every
 // review checkpoint appends another section, so the file's size changes on
 // every tick and the stability window can never close. After `extends` verdicts
@@ -268,14 +195,9 @@ func (c *churningReviewer) Review(StopEvent) ReviewVerdict {
 	return ReviewVerdict{Action: ReviewExtend, Reason: "still working"}
 }
 
-// TestRunTmuxREPL_ArtifactDebounceWiredIntoWaitLoop is the CALLER proof: it
-// drives the real driver (Engine.LaunchArgs → runTmuxREPL → detector.poll at
-// driver_tmux_repl.go:601) rather than the detector in isolation, so a debounce
-// implemented on a struct nothing reaches cannot pass it.
-//
-// Contract: while the deliverable is still being rewritten on every tick, the
-// launch must NOT report success. Before the fix the first write completes the
-// phase immediately and the driver exits ExitOK — that is this test's RED.
+// Drives the real driver (Engine.LaunchArgs → runTmuxREPL → detector.poll)
+// rather than the detector in isolation, so a debounce implemented on a
+// struct nothing reaches cannot pass it.
 func TestRunTmuxREPL_ArtifactDebounceWiredIntoWaitLoop(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}
@@ -284,17 +206,6 @@ func TestRunTmuxREPL_ArtifactDebounceWiredIntoWaitLoop(t *testing.T) {
 	code, stderr := runTmuxOnStopReview(t, fx, tmux, rev, nil,
 		Deps{ArtifactTimeoutS: 2}, "--allow-bypass", "--agent=scout")
 
-	// Assert the POSITIVE outcome, not merely "not ExitOK". A churning
-	// deliverable must exhaust the stop-review budget and die as
-	// ExitArtifactTimeout; every other non-OK exit means the driver never
-	// reached the artifact wait loop at all (REPL boot timeout, dead-shell
-	// guard, auto-respond escalation/loop-guard — each of which narrates itself
-	// on stderr). `!= ExitOK` accepted all of those as proof of a debounce they
-	// never exercised, and the reviewer-count guard below then failed with a
-	// count and nothing else: cycle-1252's audit red was exactly this shape
-	// ("reviewer ran 0 time(s)", red-on-retry) and was undiagnosable afterwards
-	// because the driver's own explanation was discarded. Both assertions now
-	// carry stderr, so a recurrence names its cause instead of its symptom.
 	if code != ExitArtifactTimeout {
 		t.Fatalf("exit = %d, want %d (ExitArtifactTimeout): a deliverable rewritten on every poll "+
 			"tick must neither complete the phase nor exit before the wait loop — exit %d is "+
@@ -324,12 +235,9 @@ func debounceExitDiagnosis(code int) string {
 	}
 }
 
-// TestArtifactStableTicks_IsAMeaningfulWindow guards the constant itself: a
-// builder can green every test above by defining artifactStableTicks = 1, which
-// is arithmetically "one observation" — no window at all. Two consecutive
-// identical observations, ~2s apart, is the minimum that can span an agent's
-// Write→Edit gap, and it is the value the fixture-budget audit
-// (TestRunTmuxREPL_ExtendNoEscalationReport, ArtifactTimeoutS=2) was sized for.
+// Guards the constant directly: every test above could pass with
+// artifactStableTicks = 1, which is arithmetically "one observation" — no
+// window at all.
 func TestArtifactStableTicks_IsAMeaningfulWindow(t *testing.T) {
 	if artifactStableTicks < 2 {
 		t.Fatalf("artifactStableTicks = %d — a window of fewer than 2 consecutive identical "+
@@ -346,32 +254,10 @@ func TestArtifactStableTicks_IsAMeaningfulWindow(t *testing.T) {
 	}
 }
 
-// TestRunTmuxREPL_ArtifactDebounceHermeticUnderAmbientFleetEnv is the
-// ENVIRONMENT-invariance regression, and the reason it is pinned to the caller
-// proof above rather than living in a general hygiene test: the debounce's
-// gating predicate is exactly the one that kept losing runs to this.
-//
-// Cycles 1252 and 1254 were both FAILed at audit by the caller proof going red
-// in the ACS/EGPS gate while the Builder, the Auditor and `evolve selfcheck
-// build` all ran it green. Not a flake — a one-variable difference. The gate
-// (internal/acsrunner/runner.go) shells `go test` with a bare exec and no
-// cmd.Env, so it inherits the orchestrator's EVOLVE_FLEET=1 (internal/fleet).
-// runTmuxREPL reads that key through lookupEnv, and with a nil Deps.LookupEnv
-// the read reached the ambient process env: under a fleet supervisor with no
-// --worktree, the CB.2 guard correctly refuses with errWorktreeRequired ->
-// ExitBadFlags(10) BEFORE the artifact wait loop ever runs. 20 tests in this
-// package failed that way with the variable set and 0 with it unset.
-//
-// The guard is right and stays untouched. What was wrong was fixtures reading
-// the ambient environment at all, fixed at the SOURCE in newTestEngine
-// (launch_test.go) rather than by sanitizing EVOLVE_* at yet another consumer —
-// internal/core's sanitizeEnv is precisely that consumer-side workaround, and
-// it names this failure in its own comment, which is why the defect survived
-// to bite two more cycles.
-//
-// This test asserts the invariant directly: with EVOLVE_FLEET=1 exported into
-// the process, the caller proof must still reach the wait loop and time out.
-// It fails with exit 10 if anyone reintroduces an ambient env read here.
+// With EVOLVE_FLEET=1 exported into the process, the caller proof must still
+// reach the wait loop and time out rather than refuse early on
+// errWorktreeRequired: fixtures must never read the ambient process
+// environment.
 func TestRunTmuxREPL_ArtifactDebounceHermeticUnderAmbientFleetEnv(t *testing.T) {
 	t.Setenv(ipcenv.FleetKey, "1")
 

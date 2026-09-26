@@ -1,14 +1,5 @@
 package bridge
 
-// completion_secondary_test.go — Phase B pins (plan parallel-weaving-wolf,
-// ADR-0084 lineage): the artifact detector must HOLD phase-complete while a
-// contract secondary is absent, so the session survives long enough for the
-// agent to write it — the single-artifact cutoff killed retro's
-// disposition.json on 86/88 recent cycles and audit's
-// defect-dispositions.json across 1397-1429. The settle window itself stays
-// primary-only (cycle-1210/1212 race design), and phases with no secondaries
-// are byte-identical.
-
 import (
 	"context"
 	"os"
