@@ -1,10 +1,5 @@
 package inboxmover
 
-// route_console_test.go — the host facade over lifecycle.RouteConsole
-// (apicover): the FAIL closeout reaches the breaker through the same Options
-// every other lifecycle call resolves (ProjectRoot → inbox dir, Signals →
-// the leaf's accessor, Ledger → the chained appender).
-
 import (
 	"encoding/json"
 	"io"

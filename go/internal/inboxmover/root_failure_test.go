@@ -1,13 +1,5 @@
 package inboxmover
 
-// root_failure_test.go — ADR-0080 P2: FAIL-side attempt accounting for
-// ROOT-RESIDENT items. Wave lanes never claim into processing/, so the
-// existing release-path bump+quarantine (ADR-0072 S5) is structurally
-// unreachable for graded FAILs: workspace-hygiene burned 12 lanes and
-// quarantine-dead 7 with failure_count still 0. RecordRootTaskFailure is the
-// root-resident twin: bump the durable counter where the item actually
-// lives; at the ceiling, move it to the terminal quarantine/ dir.
-
 import (
 	"encoding/json"
 	"io"

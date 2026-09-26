@@ -1,11 +1,5 @@
 package inboxmover
 
-// outcome_test.go — unit coverage for the cycle-outcome seam's readers and
-// result surface. The end-to-end filesystem lifecycle (PASS-promote,
-// FAIL-bump, quarantine-at-ceiling, menu semantics) is pinned by the cycle-1156
-// ACS predicates; these tests cover the parsing and reporting edges those
-// predicates deliberately do not assert on.
-
 import (
 	"io"
 	"os"
@@ -46,9 +40,6 @@ func TestCommittedIDs(t *testing.T) {
 	}
 }
 
-// TestApplyCycleOutcome_ResultReportsMovedIDs asserts the OutcomeResult surface:
-// a PASS names the ids it actually promoted, and re-applying names none (the
-// idempotent no-op reports nothing moved rather than double-counting).
 func TestApplyCycleOutcome_ResultReportsMovedIDs(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -80,9 +71,6 @@ func TestApplyCycleOutcome_ResultReportsMovedIDs(t *testing.T) {
 	}
 }
 
-// TestClaimLaneScope_ToleratesUnresolvableIDs pins the partial-claim contract:
-// an id that cannot be claimed is skipped, never fatal — a lane must not abort
-// because one item of its scope moved on.
 func TestClaimLaneScope_ToleratesUnresolvableIDs(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

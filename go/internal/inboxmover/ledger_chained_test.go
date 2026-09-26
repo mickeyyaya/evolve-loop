@@ -1,14 +1,5 @@
 package inboxmover
 
-// ledger_chained_test.go — the fleet-concurrency chain-break generator
-// (console-plane forensics 2026-08-11, item ledger-fleet-concurrency-chain):
-// writeLedger raw-O_APPEND'ed unchained NDJSON (no prev_hash, no flock, no
-// tip update) into the hash-chained ledger.jsonl on essentially every cycle's
-// ship.postship — each such line breaks the walk at that point, and it also
-// defeated the Rebaseline seal (which must bind the physical predecessor).
-// Every inbox-lifecycle record now goes through the chained append path: same
-// flock, same prev_hash/entry_seq, same atomic tip replace.
-
 import (
 	"context"
 	"testing"
@@ -18,17 +9,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// TestLedgerAppender_SatisfiedByFileLedger names inboxmover.LedgerAppender
-// (apicover) and pins the seam's one production implementation: the chained
-// *ledger.FileLedger. A signature drift between the interface and
-// FileLedger.AppendLifecycle breaks here at compile time.
 func TestLedgerAppender_SatisfiedByFileLedger(t *testing.T) {
 	var _ LedgerAppender = ledger.New(t.TempDir())
 }
 
-// TestLedgerWrites_AreChainValid is the keystone: after a lifecycle event on
-// a ledger that already has chained history, the WHOLE chain still verifies —
-// the inbox record is a chain participant, not a foreign interleaved line.
 func TestLedgerWrites_AreChainValid(t *testing.T) {
 	repo := makeRepo(t)
 	evolveDir := repo + "/.evolve"
@@ -50,7 +34,6 @@ func TestLedgerWrites_AreChainValid(t *testing.T) {
 		t.Fatalf("chain broken by an inbox-lifecycle write (the fleet-concurrency break generator): %v", err)
 	}
 
-	// The record itself must still be findable by its lifecycle identity.
 	it, err := l.Iter(ctx)
 	if err != nil {
 		t.Fatal(err)

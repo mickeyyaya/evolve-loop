@@ -1,27 +1,5 @@
 package inboxmover
 
-// continuation_retire.go — the RELEASE half of the continuation-registry
-// lifecycle (ADR-0076 slice C, G2). `continuation.DeleteRegistryEntry*` has
-// existed since the 2026-08-10 immortal-entries stall, but nothing called it
-// when an item LEFT the pending pool, so dispatch had two stores — inbox items
-// and scope-keyed registry bindings — and every retirement path touched only
-// one. Live burn: cycle-1487 parked `context-fill-telemetry-and-cap` out of
-// .evolve/inbox and the next wave dispatched it anyway from cycle-1484's
-// binding, burning a third lane on the same deterministic collision.
-//
-// Two rules, both here so the definitions cannot drift apart:
-//
-//  1. Retirement releases (releaseContinuationOnRetire) — the binding VALUE is
-//     preserved into the retired item file's released_continuations[] first, so
-//     the salvage pointer survives the release; the delete is
-//     DeleteRegistryEntryIfCycle so a sibling lane that rebound the scope
-//     between the read and the release keeps its fresh binding.
-//  2. Liveness is the batch loader's own reach (scopeHasLiveItem) — an id is
-//     LIVE iff it sits in the inbox ROOT (LoadDir's non-recursive scan) or in
-//     processing/cycle-*/ (a lane currently holding it). consumed/, quarantine/,
-//     processed/, rejected/ and retry/ are NOT live: LoadDir skips subdirs,
-//     which is exactly why a parked item stops being picked.
-
 import (
 	"encoding/json"
 	"os"
@@ -32,40 +10,19 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 )
 
-// releasedContinuation is the preserved pointer written onto a retired item.
-// The Continuation is EMBEDDED (not nested under a new key) so the preserved
-// value keeps the one schema every other continuation reader already parses —
-// a registry-only shape is the drift the continuation package exists to
-// prevent.
+// releasedContinuation embeds Continuation so the preserved pointer keeps the one continuation schema.
 type releasedContinuation struct {
 	continuation.Continuation
 	ReleasedAt string `json:"released_at"`
 	Reason     string `json:"reason"`
-	// ReleasedBy names the authority the release was made under — the WHO a
-	// lineage erasure must answer for alongside the WHEN (ReleasedAt) and the
-	// WHY (Reason). Runtime lifecycle paths name themselves; the operator
-	// surface names the authority path that unlocked it (-operator or
-	// continuation.OperatorConfirmEnv). Omitted on records written before the
-	// field existed, which is why it is not required by any reader.
+	// ReleasedBy names the authority behind the release; records older than the field omit it.
 	ReleasedBy string `json:"released_by,omitempty"`
 }
 
-// retireAuthority is the ReleasedBy this path records. Retirement is a
-// RUNTIME lifecycle transition — the item left the pending pool and its
-// binding went with it — not an operator erasure, and the record must say so
-// plainly rather than leave the authority blank.
 const retireAuthority = "runtime (inbox retirement)"
 
-// releaseContinuationOnRetire releases taskID's registry binding as part of the
-// SAME operation that took the item out of the pending pool, preserving the
-// released value into the retired item at itemPath. Best-effort and LOUD like
-// the rest of the lifecycle: a preservation or release problem never blocks the
-// retirement that already happened, but it never happens silently either.
-//
-// Ordering is deliberate: preserve first, release second. A crash between the
-// two leaves a live binding plus a preserved copy (the read-side guard in
-// ResolveContinuationForScope then refuses it) — the reverse order would lose
-// the pointer outright.
+// releaseContinuationOnRetire releases taskID's binding as part of its retirement,
+// loudly but never blocking. It preserves before it releases, so a crash cannot lose the pointer.
 func releaseContinuationOnRetire(opts Options, itemPath, taskID, reason string) {
 	if taskID == "" || taskID == "unknown" || opts.ProjectRoot == "" {
 		return
@@ -78,13 +35,11 @@ func releaseContinuationOnRetire(opts Options, itemPath, taskID, reason string) 
 	if !ok {
 		return
 	}
-	// The preserved pointer rides the ship commit into a TRACKED .evolve/inbox
-	// item on a public remote, so the absolute host paths are collapsed to "~"
-	// first (audit cycle-1507 M1). Only Worktree/FindingsPath change; the
-	// snapshot/base/branch refs salvage actually resumes from are untouched.
+	// The preserved pointer rides the ship commit to a public remote, so host paths are redacted first.
 	if perr := appendReleasedContinuation(itemPath, continuation.RedactHostPaths(c), reason, retireAuthority, opts.Now().UTC()); perr != nil {
 		opts.logf("WARN: ", "retire '%s': preserved pointer (snapshot %s) NOT written to %s: %v — releasing the binding anyway", taskID, c.SnapshotSHA, itemPath, perr)
 	}
+	// Delete only if still this cycle's, so a sibling lane's fresh rebinding survives.
 	released, derr := continuation.DeleteRegistryEntryIfCycle(opts.ProjectRoot, taskID, c.Cycle)
 	switch {
 	case derr != nil:
@@ -96,10 +51,8 @@ func releaseContinuationOnRetire(opts Options, itemPath, taskID, reason string) 
 	}
 }
 
-// appendReleasedContinuation appends c to path's released_continuations[],
-// preserving every other field (updateItemJSON is atomic write-tmp + rename).
-// An existing array that is not an array is replaced rather than dropped
-// silently — the entry that matters is the one being written now.
+// appendReleasedContinuation appends c to path's released_continuations[]; a
+// malformed existing value is replaced, because the entry being written is the one that matters.
 func appendReleasedContinuation(path string, c continuation.Continuation, reason, releasedBy string, at time.Time) error {
 	entry, err := json.Marshal(releasedContinuation{
 		Continuation: c,
@@ -122,15 +75,8 @@ func appendReleasedContinuation(path string, c continuation.Continuation, reason
 	})
 }
 
-// The retirement subtrees are retirementStates (dispatchstate.go) — the ONE
-// list. LoadDir skips subdirs, which is exactly why an item parked in one
-// stops being picked — so a binding keyed on an id found only there is a
-// ghost. processed/ and rejected/ nest a cycle-N level (promoteDestPath), so
-// the scan is recursive.
-
-// scopeHasLiveItem reports whether scopeID still names an item the batch loader
-// can reach: the inbox ROOT (LoadDir's non-recursive scan) or a
-// processing/cycle-*/ claim (a lane currently holding it).
+// scopeHasLiveItem reports whether scopeID sits at the inbox root or in a claim,
+// the only places the batch loader can still pick it from.
 func scopeHasLiveItem(opts Options, scopeID string) bool {
 	if strings.TrimSpace(scopeID) == "" {
 		return false
@@ -139,29 +85,8 @@ func scopeHasLiveItem(opts Options, scopeID string) bool {
 	return err == nil
 }
 
-// scopeRetiredAt returns the path of the retired copy holding scopeID and the
-// retirement subtree it sits in, or ("", "") when the id is not retired
-// anywhere. The PATH is returned as well as the subtree name because both
-// read-side consumers need it: the guard preserves the released pointer into
-// that exact file, and the recency test reads its cycle stamp.
-//
-// The guard refuses on POSITIVE retirement evidence, not on mere absence, and
-// the distinction is load-bearing in both directions:
-//
-//   - A lane scope that names no inbox item at all is NOT proof of retirement —
-//     the wave planner also mints lane scopes from carryoverTodos, which never
-//     have an inbox file (the cycle-1078 orphan class this registry exists to
-//     serve). Treating absence as death would trade the re-dispatch defect for
-//     the salvage-loss defect: every carryover lane's preserved work released
-//     out from under it.
-//   - An id sitting in consumed/, quarantine/, processed/, rejected/ or retry/
-//     IS proof: those are the pool exits, and that is the exact cycle-1487/1497
-//     shape (item parked, binding immortal, lane minted anyway).
-//
-// Residual gap, stated rather than papered over: an item whose file was deleted
-// outright leaves no evidence for this belt to find. That case is closed on the
-// WRITE side by the transactional retire (releaseContinuationOnRetire /
-// consume), which is the primary fix; this read-side guard is the belt.
+// scopeRetiredAt returns the retired copy's path and subtree, or ("", ""). Only
+// positive evidence counts: carryover lane scopes never have an inbox file at all.
 func scopeRetiredAt(opts Options, scopeID string) (string, string) {
 	if strings.TrimSpace(scopeID) == "" {
 		return "", ""
@@ -188,7 +113,6 @@ func scopeRetiredAt(opts Options, scopeID string) (string, string) {
 	return "", ""
 }
 
-// itemIDAt returns the .id an inbox item carries, or "" when unreadable.
 func itemIDAt(path string) string {
 	body, err := os.ReadFile(path)
 	if err != nil {

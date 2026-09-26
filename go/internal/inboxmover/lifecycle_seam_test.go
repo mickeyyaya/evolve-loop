@@ -1,11 +1,5 @@
 package inboxmover
 
-// lifecycle_seam_test.go — ADR-0103 unit 06 step 3: the host seam. Options is a
-// value copied per call, so the ONE projection onto the leaf is (Options).mover
-// and the ONE construction site is pinned by a source scan; every seam is
-// threaded; every production and ACS spelling is kept; the wired-root golden
-// renders the fifteen replaced lines through the root's StderrSink.
-
 import (
 	"context"
 	"encoding/json"
@@ -24,9 +18,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// nonTestSourcesMentioning lists the module's non-test Go files outside the
-// lifecycle leaf and the one allowed site whose source contains needle (the
-// core/carryover_lifecycle_test.go idiom).
+// nonTestSourcesMentioning lists non-test module sources, outside the lifecycle leaf and allowed, that contain needle.
 func nonTestSourcesMentioning(t *testing.T, needle, allowed string) []string {
 	t.Helper()
 	moduleRoot, err := filepath.Abs(filepath.Join("..", ".."))
@@ -64,7 +56,6 @@ func nonTestSourcesMentioning(t *testing.T, needle, allowed string) []string {
 	return offenders
 }
 
-// Test 46 — lifecycle.New( is spelled in exactly one non-test file: the seam.
 func TestOptionsMover_OneConstructionSite(t *testing.T) {
 	const onlySite = "internal/inboxmover/inboxmover.go"
 	if offenders := nonTestSourcesMentioning(t, "lifecycle.New(", onlySite); len(offenders) > 0 {
@@ -86,10 +77,6 @@ func newRecordingCenter() *recordingCenter {
 	return r
 }
 
-// Test 47 — every Options seam reaches the leaf: the clock (the ledger TS),
-// stderr, the active-cycle reader, the landing probe (called with the sha), the
-// protected-path predicate (nil stays nil: a protected-files item is CLAIMABLE
-// through ClaimLaneScope-shaped Options; non-nil refuses) and the Center.
 func TestOptionsMover_ThreadsEverySeam(t *testing.T) {
 	repo := makeRepo(t)
 	inbox := filepath.Join(repo, ".evolve", "inbox")
@@ -140,9 +127,6 @@ func TestOptionsMover_ThreadsEverySeam(t *testing.T) {
 	}
 }
 
-// Test 48 — the retire hook is WIRED (a promote releases the registry binding
-// and preserves the pointer) and the drain reads the manifest from
-// <root>/.evolve/runs/cycle-N (the duplicated belief, pinned until 06-F4).
 func TestOptionsMover_RetireHookAndRunWorkspace(t *testing.T) {
 	root := t.TempDir()
 	seedRootItem(t, root, "task-r")
@@ -167,8 +151,6 @@ func TestOptionsMover_RetireHookAndRunWorkspace(t *testing.T) {
 	}
 }
 
-// Test 49 — every production and ACS spelling compiles unchanged and the
-// sentinels are the leaf's own pointers (errors.Is across the boundary).
 func TestFacades_KeepEverySpelling(t *testing.T) {
 	var (
 		_ func(Options, string, string) (ClaimResult, error)                   = Claim
@@ -190,9 +172,7 @@ func TestFacades_KeepEverySpelling(t *testing.T) {
 		_ func(string, string) (int, error)                                    = bumpFailureCount
 		_ func(string, func(map[string]json.RawMessage)) error                 = updateItemJSON
 		_ func(Options, int, string, *quarantinePolicy) (RecoverResult, error) = releaseCycleProcessing
-		// The drain policy is ONE struct with ONE contract: the host's spelling is
-		// an alias of the leaf's Policy, so a field added to either is the same
-		// field at outcome.go's literal — never a second struct projected by hand.
+		// Compiles only while quarantinePolicy is an alias of lifecycle.Policy, never a mirror struct.
 		_ *lifecycle.Policy                                   = (*quarantinePolicy)(nil)
 		_ lifecycle.ClaimResult                               = ClaimResult{}
 		_ lifecycle.PromoteOpts                               = PromoteOpts{}
@@ -218,12 +198,6 @@ func TestFacades_KeepEverySpelling(t *testing.T) {
 	}
 }
 
-// Test 50 — the FAIL drain through Options.Signals: the quarantine failure
-// renders in the Center (origin Mover.Release, the cycle), the fallback line
-// does not print, the INFO lines still do, and the FAIL closeout's lane-scope
-// pass leaves an already-claimed id alone — no INBOX_CLAIM_NOT_FOUND, no
-// console duplicate (the false not-found of the 2026-09-14 poison-loop
-// incident; 06-F7/06-F11 retired with it).
 func TestApplyCycleOutcome_FailDrain_EmitsInboxCodesThroughOptionsSignals(t *testing.T) {
 	repo := makeRepo(t)
 	inbox := filepath.Join(repo, ".evolve", "inbox")
@@ -256,10 +230,6 @@ func TestApplyCycleOutcome_FailDrain_EmitsInboxCodesThroughOptionsSignals(t *tes
 	}
 }
 
-// Test 51 — the wired-root golden: the same script as test 5 through
-// Options{Signals: a Center with the root's WARN-filtered StderrSink onto the
-// same stderr} renders sequence.stderr.wired.golden; the diff against the
-// Center-less golden is exactly the fifteen replaced lines (the §5 table).
 func TestGolden_LifecycleSequence_WiredRootStderr(t *testing.T) {
 	repo := makeRepo(t)
 	var stderr strings.Builder
@@ -294,8 +264,7 @@ func TestGolden_LifecycleSequence_WiredRootStderr(t *testing.T) {
 	}
 }
 
-// gitRepoWithMain builds a repo whose main holds one commit and whose side
-// branch holds a second; returns the root and the two shas.
+// gitRepoWithMain returns a repo root, a sha on main and a sha on a side branch.
 func gitRepoWithMain(t *testing.T) (root, onMain, onSide string) {
 	t.Helper()
 	root = t.TempDir()
@@ -319,13 +288,6 @@ func gitRepoWithMain(t *testing.T) (root, onMain, onSide string) {
 	return root, onMain, onSide
 }
 
-// Test 58 — the default landing probe answers the leaf's gate honestly: an
-// ancestor of main is landed, a side-branch sha is not, and a probe git cannot
-// answer (an unknown sha, no local main, a non-git root — exit 128 — or an exec
-// fault) is fail-open AND returned as the error, so INBOX_LANDED_CHECK_FAILED
-// reaches production instead of a silent (true, nil). Through a Center-less
-// facade the fault prints the fallback line; through a wired one it is the
-// event — the item lands in processed/ either way.
 func TestShaLandedOnMain_ReportsWhatGitCannotAnswer_PromoteFailsOpenLoudly(t *testing.T) {
 	repo, onMain, onSide := gitRepoWithMain(t)
 	nonGit := t.TempDir()
@@ -371,10 +333,6 @@ func TestShaLandedOnMain_ReportsWhatGitCannotAnswer_PromoteFailsOpenLoudly(t *te
 	}
 }
 
-// Test 59 — the console voice `[inbox-mover] ` is spelled ONCE across the host
-// and the leaf (lifecycle.LegacyPrefix); the host's logf and the leaf's two
-// links consume it, so 06-F5's fold of the sibling renderer is a deletion, not
-// a hunt (the cmd layer's own copies are outside the package tree).
 func TestInboxMoverPrefix_OneHome(t *testing.T) {
 	const needle = `"[inbox-mover] ` // the opening quote pins string literals, not prose
 	homes := map[string]int{}
@@ -411,12 +369,6 @@ func TestInboxMoverPrefix_OneHome(t *testing.T) {
 	}
 }
 
-// Test 60 — the FAIL drain THROUGH ApplyCycleOutcome bumps only the committed
-// ids even when a wave lane claimed the whole menu into processing/cycle-N/:
-// the uncommitted item releases with no failure_count at all. This pins the
-// third key of outcome.go's one Policy literal (Committed) at the host — the
-// leaf pins its own Policy; the ACS 1180 negative half keeps its menu item at
-// the root, where the drain never walks.
 func TestApplyCycleOutcome_FailDrain_BumpsOnlyCommittedIDsAlreadyInProcessing(t *testing.T) {
 	repo := makeRepo(t)
 	inbox := filepath.Join(repo, ".evolve", "inbox")

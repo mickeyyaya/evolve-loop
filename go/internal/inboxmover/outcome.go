@@ -1,24 +1,5 @@
 package inboxmover
 
-// outcome.go — the SINGLE cycle-outcome lifecycle seam.
-//
-// Before this file the inbox lifecycle had two half-implementations and a hole
-// in the middle:
-//
-//   - PASS side: promotion was agent-driven prose, so cycle-1147 shipped three
-//     menu items in ONE commit and promoted none of them — processed/cycle-1147/
-//     was empty and all three re-entered the very next triage
-//     (menu-pass-promotes-committed-ids).
-//   - FAIL side: the drain that bumps failure_count walks ONLY
-//     processing/cycle-N/. Nothing ever put a wave lane's worked ids there, so
-//     the ADR-0072 S5 retry ceiling was structurally unreachable for fleet work
-//     — batch-14 burned four FAILs on the same items with failure_count never
-//     leaving 0 (wave-lane-task-quarantine-dead).
-//
-// ApplyCycleOutcome is the one entry point both closeout paths now call, so the
-// PASS-promote and FAIL-bump halves cannot drift apart again
-// (never_duplicate_centralize).
-
 import (
 	"encoding/json"
 	"errors"
@@ -30,41 +11,27 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover/lifecycle"
 )
 
-// CycleOutcome is the verdict-shaped input to the lifecycle seam: what the
-// cycle was scoped to, what it actually committed to working, and how it ended.
+// CycleOutcome is one cycle's verdict as the inbox lifecycle consumes it.
 type CycleOutcome struct {
-	Cycle        int      // cycle number
-	Passed       bool     // true = PASS (promote committed ids), false = FAIL (bump/quarantine)
-	CommittedIDs []string // triage-decision.json top_n/skip_shipped — the WORKED set
-	CommitSHA    string   // ship SHA, PASS only ("" = no SHA prefix)
-	Reason       string   // ledger reason ("" = default)
-	Ceiling      int      // FailureThresholds.TaskRetryCeiling (FAIL only; <=0 disables quarantine)
-	SystemLevel  bool     // ADR-0072 S3 system failure: NEVER quarantines (AC4)
-	Routed       bool     // the closeout already routed the refused item console-manual: no bump, no park this cycle (FAIL only)
+	Cycle        int
+	Passed       bool     // PASS promotes the committed ids; FAIL bumps and may quarantine them
+	CommittedIDs []string // the worked set (top_n + skip_shipped); on FAIL, nil bumps the whole cycle dir
+	CommitSHA    string   // PASS only; "" means no SHA prefix
+	Reason       string   // ledger reason; "" means the default
+	Ceiling      int      // FAIL only; <= 0 disables quarantine
+	SystemLevel  bool     // a system-level failure, which never quarantines
+	Routed       bool     // FAIL only: the closeout already routed the refused item console-manual, so no bump or park
 }
 
 // OutcomeResult reports what the seam moved, by task id or destination path.
 type OutcomeResult struct {
-	Promoted    []string // committed ids moved to processed/cycle-N/ (PASS)
-	Released    []string // paths released back to the inbox root
-	Quarantined []string // paths parked in quarantine/ (FAIL at ceiling)
+	Promoted    []string // committed ids moved to processed/cycle-N/
+	Released    []string
+	Quarantined []string
 }
 
 // ApplyCycleOutcome applies one cycle's verdict to the inbox lifecycle.
-//
-// PASS: every committed id is promoted to processed/cycle-<N>/ (resolvable from
-// processing/cycle-*/ OR the inbox root — promotion never depends on a prior
-// claim), then the residual claims for the cycle drain back to the inbox root.
-// Uncommitted menu ids are left exactly where they are, pending for the next
-// triage. Re-applying the same PASS is an idempotent no-op: an already-promoted
-// id resolves nowhere and takes Promote's NoOp path.
-//
-// FAIL: the committed ids are claimed into processing/cycle-<N>/ if they are
-// not already there (see ClaimLaneScope for why the claim happens HERE and not
-// at dispatch), then the drain bumps the durable failure_count on those ids
-// ONLY and quarantines any that reach Ceiling. Uncommitted menu ids release
-// untouched — no phase worked them, so they must not accrue task-level
-// failures. Nothing is ever promoted to processed/ on a FAIL.
+// See ADR-0079.
 func ApplyCycleOutcome(opts Options, oc CycleOutcome) (OutcomeResult, error) {
 	opts.resolveOpts()
 	res := OutcomeResult{}
@@ -72,12 +39,8 @@ func ApplyCycleOutcome(opts Options, oc CycleOutcome) (OutcomeResult, error) {
 
 	if oc.Passed {
 		cycleStr := strconv.Itoa(oc.Cycle)
-		// Promote failures are COLLECTED, never early-returned: the residual
-		// drain below is the invariant that keeps claimed items from rotting in
-		// processing/cycle-N/ across cycles (orphans in 124/265/294/295/308),
-		// and returning on the first failed promote would skip it entirely —
-		// trading one loud non-delivery for a silent multi-item strand. Every
-		// error still reaches the caller, joined, after the drain has run.
+		// Promote errors are collected, not returned early: the residual drain
+		// below must always run, or claimed items strand in processing/.
 		var errs []error
 		for _, id := range committed {
 			pr, err := Promote(opts, id, "processed", PromoteOpts{Cycle: cycleStr, CommitSHA: oc.CommitSHA})
@@ -100,9 +63,7 @@ func ApplyCycleOutcome(opts Options, oc CycleOutcome) (OutcomeResult, error) {
 		return res, nil
 	}
 
-	// FAIL. Claim first so a committed id that never reached processing/ still
-	// gets its failure_count bumped — the exact gap that made the S5 ceiling
-	// unreachable for wave lanes.
+	// Claim first: the drain bumps only what sits in processing/cycle-N/.
 	if _, err := ClaimLaneScope(opts, oc.Cycle, committed); err != nil {
 		return res, fmt.Errorf("apply-cycle-outcome: claim committed ids: %w", err)
 	}
@@ -132,28 +93,13 @@ func ApplyCycleOutcome(opts Options, oc CycleOutcome) (OutcomeResult, error) {
 	return res, nil
 }
 
-// ClaimLaneScope moves each resolvable id from the inbox root into
-// processing/cycle-<cycle>/ and returns the ids actually claimed. An id it
-// cannot resolve — absent, already claimed by another wave, or console-routed
-// (ADR-0074) — is logged and skipped: a partial claim must never abort a lane.
-// The error return is reserved for a future whole-operation failure and is
-// currently always nil, so callers can wire it without a behavior change.
-//
-// Placement note (deliberate, load-bearing): this is called from
-// ApplyCycleOutcome's FAIL path rather than at wave dispatch. Triage builds its
-// menu from inboxbatch.LoadDir on the inbox ROOT only (triage.go:113), so
-// claiming a lane's scope BEFORE triage runs would hand triage an empty inbox
-// and starve the very cycle the claim exists to track. Claiming at outcome time
-// puts the worked ids in processing/cycle-N/ exactly when the drain needs them
-// there, with no starvation window.
+// ClaimLaneScope claims each resolvable id into processing/cycle-<cycle>/, skipping the rest; the error is always nil.
 func ClaimLaneScope(opts Options, cycle int, ids []string) ([]string, error) {
 	opts.resolveOpts()
 	cycleStr := strconv.Itoa(cycle)
 	var claimed []string
 	for _, id := range dedupeIDs(ids) {
-		// The lane's own claim already put it in processing/cycle-N/: it is where
-		// the drain needs it, and re-claiming it from the root would only raise a
-		// false INBOX_CLAIM_NOT_FOUND (cycle 1675, the 2026-09-14 poison-loop incident).
+		// Already claimed by this cycle: re-claiming from the root would raise a false not-found.
 		if loc, lerr := lifecycle.Locate(opts.InboxDir, id); lerr == nil && loc.Cycle == cycle {
 			claimed = append(claimed, id)
 			continue
@@ -167,12 +113,7 @@ func ClaimLaneScope(opts Options, cycle int, ids []string) ([]string, error) {
 	return claimed, nil
 }
 
-// CommittedIDs walks a triage-decision.json body and returns the union of
-// .top_n[].id and .skip_shipped[].task_id, deduped and order-preserving: the
-// set of ids the cycle actually committed to working. Both closeout paths key
-// their lifecycle transition off this ONE reader so PASS-promote and FAIL-bump
-// can never disagree about what "the worked set" means. Invalid JSON returns
-// nil (which callers read as "no committed set known").
+// CommittedIDs returns the deduped union of a triage decision's top_n ids and skip_shipped task ids, or nil on bad JSON.
 func CommittedIDs(body []byte) []string {
 	var d struct {
 		TopN []struct {
@@ -195,11 +136,7 @@ func CommittedIDs(body []byte) []string {
 	return dedupeIDs(out)
 }
 
-// DeferredIDs returns the ids triage EXPLICITLY deferred — work postponed
-// wholesale to a later cycle. Consumption must never retire these: the item
-// stays pickable and the deferral's remainder rides carryover. Parses the
-// "id" key only — the same key the carryover unit's triageDroppedIDs reads — so the sibling
-// readers cannot diverge on document shape.
+// DeferredIDs returns the ids triage explicitly deferred, which consumption must never retire.
 func DeferredIDs(body []byte) []string {
 	var d struct {
 		Deferred []struct {
@@ -216,37 +153,14 @@ func DeferredIDs(body []byte) []string {
 	return dedupeIDs(out)
 }
 
-// closedDropReasons are the drop-reason tokens that mean "this item's work is
-// DONE or the item itself is dead" — the only drops consumption may retire.
-// The triage persona also routes VALID work into dropped[] (requires-split,
-// out-of-scope): those items must stay pickable, and so must any UNKNOWN
-// reason — "forgetting a live todo is worse than carrying a stale one"
-// (the carryover unit's governing preference, applied to the durable
-// queue where the stakes are higher, not lower).
-//
-// A STALE drop is deliberately NOT close-class (F40 architecture review C1): a
-// premise re-check (triage Step 0b) is a judgment the console confirms, never
-// an automatic retirement — "stale" was in this list before triage was told to
-// look for stale premises, which would have let a lane's PASS ship consume a
-// stale-dropped menu-mate unverified.
+// closedDropReasons are the only drop reasons consumption may retire; an unknown
+// reason, or "stale", keeps the item pickable because a live todo outranks a stale one.
 var closedDropReasons = []string{"already-shipped", "already-done", "already-landed", "duplicate", "superseded", "obsolete"}
 
-// ClosedDroppedIDs returns the ids triage dropped WITH a close-class reason —
-// an affirmative statement the work is landed or the item is dead. The
-// carryover twin is retired reason-blind (carryover.Lifecycle.RetireTriageDropped, a
-// soft 20-slot advisory store); the durable tracked queue gets the stricter
-// reason gate. Parses the "id" key only, matching the core sibling reader.
-// SIBLING READERS: triageDroppedIDs (internal/core/carryover/workspace.go,
-// ADR-0103 unit 03 — reason-blind, for the carryover twin) and
-// committedset.DispositionsFrom (F30 — a drop with a reason is an ANSWER that
-// ends a fleet lane as planned no-work) parse the SAME dropped[] field with
-// three deliberately different policies. A schema change to dropped[] must
-// land in ALL THREE or consumption, carryover retirement and the no-work
-// terminal drift apart on the same document. The import cycle that once kept
-// them apart no longer binds — committedset is a stdlib-only leaf every one of
-// them can import — so the follow-up (decision-document-single-declaration)
-// is ONE declaration of the decision's wire shape with three projections.
+// ClosedDroppedIDs returns the ids triage dropped with a close-class reason.
 func ClosedDroppedIDs(body []byte) []string {
+	// dropped[] has two sibling readers with other policies (carryover's triageDroppedIDs,
+	// committedset.DispositionsFrom); a schema change must land in all three.
 	var d struct {
 		Dropped []struct {
 			ID     string `json:"id"`
@@ -269,12 +183,8 @@ func ClosedDroppedIDs(body []byte) []string {
 	return dedupeIDs(out)
 }
 
-// dropReasonTag is a drop reason's leading tag — the text before its first
-// ':' — lowercased and trimmed. A reason is classified by what it LEADS with:
-// "stale: superseded by #535" is a stale drop, not a superseded one, and
-// "requires-split (stale)" is a split request (F40 architecture review C1 —
-// the former substring match read any mention of a close-class word as the
-// item's retirement).
+// dropReasonTag returns the lowercased text before a reason's first ':'. A reason
+// is classified by what it leads with, so "stale: superseded by X" stays stale.
 func dropReasonTag(reason string) string {
 	if i := strings.IndexByte(reason, ':'); i >= 0 {
 		reason = reason[:i]
@@ -282,7 +192,7 @@ func dropReasonTag(reason string) string {
 	return strings.ToLower(strings.TrimSpace(reason))
 }
 
-// dedupeIDs drops empties and duplicates, preserving first-seen order.
+// dedupeIDs drops empties and duplicates, preserving first-seen order; it returns nil when none remain.
 func dedupeIDs(ids []string) []string {
 	if len(ids) == 0 {
 		return nil

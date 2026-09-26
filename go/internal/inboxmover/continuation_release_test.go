@@ -11,8 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 )
 
-// releaseFixtureItem drops an inbox item carrying id into dir and returns its
-// path.
 func releaseFixtureItem(t *testing.T, dir, id string) string {
 	t.Helper()
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -29,8 +27,6 @@ func releaseFixtureItem(t *testing.T, dir, id string) string {
 	return path
 }
 
-// releaseFixtureBind writes a registry binding, failing loudly if the fixture
-// itself did not take.
 func releaseFixtureBind(t *testing.T, root, id string, c continuation.Continuation) {
 	t.Helper()
 	if err := continuation.WriteRegistryEntry(root, id, c); err != nil {
@@ -38,7 +34,6 @@ func releaseFixtureBind(t *testing.T, root, id string, c continuation.Continuati
 	}
 }
 
-// hasRegistryBinding reports whether id holds a binding.
 func hasRegistryBinding(t *testing.T, root, id string) bool {
 	t.Helper()
 	_, ok, err := continuation.ReadRegistryEntry(root, id)
@@ -48,9 +43,6 @@ func hasRegistryBinding(t *testing.T, root, id string) bool {
 	return ok
 }
 
-// TestReleaseContinuationBinding covers the ONE release transaction every
-// retirement path now shares (the fix for audit cycle-1507's H2: the read-side
-// delete used to skip preservation and send the salvage pointer to stderr only).
 func TestReleaseContinuationBinding(t *testing.T) {
 	t.Run("preserves the pointer into the item file before deleting", func(t *testing.T) {
 		root := t.TempDir()
@@ -88,9 +80,6 @@ func TestReleaseContinuationBinding(t *testing.T) {
 				t.Errorf("released_continuations[] in %s does not preserve %q — pointer loss on release\n%s", itemPath, want, raw)
 			}
 		}
-		// WHO, beside the WHEN and WHY the record already carried: an erasure
-		// of the lineage the defect-ledger gate reads as anti-tamper evidence
-		// must name the authority it was made under (cycle-1684).
 		for _, want := range []string{`"released_by":"unit-test-authority"`, `"released_at":`} {
 			if !strings.Contains(string(raw), want) {
 				t.Errorf("released_continuations[] in %s carries no %s — the release record does not answer who/when\n%s", itemPath, want, raw)
@@ -115,9 +104,6 @@ func TestReleaseContinuationBinding(t *testing.T) {
 	})
 }
 
-// TestFindScopeItemFile pins the liveness search order the preserved pointer
-// depends on: the pending root, then a processing claim, then the retirement
-// subtrees — so the annotation always lands on the copy an operator opens.
 func TestFindScopeItemFile(t *testing.T) {
 	root := t.TempDir()
 	inbox := filepath.Join(root, ".evolve", "inbox")
@@ -143,13 +129,6 @@ func TestFindScopeItemFile(t *testing.T) {
 	}
 }
 
-// TestResolveContinuationForScopeRecency is the regression test for audit
-// cycle-1507's H1. The read-side guard deletes a ROOT-OWNED binding on
-// agent-writable evidence, so the evidence has to be recent: a retired copy
-// OLDER than the binding means the item was re-filed and rebound after that
-// retirement, and releasing on it destroys live preserved work. Same-or-newer
-// retirement (and the unstamped ordinary quarantine copy) is still evidence —
-// a guard that refuses to act on the common case is no guard at all.
 func TestResolveContinuationForScopeRecency(t *testing.T) {
 	tests := []struct {
 		name         string
