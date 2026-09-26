@@ -14,7 +14,7 @@ Follow in order. **Do not edit any file between step 4 and step 5** — that wou
 
 1. **Stage everything**: `git add -A`. The sanctioned commit path (`evolve ship --class manual`) commits the whole working tree, so this is an all-or-nothing commit (not a partial one). Staging now also lets new files be reviewed and bound into the attestation.
 2. **Detect changed languages**: `git diff --name-only HEAD`, then map extensions (`.go`→go, `.py`→python, `.ts/.tsx/.js/.jsx`→ts, `.rs`→rust).
-3. **Review chain** — invoke via the **Agent tool** on the staged diff. Apply every CRITICAL/HIGH finding, re-stage (`git add -A`), and re-run until clean. Record the names you actually ran. Two reviewers are required:
+3. **Review chain** — invoke via the **Agent tool** on the staged diff. Apply every CRITICAL/HIGH finding, re-stage (`git add -A`), and re-run until clean. Record the names you actually ran. Two reviewers are required, except for a proven comment removal (see the contract below):
    | # | Agent (or skill) | Covers |
    |---|---|---|
    | a | **simplify**: `code-simplifier` (or `ecc:code-simplifier`) | clarity, dead code, simplification |
@@ -46,6 +46,8 @@ The runner refuses to write an attestation unless `--reviewers` declares, by cap
 - **one review** reviewer — either the general `code-reviewer` / `code-review`, or the matching `<lang>-reviewer` for a changed language (`go-reviewer`, `python-reviewer`, `typescript-reviewer`, `rust-reviewer`). Only one is needed.
 
 Namespace prefixes are stripped, so `ecc:go-reviewer` counts as `go-reviewer`. Pass the names you genuinely ran — fabricating the list to skip review is a CLAUDE.md Rule 9/12 violation.
+
+**A proven comment removal needs no reviewer.** The runner checks this itself. At least one changed Go file must be comment-only against `HEAD`, by the same check as `commentaudit verify`. Every other changed file must be a regular Markdown file under `docs/`. When both hold, pass `--reviewers ""`. The attestation records no reviewer, so the commit carries no `Reviewed-by:` trailer. A code or test change, a rename, a symlink, a deletion, a `testdata/` fixture or a docs-only change still needs both reviewers ([code comments](../../docs/conventions/code-comments.md)).
 
 ## When NOT to use this skill
 

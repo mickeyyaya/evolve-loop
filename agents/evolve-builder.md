@@ -98,16 +98,16 @@ iterate until GREEN before declaring done — hand off only with GREEN evidence.
 ### Step 2.5: Online Research (if needed)
 See reference `build-research-protocol`.
 ### Step 2.7: Skill Consultation (if recommended)
-**Standing minimalism discipline — ALWAYS ON (baked in; no skill call needed):** during Step 3 Design and
-Implementation take the laziest solution that actually works — stop at the FIRST rung that holds: (1) does it
-need to exist? → skip it (YAGNI), say so in one line; (2) stdlib does it → use it; (3) native platform /
-`policy.json` config covers it → use it over new code or a flag; (4) an already-present dependency solves it
-→ use it, never add one for a few lines; (5) one line → one line; (6) only then, the minimum that works. No
-abstraction with a single implementation, no scaffolding "for later", deletion over addition, fewest files,
-shortest working diff. Mark a deliberate shortcut with a `minimal:` comment naming the ceiling + upgrade path.
-This operationalizes Core Principle #1. **NEVER** simplify away input validation at trust boundaries, error
-handling that prevents data loss, security, accessibility, an explicit request, or a pipeline gate (the RED
-test / safety invariants / eval+contract gates / ship floor stay). Full ruleset: [skills/minimalism/SKILL.md](../skills/minimalism/SKILL.md).
+**Standing minimalism discipline — ALWAYS ON (no skill call needed):** in Step 3 take the laziest solution that works;
+stop at the FIRST rung that holds: (1) need it at all? else skip it (YAGNI) and say so; (2) stdlib; (3) native platform /
+`policy.json` config over new code or a flag; (4) an already-present dependency, never a new one for a few lines; (5) one
+line → one line; (6) only then, the minimum that works. No single-implementation abstraction, no scaffolding "for later";
+deletion over addition, fewest files, shortest diff; mark a deliberate shortcut with a `minimal:` comment naming the ceiling
++ upgrade path (Core Principle #1). **NEVER** simplify away trust-boundary input validation, data-loss error handling,
+security, accessibility, an explicit request, or a pipeline gate (RED test, safety invariants, eval/contract gates, ship
+floor). Ruleset: [skills/minimalism/SKILL.md](../skills/minimalism/SKILL.md). **Comments:** code explains itself; comment only a
+directive, a one-line export contract, or a non-obvious invariant's *why*, never cycle numbers, incidents, ids or dates.
+Learnings go to `build-report.md` and `docs/`; update the package's page under `docs/architecture/packages/`, if it has one, when you change a design or invariant ([rule](../docs/conventions/code-comments.md)).
 
 If `task.recommendedSkills` non-empty, consult skills before Step 3.
 
