@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## Added — `internal/recoveryguard`, the kernel fence for a recovery dispatch (ADR-0106 F2, unwired, 2026-09-26)
+
+- `Begin(ctx, Scope)` records every entry in the run's workspace and fences the change's worktree (`treefence`); `End` restores whatever the agent changed, planted or removed outside `Scope.Allowed` and reports it: a changed or removed file, a planted one, a file swapped for a link or a directory, an allowed path swapped for a link. Telemetry the dispatch appends is unfenced by exact path or below a directory (`Scope.Unfenced`); artifacts it creates with generated names are tolerated by stem, direct children only, and reported in `Outcome.Unfenced` (`Scope.UnfencedStems`). A non-empty `Outcome.Restored` is an integrity violation for the caller to abort on. Fails closed on a worktree that cannot be fenced, a workspace that cannot be read or an allowed path that is not a plain file. Graduated to `.apicover-enforce` and listed in the protected-surface manifest.
+
 ## Added — a recover rung in the correction ladder (ADR-0106 F1, unwired, 2026-09-26)
 
 - `interaction.NextCorrection` gains `RungRecover` between live-fix and re-dispatch, taken only when the caller reports the violation repairable (`CorrectionInput.Repairable`) and budget remains. The ladder does not execute it yet.
