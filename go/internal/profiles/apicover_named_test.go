@@ -6,11 +6,8 @@ import (
 	"testing/fstest"
 )
 
-// TestLoader_TypedBindingAndGet names the Loader type via an explicit typed
-// binding (NewFromFS returns *Loader) and pins the round-trip contract: a
-// Loader built over an fs.FS resolves a profile by name. Mirrors how the
-// composition root holds a *profiles.Loader and calls Get.
 func TestLoader_TypedBindingAndGet(t *testing.T) {
+	// The explicit *Loader binding names the type for apicover's named-in-test check.
 	var l *Loader = NewFromFS(fixtureFS())
 	p, err := l.Get("scout")
 	if err != nil {
@@ -21,11 +18,6 @@ func TestLoader_TypedBindingAndGet(t *testing.T) {
 	}
 }
 
-// TestSandboxConfig_FullStructEquality binds a SandboxConfig literal and asserts
-// it round-trips through the JSON the Loader parses. This pins the typed shape
-// of profile.sandbox that the sandbox adapter (and phaseconfig/phaseregistrar
-// consumers) depend on — e.g. read_only_repo:true must survive so an auditor
-// profile cannot mutate the repo.
 func TestSandboxConfig_FullStructEquality(t *testing.T) {
 	const sandboxProfile = `{
 	  "name": "sb", "role": "sb", "cli": "claude", "model_tier_default": "haiku",

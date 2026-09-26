@@ -1,16 +1,9 @@
 package recovery
 
-// apicover_named_test.go — ADR-0050 Phase 5 public-API coverage: name and
-// exercise the exported recovery/stall types that no existing test names by
-// identifier (apicover counts field access like d.Action as "uses Decision",
-// but not as "names Decision"). Each test asserts a REAL contract.
-
+// These tests declare exported types explicitly (var x T): apicover counts naming a
+// type, not using its fields.
 import "testing"
 
-// TestDecision_IntegrityEscalateFullStruct pins the whole Decision the chain
-// returns for an integrity-adjacent state: the locked ADR-0044 decision is
-// escalate, claimed by the integrity link, with a justification. Full-struct
-// equality on the typed Decision (names the type, not just a field).
 func TestDecision_IntegrityEscalateFullStruct(t *testing.T) {
 	t.Parallel()
 	var got Decision = Recover(RecoverInput{Integrity: true})
@@ -24,22 +17,13 @@ func TestDecision_IntegrityEscalateFullStruct(t *testing.T) {
 	}
 }
 
-// TestPhaseOutcome_AbortPreservesVerdictAndSpend pins PhaseOutcome's load-bearing
-// structural invariant. PhaseOutcome is a deliberately LEAF DTO: its only
-// producer is core's (unexported) phaseOutcomeFrom, and recovery must not import
-// core (leaf constraint, see outcome.go), so there is no in-package or
-// exported-cross-package call to exercise — the type IS the contract. The
-// cycle-262 contract that type exists to enable: an abort is a cycle-level
-// disposition recorded ALONGSIDE the agent's verdict, never a rewrite of it, and
-// the burned spend is accounted even on abort. This proves Verdict/CostUSD/
-// DurationMS are independent of AbortReason — start from a happy outcome, layer
-// an abort on, and assert nothing else moved (it would catch a refactor that made
-// Verdict derive from AbortReason, or dropped a spend field).
+// PhaseOutcome's only producer lives in core, which recovery cannot import, so
+// the type itself is the contract under test.
 func TestPhaseOutcome_AbortPreservesVerdictAndSpend(t *testing.T) {
 	t.Parallel()
 	happy := PhaseOutcome{Phase: "build", Verdict: "PASS", CostUSD: 0.42, DurationMS: 1500, BootMS: 30, AttemptCount: 2}
 
-	aborted := happy // record an abort on the already-produced outcome
+	aborted := happy
 	aborted.AbortReason = "tree-diff guard: worktree leak"
 
 	if aborted.Verdict != happy.Verdict {
@@ -53,9 +37,6 @@ func TestPhaseOutcome_AbortPreservesVerdictAndSpend(t *testing.T) {
 	}
 }
 
-// TestStallAction_FromPolicyVerdict names StallAction by capturing the typed
-// verdict the StallPolicy returns. A within-budget unclassified stall yields
-// StallExtend; a confirmed-dead process yields StallKillRetry.
 func TestStallAction_FromPolicyVerdict(t *testing.T) {
 	t.Parallel()
 	p := NewChainStallPolicy(6)
@@ -70,10 +51,6 @@ func TestStallAction_FromPolicyVerdict(t *testing.T) {
 	}
 }
 
-// TestStallPolicy_InterfaceContract pins NewChainStallPolicy as a StallPolicy
-// (the constructor's declared return type) and exercises the interface method:
-// a stall past the extension budget escalates from the observer (it cannot
-// dispatch an advisor, so advise degrades to escalate).
 func TestStallPolicy_InterfaceContract(t *testing.T) {
 	t.Parallel()
 	var p StallPolicy = NewChainStallPolicy(6)

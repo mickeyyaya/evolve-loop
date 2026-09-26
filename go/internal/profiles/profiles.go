@@ -1,12 +1,5 @@
-// Package profiles loads .evolve/profiles/*.json agent permission
-// profiles. These pin every load-bearing constraint for an agent
-// subprocess: the CLI it runs against, the model tier, the allowed
-// and disallowed tools, the sandbox configuration, the budget envelope,
-// and parallel-eligibility (single-writer invariant).
-//
-// The loader is fs.FS-backed so the same impl serves tests
-// (fstest.MapFS), the dev override (os.DirFS), and the Phase 3
-// vendored embed.FS — no API churn at the consumer site.
+// Package profiles loads the agent profiles in .evolve/profiles/*.json, which
+// pin each phase agent's CLI, model tier, tools, sandbox and budget.
 package profiles
 
 import (
@@ -18,37 +11,17 @@ import (
 	"strings"
 )
 
-// Profile mirrors the .evolve/profiles/<name>.json schema. The
-// load-bearing fields are typed; everything else (including leading-
-// underscore informational keys like `_comment`) survives in Raw so
-// callers can extract un-modeled fields via a second json.Unmarshal.
+// Profile mirrors the .evolve/profiles/<name>.json schema.
 type Profile struct {
 	Name        string   `json:"name"`
 	Role        string   `json:"role"`
 	CLI         string   `json:"cli"`
 	AllowedCLIs []string `json:"allowed_clis,omitempty"`
-	// CLIFallback is the ordered list of alternate CLIs the runner tries when
-	// the primary CLI fails with one of CLIFallbackOnExit codes (Workstream
-	// G — "any CLI can run any phase"). Each entry MUST be a registered
-	// driver name (e.g. "claude-tmux", "agy-tmux"). Empty/absent = no
-	// fallback = the legacy single-CLI behavior. Chain is tried in order;
-	// the FIRST CLI that boots and returns a non-trigger exit wins.
+	// CLIFallback lists registered driver names tried in order when CLI exits
+	// with a CLIFallbackOnExit code.
 	CLIFallback []string `json:"cli_fallback,omitempty"`
-	// CLIFallbackOnExit enumerates the bridge exit codes that trigger
-	// fallback (Workstream G; default extended in cycle-122 Fix 2).
-	// Defaults to [80, 81, 124, 127] when nil/empty:
-	//   80  = ExitREPLBootTimeout (the *-tmux REPL never showed its prompt)
-	//   81  = ExitArtifactTimeout (bridge artifact-timeout — added in cycle-122)
-	//   124 = coreutils timeout(1) exit code (defensive; if a wrapper uses it)
-	//   127 = ExitMissingBinary  (the CLI binary isn't on PATH)
-	// Operators can extend per-agent (e.g. add 2 ExitSafetyGate) for an
-	// even more aggressive policy, OR shrink to [80, 127] for the
-	// production-strict posture where 81 should surface to the
-	// failure-adapter rather than retry. CLI failures NOT in this list
-	// still hard-fail — a legitimate FAIL verdict never silently routes
-	// to a different CLI. See bridge/exitcodes.go for the canonical exit
-	// numbers and runner/cli_chain.go:defaultFallbackOnExit for the live
-	// default per code.
+	// CLIFallbackOnExit lists the bridge exit codes that trigger fallback; empty
+	// means llmroute's default. Any other failure never reroutes. See ADR-0029.
 	CLIFallbackOnExit  []int              `json:"cli_fallback_on_exit,omitempty"`
 	ModelTierDefault   string             `json:"model_tier_default"`
 	ModelTierEnvelope  *ModelTierEnvelope `json:"model_tier_envelope,omitempty"`
@@ -61,9 +34,8 @@ type Profile struct {
 	ResearchQuota      map[string]int     `json:"research_quota,omitempty"`
 	Sandbox            *SandboxConfig     `json:"sandbox,omitempty"`
 	EffortLevel        string             `json:"effort_level,omitempty"`
-	// EffortOverrides maps a resolved model tier to the effort rung used when
-	// the profile lands on that tier (the bridge's launch seam applies it), so
-	// a model_tier_overrides escalation carries its effort with it.
+	// EffortOverrides maps a resolved model tier to the effort level used at
+	// that tier, so a tier escalation carries its effort. See ADR-0096.
 	EffortOverrides   map[string]string `json:"effort_overrides,omitempty"`
 	AddDir            []string          `json:"add_dir,omitempty"`
 	PermissionMode    string            `json:"permission_mode,omitempty"`
@@ -72,27 +44,19 @@ type Profile struct {
 	StopCriterion     string            `json:"stop_criterion,omitempty"`
 	TurnBudgetHint    int               `json:"turn_budget_hint,omitempty"`
 	GeneratedFrom     string            `json:"generated_from,omitempty"`
-	// SystemPrompt / SystemPromptFile carry per-agent system-level rules
-	// prepended to the prompt at launch (facet B). SystemPromptFile is read
-	// relative to the profile dir when not absolute; SystemPrompt wins if both
-	// are set.
+	// SystemPrompt holds per-agent rules prepended to the prompt at launch; it
+	// wins over SystemPromptFile, which resolves relative to the profile dir.
 	SystemPrompt     string `json:"system_prompt,omitempty"`
 	SystemPromptFile string `json:"system_prompt_file,omitempty"`
-	// DigestFile names a pre-generated role-scoped digest (go/internal/digest
-	// output) resolved relative to the profile dir when not absolute, mirroring
-	// SystemPromptFile. When set AND the file exists on disk, systemprompt.Resolve
-	// prefers its content over SystemPromptFile (cycle-1391,
-	// tokenopt-role-scoped-instruction-digests Task 2). Unset, or set but the
-	// file absent, leaves the existing precedence chain unchanged.
+	// DigestFile names a pre-generated role-scoped digest, resolved like
+	// SystemPromptFile and preferred over it when the file exists. See ADR-0023.
 	DigestFile string `json:"digest_file,omitempty"`
-	// Raw retains the on-disk bytes for callers needing un-modeled
-	// fields (e.g., parallel_subtasks, context_anchors). Populated by
-	// the loader; not part of the JSON schema.
+	// Raw holds the file's original bytes, $include_policy sentinels unexpanded,
+	// for keys the struct does not model; the typed tool lists are expanded.
 	Raw json.RawMessage `json:"-"`
 }
 
-// ModelTierEnvelope is the {min, default, max} sub-structure used by
-// profiles that constrain LLM tier escalation (e.g., triage.json).
+// ModelTierEnvelope bounds a profile's model tier escalation.
 type ModelTierEnvelope struct {
 	Min     string `json:"min,omitempty"`
 	Default string `json:"default,omitempty"`
@@ -109,19 +73,15 @@ type SandboxConfig struct {
 	AllowNetwork     bool     `json:"allow_network,omitempty"`
 }
 
-// Loader resolves profile names to parsed Profile values.
-//
-// A zero loader is valid; every Get returns fs.ErrNotExist.
+// Loader resolves profile names to Profiles; a zero Loader's Get returns fs.ErrNotExist.
 type Loader struct {
 	fs fs.FS
 }
 
-// NewFromFS constructs a Loader backed by an arbitrary fs.FS. Pass nil
-// to get the zero loader.
+// NewFromFS returns a Loader over fsys; a nil fsys gives the zero Loader.
 func NewFromFS(fsys fs.FS) *Loader { return &Loader{fs: fsys} }
 
-// NewFromDir constructs a Loader rooted at the given directory. Empty
-// path returns the zero loader.
+// NewFromDir returns a Loader rooted at dir; an empty dir gives the zero Loader.
 func NewFromDir(dir string) *Loader {
 	if dir == "" {
 		return &Loader{}
@@ -129,7 +89,7 @@ func NewFromDir(dir string) *Loader {
 	return &Loader{fs: os.DirFS(dir)}
 }
 
-// Get reads <name>.json, parses it into a Profile, and populates Raw.
+// Get loads <name>.json, expanding $include_policy sentinels in its tool lists.
 func (l *Loader) Get(name string) (Profile, error) {
 	if l.fs == nil {
 		return Profile{}, fmt.Errorf("profiles: %w (no source configured)", fs.ErrNotExist)
@@ -143,9 +103,6 @@ func (l *Loader) Get(name string) (Profile, error) {
 	if err := json.Unmarshal(raw, &prof); err != nil {
 		return Profile{}, fmt.Errorf("profiles: parse %s: %w", p, err)
 	}
-	// Raw keeps the ORIGINAL bytes — any $include_policy sentinels in it are
-	// unexpanded. Callers extracting tool lists must use the typed fields
-	// below, which carry the expanded (effective) sets.
 	prof.Raw = json.RawMessage(raw)
 	expanded, err := l.expandPolicies(prof.DisallowedTools)
 	if err != nil {
@@ -163,9 +120,8 @@ func (l *Loader) Get(name string) (Profile, error) {
 const policyFile = "tool-policy.json"
 const policyPrefix = "$include_policy:"
 
-// expandPolicies replaces "$include_policy:<name>" sentinels in tools with the
-// entries from tool-policy.json. Duplicates are removed; sentinel order preserved.
-// Returns tools unchanged when no sentinel is present (no policy file needed).
+// expandPolicies replaces each $include_policy:<name> entry with that policy's
+// tools, dropping duplicates; without a sentinel it never reads the policy file.
 func (l *Loader) expandPolicies(tools []string) ([]string, error) {
 	hasSentinel := false
 	for _, t := range tools {
@@ -214,9 +170,7 @@ func (l *Loader) expandPolicies(tools []string) ([]string, error) {
 	return result, nil
 }
 
-// List enumerates profile names (without .json extension), sorted.
-// Non-JSON files (e.g., AGENTS.md, README.txt) and non-profile JSON
-// files (e.g., tool-policy.json which has no "name" field) are excluded.
+// List returns the sorted basenames of the JSON files that carry a non-empty "name".
 func (l *Loader) List() ([]string, error) {
 	if l.fs == nil {
 		return nil, nil
@@ -231,8 +185,6 @@ func (l *Loader) List() ([]string, error) {
 		if e.IsDir() || !strings.HasSuffix(n, ".json") {
 			continue
 		}
-		// Skip non-profile JSON files (e.g., tool-policy.json) — profiles
-		// must have a non-empty "name" field.
 		raw, rerr := fs.ReadFile(l.fs, n)
 		if rerr != nil {
 			continue

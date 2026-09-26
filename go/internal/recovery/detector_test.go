@@ -1,28 +1,8 @@
 package recovery
 
-// detector_test.go — ADR-0044 C2 (Slice 2) RED tests: the deterministic
-// FatalPaneDetector registry.
-//
-// cycle-262 burned ~40 min of a ~52 min cycle waiting out the maxExtends
-// backstop on two SELF-DESCRIBING fatal pane states (the pane text literally
-// says what is wrong) because nothing in the bridge recognizes them. The
-// fixtures below are the real pane lines from the incident forensics
-// (.evolve/runs/cycle-262/tmux-final-scrollback.txt + the post-mortem):
-//
-//   claude: "⏺ There's an issue with the selected model (auto). It may not
-//            exist or you may not have access to it. Run /model to pick a
-//            different model."
-//   codex:  "Update ran successfully! Please restart Codex." (self-upgrade
-//            mid-phase; the REPL exits to a bare shell)
-//   shell:  "zsh: command not found: codex" (the bridge nudging a dead pane)
-//
-// Contract: Detect scans the recent pane tail and returns a typed
-// TerminalCause on a seeded-signature match (first match wins, ordered
-// registry); unknown panes return ok=false — classification only, no action
-// (acting is the caller's stage-gated decision).
-
 import "testing"
 
+// The pane fixtures are verbatim captures of real fatal panes; keep them unedited.
 const (
 	paneClaudeModelError = `user@host evolve-loop % claude --model auto --dangerously-skip-permissions
 ⏺ There's an issue with the selected model (auto). It may not exist or you may not have access to it. Run /model to pick a different model.`
@@ -95,11 +75,6 @@ func TestDetect_EmptyPane_NotFatal(t *testing.T) {
 	}
 }
 
-// TestTerminalCause_SessionRecoverable (F31): a cause means "the REPL process
-// is gone, the CLI and account are fine" — a fresh session of the SAME family
-// can succeed — only for a dead shell and a self-updated CLI. A model/config
-// cause, an unknown one and the zero value are not: a fresh session of the same
-// configuration fails the same way.
 func TestTerminalCause_SessionRecoverable(t *testing.T) {
 	for cause, want := range map[TerminalCause]bool{
 		CauseDeadShell:      true,
