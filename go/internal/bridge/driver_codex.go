@@ -102,7 +102,7 @@ func (codexDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, err
 	selection = modelDispatchFromExtraArgs("codex", selection, cfg.ExtraFlags)
 	observeModelDispatch(deps, selection)
 	// cfg.Worktree is "" for non-source-writing phases → inherits caller cwd.
-	rc, err := deps.Runner(ctx, name, cfg.Worktree, args, driverEnv(deps), bytes.NewReader([]byte(prompt)), stdoutF, stderrF)
+	rc, err := deps.Runner(ctx, name, cfg.Worktree, args, driverEnv(deps, cfg.Realization.Env), bytes.NewReader([]byte(prompt)), stdoutF, stderrF)
 	if err != nil {
 		return ExitMissingBinary, fmt.Errorf("[codex] %w", err)
 	}

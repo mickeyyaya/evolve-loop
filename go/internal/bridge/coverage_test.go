@@ -167,7 +167,7 @@ func TestManifestNames_Embedded(t *testing.T) {
 }
 
 func TestDriverEnv_MergesReqEnv(t *testing.T) {
-	env := driverEnv(Deps{Env: map[string]string{"FOO_COV": "bar"}})
+	env := driverEnv(Deps{Env: map[string]string{"FOO_COV": "bar"}}, nil)
 	found := false
 	for _, kv := range env {
 		if kv == "FOO_COV=bar" {

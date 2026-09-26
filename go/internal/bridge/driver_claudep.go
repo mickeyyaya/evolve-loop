@@ -123,7 +123,7 @@ func (claudePDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, e
 	// (the tmux drivers use the pane probe instead, so only the headless driver
 	// sets this). Derived from StdoutLog so it matches the observer's path
 	// (<ws>/<phase>.bridge-pid); a mismatch degrades to no probe (best-effort).
-	env := driverEnv(deps)
+	env := driverEnv(deps, cfg.Realization.Env)
 	if pidFile := core.BridgePIDFile(cfg.StdoutLog); pidFile != "" {
 		env = append(env, bridgePidfileEnv+"="+pidFile)
 	}

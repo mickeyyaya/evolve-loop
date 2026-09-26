@@ -1,9 +1,10 @@
 # Logic-first delivery — design document
 
-- **Status:** living document, kept current with every landing. Last updated 2026-09-26 23:00.
+- **Status:** living document, kept current with every landing. Last updated 2026-09-27 00:30.
 - **Decision record:** [ADR-0106](adr/0106-logic-first-delivery.md). **Policy:** [operating-policy §0](../operations/operating-policy.md).
 - **Landings:** the design in #655 (merged `5600b77a`; it replaced #653 after a CHANGELOG conflict); the first code train in #656 (merged; eight commits, replacing #654 the same way); ADR-0105 B1 in #652 (merged `e5af27fe`).
 - **Owner of the request:** the operator. **Priority:** P0; everything else parks.
+- **Research:** [Self-recovering agent loops and Claude Code fleets in 2026](../research/self-recovering-agent-loops-2026.md) — the state of practice this design is compared against, with recommendations R1–R14 mapped onto these components.
 
 ## 1. The request
 
@@ -99,6 +100,29 @@ A passed audit meets a moved `main` at ship for reasons that touch none of its f
 
 The change is the code, its tests and its explanation document (ADR-0102). Everything a phase writes about the change is a projection. Recovery may regenerate a projection; it never touches the change itself, which lives in the fenced worktree.
 
+### 5.4 The agent's identity and its pane (P3)
+
+An agent that inspects its environment must recognise its own traces. Cycle 1707's tdd agent listed the tmux sessions, found its own, read its own prompt file, and refused the phase as a prompt injection racing "the real agent"; the operator's one-line clarification an hour later resumed it. The block that says that line before the agent needs it is [`internal/bridge/phaseidentity`](packages/internal-bridge-phaseidentity.md).
+
+- **Finished by the driver, appended.** The engine composes the prompt before a session exists; only the tmux driver knows the session name, so `prepareTmuxREPL` appends `phaseidentity.Block` to the bytes it pastes. It goes after the composed prompt so the engine's bytes stay a byte-identical prefix (the cached skill and policy blocks hold across dispatches) and the deliverable path stays the last thing the agent reads. `resolved-prompt.txt` is the exact pasted bytes, so the block is auditable per phase.
+- **In the prompt, not the system prompt.** `--append-system-prompt` exists for claude only; the block is for every tmux CLI and lands in the same bytes for each.
+- **Null object, and only true claims.** No agent name or no pane → no block; a phase whose answer the bridge reads from the pane (`completion: stdout`) gets no sole-writer claim, because a statement meant to stop an agent from doubting its own facts must never contain a false one.
+- **Suggestions off through the environment.** claude's prompt suggestion is a background model request per turn and dim text under the input box that reads like agent output. `CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false` takes precedence over the setting and, unlike a `--settings` flag, is honoured under the profiles' `--setting-sources project`. The channel is the manifest's `default_env`, realized once (`Realization.Env`), exported in the pane by the tmux boot and passed to the process by the headless drivers; keys are validated as shell identifiers at parse, the loop's, the bridge's and the credential variables are refused, and every fact rendered into the block is stripped of control bytes and backticks (security review, 2026-09-27).
+- **What the block does not fix.** The repository's CLAUDE.md is written for console operators and a phase agent reads it; the block's last line answers that in-prompt, and the content itself belongs to the target repository. The twelve profiles that repeat the same claude flag list are a later centralization into the manifest's `default_args`.
+
+### 5.5 Capacity is not a verdict (the wave-14 deep-dive)
+
+Wave 14 (cycles 1708 and 1709) failed with every CLI family walled: claude-tmux answered `auth_recheck` fourteen times (a credential wall; the operator's `/login` cleared it), codex-tmux `rate_limit` eight times and `model_unsupported` six (the deep pin the account rejects), ollama-tmux refused the source-writing phases. No logic ran. The orchestrator already treats a first-dispatch exhaustion as a **deferral**: `pauseForQuota` emits `quota.paused`, writes the quota checkpoint, records the abort with the `all-families-exhausted` prefix that `cyclehealth` classifies DEFERRED, skips failure learning, and the batch returns rc 5 so the chain waits with the checkpoint intact (1709 took this path). Three seams do not reach that one function:
+
+| Id | Component | What is wrong today | Design |
+|---|---|---|---|
+| Q1 | exhaustion during a correction re-dispatch is a deferral | `cyclerun_correction.go` wraps `runner.Run`'s `ErrAllFamiliesExhausted` as "correction N dispatch failed", records a FAIL outcome, writes a failure lesson and a digest, and lets the retrospective dispatch (which hits the same wall); 1708 was sealed FAIL this way | the correction loop, the remediation gate re-run and the resume review gate check `errors.Is(err, ErrAllFamiliesExhausted)` and return through `pauseForQuota` — one seam, one classification; a test per caller pins the DEFERRED prefix, the `quota.paused` signal, the `all_families_exhausted` ledger kind and the absence of a lesson |
+| Q2 | a credential wall benches the family and names the operator | `clihealth.Benchable` benches `rate_limit`/`exhausted` only, so `auth_recheck` re-dispatched to claude fourteen times in one wave and the halt read as quota | `auth_recheck` benches the family with the same strike-scaled cooldown a quota wall gets (30 min doubling to 4 h) but stays active for routing until a probe clears it — the cooldown only schedules the canary's next probe, and the operator's login makes that probe succeed; a login pane's stale reset hint never sets the bench; the fix names no login command, because the families' logins differ (agy trusts a directory, ollama signs in). The fix is durable on the bench entry (`operator_action` in `cli-health.json`), and the chain walker's bench line and the canary's re-bench line print it. Trade-offs taken: the canary spends one probe per cooldown (30 min → 4 h) against a CLI that needs a login until the operator logs in; a bench is advice to the chain, not a veto, so a judgment phase the balanced-tier floor pins to claude still dispatches into the wall and then defers through Q1. Not built: a Signal Center ERROR code for the wall and the loop's defer message distinguishing "wait for the operator" |
+| Q3 | a deferred cycle never counts toward the halts | the consecutive-failure breaker reads every `failure-digest.json`; a deferral must never write one (1709 did not; 1708 did, through Q1's defect) | a test pins that no digest exists after a deferral through every seam Q1 covers, and the zero-ship halt rule counts deferred lanes as neither shipped nor failed |
+| Q4 | a fallback chain never appends a CLI that cannot serve the phase | the universal fallback appended ollama-tmux to the retrospective chain; it refused the source-writing phase with exit 10 and the refusal became the retro's FAIL | the chain builder filters candidates by the phase's requirements before appending them; a refusal is impossible by construction |
+
+Q1–Q3 land before the next soak wave; Q4 is a routing hygiene follow-up. None of them changes a verdict: a capacity wall stays a deferral, a credential wall becomes an operator halt, and the FAIL streak counts logic.
+
 ## 6. Decision tables
 
 ### 6.1 Routing by violation code (`deliverable`, beside the codes)
@@ -143,7 +167,7 @@ Status: **shipped** (commit on a branch, PR open or merged) · **built** (green 
 | D0 | operating-policy §0 + ADR-0106 + this document | merged, #655 | `docs/` |
 | P1 | ADR-0105 B1 unwind-rebase-pend; then the resume heal, B3, B4 | B2 merged (#649); B1 merged (#652); the resume heal, B3 and B4 designed | `core/ship_recovery*.go` |
 | P2 | a fleet lane's closeout dossier waits for the wave boundary | built, parked (`fix/dossier-commits-at-wave-boundary`; architect N1–N5 applied) | `dossier/publish_pending.go`, `cmd_loop_dossiers.go` |
-| P3 | phase prompts state the agent's identity verifiably; phase panes run without prompt suggestions | designed | bridge prompt composition, driver launch flags |
+| P3 | the pasted prompt ends by stating who the agent is (phase, cycle, session, prompt files, sole writer); phase panes export the manifest's `default_env`, and claude-tmux turns prompt suggestions off | shipped, PR pending (`feat/phase-identity`, four commits) | `bridge/phaseidentity`, `driver_tmux_prepare.go`, `driver_tmux_boot.go`, `manifests/claude-tmux.json` |
 | P4 | an exit-85 escalation names its pattern in `cause_code` and the cause line, anchored to the line start | merged, #656 | `bridge/launchoutcome/cause.go` |
 
 ### 7.2 Host derivations (H)
@@ -181,7 +205,16 @@ Status: **shipped** (commit on a branch, PR open or merged) · **built** (green 
 | F7 | salvage executes at the default config (no cwd candidate in fleet mode; tracked candidates skipped); depends on V0 | designed | `core/correction_ladder.go` |
 | F8 | composition root wires the recoverer, with a wiring-proof test | designed | `cmd/evolve/cmd_cycle.go` |
 
-### 7.5 Ledger of outcomes (L)
+### 7.5 Capacity (Q)
+
+| Id | Component | Status | Where |
+|---|---|---|---|
+| Q1 | exhaustion during a correction re-dispatch, a remediation re-run and the resume review gate defers through `pauseForQuota` (`isQuotaWall`: the runner's exit 85 means its whole family chain was walled — one sample suffices, unlike the first dispatch's two-sample rule, which predates the tiered chain); a non-wall failure stays a failure; the pause records the phase's total dispatches | shipped on the P3 train | `core/cyclerun_correction.go`, `core/cyclerun_remediate.go`, `core/resume.go` |
+| Q2 | `auth_recheck` (`clihealth.CredentialPattern`) benches the family; unlike a quota bench it stays active for routing after its cooldown (time says nothing about a login) while the canary probes it, and a succeeding probe after the operator's login clears it; the bench entry carries `operator_action` (`clihealth.OperatorAction`), which the chain walker's bench line and the canary's re-bench line print | shipped on the P3 train | `internal/clihealth`, `internal/bridgechain`, `cmd/evolve/cli_health_canary.go` |
+| Q3 | a deferral writes no failure digest and counts toward no halt | designed (§5.5) | `core/blocker_breaker.go`, `cmd/evolve` wave accounting |
+| Q4 | the fallback chain filters candidates by the phase's requirements | designed (§5.5) | `internal/bridgechain` |
+
+### 7.6 Ledger of outcomes (L)
 
 | Id | Component | Status | Where |
 |---|---|---|---|
@@ -215,6 +248,12 @@ type Scope struct{ Worktree, Workspace string; Allowed, Unfenced, UnfencedStems 
 func Begin(ctx, scope Scope) (*Guard, error) // fails closed
 func (g *Guard) End(ctx) Outcome            // Restored (violations), Unfenced (reported), Err
 func (o Outcome) Clean() bool
+
+// P3 — internal/bridge/phaseidentity (shipped)
+const Heading = "## Who you are (stated by the evolve bridge)"
+type Facts struct{ Agent string; Cycle int; Session, PromptFile, PastedFile, Artifact string }
+func Block(f Facts) string // "" without Agent and Session
+// P3 — internal/bridge (shipped): manifest default_env → Realization.Env → exportLines (pane) / driverEnv (headless)
 
 // P4 — internal/bridge/launchoutcome (shipped)
 // exit 85: cause_code = the escalation pattern (rate_limit, model_unsupported, …) or unknown_prompt
@@ -274,7 +313,7 @@ Landing order and the checkpoint each must pass before the next starts.
 |---|---|---|
 | 1 | D0 (#655), P1 (#652), the code train (#656) | merged at a wave boundary in one burst; the plane synced; the full floor green on each |
 | 2 | soak one wave | a triage lane that omits `triage-decision.json` proceeds without `GATE_CONTRACT_REJECTED [missing_secondary]`; a codex `rate_limit` escalation shows `cause_code=rate_limit`; the first fleet-rebase recovery logs "unwound its ship commit" |
-| 3 | P2 (dossier at the boundary), P3 (identity prompt, no suggestions) | a FAIL sibling's closeout no longer moves `main` under a passed lane; no agent refusal on identity |
+| 3 | P2 (dossier at the boundary), P3 (identity prompt, no suggestions — shipped 2026-09-27) | a FAIL sibling's closeout no longer moves `main` under a passed lane; no agent refusal on identity |
 | 4 | E0 → E1 → E2 → F0 → F6a | an insufficient all-form failure is re-dispatched with `Missing`; identity, block count and signals byte-identical with and without E2 |
 | 5 | V0, F7 | salvage's approval routes PASS; a rung on an empty primary keeps FAIL |
 | 6 | F2b, F3b, F4, F5, F6, F6b, F8 | a malformed build report is repaired and approved without re-dispatch; a guard violation aborts with a P0; a failed rung leaves the breaker unchanged; a resumed cycle reaches the rung |
@@ -290,6 +329,9 @@ Merges happen only at wave boundaries. Each step is its own PR; each component i
 - **Floor rejections without codes** (F0) hide Build's commonest form failure from the routing table until they carry codes.
 - **Provenance granularity** (F2b): byte ranges are strict; a repair that reorders a table may need line-level matching. Decide with the first real repair.
 - **Document-kind cycles**: E1's `solutioncheck` path is designed, not measured.
+- **Other CLIs' suggestion features**: codex, agy and ollama panes show no next-prompt suggestion today; if one appears, its off-switch is a `default_env` entry in that CLI's manifest, not code.
+- **One rule for a walled dispatch**: the first dispatch's ladder still wants two all-85 attempts (`allFamiliesQuotaExhausted`, from before the tiered chain walked every family in one `Run`), while Q1 reads one walled `Run` as the same fact; unify on `isQuotaWall` once the ladder's tests model the chain.
+- **One rule for a walled dispatch**: the first dispatch's ladder still wants two all-85 attempts (`allFamiliesQuotaExhausted`, from before the tiered chain walked every family in one `Run`), while Q1 reads one walled `Run` as the same fact; unify on `isQuotaWall` once the ladder's tests model the chain.
 - **Completion after a correction**: the bridge completes a corrected phase only when the primary artifact is rewritten; a correction whose violation names only a secondary or the explanation document should complete on that file's rewrite (or on `evolve phase verify` passing); it lands with F0.
 
 ## 13. Review log
@@ -302,6 +344,9 @@ Merges happen only at wave boundaries. Each step is its own PR; each component i
 | 2026-09-26 | go-reviewer (train) | APPROVE-WITH-MINOR | four minors applied |
 | 2026-09-26 | code-reviewer (train) | WARNING | the derivation's write-in-flight grace (MAJOR) applied; the duplicate projector absorbed |
 | 2026-09-26 | security-reviewer (train) | BLOCK → APPROVE-WITH-MINOR | unfenced boundary; allowed-path type check; no network declared; anchored markers; three gaps filed |
+| 2026-09-27 | code-simplifier, go-reviewer, code-reviewer (Q2) | no edits; WARNING → fixed; WARNING → fixed | a login pane's stale reset hint never sets the bench; the fix names no login command (the families' logins differ); a credential bench holds for routing until a probe clears it; the fix is durable on the bench entry; the design rows state the shipped shape and its trade-offs |
+| 2026-09-27 | code-simplifier, go-reviewer, code-reviewer (Q1) | one closure; APPROVE-WITH-MINOR → applied; WARNING → justified and fixed | the one-sample reading of a walled `Run` stated in code and §12; the deferral records the phase's total dispatches; the digest assertion made non-vacuous |
+| 2026-09-27 | code-simplifier, go-reviewer, code-reviewer, security-reviewer (P3) | no edits; APPROVE; WARNING → fixed; APPROVE-WITH-MINOR → hardened | the sole-writer line was false for stdout-completion phases (fixed); a manifest `default_env` could set credential or loop variables the guards never see (refused at parse); facts rendered into the block are sanitized; no manifest pattern may match the block (pinned) |
 | 2026-09-26 | consistency audit (every doc vs the design vs the shipped code) | INCONSISTENCIES-FOUND → fixed | three stale package pages, one stale sentence in phase-architecture.md, one imprecise ADR sentence; two new package pages |
 | 2026-09-26 | code-reviewer (design document) | APPROVE-WITH-MINOR | the exit-85 census corrected; the audit-seal clause restored; F2b cross-referenced |
 
@@ -313,3 +358,7 @@ Merges happen only at wave boundaries. Each step is its own PR; each component i
 | 2026-09-26 | Review (APPROVE-WITH-MINOR): the exit-85 census corrected (the eight unknown-prompt exits were four `rate_limit` and four `model_unsupported`); the audit-seal reuse clause restored; F2b cross-referenced from the ADR. |
 | 2026-09-26 | F3 routed to the codex family with claude as fallback: the balanced-tier floor (`TestClaudeFamilyFloor`) reserves claude for judgment phases with a justification, and the recovery agent is an analytic helper. |
 | 2026-09-26 | #652, #655 and #656 merged at the wave-13 boundary (1706 shipped, 1707 failed on form); statuses updated; two wave-13 observations added to the evidence and the open questions. |
+| 2026-09-27 | Q2 shipped on the P3 train: a credential wall benches like a quota wall; the bench entry carries the operator's fix and the bench lines print it (code review: the fix must outlive the log tail). Deferred: a Signal Center ERROR for the wall, the defer message's operator wording, and protection for floor-pinned judgment phases (a bench is advice, not a veto). |
+| 2026-09-27 | Q1 shipped on the P3 train: five tests pin the three seams and the negative case; eleven mutants killed; `isQuotaWall` reads the runner's exit 85 alone, because the sentinel half of the check had no caller (a mutant proved it). |
+| 2026-09-27 | §5.5 and §7.5: the wave-14 deep-dive (three consecutive FAILs: 1707 form, 1708 and 1709 capacity) designs Q1–Q4 — capacity is a deferral through the one seam that already exists, a credential wall is an operator halt, and neither counts toward the FAIL streak. |
+| 2026-09-27 | P3 shipped: §5.4 records the design (driver-appended statement; environment channel over a settings flag; what it does not fix); §8 signatures; §12 the other-CLIs question. Wave 14 (1708, 1709) failed on capacity — every CLI family walled (`auth_recheck`, `rate_limit`, `model_unsupported`) — with `cause_code` naming each pattern, the live proof of P4. |

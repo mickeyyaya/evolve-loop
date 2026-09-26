@@ -49,6 +49,7 @@ func TestCorrectionLadderResultConsts_FlowThroughRollup(t *testing.T) {
 		redis(interaction.ResultDispatchFailed),
 		redis(interaction.ResultNonCanonicalVerdict),
 		redis(interaction.ResultRejectedAgain),
+		redis(interaction.ResultQuotaDeferred),
 	})
 	if s.ByResult[interaction.ResultWouldAct] != 1 {
 		t.Errorf("ByResult[%q] = %d, want 1", interaction.ResultWouldAct, s.ByResult[interaction.ResultWouldAct])
@@ -62,13 +63,16 @@ func TestCorrectionLadderResultConsts_FlowThroughRollup(t *testing.T) {
 	if s.ByResult[interaction.ResultDispatchFailed] != 1 {
 		t.Errorf("ByResult[%q] = %d, want 1", interaction.ResultDispatchFailed, s.ByResult[interaction.ResultDispatchFailed])
 	}
+	if s.ByResult[interaction.ResultQuotaDeferred] != 1 {
+		t.Errorf("ByResult[%q] = %d, want 1", interaction.ResultQuotaDeferred, s.ByResult[interaction.ResultQuotaDeferred])
+	}
 	if s.ByResult[interaction.ResultNonCanonicalVerdict] != 1 {
 		t.Errorf("ByResult[%q] = %d, want 1", interaction.ResultNonCanonicalVerdict, s.ByResult[interaction.ResultNonCanonicalVerdict])
 	}
 	if s.ByResult[interaction.ResultRejectedAgain] != 1 {
 		t.Errorf("ByResult[%q] = %d, want 1", interaction.ResultRejectedAgain, s.ByResult[interaction.ResultRejectedAgain])
 	}
-	if s.ByRung[interaction.RungSalvage] != 3 || s.ByRung[interaction.RungRedispatch] != 3 {
+	if s.ByRung[interaction.RungSalvage] != 3 || s.ByRung[interaction.RungRedispatch] != 4 {
 		t.Errorf("rung distribution wrong: %v", s.ByRung)
 	}
 	if s.Decisions != 1 {

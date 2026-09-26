@@ -11,7 +11,7 @@ func TestAmplifiedBenchableRejectsPatternNameVariants(t *testing.T) {
 		t.Fatalf("Benchable(rate_limit) = false, want true")
 	}
 
-	for _, pattern := range []string{" rate_limit", "rate_limit ", "RATE_LIMIT", "rate-limit", "auth_recheck"} {
+	for _, pattern := range []string{" rate_limit", "rate_limit ", "RATE_LIMIT", "rate-limit", "trust_prompt"} {
 		if Benchable(pattern) {
 			t.Fatalf("Benchable(%q) = true, want false for exact closed-set matching", pattern)
 		}

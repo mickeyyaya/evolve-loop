@@ -111,7 +111,7 @@ Each component is one commit with its own tests, ordered by dependency; unwired 
 | **Process (P)** ||||
 | P1 | ADR-0105 B1 (#652), the resume heal, then B3/B4 | per ADR-0105 | per ADR-0105 |
 | P2 | a fleet lane's closeout dossier waits for the wave boundary (branch `fix/dossier-commits-at-wave-boundary`) | per its incident | per its incident |
-| P3 | phase prompts state the agent's identity verifiably; phase panes run without prompt suggestions | prompt + driver config | the composed prompt names the session and sole-writer fact; the driver launch disables suggestions |
+| P3 | phase prompts state the agent's identity verifiably; phase panes run without prompt suggestions | `bridge/phaseidentity`, the tmux drivers, manifest `default_env` | the pasted bytes end with the session, the prompt files and the sole-writer fact (`TestTmuxDispatch_PastedPromptEndsWithTheAgentsIdentity`); the pane exports `CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false` before the launch (`TestTmuxBoot_ExportsTheManifestEnvBeforeTheLaunch`) |
 | P4 | a `rate_limit` auto-respond escalation exits with its own class, never unknown-prompt | bridge | the 1707 transcript classifies as quota, routes to the fallback, and is counted as quota |
 | **Host derivation (H)** ||||
 | H1 | one reader of the triage report: `triagedecision.Derive` (strict: `## top_n` stated, every present bucket readable, pinned ids committed; absent optional buckets are `[]`) and `Project` (lenient, ship's companion), one stamp `projected_by_orchestrator`; `triagecap` delegates to it | pure, unwired | derives 1707's report and the persona's metadata tails; declines a missing `## top_n`, prose in a bucket, a non-slug id, a missing pinned id; Project never declines |

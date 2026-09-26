@@ -371,7 +371,9 @@ See [ADR-0031](adr/0031-recipe-engine-and-capability-catalog.md).
 
 - **ADR-0022 — LaunchIntent / Realizer**: the seam between operator intent
   and per-CLI launch flags; the `manifest.default_args` field cycle-124 G1a
-  activated lives here.
+  activated lives here, and so does `manifest.default_env` (ADR-0106 P3): the
+  variables a tmux driver exports in the pane shell before the launch and a
+  headless driver passes to the process.
   `docs/architecture/adr/0022-launch-intent-realizer.md`
 - **ADR-0023 — Live injection + launch rules** (with cycle-124 facet A
   addendum): the inbox protocol, envelope kinds (now 5 with `keystroke`),
