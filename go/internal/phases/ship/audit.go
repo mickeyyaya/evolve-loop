@@ -36,9 +36,8 @@ type auditEntry = auditledger.Entry
 // verifyAuditBinding implements the full audit-binding contract.
 // res.Provenance is set on success; integrity errors return *IntegrityError.
 //
-// Sets opts internal-ish state via res.Logs and (indirectly via writeStateMap)
-// for downstream phases. Returns the audit_bound_tree_sha (if present in
-// the artifact) for the gitops layer's pre-merge check.
+// Sets opts.internalAuditBoundTreeSHA from the ledger's worktree_tree_sha for
+// the gitops layer's pre-commit and post-push tree checks.
 func verifyAuditBinding(ctx context.Context, opts *Options, res *RunResult) error {
 	ledgerPath := filepath.Join(opts.ProjectRoot, ".evolve", "ledger.jsonl")
 	entry, err := findLatestAudit(ledgerPath, opts.RunID)
@@ -79,18 +78,12 @@ func verifyAuditBinding(ctx context.Context, opts *Options, res *RunResult) erro
 			"artifact_path", entry.ArtifactPath)
 	}
 
-	// Extract audit_bound_tree_sha for the gitops pre/post-merge tree-drift check.
-	// Source priority: the orchestrator's ledger binding entry (WorktreeTreeSHA =
-	// the worktree CHANGES tree it will commit) WINS over the auditor's report
-	// comment, because the auditor persona binds HEAD^{tree} = the unchanged base
-	// (the cycle's changes are uncommitted in the worktree at audit time), which
-	// can never equal the changes-commit tree → INTEGRITY_TREE_DRIFT every cycle
-	// (cycle-152). The report comment is the fallback for the non-worktree flow.
-	if entry.WorktreeTreeSHA != "" {
-		opts.internalAuditBoundTreeSHA = entry.WorktreeTreeSHA
-	} else if m := auditBoundTreeSHARe.FindStringSubmatch(string(body)); m != nil {
-		opts.internalAuditBoundTreeSHA = strings.TrimSpace(strings.Trim(m[1], "`"))
-	}
+	// The audit-bound tree is the ledger's WorktreeTreeSHA: the worktree CHANGES
+	// tree the orchestrator will commit. The auditor report is never a source —
+	// its persona binds HEAD^{tree}, the unchanged base, which can never equal
+	// the changes-commit tree. An empty WorktreeTreeSHA leaves the field unset
+	// and is refused below by verifyPredicateReceipt and the treefence check.
+	opts.internalAuditBoundTreeSHA = entry.WorktreeTreeSHA
 
 	// 5. Cycle binding: current HEAD/tree must match ledger entry.
 	if entry.GitHEAD == "" || entry.TreeStateSHA == "" {
@@ -163,8 +156,6 @@ func verifyAuditBinding(ctx context.Context, opts *Options, res *RunResult) erro
 	res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: audit verified — verdict PASS, SHA matches, HEAD/tree bound to audit, age %ds", age))
 	return nil
 }
-
-var auditBoundTreeSHARe = regexp.MustCompile(`(?m)^audit_bound_tree_sha:\s*` + "`?" + `([0-9a-f]+)` + "`?")
 
 // findLatestAudit returns the auditor ledger entry ship binds to: the newest
 // auditor row of opts.RunID's run, or of any run when runID is empty. A miss is

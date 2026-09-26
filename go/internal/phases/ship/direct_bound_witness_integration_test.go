@@ -110,8 +110,8 @@ func TestShipDirect_UnboundShipIsUnaffected(t *testing.T) {
 //
 // An earlier version hand-set internalAuditBoundTreeSHA to `HEAD^{tree}` on
 // the theory that the non-worktree flow binds the base tree. It does not: the
-// report-comment fallback that would carry a base tree is unreachable, because
-// verifyAuditBinding refuses any ledger entry whose worktree_tree_sha does not
+// audit report is never a binding source (only the ledger's worktree_tree_sha
+// is), and verifyAuditBinding refuses any ledger entry whose worktree_tree_sha does not
 // equal treefence.Take's current tree — which is never empty. So the binding
 // that reaches ship is always the CHANGES tree. Hand-setting a value no
 // producer emits made the test unfalsifiable, and it drove the guard itself to

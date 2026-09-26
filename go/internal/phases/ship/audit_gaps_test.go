@@ -206,40 +206,6 @@ func TestCheckEGPSGate_RedCountWithSkipsPresent_Blocks(t *testing.T) {
 
 // --- helpers ----------------------------------------------------------------
 
-// auditOpts returns an Options wired for verifyAuditBinding unit tests: real
-// exec runner, ship-binary-fixture for TOFU, project root = repo.
-func auditOpts(t *testing.T, repo string) *Options {
-	t.Helper()
-	bin := filepath.Join(repo, "ship-binary-fixture")
-	// Pin the TOFU state upfront so verifyAuditBinding doesn't fail on TOFU.
-	preSeedTOFU(t, repo, bin)
-	return &Options{
-		ProjectRoot: repo,
-		CycleID:     1, RunID: "test-run", AuditRound: 1,
-		PluginRoot:     repo,
-		ShipBinaryPath: bin,
-		Runner:         execRunner,
-		NowFn:          defaultNow,
-	}
-}
-
-// preSeedTOFU writes the current ship binary SHA into state.json:expected_ship_sha
-// so verifySelfSHA passes without re-pinning during test.
-func preSeedTOFU(t *testing.T, repo, binPath string) {
-	t.Helper()
-	sha, err := sha256File(binPath)
-	if err != nil {
-		t.Fatalf("sha256File(%s): %v", binPath, err)
-	}
-	stPath := filepath.Join(repo, ".evolve", "state.json")
-	m, _ := readStateMap(stPath)
-	m["expected_ship_sha"] = sha
-	m["expected_ship_version"] = ""
-	if err := writeStateMap(stPath, m); err != nil {
-		t.Fatalf("preSeedTOFU writeStateMap: %v", err)
-	}
-}
-
 // seedCustomAudit writes a custom body as audit-report.md and an auditor
 // ledger entry with the given exit code, using HEAD/tree of repo at call time.
 func seedCustomAudit(t *testing.T, repo, body string, exitCode int) {
