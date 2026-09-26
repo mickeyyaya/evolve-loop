@@ -10,42 +10,20 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// The bounded settle-retry now sits on the common clean-exit artifact-read path, so
-// any pre-existing test whose deliverable doesn't verify well-formed on the first
-// probe would pay real time.Sleep. Flip the package clock to a no-op for the whole
-// test binary — production keeps time.Sleep. Tests that assert retry COUNTS still
-// inject their own SleepFn (that's an explicit override, unaffected by this).
+// The settle retry sits on the clean-exit path, so the test binary sleeps for free; retry-count tests inject SleepFn.
 func init() { settleSleep = func(time.Duration) {} }
 
-// TestRun_NonTimeout_CleanExitIdle_DeliverableSettlesOnRetry_PrefersFile pins the
-// cycle-603/899 class (≥10 identical-goal_hash false-FAILs, 877→899). An agent
-// EXITS CLEANLY (exit 0 — no bridge error, no timeout, no ctx-cancel) after
-// writing a valid PASS deliverable, then IDLES ("Contemplating…") without a clean
-// completion signal. The presence probe (verifyFn) races that transient idle
-// state and misreports the deliverable not-OK on the first check(s). The runner
-// must settle-retry the on-disk deliverable — exactly as the reconcile path
-// already does for the timeout race — and record PASS from the FILE, never
-// synthesize FAIL from multi-phase-contaminated scrollback (which echoes other
-// phases' Deliverable-Contract example sentinels).
-//
-// Before the fix the clean-exit path did a SINGLE-SHOT verify (runner.go:715), so
-// a racy first check flipped a genuine PASS to a scrollback-synthesized FAIL.
 func TestRun_NonTimeout_CleanExitIdle_DeliverableSettlesOnRetry_PrefersFile(t *testing.T) {
 	genuine := "# audit\n<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"PASS\"} -->\n"
-	// Raw tmux scrollback contaminated with OTHER phases' prompt-echoed example
-	// sentinels — exactly what cycle-899 Classified into a false FAIL.
 	noisyStdout := "Deliverable Contract example (PASS):\n" +
 		"<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"PASS\"} -->\n" +
 		"Deliverable Contract example (FAIL):\n" +
 		"<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"FAIL\"} -->\n" +
 		"(prompt-echoed examples, not the agent's real report)\n"
 	hooks := &fakeHooks{phase: "audit", agent: "evolve-auditor", model: "opus", prompt: "x", verdict: core.VerdictPASS}
-	// noisyStdoutBridge exits CLEANLY (no error) — it writes fileContent to the
-	// deliverable and returns stdout as scrollback. This is the clean-exit path.
 	nb := &noisyStdoutBridge{fileContent: genuine, stdout: noisyStdout}
 
-	// The presence probe races the idle state: the first two checks miss, the
-	// third — within the bounded settle window — catches the well-formed PASS.
+	// The probe misses twice while the agent idles; the third check, inside the settle window, sees the PASS.
 	calls := 0
 	settling := func(phase string, roots phasecontract.Roots) (deliverable.Result, error) {
 		calls++
@@ -77,13 +55,6 @@ func TestRun_NonTimeout_CleanExitIdle_DeliverableSettlesOnRetry_PrefersFile(t *t
 	}
 }
 
-// TestRun_NonTimeout_CleanExitIdle_GenuineFAILOnDisk_RecordsFromFileNotScrollback
-// — the anti-gaming complement of the fix: preferring the on-disk deliverable must
-// never LAUNDER a verdict in EITHER direction. A clean-exit agent that writes a
-// genuine FAIL deliverable, with PASS-noise in the scrollback, must Classify the
-// FILE (→ FAIL), not the scrollback (→ a laundered PASS). The file is authoritative
-// for FAIL exactly as it is for PASS; the settle-retry can only converge on the
-// on-disk verdict, never invent a better one.
 func TestRun_NonTimeout_CleanExitIdle_GenuineFAILOnDisk_RecordsFromFileNotScrollback(t *testing.T) {
 	genuineFail := "# audit\n<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"FAIL\"} -->\n"
 	noisyPassStdout := "prompt example (PASS): <!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"PASS\"} -->\n"
@@ -108,12 +79,6 @@ func TestRun_NonTimeout_CleanExitIdle_GenuineFAILOnDisk_RecordsFromFileNotScroll
 	}
 }
 
-// TestRun_NonTimeout_CleanExitIdle_DeliverableNeverSettles_CoherentFailNotPane
-// — the settle-WAIT is BOUNDED: a clean-exit CONTRACTED phase whose deliverable never
-// verifies (a genuinely hung/absent report, not a settle race) must yield a coherent
-// deliverable-production FAIL — Classify receives an EMPTY artifact, never the lossy
-// pane. The loop must not spin, and it must never manufacture a PASS from an absent
-// deliverable NOR a FAIL scraped from prompt-contaminated scrollback.
 func TestRun_NonTimeout_CleanExitIdle_DeliverableNeverSettles_CoherentFailNotPane(t *testing.T) {
 	stdout := "raw scrollback with no clean deliverable\n"
 	hooks := &fakeHooks{phase: "audit", agent: "evolve-auditor", model: "opus", prompt: "x", verdict: core.VerdictFAIL}
@@ -145,24 +110,3 @@ func TestRun_NonTimeout_CleanExitIdle_DeliverableNeverSettles_CoherentFailNotPan
 	}
 	_ = resp
 }
-
-// ── Verdict-authority regression matrix (the "deliverable is the source of truth"
-// invariant, unified across every completion path) ─────────────────────────────
-//
-// The recorded verdict must come from the AGENT'S ON-DISK DELIVERABLE whenever it
-// enforce-verifies, and NEVER from multi-phase-contaminated bridge scrollback. Each
-// completion path re-verifies with the SAME bounded settle-retry
-// (verifyReconcileDeliverable). This suite pins the full grid:
-//
-//   completion path        | valid PASS file | settles on retry | genuine FAIL file | never-settles / absent
-//   -----------------------|-----------------|------------------|-------------------|-----------------------
-//   clean-exit (exit 0)    | PrefersFile...  | CleanExitIdle... | ...GenuineFAIL... | ...NeverSettles...     ← THIS FILE (was the gap: cycle-603/899)
-//   artifact-timeout (81)  | Timeout_Well... | Timeout_Settles..| Timeout_Sentinel- | Timeout_NeverSettles..
-//   transient (80/85/86)   | Transient_Well..| Transient_Settle.| Transient_Sentinel| Transient_NotWell...
-//   ctx-cancel (-1)        | (→ transient via IsInfraTeardownError; engine classifies -1+ctx.Err → transient)
-//
-// Invariants pinned across ALL cells:
-//   • PASS-preservation: a genuine on-disk PASS is recorded PASS (never dropped to a scrollback FAIL).
-//   • FAIL-preservation: a genuine on-disk FAIL is recorded FAIL (never laundered to a scrollback PASS).
-//   • Bounded + fail-open: an absent/never-settling deliverable falls back to stdout after ≤ reconcileSettleRetries+1
-//     verifies — the retry can only UPGRADE toward the real deliverable, never invent one, and the loop cannot spin.

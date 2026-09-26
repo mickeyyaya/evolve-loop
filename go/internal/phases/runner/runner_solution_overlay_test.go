@@ -8,13 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// TestRunner_OverlaySignalsRideThePhaseRequest — ADR-0099 slice 3: the runner
-// hands the dispatch's kernel-projected signals (core.PhaseRequest.Signals) to
-// overlay resolution unchanged — it digests nothing itself — so the SCOUT
-// dispatch of a document cycle (no report exists yet; the kind is the project
-// default core projected) carries solution-scout on BridgeRequest.Skills, the
-// build dispatch carries solution-build, and a code or signal-less dispatch
-// stays byte-identical (no skills at the profile-default tier).
 func TestRunner_OverlaySignalsRideThePhaseRequest(t *testing.T) {
 	document := map[string]string{config.SignalDeliverableKind: "document"}
 	for _, tc := range []struct {

@@ -1,17 +1,5 @@
 package runner
 
-// runner_reconcile_stale_test.go — the SECOND door of cycle-1550 (go-review
-// CRITICAL on the bridge baseline fix): after a bridge artifact-timeout the
-// runner's reconcile-on-teardown re-reads the canonical artifact and trusts a
-// well-formed deliverable. A byte-identical leftover from a PRIOR attempt is
-// well-formed, carries the cycle-scoped challenge token, and pre-fix would be
-// resurrected as this session's verdict — same wrong outcome as the bridge
-// door, five minutes slower. The runner now snapshots the artifact
-// PRE-DISPATCH and refuses to reconcile anything still byte-identical to it.
-// The cycle-254/255 contract is untouched: a deliverable the agent wrote
-// DURING the session (fakeBridge.writeArtifact — new mtime) still reconciles,
-// pinned by TestRun_Timeout_WellFormedPASS_ReconcilesToPass.
-
 import (
 	"context"
 	"os"
@@ -38,8 +26,6 @@ func seedStaleReport(t *testing.T, ws, phase string) string {
 	return path
 }
 
-// The replay: stale well-formed PASS report on disk pre-dispatch, bridge times
-// out, agent wrote NOTHING — the runner must NOT resurrect the leftover.
 func TestRun_Timeout_StalePreDispatchLeftoverIsNotReconciled(t *testing.T) {
 	ws := t.TempDir()
 	seedStaleReport(t, ws, "audit")
@@ -70,10 +56,6 @@ func TestRun_Timeout_StalePreDispatchLeftoverIsNotReconciled(t *testing.T) {
 	}
 }
 
-// The contract-preserved complement: same stale leftover, but the agent
-// REWROTE the report during the session (fakeBridge.writeArtifact — even with
-// identical bytes the mtime advances) — reconcile behaves exactly as the
-// cycle-254/255 contract requires.
 func TestRun_Timeout_RewrittenLeftoverStillReconciles(t *testing.T) {
 	ws := t.TempDir()
 	seedStaleReport(t, ws, "audit")
@@ -95,8 +77,6 @@ func TestRun_Timeout_RewrittenLeftoverStillReconciles(t *testing.T) {
 	}
 }
 
-// An OPTIONAL phase with only the stale leftover degrades to WARN (the
-// Workstream-D soft-fail), never resurrects.
 func TestRun_Timeout_OptionalPhaseStaleLeftoverDegradesToWarn(t *testing.T) {
 	ws := t.TempDir()
 	seedStaleReport(t, ws, "smell-scan")
@@ -118,11 +98,6 @@ func TestRun_Timeout_OptionalPhaseStaleLeftoverDegradesToWarn(t *testing.T) {
 	}
 }
 
-// The SECOND reconcile door — the ACS deterministic floor — must refuse the
-// stale leftover too: a prior attempt's audit report carries THIS cycle's
-// challenge token (minted once per cycle) and the workspace's acs-verdict.json
-// may equally be the prior attempt's PASS, so token+acs cannot distinguish
-// stale from fresh. Only the pre-dispatch snapshot can.
 func TestRun_Timeout_AcsFloorRefusesStaleLeftover(t *testing.T) {
 	ws := t.TempDir()
 	path := filepath.Join(ws, "audit-report.md")
@@ -147,7 +122,7 @@ func TestRun_Timeout_AcsFloorRefusesStaleLeftover(t *testing.T) {
 		Hooks:   hooks,
 		Bridge:  fb,
 		Prompts: fakePromptsFS("evolve-auditor", "x"),
-		// Verify not-OK: the shape that historically routed into the ACS floor.
+		// Verify not-OK, the shape that routes into the ACS floor.
 		VerifyFn: verifyReturns(deliverable.Result{OK: false}, nil),
 	})
 	resp, err := r.Run(context.Background(), core.PhaseRequest{Workspace: ws})

@@ -1,21 +1,5 @@
 package runner
 
-// RED wiring test for cycle-672 top_n task `echo-veto-wiring-completion`,
-// caller side of AC1: BaseRunner composes the phase prompt (runner.go ~307)
-// and invokes the events producer per dispatch attempt (~551), but the default
-// producer builds phasestream.ProduceConfig WITHOUT the prompt — so the live
-// classifier has no echo context and an agent quoting its own prompt text is
-// classified infra_failure (cycle-656 retro D3, third recurrence of the
-// cycle-641 lesson).
-//
-// This test drives the REAL default events producer (no EventsProducer
-// override) through Run() with a bridge fake that writes the phase logs, then
-// asserts on the emitted <phase>-events.ndjson. RED today behaviorally: the
-// echoed-line case emits infra_failure because the composed prompt never
-// reaches phasestream.Produce. DO NOT MODIFY — Builder threads the composed
-// prompt from Run into the producer (and ProduceConfig.InjectedPrompt) to make
-// it GREEN; the genuine-frame case must STAY green (anti-over-suppression).
-
 import (
 	"bufio"
 	"context"
@@ -28,9 +12,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasestream"
 )
 
-// logWritingBridge mimics a tmux driver: it writes the artifact AND the raw
-// phase logs (<agent>-stdout.log / <agent>-stderr.log) into the workspace, so
-// the runner's post-attempt events producer has something real to classify.
+// logWritingBridge writes the artifact and the raw phase logs, as a tmux driver does, so the producer classifies real input.
 type logWritingBridge struct {
 	artifact   string
 	stderrLine string
@@ -56,8 +38,6 @@ func (b *logWritingBridge) Probe(_ context.Context) (core.BridgeProbe, error) {
 	return core.BridgeProbe{}, nil
 }
 
-// eventsContainInfraFailure reports whether <ws>/<phase>-events.ndjson holds
-// at least one infra_failure envelope.
 func eventsContainInfraFailure(t *testing.T, ws, phase string) bool {
 	t.Helper()
 	f, err := os.Open(filepath.Join(ws, phase+"-events.ndjson"))
@@ -84,10 +64,6 @@ func eventsContainInfraFailure(t *testing.T, ws, phase string) bool {
 	return false
 }
 
-// TestC672_002_RunnerThreadsComposedPromptToEventsProducer — AC1 (caller
-// wiring): a stderr line that verbatim-echoes the COMPOSED phase prompt must
-// not surface as infra_failure in the runner-produced events stream, while a
-// genuine provider error frame (absent from the prompt) still must.
 func TestC672_002_RunnerThreadsComposedPromptToEventsProducer(t *testing.T) {
 	const composedPrompt = "Adversarial Reviewer checklist: unbounded allocation or recursion; " +
 		"TOCTOU / race windows; missing rate limits. Report exploits only."
@@ -115,8 +91,7 @@ func TestC672_002_RunnerThreadsComposedPromptToEventsProducer(t *testing.T) {
 				Hooks:   hooks,
 				Bridge:  &logWritingBridge{artifact: "# build artifact\n## Files Modified\n- a.go\n", stderrLine: tc.stderrLine},
 				Prompts: fakePromptsFS("evolve-builder", "agent body"),
-				// EventsProducer deliberately NOT overridden: this test pins the
-				// real default producer chain runner → phasestream.Produce.
+				// EventsProducer is left unset on purpose: the test pins the real default producer.
 			})
 
 			if _, err := r.Run(context.Background(), core.PhaseRequest{

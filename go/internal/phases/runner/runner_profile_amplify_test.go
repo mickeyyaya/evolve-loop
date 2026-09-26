@@ -1,12 +1,5 @@
 package runner
 
-// runner_profile_amplify_test.go — adversarial profile-loading boundary tests
-// for cycle-276 T3 (bridge-profile-contract-symmetry). The builder's
-// runner_test.go proves that profiles-dir-present + profile-absent → fast-fail
-// with the path in the error message. These tests probe the complementary
-// boundaries: absent profiles dir → existing behavior preserved (no fast-fail),
-// and profile-present → no fast-fail.
-
 import (
 	"context"
 	"os"
@@ -18,11 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
-// TestRunnerMissingProfile_NoProfilesDir verifies the critical backward-compat
-// boundary: when the profiles directory does NOT exist, the runner must proceed
-// normally (the existing behavior that all pre-276 tests rely on).
-// The fast-fail is gated on `os.Stat(profileDir).IsDir()` — absent dir must
-// not trigger the guard.
 func TestRunnerMissingProfile_NoProfilesDir(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir() // no .evolve/profiles inside
@@ -44,9 +32,6 @@ func TestRunnerMissingProfile_NoProfilesDir(t *testing.T) {
 	}
 }
 
-// TestRunnerMissingProfile_ProfilePresent verifies that when the profiles dir
-// exists AND the expected profile file is present, the runner proceeds without
-// error (fast-fail must not fire on a healthy configuration).
 func TestRunnerMissingProfile_ProfilePresent(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -54,7 +39,6 @@ func TestRunnerMissingProfile_ProfilePresent(t *testing.T) {
 	if err := os.MkdirAll(profileDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	// agent "evolve-builder" → profile name "builder" → "builder.json"
 	profileContent := `{"name":"builder","role":"builder","cli":"claude-tmux"}`
 	if err := os.WriteFile(filepath.Join(profileDir, "builder.json"), []byte(profileContent), 0o644); err != nil {
 		t.Fatal(err)
@@ -78,13 +62,6 @@ func TestRunnerMissingProfile_ProfilePresent(t *testing.T) {
 	}
 }
 
-// TestRunnerMissingProfile_AgentNameStripping verifies that the profile
-// filename uses the agent name with the "evolve-" prefix stripped:
-//   - agent "evolve-scout"  → looks for "scout.json"
-//   - agent "evolve-tdd-engineer" → looks for "tdd-engineer.json"
-//
-// If the runner accidentally looked for "evolve-scout.json" it would find
-// nothing (a silent naming mismatch that the builder's tests don't probe).
 func TestRunnerMissingProfile_AgentNameStripping(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -117,10 +94,6 @@ func TestRunnerMissingProfile_AgentNameStripping(t *testing.T) {
 	}
 }
 
-// TestRunnerMissingProfile_ProfilesDirIsFile verifies that a path collision
-// where .evolve/profiles is a FILE (not a directory) does not trigger the
-// fast-fail. os.Stat(profileDir).IsDir() must return false for a regular file,
-// so the runner proceeds as if the directory is absent.
 func TestRunnerMissingProfile_ProfilesDirIsFile(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -128,7 +101,6 @@ func TestRunnerMissingProfile_ProfilesDirIsFile(t *testing.T) {
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	// Write a FILE at the profiles path (not a directory).
 	if err := os.WriteFile(filepath.Join(evolveDir, "profiles"), []byte("not a dir"), 0o644); err != nil {
 		t.Fatal(err)
 	}
