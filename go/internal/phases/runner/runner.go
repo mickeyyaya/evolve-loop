@@ -172,6 +172,9 @@ type Options struct {
 	// (tests, gate off), falls back to the catalog-aware verify. VerifyFn
 	// (tests) outranks it.
 	ContractVerifier func() ContractVerifier
+	// HostEffects performs the phase's declared host effects before the verdict
+	// engine judges it; an accessor for the same reason as ContractVerifier.
+	HostEffects func() core.HostEffects
 	// SleepFn is the seam for the delay between the verdict engine's bounded
 	// settle-retry attempts (verdict.Engine.settle — see its doc for the
 	// cycles 824/825 rationale). When nil, defaults to settleSleep (time.Sleep).
@@ -243,6 +246,8 @@ type BaseRunner struct {
 	// the resolved probe, clock, stdout filter, optional flag and Center
 	// accessor — which live in the engine only (wiredVerdictEngine).
 	contractVerifier func() ContractVerifier
+	hostEffects      func() core.HostEffects
+	signals          func() *signalcenter.Center
 	verifyInjected   bool
 	judge            *verdict.Engine
 }
@@ -299,6 +304,8 @@ func New(opts Options) *BaseRunner {
 	}
 	b.judge = wiredVerdictEngine(opts)
 	b.contractVerifier = opts.ContractVerifier
+	b.hostEffects = opts.HostEffects
+	b.signals = resolveSignals(opts)
 	b.verifyInjected = opts.VerifyFn != nil
 	return b
 }
@@ -320,7 +327,7 @@ func (b *BaseRunner) Name() string { return b.hooks.PhaseName() }
 //  2. resolve the dispatch plan (policy pin / profile / advisor overlay, the
 //     CLI chain, the tier)
 //  3. dispatch through the bridge across the fallback chain, inside the
-//     worktree fence
+//     worktree fence, then perform the phase's declared host effects
 //  4. judge the outcome through the verdict engine (ADR-0103 unit 11): the
 //     bounded settle ladder, the teardown reconcile arms, the verdict-source
 //     rule (the contracted file, never the pane), Classify via hook, the ship
@@ -351,7 +358,9 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	dispatchResult := b.dispatchPhaseAttempts(ctx, req, prep, dispatchPlan)
 	req.WorktreeVerified = dispatchResult.worktreeVerified
 
-	return b.judge.Judge(ctx, dispatchOf(req, prep, dispatchPlan, dispatchResult), b.classifyWith(req, dispatchResult.bridgeResponse))
+	d := dispatchOf(req, prep, dispatchPlan, dispatchResult)
+	b.performHostEffects(ctx, d)
+	return b.judge.Judge(ctx, d, b.classifyWith(req, dispatchResult.bridgeResponse))
 }
 
 func (b *BaseRunner) withExplanationContract(body, phase string) (string, error) {

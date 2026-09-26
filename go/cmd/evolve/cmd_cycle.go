@@ -31,6 +31,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable"
 	"github.com/mickeyyaya/evolve-loop/go/internal/evalgate"
+	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/mintregistry"
@@ -53,7 +54,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/triage"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
-	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 	"github.com/mickeyyaya/evolve-loop/go/internal/research"
 	"github.com/mickeyyaya/evolve-loop/go/internal/resolvellm"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
@@ -529,21 +529,23 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 	// is explicit; the gate's Reviewer replaces it below when the gate is on.
 	var contractVerifier runner.ContractVerifier = deliverable.PlainVerifier{PhaseIO: cfg.PhaseIO}
 	verifierOf := func() runner.ContractVerifier { return contractVerifier }
+	var hostEffects core.HostEffects
+	hostEffectsOf := func() core.HostEffects { return hostEffects }
 
 	runners := map[core.Phase]core.PhaseRunner{
-		core.PhaseIntent: intent.New(intent.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, CompactPrompts: cfg.CompactPrompts}),
+		core.PhaseIntent: intent.New(intent.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, CompactPrompts: cfg.CompactPrompts}),
 		// Scout + Build are swarm-eligible (ADR-0032): wrapped in the swarmRunner
 		// Decorator so stage=advisory|enforce (policy.json "swarm.stage") dispatches
 		// them across N parallel workers (reader fan-out / writer merge-train).
 		// Default (stage absent/shadow) = byte-identical delegate — zero behavior change.
 		// PhaseIO threads cfg.PhaseIO into the reconcile rung (3.10 Slice 1); StageOff
 		// (the shipping default) keeps these byte-identical.
-		core.PhaseScout:        swarmrunner.New(scout.New(scout.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, PhaseIO: cfg.PhaseIO, CompactPrompts: cfg.CompactPrompts}), walked, swarm.ModeReader, swCfg),
-		core.PhaseTriage:       triage.New(triage.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, PhaseIO: cfg.PhaseIO, CompactPrompts: cfg.CompactPrompts}),
-		core.PhaseTDD:          tdd.New(tdd.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, CompactPrompts: cfg.CompactPrompts}),
-		core.PhaseBuildPlanner: buildplanner.New(buildplanner.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf}).BaseRunner(),
-		core.PhaseBuild:        swarmrunner.New(build.New(build.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, PhaseIO: cfg.PhaseIO, CompactPrompts: cfg.CompactPrompts}), walked, swarm.ModeWriter, swCfg),
-		core.PhaseAudit:        audit.NewDefaultWithStageCompactSpec(walked, prm, cfg.PhaseIO, cfg.CompactPrompts, documentSpecPtr(cfg), audit.WithContractVerifier(verifierOf), audit.WithSignals(func() *signalcenter.Center { return signals })),
+		core.PhaseScout:        swarmrunner.New(scout.New(scout.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, PhaseIO: cfg.PhaseIO, CompactPrompts: cfg.CompactPrompts}), walked, swarm.ModeReader, swCfg),
+		core.PhaseTriage:       triage.New(triage.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, PhaseIO: cfg.PhaseIO, CompactPrompts: cfg.CompactPrompts}),
+		core.PhaseTDD:          tdd.New(tdd.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, CompactPrompts: cfg.CompactPrompts}),
+		core.PhaseBuildPlanner: buildplanner.New(buildplanner.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf}).BaseRunner(),
+		core.PhaseBuild:        swarmrunner.New(build.New(build.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, PhaseIO: cfg.PhaseIO, CompactPrompts: cfg.CompactPrompts}), walked, swarm.ModeWriter, swCfg),
+		core.PhaseAudit:        audit.NewDefaultWithStageCompactSpec(walked, prm, cfg.PhaseIO, cfg.CompactPrompts, documentSpecPtr(cfg), audit.WithContractVerifier(verifierOf), audit.WithHostEffects(hostEffectsOf), audit.WithSignals(func() *signalcenter.Center { return signals })),
 		// ManifestGate is threaded from policy.json `gates.manifest_gate` (default
 		// "shadow") so the ship-bind manifest gate is operator-activatable — it was
 		// unreachable short of a code edit before cycle-1064.
@@ -552,7 +554,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 		// Ship-error recovery phase (Component #8): the advisor's recovery chain
 		// routes an unknown/novel ShipError here to diagnose + decide RESHIP /
 		// RERUN_PHASE / BLOCK. Optional — never on the mandatory spine.
-		core.PhaseDebugger: debugger.New(debugger.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, CompactPrompts: cfg.CompactPrompts}),
+		core.PhaseDebugger: debugger.New(debugger.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, CompactPrompts: cfg.CompactPrompts}),
 	}
 
 	// User-defined phases ("Lego" overlays): merge .evolve/phases/<name>/phase.json
@@ -601,13 +603,13 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 			continue // ApplyUserRouting already warned + skipped it; no dead runner
 		}
 		if _, exists := runners[core.Phase(s.Name)]; !exists {
-			runners[core.Phase(s.Name)] = specrunner.New(s, specrunner.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf})
+			runners[core.Phase(s.Name)] = specrunner.New(s, specrunner.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf})
 		}
 	}
 	// Spec-runner fallback for BUILTIN registry phases the advisor can SELECT
 	// (see registerBuiltinSpecRunners) — makes the invariant "every
 	// advisor-selectable phase is dispatchable" hold.
-	registerBuiltinSpecRunners(runners, builtinCat, prm, walked, os.Stderr)
+	registerBuiltinSpecRunners(runners, builtinCat, specrunner.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf}, os.Stderr)
 	// DynamicLLM brain: the routing advisor, defined like every phase agent —
 	// persona (agents/evolve-router.md) + profile (router.json) + artifact. Its
 	// {cli, model} resolve from the profile + EVOLVE_ROUTER_CLI/_MODEL env (the
@@ -839,6 +841,8 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 	// branch carries the audit verdict forward instead of always re-auditing.
 	// All fail-closed — see cmd_composition_wiring.go.
 	opts = append(opts, compositionOptions()...)
+	hostEffects = deliverable.NewHostEffects(catalog, hostInboxClaimer(ld, signals))
+	opts = append(opts, core.WithHostEffects(hostEffects))
 	opts = append(opts, core.WithSignalCenter(signals))
 
 	return orchDeps{
@@ -848,6 +852,13 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 		Signals:      signals,
 		Bridge:       br,
 		Runners:      runners,
+	}
+}
+
+// hostInboxClaimer claims through the same floor as `evolve inbox-mover claim`.
+func hostInboxClaimer(ld inboxmover.LedgerAppender, signals *signalcenter.Center) deliverable.Claimer {
+	return func(inboxDir string, cycle int, ids []string) error {
+		return inboxmover.ClaimPending(inboxmover.Options{InboxDir: inboxDir, Stderr: os.Stderr, Ledger: ld, Signals: signals, IsProtectedPath: guards.IsProtectedScope}, cycle, ids)
 	}
 }
 
@@ -1004,7 +1015,7 @@ func resolveRouterDispatch(evolveDir string, rc policy.RouterPolicy) (cli, model
 // dead entries). Guarded on persona existence: a kind:llm phase whose
 // agents/<name>.md is missing (e.g. plan-review today) is skipped + WARNed to
 // `warn` rather than wired to a runner it cannot execute.
-func registerBuiltinSpecRunners(runners map[core.Phase]core.PhaseRunner, builtinCat phasespec.Catalog, prm *prompts.Loader, br core.Bridge, warn io.Writer) {
+func registerBuiltinSpecRunners(runners map[core.Phase]core.PhaseRunner, builtinCat phasespec.Catalog, base specrunner.Config, warn io.Writer) {
 	for _, s := range builtinCat.All() {
 		if s.KindOrDefault() != "llm" || s.RoleOrDefault() == phasespec.RoleControl {
 			continue
@@ -1012,11 +1023,11 @@ func registerBuiltinSpecRunners(runners map[core.Phase]core.PhaseRunner, builtin
 		if _, exists := runners[core.Phase(s.Name)]; exists {
 			continue
 		}
-		if _, err := prm.Agent(s.AgentName()); err != nil {
+		if _, err := base.Prompts.Agent(s.AgentName()); err != nil {
 			fmt.Fprintf(warn, "[phases] WARN selectable spec phase %q (kind:llm) has no runner and no persona %s.md — not dispatchable until a persona is added\n", s.Name, s.AgentName())
 			continue
 		}
-		runners[core.Phase(s.Name)] = specrunner.New(s, specrunner.Config{Bridge: br, Prompts: prm})
+		runners[core.Phase(s.Name)] = specrunner.New(s, base)
 	}
 }
 

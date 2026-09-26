@@ -1,9 +1,6 @@
 package main
 
 import (
-	"io"
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
@@ -17,12 +14,7 @@ import (
 // to it — this is the wiring proof, in the SignalCenterReachesEveryPhaseRunner
 // shape.
 func TestWireOrchestratorDeps_ContractVerifierReachesEveryPhaseRunner(t *testing.T) {
-	root := t.TempDir()
-	evolveDir := filepath.Join(root, ".evolve")
-	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	d := wireOrchestratorDeps(root, evolveDir, io.Discard)
+	d := wiredWithRealPhases(t)
 	if len(d.Runners) == 0 {
 		t.Fatal("orchDeps.Runners must expose the phase-runner map")
 	}

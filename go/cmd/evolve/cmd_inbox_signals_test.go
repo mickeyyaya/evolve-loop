@@ -91,7 +91,7 @@ func TestInboxCenterlessRootsArePinned(t *testing.T) {
 		"cmd/evolve/cmd_inbox_quarantine.go":    "operator command `evolve inbox quarantine release` — 06-F1",
 		"cmd/evolve/cmd_continuation.go":        "operator command `evolve continuation` — 06-F1",
 		"cmd/evolve/cmd_inbox_consume.go":       "operator command `evolve inbox consume` (two literals) — 06-F1",
-		"cmd/evolve/cmd_cycle.go":               "read-only probes (failure count, continuation scope, dispatch state) — never write",
+		"cmd/evolve/cmd_cycle.go":               "read-only probes (failure count, continuation scope, dispatch state) — never write; hostInboxClaimer — WIRED (Signals: signals)",
 		"internal/loopwave/launcher.go":         "the wave engine's freshness probe (ADR-0103 unit 13) — read-only, WIRED (Signals: e.center())",
 		"internal/loopwave/plan.go":             "the wave engine's consumed-top_n prune probe (ADR-0103 unit 13) — read-only, WIRED (Signals: e.center())",
 		"internal/triagecap/lane_menu.go":       "the ProjectRoot-less prune probe — never writes",
