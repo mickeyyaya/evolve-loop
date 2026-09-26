@@ -9,8 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// injectCatalogDir injects dir as the model-catalog directory for the duration
-// of the test, restoring the original fn-var at cleanup.
 func injectCatalogDir(t *testing.T, dir string) {
 	t.Helper()
 	orig := modelCatalogDirFn
@@ -44,14 +42,12 @@ func TestApplyCatalogTierMap_LiveOverrides(t *testing.T) {
 	if got.ModelTierMap["fast"] != "claude-haiku-4-5" {
 		t.Fatalf("fast not overridden: %v", got.ModelTierMap)
 	}
-	// A tier the catalog didn't carry keeps the manifest value.
 	if got.ModelTierMap["balanced"] != "sonnet" {
 		t.Fatalf("balanced should be untouched: %v", got.ModelTierMap)
 	}
 }
 
 func TestApplyCatalogTierMap_DetectDoesNotOverride(t *testing.T) {
-	// A detect-sourced entry must NOT override the manifest (the safety gate).
 	cat := modelcatalog.Catalog{CLIs: map[string]modelcatalog.CLIEntry{
 		"claude": {Source: modelcatalog.SourceDetect, TierModels: map[string]string{"deep": "wrong"}},
 	}}
@@ -62,7 +58,6 @@ func TestApplyCatalogTierMap_DetectDoesNotOverride(t *testing.T) {
 }
 
 func TestApplyCatalogTierMap_NoEntryIsByteIdentical(t *testing.T) {
-	// No catalog entry for this CLI → the SAME ModelTierMap is returned (not a copy).
 	m := manifestWithTierMap()
 	cat := modelcatalog.Catalog{CLIs: map[string]modelcatalog.CLIEntry{
 		"codex": {Source: modelcatalog.SourceLive, TierModels: map[string]string{"deep": "gpt-5.5"}},
@@ -83,16 +78,11 @@ func TestBaseCLIName(t *testing.T) {
 }
 
 func TestLoadManifest_NoCatalogIsUnchanged(t *testing.T) {
-	// Point the catalog dir at an empty temp dir → LoadManifest must return the
-	// embedded manifest untouched (byte-identical-until-catalog property).
 	injectCatalogDir(t, t.TempDir())
 	m, err := LoadManifest("claude-tmux")
 	if err != nil {
 		t.Fatal(err)
 	}
-	// embedded claude-tmux manifest has its own ModelTierMap; just assert the
-	// load succeeded and overlay was a no-op (deep maps to the embedded value,
-	// not anything catalog-injected).
 	if m.CLI == "" {
 		t.Fatal("manifest failed to load")
 	}
@@ -123,8 +113,6 @@ func TestLoadManifest_LiveCatalogOverlays(t *testing.T) {
 	}
 }
 
-// TestModelCatalogDirFn_Injectable verifies that the fn-var seam is injectable:
-// replacing modelCatalogDirFn redirects loadCatalogCached to the injected directory.
 func TestModelCatalogDirFn_Injectable(t *testing.T) {
 	want := t.TempDir()
 	orig := modelCatalogDirFn

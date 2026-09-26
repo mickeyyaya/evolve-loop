@@ -6,9 +6,7 @@ import (
 	"testing"
 )
 
-// namedCaptureCfg builds a Config bound to an already-existing named session so
-// EnsureSession attaches immediately (no boot loop) and the capture flow is the
-// unit under test.
+// namedCaptureCfg binds an existing named session so EnsureSession attaches without a boot loop.
 func namedCaptureCfg(t *testing.T, name string) *Config {
 	t.Helper()
 	return &Config{
@@ -30,7 +28,6 @@ func TestCaptureModelPicker_OpensImmediately(t *testing.T) {
 	if !strings.Contains(pane, "Select model") {
 		t.Fatalf("pane missing picker: %q", pane)
 	}
-	// Safety: the picker is always dismissed with Esc (never confirmed).
 	if !tx.sentContains("Escape") {
 		t.Fatalf("Escape never sent; sends=%v", tx.sentKeys)
 	}
@@ -44,7 +41,6 @@ func TestCaptureModelPicker_NeverOpensErrors(t *testing.T) {
 	if _, err := CaptureModelPicker(context.Background(), cfg, recipeDeps(tx), "claude-tmux"); err == nil {
 		t.Fatal("expected error when picker never opens")
 	}
-	// Even on the failure path the picker attempt must be dismissed.
 	if !tx.sentContains("Escape") {
 		t.Fatalf("Escape not sent on failure path; sends=%v", tx.sentKeys)
 	}

@@ -38,7 +38,6 @@ func TestBillingSnapshot(t *testing.T) {
 		t.Fatalf("snapshot should record the api-key canary; got %s", b)
 	}
 
-	// missing args
 	if _, err := eng.BillingSnapshot("", "x"); err == nil {
 		t.Fatal("missing dir should error")
 	}
@@ -93,7 +92,6 @@ func TestBillingCompare(t *testing.T) {
 			}
 		})
 	}
-	// read error → INCONCLUSIVE
 	if _, code := BillingCompare("/no/before.json", "/no/after.json"); code != 2 {
 		t.Fatalf("missing files → code %d, want 2", code)
 	}

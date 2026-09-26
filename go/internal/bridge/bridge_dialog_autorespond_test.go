@@ -1,26 +1,3 @@
-// bridge_dialog_autorespond_test.go — cycle-245 task `bridge-dialog-auto-respond` (RED).
-//
-// Migration step 6 (carryover `bridge-weak-signal-profiles`, the "biggest
-// latency lever ~10min/cycle"): two weak-signal gaps in the tmux bridge.
-//
-//  1. agy's end-of-session rating dialog ("Rate this response" / "How helpful
-//     was this session") has NO rule in agy-tmux.json's interactive_prompts,
-//     so the auto-responder noops and the run burns the full artifact-wait
-//     window before failing. Contract: the dialog must auto-respond (some key
-//     sequence is sent; the run is not stalled by a survey).
-//  2. When the artifact-wait review checkpoint finds the agent IDLE with the
-//     artifact missing, the driver gives up straight into the
-//     ExitArtifactTimeout relaunch path. Contract: before giving up, send
-//     EXACTLY ONE in-pane nudge naming the artifact path (the agent often
-//     finished the work and just forgot the Write); only on a subsequent
-//     idle checkpoint does the existing timeout path proceed.
-//
-// RED note: compiles against existing API, fails at RUNTIME today —
-// the rating pane noops and zero nudges are delivered. Builder makes these
-// GREEN via (a) a new interactive_prompts rule in
-// go/internal/bridge/manifests/agy-tmux.json (config-only; policy
-// auto_respond) and (b) a one-shot nudge guard in driver_tmux_repl.go's
-// review-checkpoint path. DO NOT modify this file.
 package bridge
 
 import (
@@ -32,13 +9,6 @@ import (
 	"time"
 )
 
-// --- 1. agy session-rating dialog -----------------------------------------
-
-// TestAgyTmuxManifest_SessionRating_AutoResponds drives the REAL embedded
-// agy-tmux manifest through the production decision engine: a pane showing
-// agy's end-of-session rating dialog must produce an auto-response (keys
-// sent), not a noop that stalls the run. RED today: no rule matches → noop.
-//
 // Deprecated: TestAgyTmuxManifest_SessionRating_AutoResponds
 func TestAgyTmuxManifest_SessionRating_AutoResponds(t *testing.T) {
 	m, err := LoadManifest("agy-tmux")
@@ -65,10 +35,6 @@ func TestAgyTmuxManifest_SessionRating_AutoResponds(t *testing.T) {
 	}
 }
 
-// TestAgyTmuxManifest_SessionRating_NoFalsePositives — the new rule must not
-// hijack ordinary working output (negative axis), and the pre-existing
-// escalation rules must keep escalating (the rating rule must not shadow
-// auth/rate-limit panes, which contain no rating text).
 func TestAgyTmuxManifest_SessionRating_NoFalsePositives(t *testing.T) {
 	m, err := LoadManifest("agy-tmux")
 	if err != nil {
@@ -82,8 +48,6 @@ func TestAgyTmuxManifest_SessionRating_NoFalsePositives(t *testing.T) {
 		}
 	})
 	t.Run("auth_prompt_still_escalates", func(t *testing.T) {
-		// Regression pin (pre-existing GREEN): adding the rating rule must not
-		// reorder/shadow the escalate-class rules.
 		action, rc := decideAutoRespond("Please log in to continue", m.InteractivePrompts, map[string]int{}, false)
 		if rc != 85 {
 			t.Errorf("auth pane must still escalate; got action=%q rc=%d", action, rc)
@@ -91,12 +55,7 @@ func TestAgyTmuxManifest_SessionRating_NoFalsePositives(t *testing.T) {
 	})
 }
 
-// --- 2. idle-artifact one-shot nudge ---------------------------------------
-
-// nudgeRecordingTmux extends the scripted fakeTmux to also record the CONTENT
-// delivered in-pane via the paste path (LoadBuffer reads the scratch/prompt
-// file at call time). The nudge contract is channel-agnostic: a nudge counts
-// whether the driver pastes it or send-keys it.
+// nudgeRecordingTmux also records pasted buffer content, so a nudge counts whether the driver pastes it or sends keys.
 type nudgeRecordingTmux struct {
 	*fakeTmux
 	pastes []string
@@ -109,9 +68,7 @@ func (n *nudgeRecordingTmux) LoadBuffer(ctx context.Context, session, file strin
 	return n.fakeTmux.LoadBuffer(ctx, session, file)
 }
 
-// deliveriesNaming counts in-pane deliveries (pasted buffers + sent key
-// strings) that mention sub — used with the absolute artifact path, which the
-// fixture prompt and the launch command line never contain.
+// deliveriesNaming counts pasted buffers and sent keys that mention sub; the fixture prompt and launch line never hold the artifact path.
 func (n *nudgeRecordingTmux) deliveriesNaming(sub string) int {
 	count := 0
 	for _, p := range n.pastes {
@@ -127,10 +84,7 @@ func (n *nudgeRecordingTmux) deliveriesNaming(sub string) int {
 	return count
 }
 
-// runTmuxNudge drives a claude-tmux launch (REPL boots immediately, pane
-// stays idle/static) with a recording fake and a wall-clock safety net: a
-// runaway nudge loop hits the 30s context deadline instead of hanging `go
-// test`, and then fails the delivery-count assertion.
+// runTmuxNudge drives an idle claude-tmux launch under a 30s deadline, so a runaway nudge loop fails the count instead of hanging go test.
 func runTmuxNudge(t *testing.T, fx launchFixture, tmux *nudgeRecordingTmux) (int, string) {
 	t.Helper()
 	eng := NewEngine(Deps{
@@ -145,11 +99,6 @@ func runTmuxNudge(t *testing.T, fx launchFixture, tmux *nudgeRecordingTmux) (int
 	return code, stderr.String()
 }
 
-// TestTmuxREPL_IdleArtifactNudge_SentOnceThenTimeout — THE nudge contract:
-// agent idle (static pane), artifact never appears → the driver delivers
-// EXACTLY ONE in-pane nudge naming the artifact path, then the run still
-// concludes with ExitArtifactTimeout (the relaunch path is unchanged — the
-// nudge buys one extra interval, not immortality). RED today: 0 nudges.
 func TestTmuxREPL_IdleArtifactNudge_SentOnceThenTimeout(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &nudgeRecordingTmux{fakeTmux: &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}}
@@ -162,9 +111,6 @@ func TestTmuxREPL_IdleArtifactNudge_SentOnceThenTimeout(t *testing.T) {
 	}
 }
 
-// TestTmuxREPL_NoNudgeWhenArtifactPresent — negative pin: a run whose
-// artifact is already on disk completes without any nudge chatter (the nudge
-// must be gated on artifact-missing, not fire on every review tick).
 func TestTmuxREPL_NoNudgeWhenArtifactPresent(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
 	if err := os.WriteFile(fx.artifact, []byte("<!-- challenge-token: "+fx.token+" -->\nDONE\n"), 0o644); err != nil {

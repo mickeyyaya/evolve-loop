@@ -9,9 +9,7 @@ import (
 	"time"
 )
 
-// bootSmokeDeps returns Deps wired for a deterministic boot smoke-test: the
-// scripted fakeTmux, a no-op Sleep (boot/poll loops iterate instantly), and an
-// empty env (so the cost-leak guards see no ANTHROPIC_* keys).
+// bootSmokeDeps scripts fakeTmux with a no-op Sleep and an empty env, so the cost-leak guards see no ANTHROPIC_* keys.
 func bootSmokeDeps(tmux *fakeTmux) (Deps, *bytes.Buffer) {
 	var stderr bytes.Buffer
 	return Deps{
@@ -22,9 +20,6 @@ func bootSmokeDeps(tmux *fakeTmux) (Deps, *bytes.Buffer) {
 	}, &stderr
 }
 
-// TestBootSmokeTest_BootSuccess — when the REPL prompt marker appears, the boot
-// smoke-test returns ExitOK, cleanly exits the REPL (/exit), and delivers NO
-// task prompt (boot-only: resolved-prompt.txt is never written).
 func TestBootSmokeTest_BootSuccess(t *testing.T) {
 	ws := t.TempDir()
 	tmux := &fakeTmux{paneSeq: []string{"❯"}} // ❯ marker on first capture
@@ -41,8 +36,6 @@ func TestBootSmokeTest_BootSuccess(t *testing.T) {
 	}
 }
 
-// TestBootSmokeTest_BootTimeout — when the marker never appears, return
-// ExitREPLBootTimeout and the captured pane scrollback (for diagnosis).
 func TestBootSmokeTest_BootTimeout(t *testing.T) {
 	ws := t.TempDir()
 	tmux := &fakeTmux{paneSeq: []string{"booting... (no marker yet)"}}
@@ -56,8 +49,6 @@ func TestBootSmokeTest_BootTimeout(t *testing.T) {
 	}
 }
 
-// TestBootSmokeTest_UnknownDriver — an unregistered driver name is a usage
-// error, not a boot attempt.
 func TestBootSmokeTest_UnknownDriver(t *testing.T) {
 	deps, _ := bootSmokeDeps(&fakeTmux{})
 	if rc, _ := BootSmokeTest(context.Background(), "no-such-driver", &Config{Workspace: t.TempDir()}, deps); rc != ExitBadFlags {
@@ -65,8 +56,6 @@ func TestBootSmokeTest_UnknownDriver(t *testing.T) {
 	}
 }
 
-// TestBootSmokeTest_NonTmuxDriver — only the *-tmux drivers have a bootable REPL;
-// a non-tmux driver (claude-p, headless) is rejected as a usage error.
 func TestBootSmokeTest_NonTmuxDriver(t *testing.T) {
 	deps, _ := bootSmokeDeps(&fakeTmux{})
 	if rc, _ := BootSmokeTest(context.Background(), "claude-p", &Config{Workspace: t.TempDir()}, deps); rc != ExitBadFlags {
@@ -74,9 +63,6 @@ func TestBootSmokeTest_NonTmuxDriver(t *testing.T) {
 	}
 }
 
-// TestBootSmokeTest_SandboxPrefixApplied — with a worktree set and a sandbox
-// wrapper available, the boot launch is sandbox-wrapped (the riskiest boot path
-// the write-phases use) and still boots + exits cleanly.
 func TestBootSmokeTest_SandboxPrefixApplied(t *testing.T) {
 	ws := t.TempDir()
 	wt := t.TempDir()
@@ -94,8 +80,6 @@ func TestBootSmokeTest_SandboxPrefixApplied(t *testing.T) {
 	}
 }
 
-// TestBootSmokeTest_NilCfg verifies that passing cfg==nil triggers the
-// self-provisioning path (workspace auto-created, cleaned up on return).
 func TestBootSmokeTest_NilCfg(t *testing.T) {
 	tmux := &fakeTmux{paneSeq: []string{"❯"}} // prompt marker present → boot succeeds
 	deps, _ := bootSmokeDeps(tmux)
