@@ -1,6 +1,3 @@
-// reap_orphans_exec_test.go — production exec-layer contracts + apicover naming
-// for the symbols only the wiring (not the pure suite) exercises. The seam
-// tests mutate the package-global tmuxListRun, so they do NOT run in parallel.
 package swarm
 
 import (
@@ -10,8 +7,8 @@ import (
 	"testing"
 )
 
-// TestExecPidAlive: the running test process is alive; sentinel/absurd pids are
-// dead. This is the liveness oracle the GC trusts to spare concurrent runs.
+// Tests that swap the tmuxListRun or socketGlob seams must not call t.Parallel().
+
 func TestExecPidAlive(t *testing.T) {
 	t.Parallel()
 	if !ExecPidAlive(os.Getpid()) {
@@ -25,9 +22,6 @@ func TestExecPidAlive(t *testing.T) {
 	}
 }
 
-// TestExecListBridgeSessions_ParsesLines pins the line parsing: one name per
-// line, blanks dropped. Drives the production lister through the tmuxListRun
-// seam so it never touches a real server.
 func TestExecListBridgeSessions_ParsesLines(t *testing.T) {
 	old := tmuxListRun
 	defer func() { tmuxListRun = old }()
@@ -43,8 +37,6 @@ func TestExecListBridgeSessions_ParsesLines(t *testing.T) {
 	}
 }
 
-// TestExecListBridgeSessions_NoServerIsNoError: a stopped server exits non-zero
-// with empty output — that is "nothing to reap", not a failure.
 func TestExecListBridgeSessions_NoServerIsNoError(t *testing.T) {
 	old := tmuxListRun
 	defer func() { tmuxListRun = old }()
@@ -57,9 +49,6 @@ func TestExecListBridgeSessions_NoServerIsNoError(t *testing.T) {
 	}
 }
 
-// TestExecListBridgeSessions_PartialOutputOnError: when tmux errors but has
-// already emitted partial output, the lister must surface the error and drop the
-// partial list — never act on a truncated view of the server.
 func TestExecListBridgeSessions_PartialOutputOnError(t *testing.T) {
 	old := tmuxListRun
 	defer func() { tmuxListRun = old }()
@@ -75,8 +64,6 @@ func TestExecListBridgeSessions_PartialOutputOnError(t *testing.T) {
 	}
 }
 
-// TestExecReapOrphans_CleanServerNoop names+executes the production wiring end
-// to end against an empty server — it must be a harmless no-op.
 func TestExecReapOrphans_CleanServerNoop(t *testing.T) {
 	old := tmuxListRun
 	defer func() { tmuxListRun = old }()
@@ -88,8 +75,6 @@ func TestExecReapOrphans_CleanServerNoop(t *testing.T) {
 	}
 }
 
-// TestExecListBridgeSockets_NamesOnly drives the production socket lister through
-// the socketGlob seam (never touches the real tmux socket dir).
 func TestExecListBridgeSockets_NamesOnly(t *testing.T) {
 	old := socketGlob
 	defer func() { socketGlob = old }()
@@ -100,8 +85,6 @@ func TestExecListBridgeSockets_NamesOnly(t *testing.T) {
 	}
 }
 
-// TestExecReapOrphanSockets_NoSocketsNoop names+executes the production socket-GC
-// wiring against an empty host — a harmless no-op.
 func TestExecReapOrphanSockets_NoSocketsNoop(t *testing.T) {
 	old := socketGlob
 	defer func() { socketGlob = old }()
@@ -112,7 +95,6 @@ func TestExecReapOrphanSockets_NoSocketsNoop(t *testing.T) {
 	}
 }
 
-// TestExecKillServer_RefusesEmpty: never aim kill-server at an empty socket name.
 func TestExecKillServer_RefusesEmpty(t *testing.T) {
 	t.Parallel()
 	if ExecKillServer(context.Background(), "") == nil {

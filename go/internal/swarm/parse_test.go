@@ -30,7 +30,6 @@ func TestParsePlan_FencedBlock(t *testing.T) {
 	if plan.Workers[1].CLI != "codex" || plan.Workers[1].DependsOn[0] != "w0" {
 		t.Errorf("worker w1 wrong: %+v", plan.Workers[1])
 	}
-	// End-to-end: a valid disjoint writer plan must validate OK.
 	if got := Validate(plan); !got.OK {
 		t.Errorf("parsed plan should validate OK: %+v", got)
 	}

@@ -70,8 +70,6 @@ func TestTopoOrder(t *testing.T) {
 	}
 }
 
-// TestTopoOrder_Deterministic guards the tie-break: the same input always yields
-// the same order, regardless of input slice order.
 func TestTopoOrder_Deterministic(t *testing.T) {
 	a := []WorkerSpec{w("w0"), w("w1", "w0"), w("w2", "w0")}
 	b := []WorkerSpec{w("w2", "w0"), w("w1", "w0"), w("w0")}

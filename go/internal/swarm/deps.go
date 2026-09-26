@@ -6,62 +6,45 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 )
 
-// Launcher is the narrow seam the dispatcher needs from the bridge: launch one
-// worker and report its exit/cost/session-identity. It mirrors core.Bridge.Launch
-// but is defined here (accept-interface-where-used) so the swarm package does not
-// import core for dispatch — the composition root adapts core.Bridge to this.
+// Launcher launches one worker and reports its exit, cost and session identity.
 type Launcher interface {
 	Launch(ctx context.Context, req LaunchRequest) (LaunchResult, error)
 }
 
-// LaunchRequest is the per-worker launch contract — the subset of
-// core.BridgeRequest the dispatcher fills. The composition root maps this onto
-// core.BridgeRequest 1:1.
+// LaunchRequest is the per-worker launch contract, mapped 1:1 onto core.BridgeRequest by the composition root.
 type LaunchRequest struct {
 	CLI          string
 	Model        string
 	Profile      string
-	Agent        string // "<task-or-mode>-w<i>" — collision-safe tmux/inbox key
-	SessionName  string // deterministic tmux session name (orphan-on-cancel hardening); empty for headless
+	Agent        string // "<task-or-mode>-<workerID>": the collision-safe tmux/inbox key
+	SessionName  string // deterministic tmux session name; empty for headless
 	Prompt       string
 	Workspace    string
 	Worktree     string
 	ProjectRoot  string
 	ArtifactPath string
 	Cycle        int
-	// Env is the per-worker environment overlay the dispatcher computes (e.g. an
-	// isolated PORT for writer dev servers). The composition root merges it OVER
-	// the shared phase env, so per-worker keys win. Nil/empty = phase env only.
+	// Env is merged over the shared phase env, so per-worker keys win; nil means the phase env only.
 	Env map[string]string
 }
 
-// LaunchResult is the per-worker launch outcome (subset of core.BridgeResponse).
+// LaunchResult is the per-worker launch outcome, a subset of core.BridgeResponse.
 type LaunchResult struct {
-	ExitCode int
-	CostUSD  float64
-	// Tokens (S5, token-telemetry) is the per-worker LLM token usage, carried
-	// alongside CostUSD so the swarm merge can sum counts, not just dollars. The
-	// composition root maps it from core.BridgeResponse.Tokens.
-	Tokens cyclestate.TokenUsage
-	// PGID is the launched process group (0 if the launcher can't report one);
-	// the dispatcher records it so the reaper can group-kill.
-	PGID int
-	// TmuxSession is the session name the driver used (empty for headless).
-	TmuxSession string
+	ExitCode    int
+	CostUSD     float64
+	Tokens      cyclestate.TokenUsage
+	PGID        int    // 0 when the launcher cannot report one
+	TmuxSession string // empty for headless
 }
 
-// Deps are the injected ports for a swarm dispatch — Dependency Injection so the
-// dispatcher is unit-testable with fakes and carries no hidden global state.
+// Deps are the injected ports for one swarm dispatch.
 type Deps struct {
 	Launcher    Launcher
-	Provisioner WorkerProvisioner // writers only (readers pass nil)
-	Killer      SessionKiller     // optional; nil skips per-session reap
-	Registry    *SessionRegistry  // optional; nil skips session tracking
-	// Concurrency caps how many workers launch at once (semaphore size). <=0
-	// means "one slot per worker" (unbounded); callers should pass
-	// EVOLVE_SWARM_CONCURRENCY (default 2).
+	Provisioner WorkerProvisioner // writers only; readers pass nil
+	Killer      SessionKiller     // nil skips per-session reap
+	Registry    *SessionRegistry  // nil skips session tracking
+	// Concurrency caps simultaneous launches; <=0 means one slot per worker.
 	Concurrency int
-	// PortBase is the first port handed to writer workers (worker i → base+i) so
-	// their dev servers don't collide. <=0 falls back to DefaultPortBase.
+	// PortBase is writer worker 0's port (worker i gets base+i); <=0 means DefaultPortBase.
 	PortBase int
 }
