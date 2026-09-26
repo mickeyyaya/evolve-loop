@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — an exit-85 escalation names its pattern (ADR-0106 P4, 2026-09-26)
+
+Exit 85 covers the auto-responder's escalations and the corroborated quota wall, and the numeric exit table is frozen, so the attempt ledger read every one as `unknown_prompt`. Over cycles 1673–1707 eight of those were `rate_limit` walls and four were `model_unsupported`: the codex deep pin the account rejects (incident 2026-09-14).
+
+- `launchoutcome.Classify` lets the escalation pattern ride `cause_code` and the launch error line on exit 85, as the 81 sub-causes do: `rate_limit`, `model_unsupported`, and `unknown_prompt` only for a prompt nobody recognised. The exit class, its signal code and its transient sentinel are unchanged; a loop-guard report is not an escalation, and both markers are read only at the start of a line, where only the host writes.
+- `signal-codes.md` is regenerated; the 2026-09-14 incident carries the update.
+
 ## Fixed — a Build may retract a draft it never committed (cycle 1705, 2026-09-26)
 
 Cycle 1705 passed audit and still failed. `guard:docdelete` denied the Builder's removal of its own never-committed explanation draft, and its deny message prescribed a plain `mv` into the archive home. That left the draft untracked, and the host predicate gate refuses untracked inputs. So it forced FAIL over the auditor's PASS.
