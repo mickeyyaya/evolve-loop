@@ -392,7 +392,10 @@
         ],
         "agent_owed": [
           "triage-decision.json"
-        ]
+        ],
+        "derived_from": {
+          "triage-decision.json": "triage-report.md"
+        }
       },
       "effects": [
         "inbox-claim"

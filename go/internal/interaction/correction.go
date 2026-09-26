@@ -5,6 +5,9 @@ type CorrectionInput struct {
 	Phase, Workspace, Worktree string
 	// Violation is the review gate's summarized rejection reason.
 	Violation string
+	// Repairable reports the recovery agent may repair the deliverable: every violation is a form code and the
+	// phase is not a judgment or control phase.
+	Repairable bool
 	// NamedREPL reports a named tmux session preserved through the review gate, which live_fix needs.
 	NamedREPL bool
 	// Busy reports the preserved pane is mid-turn; a busy agent is never interrupted.
@@ -23,6 +26,7 @@ type CorrectionAction struct {
 // Ladder rungs, cheapest first; the values are the Event.Rung vocabulary.
 const (
 	RungSalvage    = "salvage"
+	RungRecover    = "recover"
 	RungLiveFix    = "live_fix"
 	RungRedispatch = "redispatch"
 )
@@ -49,6 +53,12 @@ func NextCorrection(in CorrectionInput) CorrectionAction {
 		return CorrectionAction{
 			Rung:   RungLiveFix,
 			Reason: "phase's own REPL is preserved and idle: one templated fix beats a full re-dispatch",
+		}
+	}
+	if in.RungBudget[RungRecover] > 0 && in.Repairable {
+		return CorrectionAction{
+			Rung:   RungRecover,
+			Reason: "the recovery agent restructures the deliverable around the phase's logic; the phase is not re-run",
 		}
 	}
 	if in.RungBudget[RungRedispatch] > 0 {

@@ -1,0 +1,113 @@
+{
+  "name": "deliverable-recovery",
+  "role": "deliverable-recovery",
+  "cli": "codex-tmux",
+  "model_tier_default": "balanced",
+  "allowed_tools": [
+    "Read",
+    "Grep",
+    "Glob",
+    "Bash(ls:*)",
+    "Bash(cat:*)",
+    "Bash(head:*)",
+    "Bash(tail:*)",
+    "Bash(wc:*)",
+    "Bash(git diff:*)",
+    "Bash(git log:*)",
+    "Bash(git show:*)",
+    "Bash(git status:*)",
+    "Bash(evolve phase verify:*)",
+    "Write(.evolve/runs/cycle-*/**)",
+    "Edit(.evolve/runs/cycle-*/**)"
+  ],
+  "disallowed_tools": [
+    "Bash(git commit:*)",
+    "Bash(git push:*)",
+    "Bash(git reset:*)",
+    "Bash(git checkout:*)",
+    "Bash(git restore:*)",
+    "Bash(git stash:*)",
+    "Bash(git add:*)",
+    "Bash(git merge:*)",
+    "Bash(git rebase:*)",
+    "Bash(git worktree:*)",
+    "Bash(gh:*)",
+    "Bash(rm:*)",
+    "Bash(mv:*)",
+    "Bash(go test:*)",
+    "Bash(curl:*)",
+    "Bash(wget:*)",
+    "WebFetch",
+    "WebSearch",
+    "Edit(.evolve/worktrees/**)",
+    "Write(.evolve/worktrees/**)",
+    "Edit(go/**)",
+    "Write(go/**)",
+    "Edit(skills/**)",
+    "Edit(agents/**)",
+    "Edit(scripts/**)",
+    "Edit(.evolve/state.json)",
+    "Edit(.evolve/ledger.jsonl)",
+    "Edit(.evolve/profiles/**)",
+    "Write(skills/**)",
+    "Write(agents/**)",
+    "Write(scripts/**)",
+    "Write(.evolve/state.json)",
+    "Write(.evolve/ledger.jsonl)",
+    "Write(.evolve/profiles/**)"
+  ],
+  "add_dir": [
+    "."
+  ],
+  "max_budget_usd": 1.0,
+  "max_turns": 20,
+  "output_artifact": ".evolve/runs/cycle-{cycle}/deliverable-recovery.json",
+  "extra_flags_by_cli": {
+    "claude-tmux": [
+      "--strict-mcp-config",
+      "--exclude-dynamic-system-prompt-sections",
+      "--disable-slash-commands",
+      "--setting-sources",
+      "project"
+    ]
+  },
+  "model_tier_envelope": {
+    "min": "balanced",
+    "default": "balanced",
+    "max": "deep"
+  },
+  "allowed_clis": [
+    "all"
+  ],
+  "stream_output": true,
+  "generated_from": "hand-authored (ADR-0106 F3)",
+  "cli_fallback": [
+    "claude-tmux"
+  ],
+  "effort_level": "medium",
+  "sandbox": {
+    "enabled": true,
+    "write_subpaths": [
+      ".evolve/runs/cycle-*"
+    ],
+    "read_only_repo": true,
+    "deny_read_subpaths": [
+      "docs/private"
+    ],
+    "deny_subpaths": [
+      ".git",
+      "scripts",
+      "skills",
+      "agents",
+      ".claude-plugin",
+      ".evolve/state.json",
+      ".evolve/ledger.jsonl",
+      ".evolve/profiles",
+      ".evolve/evals",
+      ".evolve/worktrees",
+      ".evolve/inbox",
+      "docs/private"
+    ],
+    "allow_network": false
+  }
+}

@@ -144,6 +144,18 @@ func ValidateOutputsPartition(s PhaseSpec) []string {
 			v = append(v, fmt.Sprintf("secondary output %q is declared but not classified — add it to outputs.agent_owed (the agent writes it) or outputs.harness_produced (a harness component does)", base))
 		}
 	}
+	primary := ""
+	if len(s.Outputs.Files) > 0 {
+		primary = filepath.Base(s.Outputs.Files[0])
+	}
+	for owed, source := range s.Outputs.DerivedFrom {
+		switch {
+		case seen[owed] != "agent_owed":
+			v = append(v, fmt.Sprintf("outputs.derived_from names %q, which outputs.agent_owed does not classify — only an agent-owed secondary is derived", owed))
+		case source != primary || primary == "":
+			v = append(v, fmt.Sprintf("outputs.derived_from derives %q from %q, but the host derives only from the primary output %q", owed, source, primary))
+		}
+	}
 	slices.Sort(v)
 	return v
 }

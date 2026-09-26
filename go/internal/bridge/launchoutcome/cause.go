@@ -1,6 +1,9 @@
 package launchoutcome
 
-import "strings"
+import (
+	"regexp"
+	"strings"
+)
 
 // ArtifactTimeoutMarker prefixes the ONE self-describing artifact-wait summary
 // line the tmux wait diagnostic writes and the classifier parses. Hyphenated +
@@ -118,4 +121,45 @@ func timeoutCauseCode(stderr string) string {
 		return string(value)
 	}
 	return ""
+}
+
+// escalationMarker is the auto-responder's report line; its pattern names what the pane showed.
+const escalationMarker = "escalation report written (pattern="
+
+// exhaustedMarker is the checkpoint's corroborated quota wall, which also exits 85; the driver tag precedes it.
+const exhaustedMarker = "EXHAUSTED: pane shows a quota/rate-limit wall"
+
+var exhaustedLineRE = regexp.MustCompile(`^\[[a-z0-9-]+\] ` + regexp.QuoteMeta(exhaustedMarker))
+
+// escalationLine is the stderr line that explains an exit 85: the escalation report, or the corroborated
+// wall; "" when neither was written (the loop guard's report is not an escalation).
+func escalationLine(stderr string) string {
+	for _, rawLine := range strings.Split(stderr, "\n") {
+		line := strings.TrimSpace(rawLine)
+		switch {
+		case strings.HasPrefix(line, "[auto-respond] "+escalationMarker) && strings.HasSuffix(line, "reason=escalate)"):
+			return boundCause(strings.TrimPrefix(line, "[auto-respond] "))
+		case exhaustedLineRE.MatchString(line):
+			return boundCause(line[strings.Index(line, exhaustedMarker):])
+		}
+	}
+	return ""
+}
+
+// escalationCause is the ledger sub-cause of an exit 85: the pattern the auto-responder matched (rate_limit,
+// model_unsupported, …), rate_limit for a corroborated wall, and "" for a prompt nobody recognised.
+func escalationCause(stderr string) string {
+	line := escalationLine(stderr)
+	if strings.HasPrefix(line, exhaustedMarker) {
+		return "rate_limit"
+	}
+	_, rest, found := strings.Cut(line, escalationMarker)
+	if !found {
+		return ""
+	}
+	pattern, _, _ := strings.Cut(rest, " ")
+	if pattern == "" || pattern == "unknown" {
+		return ""
+	}
+	return pattern
 }

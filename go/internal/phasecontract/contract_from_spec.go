@@ -23,6 +23,7 @@ func FromSpec(spec phasespec.PhaseSpec) Contract {
 		RequireFailureContext: len(verdicts) > 0 && spec.Classify != nil && spec.Classify.RequireFailureContext,
 		AgentOwedFiles:        spec.Outputs.AgentOwed,
 		Effects:               spec.Effects,
+		DerivedFrom:           spec.Outputs.DerivedFrom,
 	}
 }
 
@@ -30,6 +31,7 @@ func FromSpec(spec phasespec.PhaseSpec) Contract {
 func overlayDeclared(c Contract, spec phasespec.PhaseSpec) Contract {
 	c.AgentOwedFiles = spec.Outputs.AgentOwed
 	c.Effects = spec.Effects
+	c.DerivedFrom = spec.Outputs.DerivedFrom
 	return c
 }
 

@@ -78,6 +78,9 @@ type Contract struct {
 	// AgentOwedFiles and Effects come only from the registry declaration, never a built-in literal. See ADR-0100.
 	AgentOwedFiles []string
 	Effects        []string
+	// DerivedFrom maps an agent-owed secondary to the primary the host derives it from when the agent leaves
+	// it absent. See ADR-0106.
+	DerivedFrom map[string]string
 }
 
 // EffectInboxClaim names the effect of claiming a cycle's committed inbox items.

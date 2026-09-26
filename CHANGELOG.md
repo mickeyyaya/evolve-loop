@@ -2,6 +2,38 @@
 
 All notable changes to this project will be documented in this file.
 
+- The profile runs on the codex family with claude as its fallback, as the other helpers do: the balanced-tier floor (`TestClaudeFamilyFloor`) reserves claude for judgment phases with a justification, and the recovery agent decides nothing. The first ship routed it to claude and the full floor caught it.
+## Added — the recovery agent's profile and persona (ADR-0106 F3, unwired, 2026-09-26)
+
+- `.evolve/profiles/deliverable-recovery.json` runs sandboxed over a read-only repository with the run directory as its only write grant, so a helper launched without a worktree is wrapped rather than unconfined. It declares no network, but the wrapper forces the network on for every dispatch today (`sandboxPrefixForLaunch`, filed as `sandbox-wrapper-forces-network-on`) and the tmux drivers enforce no tool list (filed as `tmux-drivers-ignore-profile-tool-lists`), so the filesystem grant is the boundary that holds; the test pins the forced-on launch path so it flips when the wrapper honours the declaration; `agents/evolve-deliverable-recovery.md` states the agent's identity and sole-writer fact up front (cycle 1707's TDD agent refused its own task for an hour, taking itself for an intruder) and forbids inventing, editing code, or deciding a verdict. Tests pin that no grant reaches the repository beyond the run dir or any worktree.
+
+## Added — `internal/recoveryguard`, the kernel fence for a recovery dispatch (ADR-0106 F2, unwired, 2026-09-26)
+
+- `Begin(ctx, Scope)` records every entry in the run's workspace and fences the change's worktree (`treefence`); `End` restores whatever the agent changed, planted or removed outside `Scope.Allowed` and reports it: a changed or removed file, a planted one, a file swapped for a link or a directory, an allowed path swapped for a link. Telemetry the dispatch appends is unfenced by exact path or below a directory (`Scope.Unfenced`); artifacts it creates with generated names are tolerated by stem, direct children only, and reported in `Outcome.Unfenced` (`Scope.UnfencedStems`). A non-empty `Outcome.Restored` is an integrity violation for the caller to abort on. Fails closed on a worktree that cannot be fenced, a workspace that cannot be read or an allowed path that is not a plain file. Graduated to `.apicover-enforce` and listed in the protected-surface manifest.
+
+## Added — a recover rung in the correction ladder (ADR-0106 F1, unwired, 2026-09-26)
+
+- `interaction.NextCorrection` gains `RungRecover` between live-fix and re-dispatch, taken only when the caller reports the violation repairable (`CorrectionInput.Repairable`) and budget remains. The ladder does not execute it yet.
+
+## Added — the host derives a declared secondary before any judge (ADR-0106 H2, 2026-09-26)
+
+- The registry declares what is derivable: `outputs.derived_from` maps an agent-owed secondary to the primary the host derives it from. The partition validator requires the file to be agent-owed and the source to be the primary; the descriptor schema documents the field.
+- `HostEffects.Perform` derives each declared file the agent left absent or empty after the host effects and before the runner's judge and the gate, so both judge a complete deliverable. A file the agent wrote, or is still landing, is never touched: the read waits out a write in flight as the gate's does, and a read fault declines. The lane-pin check therefore guards only the derived file; a decision the agent wrote is judged by the gate as before. A decline is a WARN (`ORCHESTRATOR_HOST_EFFECT_FAILED`) and leaves the absence for the gate. A declaration without a registered deriver fails the deliverable tests.
+- `triage` declares `triage-decision.json` derived from `triage-report.md`. Docs: `deliverable-contract.md`.
+
+## Added — triage's decision derived from its report (ADR-0106 H1, 2026-09-26)
+
+`triage-decision.json` states the commitment the report already carries in prose. Cycles 1672, 1687, 1697 and 1707 re-ran the whole phase because the agent left the file absent.
+
+- `internal/triagedecision` is the one reader of the report. `Derive(report, cycle, lanePin)` is the strict mode the host writes before any judge: `## top_n` stated, every present bucket readable (slug ids, cards or a `(none …)` line, nothing else), pinned lane items committed; an absent `deferred`, `dropped` or `superseded` section is empty, which commits more, never less. `Project(report, cycle)` is the lenient companion ship already wrote, moved here with its parser (`triagecap.ProjectDecisionJSON` delegates), so the report has one grammar: `- {id}: {action} — key=value` tails, `files=` footprints, `reason=`. Both carry the one stamp `projected_by_orchestrator`. Nothing the report does not state is written. The package is a protected surface: a lane must not soften what it commits itself to.
+
+## Fixed — an exit-85 escalation names its pattern (ADR-0106 P4, 2026-09-26)
+
+Exit 85 covers the auto-responder's escalations and the corroborated quota wall, and the numeric exit table is frozen, so the attempt ledger read every one as `unknown_prompt`. Over cycles 1673–1707 all eight were named by their escalation reports: four `rate_limit` walls and four `model_unsupported`, the codex deep pin the account rejects (incident 2026-09-14).
+
+- `launchoutcome.Classify` lets the escalation pattern ride `cause_code` and the launch error line on exit 85, as the 81 sub-causes do: `rate_limit`, `model_unsupported`, and `unknown_prompt` only for a prompt nobody recognised. The exit class, its signal code and its transient sentinel are unchanged; a loop-guard report is not an escalation, and both markers are read only at the start of a line, where only the host writes.
+- `signal-codes.md` is regenerated; the 2026-09-14 incident carries the update.
+
 ## Added — logic-first delivery: phases own the logic, the pipeline owns the form (ADR-0106, operating-policy §0, 2026-09-26)
 
 Over cycles ~1550–1707 a byte-identical change re-ran Build and Audit because a peer landed first (14 cycles), a derivable secondary sent a whole phase back (4 cycles, still recurring), and cycle 1707's TDD agent refused its own task for an hour over a process misunderstanding. None was a defect in the change. The operator's direction, P0: phases focus on logic; a format or process failure is recovered, never blocking.

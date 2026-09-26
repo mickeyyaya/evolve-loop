@@ -3,6 +3,7 @@ package triagecap
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/mickeyyaya/evolve-loop/go/internal/triagedecision"
 	"os"
 	"regexp"
 	"strings"
@@ -74,12 +75,12 @@ func committedCards(artifact, companionPath string) ([]cardCheck, bool) {
 		return nil, false
 	}
 	var cards []cardCheck
-	for _, it := range parseItems(body) {
-		declared, _ := splitDeclaredFiles(it.rest)
+	for _, it := range triagedecision.ParseSection(body).Items {
+		declared, _ := triagedecision.SplitDeclaredFiles(it.Rest)
 		cards = append(cards, cardCheck{
-			id:          it.id,
-			text:        it.rest,
-			usable:      filesOf(it.rest),
+			id:          it.ID,
+			text:        it.Rest,
+			usable:      triagedecision.FilesOf(it.Rest),
 			declaredRaw: len(declared),
 		})
 	}
@@ -108,7 +109,7 @@ func companionCards(companionPath string) ([]cardCheck, bool) {
 		}
 		var usable []string
 		for _, f := range c.Files {
-			if p, ok := declaredFilePath(f); ok {
+			if p, ok := triagedecision.DeclaredFilePath(f); ok {
 				usable = append(usable, p)
 			}
 		}
