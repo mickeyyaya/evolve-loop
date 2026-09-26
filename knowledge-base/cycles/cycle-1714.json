@@ -1,0 +1,95 @@
+{
+  "schema_version": 2,
+  "cycle": 1714,
+  "run_id": "01M3FVE82CE3FHZRFJCBTAP0R1",
+  "goal": "Pipeline-health verification, wave 16 (2026-09-27, on main cb36eae6, the first wave with ADR-0106 W1, H1b and X1 live beside P3, Q1 and Q2: a shipped or declined id no inbox item backs leaves a retirement record (processed/ or rejected/cycle-N) and is never re-pinned; an empty optional bucket in triage-report.md is no cards; .evolve/inbox/ records are non-material to the explanation document, so no floor asks a builder to describe the ship's consumption stamp; and every tmux phase pane's resolved-prompt.txt ends with the identity statement (\"## Who you are (stated by the evolve bridge)\") and its pane exports CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false before the launch; a quota wall met on a correction re-dispatch, a remediation re-run or a resumed review leaves the cycle DEFERRED (all_families_exhausted in the ledger, no failure digest, no retrospective), never FAIL; a login prompt benches the family with operator_action in cli-health.json and no second dispatch goes into it). Work the highest-weight lane-eligible inbox items end-to-end — claim, tdd, build, audit, ship — with full phase integrity, on the fixed plane. That includes everything waves 3–14 verified, and the fixes on this main:\n- (P3) an agent that inspects its pane finds its own session, its prompt files and the sole-writer fact stated in the prompt it was given; a stdout-completion phase is told the bridge reads its pane;\n- (Q1) a walled correction re-dispatch is the same deferral as a walled first dispatch;\n- (Q2) a credential wall is benched until a probe after the operator's login clears it; the bench lines name the fix;\n- (P4, H1, H2, from wave 14) an exit-85 escalation carries its pattern in cause_code; the host derives triage-decision.json from the report before any judge;\n- (W1, H1b, X1, from wave 15) a lane pinned to an id no inbox item backs ends once, with a record; a `## superseded` with nothing under it derives to []; the explanation floor never names an inbox record as a material path.\n\nEarlier fixes still in force: a worktree ship binds its own tree (#648); routing never sends a lane work its builder's sandbox forbids; a lane's cycle-state override applies only inside its own evolve dir; a Build may `git rm` its own never-committed explanation draft (#651); the explanation contract can move base without a Build when the host proves the change byte-identical (#649).\n\nEvery cycle must:\n- commit to a claimed inbox item (an empty top_n must not run the spine);\n- bind its audit to the changes tree it ships;\n- disposition the cycle's OWN defect ledger as well as inherited ids;\n- record a terminal outcome on every exit;\n- never modify a protected control-plane file by any tool;\n- leave no stale worktree behind.\n\nPipeline-integrity items and items whose fix surface is protected are console-owned, not lane work. ADR-0099 document deliverables are eligible. The measure of this wave is consecutive shipped cycles: 1712 shipped (its code verified on the first audit; one explanation sentence about a host-stamped inbox record cost it a round), 1713 ended planned no-work on a pin already shipped; the streak stands at one; six in a row is the goal.",
+  "final_verdict": "FAIL",
+  "tasks": [
+    "file-size-decomposition-backlog"
+  ],
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 125366,
+      "started_at": "2026-09-26T21:55:49Z",
+      "ended_at": "2026-09-26T21:57:55Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 18,
+        "output": 8232,
+        "cache_read": 588620,
+        "cache_write": 83152
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "FAIL",
+      "duration_ms": 63798,
+      "started_at": "2026-09-26T21:58:24Z",
+      "ended_at": "2026-09-26T21:59:29Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 16,
+        "output": 3271,
+        "cache_read": 589598,
+        "cache_write": 33472
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 1714",
+      "priority": "high"
+    }
+  ],
+  "timing": {
+    "total_ms": 189164,
+    "phase_count": 2,
+    "retried_count": 0,
+    "longest_phase": "scout",
+    "longest_ms": 125366,
+    "by_archetype_ms": {
+      "plan": 189164
+    },
+    "total_tokens": {
+      "input": 34,
+      "output": 11503,
+      "cache_read": 1178218,
+      "cache_write": 116624
+    },
+    "tokens_by_archetype": {
+      "plan": {
+        "input": 34,
+        "output": 11503,
+        "cache_read": 1178218,
+        "cache_write": 116624
+      }
+    },
+    "wasted_tokens": {
+      "input": 16,
+      "output": 3271,
+      "cache_read": 589598,
+      "cache_write": 33472
+    },
+    "cache_hit_ratio": 0.9999711436942182,
+    "hot_phase_count": 2,
+    "hot_phases": [
+      "scout",
+      "triage"
+    ]
+  }
+}
