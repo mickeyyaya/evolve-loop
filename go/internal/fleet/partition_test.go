@@ -15,12 +15,6 @@ func bucketIDs(b []Todo) []string {
 	return ids
 }
 
-// assertCrossBucketDisjoint is the load-bearing concurrency invariant: every
-// repo file is owned by AT MOST ONE bucket. Buckets run as CONCURRENT cycles
-// (each its own `evolve cycle run` + worktree), so a file appearing in two
-// buckets means two cycles edit it at once and collide on the shared tree at
-// ship time. (Two todos in the SAME bucket touching one file is fine — one
-// cycle, one worktree, sequential.)
 func assertCrossBucketDisjoint(t *testing.T, buckets [][]Todo) {
 	t.Helper()
 	owner := map[string]int{}
@@ -37,8 +31,6 @@ func assertCrossBucketDisjoint(t *testing.T, buckets [][]Todo) {
 	}
 }
 
-// TestPartition_CrossBucketFileDisjoint: two todos touching the same file must
-// land in the SAME bucket (one sequential cycle), never spread across buckets.
 func TestPartition_CrossBucketFileDisjoint(t *testing.T) {
 	todos := []Todo{
 		{ID: "a", Files: []string{"shared.go"}},
@@ -51,8 +43,6 @@ func TestPartition_CrossBucketFileDisjoint(t *testing.T) {
 	}
 }
 
-// TestPartition_DisjointTodos_SpreadAcrossCycles: non-overlapping todos may run
-// concurrently — they spread across the available buckets.
 func TestPartition_DisjointTodos_SpreadAcrossCycles(t *testing.T) {
 	todos := []Todo{
 		{ID: "a", Files: []string{"pkg/a.go"}},
@@ -63,17 +53,11 @@ func TestPartition_DisjointTodos_SpreadAcrossCycles(t *testing.T) {
 		t.Fatalf("disjoint todos deferred: %v", deferred)
 	}
 	assertCrossBucketDisjoint(t, buckets)
-	// Independent (file-disjoint) todos spread to distinct buckets via
-	// least-loaded assignment, so both cycles get work.
 	if len(buckets[0]) != 1 || len(buckets[1]) != 1 {
 		t.Fatalf("disjoint todos should spread one-per-bucket; got %v / %v", bucketIDs(buckets[0]), bucketIDs(buckets[1]))
 	}
 }
 
-// TestPartition_SameFileTodos_ClusterInOneBucket: two todos sharing a file must
-// land in the SAME bucket — one cycle runs them sequentially in one worktree, so
-// no two CONCURRENT cycles ever touch shared.go. (The pre-fix algorithm spread
-// them across buckets, which let two cycles collide on shared.go.)
 func TestPartition_SameFileTodos_ClusterInOneBucket(t *testing.T) {
 	todos := []Todo{
 		{ID: "a", Files: []string{"shared.go", "x.go"}},
@@ -84,7 +68,6 @@ func TestPartition_SameFileTodos_ClusterInOneBucket(t *testing.T) {
 	if len(deferred) != 0 {
 		t.Fatalf("unexpected deferred: %v", deferred)
 	}
-	// a and b share shared.go → exactly one bucket holds both.
 	for i, b := range buckets {
 		if len(b) == 1 {
 			t.Errorf("bucket %d holds only %v — same-file todos a,b must cluster together", i, bucketIDs(b))
@@ -92,10 +75,6 @@ func TestPartition_SameFileTodos_ClusterInOneBucket(t *testing.T) {
 	}
 }
 
-// TestPartition_AllSameFile_AllClusterNoneDeferred: N todos all touching one file
-// cannot be parallelized safely, so they all cluster into ONE cycle (the others
-// stay empty) and NONE defer — deferring a same-file todo to a later wave would
-// not help (it still needs exclusive ownership of that file).
 func TestPartition_AllSameFile_AllClusterNoneDeferred(t *testing.T) {
 	todos := []Todo{
 		{ID: "a", Files: []string{"hot.go"}},
@@ -116,14 +95,11 @@ func TestPartition_AllSameFile_AllClusterNoneDeferred(t *testing.T) {
 	}
 }
 
-// TestPartition_DeferOnlyWhenFilesBridgeBuckets: a todo whose files are split
-// across TWO already-distinct buckets cannot be placed without bridging them
-// into a cross-tree collision → it is deferred to a later wave.
 func TestPartition_DeferOnlyWhenFilesBridgeBuckets(t *testing.T) {
 	todos := []Todo{
-		{ID: "a", Files: []string{"a.go"}},         // -> bucket 0
-		{ID: "b", Files: []string{"b.go"}},         // -> bucket 1 (least-loaded)
-		{ID: "c", Files: []string{"a.go", "b.go"}}, // bridges 0 and 1 -> defer
+		{ID: "a", Files: []string{"a.go"}},
+		{ID: "b", Files: []string{"b.go"}},
+		{ID: "c", Files: []string{"a.go", "b.go"}},
 	}
 	buckets, deferred := Partition(todos, 2)
 	assertCrossBucketDisjoint(t, buckets)
@@ -132,8 +108,6 @@ func TestPartition_DeferOnlyWhenFilesBridgeBuckets(t *testing.T) {
 	}
 }
 
-// TestPartition_NormalizesPaths: ./a.go and a.go are the same file → the two
-// todos cluster in one bucket (cross-bucket disjointness honors normalization).
 func TestPartition_NormalizesPaths(t *testing.T) {
 	todos := []Todo{
 		{ID: "a", Files: []string{"./pkg/a.go"}},
@@ -146,14 +120,11 @@ func TestPartition_NormalizesPaths(t *testing.T) {
 	}
 }
 
-// TestPlanCycles_DisjointScopesPlusDeferred: PlanCycles maps the partition into
-// concurrent cycle specs, each carrying a DISJOINT, non-empty Scope and the
-// EVOLVE_FLEET_SCOPE env the launched cycle reads; bridging todos defer.
 func TestPlanCycles_DisjointScopesPlusDeferred(t *testing.T) {
 	todos := []Todo{
 		{ID: "a", Files: []string{"a.go"}},
 		{ID: "b", Files: []string{"b.go"}},
-		{ID: "c", Files: []string{"a.go", "b.go"}}, // bridges 0 and 1 -> deferred
+		{ID: "c", Files: []string{"a.go", "b.go"}},
 	}
 	specs, deferred := PlanCycles(todos, 2)
 	if len(specs) != 2 {
@@ -179,8 +150,6 @@ func TestPlanCycles_DisjointScopesPlusDeferred(t *testing.T) {
 	}
 }
 
-// TestPlanCycles_SkipsEmptyBuckets: when the backlog can't fill `count` cycles
-// (all work clusters), empty buckets produce NO spec — fewer cycles, not idle ones.
 func TestPlanCycles_SkipsEmptyBuckets(t *testing.T) {
 	todos := []Todo{
 		{ID: "a", Files: []string{"h.go"}},
@@ -198,9 +167,6 @@ func TestPlanCycles_SkipsEmptyBuckets(t *testing.T) {
 	}
 }
 
-// locateTodo returns the bucket index of id (found=true, deferred=false), or
-// deferred=true if id is in the deferred slice, or found=false if missing from
-// both — a caller-contract violation.
 func locateTodo(buckets [][]Todo, deferred []Todo, id string) (bucket int, isDeferred bool, found bool) {
 	for i, b := range buckets {
 		for _, td := range b {
@@ -217,12 +183,6 @@ func locateTodo(buckets [][]Todo, deferred []Todo, id string) (bucket int, isDef
 	return -1, false, false
 }
 
-// assertGraphConnectedNotSplit is the cycle-871 load-bearing invariant (rung 1
-// of the merge ladder, research finding #2): two todos whose transitive
-// package sets intersect (or either touches a global-zone file) must be
-// co-scheduled into the SAME bucket, or deferred — NEVER split across two
-// distinct concurrent buckets, since that would let two cycles independently
-// touch reachable code and merge-skew (rename + call-site) on landing.
 func assertGraphConnectedNotSplit(t *testing.T, buckets [][]Todo, deferred []Todo, idA, idB string) {
 	t.Helper()
 	ba, da, fa := locateTodo(buckets, deferred, idA)
@@ -235,15 +195,8 @@ func assertGraphConnectedNotSplit(t *testing.T, buckets [][]Todo, deferred []Tod
 	}
 }
 
-// TestPartitionGraph_PackageGraphConnectedTodos_NeverSplitAcrossBuckets pins
-// the rung-1 fix: todo "a" edits go/internal/fleet/partition.go (package
-// fleet) and todo "b" edits go/internal/ipcenv/ipcenv.go (package ipcenv,
-// transitively imported BY fleet — see partition.go's import block). Their
-// Files sets are disjoint, but the package graph connects them, so today's
-// file-only Partition would wrongly spread them to two concurrent buckets —
-// exactly the merge-skew gap (rename in ipcenv, call-site in fleet) research
-// finding #2 warns about.
 func TestPartitionGraph_PackageGraphConnectedTodos_NeverSplitAcrossBuckets(t *testing.T) {
+	// Disjoint files, but package fleet imports ipcenv, so the package graph connects them.
 	todos := []Todo{
 		{ID: "a", Files: []string{"internal/fleet/partition.go"}},
 		{ID: "b", Files: []string{"internal/ipcenv/ipcenv.go"}},
@@ -255,12 +208,8 @@ func TestPartitionGraph_PackageGraphConnectedTodos_NeverSplitAcrossBuckets(t *te
 	assertGraphConnectedNotSplit(t, buckets, deferred, "a", "b")
 }
 
-// TestPartitionGraph_UnrelatedPackages_StillSpreadAcrossBuckets is the
-// no-regression baseline: fleet and acsrunner have ZERO import relationship
-// in either direction (verified via `go list -deps` at authoring time), so
-// they must still spread to distinct concurrent buckets and NEVER defer —
-// over-conflicting everything would defeat the point of fleet concurrency.
 func TestPartitionGraph_UnrelatedPackages_StillSpreadAcrossBuckets(t *testing.T) {
+	// fleet and acsrunner share no import edge in either direction.
 	todos := []Todo{
 		{ID: "a", Files: []string{"internal/acsrunner/runner.go"}},
 		{ID: "b", Files: []string{"internal/fleet/partition.go"}},
@@ -282,10 +231,6 @@ func TestPartitionGraph_UnrelatedPackages_StillSpreadAcrossBuckets(t *testing.T)
 	}
 }
 
-// TestPartitionGraph_GlobalZoneFile_ConflictsWithEveryBucket pins the fixed
-// global-zone list (go.mod, go.sum, policy/hook/generated files): a todo
-// touching go.mod must conflict with every other bucket regardless of the
-// package graph, since a go.mod edit can change ANY package's build.
 func TestPartitionGraph_GlobalZoneFile_ConflictsWithEveryBucket(t *testing.T) {
 	todos := []Todo{
 		{ID: "a", Files: []string{"internal/acsrunner/runner.go"}},
@@ -298,10 +243,6 @@ func TestPartitionGraph_GlobalZoneFile_ConflictsWithEveryBucket(t *testing.T) {
 	assertGraphConnectedNotSplit(t, buckets, deferred, "a", "b")
 }
 
-// TestPartitionGraph_PureFileDisjointness_Unchanged pins the no-regression AC:
-// with no package-graph or global-zone relationship at all, PartitionGraph's
-// behavior matches plain Partition — same-file todos cluster, disjoint-file
-// todos spread, bridging todos defer.
 func TestPartitionGraph_PureFileDisjointness_Unchanged(t *testing.T) {
 	todos := []Todo{
 		{ID: "a", Files: []string{"internal/fleet/partition.go"}},
@@ -322,7 +263,6 @@ func TestPartitionGraph_PureFileDisjointness_Unchanged(t *testing.T) {
 	}
 }
 
-// TestPartition_NLessThanOne_DefaultsToOne keeps a degenerate n safe.
 func TestPartition_NLessThanOne_DefaultsToOne(t *testing.T) {
 	buckets, deferred := Partition([]Todo{{ID: "a"}}, 0)
 	if len(buckets) != 1 || len(buckets[0]) != 1 || len(deferred) != 0 {
@@ -330,7 +270,6 @@ func TestPartition_NLessThanOne_DefaultsToOne(t *testing.T) {
 	}
 }
 
-// laneOwning returns the index of the single spec whose Scope owns id, or -1.
 func laneOwning(specs []CycleSpec, id string) int {
 	for i, s := range specs {
 		for _, x := range s.Scope {
@@ -342,11 +281,6 @@ func laneOwning(specs []CycleSpec, id string) int {
 	return -1
 }
 
-// TestPlanFromTriage_OverlappingDeclaredFilesCollapseToOneLane pins the cycle-523
-// fix: two top_n cards declaring the SAME file must land in ONE lane. Before the
-// fix PlanFromTriage set Todo{Files: []string{id}}, so distinct ids were trivially
-// file-disjoint and spread to two colliding lanes (the fictional-disjoint defect
-// inbox item wave-seed-partitions-on-id-not-real-files, weight 0.92).
 func TestPlanFromTriage_OverlappingDeclaredFilesCollapseToOneLane(t *testing.T) {
 	decision := []byte(`{"top_n":[
 		{"id":"alpha","files":["go/internal/fleet/triageplan.go"]},
@@ -364,9 +298,6 @@ func TestPlanFromTriage_OverlappingDeclaredFilesCollapseToOneLane(t *testing.T) 
 	}
 }
 
-// TestPlanFromTriage_DisjointDeclaredFilesSpreadToCountLanes is the baseline the
-// fix must not over-collapse: cards touching disjoint files still spread to
-// `count` lanes.
 func TestPlanFromTriage_DisjointDeclaredFilesSpreadToCountLanes(t *testing.T) {
 	decision := []byte(`{"top_n":[
 		{"id":"alpha","files":["go/internal/fleet/a.go"]},
@@ -384,8 +315,6 @@ func TestPlanFromTriage_DisjointDeclaredFilesSpreadToCountLanes(t *testing.T) {
 	}
 }
 
-// TestPlanFromTriage_NoDeclaredFilesFallsBackToIdIsland pins the fallback: a card
-// with no files[] stays an id-island, so file-less cards remain independent.
 func TestPlanFromTriage_NoDeclaredFilesFallsBackToIdIsland(t *testing.T) {
 	decision := []byte(`{"top_n":[{"id":"gamma"},{"id":"delta"}]}`)
 	specs, _, err := PlanFromTriage(decision, nil, 2, nil)
@@ -397,9 +326,6 @@ func TestPlanFromTriage_NoDeclaredFilesFallsBackToIdIsland(t *testing.T) {
 	}
 }
 
-// TestPlanFromTriage_CommittedFloorsKeepIdIsland pins that bare string sources
-// (committed_floors) are unaffected by the files change — each floor's id is its
-// own footprint, so distinct floors still spread.
 func TestPlanFromTriage_CommittedFloorsKeepIdIsland(t *testing.T) {
 	decision := []byte(`{"committed_floors":["pkg/one","pkg/two"]}`)
 	specs, _, err := PlanFromTriage(decision, nil, 2, nil)

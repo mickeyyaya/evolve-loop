@@ -7,8 +7,6 @@ import (
 	"time"
 )
 
-// TestSupervisor_PerCycleTimeoutPropagatesDeadline: a positive CycleTimeout gives
-// each launch a deadline-bearing context.
 func TestSupervisor_PerCycleTimeoutPropagatesDeadline(t *testing.T) {
 	var hadDeadline bool
 	s := &Supervisor{
@@ -24,8 +22,6 @@ func TestSupervisor_PerCycleTimeoutPropagatesDeadline(t *testing.T) {
 	}
 }
 
-// TestSupervisor_ZeroTimeoutImposesNoDeadline: CycleTimeout=0 leaves the parent
-// context untouched (opt-in deadline).
 func TestSupervisor_ZeroTimeoutImposesNoDeadline(t *testing.T) {
 	hadDeadline := true
 	s := &Supervisor{
@@ -41,9 +37,6 @@ func TestSupervisor_ZeroTimeoutImposesNoDeadline(t *testing.T) {
 	}
 }
 
-// TestSupervisor_PerCycleTimeoutReapsHungLaunch: a wedged child that only unblocks
-// on cancellation is reaped at the deadline instead of hanging the wave forever
-// (the BLOCKER from the large-scale readiness audit).
 func TestSupervisor_PerCycleTimeoutReapsHungLaunch(t *testing.T) {
 	s := &Supervisor{
 		CycleTimeout: 30 * time.Millisecond,

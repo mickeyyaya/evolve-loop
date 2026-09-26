@@ -1,24 +1,11 @@
 package fleet
 
-// todosfromtriage_test.go — test-amplification for cycle 553's newly EXPORTED
-// TodosFromTriage (extracted from PlanFromTriage as a pure refactor so the
-// rolling pool dispatch path rolls the SAME backlog the wave path
-// partitions; see build-report.md "New Surface" + triageplan.go's doc
-// comment surfaced via `go doc`). Black-box against the spec only: before
-// this cycle the function was unexported and only ever exercised indirectly
-// through PlanFromTriage's returned CycleSpecs; this file pins its contract
-// DIRECTLY at the new exported boundary. Fixtures mirror the JSON shapes
-// already established by triageplan_test.go / triageplan_amplify_test.go
-// (pre-existing, unmodified this cycle) so the parse-schema assumptions are
-// grounded in prior-precedent tests, not guessed.
-
 import (
 	"encoding/json"
 	"fmt"
 	"testing"
 )
 
-// todoIDs collects the distinct todo IDs TodosFromTriage returned.
 func todoIDs(todos []Todo) map[string]bool {
 	ids := map[string]bool{}
 	for _, td := range todos {
@@ -27,10 +14,6 @@ func todoIDs(todos []Todo) map[string]bool {
 	return ids
 }
 
-// TestTodosFromTriage_FloorsBecomeDistinctTodos (positive): committed_floors
-// entries must surface as one Todo per distinct id — the same floors
-// TestPlanFromTriage_DisjointScopesAcrossLanes partitions into lane specs,
-// but pinned here directly against the raw Todo backlog.
 func TestTodosFromTriage_FloorsBecomeDistinctTodos(t *testing.T) {
 	decisionJSON := []byte(`{"committed_floors":["bridge","core","audit"]}`)
 	todos, _, err := TodosFromTriage(decisionJSON, nil, nil)
@@ -48,9 +31,6 @@ func TestTodosFromTriage_FloorsBecomeDistinctTodos(t *testing.T) {
 	}
 }
 
-// TestTodosFromTriage_CardPackagesFallbackWhenFloorsAbsent (positive):
-// mirrors TestPlanFromTriage_FallsBackToCardPackagesWhenFloorsAbsent's
-// fixture, pinned directly against TodosFromTriage.
 func TestTodosFromTriage_CardPackagesFallbackWhenFloorsAbsent(t *testing.T) {
 	todos, _, err := TodosFromTriage([]byte(`{}`), []string{"core", "audit"}, nil)
 	if err != nil {
@@ -62,9 +42,6 @@ func TestTodosFromTriage_CardPackagesFallbackWhenFloorsAbsent(t *testing.T) {
 	}
 }
 
-// TestTodosFromTriage_FloorsTakePrecedenceOverCards (negative/precedence):
-// mirrors TestPlanFromTriage_FloorsTakePrecedenceOverCards — cards must never
-// merge into a floors-derived backlog.
 func TestTodosFromTriage_FloorsTakePrecedenceOverCards(t *testing.T) {
 	todos, _, err := TodosFromTriage([]byte(`{"committed_floors":["bridge"]}`), []string{"core", "audit"}, nil)
 	if err != nil {
@@ -76,12 +53,6 @@ func TestTodosFromTriage_FloorsTakePrecedenceOverCards(t *testing.T) {
 	}
 }
 
-// TestTodosFromTriage_DuplicateFloorsCollapseToDistinctTodos (edge): repeated
-// floor ids must collapse to ONE Todo per distinct id, not one Todo per raw
-// entry — mirrors TestPlanFromTriage_DuplicateFloorsNeverOverSchedule but
-// additionally asserts len(todos) itself (not just the partitioned spec
-// count), which the spec-level test could not distinguish from a dedup that
-// happened later in PlanCycles instead of in TodosFromTriage.
 func TestTodosFromTriage_DuplicateFloorsCollapseToDistinctTodos(t *testing.T) {
 	todos, _, err := TodosFromTriage([]byte(`{"committed_floors":["core","core","audit","core"]}`), nil, nil)
 	if err != nil {
@@ -96,9 +67,6 @@ func TestTodosFromTriage_DuplicateFloorsCollapseToDistinctTodos(t *testing.T) {
 	}
 }
 
-// TestTodosFromTriage_MalformedJSONRejectsWithNoTodos (negative): truncated
-// JSON must reject, never guess — mirrors
-// TestPlanFromTriage_MalformedDecisionJSON_RejectsNotGuesses.
 func TestTodosFromTriage_MalformedJSONRejectsWithNoTodos(t *testing.T) {
 	todos, _, err := TodosFromTriage([]byte(`{"committed_floors":[`), []string{"core"}, nil)
 	if err == nil {
@@ -109,10 +77,6 @@ func TestTodosFromTriage_MalformedJSONRejectsWithNoTodos(t *testing.T) {
 	}
 }
 
-// TestTodosFromTriage_WrongTypeFieldsRejected (negative): mirrors
-// TestPlanFromTriage_WrongTypeDecisionFieldsRejected — wrong-typed decision
-// JSON must reject rather than silently falling back to cards (masking a
-// corrupted triage artifact).
 func TestTodosFromTriage_WrongTypeFieldsRejected(t *testing.T) {
 	cases := []struct {
 		name string
@@ -136,10 +100,6 @@ func TestTodosFromTriage_WrongTypeFieldsRejected(t *testing.T) {
 	}
 }
 
-// TestTodosFromTriage_DegenerateBytesNeverPanicsOrPartialErrors (edge/OOD):
-// mirrors TestPlanFromTriage_DegenerateDecisionBytesFailSafe — empty/nil/null
-// decision bytes must never panic and must never return both an error AND
-// non-empty todos.
 func TestTodosFromTriage_DegenerateBytesNeverPanicsOrPartialErrors(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -166,11 +126,6 @@ func TestTodosFromTriage_DegenerateBytesNeverPanicsOrPartialErrors(t *testing.T)
 	}
 }
 
-// TestTodosFromTriage_LargeScaleAllFloorsSurviveDistinctly (limit/large-scale):
-// mirrors TestPlanFromTriage_LargeScaleAllFloorsScheduledDisjoint (100
-// floors) but widened to 200 and pinned directly against the raw Todo count
-// (not the post-partition spec count) — no floor may be silently dropped or
-// merged during the parse itself.
 func TestTodosFromTriage_LargeScaleAllFloorsSurviveDistinctly(t *testing.T) {
 	floors := make([]string, 200)
 	for i := range floors {
@@ -190,10 +145,6 @@ func TestTodosFromTriage_LargeScaleAllFloorsSurviveDistinctly(t *testing.T) {
 	}
 }
 
-// TestTodosFromTriage_TopNCardsBecomeTodos (positive): mirrors
-// TestPlanFromTriage_ProductionFixtureTopNOnlyFallback — a real triage-
-// decision.json shape (top_n cards, no committed_floors) must still parse
-// into a non-empty Todo backlog.
 func TestTodosFromTriage_TopNCardsBecomeTodos(t *testing.T) {
 	decisionJSON := []byte(`{
 		"cycle": 464,

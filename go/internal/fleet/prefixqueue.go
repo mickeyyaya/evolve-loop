@@ -5,21 +5,6 @@ import (
 	"sync"
 )
 
-// prefixqueue.go implements the cycle-975 inbox item prefix-speculation-landing-queue
-// (campaign merge-efficiency-2026-07): a single-writer landing composer modeled on
-// Zuul / GitHub merge-queue "prefix" speculation. Fleet lanes never push main
-// themselves; instead a PrefixQueue holds a FIFO of PASS lane candidates and builds
-// composed candidate trees as queue PREFIXES (L1, L1+L2, L1+L2+L3), which are verified
-// against the native gate set. The first failing prefix names the culprit positionally
-// (Zuul NNFI — No New Failures Introduced) and the lanes behind it re-form without it,
-// so no bisection subsystem is needed. The window is an AIMD control loop (start 3,
-// +1 per green, halve on red, floor 1). Lanes are risk-tiered like Rust rollups: an
-// iffy (core / cross-cutting) lane and any overlap-zone lane (sharing a touched file
-// with a lane already in the composing group) get a solo prefix slot.
-//
-// Landing strategy is policy config (fleet.landing: per-lane | prefix-queue), NOT an
-// env flag (standing rule no_feature_flags_use_design_patterns) — see LandingMode.
-
 // RiskTier ranks how safely a lane may be composed with others in one prefix.
 type RiskTier int
 
@@ -32,25 +17,17 @@ const (
 	TierIffy
 )
 
-// LaneCandidate is a PASS lane awaiting landing: its stable ID, its risk tier, and the
-// repo-relative files it touches (used to detect overlap-zone conflicts).
+// LaneCandidate is a PASS lane awaiting landing; Files are repo-relative and detect overlap-zone conflicts.
 type LaneCandidate struct {
 	ID    string
 	Tier  RiskTier
 	Files []string
 }
 
-// PrefixQueue is the single-writer landing composer: a FIFO of PASS lane candidates
-// plus the AIMD window controlling how many lanes it will speculate over at once.
-//
-// The composer is the single writer to main, but its own state (lanes/window) is
-// still reached from >1 goroutine the moment a concurrent driver enqueues PASS
-// lanes or reports AIMD outcomes; mu enforces the single-writer contract on that
-// shared state so a torn append never silently loses a lane (the 948/949 lost-work
-// class). Every exported method that reads or mutates lanes/window takes mu; the
-// unexported groups() helper does NOT lock and is only ever called from a method
-// that already holds it (no re-entrant re-lock, no deadlock).
+// PrefixQueue is the single-writer landing composer: a FIFO of PASS lanes plus the AIMD window.
+// See ADR-0078.
 type PrefixQueue struct {
+	// mu guards lanes and window: drivers enqueue and report outcomes from several goroutines.
 	mu     sync.Mutex
 	lanes  []LaneCandidate
 	window int
@@ -93,10 +70,8 @@ func (q *PrefixQueue) OnRed() {
 	}
 }
 
-// groups partitions the FIFO into composable groups, in order. A TierIffy lane is
-// always its own group; a lane that shares a touched file with any lane already in the
-// current group starts a fresh group (overlap-zone isolation). All other lanes accrete
-// into the current group.
+// groups splits the FIFO into composable groups; a TierIffy or overlapping lane starts a new one.
+// The caller must hold q.mu.
 func (q *PrefixQueue) groups() [][]LaneCandidate {
 	var result [][]LaneCandidate
 	var cur []LaneCandidate
@@ -135,10 +110,7 @@ func (q *PrefixQueue) groups() [][]LaneCandidate {
 	return result
 }
 
-// ComposePrefixes returns the candidate prefix trees to verify, as lane-ID slices.
-// Within each composable group the prefixes are cumulative (prefix k = the group's
-// lane IDs [0..k]); iffy and overlap-zone lanes land in their own single-element group,
-// so they never appear in a multi-lane prefix.
+// ComposePrefixes returns each group's cumulative lane-ID prefixes, in queue order.
 func (q *PrefixQueue) ComposePrefixes() [][]string {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -154,13 +126,7 @@ func (q *PrefixQueue) ComposePrefixes() [][]string {
 	return prefixes
 }
 
-// ResolveCulprit lands as many lanes as possible using positional NNFI resolution.
-// verify reports whether a composed set of lane IDs passes the gate set. Within each
-// group the composer optimistically extends the known-good committed set one lane at a
-// time: a lane that keeps the set green lands; a lane that turns it red is the culprit
-// (positionally named — it is the only new addition to a known-good set) and is ejected,
-// while the lanes behind it re-form and continue. This runs in O(lanes) verify calls —
-// exactly one per lane — with no bisection sweep.
+// ResolveCulprit lands lanes by positional NNFI, ejecting each lane that turns a known-good set red.
 func (q *PrefixQueue) ResolveCulprit(verify func(laneIDs []string) bool) (landed, ejected []string) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -176,21 +142,8 @@ func (q *PrefixQueue) ResolveCulprit(verify func(laneIDs []string) bool) (landed
 			}
 		}
 	}
-	// Post-ejection whole-set re-verify (T3, F2 gap). Per-group NNFI proves each
-	// group's prefix green in isolation, but the UNION of independently-green
-	// groups can still be red — two solo-green iffy lanes whose composite fails
-	// (each is its own group, so the cross-group interaction is never speculated
-	// on). Invariant to restore: verify(landed) must ALWAYS hold. Re-verify the
-	// surviving set as a whole and, while it is red, eject the positionally-newest
-	// landed lane and re-check.
-	//
-	// DESIGN NOTE — positional-NNFI limitation (AC-T3c): NNFI blames the newest
-	// addition to a known-good set, so this tail-trim ejects the LAST-landed lane,
-	// not necessarily the true composite-poisoning one. An innocent later lane may
-	// be ejected in place of an earlier culprit. The guarantee here is only that no
-	// poisoned composite LANDS (verify(landed) holds); the ejected identity is
-	// positional, not causal. Precise blame would need cross-group bisection, which
-	// this NNFI design deliberately trades away for a linear verify budget.
+	// Green groups can still form a red union, so verify(landed) is restored by trimming
+	// from the tail; the ejected lane is positional, not necessarily the culprit.
 	for len(landed) > 0 && !verify(landed) {
 		last := len(landed) - 1
 		ejected = append(ejected, landed[last])
@@ -199,8 +152,7 @@ func (q *PrefixQueue) ResolveCulprit(verify func(laneIDs []string) bool) (landed
 	return landed, ejected
 }
 
-// LandingMode is the policy vocabulary for how a fleet lands PASS lanes. It is set via
-// policy config (fleet.landing), never an env flag.
+// LandingMode is the fleet.landing policy vocabulary for how PASS lanes reach main.
 type LandingMode string
 
 const (
@@ -215,8 +167,7 @@ func DefaultLandingMode() LandingMode {
 	return LandingPerLane
 }
 
-// ParseLandingMode validates s against the known landing-mode vocabulary. An unknown or
-// empty value is rejected with an error rather than silently coerced to a default.
+// ParseLandingMode validates s against the landing-mode vocabulary, rejecting unknown and empty values.
 func ParseLandingMode(s string) (LandingMode, error) {
 	switch LandingMode(s) {
 	case LandingPerLane, LandingPrefixQueue:

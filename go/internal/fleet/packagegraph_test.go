@@ -1,28 +1,7 @@
-// packagegraph_test.go — cycle-871 TDD contract for merge ladder RUNG 1
-// (inbox merge-rung1-package-graph-disjoint; research
-// knowledge-base/research/merge-concurrency-2026/README.md finding #2:
-// "file-level disjointness is explicitly insufficient (merge skew: rename +
-// call-site)"). fleet.Partition today buckets todos by literal file paths
-// only; it has no notion of Go package import-graph reachability, so two
-// todos that touch disjoint files but are connected through the import graph
-// (e.g. one edits a package, the other edits a caller of that package) are
-// wrongly treated as safe to co-schedule concurrently.
-//
-// This file pins the package-graph resolver's contract using REAL repo
-// packages (no synthetic fixtures needed): go/internal/fleet transitively
-// imports go/internal/ipcenv (see partition.go's import block), while
-// go/internal/acsrunner has zero import relationship with fleet in either
-// direction (verified via `go list -deps` at authoring time).
-//
-// RED status at authoring (cycle 871): every test below fails to COMPILE —
-// TransitivePackageSet, IsGlobalZone and GlobalZoneFiles do not exist yet.
-// That is the correct RED signal (Builder's job is to add packagegraph.go).
 package fleet
 
 import "testing"
 
-// repoRoot is the go module root as seen from this package's directory
-// (go/internal/fleet) when `go test` runs with its package dir as cwd.
 const repoRoot = "../.."
 
 func TestTransitivePackageSet_ResolvesTransitiveImport(t *testing.T) {

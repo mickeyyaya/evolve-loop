@@ -8,7 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
-// scopesOf reduces waves to [wave][spec][todo-id] for assertion.
 func scopesOf(waves [][]CycleSpec) [][][]string {
 	out := make([][][]string, len(waves))
 	for i, wave := range waves {
@@ -97,7 +96,6 @@ func TestPlanWaves_SetsScopeEnv(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// One wave (no deps), two file-disjoint specs.
 	if len(waves) != 1 || len(waves[0]) != 2 {
 		t.Fatalf("want 1 wave of 2 specs, got %v", scopesOf(waves))
 	}
@@ -109,7 +107,6 @@ func TestPlanWaves_SetsScopeEnv(t *testing.T) {
 }
 
 func TestGroupByFiles_TransitiveSharing(t *testing.T) {
-	// a—b share x, b—c share y ⇒ all three transitively connected ⇒ one group.
 	groups := groupByFiles([]Todo{
 		td("a", []string{"x"}),
 		td("b", []string{"x", "y"}),
@@ -120,10 +117,6 @@ func TestGroupByFiles_TransitiveSharing(t *testing.T) {
 	}
 }
 
-// TestPlanWaves_ThreadsOutputContract: a single-todo (file-disjoint) cycle
-// carries that todo's OutputContract verbatim onto its CycleSpec, so it reaches
-// the launched cycle as its binding goal (issue 14/22 — the contract was dropped
-// Todo→CycleSpec, leaving the scout to free-choose a non-reducing task).
 func TestPlanWaves_ThreadsOutputContract(t *testing.T) {
 	waves, err := PlanWaves([]Todo{
 		{ID: "a", Files: []string{"x.go"}, OutputContract: "delete EVOLVE_FOO; FlagCeiling toward 35"},
@@ -144,8 +137,6 @@ func TestPlanWaves_ThreadsOutputContract(t *testing.T) {
 	}
 }
 
-// TestPlanWaves_CombinesContractsForFileSharingGroup: when file-sharing todos
-// merge into one cycle, each todo's contract is preserved, labeled by id.
 func TestPlanWaves_CombinesContractsForFileSharingGroup(t *testing.T) {
 	waves, err := PlanWaves([]Todo{
 		{ID: "a", Files: []string{"shared.go"}, OutputContract: "do A"},
@@ -163,9 +154,6 @@ func TestPlanWaves_CombinesContractsForFileSharingGroup(t *testing.T) {
 	}
 }
 
-// TestPlanCycles_ThreadsOutputContract: the flat `evolve fleet --plan` path
-// (PlanCycles) carries the contract onto its specs too, not just the campaign
-// PlanWaves path — both partitioners thread it (reviewer HIGH).
 func TestPlanCycles_ThreadsOutputContract(t *testing.T) {
 	specs, _ := PlanCycles([]Todo{
 		{ID: "a", Files: []string{"x.go"}, OutputContract: "delete EVOLVE_FOO"},
