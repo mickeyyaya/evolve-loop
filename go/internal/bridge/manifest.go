@@ -103,14 +103,18 @@ type Manifest struct {
 	// subprocess drivers. Use Manifest.IsTmux() rather than inspecting the
 	// CLI name string directly — that is the closed abstraction point for
 	// this distinction across the entire codebase.
-	Transport          string              `json:"transport,omitempty"`
-	BinaryMinVersion   string              `json:"binary_min_version"`
-	DefaultTier        string              `json:"default_tier"`
-	TierDependencies   map[string][]string `json:"tier_dependencies"`
-	PromptMarker       string              `json:"prompt_marker"`
-	DefaultModel       string              `json:"default_model"`
-	DefaultArgs        []string            `json:"default_args"`
-	InteractivePrompts []ManifestPrompt    `json:"interactive_prompts"`
+	Transport        string              `json:"transport,omitempty"`
+	BinaryMinVersion string              `json:"binary_min_version"`
+	DefaultTier      string              `json:"default_tier"`
+	TierDependencies map[string][]string `json:"tier_dependencies"`
+	PromptMarker     string              `json:"prompt_marker"`
+	DefaultModel     string              `json:"default_model"`
+	DefaultArgs      []string            `json:"default_args"`
+	// DefaultEnv is the always-on environment of the CLI process, as DefaultArgs is its always-on flags:
+	// a headless driver hands it to the process, a tmux driver exports it in the pane shell before the
+	// launch. Keys are shell identifiers (validated at parse).
+	DefaultEnv         map[string]string `json:"default_env,omitempty"`
+	InteractivePrompts []ManifestPrompt  `json:"interactive_prompts"`
 	// TransientRegex recognizes a TEMPORARY upstream failure in this CLI's PHASE
 	// pane — an overloaded, unavailable or erroring server — as distinct from the
 	// permanent quota wall controls.usage.exhausted_regex matches. Top-level, not
@@ -287,6 +291,17 @@ func parseManifestWithStderr(cli string, data []byte, stderr io.Writer) (Manifes
 	if m.CLI == "" || m.Binary == "" {
 		return Manifest{}, fmt.Errorf("bridge:manifest: missing required fields (cli, binary) for %s", cli)
 	}
+	for key, value := range m.DefaultEnv {
+		if !isShellIdentifier(key) {
+			return Manifest{}, fmt.Errorf("bridge:manifest: default_env key %q for cli=%s is not a shell identifier", key, cli)
+		}
+		if isReservedEnvKey(key) {
+			return Manifest{}, fmt.Errorf("bridge:manifest: default_env key %q for cli=%s is reserved: the loop's, the bridge's and the credential variables are not a manifest's to set", key, cli)
+		}
+		if hasControlByte(value) {
+			return Manifest{}, fmt.Errorf("bridge:manifest: default_env value for %q (cli=%s) carries a control byte; it is typed into a pane", key, cli)
+		}
+	}
 	// v1 → v2 schema compat (cycle-124 followup): a manifest declaring the
 	// legacy `tier_aliases` key — with the Anthropic-leaked vocabulary
 	// `{haiku|sonnet|opus → native}` — is read into a sidecar struct,
@@ -310,6 +325,37 @@ func parseManifestWithStderr(cli string, data []byte, stderr io.Writer) (Manifes
 		}
 	}
 	return m, nil
+}
+
+// credentialEnvKeys are the variables the credential-isolation guards read before a launch; a manifest
+// must not be able to set what the guards never see.
+var credentialEnvKeys = map[string]bool{"ANTHROPIC_API_KEY": true, "ANTHROPIC_BASE_URL": true, "OPENAI_API_KEY": true}
+
+// isReservedEnvKey reports whether key belongs to the loop (EVOLVE_), the bridge (BRIDGE_) or a credential.
+func isReservedEnvKey(key string) bool {
+	return credentialEnvKeys[key] || strings.HasPrefix(key, "EVOLVE_") || strings.HasPrefix(key, "BRIDGE_")
+}
+
+// hasControlByte reports whether s carries a C0 control byte or DEL.
+func hasControlByte(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] < 0x20 || s[i] == 0x7f {
+			return true
+		}
+	}
+	return false
+}
+
+// isShellIdentifier reports whether key can stand left of `=` in an `export` line.
+func isShellIdentifier(key string) bool {
+	for i := 0; i < len(key); i++ {
+		c := key[i]
+		if c == '_' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || i > 0 && c >= '0' && c <= '9' {
+			continue
+		}
+		return false
+	}
+	return key != ""
 }
 
 // translateV1TierAliases maps the legacy Anthropic-named tier keys to the

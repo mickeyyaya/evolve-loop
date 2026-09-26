@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## Added — a CLI manifest declares its process environment (`default_env`, ADR-0106 P3, unwired, 2026-09-27)
+
+- `default_env` is to variables what `default_args` is to flags. The realizer copies it into `Realization.Env`; `driverEnv` layers it between the process environment and the request's `Deps.Env` overrides (the last value of a key wins); `exportLines` renders the `export KEY=value` lines a tmux driver will send, sorted and shell-quoted. The parser refuses a key that is not a shell identifier, a key that belongs to the loop (`EVOLVE_`), the bridge (`BRIDGE_`) or a credential (the guards read the process environment before a launch and never see a manifest's map), and a value carrying a control byte.
+
 ## Added — `internal/bridge/phaseidentity`, the statement of who the agent is (ADR-0106 P3, unwired, 2026-09-27)
 
 Cycle 1707's tdd agent listed the tmux sessions, found its own, read its own prompt file, and refused the phase as a prompt injection racing "the real agent"; an operator's one-line identity clarification resumed it an hour later.
