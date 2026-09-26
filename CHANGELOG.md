@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## Added — `internal/bridge/phaseidentity`, the statement of who the agent is (ADR-0106 P3, unwired, 2026-09-27)
+
+Cycle 1707's tdd agent listed the tmux sessions, found its own, read its own prompt file, and refused the phase as a prompt injection racing "the real agent"; an operator's one-line identity clarification resumed it an hour later.
+
+- `Block(Facts)` renders five lines a tmux driver appends to the bytes it pastes: the phase and cycle; the tmux session and the command that prints it; the two prompt files and that finding them, or the session in `tmux ls`, is expected; the sole-writer fact and the standing instruction not to kill, pause or hand off the session or wait for an operator; and that instruction files addressed to the console operator describe the operator's sessions, not this one. `""` without an agent name or a session; every fact is stripped of control bytes and backticks before it is rendered. Pure, standard library only, golden-pinned, in `.apicover-enforce`.
+
 - The profile runs on the codex family with claude as its fallback, as the other helpers do: the balanced-tier floor (`TestClaudeFamilyFloor`) reserves claude for judgment phases with a justification, and the recovery agent decides nothing. The first ship routed it to claude and the full floor caught it.
 ## Added — the recovery agent's profile and persona (ADR-0106 F3, unwired, 2026-09-26)
 
