@@ -1,7 +1,7 @@
 {
   "name": "deliverable-recovery",
   "role": "deliverable-recovery",
-  "cli": "claude-tmux",
+  "cli": "codex-tmux",
   "model_tier_default": "balanced",
   "allowed_tools": [
     "Read",
@@ -82,7 +82,7 @@
   "stream_output": true,
   "generated_from": "hand-authored (ADR-0106 F3)",
   "cli_fallback": [
-    "codex-tmux"
+    "claude-tmux"
   ],
   "effort_level": "medium",
   "sandbox": {
