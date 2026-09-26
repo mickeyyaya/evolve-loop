@@ -2,19 +2,8 @@ package panestream
 
 import "testing"
 
-// liveness_exhaustion_test.go — the ExhaustionProbe Decorator (S1). A CLI that
-// hits a quota/rate-limit wall MID-EXECUTION prints its error and returns to the
-// REPL prompt without exiting; the re-printed error reads as new content, so the
-// inner liveness detector calls it LivenessConverging ("real output is never
-// stuck") and the reviewer extends forever — the livelock that hung agy 15+ min.
-// The decorator makes the wall an ORTHOGONAL, dominating signal.
-
-// Compile-time conformance: the decorator IS a LivenessProbe (composes over any).
 var _ LivenessProbe = (*ExhaustionProbe)(nil)
 
-// A pane matching the profile's ExhaustedRegex is LivenessExhausted, OVERRIDING
-// whatever the inner probe would report — even a frame the inner detector would
-// call Converging (new content), because that "content" is the quota error.
 func TestExhaustionProbe_OverridesLiveness(t *testing.T) {
 	p := PaneProfile{Name: "agy", ExhaustedRegex: `(?i)quota (exceeded|reached)`}
 	probe := NewExhaustionProbe(NewDefaultDetector(3))
@@ -29,9 +18,6 @@ func TestExhaustionProbe_OverridesLiveness(t *testing.T) {
 	}
 }
 
-// No match → the decorator is transparent: it delegates to the inner probe
-// byte-identically (same state, same confidence), so healthy sessions are
-// unaffected.
 func TestExhaustionProbe_DelegatesWhenNoMatch(t *testing.T) {
 	p := PaneProfile{Name: "agy", ExhaustedRegex: `(?i)quota reached`}
 	inner := NewDefaultDetector(3)
@@ -46,8 +32,6 @@ func TestExhaustionProbe_DelegatesWhenNoMatch(t *testing.T) {
 	}
 }
 
-// An empty ExhaustedRegex never walls (fail-open — the detector must never
-// invent a wall for a CLI whose manifest defines no pattern, e.g. codex).
 func TestExhaustionProbe_EmptyPatternNeverWalls(t *testing.T) {
 	p := PaneProfile{Name: "codex", ExhaustedRegex: ""}
 	probe := NewExhaustionProbe(NewDefaultDetector(3))
@@ -56,8 +40,6 @@ func TestExhaustionProbe_EmptyPatternNeverWalls(t *testing.T) {
 	}
 }
 
-// An invalid (uncompilable) ExhaustedRegex fails open — never walls, never
-// panics: the gate's own misconfiguration must not brick a session.
 func TestExhaustionProbe_InvalidPatternFailsOpen(t *testing.T) {
 	p := PaneProfile{Name: "x", ExhaustedRegex: "([unclosed"}
 	probe := NewExhaustionProbe(NewDefaultDetector(3))
@@ -66,8 +48,6 @@ func TestExhaustionProbe_InvalidPatternFailsOpen(t *testing.T) {
 	}
 }
 
-// The decorator caches its compiled regex across calls with a stable pattern
-// (the profile is constant per session) — a subsequent match still walls.
 func TestExhaustionProbe_MatchesAcrossCalls(t *testing.T) {
 	p := PaneProfile{Name: "agy", ExhaustedRegex: `(?i)quota reached`}
 	probe := NewExhaustionProbe(NewDefaultDetector(3))

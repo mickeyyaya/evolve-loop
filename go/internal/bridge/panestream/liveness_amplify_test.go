@@ -6,33 +6,13 @@ import (
 	"testing"
 )
 
-// Adversarial amplification tests for the LivenessDetector strategy layer (cycle-423).
-// Written by the Test Amplifier — black-box view, spec only, no implementation reading.
-//
-// Coverage gaps targeted (not reached by ACS predicates C423_001–C423_014):
-//   A1  Stall counter RESET on content growth (AC5 only tests monotonic accumulation)
-//   A2  Confidence ∈ [0,1] for ALL state paths (AC6 only checks Converging via DetectorFor)
-//   A3  stallThreshold=1 boundary (AC5 uses threshold=2 and tests N-1/N)
-//   A4  ClaudeDetector: DECREASING token → falls back to default (AC11=increasing, AC12=static)
-//   A5  ClaudeDetector: very large token value — no overflow, valid confidence
-//   A6  DetectorFor: unknown/empty profile — no panic, returns valid probe
-//   A7  Many quiet (Idle) frames: never reaches Hung (stall counter must not increment on Idle)
-//   A8  Upload-direction (↑) token counter: not a Converging signal for ClaudeDetector
-
-// TestAmp_DefaultDetector_StallCounterResetsOnContent verifies the "consecutive"
-// invariant in the stall-threshold contract: injecting a content-growth frame after
-// (N-1) stalls must reset the counter so the agent needs another full stallThreshold
-// stalls to reach Hung. C423_005 only tests monotonic accumulation to threshold.
-// A reset-bug would cause premature Hung after any content-then-stall sequence.
 func TestAmp_DefaultDetector_StallCounterResetsOnContent(t *testing.T) {
 	profile := Profiles["claude"]
 	const stall = 3
 	det := NewDefaultDetector(stall)
 
-	// Prime on content.
-	det.Assess("⏺ initial output\n❯ \n", profile)
+	det.Assess("⏺ initial output\n❯ \n", profile) // prime
 
-	// Accumulate (stall-1) stall intervals — must NOT reach Hung yet.
 	spinner := "⏺ initial output\n✽ Thinking… (5s · ↓ 50 tokens)\n❯ \n"
 	for i := 0; i < stall-1; i++ {
 		s, _ := det.Assess(spinner, profile)
@@ -41,10 +21,8 @@ func TestAmp_DefaultDetector_StallCounterResetsOnContent(t *testing.T) {
 		}
 	}
 
-	// Content growth must reset the counter.
 	det.Assess("⏺ initial output\n⏺ new answer line\n❯ \n", profile)
 
-	// After reset, (stall-1) further stalls must AGAIN be non-Hung.
 	spinner2 := "⏺ initial output\n⏺ new answer line\n✽ Thinking… (20s · ↓ 200 tokens)\n❯ \n"
 	for i := 0; i < stall-1; i++ {
 		s, _ := det.Assess(spinner2, profile)
@@ -53,16 +31,12 @@ func TestAmp_DefaultDetector_StallCounterResetsOnContent(t *testing.T) {
 		}
 	}
 
-	// Now hit threshold again to confirm counting still works after reset.
 	s, _ := det.Assess(spinner2, profile)
 	if s != LivenessHung {
 		t.Errorf("post-reset stall × %d: got %v, want LivenessHung (threshold=%d should be reached again)", stall, s, stall)
 	}
 }
 
-// TestAmp_DefaultDetector_ConfidenceAlwaysInRange verifies that for every
-// LivenessState path the returned confidence value is always in [0.0, 1.0].
-// C423_006 only checks this for the Converging path via DetectorFor + real frames.
 func TestAmp_DefaultDetector_ConfidenceAlwaysInRange(t *testing.T) {
 	profile := Profiles["claude"]
 	det := NewDefaultDetector(2)
@@ -88,10 +62,6 @@ func TestAmp_DefaultDetector_ConfidenceAlwaysInRange(t *testing.T) {
 	}
 }
 
-// TestAmp_DefaultDetector_StallThresholdOneBoundary verifies the degenerate
-// boundary stallThreshold=1: the FIRST busy-but-stagnant interval must immediately
-// classify as Hung. C423_005 uses threshold=2 and tests the (N-1)/N boundary;
-// threshold=1 is the limiting case where BusyButStagnant and Hung collapse.
 func TestAmp_DefaultDetector_StallThresholdOneBoundary(t *testing.T) {
 	profile := Profiles["claude"]
 	det := NewDefaultDetector(1) // threshold=1: first stall → Hung immediately
@@ -103,17 +73,11 @@ func TestAmp_DefaultDetector_StallThresholdOneBoundary(t *testing.T) {
 	}
 }
 
-// TestAmp_ClaudeDetector_DecreasingTokenFallsBackToDefault verifies that a
-// DECREASING token counter does NOT elevate confidence above the default detector.
-// AC11 covers increasing tokens; AC12 covers static tokens; this is the missing
-// negative variant: a decreasing counter (terminal wrap / corrupted output) must
-// not read as a monotonic growth signal.
 func TestAmp_ClaudeDetector_DecreasingTokenFallsBackToDefault(t *testing.T) {
 	profile := Profiles["claude"]
 	det := NewClaudeDetector(3)
 	base := NewDefaultDetector(3)
 
-	// Strictly decreasing token sequence.
 	frames := []string{
 		"✽ Generating… (5s · ↓ 300 tokens)\n❯ \n",
 		"✽ Generating… (10s · ↓ 200 tokens)\n❯ \n",
@@ -131,10 +95,6 @@ func TestAmp_ClaudeDetector_DecreasingTokenFallsBackToDefault(t *testing.T) {
 	}
 }
 
-// TestAmp_ClaudeDetector_LargeTokenNoOverflow verifies that a very large token
-// count does not cause integer overflow, panic, or out-of-range confidence.
-// C423_013 tests malformed formats; this tests a valid format with extreme numeric
-// values that could overflow int32 or miscalculate if parsed with the wrong type.
 func TestAmp_ClaudeDetector_LargeTokenNoOverflow(t *testing.T) {
 	profile := Profiles["claude"]
 	det := NewClaudeDetector(3)
@@ -156,10 +116,6 @@ func TestAmp_ClaudeDetector_LargeTokenNoOverflow(t *testing.T) {
 	}
 }
 
-// TestAmp_DetectorFor_UnknownProfileReturnsProbe verifies that DetectorFor does
-// not panic and returns a non-nil, callable probe for an unrecognized CLI name.
-// AC6 only covers the 4 known CLIs; an unknown profile must fall back safely
-// (presumably to DefaultDetector) rather than panicking or returning nil.
 func TestAmp_DetectorFor_UnknownProfileReturnsProbe(t *testing.T) {
 	unknown := PaneProfile{Name: "unknown-future-cli", BoundaryMarker: "$ "}
 
@@ -174,7 +130,6 @@ func TestAmp_DetectorFor_UnknownProfileReturnsProbe(t *testing.T) {
 		t.Fatal("DetectorFor(unknown profile) = nil; want non-nil probe (safe default expected)")
 	}
 
-	// Verify the probe is callable and returns valid values.
 	probe.Assess("some content\n$ \n", unknown) // prime
 	state, conf := probe.Assess("some more content\n$ \n", unknown)
 
@@ -192,11 +147,6 @@ func TestAmp_DetectorFor_UnknownProfileReturnsProbe(t *testing.T) {
 	}
 }
 
-// TestAmp_DefaultDetector_QuietFramesNeverHung verifies that feeding N > stallThreshold
-// quiet frames (no busy affordance, same content) never produces Hung.
-// Quiet intervals classify as Idle — the stall counter must NOT increment on Idle,
-// only on BusyButStagnant (busy+no-content). C423_004 checks 1 quiet interval;
-// this verifies the invariant holds across many repetitions.
 func TestAmp_DefaultDetector_QuietFramesNeverHung(t *testing.T) {
 	profile := Profiles["claude"]
 	const stall = 2
@@ -204,7 +154,6 @@ func TestAmp_DefaultDetector_QuietFramesNeverHung(t *testing.T) {
 
 	det.Assess("⏺ content\n❯ \n", profile) // prime
 
-	// Feed (stall+5) quiet frames: same content, no spinner/affordance.
 	quietFrame := "⏺ content\n❯ \n"
 	for i := 0; i < stall+5; i++ {
 		s, _ := det.Assess(quietFrame, profile)
@@ -217,17 +166,11 @@ func TestAmp_DefaultDetector_QuietFramesNeverHung(t *testing.T) {
 	}
 }
 
-// TestAmp_ClaudeDetector_UploadArrowNotConvergenceSignal verifies that a token
-// counter using the ↑ (upload/prompt) direction does NOT elevate the ClaudeDetector
-// above the default. ADR-0047 classifies BOTH ↑ and ↓ as chrome affordance;
-// only ↓ (response generation) is a download-growth signal. A monotonically
-// increasing ↑ counter must not be misread as response generation evidence.
 func TestAmp_ClaudeDetector_UploadArrowNotConvergenceSignal(t *testing.T) {
 	profile := Profiles["claude"]
 	det := NewClaudeDetector(3)
 	base := NewDefaultDetector(3)
 
-	// Monotonically increasing ↑ (upload) counter.
 	uploadFrames := []string{
 		"✽ Kneading… (5s · ↑ 50 tokens)\n❯ \n",
 		"✽ Kneading… (10s · ↑ 150 tokens)\n❯ \n",
@@ -245,10 +188,6 @@ func TestAmp_ClaudeDetector_UploadArrowNotConvergenceSignal(t *testing.T) {
 	}
 }
 
-// TestAmp_DefaultDetector_LargeFrameNoTimeout verifies that a very large rendered
-// pane (2000+ content lines) does not panic, stack-overflow, or produce out-of-range
-// confidence. No ACS predicate covers large-scale inputs; a naive O(n²) string-scan
-// would degrade severely on panes with accumulated thousands of output lines.
 func TestAmp_DefaultDetector_LargeFrameNoTimeout(t *testing.T) {
 	profile := Profiles["claude"]
 	det := NewDefaultDetector(3)
