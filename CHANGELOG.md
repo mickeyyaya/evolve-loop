@@ -2,6 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
+- The profile runs on the codex family with claude as its fallback, as the other helpers do: the balanced-tier floor (`TestClaudeFamilyFloor`) reserves claude for judgment phases with a justification, and the recovery agent decides nothing. The first ship routed it to claude and the full floor caught it.
 ## Added — the recovery agent's profile and persona (ADR-0106 F3, unwired, 2026-09-26)
 
 - `.evolve/profiles/deliverable-recovery.json` runs sandboxed over a read-only repository with the run directory as its only write grant, so a helper launched without a worktree is wrapped rather than unconfined. It declares no network, but the wrapper forces the network on for every dispatch today (`sandboxPrefixForLaunch`, filed as `sandbox-wrapper-forces-network-on`) and the tmux drivers enforce no tool list (filed as `tmux-drivers-ignore-profile-tool-lists`), so the filesystem grant is the boundary that holds; the test pins the forced-on launch path so it flips when the wrapper honours the declaration; `agents/evolve-deliverable-recovery.md` states the agent's identity and sole-writer fact up front (cycle 1707's TDD agent refused its own task for an hour, taking itself for an intruder) and forbids inventing, editing code, or deciding a verdict. Tests pin that no grant reaches the repository beyond the run dir or any worktree.
