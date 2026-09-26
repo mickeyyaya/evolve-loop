@@ -7,12 +7,6 @@ import (
 	"testing"
 )
 
-// TestTDDPromptDeclaresHandoffSlugs — cycle-1620 salvage (architecture
-// CRITICAL 2): the TDD->Build scope gate reads `slugs[]` from the handoff JSON
-// and a comma-separated `## Task:` header, so the persona that PRODUCES the
-// report must instruct exactly that shape, bound to the `## Task Contract`
-// block's ids. Without this the only reports that pass the multi-member gate
-// are the ones tests author themselves.
 func TestTDDPromptDeclaresHandoffSlugs(t *testing.T) {
 	path := filepath.Join(repoRoot(t), "agents", "evolve-tdd-engineer.md")
 	data, err := os.ReadFile(path)

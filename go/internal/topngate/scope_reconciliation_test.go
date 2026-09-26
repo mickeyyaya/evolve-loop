@@ -1,31 +1,5 @@
 package topngate
 
-// scope_reconciliation_test.go — the red-first contract for inbox item
-// `multi-slug-lane-scope-reconciliation` (cycle-1620).
-//
-// The defect (cycle-1480, batch-20260815c wave-2, recurred cycle-1483). A lane
-// bundled two slugs: `minted-phase-verdict-contract-unsatisfiable` and
-// `dead-api-sweep`. TDD minted a cycle-wide predicate suite covering BOTH; the
-// Builder's deliverable contract bound only the FIRST. Nothing reconciled the
-// two scopes, so the lane ran the full ~12-phase spine and FAILed at audit with
-// slug 2 entirely undelivered. Verbatim audit H1: "TDD minted a cycle-wide
-// predicate suite covering both slugs while the Builder contract bound only the
-// first slug; nothing reconciles the two scopes."
-//
-// The contract these tests freeze. When triage's ## top_n commits TWO OR MORE
-// members, the TDD deliverable's DECLARED member set must EQUAL the committed
-// set; a missing committed member is a CERTAIN scope mismatch and must abort at
-// the TDD->Build boundary with a reason containing the marker `scope-mismatch`
-// and NAMING every omitted member. A one-member commitment keeps today's
-// fail-open / label-drift-advisory behavior exactly (no regression).
-//
-// The declared member set is stated BOTH ways a TDD report can state it — the
-// "## Task:" header (comma-separated when plural) and the "## Handoff to
-// Builder" JSON's slugs[] — so these tests bind to the DECLARATION, never to
-// one syntax. JSON shown inside an OUTER `~~~markdown` example fence is
-// illustration, not declaration, and must never be read as the handoff
-// (recovery review 2026-09-09, the false-accept control).
-
 import (
 	"context"
 	"encoding/json"
@@ -38,14 +12,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// mdFence is the markdown code-fence delimiter. Named because a Go raw string
-// literal cannot contain a backtick.
+// mdFence exists because a raw string literal cannot contain a backtick.
 const mdFence = "```"
 
-// writeScopedTDDReport writes a test-report.md declaring exactly `declared` as
-// its member set, stated in BOTH the "## Task:" header and the handoff JSON's
-// slugs[]. preamble is rendered verbatim between the header and the RED output
-// (the outer-fence false-accept control injects its fake handoff there).
+// writeScopedTDDReport states declared in both the ## Task: header and the
+// handoff slugs[]; preamble goes between the header and the RED output.
 func writeScopedTDDReport(t *testing.T, workspace string, declared []string, preamble string) {
 	t.Helper()
 	handoff, err := json.Marshal(map[string]any{
@@ -81,10 +52,6 @@ func writeScopedTDDReport(t *testing.T, workspace string, declared []string, pre
 	}
 }
 
-// reviewTDD drives the PRODUCTION reviewer at the TDD->Build boundary — the
-// same constructor and stage cmd/evolve/cmd_cycle.go:657 wires into the cycle's
-// reviewer chain (config default TopNGate=StageEnforce). A helper called
-// directly would prove nothing about the shipped path.
 func reviewTDD(t *testing.T, workspace string) core.ReviewResult {
 	t.Helper()
 	return NewReviewer(config.StageEnforce).Review(context.Background(), core.ReviewInput{
@@ -93,8 +60,6 @@ func reviewTDD(t *testing.T, workspace string) core.ReviewResult {
 	})
 }
 
-// TestTDDScopeGate_TwoSlugHandoffOmittingCommittedMemberBlocks is the cycle-1480
-// shape verbatim: two committed members, one declared. Build must not start.
 func TestTDDScopeGate_TwoSlugHandoffOmittingCommittedMemberBlocks(t *testing.T) {
 	ws := t.TempDir()
 	writeTriageReport(t, ws, "minted-phase-verdict-contract-unsatisfiable", "dead-api-sweep")
@@ -110,9 +75,6 @@ func TestTDDScopeGate_TwoSlugHandoffOmittingCommittedMemberBlocks(t *testing.T) 
 	}
 }
 
-// TestTDDScopeGate_TwoSlugCompleteDeclarationProceeds is the anti-no-op control:
-// blocking every multi-member lane would pass the test above and kill the fleet's
-// only legitimate bundling path. A COMPLETE declaration must proceed.
 func TestTDDScopeGate_TwoSlugCompleteDeclarationProceeds(t *testing.T) {
 	ws := t.TempDir()
 	writeTriageReport(t, ws, "minted-phase-verdict-contract-unsatisfiable", "dead-api-sweep")
@@ -123,9 +85,6 @@ func TestTDDScopeGate_TwoSlugCompleteDeclarationProceeds(t *testing.T) {
 	}
 }
 
-// TestTDDScopeGate_TwoSlugDeclarationOrderIsIrrelevant pins SET equality, not
-// list equality: the members are unordered work items, and a gate that keyed on
-// order would false-block correct work (the cycles 916/1012 destruction class).
 func TestTDDScopeGate_TwoSlugDeclarationOrderIsIrrelevant(t *testing.T) {
 	ws := t.TempDir()
 	writeTriageReport(t, ws, "minted-phase-verdict-contract-unsatisfiable", "dead-api-sweep")
@@ -136,9 +95,6 @@ func TestTDDScopeGate_TwoSlugDeclarationOrderIsIrrelevant(t *testing.T) {
 	}
 }
 
-// TestTDDScopeGate_SingleSlugLaneUnaffected is the no-regression control: the
-// overwhelming majority of lanes commit ONE member, and their fail-open /
-// label-drift-advisory behavior must be untouched by the new equality rule.
 func TestTDDScopeGate_SingleSlugLaneUnaffected(t *testing.T) {
 	ws := t.TempDir()
 	writeTriageReport(t, ws, "multi-slug-lane-scope-reconciliation")
@@ -149,8 +105,6 @@ func TestTDDScopeGate_SingleSlugLaneUnaffected(t *testing.T) {
 	}
 }
 
-// TestTDDScopeGate_ThreeSlugPartialDeclarationBlocks is the OOD case: the defect
-// is not specific to N=2. Two of three declared is still an undelivered member.
 func TestTDDScopeGate_ThreeSlugPartialDeclarationBlocks(t *testing.T) {
 	ws := t.TempDir()
 	writeTriageReport(t, ws, "alpha", "beta", "gamma")
@@ -165,10 +119,6 @@ func TestTDDScopeGate_ThreeSlugPartialDeclarationBlocks(t *testing.T) {
 	}
 }
 
-// TestTDDScopeGate_OuterFenceFakeCompleteHandoffStillBlocks is the false-accept
-// control from the 2026-09-09 recovery review. The report DOCUMENTS a complete
-// handoff inside an outer `~~~markdown` example fence while actually declaring
-// one member. Illustration is not declaration: the lane must still block.
 func TestTDDScopeGate_OuterFenceFakeCompleteHandoffStillBlocks(t *testing.T) {
 	ws := t.TempDir()
 	writeTriageReport(t, ws, "minted-phase-verdict-contract-unsatisfiable", "dead-api-sweep")
@@ -193,11 +143,6 @@ func TestTDDScopeGate_OuterFenceFakeCompleteHandoffStillBlocks(t *testing.T) {
 	}
 }
 
-// TestTDDScopeGate_ScopeMismatchIsDeterministic pins the AC's "deterministic
-// check": identical inputs must yield an identical verdict every time. A gate
-// that depends on map iteration order (the committed/declared sets are set
-// comparisons) would report the omitted members in a shuffling order and make
-// the block un-reproducible in the audit trail.
 func TestTDDScopeGate_ScopeMismatchIsDeterministic(t *testing.T) {
 	ws := t.TempDir()
 	writeTriageReport(t, ws, "alpha", "beta", "gamma")
@@ -214,10 +159,6 @@ func TestTDDScopeGate_ScopeMismatchIsDeterministic(t *testing.T) {
 	}
 }
 
-// TestTDDScopeGate_AppliesBeforeBuildNotAfter pins the BOUNDARY the inbox item
-// names: the reconciliation must abort at TDD->Build, not later. Reviewing the
-// build phase's deliverable with the same workspace must not resurrect the
-// TDD-scope block (that would move the abort past the spend it exists to save).
 func TestTDDScopeGate_AppliesBeforeBuildNotAfter(t *testing.T) {
 	ws := t.TempDir()
 	writeTriageReport(t, ws, "minted-phase-verdict-contract-unsatisfiable", "dead-api-sweep")
