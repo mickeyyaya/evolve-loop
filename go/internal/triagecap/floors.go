@@ -12,19 +12,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolve-loop/go/internal/triagedecision"
 )
-
-// init rejects an empty phasecontract.Triage.Sections. Package vars initialize before
-// init, so topNHeadingRE's index expression would panic first.
-func init() {
-	if len(phasecontract.Triage.Sections) == 0 {
-		panic("triagecap: phasecontract.Triage has no sections — topNHeadingRE cannot be constructed")
-	}
-}
-
-// topNHeadingRE anchors on phasecontract.Triage's canonical heading, the one the triage classifier uses.
-var topNHeadingRE = regexp.MustCompile(`(?m)^` + regexp.QuoteMeta(phasecontract.Triage.Sections[0].Canonical) + `\b`)
 
 var nextHeadingRE = regexp.MustCompile(`(?m)^## `)
 
@@ -229,8 +218,10 @@ func proseFloorPackages(artifact string, knownPkgs []string) map[string]bool {
 	return seen
 }
 
+// topNSection reads the report's top_n bucket through the one parser; TestTopNHeadingIsTheContracts pins the
+// heading to phasecontract.Triage.
 func topNSection(artifact string) (string, bool) {
-	return sectionBody(artifact, topNHeadingRE)
+	return triagedecision.SectionBody(artifact, "top_n")
 }
 
 // tokenRE keeps hyphens inside tokens, so a slug like "fake-config" is not a mention of package config.
@@ -240,15 +231,9 @@ var tokenRE = regexp.MustCompile(`[A-Za-z0-9_-]+`)
 // defer_reason= goes to end of line because it names other work; the evidence= value stays because it names real packages.
 var metadataFieldRE = regexp.MustCompile(`\bdefer_reason=[^\n]*|\b(?:source|priority)=\S+|\bevidence=`)
 
-// filesFieldRE finds only the start of a files= field; splitDeclaredFiles delimits its value.
-var filesFieldRE = regexp.MustCompile(`\bfiles\s*[=:]\s*`)
-
-// nextMetadataFieldRE ends a files= value at the next ", key=" field, which lets the value itself contain commas.
-var nextMetadataFieldRE = regexp.MustCompile(`,\s*[A-Za-z_][A-Za-z0-9_]*=`)
-
 // floorItem removes the declared footprint; every floor scan goes through it, because a footprint is never a floor.
 func floorItem(item string) string {
-	_, stripped := splitDeclaredFiles(item)
+	_, stripped := triagedecision.SplitDeclaredFiles(item)
 	return stripped
 }
 

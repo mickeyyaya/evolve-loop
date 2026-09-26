@@ -11,6 +11,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/triagedecision"
 )
 
 // cardFilesReport's first top_n item declares its footprint; the second names a path in prose only.
@@ -197,11 +198,11 @@ func TestSplitDeclaredFiles_ToleratesTheSpellingsAgentsWrite(t *testing.T) {
 		"do it — files=go/internal/core/a.go, files=go/internal/bridge/b.go, source=scout",
 		"do it — priority=H, files=go/internal/core/a.go go/internal/bridge/b.go",
 	} {
-		got := filesOf(rest)
+		got := triagedecision.FilesOf(rest)
 		if len(got) != 2 || got[0] != want[0] || got[1] != want[1] {
-			t.Errorf("filesOf(%q) = %v, want %v", rest, got, want)
+			t.Errorf("FilesOf(%q) = %v, want %v", rest, got, want)
 		}
-		if _, stripped := splitDeclaredFiles(rest); strings.Contains(stripped, "/a.go") || strings.Contains(stripped, "/b.go") {
+		if _, stripped := triagedecision.SplitDeclaredFiles(rest); strings.Contains(stripped, "/a.go") || strings.Contains(stripped, "/b.go") {
 			t.Errorf("stripped item %q still carries a declared path — the floor scanners would read it as a package mention", stripped)
 		}
 	}
