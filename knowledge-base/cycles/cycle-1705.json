@@ -1,0 +1,196 @@
+{
+  "schema_version": 2,
+  "cycle": 1705,
+  "run_id": "01M3EFKM5M6NWYXGVM6MB9NM8E",
+  "goal": "Pipeline-health verification, wave 12 (2026-09-26, on main 5806b56b). Work the highest-weight lane-eligible inbox items end-to-end — claim, tdd, build, audit, ship — with full phase integrity, on the fixed plane. That includes everything waves 3–11 verified, the #647 train, and (#648) a worktree ship binding its own tree: plane bookkeeping (the inbox queue) no longer sends a passed audit back to re-audit. The train:\n- routing never sends a lane work its builder's sandbox forbids (cycles 1696/1699): the floor judges protected surface OR the build profile's enforced sandbox deny list;\n- a lane's EVOLVE_CYCLE_STATE_FILE override applies only inside its own evolve dir (cycle 1700), so tests a lane runs can no longer overwrite its live cycle state;\n- the guards judge the clean path, and an `evolve ship` allows only itself — each simple command in a Bash line is judged on its own; the never-denying research quota guard is gone;\n- code comments follow docs/conventions/code-comments.md: code explains itself, knowledge goes to docs/architecture/packages/\u003cdir\u003e.md.\n\nEvery cycle must:\n- commit to a claimed inbox item (an empty top_n must not run the spine);\n- bind its audit to the changes tree it ships;\n- disposition the cycle's OWN defect ledger as well as inherited ids;\n- record a terminal outcome on every exit;\n- never modify a protected control-plane file by any tool;\n- leave no stale worktree behind.\n\nPipeline-integrity items and items whose fix surface is protected are console-owned, not lane work. ADR-0099 document deliverables are eligible. The measure of this wave is consecutive shipped cycles: 1701, 1703 and 1702 shipped, so the streak stands at three.",
+  "final_verdict": "FAIL",
+  "tasks": [
+    "fleet-pool-test-wallclock-flake"
+  ],
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 78781,
+      "started_at": "2026-09-26T09:09:49Z",
+      "ended_at": "2026-09-26T09:11:09Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 12,
+        "output": 4744,
+        "cache_read": 356606,
+        "cache_write": 77084
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 57713,
+      "started_at": "2026-09-26T09:11:40Z",
+      "ended_at": "2026-09-26T09:12:40Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 10,
+        "output": 2666,
+        "cache_read": 347338,
+        "cache_write": 30071
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 867866,
+      "started_at": "2026-09-26T09:12:40Z",
+      "ended_at": "2026-09-26T09:27:08Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 78,
+        "output": 78814,
+        "cache_read": 5030798,
+        "cache_write": 153808
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 95701,
+      "started_at": "2026-09-26T09:27:08Z",
+      "ended_at": "2026-09-26T09:36:43Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 30,
+        "output": 7892,
+        "cache_read": 1024472,
+        "cache_write": 45187
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "FAIL",
+      "duration_ms": 284328,
+      "started_at": "2026-09-26T09:37:20Z",
+      "ended_at": "2026-09-26T09:44:00Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 60,
+        "output": 21991,
+        "cache_read": 2878611,
+        "cache_write": 88282
+      }
+    },
+    {
+      "name": "retro",
+      "verdict": "PASS",
+      "duration_ms": 150971,
+      "started_at": "2026-09-26T09:44:32Z",
+      "ended_at": "2026-09-26T09:47:04Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 30,
+        "output": 14257,
+        "cache_read": 1098794,
+        "cache_write": 56569
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "failure": {
+    "fingerprint": "audit|gate-block|ef56bba92cc2",
+    "pre_class": "gate-block",
+    "reasons": [
+      "host predicate execution: predicate execution tree includes undeclared inputs absent from the ship tree; explicitly stage intended Build files or remove the inputs, then re-run Audit",
+      "acs-verdict.json: read: open /Users/danleemh/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-1705/acs-verdict.json: no such file or directory",
+      "verdict-conflict: auditor narrative=PASS but 2 deterministic gate(s) forced FAIL [host predicate execution, EGPS acs-verdict.json unreadable] — the gate outranks the narrative (ship policy unchanged"
+    ]
+  },
+  "system_failure": {
+    "category": "infra-systemic",
+    "level": "system",
+    "evidence": "orchestrator-classified infra-systemic: failure-dossier.json recorded_verdict=FAIL with audit_declared={}; audit-report.md narrative PASS 0.9; audit-chain-shadow.json chain_verdict=PASS overrode_by=[host predicate execution, EGPS acs-verdict.json unreadable]; audit-fail-reason.json reason[0] is the predicate_authority.go:43 tree-fence refusal; the only untracked non-ignored worktree path is docs/private/research/archived-2026-09-26/cycle-1705-01m3efkm5m6nwyxgvm6mb9nm8e.md, created because guard:docdelete denied delete and move-out (build-stderr.log:106,112) and its deny message prescribes that archive home",
+    "halt": true
+  },
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 1705",
+      "priority": "high"
+    }
+  ],
+  "timing": {
+    "total_ms": 1535360,
+    "phase_count": 6,
+    "retried_count": 0,
+    "longest_phase": "tdd",
+    "longest_ms": 867866,
+    "by_archetype_ms": {
+      "build": 95701,
+      "control": 150971,
+      "evaluate": 284328,
+      "plan": 1004360
+    },
+    "total_tokens": {
+      "input": 220,
+      "output": 130364,
+      "cache_read": 10736619,
+      "cache_write": 451001
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 30,
+        "output": 7892,
+        "cache_read": 1024472,
+        "cache_write": 45187
+      },
+      "control": {
+        "input": 30,
+        "output": 14257,
+        "cache_read": 1098794,
+        "cache_write": 56569
+      },
+      "evaluate": {
+        "input": 60,
+        "output": 21991,
+        "cache_read": 2878611,
+        "cache_write": 88282
+      },
+      "plan": {
+        "input": 100,
+        "output": 86224,
+        "cache_read": 5734742,
+        "cache_write": 260963
+      }
+    },
+    "wasted_tokens": {
+      "input": 60,
+      "output": 21991,
+      "cache_read": 2878611,
+      "cache_write": 88282
+    },
+    "cache_hit_ratio": 0.9999795097979954,
+    "hot_phase_count": 5,
+    "hot_phases": [
+      "scout",
+      "triage",
+      "tdd",
+      "build",
+      "audit"
+    ]
+  }
+}
