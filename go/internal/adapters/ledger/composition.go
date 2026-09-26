@@ -23,6 +23,9 @@ const TrivialRebaseMethod = "trivial-rebase"
 // ScopedReviewMethod is the RUNG 2 method, recorded when a scoped merge review resolved an overlapping change.
 const ScopedReviewMethod = "scoped-review"
 
+// IdenticalRebaseMethod is the ADR-0105 B3 method: a byte-identical rebase carrying the verdict of the audited tree it names.
+const IdenticalRebaseMethod = "identical-rebase"
+
 // compositionFields is the kernel-recomputable subset of a composition-verdict line.
 type compositionFields struct {
 	PatchID          string `json:"patch_id"`
@@ -47,17 +50,18 @@ func PatchID(diff []byte) (string, error) {
 
 // CompositionVerdictInput is what a caller supplies to persist a composition verdict; the writer trusts none of it.
 type CompositionVerdictInput struct {
-	Cycle        int
-	Method       string            // composition method; blank defaults to TrivialRebaseMethod (RUNG 0)
-	LaneAuditRef string            // artifact_sha256 of the bound auditor entry
-	PatchID      string            // caller-claimed patch-id of the change
-	AuditedBase  string            // git HEAD the audit originally bound
-	GitHead      string            // composed HEAD the verdict carries forward to
-	TreeStateSHA string            // composed tree state the gates ran on
-	GateResults  map[string]string // must record "pass" for every required composed gate
-	AuditedDiff  []byte            // unified diff the audit reviewed
-	ComposedDiff []byte            // unified diff of the composed (rebased) tree
-	ArtifactDir  string            // directory the two diff artifacts persist under
+	Cycle          int
+	Method         string            // composition method; blank defaults to TrivialRebaseMethod (RUNG 0)
+	LaneAuditRef   string            // artifact_sha256 of the bound auditor entry
+	PatchID        string            // caller-claimed patch-id of the change
+	AuditedBase    string            // git HEAD the audit originally bound
+	GitHead        string            // composed HEAD the verdict carries forward to
+	TreeStateSHA   string            // composed tree state the gates ran on
+	AuditedTreeSHA string            // the audited changes tree the carry binds (identical-rebase only)
+	GateResults    map[string]string // must record "pass" for every required composed gate
+	AuditedDiff    []byte            // unified diff the audit reviewed
+	ComposedDiff   []byte            // unified diff of the composed (rebased) tree
+	ArtifactDir    string            // directory the two diff artifacts persist under
 }
 
 // compositionRecord is the on-disk line: the union of ship's compositionEntry and compositionFields,
@@ -72,6 +76,7 @@ type compositionRecord struct {
 	AuditedBase      string            `json:"audited_base"`
 	GitHead          string            `json:"git_head"`
 	TreeStateSHA     string            `json:"tree_state_sha"`
+	AuditedTreeSHA   string            `json:"audited_tree_sha,omitempty"`
 	GateResults      map[string]string `json:"gate_results"`
 	AuditedDiffPath  string            `json:"audited_diff_path"`
 	ComposedDiffPath string            `json:"composed_diff_path"`
@@ -137,6 +142,7 @@ func WriteCompositionVerdict(ledgerPath string, in CompositionVerdictInput) erro
 		AuditedBase:      in.AuditedBase,
 		GitHead:          in.GitHead,
 		TreeStateSHA:     in.TreeStateSHA,
+		AuditedTreeSHA:   in.AuditedTreeSHA,
 		GateResults:      in.GateResults,
 		AuditedDiffPath:  auditedPath,
 		ComposedDiffPath: composedPath,
@@ -176,4 +182,47 @@ func verifyCompositionLine(i int, line []byte) error {
 		}
 	}
 	return nil
+}
+
+// CompositionVerdict is one carry record as ship reads it back; the diffs stay on disk at the recorded paths.
+type CompositionVerdict struct {
+	Cycle            int
+	Method           string
+	LaneAuditRef     string
+	PatchID          string
+	AuditedBase      string
+	GitHead          string
+	TreeStateSHA     string
+	AuditedTreeSHA   string
+	GateResults      map[string]string
+	AuditedDiffPath  string
+	ComposedDiffPath string
+}
+
+// LatestCompositionVerdict returns the newest carry record of method for the audit laneAuditRef names;
+// an absent ledger or no such record is simply no carry.
+func LatestCompositionVerdict(ledgerPath, method, laneAuditRef string) (CompositionVerdict, bool, error) {
+	body, err := os.ReadFile(ledgerPath)
+	if os.IsNotExist(err) {
+		return CompositionVerdict{}, false, nil
+	}
+	if err != nil {
+		return CompositionVerdict{}, false, err
+	}
+	var latest CompositionVerdict
+	found := false
+	for _, line := range bytes.Split(body, []byte("\n")) {
+		if len(bytes.TrimSpace(line)) == 0 {
+			continue
+		}
+		var rec compositionRecord
+		if json.Unmarshal(line, &rec) != nil || rec.Kind != CompositionVerdictKind || rec.Method != method || rec.LaneAuditRef != laneAuditRef {
+			continue
+		}
+		latest = CompositionVerdict{Cycle: rec.Cycle, Method: rec.Method, LaneAuditRef: rec.LaneAuditRef, PatchID: rec.PatchID,
+			AuditedBase: rec.AuditedBase, GitHead: rec.GitHead, TreeStateSHA: rec.TreeStateSHA, AuditedTreeSHA: rec.AuditedTreeSHA,
+			GateResults: rec.GateResults, AuditedDiffPath: rec.AuditedDiffPath, ComposedDiffPath: rec.ComposedDiffPath}
+		found = true
+	}
+	return latest, found, nil
 }

@@ -34,3 +34,14 @@ func TestTrivialRebaseMethod_WriterReaderContract(t *testing.T) {
 		t.Errorf("TrivialRebaseMethod = %q, want %q", TrivialRebaseMethod, "trivial-rebase")
 	}
 }
+
+func TestAPI_IdenticalRebaseCarryIsNamed(t *testing.T) {
+	var (
+		_ string                                                         = IdenticalRebaseMethod
+		_ func(string, string, string) (CompositionVerdict, bool, error) = LatestCompositionVerdict
+		_ CompositionVerdict
+	)
+	if IdenticalRebaseMethod != "identical-rebase" {
+		t.Errorf("IdenticalRebaseMethod = %q", IdenticalRebaseMethod)
+	}
+}
