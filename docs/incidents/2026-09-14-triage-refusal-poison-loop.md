@@ -49,6 +49,17 @@ Why route rather than count: a protected-surface refusal is deterministic — th
 
 One WARN names the item, the surface and the disposition; the item carries `route`, `routed_reason`, `routed_cycle`, `routed_at`; no lane draws it again; the console worklist shows it under `route:console-manual`.
 
+## Superseded on the verdict (2026-09-27, ADR-0106 R1)
+
+Cycle 1714 (wave 16) met the same shape on an item with no declared files and paid the same price: a FAIL verdict for a routing fact. The breaker above stays, but the decision moved one step earlier, into the host's hands: the classify hook now moves every card that names a protected surface out of `top_n` into `escalate_block` with the reason `protected-surface: <path> — …` and returns PASS with one warning per card; an emptied `top_n` is the planned no-work end and the no-work closeout (`ApplyNoWork`) routes the item with that reason, while other cards continue the cycle. What the operator sees now:
+
+```
+[orchestrator] phase.outcome … cycle=N phase=triage … verdict=PASS diagnostic_codes=TRIAGE_PROTECTED_SURFACE   (a warning, not a refusal)
+[inbox]        inbox.warning WARN INBOX_ITEM_ROUTED_CONSOLE cycle=N origin=Mover.RouteConsole — route-console: '<id>' is now console-manual — lane triage (cycle N) escalate_block: protected-surface: <path> …
+```
+
+The failure path in the table above now handles only the fail-closed case (a route the host could not record, which still seals FAIL with the code). Design: [logic-first-delivery-design.md](../architecture/logic-first-delivery-design.md) §5.7.
+
 ## Mitigation applied on the plane before the fix landed
 
 `2026-07-30T13-04-00Z-verdict-sentinel-as-tool-call.json` was routed `console-manual` by hand (with the same reason) so the running wave stopped drawing it.

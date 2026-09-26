@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — a top_n card on a protected surface is routed by the host, never the cycle's FAIL (ADR-0106 R1, R2, 2026-09-27)
+
+- Cycle 1714 (wave 16) was pinned to an inbox item with no declared files; its triage named `go/internal/core/orchestrator.go`, the classify hook refused the report with `TRIAGE_PROTECTED_SURFACE`, the cycle sealed FAIL after two phases and the failure path routed the item to the console. The hook now moves every such card out of `top_n` into `escalate_block` with the reason `protected-surface: <path> — control-plane changes go through the console route (operator-gated), not lane top_n` and returns PASS with one warning per card; an emptied `top_n` is the planned no-work end and the no-work closeout routes the item with that reason, while other cards continue the cycle. A route that cannot be recorded fails closed. The triage prompt now lists the protected surfaces (`guards.ProtectedSurfaceManifest`) and the drop reason, and the persona carries the rule. Design: `docs/architecture/logic-first-delivery-design.md` §5.7 and §7.8.
+
 ## Fixed — an inbox lifecycle record is non-material to the explanation document (ADR-0106 X1, 2026-09-27)
 
 - Cycle 1712 sealed FAIL with its code verified (ACS 10/10, EGPS red 0, a mutation probe): the build floor had demanded that the explanation document describe `.evolve/inbox/…-lineage-datestamp-normalization.json` (twelve corrections across 1707, 1708 and 1712), the builder wrote "content unchanged" for the item it moved to `consumed/`, the ship's in-commit consumption stamped the file, and the auditor's review found the sentence contradicted. `.evolve/inbox/` joins `nonMaterialPrefixes`: the host claims, moves, stamps and retires those records, so neither the floor nor the auditor asks the builder to explain them.

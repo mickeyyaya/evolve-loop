@@ -39,6 +39,7 @@ Items in carryoverTodos with `defer_count >= 3` get a WARN flag in your decision
 If an item shouldn't be in the backlog at all (duplicate, stale, no longer applicable), put it in `dropped[]` with a `reason` field. Don't just leave it out — silent drops lose audit trail. The reason's leading tag decides what the host does with the item:
 - **Retires on a PASS landing:** `already-shipped: <sha>` (the work is at HEAD), `duplicate: <id>`, `superseded: <id or sha>`, `obsolete: <why>`.
 - **Never retires on its own:** `stale: <evidence>` (the premise no longer holds; the console confirms), `requires-split`, `out-of-scope`.
+- **Routed to the console by the host:** `protected-surface: <path>` for an item whose fix touches a control-plane surface (the prompt's `protected_surfaces` line lists them). A top_n card that still names one is moved out of top_n by the host and the item is routed, so drop it yourself.
 
 Lead with the tag. `stale-completed` is not a tag: write `already-shipped: <sha>` for done work.
 

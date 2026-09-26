@@ -259,7 +259,19 @@ func inboxBatchesSection(projectRoot string, forbidden func(string) bool) string
 		fmt.Fprintf(&sect, "- console_routed_excluded: %d operator-owned item(s) NOT selectable (route, pipeline-* kind, or protected fix surface; the claim floor refuses them): %s\n",
 			len(console), strings.Join(ids, ", "))
 	}
+	fmt.Fprintf(&sect, "- protected_surfaces: a top_n card must not name a path under a control-plane surface; drop such an item with reason "+
+		"`protected-surface: <path>` (the host routes it to the console, and moves a card that still names one out of top_n): %s\n",
+		strings.Join(protectedSurfaceFragments(), ", "))
 	return sect.String()
+}
+
+// protectedSurfaceFragments lists the manifest's fragments as the prompt names them.
+func protectedSurfaceFragments() []string {
+	out := make([]string, 0, len(guards.ProtectedSurfaceManifest))
+	for _, e := range guards.ProtectedSurfaceManifest {
+		out = append(out, e.Fragment)
+	}
+	return out
 }
 
 func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeResponse) (string, []core.Diagnostic, string) {
@@ -291,15 +303,17 @@ func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRes
 	}
 	// The prompt partition sees only inbox items, but a top_n card can come from the scout or a
 	// fleet todo, so every card's files are judged again here with the lane predicate.
-	if id, path, hit := protectedTopNViolation(body, h.forbidden); hit {
-		return core.VerdictFAIL, []core.Diagnostic{{
-			Severity: "error",
-			Message: fmt.Sprintf(
-				"top_n card %q names protected surface %q — control-plane changes go through the console route (operator-gated), not lane top_n",
-				id, path),
-			Code:    cyclestate.DiagCodeTriageProtectedSurface,
-			Subject: id,
-		}}, string(core.PhaseTDD)
+	if cards := protectedTopNCards(body, h.forbidden); len(cards) > 0 {
+		if err := routeProtectedCards(filepath.Join(req.Workspace, "triage-decision.json"), cards); err != nil {
+			return core.VerdictFAIL, []core.Diagnostic{{
+				Severity: cyclestate.SeverityError,
+				Message: fmt.Sprintf("top_n card %q names protected surface %q and its console route could not be recorded: %v",
+					cards[0].ID, cards[0].Path, err),
+				Code:    cyclestate.DiagCodeTriageProtectedSurface,
+				Subject: cards[0].ID,
+			}}, string(core.PhaseTDD)
+		}
+		diags = append(diags, routedCardDiagnostics(cards)...)
 	}
 	unifiedDiags, err := processUnifiedCommitment(req)
 	if err != nil {
@@ -309,7 +323,7 @@ func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRes
 			Code:     cyclestate.DiagCodeTriageCommitmentInvalid,
 		}}, string(core.PhaseTDD)
 	}
-	return core.VerdictPASS, unifiedDiags, string(core.PhaseTDD)
+	return core.VerdictPASS, append(diags, unifiedDiags...), string(core.PhaseTDD)
 }
 
 // topNSectionBody returns the ## top_n section content (everything after the
@@ -336,45 +350,6 @@ var topNItemIDRE = regexp.MustCompile(`(?m)^[-*]\s+([^:\n]+):`)
 // delimited encoding inboxbatch.RenderMarkdown emits (files={a;b;c}) or the
 // bare, comma-terminated encoding real cycle output also uses (files=a;b;c).
 var filesFieldRE = regexp.MustCompile(`files=(?:\{([^}]*)\}|([^,\n]*))`)
-
-// protectedTopNViolation scans body (a ## top_n section's content) line by
-// line for the first list item whose files= segment names a lane-forbidden path, judged by
-// forbidden, or by manifest membership when forbidden is nil. Only the first hit is reported:
-// one violation fails the whole artifact.
-func protectedTopNViolation(body string, forbidden func(string) bool) (id, path string, ok bool) {
-	if forbidden == nil {
-		forbidden = guards.IsProtectedSurface
-	}
-	for _, line := range strings.Split(body, "\n") {
-		if !listItemRE.MatchString(line) {
-			continue
-		}
-		filesMatch := filesFieldRE.FindStringSubmatch(line)
-		if filesMatch == nil {
-			continue
-		}
-		filesRaw := filesMatch[1]
-		if filesRaw == "" {
-			filesRaw = filesMatch[2]
-		}
-		for _, f := range strings.Split(filesRaw, ";") {
-			f = strings.TrimSpace(f)
-			// Strip a trailing "(note)" annotation, e.g. "role.go (allowance)".
-			if idx := strings.Index(f, "("); idx >= 0 {
-				f = strings.TrimSpace(f[:idx])
-			}
-			if f == "" || !forbidden(f) {
-				continue
-			}
-			cardID := ""
-			if idMatch := topNItemIDRE.FindStringSubmatch(line); idMatch != nil {
-				cardID = strings.TrimSpace(idMatch[1])
-			}
-			return cardID, f, true
-		}
-	}
-	return "", "", false
-}
 
 // Config holds the dependencies for constructing a triage Phase: the bridge
 // used to dispatch the agent, the prompt loader, an optional clock, and the

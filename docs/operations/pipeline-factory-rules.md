@@ -67,7 +67,7 @@ Failures are *routed*, never fatal to the queue: a task-level FAIL classifies, l
 |---|---|---|
 | build-fail · audit-fail · ship-gate-config | the item | `failure_count` bump; quarantine at the ceiling (ADR-0072 S5) |
 | phase-refusal (coded, e.g. `TRIAGE_TOPN_EMPTY`) | the item | bump toward the ceiling — the gate said the work was malformed |
-| phase-refusal `TRIAGE_PROTECTED_SURFACE` | the operator | routed console-manual on the first hit; the cycle's other items released untouched |
+| phase-refusal `TRIAGE_PROTECTED_SURFACE` | the operator | since ADR-0106 R1 (2026-09-27) the host moves the card into `escalate_block` and the planned no-work closeout routes the item console-manual on the first hit; the cycle's other cards continue and the cycle is never a FAIL for it (the failure-path route remains for the fail-closed case) |
 | phase-refusal `TRIAGE_COMMITMENT_INVALID` (I/O fault) · infrastructure · integrity-breach · exit-transport-hang | the pipeline | no bump; recurring fingerprints and guard aborts halt at policy ceilings; P0 auto-filed |
 
 Where whose-fault lives: `cyclestate.RefusalDisposition` (the table beside the refusal vocabulary) and `cycleoutcome.IsTaskLevelResult`.
