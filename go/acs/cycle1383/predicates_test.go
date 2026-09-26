@@ -168,9 +168,9 @@ func TestC1383_005_ProtectedSurfaceAdmissionStillEnforced(t *testing.T) {
 	// a renamed or deleted case must show up as a missing PASS, not silently
 	// drop out of a fuzzy pattern.
 	pattern := "TestTriageClassify_(" + strings.Join([]string{
-		"RejectsProtectedSurfaceTopNCard_BraceSyntax",
-		"RejectsProtectedSurfaceTopNCard_BareSyntax",
-		"RejectsAmongMultipleCards_NamesOffendingIdOnly",
+		"RoutesProtectedSurfaceTopNCard_BraceSyntax",
+		"RoutesProtectedSurfaceTopNCard_BareSyntax",
+		"RoutesAmongMultipleCards_NamesOffendingIdOnly",
 		"AllowsNonProtectedTopNCard",
 		"NoFilesSegmentIsUnaffected",
 	}, "|") + ")$"
