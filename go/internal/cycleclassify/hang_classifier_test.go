@@ -6,8 +6,7 @@ import (
 	"testing"
 )
 
-// setHangClassifierForTest swaps hangClassifierFn for the duration of a test
-// and restores it via t.Cleanup. NOT t.Parallel-safe.
+// setHangClassifierForTest swaps the package-level hangClassifierFn, so callers cannot run in parallel.
 func setHangClassifierForTest(t *testing.T, enabled bool) {
 	t.Helper()
 	prev := hangClassifierFn
@@ -15,12 +14,8 @@ func setHangClassifierForTest(t *testing.T, enabled bool) {
 	t.Cleanup(func() { hangClassifierFn = prev })
 }
 
-// TestSetHangClassifier_WiresToggleFromPolicy verifies the exported policy setter
-// actually controls the hang-classifier gate Classify reads. flag-campaign-7
-// replaced the EVOLVE_HANG_CLASSIFIER env read with this setter (env -> policy.json),
-// so the setter — not an os.Getenv — is now the production wiring point.
 func TestSetHangClassifier_WiresToggleFromPolicy(t *testing.T) {
-	// NOT t.Parallel — mutates package-level hangClassifierFn.
+	// Not parallel: mutates the package-level hangClassifierFn.
 	prev := hangClassifierFn
 	t.Cleanup(func() { hangClassifierFn = prev })
 
@@ -34,11 +29,8 @@ func TestSetHangClassifier_WiresToggleFromPolicy(t *testing.T) {
 	}
 }
 
-// TestClassify_HangClassifier_ReclassifiesSHIPPED covers Gap #6: when the
-// hang-classifier is enabled, a SHIPPED-verdict report + matching git log
-// entry should reclassify integrity-breach as exit-transport-hang.
 func TestClassify_HangClassifier_ReclassifiesSHIPPED(t *testing.T) {
-	// NOT t.Parallel — mutates package-level gitLogFn + hangClassifierFn.
+	// Not parallel: mutates the package-level gitLogFn and hangClassifierFn.
 	setHangClassifierForTest(t, true)
 	prev := gitLogFn
 	defer func() { gitLogFn = prev }()
@@ -68,7 +60,7 @@ func TestClassify_HangClassifier_NoCommitFalsePositive(t *testing.T) {
 	setHangClassifierForTest(t, true)
 	prev := gitLogFn
 	defer func() { gitLogFn = prev }()
-	gitLogFn = func(string) bool { return false } // no matching commit
+	gitLogFn = func(string) bool { return false }
 
 	parent := t.TempDir()
 	ws := filepath.Join(parent, "cycle-43")
@@ -77,15 +69,13 @@ func TestClassify_HangClassifier_NoCommitFalsePositive(t *testing.T) {
 	_ = os.WriteFile(filepath.Join(ws, "orchestrator-report.md"), []byte(report), 0o644)
 
 	r := Classify(ws)
-	// Without git commit, SHIPPED alone doesn't reclassify — falls to
-	// integrity-breach (no other markers).
 	if r.Class != ClassIntegrityBreach {
 		t.Fatalf("got %q want integrity-breach (no commit → no reclassify)", r.Class)
 	}
 }
 
 func TestClassify_HangClassifier_DisabledByDefault(t *testing.T) {
-	setHangClassifierForTest(t, false) // explicitly off
+	setHangClassifierForTest(t, false) // pins the disabled branch; the package default is also off
 	prev := gitLogFn
 	defer func() { gitLogFn = prev }()
 	gitLogFn = func(string) bool { return true } // would match if checked
@@ -111,14 +101,11 @@ func TestClassify_HangClassifier_NonShippedNoReclassify(t *testing.T) {
 	parent := t.TempDir()
 	ws := filepath.Join(parent, "cycle-45")
 	_ = os.MkdirAll(ws, 0o755)
-	// Report has Verdict block but says FAILED on the SAME line so
-	// audit-fail regex (line-by-line) matches first. Confirms hang
-	// classifier doesn't override stronger classifications.
+	// FAILED sits on the Verdict line itself so the line-by-line audit-fail regex matches first.
 	report := "Verdict: FAILED — auditor rejected\n"
 	_ = os.WriteFile(filepath.Join(ws, "orchestrator-report.md"), []byte(report), 0o644)
 
 	r := Classify(ws)
-	// FAILED → audit-fail regex matches first (Verdict.*FAIL).
 	if r.Class != ClassAuditFail {
 		t.Fatalf("got %q want audit-fail (not exit-transport-hang)", r.Class)
 	}
@@ -130,7 +117,6 @@ func TestClassify_HangClassifier_BadWorkspacePath(t *testing.T) {
 	defer func() { gitLogFn = prev }()
 	gitLogFn = func(string) bool { return true }
 
-	// Workspace name doesn't follow cycle-N convention.
 	parent := t.TempDir()
 	ws := filepath.Join(parent, "not-a-cycle-dir")
 	_ = os.MkdirAll(ws, 0o755)

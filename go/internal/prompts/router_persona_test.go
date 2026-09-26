@@ -9,16 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// router_persona_test.go — RED contract for cycle-420 task router-persona-tsc-compress.
-//
-// RED state (before builder):
-//   - evolve-router.md has no "<!-- TSC applied" marker (TSC=0)
-//   - prose region (frontmatter-end → "## Phase Catalog — Core Values") is 6169 bytes
-//     (want < 5243, i.e. ≥15% reduction)
-//   - catalog section (7988 bytes) must remain byte-identical
-
-// routerContent reads evolve-router.md and returns raw bytes and body string.
-// Reuses the package-level repoRoot from realdoc_strip_test.go.
 func routerContent(t *testing.T) (raw []byte, body string) {
 	t.Helper()
 	root := repoRoot(t)
@@ -30,14 +20,8 @@ func routerContent(t *testing.T) (raw []byte, body string) {
 	return raw, string(raw)
 }
 
-// routerProseBytes returns the byte length of the PROSE region in
-// evolve-router.md: from the end of the YAML frontmatter block to (not
-// including) the "## Phase Catalog — Core Values" heading, MINUS the generated
-// goal-recipes table between the GENERATED markers. The table is a projection
-// of phase-registry.json:config.goal_recipes (locked by
-// router.TestRouterPersonaRecipeTable_NoDrift), so it grows with the catalog by
-// design and is not prose TSC governs — counting it made the pin fail on the
-// first new recipe row (ADR-0099, 2026-09-09: main sat 4 bytes under the cap).
+// routerProseBytes measures the body above the catalog heading minus the generated goal-recipes
+// table, which is a registry projection that grows with the catalog, not prose TSC governs.
 func routerProseBytes(t *testing.T, body string) int {
 	t.Helper()
 	const fmDelim = "---\n"
@@ -63,8 +47,6 @@ func routerProseBytes(t *testing.T, body string) int {
 	return len([]byte(region)) - len([]byte(region[gb:ge+len(genEnd)]))
 }
 
-// routerCatalogBytes returns the byte length of the "## Phase Catalog — Core Values"
-// section (from the heading to the next "## " heading or EOF).
 func routerCatalogBytes(t *testing.T, body string) int {
 	t.Helper()
 	const heading = "## Phase Catalog — Core Values"
@@ -80,14 +62,6 @@ func routerCatalogBytes(t *testing.T, body string) int {
 	return len([]byte(section))
 }
 
-// TestRouterPersona_TSCMarkerPresent asserts that evolve-router.md carries the
-// "<!-- TSC applied" marker, matching scout/builder/auditor.
-//
-// AC1 — router-persona-tsc-compress.
-//
-// RED baseline: evolve-router.md has no TSC marker (TSC=0 per scout-report.md).
-// Builder must add "<!-- TSC applied — see knowledge-base/research/tsc-prompt-compression-2026.md -->"
-// (or similar form matching the pattern) at the top of the persona body.
 func TestRouterPersona_TSCMarkerPresent(t *testing.T) {
 	_, body := routerContent(t)
 	if !strings.Contains(body, "<!-- TSC applied") {
@@ -97,23 +71,12 @@ func TestRouterPersona_TSCMarkerPresent(t *testing.T) {
 	}
 }
 
-// TestRouterPersona_ProseRegionByteReduction asserts that the prose region of
-// evolve-router.md (from end of frontmatter to the Phase Catalog heading,
-// excluding the generated goal-recipes table) stays strictly under the
-// anti-bloat ceiling.
-//
-// AC2 — router-persona-tsc-compress. The original pin was <5243 bytes over a
-// region that INCLUDED the generated table (≥15% below the 6169-byte pre-TSC
-// baseline). Re-baselined 2026-09-09 (ADR-0099): the table is registry-projected
-// config, so the pin now measures prose only — 2349 bytes on main at the
-// re-baseline; the ceiling is a deliberate anti-bloat bound (~+28%) so a
-// regrowth wave still fails here while a legitimate sentence and recipe rows
-// never do (the old pin died at +4 bytes).
+// Despite the name, this pins an anti-bloat ceiling on the prose region, not a reduction.
 func TestRouterPersona_ProseRegionByteReduction(t *testing.T) {
 	_, body := routerContent(t)
 	got := routerProseBytes(t, body)
-	const baselineBytes = 2349 // prose-only size on main, 2026-09-09
-	const maxBytes = 3000      // deliberate anti-bloat ceiling (~+28% over the re-baseline) — headroom for legitimate edits, still fails on a regrowth wave
+	const baselineBytes = 2349 // prose-only size at the re-baseline
+	const maxBytes = 3000      // room for real edits; still fails on a regrowth wave
 	if got >= maxBytes {
 		t.Errorf("RED: prose region (excluding the generated recipe table) is %d bytes (want <%d, re-baseline=%d).\n"+
 			"Apply TSC to the prose sections (## Your job, ## Output contract, ## Goal-Type Recipes prose)\n"+
@@ -122,14 +85,6 @@ func TestRouterPersona_ProseRegionByteReduction(t *testing.T) {
 	}
 }
 
-// TestRouterPersona_CatalogByteIdentical_Negative asserts that the
-// "## Phase Catalog — Core Values" section is exactly 7988 bytes (the baseline).
-// TSC must not touch the catalog table — it is guarded by TestRouterCompaction.
-//
-// AC3 (negative) — router-persona-tsc-compress.
-//
-// Pre-existing GREEN: catalog is 7988 bytes before Builder runs.
-// Anti-gaming sentinel: catches a builder who reduces prose bytes by trimming the catalog.
 func TestRouterPersona_CatalogByteIdentical_Negative(t *testing.T) {
 	_, body := routerContent(t)
 	got := routerCatalogBytes(t, body)
@@ -141,13 +96,6 @@ func TestRouterPersona_CatalogByteIdentical_Negative(t *testing.T) {
 	}
 }
 
-// TestRouterPersona_DomainVocabPreserved asserts that key domain vocabulary tokens
-// (code spans, JSON keys, operator strings) are preserved verbatim in evolve-router.md.
-//
-// AC4 (edge) — router-persona-tsc-compress.
-//
-// Pre-existing GREEN: all tokens present before Builder runs.
-// Regression guard: TSC must not strip backtick spans or JSON field names.
 func TestRouterPersona_DomainVocabPreserved(t *testing.T) {
 	_, body := routerContent(t)
 	for _, token := range []string{
@@ -164,13 +112,6 @@ func TestRouterPersona_DomainVocabPreserved(t *testing.T) {
 	}
 }
 
-// TestRouterPersona_LoaderAndRenderParseGreen asserts that prompts.ParseFrontmatter
-// still parses evolve-router.md correctly after the TSC pass.
-//
-// AC5 (regression) — router-persona-tsc-compress.
-//
-// Pre-existing GREEN: file parses cleanly before Builder runs.
-// Regression guard: TSC must not corrupt the YAML frontmatter or break the body.
 func TestRouterPersona_LoaderAndRenderParseGreen(t *testing.T) {
 	root := repoRoot(t)
 	raw, err := os.ReadFile(filepath.Join(root, "agents", "evolve-router.md"))
@@ -192,7 +133,6 @@ func TestRouterPersona_LoaderAndRenderParseGreen(t *testing.T) {
 	if len(body) < 100 {
 		t.Errorf("parsed body suspiciously short (%d bytes) — TSC may have over-deleted content", len(body))
 	}
-	// Also verify the existing compaction test still passes by calling SubprocessOutput.
 	goDir := filepath.Join(root, "go")
 	_, stderr, code, subErr := acsassert.SubprocessOutput(
 		"go", "test", "-C", goDir, "-count=1", "-run", "TestRouterCompaction", "./internal/prompts/")

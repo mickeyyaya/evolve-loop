@@ -10,24 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 )
 
-// rollback_test.go — RED contract for cycle-573 Task 3
-// (dossier-commit-rollback-on-failure, inbox weight 0.84 medium).
-//
-// commitPairGit stages cycle-<base>.{json,md} via `git add`, then commits. On a
-// PERMANENT (non-lock) commit failure it returns the error but never unstages
-// the pair — so the staged files survive into the next cycle's tree-diff guard
-// as phantom staged changes. The fix: on a permanent failure, `git reset` the
-// pair back out of the index before returning the (unchanged) error.
-//
-// The load-bearing invariant is the STAGED set, not the whole porcelain: newly
-// created files legitimately remain on disk as untracked after an unstage; the
-// pollution the guard trips on is a non-empty index. So the assertion is
-// `git diff --cached --name-only` == empty.
-//
-// RED today: after the failed commit the pair is still staged, so the staged set
-// is non-empty. GREEN once commitPairGit resets on permanent failure.
-
-// stagedPaths returns the names in the git index (staged set) for dir.
 func stagedPaths(t *testing.T, dir string) []string {
 	t.Helper()
 	cmd := exec.Command("git", "diff", "--cached", "--name-only")
@@ -46,18 +28,12 @@ func stagedPaths(t *testing.T, dir string) []string {
 	return paths
 }
 
-// TestCommitPairGit_RollsBackStagedOnPermanentFailure — AC-3a (behavioural):
-// with an identity-less git env (a permanent, non-lock commit failure),
-// commitPairGit must (1) still return the underlying error and (2) leave the
-// index empty — no staged pair to pollute the next cycle's tree-diff guard.
 func TestCommitPairGit_RollsBackStagedOnPermanentFailure(t *testing.T) {
-	// Isolate git config so the run never touches the host's config.
 	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
 	t.Setenv("GIT_CONFIG_SYSTEM", os.DevNull)
 
 	dir := t.TempDir()
-	// Baseline commit WITH a one-shot inline identity so HEAD exists (git reset --
-	// <path> needs a resolvable HEAD). The identity is never persisted to config.
+	// A baseline commit gives `git reset -- <path>` a resolvable HEAD.
 	for _, args := range [][]string{
 		{"init"},
 		{"-c", "user.email=seed@example.com", "-c", "user.name=seed", "commit", "--allow-empty", "-m", "baseline"},
@@ -70,11 +46,8 @@ func TestCommitPairGit_RollsBackStagedOnPermanentFailure(t *testing.T) {
 		}
 	}
 
-	// Force a PERMANENT (non-lock) commit failure deterministically on any host:
-	// an explicitly-empty author/committer ident makes `git commit` fatal
-	// ("empty ident name not allowed"), regardless of gecos/hostname auto-detect.
-	// Set only now — after the baseline commit — so commitPairGit inherits it via
-	// os.Environ() but the baseline above still succeeds.
+	// An empty ident makes `git commit` fail permanently on any host. Set after the
+	// baseline commit, so only commitPairGit inherits it.
 	for _, k := range []string{"GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL"} {
 		t.Setenv(k, "")
 	}

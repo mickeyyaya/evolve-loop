@@ -1,11 +1,6 @@
-// Package router is the deterministic phase-routing kernel for evolve-loop.
-// It digests the objective signals each phase already writes to its handoff
-// artifact, then computes which optional phases to insert/skip — under the
-// "model proposes, kernel disposes" discipline.
-//
-// Leaf package by design: like internal/failureadapter and internal/config,
-// it must NOT import internal/core (core.Orchestrator imports router). Phase
-// identifiers cross the boundary as plain strings; core converts at the call site.
+// Package router is the deterministic phase-routing kernel: it digests what phases write and decides
+// which phases run ("model proposes, kernel disposes"). It is a leaf: core imports it, so it must
+// never import core.
 package router
 
 import (
@@ -14,11 +9,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 )
 
-// Severity is an ordinal encoding of a defect/thrust severity so the router
-// can compare with >= against a configured threshold (e.g. insert tester when
-// SeverityMax >= High).
+// Severity is an ordinal defect severity, so triggers can compare with >=.
 type Severity int
 
+// Severity levels, lowest first.
 const (
 	SevNone Severity = iota
 	SevLow
@@ -27,8 +21,7 @@ const (
 	SevCritical
 )
 
-// ParseSeverity maps a handoff severity string to its ordinal. Unknown/empty
-// strings map to SevNone (fail-low: an unparseable severity never escalates routing).
+// ParseSeverity maps a severity word to its ordinal; an unknown word is SevNone, so it never escalates routing.
 func ParseSeverity(s string) Severity {
 	switch strings.ToUpper(strings.TrimSpace(s)) {
 	case "CRITICAL":
@@ -44,6 +37,7 @@ func ParseSeverity(s string) Severity {
 	}
 }
 
+// String returns the canonical severity word.
 func (s Severity) String() string {
 	switch s {
 	case SevCritical:
@@ -59,61 +53,49 @@ func (s Severity) String() string {
 	}
 }
 
-// RoutingSignals is the normalized, objective digest of the handoff artifacts
-// seen so far this cycle. ONLY objective fields the phases emit — never an LLM
-// self-assessment of confidence (anti-spec-gaming). Populated by Digest.
+// RoutingSignals is the objective digest of this cycle's phase artifacts; it never carries an LLM's
+// self-assessed confidence.
 type RoutingSignals struct {
 	Scout  ScoutSignals
 	Triage TriageSignals
 	Build  BuildSignals
 	Audit  AuditSignals
 
-	// Generic is the uniform signal plane: namespaced <phase>.<key> values
-	// folded from each handoff's top-level "signals" block. This is what lets a
-	// user-defined phase emit a signal the router can key on without a bespoke
-	// typed extractor. Populated by Digest; consumed by resolveField as a
-	// fallback for fields not covered by the typed structs above (Stage 2).
+	// Generic holds namespaced <phase>.<key> signals for fields the typed structs do not cover.
 	Generic map[string]any
 
-	// DigestDegraded lists anchor-handoff reads that failed for reasons
-	// OTHER than absence (EISDIR, permission, transient IO) — the read-miss
-	// vs genuine-gap distinction (R5). A degraded digest means a
-	// Present:false may be a read miss, so the spine gate must stay
-	// fail-open for this evaluation; only a CLEAN absence (empty
-	// DigestDegraded) may fail closed at EVOLVE_PHASE_RECOVERY=enforce.
+	// DigestDegraded lists reads that failed for a reason other than absence. While it is
+	// non-empty a Present:false may be a read miss, so the spine gate stays fail-open.
 	DigestDegraded []string
 }
 
-// GenericValue returns the namespaced generic signal for field (e.g.
-// "security.severity_max"); ok is false when absent. Type note: values come
-// from encoding/json, so JSON numbers are float64 (not int) — numeric callers
-// must assert float64.
+// GenericValue returns the generic signal for field; JSON numbers arrive as float64.
 func (s RoutingSignals) GenericValue(field string) (any, bool) {
 	v, ok := s.Generic[field]
 	return v, ok
 }
 
-// ScoutSignals are the routing-relevant fields of handoff-scout.json.
+// ScoutSignals are the routing-relevant fields of scout's handoff or report.
 type ScoutSignals struct {
 	CycleSizeEstimate string // "trivial|small|medium|large"
-	GoalType          string // scout-declared goal type (a phase-registry goal_recipes key); "" = undeclared
-	DeliverableKind   string // "code|document" as scout declared it; "" = undeclared (ADR-0099)
-	ItemCount         int    // # of itemN_* blocks (scope breadth)
-	CarryoverCount    int    // carryover todos surfaced
-	BacklogSize       int    // total queued backlog items (breadth of pending work)
+	GoalType          string // a phase-registry goal_recipes key; "" = undeclared
+	DeliverableKind   string // "code|document"; "" = undeclared
+	ItemCount         int    // itemN_* blocks: scope breadth
+	CarryoverCount    int
+	BacklogSize       int
 	Present           bool
 }
 
-// TriageSignals are the routing-relevant fields of triage's handoff.
+// TriageSignals are the routing-relevant fields of triage's handoff, report and decision.
 type TriageSignals struct {
-	CycleSize          string   // authoritative size after triage refines scout's estimate
-	PhaseSkip          []string // PSMAS phase_skip[] recommendation (additive only)
-	DeliverableKind    string   // authoritative "code|document" after triage bounds top_n; "" = undeclared (ADR-0099)
-	CommittedCount     int      // number of tasks in triage-decision.json top_n
-	UnifiedSize        string   // "small|large" only after triage validates unified_commitment
-	UnifiedMemberCount int      // number of separately accepted members in the validated commitment
+	CycleSize          string   // refines scout's estimate
+	PhaseSkip          []string // PSMAS recommendation, additive only
+	DeliverableKind    string   // authoritative over scout's; "" = undeclared
+	CommittedCount     int      // tasks in triage-decision.json top_n
+	UnifiedSize        string   // "small|large", set only for a validated unified commitment
+	UnifiedMemberCount int
 	Present            bool
-	commitmentKnown    bool // distinguishes an explicit empty top_n from a missing decision artifact
+	commitmentKnown    bool // separates an explicit empty top_n from a missing decision
 }
 
 // HasEmptyTriageCommitment reports whether triage authoritatively committed no
@@ -122,21 +104,21 @@ func (s RoutingSignals) HasEmptyTriageCommitment() bool {
 	return s.Triage.Present && s.Triage.commitmentKnown && s.Triage.CommittedCount == 0
 }
 
-// BuildSignals are the routing-relevant fields of handoff-build(er).json.
+// BuildSignals are the routing-relevant fields of build's handoff.
 type BuildSignals struct {
 	Verdict       string
 	ACSGreen      int
-	ACSRed        int // failing-predicate count — objective regression signal
+	ACSRed        int // failing predicates
 	ACSTotal      int
 	ACSThisCycle  int
 	ACSRegression int
-	SeverityMax   Severity // max thrusts[].severity, ordinal-encoded
-	FilesTouched  int      // union(thrusts[].files_modified + files_new)
-	DiffLOC       int      // lines-of-code changed this build (top-level diff_loc)
+	SeverityMax   Severity // highest thrusts[].severity
+	FilesTouched  int      // distinct files across thrusts; a package count from the git fallback
+	DiffLOC       int
 	Present       bool
 }
 
-// AuditSignals are the routing-relevant fields of handoff-audit(or).json.
+// AuditSignals are the routing-relevant fields of audit's handoff or acs-verdict.json.
 type AuditSignals struct {
 	Verdict           string
 	Confidence        float64
@@ -145,8 +127,7 @@ type AuditSignals struct {
 	Present           bool
 }
 
-// CycleSize returns the authoritative cycle-size: triage's refinement when
-// present, else scout's estimate, else "" (treated as non-trivial by callers).
+// CycleSize returns triage's size, else scout's estimate, else "" (callers treat it as non-trivial).
 func (s RoutingSignals) CycleSize() string {
 	if s.Triage.Present && s.Triage.CycleSize != "" {
 		return s.Triage.CycleSize
@@ -157,16 +138,14 @@ func (s RoutingSignals) CycleSize() string {
 	return ""
 }
 
-// DeliverableKindCode and DeliverableKindDocument are the two deliverable
-// kinds a cycle can declare (ADR-0099). Any other word is not a kind.
+// DeliverableKindCode and DeliverableKindDocument are the two deliverable kinds a cycle can declare.
+// See ADR-0099.
 const (
 	DeliverableKindCode     = config.DeliverableKindCode
 	DeliverableKindDocument = config.DeliverableKindDocument
 )
 
-// NormalizeDeliverableKind returns the kind when v is one of the two declared
-// kinds and "" otherwise — an unrecognised word is treated as undeclared, so
-// it can never release a pinned phase (fail-safe to the code side).
+// NormalizeDeliverableKind returns v's kind, or "" for any other word so it can never release a pinned phase.
 func NormalizeDeliverableKind(v string) string {
 	switch strings.ToLower(strings.TrimSpace(v)) {
 	case DeliverableKindCode:
@@ -177,11 +156,7 @@ func NormalizeDeliverableKind(v string) string {
 	return ""
 }
 
-// DeliverableKind returns the cycle's authoritative deliverable kind: triage's
-// refinement when declared, else scout's, else "code". The absent default is
-// the CONSERVATIVE side — with nothing digested (plan time) a rule of the form
-// `deliverable_kind != document` holds, so the tdd integrity pin stays on and
-// is released only by a digested document declaration (ADR-0099).
+// DeliverableKind returns the declared kind, else "code": the conservative default that keeps the tdd pin.
 func (s RoutingSignals) DeliverableKind() string {
 	if k, ok := s.DeclaredDeliverableKind(); ok {
 		return k
@@ -189,12 +164,7 @@ func (s RoutingSignals) DeliverableKind() string {
 	return DeliverableKindCode
 }
 
-// DeclaredDeliverableKind returns the kind a report DECLARED (triage is
-// authoritative over scout) and whether one did. The integrity floor reads
-// DeliverableKind (declaration or the conservative code default); a
-// dispatch-time projection that may substitute the project's default kind
-// reads this, so "nobody said" and "somebody said code" stay distinguishable
-// (ADR-0099 slice 3).
+// DeclaredDeliverableKind returns the kind a report declared (triage over scout) and whether one did.
 func (s RoutingSignals) DeclaredDeliverableKind() (string, bool) {
 	if s.Triage.Present && s.Triage.DeliverableKind != "" {
 		return s.Triage.DeliverableKind, true

@@ -6,10 +6,6 @@ import (
 	"testing"
 )
 
-// TestWorktreeBaseFor_LoadsFromDisk covers the fail-open loader the preflight
-// composition roots use to agree with the orchestrator on the operator worktree
-// base. Absent policy.json ⇒ "" (default base selection); a present worktree.base
-// flows through.
 func TestWorktreeBaseFor_LoadsFromDisk(t *testing.T) {
 	dir := t.TempDir()
 

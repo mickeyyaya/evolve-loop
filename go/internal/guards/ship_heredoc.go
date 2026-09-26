@@ -5,29 +5,8 @@ import (
 	"strings"
 )
 
-// stripHeredocs removes heredoc body content from a multi-line shell command
-// string. This mirrors the awk pre-processor in
-// legacy/scripts/guards/ship-gate.sh that was added to prevent commit-message
-// bodies (which legitimately contain literal "git push" / "git commit"
-// describing what a script does) from tripping the ship-verb regex.
-//
-// Handles bash heredoc syntax:
-//
-//	cat <<EOF        — unquoted
-//	cat <<'EOF'      — single-quoted (no var expansion in bash; same here)
-//	cat <<"EOF"      — double-quoted
-//	cat <<-EOF       — tab-stripping form
-//
-// The marker is any identifier matching [A-Za-z_][A-Za-z0-9_]*. Body content
-// between `<<MARKER` (or `<<-MARKER` / `<<'MARKER'` / `<<"MARKER"`) and the
-// matching marker on its own line (with optional leading whitespace) is
-// dropped from the returned string. The marker lines themselves are
-// preserved so byte offsets stay roughly aligned for downstream regex
-// matchers that want to see the heredoc opener / closer.
-//
-// Multiple sequential heredocs in one command are handled. Unterminated
-// heredocs leave the rest of the input dropped (matches bash's behavior of
-// continuing the heredoc to EOF).
+// stripHeredocs drops heredoc body lines from a shell command and keeps the opener and closing marker lines.
+// An unterminated heredoc drops the rest of the input, as bash reads it to EOF.
 func stripHeredocs(cmd string) string {
 	if !strings.Contains(cmd, "<<") {
 		return cmd
@@ -42,14 +21,11 @@ func stripHeredocs(cmd string) string {
 			stripped := strings.TrimLeft(line, " \t")
 			if stripped == marker {
 				inHeredoc = false
-				out = append(out, line) // keep the closing marker line
+				out = append(out, line)
 			}
-			// else: drop the body line (don't append)
 			continue
 		}
-		// Detect heredoc start on this line.
 		if m := heredocStartRE.FindStringSubmatch(line); m != nil {
-			// m[1] is the marker (after stripping -, optional quotes).
 			marker = stripHeredocMarker(m[1])
 			inHeredoc = true
 		}
@@ -58,13 +34,9 @@ func stripHeredocs(cmd string) string {
 	return strings.Join(out, "\n")
 }
 
-// heredocStartRE matches `<<MARKER` / `<<-MARKER` / `<<'MARKER'` / `<<"MARKER"`
-// with optional whitespace before the marker.
 var heredocStartRE = regexp.MustCompile(`<<-?[ \t]*(['"]?[A-Za-z_][A-Za-z0-9_]*['"]?)`)
 
-// stripHeredocMarker removes surrounding ' or " quotes from a captured
-// heredoc marker. Bash treats `<<'EOF'` and `<<EOF` identically as
-// terminator-matching goes; both end at a line whose only content is `EOF`.
+// stripHeredocMarker unquotes a captured marker: quoting changes expansion, not the terminator line.
 func stripHeredocMarker(s string) string {
 	s = strings.TrimSpace(s)
 	if len(s) >= 2 {

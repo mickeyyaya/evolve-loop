@@ -12,8 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 )
 
-// stubPhase is a minimal PhaseRunner used to drive cmd_phase tests
-// without spinning real bridges + prompts.
 type stubPhase struct {
 	resp core.PhaseResponse
 	err  error
@@ -106,15 +104,12 @@ func TestRunPhase_RunnerErrorExits1(t *testing.T) {
 	if code != 1 {
 		t.Errorf("code=%d, want 1", code)
 	}
-	// Partial response should still be emitted to stdout.
 	var got core.PhaseResponse
 	if err := json.Unmarshal(stdout.Bytes(), &got); err != nil {
 		t.Errorf("expected partial response on stdout; parse err=%v raw=%q", err, stdout.String())
 	}
 }
 
-// Regression: a real phase factory entry must exist in the registry
-// for every phase constant. Catches missed phase additions.
 func TestPhaseFactoriesCoverAllPhases(t *testing.T) {
 	want := []core.Phase{
 		core.PhaseIntent, core.PhaseScout, core.PhaseTriage, core.PhaseTDD,

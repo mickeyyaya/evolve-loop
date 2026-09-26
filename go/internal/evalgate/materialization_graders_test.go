@@ -9,14 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// TestMaterializationGate_RequiresACodeGraderPerEval pins the rule this
-// gate's own remediation has always promised ("Each must contain at least
-// one `[code]` grader") but never checked: an eval that exists with no
-// [code] grader passed here, reached the build, and was refused by the
-// lane's own durability test at the SHIP gate (cycle 1679, 2026-09-14) —
-// after which the builder could not fix it (its sandbox denies .evolve/evals)
-// and two repair rounds burned. The scout owns the eval; the gate must fail
-// the scout while the scout still holds the pen.
 func TestMaterializationGate_RequiresACodeGraderPerEval(t *testing.T) {
 	root, ws := scoutWorkspaceSelecting(t, "crossartifact-invariant-stack")
 	evalPath := filepath.Join(root, ".evolve", "evals", "crossartifact-invariant-stack.md")

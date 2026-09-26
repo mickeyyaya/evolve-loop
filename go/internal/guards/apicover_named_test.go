@@ -1,13 +1,5 @@
 //go:build integration
 
-// apicover_named_test.go — public-API coverage (ADR-0050 Phase 5). Names and
-// exercises the exported guard TYPES apicover flagged uncovered in this
-// package. The existing *_test.go files only call the New* constructors, so the
-// bare type identifiers (Chain/DocDelete/Quota/Ship) never appear as tokens in
-// test source — apicover reports the types UNCOVERED even though their methods
-// are tested. Each test below names the concrete type via a typed declaration
-// AND asserts a real contract: the type satisfies core.Guard and its Decide
-// returns the documented Allow verdict (Rule 9 — no bare `var _ T` padding).
 package guards
 
 import (
@@ -17,12 +9,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// TestChainType_SatisfiesGuardAndDenies names the *Chain type via a typed
-// declaration, binds it to the core.Guard interface the kernel dispatches
-// against, and asserts a nil-ledger Chain denies (its documented contract).
+// The typed declarations below name each guard type, which apicover needs to count the type as covered.
 func TestChainType_SatisfiesGuardAndDenies(t *testing.T) {
 	var g *Chain = NewChain(nil)
-	var _ core.Guard = g // *Chain must satisfy the kernel Guard port.
+	var _ core.Guard = g
 	if g.Name() != "chain" {
 		t.Fatalf("Chain.Name() = %q, want chain", g.Name())
 	}
@@ -35,8 +25,6 @@ func TestChainType_SatisfiesGuardAndDenies(t *testing.T) {
 	}
 }
 
-// TestDocDeleteType_SatisfiesGuardAndDenies names the *DocDelete type and
-// asserts it denies an `rm docs/` command (its documented contract).
 func TestDocDeleteType_SatisfiesGuardAndDenies(t *testing.T) {
 	var g *DocDelete = NewDocDelete(false)
 	var _ core.Guard = g
@@ -52,8 +40,6 @@ func TestDocDeleteType_SatisfiesGuardAndDenies(t *testing.T) {
 	}
 }
 
-// TestQuotaType_SatisfiesGuardAndEnforcesCap names the *Quota type and asserts
-// it denies once the per-agent WebSearch cap is exhausted (its core contract).
 func TestQuotaType_SatisfiesGuardAndEnforcesCap(t *testing.T) {
 	var g *Quota = NewQuota(QuotaConfig{WebSearch: 1})
 	var _ core.Guard = g
@@ -69,8 +55,6 @@ func TestQuotaType_SatisfiesGuardAndEnforcesCap(t *testing.T) {
 	}
 }
 
-// TestShipType_SatisfiesGuardAndDenies names the *Ship type and asserts it
-// denies a bare `git commit` (the un-sanctioned ship path it gates).
 func TestShipType_SatisfiesGuardAndDenies(t *testing.T) {
 	var g *Ship = NewShip(false)
 	var _ core.Guard = g

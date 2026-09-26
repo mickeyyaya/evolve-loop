@@ -4,8 +4,6 @@ import (
 	"testing"
 )
 
-// TestRecover_Branches locks one case per handler branch in the recovery
-// Chain of Responsibility.
 func TestRecover_Branches(t *testing.T) {
 	cases := []struct {
 		name       string
@@ -13,7 +11,6 @@ func TestRecover_Branches(t *testing.T) {
 		wantPhase  string
 		wantReason string
 	}{
-		// AUDIT_BINDING_* family → re-audit (saga re-establishes the binding).
 		{"binding head moved", &Blocker{Code: "AUDIT_BINDING_HEAD_MOVED", Class: "precondition", Stage: "ship"}, "audit", "recover:precondition-reaudit"},
 		{"binding tree mismatch", &Blocker{Code: "AUDIT_BINDING_TREE_MISMATCH", Class: "precondition", Stage: "ship"}, "audit", "recover:precondition-reaudit"},
 		{"binding artifact sha", &Blocker{Code: "AUDIT_BINDING_ARTIFACT_SHA", Class: "precondition", Stage: "ship"}, "audit", "recover:precondition-reaudit"},
@@ -24,49 +21,29 @@ func TestRecover_Branches(t *testing.T) {
 		{"binding no auditor", &Blocker{Code: "AUDIT_BINDING_NO_AUDITOR", Class: "precondition", Stage: "ship"}, "audit", "recover:precondition-reaudit"},
 		{"binding no ledger", &Blocker{Code: "AUDIT_BINDING_NO_LEDGER", Class: "precondition", Stage: "ship"}, "audit", "recover:precondition-reaudit"},
 
-		// EGPS_RED_COUNT → re-audit (re-establish the gate precondition).
 		{"egps red count", &Blocker{Code: "EGPS_RED_COUNT", Class: "precondition", Stage: "ship"}, "audit", "recover:precondition-reaudit"},
 
-		// precondition class with a non-binding, non-egps code → re-audit.
 		{"precondition generic", &Blocker{Code: "SOME_PRECONDITION", Class: "precondition", Stage: "ship"}, "audit", "recover:precondition-reaudit"},
 
-		// Ship-LOCAL preconditions: conditions a re-audit cannot re-establish
-		// (the cycle-230 audit↔ship loop). Ship's in-Run repair ladder already
-		// attempted the typed repair before this error surfaced, so the router
-		// hands the residue to the debugger phase — never back to audit.
 		{"ship-local ff-merge diverged", &Blocker{Code: "GIT_FF_MERGE_DIVERGED", Class: "precondition", Stage: "ship"}, "debugger", "recover:ship-local-debugger"},
 		{"ship-local commit prefix gate", &Blocker{Code: "COMMIT_PREFIX_GATE", Class: "precondition", Stage: "ship"}, "debugger", "recover:ship-local-debugger"},
 		{"ship-local detached head", &Blocker{Code: "GIT_DETACHED_HEAD", Class: "precondition", Stage: "ship"}, "debugger", "recover:ship-local-debugger"},
 		{"ship-local worktree resolve", &Blocker{Code: "WORKTREE_RESOLVE", Class: "precondition", Stage: "ship"}, "debugger", "recover:ship-local-debugger"},
-		// F37: a cycle diff touching the protected control plane is the BUILD's
-		// to reshape — a re-audit re-verifies the same diff and the debugger
-		// cannot change what a cycle may write.
 		{"control-plane violation → rebuild", &Blocker{Code: "CONTROL_PLANE_VIOLATION", Class: "precondition", Stage: "verify_class"}, "build", "recover:control-plane-rebuild"},
-		// Push rejection already declined by ship's in-Run fetch+ff-retry and
-		// reclassified precondition (needs-reaudit) → re-audit is correct.
 		{"push rejected needs-reaudit", &Blocker{Code: "GIT_PUSH_REJECTED", Class: "precondition", Stage: "ship"}, "audit", "recover:precondition-reaudit"},
 
-		// AUDIT_BINDING_ prefix but empty class still routes via the prefix rule.
 		{"binding prefix no class", &Blocker{Code: "AUDIT_BINDING_FUTURE_CODE", Class: "", Stage: "ship"}, "audit", "recover:precondition-reaudit"},
 
-		// ADR-0049 S5b: fleet ff-merge divergence is transient-classed but must
-		// route to RE-AUDIT (rebase + test-the-merged-tree), NOT the generic
-		// transient retry-ship — the dedicated handler is ordered before it.
 		{"fleet rebase needed → reaudit", &Blocker{Code: "GIT_FLEET_REBASE_NEEDED", Class: "transient", Stage: "ship"}, "audit", "recover:fleet-rebase-reaudit"},
 
-		// ADR-0049 G13a: a fleet rebase CONFLICT (genuine overlapping work) cannot
-		// be re-audited away → route to the debugger, never back to audit/ship.
 		{"fleet rebase conflict → debugger", &Blocker{Code: "GIT_FLEET_REBASE_CONFLICT", Class: "integrity", Stage: "ship"}, "debugger", "recover:fleet-rebase-conflict-debugger"},
 
-		// transient → retry ship.
 		{"transient push rejected", &Blocker{Code: "GIT_PUSH_REJECTED", Class: "transient", Stage: "ship"}, "ship", "recover:transient-retry-ship"},
 		{"transient git io", &Blocker{Code: "GIT_IO", Class: "transient", Stage: "ship"}, "ship", "recover:transient-retry-ship"},
 
-		// integrity → block (end).
 		{"integrity self sha", &Blocker{Code: "SELF_SHA_TAMPERED", Class: "integrity", Stage: "ship"}, PhaseEnd, "recover:integrity-block"},
 		{"integrity tree drift", &Blocker{Code: "INTEGRITY_TREE_DRIFT", Class: "integrity", Stage: "ship"}, PhaseEnd, "recover:integrity-block"},
 
-		// unknown code + unknown class → debugger (terminal catch-all).
 		{"unknown novel code", &Blocker{Code: "SOME_NOVEL_CODE", Class: "", Stage: "ship"}, "debugger", "recover:unknown-debugger"},
 		{"unknown class config", &Blocker{Code: "BAD_CONFIG", Class: "config", Stage: "ship"}, "debugger", "recover:unknown-debugger"},
 	}
@@ -94,7 +71,6 @@ func TestRecover_Branches(t *testing.T) {
 	}
 }
 
-// TestRecover_NilBlocker locks the defensive no-blocker path.
 func TestRecover_NilBlocker(t *testing.T) {
 	got := Recover(RouteInput{})
 	if got.NextPhase != PhaseEnd {
@@ -105,9 +81,6 @@ func TestRecover_NilBlocker(t *testing.T) {
 	}
 }
 
-// TestRecover_OrderIntegrityWinsOverPrecondition proves the chain order:
-// an error that is BOTH integrity class AND an AUDIT_BINDING_ code must hit
-// the integrity-block rule first (→ end), never the precondition rule.
 func TestRecover_OrderIntegrityWinsOverPrecondition(t *testing.T) {
 	in := RouteInput{Blocker: &Blocker{
 		Code:  "AUDIT_BINDING_HEAD_MOVED",
@@ -123,9 +96,6 @@ func TestRecover_OrderIntegrityWinsOverPrecondition(t *testing.T) {
 	}
 }
 
-// TestRecover_StrategyDelegationParity locks the shared-delegation invariant:
-// StaticPreset and LLMProposal both delegate to the pure Recover, so for every
-// input their Recover results are identical to each other and to Recover.
 func TestRecover_StrategyDelegationParity(t *testing.T) {
 	inputs := []RouteInput{
 		{Blocker: &Blocker{Code: "AUDIT_BINDING_STALE", Class: "precondition", Stage: "ship"}},

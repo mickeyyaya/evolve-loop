@@ -1,8 +1,3 @@
-// Package bridge tests the Go-only adapter: it must validate the request,
-// inject the resolved interactive policy into the prompt body, and
-// delegate to the in-process Engine. The Engine's own launch/probe
-// behavior is covered by internal/bridge; here a fake core.Bridge stands
-// in so the assertions are about the adapter's two jobs (policy + delegation).
 package bridge
 
 import (
@@ -16,9 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// fakeEngine is the injected core.Bridge. It records the request it
-// received (so tests can assert the policy-injected prompt) and returns
-// scripted results.
 type fakeEngine struct {
 	gotReq core.BridgeRequest
 	resp   core.BridgeResponse
@@ -35,7 +27,6 @@ func (f *fakeEngine) Probe(context.Context) (core.BridgeProbe, error) {
 	return f.probe, nil
 }
 
-// withEngine builds an Adapter wired to the given fake engine.
 func withEngine(fe *fakeEngine) *Adapter {
 	a := New()
 	a.engineFactory = func(map[string]string) core.Bridge { return fe }
@@ -49,8 +40,6 @@ func truncate(s string, n int) string {
 	return s[:n] + "…"
 }
 
-// TestLaunch_RequiredFieldValidation — the adapter rejects requests
-// missing any of the four required fields before touching the engine.
 func TestLaunch_RequiredFieldValidation(t *testing.T) {
 	full := core.BridgeRequest{CLI: "claude-tmux", Profile: "/p", Workspace: "/ws", ArtifactPath: "/a.md"}
 	cases := map[string]func(core.BridgeRequest) core.BridgeRequest{
@@ -76,8 +65,6 @@ func TestLaunch_RequiredFieldValidation(t *testing.T) {
 	}
 }
 
-// TestLaunch_DelegatesToEngine — a valid request reaches the engine and
-// its response is returned verbatim.
 func TestLaunch_DelegatesToEngine(t *testing.T) {
 	fe := &fakeEngine{resp: core.BridgeResponse{ExitCode: 0, Stdout: "ARTIFACT"}}
 	resp, err := withEngine(fe).Launch(context.Background(), core.BridgeRequest{
@@ -107,10 +94,6 @@ func TestLaunch_OnStopReviewBranchStillValidatesViaEngine(t *testing.T) {
 	}
 }
 
-// TestLaunch_InjectsDeliverableContract — for a registered agent the prompt the
-// engine receives carries the Deliverable Contract block AND a footer with the
-// EXACT artifact path as (essentially) the last line. The per-cycle path must
-// appear only in the suffix, not in the cacheable prefix (cache-safety). ADR-0034.
 func TestLaunch_InjectsDeliverableContract(t *testing.T) {
 	fe := &fakeEngine{}
 	artifact := "/abs/.evolve/runs/cycle-213/build-report.md"
@@ -128,18 +111,14 @@ func TestLaunch_InjectsDeliverableContract(t *testing.T) {
 	if !strings.Contains(got, artifact) {
 		t.Errorf("prompt missing exact artifact path %q", artifact)
 	}
-	// Footer recency: the exact path must be in the tail, after the persona body.
 	if strings.Index(got, artifact) < strings.Index(got, "PERSONA-BODY") {
 		t.Errorf("artifact path must appear AFTER the body (footer/recency); prompt:\n%s", got)
 	}
-	// Cache-safety: the path must not appear before the body (no path in prefix).
 	if before := got[:strings.Index(got, "PERSONA-BODY")]; strings.Contains(before, artifact) {
 		t.Errorf("artifact path leaked into the cacheable prefix:\n%s", before)
 	}
 }
 
-// TestLaunch_NoContract_ForUnregisteredAgent — an agent with no contract gets no
-// block (graceful), so non-phase bridge callers are unaffected.
 func TestLaunch_NoContract_ForUnregisteredAgent(t *testing.T) {
 	fe := &fakeEngine{}
 	_, err := withEngine(fe).Launch(context.Background(), core.BridgeRequest{
@@ -154,7 +133,6 @@ func TestLaunch_NoContract_ForUnregisteredAgent(t *testing.T) {
 	}
 }
 
-// TestProbe_DelegatesToEngine — Probe forwards the engine's probe.
 func TestProbe_DelegatesToEngine(t *testing.T) {
 	fe := &fakeEngine{probe: core.BridgeProbe{Version: "darwin", CLIs: map[string]string{"claude-tmux": "full"}}}
 	got, err := withEngine(fe).Probe(context.Background())
@@ -179,8 +157,6 @@ func TestProbe_DefaultEngineFactoryIsUsable(t *testing.T) {
 	}
 }
 
-// TestNewDefault_ReturnsUsableAdapter — the production constructor wires a
-// real engine factory (projectRoot reserved/unused).
 func TestNewDefault_ReturnsUsableAdapter(t *testing.T) {
 	a := NewDefault("/any/project/root", nil)
 	if a == nil || a.engineFactory == nil {
@@ -188,10 +164,7 @@ func TestNewDefault_ReturnsUsableAdapter(t *testing.T) {
 	}
 }
 
-// --- interactive-policy injection (v12.1 Capability 3) ---
-
-// runOnce launches the adapter against a fake engine and returns the
-// prompt body the engine actually received (after policy injection).
+// runOnce launches against a fake engine and returns the prompt the engine received.
 func runOnce(t *testing.T, agent, prompt string, env map[string]string) string {
 	return runOnceWithPolicy(t, agent, prompt, env, "")
 }
@@ -225,9 +198,7 @@ func TestLaunch_NoPolicyPrefix_WhenEscalateExplicit(t *testing.T) {
 	if strings.Contains(body, "Subagent Interactive Policy") {
 		t.Errorf("escalate policy must not inject a block; got first 120 chars: %q", truncate(body, 120))
 	}
-	// The Deliverable Contract block (ADR-0034) is orthogonal to interactive
-	// policy and is still injected for a registered agent; assert only that the
-	// original body survives and no policy block was added.
+	// The contract block is still injected under escalate, so only the body's presence is asserted.
 	if !strings.Contains(body, "builder body") {
 		t.Errorf("original body missing under escalate; got %q", truncate(body, 120))
 	}
@@ -268,8 +239,6 @@ func TestResolvePolicy_PolicyJsonHasPrecedence(t *testing.T) {
 
 func TestResolvePolicy_ProfilePolicyHasPrecedenceIfDefault(t *testing.T) {
 	dir := t.TempDir()
-	// no policy.json, or empty interactive_policy falls back to default "recommended_or_first",
-	// so profilePolicy should be returned.
 	if got := resolvePolicy(dir, "scout", PolicyEscalate); got != PolicyEscalate {
 		t.Errorf("profile should be used when policy.json is empty: got=%q want=%q", got, PolicyEscalate)
 	}
@@ -298,10 +267,6 @@ func TestInjectPolicyPrefix_EscalateReturnsBodyUnchanged(t *testing.T) {
 func TestLaunch_PolicyBlockStableAcrossRuns(t *testing.T) {
 	body1 := runOnce(t, "scout", "BODYTOKEN1", nil)
 	body2 := runOnce(t, "scout", "BODYTOKEN2", nil)
-	// The cacheable prefix is everything BEFORE the per-run body. With the
-	// Deliverable Contract (ADR-0034) the volatile per-cycle path lives in a
-	// footer AFTER the body, so the prefix (policy + invariant contract block)
-	// must still be byte-identical across runs.
 	prefix1 := body1[:strings.Index(body1, "BODYTOKEN1")]
 	prefix2 := body2[:strings.Index(body2, "BODYTOKEN2")]
 	if prefix1 != prefix2 {
@@ -316,8 +281,6 @@ func TestLaunch_BootTimeoutStoreWired(t *testing.T) {
 	if !a.BootTimeoutStoreWired() {
 		t.Error("expected BootTimeoutStoreWired() true for an Adapter built via NewDefault (production deps inject the boot-timeout strike writer)")
 	}
-	// A bare New() Adapter has no strike writer injected — pins the accessor's
-	// documented contract (true for NewDefault, false for New).
 	if New().BootTimeoutStoreWired() {
 		t.Error("expected BootTimeoutStoreWired() false for a bare New() Adapter")
 	}

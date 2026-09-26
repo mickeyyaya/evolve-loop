@@ -1,9 +1,9 @@
 package cyclestate
 
 // Phase is the typed identity of an orchestrator lifecycle stage.
-// Stringly-backed for JSON portability.
 type Phase string
 
+// The lifecycle stages; each string is a wire value in ledger and state JSON.
 const (
 	PhaseStart        Phase = "start"
 	PhaseIntent       Phase = "intent"
@@ -16,11 +16,7 @@ const (
 	PhaseAudit        Phase = "audit"
 	PhaseShip         Phase = "ship"
 	PhaseRetro        Phase = "retro"
-	// PhaseDebugger is the recovery phase the advisor can recommend when a
-	// phase (typically ship) returns a structured error/blocker. It receives
-	// the ShipError on its input, diagnoses the root cause, and emits a
-	// debug-decision (RESHIP / RERUN_PHASE / BLOCK) the orchestrator executes.
-	// OPTIONAL — never on the mandatory spine.
+	// PhaseDebugger is the optional recovery phase that diagnoses a structured phase error; never on the mandatory spine.
 	PhaseDebugger Phase = "debugger"
 	PhaseEnd      Phase = "end"
 )

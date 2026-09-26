@@ -1,8 +1,5 @@
 package policy_test
 
-// ClassifyPolicy — the classifier config that replaced EVOLVE_HANG_CLASSIFIER.
-// HangClassifier defaults false (opt-in); absent block is safe (no reclassification).
-
 import (
 	"testing"
 

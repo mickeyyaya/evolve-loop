@@ -9,20 +9,15 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// reviewer composes the top_n binding gate behind one core.DeliverableReviewer.
-// It is stage-aware: at StageShadow every violation is logged but approved; at
-// StageEnforce a CERTAIN violation aborts the cycle at the build->audit
-// transition. StageOff is never constructed (the composition root skips
-// WithReviewer entirely). Mirrors internal/evalgate.reviewer — stage-gating is
-// the whole rollout control (no feature flag).
+// reviewer runs the gates behind one core.DeliverableReviewer: shadow logs
+// every finding, enforce also rejects the first certain violation.
 type reviewer struct {
 	stage config.Stage
 	gates []gate
 	logf  func(format string, args ...any)
 }
 
-// NewReviewer builds the composite gate reviewer for the given stage. Callers
-// wire it via core.WithReviewer only when stage != StageOff.
+// NewReviewer returns the topngate reviewer for stage; callers skip it at StageOff.
 func NewReviewer(stage config.Stage) core.DeliverableReviewer {
 	return &reviewer{
 		stage: stage,
@@ -31,9 +26,7 @@ func NewReviewer(stage config.Stage) core.DeliverableReviewer {
 	}
 }
 
-// Review runs each applicable gate. The first CERTAIN violation aborts at
-// StageEnforce; everything else (any violation at shadow, a non-build phase) is
-// logged and approved. A blocked review records a non-empty abort_reason.
+// Review logs every gate finding and rejects only a certain violation at StageEnforce.
 func (r *reviewer) Review(_ context.Context, in core.ReviewInput) core.ReviewResult {
 	for _, g := range r.gates {
 		if !g.appliesTo(in.Phase) {

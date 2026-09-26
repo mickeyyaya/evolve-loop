@@ -1,10 +1,5 @@
 package llmroute
 
-// RED contract for ApplyBench (cycle-283): the dispatch chain must START at a
-// healthy CLI when the primary's family is benched, mirroring Probe's
-// demote-not-drop reorder. Bench is advice, never a veto: with every family
-// benched, the chain runs least-recently-benched first.
-
 import (
 	"testing"
 	"time"
@@ -19,7 +14,7 @@ func TestFamilyMapsDriverToBinary(t *testing.T) {
 		"claude-p":    "claude",
 		"agy-tmux":    "agy",
 		"ollama-tmux": "ollama",
-		"unknown-cli": "unknown-cli", // unknown maps to itself
+		"unknown-cli": "unknown-cli",
 	}
 	for cli, want := range cases {
 		if got := Family(cli); got != want {
@@ -61,7 +56,7 @@ func TestApplyBenchAllBenchedLeastRecentFirst(t *testing.T) {
 	newer := older.Add(time.Hour)
 	p := Plan{Candidates: []string{"codex-tmux", "claude-tmux"}}
 	out := ApplyBench(p, map[string]time.Time{"codex": newer, "claude": older})
-	want := []string{"claude-tmux", "codex-tmux"} // least-recently-benched first
+	want := []string{"claude-tmux", "codex-tmux"}
 	for i, w := range want {
 		if out.Candidates[i] != w {
 			t.Fatalf("all-benched candidates=%v, want %v (bench is advice, not a veto)", out.Candidates, want)

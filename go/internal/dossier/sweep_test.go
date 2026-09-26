@@ -14,12 +14,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// interceptExec wraps the real production runner and forces every `git
-// commit` invocation naming blockBase to fail permanently, while every other
-// call (add, diff, status, and commits for other bases) passes through to
-// real git unchanged. Lets a SweepOrphans test exercise a genuinely
-// unrecoverable per-pair failure deterministically, without racing a real
-// stuck git index.lock.
+// interceptExec wraps the real git runner and makes every `git commit` naming
+// blockBase fail permanently, without racing a real index.lock.
 type interceptExec struct {
 	blockBase string
 }
@@ -38,9 +34,6 @@ func (i *interceptExec) run(ctx context.Context, name, dir string, args, env []s
 	return sysexec.DefaultRunner(ctx, name, dir, args, env, stdin, stdout, stderr)
 }
 
-// initSweepRepo makes dir a git working tree with a commit identity
-// configured, mirroring write_test.go's initGitRepo (this file adds its own
-// copy to keep sweep_test.go independently readable).
 func initSweepRepo(t *testing.T, dir string) {
 	t.Helper()
 	for _, args := range [][]string{
@@ -74,10 +67,6 @@ func sweepGitStatus(t *testing.T, dir string) string {
 	return strings.TrimSpace(string(out))
 }
 
-// TestSweepOrphans_RecommitsUntrackedPairs is the scout-mandated verification
-// anchor (verifiableBy) for sweep-orphaned-dossier-pairs-and-harden-commit:
-// untracked, COMPLETE cycle-N.{json,md} pairs sitting in the main tree (the 35
-// live orphans confirmed by cycle-564 scout) must be detected and recommitted.
 func TestSweepOrphans_RecommitsUntrackedPairs(t *testing.T) {
 	dir := t.TempDir()
 	initSweepRepo(t, dir)
@@ -107,10 +96,6 @@ func TestSweepOrphans_RecommitsUntrackedPairs(t *testing.T) {
 	}
 }
 
-// TestSweepOrphans_SkipsIncompleteOrMismatchedPairs is the edge-case
-// regression for AC2's "skipping incomplete/mismatched pairs" clause: a lone
-// cycle-N.json with no matching .md (a partial write, e.g. from a killed
-// dossier writer) must be left alone, not force-committed as a half pair.
 func TestSweepOrphans_SkipsIncompleteOrMismatchedPairs(t *testing.T) {
 	dir := t.TempDir()
 	initSweepRepo(t, dir)
@@ -132,18 +117,11 @@ func TestSweepOrphans_SkipsIncompleteOrMismatchedPairs(t *testing.T) {
 	if !found {
 		t.Errorf("Skipped = %v, want it to contain cycle 30", res.Skipped)
 	}
-	// The lone file must still be untracked afterward — proof SweepOrphans
-	// never attempted git add/commit on the incomplete pair.
 	if s := sweepGitStatus(t, dir); !strings.Contains(s, "cycle-30.json") {
 		t.Errorf("cycle-30.json missing from git status (want it left untracked): %q", s)
 	}
 }
 
-// TestSweepOrphans_LogsUnrecoverableFailureLoudly is the RED anchor for AC3:
-// an unrecoverable per-pair commit failure must be logged loudly with the
-// cycle number and underlying error (never silently swallowed), and the sweep
-// must continue recommitting the REMAINING orphans rather than aborting the
-// whole batch on one bad pair.
 func TestSweepOrphans_LogsUnrecoverableFailureLoudly(t *testing.T) {
 	dir := t.TempDir()
 	initSweepRepo(t, dir)

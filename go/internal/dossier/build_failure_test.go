@@ -9,16 +9,6 @@ import (
 	"unicode/utf8"
 )
 
-// These tests cover the failure-identity ingestion (dossier-carries-failure-
-// reason): a FAIL Build reads <workspace>/failure-digest.json +
-// <workspace>/audit-fail-reason.json — the artifacts core.ensureFailureDigest
-// and the coherence floor have already written by dossier time — into
-// Dossier.Failure, so the committed record says WHY the cycle failed instead
-// of only pointing at gitignored workspace forensics. Ingestion is best-effort
-// per artifact: absent/malformed files degrade to a smaller (or nil) block and
-// never fail Build.
-
-// writeReasonArtifact writes audit-fail-reason.json carrying reasons.
 func writeReasonArtifact(t *testing.T, ws string, reasons []string) {
 	t.Helper()
 	writeWorkspaceJSON(t, ws, auditFailReasonFile, map[string]any{
@@ -26,7 +16,6 @@ func writeReasonArtifact(t *testing.T, ws string, reasons []string) {
 	})
 }
 
-// writeWorkspaceJSON marshals v into <ws>/<name>.
 func writeWorkspaceJSON(t *testing.T, ws, name string, v any) {
 	t.Helper()
 	b, err := json.Marshal(v)
@@ -96,9 +85,6 @@ func TestBuild_PassIgnoresFailureArtifacts(t *testing.T) {
 	}
 }
 
-// TestBuild_MalformedDigestStillCarriesReasons pins per-artifact degradation:
-// a corrupt digest must not discard the perfectly good reasons[], and vice
-// versa the block still forms from the digest alone when reasons are absent.
 func TestBuild_MalformedDigestStillCarriesReasons(t *testing.T) {
 	ws := t.TempDir()
 	writeWorkspaceJSON(t, ws, "audit-fail-reason.json", map[string]any{
@@ -119,8 +105,6 @@ func TestBuild_MalformedDigestStillCarriesReasons(t *testing.T) {
 	}
 }
 
-// TestBuild_FailureReasonsTruncatedAndCapped bounds the carried evidence at
-// the ingestion seam: ≤5 reasons, each ≤200 chars, head kept, blanks dropped.
 func TestBuild_FailureReasonsTruncatedAndCapped(t *testing.T) {
 	ws := t.TempDir()
 	reasons := []string{"  ", ""} // blanks are dropped, not carried
@@ -150,8 +134,6 @@ func TestBuild_FailureReasonsTruncatedAndCapped(t *testing.T) {
 	}
 }
 
-// TestRenderMarkdown_FailureSection pins the human-readable projection: the
-// fingerprint, class and each reason appear under a "## Failure" heading.
 func TestRenderMarkdown_FailureSection(t *testing.T) {
 	d := &Dossier{
 		Cycle:        8,
@@ -178,10 +160,6 @@ func TestRenderMarkdown_FailureSection(t *testing.T) {
 	}
 }
 
-// TestFailureReasons_MultibyteTruncationStaysValidUTF8 is the degenerate-impl
-// killer for the byte-bound cut (review MEDIUM: every other truncation test
-// uses ASCII, so a plain r[:200] would pass them all and commit mojibake into
-// knowledge-base/cycles/*.json).
 func TestFailureReasons_MultibyteTruncationStaysValidUTF8(t *testing.T) {
 	ws := t.TempDir()
 	long := strings.Repeat("é", 300) // 600 bytes; the cut lands mid-rune
@@ -198,9 +176,6 @@ func TestFailureReasons_MultibyteTruncationStaysValidUTF8(t *testing.T) {
 	}
 }
 
-// TestFailureReasons_MultilineReasonCollapses — a reason carrying newlines (test
-// output excerpts do) must never reach the md bullet renderer intact: a "## "
-// line inside a reason becomes a fake heading in the committed record.
 func TestFailureReasons_MultilineReasonCollapses(t *testing.T) {
 	ws := t.TempDir()
 	writeReasonArtifact(t, ws, []string{"EGPS red\n## Phases\n- fake bullet\n"})
@@ -216,9 +191,6 @@ func TestFailureReasons_MultilineReasonCollapses(t *testing.T) {
 	}
 }
 
-// TestFailureRecord_StaleDigestCycleIsRejected — a digest left by a DIFFERENT
-// cycle must not become this cycle's committed identity (review MEDIUM: a false
-// forensic identity is worse than an absent one).
 func TestFailureRecord_StaleDigestCycleIsRejected(t *testing.T) {
 	ws := t.TempDir()
 	if err := os.WriteFile(filepath.Join(ws, failureDigestFile),
@@ -236,7 +208,6 @@ func TestFailureRecord_StaleDigestCycleIsRejected(t *testing.T) {
 	if len(rec.Reasons) != 1 {
 		t.Errorf("reasons must survive the digest rejection: %v", rec.Reasons)
 	}
-	// Matching cycle ⇒ adopted.
 	if fresh, _ := failureRecord(ws, 41); fresh == nil || fresh.Fingerprint == "" {
 		t.Errorf("a digest whose cycle MATCHES must be adopted: %+v", fresh)
 	}

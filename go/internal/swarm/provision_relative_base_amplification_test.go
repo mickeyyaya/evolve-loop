@@ -33,9 +33,8 @@ func TestGitProvisioner_RelativeWorktreeBaseHasNoFilesystemSideEffects(t *testin
 	assertMissingAmplificationPath(t, filepath.Join(repo, relativeBase))
 }
 
-// chdirForAmplification is testing.T.Chdir for the CI-pinned toolchain —
-// t.Chdir is Go 1.24+; CI runs Go 1.23. os.Chdir is process-global: must
-// not be called from a t.Parallel test.
+// chdirForAmplification stands in for t.Chdir, which needs Go 1.24 while CI pins Go 1.23.
+// os.Chdir is process-global, so never call this from a t.Parallel test.
 func chdirForAmplification(t *testing.T, dir string) {
 	t.Helper()
 	prev, err := os.Getwd()

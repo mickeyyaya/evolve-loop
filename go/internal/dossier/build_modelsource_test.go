@@ -9,15 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasetiming"
 )
 
-// TestBuild_ProjectsModelSourceAndResolvedModel (T3 AC4): dossier.Build must
-// project each phase-timing.json entry's model provenance (source:
-// profile|pin|advisor, plus the resolved concrete model string) into the
-// corresponding PhaseRecord — the same ingestion path DurationMS/Archetype
-// already use (build.go:timingRecords), so the committed dossier records
-// WHICH resolution path won for every executed phase, closing the P3
-// dormancy (dormancy could hide again with no per-phase model provenance).
-// RED today: phasetiming.Entry and dossier.PhaseRecord carry no
-// ModelSource/ResolvedModel fields (compile-fails until added).
 func TestBuild_ProjectsModelSourceAndResolvedModel(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
@@ -61,13 +52,6 @@ func TestBuild_ProjectsModelSourceAndResolvedModel(t *testing.T) {
 	}
 }
 
-// TestBuild_LegacyWorkspaceWithoutModelMetadataDegradesSafely (T3 AC5,
-// EDGE): a phase-timing.json written before this change (no model_source/
-// resolved_model keys at all) must still build a valid dossier — the field
-// stays absent (empty string, never a fabricated "profile" claim) and Build
-// never errors. This is the safe-degrade contract a gaming fake ("hardcode
-// model source to profile") must not be able to satisfy, since it would
-// fabricate a claim the legacy log never made.
 func TestBuild_LegacyWorkspaceWithoutModelMetadataDegradesSafely(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()

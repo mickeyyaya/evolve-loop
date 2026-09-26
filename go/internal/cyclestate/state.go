@@ -1,15 +1,6 @@
 package cyclestate
 
-// This file holds the on-disk cycle/state DTOs — the value types serialized to
-// .evolve/state.json and .evolve/cycle-state.json. They are byte-identity
-// critical (the JSON tags and field order define the on-disk wire shape; the
-// ledger SHA-chain and resume path depend on stable bytes). Pure data: no
-// methods, no I/O, no dependency on any other internal package. Persistence and
-// mutation logic live in package core (the Storage/Ledger ports) and
-// internal/triagecap (the throughput window ops).
-
-// State struct {...} mirrors the persisted .evolve/state.json (a SUBSET view —
-// the orchestrator's WriteState drops unmodeled keys).
+// State is a subset view of .evolve/state.json; the orchestrator's WriteState drops every key it does not model.
 type State struct {
 	LastUpdated     string          `json:"lastUpdated"`
 	LastCycleNumber int             `json:"lastCycleNumber"`
@@ -17,34 +8,22 @@ type State struct {
 	CurrentBatch    BatchAccrual    `json:"currentBatch"`
 	FailedAt        []FailedRecord  `json:"failedApproaches,omitempty"`
 	CarryoverTodos  []CarryoverTodo `json:"carryoverTodos,omitempty"`
-	// SetupCompletedAt / SetupVersion are the first-run onboarding marker
-	// (RFC3339 stamp + version) written by `evolve setup complete`. Empty
-	// SetupCompletedAt means setup has never run → `evolve loop` prints a
-	// one-line non-blocking nudge. omitempty keeps pre-setup state.json
-	// byte-clean. NOTE: this struct is a SUBSET view of state.json (the
-	// orchestrator's WriteState would drop unmodeled keys), so the setup
-	// marker is written via a lossless raw-merge — never via WriteState.
+	// SetupCompletedAt and SetupVersion are the onboarding marker; `evolve setup complete`
+	// writes them by lossless raw merge, never WriteState.
 	SetupCompletedAt string `json:"setupCompletedAt,omitempty"`
 	SetupVersion     int    `json:"setupVersion,omitempty"`
-	// TriageThroughput is the rolling window (last 5 floor-bearing PASS
-	// cycles) of coverage floors passed per cycle — the observed builder
-	// throughput that bounds triage's per-cycle floor commitments (R9,
-	// inbox coverage-floor-overpacking). Ops live in internal/triagecap.
+	// TriageThroughput is the rolling window of coverage floors passed per recent PASS cycle,
+	// which bounds triage's floor commitments; internal/triagecap owns its ops.
 	TriageThroughput []TriageThroughputEntry `json:"triageThroughput,omitempty"`
-	// StateRevision counts writes made through Storage.UpdateState (CA.3
-	// OCC): ++ per serialized RMW. 0 (omitted) = never touched by
-	// UpdateState; a gap/repeat in the sequence betrays a writer that
-	// bypassed the lock. Additive field — single-mode byte-stable.
+	// StateRevision increments once per Storage.UpdateState read-modify-write;
+	// a gap or repeat exposes a writer that bypassed the lock.
 	StateRevision int `json:"stateRevision,omitempty"`
-	// LastAllocatedCycleNumber is the CA.4 allocation lease: the highest
-	// cycle number ever minted (≠ LastCycleNumber, the highest COMPLETED).
-	// Bumped atomically via UpdateState before a run starts; a crashed run
-	// burns its number. Additive field — single-mode byte-stable.
+	// LastAllocatedCycleNumber is the highest cycle number ever minted (LastCycleNumber is the highest
+	// completed); UpdateState bumps it before a run starts, so a crashed run burns its number.
 	LastAllocatedCycleNumber int `json:"lastAllocatedCycleNumber,omitempty"`
 }
 
-// TriageThroughputEntry is one observed cycle in the triage-capacity rolling
-// window: a PASS cycle and how many coverage floors it committed and passed.
+// TriageThroughputEntry is one PASS cycle in the triage-capacity window and the coverage floors it passed.
 type TriageThroughputEntry struct {
 	Cycle  int `json:"cycle"`
 	Floors int `json:"floors"`
@@ -56,11 +35,7 @@ type BatchAccrual struct {
 	GoalHash            string  `json:"goalHash,omitempty"`
 }
 
-// FailedRecord captures a non-PASS cycle outcome — what the bash side
-// writes into state.json:failedApproaches[]. JSON tags use camelCase to
-// match the on-disk shape (see legacy/scripts/dispatch/subagent-run.sh +
-// failure-classifications.sh). The Classification + ExpiresAt fields are
-// consumed by failureadapter to decide RETRY/BLOCK/PROCEED.
+// FailedRecord is one non-PASS cycle outcome in state.json failedApproaches[], the input failureadapter decides from.
 type FailedRecord struct {
 	TS                string   `json:"ts,omitempty"`
 	Cycle             int      `json:"cycle"`
@@ -83,38 +58,28 @@ type CarryoverTodo struct {
 	Action         string `json:"action"`
 	Priority       string `json:"priority"`
 	FirstSeenCycle int    `json:"first_seen_cycle"`
-	// Deprecated (ADR-0072 S5): this counter was only ever written as 0 and
-	// never incremented in the real cycle-failure path — a dead field. The
-	// single source of truth for per-task failure memory is now the inbox item
-	// JSON's own "failure_count", bumped and consulted by
-	// inboxmover.ApplyCycleOutcome's FAIL drain. Kept for wire-compat with
-	// existing state.json blobs; do not add new reads.
+	// CyclesUnpicked is never incremented; per-task failure memory is the inbox item's failure_count.
+	// Kept for wire compatibility; add no new reads.
 	CyclesUnpicked int `json:"cycles_unpicked"`
-	// ExpiresAt (RFC3339) is the TTL stamp inherited from the FailedRecord that
-	// created this todo, mirroring failedApproaches. It lets the loop-start prune
-	// (failurelog.PruneExpiredCarryoverTodos) age the array out instead of letting
-	// it grow unboundedly. Empty ⇒ legacy/untimestamped ⇒ never auto-pruned.
+	// ExpiresAt (RFC3339) is inherited from the originating FailedRecord so the loop-start prune
+	// ages the todo out; empty means it is never auto-pruned.
 	ExpiresAt string `json:"expiresAt,omitempty"`
 }
 
-// CycleState mirrors .evolve/cycle-state.json (transient per-cycle).
+// CycleState mirrors .evolve/cycle-state.json; later-added fields are omitempty so older checkpoints round-trip unchanged.
 type CycleState struct {
-	// FinalVerdict is the host's floor-gated disposition at the last completed
-	// phase. Post-audit resume must retain it rather than defaulting to PASS.
+	// FinalVerdict is the floor-gated disposition at the last completed phase;
+	// post-audit resume keeps it rather than defaulting to PASS.
 	FinalVerdict string `json:"final_verdict,omitempty"`
-	// GoalHash and GoalText preserve the original request across quota pauses.
+	// GoalHash and GoalText carry the original request across quota pauses.
 	// Absent on legacy checkpoints; resume resolves those conservatively.
 	GoalHash string `json:"goal_hash,omitempty"`
 	GoalText string `json:"goal_text,omitempty"`
-	// Shipped is the cycle's own ship latch: set by both dispatch roots when the
-	// ship phase PASSes and survives the deliverable review, never inferred from
-	// main HEAD movement (a sibling lane moves HEAD too — cycle 1630). Persisted
-	// so a pause/resume after ship keeps the fact; the outcome label
-	// (SHIPPED_VIA_BUILD) and the post-ship observer degrade both read it.
-	// omitempty: pre-latch checkpoints decode/encode unchanged.
+	// Shipped is this cycle's own ship latch, set when its ship phase PASSes review; it is
+	// never inferred from main HEAD, which sibling lanes move too.
 	Shipped bool `json:"shipped,omitempty"`
-	// PreCycleHEAD retains the closeout baseline when execution pauses after
-	// Ship. Capturing a new baseline on resume would lose that completed ship.
+	// PreCycleHEAD keeps the closeout baseline across a pause after Ship;
+	// recapturing it on resume would lose that completed ship.
 	PreCycleHEAD    string   `json:"pre_cycle_head,omitempty"`
 	CycleID         int      `json:"cycle_id"`
 	Phase           string   `json:"phase"`
@@ -125,99 +90,39 @@ type CycleState struct {
 	CompletedPhases []string `json:"completed_phases,omitempty"`
 	WorkspacePath   string   `json:"workspace_path"`
 	IntentRequired  bool     `json:"intent_required"`
-	// RunID is the CA.5 event-sourced run identity: the ULID RunCycle mints
-	// for this run, also stamped on every ledger entry the run emits.
-	// Additive omitempty field — pre-CA.5 cycle-state files decode/encode
-	// unchanged.
+	// RunID is the ULID RunCycle mints for this run, also stamped on every ledger entry it emits.
 	RunID string `json:"run_id,omitempty"`
-	// WorktreeBaseSHA is the per-cycle worktree HEAD at creation == the cycle
-	// base. Persisted so the crash-resume path (RunCycleFromPhase) can run the
-	// cycle-156 build-commit normalize, which RunCycle previously drove from a
-	// run-local variable. Empty (omitted) for pre-field checkpoints and
-	// worktree-less cycles → the normalize degrades to a no-op.
+	// WorktreeBaseSHA is the cycle worktree's HEAD at creation, persisted so crash-resume can run
+	// the build-commit normalize; empty makes that normalize a no-op.
 	WorktreeBaseSHA string `json:"worktree_base_sha,omitempty"`
-	// AuditRepairAttempts counts the in-cycle audit repairs already dispatched
-	// (audit-repair loop). It lives in cycle state rather than orchestrator
-	// memory so the count survives the retro→tdd→build→audit round trip AND a
-	// crash-resume — an in-memory counter would silently reset on resume and
-	// hand a failing cycle unlimited retries. Additive omitempty: pre-field
-	// checkpoints decode as 0, which is exactly "no repair attempted yet".
+	// AuditRepairAttempts counts in-cycle audit repairs dispatched; it is persisted because an
+	// in-memory count would reset on resume and grant a failing cycle unlimited retries.
 	AuditRepairAttempts int `json:"audit_repair_attempts,omitempty"`
-	// ShipRecoveryCode is the ship error code a recovery is rebuilding from
-	// (set when recoverFromShipError routes back to tdd/build, cleared by the
-	// ship latch). It lives in cycle state so the standing-audit-findings
-	// brief seeds identically on the live loop and on crash-resume — the
-	// in-process context snapshot that also carries the code does not
-	// survive a resume. Additive omitempty.
+	// ShipRecoveryCode is the ship error a recovery rebuilds from, cleared by the ship latch;
+	// persisted so the live loop and a resume seed the standing-findings brief alike.
 	ShipRecoveryCode string `json:"ship_recovery_code,omitempty"`
-	// AuditDeclineReason is the retry envelope's reason when an audit FAIL
-	// earned no direct repair grant (the cycle went to retro, which may still
-	// adjudicate a retry). Set by consumeAuditRepairGrant on the decline
-	// branch, cleared by a later grant or the ship latch; it is the ONE
-	// predicate that marks a retro-routed tdd/build re-entry as re-audited
-	// work owed the audit's standing findings. Additive omitempty.
+	// AuditDeclineReason is the retry envelope's reason when an audit FAIL got no repair grant;
+	// it alone marks a retro-routed tdd/build re-entry as owed the audit's standing findings.
 	AuditDeclineReason string `json:"audit_decline_reason,omitempty"`
-	// AuditDispatches counts audit DISPATCHES (not completions) this cycle. It
-	// is the round-supersession index for retiring the previous audit round's
-	// verdict artifacts (cycle-1603): CompletedPhases records only successes,
-	// so an audit that crashed or quota-paused mid-flight after the auditor
-	// pre-wrote acs-verdict.json would be invisible to a completion-derived
-	// index and its dead attempt's verdict would be honored on resume.
-	// Incremented in the audit pre-dispatch block BEFORE the pre-phase
-	// cycle-state write, so an interrupted round has already persisted its
-	// dispatch and the resumed re-dispatch retires it. Additive omitempty:
-	// pre-field checkpoints decode as 0 and the completion-derived count
-	// backstops them (supersedePreviousAuditRound).
+	// AuditDispatches counts audit dispatches, not completions, to retire a superseded round's verdicts.
+	// It is bumped before the pre-phase checkpoint write, so a resume retires an interrupted round.
 	AuditDispatches int `json:"audit_dispatches,omitempty"`
-	// AuditRepairActive marks that the cycle is CURRENTLY inside a repair round
-	// — set when a repair is granted, cleared when audit is re-dispatched. It is
-	// deliberately separate from the counter above: AuditRepairAttempts is
-	// monotonic, so gating the repair-brief injection on it leaked a stale
-	// rejection into any later re-entry into tdd/build (Ship->Build and
-	// Debugger->TDD are both legal edges), telling an agent doing unrelated
-	// ship-error recovery that "this cycle's audit REJECTED your previous build".
-	// A counter answers "how many"; this answers "right now".
+	// AuditRepairActive is true only inside a granted repair round; the monotonic
+	// AuditRepairAttempts cannot gate the repair brief without leaking it into later re-entries.
 	AuditRepairActive bool `json:"audit_repair_active,omitempty"`
-	// ExplanationDocumentationVersion is host-owned activation state for the
-	// Build explanation contract. Fresh cycles persist the current version;
-	// legacy checkpoints decode as zero and remain grandfathered.
+	// ExplanationDocumentationVersion is the Build explanation contract version this cycle
+	// activated; zero grandfathers legacy checkpoints.
 	ExplanationDocumentationVersion int `json:"explanation_documentation_version,omitempty"`
-	// AuditFailReasons: the error-severity diagnostics behind an audit FAIL
-	// verdict recorded by the runner's OWN gates (set in-process at the
-	// recordFloorVerdictFailure chokepoint; cleared on every audit re-dispatch).
-	// The ADR-0072 coherence floor reads THIS field — orchestrator memory, never
-	// an agent-writable workspace file — to tell a DIAGNOSED gate-downgrade
-	// (coherent task-FAIL → retro + continue) from an unexplained forged verdict
-	// (halt). Additive omitempty; persisted so a crash between the verdict
-	// record and cycle finalization resumes without a false halt (the resume
-	// path already trusts cycle-state.json wholesale).
+	// AuditFailReasons are the runner's own error diagnostics behind an audit FAIL, read here by the coherence
+	// floor (never from a workspace file); persisted so a crash resumes without a false halt.
 	AuditFailReasons []string `json:"audit_fail_reasons,omitempty"`
-	// ShipFailReasons: the SHIP-phase's explained-failure carrier, the
-	// post-audit twin of AuditFailReasons (pipeline-defect-pipeline-blocker
-	// Task 1, cycle-1329). Set at the ship error-record chokepoint
-	// (recordFailureLearning, fl.Failed==PhaseShip) from the orchestrator's
-	// own in-process record of the ship error — never a workspace file, to
-	// preserve the same trust boundary AuditFailReasons documents above —
-	// and cleared on ship re-dispatch (resetFloorFailReason). The ADR-0072
-	// coherence floor folds this in alongside AuditFailReasons so a green
-	// audit + green ACS cycle that legitimately fails at ship (e.g. a
-	// repo-contract-gate rejection) is diagnosed as a coherent task failure,
-	// not misclassified as a forged verdict. Additive omitempty; persisted so
-	// a crash between the ship error record and cycle finalization resumes
-	// without a false halt.
+	// ShipFailReasons is the ship-phase twin of AuditFailReasons, so a ship rejection after a green audit
+	// reads as a coherent task failure, not a forged verdict; persisted for the same crash-resume reason.
 	ShipFailReasons []string `json:"ship_fail_reasons,omitempty"`
-	// FailedAt: the cycle's failure history (mirrors State.FailedAt), carried on
-	// the per-cycle checkpoint so the ADR-0072 S4 evidence dossier can compose
-	// its non-progress counters (same-class recurrence, repeat count) from
-	// independent evidence at the retro-decision chokepoint. Additive omitempty;
-	// pre-S4 checkpoints decode/encode unchanged.
+	// FailedAt mirrors State.FailedAt so the evidence dossier can count same-class recurrence
+	// at the retro decision.
 	FailedAt []FailedRecord `json:"failed_at,omitempty"`
-	// BookkeepingRegradeAttempted bounds the bookkeeping-regrade micro-cycle
-	// (retro→audit re-dispatch when a FAIL's only explanations are
-	// bookkeeping-class) to ONCE per cycle. Orchestrator-owned like
-	// AuditFailReasons — the guard is never read from an agent-writable
-	// workspace file, so an auditor deleting a marker cannot mint itself
-	// unbounded re-audits. Additive omitempty; persisted so a crash between
-	// the regrade decision and the re-audit resumes without a second grant.
+	// BookkeepingRegradeAttempted bounds the bookkeeping-regrade re-audit to once per cycle; it lives here,
+	// not in a workspace file an agent could delete, so neither an agent nor a crash-resume grants it twice.
 	BookkeepingRegradeAttempted bool `json:"bookkeeping_regrade_attempted,omitempty"`
 }

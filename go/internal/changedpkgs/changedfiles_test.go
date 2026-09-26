@@ -6,9 +6,6 @@ import (
 	"testing"
 )
 
-// ChangedFilesChecked reads the WORKING TREE: an unstaged modification, an
-// index-added file and an untracked file all count, and only the two the base
-// does not have are Added. FromGitChecked is its projection.
 func TestChangedFilesChecked_WorkingTreeNotIndex(t *testing.T) {
 	root := newRepoWithBaseline(t)
 	writeFile(t, root, "go/internal/base/base.go", "package base\n\nconst Changed = true\n") // unstaged
@@ -37,7 +34,6 @@ func TestChangedFilesChecked_WorkingTreeNotIndex(t *testing.T) {
 	}
 }
 
-// A rename is reported once, at its destination, as Added.
 func TestChangedFilesChecked_RenameIsAddedAtTheDestination(t *testing.T) {
 	root := newRepoWithBaseline(t)
 	gitCmd(t, root, "mv", "go/internal/base/base.go", "go/internal/base/moved.go")
@@ -47,7 +43,6 @@ func TestChangedFilesChecked_RenameIsAddedAtTheDestination(t *testing.T) {
 	}
 }
 
-// Not derivable is never "nothing changed".
 func TestChangedFilesChecked_NotDerivable(t *testing.T) {
 	for name, args := range map[string][2]string{
 		"empty root": {"", "HEAD"},
@@ -64,9 +59,6 @@ func TestChangedFilesChecked_NotDerivable(t *testing.T) {
 	}
 }
 
-// PackagesOf is the file→package projection every consumer of the seed
-// shares: Go files under go/ map to their package's test pattern, deduped and
-// sorted; anything else contributes nothing; no Go file at all is nil.
 func TestPackagesOf_ProjectsGoFilesOntoSortedPatterns(t *testing.T) {
 	got := PackagesOf([]ChangedFile{
 		{Path: "go/internal/user/user_test.go", Added: true},

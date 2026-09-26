@@ -7,9 +7,6 @@ import (
 	"testing"
 )
 
-// TestLoad_DeliverableKinds_FromRegistry — ADR-0099 slice 2: the document
-// deliverable contract is CONFIG (phase-registry.json:config.deliverable_kinds),
-// consumed by ONE deterministic engine. Pins the shipped registry's shape.
 func TestLoad_DeliverableKinds_FromRegistry(t *testing.T) {
 	cfg, _ := Load(filepath.Join("..", "..", "..", "docs", "architecture", "phase-registry.json"), map[string]string{})
 	doc, ok := cfg.DeliverableKinds["document"]
@@ -36,9 +33,6 @@ func TestLoad_DeliverableKinds_FromRegistry(t *testing.T) {
 	}
 }
 
-// TestLoadDomain — the first Go reader of .evolve/domain.json (documented in
-// docs/reference/configuration.md since v8, zero readers until now): the
-// project's default deliverable kind when a task declares none.
 func TestLoadDomain(t *testing.T) {
 	root := t.TempDir()
 	if _, ok, err := LoadDomain(root); ok || err != nil {
@@ -75,9 +69,6 @@ func TestLoadDomain(t *testing.T) {
 	}
 }
 
-// TestDocumentSpec_AndKindVocabulary names the one lookup and the two kind
-// constants every projection uses, and pins the load warning for a hole in
-// the contract (root/min_options are registry-owned, never defaulted).
 func TestDocumentSpec_AndKindVocabulary(t *testing.T) {
 	if DeliverableKindCode != "code" || DeliverableKindDocument != "document" {
 		t.Fatalf("kind vocabulary drifted: %q %q", DeliverableKindCode, DeliverableKindDocument)
@@ -106,10 +97,6 @@ func TestDocumentSpec_AndKindVocabulary(t *testing.T) {
 	}
 }
 
-// TestSignalKeys_AreTheConditionalRuleWords — ADR-0099 slice 3: an overlay
-// `when` clause, core's dispatch projection and the compiled tdd rule name the
-// deliverable-kind signal with ONE word, and the goal type is the scout's
-// namespaced routable field.
 func TestSignalKeys_AreTheConditionalRuleWords(t *testing.T) {
 	named := false
 	for _, c := range DefaultTddRule().Clauses() {

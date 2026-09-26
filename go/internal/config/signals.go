@@ -1,14 +1,8 @@
 package config
 
-// signals.go — what module config can say: the six registered codes, the ONE
-// projection from the legacy Warning.Code vocabulary onto them, the one
-// appender every producer site calls, the range stamper the pipeline uses to
-// attach the triage fields, and the one producer that turns a Warning into a
-// config.warning event.
-
 import "github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 
-// The unit's codes — registered in init with the reasons a triage reads.
+// The config module's registered signal codes.
 const (
 	CodeUnknownValue       signalcenter.Code = "CONFIG_UNKNOWN_VALUE"
 	CodeWeakSpine          signalcenter.Code = "CONFIG_WEAK_SPINE"
@@ -18,8 +12,7 @@ const (
 	CodeRegistryMalformed  signalcenter.Code = "CONFIG_REGISTRY_MALFORMED"
 )
 
-// The legacy Warning.Code vocabulary the in-package pins and `evolve solution`
-// read — the ONE spelling each producer site passes to warn.
+// The legacy Warning.Code vocabulary that in-package pins and `evolve solution` read.
 const (
 	codeUnknownValue       = "unknown-value"
 	codeWeakSpine          = "weak-spine"
@@ -29,12 +22,8 @@ const (
 	codeRegistryMalformed  = "registry-malformed"
 )
 
-// signalCodes is the ONE projection from a Warning.Code onto its registered
-// signal code — six explicit pairs (data, not a string transform), walked by
-// TestSignalCodes_TableIsTheOneProjectionWithNoPhantoms. emit reads it; a Code
-// absent from it would reach the Center empty and be stamped
-// SIGNALCENTER_MISSING_CODE (raised, never dropped), which the stream golden
-// asserts never happens.
+// signalCodes maps each Warning.Code to its signal code. A missing entry would reach the Center
+// empty and be stamped SIGNALCENTER_MISSING_CODE.
 var signalCodes = map[string]signalcenter.Code{
 	codeUnknownValue:       CodeUnknownValue,
 	codeWeakSpine:          CodeWeakSpine,
@@ -53,11 +42,7 @@ func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleConfig, CodeRegistryMalformed, "docs/architecture/phase-registry.json was read but is not valid JSON (a trailing comma is the classic); the same compiled-baseline degrade as CONFIG_REGISTRY_UNREADABLE — no triage, no registry order — with the decoder's error in the reason; fields.step=registry, path, err")
 }
 
-// warn is the ONE appender: every Warning the package mints passes through it
-// with its code, its operator sentence and the fields the producer knows. The
-// Fields map is always the Warning's own (copied), so the range stamper can
-// add the step/source/key/path the caller knows without touching the
-// producer's map.
+// warn is the one appender. It copies fields so the range stamper never touches the producer's map.
 func warn(ws *[]Warning, code, msg string, fields map[string]string) {
 	own := make(map[string]string, len(fields)+4)
 	for k, v := range fields {
@@ -66,9 +51,7 @@ func warn(ws *[]Warning, code, msg string, fields map[string]string) {
 	*ws = append(*ws, Warning{Code: code, Message: msg, Fields: own})
 }
 
-// stamp sets each key/value pair of kv on every Warning in the range — the
-// pipeline stamps what only it knows (the step, the source, the registry path,
-// the env var, the phase name) onto the warnings a step appended.
+// stamp sets each key/value pair of kv on every Warning in the range.
 func stamp(ws []Warning, kv ...string) {
 	for i := range ws {
 		for j := 0; j+1 < len(kv); j += 2 {
@@ -77,11 +60,8 @@ func stamp(ws []Warning, kv ...string) {
 	}
 }
 
-// emit is the ONE producer: each Warning becomes a config.warning WARN under
-// module config, Cycle 0 (the loader is batch-level: it runs before any cycle
-// number exists, so the root's durable sink files it under <evolveDir>),
-// Origin naming the exported method, the Message as the reason and the
-// Warning's fields verbatim. A nil Center is the Null Object.
+// emit sends each Warning as a config.warning WARN. The event's Cycle stays zero because the
+// loader runs before any cycle number exists. A nil Center is the Null Object.
 func (l *Loader) emit(origin string, ws []Warning) {
 	for _, w := range ws {
 		l.center().Emit(signalcenter.Event{
@@ -98,11 +78,7 @@ func (l *Loader) center() *signalcenter.Center {
 	return l.signals()
 }
 
-// IsRegistryFault reports whether w questions the registry itself or the
-// mandatory set it declares — the registry could not be read or parsed (the
-// compiled baseline stood in), or the spine it declares is weak. Readers that
-// print the mandatory set (the dashboard) forward exactly these; the other
-// registry-step warnings are about individual dials and phases.
+// IsRegistryFault reports whether w questions the registry itself: unreadable, malformed, or a weak spine.
 func IsRegistryFault(w Warning) bool {
 	switch w.Code {
 	case codeRegistryUnreadable, codeRegistryMalformed, codeWeakSpine:

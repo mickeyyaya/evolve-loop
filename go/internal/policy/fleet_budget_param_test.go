@@ -1,17 +1,5 @@
 package policy_test
 
-// FleetBudgetPolicy/FleetBudgetConfig — the .evolve/policy.json "fleet.budget"
-// block (Q4 of the quota-driven budgeting campaign): the operator's OPT-IN to
-// quota-driven lane sizing. It resolves onto FleetConfig.Budget as a *pointer*
-// so absence is unambiguous — nil ⇒ the wave never probes quota (zero added
-// latency, byte-identical lanes to today). Present ⇒ the wave measures quota +
-// pace and computes a fleetbudget.Plan, applied only when Stage=="enforce"
-// (Stage=="shadow", the default, computes + logs but never resizes — a genuine
-// soak). Stage is closed-vocabulary ("shadow"|"enforce") failing safe to
-// "shadow" with a surfaced warning, mirroring plan_source's fail-safe branch.
-//
-// Black-box: drives only the exported Policy/FleetPolicy/FleetConfig surface.
-
 import (
 	"strings"
 	"testing"
@@ -19,9 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// TestFleetConfig_BudgetAbsent pins the shadow-safe default: no fleet.budget
-// block ⇒ FleetConfig.Budget is nil. A getter that eagerly allocates a Budget
-// (defeating the "no block ⇒ no probe" latency guard) fails here.
 func TestFleetConfig_BudgetAbsent(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -38,10 +23,6 @@ func TestFleetConfig_BudgetAbsent(t *testing.T) {
 	}
 }
 
-// TestFleetConfig_BudgetResolution pins the resolved tunables + Stage default.
-// An empty budget block still resolves a non-nil Budget with Stage="shadow" and
-// the default history window; explicit values pass through; a positive
-// HistoryWindow overrides the default.
 func TestFleetConfig_BudgetResolution(t *testing.T) {
 	cases := []struct {
 		name           string
@@ -49,8 +30,8 @@ func TestFleetConfig_BudgetResolution(t *testing.T) {
 		wantStage      string
 		wantCapacity   float64
 		wantSafety     float64
-		wantHistoryPos bool // HistoryWindow must be > 0 (defaulted or overridden)
-		wantHistory    int  // exact, when wantHistoryPos and non-default asserted
+		wantHistoryPos bool
+		wantHistory    int
 	}{
 		{
 			name:           "empty-block-defaults-shadow",
@@ -84,8 +65,7 @@ func TestFleetConfig_BudgetResolution(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			budget := tc.budget
-			// Name FleetBudgetConfig by identifier (apicover counts the .Budget
-			// field access as a use, not a name).
+			// Declared by type name: apicover does not count the .Budget field access.
 			var b *policy.FleetBudgetConfig = policy.Policy{Fleet: &policy.FleetPolicy{Budget: &budget}}.FleetConfig().Budget
 			if b == nil {
 				t.Fatalf("FleetConfig().Budget = nil, want non-nil for a present block")
@@ -109,9 +89,6 @@ func TestFleetConfig_BudgetResolution(t *testing.T) {
 	}
 }
 
-// TestFleetConfig_BudgetStageUnknown pins the closed-vocabulary fail-safe:
-// an unknown Stage resolves to "shadow" (the safe non-resizing branch) AND
-// surfaces a warning naming the rejected value — never silently enforces.
 func TestFleetConfig_BudgetStageUnknown(t *testing.T) {
 	got := policy.Policy{Fleet: &policy.FleetPolicy{Budget: &policy.FleetBudgetPolicy{Stage: "enfroce"}}}.FleetConfig()
 	if got.Budget == nil || got.Budget.Stage != "shadow" {

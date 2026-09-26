@@ -9,19 +9,7 @@ import (
 	"testing"
 )
 
-// TestRouter_NoEnvReads is the no-sprawl gate for the routing kernel. The
-// router is a leaf decision package: every flag/config value must arrive via
-// the injected config.RoutingConfig (read once in config.Load at the
-// composition root), never by reading the process environment here. A stray
-// os.Getenv call in this package would reintroduce the scattered-flag smell
-// the dynamic-routing design exists to cure.
-//
-// Detection is AST-based (not substring) so comments and string literals
-// mentioning os.Getenv don't trip the gate — only real call expressions do.
-//
-// Scope note: this gate covers the new routing kernel. The broader phase-flag
-// cleanup (triage/tdd/buildplanner ShouldSkip) is the deferred task-5B
-// follow-on and is intentionally out of scope here.
+// The check is AST-based, so comments and strings that mention os.Getenv do not trip it.
 func TestRouter_NoEnvReads(t *testing.T) {
 	srcs, err := filepath.Glob("*.go")
 	if err != nil {

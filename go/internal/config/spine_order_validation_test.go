@@ -2,11 +2,6 @@ package config
 
 import "testing"
 
-// TestValidateSpine_ShipBeforeAuditWarns covers the ADR-0058 S6 spine-order guard:
-// the config-driven floor positions anchors by their configured order, so a
-// scrambled order placing ship before audit must surface a loud spine-order
-// warning (the legality graph + audit verdict branch still block it, but the
-// misordering must never go unnoticed). A sane order raises no such warning.
 func TestValidateSpine_ShipBeforeAuditWarns(t *testing.T) {
 	t.Parallel()
 

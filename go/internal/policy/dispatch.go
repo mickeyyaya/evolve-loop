@@ -1,28 +1,25 @@
 package policy
 
+// FanoutPolicy is the "fanout" block; prefer Policy.FanoutConfig for resolved values.
 type FanoutPolicy struct {
-	// Concurrency is the max parallel workers in flight. 0/absent ⇒ 2.
+	// Concurrency: below 1 means 2.
 	Concurrency int `json:"concurrency,omitempty"`
-	// TimeoutSecs is the per-worker timeout. 0/absent ⇒ fanoutdispatch built-in.
-	TimeoutSecs int `json:"timeout_secs,omitempty"`
-	// CancelOnConsensus cancels remaining workers when ConsensusK voters agree.
+	// TimeoutSecs: 0 means the fanoutdispatch built-in.
+	TimeoutSecs       int  `json:"timeout_secs,omitempty"`
 	CancelOnConsensus bool `json:"cancel_on_consensus,omitempty"`
-	// ConsensusK is the consensus threshold. 0/absent ⇒ fanoutdispatch built-in.
+	// ConsensusK: 0 means the fanoutdispatch built-in.
 	ConsensusK int `json:"consensus_k,omitempty"`
-	// ConsensusPollSecs is the poll interval. 0/absent ⇒ fanoutdispatch built-in.
+	// ConsensusPollSecs: 0 means the fanoutdispatch built-in.
 	ConsensusPollSecs int `json:"consensus_poll_secs,omitempty"`
-	// TrackWorkers tracks active fanout worker PIDs. Nil/absent ⇒ true.
+	// TrackWorkers: nil means true.
 	TrackWorkers *bool `json:"track_workers,omitempty"`
-	// CachePrefixEnabled writes shared cache-prefix.md for siblings. Nil/absent ⇒ true.
+	// CachePrefixEnabled writes a shared cache-prefix.md for siblings; nil means true.
 	CachePrefixEnabled *bool `json:"cache_prefix_enabled,omitempty"`
 	// TestExecutor overrides the fanout worker command for test harnesses.
 	TestExecutor string `json:"test_executor,omitempty"`
 }
 
-// FanoutConfig returns a FanoutPolicy with all defaults resolved. Concurrency
-// defaults to 2 (min 1); TrackWorkers and CachePrefixEnabled default to true
-// (returned pointers are never nil). Int fields use 0 as the fanoutdispatch
-// built-in-default sentinel.
+// FanoutConfig resolves the fanout block; the returned pointers are never nil.
 func (p Policy) FanoutConfig() FanoutPolicy {
 	tw, cp := true, true
 	out := FanoutPolicy{
@@ -51,9 +48,7 @@ func (p Policy) FanoutConfig() FanoutPolicy {
 	return out
 }
 
-// ObserverPolicy configures phase observation and inactivity watchdogs.
-// Pointer fields preserve the distinction between an omitted value and an
-// explicit zero/false override (for example nudge_s=0 disables nudging).
+// ObserverPolicy configures phase observation and watchdogs; pointers keep an explicit zero (nudge_s=0 disables) distinct from absent.
 type ObserverPolicy struct {
 	Autospawn        *bool  `json:"autospawn,omitempty"`
 	PollS            *int   `json:"poll_s,omitempty"`
@@ -67,8 +62,7 @@ type ObserverPolicy struct {
 	WatchdogDisabled bool   `json:"watchdog_disabled,omitempty"`
 }
 
-// ObserverConfig returns an ObserverPolicy with all defaults resolved.
-// Returned pointer fields are always non-nil.
+// ObserverConfig resolves the observer block; the returned pointers are never nil.
 func (p Policy) ObserverConfig() ObserverPolicy {
 	autospawn, pollS, stallS, nudgeS := true, 5, 600, 300
 	watchdogPollS, watchdogWarnPct, watchdogGraceS := 15, 75, 10
@@ -112,61 +106,23 @@ func (p Policy) ObserverConfig() ObserverPolicy {
 	return out
 }
 
-// BridgePolicy configures operator-writable bridge override directories and
-// timing overrides. Empty string fields preserve each subsystem's built-in
-// .evolve directory. Zero int fields mean "use the bridge package built-in
-// default" (the bridge's defaultIfZero helper handles the zero sentinel).
+// BridgePolicy holds bridge directory and timing overrides; an empty string or zero int means the built-in.
 type BridgePolicy struct {
-	ManifestDir string `json:"manifest_dir,omitempty"`
-	CatalogDir  string `json:"catalog_dir,omitempty"`
-	RecipeDir   string `json:"recipe_dir,omitempty"`
-	// Timing overrides (seconds). 0 = use bridge built-in default.
-	BootTimeoutS       int `json:"boot_timeout_s,omitempty"`
-	ArtifactTimeoutS   int `json:"artifact_timeout_s,omitempty"`
-	ArtifactMaxExtends int `json:"artifact_max_extends,omitempty"`
-	ScrollbackLines    int `json:"scrollback_lines,omitempty"`
-	// PhaseArtifactTimeoutS overrides the artifact-wait budget for individual
-	// phases, keyed on bridge AGENT LABEL. Positive values only; see
-	// PhaseArtifactTimeouts for the merge rules. Absent/empty = compiled
-	// defaults only.
+	ManifestDir        string `json:"manifest_dir,omitempty"`
+	CatalogDir         string `json:"catalog_dir,omitempty"`
+	RecipeDir          string `json:"recipe_dir,omitempty"`
+	BootTimeoutS       int    `json:"boot_timeout_s,omitempty"`
+	ArtifactTimeoutS   int    `json:"artifact_timeout_s,omitempty"`
+	ArtifactMaxExtends int    `json:"artifact_max_extends,omitempty"`
+	ScrollbackLines    int    `json:"scrollback_lines,omitempty"`
+	// PhaseArtifactTimeoutS is keyed on the bridge agent label; see PhaseArtifactTimeouts.
 	PhaseArtifactTimeoutS map[string]int `json:"phase_artifact_timeout_s,omitempty"`
-	// AnthropicBaseURL is the operator override for the Anthropic API base URL
-	// (proxy mode). Replaces EVOLVE_ANTHROPIC_BASE_URL env read. Empty = no proxy.
+	// AnthropicBaseURL is the proxy base URL; empty means no proxy.
 	AnthropicBaseURL string `json:"anthropic_base_url,omitempty"`
 }
 
-// defaultPhaseArtifactTimeoutS is the compiled per-phase artifact-wait budget
-// (seconds), keyed on the bridge AGENT LABEL — the vocabulary
-// core.BridgeRequest.Agent carries and Engine.Launch dispatches with.
-// internal/phases/retro launches Agent:"retrospective", so a map keyed only on
-// the core phase name "retro" would be unit-green and live-dead; both
-// vocabularies carry the budget because the phase-name/agent-label skew is
-// permanent.
-//
-// retro=900s: the grown retro contract (report + preventive_actions +
-// disposition.json) no longer fits the 300s builtin — cycle-1048's retro was
-// ctx-canceled at ~608s mid-authoring, losing the artifact entirely.
-//
-// The deep-tier analysis phases (tdd, build, audit, adversarial-review) carry
-// 1200s: the bridge's base artifact-wait is 300s (bridge.tmuxArtifactTimeoutS)
-// and the deterministic reviewer grants at most 6 extends
-// (bridge.defaultArtifactMaxExtends), so ~650s of wall clock was the effective
-// ceiling for every phase this map did not name. SIX cycles died there in one
-// day with codes=[missing_artifact] — report + acs absent, a content-free infra
-// FAIL — across FOUR phase types (audit ×2 and retro on cycle-1201,
-// adversarial-review on 1217, tdd on 1218/1219), the last on a QUIET host, which
-// rules out contention as the sole cause: load made it worse, the budget was the
-// floor. An opus-tier agent doing real analysis on this repo legitimately needs
-// more than 11 minutes. Both vocabularies are listed for the same reason retro
-// carries two keys (the cycle-1054 unit-green/live-dead defect): the runner
-// dispatches Agent = the core phase NAME ("tdd"/"build"/"audit"), while the
-// persona vocabulary spells the same phases "tdd-engineer"/"builder"/"auditor",
-// and the skew is permanent.
-//
-// This list stays NARROW by design. Every phase NOT named here deliberately
-// keeps the 300s builtin, so global hang detection is not weakened across the
-// board to fix the phases that legitimately think for a long time — a wedged
-// scout/intent/triage/ship is still surfaced in ~11 minutes, not ~2.3 hours.
+// defaultPhaseArtifactTimeoutS keys each phase by both its agent label and persona alias (the two differ
+// permanently), and stays narrow so every other phase keeps the 300s hang-detection builtin.
 var defaultPhaseArtifactTimeoutS = map[string]int{
 	"retrospective":      900,
 	"retro":              900,
@@ -179,17 +135,7 @@ var defaultPhaseArtifactTimeoutS = map[string]int{
 	"adversarial-review": 1200,
 }
 
-// PhaseArtifactTimeouts resolves the per-phase artifact-wait budgets in
-// seconds, keyed on bridge agent label: the compiled defaults merged with the
-// operator's phase_artifact_timeout_s overrides. Overrides are positive-only —
-// a zero or negative entry is rejected rather than applied, so a typo can
-// neither silently restore a compiled default's pre-fix cliff nor yield a
-// negative deadline. A listed POSITIVE value is authoritative in both
-// directions: an operator may deliberately raise or lower a compiled default,
-// because explicit config outranks a compiled guess. A phase with no entry
-// resolves 0, the bridge's "use the built-in default" sentinel (300s), and the
-// global ArtifactTimeoutS is never read or written here. Returns a fresh map on
-// every call so a mutating caller cannot poison later resolutions.
+// PhaseArtifactTimeouts returns a fresh map of compiled per-phase budgets merged with positive overrides.
 func (p BridgePolicy) PhaseArtifactTimeouts() map[string]int {
 	out := make(map[string]int, len(defaultPhaseArtifactTimeoutS)+len(p.PhaseArtifactTimeoutS))
 	for phase, budget := range defaultPhaseArtifactTimeoutS {
@@ -203,9 +149,7 @@ func (p BridgePolicy) PhaseArtifactTimeouts() map[string]int {
 	return out
 }
 
-// BridgeConfig returns the configured bridge policy. Zero int fields mean
-// "use bridge built-in defaults"; the bridge package resolves them via
-// defaultIfZero.
+// BridgeConfig returns the bridge block, or the zero value when absent.
 func (p Policy) BridgeConfig() BridgePolicy {
 	if p.Bridge == nil {
 		return BridgePolicy{}
@@ -213,18 +157,15 @@ func (p Policy) BridgeConfig() BridgePolicy {
 	return *p.Bridge
 }
 
-// QuotaResetConfig configures the quota-reset wake-time estimator (quotareset package).
-// Replaces the EVOLVE_QUOTA_RESET_AT and EVOLVE_QUOTA_RESET_HOURS env reads.
+// QuotaResetConfig configures the quotareset wake-time estimator.
 type QuotaResetConfig struct {
-	// ResetAt is an operator-supplied ISO 8601 wake-time override. Empty = no override.
+	// ResetAt is an ISO 8601 wake-time override; empty means none.
 	ResetAt string `json:"reset_at,omitempty"`
-	// DefaultHours is the fallback wake duration when no override or hint file
-	// is present. Zero = use built-in default (5.4167 ≈ 5h25min).
+	// DefaultHours is the fallback wake duration; 0 means the built-in 5.4167 (about 5h25m).
 	DefaultHours float64 `json:"default_hours,omitempty"`
 }
 
-// QuotaResetConfig returns a QuotaResetConfig with defaults resolved.
-// When absent from policy.json the zero value means "use quotareset built-in defaults".
+// QuotaResetConfig returns the quota_reset block, or the zero value (quotareset defaults) when absent.
 func (p Policy) QuotaResetConfig() QuotaResetConfig {
 	if p.QuotaReset == nil {
 		return QuotaResetConfig{}
@@ -232,18 +173,13 @@ func (p Policy) QuotaResetConfig() QuotaResetConfig {
 	return *p.QuotaReset
 }
 
-// CLIHealthConfig configures the CLI-health subsystem. ProactiveProbe enables
-// the per-cycle, concurrent usage/status probe that benches capped families
-// BEFORE any phase boots them — complementing the reactive bench (which only
-// learns of a cap after a phase already burned a boot). Off by default; the
-// EVOLVE_CLI_HEALTH=0 env gate remains the master kill-switch for the whole
-// subsystem (canary + probe).
+// CLIHealthConfig configures the CLI-health subsystem; EVOLVE_CLI_HEALTH=0 still disables all of it.
 type CLIHealthConfig struct {
+	// ProactiveProbe (opt-in) benches capped CLI families before any phase boots them.
 	ProactiveProbe bool `json:"proactive_probe,omitempty"`
 }
 
-// CLIHealthConfig returns the CLI-health config; the zero value (absent block)
-// means ProactiveProbe=false.
+// CLIHealthConfig returns the cli_health block, or the zero value (probe off) when absent.
 func (p Policy) CLIHealthConfig() CLIHealthConfig {
 	if p.CLIHealth == nil {
 		return CLIHealthConfig{}
@@ -251,13 +187,11 @@ func (p Policy) CLIHealthConfig() CLIHealthConfig {
 	return *p.CLIHealth
 }
 
-// DispatchConfig configures the loop dispatch verification policy and circuit-breaker.
-// Replaces EVOLVE_DISPATCH_POLICY and EVOLVE_DISPATCH_REPEAT_THRESHOLD env reads.
+// DispatchConfig configures loop dispatch verification and its repeat circuit-breaker.
 type DispatchConfig struct {
-	// Policy selects dispatch verification: "off" / "verify" (default) / "stop".
+	// Policy is "off", "verify" (default) or "stop".
 	Policy string `json:"policy,omitempty"`
-	// RepeatThreshold is the same-cycle repeat count that trips the circuit-breaker.
-	// Zero / absent ⇒ built-in default (5).
+	// RepeatThreshold is the same-cycle repeat count that trips the breaker; non-positive means 5.
 	RepeatThreshold int `json:"repeat_threshold,omitempty"`
 }
 
@@ -277,5 +211,3 @@ func (p Policy) DispatchConfig() DispatchConfig {
 	}
 	return c
 }
-
-// WorkflowPolicy is the .evolve/policy.json "workflow" block.

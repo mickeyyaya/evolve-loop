@@ -1,18 +1,3 @@
-// composition_write_test.go — RED contract for WriteCompositionVerdict, the
-// RUNG 0 producer (cycle-787; knowledge-base/research/merge-concurrency-2026).
-// Cycle-786 landed the reader (ship.tryTrivialRebaseCarryForward) and the
-// kernel verifier (verifyCompositionLine); nothing in the tree writes a
-// composition-verdict line yet. These tests encode the writer's contract:
-//
-//   - round-trip: a written line is accepted by the existing kernel verify
-//     and carries every field both consumer structs read;
-//   - fail-closed at write time: a patch_id that does not recompute from the
-//     supplied diffs, or a gate_results map not green on the full
-//     ciparity.RequiredComposedGates set, is an error and appends NOTHING;
-//   - empty/whitespace-only diffs are rejected (mirrors PatchID(nil) erroring).
-//
-// Builder contract: implement WriteCompositionVerdict in composition.go to
-// turn these GREEN. Do not modify this file.
 package ledger
 
 import (
@@ -26,8 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
 )
 
-// passingComposedGates returns the full required composed-tree gate set,
-// all green — built from the SSOT list, not a second hardcoded copy.
 func passingComposedGates() map[string]string {
 	m := make(map[string]string, len(ciparity.RequiredComposedGates))
 	for _, g := range ciparity.RequiredComposedGates {
@@ -36,9 +19,6 @@ func passingComposedGates() map[string]string {
 	return m
 }
 
-// honestWriteInput builds a CompositionVerdictInput whose patch_id honestly
-// recomputes from its diffs and whose gates are all green; artifacts persist
-// under artifactDir.
 func honestWriteInput(t *testing.T, artifactDir string) CompositionVerdictInput {
 	t.Helper()
 	honestID, err := PatchID([]byte(compTestDiff))
@@ -59,8 +39,6 @@ func honestWriteInput(t *testing.T, artifactDir string) CompositionVerdictInput 
 	}
 }
 
-// ledgerSize stats ledgerPath, treating "does not exist" as size 0 so the
-// no-partial-write assertions cover both a fresh and a pre-populated ledger.
 func ledgerSize(t *testing.T, ledgerPath string) int64 {
 	t.Helper()
 	fi, err := os.Stat(ledgerPath)
@@ -73,11 +51,6 @@ func ledgerSize(t *testing.T, ledgerPath string) int64 {
 	return fi.Size()
 }
 
-// TestWriteCompositionVerdict_RoundTrip: write → read back → kernel verify.
-// The written line must satisfy BOTH consumers: ship's compositionEntry
-// (kind/method/lane_audit_ref/patch_id/audited_base/git_head/tree_state_sha/
-// gate_results) and ledger's compositionFields (patch_id + both persisted
-// diff artifact paths), and the existing Verify must accept it unchanged.
 func TestWriteCompositionVerdict_RoundTrip(t *testing.T) {
 	dir := t.TempDir()
 	ledgerPath := filepath.Join(dir, "ledger.jsonl")
@@ -123,8 +96,6 @@ func TestWriteCompositionVerdict_RoundTrip(t *testing.T) {
 		}
 	}
 
-	// The persisted artifacts must round-trip byte-for-byte: kernel verify
-	// recomputes patch-id from these files, not from the caller's memory.
 	for field, want := range map[string]string{
 		"audited_diff_path":  compTestDiff,
 		"composed_diff_path": compTestDiff,
@@ -142,18 +113,12 @@ func TestWriteCompositionVerdict_RoundTrip(t *testing.T) {
 		}
 	}
 
-	// The whole point: the EXISTING kernel verifier accepts the writer's
-	// output with zero changes on the verify side.
 	if err := New(dir).Verify(context.Background()); err != nil {
 		t.Fatalf("existing ledger Verify must accept a written composition-verdict: %v", err)
 	}
 }
 
-// TestWriteCompositionVerdict_RejectsPatchIDMismatch: fail-closed at write
-// time. A claimed patch_id that does not recompute from the supplied diffs,
-// or a gate_results map missing/failing any required composed gate, is an
-// error AND appends nothing — asserted by ledger byte-length, not just the
-// error return (a fake that errors after writing must fail here).
+// Also covers missing and failed required gates, not only a patch-id mismatch.
 func TestWriteCompositionVerdict_RejectsPatchIDMismatch(t *testing.T) {
 	cases := []struct {
 		name   string
@@ -176,8 +141,7 @@ func TestWriteCompositionVerdict_RejectsPatchIDMismatch(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
 			ledgerPath := filepath.Join(dir, "ledger.jsonl")
-			// Pre-populate so "appends nothing" is a real byte-length
-			// delta check, not just "file still absent".
+			// Pre-populated, so "appends nothing" is a byte-length delta rather than "file still absent".
 			preexisting := []byte(`{"kind":"unrelated"}` + "\n")
 			if err := os.WriteFile(ledgerPath, preexisting, 0o644); err != nil {
 				t.Fatalf("seed ledger: %v", err)
@@ -197,11 +161,6 @@ func TestWriteCompositionVerdict_RejectsPatchIDMismatch(t *testing.T) {
 	}
 }
 
-// TestWriteCompositionVerdict_EmptyDiff: an empty or whitespace-only diff for
-// either artifact is rejected before anything is persisted (mirrors
-// PatchID(nil) erroring rather than returning a forgeable empty identity).
-// The whitespace-only case exists precisely to catch a writer that
-// special-cases "" but not "   \n".
 func TestWriteCompositionVerdict_EmptyDiff(t *testing.T) {
 	cases := []struct {
 		name   string

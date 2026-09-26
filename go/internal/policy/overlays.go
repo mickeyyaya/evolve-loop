@@ -1,20 +1,3 @@
-// overlays.go — skill-overlay resolver (cycle-609 skill-overlays-bridge-layer).
-//
-// The nil-able-pointer + resolver idiom mirrors ObserverPolicy/ObserverConfig
-// (policy.go): Policy.Overlays == nil ⇒ the compiled default applies; a non-nil
-// block with an empty Rules slice is an explicit operator opt-out (zero
-// overlays, NOT the default); a non-nil block with rules resolves the UNION of
-// every matching rule's skills, deduped, in stable (first-seen) order.
-//
-// The core is the policy-layer resolver — a pure, side-effect-free mapping from
-// a dispatch descriptor to an ordered skill list (ResolveOverlays). The
-// producers that construct an OverlayDispatch from a live launch already landed:
-// the phase runner threads ResolveOverlays onto BridgeRequest.Skills per tiered
-// dispatch (phases/runner/runner.go), and the non-phase dispatch sites
-// (subagent.Run, retro.Phase.Run, swarmrunner's launcher) resolve through
-// ResolveLaunchOverlaysFailOpen below. skills/fable/ is already covered by the
-// ProtectedSurfaceManifest (guards/integrity_surface.go), so the F1 surface is
-// live, not dormant.
 package policy
 
 import (
@@ -26,13 +9,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 )
 
-// OverlaysPolicy is the operator-configurable skill-overlay block. Rules are
-// evaluated in order; a dispatch may match several (their skills union).
+// OverlaysPolicy is the "overlays" block; a dispatch may match several rules, and their skills union.
 type OverlaysPolicy struct {
 	Rules []OverlayRule `json:"rules,omitempty"`
-	// Advisor bounds what the advisor may PROPOSE per dispatch (allow/deny list,
-	// per-dispatch cap). nil ⇒ compiled defaults (unbounded allow, empty deny,
-	// max_skills_per_dispatch=2). Advisory adds; the clamp never widens policy.
+	// Advisor bounds what the advisor may propose; nil means allow all, deny none, max 2.
 	Advisor *AdvisorOverlayPolicy `json:"advisor,omitempty"`
 }
 
@@ -43,41 +23,28 @@ type AdvisorOverlayPolicy struct {
 	MaxSkillsPerDispatch int      `json:"max_skills_per_dispatch,omitempty"`
 }
 
-// defaultMaxSkillsPerDispatch is the compiled cap applied when the operator
-// leaves overlays.advisor (or its max) unset.
 const defaultMaxSkillsPerDispatch = 2
 
-// AdvisorSkillRejection records one clamped-out advisor proposal. Reason is one
-// of the literal strings "not-in-registry", "denylisted",
-// "over-max-skills-per-dispatch" — logged to advisor-rejections.json, never a
-// silent drop.
+// AdvisorSkillRejection records one clamped-out proposal, logged to advisor-rejections.json.
 type AdvisorSkillRejection struct {
-	Skill  string `json:"skill"`
+	Skill string `json:"skill"`
+	// Reason is "not-in-registry", "not-allowlisted", "denylisted" or "over-max-skills-per-dispatch".
 	Reason string `json:"reason"`
 }
 
-// OverlayRule matches a dispatch when EVERY non-empty selector dimension
-// matches. An empty dimension is a wildcard. Patterns are glob (path.Match), so
-// a literal like "audit" matches only itself while "gpt-*" matches "gpt-5".
+// OverlayRule matches when every non-empty selector glob-matches (path.Match) and every When clause holds.
 type OverlayRule struct {
 	Phases []string `json:"phases,omitempty"`
 	CLIs   []string `json:"clis,omitempty"`
 	Models []string `json:"models,omitempty"`
 	Tiers  []string `json:"tiers,omitempty"`
-	// When keys the rule on the CYCLE's objective signals (ADR-0099 slice 3):
-	// every clause must hold against OverlayDispatch.Signals. An absent
-	// signal never matches (fail-closed, the D2 discipline), so a rule keyed
-	// on `deliverable_kind == document` is inert until core has projected a
-	// document kind. The clause type is the kernel's own (config.Condition),
-	// string-valued here: {"field": "deliverable_kind", "op": "eq", "value": "document"}.
+	// When keys the rule on the cycle's signals; a clause on an absent signal never matches.
+	// See ADR-0099.
 	When   []config.Condition `json:"when,omitempty"`
 	Skills []string           `json:"skills,omitempty"`
 }
 
-// OverlayDispatch is the descriptor a resolver call is keyed on — the phase,
-// driver (cli), model, and capability tier of a single agent launch, plus the
-// cycle's objective signals the `when` selector reads (nil when the caller
-// has none: every `when` rule then stays inert).
+// OverlayDispatch describes one agent launch for overlay resolution; nil Signals leaves every When rule inert.
 type OverlayDispatch struct {
 	Phase   string
 	CLI     string
@@ -86,27 +53,18 @@ type OverlayDispatch struct {
 	Signals map[string]string
 }
 
-// compiledDefaultOverlays is the single source of the built-in overlay set —
-// the ONLY Go literal tier→skills mapping in this package. Operators override
-// it wholesale via policy.json's overlays block (absent ⇒ this default; empty
-// rules ⇒ opt out).
+// compiledDefaultOverlays is the only built-in tier→skills mapping; a policy overlays block replaces it wholesale.
 func compiledDefaultOverlays() []OverlayRule {
 	document := []config.Condition{{Field: config.SignalDeliverableKind, Op: "eq", Value: config.DeliverableKindDocument}}
 	return []OverlayRule{
 		{Tiers: []string{"deep", "top"}, Skills: []string{"fable"}},
-		// ADR-0099 slice 3: a document cycle's discovery, build and audit run
-		// under the solution-skill personas — deterministic, signal-keyed, and
-		// inert for every code cycle (absent/`code` signal ⇒ no match).
 		{Phases: []string{"scout"}, When: document, Skills: []string{"solution-scout"}},
 		{Phases: []string{"build"}, When: document, Skills: []string{"solution-build"}},
 		{Phases: []string{"audit"}, When: document, Skills: []string{"solution-audit"}},
 	}
 }
 
-// CompiledDefaultOverlaySkills returns every skill the compiled-default rules
-// can preload, deduped in rule order — the ONE list the integrity guard pins
-// ProtectedSurfaceManifest to: a persona the kernel injects on its own
-// authority is control-plane (docs/architecture/skill-overlays.md).
+// CompiledDefaultOverlaySkills lists the compiled-default skills; ProtectedSurfaceManifest is pinned to it.
 func CompiledDefaultOverlaySkills() []string {
 	var out []string
 	seen := map[string]struct{}{}
@@ -122,12 +80,11 @@ func CompiledDefaultOverlaySkills() []string {
 	return out
 }
 
-// ResolveOverlays returns the ordered, deduped skill list that applies to the
-// given dispatch. See the file header for the nil/empty/rules contract.
+// ResolveOverlays returns the deduped skills, in first-seen order, of every rule matching d.
 func (p Policy) ResolveOverlays(d OverlayDispatch) []string {
 	rules := compiledDefaultOverlays()
 	if p.Overlays != nil {
-		rules = p.Overlays.Rules // explicit block (possibly empty ⇒ opt-out)
+		rules = p.Overlays.Rules
 	}
 	var out []string
 	seen := map[string]struct{}{}
@@ -149,30 +106,15 @@ func (p Policy) ResolveOverlays(d OverlayDispatch) []string {
 	return out
 }
 
-// DispatchFromPhaseRequest builds an OverlayDispatch from a single phase
-// launch's routing fields. It is a pure field mapping — the caller resolves
-// the routing-mode tier logic BEFORE calling: pass tier="" for the non-auto
-// degrade floor, and a populated tier only under model_routing=auto with a
-// non-nil clamped plan (mirrors core.PhaseRequest.ModelRoutingCLI/
-// ModelRoutingTier).
+// DispatchFromPhaseRequest builds an OverlayDispatch; pass tier="" unless model_routing=auto produced a tier.
 func DispatchFromPhaseRequest(phase, cli, model, tier string) OverlayDispatch {
 	return OverlayDispatch{Phase: phase, CLI: cli, Model: model, Tier: tier}
 }
 
-// ResolveLaunchOverlaysFailOpen loads projectRoot's policy.json and returns the
-// skill-overlay NAMES for the given dispatch. It is the shared entry point for
-// the non-phase dispatch sites (subagent.Run, retro.Phase.Run, swarmrunner's
-// bridgeLauncher) so a launch through ANY BridgeRequest construction seam
-// attaches the same tier-gated persona the phase runner threads — a single
-// source, not three copies of load+resolve. It is FAIL-OPEN (AC3): a missing or
-// malformed policy.json degrades to the compiled-default overlays with a WARN to
-// stderr rather than aborting the launch (the phase runner hard-fails on a
-// malformed policy instead, since a phase dispatch has a report path to carry
-// the error; these seams do not). These sites have no separate routing tier, so
-// the model override IS the tier — pass model for both, mirroring runner.go's
-// DispatchFromPhaseRequest(phase, cli, tier, tier).
+// ResolveLaunchOverlaysFailOpen resolves overlays for the non-phase launch seams, where model doubles as the tier.
 func ResolveLaunchOverlaysFailOpen(projectRoot, phase, cli, model string) []string {
 	pol, err := Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
+	// Fail open: these seams have no report to carry the error, unlike the phase runner.
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[overlays] WARN policy load failed (%v) — using compiled-default overlays\n", err)
 		pol = Policy{}
@@ -180,14 +122,7 @@ func ResolveLaunchOverlaysFailOpen(projectRoot, phase, cli, model string) []stri
 	return pol.ResolveOverlays(DispatchFromPhaseRequest(phase, cli, model, model))
 }
 
-// SkillRegistryFromFS reads the skill registry from the filesystem: every
-// immediate subdirectory of skillsDir that contains a SKILL.md is a skill, its
-// directory name the registry entry. A directory without SKILL.md is not a
-// skill and is excluded. An empty (or SKILL.md-less) skillsDir is a valid,
-// degenerate registry — it returns an empty list, not an error — so every
-// proposal clamps to nothing rather than the loader failing on a legitimate
-// empty state. This is the single source of the advisor's allowed skill names;
-// no hand-maintained list exists (drift-proof, AC5).
+// SkillRegistryFromFS lists skillsDir's subdirectories that contain a SKILL.md; none is a valid empty registry.
 func SkillRegistryFromFS(skillsDir string) ([]string, error) {
 	entries, err := os.ReadDir(skillsDir)
 	if err != nil {
@@ -199,23 +134,16 @@ func SkillRegistryFromFS(skillsDir string) ([]string, error) {
 			continue
 		}
 		if _, err := os.Stat(filepath.Join(skillsDir, e.Name(), "SKILL.md")); err != nil {
-			continue // no SKILL.md ⇒ not a skill
+			continue
 		}
 		out = append(out, e.Name())
 	}
 	return out, nil
 }
 
-// ClampAdvisorSkills disposes of an advisor's proposed skill set against the
-// filesystem registry and the operator's overlays.advisor block: "advisor
-// proposes, kernel disposes". Accepted skills keep the advisor's proposal order
-// (its own priority ordering — never re-sorted). Every clamped-out skill yields
-// exactly one AdvisorSkillRejection with a literal reason, so nothing is
-// silently dropped. Membership is verbatim string equality against the
-// registry, so a proposal containing a path separator (or any string not a
-// registry entry) never resolves — the clamp never joins/normalizes a proposal
-// against the skills root before comparing (AC3 injection guard).
+// ClampAdvisorSkills filters proposals by registry and overlays.advisor in order, recording each rejection.
 func (p Policy) ClampAdvisorSkills(proposed, registry []string) (accepted []string, rejections []AdvisorSkillRejection) {
+	// Exact string membership, never path-normalized, so a path-like proposal can never resolve.
 	inRegistry := make(map[string]struct{}, len(registry))
 	for _, s := range registry {
 		inRegistry[s] = struct{}{}
@@ -258,12 +186,7 @@ func (p Policy) ClampAdvisorSkills(proposed, registry []string) (accepted []stri
 	return accepted, rejections
 }
 
-// ResolveOverlaysWithAdvisor returns the additive union of the static overlay
-// rules (ResolveOverlays) and the already-clamped advisor skills, deduped in
-// stable static-first order. A nil/empty advisor proposal is byte-identical to
-// ResolveOverlays — advisory adds, never replaces policy (AC1). Callers MUST
-// pass skills already run through ClampAdvisorSkills; this merge does not
-// re-validate them against the registry.
+// ResolveOverlaysWithAdvisor appends already-clamped advisor skills, deduped, after ResolveOverlays' result.
 func (p Policy) ResolveOverlaysWithAdvisor(d OverlayDispatch, clampedAdvisorSkills []string) []string {
 	out := p.ResolveOverlays(d)
 	if len(clampedAdvisorSkills) == 0 {
@@ -283,7 +206,6 @@ func (p Policy) ResolveOverlaysWithAdvisor(d OverlayDispatch, clampedAdvisorSkil
 	return out
 }
 
-// toSet builds a membership set from a string slice.
 func toSet(ss []string) map[string]struct{} {
 	m := make(map[string]struct{}, len(ss))
 	for _, s := range ss {
@@ -292,8 +214,6 @@ func toSet(ss []string) map[string]struct{} {
 	return m
 }
 
-// matches reports whether every non-empty selector dimension of the rule is
-// satisfied by the dispatch.
 func (r OverlayRule) matches(d OverlayDispatch) bool {
 	return matchDim(r.Phases, d.Phase) &&
 		matchDim(r.CLIs, d.CLI) &&
@@ -302,13 +222,8 @@ func (r OverlayRule) matches(d OverlayDispatch) bool {
 		matchWhen(r.When, d.Signals)
 }
 
-// matchWhen reports whether every `when` clause holds. A clause over an
-// ABSENT signal is false in both polarities and an unknown op is false
-// (fail-closed). Which signals can be absent is the producer's contract: core
-// always supplies config.SignalDeliverableKind (declared, else the project default,
-// else "code" — so `ne document` DOES fire on a default-code cycle) and
-// config.SignalGoalType only when the scout declared one; a nil-Signals dispatch
-// (the non-phase launch seams) matches no `when` rule at all.
+// matchWhen fails closed: an absent signal, a non-string value or an unknown op
+// never matches, in either polarity.
 func matchWhen(when []config.Condition, signals map[string]string) bool {
 	for _, c := range when {
 		v, ok := signals[c.Field]
@@ -332,9 +247,6 @@ func matchWhen(when []config.Condition, signals map[string]string) bool {
 	return true
 }
 
-// matchDim reports whether value satisfies a selector dimension. An empty
-// patterns slice is a wildcard (matches anything); otherwise value must
-// glob-match at least one pattern.
 func matchDim(patterns []string, value string) bool {
 	if len(patterns) == 0 {
 		return true

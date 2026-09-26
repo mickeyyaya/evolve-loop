@@ -7,11 +7,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// PhasePolicy is the single enablement-decision object (Fowler's "decision point
-// vs router"): it answers "should phase X run this cycle?" from the injected
-// config + digested signals, so phase code never reads EVOLVE_* env vars itself.
-// This collapses the scattered Skipper os.Getenv checks (triage/buildplanner/
-// scout/audit/retro) into one polymorphic decision.
+// PhasePolicy answers "should phase X run this cycle?" from injected config, so phase code never reads env vars.
 type PhasePolicy struct {
 	Cfg config.RoutingConfig
 }
@@ -19,9 +15,7 @@ type PhasePolicy struct {
 // NewPhasePolicy builds a policy from the loaded config.
 func NewPhasePolicy(cfg config.RoutingConfig) PhasePolicy { return PhasePolicy{Cfg: cfg} }
 
-// Enabled reports whether a phase should run. Precedence mirrors the router's
-// shouldRun (minus the routing-level insertion cap, which is not a phase's
-// concern): mandatory > conditional-pin > forced on/off > content trigger.
+// Enabled reports whether a phase should run, with shouldRun's precedence minus the insertion cap.
 func (p PhasePolicy) Enabled(phase string, sig RoutingSignals) bool {
 	if isMandatory(p.Cfg, phase) {
 		return true
@@ -39,23 +33,9 @@ func (p PhasePolicy) Enabled(phase string, sig RoutingSignals) bool {
 	}
 }
 
-// ShouldRunPhase is the enablement authority for a SELF-SKIPPING phase
-// (triage/tdd/build-planner consult it from their Skipper.ShouldSkip). It is
-// deliberately stage-aware:
-//
-//   - Below Enforce (Off/Shadow/Advisory) it is pure flag/enable resolution —
-//     byte-identical to the legacy req.Env["EVOLVE_*"] checks — because the
-//     STATIC state machine, not the router, owns sequencing there. The
-//     conditional-pin and content triggers (which need digested signals) are
-//     NOT applied at the phase level; signal-aware routing is the
-//     orchestrator's job.
-//   - From Enforce up it defers to the full kernel policy (Enabled), so a
-//     conditional-pinned phase cannot be flag-disabled. Signal-aware
-//     insert/skip already happened at the transition; the phase passes empty
-//     signals here and simply confirms "run".
-//
-// This split is what lets the same one code path preserve legacy Stage:Off
-// behavior while honoring the trust kernel under Enforce.
+// ShouldRunPhase decides for a self-skipping phase. Below Enforce the static state machine owns
+// sequencing, so it resolves only enable flags; from Enforce up it defers to Enabled, so a pinned
+// phase cannot be flag-disabled.
 func (p PhasePolicy) ShouldRunPhase(phase string) bool {
 	if p.Cfg.Stage >= config.StageEnforce {
 		return p.Enabled(phase, RoutingSignals{})
@@ -69,27 +49,16 @@ func (p PhasePolicy) ShouldRunPhase(phase string) bool {
 	case config.EnableOn:
 		return true
 	default:
-		// Optional phase with no explicit enable in a legacy stage ⇒ skip
-		// (matches build-planner's opt-in default). With config defaults +
-		// registry `enabled` set, the self-skipping phases never land here.
 		return false
 	}
 }
 
-// PolicyForProject resolves the PhasePolicy a phase should use from its
-// request, via config.Load (the sole env interpreter — env is the injected
-// req.Env map, never os.Getenv). A missing registry falls back to config
-// defaults, so the legacy run/skip posture holds even in tests. Calling the
-// deterministic loader per phase avoids threading the injected policy through
-// the two phase-construction paths (orchestrator wiring + registry factories)
-// and the zero-value-skip hazard that would create.
+// PolicyForProject loads the PhasePolicy for a phase from the registry and env; a missing registry uses defaults.
+// Loading per phase avoids threading a policy through both phase-construction paths.
 func PolicyForProject(projectRoot string, env map[string]string) PhasePolicy {
 	cfg, _ := config.Load(config.RegistryPath(projectRoot), env)
-	// Apply the user policy's mandatory_phases here too, identically to the
-	// loop's composition root — otherwise a self-skipping phase (triage/tdd/
-	// build-planner) made mandatory ONLY by policy would re-read config without
-	// the merge and skip itself. A malformed policy is ignored here (best-effort
-	// for the skip decision); the runner re-loads it and hard-fails at dispatch.
+	// Merge policy exactly as the composition root does, or a phase made mandatory only by
+	// policy would skip itself. A malformed policy is ignored here and hard-fails at dispatch.
 	if pol, err := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json")); err == nil {
 		cfg.Mandatory = pol.MergeMandatory(cfg.Mandatory)
 		cfg.AuditFailRoutesTo = FailureRouteFromPolicy(pol)
@@ -97,14 +66,9 @@ func PolicyForProject(projectRoot string, env map[string]string) PhasePolicy {
 	return PhasePolicy{Cfg: cfg}
 }
 
-// FailureRouteFromPolicy folds policy.json:failure_floor into the single
-// audit-FAIL route the router consumes (Phase 4a — one user surface).
-// always_learn=false tunes the DEFAULT route down to the lightweight memo
-// phase — an explicitly written audit_fail_routes_to:"retrospective" wins
-// (explicit beats derived; FailurePolicy launders defaults, so the raw
-// field is checked here). An absent failure_floor returns "" so the
-// deprecated enable-chain behavior stands for one more release. The
-// deterministic floor is unaffected either way.
+// FailureRouteFromPolicy folds policy.json:failure_floor into the audit-FAIL route, or "" when absent.
+// always_learn=false downgrades the default route to memo, but an explicit "retrospective" wins; the raw
+// field is read because FailurePolicy launders defaults.
 func FailureRouteFromPolicy(pol policy.Policy) string {
 	if pol.FailureFloor == nil {
 		return ""

@@ -7,12 +7,7 @@ import (
 	"testing"
 )
 
-// TestPersonaTemplates_CarryTheHeaderLines — ADR-0099 slice 3: the words the
-// kernel READS (HeaderGoalType, HeaderDeliverableKind, HeaderCycleSize) are the
-// words the scout and triage personas WRITE. Two pins per header: the
-// DISPATCHED persona names it as a directive (agents/evolve-scout.md's
-// operational body — the reference file is stripped from dispatched prompts),
-// and the output template carries it as a line-start header.
+// The reference file is stripped from dispatched prompts, so the dispatched scout persona must name each header too.
 func TestPersonaTemplates_CarryTheHeaderLines(t *testing.T) {
 	agents := filepath.Join("..", "..", "..", "agents")
 	read := func(name string) string {

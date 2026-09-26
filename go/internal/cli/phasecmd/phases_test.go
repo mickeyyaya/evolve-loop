@@ -8,8 +8,6 @@ import (
 	"testing"
 )
 
-// newPhasesProject builds a temp project root with a minimal built-in registry
-// and points EVOLVE_PROJECT_ROOT at it. Returns the root.
 func newPhasesProject(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
@@ -73,7 +71,6 @@ func TestRunPhases_ValidateClean(t *testing.T) {
 
 func TestRunPhases_ValidateFail(t *testing.T) {
 	root := newPhasesProject(t)
-	// not optional → floor violation
 	writeUserPhaseFile(t, root, "bad-phase", `{"name":"bad-phase","optional":false}`)
 	var out, errb bytes.Buffer
 	if rc := RunPhases([]string{"validate"}, nil, &out, &errb); rc != 2 {
@@ -90,19 +87,16 @@ func TestRunPhases_AddThenValidate(t *testing.T) {
 	if rc := RunPhases([]string{"add", "my-check"}, nil, &out, &errb); rc != 0 {
 		t.Fatalf("add rc = %d, want 0; stderr=%s", rc, errb.String())
 	}
-	// scaffolded files exist
 	for _, f := range []string{"phase.json", "agent.md", "profile.json"} {
 		p := filepath.Join(root, ".evolve", "phases", "my-check", f)
 		if _, err := os.Stat(p); err != nil {
 			t.Errorf("scaffold missing %s: %v", f, err)
 		}
 	}
-	// the scaffolded spec validates clean
 	out.Reset()
 	if rc := RunPhases([]string{"validate", "my-check"}, nil, &out, &errb); rc != 0 {
 		t.Errorf("validate scaffolded rc = %d, want 0; out=%s", rc, out.String())
 	}
-	// re-add refuses
 	if rc := RunPhases([]string{"add", "my-check"}, nil, &out, &errb); rc != 1 {
 		t.Errorf("re-add rc = %d, want 1 (exists)", rc)
 	}
@@ -110,8 +104,6 @@ func TestRunPhases_AddThenValidate(t *testing.T) {
 
 func TestRunPhases_BadName(t *testing.T) {
 	newPhasesProject(t)
-	// Uppercase/space and path-traversal names are both rejected before any
-	// mkdir (ValidateUserSpec's kebab-case floor), closing the escape vector.
 	for _, bad := range []string{"Bad Name", "../escape", "a/b"} {
 		var out, errb bytes.Buffer
 		if rc := RunPhases([]string{"add", bad}, nil, &out, &errb); rc != 10 {

@@ -7,15 +7,6 @@ import (
 	"testing"
 )
 
-// TestIter_RealLedger_NoStringCycleError confirms that the live reader
-// can iterate the project's real .evolve/ledger.jsonl end-to-end
-// without the "json: cannot unmarshal string into Go struct field
-// LedgerEntry.cycle of type int" failure that the dispatcher logged at
-// line 1740 during cycle-107 (2026-05-26).
-//
-// The test is skipped when the file isn't reachable (CI sandboxes,
-// fresh checkouts), so this acts as a project-local smoke without
-// constraining external test environments.
 func TestIter_RealLedger_NoStringCycleError(t *testing.T) {
 	candidates := []string{
 		filepath.Join("..", "..", "..", "..", ".evolve"),
@@ -60,9 +51,6 @@ func TestIter_RealLedger_NoStringCycleError(t *testing.T) {
 	if read == 0 {
 		t.Fatal("expected at least one entry from real ledger")
 	}
-	// Sanity: we know the v10.16.0 manual entry exists in this project's
-	// ledger. If the project ledger is loaded, we expect at least one
-	// CycleLabel-carrying entry (the legacy bad line at seq=1740).
 	if withLabel == 0 {
 		t.Logf("note: zero labeled entries — either the project ledger predates the v10.16.0 manual entry, or it was rewritten")
 	}

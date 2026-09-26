@@ -1,11 +1,5 @@
 package dossier
 
-// read_test.go — ReadCommitted's own contract. Its production caller is the loop
-// summary's spine fail-open roll-up (cmd/evolve/cmd_loop_outcome.go
-// spineFailOpenRollup), which needs exactly three properties from this reader: the
-// window is honored (a batch must not fold history), the cycle order is
-// deterministic, and one broken file cannot take the reporting surface down.
-
 import (
 	"encoding/json"
 	"fmt"
@@ -38,9 +32,6 @@ func writeCorpusDossier(t *testing.T, root string, cycle int, events []cyclestat
 	}
 }
 
-// TestReadCommitted_WindowedAscendingAndFaultTolerant covers all three properties
-// in one pass over one corpus, because they are one contract: what a batch-scoped
-// reporting surface can safely trust.
 func TestReadCommitted_WindowedAscendingAndFaultTolerant(t *testing.T) {
 	root := t.TempDir()
 	writeCorpusDossier(t, root, 9, nil)  // before the window
@@ -71,12 +62,9 @@ func TestReadCommitted_WindowedAscendingAndFaultTolerant(t *testing.T) {
 		t.Errorf("cycle 10 spine fail-opens = %+v, want the committed record round-tripped", got[0].SpineFailOpens)
 	}
 
-	// An absent corpus is not an error: a fresh project has written no dossiers.
 	if got := ReadCommitted(t.TempDir(), 1); got != nil {
 		t.Errorf("absent knowledge-base/cycles returned %+v, want nil", got)
 	}
-	// minCycle <= 0 reads everything — callers that cannot bound their window must
-	// decide for themselves whether that is what they want.
 	if got := ReadCommitted(root, 0); len(got) != 3 {
 		t.Errorf("ReadCommitted(minCycle=0) returned %d, want all 3 parseable dossiers", len(got))
 	}

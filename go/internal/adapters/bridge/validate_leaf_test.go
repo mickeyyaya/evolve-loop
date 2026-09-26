@@ -1,9 +1,5 @@
 package bridge
 
-// validate_leaf_test.go — ADR-0103 unit 10 (design §6 test 39): the adapter's
-// request gauntlet projects the host's ONE rule (gobridge.ValidateRequest) —
-// the same four strings in the same order as the engine's Launch.
-
 import (
 	"testing"
 

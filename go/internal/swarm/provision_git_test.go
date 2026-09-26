@@ -10,10 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
-// White-box, fast-tier coverage that provision's git calls route through the
-// gitexec seam (the newGit factory lets each call pick its own -C dir). The
-// real-git reuse/teardown/error paths stay covered by provision_test.go.
-
 func fakeProvisioner(fake *fixtures.FakeExec, baseOverride string) gitWorkerProvisioner {
 	return gitWorkerProvisioner{baseOverride: baseOverride, newGit: func(dir string) gitexec.Git {
 		return gitexec.Git{Dir: dir, Exec: fake.Run}
@@ -37,10 +33,6 @@ func TestCleanup_RoutesGitWorktreeRemoveThroughSeam(t *testing.T) {
 	}
 }
 
-// TestCleanup_RoutesGitBranchDeleteThroughSeam (S3, workspace-hygiene plan):
-// Cleanup must run `git branch -d <leaf>` in projectRoot AFTER the worktree
-// remove, through the same injectable seam — the FakeExec fast-tier mirror of
-// TestGitWorkerProvisioner_Cleanup_DeletesMergedBranch's real-git assertion.
 func TestCleanup_RoutesGitBranchDeleteThroughSeam(t *testing.T) {
 	fake := &fixtures.FakeExec{}
 	p := fakeProvisioner(fake, "")
@@ -62,9 +54,6 @@ func TestCleanup_RoutesGitBranchDeleteThroughSeam(t *testing.T) {
 	}
 }
 
-// TestCleanup_UnmergedBranch_NeverForceDeletes (S3): a scripted `branch -d`
-// refusal (rc=1, the unmerged case) must NOT be escalated to `-D`, and
-// Cleanup must still return nil (best-effort).
 func TestCleanup_UnmergedBranch_NeverForceDeletes(t *testing.T) {
 	fake := &fixtures.FakeExec{Scripts: map[string]fixtures.ExecResponse{
 		"git branch": {ExitCode: 1, Stderr: "error: the branch is not fully merged"},
@@ -94,8 +83,6 @@ func TestAddWorktree_FreshAdd_RoutesGitWorktreeAddThroughSeam(t *testing.T) {
 	if want := filepath.Join(base, integBranch); wt != want {
 		t.Errorf("wt = %q, want %q", wt, want)
 	}
-	// Fresh add: the worktree dir does not exist, so no reuse rev-parse probe —
-	// exactly one git call, the worktree add.
 	if keys := fake.CallKeys(); !reflect.DeepEqual(keys, []string{"git worktree"}) {
 		t.Fatalf("calls = %v, want [git worktree]", keys)
 	}

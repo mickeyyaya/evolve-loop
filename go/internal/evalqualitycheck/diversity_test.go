@@ -6,7 +6,6 @@ import (
 	"testing"
 )
 
-// writeEvalDir builds a temp dir of eval files from name→body and returns it.
 func writeEvalDir(t *testing.T, files map[string]string) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -26,7 +25,6 @@ func fence(cmds ...string) string {
 	return body + "```\n"
 }
 
-// TestCheckDiversity_Levels is the data-driven matrix over suite shapes.
 func TestCheckDiversity_Levels(t *testing.T) {
 	posEval := fence(`grep -q "Feature initialized" src/f.txt`)
 	negEval := fence(`! grep -q "removed" src/f.txt`)
@@ -90,9 +88,6 @@ func TestCheckDiversity_Levels(t *testing.T) {
 	}
 }
 
-// TestCheckDiversity_ArchiveScaleZeroNegativeIsWarnNotHalt — a large accumulated
-// archive (>maxCohesiveSuiteSize) with zero negatives downgrades HALT→WARN so
-// the legacy .evolve/evals/ corpus is never a hard block.
 func TestCheckDiversity_ArchiveScaleZeroNegativeIsWarnNotHalt(t *testing.T) {
 	pos := fence(`grep -q "x" src/f.txt`)
 	files := map[string]string{}
@@ -109,9 +104,6 @@ func TestCheckDiversity_ArchiveScaleZeroNegativeIsWarnNotHalt(t *testing.T) {
 	}
 }
 
-// TestCheckDiversity_NegativeCasePrecision — the word "failure" inside a grep
-// target must NOT count as a negative case (it's a doc-grep, not a rejection
-// test); shell negation constructs MUST.
 func TestCheckDiversity_NegativeCasePrecision(t *testing.T) {
 	cases := []struct {
 		cmd         string
@@ -120,12 +112,12 @@ func TestCheckDiversity_NegativeCasePrecision(t *testing.T) {
 		{`grep -q "failure pattern analysis" docs/x.md`, false}, // English word, not a negative test
 		{`grep -q "should not fail" docs/x.md`, false},          // still a doc-grep target
 		{`grep -q "result != expected" out.txt`, false},         // != inside a grep string is NOT a negative test
-		{`grep -q "!= mismatch" out.txt`, false},                // != inside a grep string is NOT a negative test
-		{`! grep -q "removed" src/f.txt`, true},                 // shell negation
-		{`test "$x" -ne 0`, true},                               // numeric inequality
-		{`assert_fail "rejects bad input" cmd`, true},           // helper naming
-		{`run cmd; [ "$?" != 0 ]`, true},                        // != inside a test bracket IS a negative assertion
-		{`go test ./...`, false},                                // plain positive
+		{`grep -q "!= mismatch" out.txt`, false},
+		{`! grep -q "removed" src/f.txt`, true},
+		{`test "$x" -ne 0`, true},
+		{`assert_fail "rejects bad input" cmd`, true},
+		{`run cmd; [ "$?" != 0 ]`, true}, // != inside a test bracket IS a negative assertion
+		{`go test ./...`, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.cmd, func(t *testing.T) {
@@ -137,7 +129,6 @@ func TestCheckDiversity_NegativeCasePrecision(t *testing.T) {
 	}
 }
 
-// TestCheckDiversity_EdgeCaseDetection — boundary/OOD keywords flag edge cases.
 func TestCheckDiversity_EdgeCaseDetection(t *testing.T) {
 	dir := writeEvalDir(t, map[string]string{
 		"edge.md": fence(`run cmd --input "" # empty boundary`, `grep -q "invalid" out.txt`),
@@ -151,8 +142,6 @@ func TestCheckDiversity_EdgeCaseDetection(t *testing.T) {
 	}
 }
 
-// TestCheckDiversity_SkipsMetaAndCommandlessFiles — underscore-prefixed files
-// and files with no bash commands do not count toward the suite.
 func TestCheckDiversity_SkipsMetaAndCommandlessFiles(t *testing.T) {
 	dir := writeEvalDir(t, map[string]string{
 		"_canary.md":    fence(`echo "canary"`),
@@ -169,7 +158,6 @@ func TestCheckDiversity_SkipsMetaAndCommandlessFiles(t *testing.T) {
 	}
 }
 
-// TestCheckDiversity_SlugFilter — only files whose name contains the slug count.
 func TestCheckDiversity_SlugFilter(t *testing.T) {
 	dir := writeEvalDir(t, map[string]string{
 		"feat-login.md":  fence(`grep -q "x" f.txt`),
@@ -197,7 +185,6 @@ func TestCheckDiversity_DirNotFound(t *testing.T) {
 	}
 }
 
-// TestCheckDiversity_PerFileFingerprint — verifies the per-file Files slice.
 func TestCheckDiversity_PerFileFingerprint(t *testing.T) {
 	dir := writeEvalDir(t, map[string]string{
 		"neg.md": fence(`! grep -q "x" f.txt`),

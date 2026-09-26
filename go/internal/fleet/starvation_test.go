@@ -7,19 +7,6 @@ import (
 	"testing"
 )
 
-// starvation_test.go — non-acs regression coverage for the recovered L3
-// work-supply-starvation observer (starvation.go). The ACS predicates in
-// go/acs/cycle544 are the cycle-scoped gate; these tests are the PERMANENT,
-// package-local coverage of the observer's public contract and directly satisfy
-// AC-4 (cmd_loop.go's `case ran:` side effect covered OUTSIDE package main) and
-// AC-5 (quota-shrunk anti-no-op) via package-fleet unit tests — the coverage the
-// recovered starvation.go needs and that the cycle-543 diff never provided.
-
-// TestStarvation_QuotaShrunkWaveNeverStarves — AC-5. A quota/capacity shrink
-// (waveCfg.Count < fleetCfg.Count ⇒ QuotaShrunk=true) that leaves DesiredLanes
-// unrealized is NEVER work-supply starvation. Repeated shrunk waves must never
-// advance the streak nor fire. Anti-no-op: an impl that keys off
-// RealizedLanes < DesiredLanes alone fails.
 func TestStarvation_QuotaShrunkWaveNeverStarves(t *testing.T) {
 	shrunk := WaveObservation{DesiredLanes: 4, RealizedLanes: 1, QuotaShrunk: true}
 	if shrunk.Starved() {
@@ -36,11 +23,6 @@ func TestStarvation_QuotaShrunkWaveNeverStarves(t *testing.T) {
 	}
 }
 
-// TestStarvation_ObserveFiresAfterKAndWritesInboxTodo — AC-4. Drives the exact
-// side effect cmd_loop.go's `case ran:` arm performs (observe→build→WriteTo),
-// here outside package main. DesiredLanes/RealizedLanes name the operator-
-// asserted vs realized lane counts. Asserts the K-th consecutive starved wave
-// fires and persists one cause-stable inbox todo.
 func TestStarvation_ObserveFiresAfterKAndWritesInboxTodo(t *testing.T) {
 	const k = 3
 	obs := WaveObservation{DesiredLanes: 3, RealizedLanes: 1, QuotaShrunk: false}
@@ -85,8 +67,6 @@ func TestStarvation_ObserveFiresAfterKAndWritesInboxTodo(t *testing.T) {
 	}
 }
 
-// TestStarvation_FireResetsStreakAndRecoveryResets — the streak spans waves,
-// resets on a fire (next fire needs a fresh K), and resets on a recovered wave.
 func TestStarvation_FireResetsStreakAndRecoveryResets(t *testing.T) {
 	starved := WaveObservation{DesiredLanes: 2, RealizedLanes: 1}
 	var tr StarvationTracker
@@ -99,7 +79,6 @@ func TestStarvation_FireResetsStreakAndRecoveryResets(t *testing.T) {
 	if tr.Streak() != 0 {
 		t.Fatalf("streak=%d after fire, want 0", tr.Streak())
 	}
-	// Advance one starved wave (streak→1) then recover: streak must return to 0.
 	tr.Observe(starved, 5)
 	if got := tr.Streak(); got != 1 {
 		t.Fatalf("streak=%d after one starved wave, want 1", got)
@@ -113,8 +92,6 @@ func TestStarvation_FireResetsStreakAndRecoveryResets(t *testing.T) {
 	}
 }
 
-// TestStarvation_KBelowOneClampsToOne — k<1 is treated as k=1, so a single
-// starved wave fires immediately.
 func TestStarvation_KBelowOneClampsToOne(t *testing.T) {
 	var tr StarvationTracker
 	starved := WaveObservation{DesiredLanes: 2, RealizedLanes: 0}
@@ -123,8 +100,6 @@ func TestStarvation_KBelowOneClampsToOne(t *testing.T) {
 	}
 }
 
-// TestStarvationItem_ValidateRejectsUnderweightAndMissingFields — a malformed
-// self-injection must fail loud, never seed a silent no-op todo.
 func TestStarvationItem_ValidateRejectsUnderweightAndMissingFields(t *testing.T) {
 	good := BuildStarvationItem(WaveObservation{DesiredLanes: 3, RealizedLanes: 1}, 3, 0.9, 1, "2026-07-06T00:00:00Z")
 	if err := good.Validate(); err != nil {

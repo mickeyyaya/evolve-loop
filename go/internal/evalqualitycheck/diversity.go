@@ -1,16 +1,5 @@
 package evalqualitycheck
 
-// Suite-level adversarial-diversity check. Where Check() asks "is THIS eval a
-// tautology?", CheckDiversity asks "does this SET of evals cover the negative
-// and edge cases, or is it all happy-path?" — applying Google's adversarial-
-// testing diversity requirement (skills/adversarial-testing/SKILL.md §6).
-//
-// Heuristics are deterministic and keyword-based: a complement to mutation
-// testing (mutate-eval.sh kill-rate ≥0.8), NOT a replacement. They favor
-// precision over recall — a false HALT (blocking honest work) is worse than a
-// missed WARN, so negative-case detection keys on shell-level negation
-// constructs, not English words like "fail" (which appear in doc-grep evals).
-
 import (
 	"fmt"
 	"os"
@@ -22,22 +11,20 @@ import (
 // DiversityLevel classifies a suite of evals for adversarial diversity.
 type DiversityLevel int
 
+// Diversity levels in rising severity.
 const (
 	DiversityPass DiversityLevel = 0 // diverse enough (or nothing to assess)
 	DiversityWarn DiversityLevel = 1 // weak diversity; advisory
 	DiversityHalt DiversityLevel = 2 // a cohesive suite with zero negative cases
 )
 
-// maxCohesiveSuiteSize bounds the eval count for which a zero-negative-case
-// suite is a hard HALT. A single cycle authors a handful of evals; beyond this
-// the directory is an accumulated archive (e.g. .evolve/evals/ holds every
-// historical task), not one authoring unit — so the floor downgrades to an
-// advisory WARN rather than blocking on legacy corpus.
+// maxCohesiveSuiteSize is the largest suite treated as one authoring unit; a larger
+// directory is an accumulated archive, so a zero-negative result there only WARNs.
 const maxCohesiveSuiteSize = 12
 
 // DiversityOptions configures CheckDiversity. EvalDir is required.
 type DiversityOptions struct {
-	EvalDir string // directory of <slug>.md eval files
+	EvalDir string
 	Slug    string // optional: only consider files whose name contains this substring
 }
 
@@ -61,20 +48,13 @@ type DiversityResult struct {
 }
 
 var (
-	// negativeCaseRE matches shell-level negation / expected-failure
-	// constructs — NOT the English word "fail" (which appears in doc-grep
-	// evals like `grep -q "failure pattern"`). Precision over recall: `!=`
-	// is matched ONLY inside a test bracket `[ ... != ... ]`, not as a bare
-	// token (else `grep -q "a != b"` would be a false negative-case match).
+	// Precision over recall: only shell negation constructs count, never English words like "fail",
+	// and `!=` counts only inside a test bracket.
 	negativeCaseRE = regexp.MustCompile(`(^|\s)!\s|\bexit\s+1\b|-ne\s+0|\[[^]]*!=[^]]*\]|\b(assert|expect|should|must)[_-]?(fail|error|reject|not)\b`)
-	// edgeCaseRE matches boundary / out-of-distribution input indicators.
-	edgeCaseRE = regexp.MustCompile(`\binvalid\b|\bmissing\b|\bcorrupt(ed)?\b|\bmalformed\b|\boverflow\b|\bboundary\b|\bempty\b|""|''`)
+	edgeCaseRE     = regexp.MustCompile(`\binvalid\b|\bmissing\b|\bcorrupt(ed)?\b|\bmalformed\b|\boverflow\b|\bboundary\b|\bempty\b|""|''`)
 )
 
-// CheckDiversity reads every <slug>.md eval in opts.EvalDir (skipping
-// underscore-prefixed meta/canary files and files with no commands) and scores
-// the suite for adversarial diversity. The directory-not-found case is an
-// error; an empty/command-free directory is DiversityPass (nothing to assess).
+// CheckDiversity scores the .md evals in opts.EvalDir for adversarial diversity; a suite with no commands passes.
 func CheckDiversity(opts DiversityOptions) (DiversityResult, error) {
 	if opts.EvalDir == "" {
 		return DiversityResult{}, fmt.Errorf("evalqualitycheck: EvalDir required")
@@ -135,13 +115,7 @@ func CheckDiversity(opts DiversityOptions) (DiversityResult, error) {
 	return res, nil
 }
 
-// scoreDiversity maps the suite metrics to a level + human reasons. The gate
-// keys on the presence of a NEGATIVE case — the highest-precision adversarial
-// signal (a shell-level rejection construct, unlikely to appear by accident).
-// A cohesive-size suite (3..maxCohesiveSuiteSize) with zero negatives is a hard
-// HALT; a smaller or archive-scale zero-negative suite is an advisory WARN;
-// any suite with ≥1 negative case PASSes. Edge-case counts are reported but do
-// not gate (keyword-based, so noisier).
+// scoreDiversity gates on negative cases only; edge-case detection is keyword-based and too noisy to gate.
 func scoreDiversity(d DiversityResult) (DiversityLevel, []string) {
 	switch {
 	case d.EvalCount == 0:

@@ -1,9 +1,5 @@
 package config
 
-// loader_test.go — ADR-0103 unit 08 step 2: the Loader with its injected
-// reader and Center accessor, the range-stamped triage fields, the two registry
-// codes that close the silent kill-path, and the stream contract.
-
 import (
 	"encoding/json"
 	"errors"
@@ -31,7 +27,6 @@ func readerReturning(raw []byte, err error) Option {
 	return WithReadFile(func(string) ([]byte, error) { return raw, err })
 }
 
-// Test 16 — the default reader is os.ReadFile and no Center is wired.
 func TestNew_DefaultsToDiskAndNoCenter(t *testing.T) {
 	l := New()
 	if l.SignalsWired() {
@@ -44,7 +39,6 @@ func TestNew_DefaultsToDiskAndNoCenter(t *testing.T) {
 	}
 }
 
-// Test 17 — EVOLVE_USE_PHASE_REGISTRY=0 never touches the reader; "false" does.
 func TestLoader_UseRegistryZeroNeverCallsTheReader(t *testing.T) {
 	calls := 0
 	l, events := observed(t, WithReadFile(func(string) ([]byte, error) { calls++; return nil, fs.ErrNotExist }))
@@ -58,7 +52,6 @@ func TestLoader_UseRegistryZeroNeverCallsTheReader(t *testing.T) {
 	}
 }
 
-// Test 18 — absence is the ordinary silent case: defaults, no warning, no event.
 func TestLoader_Load_RegistryAbsentIsSilent(t *testing.T) {
 	l, events := observed(t, readerReturning(nil, &fs.PathError{Op: "open", Path: "/r/x.json", Err: fs.ErrNotExist}))
 	cfg, ws := l.Load("/r/x.json", nil)
@@ -67,7 +60,6 @@ func TestLoader_Load_RegistryAbsentIsSilent(t *testing.T) {
 	}
 }
 
-// Test 19 — a registry that exists but cannot be read: one WARN, the baseline.
 func TestLoader_Load_RegistryUnreadableWarnsAndRunsTheBaseline(t *testing.T) {
 	const path = "/r/docs/architecture/phase-registry.json"
 	readErr := &fs.PathError{Op: "open", Path: path, Err: syscall.EACCES}
@@ -91,8 +83,6 @@ func TestLoader_Load_RegistryUnreadableWarnsAndRunsTheBaseline(t *testing.T) {
 	}
 }
 
-// Test 20 — a registry that read but did not parse: the MALFORMED code carries
-// the decoder's error; the value is the triage-less baseline.
 func TestLoader_Load_RegistryMalformedWarnsAndRunsTheBaseline(t *testing.T) {
 	const path = "/r/docs/architecture/phase-registry.json"
 	l, events := observed(t, readerReturning([]byte("{"), nil))
@@ -109,9 +99,6 @@ func TestLoader_Load_RegistryMalformedWarnsAndRunsTheBaseline(t *testing.T) {
 	}
 }
 
-// Test 21 — the range stamps: step/source/path per pipeline step, the env
-// var name at the arm, the phase name on the registry enable, the new
-// missing-':' warning (D3), the validators' own fields.
 func TestLoader_Load_StampsStepSourceKeyAndPathPerRange(t *testing.T) {
 	env := kitchenSinkEnv()
 	env["EVOLVE_CONDITIONAL_MANDATORY"] = "noColon"
@@ -146,8 +133,6 @@ func TestLoader_Load_StampsStepSourceKeyAndPathPerRange(t *testing.T) {
 	if f := ws[12].Fields; ws[12].Code != "inert-phase-enable" || f["step"] != "inert" || f["phase"] != "plan-review" || f["stage"] != "0" {
 		t.Errorf("inert-phase-enable fields: %+v", ws[12])
 	}
-	// The env arm's key replaces the parser's registry key name while the
-	// Message keeps its byte-identical spelling (D9).
 	_, ws = New().Load("/nonexistent/phase-registry.json", map[string]string{"EVOLVE_DYNAMIC_ROUTING": "bogus", "EVOLVE_ROUTING_MODE": "bogus"})
 	if len(ws) != 2 || ws[0].Fields["key"] != "EVOLVE_DYNAMIC_ROUTING" || !strings.HasPrefix(ws[0].Message, "dynamic_routing=") ||
 		ws[1].Fields["key"] != "EVOLVE_ROUTING_MODE" || !strings.HasPrefix(ws[1].Message, "routing_mode=") || ws[1].Fields["default"] != "llm" {
@@ -155,9 +140,6 @@ func TestLoader_Load_StampsStepSourceKeyAndPathPerRange(t *testing.T) {
 	}
 }
 
-// Test 22 — every warning is emitted exactly once, in order, and the
-// {module, kind, code, origin, step} sequence is the stream contract (D8);
-// no event carries the Center's missing-code drift.
 func TestLoader_Load_EmitsEveryWarningOnceInOrderAndMatchesTheStreamGolden(t *testing.T) {
 	l, events := observed(t)
 	_, ws := l.Load(kitchenSinkRegistry(), kitchenSinkEnv())
@@ -180,8 +162,6 @@ func TestLoader_Load_EmitsEveryWarningOnceInOrderAndMatchesTheStreamGolden(t *te
 	}
 }
 
-// Test 23 — the package-level Load is New().Load: same value, same warnings,
-// no Center to reach.
 func TestLoad_FacadeReturnsTheLoaderValuesAndEmitsNothing(t *testing.T) {
 	cfg, ws := Load(kitchenSinkRegistry(), kitchenSinkEnv())
 	cfg2, ws2 := New().Load(kitchenSinkRegistry(), kitchenSinkEnv())
@@ -190,7 +170,6 @@ func TestLoad_FacadeReturnsTheLoaderValuesAndEmitsNothing(t *testing.T) {
 	}
 }
 
-// Test 25 — map-driven warnings are sorted by key (D5).
 func TestApplyRegistry_MapWarningsAreSortedByKey(t *testing.T) {
 	var kinds, rules []string
 	for _, k := range []string{"k3", "k7", "k1", "k8", "k5", "k2", "k6", "k4"} {
@@ -210,7 +189,6 @@ func TestApplyRegistry_MapWarningsAreSortedByKey(t *testing.T) {
 	}
 }
 
-// Test 26 — the four registry steps are independent and guarded.
 func TestApplyRegistry_FourStepsAreIndependent(t *testing.T) {
 	var ws []Warning
 	cfg := defaults()
@@ -234,8 +212,6 @@ func TestApplyRegistry_FourStepsAreIndependent(t *testing.T) {
 	}
 }
 
-// Test 27 — the two pure ladders: the gate trichotomy rejects advisory, the
-// router ladder accepts it; both trim and reject anything else.
 func TestGateStageAndRouterStage_LaddersTrimAndReject(t *testing.T) {
 	for in, want := range map[string]Stage{"0": StageOff, "off": StageOff, " shadow ": StageShadow, "enforce": StageEnforce} {
 		if s, ok := GateStage(in); !ok || s != want {
@@ -261,7 +237,6 @@ func TestGateStageAndRouterStage_LaddersTrimAndReject(t *testing.T) {
 	}
 }
 
-// Test 30 — the package's one panic is reachable and carries its prefix.
 func TestMustCondRule_PanicsWithTheDocumentedPrefix(t *testing.T) {
 	defer func() {
 		r := recover()
@@ -275,14 +250,12 @@ func TestMustCondRule_PanicsWithTheDocumentedPrefix(t *testing.T) {
 	mustCondRule("garbage")
 }
 
-// Test 31 — the ONE spelling of the registry's location.
 func TestRegistryPath_IsTheDocsArchitectureSpelling(t *testing.T) {
 	if got, want := RegistryPath("/r"), filepath.Join("/r", "docs", "architecture", "phase-registry.json"); got != want {
 		t.Fatalf("RegistryPath = %q, want %q", got, want)
 	}
 }
 
-// Test 32 — the sandbox dial trims and names the current default when it warns.
 func TestParseSandboxMode_TrimsAndWarnsNamingTheCurrentDefault(t *testing.T) {
 	var ws []Warning
 	if got := parseSandboxMode(" on ", SandboxModeAuto, &ws); got != SandboxModeOn || len(ws) != 0 {
@@ -296,7 +269,6 @@ func TestParseSandboxMode_TrimsAndWarnsNamingTheCurrentDefault(t *testing.T) {
 	}
 }
 
-// Test 33 — domain.json is read under the ONE .evolve join (paths.EvolveDirOf).
 func TestLoadDomain_ReadsUnderTheEvolveDir(t *testing.T) {
 	root := t.TempDir()
 	dir := filepath.Join(root, ".evolve")
@@ -315,8 +287,6 @@ func TestLoadDomain_ReadsUnderTheEvolveDir(t *testing.T) {
 	}
 }
 
-// Test 35 — the leaf writes nothing to stderr or disk, and every Warning is
-// minted by the one appender (no bare literal skips the Fields map).
 func TestNoStderrOrWritesInTheLeaf(t *testing.T) {
 	for name, src := range leafSources(t) {
 		for _, needle := range []string{"os.Stderr", "fmt.Fprint", "os.WriteFile", "os.Create", "os.MkdirAll"} {
@@ -360,8 +330,6 @@ func leafSources(t *testing.T) map[string]string {
 	return out
 }
 
-// The Fields map is the Warning's triage half; json.Marshal of a Warning
-// therefore carries it — the goldens project {Code, Message} for that reason.
 func TestWarning_FieldsMarshalBesideCodeAndMessage(t *testing.T) {
 	b, err := json.Marshal(Warning{Code: "weak-spine", Message: "m", Fields: map[string]string{"step": "spine"}})
 	if err != nil || string(b) != `{"Code":"weak-spine","Message":"m","Fields":{"step":"spine"}}` {

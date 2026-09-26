@@ -8,17 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
-// TestClampPlanModelRouting_Matrix (T4 AC2): the recorded-rejection clamp
-// matrix required by the golden replay — out-of-envelope tier (above max),
-// disallowed CLI, catalog-miss, and the operator low-model floor case
-// (fast against a min=balanced envelope must clamp UP to balanced, not down
-// to empty). Every case must (a) fire exactly one clamp and (b) carry a
-// Phase on that Clamp so a rejection record can name which phase was
-// clamped (RejectionsFromClamps, below) — the eval's "recorded rejection ...
-// naming the phase + reason" requirement. RED for the floor case (current
-// ClampPlanModelRouting clamps every guardrail violation to empty, never
-// up to the envelope minimum) and for Clamp.Phase (field does not exist
-// yet, compile-fails).
 func TestClampPlanModelRouting_Matrix(t *testing.T) {
 	t.Run("out-of-envelope-tier-above-max", func(t *testing.T) {
 		prof := &profiles.Profile{CLI: "claude-tmux", AllowedCLIs: []string{"claude"},
@@ -97,11 +86,6 @@ func TestClampPlanModelRouting_Matrix(t *testing.T) {
 	})
 }
 
-// TestClampPlanModelRouting_NoRelaxationEvenWithJustification (T4 AC4,
-// NEGATIVE): the clamp is ABSOLUTE — a persuasive Justification string on the
-// entry must never widen the envelope or skip the guardrail check ("model
-// proposes, kernel disposes"). A gaming fake that special-cases a
-// "justified" proposal to let an out-of-bounds tier through must fail this.
 func TestClampPlanModelRouting_NoRelaxationEvenWithJustification(t *testing.T) {
 	prof := &profiles.Profile{CLI: "claude-tmux", AllowedCLIs: []string{"claude"},
 		ModelTierEnvelope: &profiles.ModelTierEnvelope{Min: "balanced", Max: "balanced"}}
@@ -122,12 +106,6 @@ func TestClampPlanModelRouting_NoRelaxationEvenWithJustification(t *testing.T) {
 	}
 }
 
-// TestRejectionsFromClamps_NamesPhaseAndReason (T4 AC2): converts router
-// Clamps (from ClampPlanModelRouting or the integrity-floor clamp) into the
-// advisor-rejections.json PlanRejection shape, so a model-routing clamp is
-// visible in the SAME rejection artifact operators already read — naming the
-// phase and the rule that fired. RED today: RejectionsFromClamps does not
-// exist.
 func TestRejectionsFromClamps_NamesPhaseAndReason(t *testing.T) {
 	clamps := []Clamp{
 		{Phase: "build", Rule: "model-routing-guardrail", Proposed: `build={cli:"mallory-cli",tier:""}`, Forced: "build={cli:,tier:} (profile default)"},

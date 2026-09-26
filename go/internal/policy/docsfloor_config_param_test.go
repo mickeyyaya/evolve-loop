@@ -8,9 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// TestDocsFloorConfigDefaults pins the compiled default and every override
-// path: the ADR-0077 floor is armed without a policy block, and the operator
-// dial in .evolve/policy.json reaches it (config-injected, no flag).
 func TestDocsFloorConfigDefaults(t *testing.T) {
 	cases := []struct {
 		name string
@@ -47,8 +44,6 @@ func TestDocsFloorConfigDefaults(t *testing.T) {
 	}
 }
 
-// TestDocsFloorConfigRoundTripsThroughLoad proves the JSON key is the one
-// operators write: a real policy.json read must reach DocsFloorConfig.
 func TestDocsFloorConfigRoundTripsThroughLoad(t *testing.T) {
 	dir := t.TempDir()
 	for _, tc := range []struct {

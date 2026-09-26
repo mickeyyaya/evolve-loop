@@ -7,13 +7,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 )
 
-// TestExecTmuxKill_TargetsIsolatedBridgeSocket: teardown must kill sessions on
-// the bridge's dedicated socket, not the default. If the driver moved agent panes
-// to the isolated socket (bridge.TmuxSocket) but the killer stayed on the default,
-// reaped sessions would be invisible to it and leak as orphans.
 func TestExecTmuxKill_TargetsIsolatedBridgeSocket(t *testing.T) {
-	// F6: TmuxSocketArgs now resolves a per-run socket from the env; clear it so
-	// this test pins the DEFAULT socket name invariant regardless of the shell.
+	// Clear the per-run socket so the test pins the default socket name whatever the shell sets.
 	t.Setenv(bridge.TmuxSocketEnv, "")
 	var got []string
 	orig := tmuxRun

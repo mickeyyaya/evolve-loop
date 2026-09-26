@@ -12,47 +12,14 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// gate_defect_chain_test.go — cycle-459 TDD contract for the triage-cap gate
-// defect chain F1–F5 (inbox triagecap-prose-counter-defect; post-mortem of
-// cycles 448/449, which both died at this gate after complying with its
-// correction twice). These tests are authored RED-FIRST by the TDD engineer;
-// the Builder makes them GREEN without modifying them.
-//
-//   F1 — the prose counter counts packages named in EVIDENCE citations as
-//        committed floors (cycle 449: 3 true floors counted as 7).
-//   F2 — the reject reason states neither the counting rule nor the
-//        declaration-primary escape (triage-decision.json committed_floors[]).
-//   F3 — nothing checks that a floor-bearing report carries the declaration
-//        companion (the declaration-primary design has no producer check).
-//   F4 — ShouldDemote requires rejections at currentCycle-1 AND -2, so an
-//        operator reset that seals a cycle without a rejection record breaks
-//        the identical-rejection demotion chain (cycle 450 reset ⇒ 451/452
-//        cannot demote).
-//   F5 — the reject reason shows the count but not WHICH packages were
-//        counted, so corrections are not self-explanatory.
-//
-// The goldens are the EXACT preserved cycle-448/449 triage artifacts
-// (testdata/triage-cycle44{8,9}-golden.md, byte-identical to
-// .evolve/runs/cycle-44{8,9}/triage-report.md).
-
-// gapGoldenPkgs mirrors the production package vocabulary relevant to the
-// cycle-448/449 goldens: the three true floor targets (core, bridge, audit)
-// plus the phantom sources the defective counter attributed (scout via kept
-// evidence= values, sysexec via "sysexec.RunFunc" in item prose) and
-// distractors that must never count. With this vocabulary the unfixed
-// counter yields 7 on the cycle-449 golden — the exact incident count.
+// gapGoldenPkgs holds the goldens' true targets, the phantom sources (scout, sysexec) and distractors;
+// with it, a counter that reads evidence citations counts 7 on triage-cycle449-golden.md.
 var gapGoldenPkgs = []string{
 	"core", "bridge", "audit",
 	"scout", "sysexec",
 	"config", "router", "llmroute", "recovery", "evidence", "paths",
 }
 
-// TestCountCommittedFloors_Cycle449GoldenReplay (F1, golden) — the normative
-// acceptance of the fix: cycle 449 committed exactly three coverage floors
-// (core 85.0 / bridge 94.5 / audit 96.0, one per top_n item) and was killed
-// because evidence citations ("core 83.1%", "bridge 93.5%; matchExhausted
-// 66.7%", "audit 92.6%", "scout fresh cover-func", "sysexec.RunFunc")
-// inflated the count to 7. The EXACT report must count 3 after the fix.
 func TestCountCommittedFloors_Cycle449GoldenReplay(t *testing.T) {
 	artifact := readFixture(t, "triage-cycle449-golden.md")
 	got := CountCommittedFloors(artifact, gapGoldenPkgs)
@@ -61,13 +28,6 @@ func TestCountCommittedFloors_Cycle449GoldenReplay(t *testing.T) {
 	}
 }
 
-// TestCountCommittedFloors_Cycle448GoldenReplay (F1, anti-weakening golden) —
-// cycle 448 genuinely committed FOUR floor targets (item 1: "coverage floors
-// core ≥85.0%, audit ≥96.0%, bridge ≥94.5%" = 3; item 2: "core total
-// coverage ... to ≥86.0%" = 1). The fix must scope out evidence citations
-// WITHOUT collapsing true multi-package floor commitments: this golden counts
-// 4 before AND after the fix. The gate's purpose (cycles 280/282/283 real
-// overpacking) stays intact.
 func TestCountCommittedFloors_Cycle448GoldenReplay(t *testing.T) {
 	artifact := readFixture(t, "triage-cycle448-golden.md")
 	got := CountCommittedFloors(artifact, gapGoldenPkgs)
@@ -76,11 +36,6 @@ func TestCountCommittedFloors_Cycle448GoldenReplay(t *testing.T) {
 	}
 }
 
-// TestCountCommittedFloors_EvidenceCitationDoesNotCount (F1, semantic) — a
-// single-target floor item whose contract-mandated evidence sentence names
-// OTHER packages with percentages counts 1, not 4. The pipeline's own
-// eval-quality rules REQUIRE rich numeric evidence; the gate must not punish
-// what another gate demands.
 func TestCountCommittedFloors_EvidenceCitationDoesNotCount(t *testing.T) {
 	artifact := "## top_n (commit to THIS cycle)\n" +
 		"- salvage-core-coverage: raise core coverage floor to ≥85.0% — priority=H, evidence=scout fresh cover-func (bridge 93.5%; matchExhausted 66.7% in audit), source=scout\n"
@@ -90,10 +45,7 @@ func TestCountCommittedFloors_EvidenceCitationDoesNotCount(t *testing.T) {
 	}
 }
 
-// newGateDefectReviewer wires the clamp with seam overrides and a FORMATTED
-// log capture (newTestReviewer captures only format strings, which would
-// make warning-content assertions depend on how the implementation splits
-// format vs args).
+// newGateDefectReviewer captures formatted log lines; newTestReviewer keeps only format strings, which hide args.
 func newGateDefectReviewer(stage config.Stage, window []core.TriageThroughputEntry, fails []FailEntry, logs *[]string) *CapReviewer {
 	r := newCapReviewer(stage)
 	r.pkgsFn = func(string) []string { return []string{"swarmrunner", "bridge", "evalgate"} }
@@ -110,11 +62,6 @@ func newGateDefectReviewer(stage config.Stage, window []core.TriageThroughputEnt
 // tightWindow yields K=1 ⇒ cap 2, so the 3-floor overpackedArtifact rejects.
 var tightWindow = []core.TriageThroughputEntry{{Cycle: 300, Floors: 1}}
 
-// TestCapReviewer_RejectReasonStatesDeclarationEscape (F2) — the corrective
-// must be actionable: an agent that cannot see the counting rule cannot
-// comply with it (cycles 448/449 complied with the natural reading twice and
-// were killed twice). The reject reason must name the declaration-primary
-// escape: emit triage-decision.json with committed_floors[].
 func TestCapReviewer_RejectReasonStatesDeclarationEscape(t *testing.T) {
 	ws := writeTriageWorkspace(t, overpackedArtifact)
 	r := newGateDefectReviewer(config.StageEnforce, tightWindow, nil, nil)
@@ -129,11 +76,6 @@ func TestCapReviewer_RejectReasonStatesDeclarationEscape(t *testing.T) {
 	}
 }
 
-// TestCapReviewer_RejectReasonListsCountedPackages (F5) — observability: the
-// reason must name WHICH packages the counter attributed, so a correction is
-// self-explanatory ("counted: bridge, evalgate, swarmrunner") and a counter
-// defect is visible in the rejection itself instead of requiring a
-// post-mortem against the preserved artifacts.
 func TestCapReviewer_RejectReasonListsCountedPackages(t *testing.T) {
 	ws := writeTriageWorkspace(t, overpackedArtifact)
 	r := newGateDefectReviewer(config.StageEnforce, tightWindow, nil, nil)
@@ -151,17 +93,13 @@ func TestCapReviewer_RejectReasonListsCountedPackages(t *testing.T) {
 	}
 }
 
-// Same-template rejection summaries for cycles 448/449, shaped like the real
-// state.json:failedApproaches records (same digit-run lengths throughout, so
-// ReasonTemplateHash collapses them — the incident's determinism artifact).
+// These summaries share every digit-run length, so ReasonTemplateHash collapses them.
 const (
 	gapSummary448 = `cycle 448 failed during triage: review gate: phase "triage" deliverable rejected after 2 correction(s): triage overpacked: 4 committed coverage floors exceed the capacity cap 3 (= ceil(1.25×K), K=2 observed floors/turn over 5 shipped cycles). Re-emit the triage report keeping at most 3 coverage floors in ## top_n and move the remaining floor work to ## deferred — deferred items carry over to the next cycle automatically.`
 	gapSummary449 = `cycle 449 failed during triage: review gate: phase "triage" deliverable rejected after 2 correction(s): triage overpacked: 7 committed coverage floors exceed the capacity cap 3 (= ceil(1.25×K), K=2 observed floors/turn over 5 shipped cycles). Re-emit the triage report keeping at most 3 coverage floors in ## top_n and move the remaining floor work to ## deferred — deferred items carry over to the next cycle automatically.`
 )
 
-// writeGapWorkspace builds one cycle's review workspace under a SHARED
-// project root (unlike newDemotionFixture, which owns its root) so relief
-// consumption can be observed across consecutive cycles.
+// writeGapWorkspace shares one project root across cycles so relief consumption is observable.
 func writeGapWorkspace(t *testing.T, root string, cycle int) core.ReviewInput {
 	t.Helper()
 	ws := filepath.Join(root, ".evolve", "runs", fmt.Sprintf("cycle-%d", cycle))
@@ -186,14 +124,6 @@ func newGapRoot(t *testing.T) string {
 	return root
 }
 
-// TestCapReviewer_ResetSealedGapStillDemotes (F4) — the incident replay:
-// cycles 448 and 449 recorded same-template rejections from this gate; an
-// operator SIGINT + `cycle reset --force` sealed cycle 450 WITHOUT a
-// rejection record. Reviewing cycle 451, the last two RECORDED same-template
-// rejections (448, 449) are within the demotion window, so the gate must
-// treat the reset-sealed 450 as a transparent gap: demote to shadow
-// (approve) and auto-file exactly one defect. Today ShouldDemote demands
-// records at 450 AND 449, so 451 enforces and burns — RED.
 func TestCapReviewer_ResetSealedGapStillDemotes(t *testing.T) {
 	root := newGapRoot(t)
 	pair := []FailEntry{{Cycle: 448, Summary: gapSummary448}, {Cycle: 449, Summary: gapSummary449}}
@@ -209,12 +139,6 @@ func TestCapReviewer_ResetSealedGapStillDemotes(t *testing.T) {
 	}
 }
 
-// TestCapReviewer_ReliefIsOneCycleThenEnforces (F4, bounded relief) — the
-// demotion's one-cycle relief semantics survive the gap fix: after cycle 451
-// consumes the 448/449 pair's relief (shadow + auto-filed defect), cycle 452
-// with the SAME history must enforce again. This pins against the naive
-// pure-window implementation, under which the pair would keep granting
-// relief to every cycle in the window.
 func TestCapReviewer_ReliefIsOneCycleThenEnforces(t *testing.T) {
 	root := newGapRoot(t)
 	pair := []FailEntry{{Cycle: 448, Summary: gapSummary448}, {Cycle: 449, Summary: gapSummary449}}
@@ -228,11 +152,6 @@ func TestCapReviewer_ReliefIsOneCycleThenEnforces(t *testing.T) {
 	}
 }
 
-// TestCapReviewer_StaleRejectionPairOutsideWindowEnforces (F4, negative) — a
-// same-template pair far in the past grants no relief: the demotion window
-// is small (the fix's own spec suggests ~3 cycles). A 444/445 pair reviewed
-// at cycle 451 must keep enforcing. GREEN today and must stay GREEN — this
-// is the anti-overcorrection bound on the gap transparency.
 func TestCapReviewer_StaleRejectionPairOutsideWindowEnforces(t *testing.T) {
 	root := newGapRoot(t)
 	stale := []FailEntry{{Cycle: 444, Summary: gapSummary448}, {Cycle: 445, Summary: gapSummary449}}
@@ -243,12 +162,6 @@ func TestCapReviewer_StaleRejectionPairOutsideWindowEnforces(t *testing.T) {
 	}
 }
 
-// TestCapReviewer_FloorBearingReportWithoutDeclarationWarns (F3) — the
-// declaration-primary design finally gets a producer check: reviewing a
-// floor-bearing triage report that lacks a committed_floors declaration must
-// WARN (log naming triage-decision.json + committed_floors) while still
-// approving an under-cap report. Non-floor-bearing reports and reports that
-// carry the declaration stay silent — the warning must not become noise.
 func TestCapReviewer_FloorBearingReportWithoutDeclarationWarns(t *testing.T) {
 	floorArtifact := "## top_n (commit to THIS cycle)\n- coverage-one: Push bridge coverage to ≥98%\n"
 

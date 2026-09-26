@@ -9,8 +9,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasewatchdog"
 )
 
-// runPhaseWatchdog is the `evolve phase-watchdog <workspace> <pgid> <cycle> <cycle-state>` subcommand.
-// Ports legacy/scripts/dispatch/phase-watchdog.sh.
+// RunPhaseWatchdog implements `evolve phase-watchdog <workspace> <pgid> <cycle> <cycle-state>`.
 func RunPhaseWatchdog(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	var pos []string
 	for _, a := range args {
@@ -46,7 +45,6 @@ func RunPhaseWatchdog(args []string, _ io.Reader, stdout, stderr io.Writer) int 
 }
 
 // watchdogEnvConfig resolves watchdog settings from .evolve/policy.json.
-// EVOLVE_PROJECT_ROOT remains the bootstrap path to that file.
 func watchdogEnvConfig() phasewatchdog.Config {
 	cfg := loadObserverPolicy()
 	return phasewatchdog.Config{

@@ -8,13 +8,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// === stripHeredocs table ===================================================
 func TestStripHeredocs(t *testing.T) {
 	cases := []struct {
-		name string
-		in   string
-		// We assert that specific phrases are NOT present in the output
-		// (heredoc body stripped) and that markers ARE preserved.
+		name           string
+		in             string
 		mustNotContain []string
 		mustContain    []string
 	}{
@@ -107,12 +104,8 @@ git commit body line 2`,
 	}
 }
 
-// === The full ship-gate now lets verbs-in-heredoc-body pass ================
 func TestShip_Decide_VerbInHeredocBody(t *testing.T) {
 	s := NewShip(false)
-	// Native evolve ship invocation with commit message body that
-	// legitimately mentions `git push` and `git commit` (the v11.7.5
-	// failure mode that triggered this fix).
 	body := `evolve ship --class manual "$(cat <<'EOF'
 feat: port a script that calls git push origin and git commit -m
 The script does:
@@ -130,7 +123,6 @@ EOF
 	}
 }
 
-// === A bare `git push` outside any heredoc still triggers DENY =============
 func TestShip_Decide_BareGitPush_Denied(t *testing.T) {
 	s := NewShip(false)
 	in := core.GuardInput{
@@ -143,7 +135,6 @@ func TestShip_Decide_BareGitPush_Denied(t *testing.T) {
 	}
 }
 
-// === `evolve ship` invocation is allowed ====================================
 func TestShip_Decide_NativeEvolveShip_Allowed(t *testing.T) {
 	s := NewShip(false)
 	cases := []string{
@@ -164,7 +155,6 @@ func TestShip_Decide_NativeEvolveShip_Allowed(t *testing.T) {
 	}
 }
 
-// === Word-boundary safety: "devolve ship" must NOT match nativeShipRe ======
 func TestShip_Decide_WordBoundary_Devolve(t *testing.T) {
 	s := NewShip(false)
 	in := core.GuardInput{
@@ -179,7 +169,6 @@ func TestShip_Decide_WordBoundary_Devolve(t *testing.T) {
 	}
 }
 
-// === Canonical bash ship.sh path still allowed (no regression) ============
 func TestShip_Decide_BashShipSh_Allowed(t *testing.T) {
 	s := NewShip(false)
 	in := core.GuardInput{

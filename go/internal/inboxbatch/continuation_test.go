@@ -6,11 +6,6 @@ import (
 	"testing"
 )
 
-// continuation_test.go — ADR-0076 slice C schema: a FAILed cycle with
-// salvageable preserved work stamps its item with a continuation binding; the
-// next claim adopts it instead of restarting cold. The field must round-trip
-// tolerantly through LoadDir (absent = nil, never an error).
-
 func TestItem_ContinuationRoundTrip(t *testing.T) {
 	dir := t.TempDir()
 	body := `{

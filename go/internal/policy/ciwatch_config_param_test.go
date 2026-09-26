@@ -7,8 +7,6 @@ import (
 	"testing"
 )
 
-// writeCIWatchPolicy writes a policy.json document and loads it, so the knobs
-// are proven to resolve from an on-disk policy.json — not from Go literals.
 func loadCIWatchPolicy(t *testing.T, body string) Policy {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "policy.json")
@@ -22,12 +20,6 @@ func loadCIWatchPolicy(t *testing.T, body string) Policy {
 	return p
 }
 
-// TestCIWatchPolicy_KnobsFromPolicyJSON pins the AC4 contract for
-// push-ci-watch-remote-parity (cycle-748): every knob (enabled, timeout, poll
-// interval) resolves from a policy.json ci_watch block; an ABSENT block yields
-// the compiled defaults (watch enabled — gates default ON as compiled Go
-// defaults, the observer/fleet pattern); malformed values are rejected
-// explicitly rather than silently zeroed.
 func TestCIWatchPolicy_KnobsFromPolicyJSON(t *testing.T) {
 	t.Run("absent block resolves compiled defaults", func(t *testing.T) {
 		p := loadCIWatchPolicy(t, `{}`)

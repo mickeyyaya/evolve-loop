@@ -1,9 +1,5 @@
 package phaseobserver
 
-// seam_test.go — ADR-0103 unit 12 §6 tests 37-38: the host is the unit's ONE
-// construction site of the engine, and its Nudge port is the inbox append the
-// original spelled inline.
-
 import (
 	"os"
 	"path/filepath"
@@ -16,9 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/inbox"
 )
 
-// TestObserverEngine_OneConstructionSite — `observerengine.New(` appears in
-// exactly one non-test file of the module: this package's seam. Kills M53 (a
-// second construction — e.g. the live adapter building an engine of its own).
 func TestObserverEngine_OneConstructionSite(t *testing.T) {
 	const onlySite = "internal/phaseobserver/phaseobserver.go"
 	if offenders := nonTestSourcesMentioning(t, "observerengine.New(", onlySite); len(offenders) > 0 {
@@ -33,8 +26,7 @@ func TestObserverEngine_OneConstructionSite(t *testing.T) {
 	}
 }
 
-// nonTestSourcesMentioning lists the module's non-test Go files other than the
-// allowed site whose source contains needle (carryover_lifecycle_test.go idiom).
+// nonTestSourcesMentioning lists the module's non-test Go files, other than allowed, whose source contains needle.
 func nonTestSourcesMentioning(t *testing.T, needle, allowed string) []string {
 	t.Helper()
 	moduleRoot, err := filepath.Abs(filepath.Join("..", ".."))
@@ -72,10 +64,6 @@ func nonTestSourcesMentioning(t *testing.T, needle, allowed string) []string {
 	return offenders
 }
 
-// TestRun_WiresTheNudgeOverTheInbox — the nudge lands in inbox.Path(ws, agent)
-// as {Kind nudge, Body NudgeBody, Source observer} with a TS from the injected
-// clock, exactly once (phaseobserver_nudge_test.go:19's pin re-asserted on the
-// envelope's every field). Kills M54 (a Nudge closure drift in wiredEngine).
 func TestRun_WiresTheNudgeOverTheInbox(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()

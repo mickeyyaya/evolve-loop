@@ -6,8 +6,6 @@ import (
 	"testing"
 )
 
-// tierTestPlan is the shared fixture: two-CLI chain, default triggers, a
-// deep→balanced tier chain.
 func tierTestPlan() Plan {
 	return Plan{
 		Candidates: []string{"claude-tmux", "codex-tmux"},
@@ -17,18 +15,15 @@ func tierTestPlan() Plan {
 	}
 }
 
-// TestTieredDispatchResult_NamedShape names the exported TieredDispatchResult
-// type explicitly so its return-value fields are part of the tested contract: an
-// all-quota walk reports the terminal CLI/Tier, every attempt in order, and the
-// terminal error.
 func TestTieredDispatchResult_NamedShape(t *testing.T) {
+	// The explicit type names TieredDispatchResult for apicover's identifier scan.
 	var res TieredDispatchResult = DispatchTiered(tierTestPlan(), func(cli, tier string) (int, error) {
-		return 85, errors.New("quota") // every cli×tier exits 85 → the full walk
+		return 85, errors.New("quota")
 	}, nil)
 	if res.CLI == "" || res.Tier == "" {
 		t.Errorf("TieredDispatchResult must report the terminal CLI/Tier, got %+v", res)
 	}
-	if len(res.Attempts) != 4 { // 2 CLIs × 2 tiers (deep, balanced)
+	if len(res.Attempts) != 4 {
 		t.Errorf("Attempts = %v, want 4 (2 CLIs × 2 tiers)", res.Attempts)
 	}
 	if res.Err == nil {
@@ -58,11 +53,6 @@ func TestTierChain(t *testing.T) {
 	}
 }
 
-// TestDispatchTiered_StepsDownAfterQuotaExhaustedChain is the scout
-// verifiableBy regression test: given a Plan whose CLI chain all return exit
-// 85 at tier "deep", DispatchTiered retries the same CLI chain at
-// "balanced" before declaring quota-exhausted, and never steps below the
-// chain's floor.
 func TestDispatchTiered_StepsDownAfterQuotaExhaustedChain(t *testing.T) {
 	var attempts []string
 	var steps []string
@@ -108,9 +98,7 @@ func TestDispatchTiered_TerminalOnlyAfterLowestTierExhausted(t *testing.T) {
 }
 
 func TestDispatchTiered_NonQuotaExitsNeverStepTier(t *testing.T) {
-	// Chain exhausted on 81 (CLI-level trigger): terminal error, no tier
-	// step-down. A mixed 81/85 chain likewise must not step down — the
-	// step-down predicate is "EVERY attempt at the tier exited 85".
+	// mixed: codex exits 85 and claude 81, so not every attempt at the tier exited 85.
 	for _, mixed := range []bool{false, true} {
 		var attempts []string
 		stepDowns := 0

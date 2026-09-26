@@ -5,11 +5,6 @@ import (
 	"testing"
 )
 
-// TestDigest_PayloadWrapped_EquivalentToFlat is the golden-equivalence anchor
-// for ADR-0050 Phase 3.3: Digest must read the new payload-wrapped handoff
-// envelope and yield byte-identical RoutingSignals to the legacy flat envelope
-// (Postel-compatible). Until digest.go unwraps `payload`, the wrapped workspace
-// extracts nothing and this fails RED.
 func TestDigest_PayloadWrapped_EquivalentToFlat(t *testing.T) {
 	roles := []string{"scout", "triage", "build", "audit"}
 	triage := `{"cycle_size_estimate":"medium","phase_skip":["retrospective"]}`
@@ -20,8 +15,6 @@ func TestDigest_PayloadWrapped_EquivalentToFlat(t *testing.T) {
 	writeFile(t, flat, "handoff-scout.json", scoutHandoff)
 	writeFile(t, flat, "handoff-triage.json", triage)
 
-	// wrap embeds the exact flat bytes as the `payload` of the canonical
-	// envelope (schema_version 2 + promoted top-level fields).
 	wrap := func(phase, payload string) string {
 		return `{"schema_version":2,"phase":"` + phase + `","payload":` + payload + `,"verdict":"PASS","signals":{}}`
 	}
@@ -43,23 +36,13 @@ func TestDigest_PayloadWrapped_EquivalentToFlat(t *testing.T) {
 	if !reflect.DeepEqual(flatSig, wrappedSig) {
 		t.Fatalf("payload-wrapped digest != flat digest:\n flat   =%+v\n wrapped=%+v", flatSig, wrappedSig)
 	}
-	// Guard against a vacuous pass (both all-zero): the wrapped digest must
-	// have actually extracted the build content.
+	// Guards against a vacuous pass where both digests are empty.
 	if !wrappedSig.Build.Present || wrappedSig.Build.SeverityMax != SevCritical {
 		t.Fatalf("wrapped build not extracted (unwrap missing?): %+v", wrappedSig.Build)
 	}
 }
 
-// TestDigest_PayloadWrapped_FoldsInnerSignals makes the wrapped signal-fold path
-// load-bearing (the other wrapped tests use empty signals, so signal folding
-// through the wrapper was never actually exercised). A signal living in the
-// inner payload's top-level "signals" object must surface in the generic plane
-// identically whether the handoff is flat or payload-wrapped — pinning the
-// authority contract that Digest folds from the UNWRAPPED payload, and that the
-// wrapper's promoted top-level signals are a copy, not a separate source.
 func TestDigest_PayloadWrapped_FoldsInnerSignals(t *testing.T) {
-	// A build handoff whose body carries top-level signals (a bare key the
-	// router namespaces as build.*, and an already-dotted cross-namespace key).
 	body := `{"verdict":"PASS","signals":{"files_touched":4,"security.precheck":"clean"}}`
 	wrapped := `{"schema_version":2,"phase":"build","payload":` + body + `,"verdict":"PASS","signals":{}}`
 
@@ -79,7 +62,6 @@ func TestDigest_PayloadWrapped_FoldsInnerSignals(t *testing.T) {
 	if !reflect.DeepEqual(flatSig, wrapSig) {
 		t.Fatalf("inner-signal fold not flat-equivalent:\n flat=%+v\n wrap=%+v", flatSig, wrapSig)
 	}
-	// Non-vacuous: the inner-payload signals were actually folded through the wrapper.
 	if v, ok := wrapSig.GenericValue("build.files_touched"); !ok || v != float64(4) {
 		t.Fatalf("inner bare signal not folded through wrapper: (%v, %v)", v, ok)
 	}
@@ -88,8 +70,6 @@ func TestDigest_PayloadWrapped_FoldsInnerSignals(t *testing.T) {
 	}
 }
 
-// TestDigest_FlatStillWorks pins the fallback half: a legacy flat envelope (no
-// payload key) must keep extracting exactly as before the unwrap step.
 func TestDigest_FlatStillWorks(t *testing.T) {
 	ws := t.TempDir()
 	writeFile(t, ws, "handoff-build.json", buildHandoff)

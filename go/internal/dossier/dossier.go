@@ -1,14 +1,6 @@
-// Package dossier is the durable, structured, cross-loop history/experience
-// record for an evolve-loop cycle (ADR-0055). Today every cycle's structured
-// data (phase reports, ledger, lessons, carryover) lives in gitignored runtime
-// (.evolve/) and is lost across sessions/branches/loops. The Dossier aggregates
-// it into ONE committed artifact (knowledge-base/cycles/cycle-N.json) that the
-// next cycle's Scout — and any other session or loop — reads as the source of
-// truth, so the project learns from experience including FAILED verdicts.
-//
-// The Go struct + Validate() are the SSOT (deterministic; the project does not
-// use a JSON-Schema-v2020-12 validator). schemas/cycle-dossier.schema.json is the
-// committed human/cross-tool reference, kept in sync by a drift test.
+// Package dossier builds, validates, writes and reads the committed per-cycle
+// record, knowledge-base/cycles/cycle-N.{json,md}.
+// See docs/architecture/packages/internal-dossier.md.
 package dossier
 
 import (
@@ -25,8 +17,8 @@ const (
 	VerdictWarn = "WARN"
 	VerdictFail = "FAIL"
 
-	// CurrentSchemaVersion distinguishes dossiers written after the retro-skip
-	// mislabel fix from the unversioned legacy corpus.
+	// CurrentSchemaVersion is stamped on every new dossier; the unversioned
+	// legacy corpus reads as zero.
 	CurrentSchemaVersion = 2
 )
 
@@ -39,69 +31,32 @@ type Dossier struct {
 	FinalVerdict  string `json:"final_verdict"`
 	CommitSHA     string `json:"commit_sha,omitempty"`
 	TreeSHA       string `json:"tree_sha,omitempty"`
-	// Tasks is the task set triage COMMITTED for this cycle (top_n ids). It is
-	// a POINTER because the three states are genuinely distinct and the record
-	// must not conflate them:
-	//
-	//	nil         → no triage decision recorded (unknown); the field is omitted
-	//	&[]string{} → an explicit EMPTY commitment; serializes as []
-	//	&[...]      → the committed ids
-	//
-	// "committed to nothing" is a finding in its own right — cycle-1623 did
-	// exactly that and then ran twelve phases anyway — so it must stay
-	// distinguishable from "we never asked". A plain []string cannot express
-	// this: without omitempty a nil marshals to `null`, which the schema's
-	// "type": "array" rejects; with omitempty an explicit empty commitment
-	// silently vanishes.
+	// Tasks is the triage commitment. It is a pointer so that nil (no decision
+	// read, field omitted) stays distinct from an explicit empty commitment ([]).
 	Tasks   *[]string     `json:"tasks,omitempty"`
 	Phases  []PhaseRecord `json:"phases"`
 	Defects []Defect      `json:"defects,omitempty"`
-	// Failure is the FAIL cycle's failure identity (digest fingerprint +
-	// pre-class + bounded reasons[]), ingested from the workspace artifacts
-	// failure-digest.json + audit-fail-reason.json so the committed record
-	// says WHY the cycle failed. Nil on non-FAIL cycles and whenever the
-	// artifacts yielded no content — best-effort, never fabricated.
-	Failure *FailureRecord `json:"failure,omitempty"`
-	// SystemFailure preserves the deterministic system-level classification
-	// attached by the orchestrator. Nil keeps ordinary dossiers byte-compatible.
+	// Failure is nil on non-FAIL cycles and whenever the failure artifacts
+	// yielded no content.
+	Failure       *FailureRecord                  `json:"failure,omitempty"`
 	SystemFailure *cyclestate.SystemFailureSignal `json:"system_failure,omitempty"`
 	Decisions     []string                        `json:"decisions,omitempty"`
 	Lessons       []Lesson                        `json:"lessons,omitempty"`
 	Carryover     []Carryover                     `json:"carryover,omitempty"`
-	// SkippedPhases records phases that genuinely did NOT run, with the cause
-	// (closeout after an abnormal mid-cycle exit).
+	// SkippedPhases lists only phases that did not run. A phase that ran but
+	// whose verdict was declined belongs in PhasesRunVerdictNotAdopted.
 	SkippedPhases []cyclestate.SkippedPhase `json:"skipped_phases,omitempty"`
-	// PhasesRunVerdictNotAdopted records non-floor phases that RAN and returned
-	// non-PASS after the floor verdict was set, so their verdict was declined
-	// rather than allowed to overwrite the floor-derived FinalVerdict (cycle-802).
-	// Present so a cycle that PASSed its floor but had a retro/memo fail under
-	// quota pressure still records that experience instead of dropping it.
-	//
-	// These records used to be written into skipped_phases, which made every FAIL
-	// dossier claim `{phase: retro, reason: FAIL}` was SKIPPED while retro's report
-	// sat in the run dir — a record contradicting its own artifacts, poisoning the
-	// consumers that read dossiers to learn which judgment phases executed
-	// (dossier-retro-skipped-mislabel). omitempty, mirroring skipped_phases.
+	// PhasesRunVerdictNotAdopted lists non-floor phases that ran and returned
+	// non-PASS after the floor verdict was set, so their verdict was declined.
 	PhasesRunVerdictNotAdopted []cyclestate.VerdictNotAdopted `json:"phases_run_verdict_not_adopted,omitempty"`
-	// SpineFailOpens records every spine-gate fail-open this cycle took (the
-	// phase entered anyway + the missing predecessor artifact + the reason).
-	// omitempty, mirroring skipped_phases: an operator scanning dossiers sees
-	// the field only where there is something to see (cycle-1166).
-	SpineFailOpens []cyclestate.SpineFailOpen `json:"spine_fail_opens,omitempty"`
-	StartedAt      string                     `json:"started_at,omitempty"`
-	EndedAt        string                     `json:"ended_at,omitempty"`
-	// Timing is the cycle-level latency roll-up (where the wall-clock went),
-	// ingested from phase-timing.json. Nil when the cycle wrote no timing log.
-	Timing *phasetiming.Summary `json:"timing,omitempty"`
-	// CIWatch is the remote GitHub CI verdict for the cycle's pushed commit,
-	// ingested from ci-watch-verdict.json (cycle-748). Nil when the cycle
-	// recorded no watch verdict — never fabricated.
-	CIWatch *CIWatchRecord `json:"ci_watch,omitempty"`
+	SpineFailOpens             []cyclestate.SpineFailOpen     `json:"spine_fail_opens,omitempty"`
+	StartedAt                  string                         `json:"started_at,omitempty"`
+	EndedAt                    string                         `json:"ended_at,omitempty"`
+	Timing                     *phasetiming.Summary           `json:"timing,omitempty"`
+	CIWatch                    *CIWatchRecord                 `json:"ci_watch,omitempty"`
 }
 
-// PhaseRecord is one phase's outcome within the cycle (mirrors a ledger entry +
-// its handoff report). The timing fields (omitempty) carry the durable per-phase
-// latency evidence ingested from phase-timing.json.
+// PhaseRecord is one phase's outcome within the cycle.
 type PhaseRecord struct {
 	Name        string         `json:"name"`
 	Verdict     string         `json:"verdict"`
@@ -112,21 +67,14 @@ type PhaseRecord struct {
 	StartedAt   string         `json:"started_at,omitempty"`
 	EndedAt     string         `json:"ended_at,omitempty"`
 	Archetype   string         `json:"archetype,omitempty"`
-	// ModelSource + ResolvedModel (T3, cycle-463) project the per-phase model
-	// provenance ingested from phase-timing.json — "profile"|"pin"|"advisor"
-	// plus the concrete resolved model/tier. Both absent (never fabricated) on
-	// a legacy timing log written before this field existed.
-	ModelSource   string `json:"model_source,omitempty"`
-	ResolvedModel string `json:"resolved_model,omitempty"`
-	// Tokens (S6, token-telemetry) projects the per-phase terminal token usage
-	// ingested from phase-timing.json (Entry.Tokens, S4) so the durable dossier
-	// record carries counts beside DurationMS. Zero (omitempty ⇒ absent) on a
-	// legacy timing log written before the field existed — never fabricated.
-	Tokens cyclestate.TokenUsage `json:"tokens,omitempty"`
+	// ModelSource is "profile", "pin" or "advisor"; it and ResolvedModel are
+	// empty when the timing log predates model provenance.
+	ModelSource   string                `json:"model_source,omitempty"`
+	ResolvedModel string                `json:"resolved_model,omitempty"`
+	Tokens        cyclestate.TokenUsage `json:"tokens,omitempty"`
 }
 
-// Defect is one audit finding (the H1/H2 taxonomy) — preserved so a failed cycle
-// records WHY it failed and how to fix it.
+// Defect is one audit finding, recorded so a failed cycle says why it failed.
 type Defect struct {
 	ID       string `json:"id"`
 	Severity string `json:"severity"`
@@ -152,10 +100,8 @@ func validVerdict(v string) bool {
 	return v == VerdictPass || v == VerdictWarn || v == VerdictFail
 }
 
-// Validate is the deterministic trust boundary: a dossier is well-formed only if
-// it identifies the cycle + goal, carries a valid final verdict and at least one
-// phase, and — crucially — a FAILED cycle records BOTH why it failed (>=1 defect)
-// AND the work to fix it (>=1 carryover), so no failure's experience is lost.
+// Validate requires a cycle, a goal, valid verdicts and at least one phase, and
+// for a FAIL at least one defect (why) and one carryover (the fix work).
 func (d *Dossier) Validate() error {
 	if d.Cycle <= 0 {
 		return fmt.Errorf("dossier: cycle must be >= 1")
@@ -198,15 +144,11 @@ func (d *Dossier) Validate() error {
 	return nil
 }
 
-// HasCommitment reports whether triage recorded a commitment for this cycle at
-// all (as opposed to no decision having been read). It is the template's guard:
-// "committed to nothing" must render, "we never asked" must not.
+// HasCommitment reports whether a triage commitment was recorded, even an empty one.
 func (d *Dossier) HasCommitment() bool { return d != nil && d.Tasks != nil }
 
-// CommitmentLine renders the committed task ids for the human-readable half of
-// the record. An explicit EMPTY commitment renders as a stated fact rather than
-// a blank, because a cycle that committed to nothing and then ran a full spine
-// is exactly what the reader needs to see (cycle-1623).
+// CommitmentLine renders the committed task ids for the markdown record; an
+// explicit empty commitment renders as a stated fact, not a blank.
 func (d *Dossier) CommitmentLine() string {
 	if !d.HasCommitment() {
 		return ""

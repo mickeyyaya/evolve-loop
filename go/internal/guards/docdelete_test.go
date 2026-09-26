@@ -7,16 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// DocDelete is the port of scripts/hooks/doc-deletion-guard.sh.
-// Rules:
-//   - rm command targeting docs/** or knowledge-base/** → DENY
-//   - mv from docs/** or knowledge-base/** → DENY unless the dest stays under
-//     docs/ (reorganization within the single doc root is never a deletion;
-//     the archive home is docs/private/research/archived-YYYY-MM-DD/ since
-//     the 2026-08-05 doc-root consolidation — knowledge-base/research/ is
-//     retired as an archive target)
-//   - constructor policy can bypass
-//   - Edit / Write tools pass through (cannot delete files in place)
 func TestDocDelete_Name(t *testing.T) {
 	g := NewDocDelete(false)
 	if g.Name() != "docdelete" {
@@ -137,7 +127,7 @@ func TestDocDelete_MissingCommandIsAllow(t *testing.T) {
 	g := NewDocDelete(false)
 	dec := g.Decide(context.Background(), core.GuardInput{
 		ToolName:  "Bash",
-		ToolInput: map[string]any{}, // no command field
+		ToolInput: map[string]any{},
 	})
 	if !dec.Allow {
 		t.Errorf("missing command must allow, got: %s", dec.Reason)

@@ -7,12 +7,6 @@ import (
 	"testing"
 )
 
-// TestPrePlanReconDigest_Deterministic pins WS2-S0b (ADR-0052): the pre-plan
-// recon digest is a deterministic, sorted, fail-open function of its inputs —
-// same inputs ⇒ byte-identical digest, slice fields sorted+deduped, and a nil
-// changedFiles slice (an upstream git error) simply omits the file-derived facts
-// rather than erroring. This is the property that lets the recon feed measured
-// repo facts into the INITIAL plan without becoming a flaky or fatal dependency.
 func TestPrePlanReconDigest_Deterministic(t *testing.T) {
 	t.Parallel()
 	files := []string{"go/internal/core/x.go", "go/internal/core/x_test.go", "web/app.ts", "go/internal/core/x.go"}
@@ -43,8 +37,6 @@ func TestPrePlanReconDigest_Deterministic(t *testing.T) {
 		t.Errorf("hotspot frequency ranking wrong: %v", a.RecentHotspots)
 	}
 
-	// Fail-open: nil files omit the file-derived facts, no panic; keyword/backlog
-	// facts still present, so the digest is NOT zero.
 	z := BuildReconDigest(nil, goal, 0, 0)
 	if len(z.LangsTouched) != 0 || z.HasTests || len(z.RecentHotspots) != 0 {
 		t.Errorf("nil files must omit file facts (fail-open): %+v", z)
@@ -57,10 +49,6 @@ func TestPrePlanReconDigest_Deterministic(t *testing.T) {
 	}
 }
 
-// TestRenderReconDigest_FactsAndByteIdenticalOff pins the pure render: a
-// populated digest renders a stable, deterministic section; a zero digest renders
-// NOTHING — the property that keeps EVOLVE_ROUTER_RECON_DIGEST byte-identical
-// when off (and harmless when on but nothing was gathered).
 func TestRenderReconDigest_FactsAndByteIdenticalOff(t *testing.T) {
 	t.Parallel()
 	d := BuildReconDigest([]string{"a.go", "a_test.go"}, "fix bug", 1, 0)

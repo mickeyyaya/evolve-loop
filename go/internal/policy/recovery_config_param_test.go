@@ -1,12 +1,5 @@
 package policy_test
 
-// RecoveryPolicy — the ADR-0044 Unified Phase Recovery config (cycle-12 flag retirement).
-// PhaseRecovery defaults "shadow" (behavior-neutral); absent block is safe.
-// R8.5 (2026-07-16): SpineFloor — the spine floor's OWN dial — defaults
-// "enforce" (replay-evidenced flip); "shadow" is the policy escape hatch.
-// F27 (2026-09-26): FatalPane — the ADR-0044 C2 fatal-pane fast-fail's OWN
-// dial — defaults "enforce" (soak-evidenced flip); "shadow" is its hatch.
-
 import (
 	"testing"
 
@@ -78,22 +71,16 @@ func TestLoad_RecoveryBlock(t *testing.T) {
 			policy.RecoveryPolicy{PhaseRecovery: "shadow", SpineFloor: "enforce", FatalPane: "enforce"},
 		},
 		{
-			// The R8.5 escape hatch: dial the spine floor back to shadow via
-			// policy.json, no recompile, without touching phase_recovery.
 			"spine-floor-shadow-escape-hatch",
 			`{"recovery":{"spine_floor":"shadow"}}`,
 			policy.RecoveryPolicy{PhaseRecovery: "shadow", SpineFloor: "shadow", FatalPane: "enforce"},
 		},
 		{
-			// F27 escape hatch: dial the fatal-pane fast-fail back to shadow
-			// via policy.json, no recompile, without touching phase_recovery.
 			"fatal-pane-shadow-escape-hatch",
 			`{"recovery":{"fatal_pane":"shadow"}}`,
 			policy.RecoveryPolicy{PhaseRecovery: "shadow", SpineFloor: "enforce", FatalPane: "shadow"},
 		},
 		{
-			// The dials are independent: silencing the whole ADR-0044 program
-			// does not silence the fatal-pane fast-fail (its own dial).
 			"phase-recovery-off-leaves-fatal-pane",
 			`{"recovery":{"phase_recovery":"off"}}`,
 			policy.RecoveryPolicy{PhaseRecovery: "off", SpineFloor: "enforce", FatalPane: "enforce"},
@@ -112,11 +99,6 @@ func TestLoad_RecoveryBlock(t *testing.T) {
 	}
 }
 
-// TestBridgeRecoveryStages_ParsesThroughTheLoaderTrichotomy (F27 review fold):
-// the accessor every setter-less bridge root seeds from parses each word with
-// config.GateStage, the Loader's own parser — so "Enforce" is off here exactly
-// as at the cycle root (it was enforce under the bridge's case-folding
-// normalizer), and a typo never arms the kill path.
 func TestBridgeRecoveryStages_ParsesThroughTheLoaderTrichotomy(t *testing.T) {
 	cases := []struct {
 		name                    string
@@ -131,7 +113,6 @@ func TestBridgeRecoveryStages_ParsesThroughTheLoaderTrichotomy(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			r, f := policy.Policy{Recovery: tc.rec}.BridgeRecoveryStages()
-			// The words the cycle root forwards (cfg.<dial>.String()), byte for byte.
 			if r != tc.wantRecovery.String() || f != tc.wantFatal.String() {
 				t.Errorf("BridgeRecoveryStages() = %q/%q, want %q/%q", r, f, tc.wantRecovery.String(), tc.wantFatal.String())
 			}

@@ -1,30 +1,5 @@
 package dossier
 
-// skipevidence_test.go — the consumer-side contract of
-// dossier-corpus-carries-retro-mislabel (cycle 1666).
-//
-// No production reader interprets skipped_phases today (premise-challenge,
-// cycle 1666: contextfillcorrelate decodes only cycle + final_verdict; the
-// loop-outcome roll-up reads only spine_fail_opens). So the "disposition
-// assembler" the inbox record names is any FUTURE consumer that asks the
-// committed corpus which judgment phases executed — and the record type's own
-// package is the one boundary every such consumer must cross. PhaseSkipEvidence
-// is that boundary: it is the ONLY sanctioned way to read a skipped_phases
-// entry, and it refuses to treat a pre-discriminator record's entry as evidence
-// of anything. A legacy record is cross-checked against the run artifacts
-// instead:
-//
-//	Contradicted — an execution receipt proves the phase RAN (the mislabel)
-//	Unverified   — no receipt survives: unknown, NOT a skip
-//	Trusted      — the record carries the discriminator: the phase did not run
-//	None         — no skipped_phases entry for the phase at all
-//
-// Two receipt sources, because the historical run dirs are gone: the phase's
-// report in <root>/.evolve/runs/cycle-N/ (retrospective-report.md, or the
-// pre-rename retro-report.md that 201 of the ledger's receipts still name), or
-// the hash-chained ledger's {cycle:N, role:retro, kind:agent_subprocess} entry
-// (<root>/.evolve/ledger.jsonl) — the record of the subprocess that wrote it.
-
 import (
 	"fmt"
 	"os"
@@ -70,16 +45,11 @@ func writeLedger(t *testing.T, root string, lines ...string) {
 	}
 }
 
-// retroReceipt is the ledger line the real corpus carries for every one of
-// the 134 affected cycles (cycle-823's verbatim shape, entry_seq 57180).
+// retroReceipt is the ledger line a real retro dispatch leaves for cycle.
 func retroReceipt(cycle int) string {
 	return fmt.Sprintf(`{"ts":"2026-07-14T01:12:21Z","cycle":%d,"role":"retro","kind":"agent_subprocess","exit_code":0,"artifact_path":"/x/.evolve/runs/cycle-%d/retro-report.md","git_head":"b140da6b","entry_seq":57180,"prev_hash":"146689a4","run_id":"01KXEYRET2P9R0CXBEMYPK5FFC"}`, cycle, cycle)
 }
 
-// TestPhaseSkipEvidence_LegacyRetroSkipIsNeverTrusted — a pre-discriminator
-// record's retro entry is NEVER evidence retro was skipped: with a receipt it
-// is contradicted, without one it is unverified. Both are "not skipped" to a
-// consumer; neither may be read as the skip the label claims.
 func TestPhaseSkipEvidence_LegacyRetroSkipIsNeverTrusted(t *testing.T) {
 	cases := []struct {
 		name  string
@@ -128,10 +98,6 @@ func TestPhaseSkipEvidence_LegacyRetroSkipIsNeverTrusted(t *testing.T) {
 	}
 }
 
-// TestPhaseSkipEvidence_VersionedAndAbsentEntries — the positive and edge
-// rows: a record carrying the discriminator is trusted at face value (that is
-// the discriminator's purpose — no artifact lookup needed), and a phase with
-// no entry, on any record or on a nil record, is None.
 func TestPhaseSkipEvidence_VersionedAndAbsentEntries(t *testing.T) {
 	root := t.TempDir() // deliberately empty: no runs, no ledger
 	versioned := legacyRetroSkipDossier(4300)

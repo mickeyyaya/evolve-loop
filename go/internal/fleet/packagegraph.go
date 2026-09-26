@@ -10,20 +10,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// modulePrefix identifies module-internal import paths. Only these can
-// merge-skew a concurrent build (research finding #2: rename + call-site);
-// stdlib/third-party imports are excluded so two todos that merely share a
-// stdlib dependency (e.g. both import "fmt") don't spuriously conflict.
+// modulePrefix limits conflicts to module-internal imports, so a shared stdlib import never conflicts.
 const modulePrefix = "github.com/mickeyyaya/evolve-loop/go/"
 
-// TransitivePackageSet resolves files (module-root-relative paths, e.g.
-// "internal/fleet/partition.go") to the set of module-internal import paths
-// transitively reachable from their containing packages, including each
-// file's own package. It shells out to `go list -deps` (no synthetic graph —
-// the real build graph, so renames/refactors are always current) once per
-// distinct containing directory. repoRoot is the Go module root (containing
-// go.mod). A file that doesn't exist on disk is a caller-contract violation —
-// fail loud rather than silently resolving an empty/wrong package.
+// TransitivePackageSet returns the module-internal packages reachable from the packages holding files (module-root-relative).
 func TransitivePackageSet(files []string, repoRoot string) (map[string]bool, error) {
 	dirs := map[string]bool{}
 	for _, f := range files {
@@ -49,10 +39,7 @@ func TransitivePackageSet(files []string, repoRoot string) (map[string]bool, err
 	return set, nil
 }
 
-// globalZoneFiles are module-root-relative files whose edit can affect the
-// build of ANY package regardless of the import graph: go.mod/go.sum change
-// dependency resolution for the whole module, and policy/hook files are
-// cross-cutting by convention (research finding #2's prescribed design).
+// globalZoneFiles can affect every package's build regardless of the import graph.
 var globalZoneFiles = []string{
 	"go.mod",
 	"go.sum",
@@ -77,24 +64,14 @@ func GlobalZoneFiles() []string {
 	return out
 }
 
-// PartitionGraph is [Partition]'s package-graph-aware sibling (rung 1 of the
-// merge ladder): it assigns todos to n concurrent buckets such that no two
-// buckets' TRANSITIVE PACKAGE sets intersect, not just their literal files.
-// Two todos touching disjoint files but connected through the import graph
-// (a rename in package foo, a call-site edit in package bar that imports foo)
-// are co-scheduled into the same bucket, or deferred — never split, matching
-// Partition's cross-bucket-disjointness invariant but at build-graph
-// granularity. A todo touching a global-zone file (go.mod, go.sum, ...)
-// always conflicts with every bucket already holding work, since it can
-// change any package's build. Deterministic: input order preserved, ties
-// break to the lowest bucket index.
+// PartitionGraph is [Partition] over transitive package sets, treating global-zone files as conflicting with every bucket.
 func PartitionGraph(todos []Todo, n int, repoRoot string) (buckets [][]Todo, deferred []Todo, err error) {
 	if n < 1 {
 		n = 1
 	}
 	buckets = make([][]Todo, n)
 	owner := map[string]int{} // module-internal package path -> owning bucket
-	gzBucket := -1            // bucket holding the global-zone-touching todo(s), -1 = none yet
+	gzBucket := -1            // bucket holding the global-zone todo(s); -1 = none yet
 
 	for _, td := range todos {
 		gzFiles, pkgFiles := splitGlobalZone(td.Files)
@@ -142,10 +119,7 @@ func PartitionGraph(todos []Todo, n int, repoRoot string) (buckets [][]Todo, def
 	return buckets, deferred, nil
 }
 
-// splitGlobalZone partitions files into global-zone files and ordinary
-// package-graph files (see IsGlobalZone) — global-zone files are excluded
-// from TransitivePackageSet since they aren't Go source (no package to
-// resolve); their conflict semantics are handled separately in PartitionGraph.
+// splitGlobalZone separates global-zone files, which have no package to resolve, from package-graph files.
 func splitGlobalZone(files []string) (gzFiles, pkgFiles []string) {
 	for _, f := range files {
 		if IsGlobalZone(f) {

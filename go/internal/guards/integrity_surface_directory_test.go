@@ -5,14 +5,6 @@ import (
 	"testing"
 )
 
-// TestIsProtectedScope_DirectorySpellingCoversTheSurfaceInside (F29): the SCOPE
-// projection answers the question a declared fix surface poses — a directory
-// spelling (trailing slash, or a last segment with no extension) is in scope
-// when a manifest fragment lies inside it. Before F29 the console classifier
-// had only membership, so `tokenopt-handoff-digests-per-edge-remainder` (files
-// go/internal/core/, go/internal/phases/runner/) reached a lane four times
-// (cycles 1646, 1651, 1654, 1656) and triage's breaker refused its card each
-// time.
 func TestIsProtectedScope_DirectorySpellingCoversTheSurfaceInside(t *testing.T) {
 	inScope := []string{
 		"go/internal/core/",             // holds orchestrator.go, cyclerun.go, …
@@ -43,13 +35,6 @@ func TestIsProtectedScope_DirectorySpellingCoversTheSurfaceInside(t *testing.T) 
 	}
 }
 
-// TestIsProtectedSurface_MembershipStaysMembership: the MEMBERSHIP projection
-// the ship tripwire, the role write-guard, the fleet preflight and triage's
-// breaker use is NOT widened to scope — a directory that merely contains
-// protected files is not itself a member (the breaker must never get stricter
-// than the seed that screens for it). Its one F29 fix: a path NAMING a
-// protected directory without the trailing slash (a package or import path)
-// is a member of that directory.
 func TestIsProtectedSurface_MembershipStaysMembership(t *testing.T) {
 	members := []string{
 		"go/internal/bridge", // names the protected /go/internal/bridge/ directory
@@ -75,11 +60,6 @@ func TestIsProtectedSurface_MembershipStaysMembership(t *testing.T) {
 	}
 }
 
-// TestIsProtectedScope_ImpliedByMembership pins the invariant that makes the
-// seed-time screen sound: every member is in scope — for every manifest
-// fragment (repo-relative, with and without a worktree prefix) and the table
-// cases above, so the classifier using scope refuses at least what the breaker
-// using membership would.
 func TestIsProtectedScope_ImpliedByMembership(t *testing.T) {
 	var paths []string
 	for _, e := range ProtectedSurfaceManifest {

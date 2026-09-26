@@ -29,8 +29,6 @@ func TestFloorPhases_AuditOnlyOptIn(t *testing.T) {
 }
 
 func TestFloorPhases_AuditIsNonRemovable(t *testing.T) {
-	// A user floor that omits audit must still get audit appended — the one
-	// gate that can never be dropped, even by typo.
 	p := Policy{ShipFloor: []string{"build"}}
 	floor, overridden := p.FloorPhases()
 	if !overridden {

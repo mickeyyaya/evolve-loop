@@ -8,14 +8,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 )
 
-// checkCLIHealth surfaces ACTIVE CLI-family benches (.evolve/cli-health.json,
-// written when a dispatch died on a classified transient wall like
-// rate_limit) so the operator sees AT BATCH START that chains will run
-// fallback-first — instead of discovering it from per-phase fallback logs
-// (cycle-283: codex was quota-walled all night and only the dispatch trail
-// showed it). Always Warn, never Halt: the fallback chain exists precisely so
-// a benched family doesn't block the batch, and expired benches are canaried
-// per-cycle by the loop.
+// checkCLIHealth warns at batch start that benched CLI families will run fallback-first.
+// Never a halt: the fallback chain exists so a benched family does not block the batch.
 func checkCLIHealth(o resolved) CheckResult {
 	const name = "cli-health"
 	active := o.cliHealthActive()
@@ -35,7 +29,6 @@ func checkCLIHealth(o resolved) CheckResult {
 	}
 }
 
-// defaultCLIHealthActive reads the real bench store.
 func defaultCLIHealthActive(projectRoot string) func() []clihealth.Entry {
 	return func() []clihealth.Entry {
 		active := clihealth.NewStore(projectRoot, nil).Active()

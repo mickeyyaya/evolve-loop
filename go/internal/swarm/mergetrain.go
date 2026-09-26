@@ -10,72 +10,49 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 )
 
-// ErrMergeConflict is returned by a GitMerger when a merge could not be applied
-// cleanly (the merger has already aborted, leaving the integration branch at its
-// prior tip).
+// ErrMergeConflict wraps a merge that could not be applied; the merger has already aborted it.
 var ErrMergeConflict = errors.New("merge conflict")
 
-// GitMerger merges one worker dev branch into the integration branch. Injected
-// so the merge-train is testable without real git. The production impl
-// (ExecGitMerger) shells out; on conflict it `git merge --abort`s so the
-// integration branch is never left half-merged.
+// GitMerger merges one worker dev branch into the integration branch and never leaves it half-merged.
 type GitMerger interface {
 	Merge(ctx context.Context, integrationBranch, fromBranch string) error
 }
 
-// AcceptanceChecker runs a worker's acceptance gate (e.g. `go test`) against the
-// integration worktree AFTER its branch is merged. nil error = pass. This is the
-// "gate each merge step on the acceptance check, not just git success" rule
-// (research: ~80% fewer broken integrations) — a merge that text-merges but
-// breaks the build is rolled back. A nil AcceptanceChecker skips the gate.
+// AcceptanceChecker runs a worker's acceptance check against the integration tip after its merge; nil error passes.
 type AcceptanceChecker func(ctx context.Context, workerID, integrationBranch string) error
 
-// ConflictResolver re-invokes the authoring worker to resolve a merge conflict
-// (or acceptance failure) against the current integration tip — the
-// "authoring-worker resolves its own conflicts" rule. Returns nil if resolved
-// (the train then retries the merge once). A nil ConflictResolver means "no
-// resolution attempt" → the step fails.
+// ConflictResolver re-invokes the authoring worker to fix a failed merge step; nil error means retry the merge.
 type ConflictResolver func(ctx context.Context, workerID, integrationBranch string) error
 
 // MergeOutcome records one worker's merge-train step.
 type MergeOutcome struct {
 	WorkerID string
 	Merged   bool
-	Resolved bool   // a conflict/acceptance failure was fixed on retry
+	Resolved bool   // a conflict or acceptance failure was fixed on retry
 	Reason   string // failure reason when !Merged
 }
 
 // MergeReport is the whole merge-train result.
 type MergeReport struct {
-	Outcomes []MergeOutcome
-	// AllMerged is true iff every worker landed on the integration branch.
-	AllMerged bool
+	Outcomes  []MergeOutcome
+	AllMerged bool // every worker landed; false for an empty order
 }
 
 // MergeTrainDeps are the injected seams for RunMergeTrain.
 type MergeTrainDeps struct {
 	Merger     GitMerger
-	Accept     AcceptanceChecker // optional; nil skips acceptance gating
-	Resolver   ConflictResolver  // optional; nil = no conflict re-dispatch (fail on conflict)
-	MaxRetries int               // conflict re-dispatch attempts per worker (default 1)
+	Accept     AcceptanceChecker // nil skips acceptance gating
+	Resolver   ConflictResolver  // nil fails a step on its first conflict
+	MaxRetries int               // resolution attempts per worker: 0 means 1, negative means none
 }
 
-// RunMergeTrain serializes the worker dev-branch → integration-branch merges in
-// the given topological order (from Validate/TopoOrder), gating each on its
-// acceptance check. This is the WRITER fan-in. It is strictly sequential — only
-// one merge touches the shared integration index at a time, so there is no
-// .git/index.lock contention.
-//
-// Per worker: merge → (acceptance) → on conflict OR acceptance failure, invoke
-// the ConflictResolver (authoring worker) up to MaxRetries and retry → still
-// failing ⇒ record the failure and STOP (a half-built integration must not
-// proceed; the caller falls back / fails the phase).
+// RunMergeTrain merges workers one at a time in the given order, gating each on acceptance, and stops at the first failure.
 func RunMergeTrain(ctx context.Context, integrationBranch string, order []string, branchByID map[string]string, deps MergeTrainDeps) MergeReport {
 	maxRetries := deps.MaxRetries
 	if maxRetries < 0 {
 		maxRetries = 0
 	} else if maxRetries == 0 {
-		maxRetries = 1 // default: one authoring-worker resolution attempt
+		maxRetries = 1
 	}
 
 	var rep MergeReport
@@ -85,14 +62,12 @@ func RunMergeTrain(ctx context.Context, integrationBranch string, order []string
 		rep.Outcomes = append(rep.Outcomes, out)
 		if !out.Merged {
 			rep.AllMerged = false
-			break // do not continue a half-built integration
+			break // never build on a half-built integration
 		}
 	}
 	return rep
 }
 
-// mergeOneWorker runs one worker's merge + acceptance, with bounded
-// conflict-resolution retries.
 func mergeOneWorker(ctx context.Context, integ, id, branch string, deps MergeTrainDeps, maxRetries int) MergeOutcome {
 	out := MergeOutcome{WorkerID: id}
 	for attempt := 0; attempt <= maxRetries; attempt++ {
@@ -106,7 +81,6 @@ func mergeOneWorker(ctx context.Context, integ, id, branch string, deps MergeTra
 				stepErr = fmt.Errorf("acceptance: %w", acErr)
 			}
 		}
-		// Failed (conflict or acceptance). Try the authoring worker once more.
 		out.Reason = stepErr.Error()
 		if attempt == maxRetries || deps.Resolver == nil {
 			return out
@@ -126,12 +100,9 @@ func runAcceptance(ctx context.Context, ac AcceptanceChecker, id, integ string) 
 	return ac(ctx, id, integ)
 }
 
-// ExecGitMerger is the production GitMerger. It merges fromBranch into the
-// integration branch (whose worktree is IntegrationWorktree) with a merge
-// commit; on conflict it aborts so the integration tip is unchanged.
+// ExecGitMerger is the production GitMerger: a --no-ff merge run inside the integration worktree.
 type ExecGitMerger struct {
-	// IntegrationWorktree is the path whose checked-out branch is the integration
-	// branch (merges run with -C here so the shared index is the integration one).
+	// IntegrationWorktree has the integration branch checked out, so merges use its index.
 	IntegrationWorktree string
 }
 
@@ -140,25 +111,17 @@ func (m ExecGitMerger) Merge(ctx context.Context, _ /*integrationBranch*/, fromB
 	return mergeWith(ctx, gitexec.Default(m.IntegrationWorktree), fromBranch)
 }
 
-// mergeWith is the gitexec-backed core behind ExecGitMerger.Merge. On any
-// failure (unrecoverable error OR non-zero exit, e.g. a merge conflict) it
-// aborts so the integration branch is left at its prior tip, then returns an
-// error wrapping ErrMergeConflict with the git stderr — matching the original
-// exec.CommandContext form.
 func mergeWith(ctx context.Context, g gitexec.Git, fromBranch string) error {
 	_, stderr, code, err := g.Capture(ctx, "merge", "--no-ff", "--no-edit", fromBranch)
 	if err != nil || code != 0 {
-		// Abort so the integration branch is left clean for the next attempt.
+		// Abort so the integration branch stays at its prior tip for the next attempt.
 		_ = g.Run(ctx, "merge", "--abort")
 		return fmt.Errorf("%w: merge %s: %s: %s", ErrMergeConflict, fromBranch, gitFailReason(code, err), strings.TrimSpace(stderr))
 	}
 	return nil
 }
 
-// Synthesize is the READER fan-in: it concatenates the workers' summary
-// artifacts (in the given order) into one merged document. Readers do no git
-// merge — overlap is harmless, so synthesis simply joins the parts with a
-// per-worker header. The caller supplies each worker's artifact text.
+// Synthesize is the reader fan-in: it joins worker artifacts in order, each under a per-worker header.
 func Synthesize(order []string, artifactByID map[string]string) string {
 	var b bytes.Buffer
 	for _, id := range order {

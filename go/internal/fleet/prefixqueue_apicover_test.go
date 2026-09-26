@@ -5,13 +5,6 @@ import (
 	"testing"
 )
 
-// prefixqueue_apicover_test.go — default-tag public-API coverage for the salvaged
-// prefix composer (ADR-0069: the acs-tagged go/acs/cycle975+981 predicates do NOT
-// run under `go test ./internal/...`, so repo-wide apicover flags every
-// prefixqueue.go export as uncovered — the exact gap that reds main). Each test
-// names and exercises a real contract (Rule 9), it is not a bare reference.
-
-// pqContains reports whether ids includes id (test-local helper).
 func pqContains(ids []string, id string) bool {
 	for _, x := range ids {
 		if x == id {
@@ -21,8 +14,6 @@ func pqContains(ids []string, id string) bool {
 	return false
 }
 
-// TestNewPrefixQueue_WindowStartsAtThree names NewPrefixQueue + Window and pins
-// the AIMD window's compiled start value.
 func TestNewPrefixQueue_WindowStartsAtThree(t *testing.T) {
 	q := NewPrefixQueue()
 	if q == nil {
@@ -33,28 +24,24 @@ func TestNewPrefixQueue_WindowStartsAtThree(t *testing.T) {
 	}
 }
 
-// TestPrefixQueue_AIMDWindow names OnGreen/OnRed and pins additive-increase,
-// multiplicative-decrease, and the floor of 1.
 func TestPrefixQueue_AIMDWindow(t *testing.T) {
 	q := NewPrefixQueue()
 	q.OnGreen()
-	q.OnGreen() // 3 -> 5
+	q.OnGreen()
 	if got := q.Window(); got != 5 {
 		t.Errorf("Window after 2 greens = %d, want 5", got)
 	}
-	q.OnRed() // 5 -> 2
+	q.OnRed()
 	if got := q.Window(); got != 2 {
 		t.Errorf("Window after red = %d, want 2", got)
 	}
-	q.OnRed() // 2 -> 1
-	q.OnRed() // floor
+	q.OnRed()
+	q.OnRed()
 	if got := q.Window(); got != 1 {
 		t.Errorf("Window at floor = %d, want 1", got)
 	}
 }
 
-// TestPrefixQueue_ComposePrefixes names Enqueue/ComposePrefixes + LaneCandidate,
-// RiskTier and its consts, pinning cumulative composition and solo-slot isolation.
 func TestPrefixQueue_ComposePrefixes(t *testing.T) {
 	q := NewPrefixQueue()
 	q.Enqueue(LaneCandidate{ID: "L1", Tier: TierRollup, Files: []string{"a/a.go"}})
@@ -62,7 +49,6 @@ func TestPrefixQueue_ComposePrefixes(t *testing.T) {
 	q.Enqueue(LaneCandidate{ID: "IFFY", Tier: TierIffy, Files: []string{"core/c.go"}})
 
 	got := q.ComposePrefixes()
-	// L1, L1+L2 compose; IFFY is solo.
 	want := [][]string{{"L1"}, {"L1", "L2"}, {"IFFY"}}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("ComposePrefixes() = %v, want %v", got, want)
@@ -74,8 +60,6 @@ func TestPrefixQueue_ComposePrefixes(t *testing.T) {
 	}
 }
 
-// TestPrefixQueue_ResolveCulprit names ResolveCulprit and pins positional NNFI
-// ejection in a linear verify budget.
 func TestPrefixQueue_ResolveCulprit(t *testing.T) {
 	q := NewPrefixQueue()
 	q.Enqueue(LaneCandidate{ID: "L1", Tier: TierMaybe, Files: []string{"a/a.go"}})
@@ -98,9 +82,6 @@ func TestPrefixQueue_ResolveCulprit(t *testing.T) {
 	}
 }
 
-// TestPrefixQueueType_ZeroValue names the PrefixQueue and RiskTier types by their
-// bare identifiers and pins the zero-value composer: an unstarted queue still
-// composes an enqueued lane (window is unused by ComposePrefixes).
 func TestPrefixQueueType_ZeroValue(t *testing.T) {
 	var q PrefixQueue
 	var tier RiskTier = TierMaybe
@@ -110,8 +91,6 @@ func TestPrefixQueueType_ZeroValue(t *testing.T) {
 	}
 }
 
-// TestLandingMode_Vocabulary names LandingMode, its consts, DefaultLandingMode
-// and ParseLandingMode, pinning the closed vocabulary + fail-loud parse.
 func TestLandingMode_Vocabulary(t *testing.T) {
 	if DefaultLandingMode() != LandingPerLane {
 		t.Errorf("DefaultLandingMode() = %q, want %q", DefaultLandingMode(), LandingPerLane)

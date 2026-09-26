@@ -72,8 +72,7 @@ func TestRun_WritesShutdownReport(t *testing.T) {
 		close(done)
 	}()
 
-	// <-done is the real barrier: Run catches an already-closed shutdown on its
-	// first select iteration and writes the report before returning. No sleep.
+	// An already-closed shutdown fires on the first select, so <-done is the only barrier needed.
 	close(shutdown)
 	<-done
 
@@ -102,7 +101,7 @@ func TestRun_StallDetectionFires(t *testing.T) {
 		mu.Lock()
 		defer mu.Unlock()
 		callIdx++
-		// First two calls (setup + first emit) at startTime; subsequent at +1000s
+		// Construction and observer_started read startTime; every later read is past StallS.
 		if callIdx <= 2 {
 			return startTime
 		}
@@ -184,16 +183,13 @@ func TestRun_TailsStdoutLog(t *testing.T) {
 	t.Parallel()
 	ws := tempWorkspace(t)
 	stdoutLog := filepath.Join(ws, "builder-stdout.log")
-	// Pre-seed with 2 events.
 	_ = os.WriteFile(stdoutLog, []byte(
 		`{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{"path":"x"}}]}}
 {"type":"user","message":{"content":[{"type":"tool_result","is_error":false}]}}
 `), 0o644)
 
 	now := time.Date(2026, 5, 23, 12, 0, 0, 0, time.UTC)
-	// StopAfterMS drives a deterministic termination: Run blocks until the stop
-	// timer (200ms), having tailed the pre-seeded stdout on its poll ticks
-	// (interval = StopAfterMS/4 = 50ms). No shutdown goroutine racing a sleep.
+	// With StopAfterMS set, Run ticks every StopAfterMS/4, so it tails the log before the timer ends it.
 	rc := Run(Config{
 		Workspace: ws, Cycle: 1, Phase: "build", Agent: "builder",
 		PollS: 1, StallS: 9999, EOFGraceS: 9999,

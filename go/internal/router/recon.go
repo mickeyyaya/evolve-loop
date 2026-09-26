@@ -7,28 +7,18 @@ import (
 	"strings"
 )
 
-// ReconDigest is the deterministic pre-plan recon (ADR-0052 WS2-S0b): measured
-// repo facts fed into the INITIAL whole-cycle Plan prompt so upfront phase
-// selection is grounded in evidence, not goal-text inference alone (closing
-// capability gap #1 for the initial plan, deterministically — no LLM, no
-// subagent, per Core Rule 5). Every field is deterministic given repo state; the
-// core gatherer FAILS OPEN — a git/fs error omits that fact and never errors —
-// so a degraded environment silently narrows the digest rather than breaking
-// planning. The floor still clamps whatever plan results, so more signal yields
-// better plans, never unsafe ones.
+// ReconDigest holds the measured repo facts fed into the initial plan prompt. The gatherer
+// fails open: a git or fs error omits a fact rather than failing planning.
 type ReconDigest struct {
-	LangsTouched    []string // distinct source languages in recently-changed files (sorted, deduped)
-	HasTests        bool     // the recently-changed set includes test files
-	BacklogSize     int      // queued backlog items (0 before scout has run)
-	CarryoverCount  int      // unresolved carryover todos surfaced this cycle
-	GoalKeywordHits []string // routing-salient keywords found in the goal text (sorted, deduped)
-	RecentHotspots  []string // most-frequently-changed files recently (sorted by freq, capped)
+	LangsTouched    []string // languages of recently changed files, sorted
+	HasTests        bool
+	BacklogSize     int // 0 before scout has run
+	CarryoverCount  int
+	GoalKeywordHits []string // routing-salient goal keywords, sorted
+	RecentHotspots  []string // most-changed files, by frequency, capped
 }
 
-// IsZero reports whether the digest carries no measured facts. RenderReconDigest
-// emits nothing for a zero digest, so an empty recon keeps the prompt
-// byte-identical — the EVOLVE_ROUTER_RECON_DIGEST=off guarantee, and also the
-// harmless-when-on-but-empty case.
+// IsZero reports whether the digest carries no facts; a zero digest renders nothing.
 func (d ReconDigest) IsZero() bool {
 	return len(d.LangsTouched) == 0 && !d.HasTests && d.BacklogSize == 0 &&
 		d.CarryoverCount == 0 && len(d.GoalKeywordHits) == 0 && len(d.RecentHotspots) == 0
@@ -38,24 +28,14 @@ func (d ReconDigest) IsZero() bool {
 // rubric out of the context window.
 const maxReconHotspots = 8
 
-// reconGoalKeywords are the routing-salient terms whose presence in the goal text
-// is worth surfacing to the planner — they correlate with phase need (bug →
-// reproduction, security → review, performance → benchmark, etc.). A fixed,
-// pre-sorted, unique vocabulary keeps GoalKeywordHits deterministic and the
-// prompt prefix cache-stable. KEEP SORTED (reconGoalKeywordHits relies on it).
-// An array literal ([...]string) makes the table immutable at compile time — a
-// stray append/index-assign by a future caller is a build error, not a silent
-// shared-state corruption.
+// reconGoalKeywords must stay sorted and unique: reconGoalKeywordHits relies on it to return a
+// sorted result, which keeps the prompt prefix cache-stable.
 var reconGoalKeywords = [...]string{
 	"api", "bug", "concurrency", "doc", "fix", "migration",
 	"performance", "refactor", "regression", "security", "test",
 }
 
-// BuildReconDigest assembles the digest from already-gathered inputs — PURE and
-// deterministic (all slice outputs sorted + deduped), so it is unit-testable
-// without a repo. A nil changedFiles slice (an upstream git error, the fail-open
-// contract) simply omits the file-derived facts. goalText is matched
-// case-insensitively against reconGoalKeywords.
+// BuildReconDigest assembles a deterministic digest; nil changedFiles omits the file-derived facts.
 func BuildReconDigest(changedFiles []string, goalText string, backlogSize, carryoverCount int) ReconDigest {
 	d := ReconDigest{BacklogSize: backlogSize, CarryoverCount: carryoverCount}
 	d.GoalKeywordHits = reconGoalKeywordHits(goalText)
@@ -63,10 +43,8 @@ func BuildReconDigest(changedFiles []string, goalText string, backlogSize, carry
 	return d
 }
 
-// RenderReconDigest writes the digest under a stable, deterministic heading so
-// the planner sees measured repo facts. It emits each fact only when present and
-// NOTHING for a zero digest — that emptiness is what keeps the prompt
-// byte-identical when the recon is off (or on but un-gathered).
+// RenderReconDigest writes the present facts under a fixed heading, and nothing for a zero digest,
+// so the prompt is byte-identical when recon is off.
 func RenderReconDigest(b *strings.Builder, d ReconDigest) {
 	if d.IsZero() {
 		return
@@ -92,13 +70,8 @@ func RenderReconDigest(b *strings.Builder, d ReconDigest) {
 	}
 }
 
-// reconGoalKeywordHits returns the reconGoalKeywords whose value is a WORD-PREFIX
-// of some word in goalText (case-insensitive). Word-prefix — not substring —
-// avoids the mid-word false positives that mislead the planner ("prefix"/"suffix"
-// must NOT count as "fix"; "latest" must NOT count as "test") while still
-// catching morphological variants ("docs"/"documentation" → "doc", "fixes" →
-// "fix"). Because reconGoalKeywords is pre-sorted+unique, the result stays sorted
-// and unique without re-sorting.
+// reconGoalKeywordHits returns the keywords that prefix some word of goalText, case-insensitively.
+// A word prefix, not a substring, so "prefix" is not "fix" and "latest" is not "test", yet "docs" is "doc".
 func reconGoalKeywordHits(goalText string) []string {
 	words := strings.FieldsFunc(strings.ToLower(goalText), func(r rune) bool {
 		return r < 'a' || r > 'z'
@@ -118,9 +91,8 @@ func reconGoalKeywordHits(goalText string) []string {
 	return hits
 }
 
-// reconFromFiles derives the file-based facts (languages, test presence, churn
-// hotspots) from a list of recently-changed paths (duplicates expected — each
-// commit-touch is one entry, so frequency = churn). Empty input ⇒ no facts.
+// reconFromFiles derives languages, test presence and hotspots; each commit touch is one entry,
+// so a path's frequency is its churn.
 func reconFromFiles(files []string) (langs []string, hasTests bool, hotspots []string) {
 	if len(files) == 0 {
 		return nil, false, nil
@@ -143,8 +115,7 @@ func reconFromFiles(files []string) (langs []string, hasTests bool, hotspots []s
 	return sortedKeys(langSet), hasTests, topByFreq(freq, maxReconHotspots)
 }
 
-// langForPath maps a path's extension to a coarse language label, or "" when the
-// extension is unrecognized (config/data files contribute no language signal).
+// langForPath maps a path's extension to a coarse language label, or "".
 func langForPath(path string) string {
 	switch strings.ToLower(filepath.Ext(path)) {
 	case ".go":
@@ -165,8 +136,6 @@ func langForPath(path string) string {
 	return ""
 }
 
-// isTestPath reports whether a path looks like a test file across the languages
-// langForPath covers (Go _test.go, JS/TS .test/.spec, Python test_*).
 func isTestPath(path string) bool {
 	base := strings.ToLower(filepath.Base(path))
 	return strings.HasSuffix(base, "_test.go") ||
@@ -174,8 +143,6 @@ func isTestPath(path string) bool {
 		strings.HasPrefix(base, "test_")
 }
 
-// sortedKeys returns the map keys sorted — the deterministic projection used for
-// the language set.
 func sortedKeys(set map[string]struct{}) []string {
 	if len(set) == 0 {
 		return nil
@@ -188,8 +155,7 @@ func sortedKeys(set map[string]struct{}) []string {
 	return out
 }
 
-// topByFreq returns up to n paths ranked by descending frequency, ties broken by
-// path for determinism.
+// topByFreq returns up to n paths by descending frequency, ties broken by path.
 func topByFreq(freq map[string]int, n int) []string {
 	if len(freq) == 0 {
 		return nil

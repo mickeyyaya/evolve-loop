@@ -1,17 +1,3 @@
-// `evolve serve-phase <name>` is the envelope-framed subprocess entry
-// that pairs with phaseproto.SubprocessRunner. Where `evolve phase`
-// speaks raw PhaseRequest/PhaseResponse JSON for direct human / script
-// use, `serve-phase` wraps the same handler in phaseproto.ServeStdio
-// so the orchestrator can drive cross-CLI agents (Go, Node, Python)
-// through one stable Envelope wire.
-//
-// Protocol (one process per invocation):
-//
-//	stdin:  one phaseproto.Envelope{Kind:"request"} line
-//	stdout: one phaseproto.Envelope{Kind:"response"|"error"} line
-//	stderr: human-readable diagnostics
-//	exit:   0 normally (handler errors are wire-level via error envelope);
-//	        1 on framing / I/O failure; 10 on bad CLI args.
 package phasecmd
 
 import (
@@ -25,6 +11,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/phaseproto"
 )
 
+// RunServePhase implements `evolve serve-phase <name>`: one phase run over phaseproto envelopes on stdio.
 func RunServePhase(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
 		fmt.Fprintf(stderr, "evolve serve-phase: missing phase name (%s)\n", strings.Join(registry.Names(), "|"))

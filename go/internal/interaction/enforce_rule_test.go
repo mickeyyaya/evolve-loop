@@ -1,8 +1,3 @@
-// enforce_rule_test.go — R8.2: the I4 shadow→enforce flip. PromoteRule
-// always lands at shadow; EnforceRule is the measured-clean transition the
-// batch sweep calls. Pins: flip rewrites stage preserving fields; idempotent
-// on already-enforce; missing rule errors (never create on flip); corpus
-// rot since promotion BLOCKS the flip.
 package interaction
 
 import (
@@ -37,7 +32,6 @@ func TestEnforceRule_FlipsShadowToEnforce(t *testing.T) {
 	if rules[0].Regex != enfTestRegex || rules[0].ResponseKeys != "1,Enter" {
 		t.Errorf("flip must preserve regex/keys: %+v", rules[0])
 	}
-	// Idempotent re-flip.
 	if err := EnforceRule(dir, id, []string{"healthy line"}); err != nil {
 		t.Fatalf("re-EnforceRule: %v", err)
 	}
@@ -53,13 +47,11 @@ func TestEnforceRule_MissingRuleErrors(t *testing.T) {
 func TestEnforceRule_CorpusRotBlocksFlip(t *testing.T) {
 	t.Parallel()
 	dir, id := promoteFixture(t)
-	// The corpus has rotted: a healthy line now matches the pattern.
 	rotted := []string{"Do you want to proceed with dangerous-op? [healthy banner]"}
 	err := EnforceRule(dir, id, rotted)
 	if err == nil || !strings.Contains(err.Error(), "re-validation") {
 		t.Fatalf("corpus rot must block the flip (got %v)", err)
 	}
-	// And the file must still say shadow.
 	data, _ := os.ReadFile(filepath.Join(dir, id+".yaml"))
 	if !strings.Contains(string(data), "stage: shadow") {
 		t.Errorf("blocked flip must leave the rule at shadow:\n%s", data)

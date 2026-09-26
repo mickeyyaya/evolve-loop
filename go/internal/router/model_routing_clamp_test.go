@@ -12,8 +12,6 @@ func profileFunc(p *profiles.Profile) func(string) *profiles.Profile {
 	return func(string) *profiles.Profile { return p }
 }
 
-// TestClampPlanModelRouting_InBoundsHonored: an in-bounds, catalog-resolvable
-// {cli,tier} proposal passes through unchanged with zero clamps.
 func TestClampPlanModelRouting_InBoundsHonored(t *testing.T) {
 	prof := &profiles.Profile{CLI: "claude-tmux", AllowedCLIs: []string{"claude", "codex"},
 		ModelTierEnvelope: &profiles.ModelTierEnvelope{Min: "balanced", Max: "deep"}}
@@ -31,8 +29,6 @@ func TestClampPlanModelRouting_InBoundsHonored(t *testing.T) {
 	}
 }
 
-// TestClampPlanModelRouting_ClampsOutOfEnvelopeTier: a tier below the
-// profile's envelope minimum is forced back and recorded as one clamp.
 func TestClampPlanModelRouting_ClampsOutOfEnvelopeTier(t *testing.T) {
 	prof := &profiles.Profile{CLI: "claude-tmux", AllowedCLIs: []string{"claude"},
 		ModelTierEnvelope: &profiles.ModelTierEnvelope{Min: "balanced", Max: "deep"}}
@@ -50,8 +46,6 @@ func TestClampPlanModelRouting_ClampsOutOfEnvelopeTier(t *testing.T) {
 	}
 }
 
-// TestClampPlanModelRouting_ClampsDisallowedCLI: a CLI outside allowed_clis
-// never survives unchanged.
 func TestClampPlanModelRouting_ClampsDisallowedCLI(t *testing.T) {
 	prof := &profiles.Profile{CLI: "claude-tmux", AllowedCLIs: []string{"claude"}}
 	plan := &PhasePlan{Entries: []PhasePlanEntry{{Phase: "build", Run: true, CLI: "mallory-cli"}}}
@@ -65,8 +59,6 @@ func TestClampPlanModelRouting_ClampsDisallowedCLI(t *testing.T) {
 	}
 }
 
-// TestClampPlanModelRouting_ClampsCatalogMiss: an otherwise-legal pair the
-// live catalog cannot resolve is clamped away rather than reaching dispatch.
 func TestClampPlanModelRouting_ClampsCatalogMiss(t *testing.T) {
 	prof := &profiles.Profile{CLI: "claude-tmux", AllowedCLIs: []string{"claude"},
 		ModelTierEnvelope: &profiles.ModelTierEnvelope{Min: "fast", Max: "deep"}}
@@ -81,9 +73,6 @@ func TestClampPlanModelRouting_ClampsCatalogMiss(t *testing.T) {
 	}
 }
 
-// TestClampPlanModelRouting_CrossFamilyIsPreferenceNotReject (B2): with no
-// allowed_clis restriction configured, a cross-family CLI choice is legal by
-// default — a clamp must not equate "different family" with "disallowed".
 func TestClampPlanModelRouting_CrossFamilyIsPreferenceNotReject(t *testing.T) {
 	prof := &profiles.Profile{CLI: "claude-tmux"}
 	catalog := modelcatalog.Catalog{CLIs: map[string]modelcatalog.CLIEntry{
@@ -100,14 +89,6 @@ func TestClampPlanModelRouting_CrossFamilyIsPreferenceNotReject(t *testing.T) {
 	}
 }
 
-// TestClampPlanModelRouting_SuffixedCLIHonoredViaBaseName (mr4b AC1, F2 fix):
-// a suffixed CLI like "claude-tmux" whose BASE FAMILY ("claude", via
-// policy.BaseCLI) resolves in the live catalog must be HONORED — not wrongly
-// clamped as a catalog miss. Before the F2 fix, ClampPlanModelRouting passed
-// the raw suffixed e.CLI to catalogLookup, which is keyed on the base family,
-// so a valid suffixed proposal always missed. The suffixed CLI string itself
-// (e.CLI) must survive UNCHANGED on the honored path (api-contract Invariant
-// I1: normalization is catalogLookup-only, never a rewrite of e.CLI).
 func TestClampPlanModelRouting_SuffixedCLIHonoredViaBaseName(t *testing.T) {
 	if got := policy.BaseCLI("claude-tmux"); got != "claude" {
 		t.Fatalf("setup: policy.BaseCLI(%q) = %q, want claude", "claude-tmux", got)
@@ -115,8 +96,7 @@ func TestClampPlanModelRouting_SuffixedCLIHonoredViaBaseName(t *testing.T) {
 	prof := &profiles.Profile{CLI: "claude-tmux", AllowedCLIs: []string{"claude"},
 		ModelTierEnvelope: &profiles.ModelTierEnvelope{Min: "fast", Max: "deep"}}
 	catalog := modelcatalog.Catalog{CLIs: map[string]modelcatalog.CLIEntry{
-		// Catalog is keyed on the BASE family "claude", never on a driver-
-		// qualified name — exactly the mismatch F2 exploited.
+		// The catalog is keyed on the base family, never a driver-qualified name.
 		"claude": {Source: modelcatalog.SourceLive, TierModels: map[string]string{"deep": "opus"}},
 	}}
 	plan := &PhasePlan{Entries: []PhasePlanEntry{{Phase: "scout", Run: true, CLI: "claude-tmux", Tier: "deep"}}}
@@ -130,8 +110,6 @@ func TestClampPlanModelRouting_SuffixedCLIHonoredViaBaseName(t *testing.T) {
 	}
 }
 
-// TestClampPlanModelRouting_NilPlanAndNoProposal covers the defensive nil-plan
-// return and the "nothing proposed" no-op path (an entry with CLI==Tier=="").
 func TestClampPlanModelRouting_NilPlanAndNoProposal(t *testing.T) {
 	if out, clamps := ClampPlanModelRouting(nil, profileFunc(nil), (modelcatalog.Catalog{}).Lookup); out != nil || clamps != nil {
 		t.Errorf("nil plan => (%v, %v), want (nil, nil)", out, clamps)

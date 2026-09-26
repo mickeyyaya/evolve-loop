@@ -1,43 +1,11 @@
 package tokenusage
 
-// defaultresolver_test.go — RED contract for cycle-623 task
-// token-resolver-production-wiring (inbox
-// 2026-07-08T02-10-00Z-token-resolver-production-wiring.json, weight 0.96;
-// scout-report.md hypothesis 1: "Wiring tokenusage.Chain(...) into both
-// composition roots via one shared tokenusage.DefaultResolver(configRoot)
-// helper").
-//
-// DefaultResolver is the SINGLE shared helper both production composition
-// roots (internal/adapters/bridge.Adapter and internal/subagent's
-// defaultExecAdapter) must call to build their Deps.TokenResolver — the fix
-// for the confirmed bug (grep: 0 non-test hits for TokenResolver in either
-// composition root) that has made token telemetry silently all-zero since at
-// least cycle 612. DefaultResolver is undefined today, so this package fails
-// to compile — the intended RED signal. Builder implements:
-//
-//	func DefaultResolver(configRoot string) func(Window) (Result, error) {
-//	    return func(w Window) (Result, error) {
-//	        return Chain(TranscriptCollector(configRoot, w)), nil
-//	    }
-//	}
-//
-// (S4/S5 tiers — EventsResultCollector, ScrollbackPeakCollector — are out of
-// scope: Window carries no logPath/pane, only Worktree/ArtifactPath/Start/
-// End, so only the transcript tier is derivable generically from a Window
-// alone. See test-report.md Coverage Map for this scope decision.)
-
 import (
 	"os"
 	"path/filepath"
 	"testing"
 )
 
-// TestDefaultResolver_TranscriptFixture_ReturnsTranscriptSource — AC:
-// "fixture Launch appends one llm-calls.ndjson record with source != 'none'"
-// (scout verifiableBy). A resolver built by DefaultResolver, invoked with a
-// Window matching a real on-disk transcript fixture, must recover the SAME
-// usage ScanConfigRoot would (DefaultResolver must not re-implement or
-// approximate the scan) and report SourceTranscript — never SourceNone.
 func TestDefaultResolver_TranscriptFixture_ReturnsTranscriptSource(t *testing.T) {
 	worktree := "/repo/worktrees/cycle-623"
 	root := t.TempDir()
@@ -72,15 +40,8 @@ func TestDefaultResolver_TranscriptFixture_ReturnsTranscriptSource(t *testing.T)
 	}
 }
 
-// TestDefaultResolver_EmptyConfigRoot_ReturnsSourceNoneNotError — negative:
-// a configRoot with no matching transcript (the common case — most launches
-// have no Claude Code transcript to recover from) must fail OPEN: SourceNone,
-// zero usage, nil error. It must never fabricate usage and must never error
-// (token telemetry is documented best-effort; an error here would make a
-// resolver failure visible to recordTokenUsage's WARN path for every launch,
-// not just genuine failures).
 func TestDefaultResolver_EmptyConfigRoot_ReturnsSourceNoneNotError(t *testing.T) {
-	root := t.TempDir() // no projects/ dir at all
+	root := t.TempDir()
 
 	resolver := DefaultResolver(root)
 	res, err := resolver(Window{

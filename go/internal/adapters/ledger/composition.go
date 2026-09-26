@@ -1,15 +1,3 @@
-// composition.go — kernel verification of composition-verdict entries
-// (merge ladder RUNG 0, cycle-786; knowledge-base/research/
-// merge-concurrency-2026: review verdicts follow the CHANGE via git
-// patch-id, gates follow the TREE).
-//
-// A composition-verdict entry records that an audit verdict carried
-// forward across a conflict-free trivial rebase. It is deterministic and
-// kernel-recomputable: anyone can re-derive the patch-id of its two
-// persisted diff artifacts and compare against the recorded patch_id —
-// zero LLM tokens. Verify/VerifyDeep do exactly that for every such
-// entry; a mismatch (drifted composed diff, forged patch_id, missing
-// artifact) is tampering and breaks the chain like any hash break.
 package ledger
 
 import (
@@ -26,33 +14,23 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// CompositionVerdictKind is the ledger entry kind recording a
-// trivial-rebase audit carry-forward (ship's fast path reads it, ledger
-// verify kernel-recomputes it).
+// CompositionVerdictKind is the kind of an audit carry-forward entry that ledger verify kernel-recomputes.
 const CompositionVerdictKind = "composition-verdict"
 
-// TrivialRebaseMethod is the composition method RUNG 0 defines; the
-// ship-side reader filters on it, so writer and reader share one constant.
+// TrivialRebaseMethod is the RUNG 0 composition method; the writer and the ship-side reader share it.
 const TrivialRebaseMethod = "trivial-rebase"
 
-// ScopedReviewMethod is the composition method RUNG 2 records when a scoped
-// merge review (mergerung2.go) resolved an overlapping change — distinct from
-// a trivial-rebase carry-forward so the ship-side reader and any audit can
-// tell a reviewed composition from a no-op rebase.
+// ScopedReviewMethod is the RUNG 2 method, recorded when a scoped merge review resolved an overlapping change.
 const ScopedReviewMethod = "scoped-review"
 
-// compositionFields is the kernel-recomputable subset of a
-// composition-verdict line.
+// compositionFields is the kernel-recomputable subset of a composition-verdict line.
 type compositionFields struct {
 	PatchID          string `json:"patch_id"`
 	AuditedDiffPath  string `json:"audited_diff_path"`
 	ComposedDiffPath string `json:"composed_diff_path"`
 }
 
-// PatchID pipes a unified diff through `git patch-id --stable` and returns
-// the patch-id — the offset-insensitive content identity of a change
-// (bors-style patch identity; merge-concurrency-2026). patch-id is a pure
-// stdin filter: no repo access, works in any directory.
+// PatchID returns the `git patch-id --stable` content identity of diff; it needs no repository.
 func PatchID(diff []byte) (string, error) {
 	cmd := exec.Command("git", "patch-id", "--stable")
 	cmd.Stdin = bytes.NewReader(diff)
@@ -67,12 +45,7 @@ func PatchID(diff []byte) (string, error) {
 	return fields[0], nil
 }
 
-// CompositionVerdictInput carries everything a caller must supply to persist
-// a trivial-rebase composition verdict. The writer trusts none of it: the
-// claimed PatchID must recompute from BOTH diffs and GateResults must be
-// green on the full ciparity.RequiredComposedGates set, or nothing is
-// written — fail-closed at write time so no line can land that
-// verifyCompositionLine would immediately flag as tampered.
+// CompositionVerdictInput is what a caller supplies to persist a composition verdict; the writer trusts none of it.
 type CompositionVerdictInput struct {
 	Cycle        int
 	Method       string            // composition method; blank defaults to TrivialRebaseMethod (RUNG 0)
@@ -87,10 +60,8 @@ type CompositionVerdictInput struct {
 	ArtifactDir  string            // directory the two diff artifacts persist under
 }
 
-// compositionRecord is the full on-disk composition-verdict line — the
-// union of ship's compositionEntry (read side) and this package's
-// compositionFields (kernel-verify side), plus the hash-chain fields
-// appendChained fills in.
+// compositionRecord is the on-disk line: the union of ship's compositionEntry and compositionFields,
+// plus the chain fields appendChained fills in.
 type compositionRecord struct {
 	TS               string            `json:"ts"`
 	Cycle            int               `json:"cycle"`
@@ -108,11 +79,7 @@ type compositionRecord struct {
 	PrevHash         string            `json:"prev_hash"`
 }
 
-// WriteCompositionVerdict validates in, persists both diff artifacts under
-// in.ArtifactDir, and appends one hash-chained composition-verdict line to
-// ledgerPath. Every validation failure returns before any byte is written
-// to the ledger. This is the RUNG 0 producer for the fast path
-// ship.tryTrivialRebaseCarryForward consumes (merge-concurrency-2026).
+// WriteCompositionVerdict validates in, persists both diffs and appends one chained line; validation writes nothing.
 func WriteCompositionVerdict(ledgerPath string, in CompositionVerdictInput) error {
 	if filepath.Base(ledgerPath) != "ledger.jsonl" {
 		return fmt.Errorf("composition-verdict: ledger path must be a ledger.jsonl (chained append), got %q", ledgerPath)
@@ -181,10 +148,8 @@ func WriteCompositionVerdict(ledgerPath string, in CompositionVerdictInput) erro
 	})
 }
 
-// verifyCompositionLine kernel-recomputes one composition-verdict line:
-// both persisted diff artifacts must recompute to the recorded patch_id.
-// Any failure wraps core.ErrLedgerChainBroken so `evolve ledger verify`
-// exits 2 exactly as it does for a hash-chain break.
+// verifyCompositionLine checks both persisted diffs recompute the recorded patch_id. Failures wrap
+// core.ErrLedgerChainBroken so `evolve ledger verify` exits 2 as for a hash break.
 func verifyCompositionLine(i int, line []byte) error {
 	var f compositionFields
 	if err := json.Unmarshal(line, &f); err != nil {

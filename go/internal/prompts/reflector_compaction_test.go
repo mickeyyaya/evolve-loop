@@ -7,17 +7,6 @@ import (
 	"testing"
 )
 
-// reflector_compaction_test.go — RED contract for cycle-417 task reflector-reference-ondemand-split.
-//
-// RED state (before builder):
-//   - evolve-reflector.md has no ## Reference Index heading → StripOnDemandSections returns body unchanged
-//   - "## Why this agent exists" historical narrative (lines ~172–179) is inline (not below marker)
-//   - evolve-reflector-reference.md does not exist
-
-// TestReflectorCompaction_MarkerPresent asserts that evolve-reflector.md contains a
-// line-anchored ## Reference Index heading so StripOnDemandSections fires on every
-// reflection dispatch.
-// RED: evolve-reflector.md has no ## Reference Index heading.
 func TestReflectorCompaction_MarkerPresent(t *testing.T) {
 	root := repoRoot(t)
 	raw, err := os.ReadFile(filepath.Join(root, "agents", "evolve-reflector.md"))
@@ -37,10 +26,6 @@ func TestReflectorCompaction_MarkerPresent(t *testing.T) {
 	}
 }
 
-// TestReflectorCompaction_StripSavesBytes asserts that StripOnDemandSections applied to
-// the real evolve-reflector.md body saves ≥200 bytes (the "## Why this agent exists"
-// narrative is ~850 bytes; 200 is a conservative floor).
-// RED: no heading → 0 bytes stripped (0 < 200).
 func TestReflectorCompaction_StripSavesBytes(t *testing.T) {
 	root := repoRoot(t)
 	raw, err := os.ReadFile(filepath.Join(root, "agents", "evolve-reflector.md"))
@@ -61,10 +46,6 @@ func TestReflectorCompaction_StripSavesBytes(t *testing.T) {
 	}
 }
 
-// TestReflectorCompaction_OperationalAnchorsAboveMarker asserts that required behavior-bearing
-// sections survive StripOnDemandSections (remain above the ## Reference Index marker).
-// Pre-existing GREEN: stripped==body (no heading) → all content present.
-// Regression guard: fires if builder accidentally buries any of these below the marker.
 func TestReflectorCompaction_OperationalAnchorsAboveMarker(t *testing.T) {
 	root := repoRoot(t)
 	raw, err := os.ReadFile(filepath.Join(root, "agents", "evolve-reflector.md"))
@@ -89,13 +70,6 @@ func TestReflectorCompaction_OperationalAnchorsAboveMarker(t *testing.T) {
 	}
 }
 
-// TestReflectorCompaction_NarrativeAbsentAfterStrip_Negative asserts that the
-// "## Why this agent exists" historical narrative is relocated BELOW the ## Reference Index
-// marker and thus absent from the stripped body.
-// NEGATIVE: verifies behavioral removal of narrative content after stripping.
-//
-// RED: stripped==body (no heading) → "## Why this agent exists" IS present in stripped → FAIL.
-// GREEN after builder: narrative relocated below marker → absent in stripped.
 func TestReflectorCompaction_NarrativeAbsentAfterStrip_Negative(t *testing.T) {
 	root := repoRoot(t)
 	raw, err := os.ReadFile(filepath.Join(root, "agents", "evolve-reflector.md"))
@@ -115,10 +89,6 @@ func TestReflectorCompaction_NarrativeAbsentAfterStrip_Negative(t *testing.T) {
 	}
 }
 
-// TestReflectorReferenceStubExists verifies that agents/evolve-reflector-reference.md
-// exists and is non-empty. The stub must carry the "## Why this agent exists" narrative
-// relocated from evolve-reflector.md, making it available for on-demand Layer 3 lookup.
-// RED: file does not exist yet (written by builder as part of cycle-417).
 func TestReflectorReferenceStubExists(t *testing.T) {
 	root := repoRoot(t)
 	path := filepath.Join(root, "agents", "evolve-reflector-reference.md")
@@ -133,10 +103,6 @@ func TestReflectorReferenceStubExists(t *testing.T) {
 	}
 }
 
-// TestReflectorCompaction_SyntheticBuriedNarrativeNegative asserts that content placed
-// below ## Reference Index in a synthetic reflector body does NOT appear in the stripped output.
-// Anti-gaming sentinel: a no-op strip implementation would fail the byte-savings test.
-// Pre-existing GREEN: StripOnDemandSections correctly handles this.
 func TestReflectorCompaction_SyntheticBuriedNarrativeNegative(t *testing.T) {
 	body := "Operational rules.\n\n## What NOT to do\n\nDo not invent causes.\n\n" +
 		"## Reference Index (Layer 3, on-demand)\n\n## Why this agent exists\n\nHistorical narrative.\n"
@@ -152,9 +118,7 @@ func TestReflectorCompaction_SyntheticBuriedNarrativeNegative(t *testing.T) {
 	}
 }
 
-// reflectorBodyHasCompactMarker mirrors prompts.StripOnDemandSections detection logic:
-// returns true iff body contains a line that is exactly "## Reference Index"
-// or starts with "## Reference Index " (space-suffixed form).
+// reflectorBodyHasCompactMarker must agree with StripOnDemandSections on what counts as the heading.
 func reflectorBodyHasCompactMarker(body string) bool {
 	for _, line := range strings.Split(body, "\n") {
 		trimmed := strings.TrimRight(line, "\r")

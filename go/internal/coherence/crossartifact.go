@@ -1,37 +1,5 @@
 package coherence
 
-// crossartifact.go — the cross-artifact metamorphic invariant stack (cycle-1676,
-// inbox item `crossartifact-invariant-stack`). Four WEAK deterministic verifiers
-// run over one cycle's own artifacts and each reports independently:
-//
-//	verdict-agreement       the embedded <!-- evolve-verdict --> sentinel agrees
-//	                        with the standalone acs-verdict.json verdict
-//	test-count-agreement    the claimed suite counts survive an independent
-//	                        recount of the artifact's own parsed runner results
-//	                        (cycle-1673 M1: a document claiming "zero red
-//	                        predicates" sat beside an artifact recording red_count=3)
-//	referenced-paths-exist  every evidence_path the audit sentinel cites resolves
-//	                        under the workspace or the LANE worktree (#612: a
-//	                        project-root snapshot is not evidence of what a lane wrote)
-//	provenance-phase-order  phase-timing.json's chain runs forward and no audit
-//	                        precedes the build it audits
-//
-// Weaver (arXiv:2506.18203): a stack of weak deterministic verifiers approaches
-// strong-verifier power at near-zero cost and is immune to LLM-judge bias. The
-// stack COMPLEMENTS the adversarial audit; it never replaces it.
-//
-// THREE statuses, not two. `indeterminate` is load-bearing in both directions:
-// an absent or malformed artifact can never read as a verified match (that is
-// how a presence-only check gets gamed), and is equally never a violation (that
-// is how an advisory earns a false-positive rate and gets switched off). Every
-// invariant fails SAFE into it.
-//
-// ADVISORY. Per the inbox record's own rule and the 1054/1060 breaker lesson,
-// every invariant ships advisory: InvariantReport.Advisory is true and nothing
-// here blocks a cycle. Graduating any invariant to blocking is a separate,
-// separately-evidenced decision that needs a measured ~0 false-positive rate —
-// which is exactly why the caller records the report on EVERY cycle.
-
 import (
 	"encoding/json"
 	"fmt"
@@ -44,8 +12,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasetiming"
 )
 
-// InvariantStatus is one invariant's outcome: a verified match, a verified
-// disagreement, or "the artifacts could not establish either".
+// InvariantStatus is one invariant's outcome: ok, violated, or indeterminate.
 type InvariantStatus string
 
 const (
@@ -53,8 +20,7 @@ const (
 	InvariantOK InvariantStatus = "ok"
 	// InvariantViolated means the invariant was evaluated and does NOT hold.
 	InvariantViolated InvariantStatus = "violated"
-	// InvariantIndeterminate means the artifacts were absent, malformed or
-	// silent — never a verified match, and never a violation.
+	// InvariantIndeterminate means the artifacts were absent, malformed or silent: never a match, never a violation.
 	InvariantIndeterminate InvariantStatus = "indeterminate"
 )
 
@@ -69,24 +35,20 @@ const (
 	InvariantPhaseOrder = "provenance-phase-order"
 )
 
-// Invariant is one weak verifier's finding. Evidence is always populated for a
-// non-ok status: a finding nobody can act on is not a finding.
+// Invariant is one weak verifier's finding; a non-ok status always carries Evidence.
 type Invariant struct {
 	Name     string          `json:"name"`
 	Status   InvariantStatus `json:"status"`
 	Evidence string          `json:"evidence"`
 }
 
-// InvariantReport is the per-cycle aggregate: exactly the four invariants, in
-// the declared order, always advisory.
+// InvariantReport is the per-cycle aggregate: the four invariants in declared order, always advisory.
 type InvariantReport struct {
 	Advisory   bool        `json:"advisory"`
 	Invariants []Invariant `json:"invariants"`
 }
 
-// Violations projects only the violated invariants, in report order.
-// Indeterminates never leak in — an advisory that fires on absence is a
-// false-positive generator.
+// Violations returns only the violated invariants, in report order; indeterminates never appear.
 func (r InvariantReport) Violations() []Invariant {
 	var out []Invariant
 	for _, inv := range r.Invariants {
@@ -97,13 +59,7 @@ func (r InvariantReport) Violations() []Invariant {
 	return out
 }
 
-// CheckCrossArtifactInvariants evaluates the four invariants over one cycle's
-// workspace, resolving cited evidence paths under the workspace first and then
-// under the lane worktree. It is pure I/O + comparison: deterministic, never
-// panicking on malformed input, and byte-identical across evaluations of an
-// unchanged workspace (the report must be diffable across cycles, since that
-// diff is the only way the advisory's false-positive rate ever becomes
-// measurable).
+// CheckCrossArtifactInvariants evaluates the four invariants over a cycle workspace, resolving cited paths under it and then the lane worktree.
 func CheckCrossArtifactInvariants(workspace, worktree string) InvariantReport {
 	sentinel, sentinelOK := readAuditSentinel(workspace)
 	acs, acsOK := readACSArtifact(workspace)
@@ -118,9 +74,6 @@ func CheckCrossArtifactInvariants(workspace, worktree string) InvariantReport {
 	}
 }
 
-// readAuditSentinel parses the audit report's canonical verdict sentinel. It
-// goes through phasecontract — never a bespoke grep, which would read the
-// contract's own printed example (and any prose "PASS") as a real verdict.
 func readAuditSentinel(workspace string) (phasecontract.VerdictSentinel, bool) {
 	b, err := os.ReadFile(filepath.Join(workspace, phasecontract.ArtifactFilename("audit")))
 	if err != nil {
@@ -129,11 +82,8 @@ func readAuditSentinel(workspace string) (phasecontract.VerdictSentinel, bool) {
 	return phasecontract.ParseVerdictSentinelFull(string(b))
 }
 
-// acsArtifact is the acs-verdict.json fields this stack compares: the CLAIMED
-// summary up top, and the independently parsed runner results beside it.
-// Decoded locally, matching ReadCycleVerdicts's precedent in this package —
-// importing internal/acssuite would drag config/profiles/policy/gitexec into
-// this deliberately lean leaf.
+// acsArtifact is decoded locally: importing internal/acssuite would pull gitexec,
+// sysexec, changedpkgs and verifylock into this package.
 type acsArtifact struct {
 	PredicateSuite struct {
 		Total int `json:"total"`
@@ -147,8 +97,6 @@ type acsArtifact struct {
 	Verdict    string `json:"verdict"`
 }
 
-// readACSArtifact decodes acs-verdict.json. An absent or malformed artifact is
-// reported as "not established" — never as a zero-valued match.
 func readACSArtifact(workspace string) (acsArtifact, bool) {
 	b, err := os.ReadFile(filepath.Join(workspace, "acs-verdict.json"))
 	if err != nil {
@@ -161,8 +109,6 @@ func readACSArtifact(workspace string) (acsArtifact, bool) {
 	return a, true
 }
 
-// checkVerdictAgreement compares the embedded sentinel verdict against the
-// standalone acs-verdict.json verdict (cycles 862→899).
 func checkVerdictAgreement(s phasecontract.VerdictSentinel, sentinelOK bool, a acsArtifact, acsOK bool) Invariant {
 	sv := strings.ToUpper(strings.TrimSpace(s.Verdict))
 	av := strings.ToUpper(strings.TrimSpace(a.Verdict))
@@ -180,8 +126,6 @@ func checkVerdictAgreement(s phasecontract.VerdictSentinel, sentinelOK bool, a a
 	return ok(InvariantVerdictAgreement, fmt.Sprintf("sentinel verdict=%s agrees with the standalone verdict=%s", sv, av))
 }
 
-// checkTestCounts recounts the artifact's own parsed runner results and holds
-// the claimed summary against them (the cycle-1673 M1 shape).
 func checkTestCounts(a acsArtifact, acsOK bool) Invariant {
 	if !acsOK {
 		return indeterminate(InvariantTestCounts, "acs-verdict.json is absent or unparseable — nothing to recount")
@@ -221,9 +165,6 @@ func checkTestCounts(a acsArtifact, acsOK bool) Invariant {
 	return ok(InvariantTestCounts, claim)
 }
 
-// checkReferencedPaths resolves every evidence path the audit sentinel cites
-// against the cycle workspace and then the LANE worktree. Only the tree the
-// lane actually wrote counts as evidence the lane produced (#612).
 func checkReferencedPaths(s phasecontract.VerdictSentinel, sentinelOK bool, workspace, worktree string) Invariant {
 	if !sentinelOK || s.Failure == nil {
 		return indeterminate(InvariantReferencedPaths,
@@ -251,13 +192,8 @@ func checkReferencedPaths(s phasecontract.VerdictSentinel, sentinelOK bool, work
 	return ok(InvariantReferencedPaths, fmt.Sprintf("all %d cited evidence path(s) resolve under the cycle workspace or the lane worktree", len(cited)))
 }
 
-// resolvesUnder reports whether a cited relative path exists beneath root.
-//
-// Containment is checked BEFORE the stat. filepath.Join cleans "../" segments
-// away, so a citation that climbs out of root would otherwise land on a real
-// file outside both roots and read as resolved — and a path the lane did not
-// write is not evidence the lane produced, however real it is (#612, and the
-// cycle-1676 audit's L1).
+// resolvesUnder checks containment before the stat: filepath.Join cleans "../"
+// segments, so an escaping citation could otherwise resolve to a real file outside root.
 func resolvesUnder(root, rel string) bool {
 	if strings.TrimSpace(root) == "" {
 		return false
@@ -271,16 +207,13 @@ func resolvesUnder(root, rel string) bool {
 	return err == nil
 }
 
-// timedPhase is one phase-timing entry with its timestamps already parsed.
 type timedPhase struct {
 	phase   string
 	started time.Time
 	ended   time.Time
 }
 
-// checkPhaseOrder validates the recorded provenance chain: it must run forward,
-// and no audit may be recorded before the build it audits. Re-dispatched
-// build/audit rounds are legal and stay ok.
+// checkPhaseOrder compares only the first build and first audit, so re-dispatched build/audit rounds stay ok.
 func checkPhaseOrder(workspace string) Invariant {
 	entries, err := phasetiming.Read(workspace)
 	if err != nil {
@@ -328,7 +261,6 @@ func checkPhaseOrder(workspace string) Invariant {
 	return ok(InvariantPhaseOrder, fmt.Sprintf("the recorded %d-phase chain runs forward and respects the build→audit floor", len(chain)))
 }
 
-// firstPhase returns the first entry recorded for the named phase.
 func firstPhase(chain []timedPhase, name string) (timedPhase, bool) {
 	for _, e := range chain {
 		if e.phase == name {

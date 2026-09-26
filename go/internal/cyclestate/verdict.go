@@ -1,9 +1,6 @@
 package cyclestate
 
-// Verdict constants — the four outcomes a phase may emit. These match
-// the EGPS gate vocabulary (CLAUDE.md env-var table: WARN removed at
-// v10.0.0 but still accepted by Audit for the pre-EGPS soft-start
-// boundary; SKIPPED used when a phase opted out, e.g. EVOLVE_TRIAGE_DISABLE).
+// Verdict constants are the per-phase outcomes the EGPS gate matches verbatim; SKIPPED marks a phase that opted out.
 const (
 	VerdictPASS    = "PASS"
 	VerdictFAIL    = "FAIL"
@@ -11,34 +8,22 @@ const (
 	VerdictSKIPPED = "SKIPPED"
 )
 
-// ClassificationMidExecutionFail is the supervisor's default class for a phase
-// that failed mid-cycle with no self-report. Deliberately OUTSIDE failurelog's
-// taxonomy: NormalizeLegacy maps it to UnknownClassification, so a record
-// carrying it ages out on the one-day legacy bucket (failurelog.LegacyEffectiveTTL)
-// — an operator decision (ADR-0103 unit 03b, F11). Projected by the
-// failure-learning engine (the FailedRecord and the lesson event) and by
-// recurrence's generic-pattern denylist; every other spelling is data.
+// ClassificationMidExecutionFail is the supervisor's default class for a phase that failed mid-cycle with no self-report.
+// It stays outside failurelog's taxonomy on purpose, so records carrying it age out on the one-day legacy TTL.
 const ClassificationMidExecutionFail = "cycle-mid-execution-fail"
 
-// CycleTerminationTriageNoWork identifies a successful Triage transition that
-// explicitly committed zero tasks and ended before any implementation phase.
+// CycleTerminationTriageNoWork marks a cycle whose Triage committed zero tasks and ended before any implementation phase.
 const CycleTerminationTriageNoWork = "triage-empty-commitment"
 
-// CycleOutcome constants — cycle-level FinalVerdict labels emitted by
-// finalizeOutcome. Distinct from the per-phase Verdict* set because a
-// cycle outcome covers multiple phases plus the cycle's own ship latch.
-// They disambiguate the bare "SKIPPED" verdict that previously conflated
-// a shipped cycle, a fluent-mode advisory, and a no-signal noop.
-// SHIPPED_VIA_BUILD is emitted only when THIS cycle's ship phase PASSed;
-// main HEAD movement is never evidence (a sibling lane moves it too).
+// CycleOutcome constants are the cycle-level FinalVerdict labels, distinct from the per-phase verdicts.
+// SHIPPED_VIA_BUILD needs this cycle's own ship PASS; main HEAD movement is never evidence, since sibling lanes move it.
 const (
 	CycleOutcomeShippedViaBuild      = "SHIPPED_VIA_BUILD"
 	CycleOutcomeSkippedAuditAdvisory = "SKIPPED_AUDIT_ADVISORY"
 	CycleOutcomeSkippedUnknown       = "SKIPPED_UNKNOWN"
 )
 
-// IsVerdict reports whether s is one of the canonical verdict strings.
-// Case- and whitespace-sensitive — guards against silent typos.
+// IsVerdict reports whether s is exactly one of the canonical verdict strings (case- and whitespace-sensitive).
 func IsVerdict(s string) bool {
 	switch s {
 	case VerdictPASS, VerdictFAIL, VerdictWARN, VerdictSKIPPED:

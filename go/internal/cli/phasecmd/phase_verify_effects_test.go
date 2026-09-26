@@ -1,11 +1,5 @@
 package phasecmd
 
-// phase_verify_effects_test.go — ADR-0100 slice 2: the agent self-check
-// judges a declared EFFECT exactly as the host gate does (self-check ≡ gate,
-// ADR-0034). It takes the cycle from the persisted cycle state the way it
-// already takes the explanation-documentation version, and the inbox from
-// the project root the resolver already uses.
-
 import (
 	"encoding/json"
 	"io"
@@ -18,9 +12,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 )
 
-// projectWithRegistryTriage builds a project whose registry is the checked-in
-// triage entry alone — the real declaration (outputs + effects), nothing
-// hand-written that could drift from it.
+// projectWithRegistryTriage copies the checked-in triage entry, so the fixture cannot drift from the real declaration.
 func projectWithRegistryTriage(t *testing.T) string {
 	t.Helper()
 	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "docs", "architecture", "phase-registry.json"))
@@ -78,20 +70,15 @@ func TestPhaseVerify_DeclaredEffectFollowsCycleState(t *testing.T) {
 	write(ws, core.RunStateFile, `{"cycle_id":7,"phase":"triage"}`)
 	write(inbox, "2026-09-12T00-00-00Z-x.json", `{"id":"x","title":"fixture"}`)
 
-	// Committed to x, x still pending at the inbox root: the gate blocks, so
-	// the self-check must too — naming the effect.
 	if code, _, errb := runVerify(t, "triage", "--workspace="+ws); code != 1 || !strings.Contains(errb, "missing_effect") {
 		t.Fatalf("unclaimed commitment: exit=%d stderr=%q — the self-check must demand the claim the gate demands", code, errb)
 	}
-	// The claim performed — by the production writer the persona invokes.
 	if _, err := inboxmover.Claim(inboxmover.Options{ProjectRoot: project, Stderr: io.Discard}, "x", "7"); err != nil {
 		t.Fatal(err)
 	}
 	if code, _, errb := runVerify(t, "triage", "--workspace="+ws); code != 0 {
 		t.Fatalf("claimed commitment must verify OK: exit=%d stderr=%q", code, errb)
 	}
-	// Without the persisted cycle the effect cannot be located: report the
-	// ambiguity (fail open, exit 2), never print OK.
 	if err := os.Remove(filepath.Join(ws, core.RunStateFile)); err != nil {
 		t.Fatal(err)
 	}

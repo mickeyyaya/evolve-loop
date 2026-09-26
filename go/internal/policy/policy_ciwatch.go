@@ -2,28 +2,17 @@ package policy
 
 import "fmt"
 
-// CIWatchPolicy configures the post-push GitHub CI watch and the release
-// preflight CI hard-gate (cycle-748, push-ci-watch-remote-parity). All knobs
-// live in the policy.json `ci_watch` block — zero env flags by design.
-// Pointer fields preserve the distinction between an omitted value and an
-// explicit zero/false override.
+// CIWatchPolicy is the "ci_watch" block for the post-push CI watch and the release preflight CI gate.
 type CIWatchPolicy struct {
-	// Enabled turns the post-push CI watch on/off. Compiled default: true
-	// (gates default ON as compiled Go defaults, observer/fleet pattern).
+	// Enabled defaults to true.
 	Enabled *bool `json:"enabled,omitempty"`
-	// TimeoutS bounds how long a watch waits for the pushed SHA's CI run to
-	// complete. Compiled default: 900.
+	// TimeoutS bounds the wait for the pushed SHA's CI run; default 900.
 	TimeoutS *int `json:"timeout_s,omitempty"`
-	// PollS is the poll interval while the run is queued/in progress.
-	// Compiled default: 30.
+	// PollS is the poll interval while the run is queued or in progress; default 30.
 	PollS *int `json:"poll_s,omitempty"`
 }
 
-// CIWatchConfig returns the ci_watch knobs with compiled defaults resolved;
-// returned pointer fields are always non-nil. An absent block yields the
-// compiled defaults (enabled, 900s timeout, 30s poll). Malformed values
-// (non-positive timeout or poll interval) are rejected explicitly — never
-// silently zeroed or clamped.
+// CIWatchConfig resolves ci_watch with non-nil pointers and rejects a non-positive timeout or poll interval.
 func (p Policy) CIWatchConfig() (CIWatchPolicy, error) {
 	enabled, timeoutS, pollS := true, 900, 30
 	out := CIWatchPolicy{Enabled: &enabled, TimeoutS: &timeoutS, PollS: &pollS}

@@ -7,15 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// Quota is the port of scripts/hooks/research-quota-gate.sh. Phase-1
-// surface: a simple in-memory counter keyed by (agent, bucket). Real
-// persistence into cycle-state.json:research_usage lands in Phase 2.
-// Workflow policy can lift the cap through QuotaConfig.
-//
-// Buckets:
-//   - WebSearch  → "web_search"  (default cap 3 per agent)
-//   - WebFetch   → "web_fetch"   (default cap 5)
-//   - kb-search  → "kb_search"   (default cap 20; detected via Bash command)
 func TestQuota_Name(t *testing.T) {
 	g := NewQuota(QuotaConfig{})
 	if g.Name() != "quota" {
@@ -58,7 +49,6 @@ func TestQuota_DeepResearchBypass(t *testing.T) {
 
 func TestQuota_BucketsIsolated(t *testing.T) {
 	g := NewQuota(QuotaConfig{WebSearch: 1, WebFetch: 1})
-	// Use up WebSearch.
 	dec := g.Decide(context.Background(), core.GuardInput{
 		ToolName:  "WebSearch",
 		ToolInput: map[string]any{"agent": "x"},
@@ -73,7 +63,6 @@ func TestQuota_BucketsIsolated(t *testing.T) {
 	if dec.Allow {
 		t.Error("second WebSearch must deny (cap=1)")
 	}
-	// WebFetch still has its own counter.
 	dec = g.Decide(context.Background(), core.GuardInput{
 		ToolName:  "WebFetch",
 		ToolInput: map[string]any{"agent": "x"},
@@ -141,7 +130,6 @@ func TestQuota_KbSearchViaBash(t *testing.T) {
 
 func TestQuota_UnknownAgentFallback(t *testing.T) {
 	g := NewQuota(QuotaConfig{WebSearch: 1})
-	// No agent provided → counted under "unknown".
 	dec := g.Decide(context.Background(), core.GuardInput{
 		ToolName:  "WebSearch",
 		ToolInput: map[string]any{},
@@ -159,7 +147,6 @@ func TestQuota_UnknownAgentFallback(t *testing.T) {
 }
 
 func TestQuota_DefaultCapsUsedWhenZero(t *testing.T) {
-	// Construct with all zeros → defaults kick in (ws=3, fetch=5, kb=20).
 	g := NewQuota(QuotaConfig{})
 	if g.cfg.WebSearch != 3 || g.cfg.WebFetch != 5 || g.cfg.KbSearch != 20 {
 		t.Errorf("defaults not applied: %+v", g.cfg)

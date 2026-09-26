@@ -6,11 +6,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 )
 
-// TestPlanMismatch_TriggersOnlyOnMaterialDivergence pins WS2-S4 (ADR-0052) with a
-// boundary table: "tester" inserts when scout.item_count >= 5. A mismatch exists
-// only when the trigger FIRES on the measured signals AND the plan omits that
-// phase. N=4 (below threshold) is not a mismatch; N=5 (fires) with tester
-// unscheduled is; N=5 with tester already scheduled is not (need covered, no churn).
 func TestPlanMismatch_TriggersOnlyOnMaterialDivergence(t *testing.T) {
 	t.Parallel()
 	in := func(itemCount int) RouteInput {

@@ -1,9 +1,3 @@
-// Package topngate implements the build->audit BLOCKING gate that enforces
-// Builder task-slug binding to triage-report.md's ## top_n (inbox
-// builder-task-binding-topn-gate, weight 0.96, 7th recurrence: cycles 282,
-// 310, 522, 575, 577, 599, 640). This file drives topNBindingGate.check
-// directly (white-box, same package — mirrors internal/evalgate/gates_test.go
-// for materializationGate).
 package topngate
 
 import (
@@ -18,9 +12,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// writeTriageReport writes a triage-report.md ## top_n section listing the
-// given slugs (prose form, matching agents/evolve-triage.md Step 4's real
-// output shape).
+// writeTriageReport also writes the matching triage-decision.json, which core.ContractTaskIDs reads.
 func writeTriageReport(t *testing.T, workspace string, topN ...string) {
 	t.Helper()
 	writeTriageDecision(t, workspace, topN, nil)
@@ -35,8 +27,6 @@ func writeTriageReport(t *testing.T, workspace string, topN ...string) {
 	}
 }
 
-// writeBuildReport writes a build-report.md whose ## Task: line claims
-// claimedSlug (matching agents/evolve-builder.md's contracted header shape).
 func writeBuildReport(t *testing.T, workspace, claimedSlug string) {
 	t.Helper()
 	body := "# Build Report\n\n## Task: " + claimedSlug + "\n\nBody.\n"
@@ -57,12 +47,6 @@ func TestTopNBindingGate(t *testing.T) {
 	})
 
 	t.Run("out-of-lane slug is ADVISORY: WARN + pass (2026-07-22)", func(t *testing.T) {
-		// POLICY CHANGE (operator-directed, cycles 916 + 1012): both recorded
-		// fatal rejections discarded CORRECT work whose report merely labeled
-		// the committed task differently — two LLM strings compared. The lane
-		// is plan-driven by construction, so label drift WARNs loudly and the
-		// binding authority is the committed set. Scope-based fraud
-		// verification is the queued construction-level replacement.
 		ws := t.TempDir()
 		writeTriageReport(t, ws, "statefile-rmw-flock-single-source")
 		writeBuildReport(t, ws, "fix-token-resolver-transcript-source")
@@ -70,9 +54,6 @@ func TestTopNBindingGate(t *testing.T) {
 		if block {
 			t.Fatalf("label drift must never block; got reason=%q", reason)
 		}
-		// The reason is POPULATED (block=false) so the reviewer's single
-		// structured logf seam emits the advisory — testable, unlike a raw
-		// stderr write inside the gate.
 		if !strings.Contains(reason, "label drift") || !strings.Contains(reason, "fix-token-resolver-transcript-source") || !strings.Contains(reason, "statefile-rmw-flock-single-source") {
 			t.Fatalf("advisory reason must name the drift and both slug sets; got %q", reason)
 		}
@@ -108,7 +89,7 @@ func TestTopNBindingGate(t *testing.T) {
 
 	t.Run("empty top_n → fail-open (nothing committed to bind against)", func(t *testing.T) {
 		ws := t.TempDir()
-		writeTriageReport(t, ws) // no entries
+		writeTriageReport(t, ws)
 		writeBuildReport(t, ws, "anything")
 		reason, block := topNBindingGate{}.check(core.ReviewInput{Phase: string(core.PhaseBuild), Workspace: ws})
 		if reason != "" || block {
@@ -132,9 +113,6 @@ func TestTopNBindingGate_AppliesToBuildOnly(t *testing.T) {
 	}
 }
 
-// writeTDDReport writes a test-report.md whose "## Task:" line claims
-// claimedSlug and whose "## Handoff to Builder" fenced JSON declares testFiles
-// (matching agents/evolve-tdd.md Step 6's contracted deliverable shape).
 func writeTDDReport(t *testing.T, workspace, claimedSlug string, testFiles ...string) {
 	t.Helper()
 	var b strings.Builder
@@ -151,13 +129,6 @@ func writeTDDReport(t *testing.T, workspace, claimedSlug string, testFiles ...st
 	}
 }
 
-// TestTDDScopeGate_LabelDriftIsAdvisory is the cycle-1073 crux. tddScopeGate's
-// case 2 (non-empty committed top_n + an authored slug with zero overlap) is
-// the SAME "two LLM-authored strings compared for exact equality" defect that
-// #348 (cbd088a1) converted to an advisory for the sibling topNBindingGate,
-// one phase later in the pipeline. Two recorded false rejections (cycles 916,
-// 1012) discarded correct work over a label; the triage->TDD transition carries
-// the identical risk and must warn, not block.
 func TestTDDScopeGate_LabelDriftIsAdvisory(t *testing.T) {
 	ws := t.TempDir()
 	writeTriageReport(t, ws, "statefile-rmw-flock-single-source")
@@ -166,9 +137,6 @@ func TestTDDScopeGate_LabelDriftIsAdvisory(t *testing.T) {
 	if block {
 		t.Fatalf("label drift at triage->TDD must never block (mirrors #348's build-gate fix); got reason=%q", reason)
 	}
-	// The reason stays POPULATED at block=false so the reviewer's single
-	// structured logf seam still emits the advisory (testable, unlike a raw
-	// stderr write inside the gate).
 	if !strings.Contains(reason, "label drift") {
 		t.Errorf("advisory reason must be labelled %q so operators can grep it; got %q", "label drift", reason)
 	}
@@ -180,15 +148,9 @@ func TestTDDScopeGate_LabelDriftIsAdvisory(t *testing.T) {
 	}
 }
 
-// TestTDDScopeGate_EmptyTopNStillBlocks is the anti-overcorrection guard: case
-// 1 (empty committed top_n + a non-empty authored set) is NOT a labelling
-// dispute — no committed item exists that the authored files could be a
-// differently-labelled response to — so it must stay fatal. A blanket
-// "block=false" rewrite of check() would pass the advisory test above and fail
-// here.
 func TestTDDScopeGate_EmptyTopNStillBlocks(t *testing.T) {
 	ws := t.TempDir()
-	writeTriageReport(t, ws) // triage committed nothing
+	writeTriageReport(t, ws)
 	writeTDDReport(t, ws, "orphan-task", "go/acs/cycle1073/predicates_test.go")
 	reason, block := tddScopeGate{}.check(core.ReviewInput{Phase: string(core.PhaseTDD), Workspace: ws})
 	if !block {
@@ -240,7 +202,7 @@ func TestTDDScopeGate(t *testing.T) {
 
 	t.Run("authored nothing → fail-open no-op PASS", func(t *testing.T) {
 		ws := t.TempDir()
-		writeTriageReport(t, ws) // empty top_n
+		writeTriageReport(t, ws)
 		writeTDDReport(t, ws, "orphan-task")
 		reason, block := tddScopeGate{}.check(core.ReviewInput{Phase: string(core.PhaseTDD), Workspace: ws})
 		if reason != "" || block {
@@ -274,35 +236,13 @@ func TestTDDScopeGate_AppliesToTDDOnly(t *testing.T) {
 	}
 }
 
-// --- cycle-1111: file-scope binding (tdd-file-scope-binding-check) -----------
-//
-// The slug check above compares two LLM-authored PROSE labels, which is why
-// both drift cases are advisory. The gate's own comments (gate.go:73-75,
-// 132-135) name the missing complement as "the queued construction-level
-// check": the committed item's DECLARED file scope vs what TDD actually
-// authored. A deliverable can carry the right label and touch nothing the
-// committed item names — today that passes silently.
-//
-// This second check runs ALONGSIDE the slug check on the in-lane path (it
-// never replaces or tightens it) and is ADVISORY (block=false), matching this
-// gate family's fail-open convention: a scope mismatch has legitimate causes
-// (shared helper, incidental file), so it warns and lets shadow evidence
-// decide whether it ever becomes fatal.
-
-// scoutTask is one "### Task N: <slug>" entry of scout-report.md's
-// "## Selected Tasks" section, with the paths its "- **targetFiles:**" line
-// declares.
 type scoutTask struct {
 	slug        string
 	targetFiles []string
 }
 
-// writeScoutReportTasks writes a scout-report.md whose "## Selected Tasks"
-// section carries one "### Task N: <slug>" header per task followed by the
-// contracted "- **targetFiles:** `path` (prose), `path` (prose)" line. The
-// backticks and trailing prose annotations are REAL (see this cycle's own
-// scout-report.md:43) — the parser must take the backticked paths and ignore
-// the annotations. A task with no targetFiles emits no such line at all.
+// writeScoutReportTasks follows each backticked path with prose, as real scout
+// reports do, so the parser must ignore the annotations.
 func writeScoutReportTasks(t *testing.T, workspace string, tasks ...scoutTask) {
 	t.Helper()
 	var b strings.Builder
@@ -327,17 +267,11 @@ func writeScoutReportTasks(t *testing.T, workspace string, tasks ...scoutTask) {
 	}
 }
 
-// writeScoutReport is the single-task convenience form.
 func writeScoutReport(t *testing.T, workspace, slug string, targetFiles ...string) {
 	t.Helper()
 	writeScoutReportTasks(t, workspace, scoutTask{slug: slug, targetFiles: targetFiles})
 }
 
-// TestTDDScopeGate_FileScopeDriftIsAdvisory is the cycle-1111 crux: the label
-// matches the committed item exactly, so every existing check passes silently,
-// yet the authored file lives in a tree the committed item never names. That
-// is the wrong-work shape the slug check provably cannot see, and the one the
-// gate's own comments defer to this check.
 func TestTDDScopeGate_FileScopeDriftIsAdvisory(t *testing.T) {
 	ws := t.TempDir()
 	writeTriageReport(t, ws, "tdd-file-scope-binding-check")
@@ -374,9 +308,6 @@ func TestTDDScopeGate_FileScopeBinding(t *testing.T) {
 	})
 
 	t.Run("authored test file beside a declared target passes silently", func(t *testing.T) {
-		// The normal, correct shape: Scout names the PRODUCTION file, TDD
-		// authors the sibling _test.go. Same directory = same scope; flagging
-		// it would make the advisory fire on every healthy cycle.
 		ws := t.TempDir()
 		writeTriageReport(t, ws, "committed-slug")
 		writeScoutReport(t, ws, "committed-slug", "go/internal/topngate/gate.go")
@@ -411,7 +342,7 @@ func TestTDDScopeGate_FileScopeBinding(t *testing.T) {
 	t.Run("task present but no targetFiles line fails open", func(t *testing.T) {
 		ws := t.TempDir()
 		writeTriageReport(t, ws, "committed-slug")
-		writeScoutReport(t, ws, "committed-slug") // header, no targetFiles line
+		writeScoutReport(t, ws, "committed-slug")
 		writeTDDReport(t, ws, "committed-slug", "go/internal/tokenresolver/resolver_test.go")
 		reason, block := tddScopeGate{}.check(core.ReviewInput{Phase: string(core.PhaseTDD), Workspace: ws})
 		if reason != "" || block {
@@ -431,9 +362,8 @@ func TestTDDScopeGate_FileScopeBinding(t *testing.T) {
 	})
 
 	t.Run("scope is read per-slug, never borrowed from a sibling task", func(t *testing.T) {
-		// The decoy task declares exactly the tree TDD authored into. A parser
-		// that grabs the first (or any) **targetFiles:** line instead of the
-		// committed slug's own line passes this and misses real wrong-work.
+		// The decoy declares exactly the tree TDD authored into, so a parser
+		// that reads any task's targetFiles line would stay silent.
 		ws := t.TempDir()
 		writeTriageReport(t, ws, "committed-slug")
 		writeScoutReportTasks(t, ws,
@@ -451,9 +381,6 @@ func TestTDDScopeGate_FileScopeBinding(t *testing.T) {
 	})
 
 	t.Run("label drift keeps its own advisory, not the file-scope one", func(t *testing.T) {
-		// Regression guard on the existing check: when the slug is out-of-lane
-		// the gate reports LABEL drift (the pre-existing signal); the new check
-		// must not swallow or rename it.
 		ws := t.TempDir()
 		writeTriageReport(t, ws, "committed-slug")
 		writeScoutReport(t, ws, "committed-slug", "go/internal/topngate/gate.go")
@@ -468,8 +395,6 @@ func TestTDDScopeGate_FileScopeBinding(t *testing.T) {
 	})
 
 	t.Run("enforce stage approves the file-scope advisory end to end", func(t *testing.T) {
-		// The advisory must survive the reviewer at the STRICTEST stage: a
-		// block=false signal can never abort a cycle, only log.
 		ws := t.TempDir()
 		writeTriageReport(t, ws, "committed-slug")
 		writeScoutReport(t, ws, "committed-slug", "go/internal/topngate/gate.go")
@@ -481,10 +406,8 @@ func TestTDDScopeGate_FileScopeBinding(t *testing.T) {
 	})
 
 	t.Run("empty top_n still blocks regardless of declared scope", func(t *testing.T) {
-		// Anti-overcorrection: the ONE fatal case must not be softened by the
-		// new advisory path.
 		ws := t.TempDir()
-		writeTriageReport(t, ws) // triage committed nothing
+		writeTriageReport(t, ws)
 		writeScoutReport(t, ws, "orphan-task", "go/internal/topngate/gate.go")
 		writeTDDReport(t, ws, "orphan-task", "go/internal/topngate/gate_test.go")
 		reason, block := tddScopeGate{}.check(core.ReviewInput{Phase: string(core.PhaseTDD), Workspace: ws})
@@ -494,9 +417,6 @@ func TestTDDScopeGate_FileScopeBinding(t *testing.T) {
 	})
 }
 
-// writeTriageDecision writes the structural triage decision (top_n + deferred)
-// the Task Contract and the multi-member scope gate bind to
-// (core.ContractTaskIDs); the markdown report stays the legacy paths' source.
 func writeTriageDecision(t *testing.T, workspace string, topN, deferred []string) {
 	t.Helper()
 	ids := func(in []string) []map[string]string {

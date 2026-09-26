@@ -1,6 +1,3 @@
-// Package profiles loads .evolve/profiles/*.json agent permission
-// profiles. The shape is pinned by the existing 16 profile files in
-// the repo; this loader must round-trip every one of them.
 package profiles
 
 import (
@@ -14,8 +11,7 @@ import (
 	"testing/fstest"
 )
 
-// sampleProfile mirrors .evolve/profiles/scout.json's load-bearing
-// fields (the orchestrator and sandbox adapter consult these).
+// sampleProfile carries un-modeled keys (budget fields, _comment) that must not break parsing.
 const sampleProfile = `{
   "name": "scout",
   "role": "scout",
@@ -43,21 +39,17 @@ const sampleProfile = `{
   "_comment": "informational only, must not break parsing"
 }`
 
-// minimalProfile — smallest valid profile; verifies the loader doesn't
-// require optional fields.
 const minimalProfile = `{"name": "tiny", "role": "tiny", "cli": "claude", "model_tier_default": "haiku"}`
 
 func fixtureFS() fstest.MapFS {
 	return fstest.MapFS{
 		"scout.json": &fstest.MapFile{Data: []byte(sampleProfile)},
 		"tiny.json":  &fstest.MapFile{Data: []byte(minimalProfile)},
-		"AGENTS.md":  &fstest.MapFile{Data: []byte("non-JSON")}, // must NOT appear in List
+		"AGENTS.md":  &fstest.MapFile{Data: []byte("non-JSON")},
 		"README.txt": &fstest.MapFile{Data: []byte("ignored")},
 	}
 }
 
-// TestGet_HappyPath_TypedFields verifies every load-bearing typed field
-// populates as expected.
 func TestGet_HappyPath_TypedFields(t *testing.T) {
 	l := NewFromFS(fixtureFS())
 	p, err := l.Get("scout")
@@ -118,7 +110,6 @@ func TestRepositoryBuilderProfile_ProtectsHostExplanationState(t *testing.T) {
 	}
 }
 
-// TestGet_SandboxConfig — nested object parses into typed struct.
 func TestGet_SandboxConfig(t *testing.T) {
 	l := NewFromFS(fixtureFS())
 	p, _ := l.Get("scout")
@@ -139,9 +130,6 @@ func TestGet_SandboxConfig(t *testing.T) {
 	}
 }
 
-// TestGet_ReadOnlyRepo_AuditorPattern — auditor.json sets
-// read_only_repo:true; verifies this critical sandboxing flag survives
-// the round-trip.
 func TestGet_ReadOnlyRepo_AuditorPattern(t *testing.T) {
 	fsys := fstest.MapFS{
 		"auditor.json": &fstest.MapFile{Data: []byte(`{"name":"auditor","role":"auditor","cli":"claude","model_tier_default":"opus","sandbox":{"read_only_repo":true,"deny_subpaths":[".evolve/state.json"]}}`)},
@@ -155,8 +143,6 @@ func TestGet_ReadOnlyRepo_AuditorPattern(t *testing.T) {
 	}
 }
 
-// TestGet_MinimalProfile_NoOptionalFields — caller doesn't need to
-// configure optional fields.
 func TestGet_MinimalProfile_NoOptionalFields(t *testing.T) {
 	l := NewFromFS(fixtureFS())
 	p, err := l.Get("tiny")
@@ -174,7 +160,6 @@ func TestGet_MinimalProfile_NoOptionalFields(t *testing.T) {
 	}
 }
 
-// TestGet_NotFound — fs.ErrNotExist propagates.
 func TestGet_NotFound(t *testing.T) {
 	l := NewFromFS(fixtureFS())
 	_, err := l.Get("nonexistent")
@@ -183,8 +168,6 @@ func TestGet_NotFound(t *testing.T) {
 	}
 }
 
-// TestGet_MalformedJSON_Surfaces — corrupt profile must return an
-// error with file context, not panic.
 func TestGet_MalformedJSON_Surfaces(t *testing.T) {
 	fsys := fstest.MapFS{"bad.json": &fstest.MapFile{Data: []byte(`{not json`)}}
 	_, err := NewFromFS(fsys).Get("bad")
@@ -193,21 +176,17 @@ func TestGet_MalformedJSON_Surfaces(t *testing.T) {
 	}
 }
 
-// TestGet_RawJSONPreserved — Raw must contain the original bytes so
-// callers can extract un-typed fields (e.g., `_comment`, parallel_subtasks).
 func TestGet_RawJSONPreserved(t *testing.T) {
 	l := NewFromFS(fixtureFS())
 	p, _ := l.Get("scout")
 	if len(p.Raw) == 0 {
 		t.Error("Raw empty; callers can't extract un-typed fields")
 	}
-	// Verify _comment survives the round-trip via Raw (typed field ignored).
 	if !containsBytes(p.Raw, []byte("informational only")) {
 		t.Errorf("Raw missing _comment payload")
 	}
 }
 
-// TestList_SortedAndJSONOnly — only *.json files appear; sorted alphabetically.
 func TestList_SortedAndJSONOnly(t *testing.T) {
 	names, err := NewFromFS(fixtureFS()).List()
 	if err != nil {
@@ -223,7 +202,6 @@ func TestList_SortedAndJSONOnly(t *testing.T) {
 	}
 }
 
-// TestZeroLoader_GetReturnsErrNotExist — zero loader contract.
 func TestZeroLoader_GetReturnsErrNotExist(t *testing.T) {
 	l := NewFromFS(nil)
 	_, err := l.Get("any")
@@ -232,7 +210,6 @@ func TestZeroLoader_GetReturnsErrNotExist(t *testing.T) {
 	}
 }
 
-// TestNewFromDir_ReadsRealFile — disk round-trip via os.DirFS.
 func TestNewFromDir_ReadsRealFile(t *testing.T) {
 	tmp := t.TempDir()
 	if err := os.WriteFile(filepath.Join(tmp, "x.json"), []byte(minimalProfile), 0o644); err != nil {
@@ -247,7 +224,6 @@ func TestNewFromDir_ReadsRealFile(t *testing.T) {
 	}
 }
 
-// TestNewFromDir_Empty_ReturnsZeroLoader — empty path → zero loader.
 func TestNewFromDir_Empty_ReturnsZeroLoader(t *testing.T) {
 	l := NewFromDir("")
 	_, err := l.Get("any")
@@ -256,11 +232,6 @@ func TestNewFromDir_Empty_ReturnsZeroLoader(t *testing.T) {
 	}
 }
 
-// TestSmoke_RealProfiles — load every git-TRACKED profile under
-// .evolve/profiles/ (via the RealTreeProfiles funnel; untracked files are
-// runtime mints, not repo config — cd49274beab2 class) and verify each has
-// Name + Role + CLI. Skipped if dir absent. This is the canary for any
-// schema drift between bash JSON and Go types.
 func TestSmoke_RealProfiles(t *testing.T) {
 	if _, err := os.Stat(realProfilesDir(t)); err != nil {
 		t.Skipf("profiles dir not reachable: %v", err)
@@ -282,9 +253,6 @@ func TestSmoke_RealProfiles(t *testing.T) {
 	}
 }
 
-// TestList_SkipsSubdirectories — fs.ReadDir surfaces subdirs; the
-// loader must skip them (the .evolve/profiles/ tree contains an
-// AGENTS.md sibling — and could contain subdirs in future).
 func TestList_SkipsSubdirectories(t *testing.T) {
 	fsys := fstest.MapFS{
 		"good.json":         &fstest.MapFile{Data: []byte(minimalProfile)},
@@ -299,8 +267,6 @@ func TestList_SkipsSubdirectories(t *testing.T) {
 	}
 }
 
-// TestList_ZeroLoader_ReturnsNil — explicit contract for the
-// nil-fs case (parallel to TestZeroLoader_GetReturnsErrNotExist).
 func TestList_ZeroLoader_ReturnsNil(t *testing.T) {
 	names, err := NewFromFS(nil).List()
 	if err != nil || names != nil {
@@ -308,7 +274,6 @@ func TestList_ZeroLoader_ReturnsNil(t *testing.T) {
 	}
 }
 
-// containsBytes — local helper (no strings import in test file).
 func containsBytes(haystack, needle []byte) bool {
 	for i := 0; i+len(needle) <= len(haystack); i++ {
 		match := true

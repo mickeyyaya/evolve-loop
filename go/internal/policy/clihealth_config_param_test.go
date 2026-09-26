@@ -1,10 +1,5 @@
 package policy_test
 
-// CLIHealthConfig — the typed parameter gating the proactive per-cycle usage
-// probe. Driven only through Policy.CLIHealthConfig() and policy.Load, never
-// env. Default (absent block) is ProactiveProbe=false: the probe is opt-in, so
-// nothing changes for an operator who has not enabled it.
-
 import (
 	"testing"
 

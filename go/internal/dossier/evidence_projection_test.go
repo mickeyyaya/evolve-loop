@@ -11,21 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasetiming"
 )
 
-// evidence_projection_test.go — cycle-1623 forensics: a cycle that ran 12
-// phases and shipped 922 lines to origin/main recorded a dossier containing
-// ONE synthetic phase ("cycle-recorded", PASS, zero tokens) and no commit.
-//
-// Root cause: phase-timing.json is written by a DEFERRED call in RunCycle, so
-// it lands AFTER writeCycleDossier has already read it. On the normal path the
-// dossier therefore always missed its own evidence; only a resumed cycle (which
-// writes the log mid-run) recorded real phases. The healthier the cycle, the
-// emptier its permanent record — and a synthesized PASS made the gap invisible.
-//
-// The contract these tests pin: a dossier is a PROJECTION OF EVIDENCE. Live
-// evidence is authoritative, the on-disk log is the fallback, and absent
-// evidence is recorded LOUDLY as a degraded record — never synthesized as a
-// passing phase.
-
 func mustBuild(t *testing.T, cycle int, opts BuildOpts) *Dossier {
 	t.Helper()
 	d, err := Build(cycle, opts)
@@ -42,10 +27,6 @@ func baseOpts(ws string) BuildOpts {
 	return BuildOpts{WorkspacePath: ws, Goal: "g", RunID: "R", FinalVerdict: "PASS"}
 }
 
-// TestBuild_LivePhaseTimingsAreAuthoritative: the in-memory timings the
-// orchestrator already holds are passed straight in, so the dossier cannot
-// depend on whether the deferred file write has landed yet. This is the
-// ordering defect's structural fix: remove the dependency, don't re-time it.
 func TestBuild_LivePhaseTimingsAreAuthoritative(t *testing.T) {
 	ws := t.TempDir() // deliberately EMPTY: no phase-timing.json on disk
 	opts := baseOpts(ws)
@@ -67,11 +48,6 @@ func TestBuild_LivePhaseTimingsAreAuthoritative(t *testing.T) {
 	}
 }
 
-// TestBuild_AbsentEvidenceIsLoudNeverASynthesizedPass: with no live timings and
-// no log on disk, the record must SAY the evidence is missing. The old
-// behavior — one "cycle-recorded" phase carrying the cycle's PASS — made a
-// twelve-phase cycle indistinguishable from a one-phase cycle and fabricated
-// per-phase evidence that no phase produced.
 func TestBuild_AbsentEvidenceIsLoudNeverASynthesizedPass(t *testing.T) {
 	d := mustBuild(t, 1623, baseOpts(t.TempDir()))
 	if len(d.Phases) != 1 {
@@ -88,16 +64,11 @@ func TestBuild_AbsentEvidenceIsLoudNeverASynthesizedPass(t *testing.T) {
 		!strings.Contains(strings.ToLower(p.KeyFindings), "degraded") {
 		t.Errorf("the marker must name the degradation; got %q", p.KeyFindings)
 	}
-	// The cycle's own verdict is untouched — only the phase record degrades.
 	if d.FinalVerdict != "PASS" {
 		t.Errorf("FinalVerdict must stay the cycle's real outcome; got %q", d.FinalVerdict)
 	}
 }
 
-// TestBuild_ProjectsTheShippedCommit: Dossier.CommitSHA existed in the schema
-// but no producer ever set it, so every dossier omitted the one fact that
-// proves delivery. ship-binding.json is the ship phase's own proof; the
-// dossier reads it the way it already reads ci-watch-verdict.json.
 func TestBuild_ProjectsTheShippedCommit(t *testing.T) {
 	ws := t.TempDir()
 	writeJSON(t, filepath.Join(ws, ShipBindingFile), ShipBinding{
@@ -111,16 +82,11 @@ func TestBuild_ProjectsTheShippedCommit(t *testing.T) {
 	if d.TreeSHA != "3388ca0b573a5a5fe9bdeeb4771e4fb7b517b06e" {
 		t.Errorf("TreeSHA = %q, want the committed tree from the same binding", d.TreeSHA)
 	}
-	// No binding ⇒ no commit claimed. Never fabricated.
 	if d2 := mustBuild(t, 1623, baseOpts(t.TempDir())); d2.CommitSHA != "" {
 		t.Errorf("absent ship-binding must leave CommitSHA empty; got %q", d2.CommitSHA)
 	}
 }
 
-// TestBuild_ProjectsTheCommittedTasks: "what was this cycle for" belongs in the
-// permanent record. triage-decision.json's top_n is the committed set; an
-// EMPTY commitment is itself the finding cycle-1623 needed to surface, so it is
-// recorded as an explicit empty list rather than an absent field.
 func TestBuild_ProjectsTheCommittedTasks(t *testing.T) {
 	ws := t.TempDir()
 	writeJSON(t, filepath.Join(ws, committedset.DecisionFile), map[string]any{
@@ -137,10 +103,6 @@ func TestBuild_ProjectsTheCommittedTasks(t *testing.T) {
 	}
 }
 
-// TestBuild_Cycle1623Shape is the forensic regression: the exact evidence
-// cycle-1623 left on disk must produce a record an operator (or a ship-rate
-// query) can read correctly — twelve phases, the shipped commit, and an empty
-// commitment, all visible at once.
 func TestBuild_Cycle1623Shape(t *testing.T) {
 	ws := t.TempDir()
 	writeJSON(t, filepath.Join(ws, ShipBindingFile), ShipBinding{CommitSHA: "dc00395a"})
@@ -172,11 +134,6 @@ func writeJSON(t *testing.T, path string, v any) {
 	}
 }
 
-// TestShippedCommit_RoundTripsTheWriterType marshals the SHARED ShipBinding
-// type — the one phases/ship now writes — and reads it back. The previous
-// version of this test hand-typed the key names, so a writer rename would have
-// left it green while every dossier's delivery record silently emptied. Now the
-// coupling is the type: a rename is a compile error at the write site.
 func TestShippedCommit_RoundTripsTheWriterType(t *testing.T) {
 	ws := t.TempDir()
 	writeJSON(t, filepath.Join(ws, ShipBindingFile), ShipBinding{
@@ -192,7 +149,6 @@ func TestShippedCommit_RoundTripsTheWriterType(t *testing.T) {
 	if _, _, ok := shippedCommit(t.TempDir()); ok {
 		t.Error("absent binding must report not-ok, never a fabricated commit")
 	}
-	// A binding with no commit is not a delivery.
 	empty := t.TempDir()
 	writeJSON(t, filepath.Join(empty, ShipBindingFile), ShipBinding{Cycle: 1623})
 	if _, _, ok := shippedCommit(empty); ok {
@@ -200,12 +156,6 @@ func TestShippedCommit_RoundTripsTheWriterType(t *testing.T) {
 	}
 }
 
-// TestCommittedTasks_AbsentEmptyAndPopulated pins the three-way contract the
-// dossier depends on, using the artifact constant the reader resolves
-// (committedset.DecisionFile) so a filename change fails here rather than silently
-// emptying every record's commitment. Absent ⇒ not-ok (unknown); present but
-// empty ⇒ ok with an empty non-nil slice (the cycle committed to nothing —
-// cycle-1623's finding); populated ⇒ the ids in order.
 func TestCommittedTasks_AbsentEmptyAndPopulated(t *testing.T) {
 	if _, ok := committedTasks(t.TempDir()); ok {
 		t.Error("absent decision must be not-ok (unknown), never an empty commitment")
@@ -236,12 +186,6 @@ func TestCommittedTasks_AbsentEmptyAndPopulated(t *testing.T) {
 	}
 }
 
-// TestBuild_TasksSerialization asserts on the MARSHALED BYTES, not the Go
-// value, because the defect this pins was invisible at the Go level: a plain
-// []string field left nil by an absent triage decision marshals to
-// `"tasks": null`, which the schema's `"type": "array"` rejects — a record
-// that fails its own contract. The three states must be distinguishable on
-// the wire: omitted (unknown), [] (explicit empty commitment), and the ids.
 func TestBuild_TasksSerialization(t *testing.T) {
 	marshal := func(ws string) string {
 		t.Helper()
@@ -252,7 +196,6 @@ func TestBuild_TasksSerialization(t *testing.T) {
 		return string(body)
 	}
 
-	// 1. No triage decision at all ⇒ the field is OMITTED, never null.
 	got := marshal(t.TempDir())
 	if strings.Contains(got, `"tasks":null`) {
 		t.Errorf("an absent decision must omit tasks, never emit null (the schema types it as an array): %s", got)
@@ -261,14 +204,12 @@ func TestBuild_TasksSerialization(t *testing.T) {
 		t.Errorf("an absent decision must omit the field entirely: %s", got)
 	}
 
-	// 2. Present-but-empty commitment ⇒ [] on the wire, never omitted.
 	empty := t.TempDir()
 	writeJSON(t, filepath.Join(empty, committedset.DecisionFile), map[string]any{"top_n": []any{}})
 	if got := marshal(empty); !strings.Contains(got, `"tasks":[]`) {
 		t.Errorf("an explicit empty commitment must serialize as []: %s", got)
 	}
 
-	// 3. Populated commitment ⇒ the ids.
 	full := t.TempDir()
 	writeJSON(t, filepath.Join(full, committedset.DecisionFile), map[string]any{
 		"top_n": []map[string]string{{"id": "alpha"}},
@@ -278,10 +219,6 @@ func TestBuild_TasksSerialization(t *testing.T) {
 	}
 }
 
-// TestRender_CommitmentIsVisibleToAHumanReader: the JSON half is what queries
-// read; knowledge-base/cycles/cycle-N.md is what people read, and the personas
-// point them there. A commitment recorded only in JSON leaves "what was this
-// cycle for" unanswerable in the half that gets read.
 func TestRender_CommitmentIsVisibleToAHumanReader(t *testing.T) {
 	ws := t.TempDir()
 	writeJSON(t, filepath.Join(ws, committedset.DecisionFile), map[string]any{
@@ -296,7 +233,6 @@ func TestRender_CommitmentIsVisibleToAHumanReader(t *testing.T) {
 		t.Errorf("the rendered record must name the committed tasks:\n%s", md)
 	}
 
-	// An explicit EMPTY commitment states itself rather than rendering blank.
 	empty := t.TempDir()
 	writeJSON(t, filepath.Join(empty, committedset.DecisionFile), map[string]any{"top_n": []any{}})
 	raw, err = RenderMarkdown(mustBuild(t, 1623, baseOpts(empty)))
@@ -308,7 +244,6 @@ func TestRender_CommitmentIsVisibleToAHumanReader(t *testing.T) {
 		t.Errorf("an empty commitment must state itself:\n%s", md)
 	}
 
-	// No decision at all ⇒ the line is absent (unknown, not "nothing").
 	raw, err = RenderMarkdown(mustBuild(t, 1623, baseOpts(t.TempDir())))
 	md = string(raw)
 	if err != nil {

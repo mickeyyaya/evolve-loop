@@ -1,0 +1,34 @@
+# internal/prompts
+
+> Related: the compaction incident [2026-08-10-persona-strip-lobotomy.md](../../incidents/2026-08-10-persona-strip-lobotomy.md), the zero-loader hardening in [2026-08-24-personaless-menu-phase-lane-kill.md](../../incidents/2026-08-24-personaless-menu-phase-lane-kill.md), the `CompactPrompts` wiring in [internal-config.md](internal-config.md), the persona house rules in [change-log-2026-07-30.md §9](../../operations/change-log-2026-07-30.md), and the router's recipe projection in [internal-router.md](internal-router.md). This page keeps the package-level detail those do not.
+
+## Purpose
+
+`internal/prompts` loads agent personas (`agents/<name>.md`) and skill docs (`skills/<name>/SKILL.md`), parses their frontmatter, and provides `StripOnDemandSections`, the compaction the runner applies at dispatch when `CompactPrompts` is on. Its test suite also holds the repo's content guards on the persona docs themselves.
+
+## Design
+
+- **fs.FS-backed loader.** Tests use `fstest.MapFS`; production uses `os.DirFS` through `NewForProject`, which reads `$EVOLVE_PROMPTS_DIR` when set and the project root otherwise. The original plan also named an `embed.FS` copy of `agents/` and `skills/`; it was never wired, and the fs.FS surface keeps that a one-line swap if it ever is.
+- **Zero loader.** `NewFromFS(nil)` and `NewFromDir("")` give a Loader with no filesystem. Every read returns `fs.ErrNotExist`, and `Agents`/`Skills` return `nil, nil`.
+- **Minimal frontmatter parser.** It handles only the shapes the repo's docs use: flat `key: value`, single- or double-quoted values, and inline `[a, "b"]` arrays (returned as `[]string`). A full YAML dependency would grow the binary for no gain. The first `:` splits key from value, so a value can hold colons. Blank lines, `#` lines, lines without a colon and empty keys are skipped. CRLF is tolerated. A file without a leading `---` fence returns a nil map and the whole content as body; an opening fence with no closing one is an error. Inline arrays split on commas outside quotes, with no escape handling.
+- **On-demand strip.** A persona's static reference tail sits under a `## Reference Index` heading and is the same on every dispatch. `StripOnDemandSections` cuts the body at the first line that is exactly `## Reference Index` or starts with `## Reference Index ` (the production form is `## Reference Index (Layer 3, on-demand)`). The match is line-anchored, case-sensitive, H2 only, and CRLF-aware, so an inline prose mention never triggers it. A body without the heading comes back unchanged, and the strip is idempotent.
+- **Router compaction is in place.** `agents/evolve-router.md`'s phase catalog is the router's working menu, so it is not stripped at a marker. Its size is held by the router tests instead: the catalog keeps its 66 rows at a pinned byte size, and the prose above it has an anti-bloat ceiling.
+
+## Invariants
+
+- **The zero loader carries two sentinels.** Its error wraps both `fs.ErrNotExist` (the documented zero-loader contract) and `ErrNoSource`. A misresolved prompts root makes every doc look missing, and `ErrNoSource` lets the runner refuse to treat that as one skippable missing persona.
+- **Stripping must keep operational directives.** Everything a phase needs every cycle sits above the marker, and each persona's marker sits at end of file. The keep-guard `internal/phasecoherence/persona_strip_operational_test.go` decides what may be stripped. The low savings floors in this package's tests (64 to 256 bytes) only prove the marker section exists; they are deliberately not quotas, because quotas once forced operational text below the marker.
+- **Relocated, not deleted.** Tests that check a section is absent from the stripped body are paired with tests that check it still exists in the raw file, so moving content below the marker never becomes deleting it.
+- **Persona line budget.** `agents/evolve-{scout,builder,auditor}.md` share a combined budget of fewer than 751 lines, pinned by `TestPersonaStopCriterionDedupe_CombinedLineCountReduced` and enforced in-lane by `core.personaBudgetFailures`. New persona text is paid for by tightening existing prose, never by raising the cap.
+- **House rules live in the always-on body.** The builder and TDD-engineer personas must carry the apicover graduation (the two edits: a `go/.apicover-enforce` line and an `apicover_named_test.go`) and the caller-proof requirement above the strip marker. An instruction the agent never receives is worthless.
+- **Router prose is measured without the generated table.** The goal-recipes table between the `GENERATED:goal-recipes` markers is a projection of `phase-registry.json:config.goal_recipes` and grows with the catalog by design, so the prose ceiling excludes it.
+- **Reference stubs.** `agents/evolve-tdd-engineer-reference.md` and `agents/evolve-reflector-reference.md` hold the on-demand material relocated out of their personas. The reflector stub must carry the `## Why this agent exists` narrative.
+
+## Findings
+
+- **cycle-413**: `StripOnDemandSections` matched the heading by exact equality and missed the production form `## Reference Index (Layer 3, on-demand)`, so compaction silently did nothing. The prefix match fixed it; `realdoc_strip_test.go` is the regression.
+- **cycles 415–422** (the compaction series): markers were added to the tdd-engineer and triage personas (415), intent (416) and the reflector (417); the router catalog was compacted in place (417) and its prose compressed (420); retrospective and orchestrator tails were moved (421); intent and triage tails were expanded (422). Several of those tests set savings floors or "absent after strip" checks that demanded operational text sit below the marker.
+- **2026-08-10 persona-strip lobotomy**: those floors had fossilized the burial. The auditor ran on 27% of its persona, and triage lost its inbox-ingestion and idempotency rules because their version-tagged headings were misclassified as history. Every burial pin was inverted to a keep-pin, the floors were cut to marker-presence checks, and the phasecoherence keep-guard became the authority. See the incident record.
+- **cycle-646**: the three personas' `## STOP CRITERION` blocks were deduplicated into a shared reference. 751 was the pre-dedupe combined line count, and it stayed as the standing budget.
+- **cycle-1551**: a persona-less menu phase killed a lane. The hardening added `ErrNoSource` so a nil source cannot pass as one missing doc. See the incident record.
+- **ADR-0099 re-baseline (2026-09-09)**: the router prose pin measured a region that included the generated recipe table, and it failed four bytes over its cap on the first new recipe row. The pin now measures prose only: 2349 bytes at the re-baseline, with a ceiling of 3000 (about +28%) and a floor of 1200 (about 50%).

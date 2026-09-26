@@ -11,24 +11,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sessionrecord"
 )
 
-// Cycle-769 boot-orphan-sweep-bounded-tombstone regression contract (preflight
-// half). Incident: checks.go ran the boot orphan sweep with
-// context.Background() — a wedged tmux server hangs loop boot silently and
-// indefinitely, while the per-cycle sweep has been deadline-bounded
-// (orphanGCTimeout, cmd_loop_control.go) since the same incident class.
-//
-// Contract: the preflight sweep's killer receives a context carrying a
-// boot-scale deadline (≤30s from the call — the existing orphanGCTimeout is
-// 15s; the exact home of the hoisted const is the implementer's choice), so a
-// blocked tmux exec is abandoned instead of wedging boot. The killer is
-// injectable via Options.OrphanKill (defaulting to swarm.ExecTmuxKill) —
-// preflight is otherwise untestable without a real tmux server.
 func TestPreflight_OrphanReapIsDeadlineBounded(t *testing.T) {
 	opts := goodPipelineOptions(t)
 
-	// A lease-less run with one registered session, so the sweep must invoke
-	// the killer (an empty runs dir would green trivially without exercising
-	// the deadline path at all).
+	// A lease-less run with a registered session forces the sweep to call the killer.
 	runDir := filepath.Join(opts.EvolveDir, "runs", "stale")
 	if err := os.MkdirAll(runDir, 0o755); err != nil {
 		t.Fatal(err)

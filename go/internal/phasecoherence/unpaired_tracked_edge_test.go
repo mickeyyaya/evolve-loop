@@ -1,21 +1,5 @@
 package phasecoherence
 
-// unpaired_tracked_edge_test.go — edge-case pins for the #421 tracked-only
-// Direction-B binding, added with the 2026-08-09 zero-ship batch postmortem
-// (docs/incidents/2026-08-09-zero-ship-batch.md). The base regression file
-// (unpaired_tracked_test.go) pins tracked-bound / untracked-unbound / loud
-// non-repo error; these close the corners the adversarial review flagged:
-//   - error fidelity: the wrapped error must carry git's stderr ("not a git
-//     repository"), not just "exit status 128" — that line is the fallback
-//     diagnostic an operator reads during an incident.
-//   - empty tracked set: a repo with NO tracked profiles returns an empty
-//     set + nil error — the input that must trigger the caller's loud
-//     bind-all fallback rather than silently unbinding the gate.
-//   - staged-but-uncommitted counts as tracked (the stricter direction; no
-//     CI-vs-plane skew that weakens the gate).
-//   - nested tracked profiles must NOT alias a same-named top-level stub
-//     into the binding set (basename collision).
-
 import (
 	"os"
 	"os/exec"

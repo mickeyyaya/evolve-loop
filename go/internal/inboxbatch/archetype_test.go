@@ -25,8 +25,6 @@ func TestIsOperatorState(t *testing.T) {
 	}
 }
 
-// TestItemClassRoundTrip pins the json tag itself: a field added without
-// `json:"class"` leaves Class empty here.
 func TestItemClassRoundTrip(t *testing.T) {
 	dir := t.TempDir()
 	writeItem(t, dir, "a.json", `{"id":"a","class":"pipeline-architecture"}`)

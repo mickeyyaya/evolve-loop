@@ -1,12 +1,6 @@
-// Package bridge adapts the in-process native-Go bridge.Engine to the
-// core.Bridge port, adding the one concern the Engine deliberately does
-// not own: interactive-policy injection into the prompt body. The bash
-// tools/agent-bridge subprocess and the EVOLVE_BRIDGE_GO toggle that
-// selected it were removed in the v12 flag-day cutover — the Go bridge is
-// now the only implementation, so this adapter has a single path.
-//
-// Production wiring goes through NewDefault; tests override engineFactory
-// to inject a fake core.Bridge and assert delegation + policy injection.
+// Package bridge adapts the in-process bridge.Engine to the core.Bridge port
+// and assembles the prompt each phase agent receives.
+// See docs/architecture/packages/internal-adapters-bridge.md.
 package bridge
 
 import (
@@ -27,21 +21,14 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/tokenusage"
 )
 
-// Interactive policy values for the typed profile policy and the per-agent
-// request override via policy.json's interactive_policies. The bridge
-// prepends a deterministic policy block to the prompt body so phase
-// agents self-resolve interactive prompts (AskUserQuestion, y/N) without
-// blocking the autonomous loop. See docs/architecture/plan-mode-dispatch.md
-// (v12.1) for the design rationale.
+// Interactive policies: how a phase agent resolves its own interactive prompts without blocking the loop.
 const (
 	PolicyRecommendedOrFirst = "recommended_or_first"
 	PolicyEscalate           = "escalate"
 	PolicyAutoYes            = "auto_yes"
 )
 
-// policyBlockRecommendedOrFirst is the prompt prefix injected when the
-// effective policy is recommended_or_first. Kept short to stay well
-// under the 200-token cache-prefix budget called out in the v12.1 plan.
+// The policy blocks stay constant and under ~200 tokens so the cached prompt prefix stays stable.
 const policyBlockRecommendedOrFirst = "## Subagent Interactive Policy (recommended_or_first)\n\n" +
 	"If you would invoke AskUserQuestion or any equivalent interactive prompt, instead\n" +
 	"auto-resolve as follows:\n" +
@@ -50,9 +37,6 @@ const policyBlockRecommendedOrFirst = "## Subagent Interactive Policy (recommend
 	"- Record the resolution in your output as: `Auto-picked: <choice> (policy: recommended-or-first)`.\n" +
 	"- Never block on operator input; the loop is autonomous.\n\n---\n\n"
 
-// policyBlockAutoYes is the prompt prefix injected when the effective
-// policy is auto_yes. For multi-option prompts the agent falls back to
-// the recommended-or-first rule.
 const policyBlockAutoYes = "## Subagent Interactive Policy (auto_yes)\n\n" +
 	"For any binary yes/no prompt that would otherwise block, choose \"yes\" and note\n" +
 	"the resolution in your output as: `Auto-picked: yes (policy: auto_yes)`.\n" +
@@ -61,53 +45,28 @@ const policyBlockAutoYes = "## Subagent Interactive Policy (auto_yes)\n\n" +
 	"- Otherwise pick the first listed option.\n" +
 	"Never block on operator input; the loop is autonomous.\n\n---\n\n"
 
-// Adapter is the core.Bridge implementation: it injects the interactive
-// policy prefix, then delegates to the in-process Go bridge.Engine built
-// by engineFactory. A single Adapter instance is safe for sequential reuse.
+// Adapter is the core.Bridge implementation: it assembles the prompt, then delegates to the in-process Engine.
 type Adapter struct {
-	// engineFactory builds the in-process core.Bridge for a given
-	// request-local env overlay. Defaulted in New; overridable in tests.
 	engineFactory func(env map[string]string) core.Bridge
-	// onStopReview, when non-nil, is invoked for every stop-review decision
-	// the tmux driver makes (extend AND pause). The cycle number is taken from
-	// BridgeRequest.Cycle at the time of the Launch call, so the callback is
-	// cycle-scoped. Set via SetOnStopReview after construction.
+	// onStopReview receives every stop-review decision (extend and pause), scoped to the request's Cycle.
 	onStopReview func(cycle int, phase, action, reason string)
-	// resolver resolves the deliverable contract injected into each phase's
-	// prompt. Defaults to built-in-only; SetContractResolver upgrades it to a
-	// catalog-aware resolver so user/minted phases get their spec-derived
-	// contract block + exact-path footer (WS-A, ADR-0034).
-	resolver phasecontract.Resolver
-	// signals is the ADR-0101 Signal Center every engine this Adapter builds
-	// produces into; injected at construction (NewDefault), nil = Null Object.
+	resolver     phasecontract.Resolver
+	// signals is the Center every engine this Adapter builds produces into; nil is the Null Object.
 	signals *signalcenter.Center
-	// phaseIO is the EVOLVE_PHASE_IO rollout stage (ADR-0050 §3.8b). At
-	// >=StageAdvisory the injected contract block instructs build/scout/triage to
-	// self-report failure via a structured sentinel; default StageOff keeps the
-	// dispatched prompt byte-identical to pre-3.8b.
 	phaseIO config.Stage
-	// recoveryStage is the ADR-0044 Unified Phase Recovery stage (channel,
-	// ask-broker, transient-dwell), seeded from policy.json by NewDefault and
-	// overridden by the cycle root with the Loader-resolved cfg.PhaseRecovery.
+	// recoveryStage is the phase-recovery program dial (channel, ask-broker, transient-dwell).
 	recoveryStage string
-	// fatalPaneStage is the C2 fatal-pane fast-fail's OWN stage (F27), seeded
-	// and overridden the same way from cfg.FatalPane. Both stages reach the
-	// engine through productionEngineDeps, the builder every path shares.
+	// fatalPaneStage is the fatal-pane fast-fail's own dial, independent of recoveryStage.
 	fatalPaneStage string
-	// bridgeConfig carries the timing overrides loaded from policy.json at
-	// construction time. Zero values mean "use bridge built-in defaults".
+	// bridgeConfig holds the policy.json timing overrides; zero values mean the engine's built-in defaults.
 	bridgeConfig policy.BridgePolicy
-	// contextFillWarnPct is the policy-resolved context-fill WARN threshold
-	// (cycle-1444), loaded alongside bridgeConfig at NewDefault. Zero (bare
-	// New(), or an unreadable policy.json) leaves the engine to apply its own
-	// built-in default, so the fail-open path matches the configured one.
+	// contextFillWarnPct is the validated policy threshold; zero lets the engine apply its built-in default.
 	contextFillWarnPct int
 	// bootTimeoutStore records driver-scoped boot-timeout bench strikes.
 	bootTimeoutStore *clihealth.Store
 }
 
-// New constructs an Adapter backed by the native-Go bridge.Engine. Tests
-// override the engineFactory field directly to inject a fake.
+// New constructs an Adapter backed by the in-process bridge.Engine, resolving built-in contracts only.
 func New() *Adapter {
 	return &Adapter{
 		engineFactory: func(env map[string]string) core.Bridge {
@@ -117,28 +76,18 @@ func New() *Adapter {
 	}
 }
 
-// NewDefault constructs the production Adapter, loading timing overrides
-// from <projectRoot>/.evolve/policy.json when available (fail-open: a
-// missing or unparseable policy.json falls back to bridge built-in defaults).
+// NewDefault constructs the production Adapter, seeding it from <projectRoot>/.evolve/policy.json (fail-open to built-in defaults).
 func NewDefault(projectRoot string, signals *signalcenter.Center) *Adapter {
 	a := New()
 	a.signals = signals
 	pol, err := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
 	if err == nil {
 		a.bridgeConfig = pol.BridgeConfig()
-		// Resolve through policy's validating resolver, never off the raw
-		// field: an out-of-range operator value must arrive as the built-in.
+		// The validating resolver, never the raw field: an out-of-range value must arrive as the built-in.
 		a.contextFillWarnPct = pol.ContextFillConfig().WarnThresholdPct
 	}
-	// A failed load leaves pol zero, so the recovery dials resolve to their
-	// compiled defaults — the same fail-open as the timings above — parsed by
-	// the Loader's own trichotomy (policy.BridgeRecoveryStages). Roots that
-	// never call the setters (the per-phase registry factories) still carry
-	// policy's dials; the cycle root overrides them via wireBridgeStages.
-	// Deliberately BOTH dials: before F27 such roots pinned the program dial
-	// to shadow whatever policy.json said, so an operator's explicit
-	// `recovery.phase_recovery` now reaches them too (one source for every
-	// production path) — the compiled default is still shadow.
+	// Seeded for roots that never call the setters; a failed load leaves pol zero, so compiled defaults apply.
+	// See ADR-0044.
 	a.recoveryStage, a.fatalPaneStage = pol.BridgeRecoveryStages()
 	a.bootTimeoutStore = clihealth.NewStore(projectRoot, nil)
 	a.engineFactory = func(env map[string]string) core.Bridge {
@@ -147,22 +96,15 @@ func NewDefault(projectRoot string, signals *signalcenter.Center) *Adapter {
 	return a
 }
 
-// productionEngineDeps builds the gobridge.Deps shared by every production
-// composition path in this Adapter (NewDefault's engineFactory and the
-// onStopReview branch of Launch) so they cannot drift apart. Wires
-// TokenResolver via tokenusage.DefaultResolver against the env's HOME (see
-// configRoot) — the fix for the confirmed cycle-612+ bug where production
-// launches got silent zero token telemetry.
+// productionEngineDeps is the one Deps builder for both production paths (NewDefault's factory and
+// Launch's onStopReview branch), so they cannot drift apart.
 func (a *Adapter) productionEngineDeps(env map[string]string) gobridge.Deps {
 	return gobridge.Deps{
-		Env:                env,
-		BootTimeoutStore:   a.bootTimeoutStore,
-		BootTimeoutS:       a.bridgeConfig.BootTimeoutS,
-		ArtifactTimeoutS:   a.bridgeConfig.ArtifactTimeoutS,
-		ArtifactMaxExtends: a.bridgeConfig.ArtifactMaxExtends,
-		// Per-phase artifact budgets (compiled retro=900 + operator overrides).
-		// Resolved here, at the production root, so every phase launch that
-		// goes through this Adapter carries them.
+		Env:                   env,
+		BootTimeoutStore:      a.bootTimeoutStore,
+		BootTimeoutS:          a.bridgeConfig.BootTimeoutS,
+		ArtifactTimeoutS:      a.bridgeConfig.ArtifactTimeoutS,
+		ArtifactMaxExtends:    a.bridgeConfig.ArtifactMaxExtends,
 		PhaseArtifactTimeoutS: a.bridgeConfig.PhaseArtifactTimeouts(),
 		ScrollbackLines:       a.bridgeConfig.ScrollbackLines,
 		TokenResolver:         tokenusage.DefaultResolver(configRoot(env)),
@@ -170,19 +112,13 @@ func (a *Adapter) productionEngineDeps(env map[string]string) gobridge.Deps {
 		RecoveryStage:         a.recoveryStage,
 		FatalPaneStage:        a.fatalPaneStage,
 		Signals:               a.signals,
-		// Wall corroboration (2026-08-15 false-wall incident): a pane
-		// exhaustion match escalates rc 85 only after a live one-token probe
-		// corroborates it — subject-matter wall vocabulary (a lane editing
-		// the exhaustion fixtures) can no longer forge a quota wall. Wired
-		// HERE, the production root, so tests keep the legacy nil seam.
+		// A pane wall match escalates rc 85 only after a live probe confirms it; wired only at this
+		// production root so engine tests keep the nil seam.
 		CorroborateWall: gobridge.DefaultWallCorroborator(nil, os.Stderr),
 	}
 }
 
-// configRoot resolves the Claude config directory from a request-local env
-// overlay, falling back to the process environment — same precedent as
-// internal/bridge/doctor.go's doctorHome() + ".claude" (see
-// internal/bridge/billing.go:47 for the exact join).
+// configRoot is $HOME/.claude, reading HOME from the request env before the process env.
 func configRoot(env map[string]string) string {
 	home := env["HOME"]
 	if home == "" {
@@ -191,24 +127,17 @@ func configRoot(env map[string]string) string {
 	return filepath.Join(home, ".claude")
 }
 
-// BootTimeoutStoreWired reports whether the Adapter has a non-nil boot-timeout
-// bench store. True for any Adapter built via NewDefault; false for bare New().
-// Used by acceptance tests to confirm production deps inject the strike writer.
+// BootTimeoutStoreWired reports whether a boot-timeout strike store is wired (true for NewDefault, false for New).
 func (a *Adapter) BootTimeoutStoreWired() bool {
 	return a.bootTimeoutStore != nil
 }
 
-// SetOnStopReview wires a callback invoked for every stop-review verdict the
-// tmux driver makes during a Launch call. cycle is taken from BridgeRequest.Cycle.
-// Passing nil clears the callback (no-op; default production state).
+// SetOnStopReview sets the callback for every stop-review decision made during Launch; nil clears it.
 func (a *Adapter) SetOnStopReview(fn func(cycle int, phase, action, reason string)) {
 	a.onStopReview = fn
 }
 
-// SetContractResolver upgrades the adapter to inject spec-derived contracts for
-// user/minted phases. Pass a phasecontract.NewCatalogResolver(catalog.Get) built
-// from the orchestrator's merged catalog. Passing nil restores built-in-only
-// resolution (the default).
+// SetContractResolver installs a catalog-aware contract resolver for user and minted phases; nil restores built-ins only.
 func (a *Adapter) SetContractResolver(r phasecontract.Resolver) {
 	if r == nil {
 		r = phasecontract.BuiltinResolver{}
@@ -216,43 +145,29 @@ func (a *Adapter) SetContractResolver(r phasecontract.Resolver) {
 	a.resolver = r
 }
 
-// SetPhaseIOStage wires the EVOLVE_PHASE_IO rollout stage so the injected
-// contract block activates the build/scout/triage self-report-failure
-// instruction at >=StageAdvisory (ADR-0050 §3.8b). Default (unset) is StageOff:
-// the dispatched prompt is byte-identical to pre-3.8b.
+// SetPhaseIOStage sets the phase-I/O stage; at StageAdvisory or above the contract block asks for structured failure sentinels.
 func (a *Adapter) SetPhaseIOStage(stage config.Stage) {
 	a.phaseIO = stage
 }
 
-// SetRecoveryStage wires the ADR-0044 Unified Phase Recovery stage (channel,
-// ask-broker, transient-dwell) so the engine reads the policy-resolved value
-// instead of the retired EVOLVE_PHASE_RECOVERY env var. "" normalizes to
-// "shadow" (behavior-neutral) in channel.ResolveStage.
+// SetRecoveryStage sets the phase-recovery stage (channel, ask-broker, transient-dwell); "" normalizes to shadow.
 func (a *Adapter) SetRecoveryStage(stage string) {
 	a.recoveryStage = stage
 }
 
-// SetFatalPaneStage wires the C2 fatal-pane fast-fail's OWN stage (F27) —
-// independent of SetRecoveryStage, so arming the fast-fail never arms the
-// channel. "" normalizes to "shadow" in the engine (an unwired stage observes).
+// SetFatalPaneStage sets the fatal-pane fast-fail's own stage, independent of SetRecoveryStage; "" normalizes to shadow.
 func (a *Adapter) SetFatalPaneStage(stage string) {
 	a.fatalPaneStage = stage
 }
 
-// Launch injects the resolved interactive policy into the prompt body and
-// delegates to the Engine, which materializes the prompt, dispatches the
-// driver, and reads the artifact into BridgeResponse.Stdout.
+// Launch assembles the prompt (contract, policy, rules, skills, directives, correction) and delegates to the Engine.
 func (a *Adapter) Launch(ctx context.Context, req core.BridgeRequest) (core.BridgeResponse, error) {
 	if err := validate(req); err != nil {
 		return core.BridgeResponse{}, err
 	}
 	inproc := req
-	// Prompt assembly order (top of string → bottom):
-	//   Correction (outermost, re-dispatch only) > Operator Directives > Skills > Rules > Policy > Contract block > Body > path footer.
-	// The contract's invariant block sits in the cacheable prefix; the volatile
-	// per-cycle path lands in the footer (last line) — cache-safe AND recency-
-	// optimal. See injectContract. Skill overlays sit at the persona altitude
-	// (just above the profile Rules): stable per phase/tier, so cache-coherent.
+	// Each inject wraps the previous result, so Correction lands outermost. Nothing per-cycle may
+	// precede the body: the prefix stays cacheable and the path lands in the tail.
 	contractID := req.Agent
 	if req.Contract != "" {
 		contractID = req.Contract
@@ -267,10 +182,7 @@ func (a *Adapter) Launch(ctx context.Context, req core.BridgeRequest) (core.Brid
 	withDirectives := injectOperatorDirectives(withSkills, req.OperatorDirectives)
 	inproc.Prompt = injectCorrectionPrefix(withDirectives, req.CorrectionDirective)
 
-	// When an onStopReview callback is wired (production path), build the engine
-	// directly so we can inject the cycle-scoped OnStopReview into Deps.
-	// Tests that override engineFactory leave onStopReview nil, so they continue
-	// to use the engineFactory path unchanged.
+	// The cycle-scoped OnStopReview needs this launch's own Deps, so this branch bypasses engineFactory.
 	if a.onStopReview != nil {
 		cycle := req.Cycle
 		cb := a.onStopReview
@@ -287,14 +199,9 @@ func (a *Adapter) Probe(ctx context.Context) (core.BridgeProbe, error) {
 	return a.engineFactory(nil).Probe(ctx)
 }
 
-// validate is the required-field gauntlet, projected from the engine's ONE
-// rule (gobridge.ValidateRequest) so the adapter and the engine's Launch
-// reject the same request with the same string.
 func validate(req core.BridgeRequest) error { return gobridge.ValidateRequest(req) }
 
-// resolvePolicy returns the effective interactive policy for the given agent.
-// policy.json is the explicit override surface and profilePolicy is
-// the typed profile value resolved by the runner.
+// resolvePolicy prefers a non-default policy.json value, then the profile's policy, then recommended_or_first.
 func resolvePolicy(projectRoot string, agent string, profilePolicy string) string {
 	pol := policy.InteractivePolicyFor(projectRoot, agent)
 	if pol != "recommended_or_first" {
@@ -306,33 +213,19 @@ func resolvePolicy(projectRoot string, agent string, profilePolicy string) strin
 	return PolicyRecommendedOrFirst
 }
 
-// injectPolicyPrefix prepends the policy block to the prompt body based
-// on the resolved policy. Returns the original prompt unchanged when
-// policy is "escalate" (operator opted out of auto-resolution).
-// Unknown values fall through to recommended_or_first so a typo in env
-// configuration cannot break the autonomy posture.
+// injectPolicyPrefix prepends the policy block. escalate adds none; an unknown value gets the default
+// block so a typo cannot break the loop's autonomy.
 func injectPolicyPrefix(prompt, policy string) string {
 	switch policy {
 	case PolicyEscalate:
 		return prompt
 	case PolicyAutoYes:
 		return policyBlockAutoYes + prompt
-	default: // PolicyRecommendedOrFirst and unknown values both inject the default block
+	default:
 		return policyBlockRecommendedOrFirst + prompt
 	}
 }
 
-// injectContract wraps the prompt body with the Deliverable Contract (ADR-0034)
-// when the selected protocol has a registered contract: the invariant instruction block is
-// prepended (cacheable prefix) and the volatile exact-path footer is appended
-// (last line). Agents with no contract (non-phase bridge callers) pass through
-// unchanged. The path is surfaced in the prompt TEXT here, not just in the
-// BridgeRequest.ArtifactPath flag the engine uses to poll — closing the gap that
-// forced the agent to infer its own output path.
-//
-// Resolution runs through a.resolver: built-ins always, plus spec-derived
-// contracts for user/minted phases when a catalog resolver is wired (WS-A). A
-// nil resolver (zero-value Adapter in a test) degrades to built-in-only.
 func (a *Adapter) contractResolver() phasecontract.Resolver {
 	resolver := a.resolver
 	if resolver == nil {
@@ -341,6 +234,8 @@ func (a *Adapter) contractResolver() phasecontract.Resolver {
 	return resolver
 }
 
+// injectContract puts the resolved contract's invariant block before the body and its exact-path tail after it.
+// See ADR-0034.
 func (a *Adapter) injectContract(prompt, contractID, artifactPath, workspace string) string {
 	resolver := a.contractResolver()
 	c, ok := resolver.Resolve(contractID)
@@ -348,38 +243,19 @@ func (a *Adapter) injectContract(prompt, contractID, artifactPath, workspace str
 		if artifactPath == "" {
 			return prompt
 		}
-		// Unresolved agent WITH a pollable artifact = a minted/unregistered
-		// phase. The engine will wait on artifactPath either way, so the
-		// prompt must disclose it — a naked pass-through here is exactly the
-		// cycle-1424 halt (600s artifact-timeout: the agent was never told
-		// the path). FOOTER only, not RenderContractTail: the tail embeds a
-		// `evolve phase verify <agent>` self-check that is guaranteed exit 10
-		// for a resolver-miss agent — an impossible instruction, the same
-		// class this branch exists to close (adversarial-review BLOCK).
+		// The engine polls artifactPath, so the prompt must name it. Footer only: the full tail's
+		// `evolve phase verify <agent>` self-check always exits 10 for an unregistered phase.
 		c = phasecontract.Contract{Phase: contractID, AgentName: contractID, ArtifactName: filepath.Base(artifactPath)}
 		return prompt + phasecontract.RenderContractFooter(c, artifactPath)
 	}
-	// ADR-0050 §3.8b: at >=StageAdvisory, instruct build/scout/triage to
-	// self-report failure via a structured sentinel. Gated >=advisory (NOT
-	// enforce) so the advisory soak exercises the emitted sentinels before the
-	// enforce flip; off/shadow keep the prompt byte-identical (the classifier's
-	// always-on Pass 0 must not see new sentinels in production).
+	// Off and shadow keep the prompt byte-identical: the classifier's sentinel pass is not stage-gated.
+	// See ADR-0050.
 	includePhaseIO := a.phaseIO >= config.StageAdvisory
-	// The tail is RenderContractTail, not RenderContractFooter: the footer path
-	// line is still there (byte-identical, and it stays the marker tooling greps
-	// for) but it is now followed by the XML-tagged <deliverable-contract> block
-	// that restates the machine contract AT the generation point. Claude follows
-	// turn-tail instructions more reliably than preamble ones, which is why the
-	// correction prompt — same requirements, tail placement — is what gets
-	// compliance today.
 	return phasecontract.RenderContractBlockStage(c, includePhaseIO) + prompt + phasecontract.RenderContractTail(c, artifactPath, workspace)
 }
 
-// injectRulesPrefix prepends a "## Rules" block carrying the per-agent
-// launch-time system prompt (facet B). Empty rules pass through unchanged.
-// Applied at the same seam as injectPolicyPrefix so it is CLI-agnostic —
-// headless and tmux drivers alike — and sidesteps launchCmdLine's lack of
-// shell-quoting (a multi-line system prompt never touches the launch argv).
+// injectRulesPrefix prepends the agent's launch-time system prompt as a "## Rules" block.
+// See ADR-0023.
 func injectRulesPrefix(prompt, rules string) string {
 	if rules == "" {
 		return prompt
@@ -387,16 +263,8 @@ func injectRulesPrefix(prompt, rules string) string {
 	return "## Rules\n\n" + rules + "\n\n---\n\n" + prompt
 }
 
-// injectSkillOverlays prepends the policy-resolved skill-overlay persona blocks
-// (req.Skills, materialized from <project_root>/skills/<name>/SKILL.md) to the
-// prompt at the persona altitude, so a phase agent begins its turn with the
-// configured operating discipline preloaded — CLI-agnostic (the block is plain
-// prompt text every driver receives). "Which skill for which phase agent" is
-// resolved upstream by policy (internal/policy Policy.ResolveOverlays) and
-// carried on req.Skills; this only materializes it. A configured skill that
-// cannot be resolved (missing/unreadable SKILL.md, unsafe name) is WARNed
-// loudly and the dispatch proceeds without it — never a silent drop. No
-// ProjectRoot or no Skills ⇒ prompt unchanged (byte-identical pre-feature).
+// injectSkillOverlays prepends req.Skills, read from <ProjectRoot>/skills/<name>/SKILL.md. A skill
+// that cannot be read is WARNed and skipped, never fatal.
 func injectSkillOverlays(prompt string, req core.BridgeRequest) string {
 	if req.ProjectRoot == "" || len(req.Skills) == 0 {
 		return prompt
@@ -412,11 +280,7 @@ func injectSkillOverlays(prompt string, req core.BridgeRequest) string {
 	return overlay + "---\n\n" + prompt
 }
 
-// injectCorrectionPrefix prepends a "## Correction" block carrying the
-// orchestrator's contract-correction directive (the previous deliverable was
-// rejected; fix it). Empty directive passes through unchanged. Applied at the
-// same CLI-agnostic seam as injectRulesPrefix, OUTERMOST so it lands at the very
-// top of the prompt where the agent sees the correction first.
+// injectCorrectionPrefix prepends the orchestrator's contract-correction directive as a "## Correction" block.
 func injectCorrectionPrefix(prompt, directive string) string {
 	if directive == "" {
 		return prompt
@@ -424,13 +288,7 @@ func injectCorrectionPrefix(prompt, directive string) string {
 	return "## Correction\n\n" + directive + "\n\n---\n\n" + prompt
 }
 
-// injectOperatorDirectives prepends the runtime operator-directives block (the
-// pre-rendered global + per-loop guidance snapshotted at cycle start). Empty
-// directives pass through unchanged (byte-identical to no directives). Applied at
-// the same CLI-agnostic seam as injectRulesPrefix, sitting just below Correction
-// so standing operator guidance is prominent without displacing an active
-// contract-correction. The block is already a complete "## Operator Directives"
-// section (rendered by internal/directives), so it is prepended verbatim.
+// injectOperatorDirectives prepends the already-rendered "## Operator Directives" block verbatim.
 func injectOperatorDirectives(prompt, directives string) string {
 	if directives == "" {
 		return prompt
@@ -438,21 +296,15 @@ func injectOperatorDirectives(prompt, directives string) string {
 	return directives + "\n\n---\n\n" + prompt
 }
 
-// SetModelCatalogDirFn sets the model-catalog directory resolver in the inner bridge.
-// Called by cmd/evolve to inject the active cycle's evolve directory without
-// touching the process environment.
+// SetModelCatalogDirFn sets the inner bridge's process-wide model-catalog directory resolver.
 func SetModelCatalogDirFn(fn func() string) {
 	gobridge.SetModelCatalogDirFn(fn)
 }
 
-// SignalsWired reports whether a Signal Center was injected at construction —
-// the composition root's wiring proof (ADR-0101 S3).
+// SignalsWired reports whether a Signal Center was injected at construction.
 func (a *Adapter) SignalsWired() bool { return a.signals != nil }
 
-// Signals is the carrier's read seam (ADR-0103 unit 11): the phase runner
-// adopts the Center the injected Adapter carries, so every runner built over
-// the production bridge reports into the root's Center without a fifteen-site
-// wiring change. Nil for the Null Object; a nil receiver reads the same way.
+// Signals returns the injected Signal Center for the phase runner to adopt; nil for the Null Object and a nil receiver.
 func (a *Adapter) Signals() *signalcenter.Center {
 	if a == nil {
 		return nil

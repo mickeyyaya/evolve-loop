@@ -7,10 +7,6 @@ import (
 	"testing"
 )
 
-// TestState_RoundTrip pins the on-disk shape of state.json: a fully-populated
-// State must marshal and unmarshal back to an equal value, and the wire field
-// names (the byte-identity boundary that the ledger SHA-chain and resume path
-// depend on) must be exactly as declared.
 func TestState_RoundTrip(t *testing.T) {
 	in := State{
 		LastUpdated:              "2026-06-21T00:00:00Z",
@@ -34,10 +30,7 @@ func TestState_RoundTrip(t *testing.T) {
 	if !reflect.DeepEqual(in, out) {
 		t.Errorf("round-trip mismatch:\n in=%+v\nout=%+v", in, out)
 	}
-	// Byte-identity guard: the State wire names AND the sub-record wire names
-	// (BatchAccrual/FailedRecord/CarryoverTodo/TriageThroughputEntry) must be
-	// exactly these — a tag rename that still produced an equal Go value would
-	// slip past the round-trip DeepEqual above.
+	// DeepEqual cannot see a tag rename; only the wire names can.
 	for _, want := range []string{
 		`"lastCycleNumber"`, `"failedApproaches"`, `"carryoverTodos"`, `"currentBatch"`,
 		`"cycleAccruedCostUSD"`, `"retrospected"`, `"first_seen_cycle"`, `"floors"`,
@@ -48,7 +41,6 @@ func TestState_RoundTrip(t *testing.T) {
 	}
 }
 
-// TestCycleState_RoundTrip pins the snake_case wire shape of cycle-state.json.
 func TestCycleState_RoundTrip(t *testing.T) {
 	in := CycleState{
 		CycleID:         9,
@@ -81,8 +73,6 @@ func TestCycleState_RoundTrip(t *testing.T) {
 	}
 }
 
-// TestStateOmitempty guards that the optional fields drop out of a zero State —
-// pre-feature state.json files must stay byte-clean (no spurious keys).
 func TestStateOmitempty(t *testing.T) {
 	b, err := json.Marshal(State{})
 	if err != nil {

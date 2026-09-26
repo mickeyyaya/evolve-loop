@@ -6,20 +6,6 @@ import (
 	"testing"
 )
 
-// compaction_coverage_test.go — RED contract for cycle-416 task prompt-compaction-coverage-gate.
-//
-// Regression guard: every per-cycle phase agent must have a ## Reference Index heading so
-// StripOnDemandSections fires on every cycle dispatch. Fails loudly naming any agent whose
-// marker is missing or whose body is not strictly shortened.
-//
-// RED state (before builder): evolve-intent.md has no ## Reference Index heading;
-// StripOnDemandSections returns its body unchanged — len(stripped) == len(body) → FAIL for intent.
-
-// TestAllPerCycleAgentsStrictlyCompact asserts that every per-cycle phase agent's prompt body
-// is strictly shortened by StripOnDemandSections (marker present + tail non-empty).
-// A regression: if any agent loses its ## Reference Index heading, this test fails loudly
-// naming the specific agent, preventing silent per-cycle token re-inflation.
-// RED: evolve-intent has no heading → stripped==body → len(stripped) < len(body) is false → FAIL.
 func TestAllPerCycleAgentsStrictlyCompact(t *testing.T) {
 	root := repoRoot(t)
 	perCycleAgents := []string{
@@ -49,11 +35,6 @@ func TestAllPerCycleAgentsStrictlyCompact(t *testing.T) {
 	}
 }
 
-// TestCompactionCoverage_MarkerlessBodyUnchanged_Negative asserts that a body with no
-// ## Reference Index heading is returned byte-for-byte unchanged by StripOnDemandSections.
-// This confirms the gate logic: only bodies WITH a marker are shortened; a markerless body
-// reaching this function means the agent was not updated — the test above will catch it.
-// Pre-existing GREEN: StripOnDemandSections already handles this correctly.
 func TestCompactionCoverage_MarkerlessBodyUnchanged_Negative(t *testing.T) {
 	body := "# Agent\n\nOperational content.\n\nMore rules.\n"
 	stripped := StripOnDemandSections(body)

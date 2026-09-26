@@ -1,31 +1,20 @@
 package policy
 
-// Chronicle S2 (chronicle-s2-digest-writer): the .evolve/policy.json
-// "chronicle" block, mirroring the GatesPolicy default-then-override idiom.
-// Lives in its own file because policy.go is already 1500+ lines.
-//
-// Stages are policy-driven (shadow/enforce/off), NOT feature flags: compiled
-// defaults apply when the block is absent, and a present block overrides only
-// the fields it sets. Bump step / cap / autofile weight / historian cap stay
-// compiled constants in their owning packages, by design.
-
-// ChroniclePolicy is the .evolve/policy.json "chronicle" block.
+// ChroniclePolicy is the "chronicle" block of recurrence-chronicle stages and digest budgets.
 type ChroniclePolicy struct {
-	// Digest is the recent-outcomes digest stage: "shadow" (default — write
-	// the artifact, don't inject it), "enforce", or "off".
+	// Digest is "shadow" (default: write the digest, do not inject it), "enforce" or "off".
 	Digest string `json:"digest,omitempty"`
-	// DigestTokens caps the rendered digest (len/4 estimator). Default 1200.
+	// DigestTokens caps the rendered digest, estimated as len/4; default 1200.
 	DigestTokens int `json:"digest_tokens,omitempty"`
-	// DigestCycles caps the dossier window. Default 10.
+	// DigestCycles caps the dossier window; default 10.
 	DigestCycles int `json:"digest_cycles,omitempty"`
-	// Escalation is the recurrence-escalation stage. Default "shadow".
+	// Escalation is the recurrence-escalation stage; default "shadow".
 	Escalation string `json:"escalation,omitempty"`
-	// Historian is the historian phase stage. Default "off".
+	// Historian is the historian phase stage; default "off".
 	Historian string `json:"historian,omitempty"`
 }
 
-// ChronicleConfig is the resolved chronicle configuration with the compiled
-// defaults applied.
+// ChronicleConfig is the resolved chronicle configuration with the compiled defaults applied.
 type ChronicleConfig struct {
 	Digest       string
 	DigestTokens int
@@ -34,9 +23,7 @@ type ChronicleConfig struct {
 	Historian    string
 }
 
-// ChronicleConfig resolves the chronicle block against the compiled defaults:
-// digest=shadow, digest_tokens=1200, digest_cycles=10, escalation=shadow,
-// historian=off. An absent (or empty) block resolves to exactly the defaults.
+// ChronicleConfig resolves the chronicle block; an absent or empty block yields exactly the defaults.
 func (p Policy) ChronicleConfig() ChronicleConfig {
 	c := ChronicleConfig{
 		Digest:       "shadow",

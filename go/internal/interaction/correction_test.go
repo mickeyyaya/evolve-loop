@@ -1,7 +1,5 @@
 package interaction_test
 
-// ADR-0045 I2 — the pure correction-ladder decision (§8 RED tests).
-
 import (
 	"testing"
 
@@ -16,10 +14,6 @@ func fullBudget(redispatch int) map[string]int {
 	}
 }
 
-// TestNextCorrection_OrderIsLoadBearing — cheapest repair first: with every
-// budget available (and rung-2 preconditions met), the ladder walks
-// salvage → live_fix → redispatch; with all spent it yields "" (abort as
-// today). Every decision carries a justification.
 func TestNextCorrection_OrderIsLoadBearing(t *testing.T) {
 	t.Parallel()
 	in := interaction.CorrectionInput{
@@ -55,10 +49,6 @@ func TestNextCorrection_OrderIsLoadBearing(t *testing.T) {
 	}
 }
 
-// TestRung2_RequiresNamedSession_ElseSkipsToRedispatch — the H1 lifecycle
-// constraint: live_fix needs a NAMED session preserved through the review
-// gate AND an idle pane. Unnamed ⇒ rung 3; busy ⇒ rung 3 (never touch a
-// working agent).
 func TestRung2_RequiresNamedSession_ElseSkipsToRedispatch(t *testing.T) {
 	t.Parallel()
 	base := interaction.CorrectionInput{
@@ -86,8 +76,6 @@ func TestRung2_RequiresNamedSession_ElseSkipsToRedispatch(t *testing.T) {
 	})
 }
 
-// TestNextCorrection_BudgetsExhaust — zero/negative/missing budgets are all
-// "spent"; a nil budget map decides nothing (the caller aborts as today).
 func TestNextCorrection_BudgetsExhaust(t *testing.T) {
 	t.Parallel()
 	in := interaction.CorrectionInput{Phase: "build", Violation: "v"}

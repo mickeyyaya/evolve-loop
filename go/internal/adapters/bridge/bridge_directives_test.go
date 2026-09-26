@@ -8,16 +8,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// bridge_directives_test.go — runtime operator-directives block: the pre-rendered
-// global + per-loop guidance injected at the same CLI-agnostic seam as
-// injectRulesPrefix, sitting just below Correction and above Rules.
-
 func TestInjectOperatorDirectives(t *testing.T) {
-	// Empty = identity (off path byte-identical).
 	if got := injectOperatorDirectives("BODY", ""); got != "BODY" {
 		t.Errorf("empty directives must pass through, got %q", got)
 	}
-	// Non-empty prepends the (already-rendered) block above the body.
 	block := "## Operator Directives\n\nBe env-agnostic."
 	got := injectOperatorDirectives("BODY", block)
 	if !strings.HasPrefix(got, block) {
@@ -28,8 +22,6 @@ func TestInjectOperatorDirectives(t *testing.T) {
 	}
 }
 
-// Order: Correction (outermost) > Operator Directives > Rules > Body, mirroring
-// Adapter.Launch's assembly seam.
 func TestOperatorDirectivesComposeOrder(t *testing.T) {
 	withRules := injectRulesPrefix("BODY", "RULE TEXT")
 	withDirectives := injectOperatorDirectives(withRules, "## Operator Directives\n\nDIR")
@@ -44,8 +36,6 @@ func TestOperatorDirectivesComposeOrder(t *testing.T) {
 	}
 }
 
-// TestLaunch_InjectsOperatorDirectives proves the REAL Adapter.Launch path injects
-// the block when the BridgeRequest carries OperatorDirectives.
 func TestLaunch_InjectsOperatorDirectives(t *testing.T) {
 	fe := &fakeEngine{}
 	_, err := withEngine(fe).Launch(context.Background(), core.BridgeRequest{
@@ -67,8 +57,6 @@ func TestLaunch_InjectsOperatorDirectives(t *testing.T) {
 	}
 }
 
-// TestLaunch_NoOperatorDirectives_WhenEmpty — default path: no directives ⇒ no
-// block (byte-identical to pre-feature launches).
 func TestLaunch_NoOperatorDirectives_WhenEmpty(t *testing.T) {
 	fe := &fakeEngine{}
 	_, err := withEngine(fe).Launch(context.Background(), core.BridgeRequest{

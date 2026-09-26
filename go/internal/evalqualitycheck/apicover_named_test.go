@@ -6,12 +6,6 @@ import (
 	"testing"
 )
 
-// TestCheck_BindsResultAndClassifiedLine binds the Result and ClassifiedLine
-// output structs to their real producer, Check. A single-command eval whose one
-// fenced bash line is the `:` tautology must classify as LevelHalt, and Check
-// must surface that both in Result.Overall and in the per-command
-// ClassifiedLine breakdown (Line/Level/Reason), proving the structs carry the
-// classifier's real verdict rather than just being named.
 func TestCheck_BindsResultAndClassifiedLine(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "eval.md")
@@ -39,13 +33,6 @@ func TestCheck_BindsResultAndClassifiedLine(t *testing.T) {
 	}
 }
 
-// TestCheckDiversity_BindsDiversityStructs binds the DiversityResult and
-// EvalDiversity output structs to their real producer, CheckDiversity. A
-// two-file suite — one positive-only eval and one with a shell-level negation
-// (`! grep ...`) — must count one negative case and therefore PASS, and the
-// per-file EvalDiversity fingerprint must flag exactly the negative file's
-// HasNegative. This asserts the diversity scorer's real contract through the
-// structs.
 func TestCheckDiversity_BindsDiversityStructs(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "pos.md"),
@@ -71,15 +58,12 @@ func TestCheckDiversity_BindsDiversityStructs(t *testing.T) {
 	if res.NegativeCaseCount != 1 {
 		t.Errorf("NegativeCaseCount = %d, want 1", res.NegativeCaseCount)
 	}
-	// A suite with ≥1 negative case PASSes (the negative case is the
-	// highest-precision adversarial signal).
 	if res.Level != DiversityPass {
 		t.Errorf("Level = %v, want DiversityPass (one negative case present)", res.Level)
 	}
 	if len(res.Files) != 2 {
 		t.Fatalf("Files = %d, want 2 per-file fingerprints", len(res.Files))
 	}
-	// Exactly one of the two EvalDiversity fingerprints must carry HasNegative.
 	negFiles := 0
 	for _, f := range res.Files {
 		var _ EvalDiversity = f // bind the per-file struct type

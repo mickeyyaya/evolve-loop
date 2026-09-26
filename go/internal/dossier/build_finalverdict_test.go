@@ -2,12 +2,6 @@ package dossier
 
 import "testing"
 
-// These tests cover BuildOpts.FinalVerdict — the extension that lets the cycle
-// producer (core.RunCycle, ADR-0055) record a cycle's REAL outcome instead of an
-// always-PASS skeleton. A FAIL dossier must still satisfy Validate (>=1 defect +
-// >=1 carryover), so Build synthesizes a minimal, truthful pair pointing at the
-// audit artifacts rather than fabricating a PASS for a failed cycle.
-
 func TestBuild_FinalVerdictDefaultsToPass(t *testing.T) {
 	d, err := Build(1, BuildOpts{WorkspacePath: "/w", Goal: "g"})
 	if err != nil {

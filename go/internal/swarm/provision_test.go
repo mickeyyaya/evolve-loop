@@ -11,9 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/runscope"
 )
 
-// integBranchFor / workerBranchFor / cycleBranchFor are the runscope-derived
-// expected names a test asserts against — the single source the production
-// provisioner now mints, so the tests cannot drift from the impl.
 func integBranchFor(root string, cycle int) string {
 	return runscope.New(runscope.LaneFromRoot(root), "", cycle).IntegrationBranch()
 }
@@ -21,7 +18,6 @@ func workerBranchFor(root string, cycle int, workerID string) string {
 	return runscope.New(runscope.LaneFromRoot(root), "", cycle).WorkerBranch(workerID)
 }
 
-// gitInit makes a throwaway repo with one commit so `git worktree add` works.
 func gitInit(t *testing.T) string {
 	t.Helper()
 	if _, err := exec.LookPath("git"); err != nil {
@@ -70,8 +66,6 @@ func TestGitWorkerProvisioner_IntegrationAndWorkers(t *testing.T) {
 		t.Errorf("integration branch = %q, want %q", branchOf(t, integ), integBranch)
 	}
 
-	// Workers branch off the integration branch with a NAMED branch (symbolic-ref
-	// resolvable, required by merge-train/ship).
 	w0, err := p.CreateWorker(ctx, root, 5, "w0", integBranch)
 	if err != nil {
 		t.Fatal(err)
@@ -86,7 +80,6 @@ func TestGitWorkerProvisioner_IntegrationAndWorkers(t *testing.T) {
 	if w0 == w1 {
 		t.Error("workers must get distinct worktrees")
 	}
-	// linkGuardDeps ran for each provisioned worktree.
 	if len(linked) != 3 {
 		t.Errorf("linkGuardDeps should run per worktree (3), got %d", len(linked))
 	}
@@ -102,7 +95,7 @@ func TestGitWorkerProvisioner_CreateWorkerIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, err := p.CreateWorker(ctx, root, 1, "w0", integBranch) // reuse
+	b, err := p.CreateWorker(ctx, root, 1, "w0", integBranch)
 	if err != nil {
 		t.Fatalf("idempotent re-create failed: %v", err)
 	}
@@ -127,15 +120,11 @@ func TestGitWorkerProvisioner_Cleanup(t *testing.T) {
 	if _, err := os.Stat(w0); !os.IsNotExist(err) {
 		t.Errorf("worktree should be gone after cleanup, stat err=%v", err)
 	}
-	// Cleanup of empty path is a no-op.
 	if err := p.Cleanup(ctx, root, ""); err != nil {
 		t.Errorf("cleanup of empty path should be no-op, got %v", err)
 	}
 }
 
-// branchExistsSwarm lists local branches matching name — the real-git ground
-// truth mirror of core's branchExists, for the S3 (workspace-hygiene plan)
-// branch-delete-on-Cleanup guard swarm must carry too.
 func branchExistsSwarm(t *testing.T, root, name string) bool {
 	t.Helper()
 	out, err := exec.Command("git", "-C", root, "branch", "--list", name).Output()
@@ -145,11 +134,6 @@ func branchExistsSwarm(t *testing.T, root, name string) bool {
 	return strings.TrimSpace(string(out)) != ""
 }
 
-// TestGitWorkerProvisioner_Cleanup_DeletesMergedBranch (S3): a worker branch
-// that never diverged from the integration branch's base is trivially merged
-// into main, so Cleanup must delete it — mirroring core.gitWorktree.Cleanup's
-// same guard (this package cannot depend on core, so the logic is
-// independently mirrored per the plan's stated design).
 func TestGitWorkerProvisioner_Cleanup_DeletesMergedBranch(t *testing.T) {
 	root := gitInit(t)
 	ctx := context.Background()
@@ -175,9 +159,6 @@ func TestGitWorkerProvisioner_Cleanup_DeletesMergedBranch(t *testing.T) {
 	}
 }
 
-// TestGitWorkerProvisioner_Cleanup_UnmergedBranchSurvives (S3): a worker
-// branch carrying a commit never merged back to main must survive Cleanup —
-// git's own `branch -d` merge-check is the safety net, never escalated to `-D`.
 func TestGitWorkerProvisioner_Cleanup_UnmergedBranchSurvives(t *testing.T) {
 	root := gitInit(t)
 	ctx := context.Background()
@@ -215,10 +196,8 @@ func TestGitWorkerProvisioner_Cleanup_UnmergedBranchSurvives(t *testing.T) {
 	}
 }
 
-// TestWorktreeBase_AbsoluteOverride covers the policy.json worktree.base override
-// path. An absolute override is honored verbatim with no error.
 func TestWorktreeBase_AbsoluteOverride(t *testing.T) {
-	custom := filepath.Join(t.TempDir(), "custom-base") // t.TempDir is absolute
+	custom := filepath.Join(t.TempDir(), "custom-base")
 	got, err := worktreeBase(custom, "/some/project")
 	if err != nil {
 		t.Fatalf("absolute override must not error, got %v", err)
@@ -228,8 +207,6 @@ func TestWorktreeBase_AbsoluteOverride(t *testing.T) {
 	}
 }
 
-// TestWorktreeBase_DefaultPath covers the default (no env) path. The default is
-// rooted at the absolute projectRoot, so it returns no error.
 func TestWorktreeBase_DefaultPath(t *testing.T) {
 	got, err := worktreeBase("", "/proj")
 	if err != nil {
@@ -240,13 +217,6 @@ func TestWorktreeBase_DefaultPath(t *testing.T) {
 	}
 }
 
-// TestWorktreeBase_RelativeOverrideReturnsError pins the inbox-defect closure
-// (swarm-tests-relative-worktree-base): the guard refusing a non-absolute base
-// must live in worktreeBase ITSELF — not only one call-site deeper in
-// addWorktree. A relative worktree.base override must make worktreeBase return a
-// ("", error) whose message identifies the base must be absolute, BEFORE any
-// caller touches git/MkdirAll. This is the negative (anti-no-op) axis: a build
-// that leaves worktreeBase returning the relative string verbatim fails here.
 func TestWorktreeBase_RelativeOverrideReturnsError(t *testing.T) {
 	got, err := worktreeBase("relative-worktrees", "/some/project")
 	if err == nil {
@@ -260,18 +230,6 @@ func TestWorktreeBase_RelativeOverrideReturnsError(t *testing.T) {
 	}
 }
 
-// TestWorktreeBase_RelativeProjectRootRefused pins the LAST gap of the
-// swarm-tests-relative-worktree-base inbox defect (cycle-297). Cycle 296 moved
-// the IsAbs guard into worktreeBase, but only on the override branch. The
-// DEFAULT branch still returned
-// filepath.Join(projectRoot, ".evolve", "worktrees") verbatim — which is
-// RELATIVE when projectRoot is relative (e.g. "."). A relative worktree base
-// breaks `git worktree add` (resolved against an unintended cwd) and the
-// tree-diff guard. With no override, worktreeBase("", ".") must return
-// ("", error) whose message identifies that the base/root must be absolute,
-// BEFORE any caller touches git/MkdirAll. This is the negative (anti-no-op)
-// axis: the RED baseline returned ".evolve/worktrees" with a nil error, so this
-// test fails until the default branch also guards IsAbs.
 func TestWorktreeBase_RelativeProjectRootRefused(t *testing.T) {
 	got, err := worktreeBase("", ".")
 	if err == nil {
@@ -300,12 +258,10 @@ func TestAddWorktree_RelativeBaseRefused(t *testing.T) {
 	}
 }
 
-// TestCreateWorker_EmptyIntegrationBranch covers the empty-integrationBranch fallback.
 func TestCreateWorker_EmptyIntegrationBranch(t *testing.T) {
 	root := gitInit(t)
 	ctx := context.Background()
 	p := NewGitWorkerProvisioner(nil, "")
-	// Empty integrationBranch → falls back to "HEAD"
 	wt, err := p.CreateWorker(ctx, root, 9, "w0", "")
 	if err != nil {
 		t.Fatalf("CreateWorker with empty integrationBranch: %v", err)
@@ -315,21 +271,16 @@ func TestCreateWorker_EmptyIntegrationBranch(t *testing.T) {
 	}
 }
 
-// TestAddWorktree_StaleStubRemoved covers the stale-directory teardown path in
-// addWorktree: when the path exists but is NOT a valid git worktree (missing
-// .git), git worktree add -B would fail. The impl removes the stub and retries.
 func TestAddWorktree_StaleStubRemoved(t *testing.T) {
 	root := gitInit(t)
 	base := filepath.Join(root, ".evolve", "worktrees")
 	ctx := context.Background()
 
-	// Pre-create a stale stub at the EXACT path CreateWorker will target, so the
-	// teardown path is actually exercised.
+	// The stub sits at the exact path CreateWorker targets, so the teardown path really runs.
 	stub := filepath.Join(base, workerBranchFor(root, 7, "w0"))
 	if err := os.MkdirAll(stub, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	// Write a dummy file to confirm the stub is not silently kept.
 	if err := os.WriteFile(filepath.Join(stub, "stale.txt"), []byte("old"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -339,7 +290,6 @@ func TestAddWorktree_StaleStubRemoved(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateWorker with stale stub: %v", err)
 	}
-	// The stale file must have been swept away.
 	if _, err := os.Stat(filepath.Join(wt, "stale.txt")); !os.IsNotExist(err) {
 		t.Error("stale stub content should have been removed before worktree re-creation")
 	}

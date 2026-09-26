@@ -2,20 +2,17 @@ package policy
 
 import "github.com/mickeyyaya/evolve-loop/go/internal/config"
 
+// ReportBudgetPolicy is the "report_budget" block, dialed separately from the report-size gate's stage.
 type ReportBudgetPolicy struct {
 	HandoffTokens int `json:"handoff_tokens,omitempty"`
 }
 
-// ReportBudgetConfig is the resolved report-budget configuration with defaults
-// applied. HandoffTokens is the ~2K default token budget for the never-evict
-// "## Handoff Summary" section (policy-sourced per phase_settings_from_config_not_code).
+// ReportBudgetConfig holds the resolved token budget for the never-evicted "## Handoff Summary" section.
 type ReportBudgetConfig struct {
 	HandoffTokens int
 }
 
-// ReportBudgetConfig returns the report-size token budgets with built-in
-// defaults resolved. An absent or empty report_budget block resolves the 2000
-// default; an explicit positive value overrides it.
+// ReportBudgetConfig returns the report budgets, defaulting HandoffTokens to 2000.
 func (p Policy) ReportBudgetConfig() ReportBudgetConfig {
 	c := ReportBudgetConfig{HandoffTokens: 2000}
 	if p.ReportBudget == nil {
@@ -27,19 +24,12 @@ func (p Policy) ReportBudgetConfig() ReportBudgetConfig {
 	return c
 }
 
-// RetroAutofilePolicy is the .evolve/policy.json "retro_autofile" block. It
-// tunes the retro→inbox preventive-actions autofiler (internal/retrofile):
-// DefaultWeight is the weight applied to a filed preventive-action item that
-// carries no per-action weight_hint. Absent ⇒ the compiled-in safe default.
+// RetroAutofilePolicy is the "retro_autofile" block; DefaultWeight applies to preventive actions without a weight_hint.
 type RetroAutofilePolicy struct {
 	DefaultWeight float64 `json:"default_weight,omitempty"`
 }
 
-// RetroAutofileDefaultWeight returns the default weight for auto-filed retro
-// preventive-action inbox items. Absent/non-positive block ⇒ 0.75 (the
-// compiled-in safe default); a present positive DefaultWeight overrides it.
-// Sourced from policy, never a Go literal at the call site
-// (feedback_phase_settings_from_config_not_code).
+// RetroAutofileDefaultWeight returns the weight for auto-filed retro preventive actions, defaulting to 0.75.
 func (p Policy) RetroAutofileDefaultWeight() float64 {
 	const safeDefault = 0.75
 	if p.RetroAutofile == nil || p.RetroAutofile.DefaultWeight <= 0 {
@@ -48,23 +38,14 @@ func (p Policy) RetroAutofileDefaultWeight() float64 {
 	return p.RetroAutofile.DefaultWeight
 }
 
-// GoalStallPolicy is the .evolve/policy.json "goal_stall" block. It tunes the
-// goal-stall escalation (cmd/evolve/cmd_loop_goalstall.go): Threshold is the
-// number of CONSECUTIVE empty/blocked cycles on one goal after which the loop
-// stops blind re-dispatch and self-files an inbox todo; NonprogressThreshold is
-// the same ceiling for the WIDER union class (any cycle that shipped nothing,
-// FAIL included); Weight is that todo's weight. Absent ⇒ the compiled-in safe
-// defaults.
+// GoalStallPolicy is the "goal_stall" block for the goal-stall escalation.
 type GoalStallPolicy struct {
 	Threshold            int     `json:"threshold,omitempty"`
 	NonprogressThreshold int     `json:"nonprogress_threshold,omitempty"`
 	Weight               float64 `json:"weight,omitempty"`
 }
 
-// GoalStallThreshold returns the consecutive non-shipping-cycle count that
-// triggers goal-stall escalation. Absent/non-positive block ⇒ 3 (the compiled-in
-// safe default); a present positive Threshold overrides it. Sourced from policy,
-// never a Go literal at the call site (feedback_phase_settings_from_config_not_code).
+// GoalStallThreshold returns how many consecutive empty or blocked cycles on one goal trigger escalation, defaulting to 3.
 func (p Policy) GoalStallThreshold() int {
 	const safeDefault = 3
 	if p.GoalStall == nil || p.GoalStall.Threshold <= 0 {
@@ -73,17 +54,9 @@ func (p Policy) GoalStallThreshold() int {
 	return p.GoalStall.Threshold
 }
 
-// GoalStallNonprogressThreshold returns the consecutive NON-SHIPPING-cycle count
-// (any outcome that is not PASS / SHIPPED_VIA_BUILD — FAIL, WARN, empty and
-// blocked alike) that triggers the union non-progress escalation. It exists
-// because the empty-only goal-stall counter and the consecutive-FAIL breaker each
-// RESET on the other's outcome, so an interleaved FAIL,EMPTY,FAIL,EMPTY goal
-// crossed neither ceiling and ground on forever. Absent/non-positive block ⇒ 5,
-// deliberately ABOVE the empty-only default of 3: a mixed streak is noisier
-// evidence (a FAIL at least produced a signal), so it gets more rope. Sourced
-// from policy, never a Go literal at the call site
-// (feedback_phase_settings_from_config_not_code).
+// GoalStallNonprogressThreshold returns how many consecutive non-shipping cycles of any outcome trigger escalation.
 func (p Policy) GoalStallNonprogressThreshold() int {
+	// Above the empty-only default of 3: a mixed FAIL/EMPTY streak is noisier evidence.
 	const safeDefault = 5
 	if p.GoalStall == nil || p.GoalStall.NonprogressThreshold <= 0 {
 		return safeDefault
@@ -91,13 +64,7 @@ func (p Policy) GoalStallNonprogressThreshold() int {
 	return p.GoalStall.NonprogressThreshold
 }
 
-// GoalStallWeight returns the weight applied to a self-filed goal-stall inbox
-// todo. Absent/non-positive block ⇒ 0.9 (a stalled goal is a high-priority
-// self-prioritization signal, never a low-weight afterthought). A present
-// positive Weight raises it above 0.9; the item-build layer independently
-// re-floors any value below 0.9 back UP to 0.9 (goalStallWeightFloor), so a
-// config value under 0.9 is accepted here but does not take effect — the
-// effective floor is always 0.9 regardless of config.
+// GoalStallWeight returns the goal-stall todo's weight, defaulting to 0.9; the item builder re-floors lower values to 0.9.
 func (p Policy) GoalStallWeight() float64 {
 	const safeDefault = 0.9
 	if p.GoalStall == nil || p.GoalStall.Weight <= 0 {
@@ -106,19 +73,13 @@ func (p Policy) GoalStallWeight() float64 {
 	return p.GoalStall.Weight
 }
 
-// SandboxPolicy is the .evolve/policy.json "sandbox" block. NestedFallback
-// selects the verified-fallback rollout stage for nested runs where the inner
-// OS sandbox can't apply: "off" (default — no canary), "shadow" (run the
-// write-canary and WARN if the outer environment is unverified), or "enforce"
-// (HALT the batch if unverified). Resolved to a config.Stage via parseGateStage
-// at the composition root; unknown values map to off (canary disabled).
+// SandboxPolicy is the "sandbox" block.
 type SandboxPolicy struct {
+	// NestedFallback stages the nested-run write-canary: "off" (default), "shadow" (WARN) or "enforce" (HALT).
 	NestedFallback string `json:"nested_fallback,omitempty"`
 }
 
-// SandboxConfig returns sandbox configuration with built-in defaults resolved.
-// Empty/absent NestedFallback ⇒ "off" (canary opt-in; a fresh policy.json never
-// runs the write-canary nor halts a nested run).
+// SandboxConfig returns the sandbox block, defaulting NestedFallback to "off".
 func (p Policy) SandboxConfig() SandboxPolicy {
 	c := SandboxPolicy{NestedFallback: "off"}
 	if p.Sandbox == nil {
@@ -130,35 +91,19 @@ func (p Policy) SandboxConfig() SandboxPolicy {
 	return c
 }
 
-// RecoveryPolicy is the .evolve/policy.json "recovery" block.
-// It surfaces the ADR-0044 Unified Phase Recovery rollout stage so operators
-// can set phase_recovery = "enforce" in policy.json without an env var, and
-// (R8.5, 2026-07-16) the artifact-backed spine floor's OWN dial — split from
-// phase_recovery because that stage ALSO arms the bidirectional channel
-// (ADR-0045 I6) and the failure-adviser promotion path (see
-// config.RolloutStages.SpineFloor for the full decoupling rationale), and
-// (F27, 2026-09-26) the ADR-0044 C2 fatal-pane fast-fail's OWN dial, split
-// the same way (see config.RolloutStages.FatalPane).
+// RecoveryPolicy is the "recovery" block of phase-recovery rollout stages.
+// See ADR-0044.
 type RecoveryPolicy struct {
+	// PhaseRecovery also arms the bidirectional channel and adviser promotion, so the two floors below have their own dials.
 	PhaseRecovery string `json:"phase_recovery,omitempty"`
-	// SpineFloor gates ONLY the clean-absence handoff-gap abort:
-	// "enforce" (default) aborts the cycle; "shadow" WARN-and-proceeds (the
-	// no-recompile escape hatch); anything else parses to off ≡ shadow (the
-	// gate never acts below enforce).
+	// SpineFloor gates only the clean-absence handoff-gap abort; below "enforce" it WARNs and proceeds.
 	SpineFloor string `json:"spine_floor,omitempty"`
-	// FatalPane gates ONLY the stop-review checkpoint's fatal-pane fast-fail:
-	// "enforce" (default) ends the wait in one interval on a persisted,
-	// non-Busy fatal pane match; "shadow" records would_fast_fail and lets
-	// the reviewer decide (the no-recompile escape hatch); "off" skips the
-	// detector entirely.
+	// FatalPane gates only the stop-review fatal-pane fast-fail: "enforce" ends the wait,
+	// "shadow" records would_fast_fail, "off" skips the detector.
 	FatalPane string `json:"fatal_pane,omitempty"`
 }
 
-// RecoveryConfig returns recovery configuration with built-in defaults resolved.
-// Empty/absent PhaseRecovery ⇒ "shadow" (behavior-neutral first-ship default);
-// empty/absent SpineFloor ⇒ "enforce" (the R8.5 flip — replay-evidenced; see
-// config.defaults()); empty/absent FatalPane ⇒ "enforce" (the F27 flip —
-// soak-evidenced: every shadow match was a dead pane; see config.defaults()).
+// RecoveryConfig returns the recovery block, defaulting to shadow phase recovery and enforced SpineFloor and FatalPane.
 func (p Policy) RecoveryConfig() RecoveryPolicy {
 	c := RecoveryPolicy{PhaseRecovery: "shadow", SpineFloor: "enforce", FatalPane: "enforce"}
 	if p.Recovery == nil {
@@ -176,34 +121,23 @@ func (p Policy) RecoveryConfig() RecoveryPolicy {
 	return c
 }
 
-// BridgeRecoveryStages returns the two ADR-0044 recovery dials as the canonical
-// stage words every production bridge Deps builder that does not go through the
-// Loader injects (adapters/bridge.NewDefault, the subagent root). Each word is
-// parsed by config.GateStage — the Loader's own trichotomy parser — so a policy
-// word resolves to the SAME stage on every root (F27 architecture review: one
-// parser, no root-specific case-folding; an unknown word is off, never enforce).
+// BridgeRecoveryStages returns the phase-recovery and fatal-pane stage words for bridge roots that bypass the Loader.
 func (p Policy) BridgeRecoveryStages() (recovery, fatalPane string) {
 	rc := p.RecoveryConfig()
+	// The Loader's own parser, so every root resolves a word identically and an unknown word is off.
 	r, _ := config.GateStage(rc.PhaseRecovery)
 	f, _ := config.GateStage(rc.FatalPane)
 	return r.String(), f.String()
 }
 
-// DocsFloorPolicy is the .evolve/policy.json "docs_floor" block — the
-// config-as-code dial (no flag) for the ADR-0077 documentation floor, shaped
-// exactly like the SpineFloor dial it is modeled on.
+// DocsFloorPolicy is the "docs_floor" block for the documentation floor.
+// See ADR-0077.
 type DocsFloorPolicy struct {
-	// Stage selects the rollout stage: "off" / "shadow" / "enforce".
-	// Empty/absent ⇒ "enforce". Unlike the spine floor, "enforce" here still
-	// only WARNs (see internal/docsfloor): the mechanical half of the rule is
-	// "is there a doc at all", and judging adequacy stays with the auditor.
-	// "off" is the no-recompile escape hatch for a lane that legitimately
-	// churns architecture surfaces without a doc delta.
+	// Stage is "off", "shadow" or "enforce" (default); even "enforce" only WARNs.
 	Stage string `json:"stage,omitempty"`
 }
 
-// DocsFloorConfig returns docs-floor configuration with the built-in default
-// resolved: empty/absent Stage ⇒ "enforce".
+// DocsFloorConfig returns the docs_floor block, defaulting Stage to "enforce".
 func (p Policy) DocsFloorConfig() DocsFloorPolicy {
 	c := DocsFloorPolicy{Stage: "enforce"}
 	if p.DocsFloor == nil {
@@ -215,32 +149,19 @@ func (p Policy) DocsFloorConfig() DocsFloorPolicy {
 	return c
 }
 
-// MergeGatePolicy is the .evolve/policy.json "merge_gate" block — the config-as-code
-// surface for the merge-to-main gate (no flags). Stage drives the
-// shadow→advisory→enforce rollout; the remaining fields are the cadence-scaling
-// thresholds the advisor reads to decide when accumulated milestone work is
-// promoted to main.
+// MergeGatePolicy is the "merge_gate" block: the merge-to-main gate's stage and cadence thresholds.
+// See ADR-0057.
 type MergeGatePolicy struct {
-	// Stage selects the rollout stage: "off" / "shadow" / "advisory" / "enforce".
-	// Empty/absent ⇒ "shadow" (gate runs and records its would-be verdict but
-	// promotes nothing — byte-neutral first deploy over the riskiest action). The
-	// composition root translates this string to a config.Stage via parseStage,
-	// whose closed vocabulary maps any UNKNOWN value (e.g. a "enforced" typo) to
-	// StageOff — a fail-safe that disables the gate rather than guessing, so a
-	// misspelling can never silently arm auto-merge.
+	// Stage is "off", "shadow" (default), "advisory" or "enforce"; the composition
+	// root maps an unknown word to off, so a typo can never arm auto-merge.
 	Stage string `json:"stage,omitempty"`
-	// BatchWaveCount is how many completed campaign waves accumulate before the
-	// advisor fires the gate (cadence scaling). Zero/absent ⇒ 1 (gate per wave).
+	// BatchWaveCount is how many completed waves accumulate before the gate fires; non-positive means 1.
 	BatchWaveCount int `json:"batch_wave_count,omitempty"`
-	// BatchChurnLOC is the diff-size ceiling (changed LOC) above which the advisor
-	// prefers batching over per-wave promotion. Zero/absent ⇒ 800.
+	// BatchChurnLOC is the changed-LOC ceiling above which batching is preferred; non-positive means 800.
 	BatchChurnLOC int `json:"batch_churn_loc,omitempty"`
-	// BlockSeverity is the build severity at or above which the gate hard-defers
-	// promotion. Empty/absent ⇒ "HIGH".
+	// BlockSeverity is the build severity at or above which promotion is deferred; empty means "HIGH".
 	BlockSeverity string `json:"block_severity,omitempty"`
-	// CarryoverStallCycles is the anti-starvation bound: when a feature's oldest
-	// unpicked P0/P1 carryover has aged this many cycles, force a feature-complete
-	// promotion attempt. Zero/absent ⇒ 8.
+	// CarryoverStallCycles forces a promotion attempt once the oldest P0/P1 carryover is this old; non-positive means 8.
 	CarryoverStallCycles int `json:"carryover_stall_cycles,omitempty"`
 }
 
@@ -253,11 +174,7 @@ type MergeGateConfig struct {
 	CarryoverStallCycles int
 }
 
-// MergeGateConfig returns merge-gate configuration with built-in defaults
-// resolved. The zero-value Policy{} yields the safe defaults (stage="shadow",
-// so an absent block is provably behavior-neutral). Each numeric threshold
-// overrides only when > 0 and each string only when non-empty, so a partial
-// block can never silently produce an unsafe zero threshold. Pure.
+// MergeGateConfig returns merge-gate configuration; only positive numbers and non-empty strings override.
 func (p Policy) MergeGateConfig() MergeGateConfig {
 	c := MergeGateConfig{
 		Stage:                "shadow",
@@ -286,8 +203,3 @@ func (p Policy) MergeGateConfig() MergeGateConfig {
 	}
 	return c
 }
-
-// ParallelEvaluatePolicy is the .evolve/policy.json "parallel_evaluate" block —
-// the config-as-code surface for post-build evaluate-phase parallelization (no
-// flags). Stage drives the off→shadow→enforce rollout; Concurrency bounds the
-// parallel runner pool. See [[phase_settings_from_config_not_code]].

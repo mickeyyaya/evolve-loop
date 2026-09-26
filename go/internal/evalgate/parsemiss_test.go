@@ -1,19 +1,3 @@
-// parsemiss_test.go — cycle-1685 regression pins for the parse-miss vs
-// convergence distinction (inbox id `evalgate-selectedslugs-nil-blindness`).
-//
-// SelectedSlugs returns nil for two categorically different scout-report shapes,
-// and until this cycle nothing downstream could tell them apart:
-//
-//  1. genuine convergence — no "## Selected Tasks" section at all; fail-open is
-//     CORRECT, the cycle claimed no work;
-//  2. format drift — the section IS present with real task prose whose slug the
-//     parser cannot read, so it yields zero slugs and Gate A's fail-open path
-//     checks NOTHING while believing it checked everything.
-//
-// Shape 2 is cycle-1570: scout selected `config-gate-default-policy-authority`,
-// authored no eval, the section parsed to nil, Gate A approved, and the missing
-// eval surfaced three phases later as an audit H1.
-
 package evalgate
 
 import (
@@ -29,20 +13,14 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// cycle1570ReportShape is the REAL incident shape, not a synthetic stand-in: a
-// "## Selected Tasks" section carrying genuine task prose for
-// config-gate-default-policy-authority whose slug is stated as free prose
-// ("Task slug: ...") instead of the "- **Slug:**" bullet slugLineRE requires.
-// Neither empty nor absent — and it parses to zero slugs.
+// cycle1570ReportShape states its slug as prose ("Task slug:") rather than as a
+// bullet, so it parses to no slug.
 const cycle1570ReportShape = "# Scout Report\n\n## Selected Tasks\n\n" +
 	"### Task 1: Config gate default policy authority\n" +
 	"Task slug: config-gate-default-policy-authority\n" +
 	"- **Type:** bug\n- **Complexity:** S\n\n" +
 	"No eval file was authored for this task; the slug is only named in prose above.\n"
 
-// TestCycle1570ReportShape pins the incident itself. The first assertion is the
-// fixture PREMISE: this shape must still parse to zero slugs, or the predicate
-// below is exercising nothing. The second is the fix.
 func TestCycle1570ReportShape(t *testing.T) {
 	if got := SelectedSlugs(cycle1570ReportShape); got != nil {
 		t.Fatalf("fixture premise broken: the cycle-1570 shape must still parse to ZERO slugs for this test to pin the reported bug; SelectedSlugs()=%v", got)
@@ -55,14 +33,12 @@ func TestCycle1570ReportShape(t *testing.T) {
 	}
 }
 
-// TestSelectedTasksParseMiss is the behavioural table: true ONLY for drift.
 func TestSelectedTasksParseMiss(t *testing.T) {
 	cases := []struct {
 		name   string
 		report string
 		want   bool
 	}{
-		// Drift — the section claims work the parser could not read.
 		{"cycle-1570 prose slug", cycle1570ReportShape, true},
 		{
 			name: "drifted section followed by another heading",
@@ -71,13 +47,11 @@ func TestSelectedTasksParseMiss(t *testing.T) {
 			want: true,
 		},
 
-		// Genuine convergence — nothing was claimed.
 		{"no Selected Tasks section at all", "## Gap Analysis\nNothing to do.\n", false},
 		{"empty report", "", false},
 		{"prose report that never uses the heading", "# Scout Report\n\nThe backlog converged; no task was selected.\n", false},
 		{"decision trace with zero selections", "## Decision Trace\n```json\n{\"decisionTrace\":[]}\n```\n", false},
 
-		// Contentless section — a heading claiming nothing is still convergence.
 		{"heading then EOF", "## Selected Tasks\n", false},
 		{"heading with no trailing newline", "## Selected Tasks", false},
 		{"heading then blank lines only", "## Selected Tasks\n\n\n   \n\t\n", false},
@@ -85,7 +59,6 @@ func TestSelectedTasksParseMiss(t *testing.T) {
 		{"heading then a multi-line html comment only", "## Selected Tasks\n\n<!--\nnone\nselected\n-->\n", false},
 		{"heading then blanks then the next heading", "## Selected Tasks\n\n\n## Deferred\n- carried prose\n", false},
 
-		// Section-bounded: content in a LATER section is not this section's drift.
 		{
 			name: "prose lives after the next heading",
 			report: "## Selected Tasks\n\n## Deferred\n\n### Task 1: Elsewhere\n" +
@@ -93,7 +66,6 @@ func TestSelectedTasksParseMiss(t *testing.T) {
 			want: false,
 		},
 
-		// Readable sections are never drift.
 		{"plain slug bullet", "## Selected Tasks\n- **Slug:** add-cache\n", false},
 		{"backticked slug bullet (the persona's live form)", "## Selected Tasks\n- **Slug:** `add-cache`\n", false},
 		{"bounded bullet with a later section", "## Selected Tasks\n- **Slug:** in-section\n\n## Deferred\n- **Slug:** not-counted\n", false},
@@ -107,9 +79,6 @@ func TestSelectedTasksParseMiss(t *testing.T) {
 	}
 }
 
-// TestSelectedTasksParseMiss_TraceOnlyReportNotFlagged pins the scoping: the
-// signal reads the Selected Tasks body and nothing else, so a separately
-// malformed "## Decision Trace" can never leak into it.
 func TestSelectedTasksParseMiss_TraceOnlyReportNotFlagged(t *testing.T) {
 	t.Run("readable section beside a malformed decision trace", func(t *testing.T) {
 		report := "## Selected Tasks\n- **Slug:** ok-slug\n\n## Decision Trace\n```json\n{not valid json\n```\n"
@@ -136,10 +105,6 @@ func TestSelectedTasksParseMiss_TraceOnlyReportNotFlagged(t *testing.T) {
 	})
 }
 
-// TestMaterializationGate_ParseMissAdvisoryIsNonBlocking is the caller proof:
-// the detector must actually reach Gate A, and must reach it as an ADVISORY.
-// Both halves matter — an unreported signal is dead code, and a blocking one
-// would false-block every converged cycle.
 func TestMaterializationGate_ParseMissAdvisoryIsNonBlocking(t *testing.T) {
 	g := materializationGate{}
 
@@ -189,10 +154,6 @@ func TestMaterializationGate_ParseMissAdvisoryIsNonBlocking(t *testing.T) {
 		}
 	})
 
-	// The advisory must not claim more than it knows. Gate A checked NOTHING only
-	// when the union is genuinely empty; when the "## Decision Trace" still
-	// supplied slugs the gate DID check those, and on 3 of the 59 real cycle-16*
-	// fires it had (audit L1, cycle 1685).
 	t.Run("claims nothing-was-checked only when the union is empty", func(t *testing.T) {
 		root, ws := scoutWorkspaceWithReport(t, cycle1570ReportShape)
 		if got := SelectedSlugs(cycle1570ReportShape); got != nil {
@@ -224,10 +185,8 @@ func TestMaterializationGate_ParseMissAdvisoryIsNonBlocking(t *testing.T) {
 	})
 }
 
-// scoutWorkspaceWithReport writes body as the scout deliverable in a fresh
-// workspace, under the artifact name the scout phase really produces
-// (scoutReportName, resolved from the phasecontract registry Gate A reads
-// through), and returns an empty project root so no eval file exists anywhere.
+// scoutWorkspaceWithReport writes body as the scout report and returns a project
+// root holding no eval.
 func scoutWorkspaceWithReport(t *testing.T, body string) (projectRoot, workspace string) {
 	t.Helper()
 	projectRoot, workspace = t.TempDir(), t.TempDir()
@@ -237,9 +196,8 @@ func scoutWorkspaceWithReport(t *testing.T, body string) (projectRoot, workspace
 	return projectRoot, workspace
 }
 
-// captureParseMissLog runs fn with os.Stderr redirected to a pipe and returns
-// what was written. reviewer.logf resolves os.Stderr at call time, so this is
-// how the production gate line is observed without re-implementing the reviewer.
+// captureParseMissLog captures stderr around fn; NewReviewer's logger resolves
+// os.Stderr at call time.
 func captureParseMissLog(t *testing.T, fn func()) string {
 	t.Helper()
 	r, w, err := os.Pipe()
@@ -264,26 +222,8 @@ func captureParseMissLog(t *testing.T, fn func()) string {
 	return out
 }
 
-// --- the slugLineRE widening's measured effect ---------------------------------
-//
-// Round 1 of this cycle shipped a NEUTRALITY CLAIM about the backtick widening —
-// "the union SelectedSlugs returns is unchanged and no report becomes newly
-// blockable" — asserted from a count of "## Decision Trace" HEADINGS. Heading
-// presence is not union equality, and the claim was false: re-measured
-// 2026-09-15 over .evolve/runs/cycle-16*/scout-report.md, the widening changes
-// the union on 6 of 84 reports and makes 2 of them newly blockable at Gate A.
-//
-// The corpus is gitignored and absent in CI, so the correction cannot live only
-// in prose citing it. These fixtures reproduce the two falsifying reports so the
-// claim is RE-RUN on every `go test ./internal/evalgate`, which is the half
-// round 1 was missing.
-
-// cycle1664ReportShape and cycle1669ReportShape are the two real reports whose
-// Gate A verdict the widening changes. Each keeps the two properties that
-// matter: the slug appears ONLY as a backticked "- **Slug:**" bullet, and the
-// "## Decision Trace" is present but states its selection as a "selected_tasks"
-// string array — a shape decisionTraceSelected does not read, so the trace
-// supplies nothing and the bullet is the sole source.
+// Both shapes carry their slug only as a backticked bullet, and a Decision Trace in the
+// "selected_tasks" array form that decisionTraceSelected does not read.
 const cycle1664ReportShape = "# Scout Report — Cycle 1664\n\n" +
 	"## Selected Tasks\n\n" +
 	"### Task 1: settle-wait stability short-circuit\n" +
@@ -307,34 +247,17 @@ const cycle1669ReportShape = "# Scout Report — Cycle 1669\n\n" +
 	"  \"deferred\": [\"extend-structured-verdict-to-codex-agy\"]\n" +
 	"}\n```\n"
 
-// preWideningSlugLineRE is slugLineRE exactly as it stood before this cycle
-// (git show HEAD:go/internal/evalgate/slugs.go). The production parser cannot be
-// swapped back at run time, so the counterfactual arm needs a local copy of what
-// the old pattern matched.
+// preWideningSlugLineRE is slugLineRE without the backtick widening, the counterfactual arm.
 var preWideningSlugLineRE = regexp.MustCompile(`(?m)^[*\-]\s*\*\*Slug:\*\*\s*([a-z0-9][a-z0-9-]*)`)
 
-// slugBulletRE matches a whole "- **Slug:**" bullet line, for building the B arm
-// of the A/B pair by deleting it.
 var slugBulletRE = regexp.MustCompile(`(?m)^- \*\*Slug:\*\*.*\n`)
 
-// TestSlugLineWideningIsNotBlockingNeutral executes the corrected claim.
-//
-// Union half: on both reports the "## Decision Trace" is present but yields
-// nothing and the pre-widening pattern matches nothing, while the shipped
-// SelectedSlugs returns the slug — so the union the widening produces differs.
-//
-// Blocking half: driving the production reviewer at StageEnforce over an A/B
-// pair that differs ONLY by that bullet, Gate A BLOCKS with it and fail-opens
-// without it. That delta is what "newly blockable" means, and it is the sentence
-// round 1 got wrong.
 func TestSlugLineWideningIsNotBlockingNeutral(t *testing.T) {
 	for _, tc := range []struct{ cycle, slug, report string }{
 		{"cycle-1664", "settle-wait-stability-shortcircuit", cycle1664ReportShape},
 		{"cycle-1669", "verdict-tool-call-claudep", cycle1669ReportShape},
 	} {
 		t.Run(tc.cycle, func(t *testing.T) {
-			// Premise: these are reports that DO carry the heading round 1
-			// counted, and whose trace nonetheless supplies no slug.
 			if !strings.Contains(tc.report, "## Decision Trace") {
 				t.Fatalf("fixture premise broken: %s no longer carries a \"## Decision Trace\" — the falsified claim was about reports that carry one", tc.cycle)
 			}
@@ -349,13 +272,11 @@ func TestSlugLineWideningIsNotBlockingNeutral(t *testing.T) {
 				t.Fatalf("fixture premise broken: the pre-widening pattern already matched %v in %s, so this report cannot show a widening delta", before, tc.cycle)
 			}
 
-			// Union half.
 			got := SelectedSlugs(tc.report)
 			if len(got) != 1 || got[0] != tc.slug {
 				t.Fatalf("SelectedSlugs(%s)=%v, want exactly [%s] — the widening is the only thing that can parse this backticked bullet, and the union it produces is therefore NOT the pre-widening one", tc.cycle, got, tc.slug)
 			}
 
-			// Blocking half, B arm: the same report without the bullet.
 			without := slugBulletRE.ReplaceAllString(tc.report, "")
 			if strings.Contains(without, "**Slug:**") {
 				t.Fatalf("counterfactual arm still carries a Slug bullet — the A/B pair is not isolated to the widening")
@@ -367,8 +288,6 @@ func TestSlugLineWideningIsNotBlockingNeutral(t *testing.T) {
 				t.Fatalf("Gate A BLOCKED the counterfactual arm (reason=%q) — with no parsed slug it must fail open, or this pair cannot show a NEWLY blockable report", res.Reason)
 			}
 
-			// A arm: the real report. No eval file exists at either resolution
-			// evalFilePath checks, so the newly parsed slug blocks.
 			res := reviewScoutReport(t, tc.report)
 			if res.Approve {
 				t.Fatalf("Gate A APPROVED %s, whose backticked slug %q has no eval file — then the widening really would be blocking-neutral and the comment on slugLineRE is wrong; re-measure before editing it", tc.cycle, tc.slug)
@@ -380,9 +299,6 @@ func TestSlugLineWideningIsNotBlockingNeutral(t *testing.T) {
 	}
 }
 
-// reviewScoutReport drives the PRODUCTION reviewer — the core.WithReviewer seam
-// the orchestrator mounts — over body in a fresh workspace with an empty project
-// root, so no eval file resolves at either path evalFilePath checks.
 func reviewScoutReport(t *testing.T, body string) core.ReviewResult {
 	t.Helper()
 	root, ws := scoutWorkspaceWithReport(t, body)

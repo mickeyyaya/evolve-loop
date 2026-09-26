@@ -1,13 +1,5 @@
 package reachabilityprobe
 
-// reachabilityprobe_test.go — table-driven coverage for CheckCallSite,
-// closing the inbox tdd-structural-test-reachability-probe (weight 0.92)
-// acceptance criterion 3: "a reachable pinned call site passes the check
-// unchanged (no false positives - table-driven)". The prior coverage in
-// apicover_named_test.go exercised exactly one 2-node cycle and one acyclic
-// case as hardcoded assertions, not a table; this file adds the
-// multi-hop/edge shapes the package's own doc comment (cycle-644) promises.
-
 import (
 	"strings"
 	"testing"
@@ -19,10 +11,9 @@ func TestCheckCallSite(t *testing.T) {
 		graph     ImportGraph
 		site      CallSite
 		wantNil   bool
-		cycleHead string // required first element of Violation.Cycle when wantNil is false
+		cycleHead string
 	}{
 		{
-			// cycle-644 shape, re-asserted here in table form per the AC.
 			name: "direct_2node_cycle",
 			graph: ImportGraph{
 				"storage": {"core"},
@@ -44,8 +35,6 @@ func TestCheckCallSite(t *testing.T) {
 			cycleHead: "storage",
 		},
 		{
-			// positive "safe to freeze" case: PinningPackage is present in the
-			// graph but ReferencedPackage never reaches it.
 			name: "acyclic_reachable_pin_no_false_positive",
 			graph: ImportGraph{
 				"storage": {"core"},
@@ -56,8 +45,6 @@ func TestCheckCallSite(t *testing.T) {
 			wantNil: true,
 		},
 		{
-			// PinningPackage absent from the graph entirely: absence of
-			// evidence is not evidence of a cycle.
 			name: "pinning_package_absent_from_graph",
 			graph: ImportGraph{
 				"storage": {"core"},
@@ -67,9 +54,6 @@ func TestCheckCallSite(t *testing.T) {
 			wantNil: true,
 		},
 		{
-			// self-referential pin: a package "importing itself" is a trivial
-			// non-violation (the Go compiler already forbids self-import
-			// earlier in the pipeline).
 			name: "self_referential_pin",
 			graph: ImportGraph{
 				"core": {},
@@ -79,8 +63,6 @@ func TestCheckCallSite(t *testing.T) {
 			cycleHead: "core",
 		},
 		{
-			// disjoint graph: two components sharing no edges must never be
-			// treated as a cycle.
 			name: "disjoint_components",
 			graph: ImportGraph{
 				"storage": {"core"},
@@ -92,7 +74,6 @@ func TestCheckCallSite(t *testing.T) {
 			wantNil: true,
 		},
 		{
-			// empty graph: PinningPackage cannot be "known" in an empty graph.
 			name:    "empty_graph",
 			graph:   ImportGraph{},
 			site:    CallSite{PinningPackage: "core", ReferencedPackage: "storage", Symbol: "UpdateStateMap"},

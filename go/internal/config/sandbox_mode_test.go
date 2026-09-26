@@ -2,10 +2,6 @@ package config
 
 import "testing"
 
-// Workstream B: EVOLVE_SANDBOX=auto|on|off → cfg.SandboxMode. Unknown values
-// emit a WARN and fall back to the default (auto) rather than silently break
-// the trust boundary.
-
 func TestLoad_SandboxMode_DefaultsAuto(t *testing.T) {
 	cfg, _ := Load("", map[string]string{})
 	if cfg.SandboxMode != SandboxModeAuto {
