@@ -64,9 +64,10 @@ func (tddScopeGate) name() string { return "topn-tdd-scope" }
 
 func (tddScopeGate) appliesTo(phase string) bool { return phase == string(core.PhaseTDD) }
 
-// check requires exact set equality for a multi-member lane. For a zero- or
-// single-member lane it blocks only files authored under an empty top_n;
-// label drift and file-scope drift are advisory.
+// check requires exact set equality for a multi-member lane, then judges file
+// scope against the union of the members' scopes. For a zero- or single-member
+// lane it blocks only files authored under an empty top_n; label drift and
+// file-scope drift are advisory.
 func (tddScopeGate) check(in core.ReviewInput) (string, bool) {
 	topN, ok := readTopNSlugs(in.Workspace)
 	if !ok {
@@ -79,7 +80,10 @@ func (tddScopeGate) check(in core.ReviewInput) (string, bool) {
 	// Multi-member lanes bind to the contract's ids, not the markdown top_n,
 	// whose decomposition sub-ids would block a lane that declared its contract.
 	if committed := normalizedSlugs(core.ContractTaskIDs(in.Workspace)); len(committed) > 1 {
-		return reconcileMemberSets(committed, normalizedSlugs(declared))
+		if reason, block := reconcileMemberSets(committed, normalizedSlugs(declared)); block {
+			return reason, true
+		}
+		return fileScopeAdvisoryMulti(in.Workspace, committed, authored), false
 	}
 	if len(authored) == 0 {
 		return "", false
@@ -107,19 +111,46 @@ func (tddScopeGate) check(in core.ReviewInput) (string, bool) {
 // the committed item's scout targetFiles, and "" on any ambiguity.
 func fileScopeAdvisory(workspace, slug string, authored []string) string {
 	declared := readScoutTargetFiles(workspace, slug)
-	if len(declared) == 0 || len(authored) == 0 {
+	if len(declared) == 0 || len(authored) == 0 || anyPathOverlaps(authored, declared) {
 		return ""
-	}
-	for _, a := range authored {
-		for _, d := range declared {
-			if pathsOverlap(a, d) {
-				return ""
-			}
-		}
 	}
 	return "file scope drift (advisory): TDD authored test file(s) {" + strings.Join(authored, ", ") +
 		"} but the committed item '" + slug + "' declares targetFiles {" + strings.Join(declared, ", ") +
 		"} — zero path overlap"
+}
+
+// fileScopeAdvisoryMulti returns a reason when no authored file shares a scope
+// with ANY committed member's targetFiles. A member without a declared scope
+// could own any file, so it makes the judgement ambiguous and returns "".
+func fileScopeAdvisoryMulti(workspace string, members, authored []string) string {
+	if len(authored) == 0 {
+		return ""
+	}
+	var union []string
+	for _, slug := range members {
+		declared := readScoutTargetFiles(workspace, slug)
+		if len(declared) == 0 {
+			return ""
+		}
+		union = append(union, declared...)
+	}
+	if anyPathOverlaps(authored, union) {
+		return ""
+	}
+	return "file scope drift (advisory): TDD authored test file(s) {" + strings.Join(authored, ", ") +
+		"} but the committed members {" + strings.Join(members, ", ") + "} declare targetFiles {" +
+		strings.Join(union, ", ") + "} — zero path overlap"
+}
+
+func anyPathOverlaps(authored, declared []string) bool {
+	for _, a := range authored {
+		for _, d := range declared {
+			if pathsOverlap(a, d) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // pathsOverlap treats one directory as one scope: scout names the production

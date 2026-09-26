@@ -19,9 +19,14 @@ const mdFence = "```"
 // handoff slugs[]; preamble goes between the header and the RED output.
 func writeScopedTDDReport(t *testing.T, workspace string, declared []string, preamble string) {
 	t.Helper()
+	writeMemberTDDReport(t, workspace, declared, preamble, "go/acs/cycle1480/predicates_test.go")
+}
+
+func writeMemberTDDReport(t *testing.T, workspace string, declared []string, preamble string, testFiles ...string) {
+	t.Helper()
 	handoff, err := json.Marshal(map[string]any{
 		"slugs":            declared,
-		"testFiles":        []string{"go/acs/cycle1480/predicates_test.go"},
+		"testFiles":        testFiles,
 		"redRunConfirmed":  true,
 		"doNotModifyTests": true,
 	})
@@ -175,5 +180,128 @@ func TestTDDScopeGate_AppliesBeforeBuildNotAfter(t *testing.T) {
 	if !got.Approve && strings.Contains(got.Reason, "scope-mismatch") {
 		t.Errorf("the TDD-scope reconciliation must not re-fire at the build boundary — "+
 			"the whole point is aborting BEFORE the build spend; got %+v", got)
+	}
+}
+
+// twoMemberLane commits alpha-member and beta-member, each declaring its own package.
+func twoMemberLane(t *testing.T) string {
+	t.Helper()
+	ws := t.TempDir()
+	writeTriageReport(t, ws, "alpha-member", "beta-member")
+	writeScoutReportTasks(t, ws,
+		scoutTask{slug: "alpha-member", targetFiles: []string{"go/internal/alpha/alpha.go"}},
+		scoutTask{slug: "beta-member", targetFiles: []string{"go/internal/beta/beta.go"}},
+	)
+	return ws
+}
+
+func TestTDDScopeGate_TwoMemberFileScopeDriftIsAdvised(t *testing.T) {
+	ws := twoMemberLane(t)
+	writeMemberTDDReport(t, ws, []string{"alpha-member", "beta-member"}, "", "go/internal/tokenresolver/resolver_test.go")
+
+	reason, block := tddScopeGate{}.check(core.ReviewInput{Phase: string(core.PhaseTDD), Workspace: ws})
+	if block {
+		t.Fatalf("file-scope drift must stay advisory for a multi-member lane; got block=true reason=%q", reason)
+	}
+	if !strings.Contains(reason, "file scope drift") {
+		t.Fatalf("a complete two-member declaration authoring outside both members' scopes must emit the file-scope advisory; got %q", reason)
+	}
+	for _, want := range []string{
+		"alpha-member", "beta-member",
+		"go/internal/tokenresolver/resolver_test.go",
+		"go/internal/alpha/alpha.go", "go/internal/beta/beta.go",
+	} {
+		if !strings.Contains(reason, want) {
+			t.Errorf("advisory must name both members, the authored files and every member's declared targetFiles; missing %q in %q", want, reason)
+		}
+	}
+	if res := reviewTDD(t, ws); !res.Approve {
+		t.Errorf("the multi-member file-scope advisory must approve at enforce; got %+v", res)
+	}
+}
+
+func TestTDDScopeGate_TwoMemberInEitherScopeStaysSilent(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		authored []string
+	}{
+		{"inside the first member's scope", []string{"go/internal/alpha/alpha_test.go"}},
+		{"inside the second member's scope", []string{"go/internal/beta/beta_test.go"}},
+		{"one overlapping file among several", []string{"go/acs/cycle1480/predicates_test.go", "go/internal/beta/beta_test.go"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ws := twoMemberLane(t)
+			writeMemberTDDReport(t, ws, []string{"alpha-member", "beta-member"}, "", tc.authored...)
+
+			reason, block := tddScopeGate{}.check(core.ReviewInput{Phase: string(core.PhaseTDD), Workspace: ws})
+			if reason != "" || block {
+				t.Errorf("authored files inside ANY member's declared scope must stay silent; got reason=%q block=%v", reason, block)
+			}
+		})
+	}
+}
+
+func TestTDDScopeGate_TwoMemberWithoutDeclaredScopeStaysSilent(t *testing.T) {
+	t.Run("no scout-report.md", func(t *testing.T) {
+		ws := t.TempDir()
+		writeTriageReport(t, ws, "alpha-member", "beta-member")
+		writeMemberTDDReport(t, ws, []string{"alpha-member", "beta-member"}, "", "go/internal/tokenresolver/resolver_test.go")
+
+		reason, block := tddScopeGate{}.check(core.ReviewInput{Phase: string(core.PhaseTDD), Workspace: ws})
+		if reason != "" || block {
+			t.Errorf("no declared scope to compare against must fail open; got reason=%q block=%v", reason, block)
+		}
+	})
+
+	t.Run("scout declares neither member", func(t *testing.T) {
+		ws := t.TempDir()
+		writeTriageReport(t, ws, "alpha-member", "beta-member")
+		writeScoutReportTasks(t, ws, scoutTask{slug: "decoy-task", targetFiles: []string{"go/internal/other/other.go"}})
+		writeMemberTDDReport(t, ws, []string{"alpha-member", "beta-member"}, "", "go/internal/tokenresolver/resolver_test.go")
+
+		reason, block := tddScopeGate{}.check(core.ReviewInput{Phase: string(core.PhaseTDD), Workspace: ws})
+		if reason != "" || block {
+			t.Errorf("a sibling task's scope must not stand in for the committed members'; got reason=%q block=%v", reason, block)
+		}
+	})
+}
+
+func TestTDDScopeGate_IncompleteMemberDeclarationBlocksBeforeScopeCheck(t *testing.T) {
+	ws := twoMemberLane(t)
+	writeMemberTDDReport(t, ws, []string{"alpha-member"}, "", "go/internal/tokenresolver/resolver_test.go")
+
+	reason, block := tddScopeGate{}.check(core.ReviewInput{Phase: string(core.PhaseTDD), Workspace: ws})
+	if !block || !strings.Contains(reason, "scope-mismatch") {
+		t.Fatalf("an incomplete member declaration must still block on scope-mismatch; got reason=%q block=%v", reason, block)
+	}
+	if strings.Contains(reason, "file scope") {
+		t.Errorf("file-scope drift is judged only after a complete reconciliation, never folded into the mismatch block; got %q", reason)
+	}
+}
+
+func TestTDDScopeGate_SingleMemberFileScopeAdvisoryTextUnchanged(t *testing.T) {
+	ws := t.TempDir()
+	writeTriageReport(t, ws, "committed-slug")
+	writeScoutReport(t, ws, "committed-slug", "go/internal/topngate/gate.go", "go/internal/topngate/gate_test.go")
+	writeTDDReport(t, ws, "committed-slug", "go/internal/tokenresolver/resolver_test.go")
+
+	want := "file scope drift (advisory): TDD authored test file(s) {go/internal/tokenresolver/resolver_test.go}" +
+		" but the committed item 'committed-slug' declares targetFiles {go/internal/topngate/gate.go, go/internal/topngate/gate_test.go}" +
+		" — zero path overlap"
+	reason, block := tddScopeGate{}.check(core.ReviewInput{Phase: string(core.PhaseTDD), Workspace: ws})
+	if block || reason != want {
+		t.Errorf("single-member lanes must keep today's advisory byte for byte;\n got reason=%q block=%v\nwant reason=%q block=false", reason, block, want)
+	}
+}
+
+func TestTDDScopeGate_TwoMemberWithOneUndeclaredScopeStaysSilent(t *testing.T) {
+	ws := t.TempDir()
+	writeTriageReport(t, ws, "alpha-member", "beta-member")
+	writeScoutReportTasks(t, ws, scoutTask{slug: "alpha-member", targetFiles: []string{"go/internal/alpha/alpha.go"}})
+	writeMemberTDDReport(t, ws, []string{"alpha-member", "beta-member"}, "", "go/internal/tokenresolver/resolver_test.go")
+
+	reason, block := tddScopeGate{}.check(core.ReviewInput{Phase: string(core.PhaseTDD), Workspace: ws})
+	if reason != "" || block {
+		t.Errorf("a member with no declared scope could own any file, so the union check must fail open; got reason=%q block=%v", reason, block)
 	}
 }

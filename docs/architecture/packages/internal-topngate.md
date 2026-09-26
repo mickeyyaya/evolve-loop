@@ -13,7 +13,7 @@
 - **Build gate (`topNBindingGate`).** It compares build-report.md's `## Task:` slug with triage-report.md's `## top_n`. A mismatch returns a `label drift` reason with `block=false`. It never blocks.
 - **TDD gate (`tddScopeGate`), in order:**
   1. No triage-report.md, or no test-report.md: fail open.
-  2. The contract's committed set (`core.ContractTaskIDs`: the lane pin, else `triage-decision.json`'s top_n, minus deferrals) has more than one member: the declared slugs must equal it as a set, else a fatal `scope-mismatch` naming the missing and unexpected members.
+  2. The contract's committed set (`core.ContractTaskIDs`: the lane pin, else `triage-decision.json`'s top_n, minus deferrals) has more than one member: the declared slugs must equal it as a set, else a fatal `scope-mismatch` naming the missing and unexpected members. A complete declaration then gets the union file-scope advisory and stops here.
   3. Nothing authored: pass (the compliant no-op).
   4. Empty markdown `## top_n` with authored files: fatal.
   5. No parseable `## Task:` claim: fail open.
@@ -38,11 +38,11 @@
 - **Illustration is not declaration.** A handoff shown inside an outer example fence is never read. Pinned by `TestHandoffTestFiles_IgnoresExamples` and `TestTDDScopeGate_OuterFenceFakeCompleteHandoffStillBlocks`.
 - **The reconciliation fires at TDD→Build only.** Firing again at the build boundary would move the abort past the spend it exists to save. Pinned by `TestTDDScopeGate_AppliesBeforeBuildNotAfter`.
 - **File scope is advisory.** A legitimate deliverable can touch a shared helper or an incidental file scout never named; shadow evidence decides whether it ever becomes fatal. Pinned by `TestTDDScopeGate_FileScopeDriftIsAdvisory`.
+- **Multi-member lanes judge file scope against the union.** After a complete reconciliation, the authored files are advised only when none overlaps ANY member's `targetFiles`; a set mismatch blocks on its own reason first, and a member with no declared scope fails the check open. Pinned by `TestTDDScopeGate_TwoMemberFileScopeDriftIsAdvised`, `TestTDDScopeGate_TwoMemberInEitherScopeStaysSilent`, `TestTDDScopeGate_TwoMemberWithoutDeclaredScopeStaysSilent`, `TestTDDScopeGate_TwoMemberWithOneUndeclaredScopeStaysSilent` and `TestTDDScopeGate_IncompleteMemberDeclarationBlocksBeforeScopeCheck`; single-member text is pinned by `TestTDDScopeGate_SingleMemberFileScopeAdvisoryTextUnchanged`.
 - **One directory is one scope.** Scout names the production file while TDD authors its `_test.go` sibling; exact path equality would fire on every healthy cycle. Pinned by the `authored test file beside a declared target passes silently` subtest.
 - **Scope is read per slug.** A sibling task's `targetFiles` never satisfies the committed slug. Pinned by the `scope is read per-slug, never borrowed from a sibling task` subtest.
 - **The personas must produce what the parsers read.** `agents/evolve-builder.md` must name triage's `## top_n` as its sole task source and demote scout-report.md to background (`TestBuilderPromptNamesTopNAsSoleTaskAuthority`). `agents/evolve-tdd-engineer.md` must instruct the `slugs` handoff field, the `## Task: <id>[, <id>` header and the Task Contract binding (`TestTDDPromptDeclaresHandoffSlugs`); otherwise only test-authored reports would pass the multi-member gate.
 - **An empty workspace reads nothing.** `readWorkspaceFile` refuses it, because `filepath.Join("", name)` would resolve against the working directory.
-- **Known gap.** A complete multi-member reconciliation returns before the file-scope advisory, so multi-member lanes get no file-scope check (inbox `multi-member-file-scope-advisory`).
 
 ## Findings
 
@@ -53,4 +53,5 @@
 - **Cycle 1113**: every reviewer-level test drove build or audit, so an unwired TDD gate left the package green. The two `TestNewReviewer_TDD*` tests and the `go/acs/cycle1113` mutation predicates closed that.
 - **Cycle 1480** (batch-20260815c wave 2, recurred in 1483): a lane bundled `minted-phase-verdict-contract-unsatisfiable` and `dead-api-sweep`. TDD minted predicates for both while the Builder contract bound only the first; nothing reconciled the two, so the lane ran the whole spine and failed at audit with the second slug undelivered. That produced the multi-member set equality (inbox `multi-slug-lane-scope-reconciliation`, cycle 1620).
 - **Cycle 1620 audit and salvage review**: M1, any JSON fence under the handoff heading counted as the declaration, so an unrelated fence shadowed a complete one and falsely blocked; L1, the report's `ok` was ignored on the multi-member path, so a missing report blocked as "missing both members"; CRITICAL 1, the gate bound to the markdown top_n and blocked decomposed lanes; CRITICAL 2, the TDD persona did not instruct the declaration shape. See [the token-waste report](../../reports/2026-09-09-token-waste-root-cause.md).
+- **Cycle 1703** (inbox `multi-member-file-scope-advisory`, the cycle-1620 audit's L3): the complete-reconciliation return skipped the file-scope advisory for every multi-member lane. It now runs against the union of the members' `targetFiles`.
 - **Recovery review 2026-09-09**: the outer-fence false-accept control; a handoff documented inside a `~~~markdown` example must not count.
