@@ -1,12 +1,5 @@
 package core
 
-// failure_dossier_test.go — cycle-1002 RED contract for ADR-0072 S4 Task 1
-// (evidence-dossier-builder). The dossier composes INDEPENDENT evidence — the
-// coherence signal, the audit's self-declared failure envelope, and the
-// non-progress counters — never the recorded verdict alone (the forged-verdict
-// lesson). These tests fail RED until Builder adds buildFailureDossier /
-// writeFailureDossier + the failureDossier type in failure_dossier.go.
-
 import (
 	"encoding/json"
 	"os"
@@ -17,9 +10,9 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// writeAuditWithFailure writes an audit-report.md carrying a v2 verdict sentinel
-// with a structured failure block (ADR-0039 §7) — the shape the dossier parses
-// to surface the audit's SELF-declared class/defects.
+// writeAuditWithFailure writes an audit-report.md carrying a v2 verdict
+// sentinel with a structured failure block — the shape the dossier parses to
+// surface the audit's self-declared class/defects.
 func writeAuditWithFailure(t *testing.T, dir, verdict, class string, defects ...string) {
 	t.Helper()
 	blk := map[string]any{"class": class}
@@ -37,14 +30,9 @@ func writeAuditWithFailure(t *testing.T, dir, verdict, class string, defects ...
 	}
 }
 
-// TestFailureDossier is the Task-1 acceptance surface.
 func TestFailureDossier(t *testing.T) {
 	fp := policy.DefaultSystemFailurePolicy()
 
-	// (a) INCOHERENT: recorded FAIL but on-disk audit=PASS and acs=PASS with no
-	// substantive error → verdict-incoherence floor candidate. Also exercises
-	// the non-progress counters (composed from cs.FailedAt + policy thresholds)
-	// and the write→read-back of the emitted artifact.
 	t.Run("incoherent_verdict_floor_candidate_and_artifact", func(t *testing.T) {
 		dir := t.TempDir()
 		writeVerdicts(t, dir, "PASS", "PASS") // green artifacts contradict a recorded FAIL
@@ -92,8 +80,6 @@ func TestFailureDossier(t *testing.T) {
 		}
 	})
 
-	// (b) COHERENT: recorded FAIL with a RED on-disk audit → the negative is
-	// earned, not forged → no floor candidate.
 	t.Run("coherent_red_audit_no_floor_candidate", func(t *testing.T) {
 		dir := t.TempDir()
 		writeVerdicts(t, dir, "FAIL", "FAIL")
@@ -105,12 +91,6 @@ func TestFailureDossier(t *testing.T) {
 		}
 	})
 
-	// (c) CYCLE-1001 PROSE-ONLY: the audit self-declares a SYSTEM-class fault in
-	// its defects PROSE while the structured class stays task-level
-	// (code-audit-fail). The deterministic floor cannot catch it (FloorCandidate
-	// empty) — but the dossier MUST surface the class + defects so the
-	// orchestrator judgment layer can classify it. This is the exact shape the
-	// live cycle-1001 case looped through as task-level.
 	t.Run("cycle1001_prose_system_surfaced_for_judgment", func(t *testing.T) {
 		dir := t.TempDir()
 		writeAuditWithFailure(t, dir, "FAIL", "code-audit-fail",
@@ -131,16 +111,6 @@ func TestFailureDossier(t *testing.T) {
 		}
 	})
 
-	// (d) SHIP-PHASE EXPLAINED (cycle-1329, pipeline-defect-pipeline-blocker
-	// Task 1's failure_dossier.go twin): green audit + green ACS, but a real
-	// post-audit ship-gate rejection (REPO_CONTRACT_GATE) is recorded via
-	// cs.ShipFailReasons. The dossier's SubstantiveError computation
-	// (failure_dossier.go:86) must fold this carrier in exactly like
-	// system_failure.go:184 does — a diagnosed ship failure is coherent, so
-	// it must NOT propose the verdict-incoherence floor candidate. This is
-	// the dual-call-site lockstep the cycle-1046 comment requires: fixing
-	// only system_failure.go and leaving this twin stale reproduces the
-	// exact bug class.
 	t.Run("ship_phase_explained_no_floor_candidate", func(t *testing.T) {
 		dir := t.TempDir()
 		writeVerdicts(t, dir, "PASS", "PASS")
@@ -155,10 +125,6 @@ func TestFailureDossier(t *testing.T) {
 		}
 	})
 
-	// (e) STRUCTURED SYSTEM: the audit self-declares a system-level class
-	// structurally → AuditDeclared.Level maps to system via the policy table →
-	// the dossier proposes the infra-systemic floor candidate deterministically
-	// (caught even in orchestrator-absent fallback).
 	t.Run("structured_system_class_yields_infra_systemic_candidate", func(t *testing.T) {
 		dir := t.TempDir()
 		writeAuditWithFailure(t, dir, "FAIL", "infra-systemic",

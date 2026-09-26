@@ -9,8 +9,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
-// prepareFreshBatch runs the ordered safety checks that precede the first
-// fresh cycle. A true halt means the result was already emitted with exitCode.
+// A true halt means the result was already emitted with exitCode.
 func prepareFreshBatch(
 	ctx context.Context,
 	cfg loopConfig,
@@ -18,8 +17,8 @@ func prepareFreshBatch(
 	lr *loopResult,
 	stdout, stderr io.Writer,
 ) (lastCycle int, exitCode int, halt bool) {
-	// A stale binary must not run recovery logic. A successful refresh re-execs
-	// and never returns; refresh failures retain their existing fail-open policy.
+	// A stale binary must not run recovery logic; a successful refresh re-execs
+	// and never returns.
 	bootBinaryRefreshFn(cfg, stderr)
 	if br := bootRecoverFn(ctx, cfg, deps.Ledger, stderr); br.HaltSelfSHA {
 		lr.StopReason = "self_sha_boot_halt"
@@ -61,8 +60,8 @@ func prepareFreshBatch(
 		return 0, 2, true
 	}
 
-	// The start sweep drains finalized worktrees left by a prior crashed batch.
-	// This batch's own finalized worktrees are handled by the end sweep.
+	// Drains worktrees a prior crashed batch left finalized; this batch's own
+	// finalized worktrees are handled by the end sweep.
 	last, _ := readLastCycleNumber(context.Background(), deps.Storage)
 	gcHookFn(cfg, cycleWorkspace(cfg.ProjectRoot, last+1), stderr)
 	return last, 0, false

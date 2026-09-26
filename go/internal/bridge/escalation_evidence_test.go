@@ -1,10 +1,3 @@
-// escalation_evidence_test.go — CB.6 contract (concurrency campaign W4):
-// pane evidence SURVIVES the session's death. Cycle-286's tmux server was
-// killed mid-phase; every later interval capture returned nothing, so the
-// escalation report's final_pane carried no evidence and the retro
-// misattributed the failure to plan limits. The wait loop must retain the
-// last NON-EMPTY pane and fall back to it when the live capture is gone —
-// scrollback captured before teardown, kept until the report is written.
 package bridge
 
 import (
@@ -17,7 +10,7 @@ import (
 )
 
 // dyingServerTmux serves scripted frames, then reports the session (and any
-// capture) gone — the cycle-286 shape: server killed under a live launch.
+// capture) gone: a server killed under a live launch.
 type dyingServerTmux struct {
 	*FakeTmuxController
 	captures  int
@@ -36,10 +29,9 @@ func (d *dyingServerTmux) HasSession(ctx context.Context, session string) bool {
 	return d.captures <= d.aliveCaps
 }
 
-// TestEscalationFinalPaneFromEmptyBaseline: the complementary shape — the
-// post-paste baseline capture came back empty; the first interval checkpoint
-// is the only good frame before the server dies. lastGoodPane must be
-// populated from the checkpoint, not only the baseline.
+// This scenario's baseline capture comes back empty; the first interval
+// checkpoint is the only good frame before the server dies, so lastGoodPane
+// must come from the checkpoint, not only the baseline.
 func TestEscalationFinalPaneFromEmptyBaseline(t *testing.T) {
 	cfg := fixtureConfig(t)
 	const evidence = "Working… (esc to interrupt) — mid-turn frame"

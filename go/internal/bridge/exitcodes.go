@@ -1,31 +1,11 @@
-// Package bridge is the native-Go port of tools/agent-bridge — the
-// multi-CLI agent dispatch layer. It reimplements the bash bin/bridge
-// launch/probe/report/doctor logic in-process behind a single Engine
-// that satisfies core.Bridge, plus a CLI shim (evolve bridge ...) that
-// preserves the historical `bridge <subcommand>` surface.
-//
-// Architecture (see docs/architecture/adr/ — bridge-go-port):
-//
-//   - Engine (engine.go): Template Method — Launch() runs the fixed flow
-//     validate → resolveConfig → preflight → dispatch(driver) → report.
-//   - Driver (driver.go): Strategy + self-registering Registry, one per
-//     --cli target. Mirrors internal/phases/registry.
-//   - Seams (Deps): CmdRunner, clock, challenge-token, tmux, fs — all
-//     injectable so the whole package is unit-testable with no LLM cost.
-//
-// This Go bridge is the sole implementation: the bash tools/agent-bridge
-// and the EVOLVE_BRIDGE_GO selector toggle were removed in the v12 cutover.
+// Package bridge is the native-Go port of tools/agent-bridge, the multi-CLI
+// agent dispatch layer: it realizes a phase's launch intent into per-CLI
+// flags, drives the REPL and reports the outcome through a single Engine.
+// See docs/architecture/packages/internal-bridge.md.
 package bridge
 
-// Bridge exit codes — the numeric contract the drivers, cmd/evolve and the
-// ACS predicates read (acs/cycle1580 regex-scans this table, so the literals
-// stay here). These mirror the EC_* constants in tools/agent-bridge/bin/bridge
-// exactly; docs, skills, and the dispatcher's failure classifier depend on
-// these values, so they are load-bearing and must not drift. What each exit
-// MEANS (its sentinel, ledger cause and BRIDGE_EXIT_* code) is the unit-10
-// classifier's table (internal/bridge/launchoutcome), which spells the same
-// numbers; TestExitCodes_HostAliasesAreTheLeafValues pins the two spellings
-// as one belief.
+// Bridge exit codes: the numeric contract the drivers, cmd/evolve and the
+// ACS predicates read.
 const (
 	ExitOK               = 0   // success
 	ExitSafetyGate       = 2   // safety-gate (e.g. --human-input without host opt-in)

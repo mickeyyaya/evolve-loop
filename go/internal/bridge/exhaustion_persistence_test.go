@@ -6,17 +6,6 @@ import (
 	"time"
 )
 
-// A working agent that momentarily RENDERS wall-shaped text — a cat/grep/diff of
-// a file, test fixture, or incident report that quotes a provider's "reached your
-// … limit" message — must NOT be fast-failed. The text is gone by the next
-// observation as the agent's fresh output replaces it, so the persistence gate
-// never crosses. A genuine wall (the CLI parked, present every frame) DOES cross.
-//
-// This is the raw-pane false-FAIL class the two-round go-review of the per-model
-// exhausted_regex surfaced: killing a working agent (exit 85 → cross-family
-// failover) is the cardinal sin (cycle-254/255/314/641), strictly worse than
-// missing a wall (which merely fails over). The regex tightening reduced the
-// match surface; THIS persistence guard is the durable class fix.
 func TestExhaustion_TransientWallTextDoesNotFastFail(t *testing.T) {
 	const wallRegex = `(?i)reached your usage limit`
 	wall := "You've reached your usage limit. Run /usage-credits.\n"

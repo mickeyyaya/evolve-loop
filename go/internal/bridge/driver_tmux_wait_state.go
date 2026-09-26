@@ -9,9 +9,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
 )
 
-// replWaitState owns state that persists across completion-wait observations.
-// Keeping it per launch prevents state from leaking between concurrent REPLs
-// and gives extracted transitions one explicit object to update.
+// replWaitState is allocated per launch so state cannot leak between
+// concurrent REPLs.
 type replWaitState struct {
 	result replWaitResult
 
@@ -46,9 +45,6 @@ type replWaitState struct {
 	checkpointFatal      *fatalPaneGate
 }
 
-// observeDetector records the latest observation separately from the last
-// concrete fault. A later error-free incomplete poll changes terminal cause
-// selection without erasing useful earlier evidence.
 func (s *replWaitState) observeDetector(err error) bool {
 	s.terminalDetectorErrored = err != nil
 	if err == nil {
@@ -74,8 +70,6 @@ func (r *replWaitResult) recordTokens(pane string) {
 }
 
 func newReplWaitState(w replWaiter) *replWaitState {
-	// A review interval replaces a hard wall-clock deadline so productive agents
-	// can continue while an idle or hung agent is paused by the reviewer.
 	interval := w.cfg.ArtifactTimeoutS
 	if interval <= 0 {
 		interval = defaultIfZero(w.deps.ArtifactTimeoutS, tmuxArtifactTimeoutS)
@@ -91,13 +85,11 @@ func newReplWaitState(w replWaiter) *replWaitState {
 	if livenessCenter == nil {
 		livenessCenter = panestream.NewLivenessCenter()
 	}
-	// ADR-0101 S3: every liveness edge this dispatch observes is a
-	// pane.liveness signal stamped with its cycle, run and phase.
 	livenessCenter.RegisterLivenessHandler(paneLivenessHandler(w.deps.Signals, configIdentity(w.cfg)))
 	paneProfile := w.channel.profile
 	livenessProfile := paneProfile
-	// Exhaustion is decided separately through its persisted and corroborated
-	// gate. It must not override the liveness evidence given to the reviewer.
+	// Exhaustion decides separately through its own gate; it must not
+	// override the liveness evidence handed to the reviewer.
 	livenessProfile.ExhaustedRegex = ""
 
 	fatalPaneStage := fatalPaneStageOf(w.deps)
@@ -117,8 +109,8 @@ func newReplWaitState(w replWaiter) *replWaitState {
 		fatalPaneStage:  fatalPaneStage,
 		fatalDetector:   fatalDetector,
 		detector:        newCompletionDetector(w.cfg.Completion, w.cfg, w.deps, w.launch, w.artifactBase),
-		// The fast-poll and checkpoint paths run at different cadences. This
-		// state owns checkpoint-only gates so neither path can borrow a streak.
+		// Checkpoint-only gates live on this state so the fast-poll and
+		// checkpoint paths can't share a streak.
 		checkpointExhaustion: newExhaustionGate(),
 		checkpointWall:       &checkpointWallState{},
 		checkpointFatal:      newFatalPaneGate(),

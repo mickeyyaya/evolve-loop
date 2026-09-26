@@ -6,11 +6,6 @@ import (
 	"testing"
 )
 
-// TestInteractiveFamiliesFrom verifies the family enumeration the usage probe
-// targets: only interactive (*-tmux) drivers whose binary is actually INSTALLED,
-// mapped to their family (binary) name, deduped, and sorted. Filtering by
-// installation is what stops the probe from wasting a boot timeout every cycle
-// on a CLI the operator does not have.
 func TestInteractiveFamiliesFrom(t *testing.T) {
 	names := []string{"claude-tmux", "codex-tmux", "claude-p", "agy-tmux", "ollama-tmux"}
 	manifest := func(name string) (Manifest, error) {
@@ -24,9 +19,8 @@ func TestInteractiveFamiliesFrom(t *testing.T) {
 	}
 }
 
-// TestInteractiveFamilies_Invariants exercises the production enumeration over
-// the real registry + host PATH. The exact set is host-dependent (only installed
-// CLIs), so we assert only the stable invariants: sorted and deduped.
+// The exact set is host-dependent (only installed CLIs), so this asserts only
+// the stable invariants: sorted and deduped.
 func TestInteractiveFamilies_Invariants(t *testing.T) {
 	got := InteractiveFamilies()
 	seen := map[string]bool{}

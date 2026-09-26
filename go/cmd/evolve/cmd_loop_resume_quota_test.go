@@ -56,7 +56,7 @@ func TestRunLoop_ResumeQuotaPauseReturnsFiveAndPreservesCheckpoint(t *testing.T)
 	old := wireOrchestratorDepsFn
 	t.Cleanup(func() { wireOrchestratorDepsFn = old })
 	wireOrchestratorDepsFn = func(string, string, io.Writer) orchDeps {
-		ledger := newFakeLedger() // satisfies rootLedger (ADR-0101 S4a)
+		ledger := newFakeLedger() // satisfies rootLedger; see ADR-0101.
 		orch := core.NewOrchestrator(st, ledger, map[core.Phase]core.PhaseRunner{core.PhaseAudit: resumedQuotaRunner{}}, core.WithRetryConfig(policy.RetryConfig{PhaseMaxAttempts: 2}))
 		return orchDeps{Storage: st, Ledger: ledger, Orchestrator: orch}
 	}

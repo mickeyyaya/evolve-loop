@@ -14,27 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/tokenusage"
 )
 
-// engine_launch_tokens_amplify_test.go — adversarial amplification for
-// token-telemetry S3 (cycle 598). These tests are designed black-box from the
-// TDD "Builder Contract" (test-report.md) alone; the engine.go/ports.go
-// implementations were NOT read. They target contract clauses the three RED
-// tests in engine_launch_tokens_test.go leave unguarded:
-//
-//   - nil TokenResolver leaves usage unavailable while lifecycle telemetry remains.
-//   - Attempt==0 (existing callers) must default to attempt 1, not 0.
-//   - the append must not truncate a pre-existing llm-calls.ndjson.
-//   - the full on-disk JSON schema S6/S7 rollups decode (phase==agent,
-//     nested input/output/cache_read/cache_write, RFC3339 ts, exit_code).
-//   - the record write is gated on resolver *presence*, not usage magnitude:
-//     a zero-usage-but-no-error resolve still emits a record.
-//
-// The record schema type llmCallRecord and the harness helpers (fakeRunner,
-// writeProfile, mapLookup, NewEngine, Deps, ExitOK) are reused from the
-// existing package tests — this file only adds new test funcs.
-
-// amplifyEngine builds an Engine whose fakeRunner writes a success artifact and
-// whose resolver returns the given usage/source with no error. It returns the
-// engine plus the resolved profile so callers can build a BridgeRequest.
 func amplifyEngine(t *testing.T, ws string, usage cyclestate.TokenUsage, source tokenusage.Source) (*Engine, string) {
 	t.Helper()
 	prof := writeProfile(t, ws, "eng-tokens-amp", "")
@@ -50,7 +29,6 @@ func amplifyEngine(t *testing.T, ws string, usage cyclestate.TokenUsage, source 
 	return eng, prof
 }
 
-// readRecords reads and decodes every line of <ws>/llm-calls.ndjson.
 func readRecords(t *testing.T, ws string) []llmCallRecord {
 	t.Helper()
 	raw, err := os.ReadFile(filepath.Join(ws, "llm-calls.ndjson"))
@@ -69,16 +47,12 @@ func readRecords(t *testing.T, ws string) []llmCallRecord {
 	return recs
 }
 
-// TestEngineLaunch_NilResolver_RecordsUnavailableAttempt: token collection is
-// optional enrichment. A nil resolver must leave response tokens empty while
-// retaining the launch's identity, duration, and outcome in the attempt ledger.
 func TestEngineLaunch_NilResolver_RecordsUnavailableAttempt(t *testing.T) {
 	ws := t.TempDir()
 	prof := writeProfile(t, ws, "eng-tokens-amp", "")
 	artifact := filepath.Join(ws, "artifact.md")
 	fr := &fakeRunner{writeArtifactPath: artifact, writeArtifactBody: "OK\n"}
 
-	// No TokenResolver set -> token enrichment unavailable.
 	eng := NewEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(nil)})
 
 	resp, err := eng.Launch(context.Background(), core.BridgeRequest{
@@ -110,16 +84,12 @@ func TestEngineLaunch_NilResolver_RecordsUnavailableAttempt(t *testing.T) {
 	}
 }
 
-// TestEngineLaunch_ZeroAttempt_DefaultsToOne: existing callers do not set
-// BridgeRequest.Attempt (zero value). The contract requires the record's
-// attempt to default to 1 ("Zero (unset, existing callers) is treated as
-// attempt 1"). The RED append test always sets Attempt explicitly (1, 2), so
-// the defaulting arithmetic (an off-by-one writing 0) is untested.
+// Attempt is left at its zero value, unlike the append test's explicit 1/2,
+// to catch an off-by-one that would write 0.
 func TestEngineLaunch_ZeroAttempt_DefaultsToOne(t *testing.T) {
 	ws := t.TempDir()
 	eng, prof := amplifyEngine(t, ws, cyclestate.TokenUsage{Input: 7}, tokenusage.SourceTranscript)
 
-	// Attempt left at its zero value on purpose.
 	if _, err := eng.Launch(context.Background(), core.BridgeRequest{
 		CLI: "claude-p", Profile: prof, Model: "auto", Prompt: "x",
 		Workspace: ws, ArtifactPath: filepath.Join(ws, "artifact.md"), Agent: "scout",
@@ -136,16 +106,13 @@ func TestEngineLaunch_ZeroAttempt_DefaultsToOne(t *testing.T) {
 	}
 }
 
-// TestEngineLaunch_AppendPreservesExistingRecords: the write must open the file
-// O_APPEND, never O_TRUNC — a Launch in cycle N must not clobber records a
-// prior Launch (or prior cycle) already wrote. The RED append test starts from
-// a fresh temp dir every time, so an accidental truncate-on-open would still
-// leave it green (it only counts records it wrote itself).
+// The append test alone starts from a fresh temp dir, so a truncate-on-open
+// regression would still pass it; this seeds a pre-existing record to catch
+// that.
 func TestEngineLaunch_AppendPreservesExistingRecords(t *testing.T) {
 	ws := t.TempDir()
 	eng, prof := amplifyEngine(t, ws, cyclestate.TokenUsage{Input: 5}, tokenusage.SourceEventsResult)
 
-	// Seed a pre-existing record line (a valid prior entry).
 	sentinel := `{"ts":"PRIOR","agent":"prior-agent","attempt":9}`
 	if err := os.WriteFile(filepath.Join(ws, "llm-calls.ndjson"), []byte(sentinel+"\n"), 0o644); err != nil {
 		t.Fatalf("seed llm-calls.ndjson: %v", err)
@@ -179,10 +146,6 @@ func TestEngineLaunch_AppendPreservesExistingRecords(t *testing.T) {
 	}
 }
 
-// TestEngineLaunch_ZeroUsageStillRecords: a resolver that legitimately measures
-// zero usage must still append exactly one record and identify its source. This
-// separates measured zero from the unavailable status emitted for a nil or
-// erroring resolver.
 func TestEngineLaunch_ZeroUsageStillRecords(t *testing.T) {
 	ws := t.TempDir()
 	eng, prof := amplifyEngine(t, ws, cyclestate.TokenUsage{}, tokenusage.SourceTranscript)
@@ -210,12 +173,6 @@ func TestEngineLaunch_ZeroUsageStillRecords(t *testing.T) {
 	}
 }
 
-// TestEngineLaunch_RecordSchemaConformance: pins the exact on-disk schema the
-// S6/S7 rollups will decode without a migration. The RED append test only spot-
-// checks agent, cli, source, tokens.input and TS!="". This asserts the full
-// contract: phase mirrors agent, the four nested token fields, a parseable
-// RFC3339 timestamp, exit_code carries the launch code, and every top-level
-// key the contract names is physically present on disk.
 func TestEngineLaunch_RecordSchemaConformance(t *testing.T) {
 	ws := t.TempDir()
 	usage := cyclestate.TokenUsage{Input: 1234, Output: 567, CacheRead: 89, CacheWrite: 42}
@@ -235,8 +192,8 @@ func TestEngineLaunch_RecordSchemaConformance(t *testing.T) {
 	}
 	line := strings.TrimRight(string(raw), "\n")
 
-	// (a) Typed decode: assert field VALUES (robust to omitempty on zero-ish
-	//     numeric fields — a missing key decodes to the zero value we assert).
+	// Typed decode: omitempty on a zero-ish field still decodes to the zero
+	// value asserted below.
 	var rec llmCallRecord
 	if err := json.Unmarshal([]byte(line), &rec); err != nil {
 		t.Fatalf("record not valid JSON: %v (%q)", err, line)
@@ -281,9 +238,8 @@ func TestEngineLaunch_RecordSchemaConformance(t *testing.T) {
 		t.Errorf("model/measurement provenance = %+v", rec)
 	}
 
-	// (b) Physical key presence for the contract's guaranteed-non-empty
-	//     top-level fields (these cannot be dropped by omitempty on a success
-	//     record) plus the nested token object's four keys.
+	// Physical key presence: these top-level keys cannot be dropped by
+	// omitempty on a success record.
 	var top map[string]json.RawMessage
 	if err := json.Unmarshal([]byte(line), &top); err != nil {
 		t.Fatalf("record not a JSON object: %v", err)

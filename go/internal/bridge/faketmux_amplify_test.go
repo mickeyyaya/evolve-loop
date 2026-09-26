@@ -1,25 +1,14 @@
 package bridge
 
-// faketmux_amplify_test.go — adversarial tests for FakeTmuxController (cycle-276
-// T1). The builder's tmux_repl_fixture_test.go proves the three named fixture
-// scenarios (boot-success, boot-timeout, artifact-delivery). These tests probe
-// the controller's own behavioral contracts: panic-on-underrun, event-recording
-// fidelity, and multi-operation ordering — all properties the ACS predicates
-// rely on but don't directly test.
-
 import (
 	"context"
 	"strings"
 	"testing"
 )
 
-// TestFakeTmuxController_UnderrunPanics verifies the panic-on-underrun
-// contract: calling CapturePane when CaptureFrames is empty must panic with
-// the documented message. The panic makes misuse visible at test-design time
-// (a missing frame = a wrong fixture, not a silent empty-pane return).
 func TestFakeTmuxController_UnderrunPanics(t *testing.T) {
 	t.Parallel()
-	f := &FakeTmuxController{} // CaptureFrames is nil / empty
+	f := &FakeTmuxController{}
 	ctx := context.Background()
 
 	defer func() {
@@ -39,20 +28,16 @@ func TestFakeTmuxController_UnderrunPanics(t *testing.T) {
 	_, _ = f.CapturePane(ctx, "test-session", 0)
 }
 
-// TestFakeTmuxController_UnderrunAfterExhaustion verifies panic fires on the
-// first call AFTER the queue is emptied, not only when the queue starts empty.
 func TestFakeTmuxController_UnderrunAfterExhaustion(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	f := &FakeTmuxController{CaptureFrames: []string{"only-frame"}}
 
-	// First call consumes the one queued frame — must succeed.
 	got, err := f.CapturePane(ctx, "s", 0)
 	if err != nil || got != "only-frame" {
 		t.Fatalf("first CapturePane: got=%q err=%v, want 'only-frame' nil", got, err)
 	}
 
-	// Second call exhausts the queue — must panic.
 	defer func() {
 		if r := recover(); r == nil {
 			t.Fatal("CapturePane after queue exhaustion must panic")
@@ -61,11 +46,6 @@ func TestFakeTmuxController_UnderrunAfterExhaustion(t *testing.T) {
 	_, _ = f.CapturePane(ctx, "s", 0)
 }
 
-// TestFakeTmuxController_EventOrderRecording verifies that Events records
-// each operation in the exact call order: new-session → send → capture →
-// load-buffer → paste-buffer → kill-session. This ordering is the observable
-// contract that tests like TestCodexUpdateMenuDismiss use to assert that
-// Skip (SendKeys) precedes the PasteBuffer inject.
 func TestFakeTmuxController_EventOrderRecording(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -98,9 +78,6 @@ func TestFakeTmuxController_EventOrderRecording(t *testing.T) {
 	}
 }
 
-// TestFakeTmuxController_SendKeysRecording verifies that SentKeys accumulates
-// just the key strings (no enter flag), and SentSeq accumulates the full
-// "{keys}|{enter}" wire encoding used for ordering assertions.
 func TestFakeTmuxController_SendKeysRecording(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -123,8 +100,6 @@ func TestFakeTmuxController_SendKeysRecording(t *testing.T) {
 	}
 }
 
-// TestFakeTmuxController_PasteCountIncrement verifies that PasteCount
-// increments by 1 per PasteBuffer call regardless of the session argument.
 func TestFakeTmuxController_PasteCountIncrement(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -140,8 +115,6 @@ func TestFakeTmuxController_PasteCountIncrement(t *testing.T) {
 	}
 }
 
-// TestFakeTmuxController_KillRecorded verifies KillSession appends session
-// names to KilledSessions in call order.
 func TestFakeTmuxController_KillRecorded(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -153,8 +126,6 @@ func TestFakeTmuxController_KillRecorded(t *testing.T) {
 	}
 }
 
-// TestFakeTmuxController_HasSessionUnknownReturnsFalse verifies that querying
-// an unregistered session name returns false without panic.
 func TestFakeTmuxController_HasSessionUnknownReturnsFalse(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -164,8 +135,6 @@ func TestFakeTmuxController_HasSessionUnknownReturnsFalse(t *testing.T) {
 	}
 }
 
-// TestFakeTmuxController_FrameQueueIsConsumingFIFO verifies that CapturePane
-// returns frames in FIFO order — the first-queued frame is the first returned.
 func TestFakeTmuxController_FrameQueueIsConsumingFIFO(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()

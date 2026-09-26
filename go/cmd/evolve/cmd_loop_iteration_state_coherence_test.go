@@ -1,48 +1,5 @@
 package main
 
-// cmd_loop_iteration_state_coherence_test.go — frozen RED contract for the
-// iteration-state-coherence-sentinel lane (cycle-1693). DO NOT MODIFY: the
-// Builder makes these pass with production code in cmd_loop_window.go /
-// cmd_loop_blockerbreaker.go / cmd_loop_control.go only.
-//
-// THE GAP. unfinishedCycle (cmd_loop_control.go) is the only guard that reads
-// canonical cycle-state as possibly stale, and it runs once per batch in
-// prepareFreshBatch. prepareIteration (cmd_loop_window.go) — the chokepoint
-// cmd_loop_batch.go runs before EVERY dispatch, sequential or fleet — never
-// reads it. A fleet lane SIGKILLed by cmd_fleet.go's WaitDelay escalation dies
-// before its abnormalEpilogue defer (cyclerun_epilogue.go) can apply the state
-// floor (Phase="aborted", ActiveAgent=""), so the canonical record keeps
-// claiming a live phase for a dead cycle. Once the batch has moved past that
-// cycle (CycleID <= lastCycleNumber) unfinishedCycle cannot see it at all.
-//
-// THE CONTRACT these tests pin (inbox acceptance, verbatim scope):
-//
-//	stale in-flight record at the iteration top → WARN + Phase reconciled to
-//	"aborted"; a genuinely resumable unfinished cycle (unfinishedCycle shape)
-//	is NOT touched; wired at loopBatchCoordinator.prepareIteration for every
-//	iteration, fleet waves included; go test -race.
-//
-// "Stale in-flight" is read as the conjunction the repo already has words for:
-//   - the recorded phase is live: not fresh (CycleID 0), not a terminal phase
-//     ("aborted", "end"), and not a phase the cycle already completed and
-//     closed out (a cleanly finished lane's record is history, not residue);
-//   - the owner is dead: no run lease, or a lease whose owner fails
-//     runlease.OwnerLive (the SIGKILL shape is a FRESH heartbeat with a DEAD
-//     pid — the lane was killed seconds before this iteration top);
-//   - unfinishedCycle(cs, last) is false (the boot guard owns that shape).
-//
-// ADVERSARIAL DIVERSITY (skills/adversarial-testing §6):
-//   - Positive : StaleCanonicalState (3 shapes, incl. the "phase=retro
-//     residue" the epilogue's own comment names) + idempotence.
-//   - Negative : ResumableCycleUntouched, OwnInFlightCycleUntouched,
-//     CompletedCycleRecordUntouched, TerminalOrFreshRecordUntouched — every one
-//     diffs the persisted record and the write log, never just "no error".
-//   - Edge/OOD : CoherenceReadErrorSurfacesWithoutWrite,
-//     ReconcileWriteErrorSurfaces (fail loudly, never clobber what was unread).
-//   - Wiring   : WiredBeforeEveryIteration drives the production entrypoint
-//     runLoop (sequential) and prepareIteration under wave AND pool fleet
-//     configs (cmd_loop_batch.go:137 is the one call site for all three).
-
 import (
 	"bytes"
 	"context"
@@ -79,7 +36,6 @@ func iscsProject(t *testing.T) (root, evolveDir string) {
 	return root, evolveDir
 }
 
-// iscsRunDir creates the run workspace a cycle's canonical record points at.
 func iscsRunDir(t *testing.T, root string, cycle int) string {
 	t.Helper()
 	dir := cycleWorkspace(root, cycle)
@@ -107,7 +63,6 @@ func iscsExitedPID(t *testing.T) int {
 	return 0
 }
 
-// iscsLease writes a run lease owned by pid with the given heartbeat.
 func iscsLease(t *testing.T, runDir string, pid int, heartbeat time.Time) {
 	t.Helper()
 	if err := runlease.Write(runDir, runlease.Lease{RunID: "01ISCSRUN", OwnerPID: pid}, heartbeat); err != nil {
@@ -115,7 +70,6 @@ func iscsLease(t *testing.T, runDir string, pid int, heartbeat time.Time) {
 	}
 }
 
-// iscsDossier writes the closeout dossier a cleanly completed cycle leaves.
 func iscsDossier(t *testing.T, root string, cycle int) {
 	t.Helper()
 	dir := filepath.Join(root, "knowledge-base", "cycles")
@@ -134,9 +88,6 @@ func iscsDossier(t *testing.T, root string, cycle int) {
 	}
 }
 
-// iscsCoordinator builds the minimal coordinator the existing prepareIteration
-// tests use (TestPrepareIteration_PassesTheBatchCenterToTheRefresh), with the
-// console captured so the WARN is observable.
 func iscsCoordinator(root, evolveDir string, st core.Storage) (*loopBatchCoordinator, *bytes.Buffer) {
 	var console bytes.Buffer
 	b := &loopBatchCoordinator{
@@ -151,9 +102,8 @@ func iscsCoordinator(root, evolveDir string, st core.Storage) (*loopBatchCoordin
 	return b, &console
 }
 
-// iscsPrepare runs one iteration top on the sequential (Count=1) config and
-// requires it to reach batchProceed — a fixture that halts earlier proves
-// nothing about the coherence check.
+// iscsPrepare requires the iteration top to reach batchProceed: a fixture
+// that halts earlier proves nothing about the coherence check.
 func iscsPrepare(t *testing.T, b *loopBatchCoordinator, console *bytes.Buffer, iteration int) {
 	t.Helper()
 	fc := policy.FleetConfig{Count: 1}
@@ -166,7 +116,6 @@ func iscsPrepare(t *testing.T, b *loopBatchCoordinator, console *bytes.Buffer, i
 	}
 }
 
-// iscsWarnLines returns the console lines that WARN about cycle n.
 func iscsWarnLines(console string, cycle int) []string {
 	id := fmt.Sprintf("%d", cycle)
 	var out []string
@@ -178,8 +127,6 @@ func iscsWarnLines(console string, cycle int) []string {
 	return out
 }
 
-// iscsAssertUntouched is the byte-level negative check: the persisted record
-// is deep-equal to the seed, nothing was written, nothing WARNed about it.
 func iscsAssertUntouched(t *testing.T, st *fixtures.FakeStorage, seed core.CycleState, console string) {
 	t.Helper()
 	got, err := st.ReadCycleState(context.Background())
@@ -197,11 +144,6 @@ func iscsAssertUntouched(t *testing.T, st *fixtures.FakeStorage, seed core.Cycle
 	}
 }
 
-// TestPrepareIteration_StaleCanonicalState — AC1 positive. A canonical record
-// claiming a live phase for a dead cycle the batch already passed is WARNed
-// and reconciled with the epilogue's state-floor semantics: Phase="aborted",
-// ActiveAgent cleared, identity (CycleID, WorkspacePath, CompletedPhases)
-// preserved — a reconcile, not a wipe. A second iteration top is quiet.
 func TestPrepareIteration_StaleCanonicalState(t *testing.T) {
 	cases := []struct {
 		name      string
@@ -224,8 +166,7 @@ func TestPrepareIteration_StaleCanonicalState(t *testing.T) {
 			lease:     func(*testing.T, string) {},
 		},
 		{
-			// The "two-hour stale phase=retro residue" cyclerun_epilogue.go's
-			// state floor names: retro is live until it completes.
+			// retro is live until it completes, per cyclerun_epilogue.go's state floor.
 			name:      "killed_mid_retro",
 			phase:     "retro",
 			completed: []string{"scout", "triage", "tdd", "build", "audit", "ship"},
@@ -280,8 +221,6 @@ func TestPrepareIteration_StaleCanonicalState(t *testing.T) {
 				t.Errorf("the WARN must name the stale phase %q it reconciled: %q", tc.phase, warns)
 			}
 
-			// Idempotence: the reconciled record is terminal — the next
-			// iteration top neither rewrites it nor WARNs again.
 			writes, warnCount := len(st.CycleStateLog), len(warns)
 			iscsPrepare(t, b, console, 2)
 			if n := len(st.CycleStateLog); n != writes {
@@ -294,10 +233,6 @@ func TestPrepareIteration_StaleCanonicalState(t *testing.T) {
 	}
 }
 
-// TestPrepareIteration_ResumableCycleUntouched — AC1 negative. The boot-guard
-// shape (unfinishedCycle: CycleID > lastCycleNumber) belongs to
-// `evolve loop --resume` / `evolve cycle reset`; the iteration sentinel must
-// leave it byte-identical even when its owner is dead.
 func TestPrepareIteration_ResumableCycleUntouched(t *testing.T) {
 	const resumable = iscsLastCycle + 1
 	for _, withLease := range []bool{true, false} {
@@ -330,10 +265,6 @@ func TestPrepareIteration_ResumableCycleUntouched(t *testing.T) {
 	}
 }
 
-// TestPrepareIteration_OwnInFlightCycleUntouched — the "never touch a live
-// lane" edge. The record's cycle is already <= lastCycleNumber, so ONLY owner
-// liveness distinguishes it from residue: a fresh lease held by a live pid
-// (this very process — the loop's own in-flight cycle) must stay untouched.
 func TestPrepareIteration_OwnInFlightCycleUntouched(t *testing.T) {
 	root, evolveDir := iscsProject(t)
 	runDir := iscsRunDir(t, root, iscsStaleCycle)
@@ -356,11 +287,6 @@ func TestPrepareIteration_OwnInFlightCycleUntouched(t *testing.T) {
 	iscsAssertUntouched(t, st, seed, console.String())
 }
 
-// TestPrepareIteration_CompletedCycleRecordUntouched — over-correction guard.
-// A cleanly finished fleet lane leaves its last phase recorded AND completed,
-// a closeout dossier, and a lease whose owner exited normally. That is
-// history, not an in-flight claim: WARNing (and relabelling a shipped cycle
-// "aborted") on every healthy lane would bury the one real signal.
 func TestPrepareIteration_CompletedCycleRecordUntouched(t *testing.T) {
 	root, evolveDir := iscsProject(t)
 	runDir := iscsRunDir(t, root, iscsLastCycle)
@@ -386,9 +312,6 @@ func TestPrepareIteration_CompletedCycleRecordUntouched(t *testing.T) {
 	iscsAssertUntouched(t, st, seed, console.String())
 }
 
-// TestPrepareIteration_TerminalOrFreshRecordUntouched — records with nothing
-// to reconcile: a fresh tree, an already-aborted record (the epilogue ran, or
-// a previous iteration reconciled it), and the end marker.
 func TestPrepareIteration_TerminalOrFreshRecordUntouched(t *testing.T) {
 	cases := []struct {
 		name  string
@@ -422,9 +345,6 @@ func TestPrepareIteration_TerminalOrFreshRecordUntouched(t *testing.T) {
 	}
 }
 
-// TestPrepareIteration_CoherenceReadErrorSurfacesWithoutWrite — an unreadable
-// canonical record is reported on the loop console (never swallowed) and is
-// never overwritten: the sentinel cannot reconcile what it could not read.
 func TestPrepareIteration_CoherenceReadErrorSurfacesWithoutWrite(t *testing.T) {
 	root, evolveDir := iscsProject(t)
 	const marker = "iscs-injected: cycle-state unreadable"
@@ -447,8 +367,6 @@ func TestPrepareIteration_CoherenceReadErrorSurfacesWithoutWrite(t *testing.T) {
 	}
 }
 
-// TestPrepareIteration_ReconcileWriteErrorSurfaces — a failed reconcile write
-// is reported on the loop console, not silently dropped.
 func TestPrepareIteration_ReconcileWriteErrorSurfaces(t *testing.T) {
 	root, evolveDir := iscsProject(t)
 	runDir := iscsRunDir(t, root, iscsStaleCycle)
@@ -474,14 +392,6 @@ func TestPrepareIteration_ReconcileWriteErrorSurfaces(t *testing.T) {
 	}
 }
 
-// TestPrepareIteration_WiredBeforeEveryIteration — AC2 wiring proof. The one
-// call site (cmd_loop_batch.go:137) serves the sequential path and both fleet
-// schedulers, so the proof drives:
-//   - the production entrypoint runLoop (sequential): the reconcile write for
-//     the stale cycle lands BEFORE the batch's own cycle writes any state;
-//   - prepareIteration under a wave and a pool fleet config (iteration 1, i.e.
-//     NOT the batch's first dispatch — prepareFreshBatch is not in play), so a
-//     check gated on the sequential config, or run once per batch, fails.
 func TestPrepareIteration_WiredBeforeEveryIteration(t *testing.T) {
 	staleSeed := func(t *testing.T, root string) core.CycleState {
 		runDir := iscsRunDir(t, root, iscsStaleCycle)

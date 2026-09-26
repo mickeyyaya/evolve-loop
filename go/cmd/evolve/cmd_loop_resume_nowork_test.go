@@ -2,13 +2,6 @@
 
 package main
 
-// cmd_loop_resume_nowork_test.go — F30 architecture review M1: `evolve loop
-// --resume` can resume a fleet lane's checkpoint in-process with its lane pin,
-// so the resume root makes the same one post-result closeout as the cycle-run
-// root. Before, it made none: a resumed lane that ended planned no-work left
-// its answered item pending for the next wave to redraw, and a resumed FAIL
-// never reached the inbox lifecycle at all.
-
 import (
 	"bytes"
 	"context"
@@ -26,7 +19,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// resumedNoWorkRunner resumes into a planned-no-work end.
 type resumedNoWorkRunner struct{ cycle int }
 
 func (r resumedNoWorkRunner) RunCycle(context.Context, core.CycleRequest) (core.CycleResult, error) {
@@ -69,8 +61,6 @@ func TestRunResumeBatch_APlannedNoWorkLaneIsHandedOver(t *testing.T) {
 	}
 }
 
-// resumedFailRunner resumes into a FAIL — as a verdict, or as a cycle-level
-// failure error.
 type resumedFailRunner struct {
 	result core.CycleResult
 	err    error
@@ -86,7 +76,6 @@ func (r resumedFailRunner) RunCycleFromPhase(context.Context, core.CycleRequest,
 
 func (resumedFailRunner) SignalSummary() signalcenter.Summary { return signalcenter.Summary{} }
 
-// writeResumeCheckpoint pins a resumable checkpoint for cycle 7.
 func writeResumeCheckpoint(t *testing.T, evolveDir, ws string) {
 	t.Helper()
 	st := storage.New(evolveDir)
@@ -103,12 +92,6 @@ func writeResumeCheckpoint(t *testing.T, evolveDir, ws string) {
 	}
 }
 
-// TestRunResumeBatch_AResumedFailWalksTheFailureLifecycle (F30 re-review
-// MAJOR 1): the resume root now runs the failure walk — for a FAIL verdict and
-// for a cycle-level failure error — through the root's ledger: the claimed
-// item is released to the root. (Whether the walk also bumps failure_count is
-// the walk's own classification — a cycle with no phase-outcome record is
-// system-level and never charged — pinned in cycleoutcome, not here.)
 func TestRunResumeBatch_AResumedFailWalksTheFailureLifecycle(t *testing.T) {
 	for name, runner := range map[string]resumedFailRunner{
 		"a FAIL verdict":        {result: core.CycleResult{Cycle: 7, FinalVerdict: core.VerdictFAIL}},

@@ -2,10 +2,6 @@ package core
 
 import "testing"
 
-// TestMergeFailedRecords_UnionsDiskAndIncoming: under concurrent fleet runs, a
-// run's write must NOT clobber a peer's failure record already on disk. The merge
-// keeps disk-only records (peer's), adds incoming-only records (this run's), and
-// lets incoming win for a shared key (this run's own update, e.g. Retrospected).
 func TestMergeFailedRecords_UnionsDiskAndIncoming(t *testing.T) {
 	disk := []FailedRecord{
 		{Cycle: 1, TS: "t1", Verdict: "FAIL"},

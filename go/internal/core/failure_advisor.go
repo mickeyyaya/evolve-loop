@@ -18,20 +18,13 @@ const (
 	advisorPaneMaxCols  = 400
 )
 
-// FailureAdvisor is the ADR-0044 LLM escalation TAIL: it reads a fatal-looking
-// pane the deterministic FatalPaneDetector could NOT classify (CauseUnknown)
-// and returns a typed cause + the novel pane substring to promote + a
-// human-readable justification. Built exactly like PhaseAdvisor — bridge-
-// dispatched, persona-injected, strict-JSON-parsed — and fail-safe the same
-// way: EVERY failure (nil bridge, launch error, malformed output, vocabulary
-// violation) returns an error and the caller escalates to the operator
-// instead of acting on garbage. Deterministic-first, LLM-last (Core Agent
-// Rule 5): this advisor is never on the hot loop for a known failure — its
-// verdicts get PROMOTED into the deterministic registry
-// (recovery.PromoteAdvice), so each novel state is paid for once.
+// FailureAdvisor is the LLM escalation tail for a fatal-looking pane the
+// deterministic FatalPaneDetector could not classify (CauseUnknown).
+//
+// See ADR-0044.
 type FailureAdvisor struct {
 	bridge   Bridge
-	identity AgentIdentity // ADR-0052 WS1-S1: shared dispatch identity (same value object as PhaseAdvisor)
+	identity AgentIdentity // See ADR-0052.
 }
 
 // FailureAdvisorOption customizes a FailureAdvisor (mirrors PhaseAdvisorOption).
@@ -66,9 +59,8 @@ func WithFailureAdvisorPersona(body string) FailureAdvisorOption {
 }
 
 // NewFailureAdvisor builds the failure-classification tail over the given
-// bridge. Defaults mirror PhaseAdvisor (claude-tmux + deep): diagnosing a
-// novel terminal state is judgment work, and the advisor runs OFF the hot
-// loop (only for unclassified states), so depth beats latency here.
+// bridge, defaulting to claude-tmux/opus: it runs off the hot loop for
+// unclassified states only, so depth beats latency here.
 func NewFailureAdvisor(bridge Bridge, opts ...FailureAdvisorOption) *FailureAdvisor {
 	a := &FailureAdvisor{
 		bridge:   bridge,
@@ -93,13 +85,9 @@ type FailureAdviseInput struct {
 	Env         map[string]string
 }
 
-// Advise asks the LLM to classify one CauseUnknown terminal state. The
-// verdict is validated against the recovery vocabulary before it is returned
-// — a hallucinated cause errors here, so no caller ever has to re-check.
-// Promotion (in-memory + durable) is the caller's explicit next step via
-// recovery.PromoteAdvice; Advise itself is read-only judgment. The caller's
-// ctx bounds the dispatch (a batch cancellation must reach an in-flight
-// advisor).
+// Advise asks the LLM to classify one CauseUnknown terminal state and
+// returns a vocabulary-validated verdict; promotion into the deterministic
+// registry is the caller's separate step via recovery.PromoteAdvice.
 func (a *FailureAdvisor) Advise(ctx context.Context, in FailureAdviseInput) (*recovery.FailureAdvice, error) {
 	if a.bridge == nil {
 		return nil, fmt.Errorf("failure advisor: nil bridge")
@@ -130,9 +118,8 @@ func (a *FailureAdvisor) Advise(ctx context.Context, in FailureAdviseInput) (*re
 	return parseFailureAdvice(resp.Stdout)
 }
 
-// composePrompt renders persona (when injected) + the per-incident evidence,
-// the same layering every phase prompt uses. The inline fallback keeps the
-// advisor functional before the composition root wires the persona file.
+// The inline fallback keeps the advisor functional before the composition
+// root wires the persona file.
 func (a *FailureAdvisor) composePrompt(in FailureAdviseInput, artifact string) string {
 	var b strings.Builder
 	if a.identity.Persona != "" {
@@ -145,16 +132,13 @@ func (a *FailureAdvisor) composePrompt(in FailureAdviseInput, artifact string) s
 	}
 	b.WriteString("# Incident\n")
 	fmt.Fprintf(&b, "- phase: %s\n- cli: %s\n- exit_code: %d\n- cycle: %d\n\n", in.Phase, in.CLI, in.ExitCode, in.Cycle)
-	// ADR-0045 I5: pane text is untrusted input. It reaches this (quarantined)
-	// LLM only as a neutralized, framed digest — secrets redacted, house
-	// markers defanged, fence-breakout softened — never raw (threats S1/S6).
+	// See ADR-0045.
 	b.WriteString("# Recent pane tail\n")
 	b.WriteString(panetrust.Frame(in.PaneTail, advisorPaneMaxLines, advisorPaneMaxCols))
 	b.WriteString("\n\n")
-	// I5 grounding (review finding): the model sees only the NEUTRALIZED
-	// pane, but the promoted pane_substr is matched against RAW panes by
-	// recovery.FatalPaneDetector — a quoted neutralization artifact would
-	// promote a signature that can never fire.
+	// The model sees only the neutralized pane, but the promoted pane_substr is
+	// matched against RAW panes by recovery.FatalPaneDetector, so a quoted
+	// neutralization artifact would promote a signature that can never fire.
 	b.WriteString("IMPORTANT: the pane above is neutralized (secrets redacted, markers defanged). ")
 	b.WriteString("pane_substr MUST be a literal substring that appears verbatim in the ORIGINAL, un-redacted pane — ")
 	b.WriteString("never quote [REDACTED], [untrusted], or ''' artifacts.\n\n")
@@ -163,11 +147,9 @@ func (a *FailureAdvisor) composePrompt(in FailureAdviseInput, artifact string) s
 	return b.String()
 }
 
-// parseFailureAdvice decodes + validates the advisor's strict-JSON verdict.
-// Validation here is the trust boundary: cause must be in the typed
-// vocabulary and the substring long enough to be promotable — the same
-// checks recovery.PromoteAdvice enforces, applied early so a bad verdict
-// fails at the parse site with the model's raw output in the error.
+// parseFailureAdvice is the trust boundary: it applies the same checks
+// recovery.PromoteAdvice enforces, early, so a bad verdict fails at the parse
+// site with the model's raw output in the error.
 func parseFailureAdvice(raw string) (*recovery.FailureAdvice, error) {
 	trimmed := strings.TrimSpace(raw)
 	// Tolerate accidental code fences (the same leniency parseProposal applies).
@@ -178,10 +160,6 @@ func parseFailureAdvice(raw string) (*recovery.FailureAdvice, error) {
 	if err := json.Unmarshal([]byte(strings.TrimSpace(trimmed)), &adv); err != nil {
 		return nil, fmt.Errorf("failure advisor: unparseable verdict (%v): %.200s", err, raw)
 	}
-	// The persona's documented non-fatal signal: an empty cause means the
-	// advisor judged the pane NOT fatal. Still an error (the caller
-	// escalates to the operator — correct outcome), but operationally
-	// distinct from a hallucinated cause.
 	if adv.Cause == "" {
 		return nil, fmt.Errorf("failure advisor: advisor judged the state non-fatal — escalate to operator (justification: %s)", adv.Justification)
 	}

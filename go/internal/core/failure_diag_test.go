@@ -1,10 +1,5 @@
 package core
 
-// failure_diag_test.go — unit 02 (ADR-0103): the orchestrator keeps the seam
-// every abort site uses (writePhaseFailureDiag, now a method) and the exported
-// DeliveryFailureCause facade; the unit-02 writer is built once, reads the
-// clock and the Center live, and has ONE construction site. RED first.
-
 import (
 	"os"
 	"path/filepath"

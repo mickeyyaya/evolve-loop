@@ -1,14 +1,5 @@
 package main
 
-// cmd_loop_unit13_golden_test.go — ADR-0103 unit 13 fold 0: the characterization
-// goldens captured on 8e8f080f BEFORE the wave engine (cmd_loop_wave.go) and
-// the chain engine (cmd_loop_chain.go) moved into internal/loopwave and
-// internal/loopchain. Every test here drives the package-main spellings the
-// unit keeps as facades, so the same fixtures replay through the leaves. The
-// goldens live beside the leaves (internal/<leaf>/testdata) so the leaf tests
-// read the identical bytes; temp paths are templated {ROOT} / {EVOLVE_DIR},
-// RFC3339 stamps {TS}.
-
 import (
 	"bytes"
 	"context"
@@ -48,13 +39,11 @@ func u13Golden(t *testing.T, dir, name string) string {
 	return string(raw)
 }
 
-// u13Template replaces the fixture's temp paths and stamps with placeholders.
 func u13Template(s, root, evolveDir string) string {
 	s = strings.ReplaceAll(s, evolveDir, "{EVOLVE_DIR}")
 	s = strings.ReplaceAll(s, root, "{ROOT}")
-	// The os.ReadDir fault's PathError Op is Go-version- and OS-dependent
-	// (`open` / `fdopendir` / `readdirent`); the goldens keep `open` (see
-	// loopchain's template).
+	// os.ReadDir's fault PathError Op is Go-version- and OS-dependent (`open` /
+	// `fdopendir` / `readdirent`); the goldens canonicalize it to `open`.
 	s = u13ReadDirOp.ReplaceAllString(s, "open $1: not a directory")
 	return u13RFC3339.ReplaceAllString(s, "{TS}")
 }
@@ -80,7 +69,6 @@ func u13WriteJSON(t *testing.T, path string, v any) {
 	}
 }
 
-// u13Launcher records every Run and answers one clean result per spec.
 type u13Launcher struct{ calls [][]fleet.CycleSpec }
 
 func (l *u13Launcher) Run(_ context.Context, specs []fleet.CycleSpec) []fleet.Result {
@@ -95,8 +83,6 @@ func (l *u13Launcher) Run(_ context.Context, specs []fleet.CycleSpec) []fleet.Re
 func u13FloorsPlan(context.Context, int) ([]byte, []string, error) {
 	return []byte(`{"committed_floors":["core"]}`), nil, nil
 }
-
-// --- 1. the three step-error strings (dispatchIteration ≡ forceOneLaneDispatch) ---
 
 func u13StepErrorLines(t *testing.T) string {
 	t.Helper()
@@ -137,12 +123,9 @@ func TestWaveDispatch_StepErrorsAreByteIdenticalToTheGolden(t *testing.T) {
 	}
 }
 
-// --- 2. the decision bytes: prune keeps every key, widen re-marshals top_n only ---
-
-// u13PruneFixture seeds the prior cycle's decision (cycle 7) with one pending
-// and one consumed id and drives the production plan source: the prune runs
-// before the widen, and with alpha the only pending item the widen has
-// nothing to add, so the plan's bytes ARE the prune's.
+// u13PruneFixture seeds the prior cycle's decision with one pending and one
+// consumed id, with alpha the only pending item, so the widen stage has
+// nothing to add and the plan's bytes are exactly the prune's.
 func u13PruneFixture(t *testing.T, decision string) (plan func(stderr io.Writer) []byte, root string) {
 	t.Helper()
 	root = t.TempDir()
@@ -198,8 +181,6 @@ func TestWavePlan_PruneAndWidenBytesAreByteIdenticalToTheGolden(t *testing.T) {
 	}
 }
 
-// --- 3. the inbox seed: bytes and the exact refusal text ---
-
 func u13SeedFixture(t *testing.T, todos int) string {
 	t.Helper()
 	evolveDir := filepath.Join(t.TempDir(), ".evolve")
@@ -222,8 +203,6 @@ func TestWaveSeed_JSONAndErrorAreByteIdenticalToTheGolden(t *testing.T) {
 		t.Errorf("the refusal text is pinned: %v", err)
 	}
 }
-
-// --- 4. every stderr line the wave file writes, labeled per case ---
 
 func u13WaveStderrSections(t *testing.T) string {
 	t.Helper()
@@ -282,8 +261,8 @@ func u13WaveStderrSections(t *testing.T) string {
 	section("launcher_all_stale", func(w io.Writer) {
 		root := t.TempDir()
 		for _, id := range []string{"a", "b"} {
-			// The promoter nests processed/ by cycle (lifecycle.promoteDestPath); the
-			// console names the cycle dir, so the fixture writes the real layout.
+			// lifecycle.promoteDestPath nests processed/ by cycle; the fixture
+			// mirrors that real layout rather than a flat processed/ dir.
 			u13WriteJSON(t, filepath.Join(root, ".evolve", "inbox", "processed", "cycle-9", id+".json"), map[string]any{"id": id, "weight": 0.5, "files": []string{id + ".go"}})
 		}
 		productionWaveLauncher(policy.FleetConfig{Concurrency: 1}, "", root, "", "", io.Discard, w).Run(context.Background(), []fleet.CycleSpec{{Scope: []string{"a"}}, {Scope: []string{"b"}}})
@@ -291,8 +270,6 @@ func u13WaveStderrSections(t *testing.T) string {
 	return b.String()
 }
 
-// u13MinWidthSections drives the four minWidthRepair branches through the
-// production sink topology (testRootSignals) — the console they render on.
 func u13MinWidthSections(t *testing.T) string {
 	t.Helper()
 	var b strings.Builder
@@ -325,18 +302,9 @@ func u13CaptureWriter(fn func(io.Writer)) string {
 	return buf.String()
 }
 
-// The `.golden.txt` files are the base capture (8e8f080f) — the leaf tests
-// derive every replaced line's reason from them. The `.rendered.golden.txt`
-// files are the fold-4 console: byte-identical for every KEPT line, and the
-// declared replacements (D-1 the three min-width lines, D-2 the dispatch
-// failure, D-4 the all-stale gate) rendered by the root sink as
-// `[loop] loop.wave WARN <CODE> … — <the old sentence> k=v`. The all-stale
-// row disappears from the test-only launcher facade's console (a Null
-// Center); the leaf asserts the signal.
 func TestWaveStderr_EveryLineIsByteIdentical(t *testing.T) {
 	u13Compare(t, "wave stderr", u13WaveStderrSections(t), u13Golden(t, u13WaveGoldens, "stderr_wave.rendered.golden.txt"))
 	u13Compare(t, "min-width console", u13MinWidthSections(t), u13Golden(t, u13WaveGoldens, "stderr_minwidth.rendered.golden.txt"))
-	// Every kept line of the base capture survives verbatim.
 	base := u13Golden(t, u13WaveGoldens, "stderr_wave.golden.txt")
 	for _, line := range strings.Split(base, "\n") {
 		if strings.HasPrefix(line, "[") && !strings.HasPrefix(line, "[fleet] freshness gate: all") && !strings.Contains(u13WaveStderrSections(t), line) {
@@ -345,10 +313,8 @@ func TestWaveStderr_EveryLineIsByteIdentical(t *testing.T) {
 	}
 }
 
-// --- 5. the chain summary JSON per stop reason ---
-
-// u13ChainEnv seeds a chain project: `items` pending todos, a rebuilt binary
-// and a stale pin (so a scripted refresh can fire).
+// u13ChainEnv seeds a chain project with a stale pin so a scripted refresh
+// can fire.
 func u13ChainEnv(t *testing.T, items int) (root, evolveDir string) {
 	t.Helper()
 	root, evolveDir, _ = brhProject(t, "STALE_PIN", "REBUILT-BINARY-BYTES")
@@ -358,8 +324,8 @@ func u13ChainEnv(t *testing.T, items int) (root, evolveDir string) {
 	return root, evolveDir
 }
 
-// u13StubRefresh scripts every refresh seam so a boundary refresh fires
-// deterministically (rebuild/re-exec are recorded, never real).
+// u13StubRefresh scripts every refresh seam so rebuild/re-exec are recorded,
+// never actually run.
 func u13StubRefresh(t *testing.T, ahead func() bool) {
 	t.Helper()
 	prevAhead, prevCommit, prevProv := chainBoundaryAheadFn, chainRunningCommitFn, chainBoundaryRepinProvenanceFn
@@ -449,8 +415,6 @@ func TestChainResult_StdoutIsByteIdenticalPerStopReason(t *testing.T) {
 	}
 }
 
-// --- 6. the attempt marker and the JSONL audit entry ---
-
 func u13MarkerAndLog(t *testing.T) (marker, logLine string) {
 	t.Helper()
 	root, evolveDir, _ := brhProject(t, "STALE_PIN", "REBUILT-BINARY-BYTES")
@@ -476,18 +440,12 @@ func TestChainBoundaryRefresh_MarkerAndLogBytesAreByteIdentical(t *testing.T) {
 	u13Compare(t, "log entry", logLine, u13Golden(t, u13ChainGoldens, "log_entry.golden.jsonl"))
 }
 
-// --- 7. all twenty-three chain stderr lines ---
-
-// u13RefreshSections faults each refresh seam in turn and records the stderr
-// of maybeRefreshChainBoundary — the thirteen branches.
 func u13RefreshSections(t *testing.T) string {
 	t.Helper()
 	var b strings.Builder
 	run := func(name string, prep func(root, evolveDir string)) {
 		root, evolveDir, _ := brhProject(t, "STALE_PIN", "REBUILT-BINARY-BYTES")
 		u13StubRefresh(t, func() bool { return true })
-		// Every seam a section faults is restored right after it — the
-		// sections share one process.
 		prevLane := chainBoundaryFleetLaneFn
 		defer func() { chainBoundaryFleetLaneFn = prevLane }()
 		if prep != nil {
@@ -549,7 +507,8 @@ func u13DriverSections(t *testing.T) string {
 		_, _, stderr := u13ChainStdout(t, c)
 		fmt.Fprintf(&b, "== %s\n%s", c.reason, stderr)
 	}
-	// The invalid inbox item and the quota defer without a checkpoint block.
+	// Combines an invalid inbox item with a quota defer that carries no
+	// checkpoint, in one run.
 	root, evolveDir := u13ChainEnv(t, 1)
 	if err := os.WriteFile(filepath.Join(evolveDir, "inbox", "typo-item.json"), nil, 0o644); err != nil {
 		t.Fatal(err)
@@ -560,10 +519,6 @@ func u13DriverSections(t *testing.T) string {
 	return b.String()
 }
 
-// The chain's twenty-three lines: the base capture (`.golden.txt`) is the
-// leaf's source of every replaced line's reason; the fold-4 console
-// (`.rendered.golden.txt`) keeps the seven INFO-shaped report lines verbatim
-// and renders the sixteen replaced ones as signals (D-6).
 func TestChainStderr_AllTwentyThreeLinesAreByteIdentical(t *testing.T) {
 	u13Compare(t, "refresh stderr", u13RefreshSections(t), u13Golden(t, u13ChainGoldens, "stderr_refresh.rendered.golden.txt"))
 	u13Compare(t, "driver stderr", u13DriverSections(t), u13Golden(t, u13ChainGoldens, "stderr_driver.rendered.golden.txt"))
@@ -582,8 +537,6 @@ func TestChainStderr_AllTwentyThreeLinesAreByteIdentical(t *testing.T) {
 	}
 }
 
-// --- 9. the fault-free signal stream: a clean chain emits nothing ---
-
 func TestLoop_FaultFreeStreamIsByteIdentical(t *testing.T) {
 	root, evolveDir := u13ChainEnv(t, 1)
 	u13StubRefresh(t, func() bool { return false })
@@ -594,13 +547,9 @@ func TestLoop_FaultFreeStreamIsByteIdentical(t *testing.T) {
 	if rc := runLoopChain(loopConfig{ProjectRoot: root, EvolveDir: evolveDir}, policy.ChainConfig{Enabled: true, MaxBatches: 5}, nil, &out, &errb); rc != 0 {
 		t.Fatalf("rc=%d: %s", rc, errb.String())
 	}
-	// The chain's Signal Center records nothing on a clean run: the durable
-	// batch-level stream is absent (8e8f080f: no chain Center exists) or empty.
 	if data, err := os.ReadFile(filepath.Join(evolveDir, "signals.ndjson")); err == nil && strings.TrimSpace(string(data)) != "" {
 		t.Errorf("a clean chain must add nothing to the signal stream:\n%s", data)
 	}
-	// A clean wave through the wave dispatcher: one INFO summary from the
-	// coordinator is the only loop.wave event (the dispatcher itself is silent).
 	c := signalcenter.New()
 	var kinds []string
 	c.Subscribe(func(e signalcenter.Event) {

@@ -1,27 +1,5 @@
 package bridge
 
-// effort_toprungs_test.go — the top of the reasoning ladder, pinned per family.
-//
-// Directive history: 2026-08-24 put deep/top phases at xhigh; 2026-08-28
-// moved the CODEX-routed ones to max; 2026-09-01 moved them to high (quota
-// headroom). This file pins REALIZABILITY of the upper rungs regardless of
-// which one the current directive selects — the max/xhigh rows below stay
-// because the manifest must keep every mapped rung realizable (a directive
-// can flip back with one profile edit); WHICH rung profiles actually pin
-// lives in profiles/effort_defaults_test.go, not here.
-//
-// Two contracts: (1) each rung REALIZES on the families with an effort dial —
-// realizeScalar silently drops unmapped enum values, so a missing codex
-// mapping loses the dial with no error (observed exactly that way: the max row
-// failed with flags [--yolo], the dial simply absent); (2) EVERY tracked
-// profile's effort_level is realizable by its own family's manifest — the
-// class guard, so a future profile value can never silently no-op.
-//
-// Ladder verified live against codex 0.147.0 (/model -> "More reasoning..."):
-// low, medium, high, xhigh, max, ultra. claude exposes low..max via --effort
-// (its picker's "Ultracode" is an orchestration mode, NOT an --effort token —
-// `--effort ultracode` silently falls back to xhigh).
-
 import (
 	"encoding/json"
 	"os"
@@ -41,16 +19,9 @@ func repoRootForEffort(t *testing.T) string {
 	return filepath.Join(filepath.Dir(thisFile), "..", "..", "..")
 }
 
-// ASYMMETRY, stated so these rows are not over-read: codex-tmux maps effort
-// through a values TABLE, so an unmapped rung silently drops — that is the bug
-// class here, and the codex rows are what catch it. claude-tmux declares effort
-// as pass-through (flag, no values table), so realizeScalar appends ANY string;
-// its rows would pass for "banana" just as readily as for "max". They therefore
-// prove the pass-through MECHANISM is wired (they would fail if the channel
-// flipped to noop, the flag were renamed, or a restrictive values table were
-// added without the rung) — they prove NOTHING about max being a valid claude
-// effort, and no claude-routed profile ships max today. Claimed narrowly on
-// purpose: a guard cited for more than it checks is worse than no guard.
+// claude-tmux declares effort as pass-through (flag, no values table), so
+// realizeScalar appends any string; its rows prove the mechanism is wired,
+// not that "max" is a valid claude effort level.
 func TestEffortTopRungs_RealizeOnCodexAndClaude(t *testing.T) {
 	for _, tc := range []struct {
 		manifest string
@@ -82,12 +53,9 @@ func containsSubsequence(hay, needle []string) bool {
 	return false
 }
 
-// Every tracked profile's effort_level must be realizable by the manifest of
-// the profile's own cli family: mapped in a values table, pass-through (flag
-// with no values), or the family has no effort dial at all (noop/absent).
-// realizeScalar's silent-drop on unmapped enum values makes this the ONLY
-// place the mismatch can be caught before a live dispatch quietly loses its
-// reasoning-effort dial.
+// realizeScalar silently drops an unmapped enum value, so this is the only
+// place a profile's effort_level/effort_overrides mismatch with its manifest
+// is caught before a live dispatch quietly loses its reasoning-effort dial.
 func TestTrackedProfileEffortLevelsAllRealizable(t *testing.T) {
 	root := repoRootForEffort(t)
 	profDir := filepath.Join(root, ".evolve", "profiles")
@@ -112,9 +80,9 @@ func TestTrackedProfileEffortLevelsAllRealizable(t *testing.T) {
 		if json.Unmarshal(raw, &p) != nil || p.CLI == "" {
 			continue
 		}
-		// Every rung the profile can dispatch at: effort_level plus each
-		// per-tier effort_overrides value (ADR-0096) — the override is realized
-		// by the same realizeScalar and silently dropped the same way.
+		// See ADR-0096.
+		// An effort_overrides value is realized by the same realizeScalar
+		// and silently dropped the same way.
 		rungs := map[string]string{}
 		if p.EffortLevel != "" {
 			rungs["effort_level"] = p.EffortLevel

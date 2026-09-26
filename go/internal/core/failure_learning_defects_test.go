@@ -1,9 +1,5 @@
 package core_test
 
-// RED note: this file references core.ApplyDefectsAsCarryoverTodos which does
-// not exist yet — the compile error is the intended RED signal. Builder adds
-// the function in go/internal/core/failure_learning.go (D2-e slice).
-
 import (
 	"strings"
 	"testing"
@@ -11,9 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// TestDefects_BecomeCarryoverTodos verifies that each entry in
-// FailedRecord.Defects becomes its own CarryoverTodo (not just one generic
-// phase-failed todo). A single generic todo does NOT meet the D2 contract.
 func TestDefects_BecomeCarryoverTodos(t *testing.T) {
 	defects := []string{
 		"unbounded fan-out in auditor verify path",
@@ -47,8 +40,6 @@ func TestDefects_BecomeCarryoverTodos(t *testing.T) {
 	}
 }
 
-// TestDefects_BecomeCarryoverTodos_NegativeEmptyDefects verifies that an empty
-// Defects slice results in zero new per-defect todos (boundary / OOD case).
 func TestDefects_BecomeCarryoverTodos_NegativeEmptyDefects(t *testing.T) {
 	state := &core.State{}
 	record := core.FailedRecord{

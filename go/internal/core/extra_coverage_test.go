@@ -15,11 +15,6 @@ import (
 
 func coverNow() time.Time { return time.Date(2026, 5, 27, 0, 0, 0, 0, time.UTC) }
 
-// --- enforceNext: all five decision branches -------------------------------
-
-// TestEnforceNext covers the router-vs-kernel gate: empty/equal proposal, an
-// illegal edge (CanTransition false), a legal-but-spine-gated edge
-// (SpineSatisfiedUpTo false), and a legal differing edge that survives.
 func TestEnforceNext(t *testing.T) {
 	t.Parallel()
 	// Catalog carries one optional user phase "extra-check" so the candidatePhase
@@ -61,12 +56,6 @@ func TestEnforceNext(t *testing.T) {
 	}
 }
 
-// TestEnforceNext_EmptyOrderSkipAdvance pins the cycle-240 e2e regression: with
-// an EMPTY cfg.Order (no phase-registry.json — the e2e fixtures and any bare
-// repo), the skip-advance loop must NOT rewrite a skipped staticNext to
-// PhaseEnd (nextInOrder returns PhaseEnd for any phase absent from an empty
-// order, which silently terminated cycles after tdd). The original staticNext
-// is kept — pre-skip-advance parity — and no advance is reported.
 func TestEnforceNext_EmptyOrderSkipAdvance(t *testing.T) {
 	t.Parallel()
 	o := &Orchestrator{sm: NewStateMachine(), cfg: config.RoutingConfig{}}
@@ -77,7 +66,6 @@ func TestEnforceNext_EmptyOrderSkipAdvance(t *testing.T) {
 	}
 }
 
-// TestPlanRunsShip covers the no-ship detection that gates early-exit.
 func TestPlanRunsShip(t *testing.T) {
 	t.Parallel()
 	if !planRunsShip(nil) {
@@ -97,10 +85,6 @@ func TestPlanRunsShip(t *testing.T) {
 	}
 }
 
-// --- recordRoutingDecision: happy + skip-phases + error tolerance ----------
-
-// TestRecordRoutingDecision_HappyAndSkips covers the artifact write, SHA, and
-// the per-skip-phase ledger loop.
 func TestRecordRoutingDecision_HappyAndSkips(t *testing.T) {
 	t.Parallel()
 	led := &fakeLedger{}
@@ -121,11 +105,6 @@ func TestRecordRoutingDecision_HappyAndSkips(t *testing.T) {
 	}
 }
 
-// TestRecordRoutingDecision_ArtifactFailIsSwallowed covers two branches where
-// the artifact cannot be written — both produce exactly 1 ledger entry with a
-// blank ArtifactPath (forensics must never abort a cycle):
-//   - mkdir-fail:  workspace is under a regular file → MkdirAll errors
-//   - write-fail:  mkdir succeeds but the artifact path is a directory → WriteFile errors
 func TestRecordRoutingDecision_ArtifactFailIsSwallowed(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -176,8 +155,6 @@ func TestRecordRoutingDecision_ArtifactFailIsSwallowed(t *testing.T) {
 	}
 }
 
-// TestRecordRoutingDecision_LedgerFailIsSwallowed covers the swallowed
-// ledger-append-error path (forensics must never abort a cycle).
 func TestRecordRoutingDecision_LedgerFailIsSwallowed(t *testing.T) {
 	t.Parallel()
 	o := &Orchestrator{ledger: &fakeLedger{failOnAppend: true}, now: coverNow}
@@ -186,10 +163,6 @@ func TestRecordRoutingDecision_LedgerFailIsSwallowed(t *testing.T) {
 		router.RouterDecision{NextPhase: "audit", SkipPhases: []string{"tester"}})
 }
 
-// --- recordPhasePlan: happy + clamp log + error tolerance (ADR-0024 §2) ------
-
-// TestRecordPhasePlan_HappyAndClamps covers the phase-plan.json write, its SHA,
-// and the integrity-floor clamp-logging loop.
 func TestRecordPhasePlan_HappyAndClamps(t *testing.T) {
 	t.Parallel()
 	led := &fakeLedger{}
@@ -215,9 +188,6 @@ func TestRecordPhasePlan_HappyAndClamps(t *testing.T) {
 	}
 }
 
-// TestRecordPhasePlan_ArtifactFailIsSwallowed covers the two artifact-write
-// failure branches — each still emits exactly 1 phase_plan entry with a blank
-// ArtifactPath (plan forensics must never abort a cycle).
 func TestRecordPhasePlan_ArtifactFailIsSwallowed(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -267,8 +237,6 @@ func TestRecordPhasePlan_ArtifactFailIsSwallowed(t *testing.T) {
 	}
 }
 
-// TestRecordPhasePlan_LedgerFailIsSwallowed covers the swallowed ledger-append
-// error (plan forensics must never abort a cycle).
 func TestRecordPhasePlan_LedgerFailIsSwallowed(t *testing.T) {
 	t.Parallel()
 	o := &Orchestrator{ledger: &fakeLedger{failOnAppend: true}, now: coverNow}
@@ -276,8 +244,6 @@ func TestRecordPhasePlan_LedgerFailIsSwallowed(t *testing.T) {
 	o.recordPhasePlan(context.Background(), 5, CycleState{WorkspacePath: t.TempDir()}, plan,
 		[]router.Clamp{{Rule: "ship-requires-build", Proposed: "build=skip", Forced: "build=run"}})
 }
-
-// --- archivePollutedWorkspace: stat/non-dir/readdir error branches ----------
 
 func TestArchivePollutedWorkspace_Branches(t *testing.T) {
 	t.Parallel()
@@ -323,25 +289,10 @@ func TestArchivePollutedWorkspace_Branches(t *testing.T) {
 	})
 }
 
-// --- decideAfterRetro: the two reachable arms ------------------------------
-
-// TestDecideAfterRetro covers the retro-PASS→ship arm and the non-strict
-// PROCEED→end arm.
-//
-// The RETRY/BLOCK switch arms are unreachable FROM THIS CALL SITE: decideAfterRetro
-// calls failureadapter.Decide with Options{Now:...} (Strict=false), and every
-// non-Proceed Decision in failureadapter is gated behind `if opts.Strict`
-// (failureadapter.go:158/175/188/201/215/227). So with the current call site,
-// Decide can only return ActionProceed → the default arm. If a future change
-// passes Strict=true here, those arms become reachable and must be tested then.
 func TestDecideAfterRetro(t *testing.T) {
 	t.Parallel()
 	o := &Orchestrator{now: coverNow}
 
-	// A retro PASS is NOT recovery — retro reports on a cycle whose audit FAILed
-	// and cannot change the tree, so it takes the same disposition ladder a retro
-	// FAIL takes. With an empty CycleState the ladder's terminal arm is the
-	// adapter's PROCEED, identical to the FAIL arm below.
 	next, env, reason, _ := o.decideAfterRetro(CycleState{}, VerdictPASS, nil)
 	if next == PhaseShip {
 		t.Errorf("PASS arm = (%s, %q), must not ship a cycle the auditor rejected", next, reason)
@@ -359,10 +310,6 @@ func TestDecideAfterRetro(t *testing.T) {
 	}
 }
 
-// --- phase_advisor pure functions ----------------------------------------
-
-// TestPhaseAdvisorOptions covers WithProposerCLI/WithProposerModel (both the
-// override and the empty-ignored guard) and the NewPhaseAdvisor opts loop.
 func TestPhaseAdvisorOptions(t *testing.T) {
 	t.Parallel()
 	p := NewPhaseAdvisor(nil, WithProposerCLI("codex-tmux"), WithProposerModel("opus"))
@@ -372,20 +319,12 @@ func TestPhaseAdvisorOptions(t *testing.T) {
 	if p.identity.Model != "opus" {
 		t.Errorf("model = %q, want opus", p.identity.Model)
 	}
-	// Empty values must NOT override the defaults. The model default is opus
-	// (deep): composing the cycle + minting phases is deep-reasoning work, not
-	// lightweight routing. The composition root normally overrides both from the
-	// router profile + EVOLVE_ROUTER_CLI/_MODEL so the brain is CLI/model-configurable.
 	d := NewPhaseAdvisor(nil, WithProposerCLI(""), WithProposerModel(""))
 	if d.identity.CLI != "claude-tmux" || d.identity.Model != "opus" {
 		t.Errorf("empty opts overrode defaults: cli=%q model=%q", d.identity.CLI, d.identity.Model)
 	}
 }
 
-// --- statemachine pure spine-floor functions --------------------------------
-
-// TestAnchorArtifactPresent covers each anchor branch including the audit
-// verdict gate (only PASS/WARN count) and the default "no pre-artifact" return.
 func TestAnchorArtifactPresent(t *testing.T) {
 	t.Parallel()
 	full := router.RoutingSignals{

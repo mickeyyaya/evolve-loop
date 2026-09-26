@@ -29,65 +29,33 @@ import (
 // not an operator dial (split so the flagreaders AST guard does not flag it).
 const bridgePidfileEnv = "EVOLVE_" + "BRIDGE_PIDFILE"
 
-// CmdRunner is the subprocess seam. The production impl (execRunner)
-// wraps exec.CommandContext; tests inject a fake to drive driver
-// behavior without exec()ing a real CLI. Signature matches the adapter's
-// CmdRunner verbatim so the two are interchangeable during the M7
-// cutover.
-//
-// Return value is the exit code; err is non-nil only on truly
-// unrecoverable failures (binary not found, context cancellation). A
-// non-zero exit code with err == nil is the normal "process ran but
-// failed" path.
-//
-// dir is the subprocess working directory. Source-writing phase drivers
-// (claude-p/codex/agy) pass cfg.Worktree so the inner CLI writes into the
-// per-cycle worktree rather than the parent cwd (= main repo root) — parity
-// with the tmux driver's `cd <worktree>`. An empty dir leaves cmd.Dir unset,
-// so the subprocess inherits the caller cwd (UNCHANGED behavior for the
-// git/probe utility callers that pass "").
+// CmdRunner is the subprocess seam: it runs name with args/env in dir,
+// writing to stdout/stderr, and returns the exit code, or a non-nil err
+// only on an unrecoverable failure (binary not found, context cancellation).
 type CmdRunner func(ctx context.Context, name, dir string, args, env []string,
 	stdin io.Reader, stdout, stderr io.Writer) (exitCode int, err error)
 
-// Deps carries the injectable seams shared by the Engine and its
-// Drivers. All fields default to real implementations in NewEngine; a
-// zero-value field is replaced with its default so callers only set what
-// they want to override. Later milestones extend this with the tmux
-// controller and filesystem boundary.
+// Deps carries the injectable seams shared by the Engine and its Drivers; a
+// zero-value field is replaced with its production default in NewEngine, so
+// callers only set what they want to override.
 type Deps struct {
-	// Runner executes inner-CLI subprocesses. Defaults to execRunner.
 	Runner CmdRunner
-	// Now supplies timestamps. Defaults to time.Now (UTC formatting is
-	// the caller's responsibility). Injected for deterministic tests.
-	Now func() time.Time
-	// NewChallengeToken mints the dry-run / artifact challenge token
-	// (bash used `openssl rand -hex 8`). Defaults to 8 random bytes hex.
+	Now    func() time.Time
+	// NewChallengeToken mints the dry-run / artifact challenge token.
 	NewChallengeToken func() (string, error)
-	// CaptureBaseline snapshots the PRE-DISPATCH artifact state so the
-	// completion detector can refuse a prior attempt's leftover report
-	// (cycle-1550's stale re-grade loop). Nil defaults to the real
-	// captureArtifactBaseline. Test harnesses whose fake sessions cannot
-	// write files pre-seed the artifact as a stand-in for a MID-SESSION
-	// write; they inject a zero capture to declare exactly that intent —
-	// production never sets this field.
-	CaptureBaseline func(*Config) artifactBaseline
+	CaptureBaseline   func(*Config) artifactBaseline
 	// Env is the request-local environment overlay consulted ahead of
-	// os.Getenv (via envchain). nil is treated as empty.
+	// os.Getenv (via envchain); nil is empty.
 	Env map[string]string
-	// RecoveryStage is the ADR-0044 Unified Phase Recovery rollout stage,
-	// injected by the orchestrator from the policy-resolved cfg.PhaseRecovery.
-	// Empty ⇒ channel.ResolveStage returns "shadow" (behavior-neutral default).
+	// RecoveryStage is the Unified Phase Recovery rollout stage; empty
+	// resolves to shadow (channel.ResolveStage).
 	RecoveryStage string
-	// FatalPaneStage is the ADR-0044 C2 fatal-pane fast-fail's OWN rollout
-	// stage (F27), injected from the policy-resolved cfg.FatalPane. It gates
-	// ONLY the stop-review checkpoint's fatal-pane preemption; RecoveryStage
-	// keeps the channel, ask-broker and transient-dwell. Empty ⇒ "shadow"
-	// (an unwired Deps observes; only the composition root arms the kill path).
+	// FatalPaneStage is the fatal-pane fast-fail's own rollout stage; empty
+	// resolves to shadow.
 	FatalPaneStage string
 	// ContextFillWarnPct is the policy-resolved context-fill WARN threshold
-	// (percent of the driver family's effective context window), injected by
-	// the composition root from Policy.ContextFillConfig(). Zero = not
-	// configured ⇒ the bridge built-in default, matching policy's own.
+	// (percent of context window); zero uses the bridge's built-in default,
+	// matching policy's own.
 	ContextFillWarnPct int
 	// Typed timing fields (from BridgePolicy). Zero = use bridge built-in default.
 	ScrollbackLines    int
@@ -95,143 +63,83 @@ type Deps struct {
 	ArtifactTimeoutS   int
 	ArtifactMaxExtends int
 	// PhaseArtifactTimeoutS is the policy-resolved per-phase artifact-wait
-	// budget (seconds) keyed on agent label (BridgeRequest.Agent), from
-	// BridgePolicy.PhaseArtifactTimeouts(). Launch emits a matching positive
-	// entry as --artifact-timeout-s so it reaches Config through the same arg
-	// vector as every other launch field. A nil/empty map, an unlisted agent,
-	// or a non-positive entry all fail open to Config.ArtifactTimeoutS=0 →
-	// Deps.ArtifactTimeoutS → the 300s builtin.
+	// budget (seconds) keyed on agent label; a missing or non-positive entry
+	// falls open to the built-in default.
 	PhaseArtifactTimeoutS map[string]int
 	// CorroborateWall is the out-of-band truth check behind the exhaustion
-	// fast-fail (wallcorroborate.go): on a persistence-gate cross, only a
-	// corroborated wall escalates rc 85. nil = legacy behavior (pane match
-	// IS the verdict) — the production composition root wires
-	// DefaultWallCorroborator explicitly.
+	// fast-fail; nil falls back to the pane match being the verdict.
 	CorroborateWall WallCorroborator
-	// Stdout/Stderr are the bridge's own diagnostic streams (NOT the
-	// inner CLI's stdout/stderr — a driver redirects those to the log
-	// files named in Config). Drivers write their `[driver] ...` notes
-	// here. LaunchArgs overrides these per-call with the caller's
-	// writers. Default os.Stdout / os.Stderr.
+	// Stdout/Stderr are the bridge's own diagnostic streams, not the inner
+	// CLI's (a driver redirects those to the log files in Config).
 	Stdout io.Writer
 	Stderr io.Writer
-	// LookupEnv resolves an environment variable, like os.LookupEnv. The
+	// LookupEnv resolves an environment variable, like os.LookupEnv; the
 	// credential-isolation guards consult it to detect a key (e.g.
-	// ANTHROPIC_API_KEY) that the in-process inner CLI would inherit via
-	// driverEnv. Injected in tests for a controlled env without touching
-	// the global process env. Default os.LookupEnv.
+	// ANTHROPIC_API_KEY) the inner CLI would inherit via driverEnv.
 	LookupEnv func(key string) (string, bool)
-	// Tmux drives interactive REPLs for the *-tmux drivers. Default
-	// execTmux (shells to tmux); tests inject a scriptable fake.
-	Tmux TmuxController
-	// Sleep paces the *-tmux REPL-boot and artifact-wait poll loops.
-	// Default time.Sleep; tests inject a no-op so the loops iterate
-	// instantly (the loop bound is an iteration counter, not wall clock).
-	Sleep func(time.Duration)
-	// LookPath resolves a binary on PATH, like exec.LookPath. Probe uses
-	// it to detect available CLIs + tier dependencies. Default
-	// exec.LookPath; tests inject a controlled set.
+	Tmux      TmuxController
+	// Sleep paces the *-tmux REPL-boot and artifact-wait poll loops; the loop
+	// bound is an iteration counter, not wall clock, so a no-op Sleep in
+	// tests still terminates.
+	Sleep    func(time.Duration)
 	LookPath func(file string) (string, error)
-	// Reviewer adjudicates a pipeline StopEvent (e.g. the artifact wait
-	// elapsing a review interval) into extend/pause/stop. Default
-	// deterministicReviewer (output-progress heuristic); tests and the
-	// future LLM/orchestrator reviewer inject their own. See stopreview.go.
+	// Reviewer adjudicates a pipeline StopEvent (the artifact wait elapsing a
+	// review interval) into extend/pause/stop.
 	Reviewer StopReviewer
 	// SandboxWrap computes the OS-sandbox prefix argv for a source-writing
-	// phase (Workstream B — CLI-agnostic confinement). Returns
-	// (prefixArgv, true) when the host can sandbox AND the policy allows it;
-	// (nil, false) when sandboxing is unavailable or disabled — drivers then
-	// run unwrapped (degraded). cfg.Worktree=="" callers can skip this seam
-	// entirely (only source-writing phases need confinement).
-	//
-	// On macOS the prefix is ["sandbox-exec","-p","<sbpl-file>"]; the SBPL is
-	// written to a file (not inlined) so SendKeys doesn't have to shell-quote
-	// a multi-line profile. On Linux it is the bwrap prefix slice.
-	//
-	// Default reads cfg.SandboxMode from deps.Env + nested-claude / Probe.
+	// phase: (argv, true) when the host can sandbox and policy allows it,
+	// (nil, false) when sandboxing is unavailable or disabled, in which case
+	// drivers run unwrapped. cfg.Worktree=="" callers can skip this seam.
 	SandboxWrap SandboxWrapper
-	// BootTimeoutStore records driver-scoped boot-timeout bench strikes. When set,
-	// consecutive ExitREPLBootTimeout (exit 80) exits for the same driver are
-	// counted; reaching clihealth.DefaultBootBenchThreshold promotes the driver to
-	// an active bench so llmroute.ApplyDriverBench can demote it. Nil disables.
+	// BootTimeoutStore records driver-scoped boot-timeout bench strikes;
+	// reaching clihealth.DefaultBootBenchThreshold promotes the driver to an
+	// active bench for llmroute.ApplyDriverBench to demote. Nil disables.
 	BootTimeoutStore *clihealth.Store
-	// OnStopReview is called when a stop-review decision is made.
-	// Nil-safe: drivers must check if it is non-nil before invoking.
-	OnStopReview func(phase, action, reason string)
-	// OnBoot is called once by a tmux-REPL driver when the REPL prompt marker
-	// first appears, reporting the cold-boot latency in milliseconds (ADR-0043
-	// A0 instrumentation). Not called on a warm/resumed named session (no boot)
-	// or by headless drivers. Nil-safe: drivers check before invoking. The
-	// Engine wires this per-Launch to populate BridgeResponse.BootMS.
+	OnStopReview     func(phase, action, reason string)
+	// OnBoot is called once by a tmux-REPL driver when the REPL prompt
+	// marker first appears, reporting cold-boot latency in milliseconds.
 	OnBoot func(bootMS int64)
-	// onModelDispatch is a call-local observation hook installed by Launch.
-	// Drivers invoke it only when their finalized selector is sent to a new
-	// process/session, or when an existing named session is resumed. It is
-	// deliberately package-private: model-attempt persistence has one owner.
+	// onModelDispatch is a call-local hook Launch installs; deliberately
+	// package-private since model-attempt persistence has one writer.
 	onModelDispatch func(modelDispatch)
-	// onFatalPane is a call-local observation hook installed by Launch: the wait
-	// loop reports a preempting fatal-pane verdict's cause, the session's
-	// named-ness and the interval it waited on — the one channel the
-	// fresh-session retry reads (F31). Package-private like onModelDispatch:
-	// the retry decision has one owner.
+	// onFatalPane is a call-local hook Launch installs: the wait loop
+	// reports a preempting fatal-pane verdict's cause, session named-ness
+	// and wait interval — the one channel the fresh-session retry reads.
+	// Package-private like onModelDispatch.
 	onFatalPane func(fatalPaneObservation)
 	// KeychainProbe reports whether a macOS login-Keychain generic-password
-	// item exists for the given service. doctorAuth consults it for claude,
-	// whose OAuth token Claude Code stores in the Keychain (service
-	// "Claude Code-credentials") rather than a file — so a file-only check
-	// false-negatives on a Keychain-authenticated host. Default
-	// (defaultKeychainProbe): on darwin shells to `security find-generic-password`
-	// via Runner; on other OSes always false (no Keychain). Tests inject a
-	// deterministic stub.
+	// item exists for the given service; doctorAuth needs it because
+	// claude's OAuth token lives in the Keychain (service "Claude
+	// Code-credentials"), not a file, so a file-only check would
+	// false-negative.
 	KeychainProbe func(service string) bool
-	// MkScratchDir creates a fresh private scratch directory under dir
-	// (signature mirrors os.MkdirTemp(dir, pattern); default os.MkdirTemp,
-	// which creates the dir 0o700). It gives each dispatch a per-invocation
-	// directory for transient files that must NOT collide when two same-phase
-	// dispatches share one workspace — currently the macOS SBPL sandbox
-	// profile (ADR-0049 S0 / gap G6). Tests inject a stub to drive the
-	// mkdir-error fallback branch deterministically.
+	// MkScratchDir creates a fresh private scratch directory per dispatch so
+	// transient files (the macOS SBPL sandbox profile) don't collide when
+	// two same-phase dispatches share one workspace.
 	MkScratchDir func(dir, pattern string) (string, error)
-	// LivenessCenter (ADR-0068, S3) is the LivenessCenter the tmux-REPL stop-review
-	// checkpoint observes/aggregates for StopEvent.State — the authoritative
-	// liveness source, replacing the bare per-run detectorFor(lp) probe. nil (the
-	// production default) has the driver build a private panestream.NewLivenessCenter()
-	// per run; tests inject a shared instance so a registered LivenessProbe can be
-	// proven both to win (its state reaches StopEvent.State) and to be invoked
-	// (its call count is observable) — a bypassed center could satisfy the former
-	// by coincidence but never the latter. An injected center must be
-	// per-dispatch: newReplWaitState registers the pane.liveness handler on it
-	// and there is no unregister, so a center shared across dispatches would
-	// accumulate handlers stamped with stale identities.
+	// LivenessCenter is the authoritative liveness source the stop-review
+	// checkpoint observes; nil has the driver build its own per run. An
+	// injected instance must be per-dispatch — newReplWaitState registers a
+	// handler with no unregister, so reuse would accumulate stale handlers.
 	LivenessCenter *panestream.LivenessCenter
-	// Signals is the ADR-0101 Signal Center the engine produces into:
-	// bridge.warning / bridge.tripwire from the attempt telemetry, and — through
-	// the LivenessHandler the tmux driver registers on the LivenessCenter —
-	// pane.liveness. nil is the Null Object for tests; the production Adapter
-	// injects it at construction (adapters/bridge.NewDefault) and SignalsWired
-	// proves it reached the engine.
+	// Signals is the Signal Center the engine emits into: bridge.warning/
+	// bridge.tripwire from attempt telemetry, and pane.liveness through the
+	// tmux driver's LivenessHandler. nil is the Null Object for tests.
 	Signals *signalcenter.Center
-	// TokenResolver recovers the token usage for a completed Launch window
-	// (token-telemetry S3). nil leaves token counts unavailable while the attempt
-	// ledger still records dispatch, latency, and outcome. A resolver error is
-	// fail-open — WARNed to Stderr, and telemetry NEVER fails the Launch. It is a
-	// DI seam, not a policy toggle (matching the no-feature-flags rule): the
-	// orchestrator building the bridge Deps wires this to the shipped
-	// tokenusage.Chain(TranscriptCollector/EventsResultCollector/ScrollbackPeakCollector);
-	// tests inject a scriptable stub, and withDefaults leaves it nil (usage
-	// enrichment unavailable) so a Launch never depends on transcript discovery
-	// to succeed.
+	// TokenResolver recovers token usage for a completed Launch window; nil
+	// leaves counts unavailable while the ledger still records
+	// dispatch/latency/outcome, and a resolver error fails open (WARNed,
+	// never fails the Launch).
 	TokenResolver func(tokenusage.Window) (tokenusage.Result, error)
 }
 
-// SandboxWrapper is the bridge's view of the sandbox decision — the bridge
-// package depends on adapters/sandbox via its Config type. Kept as a named
-// type so tests can substitute without naming the function type inline.
+// SandboxWrapper is the bridge's view of the sandbox decision: a named
+// function type so tests can substitute without naming the function type
+// inline.
 type SandboxWrapper func(req SandboxWrapRequest) (prefixArgv []string, available bool)
 
-// SandboxWrapRequest carries everything the wrapper needs to decide + emit a
-// prefix. Phase is the agent name (used as the SBPL file suffix). Workspace
-// is the absolute path to write the per-phase SBPL into when needed.
+// SandboxWrapRequest carries everything SandboxWrap needs to decide and
+// emit a sandbox prefix.
 type SandboxWrapRequest struct {
 	TerminalPath  string   // assigned tmux tty; empty for headless launches
 	DenyPaths     []string // absolute write denials
@@ -240,24 +148,16 @@ type SandboxWrapRequest struct {
 	Workspace     string   // absolute path; SBPL file lives here on darwin
 	Worktree      string   // absolute path; the only write-allowed location
 	RepoRoot      string   // absolute path; the read-only main repo root
-	// WriteSubpaths are the phase profile's declared sandbox.write_subpaths,
-	// verbatim: repo-relative, or absolute, or prefixed with the
-	// {worktree_path} template. The wrapper resolves and grants them ON TOP OF
-	// the floor every sandboxed phase gets (worktree, workspace, /tmp — see
-	// sandboxWritePaths). They are the one place a phase's ADDITIONAL writes
-	// (an inbox claim, a lesson file, docs/) are declared, and the persona
-	// renders its instructions from the same profile — so a documented write
-	// is a granted write by construction. A declaration narrower than the
-	// floor documents intent; it does not narrow the floor.
+	// WriteSubpaths are the phase profile's declared sandbox.write_subpaths
+	// (repo-relative, absolute, or {worktree_path}-prefixed), granted on top
+	// of the write floor every sandboxed phase already gets; a narrower
+	// declaration documents intent without narrowing the floor.
 	WriteSubpaths []string
-	// AllowNetwork is always true on the sandboxPrefixForLaunch path (forced):
-	// a phase that reaches the sandbox runs a cloud CLI that needs the model API.
-	// See sandbox_wrap.go for the rationale.
+	// AllowNetwork is always forced true on the sandboxPrefixForLaunch path:
+	// a sandboxed phase runs a cloud CLI that needs the model API.
 	AllowNetwork bool
 }
 
-// defaultIfZero returns val if val > 0, otherwise returns def.
-// Used to resolve typed Deps int fields where 0 means "not configured".
 func defaultIfZero(val, def int) int {
 	if val > 0 {
 		return val
@@ -265,9 +165,8 @@ func defaultIfZero(val, def int) int {
 	return def
 }
 
-// withDefaults returns a copy of d with any zero-value seam replaced by
-// its production default. Keeps NewEngine and tests from each repeating
-// the defaulting logic.
+// withDefaults returns a copy of d with each zero-value seam replaced by
+// its production default.
 func (d Deps) withDefaults() Deps {
 	if d.CaptureBaseline == nil {
 		d.CaptureBaseline = captureArtifactBaseline
@@ -315,11 +214,10 @@ func (d Deps) withDefaults() Deps {
 	return d
 }
 
-// Config is the fully-resolved launch configuration: flags, env, and
-// profile merged down to concrete values (e.g. Model already has "auto"
-// resolved against the profile). The Engine populates it once and hands
-// it to the selected Driver, so drivers never re-parse flags or re-read
-// the profile. Field set mirrors the bin/bridge launch flag surface.
+// Config is the fully-resolved launch configuration — flags, env and
+// profile merged to concrete values — that the Engine populates once and
+// hands to the selected Driver; its field set mirrors the bin/bridge launch
+// flag surface.
 type Config struct {
 	CLI        string
 	Profile    string
@@ -329,20 +227,18 @@ type Config struct {
 	StdoutLog  string
 	StderrLog  string
 	Artifact   string
-	// SecondaryArtifacts: extra contract deliverables (absolute paths); the
-	// artifact completion detector requires each to EXIST before the settled
-	// primary counts as phase-complete (see completion.go).
+	// SecondaryArtifacts: extra contract deliverables (absolute paths)
+	// required alongside the primary artifact.
 	SecondaryArtifacts []string
-	// Completion selects the phase-completion contract (ADR-0027): "" /
-	// "artifact" = poll for the artifact file (default, legacy); "stdout" =
-	// complete on REPL-idle for agents that print their answer (router/advisor).
-	Completion string
-	Cycle      int
-	Worktree   string
-	// RunID is the CA.5 run identity (CB.5): non-empty → tmux session names
-	// carry the r<runid8> run token and the per-run registry is stamped with it.
+	// Completion selects the phase-completion contract: "" or "artifact"
+	// polls for the artifact file (default); "stdout" completes on
+	// REPL-idle for agents that print their answer (router/advisor).
+	// See ADR-0027.
+	Completion     string
+	Cycle          int
+	Worktree       string
 	RunID          string
-	ProjectRoot    string // absolute path; sandbox uses this as the read-only RepoRoot (WS-B)
+	ProjectRoot    string // absolute path; sandbox uses this as the read-only RepoRoot
 	Agent          string
 	PermissionMode string // "" = driver default
 	StreamOutput   bool
@@ -359,40 +255,33 @@ type Config struct {
 	AllowedTools         []string // from profile.allowed_tools
 	ExtraFlags           []string // forwarded to the inner CLI after `--` (direct passthrough)
 	// Realization is the per-CLI launch realization (ADR-0022): the model,
-	// permission, and raw flags this CLI actually understands, resolved from a
-	// LaunchIntent against the CLI's manifest. The *-tmux drivers build their
-	// launch command from Realization.LaunchFlags rather than constructing
-	// model/permission flags inline, so one CLI's argv never leaks into another.
+	// permission and raw flags this CLI understands, resolved from a
+	// LaunchIntent against its manifest; drivers build launch commands from
+	// Realization.LaunchFlags so one CLI's argv never leaks into another.
 	Realization Realization
 	// ArtifactTimeoutS overrides the *-tmux artifact-wait deadline (seconds);
-	// 0 → tmuxArtifactTimeoutS (300). A per-launch control for callers that
-	// want a tighter ceiling than the default — e.g. fast agents, or a probe
-	// that should fail quickly rather than wait the full five minutes.
+	// 0 uses the built-in default (300s).
 	ArtifactTimeoutS int
-	// BootOnly turns a *-tmux launch into a boot smoke-test: the shared REPL
-	// state machine boots the CLI and waits for the prompt marker, then exits
-	// cleanly WITHOUT delivering a prompt or waiting for an artifact. Used by
-	// BootSmokeTest / the loop readiness gate to verify the bridge can boot the
-	// CLI before any real work (and LLM budget) is committed.
+	// BootOnly turns a *-tmux launch into a boot smoke-test: it boots the
+	// CLI and waits for the prompt marker, then exits without delivering a
+	// prompt or waiting for an artifact.
 	BootOnly bool
-	// AnthropicBaseURL is the policy-sourced proxy URL override, replacing
-	// the EVOLVE_ANTHROPIC_BASE_URL env read. Non-empty → claude-tmux proxy guard fires.
+	// AnthropicBaseURL is the policy-sourced proxy URL override; non-empty
+	// fires the claude-tmux proxy guard.
 	AnthropicBaseURL string
-	// AllowNetwork carries profile.sandbox.allow_network. NOTE: on the OS-sandbox
-	// path (sandboxPrefixForLaunch) the value is FORCED true regardless — a phase
-	// that reaches the sandbox runs a cloud CLI that must reach the model API, and
-	// network-denial there isn't a valid control (see sandbox_wrap.go). The field
-	// then only decides whether a misconfig WARN fires; it does not gate the deny.
+	// AllowNetwork carries profile.sandbox.allow_network; on the OS-sandbox
+	// path it is forced true regardless (a sandboxed phase's cloud CLI must
+	// reach the model API), so this field only decides whether a misconfig
+	// WARN fires.
 	AllowNetwork bool
-	// codexConfigPath overrides the default ~/.codex/config.toml path used by
-	// pretrustCodexProjects. Set in tests to avoid touching the real user config.
+	// codexConfigPath overrides ~/.codex/config.toml for
+	// pretrustCodexProjects; tests set it to avoid touching the real file.
 	codexConfigPath string
 }
 
-// Engine is the core.Bridge implementation and the Template Method host:
-// Launch() runs the fixed pipeline (validate → resolveConfig → preflight
-// → dispatch(driver) → report) while Drivers vary only the dispatch
-// step. A single Engine instance is safe for sequential reuse.
+// Engine is the core.Bridge implementation: Launch runs a fixed pipeline
+// that only the dispatch step varies by Driver; a single instance is safe
+// for sequential reuse.
 type Engine struct {
 	deps Deps
 }
@@ -403,9 +292,9 @@ type Engine struct {
 func NewEngine(deps Deps) *Engine {
 	d := deps.withDefaults()
 	if d.TokenResolver == nil {
-		// Fail-open must be loud while accurately describing what remains:
-		// lifecycle/outcome records continue, but token counts are unavailable.
-		// ADR-0101 S3: a bridge.warning the root's sink renders (no hand-written line).
+		// Fail-open stays loud: lifecycle/outcome records continue without
+		// token counts.
+		// See ADR-0101.
 		d.Signals.Emit(signalcenter.Event{
 			Module: signalcenter.ModuleBridge, Origin: "NewEngine", Kind: signalcenter.KindBridgeWarning,
 			Severity: signalcenter.SeverityWarn, Code: CodeTokenResolverMissing,
@@ -415,13 +304,11 @@ func NewEngine(deps Deps) *Engine {
 	return &Engine{deps: d}
 }
 
-// SignalsWired reports whether a Signal Center reached this Engine — the
-// wiring proof the production Adapter's tests assert (ADR-0101 S3).
+// SignalsWired reports whether a Signal Center reached this Engine.
 func (e *Engine) SignalsWired() bool { return e.deps.Signals != nil }
 
 // HasTokenResolver reports whether this Engine was wired with a non-nil
-// TokenResolver — the seam production composition roots (adapters/bridge,
-// subagent) use to prove their DI wiring reached the constructed Engine.
+// TokenResolver.
 func (e *Engine) HasTokenResolver() bool {
 	return e.deps.TokenResolver != nil
 }
@@ -435,10 +322,10 @@ func resolvedModel(m string) string {
 	return m
 }
 
-// launchArgs is the pure construction of a Launch's bridge-CLI argument list
-// (extracted from Launch so flag emission is testable without driving a real
-// CLI). deps supplies the per-agent artifact budget; req.BudgetScale scales it
-// (ADR-0076 slice A).
+// launchArgs is the pure construction of a Launch's argument list, testable
+// without a real CLI. req.BudgetScale scales deps' per-agent artifact
+// budget.
+// See ADR-0076.
 func launchArgs(req core.BridgeRequest, promptFile, stdoutLog, stderrLog string, deps Deps) []string {
 	model := resolvedModel(req.Model)
 	args := []string{
@@ -460,9 +347,6 @@ func launchArgs(req core.BridgeRequest, promptFile, stdoutLog, stderrLog string,
 	if req.Agent != "" {
 		args = append(args, "--agent="+req.Agent)
 	}
-	// Per-phase artifact budget (retro's grown contract needs more than the
-	// 300s builtin). Indexed on the agent label; a nil map, an unlisted agent
-	// and an empty agent all yield 0 → no flag → builtin deadline.
 	if budget := scaledArtifactBudget(deps.PhaseArtifactTimeoutS[req.Agent], req.BudgetScale); budget > 0 {
 		args = append(args, "--artifact-timeout-s="+strconv.Itoa(budget))
 	}
@@ -470,13 +354,12 @@ func launchArgs(req core.BridgeRequest, promptFile, stdoutLog, stderrLog string,
 		args = append(args, "--worktree="+req.Worktree)
 	}
 	if req.RunID != "" {
-		// CB.5: run identity → run-scoped session names + per-run registry.
 		args = append(args, "--run-id="+req.RunID)
 	}
 	if req.ProjectRoot != "" {
-		// Workstream B: SandboxWrap needs the read-only RepoRoot. Threaded as
-		// a flag (parseLaunchArgs writes Config.ProjectRoot) so the args path
-		// stays the single source of truth for Config construction.
+		// Threaded as a flag (parseLaunchArgs writes Config.ProjectRoot) so
+		// args stays the single source of truth for Config construction;
+		// SandboxWrap needs it as the read-only RepoRoot.
 		args = append(args, "--project-root="+req.ProjectRoot)
 	}
 	if req.RequireSandbox {
@@ -491,17 +374,15 @@ func launchArgs(req core.BridgeRequest, promptFile, stdoutLog, stderrLog string,
 	if req.PermissionMode != "" {
 		args = append(args, "--permission-mode="+req.PermissionMode)
 	}
-	// SessionName pins a deterministic tmux session (swarm orphan-on-cancel
-	// hardening). parseLaunchArgs→LaunchArgs already validates + threads it into
-	// Config.SessionName; resolveSession then uses the named-session path.
+	// SessionName pins a deterministic tmux session — swarm orphan-on-cancel
+	// hardening; resolveSession then uses the named-session path.
 	if req.SessionName != "" {
 		args = append(args, "--session-name="+req.SessionName)
 	}
-	// The in-process entry is the autonomous runner's trusted path: it is the
-	// bypass authority, so it enables --allow-bypass for the tmux safety gates
-	// (the explicit-opt-in gate exists for ad-hoc human `evolve bridge launch`
-	// use, not for the programmatic orchestrator). Harmless for headless
-	// drivers, which do not consult AllowBypass.
+	// The in-process entry is the autonomous runner's trusted path, so it
+	// always sets --allow-bypass for the tmux safety gates (the explicit
+	// opt-in exists for ad-hoc human `evolve bridge launch` use, not the
+	// orchestrator); harmless for headless drivers, which ignore it.
 	args = append(args, "--allow-bypass")
 	if len(req.ExtraFlags) > 0 {
 		args = append(args, "--")
@@ -510,28 +391,14 @@ func launchArgs(req core.BridgeRequest, promptFile, stdoutLog, stderrLog string,
 	return args
 }
 
-// Launch satisfies core.Bridge: the in-process entry the M7 adapter
-// cutover routes to. It maps a BridgeRequest onto the LaunchArgs pipeline
-// (materializing req.Prompt to a file, mirroring the bash bridge's
-// --prompt-file contract), then reads the artifact into the response on
-// success — matching the existing subprocess adapter's behavior so the
-// cutover is a drop-in.
+// Launch satisfies core.Bridge, mapping a BridgeRequest onto the LaunchArgs
+// pipeline: materialize the prompt to a file, dispatch, then read the
+// artifact into the response on success.
+// See ADR-0103.
 //
-// The Template Method host, split in place into named steps (ADR-0103 unit
-// 10): the gauntlet → materializeInputs → the argv → runScoped (at most twice:
-// freshSessionRetry, F31) → the attempt record → clearBootStrike → readResult
-// on ExitOK, else persistLaunchError →
-// the unit-10 classifier → recordBootStrike → ONE BRIDGE_EXIT_* event. Each
-// step's name is the fields.step a triage reads; the step order is the
-// on-disk order (the launch-error persist before the strike record).
-//
-// Concurrent-safe on Engine state: Launch captures BootMS via a call-local
-// OnBoot hook installed on a per-call Deps COPY (runScoped), so it never
-// mutates the shared e.deps. Production still builds a fresh Engine per
-// Launch (adapters/bridge); this makes that contract structural rather than
-// convention. (A caller that injects genuinely shared, non-thread-safe Deps —
-// e.g. a common BootTimeoutStore — still owns that dependency's own
-// concurrency.)
+// Launch is concurrency-safe on Engine state: BootMS is captured via a
+// call-local OnBoot hook on a per-call Deps copy (runScoped), so a Launch
+// never mutates the shared e.deps.
 func (e *Engine) Launch(ctx context.Context, req core.BridgeRequest) (core.BridgeResponse, error) {
 	if err := ValidateRequest(req); err != nil {
 		return core.BridgeResponse{}, err
@@ -544,10 +411,10 @@ func (e *Engine) Launch(ctx context.Context, req core.BridgeRequest) (core.Bridg
 	args := launchArgs(req, in.promptFile, in.stdoutLog, in.stderrLog, e.deps)
 	run := e.freshSessionRetry(ctx, req, model, func() launchRun { return e.runScoped(ctx, args, req.Env) })
 	resp := core.BridgeResponse{ExitCode: run.code, Stderr: run.stderr, BootMS: run.bootMS}
-	// The terminal time is frozen before optional token resolution begins. One
-	// dispatch therefore yields one attempt record even when token enrichment
-	// is unavailable or errors — a Launch that ran a fresh session (F31) holds
-	// two: the dead one (fresh_session_retry) and this one.
+	// The terminal time is frozen before optional token resolution begins, so
+	// one dispatch yields one attempt record even when token enrichment is
+	// unavailable or errors; a Launch that ran a fresh session holds two: the
+	// dead one (fresh_session_retry) and this one.
 	c := e.recordModelAttempt(req, model, run.code, run.start, run.end, run.dispatched, run.stderr, &resp)
 	e.clearBootStrike(c, req.CLI, run.code)
 	if run.code == ExitOK {
@@ -594,9 +461,9 @@ func materializeInputs(req core.BridgeRequest) (launchInputs, error) {
 	return in, nil
 }
 
-// launchRun is what one scoped run of the pipeline yields: the exit, the
-// captured bridge stderr, the wall-clock window and the driver's observations
-// (including a fatal-pane fast-fail's observation, F31).
+// launchRun is what one scoped run of the pipeline yields: the exit,
+// captured bridge stderr, the wall-clock window and the driver's
+// observations, including a fatal-pane fast-fail's observation.
 type launchRun struct {
 	code       int
 	stderr     string
@@ -606,16 +473,11 @@ type launchRun struct {
 	fatal      fatalPaneObservation
 }
 
-// freshSessionRetry runs the launch and, when the run ended on a SESSION-
-// recoverable terminal cause (recovery.TerminalCause.SessionRecoverable: the
-// REPL process is gone, the CLI and account are fine) and freshSessionAllowed
-// holds, records the dead dispatch (its ledger row marked fresh_session_retry),
-// clears the boot strike it earned by booting, reports
-// BRIDGE_FRESH_SESSION_RETRY and runs ONE fresh session of the same CLI before
-// the caller's chain walks on (F31: cycle 1687's triage pane died with codex
-// quota-walled and ollama unable to write source — the chain had nowhere to
-// go). At most one retry: the second run's cause is never read. The caller
-// records the returned run.
+// freshSessionRetry runs the launch and, when it ended on a session-
+// recoverable terminal cause and freshSessionAllowed holds, records the dead
+// dispatch (marked fresh_session_retry), clears its boot strike, and runs
+// one fresh session of the same CLI before the caller's chain walks on. At
+// most one retry — the second run's cause is never read.
 func (e *Engine) freshSessionRetry(ctx context.Context, req core.BridgeRequest, model string, run func() launchRun) launchRun {
 	first := run()
 	if !e.freshSessionAllowed(ctx, first) {
@@ -629,18 +491,13 @@ func (e *Engine) freshSessionRetry(ctx context.Context, req core.BridgeRequest, 
 	return run()
 }
 
-// freshSessionAllowed is the retry's one gate (F31, architecture review):
-//   - the cause is session-recoverable, on the exit the fast-fail closes with
-//     (a run that delivered is never run twice);
-//   - the session is EPHEMERAL — a named session is kept alive for resume, so a
-//     re-run would reattach to the dead pane, skip boot and the sandbox, and
-//     paste the prompt into a bare shell; its lifecycle belongs to its owner
-//     (resume, the swarm reaper). Named-ness is the DRIVER's resolution
-//     (resolveSession: flag, env or profile), reported on the observation —
-//     never re-derived from the request;
-//   - the launch is live and the caller's deadline leaves room for one more
-//     of the waits the driver actually used (the observation's interval) —
-//     otherwise the chain gets a clean exit 81 in time to walk.
+// freshSessionAllowed is the retry's one gate:
+//   - the cause is session-recoverable on the exact exit the fast-fail
+//     closes with (a run that delivered is never retried);
+//   - the session is ephemeral — a named session's lifecycle belongs to its
+//     owner (resume, the swarm reaper), never to this retry;
+//   - the caller's deadline leaves room for one more of the driver's actual
+//     waits, else the chain gets a clean exit 81 in time to walk.
 func (e *Engine) freshSessionAllowed(ctx context.Context, first launchRun) bool {
 	if !first.fatal.cause.SessionRecoverable() || first.fatal.named || first.code != ExitArtifactTimeout || ctx.Err() != nil {
 		return false
@@ -651,17 +508,14 @@ func (e *Engine) freshSessionAllowed(ctx context.Context, first launchRun) bool 
 	return true
 }
 
-// markFreshSessionRetry tags the dead dispatch's ledger row (F31).
+// markFreshSessionRetry tags the dead dispatch's ledger row.
 func markFreshSessionRetry(rec *llmcalls.Record) { rec.FreshSessionRetry = true }
 
 // runScoped runs the LaunchArgs pipeline against a scoped Engine holding a
-// per-call Deps COPY: the call-local OnBoot (cold-boot latency, ADR-0043 A0)
-// and onModelDispatch hooks chain any pre-wired callback, so EVERY method in
-// the pipeline (LaunchArgs, runDryRun, requireFullCheck, driver dispatch)
-// reads the call-local hooks by construction and the shared e.deps is never
-// mutated — concurrent Launch on one Engine is race-free, no defer-restore
-// needed. e.deps is already defaulted (NewEngine), so the scoped Engine needs
-// no re-defaulting.
+// per-call Deps copy: the call-local OnBoot and onModelDispatch hooks chain
+// any pre-wired callback, so every pipeline method reads the
+// call-local hooks and the shared e.deps is never mutated — concurrent
+// Launch on one Engine is race-free with no defer-restore needed.
 func (e *Engine) runScoped(ctx context.Context, args []string, env map[string]string) launchRun {
 	var run launchRun
 	callDeps := e.deps
@@ -731,14 +585,11 @@ func (e *Engine) readResult(c attemptLogContext, req core.BridgeRequest, stdoutL
 
 // persistLaunchError keeps the captured stderr as <workspace>/<agent>-launch-
 // error.txt and returns the path, or "" when there was nothing to persist or
-// the write failed (BRIDGE_LAUNCH_ERROR_PERSIST_FAILED). R3.6 (inbox
-// bridge-launch-validation-stderr-lost): a launch dying in the validate
-// gauntlet fails BEFORE the per-agent stderr-log exists, so without this file
-// the diagnostic evaporates (cycle-270: a bare "launch exit=10" cost a
-// forensic session; the cause was one missing profile file). The classifier
-// threads the first line into the error chain so <phase>-failure-diag.json
-// carries the "[bridge] …" cause; bridgeExitCode's digit scan stops at the
-// ':', so appending the cause never breaks exit-code parsing.
+// the write failed. A launch dying in the validate gauntlet fails before the
+// per-agent stderr-log exists, so without this file the diagnostic would
+// evaporate. The classifier threads the first line into the error chain;
+// bridgeExitCode's digit scan stops at ':', so appending the cause never
+// breaks exit-code parsing.
 func (e *Engine) persistLaunchError(c attemptLogContext, workspace, agent, stderr string) string {
 	if stderr == "" {
 		return ""
@@ -789,14 +640,12 @@ func launchFields(out launchoutcome.Outcome, launchError string) map[string]stri
 const defaultContextFillWarnPct = 60
 
 // tripwireSuccessThreshold is the wall-clock floor separating a genuine
-// unmeasured success from a quiet quota-abort: only launches that ran longer
-// than this can be real work worth building a collector for (cycle-1005).
+// unmeasured success from a quiet quota-abort: only launches that ran
+// longer than this are real work worth a collector.
 const tripwireSuccessThreshold = 60 * time.Second
 
-// artifactTimeoutSummary is the Strangler Fig facade the driver-output tests
-// keep spelling: the artifact wait's self-describing summary line, mined by
-// the unit-10 classifier (launchoutcome.ArtifactTimeoutSummary) — the cause
-// miners moved with the exit table they feed.
+// artifactTimeoutSummary is a Strangler Fig facade kept for the
+// driver-output tests: it delegates to launchoutcome.ArtifactTimeoutSummary.
 func artifactTimeoutSummary(stderr string) string {
 	return launchoutcome.ArtifactTimeoutSummary(stderr)
 }
@@ -815,10 +664,9 @@ func defaultChallengeToken() (string, error) {
 	return hex.EncodeToString(b[:]), nil
 }
 
-// execRunner is the production CmdRunner — wraps exec.CommandContext and
-// maps a process exit code to (code, nil), reserving err for
-// unrecoverable failures. Ported verbatim from the adapter so behavior
-// is identical across the cutover.
+// execRunner is the production CmdRunner: it wraps exec.CommandContext and
+// maps a process exit code to (code, nil), reserving err for unrecoverable
+// failures.
 func execRunner(ctx context.Context, name, dir string, args, env []string,
 	stdin io.Reader, stdout, stderr io.Writer) (int, error) {
 	cmd := exec.CommandContext(ctx, name, args...)

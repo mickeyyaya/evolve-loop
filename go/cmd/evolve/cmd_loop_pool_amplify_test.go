@@ -1,17 +1,5 @@
 package main
 
-// cmd_loop_pool_amplify_test.go — test-amplification for cycle 553's
-// supervisor-continuous-lane-keeping contract (test-report.md AC1-AC5 +
-// build-report's "New Surface" signatures). Black-box against the spec only:
-// written without reading cmd_loop_pool.go/cmd_loop.go/cmd_loop_wave.go's
-// implementations, targeting gaps the TDD engineer's RED suite
-// (cmd_loop_pool_test.go) left uncovered — degenerate/boundary counts, exact
-// string-match requirements on Scheduling/PlanSource, the planFn-error path
-// (mirroring the sibling dispatchIteration's documented wrapped-error
-// contract per build-report S3), the Count/PlanSource axes of the gate
-// crossed directly against dispatchPoolIteration (not just shouldRunPool),
-// and large-scale/short-backlog limits on the rolling pool itself.
-
 import (
 	"context"
 	"errors"
@@ -23,11 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// TestShouldRunPool_DegenerateAndBoundaryCounts (AC1, edge/limit): Count<=0 is
-// degenerate and must never gate the pool on (mirrors the "Count>1" contract
-// clause), Count==2 is the minimal valid boundary (must fire), and a very
-// large Count (large-scale input) must still fire — the gate must not
-// silently cap or overflow on an outsized fleet width.
 func TestShouldRunPool_DegenerateAndBoundaryCounts(t *testing.T) {
 	cases := []struct {
 		name string
@@ -48,12 +31,6 @@ func TestShouldRunPool_DegenerateAndBoundaryCounts(t *testing.T) {
 	}
 }
 
-// TestShouldRunPool_ExactStringMatchRequired (AC1, negative): the gate's
-// string comparisons must be exact, case-sensitive, untrimmed matches — a
-// mistyped/mis-cased "Pool"/"POOL"/" pool"/"pool " Scheduling, or a mis-cased
-// "Triage" PlanSource, must never silently be treated as a match. A fuzzy or
-// case-insensitive comparator would incorrectly opt a typo'd config into the
-// unsoaked pool mode.
 func TestShouldRunPool_ExactStringMatchRequired(t *testing.T) {
 	mismatches := []policy.FleetConfig{
 		{Count: 2, PlanSource: "triage", Scheduling: "Pool"},
@@ -67,22 +44,12 @@ func TestShouldRunPool_ExactStringMatchRequired(t *testing.T) {
 		if shouldRunPool(fc) {
 			t.Errorf("shouldRunPool(%+v) = true, want false — comparisons must be exact-match, not fuzzy/case-insensitive", fc)
 		}
-		// No orphaned config: a Scheduling value that fails the pool's exact
-		// match must still take the wave path, so a typo never routes an
-		// operator's fleet to neither dispatcher.
 		if fc.Scheduling != "pool" && !shouldRunWave(fc) {
 			t.Errorf("shouldRunWave(%+v) = false, want true — a non-exact-\"pool\" Scheduling must fall back to the wave path, never dispatch nowhere", fc)
 		}
 	}
 }
 
-// TestDispatchPoolIteration_SingleLaneCountInertNoLaunch (AC1+AC2 combinatorial
-// gap): shouldRunPool's Count>1 clause must also be enforced INSIDE
-// dispatchPoolIteration itself (not merely by an external caller pre-check) —
-// a Count:1 pool-scheduled config must report ran=false with neither planFn
-// nor launch invoked, the same inertness TestDispatchPoolIteration_
-// WaveConfigInertNoLaunch already pins for a Scheduling mismatch, but here
-// crossing the Count axis instead.
 func TestDispatchPoolIteration_SingleLaneCountInertNoLaunch(t *testing.T) {
 	fc := policy.FleetConfig{Count: 1, Concurrency: 1, PlanSource: "triage", Scheduling: "pool"}
 	planCalled, launched := false, 0
@@ -107,11 +74,6 @@ func TestDispatchPoolIteration_SingleLaneCountInertNoLaunch(t *testing.T) {
 	}
 }
 
-// TestDispatchPoolIteration_ManualPlanSourceInertNoLaunch (AC1+AC2
-// combinatorial gap): the PlanSource=="triage" clause must also be enforced
-// internally — a manually-planned fleet requesting Scheduling="pool" must
-// stay inert (ran=false, no planFn/launch), crossing the PlanSource axis that
-// TestShouldRunPool_GateTable only checked against the gate function alone.
 func TestDispatchPoolIteration_ManualPlanSourceInertNoLaunch(t *testing.T) {
 	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "manual", Scheduling: "pool"}
 	planCalled, launched := false, 0
@@ -133,14 +95,6 @@ func TestDispatchPoolIteration_ManualPlanSourceInertNoLaunch(t *testing.T) {
 	}
 }
 
-// TestDispatchPoolIteration_PlanFnErrorSurfacesNoLaunch (negative/safety gap):
-// mirrors the sibling wave dispatcher's documented contract (build-report S3:
-// "mirrors dispatchIteration's safety contract order") — a planFn failure
-// must surface a wrapped (errors.Is-matchable) error with launch never
-// invoked, exactly like dispatchIteration's own TestDispatchIteration_
-// PlanFnErrorFallsBackSequential. This path was entirely untested for the
-// pool seam: every existing planFn in cmd_loop_pool_test.go always returns a
-// nil error.
 func TestDispatchPoolIteration_PlanFnErrorSurfacesNoLaunch(t *testing.T) {
 	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "triage", Scheduling: "pool"}
 	wantErr := errors.New("triage phase failed")
@@ -160,12 +114,6 @@ func TestDispatchPoolIteration_PlanFnErrorSurfacesNoLaunch(t *testing.T) {
 	}
 }
 
-// TestDispatchPoolIteration_BacklogShorterThanTargetNeverBlocks (limit): per
-// fleet.RunPool's documented contract ("the pool simply runs fewer lanes —
-// never zero while pending work remains"), a Target (fc.Count) larger than
-// the number of available disjoint todos must still complete promptly and
-// dispatch every todo exactly once — the dispatcher must not block waiting
-// for phantom lanes that can never fill.
 func TestDispatchPoolIteration_BacklogShorterThanTargetNeverBlocks(t *testing.T) {
 	fc := policy.FleetConfig{Count: 5, Concurrency: 5, PlanSource: "triage", Scheduling: "pool"}
 	backlog := []fleet.Todo{
@@ -205,11 +153,6 @@ func TestDispatchPoolIteration_BacklogShorterThanTargetNeverBlocks(t *testing.T)
 	}
 }
 
-// TestDispatchPoolIteration_LargeScaleBacklogAllDispatchedExactlyOnce (limit/
-// large-scale): 30 disjoint todos over a narrow Target=3 pool must eventually
-// dispatch every single todo exactly once via the injected launch seam (the
-// isolated-launch invariant must hold under sustained backfill churn, not
-// just the 3-item positive-path fixture the TDD RED suite used).
 func TestDispatchPoolIteration_LargeScaleBacklogAllDispatchedExactlyOnce(t *testing.T) {
 	const n = 30
 	fc := policy.FleetConfig{Count: 3, Concurrency: 3, PlanSource: "triage", Scheduling: "pool"}
@@ -273,11 +216,6 @@ func TestDispatchPoolIteration_LargeScaleBacklogAllDispatchedExactlyOnce(t *test
 	}
 }
 
-// TestDispatchPoolIteration_NonPositiveConcurrencyNeverBlocks (edge/negative):
-// per fleet.PoolConfig's documented contract ("Concurrency <=0 ⇒ follow
-// Target"), a zero or negative Concurrency must not stall or crash the pool —
-// it must fall back to Target-width scheduling and still dispatch every
-// disjoint todo.
 func TestDispatchPoolIteration_NonPositiveConcurrencyNeverBlocks(t *testing.T) {
 	for _, conc := range []int{0, -1} {
 		t.Run(fmt.Sprintf("concurrency=%d", conc), func(t *testing.T) {

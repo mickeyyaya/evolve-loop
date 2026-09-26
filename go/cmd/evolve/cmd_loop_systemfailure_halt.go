@@ -9,22 +9,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// systemFailureHaltExitCode is the process exit code a cycle run returns when an
-// ADR-0072 SYSTEM-level failure (a forged/incoherent verdict, not a task-code
-// failure) mandates a loop halt. It is distinct from the ordinary FAIL mapping
-// (rc=2) and the soft batch-complete rc=3, so the parent wave/fleet loop can
-// tell a forged-verdict halt apart from an ordinary task-level lane failure and
-// stop the batch instead of continuing to the next wave.
 const systemFailureHaltExitCode = 4
 
-// cycleRunExitCode is the single, side-effect-free exit-code mapping every
-// cycle-run boundary consults — runCycleRun (the fleet-lane subprocess
-// entrypoint) directly, and the sequential single-cycle path via
-// haltOnSystemFailure. A halting SystemFailure takes priority over the recorded
-// verdict: the pipeline is untrustworthy, so the halt code is returned
-// regardless of FinalVerdict (even a forged PASS). Without a halting
-// SystemFailure the historical mapping is preserved exactly: FAIL → 2,
-// everything else → 0.
 func cycleRunExitCode(res cyclestate.CycleResult) int {
 	if sf := res.SystemFailure; sf != nil && sf.Halt {
 		return systemFailureHaltExitCode
@@ -35,17 +21,6 @@ func cycleRunExitCode(res cyclestate.CycleResult) int {
 	return 0
 }
 
-// haltOnSystemFailure is the ONE shared halt+escalate action (ADR-0072 AC2)
-// invoked by the sequential single-cycle path (cmd_loop.go), each fleet lane
-// subprocess (runCycleRun) and the pipeline-blocker breaker — so the
-// escalation dossier, the P0 inbox item, the halt exit code and the ONE
-// loop.halt INCIDENT are produced identically on every code path instead of
-// the logic being duplicated inline per call site. The caller's rule names
-// the INCIDENT's code and adds the rule's own fields; the chokepoint adds the
-// floor (category, level) and what it wrote — fields.next is the dossier's
-// next_action (its one home), fields.escalation and fields.inbox_item the
-// paths. Returns systemFailureHaltExitCode so the caller propagates the halt
-// via its exit code.
 func haltOnSystemFailure(evolveDir, projectRoot string, cycle int, workspace string, sf *cyclestate.SystemFailureSignal, w io.Writer, signals *signalcenter.Center, rule loopHaltRule) int {
 	wrote := writePipelineEscalation(evolveDir, projectRoot, cycle, workspace, sf, w)
 	fields := make(map[string]string, len(rule.fields)+5)
@@ -56,13 +31,6 @@ func haltOnSystemFailure(evolveDir, projectRoot string, cycle int, workspace str
 	return systemFailureHaltExitCode
 }
 
-// anyLaneHaltedForSystemFailure reports whether any fleet lane result exited
-// with the ADR-0072 system-failure halt code. The wave/fleet dispatch loop
-// consults it to stop dispatching further waves: a forged verdict makes the
-// pipeline untrustworthy fleet-wide, so one halting lane stops the whole batch.
-// An ordinary lane FAIL (rc=2) or launch error (rc=-1/1) is deliberately NOT
-// conflated with a halt — those keep the never-stop retry semantics ADR-0072
-// draws the line at.
 func anyLaneHaltedForSystemFailure(results []fleet.Result) bool {
 	for _, r := range results {
 		if r.ExitCode == systemFailureHaltExitCode {
@@ -72,17 +40,6 @@ func anyLaneHaltedForSystemFailure(results []fleet.Result) bool {
 	return false
 }
 
-// dispatchHaltDecision is the ONE ADR-0072 halt outcome BOTH the wave and pool
-// dispatch branches apply after an iteration completes, so the two
-// structurally-similar branches cannot drift on the halt floor (per
-// [[never_duplicate_centralize_via_design_patterns]]): the pool branch shipped
-// without any halt check while the wave branch had one, exactly the drift this
-// single-sources away. Detection is delegated to anyLaneHaltedForSystemFailure
-// (no branch re-implements the ExitCode==systemFailureHaltExitCode scan): when
-// any lane forged a verdict it returns halt=true with rc=systemFailureHaltExitCode
-// and stopReason="system_failure_halt" so the caller STOPS the batch; otherwise
-// halt=false (rc=0, stopReason="") so the caller keeps the never-stop retry
-// semantics an ordinary lane FAIL is entitled to.
 func dispatchHaltDecision(results []fleet.Result) (rc int, stopReason string, halt bool) {
 	if anyLaneHaltedForSystemFailure(results) {
 		return systemFailureHaltExitCode, "system_failure_halt", true

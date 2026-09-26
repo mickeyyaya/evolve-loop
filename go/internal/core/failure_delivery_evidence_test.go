@@ -1,25 +1,5 @@
 package core
 
-// failure_delivery_evidence_test.go — RED contract for cycle-1562 task
-// `retrospective-delivery-evidence-contract` (the core half; the bridge half
-// lives in internal/bridge/driver_tmux_delivery_failure_test.go).
-//
-// Evidence (.evolve/runs/cycle-1510/retrospective-launch-error.txt): the retro
-// died with exit 81 and its terminal <phase>-failure-diag.json recorded only a
-// flat error_message. The reason the launch failed — the driver had verified,
-// in milliseconds, that the prompt was never submitted — existed nowhere
-// machine-readable. Any downstream reader (failure learning, the failure
-// adviser, a human triaging a repeat) has to substring-parse a free-text
-// error to tell an undelivered prompt from an agent that simply went quiet,
-// and those two failures have opposite remedies: relaunch the pane vs. raise
-// the phase's artifact budget.
-//
-// Contract: failurediag.Sidecar must carry the classified delivery-failure cause
-// as its OWN field, populated from the driver's `reason=` marker text, and it
-// must stay empty for every failure that is not an evidenced delivery failure.
-// The negative half is the load-bearing one — a field that is always populated
-// carries no information and would mislabel every slow phase.
-
 import (
 	"encoding/json"
 	"errors"
@@ -74,7 +54,6 @@ func TestDeliveryFailureCause_DoesNotParseCauseTextInsideReason(t *testing.T) {
 	}
 }
 
-// readFailureDiag runs the production writer and returns the decoded JSON.
 func readFailureDiag(t *testing.T, phase string, phaseErr error) map[string]any {
 	t.Helper()
 	ws := t.TempDir()
@@ -92,10 +71,6 @@ func readFailureDiag(t *testing.T, phase string, phaseErr error) map[string]any 
 	return got
 }
 
-// TestWritePhaseFailureDiag_DeliveryFailure_IsMachineReadable — AC: an
-// exhausted retro whose launches failed delivery must leave a typed cause in
-// <phase>-failure-diag.json, not only a free-text error_message. Today the
-// struct has no such field at all, so this is RED on the missing key.
 func TestWritePhaseFailureDiag_DeliveryFailure_IsMachineReadable(t *testing.T) {
 	if cause := DeliveryFailureCause(wedgedPromptTimeoutErr()); !strings.Contains(cause, "submit_wedged") {
 		t.Fatalf("DeliveryFailureCause() = %q, want classified submit_wedged reason", cause)
@@ -123,12 +98,6 @@ func TestWritePhaseFailureDiag_DeliveryFailure_IsMachineReadable(t *testing.T) {
 	}
 }
 
-// TestWritePhaseFailureDiag_GenericSilence_NoDeliveryFailureAttribution is the
-// load-bearing negative: an ordinary silent-agent timeout — same exit code,
-// same marker shape, different reason — must leave the delivery-failure field
-// EMPTY. A field populated on every exit-81 carries no information and would
-// send an operator to relaunch a pane whose real problem was too small an
-// artifact budget.
 func TestWritePhaseFailureDiag_GenericSilence_NoDeliveryFailureAttribution(t *testing.T) {
 	got := readFailureDiag(t, "retro", genericSilenceTimeoutErr())
 
@@ -138,10 +107,6 @@ func TestWritePhaseFailureDiag_GenericSilence_NoDeliveryFailureAttribution(t *te
 	}
 }
 
-// TestWritePhaseFailureDiag_NonTimeoutFailure_NoDeliveryFailureAttribution is
-// the second negative and the success-path guard: a failure that is not an
-// artifact timeout at all (a plain non-zero exit) must never acquire a
-// delivery-failure cause, and its pre-existing fields must be untouched.
 func TestWritePhaseFailureDiag_NonTimeoutFailure_NoDeliveryFailureAttribution(t *testing.T) {
 	got := readFailureDiag(t, "build", errors.New("bridge: launch exit=2: [bridge] profile not found"))
 
@@ -154,7 +119,6 @@ func TestWritePhaseFailureDiag_NonTimeoutFailure_NoDeliveryFailureAttribution(t 
 	}
 }
 
-// diagKeysOf renders a decoded diag's key set for failure messages.
 func diagKeysOf(m map[string]any) []string {
 	out := make([]string, 0, len(m))
 	for k := range m {

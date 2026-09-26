@@ -1,13 +1,5 @@
 package core
 
-// failure_advisor_test.go — ADR-0044 Slice 5 RED tests: the LLM failure
-// advisor (the AI escalation TAIL — reached only for CauseUnknown terminal
-// states the deterministic registry cannot classify; Core Agent Rule 5).
-// Modeled on phase_advisor_test.go: fakeBridge scripts the LLM, the advisor
-// must parse a strict-JSON verdict, and EVERY failure mode (nil bridge,
-// malformed JSON, invalid vocabulary) returns an error so the caller
-// escalates instead of acting on garbage — fail-safe-to-deterministic.
-
 import (
 	"context"
 	"strings"
@@ -44,8 +36,6 @@ func TestFailureAdvisor_ParsesCauseAndSignature(t *testing.T) {
 	if adv.Justification == "" {
 		t.Error("justification required — every recovery decision is justified")
 	}
-	// Dispatch contract: the failure-advisor profile + agent identity, the
-	// workspace artifact, and the artifact completion (the uniform contract).
 	if fb.gotReq.Agent != "failure-advisor" {
 		t.Errorf("agent=%q, want failure-advisor", fb.gotReq.Agent)
 	}
@@ -60,9 +50,6 @@ func TestFailureAdvisor_ParsesCauseAndSignature(t *testing.T) {
 	}
 }
 
-// The persona's documented non-fatal signal: empty cause = "this pane is not
-// fatal". Still an error (caller escalates — correct outcome), but the
-// message must say NON-FATAL, not pretend the model hallucinated.
 func TestFailureAdvisor_EmptyCause_NonFatalSignal(t *testing.T) {
 	t.Parallel()
 	a := NewFailureAdvisor(&fakeBridge{stdout: `{"cause":"","pane_substr":"","justification":"not fatal: agent recovering natively"}`})

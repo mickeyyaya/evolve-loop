@@ -7,27 +7,14 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
 )
 
-// replWaitStep tells the coordinator whether an extracted wait transition
-// continues polling or ends the loop with an exit code.
 type replWaitStep struct {
 	done bool
 	code int
 }
 
-// handleTickInteractions applies operator inbox input before auto-response for
-// one incomplete completion tick. Pane capture, streaming, and completion
-// polling stay in the coordinator so their ordering remains explicit.
 func (w replWaiter) handleTickInteractions(state *replWaitState, elapsed int, pane string, captureOK bool) replWaitStep {
-	// Drain live-injection envelopes BEFORE the auto-respond tick so an
-	// operator interrupt pre-empts a pending auto-reply on this tick.
 	if envs, _ := w.cursor.Drain(); len(envs) > 0 {
 		for _, env := range envs {
-			// injectEnvelope returns a non-empty CorrID only when an
-			// idle-gated correlated ask was actually pasted (not re-queued,
-			// dropped, or a keystroke/interrupt). The breadcrumb is emitted
-			// HERE — at the moment delivery is confirmed — so the channel sink
-			// and open-span tracking share the same owner. Channel-off delivery
-			// remains inert inside injectionDelivered.
 			cid := injectEnvelope(w.ctx, w.cfg, w.deps, w.launch, env)
 			w.channel.injectionDelivered(cid)
 		}
@@ -38,10 +25,8 @@ func (w replWaiter) handleTickInteractions(state *replWaitState, elapsed int, pa
 	switch rc {
 	case 0, 1: // noop / responded
 	case 2:
-		// Agent self-signalled progress ("extend_timeout"): restart the
-		// current review interval so the signal counts as activity. Bounded
-		// by the auto-respond loop guard (case 86) — an agent cannot defer
-		// the reviewer indefinitely by repeating the same extend prompt.
+		// Agent self-signalled progress restarts the interval so the extend
+		// counts as activity.
 		if parseExtendSecs(action) > 0 {
 			state.intervalStartS = elapsed
 			fmt.Fprintf(w.deps.Stderr, "%s agent extend signal — review interval refreshed\n", w.prefix)
