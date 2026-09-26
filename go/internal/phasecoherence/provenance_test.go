@@ -93,13 +93,11 @@ func TestProvenanceGate_LedgerCrossCheck(t *testing.T) {
 	t.Setenv("EVOLVE_PROJECT_ROOT", tmpDir)
 
 	ledgerPath := filepath.Join(evolveDir, "ledger.jsonl")
-	// write a dummy entry
 	ledgerLine := `{"cycle": 241, "role": "build", "tree_state_sha": "goodsha"}` + "\n"
 	if err := os.WriteFile(ledgerPath, []byte(ledgerLine), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
-	// 1. matching tree_sha -> passes
 	artifact1 := "<!-- evolve:provenance phase=build cycle=241 tree_sha=goodsha inputs_digest=digest789 -->\n# Report"
 	expected := ProvenanceFields{
 		Phase:        "build",
@@ -112,7 +110,6 @@ func TestProvenanceGate_LedgerCrossCheck(t *testing.T) {
 		t.Errorf("expected 0 violations, got %d: %+v", len(violations1), violations1)
 	}
 
-	// 2. mismatching tree_sha -> error
 	artifact2 := "<!-- evolve:provenance phase=build cycle=241 tree_sha=badsha inputs_digest=digest789 -->\n# Report"
 	violations2 := CheckProvenance(artifact2, expected)
 	if len(violations2) != 1 {
