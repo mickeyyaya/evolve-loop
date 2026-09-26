@@ -109,9 +109,9 @@ Content drift is covered by the whitespace and binary drift tests. The check tha
 | 2 | `latestAuditedTree` | read the audited tree `T0` from the newest auditor row of the run, by the same rule ship binds (`auditledger`); an empty tree declines | `TestLatestAuditedTree_` |
 | 3 | `unwindShipCommit`, `pendRebasedChange` | replace ship's commit with a carrier of `T0` on the audited base, then leave the change pending on the fork point; it declines unless the delta is exactly ship's inbox consumption pairs, the worktree has no untracked files, and no consumed item carries a released continuation | `TestUnwindShipCommit_`, `TestPendRebasedChange_` |
 | 4 | `routeRebasedExplanation` calls B2 | only a change pending on its fork point may be rebound, because Audit reads `git diff HEAD`; the result is Audit, anything else Build, and an incomplete rebind aborts | `TestRouteRebasedExplanation_` |
-| 5 | Wiring: unwind → rebase → pend → route | contract cycles only; no unwind when the pre-screen predicts a conflict; pend whatever the rebase's outcome, so a failed rebase leaves the audited shape | `TestRecoverFromShipError_IdenticalRebaseSkipsBuild`, `…_NonIdenticalRebaseStillReturnsToBuild`, `…_WithoutAnAuditedTreeRebasesTheShipCommit` |
+| 5 | Wiring: unwind → rebase → pend → route | contract cycles only; no unwind when the pre-screen predicts a conflict; pend whatever the rebase's outcome, so a failed rebase leaves the audited shape | `TestRecoverFromShipError_IdenticalRebaseSkipsBuild`, `…_NonIdenticalRebaseStillReturnsToBuild`, `…_WithoutAnAuditedTreeRebasesTheShipCommit`, `…_APredictedConflictIsNotUnwound`, `…_ALegacyCycleIsNotUnwound` |
 
-B1 opens two crash windows, after the carrier reset and between the rebase and the pend. A later component heals a carrier found at HEAD on resume; the carrier carries an `Evolve-Carrier` trailer for that.
+B1 opens two crash windows. After the carrier reset and before the rebase, a resumed ship binds `T0` again and the unwind repeats, so that window heals itself. Between the rebase and the pend, the carrier sits committed on the new base, and a resumed ship would go to a re-audit of a committed change. The resume heal (`resume-heals-a-carrier-left-at-head`, via the `Evolve-Carrier` trailer) is therefore required before B3 or B4 builds on B1. Before building B3, confirm that the first live fleet-rebase recovery logs `unwound its ship commit`, not `ship unwind declined:`.
 
 ### Phase by phase
 
@@ -128,7 +128,7 @@ B3 and B4 get their own tables when they are built, in the same shape.
 
 0. **Done.** The worktree-mode tree binding: ship binds a worktree ship to the worktree it lands from, not to the plane's bookkeeping. This removes 1701's second bounce.
 1. **Done.** B2 with its `Verify` lineage and the tests in its component table above (`rebind_identical_rebase_test.go`). Nothing calls it until B1 wires the recovery.
-2. B1 (the unwind) and the reordered recovery, returning Audit, not Build, when the change is identical.
+2. **Done.** B1 (the unwind) and the reordered recovery, returning Audit, not Build, when the change is identical.
 3. B3 (the repaired RUNG 0) together with the F5 artifact relocation.
 4. B4 (ship accepts a carry) and the end-to-end test `TestFleetRebase_Cycle1701Shape_ShipsWithoutBuildOrAudit`.
 

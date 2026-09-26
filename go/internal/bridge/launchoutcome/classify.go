@@ -75,6 +75,11 @@ func causeLine(code int, stderr string) string {
 			cause = summary
 		}
 	}
+	if code == ExitUnknownPrompt {
+		if line := escalationLine(stderr); line != "" {
+			cause = line
+		}
+	}
 	return cause
 }
 
@@ -83,6 +88,11 @@ func causeLine(code int, stderr string) string {
 func causeCodeOf(row exitClass, stderr string) string {
 	if row.code == ExitArtifactTimeout {
 		if cause := timeoutCauseCode(stderr); cause != "" {
+			return cause
+		}
+	}
+	if row.code == ExitUnknownPrompt {
+		if cause := escalationCause(stderr); cause != "" {
 			return cause
 		}
 	}

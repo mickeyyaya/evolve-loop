@@ -23,6 +23,9 @@ type IO struct {
 	// HarnessProduced names the secondary outputs a harness component writes;
 	// re-dispatching the agent cannot produce them, so the deliverables gate skips them.
 	HarnessProduced []string `json:"harness_produced,omitempty"`
+	// DerivedFrom maps an agent-owed secondary to the primary output the host
+	// derives it from when the agent leaves it absent. See ADR-0106.
+	DerivedFrom map[string]string `json:"derived_from,omitempty"`
 }
 
 // ClassifyRules is the declarative verdict spec a phase uses in place of Go classify code.

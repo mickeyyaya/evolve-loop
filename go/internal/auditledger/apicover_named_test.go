@@ -111,3 +111,19 @@ func TestLatestAuditorEntry(t *testing.T) {
 		t.Errorf("absent ledger: err=%v, want fs.ErrNotExist", err)
 	}
 }
+
+func TestIsAuditorRow_OnlyTheAuditAgentsSubprocessRowBinds(t *testing.T) {
+	cases := []struct {
+		row  Entry
+		want bool
+	}{
+		{Entry{Role: "auditor", Kind: "agent_subprocess"}, true},
+		{Entry{Role: "auditor", Kind: "phase_verdict"}, false},
+		{Entry{Role: "builder", Kind: "agent_subprocess"}, false},
+	}
+	for _, tc := range cases {
+		if got := IsAuditorRow(tc.row); got != tc.want {
+			t.Errorf("IsAuditorRow(%+v) = %v, want %v", tc.row, got, tc.want)
+		}
+	}
+}

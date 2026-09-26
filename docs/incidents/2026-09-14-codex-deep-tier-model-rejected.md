@@ -79,3 +79,7 @@ build phases read 56–64 minutes instead of ~30.
   (`escalate:model_unsupported`) within seconds of the error.
 - The dashboard's per-phase duration is the fastest tell: a build that "takes" 25
   minutes with no token telemetry is a stalled pane, not a slow model.
+
+## Update 2026-09-26
+
+The pin is still `gpt-5.6-sol`; cycle 1706's build paid for it again (escalated in seconds, built on Claude). ADR-0106 P4 makes the class countable: exit 85 keeps its code, and the escalation pattern now rides `cause_code` (`model_unsupported`, `rate_limit`) and the launch error line, so the eight "unknown prompt" exits of cycles 1673–1707 read as what they were: four quota walls and four dead-model dispatches.

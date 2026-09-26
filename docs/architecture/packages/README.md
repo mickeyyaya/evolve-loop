@@ -38,6 +38,8 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/dossier` | writes, commits and reads the per-cycle dossier record | [internal-dossier.md](internal-dossier.md) |
 | `internal/lanerouting` | the one routing predicate: protected surface or a path the build profile's sandbox denies | [internal-lanerouting.md](internal-lanerouting.md) |
 | `internal/phasecontract` | the single registry of each phase's deliverable contract: artifact, sections, verdicts and owed files | [internal-phasecontract.md](internal-phasecontract.md) |
+| `internal/triagedecision` | the one reader of the triage report as a decision: strict for the host derivation, lenient for ship | [internal-triagedecision.md](internal-triagedecision.md) |
+| `internal/recoveryguard` | the kernel fence around a recovery dispatch: records the run, restores and reports what the agent touched outside its grant | [internal-recoveryguard.md](internal-recoveryguard.md) |
 | `internal/phasespec` | loads, validates and merges the built-in and user phase specs into one catalog | [internal-phasespec.md](internal-phasespec.md) |
 | `internal/inboxmover` | moves inbox items through their lifecycle across concurrent lanes and enforces the routing floor | [internal-inboxmover.md](internal-inboxmover.md) |
 | `internal/inboxmover/lifecycle` | the pure inbox lifecycle moves: route, promote, release, recover and quarantine | [internal-inboxmover-lifecycle.md](internal-inboxmover-lifecycle.md) |

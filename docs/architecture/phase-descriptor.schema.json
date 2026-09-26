@@ -216,6 +216,13 @@
             "type": "string"
           },
           "description": "Secondary output files a harness component writes; declared for completeness, excluded from the gate. With agent_owed, partitions files[1:]."
+        },
+        "derived_from": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Maps an agent_owed secondary to the primary output (basename of files[0]) the host derives it from before any judge when the agent leaves it absent or empty (ADR-0106). A declaration without a registered deriver fails the deliverable tests."
         }
       }
     },

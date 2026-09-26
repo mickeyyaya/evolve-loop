@@ -47,7 +47,7 @@ func AuditorRows(ledgerPath string) ([]Entry, error) {
 		if err := json.Unmarshal([]byte(line), &e); err != nil {
 			continue
 		}
-		if e.Kind == "agent_subprocess" && e.Role == "auditor" {
+		if IsAuditorRow(e) {
 			rows = append(rows, e)
 		}
 	}
@@ -87,4 +87,10 @@ func LatestAuditorEntry(ledgerPath, runID string) (Entry, error) {
 		return Entry{}, err
 	}
 	return BindRun(rows, runID)
+}
+
+// IsAuditorRow reports whether e is an auditor row that binds a ship: the audit agent's own subprocess
+// row, not a phase marker.
+func IsAuditorRow(e Entry) bool {
+	return e.Kind == "agent_subprocess" && e.Role == "auditor"
 }

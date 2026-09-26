@@ -91,3 +91,49 @@ func TestNextCorrection_BudgetsExhaust(t *testing.T) {
 		t.Errorf("spent budgets ⇒ exhausted; got %q", act.Rung)
 	}
 }
+
+// The recovery agent repairs the deliverable around logic the phase already built, so it comes after the
+// phase's own preserved agent (live-fix) and before any fresh run of the phase.
+func TestNextCorrection_RecoverPrecedesARedispatch(t *testing.T) {
+	t.Parallel()
+	in := interaction.CorrectionInput{
+		Phase: "build", Violation: "[missing_section] ## Changes",
+		Repairable: true, NamedREPL: true,
+		DecisionID: "d1", RungBudget: recoverBudget(),
+	}
+	for _, want := range []string{
+		interaction.RungSalvage, interaction.RungLiveFix, interaction.RungRecover, interaction.RungRedispatch, "",
+	} {
+		act := interaction.NextCorrection(in)
+		if act.Rung != want {
+			t.Fatalf("rung = %q, want %q", act.Rung, want)
+		}
+		if act.Rung == "" {
+			return
+		}
+		if act.Reason == "" {
+			t.Errorf("rung %q has no justification", act.Rung)
+		}
+		in.RungBudget[act.Rung]--
+	}
+}
+
+// A judgment phase's verdict is never restructured: with budget but without Repairable the rung is skipped.
+func TestNextCorrection_RecoverNeedsARepairableViolation(t *testing.T) {
+	t.Parallel()
+	in := interaction.CorrectionInput{
+		Phase: "audit", Violation: "[missing_section] Verdict",
+		RungBudget: recoverBudget(),
+	}
+	in.RungBudget[interaction.RungSalvage] = 0
+
+	if act := interaction.NextCorrection(in); act.Rung != interaction.RungRedispatch {
+		t.Fatalf("rung = %q, want %q", act.Rung, interaction.RungRedispatch)
+	}
+}
+
+func recoverBudget() map[string]int {
+	budget := fullBudget(1)
+	budget[interaction.RungRecover] = 1
+	return budget
+}

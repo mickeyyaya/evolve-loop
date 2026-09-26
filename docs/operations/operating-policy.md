@@ -9,6 +9,53 @@
 > evidence. Update it the way code is updated: through the sanctioned review +
 > ship flow, with the incident that motivated the change cited.
 
+## 0. Logic-first delivery (P0, the refactor policy)
+
+A cycle exists to deliver logic: the fix, the feature, the architecture that
+survives the next change request. Every phase is judged on that logic. The
+form of its deliverables (report shape, required sections, artifact names and
+paths, a binding to a tree that moved, ordering and lock collisions,
+bookkeeping) is the pipeline's job to repair.
+
+1. **Three kinds of block; only two are final.** A *logic* block names a
+   defect in the change's behaviour: a failing or missing test, a regression,
+   a security finding, an audit finding on substance. It blocks. A *form or
+   process* failure goes to recovery and blocks only when recovery is
+   exhausted. An *integrity* block (the treefence, the predicate-authority
+   fence, ADR-0072 incoherence, a sandbox or recovery-guard violation) is
+   never recovered: the cycle aborts and a P0 is filed.
+2. **Recovery is layered, cheapest first.** A host derivation before any
+   judge, then deterministic rungs in code (relocate, re-bind, retry), then
+   the recovery agent, which restructures a deliverable around the logic the
+   phase already built and never edits code or tests, then a re-dispatch of
+   the phase.
+3. **Recovery never launders.** The gate that rejected a deliverable judges its
+   repair, and the verdict is re-earned, never carried. Judgment and control
+   phases are never repaired (§4). The kernel, not the agent, proves nothing
+   outside the grant changed and that every added line has a source. Every
+   recovery is recorded where the auditor and the dossier see it.
+4. **The evidence decides between assigning back and recovering.** When an
+   agent erred in the form or structure of a deliverable, the pipeline
+   recovers it toward the original intention only when the work carries
+   enough kernel-checkable evidence that the request is fulfilled: the change
+   is present, and the tests written for it are present, unchanged since TDD,
+   red on the base and green now; whether they cover the acceptance stays the
+   auditor's judgment. A missing deliverable is always assigned back.
+   Otherwise the work is assigned back, and the correction names the missing
+   evidence, never the missing format. The delivered code and its explanation
+   must speak for themselves; a recovered deliverable states only what the
+   evidence shows.
+5. **Bounded and loud.** Recovery rounds come from config. Exhausted recovery
+   is recorded as a pipeline defect to fix (§1); it still counts toward the
+   halts of §1.3, because a pipeline that cannot recover is degraded.
+
+*Evidence: over cycles ~1550–1707, a byte-identical change re-ran Build and
+Audit because a peer landed first (14 cycles); a derivable secondary sent a
+whole phase back (4 cycles, still recurring); cycle 1707's TDD agent refused
+its own task for an hour over a process misunderstanding. None of these was a
+defect in the change. Design and components:
+[ADR-0106](../architecture/adr/0106-logic-first-delivery.md).*
+
 ## 1. Pipeline-integrity policy (highest severity)
 
 A **pipeline-integrity defect** is anything that causes false cycle verdicts,
@@ -114,7 +161,7 @@ fallback-written by the retro paths), a deterministic failure digest
 (legitimacy / root-cause layer / salvage / urgency / routing — cross-checked
 against the digest so identity cannot be invented). Honest rejections stay
 rejected; the pass-rate metric is never bought by weakening judges — judgment
-phases are excluded from remediation by hard deny-list.
+and control phases are excluded from remediation by hard deny-list.
 
 ## 5. Release policy
 

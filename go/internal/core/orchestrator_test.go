@@ -115,8 +115,23 @@ func (f *fakeLedger) Append(_ context.Context, e LedgerEntry) error {
 }
 func (f *fakeLedger) Verify(_ context.Context) error { return nil }
 func (f *fakeLedger) Iter(_ context.Context) (LedgerIterator, error) {
-	return nil, errors.New("not used in tests")
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return &sliceLedgerIterator{entries: append([]LedgerEntry(nil), f.entries...)}, nil
 }
+
+type sliceLedgerIterator struct{ entries []LedgerEntry }
+
+func (it *sliceLedgerIterator) Next() (LedgerEntry, bool, error) {
+	if len(it.entries) == 0 {
+		return LedgerEntry{}, false, nil
+	}
+	next := it.entries[0]
+	it.entries = it.entries[1:]
+	return next, true, nil
+}
+
+func (it *sliceLedgerIterator) Close() error { return nil }
 
 // fakeRunner records every call. verdict[i] is the verdict returned on
 // the i-th call; later calls return the last entry.
