@@ -1,0 +1,194 @@
+{
+  "schema_version": 2,
+  "cycle": 1699,
+  "run_id": "01M3DW9CCA164ZN9V6DY2HPFYS",
+  "goal": "Pipeline-health verification, wave 10 (2026-09-26, on main ae2f40d4). Work the highest-weight lane-eligible inbox items end-to-end — claim, tdd, build, audit, ship — with full phase integrity, on the fixed plane. That includes everything waves 3–9 verified and the boundary train:\n- (F36, #637) the host performs a phase's declared effects, triage's inbox claim, before every judge — the orchestrator's reviews and the runner's engine alike — so a skipped agent claim no longer fails the contract;\n- (#635) production code is golangci-clean, so console commits to dossier and faillearn are no longer blocked;\n- (#638) code comments follow docs/conventions/code-comments.md: code explains itself, knowledge goes to docs/architecture/packages/\u003cdir\u003e.md, and a change never adds cycle numbers, incident retellings or restated code as comments.\n\nEvery cycle must:\n- commit to a claimed inbox item (an empty top_n must not run the spine);\n- bind its audit to the changes tree it ships;\n- disposition the cycle's OWN defect ledger as well as inherited ids;\n- record a terminal outcome on every exit;\n- never modify a protected control-plane file by any tool;\n- leave no stale worktree behind.\n\nPipeline-integrity items and items whose fix surface is protected are console-owned, not lane work. ADR-0099 document deliverables are eligible. The measure of this wave is consecutive shipped cycles: wave 9 reached six (1690–1695); 1696 failed its own new test and 1697 shipped, so the new streak stands at one.",
+  "final_verdict": "FAIL",
+  "tasks": [
+    "chronicle-s7a-historian-shadow"
+  ],
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 142278,
+      "started_at": "2026-09-26T03:32:11Z",
+      "ended_at": "2026-09-26T03:34:34Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 22,
+        "output": 9917,
+        "cache_read": 742605,
+        "cache_write": 85116
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 79627,
+      "started_at": "2026-09-26T03:35:09Z",
+      "ended_at": "2026-09-26T03:36:30Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 16,
+        "output": 4391,
+        "cache_read": 585827,
+        "cache_write": 32649
+      }
+    },
+    {
+      "name": "bug-reproduction",
+      "verdict": "PASS",
+      "duration_ms": 273263,
+      "started_at": "2026-09-26T03:36:32Z",
+      "ended_at": "2026-09-26T03:41:06Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 60,
+        "output": 18268,
+        "cache_read": 2568397,
+        "cache_write": 68920
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 703147,
+      "started_at": "2026-09-26T03:41:06Z",
+      "ended_at": "2026-09-26T03:52:50Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 146,
+        "output": 71466,
+        "cache_read": 12474987,
+        "cache_write": 204660
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 164798,
+      "started_at": "2026-09-26T03:52:50Z",
+      "ended_at": "2026-09-26T04:13:17Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 12,
+        "output": 4327,
+        "cache_read": 397609,
+        "cache_write": 44471
+      }
+    },
+    {
+      "name": "retro",
+      "verdict": "PASS",
+      "duration_ms": 229912,
+      "started_at": "2026-09-26T04:13:17Z",
+      "ended_at": "2026-09-26T04:17:07Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 48,
+        "output": 19875,
+        "cache_read": 2128536,
+        "cache_write": 80463
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "failure": {
+    "fingerprint": "build|gate-block|5f68336637a8",
+    "pre_class": "gate-block",
+    "reasons": [
+      "review gate: phase \"build\" deliverable rejected after 3 correction(s): build handoff floor: 3 deterministic check failure(s) — fix these exactly before handoff: ./cmd/evolve: unit tests FAIL …/pha"
+    ]
+  },
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 1699",
+      "priority": "high"
+    }
+  ],
+  "skipped_phases": [
+    {
+      "phase": "closeout",
+      "reason": "abnormal exit in phase retro"
+    }
+  ],
+  "timing": {
+    "total_ms": 1593025,
+    "phase_count": 6,
+    "retried_count": 0,
+    "longest_phase": "tdd",
+    "longest_ms": 703147,
+    "by_archetype_ms": {
+      "build": 164798,
+      "control": 229912,
+      "evaluate": 273263,
+      "plan": 925052
+    },
+    "total_tokens": {
+      "input": 304,
+      "output": 128244,
+      "cache_read": 18897961,
+      "cache_write": 516279
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 12,
+        "output": 4327,
+        "cache_read": 397609,
+        "cache_write": 44471
+      },
+      "control": {
+        "input": 48,
+        "output": 19875,
+        "cache_read": 2128536,
+        "cache_write": 80463
+      },
+      "evaluate": {
+        "input": 60,
+        "output": 18268,
+        "cache_read": 2568397,
+        "cache_write": 68920
+      },
+      "plan": {
+        "input": 184,
+        "output": 85774,
+        "cache_read": 13803419,
+        "cache_write": 322425
+      }
+    },
+    "wasted_tokens": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "cache_hit_ratio": 0.9999839138672254,
+    "hot_phase_count": 5,
+    "hot_phases": [
+      "scout",
+      "triage",
+      "bug-reproduction",
+      "tdd",
+      "build"
+    ]
+  }
+}
