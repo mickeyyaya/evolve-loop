@@ -18,6 +18,7 @@
 ## Invariants
 
 - **An absent optional bucket commits more, never less.** Treating a missing `deferred` as `[]` claims every committed item; treating a missing `top_n` as `[]` would claim nothing, so `top_n` is required in strict mode. Pinned by `TestDerive_TreatsAnAbsentOptionalBucketAsEmpty` and the `no top_n section` case of `TestDerive_DeclinesAnIncompleteOrUnreadableReport`.
+- **An empty optional bucket states no cards; an empty `top_n` still declines.** A heading with nothing under it is what an agent writes when it has nothing to say, so `deferred`, `dropped` and `superseded` left empty read as `[]` in strict mode; `top_n` left empty is a missing commitment and the report is declined (ADR-0106 H1b). Pinned by `TestDerive_ReadsAnEmptyOptionalBucketAsNoCards` and the "an empty top_n section" case of `TestDerive_DeclinesAnIncompleteOrUnreadableReport`.
 - **A pinned item is never dropped.** Pinned by `TestDerive_DeclinesWhenAPinnedItemIsNotCommitted`.
 - **Nothing the report does not state is invented.** Pinned by `TestDerive_NeverInventsWhatTheReportDoesNotState`.
 - **Only slug ids pass**, because promotion moves an id out of the inbox. `^[a-z0-9][a-z0-9-]*$`, as `triagecap` required. Pinned by the "a bullet with a non-slug id" and "a bullet with no id" cases of `TestDerive_DeclinesAnIncompleteOrUnreadableReport`.
@@ -29,4 +30,5 @@
 
 - **Cycles 308/316/320–322**: the triage agent almost never wrote the companion, so ship projected it (`triagecap.ProjectDecisionJSON`). That parser is the ancestor of this package.
 - **Cycles 1672, 1687, 1697, 1707**: the contract gate rejected triage with `missing_secondary` for the same absent file and re-dispatched the whole phase, still after ADR-0100 F36 fixed the neighbouring `missing_effect` class. The host now derives the file before any judge (ADR-0106 H2), and this package is the strict reading it uses.
+- **Cycle 1713**: triage wrote `## superseded` with nothing under it. The strict reader declined the report ("states neither cards nor none"), the host's derivation had nothing to write, and the contract gate rejected the phase with `missing_secondary` and re-dispatched it, on a lane that had nothing to commit. Form, not logic: an empty optional bucket now reads as no cards (ADR-0106 H1b).
 - **ADR-0106 review, round 2**: the first design added a second deriver beside ship's with a different grammar; the never-duplicate rule made this package the one reader and moved `triagecap`'s parser into it.

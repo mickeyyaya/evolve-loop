@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — an empty optional bucket in triage-report.md reads as no cards (ADR-0106 H1b, 2026-09-27)
+
+- Cycle 1713's triage wrote `## superseded` with nothing under it; the strict reader declined the report ("states neither cards nor none"), the host had nothing to derive, and the contract gate rejected the phase with `missing_secondary` and re-dispatched it. `deferred`, `dropped` and `superseded` left empty now derive to `[]`; an empty `top_n` is still a missing commitment and still declines.
+
 ## Fixed — a credential wall benches the family and names the operator's fix (ADR-0106 Q2, 2026-09-27)
 
 - `clihealth.Benchable` admits `auth_recheck` (`CredentialPattern`): wave 14 re-dispatched claude fourteen times into "Please log in". Unlike a quota bench it stays active for routing after its cooldown (the cooldown only schedules the canary's next probe; a succeeding probe after the operator's login clears it), a login pane's stale reset hint never sets it, and while it stands, `clihealth.OperatorAction` names the fix on the chain walker's bench line and the canary's re-bench line.
