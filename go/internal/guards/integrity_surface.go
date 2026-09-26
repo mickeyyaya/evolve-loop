@@ -5,56 +5,15 @@ import (
 	"strings"
 )
 
-// ProtectedSurfaceEntry is one row of ProtectedSurfaceManifest: a
-// slash-normalized, lower-case path fragment plus the rationale for why the
-// surface it names is pipeline control plane. Fragment is matched ANYWHERE in
-// the slash-normalized, case-folded path (see IsProtectedSurface), so a
-// directory entry keeps its trailing slash and a file entry names the full
-// filename.
+// ProtectedSurfaceEntry is one manifest row: a lower-case, slash-normalized path fragment and why it is control plane.
 type ProtectedSurfaceEntry struct {
 	Fragment  string // "/dir/" for a directory subtree, "/dir/file.ext" for a single file
-	Rationale string // why this surface grades/gates a cycle
+	Rationale string
 }
 
-// ProtectedSurfaceManifest is the SINGLE SOURCE OF TRUTH for the pipeline
-// INTEGRITY CONTROL PLANE: the deterministic gates that grade a cycle, the
-// campaign metric SSOT, the guards themselves, the campaign contract, the
-// grading rubrics, and the PreToolUse hook wiring.
-//
-// No autonomous phase agent may modify these — a cycle must never be able to
-// edit the gate that judges it. This is the structural fix for the cycle-20
-// breach, where the build agent edited
-// go/acs/regression/flagreaders/readers_test.go (and the registry SSOT) to bless
-// its own split-const dodge, and the audit approved the self-edit.
-//
-// Legitimate control-plane changes (e.g. an operator hardening a gate) go through
-// human-gated `evolve ship --class manual` OUTSIDE any cycle, where the role
-// guard's CycleID==0 path allows them — never an autonomous `--class cycle`.
-//
-// Fragments are matched anywhere in the slash-normalized path, so the boundary
-// holds regardless of the file's physical root (a per-cycle worktree, the branch
-// root, or main). The intentionally NARROW fragments (e.g. go/acs/regression/ but
-// NOT go/acs/, registry_table.go but NOT the whole flagregistry package) preserve
-// legitimate cycle behavior: a cycle still writes its own go/acs/cycleN/
-// predicates and ordinary source.
-//
-// The same manifest has a second projection, IsProtectedScope (F29), used only
-// to ROUTE inbox work: an item that DECLARES a directory holding protected files
-// (go/internal/core/) is console work at seed time. It never changes what a
-// cycle may write — the role guard, the ship tripwire, the fleet preflight and
-// triage's breaker all keep membership (IsProtectedSurface).
-//
-// The manifest is deliberately a COMPILED Go value, not config: the boundary
-// must not be config-softenable (a .evolve/policy.json knob here would let a
-// cycle write the knob that disarms the guard). Two durable tripwires check it
-// on different lanes, so neither can silently rot as the trust kernel grows:
-// go/acs/regression/protectedsurface walks the repo by NAME (any *_gate.go or
-// *guard*.go file must be covered here, L4, architecture review 2026-07-16);
-// TestProtectedSurface_CoversEveryExplanationLifecycleCallSite (guards package)
-// walks it by CALL SITE (any file that calls into the explanation-lifecycle
-// API, derived from build_explanation_handoff.go's and explanationdocs'
-// declarations, must be covered here — closes the #549 class where a
-// relocation changed WHICH file holds the code without changing its name).
+// ProtectedSurfaceManifest is the single source of truth for the pipeline control plane no autonomous cycle may modify.
+// It is compiled rather than config, so a cycle cannot write the knob that disarms it.
+// See ADR-0064.
 var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/acs/regression/", Rationale: "standing deterministic gates"},
 	{Fragment: "/go/internal/acssuite/", Rationale: "the gate runner"},
@@ -72,10 +31,7 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/.claude/settings.json", Rationale: "PreToolUse hook wiring (repo + global ~/.claude)"},
 	{Fragment: "/.evolve/policy.json", Rationale: "gate-default overrides (eval/contract/swarm gates)"},
 
-	// L4 additions (architecture review 2026-07-16): gate-shaped surfaces the
-	// pre-L4 list left silently in-cycle-writable. Dir entries where every file
-	// in the package is control plane; file entries where the package (core,
-	// phases/ship) is otherwise legitimate cycle territory.
+	// A directory entry when every file in it is control plane; file entries inside ordinary cycle territory.
 	{Fragment: "/go/internal/commitgate/", Rationale: "the pre-commit quality gate (attestation writer the manual-ship reader trusts)"},
 	{Fragment: "/go/internal/phaseintegrity/", Rationale: "the per-phase integrity chain's DigestSource (ADR-0065)"},
 	{Fragment: "/go/internal/binaryguard/", Rationale: "the compiled-binary commit backstop at the commit chokepoint"},
@@ -89,16 +45,11 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/internal/phases/ship/binary_staging_guard.go", Rationale: "staging-time backstop against compiled-binary commits (tracked-binary-in-acs-dir class fix)"},
 	{Fragment: "/go/internal/phases/ship/binary_staging_guard_test.go", Rationale: "the staging backstop's own regression pin"},
 	{Fragment: "/go/internal/bridge/driver_tmux_submitverify_guard_test.go", Rationale: "submit-verify's own keep-guard: pins that every real tmux driver declares an input-line marker (a family that omits it goes inert) and that a failed verification stays loud — a cycle editing this could re-open the cycles 1505/1510/1517 unsubmitted-prompt stall unobserved"},
-	// ADR-0074 S2 (operator-enrolled 2026-07-22, cycle-1034 salvage): the
-	// disposition gate grades the retro that grades failed cycles — a cycle
-	// able to edit it could route its own failure classification.
+	// A cycle that could edit the disposition gate could route its own failure classification.
 	{Fragment: "/go/internal/core/disposition_gate.go", Rationale: "ADR-0074 disposition-contract gate (retro's verdict-on-the-verdict verifier + digest cross-check)"},
 	{Fragment: "/go/internal/core/disposition_gate_test.go", Rationale: "the disposition gate's own regression pins"},
 
-	// Build explanation documentation is a host-activated trust boundary:
-	// Builder produces it, then Audit, Ship, and Retro independently verify the
-	// host-sealed provenance.
-	// A cycle that could edit any of these narrow surfaces could approve its own
+	// The Build explanation trust boundary: a cycle that could edit these could approve its own
 	// explanation or downgrade the active contract.
 	{Fragment: "/go/internal/explanationdocs/", Rationale: "Build explanation contract, host snapshots, and deterministic verifier"},
 	{Fragment: "/go/internal/reportdoc/", Rationale: "strict visible-Markdown parser shared by explanation review gates"},
@@ -191,18 +142,15 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/.evolve/build-explanation-contracts/", Rationale: "host-owned activation and Build result snapshots"},
 }
 
-// IsProtectedSurface reports whether path targets the pipeline integrity control
-// plane. path may be absolute or repo-relative; matching is on a slash-normalized
-// fragment, so the boundary holds regardless of the file's physical root.
+// IsProtectedSurface reports whether path is on the control plane. path may be absolute or
+// repo-relative: a fragment matches anywhere in it, so the boundary holds in any worktree.
 func IsProtectedSurface(path string) bool {
 	p, ok := normalizeSurfacePath(path)
 	if !ok {
 		return false
 	}
-	// p+"/" lets a path that NAMES a protected directory without its trailing
-	// slash ("go/internal/bridge", a package or import path) match that
-	// directory's fragment; for every other fragment it matches exactly what
-	// p does, because the appended slash can only complete a slash-ending one.
+	// The appended slash lets a slashless directory name ("go/internal/bridge") match its fragment.
+	// It changes no other match, because it can only complete a fragment that ends in a slash.
 	pd := p + "/"
 	for _, e := range ProtectedSurfaceManifest {
 		if strings.Contains(pd, e.Fragment) {
@@ -212,18 +160,9 @@ func IsProtectedSurface(path string) bool {
 	return false
 }
 
-// IsProtectedScope reports whether path IS, or CONTAINS, protected surface — the
-// question a DECLARED fix surface poses (F29): an inbox item declaring
-// `"files": ["go/internal/core/"]` will change files inside that directory, and
-// the file-level fragments IsProtectedSurface matches can never be contained in
-// the directory's own spelling. Only a directory spelling (a trailing slash, or
-// a last segment with no extension) widens beyond membership, so
-// IsProtectedSurface(p) ⇒ IsProtectedScope(p) always holds
-// (TestIsProtectedScope_ImpliedByMembership). It is a second PROJECTION of the
-// one manifest, used where a declared surface is judged — the seed-time console
-// classifier's routing roots — while the ship tripwire, the role write-guard,
-// the fleet preflight and triage's breaker keep membership: the seed must
-// refuse at least everything the breaker would, never make the breaker stricter.
+// IsProtectedScope reports whether path is, or as a directory spelling contains, protected surface.
+// Inbox routing judges declared fix surfaces with it while write-time checks keep IsProtectedSurface;
+// membership implies scope, so routing refuses at least what the triage breaker would.
 func IsProtectedScope(path string) bool {
 	if IsProtectedSurface(path) {
 		return true
@@ -242,10 +181,8 @@ func IsProtectedScope(path string) bool {
 	return false
 }
 
-// normalizeSurfacePath is the one spelling both projections match: slash-
-// separated, a leading slash so a leading segment ("go/acs/regression/...")
-// still matches its "/go/acs/..." fragment, and case-folded (macOS/Windows
-// filesystems are case-insensitive; fragments are already lower-case).
+// normalizeSurfacePath is the one spelling both projections match. The leading slash lets a
+// repo-relative path match its fragment; case-folding covers case-insensitive filesystems.
 func normalizeSurfacePath(path string) (string, bool) {
 	if path == "" {
 		return "", false
@@ -257,10 +194,8 @@ func normalizeSurfacePath(path string) (string, bool) {
 	return strings.ToLower(p), true
 }
 
-// directorySpelling reports whether the normalized path p is spelled as a
-// directory — a trailing slash, or a last segment with no extension after its
-// first character (".evolve" and "core" are directories, "runner.go" is not) —
-// returning it with exactly one trailing slash.
+// directorySpelling reports whether p is spelled as a directory (a trailing slash, or a last segment with
+// no dot after its first character, so ".evolve" counts) and returns it with one trailing slash.
 func directorySpelling(p string) (string, bool) {
 	if strings.HasSuffix(p, "/") {
 		return p, true
@@ -272,10 +207,8 @@ func directorySpelling(p string) (string, bool) {
 	return p + "/", true
 }
 
-// fragmentInside reports whether fragment lies under dir wherever dir sits: some
-// suffix of dir that starts at a path separator (the worktree/root prefix
-// dropped) is a prefix of the repo-relative fragment. The bare root "/" is
-// excluded — every fragment starts with it.
+// fragmentInside reports whether fragment lies under dir wherever dir is rooted: some suffix of dir that
+// starts at a slash prefixes the fragment. The bare root "/" is excluded, since every fragment starts with it.
 func fragmentInside(dir, fragment string) bool {
 	for i := 0; i < len(dir)-1; i++ {
 		if dir[i] == '/' && strings.HasPrefix(fragment, dir[i:]) {

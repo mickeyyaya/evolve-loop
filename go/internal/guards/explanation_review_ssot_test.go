@@ -6,30 +6,15 @@ import (
 	"testing"
 )
 
-// explanationReviewGateCallee is the fixed callee every gate below must
-// delegate to. It is a package-level const (not a literal inside the test
-// body) so integrity_surface_explanation_callsites_test.go can read the same
-// belief when it derives the call-site scanner's vocabulary — see the file
-// comment there for why a fourth, re-typed copy of this string is the belief
-// this hoist exists to avoid.
+// explanationReviewGateCallee is package-level so the call-site scanner's vocabulary reads the same name.
 const explanationReviewGateCallee = "explanationdocs.ValidateReviewedHandoff"
 
-// explanationReviewGateFiles is package-level (not a local literal) so
-// integrity_surface_explanation_callsites_test.go can read the same file list
-// when it derives the call-site scanner's vocabulary.
+// explanationReviewGateFiles is package-level so the call-site scanner's vocabulary reads the same files.
 var explanationReviewGateFiles = []string{
 	"../phases/audit/explanation_review_gate.go",
 	"../phases/retro/explanation_review_gate.go",
 }
 
-// TestExplanationReviewGates_ShareContractCore pins the single-sourcing of the
-// explanation-review contract (architecture review 2026-09-01, CRITICAL): the
-// status enum, build-status match, required/not_applicable document switch,
-// and evidence-reference check were stated twice — once per phase gate — with
-// nothing binding the copies. Both gates must now delegate the shared core to
-// explanationdocs.ValidateReviewedHandoff, and the belief literal must not
-// reappear in either phase package. Per-phase policy (heading, missing-handoff
-// verdict, NEEDS_CORRECTION disposition) legitimately stays in the gates.
 func TestExplanationReviewGates_ShareContractCore(t *testing.T) {
 	for _, path := range explanationReviewGateFiles {
 		t.Run(path, func(t *testing.T) {
@@ -40,14 +25,10 @@ func TestExplanationReviewGates_ShareContractCore(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			// The enum belief lives in explanationdocs only; a copy here means
-			// the contract forked again.
 			if strings.Contains(string(body), "must be VERIFIED or NEEDS_CORRECTION") {
 				t.Fatalf("%s restates the status-enum belief; it must live only in explanationdocs", path)
 			}
-			// ADR-0102: the reasoning-floor ladder (section → fields → floor) has
-			// ONE home, reportdoc.ReasonedReview; a gate that locates the section
-			// or applies the floor itself has forked the ladder.
+			// See ADR-0102.
 			if !functionCalls(t, path, "validateExplanationReview", "reportdoc.ReasonedReview") {
 				t.Fatalf("%s: validateExplanationReview must read the review through reportdoc.ReasonedReview", path)
 			}

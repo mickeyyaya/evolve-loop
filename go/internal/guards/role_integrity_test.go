@@ -8,10 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// TestRole_DeniesControlPlaneEditInBuildPhase is the cycle-20 regression: a build
-// phase — which IS allowed to write source into its worktree — must STILL be
-// denied (with an alarm) from editing the gate/metric/guard/contract that grades
-// it. The control-plane boundary overrides the worktree allowance.
 func TestRole_DeniesControlPlaneEditInBuildPhase(t *testing.T) {
 	worktree := "/work/wt/cycle-20" // non-/tmp so isAlwaysSafe doesn't short-circuit
 	s, _ := setupStorageWithCS(t, core.CycleState{
@@ -24,13 +20,13 @@ func TestRole_DeniesControlPlaneEditInBuildPhase(t *testing.T) {
 	g := NewRole(s, false)
 
 	for _, rel := range []string{
-		"go/acs/regression/flagreaders/readers_test.go", // the EXACT cycle-20 breach file
-		"go/internal/flagregistry/registry_table.go",    // the metric SSOT
-		"go/internal/guards/role.go",                    // the guard itself
+		"go/acs/regression/flagreaders/readers_test.go",
+		"go/internal/flagregistry/registry_table.go",
+		"go/internal/guards/role.go",
 		"knowledge-base/research/flag-campaign-plan.json",
 		"skills/audit/SKILL.md",
 		".claude/settings.json",
-		"go/internal/core/orchestrator.go", // fresh explanation activation call site
+		"go/internal/core/orchestrator.go",
 	} {
 		dec := g.Decide(context.Background(), core.GuardInput{
 			ToolName:  "Edit",
@@ -45,9 +41,6 @@ func TestRole_DeniesControlPlaneEditInBuildPhase(t *testing.T) {
 	}
 }
 
-// TestRole_AllowsLegitWorktreeWritesUnderProtection confirms the boundary does
-// not over-block: ordinary source and a cycle's OWN go/acs/cycleN predicates
-// remain writable in the build phase.
 func TestRole_AllowsLegitWorktreeWritesUnderProtection(t *testing.T) {
 	worktree := "/work/wt/cycle-20"
 	s, _ := setupStorageWithCS(t, core.CycleState{
@@ -60,8 +53,8 @@ func TestRole_AllowsLegitWorktreeWritesUnderProtection(t *testing.T) {
 	g := NewRole(s, false)
 
 	for _, rel := range []string{
-		"go/internal/core/observer.go",      // unrelated ordinary source
-		"go/acs/cycle20/predicates_test.go", // the cycle's OWN predicates (NOT under regression/)
+		"go/internal/core/observer.go",
+		"go/acs/cycle20/predicates_test.go", // the cycle's own predicates, not under regression/
 	} {
 		dec := g.Decide(context.Background(), core.GuardInput{
 			ToolName:  "Write",
@@ -73,9 +66,6 @@ func TestRole_AllowsLegitWorktreeWritesUnderProtection(t *testing.T) {
 	}
 }
 
-// TestRole_OutsideCycleAllowsControlPlane confirms the human operator (outside any
-// cycle, via `evolve ship --class manual`) can still edit the control plane —
-// the boundary applies to autonomous cycles, not operator-driven changes.
 func TestRole_OutsideCycleAllowsControlPlane(t *testing.T) {
 	s, _ := setupStorageNoCS(t)
 	g := NewRole(s, false)
@@ -88,15 +78,6 @@ func TestRole_OutsideCycleAllowsControlPlane(t *testing.T) {
 	}
 }
 
-// TestRole_DeniesGlobalSettingsInCycle is the C1 regression: the global
-// ~/.claude/settings.json (which wires the PreToolUse hooks) matches the legacy
-// "always-safe $HOME/.claude" rule, but a cycle must NOT be able to disable the
-// guards by rewriting it — the integrity check takes precedence inside a cycle.
-//
-// The home is the hermetic fixture: previously this asserted against the HOST's
-// $HOME (and against /tmp/.claude/settings.json when HOME was unset), so the
-// most security-critical predicate in the codebase was graded on a
-// machine-dependent path (guards-role-hermetic-home).
 func TestRole_DeniesGlobalSettingsInCycle(t *testing.T) {
 	s, _ := setupStorageWithCS(t, core.CycleState{
 		CycleID: 30, Phase: "build", ActiveAgent: "builder",
@@ -116,13 +97,6 @@ func TestRole_DeniesGlobalSettingsInCycle(t *testing.T) {
 	}
 }
 
-// TestRole_C1_DeniesGlobalSettingsUnsetHome is the item's named RED (HOME-less
-// runner). With NO home resolved, the always-safe $HOME/.claude rule cannot fire
-// at all, so the deny must come from the control-plane boundary alone — and it
-// must still ALARM. This is the assertion the old homeDir() fallback destroyed:
-// it rewrote the subject path to /tmp/.claude/settings.json, which is always-safe
-// by the /tmp rule, so a HOME-less run graded a different path than the one the
-// test names.
 func TestRole_C1_DeniesGlobalSettingsUnsetHome(t *testing.T) {
 	s, _ := setupStorageWithCS(t, core.CycleState{
 		CycleID: 31, Phase: "build", ActiveAgent: "builder",
@@ -131,8 +105,8 @@ func TestRole_C1_DeniesGlobalSettingsUnsetHome(t *testing.T) {
 	})
 	g := newRoleWithHome(s, false, "") // HOME unset / sandboxed runner
 	for _, path := range []string{
-		"/Users/operator/.claude/settings.json", // a real global settings path
-		"/tmp/.claude/settings.json",            // the old fallback's path: always-safe dir, protected FILE
+		"/Users/operator/.claude/settings.json",
+		"/tmp/.claude/settings.json", // a protected file inside an always-safe dir
 	} {
 		dec := g.Decide(context.Background(), core.GuardInput{
 			ToolName:  "Edit",
@@ -147,8 +121,6 @@ func TestRole_C1_DeniesGlobalSettingsUnsetHome(t *testing.T) {
 	}
 }
 
-// TestRole_AllowsGlobalSettingsOutsideCycle confirms the operator can still edit
-// their own ~/.claude/settings.json outside a cycle (the C1 fix must not break it).
 func TestRole_AllowsGlobalSettingsOutsideCycle(t *testing.T) {
 	s, _ := setupStorageNoCS(t)
 	g := newRoleWithHome(s, false, fixtureHome)
@@ -161,10 +133,8 @@ func TestRole_AllowsGlobalSettingsOutsideCycle(t *testing.T) {
 	}
 }
 
-// TestRole_BypassProtectedPathAlarms is H2: even an emergency --bypass of a
-// protected control-plane path is allowed but ALARMED — never silent.
 func TestRole_BypassProtectedPathAlarms(t *testing.T) {
-	g := NewRole(nil, true) // bypass=true
+	g := NewRole(nil, true)
 	dec := g.Decide(context.Background(), core.GuardInput{
 		ToolName:  "Edit",
 		ToolInput: map[string]any{"file_path": "/repo/go/acs/regression/flagreaders/readers_test.go"},
@@ -175,7 +145,6 @@ func TestRole_BypassProtectedPathAlarms(t *testing.T) {
 	if !dec.Alarm {
 		t.Error("bypass of a protected path must raise an Alarm")
 	}
-	// A non-protected bypass must allow WITHOUT an alarm.
 	dec = g.Decide(context.Background(), core.GuardInput{
 		ToolName:  "Edit",
 		ToolInput: map[string]any{"file_path": "/repo/go/internal/core/foo.go"},
@@ -185,14 +154,6 @@ func TestRole_BypassProtectedPathAlarms(t *testing.T) {
 	}
 }
 
-// TestRole_DeniesRelocatedExplanationCallSitesInBuildPhase is the #549
-// regression: five files gained an explanation-lifecycle call site when #549
-// carved them out of a protected file (cyclerun_review.go, resume.go,
-// audit.go, runner.go) into one the manifest did not yet name. A build phase
-// must be denied (with an alarm) from editing any of them, exactly like the
-// files it was already denied before the move — and two neighboring files
-// that were NEVER part of this call chain must stay allowed, proving the fix
-// is file-narrow rather than a blanket lockdown of the packages involved.
 func TestRole_DeniesRelocatedExplanationCallSitesInBuildPhase(t *testing.T) {
 	worktree := "/work/wt/cycle-1630" // non-/tmp so isAlwaysSafe doesn't short-circuit
 	s, _ := setupStorageWithCS(t, core.CycleState{
@@ -223,8 +184,7 @@ func TestRole_DeniesRelocatedExplanationCallSitesInBuildPhase(t *testing.T) {
 		}
 	}
 
-	// Control: neighboring files in the same packages that hold no
-	// explanation-lifecycle call site must stay ordinary, writable source.
+	// Control: neighbors that hold no lifecycle call site stay writable, so the protection is file-narrow.
 	for _, rel := range []string{
 		"go/internal/core/cyclerun_record.go",
 		"go/internal/core/resume_cursor.go",
