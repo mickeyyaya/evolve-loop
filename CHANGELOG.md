@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## Added — a recover rung in the correction ladder (ADR-0106 F1, unwired, 2026-09-26)
+
+- `interaction.NextCorrection` gains `RungRecover` between live-fix and re-dispatch, taken only when the caller reports the violation repairable (`CorrectionInput.Repairable`) and budget remains. The ladder does not execute it yet.
+
 ## Added — the host derives a declared secondary before any judge (ADR-0106 H2, 2026-09-26)
 
 - The registry declares what is derivable: `outputs.derived_from` maps an agent-owed secondary to the primary the host derives it from. The partition validator requires the file to be agent-owed and the source to be the primary; the descriptor schema documents the field.
