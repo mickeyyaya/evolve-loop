@@ -9,16 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
-// Class fix (skills-drift storm, cycles 836/838/841/843/849): a FLOOR phase
-// (audit) that returns a FAIL verdict with NO dispatch error — audit's in-process
-// CI-parity gates override a narrative PASS to FAIL — was never fed to
-// failure-learning, so state.FailedAt stayed empty and the failure-adapter +
-// Scout could not learn the recurrence. These tests pin the new success-path
-// learning: the synthesized reason and the FailedAt/carryover record.
-
-// TestFloorVerdictError_JoinsErrorSeverityDiagnostics: the synthesized error
-// names WHY the phase failed (the remediation-bearing gate messages), joining
-// ONLY error-severity diagnostics so a fail-open WARN never pollutes the reason.
 func TestFloorVerdictError_JoinsErrorSeverityDiagnostics(t *testing.T) {
 	diags := []Diagnostic{
 		{Severity: "warning", Message: "gofmt gate skipped (could not run)"},
@@ -43,18 +33,12 @@ func TestFloorVerdictError_JoinsErrorSeverityDiagnostics(t *testing.T) {
 		t.Errorf("warning-severity (fail-open) diagnostics must NOT enter the reason: %q", msg)
 	}
 
-	// No error-severity diagnostics → a generic, still-non-nil reason.
 	generic := floorVerdictError(PhaseAudit, []Diagnostic{{Severity: "warning", Message: "x"}})
 	if generic.Error() != "audit verdict=FAIL" {
 		t.Errorf("generic fallback = %q, want %q", generic.Error(), "audit verdict=FAIL")
 	}
 }
 
-// TestRecordFailedApproachState_RecordsFloorFailToStateAndCarryover: the extracted
-// record-only core appends a FailedRecord (carrying the reason) to state.FailedAt,
-// dedupes a P0 carryover todo, stamps LastCycleNumber, and returns the summary +
-// todo id — WITHOUT running retro. This is the signal the failure-adapter + Scout
-// read; before the fix it was never written on the success path.
 func TestRecordFailedApproachState_RecordsFloorFailToStateAndCarryover(t *testing.T) {
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, nil)
 	o.now = func() time.Time { return time.Date(2026, 7, 15, 1, 2, 3, 0, time.UTC) }
@@ -103,9 +87,6 @@ func TestRecordFailedApproachState_RecordsFloorFailToStateAndCarryover(t *testin
 	}
 }
 
-// TestRecordFailedApproachState_DedupesCarryover: a second identical failure in the
-// same cycle must not double-append the carryover todo (idempotent per todo id),
-// matching the error-path recordFailureLearning contract.
 func TestRecordFailedApproachState_DedupesCarryover(t *testing.T) {
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, nil)
 	o.now = func() time.Time { return time.Date(2026, 7, 15, 1, 2, 3, 0, time.UTC) }
@@ -128,17 +109,6 @@ func TestRecordFailedApproachState_DedupesCarryover(t *testing.T) {
 	}
 }
 
-// The wiring tests below pin the ACTUAL trigger point — the guard in
-// recordAndBranch that feeds a floor-phase FAIL verdict (returned with NO
-// dispatch error) into failure-learning. This is the exact site the skills-drift
-// storm re-derived forever because nothing recorded audit's err==nil gate-FAIL.
-// A driftCatalog (no catalog) keeps recordAndBranch on its literal defaults;
-// the floor is the router default {tdd,build,audit}, so audit is authoritative.
-
-// TestRecordAndBranch_AuditFAILRecordsFloorFailure is the faithful regression:
-// audit returns FAIL with error-severity diagnostics (the skills-drift gate) and
-// NO dispatch error, so recordAndBranch's success path — not an error path —
-// must record it to state.FailedAt with the remediation carried through.
 func TestRecordAndBranch_AuditFAILRecordsFloorFailure(t *testing.T) {
 	cr := retroGateHarness(t, phasespec.Catalog{})
 	defer cr.releaseShipWindow() // audit acquires the ship-window lease; free it + its heartbeat
@@ -157,10 +127,6 @@ func TestRecordAndBranch_AuditFAILRecordsFloorFailure(t *testing.T) {
 	if !strings.Contains(cr.state.FailedAt[0].Summary, "evolve skills generate") {
 		t.Errorf("recorded reason must carry the gate remediation, got %q", cr.state.FailedAt[0].Summary)
 	}
-	// Durability: the record must reach STORAGE, not only in-memory state — the
-	// live loop's abort branches return before finalizeCycle persists. Pins the
-	// writeFailureLearningState call in recordFloorVerdictFailure; without it this
-	// asserts against the persisted copy and fails.
 	persisted, err := cr.o.storage.ReadState(context.Background())
 	if err != nil {
 		t.Fatalf("ReadState: %v", err)
@@ -170,9 +136,6 @@ func TestRecordAndBranch_AuditFAILRecordsFloorFailure(t *testing.T) {
 	}
 }
 
-// TestRecordAndBranch_AuditPASSDoesNotRecord: the SAME authoritative phase, when
-// it PASSes, must add no failed-approach record — the guard keys on the FAIL
-// verdict, not on the phase being a floor phase.
 func TestRecordAndBranch_AuditPASSDoesNotRecord(t *testing.T) {
 	cr := retroGateHarness(t, phasespec.Catalog{})
 	defer cr.releaseShipWindow()
@@ -187,9 +150,6 @@ func TestRecordAndBranch_AuditPASSDoesNotRecord(t *testing.T) {
 	}
 }
 
-// TestRecordAndBranch_NonAuthoritativePhaseFAILDoesNotRecord: a non-floor phase
-// (scout) FAIL is not authoritative, so the floor-learning guard must skip it —
-// scout failures are handled by the normal flow, not this record-only path.
 func TestRecordAndBranch_NonAuthoritativePhaseFAILDoesNotRecord(t *testing.T) {
 	cr := retroGateHarness(t, phasespec.Catalog{})
 

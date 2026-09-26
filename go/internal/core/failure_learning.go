@@ -35,12 +35,9 @@ type failureLearningRequest struct {
 	Timings      *[]phaseTimingEntry
 }
 
-// phaseOutcomeFrom builds the single-source outcome record for one phase
-// dispatch (ADR-0044 C1). The verdict reconciliation rule lives HERE and only
-// here: a canonical agent verdict is recorded as-is; anything else (empty,
-// non-canonical, error-path zero response) synthesizes FAIL. A synthesized
-// PASS is structurally impossible — reconciliation only ever describes what
-// the agent itself reported.
+// phaseOutcomeFrom is the one place a canonical agent verdict is recorded
+// as-is while anything else (empty, non-canonical, error-path zero response)
+// synthesizes FAIL; a synthesized PASS is structurally impossible.
 func phaseOutcomeFrom(phase Phase, resp PhaseResponse, attempts int, abortReason, startedAt string) recovery.PhaseOutcome {
 	verdict := resp.Verdict
 	if !IsVerdict(verdict) {
@@ -62,24 +59,16 @@ func phaseOutcomeFrom(phase Phase, resp PhaseResponse, attempts int, abortReason
 	}
 }
 
-// recordPhaseOutcome is the C1 recording chokepoint (ADR-0044): EVERY
-// terminal disposition of a dispatched phase — happy advance AND each abort
-// return (exhausted retries, non-canonical verdict, review-gate reject,
-// ship-error recovery, worktree-leak recovery failure, tree-diff guard,
-// ledger/state persistence failure) — funnels through here exactly once, so
-// PhasesRun, phase-timing.json, and <phase>-usage.json always reflect what
-// actually ran. cycle-262: the build ran, PASSed, and burned tokens, but the
-// tree-guard abort path skipped all three records — the divergence this
-// chokepoint makes structurally impossible. Paths where the phase never
-// dispatched (no runner registered, pre-phase state-write failure) have no
-// outcome to record and stay bare.
+// recordPhaseOutcome is the one chokepoint every terminal disposition of a
+// dispatched phase funnels through, so PhasesRun, phase-timing.json and
+// <phase>-usage.json always reflect what actually ran.
+//
+// See ADR-0044.
 func (o *Orchestrator) recordPhaseOutcome(result *CycleResult, timings *[]phaseTimingEntry, workspace string, out recovery.PhaseOutcome) {
 	o.recorder().Record(result, timings, workspace, out)
-	// ADR-0048 Slice A (SHADOW): grade the abort reason. Observe-only — logs the
-	// tier graduated-enforcement WOULD apply; changes nothing (the floor still
-	// aborts). Evidence is conservative here (the per-site benign-churn /
-	// verified-rebuild predicates are plumbed in the enforce slice), so only the
-	// always-correctable classes surface in shadow today.
+	// Shadow: grades the abort reason but changes nothing, the floor still aborts.
+	//
+	// See ADR-0048.
 	if out.AbortReason != "" {
 		if tier := failuregrade.Grade(out.AbortReason, failuregrade.Evidence{}); tier != failuregrade.TierAbort {
 			fmt.Fprintf(os.Stderr, "[graduated-enforcement SHADOW] phase %s abort reason %q would grade as %s (ADR-0048 Slice A; enforce pending)\n", out.Phase, out.AbortReason, tier)
@@ -87,11 +76,9 @@ func (o *Orchestrator) recordPhaseOutcome(result *CycleResult, timings *[]phaseT
 	}
 }
 
-// flushPhaseTimings composes and persists this cycle's phase-timing log EXACTLY
-// once and returns the composed set, so every consumer — the durable log, the
-// normal-path dossier (completeCycle) and the abort-path dossier
-// (abnormalEpilogue) — sees the identical record regardless of which fires
-// first. Calling it again returns the cached set without re-appending.
+// flushPhaseTimings composes and persists this cycle's phase-timing log
+// exactly once and returns the composed set; calling it again returns the
+// cached set without re-appending.
 func (cr *cycleRun) flushPhaseTimings() []phaseTimingEntry {
 	if cr.timingsFlushed {
 		return cr.timingsComposed
@@ -101,19 +88,12 @@ func (cr *cycleRun) flushPhaseTimings() []phaseTimingEntry {
 	return cr.timingsComposed
 }
 
-// learningGate is the PURE pre-recorder decision of recordFailureLearning:
+// learningGate is the pure pre-recorder decision of recordFailureLearning:
 // which of the three silent exits fires, or that learning proceeds. It never
-// mutates the request — the ShipFailReasons carrier is the coordinator's,
-// written between the gate and the quota return (invariant A).
-//
-// Order: incomplete → canceled → quota-deferred. Cancellation is an
-// operator/runtime stop, not evidence that the task or phase failed: keep the
-// active phase intact for the interrupt checkpoint and spend no model call on
-// a retrospective that cannot finish under an already-canceled context. An
-// all-families quota exhaustion is a DEFERRED resume checkpoint, not a failed
-// phase: it stays out of *all* failure-learning state, including the
-// FailedRecord and P0 todo the recorder mints — errors.Is, because dispatch
-// wraps the sentinel before it reaches this chokepoint.
+// mutates the request. Order: incomplete → canceled → quota-deferred. A
+// cancellation is an operator/runtime stop, not evidence the task or phase
+// failed; an all-families quota exhaustion is a deferred resume checkpoint,
+// not a failed phase, so both stay out of failure-learning state.
 type learningGate int
 
 const (
@@ -136,18 +116,16 @@ func failureLearningGate(ctx context.Context, fl failureLearningRequest) learnin
 	return gateLearn
 }
 
-// recordFailureLearning is the chokepoint every failed phase reaches — the
-// coordinator of the failure-learning spine (ADR-0103 unit 03b): the gate,
-// the carrier, the recorder (invariant D: before the doc-missing arm and the
-// runner lookup), the deterministic arms, the retro dispatch and its
-// completion. Every stderr line below is verbatim; unit 05 codes them.
+// recordFailureLearning is the chokepoint every failed phase reaches: the
+// gate, the carrier, the recorder, the deterministic arms, the retro dispatch
+// and its completion.
 func (o *Orchestrator) recordFailureLearning(ctx context.Context, fl failureLearningRequest) {
 	gate := failureLearningGate(ctx, fl)
 	if gate == gateIncomplete || gate == gateCanceled {
 		return
 	}
 	// Preserve a ship dispatch explanation for the coherence floor even when
-	// the quota boundary skips failure learning below (invariant A).
+	// the quota boundary skips failure learning below.
 	if fl.Failed == PhaseShip {
 		fl.CycleState.ShipFailReasons = []string{fl.Err.Error()}
 	}
@@ -156,10 +134,8 @@ func (o *Orchestrator) recordFailureLearning(ctx context.Context, fl failureLear
 		return
 	}
 	summary, todoID, structured := o.recordFailedApproachState(fl)
-	// A missing persona doc is a deterministically KNOWN configuration absence
-	// (cycle-1551 class; cycles 1619/1620 spent a deep-tier agent on exactly
-	// this): learn it deterministically — the FailedRecord and carryover todo
-	// above, the failure digest and the lesson artifact — no LLM dispatch.
+	// A missing persona doc is a deterministically known configuration absence:
+	// learn it deterministically, no LLM dispatch.
 	if errors.Is(fl.Err, ErrAgentDocMissing) {
 		fmt.Fprintf(os.Stderr, "[orchestrator] failure-learning: %s persona doc missing — known configuration absence, learned deterministically (no retrospective agent dispatched)\n", fl.Failed)
 		o.ensureFailureDigest(fl.Cycle, fl.CycleRequest.ProjectRoot, fl.CycleState.WorkspacePath, string(fl.Failed), fl.Err.Error())
@@ -186,22 +162,21 @@ func (o *Orchestrator) recordFailureLearning(ctx context.Context, fl failureLear
 	o.completeRetro(ctx, fl, retroResp, todoID)
 }
 
-// learnDeterministically is the ONE fallback tail (it was copy-pasted three
-// times): the floor, then the persist LAST. It carries no digest — the
-// doc-missing arm writes its digest visibly before calling it, and the two
-// retro tails already wrote theirs before the runner ran.
+// learnDeterministically is the one fallback tail: the floor, then the
+// persist last. It carries no digest — the doc-missing arm writes its digest
+// visibly before calling it, and the two retro tails already wrote theirs
+// before the runner ran.
 func (o *Orchestrator) learnDeterministically(ctx context.Context, fl failureLearningRequest, summary string, structured *phasecontract.FailureBlock) {
 	o.writeDeterministicLearning(fl, summary, structured)
 	o.writeFailureLearningState(ctx, fl.State)
 }
 
 // dispatchRetro runs the inline retrospective: the request, the failure
-// digest BEFORE the agent (invariant C — the S1 identity the S2 disposition
-// gate cross-checks and an input the agent reads; a digest write failure only
-// WARNs, forensics plumbing never blocks learning), the retro stamp on the
-// cycle state (NOT restored afterwards — preserved, see the unit doc Q1), the
-// pre-retro cycle-state write, the observer around the run. Decides nothing:
-// the raw response and error go back to the coordinator.
+// digest before the agent (a digest write failure only WARNs, forensics
+// plumbing never blocks learning), the retro stamp on the cycle state (not
+// restored afterwards), the pre-retro cycle-state write, the observer around
+// the run. Decides nothing: the raw response and error go back to the
+// coordinator.
 func (o *Orchestrator) dispatchRetro(ctx context.Context, fl failureLearningRequest, runner PhaseRunner, summary, todoID string) (PhaseResponse, error) {
 	retroReq := fl.retroRequest(summary, todoID)
 	o.ensureFailureDigest(fl.Cycle, retroReq.ProjectRoot, fl.CycleState.WorkspacePath, string(fl.Failed), fl.Err.Error())
@@ -220,15 +195,13 @@ func (o *Orchestrator) dispatchRetro(ctx context.Context, fl failureLearningRequ
 	return retroResp, retroErr
 }
 
-// completeRetro is the retro's durable completion — the divergent twin of
-// phaseCompletionRecord.persist, kept and NAMED (the unit doc §2 lists the ten
-// divergences; folding them is unit 05's behaviour-change series): the ledger
-// entry, CompletedPhases, the post-retro cycle-state write, the unconditional
-// checkpoint, the verdict, the disposition gate (S2: a PASS retro must still
-// deliver a valid disposition.json agreeing with the S1 digest, else the
-// completion surfaces a loud gate reason), the retro outcome, and the persist
-// LAST. A failed ledger append is also LEDGER_APPEND_FAILED at the adapter's
-// one chokepoint; its line stays until unit 05 codes the nine kept lines.
+// completeRetro is the retro's durable completion — a divergent twin of
+// phaseCompletionRecord.persist, kept and named rather than folded: the
+// ledger entry, CompletedPhases, the post-retro cycle-state write, the
+// unconditional checkpoint, the verdict, the disposition gate (a PASS retro
+// must still deliver a valid disposition.json agreeing with the digest, else
+// the completion surfaces a loud gate reason), the retro outcome, and the
+// persist last.
 func (o *Orchestrator) completeRetro(ctx context.Context, fl failureLearningRequest, retroResp PhaseResponse, todoID string) {
 	if err := o.ledger.Append(ctx, LedgerEntry{
 		TS:       o.now().UTC().Format(time.RFC3339),
@@ -274,28 +247,24 @@ func (fl failureLearningRequest) retroRequest(summary, todoID string) PhaseReque
 		Cycle:       fl.Cycle,
 		ProjectRoot: fl.CycleRequest.ProjectRoot,
 		Workspace:   fl.CycleState.WorkspacePath,
-		// CB.1: even this out-of-band retro keeps the no-main-tree-cwd
-		// invariant — read-only, but invariants with exceptions aren't structural.
+		// Even this out-of-band retro keeps the no-main-tree-cwd invariant.
 		Worktree:                        fl.CycleState.ActiveWorktree,
 		WorktreeBaseSHA:                 fl.CycleState.WorktreeBaseSHA,
 		ExplanationDocumentationVersion: fl.CycleState.ExplanationDocumentationVersion,
-		// CB.5: and the run identity, for run-scoped session naming.
-		RunID:         fl.CycleState.RunID,
-		GoalHash:      fl.CycleRequest.GoalHash,
-		PreviousPhase: string(fl.Failed),
-		Env:           fl.Env,
-		Context:       retroCtx,
+		RunID:                           fl.CycleState.RunID,
+		GoalHash:                        fl.CycleRequest.GoalHash,
+		PreviousPhase:                   string(fl.Failed),
+		Env:                             fl.Env,
+		Context:                         retroCtx,
 	}
 	projectBuildExplanation(fl.CycleRequest.ProjectRoot, *fl.CycleState).apply(&req)
 	return req
 }
 
-// recorder returns the unit-01 recorder (ADR-0103). NewOrchestrator builds it
-// eagerly with the root's Center. An Orchestrator assembled as a literal —
-// the test constructions this package keeps — lazily builds and caches that
-// same live recorder on first use. A nil orchestrator (a bare cycleRun with
-// no orchestrator at all) gets a fresh bare, no-op Recorder on every call, so
-// every path that records or flushes still has ONE writer.
+// recorder lazily builds and caches the live recorder for an Orchestrator
+// assembled as a literal. A nil orchestrator gets a fresh bare, no-op
+// Recorder on every call, so every path that records or flushes still has
+// one writer.
 func (o *Orchestrator) recorder() *outcome.Recorder {
 	if o == nil {
 		return outcome.NewRecorder(time.Now, func(string) string { return "" }, func(int, recovery.PhaseOutcome) {})
@@ -306,12 +275,10 @@ func (o *Orchestrator) recorder() *outcome.Recorder {
 	return o.outcome
 }
 
-// wiredRecorder is the ONE construction of the live recorder, shared by
+// wiredRecorder is the one construction of the live recorder, shared by
 // NewOrchestrator (eager) and recorder() (lazy). Every collaborator is read
-// live: the clock through a closure (tests swap o.now after construction), the
-// archetype lookup as the live method value, the Center through an accessor
-// (WithSignalCenter is an option tests apply after construction too); the
-// emission keeps module orchestrator.
+// live: the clock through a closure, the Center through an accessor, since
+// tests apply WithSignalCenter after construction.
 func (o *Orchestrator) wiredRecorder() *outcome.Recorder {
 	return outcome.NewRecorder(func() time.Time { return o.now() }, o.phaseArchetype, o.emitPhaseOutcome,
 		outcome.WithSignals(func() *signalcenter.Center { return o.signals }))

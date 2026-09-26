@@ -1,11 +1,7 @@
 package core
 
-// failure_learning_spine_test.go — ADR-0103 unit 03b, commit 1: the pins on
-// recordFailureLearning's spine that were comments (or nothing) before the
-// split. Every test here is green on the pre-split code and red against the
-// named mutant recorded in docs/architecture/decomposition/03b-failure-learning-engine.md
-// §6/§8. Fakes and temp dirs only; the stderr-capturing tests must not run in
-// parallel (os.Stderr is process-global — captureStderr's contract).
+// The stderr-capturing tests below must not run in parallel: os.Stderr is
+// process-global, which is captureStderr's contract.
 
 import (
 	"context"
@@ -25,9 +21,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// spineRequest is the 11-field DTO the seven by-name tests build literally,
-// built here ONCE for the spine pins (audit failed, cycle 1034, the workspace
-// and project root in dir).
+// spineRequest builds the spine-pin fixture once: audit failed at Cycle=1034,
+// the workspace and project root in dir.
 func spineRequest(dir string, err error) failureLearningRequest {
 	return failureLearningRequest{
 		CycleRequest: CycleRequest{ProjectRoot: dir},
@@ -45,7 +40,7 @@ func spineRequest(dir string, err error) failureLearningRequest {
 
 // seedValidDisposition models a compliant retro agent: the real input
 // artifact, the canonical digest the assembler will derive, and a disposition
-// carrying that identity (the disposition_gate_test.go fixture).
+// carrying that identity.
 func seedValidDisposition(t *testing.T, dir string) {
 	t.Helper()
 	writeJSON(t, dir, "audit-fail-reason.json", map[string]any{
@@ -62,7 +57,7 @@ func seedValidDisposition(t *testing.T, dir string) {
 	writeJSON(t, dir, "disposition.json", d)
 }
 
-// seqStorage logs the ORDER of the two storage effects the spine performs.
+// seqStorage logs the order of the two storage effects the spine performs.
 type seqStorage struct {
 	*fakeStorage
 	seq []string
@@ -96,9 +91,6 @@ func (p *retroProbeRunner) Run(_ context.Context, req PhaseRequest) (PhaseRespon
 	return PhaseResponse{Phase: string(PhaseRetro), Verdict: p.verdict, ArtifactsDir: req.Workspace}, nil
 }
 
-// Test 1 — the no-retro-runner arm is characterised: record + todo persisted,
-// NO retro stamp, NO cycle-state write, NO retro ledger entry, NO floor
-// (the arm writes "queued carryover todo only" today — operator question 7).
 func TestRecordFailureLearning_NoRetroRunner_QueuesTodoAndPersistsWithoutRetroStamp(t *testing.T) {
 	dir := t.TempDir()
 	st := &fakeStorage{}
@@ -127,10 +119,6 @@ func TestRecordFailureLearning_NoRetroRunner_QueuesTodoAndPersistsWithoutRetroSt
 	}
 }
 
-// Test 2 — the persist (WriteState) is the LAST storage effect on every exit
-// that persists, and the three silent exits never persist. The pre-retro
-// cycle-state write fires BEFORE runner.Run, so the runner-error and
-// non-canonical arms log it too (landing-critic blocker 1).
 func TestRecordFailureLearning_PersistIsTheLastStorageEffect(t *testing.T) {
 	cases := []struct {
 		name string
@@ -177,10 +165,6 @@ func TestRecordFailureLearning_PersistIsTheLastStorageEffect(t *testing.T) {
 	}
 }
 
-// Test 3 — invariant B's engine half: the retro outcome is recorded AFTER the
-// disposition gate set RetroDecision and BEFORE the persist; the timing log
-// stays chronological [failed, retro]; the retro entry carries attempts 1 and
-// the stamped PhaseStartedAt.
 func TestRecordFailureLearning_RetroOutcomeIsRecordedAfterTheGateAndBeforeThePersist(t *testing.T) {
 	dir := t.TempDir()
 	seedValidDisposition(t, dir)
@@ -213,8 +197,6 @@ func TestRecordFailureLearning_RetroOutcomeIsRecordedAfterTheGateAndBeforeThePer
 	}
 }
 
-// Test 4 — invariant B's caller half at the loud-abort site: the failed
-// phase's outcome is recorded BEFORE the inline retro (timing log [scout FAIL, retro]).
 func TestRunCycle_FailedPhaseOutcomeIsRecordedBeforeTheInlineRetro(t *testing.T) {
 	st := &fakeStorage{}
 	runners := buildRunners(nil)
@@ -236,10 +218,6 @@ func TestRunCycle_FailedPhaseOutcomeIsRecordedBeforeTheInlineRetro(t *testing.T)
 	}
 }
 
-// Test 5 — the optional-skip site's order is pinned AS-IS: failure learning
-// (its deterministic floor and persist) runs BEFORE recordPhaseSkip files the
-// skip's ledger entry — the documented exception to invariant B (the skip's
-// phase outcome is recorded by the dispatch loop after both), unit 05's to change.
 func TestOptionalInfraSkip_RecordsTheInlineRetroBeforeTheSkipOutcome(t *testing.T) {
 	root := t.TempDir()
 	st := &fakeStorage{}
@@ -276,8 +254,8 @@ func (p *probeLedger) Append(ctx context.Context, e LedgerEntry) error {
 	return p.fakeLedger.Append(ctx, e)
 }
 
-// optionalPhaseOrchestrator is the missing-persona fixture (agent_doc_missing_test.go):
-// an optional "amplify-tests" phase after build, dynamic-LLM routing with a fixed plan.
+// optionalPhaseOrchestrator is the missing-persona fixture: an optional
+// "amplify-tests" phase after build, dynamic-LLM routing with a fixed plan.
 func optionalPhaseOrchestrator(t *testing.T, st Storage, led Ledger, runners map[Phase]PhaseRunner, extra ...Option) *Orchestrator {
 	t.Helper()
 	cat, err := phasespec.Catalog{}.Merge([]phasespec.PhaseSpec{{Name: "amplify-tests", Optional: true, After: "build"}})
@@ -295,8 +273,6 @@ func optionalPhaseOrchestrator(t *testing.T, st Storage, led Ledger, runners map
 	return NewOrchestrator(st, led, runners, opts...)
 }
 
-// Test 6 — invariant C's unobserved half: the failure digest exists on disk
-// when the retro runner STARTS (ensureFailureDigest before runner.Run).
 func TestRecordFailureLearning_DigestExistsWhenTheRetroRunnerStarts(t *testing.T) {
 	dir := t.TempDir()
 	runners := buildRunners(nil)
@@ -312,9 +288,6 @@ func TestRecordFailureLearning_DigestExistsWhenTheRetroRunnerStarts(t *testing.T
 	}
 }
 
-// Test 7 — the doc-missing arm writes the digest (the assembler overwrites a
-// foreign one) and lands the recurrence closure; the runner-error and
-// non-canonical tails NEVER re-run the assembler (a deleted digest stays absent).
 func TestRecordFailureLearning_DocMissingArmWritesTheDigestAndTheFallbackArmsNeverRewriteIt(t *testing.T) {
 	t.Run("doc-missing arm assembles the digest and records the closure", func(t *testing.T) {
 		dir := t.TempDir()
@@ -357,9 +330,6 @@ func TestRecordFailureLearning_DocMissingArmWritesTheDigestAndTheFallbackArmsNev
 	}
 }
 
-// Test 8 — characterisation of the preserved quirks after a PASS inline retro:
-// the phase stays stamped retro (Q1), cs.FinalVerdict is never stamped (Q6),
-// Result.FinalVerdict is the retro's, RetroDecision names the queued todo.
 func TestRecordFailureLearning_SuccessfulInlineRetroLeavesPhaseStampedRetro(t *testing.T) {
 	dir := t.TempDir()
 	seedValidDisposition(t, dir)
@@ -381,7 +351,6 @@ func TestRecordFailureLearning_SuccessfulInlineRetroLeavesPhaseStampedRetro(t *t
 	}
 }
 
-// Test 9 — the gate order nil → ctx → carrier → quota on the current spelling.
 func TestRecordFailureLearning_GateOrderIsNilCtxCarrierQuota(t *testing.T) {
 	exhausted := fmt.Errorf("phase ship: %w", ErrAllFamiliesExhausted)
 	twice := fmt.Errorf("outer: %w", exhausted)
@@ -426,11 +395,6 @@ func TestRecordFailureLearning_GateOrderIsNilCtxCarrierQuota(t *testing.T) {
 	}
 }
 
-// Test 10 — the signal stream is byte-identical apart from the declared codes:
-// the ordered {module/kind/code} sequence per path, captured on 97825125. The
-// fallback paths emit NOTHING today (a fake ledger emits no ledger.appended; a
-// PASS retro outcome is an INFO with no code), so a stray Emit or a dropped
-// phase.outcome shows up as a diff. Commit 2 adds the provoked-fault row.
 func TestRecordFailureLearning_StreamIsByteIdenticalApartFromTheDeclaredCodes(t *testing.T) {
 	plain := func() error { return errors.New("audit floor red") }
 	cases := []struct {
@@ -473,9 +437,6 @@ func streamSequence(events []signalcenter.Event) []string {
 	return seq
 }
 
-// Test 11a — a failed retro ledger append raises no FAILURELEARNING_/ORCHESTRATOR_
-// code (LEDGER_APPEND_FAILED at the adapter's one chokepoint is the signal);
-// the retro outcome still records.
 func TestRecordFailureLearning_RetroLedgerAppendFailure_RaisesOnlyTheLedgerCode(t *testing.T) {
 	dir := t.TempDir()
 	seedValidDisposition(t, dir)
@@ -494,9 +455,6 @@ func TestRecordFailureLearning_RetroLedgerAppendFailure_RaisesOnlyTheLedgerCode(
 	}
 }
 
-// Test 36 — the gate is a PURE four-valued decision in the order nil → ctx →
-// quota, and never touches the request (the ShipFailReasons carrier is the
-// coordinator's, written between the gate and the quota return).
 func TestFailureLearningGate_IsPureAndOrdered(t *testing.T) {
 	exhausted := fmt.Errorf("outer: %w", fmt.Errorf("phase ship: %w", ErrAllFamiliesExhausted))
 	canceled, cancel := context.WithCancel(context.Background())

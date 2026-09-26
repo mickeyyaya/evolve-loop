@@ -1,15 +1,5 @@
 package core
 
-// failure_digest_identity_test.go — the identical-fingerprint breaker's
-// identity must be CONTENT-BEARING (batch-14 halt, 2026-07-28). Cycles
-// 1137/1139/1143 were three DISTINCT, progressing auditor findings on one
-// task (zero coverage → grace never defaulted → gc.mode=off ignored), yet all
-// three digests hashed the same content-free router line
-// ("phase audit verdict FAIL routed to retro …") to one fingerprint and
-// false-tripped the breaker: verdictFailDistinguisher's task-id layer cannot
-// separate same-task retries, and its defect layer only matched "- D" bullet
-// formatting while these auditors emit the schema-v2 sentinel defects list.
-
 import (
 	"encoding/json"
 	"fmt"
@@ -69,9 +59,6 @@ func digestFor(t *testing.T, ws string) FailureDigest {
 	return d
 }
 
-// TestFailureDigest_SameTaskDistinctDefectsGetDistinctFingerprints is the
-// batch-14 live pin: the three real first-defect heads, same committed task,
-// must mint three DIFFERENT fingerprints.
 func TestFailureDigest_SameTaskDistinctDefectsGetDistinctFingerprints(t *testing.T) {
 	heads := []string{
 		"CRITICAL: the gc.mode=enforce apply path (cmd_gc.go:147-157) has zero covering tests at any level",
@@ -91,9 +78,6 @@ func TestFailureDigest_SameTaskDistinctDefectsGetDistinctFingerprints(t *testing
 	}
 }
 
-// TestFailureDigest_SameDefectAcrossRetryCyclesCollides — the breaker must
-// still catch REAL recurrence: the same defect re-audited next cycle carries
-// new cycle-numbered tokens in its text, which must normalize out.
 func TestFailureDigest_SameDefectAcrossRetryCyclesCollides(t *testing.T) {
 	a := digestFor(t, identityWorkspace(t, "task-x",
 		"acs/cycle1141 predicates never compile; TestC1141_004 drives the enforce path (cycle-1141)"))
@@ -104,10 +88,6 @@ func TestFailureDigest_SameDefectAcrossRetryCyclesCollides(t *testing.T) {
 	}
 }
 
-// TestVerdictFailDistinguisher_SentinelDefectsOutrankTaskIDs — task identity
-// is the WEAKEST layer (same-task retries with different defects are the
-// common case, and same-task repeats are S5 quarantine's job, not the
-// breaker's). With both available, the defect wins.
 func TestVerdictFailDistinguisher_SentinelDefectsOutrankTaskIDs(t *testing.T) {
 	ws := identityWorkspace(t, "task-x", "CRITICAL: the one true defect")
 	got := verdictFailDistinguisher("audit", ws)
@@ -119,8 +99,6 @@ func TestVerdictFailDistinguisher_SentinelDefectsOutrankTaskIDs(t *testing.T) {
 	}
 }
 
-// TestVerdictFailDistinguisher_FallsBackTasksWhenNoDefects — no sentinel, no
-// bullets → the task layer still beats nothing.
 func TestVerdictFailDistinguisher_FallsBackTasksWhenNoDefects(t *testing.T) {
 	ws := t.TempDir()
 	td, _ := json.Marshal(map[string]any{"top_n": []map[string]string{{"id": "task-y"}}})
@@ -132,10 +110,6 @@ func TestVerdictFailDistinguisher_FallsBackTasksWhenNoDefects(t *testing.T) {
 	}
 }
 
-// TestVerdictFailDistinguisher_ClasslessSentinelFallsSoftToBullets pins the
-// ReadFailureBlock narrowing (re-review LOW): a hand-written sentinel carrying
-// defects but NO failure.class is not authoritative — the distinguisher must
-// fall through to the bullet layer, never mint a defect head from it.
 func TestVerdictFailDistinguisher_ClasslessSentinelFallsSoftToBullets(t *testing.T) {
 	ws := t.TempDir()
 	report := "# Audit Report\n\n- D1 CRITICAL: the bullet-layer defect\n\n" +
@@ -152,9 +126,6 @@ func TestVerdictFailDistinguisher_ClasslessSentinelFallsSoftToBullets(t *testing
 	}
 }
 
-// TestAssembleFailureDigest_BoilerplateOnlyReasonIsUnexplained — a reason set
-// that is EXACTLY the content-free router line asserts no identity: the
-// digest must self-mark so the breaker routes it to the diagnosability rule.
 func TestAssembleFailureDigest_BoilerplateOnlyReasonIsUnexplained(t *testing.T) {
 	ws := t.TempDir()
 	b, _ := json.Marshal(auditFailReason{SchemaVersion: 1, Phase: "audit",
@@ -169,9 +140,6 @@ func TestAssembleFailureDigest_BoilerplateOnlyReasonIsUnexplained(t *testing.T) 
 	if !d.Unexplained {
 		t.Fatalf("boilerplate-only digest not marked Unexplained (fingerprint %s) — three of these false-tripped the identical-fingerprint breaker on batch-14", d.Fingerprint)
 	}
-	// The negative pin (re-review LOW): a MIXED set — boilerplate plus one
-	// real reason — is content-bearing; an "any boilerplate ⇒ unexplained"
-	// refactor must fail here.
 	b, _ = json.Marshal(auditFailReason{SchemaVersion: 1, Phase: "audit",
 		Reasons: []string{agentGradedRouterReason("audit"), "EGPS: red_count=1 [GCHookRunsAfterFinalize]"}})
 	if err := os.WriteFile(filepath.Join(ws, "audit-fail-reason.json"), b, 0o644); err != nil {
@@ -186,9 +154,6 @@ func TestAssembleFailureDigest_BoilerplateOnlyReasonIsUnexplained(t *testing.T) 
 	}
 }
 
-// TestEvaluateBlockerBreaker_UnexplainedDigestsNeverAssertIdentity — the
-// breaker half: content-free digests may halt as a DIAGNOSABILITY breakdown
-// (their honest name) but never as "identical defects".
 func TestEvaluateBlockerBreaker_UnexplainedDigestsNeverAssertIdentity(t *testing.T) {
 	shared := []FailureDigest{
 		{Cycle: 1, Fingerprint: "audit|verdict-fail|deadbeef0000", PreClass: "verdict-fail", Unexplained: true},
@@ -205,10 +170,6 @@ func TestEvaluateBlockerBreaker_UnexplainedDigestsNeverAssertIdentity(t *testing
 	}
 }
 
-// TestAgentGradedRouterReason_MatchesBoilerplateDetector pins the writers and
-// the detector to shared templates — if a fallback wording drifts, the
-// detector must fail here rather than silently reclassifying boilerplate as
-// content.
 func TestAgentGradedRouterReason_MatchesBoilerplateDetector(t *testing.T) {
 	for _, phase := range []string{"audit", "adversarial-review"} {
 		for _, r := range []string{agentGradedRouterReason(phase), abnormalEpilogueReason(phase)} {
@@ -225,11 +186,6 @@ func TestAgentGradedRouterReason_MatchesBoilerplateDetector(t *testing.T) {
 	}
 }
 
-// TestAbnormalEpilogue_DigestIsUnexplained drives the REAL abnormal-exit
-// production caller end-to-end: an aborted shell with no floor-written
-// fail-reason must self-mark Unexplained — three same-phase aborts (an
-// operator bounce cancels a whole wave) must never read as one recurring
-// defect to the identical-fingerprint rule.
 func TestAbnormalEpilogue_DigestIsUnexplained(t *testing.T) {
 	cr, _ := epilogueRun(t, false)
 	cr.abnormalEpilogue(nil)
@@ -246,14 +202,6 @@ func TestAbnormalEpilogue_DigestIsUnexplained(t *testing.T) {
 	}
 }
 
-// TestAbnormalEpilogue_CauseBecomesDistinguisher — live pin (batch-19 halt at
-// cycle-1208): cycles 1197/1199/1207 aborted in phase build for THREE distinct
-// reasons, but the epilogue wrote only the constant template, so all three
-// digests were Unexplained with ONE fingerprint and the diagnosability
-// breaker had to halt the batch to get an operator. The abort CAUSE — the
-// error RunCycle was about to return — is the missing distinguisher: with it
-// appended, the digest is content-bearing and distinct per cause; without it
-// (nil cause: a bare bounce) the template stays honestly Unexplained.
 func TestAbnormalEpilogue_CauseBecomesDistinguisher(t *testing.T) {
 	digestFor := func(t *testing.T, cause error) FailureDigest {
 		t.Helper()
@@ -297,13 +245,6 @@ func TestAbnormalEpilogue_CauseBecomesDistinguisher(t *testing.T) {
 	}
 }
 
-// TestAbnormalEpilogue_TeardownMarkedAndTailKept pins the review decisions on
-// the cycle-1208 fix: (1) a teardown-shaped cause (IsInfraTeardownError) is
-// marked "teardown=" — its identical fingerprints DELIBERATELY stay in the
-// identical-fingerprint population (one infra condition mowing down three
-// lanes SHOULD stop the batch at the ceiling; the marker keeps the halt
-// legible) — and (2) truncation keeps the error-chain TAIL, where identity
-// lives, so two roots under one long shared prefix never collapse.
 func TestAbnormalEpilogue_TeardownMarkedAndTailKept(t *testing.T) {
 	cr, _ := epilogueRun(t, false)
 	cr.abnormalEpilogue(fmt.Errorf("build: bridge: %w", ErrArtifactTimeout))
@@ -325,12 +266,6 @@ func TestAbnormalEpilogue_TeardownMarkedAndTailKept(t *testing.T) {
 	}
 }
 
-// TestFailureDigest_DurationTokensNormalizeOut — live pin (1146/1148): two
-// attempts failed the SAME protectedsurface red on the SAME two files, but
-// the reason embeds go-test durations ("(0.02s)", "\t1.478s" vs "\t1.495s"),
-// so the fingerprints split and the breaker went blind to a genuine
-// recurrence. Third instance of the identity-noise family (cycle tokens,
-// narrative verdicts, durations).
 func TestFailureDigest_DurationTokensNormalizeOut(t *testing.T) {
 	a := fingerprint("audit", "gate-block", []string{
 		"--- FAIL: TestEveryGateShapedFileIsProtectedSurface (0.02s); file: x_guard_test.go; FAIL\tgo/acs/regression/protectedsurface\t1.478s"})
@@ -344,9 +279,6 @@ func TestFailureDigest_DurationTokensNormalizeOut(t *testing.T) {
 	if a == c {
 		t.Fatalf("different offending files collapsed to one fingerprint — normalization over-folded")
 	}
-	// Integer-second tokens are CONFIGURATION, not timing chrome (review
-	// MEDIUM: the decimal-required contract needs its own negative pin, or a
-	// widened `\d+(\.\d+)?s` regex passes every other assertion here).
 	d := fingerprint("audit", "gate-block", []string{"go test -timeout 300s failed"})
 	e := fingerprint("audit", "gate-block", []string{"go test -timeout 600s failed"})
 	if d == e {

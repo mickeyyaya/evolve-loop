@@ -1,13 +1,5 @@
 package core
 
-// failreasons_backfill_test.go — RED contract for "no FAIL without a reason"
-// (inbox null-failreasons-capture 0.85): cycles failing at phase-infra level
-// (launch refusal, timeout, abort) sealed FinalVerdict FAIL with FailReasons
-// null — retros fingerprinted nothing (content-free identity, the bc2e3236
-// gate-block class in task-FAIL form) and the breaker could not see genuine
-// recurrence. Three instances in one night. The seal now backfills from the
-// trusted phase-timing record (orchestrator memory, never a workspace file).
-
 import (
 	"strings"
 	"testing"
@@ -40,8 +32,6 @@ func TestBackfillFailReasons_UnexplainedMarkerNeverNull(t *testing.T) {
 		t.Errorf("the fallback marker should still name the failing phase: %q", result.FailReasons[0])
 	}
 
-	// Even with NO failing phase on record (pure infra death before dispatch),
-	// the seal writes an explicit unexplained marker rather than null.
 	empty := &CycleResult{FinalVerdict: VerdictFAIL}
 	backfillFailReasons(empty, nil)
 	if len(empty.FailReasons) == 0 {
@@ -49,9 +39,6 @@ func TestBackfillFailReasons_UnexplainedMarkerNeverNull(t *testing.T) {
 	}
 }
 
-// A RECOVERED transient's abort entry (ship-recovery records the error it
-// recovered from, then continues) must not mask the phase that actually
-// failed later (diff-review MEDIUM).
 func TestBackfillFailReasons_RecoveredAbortDoesNotMaskRealFailure(t *testing.T) {
 	t.Parallel()
 	result := &CycleResult{FinalVerdict: VerdictFAIL}
@@ -79,12 +66,6 @@ func TestBackfillFailReasons_NoOpWhenExplainedOrNotFAIL(t *testing.T) {
 	}
 }
 
-// A phase that returns FAIL by its OWN Classify — triage's protected-surface
-// admission rejection (cycles 1634 and 1636, 2026-09-12/13) — recorded no
-// abort reason, so the seal labelled it "phase-infra class": a deterministic,
-// reasoned rejection paged as infrastructure. The C1 record now carries the
-// phase's own diagnostics; the seal names the error-severity ones and keeps the
-// infra marker only for a FAIL that truly recorded nothing.
 func TestBackfillFailReasons_PhaseOwnDiagnosticsNameTheReason(t *testing.T) {
 	t.Parallel()
 	result := &CycleResult{FinalVerdict: VerdictFAIL}
@@ -106,7 +87,6 @@ func TestBackfillFailReasons_PhaseOwnDiagnosticsNameTheReason(t *testing.T) {
 		t.Errorf("a reasoned FAIL must not be labelled infra, and warnings are not reasons: %q", r)
 	}
 
-	// Warnings alone explain nothing: the infra marker stays for that shape.
 	warnOnly := &CycleResult{FinalVerdict: VerdictFAIL}
 	backfillFailReasons(warnOnly, []phaseTimingEntry{
 		{Phase: "triage", Verdict: VerdictFAIL, Diagnostics: []Diagnostic{{Severity: "warning", Message: "metrics file absent"}}},

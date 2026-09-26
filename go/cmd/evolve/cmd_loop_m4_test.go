@@ -20,15 +20,10 @@ import (
 )
 
 // fakeLedgerNoAppend wraps fixtures.FakeLedger but makes Append a deliberate
-// NO-OP, so verify reads ONLY the test-controlled Entries slice — NOT whatever
-// the stub orchestrator incidentally writes during a no-op run.
-//
-// (cycle-137: an accumulating Append plus a verify that counts kind:"phase"
-// — the vocabulary the Go orchestrator actually writes — would make every
-// no-op run look like a complete cycle, silently defeating the failure-path
-// tests. fixtures.FakeLedger.Append accumulates by design, so the cmd/evolve
-// loop tests keep this thin no-op-Append wrapper rather than the canonical
-// accumulating fake.)
+// no-op, so verify reads only the test-controlled Entries slice, not the
+// kind:"phase" entries the stub orchestrator happens to write during a no-op
+// run — an accumulating Append would make every no-op run look like a
+// complete cycle and silently defeat the failure-path tests.
 type fakeLedgerNoAppend struct {
 	*fixtures.FakeLedger
 	lifecycle []ledger.LifecycleRecord // the inbox walk's lines, recorded so wiring proofs can see them
@@ -46,10 +41,9 @@ func newFakeLedger() *fakeLedgerNoAppend {
 	return &fakeLedgerNoAppend{FakeLedger: &fixtures.FakeLedger{}}
 }
 
-// scriptedOrch is a *core.Orchestrator stand-in that returns canned
-// cycle results in sequence. The real Orchestrator type is a struct,
-// not an interface, so the test seam replaces wireOrchestratorDepsFn
-// entirely — see helperStubDeps.
+// scriptedOrch is a *core.Orchestrator stand-in that returns canned cycle
+// results in sequence. The real Orchestrator type is a struct, not an
+// interface, so a test seam has to replace wireOrchestratorDepsFn entirely.
 type scriptedOrch struct {
 	results []core.CycleResult
 	errs    []error
@@ -58,10 +52,10 @@ type scriptedOrch struct {
 	idx     int
 }
 
-// noopRunner satisfies core.PhaseRunner by returning PASS for every
-// phase without touching disk or invoking a CLI. Used by installStubDeps
-// to let the orchestrator's state machine traverse start→end while
-// the test controls the ledger contents and the per-cycle workspace.
+// noopRunner satisfies core.PhaseRunner by returning PASS for every phase
+// without touching disk or invoking a CLI, letting the orchestrator's state
+// machine traverse start→end while the test controls the ledger contents and
+// the per-cycle workspace.
 type noopRunner struct{ name string }
 
 func (n noopRunner) Name() string { return n.name }
@@ -89,12 +83,11 @@ func initLoopContractRepo(t *testing.T, projectRoot string) {
 	initRepo(t, projectRoot)
 }
 
-// installStubDeps swaps wireOrchestratorDepsFn for one that returns
-// the given fake storage + ledger backed by a noop-PASS orchestrator.
-// The orchestrator's state machine runs but every phase is a no-op,
-// so the only ledger entries are the phase-kind appends the
-// orchestrator writes itself — verify will fail unless the test
-// pre-seeds agent_subprocess entries via fixtures.FakeLedger.Entries.
+// installStubDeps swaps wireOrchestratorDepsFn for one backed by a
+// noop-PASS orchestrator: every phase is a no-op, so the only ledger entries
+// are the phase-kind appends the orchestrator writes itself, and verify will
+// fail unless the test pre-seeds agent_subprocess entries via
+// fixtures.FakeLedger.Entries.
 func installStubDeps(t *testing.T, storage core.Storage, ledger rootLedger) func() {
 	t.Helper()
 	prev := wireOrchestratorDepsFn
@@ -112,8 +105,9 @@ func installStubDeps(t *testing.T, storage core.Storage, ledger rootLedger) func
 			core.PhaseRetro:        noopRunner{name: "retro"},
 		}
 		return orchDeps{
-			// ADR-0101 S4a: the stub root builds the production sink topology with
-			// the same constructor, so its rendered lines prove production's.
+			// Signals uses the same constructor as production, so its rendered
+			// lines prove production's.
+			// See ADR-0101.
 			Signals:      newRootSignalCenter(projectRoot, evolveDir, console),
 			Storage:      storage,
 			Ledger:       ledger,
@@ -208,9 +202,9 @@ func TestReadLastCycleNumber(t *testing.T) {
 	}
 }
 
-// helperPrepWorkspace seeds a cycle workspace with the minimum files
-// the post-cycle pipeline reads: orchestrator-report.md (drives
-// classification) and optionally .cycle-verdict (drives memo gate).
+// helperPrepWorkspace seeds the minimum files the post-cycle pipeline reads:
+// orchestrator-report.md (drives classification) and optionally
+// .cycle-verdict (drives the memo gate).
 func helperPrepWorkspace(t *testing.T, projectRoot string, cycle int, report, verdict string) string {
 	t.Helper()
 	ws := cycleWorkspace(projectRoot, cycle)
@@ -228,17 +222,8 @@ func helperPrepWorkspace(t *testing.T, projectRoot string, cycle int, report, ve
 	return ws
 }
 
-// Below tests exercise the M4 dispatcher pipeline end-to-end using
-// installStubDeps. The stub orchestrator returns canned CycleResults
-// so the post-cycle integration (verify+classify+events+breaker) runs
-// against a fake ledger and a fake state writer.
-//
-// Each test wires its own custom Orchestrator-like flow by stubbing
-// wireOrchestratorDepsFn AND populating the storage+ledger with the
-// state that the orchestrator would have produced.
-
-// runM4Loop prepares a stub that, on RunCycle, populates the fake
-// ledger with the entries the test expects + advances state.
+// runM4Loop seeds the cycle workspace and lets the caller pre-seed the fake
+// ledger/storage before running the loop.
 func runM4Loop(t *testing.T, projectRoot, evolveDir string, args []string,
 	storage *fixtures.FakeStorage, ledger *fakeLedgerNoAppend,
 	beforeRun func(*fixtures.FakeStorage, *fakeLedgerNoAppend),
@@ -248,16 +233,6 @@ func runM4Loop(t *testing.T, projectRoot, evolveDir string, args []string,
 	t.Helper()
 	defer installStubDeps(t, storage, ledger)()
 
-	// Override the Orchestrator.RunCycle by intercepting via a custom
-	// wireOrchestratorDepsFn that returns a fake-driven *Orchestrator.
-	// The real orchestrator runs a phase-machine — we don't want that.
-	// Instead, set up so the orchestrator finishes the cycle quickly
-	// by having NO runners registered (it'll return immediately with
-	// the PhaseStart → PhaseEnd noop since intent_required=false and
-	// scout is missing).
-	//
-	// Pre-populate side-effects the orchestrator would have made: the
-	// ledger entries, the workspace, the state advance.
 	helperPrepWorkspace(t, projectRoot, cycleNum, report, verdict)
 	if beforeRun != nil {
 		beforeRun(storage, ledger)
@@ -268,10 +243,6 @@ func runM4Loop(t *testing.T, projectRoot, evolveDir string, args []string,
 	return rc, stdout.String(), stderr.String()
 }
 
-// TestRunLoop_PolicyOff_SkipsVerify verifies that EVOLVE_DISPATCH_POLICY=off
-// does not run the verify pipeline. The fake ledger has zero entries
-// (would normally trip "missing scout"), but policy=off skips the
-// check entirely, so the loop exits cleanly.
 func TestRunLoop_PolicyOff_SkipsVerify(t *testing.T) {
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
@@ -285,21 +256,13 @@ func TestRunLoop_PolicyOff_SkipsVerify(t *testing.T) {
 		"--goal-text", "test goal",
 		"--cycles", "1",
 	}
-	// No workspace prep, no ledger entries — verify would fail in any
-	// other mode but off skips entirely.
 	rc, _, stderr := runM4Loop(t, projectRoot, evolveDir, args, storage, ledger, nil, "", "", 1)
 
-	// Orchestrator with no runners completes PhaseStart→PhaseEnd
-	// immediately. Loop exits cleanly with rc=0.
 	if rc != 0 {
 		t.Fatalf("rc=%d want 0; stderr=%q", rc, stderr)
 	}
 }
 
-// TestRunLoop_PolicyVerify_RecoverableContinues seeds a workspace with
-// a build-fail orchestrator-report and a ledger missing the auditor
-// entry. policy=verify must classify build-fail and continue the loop
-// for the next cycle (exit 0 because cycles=1 means batch ends).
 func TestRunLoop_PolicyVerify_RecoverableContinues(t *testing.T) {
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
@@ -318,15 +281,11 @@ func TestRunLoop_PolicyVerify_RecoverableContinues(t *testing.T) {
 	report := "Build status: FAIL — tests RED\n"
 	rc, _, stderr := runM4Loop(t, projectRoot, evolveDir, args, storage, ledger, nil, report, "", 1)
 
-	// rc=3 (M5+): classifier said build-fail (recoverable). policy=verify
-	// continues the loop, records the failure to state.json (or WARNs if
-	// missing), increments RecoverableFailures, and returns rc=3 at batch
-	// end — bash dispatcher parity (DISPATCH_RC=3 = DONE-WITH-RECOVERABLE-FAILURES).
+	// rc=3: classified build-fail (recoverable); policy=verify continues
+	// rather than halting.
 	if rc != 3 {
 		t.Fatalf("rc=%d want 3 (recoverable continue → DONE-WITH-RECOVERABLE-FAILURES); stderr=%q", rc, stderr)
 	}
-	// abnormal-events.jsonl in the workspace must have verify-failed +
-	// classification events.
 	events := readAbnormalEvents(t, cycleWorkspace(projectRoot, 1))
 	if got := countEvents(events, "verify-failed"); got != 1 {
 		t.Fatalf("verify-failed count=%d want 1; events=%+v", got, events)
@@ -435,9 +394,6 @@ func TestCompletedTriageNoWorkRequiresHostProvenance(t *testing.T) {
 	}
 }
 
-// TestRunLoop_PolicyVerify_IntegrityBreachStops seeds a workspace with
-// NO orchestrator-report (classifier → integrity-breach) and an empty
-// ledger. policy=verify must STOP with rc=2.
 func TestRunLoop_PolicyVerify_IntegrityBreachStops(t *testing.T) {
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
@@ -470,8 +426,6 @@ func TestRunLoop_PolicyVerify_IntegrityBreachStops(t *testing.T) {
 	}
 }
 
-// TestRunLoop_PolicyStop_AnyVerifyFailStops verifies that the legacy
-// fail-fast policy STOPs on any verify failure regardless of class.
 func TestRunLoop_PolicyStop_AnyVerifyFailStops(t *testing.T) {
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
@@ -487,8 +441,8 @@ func TestRunLoop_PolicyStop_AnyVerifyFailStops(t *testing.T) {
 		"--goal-text", "test goal",
 		"--cycles", "1",
 	}
-	// EPERM marker = infrastructure (would be recoverable under
-	// policy=verify); policy=stop must still halt the batch.
+	// EPERM classifies as infrastructure, recoverable under policy=verify, but
+	// policy=stop must still halt the batch.
 	report := "EPERM: sandbox denied write\n"
 	rc, stdout, stderr := runM4Loop(t, projectRoot, evolveDir, args, storage, ledger, nil, report, "", 1)
 	if rc != 2 {
@@ -499,9 +453,6 @@ func TestRunLoop_PolicyStop_AnyVerifyFailStops(t *testing.T) {
 	}
 }
 
-// TestRunLoop_VerifyOK_NoEvents covers the success path — a fully
-// populated ledger means verify passes, no abnormal events get
-// emitted, rc=0.
 func TestRunLoop_VerifyOK_NoEvents(t *testing.T) {
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
@@ -527,19 +478,14 @@ func TestRunLoop_VerifyOK_NoEvents(t *testing.T) {
 		t.Fatalf("rc=%d want 0; stderr=%q", rc, stderr)
 	}
 	events := readAbnormalEvents(t, cycleWorkspace(projectRoot, 1))
-	// counter-non-advance MAY fire because our fake orchestrator
-	// doesn't actually bump state.LastCycleNumber the same way a real
-	// run would when followed by a PASS audit. That's expected. But
-	// verify-failed must NOT have fired.
+	// counter-non-advance may fire, since the fake orchestrator doesn't bump
+	// state.LastCycleNumber the way a real PASS-audit run would; only
+	// verify-failed is asserted here.
 	if got := countEvents(events, "verify-failed"); got != 0 {
 		t.Fatalf("verify-failed count=%d want 0; events=%+v", got, events)
 	}
 }
 
-// TestUpdateBreaker tabulates the step function in isolation. The
-// integration in runLoop is exercised via TestRunLoop_CircuitBreakerTrips,
-// which drives a stuck orchestrator through a fixtures.FakeStorage that does
-// not advance LastCycleNumber.
 func TestUpdateBreaker(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -568,19 +514,13 @@ func TestUpdateBreaker(t *testing.T) {
 	}
 }
 
-// stuckStorage is a fixtures.FakeStorage variant whose WriteState is a no-op.
-// The orchestrator's RunCycle calls WriteState(state) at the end to
-// bump LastCycleNumber; stuckStorage ignores this so result.Cycle
-// stays at 1 every iteration, simulating a state.json that the OS
-// sandbox refuses to write (the bash scenario the breaker was added
-// to catch).
+// stuckStorage ignores WriteState, so result.Cycle stays at 1 every
+// iteration, simulating a state.json the OS sandbox refuses to write — the
+// scenario the circuit breaker exists to catch.
 type stuckStorage struct{ fixtures.FakeStorage }
 
 func (s *stuckStorage) WriteState(context.Context, core.State) error { return nil }
 
-// TestRunLoop_CircuitBreakerTrips drives the integration: stuckStorage
-// keeps result.Cycle=1 forever, threshold=3, cycles=5 → breaker trips
-// on iteration 3, exits with rc=1 + stop_reason=circuit_breaker.
 func TestRunLoop_CircuitBreakerTrips(t *testing.T) {
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
@@ -592,8 +532,6 @@ func TestRunLoop_CircuitBreakerTrips(t *testing.T) {
 	ledger := newFakeLedger()
 	defer installStubDeps(t, storage, ledger)()
 
-	// Pre-create workspace cycle-1 so EmitCircuitBreakerTripped can
-	// write its abnormal event.
 	if err := os.MkdirAll(cycleWorkspace(projectRoot, 1), 0o755); err != nil {
 		t.Fatalf("mkdir ws: %v", err)
 	}
@@ -618,8 +556,6 @@ func TestRunLoop_CircuitBreakerTrips(t *testing.T) {
 	}
 }
 
-// readAbnormalEvents parses every line of abnormal-events.jsonl in
-// workspace. Returns nil on missing file.
 func readAbnormalEvents(t *testing.T, workspace string) []map[string]any {
 	t.Helper()
 	f, err := os.Open(filepath.Join(workspace, "abnormal-events.jsonl"))

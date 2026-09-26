@@ -6,14 +6,6 @@ import (
 	"testing"
 )
 
-// TestAuditContractRejection_RedispatchesTheAuditorWithTheReason is the core
-// half of "a missing ## Explanation Documentation section is a correction, not
-// a terminal FAIL" (cycles 1601/1603): when the deliverable reviewer rejects
-// the AUDIT report with the conditional-section reason, the ladder re-dispatches
-// the audit runner once with that reason as its correction directive, and the
-// cycle proceeds on the approved second report. The reviewer side is proven in
-// deliverable (the real Reviewer at enforce); this proves the ladder accepts an
-// audit rejection like any other phase's.
 func TestAuditContractRejection_RedispatchesTheAuditorWithTheReason(t *testing.T) {
 	const reason = `audit deliverable failed contract: [missing_section] required section "## Explanation Documentation" is missing (the explanation-documentation contract v1 is active for this cycle: review the Build explanation document and emit the section with Status, Build status, Document, Document SHA256 and path:line Evidence)`
 	runners := buildRunners(nil)

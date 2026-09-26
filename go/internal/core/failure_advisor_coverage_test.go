@@ -284,9 +284,6 @@ func TestRecoveryDecisionForensicsCoverage(t *testing.T) {
 	if got := o.decideAfterDebugger(PhaseResponse{Signals: map[string]interface{}{"debugger.action": "RERUN_PHASE", "debugger.rerun_phase": "ship"}}); got != PhaseAudit {
 		t.Fatalf("debugger rerun ship must clamp to audit, got %s", got)
 	}
-	// A retro PASS is a deliverable-completeness verdict, not recovery: retro is
-	// reached only from an audit FAIL and cannot change the tree, so it takes the
-	// SAME disposition as the retro FAIL asserted immediately below.
 	if next, _, reason, _ := o.decideAfterRetro(CycleState{}, VerdictPASS, nil); next != PhaseEnd || !strings.Contains(reason, "proceed") {
 		t.Fatalf("retro pass decision = %s %q, want the same end/proceed disposition as retro FAIL", next, reason)
 	}

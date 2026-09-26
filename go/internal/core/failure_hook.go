@@ -1,15 +1,6 @@
 package core
 
-// failure_hook.go — ADR-0044 C3: the orchestrator's escalate→advise→promote
-// hook, the composition point where the chain's ActionAdvise verdict becomes
-// a real LLM consultation. Runs ONLY when the program dial is at enforce
-// (cfg.PhaseRecovery — shadow, the default, never dispatches an advisor) and
-// ONLY for an artifact-timeout abort whose escalation report carries a pane
-// the deterministic registry cannot classify. Strictly best-effort: every
-// failure is a WARN; the hook never alters the abort control flow — it runs
-// AFTER the phase outcome is recorded and the failure diag is written, and
-// its only durable side effect is a validated promotion
-// (recovery.PromoteAdvice) that makes the NEXT occurrence deterministic.
+// See ADR-0044.
 
 import (
 	"context"
@@ -25,12 +16,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
 )
 
-// adviseTimeout bounds the LLM consultation on the abort path. The cycle has
-// already failed when the hook runs, so spending up to this long ONCE to
-// learn a novel signature is a good trade (each promotion saves ~20 min of
-// maxExtends burn on every future occurrence) — but the abort must never
-// hang on a wedged advisor. 3 min covers a tmux REPL boot + an 8-turn
-// classification; the parent ctx still wins if shorter.
+// adviseTimeout bounds the LLM consultation on the abort path: long enough
+// once to learn a novel signature (each promotion saves ~20 min of maxExtends
+// burn on every future occurrence), but the abort must never hang on a
+// wedged advisor.
 const adviseTimeout = 3 * time.Minute
 
 // FailureAdviser is the port the hook consults — satisfied by
@@ -51,18 +40,16 @@ func WithFailureAdviser(a FailureAdviser) Option {
 }
 
 // FailureAdviserWired reports whether the advisor tail is injected —
-// introspection for composition-root wiring tests and the soak preflight
-// (R8: an enforce flip with no adviser wired would silently skip the
-// advise→promote path the flip exists to activate).
+// introspection for composition-root wiring tests and the soak preflight,
+// since an enforce flip with no adviser wired would silently skip the
+// advise→promote path the flip exists to activate.
 func (o *Orchestrator) FailureAdviserWired() bool { return o.failureAdviser != nil }
 
 // ModelCatalogLookupWired reports whether the composition root bound the model
 // resolvability lookup consulted by router.ClampPlanModelRouting. The clamp
 // short-circuits on a nil lookup, so an unwired gate is indistinguishable from
-// a passing one at runtime — this seam lets the composition root prove, in a
-// real (non-fake) test, that its wiring actually reaches production. Same
-// observability pattern as FailureAdviserWired above and
-// CompositionFastPathWired (composition_carryforward.go).
+// a passing one at runtime; this seam lets the composition root prove, in a
+// real test, that its wiring actually reaches production.
 func (o *Orchestrator) ModelCatalogLookupWired() bool { return o.modelCatalogLookup != nil }
 
 // fatalSignaturesDir is where validated promotions persist, relative to the
@@ -72,16 +59,14 @@ func fatalSignaturesDir(projectRoot string) string {
 }
 
 // adviseOnUnclassifiedFailure runs the C3 escalate→advise→promote path for
-// one aborted phase. See the file header for the gating contract.
+// one aborted phase.
 func (o *Orchestrator) adviseOnUnclassifiedFailure(ctx context.Context, cycle int, workspace, projectRoot string, phase Phase, failErr error, env map[string]string) {
 	if o.failureAdviser == nil || o.cfg.PhaseRecovery != config.StageEnforce {
 		return
 	}
 	if !errors.Is(failErr, ErrArtifactTimeout) {
-		return // only the timeout family carries a pane worth classifying
+		return
 	}
-	// The bridge's escalation report carries the final pane (final_pane) —
-	// the evidence envelope. Absent report ⇒ nothing to classify.
 	data, err := os.ReadFile(filepath.Join(workspace, string(phase)+"-escalation-report.json"))
 	if err != nil {
 		return
@@ -94,21 +79,11 @@ func (o *Orchestrator) adviseOnUnclassifiedFailure(ctx context.Context, cycle in
 	}
 	sigDir := fatalSignaturesDir(projectRoot)
 	det := recovery.SeedDetectorWithPromotions(sigDir)
-	// Scan the agent-STRIPPED pane, not the raw escalation evidence. The
-	// short-circuit below is deterministic-FIRST, so a false match here does not
-	// kill a phase — it does something quieter and worse: a genuinely NOVEL
-	// wedge whose pane merely carries agent-authored diff content quoting a
-	// seeded signature (an agent editing the registry, a builder writing a
-	// fatal-pane fixture) reads as "already classified". No advisor, no
-	// promotion, nothing learned, and the next occurrence burns the ~20 min
-	// maxExtends backstop again — ADR-0044's learning loop switched off by the
-	// agent's own text. Same stripper, same rules as the C2 bridge seam
-	// (recovery/strip.go). The empty prompt is deliberate: for a fatal-pane scan
-	// the echo half is neutered by the protect-list anyway (D2), so plumbing the
-	// phase prompt in here would add I/O and zero behaviour. The protect list is
-	// nil for the same reason — it is read only inside the echo branch, which an
-	// empty prompt disables (salvage review LOW: det.Signatures() here was a
-	// provably dead allocation per aborted phase).
+	// Scan the agent-stripped pane, not the raw evidence, so a genuinely novel
+	// wedge whose pane merely quotes a seeded signature in agent-authored diff
+	// content is not misread as "already classified". The empty prompt is
+	// deliberate: the echo half is neutered by the protect list regardless, so
+	// plumbing the phase prompt in here would add I/O for no behavior change.
 	if cause, _, known := det.Detect(recovery.StripAgentContent(report.FinalPane, "", nil)); known {
 		// Deterministic-first: the registry already classifies this pane —
 		// the fast-fail (C2) owns acting on it; no LLM consultation.

@@ -9,15 +9,9 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// TestEngineLaunch_ArtifactTimeout_WrapsSentinel proves Workstream D's wire
-// contract: when a driver returns ExitArtifactTimeout (81), Engine.Launch wraps
-// the error with core.ErrArtifactTimeout so the generic phase runner can
-// errors.Is-match it (and soft-fail optional phases) without importing this
-// adapter package. Any OTHER non-zero exit must NOT carry the sentinel.
 func TestEngineLaunch_ArtifactTimeout_WrapsSentinel(t *testing.T) {
 	ws := t.TempDir()
 	prof := writeProfile(t, ws, "eng-test", "")
-	// exit 81, no artifact written — the artifact-timeout signature.
 	fr := &fakeRunner{exit: ExitArtifactTimeout}
 	eng := NewEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(nil)})
 
@@ -36,8 +30,6 @@ func TestEngineLaunch_ArtifactTimeout_WrapsSentinel(t *testing.T) {
 	}
 }
 
-// TestEngineLaunch_OtherExit_NoSentinel proves the wrap is scoped to 81 —
-// a different non-zero exit (safety-gate 2) does not falsely carry the sentinel.
 func TestEngineLaunch_OtherExit_NoSentinel(t *testing.T) {
 	ws := t.TempDir()
 	prof := writeProfile(t, ws, "eng-test", "")

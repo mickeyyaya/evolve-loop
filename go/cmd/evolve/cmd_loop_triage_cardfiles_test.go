@@ -1,22 +1,5 @@
 package main
 
-// cmd_loop_triage_cardfiles_test.go — the WRITER→CONSUMER proof for
-// triage-cards-carry-files. The two halves are individually tested
-// (internal/triagecap/cardfiles_test.go for the declaration, PR #366's menu tests
-// for the partitioning); what failed live on batch-14 was the JOIN: the
-// orchestrator's projection dropped the footprint, so by the time the next wave
-// planned, the card's file knowledge existed only in prose and the planner saw an
-// id island.
-//
-// This drives the REAL production chain end to end:
-//
-//	triage-report.md  →  triagecap.ProjectDecisionJSON   (ship/postship writes it)
-//	                  →  widenNarrowDecision             (next wave's primary path)
-//	                  →  fleet.PlanFromTriage            (lane partitioning)
-//
-// RED before the projection carried files=: "mate" cannot join the committed
-// card's lane, because nothing downstream knows they touch the same file.
-
 import (
 	"os"
 	"path/filepath"
@@ -26,8 +9,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/triagecap"
 )
 
-// cardFilesTriageReport is the shape triage writes: the declared footprint rides
-// the item's metadata tail, exactly as agents/evolve-triage.md now requires.
+// cardFilesTriageReport is the shape triage writes: the declared footprint
+// rides the item's metadata tail (agents/evolve-triage.md).
 const cardFilesTriageReport = `<!-- challenge-token: abc -->
 <!-- ANCHOR:triage_decision -->
 # Triage Decision — Cycle 1167
@@ -42,10 +25,6 @@ phase_skip: []
 One audit-surface item this cycle.
 `
 
-// TestProjectedDecisionFilesReachTheLanePlanner is the join: a footprint declared
-// in the report must survive projection and make the fleet planner cluster the
-// same-file backlog mate into the SAME lane instead of a fictional-disjoint
-// second lane (the 948 lost-work class).
 func TestProjectedDecisionFilesReachTheLanePlanner(t *testing.T) {
 	dir := t.TempDir()
 	inbox := filepath.Join(dir, "inbox")

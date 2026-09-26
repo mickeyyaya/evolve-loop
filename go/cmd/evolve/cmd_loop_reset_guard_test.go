@@ -17,11 +17,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
-// cmd_loop_reset_guard_test.go — a fresh `evolve loop` run must not silently
-// clobber an unfinished cycle (which would lose its history). The guard
-// detects "cycle-state ahead of lastCycleNumber" and refuses with the
-// resume|reset fork.
-
 func TestUnfinishedCycle(t *testing.T) {
 	cases := []struct {
 		name      string
@@ -47,8 +42,8 @@ func TestUnfinishedCycle(t *testing.T) {
 
 func TestRunLoop_UnfinishedCycleGuardRefuses(t *testing.T) {
 	projectRoot, evolveDir := seedResetDir(t, 108, 107)
-	// Real storage over the seeded dir; the guard reads it and refuses before
-	// any orchestrator phase runs (so the stub orchestrator is never invoked).
+	// Real storage over the seeded dir, so the guard refuses before any
+	// orchestrator phase runs and the stub orchestrator is never invoked.
 	restore := installStubDeps(t, storage.New(evolveDir), ledger.New(evolveDir))
 	defer restore()
 
@@ -64,7 +59,6 @@ func TestRunLoop_UnfinishedCycleGuardRefuses(t *testing.T) {
 	if lr["stop_reason"] != "unfinished_cycle" {
 		t.Errorf("stop_reason=%v want unfinished_cycle", lr["stop_reason"])
 	}
-	// Guidance must name both forks.
 	g := stderr.String()
 	if !strings.Contains(g, "--resume") || !strings.Contains(g, "cycle reset") {
 		t.Errorf("guidance must mention --resume and cycle reset; got %q", g)
@@ -95,19 +89,12 @@ func TestRunLoop_CorruptedCycleStateRefuses(t *testing.T) {
 	}
 }
 
-// TestUnfinishedCycleGuard_DeadOwnerFreshLease_NotReportedAsLive — cycle-554
-// workspace-hygiene-s1 sibling: the loop's F1-sibling guard (cmd_loop.go:317)
-// reads a lease as "owned by a LIVE run" using freshness alone. A crashed
-// owner (dead pid) with a still-fresh heartbeat must fall through to the
-// normal unfinished_cycle (resume|reset) guidance instead — steering an
-// operator at `owned_by_live_run` never to reset would wedge them forever
-// against a run that will never come back. PID 999999 is a real, guaranteed-
-// dead pid (same convention as TestDefaultBootRecovery_AutosealsDeadOwnerMarker)
-// so the production pidAlive probe drives the decision, no injection needed.
-// bootRecoverFn is stubbed to a no-op (the established spy-seam idiom, see
-// TestRunLoop_InvokesBootRecoveryBeforeGate) so this test isolates the guard's
-// OWN liveness check as defense-in-depth, independent of whether boot-time
-// AutosealStaleMarker also would have healed the same marker first.
+// PID 999999 is a real, guaranteed-dead pid (same convention as
+// TestDefaultBootRecovery_AutosealsDeadOwnerMarker), so the production
+// pidAlive probe drives the decision with no injection needed. bootRecoverFn
+// is stubbed to a no-op so this test isolates the guard's own liveness check,
+// independent of whether boot-time AutosealStaleMarker would also heal the
+// same marker first.
 func TestUnfinishedCycleGuard_DeadOwnerFreshLease_NotReportedAsLive(t *testing.T) {
 	projectRoot, evolveDir := seedResetDir(t, 108, 107)
 	ws := filepath.Join(evolveDir, "runs", "cycle-108")
@@ -146,8 +133,6 @@ func TestRunLoop_ForceFreshBypassesGuard(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	rc := runLoop([]string{"--goal-text", "x", "--max-cycles", "1", "--project-root", projectRoot, "--force-fresh"}, nil, &stdout, &stderr)
-	// With the override the guard does not fire — the loop proceeds (stub
-	// runners), so the stop_reason is anything BUT unfinished_cycle.
 	var lr map[string]any
 	_ = json.Unmarshal(stdout.Bytes(), &lr)
 	if lr["stop_reason"] == "unfinished_cycle" {

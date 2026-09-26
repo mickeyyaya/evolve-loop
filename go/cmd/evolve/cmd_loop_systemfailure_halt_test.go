@@ -10,25 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 )
 
-// ADR-0072 fleet-halt-unwired (inbox adr0072-fleet-halt-unwired, cycle 956).
-//
-// Today `result.SystemFailure` is read ONLY by the sequential single-cycle
-// path in cmd_loop.go (line ~650). `runCycleRun` (cmd_cycle.go, the exact
-// entrypoint every fleet lane subprocess runs) maps FinalVerdict to an exit
-// code and never looks at SystemFailure, so a system-failure halt inside a
-// fleet lane is indistinguishable from an ordinary FAIL (rc=2) to the parent
-// wave loop — which in turn (cmd_loop_wave.go dispatchIteration / the
-// cmd_loop.go wave/pool branches) only counts `ExitCode != 0` as "failed lane"
-// and always continues to the next wave.
-//
-// These tests encode the exit-code contract as pure, unit-testable functions
-// so both the single-cycle path and the fleet subprocess boundary can share
-// ONE halt decision (AC2: no duplicated logic) instead of the sequential path
-// re-implementing the check inline.
-
-// cycleRunExitCode does not exist yet — this is the pure function
-// runCycleRun (cmd_cycle.go) must consult instead of its current inline
-// `if result.FinalVerdict == core.VerdictFAIL { return 2 }; return 0`.
 func TestCycleRunExitCode_HaltsOnSystemFailureRegardlessOfVerdict(t *testing.T) {
 	halted := cyclestate.CycleResult{
 		FinalVerdict:  "PASS",
@@ -70,10 +51,6 @@ func TestCycleRunExitCode_NoSystemFailure_FollowsOrdinaryVerdictMapping(t *testi
 	}
 }
 
-// haltOnSystemFailure does not exist yet — it is the ONE shared function
-// (AC2) both cmd_loop.go's sequential path and runCycleRun must call so the
-// dossier + P0 inbox item + halt exit code are written identically on every
-// code path, instead of the escalation logic being duplicated.
 func TestHaltOnSystemFailure_WritesDossierAndP0AndReturnsHaltExitCode(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
@@ -110,11 +87,6 @@ func TestHaltOnSystemFailure_WritesDossierAndP0AndReturnsHaltExitCode(t *testing
 	}
 }
 
-// anyLaneHaltedForSystemFailure does not exist yet — the wave/fleet dispatch
-// loop (cmd_loop_wave.go dispatchIteration, and the wave/pool branches in
-// cmd_loop.go around line 519) must consult it across ALL lane results and
-// stop dispatching further waves when it is true, instead of only counting
-// `r.Err != nil || r.ExitCode != 0` as an ordinary "failed lane".
 func TestAnyLaneHaltedForSystemFailure_DetectsHaltExitCodeAmongLanes(t *testing.T) {
 	results := []fleet.Result{
 		{Index: 0, ExitCode: 0},
@@ -127,10 +99,6 @@ func TestAnyLaneHaltedForSystemFailure_DetectsHaltExitCodeAmongLanes(t *testing.
 }
 
 func TestAnyLaneHaltedForSystemFailure_OrdinaryLaneFailuresDoNotHalt(t *testing.T) {
-	// Negative case: an ordinary FAIL (rc=2) or process error (rc=-1/1) must
-	// NOT be conflated with a system-failure halt — only the batch loop
-	// should stop; ordinary task-level failures keep the never-stop retry
-	// semantics (ADR-0072 draws this line deliberately).
 	results := []fleet.Result{
 		{Index: 0, ExitCode: 2},
 		{Index: 1, ExitCode: 1},

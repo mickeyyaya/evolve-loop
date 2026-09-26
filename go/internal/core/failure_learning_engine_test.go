@@ -12,8 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// Test 28 — the engine is constructed in ONE non-test file (the seam); the
-// helper skips the leaf (which never spells its own package name).
 func TestFailureLearningEngine_OneConstructionSite(t *testing.T) {
 	const onlySite = "internal/core/failure_learning_engine.go"
 	if offenders := nonTestSourcesMentioning(t, "failurelearning.New(", onlySite); len(offenders) > 0 {
@@ -21,8 +19,6 @@ func TestFailureLearningEngine_OneConstructionSite(t *testing.T) {
 	}
 }
 
-// Test 29 — a literal orchestrator (the remediation and floor-verdict tests
-// build one) lazily gets ONE engine whose clock follows o.now swapped later.
 func TestFailureLearning_LiteralOrchestratorGetsTheEngineOnce(t *testing.T) {
 	o := &Orchestrator{now: func() time.Time { return time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC) }}
 	first := o.failureLearning()
@@ -39,8 +35,6 @@ func TestFailureLearning_LiteralOrchestratorGetsTheEngineOnce(t *testing.T) {
 	}
 }
 
-// Test 30 — a Center applied AFTER construction receives the engine's WARN
-// with the unit's module, kind, origin, cycle, phase and fields.
 func TestFailureLearning_SeesASignalCenterAppliedAfterConstruction(t *testing.T) {
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
 	if o.failureLearning().SignalsWired() {
@@ -66,11 +60,6 @@ func TestFailureLearning_SeesASignalCenterAppliedAfterConstruction(t *testing.T)
 	}
 }
 
-// Test 31 — NewOrchestrator builds the engine eagerly, wired, and its mint
-// lands in the state the orchestrator's lifecycle persists. (The eager order
-// — engine after o.carry — is kept for one-construction hygiene; building
-// the engine first is an EQUIVALENT mutant because a Lifecycle holds only the
-// live Center accessor: recorded, not padded.)
 func TestFailureLearning_EagerConstructionSharesTheWiredLifecycle(t *testing.T) {
 	st := &fakeStorage{}
 	o := NewOrchestrator(st, &fakeLedger{}, buildRunners(nil), WithSignalCenter(signalcenter.New()))

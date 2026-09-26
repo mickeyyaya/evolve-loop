@@ -10,8 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// The tracker must escalate ONLY on the threshold-th consecutive non-shipping
-// cycle, reset on any shipping cycle, and carry the streak + distinct reasons.
 func TestGoalStallTracker_Escalation(t *testing.T) {
 	t.Run("threshold-th consecutive non-shipping cycle escalates", func(t *testing.T) {
 		var tr goalStallTracker
@@ -28,7 +26,6 @@ func TestGoalStallTracker_Escalation(t *testing.T) {
 		if esc.streak != 3 {
 			t.Errorf("streak = %d, want 3", esc.streak)
 		}
-		// SKIPPED_UNKNOWN seen twice → deduped to 2 distinct reasons.
 		if len(esc.reasons) != 2 {
 			t.Errorf("reasons = %v, want 2 distinct", esc.reasons)
 		}
@@ -38,7 +35,7 @@ func TestGoalStallTracker_Escalation(t *testing.T) {
 		var tr goalStallTracker
 		tr.observe(true, "SKIPPED_UNKNOWN", 3)
 		tr.observe(true, "SKIPPED_UNKNOWN", 3)
-		if esc := tr.observe(false, "", 3); esc != nil { // shipped — reset
+		if esc := tr.observe(false, "", 3); esc != nil {
 			t.Fatal("a shipping cycle escalated, want nil")
 		}
 		if esc := tr.observe(true, "SKIPPED_UNKNOWN", 3); esc != nil {
@@ -61,8 +58,6 @@ func TestGoalStallTracker_Escalation(t *testing.T) {
 	})
 }
 
-// The item must clamp weight up to the floor, pass validate, be idempotent by
-// goal (stable id), and carry the block reasons for the scout.
 func TestGoalStallItem_WriteIdempotentByGoal(t *testing.T) {
 	evolveDir := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(evolveDir, "inbox"), 0o755); err != nil {
@@ -82,7 +77,7 @@ func TestGoalStallItem_WriteIdempotentByGoal(t *testing.T) {
 	if err != nil {
 		t.Fatalf("writeTo: %v", err)
 	}
-	p2, err := item.writeTo(evolveDir) // second fire for the SAME goal
+	p2, err := item.writeTo(evolveDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,33 +97,28 @@ func TestGoalStallItem_WriteIdempotentByGoal(t *testing.T) {
 	}
 }
 
-// validate() must reject an under-weighted or field-missing item so a malformed
-// self-injection fails loud (the "never a silent no-op todo" contract).
 func TestGoalStallItem_ValidateRejectsMalformed(t *testing.T) {
 	good := buildGoalStallItem(goalStallKind, "abcd1234ef", &goalStallEscalation{streak: 3}, 0.9, 1, "2026-07-18T00:00:00Z")
 	if err := good.validate(); err != nil {
 		t.Fatalf("a well-formed item must validate: %v", err)
 	}
 	under := good
-	under.Weight = 0.5 // below the floor — must be rejected here even though buildGoalStallItem clamps
+	under.Weight = 0.5 // below the floor; direct assignment bypasses buildGoalStallItem's clamp
 	if err := under.validate(); err == nil {
 		t.Error("validate() accepted a weight below the floor — a silent under-weight would slip through")
 	}
 	missing := good
-	missing.Source = "" // a required field
+	missing.Source = ""
 	if err := missing.validate(); err == nil {
 		t.Error("validate() accepted an item missing a required field")
 	}
 }
 
-// A second full threshold streak (after a reset) must re-escalate — the tracker
-// re-arms, it does not fire only once per process.
 func TestGoalStallTracker_ReArmsAfterFiring(t *testing.T) {
 	var tr goalStallTracker
 	if tr.observe(true, "x", 2) != nil || tr.observe(true, "x", 2) == nil {
 		t.Fatal("first escalation did not fire at the threshold")
 	}
-	// after the reset, a fresh full streak must escalate AGAIN.
 	if tr.observe(true, "x", 2) != nil {
 		t.Fatal("re-fired at streak 1 after reset (should need a fresh threshold)")
 	}
@@ -139,8 +129,6 @@ func TestGoalStallTracker_ReArmsAfterFiring(t *testing.T) {
 	}
 }
 
-// handleGoalStall must both file the inbox todo AND emit the abnormal-event —
-// the end-to-end escalation path (the feature's only integration point).
 func TestHandleGoalStall_FilesInboxAndEmitsEvent(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
@@ -157,12 +145,10 @@ func TestHandleGoalStall_FilesInboxAndEmitsEvent(t *testing.T) {
 
 	handleGoalStall(goalStallKind, evolveDir, goalHash, workspace, 644, esc, 3, 0.9, &stderr)
 
-	// inbox todo written at the goal-stable path
 	inboxPath := filepath.Join(evolveDir, "inbox", goalStallItemIDPrefix+"805f6ced.json")
 	if _, err := os.Stat(inboxPath); err != nil {
 		t.Errorf("goal-stall inbox todo not written: %v", err)
 	}
-	// abnormal-event emitted naming the goal
 	events, err := os.ReadFile(filepath.Join(workspace, "abnormal-events.jsonl"))
 	if err != nil {
 		t.Fatalf("no abnormal-events.jsonl emitted: %v", err)
@@ -175,11 +161,6 @@ func TestHandleGoalStall_FilesInboxAndEmitsEvent(t *testing.T) {
 	}
 }
 
-// TestNonShippingOutcome_ExactNegationOfCoreShipping is the caller proof for
-// core.IsShippingVerdict: the breaker must be its exact negation, never a
-// second hand-maintained list. If someone adds a shipping label to core and
-// not here (or vice versa), the streak counter and the throughput window
-// would disagree about whether the same cycle landed work.
 func TestNonShippingOutcome_ExactNegationOfCoreShipping(t *testing.T) {
 	for _, v := range []string{
 		core.VerdictPASS, core.VerdictFAIL, core.VerdictWARN,
@@ -190,8 +171,8 @@ func TestNonShippingOutcome_ExactNegationOfCoreShipping(t *testing.T) {
 			t.Errorf("nonShippingOutcome(%q) = %v, want %v (negation of core.IsShippingVerdict)", v, got, want)
 		}
 	}
-	// Anti-tautology: the two labels that DO ship must not count as
-	// non-progress, so a streak cannot accumulate across shipping cycles.
+	// The two labels that DO ship must not count as non-progress, or a streak
+	// could accumulate across shipping cycles.
 	for _, v := range []string{core.VerdictPASS, core.CycleOutcomeShippedViaBuild} {
 		if nonShippingOutcome(v) {
 			t.Errorf("verdict %q ships — it must never advance the non-progress streak", v)

@@ -1,12 +1,5 @@
 package core
 
-// failure_hook_test.go — ADR-0044 C3 (Slice 6) tests: the orchestrator's
-// escalate→advise→promote hook. The plan's named invariant
-// (TestPhaseRecovery_ShadowDefault_NoCorrectiveAction) lives here: below
-// enforce the advisor is NEVER consulted, and even at enforce the
-// deterministic registry is checked FIRST (known panes never pay for an LLM
-// call — Rule 5).
-
 import (
 	"context"
 	"encoding/json"
@@ -89,8 +82,8 @@ func TestPhaseRecovery_Enforce_AdvisesAndPromotes(t *testing.T) {
 	if err != nil || len(entries) != 1 {
 		t.Fatalf("validated advice must be promoted durably; entries=%d err=%v", len(entries), err)
 	}
-	// The Slice-5 acceptance: a SECOND occurrence is caught deterministically
-	// — zero further advisor calls.
+	// A second occurrence must be caught deterministically — zero further
+	// advisor calls.
 	o.adviseOnUnclassifiedFailure(context.Background(), 263, ws, root, PhaseBuild, wrapTimeout(), nil)
 	if fa.calls != 1 {
 		t.Fatalf("the promoted signature must make the second occurrence deterministic; advisor called %d time(s)", fa.calls)
@@ -101,7 +94,8 @@ func TestPhaseRecovery_Enforce_KnownPaneSkipsAdvisor(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	ws := filepath.Join(root, "ws")
-	// The real cycle-262 claude pane — seeded, therefore deterministic.
+	// A real claude pane the registry already seeds, so it must classify
+	// deterministically.
 	writeEscalation(t, ws, "retro", "⏺ There's an issue with the selected model (auto). It may not exist.")
 	fa := &fakeAdviser{advice: &recovery.FailureAdvice{Cause: "model_invalid", PaneSubstr: "irrelevant long substring", Justification: "j"}}
 	o := hookOrchestrator(t, config.StageEnforce, fa)

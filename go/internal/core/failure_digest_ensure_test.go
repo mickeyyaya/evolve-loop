@@ -1,13 +1,5 @@
 package core
 
-// failure_digest_ensure_test.go — RED contract for the single-source digest
-// helper both retro dispatch paths share. Cycle-1046 (batch-6 live-fire, first
-// FAIL on the new binary) proved the S1 assembler was wired ONLY at
-// recordFailureLearning (phase-error path); verdict-path FAILs reach retro via
-// cyclerun dispatch and produced NO digest and NO disposition — blinding both
-// the disposition contract and the blocker breaker for the most common FAIL
-// class. unit-green != live-green, again.
-
 import (
 	"os"
 	"path/filepath"
@@ -29,8 +21,6 @@ func TestEnsureFailureDigest_WritesDigestWithoutLedger(t *testing.T) {
 }
 
 func TestEnsureFailureDigest_Idempotent(t *testing.T) {
-	// Both dispatch sites may run on the same cycle (error path + verdict
-	// path re-entry) — identical artifacts must yield an identical digest.
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
 	ws := t.TempDir()
 	root := t.TempDir()

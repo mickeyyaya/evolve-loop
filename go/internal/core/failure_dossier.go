@@ -1,14 +1,6 @@
 package core
 
-// failure_dossier.go — ADR-0072 S4 Task 1 (evidence-dossier-builder). The
-// dossier is the orchestrator's independent evidence packet for classifying a
-// failure: it composes the verdict-coherence signal, the audit's SELF-declared
-// failure envelope, and the non-progress counters — NEVER the recorded verdict
-// alone (the forged-verdict lesson from the clean-exit storm). It is written
-// per failing cycle so retros/operators have the untruncated "why" on disk.
-//
-// The symbols are deliberately UNEXPORTED (JSON-tagged fields only): the dossier
-// is an internal decision primitive, so it adds no apicover-gated public surface.
+// See ADR-0072.
 
 import (
 	"encoding/json"
@@ -21,10 +13,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// auditDeclared is the audit phase's SELF-declared failure envelope (ADR-0039
-// §7), surfaced verbatim so the orchestrator judgment layer can classify a
-// system-class fault the deterministic floor cannot catch (the cycle-1001
-// prose-only shape).
+// auditDeclared is the audit phase's self-declared failure envelope, surfaced
+// verbatim so the orchestrator judgment layer can classify a system-class
+// fault the deterministic floor cannot catch.
+//
+// See ADR-0039.
 type auditDeclared struct {
 	Class   string   `json:"class,omitempty"`
 	Level   string   `json:"level,omitempty"`
@@ -53,12 +46,6 @@ type failureDossier struct {
 	Evidence        string        `json:"evidence,omitempty"`
 }
 
-// buildFailureDossier composes the dossier from INDEPENDENT evidence. It never
-// trusts the recorded verdict on its own: coherence is derived from the phases'
-// on-disk artifacts, the audit envelope from the audit's own report, and the
-// counters from cycle history. FloorCandidate is set ONLY for the two
-// deterministically-detectable floor categories — a broken pipeline cannot dodge
-// them even with no orchestrator running.
 func buildFailureDossier(cs CycleState, finalVerdict string, fp policy.SystemFailurePolicy) *failureDossier {
 	d := &failureDossier{
 		CycleID:         cs.CycleID,
@@ -72,11 +59,8 @@ func buildFailureDossier(cs CycleState, finalVerdict string, fp policy.SystemFai
 		},
 	}
 
-	// (1) Coherence signal — the deterministic verdict-incoherence detector,
-	// keyed off the phases' own green/red artifacts. The dossier builder has no
-	// ContractVerifier, so DeliverableValid stays false: reconcile is the live
-	// floor's job (detectVerdictIncoherence with the injected verifier), not the
-	// dossier's; here a would-be-forged verdict surfaces as a floor candidate.
+	// The dossier builder has no ContractVerifier, so DeliverableValid stays
+	// false: reconcile is the live floor's job, not the dossier's.
 	audit, acs, auditRan := coherence.ReadCycleVerdicts(cs.WorkspacePath)
 	coh := coherence.CheckVerdictCoherence(coherence.VerdictInputs{
 		Recorded:         finalVerdict,
@@ -87,9 +71,6 @@ func buildFailureDossier(cs CycleState, finalVerdict string, fp policy.SystemFai
 		FailReasons:      cs.AuditFailReasons,
 	})
 
-	// (2) The audit's SELF-declared failure envelope. Surfaced ALWAYS (even for
-	// a task-level class) so the judgment layer sees the defects prose; the
-	// class→level mapping comes from the policy table.
 	if fb, ok := phasecontract.ReadFailureBlock(cs.WorkspacePath, string(PhaseAudit)); ok {
 		d.AuditDeclared.Class = fb.Class
 		d.AuditDeclared.Defects = fb.Defects

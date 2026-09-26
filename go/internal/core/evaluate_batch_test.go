@@ -7,9 +7,8 @@ import (
 
 func TestEvaluateBatch(t *testing.T) {
 	t.Parallel()
-	// archetype lookup mirroring the real taxonomy for the test phases.
 	arch := map[string]string{
-		"bug-reproduction": "evaluate", // PRE-build evaluate — must NOT be batched
+		"bug-reproduction": "evaluate",
 		"scout":            "plan",
 		"build":            "build",
 		"coverage-gate":    "evaluate",

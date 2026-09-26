@@ -1,30 +1,7 @@
 package core
 
-// failure_digest_pathvariance_test.go — RED contract for cycle-1440 task
-// `fingerprint-normalizer-path-variance`.
-//
-// Defect (PR #442 diff-review LOW): normalizeReasonForFingerprint strips exactly
-// two identity-noise tokens — narrative=<verdict> and go-test durations. Every
-// other per-cycle-varying token still splits ONE recurring defect into N
-// fingerprints, so the identical-fingerprint breaker (ceiling 3, standing rule
-// three_consecutive_fails_halt) never reaches its ceiling and the batch keeps
-// burning cycles on the same defect. The two live shapes are:
-//
-//	1. cycle-numbered PATHS — ".evolve/runs/cycle-1365/audit-report.md" vs the
-//	   same artifact one cycle later. Same defect, two fingerprints.
-//	2. ATTEMPT DENOMINATORS — "attempt 1/3" vs "attempt 2/3" in a retry-loop
-//	   abort reason. Same defect, three fingerprints — exactly the count the
-//	   breaker needs to see as ONE.
-//
-// Contract: both fold to a stable token; the DEFECT-identifying content (which
-// gate, which predicate, which artifact FILE) stays untouched, so two different
-// defects can never collapse into one fingerprint (the over-normalization
-// hazard the current doc comment calls out as deliberately avoided).
-
 import "testing"
 
-// TestNormalizeReasonForFingerprint_CycleNumberedPathsFold is the primary case:
-// the SAME abort shape recorded on two cycles must fingerprint identically.
 func TestNormalizeReasonForFingerprint_CycleNumberedPathsFold(t *testing.T) {
 	cases := []struct {
 		name string
@@ -55,8 +32,6 @@ func TestNormalizeReasonForFingerprint_CycleNumberedPathsFold(t *testing.T) {
 	}
 }
 
-// TestNormalizeReasonForFingerprint_AttemptDenominatorFolds pins the second
-// rule: a retry-loop abort reason naming its attempt index is ONE defect.
 func TestNormalizeReasonForFingerprint_AttemptDenominatorFolds(t *testing.T) {
 	cases := []struct{ a, b string }{
 		{"artifact timeout waiting for build-report.md (attempt 1/3)", "artifact timeout waiting for build-report.md (attempt 2/3)"},
@@ -69,11 +44,6 @@ func TestNormalizeReasonForFingerprint_AttemptDenominatorFolds(t *testing.T) {
 	}
 }
 
-// TestNormalizeReasonForFingerprint_DistinctDefectsStayDistinct is the
-// load-bearing NEGATIVE test: over-normalization that collapsed two DIFFERENT
-// defects would blind the breaker far worse than the variance it fixes. A
-// no-op normalizer passes the two tests above only by collapsing everything —
-// this one is what refutes that.
 func TestNormalizeReasonForFingerprint_DistinctDefectsStayDistinct(t *testing.T) {
 	cases := []struct {
 		name string
@@ -105,8 +75,6 @@ func TestNormalizeReasonForFingerprint_DistinctDefectsStayDistinct(t *testing.T)
 	}
 }
 
-// TestNormalizeReasonForFingerprint_ExistingPinsStayGreen is the regression
-// guard: the two normalizations that already exist must survive the extension.
 func TestNormalizeReasonForFingerprint_ExistingPinsStayGreen(t *testing.T) {
 	if a, b := normalizeReasonForFingerprint("verdict conflict narrative=PASS"), normalizeReasonForFingerprint("verdict conflict narrative=WARN"); a != b {
 		t.Errorf("narrative=<verdict> pin regressed: %q vs %q", a, b)

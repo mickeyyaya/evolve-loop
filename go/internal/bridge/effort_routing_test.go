@@ -1,42 +1,18 @@
 package bridge
 
-// effort_routing_test.go — cycle-566 RED tests for per-phase reasoning-EFFORT
-// routing (inbox `per-phase-effort-routing`, weight 0.88). Triage committed ONLY
-// the plumbing slice: an abstract `effort` (low|medium|high) dimension added to
-// LaunchIntent, realized per-manifest to each CLI's native mechanism (claude
-// effort flag, codex reasoning_effort; agy/ollama noop) — mirroring the existing
-// model_tier params.channel pattern. Retry-escalation + telemetry/soak are
-// explicitly OUT of scope this cycle (see triage-report.md Rationale).
-//
-// RED now: LaunchIntent carries no Effort field, so this file does not compile
-// until Builder adds the field + the realizeScalar("effort", intent.Effort) call
-// + the manifest `params.effort` entries. GREEN once effort is realized through an
-// effective channel for the supporting CLIs and cleanly no-ops for the rest.
-
 import (
 	"reflect"
 	"testing"
 )
 
-// effortSupportingCLIs are the embedded tmux manifests whose CLI exposes a native
-// reasoning-effort dial the manifest MUST translate the abstract effort vocabulary
-// through (inbox: claude effort param, codex reasoning_effort).
 var effortSupportingCLIs = []string{"claude-tmux", "codex-tmux"}
 
-// effortNoopCLIs are the embedded tmux manifests whose CLI has no effort dial; the
-// abstract effort MUST cleanly no-op — never abort the launch, never emit a stray
-// flag — the same parity contract model_tier holds for a positional/single-model CLI.
 var effortNoopCLIs = []string{"agy-tmux", "ollama-tmux"}
 
-// emitCount is the size of a realization's observable emission surface (launch
-// flags + REPL input). Effort translating "through some effective channel" means
-// this count grows when effort is supplied; a clean no-op leaves it unchanged.
 func emitCount(r Realization) int { return len(r.LaunchFlags) + len(r.REPLInput) }
 
-// TestEffortRealize_Matrix — AC-A: manifests map the abstract effort onto each
-// CLI's native mechanism; unsupported CLIs no-op (the parity contract). The
-// positive arm (claude/codex) is the anti-no-op guard: an all-noop implementation
-// that never wires effort would fail here, so the predicate cannot pass vacuously.
+// The positive arm (claude/codex) guards against a vacuous pass: an all-noop
+// wiring would fail here too.
 func TestEffortRealize_Matrix(t *testing.T) {
 	injectCatalogDir(t, t.TempDir()) // neutralize the live-catalog overlay (model_tier parity precedent)
 
@@ -49,11 +25,6 @@ func TestEffortRealize_Matrix(t *testing.T) {
 			base := Realize(m, LaunchIntent{ModelTier: "deep"})
 			hi := Realize(m, LaunchIntent{ModelTier: "deep", Effort: "high"})
 			lo := Realize(m, LaunchIntent{ModelTier: "deep", Effort: "low"})
-			// The dial must be effective in BOTH directions: explicit high and
-			// low realize differently (an all-noop wiring fails here), and a
-			// manifest that declares a DEFAULT (codex: high, 2026-08-15
-			// operator directive — the CLI's second model layer must never run
-			// at the CLI's own default) already carries it in the base.
 			if reflect.DeepEqual(hi, lo) {
 				t.Errorf("%s effort dial ineffective: high and low realize identically: %+v", cli, hi)
 			}
@@ -83,12 +54,6 @@ func TestEffortRealize_Matrix(t *testing.T) {
 	}
 }
 
-// TestEffortRealize_AbsentByteIdentical — AC-C regression: with Effort unset the
-// realization is byte-identical to the one produced by a manifest that predates
-// the feature (its `effort` param stripped). Guarantees the effort dimension is
-// purely additive — an unpinned launch behaves exactly as it does today. The
-// explicit Effort:"" also forces the compile dependency so this stays RED until
-// the field lands.
 func TestEffortRealize_AbsentByteIdentical(t *testing.T) {
 	injectCatalogDir(t, t.TempDir())
 
@@ -102,8 +67,6 @@ func TestEffortRealize_AbsentByteIdentical(t *testing.T) {
 			intent := LaunchIntent{ModelTier: "deep", Permission: "bypass", Effort: ""}
 			withEffortParam := Realize(m, intent)
 
-			// A manifest as it existed before the effort feature: same params
-			// minus the effort entry.
 			m2 := m
 			m2.Params = make(map[string]ParamSpec, len(m.Params))
 			for k, v := range m.Params {
@@ -113,11 +76,6 @@ func TestEffortRealize_AbsentByteIdentical(t *testing.T) {
 			}
 			preEffort := Realize(m2, intent)
 
-			// Contract split (2026-08-15): a manifest WITHOUT a declared effort
-			// default keeps the purely-additive guarantee (unset ⇒ identical
-			// to a pre-effort manifest). A manifest WITH one (codex: high)
-			// deliberately breaks it — unset now realizes the default, so the
-			// equivalence is asserted against the explicit-default form.
 			if def := m.Params["effort"].Default; def != "" {
 				explicit := Realize(m, LaunchIntent{ModelTier: "deep", Permission: "bypass", Effort: def})
 				if !reflect.DeepEqual(withEffortParam, explicit) {

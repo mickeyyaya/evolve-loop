@@ -12,14 +12,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
-// cmd_loop_signal_test.go — F4: a SIGINT/SIGTERM must stop the loop GRACEFULLY
-// (checkpoint + resumable, rc=130), not on the OS default disposition (the
-// silent kill that lost cycles 394/395). The loopSignalContext seam lets the
-// test cancel the loop's context exactly as a signal would, without delivering
-// a real process signal to the test runner.
-
-// cancelOnRunOrch cancels the loop's (seam-injected) context on the first
-// RunCycle — simulating a signal landing mid-cycle — then returns ctx.Err().
+// cancelOnRunOrch simulates a signal landing mid-cycle.
 type cancelOnRunOrch struct {
 	noSignals
 	cancel context.CancelFunc
@@ -52,7 +45,6 @@ func TestRunLoop_SignalGracefulStop(t *testing.T) {
 	ledger := newFakeLedger()
 	defer installStubDeps(t, storage, ledger)()
 
-	// Seam: hand runLoop a context the fake can cancel — no real signal.
 	ctx, cancel := context.WithCancel(context.Background())
 	prevSig := loopSignalContext
 	loopSignalContext = func(context.Context) (context.Context, context.CancelFunc) { return ctx, cancel }

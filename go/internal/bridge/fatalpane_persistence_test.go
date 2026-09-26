@@ -1,37 +1,5 @@
 package bridge
 
-// fatalpane_persistence_test.go — RED tests for the fatal-pane persistence gate
-// (cycle-1118). The exhaustion fast-fail is persistence-gated
-// (exhaustion_persistence.go: a wall must be present on `threshold` CONSECUTIVE
-// observations before it can kill the phase) precisely because the detectors match
-// against the RAW captured pane, and a WORKING agent can render fatal-shaped TEXT
-// into that pane — a cat/grep/diff of an incident report, a test fixture, a log
-// excerpt. The fatal-pane seam (fatalpane.go) matches the same way — on pane
-// substrings like "There's an issue with the selected model" / "Please restart
-// Codex" — but fires on a SINGLE observation. Same false-FAIL class
-// (cycle-254/255/314/641), unguarded.
-//
-// Contract under test — a loop-scoped gate wrapping the per-checkpoint decision:
-//
-//	gate := newFatalPaneGate()                      // ONE instance per checkpoint loop
-//	v, preempted := gate.verdict(det, ev, stage, rec, stderr, pfx)
-//
-//  1. a fatal match must have persisted for fatalPanePersistObservations
-//     CONSECUTIVE observations before it can preempt (enforce) or leave C2
-//     evidence (shadow) — a transient frame never crosses;
-//  2. any non-matching observation — healthy pane, or a Busy pane (busy outranks
-//     the detector at every stage) — RESETS the streak;
-//  3. a genuinely parked pane still fast-fails, at the threshold observation, with
-//     the unchanged ADR-0044 C2 verdict — bounded extra latency, no regression of
-//     the cycle-262 rescue path;
-//  4. off / "" / nil detector never observe at all: a disabled path must not
-//     silently accumulate a streak that a later stage flip could cash in.
-//
-// fatalPaneVerdict's OWN signature and single-observation semantics are unchanged
-// (fatalpane_test.go / fatalpane_durable_test.go stay green unmodified) — the gate
-// is additive state around the call, owned by the checkpoint loop the way
-// checkpointExhaustGate is.
-
 import (
 	"bytes"
 	"strings"
@@ -41,12 +9,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
 )
 
-// healthyTail is ordinary working-agent output — the frame that follows a
+// healthyTail is ordinary working-agent output, the frame that follows a
 // transient fatal-shaped render and must reset the streak.
 const healthyTail = "⏺ Reading incident-report.md … done. Now writing the audit."
 
-// gateObs drives one observation through a gate and returns the outcome plus the
-// evidence surfaces (durable records + stderr) that observation produced.
 type gateObs struct {
 	verdict   ReviewVerdict
 	preempted bool
@@ -54,9 +20,6 @@ type gateObs struct {
 	stderr    string
 }
 
-// observeFatal runs one gate.verdict observation with a real recorder and a real
-// stderr buffer, so the test can assert on BOTH the decision and the C2 evidence
-// trail (the two things the AC constrains).
 func observeFatal(t *testing.T, g *fatalPaneGate, rec *interaction.Recorder, stage, tail string, busy bool) gateObs {
 	t.Helper()
 	var buf bytes.Buffer
@@ -64,9 +27,6 @@ func observeFatal(t *testing.T, g *fatalPaneGate, rec *interaction.Recorder, sta
 	return gateObs{verdict: v, preempted: preempted, outcomes: rec.Outcomes(), stderr: buf.String()}
 }
 
-// TestFatalPaneGate_ThresholdMirrorsExhaustionGuard — the gate must require the
-// same number of consecutive observations as the precedent it copies; a threshold
-// of 1 is the un-gated behavior wearing a gate's name.
 func TestFatalPaneGate_ThresholdMirrorsExhaustionGuard(t *testing.T) {
 	t.Parallel()
 	if fatalPanePersistObservations != exhaustionPersistObservations {
@@ -81,11 +41,6 @@ func TestFatalPaneGate_ThresholdMirrorsExhaustionGuard(t *testing.T) {
 	}
 }
 
-// TestFatalPaneGate_TransientMatchDoesNotFastFail — THE class fix (negative axis;
-// mirrors TestExhaustion_TransientWallTextDoesNotFastFail). A working agent that
-// renders fatal-shaped text for ONE checkpoint and scrolls it away must never be
-// preempted, and must leave NO "fast_failed" record behind. The streak resets on
-// the healthy frame, so a later lone match cannot cash in the earlier one.
 func TestFatalPaneGate_TransientMatchDoesNotFastFail(t *testing.T) {
 	t.Parallel()
 	g := newFatalPaneGate()
@@ -103,7 +58,6 @@ func TestFatalPaneGate_TransientMatchDoesNotFastFail(t *testing.T) {
 		t.Fatalf("healthy pane preempted: %+v", healthy.verdict)
 	}
 
-	// Post-reset lone match: the earlier observation must NOT still be banked.
 	again := observeFatal(t, g, rec, "enforce", fatalTail, false)
 	if again.preempted {
 		t.Fatalf("a non-matching observation did not RESET the streak — two NON-consecutive lone matches crossed the gate; verdict=%+v", again.verdict)
@@ -113,11 +67,6 @@ func TestFatalPaneGate_TransientMatchDoesNotFastFail(t *testing.T) {
 	}
 }
 
-// TestFatalPaneGate_PersistentFatalPaneStillFastFails — the regression bound on
-// the cycle-262 rescue path: a pane parked in a fatal state (present every
-// checkpoint) must still fast-fail, at the threshold observation, with the
-// unchanged ADR-0044 C2 verdict — and record fast_failed exactly ONCE (an inflated
-// C2 count breaks the R8.5 would/did parity check).
 func TestFatalPaneGate_PersistentFatalPaneStillFastFails(t *testing.T) {
 	t.Parallel()
 	g := newFatalPaneGate()
@@ -148,11 +97,6 @@ func TestFatalPaneGate_PersistentFatalPaneStillFastFails(t *testing.T) {
 	}
 }
 
-// TestFatalPaneGate_ShadowEvidenceOnlyAfterPersistence — shadow must PREDICT
-// enforce. If shadow logged/recorded would_fast_fail on a transient frame while
-// enforce (gated) would not have acted, the R8.5 would/did parity check compares
-// two different semantics and the soak reads as a behavior change that never
-// happened.
 func TestFatalPaneGate_ShadowEvidenceOnlyAfterPersistence(t *testing.T) {
 	t.Parallel()
 	g := newFatalPaneGate()
@@ -181,11 +125,6 @@ func TestFatalPaneGate_ShadowEvidenceOnlyAfterPersistence(t *testing.T) {
 	}
 }
 
-// TestFatalPaneGate_BusyObservationResetsStreak — edge axis. Busy outranks the
-// detector at every stage (never kill a working agent), so a Busy checkpoint is a
-// NON-match for streak purposes: it must reset, not merely be skipped. Otherwise
-// fatal-shaped text on either side of a visibly-working checkpoint accumulates
-// into a kill.
 func TestFatalPaneGate_BusyObservationResetsStreak(t *testing.T) {
 	t.Parallel()
 	g := newFatalPaneGate()
@@ -205,10 +144,6 @@ func TestFatalPaneGate_BusyObservationResetsStreak(t *testing.T) {
 	}
 }
 
-// TestFatalPaneGate_DisabledPathsNeverAccumulate — a disabled classification path
-// must not bank a streak that a later stage flip cashes in on its first enforce
-// checkpoint. off / "" / nil-detector observe nothing; a nil gate is fail-safe
-// (never preempt).
 func TestFatalPaneGate_DisabledPathsNeverAccumulate(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
@@ -240,7 +175,6 @@ func TestFatalPaneGate_DisabledPathsNeverAccumulate(t *testing.T) {
 			if outs := rec.Outcomes(); len(outs) != 0 {
 				t.Errorf("disabled path recorded %+v", outs)
 			}
-			// The flip: no streak may have been banked while disabled.
 			if obs := observeFatal(t, g, rec, "enforce", fatalTail, false); obs.preempted {
 				t.Fatalf("first enforce observation preempted — a streak accumulated while the path was disabled; verdict=%+v", obs.verdict)
 			}
@@ -261,19 +195,11 @@ func TestFatalPaneGate_DisabledPathsNeverAccumulate(t *testing.T) {
 	})
 }
 
-// TestFatalPaneGate_AgentDiffNoiseDoesNotBankStreak (salvage review HIGH): the
-// gate must OBSERVE the same STRIPPED pane the verdict detects on. Observing
-// raw let agent-diff-quoted fatal text saturate the streak across checkpoints,
-// after which ONE transient genuinely-matching frame crossed instantly with
-// zero real persistence — the exact transient-frame kill the gate exists to
-// block.
 func TestFatalPaneGate_AgentDiffNoiseDoesNotBankStreak(t *testing.T) {
 	t.Parallel()
 	g := newFatalPaneGate()
 	rec := interaction.NewRecorder(t.TempDir())
 
-	// Saturate with agent-DIFF frames quoting a fatal signature: raw Detect
-	// matches, stripped Detect must not — so the streak must stay at zero.
 	diffTail := "❯ review the change\n+ chrome := \"There's an issue with the selected model\"\n+ det.handle(chrome)\n"
 	for i := 0; i < fatalPanePersistObservations+2; i++ {
 		if obs := observeFatal(t, g, rec, "enforce", diffTail, false); obs.preempted {
@@ -285,7 +211,6 @@ func TestFatalPaneGate_AgentDiffNoiseDoesNotBankStreak(t *testing.T) {
 			g.streak, fatalPanePersistObservations+2)
 	}
 
-	// One genuinely fatal frame after the noise must NOT cross (streak 0→1).
 	if obs := observeFatal(t, g, rec, "enforce", fatalTail, false); obs.preempted {
 		t.Fatal("a single real match after diff noise crossed the gate — the banked-noise saturation path is live")
 	}

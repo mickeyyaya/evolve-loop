@@ -1,25 +1,5 @@
 package bridge
 
-// fatalpane_test.go — ADR-0044 C2 (Slice 2) RED tests: the fatal-pane
-// fast-fail seam at the stop-review checkpoint.
-//
-// cycle-262 mechanism: a dead pane (codex self-update → bare zsh; claude
-// --model auto boot error) never produces an artifact, but the bridge's own
-// nudge text echoes into the pane, reads as "progress" next interval, and
-// buys extension after extension — ~20 min per phase against maxExtends on a
-// state that was fatal on sight. The fix consults the deterministic
-// recovery.FatalPaneDetector BEFORE the reviewer at each checkpoint:
-//
-//   stage=off     → detector not consulted; byte-identical legacy flow
-//   stage=shadow  → detect + log the would-be fast-fail; legacy verdict still
-//                   decides (behavior-neutral soak; the DEFAULT)
-//   stage=enforce → a fatal match on a non-Busy pane preempts the reviewer
-//                   with ReviewStop; the wait exits this interval and the
-//                   runner's exit-81 fallback chain takes over immediately
-//
-// A Busy pane is NEVER preempted regardless of stage — the prime directive of
-// the stop-review layer (never kill a working agent) outranks fast-fail.
-
 import (
 	"bytes"
 	"strings"
@@ -79,9 +59,6 @@ func TestFatalPaneVerdict_BusyPaneNeverPreempted(t *testing.T) {
 
 func TestFatalPaneVerdict_OffSkipsDetection(t *testing.T) {
 	t.Parallel()
-	// "off", the "" zero value, and a nil detector must all behave as off:
-	// no preempt, no detector consult, no log — a zero-value call path must
-	// never silently enable (or even observe for) a kill-path.
 	cases := []struct {
 		name  string
 		det   *recovery.FatalPaneDetector
@@ -108,9 +85,6 @@ func TestFatalPaneVerdict_OffSkipsDetection(t *testing.T) {
 
 func TestFatalPaneVerdict_ShadowBusySuppressed(t *testing.T) {
 	t.Parallel()
-	// Busy outranks the detector in EVERY stage — shadow must not even log
-	// for a visibly-working agent, or the soak trail fills with noise about
-	// panes that merely mention a signature.
 	var buf bytes.Buffer
 	_, preempted := fatalPaneVerdict(recovery.SeedDetector(), fatalEv(fatalTail, true), "shadow", nil, &buf, "[t]")
 	if preempted {
@@ -130,10 +104,6 @@ func TestFatalPaneVerdict_HealthyPaneNotPreempted(t *testing.T) {
 	}
 }
 
-// TestRecoveryStageFromEnv pins the bridge-side stage resolution via
-// Deps.RecoveryStage (policy-injected, ADR-0044): unset → shadow (the
-// behavior-neutral default), a typo → off (never silently enabling a
-// kill-path), explicit values normalized case-insensitively.
 func TestRecoveryStageFromEnv(t *testing.T) {
 	t.Parallel()
 	cases := []struct{ in, want string }{
@@ -142,7 +112,7 @@ func TestRecoveryStageFromEnv(t *testing.T) {
 		{"enforce", "enforce"},
 		{"ENFORCE", "enforce"},
 		{"off", "off"},
-		{"bogus", "off"}, // typo defaults to off, never to a kill-path
+		{"bogus", "off"},
 	}
 	for _, tc := range cases {
 		deps := Deps{RecoveryStage: tc.in}
@@ -152,11 +122,6 @@ func TestRecoveryStageFromEnv(t *testing.T) {
 	}
 }
 
-// TestFatalPaneStageOf (F27) pins the fatal-pane dial's resolution through the
-// SAME normalizer as the program dial — and reads ONLY Deps.FatalPaneStage:
-// with the program dial at enforce, an unset fatal-pane dial still resolves to
-// shadow (an unwired Deps stays observe-only; the composition root injects the
-// policy default), and a typo resolves to off (never a silent kill-path).
 func TestFatalPaneStageOf(t *testing.T) {
 	t.Parallel()
 	cases := []struct{ in, want string }{
@@ -175,9 +140,6 @@ func TestFatalPaneStageOf(t *testing.T) {
 	}
 }
 
-// TestFatalPaneVerdict_EnforceCarriesTheTypedCause (F31): a preempting verdict
-// carries the detector's TYPED cause — the fresh-session retry keys on it,
-// never on the Reason prose — and a non-preempting one carries none.
 func TestFatalPaneVerdict_EnforceCarriesTheTypedCause(t *testing.T) {
 	t.Parallel()
 	for tail, want := range map[string]recovery.TerminalCause{

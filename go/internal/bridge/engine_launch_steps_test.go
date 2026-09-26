@@ -1,14 +1,5 @@
 package bridge
 
-// engine_launch_steps_test.go — ADR-0103 unit 10, the split Launch spine and
-// its emissions (design §6 tests 41-48): the attempt context rides every
-// unit-10 event (call_id is the llm-calls.ndjson join key), the four step
-// failures are bridge.warning codes with per-step origins where two were
-// "[engine]" stderr lines and two were silent, exactly one BRIDGE_EXIT_* per
-// non-zero exit after the persist and the strike record, nothing on ExitOK.
-// The four host codes are named by IDENTIFIER (apicover counts exported
-// consts named by a bridge test).
-
 import (
 	"context"
 	"errors"
@@ -24,7 +15,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// eventsWithCode filters the recorded stream by code.
 func eventsWithCode(events []signalcenter.Event, code signalcenter.Code) []signalcenter.Event {
 	var out []signalcenter.Event
 	for _, e := range events {
@@ -35,7 +25,6 @@ func eventsWithCode(events []signalcenter.Event, code signalcenter.Code) []signa
 	return out
 }
 
-// exitEvents filters the recorded stream to the BRIDGE_EXIT_* codes.
 func exitEvents(events []signalcenter.Event) []signalcenter.Event {
 	var out []signalcenter.Event
 	for _, e := range events {
@@ -46,8 +35,6 @@ func exitEvents(events []signalcenter.Event) []signalcenter.Event {
 	return out
 }
 
-// recordingDeps builds the fixture deps under a recording Center with a
-// captured stderr.
 func recordingDeps(t *testing.T) (Deps, *[]signalcenter.Event, *strings.Builder) {
 	t.Helper()
 	c, got := recordingSignals()
@@ -55,8 +42,6 @@ func recordingDeps(t *testing.T) (Deps, *[]signalcenter.Event, *strings.Builder)
 	return Deps{Signals: c, Stderr: stderr}, got, stderr
 }
 
-// Test 41 — recordModelAttempt returns the attempt context it built: the
-// ledger row's call_id, the attempt default (1) or the request's, cli, agent.
 func TestRecordModelAttempt_ReturnsTheAttemptContext(t *testing.T) {
 	ws := t.TempDir()
 	e := NewEngine(Deps{Stderr: new(strings.Builder)})
@@ -73,9 +58,6 @@ func TestRecordModelAttempt_ReturnsTheAttemptContext(t *testing.T) {
 	}
 }
 
-// Test 42 — a boot-strike clear failure after a non-80 exit is ONE
-// BRIDGE_BOOT_STRIKE_CLEAR_FAILED with the step origin and the call identity;
-// the old "[engine] boot-strike clear failed" line is gone.
 func TestEngineLaunch_BootStrikeClearFailure_IsABridgeWarning(t *testing.T) {
 	deps, got, stderr := recordingDeps(t)
 	deps.BootTimeoutStore = brokenBootStrikeStore(t)
@@ -99,9 +81,6 @@ func TestEngineLaunch_BootStrikeClearFailure_IsABridgeWarning(t *testing.T) {
 	}
 }
 
-// Test 43 — a boot-strike record failure after exit 80 is ONE
-// BRIDGE_BOOT_STRIKE_RECORD_FAILED; the error still wraps the transient
-// sentinel; a non-80 exit never records a strike.
 func TestEngineLaunch_BootStrikeRecordFailure_IsABridgeWarning(t *testing.T) {
 	deps, got, stderr := recordingDeps(t)
 	deps.BootTimeoutStore = brokenBootStrikeStore(t)
@@ -127,9 +106,6 @@ func TestEngineLaunch_BootStrikeRecordFailure_IsABridgeWarning(t *testing.T) {
 	}
 }
 
-// Test 44 — an unwritable launch-error file is ONE
-// BRIDGE_LAUNCH_ERROR_PERSIST_FAILED with the path; the classified error is
-// unchanged and the BRIDGE_EXIT_* event carries no launch_error field.
 func TestEngineLaunch_LaunchErrorPersistFailure_IsABridgeWarning(t *testing.T) {
 	deps, got, _ := recordingDeps(t)
 	ws := t.TempDir()
@@ -155,9 +131,6 @@ func TestEngineLaunch_LaunchErrorPersistFailure_IsABridgeWarning(t *testing.T) {
 	}
 }
 
-// Test 45 — exit 0 with an unreadable result is ONE BRIDGE_RESULT_READ_FAILED
-// (path, completion) and still a nil error with an empty Stdout: the on-disk
-// report is the verdict source, never the response text.
 func TestEngineLaunch_ResultReadFailure_IsABridgeWarning_NotAnError(t *testing.T) {
 	deps, got, _ := recordingDeps(t)
 	resp, ws, err := launchThroughFixture(t, context.Background(), deps, launchFixtureScript(ExitOK, "empty"), core.BridgeRequest{})
@@ -180,9 +153,6 @@ func TestEngineLaunch_ResultReadFailure_IsABridgeWarning_NotAnError(t *testing.T
 	}
 }
 
-// Test 46 — a non-zero exit emits exactly ONE BRIDGE_EXIT_* event from
-// Engine.Launch with the classification's fields, the persisted launch-error
-// path and the ledger's call_id; the reason IS the returned error string.
 func TestEngineLaunch_NonZeroExit_EmitsOneBridgeExitSignal(t *testing.T) {
 	deps, got, _ := recordingDeps(t)
 	_, ws, err := launchThroughFixture(t, context.Background(), deps, launchFixtureScript(ExitBadFlags, "first-bridge-line"), core.BridgeRequest{Cycle: 9, RunID: "run-9"})
@@ -229,7 +199,6 @@ func TestEngineLaunch_NonZeroExit_EmitsOneBridgeExitSignal(t *testing.T) {
 	}
 }
 
-// Test 47 — a successful launch emits no BRIDGE_EXIT_* and no unit-10 step code.
 func TestEngineLaunch_ExitOK_EmitsNoBridgeExitSignal(t *testing.T) {
 	deps, got, _ := recordingDeps(t)
 	deps.BootTimeoutStore = clihealth.NewStore(t.TempDir(), nil)
@@ -244,10 +213,6 @@ func TestEngineLaunch_ExitOK_EmitsNoBridgeExitSignal(t *testing.T) {
 	}
 }
 
-// Test 48 — the declared stream order per path, asserted directly (the
-// edited golden pins the same sequences): the step failures precede the ONE
-// exit event; on exit 80 the strike record comes after the persist and before
-// the exit event.
 func TestEngineLaunch_StepFailuresPrecedeTheExitSignal(t *testing.T) {
 	deps, got, _ := recordingDeps(t)
 	deps.BootTimeoutStore = brokenBootStrikeStore(t)
@@ -277,11 +242,6 @@ func codesOf(events []signalcenter.Event) []string {
 	return out
 }
 
-// Test 55 — ONE producer helper (review fold, F5): warn(code, detail) is
-// launchWarn with its historical origin and no step, and launchWarn omits
-// the step key when the step is empty — so the four telemetry codes keep
-// the exact payload they had ({call_id, cli, agent}) while every unit-10
-// event carries its step. Both shapes are asserted on the same context.
 func TestLaunchWarn_EmptyStepIsOmitted_WarnIsLaunchWarn(t *testing.T) {
 	c, got := recordingSignals()
 	ctx := attemptLogContext{signals: c, dispatchIdentity: dispatchIdentity{cycle: 3, runID: "run-3", phase: "build"}, callID: "call-9", cli: "codex", agent: "build", attempt: 1}
@@ -307,10 +267,6 @@ func TestLaunchWarn_EmptyStepIsOmitted_WarnIsLaunchWarn(t *testing.T) {
 	}
 }
 
-// Test 56 — the four step codes' registered docs name the FULL payload the
-// event carries (review fold, Go MINOR): the step, the step's own fields and
-// the call identity every launchWarn event rides (call_id, cli, agent) — a
-// triage reading signal-codes.md sees what the line will hold.
 func TestLaunchStepCodes_DocsNameTheFullPayload(t *testing.T) {
 	for code, own := range map[signalcenter.Code]string{
 		CodeBootStrikeClearFailed:    "fields step=clear_boot_strike, ",
@@ -325,7 +281,6 @@ func TestLaunchStepCodes_DocsNameTheFullPayload(t *testing.T) {
 	}
 }
 
-// registeredDoc returns the registry doc of one bridge code.
 func registeredDoc(t *testing.T, code signalcenter.Code) string {
 	t.Helper()
 	for _, d := range signalcenter.RegisteredCodes()[signalcenter.ModuleBridge] {

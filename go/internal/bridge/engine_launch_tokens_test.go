@@ -15,20 +15,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/tokenusage"
 )
 
-// engine_launch_tokens_test.go — RED contract for token-telemetry S3
-// (cycle 598): Engine.Launch (engine.go:323) must populate
-// core.BridgeResponse.Tokens from an injected Deps.TokenResolver and append
-// one record per Launch attempt to <Workspace>/llm-calls.ndjson. See
-// test-report.md "Builder Contract" for the exact seam Builder must add
-// (Deps.TokenResolver, core.BridgeRequest.Attempt) — this file does not
-// implement production code, only the RED tests encoding the acceptance
-// criteria named in the cycle-598 inbox item
-// (token-telemetry-s3-engine-launch-instrumentation).
-
-// llmCallRecord mirrors the on-disk llm-calls.ndjson schema
-// (ts, agent, phase, cli, model, attempt, tokens, source, duration_ms,
-// exit_code) exactly as pinned by the S3 inbox item so a later cycle
-// (S6/S7 rollups) can decode it without a migration.
 type llmCallRecord struct {
 	SchemaVersion   int                   `json:"schema_version"`
 	CallID          string                `json:"call_id"`
@@ -53,10 +39,6 @@ type llmCallRecord struct {
 	FillPct         float64               `json:"fill_pct"`
 }
 
-// TestEngineLaunch_PopulatesBridgeResponseTokens: a Launch whose
-// Deps.TokenResolver resolves non-empty usage must surface that usage on
-// core.BridgeResponse.Tokens (ports.go:294 — the field exists today but
-// Launch never populates it, per scout finding engine.go:428).
 func TestEngineLaunch_PopulatesBridgeResponseTokens(t *testing.T) {
 	ws := t.TempDir()
 	prof := writeProfile(t, ws, "eng-tokens", "")
@@ -84,12 +66,6 @@ func TestEngineLaunch_PopulatesBridgeResponseTokens(t *testing.T) {
 	}
 }
 
-// TestEngineLaunch_AppendsLLMCallRecordPerFallbackAttempt: two Launch calls
-// against the same Workspace with distinct BridgeRequest.Attempt values
-// (simulating a fallback retry on a different CLI, per the scout finding
-// that each fallback candidate is its own Launch) must append TWO records
-// to llm-calls.ndjson, not overwrite a single one — this is what makes the
-// double-dispatch waste class measurable.
 func TestEngineLaunch_AppendsLLMCallRecordPerFallbackAttempt(t *testing.T) {
 	ws := t.TempDir()
 	prof := writeProfile(t, ws, "eng-tokens", "")
@@ -161,10 +137,6 @@ func TestEngineLaunch_AppendsLLMCallRecordPerFallbackAttempt(t *testing.T) {
 	}
 }
 
-// TestEngineLaunch_CollectorErrorNeverFailsLaunch: the fail-open contract
-// (S3 acceptance criteria) — a TokenResolver error must WARN (to
-// Deps.Stderr) and leave resp.Tokens at its zero value, but must NEVER
-// turn an otherwise-successful Launch into an error.
 func TestEngineLaunch_CollectorErrorNeverFailsLaunch(t *testing.T) {
 	ws := t.TempDir()
 	prof := writeProfile(t, ws, "eng-tokens", "")

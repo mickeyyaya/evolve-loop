@@ -10,9 +10,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
 )
 
-// maintainBatchState applies the bounded state maintenance requested at batch
-// startup. Failures are reported and remain non-fatal, matching the original
-// dispatcher contract.
+// maintainBatchState's failures are reported, never fatal, so batch-startup
+// maintenance cannot block a cycle.
 func maintainBatchState(cfg loopConfig, autoPrune bool, stderr io.Writer) {
 	statePath := filepath.Join(cfg.EvolveDir, "state.json")
 	if autoPrune {

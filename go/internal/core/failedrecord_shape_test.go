@@ -1,16 +1,5 @@
 package core
 
-// failedrecord_shape_test.go — R7 shape-parity pin: state.json:
-// failedApproaches has TWO appenders with different Go types — the
-// orchestrator's typed core.FailedRecord (in-memory State, persisted via
-// writeFailureLearningState) and failurelog.Recorded (raw read-modify-
-// write; reset + loop fatals). Unifying them is out of scope (State
-// lifecycle vs on-disk merge), so this test pins the JSON contract
-// instead: every key failurelog.Recorded emits must also be a key of
-// core.FailedRecord, with identical spelling. If this fails, the two
-// appenders have drifted and downstream readers (failure-adapter,
-// pruner) see a forked schema.
-
 import (
 	"encoding/json"
 	"testing"

@@ -16,9 +16,6 @@ type sequentialBatchState struct {
 	stallCfg            goalStallConfig
 }
 
-// runSequentialIteration executes one in-process cycle and reduces its
-// observable result into the batch control action. Fleet windows never call
-// this method, which keeps the sequential-only breakers isolated.
 func (b *loopBatchCoordinator) runSequentialIteration(iteration int, state *sequentialBatchState) batchDecision {
 	cycle, decision := b.dispatchSequentialCycle()
 	if decision.flow != batchProceed {

@@ -11,18 +11,9 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// TestEngine_ConcurrentLaunch_OnBootRaceFree pins the fresh-engine-per-Launch
-// contract as STRUCTURAL, not merely comment-enforced: concurrent Launch calls
-// on ONE Engine must not race. Launch installs a call-local OnBoot hook to
-// capture BootMS; the pre-fix implementation mutated the SHARED e.deps.OnBoot
-// field (restored via defer), so two concurrent Launches raced on that write.
-// `go test -race` catches it. The fix threads OnBoot through a per-call Deps
-// copy (mirroring the per-call Stdout/Stderr already threaded in LaunchArgs),
-// making the field write call-local and race-free by construction.
-//
-// The requests fast-fail inside LaunchArgs (a nonexistent profile => ExitBadFlags)
-// AFTER Launch has installed its OnBoot hook, so the test exercises the shared
-// mutation deterministically without spawning any real driver.
+// The request fast-fails inside LaunchArgs (a nonexistent profile) only after
+// Launch has installed its OnBoot hook, so the shared mutation is exercised
+// deterministically without spawning any real driver.
 func TestEngine_ConcurrentLaunch_OnBootRaceFree(t *testing.T) {
 	eng := NewEngine(Deps{
 		LookupEnv: mapLookup(nil),

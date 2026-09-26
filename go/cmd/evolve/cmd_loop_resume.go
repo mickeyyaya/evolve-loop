@@ -11,8 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// runResumeBatch owns the resume-only protocol. A resume executes exactly one
-// cycle from its checkpoint and maps that result to the batch exit contract.
 func runResumeBatch(
 	ctx context.Context,
 	cfg loopConfig,
@@ -34,8 +32,8 @@ func runResumeBatch(
 	fmt.Fprintf(stderr, "[resume] cycle=%d phase=%s reason=%s cost=$%.2f state=%s\n",
 		rp.CycleID, rp.Phase, rp.Reason, rp.CostAtPause, rp.StatePath)
 
-	// A fleet checkpoint must keep reading and writing the per-run state file
-	// that discovery selected, including a second pause during this invocation.
+	// A fleet checkpoint keeps reading and writing the per-run state file that
+	// discovery selected, including across a second pause in this invocation.
 	restoreState := core.ActivateResumeStatePath(rp, cfg.EvolveDir)
 	defer restoreState()
 
@@ -59,11 +57,6 @@ func runResumeBatch(
 		lr.emitQuotaPause(cfg, result.Cycle, stdout, stderr)
 		return 5
 	}
-	// A resumed cycle — possibly a fleet lane's checkpoint, with its lane pin —
-	// reaches the inbox lifecycle like every other root (F30 architecture
-	// review M1): the failure walk for a FAIL (a cycle-level failure error
-	// included, as at the cycle-run root), the planned-no-work hand-off for a
-	// lane that answered for its scope.
 	closeout := result
 	var clf *core.ErrCycleLevelFailure
 	if errors.As(err, &clf) {

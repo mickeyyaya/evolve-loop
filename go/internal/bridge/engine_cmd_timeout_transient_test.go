@@ -1,15 +1,5 @@
 package bridge
 
-// engine_cmd_timeout_transient_test.go — advisory-phase-contract-degrade
-// residual: exit 124 (a driver killed by a command-level timeout, e.g. gnu
-// `timeout` around a headless CLI) is infra weather — the sibling of the
-// artifact-timeout 81 — but the engine classified it as a PLAIN error, so an
-// OPTIONAL non-floor phase whose whole fallback chain died 124 was
-// cycle-fatal instead of infra-skipped (optionalInfraSkip matches only the
-// transient/timeout sentinels). These tests pin 124 → ErrTransientBridgeFailure
-// and pin 127 (missing binary) staying PLAIN — an absent CLI is an environment
-// defect that must fail loud, not retry/skip as weather.
-
 import (
 	"context"
 	"errors"
@@ -19,9 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// TestEngineLaunch_CmdTimeout124_WrapsTransient: exit 124 carries the
-// transient sentinel so retry backoff, optionalInfraSkip, and the reconcile
-// IsInfraTeardownError predicate all treat it as the timeout-kill it is.
 func TestEngineLaunch_CmdTimeout124_WrapsTransient(t *testing.T) {
 	ws := t.TempDir()
 	prof := writeProfile(t, ws, "eng-test", "")
@@ -46,11 +33,6 @@ func TestEngineLaunch_CmdTimeout124_WrapsTransient(t *testing.T) {
 	}
 }
 
-// TestEngineLaunch_MissingBinary127_StaysPlain: 127 is a launch-environment
-// defect (CLI not installed), NOT weather — it must stay a plain error so
-// nothing retries, reconciles, or silently skips over an absent binary. The
-// CLI fallback chain still advances on the raw exit code (llmroute), which is
-// the correct and only recovery for a missing family.
 func TestEngineLaunch_MissingBinary127_StaysPlain(t *testing.T) {
 	ws := t.TempDir()
 	prof := writeProfile(t, ws, "eng-test", "")

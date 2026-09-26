@@ -1,9 +1,5 @@
 package core
 
-// ADR-0045 I5 full: the ADR-0044 FailureAdvisor's prompt is the one shipped
-// LLM consumption of raw pane text — it must traverse panetrust.Frame
-// (untrusted preamble, neutralized fenced digest, secrets redacted).
-
 import (
 	"strings"
 	"testing"
