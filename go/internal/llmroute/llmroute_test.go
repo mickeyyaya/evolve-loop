@@ -10,17 +10,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
-// TestMain clears EVOLVE_CLI from the process env so tests that exercise the
-// profile/default CLI tier (env=nil) are not contaminated by a soak-batch
-// EVOLVE_CLI=claude-p in the operator shell. Tests that need to assert
-// "env beats profile" inject EVOLVE_CLI via the env map (tier 1 in envchain),
-// which always wins over os.Getenv (tier 2) regardless.
+// TestMain unsets EVOLVE_CLI so an operator's shell cannot leak into the profile and default tiers.
 func TestMain(m *testing.M) {
 	os.Unsetenv("EVOLVE_CLI")
 	os.Exit(m.Run())
 }
-
-// --- CLI chain (ported from runner/cli_chain_test.go; same matrix, now via Resolve) ---
 
 func TestResolve_EnvPerAgentBeatsProfile(t *testing.T) {
 	prof := &profiles.Profile{CLI: "codex-tmux"}
@@ -88,8 +82,6 @@ func TestResolve_FallbackDedupPreservesOrder(t *testing.T) {
 func TestResolve_DefaultTriggers(t *testing.T) {
 	prof := &profiles.Profile{CLI: "codex-tmux"}
 	got := Resolve("auditor", "audit", "auto", nil, prof, nil, nil)
-	// 85 (ExitUnknownPrompt, incl. provider rate-limit escalations) joined the
-	// defaults after cycle-267: a quota-blocked codex never chained to claude.
 	want := []int{80, 81, 85, 124, 127}
 	if !reflect.DeepEqual(got.Triggers, want) {
 		t.Errorf("triggers=%v, want %v", got.Triggers, want)
@@ -128,11 +120,8 @@ func TestPlan_TriggersFallback(t *testing.T) {
 	}
 }
 
-// --- Probe (ported from runner/cli_probe_test.go behavior) ---
-
 func TestProbe_DemotesMissingBinary(t *testing.T) {
 	p := Plan{Candidates: []string{"codex-tmux", "claude-tmux"}, Triggers: []int{80}, Model: "sonnet"}
-	// codex missing, claude present.
 	lookPath := func(bin string) (string, error) {
 		if bin == "claude" {
 			return "/usr/bin/claude", nil
@@ -174,8 +163,6 @@ func TestProbe_AllAvailableNoReorder(t *testing.T) {
 }
 
 func TestProbe_MultipleMissingPreservesRelativeOrder(t *testing.T) {
-	// codex + agy missing, claude + ollama present; available keep their order,
-	// missing keep theirs, appended after.
 	p := Plan{Candidates: []string{"codex-tmux", "claude-tmux", "agy-tmux", "ollama-tmux"}}
 	present := map[string]bool{"claude": true, "ollama": true}
 	got := Probe(p, func(bin string) (string, error) {
@@ -191,8 +178,6 @@ func TestProbe_MultipleMissingPreservesRelativeOrder(t *testing.T) {
 }
 
 func TestProbe_UnknownCLIKeepsPosition(t *testing.T) {
-	// An unknown driver name (no cliBinaryFor entry) is kept in place rather
-	// than demoted — LookupDriver might still resolve it.
 	p := Plan{Candidates: []string{"mystery-cli", "claude-tmux"}}
 	got := Probe(p, func(bin string) (string, error) {
 		if bin == "claude" {
@@ -206,17 +191,13 @@ func TestProbe_UnknownCLIKeepsPosition(t *testing.T) {
 }
 
 func TestProbe_NilLookPathDefaultsToExecLookPath(t *testing.T) {
-	// nil lookPath must not panic — it defaults to exec.LookPath. We can't
-	// assert a specific order (depends on host PATH), only that it returns a
-	// chain of the same length with the same membership.
+	// The order depends on the host PATH, so only the length is asserted.
 	p := Plan{Candidates: []string{"codex-tmux", "claude-tmux"}}
 	got := Probe(p, nil)
 	if len(got.Candidates) != 2 {
 		t.Errorf("nil lookPath: got %d candidates, want 2", len(got.Candidates))
 	}
 }
-
-// --- Model resolution ---
 
 func TestResolve_ModelEnvBeatsProfileAndDefault(t *testing.T) {
 	prof := &profiles.Profile{CLI: "claude-tmux", ModelTierDefault: "sonnet"}
@@ -248,7 +229,6 @@ func TestResolve_AutoExpandedViaSeam(t *testing.T) {
 		gotRole = role
 		return "claude-opus-4-7", true
 	}
-	// defaultModel "auto" + no profile tier → "auto" → expander.
 	got := Resolve("auditor", "audit", "auto", nil, nil, autoExpand, nil)
 	if got.Model != "claude-opus-4-7" {
 		t.Errorf("Model=%q, want claude-opus-4-7 (auto expanded)", got.Model)
@@ -279,10 +259,7 @@ func TestResolve_NonAutoModelNotExpanded(t *testing.T) {
 	}
 }
 
-// --- policy pin (absolute precedence) ---
-
 func TestResolve_PinCLIOverridesEnv(t *testing.T) {
-	// Pin beats even a per-agent env override (policy is the top authority).
 	prof := &profiles.Profile{CLI: "agy-tmux"}
 	env := map[string]string{"EVOLVE_AUDITOR_CLI": "agy-tmux"}
 	pin := &policy.Pin{CLI: "claude-tmux"}
@@ -296,7 +273,6 @@ func TestResolve_PinModelBypassesAutoExpand(t *testing.T) {
 	called := false
 	autoExpand := func(role string) (string, bool) { called = true; return "x", true }
 	pin := &policy.Pin{Model: "claude-opus-4-8"}
-	// defaultModel "auto" would normally hit autoExpand; the pin must short it.
 	got := Resolve("auditor", "audit", "auto", nil, nil, autoExpand, pin)
 	if got.Model != "claude-opus-4-8" {
 		t.Errorf("Model=%q, want claude-opus-4-8 (pin absolute)", got.Model)
@@ -307,8 +283,6 @@ func TestResolve_PinModelBypassesAutoExpand(t *testing.T) {
 }
 
 func TestResolve_PinPreservesProfileFallbackChain(t *testing.T) {
-	// A CLI pin replaces the primary but the profile fallback chain still
-	// applies (resilience): pinned claude-tmux + profile fallback [codex,agy].
 	prof := &profiles.Profile{CLI: "agy-tmux", CLIFallback: []string{"codex-tmux", "agy-tmux"}}
 	pin := &policy.Pin{CLI: "claude-tmux"}
 	got := Resolve("auditor", "audit", "auto", nil, prof, nil, pin)
@@ -319,7 +293,6 @@ func TestResolve_PinPreservesProfileFallbackChain(t *testing.T) {
 }
 
 func TestResolve_PinCLIOnlyLeavesModelNormal(t *testing.T) {
-	// A pin with only CLI must not touch model resolution.
 	prof := &profiles.Profile{CLI: "agy-tmux", ModelTierDefault: "sonnet"}
 	pin := &policy.Pin{CLI: "claude-tmux"}
 	got := Resolve("auditor", "audit", "auto", nil, prof, nil, pin)
@@ -328,26 +301,15 @@ func TestResolve_PinCLIOnlyLeavesModelNormal(t *testing.T) {
 	}
 }
 
-// TestResolve_PinBaseFamilyNormalizesToDefaultDriver guards the cycle-378
-// incident: a policy pin written with a BARE family ("codex", which is exactly
-// what `evolve setup apply` emits — Assignment.CLI is the base family) selected
-// the headless `codex` driver instead of the default tmux driver `codex-tmux`.
-// At the time the headless driver had neither the manifest model_tier_map
-// (since 2026-09-09 codex.json adopts the family table via model_tier_map_from)
-// nor the ChatGPT-account model clamp (still true), so codex exited rc=1 every
-// cycle and the loop spun. A base family that has a registered "<family>-tmux" driver MUST
-// normalize to that default driver; an already-qualified or explicit-headless
-// (e.g. "claude-p") name is left untouched.
 func TestResolve_PinBaseFamilyNormalizesToDefaultDriver(t *testing.T) {
 	for _, tc := range []struct{ pinCLI, want string }{
 		{"codex", "codex-tmux"},
 		{"claude", "claude-tmux"},
 		{"agy", "agy-tmux"},
 		{"ollama", "ollama-tmux"},
-		// already driver-qualified → untouched
 		{"codex-tmux", "codex-tmux"},
 		{"claude-tmux", "claude-tmux"},
-		// explicit headless variant preserved (no *-tmux equivalent registered)
+		// no "claude-p-tmux" driver is registered
 		{"claude-p", "claude-p"},
 	} {
 		pin := &policy.Pin{CLI: tc.pinCLI}

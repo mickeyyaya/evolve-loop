@@ -1,18 +1,5 @@
 package llmroute
 
-// overlay_family_transport_test.go — RED contract for the family-name
-// transport ambiguity (inbox overlay-family-name-transport-ambiguity 0.87;
-// hotter since #430 made escalation overlays live-fire). PR #390's
-// exact-chain-match rung closed the observed instance; a bare FAMILY the
-// chain holds only under a NON-default driver still crossed transport:
-// chain [claude-p codex] + overlay "claude" found no exact match, fell to
-// defaultDriverForFamily("claude") = claude-tmux, and moved a
-// headless-configured phase onto tmux. The decided semantics (documented in
-// ApplySoftOverlay): a BARE name (no hyphen) is a FAMILY selector satisfied
-// by promoting the chain's existing same-family entry (transport preserved);
-// a hyphen-QUALIFIED name is a DRIVER selector that wins even over a
-// same-family chain entry (an explicit transport request is never rewritten).
-
 import "testing"
 
 func TestApplySoftOverlay_BareFamilyDoesNotCrossTransportWhenTheChainHoldsANonDefaultDriver(t *testing.T) {
@@ -36,9 +23,6 @@ func TestApplySoftOverlay_DriverQualifiedOverlayWinsOverSameFamilyChainEntry(t *
 	}
 }
 
-// First-match tie-break (diff-review MEDIUM): with several same-family
-// entries, chain ORDER is the phase's resolved preference — the rung promotes
-// the first, never re-sorts transports.
 func TestApplySoftOverlay_BareFamilyPromotesFirstSameFamilyEntry(t *testing.T) {
 	t.Parallel()
 	in := Plan{Candidates: []string{"claude-tmux", "claude-p"}}
@@ -59,8 +43,7 @@ func TestApplySoftOverlay_BareFamilyWithNoFamilyEntryStillDefaults(t *testing.T)
 
 func TestApplySoftOverlay_ExactChainMatchStillWinsForBothNames(t *testing.T) {
 	t.Parallel()
-	// "codex" is both a family name and a registered driver; the #390 rung
-	// (exact chain entry) outranks everything.
+	// "codex" is both a family name and a registered driver.
 	in := Plan{Candidates: []string{"claude-p", "codex"}}
 	out := ApplySoftOverlay(in, Overlay{CLI: "codex"}, nil)
 	if out.Candidates[0] != "codex" {

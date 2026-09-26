@@ -22,3 +22,4 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/topngate` | holds a build to the tasks triage selected | [internal-topngate.md](internal-topngate.md) |
 | `internal/tokenusage` | measures a phase launch's token usage and context fill | [internal-tokenusage.md](internal-tokenusage.md) |
 | `internal/adapters/observer` | the stall observer's core adapter and liveness probes | [internal-adapters-observer.md](internal-adapters-observer.md) |
+| `internal/llmroute` | resolves the CLI and fallback chain that runs each phase | [internal-llmroute.md](internal-llmroute.md) |
