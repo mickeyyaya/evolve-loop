@@ -1,8 +1,8 @@
 # Logic-first delivery — design document
 
-- **Status:** living document, kept current with every landing. Last updated 2026-09-26 22:20.
+- **Status:** living document, kept current with every landing. Last updated 2026-09-26 23:00.
 - **Decision record:** [ADR-0106](adr/0106-logic-first-delivery.md). **Policy:** [operating-policy §0](../operations/operating-policy.md).
-- **Landings:** design PR #653 (`docs/logic-first-delivery`); code train PR #654 (`feat/recovery-rungs`, six commits); ADR-0105 B1 in PR #652.
+- **Landings:** the design in #655 (merged `5600b77a`; it replaced #653 after a CHANGELOG conflict); the first code train in #656 (merged; eight commits, replacing #654 the same way); ADR-0105 B1 in #652 (merged `e5af27fe`).
 - **Owner of the request:** the operator. **Priority:** P0; everything else parks.
 
 ## 1. The request
@@ -140,18 +140,18 @@ Status: **shipped** (commit on a branch, PR open or merged) · **built** (green 
 
 | Id | Component | Status | Where |
 |---|---|---|---|
-| D0 | operating-policy §0 + ADR-0106 + this document | shipped, #653 | `docs/` |
-| P1 | ADR-0105 B1 unwind-rebase-pend; then the resume heal, B3, B4 | B2 merged (#649); B1 shipped, #652 (CI green, merges at a wave boundary) | `core/ship_recovery*.go` |
+| D0 | operating-policy §0 + ADR-0106 + this document | merged, #655 | `docs/` |
+| P1 | ADR-0105 B1 unwind-rebase-pend; then the resume heal, B3, B4 | B2 merged (#649); B1 merged (#652); the resume heal, B3 and B4 designed | `core/ship_recovery*.go` |
 | P2 | a fleet lane's closeout dossier waits for the wave boundary | built, parked (`fix/dossier-commits-at-wave-boundary`; architect N1–N5 applied) | `dossier/publish_pending.go`, `cmd_loop_dossiers.go` |
 | P3 | phase prompts state the agent's identity verifiably; phase panes run without prompt suggestions | designed | bridge prompt composition, driver launch flags |
-| P4 | an exit-85 escalation names its pattern in `cause_code` and the cause line, anchored to the line start | shipped `4aabd0fa`, #654 | `bridge/launchoutcome/cause.go` |
+| P4 | an exit-85 escalation names its pattern in `cause_code` and the cause line, anchored to the line start | merged, #656 | `bridge/launchoutcome/cause.go` |
 
 ### 7.2 Host derivations (H)
 
 | Id | Component | Status | Where |
 |---|---|---|---|
-| H1 | one triage-report reader: `Derive` (strict) and `Project` (lenient); `triagecap` delegates; one stamp `projected_by_orchestrator`; protected surface | shipped `476f821e`, #654 | `internal/triagedecision` |
-| H2 | registry `outputs.derived_from`; the host derives an absent or empty declared secondary after the effects, before the judges, waiting out a write in flight | shipped `cfecc540`, #654 | `deliverable/host_effects.go`, `phasespec`, `phasecontract`, `phase-registry.json` |
+| H1 | one triage-report reader: `Derive` (strict) and `Project` (lenient); `triagecap` delegates; one stamp `projected_by_orchestrator`; protected surface | merged, #656 | `internal/triagedecision` |
+| H2 | registry `outputs.derived_from`; the host derives an absent or empty declared secondary after the effects, before the judges, waiting out a write in flight | merged, #656 | `deliverable/host_effects.go`, `phasespec`, `phasecontract`, `phase-registry.json` |
 | H3 | the `## Explanation Documentation` declaration derived by the host | designed | `deliverable/host_effects.go`, `explanationdocs` |
 
 ### 7.3 Evidence (E) and floors (F0, F6a)
@@ -169,10 +169,10 @@ Status: **shipped** (commit on a branch, PR open or merged) · **built** (green 
 | Id | Component | Status | Where |
 |---|---|---|---|
 | V0 | verdict refresh after an approved rung, adopted only under the guard rule | designed | `core/cyclerun_correction.go`, the phase classifiers |
-| F1 | `interaction.RungRecover` after live-fix, gated on `Repairable` | shipped `107c0f77`, #654 | `internal/interaction/correction.go` |
-| F2 | `recoveryguard`: whole-workspace fence + treefence; `Scope{Worktree, Workspace, Allowed, Unfenced, UnfencedStems}`; protected surface | shipped `4a998ac3`, #654 | `internal/recoveryguard` |
+| F1 | `interaction.RungRecover` after live-fix, gated on `Repairable` | merged, #656 (unwired) | `internal/interaction/correction.go` |
+| F2 | `recoveryguard`: whole-workspace fence + treefence; `Scope{Worktree, Workspace, Allowed, Unfenced, UnfencedStems}`; protected surface | merged, #656 (unwired) | `internal/recoveryguard` |
 | F2b | provenance check: every block the agent's report names is byte-equal to its source in the pre-rung snapshot | designed | `internal/recoveryguard` |
-| F3 | recovery-agent profile (codex family by default with claude as fallback, per the balanced-tier floor; sandbox on, read-only repo, run-dir grant, no network declared) and persona | shipped `ea58774b`, #654; routing corrected by the follow-up commit | `.evolve/profiles/deliverable-recovery.json`, `agents/evolve-deliverable-recovery.md` |
+| F3 | recovery-agent profile (codex family by default with claude as fallback, per the balanced-tier floor; sandbox on, read-only repo, run-dir grant, no network declared) and persona | merged, #656 (unwired) | `.evolve/profiles/deliverable-recovery.json`, `agents/evolve-deliverable-recovery.md` |
 | F3b | a `{cycle}` write-grant template so a profile grants only its own cycle's run dir | designed | `bridge/sandbox_paths.go` |
 | F4 | `bridgeDeliverableRecoverer`: dispatch, prompt, strict report parse | designed | `core/` beside `failure_advisor.go` |
 | F5 | `workflow.recovery_rounds`: policy.json → policy → config → orchestrator option | designed | `internal/policy`, `internal/config`, `core/orchestrator.go` |
@@ -259,6 +259,8 @@ Cycles ~1550–1707 (the inventory gathered for ADR-0106):
 | bridge `submit_wedged` / "unknown prompt" exits | process | 6 + 8 (the escalation reports name every one of the 8: 4 `rate_limit`, 4 `model_unsupported`) | P4 (counting); the codex deep pin is the operator's call |
 | loop halt from a form or process root cause (1700, 1705) | process | 2, each stops the loop | ADR-0072 stays; classification only |
 | an agent refused its own task as an intruder (1707 TDD) | process | ~1 hour | P3, the persona's identity statement |
+| a correction that touched only the explanation document left the primary unrewritten, so the finished phase idled through a review interval (1707 build) | process | ~20 min | F0; completion on the corrected file |
+| a passed build aborted when the explanation floor exhausted its correction budget (1707, after a rebase and a passed re-audit) | form | the cycle | F0, E1/E2 |
 
 No `missing_section` or `bad_verdict` rejection is recorded in the range, so the recovery agent (F4/F6) lands last, after H1/H2 and the evidence decision are measured again.
 
@@ -270,7 +272,7 @@ Landing order and the checkpoint each must pass before the next starts.
 
 | Step | Lands | Checkpoint |
 |---|---|---|
-| 1 | D0 (#653), P1 (#652), the code train (#654) | merged at a wave boundary in one burst; the plane synced; the full floor green on each |
+| 1 | D0 (#655), P1 (#652), the code train (#656) | merged at a wave boundary in one burst; the plane synced; the full floor green on each |
 | 2 | soak one wave | a triage lane that omits `triage-decision.json` proceeds without `GATE_CONTRACT_REJECTED [missing_secondary]`; a codex `rate_limit` escalation shows `cause_code=rate_limit`; the first fleet-rebase recovery logs "unwound its ship commit" |
 | 3 | P2 (dossier at the boundary), P3 (identity prompt, no suggestions) | a FAIL sibling's closeout no longer moves `main` under a passed lane; no agent refusal on identity |
 | 4 | E0 → E1 → E2 → F0 → F6a | an insufficient all-form failure is re-dispatched with `Missing`; identity, block count and signals byte-identical with and without E2 |
@@ -288,6 +290,7 @@ Merges happen only at wave boundaries. Each step is its own PR; each component i
 - **Floor rejections without codes** (F0) hide Build's commonest form failure from the routing table until they carry codes.
 - **Provenance granularity** (F2b): byte ranges are strict; a repair that reorders a table may need line-level matching. Decide with the first real repair.
 - **Document-kind cycles**: E1's `solutioncheck` path is designed, not measured.
+- **Completion after a correction**: the bridge completes a corrected phase only when the primary artifact is rewritten; a correction whose violation names only a secondary or the explanation document should complete on that file's rewrite (or on `evolve phase verify` passing); it lands with F0.
 
 ## 13. Review log
 
@@ -299,6 +302,8 @@ Merges happen only at wave boundaries. Each step is its own PR; each component i
 | 2026-09-26 | go-reviewer (train) | APPROVE-WITH-MINOR | four minors applied |
 | 2026-09-26 | code-reviewer (train) | WARNING | the derivation's write-in-flight grace (MAJOR) applied; the duplicate projector absorbed |
 | 2026-09-26 | security-reviewer (train) | BLOCK → APPROVE-WITH-MINOR | unfenced boundary; allowed-path type check; no network declared; anchored markers; three gaps filed |
+| 2026-09-26 | consistency audit (every doc vs the design vs the shipped code) | INCONSISTENCIES-FOUND → fixed | three stale package pages, one stale sentence in phase-architecture.md, one imprecise ADR sentence; two new package pages |
+| 2026-09-26 | code-reviewer (design document) | APPROVE-WITH-MINOR | the exit-85 census corrected; the audit-seal clause restored; F2b cross-referenced |
 
 ## 14. Document history
 
@@ -307,3 +312,4 @@ Merges happen only at wave boundaries. Each step is its own PR; each component i
 | 2026-09-26 | Created after the design landed in ADR-0106 and the first six components shipped (#654). |
 | 2026-09-26 | Review (APPROVE-WITH-MINOR): the exit-85 census corrected (the eight unknown-prompt exits were four `rate_limit` and four `model_unsupported`); the audit-seal reuse clause restored; F2b cross-referenced from the ADR. |
 | 2026-09-26 | F3 routed to the codex family with claude as fallback: the balanced-tier floor (`TestClaudeFamilyFloor`) reserves claude for judgment phases with a justification, and the recovery agent is an analytic helper. |
+| 2026-09-26 | #652, #655 and #656 merged at the wave-13 boundary (1706 shipped, 1707 failed on form); statuses updated; two wave-13 observations added to the evidence and the open questions. |
