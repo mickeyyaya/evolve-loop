@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — plane bookkeeping no longer sends a passed audit back to re-audit (cycle 1701, 2026-09-26)
+
+Cycle 1701 passed audit and was sent back at ship with `AUDIT_BINDING_TREE_MISMATCH`: a git-tracked inbox item in the plane had changed between its audit and its ship. Ship's binding hashed the plane's `git diff HEAD`, although a fleet lane ships from its own worktree. The plane's inbox queue, which operators and sibling lanes move all the time, was never part of what the lane commits.
+
+- `verifyAuditBinding` compares the plane-wide tree state only when the plane is the tree ship lands from. The tested root and that choice come from one decision. A worktree ship stays bound by the treefence snapshot of the worktree it commits, so a change to the shipped worktree after audit is still refused.
+- Proposed next: [ADR-0105](docs/architecture/adr/0105-identity-preserving-fleet-rebase.md) keeps a passed audit across a clean fleet rebase of an unchanged change. Today every such rebase re-runs Build and Audit (1698, 1701), and review found the existing trivial-rebase rung has never fired in worktree mode.
+- Records:
+  - `docs/incidents/2026-09-26-a-passed-audit-sent-back-by-ship-process-issues.md`;
+  - `docs/research/2026-09-26-identity-preserving-rebase-design-review.md`.
+
 ## Removed — the research quota guard, which never denied (2026-09-26)
 
 `evolve guard quota` built a fresh counter for every hook call, so its caps never outlived one call. It also keyed them on an `agent` field that no Claude Code tool input carries. Its hook matched `WebSearch|WebFetch|Bash`, so every Bash call paid for a process and a `policy.json` read that decided nothing.
