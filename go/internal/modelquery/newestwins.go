@@ -19,25 +19,46 @@ var versionToken = regexp.MustCompile(`[0-9]+(?:\.[0-9]+)*`)
 // wrong. The full id string is returned unmodified.
 //
 // Contract:
+//   - The version is read with any date-shaped run (dateRun) removed, so a
+//     snapshot date is never compared as a version number.
 //   - Input order does not affect the winner among distinct versions.
 //   - A versioned id always outranks an unversioned one.
-//   - Ties (equal versions, or all-unversioned) keep the first-listed id — a
-//     deterministic fallback to classifier/original order, never a crash.
+//   - Equal versions that are BOTH dated are ordered by calendar date.
+//   - Other ties (equal versions with at most one side dated, or
+//     all-unversioned) keep the first-listed id — a deterministic fallback to
+//     classifier/original order, never a crash.
 //   - Empty/nil input returns "".
 func NewestInLineage(ids []string) string {
 	if len(ids) == 0 {
 		return ""
 	}
 	best := ids[0]
-	bestV := parseVersion(best)
 	for _, id := range ids[1:] {
-		v := parseVersion(id)
-		if newerVersion(v, bestV) {
+		if newer(id, best) {
 			best = id
-			bestV = v
 		}
 	}
 	return best
+}
+
+// newer reports whether id a is strictly newer than id b within one lineage.
+// The numeric version decides first, read with the date run removed so a
+// snapshot date is never mistaken for a version number. The date only breaks
+// a tie between equal versions, and only when BOTH ids are dated: an undated
+// id carries no date to compare against, so neither side displaces the other
+// and the caller keeps the incumbent — an uncertain identity never
+// substitutes. This is a strict partial order (lexicographic on version, then
+// date), so a scan's winner is either its starting id or strictly newer than it.
+func newer(a, b string) bool {
+	va, vb := parseVersion(withoutDate(a)), parseVersion(withoutDate(b))
+	if newerVersion(va, vb) {
+		return true
+	}
+	if newerVersion(vb, va) {
+		return false
+	}
+	da, db := parseDate(a), parseDate(b)
+	return da.ok && db.ok && da.value > db.value
 }
 
 // version is a parsed model version. ok is false when the id carries no numeric
@@ -77,6 +98,40 @@ func newerVersion(a, b version) bool {
 		return false // both unversioned → keep first-listed
 	}
 	return compareParts(a.parts, b.parts) > 0
+}
+
+// dateVersion is a parsed calendar-date snapshot token (dateRun: YYYY[-MM[-DD]]).
+// ok is false when the id carries no date-shaped run.
+type dateVersion struct {
+	ok    bool
+	value int // YYYYMMDD; a missing month/day is treated as 0
+}
+
+// parseDate extracts the dateRun token from id into a comparable YYYYMMDD
+// integer. A missing token, or a non-numeric component (impossible given
+// dateRun's own character class but checked for defensiveness), yields ok=false.
+func parseDate(id string) dateVersion {
+	tok := dateRun.FindString(id)
+	if tok == "" {
+		return dateVersion{}
+	}
+	fields := strings.Split(tok, "-")
+	year, err := strconv.Atoi(fields[0])
+	if err != nil {
+		return dateVersion{}
+	}
+	month, day := 0, 0
+	if len(fields) > 1 {
+		if month, err = strconv.Atoi(fields[1]); err != nil {
+			return dateVersion{}
+		}
+	}
+	if len(fields) > 2 {
+		if day, err = strconv.Atoi(fields[2]); err != nil {
+			return dateVersion{}
+		}
+	}
+	return dateVersion{ok: true, value: year*10000 + month*100 + day}
 }
 
 // compareParts compares two numeric version component slices, treating a

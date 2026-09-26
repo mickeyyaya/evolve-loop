@@ -79,3 +79,28 @@ func TestNewestInLineage_UnversionedFallsBackAndNeverCrashes(t *testing.T) {
 		t.Errorf("single-element input should return that element, got %q", got)
 	}
 }
+
+// TestNewestInLineage_VersionDecidesBeforeDate: the version is read with the
+// date run removed and decides first; a date only orders equal versions that
+// are both dated, and an undated/dated tie keeps the first-listed id.
+func TestNewestInLineage_VersionDecidesBeforeDate(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		ids  []string
+		want string
+	}{
+		{[]string{"gpt-4-2024-04-09", "gpt-5"}, "gpt-5"},
+		{[]string{"gpt-4-2025-06-01", "gpt-5-2025-01-01"}, "gpt-5-2025-01-01"},
+		{[]string{"gpt-2024-04-09", "gpt-5"}, "gpt-5"},
+		{[]string{"gpt-4o-2024-11-20", "gpt-4o-2024-08-06"}, "gpt-4o-2024-11-20"},
+		{[]string{"gpt-4o-2024-08-06", "gpt-4o-2024-11-20"}, "gpt-4o-2024-11-20"},
+		{[]string{"gpt-4o", "gpt-4o-2024-08-06"}, "gpt-4o"},
+		{[]string{"gpt-4o-2024-08-06", "gpt-4o"}, "gpt-4o-2024-08-06"},
+		{[]string{"gpt-2024-04-09", "gpt-2024-06-01"}, "gpt-2024-06-01"},
+	}
+	for _, tc := range cases {
+		if got := NewestInLineage(tc.ids); got != tc.want {
+			t.Errorf("NewestInLineage(%q) = %q, want %q", tc.ids, got, tc.want)
+		}
+	}
+}

@@ -42,7 +42,9 @@ func (p FreshnessPolicy) Freshest(lineage []string) string {
 // qualitative tier decision (which line serves this tier); Go keeps 100% of
 // the numeric one (which version of that line is newest). A selection absent
 // from candidates is kept verbatim — promotion never invents or crosses
-// buckets. Pure: returns a new map, inputs are not mutated.
+// buckets, and a tie never displaces the selection (it is compared first, so
+// only a strictly newer member replaces it). Pure: returns a new map, inputs
+// are not mutated.
 func PromoteLatest(sel map[string]string, candidates []string, p FreshnessPolicy) map[string]string {
 	buckets := GroupByLineage(candidates)
 	out := make(map[string]string, len(sel))
@@ -52,9 +54,25 @@ func PromoteLatest(sel map[string]string, candidates []string, p FreshnessPolicy
 		if len(lineage) == 0 {
 			continue
 		}
-		if freshest := p.Freshest(lineage); freshest != "" {
+		if freshest := p.Freshest(incumbentFirst(lineage, model)); freshest != "" {
 			out[tier] = freshest
 		}
 	}
 	return out
+}
+
+// incumbentFirst returns lineage with sel moved to the front when present, so a
+// NewestInLineage tie keeps the classifier's pick instead of whichever
+// candidate the CLI happened to list first. Returns lineage itself when sel is
+// absent; never mutates it.
+func incumbentFirst(lineage []string, sel string) []string {
+	for i, id := range lineage {
+		if id == sel {
+			out := make([]string, 0, len(lineage))
+			out = append(out, sel)
+			out = append(out, lineage[:i]...)
+			return append(out, lineage[i+1:]...)
+		}
+	}
+	return lineage
 }

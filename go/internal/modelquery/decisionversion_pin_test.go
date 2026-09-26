@@ -12,12 +12,12 @@ import (
 // could silently reuse a pre-fix classification — decisionVersion exists to
 // invalidate those, but it is a hand-bumped constant (adversarial-review
 // finding 4: nothing enforced the bump).
-var decisionSurfaceFiles = []string{"classifier.go", "latest.go", "complete.go", "lineage.go"}
+var decisionSurfaceFiles = []string{"classifier.go", "latest.go", "complete.go", "lineage.go", "newestwins.go"}
 
 // decisionSurfacePin is the sha256 over the concatenated decision-surface
-// sources, pinned at decisionVersion "v1". Brittle BY DESIGN — this is a
+// sources, pinned at decisionVersion "v2". Brittle BY DESIGN — this is a
 // ratchet, not a unit test.
-const decisionSurfacePin = "814346a53c6dc25d4e21124322cab5471482cec5fa16a5b612c410229b01bff4"
+const decisionSurfacePin = "0be88f6798bc08006fa74276b080b09b014c8620a5a10eacb0d3fe72e7dff04f"
 
 // TestDecisionVersion_PinnedToAlgorithmSurface fails whenever a
 // decision-surface file changes, forcing the editor to answer ONE question:

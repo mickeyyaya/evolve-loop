@@ -14,7 +14,7 @@ import (
 // that is what makes the reuse gate correct rather than merely fast: without
 // it, an algorithm fix would be silently reused away for every CLI whose id
 // list happens to be unchanged.
-const decisionVersion = "v1"
+const decisionVersion = "v2"
 
 // FingerprintInput is everything the classify+promote decision depends on for
 // one CLI. Two equal fingerprints mean the decision inputs are identical and

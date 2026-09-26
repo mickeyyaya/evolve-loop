@@ -94,3 +94,36 @@ func TestPromoteLatest_UnknownSelectionKept(t *testing.T) {
 		t.Errorf("deep = %q, want the original selection kept", got["deep"])
 	}
 }
+
+// TestPromoteLatest_MixedDatedBucketsNeverDowngrade: stripping the date run
+// widens a lineage bucket to hold dated and undated ids of several versions.
+// A date must never outrank a version, and a tie with no date on one side
+// must keep the selection, in either candidate listing order.
+func TestPromoteLatest_MixedDatedBucketsNeverDowngrade(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name, sel  string
+		candidates []string
+		want       string
+	}{
+		{"higher undated version kept over older dated", "gpt-5", []string{"gpt-4-2024-04-09", "gpt-5"}, "gpt-5"},
+		{"higher dated version kept over later date", "gpt-5-2025-01-01", []string{"gpt-4-2025-06-01", "gpt-5-2025-01-01"}, "gpt-5-2025-01-01"},
+		{"date alone is not a version", "gpt-5", []string{"gpt-2024-04-09", "gpt-5"}, "gpt-5"},
+		{"undated selection kept on a same-version tie", "gpt-4o", []string{"gpt-4o-2024-08-06", "gpt-4o"}, "gpt-4o"},
+		{"dated selection kept on a same-version tie", "gpt-4o-2024-08-06", []string{"gpt-4o", "gpt-4o-2024-08-06"}, "gpt-4o-2024-08-06"},
+		{"undated selection kept even with two dated siblings", "gpt-4o", []string{"gpt-4o-2024-08-06", "gpt-4o-2024-11-20", "gpt-4o"}, "gpt-4o"},
+		{"dated selection promotes past an undated tie", "gpt-4o-2024-08-06", []string{"gpt-4o", "gpt-4o-2024-11-20", "gpt-4o-2024-08-06"}, "gpt-4o-2024-11-20"},
+		{"higher version still promotes a dated selection", "gpt-4-2024-04-09", []string{"gpt-4-2024-04-09", "gpt-5"}, "gpt-5"},
+		{"equal-version undated tie keeps the selection", "opus-4.0", []string{"opus-4", "opus-4.0"}, "opus-4.0"},
+	}
+	for _, tc := range cases {
+		candidates := append([]string(nil), tc.candidates...)
+		got := PromoteLatest(map[string]string{"deep": tc.sel}, candidates, FreshnessPolicy{})
+		if got["deep"] != tc.want {
+			t.Errorf("%s: PromoteLatest(deep=%q, %q) = %q, want %q", tc.name, tc.sel, tc.candidates, got["deep"], tc.want)
+		}
+		if !reflect.DeepEqual(candidates, tc.candidates) {
+			t.Errorf("%s: PromoteLatest reordered its candidates: %q", tc.name, candidates)
+		}
+	}
+}

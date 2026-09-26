@@ -42,6 +42,8 @@ func TestLineageKey_SeparatesCapabilityClasses(t *testing.T) {
 		{"Gemini 3.5 Flash (Medium)", "Gemini 3.1 Pro (High)"}, // Flash must not replace Pro
 		{"gpt-5.5", "gpt-5.5-mini"},                            // fast tier can't jump to the deep model
 		{"llama3.1:8b", "llama3.3:latest"},                     // :8b and :latest are different lines
+		{"llama3.1:8b", "llama3.1:70b"},                        // size suffix must survive the date-run strip
+		{"qwen2.5-coder:32b", "qwen2.5-coder:70b"},             // size suffix must survive the date-run strip
 	}
 	for _, p := range mustDiffer {
 		if LineageKey(p[0]) == LineageKey(p[1]) {
@@ -52,31 +54,16 @@ func TestLineageKey_SeparatesCapabilityClasses(t *testing.T) {
 		{"Gemini 3.1 Pro (High)", "Gemini 3.5 Pro (High)"},
 		{"opus", "opus-4.6"},
 		{"llama3.1:8b", "llama3.3:8b"},
+		// Migrated from the removed TestLineageKey_DatedSnapshotsStayDistinct_KnownLimitation
+		// per its own migration note: date-stamped snapshots of the same line now
+		// normalize to the same key so PromoteLatest can act on them
+		// (lineage-datestamp-normalization).
+		{"gpt-4o-2024-08-06", "gpt-4o-2024-11-20"},
 	}
 	for _, p := range mustMatch {
 		if LineageKey(p[0]) != LineageKey(p[1]) {
 			t.Errorf("LineageKey(%q)=%q != LineageKey(%q)=%q — version siblings split", p[0], LineageKey(p[0]), p[1], LineageKey(p[1]))
 		}
-	}
-}
-
-// TestLineageKey_DatedSnapshotsStayDistinct_KnownLimitation pins a DELIBERATE
-// conservative behavior (adversarial-review finding 3): date-stamped snapshot
-// ids of the same line ("gpt-4o-2024-08-06" vs "gpt-4o-2024-11-20") keep
-// DIFFERENT keys because only the first dotted numeric run is stripped, so
-// PromoteLatest is a no-op for them — the classifier's pick is kept, never
-// substituted. That is the fail-safe side of the design (an uncertain
-// identity must never substitute); the cost is no automatic promotion across
-// dated snapshots. None of the four live CLIs report dated ids today; the
-// follow-up is queued as lineage-datestamp-normalization. If this test
-// starts failing because normalization was implemented, move these cases to
-// the mustMatch table with collision review for size/tag suffixes
-// (":8b" vs ":70b" contain digits and must NOT be stripped).
-func TestLineageKey_DatedSnapshotsStayDistinct_KnownLimitation(t *testing.T) {
-	t.Parallel()
-	a, b := LineageKey("gpt-4o-2024-08-06"), LineageKey("gpt-4o-2024-11-20")
-	if a == b {
-		t.Fatalf("dated snapshots now share key %q — promotion across dates is armed; review the collision risk this pin documents before accepting", a)
 	}
 }
 
