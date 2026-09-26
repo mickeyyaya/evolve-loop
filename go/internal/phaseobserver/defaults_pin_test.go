@@ -1,14 +1,5 @@
 package phaseobserver_test
 
-// defaults_pin_test.go — ADR-0103 unit 12 step 0: the two owners of the
-// observer's default thresholds are the host's zero-value defaults (Run) and
-// policy's compiled ObserverConfig() (the manual subcommand dereferences the
-// latter into Config). They agree on PollS 5 / StallS 600; NudgeS is the NAMED
-// divergence (policy 300 — the subcommand nudges because phasecmd feeds the
-// policy value; host 0 — a bare Run never nudges); EOFGraceS 10 is host-only
-// (policy leaves it 0). An external package so the pin can import policy
-// without a cycle. Kills M19 (a host default drifting from policy's).
-
 import (
 	"encoding/json"
 	"os"
@@ -34,8 +25,7 @@ func TestWithDefaults_MatchPolicyCompiledDefaults(t *testing.T) {
 	calls := 0
 	rc := phaseobserver.Run(phaseobserver.Config{
 		Workspace: ws, Cycle: 1, Phase: "build", Agent: "builder",
-		// Every tunable zero → the host's defaults apply; the clock jumps 400 s
-		// (past policy's NudgeS 300) so a defaulted-on nudge would show.
+		// The clock jumps 400 s, past policy's NudgeS 300, so a defaulted-on nudge would show.
 		Now: func() time.Time {
 			mu.Lock()
 			defer mu.Unlock()

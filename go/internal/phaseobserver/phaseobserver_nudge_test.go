@@ -12,10 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/inbox"
 )
 
-// phaseobserver_nudge_test.go — the soft-stall nudge hook: before the hard
-// SIGTERM, the observer appends a single nudge envelope to the agent inbox so
-// a draining *-tmux driver can prompt the agent to continue or finalize.
-
 func TestRun_SoftStallNudge_AppendsOnceBelowKillThreshold(t *testing.T) {
 	t.Parallel()
 	ws := tempWorkspace(t)
@@ -55,8 +51,6 @@ func TestRun_SoftStallNudge_AppendsOnceBelowKillThreshold(t *testing.T) {
 		t.Errorf("kill must NOT fire below StallS; got %d", killCalls)
 	}
 
-	// Exactly one nudge envelope, regardless of how many poll ticks crossed
-	// the threshold (nudged flag dedupes).
 	envs, err := inbox.NewCursor(ws, "builder").Drain()
 	if err != nil {
 		t.Fatalf("drain: %v", err)

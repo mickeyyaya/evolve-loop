@@ -1,23 +1,5 @@
 package phaseobserver
 
-// stallpolicy_test.go — ADR-0044 C4 (Slice 4) RED tests: the observer's
-// StallPolicy Strategy seam.
-//
-// cycle-262 D5: the observer DETECTS stalls (stuck_no_output /
-// stuck_no_progress INCIDENT events) but its only action is an inline
-// "Enforce → SIGTERM" branch — detection and action are welded together, so
-// recovery policy can't evolve without editing the detector (SRP violation).
-// C4 extracts the action decision into recovery.StallPolicy injected via
-// Config: nil policy ⇒ byte-identical legacy behavior (Enforce branch,
-// unenriched envelope); a policy maps each typed StallEvent →
-// extend | kill_retry | escalate, the decision is recorded INSIDE the
-// INCIDENT envelope (action + action_reason — every recovery decision is
-// justified, ADR-0044), and only kill_retry touches the process group.
-//
-// The policy is wired by the C3 composition slice; this slice ships the seam
-// default-nil (behavior-neutral), pinned by the legacy tests above plus
-// TestRun_StallPolicyNil_EnvelopeUnenriched below.
-
 import (
 	"os"
 	"path/filepath"
@@ -30,8 +12,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
 )
 
-// scriptedStallPolicy returns a fixed action for every stall incident and
-// records the events it was consulted with.
+// scriptedStallPolicy returns a fixed action for every stall and records the events it was asked about.
 type scriptedStallPolicy struct {
 	mu     sync.Mutex
 	action recovery.StallAction
@@ -46,9 +27,7 @@ func (p *scriptedStallPolicy) Decide(ev recovery.StallEvent) (recovery.StallActi
 	return p.action, p.reason
 }
 
-// stallHarness runs the observer against a stalled (empty) stdout with a
-// frozen-then-jumped clock so the stall rule fires deterministically. It
-// returns the kill-call count and the raw events file.
+// stallHarness runs the observer over an empty stdout with a clock that jumps past StallS; it returns kills and events.
 func stallHarness(t *testing.T, enforce bool, policy *scriptedStallPolicy) (int, string) {
 	t.Helper()
 	ws := tempWorkspace(t)
@@ -95,13 +74,10 @@ func stallHarness(t *testing.T, enforce bool, policy *scriptedStallPolicy) (int,
 	return killCalls, string(events)
 }
 
-// TestRun_StallPolicyExtend_NoKill: a policy verdict of extend outranks the
-// legacy Enforce kill — the agent keeps running, and the decision is
-// justified inside the INCIDENT envelope.
 func TestRun_StallPolicyExtend_NoKill(t *testing.T) {
 	t.Parallel()
 	pol := &scriptedStallPolicy{action: recovery.StallExtend, reason: "deep-thinking phase; extend"}
-	kills, events := stallHarness(t, true /* Enforce — policy must override */, pol)
+	kills, events := stallHarness(t, true /* enforce */, pol)
 	if kills != 0 {
 		t.Errorf("policy=extend must suppress the kill even with Enforce=true; got %d kill(s)", kills)
 	}
@@ -121,13 +97,10 @@ func TestRun_StallPolicyExtend_NoKill(t *testing.T) {
 	}
 }
 
-// TestRun_StallPolicyKillRetry_SendsSIGTERM: kill_retry kills the process
-// group on the policy's authority — Enforce=false must not veto it (the
-// policy IS the action decision once injected).
 func TestRun_StallPolicyKillRetry_SendsSIGTERM(t *testing.T) {
 	t.Parallel()
 	pol := &scriptedStallPolicy{action: recovery.StallKillRetry, reason: "dead pane; fresh dispatch"}
-	kills, events := stallHarness(t, false /* no Enforce — policy drives */, pol)
+	kills, events := stallHarness(t, false /* enforce */, pol)
 	if kills == 0 {
 		t.Error("policy=kill_retry must SIGTERM the pgid even without Enforce")
 	}
@@ -136,7 +109,6 @@ func TestRun_StallPolicyKillRetry_SendsSIGTERM(t *testing.T) {
 	}
 }
 
-// TestRun_StallPolicyEscalate_NoKill: escalate surfaces without acting.
 func TestRun_StallPolicyEscalate_NoKill(t *testing.T) {
 	t.Parallel()
 	pol := &scriptedStallPolicy{action: recovery.StallEscalate, reason: "integrity-adjacent; operator decides"}
@@ -149,10 +121,6 @@ func TestRun_StallPolicyEscalate_NoKill(t *testing.T) {
 	}
 }
 
-// TestRun_StallPolicyNil_EnvelopeUnenriched pins byte-identical legacy
-// behavior for the default-nil seam: the Enforce branch still kills (covered
-// by TestRun_StallDetectionFires) AND the INCIDENT envelope carries NO
-// action/action_reason keys — the enrichment is policy-only.
 func TestRun_StallPolicyNil_EnvelopeUnenriched(t *testing.T) {
 	t.Parallel()
 	kills, events := stallHarness(t, true, nil)

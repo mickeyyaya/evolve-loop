@@ -1,9 +1,3 @@
-// process_dead_test.go — R3.4: the observer's liveness signal must include
-// the agent PROCESS, not just pane/log echo (inbox codex-update-menu,
-// cycles 274/277: a wedged shell read as alive for 25+ min). A dead process
-// group fires a "process_dead" INCIDENT within one poll tick — once, not
-// per-tick — and the stall policy resolves it to kill_retry regardless of
-// idle budgets.
 package phaseobserver
 
 import (
@@ -25,8 +19,7 @@ func runWithProcessAlive(t *testing.T, alive bool) (events string, killCalls int
 	rc := Run(Config{
 		Workspace: ws, SubagentPGID: 99999, Cycle: 1,
 		Phase: "build", Agent: "builder",
-		// StallS is huge so no idle stall can fire — any incident in this
-		// test comes from the process probe alone.
+		// A huge StallS leaves the process probe as the only rule that can fire.
 		PollS: 1, StallS: 99999, EOFGraceS: 9999,
 		StallPolicy:  recovery.NewChainStallPolicy(6),
 		ProcessAlive: func(pgid int) bool { return alive },
@@ -58,7 +51,7 @@ func TestRun_DeadProcessFiresOnceAndKills(t *testing.T) {
 	if n == 0 {
 		t.Fatalf("RED (cycle-274): dead process group produced no process_dead INCIDENT — pane/log echo is the only liveness signal today:\n%s", events)
 	}
-	if n > 2 { // kind appears in the envelope twice at most (type + payload echo); >2 means re-emission per tick
+	if n > 2 { // one envelope names the kind at most twice (type and payload)
 		t.Errorf("process_dead emitted %d times — must fire ONCE, not per tick:\n%s", n, events)
 	}
 	if !strings.Contains(events, "kill_retry") {
