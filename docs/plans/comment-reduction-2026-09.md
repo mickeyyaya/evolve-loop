@@ -111,6 +111,9 @@ Go files is each batch's count of changed Go files. The landing proof's verified
 | 46 | `internal/core`, file group 3 of 13 | 40 | 2,675 → 1,943 | — | on the comment PR |
 | 47 | `cmd/evolve`, file group 3 of 8 | 42 | 829 → 327 | — | on the comment PR |
 | 48 | `internal/bridge`, file group 2 of 7 | 33 | 1,085 → 376 | — | on the comment PR; 7 files the P3 train edits deferred to group 2b |
+| 49 | `internal/core`, file group 4 of 13 | 40 | 1,490 → 230 | — | on the comment PR |
+| 50 | `cmd/evolve`, file group 4 of 8 | 42 | 2,273 → 1,116 | — | on the comment PR |
+| 51 | `internal/bridge`, file group 3 of 7 | 38 | 1,176 → 367 | — | on the comment PR; 2 files the P3 train edits deferred to group 2b |
 
 The three largest packages are split into file groups of about 40 files, taken in name order. Each group is one batch, and the package's design page fills in group by group. Narrative is not measured per group.
 

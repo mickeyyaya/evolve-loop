@@ -22,13 +22,15 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
 )
 
+// wireOrchestratorDepsFn is the test seam for runLoop: a stub can substitute
+// a fake orchestrator and in-memory storage/ledger so the pipeline is
+// exercised without spawning real LLM subagents.
 var wireOrchestratorDepsFn = wireOrchestratorDeps
 
 // disableWorkspaceGuardForTest is a test seam: package-level test harnesses
-// that pre-seed cycle workspaces (M4/M5 dispatch validators, etc.) set this
-// to true so the orchestrator does not archive the pre-seeded files before
-// phases run. Production code always leaves this false. Replaces the retired
-// EVOLVE_DISABLE_WORKSPACE_GUARD env signal (cycle-10 flag-reduction).
+// that pre-seed cycle workspaces set this to true so the orchestrator does
+// not archive the pre-seeded files before phases run. Production code
+// always leaves this false.
 var disableWorkspaceGuardForTest bool
 
 // dispatchPolicy enumerates the dispatch verification policy values.
@@ -43,10 +45,9 @@ const (
 const defaultCircuitBreakerThreshold = 5
 
 // orphanGCTimeout bounds the crash-recovery session sweep so a wedged tmux
-// socket (corrupted server, not the common "no server" case) can never hang the
-// loop — the GC must stay robust even when the surrounding pipeline is broken.
-// Hoisted to sessionreaper.DefaultReapTimeout so the boot preflight and soak
-// checks share the same bound (cycle-769).
+// socket (corrupted server, not the common "no server" case) can never hang
+// the loop. Hoisted to sessionreaper.DefaultReapTimeout so the boot preflight
+// and soak checks share the same bound.
 const orphanGCTimeout = sessionreaper.DefaultReapTimeout
 
 // resolveDispatchPolicy maps a policy string (from DispatchConfig.Policy) to
@@ -143,8 +144,8 @@ type loopCycleRunner interface {
 	RunCycle(context.Context, core.CycleRequest) (core.CycleResult, error)
 	RunCycleFromPhase(context.Context, core.CycleRequest, *core.ResumePoint) (core.CycleResult, error)
 	// SignalSummary is the runner's per-cycle view of the Signal Center, read
-	// by the batch report (ADR-0101 S4a) — through this seam, so a scripted
-	// runner is reported exactly like the real orchestrator.
+	// by the batch report through this seam, so a scripted runner is
+	// reported exactly like the real orchestrator.
 	SignalSummary() signalcenter.Summary
 }
 
@@ -180,15 +181,12 @@ func readLastCycleNumber(ctx context.Context, st core.Storage) (int, error) {
 // readBatchWindowFloor returns the cycle number the blocker breaker's batch
 // window starts above: max(LastCycleNumber, LastAllocatedCycleNumber).
 //
-// Two counters with two meanings. LastCycleNumber tracks cycles COMPLETED —
-// an aborted cycle exits through abnormalEpilogue, which writes its failure
-// digest but returns before finalizeCycle, so the counter never advances past
-// it. LastAllocatedCycleNumber tracks cycles DISPATCHED: it advances at mint
-// time (alloc.go — "a crashed run BURNS its number"). A time boundary belongs
-// on the dispatch counter, otherwise the digests of aborted cycles stay inside
-// `> floor` on every relaunch and Rule B re-trips before any cycle runs (the
-// cycle-1335 triple re-halt: lastCycleNumber=1325 while cycles 1326/1328/1329
-// had aborted with one shared fingerprint).
+// LastCycleNumber tracks cycles completed — an aborted cycle exits through
+// abnormalEpilogue, which writes its failure digest but returns before
+// finalizeCycle, so the counter never advances past it. LastAllocatedCycleNumber
+// tracks cycles dispatched and advances at mint time, so anchoring the window
+// on it too keeps an aborted cycle's digest from re-tripping the breaker on
+// every relaunch.
 //
 // max, not a bare swap: allocateCycle falls back to LastCycleNumber+1 when
 // storage is not a StateUpdater, so a legacy state can carry a zero lease —
@@ -302,15 +300,13 @@ func cycleOwnerDead(cs core.CycleState, projectRoot string, now time.Time) (owne
 }
 
 // cycleWorkspace returns .evolve/runs/cycle-<N>/ for verify/classify.
-// Path matches the bash dispatcher's RUNS_DIR + cycle-state.json
-// WorkspacePath construction.
 func cycleWorkspace(projectRoot string, cycle int) string {
 	return filepath.Join(projectRoot, ".evolve", "runs", fmt.Sprintf("cycle-%d", cycle))
 }
 
 // reapCycleSessions kills any tmux sessions the cycle's launches registered
-// in its per-run registry (CB.5: by registry, never glob — see
-// swarm.ReapRunSessions). Fired after EVERY cycle attempt: a clean cycle's
+// in its per-run registry (never by glob — see swarm.ReapRunSessions). Fired
+// after EVERY cycle attempt: a clean cycle's
 // sessions were already killed by per-launch cleanup (re-kill is a no-op);
 // an aborted cycle's leaked sessions are exactly what the looppreflight
 // stale-session check used to find a batch too late.
@@ -347,7 +343,7 @@ func gcOrphanSessions(label string, stderr io.Writer) {
 		fmt.Fprintf(stderr, "[loop] orphan-session GC (%s): killed=%d skipped(live=%d foreign=%d no-pid=%d) errors=%d\n",
 			label, len(rep.Killed), rep.SkippedLive, rep.SkippedForeign, rep.SkippedUnparseable, len(rep.Errors))
 	}
-	// F6: also reap whole per-run tmux sockets (evolve-bridge-p<pid>) left by a
+	// Also reap whole per-run tmux sockets (evolve-bridge-p<pid>) left by a
 	// crashed loop — a different socket than ours, which the per-session sweep
 	// above (it lists only THIS run's socket) can't see. Liveness-scoped: a live
 	// loop's socket is never killed.
@@ -360,16 +356,9 @@ func gcOrphanSessions(label string, stderr io.Writer) {
 
 // updateBreaker is the pure step function of the same-cycle circuit
 // breaker. Returns the new (prev, streak, tripped) tuple given the
-// current ran_cycle.
-//
-// Algorithm (port of archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh:1110-1128):
-//
-//	if ranCycle == prev: streak++
-//	else: prev = ranCycle, streak = 1
-//	tripped = streak >= threshold
-//
-// Extracted from runLoop so the algorithm is unit-testable without
-// gaming the orchestrator's LastCycleNumber bookkeeping.
+// current ran_cycle. Extracted from runLoop so the algorithm is
+// unit-testable without gaming the orchestrator's LastCycleNumber
+// bookkeeping.
 func updateBreaker(prev, streak, ranCycle, threshold int) (newPrev, newStreak int, tripped bool) {
 	if ranCycle == prev {
 		streak++
@@ -392,9 +381,7 @@ type quotaPause struct {
 
 // detectQuotaPause reads <evolveDir>/cycle-state.json and returns a
 // populated quotaPause when checkpoint.enabled==true AND
-// checkpoint.reason=="quota-likely". The bash dispatcher's analog at
-// lines 907-930 uses jq; the Go side uses map[string]any for the same
-// schema-flexible read.
+// checkpoint.reason=="quota-likely".
 //
 // Returns (zero, false) on any failure path (missing file, malformed
 // JSON, wrong reason, or checkpoint disabled) — quota-pause is an
@@ -422,7 +409,7 @@ func detectQuotaPause(evolveDir string) (quotaPause, bool) {
 		return quotaPause{}, false
 	}
 	qp := quotaPause{
-		MaxAttempts: 3, // default per bash dispatcher (autoResumeMaxAttempts // 3)
+		MaxAttempts: 3, // default when autoResumeMaxAttempts is absent
 	}
 	// cycle_id has float64 dynamic type from JSON. Fall back to
 	// blob["cycle"] (top-level) if cycle_id absent.
@@ -462,24 +449,6 @@ func dirExists(path string) bool {
 	}
 	return info.IsDir()
 }
-
-// parseLoopArgs parses `evolve loop` arguments per the v11.5.0 M1 CLI
-// surface. Returns the resolved config + rc (0 = success, 10 = bad
-// args, exits printed to stderr).
-//
-// Argument precedence:
-//
-//	--goal-hash takes priority over --goal-text (--goal-text computes hash)
-//	--goal-text takes priority over positional [GOAL...]
-//	--cycles / --max-cycles take priority over positional [CYCLES]
-//	--strategy takes priority over positional [STRATEGY]
-//
-// Positional parsing matches the bash dispatcher heuristic at
-// archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh:325-349:
-//
-//	first numeric token (if any) → CYCLES
-//	next token if matching strategy whitelist → STRATEGY
-//	remaining tokens (joined by space) → GOAL
 
 // emitQuotaPause keeps fresh and resumed batches on the same resumable CLI
 // contract, including the reset-time hint and durable checkpoint location.

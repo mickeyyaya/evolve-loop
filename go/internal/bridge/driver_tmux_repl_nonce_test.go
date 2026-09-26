@@ -1,8 +1,3 @@
-// driver_tmux_repl_nonce_test.go — ADR-0049 N15: ephemeral tmux session names
-// must be unique even when two are minted at the SAME wall-clock instant.
-// Concurrent fleet cycles (and same-phase retries within a cycle) can dispatch
-// in the same second; a second-granularity timestamp alone collides, and tmux
-// would then have two cycles fighting over one session.
 package bridge
 
 import (
@@ -11,9 +6,6 @@ import (
 	"time"
 )
 
-// Two ephemeral sessions minted under a FROZEN clock, same run/cycle/agent,
-// must get distinct names. A timestamp (even UnixNano under a fixed clock)
-// cannot guarantee this; a per-process nonce can.
 func TestResolveSessionUniqueUnderSameClock(t *testing.T) {
 	frozen := time.Unix(1_700_000_000, 0)
 	deps := Deps{Now: func() time.Time { return frozen }}.withDefaults()
@@ -26,9 +18,6 @@ func TestResolveSessionUniqueUnderSameClock(t *testing.T) {
 	}
 }
 
-// The nonce must survive truncation: even for the longest realistic agent +
-// high cycle/pid, the unique tail must not be chopped by truncate64. Mint two
-// long-name sessions under a frozen clock and require they still differ AND fit.
 func TestResolveSessionNonceSurvivesTruncation(t *testing.T) {
 	frozen := time.Unix(1_700_000_000, 0)
 	deps := Deps{Now: func() time.Time { return frozen }}.withDefaults()
@@ -44,7 +33,6 @@ func TestResolveSessionNonceSurvivesTruncation(t *testing.T) {
 	}
 }
 
-// The run-scope prefix contract (CB.5) must still hold with the nonce in place.
 func TestResolveSessionNoncePreservesRunScopePrefix(t *testing.T) {
 	deps := Deps{Now: time.Now}.withDefaults()
 	cfg := &Config{Cycle: 12, Agent: "build", RunID: "01ARZ3NDEKTSV4RRFFQ69G5FAV"}

@@ -22,9 +22,9 @@ const (
 // so this function has no hidden polling or loop-control side effects.
 func (w replWaiter) reviewCheckpoint(state *replWaitState, elapsed int, curPane string, renderWedged bool) checkpointReviewResult {
 	state.result.recordTokens(curPane)
-	// CB.6: evidence survives the session's death. When the server is killed
-	// mid-phase every later capture is empty, so retain the last non-empty pane
-	// as the freshest real evidence.
+	// Evidence survives the session's death: when the server is killed
+	// mid-phase every later capture is empty, so retain the last non-empty
+	// pane as the freshest real evidence.
 	if strings.TrimSpace(curPane) != "" {
 		state.result.lastGoodPane = curPane
 	}
@@ -50,8 +50,6 @@ func (w replWaiter) reviewCheckpoint(state *replWaitState, elapsed int, curPane 
 		fmt.Fprintf(w.deps.Stderr, "%s EXHAUSTION-SUPPRESSED: pane matched wall vocabulary but a live probe (cheapest tier) answered — treating as content-induced; a tier-scoped wall would surface via artifact-timeout fallback instead\n", w.prefix)
 	}
 
-	// Changed compares consecutive checkpoint observations. A blank pane from a
-	// live session is a render wedge and therefore busy-stagnant, never idle.
 	progressed := state.livenessCenter.Changed(w.launch.session)
 	if renderWedged && livenessState == panestream.LivenessIdle {
 		livenessState = panestream.LivenessBusyButStagnant
@@ -73,7 +71,7 @@ func (w replWaiter) reviewCheckpoint(state *replWaitState, elapsed int, curPane 
 	}
 
 	// The persistence gate is called exactly once per checkpoint. At enforce,
-	// a crossed fatal gate preempts the reviewer and records one durable C2
+	// a crossed fatal gate preempts the reviewer and records one durable
 	// outcome; every other observation falls through to the reviewer.
 	verdict, preempted := state.checkpointFatal.verdict(
 		state.fatalDetector,

@@ -1,31 +1,5 @@
 package main
 
-// cmd_loop_chain_boundaryrefresh_selflease_test.go — RED-then-GREEN
-// regression guard for cycle-1364 D1/D2 (defect-ledger ids
-// d0dfe5b123f4142f7765c19a4e03b3f4d / d73c31a6ef1bb00dac049419a1207f939,
-// inherited through cycle-1368 into this continuation).
-//
-// D1: defaultChainBoundaryFleetLaneActive (cmd_loop_chain.go) had no
-// self-exclusion, so the CALLING lane's own just-heartbeated run dir (a
-// fresh .lease, TTL runlease.DefaultTTL=10m, written by the same process
-// that is now asking "is anyone ELSE live?") read back as a live sibling.
-// maybeRefreshChainBoundary therefore refused the rebuild on every single
-// boundary, silently disabling the auto-refresh-binary-at-boundary feature
-// this fleet_scope item exists to provide.
-//
-// D2: cmd_loop_chain_boundaryrefresh_fleetlane_test.go's own regression
-// guard (TestMaybeRefreshChainBoundary_NoFleetLaneActiveStillRefreshes)
-// deliberately leaves runs/ empty and plants no lease at all — structurally
-// incapable of exercising the "my OWN lease is still fresh" path D1 lives
-// in. That file's header says "Do NOT modify this file", so the missing
-// case is covered here instead, in a new file, per this cycle's build-report
-// disposition of D2.
-//
-// This file plants the CALLING process's own PID (os.Getpid()) into a fresh
-// lease under a run dir and asserts the boundary heal still proceeds — the
-// exact scenario D1's evidence quoted ("active=true, live=3 including this
-// lane's own .evolve/runs/cycle-1364").
-
 import (
 	"bytes"
 	"os"
@@ -86,8 +60,8 @@ func TestDefaultChainBoundaryFleetLaneActive_OwnLeasePlusRealSiblingStillDetecte
 	}
 	brflWriteRunMarker(t, siblingDir)
 	// A different pid — never our own os.Getpid() — so it must still count.
-	// A sibling is a different LIVE process (since 2026-09-15 liveness is the
-	// lease owner's, not the heartbeat's): hold a real child for the duration.
+	// A sibling is a different live process (liveness is the lease owner's,
+	// not the heartbeat's), so hold a real child for the duration.
 	sibling := exec.Command("sleep", "30")
 	if err := sibling.Start(); err != nil {
 		t.Fatalf("spawn a live sibling: %v", err)
@@ -108,9 +82,9 @@ func TestDefaultChainBoundaryFleetLaneActive_OwnLeasePlusRealSiblingStillDetecte
 }
 
 // TestMaybeRefreshChainBoundary_OwnFreshLeaseStillRefreshes is the end-to-end
-// regression guard through the actual call site: with ONLY this process's own
-// fresh lease present (the exact D1 evidence shape — no other lane running),
-// maybeRefreshChainBoundary must proceed to rebuild, not refuse.
+// regression guard through the actual call site: with only this process's
+// own fresh lease present (no other lane running), maybeRefreshChainBoundary
+// must proceed to rebuild, not refuse.
 func TestMaybeRefreshChainBoundary_OwnFreshLeaseStillRefreshes(t *testing.T) {
 	root, evolveDir, _ := brhProject(t, "STALE_PIN", "REBUILT-BINARY-BYTES")
 

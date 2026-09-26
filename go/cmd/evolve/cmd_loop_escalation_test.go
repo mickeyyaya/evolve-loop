@@ -11,10 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 )
 
-// ADR-0072 S6: the halt writes a diagnostic dossier AND auto-files a P0
-// pipeline-repair inbox item — so the QUEUE is injected (never_stop honored)
-// even though the loop halts. On resume the pipeline fix is worked first.
-
 func TestWritePipelineEscalation_WritesDossierAndInboxItem(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
@@ -57,9 +53,9 @@ func TestWritePipelineEscalation_WritesDossierAndInboxItem(t *testing.T) {
 	if item["kind"] != inboxbatch.KindPipelineRepair {
 		t.Errorf("inbox kind = %v, want %s", item["kind"], inboxbatch.KindPipelineRepair)
 	}
-	// Research F25: the halt record carries its producer, so the ADR-0074
-	// classifier's route:"lane" clamp keeps it console-owned however it is
-	// later annotated.
+	// The halt record carries its producer, so the classifier's route:"lane"
+	// clamp keeps it console-owned however it is later annotated.
+	// See ADR-0074.
 	if item["injected_by"] != escalationInjectedBy {
 		t.Errorf("inbox injected_by = %v, want %q", item["injected_by"], escalationInjectedBy)
 	}
@@ -147,7 +143,7 @@ func TestWritePipelineEscalation_VerdictIncoherenceKeepsArtifactGuidance(t *test
 	}
 }
 
-// TestWritePipelineEscalation_UnknownCategoryRetainsEvidenceOnly is AC3: a
+// TestWritePipelineEscalation_UnknownCategoryRetainsEvidenceOnly: a
 // system-failure category the escalation renderer has never seen (neither
 // "pipeline-blocker" nor "verdict-incoherence") must still surface the
 // signal's own evidence verbatim, and must never invent the
@@ -201,17 +197,10 @@ func TestWritePipelineEscalation_UnknownCategoryRetainsEvidenceOnly(t *testing.T
 	}
 }
 
-// TestWritePipelineEscalation_IdentityIncludesCycleNumber pins the fix for the
-// todo-halt-autofiler-mints-unique-ids carryover (state.json): the auto-filed
-// inbox item's id must be minted as pipeline-defect-<category>-cycle<N>, never
-// pipeline-defect-<category> alone. A category-only id is not a record
-// identity — cycle 1550 dispatched into scope committed to a scope snapshot of
-// the bare category id, but the on-disk record it once pointed at had already
-// been overwritten by a LATER halt sharing that category, so scout's live scan
-// found no matching content and the lane ran 8 phases for an empty diff (the
-// same inst-L1543c empty-scope class that FAILed audit at cycle 1548, defect
-// H1). Stamping the cycle into the id makes every halt's record identity
-// unique, so a scope snapshot can never resolve to a different halt's content.
+// TestWritePipelineEscalation_IdentityIncludesCycleNumber: the auto-filed
+// inbox item's id must be minted as pipeline-defect-<category>-cycle<N>,
+// never pipeline-defect-<category> alone — a category-only id is not a
+// unique record identity.
 func TestWritePipelineEscalation_IdentityIncludesCycleNumber(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
@@ -241,14 +230,10 @@ func TestWritePipelineEscalation_IdentityIncludesCycleNumber(t *testing.T) {
 	}
 }
 
-// TestWritePipelineEscalation_DistinctCyclesNeverCollideOnDisk is the negative
-// case for the same defect: two ADR-0072 halts sharing a category (the common
-// case — "pipeline-blocker" alone has 17 on-disk records today per
-// state.json) must NOT collapse onto one inbox file. Under the current
-// category-only filename, the second halt's atomicwrite.JSON silently
-// destroys the first halt's evidence and a future lane scoped to the id
-// resolves to whichever halt happened to write last — never the one it was
-// actually scoped to. Both cycles' records must survive side by side.
+// TestWritePipelineEscalation_DistinctCyclesNeverCollideOnDisk is the
+// negative case for the same defect: two halts sharing a category must not
+// collapse onto one inbox file — both cycles' records must survive side by
+// side.
 func TestWritePipelineEscalation_DistinctCyclesNeverCollideOnDisk(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")

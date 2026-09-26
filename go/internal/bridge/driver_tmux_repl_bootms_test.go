@@ -1,11 +1,5 @@
 package bridge
 
-// driver_tmux_repl_bootms_test.go — A0 cold-boot instrumentation (ADR-0043).
-// Proves the full chain driver→Deps.OnBoot→BridgeResponse.BootMS: the tmux-REPL
-// driver reports the cold-boot wait (the 2 fixed readiness sleeps + the marker
-// poll), the Engine captures it onto the response, and a launch that never
-// completes a cold boot reports BootMS=0.
-
 import (
 	"context"
 	"os"
@@ -52,8 +46,6 @@ func TestEngineLaunch_BootMS_CapturedOnColdBoot(t *testing.T) {
 	if resp.BootMS != wantBoot {
 		t.Errorf("BridgeResponse.BootMS = %d, want %d (2000 fixed + 1×1000 poll)", resp.BootMS, wantBoot)
 	}
-	// The Engine chains the pre-wired OnBoot, so the caller's callback fires once
-	// with the same value (single cold boot per Launch).
 	if len(onBoot) != 1 || onBoot[0] != wantBoot {
 		t.Errorf("OnBoot calls = %v, want exactly [%d]", onBoot, wantBoot)
 	}
@@ -61,9 +53,8 @@ func TestEngineLaunch_BootMS_CapturedOnColdBoot(t *testing.T) {
 
 func TestEngineLaunch_BootMS_ZeroWhenBootNeverCompletes(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
-	// CapturePane always "" → the prompt marker is never seen → the driver
-	// returns ExitREPLBootTimeout BEFORE reporting OnBoot. No completed cold
-	// boot ⇒ BootMS stays 0 (the same signal a warm/resumed named session gives).
+	// CapturePane always returns "", so the prompt marker is never seen and
+	// boot times out before OnBoot fires.
 	tmux := &fakeTmux{}
 	var onBoot []int64
 	eng := NewEngine(Deps{
@@ -97,11 +88,8 @@ func TestEngineLaunch_BootMS_ZeroOnWarmNamedSession(t *testing.T) {
 	if err := os.WriteFile(fx.artifact, []byte("<!-- challenge-token: "+fx.token+" -->\nDONE\n"), 0o644); err != nil {
 		t.Fatalf("seed artifact: %v", err)
 	}
-	// A pre-existing named session → namedExists=true → the driver RESUMEs and
-	// skips the entire cold-boot block, so OnBoot is never reached and BootMS
-	// stays 0. This is the ADR-0043 contract ("warm named session → 0") that the
-	// boot-timeout test only covers by proxy; here it is exercised directly, so a
-	// refactor that moved the OnBoot call out of the `if !namedExists` block fails.
+	// A pre-existing named session (namedExists=true) resumes and skips the
+	// cold-boot block entirely, so OnBoot never fires and BootMS stays 0.
 	const sessName = "warm1"
 	tmux := &fakeTmux{
 		existing: map[string]bool{NamedSessionName(sessName): true},

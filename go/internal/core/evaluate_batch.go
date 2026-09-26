@@ -9,19 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 )
 
-// evaluate_batch.go — PR2b batch identification (pure). The post-build checking
-// phases (archetype "evaluate", excluding the audit verdict-brancher) are
-// mutually independent — each reads the same immutable build output and emits an
-// independent verdict — so they can run concurrently. evaluateBatch finds that
-// parallelizable run in the cycle's planned phase order.
-
-// evaluateBatch returns the contiguous run of parallelizable checking phases:
-// the archetype-"evaluate" phases that sit AFTER the build phase and BEFORE
-// audit in the plan, excluding audit itself (the sole verdict-BRANCHER, which
-// must stay serial). It scans from just after build so a pre-build evaluate
-// phase (e.g. bug-reproduction on a bugfix cycle) is never batched. Returns nil
-// when there is nothing to parallelize (<2 phases, or build absent) — the caller
-// then keeps the sequential path. Pure: no side effects, archetypeOf injected.
 func evaluateBatch(plan []string, archetypeOf func(string) string) []string {
 	start := -1
 	for i, p := range plan {
@@ -31,7 +18,7 @@ func evaluateBatch(plan []string, archetypeOf func(string) string) []string {
 		}
 	}
 	if start < 0 {
-		return nil // no build phase in the plan ⇒ no post-build batch
+		return nil
 	}
 	var batch []string
 	for _, p := range plan[start:] {
@@ -43,7 +30,7 @@ func evaluateBatch(plan []string, archetypeOf func(string) string) []string {
 			continue
 		}
 		if len(batch) > 0 {
-			break // the contiguous evaluate run ended
+			break
 		}
 	}
 	if len(batch) < 2 {
@@ -52,9 +39,6 @@ func evaluateBatch(plan []string, archetypeOf func(string) string) []string {
 	return batch
 }
 
-// phaseRequestFor builds one evaluate-batch phase's PhaseRequest, mirroring
-// dispatch's assembly (the BuildPlan + PhaseIO envelope). Called SERIALLY before
-// the concurrent run so the (artifact-writing) PhaseIO assemble never races.
 func (cr *cycleRun) phaseRequestFor(phase Phase) PhaseRequest {
 	req := PhaseRequest{
 		Cycle:                           cr.cycle,
@@ -81,51 +65,18 @@ func (cr *cycleRun) phaseRequestFor(phase Phase) PhaseRequest {
 	return req
 }
 
-// dispatchRunnerWithRetry runs ONE phase's runner with the self-heal retry loop
-// (ArtifactTimeout / transient-bridge relaunch), in isolation — it reads only
-// immutable cr handles (runners, observer, retryConfig) and mutates nothing, so
-// it is safe to call concurrently. Returns (resp, attempts, err).
-//
-// Dispatch parity with the sequential loop is STRUCTURAL: both take their
-// recovery hooks from retry_opts.go and run the same retry core, so a hook added
-// there cannot silently miss this path (the gap that produced this item — an
-// optional evaluate phase exhausting infra retries aborted the whole batch).
-// Keeps `ship ⇒ build ∧ audit ∧ tdd` intact: mandatory/floor phases match no
-// skip predicate, so their errors still propagate. Admitted skip records use
-// the synchronized ledger here; cycle state and phase completion records stay
-// on the serial batch merge path.
 func (cr *cycleRun) dispatchRunnerWithRetry(phase Phase, req PhaseRequest) (PhaseResponse, int, error) {
-	// Delegate — never a second hand-maintained loop. The batch's divergence
-	// from the sequential path is declared in evaluateBatchRetryOpts (ship
-	// recovery and backfill disabled), not re-derived here (cycle-1166).
 	return cr.retryPhaseRunner(phase, req, cr.evaluateBatchRetryOpts())
 }
 
-// dispatchEvaluateBatch runs the parallelizable post-build checking phases
-// CONCURRENTLY (ParallelEvaluate=enforce), then folds their outcomes in a single
-// SERIALIZED merge. Concurrency is bounded by cfg.ParallelEvaluateConcurrency.
-//
-// Safety: only runner.Run (the minutes-long LLM slice) runs concurrently; every
-// shared-state mutation — recordPhaseOutcome (the ADR-0044 C1 chokepoint),
-// CompletedPhases, phase-completion ledger, cycle-state — happens in the single-goroutine merge,
-// except admitted skip records appended through the synchronized ledger by workers. Verdict merge is weakest-link (FAIL>WARN>PASS). A hard
-// dispatch error is all-or-nothing: every phase's outcome is still recorded
-// (C1-complete) and the cycle aborts on the first error.
-//
-// v1 fidelity gap (documented; closed before the enforce flip): the
-// deliverable-correction ladder and the tree-diff leak guard do NOT run for
-// batched phases — acceptable because evaluate phases are read-only and the
-// feature ships DORMANT (StageOff default), activated only after a shadow soak.
 func (cr *cycleRun) dispatchEvaluateBatch(batch []Phase) (loopAction, error) {
 	cr.cs.PhaseStartedAt = cr.o.now().UTC().Format(time.RFC3339)
 
-	// 1. SERIAL: build every request first (PhaseIO assemble must not race).
 	reqs := make([]PhaseRequest, len(batch))
 	for i, p := range batch {
 		reqs[i] = cr.phaseRequestFor(p)
 	}
 
-	// 2. CONCURRENT: runner.Run + self-heal retry per phase. No cr mutation.
 	type res struct {
 		resp     PhaseResponse
 		attempts int
@@ -150,7 +101,6 @@ func (cr *cycleRun) dispatchEvaluateBatch(batch []Phase) (loopAction, error) {
 	}
 	wg.Wait()
 
-	// 3. SERIAL MERGE: record every outcome (C1-complete), then abort if any errored.
 	batchVerdict := VerdictPASS
 	var firstErr error
 	var errPhase Phase
@@ -189,9 +139,6 @@ func (cr *cycleRun) dispatchEvaluateBatch(batch []Phase) (loopAction, error) {
 	return loopNext, nil
 }
 
-// planRunOrder is the ordered phase run-set for this cycle: the clamped router
-// plan's Run entries (the phases that WILL run), or cfg.Order under the static
-// spine. The source evaluateBatch reads, so a skipped phase is never batched.
 func (cr *cycleRun) planRunOrder() []string {
 	if cr.clampedPlan == nil {
 		return cr.o.cfg.Order
@@ -205,9 +152,6 @@ func (cr *cycleRun) planRunOrder() []string {
 	return out
 }
 
-// evaluateBatchAt returns the parallelizable checking batch ONLY when `next` is
-// its first phase (so the loop batches the whole run in one iteration and never
-// re-enters mid-run); otherwise nil → the caller keeps the sequential path.
 func (cr *cycleRun) evaluateBatchAt(next Phase) []Phase {
 	grp := evaluateBatch(cr.planRunOrder(), cr.o.phaseArchetype)
 	if len(grp) < 2 || grp[0] != string(next) {
@@ -220,8 +164,6 @@ func (cr *cycleRun) evaluateBatchAt(next Phase) []Phase {
 	return out
 }
 
-// mergeVerdict folds a phase verdict into the running batch verdict by
-// weakest-link precedence: FAIL dominates WARN dominates PASS.
 func mergeVerdict(acc, v string) string {
 	if acc == VerdictFAIL || v == VerdictFAIL {
 		return VerdictFAIL

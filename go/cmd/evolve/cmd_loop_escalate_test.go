@@ -12,12 +12,13 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
-// TestRunLoop_EscalatesAtIterationBoundary is the WIRING proof for the
-// failure-disposition-router S4 boundary applier: it drives the real runLoop
-// (stubbed orchestrator deps) over a temp .evolve carrying one open inbox item
-// and one staged escalate intent, and asserts the loop APPLIED the escalation —
-// weight bumped + apply report written. A commented-out call site or a defined-
-// but-uncalled applier fails this test, which a source grep would not catch.
+// TestRunLoop_EscalatesAtIterationBoundary is the wiring proof for the
+// failure-disposition-router boundary applier: it drives the real runLoop
+// (stubbed orchestrator deps) over a temp .evolve carrying one open inbox
+// item and one staged escalate intent, and asserts the loop applied the
+// escalation — weight bumped + apply report written. A commented-out call
+// site or a defined-but-uncalled applier fails this test, which a source
+// grep would not catch.
 func TestRunLoop_EscalatesAtIterationBoundary(t *testing.T) {
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
@@ -66,8 +67,8 @@ func TestRunLoop_EscalatesAtIterationBoundary(t *testing.T) {
 	if _, err := os.Stat(reportPath); err != nil {
 		t.Fatalf("loop wrote no escalation apply report at %s — the iteration-boundary call site is unwired: %v", reportPath, err)
 	}
-	// ADR-0101 S4a: the boundary's outcome is a loop.escalation WARN the stub
-	// root's console renders into this stderr.
+	// The boundary's outcome is a loop.escalation WARN the stub root's
+	// console renders into this stderr.
 	if !strings.Contains(stderr.String(), "LOOP_ESCALATION_BOUNDARY") || strings.Contains(stderr.String(), "escalation boundary (cycle") {
 		t.Fatalf("the escalation boundary must be a rendered loop.escalation signal, not a hand-written line; stderr=%q", stderr.String())
 	}

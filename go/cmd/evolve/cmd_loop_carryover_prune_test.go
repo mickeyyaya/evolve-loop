@@ -1,22 +1,5 @@
 package main
 
-// cmd_loop_carryover_prune_test.go — RED test (cycle 507, task
-// prune-stale-carryover-todos) for the WIRING of the carryoverTodos TTL prune
-// into runLoop's startup. Behavioral, not a source grep: it seeds an EXPIRED
-// carryover todo in state.json, runs runLoop far enough to execute the
-// AutoPrune block (which sits before the readiness gate), and asserts the
-// expired entry is actually gone from state.json on disk.
-//
-// This closes the "prune wired into cmd_loop.go startup, not dead code" AC the
-// same way Task 1 closes its wiring AC — by observing the runtime side effect,
-// so a prune function that runLoop never calls fails HERE (the cycle-506
-// dead-code trap). The prune must run under the existing wc.AutoPrune flag,
-// beside the failedApproaches PruneExpired call.
-//
-// RED now: runLoop does not yet prune carryoverTodos, so the expired entry
-// survives. Do NOT modify this file — wire PruneExpiredCarryoverTodos into the
-// AutoPrune block.
-
 import (
 	"bytes"
 	"encoding/json"

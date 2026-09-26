@@ -7,10 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/recurrence"
 )
 
-// TestDecideAfterRetro_NthOccurrenceForcesAdapt (AC3): a lesson whose pattern
-// has recurred (recurrence ledger count>=2) forces the RetroDecision reason to
-// "adapt"-with-escalation and MUST NOT stay a bare "proceed". A single- or
-// zero-occurrence pattern keeps the deterministic "proceed" branch.
 func TestDecideAfterRetro_NthOccurrenceForcesAdapt(t *testing.T) {
 	led := recurrence.NewLedger()
 	pol := recurrence.DefaultEscalationPolicy()

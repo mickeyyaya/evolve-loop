@@ -1,20 +1,5 @@
 package core
 
-// decision_branch_floor_test.go — cycle-1002 RED contract for ADR-0072 S4
-// Task 3 (wire-floor-override-consumption). decideAfterRetro and
-// decideAfterRetroRouted gain a 4th return value (*cyclestate.SystemFailureSignal)
-// and consume failure-decision.json under a Go-floor override:
-//
-//   - a floor category (verdict-incoherence / infra-systemic) HALTS even when
-//     the orchestrator decision (or the router) proposes a retry — the override
-//     must bite in the LIVE routed path, ABOVE the router (F1);
-//   - the cycle-1001 audit-declared system class halts both deterministically
-//     (dossier candidate, dec absent) and via judgment (dec says halt);
-//   - with no artifact and no floor, the branch/env/reason fall back
-//     BYTE-IDENTICAL to failureadapter.Decide (R4 regression guard).
-//
-// These fail RED until Builder adds the 4th return + applyFailureDecisionFloor.
-
 import (
 	"context"
 	"testing"
@@ -36,11 +21,6 @@ func floorOrchestrator(strat router.RoutingStrategy) *Orchestrator {
 	}
 }
 
-// F1 / R5 / AC3 — the LIVE path. The router proposes a `tdd` retry, and
-// failure-decision.json also says "retry" — but the cycle is verdict-incoherent
-// (green artifacts contradict the recorded FAIL), so the Go floor OVERRIDES both
-// to a halt. The override must sit above o.strategy.Decide, or a routed retry
-// survives (the exact defect the premise-challenge flagged).
 func TestDecideAfterRetroFloor_RoutedRetryOverriddenToHalt(t *testing.T) {
 	o := floorOrchestrator(fixedNextStrategy{next: "tdd"})
 	dir := t.TempDir()
@@ -64,10 +44,6 @@ func TestDecideAfterRetroFloor_RoutedRetryOverriddenToHalt(t *testing.T) {
 	}
 }
 
-// F2 / R6-a — the cycle-1001 shape caught DETERMINISTICALLY (orchestrator
-// absent). The audit self-declared a structured system class; the dossier
-// candidate is infra-systemic; with no failure-decision.json the Go floor still
-// halts.
 func TestDecideAfterRetroFloor_Cycle1001DeterministicHalt(t *testing.T) {
 	o := floorOrchestrator(fixedNextStrategy{next: "tdd"})
 	dir := t.TempDir()
@@ -88,10 +64,6 @@ func TestDecideAfterRetroFloor_Cycle1001DeterministicHalt(t *testing.T) {
 	}
 }
 
-// F2 / R6-b — the cycle-1001 shape caught via JUDGMENT. The audit's structured
-// class is task-level (code-audit-fail) so the deterministic dossier candidate
-// is empty, but the orchestrator classified it infra-systemic in
-// failure-decision.json → the floor halts on the orchestrator's own category.
 func TestDecideAfterRetroFloor_Cycle1001JudgmentHalt(t *testing.T) {
 	o := floorOrchestrator(fixedNextStrategy{next: "tdd"})
 	dir := t.TempDir()
@@ -110,17 +82,10 @@ func TestDecideAfterRetroFloor_Cycle1001JudgmentHalt(t *testing.T) {
 	}
 }
 
-// R4 / AC5 — REGRESSION GUARD. With no failure-decision.json and no floor
-// candidate, the retro branch returns a nil signal and its branch/reason are
-// BYTE-IDENTICAL to the pre-S4 deterministic failureadapter output. Driven
-// through the live routed path with a StaticPreset advisor (which agrees with
-// the deterministic branch, so the operator-facing contract string is
-// preserved) over an EMPTY workspace (no artifacts → no floor, no decision).
 func TestDecideAfterRetroFloor_FallbackByteIdentical(t *testing.T) {
 	o := floorOrchestrator(router.StaticPreset{})
 	cs := CycleState{CycleID: 1002, WorkspacePath: t.TempDir()}
 
-	// The pre-S4 deterministic expectation for empty history.
 	want := failureadapter.Decide(nil, failureadapter.Options{Now: coverNow()})
 	wantReason := "proceed: " + want.Reason
 
@@ -137,24 +102,10 @@ func TestDecideAfterRetroFloor_FallbackByteIdentical(t *testing.T) {
 	}
 }
 
-// Cycle-1603 REGRESSION (2026-09-02). Round-2 of an ADR-0092 audit repair
-// inherited round-1's agent-amended acs-verdict.json (ship_eligible=false), so
-// the EGPS override downgraded the repaired PASS to FAIL with a persisted,
-// substantive fail reason. The DETERMINISTIC incoherence detector correctly
-// declined to fire (CheckVerdictCoherence's SubstantiveError guard: a diagnosed
-// downgrade is a justified negative verdict, not a forgery) — but the
-// orchestrator's PROSE failure-decision.json classified verdict-incoherence
-// anyway, and path (2) of applyFailureDecisionFloor halted the batch on prose
-// that the deterministic evidence had already contradicted.
-//
-// Contract: a prose verdict-incoherence claim is CONTRADICTED when the recorded
-// FAIL carries persisted substantive fail reasons. The cycle stays a task-level
-// FAIL (normal retro routing); no SystemFailureSignal is produced.
 func TestDecideAfterRetroFloor_Cycle1603DiagnosedDowngradeIsNotForgery(t *testing.T) {
 	o := floorOrchestrator(router.StaticPreset{})
 	dir := t.TempDir()
-	// Green artifacts, exactly the 1603 shape: repaired report PASS + acs PASS.
-	writeVerdicts(t, dir, "PASS", "PASS")
+	writeVerdicts(t, dir, "PASS", "PASS") // green → contradicts the prose claim
 	writeDecision(t, dir, `{"category":"verdict-incoherence","level":"system","evidence":"audit-report.md declares PASS while acs-verdict.json has ship_eligible false","action":"halt-and-diagnose","fix_type":"pipeline-repair"}`)
 	cs := CycleState{CycleID: 1603, WorkspacePath: dir, AuditFailReasons: []string{
 		"EGPS: acs-verdict.json ship_eligible=false — the authoritative acssuite SSOT rejects the ship even though red_count==0; a narrative PASS cannot override it",
@@ -167,10 +118,6 @@ func TestDecideAfterRetroFloor_Cycle1603DiagnosedDowngradeIsNotForgery(t *testin
 	}
 }
 
-// Converse pin: with NO recorded fail reasons the prose classification stays
-// uncontradicted and the path-(2) halt is preserved — the narrowing above must
-// not quietly disable the forgery floor. The on-disk audit verdict is FAIL so
-// the deterministic candidate stays silent and ONLY path (2) can halt here.
 func TestDecideAfterRetroFloor_ProseIncoherenceWithoutDiagnosedReasonsStillHalts(t *testing.T) {
 	o := floorOrchestrator(router.StaticPreset{})
 	dir := t.TempDir()
@@ -188,9 +135,6 @@ func TestDecideAfterRetroFloor_ProseIncoherenceWithoutDiagnosedReasonsStillHalts
 	}
 }
 
-// The predicate's SHIP half: a diagnosed ship-floor downgrade contradicts the
-// prose claim exactly like an audit one (hasSubstantiveFailReasons is the ONE
-// spelling — this pins the half the audit-side test cannot).
 func TestDecideAfterRetroFloor_DiagnosedShipReasonsAlsoContradictProse(t *testing.T) {
 	o := floorOrchestrator(router.StaticPreset{})
 	dir := t.TempDir()

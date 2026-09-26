@@ -1,34 +1,13 @@
 package core
 
-// cyclerun_worktree_teardown_test.go — cycle-1278
-// `retro-fleet-stale-worktree-fallback`, AC2 (the root-cause companion).
-//
-// cs.ActiveWorktree = wtPath (cyclerun.go:515) is the SOLE assignment; nothing
-// clears it. When the lane teardown callback prunes the worktree
-// (o.worktree.Cleanup, cycle_worktree_teardown.go:53 — the rule both RunCycle
-// and RunCycleFromPhase now apply) the persisted cycle state keeps pointing
-// at the now-deleted directory, and the next dispatch to read that file hands the
-// stale path to the bridge — where isDir() refuses the launch. Widening
-// retroWorktree's fallback (AC1) contains the symptom; clearing the field at
-// teardown removes the source.
-//
-// These drive the REAL production seam: newCycleRun is what RunCycle calls, and
-// the closure it returns is the one RunCycle defers. The assertion is on the
-// PERSISTED cycle state (fakeStorage.cycleState — the last WriteCycleState), not
-// on an in-memory local, because the persisted file is what a later dispatch
-// actually reads.
-
 import (
 	"context"
 	"testing"
 )
 
-// teardownHarness builds an orchestrator over the standard fakes and returns the
-// storage, the worktree provisioner, and the cleanup closure newCycleRun handed
-// back — i.e. exactly what RunCycle defers.
 func teardownHarness(t *testing.T) (*fakeStorage, *fakeWorktree, func(preserve, completedNormally bool)) {
 	t.Helper()
-	st := &fakeStorage{state: State{LastCycleNumber: 1277}} // cycle 1278
+	st := &fakeStorage{state: State{LastCycleNumber: 1277}}
 	wt := &fakeWorktree{path: t.TempDir()}
 	o := NewOrchestrator(st, &fakeLedger{}, buildRunners(nil), WithWorktreeProvisioner(wt))
 
@@ -45,10 +24,6 @@ func teardownHarness(t *testing.T) (*fakeStorage, *fakeWorktree, func(preserve, 
 	return st, wt, cleanup
 }
 
-// TestCycleRunTeardown_ClearsActiveWorktreeAfterPrune is the crux (AC2). Once the
-// worktree is actually pruned, the persisted cycle state must no longer name it —
-// otherwise the very next reader (retro's dispatch, resume, checkpoint) inherits a
-// path that no longer exists.
 func TestCycleRunTeardown_ClearsActiveWorktreeAfterPrune(t *testing.T) {
 	st, wt, cleanup := teardownHarness(t)
 
@@ -62,10 +37,6 @@ func TestCycleRunTeardown_ClearsActiveWorktreeAfterPrune(t *testing.T) {
 	}
 }
 
-// TestCycleRunTeardown_PreservedWorktreeKeepsActiveWorktree is the negative axis,
-// and it is load-bearing: `evolve loop --resume` and `evolve cycle reset` reclaim
-// a preserved lane BY that path. Clearing it unconditionally would trade a stale
-// path for permanently orphaned audited work — the cycle-7 lost-work incident.
 func TestCycleRunTeardown_PreservedWorktreeKeepsActiveWorktree(t *testing.T) {
 	for _, tc := range []struct {
 		name                        string

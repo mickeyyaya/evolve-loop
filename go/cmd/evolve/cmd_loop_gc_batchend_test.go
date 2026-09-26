@@ -1,40 +1,5 @@
 package main
 
-// cmd_loop_gc_batchend_test.go — RED tests for cycle-1172, inbox item
-// `workspace-hygiene-s5-wiring-shadow-default` (scout task
-// workspace-hygiene-s5-batch-end-gc-hook).
-//
-// WHAT IS ALREADY DONE (cycle-1159): runGCHook exists, defaults an absent
-// gc.mode to "shadow", and drives BOTH gc.Plan (run dirs) and
-// gc.PlanWorktrees/ApplyWorktrees (worktree+branch backlog).
-//
-// THE REMAINING GAP: the hook has exactly ONE call site — cmd_loop.go:408,
-// which fires at batch START, before the preflight/cycle loop begins. The S5
-// plan (docs/plans/workspace-hygiene-2026-07.md) specifies a batch-END
-// invocation with "finalize FIRST then hook": the sweep must observe the
-// just-finished batch's state (a finalized, marker-cleared final cycle), not
-// the state left over from the PREVIOUS batch. A start-only hook can never
-// reap the worktrees the batch it just ran produced — the backlog it is meant
-// to drain always lags one batch behind.
-//
-// CONTRACT for Builder (do NOT modify these tests — implement production code):
-//
-//  1. Introduce the package-var seam `var gcHookFn = runGCHook` (the
-//     bootRecoverFn / runLoopPreflightFn / runLoopBatchFn idiom already used in
-//     this package) and route EVERY gc-hook call site through it.
-//  2. On a clean batch exit (max-cycles budget reached / normal completion),
-//     the loop must invoke gcHookFn AFTER the batch's final
-//     finalizeCompletedCycle — proven here by the spy observing that
-//     cycle-state.json is already GONE at hook time — and after the batch's
-//     cycles have run.
-//  3. Keeping or dropping the existing batch-START call is the implementer's
-//     call (scout AC1); these tests assert only about the LAST invocation, so
-//     either choice passes. Document whichever you pick.
-//  4. NEGATIVE: a signal-interrupted exit (rc=130) must NOT fire a batch-end
-//     sweep. That run is resumable (`evolve loop --resume`), its cycle-state
-//     marker is deliberately preserved, and reaping its worktrees/branches
-//     would destroy the very state the resume needs.
-
 import (
 	"bytes"
 	"context"
@@ -97,11 +62,11 @@ func installGCHookSpy(t *testing.T, evolveDir string) (calls *[]gcHookCall, cycl
 	return calls, cycleRan
 }
 
-// TestRunLoopBatch_GCHookFiresAfterFinalizeAtBatchEnd is the cycle-1172 crux:
-// the sweep must run at batch END, after the final cycle and after finalize.
-// The fixture writes a REAL cycle-state.json marker that is present at batch
-// start, so a start-only hook (today's single call site) records only
-// markerPresent==true/cycleHadRun==false invocations and fails here.
+// TestRunLoopBatch_GCHookFiresAfterFinalizeAtBatchEnd is the crux: the sweep
+// must run at batch end, after the final cycle and after finalize. The
+// fixture writes a real cycle-state.json marker that is present at batch
+// start, so a start-only hook records only markerPresent==true/
+// cycleHadRun==false invocations and fails here.
 func TestRunLoopBatch_GCHookFiresAfterFinalizeAtBatchEnd(t *testing.T) {
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")

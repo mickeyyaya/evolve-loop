@@ -11,13 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// WS3-S2 (ADR-0052): recordPhasePlan must hash-bind the WS3-S1 capture
-// artifacts (advisor-prompt-plan.txt / advisor-response-plan.txt) into the
-// ledger, so a post-hoc mutation of a persisted routing prompt/response is
-// detectable. The binding reuses the existing ArtifactPath+ArtifactSHA256
-// shape, one bound entry per artifact; the ledger's hash chain then carries
-// the tamper-evidence.
-
 func sha256Hex(t *testing.T, path string) string {
 	t.Helper()
 	buf, err := os.ReadFile(path)
@@ -47,7 +40,6 @@ func TestRecordPhasePlan_BindsPromptResponseSHAs(t *testing.T) {
 
 	o.recordPhasePlan(context.Background(), 42, cs, plan, nil)
 
-	// Collect the two capture-binding entries by kind.
 	bound := map[string]LedgerEntry{}
 	for _, e := range led.entries {
 		switch e.Kind {
@@ -59,36 +51,27 @@ func TestRecordPhasePlan_BindsPromptResponseSHAs(t *testing.T) {
 		t.Fatalf("want one bound entry each for advisor_prompt + advisor_response, got %d (%+v)", len(bound), led.entries)
 	}
 
-	// 1. Bound SHA == an INDEPENDENT recompute of the unmodified file.
 	if got, want := bound["advisor_prompt"].ArtifactSHA256, sha256Hex(t, promptPath); got != want {
 		t.Errorf("prompt bound sha = %q, want independently-recomputed %q", got, want)
 	}
 	if got, want := bound["advisor_response"].ArtifactSHA256, sha256Hex(t, respPath); got != want {
 		t.Errorf("response bound sha = %q, want independently-recomputed %q", got, want)
 	}
-	// The entry must point at the artifact it binds (forensics + WS3-S5 replay).
 	if bound["advisor_response"].ArtifactPath != respPath {
 		t.Errorf("response entry ArtifactPath = %q, want %q", bound["advisor_response"].ArtifactPath, respPath)
 	}
 
-	// 2. Tamper-evidence: mutate one byte of the prompt; its recomputed sha must
-	// now DIVERGE from the bound sha (the binding still attests the original).
 	if err := os.WriteFile(promptPath, []byte("PLAN PROMPT BODY — redacted copyX"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if sha256Hex(t, promptPath) == bound["advisor_prompt"].ArtifactSHA256 {
 		t.Error("a mutated prompt artifact must NOT match the bound sha — tamper-evidence failed")
 	}
-	// 3. The untouched response still matches its bound sha (no false positive).
 	if sha256Hex(t, respPath) != bound["advisor_response"].ArtifactSHA256 {
 		t.Error("an unmodified response artifact must still match its bound sha")
 	}
 }
 
-// TestRecordPhasePlan_NoCaptureNoBinding proves the binding is fail-open: when
-// the WS3-S1 capture is absent (capture write failed, or pre-WS3 cycle), no
-// advisor_prompt/advisor_response entries are appended — never a binding to a
-// missing file.
 func TestRecordPhasePlan_NoCaptureNoBinding(t *testing.T) {
 	t.Parallel()
 	led := &fakeLedger{}

@@ -27,12 +27,6 @@ func writeReport(t *testing.T, ws, name, body string) {
 	}
 }
 
-// TestDispatchSignals — ADR-0099 slice 3: core is the ONE digester feeding the
-// dispatch-time selectors (the skill-overlay `when` rule). The kind is the
-// DECLARED one when a report spoke (triage > scout), else the project default
-// (.evolve/domain.json), else code — so a document-domain project's very
-// first scout dispatch (no report exists yet) already carries the solution
-// persona, and a code project stays byte-identical.
 func TestDispatchSignals(t *testing.T) {
 	scoutDoc := "<!-- challenge-token: x -->\ngoal_type: partnership-deal\ndeliverable_kind: document\n\n## Selected Tasks\n"
 	triageCode := "<!-- challenge-token: x -->\ncycle_size_estimate: small\ndeliverable_kind: code\n\n## top_n\n- a\n"
@@ -75,11 +69,6 @@ func TestDispatchSignals(t *testing.T) {
 	}
 }
 
-// TestDispatchSignals_DegradedDigestIsLoud: a report that exists but cannot be
-// read (here: a directory in its place) is reported on stderr with the
-// kernel's own reason, and the projection stays on the conservative side —
-// even on a writing-domain project's own triage dispatch, the default never
-// reclassifies a torn cycle.
 func TestDispatchSignals_DegradedDigestIsLoud(t *testing.T) {
 	root, ws := t.TempDir(), t.TempDir()
 	writeDomainJSON(t, root, `{"domain":"writing"}`)

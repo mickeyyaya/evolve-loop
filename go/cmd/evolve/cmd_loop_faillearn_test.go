@@ -1,11 +1,3 @@
-// cmd_loop_faillearn_test.go — failure-floor Phase 2 (inbox
-// retro-always-invariant, gap 3): loop-level fatal exits must produce a
-// batch-level failedApproaches entry (classification loop-fatal,
-// stop_reason in the summary) plus a deterministic lesson artifact —
-// today they only emit the JSON envelope and exit.
-//
-// Uses the m4 harness (installStubDeps / stuckStorage / noopRunner /
-// newFakeLedger) defined in cmd_loop_m4_test.go.
 package main
 
 import (

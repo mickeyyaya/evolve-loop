@@ -31,9 +31,6 @@ func (p *permanentlyParkedPromptTmux) CapturePane(ctx context.Context, session s
 	return pane, err
 }
 
-// TestTmuxREPL_PromptSubmitWedged_ShortCircuitsSilenceBudget reproduces the
-// cycle-1510 failure: submit verification detects a wedged prompt, but the
-// result is discarded and the driver starts the normal artifact-wait loop.
 func TestTmuxREPL_PromptSubmitWedged_ShortCircuitsSilenceBudget(t *testing.T) {
 	cfg := fixtureConfig(t)
 	tm := &permanentlyParkedPromptTmux{

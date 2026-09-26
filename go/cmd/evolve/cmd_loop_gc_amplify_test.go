@@ -8,12 +8,9 @@ import (
 )
 
 // TestAmplifyGCNoPolicyFileDefaultsToShadow: no policy.json on disk at all →
-// gcPol.Mode="" → workspace-hygiene S5 resolves it to "shadow", so the run-dir
-// manifest IS published (shadow never mutates). Amended in cycle 1159: this
-// test previously asserted the pre-S5 ""→off default, the exact behavior the
-// slice inverts (same amendment as TestGCOff). The assertion is not weakened —
-// explicit gc.mode=off remains pinned by TestGCOff and
-// TestRunGCHook_ExplicitOffSkipsWorktreeSweep.
+// gcPol.Mode="" → resolves to "shadow", so the run-dir manifest is published
+// (shadow never mutates). Explicit gc.mode=off remains pinned by TestGCOff
+// and TestRunGCHook_ExplicitOffSkipsWorktreeSweep.
 func TestAmplifyGCNoPolicyFileDefaultsToShadow(t *testing.T) {
 	evolveDir := t.TempDir()
 	workspace := t.TempDir()
@@ -30,12 +27,11 @@ func TestAmplifyGCNoPolicyFileDefaultsToShadow(t *testing.T) {
 	}
 }
 
-// TestAmplifyGCShadowContinuesAfterPolicyLoadError verifies that when policy.json
-// is unreadable, runGCHook logs a WARN and CONTINUES on the zero-value policy.
-// Amended in cycle 1159 (workspace-hygiene S5): an unreadable policy yields
-// mode="" which now resolves to "shadow", not "off". That is still the safe
-// default — shadow only plans and publishes, it never mutates the tree, which
-// the run-dir assertions below pin directly.
+// TestAmplifyGCShadowContinuesAfterPolicyLoadError verifies that when
+// policy.json is unreadable, runGCHook logs a WARN and continues on the
+// zero-value policy: an unreadable policy yields mode="" which resolves to
+// "shadow", the safe default — shadow only plans and publishes, it never
+// mutates the tree, which the run-dir assertions below pin directly.
 func TestAmplifyGCShadowContinuesAfterPolicyLoadError(t *testing.T) {
 	evolveDir := t.TempDir()
 	workspace := t.TempDir()

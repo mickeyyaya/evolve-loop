@@ -16,15 +16,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
-// cmd_loop_failbreaker_test.go — EVOLVE_LOOP_MAX_CONSECUTIVE_FAILS: the
-// circuit-broken continue-on-verdict-FAIL. Soaks #3/#3b/#3c/#3d (2026-06-13)
-// each ended on the FIRST cycle whose FinalVerdict was FAIL, even when the
-// failure was a localized work-quality miss in an otherwise healthy batch —
-// turning every miss into an operator relaunch and preventing any
-// 3-consecutive-PASS streak from forming. The flag lets a batch absorb up to
-// max-1 consecutive FAILs (a streak of PASS/SHIPPED resets the count); the
-// default of 1 reproduces the pre-flag stop-on-first-FAIL contract exactly.
-
 func TestConsecutiveFailBreaker(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

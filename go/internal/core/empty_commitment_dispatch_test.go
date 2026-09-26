@@ -30,29 +30,11 @@ func (r triageDecisionRunner) Run(_ context.Context, req PhaseRequest) (PhaseRes
 	return PhaseResponse{Phase: string(PhaseTriage), Verdict: r.verdict, ArtifactsDir: req.Workspace}, nil
 }
 
-// Cycle 1623, audit round 2, finding H1 (CRITICAL).
-//
-// Round 2 gated the empty triage commitment at router.Route. Route's decision
-// is only a PROPOSAL: cyclerun_select.go:103 hands it to enforceNext, whose
-// PhaseEnd branch (routing_dispatch.go:59-63) asks
-// StateMachine.CanTerminateEarly(current, shipPlanned) — which returns false
-// unconditionally when shipPlanned is true (statemachine.go:230-233). Cycle
-// 1623's own clamped plan schedules ship, so the proposal was discarded and the
-// orchestrator dispatched tdd, build and audit against a task no phase was
-// authorized to own. The router-layer test stayed GREEN through all of it.
-//
-// This is the table pinning the decision where it is CONSUMED. It is the
-// in-package twin of the cycle predicate
-// TestC1623_005_EmptyCommitmentTerminatesOnTheComposedDispatchPath, which
-// drives the same contract through a whole RunCycle: this one isolates the
-// authority, that one proves it is reached.
-//
 // The signals are always derived by running the real router.Digest over a real
-// on-disk workspace. That is deliberate — TriageSignals.commitmentKnown is
-// unexported in package router, so a hand-built literal here could not express
-// the distinction between "committed nothing" and "no decision artifact", which
-// is the whole point of the gate. It also means this test fails if the
-// committed count ever stops being plumbed from triage-decision.json.
+// on-disk workspace, never a hand-built literal: TriageSignals.commitmentKnown
+// is unexported in package router, so only a real digest can express the
+// distinction between "committed nothing" and "no decision artifact", which is
+// the whole point of the gate.
 
 // digestTriageWorkspace materializes a cycle workspace whose triage decision
 // commits `committed` tasks and returns the production routing signals for it.
@@ -166,13 +148,6 @@ func TestRunCycle_EmptyTriageCommitmentIsPlannedNoWork(t *testing.T) {
 			wantCleanup: 1,
 		},
 		{
-			// Cycle 1623 audit round 1 (H2, M2, M1) / cycle 1639 pinned defect:
-			// decideTriageTermination gave VerdictFAIL precedence over an
-			// explicit empty commitment, so this row previously stayed a plain
-			// FAIL (breaker-counting failure, no worktree cleanup) even though
-			// triage committed no work at all. An explicit empty top_n is
-			// authoritative no-eligible-work evidence regardless of the phase
-			// verdict that carried it.
 			name:        "failed-triage-with-empty-decision",
 			verdict:     VerdictFAIL,
 			decision:    `{"top_n":[]}`,
@@ -187,10 +162,6 @@ func TestRunCycle_EmptyTriageCommitmentIsPlannedNoWork(t *testing.T) {
 			wantCleanup: 0,
 		},
 		{
-			// ANTI-NO-OP: a FAIL verdict over a NON-empty commitment must stay a
-			// real failure. A fix that treats every FAIL as planned no-work
-			// would satisfy the row above while masking every genuine
-			// triage-stage defect on committed work.
 			name:        "failed-triage-with-committed-work",
 			verdict:     VerdictFAIL,
 			decision:    `{"top_n":[{"id":"task-a"}]}`,
@@ -227,13 +198,6 @@ func TestRunCycle_EmptyTriageCommitmentIsPlannedNoWork(t *testing.T) {
 	}
 }
 
-// TestRunCycleFromPhase_ResumedFailedTriageWithEmptyDecisionIsPlannedNoWork is
-// the resumed-path twin of TestRunCycle_EmptyTriageCommitmentIsPlannedNoWork's
-// "failed-triage-with-empty-decision" row. resumeCursor.next (resume_cursor.go)
-// routes triage termination through the same o.triageTermination call as a
-// fresh cycle, but closeout's recordPlannedNoWorkOutcome must independently
-// reclassify a resumed FAIL+empty-commitment cycle too, or a paused-and-resumed
-// run diverges from a fresh one on the identical on-disk decision.
 func TestRunCycleFromPhase_ResumedFailedTriageWithEmptyDecisionIsPlannedNoWork(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -297,27 +261,13 @@ func TestEnforceNext_EmptyTriageCommitmentIsALegalTermination(t *testing.T) {
 		wantPhase   Phase
 		wantOK      bool
 	}{
-		// The defect. Cycle 1623's live configuration: triage committed nothing
-		// and the clamped plan scheduled ship.
 		{"empty-commitment-terminates-even-when-ship-planned", PhaseTriage, PhaseTDD, VerdictPASS, 0, true, PhaseEnd, true},
-		// The pre-existing no-ship early exit is unaffected.
 		{"empty-commitment-terminates-when-no-ship", PhaseTriage, PhaseTDD, VerdictPASS, 0, false, PhaseEnd, true},
 		{"failed-contract-terminates-with-committed-work", PhaseTriage, PhaseTDD, VerdictFAIL, 1, true, PhaseEnd, true},
-		// ANTI-NO-OP: committed work must never be terminated, however the
-		// proposal arrived. A gate that keys on the phase instead of the count
-		// passes the first row and bricks every productive cycle on this one.
 		{"committed-work-outranks-a-spurious-end-proposal", PhaseTriage, PhaseTDD, VerdictPASS, 1, true, PhaseTDD, false},
 		{"two-committed-tasks-still-advance", PhaseTriage, PhaseTDD, VerdictPASS, 2, true, PhaseTDD, false},
-		// FAIL-OPEN: a missing decision artifact is an UNKNOWN commitment, not
-		// an empty one. This is the row that keeps the kernel invariant intact
-		// for every cycle that never wrote triage-decision.json.
 		{"unknown-commitment-stays-blocked-when-ship-planned", PhaseTriage, PhaseTDD, VerdictPASS, -1, true, PhaseTDD, false},
-		// The scout edge is untouched: triage has not run, so no commitment
-		// exists to be empty (extra_coverage_test.go's "early-exit-blocked-when-
-		// ship" pins the same edge with zero-valued signals).
 		{"scout-edge-unchanged", PhaseScout, PhaseTriage, VerdictPASS, -1, true, PhaseTriage, false},
-		// The gate must not leak past build: once real work exists it must be
-		// evaluated, never abandoned — even if the commitment was empty.
 		{"post-build-never-terminates-early", PhaseBuild, PhaseAudit, VerdictPASS, 0, true, PhaseAudit, false},
 	}
 	for _, tc := range cases {
@@ -334,12 +284,6 @@ func TestEnforceNext_EmptyTriageCommitmentIsALegalTermination(t *testing.T) {
 	}
 }
 
-// TestCanTerminateEarly_ShipPlannedInvariantIntact pins the 2-arg authority's
-// documented meaning. The empty-commitment termination must be ADDITIVE — a new
-// seam beside this method, or a check in enforceNext — never a rewrite of what
-// CanTerminateEarly(from, shipPlanned) means, because
-// extra_coverage_test.go:45's "early-exit-blocked-when-ship" row and this one
-// both depend on it and neither may be weakened to make the fix pass.
 func TestCanTerminateEarly_ShipPlannedInvariantIntact(t *testing.T) {
 	t.Parallel()
 	sm := NewStateMachine()

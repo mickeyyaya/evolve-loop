@@ -1,40 +1,5 @@
 package main
 
-// cmd_loop_boot_recovery_repin_test.go — RED tests (cycle 514, task
-// boot-recovery-auto-repin-shipsha). Cycle 507 wired *detection* of a ship-binary
-// SHA mismatch into runLoop's boot path (detectShipSHAMismatch → res.SHAMismatch),
-// but it only WARNs — it never invokes the existing, provenance-gated repin
-// primitive phaseintegrity.RepinShipSHA. Result: the SELF_SHA_TAMPERED ship
-// cascade recurred on cycles 508-513 (nine of the last ~20 cycles). This task
-// closes the wiring gap: on a detected mismatch, boot recovery AUTO-REPINS
-// expected_ship_sha to the on-disk binary WHEN (and only when) the running
-// binary's build-commit is provenance-verified (git ancestor of HEAD) — the
-// unattended-boot successor to `evolve reset-sha`. An unverifiable mismatch
-// (possible tampering) must still be refused, so the anti-tamper guarantee holds.
-//
-// Contract the Builder implements (TDD-defined seam; mirrors the established
-// bootRecoverFn / runLoopPreflightFn package-var seam idiom):
-//
-//	type bootRecoveryResult struct { Quarantined, Sealed, SHAMismatch, Healed bool }
-//	// Healed == an auto-repin fired (the cascade was self-healed at boot).
-//
-//	// shipRepinProvenanceFn resolves the build-commit + provenance check used to
-//	// authorize a boot-time auto-repin. A seam so boot recovery stays git-free
-//	// (deterministic) in tests. Production: version.Commit() + a
-//	// `git merge-base --is-ancestor <commit> HEAD` closure over cfg.ProjectRoot,
-//	// exactly what runResetSHA (cmd_resetsha.go) uses.
-//	var shipRepinProvenanceFn = defaultShipRepinProvenance
-//	func defaultShipRepinProvenance(projectRoot string) (commit string, prov phaseintegrity.ProvenanceVerified)
-//
-//	// defaultBootRecovery: on a detected SHA mismatch, attempt an auto-repin via
-//	// phaseintegrity.RepinShipSHA(statePath, actualSHA, commit, "", prov, false)
-//	// — NEVER operatorAuthorized=true from an unattended boot. On repin success,
-//	// set res.Healed=true. On provenance failure, keep today's warn-only behavior
-//	// (res.SHAMismatch stays true; the pin is untouched; the ship gate still blocks).
-//
-// RED now (Healed field + shipRepinProvenanceFn undefined → package main test
-// build fails). Do NOT modify this file — implement the seam.
-
 import (
 	"bytes"
 	"context"
@@ -49,7 +14,7 @@ import (
 
 // AC-1 (positive): a provenance-VERIFIED ship-SHA mismatch — a legitimate
 // rebuild that changed the binary — is auto-repinned at boot, so the very next
-// boot/ship sees NO mismatch (the 508-513 SELF_SHA_TAMPERED cascade is broken).
+// boot/ship sees NO mismatch.
 func TestDefaultBootRecovery_AutoRepinsWhenProvenanceVerified(t *testing.T) {
 	repo := brInitRepo(t)
 	evolveDir := filepath.Join(repo, ".evolve")

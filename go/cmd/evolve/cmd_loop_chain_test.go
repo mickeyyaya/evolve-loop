@@ -14,12 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// cmd_loop_chain_test.go — the fake-runner harness for the outer batch-chaining
-// loop (cycle 1075). The batch dispatcher is replaced via runLoopBatchFn so the
-// BOUNDARY decisions (start another batch? stop, and why?) are exercised
-// end-to-end without spawning cycles: every test below asserts on the chain's
-// own summary + the number of batches the fake actually saw.
-
 // chainTestEnv seeds a temp project with an inbox holding `items` pending
 // todos and an optional policy.json body.
 func chainTestEnv(t *testing.T, items int, policyJSON string) loopConfig {
@@ -95,9 +89,9 @@ func runChain(t *testing.T, cfg loopConfig, cc policy.ChainConfig) (int, chainRe
 	return rc, res, stderr.String()
 }
 
-// TestRunLoopChain_InboxDrainStartsNextBatchThenCleanExit — AC1. Two pending
-// todos, one consumed per batch: the chain must start batch 2 with no external
-// invocation and then exit CLEAN (rc=0) once the inbox is empty.
+// TestRunLoopChain_InboxDrainStartsNextBatchThenCleanExit: two pending
+// todos, one consumed per batch — the chain must start a second batch with
+// no external invocation and then exit clean (rc=0) once the inbox is empty.
 func TestRunLoopChain_InboxDrainStartsNextBatchThenCleanExit(t *testing.T) {
 	cfg := chainTestEnv(t, 2, "")
 	seen := stubBatches(t, func(_ int, c loopConfig) int {
@@ -121,23 +115,11 @@ func TestRunLoopChain_InboxDrainStartsNextBatchThenCleanExit(t *testing.T) {
 	}
 }
 
-// The cycle-1075 test TestRunLoopChain_EmptyInboxExitsWithoutRunningABatch
-// asserted the OPPOSITE of today's contract: that a chain launched against an
-// already-drained inbox runs ZERO batches. Cycle 1098 (`chain-min-one-batch`)
-// judged that a defect — opting into chaining was silently weaker than the
-// pre-chain contract, where `evolve loop` always ran one batch — so the
-// behaviour it pinned is deliberately reversed, not merely relaxed. Its
-// coverage is not lost: the drained-inbox launch is now pinned by
-// TestRunLoopChain_DrainedInboxRunsExactlyOneBatch (exactly one batch, rc=0,
-// chain_inbox_empty) in cmd_loop_chain_minbatch_test.go, and the zero-batch
-// outcome it guarded survives for the case that still means it —
-// TestRunLoopChain_PreEngagedBrakeRunsZeroBatchesOnDrainedInbox.
-
-// TestRunLoopChain_QuotaExhaustionDefersInsteadOfRelaunching — AC2. rc=5 is the
-// batch's QUOTA-PAUSE contract (derived from core.allFamiliesQuotaExhausted).
-// The chain must NOT start another batch into the drained families: it stops,
-// propagates rc=5, and points at the intact checkpoint — even though the inbox
-// still holds work it would otherwise chain on.
+// TestRunLoopChain_QuotaExhaustionDefersInsteadOfRelaunching: rc=5 is the
+// batch's quota-pause contract (derived from core.allFamiliesQuotaExhausted).
+// The chain must not start another batch into the drained families: it
+// stops, propagates rc=5, and points at the intact checkpoint — even though
+// the inbox still holds work it would otherwise chain on.
 func TestRunLoopChain_QuotaExhaustionDefersInsteadOfRelaunching(t *testing.T) {
 	cfg := chainTestEnv(t, 3, "")
 	seen := stubBatches(t, func(int, loopConfig) int { return 5 })
@@ -161,9 +143,9 @@ func TestRunLoopChain_QuotaExhaustionDefersInsteadOfRelaunching(t *testing.T) {
 	}
 }
 
-// TestRunLoopChain_MaxBatchesCapHalts — AC3. With a never-draining inbox the
-// runaway backstop is the only thing that stops the chain: it must halt at
-// EXACTLY the cap, not one batch either side of it.
+// TestRunLoopChain_MaxBatchesCapHalts: with a never-draining inbox, the
+// runaway backstop is the only thing that stops the chain — it must halt at
+// exactly the cap, not one batch either side of it.
 func TestRunLoopChain_MaxBatchesCapHalts(t *testing.T) {
 	cfg := chainTestEnv(t, 5, "")
 	seen := stubBatches(t, func(int, loopConfig) int { return 0 }) // consumes nothing
@@ -178,9 +160,9 @@ func TestRunLoopChain_MaxBatchesCapHalts(t *testing.T) {
 	}
 }
 
-// TestRunLoopChain_LoopStopFileBrakeHalts — AC4. `.evolve/loop-stop` dropped
-// while batch 1 runs must halt the chain at the next boundary even though the
-// inbox still has work and the cap is far away.
+// TestRunLoopChain_LoopStopFileBrakeHalts: `.evolve/loop-stop` dropped while
+// the first batch runs must halt the chain at the next boundary even though
+// the inbox still has work and the cap is far away.
 func TestRunLoopChain_LoopStopFileBrakeHalts(t *testing.T) {
 	cfg := chainTestEnv(t, 5, "")
 	seen := stubBatches(t, func(batch int, c loopConfig) int {
@@ -202,10 +184,10 @@ func TestRunLoopChain_LoopStopFileBrakeHalts(t *testing.T) {
 	}
 }
 
-// TestRunLoopChain_FleetWidthPreservedAcrossBatches — AC6. Fleet width is a
-// hard operator commitment; a chain that re-derives per-batch settings can
-// silently narrow it. Every batch must receive the IDENTICAL config, and the
-// recorded lane count must be stable batch N → N+1.
+// TestRunLoopChain_FleetWidthPreservedAcrossBatches: fleet width is a hard
+// operator commitment; a chain that re-derives per-batch settings can
+// silently narrow it. Every batch must receive the identical config, and the
+// recorded lane count must be stable across batches.
 func TestRunLoopChain_FleetWidthPreservedAcrossBatches(t *testing.T) {
 	cfg := chainTestEnv(t, 3, `{"fleet":{"count":3}}`)
 	seen := stubBatches(t, func(_ int, c loopConfig) int {
@@ -230,10 +212,10 @@ func TestRunLoopChain_FleetWidthPreservedAcrossBatches(t *testing.T) {
 	}
 }
 
-// TestRunLoopChain_BatchErrorStopsChain — a fatal batch outcome (preflight
-// failure, unfinished cycle, ADR-0072 halt) must stop the chain and propagate
-// the code, while an rc=3 batch (completed with absorbed failures) must NOT
-// halt the queue.
+// TestRunLoopChain_BatchErrorStopsChain: a fatal batch outcome (preflight
+// failure, unfinished cycle, a system-failure halt) must stop the chain and
+// propagate the code, while an rc=3 batch (completed with absorbed failures)
+// must not halt the queue.
 func TestRunLoopChain_BatchErrorStopsChain(t *testing.T) {
 	t.Run("rc=2 halts and propagates", func(t *testing.T) {
 		cfg := chainTestEnv(t, 5, "")
@@ -320,9 +302,9 @@ func TestChainContinueDecision(t *testing.T) {
 }
 
 // TestInboxPendingCount pins that only unclaimed top-level todos count, and
-// that a missing inbox is zero rather than an error. Cycle 1098 added the third
-// return value (the skip list); well-formed fixtures must produce NO skips —
-// shape validation must not start rejecting real items.
+// that a missing inbox is zero rather than an error. Well-formed fixtures
+// must produce no skips — shape validation must not start rejecting real
+// items.
 func TestInboxPendingCount(t *testing.T) {
 	cfg := chainTestEnv(t, 4, "")
 	n, skipped, err := inboxPendingCount(cfg.EvolveDir)

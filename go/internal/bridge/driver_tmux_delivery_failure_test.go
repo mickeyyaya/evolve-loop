@@ -1,41 +1,5 @@
 package bridge
 
-// driver_tmux_delivery_failure_test.go — RED contract for cycle-1562 tasks
-// `retrospective-delivery-relaunch` and the bridge half of
-// `retrospective-delivery-evidence-contract`.
-//
-// Evidence (.evolve/runs/cycle-1510/retrospective-launch-error.txt and
-// retrospective-interactions.ndjson): the retro launch logged "prompt
-// delivered", produced ZERO tokens and zero cost, and then burned two full
-// 900s stop-review intervals before dying with ExitArtifactTimeout. The
-// submit-verify guard (driver_tmux_submitverify.go) had ALREADY classified
-// that pane as `submit_wedged` within milliseconds — but both call sites in
-// driver_tmux_repl.go pipe verifySubmitted's outcome straight into
-// recordSubmitVerify, which only appends to the ndjson ledger and returns
-// nothing. The classification is produced and never consumed: at the
-// control-flow level a detected delivery failure is indistinguishable from a
-// healthy launch that simply never speaks.
-//
-// Contract, in two halves:
-//
-//   1. RELAUNCH — a `submit_wedged` outcome must short-circuit the artifact
-//      wait immediately (ExitArtifactTimeout, which cyclerun_dispatch.go
-//      already treats as retryable via IsInfraTeardownError and relaunches
-//      exactly once), instead of consuming the full silence budget first.
-//   2. EVIDENCE — that early exit must reuse the existing artifactTimeoutMarker
-//      shape with a CLASSIFIED reason naming the site and the resend count, so
-//      artifactTimeoutSummary lifts it into phaseErr unchanged and the cause
-//      survives into failure-learning as data rather than discarded stderr.
-//
-// The false-negative guards are load-bearing and tested here as negatives: a
-// clean submission and a generically silent pane must NOT be classified as
-// delivery failures. Over-firing this classifier would convert every ordinary
-// slow phase into a bridge relaunch.
-//
-// Every test drives the REAL production entry point (runTmuxREPL /
-// Engine.Launch) over a fake tmux. A helper called directly would prove
-// nothing about reachability.
-
 import (
 	"bytes"
 	"context"
@@ -49,16 +13,13 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// deliveryFailureReasonToken is the classified-cause vocabulary the timeout
-// marker's reason= field must carry when the driver short-circuits on a
-// verified delivery failure. It is the interaction.ResultSubmitWedged value,
-// so the marker text, the ndjson ledger record, and any downstream classifier
-// all agree on one word.
+// deliveryFailureReasonToken mirrors interaction.ResultSubmitWedged, so the
+// timeout marker, the ndjson ledger, and any downstream classifier agree on
+// one word for a verified delivery failure.
 const deliveryFailureReasonToken = "submit_wedged"
 
-// parkedPromptTmux keeps the pasted prompt visible at the `❯` input line
-// forever: no number of bare Enters clears it. This is the cycle-1510 pane
-// shape — the paste landed, the submit never took.
+// parkedPromptTmux keeps the pasted prompt visible at the input line forever:
+// no number of bare Enters clears it (the paste landed, the submit never took).
 type parkedPromptTmux struct {
 	*fakeTmux
 	mu         sync.Mutex
@@ -85,11 +46,6 @@ func (p *parkedPromptTmux) CapturePane(ctx context.Context, session string, scro
 	return out, err
 }
 
-// TestTmuxREPL_CleanSubmit_NeverClassifiesDeliveryFailure is the anti-over-fire
-// negative: the ordinary happy path (prompt submits, artifact lands) must exit
-// ExitOK and must not emit an artifact-timeout marker or the submit_wedged
-// token anywhere on stderr. If the short-circuit added for AC-001 fires on a
-// verified-clean submission, every healthy phase becomes a bridge relaunch.
 func TestTmuxREPL_CleanSubmit_NeverClassifiesDeliveryFailure(t *testing.T) {
 	cfg := fixtureConfig(t)
 	base := &FakeTmuxController{CaptureFrames: []string{"❯", "working ❯", "working ❯", "final scrollback", "cleanup scrollback"}}
@@ -115,13 +71,6 @@ func TestTmuxREPL_CleanSubmit_NeverClassifiesDeliveryFailure(t *testing.T) {
 	}
 }
 
-// TestTmuxREPL_SilentPaneTimeout_NotClassifiedAsDeliveryFailure is the second
-// false-negative guard, and the one the scout's acceptance criteria name
-// explicitly: a pane whose input line IS clear (the prompt submitted fine) but
-// which then produces nothing must still burn the normal silence budget and
-// die with the GENERIC reason. Only an evidenced submit-verification failure
-// may claim the delivery-failure cause; generic silence and agent-typed text
-// stay non-transient, exactly as today.
 func TestTmuxREPL_SilentPaneTimeout_NotClassifiedAsDeliveryFailure(t *testing.T) {
 	cfg := fixtureConfig(t)
 	// Input line clear after the paste (nothing follows the marker) => the
@@ -157,13 +106,6 @@ func TestTmuxREPL_SilentPaneTimeout_NotClassifiedAsDeliveryFailure(t *testing.T)
 	}
 }
 
-// TestTmuxREPL_NudgeSubmitWedged_ClassifiedCauseSurvivesIntoMarker covers the
-// SECOND consumer site. The nudge fires from inside the stop-review pause
-// branch, so it cannot skip a silence budget it has already spent — but its
-// wedged outcome is the same evidence, and the terminal artifact-timeout
-// marker must name it instead of reporting the generic stall reason. Without
-// this, cycle-1510's ndjson (`"result":"no_effect"` on every nudge) stays the
-// only place the cause exists.
 func TestTmuxREPL_NudgeSubmitWedged_ClassifiedCauseSurvivesIntoMarker(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
 	tm := &stickyInputTmux{
@@ -195,13 +137,6 @@ func TestTmuxREPL_NudgeSubmitWedged_ClassifiedCauseSurvivesIntoMarker(t *testing
 	}
 }
 
-// TestEngineLaunch_PromptSubmitWedged_PhaseErrorCarriesClassifiedCause is the
-// evidence-contract wiring proof at the bridge boundary: the classified cause
-// must ride the existing artifactTimeoutSummary path into the error Launch
-// returns, wrapped in core.ErrArtifactTimeout so the dispatcher still sees a
-// retryable infra teardown. A short-circuit that skipped the marker shape
-// would silently drop the cause on the floor (engine.go discards driver stderr
-// past the launch-error file).
 func TestEngineLaunch_PromptSubmitWedged_PhaseErrorCarriesClassifiedCause(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "plan")
 	const prompt = "Please produce the retrospective deliverable for this cycle now."
@@ -237,12 +172,6 @@ func TestEngineLaunch_PromptSubmitWedged_PhaseErrorCarriesClassifiedCause(t *tes
 	}
 }
 
-// GROUND TRUTH beats the pane heuristic (v22.20.0 release red): a pane that
-// LOOKS parked while a post-dispatch deliverable is already on disk means the
-// submission landed — a REPL that answers by side effect alone never redraws
-// its input line. The wedged short-circuit must yield to the artifact and let
-// the normal wait complete; only a parked pane with NO deliverable keeps the
-// fast-fail (pinned by the AC-001 positive above).
 func TestTmuxREPL_ParkedPaneWithDeliveredArtifact_CompletesOK(t *testing.T) {
 	cfg := fixtureConfig(t)
 	base := &FakeTmuxController{CaptureFrames: []string{"❯", "❯ still parked prompt text here", "❯ still parked prompt text here", "❯ still parked prompt text here", "❯ still parked prompt text here", "❯ still parked prompt text here", "❯ still parked prompt text here", "❯ still parked prompt text here", "❯ still parked prompt text here", "❯ still parked prompt text here", "❯ still parked prompt text here", "❯ still parked prompt text here"}}
@@ -293,10 +222,6 @@ func (p *parkedButDeliveringTmux) CapturePane(ctx context.Context, session strin
 	return out, err
 }
 
-// The belt's baseline check is load-bearing: a parked pane with only the PRIOR
-// attempt's stale artifact on disk (byte-identical to the pre-dispatch
-// snapshot) is a genuine delivery failure — the ground-truth override must NOT
-// fire on leftovers, or the wedged fast-fail re-opens the stale re-grade loop.
 func TestTmuxREPL_ParkedPaneWithOnlyStaleArtifact_StillFastFails(t *testing.T) {
 	cfg := fixtureConfig(t)
 	if err := os.WriteFile(cfg.Artifact, []byte("stale prior report\n"), 0o644); err != nil {
@@ -327,7 +252,6 @@ func TestTmuxREPL_ParkedPaneWithOnlyStaleArtifact_StillFastFails(t *testing.T) {
 	}
 }
 
-// parkedNeverDeliveringTmux: forever-parked input line, writes nothing.
 type parkedNeverDeliveringTmux struct {
 	*FakeTmuxController
 	parkedText string

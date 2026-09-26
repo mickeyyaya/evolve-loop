@@ -1,32 +1,5 @@
 package main
 
-// cmd_loop_blockerbreaker_reconcile_test.go — RED contract for Defect A of
-// the cycle-1335 incident (fault-localization-report.md E6, Defect A).
-//
-// The defect, verified on live state: .evolve/resolved-fingerprints.json
-// DOES NOT EXIST, while the P0 that named the halting fingerprint sits
-// consumed at .evolve/inbox/consumed/ with a consumed_by narrative that
-// core.ParseConsumptionFingerprint parses correctly TODAY. The extraction
-// logic exists and works; nothing non-interactive ever calls it. The only
-// writer is the operator-invoked `evolve inbox ack-fingerprint`.
-//
-// The fix makes the ledger a PROJECTION of the consumed corpus (the repo's
-// single-source-with-projection convention, cited by name at
-// postship.go:110-113 / ADR-0047): blockerBreakerHalt reconciles
-// .evolve/inbox/consumed/ into the ledger before loading it. This is the
-// only variant that self-heals the CURRENT live state, where the P0 is
-// already consumed and the ledger does not exist.
-//
-// Two load-bearing constraints, both verified against live data:
-//
-//  1. Gate on PARSE-SUCCESS, never on `kind`. Enumerating every live inbox
-//     item, kind:"pipeline-defect" matches ZERO items; the incident's own P0
-//     and the driving item are both kind:"pipeline-repair". A kind-gated
-//     implementation passes every fixture test and never fires in production
-//     — the unit-green/live-green trap that produced this incident.
-//  2. A reconciler defect must not become a new boot blocker: per-item
-//     errors WARN and the sweep continues.
-
 import (
 	"bytes"
 	"os"
@@ -35,19 +8,14 @@ import (
 	"testing"
 )
 
-// realConsumedByNarrative is the consumed_by string carried verbatim by the
-// live incident item
-// (.evolve/inbox/consumed/2026-08-05T08-30-00Z-pipeline-defect-pipeline-blocker.json).
-// Fixtures use the live shape, never a synthetic one.
+// realConsumedByNarrative is a consumed_by string in the exact shape a real
+// consumed inbox item carries; fixtures use that shape, never a synthetic one.
 const realConsumedByNarrative = "console-2026-08-05: fingerprint ship|unknown|76d0f4fca190 = root cause fixed"
 
-// incidentFingerprint is the live fingerprint from the cycle-1335 incident,
-// carried verbatim by the digests of cycles 1326/1328/1329 on the real tree.
 const incidentFingerprint = "ship|unknown|76d0f4fca190"
 
-// writeConsumedItem drops one JSON item into .evolve/inbox/consumed/ — the
-// operator-managed terminal ledger that holds 41 live items and that no Go
-// code writes today.
+// writeConsumedItem drops one JSON item into .evolve/inbox/consumed/, the
+// operator-managed terminal ledger.
 func writeConsumedItem(t *testing.T, evolveDir, name, body string) {
 	t.Helper()
 	dir := filepath.Join(evolveDir, "inbox", "consumed")
@@ -59,15 +27,12 @@ func writeConsumedItem(t *testing.T, evolveDir, name, body string) {
 	}
 }
 
-// TestBlockerBreakerHalt_ReconcilesAlreadyConsumedItem replays the live
-// state exactly: the three incident digests are on disk, the P0 naming the
-// fingerprint is ALREADY sitting in consumed/, and the ledger does not
-// exist. The breaker must reconcile and not halt — and must materialize the
-// ledger, so the projection is durable rather than recomputed silently.
-//
-// The fixture's kind is "pipeline-repair" (the real live value), NOT the
-// "pipeline-defect" that matches zero production items: a kind-gated
-// implementation must fail this predicate.
+// TestBlockerBreakerHalt_ReconcilesAlreadyConsumedItem reconciles when the P0
+// naming the fingerprint already sits in consumed/ before the ledger exists:
+// the breaker must not halt, and must materialize the ledger so the
+// projection is durable rather than recomputed silently. The fixture's kind
+// is "pipeline-repair" — production items never carry "pipeline-defect" — so
+// a kind-gated implementation must fail this predicate.
 func TestBlockerBreakerHalt_ReconcilesAlreadyConsumedItem(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
@@ -131,8 +96,7 @@ func TestBlockerBreakerHalt_ReconcileDoesNotWeakenRuleB(t *testing.T) {
 // TestBlockerBreakerHalt_ReconcileSurvivesUnreadableItem pins the
 // fail-loud-but-never-block contract: a corrupt file in consumed/ must WARN
 // and let the sweep continue to the good item beside it. A reconciler defect
-// must never become a new boot blocker (the failure mode this whole cycle
-// exists to remove).
+// must never become a new boot blocker.
 func TestBlockerBreakerHalt_ReconcileSurvivesUnreadableItem(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
@@ -152,9 +116,9 @@ func TestBlockerBreakerHalt_ReconcileSurvivesUnreadableItem(t *testing.T) {
 	}
 }
 
-// TestBlockerBreakerHalt_NoConsumedDirIsQuiet is the zero-value edge: a tree
-// with no consumed/ directory at all reconciles to nothing, silently, and
-// leaves the pre-fix behavior byte-identical.
+// TestBlockerBreakerHalt_NoConsumedDirIsQuiet is the zero-value edge: with no
+// consumed/ directory, reconciliation is a silent no-op and the breaker
+// halts exactly as it always did.
 func TestBlockerBreakerHalt_NoConsumedDirIsQuiet(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")

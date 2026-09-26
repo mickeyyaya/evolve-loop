@@ -1,12 +1,5 @@
 package core
 
-// debugger_gate_test.go — PA-BIG S3 (ADR-0058): the debugger decision-branch
-// gate is config-driven, mirroring the retro history gate (S2). The debugger is
-// a CONTROL phase with no registry home, so its branch metadata
-// (branching_strategy: signal) comes from the builtinControlSpec seam
-// (ADR-0058 §5), overlaid by Orchestrator.specFor with registry precedence and
-// degrading to the literal phase-identity default (debugger→signal) backstop.
-
 import (
 	"context"
 	"testing"
@@ -14,10 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
-// TestSuccessorStrategy_Debugger pins the debugger resolution: the control seam
-// supplies "signal" even with no registry (proving the seam is consulted, not
-// the phase name); a registry "debugger" entry OVERRIDES the seam (registry
-// precedence). RED before S3 — phasespec.BranchingSignal does not yet exist.
 func TestSuccessorStrategy_Debugger(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -26,14 +15,11 @@ func TestSuccessorStrategy_Debugger(t *testing.T) {
 		want string
 	}{
 		{
-			// No registry at all → the control seam supplies signal.
 			name: "seam-supplies-signal",
 			o:    NewOrchestrator(nil, nil, nil),
 			want: phasespec.BranchingSignal,
 		},
 		{
-			// Registry "debugger" entry inverts to verdict → registry wins over
-			// the seam (proving specFor consults config, not the phase name).
 			name: "registry-overrides-seam",
 			o: NewOrchestrator(nil, nil, nil, WithCatalog(mustCatalog(t,
 				phasespec.PhaseSpec{Name: "debugger", BranchingStrategy: phasespec.BranchingVerdict}))),
@@ -49,8 +35,6 @@ func TestSuccessorStrategy_Debugger(t *testing.T) {
 	}
 }
 
-// TestBuiltinControlSpec asserts the control-phase seam: debugger gets a spec
-// declaring signal branching; a non-control (registry) phase has no seam entry.
 func TestBuiltinControlSpec(t *testing.T) {
 	t.Parallel()
 	spec, ok := builtinControlSpec(PhaseDebugger)
@@ -65,10 +49,8 @@ func TestBuiltinControlSpec(t *testing.T) {
 	}
 }
 
-// debuggerGateHarness builds a minimal cycleRun positioned at the completed
-// debugger phase, with the supplied catalog. Mirrors retroGateHarness:
-// recordAndBranch's pre-gate steps are fake-safe (ledger/storage fakes, empty
-// ActiveWorktree so normalizeBuildWorktree no-ops).
+// debuggerGateHarness leaves ActiveWorktree empty so normalizeBuildWorktree
+// no-ops during recordAndBranch's pre-gate steps.
 func debuggerGateHarness(t *testing.T, cat phasespec.Catalog) *cycleRun {
 	t.Helper()
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil), WithCatalog(cat))
@@ -83,12 +65,6 @@ func debuggerGateHarness(t *testing.T, cat phasespec.Catalog) *cycleRun {
 	}
 }
 
-// TestRecordAndBranch_DebuggerGateIsStrategyKeyed proves the debugger gate
-// consults successorStrategy, not the literal `current == PhaseDebugger`. A
-// registry "debugger" entry overriding to verdict makes the gate SKIP the ENTIRE
-// debugger block — so for EVERY decision signal no successor is scheduled and
-// even BLOCK (which would loopBreak inside the block) does not. RED on the
-// name-keyed gate (which fires for any debugger regardless of catalog).
 func TestRecordAndBranch_DebuggerGateIsStrategyKeyed(t *testing.T) {
 	t.Parallel()
 	for _, action := range []string{"RESHIP", "RERUN_PHASE", "BLOCK"} {
@@ -111,11 +87,6 @@ func TestRecordAndBranch_DebuggerGateIsStrategyKeyed(t *testing.T) {
 	}
 }
 
-// TestRecordAndBranch_DebuggerDegradesToSignalViaSeam is the byte-identity
-// backstop for the seam-supplied default: with no registry "debugger" entry, the
-// control seam supplies signal, the gate fires, and decideAfterDebugger routes
-// each decision signal to its successor — identical to the pre-S3 name-keyed
-// gate. (Cannot compile pre-S3, so "green" is asserted only post-S3.)
 func TestRecordAndBranch_DebuggerDegradesToSignalViaSeam(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -155,11 +126,6 @@ func TestRecordAndBranch_DebuggerDegradesToSignalViaSeam(t *testing.T) {
 	}
 }
 
-// TestNext_DebuggerSeamDoesNotLeakIntoVerdictBranch guards the subtle risk that
-// overlaying the control seam in specFor (shared by sm.Next via WithCatalog)
-// activates Next's verdict branch for debugger. The seam spec declares only
-// branching_strategy (no on_pass/on_fail), so Next must stay on its literal
-// debugger sentinel (→ end) for every verdict — byte-identical to the oracle.
 func TestNext_DebuggerSeamDoesNotLeakIntoVerdictBranch(t *testing.T) {
 	t.Parallel()
 	o := NewOrchestrator(nil, nil, nil, WithCatalog(phasespec.Catalog{}))
