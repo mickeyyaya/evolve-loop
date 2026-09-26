@@ -1,14 +1,5 @@
 package main
 
-// cmd_composition_runscope_test.go — pins the run-scoping of the composition
-// snapshot's ledger reader (the third "latest auditor entry" consumer, found
-// by the cycle-1571 H3 review sweep). The ledger is host-global across fleet
-// worktrees and, since the H3 producer fix, contains auditor entries for FAIL
-// verdicts too — so an unscoped "latest" can hand the RUNG 0 carry-forward a
-// sibling lane's (or a FAILed) audit as "the audited snapshot". Same contract
-// as ship.findLatestAudit: runID set ⇒ exact match or error; runID=="" keeps
-// latest-any.
-
 import (
 	"errors"
 	"os"

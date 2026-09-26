@@ -12,9 +12,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/channel"
 )
 
-// readCLIFrame loads a committed real capture-pane fixture for the channel e2e.
-// The frames live under the panestream package's testdata so the same
-// source-of-truth captures drive both the unit extractor tests and this e2e.
+// readCLIFrame loads a real capture from panestream's testdata, so one set of captures drives both suites.
 func readCLIFrame(t *testing.T, rel string) string {
 	t.Helper()
 	b, err := os.ReadFile(filepath.Join("panestream", "testdata", rel))
@@ -24,21 +22,8 @@ func readCLIFrame(t *testing.T, rel string) string {
 	return string(b)
 }
 
-// TestChannelE2E_RealFixtures_ClaudeSpan drives the ENTIRE bidirectional channel
-// against REAL captured claude frames — no hand-written Producer inputs:
-//
-//	Supervisor.Ask → inbox → driver delivers (inject_applied → breadcrumbs.live)
-//	→ real thinking/answer frames through the driver's PaneDelta → pane.live
-//	→ busy→idle via PaneBusy (idle_reached → breadcrumbs.live)
-//	→ real Producer normalizes the .live pair → feed
-//	→ Supervisor recovers the bracketed answer span.
-//
-// The fake tmux is SELF-PACED off breadcrumbs.live (wait for inject_applied
-// before showing the answer; write the artifact only after idle_reached), so the
-// test is robust to goroutine scheduling rather than tuned to exact tick counts.
-// The 3:1 driver-tick : producer-poll ratio guarantees inject_applied is
-// normalized into the feed in an earlier poll than the answer+idle_reached pair,
-// so the answer content's seq falls strictly inside [request, response_complete].
+// The fake tmux is self-paced off breadcrumbs.live (the answer only after inject_applied, the artifact only
+// after idle_reached), so the test does not depend on goroutine scheduling.
 func TestChannelE2E_RealFixtures_ClaudeSpan(t *testing.T) {
 	ws := t.TempDir()
 	thinking := readCLIFrame(t, "claude/thinking.txt") // busy: ✽ Inferring… · esc to interrupt
@@ -57,9 +42,7 @@ func TestChannelE2E_RealFixtures_ClaudeSpan(t *testing.T) {
 
 	tmux := &paneScriptTmux{pane: thinking} // boot marker ❯ present → REPL boots
 	deps.Tmux = tmux
-	// Self-paced state machine, keyed on what the driver has already written.
-	// Driver tick = 3 ms; the Producer polls every 1 ms, so inject_applied lands
-	// in the feed before the answer+idle_reached pair (correct span ordering).
+	// Driver tick 3 ms, producer poll 1 ms: inject_applied reaches the feed before the answer and idle_reached pair.
 	deps.Sleep = func(d time.Duration) {
 		if d != 2*time.Second {
 			time.Sleep(200 * time.Microsecond) // boot/prompt 1 s sleeps
@@ -72,9 +55,8 @@ func TestChannelE2E_RealFixtures_ClaudeSpan(t *testing.T) {
 		case !strings.Contains(string(bc), "idle_reached"):
 			tmux.setPane(answer) // PaneBusy=false + ⏺ answer above the box → idle_reached + pane.live
 		default:
-			// Both breadcrumbs in → complete. Written ONCE: under the cycle-1233
-			// cross-poll stability window (completion.go) a file rewritten on
-			// every tick keeps bumping its mtime and never settles.
+			// Written once: under the cross-poll stability window a file rewritten every tick keeps bumping its
+			// mtime and never settles.
 			if _, err := os.Stat(artifact); err != nil {
 				_ = os.WriteFile(artifact, []byte("done"), 0o644)
 			}
@@ -100,14 +82,8 @@ func TestChannelE2E_RealFixtures_ClaudeSpan(t *testing.T) {
 		driverDone <- code
 	}()
 
-	// The driver seeks the inbox cursor to EOF at boot, so an ask appended
-	// BEFORE that seek is skipped forever — and with this test's self-paced
-	// tmux, a skipped ask means the answer never arrives. A bare sleep here
-	// lost that race on a loaded CI runner (driver goroutine scheduled late →
-	// 10m package-timeout panic, macOS 2026-08-03). Sync positively instead:
-	// the driver creates build-pane.live strictly AFTER the cursor seek in the
-	// same goroutine, so once the file exists the seek has happened and an
-	// appended ask is guaranteed to be delivered.
+	// The driver seeks the inbox cursor to EOF at boot, so an ask appended before the seek is never delivered.
+	// It creates build-pane.live after the seek in the same goroutine, so waiting for that file syncs positively.
 	paneLivePath := filepath.Join(ws, "build-pane.live")
 	for bootDeadline := time.Now().Add(30 * time.Second); ; time.Sleep(time.Millisecond) {
 		if _, err := os.Stat(paneLivePath); err == nil {
@@ -118,13 +94,8 @@ func TestChannelE2E_RealFixtures_ClaudeSpan(t *testing.T) {
 		}
 	}
 
-	// The supervisor's clock must ADVANCE: its Ask deadline is computed and
-	// checked via the injected Now, so the producer's frozen clock here turned
-	// every lost-answer scenario into an infinite poll — the 10s Timeout could
-	// structurally never fire, and a missed ask became the package's 10-minute
-	// timeout panic (macOS CI 2026-08-03) instead of a 10s ErrResponseTimeout
-	// with diagnostics. One fake millisecond per reading keeps the test free of
-	// wall-clock timestamps while making the failsafe real.
+	// The supervisor's clock must advance: its Ask deadline reads the injected Now, and a frozen clock turns a
+	// lost answer into an endless poll instead of a 10s ErrResponseTimeout.
 	var supTick int64
 	supNow := func() time.Time {
 		supTick++

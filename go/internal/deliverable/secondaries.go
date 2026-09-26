@@ -10,35 +10,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// secondaries.go — ADR-0100: every AGENT-OWED declared output is verified,
-// not only outputs.files[0].
-//
-// The registry has always declared a phase's full output list; FromSpec
-// projected only the first entry into the contract, so handoff-build.json,
-// handoff-scout.json, triage-decision.json and carryover-todos.json were
-// waited for by the bridge, read by the router and by committedset, and
-// judged by nobody. A phase could omit them and the cycle continued — the
-// shape behind batch cycle 1623 (2026-09-11) and the empty triage decisions
-// of 1630/1631 (2026-09-12).
-//
-// Deliberately narrow: existence, non-emptiness, and parseability for JSON /
-// NDJSON. Markdown SHAPE stays the primary contract's business (Sections,
-// Verdicts) — restating it here would be the duplicated belief the campaign
-// forbids. Harness-produced secondaries (acs-verdict.json, written by
-// acsrunner) are declared in the registry under harness_produced and never
-// reach this function: re-dispatching an agent cannot make a harness write.
-
-// verifySecondaries appends one violation per agent-owed secondary that is
-// absent, blank, or unparseable. Each message names the file — that message
-// is the correction directive the agent is re-dispatched with. A read fault
-// that is not absence (EISDIR, permissions) is infra ambiguity and returns
-// an error, exactly as the primary does, so the caller fails OPEN rather
-// than re-dispatching an agent for a file nobody could read.
+// verifySecondaries adds one violation per agent-owed file that is absent, blank or unparseable. A read fault
+// other than absence is infra ambiguity and returns an error, so the caller fails open.
 func verifySecondaries(res *Result, c phasecontract.Contract, roots phasecontract.Roots) error {
 	for _, name := range c.AgentOwedFiles {
-		// phasecontract.OwedPath is the ONE join (the prompt tail renders the
-		// same paths): the registry declares basenames and a declared
-		// separator never steers a read outside the workspace.
+		// OwedPath is the one join the prompt tail also renders, and it keeps the read inside the workspace.
 		path := phasecontract.OwedPath(roots.Workspace, name)
 		base := filepath.Base(path)
 		res.Owed = append(res.Owed, base)
@@ -61,8 +37,7 @@ func verifySecondaries(res *Result, c phasecontract.Contract, roots phasecontrac
 	return nil
 }
 
-// secondaryParseError reports why a declared JSON/NDJSON secondary does not
-// parse, or "" when it does (or when its extension carries no parse rule).
+// secondaryParseError says why a .json or .ndjson secondary does not parse, or "" when it does or has no parse rule.
 func secondaryParseError(base, content string) string {
 	switch strings.ToLower(filepath.Ext(base)) {
 	case ".json":
@@ -82,8 +57,5 @@ func secondaryParseError(base, content string) string {
 	return ""
 }
 
-// VerifiesDeclaredDeliverables marks the production contract gate as the
-// ADR-0100 declared-deliverables gate for core's composition-root wiring
-// proof (core.DeclaredDeliverablesGateWired). True whenever the gate is not
-// switched off: at shadow/advisory it still verifies and logs would-block.
+// VerifiesDeclaredDeliverables marks the gate for core's declared-deliverables wiring proof; true unless the gate is off.
 func (r *Reviewer) VerifiesDeclaredDeliverables() bool { return r.stage != config.StageOff }

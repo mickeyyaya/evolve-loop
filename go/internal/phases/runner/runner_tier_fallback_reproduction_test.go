@@ -11,10 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// quotaExhaustedBridge always returns bridge exit=85 (ExitUnknownPrompt,
-// incl. provider quota-wall escalations — llmroute.go:45-50) regardless of
-// which CLI or model is asked to launch, and records every (cli, model) pair
-// attempted, in order, so the test can pin exactly what the runner tried.
 type quotaExhaustedBridge struct {
 	attempts []string // "cli@model", in the order the runner attempted them
 }
@@ -29,11 +25,7 @@ func (q *quotaExhaustedBridge) Probe(_ context.Context) (core.BridgeProbe, error
 	return core.BridgeProbe{}, nil
 }
 
-// writeQuotaExhaustionProfile drops a profile JSON with an explicit
-// model_tier_default (writeFallbackProfile in runner_fallback_test.go hardcodes
-// "sonnet", which is already the universal floor tier and can never step
-// down — this test needs a tier ABOVE the floor so a step-down is
-// observable) into a temp .evolve/profiles dir.
+// writeQuotaExhaustionProfile takes the tier explicitly: writeFallbackProfile's "sonnet" is the floor and cannot step down.
 func writeQuotaExhaustionProfile(t *testing.T, agentName, primaryCLI, modelTier string, fallback []string) string {
 	t.Helper()
 	root := t.TempDir()
@@ -53,33 +45,7 @@ func writeQuotaExhaustionProfile(t *testing.T, agentName, primaryCLI, modelTier 
 	return root
 }
 
-// TestRun_QuotaExhaustedAcrossChain_NeverStepsDownTier is the bug-reproduction
-// FAIL_TO_PASS pin for cycle-876's wire-tier-fallback-chain task.
-//
-// scout-report.md's Conclusion and fault-localization-report.md's #1 suspect
-// (confidence 0.95, runner.go:467,500-524,545-582) both identify the same
-// gap: when the resolved tier is quota-exhausted (exit 85) across every CLI
-// in the chain, dispatch must step down ONE policy.TierRank via
-// llmroute.TierChain and re-walk the SAME CLI chain at the lower tier before
-// giving up (Acceptance Criteria #2/#5, scout-report.md).
-//
-// This cycle's build (tier_fallback.go: TierChain/DispatchTiered,
-// llmroute.go: Plan.Tiers) added the primitives but — per build-report.md's
-// own "Design Notes"/"Discovery" sections — never swapped the runner's actual
-// production dispatch call site (BaseRunner.Run, runner.go:561-582) from the
-// CLI-only llmroute.Dispatch to llmroute.DispatchTiered. That closure still
-// captures a single `model := plan.Model` (runner.go:524) by value for every
-// attempt and never consults plan.Tiers, so the fix is INERT in production —
-// mirroring the c41fa94b→95f3e79f "plumbed upstream, never consumed at the
-// call site" failure shape called out in fault-localization-report.md.
-//
-// A profile with model_tier_default="opus" (TierRank 3) resolves
-// plan.Tiers = ["opus","balanced"] (steps down to the universal "balanced"
-// floor, tier_fallback.go:TierChain). Once the runner is fixed to dispatch
-// via DispatchTiered, an all-85 CLI chain must be walked TWICE — once at
-// "opus", once at "balanced" — for a total of 4 attempts. Today only 2
-// happen, both at "opus": the runner gives up at the first tier instead of
-// stepping down.
+// The name records the defect this reproduced; the test asserts a quota-exhausted tier steps down and re-walks the chain.
 func TestRun_QuotaExhaustedAcrossChain_NeverStepsDownTier(t *testing.T) {
 	hooks := &fakeHooks{phase: "auditor", agent: "evolve-auditor", model: "opus", prompt: "x"}
 	qb := &quotaExhaustedBridge{}

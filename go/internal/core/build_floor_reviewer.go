@@ -1,23 +1,5 @@
 package core
 
-// build_floor_reviewer.go — the shift-left build handoff floor (operator
-// directive 2026-07-21): deterministic checks move to the FRONT, as part of
-// build-phase verification, while the judgment phases (audit, adversarial-
-// review) still follow as the final verdict layer. Mounted in the E2
-// DeliverableReviewer chain for phase==build only: a red deterministic
-// self-check REJECTS the build deliverable, which the existing correction
-// ladder converts into a bounded in-phase builder fix — closing the
-// cycle-1008 class where the builder recorded ./cmd/evolve failing in
-// build-selfcheck.json and handed off anyway, burning four downstream phases
-// before the ACS toolchain gate refused ship.
-//
-// The reviewer owns POLICY only; the deterministic ENGINE is injected
-// (production: the existing phase_bindings selfcheck/gofmt machinery via
-// BuildFloorChecks). Fail-open floors: a nil engine or an engine that cannot
-// run approves loudly — downstream deterministic gates (ACS toolchain,
-// apicover, CI) stay armed, so the floor can never false-block a build over
-// its own plumbing.
-
 import (
 	"context"
 	"fmt"
@@ -38,19 +20,14 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/verifylock"
 )
 
-// BuildFloorCheckFn runs the deterministic build-floor checks for a completed
-// build and returns the failures (empty = green). Implementations must be
-// deterministic and LLM-free.
+// BuildFloorCheckFn runs deterministic, LLM-free build-floor checks for a completed build and returns the failures.
 type BuildFloorCheckFn func(ctx context.Context, in ReviewInput) []string
 
-// buildFloorReviewer implements DeliverableReviewer for the build phase.
 type buildFloorReviewer struct {
 	checks BuildFloorCheckFn
 }
 
-// NewBuildFloorReviewer builds the reviewer around an injected deterministic
-// check engine. A nil engine yields a fail-open reviewer (approve everything,
-// WARN once per review) so composition roots can wire unconditionally.
+// NewBuildFloorReviewer wraps an injected check engine; a nil engine approves with a WARN, so roots can wire it unconditionally.
 func NewBuildFloorReviewer(checks BuildFloorCheckFn) DeliverableReviewer {
 	return &buildFloorReviewer{checks: checks}
 }
@@ -73,46 +50,19 @@ func (r *buildFloorReviewer) Review(ctx context.Context, in ReviewInput) ReviewR
 	return ReviewResult{Approve: false, Retry: true, Reason: reason}
 }
 
-// DefaultBuildFloorChecks is the production deterministic engine: the
-// changed-package selfcheck engine plus every check that must run REGARDLESS
-// of the changed set. RemovalClaimFailures and personaBudgetFailures are
-// deliberately composed OUTSIDE changedPackageFloorChecks: that engine returns
-// early when the diff yields no Go test packages, and both of their triggering
-// diffs derive exactly zero packages — a build whose only claim is "I deleted
-// X" (cycle-660), and a lane whose only change is an agents/evolve-*.md
-// persona doc (cycle-1101). The early return is the precise blind spot each
-// would otherwise hide behind.
-//
-// The changed-path set is derived ONCE here and passed down: the two path-
-// driven engines must adjudicate the same diff, and one `git diff` per handoff
-// is the standing floor rule.
+// DefaultBuildFloorChecks is the production deterministic engine of the build handoff floor.
 func DefaultBuildFloorChecks(ctx context.Context, in ReviewInput) []string {
+	// Only changedPackageFloorChecks is package-driven; the rest run here because it skips a diff with no Go packages.
 	out := RemovalClaimFailures(ctx, in)
 	out = append(out, PlaceholderTokenFailures(ctx, in)...)
 	paths := changedFloorPaths(ctx, in)
 	out = append(out, personaBudgetFailures(ctx, in.Worktree, paths)...)
-	// ADR-0077 docs floor: WARN-only, so it rides the SAME derived change set
-	// rather than returning a failure — an architecture change with no doc is a
-	// finding for the auditor, never a handoff REJECT.
+	// The docs floor only WARNs: an undocumented architecture change is an auditor finding, never a handoff REJECT.
 	docsFloorWarn(in, paths)
 	return append(out, changedPackageFloorChecks(ctx, in, paths)...)
 }
 
-// ProtectedSurfaceFloorChecks is the handoff floor's copy of the ship
-// tripwire's question (ship/integrity.go verifyNoControlPlaneEdits, ADR-0064),
-// asked at the one phase that can act on it: every changed path on the
-// protected control plane is a failure the builder undoes in-phase, through the
-// correction ladder. The role guard sees only Edit/Write; a shell tool reaches
-// the tree unseen (F37: cycle 1689's builder rewrote core/cyclerun.go that
-// way), and before this floor the violation surfaced only at ship — after the
-// audit. member is the membership predicate (guards.IsProtectedSurface,
-// injected by the composition root: guards imports core). The paths are the
-// floor's axis — the cycle-base diff (HEAD when no base is recorded) plus
-// untracked files, which is the set ship judges once the post-record
-// soft-reset puts HEAD back at the base — with rename detection OFF on both
-// sides: with it on, `git diff --name-only` prints only a rename's NEW path,
-// so a file moved out of a protected path would be judged by its new name
-// alone (architecture review F37 M1).
+// ProtectedSurfaceFloorChecks fails the handoff for every changed path on the protected control plane.
 func ProtectedSurfaceFloorChecks(member func(string) bool) BuildFloorCheckFn {
 	return func(ctx context.Context, in ReviewInput) []string {
 		if in.Worktree == "" {
@@ -122,14 +72,12 @@ func ProtectedSurfaceFloorChecks(member func(string) bool) BuildFloorCheckFn {
 		if base == "" {
 			base = "HEAD"
 		}
+		// Rename detection is off, so a file moved out of the surface is judged by its old path too.
 		return protectedSurfaceFailures(changedWorktreePathsSince(ctx, in.Worktree, base, "--no-renames"), member, base)
 	}
 }
 
-// protectedSurfaceFailures is one actionable line per protected changed path;
-// a nil predicate fails open like every floor (ship's tripwire stays armed).
-// The fix is always the same — restore the path — because the check reads
-// only paths: a note in build-report.md never clears it.
+// protectedSurfaceFailures fails open on a nil predicate; ship's tripwire stays armed.
 func protectedSurfaceFailures(paths []string, member func(string) bool, base string) []string {
 	if member == nil {
 		return nil
@@ -143,9 +91,7 @@ func protectedSurfaceFailures(paths []string, member func(string) bool, base str
 	return out
 }
 
-// NewBuildExplanationReviewer returns the mandatory, inexpensive Build
-// explanation floor. Core composes it outside the optional reviewer seam, so a
-// caller cannot disable or replace the contract.
+// NewBuildExplanationReviewer returns the mandatory Build explanation floor, composed outside the optional reviewer seam.
 func NewBuildExplanationReviewer() DeliverableReviewer {
 	return NewBuildFloorReviewer(func(ctx context.Context, in ReviewInput) []string {
 		return explanationDocumentationFailures(ctx, in)
@@ -164,11 +110,8 @@ func explanationDocumentationFailures(ctx context.Context, in ReviewInput) []str
 	})
 }
 
-// docsFloorWarn evaluates the ADR-0077 documentation floor over the handoff's
-// change set and prints its WARN to stderr (the same channel every other
-// fail-open floor signal uses, so it lands in the phase log the auditor reads).
-// Stage comes from .evolve/policy.json `docs_floor.stage`; an unreadable policy
-// falls back to the compiled default, which the empty Config.Stage encodes.
+// docsFloorWarn prints the documentation floor's WARN to stderr, the phase log the auditor reads.
+// See ADR-0077.
 func docsFloorWarn(in ReviewInput, paths []string) {
 	var cfg docsfloor.Config
 	if in.ProjectRoot != "" {
@@ -176,11 +119,7 @@ func docsFloorWarn(in ReviewInput, paths []string) {
 			cfg.Stage = p.DocsFloorConfig().Stage
 		}
 	}
-	// Label with the blocking-grade classifier (docsfloor.IsArchitectureClass):
-	// it drops test-only diffs — which document nothing and were the WARN's main
-	// false positive — and picks up the trust-kernel, new-package and phase-spec
-	// surfaces the broad label misses. The VERDICT stays WARN (ADR-0077): only
-	// the precision of "is this architecture" improves here.
+	// The blocking-grade classifier drops test-only diffs; the verdict still stays WARN.
 	v := docsfloor.Evaluate(cfg, docsfloor.Input{
 		ArchitectureLabeled: docsfloor.IsArchitectureClass(paths),
 		ChangedFiles:        paths,
@@ -190,14 +129,8 @@ func docsFloorWarn(in ReviewInput, paths []string) {
 	}
 }
 
-// changedFloorPaths derives the lane's changed repo paths for the floor.
-//
-// Diff against the CYCLE BASE, not HEAD: the builder's mandated protocol
-// COMMITS its work, so at review time (before the post-record soft-reset)
-// `git diff HEAD` is empty and a HEAD-based floor approves vacuously — the
-// reviewer-caught near-no-op. Base-diff sees committed AND uncommitted work;
-// an empty base falls back to the HEAD-based derivation (degraded
-// provisioning, where the builder could not have committed).
+// changedFloorPaths diffs against the cycle base, not HEAD: the builder commits its work, so a HEAD diff is empty
+// at review time and the floor would approve vacuously.
 func changedFloorPaths(ctx context.Context, in ReviewInput) []string {
 	if in.Worktree == "" {
 		return nil
@@ -208,38 +141,22 @@ func changedFloorPaths(ctx context.Context, in ReviewInput) []string {
 	return changedWorktreePaths(ctx, in.Worktree)
 }
 
-// changedPackageFloorChecks reuses the EXACT selfcheck machinery the advisory
-// post-build binding runs
-// (changedWorktreePaths → changedGoTestPackages → runBuildSelfCheck with the
-// real go-test runner) — the flip from advisory to rejecting is the whole
-// change (the cycle-1008 smoking gun: the artifact recorded the failure and
-// nothing acted on it). Returns one line per failing package. Any inability
-// to run (no worktree, no packages) is GREEN — fail-open, downstream gates
-// stay armed.
+// changedPackageFloorChecks runs the post-build selfcheck machinery as a rejecting floor, one line per failing
+// package. An inability to run is green, because downstream gates stay armed.
 func changedPackageFloorChecks(ctx context.Context, in ReviewInput, paths []string) []string {
 	if in.Worktree == "" {
 		return nil
 	}
-	// reviewAndGuard normalizes gofmt/derived projections before invoking this
-	// floor, so the tested tree is the exact tree the explanation snapshot and
-	// downstream Audit receive.
-	// paths comes from changedFloorPaths (cycle-base diff, HEAD fallback) —
-	// see its doc for why the base axis is load-bearing.
+	// reviewAndGuard normalizes gofmt and derived projections first, so this tests the tree Audit receives.
 	pkgs := changedGoTestPackages(paths)
 	moduleDir := codequality.ModuleDir(in.Worktree)
 	pkgs = buildTagVisiblePackages(ctx, moduleDir, pkgs)
-	// Added tag-gated packages are invisible to the default-context run above
-	// (no GoFiles in that context) and were first executed at SHIP until
-	// 2026-09-14 (cycle 1679). They run here under their own tags regardless
-	// of whether anything default-visible changed.
+	// Added tag-gated packages are invisible to the default-context run, so they run under their own tags.
 	taggedFails := addedTaggedTestFailures(ctx, in, moduleDir)
 	if len(pkgs) == 0 {
 		return floorLinesFor(nil, taggedFails, nil)
 	}
-	// Split the changed set: ENFORCED packages run once under the coverage-
-	// instrumented pass inside apicoverNamingFailures (their test run doubles
-	// as the selfcheck — reviewer MED: never run the same package's tests
-	// twice per handoff); everything else takes the plain selfcheck.
+	// Enforced packages run once, in apicoverNamingFailures' coverage pass, which doubles as their selfcheck.
 	enforcedSet := map[string]bool{}
 	if enforceBytes, err := os.ReadFile(filepath.Join(moduleDir, ".apicover-enforce")); err == nil {
 		for _, p := range ciparity.IntersectEnforced(pkgs, enforceBytes) {
@@ -256,13 +173,8 @@ func changedPackageFloorChecks(ctx context.Context, in ReviewInput, paths []stri
 		}
 	}
 	fails := runBuildSelfCheck(ctx, moduleDir, plain, buildSelfCheckRunner)
-	// The apicover parity class (5 live instances: 3 main REDs, a console PR
-	// red, and cycle-1022's invisible audit override): an ENFORCED changed
-	// package with an unnamed export dies at HANDOFF, not at audit/CI.
 	namingFails := apicoverNamingFailures(ctx, moduleDir, enforced, paths)
-	// Persist the artifact for the ACS toolchain gate (same producer contract
-	// as the advisory binding, which skips its duplicate run when the floor is
-	// enforced — one go-test pass per build, not two).
+	// The ACS toolchain gate reads this artifact; the advisory binding skips its duplicate run when the floor is enforced.
 	removeBuildSelfCheckArtifact(in.Worktree)
 	if len(fails) > 0 {
 		writeBuildSelfCheckArtifact(in.Worktree, fails)
@@ -270,10 +182,7 @@ func changedPackageFloorChecks(ctx context.Context, in ReviewInput, paths []stri
 	return floorLinesFor(fails, taggedFails, namingFails)
 }
 
-// floorLinesFor renders the floor's failures one line per failing package —
-// the default-context run, then the added tag-gated packages, then the
-// apicover naming failures. The tagged failures name their tags so the
-// builder re-runs exactly what the floor ran.
+// floorLinesFor names each tagged failure's tags so the builder re-runs exactly what the floor ran.
 func floorLinesFor(fails, taggedFails []selfCheckFailure, namingFails []string) []string {
 	out := make([]string, 0, len(fails)+len(taggedFails)+len(namingFails))
 	for _, f := range fails {
@@ -286,13 +195,8 @@ func floorLinesFor(fails, taggedFails []selfCheckFailure, namingFails []string) 
 	return out
 }
 
-// addedTaggedTestFailures runs every test package the tree ADDS under the
-// build tags its files declare — the ship gate's added-test backstop, at the
-// floor. One seed (changedpkgs.ChangedFilesChecked: the working tree vs the
-// cycle base) and one grouping (addedtests.Groups) for both gates; untagged
-// groups are already covered by the default-context run. Fail-open when the
-// seed cannot be derived (no base SHA, git could not answer): the ship
-// backstop still stands behind it.
+// addedTaggedTestFailures runs every added test package under its declared build tags, with the ship backstop's
+// seed and grouping. It fails open when the seed cannot be derived.
 func addedTaggedTestFailures(ctx context.Context, in ReviewInput, moduleDir string) []selfCheckFailure {
 	if in.Worktree == "" || in.WorktreeBaseSHA == "" {
 		return nil
@@ -323,21 +227,10 @@ func addedTaggedTestFailures(ctx context.Context, in ReviewInput, moduleDir stri
 	return fails
 }
 
-// floorFailureDiagnosticMax bounds one failing package's recorded output. The
-// reason is not aesthetics: this text lands in the phase's failure reason and
-// is what the next attempt's builder is handed as the whole story.
+// floorFailureDiagnosticMax bounds one package's output, which becomes the next builder's whole failure story.
 const floorFailureDiagnosticMax = 400
 
-// floorFailureDiagnostic trims a failing package's `go test` output to the
-// TAIL, not the head.
-//
-// Cycle-1268 is the record of why the direction matters: the floor kept
-// output[:400], but `go test` writes its `--- FAIL` lines, panics and stack
-// traces at the END, after whatever the package logged on the way. The recorded
-// reason was therefore 400 bytes of repeated `[engine] WARN: Deps.TokenResolver
-// is nil` and nothing else — the operator was handed noise from exactly the
-// region where the diagnosis was not. Keeping the tail costs the same bytes and
-// carries the verdict lines.
+// floorFailureDiagnostic keeps the tail, because `go test` writes its FAIL lines, panics and stack traces last.
 func floorFailureDiagnostic(output string) string {
 	if len(output) <= floorFailureDiagnosticMax {
 		return output
@@ -345,21 +238,8 @@ func floorFailureDiagnostic(output string) string {
 	return "…" + output[len(output)-floorFailureDiagnosticMax:]
 }
 
-// buildTagVisiblePackages drops changed packages that have NO Go files under
-// the default build tags — the ACS predicate packages, which are `//go:build
-// acs`. `go test` on one is a SETUP failure ("build constraints exclude all Go
-// files"), not a test failure, so without this filter a cycle whose diff
-// carries an acs package red-lines its own build floor for a package that is
-// green under `-tags acs`.
-//
-// Second line of defense, not the fix: the plain selfcheck path already
-// tolerates this condition via goTestExcludedByBuildTags, and the primary fix
-// is that modern acs packages are NOT enrolled in .apicover-enforce at all (see
-// the rationale block there). This filter covers the legacy ./acs/cycle9..661
-// enrollments, which would otherwise still reach the enforced coverage run.
-//
-// Fail-open by construction: any `go list` plumbing error returns the input
-// unchanged, so a broken toolchain narrows nothing and the floor keeps judging.
+// buildTagVisiblePackages drops changed packages with no Go files under the default build tags, whose `go test` is a
+// setup failure rather than a test failure. It fails open: a `go list` error returns the input unchanged.
 func buildTagVisiblePackages(ctx context.Context, moduleDir string, pkgs []string) []string {
 	if len(pkgs) == 0 {
 		return pkgs
@@ -398,12 +278,8 @@ func buildTagVisiblePackages(ctx context.Context, moduleDir string, pkgs []strin
 	return kept
 }
 
-// apicoverNamingFailures runs the coverage-backed apicover enforce check over
-// the enforced changed packages — the same naming floor CI applies, shifted
-// to build handoff. The coverage test run DOUBLES as those packages'
-// selfcheck (a test failure is returned as a floor failure, never silently
-// dropped), and every fail-open plumbing branch WARNs loudly (reviewer MED:
-// silence here would let a coverage-run flake vanish the naming check).
+// apicoverNamingFailures applies CI's apicover naming floor at handoff. Its coverage run doubles as the enforced
+// packages' selfcheck, and every fail-open plumbing branch WARNs.
 func apicoverNamingFailures(ctx context.Context, moduleDir string, enforced []string, changedPaths []string) []string {
 	if len(enforced) == 0 {
 		return nil
@@ -412,15 +288,12 @@ func apicoverNamingFailures(ctx context.Context, moduleDir string, enforced []st
 	for _, p := range enforced {
 		dirs = append(dirs, filepath.Join(moduleDir, strings.TrimPrefix(p, "./")))
 	}
-	// Diff-scope (cycle-1048): only violations in files THIS change touched
-	// hard-fail; a touched package's pre-existing debt WARNs in the report.
+	// Only violations in files this change touched hard-fail; a touched package's older debt only WARNs.
 	changedByDir := changedFileBasenamesByDir(moduleDir, dirs, changedPaths)
-	// apicover's enforce contract is named-AND-executed — it needs a coverage
-	// profile or every named export reads as false-green. Generate one scoped
-	// to the enforced changed packages (their single test run this handoff).
+	// apicover's enforce contract needs a coverage profile, or every named export reads as false-green.
 	coverFunc, testOut, status := scopedCoverFunc(ctx, moduleDir, enforced)
 	if coverFunc != "" {
-		defer func() { _ = os.RemoveAll(filepath.Dir(coverFunc)) }() // reviewer HIGH: no temp leak
+		defer func() { _ = os.RemoveAll(filepath.Dir(coverFunc)) }()
 	}
 	switch status {
 	case coverStatusTestsFailed:
@@ -455,18 +328,11 @@ const (
 	coverStatusPlumbingError
 )
 
-// scopedCoverFunc runs `go test -coverprofile` over pkgs and converts it to
-// `go tool cover -func` output. Returns the func-file path (caller owns the
-// temp dir cleanup via its parent), the combined test output, and a status
-// distinguishing TEST failures (a real floor finding) from PLUMBING errors
-// (fail-open, loudly). The per-invocation -timeout mirrors realGoUnitTest's
-// defense-in-depth so one hung package cannot wedge the whole check beyond
-// the ambient ctx.
+// scopedCoverFunc returns the cover -func path, the test output, and a status that separates test failures from
+// plumbing errors. The per-run -timeout keeps one hung package from wedging the check.
 func scopedCoverFunc(ctx context.Context, moduleDir string, pkgs []string) (path, output string, status int) {
-	// ADR-0080 P1: the coverage run doubles as the enforced packages'
-	// selfcheck — a full go-test execution, host-wide single-flight for the
-	// same reason as the EGPS suite (batch-16 contention false-reds). A lock
-	// failure degrades to unserialized, never to skipped verification.
+	// The coverage run is a full go-test execution, so it takes the host-wide verification single-flight.
+	// A lock failure degrades to unserialized, never to skipped verification.
 	if release, lerr := verifylock.Acquire(ctx, filepath.Dir(moduleDir), os.Stderr); lerr == nil {
 		defer release()
 	} else {
@@ -498,9 +364,7 @@ func scopedCoverFunc(ctx context.Context, moduleDir string, pkgs []string) (path
 	return funcOut, "", coverStatusOK
 }
 
-// changedFileBasenamesByDir maps each enforced package dir to the basenames of
-// the changed .go files inside it — the diff-scope filter apicover consumes.
-// changedPaths are worktree-relative; dirs are absolute under moduleDir's tree.
+// changedFileBasenamesByDir maps each enforced package dir to the basenames of its changed .go files.
 func changedFileBasenamesByDir(moduleDir string, dirs []string, changedPaths []string) map[string]map[string]bool {
 	out := make(map[string]map[string]bool, len(dirs))
 	worktree := filepath.Dir(moduleDir) // moduleDir = <worktree>/go

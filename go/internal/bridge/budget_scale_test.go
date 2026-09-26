@@ -8,12 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// budget_scale_test.go — ADR-0076 slice A (A3): a build launch for a large
-// cycle carries a scaled --artifact-timeout-s. The scaling seam is
-// scaledArtifactBudget (pure) consumed by launchArgs (the pure extraction of
-// Launch's inline arg construction), so the composed flag emission is testable
-// without driving a real CLI.
-
 func TestScaledArtifactBudget(t *testing.T) {
 	cases := []struct {
 		name  string

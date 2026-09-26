@@ -1,12 +1,5 @@
 package core
 
-// console_lease_test.go — ADR-0080 S4, defense in depth: an EXPLICIT,
-// time-bounded operator lease can waive tree-diff attribution for named
-// paths. Review BLOCK hardening pinned here: the lease is HUB-resident
-// (git common dir — outside every worktree, unreachable by the .evolve/
-// legitimacy blanket), adopted once at cycle start, exact-path, expiring,
-// and LOUD per waiver.
-
 import (
 	"encoding/json"
 	"os"
@@ -60,10 +53,6 @@ func TestReadConsoleLease_ActiveLeaseYieldsExactPaths(t *testing.T) {
 	}
 }
 
-// TestReadConsoleLease_WorktreeResidentLeaseIsIgNORED is the review-BLOCK
-// pin: a lease file written INSIDE the checkout (the old .evolve/ location —
-// exactly what a lane phase could author) waives nothing. Only the hub copy
-// counts.
 func TestReadConsoleLease_WorktreeResidentLeaseIsIgnored(t *testing.T) {
 	root := leaseRoot(t)
 	now := time.Now()
@@ -118,10 +107,6 @@ func TestReadConsoleLease_MissingExpiryNeverWaives(t *testing.T) {
 	}
 }
 
-// TestFilterRealLeaks_LeaseWaiverIsExactAndLoud is the WIRING proof (review
-// MEDIUM): the classifier chain itself — a leaked SOURCE path is waived only
-// by an exact lease entry, the waiver WARNs with the ADR reference, and an
-// unleased source leak stays real.
 func TestFilterRealLeaks_LeaseWaiverIsExactAndLoud(t *testing.T) {
 	var warn strings.Builder
 	leaked := []string{"go/internal/core/foo.go", "go/internal/core/bar.go"}

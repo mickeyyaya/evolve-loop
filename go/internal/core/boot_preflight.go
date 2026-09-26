@@ -10,19 +10,7 @@ import (
 	"strings"
 )
 
-// boot_preflight.go — boot-time recovery primitives for a dirty/tampered main
-// tree (cycle 507, task wire-boot-recovery-functions; the piece cycle 506's
-// audit F1 flagged as unwired). When a leak escapes into the main tree, EVERY
-// subsequent cycle's tree-diff guard FAILs, attributing the pre-existing dirt to
-// whichever phase runs first and wedging the loop until a human `git stash`es.
-// These functions let runLoop's boot path self-heal before the first cycle
-// dispatches — non-destructively (stash, not checkout) and only for tracked
-// source, never the loop's own managed dirs.
-
-// classifyDirtyPaths splits git-status paths into those to quarantine (leaked
-// tracked source) and those to ignore (the loop's own managed dirs — .evolve/
-// and knowledge-base/ — whose in-flight cycle writes must never trigger a
-// false-positive quarantine of the loop's own state).
+// classifyDirtyPaths splits dirty paths into leaked tracked source to quarantine and loop-managed paths to ignore.
 func classifyDirtyPaths(paths []string) (quarantine, ignored []string) {
 	for _, p := range paths {
 		if isLoopManagedPath(p) {
@@ -34,24 +22,14 @@ func classifyDirtyPaths(paths []string) (quarantine, ignored []string) {
 	return quarantine, ignored
 }
 
-// isLoopManagedPath reports whether p lives under a loop-managed directory whose
-// churn is normal cycle activity, not a leak to quarantine.
 func isLoopManagedPath(p string) bool {
 	p = strings.TrimPrefix(p, "./")
-	// The ship binary is verified (ShipSHAMismatch) and re-pinned (boot auto-repin)
-	// within the same boot-recovery pass; quarantining it here would stash the
-	// rebuilt binary away and revert on-disk to the old committed one, re-opening
-	// the very SHA mismatch the repin just healed. It is loop-managed, never dirt.
+	// Boot recovery re-pins the ship binary in the same pass; stashing it would reopen the SHA mismatch the repin heals.
 	return p == "go/bin/evolve" ||
 		strings.HasPrefix(p, ".evolve/") || strings.HasPrefix(p, "knowledge-base/")
 }
 
-// QuarantineDirtyTree stashes leaked tracked-source dirt so `git status
-// --porcelain` is clean for the next cycle's tree-diff guard. It is
-// NON-DESTRUCTIVE: the content is preserved in a named stash (recoverable via
-// `git stash pop`), never discarded. Only the classified quarantine paths are
-// stashed (`-u -- <paths>`), so the loop's own managed dirs are left untouched.
-// Returns stashed=false (no error) when the tree has no quarantinable dirt.
+// QuarantineDirtyTree moves leaked tracked-source dirt into a named stash, never discarding it or touching loop-managed dirs.
 func QuarantineDirtyTree(ctx context.Context, repoRoot, label string) (bool, error) {
 	dirty, err := porcelainPaths(ctx, repoRoot)
 	if err != nil {
@@ -61,11 +39,8 @@ func QuarantineDirtyTree(ctx context.Context, repoRoot, label string) (bool, err
 	if len(quarantine) == 0 {
 		return false, nil
 	}
-	// Defend the ship binary at the stash chokepoint: when a quarantine path is a
-	// collapsed untracked parent dir (e.g. git reports "go/" rather than the file),
-	// an exact-path classify exclusion can't catch it, so exclude go/bin/evolve
-	// from the stash pathspec too — boot recovery re-pins it in this same pass and
-	// must never stash the rebuilt binary away.
+	// git may report a collapsed untracked parent dir that classifyDirtyPaths cannot exclude, so the pathspec
+	// excludes the ship binary too.
 	args := append([]string{"stash", "push", "--include-untracked", "-m", label, "--"}, quarantine...)
 	args = append(args, ":(exclude)go/bin/evolve")
 	cmd := exec.CommandContext(ctx, "git", args...)
@@ -76,8 +51,6 @@ func QuarantineDirtyTree(ctx context.Context, repoRoot, label string) (bool, err
 	return true, nil
 }
 
-// porcelainPaths returns the set of dirty paths reported by `git status
-// --porcelain` in repoRoot (empty for a clean tree).
 func porcelainPaths(ctx context.Context, repoRoot string) ([]string, error) {
 	cmd := exec.CommandContext(ctx, "git", "status", "--porcelain")
 	cmd.Dir = repoRoot
@@ -90,8 +63,7 @@ func porcelainPaths(ctx context.Context, repoRoot string) ([]string, error) {
 		if len(line) < 4 {
 			continue
 		}
-		// Porcelain v1: "XY <path>" (2 status chars + space). Renames render as
-		// "old -> new" — take the destination.
+		// Porcelain v1 is "XY <path>"; a rename renders as "old -> new", so take the destination.
 		p := strings.TrimSpace(line[3:])
 		if idx := strings.Index(p, " -> "); idx >= 0 {
 			p = p[idx+len(" -> "):]
@@ -104,10 +76,7 @@ func porcelainPaths(ctx context.Context, repoRoot string) ([]string, error) {
 	return paths, nil
 }
 
-// ShipSHAMismatch reports whether the on-disk ship binary's SHA-256 differs from
-// expectedSHA (the SELF_SHA_TAMPERED cascade, caught at boot instead of only
-// when the ship phase fails). Returns the actual on-disk SHA so the caller can
-// name the drift; a matching SHA is not a false positive.
+// ShipSHAMismatch reports whether the ship binary's SHA-256 differs from expectedSHA, and returns the actual SHA.
 func ShipSHAMismatch(binPath, expectedSHA string) (bool, string, error) {
 	data, err := os.ReadFile(binPath)
 	if err != nil {

@@ -166,9 +166,6 @@ func TestFromSpec(t *testing.T) {
 	}
 }
 
-// ADR-0039 §7: classify.require_failure_context opts a verdict-emitting user
-// phase into the failure-signal contract; it is inert without a verdict (the
-// gate must never invent a verdict requirement — the cycle-192 class).
 func TestFromSpec_RequireFailureContext(t *testing.T) {
 	verdictSpec := phasespec.PhaseSpec{
 		Name: "sec-scan", Role: "evaluate",
@@ -178,7 +175,7 @@ func TestFromSpec_RequireFailureContext(t *testing.T) {
 		t.Error("evaluate+verdict_on_pass+require_failure_context must set RequireFailureContext")
 	}
 	noVerdict := phasespec.PhaseSpec{
-		Name:     "notes", // plan archetype: verdictsFromSpec returns nil
+		Name:     "notes", // no role: defaults to plan, which emits no verdicts
 		Classify: &phasespec.ClassifyRules{RequireFailureContext: true},
 	}
 	if c := FromSpec(noVerdict); c.RequireFailureContext {

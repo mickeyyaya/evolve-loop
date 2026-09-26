@@ -13,15 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// Reconcile-on-timeout (self-healing): when the bridge reports ErrArtifactTimeout
-// but the agent's contracted deliverable is on disk and WELL-FORMED, the runner
-// must trust the deliverable's verdict (via Classify) instead of synthesizing
-// FAIL. This is the deeper fix behind the cycle-254/255 false-FAILs: a complete
-// PASS audit report was discarded because the bridge gave up on the wait window.
-// The verifyFn seam lets these tests drive the well-formedness branch directly
-// without coupling to per-phase contract sections; the real deliverable.Verify +
-// EGPS gate is exercised end-to-end in the audit package.
-
 func verifyReturns(res deliverable.Result, err error) func(string, phasecontract.Roots) (deliverable.Result, error) {
 	return func(phase string, roots phasecontract.Roots) (deliverable.Result, error) {
 		if err != nil {
@@ -31,17 +22,8 @@ func verifyReturns(res deliverable.Result, err error) func(string, phasecontract
 	}
 }
 
-// verifiedFrom makes a scripted deliverable.Result honor the verifyFn seam's
-// SINGLE-READ contract (deliverable-verified-bytes-single-read): production's
-// deliverable.Verify returns the artifact path it judged plus the exact bytes it
-// read, and BaseRunner.Run classifies THOSE bytes. A double that returned only a
-// bare OK/!OK would leave the runner with nothing to classify, so every fake here
-// stamps the path + bytes exactly as Verify does — reading the same
-// <workspace>/<phase>-report.md the runner hands the bridge.
-//
-// No file on disk ⇒ the Result is left path-less, which is how a NoArtifact
-// contract (ship) presents and is what keeps the pane the verdict source for the
-// deliberately-lying alwaysOKVerify plumbing stubs.
+// verifiedFrom stamps the judged path and bytes as deliverable.Verify does, because the runner classifies those bytes.
+// Without a file the Result stays path-less, as a NoArtifact contract presents, so the pane stays the verdict source.
 func verifiedFrom(res deliverable.Result, phase string, roots phasecontract.Roots) deliverable.Result {
 	path := filepath.Join(roots.Workspace, phase+"-report.md")
 	data, err := os.ReadFile(path)
@@ -53,10 +35,6 @@ func verifiedFrom(res deliverable.Result, phase string, roots phasecontract.Root
 	return res
 }
 
-// TestRun_Timeout_WellFormedPASS_ReconcilesToPass — the core fix: timeout +
-// a well-formed deliverable whose Classify verdict is PASS → reconcile to PASS
-// with a nil error, Reconciled=true, and Classify actually ran (proves the
-// fall-through, not a bare sentinel read).
 func TestRun_Timeout_WellFormedPASS_ReconcilesToPass(t *testing.T) {
 	hooks := &fakeHooks{phase: "audit", agent: "evolve-auditor", model: "opus", prompt: "x", verdict: core.VerdictPASS}
 	fb := &fakeBridge{err: artifactTimeoutErr(), writeArtifact: "# audit\n<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"PASS\"} -->\n"}
@@ -85,11 +63,6 @@ func TestRun_Timeout_WellFormedPASS_ReconcilesToPass(t *testing.T) {
 	}
 }
 
-// TestRun_Timeout_SentinelFAIL_StaysFail — reconciliation only UPGRADES toward
-// the agent's real verdict; it never downgrades. A well-formed deliverable whose
-// Classify verdict is FAIL stays FAIL. Because the deliverable is COMPLETE, the
-// phase is treated as a normal completed FAIL (nil error → routes as a real
-// audit-fail, not an infra-timeout retry).
 func TestRun_Timeout_SentinelFAIL_StaysFail(t *testing.T) {
 	hooks := &fakeHooks{phase: "audit", agent: "evolve-auditor", model: "opus", prompt: "x", verdict: core.VerdictFAIL}
 	fb := &fakeBridge{err: artifactTimeoutErr(), writeArtifact: "# audit\nFAIL\n"}
@@ -115,9 +88,6 @@ func TestRun_Timeout_SentinelFAIL_StaysFail(t *testing.T) {
 	}
 }
 
-// TestRun_Timeout_NotWellFormed_StaysFail — a hung agent that wrote nothing /
-// a partial / a malformed deliverable → Verify !OK → hard-FAIL, Classify NOT
-// reached. This is the guard that reconciliation can't ship a hung agent.
 func TestRun_Timeout_NotWellFormed_StaysFail(t *testing.T) {
 	hooks := &fakeHooks{phase: "audit", agent: "evolve-auditor", model: "opus", prompt: "x", verdict: core.VerdictPASS}
 	fb := &fakeBridge{err: artifactTimeoutErr()} // no artifact written
@@ -148,8 +118,6 @@ func TestRun_Timeout_NotWellFormed_StaysFail(t *testing.T) {
 	}
 }
 
-// TestRun_OptionalPhase_Timeout_WellFormedPASS_ReconcilesToPass — optional phases
-// reconcile UP past the old unconditional WARN when the deliverable is clean.
 func TestRun_OptionalPhase_Timeout_WellFormedPASS_ReconcilesToPass(t *testing.T) {
 	hooks := &fakeHooks{phase: "build-planner", agent: "evolve-build-planner", model: "opus", prompt: "x", verdict: core.VerdictPASS}
 	fb := &fakeBridge{err: artifactTimeoutErr(), writeArtifact: "# plan\n"}
@@ -173,9 +141,6 @@ func TestRun_OptionalPhase_Timeout_WellFormedPASS_ReconcilesToPass(t *testing.T)
 	}
 }
 
-// TestRun_NonTimeoutError_Timeout_StaysFail_Unchanged — guards against
-// over-broadening: a NON-timeout bridge error never consults the deliverable;
-// it hard-fails exactly as before (Classify not called, not reconciled).
 func TestRun_NonTimeoutError_StaysFail_Unchanged(t *testing.T) {
 	hooks := &fakeHooks{phase: "audit", agent: "evolve-auditor", model: "opus", prompt: "x", verdict: core.VerdictPASS}
 	fb := &fakeBridge{err: errors.New("bridge: launch exit=2"), writeArtifact: "# audit\nPASS\n"} // safety-gate, not a timeout
@@ -208,13 +173,7 @@ func TestRun_NonTimeoutError_StaysFail_Unchanged(t *testing.T) {
 	}
 }
 
-// noisyStdoutBridge simulates a non-timeout completion (err=nil) where the
-// agent wrote a well-formed deliverable to disk but the captured stdout
-// scrollback is noisy — e.g. it contains the Deliverable Contract's own
-// prompt-echoed PASS/FAIL example sentinel lines. This is the cycle-603
-// failure mode: NOT a timeout, so the existing reconcile fallback (gated on
-// ErrArtifactTimeout, runner.go:585) never engages, and classification falls
-// straight through to raw bres.Stdout (runner.go:655-662).
+// noisyStdoutBridge exits cleanly with stdout full of the contract's echoed PASS and FAIL example sentinels.
 type noisyStdoutBridge struct {
 	fileContent string
 	stdout      string
@@ -232,14 +191,6 @@ func (b *noisyStdoutBridge) Probe(_ context.Context) (core.BridgeProbe, error) {
 	return core.BridgeProbe{}, nil
 }
 
-// TestRun_NonTimeout_WellFormedDeliverable_PrefersFileOverNoisyStdout —
-// cycle-603: a non-timeout completion whose captured stdout contains BOTH a
-// PASS-example and a FAIL-example contract-style sentinel line (the
-// Deliverable Contract's own printed examples, not the agent's real verdict)
-// must not classify off that noise. When the on-disk deliverable exists and
-// verifies well-formed (OK), the runner must prefer the file — generalizing
-// the already-tested timeout-reconcile pattern to every completion path, not
-// just ErrArtifactTimeout.
 func TestRun_NonTimeout_WellFormedDeliverable_PrefersFileOverNoisyStdout(t *testing.T) {
 	genuine := "# audit\n<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"PASS\"} -->\n"
 	noisyStdout := "Deliverable Contract example (PASS):\n" +
@@ -277,27 +228,10 @@ func hasWarningDiag(diags []core.Diagnostic) bool {
 	return false
 }
 
-// TestNew_DefaultVerifyFnIsCatalogAware moved to runner_phaseio_test.go as
-// TestRun_DefaultProbeResolvesTheMergedCatalog, pinned through Run (review
-// fold F4: the probe lives in the verdict engine only).
-
-// TestRun_Timeout_DeliverableSettlesOnRetry_ReconcilesToPass — cycles 824/825
-// (width-2 storm): a next-phase (retrospective) context-cancel tore down the
-// audit bridge session and was LAUNDERED into ErrArtifactTimeout at the exact
-// instant the auditor's PASS deliverable was still SETTLING to disk. A
-// single-shot verify at that instant reads a half-written file, so the mandatory
-// audit phase hard-FAILs and a genuinely-PASS audited cycle (build PASS, tdd
-// RED->green, adversarial PASS, audit PASS 0.95) is discarded and requeued from
-// scratch. The reconcile must re-verify across a bounded settle window so the
-// settled deliverable is caught and the cycle reconciles to the agent's real PASS
-// — honoring the reconcile block's own documented intent (trust a deliverable
-// written just as the bridge gave up on the wait window).
 func TestRun_Timeout_DeliverableSettlesOnRetry_ReconcilesToPass(t *testing.T) {
 	hooks := &fakeHooks{phase: "audit", agent: "evolve-auditor", model: "opus", prompt: "x", verdict: core.VerdictPASS}
 	fb := &fakeBridge{err: artifactTimeoutErr(), writeArtifact: "# audit\n<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"PASS\"} -->\n"}
-	// The deliverable is still settling: the first two verifies miss (file
-	// mid-write), the third — within the settle window — catches the well-formed
-	// PASS deliverable.
+	// The first two verifies miss a file still being written; the third, inside the settle window, sees the PASS.
 	calls := 0
 	settling := func(phase string, roots phasecontract.Roots) (deliverable.Result, error) {
 		calls++
@@ -329,11 +263,6 @@ func TestRun_Timeout_DeliverableSettlesOnRetry_ReconcilesToPass(t *testing.T) {
 	}
 }
 
-// TestRun_Timeout_DeliverableNeverSettles_StillFailsBounded — the settle-retry is
-// BOUNDED and never manufactures a PASS. A genuinely absent / never-settling
-// deliverable (a hung agent, not a settle race) still hard-FAILs after a fixed
-// number of re-verifies: the loop must not spin, and reconciliation can only
-// UPGRADE a timeout toward a real deliverable — never invent one.
 func TestRun_Timeout_DeliverableNeverSettles_StillFailsBounded(t *testing.T) {
 	hooks := &fakeHooks{phase: "audit", agent: "evolve-auditor", model: "opus", prompt: "x", verdict: core.VerdictPASS}
 	fb := &fakeBridge{err: artifactTimeoutErr()}

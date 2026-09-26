@@ -1,16 +1,5 @@
 package runner
 
-// Slice-5 full-story replay (deterministic clock): the complete
-// detect → remember → react → recover loop the cycle-283 incident lacked.
-//
-//	t0      dispatch: codex walls (85 + rate_limit report) → benched, claude
-//	        carries the phase; benched_until comes from the pane's own
-//	        "try again at 6:11 AM" hint
-//	t0+5m   dispatch: chain starts at claude — zero codex boots
-//	t0+7h   dispatch (bench expired): codex gets its canary shot first; it
-//	        walls AGAIN → re-benched with strikes=2
-//	then    dispatch: codex demoted again while the strike bench is active
-
 import (
 	"context"
 	"testing"
@@ -40,14 +29,11 @@ func storyRun(t *testing.T, root string, bridge core.Bridge, now time.Time) {
 
 func TestCLIHealthFullStory(t *testing.T) {
 	root := writeFallbackProfile(t, "evolve-auditor", "codex-tmux", []string{"claude-tmux"})
-	// Deterministic zone (NOT time.Local): ParseResetHint interprets the wall
-	// clock in now's location, and the assertion below must mean the same
-	// instant on every host (review: injected-clock discipline).
+	// A fixed zone, not time.Local: ParseResetHint reads the wall clock in now's location.
 	loc := time.FixedZone("STORY", 8*3600)
 	t0 := time.Date(2026, 6, 11, 0, 30, 0, 0, loc)
 
-	// t0 — codex walls; the report's capturedAt must be >= run start (the
-	// injected clock returns t0 for the runner, so stamp exactly t0).
+	// capturedAt must not precede the run start, and the injected clock returns t0 to the runner.
 	wallBridge := func() *escalatingBridge {
 		return &escalatingBridge{
 			scriptedBridge: scriptedBridge{responses: map[string]scriptedResp{
@@ -68,22 +54,18 @@ func TestCLIHealthFullStory(t *testing.T) {
 	if bench.Family == "" {
 		t.Fatal("t0: wall not benched")
 	}
-	// The pane's own hint ("try again at 6:11 AM" +2min margin) wins over the
-	// default cooldown.
+	// The pane's own hint (6:11 AM plus a 2-minute margin) wins over the default cooldown.
 	wantUntil := time.Date(2026, 6, 11, 6, 13, 0, 0, loc)
 	if !bench.BenchedUntil.Equal(wantUntil) {
 		t.Errorf("benched_until=%v, want %v (the wall's own reset hint)", bench.BenchedUntil, wantUntil)
 	}
 
-	// t0+5m — active bench: the chain must start at claude, zero codex boots.
 	sb := &scriptedBridge{responses: map[string]scriptedResp{"claude-tmux": {}}}
 	storyRun(t, root, sb, t0.Add(5*time.Minute))
 	if len(sb.calls) != 1 || sb.calls[0] != "claude-tmux" {
 		t.Fatalf("t0+5m dispatch=%v, want exactly [claude-tmux] (benched codex never boots)", sb.calls)
 	}
 
-	// t0+7h — bench expired: codex gets the canary-by-dispatch shot first and
-	// walls AGAIN → re-benched with strikes incremented.
 	t1 := t0.Add(7 * time.Hour)
 	eb2 := wallBridge()
 	eb2.capturedAt = t1
@@ -100,7 +82,6 @@ func TestCLIHealthFullStory(t *testing.T) {
 		t.Errorf("strikes=%d, want 2 (consecutive re-bench)", rebench.Strikes)
 	}
 
-	// While the strike bench is active, codex is demoted again.
 	sb2 := &scriptedBridge{responses: map[string]scriptedResp{"claude-tmux": {}}}
 	storyRun(t, root, sb2, t1.Add(time.Minute))
 	if len(sb2.calls) != 1 || sb2.calls[0] != "claude-tmux" {

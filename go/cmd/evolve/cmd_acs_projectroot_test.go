@@ -1,21 +1,5 @@
 package main
 
-// cmd_acs_projectroot_test.go — RED contract for the cycle-1434 ADR-0072 halt
-// (auto-filed P0): `evolve acs suite` derived EVOLVE_PROJECT_ROOT via
-// mainProjectRoot (git --git-common-dir parent), which resolves to the OWNING
-// repo. Correct when a cycle worktree's owner IS the plane; wrong the moment
-// the plane is itself a linked worktree — all linked worktrees share one
-// common dir, so the derivation skipped the plane and landed on the console
-// checkout, whose .evolve has none of this cycle's run state. Three predicates
-// red'd against the wrong state root while the audit phase's correct-root run
-// was 8/8 green, and the CLI-written artifact won.
-//
-// The invocation already names the correct plane: --evolve-dir (default
-// ".evolve" under the caller's cwd, which the audit persona pins to the plane
-// root). suiteProjectRoot anchors on it whenever it actually holds this
-// cycle's run — kernel-owned proof it is the plane — and falls back to the
-// git derivation for invocations with no plane evolveDir (issue #12 shape).
-
 import (
 	"os"
 	"os/exec"
@@ -23,7 +7,6 @@ import (
 	"testing"
 )
 
-// addWorktree links a new worktree of repo at abs path dst, detached on HEAD.
 func addWorktree(t *testing.T, repo, dst string) {
 	t.Helper()
 	cmd := exec.Command("git", "worktree", "add", "--detach", dst)
@@ -41,9 +24,7 @@ func TestSuiteProjectRoot_NestedPlaneWorktree(t *testing.T) {
 		t.Fatal(err)
 	}
 	initRepo(t, console)
-	// The plane is a LINKED worktree of the console repo (the live topology:
-	// evolve-loop-runtime is a worktree of evolve-loop) and holds the runtime
-	// state for cycle 7.
+	// The plane is itself a linked worktree of the console, as in the live hub.
 	plane := filepath.Join(base, "plane")
 	addWorktree(t, console, plane)
 	planeEvolve := filepath.Join(plane, ".evolve")
@@ -51,13 +32,10 @@ func TestSuiteProjectRoot_NestedPlaneWorktree(t *testing.T) {
 	if err := os.MkdirAll(runDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	// The anchor is the kernel-owned cycle-state.json — presence alone, no
-	// field values (an empty active_worktree must not demote the plane).
+	// An empty state file: presence alone must prove the plane.
 	if err := os.WriteFile(filepath.Join(runDir, "cycle-state.json"), []byte("{}"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// The cycle worktree is a sibling linked worktree — its git common dir is
-	// the CONSOLE's, not the plane's.
 	cycleWT := filepath.Join(base, "cycle-wt")
 	addWorktree(t, console, cycleWT)
 

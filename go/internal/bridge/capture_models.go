@@ -7,42 +7,23 @@ import (
 	"time"
 )
 
-// modelPickerMarkers are substrings that indicate a CLI's /model picker is
-// open: codex "Select Model", agy "Switch Model", claude "Select model".
+// modelPickerMarkers show an open /model picker: codex "Select Model", agy "Switch Model", claude "Select model".
 var modelPickerMarkers = []string{"Select Model", "Switch Model", "Select model"}
 
-// modelPickerPollTicks bounds each poll (seconds) for the picker to render.
+// modelPickerPollTicks is how many one-second polls wait for the picker to render.
 const modelPickerPollTicks = 6
 
-// CaptureModelPicker launches-or-attaches the CLI's REPL, opens its interactive
-// /model picker, captures the pane, and dismisses the picker with Esc WITHOUT
-// confirming — so the live model is never changed. The returned pane is parsed
-// by modelquery's per-CLI picker parsers. An ephemeral session is killed after
-// capture so a daily refresh does not leak live REPL processes.
-//
-// Safety: the picker is opened by `/model` + Enter (the slash-command idiom).
-// codex intercepts that first Enter with a slash autocomplete and needs ONE
-// more Enter to open the picker; that extra Enter is sent ONLY while the picker
-// is not yet open, so a CLI whose picker opened immediately is never
-// accidentally confirmed. The final keystroke is always Esc.
+// CaptureModelPicker captures the CLI's /model picker pane and dismisses it with Esc, so the live model never changes.
 func CaptureModelPicker(ctx context.Context, cfg *Config, deps Deps, cli string) (pane string, err error) {
 	deps = deps.withDefaults()
-	// I1 NOTE (resolved 2026-08-05): liveRefresh now passes a throwaway scratch
-	// dir as cfg.Workspace, so Workspace-relative writes (escalation reports,
-	// llm-calls.ndjson, launch errors) land outside the repo and are salvaged
-	// to .evolve/models-probe before teardown (salvageProbeDiagnostics,
-	// cmd_models_live.go). Two distinct knobs, easy to conflate: the tmux
-	// session's CWD is governed by cfg.Worktree (never set on this path — the
-	// recipe falls back to os.Getwd()); cfg.Workspace only anchors those
-	// diagnostic writes. Do not "fix" the cwd by pointing Worktree at scratch —
-	// a picker capture needs no cwd guarantee at all.
+	// cfg.Workspace only anchors diagnostic writes. The session cwd is cfg.Worktree, left unset on purpose:
+	// a picker capture needs no cwd guarantee.
 	drv, _, derr := newRecipeDriver(cfg, deps, cli)
 	if derr != nil {
 		return "", derr
 	}
 	if cfg.SessionName == "" { // ephemeral session — reap the live REPL afterwards
-		// Detached context: the session must be reaped even if the caller's ctx
-		// was already cancelled (deadline/parent cancel) by the time we return.
+		// Detached context: the session is reaped even when the caller's ctx is already cancelled.
 		defer func() { _ = deps.Tmux.KillSession(context.Background(), drv.session) }()
 	}
 	if serr := drv.EnsureSession(ctx); serr != nil {
@@ -54,9 +35,8 @@ func CaptureModelPicker(ctx context.Context, cfg *Config, deps Deps, cli string)
 
 	pane, opened := pollForModelPicker(ctx, drv, deps)
 	if !opened {
-		// codex's slash-autocomplete swallowed the first Enter; one more opens it.
-		// A SendKeys error here means the session died — fail fast (Esc-dismissing
-		// first) rather than burning another full poll on a dead session.
+		// codex's slash autocomplete swallows the first Enter, so one more opens the picker; it is sent only while
+		// the picker is closed, never to confirm. A SendKeys error means the session died: dismiss and fail fast.
 		if kerr := drv.SendKeys(ctx, "Enter"); kerr != nil {
 			_ = drv.SendKeys(ctx, "Escape")
 			return pane, fmt.Errorf("recipe: /model extra-enter for %s: %w", cli, kerr)
@@ -71,8 +51,6 @@ func CaptureModelPicker(ctx context.Context, cfg *Config, deps Deps, cli string)
 	return pane, nil
 }
 
-// pollForModelPicker polls the pane up to modelPickerPollTicks times, returning
-// the last captured pane and whether a picker marker appeared.
 func pollForModelPicker(ctx context.Context, drv *recipeSessionDriver, deps Deps) (pane string, opened bool) {
 	for i := 0; i < modelPickerPollTicks; i++ {
 		deps.Sleep(time.Second)

@@ -1,8 +1,5 @@
 package lifecycle
 
-// mover_test.go — the Mover's construction, its Null-Object defaults and the
-// ONE producer's two links (ADR-0103 unit 06 §6 tests 19-21).
-
 import (
 	"context"
 	"errors"
@@ -17,7 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// recordingCenter captures every event a Mover emits.
 type recordingCenter struct {
 	c      *signalcenter.Center
 	events []signalcenter.Event
@@ -93,8 +89,7 @@ func procPath(inbox string, cycle int, name string) string {
 
 func tmpPathOf(path string) string { return path + ".tmp." + strconv.Itoa(os.Getpid()) }
 
-// faultLines returns the fallback-link lines (the legacy WARN/ERROR tokens)
-// in stderr, in order — the INFO lines are kept lines and print on both links.
+// faultLines keeps the WARN and ERROR lines of stderr; INFO lines print whether or not a Center is wired.
 func faultLines(stderr string) []string {
 	var out []string
 	for _, line := range strings.Split(stderr, "\n") {
@@ -117,9 +112,6 @@ func equalStrings(a, b []string) bool {
 	return true
 }
 
-// Test 19 — New(dir, nil) is a working Null-Object Mover: no Center, no ledger,
-// no retire hook, no active-cycle reader, no landing probe, no run workspace;
-// every With*(nil) keeps the default.
 func TestNew_NullObjectDefaults(t *testing.T) {
 	inbox := newInbox(t)
 	m := New(inbox, nil, WithStderr(nil), WithNow(nil), WithActiveCycle(nil), WithLanded(nil), WithRetire(nil),
@@ -152,9 +144,6 @@ func TestNew_NullObjectDefaults(t *testing.T) {
 	}
 }
 
-// Test 19b — every With*(nil) is a no-op AFTER a real seam too: the eight
-// options share one idiom (nil keeps what is installed), so a stray nil in an
-// option list never clobbers the predicate or the run-workspace spelling.
 func TestNew_NilOptionNeverClobbersAnInstalledSeam(t *testing.T) {
 	inbox := newInbox(t)
 	writeItem(t, filepath.Join(inbox, "p.json"), `{"id":"p","files":["go/internal/guards/role.go (fix)"]}`)
@@ -292,10 +281,6 @@ func warnRows() []warnRow {
 	}
 }
 
-// Test 20 — the one producer's two links: with a Center every fault is ONE
-// inbox.warning WARN event under module inbox (origin, cycle, code, step,
-// task_id) and no fallback line; without one the legacy line prints byte for
-// byte and nothing is emitted.
 func TestMover_Warn_TwoLinks(t *testing.T) {
 	for _, row := range warnRows() {
 		t.Run(row.name+"/wired", func(t *testing.T) {
@@ -315,7 +300,6 @@ func TestMover_Warn_TwoLinks(t *testing.T) {
 					e.Severity != signalcenter.SeverityWarn || e.Cycle != row.cycle || e.Fields["step"] != row.wantSteps[i] {
 					t.Errorf("event %d = %+v; want %s under inbox/inbox.warning/WARN cycle=%d step=%s", i, e, row.wantCodes[i], row.cycle, row.wantSteps[i])
 				}
-				// Every per-item event names its task_id; the manifest fault is per cycle (workspace).
 				if perItem := e.Code != CodeContinuationManifestUnreadable; perItem && e.Fields["task_id"] == "" || !perItem && e.Fields["workspace"] == "" {
 					t.Errorf("event %d = %+v; want task_id on a per-item event, workspace on the manifest fault", i, e)
 				}
@@ -363,9 +347,6 @@ var codeSteps = map[signalcenter.Code][]string{
 	CodeRouteNotFound:                  {"locate"},
 }
 
-// Test 21 — every code is registered under module inbox with a doc that names
-// its fields.step values; the real registry is conflict-free; no INBOX_ code
-// doubles the ledger adapter's LEDGER_APPEND_FAILED.
 func TestMover_Codes_RegisteredUnderInbox_DocsNameTheirSteps_NoLedgerDouble(t *testing.T) {
 	if len(codeSteps) != 14 {
 		t.Fatalf("the unit registers 14 codes, the table names %d", len(codeSteps))

@@ -21,9 +21,6 @@ func benchExpired(t *testing.T, root, family string, strikes int) {
 	}
 }
 
-// TestCanaryRecoveryClearsBench: an expired bench whose probe succeeds is
-// cleared — the family is healthy again with one cheap probe instead of a
-// full phase stall.
 func TestCanaryRecoveryClearsBench(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -42,8 +39,6 @@ func TestCanaryRecoveryClearsBench(t *testing.T) {
 	}
 }
 
-// TestCanaryStillWalledRebenchesWithStrike: a probe that hits the wall again
-// re-benches with strikes+1 (doubled cooldown when no reset hint parses).
 func TestCanaryStillWalledRebenchesWithStrike(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -65,8 +60,6 @@ func TestCanaryStillWalledRebenchesWithStrike(t *testing.T) {
 	}
 }
 
-// TestCanaryWallWithResetHintUsesIt: the re-bench honors the pane's own reset
-// hint over the strike cooldown.
 func TestCanaryWallWithResetHintUsesIt(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -82,8 +75,6 @@ func TestCanaryWallWithResetHintUsesIt(t *testing.T) {
 	}
 }
 
-// TestCanaryNonWallFailureClears: a non-wall probe failure clears the bench —
-// other failure classes belong to the normal dispatch machinery.
 func TestCanaryNonWallFailureClears(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -100,8 +91,6 @@ func TestCanaryNonWallFailureClears(t *testing.T) {
 	}
 }
 
-// TestCanarySkipsActiveBenchesAndDisabledEnv: active benches are not probed;
-// EVOLVE_CLI_HEALTH=0 disables the whole canary.
 func TestCanarySkipsActiveBenchesAndDisabledEnv(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

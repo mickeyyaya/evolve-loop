@@ -13,8 +13,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/systemprompt"
 )
 
-// phaseDispatchPlan contains the resolved, immutable inputs shared by every
-// fallback attempt in one phase execution.
+// phaseDispatchPlan is the immutable input every fallback attempt of one execution shares.
 type phaseDispatchPlan struct {
 	plan              llmroute.Plan
 	overlayPolicy     policy.Policy

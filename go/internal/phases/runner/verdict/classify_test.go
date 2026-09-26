@@ -1,9 +1,5 @@
 package verdict
 
-// classify_test.go — the classify half (ADR-0103 unit 11 §6 tests 26-27): the
-// fault-only unverified-deliverable signal, the ship guard, the violation
-// trail and the clean-stdout companion.
-
 import (
 	"context"
 	"errors"
@@ -13,12 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable"
 )
 
-// Test 26 — RUNNER_DELIVERABLE_UNVERIFIED fires only when the final verdict is
-// FAIL: the guard's downgrade (downgraded=true) or Classify's own FAIL; a
-// WARN/SKIPPED pass-through emits nothing though the violations still reach
-// the diagnostics; an uncontracted phase never signals. Kills `event on
-// pass-through`, `WARN downgraded`, `verdict_before after the guard`, `codes
-// dropped`.
 func TestClassify_UnverifiedDeliverable_SignalsOnlyWhenTheFinalVerdictIsFail(t *testing.T) {
 	codes := []string{deliverable.CodeMissingChallengeToken, deliverable.CodeBadVerdict}
 	for _, tc := range []struct {
@@ -69,7 +59,6 @@ func TestClassify_UnverifiedDeliverable_SignalsOnlyWhenTheFinalVerdictIsFail(t *
 	}
 }
 
-// applyShipGuard is pure: the table the test above drives through Judge.
 func TestApplyShipGuard_DowngradesOnlyUnverifiedCleanShipVerdicts(t *testing.T) {
 	for _, tc := range []struct{ in, want string }{{core.VerdictPASS, core.VerdictFAIL}, {"BOGUS", core.VerdictFAIL}, {core.VerdictFAIL, core.VerdictFAIL}, {core.VerdictWARN, core.VerdictWARN}, {core.VerdictSKIPPED, core.VerdictSKIPPED}} {
 		if got := applyShipGuard(tc.in, true); got != tc.want {
@@ -81,9 +70,6 @@ func TestApplyShipGuard_DowngradesOnlyUnverifiedCleanShipVerdicts(t *testing.T) 
 	}
 }
 
-// Test 27 — the clean-stdout companion: a nil filter is never called; a
-// failing filter is ONE code, never an error, and the verdict stands. Kills
-// `nil filter dereferenced`, `error blocks the phase`, `drop the emit`.
 func TestWriteCleanStdout_NilFilterSkips_ErrorIsACodeNeverAnError(t *testing.T) {
 	off := newHarness(t, probe{okFrom: 1}, WithStdoutFilter(nil))
 	off.writeReport(t, "audit", reportPASS)
@@ -106,8 +92,6 @@ func TestWriteCleanStdout_NilFilterSkips_ErrorIsACodeNeverAnError(t *testing.T) 
 		len(ev[0].Fields) != 1 || ev[0].Fields["workspace"] != failing.ws {
 		t.Errorf("one RUNNER_STDOUT_FILTER_FAILED whose only field is the workspace (Phase names the companion; its filename is the writer's belief, never re-spelled here): %+v", ev)
 	}
-	// Ordering inside the declared fold (D2): the filter's WARN precedes the
-	// ONE reconcile event, which is emitted with the verdict known.
 	both := newHarness(t, probe{okFrom: 1}, WithStdoutFilter(func(string, string) error { return errors.New("x") }))
 	both.writeReport(t, "audit", reportPASS)
 	if _, err := both.e.Judge(context.Background(), both.dispatch("audit", timeoutErr()), classifyAs(core.VerdictPASS, "")); err != nil {

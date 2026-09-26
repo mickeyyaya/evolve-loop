@@ -7,17 +7,8 @@ import (
 	"testing"
 )
 
-// TestWireOrchestratorDeps_EveryConsumerGetsTheChainWalkingBridge is the
-// source-scan guard for the one construction site: wireOrchestratorDeps wraps
-// the raw bridge in bridgechain.New exactly once and hands the WRAPPED handle
-// to every consumer (phase configs, the swarm decorator, the retro, the
-// debugger, the spec runners, the registrar, the advisor, the failure advisor,
-// the catalog publisher). The raw `br` may only be constructed, configured
-// through its Set* methods, wrapped, handed to the catalog publisher as its
-// contract-resolver sink, and exposed on orchDeps (*bridge.Adapter) for the
-// host's own configuration — never launched. A new `Bridge: br` is how the retro lost its
-// fallback for two waves (2026-09-14); this test makes that a compile-time
-// habit rather than a forensic finding.
+// The raw br may only be constructed, configured through its Set* methods,
+// wrapped, used as the catalog publisher's sink and exposed on orchDeps; never launched.
 func TestWireOrchestratorDeps_EveryConsumerGetsTheChainWalkingBridge(t *testing.T) {
 	src, err := os.ReadFile("cmd_cycle.go")
 	if err != nil {
@@ -39,7 +30,7 @@ func TestWireOrchestratorDeps_EveryConsumerGetsTheChainWalkingBridge(t *testing.
 		regexp.MustCompile(`^\s*br\.Set[A-Za-z]+\(`),
 		regexp.MustCompile(`bridgechain\.New\(br,`),
 		regexp.MustCompile(`catalogPublisher\(br\)`),   // the concrete adapter's contract-resolver sink — configured, never launched
-		regexp.MustCompile(`wireBridgeStages\(br, `),   // F27: takes a bridgeStageSink (three setters, no Launch) — a configurer by type
+		regexp.MustCompile(`wireBridgeStages\(br, `),   // takes a bridgeStageSink (three setters, no Launch) — a configurer by type
 		regexp.MustCompile(`^\s*Bridge:\s{2,}br,\s*$`), // orchDeps.Bridge (*bridge.Adapter): the host's own Set* handle — never launched
 	}
 	for i, line := range strings.Split(fn, "\n") {

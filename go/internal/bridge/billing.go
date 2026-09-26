@@ -10,16 +10,6 @@ import (
 	"strings"
 )
 
-// billing.go — credential-isolation hygiene (Go port of
-// lib/billing-snapshot.sh): snapshot the credential-resolution state
-// before/after a call and compare for an unintended auth path (env-var
-// leak, proxy injection, credential rotation). Vendor-agnostic operator
-// tooling, not on the cycle path.
-//
-// Simplification vs bash: file + env signals only (the macOS Keychain /
-// `claude usage` / statsig branches are platform/exec-specific — the
-// credentials-file fingerprint covers the common case).
-
 type billingSnapshot struct {
 	TS                    string `json:"ts"`
 	Label                 string `json:"label"`
@@ -29,8 +19,7 @@ type billingSnapshot struct {
 	AnthropicBaseURLInEnv string `json:"anthropic_base_url_in_env"` // "" when unset
 }
 
-// BillingSnapshot writes a credential-state snapshot to dir and returns
-// its path. The access token is never stored — only a salted-prefix hash.
+// BillingSnapshot writes a credential-state snapshot to dir and returns its path; the token is stored only as a hash.
 func (e *Engine) BillingSnapshot(dir, label string) (string, error) {
 	if dir == "" || label == "" {
 		return "", fmt.Errorf("bridge:billing: snapshot requires dir and label")
@@ -65,8 +54,7 @@ func (e *Engine) BillingSnapshot(dir, label string) (string, error) {
 	return out, nil
 }
 
-// billingTokenHash returns a sha256 of the access-token prefix (never the
-// token itself), or a sentinel when absent / token-less.
+// billingTokenHash hashes the access-token prefix, never the whole token, or returns a sentinel.
 func billingTokenHash(b []byte) string {
 	s := string(b)
 	i := strings.Index(s, `"accessToken":"`)
@@ -81,9 +69,7 @@ func billingTokenHash(b []byte) string {
 	return hex.EncodeToString(h[:])
 }
 
-// BillingCompare diffs two snapshots and returns (verdict, exitCode):
-// 0 PASS (credential isolation held), 1 FAIL (override env leak),
-// 2 INCONCLUSIVE.
+// BillingCompare diffs two snapshots: exit 0 PASS, 1 FAIL (override env leak), 2 INCONCLUSIVE.
 func BillingCompare(beforePath, afterPath string) (string, int) {
 	var before, after billingSnapshot
 	if !readBillingSnap(beforePath, &before) || !readBillingSnap(afterPath, &after) {

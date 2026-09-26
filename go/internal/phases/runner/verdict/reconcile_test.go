@@ -1,9 +1,5 @@
 package verdict
 
-// reconcile_test.go — the teardown reconcile arms (ADR-0103 unit 11 §6 tests
-// 21-25): the arm ORDER, the forensic FAIL event, the optional degrade, the ACS
-// deterministic floor and the reconcile trail.
-
 import (
 	"context"
 	"errors"
@@ -22,13 +18,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// unverifiedReport is the host harness's malformed report — long enough that
-// the 160-byte forensic tail is a real suffix (verdict_scenarios_test.go).
+// unverifiedReport mirrors the host harness's malformed report; it is long enough that the
+// 160-byte forensic tail is a real suffix.
 const unverifiedReport = "# audit\n(partial — no verdict sentinel, no challenge token)\n" +
 	"## Findings\n- one\n- two\n- three\n- four\n- five\n- six\n- seven\n- eight\n- nine\n- ten\n- eleven\n- twelve\n- thirteen\n- fourteen\n- fifteen\n- sixteen\n- seventeen\n- eighteen\n- nineteen\n- twenty\n"
 
-// seedStale writes the artifact BEFORE dispatch with an old mtime and returns
-// the pre-dispatch snapshot the host's preparation would have taken.
+// seedStale writes a pre-dispatch leftover with an old mtime and returns its snapshot.
 func seedStale(t *testing.T, path, body string) Snapshot {
 	t.Helper()
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
@@ -55,11 +50,6 @@ func eventsWith(events []signalcenter.Event, code signalcenter.Code) []signalcen
 	return out
 }
 
-// Test 21 — the arm order stale-refusal → OK → optional → ACS floor →
-// forensic FAIL, each arm reached by its own row. Kills `stale gate after OK`,
-// `optional before OK`, `floor consulted when stale`, `&& res.OK dropped from
-// the gate`, `mtime ignored`. The optional-vs-floor order is unobservable
-// (audit is never optional) — recorded EQUIVALENT, kept structurally.
 func TestReconcileTeardown_ArmOrderIsStaleOKOptionalACSFloorForensic(t *testing.T) {
 	t.Run("stale leftover refuses BOTH doors", func(t *testing.T) {
 		h := newHarness(t, probe{okFrom: 1})
@@ -141,11 +131,6 @@ func TestReconcileTeardown_ArmOrderIsStaleOKOptionalACSFloorForensic(t *testing.
 	})
 }
 
-// Test 22 — the forensic FAIL event carries every value the old
-// [VERDICT-FORENSIC] line carried (the golden reproduces from the fields) plus
-// the cause vocabulary, under the Center's field cap. Kills `tail from the
-// head`, `codes joined by ;`, `cause mapping swapped`, `origin misnamed`,
-// `teardownKind swapped`, `event on the OK arm`.
 func TestForensicFail_EmitsOneEventWithTheGoldenFields(t *testing.T) {
 	golden := strings.Split(strings.TrimSpace(readGolden(t, "stderr_forensic.golden.txt")), "\n")
 	h := newHarness(t, probe{codes: []string{deliverable.CodeMissingChallengeToken, deliverable.CodeBadVerdict}})
@@ -184,7 +169,6 @@ func TestForensicFail_EmitsOneEventWithTheGoldenFields(t *testing.T) {
 	if _, has := f["truncated"]; has || len(f) > signalcenter.MaxFields-1 {
 		t.Errorf("the code must stay under the field cap with one slot of slack: %d keys %+v", len(f), f)
 	}
-	// The old line, reproduced from the fields, equals the pre-extraction golden.
 	oldLine := fmt.Sprintf("[VERDICT-FORENSIC] teardown-FAIL phase=%s roots{%s} verr=<nil> codes=[%s] report{%s} acs{%s}", e.Phase, f["roots"], f["codes"], f["report"], f["acs"])
 	oldLine = strings.NewReplacer(h.ws+"-wt", "{wt}", h.ws, "{ws}", h.root, "{root}").Replace(oldLine)
 	if oldLine != golden[0] {
@@ -212,9 +196,6 @@ func TestForensicFail_EmitsOneEventWithTheGoldenFields(t *testing.T) {
 	}
 }
 
-// Test 23 — the optional degrade: (WARN, nil), the exact message with and
-// without the unverifiable suffix, one event. Kills `suffix dropped`, `error
-// returned on the WARN arm`, `optional arm after the floor`.
 func TestDegradeOptional_WarnResponseAndOneEvent(t *testing.T) {
 	h := newHarness(t, probe{codes: []string{deliverable.CodeMissingArtifact}}, WithOptional(true))
 	d := h.dispatch("build-planner", timeoutErr())
@@ -243,10 +224,6 @@ func TestDegradeOptional_WarnResponseAndOneEvent(t *testing.T) {
 	}
 }
 
-// Test 24 — the ACS deterministic floor: audit only, acs PASS, auditRan, the
-// token echoed (TrimSpace, non-empty), and the ONE late read when the probe
-// produced no bytes. Kills `audit gate dropped`, `auditRan ignored`,
-// `TrimSpace dropped`, `late read dropped`, `second read`.
 func TestRescueViaACSFloor_RescuesOnlyAudit_PassPass_TokenEchoed_LateReadOnce(t *testing.T) {
 	stray := probe{codes: []string{deliverable.CodeStrayInWorktree}}
 	rescued := func(t *testing.T, h *harness, phase string) (reconciliation, bool) {
@@ -326,8 +303,7 @@ func TestRescueViaACSFloor_RescuesOnlyAudit_PassPass_TokenEchoed_LateReadOnce(t 
 		if early != nil || err != nil || !r.acsFloorRescued || r.verified.ArtifactPath != d.ArtifactPath || r.verified.Content != reportWithToken {
 			t.Fatalf("the late read adopts path + bytes: %+v %+v %v", r, early, err)
 		}
-		// A directory at the path now: the classify step must reuse the adopted
-		// bytes, never read a second time.
+		// A directory at the path makes any second read visible.
 		if err := os.Remove(d.ArtifactPath); err != nil {
 			t.Fatal(err)
 		}
@@ -342,11 +318,6 @@ func TestRescueViaACSFloor_RescuesOnlyAudit_PassPass_TokenEchoed_LateReadOnce(t 
 	})
 }
 
-// Test 25 — ONE RUNNER_RECONCILED per reconcile: via=verify with the :163
-// trail, via=acs_floor with the :167 trail + the override diagnostic and the
-// overridden codes; an empty code list yields no override diagnostic. Kills
-// `two events per rescue`, `override diag without codes`, `Reconciled unset`,
-// `code on the non-reconciled path`.
 func TestReconcileTrail_EmitsOneReconciledEventViaVerifyOrACSFloor(t *testing.T) {
 	verify := newHarness(t, probe{okFrom: 1})
 	verify.writeReport(t, "audit", reportPASS)
@@ -398,11 +369,6 @@ func readGolden(t *testing.T, name string) string {
 	return string(b)
 }
 
-// F22: the verifier may now WRITE (the contract gate salvages a sole
-// recoverable bad_verdict and persists the repaired artifact). The
-// pre-dispatch identity is read before the probe, so a leftover the probe
-// repairs is still refused as a prior attempt's report — cycle-1550's guard
-// must not be defeated by our own rewrite.
 func TestReconcileTeardown_LeftoverRepairedByTheProbeIsStillRefused(t *testing.T) {
 	h := newHarness(t, probe{okFrom: 1})
 	d := h.dispatch("audit", timeoutErr())

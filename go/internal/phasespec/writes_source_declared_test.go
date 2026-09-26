@@ -8,18 +8,14 @@ import (
 	"testing"
 )
 
-// TestUserSpecs_SourceWritersDeclareWritesSource pins the operator-overlay
-// phases whose personas author files into the worktree. Since ADR-0097 a
-// phase without writes_source is FENCED — its worktree writes are undone and
-// reported — so a writer that forgets the declaration loses its deliverable.
-// The two known writers are pinned here (the architecture review found both
-// undeclared); add a name when a new persona writes source.
+// Add a phase here when its persona starts writing source.
+// See ADR-0097.
 func TestUserSpecs_SourceWritersDeclareWritesSource(t *testing.T) {
 	_, file, _, ok := runtime.Caller(0)
 	if !ok {
 		t.Fatal("cannot locate test file")
 	}
-	root := filepath.Clean(filepath.Join(filepath.Dir(file), "..", "..", "..")) // go/internal/phasespec → repo root
+	root := filepath.Clean(filepath.Join(filepath.Dir(file), "..", "..", ".."))
 	for _, name := range []string{"bug-reproduction", "test-amplification"} {
 		raw, err := os.ReadFile(filepath.Join(root, ".evolve", "phases", name, "phase.json"))
 		if err != nil {

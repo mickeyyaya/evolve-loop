@@ -14,18 +14,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// TestRun_DefaultProbeHonorsPhaseIO (ADR-0050 Phase 3.10 Slice 1): with no
-// VerifyFn injected, the verdict engine judges with the catalog-aware probe
-// New resolves over Options.PhaseIO — at enforce a build FAIL-without-block
-// report is caught (parity with the host gate: the ship guard turns the hook's
-// PASS into a coherent FAIL and the violation is on the response) and below
-// enforce it stays dormant (byte-identical: PASS). Pinned THROUGH Run since
-// review fold F4 — the probe lives in the engine only, so the pin observes
-// what the engine judged with, not a field New set. Kills `stage dropped from
-// the default probe`, `default probe not handed to the engine`.
 func TestRun_DefaultProbeHonorsPhaseIO(t *testing.T) {
-	// A section-complete build report whose only possible violation is the
-	// missing failure block (FAIL sentinel without a structured block).
+	// A section-complete build report whose only possible violation is the missing failure block.
 	report := "# Report\n\n## Changes\n- x\n\n" + phasecontract.RenderVerdictSentinel("build", "FAIL") + "\n"
 	run := func(stage config.Stage) (core.PhaseResponse, *fakeHooks) {
 		t.Helper()
@@ -54,13 +44,6 @@ func TestRun_DefaultProbeHonorsPhaseIO(t *testing.T) {
 	}
 }
 
-// TestRun_DefaultProbeResolvesTheMergedCatalog — the reconcile default must
-// resolve contracts under the SAME policy as the host gate and the agent
-// self-check (merged catalog), not BuiltinResolver-only: a user/minted phase
-// (e.g. an advisor-inserted mutation-gate) whose artifact survived a bridge
-// timeout was unresolvable and synthesized FAIL. Pinned THROUGH Run (review
-// fold F4): a resolved contract makes the on-disk report the verdict source;
-// an unresolved one leaves the pane. Kills `BuiltinResolver-only default`.
 func TestRun_DefaultProbeResolvesTheMergedCatalog(t *testing.T) {
 	root := t.TempDir()
 	regDir := filepath.Join(root, "docs", "architecture")

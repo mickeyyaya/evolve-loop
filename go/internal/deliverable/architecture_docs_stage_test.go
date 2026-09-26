@@ -9,13 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// Cycle-1150: VerifyBuildWithChangedPathsStage is the resolver+stage-aware form
-// the CLI self-check needs. The CLI resolves through the merged phase catalog at
-// the configured EVOLVE_PHASE_IO stage; if reaching the docs floor forced it
-// down to VerifyBuildWithChangedPaths' built-in/StageOff defaults, the wiring
-// would silently WEAKEN the build contract it already enforces. These tests pin
-// both halves: the floor still fires, and the stage-gated check is not lost.
-
 // stageBuildWorkspace writes a build-report.md with the given body.
 func stageBuildWorkspace(t *testing.T, body string) string {
 	t.Helper()
@@ -26,9 +19,6 @@ func stageBuildWorkspace(t *testing.T, body string) string {
 	return ws
 }
 
-// TestVerifyBuildWithChangedPathsStage_AppliesFloorAndPreservesStage — the
-// stage-threaded form must behave like VerifyWithStage plus the floor, not like
-// Verify plus the floor.
 func TestVerifyBuildWithChangedPathsStage_AppliesFloorAndPreservesStage(t *testing.T) {
 	roots := phasecontract.Roots{Workspace: stageBuildWorkspace(t, archFloorBuildReport)}
 	archClass := []string{"go/internal/policy/policy.go"}

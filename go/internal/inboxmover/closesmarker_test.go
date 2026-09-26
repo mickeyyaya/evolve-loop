@@ -1,28 +1,5 @@
 package inboxmover
 
-// closesmarker_test.go — RED contract for `ClosesInboxIDs`, the builder-authored
-// closure marker parser (cycle 1452, inbox item consumption-rides-landing-ship
-// weight 0.92).
-//
-// Why a marker and not diff inference: `connects_to` in an inbox item is a HINT,
-// not an acceptance predicate, so inferring closure from touched paths would
-// consume items an unrelated diff happened to brush past. Silent over-consumption
-// is strictly worse than the under-consumption we have today (data loss vs. a
-// wasted bookkeeping cycle), so closure must be an explicit, line-anchored,
-// auditor-checkable assertion by the Builder.
-//
-// The contract this file freezes (doNotModifyTests):
-//
-//  1. A line whose first non-blank content — after an optional markdown bullet
-//     (`-` / `*` / `+`) — is `Closes-Inbox:` (marker matched case-insensitively)
-//     contributes its comma-separated ids.
-//  2. Ids are trimmed of whitespace and surrounding backticks, and must match
-//     `[A-Za-z0-9._-]+`; anything else on the line is dropped, not guessed at.
-//  3. Result is deduped, first-seen order preserved; nil when nothing matched.
-//  4. NOT line-anchored ⇒ NOT a marker. Prose that merely mentions the marker
-//     mid-sentence contributes nothing. This is the anti-false-positive half and
-//     the reason a substring/regex-anywhere implementation cannot pass.
-
 import (
 	"reflect"
 	"testing"
@@ -60,7 +37,7 @@ func TestClosesInboxIDs(t *testing.T) {
 			body: "Closes-Inbox: b-item, a-item\nCloses-Inbox: a-item\nCloses-Inbox: b-item, c-item\n",
 			want: []string{"b-item", "a-item", "c-item"},
 		},
-		// --- negative / adversarial half: none of these may consume anything ---
+		// Negative half: none of these may consume anything.
 		{
 			name: "prose mention mid-sentence is not a marker",
 			body: "This landing Closes-Inbox: nothing-really, per the convention.\n",

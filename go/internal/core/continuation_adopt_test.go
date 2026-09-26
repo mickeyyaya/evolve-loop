@@ -1,13 +1,5 @@
 package core
 
-// continuation_adopt_test.go — ADR-0076 slice C, consume side. A new cycle
-// whose scoped item carries a valid continuation provisions its worktree FROM
-// the snapshot commit (standard provisioning path — work inherits via git
-// history, never via dirty-state adoption), sets the review base to the
-// ORIGINAL base so cumulative work is reviewed whole, and serves the prior
-// attempt's findings to the build phase. Any validation failure falls back to
-// fresh provisioning, loudly.
-
 import (
 	"context"
 	"encoding/json"
@@ -20,13 +12,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 )
 
-// RealInboxForTest bridges to the REAL inboxmover functions, injected by the
-// external test package (continuation_adopt_inbox_test.go, package core_test).
-// A direct inboxmover import here became a test import cycle when inboxmover's
-// lifecycle records started going through adapters/ledger → core (the chained
-// ledger fix); core_test → inboxmover → core is acyclic, and init runs before
-// any test, so the byte-for-byte "real inboxmover" property is preserved.
-// Test-binary-only: declared in a _test.go file, never part of the package API.
+// RealInboxForTest holds the real inboxmover functions, injected by the external test package.
 var RealInboxForTest struct {
 	Resolve      func(root string, cycle int) *continuation.Continuation
 	ResolveScope func(root string, cycle int, scopeIDs []string) *continuation.Continuation
@@ -127,9 +113,7 @@ func TestRunCycle_AdoptsContinuationAndServesFindings(t *testing.T) {
 	if err := os.WriteFile(m.FindingsPath, []byte(`{"phase":"build","summary":"export X unnamed in tests"}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// PRODUCTION flow: the FAILed cycle's release stamps the item at the inbox
-	// ROOT; the NEXT cycle's triage claims it into processing/cycle-N
-	// mid-cycle; only then does the resolver see it (architect finding #1).
+	// As in production, the resolver sees the stamped item only after triage claims it mid-cycle.
 	seedStampedInboxItem(t, root, 83, "task-a")
 
 	runners := buildRunners(nil)
@@ -174,8 +158,6 @@ func TestRunCycle_AdoptsContinuationAndServesFindings(t *testing.T) {
 	if !strings.Contains(req.Context["continuation_findings"], "export X unnamed") {
 		t.Errorf("build context must carry prior findings; got %q", req.Context["continuation_findings"])
 	}
-	// Ship-manifest breadcrumb: the adopting cycle's OWN workspace carries the
-	// manifest copy (reconcileManifest unions the prior declared paths).
 	if _, ok, _ := continuation.ReadManifest(req.Workspace); !ok {
 		t.Error("adopting cycle's workspace must carry the continuation manifest copy")
 	}
@@ -211,9 +193,7 @@ func TestRunCycle_InvalidContinuationFallsBackFresh(t *testing.T) {
 	}
 }
 
-// productionResolver mirrors the composition root's closure (cmd_cycle.go)
-// byte-for-byte: the REAL inboxmover.ResolveContinuation over processing
-// claims — the composed-path proof the mock resolver could not give.
+// productionResolver mirrors the composition root's closure in cmd_cycle.go.
 func productionResolver(t *testing.T) func(string, int, []string) *continuation.Continuation {
 	t.Helper()
 	return func(root string, cycle int, _ []string) *continuation.Continuation {
@@ -221,9 +201,7 @@ func productionResolver(t *testing.T) func(string, int, []string) *continuation.
 	}
 }
 
-// seedStampedInboxItem exercises the PRODUCTION stamp path: an item claimed by
-// the FAILed cycle is released through releaseCycleProcessing, which stamps it
-// from the cycle's continuation manifest and lands it at the inbox root.
+// seedStampedInboxItem stamps through the production release path, landing the item at the inbox root.
 func seedStampedInboxItem(t *testing.T, root string, failedCycle int, taskID string) {
 	t.Helper()
 	procDir := filepath.Join(root, ".evolve", "inbox", "processing", "cycle-"+itoa(failedCycle))
@@ -252,9 +230,7 @@ func seedStampedItemDirect(t *testing.T, root string, m continuation.Continuatio
 	}
 }
 
-// claimingTriageRunner mimics the production triage phase's side effect: it
-// CLAIMS its selected item from the inbox root into processing/cycle-N via the
-// real inboxmover.Claim, mid-cycle — the ordering the adoption seam is keyed to.
+// claimingTriageRunner claims its item through the real inboxmover.Claim mid-cycle, as production triage does.
 type claimingTriageRunner struct {
 	*fakeRunner
 	root   string

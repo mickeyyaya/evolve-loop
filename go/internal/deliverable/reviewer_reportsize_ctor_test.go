@@ -10,14 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// reviewer_reportsize_ctor_test.go — the catalog-aware constructor
-// NewReviewerWithCatalogStageReportSize (cycle-565 Slice S1) actually threads
-// the report-size gate + budget onto the Reviewer, mirroring
-// TestNewReviewerWithCatalogStage_ThreadsPhaseIO for the phaseIO dial: an
-// oversized handoff section is blocked at reportSizeGate=enforce and approved
-// (dormant) at off — proving the two new params are wired, not dropped. This is
-// the production wiring the cmd_cycle.go call site uses, so it must be exercised
-// through the public constructor (apicover named-coverage, cycle-542 lesson).
 func TestNewReviewerWithCatalogStageReportSize_ThreadsGate(t *testing.T) {
 	big := strings.Repeat("word ", 5000)
 	report := "## Changes\n- x\nVerdict: PASS\n## Handoff Summary\n" + big

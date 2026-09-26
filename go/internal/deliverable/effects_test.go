@@ -1,17 +1,5 @@
 package deliverable
 
-// effects_test.go — ADR-0100 slice 2: a declared EFFECT is verified at the
-// phase boundary exactly as a declared output is.
-//
-// Triage's persona claims every inbox item it ingests (`evolve inbox-mover
-// claim`, Step 0a.4) so that no sibling lane can select the same item. Two
-// batch cycles showed the claim silently not happening while the report and
-// decision looked complete: 1631 claimed the worktree's tracked COPY of the
-// inbox (the plane's item stayed dispatchable) and 1630's claim was refused by
-// the sandbox. Nothing judged the effect, so the spine ran on an unclaimed
-// commitment. The codes below are stable so the ladder's same-defect identity
-// recognizes a repeat and escalates instead of re-dispatching blindly.
-
 import (
 	"os"
 	"path/filepath"
@@ -24,9 +12,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
-// triageSpecWithClaim is the registry's triage declaration in miniature: the
-// primary report plus the one effect the persona performs outside its
-// workspace.
+// triageSpecWithClaim is the registry's triage declaration in miniature: the report plus the claim effect.
 func triageSpecWithClaim(effects ...string) phasespec.PhaseSpec {
 	return phasespec.PhaseSpec{
 		Name: "triage", Role: "triage",
@@ -103,8 +89,6 @@ func TestVerify_DeclaredEffectInboxClaim(t *testing.T) {
 				t.Fatalf("triage declares the inbox-claim effect and the %s, but the gate returned OK=%v violations=%+v (want %s) — the spine would run on an unclaimed commitment",
 					tc.name, res.OK, res.Violations, tc.wantCode)
 			}
-			// The violation must NAME the effect, the item and the cycle: it
-			// becomes the correction directive the agent is re-dispatched with.
 			for _, m := range tc.mentions {
 				if !violationMentions(res, m) {
 					t.Errorf("violation must mention %q: %+v", m, res.Violations)
@@ -114,8 +98,6 @@ func TestVerify_DeclaredEffectInboxClaim(t *testing.T) {
 	}
 }
 
-// An effect the registry declares but no check binds is a registry defect,
-// never something an agent can correct — the gate says so instead of passing.
 func TestVerify_UnboundDeclaredEffect(t *testing.T) {
 	ws, evolveDir := claimFixture{committedToX, "cycle-7"}.layout(t)
 	roots := phasecontract.Roots{Workspace: ws, EvolveDir: evolveDir, Cycle: 7}
@@ -128,9 +110,6 @@ func TestVerify_UnboundDeclaredEffect(t *testing.T) {
 	}
 }
 
-// The check cannot locate processing/cycle-N/ without the cycle: that is a
-// caller defect (every production verifier carries it), reported as the
-// package's fail-open error rather than a silent pass.
 func TestVerify_DeclaredEffectNeedsCycleInRoots(t *testing.T) {
 	ws, evolveDir := claimFixture{committedToX, "inbox"}.layout(t)
 	roots := phasecontract.Roots{Workspace: ws, EvolveDir: evolveDir} // no Cycle

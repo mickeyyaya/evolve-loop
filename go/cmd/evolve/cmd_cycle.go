@@ -1,7 +1,3 @@
-// `evolve cycle run` drives one cycle through the orchestrator. Wires
-// storage + ledger adapters with all 8 phase runners (intent through
-// retro). Subcommand surface stays small; the orchestrator owns the
-// phase sequencing.
 package main
 
 import (
@@ -63,7 +59,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/triagecap"
 )
 
-// runCycle implements `evolve cycle <subcommand>`. Subcommands: run | reset | timing.
+// runCycle implements `evolve cycle <subcommand>`: run | reset | timing | outputs.
 func runCycle(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
 		fmt.Fprintln(stderr, "evolve cycle: missing subcommand (try: run | reset | timing)")
@@ -84,11 +80,8 @@ func runCycle(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	}
 }
 
-// runCycleReset seals an unfinished cycle: it archives the workspace +
-// cycle-state snapshot + a manifest (history preserved, never deleted),
-// appends an auditable ledger entry, advances lastCycleNumber so the number
-// is never reused, and clears cycle-state.json. The complement of
-// `evolve loop --resume`. See core.SealCycle.
+// runCycleReset seals an unfinished cycle through core.SealCycle; the
+// complement of `evolve loop --resume`.
 func runCycleReset(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve cycle reset", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -107,9 +100,7 @@ func runCycleReset(args []string, stdout, stderr io.Writer) int {
 	if err := fs.Parse(args); err != nil {
 		return 10
 	}
-	// Absolutize the root so SealCycle's "workspace inside projectRoot" check
-	// compares absolute-to-absolute. A relative root here refused to seal
-	// cycle-120 (whose workspace_path was absolute, written by the fixed loop).
+	// SealCycle's "workspace inside projectRoot" check needs both sides absolute.
 	projectRoot = paths.AbsoluteRoot("--project-root", projectRoot, func(m string) {
 		fmt.Fprintf(stderr, "evolve cycle reset: WARN: %s\n", m)
 	})
@@ -117,22 +108,15 @@ func runCycleReset(args []string, stdout, stderr io.Writer) int {
 		evolveDir = filepath.Join(projectRoot, ".evolve")
 	}
 
-	// The liveness fence lives in SealCycle — it reads the per-run .lease
-	// heartbeat (the SSOT for "is the owner alive?"). The OLD `.evolve/.lock`
-	// pre-check here was a false negative that caused the cycle-395 race: the
-	// dispatcher's lock is per-CYCLE (released between cycles), so a sibling
-	// reset acquired it in the gap and sealed a RUNNING loop. We pass Force
-	// through and let the heartbeat-backed fence decide.
+	// The liveness fence is SealCycle's lease heartbeat. The dispatcher's
+	// .evolve/.lock is per cycle and released between cycles, so it proves nothing.
 	res, err := core.SealCycle(context.Background(), ledger.New(evolveDir), core.SealOptions{
 		EvolveDir:   evolveDir,
 		ProjectRoot: projectRoot,
 		Reason:      reason,
 		DryRun:      dryRun,
 		Force:       force,
-		// PID-aware liveness (cycle-554): a crashed owner whose heartbeat has not
-		// yet aged past the TTL (the 2-6min post-crash window) is no longer "live",
-		// so a plain `evolve cycle reset` seals it WITHOUT --force. A genuinely
-		// running owner (alive pid) still refuses. Same probe boot recovery uses.
+		// A dead owner pid seals without --force even before its heartbeat ages out.
 		PidAlive: pidAlive,
 	})
 	if err != nil {
@@ -184,9 +168,6 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 	fs.StringVar(&evolveDir, "evolve-dir", "", "path to .evolve/ state directory (default <project-root>/.evolve)")
 	fs.BoolVar(&simulate, "simulate", false, "no-LLM walk: every phase returns PASS without calling out (for parity-audit harness)")
 	fs.BoolVar(&bypassPolicy, "bypass-policy", false, "use --bypass-policy to bypass policy.json pin enforcement for every phase this run (operator escape hatch)")
-	// The cost-budget flags (--budget-usd/--budget/--batch-cap-usd) are removed
-	// from the parameter surface; strip any legacy occurrence (with a WARN) before
-	// parse so old scripts don't trip flag.Parse's "not defined" error.
 	args = stripRemovedBudgetFlags(args, func(m string) {
 		fmt.Fprintf(stderr, "evolve cycle run: WARN: %s\n", m)
 	})
@@ -197,9 +178,8 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "evolve cycle run: --goal-hash is required")
 		return 10
 	}
-	// Absolutize before any path is derived from projectRoot — a relative root
-	// (default ".") makes worktree-phase artifact paths diverge across the
-	// agent's worktree cwd and the in-process bridge's main cwd (cycle-119).
+	// Absolutize before deriving any path: a relative root makes worktree-phase
+	// artifact paths diverge between the agent's cwd and the bridge's.
 	projectRoot = paths.AbsoluteRoot("--project-root", projectRoot, func(m string) {
 		fmt.Fprintf(stderr, "evolve cycle run: WARN: %s\n", m)
 	})
@@ -212,17 +192,9 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 	}
 
 	if !simulate {
-		// Crash-recovery GC before the cycle: reap dead-owner tmux sessions left
-		// by a prior crashed run (see gcOrphanSessions). Skipped in --simulate —
-		// the no-LLM parity walk launches no sessions.
 		gcOrphanSessions("cycle-start", stderr)
 	}
 
-	// Both roots share the deps shape and the signal topology
-	// (newRootSignalCenter); --simulate differs in its runners (stubs), its
-	// worktree provisioner (the root, in place) and its dossier-commit knob
-	// (files only), and has no bridge. Unit 01 (ADR-0103): a Center-less simulate root had silenced the
-	// recorder's warnings, so the Null-Object root is gone.
 	var d orchDeps
 	if simulate {
 		d = wireSimulateOrchestrator(projectRoot, evolveDir, stderr)
@@ -231,7 +203,6 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 	}
 	var lifecycleLedger inboxmover.LedgerAppender = d.Ledger
 	orch, signals := d.Orchestrator, d.Signals
-	// ADR-0101 S2a: no queued signal is lost at command exit (Center.Flush).
 	defer d.Signals.Flush()
 	cycleEnv := filterEvolveEnv(os.Environ())
 	result, err := orch.RunCycle(context.Background(), core.CycleRequest{
@@ -243,13 +214,8 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 		BypassPolicy:          bypassPolicy,
 	})
 	if err != nil {
-		// A cycle-level FAIL must reach the inbox lifecycle from HERE too: every
-		// fleet lane runs this entrypoint as a subprocess, and fleet.Result
-		// carries neither the lane's cycle number nor its workspace — so the
-		// parent wave loop structurally cannot apply a lane's verdict. Applying
-		// it in-process (where cycle + workspace are local) mirrors the PASS half
-		// in phases/ship/postship.go and is what makes the ADR-0072 S5 retry
-		// ceiling reachable for fleet-dispatched work at all.
+		// Fleet lanes run this entrypoint as a subprocess and fleet.Result carries no
+		// cycle or workspace, so a lane's FAIL reaches the inbox lifecycle only here.
 		var clf *core.ErrCycleLevelFailure
 		if errors.As(err, &clf) {
 			warnCycleFailureOutcome(stderr, result.Cycle, applyCycleFailureOutcome(projectRoot, evolveDir, result.Cycle, stderr, lifecycleLedger, signals))
@@ -259,39 +225,23 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 	}
 	buf, _ := json.MarshalIndent(result, "", "  ")
 	fmt.Fprintln(stdout, string(buf))
-	// ADR-0072 (adr0072-fleet-halt-unwired): every fleet lane runs THIS
-	// entrypoint as a subprocess, and its exit code is the ONLY channel back to
-	// the parent wave loop. A halting SystemFailure must therefore surface as a
-	// distinct exit code (not the ambiguous rc=2 FAIL) so the parent can halt the
-	// batch — and it writes the escalation dossier + P0 inbox item HERE, via the
-	// same shared helper the sequential path uses, so the breadcrumb exists even
-	// when the halt originated inside a lane. Ordinary outcomes keep the historical
-	// rc=2/0 mapping (cycleRunExitCode).
+	// The exit code is a lane's only channel to its parent wave, so a halting
+	// SystemFailure gets its own code and writes the dossier and P0 item here.
 	if sf := result.SystemFailure; sf != nil && sf.Halt {
 		return haltOnSystemFailure(evolveDir, projectRoot, result.Cycle, cycleWorkspace(projectRoot, result.Cycle), sf, stderr, signals, systemFailureRule)
 	}
-	// The other shape of a FAIL — RunCycle returned no error but the cycle's
-	// final verdict is FAIL — and the planned-no-work hand-off: each applied
-	// exactly once (the err!=nil branch above already returned).
+	// A FAIL verdict without an error, or a no-work hand-off; the error branch
+	// above already returned, so each applies once.
 	if applied, err := closeoutCycleOutcome(result, projectRoot, evolveDir, stderr, lifecycleLedger, signals); err != nil {
 		fmt.Fprintf(stderr, "evolve cycle run: WARN: could not apply cycle %d %s to the inbox: %v\n", result.Cycle, applied, err)
 	}
 	return cycleRunExitCode(result)
 }
 
-// closeoutCycleOutcome applies a completed cycle's verdict to the inbox: the
-// failure walk for a FAIL, the planned-no-work hand-off for a lane that
-// answered for its scope without committing it (F30), nothing otherwise. It
-// is the ONE post-result closeout every root makes — the cycle-run root every
-// fleet lane runs, the sequential loop and `evolve loop --resume`, which can
-// resume a fleet lane's checkpoint with its lane pin (F30 architecture review
-// M1) — and it returns what it applied ("failure outcome" / "no-work
-// hand-off") and the walk's error for the caller to WARN in its own voice: a
-// lifecycle hiccup never changes a cycle's exit code or a batch's flow. One
-// known asymmetry: a quota wall (ErrAllFamiliesExhausted) pauses a resume
-// BEFORE this call — its claims wait for the resumed attempt — while the
-// cycle-run root and the sequential loop walk (and charge) it as a cycle-level
-// failure; which is right is filed as quota-pause-closeout-parity.
+// closeoutCycleOutcome is the one post-result closeout every root makes: the
+// failure walk on FAIL, the no-work hand-off for a lane that answered its
+// scope, else nothing. It returns what it applied and the walk's error for the
+// caller to WARN; a lifecycle hiccup never changes an exit code or a batch.
 func closeoutCycleOutcome(result core.CycleResult, projectRoot, evolveDir string, stderr io.Writer, lifecycle inboxmover.LedgerAppender, signals *signalcenter.Center) (applied string, err error) {
 	switch {
 	case result.FinalVerdict == cyclestate.VerdictFAIL:
@@ -302,10 +252,8 @@ func closeoutCycleOutcome(result core.CycleResult, projectRoot, evolveDir string
 	return "", nil
 }
 
-// applyCycleNoWorkOutcome hands a planned-no-work lane's answered scoped items
-// to the console and releases its claims (cycleoutcome.ApplyNoWork — F30's
-// loop breaker) on the root's ledger and Signal Center, like the failure walk.
-// A cycle without a lane pin has nothing to hand over.
+// applyCycleNoWorkOutcome hands a no-work lane's answered scoped items to the
+// console and releases its claims; a cycle without a lane pin has none.
 func applyCycleNoWorkOutcome(projectRoot string, cycle int, stderr io.Writer, lifecycle inboxmover.LedgerAppender, signals *signalcenter.Center) error {
 	_, err := cycleoutcome.ApplyNoWork(cycleoutcome.NoWorkInputs{
 		ProjectRoot: projectRoot,
@@ -316,19 +264,9 @@ func applyCycleNoWorkOutcome(projectRoot string, cycle int, stderr io.Writer, li
 	return err
 }
 
-// applyCycleFailureOutcome walks the failed cycle's triage-committed ids
-// through the inbox failure lifecycle (bump failure_count, quarantine at the S5
-// ceiling) via the shared seam — the ONE call every root makes (the cycle-run
-// root and both sequential loop paths). The walk appends its lifecycle lines
-// through the root's ledger so the Signal Center observes them like every
-// other entry (ADR-0101 S4a); a nil ledger (the --simulate root) lets the
-// mover fall back to its own, unobserved file ledger. The walk's own faults
-// (ADR-0103 unit 06: a park that could not deliver, a double-move, a stamp
-// that could not land) reach the root's Signal Center through signals, so
-// they land in the cycle workspace's signals.ndjson beside the ledger events
-// instead of on stderr alone. The error returns for the caller to WARN in
-// its own voice: a lifecycle hiccup never changes a cycle's exit code (the
-// lane's only channel to its parent) or a batch's flow.
+// applyCycleFailureOutcome walks the failed cycle's committed ids through the
+// inbox failure lifecycle on the root's ledger and Signal Center. A nil ledger
+// (the --simulate root) falls back to the mover's own unobserved file ledger.
 func applyCycleFailureOutcome(projectRoot, evolveDir string, cycle int, stderr io.Writer, lifecycle inboxmover.LedgerAppender, signals *signalcenter.Center) error {
 	_, err := cycleoutcome.ApplyFailure(cycleoutcome.FailureInputsFor(
 		projectRoot, evolveDir, cycleWorkspace(projectRoot, cycle), cycle, stderr,
@@ -343,57 +281,36 @@ func warnCycleFailureOutcome(stderr io.Writer, cycle int, err error) {
 	}
 }
 
-// filterEvolveEnv extracts the EVOLVE_* and BRIDGE_* slice of the
-// process environment into a flat map. Phases consult these for CLI
-// selection (EVOLVE_CLI), model overrides (EVOLVE_*_MODEL), and ship
-// behaviour (EVOLVE_SHIP_SCRIPT). BRIDGE_TESTING / BRIDGE_*_BINARY are
-// also propagated so test invocations can swap CLI binaries.
-// filterEvolveEnv forwards to cmdutil.FilterEvolveEnv — the implementation now
-// lives in the cmd/evolve/cmdutil leaf so the decomposed internal/cli/* groups
-// share ONE definition. Thin forwarder kept so this file's callers are unchanged.
+// filterEvolveEnv forwards to cmdutil.FilterEvolveEnv, the one definition the
+// internal/cli groups share.
 func filterEvolveEnv(environ []string) map[string]string {
 	return cmdutil.FilterEvolveEnv(environ)
 }
 
-// orchDeps is the wired bundle when callers need access to the storage
-// and ledger handles in addition to the orchestrator (cmd_loop uses
-// the ledger handle for post-cycle verification).
+// orchDeps is the wired orchestrator plus the storage and ledger handles its
+// callers query, so none re-resolves evolveDir.
 type orchDeps struct {
 	Storage      core.Storage
 	Ledger       rootLedger
 	Orchestrator *core.Orchestrator
-	// Signals is the ADR-0101 Signal Center: constructed here, before the
-	// bridge, always (a nil Center is a test affordance only). No production
-	// reader yet, by design: the bridge receives it at construction in S3 and
-	// cmd_loop reads Orchestrator.SignalSummary() for the batch report in S4.
+	// Signals is always built; a nil Center is a test affordance only.
 	Signals *signalcenter.Center
-	// Bridge is the production Adapter injected into every phase runner; it
-	// carries Signals into each engine it builds (ADR-0101 S3).
+	// Bridge carries Signals into every engine it builds.
 	Bridge *bridge.Adapter
-	// Runners is the phase-runner map the orchestrator was built over — a root
-	// field for the per-runner wiring proof (ADR-0103 unit 11: every
-	// BaseRunner-backed runner's verdict engine reaches Signals through the
-	// Bridge), in the orchDeps.Bridge precedent; no production reader.
+	// Runners backs the per-runner Signals wiring proof; no production reader.
 	Runners map[core.Phase]core.PhaseRunner
 }
 
-// rootLedger is what the composition root's ledger offers its consumers: the
-// core's port (Append/Verify/Iter) and the inbox mover's chained lifecycle
-// seam — one object, one identity, so the failed-cycle inbox walk appends its
-// lifecycle lines through the SAME observed ledger the orchestrator writes.
+// rootLedger is one object serving the core port and the inbox mover's
+// lifecycle seam, so the failed-cycle walk appends through the observed ledger.
 type rootLedger interface {
 	core.Ledger
 	inboxmover.LedgerAppender
 }
 
-// newRootSignalCenter is the ONE sink topology every root builds — and the
-// loop tests' stub root, so a test that asserts a rendered line proves
-// production's topology (ADR-0101 S4a). Listeners: the durable
-// signals.ndjson — per cycle workspace for cycle-scoped signals, and
-// <evolveDir>/signals.ndjson for batch-level (cycle-less) ones: the loop's
-// own halts and wave summaries, a bridge warning before any cycle — and the
-// console at WARN and above (signalcenter.ConsoleSink, the one home of that
-// threshold; the severity contract's "log only" INFO tier stays in the files).
+// newRootSignalCenter is the one sink topology every root builds, the loop
+// tests' stub root included: signals.ndjson (the cycle workspace's, or
+// <evolveDir>'s for cycle-less signals) plus the console at WARN and above.
 func newRootSignalCenter(projectRoot, evolveDir string, console io.Writer) *signalcenter.Center {
 	signals := signalcenter.New(signalcenter.WithPID(os.Getpid()))
 	signals.Subscribe(signals.NDJSONSink(func(cycle int) string {
@@ -406,29 +323,19 @@ func newRootSignalCenter(projectRoot, evolveDir string, console io.Writer) *sign
 	return signals
 }
 
-// wireOrchestratorDeps mirrors wireOrchestrator but returns the
-// underlying storage + ledger so callers can run cross-cutting
-// queries (verify the ledger, read state.json) without re-instantiating
-// the adapters and risking divergence in the evolveDir resolution.
+// wireOrchestratorDeps builds the production orchestrator and returns it with
+// its storage, ledger, Signal Center, bridge and runners.
 func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orchDeps {
-	// Pin the model-catalog dir to the SAME .evolve the cycle-start refresher
-	// writes, so the in-process LoadManifest overlay reads the right file
-	// regardless of EVOLVE_PROJECT_ROOT (which the loop resolves from a flag,
-	// not necessarily the env). Set unconditionally — evolveDir is authoritative.
+	// Pin the model-catalog dir to this .evolve, which the cycle-start refresher
+	// writes; EVOLVE_PROJECT_ROOT may name another tree.
 	if evolveDir != "" {
 		d := evolveDir
 		bridge.SetModelCatalogDirFn(func() string { return d })
 	}
-	// ADR-0101 S1: the Signal Center is built FIRST (the bridge receives it at
-	// construction in S3 — Deps normalize inside NewEngine) and unconditionally:
-	// TestNilSignalCenterRootsArePinned lists the only roots allowed to skip it.
-	// The orchestrator subscribes via WithSignalCenter.
+	// Built first and unconditionally: the bridge takes the Center at construction.
+	// TestNilSignalCenterRootsArePinned lists the roots that may skip it.
 	signals := newRootSignalCenter(projectRoot, evolveDir, console)
-	// Ledger and storage come next, so the bridge adapter can wire its
-	// stop-review callback to append kind=stop_review entries (ADR-0026 Stage 1 #5);
-	// the ledger is observed at its append chokepoint so every appended entry
-	// is also a ledger.appended signal (ADR-0101 S4a — the file ledger still
-	// chains and locks; WithSignals is a construction option, not a wrapper).
+	// The ledger precedes the bridge so the stop-review callback can append to it.
 	st := storage.New(evolveDir)
 	ld := ledger.New(evolveDir, ledger.WithSignals(signals))
 
@@ -445,80 +352,48 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 	})
 	prm := cmdutil.NewPromptsLoader(projectRoot)
 
-	// Composition root: the SOLE reader of routing env+config. The unit-08
-	// Loader (cmd_cycle_config.go) maps the central registry + contained env
-	// overrides into one RoutingConfig; router.Select picks the brain once. With
-	// dynamic_routing=0 (Stage:Off, the escape hatch; advisory is the
-	// default since 2026-06-06) NewOrchestrator behaves exactly as before. A nil proposer means DynamicLLM degrades to the deterministic
-	// StaticPreset (the bridge-backed Proposer is a tracked follow-on).
-	// Loaded BEFORE the runners map so cfg.PhaseIO can thread into the
-	// build/scout/triage reconcile rung (ADR-0050 §3.10 Slice 1).
-	// Every warning the Loader resolves rides the Center as config.warning
-	// (the root StderrSink renders WARN; the cycle-less durable sink files it);
-	// the discarded slice is the same data — nothing to print twice. The path
-	// stays a local: phasespec.Load below reads the same file.
+	// The root is the sole reader of routing env and config. Loaded before the
+	// runners so cfg.PhaseIO reaches the reconcile rung; warnings ride the Center.
 	registryPath := config.RegistryPath(projectRoot)
 	loader := wiredRoutingConfigLoader(signals)
 	cfg, _ := loader.Load(registryPath, filterEvolveEnv(os.Environ()))
 
-	// User policy (.evolve/policy.json): merge mandatory_phases into the routing
-	// spine so the advisor can never drop a user-declared mandatory phase. This
-	// is ADDITIVE — policy can only ADD mandatory phases; the non-configurable
-	// integrity floor (ship ⇒ build ∧ audit, enforced in config.Load) keeps the
-	// core spine regardless. A malformed policy is WARNed here (this construction
-	// path returns no error) and hard-fails loudly at the first phase dispatch,
-	// where the runner re-loads it for pins. Per-phase CLI/model pins are
-	// consulted at dispatch by the runner. Loaded BEFORE the runners map so
-	// swarm config (policy.SwarmConfig) can be threaded into swarmrunner.New.
-	var shipFloor []string // WS4: nil ⇒ orchestrator uses router.DefaultShipFloor
+	// policy.json can only add mandatory phases. A malformed policy WARNs here and
+	// fails loudly at the first dispatch, where the runner reloads it for pins.
+	var shipFloor []string // nil ⇒ router.DefaultShipFloor
 	pol, policyErr := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
 	if policyErr != nil {
 		fmt.Fprintf(os.Stderr, "[policy] WARN %v (mandatory merge skipped; fails loudly at dispatch)\n", policyErr)
 		pol = policy.Policy{}
 	} else {
 		cfg.Mandatory = pol.MergeMandatory(cfg.Mandatory)
-		// WS4: a user-configured ship_floor (e.g. ["audit"] for audit-only) drives
-		// the integrity-floor clamp; absent ⇒ leave nil so the safe default stands.
 		if floor, overridden := pol.FloorPhases(); overridden {
 			shipFloor = floor
 		}
-		// Failure floor (Phase 4a): policy.json:failure_floor is the one
-		// surface for the audit-FAIL learning route; shared fold with
-		// router.PolicyForProject so per-phase consumers see the same route.
+		// failure_floor is the one surface for the audit-FAIL route, folded the same
+		// way as router.PolicyForProject.
 		cfg.AuditFailRoutesTo = router.FailureRouteFromPolicy(pol)
 	}
 	swCfg := swarmrunner.Config{Stage: pol.SwarmConfig().Stage, PortBase: pol.SwarmConfig().PortBase, WorktreeBase: pol.WorktreeBase()}
 	gatesCfg := pol.GatesConfig()
 	routerCfg := pol.RouterConfig()
 	recoveryCfg := pol.RecoveryConfig()
-	// The thirteen policy dials resolve through the Loader's ladders (a typo'd
-	// gate word is off WITH a CONFIG_UNKNOWN_VALUE, where the root's hand
-	// copies were silent); recoveryCfg survives solely for this projection.
+	// The policy dials resolve through the Loader's ladders, so a typo'd word warns
+	// CONFIG_UNKNOWN_VALUE; recoveryCfg survives only for this projection.
 	cfg, _ = loader.ApplyPolicyStages(cfg, policyStagesOf(gatesCfg, recoveryCfg, routerCfg, pol.ParallelEvaluateConfig()))
-	// Resolved once here so all phase constructors below share the same value.
-	// Avoids a second pol.WorkflowConfig() call at line ~538.
 	wfCfg := pol.WorkflowConfig()
 
-	// Universal-fallback discovery seam (workflow.universal_fallback, default on):
-	// set the runner package-var seams ONCE, before the phase constructors below,
-	// so a phase whose whole configured CLI chain is absent on THIS host routes to
-	// a present+usable LLM instead of halting the batch. Discovery is a memoized
-	// bridge.Doctor probe (installed + non-blocked, one driver per family, tmux
-	// variant — the fleet default); it runs at most once per process, lazily on
-	// the first phase that actually needs it. Off ⇒ both seams stay nil/false and
-	// dispatch is byte-identical to the pre-feature path.
+	// Set the universal-fallback seams once, before the constructors, so a phase
+	// whose CLI chain is absent on this host routes to a present LLM. Discovery is
+	// a memoized bridge.Doctor probe run lazily by the first phase that needs it.
 	runner.DefaultUniversalFallback = wfCfg.UniversalFallback
 	if wfCfg.UniversalFallback {
 		var discOnce sync.Once
 		var discovered []string
 		runner.DefaultDiscoverCLIsFn = func() []string {
 			discOnce.Do(func() {
-				// BOUNDED context (go-review HIGH): Doctor shells `<cli> --version`
-				// per installed CLI; on the unattended loop hot path a hung probe
-				// (stuck auth prompt / network stall) under context.Background()
-				// would wedge this sync.Once forever and stall the whole loop —
-				// defeating the feature's own no-halt goal. A timeout degrades to
-				// "no discovery" (empty → fail-loud ExitMissingBinary), never a hang.
+				// Bounded: a hung `<cli> --version` would wedge this sync.Once and stall the
+				// loop. A timeout degrades to no discovery, which fails loud.
 				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 				defer cancel()
 				rep, _ := gobridge.NewEngine(gobridge.Deps{}).Doctor(ctx, "", false)
@@ -531,21 +406,16 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 					seenFam[fam] = true
 					discovered = append(discovered, fam+"-tmux")
 				}
-				// The operator's family ban applies to the last-resort tail only
-				// (policy workflow.universal_fallback_exclude, default agy).
+				// The operator's family ban applies to this last-resort tail only.
 				discovered = llmroute.ExcludeFamilies(discovered, wfCfg.UniversalFallbackExclude)
 			})
 			return discovered
 		}
 	}
 
-	// bridgechain: the CLI/tier fallback chain is a property of the bridge HANDLE
-	// (Decorator, wrapped once here). Every consumer below launches through
-	// `walked`: the retro, the debugger, the spec runners, the registrar, the
-	// failure advisor and the swarm launcher get the walk by construction; the
-	// runner and the advisor walk their own chains and mark each attempt, so
-	// they pass straight through. Lanes 1676/1677 (2026-09-14): the retro's
-	// direct launch had no chain and one codex timeout sealed the cycle.
+	// The CLI/tier fallback chain wraps the bridge handle once, and every consumer
+	// below launches through walked. The runner and the advisor walk their own
+	// chains, so they pass straight through.
 	diagf := func(format string, args ...any) { fmt.Fprintf(os.Stderr, format, args...) }
 	discover := func() []string {
 		if runner.DefaultDiscoverCLIsFn == nil {
@@ -560,13 +430,9 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 		}),
 		bridgechain.WithLog(diagf))
 
-	// The contract gate's Reviewer is built after the runners (it needs the
-	// merged phase catalog); every BaseRunner's verdict engine reaches it
-	// through this accessor so gate and engine share ONE verifier — the bytes
-	// the engine classifies are the bytes the gate approves (research F22:
-	// cycle 1685 classified the unrepaired bytes the gate then salvaged).
-	// Gate OFF keeps the Null-Object PlainVerifier (no salvage) so the choice
-	// is explicit; the gate's Reviewer replaces it below when the gate is on.
+	// Every BaseRunner's verdict engine reads the contract verifier through this
+	// accessor, so the engine classifies the bytes the gate approves. Gate off
+	// keeps the Null-Object PlainVerifier; the gate's Reviewer replaces it below.
 	var contractVerifier runner.ContractVerifier = deliverable.PlainVerifier{PhaseIO: cfg.PhaseIO}
 	verifierOf := func() runner.ContractVerifier { return contractVerifier }
 	var hostEffects core.HostEffects
@@ -575,40 +441,27 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 
 	runners := map[core.Phase]core.PhaseRunner{
 		core.PhaseIntent: intent.New(intent.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, CompactPrompts: cfg.CompactPrompts}),
-		// Scout + Build are swarm-eligible (ADR-0032): wrapped in the swarmRunner
-		// Decorator so stage=advisory|enforce (policy.json "swarm.stage") dispatches
-		// them across N parallel workers (reader fan-out / writer merge-train).
-		// Default (stage absent/shadow) = byte-identical delegate — zero behavior change.
-		// PhaseIO threads cfg.PhaseIO into the reconcile rung (3.10 Slice 1); StageOff
-		// (the shipping default) keeps these byte-identical.
+		// Scout and Build are swarm-eligible; below advisory the Decorator delegates.
+		// See ADR-0032.
 		core.PhaseScout:        swarmrunner.New(scout.New(scout.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, PhaseIO: cfg.PhaseIO, CompactPrompts: cfg.CompactPrompts}), walked, swarm.ModeReader, swCfg),
 		core.PhaseTriage:       triage.New(triage.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, PhaseIO: cfg.PhaseIO, CompactPrompts: cfg.CompactPrompts, LaneForbidden: forbidden}),
 		core.PhaseTDD:          tdd.New(tdd.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, CompactPrompts: cfg.CompactPrompts}),
 		core.PhaseBuildPlanner: buildplanner.New(buildplanner.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf}).BaseRunner(),
 		core.PhaseBuild:        swarmrunner.New(build.New(build.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, PhaseIO: cfg.PhaseIO, CompactPrompts: cfg.CompactPrompts}), walked, swarm.ModeWriter, swCfg),
 		core.PhaseAudit:        audit.NewDefaultWithStageCompactSpec(walked, prm, cfg.PhaseIO, cfg.CompactPrompts, documentSpecPtr(cfg), audit.WithContractVerifier(verifierOf), audit.WithHostEffects(hostEffectsOf), audit.WithSignals(func() *signalcenter.Center { return signals })),
-		// ManifestGate is threaded from policy.json `gates.manifest_gate` (default
-		// "shadow") so the ship-bind manifest gate is operator-activatable — it was
-		// unreachable short of a code edit before cycle-1064.
+		// The ship-bind manifest gate is operator-activatable via gates.manifest_gate.
 		core.PhaseShip:  ship.New(ship.Config{Runner: sysexec.DefaultRunner, PhaseIO: cfg.PhaseIO, ManifestGate: gatesCfg.ManifestGate, RepoContractGate: gatesCfg.RepoContractGate, Signals: signals}),
 		core.PhaseRetro: retro.New(retro.Config{Bridge: walked, Prompts: prm, Model: "auto", CompactPrompts: cfg.CompactPrompts}),
-		// Ship-error recovery phase (Component #8): the advisor's recovery chain
-		// routes an unknown/novel ShipError here to diagnose + decide RESHIP /
-		// RERUN_PHASE / BLOCK. Optional — never on the mandatory spine.
+		// The debugger diagnoses a novel ShipError; optional, never on the spine.
 		core.PhaseDebugger: debugger.New(debugger.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, CompactPrompts: cfg.CompactPrompts}),
 	}
 
-	// User-defined phases ("Lego" overlays): merge .evolve/phases/<name>/phase.json
-	// over the built-in catalog, splice the VALID ones into the routing order +
-	// triggers (the floor is enforced here — invalid specs are never routed), and
-	// register a spec-driven runner for each so the orchestrator can execute it.
-	// No user phases ⇒ all of this is a no-op and behavior is byte-identical.
+	// User phases merge over the built-in catalog; only valid specs are routed and
+	// get a spec runner.
 	builtinCat, builtinErr := phasespec.Load(registryPath)
 	if builtinErr != nil {
-		// Non-fatal (matches config.Load's tolerant posture above), but no longer
-		// silent: a missing/malformed registry means registerBuiltinSpecRunners
-		// wires nothing, so a selectable phase could later abort at dispatch —
-		// surface the cause here rather than leave it undiagnosable.
+		// Non-fatal but loud: with no registry no builtin spec runner is wired, so a
+		// selectable phase would abort at dispatch.
 		fmt.Fprintf(os.Stderr, "[phases] WARN builtin registry load failed (%v); builtin spec-runners not registered\n", builtinErr)
 	}
 	userSpecs, discWarns := discoverUserSpecsClamped(projectRoot, prm)
@@ -616,29 +469,17 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 	for _, w := range append(discWarns, mergeWarns...) {
 		fmt.Fprintf(os.Stderr, "[phases] WARN %s\n", w)
 	}
-	// Make the bridge catalog-aware so user/minted phases get their spec-derived
-	// Deliverable Contract block + exact-path footer injected (WS-A, ADR-0034).
+	// Catalog-aware so user and minted phases get their spec-derived contract.
 	br.SetContractResolver(phasecontract.NewCatalogResolver(catalog.Get))
-	// …and keep it aware: `catalog.Get` above is a method value bound to THIS
-	// catalog VALUE, whose byName map is the pre-mint one. A phase minted
-	// mid-cycle is spliced into a NEW catalog value (Catalog.Merge allocates a
-	// fresh map), so without the publisher below the resolver misses the minted
-	// phase for the rest of the cycle and dispatch falls back to the
-	// unresolved-agent path — the cycle-1424 600s artifact-timeout halt. The
-	// orchestrator option is appended beside core.WithRegistrar (see below).
-	// ADR-0050 §3.8b: at EVOLVE_PHASE_IO>=advisory the injected contract block
-	// instructs build/scout/triage to self-report failure via a structured
-	// sentinel; default (off) leaves the dispatched prompt byte-identical.
+	// catalog.Get is bound to this pre-mint catalog value; the catalog publisher
+	// below re-binds the resolver after each mid-cycle mint.
 	wireBridgeStages(br, cfg)
 	for _, w := range phasespec.ApplyUserRouting(&cfg, userSpecs, builtinCat) {
 		fmt.Fprintf(os.Stderr, "[phases] WARN %s\n", w)
 	}
-	// Register a spec-driven runner for each valid user phase. This MUST use the
-	// same catalog-aware validator as ApplyUserRouting above (line ~399): the
-	// bare ValidateUserSpec re-imposes the two-tier single-word naming floor that
-	// ValidateUserSpecWithCatalog exempts for optional built-ins (e.g. "memo"),
-	// so routing would nominate the phase while dispatch silently dropped it —
-	// the cycle-563 memo-dispatch bug. Keep these two call sites in lockstep.
+	// Must use ApplyUserRouting's catalog-aware validator: the bare
+	// ValidateUserSpec rejects optional built-ins such as memo, so routing would
+	// plan a phase that never dispatches.
 	for _, s := range catalog.UserPhases() {
 		if len(phasespec.ValidateUserSpecWithCatalog(s, builtinCat)) > 0 {
 			continue // ApplyUserRouting already warned + skipped it; no dead runner
@@ -647,28 +488,13 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 			runners[core.Phase(s.Name)] = specrunner.New(s, specrunner.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf})
 		}
 	}
-	// Spec-runner fallback for BUILTIN registry phases the advisor can SELECT
-	// (see registerBuiltinSpecRunners) — makes the invariant "every
-	// advisor-selectable phase is dispatchable" hold.
+	// Spec-runner fallback so every advisor-selectable builtin phase dispatches.
 	registerBuiltinSpecRunners(runners, builtinCat, specrunner.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf}, os.Stderr)
-	// DynamicLLM brain: the routing advisor, defined like every phase agent —
-	// persona (agents/evolve-router.md) + profile (router.json) + artifact. Its
-	// {cli, model} resolve from the profile + EVOLVE_ROUTER_CLI/_MODEL env (the
-	// same precedence phases use), so the brain is configurable to any LLM CLI
-	// (claude/opus default, or codex/<family deep model>-high, agy/gemini, …). Composing the
-	// cycle + minting phases is deep-reasoning work, hence the opus/deep default.
-	// Select consults it only at routing_mode=llm; the kernel clamp is the floor.
-	// The advisor's PRIMARY model is the plan/re-plan (deep) dispatch — the
-	// confidence-critical decision. WS6-S1: routed through the per-decision-type
-	// resolver so policy can override it; no-op vs the prior resolveRouterDispatch
-	// when unset. WS6-S2: if the resolved family is benched
-	// (the cli-health circuit breaker), fall back to the healthy claude family;
-	// when even that is benched the advisor keeps the benched dispatch and degrades
-	// to the static spine via its existing fail-safe (clihealth IS the breaker).
+	// The routing advisor resolves {cli, model} like a phase: router profile, then
+	// policy. Plan decisions use the deep tier. A benched family falls back to
+	// claude; with claude benched too the advisor degrades to the static spine.
 	advCLI, advModel, advHealthy := resolveRouterDispatchHealthy(evolveDir, decisionPlan, benchedFamilies(projectRoot), routerCfg)
 	if !advHealthy {
-		// advCLI/advModel are the base (benched) dispatch — usable; the advisor's
-		// dispatch will fail on the benched family and degrade to the static spine.
 		fmt.Fprintf(os.Stderr, "[router] WARN router family and the claude fallback are both benched — advisor will degrade to the static spine\n")
 	}
 	var advPersona string
@@ -685,81 +511,45 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 		core.WithAdvisorSignals(signals),
 	)
 	strategy := router.Select(cfg, advisor)
-	// The same advisor also produces the upfront whole-cycle plan the integrity
-	// floor clamps (ADR-0024 §2). Wire it unconditionally: the orchestrator is the
-	// single gate — it consults the planner only at Stage>=Advisory AND
-	// Mode==DynamicLLM, so in static mode or below Advisory it is never called
-	// (no LLM cost), and the kernel falls back to the configurable spine.
+	// The advisor also plans the whole cycle; the orchestrator consults it only at
+	// Stage>=Advisory with DynamicLLM, so wiring it here costs nothing otherwise.
 	opts := []core.Option{
 		core.WithRouting(cfg, strategy),
 		core.WithCatalog(catalog),
 		core.WithPlanner(advisor),
-		// ADR-0044 Slice-6 post-soak step (R8.1): the LLM failure-advisor
-		// tail. Wired unconditionally — the hook is enforce-gated
-		// (cfg.PhaseRecovery) and best-effort, so below enforce it never
-		// dispatches; at enforce it turns one unclassified fatal pane into a
-		// validated promotion (each promotion saves ~20 min of maxExtends
-		// burn on every future occurrence).
+		// Best-effort and gated on cfg.PhaseRecovery=enforce; below that it never
+		// dispatches.
 		core.WithFailureAdviser(core.NewFailureAdvisor(walked, failureAdvisorOpts(projectRoot)...)),
-		// R9.1 triage-capacity: record shipped cycles' committed-floor counts
-		// into the rolling throughput window (state.json:triageThroughput) —
-		// the observed-capacity signal the R9.2 clamp bounds triage with.
+		// Feeds state.json:triageThroughput, the window the triage clamp bounds with.
 		core.WithThroughputRecorder(triagecap.Recorder(projectRoot)),
-		// Mint advisor-proposed phases (Steps 11/12): persist their dispatch
-		// profile + spec under .evolve so the unchanged runner resolves them
-		// from disk, then dispatch by name like a built-in. Only active when the
-		// advisor drives (Stage>=Advisory) and a plan carries MintPhases.
-		// RegistryPath anchors to projectRoot (not evolveDir) because the
-		// tree-diff guard reads mintregistry.Path(ProjectRoot) — the guard only
-		// sees writes under the project tree, so write and read must agree
-		// there (cycle-967 Variant A2).
-		// Re-bind the bridge's deliverable-contract resolver on every mid-cycle
-		// mint, so a phase minted at Step 11/12 resolves its spec-derived contract
-		// in the SAME cycle (cycle-1429; the miss #429 only made safe).
+		// Re-bind the bridge's contract resolver on each mid-cycle mint, so a minted
+		// phase resolves its contract in the same cycle.
 		core.WithCatalogPublisher(catalogPublisher(br)),
 		core.WithRegistrar(registrarMinter{r: phaseregistrar.Registrar{
 			Bridge:       walked,
 			Prompts:      prm,
 			ProfilesDir:  filepath.Join(evolveDir, "profiles"),
 			PhasesDir:    filepath.Join(evolveDir, "phases"),
-			RegistryPath: mintregistry.Path(projectRoot),
+			RegistryPath: mintregistry.Path(projectRoot), // the tree-diff guard reads it under projectRoot
 		}}),
 	}
-	// Cycle-122 Fix 3 / ADR-0030: auto-spawn the per-phase observer
-	// goroutine unless explicitly disabled in policy.json.
-	// Restores the pre-v12 bash-dispatcher behavior the Go port silently
-	// dropped. The default StallS=600s matches the bridge's coarse
-	// artifact-timeout.
+	// Auto-spawn the per-phase observer unless policy.json disables it.
 	observerCfg := pol.ObserverConfig()
 	if *observerCfg.Autospawn {
 		ca := observer.NewCoreAdapter(observerCfg)
 		ca.RecoveryStage = cfg.PhaseRecovery.String()
-		ca.Signals = func() *signalcenter.Center { return signals } // ADR-0103 unit 12: the adapter's own faults are observer.warning signals
+		ca.Signals = func() *signalcenter.Center { return signals } // the adapter's own faults are observer.warning signals
 		opts = append(opts, core.WithObserver(ca))
 	}
-	// Structural eval gates (internal/evalgate): Gate A (scout eval-file
-	// materialization) + Gate B (tdd predicate-quality), mounted at the
-	// per-phase DeliverableReviewer seam. Default enforce (config.defaults);
-	// policy.gates.eval_gate=off keeps the noopReviewer default.
-	// The gates fail open on any ambiguity, so enforce never false-blocks.
-	// Compose the structural eval gates with the deliverable-contract gate
-	// (internal/deliverable, ADR-0034) behind ONE reviewer via ChainReviewers —
-	// WithReviewer sets a single reviewer, so both gates must be chained at the
-	// same seam. Each is gated independently (default enforce); both fail open on
-	// ambiguity. With both off, no reviewer is wired (noopReviewer; byte-identical).
+	// Every deliverable gate chains behind one reviewer, since WithReviewer takes
+	// one. Each is gated on its own and fails open on ambiguity.
 	var reviewers []core.DeliverableReviewer
-	// Build handoff floor (2026-07-21 shift-left): deterministic self-check
-	// REJECTS a red build deliverable so the E2 correction ladder fixes it
-	// in-phase; judgment phases still follow as the verdict layer. Chained
-	// FIRST because its rejection carries the exact defect list the ladder
-	// needs. It IS the expensive reviewer (real go-test per changed package) —
-	// the advisory post-build selfcheck skips its duplicate run when this
-	// floor is enforced, so each build pays the go-test cost exactly once.
+	// The build floor runs first: its rejection carries the defect list the
+	// correction ladder needs. It is the one real go-test run per changed package;
+	// the advisory post-build selfcheck skips its duplicate when this is enforced.
 	if pol.WorkflowConfig().BuildFloorEnforced {
 		checks := productionBuildFloorChecks
-		// ADR-0099 slice 2: a document cycle's solutions/<slug>/ is judged by the
-		// same deterministic floor seam (internal/solutioncheck over the
-		// registry's deliverable_kinds.document contract); silent for code cycles.
+		// A document cycle's solutions/<slug>/ is judged by the same floor seam.
 		if spec, ok := cfg.DocumentSpec(); ok {
 			checks = core.ChainBuildFloorChecks(productionBuildFloorChecks, core.SolutionFloorChecks(spec))
 		}
@@ -769,12 +559,8 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 		reviewers = append(reviewers, evalgate.NewReviewer(cfg.EvalGate))
 	}
 	if cfg.ContractGate != config.StageOff {
-		// Catalog-aware so user/minted phases get spec-derived contracts (WS-A):
-		// the host gate enforces the SAME well-formedness the agent's
-		// `evolve phase verify` self-check derives from the phase.json. The
-		// report-size gate (cycle-565 S1) rides the same reviewer as its own
-		// dial: default shadow (observe-only) so it is byte-identical until an
-		// operator promotes gates.report_size_gate to enforce.
+		// Catalog-aware, so the gate enforces what `evolve phase verify` derives from
+		// phase.json. The report-size gate rides it as its own dial.
 		rev := deliverable.NewReviewerWithCatalogStageReportSize(
 			cfg.ContractGate, catalog, cfg.PhaseIO,
 			parseGateStage(gatesCfg.ReportSizeGate), pol.ReportBudgetConfig().HandoffTokens, deliverable.WithSignals(signals))
@@ -782,93 +568,59 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 		reviewers = append(reviewers, rev)
 	}
 	if cfg.TriageCapGate != config.StageOff {
-		// R9.2 triage capacity clamp (internal/triagecap): committed coverage
-		// floors above ceil(1.25·K observed throughput) reject the triage
-		// deliverable into the correction ladder with a cap directive.
-		// Chained AFTER the contract gate: well-formedness first, capacity
-		// second. Fails open on ambiguity.
+		// Capacity clamp, after the contract gate: well-formedness first.
 		reviewers = append(reviewers, triagecap.NewReviewer(cfg.TriageCapGate))
 	}
 	if cfg.TopNGate != config.StageOff {
-		// build->audit task-binding clamp (internal/topngate): a build report
-		// whose ## Task: slug falls outside triage ## top_n is a CERTAIN
-		// wrong-task build; enforce aborts it before audit/ship spend (inbox
-		// builder-task-binding-topn-gate, 8th recurrence). Chained after the
-		// contract gate: well-formedness first, task-identity binding second.
-		// Fails open on ambiguity (missing report, empty top_n).
-		// The same reviewer also carries the triage->TDD scope clamp (inbox
-		// tdd-topn-binding-gate, cycle-660): a TDD deliverable that authors
-		// test files under an empty or non-overlapping ## top_n is aborted one
-		// phase earlier, before the orphan scaffolds reach build.
+		// Task-binding clamp, after the contract gate: a build whose task is outside
+		// triage top_n, or a TDD that authors tests under an empty or disjoint top_n,
+		// aborts before later phases spend on it.
 		reviewers = append(reviewers, topngate.NewReviewer(cfg.TopNGate))
 	}
 	if len(reviewers) > 0 {
 		opts = append(opts, core.WithReviewer(core.ChainReviewers(reviewers...)))
 	}
 	if cfg.ContractGate != config.StageOff {
-		// ADR-0045 I2: the breaker-neutral re-check the salvage rung verifies
-		// relocations with — same catalog-aware resolution as the gate, so the
-		// rung and the gate can never disagree about "well-formed". Wired at
-		// every contract-gate stage (shadow needs it for would-salvage soak
-		// telemetry); execution stays gated on EVOLVE_PHASE_RECOVERY=enforce.
+		// The salvage rung's re-check shares the gate's resolution, so they agree on
+		// well-formed. Wired at every stage for shadow telemetry; execution stays
+		// gated on EVOLVE_PHASE_RECOVERY=enforce.
 		opts = append(opts, core.WithContractVerifier(deliverable.NewVerifierWithCatalogStage(catalog, cfg.PhaseIO)))
 	}
-	// Cycle-start live model-catalog refresh (TTL=1 day, gated + best-effort
-	// inside the closure). Opt out via policy.json "catalog":{"auto_refresh":false}.
+	// Cycle-start live model-catalog refresh, best-effort under its stage.
 	opts = append(opts, core.WithCatalogRefresher(makeCatalogRefresher(projectRoot, evolveDir, pol.CatalogConfig().RefreshStage)))
-	// The stage the refresher above ran under, stamped into the per-cycle
-	// catalog_refresh ledger entry (the shadow-soak's audit trail).
+	// The refresher's stage, stamped into each catalog_refresh ledger entry.
 	opts = append(opts, core.WithCatalogRefreshStage(func() string { return pol.CatalogConfig().RefreshStage }))
 
-	// Catalog-resolvability gate for advisor model routing (cycle-440 MR4a).
-	// router.ClampPlanModelRouting clears a proposed {cli,tier} that cannot
-	// resolve to a model; without this injection o.modelCatalogLookup is nil
-	// and that gate silently does nothing.
+	// Without this lookup router.ClampPlanModelRouting cannot clear an
+	// unresolvable {cli, tier} and silently does nothing.
 	opts = append(opts, core.WithModelCatalogLookup(resolveModelTier))
 
-	// Runtime operator-directives provider: the ONLY place that resolves directives
-	// config (home dir + runscope lane + file paths). The orchestrator stays
-	// config-agnostic and just consumes the snapshot each cycle.
+	// The only resolver of operator-directives config; the orchestrator consumes
+	// a snapshot each cycle.
 	opts = append(opts, core.WithDirectivesProvider(makeDirectivesProvider(projectRoot)))
 
-	// WS2 knowledge-base recall: wire the lessons corpus so the advisor plans
-	// with recall memory (prior failures + lessons). Lookup is best-effort and
-	// only consulted at plan time; an absent corpus is a no-op.
-	// The recall bound is RESOLVED from policy.json (research.recall_k), never a
-	// compiled literal: a knob whose value never reaches this construction is
-	// dead config. Default holds at 5 — see policy.ResearchConfig.
+	// The recall bound resolves from policy.json research.recall_k; a knob that
+	// never reaches this construction is dead config.
 	opts = append(opts, core.WithKB(research.NewFileKBWithRecall(kbRootsAbs(projectRoot), kbRecallK(projectRoot))))
 
-	// WS4 configurable integrity floor: pass the user-resolved ship_floor (nil ⇒
-	// the orchestrator's safe default). Empty is ignored by WithShipFloor.
 	opts = append(opts, core.WithShipFloor(shipFloor))
 	opts = append(opts, core.WithRetryConfig(pol.RetryConfig()))
-	// ADR-0076 D: the retry-tier-escalation failure-count read seam, backed by
-	// the durable per-item counter the S5 chain maintains.
+	// Retry-tier escalation reads the durable per-item failure counter.
 	opts = append(opts, core.WithFailureCountReader(func(id string) int {
 		n, _ := inboxmover.ReadFailureCount(inboxmover.Options{ProjectRoot: projectRoot}, id)
 		return n
 	}))
-	// ADR-0076 C: continuation-on-fail resolve seam — the orchestrator adopts a
-	// prior FAILed attempt's salvage snapshot when this cycle's scope carries
-	// one (validated in-orchestrator against live git state). Claimed scopes
-	// resolve from the processing claims; a lane whose scope came from the wave
-	// planner instead resolves from its pinned lane-scope todo ids (G2).
+	// Continuation-on-fail adopts a prior FAILed attempt's salvage for this scope;
+	// a planner-pinned lane resolves from its lane-scope todo ids.
 	opts = append(opts, core.WithScopePathResolver(scopePathResolver))
 	opts = append(opts, core.WithContinuationResolver(func(root string, cycle int, scopeIDs []string) *continuation.Continuation {
-		// Stderr is wired (was the io.Discard default): the live-scope guard's
-		// refusal line — "this scope has no live pending item, binding released"
-		// — is the operator's only signal that a ghost binding was caught, and a
-		// discarded warning is how cycles 1487/1497 stayed invisible for three
-		// waves.
+		// The live-scope guard's refusal is the operator's only sign that a ghost
+		// binding was caught, so it must reach stderr.
 		return inboxmover.ResolveContinuationForScope(inboxmover.Options{ProjectRoot: root, Stderr: os.Stderr}, cycle, scopeIDs)
 	}))
 	opts = append(opts, core.WithWorkflowConfig(wfCfg))
 	opts = append(opts, core.WithChronicleConfig(pol.ChronicleConfig()))
-	// ADR-0072 system-failure decision policy. A malformed failure_policy block
-	// falls back to the orchestrator's compiled DefaultSystemFailurePolicy (the
-	// Go-enforced floor is preserved regardless) — same safe semantics as an
-	// absent block; only an operator's non-floor tuning would be dropped.
+	// A malformed failure_policy keeps the compiled defaults; the floor holds.
 	if fp, err := pol.FailurePolicyConfig(); err == nil {
 		opts = append(opts, core.WithFailurePolicy(fp))
 	} else {
@@ -876,11 +628,8 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 	}
 	opts = append(opts, core.WithWorktreeBase(pol.WorktreeBase()))
 
-	// RUNG 0 trivial-rebase composition-verdict fast path (cycle-786/801 built
-	// the pieces, cycle-804 wires them): bind the snapshot / gate-runner /
-	// verdict-writer closures so recoverFromShipError's clean fleet-rebase
-	// branch carries the audit verdict forward instead of always re-auditing.
-	// All fail-closed — see cmd_composition_wiring.go.
+	// A clean fleet rebase carries the audit verdict forward instead of
+	// re-auditing; every closure fails closed.
 	opts = append(opts, compositionOptions()...)
 	hostEffects = deliverable.NewHostEffects(catalog, hostInboxClaimer(ld, signals, forbidden))
 	opts = append(opts, core.WithHostEffects(hostEffects))
@@ -903,18 +652,15 @@ func hostInboxClaimer(ld inboxmover.LedgerAppender, signals *signalcenter.Center
 	}
 }
 
-// kbRootsAbs resolves the KB search roots (relative by default,
-// e.g. ".evolve/instincts/lessons/") against the project root so the KB reads
-// the right corpus regardless of the process cwd. Absolute roots pass through.
-// kbRecallK resolves the KB recall bound from .evolve/policy.json. A load
-// failure resolves to the built-in default (policy.Load returns a zero Policy),
-// which is today's behaviour — an unreadable policy file must not disable
-// recall memory.
+// kbRecallK resolves the KB recall bound from policy.json. An unreadable
+// policy keeps the default rather than disabling recall.
 func kbRecallK(projectRoot string) int {
 	pol, _ := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
 	return pol.ResearchConfig().RecallK
 }
 
+// kbRootsAbs resolves the KB search roots against the project root, so the
+// corpus read does not depend on the process cwd.
 func kbRootsAbs(projectRoot string) []string {
 	pol, _ := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
 	raw := research.SearchPathsFromEnv(pol.PathsConfig())
@@ -929,11 +675,8 @@ func kbRootsAbs(projectRoot string) []string {
 	return out
 }
 
-// cycleContext builds the CycleRequest.Context seed: the commit message always,
-// plus Context["goal"] = the human-readable goal text when one was supplied. The
-// "goal" key is the convention the `evolve loop` dispatcher uses and that Scout +
-// the routing advisor read (Context["strategy"] is the distinct strategy MODE, not
-// the goal). Omitting --goal keeps the prior behavior (no goal key).
+// cycleContext seeds CycleRequest.Context with the commit message and, when
+// given, Context["goal"], the key Scout and the routing advisor read.
 func cycleContext(goalHash, goalText string) map[string]string {
 	ctx := map[string]string{
 		"commit_message": fmt.Sprintf("evolve-cycle: goal=%s", goalHash),
@@ -944,15 +687,8 @@ func cycleContext(goalHash, goalText string) map[string]string {
 	return ctx
 }
 
-// resolveRouterDispatch resolves the routing advisor's {cli, model} the same way
-// a phase resolves its capability: profile (.evolve/profiles/router.json) defaults,
-// overridden by the per-agent env (EVOLVE_ROUTER_CLI / EVOLVE_ROUTER_MODEL). This
-// makes the brain configurable to any LLM CLI (e.g. codex-tmux + deep→the family manifest's deep model).
-// Fallback is opus on claude-tmux (deep reasoning for composition/minting).
-// routerDecisionType selects which advisor decision a dispatch is resolved for
-// (ADR-0052 WS6-S1). The confidence-critical whole-cycle decisions (plan,
-// re-plan) want the DEEP tier; the lightweight off-critical-path ones (the
-// reactive propose, the route-quality judge) can use the FAST tier (D2).
+// routerDecisionType selects the advisor decision a dispatch resolves for:
+// plan and re-plan want the deep tier, propose and judge the fast one.
 type routerDecisionType int
 
 const (
@@ -962,11 +698,8 @@ const (
 	decisionJudge                             // route-quality judge (fast)
 )
 
-// resolveRouterDispatchFor resolves the (cli, model) for a SPECIFIC advisor
-// decision type (ADR-0052 WS6-S1, optional multi-model). It starts from the
-// single base dispatch (resolveRouterDispatch) and applies a per-type model
-// override from RouterPolicy. With no override set it returns the base value for
-// every type. The CLI is unchanged across types; only the model tier differs.
+// resolveRouterDispatchFor applies RouterPolicy's per-decision model override
+// to the base dispatch; the CLI is the same for every type.
 func resolveRouterDispatchFor(evolveDir string, dt routerDecisionType, rc policy.RouterPolicy) (cli, model string) {
 	cli, model = resolveRouterDispatch(evolveDir, rc)
 	switch dt {
@@ -982,43 +715,32 @@ func resolveRouterDispatchFor(evolveDir string, dt routerDecisionType, rc policy
 	return cli, model
 }
 
-// resolveRouterDispatchHealthy resolves the per-decision dispatch and, if the
-// chosen CLI's family is currently benched (the cli-health circuit breaker —
-// repeated failures bench a family), falls back to the universal claude family
-// (the no-agy-fallback rule: claude is the universal fallback). If the claude
-// fallback is ALSO benched it returns ok=false and the caller degrades to the
-// static spine — the advisor's existing fail-safe, so no separate breaker is
-// minted (clihealth IS the breaker; ADR-0052 WS6-S2). benched is the set of
-// benched family names (clihealth.Store.Active values' Family).
+// resolveRouterDispatchHealthy falls back to claude-tmux when the chosen family
+// is benched. With claude benched too it returns the base dispatch and
+// ok=false, and the advisor degrades to the static spine.
 func resolveRouterDispatchHealthy(evolveDir string, dt routerDecisionType, benched map[string]bool, rc policy.RouterPolicy) (cli, model string, ok bool) {
 	cli, model = resolveRouterDispatchFor(evolveDir, dt, rc)
 	if !benched[llmroute.Family(cli)] {
-		return cli, model, true // primary family healthy
+		return cli, model, true
 	}
 	if benched["claude"] {
-		// Primary AND the universal claude fallback are benched. Return the base
-		// (benched) dispatch with ok=false: the caller dispatches it and the
-		// advisor degrades to the static spine via its existing fail-safe. We
-		// return a USABLE dispatch (never empty strings) so a caller that ignores
-		// ok still gets a valid CLI rather than a silent misconfiguration.
+		// A usable dispatch even with ok=false, so a caller ignoring ok never gets "".
 		return cli, model, false
 	}
-	return "claude-tmux", model, true // fall back to the healthy claude family
+	return "claude-tmux", model, true
 }
 
-// benchedFamilies returns the set of CLI families currently benched by the
-// cli-health store (the circuit breaker — repeated transient failures bench a
-// family), keyed by family name. An empty/unreadable store ⇒ empty set (no
-// fallback needed). Reuses clihealth.Store (the SAME store the advisor prompt's
-// bench context reads), never a parallel breaker.
+// benchedFamilies is the set of families the clihealth store benches now.
 func benchedFamilies(projectRoot string) map[string]bool {
 	out := map[string]bool{}
 	for family := range clihealth.NewStore(projectRoot, nil).Active() {
-		out[family] = true // Active() is keyed by family name
+		out[family] = true
 	}
 	return out
 }
 
+// resolveRouterDispatch resolves the routing advisor's base {cli, model}:
+// claude-tmux/opus, then .evolve/profiles/router.json, then RouterPolicy.
 func resolveRouterDispatch(evolveDir string, rc policy.RouterPolicy) (cli, model string) {
 	cli, model = "claude-tmux", "opus"
 	if raw, err := os.ReadFile(filepath.Join(evolveDir, "profiles", "router.json")); err == nil {
@@ -1044,18 +766,9 @@ func resolveRouterDispatch(evolveDir string, rc policy.RouterPolicy) (cli, model
 	return cli, model
 }
 
-// registerBuiltinSpecRunners wires a spec-driven runner for every builtin
-// registry phase the advisor can SELECT (WS3 catalog cards = non-Control
-// archetypes) that is declared kind:llm but is absent from the hand-wired
-// runners map (e.g. tester, an advisor-selectable architecture-design). Without
-// this such a phase is catalog-visible — the advisor can select it — yet has no
-// runner, so dispatch would abort (ErrPhaseInvalid). Mutates runners in place.
-//
-// Control-archetype phases (memo/retrospective) are kernel-dispatched under
-// their canonical names and are NOT advisor-selectable, so they are excluded (no
-// dead entries). Guarded on persona existence: a kind:llm phase whose
-// agents/<name>.md is missing (e.g. plan-review today) is skipped + WARNed to
-// `warn` rather than wired to a runner it cannot execute.
+// registerBuiltinSpecRunners gives each advisor-selectable kind:llm builtin
+// phase that lacks a hand-wired runner a spec runner, so selecting it never
+// aborts dispatch. Control phases are skipped; a phase with no persona WARNs.
 func registerBuiltinSpecRunners(runners map[core.Phase]core.PhaseRunner, builtinCat phasespec.Catalog, base specrunner.Config, warn io.Writer) {
 	for _, s := range builtinCat.All() {
 		if s.KindOrDefault() != "llm" || s.RoleOrDefault() == phasespec.RoleControl {
@@ -1072,9 +785,8 @@ func registerBuiltinSpecRunners(runners map[core.Phase]core.PhaseRunner, builtin
 	}
 }
 
-// registrarMinter adapts the concrete phaseregistrar.Registrar to the narrow
-// core.PhaseMinter port (which returns spec + runner separately) so core stays
-// decoupled from phaseregistrar/specrunner.
+// registrarMinter adapts phaseregistrar.Registrar to core.PhaseMinter, keeping
+// core decoupled from phaseregistrar.
 type registrarMinter struct{ r phaseregistrar.Registrar }
 
 func (m registrarMinter) Register(cfg phaseconfig.PhaseConfig) (phasespec.PhaseSpec, core.PhaseRunner, error) {
@@ -1085,10 +797,8 @@ func (m registrarMinter) Register(cfg phaseconfig.PhaseConfig) (phasespec.PhaseS
 	return res.Spec, res.Runner, nil
 }
 
-// scopePathResolver maps a scoped task id to its LIVE inbox record's absolute
-// path, "" when the id is not pending (carryover ids, consumed namesakes).
-// Named (not an inline closure) so the composition-root wiring is testable —
-// the week's recurring survivor is a correct component the root never calls.
+// scopePathResolver maps a scoped task id to its pending inbox record's path,
+// or "". Named rather than inline so the root's wiring is testable.
 func scopePathResolver(projectRoot, taskID string) string {
 	st := inboxmover.ResolveDispatchState(inboxmover.Options{ProjectRoot: projectRoot}, taskID)
 	if st.State != inboxmover.StatePending {
@@ -1097,17 +807,11 @@ func scopePathResolver(projectRoot, taskID string) string {
 	return st.Path
 }
 
-// failureAdvisorOpts resolves the failure advisor's dispatch identity from its
-// tracked profile (.evolve/profiles/failure-advisor.json), mirroring the
-// router advisor's WithProposerCLI wiring above. Review of the 2026-08-26
-// deep-tier arrangement found the advisor hardcoding claude-tmux/opus and
-// never reading its profile — dormant today (advise hook gates on
-// PhaseRecovery=enforce) but wrong the moment that stage flips. Absent or
-// unreadable profile keeps the compiled default (fail-open).
+// failureAdvisorOpts resolves the failure advisor's CLI from its tracked
+// profile; an absent or unreadable profile keeps the compiled default.
 func failureAdvisorOpts(projectRoot string) []core.FailureAdvisorOption {
-	// GitRoot pinned to projectRoot: resolvellm's git-root fallback shells
-	// `git rev-parse` from the PROCESS cwd, which in worktree/plane setups can
-	// resolve a DIFFERENT tree's profile than the one this cycle runs against.
+	// Pinned: resolvellm's git fallback runs from the process cwd, which can be
+	// another tree.
 	r, err := resolvellm.Resolve("failure-advisor", resolvellm.Options{ProjectRoot: projectRoot, GitRoot: projectRoot})
 	if err != nil || r.CLI == "" {
 		return nil
@@ -1115,10 +819,8 @@ func failureAdvisorOpts(projectRoot string) []core.FailureAdvisorOption {
 	return []core.FailureAdvisorOption{core.WithFailureAdvisorCLI(r.CLI)}
 }
 
-// documentSpecPtr is the registry's document deliverable contract as the
-// nil-able pointer the audit phase takes (ADR-0099 slice 2): the ONE
-// resolution the composition root hands to both the build floor and the audit
-// gate, so the two surfaces judge the same shape.
+// documentSpecPtr is the registry's document contract, the one resolution the
+// build floor and the audit gate share.
 func documentSpecPtr(cfg config.RoutingConfig) *config.DeliverableKindSpec {
 	spec, ok := cfg.DocumentSpec()
 	if !ok {

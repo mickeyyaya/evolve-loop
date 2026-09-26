@@ -1,14 +1,5 @@
 package main
 
-// cmd_cycle_simulate_git_test.go — the --simulate root is a no-LLM plumbing
-// walk and must never mutate the operator's git repository: no
-// `dossier: cycle-N closeout` commit, no `cycle-*` branch, no git worktree.
-// It still writes its records (runs/, the dossier file) so the plumbing it
-// exists to check is exercised. Incident: a whole-module floor that ran
-// acs/cycle8's `evolve campaign run --simulate` from the checkout committed
-// dossier closeouts onto the dev branch and left worktrees behind
-// (docs/incidents/2026-09-14-simulate-runs-against-the-checkout.md).
-
 import (
 	"context"
 	"os"
@@ -72,9 +63,8 @@ func simulateCaptureStderr(t *testing.T, fn func()) string {
 	return out
 }
 
-// statusWithoutWalkRecords drops the walk's own UNTRACKED records (the seed
-// repo ignores nothing) so the comparison sees only the operator's tree; a
-// staged or modified path under those dirs would still be a mutation.
+// statusWithoutWalkRecords drops the walk's own untracked records, so the
+// comparison sees only the operator's tree; a staged or modified path still counts.
 func statusWithoutWalkRecords(status string) string {
 	var kept []string
 	for _, line := range strings.Split(status, "\n") {
@@ -86,14 +76,8 @@ func statusWithoutWalkRecords(status string) string {
 	return strings.Join(kept, "\n")
 }
 
-// TestWireSimulateOrchestrator_NeverMutatesGit pins the whole class on a real
-// seed repo that has a Go module: no commit, no cycle-* branch, no worktree,
-// AND none of the host's per-phase worktree normalizers touch the operator's
-// files — gofmt -w must not rewrite an unformatted tracked file, and the
-// leak-recovery `git checkout -- <path>` must not revert an uncommitted
-// edit. Those two ran on the checkout when the simulate root read it in
-// place with only the salvage snapshot guarded (architecture review of the
-// first fix).
+// The seed repo holds a Go module, an unformatted tracked file and an
+// uncommitted edit, so the host's gofmt -w and leak-recovery checkout would show.
 func TestWireSimulateOrchestrator_NeverMutatesGit(t *testing.T) {
 	root := t.TempDir()
 	initRepoWithCommit(t, root)
@@ -111,8 +95,7 @@ func TestWireSimulateOrchestrator_NeverMutatesGit(t *testing.T) {
 	mustSeed("go/seed.go", unformatted)
 	gitOut(t, root, "add", "go")
 	gitOut(t, root, "commit", "-q", "-m", "seed module with an unformatted file")
-	// The operator's uncommitted edit to a tracked file: leak recovery on an
-	// in-place root would see it as a main-tree leak and `git checkout` it away.
+	// Leak recovery on an in-place root would `git checkout` this edit away.
 	mustSeed("README.md", "seed\noperator's uncommitted edit\n")
 	evolveDir := filepath.Join(root, ".evolve")
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
@@ -152,7 +135,6 @@ func TestWireSimulateOrchestrator_NeverMutatesGit(t *testing.T) {
 	if !strings.Contains(stderr, "the active worktree is the project root") {
 		t.Errorf("the in-place root is announced once, with what it disables, got:\n%s", stderr)
 	}
-	// The plumbing still ran: the cycle's records exist.
 	if _, serr := os.Stat(filepath.Join(root, "knowledge-base", "cycles")); serr != nil {
 		t.Errorf("the dossier file (uncommitted) is still written: %v", serr)
 	}
@@ -161,10 +143,6 @@ func TestWireSimulateOrchestrator_NeverMutatesGit(t *testing.T) {
 	}
 }
 
-// The simulate runner writes each phase's contracted report stub (a PASS
-// sentinel) into the workspace, so the deliverable floors the walk exists to
-// exercise see a deliverable — before this, the walk passed only where stale
-// run dirs from earlier litter happened to supply build-report.md.
 func TestSimulatePhase_WritesTheContractedReportStub(t *testing.T) {
 	ws := filepath.Join(t.TempDir(), "runs", "cycle-3")
 	resp, err := (&simulatePhase{name: core.PhaseBuild}).Run(context.Background(), core.PhaseRequest{Workspace: ws, Cycle: 3})
@@ -186,8 +164,6 @@ func TestSimulatePhase_WritesTheContractedReportStub(t *testing.T) {
 	}
 }
 
-// A --simulate campaign is a no-LLM walk: the per-wave live probes (the CLI
-// health canary and the usage probe launch real CLIs) must not run.
 func TestCampaignBeforeWave_SimulateRunsNoLiveProbes(t *testing.T) {
 	if hook := campaignBeforeWave(true, t.TempDir(), os.Stderr); hook != nil {
 		t.Error("--simulate must install no live-probe hook")

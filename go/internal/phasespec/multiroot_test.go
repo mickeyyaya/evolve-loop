@@ -72,7 +72,6 @@ func TestDiscoverUserSpecsFromRoots_Empty(t *testing.T) {
 	}
 }
 
-// Per-root malformed-JSON warnings must surface through the multi-root path.
 func TestDiscoverUserSpecsFromRoots_PropagatesPerRootWarnings(t *testing.T) {
 	rootA := t.TempDir()
 	writeUserPhase(t, rootA, "broken", `{not json`)

@@ -8,15 +8,6 @@ import (
 	"testing"
 )
 
-// TestPretrustCodexProjects covers Fix 1 of the cycle-122 remediation
-// (see docs/incidents/cycle-122-codex-permission-modal-and-wsg-fallback-gap.md):
-// codex-tmux must pre-trust the worktree + workspace paths in
-// ~/.codex/config.toml so codex's own permission layer does not prompt
-// "Press enter to confirm" at runtime when the agent shells out a
-// command that writes outside the worktree boundary.
-//
-// Test seam: EVOLVE_CODEX_CONFIG_PATH redirects the merge target to a
-// per-test tempdir so the real ~/.codex is never touched.
 func TestPretrustCodexProjects(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -39,10 +30,8 @@ func TestPretrustCodexProjects(t *testing.T) {
 			},
 		},
 		{
-			// Fully idempotent only when BOTH the trust entries AND the cycle-142
-			// [notice] rate-limit-nudge suppression are already present; pretrust
-			// adds the notice alongside the trust entries, so a fixture missing it
-			// would (correctly) be rewritten.
+			// Idempotent only when the trust entries and the [notice] nudge suppression are both present;
+			// a fixture missing the notice is rewritten.
 			name: "IdempotentWhenAlreadyTrusted",
 			existing: `model = "gpt-5.5"
 
@@ -135,9 +124,7 @@ trust_level = "trusted"
 			},
 		},
 		{
-			// HIGH-2 from cycle-122 review: control characters in a path
-			// would corrupt config.toml and prevent codex from starting.
-			// All TOML §2.4 prohibited chars must be escaped.
+			// Control characters in a path would corrupt config.toml and stop codex from starting.
 			name:      "PathWithControlChars_AllEscaped",
 			existing:  "",
 			worktree:  "/tmp/with\nnewline\tand\rcr",
@@ -151,10 +138,8 @@ trust_level = "trusted"
 			},
 		},
 		{
-			// HIGH-2 companion: backslash escape happens BEFORE other
-			// escapes (Replacer applies all simultaneously, not
-			// sequentially); a path containing both \ and " must
-			// produce the right byte sequence.
+			// strings.Replacer applies every escape at once, not in sequence, so a path holding both a
+			// backslash and a quote must still produce the right bytes.
 			name:      "PathWithBackslashAndQuote_EscapedOnce",
 			existing:  "",
 			worktree:  `/tmp/a\b"c`,
@@ -205,15 +190,13 @@ trust_level = "trusted"
 					t.Errorf("unexpected substring %q present in:\n%s", abs, gotStr)
 				}
 			}
-			// Defensive: every appended section must be paired with a trust_level line.
 			headerCount := strings.Count(gotStr, "[projects.")
 			trustCount := strings.Count(gotStr, `trust_level = "trusted"`)
 			if trustCount < headerCount {
 				t.Errorf("trust_level lines (%d) < project headers (%d)\n%s",
 					trustCount, headerCount, gotStr)
 			}
-			// MEDIUM-2 from cycle-122 review: when worktree==workspace,
-			// the section must appear EXACTLY once, not just at-least-once.
+			// When worktree equals workspace the section appears exactly once.
 			if tt.worktree != "" && tt.worktree == tt.workspace {
 				h := codexProjectHeader(tt.worktree)
 				if got := strings.Count(gotStr, h); got != 1 {
@@ -224,22 +207,7 @@ trust_level = "trusted"
 	}
 }
 
-// TestPretrustCodexProjects_ConcurrentCalls_AllEntriesSurvive is the N10
-// (ADR-0049) regression. Under `evolve fleet` the whole-cycle project lock is
-// skipped, so multiple cycles' codex Preflights pre-trust DISTINCT paths into
-// the SAME host-global ~/.codex/config.toml concurrently. The unique CreateTemp
-// already prevents temp-file clobbering, but the read-merge-write-RENAME was
-// last-writer-wins: cycles that each read a config WITHOUT the others' entries
-// each rename their own snapshot, so the final file keeps only the last writer's
-// trust entries. A dropped trust entry re-arms codex's "Press enter to confirm"
-// runtime modal that hung cycle-122 for the cycle whose entry lost the race.
-//
-// The fix serializes the whole RMW under flock.WithPathLock(configPath), so the
-// append-only merges compose losslessly: EVERY path stays trusted. A start
-// barrier forces all readers to observe the same (empty) initial state, so the
-// pre-fix lost-update trips reliably across the iterations. (This REPLACES the
-// old test, which asserted only "at least the LAST writer's entries" — it
-// enshrined the very lost-update this fix removes.)
+// A start barrier makes every reader see the same empty file, so a lost update trips reliably across iterations.
 func TestPretrustCodexProjects_ConcurrentCalls_AllEntriesSurvive(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.toml")
@@ -290,8 +258,6 @@ func TestPretrustCodexProjects_ConcurrentCalls_AllEntriesSurvive(t *testing.T) {
 	}
 }
 
-// TestPretrustCodexProjects_CreatesParentDir guards that a fresh host
-// without ~/.codex/ gets the directory created (0700) before the merge.
 func TestPretrustCodexProjects_CreatesParentDir(t *testing.T) {
 	dir := t.TempDir()
 	nested := filepath.Join(dir, "codex-home", ".codex", "config.toml")
@@ -312,9 +278,6 @@ func TestPretrustCodexProjects_CreatesParentDir(t *testing.T) {
 	}
 }
 
-// TestPretrustCodexProjects_NilCfg guards that a nil Config is a no-op
-// rather than a nil-deref panic — the helper must be safe to call from
-// any code path that has not yet populated the cfg.
 func TestPretrustCodexProjects_NilCfg(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.toml")
@@ -326,11 +289,6 @@ func TestPretrustCodexProjects_NilCfg(t *testing.T) {
 	}
 }
 
-// TestPretrustCodexProjects_WritesHideRateLimitNudge — cycle-142: the pretrust
-// pass must also suppress codex's "Approaching rate limits / Switch to mini?"
-// model-switch modal, which otherwise hangs the phase until the artifact-wait
-// deadline. The [notice] key is written alongside the trust entries and is
-// idempotent.
 func TestPretrustCodexProjects_WritesHideRateLimitNudge(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.toml")
@@ -342,11 +300,9 @@ func TestPretrustCodexProjects_WritesHideRateLimitNudge(t *testing.T) {
 	if !strings.Contains(string(got), "[notice]") || !strings.Contains(string(got), "hide_rate_limit_model_nudge = true") {
 		t.Errorf("config must contain a [notice] table suppressing the rate-limit nudge; got:\n%s", got)
 	}
-	// Trust entries must still be present (notice did not clobber them).
 	if !strings.Contains(string(got), "trust_level") {
 		t.Errorf("trust entries must coexist with the notice; got:\n%s", got)
 	}
-	// Idempotent: a second pass must not duplicate the key.
 	if err := pretrustCodexProjects(cfg); err != nil {
 		t.Fatalf("pretrust 2: %v", err)
 	}
@@ -356,7 +312,6 @@ func TestPretrustCodexProjects_WritesHideRateLimitNudge(t *testing.T) {
 	}
 }
 
-// TestAppendCodexNotice is a pure-string unit test of the notice merge.
 func TestAppendCodexNotice(t *testing.T) {
 	out := appendCodexNotice("")
 	if !strings.Contains(out, "[notice]") || !strings.Contains(out, "hide_rate_limit_model_nudge = true") {
@@ -370,15 +325,12 @@ func TestAppendCodexNotice(t *testing.T) {
 	if !strings.Contains(out3, "trust_level") || !strings.Contains(out3, "hide_rate_limit_model_nudge") {
 		t.Errorf("must preserve existing content + append notice; got %q", out3)
 	}
-	// Cover the `out += "\n"` branch: existing non-empty without trailing newline.
 	out4 := appendCodexNotice("no-newline-at-end")
 	if !strings.HasSuffix(out4, "\n") || !strings.Contains(out4, "hide_rate_limit_model_nudge") {
 		t.Errorf("non-newline-terminated input must have newline added + notice appended; got %q", out4)
 	}
 }
 
-// TestAppendCodexTrustEntries is a pure-string unit test of the merge
-// math, exercising edge cases that don't need a tempdir.
 func TestAppendCodexTrustEntries(t *testing.T) {
 	tests := []struct {
 		name     string

@@ -7,15 +7,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// ADR-0050 Phase 3.10 Slice 1: the reconcile-on-timeout rung (VerifyCatalogAware)
-// is the THIRD deliverable-verify path. 3.8 threaded the host gate and the salvage
-// rung with cfg.PhaseIO but deliberately left this one at StageOff (the TODO(3.10)).
-// Slice 1 makes it stage-aware via VerifyCatalogAwareStage, so at enforce it honors
-// the SAME failure-context requirement the host gate does. These reuse the 3.8
-// phaseioFailFixtures / failReport / writeFile / hasCode helpers (same package).
-// With roots.EvolveDir == "" the catalog-aware path takes the BuiltinResolver
-// branch, so the gate behaviour matches VerifyWithStage for built-in phases.
-
+// Empty roots.EvolveDir takes the BuiltinResolver branch, so these match VerifyWithStage for built-in phases.
 func TestVerifyCatalogAwareStage_FailWithoutBlock_BlocksAtEnforce(t *testing.T) {
 	for phase, fx := range phaseioFailFixtures {
 		t.Run(phase, func(t *testing.T) {
@@ -50,10 +42,6 @@ func TestVerifyCatalogAwareStage_FailWithoutBlock_DormantBelowEnforce(t *testing
 	}
 }
 
-// VerifyCatalogAware is exactly VerifyCatalogAwareStage at StageOff — the
-// byte-identical back-compat wrapper kept for the existing callers that pass no
-// stage. This is the equivalence proof that resolving TODO(3.10) did not change
-// any default-path behaviour.
 func TestVerifyCatalogAware_EqualsStageOff(t *testing.T) {
 	ws := t.TempDir()
 	writeFile(t, ws, "build-report.md", failReport("build", "## Changes", false))
@@ -71,9 +59,7 @@ func TestVerifyCatalogAware_EqualsStageOff(t *testing.T) {
 	}
 }
 
-// equalViolationCodes compares two Results by their ordered violation codes — a
-// stricter back-compat proof than a length check (catches a same-count but
-// different-code divergence between the wrapper and the StageOff call).
+// equalViolationCodes compares ordered violation codes, which is stricter than comparing counts.
 func equalViolationCodes(a, b Result) bool {
 	if len(a.Violations) != len(b.Violations) {
 		return false

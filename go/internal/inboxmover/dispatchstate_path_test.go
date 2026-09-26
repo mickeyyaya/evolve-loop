@@ -1,17 +1,5 @@
 package inboxmover
 
-// dispatchstate_path_test.go — a pending task's dispatch state must carry the
-// LIVE record's path.
-//
-// cycle-1548 (soak-20260823a halt): the dispatched scope id resolved to 17
-// on-disk records — one LIVE in inbox/, sixteen namesakes in consumed/ — and
-// the resolver, which had the live path in hand (FindFileByTaskID), DISCARDED
-// it. The prompt then carried a bare id, the agent name-searched the tree, and
-// every phase report cited a consumed record from a halt CURED two weeks
-// earlier. The auto-minted P0 ids are deliberately stable per category (the
-// dedup identity), so namesakes accumulate forever: name-based resolution is
-// structurally unsafe here, and the resolved PATH is the only safe handle.
-
 import (
 	"encoding/json"
 	"os"
@@ -32,8 +20,6 @@ func writeInboxRecord(t *testing.T, dir, id string) string {
 	return p
 }
 
-// THE headline, in the live shape: one pending record plus consumed namesakes.
-// The state must be Pending AND carry the LIVE path — never a namesake's.
 func TestResolveDispatchState_PendingCarriesTheLivePath(t *testing.T) {
 	root := t.TempDir()
 	inbox := filepath.Join(root, ".evolve", "inbox")
@@ -51,8 +37,6 @@ func TestResolveDispatchState_PendingCarriesTheLivePath(t *testing.T) {
 	}
 }
 
-// Non-pending states carry no path: their records are lifecycle history, and
-// handing an agent a processed/consumed path is exactly the defect.
 func TestResolveDispatchState_NonPendingCarriesNoPath(t *testing.T) {
 	root := t.TempDir()
 	inbox := filepath.Join(root, ".evolve", "inbox")

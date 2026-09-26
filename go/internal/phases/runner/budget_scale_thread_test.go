@@ -1,10 +1,5 @@
 package runner
 
-// budget_scale_thread_test.go — ADR-0076 slice A: the runner must thread
-// PhaseRequest.BudgetScale onto the BridgeRequest verbatim, or the dispatch's
-// difficulty multiplier dies between core and the engine (the I2 dead-link
-// class this campaign exists to kill).
-
 import (
 	"context"
 	"os"

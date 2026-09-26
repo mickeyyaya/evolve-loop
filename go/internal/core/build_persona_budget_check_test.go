@@ -1,13 +1,5 @@
 package core
 
-// build_persona_budget_check_test.go — permanent regression cover for the
-// cycle-1101 in-lane persona-budget gate. The cycle-scoped ACS predicates
-// (go/acs/cycle1101) exercise the same behaviour against a real go module and
-// vanish with the cycle; these keep the CONJUNCTION (persona path changed AND
-// internal/prompts red) pinned for every future cycle, hermetically: the
-// go-test subprocess is replaced at the buildSelfCheckRunner seam so no test
-// here spawns `go test`.
-
 import (
 	"context"
 	"os"
@@ -40,8 +32,7 @@ func TestPersonaDocTouched(t *testing.T) {
 	}
 }
 
-// stubSelfCheckRunner swaps the go-test seam for the duration of a test and
-// records which packages it was asked to run.
+// stubSelfCheckRunner returns the packages the stubbed go-test seam was asked to run.
 func stubSelfCheckRunner(t *testing.T, output string, passed bool) *[]string {
 	t.Helper()
 	old := buildSelfCheckRunner
@@ -116,11 +107,7 @@ func TestPersonaBudgetFailures(t *testing.T) {
 	})
 }
 
-// TestDefaultBuildFloorChecks_IncludesPersonaBudgetCheck is the WIRING proof:
-// the check must fire through the engine actually injected at the build phase
-// (cmd_cycle.go: NewBuildFloorReviewer(DefaultBuildFloorChecks)), not merely
-// exist. A real git fixture supplies the diff because the production path
-// derives changed paths from git, never from an injected list.
+// A real git fixture, because the production path derives changed paths from git.
 func TestDefaultBuildFloorChecks_IncludesPersonaBudgetCheck(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")
@@ -157,7 +144,7 @@ func TestDefaultBuildFloorChecks_IncludesPersonaBudgetCheck(t *testing.T) {
 	base := strings.TrimSpace(string(baseOut))
 	in := ReviewInput{Phase: string(PhaseBuild), Worktree: wt, WorktreeBaseSHA: base}
 
-	// The lane grows the persona doc past budget and COMMITS (builder protocol).
+	// The builder protocol commits its work.
 	write("agents/evolve-scout.md", "# Evolve Scout\n\nlines that blow the budget\n")
 	git("add", "-A")
 	git("commit", "-q", "-m", "persona edit")
@@ -167,7 +154,6 @@ func TestDefaultBuildFloorChecks_IncludesPersonaBudgetCheck(t *testing.T) {
 	if len(fails) != 1 || !strings.Contains(fails[0], "internal/prompts") {
 		t.Fatalf("DefaultBuildFloorChecks did not surface the persona-budget breach — the check is UNWIRED; got %v", fails)
 	}
-	// And the reviewer converts it into a retryable REJECT, not a WARN.
 	res := NewBuildFloorReviewer(DefaultBuildFloorChecks).Review(context.Background(), in)
 	if res.Approve || !res.Retry {
 		t.Fatalf("persona-budget breach must REJECT with Retry; got Approve=%v Retry=%v", res.Approve, res.Retry)

@@ -6,13 +6,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// TestParseVerdictSentinelFull_RejectsPlaceholderEcho_MixedWithRealDefect
-// probes the boundary between two plausible readings of the guard: "reject
-// only when EVERY defect is a placeholder" vs "reject when ANY defect is a
-// placeholder". A contract-example echo can only ever appear alongside real
-// content if the capture is noisy (never as the agent's deliberate choice),
-// so even one wholly-bracketed entry must be disqualifying — mixing in a
-// genuine-looking defect must not launder it back to ok=true.
 func TestParseVerdictSentinelFull_RejectsPlaceholderEcho_MixedWithRealDefect(t *testing.T) {
 	raw := phasecontract.RenderVerdictSentinelWithFailure("build", "FAIL", &phasecontract.FailureBlock{
 		Class:   "build_failure",
@@ -23,10 +16,6 @@ func TestParseVerdictSentinelFull_RejectsPlaceholderEcho_MixedWithRealDefect(t *
 	}
 }
 
-// TestParseVerdictSentinelFull_RejectsPlaceholderEcho_WhitespacePadded checks
-// that surrounding whitespace around the bracketed token (plausible if a
-// template line is echoed with leading indentation or a trailing space)
-// still counts as "wholly" a placeholder.
 func TestParseVerdictSentinelFull_RejectsPlaceholderEcho_WhitespacePadded(t *testing.T) {
 	raw := phasecontract.RenderVerdictSentinelWithFailure("audit", "FAIL", &phasecontract.FailureBlock{
 		Class:   "review_failure",
@@ -37,11 +26,6 @@ func TestParseVerdictSentinelFull_RejectsPlaceholderEcho_WhitespacePadded(t *tes
 	}
 }
 
-// TestParseVerdictSentinelFull_AllowsGenuineContentContainingAngleBrackets is
-// the false-positive guard's mirror image: a real defect can legitimately
-// mention angle brackets (generics, HTML tags, redirects) without being a
-// placeholder echo, because the bracketed span is not the WHOLE string. A
-// broad "contains '<'" implementation would wrongly reject this.
 func TestParseVerdictSentinelFull_AllowsGenuineContentContainingAngleBrackets(t *testing.T) {
 	raw := phasecontract.RenderVerdictSentinelWithFailure("build", "FAIL", &phasecontract.FailureBlock{
 		Class:   "build_failure",
@@ -56,11 +40,6 @@ func TestParseVerdictSentinelFull_AllowsGenuineContentContainingAngleBrackets(t 
 	}
 }
 
-// TestParseVerdictSentinelFull_RejectsGenericPlaceholderShape_NotJustKnownStrings
-// confirms the guard matches the wholly-bracketed SHAPE, not a hardcoded list
-// of the two known template strings ("<one line per defect>",
-// "<artifact path>"). A future template rewording ("<TODO: ...>") must still
-// be caught.
 func TestParseVerdictSentinelFull_RejectsGenericPlaceholderShape_NotJustKnownStrings(t *testing.T) {
 	raw := phasecontract.RenderVerdictSentinelWithFailure("scout", "FAIL", &phasecontract.FailureBlock{
 		Class:         "scout_failure",
@@ -71,10 +50,6 @@ func TestParseVerdictSentinelFull_RejectsGenericPlaceholderShape_NotJustKnownStr
 	}
 }
 
-// TestParseVerdictSentinelFull_MixedAcrossBothFields exercises Defects and
-// EvidencePaths simultaneously, each holding one genuine and one placeholder
-// entry — a combinatorial case neither original RED test (which varies only
-// one field at a time) covers.
 func TestParseVerdictSentinelFull_MixedAcrossBothFields(t *testing.T) {
 	raw := phasecontract.RenderVerdictSentinelWithFailure("tdd", "FAIL", &phasecontract.FailureBlock{
 		Class:         "tdd_failure",
@@ -86,10 +61,6 @@ func TestParseVerdictSentinelFull_MixedAcrossBothFields(t *testing.T) {
 	}
 }
 
-// TestParseVerdictSentinelFull_UnclosedBracket_NotTreatedAsPlaceholder covers
-// a malformed-but-real string that starts with '<' but never closes — the
-// guard must require a matching closing '>' anchored at end-of-string, not
-// merely a leading '<'.
 func TestParseVerdictSentinelFull_UnclosedBracket_NotTreatedAsPlaceholder(t *testing.T) {
 	raw := phasecontract.RenderVerdictSentinelWithFailure("audit", "FAIL", &phasecontract.FailureBlock{
 		Class:   "review_failure",
@@ -104,12 +75,6 @@ func TestParseVerdictSentinelFull_UnclosedBracket_NotTreatedAsPlaceholder(t *tes
 	}
 }
 
-// TestParseVerdictSentinelFull_RoundTripsRealFailureBlockThroughRenderAndParse
-// is a producer→consumer lockstep check using only the package's public
-// render/parse pair: a fully genuine failure block (multiple real defects and
-// evidence paths, non-trivial Class) must survive the render→parse round
-// trip byte-for-byte in every field, confirming the placeholder guard adds
-// no collateral damage to ordinary failure reporting.
 func TestParseVerdictSentinelFull_RoundTripsRealFailureBlockThroughRenderAndParse(t *testing.T) {
 	want := &phasecontract.FailureBlock{
 		Class:         "eval_failure",

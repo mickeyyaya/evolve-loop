@@ -11,11 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
 )
 
-// TestBuildExplanationReviewer_RequiresExplanationForMaterialChange is the RED
-// contract for the Build -> Audit explanation handoff. A new-schema triage
-// decision marks the selected material change as documentation-required; a
-// Builder that changes the implementation but omits the explanation
-// deliverable must be rejected by the existing correction ladder seam.
 func TestBuildExplanationReviewer_RequiresExplanationForMaterialChange(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")

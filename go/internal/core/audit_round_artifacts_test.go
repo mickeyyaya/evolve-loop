@@ -1,18 +1,5 @@
 package core
 
-// audit_round_artifacts_test.go — regression contract for the cycle-1603
-// stale-verdict-artifact class (2026-09-02).
-//
-// Any audit RE-dispatch (the ADR-0092/0093 repair loop, a bookkeeping regrade,
-// ship-error recovery, debugger RERUN_PHASE) that leaves the previous round's
-// verdict artifacts at their canonical paths replays superseded evidence
-// through audit.Classify's verdict-exists gate: in cycle-1603 round-1's
-// agent-amended ship_eligible=false forced every repaired PASS back to FAIL,
-// so the repair loop was structurally unable to succeed. The retirement lives
-// at the audit pre-dispatch seam (beside resetFloorFailReason, both dispatch
-// surfaces) — the unit tests pin the helper's contract, and the live test pins
-// the wiring through a real repair cycle.
-
 import (
 	"context"
 	"os"
@@ -43,8 +30,6 @@ func TestRetireSupersededAuditArtifacts_ArchivesBothVerdictFiles(t *testing.T) {
 }
 
 func TestRetireSupersededAuditArtifacts_RoundZeroHonorsPreStagedVerdict(t *testing.T) {
-	// First dispatch: an operator/CI pre-staged acs-verdict.json keeps the
-	// honor audit.Classify grants it — nothing is superseded yet.
 	dir := t.TempDir()
 	mustWriteRoundArtifact(t, filepath.Join(dir, "acs-verdict.json"), "operator-pre-stage")
 
@@ -56,9 +41,7 @@ func TestRetireSupersededAuditArtifacts_RoundZeroHonorsPreStagedVerdict(t *testi
 }
 
 func TestRetireSupersededAuditArtifacts_NeverClobbersAnExistingArchive(t *testing.T) {
-	// An errored attempt re-dispatched within the SAME round: the first
-	// retirement already archived the round's true evidence; a partial file
-	// written by the dead attempt is dropped, not archived over it.
+	// A dead attempt's partial file is dropped, never archived over the round's first retirement.
 	dir := t.TempDir()
 	mustWriteRoundArtifact(t, filepath.Join(dir, "acs-verdict.round1.json"), "true-round1-evidence")
 	mustWriteRoundArtifact(t, filepath.Join(dir, "acs-verdict.json"), "partial-from-dead-attempt")
@@ -98,12 +81,6 @@ func TestCompletedAuditRounds_CountsOnlyAuditOccurrences(t *testing.T) {
 	}
 }
 
-// THE LIVE PATH — the cycle-1603 shape driven through a real repair cycle. The
-// round-1 auditor pre-writes acs-verdict.json (the persona instructs exactly
-// that) and FAILs with a repairable class; the granted repair re-enters
-// tdd/build; at the round-2 audit DISPATCH the stale verdict must already be
-// retired — asserted from inside the runner, at the exact moment the real
-// verdict-exists gate would have read it.
 func TestAuditRedispatch_RetiresPreviousRoundVerdicts(t *testing.T) {
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
@@ -132,9 +109,7 @@ func TestAuditRedispatch_RetiresPreviousRoundVerdicts(t *testing.T) {
 
 const round1VerdictBody = `{"verdict":"PASS","red_count":0,"ship_eligible":false}`
 
-// verdictStagingAuditRunner reproduces the live auditor's artifact behavior:
-// round 1 pre-writes the acs verdict + a FAIL report with a repairable class;
-// round 2 checks the canonical paths were retired before it started and PASSes.
+// verdictStagingAuditRunner pre-writes the verdict in round 1, like the live auditor, and checks its retirement in round 2.
 type verdictStagingAuditRunner struct {
 	t                   *testing.T
 	runs                int
@@ -174,14 +149,8 @@ func mustReadRoundArtifact(t *testing.T, path string) string {
 	return string(b)
 }
 
-// Resume-surface parity: a cycle that crashed and resumed AT audit must retire
-// superseded verdicts on its re-audits exactly like the live loop — the resume
-// loop has its own dispatch seam (resume.go), and a miss there would revive
-// the cycle-1603 replay on precisely the surface that exists for recovery.
 func TestResumedAuditRedispatch_RetiresPreviousRoundVerdicts(t *testing.T) {
-	// The resume surface takes its workspace from the PERSISTED cycle-state
-	// (authoritativeResumeIdentity), so the harness seeds one — an empty
-	// workspace would silently no-op the retirement under test.
+	// The resume surface takes its workspace from the persisted cycle-state; an empty one would no-op the retirement.
 	ws := t.TempDir()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}, cycleState: CycleState{CycleID: 1603, WorkspacePath: ws}}
 	led := &fakeLedger{}
@@ -203,11 +172,6 @@ func TestResumedAuditRedispatch_RetiresPreviousRoundVerdicts(t *testing.T) {
 	}
 }
 
-// The primitive's counter math IS the crash-correctness (review-2 HIGH): each
-// call retires by the persisted dispatch count and then advances it, so a
-// dispatch that never completes still marks its round superseded. A dropped
-// increment would leave every later dispatch at round 0 — permanently
-// honoring stale verdicts.
 func TestSupersedePreviousAuditRound_AdvancesThePersistedDispatchCounter(t *testing.T) {
 	ws := t.TempDir()
 	cs := CycleState{WorkspacePath: ws}
@@ -227,10 +191,6 @@ func TestSupersedePreviousAuditRound_AdvancesThePersistedDispatchCounter(t *test
 	}
 }
 
-// Legacy backstop: a checkpoint persisted before AuditDispatches existed
-// decodes the counter as 0, but its CompletedPhases still names the finished
-// rounds — the completion-derived count must floor the index so a mid-repair
-// legacy resume still retires.
 func TestSupersedePreviousAuditRound_LegacyCheckpointFallsBackToCompletions(t *testing.T) {
 	ws := t.TempDir()
 	mustWriteRoundArtifact(t, filepath.Join(ws, "acs-verdict.json"), "legacy-round-1")
@@ -246,11 +206,6 @@ func TestSupersedePreviousAuditRound_LegacyCheckpointFallsBackToCompletions(t *t
 	}
 }
 
-// Review-2 HIGH, the live crash shape: an audit quota-paused/crashed
-// MID-FLIGHT after the auditor pre-wrote acs-verdict.json has no
-// CompletedPhases entry — only the persisted AuditDispatches counter knows the
-// round existed. The resumed re-dispatch must retire the dead attempt's
-// verdict instead of honoring it through the verdict-exists gate.
 func TestResumedCrashedAudit_RetiresTheDeadAttemptsVerdict(t *testing.T) {
 	ws := t.TempDir()
 	mustWriteRoundArtifact(t, filepath.Join(ws, "acs-verdict.json"), `{"verdict":"PASS","ship_eligible":false}`)
@@ -278,9 +233,7 @@ func TestResumedCrashedAudit_RetiresTheDeadAttemptsVerdict(t *testing.T) {
 	}
 }
 
-// retirementProbeRunner records, at its first dispatch, whether the canonical
-// acs-verdict.json had been retired — the exact read the real verdict-exists
-// gate performs — then PASSes.
+// retirementProbeRunner records at its first dispatch whether acs-verdict.json was already retired.
 type retirementProbeRunner struct{ sawRetirement bool }
 
 func (r *retirementProbeRunner) Name() string { return string(PhaseAudit) }

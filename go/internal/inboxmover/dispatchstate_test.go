@@ -6,7 +6,6 @@ import (
 	"testing"
 )
 
-// writeTask drops a minimal task JSON into dir (created as needed).
 func writeTask(t *testing.T, dir, id string, deps []string) {
 	t.Helper()
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -22,19 +21,14 @@ func writeTask(t *testing.T, dir, id string, deps []string) {
 	}
 }
 
-// TestResolveDispatchState pins the lifecycle classification the fleet
-// dispatch freshness gate builds on (cycle 767, dispatch-freshness-gate):
-// each lifecycle dir maps to its state, pending carries the declared deps,
-// processing names the owning cycle, and no evidence anywhere is StateUnknown
-// (the fail-open posture — a bad or absent inbox must never false-skip a lane).
 func TestResolveDispatchState(t *testing.T) {
 	root := t.TempDir()
 	inbox := filepath.Join(root, ".evolve", "inbox")
 	writeTask(t, inbox, "task-pending", []string{"dep-a"})
 	writeTask(t, filepath.Join(inbox, "processing", "cycle-748"), "task-inflight", nil)
 	writeTask(t, filepath.Join(inbox, "processed"), "task-done", nil)
-	writeTask(t, filepath.Join(inbox, "processed", "cycle-1679"), "task-shipped", nil) // production layout: promoteDestPath nests processed/ by cycle
-	writeTask(t, filepath.Join(inbox, "consumed"), "task-consumed", nil)               // `evolve inbox consume` (the in-commit landing consumption)
+	writeTask(t, filepath.Join(inbox, "processed", "cycle-1679"), "task-shipped", nil) // the production layout nests processed/ by cycle
+	writeTask(t, filepath.Join(inbox, "consumed"), "task-consumed", nil)
 	writeTask(t, filepath.Join(inbox, "rejected"), "task-nope", nil)
 	writeTask(t, filepath.Join(inbox, "retry"), "task-again", nil)
 	writeTask(t, filepath.Join(inbox, "quarantine"), "task-poison", nil)
@@ -53,10 +47,6 @@ func TestResolveDispatchState(t *testing.T) {
 		{"task-consumed", StateConsumed, "", ""},
 		{"task-nope", StateRejected, "", ""},
 		{"task-again", StateRetry, "", ""},
-		// A todo parked by the ADR-0072 S5 retry ceiling must classify as
-		// quarantine, NOT fall through to StateUnknown: the dispatch freshness
-		// gate fails OPEN on unknown, so an unclassified quarantine would let the
-		// very next wave relaunch the poison todo the ceiling just parked.
 		{"task-poison", StateQuarantine, "", ""},
 		{"task-never-seen", StateUnknown, "", ""},
 	}

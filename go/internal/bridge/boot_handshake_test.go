@@ -1,25 +1,3 @@
-// boot_handshake_test.go — RED contract for inbox
-// codex-update-menu-swallows-injection (2026-06-10T11-10Z, 3× recurrence
-// cycles 274/277): the boot loop declared "REPL ready" on a prompt-marker
-// SUBSTRING alone. A marker lookalike rendered over a dead shell (codex's
-// update menu exited to zsh; the pasted prompt spilled into quote>/bquote>
-// continuation) read as ready, the injection landed in the shell, and the
-// phase wedged 25+ min behind a false-positive liveness signal.
-//
-// Contract pinned here (R3.1/R3.2 of the concurrency-factory plan):
-//
-//  1. Marker visible but the pane's foreground process is a SHELL → NOT
-//     ready. The shell set is closed (zsh/bash/…); CLI binary names vary
-//     (claude runs under node), so the predicate rejects-known-shell rather
-//     than requires-known-binary — degradation-safe for controllers that
-//     don't implement PaneCommander.
-//  2. Post-paste: the first wait-loop pane (the existing interval baseline,
-//     no new capture) showing shell-spill signatures WITH shell-process
-//     confirmation → fail fast with ExitREPLBootTimeout (transient → the
-//     fallback chain), never a 25-min stall. Mid-run process death stays
-//     the observer's job (plan R3.4).
-//  3. A pane that merely CONTAINS spill-lookalike text (e.g. a prompt
-//     discussing shell errors) while the process is the CLI → ignored.
 package bridge
 
 import (
@@ -27,9 +5,7 @@ import (
 	"testing"
 )
 
-// shellWedgeTmux is a FakeTmuxController whose reported pane process flips
-// to a shell after the prompt paste — the exact cycle-274 sequence (codex
-// exited to zsh; the paste spilled into the shell).
+// shellWedgeTmux reports a shell as the pane process after the prompt paste: the CLI exited and the paste spilled into the shell.
 type shellWedgeTmux struct {
 	*FakeTmuxController
 	postPasteCmd string
@@ -43,8 +19,7 @@ func (s *shellWedgeTmux) PasteBuffer(ctx context.Context, session string) error 
 	return nil
 }
 
-// markerOverDeadShell renders the cycle-274 trap: a stale prompt marker in
-// scrollback above a wedged zsh continuation prompt.
+// markerOverDeadShell is a stale prompt marker in scrollback above a wedged zsh continuation prompt.
 const markerOverDeadShell = `❯ previous output above
 user@host evolve-loop % knowledge-base/research/
 bquote>
@@ -86,12 +61,8 @@ func TestBootAcceptsMarkerWithCLIProcess(t *testing.T) {
 
 func TestPostPasteShellSpillFailsFast(t *testing.T) {
 	cfg := fixtureConfig(t)
-	// Frames: boot sees the marker (process=node, ready); the post-paste
-	// interval baseline shows the spill (process now zsh). No artifact is
-	// ever written — pre-fix this stalls through the whole artifact wait;
-	// post-fix it returns ExitREPLBootTimeout on the baseline check.
-	// Frame slots: boot-marker → post-paste interval baseline (the spill) →
-	// deferred-cleanup final scrollback.
+	// Frames: boot marker (process node), then the post-paste interval baseline showing the spill (process zsh),
+	// then the deferred-cleanup final scrollback. No artifact is ever written.
 	base := &FakeTmuxController{
 		CaptureFrames: []string{"❯", cycle274BquoteSpill, cycle274BquoteSpill},
 		PaneCmd:       "node",
@@ -113,16 +84,8 @@ func TestPostPasteShellSpillFailsFast(t *testing.T) {
 
 func TestPostPasteSpillLookalikeWithCLIProcessIgnored(t *testing.T) {
 	cfg := fixtureConfig(t)
-	// The pane QUOTES spill text (an agent discussing shell errors) but the
-	// foreground process is still the CLI → must not fail. The artifact
-	// appears on paste, so the run completes normally.
-	// The spill-lookalike frame is queued TWICE: under the cycle-1233 cross-poll
-	// stability window the artifact completes one tick later than it used to, so
-	// the pane is captured once more while the deliverable settles. Repeating the
-	// same frame is what a real settled pane does — and it keeps the lookalike
-	// text on screen for that extra tick, which is exactly what this test wants
-	// ignored. The frame budget is grown, not the panic-on-underrun contract
-	// weakened (see TestFakeTmuxController_UnderrunAfterExhaustion).
+	// The pane quotes spill text while the foreground process is still the CLI, so the run must complete.
+	// The lookalike frame is queued twice: the cross-poll stability window captures the settled pane once more.
 	base := &FakeTmuxController{
 		CaptureFrames: []string{"❯", cycle274BquoteSpill + "\n❯", cycle274BquoteSpill + "\n❯", "final", "cleanup"},
 		PaneCmd:       "node",
@@ -137,11 +100,7 @@ func TestPostPasteSpillLookalikeWithCLIProcessIgnored(t *testing.T) {
 	}
 }
 
-// TestGuardOffShellREPLBoots pins the opt-out (the PR-71 Ubuntu CI
-// regression): a harness whose "REPL" legitimately IS a shell script (the
-// RealTmux integration fixtures) must boot normally when guardDeadShell is
-// unset, even though the pane process reports a shell. Contrast:
-// TestBootRejectsMarkerOverDeadShell covers the armed+shell→reject mirror.
+// A harness whose REPL is a shell script (the RealTmux integration fixtures) must boot when guardDeadShell is unset.
 func TestGuardOffShellREPLBoots(t *testing.T) {
 	cfg := fixtureConfig(t)
 	tm := &FakeTmuxController{CaptureFrames: []string{"❯", "❯ done"}, PaneCmd: "bash"}

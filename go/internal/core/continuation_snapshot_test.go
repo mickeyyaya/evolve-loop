@@ -1,11 +1,5 @@
 package core
 
-// continuation_snapshot_test.go — ADR-0076 slice C (C1/C2): at the preserve
-// decision a FAILed cycle's dirty worktree is SNAPSHOT-COMMITTED onto its
-// cycle branch (an immutable ref — adoption never trusts mutable dirty state)
-// and a continuation manifest is stamped into the workspace, gated on the
-// carry-forward screen classifying the snapshot Clean against main.
-
 import (
 	"context"
 	"os"
@@ -36,9 +30,7 @@ func initContinuationRepo(t *testing.T, cycle int) (string, string) {
 	if err := os.WriteFile(filepath.Join(root, "a.txt"), []byte("base\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// Mirror the production repo's ignore truth: linkGuardDeps plants
-	// gitignored infrastructure (go/bin symlink, .evolve state links) in every
-	// provisioned worktree — a snapshot must never see it as dirt.
+	// linkGuardDeps plants gitignored infrastructure in every worktree; a snapshot must not see it as dirt.
 	if err := os.WriteFile(filepath.Join(root, ".gitignore"), []byte(".evolve/\ngo/bin/\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -127,15 +119,9 @@ func TestStampContinuationManifest_WritesGatedManifest(t *testing.T) {
 	if m.Branch == "" {
 		t.Error("manifest must carry the cycle branch")
 	}
-	// The snapshot ref must be reachable from the recorded branch (immutable
-	// anchor even if the worktree directory is later pruned).
 	if got := gitOut(t, root, "merge-base", "--is-ancestor", m.SnapshotSHA, m.Branch); got != "" {
 		t.Errorf("snapshot not on branch: %s", got)
 	}
-	// Findings must point at the REASON artifact, not the digest identity
-	// shell (1146→1148 live gap: the digest served as "prior findings" told
-	// the next builder nothing, so it repeated the identical protectedsurface
-	// rejection while the fail-reason carried the remedy the whole time).
 	if filepath.Base(m.FindingsPath) != "audit-fail-reason.json" {
 		t.Errorf("FindingsPath = %q, want the audit-fail-reason.json REASON artifact — a digest shell is unactionable as builder findings", m.FindingsPath)
 	}
@@ -167,13 +153,6 @@ func TestStampContinuationManifest_ConflictingWorkIsNotStamped(t *testing.T) {
 	}
 }
 
-// TestAbnormalEpilogue_StampsContinuation pins the G1 gap the FIRST live FAIL
-// exposed (cycle-1078, 2026-07-23): a review-gate rejection exits RunCycle via
-// the ERROR path, which never reaches finalizeCycle — the worktree was
-// preserved but no continuation manifest was written, so the resumption
-// machinery had nothing to bind. The unskippable abnormal epilogue must stamp
-// too (idempotent with the finalize-path stamp; runs after the failure digest
-// so FindingsPath has content).
 func TestAbnormalEpilogue_StampsContinuation(t *testing.T) {
 	root, wt := initContinuationRepo(t, 78)
 	ws := filepath.Join(root, ".evolve", "runs", "cycle-78")

@@ -6,46 +6,21 @@ import (
 	"testing"
 )
 
-// apicover_shiperror_test.go — public-API coverage (ADR-0050, Phase 5) for the
-// ShipError protocol in shiperror.go. The ship phase is a pure executor: every
-// failure it cannot execute through is reported as a *ShipError carrying a
-// precise Code, a severity Class, the Stage it failed at, and a Debug map. The
-// orchestrator errors.As-matches it to decide recovery. These tests name AND
-// exercise the 4 protocol types, the 2 previously-uncovered ShipStage consts,
-// and all 33 previously-uncovered ShipErrorCode consts, asserting the REAL
-// construction + rendering + class-pairing contracts (not value padding).
-//
-// There is intentionally NO code->class mapper function in core: the class is
-// chosen per call-site (internal/phases/ship/{verify,gitops}.go via the shipErr
-// wrapper) and recorded verbatim by NewShipError. So the contract this file
-// pins is: (a) NewShipError faithfully records {code,class,stage,message,debug};
-// (b) Error() renders all three identity fields; (c) the canonical class each
-// code is constructed with in production round-trips through errors.As. The
-// per-code wantClass column below is transcribed from the live ship call-sites,
-// so a drift between this table and production is a real protocol regression.
-
-// shipCodeCase binds a code to the severity Class the ship phase actually
-// constructs it with in production (internal/phases/ship/*.go).
 type shipCodeCase struct {
 	code      ShipErrorCode
 	wantClass ShipErrorClass
-	// stage the production call-site uses; asserted to be one of the known stages.
-	stage ShipStage
+	stage     ShipStage
 }
 
-// allShipCodeCases enumerates the 33 codes targeted by apicover, each paired
-// with its canonical production Class + Stage (see file header for provenance).
+// allShipCodeCases pairs each code with the Class and Stage its production call site in internal/phases/ship uses.
 func allShipCodeCases() []shipCodeCase {
 	return []shipCodeCase{
-		// verify-explanation
 		{CodeExplanationDocumentation, ShipClassPrecondition, StageVerifyExplanation},
 
-		// verify-self-sha
 		{CodeSelfSHATampered, ShipClassIntegrity, StageVerifySelfSHA},
 		{CodeSelfSHAIO, ShipClassTransient, StageVerifySelfSHA},
 		{CodeStateIO, ShipClassTransient, StageVerifySelfSHA},
 
-		// verify-class — audit binding (all precondition: upstream re-establishable)
 		{CodeAuditBindingTreeMismatch, ShipClassPrecondition, StageVerifyClass},
 		{CodeAuditBindingArtifactSHA, ShipClassPrecondition, StageVerifyClass},
 		{CodeAuditBindingArtifactMissing, ShipClassPrecondition, StageVerifyClass},
@@ -58,13 +33,10 @@ func allShipCodeCases() []shipCodeCase {
 		{CodeAuditBindingAuditorExit, ShipClassPrecondition, StageVerifyClass},
 		{CodeAuditBindingNoLedger, ShipClassPrecondition, StageVerifyClass},
 
-		// verify-class — EGPS gate
 		{CodeEGPSRedCount, ShipClassPrecondition, StageVerifyClass},
 
-		// verify-class — pipeline control-plane integrity boundary (ADR-0064)
 		{CodeControlPlaneViolation, ShipClassPrecondition, StageVerifyClass},
 
-		// verify-class — manual / trivial / commit-gate (operator/config errors)
 		{CodeInvalidClass, ShipClassConfig, StageVerifyClass},
 		{CodeManualNotTTY, ShipClassConfig, StageVerifyClass},
 		{CodeManualDeclined, ShipClassConfig, StageVerifyClass},
@@ -74,7 +46,6 @@ func allShipCodeCases() []shipCodeCase {
 		{CodeTrivialNotTrivial, ShipClassConfig, StageVerifyClass},
 		{CodeTrivialCriticalPaths, ShipClassConfig, StageVerifyClass},
 
-		// atomic-ship — git
 		{CodeGitDetachedHead, ShipClassPrecondition, StageAtomicShip},
 		{CodeGitStageFailed, ShipClassTransient, StageAtomicShip},
 		{CodeGitCommitFailed, ShipClassPrecondition, StageAtomicShip},
@@ -83,21 +54,15 @@ func allShipCodeCases() []shipCodeCase {
 		{CodeGitFleetRebaseConflict, ShipClassIntegrity, StageAtomicShip},
 		{CodeCommitPrefixGate, ShipClassPrecondition, StageAtomicShip},
 
-		// generic / fallthrough
 		{CodeArgs, ShipClassConfig, StageArgs},
-		// CodeUnknown is the generic fallthrough identity; it has no fixed
-		// production class, so it is exercised separately below (no class assert).
+		// CodeUnknown has no fixed production class, so it is exercised separately.
 	}
 }
 
-// TestShipError_TypesAreUsable names the 4 protocol types (ShipError,
-// ShipErrorClass, ShipErrorCode, ShipStage) as typed vars and asserts the
-// zero/known-value relationships the orchestrator relies on.
 func TestShipError_TypesAreUsable(t *testing.T) {
 	t.Parallel()
 
-	// Name each type via a typed declaration so apicover marks them covered,
-	// and assert the underlying-string identity contract the ledger keys off.
+	// Typed declarations name each type for apicover.
 	var code ShipErrorCode = CodeArgs
 	var class ShipErrorClass = ShipClassConfig
 	var stage ShipStage = StageArgs
@@ -112,15 +77,11 @@ func TestShipError_TypesAreUsable(t *testing.T) {
 	if string(stage) != "args" {
 		t.Errorf("ShipStage underlying string = %q; want args", string(stage))
 	}
-	// A value ShipError still renders via its pointer Error() method.
 	if got := se.Error(); !strings.Contains(got, "ARGS") || !strings.Contains(got, "boom") {
 		t.Errorf("ShipError.Error() = %q; want it to carry code+message", got)
 	}
 }
 
-// TestShipStageConsts_PostShipAndVerifySelfSHA names the 2 uncovered ShipStage
-// consts and asserts each plays its documented role: a distinct, non-empty,
-// stable stage identity that NewShipError records and Error() renders.
 func TestShipStageConsts_PostShipAndVerifySelfSHA(t *testing.T) {
 	t.Parallel()
 
@@ -128,9 +89,9 @@ func TestShipStageConsts_PostShipAndVerifySelfSHA(t *testing.T) {
 		stage    ShipStage
 		wantWire string
 	}{
-		{StageVerifyExplanation, "verify-explanation"}, // preflight: Build explanation contract
-		{StageVerifySelfSHA, "verify-self-sha"},        // first legacy ship stage: TOFU self-SHA pin
-		{StagePostShip, "post-ship"},                   // last ship stage: post-push tree-drift guard
+		{StageVerifyExplanation, "verify-explanation"},
+		{StageVerifySelfSHA, "verify-self-sha"},
+		{StagePostShip, "post-ship"},
 	}
 	seen := map[ShipStage]bool{}
 	for _, tc := range cases {
@@ -142,7 +103,6 @@ func TestShipStageConsts_PostShipAndVerifySelfSHA(t *testing.T) {
 		}
 		seen[tc.stage] = true
 
-		// Role: the stage is recorded into a ShipError and surfaced in Error().
 		se := NewShipError(CodeStateIO, ShipClassTransient, tc.stage, "io trouble")
 		if se.Stage != tc.stage {
 			t.Errorf("NewShipError did not record stage: got %q want %q", se.Stage, tc.stage)
@@ -151,29 +111,22 @@ func TestShipStageConsts_PostShipAndVerifySelfSHA(t *testing.T) {
 			t.Errorf("Error() = %q; want it to render @%s", se.Error(), tc.wantWire)
 		}
 	}
-	// The two consts must be distinct from each other.
 	if StagePostShip == StageVerifySelfSHA || StageVerifyExplanation == StageVerifySelfSHA {
 		t.Fatal("ship stages must have distinct identities")
 	}
 }
 
-// TestShipErrorCodes_ConstructAndClassify drives all 33 target codes through
-// the REAL constructor with their canonical production class+stage, then
-// asserts each produces a well-formed, errors.As-recoverable ShipError whose
-// Code/Class/Stage round-trip and whose Error() carries the code wire string.
 func TestShipErrorCodes_ConstructAndClassify(t *testing.T) {
 	t.Parallel()
 
 	cases := allShipCodeCases()
-	if len(cases) != 33 { // CodeUnknown has no canonical production class and is tested separately.
+	if len(cases) != 33 {
 		t.Fatalf("table drift: have %d code cases, want 33 (CodeUnknown is separate)", len(cases))
 	}
 
 	seenWire := map[string]bool{}
 	for _, tc := range cases {
 		t.Run(string(tc.code), func(t *testing.T) {
-			// Code wire strings must be unique — the ledger + debugger persona
-			// key off them, so a collision is a real protocol bug.
 			wire := string(tc.code)
 			if wire == "" {
 				t.Fatalf("code %v has empty wire string", tc.code)
@@ -183,11 +136,9 @@ func TestShipErrorCodes_ConstructAndClassify(t *testing.T) {
 			}
 			seenWire[wire] = true
 
-			// Construct through the real constructor with a diagnostic pair.
 			se := NewShipError(tc.code, tc.wantClass, tc.stage, "produced by ship",
 				"detail", wire)
 
-			// Identity round-trips verbatim (constructor records, never mutates).
 			if se.Code != tc.code {
 				t.Errorf("Code = %q; want %q", se.Code, tc.code)
 			}
@@ -198,7 +149,6 @@ func TestShipErrorCodes_ConstructAndClassify(t *testing.T) {
 				t.Errorf("Stage = %q; want %q", se.Stage, tc.stage)
 			}
 
-			// Error() is the single-line "[CODE/class @stage] message" contract.
 			msg := se.Error()
 			for _, want := range []string{wire, string(tc.wantClass), string(tc.stage), "produced by ship"} {
 				if !strings.Contains(msg, want) {
@@ -206,7 +156,6 @@ func TestShipErrorCodes_ConstructAndClassify(t *testing.T) {
 				}
 			}
 
-			// Debug pair recorded + rendered deterministically.
 			if got := se.Debug["detail"]; got != wire {
 				t.Errorf("Debug[detail] = %q; want %q", got, wire)
 			}
@@ -214,7 +163,6 @@ func TestShipErrorCodes_ConstructAndClassify(t *testing.T) {
 				t.Errorf("DebugString() = %q; want it to contain detail=%s", ds, wire)
 			}
 
-			// The orchestrator recovers it from a wrapped chain via errors.As.
 			wrapped := fmt.Errorf("orchestrator layer: %w", error(se))
 			if got, ok := AsShipError(wrapped); !ok {
 				t.Errorf("AsShipError(wrap(%s)) = (_, false); want recoverable", wire)
@@ -225,10 +173,6 @@ func TestShipErrorCodes_ConstructAndClassify(t *testing.T) {
 	}
 }
 
-// TestShipErrorClass_VocabularyIsExhaustiveAndDistinct names ShipErrorClass and
-// asserts the 4 severity values the codes map onto are the complete, distinct
-// vocabulary actually used by the 31 classified codes — so a new unclassified
-// class or a code with an out-of-vocabulary class is caught here.
 func TestShipErrorClass_VocabularyIsExhaustiveAndDistinct(t *testing.T) {
 	t.Parallel()
 
@@ -249,7 +193,6 @@ func TestShipErrorClass_VocabularyIsExhaustiveAndDistinct(t *testing.T) {
 		}
 		usedClasses[tc.wantClass] = true
 	}
-	// Every severity class is actually exercised by at least one target code.
 	for c := range vocab {
 		if !usedClasses[c] {
 			t.Errorf("severity class %q is never used by any target code", c)
@@ -257,17 +200,12 @@ func TestShipErrorClass_VocabularyIsExhaustiveAndDistinct(t *testing.T) {
 	}
 }
 
-// TestCodeUnknown_FallthroughIdentity covers the 32nd code, CodeUnknown — the
-// generic fallthrough identity with no fixed production class. Its contract is
-// only that it is a non-empty, distinct wire string the constructor records and
-// that round-trips through errors.As like any other code.
 func TestCodeUnknown_FallthroughIdentity(t *testing.T) {
 	t.Parallel()
 
 	if string(CodeUnknown) != "UNKNOWN" {
 		t.Errorf("CodeUnknown wire = %q; want UNKNOWN", string(CodeUnknown))
 	}
-	// Distinct from the classified codes (no accidental aliasing).
 	for _, tc := range allShipCodeCases() {
 		if tc.code == CodeUnknown {
 			t.Fatalf("CodeUnknown must not appear in the classified table")
@@ -282,7 +220,6 @@ func TestCodeUnknown_FallthroughIdentity(t *testing.T) {
 	}
 }
 
-// errCode is a nil-safe Code accessor for the failure message above.
 func errCode(se *ShipError) ShipErrorCode {
 	if se == nil {
 		return ""

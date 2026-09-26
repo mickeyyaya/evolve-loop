@@ -1,9 +1,5 @@
 package advisor
 
-// catalog_test.go — the SELECT menu (ADR-0103 unit 04 §6 test 32; the core
-// on-demand index tests moved verbatim in intent; the ACS-named overflow
-// tests stay in core over the facade).
-
 import (
 	"fmt"
 	"strings"
@@ -21,10 +17,6 @@ func overflowCards(n int) []router.PhaseCard {
 	return cards
 }
 
-// Test 32 — the enriched slots go to (Optional+metadata, Optional, rest) in
-// stable order, overflow names never render individually, the pointer line
-// appears only on overflow, the on-demand index only when something
-// declined, WriteCatalog is the nil-index alias.
 func TestWriteCatalog_EnrichesTwelveByStablePriorityAndPointsAtTheRest(t *testing.T) {
 	var b strings.Builder
 	WriteCatalogWithOnDemand(&b, richCatalog(), []string{"market-sizing", "okr-draft"})
@@ -91,7 +83,6 @@ func TestWriteCard_WritesSourceCategoriesAndHintCap(t *testing.T) {
 	}
 }
 
-// The on-demand index names the declined phases compactly (moved from core).
 func TestWriteCatalog_OnDemandPhasesAreStillIndexed(t *testing.T) {
 	var b strings.Builder
 	WriteCatalogWithOnDemand(&b, []router.PhaseCard{{Name: "scout", Optional: true}}, []string{"market-sizing", "okr-draft"})

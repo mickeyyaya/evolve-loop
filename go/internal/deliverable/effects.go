@@ -46,11 +46,8 @@ func inboxDir(roots phasecontract.Roots) string {
 	return filepath.Join(roots.EvolveDir, "inbox")
 }
 
-// checkInboxClaim owes a claim for every committed id that is an inbox item:
-// the item's file must sit under this cycle's processing/ dir. An id with no
-// inbox file (scout- or carryover-originated work) owes nothing; an empty or
-// unrecorded commitment owes nothing. Each violation names the item and the
-// exact command, because that message is the correction directive.
+// checkInboxClaim owes a claim under this cycle's processing/ dir for every committed id that is an inbox item;
+// an id with no inbox file, or an empty commitment, owes nothing. The message is the correction directive.
 func checkInboxClaim(res *Result, roots phasecontract.Roots) error {
 	if roots.Cycle == 0 || roots.EvolveDir == "" {
 		return errors.New("deliverable: effect inbox-claim needs Roots.Cycle and Roots.EvolveDir to locate processing/cycle-N/")

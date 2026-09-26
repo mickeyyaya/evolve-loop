@@ -1,27 +1,5 @@
 package core
 
-// build_removal_check.go — deterministic truth-check for the removal claims a
-// build report makes about its own worktree (inbox item `tdd-topn-binding-gate`,
-// acceptance criterion 2: "a build report claiming a removal that did not happen
-// fails build-selfcheck deterministically").
-//
-// The cycle-660 incident this closes: build-report.md asserted that orphaned RED
-// scaffolds were "already removed by a concurrent actor" while the files were
-// still sitting in the worktree, and the false claim passed review undetected —
-// the prose was the only evidence and nobody checked the tree. A claim about
-// tree state is machine-checkable, so it is checked by machine, not read.
-//
-// Prose is deliberately NOT parsed: a natural-language matcher on "removed"
-// would false-block honest reports and is exactly the proxy-signal failure this
-// gate exists to end. The claim surface is a structured fenced ```json block
-// carrying a "removedPaths" array (mirroring the fenced-JSON handoff contract
-// topngate already uses); anything else is invisible to this check.
-//
-// The filesystem is only half of a tracked deletion: a path absent on disk but
-// still present in the Git index returns after a fresh checkout. Every Git
-// ambiguity remains fail-open, so the floor cannot false-block a build over a
-// missing repository or its own plumbing.
-
 import (
 	"context"
 	"encoding/json"
@@ -33,17 +11,13 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// removalClaim is the structured claim block a build report emits. Unrelated
-// fenced JSON (e.g. topngate's testFiles handoff) unmarshals with a nil
-// RemovedPaths and is skipped.
+// removalClaim is the only claim surface; prose is never parsed, because a
+// matcher on "removed" would false-block honest reports.
 type removalClaim struct {
 	RemovedPaths []string `json:"removedPaths"`
 }
 
-// RemovalClaimFailures is a BuildFloorCheckFn: it reads the build report,
-// collects every path the report claims to have removed, and returns one
-// failure line per claimed path that still exists in the worktree or its Git
-// index.
+// RemovalClaimFailures names each path the build report claims removed that still exists in the worktree or its Git index.
 func RemovalClaimFailures(ctx context.Context, in ReviewInput) []string {
 	if in.Workspace == "" || in.Worktree == "" {
 		return nil
@@ -87,8 +61,7 @@ func readBuildReport(workspace string) (string, bool) {
 	return "", false
 }
 
-// parseRemovalClaims extracts every removedPaths entry from the report's fenced
-// ```json blocks. Unparseable blocks are skipped, never fatal.
+// parseRemovalClaims skips unparseable blocks rather than failing.
 func parseRemovalClaims(body string) []string {
 	var out []string
 	for _, block := range fencedJSONBlocks(body) {

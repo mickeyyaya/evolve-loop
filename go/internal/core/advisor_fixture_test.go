@@ -1,14 +1,5 @@
 package core
 
-// advisor_fixture_test.go — the ONE rich RouteInput the unit-04 goldens
-// (ADR-0103, docs/architecture/decomposition/04-advisor.md §6 step 1) are
-// captured over on the pre-extraction code and replayed through the leaf:
-// every prompt section rendered at once — a 13-card catalog spanning the
-// three enrichment buckets, three on-demand names, 23 carryover todos across
-// every priority spelling with one 700-rune action, two benches (one walled),
-// recall memory, two unavailable phases, conditional rules + triggers +
-// rubric hints, a 4100-rune goal and all four signal blocks.
-
 import (
 	"fmt"
 	"strings"
@@ -19,15 +10,13 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// goldenWorkspace is the literal workspace the prompt goldens carry: the
-// composer renders it into the absolute artifact-path instruction and never
-// touches the disk, so no templating is needed.
+// goldenWorkspace is rendered into the artifact-path instruction and never touched on disk, so it needs no templating.
 const goldenWorkspace = "/ws/cycle-42"
 
-// goldenPersona is the stub persona the persona-path goldens compose over —
-// the real agents/evolve-router.md would break on every persona edit.
+// goldenPersona is a stub, because the real agents/evolve-router.md would break the goldens on every persona edit.
 const goldenPersona = "# evolve-router\nYou are the ROUTER persona stub (PERSONA_MARKER_42)."
 
+// richRouteInput renders every advisor prompt section at once, so the goldens cover all of them.
 func richRouteInput() router.RouteInput {
 	return router.RouteInput{
 		Current:   "build",
@@ -74,9 +63,7 @@ func richRouteInput() router.RouteInput {
 	}
 }
 
-// richCarryoverTodos: 23 todos over every priority spelling the rank table
-// knows plus the malformed ones, with descending/ascending FirstSeenCycle so
-// the rank-then-recency order and the stable ties are all exercised.
+// richCarryoverTodos mixes every priority spelling and both FirstSeenCycle orders to exercise rank, recency and ties.
 func richCarryoverTodos() []router.CarryoverTodo {
 	priorities := []string{"P0", "P1", "H", "HIGH", "P2", "P3", "M", "MED", "MEDIUM", "L", "LOW", "", "blocking", " p1 ", "p0", "P2", "P1", "P0", "LOW", "P3", "H", "P0", "M"}
 	todos := make([]router.CarryoverTodo, 0, len(priorities))
@@ -96,9 +83,7 @@ func richCarryoverTodos() []router.CarryoverTodo {
 	return todos
 }
 
-// richCatalog: 13 cards — 5 Optional with metadata, 4 Optional without, 4
-// spine — in a deliberately interleaved order so the stable partition is
-// visible in the golden. One card carries every guardrail line.
+// richCatalog interleaves its cards so the stable partition is visible in the golden.
 func richCatalog() []router.PhaseCard {
 	return []router.PhaseCard{
 		{Name: "scout", Role: "plan"},
@@ -117,10 +102,7 @@ func richCatalog() []router.PhaseCard {
 	}
 }
 
-// launchRouteInput is the compact input the launch-request and capture
-// goldens use: the fields the launcher threads (workspace, worktree, root,
-// cycle, env) plus a secret-shaped token in the goal so the persisted prompt's
-// redaction is part of the capture golden.
+// launchRouteInput carries a secret-shaped token in the goal so the capture golden covers redaction.
 func launchRouteInput(ws, root, wt string) router.RouteInput {
 	return router.RouteInput{
 		Current:        "build",

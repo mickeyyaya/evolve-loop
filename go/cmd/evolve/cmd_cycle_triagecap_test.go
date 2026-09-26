@@ -1,8 +1,3 @@
-// cmd_cycle_triagecap_test.go — R9.1 (concurrency-factory plan): the
-// production composition root must wire the triage-throughput recorder so
-// shipped coverage cycles feed the rolling window the R9.2 capacity clamp
-// reads. Without this wiring the clamp would run forever on the cycle-281
-// seed instead of the observed throughput.
 package main
 
 import (

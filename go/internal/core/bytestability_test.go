@@ -7,28 +7,19 @@ import (
 	"testing"
 )
 
-// bytestability_test.go — CA.6 (concurrency-factory plan, Track C-A): the
-// single-mode byte-stability golden. Track C may only ADD omitempty fields
-// to the shared persisted shapes — never rename, retype, or de-omit. This
-// pin freezes each struct's JSON key set: a new field fails the test until
-// it is consciously appended to the additive allowlist below, and a
-// removed/renamed legacy key fails immediately. (The runtime half of CA.6 —
-// the 10-cycle soak with byte-compared state/ledger — runs as a batch.)
-
-// legacyStateKeys is the pre-Track-C state.json surface (frozen 2026-06-11).
+// Legacy key sets never change. A new persisted field must be omitempty and
+// appended to its additive list, so an older file keeps its bytes.
 var legacyStateKeys = []string{
 	"lastUpdated", "lastCycleNumber", "version", "currentBatch",
 	"failedApproaches", "carryoverTodos", "setupCompletedAt", "setupVersion",
 }
 
-// additiveStateKeys is every key Track C added — omitempty, additive-only.
 var additiveStateKeys = []string{
-	"triageThroughput",         // R9.1
-	"stateRevision",            // CA.3
-	"lastAllocatedCycleNumber", // CA.4
+	"triageThroughput",
+	"stateRevision",
+	"lastAllocatedCycleNumber",
 }
 
-// legacyLedgerEntryKeys is the pre-Track-C ledger line surface.
 var legacyLedgerEntryKeys = []string{
 	"ts", "cycle", "cycle_label", "role", "kind", "model", "exit_code",
 	"duration_s", "artifact_path", "artifact_sha256", "challenge_token",
@@ -37,34 +28,33 @@ var legacyLedgerEntryKeys = []string{
 }
 
 var additiveLedgerEntryKeys = []string{
-	"run_id",  // CA.2
-	"task_id", // inbox-lifecycle records routed through the chain (ledger-fleet-concurrency-chain)
+	"run_id",
+	"task_id",
 }
 
-// legacyCycleStateKeys is the pre-Track-C cycle-state.json surface.
 var legacyCycleStateKeys = []string{
 	"cycle_id", "phase", "started_at", "phase_started_at", "active_agent",
 	"active_worktree", "completed_phases", "workspace_path", "intent_required",
 }
 
 var additiveCycleStateKeys = []string{
-	"run_id",                            // CA.5
-	"worktree_base_sha",                 // cycle-156 resume parity
-	"audit_fail_reasons",                // ADR-0072 diagnosed-downgrade signal (cycles 930-932 false-HALT fix)
-	"failed_at",                         // ADR-0072 S4 dossier non-progress counters (per-cycle history mirror)
-	"ship_fail_reasons",                 // ADR-0072 ship-phase explained-failure carrier (pipeline-defect-pipeline-blocker, cycle-1329)
-	"bookkeeping_regrade_attempted",     // once-per-cycle bound of the retro→audit bookkeeping regrade (2026-08-10 investigation)
-	"audit_repair_attempts",             // in-cycle audit-repair loop bound (wave-3 cycles 1572/1573/1574)
-	"audit_repair_active",               // in-repair-round flag; distinct from the monotonic counter (review MEDIUM: stale-brief leak)
-	"audit_dispatches",                  // audit round-supersession index; dispatch-persisted so a crashed round retires on resume (cycle-1603)
-	"explanation_documentation_version", // host-owned Build explanation contract activation
-	"goal_hash",                         // recovery: original task identity across pauses
-	"goal_text",                         // recovery: original goal for phase memory and dossiers
-	"pre_cycle_head",                    // recovery: preserve closeout baseline after Ship
-	"final_verdict",                     // recovery: preserve the host floor disposition across pauses
-	"shipped",                           // ADR-0100 PR-3: this cycle's own ship latch, persisted so a pause/resume after Ship keeps it; read by the outcome label + post-ship observer degrade on both roots,
-	"ship_recovery_code",                // 2026-09-15: the ship-error recovery marker the standing-audit-findings brief keys on (research F16)
-	"audit_decline_reason",              // 2026-09-15: the audit-fail decline marker a retro-routed re-entry keys on (research F19)
+	"run_id",
+	"worktree_base_sha",
+	"audit_fail_reasons",
+	"failed_at",
+	"ship_fail_reasons",
+	"bookkeeping_regrade_attempted",
+	"audit_repair_attempts",
+	"audit_repair_active",
+	"audit_dispatches",
+	"explanation_documentation_version",
+	"goal_hash",
+	"goal_text",
+	"pre_cycle_head",
+	"final_verdict",
+	"shipped",
+	"ship_recovery_code",
+	"audit_decline_reason",
 }
 
 func jsonKeysOf(t *testing.T, v any) []string {
@@ -107,9 +97,6 @@ func TestByteStability_CycleStateKeysAdditiveOnly(t *testing.T) {
 	assertGoldenKeys(t, "core.CycleState", jsonKeysOf(t, CycleState{}), legacyCycleStateKeys, additiveCycleStateKeys)
 }
 
-// TestByteStability_AdditiveFieldsAreOmitempty — an additive field that is
-// NOT omitempty changes every pre-Track-C file on its next write. Verify
-// every allowlisted additive key carries omitempty on its struct tag.
 func TestByteStability_AdditiveFieldsAreOmitempty(t *testing.T) {
 	check := func(v any, additive []string) {
 		rt := reflect.TypeOf(v)

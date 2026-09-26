@@ -14,13 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// Cycle 1685 (2026-09-15): the runner's verdict engine verified with the plain
-// verifier and classified the UNREPAIRED bytes ("no parseable verdict →
-// FAIL") while this Reviewer later salvaged, persisted and approved the
-// repaired file — two verifiers, one salvage, a red_count=0 cycle sealed FAIL.
-// VerifyForClassification is the Reviewer's own verify+salvage offered to the
-// engine: the bytes it returns are the bytes it persisted and will approve,
-// and the salvage is reported exactly once.
 func TestVerifyForClassification_SalvagesPersistsAndReportsOnce(t *testing.T) {
 	t.Parallel()
 	fenced := "# Audit Report\n\n## Verdict\n**PASS**\n\n## Issues\nnone\n\n## Ledger Entry\n\n```json\n{\"verdict\": \"PASS\", \"red\": 0}\n```\n"
@@ -57,7 +50,6 @@ func TestVerifyForClassification_SalvagesPersistsAndReportsOnce(t *testing.T) {
 	if count(gatesignal.CodeSalvaged) != 1 {
 		t.Fatalf("one GATE_CONTRACT_SALVAGED for the one salvage, got %d: %+v", count(gatesignal.CodeSalvaged), events)
 	}
-	// The gate's own review now meets a clean file: approved, verified, no second salvage.
 	if rr := r.Review(context.Background(), in); !rr.Approve {
 		t.Fatalf("the gate approves the file it repaired: %+v", rr)
 	}
@@ -82,10 +74,6 @@ func TestVerifyForClassification_OutsideEnforceReturnsTheVerifiedBytesUntouched(
 	}
 }
 
-// The bad_verdict baseline is ONE append-only record per block. The engine's
-// settle loop may call VerifyForClassification up to SettleRetries times on a
-// block that never repairs; it records only the salvage it persists, and
-// leaves an unrecoverable block to Review (called once).
 func TestVerifyForClassification_BaselineIsRecordedOncePerBlock(t *testing.T) {
 	t.Parallel()
 	rows := func(root string) int {
@@ -139,10 +127,6 @@ func TestPlainVerifier_IsTheCatalogAwareVerifyWithoutSalvage(t *testing.T) {
 	}
 }
 
-// NewReviewerStage is the concrete *Reviewer the composition root hands the
-// runners as their ContractVerifier. Both dials must arrive, because the
-// engine path reads both: the gate stage decides whether a salvage is
-// persisted, PhaseIO whether the sentinel is the sole verdict source.
 func TestNewReviewerStage_ThreadsBothDialsIntoTheEnginePath(t *testing.T) {
 	t.Parallel()
 	fenced := "# Audit Report\n\n## Verdict\n**PASS**\n\n## Issues\nnone\n\n```json\n{\"verdict\": \"PASS\"}\n```\n"

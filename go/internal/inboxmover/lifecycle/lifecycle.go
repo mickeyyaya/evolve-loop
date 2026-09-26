@@ -1,22 +1,6 @@
-// Package lifecycle is unit 06 of the component breakdown (ADR-0103): the
-// inbox lifecycle mover. One Mover owns the five transitions over ONE inbox
-// dir — Claim (inbox/ → processing/cycle-N/), Promote (→ processed | rejected
-// | retry | quarantine), ReleaseFromQuarantine, the cycle drain Release (with
-// the ADR-0072 S5 failure_count bump and quarantine park) and RecoverOrphans —
-// plus the processed-record primitives (the one id→file resolver, the one
-// atomic item rewrite, the failure counter's one reader and one writer) and
-// the chained inbox-lifecycle ledger line. Every collaborator is injected at
-// construction with a Null-Object default: the ledger appender, stderr, the
-// clock, the active-cycle reader, the landing probe, the protected-path
-// predicate, the continuation retire hook, the run-workspace spelling and the
-// Signal Center accessor. The host (internal/inboxmover) resolves the
-// production defaults, builds the Mover once per call and keeps every caller's
-// spelling behind its facades. The leaf never imports gitexec, core, the
-// guards or the host. Failure modes report as inbox.warning under module
-// inbox through ONE producer with two links: the Center when a root wired one,
-// else the byte-identical legacy `[inbox-mover] WARN:|ERROR:` line onto the
-// injected stderr — nothing goes silent on a Center-less root.
-// Design: docs/architecture/decomposition/06-inboxmover.md.
+// Package lifecycle moves inbox items between their lifecycle states and
+// records every move on the chained ledger.
+// See docs/architecture/packages/internal-inboxmover-lifecycle.md.
 package lifecycle
 
 import (
@@ -30,8 +14,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// The unit's codes — fourteen WARN conditions (twelve at the unit, two from the 2026-09-14 poison-loop breaker) that replaced fifteen hand-written
-// stderr lines and gave three silent arms a voice — registered with their docs.
+// Codes of the inbox.warning conditions the mover reports; init registers each with its doc.
 const (
 	CodeClaimNotFound                  signalcenter.Code = "INBOX_CLAIM_NOT_FOUND"
 	CodeClaimRefused                   signalcenter.Code = "INBOX_CLAIM_REFUSED"
@@ -66,30 +49,20 @@ func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleInbox, CodeRouteNotFound, "the FAIL closeout could not find the item it was told to route (fields.task_id, inbox_dir, step=locate) — or found it held by another cycle's claim (fields.held_by_cycle) — the refusal is NOT recorded on it and it WILL be re-picked; neither processing/cycle-*/ nor the inbox root holds the id")
 }
 
-// LegacyPrefix is the console voice of every line the mover prints — the
-// fallback link, the kept INFO/usage lines — and of the host's sibling lines
-// (its logf) until unit 06b folds that renderer: ONE spelling, consumed
-// everywhere (TestInboxMoverPrefix_OneHome).
+// LegacyPrefix opens every console line the mover and its host print.
 const LegacyPrefix = "[inbox-mover] "
 
-// Sentinel errors — the exit-code contract of the cmd layer (errors.Is on the
-// same pointers the host re-exports).
+// Sentinel errors: the cmd layer maps them to exit codes through errors.Is.
 var (
 	ErrNotFound = errors.New("inboxmover: task not found")
 	ErrMvFailed = errors.New("inboxmover: mv failed")
 	ErrBadArgs  = errors.New("inboxmover: bad arguments")
 	ErrBadState = errors.New("inboxmover: invalid new_state")
-	// ErrConsoleRouted refuses the lane handoff of an operator-owned item
-	// (ADR-0074 I1): route:"console-*" or a protected fix surface. Prompts
-	// advise; Claim enforces — a triage LLM naming the item cannot move it.
+	// ErrConsoleRouted refuses a lane claim of an operator-owned item.
+	// See ADR-0074.
 	ErrConsoleRouted = errors.New("inboxmover: item is console-routed (operator-owned) — refusing lane claim")
 )
 
-// validStates is the set of allowed promote targets. "quarantine" is the
-// ADR-0072 S5 terminal state: a task that has failed task_retry_ceiling times
-// routes here (a sibling dir the triage scanner never walks) instead of being
-// released back to the inbox root every cycle, so a poison todo stops being
-// re-picked forever.
 var validStates = map[string]bool{
 	"processed":  true,
 	"rejected":   true,
@@ -97,18 +70,12 @@ var validStates = map[string]bool{
 	"quarantine": true,
 }
 
-// LedgerAppender is the chained-append seam (interface at point of use);
-// satisfied by *ledger.FileLedger.
+// LedgerAppender appends a lifecycle record to the chained ledger; *ledger.FileLedger satisfies it.
 type LedgerAppender interface {
 	AppendLifecycle(ctx context.Context, r ledger.LifecycleRecord) error
 }
 
-// Mover owns the inbox lifecycle transitions over ONE inbox dir. Two
-// positional required collaborators (the dir and the ledger appender — a nil
-// appender is the Null Object: nothing is appended, nothing is said) and
-// eight functional options, each with a Null-Object default, so a leaf test
-// needs no git, no registry and no Center, and every production literal that
-// leaves a seam nil behaves exactly as it did before the unit.
+// Mover moves the items of one inbox dir between lifecycle states.
 type Mover struct {
 	inboxDir     string
 	ledger       LedgerAppender
@@ -122,10 +89,10 @@ type Mover struct {
 	signals      func() *signalcenter.Center
 }
 
-// Option configures a Mover at construction (functional options).
+// Option configures a Mover at construction.
 type Option func(*Mover)
 
-// New builds the Mover over its inbox dir and ledger appender.
+// New builds a Mover over inboxDir; a nil appender records nothing and says nothing.
 func New(inboxDir string, appender LedgerAppender, opts ...Option) *Mover {
 	m := &Mover{
 		inboxDir:    inboxDir,
@@ -142,8 +109,7 @@ func New(inboxDir string, appender LedgerAppender, opts ...Option) *Mover {
 	return m
 }
 
-// WithStderr installs the writer the kept INFO/usage lines and the fallback
-// link print to; nil keeps io.Discard.
+// WithStderr sets the writer for the console lines; nil keeps io.Discard.
 func WithStderr(w io.Writer) Option {
 	return func(m *Mover) {
 		if w != nil {
@@ -161,9 +127,7 @@ func WithNow(fn func() time.Time) Option {
 	}
 }
 
-// WithActiveCycle installs the active-cycle reader RecoverOrphans consults;
-// nil keeps the erroring default, whose swallowed error means "-1" — every
-// processing dir recovers.
+// WithActiveCycle sets RecoverOrphans' active-cycle reader; nil keeps a failing one, so every dir recovers.
 func WithActiveCycle(fn func() (string, error)) Option {
 	return func(m *Mover) {
 		if fn != nil {
@@ -172,8 +136,7 @@ func WithActiveCycle(fn func() (string, error)) Option {
 	}
 }
 
-// WithLanded installs the delivery-evidence probe a processed-promotion with a
-// sha consults; nil keeps the default that treats every sha as landed.
+// WithLanded sets the landing probe for a processed promotion with a sha; nil treats every sha as landed.
 func WithLanded(fn func(sha string) (bool, error)) Option {
 	return func(m *Mover) {
 		if fn != nil {
@@ -182,10 +145,7 @@ func WithLanded(fn func(sha string) (bool, error)) Option {
 	}
 }
 
-// WithProtectedPath installs the control-plane scope predicate of the
-// ADR-0074 claim floor; nil keeps what is installed (the default nil disables
-// only the files-derived rule — an explicit route:"console-*" field always
-// refuses).
+// WithProtectedPath sets the claim floor's protected-path predicate; nil keeps the installed one.
 func WithProtectedPath(fn func(path string) bool) Option {
 	return func(m *Mover) {
 		if fn != nil {
@@ -194,9 +154,7 @@ func WithProtectedPath(fn func(path string) bool) Option {
 	}
 }
 
-// WithRetire installs the hook Promote fires after the INFO line and before
-// the ledger line (the host releases the item's continuation binding there);
-// nil keeps the no-op.
+// WithRetire sets the hook Promote fires between its console line and its ledger line; nil keeps the no-op.
 func WithRetire(fn func(itemPath, taskID, reason string)) Option {
 	return func(m *Mover) {
 		if fn != nil {
@@ -205,9 +163,7 @@ func WithRetire(fn func(itemPath, taskID, reason string)) Option {
 	}
 }
 
-// WithRunWorkspace installs the cycle → run-workspace spelling the drain reads
-// the continuation manifest from; nil keeps what is installed (the default nil
-// means no manifest is read).
+// WithRunWorkspace sets where the drain reads a cycle's continuation manifest; nil keeps the installed one.
 func WithRunWorkspace(fn func(cycle int) string) Option {
 	return func(m *Mover) {
 		if fn != nil {
@@ -216,9 +172,7 @@ func WithRunWorkspace(fn func(cycle int) string) Option {
 	}
 }
 
-// WithSignals installs the accessor of the Signal Center the unit reports
-// through — read at every use. A nil accessor, or one returning nil, selects
-// the fallback link: the legacy line on the injected stderr.
+// WithSignals sets the Signal Center accessor, read at every use; no Center selects the console fallback.
 func WithSignals(c func() *signalcenter.Center) Option {
 	return func(m *Mover) { m.signals = c }
 }
@@ -233,10 +187,7 @@ func (m *Mover) center() *signalcenter.Center {
 	return m.signals()
 }
 
-// fault is the Parameter Object of the one producer: the code, the exported
-// method that produced it, the cycle the call knows, the legacy severity token
-// ("WARN: " | "ERROR: ") the fallback link prints, the sentence (the legacy
-// line minus its prefix) and the fields a triage needs (always step, task_id).
+// fault is one warning; legacy is the severity token the console fallback prints before reason.
 type fault struct {
 	code   signalcenter.Code
 	origin string
@@ -246,11 +197,7 @@ type fault struct {
 	fields map[string]string
 }
 
-// warn is the unit's ONE producer with two links: a wired Center receives an
-// inbox.warning WARN under module inbox; a Center-less root gets the legacy
-// `[inbox-mover] <token><sentence>` line, byte for byte what the hand-written
-// logf printed before the unit — so no root goes silent (06-F1 removes the
-// second link root by root as each gains a Center).
+// warn emits f to the wired Center, or prints it as a console line when none is wired.
 func (m *Mover) warn(f fault) {
 	if c := m.center(); c != nil {
 		c.Emit(signalcenter.Event{
@@ -262,8 +209,7 @@ func (m *Mover) warn(f fault) {
 	m.linef("%s%s", f.legacy, f.reason)
 }
 
-// linef prints a kept line — the INFO transitions, the usage/bad-args ERROR
-// lines and the ledger-append WARN — in the legacy voice on both links.
+// linef prints a console line; the INFO, usage and ledger-append lines print whether or not a Center is wired.
 func (m *Mover) linef(format string, args ...any) {
 	fmt.Fprintf(m.stderr, LegacyPrefix+format+"\n", args...)
 }

@@ -1,7 +1,3 @@
-// cmd_contextfillcorrelate.go wires internal/contextfillcorrelate into the
-// top-level dispatch table as `evolve context-fill correlate`. Without this
-// file the join would be a library with no production caller — the exact dead
-// seam the caller-proof floor exists to catch.
 package main
 
 import (
@@ -29,17 +25,9 @@ func runContextFill(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	}
 }
 
-// writeReportAtomic writes the markdown report to path using the repo's
-// temp-then-rename convention (internal/core/blocker_breaker.go et al), so a
-// reader never observes a half-written report and a crash never truncates a
-// good one.
-//
-// The Lstat guard is the security half: the previous bare os.WriteFile opened
-// the destination O_TRUNC and followed symlinks, so an attacker (or a stale
-// artifact link) who pre-planted `report.md -> ~/.ssh/authorized_keys` had that
-// target truncated and overwritten with report text. Refusing a non-regular
-// destination outright is cheaper than trying to make following one safe; the
-// rename then replaces the path itself rather than writing through it.
+// writeReportAtomic writes through temp-then-rename, so a reader never sees a
+// half-written report. It refuses a non-regular destination: writing through a
+// pre-planted symlink would truncate whatever it points at.
 func writeReportAtomic(path, content string) error {
 	if fi, err := os.Lstat(path); err == nil && !fi.Mode().IsRegular() {
 		return fmt.Errorf("refusing to write %s: not a regular file (mode %s)", path, fi.Mode())
@@ -57,11 +45,9 @@ func writeReportAtomic(path, content string) error {
 	return nil
 }
 
-// runContextFillCorrelate reads the real corpus under --project-root and emits
-// the fill-vs-verdict correlation: --json for the machine projection, --out for
-// the markdown artifact, markdown on stdout when neither is given. A root with
-// no dossier corpus exits non-zero rather than printing an empty report —
-// absent evidence must never read as a measured zero.
+// runContextFillCorrelate emits the fill-vs-verdict correlation as --json,
+// --out markdown, or markdown on stdout. A root with no dossier corpus exits
+// non-zero: absent evidence must never read as a measured zero.
 func runContextFillCorrelate(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve context-fill correlate", flag.ContinueOnError)
 	fs.SetOutput(stderr)

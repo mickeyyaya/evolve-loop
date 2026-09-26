@@ -1,8 +1,5 @@
 package lifecycle
 
-// quarantine.go — the ADR-0072 S5 decision, the drain's park policy and the
-// operator's release out of quarantine/ (inboxmover.go:432-487, :636-651).
-
 import (
 	"encoding/json"
 	"fmt"
@@ -10,45 +7,23 @@ import (
 	"path/filepath"
 )
 
-// ShouldQuarantine is the pure ADR-0072 S5 decision: quarantine a task once its
-// task-level failure count reaches the configured ceiling. A zero (or negative)
-// ceiling disables quarantine entirely, and a system-level failure NEVER
-// quarantines — the S3 floor halt takes precedence (AC4). The caller passes the
-// ceiling (FailureThresholds.TaskRetryCeiling, default 2) and the system-level
-// flag; the leaf deliberately does not import internal/policy so the package
-// layering stays intact.
+// ShouldQuarantine reports whether a task-level failure count reached a positive ceiling.
+// See ADR-0072.
 func ShouldQuarantine(failureCount, ceiling int, systemLevelFailure bool) bool {
 	return ceiling > 0 && !systemLevelFailure && failureCount >= ceiling
 }
 
-// Policy carries the ADR-0072 S5 decision inputs for a failure drain: the
-// task-level retry ceiling and whether this cycle's failure was system-level
-// (an S3 floor halt), which suppresses the bump and the quarantine (AC4).
-// Committed restricts the failure_count bump (and therefore quarantine) to the
-// ids triage actually COMMITTED to the cycle; nil means "every item in the
-// drain" — the legacy whole-dir behavior an outcome with no committed ids
-// still selects (wave lanes claim a whole menu but work only the committed
-// subset). A nil *Policy is the plain release-to-root drain.
+// Policy holds a failure drain's quarantine inputs; a nil *Policy is a plain release.
 type Policy struct {
 	Ceiling     int
-	SystemLevel bool
-	Committed   map[string]bool
-	// Routed: the closeout already routed the refused item console-manual, so
-	// this cycle's disposition is taken — the drain bumps and parks nothing,
-	// without pretending the failure was system-level (a separate knob so the
-	// next behaviour keyed to SystemLevel never applies to a routed refusal).
+	SystemLevel bool            // a system-level failure: nothing bumps or parks
+	Committed   map[string]bool // the ids that accrue failures; nil means every drained item
+	// Routed means the closeout already routed the refused item: nothing bumps or parks,
+	// and the failure is not mislabelled system-level.
 	Routed bool
 }
 
-// ReleaseFromQuarantine is the operator escape hatch for ADR-0072 S5: it moves
-// an item out of quarantine/ back to the inbox root and resets its
-// failure_count to 0, so the next cycle's triage can re-pick it. Returns
-// ErrNotFound when no quarantined item carries taskID. Idempotent-safe: a
-// basename already present at the inbox root is left untouched (never
-// clobbered) and reported as ErrMvFailed. The counter reset precedes the
-// rename (a preserved quirk: a failed rename leaves a zeroed quarantined item)
-// and is best-effort — a rewrite failure never blocks the release, but since
-// the unit it is reported.
+// ReleaseFromQuarantine moves a quarantined item back to the inbox root with its failure_count reset to 0.
 func (m *Mover) ReleaseFromQuarantine(taskID string) (PromoteResult, error) {
 	res := PromoteResult{}
 	if taskID == "" {

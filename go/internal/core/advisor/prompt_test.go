@@ -1,10 +1,5 @@
 package advisor
 
-// prompt_test.go — the prompt composers and the routing context (ADR-0103
-// unit 04 §6 tests 29, 33-35; the core rubric/failure/deliverable-kind/
-// recall/clihealth/persona/absolute-path/mint-documentation tests moved
-// verbatim in intent).
-
 import (
 	"errors"
 	"strings"
@@ -15,10 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// Test 29 — the recon gather fails open: a reader fault is one
-// ADVISOR_RECON_GIT_FAILED and the digest renders without file facts; the
-// reader is never called with the recon off or an empty root; the Null
-// Object default renders exactly the git-error path.
 func TestComposePlanPrompt_ReconGitFaultWarnsOnceAndTheDigestDegrades(t *testing.T) {
 	in := baseRouteInput()
 	in.GoalText = "fix a security bug in the auth flow"
@@ -54,25 +45,16 @@ func TestComposePlanPrompt_ReconGitFaultWarnsOnceAndTheDigestDegrades(t *testing
 	if want, got := a.ComposePlanPrompt(in, "routing-plan.json"), quiet.ComposePlanPrompt(in, "routing-plan.json"); want != got {
 		t.Error("the Null-Object reader renders exactly the git-error path")
 	}
-	// The prompt (and its recon) is composed BEFORE the launch guards run — the
-	// pre-extraction argument order — so a nil launcher still reports the recon
-	// fault first, then the preflight refusal.
 	*got = nil
 	if _, err := a.Plan(in); err == nil || len(*got) != 2 || (*got)[0].Code != CodeReconGitFailed || (*got)[1].Code != CodeLaunchFailed {
 		t.Errorf("compose → preflight: %v %+v", err, *got)
 	}
-	// The PRODUCTION re-plan composes from its decision, never through the
-	// artifact-string map the facade uses: its recon fault carries the re-plan
-	// stamp (review fold — killed by decisionForArtifact ⇒ always Plan).
 	*got = nil
 	if _, err := a.RePlan(in); err == nil || len(*got) != 2 || (*got)[0].Code != CodeReconGitFailed || (*got)[0].Origin != "Advisor.RePlan" || (*got)[0].Fields["decision"] != "replan" {
 		t.Errorf("RePlan's recon fault carries the re-plan stamp: %v %+v", err, *got)
 	}
 }
 
-// Test 33 — the nine context sections render in order (ending with the
-// FORBIDDEN line), equal the routing golden's context, and vanish when their
-// input is empty; benches are family-sorted and a quota wall is WALLED.
 func TestWriteRoutingContext_SectionsRenderInOrderAndVanishWhenEmpty(t *testing.T) {
 	var b strings.Builder
 	WriteRoutingContext(&b, richRouteInput())
@@ -94,7 +76,6 @@ func TestWriteRoutingContext_SectionsRenderInOrderAndVanishWhenEmpty(t *testing.
 		strings.Index(out, "- agy:") > strings.Index(out, "- codex:") {
 		t.Errorf("benches: family-sorted, walled iff the reason mentions exhaustion, UTC clock:\n%s", out)
 	}
-	// Optional = trigger phases minus the unavailable ones, sorted; unavailable listed as given.
 	if !strings.Contains(out, "- architecture-design\n- plan-review\n- tester\n") || strings.Contains(out, "- security-sweep\n- tester") {
 		t.Errorf("optional phases sorted, persona-less ones removed:\n%s", out)
 	}
@@ -119,8 +100,6 @@ func TestWriteRoutingContext_SectionsRenderInOrderAndVanishWhenEmpty(t *testing.
 	}
 }
 
-// Test 34 — the rubric projections, the op tables, the signal lines, the
-// recall section, the failure-transition alias and the failure vocabulary.
 func TestWriteRubricLines_ProjectsTheRoutingConfig(t *testing.T) {
 	in := router.RouteInput{Cfg: config.RoutingConfig{
 		Triggers: map[string]config.RoutingBlock{
@@ -255,8 +234,6 @@ func TestWriteFailureVocabulary_NamesEveryFailureInsertPhase(t *testing.T) {
 	}
 }
 
-// Test 35 — the persona composition, the legacy fallback, the absolute
-// artifact path equal to the launch's, and the mint schema in both prompts.
 func TestComposePlanPrompt_PersonaCompositionAndAbsoluteArtifactPath(t *testing.T) {
 	const ws = "/tmp/ws-abs-artifact-test"
 	fl := &fakeLauncher{stdout: planJSON()}
@@ -297,7 +274,6 @@ func TestComposePlanPrompt_PersonaCompositionAndAbsoluteArtifactPath(t *testing.
 	}
 }
 
-// TruncateGoal is textcap's rule at the advisor's bound.
 func TestTruncateGoal_CapsAtTheAdvisorBound(t *testing.T) {
 	long := strings.Repeat("g", MaxGoalTextRunes+7)
 	got := TruncateGoal("  " + long + "  ")
@@ -312,11 +288,6 @@ func TestTruncateGoal_CapsAtTheAdvisorBound(t *testing.T) {
 	}
 }
 
-// The plan prompt shares the routing context (goal, carryover todos, the
-// rubric, the four signal lines, the optional-triggers block) with the
-// per-transition prompt but asks for the whole-cycle ARRAY shape — the two
-// cadences diverge correctly (the core RendersGoal / RendersCarryoverTodos /
-// WholeCycleArray / FullSignalsAndTriggers intents, moved).
 func TestBuildPlanPrompt_SharesTheRoutingContextAndAsksForTheArray(t *testing.T) {
 	in := router.RouteInput{
 		Current: "start", Cycle: 3, Completed: []string{},

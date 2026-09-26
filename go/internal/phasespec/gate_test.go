@@ -6,9 +6,6 @@ import (
 	"testing"
 )
 
-// TestArtifactGate_JSONRoundTrip pins the PA-DDK DDK-4 gate descriptor's wire
-// contract: a PhaseSpec.Gate round-trips under its documented JSON keys and
-// omits cleanly when unset.
 func TestArtifactGate_JSONRoundTrip(t *testing.T) {
 	var g ArtifactGate = ArtifactGate{RequiresPresent: true, VerdictIn: []string{"PASS", "WARN"}}
 	raw, err := json.Marshal(PhaseSpec{Name: "audit", Gate: &g})
@@ -27,8 +24,7 @@ func TestArtifactGate_JSONRoundTrip(t *testing.T) {
 		t.Errorf("gate round-trip lost data: %+v", rt.Gate)
 	}
 
-	// An unset gate must be omitted from the wire form (the "gate" key, distinct
-	// from the existing "gates" field).
+	// Matching `"gate":` with the colon keeps the distinct "gates" key from matching.
 	bare, _ := json.Marshal(PhaseSpec{Name: "scout"})
 	if strings.Contains(string(bare), `"gate":`) {
 		t.Errorf("unset gate must be omitted:\n%s", bare)

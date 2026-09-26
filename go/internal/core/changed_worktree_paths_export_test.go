@@ -8,19 +8,7 @@ import (
 	"testing"
 )
 
-// RED contract for cycle-1150 / wire-docsfloor-verify-cli.
-//
-// The CLI self-check (`evolve phase verify build`) needs the same changed-path
-// derivation the host-side docs-floor reviewer already uses. That logic lives
-// in the unexported changedWorktreePaths (phase_bindings.go): re-implementing
-// git-diff derivation in internal/cli/phasecmd would put two answers to "what
-// did this cycle change?" in the tree, and the gate and the self-check would
-// drift (the ADR-0034 no-drift invariant). This test pins the single source
-// with a projection: one EXPORTED wrapper, same semantics.
-
-// changedPathsRepoFixture builds a git repo with one base commit, then applies
-// a tracked modification and an untracked addition — the two shapes
-// changedWorktreePaths must both report.
+// changedPathsRepoFixture leaves a tracked modification and an untracked addition.
 func changedPathsRepoFixture(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -41,7 +29,6 @@ func changedPathsRepoFixture(t *testing.T) string {
 	run("add", "base.txt")
 	run("commit", "-q", "-m", "base")
 
-	// Tracked modification.
 	if err := os.WriteFile(filepath.Join(dir, "base.txt"), []byte("changed\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -56,11 +43,6 @@ func changedPathsRepoFixture(t *testing.T) string {
 	return dir
 }
 
-// TestChangedWorktreePaths_ExportedForCLIConsumers — AC5. The exported wrapper
-// must exist and return BOTH tracked changes vs HEAD and untracked additions,
-// repo-relative, so the CLI can feed deliverable.VerifyBuildWithChangedPaths
-// the same set the host reviewer sees. Compiling at all is half the contract:
-// the name must be exported.
 func TestChangedWorktreePaths_ExportedForCLIConsumers(t *testing.T) {
 	dir := changedPathsRepoFixture(t)
 
@@ -77,10 +59,6 @@ func TestChangedWorktreePaths_ExportedForCLIConsumers(t *testing.T) {
 	}
 }
 
-// TestChangedWorktreePaths_EmptyWorktreeIsEmpty — the fail-open edge. A clean
-// repo (and a path that is not a repo at all) must yield no paths rather than a
-// spurious entry: an empty change set is what makes the docs floor SKIP instead
-// of manufacturing a violation.
 func TestChangedWorktreePaths_EmptyWorktreeIsEmpty(t *testing.T) {
 	t.Run("clean repo", func(t *testing.T) {
 		dir := t.TempDir()

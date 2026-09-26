@@ -6,22 +6,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 )
 
-// ApplyUserRouting splices validated user phases into the routing config so the
-// kernel router can PROPOSE them: each phase is positioned in cfg.Order (after
-// its After anchor, or just before "audit" by default), its insert_when
-// triggers are registered, and it is marked content-routed (EnableContent).
-//
-// Invalid specs (per ValidateUserSpecWithCatalog — e.g. not optional) are
-// SKIPPED with a warning and never routed: the safety floor is enforced at the
-// wiring seam, so a malformed user phase can never enter the kernel's candidate
-// set. Returns the skip warnings. The builtin catalog exempts activation
-// overlays for already-optional built-in phases from the single-word naming
-// floor (see ValidateUserSpecWithCatalog) — pass an empty Catalog{} for no
-// exemption.
+// ApplyUserRouting splices valid user specs into cfg so the router can propose them; builtin enables the optional-built-in exemption (Catalog{} for none).
 func ApplyUserRouting(cfg *config.RoutingConfig, specs []PhaseSpec, builtin Catalog) []string {
 	var warnings []string
 	var pending []PhaseSpec
 	for _, s := range specs {
+		// The safety floor is enforced at this wiring seam, so an invalid spec never becomes a routing candidate.
 		if v := ValidateUserSpecWithCatalog(s, builtin); len(v) > 0 {
 			warnings = append(warnings, "phase "+s.Name+" not routed (invalid): "+strings.Join(v, "; "))
 			continue
@@ -38,25 +28,12 @@ func ApplyUserRouting(cfg *config.RoutingConfig, specs []PhaseSpec, builtin Cata
 		cfg.PhaseEnable[s.Name] = config.EnableContent
 		pending = append(pending, s)
 	}
-	// Placement is a FIXPOINT over the batch: a spec with a non-empty anchor
-	// waits for that anchor, which may itself be a later spec in the same batch
-	// — DiscoverUserSpecs sorts alphabetically, so input order never guarantees
-	// anchor-before-anchored (cycle-1550: bug-reproduction, anchored after
-	// fault-localization, was spliced first, missed its anchor, and silently
-	// took the before-audit fallback — executing a red-first Evaluate phase
-	// POST-build). Passes repeat while progress is made. When a pass strands,
-	// the stuck set splits: an anchor naming NO batch-mate will never appear —
-	// force-place that spec at the fallback, LOUDLY — while a spec anchored to
-	// a stuck batch-mate is only TRANSITIVELY blocked and is held, so the next
-	// pass places it after its just-placed anchor (declared order honored even
-	// through the escape). Only a pure anchor cycle, where no honorable order
-	// exists, falls back wholesale.
+	// Placement is a fixpoint: discovery sorts alphabetically, so an anchor may be a later
+	// batch-mate. Passes repeat while any spec is placed.
 	for len(pending) > 0 {
 		var deferred []PhaseSpec
 		for _, s := range pending {
-			// A name already in the order (activation overlay of a placed
-			// phase) never defers and never warns: spliceAfter is idempotent
-			// and nothing will move regardless of the anchor's fate.
+			// A name already in the order never defers or warns: nothing will move.
 			if indexOfStr(cfg.Order, s.Name) < 0 && s.After != "" && indexOfStr(cfg.Order, s.After) < 0 {
 				deferred = append(deferred, s)
 				continue
@@ -71,6 +48,7 @@ func ApplyUserRouting(cfg *config.RoutingConfig, specs []PhaseSpec, builtin Cata
 			var held []PhaseSpec
 			placed := false
 			for _, s := range deferred {
+				// Held, not force-placed, so it still lands after its stuck anchor.
 				if stuck[s.After] {
 					held = append(held, s)
 					continue
@@ -80,12 +58,8 @@ func ApplyUserRouting(cfg *config.RoutingConfig, specs []PhaseSpec, builtin Cata
 				placed = true
 			}
 			if !placed { // anchor deadlock (cycle, possibly with tails)
-				// Force-place exactly ONE spec — the first that is itself an
-				// anchor target of another stuck spec — then re-loop: its
-				// dependents (cycle tails and remaining members alike) resolve
-				// after it on later passes, honoring their declared order. Only
-				// the broken link gets a warning; the specs downstream of it
-				// are placed honorably and silently.
+				// Force-place one anchor target and re-loop, so its dependents follow it in
+				// declared order and only the broken link warns.
 				isAnchor := map[string]bool{}
 				for _, s := range held {
 					isAnchor[s.After] = true
@@ -111,9 +85,7 @@ func ApplyUserRouting(cfg *config.RoutingConfig, specs []PhaseSpec, builtin Cata
 	return warnings
 }
 
-// spliceAfter inserts name into order right after anchor. If anchor is empty or
-// absent, it inserts just before "audit" (the canonical post-build check slot);
-// if "audit" is absent too, it appends. A name already present is left alone.
+// spliceAfter inserts name after anchor, else before "audit", else at the end; a name already present is a no-op.
 func spliceAfter(order []string, name, anchor string) []string {
 	if indexOfStr(order, name) >= 0 {
 		return order

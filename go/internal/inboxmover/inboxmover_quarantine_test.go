@@ -7,12 +7,7 @@ import (
 	"testing"
 )
 
-// failDrain runs the ADR-0072 S5 failure drain over processing/cycle-<cycle>/
-// through the ONE public lifecycle door, ApplyCycleOutcome. Audit D3 retired
-// the ReleaseCycleProcessingWithQuarantine wrapper these tests used to call: it
-// had no production caller, so it was a second entry point into a lifecycle
-// ApplyCycleOutcome owns. Leaving CommittedIDs nil selects the same whole-dir
-// bump the wrapper performed, so these assertions cover the identical path.
+// failDrain leaves CommittedIDs nil, so the drain bumps every item in the cycle dir.
 func failDrain(opts Options, cycle, ceiling int, systemLevel bool) (OutcomeResult, error) {
 	return ApplyCycleOutcome(opts, CycleOutcome{
 		Cycle:       cycle,
@@ -23,7 +18,6 @@ func failDrain(opts Options, cycle, ceiling int, systemLevel bool) (OutcomeResul
 	})
 }
 
-// writeProcItem drops a minimal item into processing/cycle-<cycle>/.
 func writeProcItem(t *testing.T, inbox, cycle, id string) {
 	t.Helper()
 	dir := filepath.Join(inbox, "processing", "cycle-"+cycle)
@@ -51,8 +45,6 @@ func itemFailureCount(t *testing.T, path string) int {
 	return m.FailureCount
 }
 
-// TestReleaseWithQuarantine_BelowCeilingReleasesAndCounts — below the ceiling an
-// item returns to the inbox root with an incremented durable failure_count.
 func TestReleaseWithQuarantine_BelowCeilingReleasesAndCounts(t *testing.T) {
 	root := t.TempDir()
 	inbox := filepath.Join(root, ".evolve", "inbox")
@@ -78,26 +70,21 @@ func TestReleaseWithQuarantine_BelowCeilingReleasesAndCounts(t *testing.T) {
 	}
 }
 
-// TestReleaseWithQuarantine_AtCeilingQuarantines — once the persisted count
-// reaches the ceiling the item routes to quarantine/ and is gone from the root.
 func TestReleaseWithQuarantine_AtCeilingQuarantines(t *testing.T) {
 	root := t.TempDir()
 	inbox := filepath.Join(root, ".evolve", "inbox")
 	opts := Options{ProjectRoot: root}
 
-	// First failure (count→1): released to root, below ceiling 2.
 	writeProcItem(t, inbox, "5", "poison")
 	if _, err := failDrain(opts, 5, 2, false); err != nil {
 		t.Fatal(err)
 	}
-	// Re-claim for the next cycle: move root item into processing/cycle-6/.
 	if err := os.MkdirAll(filepath.Join(inbox, "processing", "cycle-6"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Rename(filepath.Join(inbox, "poison.json"), filepath.Join(inbox, "processing", "cycle-6", "poison.json")); err != nil {
 		t.Fatal(err)
 	}
-	// Second failure (count→2): hits ceiling, quarantines.
 	if _, err := failDrain(opts, 6, 2, false); err != nil {
 		t.Fatal(err)
 	}
@@ -114,8 +101,6 @@ func TestReleaseWithQuarantine_AtCeilingQuarantines(t *testing.T) {
 	}
 }
 
-// TestReleaseWithQuarantine_SystemLevelNeverQuarantines — AC4 at the wiring
-// level: a system-level failure past the ceiling still releases to root.
 func TestReleaseWithQuarantine_SystemLevelNeverQuarantines(t *testing.T) {
 	root := t.TempDir()
 	inbox := filepath.Join(root, ".evolve", "inbox")
@@ -137,8 +122,6 @@ func TestReleaseWithQuarantine_SystemLevelNeverQuarantines(t *testing.T) {
 	}
 }
 
-// TestReleaseFromQuarantine_RoundTrips — the operator escape hatch returns an
-// item to the inbox root and resets its failure budget.
 func TestReleaseFromQuarantine_RoundTrips(t *testing.T) {
 	root := t.TempDir()
 	inbox := filepath.Join(root, ".evolve", "inbox")
@@ -163,17 +146,11 @@ func TestReleaseFromQuarantine_RoundTrips(t *testing.T) {
 	if got := itemFailureCount(t, res.DestPath); got != 0 {
 		t.Errorf("failure_count = %d; want 0 (reset on release)", got)
 	}
-	// Missing id is a clean not-found, not a panic.
 	if _, err := ReleaseFromQuarantine(opts, "nope"); err == nil {
 		t.Error("expected ErrNotFound for absent id")
 	}
 }
 
-// TestShouldQuarantine_NamesThePredicate (apicover): the exported S5 decision
-// predicate, exercised over its whole contract — quarantine at/over the
-// ceiling for TASK-level failures only; system-level failures NEVER
-// quarantine (S3 halt precedence) regardless of count; zero/negative ceiling
-// disables quarantine.
 func TestShouldQuarantine_NamesThePredicate(t *testing.T) {
 	cases := []struct {
 		count, ceiling int
@@ -183,7 +160,7 @@ func TestShouldQuarantine_NamesThePredicate(t *testing.T) {
 		{2, 3, false, false}, // below ceiling
 		{3, 3, false, true},  // at ceiling
 		{9, 3, false, true},  // over ceiling
-		{9, 3, true, false},  // system-level: S3 precedence, never quarantine
+		{9, 3, true, false},  // system-level: never quarantines
 		{9, 0, false, false}, // ceiling 0 = disabled
 	}
 	for _, tc := range cases {

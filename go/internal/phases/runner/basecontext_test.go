@@ -1,14 +1,5 @@
 package runner
 
-// RED-phase contract for cycle-249 task `runner-base-cycle-context`:
-// BaseCycleContext(body, req) is the single source for the "## Cycle
-// Context" core block that 10 phase files currently copy-paste. The
-// helper must emit the four mandatory fields BYTE-IDENTICALLY to the
-// duplicated block so callers can swap to it with zero prompt drift.
-//
-// These tests fail at baseline because BaseCycleContext does not exist
-// yet (compile error: undefined) — that is the correct RED signal.
-
 import (
 	"strings"
 	"testing"
@@ -25,13 +16,6 @@ func TestBaseCycleContext_CoreBlockByteIdentical(t *testing.T) {
 		Workspace:   "/ws/dir",
 	}
 	got := BaseCycleContext("AGENT BODY", req)
-	// Byte-for-byte parity with the duplicated block:
-	//   b.WriteString(body)
-	//   b.WriteString("\n\n## Cycle Context\n")
-	//   fmt.Fprintf(&b, "- cycle: %d\n", req.Cycle)
-	//   fmt.Fprintf(&b, "- goal_hash: %s\n", req.GoalHash)
-	//   fmt.Fprintf(&b, "- project_root: %s\n", req.ProjectRoot)
-	//   fmt.Fprintf(&b, "- workspace: %s\n", req.Workspace)
 	want := "AGENT BODY\n\n## Cycle Context\n" +
 		"- cycle: 249\n" +
 		"- goal_hash: 8274f532\n" +
@@ -42,9 +26,6 @@ func TestBaseCycleContext_CoreBlockByteIdentical(t *testing.T) {
 	}
 }
 
-// Negative: the helper owns ONLY the four mandatory fields. Phase-specific
-// extras (worktree, goal text, mode, carryover_summary) remain the caller's
-// responsibility — emitting them here would change every phase's prompt.
 func TestBaseCycleContext_OmitsPhaseSpecificExtras(t *testing.T) {
 	req := core.PhaseRequest{
 		Cycle:       7,
@@ -62,8 +43,6 @@ func TestBaseCycleContext_OmitsPhaseSpecificExtras(t *testing.T) {
 	}
 }
 
-// Edge: empty body still yields a well-formed block (callers like
-// specrunner may compose from inline bodies that can be empty).
 func TestBaseCycleContext_EmptyBody(t *testing.T) {
 	got := BaseCycleContext("", core.PhaseRequest{Cycle: 1, GoalHash: "g", ProjectRoot: "/r", Workspace: "/s"})
 	if !strings.HasPrefix(got, "\n\n## Cycle Context\n") {
@@ -71,8 +50,6 @@ func TestBaseCycleContext_EmptyBody(t *testing.T) {
 	}
 }
 
-// Edge: zero values are emitted, not skipped — parity with the current
-// duplicated block, which prints all four lines unconditionally.
 func TestBaseCycleContext_ZeroValuesStillEmitAllFourKeys(t *testing.T) {
 	got := BaseCycleContext("B", core.PhaseRequest{})
 	for _, key := range []string{"- cycle: 0\n", "- goal_hash: \n", "- project_root: \n", "- workspace: \n"} {

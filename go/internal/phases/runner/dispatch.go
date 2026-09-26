@@ -40,62 +40,25 @@ func (b *BaseRunner) dispatchPhaseAttempts(
 	sysPrompt := resolved.systemPrompt
 	model := plan.Model
 
-	// WS-G1: dispatch through the chain via llmroute.Dispatch — the SAME
-	// chain-walk implementation the advisor uses (cycle-435,
-	// [[never_duplicate_centralize_via_design_patterns]]), rather than a
-	// hand-rolled copy of it. Each attempt: build BridgeRequest for the
-	// candidate CLI, Launch, normalize events. On a trigger exit (default
-	// {80, 81, 124, 127} per cli_chain.go:defaultFallbackOnExit —
-	// REPL-boot-timeout / artifact-timeout / coreutils-timeout /
-	// missing-binary) Dispatch advances to the next candidate. Any other exit
-	// (or success) stops the walk — a legitimate FAIL verdict from a model
-	// never silently routes to a different CLI. Final attempt's (bres,
-	// bridgeErr) is what the rest of the function consumes; events file
-	// reflects the final CLI's stdout so cycleclassify sees what actually
-	// happened last.
-	// Worktree fence (ADR-0097): a phase without write permission hands
-	// downstream the exact tree it was given. Snapshot before the first
-	// attempt, restore after the last — the classify hooks below (the audit's
-	// explanation binding among them) must judge the builder's tree, not the
-	// auditor's probes (cycles 1603-1605).
 	fence := takeWorktreeFence(ctx, phase, req)
 
 	var bres core.BridgeResponse
 	var bridgeErr error
 	var attemptLog []string
-	// WS-876: dispatch through the TIER fallback chain. DispatchTiered walks
-	// plan.Tiers outer × plan.Candidates inner: within a tier it behaves exactly
-	// like Dispatch (trigger exit advances the CLI, a real FAIL stops), and it
-	// steps DOWN to the next tier ONLY when every CLI at the current tier exited
-	// 85 (quota) — the fable/opus→sonnet step-down the operator needs so a
-	// fully-quota-walled top tier fails over to a lower-cost live tier instead of
-	// aborting the phase. The tier string flows straight into BridgeRequest.Model:
-	// the bridge realizer maps it per-CLI via the manifest's model_tier_map
-	// (opus→opus/gpt-5.5, balanced→sonnet/gpt-5.4, …), so no runner-side model
-	// resolution is needed — passing the tier is as literal as passing plan.Model.
+	// The tier is passed as the model; the bridge maps it per CLI, so the runner resolves no model itself.
 	tieredRes := llmroute.DispatchTiered(plan, func(candidateCLI, tier string) (int, error) {
 		i := len(attemptLog)
 		if i > 0 {
-			// Read the previous attempt from attemptLog, NOT plan.Candidates[i-1]:
-			// under tiering i grows past len(Candidates) (candidates × tiers), so
-			// indexing Candidates would panic on the first real step-down.
+			// attemptLog, not Candidates: under tiering i outgrows Candidates, so indexing it panics on a step-down.
 			log.Diag().Infof(
 				"[runner] phase=%s fallback %d: trying cli=%s tier=%s (previous=%s exit=%d)\n",
 				phase, i+1, candidateCLI, tier, attemptLog[i-1], bres.ExitCode)
 		}
-		// Skill overlays are resolved PER ATTEMPT: the fallback tier steps down
-		// across attempts, and overlay rules key on tier (e.g. deep/top→fable), so
-		// the configured skill set is recomputed for each (cli, tier) actually
-		// dispatched. Pure policy lookup; the adapter materializes the SKILL.md.
+		// Overlays resolve per attempt because overlay rules key on the tier, which steps down across attempts.
 		overlayDispatch := policy.DispatchFromPhaseRequest(phase, candidateCLI, tier, tier)
-		// ADR-0099 slice 3: the objective signals the `when` selector reads are
-		// core's projection (PhaseRequest.Signals, one digest per dispatch); the
-		// runner copies, never re-reads the workspace.
+		// core's one per-dispatch signal projection; the runner never re-reads the workspace.
 		overlayDispatch.Signals = req.Signals
 		overlaySkills := overlayPolicy.ResolveOverlays(overlayDispatch)
-		// Observability: announce the resolved overlay set for THIS (cli, tier)
-		// attempt so operators/graders see the persona fired without diffing the
-		// prompt file. Rendered even for the empty set (skill-overlays=[]).
 		log.Diag().Infof("%s\n", FormatSkillOverlayLog(phase, overlaySkills, tier))
 		bres, bridgeErr = b.bridge.Launch(ctx, core.BridgeRequest{
 			CLI:                 candidateCLI,
@@ -119,21 +82,15 @@ func (b *BaseRunner) dispatchPhaseAttempts(
 			Skills:              overlaySkills,
 			CorrectionDirective: req.CorrectionDirective,
 			OperatorDirectives:  req.OperatorDirectives,
-			ChainAttempt:        true, // one attempt of THIS walk — a chain-walking handle passes it through
+			ChainAttempt:        true, // one attempt of this walk, so a chain-walking handle passes it through
 		})
-		// Normalize per attempt so the final events file reflects the
-		// final CLI's stdout — cycleclassify reads <phase>-events.ndjson
-		// and we want it to describe what actually happened last.
+		// Per attempt, so the events file cycleclassify reads describes the last CLI that ran.
 		if err := b.eventsProducer(req.Workspace, phase, candidateCLI, req.Cycle, prompt); err != nil {
 			log.Diag().Warnf("[runner] WARN events producer phase=%s cli=%s: %v (cost/classification degraded)\n", phase, candidateCLI, err)
 		}
 		attemptLog = append(attemptLog, fmt.Sprintf("%s@%s=%d", candidateCLI, tier, bres.ExitCode))
-		// CLI-health bench: an exit-85 with a fresh benchable escalation
-		// report (rate_limit class) is remembered ACROSS dispatches — run on
-		// every candidate including the last, so the wall is recorded even
-		// when no fallback remains (cycle-283). Staleness is judged against
-		// the RUN start: the guard exists to exclude cross-PHASE leftovers in
-		// the shared workspace, not earlier attempts of this same run.
+		// Every candidate, the last included, so a wall is benched even with no fallback left. Staleness counts
+		// from the run start: the guard excludes other phases' leftovers, not this run's earlier attempts.
 		if bridgeErr != nil && bres.ExitCode == 85 {
 			b.maybeBenchOnEscalation(req.ProjectRoot, req.Workspace, candidateCLI, start, req.Env)
 		}
@@ -141,9 +98,7 @@ func (b *BaseRunner) dispatchPhaseAttempts(
 	}, func(from, to string) {
 		log.Diag().Infof("[runner] phase=%s tier step-down: %s → %s (CLI chain exhausted at quota)\n", phase, from, to)
 	})
-	// ResolvedModel reports the tier the terminal attempt actually ran at (a
-	// step-down means the phase ran below its resolved tier); fall back to the
-	// resolved model for the empty-candidates edge case DispatchTiered guards.
+	// The terminal attempt's tier, below the resolved one after a step-down; empty only without candidates.
 	resolvedModel := tieredRes.Tier
 	if resolvedModel == "" {
 		resolvedModel = model

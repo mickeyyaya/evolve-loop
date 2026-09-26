@@ -1,17 +1,5 @@
-// Package phasespec is the rich, declarative definition of a pipeline phase —
-// the "Lego brick" descriptor. A PhaseSpec carries everything the engine needs
-// to run a phase as DATA: identity, the typed I/O contract (files + signals it
-// consumes and produces), the prompt/classify behavior, and routing triggers.
-//
-// It is the single full parser of phase-registry.json's phases[] array and of
-// per-phase .evolve/phases/<name>/phase.json overlays (Stage 4). config.Load
-// reads only the routing subset; phaseorder reads only the order — both are
-// consolidated onto this Catalog in later stages.
-//
-// Layering: phasespec imports config (to reuse RoutingBlock/Condition) and
-// stdlib only. It MUST NOT import core — core imports phasespec (PhaseRequest
-// carries a PhaseSpec), so a phasespec→core edge would cycle. PhaseSpec is pure
-// data: no behavior beyond defaulted accessors.
+// Package phasespec parses the phase registry and per-phase overlays into a
+// Catalog of declarative phase definitions. See docs/architecture/packages/internal-phasespec.md.
 package phasespec
 
 import (
@@ -25,184 +13,95 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
-// IO is the typed input/output contract of a phase: the artifact files it
-// reads/writes and the namespaced signals it consumes/emits. The signals
-// declaration is what makes the pipe reorderable — a brick states what it needs
-// and what it produces, so the catalog can order it and validate unsatisfiable
-// inputs.
+// IO is a phase's typed input/output contract: the artifact files and namespaced signals.
 type IO struct {
 	Files   []string `json:"files,omitempty"`
 	Signals []string `json:"signals,omitempty"`
-	// AgentOwed names the secondary output files (basenames of Files[1:]) the
-	// phase AGENT must write itself; Files[0] is always owed. The declared-
-	// deliverables gate (ADR-0100) verifies these exist and parse after the
-	// phase, and a gap re-dispatches the agent with a correction naming them.
+	// AgentOwed names the secondary outputs (basenames of Files[1:]) the agent
+	// must write itself; Files[0] is always owed.
 	AgentOwed []string `json:"agent_owed,omitempty"`
-	// HarnessProduced names the secondary output files a harness component
-	// writes (audit: acs-verdict.json by acsrunner). They are declared so the
-	// file list stays complete, and excluded from the gate because re-
-	// dispatching an agent cannot produce them. Together with AgentOwed this
-	// partitions Files[1:]; the real-registry test pins the partition.
+	// HarnessProduced names the secondary outputs a harness component writes;
+	// re-dispatching the agent cannot produce them, so the deliverables gate skips them.
 	HarnessProduced []string `json:"harness_produced,omitempty"`
 }
 
-// ClassifyRules is the declarative verdict spec — replaces per-phase Go Classify
-// for the common case. require_sections + fail_if_empty cover the markdown-shape
-// checks the built-in phases hand-code today; fail_if_signal gates on an emitted
-// signal threshold (e.g. {"security.severity_max": ">=HIGH"}).
+// ClassifyRules is the declarative verdict spec a phase uses in place of Go classify code.
 type ClassifyRules struct {
-	RequireSections []string          `json:"require_sections,omitempty"`
-	FailIfEmpty     bool              `json:"fail_if_empty,omitempty"`
-	FailIfSignal    map[string]string `json:"fail_if_signal,omitempty"`
-	VerdictOnPass   string            `json:"verdict_on_pass,omitempty"`
-	// RequireFailureContext opts a verdict-emitting phase into the ADR-0039
-	// failure-signal contract: a FAIL/WARN sentinel must carry the structured
-	// failure block (class/defects/evidence_paths) or the contract gate
-	// re-dispatches with a correction.
+	RequireSections []string `json:"require_sections,omitempty"`
+	FailIfEmpty     bool     `json:"fail_if_empty,omitempty"`
+	// FailIfSignal cannot be evaluated until a signal bus exists, so declaring it fails the phase.
+	FailIfSignal  map[string]string `json:"fail_if_signal,omitempty"`
+	VerdictOnPass string            `json:"verdict_on_pass,omitempty"`
+	// RequireFailureContext requires a FAIL/WARN sentinel to carry the structured failure block.
+	// See ADR-0039.
 	RequireFailureContext bool `json:"require_failure_context,omitempty"`
-	// VerdictFromSentinel opts a JUDGMENT phase into having its own stated
-	// verdict decide, instead of having it discarded.
-	//
-	// A judgment phase (premise-challenge, adversarial-review) renders a
-	// conclusion and emits the canonical machine sentinel carrying it. Without
-	// this key the classifier reads STRUCTURE ONLY, so a well-formed report is
-	// PASS no matter what it concluded — cycle-1528 stated "FAIL (BLOCK). The
-	// cycle must not proceed as framed" and the cycle ran to completion.
-	//
-	// Stage word, not a bool, because the population this switches on is
-	// UNCALIBRATED — a verdict nothing ever consumed is a verdict nobody ever
-	// calibrated, so enforcing it without a measured soak would halt nearly
-	// every cycle at that phase. ADR-0091 owns the measured counts; they move
-	// every cycle, and a stale copy here would mislead a promotion decision.
-	// "" = off (legacy, byte-identical),
-	// "shadow" = record the disagreement and route as before, "enforce" = the
-	// stated verdict decides. Per-phase and not a global policy stage because
-	// the two phases are in very different states of calibration and must be
-	// promotable independently.
+	// VerdictFromSentinel lets a judgment phase's stated verdict decide: "" off, "shadow" records, "enforce" decides.
+	// See ADR-0091.
 	VerdictFromSentinel string `json:"verdict_from_sentinel,omitempty"`
 }
 
-// Gates names the inter-phase gate functions (declarative; resolved by the
-// guard layer). Carried for the registry contract; not evaluated here.
+// Gates names the inter-phase gate functions; the guard layer resolves them, not this package.
 type Gates struct {
 	In  string `json:"in,omitempty"`
 	Out string `json:"out,omitempty"`
 }
 
-// PhaseSpec is the brick definition. All fields are optional in JSON so a user
-// phase.json can be minimal; accessor methods supply conventional defaults.
+// PhaseSpec is one phase's declarative definition; every JSON field is optional and accessors supply defaults.
 type PhaseSpec struct {
 	Name         string `json:"name"`
 	Kind         string `json:"kind,omitempty"`      // "llm" (default) | "native" | "command" (reserved)
-	Role         string `json:"archetype,omitempty"` // Plan|Build|Evaluate|Control archetype (see Role; inferred from Name when empty). NOTE: distinct from the registry's "role" key, which names the agent/profile (intent/scout/builder/auditor); this is the composition archetype, hence a separate "archetype" JSON key.
+	Role         string `json:"archetype,omitempty"` // composition archetype; the registry's "role" key names the agent profile instead
 	Optional     bool   `json:"optional,omitempty"`
 	Agent        string `json:"agent,omitempty"`
 	Model        string `json:"model,omitempty"`
 	WritesSource bool   `json:"writes_source,omitempty"`
-	// Advisor-facing metadata (ADR-0038): rendered into the phase inventory and
-	// the advisor's SELECT catalog so routing decisions are informed, not
-	// name-guessing. All optional; absence degrades to today's name-only card.
+	// Advisor-facing SELECT-card metadata; absence degrades to a name-only card.
 	Description string   `json:"description,omitempty"` // one line: what the phase produces
 	WhenToUse   string   `json:"when_to_use,omitempty"` // the signal/goal that should trigger SELECTing it
 	Categories  []string `json:"categories,omitempty"`  // goal types, validated softly by UnknownCategories
-	// AllowedCLIs + ModelTierEnvelope (cycle-463 T1) carry this phase's OWN
-	// dispatch guardrails (phase-registry.json contracts) so the advisor's
-	// plan-prompt catalog can project them (router.PhaseCard mirrors these
-	// exact fields) instead of the advisor proposing a {cli,tier} blind. Both
-	// nil/empty in the common case (no per-phase guardrail configured).
+	// The phase's own dispatch guardrails, mirrored by router.PhaseCard so the advisor proposes within them.
 	AllowedCLIs       []string                    `json:"allowed_clis,omitempty"`
 	ModelTierEnvelope *profiles.ModelTierEnvelope `json:"model_tier_envelope,omitempty"`
-	// Catalog decides whether this phase occupies a slot on the ADVISOR'S
-	// SELECT MENU. It does not affect whether the phase is installed, routable,
-	// dispatchable by an explicit plan, or mintable — only whether the planner
-	// is offered it as a card.
-	//
-	// Measured 2026-08-23: 65 non-control phases were projected as SELECT cards
-	// against maxEnrichedCatalogCards=12, so 53 rendered in the degraded
-	// overflow form — and 47 of the 65 had never been selected in 120 cycles.
-	// The enriched slots were allocated by registry order, not usefulness, so
-	// phases the advisor actually uses lost their metadata to phases it has
-	// never once chosen. "If a human engineer can't definitively say which tool
-	// should be used, an AI agent can't be expected to do better."
-	//
-	// "" (absent) = CatalogSelect, today's behavior byte-for-byte.
-	// "on-demand" = keep it installed, take it off the menu. The declined set is
-	// still INDEXED by name in one line of the prompt, so nothing becomes
-	// undiscoverable — this hides phases from the menu, it does not remove them.
+	// Catalog decides only advisor SELECT-menu membership, never installation, routing or dispatch.
 	Catalog   string `json:"catalog,omitempty"`
 	Enabled   string `json:"enabled,omitempty"`
 	EnableVar string `json:"enable_var,omitempty"`
 	Inputs    IO     `json:"inputs,omitempty"`
 	Outputs   IO     `json:"outputs,omitempty"`
-	// Effects names the lifecycle effects the phase's persona is instructed to
-	// perform outside its workspace (triage: "inbox-claim"). Each name binds
-	// to one deterministic check in the declared-deliverables gate; a user
-	// phase may declare them (they only ADD checks — nothing here loosens the
-	// primary contract, so the ADR-0058 stripping does not apply).
+	// Effects names lifecycle effects performed outside the workspace (triage: "inbox-claim"), each
+	// checked by the deliverables gate. They only add checks, so user phases may declare them.
 	Effects       []string             `json:"effects,omitempty"`
 	PromptContext []string             `json:"prompt_context,omitempty"`
 	Classify      *ClassifyRules       `json:"classify,omitempty"`
 	Routing       *config.RoutingBlock `json:"routing,omitempty"`
 	Gates         Gates                `json:"gates,omitempty"`
-	// After names the phase this one slots in right after, in the routing order
-	// (e.g. "build" → runs between build and audit). Empty defaults to running
-	// just before "audit" — the canonical post-build check slot.
+	// After is the routing-order anchor this phase follows; empty places it just before "audit".
 	After string `json:"after,omitempty"`
-	// Verdict branch targets (ADR-0058): the phase a verdict-branching phase
-	// transitions to on PASS/WARN (OnPass) and FAIL (OnFail). The state
-	// machine's Next consults these for the audit branch (S1); empty degrades
-	// to the literal table.
+	// Verdict branch targets: OnPass on PASS/WARN, OnFail on FAIL; empty uses the literal table.
 	OnPass string `json:"on_pass,omitempty"`
 	OnFail string `json:"on_fail,omitempty"`
-	// BranchingStrategy (ADR-0058) selects how this phase's successor is chosen:
-	// "" / "verdict" = verdict-driven (the linear default); "history" = the
-	// failure-adapter consults cycle history rather than this phase's own verdict
-	// (retrospective); "signal" = a decision signal on PhaseResponse picks the
-	// successor (debugger). The orchestrator's successorStrategy reads it; empty —
-	// or an unset catalog — degrades to the literal phase-identity default
-	// (retro→history, debugger→signal), keeping the flow byte-identical.
+	// BranchingStrategy picks how the successor is chosen; empty uses the phase-identity default.
 	BranchingStrategy string `json:"branching_strategy,omitempty"`
-	// Gate (PA-DDK DDK-4) declares the artifact-floor THRESHOLDS this anchor's
-	// handoff must meet before a later anchor may run — config-driven policy
-	// evaluated against the trusted Go signal digest. nil ⇒ the literal floor map
-	// (byte-identical fallback). See ArtifactGate.
-	Gate *ArtifactGate `json:"gate,omitempty"`
-	// Recovery (PA-DDK DDK-6) config-drives a control phase's recovery SUCCESSOR
-	// targets — the phase a history/signal-branching phase routes to per its
-	// verdict / failure-adapter action / debugger action key. The decision POLICY
-	// (failure-adapter consultation, signal parsing) stays Go; only the target
-	// mapping is config. nil ⇒ the literal target table (byte-identical fallback).
-	Recovery *RecoveryMap `json:"recovery,omitempty"`
-	// EarlyExit (PA-DDK DDK-7) declares whether this phase may legally terminate a
-	// no-ship convergence cycle (→ end). A pointer so unset (nil) degrades to the
-	// literal pre-build set ({scout, triage}); an explicit value lets config fully
-	// own the early-exit set. The shipPlanned guard (a ship-intended cycle can
-	// never early-exit) stays in Go — it is the invariant, not a per-phase dial.
+	// Gate, Recovery and EarlyExit config-drive the kernel; nil uses the literal fallback.
+	// See ADR-0060.
+	Gate     *ArtifactGate `json:"gate,omitempty"`
+	Recovery *RecoveryMap  `json:"recovery,omitempty"`
+	// EarlyExit is whether this phase may end a no-ship cycle; a ship-intended cycle never exits early, and Go enforces that.
 	EarlyExit *bool `json:"early_exit,omitempty"`
 }
 
-// RecoveryMap maps a recovery KEY (a verdict, a failure-adapter Action string,
-// or a debugger action) to a successor phase name. The chosen edge is still
-// gated by the legality graph at the call site — config selects, the graph
-// constrains. An unmapped key falls back to the literal target (PA-DDK DDK-6).
+// RecoveryMap maps a recovery key (verdict, failure-adapter action or debugger action) to a successor phase.
 type RecoveryMap struct {
 	Targets map[string]string `json:"targets,omitempty"`
 }
 
-// ArtifactGate is the declarative artifact-floor threshold for an anchor phase
-// (PA-DDK DDK-4, ADR-0060). RequiresPresent demands a real on-disk handoff this
-// cycle; VerdictIn (when non-empty) additionally requires the digested verdict
-// to be one of the listed values — this is how audit's PASS/WARN soft-pass floor
-// is expressed AS CONFIG. The digest that supplies present/verdict stays trusted
-// Go; only these thresholds are operator-settable.
+// ArtifactGate is an anchor phase's operator-settable artifact-floor threshold over the trusted Go digest.
 type ArtifactGate struct {
 	RequiresPresent bool     `json:"requires_present,omitempty"`
 	VerdictIn       []string `json:"verdict_in,omitempty"`
 }
 
-// Branching strategy values for PhaseSpec.BranchingStrategy (ADR-0058). The
-// empty value is treated as BranchingVerdict (the linear default), so a minimal
-// phase.json need not declare one.
+// Branching strategy values for PhaseSpec.BranchingStrategy; empty means BranchingVerdict.
 const (
 	BranchingVerdict = "verdict" // successor chosen by this phase's own verdict
 	BranchingHistory = "history" // successor chosen by the failure-adapter from cycle history
@@ -217,22 +116,19 @@ func (s PhaseSpec) KindOrDefault() string {
 	return s.Kind
 }
 
-// Role is the Plan/Build/Evaluate archetype a phase fulfills — the organizing
-// abstraction for advisor composition (compose within roles) and the integrity
-// floor (a plan reaching ship must run ≥1 Evaluate phase). Control covers
-// pipeline mechanics that are none of the three (ship, retro, memo, debugger).
+// Role is the archetype a phase fulfills; the advisor composes within roles and the floor needs an Evaluate phase.
 type Role string
 
+// Role values; Control covers pipeline mechanics that are none of the other three.
 const (
-	RolePlan     Role = "plan"     // decide what/how: intent, scout, triage, tdd, build-planner, architecture-design
-	RoleBuild    Role = "build"    // produce the change: build
-	RoleEvaluate Role = "evaluate" // verify the change: audit, tester
-	RoleControl  Role = "control"  // pipeline control, not Plan/Build/Evaluate: ship, retro, memo, debugger
+	RolePlan     Role = "plan"     // decide what and how
+	RoleBuild    Role = "build"    // produce the change
+	RoleEvaluate Role = "evaluate" // verify the change
+	RoleControl  Role = "control"  // pipeline control
 )
 
-// inferredRoles maps the built-in phase names to their archetype. A phase whose
-// Role is unset falls back to this table (so existing registry entries need no
-// edit); an unknown name defaults to Plan (the safest "needs scoping" bucket).
+// inferredRoles gives built-in phases an archetype without a registry edit.
+// An unknown name is Plan, the safest "needs scoping" bucket.
 var inferredRoles = map[string]Role{
 	"intent": RolePlan, "scout": RolePlan, "triage": RolePlan, "tdd": RolePlan,
 	"build-planner": RolePlan, "swarm-plan": RolePlan, "architecture-design": RolePlan, "plan-review": RolePlan,
@@ -242,18 +138,13 @@ var inferredRoles = map[string]Role{
 	"memo": RoleControl, "debugger": RoleControl, "start": RoleControl, "end": RoleControl,
 }
 
-// RoleOrDefault returns the explicit Role (normalized + validated), or infers
-// one from the phase Name when unset or unrecognized. Used by the floor
-// (Evaluate detection) and the advisor catalog, so a mis-cased or typo'd
-// "role" in registry/overlay JSON must NOT silently become an unmatchable
-// Role — it falls through to name inference instead.
+// RoleOrDefault returns the normalized explicit Role, else infers one from Name, so a typo never yields an unmatchable Role.
 func (s PhaseSpec) RoleOrDefault() Role {
 	if s.Role != "" {
 		switch normalized := Role(strings.ToLower(strings.TrimSpace(s.Role))); normalized {
 		case RolePlan, RoleBuild, RoleEvaluate, RoleControl:
 			return normalized
 		}
-		// unknown explicit value → fall through to name inference
 	}
 	if r, ok := inferredRoles[s.Name]; ok {
 		return r
@@ -277,14 +168,7 @@ func (s PhaseSpec) ModelOrDefault() string {
 	return s.Model
 }
 
-// ApplyArchetypeDefaults fills zero fields on a user-overlay PhaseSpec whose
-// archetype is evaluate. Call only at DiscoverUserSpecs time — never at
-// registry Load(), because built-in evaluate phases (audit) are required and
-// must NOT have Optional forced to true.
-//
-// Scope note: only the evaluate archetype gets implicit defaults. Plan and
-// control archetype phase.json files must still declare "optional": true
-// explicitly — ValidateUserSpec hard-rejects user phases without it.
+// ApplyArchetypeDefaults fills an evaluate-archetype user spec's zero fields; never call it from Load, where audit must stay required.
 func ApplyArchetypeDefaults(s *PhaseSpec) {
 	if s.RoleOrDefault() != RoleEvaluate {
 		return
@@ -306,33 +190,28 @@ func ApplyArchetypeDefaults(s *PhaseSpec) {
 	}
 }
 
-// Catalog is the ordered, lookup-able set of phase specs. Registry order is
-// preserved (All) for pipeline sequencing; Names is a sorted snapshot.
 // Catalog membership words for PhaseSpec.Catalog.
 const (
-	// CatalogSelect is the absent/default value: the phase is offered to the
-	// advisor as a SELECT card.
+	// CatalogSelect is the absent default: the phase is offered to the advisor as a SELECT card.
 	CatalogSelect = ""
-	// CatalogOnDemand keeps the phase installed and dispatchable but off the
-	// advisor's menu.
+	// CatalogOnDemand keeps the phase installed and dispatchable but off the advisor's menu.
 	CatalogOnDemand = "on-demand"
 )
 
 // IsOnDemand reports whether this phase has declined its advisor SELECT slot.
 func (s PhaseSpec) IsOnDemand() bool { return s.Catalog == CatalogOnDemand }
 
-// KnownCatalogWord reports whether c is a recognized catalog membership value.
-// An unknown word is a config typo that would silently leave the phase on the
-// menu, so the repo-catalog guard fails on it loudly rather than defaulting.
+// KnownCatalogWord reports whether c is a membership word; an unknown one would silently leave the phase on the menu.
 func KnownCatalogWord(c string) bool { return c == CatalogSelect || c == CatalogOnDemand }
 
+// Catalog is the ordered, lookup-able set of phase specs.
 type Catalog struct {
 	order     []string
 	byName    map[string]PhaseSpec
-	userNames map[string]bool // names contributed by an operator overlay (see Merge)
+	userNames map[string]bool
 }
 
-// Get returns the spec for name. (spec, false) on miss.
+// Get returns the spec for name, or false on a miss.
 func (c Catalog) Get(name string) (PhaseSpec, bool) {
 	s, ok := c.byName[name]
 	return s, ok
@@ -347,8 +226,7 @@ func (c Catalog) All() []PhaseSpec {
 	return out
 }
 
-// UserPhases returns specs for phases contributed by an operator overlay
-// (as opposed to built-in registry entries). Order matches registry insertion.
+// UserPhases returns the operator-overlay specs in insertion order.
 func (c Catalog) UserPhases() []PhaseSpec {
 	out := make([]PhaseSpec, 0)
 	for _, n := range c.order {
@@ -366,14 +244,11 @@ func (c Catalog) Names() []string {
 	return out
 }
 
-// registryDoc is the full phases[] view of phase-registry.json.
 type registryDoc struct {
 	Phases []PhaseSpec `json:"phases"`
 }
 
-// Load reads the registry at path and returns its phase Catalog. An unreadable
-// or malformed file is a hard error (the registry is a required contract, not a
-// fail-open signal source). A spec with an empty name is skipped with no error.
+// Load parses the registry at path; the registry is a required contract, so any read, parse or validation failure is an error.
 func Load(path string) (Catalog, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -388,18 +263,14 @@ func Load(path string) (Catalog, error) {
 		if s.Name == "" {
 			continue
 		}
-		// Load-time validator (ADR-0058 S4): the registry is a contract — a
-		// malformed activating field fails loudly here, never silently degrades.
 		if viol := ValidateActivatingFields(s); len(viol) > 0 {
 			return Catalog{}, fmt.Errorf("phase registry %q: phase %q: %s", path, s.Name, strings.Join(viol, "; "))
 		}
-		// ADR-0100: a secondary output nobody classified would be silently
-		// ungated; the registry fails to load instead.
 		if viol := ValidateOutputsPartition(s); len(viol) > 0 {
 			return Catalog{}, fmt.Errorf("phase registry %q: phase %q: %s", path, s.Name, strings.Join(viol, "; "))
 		}
 		if _, ok := cat.byName[s.Name]; ok {
-			continue // first wins; built-ins precede user overlays at merge time
+			continue
 		}
 		cat.order = append(cat.order, s.Name)
 		cat.byName[s.Name] = s

@@ -13,10 +13,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
-// makeRepo sets up an inbox/-style repo with optional inbox/ files,
-// processing/cycle-N/ files, and cycle-state.json. Returns the repo root.
-// The temp-dir/.evolve scaffold comes from fixtures.NewWorkspace; the inbox/
-// subdir is the domain-specific seeding this package needs.
+// makeRepo returns a temp project root holding an empty .evolve/inbox.
 func makeRepo(t *testing.T) string {
 	t.Helper()
 	ws := fixtures.NewWorkspace(t).Build()
@@ -26,7 +23,6 @@ func makeRepo(t *testing.T) string {
 	return ws.Root
 }
 
-// dropInboxFile creates inbox/<name>.json with {"id":<id>} content.
 func dropInboxFile(t *testing.T, repo, name, id string) string {
 	t.Helper()
 	dir := filepath.Join(repo, ".evolve", "inbox")
@@ -38,7 +34,6 @@ func dropInboxFile(t *testing.T, repo, name, id string) string {
 	return path
 }
 
-// dropProcessingFile creates processing/cycle-N/<name>.json.
 func dropProcessingFile(t *testing.T, repo, cycle, name, id string) string {
 	t.Helper()
 	dir := filepath.Join(repo, ".evolve", "inbox", "processing", "cycle-"+cycle)
@@ -53,7 +48,6 @@ func dropProcessingFile(t *testing.T, repo, cycle, name, id string) string {
 	return path
 }
 
-// setCycleState writes cycle-state.json with the given active cycle id.
 func setCycleState(t *testing.T, repo, id string) {
 	t.Helper()
 	path := filepath.Join(repo, ".evolve", "cycle-state.json")
@@ -63,7 +57,6 @@ func setCycleState(t *testing.T, repo, id string) {
 	}
 }
 
-// === Claim happy path =====================================================
 func TestClaim_HappyPath(t *testing.T) {
 	repo := makeRepo(t)
 	dropInboxFile(t, repo, "task-1.json", "task-1")
@@ -80,7 +73,6 @@ func TestClaim_HappyPath(t *testing.T) {
 	if _, err := os.Stat(res.SrcPath); err == nil {
 		t.Errorf("src file should be gone")
 	}
-	// Ledger entry present.
 	body, err := os.ReadFile(filepath.Join(repo, ".evolve", "ledger.jsonl"))
 	if err != nil {
 		t.Fatalf("read ledger: %v", err)
@@ -90,7 +82,6 @@ func TestClaim_HappyPath(t *testing.T) {
 	}
 }
 
-// === Claim missing task → ErrNotFound =====================================
 func TestClaim_NotFound(t *testing.T) {
 	repo := makeRepo(t)
 	_, err := Claim(Options{ProjectRoot: repo}, "task-missing", "5")
@@ -99,7 +90,6 @@ func TestClaim_NotFound(t *testing.T) {
 	}
 }
 
-// === Claim with missing args → ErrBadArgs =================================
 func TestClaim_BadArgs(t *testing.T) {
 	repo := makeRepo(t)
 	_, err := Claim(Options{ProjectRoot: repo}, "", "5")
@@ -108,7 +98,6 @@ func TestClaim_BadArgs(t *testing.T) {
 	}
 }
 
-// === Promote: processing → processed (no SHA) ==============================
 func TestPromote_ProcessedNoSHA(t *testing.T) {
 	repo := makeRepo(t)
 	dropProcessingFile(t, repo, "5", "task-1.json", "task-1")
@@ -124,7 +113,6 @@ func TestPromote_ProcessedNoSHA(t *testing.T) {
 	}
 }
 
-// === Promote: processing → processed (with SHA prefix) ====================
 func TestPromote_ProcessedWithSHA(t *testing.T) {
 	repo := makeRepo(t)
 	dropProcessingFile(t, repo, "5", "task-1.json", "task-1")
@@ -140,7 +128,6 @@ func TestPromote_ProcessedWithSHA(t *testing.T) {
 	}
 }
 
-// === Promote: rejected/retry destination layout ===========================
 func TestPromote_Rejected(t *testing.T) {
 	repo := makeRepo(t)
 	dropProcessingFile(t, repo, "5", "task-1.json", "task-1")
@@ -168,7 +155,6 @@ func TestPromote_Retry(t *testing.T) {
 	}
 }
 
-// === Promote: missing source (NoOp for ship.sh compat) ====================
 func TestPromote_NotFound_NoOp(t *testing.T) {
 	repo := makeRepo(t)
 	res, err := Promote(Options{ProjectRoot: repo}, "task-missing", "processed", PromoteOpts{Cycle: "5"})
@@ -180,25 +166,6 @@ func TestPromote_NotFound_NoOp(t *testing.T) {
 	}
 }
 
-// === Promote: ancestry-gated delivery evidence (cycle-598 incident) =======
-//
-// Root cause (inbox item inbox-promotion-requires-landed-ship): Promote used
-// to key promotion on the caller-supplied newState alone (a proxy for "cycle
-// verdict PASS"), never checking whether the ship commit actually landed on
-// main. A push-rejected ship whose recovery path still reported PASS could
-// promote to processed/ with a commit that git log --all never contained,
-// silently dropping the directive while reporting it done.
-//
-// The fix under test: Options gains an IsLandedFn seam (nil defaults to a
-// real `git merge-base --is-ancestor <sha> main` check against ProjectRoot,
-// fail-open on a seam/exec error so a non-git ProjectRoot — as used by every
-// pre-existing Promote test above — never regresses). When newState ==
-// "processed" and PromoteOpts.CommitSHA is set, Promote consults IsLandedFn:
-// landed=false reroutes the item to retry/ (never processed/) and the ledger
-// records why; landed=true promotes normally.
-
-// TestPromote_ProcessedRefusedWhenNotLanded is the RED anchor: an unlanded
-// SHA must never reach processed/, regardless of the caller's PASS verdict.
 func TestPromote_ProcessedRefusedWhenNotLanded(t *testing.T) {
 	repo := makeRepo(t)
 	dropProcessingFile(t, repo, "598", "task-1.json", "task-1")
@@ -233,8 +200,6 @@ func TestPromote_ProcessedRefusedWhenNotLanded(t *testing.T) {
 	}
 }
 
-// TestPromote_ProcessedPromotesWhenLanded is the twin GREEN case: a SHA the
-// ancestry check confirms landed promotes exactly as before.
 func TestPromote_ProcessedPromotesWhenLanded(t *testing.T) {
 	repo := makeRepo(t)
 	dropProcessingFile(t, repo, "598", "task-2.json", "task-2")
@@ -253,11 +218,6 @@ func TestPromote_ProcessedPromotesWhenLanded(t *testing.T) {
 	}
 }
 
-// TestPromote_ProcessedNoSHASkipsAncestryCheck: when the caller supplies no
-// CommitSHA at all (legacy callers, or the ship.sh-compat empty-SHA path),
-// there is nothing to check ancestry of — Promote must not invoke IsLandedFn
-// and must promote exactly as the pre-existing TestPromote_ProcessedNoSHA
-// case does.
 func TestPromote_ProcessedNoSHASkipsAncestryCheck(t *testing.T) {
 	repo := makeRepo(t)
 	dropProcessingFile(t, repo, "5", "task-3.json", "task-3")
@@ -281,7 +241,6 @@ func TestPromote_ProcessedNoSHASkipsAncestryCheck(t *testing.T) {
 	}
 }
 
-// === Promote: invalid state → ErrBadState =================================
 func TestPromote_BadState(t *testing.T) {
 	repo := makeRepo(t)
 	dropProcessingFile(t, repo, "5", "task-1.json", "task-1")
@@ -291,7 +250,6 @@ func TestPromote_BadState(t *testing.T) {
 	}
 }
 
-// === Promote: inbox/ fallback when source not in processing ==============
 func TestPromote_InboxFallback(t *testing.T) {
 	repo := makeRepo(t)
 	dropInboxFile(t, repo, "task-1.json", "task-1")
@@ -302,22 +260,19 @@ func TestPromote_InboxFallback(t *testing.T) {
 	if res.NoOp {
 		t.Error("NoOp = true, want false (inbox/ fallback)")
 	}
-	// Ledger should record the from-path with srcRel="inbox" (the historical
-	// format preserves the leading `.evolve/inbox/<srcRel>/` even when that
-	// double-nests for the inbox fallback path — now folded into message).
+	// A root item's ledger From double-nests inbox/ (a preserved quirk).
 	body, _ := os.ReadFile(filepath.Join(repo, ".evolve", "ledger.jsonl"))
 	if !strings.Contains(string(body), `.evolve/inbox/inbox/task-1.json`) {
 		t.Errorf("ledger missing inbox-fallback entry: %s", body)
 	}
 }
 
-// === RecoverOrphans: dead cycles get recovered, active cycle skipped =====
 func TestRecoverOrphans_HappyPath(t *testing.T) {
 	repo := makeRepo(t)
 	setCycleState(t, repo, "5")
-	dropProcessingFile(t, repo, "3", "task-a.json", "task-a") // dead → recover
-	dropProcessingFile(t, repo, "3", "task-b.json", "task-b") // dead → recover
-	dropProcessingFile(t, repo, "5", "task-c.json", "task-c") // active → skip
+	dropProcessingFile(t, repo, "3", "task-a.json", "task-a")
+	dropProcessingFile(t, repo, "3", "task-b.json", "task-b")
+	dropProcessingFile(t, repo, "5", "task-c.json", "task-c")
 
 	res, err := RecoverOrphans(Options{ProjectRoot: repo})
 	if err != nil {
@@ -326,20 +281,17 @@ func TestRecoverOrphans_HappyPath(t *testing.T) {
 	if res.Recovered != 2 {
 		t.Errorf("Recovered = %d, want 2", res.Recovered)
 	}
-	// task-a + task-b should now be at inbox/.
 	for _, name := range []string{"task-a.json", "task-b.json"} {
 		path := filepath.Join(repo, ".evolve", "inbox", name)
 		if _, err := os.Stat(path); err != nil {
 			t.Errorf("%s should be in inbox/: %v", name, err)
 		}
 	}
-	// task-c should still be in processing/cycle-5/.
 	if _, err := os.Stat(filepath.Join(repo, ".evolve", "inbox", "processing", "cycle-5", "task-c.json")); err != nil {
 		t.Errorf("task-c.json should still be in active cycle dir")
 	}
 }
 
-// === RecoverOrphans: no processing dir → no-op ============================
 func TestRecoverOrphans_NoProcessingDir(t *testing.T) {
 	repo := makeRepo(t)
 	res, err := RecoverOrphans(Options{ProjectRoot: repo})
@@ -351,7 +303,6 @@ func TestRecoverOrphans_NoProcessingDir(t *testing.T) {
 	}
 }
 
-// === RecoverOrphans: missing cycle-state → all cycles treated as dead ====
 func TestRecoverOrphans_NoCycleState(t *testing.T) {
 	repo := makeRepo(t)
 	dropProcessingFile(t, repo, "3", "task-a.json", "task-a")
@@ -364,7 +315,6 @@ func TestRecoverOrphans_NoCycleState(t *testing.T) {
 	}
 }
 
-// === Ledger entry shape ===================================================
 func TestLedgerEntry_Schema(t *testing.T) {
 	repo := makeRepo(t)
 	dropInboxFile(t, repo, "task-1.json", "task-1")
@@ -381,10 +331,6 @@ func TestLedgerEntry_Schema(t *testing.T) {
 	if err := json.Unmarshal(body[:len(body)-1], &entry); err != nil {
 		t.Fatalf("ledger not valid JSON: %v\n%s", err, body)
 	}
-	// The CHAINED shape (core.LedgerEntry): kind carries the old class value,
-	// from/to/reason fold into message, and the line is a chain participant
-	// (prev_hash + entry_seq present — the raw-append shape was the
-	// fleet-concurrency chain-break generator).
 	for _, field := range []string{"ts", "kind", "action", "task_id", "cycle", "message", "prev_hash", "entry_seq"} {
 		if _, ok := entry[field]; !ok {
 			t.Errorf("ledger entry missing field %q: %v", field, entry)
@@ -408,10 +354,8 @@ func TestLedgerEntry_Schema(t *testing.T) {
 	}
 }
 
-// === findFileByTaskID ignores non-JSON / unparseable files ================
 func TestFindFileByTaskID_IgnoresNonJSON(t *testing.T) {
 	d := t.TempDir()
-	// Drop an unrelated file + a malformed JSON + the real target.
 	_ = os.WriteFile(filepath.Join(d, "readme.md"), []byte("# hi"), 0o644)
 	_ = os.WriteFile(filepath.Join(d, "bad.json"), []byte("{not json"), 0o644)
 	_ = os.WriteFile(filepath.Join(d, "good.json"), []byte(`{"id":"target"}`), 0o644)
@@ -425,11 +369,6 @@ func TestFindFileByTaskID_IgnoresNonJSON(t *testing.T) {
 	}
 }
 
-// === promoteDestPath / intPtr / strPtr — moved to the lifecycle leaf with the
-// code (ADR-0103 unit 06: lifecycle/promote_test.go TestPromoteDestPath_AndCycleOrZero,
-// lifecycle/ledger_test.go TestIntPtr_StrPtr_FoldLifecycleMessage).
-
-// === readActiveCycle: missing file ========================================
 func TestReadActiveCycle_MissingFile(t *testing.T) {
 	_, err := readActiveCycle("/tmp/this-cycle-state-does-not-exist-xyz.json")
 	if err == nil {

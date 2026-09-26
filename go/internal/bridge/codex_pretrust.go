@@ -11,13 +11,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
 )
 
-// tomlKeyEscaper escapes the characters TOML basic strings prohibit
-// inside table-key quotes. Per TOML spec §2.4, ALL control characters
-// (U+0000–U+001F except U+0009 tab, which is technically allowed) must
-// be escaped or the file is unparseable. A path that smuggled a literal
-// \n through codexProjectHeader would corrupt ~/.codex/config.toml and
-// codex would refuse to start — far worse than the modal-stall this
-// helper exists to prevent. Per cycle-122 review HIGH-2 finding.
+// tomlKeyEscaper escapes backslash, quote and the control characters that have a TOML short escape.
+// An unescaped newline in a path would corrupt ~/.codex/config.toml and stop codex from starting.
 var tomlKeyEscaper = strings.NewReplacer(
 	`\`, `\\`,
 	`"`, `\"`,
@@ -28,40 +23,11 @@ var tomlKeyEscaper = strings.NewReplacer(
 	"\r", `\r`,
 )
 
-// pretrustCodexProjects writes per-cycle trust entries into
-// ~/.codex/config.toml for cfg.Worktree and cfg.Workspace so codex's own
-// permission layer (separate from the bridge's sandbox-exec/bwrap host
-// sandbox) treats writes to those paths as allowed and does NOT render
-// the "Press enter to confirm" runtime modal that hung cycle-122 tdd.
-//
-// Cycle-121's research dossier flagged this as "Fix A" deferred at the
-// time; cycle-122 made the deferral cost concrete. See
-// docs/incidents/cycle-122-codex-permission-modal-and-wsg-fallback-gap.md
-// and codex Fix A in
-// knowledge-base/research/codex-cli-0.134-repl-boot-timeout-2026-05-28.md.
-//
-// The merge is APPEND-ONLY and idempotent: if a `[projects."<path>"]`
-// section is already present, the path is skipped (no duplicate).
-//
-// Concurrency (ADR-0049 N10): under `evolve fleet` the whole-cycle project
-// lock is skipped, so several cycles' codex Preflights pre-trust DISTINCT
-// paths into this one host-global file at once. A unique CreateTemp keeps each
-// writer's temp private, but the read-merge-write-RENAME was last-writer-wins:
-// two cycles that each read a config WITHOUT the other's entry each rename
-// their own snapshot, so the final file keeps only the last writer's trust
-// entries. The cycle whose entry was dropped then hits the "Press enter to
-// confirm" modal that hung cycle-122. The whole RMW now runs under
-// flock.WithPathLock(configPath) so the append-only merges serialize and
-// compose losslessly — every path stays trusted. (The lock pairs with, it does
-// not replace, the atomic CreateTemp+Rename: the lock prevents lost updates,
-// the rename keeps lock-free readers tear-free.)
-//
-// No-ops when cfg.Worktree AND cfg.Workspace are both empty. Returns nil
-// (best-effort: a pretrust failure must NOT block phase launch — the
-// modal-stall path still defends via Fix 2's extended fallback trigger
-// list, and the operator sees the warning on stderr).
-//
-// Test seam: EVOLVE_CODEX_CONFIG_PATH overrides the resolved path.
+// pretrustCodexProjects trusts cfg.Worktree and cfg.Workspace in the codex config so codex never renders its
+// "Press enter to confirm" modal, and hides the rate-limit model-switch modal. The merge is append-only and
+// idempotent. It runs under flock.WithPathLock because concurrent fleet cycles share this host-global file.
+// Callers log an error and continue: a pretrust failure must not block a launch.
+// See ADR-0049.
 func pretrustCodexProjects(cfg *Config) error {
 	paths := codexPretrustPaths(cfg)
 	if len(paths) == 0 {
@@ -71,8 +37,7 @@ func pretrustCodexProjects(cfg *Config) error {
 	if err != nil {
 		return fmt.Errorf("resolve codex config path: %w", err)
 	}
-	// MkdirAll at 0o700 BEFORE the lock: PathLock's own MkdirAll uses 0o755, so
-	// creating the dir here first preserves codex's stricter permission.
+	// Create the dir at 0o700 before the lock, because PathLock's own MkdirAll would use 0o755.
 	if err := os.MkdirAll(filepath.Dir(configPath), 0o700); err != nil {
 		return fmt.Errorf("ensure codex config dir: %w", err)
 	}
@@ -82,15 +47,12 @@ func pretrustCodexProjects(cfg *Config) error {
 			return fmt.Errorf("read codex config: %w", err)
 		}
 		merged := appendCodexTrustEntries(string(existing), paths)
-		// cycle-142: also suppress codex's "Approaching rate limits / Switch to
-		// <mini>?" model-switch modal, which is undismissable by the auto-responder
-		// and stalls the phase until the artifact-wait deadline.
+		// Also hide codex's rate-limit model-switch modal, which the auto-responder cannot dismiss.
 		merged = appendCodexNotice(merged)
 		if merged == string(existing) {
 			return nil // every path already trusted + notice already present
 		}
-		// os.CreateTemp guarantees a unique filename so lock-free readers never
-		// observe a partial write (the lock above serializes our own writers).
+		// A unique temp file keeps lock-free readers from seeing a partial write.
 		dir := filepath.Dir(configPath)
 		base := filepath.Base(configPath)
 		f, err := os.CreateTemp(dir, base+".tmp.*")
@@ -107,11 +69,9 @@ func pretrustCodexProjects(cfg *Config) error {
 			_ = os.Remove(tmp)
 			return fmt.Errorf("close codex config tmp: %w", err)
 		}
-		// CreateTemp defaults to 0o600 on POSIX, matching the original
-		// WriteFile perm choice — no Chmod needed.
+		// CreateTemp creates the file 0o600, so no Chmod is needed.
 		if err := os.Rename(tmp, configPath); err != nil {
-			// Best-effort cleanup; the .tmp.* file is harmless if Remove
-			// also fails (user-owned dir, dropped on next pretrust attempt).
+			// Best-effort cleanup; a leftover .tmp.* file is harmless.
 			_ = os.Remove(tmp)
 			return fmt.Errorf("rename codex config: %w", err)
 		}
@@ -119,9 +79,7 @@ func pretrustCodexProjects(cfg *Config) error {
 	})
 }
 
-// codexPretrustPaths returns the non-empty subset of cfg.Worktree +
-// cfg.Workspace. Order is deterministic (worktree then workspace) so
-// tests can assert exact merge output.
+// codexPretrustPaths returns cfg.Worktree then cfg.Workspace, skipping empty and duplicate paths.
 func codexPretrustPaths(cfg *Config) []string {
 	if cfg == nil {
 		return nil
@@ -136,8 +94,7 @@ func codexPretrustPaths(cfg *Config) []string {
 	return out
 }
 
-// resolveCodexConfigPath returns cfg.codexConfigPath when set, otherwise
-// falls back to the default ~/.codex/config.toml.
+// resolveCodexConfigPath returns cfg.codexConfigPath when set, else ~/.codex/config.toml.
 func resolveCodexConfigPath(cfg *Config) (string, error) {
 	if cfg != nil && cfg.codexConfigPath != "" {
 		return cfg.codexConfigPath, nil
@@ -153,8 +110,7 @@ func defaultCodexConfigPath() (string, error) {
 	return filepath.Join(home, ".codex", "config.toml"), nil
 }
 
-// codexVersionPathFn is the DI seam for resolving the codex version file path.
-// Tests replace this var (with t.Cleanup restore) to inject a temporary path.
+// codexVersionPathFn is the seam tests replace to redirect the codex version file.
 var codexVersionPathFn func() (string, error) = defaultCodexVersionPath
 
 func defaultCodexVersionPath() (string, error) {
@@ -194,16 +150,8 @@ func dismissCodexUpdateNag() error {
 	return os.WriteFile(path, body, 0o600)
 }
 
-// appendCodexTrustEntries returns existing with one new
-// `[projects."<path>"]\ntrust_level = "trusted"\n` block appended per
-// path that doesn't already have a section header in existing. The
-// check is substring-based — codex's TOML parser is permissive and
-// duplicate sections last-win, so a false-negative skip (rare: a
-// section header inside a string literal) only causes a benign
-// duplicate, never a missing trust entry.
-//
-// The returned content is guaranteed to end with a newline so future
-// appends start on a fresh line.
+// appendCodexTrustEntries appends a trusted [projects."<path>"] block for each path whose header text is absent.
+// Presence is a substring match; the result ends with a newline.
 func appendCodexTrustEntries(existing string, paths []string) string {
 	out := existing
 	if out != "" && !strings.HasSuffix(out, "\n") {
@@ -222,20 +170,10 @@ func appendCodexTrustEntries(existing string, paths []string) string {
 	return out
 }
 
-// codexRateLimitNudgeKey is the config.toml key that suppresses codex's
-// "Approaching rate limits / Switch to <mini>?" model-switch modal. Without it,
-// codex can render an undismissable modal mid-run that stalls the phase until
-// the artifact-wait deadline (cycle-142). Per the codex config reference
-// ([notice] hide_rate_limit_model_nudge).
+// codexRateLimitNudgeKey is the [notice] key that hides codex's "Switch to <mini>?" rate-limit modal.
 const codexRateLimitNudgeKey = "hide_rate_limit_model_nudge"
 
-// appendCodexNotice appends a `[notice]` table setting
-// hide_rate_limit_model_nudge = true when existing does not already set that
-// key. Append-only + idempotent, mirroring appendCodexTrustEntries. The
-// returned content ends with a newline. The key-presence check is substring-
-// based (consistent with appendCodexTrustEntries): codex's TOML parser
-// last-wins on duplicates, so a rare false-negative only yields a benign
-// duplicate, never a missing suppression.
+// appendCodexNotice appends a [notice] table setting codexRateLimitNudgeKey unless the key text already appears.
 func appendCodexNotice(existing string) string {
 	if strings.Contains(existing, codexRateLimitNudgeKey) {
 		return existing
@@ -244,21 +182,14 @@ func appendCodexNotice(existing string) string {
 	if out != "" && !strings.HasSuffix(out, "\n") {
 		out += "\n"
 	}
-	// Extra blank line before the block: [notice] is a top-level TOML table, so
-	// it gets clearer separation from the preceding [projects."…"] sections than
-	// the single-line gap appendCodexTrustEntries uses between same-kind entries.
+	// [notice] is a top-level table, so it gets an extra blank line of separation.
 	if out != "" {
 		out += "\n"
 	}
 	return out + "[notice]\n" + codexRateLimitNudgeKey + " = true\n"
 }
 
-// codexProjectHeader builds the `[projects."<escaped-path>"]` line for
-// path. Uses tomlKeyEscaper to handle the full set of TOML basic-string
-// prohibitions (backslash, double-quote, and all control characters per
-// TOML §2.4). Typical filesystem paths contain none of these, but a
-// path with an embedded newline that smuggled past upstream validation
-// would otherwise corrupt config.toml and prevent codex from starting.
+// codexProjectHeader builds the [projects."<path>"] header with the path TOML-escaped.
 func codexProjectHeader(path string) string {
 	return fmt.Sprintf(`[projects."%s"]`, tomlKeyEscaper.Replace(path))
 }

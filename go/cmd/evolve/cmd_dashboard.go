@@ -1,12 +1,5 @@
 package main
 
-// cmd_dashboard.go — `evolve dashboard [--project-root P] [--addr A] [--snapshot]`
-// serves the read-only live pipeline dashboard (internal/dashboard, ADR-0095):
-// loop status, inbox, per-cycle progress, what went wrong, ship-rate trend.
-// Pure reader: no state, ledger, inbox, or registry mutation; never takes the
-// loop's flock sidecars — safe to run beside a live loop. --snapshot prints the
-// JSON snapshot once to stdout and exits (scripting / smoke checks).
-
 import (
 	"context"
 	"encoding/json"
@@ -23,13 +16,15 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 )
 
-// dashboardServe is the seam between flag parsing and the long-running server
-// so the command's wiring is testable without binding a port. At runtime it is
-// exactly dashboard.New(...).ListenAndServe.
+// dashboardServe is the seam between flag parsing and the long-running server,
+// so the wiring is testable without binding a port.
 var dashboardServe = func(ctx context.Context, root, addr string) error {
 	return dashboard.New(root, dashboard.Options{Env: envMap()}).ListenAndServe(ctx, addr)
 }
 
+// runDashboard serves the read-only live pipeline dashboard, or prints one JSON
+// snapshot with --snapshot. It never takes the loop's locks.
+// See ADR-0095.
 func runDashboard(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("dashboard", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -59,10 +54,8 @@ func runDashboard(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	return 0
 }
 
-// dashboardProjectRoot resolves flag → EVOLVE_PROJECT_ROOT → cwd through the
-// shared cmdutil rule, then makes the flag value absolute (paths.AbsoluteRoot:
-// a relative root is the cycle-119 defect class — the server and the artifacts
-// it names must agree on one location).
+// dashboardProjectRoot resolves flag, then EVOLVE_PROJECT_ROOT, then cwd, and
+// absolutizes a flag value so the server and its artifacts agree on one root.
 func dashboardProjectRoot(flagRoot string, stderr io.Writer) string {
 	if flagRoot == "" {
 		return cmdutil.EnvOrCwd("EVOLVE_PROJECT_ROOT")

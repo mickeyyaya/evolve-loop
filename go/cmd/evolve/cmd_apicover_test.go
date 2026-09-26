@@ -10,7 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/apicover"
 )
 
-// apicoverGoRoot locates go/ from this test file (cmd/evolve/ → two up).
 func apicoverGoRoot(t *testing.T) string {
 	t.Helper()
 	_, thisFile, _, ok := runtime.Caller(0)
@@ -20,12 +19,8 @@ func apicoverGoRoot(t *testing.T) string {
 	return filepath.Join(filepath.Dir(thisFile), "..", "..")
 }
 
-// TestApicoverSubcommand_ByteParityWithStandalone proves `evolve apicover`
-// reproduces the standalone cmd/apicover exactly. The standalone's main() is
-// literally os.Exit(apicover.Main(os.Args[1:], os.Stdout, os.Stderr)), so
-// apicover.Main IS the standalone behavior; the subcommand handler runApicover
-// must emit byte-identical stdout/stderr and the same exit code across enforced
-// packages (guards against the subcommand munging args or swapping streams).
+// apicover.Main is the whole of the standalone binary's main, so comparing
+// against it proves byte parity with cmd/apicover.
 func TestApicoverSubcommand_ByteParityWithStandalone(t *testing.T) {
 	root := apicoverGoRoot(t)
 	pkgs := []string{
@@ -51,8 +46,7 @@ func TestApicoverSubcommand_ByteParityWithStandalone(t *testing.T) {
 		if subErr.String() != libErr.String() {
 			t.Errorf("%s: stderr diverged\n--sub--\n%s\n--lib--\n%s", pkg, subErr.String(), libErr.String())
 		}
-		// Prove apicover actually ran (not two identical no-ops): the report
-		// always ends with a summary line.
+		// Two identical no-ops would also match; the summary line proves a run.
 		if !strings.Contains(subOut.String(), "summary:") {
 			t.Errorf("%s: subcommand produced no apicover report:\n%s", pkg, subOut.String())
 		}

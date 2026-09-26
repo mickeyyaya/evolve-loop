@@ -11,12 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
 )
 
-// TestDecideAutoRespond_IdleGatesEscalateWhileBusy pins the ADR-0047 state-gate
-// (cycle-314): a policy=escalate match while the CLI is BUSY is the agent
-// QUOTING the banner in its output, not the CLI's own chrome — it must NOT
-// escalate/bench. A real banner on an IDLE pane still escalates. This catches
-// the residual the diff-line strip missed: a BARE (unnumbered) "+\t..." edit
-// line carrying the quoted banner.
 func TestDecideAutoRespond_IdleGatesEscalateWhileBusy(t *testing.T) {
 	m, err := LoadManifest("codex-tmux")
 	if err != nil {
@@ -41,10 +35,8 @@ func TestDecideAutoRespond_IdleGatesEscalateWhileBusy(t *testing.T) {
 		t.Errorf("idle pane with real banner must escalate: got %q/%d", a, rc)
 	}
 
-	// Scoping invariant: an auto_respond prompt (per-edit-approval) carries its
-	// own "esc to cancel" affordance → PaneBusy=true, yet it MUST still fire —
-	// the gate suppresses escalate only. Guards against a future widening of the
-	// gate condition silently swallowing approval modals.
+	// An auto_respond prompt carries its own "esc to cancel", so it reads busy yet must still fire:
+	// the gate is escalate-only.
 	approvalPane := "Would you like to make the following edits?\n  1. Yes, proceed\n  2. Yes, and don't ask again\n  3. No\n\nPress enter to confirm or esc to cancel"
 	if !panestream.PaneBusy(approvalPane, panestream.Profiles["codex"]) {
 		t.Fatal("fixture invalid: the approval modal carries an esc-to-cancel affordance, must read busy")
@@ -53,10 +45,6 @@ func TestDecideAutoRespond_IdleGatesEscalateWhileBusy(t *testing.T) {
 		t.Errorf("auto_respond approval must still fire while busy: got %q/%d", a, rc)
 	}
 }
-
-// autorespond_test.go — pure decision truth table + key-CSV parsing +
-// integration through the claude-tmux driver (escalate → ExitUnknownPrompt;
-// a stuck auto_respond prompt → loop guard → ExitRespondLoopGuard).
 
 func TestDecideAutoRespond(t *testing.T) {
 	prompts := []ManifestPrompt{
@@ -85,19 +73,11 @@ func TestDecideAutoRespond(t *testing.T) {
 	}
 }
 
-// TestDecideAutoRespond_AgentDiffContentNotChrome pins the soak-#4 cycle-314
-// false positive: the codex agent editing the clihealth package (the
-// rate-limit PARSER) types a test fixture containing "You've hit your usage
-// limit" in a numbered-diff line; the escalate rule matched that agent
-// content and benched codex 30min on a false rate-limit. CLI rate-limit
-// chrome is never a numbered-diff line — agent diff content must be excluded
-// from escalate-pattern matching, while a real banner still escalates.
 func TestDecideAutoRespond_AgentDiffContentNotChrome(t *testing.T) {
 	prompts := []ManifestPrompt{
 		{Name: "rate_limit", Regex: `(usage|rate)[ -]limit (reached|exceeded|hit)|hit your (usage|rate) limit|too many requests|quota exceeded`, Policy: "escalate"},
 	}
-	// The exact cycle-314 shape: the agent's editor shows a numbered diff of
-	// clihealth_test.go, and the footer shows it actively Working.
+	// The agent's editor shows a numbered diff of a fixture while the footer shows it Working.
 	agentEditPane := "" +
 		"   223 +\t// fixture: codex usage-limit banner\n" +
 		"   224 +\tpane := \"■ You've hit your usage limit. Upgrade to Pro\"\n" +
@@ -105,15 +85,11 @@ func TestDecideAutoRespond_AgentDiffContentNotChrome(t *testing.T) {
 	if a, rc := decideAutoRespond(agentEditPane, prompts, map[string]int{}, false); rc != 0 {
 		t.Fatalf("agent diff content must NOT escalate, got (%q,%d)", a, rc)
 	}
-	// A real codex rate-limit banner (CLI chrome, not a diff line) must still
-	// escalate.
 	realBanner := "codex\n\n  You've hit your usage limit. try again in 3 hours.\n"
 	if a, rc := decideAutoRespond(realBanner, prompts, map[string]int{}, false); rc != 85 {
 		t.Fatalf("real rate-limit banner must escalate, got (%q,%d)", a, rc)
 	}
-	// Mixed pane: the agent is editing the fixture AND a real banner appears
-	// on a non-diff line. The strip removes only the diff line, so the real
-	// banner still escalates — the fix never suppresses genuine chrome.
+	// Mixed pane: only the diff line is stripped, so the real banner still escalates.
 	mixedPane := "" +
 		"   224 +\tpane := \"■ You've hit your usage limit. Upgrade to Pro\"\n" +
 		"You've hit your usage limit. try again in 3 hours.\n"
@@ -122,35 +98,20 @@ func TestDecideAutoRespond_AgentDiffContentNotChrome(t *testing.T) {
 	}
 }
 
-// TestDecideAutoRespond_BareDiffLineNotChrome pins the cycle-314 RESIDUAL that
-// the numbered-diff strip and the busy idle-gate both miss (inbox
-// bridge-ratelimit-matches-agent-content, remaining sub-fix): a BARE unified-
-// diff line ("+content" / "-content" WITHOUT a leading line number) carrying a
-// quoted rate-limit banner is still agent edit content, not CLI chrome. After
-// codex finishes an edit the diff lingers in the IDLE scrollback (paneBusy=
-// false), so the ADR-0047 idle-gate does not fire and agentDiffLineRE (numbered
-// only) does not strip it — the escalate rule then benches codex on the agent's
-// own content. The fix must exclude bare diff lines from escalate-pattern
-// matching while leaving genuine banner chrome (never diff-prefixed) intact.
 func TestDecideAutoRespond_BareDiffLineNotChrome(t *testing.T) {
 	prompts := []ManifestPrompt{
 		{Name: "rate_limit", Regex: `(usage|rate)[ -]limit (reached|exceeded|hit)|hit your (usage|rate) limit|too many requests|quota exceeded`, Policy: "escalate"},
 	}
-	// Bare unified-diff ADDED line (no line number) the agent is writing into a
-	// fixture; the pane is IDLE so the busy idle-gate does NOT apply — only a
-	// bare-diff strip can save this. Must NOT escalate.
+	// The pane is idle, so the busy gate does not apply; only the bare-diff strip can save this.
 	bareAdd := "diff --git a/clihealth_test.go b/clihealth_test.go\n" +
 		"+\tpane := \"You've hit your usage limit. Upgrade to Pro\"\n"
 	if a, rc := decideAutoRespond(bareAdd, prompts, map[string]int{}, false); rc == 85 {
 		t.Errorf("bare-diff ADDED line on an idle pane must NOT escalate (agent content): got %q/%d", a, rc)
 	}
-	// Bare unified-diff REMOVED line carrying banner text — same exclusion.
 	bareDel := "-\told := \"quota exceeded for this org\"\n"
 	if a, rc := decideAutoRespond(bareDel, prompts, map[string]int{}, false); rc == 85 {
 		t.Errorf("bare-diff REMOVED line must NOT escalate (agent content): got %q/%d", a, rc)
 	}
-	// Regression: a REAL banner (CLI chrome, never diff-prefixed) on an idle pane
-	// MUST still escalate — the bare-diff strip must not over-suppress chrome.
 	realBanner := "codex\n\n  You've hit your usage limit. try again in 3 hours.\n"
 	if a, rc := decideAutoRespond(realBanner, prompts, map[string]int{}, false); rc != 85 {
 		t.Errorf("real rate-limit banner must still escalate: got %q/%d", a, rc)
@@ -186,10 +147,7 @@ func TestDecideAutoRespond_LoopGuard(t *testing.T) {
 }
 
 func TestSendKeySequence(t *testing.T) {
-	// Each token becomes its own ordered keystroke ("keys|enter"). The
-	// multi-keystroke case is the load-bearing one: claude's multi-select
-	// needs Enter (toggle) → Right (to Submit) → Enter (submit) as three
-	// distinct presses, which the old (keys,enter) collapse could not express.
+	// The multi-keystroke case is the load-bearing one: claude's multi-select needs three distinct presses.
 	cases := []struct {
 		name, csv string
 		want      []string
@@ -215,8 +173,7 @@ func TestSendKeySequence(t *testing.T) {
 }
 
 func TestClaudeTmux_AutoRespond_EscalateWritesReport(t *testing.T) {
-	// REPL boots (❯), then the pane shows an auth-recheck prompt the
-	// claude-tmux manifest classifies as escalate → ExitUnknownPrompt + report.
+	// The REPL boots, then shows an auth-recheck prompt the manifest escalates.
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault, "Please log in to continue"}}
 	code, _ := runTmux(t, fx, tmux, nil, "--allow-bypass")
@@ -229,8 +186,7 @@ func TestClaudeTmux_AutoRespond_EscalateWritesReport(t *testing.T) {
 }
 
 func TestClaudeTmux_AutoRespond_StuckPromptTripsLoopGuard(t *testing.T) {
-	// A model-deprecation prompt (auto_respond y,Enter) that never clears:
-	// the engine sends keys each tick, and the 6th match trips the loop guard.
+	// A model-deprecation prompt that never clears: the 6th match trips the loop guard.
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault, "this model is deprecated, Continue?"}}
 	code, _ := runTmux(t, fx, tmux, nil, "--allow-bypass")
@@ -242,10 +198,6 @@ func TestClaudeTmux_AutoRespond_StuckPromptTripsLoopGuard(t *testing.T) {
 	}
 }
 
-// TestDecideAutoRespond_CodexModelUnsupportedIsIdleGated pins the busy gate for
-// the model_unsupported rule: the 400 printed while codex is still "Working"
-// (an agent quoting it, or the CLI mid-retry) is not a wall; the same text on
-// an idle pane is, and must escalate so the runner falls back at once.
 func TestDecideAutoRespond_CodexModelUnsupportedIsIdleGated(t *testing.T) {
 	m, err := LoadManifest("codex-tmux")
 	if err != nil {

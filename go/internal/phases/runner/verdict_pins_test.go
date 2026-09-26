@@ -1,10 +1,5 @@
 package runner
 
-// verdict_pins_test.go — ADR-0103 unit 11, step 1: the response-shape pins of
-// the classify half (diagnostic order, the violation trail, the ship guard) and
-// the teardown-FAIL diagnostic. GREEN on 8e8f080f; each named mutant was
-// hand-applied once to prove the pin bites (doc §6).
-
 import (
 	"context"
 	"strings"
@@ -22,10 +17,6 @@ func diagMessages(diags []core.Diagnostic) []string {
 	return out
 }
 
-// Test 2 — Diagnostics order: Classify's own, then the fence, then the
-// contract violations; on a reconciled teardown the reconcile warning and the
-// ACS override follow. Kills `fence diags appended after violations`,
-// `override diag emitted without codes`, `reconcile diag before Classify diags`.
 func TestRun_VerdictDiagnostics_OrderIsClassifyFenceViolationsReconcileOverride(t *testing.T) {
 	classifyDiags := []core.Diagnostic{{Severity: "warning", Message: "classify one"}, {Severity: "error", Message: "classify two"}}
 	clean := runVerdictScenario(t, verdictScenario{name: "order", phase: "audit", agent: "evolve-auditor", file: unverifiedReport, stdout: panePASS,
@@ -41,9 +32,7 @@ func TestRun_VerdictDiagnostics_OrderIsClassifyFenceViolationsReconcileOverride(
 		t.Errorf("clean-path order %q, want %q", got, want)
 	}
 
-	// A read-only phase whose worktree is not a repository yields exactly one
-	// fence diagnostic (snapshot unavailable) — it sits between Classify's and
-	// the violations.
+	// A read-only phase in a non-repository worktree yields one fence diagnostic, between Classify's and the violations.
 	hooks := &fakeHooks{phase: "audit", agent: "evolve-auditor", model: "opus", prompt: "x", verdict: core.VerdictPASS, diagnostics: classifyDiags}
 	var counts probeCounts
 	r := New(Options{Hooks: hooks, Bridge: &goldenBridge{fileContent: unverifiedReport, stdout: panePASS}, Prompts: fakePromptsFS("evolve-auditor", "x"),
@@ -73,9 +62,6 @@ func TestRun_VerdictDiagnostics_OrderIsClassifyFenceViolationsReconcileOverride(
 	}
 }
 
-// Test 3 — every contract violation becomes exactly one "error" diagnostic, and
-// none on the OK path. Kills `violations dropped`, `severity warning`,
-// `emitted on OK`.
 func TestRun_ContractViolations_BecomeErrorDiagnosticsOncePerViolation(t *testing.T) {
 	notOK := runVerdictScenario(t, verdictScenario{name: "v", phase: "audit", agent: "evolve-auditor", file: unverifiedReport, stdout: panePASS,
 		verify: verifySpec{kind: verifyNotOK, codes: []string{"a_code", "b_code"}}, verdict: core.VerdictPASS})
@@ -98,10 +84,6 @@ func TestRun_ContractViolations_BecomeErrorDiagnosticsOncePerViolation(t *testin
 	}
 }
 
-// Test 4 — the ship guard: a contracted deliverable that failed verification
-// downgrades a clean-ship (or non-canonical) verdict to FAIL, passes
-// FAIL/WARN/SKIPPED through, and never touches NextPhase. Kills `WARN removed
-// from the case list`, `nextPhase cleared on downgrade`.
 func TestRun_ShipGuardDowngrade_LeavesNextPhaseUntouched_AndPassesThroughFailWarnSkipped(t *testing.T) {
 	for _, tc := range []struct{ in, want string }{
 		{core.VerdictPASS, core.VerdictFAIL}, {"", core.VerdictFAIL}, {"BOGUS", core.VerdictFAIL},
@@ -122,14 +104,6 @@ func TestRun_ShipGuardDowngrade_LeavesNextPhaseUntouched_AndPassesThroughFailWar
 	}
 }
 
-// Test 5 (retargeted at the fold) — the teardown-FAIL diagnostic carries the
-// cause: the FIRST violation's message, or the stale-leftover refusal. The
-// [VERDICT-FORENSIC] stderr line this test captured on 8e8f080f is kept as
-// the record (verdict/testdata/stderr_forensic.golden.txt) and is reproduced
-// field-for-field by the RUNNER_TEARDOWN_FAIL event (leaf test
-// TestForensicFail_EmitsOneEventWithTheGoldenFields; the stream per scenario by
-// TestRun_StreamIsEmptyOnTheHappyPathAndCarriesOneCodePerFaultPath). Kills
-// `Violations[0] → [1]`, `refusal text dropped from the diagnostic`.
 func TestRun_TeardownFail_DiagnosticCarriesTheCause(t *testing.T) {
 	malformed := verdictScenario{name: "m", phase: "audit", agent: "evolve-auditor", bridgeErr: artifactTimeoutErr(), file: unverifiedReport,
 		verify: verifySpec{kind: verifyNotOK, codes: []string{deliverable.CodeMissingChallengeToken, deliverable.CodeBadVerdict}}, verdict: core.VerdictPASS, wantErr: true}

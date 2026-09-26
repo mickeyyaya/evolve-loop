@@ -1,16 +1,3 @@
-// chokepoint_escape_test.go — ADR-0044 C1 invariant regression (inbox
-// cycle-terminal-path-escapes-c1-chokepoint, weight 0.98; the cycle-492 escape).
-//
-// Contract: when RunCycle's bounded dispatch loop exhausts its iteration budget
-// without reaching PhaseEnd (a transition-table cycle keeps re-selecting phases),
-// the cycle MUST record an explicit terminal abort so cyclehealth.ClassifyOutcome
-// classifies it FAILED_EXPLAINED — never the FAILED_UNEXPLAINED alarm bucket. The
-// escape is a CYCLE-level failure (loud + diagnosable), never batch-fatal.
-//
-// Driven deterministically: WithMaxPhaseIterations caps the loop below the spine
-// length, so an all-PASS cycle exits via the iteration bound (the exact escape
-// path) instead of reaching ship→end. Shares the core_test harness (recStorage,
-// fakeLedger, newRunners) from orchestrator_recovery_test.go.
 package core_test
 
 import (
@@ -24,15 +11,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclehealth"
 )
 
-// TestRunCycle_TransitionCycleGuard_RecordsChokepointEscape pins the C1
-// invariant: the bounded-loop escape is recorded as a terminal abort, so the
-// cycle never classifies FAILED_UNEXPLAINED.
 func TestRunCycle_TransitionCycleGuard_RecordsChokepointEscape(t *testing.T) {
 	t.Parallel()
 	projectRoot := t.TempDir()
-	// Cap at 2: the spine (scout→triage→tdd→…→ship→end) needs far more than 2
-	// dispatches to reach PhaseEnd, so the loop exits via the iteration bound —
-	// exactly the transition-cycle escape path the guard must catch.
+	// The spine needs far more than 2 dispatches, so the loop exits via the iteration bound.
 	orch := core.NewOrchestrator(&recStorage{}, &fakeLedger{}, newRunners(nil),
 		core.WithMaxPhaseIterations(2))
 	res, err := orch.RunCycle(context.Background(), core.CycleRequest{
@@ -40,17 +22,13 @@ func TestRunCycle_TransitionCycleGuard_RecordsChokepointEscape(t *testing.T) {
 		GoalHash:    "test-goal",
 		Context:     map[string]string{"commit_message": "test commit"},
 	})
-	// The escape is CYCLE-level: RunCycle returns without a batch-fatal error.
 	if err != nil {
 		t.Fatalf("RunCycle returned a batch-fatal error; the chokepoint escape must fail the cycle in-band: %v", err)
 	}
-	// A transition-cycle escape must never look like success.
 	if res.FinalVerdict == core.VerdictPASS {
 		t.Errorf("FinalVerdict = PASS — a transition-cycle escape must not classify as success")
 	}
 
-	// The real contract: the cycle workspace's phase-timing.json carries a
-	// terminal abort, so ClassifyOutcome does NOT page FAILED_UNEXPLAINED.
 	ws := findCycleWorkspace(t, projectRoot)
 	outcome, detail := cyclehealth.ClassifyOutcome(ws)
 	if outcome == cyclehealth.OutcomeFailedUnexplained {

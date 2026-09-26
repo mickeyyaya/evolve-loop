@@ -7,13 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// Cycle 1685 (2026-09-15): the auditor wrote its verdict as fenced JSON
-// without the sentinel wrapper. The gate salvaged the sole bad_verdict,
-// persisted the repaired report and approved it — but the runner had already
-// classified the UNREPAIRED bytes ("no parseable verdict → FAIL"), so a
-// red_count=0 cycle sealed FAIL with no failure class and no repair round.
-// The runner must classify the bytes the gate will approve: the pure repair
-// is one function both consumers share.
 func TestRepairedVerdictContent_RepairsTheSoleRecoverableBadVerdictInMemory(t *testing.T) {
 	fenced := "# Audit Report\n\n## Verdict\n\n**PASS** — every criterion carries evidence.\n\n## Ledger Entry\n\n```json\n{\"verdict\": \"PASS\", \"green\": 196, \"red\": 0}\n```\n"
 	res := Result{OK: false, Phase: "audit", ArtifactPath: "audit-report.md", Content: fenced,

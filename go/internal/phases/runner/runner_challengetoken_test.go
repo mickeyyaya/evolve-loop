@@ -1,15 +1,5 @@
 package runner
 
-// runner_challengetoken_test.go — cycle-269 incident, prompt half: the
-// bash→Go migration dropped the challenge-token prompt injection entirely
-// (builder.json's challenge_token_required had NO Go consumer;
-// resolved-prompt.txt carried zero mentions), so whether a builder echoed the
-// token depended on it spontaneously reading scout-report line 2 — the claude
-// fallback didn't, and a perfect build FAILed at audit. The runner now
-// appends a deterministic token block (the TurnBudgetHint append precedent)
-// for phases whose CONTRACT requires the echo, sourced from the minted
-// <workspace>/challenge-token.txt.
-
 import (
 	"context"
 	"os"
@@ -20,7 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// promptRecordingBridge captures the exact prompt the runner dispatches.
 type promptRecordingBridge struct{ gotPrompt string }
 
 func (b *promptRecordingBridge) Launch(_ context.Context, req core.BridgeRequest) (core.BridgeResponse, error) {
@@ -73,8 +62,7 @@ func TestRun_TokenRequiredPhase_NoTokenFile_PromptUnchanged(t *testing.T) {
 
 func TestRun_NonTokenPhase_PromptUnchangedEvenWithFile(t *testing.T) {
 	t.Parallel()
-	// scout MINTS the token; injecting an echo instruction into it would be
-	// circular. Its prompt stays untouched even when the file exists.
+	// scout mints the token, so its prompt never carries the echo instruction.
 	prompt := runWithToken(t, "scout", "evolve-scout", true)
 	if strings.Contains(strings.ToLower(prompt), "challenge") {
 		t.Errorf("non-token-required phase must not receive the block; got: %q", prompt)

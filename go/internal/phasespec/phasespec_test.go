@@ -7,7 +7,6 @@ import (
 	"testing"
 )
 
-// writeRegistry writes a registry JSON fixture into a temp dir and returns its path.
 func writeRegistry(t *testing.T, body string) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -112,7 +111,6 @@ func TestCatalog_NamesAndOrder(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	// All() preserves registry (insertion) order; Names() returns a sorted snapshot.
 	all := cat.All()
 	if len(all) != 2 || all[0].Name != "scout" || all[1].Name != "security-scan" {
 		t.Errorf("All order = %v, want [scout security-scan] (registry order)", names(all))
@@ -127,9 +125,6 @@ func TestCatalog_NamesAndOrder(t *testing.T) {
 }
 
 func TestLoad_DuplicateName_FirstWins(t *testing.T) {
-	// Locks the merge contract Stage 4 depends on: when the same name appears
-	// twice, the first entry wins and the second is dropped (built-ins precede
-	// user overlays at merge time).
 	dup := `{ "phases": [
 		{ "name": "scout", "model": "opus" },
 		{ "name": "scout", "model": "haiku" }

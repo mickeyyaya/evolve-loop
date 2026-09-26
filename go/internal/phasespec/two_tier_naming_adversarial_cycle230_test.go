@@ -7,21 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
-// Cycle-230 test-amplification adversarial tests for task phase-naming-lint.
-// Written from spec only (no implementation read) — anti-bias isolation.
-//
-// Coverage gaps addressed:
-//   - Digit-containing names: twoTierNameRE ^[a-z]+(-[a-z]+)+$ disallows digits
-//     (documented in builder notes; tests deliberately NOT written by TDD-engineer)
-//   - Three-or-more word names: ensures the (+) quantifier works for >2 segments
-//   - Non-optional specs: ValidateUserSpec is called on non-optional specs in some
-//     callers; built-in single-word names must not trip the two-tier gate if the
-//     Optional flag guards the branch.
-
-// TestTwoTierNaming_DigitsRejected_Amp: names that include ASCII digits must be
-// rejected by the two-tier gate because twoTierNameRE uses [a-z] (no \d).
-// Builder notes explicitly state digit behavior is not pinned by TDD tests —
-// this amplification test fills that gap.
 func TestTwoTierNaming_DigitsRejected_Amp(t *testing.T) {
 	digitNames := []string{
 		"phase2-check", // digit in first segment
@@ -42,9 +27,6 @@ func TestTwoTierNaming_DigitsRejected_Amp(t *testing.T) {
 	}
 }
 
-// TestTwoTierNaming_ThreePlusWordsAccepted_Amp: the regex quantifier (+) means
-// the pattern requires ONE OR MORE (-[a-z]+) groups after the first segment.
-// Names with 3 or more segments must therefore be accepted.
 func TestTwoTierNaming_ThreePlusWordsAccepted_Amp(t *testing.T) {
 	threeWordNames := []string{
 		"a-b-c",
@@ -67,9 +49,6 @@ func TestTwoTierNaming_ThreePlusWordsAccepted_Amp(t *testing.T) {
 	}
 }
 
-// TestTwoTierNaming_UnderscoreAndSpecialRejected_Amp: names that use underscores
-// or other non-hyphen separators are malformed and must produce at least one
-// violation (caught by either the legacy nameRE or the twoTierNameRE).
 func TestTwoTierNaming_UnderscoreAndSpecialRejected_Amp(t *testing.T) {
 	badSep := []string{
 		"my_phase",   // underscore separator

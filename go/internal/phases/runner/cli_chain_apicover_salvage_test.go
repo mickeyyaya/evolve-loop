@@ -1,10 +1,5 @@
 package runner
 
-// cli_chain_apicover_salvage_test.go — apicover Phase-5 naming coverage for the
-// salvaged cycle-943 export (false-RED salvage, post-v22.4.2): NAMES + EXERCISES
-// FormatSkillOverlayLog. Behavioral (Rule 9): pins the exact observability line
-// shape operators/graders grep for, including the empty-set rendering that
-// distinguishes "no overlay resolved" from "the line never ran".
 import (
 	"testing"
 )

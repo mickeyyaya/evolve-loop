@@ -7,14 +7,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
-// metadataAllowlist is the SHRINKING set of OPTIONAL catalog phases that still
-// lack advisor-facing SELECT metadata (when_to_use / description). ADR-0052
-// WS5-S3: it makes the metadata backlog VISIBLE and only lets it shrink — a NEW
-// optional phase with no metadata fails the test (add metadata, do not pad this
-// list), and a phase that GAINS metadata or is removed must be deleted here (the
-// test rejects stale entries). Seeded against the live catalog at slice time
-// (2026-06-17, 74 phases). Closing gap #3: the catalog metadata can no longer
-// silently rot — each name here is a unit of backlog to retire, not a license.
+// metadataAllowlist is the shrink-only backlog of optional phases still lacking SELECT metadata.
 var metadataAllowlist = map[string]bool{
 	"accessibility-audit": true, "account-reconcile": true, "adversarial-review": true,
 	"api-contract-design": true, "architecture-design": true, "authz-gap-scan": true,
@@ -43,19 +36,11 @@ var metadataAllowlist = map[string]bool{
 	"type-safety-audit": true, "variance-analysis": true,
 }
 
-// TestPhaseCatalog_OptionalPhasesHaveSelectMetadata gates the phase-config
-// catalog (the ~79-phase registry + user phases, NOT the 15 router PhaseCard
-// defaults): every optional phase must carry when_to_use or description, except
-// the shrinking allowlist above.
 func TestPhaseCatalog_OptionalPhasesHaveSelectMetadata(t *testing.T) {
 	cat, _, _, err := phasespec.MergedCatalog(repoRoot(t))
 	if err != nil {
 		t.Fatalf("MergedCatalog: %v", err)
 	}
-	// Built-in registry entries are always bound; user/on-disk overlay entries
-	// (cat.IsUser) bind only when their .evolve/phases/<dir>/phase.json is
-	// git-tracked — untracked dirs are runtime/local state that can never
-	// reach a CI checkout (cd49274beab2 class). Nil = no git context = bind all.
 	trackedUser := phasespec.TrackedUserPhaseNames(t, repoRoot(t))
 
 	missing := map[string]bool{}
@@ -69,7 +54,6 @@ func TestPhaseCatalog_OptionalPhasesHaveSelectMetadata(t *testing.T) {
 		}
 	}
 
-	// 1. No NEW optional phase may lack metadata (the gate bites).
 	var newGaps []string
 	for name := range missing {
 		if !metadataAllowlist[name] {
@@ -81,8 +65,6 @@ func TestPhaseCatalog_OptionalPhasesHaveSelectMetadata(t *testing.T) {
 		t.Errorf("%d optional phase(s) lack SELECT metadata (when_to_use/description) and are NOT allowlisted — add metadata, do not pad the allowlist:\n%v", len(newGaps), newGaps)
 	}
 
-	// 2. The allowlist may only SHRINK: an entry that now has metadata or no
-	// longer exists must be deleted.
 	var stale []string
 	for name := range metadataAllowlist {
 		if !missing[name] {

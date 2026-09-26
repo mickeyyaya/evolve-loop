@@ -1,9 +1,5 @@
 package lifecycle
 
-// item_test.go — the processed-record primitives (§6 tests 38-39): the one
-// id→file resolver, the one iterator, the one atomic rewrite, the failure
-// counter's one reader and one writer.
-
 import (
 	"encoding/json"
 	"errors"
@@ -12,8 +8,6 @@ import (
 	"testing"
 )
 
-// Test 38a — ReadFailureCount walks the root and processing/cycle-* only
-// (never quarantine/ or retry/ — Q14); a malformed hit reads as not-found.
 func TestReadFailureCount_RootAndProcessing_NotQuarantine(t *testing.T) {
 	inbox := newInbox(t)
 	writeItem(t, filepath.Join(inbox, "a.json"), `{"id":"a","failure_count":2}`)
@@ -39,8 +33,6 @@ func TestReadFailureCount_RootAndProcessing_NotQuarantine(t *testing.T) {
 	}
 }
 
-// Test 38b — FindFileByTaskID returns the ReadDir error, ignores non-JSON and
-// skips malformed files; an absent id is the bare ErrNotFound.
 func TestFindFileByTaskID_ReadDirError_IgnoresNonJSON_SkipsMalformed(t *testing.T) {
 	inbox := newInbox(t)
 	if _, err := FindFileByTaskID(filepath.Join(inbox, "nope"), "x"); err == nil || errors.Is(err, ErrNotFound) {
@@ -59,9 +51,6 @@ func TestFindFileByTaskID_ReadDirError_IgnoresNonJSON_SkipsMalformed(t *testing.
 	}
 }
 
-// Test 38c — Locate: a processing claim outranks a root copy; an absent id
-// (including a project with no inbox) is ErrNotFound; a read fault on the
-// root (a FILE where the inbox dir should be) is returned as itself.
 func TestLocate_ProcessingOutranksRootAndAbsentIsNotFound(t *testing.T) {
 	inbox := newInbox(t)
 	writeItem(t, filepath.Join(inbox, "a.json"), `{"id":"a"}`)
@@ -86,7 +75,6 @@ func TestLocate_ProcessingOutranksRootAndAbsentIsNotFound(t *testing.T) {
 	}
 }
 
-// Test 38d — jsonEntries lists *.json files only, never directories.
 func TestJsonEntries_SkipsDirsAndNonJSON(t *testing.T) {
 	inbox := newInbox(t)
 	writeItem(t, filepath.Join(inbox, "b.json"), `{}`)
@@ -102,10 +90,6 @@ func TestJsonEntries_SkipsDirsAndNonJSON(t *testing.T) {
 	}
 }
 
-// Test 39 — the bump is ONE atomic rewrite: the continuation sheds only when
-// shedAt says so, the count and reason land in the same bytes, an exported
-// BumpFailureCount never sheds, a directory at the tmp path returns the error
-// with the item untouched.
 func TestBumpWith_ShedsContinuationOnlyAtCeiling_OneRename(t *testing.T) {
 	inbox := newInbox(t)
 	item := filepath.Join(inbox, "a.json")
@@ -143,8 +127,6 @@ func TestBumpWith_ShedsContinuationOnlyAtCeiling_OneRename(t *testing.T) {
 	}
 }
 
-// UpdateItemJSON's arms: a malformed item, a mutate that leaves invalid raw
-// JSON (the marshal error), and commitTmp's rename failure removing the tmp.
 func TestUpdateItemJSON_ErrorArmsAndCommitTmp(t *testing.T) {
 	inbox := newInbox(t)
 	bad := filepath.Join(inbox, "bad.json")
@@ -178,7 +160,6 @@ func TestUpdateItemJSON_ErrorArmsAndCommitTmp(t *testing.T) {
 	}
 }
 
-// readTaskIDOrUnknown's three fallbacks (moved from extra_coverage_test.go:17-43).
 func TestReadTaskIDOrUnknown_Fallbacks(t *testing.T) {
 	dir := t.TempDir()
 	if got := readTaskIDOrUnknown(filepath.Join(dir, "missing.json")); got != "unknown" {

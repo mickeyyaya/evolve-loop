@@ -7,19 +7,13 @@ import (
 	"sort"
 )
 
-// userSpecFile is the per-phase definition filename an operator drops under
-// <phasesDir>/<name>/phase.json.
 const userSpecFile = "phase.json"
 
-// DiscoverUserSpecs reads operator-authored phase definitions from
-// <phasesDir>/<name>/phase.json. Missing dir → no specs (fail-open: user
-// phases are opt-in). An unreadable or malformed phase.json is skipped with a
-// warning rather than failing the whole load — one broken brick must not break
-// the catalog. Specs are returned sorted by directory name for determinism.
+// DiscoverUserSpecs reads <phasesDir>/<name>/phase.json specs sorted by directory; a missing dir or bad file is skipped, never fatal.
 func DiscoverUserSpecs(phasesDir string) (specs []PhaseSpec, warnings []string) {
 	entries, err := os.ReadDir(phasesDir)
 	if err != nil {
-		return nil, nil // no .evolve/phases/ → nothing to discover
+		return nil, nil
 	}
 	names := make([]string, 0, len(entries))
 	for _, e := range entries {
@@ -33,7 +27,7 @@ func DiscoverUserSpecs(phasesDir string) (specs []PhaseSpec, warnings []string) 
 		path := filepath.Join(phasesDir, dir, userSpecFile)
 		raw, err := os.ReadFile(path)
 		if err != nil {
-			continue // dir without a phase.json is not a phase definition
+			continue // a dir without phase.json is not a phase
 		}
 		var s PhaseSpec
 		if err := json.Unmarshal(raw, &s); err != nil {
@@ -41,9 +35,7 @@ func DiscoverUserSpecs(phasesDir string) (specs []PhaseSpec, warnings []string) 
 			continue
 		}
 		if s.Name == "" {
-			// Default the name to the directory — but the dir name is untrusted
-			// filesystem input, so guard the kebab-case floor here rather than
-			// admitting a malformed name into the catalog.
+			// The directory name is untrusted input, so it must pass the kebab-case floor before naming a phase.
 			if !nameRE.MatchString(dir) {
 				warnings = append(warnings, "skipped "+path+": directory name "+dir+" is not valid kebab-case and phase.json has no name")
 				continue
@@ -51,11 +43,9 @@ func DiscoverUserSpecs(phasesDir string) (specs []PhaseSpec, warnings []string) 
 			s.Name = dir
 		}
 		ApplyArchetypeDefaults(&s)
-		// ADR-0058 trust boundary: transition-activating fields are restricted to
-		// built-in phases. A user phase.json that declares one has it stripped (with
-		// a warning) so an overlay can never inject a verdict/history/signal branch
-		// into the kernel — the restriction is enforced at the real user-file
-		// ingestion point, where provenance is known.
+		// Transition-activating fields are built-in only, so an overlay can never inject a branch
+		// into the kernel; this is the one ingestion point where provenance is known.
+		// See ADR-0058.
 		if s.OnPass != "" || s.OnFail != "" || s.BranchingStrategy != "" {
 			warnings = append(warnings, "user phase "+s.Name+" in "+path+" declares transition-activating fields (on_pass/on_fail/branching_strategy) — stripped; these are restricted to built-in phases (ADR-0058)")
 			s.OnPass, s.OnFail, s.BranchingStrategy = "", "", ""
@@ -65,14 +55,7 @@ func DiscoverUserSpecs(phasesDir string) (specs []PhaseSpec, warnings []string) 
 	return specs, warnings
 }
 
-// DiscoverUserSpecsFromRoots reads phase definitions from each discovery root
-// in order and concatenates them (ADR-0038 multi-root: .evolve/phases plus any
-// plugin-bundle roots from EVOLVE_PHASE_ROOTS). On an inter-root name
-// collision the LEFT-MOST root wins with a shadowing warning — so the local
-// project root, conventionally first, can deliberately shadow a plugin phase.
-// sources maps each kept phase name to the root it was loaded from
-// (provenance for the inventory and `phases list`). Missing roots are
-// fail-open, exactly like DiscoverUserSpecs.
+// DiscoverUserSpecsFromRoots discovers specs across roots; the left-most root wins a name clash, and sources maps name to root.
 func DiscoverUserSpecsFromRoots(roots []string) (specs []PhaseSpec, sources map[string]string, warnings []string) {
 	sources = make(map[string]string)
 	for _, root := range roots {
@@ -90,12 +73,7 @@ func DiscoverUserSpecsFromRoots(roots []string) (specs []PhaseSpec, sources map[
 	return specs, sources, warnings
 }
 
-// Merge returns a new Catalog with the user specs layered over the built-in
-// catalog. A user spec whose name clashes with a built-in is DROPPED with a
-// warning (built-ins win — an operator cannot silently redefine a spine phase).
-// The receiver is not mutated. User specs are appended in input-slice order, so
-// callers wanting deterministic listing should pass sorted specs (as
-// DiscoverUserSpecs does).
+// Merge returns a new Catalog with user specs appended over the built-ins, which win every clash except an optional built-in's overlay.
 func (c Catalog) Merge(user []PhaseSpec) (Catalog, []string) {
 	merged := Catalog{
 		order:     append([]string(nil), c.order...),
@@ -112,16 +90,8 @@ func (c Catalog) Merge(user []PhaseSpec) (Catalog, []string) {
 			continue
 		}
 		if _, isBuiltin := c.byName[s.Name]; isBuiltin {
-			// An overlay whose name matches an OPTIONAL built-in (e.g. `memo`,
-			// whose routing lives only in the operator overlay) is ADOPTED, not
-			// dropped — completing cycle-547's exemption (already wired into
-			// ValidateUserSpecWithCatalog/ApplyUserRouting via isOptionalBuiltinName)
-			// at this last unqualified call site. The name already sits in
-			// merged.order via the built-in, so replace the stub in place — no
-			// reorder. A NON-optional (mandatory spine) built-in still drops with
-			// the clash warning, so an operator can never hijack a spine phase's
-			// slot (the anti-hijack floor is the built-in's Optional flag, not the
-			// overlay's own).
+			// An optional built-in's overlay (memo) is adopted in place. The built-in's own Optional
+			// flag, not the overlay's, keeps an operator from hijacking a mandatory spine phase.
 			if isOptionalBuiltinName(s.Name, c) {
 				merged.byName[s.Name] = s
 				merged.userNames[s.Name] = true
@@ -141,6 +111,5 @@ func (c Catalog) Merge(user []PhaseSpec) (Catalog, []string) {
 	return merged, warnings
 }
 
-// IsUser reports whether name was contributed by an operator overlay (vs a
-// built-in registry entry).
+// IsUser reports whether name was contributed by an operator overlay.
 func (c Catalog) IsUser(name string) bool { return c.userNames[name] }

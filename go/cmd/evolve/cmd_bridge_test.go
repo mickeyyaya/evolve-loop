@@ -9,8 +9,6 @@ import (
 	"testing"
 )
 
-// cmd_bridge_test.go — tests the `evolve bridge` CLI shim dispatch.
-
 func writeBridgePolicy(t *testing.T, bridge map[string]string) {
 	t.Helper()
 	root := t.TempDir()
@@ -65,7 +63,6 @@ func TestRunBridge_Probe(t *testing.T) {
 	if !strings.Contains(s, `"os"`) || !strings.Contains(s, `"results"`) {
 		t.Fatalf("probe JSON should carry os + results; got %q", s)
 	}
-	// Every known driver should appear in the probe output.
 	for _, cli := range []string{"claude-p", "claude-tmux", "codex", "agy"} {
 		if !strings.Contains(s, `"`+cli+`"`) {
 			t.Fatalf("probe output missing cli %q; got %q", cli, s)
@@ -93,7 +90,6 @@ func TestRunBridge_AddRule(t *testing.T) {
 	if !strings.Contains(out.String(), "appended rule") {
 		t.Fatalf("add-rule should confirm; got %q", out.String())
 	}
-	// missing --regex → exit 10
 	var out2, errb2 bytes.Buffer
 	if code := runBridge([]string{"add-rule", "--cli=claude-p"}, nil, &out2, &errb2); code != 10 {
 		t.Fatalf("add-rule missing regex exit = %d, want 10", code)
@@ -130,12 +126,10 @@ func TestRunBridge_Billing(t *testing.T) {
 	if !strings.Contains(snap, "snap-pre-") {
 		t.Fatalf("snapshot path = %q", snap)
 	}
-	// compare a snapshot against itself → a valid verdict code (0/1/2).
 	var out2 bytes.Buffer
 	if c := runBridge([]string{"billing", "compare", snap, snap}, nil, &out2, &errb); c < 0 || c > 2 {
 		t.Fatalf("billing compare exit = %d, want 0/1/2", c)
 	}
-	// usage / arity errors → 10
 	for _, args := range [][]string{{"billing"}, {"billing", "snapshot"}, {"billing", "compare"}, {"billing", "bogus"}} {
 		var o bytes.Buffer
 		if c := runBridge(args, nil, &o, &errb); c != 10 {

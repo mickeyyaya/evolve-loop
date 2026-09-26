@@ -2,13 +2,6 @@ package phasecontract
 
 import "testing"
 
-// required_ssot_test.go pins the "what counts as a complete cycle" SSOT that
-// cyclehealth, redteamcheck and ledgerverify now read instead of each carrying
-// their own `[]string{"scout", "builder", "auditor"}` literal (cycle-1140,
-// phasecontract-role-artifact-ssot). The accessors must DERIVE from the
-// registry — a hand-typed return here would recreate the very drift they exist
-// to remove.
-
 func TestRequiredRoles_DerivesFromRegistryAgentNames(t *testing.T) {
 	got := RequiredRoles()
 	want := []string{"scout", "builder", "auditor"}
@@ -20,9 +13,6 @@ func TestRequiredRoles_DerivesFromRegistryAgentNames(t *testing.T) {
 			t.Errorf("RequiredRoles()[%d] = %q, want %q", i, got[i], w)
 		}
 	}
-	// DERIVATION (anti-hardcode): each returned role must be the AgentName of
-	// its registry contract. A literal return passes the equality check above
-	// but drifts silently the moment a contract's AgentName changes.
 	for i, phase := range requiredPhases {
 		c, ok := For(phase)
 		if !ok {
@@ -55,10 +45,6 @@ func TestRequiredArtifacts_DerivesFromRegistryArtifactNames(t *testing.T) {
 	}
 }
 
-// TestRequiredAccessors_ReturnCopies guards the shared-slice hazard: three
-// packages assign these to package-level vars, so a returned backing array
-// aliased across callers would let one consumer's append corrupt another's
-// vocabulary.
 func TestRequiredAccessors_ReturnCopies(t *testing.T) {
 	a := RequiredRoles()
 	a[0] = "mutated"
@@ -72,9 +58,6 @@ func TestRequiredAccessors_ReturnCopies(t *testing.T) {
 	}
 }
 
-// TestRetroAndBuildPlanner_RegisteredWithRuntimeTruthNames pins the artifact
-// half: both phases write real files whose names lived only in
-// backfill.phaseHeaders and core.backfillArtifactPath before this registration.
 func TestRetroAndBuildPlanner_RegisteredWithRuntimeTruthNames(t *testing.T) {
 	cases := []struct{ phase, artifact, agent string }{
 		{"retro", "retrospective-report.md", "retrospective"},
@@ -100,12 +83,6 @@ func TestRetroAndBuildPlanner_RegisteredWithRuntimeTruthNames(t *testing.T) {
 	}
 }
 
-// TestArtifactName_ResolvesFromRegistryAndSkipsNoArtifact exercises the
-// accessor the cycle-1145 backfill routed five packages through (evalgate,
-// topngate, phases/scout, router, cyclesimulator). It must return the registry
-// value — not a re-typed literal — for real deliverable phases, and the empty
-// string for the two cases callers have to branch on: an unregistered phase and
-// a NoArtifact phase ("ship", whose result is a pushed commit, not a file).
 func TestArtifactName_ResolvesFromRegistryAndSkipsNoArtifact(t *testing.T) {
 	for _, phase := range []string{"scout", "build", "audit", "tdd", "triage", "intent"} {
 		c, ok := For(phase)
@@ -120,7 +97,6 @@ func TestArtifactName_ResolvesFromRegistryAndSkipsNoArtifact(t *testing.T) {
 		}
 	}
 
-	// Alias resolution rides on For, so the human-facing name must agree.
 	if ArtifactName("advisor") != ArtifactName("router") {
 		t.Errorf("ArtifactName(\"advisor\") = %q, want the canonical router value %q",
 			ArtifactName("advisor"), ArtifactName("router"))

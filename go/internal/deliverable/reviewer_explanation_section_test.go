@@ -24,11 +24,6 @@ func writeAuditReport(t *testing.T, body string) (workspace, projectRoot string)
 	return workspace, projectRoot
 }
 
-// TestReviewer_ExplanationSectionRequiredOnlyWhileContractActive — cycles 1601
-// and 1603 died on "audit-report.md is missing ## Explanation Documentation"
-// as a terminal FAIL. The section is a contract violation the correction
-// ladder re-dispatches — but only when the cycle's explanation contract is
-// active; a cycle without it is never asked for the section.
 func TestReviewer_ExplanationSectionRequiredOnlyWhileContractActive(t *testing.T) {
 	t.Parallel()
 	r := newTestReviewer(config.StageEnforce, filepath.Join(t.TempDir(), "breaker.json"), 3)
@@ -55,9 +50,6 @@ func TestReviewer_ExplanationSectionRequiredOnlyWhileContractActive(t *testing.T
 	}
 }
 
-// TestVerify_ExplanationSectionRidesOnRoots — the version travels on Roots, so
-// Verify (the CLI self-check, the salvage re-check) judges the section exactly
-// as the host gate does; the match is the exact visible level-two heading.
 func TestVerify_ExplanationSectionRidesOnRoots(t *testing.T) {
 	t.Parallel()
 	verify := func(body string, version int) Result {
@@ -85,13 +77,11 @@ func TestVerify_ExplanationSectionRidesOnRoots(t *testing.T) {
 			t.Errorf("%s must not count as the section (the audit gate would refuse it): %+v", name, res.Violations)
 		}
 	}
-	// A missing artifact carries only its own violation.
 	ws := t.TempDir()
 	res, err := VerifyWithStage("audit", phasecontract.Roots{Workspace: ws, ExplanationDocumentationVersion: 1}, phasecontract.BuiltinResolver{}, config.StageOff)
 	if err != nil || len(res.Violations) != 1 || !res.hasCode(CodeMissingArtifact) {
 		t.Fatalf("missing artifact: %+v %v", res.Violations, err)
 	}
-	// Other phases declare no explanation sections.
 	if c, _ := phasecontract.For("scout"); len(c.ExplanationSections) != 0 {
 		t.Fatal("scout must not owe an explanation section")
 	}

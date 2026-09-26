@@ -1,19 +1,5 @@
 package core
 
-// agent_doc_missing_test.go — an OPTIONAL phase whose persona does not exist
-// skips with a WARN; it must not kill the lane.
-//
-// soak-20260824a, cycle-1551: the advisor inserted defect-disposition-preflight
-// (optional, on the SELECT menu), whose phase.json declares no agent and whose
-// derived persona (agents/evolve-defect-disposition-preflight.md) exists
-// nowhere. The load failed, the cycle died rc=4, the ADR-0072 halt stopped the
-// whole batch — a full lane killed by an optional extra's missing file. Four
-// catalog phases share the defect (two were on the menu).
-//
-// The remedy reuses optionalInfraSkip's guard rails wholesale: mandatory
-// phases, ship-floor phases, and non-optional phases still fail LOUD — only a
-// genuinely optional phase degrades, and the skip is recorded, never silent.
-
 import (
 	"context"
 	"errors"
@@ -37,7 +23,6 @@ func TestOptionalPhaseSkip_AdmitsMissingAgentDoc(t *testing.T) {
 	}
 }
 
-// The guard rails hold: the same error on a NON-optional phase stays fatal.
 func TestOptionalPhaseSkip_MissingDocOnMandatoryPhaseStaysFatal(t *testing.T) {
 	spec := specWith("build", "build", "")
 	spec.Optional = false
@@ -49,9 +34,6 @@ func TestOptionalPhaseSkip_MissingDocOnMandatoryPhaseStaysFatal(t *testing.T) {
 	}
 }
 
-// The ship floor holds even for a catalog-Optional phase: a floor member
-// mis-marked Optional must not vanish on a missing persona — the skip may
-// never weaken ship => build ∧ audit ∧ tdd.
 func TestOptionalPhaseSkip_FloorPhaseNeverSkipsOnMissingDoc(t *testing.T) {
 	o := amplNewSkipOrchestrator(t, nil, []string{"build", "audit", "tdd"}, optionalSpecFor("audit"))
 	if o.optionalInfraSkip(Phase("audit"), ErrAgentDocMissing) {
@@ -59,8 +41,6 @@ func TestOptionalPhaseSkip_FloorPhaseNeverSkipsOnMissingDoc(t *testing.T) {
 	}
 }
 
-// Configured-mandatory outranks catalog-Optional for the new class too — the
-// generic cfg.Mandatory guard, not the floor loop, is what protects ship.
 func TestOptionalPhaseSkip_ConfiguredMandatoryNeverSkipsOnMissingDoc(t *testing.T) {
 	o := amplNewSkipOrchestrator(t, []string{"memo"}, nil, optionalSpecFor("memo"))
 	if o.optionalInfraSkip(Phase("memo"), ErrAgentDocMissing) {
@@ -68,7 +48,6 @@ func TestOptionalPhaseSkip_ConfiguredMandatoryNeverSkipsOnMissingDoc(t *testing.
 	}
 }
 
-// Any other load error (unreadable file, permission) keeps today's behavior.
 func TestOptionalPhaseSkip_OtherLoadErrorsUnchanged(t *testing.T) {
 	cat := catalogOf(t, specWith("defect-disposition-preflight", "evaluate", ""))
 	o := &Orchestrator{catalog: cat}
@@ -77,11 +56,6 @@ func TestOptionalPhaseSkip_OtherLoadErrorsUnchanged(t *testing.T) {
 	}
 }
 
-// End-to-end (cycle-1551 replay): an advisor-scheduled OPTIONAL phase whose
-// runner dies with the missing-persona sentinel must not abort the cycle —
-// audit+ship still run — and the ledger files the skip under its OWN kind
-// (optional_missing_persona_skip), never the infra key: zero retries and no
-// infra event happened, and forensics must not merge the classes.
 func TestOptionalPhaseMissingPersonaSkipsShipsAndLedgersOwnKind(t *testing.T) {
 	t.Parallel()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
@@ -123,12 +97,6 @@ func TestOptionalPhaseMissingPersonaSkipsShipsAndLedgersOwnKind(t *testing.T) {
 	}
 }
 
-// 2026-09-09 token-waste root cause #2: cycles 1619/1620 spent 344 s and 311 s
-// in a retrospective AGENT for a missing optional persona — a deterministically
-// known configuration absence. The skip is still learned (FailedRecord,
-// carryover todo, deterministic lesson artifact), but no LLM is dispatched for
-// it: there is nothing a retrospective could discover that the sentinel does
-// not already say.
 func TestOptionalPhaseMissingPersona_LearnsDeterministicallyWithoutRetroAgent(t *testing.T) {
 	root := t.TempDir()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
