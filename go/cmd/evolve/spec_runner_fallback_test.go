@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/specrunner"
 	"os"
 	"path/filepath"
 	"strings"
@@ -49,7 +50,7 @@ func TestRegisterBuiltinSpecRunners(t *testing.T) {
 
 	runners := map[core.Phase]core.PhaseRunner{} // empty: nothing hand-wired
 	var warn strings.Builder
-	registerBuiltinSpecRunners(runners, cat, prm, nil, &warn)
+	registerBuiltinSpecRunners(runners, cat, specrunner.Config{Prompts: prm}, &warn)
 
 	if _, ok := runners[core.Phase("tester")]; !ok {
 		t.Error("tester (Evaluate, kind:llm, persona present) must get a fallback runner")
@@ -76,7 +77,7 @@ func TestRegisterBuiltinSpecRunners_DoesNotOverrideExisting(t *testing.T) {
 	prm := loaderWithPersonas(t, "evolve-tester")
 	sentinel := stubRunner{}
 	runners := map[core.Phase]core.PhaseRunner{core.Phase("tester"): sentinel}
-	registerBuiltinSpecRunners(runners, cat, prm, nil, &strings.Builder{})
+	registerBuiltinSpecRunners(runners, cat, specrunner.Config{Prompts: prm}, &strings.Builder{})
 	if runners[core.Phase("tester")] != core.PhaseRunner(sentinel) {
 		t.Error("fallback must NOT override a phase that already has a hand-wired runner")
 	}

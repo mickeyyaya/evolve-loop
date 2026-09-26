@@ -148,6 +148,9 @@ type Contract struct {
 	Effects        []string
 }
 
+// EffectInboxClaim names the effect of claiming a cycle's committed inbox items.
+const EffectInboxClaim = "inbox-claim"
+
 // TopLevelJSONShape returns the explicit shape, or object for legacy keyed
 // contracts because top-level keys can only be enforced on an object.
 func (c Contract) TopLevelJSONShape() JSONShape {

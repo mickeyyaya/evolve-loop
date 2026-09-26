@@ -160,7 +160,7 @@ func TestRenderContractBlock_FailureContextInstruction(t *testing.T) {
 // registry change would have moved the gate without moving the prompt.
 func TestRenderContract_StatesTheAgentOwedFilesAndEffectsTheGateVerifies(t *testing.T) {
 	c := Contract{Phase: "triage", ArtifactName: "triage-report.md", Kind: KindMarkdown,
-		AgentOwedFiles: []string{"triage-decision.json"}, Effects: []string{"inbox-claim"}}
+		AgentOwedFiles: []string{"triage-decision.json"}, Effects: []string{EffectInboxClaim}}
 	block := RenderContractBlock(c)
 	if !strings.Contains(block, `"triage-decision.json"`) || !strings.Contains(block, "<owed-files>") {
 		t.Fatalf("the block names each agent-owed file and where it goes:\n%s", block)

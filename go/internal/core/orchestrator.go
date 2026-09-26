@@ -354,6 +354,8 @@ type Orchestrator struct {
 	// stays dark ⇒ recovery behaves exactly as it does today (no regression).
 	scopedMergeReviewer ScopedMergeReviewer
 
+	hostEffects HostEffects
+
 	// worktree provisions/cleans the per-cycle source worktree (ADR-0027).
 	// Default gitWorktree (real git); injected in tests via
 	// WithWorktreeProvisioner so RunCycle runs without touching real git.

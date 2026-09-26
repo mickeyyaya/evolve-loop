@@ -126,6 +126,63 @@
    each owed file at the exact path the gate reads (`phasecontract.OwedPath`, the one join), so the
    prompt and the gate cannot drift on names or locations (they used to live only in persona prose).
 
+10. **Amendment (F36, 2026-09-26): the host performs a declared effect it can, and the gate
+    verifies the host's action.** In five cycles (1647, 1671, 1689, 1693 and 1694) the triage agent
+    committed its `top_n` and never ran the claim. Each cost one correction re-dispatch on
+    `missing_effect` `inbox-claim`. A claim is a deterministic file move (Core Rule 5), so the
+    host now performs it.
+    - **One registry, two halves.** `deliverable.effects` maps each effect name to
+      `{check, perform}`. A nil `perform` leaves the effect to the agent.
+    - **One input.** `deliverable.HostEffects.Perform` receives the `core.ReviewInput` the gate
+      receives. It resolves the phase through the same `CatalogResolver` and derives roots, cycle
+      and inbox directory through the same `rootsFor`. So the host and the gate cannot disagree
+      about which effects apply, what is owed, or where. The first cut resolved these separately,
+      and review found a legacy resume that would claim into `cycle-0` while the gate checked
+      `cycle-N`.
+    - **Before every judge.** The same `HostEffects` instance runs at two points, and the claim
+      is idempotent, so running it twice is harmless:
+      - The runner's verdict engine judges first. `runner.Run` performs the effects from its
+        dispatch projection just before `Judge`. The engine's first probe and every settle probe
+        therefore see the claim, and the phase is not downgraded to FAIL as
+        `DELIVERABLE_UNVERIFIED`. Review found this judge after the first redesign, which had
+        performed only at the gate.
+      - Then the gate. `core.Orchestrator.performEffectsAndReview` performs the effects, then
+        calls the reviewer, and it replaces every reviewer call. On the fresh root those are the
+        initial, salvage and correction reviews (`reviewDeliverable`). On the resume root they
+        are the initial and correction reviews, and there the gate judges a checkpointed
+        response without re-running the runner.
+      - Every phase `Config` forwards a late-bound `HostEffects` accessor into `runner.Options`,
+        the same way it forwards `ContractVerifier`. That includes the builtin spec-fallback
+        runners (`registerBuiltinSpecRunners`: plan-review, doc-sync, spec-verify,
+        architecture-design, tester and the rest). Before this change they had neither accessor,
+        so they also judged with a different verifier than the gate: the cycle-1685 class.
+      - Each point reports its own failure: the runner as `RUNNER_HOST_EFFECT_FAILED`, the gate
+        as `ORCHESTRATOR_HOST_EFFECT_FAILED`. The runner performs under
+        `context.WithoutCancel`, because a teardown is often what cancelled the context.
+      - A claim needs a cycle and an absolute project root. With either missing it fails
+        loudly and moves nothing.
+    - **The claim.** `inboxmover.ClaimPending` claims the committed ids
+      (`committedset.Committed`) still pending at the root. It uses the same ADR-0074 floor as
+      `evolve inbox-mover claim` (`guards.IsProtectedScope`), on the root's chained ledger and
+      Center. Absent, already-held and console-routed ids are left to the gate; every other
+      failure is returned. A returned failure becomes `ORCHESTRATOR_HOST_EFFECT_FAILED` (WARN),
+      and the review still runs.
+    - **What the gate checks is unchanged.** Only its correction text changed: it now says the
+      host's claim did not land and the agent should defer or drop the item.
+    - Persona Step 0a.4 is advisory. `Orchestrator.HostEffectsWired()` is the composition-root
+      proof, and `--simulate` never binds a performer.
+    - **Known seams, not changed here.**
+      - The host claims `committedset.Committed` (lane pin first), but closeout promotes
+        `inboxmover.CommittedIDs` (top_n and skip_shipped). A pinned id outside `top_n` is claimed,
+        then drained back on PASS.
+      - The claim happens before judgment. A commitment the gate rejects, or one a correction
+        later shrinks, stays in `processing/cycle-N/` until the closeout drain, and sibling lanes
+        cannot draw it meanwhile. This matches the era when the agent claimed.
+      - Three readers classify where an item sits: `ClaimPending`, `ClaimLaneScope` and
+        `checkInboxClaim`. Their rules differ on purpose. The host's claim leaves any held item to
+        the gate. The FAIL closeout claims whatever it can so that failure counts are bumped. The
+        gate judges.
+
 ## Why the existing gate, not a new stage
 
 The first design was a deterministic reviewer *decorated* in front of the semantic one. The
@@ -190,3 +247,20 @@ claiming it is re-dispatched with the effect and item named and ends `FAILED_EXP
 triage that claims on the correction round ships; an empty commitment owes no claim and still
 ends triage no-work. `internal/phases/runner` proves both verify sites carry the cycle;
 `internal/cli/phasecmd` proves the self-check follows the persisted cycle state.
+
+Amendment 10 (F36):
+- `internal/phases/runner`: `TestRun_HostEffectsPrecedeTheFirstVerification`. A verifier that refuses until the effects have run classifies PASS on its first probe, with no settle retry, and the effects receive the dispatch's projection once.
+- `internal/core`:
+  - `performEffectsAndReview` performs host effects before every review, with the identical input.
+  - A failure is a coded WARN, and the review still runs.
+  - In both `RunCycle` and `RunCycleFromPhase`, host effects precede every review, including a correction re-review.
+  - The resume case starts from a checkpoint without a cycle id and claims under the resume point's cycle.
+- `internal/deliverable`:
+  - `HostEffects` claims exactly what the check owes: top_n minus deferred, a lane pin, nothing recorded, an empty commitment, and a phase without the effect.
+  - The declaration is catalog config, a missing cycle fails loudly, and every registry entry has a check.
+  - In `TestDeclaredEffects_HostClaim`, the never-claiming agent is accepted on its first review, and a console-routed commitment stays refused and surfaces as the gate's correction.
+- `internal/inboxmover`: `ClaimPending` claims only pending ids, raises no false `INBOX_CLAIM_NOT_FOUND`, and returns a failed move.
+- `cmd/evolve`: over the repo's real personas and registry, the production orchestrator and every phase runner report `HostEffectsWired()`, and every runner reports `ContractVerifierWired()`. That includes the builtin spec-fallback runners, which a bare temp root never registered, so the old pins could not see them. `--simulate` binds nothing.
+- `internal/phases/runner`: `TestRun_AFailedHostEffectIsACodedWarning`. `internal/deliverable`: `TestHostEffects_WithoutAProjectRootIsAnError`.
+
+TDD: the runner fix and the redesign were written test-first, and each test was seen failing before its code. The first cut's `ClaimPending` and end-to-end tests were written after their code, then proven by mutation. Thirteen reverted mutations each failed an assertion: five in core, three in deliverable, two in inboxmover, and three at the runner and wiring level (the pre-judge call, triage's root wiring, the swarm forwarder).

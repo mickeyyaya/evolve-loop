@@ -18,5 +18,6 @@
     "go/internal/inboxmover/",
     "agents/evolve-triage.md"
   ],
-  "notes": "Filed from the console 2026-09-26 during wave 7 (research F36 candidate). Evidence: runs/cycle-{1647,1671,1689}/signals.ndjson (grep missing_effect). Console-owned by kind (pipeline-*)."
+  "notes": "Filed from the console 2026-09-26 during wave 7 (research F36 candidate). Evidence: runs/cycle-{1647,1671,1689}/signals.ndjson (grep missing_effect). Console-owned by kind (pipeline-*).",
+  "consumed_by": "F36 (fix/host-performed-claim): before every review, core.Orchestrator.review runs deliverable.HostEffects on the gate's own ReviewInput. That performs the declared inbox-claim (inboxmover.ClaimPending, ADR-0074 floor) from the same {check, perform} registry the gate verifies with. Persona Step 0a.4 is advisory. All three acceptance criteria are pinned: zero-correction acceptance and the console-routed refusal by deliverable TestDeclaredEffects_HostClaim, and the 1689 shape by that test plus core TestRunCycle_EveryReviewPerformsHostEffectsFirst. See ADR-0100 amendment 10 and docs/incidents/2026-09-26-triage-claim-left-to-the-agent.md."
 }

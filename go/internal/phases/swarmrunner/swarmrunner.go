@@ -328,3 +328,11 @@ func (d *Decorator) ContractVerifierWired() bool {
 	}
 	return false
 }
+
+// HostEffectsWired forwards the wrapped runner's host-effects wiring proof.
+func (d *Decorator) HostEffectsWired() bool {
+	if w, ok := d.inner.(interface{ HostEffectsWired() bool }); ok {
+		return w.HostEffectsWired()
+	}
+	return false
+}

@@ -361,6 +361,7 @@ type Config struct {
 	// verdict engine (runner.Options.ContractVerifier): one verifier for gate
 	// and engine (research F22). nil = the catalog-aware default.
 	ContractVerifier func() runner.ContractVerifier
+	HostEffects      func() core.HostEffects
 	NowFn            func() time.Time
 	// GenerateVerdict, when set, produces <workspace>/acs-verdict.json from
 	// the cycle's ACS predicates on every classification. Candidates never
@@ -439,6 +440,11 @@ func WithContractVerifier(fn func() runner.ContractVerifier) Option {
 	return func(c *Config) { c.ContractVerifier = fn }
 }
 
+// WithHostEffects hands the audit runner the host's effect performer.
+func WithHostEffects(fn func() core.HostEffects) Option {
+	return func(c *Config) { c.HostEffects = fn }
+}
+
 func WithSignals(c func() *signalcenter.Center) Option {
 	return func(cfg *Config) { cfg.Signals = c }
 }
@@ -461,6 +467,7 @@ func New(c Config) *Phase {
 			Hooks:            newHooks(c),
 			Bridge:           c.Bridge,
 			ContractVerifier: c.ContractVerifier,
+			HostEffects:      c.HostEffects,
 			Prompts:          c.Prompts,
 			NowFn:            c.NowFn,
 			CompactPrompts:   c.CompactPrompts,

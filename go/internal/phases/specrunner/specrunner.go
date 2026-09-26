@@ -238,6 +238,7 @@ type Config struct {
 	// verdict engine (runner.Options.ContractVerifier): one verifier for gate
 	// and engine (research F22). nil = the catalog-aware default.
 	ContractVerifier func() runner.ContractVerifier
+	HostEffects      func() core.HostEffects
 	NowFn            func() time.Time
 	// PromptBody, when non-empty, is forwarded as the inline prompt body;
 	// empty (the default) loads agents/<AgentName>.md from disk — see the
@@ -255,6 +256,7 @@ func New(spec phasespec.PhaseSpec, c Config) *Phase {
 			Hooks:            hooks{spec: spec, promptBody: c.PromptBody},
 			Bridge:           c.Bridge,
 			ContractVerifier: c.ContractVerifier,
+			HostEffects:      c.HostEffects,
 			Prompts:          c.Prompts,
 			NowFn:            c.NowFn,
 		}),

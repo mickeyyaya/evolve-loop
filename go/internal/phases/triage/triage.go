@@ -387,6 +387,7 @@ type Config struct {
 	// verdict engine (runner.Options.ContractVerifier): one verifier for gate
 	// and engine (research F22). nil = the catalog-aware default.
 	ContractVerifier func() runner.ContractVerifier
+	HostEffects      func() core.HostEffects
 	NowFn            func() time.Time
 	// PhaseIO threads the EVOLVE_PHASE_IO stage into the reconcile rung (ADR-0050
 	// §3.10 Slice 1). Zero value (StageOff) = byte-identical.
@@ -409,6 +410,7 @@ func New(c Config) *Phase {
 			Hooks:            hooks{},
 			Bridge:           c.Bridge,
 			ContractVerifier: c.ContractVerifier,
+			HostEffects:      c.HostEffects,
 			Prompts:          c.Prompts,
 			NowFn:            c.NowFn,
 			PhaseIO:          c.PhaseIO,

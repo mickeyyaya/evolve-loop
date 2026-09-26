@@ -34,6 +34,7 @@ type Config struct {
 	// ContractVerifier is the deliverables gate's verifier accessor for the
 	// verdict engine (one verifier for gate and engine, research F22).
 	ContractVerifier func() runner.ContractVerifier
+	HostEffects      func() core.HostEffects
 }
 
 // Phase implements runner.Hooks and runner.Skipper for the build-planner
@@ -42,11 +43,12 @@ type Phase struct {
 	bridge           core.Bridge
 	prompts          *prompts.Loader
 	contractVerifier func() runner.ContractVerifier
+	hostEffects      func() core.HostEffects
 }
 
 // New returns a Phase ready to be wired into the orchestrator.
 func New(cfg Config) *Phase {
-	return &Phase{bridge: cfg.Bridge, prompts: cfg.Prompts, contractVerifier: cfg.ContractVerifier}
+	return &Phase{bridge: cfg.Bridge, prompts: cfg.Prompts, contractVerifier: cfg.ContractVerifier, hostEffects: cfg.HostEffects}
 }
 
 // BaseRunner wraps the phase in a runner.BaseRunner so it satisfies
@@ -57,7 +59,7 @@ func (p *Phase) BaseRunner() *runner.BaseRunner {
 	// its artifact never appears (ExitArtifactTimeout — e.g. cycle-120 quota
 	// exhaustion), it degrades to WARN and the cycle advances to build instead
 	// of aborting. See Workstream D.
-	return runner.New(runner.Options{Hooks: p, Bridge: p.bridge, Prompts: p.prompts, Optional: true, ContractVerifier: p.contractVerifier})
+	return runner.New(runner.Options{Hooks: p, Bridge: p.bridge, Prompts: p.prompts, Optional: true, ContractVerifier: p.contractVerifier, HostEffects: p.hostEffects})
 }
 
 // ShouldSkip implements runner.Skipper. Delegates to the central PhasePolicy

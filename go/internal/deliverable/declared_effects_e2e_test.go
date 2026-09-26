@@ -127,7 +127,7 @@ func effectCatalog(t *testing.T) phasespec.Catalog {
 	return cat
 }
 
-func effectOrchestrator(t *testing.T, root string, runners map[core.Phase]core.PhaseRunner) *core.Orchestrator {
+func effectOrchestrator(t *testing.T, root string, runners map[core.Phase]core.PhaseRunner, opts ...core.Option) *core.Orchestrator {
 	t.Helper()
 	evolveDir := filepath.Join(root, ".evolve")
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
@@ -137,7 +137,55 @@ func effectOrchestrator(t *testing.T, root string, runners map[core.Phase]core.P
 	reviewer := NewReviewerWithCatalog(config.StageEnforce, cat).(*Reviewer)
 	reviewer.threshold = 99 // the breaker is not what this proof is about
 	reviewer.breakerPath = filepath.Join(t.TempDir(), "breaker.json")
-	return core.NewOrchestrator(storage.New(evolveDir), ledger.New(evolveDir), runners, core.WithCatalog(cat), core.WithReviewer(triageOnly{reviewer}))
+	return core.NewOrchestrator(storage.New(evolveDir), ledger.New(evolveDir), runners, append([]core.Option{core.WithCatalog(cat), core.WithReviewer(triageOnly{reviewer})}, opts...)...)
+}
+
+func hostEffects(t *testing.T) core.Option {
+	claim := func(inboxDir string, cycle int, ids []string) error {
+		return inboxmover.ClaimPending(inboxmover.Options{InboxDir: inboxDir, Stderr: io.Discard}, cycle, ids)
+	}
+	return core.WithHostEffects(NewHostEffects(effectCatalog(t), claim))
+}
+
+func TestDeclaredEffects_HostClaim(t *testing.T) {
+	t.Run("an unclaimed commitment is claimed by the host: zero corrections", func(t *testing.T) {
+		root := gitRepoWithOneCommit(t)
+		seedPendingItem(t, root)
+		runners, triage := effectRunners(t, 0, true) // the agent never claims
+		o := effectOrchestrator(t, root, runners, hostEffects(t))
+
+		if _, err := o.RunCycle(context.Background(), core.CycleRequest{ProjectRoot: root, GoalHash: "g", DisableWorkspaceGuard: true}); err != nil {
+			t.Fatalf("the host's claim must satisfy the declared effect: %v", err)
+		}
+		if len(triage.requests) != 1 {
+			t.Fatalf("triage ran %d time(s), want exactly 1 — the host claimed, no correction owed: %q", len(triage.requests), directives(triage.requests))
+		}
+		if ship := runners[core.PhaseShip].(*stubPhase); len(ship.requests) != 1 {
+			t.Errorf("the cycle must reach ship exactly once, got %d", len(ship.requests))
+		}
+	})
+	t.Run("a console-routed commitment stays refused and the gate judges it", func(t *testing.T) {
+		root := gitRepoWithOneCommit(t)
+		inbox := filepath.Join(root, ".evolve", "inbox")
+		if err := os.MkdirAll(inbox, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(inbox, pendingItemFile), []byte(`{"id":"x","title":"fixture","weight":0.9,"route":"console-only"}`), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		runners, triage := effectRunners(t, 0, true)
+		o := effectOrchestrator(t, root, runners, hostEffects(t))
+
+		if _, err := o.RunCycle(context.Background(), core.CycleRequest{ProjectRoot: root, GoalHash: "g", DisableWorkspaceGuard: true}); err == nil {
+			t.Fatal("a console-routed commitment must not pass the declared effect")
+		}
+		if _, err := os.Stat(filepath.Join(inbox, pendingItemFile)); err != nil {
+			t.Fatalf("the refused item must stay at the inbox root: %v", err)
+		}
+		if correctionNaming(triage.requests[1:], "inbox-claim") == 0 {
+			t.Fatalf("the refusal must surface as the gate's inbox-claim correction: %q", directives(triage.requests))
+		}
+	})
 }
 
 func TestDeclaredEffects_CommittedItemNotClaimed_IsCorrectedThenFails(t *testing.T) {
