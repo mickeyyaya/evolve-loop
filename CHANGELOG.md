@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## Added — triage's decision derived from its report (ADR-0106 H1, 2026-09-26)
+
+`triage-decision.json` states the commitment the report already carries in prose. Cycles 1672, 1687, 1697 and 1707 re-ran the whole phase because the agent left the file absent.
+
+- `internal/triagedecision` is the one reader of the report. `Derive(report, cycle, lanePin)` is the strict mode the host writes before any judge: `## top_n` stated, every present bucket readable (slug ids, cards or a `(none …)` line, nothing else), pinned lane items committed; an absent `deferred`, `dropped` or `superseded` section is empty, which commits more, never less. `Project(report, cycle)` is the lenient companion ship already wrote, moved here with its parser (`triagecap.ProjectDecisionJSON` delegates), so the report has one grammar: `- {id}: {action} — key=value` tails, `files=` footprints, `reason=`. Both carry the one stamp `projected_by_orchestrator`. Nothing the report does not state is written. The package is a protected surface: a lane must not soften what it commits itself to.
+
 ## Fixed — an exit-85 escalation names its pattern (ADR-0106 P4, 2026-09-26)
 
 Exit 85 covers the auto-responder's escalations and the corroborated quota wall, and the numeric exit table is frozen, so the attempt ledger read every one as `unknown_prompt`. Over cycles 1673–1707 eight of those were `rate_limit` walls and four were `model_unsupported`: the codex deep pin the account rejects (incident 2026-09-14).

@@ -97,6 +97,7 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/internal/loopchain/", Rationale: "the batch-chaining driver and the boundary binary-refresh engine (ADR-0103 unit 13)"},
 	{Fragment: "/go/cmd/evolve/cmd_loop_wave.go", Rationale: "the unit-13 wave seam: the engine's one wired construction, the coordinator accessor and the facades the pool, the budget wrapper and the by-name tests keep (ADR-0103)"},
 	{Fragment: "/go/cmd/evolve/cmd_loop_chain.go", Rationale: "the unit-13 chain seam: the eleven package-var projections, the two process adapters, the chain root's Center and the facades the ACS-named tests keep (ADR-0103)"},
+	{Fragment: "/go/internal/triagedecision/", Rationale: "ADR-0106 H1: the one reader of the triage report the host derives the decision from before any judge — a lane that could edit it could commit itself to less than its pin"},
 	{Fragment: "/go/internal/core/ship_recovery.go", Rationale: "rebase recovery must invalidate stale explanation and route through Build"},
 	{Fragment: "/go/internal/core/resume.go", Rationale: "resume entry point (RunCycleFromPhase) and resumed-deliverable explanation review parity (reviewResumedDeliverable)"},
 	{Fragment: "/go/internal/core/resume_execution.go", Rationale: "resume sealing, projection, and post-Build refresh call sites (resumeExecution.run); carved out of resume.go by #549"},
