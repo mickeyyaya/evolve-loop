@@ -26,7 +26,7 @@ func TestChainType_SatisfiesGuardAndDenies(t *testing.T) {
 }
 
 func TestDocDeleteType_SatisfiesGuardAndDenies(t *testing.T) {
-	var g *DocDelete = NewDocDelete(false)
+	var g *DocDelete = NewDocDelete(false, nil)
 	var _ core.Guard = g
 	if g.Name() != "docdelete" {
 		t.Fatalf("DocDelete.Name() = %q, want docdelete", g.Name())

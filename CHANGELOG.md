@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — a Build may retract a draft it never committed (cycle 1705, 2026-09-26)
+
+Cycle 1705 passed audit and still failed. `guard:docdelete` denied the Builder's removal of its own never-committed explanation draft, and its deny message prescribed a plain `mv` into the archive home. That left the draft untracked, and the host predicate gate refuses untracked inputs. So it forced FAIL over the auditor's PASS.
+
+- `docdelete` lets a Build `rm`/`git rm` exactly one path: the active cycle's own explanation document, from the repository root, when `HEAD` never held it (compared case-folded) and no parent directory is a symlink. Any other operand, spelling, expansion or pathspec is denied as before.
+- The deny also closes older holes: the doc roots match case-folded and as bare words (`rm -rf docs`), and an `rm` or `mv` after `cd`/`pushd` into a doc root, under `git -C docs`, or from a shell already inside one is judged.
+- The deny message advises `git mv`, so an archived copy stays staged.
+- Record: `docs/incidents/2026-09-26-the-doc-guard-sent-a-draft-where-the-predicate-gate-refuses-it.md`.
+
 ## Fixed — plane bookkeeping no longer sends a passed audit back to re-audit (cycle 1701, 2026-09-26)
 
 Cycle 1701 passed audit and was sent back at ship with `AUDIT_BINDING_TREE_MISMATCH`: a git-tracked inbox item in the plane had changed between its audit and its ship. Ship's binding hashed the plane's `git diff HEAD`, although a fleet lane ships from its own worktree. The plane's inbox queue, which operators and sibling lanes move all the time, was never part of what the lane commits.
