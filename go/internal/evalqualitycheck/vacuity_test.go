@@ -1,16 +1,5 @@
 package evalqualitycheck
 
-// vacuity_test.go — pins the fix for the vacuous quality-gate class found in
-// the 2026-08-09 postmortem sweep (docs/incidents/2026-08-09-zero-ship-batch.md,
-// ADR-0084 invariant 2): the scout template mandates `- [code] <cmd>` bullet
-// graders (agents/evolve-scout-reference.md, eval-format-template anchor) but
-// scanBashCommands read only ```bash fences — so 281 of 625 live evals
-// (bullet-format) produced ZERO parsed commands and the anti-gaming gate
-// returned LevelPass vacuously. Three pins: (1) the bullet format parses,
-// (2) the template's own literal example round-trips through the production
-// scanner (single-source: template drift breaks this test), (3) zero parsed
-// commands is a WARN, never a silent PASS.
-
 import (
 	"os"
 	"path/filepath"
@@ -63,10 +52,7 @@ func TestCheck_TemplateExampleRoundTripsThroughScanner(t *testing.T) {
 	if j := strings.Index(section[len(anchor):], "<!-- ANCHOR:"); j >= 0 {
 		section = section[:len(anchor)+j]
 	}
-	// The template shows the eval INSIDE a ````markdown illustration fence;
-	// an authored eval file carries the bullets at top level. Unwrap the
-	// fence to scan what an authored file would actually contain (fenced
-	// bullets are deliberately NOT scanned — see the decoy test below).
+	// The template wraps its example in a ````markdown fence; an authored eval carries the bullets at top level.
 	fence := "````markdown"
 	fi := strings.Index(section, fence)
 	if fi < 0 {
@@ -93,9 +79,6 @@ func TestCheck_ZeroCommandsIsWarnNeverSilentPass(t *testing.T) {
 }
 
 func TestCheck_FencedDecoyBulletIsNotACommand(t *testing.T) {
-	// The adversarial-review BLOCK scenario: a `[code]`-styled bullet inside
-	// a non-bash fence is illustration (or a planted decoy to fake rigor)
-	// and must not be extracted as a real command.
 	res := checkContent(t, "# Eval: decoy\n```text\n- `[code]` `rm -rf /tmp/should-not-run`\n```\n")
 	for _, c := range res.Commands {
 		if strings.Contains(c.Line, "should-not-run") {
@@ -108,9 +91,6 @@ func TestCheck_FencedDecoyBulletIsNotACommand(t *testing.T) {
 }
 
 func TestCheck_ScoreCapGradedEvalPassesWithNote(t *testing.T) {
-	// ~82% of the live corpus is score_cap/evidence-graded (consumed by the
-	// ACS suite, not this scanner) — zero bash commands there is designed,
-	// and a blanket WARN would train operators to ignore real WARNs.
 	res := checkContent(t, "# Eval: acs-form\nscore_cap: 0.8\nevidence: \"cd go && go test ./internal/core/\"\n")
 	if res.Overall != LevelPass {
 		t.Errorf("Overall = %v, want LevelPass — score_cap grading is the ACS suite's jurisdiction", res.Overall)
