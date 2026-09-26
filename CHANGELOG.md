@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## Added — the recovery agent's profile and persona (ADR-0106 F3, unwired, 2026-09-26)
+
+- `.evolve/profiles/deliverable-recovery.json` runs sandboxed over a read-only repository with the run directory as its only write grant, so a helper launched without a worktree is wrapped rather than unconfined. It declares no network, but the wrapper forces the network on for every dispatch today (`sandboxPrefixForLaunch`, filed as `sandbox-wrapper-forces-network-on`) and the tmux drivers enforce no tool list (filed as `tmux-drivers-ignore-profile-tool-lists`), so the filesystem grant is the boundary that holds; the test pins the forced-on launch path so it flips when the wrapper honours the declaration; `agents/evolve-deliverable-recovery.md` states the agent's identity and sole-writer fact up front (cycle 1707's TDD agent refused its own task for an hour, taking itself for an intruder) and forbids inventing, editing code, or deciding a verdict. Tests pin that no grant reaches the repository beyond the run dir or any worktree.
+
 ## Added — `internal/recoveryguard`, the kernel fence for a recovery dispatch (ADR-0106 F2, unwired, 2026-09-26)
 
 - `Begin(ctx, Scope)` records every entry in the run's workspace and fences the change's worktree (`treefence`); `End` restores whatever the agent changed, planted or removed outside `Scope.Allowed` and reports it: a changed or removed file, a planted one, a file swapped for a link or a directory, an allowed path swapped for a link. Telemetry the dispatch appends is unfenced by exact path or below a directory (`Scope.Unfenced`); artifacts it creates with generated names are tolerated by stem, direct children only, and reported in `Outcome.Unfenced` (`Scope.UnfencedStems`). A non-empty `Outcome.Restored` is an integrity violation for the caller to abort on. Fails closed on a worktree that cannot be fenced, a workspace that cannot be read or an allowed path that is not a plain file. Graduated to `.apicover-enforce` and listed in the protected-surface manifest.
