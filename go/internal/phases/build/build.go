@@ -25,11 +25,14 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 )
 
+// ProfileName is the agent profile the build phase runs under; its sandbox bounds what a lane can write.
+const ProfileName = "builder"
+
 // hooks implements runner.Hooks for the build phase.
 type hooks struct{}
 
 func (hooks) PhaseName() string       { return string(core.PhaseBuild) }
-func (hooks) AgentPromptName() string { return "evolve-builder" }
+func (hooks) AgentPromptName() string { return "evolve-" + ProfileName }
 func (hooks) ArtifactFilename(_ core.PhaseRequest) string {
 	return phasecontract.ArtifactFilename(string(core.PhaseBuild))
 }
