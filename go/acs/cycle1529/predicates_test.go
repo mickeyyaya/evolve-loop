@@ -148,17 +148,25 @@ func TestC1529_003_CancelParityTestsRemainGreen(t *testing.T) {
 	}
 }
 
+// Cycle 1529's shipped closure: its ship commit on main and that commit's
+// parent. Their diff is the closure this package vouches for.
+const (
+	closureBase = "19b427c4214e1ad6f84239cd1781f592b0faec22"
+	closureShip = "57e227c1e36f33562c922dcdf2546b160739e45d"
+)
+
 // TestC1529_004_ClosureStaysDocOnly is the negative/scope axis. The task is a
 // closure, explicitly NOT the hardening the stale item scoped: touching
-// go/internal/bridge/*.go this cycle means the lane re-litigated an
-// already-fixed defect without a RED test for it. Compares the worktree
-// (committed lane work AND uncommitted edits) against main.
+// go/internal/bridge this cycle means the lane re-litigated an already-fixed
+// defect without a RED test for it. It diffs cycle 1529's own base..ship range,
+// never the live `main` ref, so later bridge work on either side of main
+// cannot fail it.
 func TestC1529_004_ClosureStaysDocOnly(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	stdout, stderr, code, err := acsassert.SubprocessOutput(
-		"git", "-C", root, "diff", "--name-only", "main", "--", "go/internal/bridge")
+		"git", "-C", root, "diff", "--name-only", closureBase, closureShip, "--", "go/internal/bridge")
 	if err != nil || code != 0 {
-		t.Fatalf("RED: git diff vs main failed (code=%d err=%v): %s", code, err, stderr)
+		t.Fatalf("RED: git diff %s..%s failed (code=%d err=%v): %s", closureBase[:8], closureShip[:8], code, err, stderr)
 	}
 	if changed := strings.TrimSpace(stdout); changed != "" {
 		t.Errorf("RED: closure task modified bridge production code (must stay doc-only):\n%s", changed)
