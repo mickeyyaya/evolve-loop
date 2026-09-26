@@ -30,7 +30,6 @@ func TestReviewerWithCatalog_BlocksMalformedUserPhase(t *testing.T) {
 	if err := os.MkdirAll(ws, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	// A user-phase report MISSING the required section.
 	if err := os.WriteFile(filepath.Join(ws, "foo-report.md"), []byte("# Foo\nno heading\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -64,10 +63,6 @@ func TestReviewerWithCatalog_ApprovesWellFormedUserPhase(t *testing.T) {
 	}
 }
 
-// Phase 3.8 (ADR-0050): the catalog-aware ...Stage constructors actually thread
-// the EVOLVE_PHASE_IO dial onto the gate/verifier. A build report that
-// self-reports FAIL without a structured failure block is blocked at enforce and
-// approved (dormant) at off — proving the phaseIO param is wired, not dropped.
 func TestNewReviewerWithCatalogStage_ThreadsPhaseIO(t *testing.T) {
 	root := t.TempDir()
 	ws := filepath.Join(root, "ws")
@@ -139,17 +134,9 @@ func TestNewReviewer_BackCompatBuiltins(t *testing.T) {
 	}
 }
 
-// TestReviewerWithCatalog_FailsOpenWhenNoContractResolves — test-plan P0 #5:
-// a native/no-output phase that resolves to NO contract (CatalogResolver
-// miss) is AMBIGUITY at the gate even at StageEnforce: approve (fail open),
-// and the consecutive-block breaker must not move. This is the
-// "[contract-gate] ship: ambiguity, failing open" line from the 2026-06-12
-// soak — pinned so the fail-open never silently becomes a block (or a
-// breaker leak) for contract-less phases.
 func TestReviewerWithCatalog_FailsOpenWhenNoContractResolves(t *testing.T) {
 	root := t.TempDir()
 	breaker := filepath.Join(root, "breaker.json")
-	// Catalog with NO matching spec — "ghost-phase" resolves nowhere.
 	rev := NewReviewerWithCatalog(config.StageEnforce, phasespec.Catalog{})
 	rev.(*Reviewer).breakerPath = breaker
 

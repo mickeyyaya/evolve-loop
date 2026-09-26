@@ -1,10 +1,5 @@
 package deliverable
 
-// grace_test.go — the write-in-flight grace window (cycle-1212 salvage,
-// review BLOCK: the grace path crosses every phase of every cycle and shipped
-// untested in the first cut). All timing goes through the graceSleep seam —
-// no real-time waits.
-
 import (
 	"errors"
 	"os"

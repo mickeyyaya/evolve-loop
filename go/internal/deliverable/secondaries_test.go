@@ -1,16 +1,5 @@
 package deliverable
 
-// secondaries_test.go — ADR-0100: the contract gate verifies every AGENT-OWED
-// declared output, not only outputs.files[0].
-//
-// Before this, FromSpec projected only Files[0] into the contract, so
-// handoff-build.json, handoff-scout.json, triage-decision.json and
-// carryover-todos.json were declared in the registry, waited for by the
-// bridge's completion detector, and never judged by anyone: a phase could
-// omit them and the cycle continued. The codes below are stable so the
-// correction ladder's same-defect identity (contractBlocksShareIdentity)
-// recognizes a repeat and escalates instead of re-dispatching blindly.
-
 import (
 	"os"
 	"path/filepath"
@@ -22,8 +11,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
-// buildSpecWithHandoff is the registry's build declaration in miniature:
-// two files, the second owed by the agent.
+// buildSpecWithHandoff is the registry's build declaration in miniature: two files, the second owed by the agent.
 func buildSpecWithHandoff() phasespec.PhaseSpec {
 	return phasespec.PhaseSpec{
 		Name: "build", Role: "build",
@@ -75,8 +63,6 @@ func TestVerify_AgentOwedSecondary(t *testing.T) {
 				t.Fatalf("handoff-build.json is declared agent-owed and is %s, but the gate returned OK=%v violations=%+v (want %s) — the phase would proceed with its declared deliverable missing",
 					tc.name, res.OK, res.Violations, tc.wantCode)
 			}
-			// The violation must NAME the file: it becomes the correction
-			// directive the agent is re-dispatched with.
 			if !violationMentions(res, "handoff-build.json") {
 				t.Fatalf("violation does not name the missing file: %+v", res.Violations)
 			}
@@ -84,8 +70,6 @@ func TestVerify_AgentOwedSecondary(t *testing.T) {
 	}
 }
 
-// TestVerify_HarnessProducedSecondaryIsNotGated: acs-verdict.json is written by
-// acsrunner, not the auditor; re-dispatching the agent could never produce it.
 func TestVerify_HarnessProducedSecondaryIsNotGated(t *testing.T) {
 	ws := t.TempDir()
 	writeFile(t, ws, "audit-report.md", "# Audit Report\n\n## Verdict\nPASS\n\n## Findings\n- none\n\n## Handoff Summary\n- ok\n")
@@ -103,7 +87,6 @@ func TestVerify_HarnessProducedSecondaryIsNotGated(t *testing.T) {
 	}
 }
 
-// TestVerify_NDJSONSecondary: every non-blank line must parse.
 func TestVerify_NDJSONSecondary(t *testing.T) {
 	spec := phasespec.PhaseSpec{Name: "scout", Role: "discover",
 		Outputs: phasespec.IO{
@@ -140,8 +123,6 @@ func violationMentions(res Result, s string) bool {
 	return false
 }
 
-// TestReviewer_VerifiesDeclaredDeliverables: the capability the composition-
-// root proof asks for is true whenever the gate is not switched off.
 func TestReviewer_VerifiesDeclaredDeliverables(t *testing.T) {
 	for _, tc := range []struct {
 		stage config.Stage
@@ -154,10 +135,7 @@ func TestReviewer_VerifiesDeclaredDeliverables(t *testing.T) {
 	}
 }
 
-// TestVerify_UnreadableSecondaryIsAmbiguity: a read fault that is not absence
-// (here: a directory where the file should be) is infra, not an agent
-// violation — the gate returns an error and the reviewer fails OPEN, exactly
-// as it does for the primary. Re-dispatching an agent cannot fix EISDIR.
+// A directory where the file should be is a non-absence read fault.
 func TestVerify_UnreadableSecondaryIsAmbiguity(t *testing.T) {
 	ws := t.TempDir()
 	writeFile(t, ws, "build-report.md", validBuildReport)

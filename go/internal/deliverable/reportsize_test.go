@@ -5,18 +5,6 @@ import (
 	"testing"
 )
 
-// reportsize_test.go — RED contract for cycle-565 Slice S1 of
-// report-size-contracts-jit-artifacts: a per-artifact token/size budget check
-// on the never-evict "## Handoff Summary" section (phasecontract.HandoffSummary
-// — see handoffsummary_test.go in go/internal/phasecontract). No tokenizer
-// dependency exists in this repo (go.mod has none), so EstimateTokens uses the
-// common ~4-chars-per-token heuristic already implicit in this codebase's other
-// byte-length budgets (e.g. core.salvageMaxBytes) rather than inventing a real
-// tokenizer.
-//
-// RED today: EstimateTokens, HandoffSectionContent, CheckHandoffBudget, and
-// CodeHandoffBudgetExceeded do not exist (compile failure).
-
 func TestEstimateTokens(t *testing.T) {
 	cases := []struct {
 		name string
@@ -32,8 +20,7 @@ func TestEstimateTokens(t *testing.T) {
 			t.Errorf("%s: EstimateTokens(len=%d) = %d, want %d", c.name, len(c.s), got, c.want)
 		}
 	}
-	// Monotonic: more content never yields fewer estimated tokens (anti-no-op —
-	// a stub that always returns a constant fails this).
+	// Monotonic, so a stub returning a constant fails.
 	if EstimateTokens(strings.Repeat("y", 4000)) <= EstimateTokens(strings.Repeat("y", 40)) {
 		t.Error("EstimateTokens must grow with content length (monotonic); got a flat/constant result")
 	}

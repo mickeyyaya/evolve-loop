@@ -1,20 +1,5 @@
 package deliverable
 
-// declared_effects_e2e_test.go — ADR-0100 slice 2, the proof at the public
-// seam.
-//
-// A REAL cycle (production storage + ledger, the catalog-aware contract
-// reviewer at enforce) whose triage writes a contract-valid triage-report.md
-// and triage-decision.json committing to inbox item "x" — and never claims
-// it: the item stays pending at the plane's inbox root, exactly the 1631
-// shape (the agent "claimed" a worktree copy) and the 1623 shape (the claim
-// was denied and the spine ran anyway). Before this slice the cycle proceeded
-// to tdd. Now: the gate rejects, the ladder re-dispatches with the item and
-// the command named in the directive, and either the claim lands (the cycle
-// ships) or the ladder exhausts and the cycle ends FAILED_EXPLAINED naming
-// the effect. An empty commitment owes no claim and still ends as triage
-// no-work.
-
 import (
 	"context"
 	"io"
@@ -33,8 +18,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
-// triageOnly scopes the real reviewer to the triage deliverable: the stub
-// phases write no artifacts and are not what this proof is about.
+// triageOnly scopes the real reviewer to triage; the stub phases write no artifacts.
 type triageOnly struct{ inner core.DeliverableReviewer }
 
 func (r triageOnly) Review(ctx context.Context, in core.ReviewInput) core.ReviewResult {
@@ -58,10 +42,8 @@ func seedPendingItem(t *testing.T, root string) {
 	}
 }
 
-// effectRunners builds a spine whose triage commits to "x" on every call and
-// claims it (through the production inboxmover.Claim) only from attempt
-// claimFrom (0 = never). commit=false writes an
-// explicit empty commitment instead.
+// effectRunners' triage commits to "x" on every call and claims it through inboxmover.Claim from attempt claimFrom
+// (0 = never); commit=false writes an explicit empty commitment instead.
 func effectRunners(t *testing.T, claimFrom int, commit bool) (map[core.Phase]core.PhaseRunner, *stubPhase) {
 	t.Helper()
 	triage := &stubPhase{name: string(core.PhaseTriage)}
@@ -81,15 +63,13 @@ func effectRunners(t *testing.T, claimFrom int, commit bool) (map[core.Phase]cor
 			}
 		}
 		if claimFrom > 0 && n >= claimFrom {
-			// The persona's `evolve inbox-mover claim` — the production writer, so
-			// the proof holds only if the gate reads where the claim really lands.
+			// The production writer, so the proof holds only if the gate reads where the claim really lands.
 			if _, err := inboxmover.Claim(inboxmover.Options{ProjectRoot: req.ProjectRoot, Stderr: io.Discard}, "x", strconv.Itoa(req.Cycle)); err != nil {
 				t.Fatal(err)
 			}
 		}
 	}
-	// The build floor (a separate deterministic gate) needs a contract-valid
-	// build-report.md to let the corrected cycle reach ship; reuse PR-1's.
+	// The build floor needs a contract-valid build-report.md for the corrected cycle to reach ship.
 	build := &stubPhase{name: string(core.PhaseBuild)}
 	build.onRun = func(_ int, req core.PhaseRequest) {
 		report := contractValidBuildReport
@@ -107,10 +87,7 @@ func effectRunners(t *testing.T, claimFrom int, commit bool) (map[core.Phase]cor
 	return runners, triage
 }
 
-// effectCatalog is the registry's triage declaration in miniature — the owed
-// decision plus the claim effect — so the proof does not depend on what the
-// checked-in registry happens to declare (that is pinned by
-// TestPhaseRegistry_EveryDeclaredEffectHasACheck).
+// effectCatalog is the registry's triage declaration in miniature, so the proof does not depend on the checked-in registry.
 func effectCatalog(t *testing.T) phasespec.Catalog {
 	t.Helper()
 	cat, warnings := (phasespec.Catalog{}).Merge([]phasespec.PhaseSpec{{
@@ -228,13 +205,7 @@ func TestDeclaredEffects_ClaimedCommitment_IsAccepted(t *testing.T) {
 	}
 }
 
-// An explicit empty commitment owes the declared-effects gate NO claim (no
-// inbox-claim correction is issued, triage runs once) — and since the
-// cycle-1623 P1 (inbox 2026-09-12T10-00-00Z-triage-empty-commitment-still-
-// dispatches-spine), an empty commitment beside a still-CLAIMABLE inbox item is
-// no longer credited as planned no-work: the host stops at triage with the
-// named claim-failed reason and no implementation phase. The legitimate
-// no-work disposition needs an inbox with nothing claimable (second case).
+// An empty commitment owes no claim; beside a still-claimable item triage stops as claim-failed, not as no-work.
 func TestDeclaredEffects_EmptyCommitment_OwesNoClaim(t *testing.T) {
 	t.Run("claimable item left alone: no claim owed, stopped as claim-failed", func(t *testing.T) {
 		root := gitRepoWithOneCommit(t)

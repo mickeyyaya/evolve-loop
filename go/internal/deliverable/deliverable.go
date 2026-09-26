@@ -1,20 +1,6 @@
-// Package deliverable is the shared verifier for phase-agent deliverables. The
-// `evolve phase verify` self-check (cmd_phase_verify.go) and the host-side
-// contract gate (reviewer.go) both call Verify so the agent's pre-finish check
-// and the harness's post-phase gate run BYTE-IDENTICAL logic — they can never
-// drift. Design: ADR-0034.
-//
-// Scope: WELL-FORMEDNESS ONLY (does the deliverable exist at the contracted
-// path, in the right shape, with the required sections/keys and a parseable
-// verdict). Semantic correctness — "is the report's content right" — is the
-// auditor's LLM-judged job. A Verify PASS must never be read as a semantic PASS
-// (the validation-vs-guardrail split; anti-Goodhart).
-//
-// Fail-open / fail-closed contract, encoded in the return signature:
-//
-//	err != nil       → ambiguity / infrastructure fault (unknown phase) → caller fails OPEN
-//	err == nil, !OK  → confirmed agent violation                        → caller fails CLOSED
-//	err == nil, OK   → well-formed
+// Package deliverable is the one well-formedness verifier behind both the agent's
+// `evolve phase verify` self-check and the host contract gate, so the two cannot drift.
+// See docs/architecture/packages/internal-deliverable.md.
 package deliverable
 
 import (
@@ -43,33 +29,12 @@ type Result struct {
 	Phase        string      `json:"phase"`
 	ArtifactPath string      `json:"artifact_path"`
 	Violations   []Violation `json:"violations,omitempty"`
-	// Content is the EXACT deliverable bytes this verdict was computed from —
-	// the single-read seam (deliverable-verified-bytes-single-read). Verify has
-	// to read the artifact to judge it; before this field the host runner
-	// re-read the same path to classify, so the classified bytes were only
-	// PROBABLY the bytes that passed Verify (a file swap in between classified
-	// content Verify never saw). BaseRunner.Run — the production consumer —
-	// classifies Content, making "the file is the sole verdict source" literal.
-	//
-	// Semantics (err == nil; every error return is a zero Result, so it carries
-	// neither path nor content), keyed on ArtifactPath:
-	//
-	//	ArtifactPath == ""  → the contract declares NO file (ship/NoArtifact):
-	//	                      Content is meaningless and always empty.
-	//	ArtifactPath != ""  → Content is what the read returned: the bytes on a
-	//	                      present deliverable (OK or !OK), empty when the
-	//	                      artifact was absent/blank at the end of the
-	//	                      write-in-flight grace window.
-	//
-	// json:"-" deliberately: the `evolve phase verify` JSON output is a verdict
-	// report, not a copy of the report it verified.
+	// Content is the exact bytes this verdict was computed from, so a consumer never
+	// re-reads the path; empty when the artifact was absent or blank, or declared no file.
 	Content string `json:"-"`
 
-	// Owed and Effects name the agent-owed files (basenames) and the declared
-	// effects this verdict CHECKED — filled by the verifier, so the contract
-	// gate's verified signal reports what was looked for, never a second
-	// resolution of what is declared now (the single-read seam Content set).
-	// json:"-" like Content: the verdict report is not the evidence stream.
+	// Owed and Effects name the owed files (basenames) and effects this verdict checked,
+	// so the verified signal never re-resolves the declaration.
 	Owed    []string `json:"-"`
 	Effects []string `json:"-"`
 }
@@ -79,89 +44,54 @@ const (
 	CodeMissingArtifact = "missing_artifact"
 	CodeEmptyArtifact   = "empty_artifact"
 	CodeMissingSection  = "missing_section"
-	// CodeMissingChallengeToken: a RequireChallengeToken contract's report
-	// does not echo the minted <workspace>/challenge-token.txt token
-	// (proof-of-read, cycle-269). Checked here — the correctable boundary —
-	// so the PR-#60 correction loop re-dispatches with the exact token
-	// BEFORE the audit backstop. Fail-open when no token was minted.
+	// CodeMissingChallengeToken: the report does not echo the minted challenge token (proof of read).
 	CodeMissingChallengeToken = "missing_challenge_token"
 	CodeBadVerdict            = "bad_verdict"
 	CodeStrayInWorktree       = "stray_in_worktree"
 	CodeInvalidJSON           = "invalid_json"
 	CodeMissingKey            = "missing_key"
-	// CodeFailureContextMissing: a sentinel-declared FAIL/WARN lacks the
-	// ADR-0039 structured failure block. (snake_case to match this closed
-	// vocabulary; ADR prose spells it with hyphens.)
+	// CodeFailureContextMissing: a sentinel-declared FAIL/WARN lacks the structured failure block.
 	CodeFailureContextMissing = "failure_context_missing"
-	// CodeFailureClassUnknown: the failure block's class is outside the
-	// failurelog vocabulary. The class drives the retry envelope — an unknown
-	// class declines the direct repair grant (cycle 1684's
-	// "superseded-predicate-contradiction" cost a full retrospective before a
-	// retry that carried none of the audit's findings) — so it is validated
-	// at this boundary and the correction hands the agent the vocabulary.
+	// CodeFailureClassUnknown: the failure block's class is outside the failurelog vocabulary.
 	CodeFailureClassUnknown = "failure_class_unknown"
-	// ADR-0100 — an AGENT-OWED secondary output (registry outputs.agent_owed)
-	// is absent, blank, or unparseable. The code stays one word per class so
-	// the correction ladder's same-defect identity recognizes a repeat; the
-	// message names the file, and that message is the correction the agent
-	// is re-dispatched with.
+	// Agent-owed secondaries: one code per class so the ladder's same-defect identity sees a repeat.
 	CodeMissingSecondary   = "missing_secondary"
 	CodeEmptySecondary     = "empty_secondary"
 	CodeMalformedSecondary = "malformed_secondary"
-	// ADR-0100 slice 2 — declared effects (effects.go). missing_effect: a
-	// committed inbox item the phase was instructed to claim is not under this
-	// cycle's processing/ dir; unbound_effect: the registry names an effect no
-	// deterministic check binds (a registry defect, not an agent one).
+	// Declared effects: missing_effect is an unperformed effect, unbound_effect a registry name no check binds.
 	CodeMissingEffect = "missing_effect"
 	CodeUnboundEffect = "unbound_effect"
 )
 
-// Verify runs the deterministic well-formedness checks for a phase's deliverable
-// against the built-in phasecontract registry. See the package doc for the
-// return contract. It is VerifyWith with the BuiltinResolver default —
-// preserved so existing callers (and any path that only deals in built-in
-// phases) are unchanged.
+// Verify checks a phase's deliverable against the built-in registry: an error is ambiguity (fail open), !OK a confirmed violation (fail closed).
 func Verify(phase string, roots phasecontract.Roots) (Result, error) {
 	return VerifyWith(phase, roots, phasecontract.BuiltinResolver{})
 }
 
-// VerifyWith runs the well-formedness checks resolving the phase's contract
-// through the given Resolver. A CatalogResolver lets user/minted phases be
-// verified against a spec-derived contract (FromSpec) with no Go change, while
-// built-ins stay authoritative. See the package doc for the return contract.
-// It is VerifyWithStage pinned to StageOff — the byte-identical default that
-// keeps every existing caller (and any path with no PhaseIO dial) unchanged.
+// VerifyWith is Verify resolving the contract through resolver, so user and minted phases verify against their spec.
 func VerifyWith(phase string, roots phasecontract.Roots, resolver phasecontract.Resolver) (Result, error) {
 	return VerifyWithStage(phase, roots, resolver, config.StageOff)
 }
 
-// VerifyWithStage is VerifyWith threaded with the EVOLVE_PHASE_IO rollout stage
-// (ADR-0050 §3.8). The stage gates only the additive RequireFailureContextPhaseIO
-// check for build/scout/triage (fires at StageEnforce); every other check is
-// stage-independent, so VerifyWithStage(..., StageOff) == the pre-3.8 VerifyWith.
+// VerifyWithStage is VerifyWith with the EVOLVE_PHASE_IO stage, which gates only the RequireFailureContextPhaseIO check.
 func VerifyWithStage(phase string, roots phasecontract.Roots, resolver phasecontract.Resolver, phaseIO config.Stage) (Result, error) {
 	c, ok := resolver.Resolve(phase)
 	if !ok {
-		// Ambiguity: we cannot determine what "well-formed" means. Fail OPEN.
+		// Without a contract there is no definition of well-formed: fail open.
 		return Result{}, fmt.Errorf("deliverable: no contract registered for phase %q", phase)
 	}
 	if c.NoArtifact {
-		// No file deliverable (ship: the pushed commit). Trivially well-formed —
-		// the real invariant is enforced by the ship-gate + commit-gate
-		// attestation, not a file-shape check.
+		// ship's deliverable is the pushed commit, which the ship and commit gates verify.
 		return Result{Phase: phase, OK: true}, nil
 	}
 	res, err := verifyPrimary(phase, c, roots, phaseIO)
 	if err != nil {
 		return Result{}, err
 	}
-	// ADR-0100: the agent-owed secondaries are judged after the primary so a
-	// correction can name everything the phase still owes in one directive.
+	// Secondaries, then effects, after the primary: one correction names everything still owed.
 	if err := verifySecondaries(&res, c, roots); err != nil {
 		return Result{}, err
 	}
-	// ADR-0100 slice 2: then the declared effects, so one directive names
-	// every output AND effect the phase still owes.
 	if err := verifyEffects(&res, c, roots); err != nil {
 		return Result{}, err
 	}
@@ -169,14 +99,10 @@ func VerifyWithStage(phase string, roots phasecontract.Roots, resolver phasecont
 	return res, nil
 }
 
-// verifyPrimary runs the primary-artifact checks (existence with the write-
-// in-flight grace, emptiness, then the kind-specific shape) and returns the
-// Result unfinished: the caller appends the secondary checks and finishes.
+// verifyPrimary checks the primary artifact and returns the Result unfinished, for the secondary and effect checks.
 func verifyPrimary(phase string, c phasecontract.Contract, roots phasecontract.Roots, phaseIO config.Stage) (Result, error) {
 	path := c.ArtifactPath(roots)
-	// The runner-threaded dispatched path is the ONE source when present
-	// (Roots.DispatchedArtifact) — the contract keeps owning the SHAPE checks
-	// while the runner owns WHICH file the phase was actually asked to write.
+	// The runner owns which file this run was asked to write; the contract still owns its shape.
 	if roots.DispatchedArtifact != "" {
 		path = roots.DispatchedArtifact
 	}
@@ -184,16 +110,12 @@ func verifyPrimary(phase string, c phasecontract.Contract, roots phasecontract.R
 
 	content, exists, err := readDeliverableWithGrace(path)
 	if err != nil {
-		// Unreadable for a reason other than absence (permissions, IO) is infra.
+		// A read fault other than absence is infra ambiguity, not an agent violation.
 		return Result{}, fmt.Errorf("deliverable: read %s: %w", path, err)
 	}
-	// Single-read seam: every return below carries the bytes this verdict was
-	// computed from, so the caller never re-reads the path (see Result.Content).
 	res.Content = content
 	if !exists {
 		res.add(CodeMissingArtifact, fmt.Sprintf("deliverable not found — write it to exactly: %s", path))
-		// If the agent wrote it into the worktree instead, say so — that is
-		// the actionable correction (the recoverBuildLeak failure class).
 		checkStray(&res, c, roots)
 		return res, nil
 	}
@@ -211,69 +133,18 @@ func verifyPrimary(phase string, c phasecontract.Contract, roots phasecontract.R
 	return res, nil
 }
 
-// Write-in-flight grace window (cycle-1212). A phase agent's final deliverable
-// write is not atomic with respect to the verify call that follows it: the
-// self-check and the host contract gate can both observe ENOENT (create not yet
-// visible) or a zero-length file (bytes not yet flushed) for a deliverable that
-// IS being written. A single unretried read cannot tell that from "never
-// written", and both surface as a CONFIRMED violation — a false FAIL that fails
-// CLOSED. So absence/emptiness is treated as provisional for a bounded window.
-//
-// The window must be long enough to cover a lagging write and short enough that
-// a genuinely missing deliverable is still reported promptly (a retry that waits
-// minutes is its own outage). Deliberately NOT configurable: this is an I/O
-// robustness constant, not a phase setting — no flag, no dial.
-//
-// LAYERING (review HIGH on the first cut): the host runner already re-probes
-// Verify up to 16x at 200ms for missing/empty/MALFORMED artifacts
-// (runner.go verifyReconcileDeliverable), so on that path this window nests
-// inside the outer retry and a genuinely-absent artifact's confirmation cost
-// is ~16x(probe+500ms) ≈ 11s worst-case — accepted: it is paid once, only on
-// a phase that produced nothing, and is far cheaper than the false FAIL it
-// prevents. This grace layer EXISTS for the callers with NO outer retry (the
-// CLI self-check, `evolve phase verify`). Partial-but-non-blank content is
-// deliberately NOT retried here — mid-write truncation is closed at the
-// SOURCE by the bridge artifact-ready cross-poll debounce (completion.go):
-// the wait loop reports a deliverable finished only after artifactStableTicks
-// consecutive poll ticks observe an UNCHANGED (size, mtime) key, so a file
-// still being appended to never reaches this reader half-written. mtime is in
-// the key because a size-only window is blind to an equal-length fix-up Edit,
-// and that same window gates the DESTRUCTIVE relocation of a non-canonical
-// fallback rather than following it (copying first would snapshot a partial
-// file to the canonical path and remove the source the agent still holds
-// open). One path there completes without a closed window — the wait loop's
-// final post-cancel poll — and it is restricted to rename-only
-// canonicalization, which relinks an inode and so cannot truncate or delete;
-// stating the exception is the point, because the unqualified version of this
-// sentence was audited as a claim the code refuted (cycle-1256 D2). What is
-// malformed-but-present stays the runner's reconcile territory.
+// A final write is not atomic with the verify after it, so absence or emptiness is provisional for readGraceWindow.
+// Partial content is closed upstream: completion.go waits artifactStableTicks consecutive polls of an unchanged (size, mtime) key.
 const (
 	readGraceWindow = 500 * time.Millisecond
 	readGracePoll   = 20 * time.Millisecond
 )
 
-// graceSleep is the test seam for the grace poll (the runner's settleSleep
-// idiom): not a dial — tests inject a no-op so negative paths do not pay
-// real-time waits.
+// graceSleep is a test seam, not a dial.
 var graceSleep = time.Sleep
 
-// readDeliverableWithGrace reads the deliverable at path, tolerating a write
-// still in flight. It reads FIRST and waits only on failure, so the
-// overwhelmingly common already-written case pays exactly one os.ReadFile.
-//
-// Returns:
-//
-//	err != nil            → non-absence read fault (EISDIR, permissions, IO) →
-//	                        infra ambiguity, surfaced immediately since it will
-//	                        never clear on its own; the retry budget is not spent
-//	                        on it and it is never reclassified as a violation.
-//	exists == false       → still absent when the grace window closed → the
-//	                        caller's confirmed CodeMissingArtifact.
-//	exists, content blank → still empty when the window closed → the caller's
-//	                        confirmed CodeEmptyArtifact.
-//
-// The grace window never launders a real violation into a PASS: it only delays
-// the verdict, it does not change it.
+// readDeliverableWithGrace reads first and polls only while the file is absent or blank. The window delays
+// a missing or empty verdict but never changes it, and a non-absence read fault returns at once as infra.
 func readDeliverableWithGrace(path string) (content string, exists bool, err error) {
 	deadline := time.Now().Add(readGraceWindow)
 	for {
@@ -284,7 +155,6 @@ func readDeliverableWithGrace(path string) (content string, exists bool, err err
 		case rerr != nil && !os.IsNotExist(rerr):
 			return "", false, rerr
 		}
-		// Absent, or present-but-blank: possibly a write still in flight.
 		if !time.Now().Before(deadline) {
 			return string(data), rerr == nil, nil
 		}
@@ -298,12 +168,7 @@ func verifyMarkdown(res *Result, c phasecontract.Contract, content string, roots
 			res.add(CodeMissingSection, fmt.Sprintf("required section %q is missing", s.Canonical))
 		}
 	}
-	// Conditional sections (ExplanationSections) are owed only while the cycle's
-	// explanation-documentation contract is active; the version rides on Roots
-	// so every verifier — gate, runner, salvage re-check, `evolve phase verify`
-	// — asks the same question. Matched by the exact visible level-two heading
-	// (reportdoc.HasSection), the predicate the audit's own gate uses, so a
-	// report the gate refuses can never slip past the correction ladder.
+	// reportdoc.HasSection is the audit gate's own predicate, so a report that gate refuses cannot pass here.
 	if roots.ExplanationDocumentationVersion != 0 {
 		for _, s := range c.ExplanationSections {
 			if !reportdoc.HasSection(content, s.Title()) {
@@ -314,27 +179,11 @@ func verifyMarkdown(res *Result, c phasecontract.Contract, content string, roots
 	if len(c.Verdicts) > 0 && !verdictPresent(content, c.Verdicts, phaseIO) {
 		res.add(CodeBadVerdict, fmt.Sprintf("no parseable verdict; expected one of %v", c.Verdicts))
 	}
-	// ADR-0039 §7 / ADR-0050 §3.8: a sentinel-declared FAIL/WARN must carry the
-	// structured failure block. RequireFailureContext (audit) enforces this
-	// unconditionally; RequireFailureContextPhaseIO (build/scout/triage) enforces
-	// it only once the PhaseIO rollout reaches enforce — off/shadow/advisory stay
-	// byte-identical, so a phase that has not yet adopted the sentinel cannot be
-	// false-blocked before the cutover. Applies ONLY to sentinel verdicts —
-	// legacy prose-only artifacts stay legal forever. The message is the
-	// correction directive (re-dispatched verbatim).
+	// A sentinel FAIL/WARN owes the structured failure block; PhaseIO phases owe it only at enforce, prose-only verdicts never.
 	if c.RequireFailureContext || (c.RequireFailureContextPhaseIO && phaseIO >= config.StageEnforce) {
-		// NormalizeLegacy is the ONE taxonomy, so its legacy aliases ("FAIL",
-		// "WARN", "audit-fail") pass here although the rendered vocabulary lists
-		// only the canonical spellings — a deliberate trade-off: one source over
-		// a stricter gate that would have to duplicate the alias table.
-		// The class is validated where it is consumed: the audit's unconditional
-		// block feeds decideAfterAuditFail's retry envelope on FAIL and the
-		// failure record on FAIL and WARN alike (a WARN's class is what the
-		// ledger and the carryover read), so both verdicts are checked. The
-		// PhaseIO self-report path (scout/triage) is not: its class feeds no
-		// decision today, and its exemplar now draws from the vocabulary too.
 		s, ok := phasecontract.ParseVerdictSentinelFull(content)
 		isFailOrWarn := ok && (s.Verdict == "FAIL" || s.Verdict == "WARN")
+		// Only the audit's class feeds a decision (retry envelope, failure record); NormalizeLegacy's aliases pass on purpose.
 		if c.RequireFailureContext && isFailOrWarn && s.Failure != nil && s.Failure.Class != "" && failurelog.NormalizeLegacy(s.Failure.Class) == failurelog.UnknownClassification {
 			res.add(CodeFailureClassUnknown, fmt.Sprintf(
 				"verdict %s declares failure class %q, which is not in the failure vocabulary — re-emit the evolve-verdict sentinel with \"class\" set to one of [%s] (on FAIL the class drives the retry envelope — an unknown class forfeits the direct repair; on FAIL and WARN it is what the failure record and the carryover read). Keep your judgment in the defects and prescription entries.",
@@ -345,11 +194,7 @@ func verifyMarkdown(res *Result, c phasecontract.Contract, content string, roots
 				"verdict %s declares no structured failure context — re-emit the evolve-verdict sentinel as schema_version 2 with a failure block: {\"class\":\"<failure class>\",\"defects\":[\"<one line per defect>\"],\"evidence_paths\":[\"<artifact>\"]}", s.Verdict))
 		}
 	}
-	// Cycle-269: the challenge-token echo (proof the agent read the upstream
-	// report) was audit-only — a perfect EGPS-green build FAILed the whole
-	// cycle, unrecoverably, over a missing echo. Enforce at THIS boundary so
-	// the correction loop fixes it pre-audit. The minted token lives in the
-	// workspace; absent/empty file ⇒ nothing to echo ⇒ silent (fail-open).
+	// Checked here so the correction ladder can fix a missing echo before audit; no minted token owes nothing.
 	if c.RequireChallengeToken {
 		if tok, err := os.ReadFile(filepath.Join(roots.Workspace, "challenge-token.txt")); err == nil {
 			if t := strings.TrimSpace(string(tok)); t != "" && !strings.Contains(content, t) {
@@ -361,10 +206,7 @@ func verifyMarkdown(res *Result, c phasecontract.Contract, content string, roots
 	checkStray(res, c, roots)
 }
 
-// checkStray flags a deliverable the agent wrote into the worktree root instead
-// of the workspace — the exact failure the recoverBuildLeak fixes
-// (cb604d6/f96537c) chased reactively. Only meaningful for workspace-target
-// contracts with a distinct worktree.
+// checkStray flags a deliverable written into the worktree root instead of the workspace.
 func checkStray(res *Result, c phasecontract.Contract, roots phasecontract.Roots) {
 	if c.WriteTarget != phasecontract.TargetWorkspace {
 		return
@@ -372,9 +214,7 @@ func checkStray(res *Result, c phasecontract.Contract, roots phasecontract.Roots
 	if roots.Worktree == "" || roots.Worktree == roots.Workspace {
 		return
 	}
-	// Hunt by the DISPATCHED basename when the runner threaded one — the
-	// stray hint must name the file this run actually asked for (delta-mode
-	// intent leaks intent-delta.md, not intent.md).
+	// Name the dispatched file: delta-mode intent writes intent-delta.md, not intent.md.
 	name := c.ArtifactName
 	if roots.DispatchedArtifact != "" {
 		name = filepath.Base(roots.DispatchedArtifact)
@@ -411,8 +251,7 @@ func verifyJSON(res *Result, c phasecontract.Contract, content string) {
 		res.add(CodeInvalidJSON, fmt.Sprintf("not valid JSON object: %v", err))
 		return
 	}
-	// Tolerant reader: only the minimal required keys are checked; unknown/future
-	// keys are ignored (Postel's law + forward-compat).
+	// Tolerant reader: unknown keys are ignored for forward compatibility.
 	for _, k := range c.RequiredKeys {
 		if _, ok := top[k]; !ok {
 			res.add(CodeMissingKey, fmt.Sprintf("required key %q is missing", k))
@@ -420,9 +259,9 @@ func verifyJSON(res *Result, c phasecontract.Contract, content string) {
 	}
 }
 
-// verdictPresent reports whether the deliverable declares an allowed verdict.
-// Layer-5 strangler: the machine-readable sentinel is checked first; the prose
-// scan is the fallback for reports written against older templates.
+// verdictPresent reports whether content declares an allowed verdict: the sentinel first, then the legacy
+// prose scan, which is off at enforce so an out-of-vocabulary sentinel gets no prose rescue.
+// See ADR-0050.
 func verdictPresent(content string, verdicts []string, phaseIO config.Stage) bool {
 	if v, ok := phasecontract.ParseVerdictSentinel(content); ok {
 		for _, allowed := range verdicts {
@@ -430,15 +269,7 @@ func verdictPresent(content string, verdicts []string, phaseIO config.Stage) boo
 				return true
 			}
 		}
-		// A sentinel with an out-of-vocabulary verdict is not a valid declaration;
-		// fall through to the prose scan rather than trusting it. ADR-0050 §3.10
-		// Slice 5: below enforce that fall-through reaches the prose scan; at
-		// enforce the prose scan is gated off, so an out-of-vocab sentinel resolves
-		// to false (CodeBadVerdict) with no prose rescue.
 	}
-	// ADR-0050 §3.10 Slice 5: the prose substring scan is the legacy fallback for
-	// older templates; at enforce the sentinel is mandatory, so gate it off
-	// (>= StageEnforce). Below enforce it stays active — byte-identical.
 	if phaseIO < config.StageEnforce {
 		for _, v := range verdicts {
 			if strings.Contains(content, v) {
@@ -455,11 +286,7 @@ func (r *Result) add(code, msg string) {
 
 func (r *Result) finish() { r.OK = len(r.Violations) == 0 }
 
-// onlyViolation reports whether the result is failing solely because of the
-// given code — at least one violation exists and every violation carries that
-// code. Used by the Reviewer to treat a warn-only report-size violation as
-// non-blocking while still blocking on any co-occurring real contract
-// violation.
+// onlyViolation reports whether r fails solely on code; salvage and the warn-only size gate need sole, never membership.
 func (r Result) onlyViolation(code string) bool {
 	if len(r.Violations) == 0 {
 		return false
