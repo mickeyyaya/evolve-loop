@@ -1,11 +1,5 @@
 package policy_test
 
-// parallel_evaluate_config_test.go — resolution tests for policy.ParallelEvaluatePolicy
-// and Policy.ParallelEvaluateConfig() (mirrors mergegate_config_test.go, T1 RED).
-//
-// RED: policy.ParallelEvaluatePolicy and Policy.ParallelEvaluateConfig() do not yet
-// exist; this file fails to compile until Builder adds them (compile-fail = RED evidence).
-
 import (
 	"testing"
 
@@ -46,9 +40,6 @@ func TestParallelEvaluateConfig_StageOverrideEnforce(t *testing.T) {
 	}
 }
 
-// TestParallelEvaluateConfig_UnknownStageFallsToOff is the load-bearing negative test:
-// a typo (e.g. "enableddddd") must map to "off", never to "enforce" or any other
-// active stage, so a misspelling cannot silently arm the parallel dispatcher.
 func TestParallelEvaluateConfig_UnknownStageFallsToOff(t *testing.T) {
 	got := policy.Policy{ParallelEvaluate: &policy.ParallelEvaluatePolicy{Stage: "enableddddd"}}.ParallelEvaluateConfig()
 	if got.Stage != "off" {

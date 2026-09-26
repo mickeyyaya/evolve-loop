@@ -1,9 +1,5 @@
 package policy_test
 
-// BridgePolicy — operator-writable override directories. Zero value is
-// intentional (each subsystem falls back to its canonical .evolve dir), so the
-// accessor is a pure passthrough with a nil-guard.
-
 import (
 	"reflect"
 	"testing"
@@ -57,13 +53,6 @@ func TestLoad_BridgeBlock(t *testing.T) {
 	}
 }
 
-// TestBridgePolicy_PhaseArtifactTimeouts pins the per-phase artifact-wait
-// budget resolver: compiled defaults keyed on the bridge AGENT LABEL, a
-// positive-only operator merge, and a fresh map per call. The 900s retro entry
-// exists because the grown retro contract does not fit the 300s builtin
-// (cycle-1048's retro was ctx-canceled at ~608s); the 1200s deep-tier entries
-// exist because six deep-tier phases died at ~650s with no artifact in a single
-// day (see TestBridgePolicy_DeepTierArtifactBudgets for the arithmetic).
 func TestBridgePolicy_PhaseArtifactTimeouts(t *testing.T) {
 	cases := []struct {
 		name  string
@@ -73,15 +62,10 @@ func TestBridgePolicy_PhaseArtifactTimeouts(t *testing.T) {
 	}{
 		{"compiled-agent-label", nil, "retrospective", 900},
 		{"compiled-phase-alias", nil, "retro", 900},
-		// "scout" (not "build") is the unlisted probe: build/audit/tdd now carry
-		// compiled deep-tier budgets, so asserting 0 for them would pin the
-		// pre-fix cliff instead of the sentinel contract.
+		// scout, not build, is the unlisted probe: build/audit/tdd carry compiled budgets.
 		{"unlisted-phase-uses-builtin-sentinel", nil, "scout", 0},
 		{"operator-adds-entry", map[string]int{"scout": 600}, "scout", 600},
 		{"operator-raises-compiled", map[string]int{"retrospective": 1200}, "retrospective", 1200},
-		// Explicit positive operator config is AUTHORITATIVE in both directions:
-		// it may deliberately lower a compiled default. Only non-positive values
-		// are rejected.
 		{"operator-lowers-compiled", map[string]int{"audit": 600}, "audit", 600},
 		{"zero-override-rejected", map[string]int{"retrospective": 0}, "retrospective", 900},
 		{"negative-override-rejected", map[string]int{"retrospective": -5}, "retrospective", 900},
@@ -96,8 +80,6 @@ func TestBridgePolicy_PhaseArtifactTimeouts(t *testing.T) {
 		})
 	}
 
-	// An unrelated override must not erase a compiled entry, and the per-phase
-	// map must never bleed into the global artifact_timeout_s budget.
 	bp := policy.BridgePolicy{PhaseArtifactTimeoutS: map[string]int{"scout": 600}}
 	if got := bp.PhaseArtifactTimeouts()["retrospective"]; got != 900 {
 		t.Errorf("compiled retrospective entry = %d after unrelated override, want 900", got)
@@ -106,7 +88,6 @@ func TestBridgePolicy_PhaseArtifactTimeouts(t *testing.T) {
 		t.Errorf("global ArtifactTimeoutS = %d, want 0 (per-phase must not bleed into global)", bp.ArtifactTimeoutS)
 	}
 
-	// Fresh map per call: a mutating caller must not poison later resolutions.
 	first := policy.BridgePolicy{}.PhaseArtifactTimeouts()
 	first["retrospective"] = 1
 	if second := (policy.BridgePolicy{}).PhaseArtifactTimeouts()["retrospective"]; second != 900 {

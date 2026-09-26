@@ -1,8 +1,5 @@
 package policy_test
 
-// CatalogPolicy — the model-catalog config that replaced EVOLVE_MODELCATALOG_AUTOREFRESH.
-// AutoRefresh defaults true (on); absent block keeps catalog refresh enabled.
-
 import (
 	"testing"
 

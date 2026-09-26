@@ -1,8 +1,5 @@
 package policy_test
 
-// PathsConfig — the paths discovery config that replaced EVOLVE_KB_SEARCH_PATHS
-// and EVOLVE_PHASE_ROOTS. Absent block → empty PathsConfig; callers use built-in defaults.
-
 import (
 	"testing"
 

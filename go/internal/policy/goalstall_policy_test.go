@@ -2,9 +2,6 @@ package policy
 
 import "testing"
 
-// The goal-stall threshold/weight must come from policy with a compiled-in safe
-// default when the block is absent or non-positive (never a Go literal at the
-// call site).
 func TestGoalStallThreshold_DefaultAndOverride(t *testing.T) {
 	if got := (Policy{}).GoalStallThreshold(); got != 3 {
 		t.Errorf("absent block: threshold = %d, want compiled default 3", got)
@@ -17,11 +14,6 @@ func TestGoalStallThreshold_DefaultAndOverride(t *testing.T) {
 	}
 }
 
-// The non-progress threshold is the UNION breaker's ceiling (any non-shipping
-// outcome, FAIL included). It must be config-driven with its own compiled
-// default, and that default must sit ABOVE the empty-only goal-stall threshold —
-// a mixed FAIL/EMPTY streak is noisier evidence than a clean empty streak, so it
-// gets more rope before escalating.
 func TestGoalStallNonprogressThreshold_DefaultAndOverride(t *testing.T) {
 	got := (Policy{}).GoalStallNonprogressThreshold()
 	if got != 5 {

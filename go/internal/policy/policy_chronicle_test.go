@@ -1,14 +1,5 @@
 package policy
 
-// TDD contract for chronicle-s2-digest-writer (cycle 702): the "chronicle"
-// policy block, mirroring the GatesPolicy default-then-override idiom.
-// RED until policy_chronicle.go defines ChroniclePolicy + Policy.ChronicleConfig().
-//
-// Compiled defaults (per the approved chronicle plan): digest=shadow,
-// digest_tokens=1200, digest_cycles=10, escalation=shadow, historian=off.
-// An absent block resolves the defaults; a present block overrides only the
-// fields it sets (no feature flags — policy-driven stages only).
-
 import (
 	"encoding/json"
 	"testing"
@@ -34,17 +25,14 @@ func assertChronicle(t *testing.T, got ChronicleConfig, digest string, tokens, c
 }
 
 func TestChronicleConfig_CompiledDefaults(t *testing.T) {
-	var p Policy // no chronicle block at all
+	var p Policy
 	assertChronicle(t, p.ChronicleConfig(), "shadow", 1200, 10, "shadow", "off")
 
-	// An explicitly empty block must resolve identically to an absent one.
 	p = Policy{Chronicle: &ChroniclePolicy{}}
 	assertChronicle(t, p.ChronicleConfig(), "shadow", 1200, 10, "shadow", "off")
 }
 
 func TestChronicleConfig_PolicyOverrides(t *testing.T) {
-	// Full override via the on-disk JSON shape — pins the json tags, not just
-	// the Go field names.
 	var p Policy
 	doc := `{"chronicle":{"digest":"enforce","digest_tokens":800,"digest_cycles":5,"escalation":"enforce","historian":"shadow"}}`
 	if err := json.Unmarshal([]byte(doc), &p); err != nil {
@@ -55,7 +43,6 @@ func TestChronicleConfig_PolicyOverrides(t *testing.T) {
 	}
 	assertChronicle(t, p.ChronicleConfig(), "enforce", 800, 5, "enforce", "shadow")
 
-	// Partial override: only digest set — every other field keeps its default.
 	var partial Policy
 	if err := json.Unmarshal([]byte(`{"chronicle":{"digest":"enforce"}}`), &partial); err != nil {
 		t.Fatalf("unmarshal partial policy doc: %v", err)

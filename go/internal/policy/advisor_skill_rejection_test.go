@@ -1,12 +1,5 @@
 package policy_test
 
-// advisor_skill_rejection_test.go — cycle-613 advisor-skill-selection.
-// AdvisorSkillRejection values are logged to advisor-rejections.json, so its
-// wire shape (json tags) is part of the contract the rejection-plumbing
-// checklist item depends on. This pins that shape and names the type for
-// apicover. Separate from advisor_skill_overlay_test.go (the RED clamp/merge
-// contract) so that protected file is not modified.
-
 import (
 	"encoding/json"
 	"testing"

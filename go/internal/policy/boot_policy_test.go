@@ -1,11 +1,5 @@
 package policy
 
-// boot_policy_test.go — the boot.binary_refresh knob (binary-lag self-heal,
-// docs/chronicle/2026-08-binary-lag.md). Closed vocabulary {auto, off};
-// absent block, empty word, and unknown words all resolve to "auto": the
-// self-heal is integrity posture, so a typo must not silently disable it
-// (the fleet-landing unknown-word precedent, inverted for a default-on dial).
-
 import "testing"
 
 func TestBootBinaryRefresh_Vocabulary(t *testing.T) {

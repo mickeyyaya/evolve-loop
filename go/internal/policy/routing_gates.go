@@ -1,23 +1,17 @@
 package policy
 
+// defaultObservationMaskWindow is the empirical optimum (M=10) from the
+// observation-masking study, arXiv 2508.21433.
 const defaultObservationMaskWindow = 10
 
-// ObservationMaskPolicy is the .evolve/policy.json "observation_mask" block and
-// its own resolved-config type (mirrors the RouterPolicy raw==resolved idiom):
-// a single WindowTurns knob. It also serves as ObservationMaskConfig's return
-// value with defaults applied.
+// ObservationMaskPolicy is the "observation_mask" block and also its own resolved value.
 type ObservationMaskPolicy struct {
-	// WindowTurns is how many of the newest evictable tool observations stay
-	// unmasked. Zero/negative/absent ⇒ defaultObservationMaskWindow (10). A
-	// resolved WindowTurns<=0 is never produced by the getter; when a caller
-	// passes it straight to phasestream.MaskStaleObservations, <=0 means
-	// "feature off" (byte-identical passthrough).
+	// WindowTurns is how many newest evictable tool observations stay unmasked;
+	// non-positive means 10. The getter never returns <=0, which phasestream reads as off.
 	WindowTurns int `json:"window_turns,omitempty"`
 }
 
-// ObservationMaskConfig returns the observation-mask window with the built-in
-// default resolved. An absent block, or a non-positive window_turns override,
-// yields WindowTurns=10; a positive override passes through. No I/O, no env.
+// ObservationMaskConfig returns the observation-mask window, defaulting to 10.
 func (p Policy) ObservationMaskConfig() ObservationMaskPolicy {
 	c := ObservationMaskPolicy{WindowTurns: defaultObservationMaskWindow}
 	if p.ObservationMask != nil && p.ObservationMask.WindowTurns > 0 {
@@ -38,7 +32,7 @@ type RouterPolicy struct {
 	Model        string `json:"model,omitempty"`
 }
 
-// RouterConfig returns router configuration with built-in defaults resolved.
+// RouterConfig returns router configuration, defaulting RouterReplan to "shadow" and ReplanDepth to 1.
 func (p Policy) RouterConfig() RouterPolicy {
 	c := RouterPolicy{RouterReplan: "shadow", ReplanDepth: 1}
 	if p.Router == nil {
@@ -59,36 +53,22 @@ func (p Policy) RouterConfig() RouterPolicy {
 	return c
 }
 
-// GatesPolicy is the .evolve/policy.json "gates" block.
+// GatesPolicy is the .evolve/policy.json "gates" block of per-gate rollout stages.
 type GatesPolicy struct {
 	ContractGate  string `json:"contract_gate,omitempty"`
 	EvalGate      string `json:"eval_gate,omitempty"`
 	TriageCapGate string `json:"triage_cap_gate,omitempty"`
 	ReviewGate    string `json:"review_gate,omitempty"`
-	// TopNGate is the build->audit top_n task-binding gate's rollout dial
-	// (internal/topngate). Default "enforce": a build report whose ## Task:
-	// slug falls outside triage ## top_n aborts before audit.
+	// TopNGate aborts before audit when the build report's task slug is outside triage top_n.
 	TopNGate string `json:"topn_gate,omitempty"`
-	// ReportSizeGate is the report-size (handoff-summary token budget) gate's own
-	// rollout dial (cycle-565 Slice S1). Unlike the other gates it defaults to
-	// "shadow", not "enforce": the inbox spec calls for shadow/warn BEFORE
-	// enforce so the budget is observed before it can block a cycle.
+	// ReportSizeGate defaults to "shadow" so the handoff budget is observed before it can block.
 	ReportSizeGate string `json:"report_size_gate,omitempty"`
-	// ManifestGate is the ship-bind tree-manifest reconciliation gate's rollout
-	// dial (internal/phases/ship/manifest.go, cycle-1064). Like ReportSizeGate it
-	// defaults to "shadow", not "enforce": out-of-manifest paths (the cross-lane
-	// untracked-leak shape) are LOGGED before the gate is allowed to block a
-	// cycle. "enforce" fails the ship closed with core.CodeManifestGate.
+	// ManifestGate defaults to "shadow": out-of-manifest ship paths are logged before
+	// the gate may fail a ship with core.CodeManifestGate.
 	ManifestGate string `json:"manifest_gate,omitempty"`
 
-	// RepoContractGate is the ship-time repo-contract scanner pack's dial
-	// (internal/phases/ship/repocontract.go). Unlike ManifestGate it defaults
-	// to "enforce": the scanners are the deterministic repo-wide guard suites
-	// (phasespec, profiles, phasecoherence, routingtest) whose breakage IS a
-	// red main — four lane landings redded main in the week of 2026-08-04
-	// (artifact-bytes, phase metadata, profile stubs, incident-postmortem),
-	// each a CI-email storm; FP≈0 because a failing scanner here fails on
-	// main's next run by construction. "off" disables.
+	// RepoContractGate runs the repo-wide guard suites at ship time; it defaults to
+	// "enforce" because those suites fail on main's next run anyway (false-positive rate near zero).
 	RepoContractGate string `json:"repo_contract_gate,omitempty"`
 }
 
@@ -107,16 +87,13 @@ type GatesConfig struct {
 // GatesConfig returns persistent gate stages with built-in defaults resolved.
 func (p Policy) GatesConfig() GatesConfig {
 	c := GatesConfig{
-		ContractGate:   "enforce",
-		EvalGate:       "enforce",
-		TriageCapGate:  "enforce",
-		ReviewGate:     "off",
-		ReportSizeGate: "shadow", // shadow/warn first, per the Slice S1 inbox spec
-		TopNGate:       "enforce",
-		ManifestGate:   "shadow", // shadow-first, mirroring ReportSizeGate (cycle-1064)
-		// enforce-default deviation from shadow-first, justified: the pack is
-		// existing deterministic repo tests (FP≈0), and every failure mode it
-		// gates was a LIVE red-main incident in the preceding week.
+		ContractGate:     "enforce",
+		EvalGate:         "enforce",
+		TriageCapGate:    "enforce",
+		ReviewGate:       "off",
+		ReportSizeGate:   "shadow",
+		TopNGate:         "enforce",
+		ManifestGate:     "shadow",
 		RepoContractGate: "enforce",
 	}
 	if p.Gates == nil {
@@ -148,8 +125,3 @@ func (p Policy) GatesConfig() GatesConfig {
 	}
 	return c
 }
-
-// ReportBudgetPolicy is the .evolve/policy.json "report_budget" block: the
-// per-artifact token budgets the report-size gate enforces (cycle-565 Slice S1).
-// Separate from GatesPolicy so the budget VALUE and the gate STAGE are dialed
-// independently. Absent ⇒ built-in defaults apply.

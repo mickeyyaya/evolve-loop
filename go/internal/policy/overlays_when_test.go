@@ -10,11 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// ADR-0099 slice 3 — an overlay rule may key on a cycle SIGNAL (`when`), not
-// only on phase/cli/model/tier: a document cycle preloads the solution skills
-// into the scout, build and audit dispatches. Absent signal ⇒ the rule does
-// not match (fail-closed, the D2 discipline); the selector is deterministic
-// config, the advisor may still ADD skills through its clamp.
 func TestResolveOverlays_WhenSelector(t *testing.T) {
 	pol := policy.Policy{Overlays: &policy.OverlaysPolicy{Rules: []policy.OverlayRule{
 		{Phases: []string{"build"}, When: []config.Condition{{Field: "deliverable_kind", Op: "eq", Value: "document"}}, Skills: []string{"solution-build"}},
@@ -44,9 +39,6 @@ func TestResolveOverlays_WhenSelector(t *testing.T) {
 	if got := ne.ResolveOverlays(code); !reflect.DeepEqual(got, []string{"x"}) {
 		t.Errorf("ne on a present non-matching value fires; got %v", got)
 	}
-	// A non-string clause value (JSON number/bool) never matches in either
-	// polarity — the signal plane is string-valued and the selector fails
-	// closed instead of coercing.
 	nonString := policy.Policy{Overlays: &policy.OverlaysPolicy{Rules: []policy.OverlayRule{
 		{When: []config.Condition{{Field: config.SignalDeliverableKind, Op: "eq", Value: 123}}, Skills: []string{"x"}},
 		{When: []config.Condition{{Field: config.SignalDeliverableKind, Op: "ne", Value: true}}, Skills: []string{"y"}},
@@ -54,8 +46,6 @@ func TestResolveOverlays_WhenSelector(t *testing.T) {
 	if got := nonString.ResolveOverlays(code); len(got) != 0 {
 		t.Errorf("non-string clause values must fail closed in both polarities; got %v", got)
 	}
-	// Any projected signal is selectable, not only the kind: a rule keyed on
-	// the goal type fires on the recipe the scout declared.
 	byGoal := policy.Policy{Overlays: &policy.OverlaysPolicy{Rules: []policy.OverlayRule{
 		{When: []config.Condition{{Field: config.SignalGoalType, Op: "eq", Value: "partnership-deal"}}, Skills: []string{"deal-lens"}},
 	}}}
@@ -65,9 +55,6 @@ func TestResolveOverlays_WhenSelector(t *testing.T) {
 	}
 }
 
-// TestCompiledDefaultOverlays_SolutionSkillsOnDocumentCycles: with no operator
-// overlays block, a document cycle's scout/build/audit dispatches preload the
-// solution skills — and the deep-tier fable rule still applies alongside.
 func TestCompiledDefaultOverlays_SolutionSkillsOnDocumentCycles(t *testing.T) {
 	var pol policy.Policy
 	doc := map[string]string{config.SignalDeliverableKind: "document"}
@@ -80,7 +67,6 @@ func TestCompiledDefaultOverlays_SolutionSkillsOnDocumentCycles(t *testing.T) {
 			t.Errorf("code %s at balanced = %v, want none (byte-identical to before)", phase, got)
 		}
 	}
-	// Every compiled-default skill exists in the registry (no dangling name).
 	registry, err := policy.SkillRegistryFromFS("../../../skills")
 	if err != nil {
 		t.Fatal(err)
@@ -96,10 +82,6 @@ func TestCompiledDefaultOverlays_SolutionSkillsOnDocumentCycles(t *testing.T) {
 	}
 }
 
-// TestCompiledDefaultOverlaySkills: the compiled-default skill set is exported
-// as ONE list so the integrity guard (ProtectedSurfaceManifest) can be pinned
-// to it — every persona the kernel preloads on its own authority is
-// control-plane, and the next compiled skill cannot skip the manifest.
 func TestCompiledDefaultOverlaySkills(t *testing.T) {
 	got := policy.CompiledDefaultOverlaySkills()
 	want := []string{"fable", "solution-scout", "solution-build", "solution-audit"}

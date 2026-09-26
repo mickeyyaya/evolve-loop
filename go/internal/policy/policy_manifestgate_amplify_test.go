@@ -5,10 +5,6 @@ import (
 	"testing"
 )
 
-// TestGatesConfig_ManifestGate_WrongJSONTypeErrors is the fail-loudly axis:
-// an operator hand-editing .evolve/policy.json who types a number instead of
-// a string for manifest_gate must get a decode error, not a silently
-// defaulted/garbage value.
 func TestGatesConfig_ManifestGate_WrongJSONTypeErrors(t *testing.T) {
 	var p Policy
 	err := json.Unmarshal([]byte(`{"gates":{"manifest_gate":123}}`), &p)
@@ -17,11 +13,6 @@ func TestGatesConfig_ManifestGate_WrongJSONTypeErrors(t *testing.T) {
 	}
 }
 
-// TestGatesConfig_ManifestGate_CaseAndWhitespacePreservedVerbatim pins that
-// policy.go performs NO normalization on the raw string — a load-bearing
-// assumption for reconcileManifest's strict equality check against the exact
-// literal "enforce". If policy.go ever started trimming/lowercasing, this
-// test documents the change is deliberate rather than an accidental drift.
 func TestGatesConfig_ManifestGate_CaseAndWhitespacePreservedVerbatim(t *testing.T) {
 	for _, tc := range []struct{ name, raw, want string }{
 		{"wrong case Enforce", `{"gates":{"manifest_gate":"Enforce"}}`, "Enforce"},
@@ -38,13 +29,6 @@ func TestGatesConfig_ManifestGate_CaseAndWhitespacePreservedVerbatim(t *testing.
 	}
 }
 
-// TestGatesConfig_ManifestGate_MultiGateInteraction sets manifest_gate
-// alongside several other confirmed gate keys in ONE JSON blob, each to a
-// distinct non-default value. The pre-existing DoesNotDisturbOtherGates test
-// only sets manifest_gate and checks the OTHER gates stay at their defaults;
-// this is the inverse combination — several explicitly set together — which
-// catches field-tag collisions or struct-layout drift that per-field
-// isolation cannot.
 func TestGatesConfig_ManifestGate_MultiGateInteraction(t *testing.T) {
 	raw := `{"gates":{
 		"contract_gate":"off",
@@ -71,10 +55,6 @@ func TestGatesConfig_ManifestGate_MultiGateInteraction(t *testing.T) {
 	}
 }
 
-// TestGatesConfig_ManifestGate_Idempotent proves GatesConfig() is a pure
-// projection: calling it twice on the same Policy returns equal results, and
-// the resolved GatesConfig is a value the caller owns (mutating one call's
-// result must not leak into the next call's result via shared state).
 func TestGatesConfig_ManifestGate_Idempotent(t *testing.T) {
 	var p Policy
 	if err := json.Unmarshal([]byte(`{"gates":{"manifest_gate":"enforce"}}`), &p); err != nil {

@@ -1,9 +1,5 @@
 package policy_test
 
-// SandboxPolicy — the OS-sandbox config block. NestedFallback gates the
-// verified-fallback write-canary (off/shadow/enforce); it defaults "off" so the
-// canary is opt-in and a fresh policy.json never runs it.
-
 import (
 	"testing"
 

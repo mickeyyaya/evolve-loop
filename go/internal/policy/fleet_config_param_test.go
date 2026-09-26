@@ -1,22 +1,5 @@
 package policy_test
 
-// FleetPolicy/FleetConfig — the .evolve/policy.json "fleet" block (S1 of the
-// FLEET-AS-POLICY operator-priority goal, cycle 464), mirroring the
-// SwarmPolicy/SwarmConfig precedent exactly (policy.go:779-845): a raw
-// *FleetPolicy block on Policy, a resolved FleetConfig struct, and a
-// FleetConfig() getter with fail-safe defaults. Absent block ⇒ Count=1
-// (byte-identical sequential execution); Concurrency<=0 ⇒ follows the
-// resolved Count; PlanSource is closed-vocabulary ("triage"|"manual") with
-// an unknown value failing safe to "manual" PLUS a surfaced warning (unlike
-// the swarm/parallel_evaluate precedents, which fail back to their DEFAULT
-// value — this block's spec explicitly calls for the non-default fail-safe
-// branch, so the getter is not I/O: it returns the warning as data on the
-// resolved config rather than logging, matching the package's no-I/O-in-
-// getters style).
-//
-// Black-box: drives only the exported Policy/FleetPolicy/FleetConfig
-// surface, zero env.
-
 import (
 	"strings"
 	"testing"
@@ -24,13 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// TestFleetConfig_Resolution pins the count/concurrency resolution table:
-// absent/empty block and non-positive Count all clamp to 1 (never a
-// zero-lane or negative-lane wave); Count overrides pass through; a
-// non-positive Concurrency follows the RESOLVED Count (not the raw input),
-// and an explicit positive Concurrency passes through independently of
-// Count. A hardcoded-defaults getter (ignoring the override) fails the
-// count:3 and count:2/concurrency:5 cases.
 func TestFleetConfig_Resolution(t *testing.T) {
 	defaults := policy.FleetConfig{Count: 1, Concurrency: 1, PlanSource: "triage"}
 	cases := []struct {
@@ -77,11 +53,6 @@ func TestFleetConfig_Resolution(t *testing.T) {
 	}
 }
 
-// TestFleetConfig_MinLanesResolution pins the min_lanes floor resolution
-// (2026-07-03): absent/≤1 ⇒ 1 (historical min-1 shrink); a positive override
-// raises the floor but clamps to ≤ Count (a floor above the lane count is
-// meaningless). This floor is what lets the quota-aware wave shrink keep the
-// operator's asserted concurrent-lane budget through a transient CLI bench.
 func TestFleetConfig_MinLanesResolution(t *testing.T) {
 	cases := []struct {
 		name string
@@ -106,16 +77,6 @@ func TestFleetConfig_MinLanesResolution(t *testing.T) {
 	}
 }
 
-// TestFleetConfig_PlanSourceClosedVocab pins the plan_source closed
-// vocabulary: "triage" is the default (empty/absent), "manual" passes
-// through, and any OTHER value (an operator typo, e.g. "yolo") fails safe
-// to "manual" — NOT to "yolo" (a passthrough getter with no vocabulary
-// check) and NOT to the "triage" default (the swarm/parallel_evaluate
-// precedent's fail-to-default idiom would be wrong here per the goal spec)
-// — and the getter must surface a non-empty warning on the resolved config
-// so callers can log/report it without the getter itself doing I/O. Valid
-// values (explicit "triage", "manual", and the empty default) must NOT
-// produce a warning.
 func TestFleetConfig_PlanSourceClosedVocab(t *testing.T) {
 	cases := []struct {
 		name        string

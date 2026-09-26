@@ -1,10 +1,5 @@
 package policy
 
-// L3.1: policy.json gains a declarative "gc" block (schema in internal/gc).
-// Absent block ⇒ nil ⇒ gc applies its own defaults; a present block parses
-// field-for-field. Pinned here so the user-facing file contract can't drift
-// from the engine's schema silently.
-
 import (
 	"os"
 	"path/filepath"
