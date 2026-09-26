@@ -646,3 +646,5 @@
 # under which build tags"; consumers: the ship repo-contract gate and the build floor.
 ./internal/addedtests
 ./internal/commentaudit
+# auditledger — the one reader of auditor ledger rows; consumers: ship, cmd/evolve composition, releasepreflight.
+./internal/auditledger

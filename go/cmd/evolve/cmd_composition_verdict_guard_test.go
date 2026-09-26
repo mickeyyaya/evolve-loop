@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/auditledger"
 )
 
 // cmd_composition_verdict_guard_test.go — cycle-1571 H2.
@@ -37,7 +39,7 @@ func writeArtifact(t *testing.T, verdict string) string {
 // TestRequireReusableAudit_RefusesFAIL is the pin for the live defect.
 func TestRequireReusableAudit_RefusesFAIL(t *testing.T) {
 	t.Parallel()
-	err := requireReusableAudit(auditLedgerEntry{ArtifactPath: writeArtifact(t, "FAIL")})
+	err := requireReusableAudit(auditledger.Entry{ArtifactPath: writeArtifact(t, "FAIL")})
 	if err == nil {
 		t.Fatal("a FAILed audit was accepted as the carry-forward snapshot — a rejection must never be carried forward")
 	}
@@ -52,7 +54,7 @@ func TestRequireReusableAudit_RefusesFAIL(t *testing.T) {
 func TestRequireReusableAudit_AcceptsShippableVerdicts(t *testing.T) {
 	t.Parallel()
 	for _, v := range []string{"PASS", "WARN"} {
-		if err := requireReusableAudit(auditLedgerEntry{ArtifactPath: writeArtifact(t, v)}); err != nil {
+		if err := requireReusableAudit(auditledger.Entry{ArtifactPath: writeArtifact(t, v)}); err != nil {
 			t.Errorf("verdict %s must be carry-forward eligible, got: %v", v, err)
 		}
 	}
@@ -65,7 +67,7 @@ func TestRequireReusableAudit_AcceptsShippableVerdicts(t *testing.T) {
 func TestRequireReusableAudit_UnreadableArtifactFailsClosed(t *testing.T) {
 	t.Parallel()
 	missing := filepath.Join(t.TempDir(), "gone.md")
-	if err := requireReusableAudit(auditLedgerEntry{ArtifactPath: missing}); err == nil {
+	if err := requireReusableAudit(auditledger.Entry{ArtifactPath: missing}); err == nil {
 		t.Error("a missing artifact must fail closed to a full re-audit, not pass")
 	}
 
@@ -73,11 +75,11 @@ func TestRequireReusableAudit_UnreadableArtifactFailsClosed(t *testing.T) {
 	if err := os.WriteFile(noVerdict, []byte("# Audit Report\n\nno verdict here\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := requireReusableAudit(auditLedgerEntry{ArtifactPath: noVerdict}); err == nil {
+	if err := requireReusableAudit(auditledger.Entry{ArtifactPath: noVerdict}); err == nil {
 		t.Error("an artifact with no parseable verdict must fail closed, not pass")
 	}
 
-	if err := requireReusableAudit(auditLedgerEntry{ArtifactPath: ""}); err == nil {
+	if err := requireReusableAudit(auditledger.Entry{ArtifactPath: ""}); err == nil {
 		t.Error("an entry with no artifact_path must fail closed")
 	}
 }
@@ -125,7 +127,7 @@ func TestRequireReusableAudit_ForeignPhaseSentinelRefused(t *testing.T) {
 	if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	err := requireReusableAudit(auditLedgerEntry{ArtifactPath: p})
+	err := requireReusableAudit(auditledger.Entry{ArtifactPath: p})
 	if err == nil {
 		t.Fatal("a build-phase sentinel must not satisfy the audit carry-forward guard")
 	}

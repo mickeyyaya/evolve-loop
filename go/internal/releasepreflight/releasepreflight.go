@@ -25,7 +25,6 @@
 package releasepreflight
 
 import (
-	"bufio"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -38,6 +37,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/auditledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 
 	"github.com/mickeyyaya/evolve-loop/go/pkg/naminguard"
@@ -359,24 +359,9 @@ type auditResult struct {
 	phantomCount int
 }
 
-// roleAuditorRE matches the bash grep '"role":"auditor"' substring search.
-var roleAuditorRE = regexp.MustCompile(`"role":"auditor"`)
-
-// artifactPathRE extracts the artifact_path field (matches jq -r .artifact_path).
-var artifactPathRE = regexp.MustCompile(`"artifact_path":"([^"]*)"`)
-
-// gitHeadRE extracts the git_head field — the commit an auditor entry bound.
-var gitHeadRE = regexp.MustCompile(`"git_head":"([^"]*)"`)
-
-// worktreeTreeSHARE extracts worktree_tree_sha, present ONLY when the audit
-// examined uncommitted worktree changes — i.e. it is the marker of a cycle/lane
-// audit as opposed to an audit of a committed tree.
-var worktreeTreeSHARE = regexp.MustCompile(`"worktree_tree_sha":"([^"]*)"`)
-
 // auditedUncommittedWork reports whether the entry bound a worktree delta.
-func auditedUncommittedWork(line string) bool {
-	m := worktreeTreeSHARE.FindStringSubmatch(line)
-	return len(m) >= 2 && m[1] != ""
+func auditedUncommittedWork(e auditledger.Entry) bool {
+	return e.WorktreeTreeSHA != ""
 }
 
 // shortSHA abbreviates a commit for operator-facing logs; "" stays "unknown".
@@ -389,20 +374,6 @@ func shortSHA(sha string) string {
 	}
 	return sha
 }
-
-// entryHead returns the commit the auditor ledger line bound, or "" when the
-// line carries none (legacy entries). An unknown head is never treated as a
-// match, so it falls to the conservative branch.
-func entryHead(line string) string {
-	m := gitHeadRE.FindStringSubmatch(line)
-	if len(m) < 2 {
-		return ""
-	}
-	return m[1]
-}
-
-// tsFieldRE extracts the ts field.
-var tsFieldRE = regexp.MustCompile(`"ts":"([^"]*)"`)
 
 // inlineVerdictRE matches `Verdict: PASS`, `**Verdict: PASS**`, or
 // `Verdict: **PASS**` (case-insensitive). Matches the bash:
@@ -471,50 +442,35 @@ const auditVerdictScopedOut = "SCOPED_OUT"
 
 func checkRecentAudit(ledgerPath, releaseHead string, strict bool, now time.Time) (auditResult, error) {
 	var res auditResult
-	body, err := os.ReadFile(ledgerPath)
+	rows, err := auditledger.AuditorRows(ledgerPath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			// Clean checkout / CI / fresh worktree: no ledger → advisory, not fatal.
 			res.verdict = auditVerdictNone
 			return res, nil
 		}
-		return res, fmt.Errorf("ledger read %s: %w", ledgerPath, err)
+		return res, err
 	}
-	// Walk auditor entries in reverse (newest first).
-	var auditorEntries []string
-	scanner := bufio.NewScanner(strings.NewReader(string(body)))
-	scanner.Buffer(make([]byte, 1<<20), 1<<24) // allow large lines
-	for scanner.Scan() {
-		line := scanner.Text()
-		if roleAuditorRE.MatchString(line) {
-			auditorEntries = append(auditorEntries, line)
-		}
-	}
-	if err := scanner.Err(); err != nil {
-		return res, fmt.Errorf("ledger read: %v", err)
-	}
-	if len(auditorEntries) == 0 {
+	if len(rows) == 0 {
 		// Ledger exists but no audit has run → audit signal unavailable, advisory.
 		res.verdict = auditVerdictNone
 		return res, nil
 	}
 
-	var candidate string
-	for i := len(auditorEntries) - 1; i >= 0; i-- {
-		entry := auditorEntries[i]
-		m := artifactPathRE.FindStringSubmatch(entry)
-		if len(m) < 2 || m[1] == "" {
+	var candidate *auditledger.Entry
+	for i := range rows {
+		if rows[i].ArtifactPath == "" {
 			res.phantomCount++
 			continue
 		}
-		if _, err := os.Stat(m[1]); err == nil {
-			candidate = entry
-			res.artifact = m[1]
+		if _, err := os.Stat(rows[i].ArtifactPath); err == nil {
+			candidate = &rows[i]
+			res.artifact = rows[i].ArtifactPath
 			break
 		}
 		res.phantomCount++
 	}
-	if candidate == "" {
+	if candidate == nil {
 		// Audit artifacts GC'd (all-phantom) or none usable → signal unavailable,
 		// advisory (not a failed audit). CI-green is the authoritative gate.
 		res.verdict = auditVerdictNone
@@ -565,9 +521,9 @@ func checkRecentAudit(ledgerPath, releaseHead string, strict bool, now time.Time
 		// still blocks. An unresolvable releaseHead keeps the conservative
 		// block: we cannot prove the failing audit is unrelated, so we do not
 		// assume it — scoping is never a bypass.
-		auditedHead := entryHead(candidate)
+		auditedHead := candidate.GitHEAD
 		scopedOut := releaseHead != "" &&
-			((auditedHead != "" && auditedHead != releaseHead) || auditedUncommittedWork(candidate))
+			((auditedHead != "" && auditedHead != releaseHead) || auditedUncommittedWork(*candidate))
 		if scopedOut {
 			res.verdict = auditVerdictScopedOut
 			res.auditedHead = auditedHead
@@ -583,11 +539,10 @@ func checkRecentAudit(ledgerPath, releaseHead string, strict bool, now time.Time
 	res.verdict = verdict
 
 	// Age check.
-	tsMatch := tsFieldRE.FindStringSubmatch(candidate)
-	if len(tsMatch) < 2 || tsMatch[1] == "" {
+	if candidate.TS == "" {
 		return res, errors.New("ledger entry missing ts")
 	}
-	ts, err := time.Parse(time.RFC3339, tsMatch[1])
+	ts, err := time.Parse(time.RFC3339, candidate.TS)
 	if err != nil {
 		// Bash fallback: missing/unparseable ts → skip age check (return ok).
 		return res, nil

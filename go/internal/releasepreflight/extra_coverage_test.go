@@ -145,7 +145,7 @@ func TestDefaultSimulationRunner_GoBinDefault(t *testing.T) {
 
 // auditEntry builds a single ledger JSONL line for an auditor entry.
 func auditEntry(artifactPath, ts string) string {
-	line := `{"role":"auditor"`
+	line := `{"role":"auditor","kind":"agent_subprocess"`
 	if artifactPath != "" {
 		line += `,"artifact_path":"` + artifactPath + `"`
 	}

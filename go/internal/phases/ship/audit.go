@@ -13,7 +13,6 @@ package ship
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -22,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/acssuite"
+	"github.com/mickeyyaya/evolve-loop/go/internal/auditledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
@@ -30,18 +30,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/treestate"
 )
 
-// auditEntry is the subset of LedgerEntry fields ship cares about.
-type auditEntry struct {
-	Role            string `json:"role"`
-	Kind            string `json:"kind"`
-	RunID           string `json:"run_id,omitempty"` // ADR-0049 S4 / G5: run-scope the binding lookup
-	ExitCode        int    `json:"exit_code"`
-	ArtifactPath    string `json:"artifact_path"`
-	ArtifactSHA256  string `json:"artifact_sha256"`
-	GitHEAD         string `json:"git_head"`
-	TreeStateSHA    string `json:"tree_state_sha"`
-	WorktreeTreeSHA string `json:"worktree_tree_sha"`
-}
+// auditEntry is the auditor ledger row ship binds to.
+type auditEntry = auditledger.Entry
 
 // verifyAuditBinding implements the full audit-binding contract.
 // res.Provenance is set on success; integrity errors return *IntegrityError.
@@ -176,67 +166,25 @@ func verifyAuditBinding(ctx context.Context, opts *Options, res *RunResult) erro
 
 var auditBoundTreeSHARe = regexp.MustCompile(`(?m)^audit_bound_tree_sha:\s*` + "`?" + `([0-9a-f]+)` + "`?")
 
-// findLatestAudit returns the auditor ledger entry ship binds to, walking
-// ledger.jsonl backwards for the most recent agent_subprocess entry with
-// role=auditor. When runID is set, ONLY an entry stamped with THIS run may
-// bind (ADR-0049 S4 / gap G5); a miss is a hard integrity stop, never a
-// fallback. The pre-2026-08-26 cross-run fallback was cycle-1571's H3
-// fail-open hole: a FAILed cycle (which then emitted no auditor entry) bound
-// a sibling lane's audit — surfacing as AUDIT_BINDING_HEAD_MOVED instead of
-// this run's FAIL, and, when the sibling shares HEAD, capable of SHIPPING a
-// FAILed cycle on the sibling's PASS. Same failure shape as the 2026-05-29
-// "ancient bash-era auditor entry" incident, closed at the consumer this time.
-// Standalone runID=="" keeps binding the latest auditor entry overall.
-//
-// Missing/empty ledger → IntegrityError. Found-but-no-auditor →
-// IntegrityError. Any unmarshal error on a candidate line is treated as
-// "not an auditor entry" (forward-compat: alien lines should not crash
-// ship-gate).
+// findLatestAudit returns the auditor ledger entry ship binds to: the newest
+// auditor row of opts.RunID's run, or of any run when runID is empty. A miss is
+// an integrity stop, never a fallback to another run's audit.
 func findLatestAudit(ledgerPath, runID string) (*auditEntry, error) {
-	raw, err := os.ReadFile(ledgerPath)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return nil, shipErr(core.CodeAuditBindingNoLedger, core.ShipClassPrecondition, core.StageVerifyClass,
-				fmt.Sprintf("no ledger at %s — no Auditor has ever run", ledgerPath), "ledger_path", ledgerPath)
-		}
+	entry, err := auditledger.LatestAuditorEntry(ledgerPath, runID)
+	switch {
+	case err == nil:
+		return &entry, nil
+	case errors.Is(err, auditledger.ErrNoAuditorForRun):
+		return nil, shipErr(core.CodeAuditBindingNoAuditor, core.ShipClassPrecondition, core.StageVerifyClass,
+			err.Error()+" — independent review missing",
+			"ledger_path", ledgerPath)
+	case errors.Is(err, os.ErrNotExist):
+		return nil, shipErr(core.CodeAuditBindingNoLedger, core.ShipClassPrecondition, core.StageVerifyClass,
+			fmt.Sprintf("no ledger at %s — no Auditor has ever run", ledgerPath), "ledger_path", ledgerPath)
+	default:
 		return nil, shipErr(core.CodeStateIO, core.ShipClassTransient, core.StageVerifyClass,
-			"ship: read ledger: "+err.Error(), "ledger_path", ledgerPath)
+			"ship: "+err.Error(), "ledger_path", ledgerPath)
 	}
-	lines := strings.Split(string(raw), "\n")
-	var latestForeign *auditEntry // newest refused entry, for the error's forensics only
-	for i := len(lines) - 1; i >= 0; i-- {
-		line := strings.TrimSpace(lines[i])
-		if line == "" {
-			continue
-		}
-		var e auditEntry
-		if err := json.Unmarshal([]byte(line), &e); err != nil {
-			continue
-		}
-		if e.Kind != "agent_subprocess" || e.Role != "auditor" {
-			continue
-		}
-		if runID == "" || e.RunID == runID {
-			entry := e
-			return &entry, nil
-		}
-		if latestForeign == nil {
-			entry := e
-			latestForeign = &entry
-		}
-	}
-	msg := "no Auditor ledger entry found — independent review missing"
-	if latestForeign != nil {
-		foreignRun := latestForeign.RunID
-		if foreignRun == "" {
-			foreignRun = "<unstamped>"
-		}
-		msg = fmt.Sprintf(
-			"no Auditor ledger entry for run %s — independent review missing (refused to bind foreign run %s, git_head=%s: one cycle's ship gate must never be satisfied by another cycle's audit)",
-			runID, foreignRun, latestForeign.GitHEAD)
-	}
-	return nil, shipErr(core.CodeAuditBindingNoAuditor, core.ShipClassPrecondition, core.StageVerifyClass,
-		msg, "ledger_path", ledgerPath)
 }
 
 // parseVerdicts grep-and-awk's the audit report for PASS/WARN/FAIL.

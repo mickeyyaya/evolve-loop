@@ -1,0 +1,26 @@
+{
+  "connects_to": [
+    "go/internal/phases/ship/audit.go",
+    "go/cmd/evolve/cmd_composition_wiring.go",
+    "go/internal/releasepreflight/releasepreflight.go"
+  ],
+  "consumed": {
+    "at": "2026-09-26T04:45:13Z",
+    "cycle": "",
+    "via": "ship"
+  },
+  "created_at": "2026-08-27T06:00:00Z",
+  "files": [
+    "go/internal/phases/ship/audit.go",
+    "go/cmd/evolve/cmd_composition_wiring.go",
+    "go/internal/releasepreflight/releasepreflight.go",
+    "go/internal/phases/ship/runscope_test.go",
+    "go/cmd/evolve/cmd_composition_runscope_test.go"
+  ],
+  "id": "unify-auditor-ledger-readers",
+  "kind": "refactor",
+  "summary": "ship.findLatestAudit, cmd/evolve.latestAuditEntry, releasepreflight.checkRecentAudit, and redteamcheck each re-declare a struct/regex for the same ledger row and each encode their own scoping policy. The TODO(merge-concurrency-2026) at cmd_composition_wiring.go:105 says to fold them together 'if a third consumer appears' — the third and fourth have appeared, so the TODO is stale. Operating-policy §3.5 (single source with projection) applies; the in-repo precedent is internal/treestate, cited in ship/audit.go's own comments, plus verdictcache.ProbeEligible. Shape: a leaf package owning the scan + run-scope predicate + a typed ErrNoAuditorForRun carrying the refused foreign entry for forensics, with each consumer mapping the sentinel onto its own error vocabulary. Merges two near-identical test files as a side effect. Also refresh the stale TODO. Est. half a day, one lane.",
+  "surface_note": "2026-09-26 console readiness audit (read-only, against main): READY — TODO(merge-concurrency-2026) still open at cmd_composition_wiring.go:105; the four readers are independent. | 2026-09-26 console premise audit (read-only, against main 4bd6f2ee): PARTIAL — THREE genuine duplicates of find-latest-auditor-entry + run/cycle scoping: phases/ship/audit.go:195 findLatestAudit, cmd/evolve/cmd_composition_wiring.go:159 latestAuditEntry (TODO :105-106 names the third consumer), releasepreflight/releasepreflight.go:472 checkRecentAudit (regex). redteamcheck is OUT OF SCOPE: it scans ALL roles cycle-scoped (LedgerRoleCompleteness :91, ChallengeTokenIntegrity :183) — no run scoping, no auditor-only miss case; do not fold it into the helper.",
+  "title": "Four independent readers of the auditor ledger entry — unify behind one helper with a typed sentinel",
+  "weight": 0.72
+}

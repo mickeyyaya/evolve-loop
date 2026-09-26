@@ -10,10 +10,13 @@ package main
 // latest-any.
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/auditledger"
 )
 
 func writeLedger(t *testing.T, lines ...string) string {
@@ -60,5 +63,27 @@ func TestLatestAuditEntry_NoRunContext_KeepsLatestAny(t *testing.T) {
 	}
 	if e.GitHEAD != "shaNew" {
 		t.Errorf("runID=\"\" got git_head=%q, want latest shaNew (standalone behavior unchanged)", e.GitHEAD)
+	}
+}
+
+func TestLatestAuditEntry_SkipsRowWithoutGitHead(t *testing.T) {
+	t.Parallel()
+	p := writeLedger(t,
+		`{"role":"auditor","kind":"agent_subprocess","run_id":"MINE","git_head":"shaBound","artifact_sha256":"a"}`,
+		`{"role":"auditor","kind":"agent_subprocess","run_id":"MINE","artifact_sha256":"b"}`)
+	e, err := latestAuditEntry(p, "MINE")
+	if err != nil {
+		t.Fatalf("latestAuditEntry: %v", err)
+	}
+	if e.GitHEAD != "shaBound" {
+		t.Errorf("bound git_head=%q, want shaBound (a row without git_head cannot seed the snapshot diff)", e.GitHEAD)
+	}
+}
+
+func TestLatestAuditEntry_MissIsTheAuditledgerSentinel(t *testing.T) {
+	t.Parallel()
+	p := writeLedger(t, `{"role":"auditor","kind":"agent_subprocess","run_id":"MINE"}`)
+	if _, err := latestAuditEntry(p, "MINE"); !errors.Is(err, auditledger.ErrNoAuditorForRun) {
+		t.Fatalf("a run whose only row bound no commit must miss with ErrNoAuditorForRun, got %v", err)
 	}
 }

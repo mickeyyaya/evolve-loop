@@ -366,9 +366,9 @@ func TestRun_PhantomEntries(t *testing.T) {
 	// Two phantom entries (missing artifact) followed by one valid (older).
 	// Reverse-order traversal must skip the phantoms and accept the valid.
 	ledger := strings.Join([]string{
-		fmt.Sprintf(`{"ts":"%s","role":"auditor","artifact_path":"%s"}`, now, auditPath),
-		fmt.Sprintf(`{"ts":"%s","role":"auditor","artifact_path":"/tmp/doesnotexist-1.md"}`, now),
-		fmt.Sprintf(`{"ts":"%s","role":"auditor","artifact_path":"/tmp/doesnotexist-2.md"}`, now),
+		fmt.Sprintf(`{"ts":"%s","role":"auditor","kind":"agent_subprocess","artifact_path":"%s"}`, now, auditPath),
+		fmt.Sprintf(`{"ts":"%s","role":"auditor","kind":"agent_subprocess","artifact_path":"/tmp/doesnotexist-1.md"}`, now),
+		fmt.Sprintf(`{"ts":"%s","role":"auditor","kind":"agent_subprocess","artifact_path":"/tmp/doesnotexist-2.md"}`, now),
 	}, "\n") + "\n"
 	if err := os.WriteFile(filepath.Join(r, ".evolve", "ledger.jsonl"),
 		[]byte(ledger), 0o644); err != nil {
@@ -394,7 +394,7 @@ func TestRun_StaleAudit(t *testing.T) {
 	// 8 days ago.
 	staleTs := time.Now().Add(-8 * 24 * time.Hour).UTC().Format(time.RFC3339)
 	ledger := fmt.Sprintf(
-		`{"ts":"%s","role":"auditor","artifact_path":"%s"}`+"\n",
+		`{"ts":"%s","role":"auditor","kind":"agent_subprocess","artifact_path":"%s"}`+"\n",
 		staleTs, auditPath)
 	if err := os.WriteFile(filepath.Join(r, ".evolve", "ledger.jsonl"),
 		[]byte(ledger), 0o644); err != nil {

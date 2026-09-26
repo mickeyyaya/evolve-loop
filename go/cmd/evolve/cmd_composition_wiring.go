@@ -15,14 +15,13 @@ package main
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
+	"github.com/mickeyyaya/evolve-loop/go/internal/auditledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
@@ -98,21 +97,6 @@ func runComposedGates(ctx context.Context, worktree string) map[string]string {
 	return results
 }
 
-// auditLedgerEntry is the composition-verdict-scoped subset of an auditor
-// ledger line the snapshot needs. Ship's audit reader (findLatestAudit) is
-// package-private; a 4-field scan avoids exporting ship internals for this
-// single call site.
-// TODO(merge-concurrency-2026): fold into a shared ledger read-side helper if
-// a third consumer appears.
-type auditLedgerEntry struct {
-	Role           string `json:"role"`
-	Kind           string `json:"kind"`
-	RunID          string `json:"run_id"`
-	ArtifactPath   string `json:"artifact_path"`
-	ArtifactSHA256 string `json:"artifact_sha256"`
-	GitHEAD        string `json:"git_head"`
-}
-
 // readCompositionSnapshot captures what the bound audit reviewed BEFORE a
 // peer moved main: the auditor entry's artifact SHA (LaneAuditRef), the git
 // HEAD it bound (AuditedBase), and the audited change as a diff + its
@@ -146,39 +130,26 @@ func readCompositionSnapshot(ctx context.Context, worktree, runID string) (core.
 	}, nil
 }
 
-// latestAuditEntry walks ledger.jsonl backwards for the most recent bound
-// auditor entry OF THIS RUN. Run-scoped since 2026-08-26, same hardening as
-// ship.findLatestAudit (whose old cross-run fallback was cycle-1571's H3
-// fail-open hole): the ledger is host-global across fleet worktrees, and the
-// producer now records auditor entries for FAIL verdicts too, so an unscoped
-// "latest" can be a sibling lane's — or a FAILed — audit. runID=="" (no run
-// context) keeps latest-any. findCompositionVerdict's LaneAuditRef equality
-// against this run's own bound artifact remains the downstream safety net
-// either way. Alien/unparseable lines are skipped; a miss is an error the
-// snapshot surfaces so compositionCarryForward fails closed to full re-audit.
-func latestAuditEntry(ledgerPath, runID string) (auditLedgerEntry, error) {
-	raw, err := os.ReadFile(ledgerPath)
+// latestAuditEntry returns this run's newest auditor row that bound a commit
+// (latest-any when runID is empty). Rows without a git_head are skipped: the
+// snapshot diffs against the bound head. Any miss is an error, so
+// compositionCarryForward fails closed to a full re-audit.
+func latestAuditEntry(ledgerPath, runID string) (auditledger.Entry, error) {
+	rows, err := auditledger.AuditorRows(ledgerPath)
 	if err != nil {
-		return auditLedgerEntry{}, fmt.Errorf("composition snapshot: read ledger %s: %w", ledgerPath, err)
+		return auditledger.Entry{}, fmt.Errorf("composition snapshot: %w", err)
 	}
-	lines := strings.Split(string(raw), "\n")
-	for i := len(lines) - 1; i >= 0; i-- {
-		line := strings.TrimSpace(lines[i])
-		if line == "" {
-			continue
-		}
-		var e auditLedgerEntry
-		if err := json.Unmarshal([]byte(line), &e); err != nil {
-			continue
-		}
-		if e.Kind != "agent_subprocess" || e.Role != "auditor" || e.GitHEAD == "" {
-			continue
-		}
-		if runID == "" || e.RunID == runID {
-			return e, nil
+	bound := make([]auditledger.Entry, 0, len(rows))
+	for _, e := range rows {
+		if e.GitHEAD != "" {
+			bound = append(bound, e)
 		}
 	}
-	return auditLedgerEntry{}, fmt.Errorf("composition snapshot: no bound auditor entry for run %q in %s (foreign-run entries refused)", runID, ledgerPath)
+	entry, err := auditledger.BindRun(bound, runID)
+	if err != nil {
+		return auditledger.Entry{}, fmt.Errorf("composition snapshot: %w in %s (foreign-run entries refused)", err, ledgerPath)
+	}
+	return entry, nil
 }
 
 // requireReusableAudit refuses to build a carry-forward snapshot from an audit
@@ -194,7 +165,7 @@ func latestAuditEntry(ledgerPath, runID string) (auditLedgerEntry, error) {
 // severity lives in the artifact. Deliberately no fallback to an older PASS —
 // if this run's newest audit says FAIL, carry-forward declines rather than
 // reaching behind it. Every failure path here fails CLOSED to a full re-audit.
-func requireReusableAudit(entry auditLedgerEntry) error {
+func requireReusableAudit(entry auditledger.Entry) error {
 	if entry.ArtifactPath == "" {
 		return fmt.Errorf("composition snapshot: bound auditor entry has no artifact_path — cannot confirm its verdict")
 	}
