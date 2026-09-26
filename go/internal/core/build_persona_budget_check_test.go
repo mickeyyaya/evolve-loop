@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
 func TestPersonaDocTouched(t *testing.T) {
@@ -112,14 +114,8 @@ func TestDefaultBuildFloorChecks_IncludesPersonaBudgetCheck(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")
 	}
-	wt := t.TempDir()
-	git := func(args ...string) {
-		t.Helper()
-		cmd := exec.Command("git", append([]string{"-C", wt}, args...)...)
-		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("git %v: %v\n%s", args, err, out)
-		}
-	}
+	repo := gittest.Fixture(t)
+	wt := repo.Dir
 	write := func(rel, body string) {
 		t.Helper()
 		p := filepath.Join(wt, rel)
@@ -130,24 +126,17 @@ func TestDefaultBuildFloorChecks_IncludesPersonaBudgetCheck(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	git("init", "-q")
-	git("config", "user.email", "t@t")
-	git("config", "user.name", "t")
 	write("agents/evolve-scout.md", "# Evolve Scout\n")
 	write("docs/notes.md", "# Notes\n")
-	git("add", "-A")
-	git("commit", "-q", "-m", "base")
-	baseOut, err := exec.Command("git", "-C", wt, "rev-parse", "HEAD").Output()
-	if err != nil {
-		t.Fatal(err)
-	}
-	base := strings.TrimSpace(string(baseOut))
+	repo.Git("add", "-A")
+	repo.Git("commit", "-q", "-m", "base")
+	base := repo.Git("rev-parse", "HEAD")
 	in := ReviewInput{Phase: string(PhaseBuild), Worktree: wt, WorktreeBaseSHA: base}
 
 	// The builder protocol commits its work.
 	write("agents/evolve-scout.md", "# Evolve Scout\n\nlines that blow the budget\n")
-	git("add", "-A")
-	git("commit", "-q", "-m", "persona edit")
+	repo.Git("add", "-A")
+	repo.Git("commit", "-q", "-m", "persona edit")
 
 	stubSelfCheckRunner(t, "--- FAIL: TestPersonaStopCriterionDedupe_CombinedLineCountReduced\n", false)
 	fails := DefaultBuildFloorChecks(context.Background(), in)

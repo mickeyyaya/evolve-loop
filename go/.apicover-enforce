@@ -650,3 +650,5 @@
 ./internal/auditledger
 # lanerouting — the one predicate for "no lane can change this path": protected surface OR the build profile's sandbox deny list.
 ./internal/lanerouting
+# gittest — the one owner of git-backed test fixtures: quiet-maintenance repos, retried teardown that names its holder.
+./internal/gittest

@@ -3,7 +3,6 @@ package routingtest
 import (
 	"context"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
@@ -160,8 +160,7 @@ func runCycle(t *testing.T, s ScenarioSpec) {
 		opts = append(opts, core.WithWorkflowConfig(policy.WorkflowConfig{PhaseEnables: phaseEnables}))
 	}
 
-	projectRoot := t.TempDir()
-	initScenarioRepo(t, projectRoot)
+	projectRoot := initScenarioRepo(t)
 	cycle := s.LastCycle + 1
 	ws := seedWorkspace(t, projectRoot, cycle, s.Signals.HandoffFiles())
 
@@ -225,22 +224,18 @@ func runCycle(t *testing.T, s ScenarioSpec) {
 	}
 }
 
-func initScenarioRepo(t *testing.T, root string) {
+// initScenarioRepo returns the root of a committed scenario repo built through
+// gittest, so the commits RunCycle makes inside it cannot leave a background
+// git writing into the tree at teardown.
+func initScenarioRepo(t *testing.T) string {
 	t.Helper()
-	if err := os.WriteFile(filepath.Join(root, ".gitignore"), []byte(".evolve/\ngo/bin/\n"), 0o644); err != nil {
+	repo := gittest.Fixture(t)
+	if err := os.WriteFile(filepath.Join(repo.Dir, ".gitignore"), []byte(".evolve/\ngo/bin/\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	for _, args := range [][]string{
-		{"init", "-q"},
-		{"config", "user.email", "test@evolve-loop.test"},
-		{"config", "user.name", "Evolve Test"},
-		{"add", ".gitignore"},
-		{"commit", "-q", "-m", "scenario base"},
-	} {
-		if out, err := exec.Command("git", append([]string{"-C", root}, args...)...).CombinedOutput(); err != nil {
-			t.Fatalf("git %v: %v: %s", args, err, strings.TrimSpace(string(out)))
-		}
-	}
+	repo.Git("add", ".gitignore")
+	repo.Git("commit", "-q", "-m", "scenario base")
+	return repo.Dir
 }
 
 // --- assertion helpers ---
