@@ -22,7 +22,7 @@ func TestBenchable_AdmitsTheExhaustedWall(t *testing.T) {
 				"or the family is re-dispatched into a wall we already measured", p)
 		}
 	}
-	for _, p := range []string{"trust_prompt", "auth_recheck", ""} {
+	for _, p := range []string{"trust_prompt", "model_deprecation_continue", ""} {
 		if Benchable(p) {
 			t.Errorf("Benchable(%q) = true — situational escalations must stay retryable", p)
 		}

@@ -288,8 +288,8 @@ func BenchOnEscalation(projectRoot, workspace, cli string, dispatchStart time.Ti
 		logf("WARN cli-health bench write failed: %v\n", err)
 		return
 	}
-	logf("cli-health: benched family %s until %s (pattern=%s strikes=%d)\n",
-		family, entry.BenchedUntil.Format(time.RFC3339), rep.Pattern, entry.Strikes)
+	logf("cli-health: benched family %s until %s (pattern=%s strikes=%d)%s\n",
+		family, entry.BenchedUntil.Format(time.RFC3339), rep.Pattern, entry.Strikes, operatorSuffix(entry))
 }
 
 // Signals forwards the inner adapter's Signal Center so the verdict engine of
@@ -310,4 +310,12 @@ func (w *Walking) SignalsWired() bool {
 		return src.SignalsWired()
 	}
 	return false
+}
+
+// operatorSuffix appends the operator's fix to a bench line when the wall needs one.
+func operatorSuffix(entry clihealth.Entry) string {
+	if entry.OperatorAction != "" {
+		return " — " + entry.OperatorAction
+	}
+	return ""
 }

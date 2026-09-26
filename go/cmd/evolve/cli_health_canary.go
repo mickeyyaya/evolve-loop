@@ -55,6 +55,9 @@ func runCLIHealthCanary(ctx context.Context, projectRoot string, env map[string]
 			entry, _ := store.BenchWall(family, pattern, scrollback)
 			fmt.Fprintf(stderr, "[loop] cli-health canary: %s still walled (pattern=%s) — re-benched until %s (strikes=%d)\n",
 				family, pattern, entry.BenchedUntil.Format(time.RFC3339), entry.Strikes)
+			if entry.OperatorAction != "" {
+				fmt.Fprintf(stderr, "[loop] cli-health canary: %s\n", entry.OperatorAction)
+			}
 		default:
 			_ = store.Clear(family)
 			fmt.Fprintf(stderr, "[loop] cli-health canary: %s probe failed rc=%d (not a wall) — bench cleared; normal dispatch machinery owns this failure class\n",
