@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — a credential wall benches the family and names the operator's fix (ADR-0106 Q2, 2026-09-27)
+
+- `clihealth.Benchable` admits `auth_recheck` (`CredentialPattern`): wave 14 re-dispatched claude fourteen times into "Please log in". Unlike a quota bench it stays active for routing after its cooldown (the cooldown only schedules the canary's next probe; a succeeding probe after the operator's login clears it), a login pane's stale reset hint never sets it, and while it stands, `clihealth.OperatorAction` names the fix on the chain walker's bench line and the canary's re-bench line.
+
 ## Fixed — a quota wall on a correction, a remediation re-run or a resumed review defers the cycle (ADR-0106 Q1, 2026-09-27)
 
 Cycle 1708 met every CLI family walled on its build correction re-dispatch and was sealed FAIL; cycle 1709 met the same wall on a first dispatch and was deferred.
