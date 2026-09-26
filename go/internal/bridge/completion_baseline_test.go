@@ -1,21 +1,5 @@
 package bridge
 
-// completion_baseline_test.go — the pre-dispatch artifact baseline
-// (cycle-1550; red test salvaged from the 1554 lane's ADR-0076 continuation
-// snapshot). A correction re-dispatch whose prior failed attempt left its
-// report at the canonical path had those UNCHANGED bytes certified as
-// completion after two stability ticks — no post-dispatch write required —
-// so a stale FAIL verdict re-graded itself on every retry. The contract: an
-// observation identical to the pre-dispatch baseline never begins a stability
-// window and never completes, the finality concession included; the moment
-// the agent actually writes (mtime/size change), everything behaves as before.
-//
-// newArtifactDetectorAt (the baseline-FREE helper) deliberately stays for the
-// existing suite: those tests write files as harness setup for
-// "agent-wrote-mid-session" scenarios, which is exactly what an absent
-// baseline models. Only these tests construct with a captured baseline, the
-// way production does before prompt delivery.
-
 import (
 	"context"
 	"os"
@@ -29,9 +13,6 @@ func newArtifactDetectorWithBaselineAt(ws, artifact string) *artifactDetector {
 	return &artifactDetector{cfg: cfg, baseline: captureArtifactBaseline(cfg)}
 }
 
-// The 1554 lane's red test, verbatim intent: pre-existing artifact, fresh
-// detector with the baseline captured — unchanged bytes must never certify;
-// the first post-dispatch write begins a normal stability window.
 func TestArtifactDetector_PreExistingArtifactRequiresPostDispatchWrite(t *testing.T) {
 	ws := t.TempDir()
 	canonical := filepath.Join(ws, "report.md")
@@ -58,9 +39,6 @@ func TestArtifactDetector_PreExistingArtifactRequiresPostDispatchWrite(t *testin
 	}
 }
 
-// The finality concession stops at the baseline: at the buzzer, an artifact
-// byte-identical to the pre-dispatch snapshot must NOT complete — timeout is
-// the honest outcome for an agent that wrote nothing all session.
 func TestArtifactDetector_FinalPollRefusesUnchangedBaseline(t *testing.T) {
 	ws := t.TempDir()
 	canonical := filepath.Join(ws, "report.md")
@@ -75,8 +53,6 @@ func TestArtifactDetector_FinalPollRefusesUnchangedBaseline(t *testing.T) {
 	}
 }
 
-// …but an artifact the agent DID rewrite keeps the concession: finality still
-// completes a post-dispatch write even without a closed stability window.
 func TestArtifactDetector_FinalPollStillCompletesPostDispatchWrite(t *testing.T) {
 	ws := t.TempDir()
 	canonical := filepath.Join(ws, "report.md")
@@ -92,8 +68,6 @@ func TestArtifactDetector_FinalPollStillCompletesPostDispatchWrite(t *testing.T)
 	}
 }
 
-// No pre-dispatch artifact = absent baseline: behavior is byte-identical to
-// the pre-fix detector (the 15 existing debounce/finality tests pin the rest).
 func TestCaptureArtifactBaseline(t *testing.T) {
 	ws := t.TempDir()
 	canonical := filepath.Join(ws, "report.md")
@@ -108,14 +82,6 @@ func TestCaptureArtifactBaseline(t *testing.T) {
 	}
 }
 
-// PRODUCTION-PATH wiring pin (the layer the unit tests cannot see): the
-// baseline capture happens inside runTmuxREPL itself, BEFORE prompt delivery,
-// and is threaded into the detector. Driven through the full engine
-// (LaunchArgs → runTmuxREPL): a stale artifact left at the canonical path by
-// a prior failed attempt, with a live session that never writes, must drive
-// the run to ExitArtifactTimeout — pre-fix, the detector certified the stale
-// bytes after two stability ticks and the run "completed" with the prior
-// attempt's verdict (cycle-1550's re-grade loop).
 func TestRunTmuxREPL_StalePreDispatchArtifactTimesOutInsteadOfCompleting(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
 	writeArtifact(t, fx.artifact, "verdict: FAIL\nprior attempt's report\n", fixedMTime)
@@ -150,15 +116,10 @@ func TestArtifactDetector_SameMTimeDifferentSizeWriteIsPostDispatch(t *testing.T
 	}
 }
 
-// zeroBaselineCapture declares a harness's pre-seeded artifact to be a stand-in
-// for a MID-SESSION write (fake sessions cannot write files): no pre-dispatch
-// baseline exists in the modeled scenario.
+// zeroBaselineCapture models a fake session, which cannot write files, as
+// already mid-session: no pre-dispatch baseline exists.
 func zeroBaselineCapture(*Config) artifactBaseline { return artifactBaseline{} }
 
-// The production default must remain the REAL capture: if withDefaults ever
-// stops wiring captureArtifactBaseline, the stale-artifact gate silently
-// disappears from every live dispatch while explicit-injection tests stay
-// green — this pin is the tripwire.
 func TestDepsWithDefaults_CaptureBaselineIsReal(t *testing.T) {
 	ws := t.TempDir()
 	canonical := filepath.Join(ws, "report.md")
@@ -170,11 +131,10 @@ func TestDepsWithDefaults_CaptureBaselineIsReal(t *testing.T) {
 	}
 }
 
-// Design-review note 1 (the side door): a pre-dispatch STRAY at a fallback
-// location, shadowed by the stale canonical at capture time, must also be
-// baselined — if the canonical vanishes mid-session (rm-then-rewrite gap),
-// the stray gets located and would otherwise start a fresh window and launder
-// the same class through the fallback path.
+// A pre-dispatch stray at a fallback location, shadowed by the stale
+// canonical at capture time, must also be baselined: if the canonical
+// vanishes mid-session (a rm-then-rewrite gap), the stray would otherwise
+// start a fresh window and launder the same class through the fallback path.
 func TestArtifactDetector_ShadowedFallbackStrayIsAlsoBaselined(t *testing.T) {
 	ws := t.TempDir()
 	canonical := filepath.Join(ws, "report.md")

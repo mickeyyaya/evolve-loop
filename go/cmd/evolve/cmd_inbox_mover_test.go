@@ -140,7 +140,6 @@ func TestCmd_InboxMover_Promote_CommitSHAFlag(t *testing.T) {
 	if rc != 0 {
 		t.Fatalf("rc = %d, want 0", rc)
 	}
-	// File should have SHA8 prefix.
 	dest := filepath.Join(d, ".evolve", "inbox", "processed", "cycle-5", "deadbeef-task-1.json")
 	if _, err := os.Stat(dest); err != nil {
 		t.Errorf("dest with SHA prefix missing: %v", err)

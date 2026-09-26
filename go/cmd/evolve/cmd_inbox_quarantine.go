@@ -1,13 +1,3 @@
-// cmd_inbox_quarantine.go — operator surface for ADR-0072 S5 task quarantine.
-//
-//	evolve inbox quarantine list [--json]     show quarantined poison todos
-//	evolve inbox quarantine release <id>      un-quarantine an item (reset its
-//	                                          failure count, return to inbox root)
-//
-// This is the escape hatch for the automatic S5 quarantine wired into the loop's
-// cycle-failure drain: an operator inspects why a todo was quarantined (the item
-// JSON carries failure_count + last_failure_reason) and, once the root cause is
-// fixed, releases it back into triage.
 package main
 
 import (
@@ -20,6 +10,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 )
 
+// runInboxQuarantine implements `evolve inbox quarantine list [--json]` and
+// `evolve inbox quarantine release <id>` — the operator surface for the
+// automatic task quarantine wired into the loop's cycle-failure drain.
+// See ADR-0072.
 func runInboxQuarantine(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
 		fmt.Fprintln(stderr, "usage: evolve inbox quarantine <list|release> ...")

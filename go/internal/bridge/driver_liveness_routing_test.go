@@ -1,14 +1,7 @@
 package bridge
 
-// driver_liveness_routing_test.go — pins the bridge-level detectorFor seam (T2).
-//
-// Pre-GREEN: detectorFor already delegates correctly to panestream.DetectorFor;
-// these tests pin the routing at the consumer boundary (tmux_pane_checks.go:27)
-// against future regression (e.g. a new driver silently falling to the coarse
-// boolean path).
-//
-// Why package bridge (not bridge_test): detectorFor is unexported; the only way
-// to call it without making it exported is from within the package itself.
+// This file is package bridge, not bridge_test, because detectorFor is
+// unexported; calling it without exporting it requires being in-package.
 
 import (
 	"bytes"
@@ -30,8 +23,6 @@ func repoRootForBridge(t *testing.T) string {
 	return strings.TrimSpace(string(out))
 }
 
-// TestDriverLivenessRouting_ClaudeTmux asserts that claude-tmux maps to ClaudeDetector,
-// enabling the monotonic-↓-token-counter Converging override for claude sessions.
 func TestDriverLivenessRouting_ClaudeTmux(t *testing.T) {
 	lp := tmuxLaunch{name: "claude-tmux"}
 	probe := detectorFor(lp)
@@ -40,8 +31,6 @@ func TestDriverLivenessRouting_ClaudeTmux(t *testing.T) {
 	}
 }
 
-// TestDriverLivenessRouting_CodexTmux asserts that codex-tmux maps to DefaultDetector
-// (codex has no busy affordance; growth-velocity-only is the documented fallback).
 func TestDriverLivenessRouting_CodexTmux(t *testing.T) {
 	lp := tmuxLaunch{name: "codex-tmux"}
 	probe := detectorFor(lp)
@@ -50,8 +39,6 @@ func TestDriverLivenessRouting_CodexTmux(t *testing.T) {
 	}
 }
 
-// TestDriverLivenessRouting_AgyTmux asserts that agy-tmux maps to AgyDetector,
-// enabling the ⣯-Generating-spinner override for agy sessions.
 func TestDriverLivenessRouting_AgyTmux(t *testing.T) {
 	lp := tmuxLaunch{name: "agy-tmux"}
 	probe := detectorFor(lp)
@@ -60,8 +47,6 @@ func TestDriverLivenessRouting_AgyTmux(t *testing.T) {
 	}
 }
 
-// TestDriverLivenessRouting_OllamaTmux asserts that ollama-tmux maps to OllamaDetector,
-// enabling the "Thinking..." header Converging override for ollama sessions.
 func TestDriverLivenessRouting_OllamaTmux(t *testing.T) {
 	lp := tmuxLaunch{name: "ollama-tmux"}
 	probe := detectorFor(lp)
@@ -70,10 +55,6 @@ func TestDriverLivenessRouting_OllamaTmux(t *testing.T) {
 	}
 }
 
-// TestDriverLivenessRouting_UnknownTmux is the load-bearing negative test: an
-// unknown driver must never return nil (which would panic in the reviewer) and must
-// never fall to a coarse boolean-only path — it routes to DefaultDetector so the
-// growth-velocity strategy is always available.
 func TestDriverLivenessRouting_UnknownTmux(t *testing.T) {
 	lp := tmuxLaunch{name: "unknown-tmux"}
 	probe := detectorFor(lp)
@@ -85,10 +66,6 @@ func TestDriverLivenessRouting_UnknownTmux(t *testing.T) {
 	}
 }
 
-// TestDriverLivenessRouting_StopReviewHasNoCLILiterals is the grep-assert that
-// stopreview.go contains zero CLI-name literals ("claude", "codex", "agy", "ollama").
-// All per-CLI branching must live in panestream.DetectorFor (ADR-0047 §3), not the
-// reviewer — this test pins that invariant at the file level.
 func TestDriverLivenessRouting_StopReviewHasNoCLILiterals(t *testing.T) {
 	root := repoRootForBridge(t)
 	path := filepath.Join(root, "go", "internal", "bridge", "stopreview.go")

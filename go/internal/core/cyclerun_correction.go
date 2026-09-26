@@ -13,7 +13,7 @@ import (
 // iteration consumes one rung budget or terminates, and temporary routing and
 // correction directives are restored before the method returns.
 func (cr *cycleRun) reviewWithCorrections(next Phase, dr *dispatchResult) (loopAction, error) {
-	// Workstream E2: per-phase deliverable review gate. Runs ONLY for
+	// Per-phase deliverable review gate. Runs ONLY for
 	// non-SKIPPED verdicts (a SKIPPED phase produced no deliverable to
 	// review) and BEFORE the tree-diff guard + ledger append, so a reject
 	// aborts the cycle without recording the phase as a success. The
@@ -36,17 +36,16 @@ func (cr *cycleRun) reviewWithCorrections(next Phase, dr *dispatchResult) (loopA
 		// advisor overlay under model_routing=auto; empty otherwise). The
 		// contract-block escalation below temporarily overrides it for a
 		// re-dispatch and this value is restored when the ladder ends, so the
-		// phase's own routing is never mutated (scoping constraint 1 in
-		// contract_escalation.go).
+		// phase's own routing is never mutated.
 		baseRoutingCLI := dr.phaseReq.ModelRoutingCLI
 		// escalated latches once a contract-block escalation has re-pointed a
 		// re-dispatch, so the demotion WARN can state truthfully whether
 		// escalation was tried (it is a no-op for a phase whose whole chain is
 		// one CLI family).
 		escalated := false
-		// salvageRetried latches once the no-escalation-target remedy (scoping
-		// constraint 5) has turned a correction into a structured re-prompt, so
-		// the demotion record can distinguish "a remedy was tried and failed"
+		// salvageRetried latches once the no-escalation-target remedy has
+		// turned a correction into a structured re-prompt, so the demotion
+		// record can distinguish "a remedy was tried and failed"
 		// from "no remedy was possible". Disjoint from escalated by construction:
 		// the remedy fires only where contractEscalationCLI found no target.
 		salvageRetried := false
@@ -64,25 +63,23 @@ func (cr *cycleRun) reviewWithCorrections(next Phase, dr *dispatchResult) (loopA
 		// runner.Run directly (no
 		// bridge-timeout retry on corrections — see the design's scope note).
 		maxCorrections := cr.correctionLimitFor(next, cr.retryConfig.ContractCorrectionRetries)
-		// ADR-0045 I1: a correction re-dispatch is an interaction — every
-		// rung of ONE correction decision shares a DecisionID, and each
-		// re-dispatch records an outcome resolved by its verdict + the
-		// re-review. The I2 ladder's salvage/live-fix rungs will join
-		// this same decision when they ship.
+		// A correction re-dispatch is an interaction: every rung of ONE
+		// correction decision shares a DecisionID, and each re-dispatch
+		// records an outcome resolved by its verdict + the re-review. The
+		// ladder's salvage/live-fix rungs join this same decision.
+		// See ADR-0045.
 		irec := interaction.NewRecorder(cr.cs.WorkspacePath)
 		decisionID := ""
 		if !rr.Approve && (maxCorrections > 0 || cr.o.contractVerifier != nil) {
 			decisionID = fmt.Sprintf("%s-c%d-%d", next, cr.cycle, cr.o.now().UnixNano())
 		}
-		// ADR-0045 I2: graduated correction ladder. The DECISION is the
-		// pure interaction.NextCorrection CoR (salvage → live_fix →
-		// redispatch, cheapest first); EXECUTION is stage-gated here.
-		// Salvage gets budget only when a breaker-neutral verifier is
-		// wired. Rung 2 (live_fix) is decision-complete but
-		// execution-dormant at v1: the orchestrator does not yet request
-		// named sessions, so NamedREPL is hard-false until the session
-		// request + reaper plumbing lands (the C1→C3 deferred-unification
-		// precedent; see interaction/correction.go).
+		// The graduated correction ladder: interaction.NextCorrection decides
+		// (salvage → live_fix → redispatch, cheapest first); execution is
+		// stage-gated here. Salvage gets budget only when a breaker-neutral
+		// verifier is wired. live_fix is decision-complete but
+		// execution-dormant: the orchestrator does not yet request named
+		// sessions, so NamedREPL is hard-false until the session request and
+		// reaper plumbing land (see interaction/correction.go).
 		rungBudget := map[string]int{
 			interaction.RungSalvage:    1,
 			interaction.RungLiveFix:    1,
@@ -158,20 +155,20 @@ func (cr *cycleRun) reviewWithCorrections(next Phase, dr *dispatchResult) (loopA
 			corr++
 			fmt.Fprintf(os.Stderr, "[orchestrator] phase %s: contract violation (correction %d/%d) — re-dispatching with correction: %s\n",
 				next, corr, maxCorrections, rr.Reason)
-			// CLI escalation (inbox contract-block-cli-escalation): from the
-			// correction answering the SECOND consecutive block, re-dispatch on
-			// a different CLI FAMILY instead of asking the CLI that just
-			// mis-formatted the deliverable twice to try a third time. Scoped to
-			// THIS re-dispatch only — the profile and the phase's own routing are
-			// untouched, and the soft overlay keeps the original chain behind the
-			// escalated primary. No target (already on the universal family with
-			// no other family configured) ⇒ the correction becomes a structured
-			// re-prompt on the SAME routing instead (scoping constraint 5) — the
-			// ladder no longer falls through unremedied there.
+			// CLI escalation: from the correction answering the SECOND
+			// consecutive block, re-dispatch on a different CLI FAMILY instead
+			// of asking the CLI that just mis-formatted the deliverable twice
+			// to try a third time. Scoped to THIS re-dispatch only — the
+			// profile and the phase's own routing are untouched, and the soft
+			// overlay keeps the original chain behind the escalated primary.
+			// No target (already on the universal family with no other family
+			// configured) ⇒ the correction becomes a structured re-prompt on
+			// the SAME routing instead.
+			//
 			// The count alone is not the signature: the block must also be the
 			// SAME defect as the one that triggered the previous correction
-			// (contractBlocksShareIdentity, scoping constraint 4) — two different
-			// violations are two honest defects, not an incapable CLI.
+			// (contractBlocksShareIdentity) — two different violations are two
+			// honest defects, not an incapable CLI.
 			salvageRetry := false
 			// Escalation eligibility has two typed doors, one per rejection class:
 			//   - rr.Blocks: the deliverable contract gate's own breaker count.
@@ -181,14 +178,8 @@ func (cr *cycleRun) reviewWithCorrections(next Phase, dr *dispatchResult) (loopA
 			//     breaker, so the in-cycle ordinal is its only honest counter —
 			//     and constraint 2's desync warning is about the DELIVERABLE
 			//     breaker's cross-cycle file, which this class does not have.
-			//     Measured basis (2026-08-23): every eval-materialization
-			//     failure since cycle-1450 (1471/1476/1504/1531/1540/1545) was
-			//     one CLI family, 0-for-all correction rounds on that family,
-			//     including rounds whose directive named the exact writable
-			//     paths — for the CREATE-a-missing-artifact class, a different
-			//     CLI is demonstrably the remedy. Remediation-LESS Blocks==0
-			//     rejections (topngate/triagecap/build floor) keep constraint 3
-			//     exactly: they never enter here.
+			//     Remediation-LESS Blocks==0 rejections (topngate/triagecap/
+			//     build floor) keep constraint 3 exactly: they never enter here.
 			escalEligible := rr.Blocks >= contractEscalateAtBlock ||
 				(rr.Remediation != "" && corr >= contractEscalateAtBlock)
 			if escalEligible && contractBlocksShareIdentity(prevBlockIdentity, rr.Reason) {
@@ -324,8 +315,9 @@ func (cr *cycleRun) reviewWithCorrections(next Phase, dr *dispatchResult) (loopA
 			if maxCorrections == 0 {
 				// Byte-identical to the pre-feature abort message.
 				phaseErr := fmt.Errorf("review gate: phase %q deliverable rejected: %s", next, rr.Reason)
-				// ADR-0044 C1: the phase ran and produced its own verdict;
-				// the reject is recorded as the abort reason, not a rewrite.
+				// The phase ran and produced its own verdict; the reject is
+				// recorded as the abort reason, not a rewrite.
+				// See ADR-0044.
 				cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, dr.resp, dr.attemptCount, phaseErr.Error(), cr.cs.PhaseStartedAt))
 				cr.recordFailureLearning(next, phaseErr, 1)
 				return loopAbort, wrapCycleLevelError(next, phaseErr)

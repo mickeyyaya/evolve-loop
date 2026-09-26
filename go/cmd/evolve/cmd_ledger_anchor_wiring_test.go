@@ -1,12 +1,3 @@
-// cmd_ledger_anchor_wiring_test.go — cycle-1433 durable WIRING proof for the two
-// ledger-fleet-concurrency-chain repairs.
-//
-// The ledger package owns the behavior; this file owns the seam. Both surfaces
-// are operator-facing CLI, so a correct AnchorLine/Rebaseline that no subcommand
-// or flag reaches is dead code — and the cycle-1433 ACS predicates that drive the
-// compiled binary are cycle-scoped and retire. These tests call runLedger, the
-// production dispatcher, so a dropped `--line-sha` flag or `rebaseline` case
-// stays caught after cycle-1433's predicates are gone.
 package main
 
 import (
@@ -53,9 +44,6 @@ func writeWiringLedger(t *testing.T) (dir, firstSeq2, secondSeq2 string) {
 	return dir, sha(b1), sha(b2)
 }
 
-// TestRunLedgerAnchor_AmbiguousSeqIsRefusedAndLineSHADisambiguates pins the
-// anchor seam: the ambiguity refusal reaches the operator with an actionable
-// --line-sha remedy, and that flag is parsed and forwarded to AnchorLine.
 func TestRunLedgerAnchor_AmbiguousSeqIsRefusedAndLineSHADisambiguates(t *testing.T) {
 	dir, _, second := writeWiringLedger(t)
 	anchorPath := filepath.Join(dir, "ledger-anchor.json")
@@ -96,9 +84,6 @@ func TestRunLedgerAnchor_AmbiguousSeqIsRefusedAndLineSHADisambiguates(t *testing
 	}
 }
 
-// TestRunLedgerRebaseline_SubcommandIsReachableAndGated pins the rebaseline seam:
-// the subcommand dispatches (never "unknown subcommand"), the --note gate refuses
-// from the command's own validation, and a gated call seals in one invocation.
 func TestRunLedgerRebaseline_SubcommandIsReachableAndGated(t *testing.T) {
 	t.Run("missing_note_is_refused_by_the_command_not_the_dispatcher", func(t *testing.T) {
 		dir, _, _ := writeWiringLedger(t)

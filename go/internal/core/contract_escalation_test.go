@@ -1,20 +1,5 @@
 package core
 
-// contract_escalation_test.go — RED-first coverage for CONTRACT-BLOCK CLI
-// ESCALATION (inbox contract-block-cli-escalation, P1 weight 0.95; twice
-// confirmed live: batch-19 cycles 1171/1172 adversarial-review and batch-21
-// cycle-1215 triage, both on agy-tmux).
-//
-// The live defect: reviewAndGuard's correction ladder re-dispatches the SAME
-// profile CLI after a contract block. cli_fallback fires only on infra exit
-// codes {80,81,85,124,127}, never on a contract violation, so a CLI that
-// systematically mis-formats a deliverable burns every correction and the
-// contract-gate breaker demotes enforce→advisory — a gate-WEAKENING outcome.
-//
-// These tests drive the REAL Orchestrator.profileForModelRouting seam (real
-// .evolve/profiles/*.json on disk) through RunCycle, so they exercise the
-// production resolution path rather than a stub.
-
 import (
 	"context"
 	"encoding/json"
@@ -57,7 +42,7 @@ func writeCLIProfile(t *testing.T, root, agent, cli string, fallback []string) {
 // deliverable is a BLOCK, `threshold` consecutive blocks demote enforce→advisory
 // (Approve + Demoted), and a compliant deliverable resets the counter.
 //
-// compliantCLI == "" models batch-19/21: no re-dispatch ever complies.
+// compliantCLI == "" models a CLI where no re-dispatch ever complies.
 type escalationProbe struct {
 	phase        string
 	compliantCLI string
@@ -67,9 +52,9 @@ type escalationProbe struct {
 	approveAfter int
 	// reasonPerBlock, when non-empty, supplies the violation text per consecutive
 	// block (block n uses index n-1, the last entry repeating for later blocks).
-	// Empty ⇒ every block reports the same reason, which is what the pre-cycle-1289
-	// tests assume. This is the ONE axis the fingerprint gate turns on: whether
-	// block 2's violation is the SAME defect as block 1's.
+	// Empty ⇒ every block reports the same reason. This is the ONE axis the
+	// fingerprint gate turns on: whether block 2's violation is the SAME defect
+	// as block 1's.
 	reasonPerBlock []string
 
 	lastCLI    string   // ModelRoutingCLI of the most recent dispatch
@@ -137,11 +122,10 @@ func runEscalationCycle(t *testing.T, root string, probe *escalationProbe) (*fak
 // a test observes the correction re-dispatches themselves, not the demotion.
 const neverDemotingThreshold = 99
 
-// TestContractCorrection_SecondBlockEscalatesToProfileFallback is the primary
-// acceptance criterion (a): after the SECOND consecutive contract block the
-// re-dispatch must go to the profile's cli_fallback, not the same
-// contract-violating CLI. The profile's PRIMARY routing must be untouched —
-// dispatch 1 (initial) and dispatch 2 (correction 1) carry no routing override.
+// After the SECOND consecutive contract block the re-dispatch must go to the
+// profile's cli_fallback, not the same contract-violating CLI. The profile's
+// PRIMARY routing must be untouched — dispatch 1 (initial) and dispatch 2
+// (correction 1) carry no routing override.
 func TestContractCorrection_SecondBlockEscalatesToProfileFallback(t *testing.T) {
 	root := t.TempDir()
 	writeCLIProfile(t, root, "builder", "agy-tmux", []string{"codex-tmux"})
@@ -161,8 +145,7 @@ func TestContractCorrection_SecondBlockEscalatesToProfileFallback(t *testing.T) 
 	}
 }
 
-// TestContractCorrection_FirstBlockDoesNotEscalate is acceptance criterion (c):
-// one bad turn is not a CLI verdict. Correction 1 must re-dispatch on the SAME
+// One bad turn is not a CLI verdict. Correction 1 must re-dispatch on the SAME
 // (primary) routing — escalating on the first block would reroute 99% of a
 // phase's honest single-turn slips onto a different CLI.
 func TestContractCorrection_FirstBlockDoesNotEscalate(t *testing.T) {
@@ -249,11 +232,10 @@ func TestContractCorrection_NonContractRejectionNeverEscalates(t *testing.T) {
 	}
 }
 
-// TestContractCorrection_NoDeclaredFallbackEscalatesToUniversalClaude is
-// acceptance criterion (b): a profile that declares NO cli_fallback still
-// escalates — to the universal claude fallback — so the escape hatch is CLI
-// escalation rather than gate demotion for every profile, not just the ones
-// whose operator happened to configure a chain.
+// A profile that declares NO cli_fallback still escalates — to the universal
+// claude fallback — so the escape hatch is CLI escalation rather than gate
+// demotion for every profile, not just the ones whose operator happened to
+// configure a chain.
 func TestContractCorrection_NoDeclaredFallbackEscalatesToUniversalClaude(t *testing.T) {
 	root := t.TempDir()
 	writeCLIProfile(t, root, "builder", "agy-tmux", nil)
@@ -291,11 +273,9 @@ func TestContractCorrection_SameFamilyFallbackIsNotAnEscalation(t *testing.T) {
 	}
 }
 
-// TestContractCorrection_CompliantFallbackPreventsCircuitOpen is acceptance
-// criterion (d) — the whole point of the fix. The primary CLI never satisfies
-// the contract but the escalation target does, so the third strike never lands:
-// the cycle completes, the contract gate is NOT demoted, and no demotion
-// evidence is recorded.
+// The primary CLI never satisfies the contract but the escalation target
+// does, so the third strike never lands: the cycle completes, the contract
+// gate is NOT demoted, and no demotion evidence is recorded.
 func TestContractCorrection_CompliantFallbackPreventsCircuitOpen(t *testing.T) {
 	root := t.TempDir()
 	writeCLIProfile(t, root, "builder", "agy-tmux", []string{"codex-tmux"})
@@ -321,10 +301,9 @@ func TestContractCorrection_CompliantFallbackPreventsCircuitOpen(t *testing.T) {
 	}
 }
 
-// TestContractCorrection_CircuitOpenWarnsAndFilesItem is acceptance criterion
-// (e): when even the escalated CLI fails the contract, the circuit still opens
-// as the LAST resort — but the demotion is no longer a single invisible log
-// line. It records a cycle-visible ledger entry AND stages an autofile intent
+// When even the escalated CLI fails the contract, the circuit still opens as
+// the LAST resort — but the demotion is not a single invisible log line. It
+// records a cycle-visible ledger entry AND stages an autofile intent
 // naming the demoted phase + CLI (staged, never written straight to
 // .evolve/inbox — a mid-flight inbox write races inboxmover.Claim's os.Rename;
 // recurrence.ApplyBoundary is the only sanctioned inbox writer).
@@ -385,8 +364,7 @@ func TestContractCorrection_CircuitOpenWarnsAndFilesItem(t *testing.T) {
 }
 
 // TestFormatContractGateDemotionWarn pins the operator-facing WARN's content:
-// the demoted phase and the CLI must both be named (the batch-19 log line named
-// neither, which is why two batches lost cycles to an invisible demotion).
+// the demoted phase and the CLI must both be named.
 func TestFormatContractGateDemotionWarn(t *testing.T) {
 	t.Parallel()
 	reason := "triage deliverable failed contract: [missing_failure_block] schema_version 2 required"
@@ -409,9 +387,9 @@ func TestFormatContractGateDemotionWarn(t *testing.T) {
 
 // TestChainReviewers_PropagatesDemotedThroughApproval is the WIRING proof for
 // the demotion signal: production mounts the contract gate INSIDE
-// core.ChainReviewers (cmd_cycle.go), and the chain used to rebuild a bare
-// ReviewResult{Approve:true} on the all-approve path — which would silently
-// swallow the contract gate's Demoted flag and leave the orchestrator blind.
+// core.ChainReviewers (cmd_cycle.go), and the all-approve path must not rebuild
+// a bare ReviewResult{Approve:true} — that would silently swallow the contract
+// gate's Demoted flag and leave the orchestrator blind.
 func TestChainReviewers_PropagatesDemotedThroughApproval(t *testing.T) {
 	t.Parallel()
 	chain := ChainReviewers(
@@ -475,37 +453,9 @@ func TestUniversalContractFallbackMatchesLLMRouteDefault(t *testing.T) {
 	}
 }
 
-// ============================================================================
-// cycle-1289 — FINGERPRINT-GATED ESCALATION TRIGGER
-//
-// The gap the landed PR #390 mechanism leaves open: the trigger at
-// cyclerun_review.go counts blocks (`rr.Blocks >= contractEscalateAtBlock`) and
-// never asks whether block 2 is the SAME defect as block 1. Two genuinely
-// different contract violations on one phase (block 1 misses a section heading,
-// block 2 misses the verdict sentinel) then read as one incapable-CLI signature
-// and spend round 2's budget on a different family for no reason. The inbox item
-// (.evolve/inbox/2026-08-04T07-15-00Z-contract-block-cli-escalation.json) states
-// the fix: "integrate with the fingerprint breaker so identical blocks share
-// identity" — i.e. reuse failure_digest.go's normalizeReasonForFingerprint, the
-// blocker breaker's OWN identity primitive, rather than invent a second one.
-//
-// Three axes, encoded below and by the pre-existing tests:
-//
-//	NEGATIVE  differing violations       → NO escalation  (TestContractCorrection_DifferingBlockReasonsDoNotEscalate)
-//	POSITIVE  same defect, noisy text    → escalates      (TestContractCorrection_NormalizedIdenticalReasonsEscalate)
-//	EDGE      no prior reason observed   → escalates      (TestContractCorrection_HotBreakerEscalatesOnFirstCorrection, above)
-//
-// The EDGE axis is load-bearing and is why the gate is "prior reason known AND
-// differing ⇒ suppress", not "equal ⇒ escalate": a breaker left HOT by an
-// earlier cycle arrives at Blocks>=2 on this ladder's FIRST block, so there is
-// no prior reason to compare. Requiring equality there would silently delete the
-// hot-breaker escape hatch that PR #390's review established.
-// ============================================================================
-
-// TestContractCorrection_DifferingBlockReasonsDoNotEscalate is the NEGATIVE
-// acceptance criterion: block 2 carrying a DIFFERENT violation than block 1 is
-// two honest defects, not one incapable CLI, so correction 2 must re-dispatch on
-// the phase's own routing exactly as it did before the escalation feature landed.
+// Block 2 carrying a DIFFERENT violation than block 1 is two honest defects,
+// not one incapable CLI, so correction 2 must re-dispatch on the phase's own
+// routing, unescalated.
 func TestContractCorrection_DifferingBlockReasonsDoNotEscalate(t *testing.T) {
 	root := t.TempDir()
 	writeCLIProfile(t, root, "builder", "agy-tmux", []string{"codex-tmux"})
@@ -569,57 +519,12 @@ func TestContractCorrection_NormalizedIdenticalReasonsEscalate(t *testing.T) {
 	}
 }
 
-// ============================================================================
-// CYCLE-1291 — VIOLATION-CODE-SET IDENTITY (the cycle-1289 audit defect)
-//
-// cycle-1289 shipped contractBlocksShareIdentity as a WHOLE-STRING compare of
-// normalizeReasonForFingerprint(reason). The audit rejected it HIGH:
-//
-//	"contractBlocksShareIdentity compares whole summarize() strings, so a
-//	 partially-repaired violation set (subset) reads as a different defect and
-//	 suppresses [escalation]"
-//	(.evolve/runs/cycle-1289/audit-fail-reason.json)
-//
-// The reason under comparison is deliverable.summarize() — a "; "-joined
-// rendering of EVERY violation on that block ("[code] message"). So when block 1
-// reports {missing_section, missing_verdict} and the correction closes ONE of
-// them, block 2 reports {missing_verdict} alone. That is the SAME defect getting
-// partially repaired — the strongest possible incapable-CLI signature, since the
-// CLI demonstrably cannot close the remaining violation — yet the two rendered
-// strings differ verbatim, normalizeReasonForFingerprint (which masks only
-// durations and narrative verdicts, never violation-set MEMBERSHIP) leaves them
-// differing, and the escalation is suppressed exactly when it is most warranted.
-//
-// The fix is to compare violation-CODE SETS, not rendered text. deliverable.
-// Violation.Code is the stable identity primitive (go/internal/deliverable/
-// deliverable.go:33-36) and is untouched by prose rewording or violation order.
-// Same defect ⇔ the two blocks' code sets INTERSECT.
-//
-// IMPORT-CYCLE CONSTRAINT (cycle-644 reachability obligation — compiler-proven
-// this cycle, do not re-litigate): internal/deliverable imports internal/core
-// (reviewer.go:12, verifier.go:18) and core imports deliverable NOWHERE. So
-// core.ReviewResult can NOT carry []deliverable.Violation — that is an import
-// cycle and the criterion would be permanently unsatisfiable. The code set must
-// reach core as plain data (codes parsed out of the rendered Reason, or a
-// []string field on ReviewResult). These tests pin BEHAVIOUR through the real
-// RunCycle ladder and deliberately do NOT pin either shape.
-//
-// Four axes, all driven through the production caller (RunCycle → reviewAndGuard):
-//
-//	POSITIVE  subset repair    {A,B} → {B}     → escalates  (001, THE audit defect)
-//	POSITIVE  superset regress {B}   → {A,B}   → escalates  (002)
-//	NEGATIVE  disjoint sets    {A,B} → {C,D}   → NO escalate (003)
-//	EDGE      reordered/reworded same set      → escalates  (004)
-//	EDGE      no [code] token at all           → escalates  (005, fail-safe)
-// ============================================================================
-
-// TestContractCorrection_SubsetRepairStillEscalates is THE cycle-1289 audit
-// defect, encoded. Block 1 carries two violations; the correction closes the
-// first, so block 2 carries only the second — a strict SUBSET of block 1's code
-// set. Under whole-string identity the two summaries differ verbatim and the
-// escalation is suppressed. Under code-set identity the sets intersect on
-// missing_verdict, the blocks are one partially-repaired defect, and the second
-// consecutive block must still escalate off the failing CLI family.
+// Block 1 carries two violations; the correction closes the first, so block 2
+// carries only the second — a strict SUBSET of block 1's code set. Under
+// whole-string identity the two summaries differ verbatim and escalation would
+// be suppressed; under code-set identity the sets intersect on missing_verdict,
+// the blocks are one partially-repaired defect, and the second consecutive
+// block must still escalate off the failing CLI family.
 func TestContractCorrection_SubsetRepairStillEscalates(t *testing.T) {
 	root := t.TempDir()
 	writeCLIProfile(t, root, "builder", "agy-tmux", []string{"codex-tmux"})
@@ -633,8 +538,8 @@ func TestContractCorrection_SubsetRepairStillEscalates(t *testing.T) {
 	}
 	// Guard the fixture: the defect only exists if the two rendered reasons
 	// differ verbatim AND stay differing after fingerprint normalization —
-	// otherwise the pre-fix whole-string compare would already have escalated
-	// and this test would pass for the wrong reason.
+	// otherwise a whole-string compare would already escalate and this test
+	// would pass for the wrong reason.
 	if probe.reasonPerBlock[0] == probe.reasonPerBlock[1] {
 		t.Fatal("fixture invalid: the two reasons must differ VERBATIM")
 	}
@@ -685,12 +590,11 @@ func TestContractCorrection_SupersetRegressionStillEscalates(t *testing.T) {
 	}
 }
 
-// TestContractCorrection_DisjointViolationSetsDoNotEscalate is the NEGATIVE
-// axis, and the guard against "fix the subset case by escalating on everything".
-// Two MULTI-violation blocks sharing NO code are two honest, unrelated defects —
-// scoping constraint 4's original intent — so correction 2 must re-dispatch on
-// the phase's own routing (empty ModelRoutingCLI override), exactly as before
-// the escalation feature landed. An implementation that simply deleted the
+// TestContractCorrection_DisjointViolationSetsDoNotEscalate is the guard
+// against "fix the subset case by escalating on everything". Two
+// MULTI-violation blocks sharing NO code are two honest, unrelated defects, so
+// correction 2 must re-dispatch on the phase's own routing (empty
+// ModelRoutingCLI override). An implementation that simply deleted the
 // identity gate to make the subset test pass fails here.
 func TestContractCorrection_DisjointViolationSetsDoNotEscalate(t *testing.T) {
 	root := t.TempDir()
@@ -780,20 +684,16 @@ func TestContractCorrection_UncodedReasonsFallBackToTextIdentity(t *testing.T) {
 	}
 }
 
-// TestContractArtifactDetermined_Table is the RED contract for cycle-1510 task
-// `contract-correction-hash-freshness-classification` (carryover from the
-// cycle-1508 audit FAIL, defects H1/L1).
-//
-// What it pins. contractArtifactDetermined(code) answers exactly one question:
-// "does repairing this violation NECESSARILY change the bytes of the watched
-// deliverable artifact?" — the only precondition under which an unchanged
-// artifact hash is sound evidence of "no new work was done". Six codes qualify,
-// because their repair IS an edit to the artifact. deliverable.CodeStrayInWorktree
-// is the canonical counter-example the cycle-1508 audit was built around: it is
-// repaired by DELETING a stray worktree copy, which leaves the watched artifact
-// byte-identical — so a hash-equality short-circuit that does not consult this
+// TestContractArtifactDetermined_Table pins contractArtifactDetermined(code):
+// does repairing this violation NECESSARILY change the bytes of the watched
+// deliverable artifact? — the only precondition under which an unchanged
+// artifact hash is sound evidence of "no new work was done". Six codes
+// qualify, because their repair IS an edit to the artifact.
+// deliverable.CodeStrayInWorktree is the counter-example: it is repaired by
+// DELETING a stray worktree copy, which leaves the watched artifact
+// byte-identical, so a hash-equality short-circuit that does not consult this
 // classifier converts a repairable contract block into a deterministic ladder
-// abort (inst-L1508a).
+// abort.
 //
 // NEGATIVE + fail-closed axis. Unknown codes must return false. The classifier
 // is an ALLOWLIST, not a denylist: a code this function has never heard of is,
@@ -841,9 +741,8 @@ func TestContractArtifactDetermined_Table(t *testing.T) {
 	}
 }
 
-// TestContractArtifactDetermined_StrayInWorktreeIsFalse is the crux assertion
-// stated on its own so a regression names itself in the failure output: the
-// exact pair that made cycle-1508's proposed hash short-circuit unsound.
+// TestContractArtifactDetermined_StrayInWorktreeIsFalse states the crux
+// assertion on its own so a regression names itself in the failure output.
 func TestContractArtifactDetermined_StrayInWorktreeIsFalse(t *testing.T) {
 	t.Parallel()
 	if contractArtifactDetermined("stray_in_worktree") {
@@ -857,14 +756,14 @@ func TestContractArtifactDetermined_StrayInWorktreeIsFalse(t *testing.T) {
 // TestContractArtifactDetermined_CodesMatchDeliverableVocabulary pins the
 // allowlist to the SOURCE vocabulary rather than to string literals invented
 // here: every allowlisted code must be a code deliverable actually emits. The
-// codes reach core as plain strings (deliverable imports core, so core cannot
-// import deliverable.Violation — see the identity comment above), which is
-// exactly why drift between the two vocabularies is invisible to the compiler
-// and has to be asserted.
+// codes reach core as plain strings, because deliverable imports core and core
+// cannot import deliverable.Violation, which is exactly why drift between the
+// two vocabularies is invisible to the compiler and has to be asserted.
 func TestContractArtifactDetermined_CodesMatchDeliverableVocabulary(t *testing.T) {
 	t.Parallel()
-	// Mirrors internal/deliverable's exported code constants (deliverable.go:69-85).
-	// Kept as data, not an import, because of the documented import-cycle constraint.
+	// Mirrors internal/deliverable's exported code constants, kept as data
+	// rather than an import because of the deliverable→core import-cycle
+	// constraint.
 	allDeliverableCodes := []string{
 		"missing_artifact", "empty_artifact", "missing_section",
 		"missing_challenge_token", "bad_verdict", "stray_in_worktree",

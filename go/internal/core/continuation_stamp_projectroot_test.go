@@ -1,15 +1,5 @@
 package core
 
-// continuation_stamp_projectroot_test.go — a salvage snapshot (ADR-0076) is
-// `git add -A` + commit of a cycle's ISOLATED worktree. When the active
-// worktree is the project root itself — the --simulate root reads the root in
-// place; a resume checkpoint can name it — that would commit the operator's
-// own tree (the second mutation the 2026-09-14 simulate incident found after
-// the dossier commit). The stamp refuses, out loud, and stamps no
-// continuation. The refusal is the package's ONE "is this the live
-// repository" predicate (sameDirectory), so a symlink alias or a relative
-// spelling of the root is refused exactly like the absolute path.
-
 import (
 	"context"
 	"os"

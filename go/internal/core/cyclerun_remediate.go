@@ -1,30 +1,5 @@
 package core
 
-// cyclerun_remediate.go — graduated remediation (operator directive
-// 2026-07-21; inbox graduated-remediation-fix-forward, ADR pending): when a
-// configured DETERMINISTIC gate phase returns a FAIL verdict, dispatch the
-// builder ONCE per round with the gate's report as a correction directive,
-// then re-run the SAME gate and adopt its fresh verdict. The economics: a
-// mechanical, gate-prescribed defect (missing tests, format, naming) costs a
-// bounded in-phase fix (~1-2M tokens) instead of discarding a sound cycle
-// (~12.5M) — the 983/992/1007/1019/1020 waste class, capped by cycle-1019
-// where the audit-PASSed ADR-0072 S5 implementation was thrown away over
-// three missing test files the gate itself had prescribed, and cycle-1020
-// then re-implemented it from scratch and failed the same gate the same way.
-//
-// Integrity floors:
-//   - the SAME gate must pass — remediation never overrides a verdict, it
-//     re-earns one; every downstream phase (audit, EGPS, ship gates) runs
-//     unchanged after it;
-//   - the round cap is hard (config workflow.remediation_rounds, default 1 at
-//     the composition root; ZERO in core's zero-value config so untouched
-//     tests and legacy paths are byte-identical);
-//   - only phases listed in workflow.remediable_phases participate —
-//     deterministic gates only by contract; judgment phases must never be
-//     listed;
-//   - provenance is loud: CycleResult.Remediations records every round and
-//     outcome, so a remediated cycle is never a silent PASS.
-
 import (
 	"fmt"
 	"os"
@@ -82,14 +57,13 @@ func (cr *cycleRun) maybeRemediate(next Phase, dr *dispatchResult) (loopAction, 
 	fmt.Fprintf(os.Stderr, "[orchestrator] remediation: gate %s FAILed — dispatching builder fix round %d/%d (report: %s)\n",
 		next, round, wf.RemediationRounds, report)
 
-	// Record the ORIGINAL failing gate attempt through the ADR-0044 C1
+	// Record the original failing gate attempt through the phase-outcome
 	// chokepoint before anything else — the re-run gets its own window below,
 	// so the record honestly shows gate-FAIL, fix, gate-rerun.
 	cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, dr.resp, dr.attemptCount, "", cr.cs.PhaseStartedAt))
 
-	// Tree-diff guard parity with a normal dispatch (the one class this
-	// codebase keeps hardening against): snapshot before the fix dispatch,
-	// recover + check after; a main-tree leak voids the round.
+	// Tree-diff guard parity with a normal dispatch: snapshot before the fix
+	// dispatch, recover + check after; a main-tree leak voids the round.
 	var fixGuard *treediff.Guard
 	var fixBefore []string
 	fixSnapOK := false
@@ -123,8 +97,8 @@ func (cr *cycleRun) maybeRemediate(next Phase, dr *dispatchResult) (loopAction, 
 	if obsCancel != nil {
 		obsCancel()
 	}
-	// ADR-0044 C1: the fix dispatch burned tokens — record it whatever happens,
-	// under its own label so it never clobbers the build phase's own records.
+	// The fix dispatch burned tokens — record it whatever happens, under its
+	// own label so it never clobbers the build phase's own records.
 	fixAbort := ""
 	if berr != nil {
 		fixAbort = fmt.Sprintf("remediation fix dispatch: %v", berr)
@@ -181,10 +155,9 @@ func (cr *cycleRun) maybeRemediate(next Phase, dr *dispatchResult) (loopAction, 
 		fmt.Sprintf("%s: round %d -> %s", next, round, resp2.Verdict))
 	fmt.Fprintf(os.Stderr, "[orchestrator] remediation: gate %s re-ran -> %s (round %d/%d)\n",
 		next, resp2.Verdict, round, wf.RemediationRounds)
-	// ADR-0100 §4: the re-run's deliverable meets the same reviewer the
-	// original did. Before this it reached recordAndBranch on the strength of
-	// its verdict alone, so a re-run that omitted a declared deliverable — or
-	// failed any contract check — was recorded as if reviewed.
+	// The re-run's deliverable meets the same reviewer the original did, so a
+	// re-run that omits a declared deliverable or fails a contract check is
+	// never recorded as reviewed.
 	if act, err := cr.reviewAndGuard(next, dr); act == loopAbort || err != nil {
 		return act, err
 	}

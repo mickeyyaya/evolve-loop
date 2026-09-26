@@ -1,14 +1,5 @@
 package core
 
-// cyclerun_epilogue.go — the abnormal-exit epilogue (cycle-1048): NO exit path
-// may leave a started cycle without its evidence trail. The loopAbort path
-// returned immediately, skipping finalizeCycle — so the seal, dossier, and
-// coherence floors never ran, and every downstream detector (monitors read
-// dossiers; floors run in finalize) was blind to a cycle the loop itself had
-// already logged as failed. Detectors must not depend on artifacts produced
-// by the failure path they monitor: visibility is guaranteed by construction
-// here (a defer), not by the success of the thing being watched.
-
 import (
 	"context"
 	"errors"
@@ -44,18 +35,18 @@ func (cr *cycleRun) checkpointInterruptedPhase(cause error) {
 // distinguishing fact (nil on a bare bounce AND on a panic, which reaches
 // this defer with retErr unset: both stay honestly Unexplained). Appended to
 // the constant template it makes the digest content-bearing and
-// cause-distinct; without it three distinct same-phase aborts share one
+// cause-distinct; without it, distinct same-phase aborts share one
 // Unexplained fingerprint and the diagnosability breaker's only move is
-// halting the batch (batch-19 cycle-1208: 1197/1199/1207 all
-// "build|unknown|7c02ce1f4f95").
+// halting the batch.
 //
 // Teardown-shaped causes (IsInfraTeardownError: artifact timeout, transient
 // bridge death) are marked "teardown=" instead of "cause=". Their identical
-// fingerprints STAY in the identical-fingerprint population DELIBERATELY
-// (review HIGH, decision pinned): one systemic infra condition mowing down
-// three lanes is exactly the recurring-infra shape ADR-0072's halt doctrine
-// wants stopped at the ceiling — the marker makes that shape legible in the
-// halt message instead of reading as "identical defects".
+// fingerprints stay in the identical-fingerprint population deliberately:
+// one systemic infra condition mowing down several lanes is exactly the
+// recurring-infra shape the halt doctrine wants stopped at the ceiling — the
+// marker makes that shape legible in the halt message instead of reading as
+// "identical defects".
+// See ADR-0072.
 func (cr *cycleRun) abnormalEpilogue(cause error) {
 	// Quota exhaustion and graceful cancellation are resource/operator pauses
 	// with their own checkpoints. A FAIL closeout would make a resumable cycle
@@ -90,23 +81,25 @@ func (cr *cycleRun) abnormalEpilogue(cause error) {
 	// field the dossier projects, so it must be where the skip actually lives).
 	cr.result.SkippedPhases = append(cr.result.SkippedPhases,
 		SkippedPhase{Phase: "closeout", Reason: "abnormal exit in phase " + cr.cs.Phase})
-	// ADR-0101 S2a: the cycle's event stream ends with a seal on this path
-	// too — FAIL, the abort reason as the termination reason — so "how did
-	// cycle N end" has one answer in signals.ndjson on every path.
+	// The cycle's event stream ends with a seal on this path too — FAIL, the
+	// abort reason as the termination reason — so "how did this cycle end"
+	// has one answer in signals.ndjson on every path.
+	// See ADR-0101.
 	sealed := cr.result
 	sealed.FinalVerdict, sealed.TerminationReason = VerdictFAIL, reason
 	cr.emitCycleClose(sealed, "cycleRun.abnormalEpilogue")
 	if derr := writeCycleDossier(cr.o.gitMutationLock, cr.dossierParams(VerdictFAIL)); derr != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d: abnormal-epilogue dossier not written: %v\n", cr.cycle, derr)
 	}
-	// ADR-0076 slice C (G1, cycle-1078): error-path aborts never reach
-	// finalizeCycle, so the preserved worktree would carry no continuation
-	// manifest and the resumption machinery would have nothing to bind. Stamp
-	// here too — after the failure digest above, so FindingsPath has content.
-	// Idempotent with the finalize-path stamp; no-op when no worktree exists.
+	// Error-path aborts never reach finalizeCycle, so the preserved worktree
+	// would carry no continuation manifest for the resumption machinery to
+	// bind. Stamp here too, after the failure digest above so FindingsPath
+	// has content; idempotent with the finalize-path stamp, and a no-op with
+	// no worktree.
+	// See ADR-0076.
 	cr.o.stampContinuationManifest(epilogueCtx, cr.cs, cr.cycle, cr.req.ProjectRoot)
 	// State floor: the canonical record must never claim a live phase for a
-	// dead cycle (the two-hour stale phase=retro residue).
+	// dead cycle.
 	cr.cs.Phase = "aborted"
 	cr.cs.ActiveAgent = ""
 	if werr := cr.o.storage.WriteCycleState(epilogueCtx, cr.cs); werr != nil {

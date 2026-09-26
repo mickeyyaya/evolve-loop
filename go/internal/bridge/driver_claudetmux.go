@@ -62,7 +62,7 @@ func (claudeTmuxDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int
 		inputLineMarker: tmuxPromptMarkerDefault,
 		bootScrollback:  0, // claude renders to the visible pane
 		bootIntervalS:   1,
-		tickDuringBoot:  true, // claude shows boot-time folder-trust dialogs whose ❯ cursor collides with the REPL marker (v2.1.193 numbered/Yes-default; v2.1.252 unnumbered/No-default — see the manifest trust_prompt* rules)
+		tickDuringBoot:  true, // claude shows boot-time folder-trust dialogs whose ❯ cursor collides with the REPL marker (see the manifest trust_prompt* rules)
 		exitSeq:         []tmuxKey{{keys: "/exit", enter: true, pauseS: 2}},
 		bootOnly:        cfg.BootOnly,
 		guardDeadShell:  true,

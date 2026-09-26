@@ -8,10 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/detectcli"
 )
 
-// runDetectCLI is the `evolve detect-cli` subcommand: ports
-// legacy/scripts/dispatch/detect-cli.sh. Prints the matched CLI name
-// to stdout (one of: claude, gemini, codex, antigravity, unknown, or
-// the --platform override). `--json` switches to envelope form.
 func runDetectCLI(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	jsonMode := false
 	platformOverride := ""

@@ -22,9 +22,9 @@ import (
 //	tail   [--evolve-dir DIR] [--n N]    print the last N entries as JSONL
 //	anchor <seq> [--evolve-dir DIR] [--note S] [--line-sha SHA]
 //	                                     record a non-destructive epoch-anchor
-//	                                     at entry_seq=<seq> (ledger-1740;
-//	                                     OPERATOR sign-off). --line-sha names
-//	                                     the exact line when siblings share a seq
+//	                                     at entry_seq=<seq> (OPERATOR sign-off).
+//	                                     --line-sha names the exact line when
+//	                                     siblings share a seq
 //	rebaseline --note S [--evolve-dir DIR]  seal a densely damaged prefix in ONE
 //	                                     call (OPERATOR sign-off; append-only)
 func runLedger(args []string, _ io.Reader, stdout, stderr io.Writer) int {
@@ -73,13 +73,13 @@ func runLedgerVerify(args []string, stderr io.Writer) int {
 	return 0
 }
 
-// verifiedFrom states WHICH history the verification just accepted. A success
-// over a full-strict chain and a success that deliberately trusted an
-// adjudicated prefix (ADR-0048's epoch anchor) are different claims, and
-// printing one string for both is what let the ledger-1740 damage stay
-// invisible. The anchor is named by its own identity — read from the ledger,
-// never a literal — so two ledgers sealed at different lines read differently
-// and an operator can carry the pair straight to `evolve ledger anchor`.
+// verifiedFrom states WHICH history the verification just accepted: a
+// full-strict chain and a chain that trusted an adjudicated epoch anchor are
+// different claims and must print differently. The anchor is named by its own
+// identity — read from the ledger, never a literal — so two ledgers sealed at
+// different lines read differently and an operator can carry the pair
+// straight to `evolve ledger anchor`.
+// See ADR-0048.
 func verifiedFrom(s ledger.VerifiedScope) string {
 	if s.AnchorLineSHA == "" {
 		return "verified strictly from genesis (no epoch anchor)"
@@ -113,11 +113,11 @@ func runLedgerSeal(args []string, stderr io.Writer) int {
 	return 0
 }
 
-// runLedgerAnchor records a non-destructive epoch-anchor (ADR-0048; the
-// ledger-1740 disposition). An OPERATOR action: it declares the pre-anchor
-// prefix trusted-as-preserved and validates the chain strictly forward from the
-// anchored line. Always re-verifies after, so an anchor that does not green the
-// chain is surfaced immediately (rc 2), not at the next audit.
+// runLedgerAnchor records a non-destructive epoch-anchor. An OPERATOR action:
+// it declares the pre-anchor prefix trusted-as-preserved and validates the
+// chain strictly forward from the anchored line. Always re-verifies after, so
+// an anchor that does not green the chain is surfaced immediately (rc 2), not
+// at the next audit.
 func runLedgerAnchor(args []string, stderr io.Writer) int {
 	// <entry_seq> is the first positional, BEFORE flags: Go's flag.Parse stops
 	// at the first non-flag token, so a flag-first layout (`--note x 42`) would

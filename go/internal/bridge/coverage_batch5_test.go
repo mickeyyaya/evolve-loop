@@ -7,9 +7,6 @@ import (
 	"testing"
 )
 
-// coverage_batch5_test.go — defensive branches reachable only via seams:
-// the challenge-token entropy error and the manifest-FS read errors.
-
 // fakeManifestFS is a swappable manifestSource for error injection.
 type fakeManifestFS struct {
 	entries    []fs.DirEntry
@@ -62,7 +59,6 @@ func TestManifestNames_ReadDirError(t *testing.T) {
 }
 
 func TestProbe_LoadManifestFailsForListedCLI(t *testing.T) {
-	// ReadDir lists x.json but ReadFile fails → Probe records tier "none".
 	swapManifestFS(t, fakeManifestFS{entries: []fs.DirEntry{fakeDirEntry{"x.json"}}})
 	eng := NewEngine(Deps{LookPath: func(string) (string, error) { return "", errNoBin }})
 	p, err := eng.Probe(context.Background())

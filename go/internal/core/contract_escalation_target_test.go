@@ -1,15 +1,5 @@
 package core
 
-// contract_escalation_target_test.go — white-box coverage for the escalation
-// TARGET decision (inbox contract-block-cli-escalation). The ladder-level
-// integration tests in contract_escalation_test.go prove the target is applied to
-// the right re-dispatch; these prove it IS the right target, across the
-// phase/profile shapes that actually exist on the live tree.
-//
-// Production caller: reviewAndGuard's correction ladder (cyclerun_review.go)
-// calls contractEscalationCLI + contractDispatchCLI on every contract-blocked
-// re-dispatch, and the integration tests reach both through RunCycle.
-
 import (
 	"encoding/json"
 	"os"
@@ -41,14 +31,12 @@ func writeRawProfile(t *testing.T, root, agent string, doc map[string]any) {
 	}
 }
 
-// TestContractEscalation_MintedPhaseResolvesItsOwnProfile is the coverage fix for
-// the phase this whole item's batch-19 evidence came from. phaseAgentName maps
-// only the 10 built-in spine phases, so `adversarial-review` — which HAS a real
-// .evolve/profiles/adversarial-review.json — resolves to a nil profile through
-// the built-in table alone, and a nil profile means "primary is claude-tmux",
-// which means "same family", which means NO escalation. Every minted/user phase
-// under .evolve/phases/ shares that shape, and they are exactly the phases an
-// operator points at a non-claude CLI.
+// adversarial-review has a real .evolve/profiles/adversarial-review.json but is
+// absent from phaseAgentName's built-in table; falling back to a nil profile
+// there reads as primary=claude-tmux, "same family", and therefore no
+// escalation — the exact shape of every minted/user phase under
+// .evolve/phases/, which are exactly the phases an operator points at a
+// non-claude CLI.
 func TestContractEscalation_MintedPhaseResolvesItsOwnProfile(t *testing.T) {
 	t.Setenv("EVOLVE_CLI", "")
 	root := t.TempDir()

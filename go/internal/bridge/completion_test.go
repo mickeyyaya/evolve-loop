@@ -9,11 +9,6 @@ import (
 	"testing"
 )
 
-// completion_test.go — unit coverage for the ADR-0027 completion Strategy:
-// the factory's default-to-artifact safety, the artifact detector's parity
-// with artifactReady, and the stdout detector's idle-debounce + activity
-// gating (the router/advisor's contract).
-
 func TestNewCompletionDetector_DefaultsToArtifact(t *testing.T) {
 	cfg := &Config{Artifact: "/tmp/x"}
 	lp := tmuxLaunch{promptMarker: "❯"}
@@ -33,14 +28,11 @@ func TestArtifactDetector_Poll(t *testing.T) {
 	canonical := filepath.Join(ws, "report.md")
 	d := &artifactDetector{cfg: &Config{Workspace: ws, Artifact: canonical}}
 
-	// Absent → not ready, no error, no note.
 	if ready, _, note, err := d.poll(context.Background()); ready || err != nil || note != "" {
 		t.Fatalf("absent artifact: got (ready=%v, note=%q, err=%v), want (false, \"\", nil)", ready, note, err)
 	}
-	// Present (non-empty) and UNCHANGING → ready with an "appeared" note.
-	// Readiness is no longer first-sight: cycle-1233 added the cross-poll
-	// stability window (see completion_debounce_test.go for that contract), so
-	// parity with artifactReady is asserted at the point the window closes.
+	// Readiness follows the cross-poll stability window (completion_debounce_test.go),
+	// not first sight.
 	if err := os.WriteFile(canonical, []byte("DONE\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -106,7 +98,6 @@ func TestStdoutDetector_NotReadyBeforeActivity(t *testing.T) {
 }
 
 func TestParseLaunchArgs_CompletionFlag(t *testing.T) {
-	// Both --completion=stdout and the env fallback round-trip into rawLaunch.
 	raw, err := parseLaunchArgs([]string{"--completion=stdout"}, nil)
 	if err != nil {
 		t.Fatalf("parse --completion=stdout: %v", err)
@@ -124,10 +115,6 @@ func TestParseLaunchArgs_CompletionFlag(t *testing.T) {
 }
 
 func TestClaudeTmux_StdoutCompletion_NoArtifactNeeded(t *testing.T) {
-	// The stdout contract completes WITHOUT any artifact file: the REPL boots
-	// (marker in pane[0]), shows activity, then settles on the marker — and the
-	// driver returns ExitOK even though fx.artifact was never written. This is
-	// the cycle-117 advisor deadlock, fixed.
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &fakeTmux{paneSeq: []string{
 		tmuxPromptMarkerDefault,                  // boot loop capture: marker seen → REPL ready
@@ -145,10 +132,6 @@ func TestClaudeTmux_StdoutCompletion_NoArtifactNeeded(t *testing.T) {
 	}
 }
 
-// TestGitEvidenceDetector_ClosureCalled covers the gitCmd closure body
-// (lines 98-103 in completion.go) which is only executed when d.poll() fires.
-// The closure calls deps.Runner; a fake runner lets us verify the dispatch
-// without a real git worktree.
 func TestGitEvidenceDetector_ClosureCalled(t *testing.T) {
 	called := false
 	deps := Deps{

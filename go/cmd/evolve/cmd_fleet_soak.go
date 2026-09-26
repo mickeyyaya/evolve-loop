@@ -1,12 +1,3 @@
-// cmd_fleet_soak.go — evolve fleet soak: concurrency invariant harness (Slice 5, ADR-0049).
-// Proves that Slices 1-4 (runscope, codex-pretrust, sessionreaper, cliadmit) compose
-// correctly under concurrent load by running N in-process fake "cycles" and asserting
-// the four structural invariants from the concurrency architecture spec.
-//
-// soakreport note: the internal/soakreport package aggregates ADR-0044 C2/C4/I2/I3/I4
-// phase-recovery component evidence across historical cycles. This soak harness covers a
-// distinct concern (concurrent-run isolation invariants) and renders its own 4-row verdict
-// table; soakreport.Collect is not appropriate for per-soak-run structural checks.
 package main
 
 import (
@@ -57,7 +48,6 @@ func runFleetSoak(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return 1
 	}
 
-	// Resolve launch function: injected fake for tests; real --simulate for CLI.
 	launchFn := soakLaunchFn
 	if launchFn == nil {
 		binPath, err := os.Executable()
@@ -71,10 +61,8 @@ func runFleetSoak(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		launchFn = execCycleLaunch(binPath, true, "", goalHash, "", stdout, stderr)
 	}
 
-	// Invariant 1: N distinct CycleBranch values from N distinct RunScopes.
 	inv1S, inv1E := soakCheckBranches(count)
 
-	// Run N concurrent launches via fleet.Supervisor.
 	specs := make([]fleet.CycleSpec, count)
 	for i := range specs {
 		specs[i] = fleet.CycleSpec{GoalHash: goalHash}
@@ -91,15 +79,13 @@ func runFleetSoak(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "evolve fleet soak: %d/%d launches failed\n", failed, count)
 	}
 
-	// Invariant 2: post-soak ReapOrphans finds 0 live orphans.
 	inv2S, inv2E := soakCheckReap(evolveDir)
 
-	// Invariant 3: structural — ReapRunSessions is registry-path-bound, so a
-	// reaper for run A cannot reach run B's sessions by construction.
+	// Invariant 3 is structural, not checked at runtime: ReapRunSessions is
+	// registry-path-bound, so a reaper for run A cannot reach run B's sessions.
 	const inv3S = "PASS"
 	const inv3E = "structural: sessionreaper binds each sweep to one run's own registry path"
 
-	// Invariant 4: shared TOML config has N [projects.*] entries (if --toml-path given).
 	inv4S, inv4E := soakCheckToml(tomlPath, count)
 
 	renderSoakTable(stdout, inv1S, inv1E, inv2S, inv2E, inv3S, inv3E, inv4S, inv4E)
@@ -131,7 +117,7 @@ func soakCheckReap(evolveDir string) (status, evidence string) {
 	if killer == nil {
 		killer = swarm.ExecTmuxKill
 	}
-	// Same wedged-tmux bound as the loop-boot sweep (cycle-769).
+	// Same wedged-tmux bound as the loop-boot sweep.
 	ctx, cancel := context.WithTimeout(context.Background(), sessionreaper.DefaultReapTimeout)
 	defer cancel()
 	rep, err := sessionreaper.ReapOrphans(ctx, evolveDir, sessionreaper.Options{

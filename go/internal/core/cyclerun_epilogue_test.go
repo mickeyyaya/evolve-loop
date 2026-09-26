@@ -1,11 +1,5 @@
 package core
 
-// cyclerun_epilogue_test.go — cycle-1048 pins: every started cycle leaves a
-// dossier + digest + coherent state on EVERY exit path. The abort path
-// (`return cr.result, err` at loopAbort) skipped finalizeCycle, leaving a
-// two-hour stale phase=retro record and a dossier-less, monitor-invisible
-// failure.
-
 import (
 	"os"
 	"path/filepath"
@@ -43,10 +37,6 @@ func TestAbnormalEpilogue_WritesDossierDigestAndCoherentState(t *testing.T) {
 	if !strings.Contains(string(raw), "FAIL") || !strings.Contains(string(raw), "abnormal exit in phase retro") {
 		t.Fatalf("dossier must record the abnormal outcome, got %s", raw)
 	}
-	// closeout genuinely did NOT run, so this is the one TRUE skipped_phases record —
-	// and it must live on the result, which is what the dossier projects (one record,
-	// one projection). The ran-but-declined field stays absent: a phase that never ran
-	// has no verdict to decline (dossier-retro-skipped-mislabel).
 	if len(cr.result.SkippedPhases) != 1 || cr.result.SkippedPhases[0].Phase != "closeout" {
 		t.Errorf("the skip must be recorded on CycleResult.SkippedPhases, not only inlined into the dossier call: %+v", cr.result.SkippedPhases)
 	}

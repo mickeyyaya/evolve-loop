@@ -8,9 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/recurrence"
 )
 
-// TestLessonsRecurrence_SortedByCountWithFixStatus (AC4): `evolve lessons
-// recurrence` lists patterns sorted by descending count, each row carrying its
-// fix-item status.
 func TestLessonsRecurrence_SortedByCountWithFixStatus(t *testing.T) {
 	led := recurrence.NewLedger()
 	led.Entries["rare"] = &recurrence.Entry{Pattern: "rare", Count: 2}
