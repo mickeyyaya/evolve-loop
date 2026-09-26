@@ -28,7 +28,6 @@ var guardLogTag = map[string]string{
 	"ship":      "ship-gate",
 	"phase":     "phase-gate-pre",
 	"role":      "role-gate",
-	"quota":     "research-quota-gate",
 	"docdelete": "doc-deletion-guard",
 	"chain":     "chain",
 }
@@ -281,7 +280,7 @@ func runListAuditFails(args []string, evolveDir string, stdout, stderr io.Writer
 
 func buildGuard(name, evolveDir string, bypass bool) (core.Guard, error) {
 	var workflow policy.WorkflowConfig
-	if name == "docdelete" || name == "quota" {
+	if name == "docdelete" {
 		pol, err := policy.Load(filepath.Join(evolveDir, "policy.json"))
 		if err != nil {
 			return nil, err
@@ -297,12 +296,10 @@ func buildGuard(name, evolveDir string, bypass bool) (core.Guard, error) {
 		return guards.NewRole(storage.New(evolveDir), bypass), nil
 	case "docdelete":
 		return guards.NewDocDelete(workflow.AllowDocDelete), nil
-	case "quota":
-		return guards.NewQuota(guards.QuotaConfig{AllowDeepResearch: workflow.AllowDeepResearch}), nil
 	case "chain":
 		return guards.NewChain(ledger.New(evolveDir)), nil
 	default:
-		return nil, fmt.Errorf("unknown guard %q (known: ship phase role docdelete quota chain triage-floors)", name)
+		return nil, fmt.Errorf("unknown guard %q (known: ship phase role docdelete chain triage-floors)", name)
 	}
 }
 

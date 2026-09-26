@@ -42,7 +42,7 @@ The review surfaced two **test-quality defects** masquerading as other problems 
 
 | Finding | Root cause | Smell (testing-patterns) | Fix |
 |---|---|---|---|
-| `guards` suite red, denial tests "fail open" | tests read ambient `EVOLVE_BYPASS_*` via `os.Getenv`; operator exports them → every `Decide` short-circuits to Allow | Local Hero (#6); breaks F.I.R.S.T. Isolated/Repeatable | hermetic `TestMain` neutralizes all 5 bypass vars + `TestGuardsSuiteIsHermetic` invariant guard |
+| `guards` suite red, denial tests "fail open" | tests read ambient `EVOLVE_BYPASS_*` via `os.Getenv`; operator exports them → every `Decide` short-circuits to Allow | Local Hero (#6); breaks F.I.R.S.T. Isolated/Repeatable | the guards read no environment but `$HOME` (taken once by `NewRole`), pinned by the AST scan `TestGuards_ReadNoEnvironmentButHome`; the ambient-env `TestMain` is gone |
 | `bridge/TestRealTmux_ArtifactTimeout` flaky under load | one `perTick` scales both boot-wait (60 polls) and artifact-wait; 600ms boot budget raced real-tmux boot → wrong exit code | arbitrary-timeout / condition-based-waiting | decouple: generous boot budget (9s) + short `ArtifactTimeoutS` |
 
 **Lesson:** a test that fails for the wrong reason (ambient env, timing) is as dangerous as no test — it can also *pass* for the wrong reason and hide a real regression. Hermeticity first, then coverage.

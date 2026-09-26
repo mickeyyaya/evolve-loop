@@ -40,21 +40,6 @@ func TestDocDeleteType_SatisfiesGuardAndDenies(t *testing.T) {
 	}
 }
 
-func TestQuotaType_SatisfiesGuardAndEnforcesCap(t *testing.T) {
-	var g *Quota = NewQuota(QuotaConfig{WebSearch: 1})
-	var _ core.Guard = g
-	if g.Name() != "quota" {
-		t.Fatalf("Quota.Name() = %q, want quota", g.Name())
-	}
-	in := core.GuardInput{ToolName: "WebSearch", ToolInput: map[string]any{"agent": "scout"}}
-	if dec := g.Decide(context.Background(), in); !dec.Allow {
-		t.Fatalf("first WebSearch under cap=1 must allow: %s", dec.Reason)
-	}
-	if dec := g.Decide(context.Background(), in); dec.Allow {
-		t.Fatal("second WebSearch over cap=1 must deny, got Allow=true")
-	}
-}
-
 func TestShipType_SatisfiesGuardAndDenies(t *testing.T) {
 	var g *Ship = NewShip(false)
 	var _ core.Guard = g

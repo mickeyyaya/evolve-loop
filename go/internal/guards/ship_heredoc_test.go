@@ -8,7 +8,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-func TestStripHeredocs(t *testing.T) {
+func TestSplitShellCommands_DropsHeredocBodies(t *testing.T) {
 	cases := []struct {
 		name           string
 		in             string
@@ -89,7 +89,7 @@ git commit body line 2`,
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			out := stripHeredocs(tc.in)
+			out := commandTexts(tc.in)
 			for _, s := range tc.mustNotContain {
 				if strings.Contains(out, s) {
 					t.Errorf("output should NOT contain %q\nout=%q", s, out)
@@ -104,22 +104,30 @@ git commit body line 2`,
 	}
 }
 
+func commandTexts(cmd string) string {
+	var texts []string
+	for _, c := range splitShellCommands(cmd) {
+		texts = append(texts, c.text)
+	}
+	return strings.Join(texts, "\n")
+}
+
+// The command is not a native ship, so only the heredoc rule can allow it.
 func TestShip_Decide_VerbInHeredocBody(t *testing.T) {
 	s := NewShip(false)
-	body := `evolve ship --class manual "$(cat <<'EOF'
-feat: port a script that calls git push origin and git commit -m
+	body := `cat > notes.md <<'EOF'
 The script does:
   1. git revert HEAD
   2. git push origin :refs/tags/X
 EOF
-)"`
+echo written`
 	in := core.GuardInput{
 		ToolName:  "Bash",
 		ToolInput: map[string]any{"command": body},
 	}
 	dec := s.Decide(context.Background(), in)
 	if !dec.Allow {
-		t.Errorf("verb-in-heredoc-body should be allowed (native ship path); got DENY: %s", dec.Reason)
+		t.Errorf("a ship verb in a heredoc body is data, not a command; got DENY: %s", dec.Reason)
 	}
 }
 
@@ -166,19 +174,5 @@ func TestShip_Decide_WordBoundary_Devolve(t *testing.T) {
 	dec := s.Decide(context.Background(), in)
 	if dec.Allow {
 		t.Error("'devolve ship' should NOT be recognized as native evolve ship; git push should DENY")
-	}
-}
-
-func TestShip_Decide_BashShipSh_Allowed(t *testing.T) {
-	s := NewShip(false)
-	in := core.GuardInput{
-		ToolName: "Bash",
-		ToolInput: map[string]any{
-			"command": `bash legacy/scripts/lifecycle/ship.sh "msg with git push in body"`,
-		},
-	}
-	dec := s.Decide(context.Background(), in)
-	if !dec.Allow {
-		t.Errorf("canonical bash ship.sh should be allowed; got DENY: %s", dec.Reason)
 	}
 }

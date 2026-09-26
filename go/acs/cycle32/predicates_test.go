@@ -7,7 +7,7 @@
 //	dead-sweep EVOLVE_BUILD_PLANNER_LATENCY_CEILING_S (zero Go reader). 5 flags:
 //	  - EVOLVE_BACKFILL_ENABLED        → WorkflowConfig.BackfillEnabled *bool (cyclerun_dispatch)
 //	  - EVOLVE_CYCLE_BUDGET            → WorkflowConfig.CycleBudget string (cmd_loop)
-//	  - EVOLVE_ALLOW_DEEP_RESEARCH     → QuotaConfig.AllowDeepResearch bool (DI in guards/quota)
+//	  - EVOLVE_ALLOW_DEEP_RESEARCH     → removed with the quota guard (2026-09-26)
 //	  - EVOLVE_ALLOW_DOC_DELETE        → DocDelete.allow bool (DI in guards/docdelete)
 //	  - EVOLVE_BUILD_PLANNER_LATENCY_CEILING_S → dead sweep (docs-only; no Go reader)
 //	Lower FlagCeiling 102→97; regenerate docs/architecture/control-flags.md.
@@ -85,7 +85,7 @@ import (
 // removedFlags is the canonical list of 5 flags that cycle-32 removes:
 //   - EVOLVE_BACKFILL_ENABLED:               migrated to WorkflowConfig.BackfillEnabled
 //   - EVOLVE_CYCLE_BUDGET:                   migrated to WorkflowConfig.CycleBudget
-//   - EVOLVE_ALLOW_DEEP_RESEARCH:            migrated to QuotaConfig.AllowDeepResearch (DI)
+//   - EVOLVE_ALLOW_DEEP_RESEARCH:            removed with the quota guard (2026-09-26)
 //   - EVOLVE_ALLOW_DOC_DELETE:               migrated to DocDelete.allow (DI)
 //   - EVOLVE_BUILD_PLANNER_LATENCY_CEILING_S: dead sweep (docs-only; no Go reader)
 var removedFlags = []string{
@@ -137,7 +137,6 @@ func TestC32_001_RemovedFlagsAbsentFromRegistry(t *testing.T) {
 //
 //	cyclerun_dispatch.go:179  envchain.BoolValue(cr.envSnap["EVOLVE_BACKFILL_ENABLED"], true)
 //	cmd_loop.go:269           cyclebudget.ParseStage(os.Getenv("EVOLVE_CYCLE_BUDGET"))
-//	guards/quota.go:45        envEnabled("EVOLVE_ALLOW_DEEP_RESEARCH")
 //	guards/docdelete.go:26    envEnabled("EVOLVE_ALLOW_DOC_DELETE")
 func TestC32_004_NoEnvReadsInProductionGo(t *testing.T) {
 	// acs-predicate: config-check
@@ -153,10 +152,6 @@ func TestC32_004_NoEnvReadsInProductionGo(t *testing.T) {
 		{
 			filepath.Join(root, "go", "cmd", "evolve", "cmd_loop.go"),
 			[]string{"EVOLVE_CYCLE_BUDGET"},
-		},
-		{
-			filepath.Join(root, "go", "internal", "guards", "quota.go"),
-			[]string{"EVOLVE_ALLOW_DEEP_RESEARCH"},
 		},
 		{
 			filepath.Join(root, "go", "internal", "guards", "docdelete.go"),
@@ -177,9 +172,8 @@ func TestC32_004_NoEnvReadsInProductionGo(t *testing.T) {
 }
 
 // TestC32_005_WorkflowConfigDefaults verifies that policy.Policy{}.WorkflowConfig()
-// returns the correct zero-value defaults for the two new fields:
-//   - BackfillEnabled == true  (nil *bool → default-on, matching envchain default)
-//   - AllowDeepResearch == false (zero value; opt-in override, not default-on)
+// defaults BackfillEnabled to true (nil *bool → default-on, matching envchain default).
+// AllowDeepResearch was removed with the quota guard, its only reader.
 //
 // Covers AC5 + EDGE1 (merged). BEHAVIORAL: directly calls the production
 // WorkflowConfig() resolver on an empty Policy — the same code path the
@@ -200,13 +194,6 @@ func TestC32_005_WorkflowConfigDefaults(t *testing.T) {
 			"WorkflowPolicy.BackfillEnabled is *bool; nil must resolve to the default-on\n" +
 			"value (true), matching envchain.BoolValue(cr.envSnap[\"EVOLVE_BACKFILL_ENABLED\"], true).\n" +
 			"Builder must initialize the default: c.BackfillEnabled = true in WorkflowConfig().")
-	}
-
-	// AllowDeepResearch must default to false (zero value; opt-in, not default-on).
-	if cfg.AllowDeepResearch {
-		t.Errorf("RED: WorkflowConfig().AllowDeepResearch = true, want false.\n" +
-			"AllowDeepResearch is an opt-in override (was gated by envEnabled == os.Getenv == '1').\n" +
-			"The default must be false; the operator sets it to true in policy.json when needed.")
 	}
 }
 
