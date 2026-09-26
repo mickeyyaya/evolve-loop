@@ -1,9 +1,5 @@
 package interaction_test
 
-// ADR-0045 I1 (slice 1) — the recording chokepoint + per-cycle rollup.
-// Black-box: assertions read the ndjson ledger and summary files exactly the
-// way a downstream consumer (retro, operator) would.
-
 import (
 	"encoding/json"
 	"os"
@@ -15,7 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// readLedger parses <ws>/<phase>-interactions.ndjson into outcomes.
 func readLedger(t *testing.T, ws, phase string) []interaction.Outcome {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join(ws, phase+"-interactions.ndjson"))
@@ -36,9 +31,6 @@ func readLedger(t *testing.T, ws, phase string) []interaction.Outcome {
 	return outs
 }
 
-// TestRecord_EveryInjectionKindProducesOutcome — the §8 table over kinds: one
-// Record per kind ⇒ one parseable ndjson line per kind in the phase ledger,
-// and the in-memory view agrees (record-reflects-reality at both sinks).
 func TestRecord_EveryInjectionKindProducesOutcome(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
@@ -77,9 +69,6 @@ func TestRecord_EveryInjectionKindProducesOutcome(t *testing.T) {
 	}
 }
 
-// TestRecorder_EmptyWorkspaceSkipsFileKeepsMemory — the C1 cwd-leak lesson,
-// pinned from day one: an empty workspace must not invent a file location
-// (no ndjson in the cwd), but the in-memory record survives.
 func TestRecorder_EmptyWorkspaceSkipsFileKeepsMemory(t *testing.T) {
 	cwd := t.TempDir()
 	old, _ := os.Getwd()
@@ -101,8 +90,6 @@ func TestRecorder_EmptyWorkspaceSkipsFileKeepsMemory(t *testing.T) {
 	}
 }
 
-// TestRecord_EmptyPhaseFallsBackToUnknownLedger pins the filename fallback:
-// phase-less events are still recorded, but never to an empty basename.
 func TestRecord_EmptyPhaseFallsBackToUnknownLedger(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
@@ -125,8 +112,6 @@ func TestRecord_EmptyPhaseFallsBackToUnknownLedger(t *testing.T) {
 	}
 }
 
-// TestRecorder_NilSafe — producers carry no nil guards (the recovery-detector
-// idiom): a nil recorder records nothing and never panics.
 func TestRecorder_NilSafe(t *testing.T) {
 	t.Parallel()
 	var rec *interaction.Recorder
@@ -136,11 +121,6 @@ func TestRecorder_NilSafe(t *testing.T) {
 	}
 }
 
-// TestLedgerPayload_NeutralizedBeforeWrite — threat S10: pane-derived Payload
-// persists in the ledger and may later be read by an LLM. The write must
-// strip ANSI, defang house markers (the REAL sentinel parser must fail on the
-// stored line), and cap length — neutralize-at-the-chokepoint, never
-// trust-the-producer.
 func TestLedgerPayload_NeutralizedBeforeWrite(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
@@ -176,12 +156,11 @@ func TestLedgerPayload_NeutralizedBeforeWrite(t *testing.T) {
 	}
 }
 
-// TestNeutralize_MultiLineLargePayload exercises the second cap in neutralize:
-// panetrust caps each retained line, then interaction caps the joined digest.
 func TestNeutralize_MultiLineLargePayload(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
 	rec := interaction.NewRecorder(ws)
+	// Each line fits Digest's per-line cap; only the joined digest exceeds 200 runes.
 	payload := strings.Join([]string{
 		strings.Repeat("a", 180),
 		strings.Repeat("b", 180),
@@ -234,8 +213,6 @@ func TestNeutralize_LongPayloadCapUsesRunesNotBytes(t *testing.T) {
 	}
 }
 
-// TestRecord_InvalidWorkspaceSwallowsFileError proves telemetry write errors
-// do not abort recording: the in-memory outcome remains available.
 func TestRecord_InvalidWorkspaceSwallowsFileError(t *testing.T) {
 	t.Parallel()
 	parent := t.TempDir()
@@ -262,10 +239,6 @@ func TestRecord_InvalidWorkspaceSwallowsFileError(t *testing.T) {
 	}
 }
 
-// TestRollup_SummarizesPerCycle_RungDistribution — §10(d)'s acceptance metric
-// must be computable: the rollup aggregates EVERY per-phase ledger in the
-// workspace into kind/result/rung distributions, distinct decision count, and
-// cost. Outcomes for two phases prove cross-ledger aggregation.
 func TestRollup_SummarizesPerCycle_RungDistribution(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
@@ -312,8 +285,6 @@ func TestRollup_SummarizesPerCycle_RungDistribution(t *testing.T) {
 	}
 }
 
-// TestWriteRollup_NothingToSummarize — a workspace with no interactions stays
-// clean: no empty-noise summary file, nil error.
 func TestWriteRollup_NothingToSummarize(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()

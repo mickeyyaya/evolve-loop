@@ -1,11 +1,5 @@
 package interaction
 
-// rollup.go — the per-cycle aggregation over every per-phase interaction
-// ledger in a workspace: <phase>-interactions.ndjson → interaction-summary.json
-// (phase-timing.json's sibling). The orchestrator writes it from RunCycle's
-// deferred persistence block; because the rollup READS the ndjson files, it
-// aggregates bridge-subprocess records and orchestrator records uniformly.
-
 import (
 	"encoding/json"
 	"os"
@@ -14,31 +8,25 @@ import (
 	"strings"
 )
 
-// summarySchemaVersion versions interaction-summary.json for readers.
 const summarySchemaVersion = 1
 
-// Summary is the per-cycle interaction rollup (ADR-0045 §10(d): the
-// rung-distribution acceptance metric reads ByRung shifting toward salvage).
+// Summary is the per-cycle interaction rollup written to interaction-summary.json.
 type Summary struct {
 	SchemaVersion int `json:"schema_version"`
 	// Total is the number of interaction outcomes recorded this cycle.
 	Total int `json:"total"`
-	// ByKind / ByResult / ByRung count outcomes per Event.Kind, per
-	// Outcome.Result, and per ladder rung ("none" for non-ladder
-	// interactions).
+	// ByKind, ByResult and ByRung count outcomes per kind, result and ladder rung ("none" outside the ladder).
 	ByKind   map[string]int `json:"by_kind"`
 	ByResult map[string]int `json:"by_result"`
 	ByRung   map[string]int `json:"by_rung"`
-	// Decisions counts distinct correction decisions (non-empty
-	// DecisionIDs), so re-dispatches AVERTED are computable per §10(a).
+	// Decisions counts distinct non-empty DecisionIDs, so re-dispatches averted are computable.
 	Decisions int `json:"decisions"`
 	// CostUSD is the advisor spend attributed to interactions this cycle.
 	CostUSD float64 `json:"cost_usd"`
 }
 
-// Rollup aggregates every *-interactions.ndjson under workspace. ok=false
-// when there is nothing to summarize (no files, empty workspace). Corrupt
-// lines are skipped — the read side of a crash-safe ledger is tolerant.
+// Rollup aggregates every *-interactions.ndjson under workspace, skipping corrupt lines.
+// ok is false when there is nothing to summarize.
 func Rollup(workspace string) (Summary, bool) {
 	if workspace == "" {
 		return Summary{}, false
@@ -47,7 +35,7 @@ func Rollup(workspace string) (Summary, bool) {
 	if err != nil || len(paths) == 0 {
 		return Summary{}, false
 	}
-	sort.Strings(paths) // deterministic aggregation order
+	sort.Strings(paths)
 	s := Summary{
 		SchemaVersion: summarySchemaVersion,
 		ByKind:        map[string]int{},
@@ -66,7 +54,7 @@ func Rollup(workspace string) (Summary, bool) {
 			}
 			var out Outcome
 			if jerr := json.Unmarshal([]byte(ln), &out); jerr != nil {
-				continue // tolerant reader: skip corrupt lines
+				continue
 			}
 			s.Total++
 			s.ByKind[out.Kind]++
@@ -89,9 +77,8 @@ func Rollup(workspace string) (Summary, bool) {
 	return s, true
 }
 
-// WriteRollup writes interaction-summary.json beside the ledgers when there
-// is anything to summarize; a workspace with no interactions stays clean (no
-// empty-noise files). Best-effort atomic (tmp + rename).
+// WriteRollup writes interaction-summary.json beside the ledgers via tmp and rename;
+// a workspace with nothing to summarize gets no file.
 func WriteRollup(workspace string) error {
 	s, ok := Rollup(workspace)
 	if !ok {

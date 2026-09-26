@@ -1,30 +1,5 @@
 package interaction
 
-// rulepromote.go — ADR-0045 I4: Reflexion for the auto-respond registry. The
-// escalation report tells a HUMAN to run `evolve bridge add-rule`; the fatal-
-// pane registry already self-expands (ADR-0044 Slice 5), and the interaction
-// registry should too — more carefully, because a bad auto-respond rule ACTS
-// (keystrokes) rather than just classifies.
-//
-// This is a thin payload specialization of the recovery/promote.go mechanism
-// (one promotion idiom, two payloads): absent-only content-hash YAML,
-// corrupt-safe replay, operator-edit-wins. The payload here is
-// {regex, response_keys, note} + a per-rule stage, instead of {cause, substr}.
-//
-// Validation is the trust boundary and is DELIBERATELY STRICTER than the
-// operator hatch (keyspec.Validate WARNs-but-sends): an auto-promoted rule
-// that fires keystrokes must clear a REJECTING gate —
-//   - the regex compiles under Go's RE2 (no catastrophic backtracking by
-//     construction) and is >= minRulePatternLen (a tiny pattern is a
-//     false-positive bomb that would inject keystrokes into healthy work);
-//   - every response key passes keyspec.Classify as NON-suspect (a single
-//     ClassSuspect token refuses the whole rule);
-//   - the pattern must NOT match any line of the IMMUTABLE healthy-pane corpus
-//     (a rule that fires on normal output is a DoS).
-//
-// Promoted rules land `shadow` (log would-respond only); auto-enforce is a
-// MEASURED step (zero false fires observed via I1), never assumed.
-
 import (
 	"crypto/sha256"
 	"encoding/hex"
@@ -39,12 +14,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/keyspec"
 )
 
-// minRulePatternLen is the floor on a promoted regex's source length: short
-// patterns match too much and a keystroke-firing rule must never be that cheap
-// to trigger (mirrors recovery.minPromotedSubstrLen's reasoning).
+// minRulePatternLen keeps short patterns, which match healthy output, from firing keystrokes.
 const minRulePatternLen = 12
 
-// Rule stages (the per-rule rollout rides INSIDE the registry file, not a flag).
+// Rule stages; the per-rule stage rides inside the registry file.
 const (
 	RuleStageShadow  = "shadow"
 	RuleStageEnforce = "enforce"
@@ -56,17 +29,16 @@ type InteractionRule struct {
 	Regex        string
 	ResponseKeys string // CSV, same shape as ManifestPrompt.ResponseKeys
 	Note         string
-	Stage        string // shadow (promoted) | enforce (measured-clean)
+	Stage        string // RuleStageShadow or RuleStageEnforce
 }
 
-// ValidateRule is the REJECTING trust-boundary gate. corpus is the immutable
-// healthy-pane fixture every promoted pattern must NOT match. A nil/err return
-// means the rule is unsafe to promote — the caller escalates, never relaxes.
+// ValidateRule is the rejecting trust-boundary gate; a non-nil error means the rule is unsafe to promote.
+// corpus is the immutable healthy-pane fixture no promoted pattern may match.
 func ValidateRule(regex, responseKeys string, corpus []string) error {
 	if len(regex) < minRulePatternLen {
 		return fmt.Errorf("interaction: rule pattern %q too short to promote safely (min %d — short patterns are false-positive bombs)", regex, minRulePatternLen)
 	}
-	re, err := regexp.Compile(regex) // Go RE2 — no catastrophic backtracking by construction
+	re, err := regexp.Compile(regex)
 	if err != nil {
 		return fmt.Errorf("interaction: rule pattern does not compile: %w", err)
 	}
@@ -78,8 +50,7 @@ func ValidateRule(regex, responseKeys string, corpus []string) error {
 			continue
 		}
 		nonEmpty = true
-		// REJECTING form: keyspec.Validate WARNs-but-sends (operator hatch);
-		// an auto-promoted rule gets the hard gate — any suspect token refuses.
+		// Stricter than keyspec.Validate, which warns but sends: a promoted rule fires keystrokes.
 		if keyspec.Classify(k) == keyspec.ClassSuspect {
 			return fmt.Errorf("interaction: response key %q is a suspected typo (ClassSuspect) — refusing to auto-promote a keystroke rule", k)
 		}
@@ -95,17 +66,14 @@ func ValidateRule(regex, responseKeys string, corpus []string) error {
 	return nil
 }
 
-// ruleID derives the stable file id from the pattern (idempotent re-promotion,
-// convergent with the absent-only write — the recovery.promotionID idiom).
+// ruleID hashes the pattern, so re-promotion targets the same file.
 func ruleID(regex string) string {
 	sum := sha256.Sum256([]byte(regex))
 	return "rule-" + hex.EncodeToString(sum[:6])
 }
 
-// PromoteRule validates then durably persists a rule under dir as <id>.yaml,
-// absent-only (an existing — possibly operator-edited — file always wins),
-// landing at stage `shadow`. Validation failure returns an error WITHOUT
-// writing (the trust boundary). Returns the stable id.
+// PromoteRule validates a rule, then writes it under dir as <id>.yaml at stage shadow unless
+// that file exists. It returns the id; a validation failure writes nothing.
 func PromoteRule(dir, regex, responseKeys, note string, corpus []string) (string, error) {
 	if err := ValidateRule(regex, responseKeys, corpus); err != nil {
 		return "", err
@@ -113,7 +81,7 @@ func PromoteRule(dir, regex, responseKeys, note string, corpus []string) (string
 	id := ruleID(regex)
 	path := filepath.Join(dir, id+".yaml")
 	if _, err := os.Stat(path); err == nil {
-		return id, nil // existing promotion wins (idempotent)
+		return id, nil // an existing, possibly operator-edited file wins
 	} else if !os.IsNotExist(err) {
 		return "", err
 	}
@@ -124,27 +92,16 @@ func PromoteRule(dir, regex, responseKeys, note string, corpus []string) (string
 	fmt.Fprintf(&b, "response_keys: %s\n", strconv.Quote(responseKeys))
 	fmt.Fprintf(&b, "note: %s\n", strconv.Quote(note))
 	fmt.Fprintf(&b, "stage: %s\n", RuleStageShadow)
-	// ADR-0049 N14: route through the atomicwrite SSOT (the twin of recovery's
-	// PromoteSignature fix). The hand-rolled `path + ".tmp"` was SHARED, so two
-	// concurrent fleet cycles promoting the same content-hashed rule interleaved
-	// on one temp — the loser's rename hit ENOENT (a lost promotion) and a partial
-	// write could tear the rule every later boot replays. os.CreateTemp gives each
-	// writer a UNIQUE temp; it also mkdirs the parent, so the explicit MkdirAll is
-	// gone.
+	// atomicwrite gives each writer a unique temp, so concurrent promotions of one path cannot tear it.
+	// See ADR-0049.
 	if err := atomicwrite.Bytes(path, []byte(b.String())); err != nil {
 		return "", err
 	}
 	return id, nil
 }
 
-// EnforceRule flips one promoted rule from shadow to enforce — the I4
-// "measured auto-enforce" transition (R8.2). It re-validates against the
-// CURRENT corpus first (the measured-clean bar includes "0 healthy-corpus
-// hits" — corpus rot since promotion must block the flip), then rewrites the
-// YAML with stage: enforce, preserving every other field. The CALLER owns
-// the fire-count/contradiction evidence; this function owns only the safety
-// re-check and the durable flip. Missing rule → error (never create on
-// flip); already-enforce → idempotent no-op.
+// EnforceRule flips a promoted rule from shadow to enforce after re-validating it against the
+// current corpus. A missing rule is an error; an already-enforced rule is a no-op.
 func EnforceRule(dir, id string, corpus []string) error {
 	path := filepath.Join(dir, id+".yaml")
 	data, err := os.ReadFile(path)
@@ -161,9 +118,7 @@ func EnforceRule(dir, id string, corpus []string) error {
 	if err := ValidateRule(r.Regex, r.ResponseKeys, corpus); err != nil {
 		return fmt.Errorf("interaction: enforce %s: re-validation failed (corpus rot since promotion?): %w", id, err)
 	}
-	// Line-surgical rewrite: ONLY the stage line changes, so an
-	// operator-edited file (extra fields, reworded note) survives the flip
-	// intact (review MEDIUM: reconstruction silently dropped custom keys).
+	// Rewrite only the stage line, so operator-added fields survive the flip.
 	lines := strings.Split(string(data), "\n")
 	flipped := false
 	for i, ln := range lines {
@@ -176,23 +131,15 @@ func EnforceRule(dir, id string, corpus []string) error {
 	if !flipped {
 		lines = append(lines, "stage: "+RuleStageEnforce)
 	}
-	// ADR-0049 N14: same shared-temp fix as PromoteRule. The shadow→enforce flip
-	// is a read-modify-write; concurrent flips of one rule both wrote the shared
-	// path+".tmp" and one rename hit ENOENT. atomicwrite's unique temp makes each
-	// flip atomic and last-writer-wins is benign (both converge to stage enforce).
+	// Concurrent flips each get a unique temp; last writer wins, and all write enforce.
 	if err := atomicwrite.Bytes(path, []byte(strings.Join(lines, "\n"))); err != nil {
 		return fmt.Errorf("interaction: enforce %s: %w", id, err)
 	}
 	return nil
 }
 
-// LoadRules replays every parseable rule in dir, RE-VALIDATING each against
-// the current corpus (a corpus update — e.g. a new CLI version's healthy
-// banner — DEMOTES a rule that now matches, so promotion is never validated
-// only once against a corpus that can rot). A rule failing re-validation is
-// dropped from the loaded set (its file stays for the operator to inspect);
-// a corrupt file is skipped (boot never bricks). enforceOnly returns only the
-// rules cleared to enforce.
+// LoadRules replays every parseable rule in dir, dropping any that fails re-validation against
+// the current corpus; a corrupt file is skipped so boot never bricks.
 func LoadRules(dir string, corpus []string) []InteractionRule {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -211,18 +158,16 @@ func LoadRules(dir string, corpus []string) []InteractionRule {
 		if !ok {
 			continue
 		}
-		// Boot re-validation against the CURRENT corpus (S3 corpus-rot).
 		if err := ValidateRule(r.Regex, r.ResponseKeys, corpus); err != nil {
-			continue // now-unsafe → demoted out of the active set
+			continue
 		}
 		rules = append(rules, r)
 	}
 	return rules
 }
 
-// parseRule reads the fixed-key subset PromoteRule writes. A file missing the
-// regex or response_keys is skipped (ok=false). An unknown stage normalizes to
-// shadow (the safe default — never auto-escalate on a typo).
+// parseRule reads the fixed-key subset PromoteRule writes; it needs regex and response_keys,
+// and any stage other than enforce reads as shadow, so a typo never escalates a rule.
 func parseRule(data string) (InteractionRule, bool) {
 	var r InteractionRule
 	for _, line := range strings.Split(data, "\n") {
