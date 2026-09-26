@@ -1,11 +1,5 @@
 package core
 
-// carryover_lifecycle_test.go — unit 03 (ADR-0103): the orchestrator's seam
-// onto the carryover unit — the accessor pair, the persist facade reading the
-// store at call time, the RMW branch's golden bytes, the consumer pin of the
-// priority vocabulary, the one-construction guard and the closeout order at
-// the real finalizeCycle.
-
 import (
 	"context"
 	"encoding/json"
@@ -18,8 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// carryoverTodoExists keeps the nine assertion sites of this package's tests
-// compiling; the rule lives in the unit as HasID.
 func carryoverTodoExists(todos []CarryoverTodo, id string) bool { return carryover.HasID(todos, id) }
 
 func TestCarryover_LiteralOrchestratorGetsTheLifecycleOnce(t *testing.T) {
@@ -59,8 +51,6 @@ func TestCarryover_SeesASignalCenterAppliedAfterConstruction(t *testing.T) {
 	}
 }
 
-// The default-build twin of the integration-tagged forensics test: the store
-// is read at CALL time, never snapshotted at construction.
 func TestWriteFailureLearningState_ReadsTheStoreAtCallTime(t *testing.T) {
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
 	swapped := &fakeStorage{}
@@ -71,8 +61,7 @@ func TestWriteFailureLearningState_ReadsTheStoreAtCallTime(t *testing.T) {
 	}
 }
 
-// ADR-0103 item 4: the RMW branch's bytes, captured on the pre-extraction code
-// (f7c2d85d) with this exact fixture — the first core test to drive it.
+// The golden was captured on the pre-extraction code with this exact fixture.
 func TestWriteFailureLearningState_RMWBranchIsByteIdenticalToTheGolden(t *testing.T) {
 	const golden = `{"lastUpdated":"","lastCycleNumber":41,"version":0,"currentBatch":{"cycleAccruedCostUSD":0},"failedApproaches":[{"ts":"t40","cycle":40,"verdict":"FAIL","recordedAt":"r40","retrospected":true,"summary":"mine"},{"ts":"t9","cycle":9,"verdict":"FAIL","recordedAt":"r9","defects":["d"],"retrospected":false}],"carryoverTodos":[{"id":"peer","action":"peer todo","priority":"P1","first_seen_cycle":40,"cycles_unpicked":0},{"id":"shared","action":"disk","priority":"P0","first_seen_cycle":40,"cycles_unpicked":0,"expiresAt":"2026-01-01T00:00:00Z"},{"id":"new","action":"new todo","priority":"P1","first_seen_cycle":9,"cycles_unpicked":0,"expiresAt":"2026-03-01T00:00:00Z"}],"stateRevision":1}`
 	f := &fakeUpdaterStorage{}
@@ -89,19 +78,12 @@ func TestWriteFailureLearningState_RMWBranchIsByteIdenticalToTheGolden(t *testin
 	}
 }
 
-// The consumer pin of the unit's priority vocabulary: core's consts project
-// the unit's (the advisor's rank table — the other consumer — pins the same
-// vocabulary from its own package since ADR-0103 unit 04).
 func TestCarryoverPriorityRank_RanksTheUnitsVocabulary(t *testing.T) {
 	if carryoverPriorityBlocking != carryover.PriorityBlocking || carryoverPriorityLesson != carryover.PriorityLesson {
 		t.Fatal("core's priority consts are projections of the unit's")
 	}
 }
 
-// The lifecycle is exported now: every non-test construction outside the unit
-// must be the orchestrator's wiredCarryover / nullCarryover, in ONE file — and
-// the three Null-Object facades kept for tests and ACS predicates must have
-// no production caller either (one would drop the unit's WARNs silently).
 func TestCarryoverLifecycle_OneConstructionSite(t *testing.T) {
 	const onlySite = "internal/core/carryover_lifecycle.go"
 	for _, needle := range []string{"carryover.New(", "MergeWorkspaceCarryover(", "MergeWorkspacePrescriptionCarryover(", "ApplyDefectsAsCarryoverTodos("} {
@@ -150,9 +132,6 @@ func nonTestSourcesMentioning(t *testing.T, needle, allowed string) []string {
 	return offenders
 }
 
-// The cycle-1538 pin at the seam: through the REAL finalizeCycle, a memo that
-// re-supplies a triage-dropped id cannot resurrect it (retire runs after both
-// merges), and the prescription merge runs too.
 func TestFinalizeCycle_CloseoutKeepsTheThreeStepOrder(t *testing.T) {
 	workspace := t.TempDir()
 	for name, body := range map[string]string{

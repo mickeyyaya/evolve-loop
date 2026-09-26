@@ -1,15 +1,5 @@
 package core
 
-// continuation_decline_release_test.go — pins the decline-release half of the
-// 2026-08-10 absorbing-FAIL fix: when adoption REJECTS a stale binding
-// (snapshot landed / worktree gone), the orchestrator must RELEASE that
-// registry binding — otherwise the root-owned entry outlives its manifest and
-// the defect-ledger gate's out-of-band check auto-FAILs every future lane on
-// that scope (cycles 1412/1418). The release is orchestrator-side, so the
-// gate's cycle-1285 anti-tamper block (workspace manifest deleted while a
-// LIVE binding exists ⇒ blocked) is untouched — deletion by an agent still
-// blocks; declination by the adopter now releases.
-
 import (
 	"testing"
 

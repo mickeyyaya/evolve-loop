@@ -11,8 +11,6 @@ import (
 	"testing"
 )
 
-// A main update between screening and seeding must not dispatch any phase
-// against the rejected snapshot, and neither old nor newly seeded work is lost.
 func TestRunCycle_ContinuationAdvanceFailureStopsBeforeBuild(t *testing.T) {
 	for _, failSeed := range []bool{false, true} {
 		name := "base-advance"

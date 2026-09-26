@@ -9,21 +9,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// placeholderTokenRE matches an UPPER_SNAKE template token ending in
-// _PLACEHOLDER (FULLSUITE_PLACEHOLDER, ACS_RESULT_PLACEHOLDER): the shape a
-// builder's own report scaffolding uses for a slot it must overwrite with an
-// executed result (no shipped persona emits the token — cycle 1679 minted it
-// itself — so the grammar here is the only home of the rule). Prose mentioning a "placeholder", a lowercase
-// identifier, or a token that merely starts with PLACEHOLDER is not a slot.
+// placeholderTokenRE matches an UPPER_SNAKE token ending in _PLACEHOLDER, the
+// slot shape of a builder's own report scaffolding. No persona emits it, so
+// this grammar is the rule's only home. Prose and lowercase names never match.
 var placeholderTokenRE = regexp.MustCompile(`\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*_PLACEHOLDER\b`)
 
-// PlaceholderTokenFailures is the build handoff floor's deterministic check
-// that no template slot survived into build-report.md. Cycle 1679 round 5
-// handed off "`go test -count=1 ./...` → FULLSUITE_PLACEHOLDER" under a
-// heading promising every number was executed; the floor passed it and the
-// audit spent a round naming it (M3 verification-gap). One failure per token
-// per line, naming the report line, so the correction ladder's instruction is
-// exact. No report → nothing to refuse (the deliverables gate owns absence).
+// PlaceholderTokenFailures names each template slot left in the build report; a missing report is the deliverables gate's to refuse.
 func PlaceholderTokenFailures(_ context.Context, in ReviewInput) []string {
 	if in.Workspace == "" {
 		return nil

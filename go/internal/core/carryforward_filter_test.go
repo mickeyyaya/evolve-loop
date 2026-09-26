@@ -1,18 +1,5 @@
 package core
 
-// carryforward_filter_test.go — fast-tier coverage for the deterministic
-// carry-forward candidate screen (cycle 962). These are white-box tests: core
-// cannot import test/fixtures (that package imports core), so they drive the
-// package gitRunner seam directly through a SCRIPTED fake that answers each git
-// subcommand independently — the single-canned-response gitRec is too blunt for
-// functions that branch on distinct exit codes across is-ancestor / cherry /
-// merge-tree.
-//
-// The assertions probe INTENT, not surface: (1) a genuine 3-way conflict is
-// (false, nil) and NEVER an error, and (2) the supersession screen runs BEFORE
-// the merge dry-run so an already-landed candidate is rejected without the
-// merge-tree that would mask it as "clean".
-
 import (
 	"context"
 	"io"
@@ -22,8 +9,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// seamGit is a per-subcommand recording git seam. respond maps a git
-// invocation (by args) to (stdout, exitCode); a nil/zero response is (”, 0).
+// seamGit answers each git subcommand separately, because gitRec's one canned
+// response cannot drive the exit-code branches. A nil respond answers ("", 0).
 type seamGit struct {
 	respond func(args []string) (stdout string, exit int)
 	calls   [][]string
@@ -85,8 +72,6 @@ func TestCarryforwardCandidateLandable_CleanMergeIsLandable(t *testing.T) {
 	}
 }
 
-// The load-bearing contract: a REAL merge conflict is (false, nil), never an
-// error. A caller distinguishing "not landable" from "git broke" depends on it.
 func TestCarryforwardCandidateLandable_ConflictIsFalseNotError(t *testing.T) {
 	s := &seamGit{respond: func(args []string) (string, int) {
 		switch {
@@ -110,9 +95,6 @@ func TestCarryforwardCandidateLandable_ConflictIsFalseNotError(t *testing.T) {
 	}
 }
 
-// Order matters: an already-landed (ancestor) candidate is rejected by the
-// supersession screen BEFORE the merge dry-run — merge-tree of an
-// already-absorbed change would read "clean" and mask the duplicate.
 func TestCarryforwardCandidateLandable_SupersededShortCircuitsBeforeMerge(t *testing.T) {
 	s := &seamGit{respond: func(args []string) (string, int) {
 		if has(args, "merge-base", "--is-ancestor") {
@@ -131,8 +113,6 @@ func TestCarryforwardCandidateLandable_SupersededShortCircuitsBeforeMerge(t *tes
 	}
 }
 
-// Patch-id supersession: not an ancestor, but `git cherry` shows every commit
-// already on base (all `-`, no `+`) → superseded, no merge attempted.
 func TestCarryforwardCandidateLandable_PatchIdDuplicateSuperseded(t *testing.T) {
 	s := &seamGit{respond: func(args []string) (string, int) {
 		switch {
@@ -162,13 +142,6 @@ func has(args []string, prefix ...string) bool {
 	return strings.Join(args[:len(prefix)], " ") == strings.Join(prefix, " ")
 }
 
-// TestClassifyFleetRebaseCandidate_ThreeWayVerdicts names + exercises the
-// fleet-rebase pre-screen surface (apicover): FleetRebaseVerdict and all three
-// constants, bound via the classifier's REAL decision paths through the git
-// seam. The key intent pin is the disambiguation the doc warns about: a
-// not-landable candidate is AlreadyLanded ONLY when the supersession screen
-// says so — a genuine 3-way conflict must classify FleetRebaseConflict, never
-// be short-circuited as landed (which would silently drop overlapping work).
 func TestClassifyFleetRebaseCandidate_ThreeWayVerdicts(t *testing.T) {
 	cases := []struct {
 		label   string
@@ -220,8 +193,6 @@ func TestClassifyFleetRebaseCandidate_ThreeWayVerdicts(t *testing.T) {
 	}
 }
 
-// TestClassifyFleetRebaseCandidate_GitInfraErrorIsError pins the contract that
-// infrastructure failure surfaces as an error, never masked as a verdict.
 func TestClassifyFleetRebaseCandidate_GitInfraErrorIsError(t *testing.T) {
 	s := &seamGit{respond: func(args []string) (string, int) {
 		if has(args, "merge-base", "--is-ancestor") {
