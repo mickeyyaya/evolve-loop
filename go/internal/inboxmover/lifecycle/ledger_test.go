@@ -1,9 +1,5 @@
 package lifecycle
 
-// ledger_test.go — the lifecycle ledger line and its helpers (§6 tests 40-41;
-// the writeLedger tests moved from extra_coverage_test.go:98-130 and the
-// intPtr/strPtr tests from inboxmover_test.go:455-476).
-
 import (
 	"errors"
 	"strings"
@@ -11,14 +7,11 @@ import (
 	"time"
 )
 
-// Test 40 — a nil ledger is silent; a failing appender prints the verbatim
-// WARN line (the ledger adapter owns LEDGER_APPEND_FAILED — no INBOX_ code
-// doubles it); the TS is UTC RFC3339 from the injected clock.
 func TestLedgerLine_NilLedgerIsSilent_AppendFailureIsTheVerbatimLine(t *testing.T) {
 	var stderr strings.Builder
 	rc := newRecordingCenter()
 	silent := New(t.TempDir(), nil, WithStderr(&stderr), WithSignals(rc.accessor()))
-	silent.ledgerLine(ledgerEntry{Action: "claim", TaskID: "t1"}) // must not panic, must print nothing
+	silent.ledgerLine(ledgerEntry{Action: "claim", TaskID: "t1"})
 	if stderr.Len() != 0 || len(rc.events) != 0 {
 		t.Errorf("a nil ledger appends nothing and says nothing: %q %+v", stderr.String(), rc.events)
 	}
@@ -43,7 +36,6 @@ func TestLedgerLine_NilLedgerIsSilent_AppendFailureIsTheVerbatimLine(t *testing.
 	}
 }
 
-// Test 41 — intPtr (with the Sscanf leniency Q3), strPtr and the message fold.
 func TestIntPtr_StrPtr_FoldLifecycleMessage(t *testing.T) {
 	if intPtr("") != nil || intPtr("garbage") != nil {
 		t.Error("intPtr: empty and unparseable ⇒ nil")

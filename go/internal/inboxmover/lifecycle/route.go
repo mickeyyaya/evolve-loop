@@ -1,14 +1,5 @@
 package lifecycle
 
-// route.go — RouteConsole: the FAIL closeout's per-item breaker for a
-// deterministic refusal. A triage gate that refuses a top_n card because it
-// names a protected surface has said, in so many words, that the item is
-// operator-owned; retrying it lane after lane only burns the scout and triage
-// tokens again (nine cycles for one item, 1650–1675 — the incident doc). The
-// item is rewritten IN PLACE, wherever the lane's claim left it, so the drain
-// that follows releases it already carrying route:console-manual and the
-// ADR-0074 claim floor refuses every later lane.
-
 import (
 	"encoding/json"
 	"fmt"
@@ -17,8 +8,7 @@ import (
 	"time"
 )
 
-// RouteConsoleValue is the route the breaker writes — the same word the
-// operator writes by hand and the claim floor reads (inboxbatch.ConsoleRouted).
+// RouteConsoleValue is the route RouteConsole writes and the claim floor refuses.
 const RouteConsoleValue = "console-manual"
 
 // RouteResult describes what happened: the rewritten item's path.
@@ -26,13 +16,7 @@ type RouteResult struct {
 	Path string
 }
 
-// RouteConsole rewrites the item's record with route:console-manual, the
-// refusal as routed_reason, the cycle that refused it and the clock's stamp;
-// the item is located across processing/cycle-*/ and the inbox root (Locate)
-// and is NOT moved. Returns ErrNotFound (INBOX_ROUTE_NOT_FOUND) when no record
-// carries the id and the rewrite fault (INBOX_ITEM_REWRITE_FAILED, step=route)
-// when the atomic rewrite cannot happen — in both cases nothing is routed and
-// the fault is on the stream.
+// RouteConsole marks taskID's item route:console-manual where it lies, so no later lane claims it.
 func (m *Mover) RouteConsole(taskID, reason string, cycle int) (RouteResult, error) {
 	res := RouteResult{}
 	if taskID == "" {
@@ -46,8 +30,7 @@ func (m *Mover) RouteConsole(taskID, reason string, cycle int) (RouteResult, err
 			fields: map[string]string{"task_id": taskID, "inbox_dir": m.inboxDir, "step": "locate"}})
 		return res, fmt.Errorf("%w: %s", ErrNotFound, taskID)
 	}
-	// An item held by ANOTHER cycle's claim is a live lane's, not this closeout's
-	// to route (a mis-copied id must never rewrite someone else's work).
+	// Another cycle's claim belongs to a live lane; a mis-copied id must never rewrite it.
 	if loc.Cycle != 0 && loc.Cycle != cycle {
 		m.warn(fault{code: CodeRouteNotFound, origin: "Mover.RouteConsole", cycle: cycle, legacy: "WARN: ",
 			reason: fmt.Sprintf("route-console: task '%s' is held by cycle %d's claim, not cycle %d's — not routed", taskID, loc.Cycle, cycle),
@@ -81,7 +64,6 @@ func (m *Mover) RouteConsole(taskID, reason string, cycle int) (RouteResult, err
 	return res, nil
 }
 
-// jsonString renders a Go string as a JSON string value for the item rewrite.
 func jsonString(s string) json.RawMessage {
 	b, _ := json.Marshal(s) // a string never fails to marshal
 	return b

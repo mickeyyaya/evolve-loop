@@ -1,10 +1,5 @@
 package lifecycle
 
-// promote.go — processing/ (or inbox/) → processed | rejected | retry |
-// quarantine (inboxmover.go:261-430 on the base), split along its comment
-// seams: validate → locate → the landing gate → deliver → the retire+ledger
-// tail.
-
 import (
 	"fmt"
 	"os"
@@ -23,10 +18,9 @@ type PromoteOpts struct {
 type PromoteResult struct {
 	SrcPath  string
 	DestPath string
-	NoOp     bool // true if source was not found (ship.sh compat → exit 0)
+	NoOp     bool // nothing moved: the id was not found or the rename failed
 }
 
-// promotion is one promote's resolved source and destination.
 type promotion struct {
 	taskID  string
 	src     string
@@ -38,9 +32,7 @@ type promotion struct {
 	opts    PromoteOpts
 }
 
-// Promote moves a file from processing/ (or inbox/ fallback) to
-// processed|rejected|retry|quarantine/. Exits 0-equivalent even when source
-// not found — ship.sh must never block on this.
+// Promote moves taskID's item to processed, rejected, retry or quarantine; an absent item is a NoOp success.
 func (m *Mover) Promote(taskID, newState string, p PromoteOpts) (PromoteResult, error) {
 	res := PromoteResult{}
 	if err := m.validatePromote(taskID, newState); err != nil {
@@ -52,7 +44,7 @@ func (m *Mover) Promote(taskID, newState string, p PromoteOpts) (PromoteResult, 
 			reason: fmt.Sprintf("promote: task '%s' not found in processing/ or inbox/ — already moved?", taskID),
 			fields: map[string]string{"task_id": taskID, "state": newState, "step": "locate"}})
 		res.NoOp = true
-		return res, nil // ship.sh compat: NoOp success
+		return res, nil // a missing item never blocks the ship
 	}
 	newState, reroutedUnlanded := m.landingGate(taskID, newState, p)
 	pr := promotion{taskID: taskID, src: src, srcRel: srcRel, base: filepath.Base(src), state: newState, opts: p}
@@ -66,12 +58,7 @@ func (m *Mover) Promote(taskID, newState string, p PromoteOpts) (PromoteResult, 
 	res.DestPath = pr.dest
 	m.linef("promoted: %s → %s/", pr.base, newState)
 	reason := "ship-promote-" + newState
-	// Transactional retire (park-consume-releases-continuation-binding): every
-	// Promote destination is OUT of the batch loader's reach, so the item's
-	// registry binding must go with it in this same operation (cycle-1487).
-	// The reason override lands BEFORE the hook so the preserved pointer and
-	// the ledger entry describe the same transaction with the same word
-	// (audit cycle-1507 L1).
+	// The override precedes the retire hook so the preserved pointer and the ledger line carry one reason.
 	if reroutedUnlanded {
 		reason = "ship-promote-retry-unlanded-sha"
 	}
@@ -88,8 +75,7 @@ func (m *Mover) Promote(taskID, newState string, p PromoteOpts) (PromoteResult, 
 	return res, nil
 }
 
-// validatePromote is the usage and state check (both lines kept verbatim —
-// the stale `processed|rejected|retry` text is a preserved quirk).
+// validatePromote's bad-state line omits quarantine on purpose: a pinned, preserved quirk.
 func (m *Mover) validatePromote(taskID, newState string) error {
 	if taskID == "" || newState == "" {
 		m.linef("ERROR: usage: promote <task_id> <new_state> [<cycle>] [--commit-sha <sha>]")
@@ -102,8 +88,6 @@ func (m *Mover) validatePromote(taskID, newState string) error {
 	return nil
 }
 
-// locateSource resolves the item — a processing claim first, then the inbox
-// root (Locate is the one walk) — and the srcRel the ledger From path spells.
 func (m *Mover) locateSource(taskID string) (src, srcRel string) {
 	if loc, err := Locate(m.inboxDir, taskID); err == nil {
 		src, srcRel = loc.Path, "inbox"
@@ -114,11 +98,7 @@ func (m *Mover) locateSource(taskID string) (src, srcRel string) {
 	return src, srcRel
 }
 
-// landingGate is the delivery-evidence gate (inbox-promotion-requires-landed-
-// ship): a processed-promotion carrying a ship SHA must be backed by that
-// commit actually landing on main, or it reroutes to retry/. Empty SHA and
-// non-processed states skip the check. A probe error fails OPEN (the sha is
-// treated as landed) — and, since the unit, says so.
+// landingGate reroutes a processed promotion to retry/ when its ship sha has not landed on main.
 func (m *Mover) landingGate(taskID, newState string, p PromoteOpts) (string, bool) {
 	if newState != "processed" || p.CommitSHA == "" {
 		return newState, false
@@ -139,11 +119,8 @@ func (m *Mover) landingGate(taskID, newState string, p PromoteOpts) (string, boo
 	return "retry", true
 }
 
-// deliver creates the destination dir and renames the item. A mkdir failure
-// is an INFRASTRUCTURE non-delivery: the task is still where it was and
-// nothing promoted it, so it returns ErrMvFailed with NoOp false (a loud error
-// that also lost the file would be worse — inboxmover-promote-mkdir-fail-loud).
-// A rename failure keeps the historical (NoOp=true, nil) compat contract.
+// deliver moves the item into its destination. A mkdir failure is ErrMvFailed with the item in
+// place; a rename failure stays the (NoOp=true, nil) success that callers depend on.
 func (m *Mover) deliver(pr promotion) (noop bool, err error) {
 	warnEntry := ledgerEntry{Action: "promote-warn", TaskID: pr.taskID, From: ".evolve/inbox/" + pr.srcRel + "/" + pr.base,
 		To: pr.dest, Cycle: intPtr(pr.opts.Cycle), GitSHA: strPtr(pr.opts.CommitSHA)}
@@ -169,12 +146,7 @@ func (m *Mover) deliver(pr promotion) (noop bool, err error) {
 	return false, nil
 }
 
-// promoteDestPath computes (destDir, dest) for a given new state:
-//
-//	processed:  <inbox>/processed/cycle-<cycle|0>/[<sha8>-]<base>
-//	rejected:   <inbox>/rejected/cycle-<cycle|0>/<base>
-//	retry:      <inbox>/retry/<base>
-//	quarantine: <inbox>/quarantine/<base> (flat: terminal, not per-cycle)
+// promoteDestPath returns the destination dir and path; quarantine is flat because it is terminal.
 func promoteDestPath(inboxDir, base, newState string, p PromoteOpts) (string, string) {
 	switch newState {
 	case "processed":
@@ -200,7 +172,6 @@ func promoteDestPath(inboxDir, base, newState string, p PromoteOpts) (string, st
 	return "", ""
 }
 
-// cycleOrZero is the ONE spelling of the destination's default cycle segment.
 func cycleOrZero(cycle string) string {
 	if cycle == "" {
 		return "0"
