@@ -457,6 +457,9 @@ func (o *Orchestrator) reviewResumedDeliverable(
 			cancel()
 		}
 		if err != nil {
+			if isQuotaWall(err) {
+				return corrected, fmt.Errorf("resume review gate: phase %s correction %d: %w", phase, correction, ErrAllFamiliesExhausted)
+			}
 			return corrected, fmt.Errorf("resume review gate: phase %q correction %d dispatch failed: %w", phase, correction, err)
 		}
 		if !IsVerdict(corrected.Verdict) {

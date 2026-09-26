@@ -40,7 +40,9 @@ const (
 	ResultAccepted      = "accepted"
 	ResultRejectedAgain = "rejected_again"
 	// ResultDispatchFailed / ResultNonCanonicalVerdict: the correction re-dispatch errored / returned an unevaluable verdict.
-	ResultDispatchFailed      = "dispatch_failed"
+	ResultDispatchFailed = "dispatch_failed"
+	// ResultQuotaDeferred: the re-dispatch met a quota wall and the cycle deferred instead of failing.
+	ResultQuotaDeferred       = "quota_deferred"
 	ResultNonCanonicalVerdict = "non_canonical_verdict"
 
 	// ResultSubmitVerified: the input line was already clear. It is not ResultPromptCleared,

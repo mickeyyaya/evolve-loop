@@ -24,6 +24,8 @@
 - **Kernel answerer as a Strategy over a closed fact set.** `KernelAnswerer` maps a question by keyword to one of four dispatch facts (`artifact_path`, `workspace`, `worktree`, `cycle`) that the agent's own prompt already carried. It does no I/O and calls no LLM; the advisor tail for novel questions is the caller's. `KernelFacts.Cycle` arrives pre-rendered, so the leaf carries no int formatting policy.
 - **Rule promotion is a payload specialization of `recovery/promote.go`.** One promotion idiom, two payloads: absent-only content-hash YAML, corrupt-safe replay, operator edit wins. The payload here is `{regex, response_keys, note}` plus a per-rule stage, which rides inside the file rather than a flag. The file id is a short hash of the regex, so re-promotion targets the same file.
 
+- **`ResultQuotaDeferred` (`quota_deferred`)** is the correction outcome recorded when the re-dispatch met a quota wall and the cycle deferred instead of failing ([ADR-0106](../adr/0106-logic-first-delivery.md) Q1); the rollup counts it beside `dispatch_failed`.
+
 ## Invariants
 
 - **The recorder runs at every `EVOLVE_PHASE_RECOVERY` stage, including `off`.** Recording is side-effect-free observation (the `FatalPaneDetector` precedent); only corrective actions gate on the stage.

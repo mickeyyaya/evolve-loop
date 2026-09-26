@@ -203,10 +203,14 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 		}
 		retryHooks := retryOpts{quotaExhausted: allFamiliesQuotaExhausted, optionalInfraSkip: o.optionalInfraSkip}
 		resp, attempts, err := dispatch.retryPhaseRunner(next, phaseReq, retryHooks)
-		if errors.Is(err, ErrAllFamiliesExhausted) {
+		// pauseForQuota records through dispatch, so the resume's own accumulators go in and come back.
+		pauseOnQuotaWall := func() {
 			dispatch.result, dispatch.phaseTimings = result, phaseTimings
 			err = dispatch.pauseForQuota(next, resp, attempts)
 			result, phaseTimings = dispatch.result, dispatch.phaseTimings
+		}
+		if errors.Is(err, ErrAllFamiliesExhausted) {
+			pauseOnQuotaWall()
 			return result, err
 		}
 		if err != nil {
@@ -223,6 +227,10 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 		// before Build's explanation is reviewed and sealed.
 		o.normalizeBuildWorktree(ctx, next, cs, req.ProjectRoot)
 		resp, err = o.reviewResumedDeliverable(ctx, req.ProjectRoot, cycle, cs, next, runner, phaseReq, resp, mainDirtyBaseline)
+		if errors.Is(err, ErrAllFamiliesExhausted) {
+			pauseOnQuotaWall()
+			return result, err
+		}
 		if err != nil {
 			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempts, err.Error(), cs.PhaseStartedAt))
 			return result, err

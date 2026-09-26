@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — a quota wall on a correction, a remediation re-run or a resumed review defers the cycle (ADR-0106 Q1, 2026-09-27)
+
+Cycle 1708 met every CLI family walled on its build correction re-dispatch and was sealed FAIL; cycle 1709 met the same wall on a first dispatch and was deferred.
+
+- `isQuotaWall` is the one classification of a walled dispatch: the runner walks its whole family chain inside a single `Run` and returns exit 85 only when every family it may use answered with a wall. The correction loop, the remediation re-run and the resumed review gate now return through `pauseForQuota` — the quota checkpoint, the `all_families_exhausted` ledger kind, the DEFERRED abort reason, no failure learning, no retrospective, no digest for the consecutive-failure breaker to count. The interaction ledger records the correction as `quota_deferred`.
+
 ## Docs — ADR-0106 P3 landed; the design document, the bridge pages and the manifest channel (2026-09-27)
 
 - `logic-first-delivery-design.md` §5.4 records the P3 decisions (the statement is finished by the driver and appended; the environment channel over a settings flag; what the block does not fix), the P3 row reads shipped, §8 carries its signatures, §12 the open question on other CLIs' suggestion features. `internal-bridge-phaseidentity.md` is new; `internal-bridge.md`, the packages index, `full-tmux-control.md` §9, ADR-0022 and ADR-0106 describe `default_env` and the identity statement. The F3 routing bullet that a replay placed above its heading sits under it again.

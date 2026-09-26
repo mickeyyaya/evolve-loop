@@ -277,6 +277,10 @@ func (cr *cycleRun) reviewWithCorrections(next Phase, dr *dispatchResult) (loopA
 				obsCancel()
 			}
 			if rerr != nil {
+				if isQuotaWall(rerr) {
+					recordCorrection(interaction.ResultQuotaDeferred)
+					return loopAbort, cr.pauseForQuota(next, dr.resp, dr.attemptCount+corr)
+				}
 				recordCorrection(interaction.ResultDispatchFailed)
 				phaseErr := fmt.Errorf("phase %q correction %d dispatch failed: %w", next, corr, rerr)
 				cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, dr.resp, dr.attemptCount, phaseErr.Error(), cr.cs.PhaseStartedAt))

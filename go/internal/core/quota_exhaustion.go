@@ -33,3 +33,13 @@ func allFamiliesQuotaExhausted(attemptExits []int) bool {
 	}
 	return true
 }
+
+// isQuotaWall reports whether one dispatch came back walled: the runner walks its whole family chain
+// inside a single Run and returns exit 85 only when every family it may use answered with a wall (the
+// chain steps on exit 85 because llmroute's fallback triggers include it), so a correction re-dispatch,
+// a remediation re-run or a resume review gate that sees it defers exactly as the first dispatch does.
+// One sample suffices here; the first dispatch's two-sample rule (allFamiliesQuotaExhausted) predates the
+// tiered chain and is kept until its tests model the chain.
+func isQuotaWall(err error) bool {
+	return bridgeExitCode(err) == 85
+}
