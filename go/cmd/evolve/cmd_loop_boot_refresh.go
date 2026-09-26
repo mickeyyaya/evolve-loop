@@ -1,52 +1,5 @@
 package main
 
-// cmd_loop_boot_refresh.go — boot-time binary staleness self-heal (the
-// binary-lag class, 2026-08-05 retro: docs/chronicle/2026-08-binary-lag.md).
-//
-// The loop ships fixes to main but keeps executing the binary it booted with;
-// until an operator manually rebuilds, every landed pipeline fix is inert.
-// Measured cost in one night: the sentinel tail-anchor fix landed at
-// cycle-1301 while cycles 1302–1309 ran the old parser — three wasted lane
-// cycles and the cycle-1309 identical-fingerprint batch HALT on a defect the
-// repo had already fixed. This is deterministic operator toil, which belongs
-// in code.
-//
-// At boot, BEFORE recovery and the readiness gate: if the running binary's
-// embedded build commit is behind the plane HEAD by a delta that touches go/,
-// rebuild via the canonical make target and re-exec the fresh binary in
-// place. The re-exec'd process's existing boot machinery (auto-repin,
-// recovery, preflight) then runs on the new binary. EVERY step is fail-open:
-// any failure WARNs and boots the old binary — a stale batch is yesterday's
-// status quo, a bricked loop is worse. A consume-once marker FILE
-// (.evolve/boot-refresh-marker, value = healed-to HEAD) caps the self-heal
-// at one attempt per target so a rebuild that does not change the stamp can
-// never re-exec forever.
-//
-// DOCUMENTED INTENT (adversarial review 2026-08-05, findings 3/4/6):
-//   - --resume never refreshes (the resume branch returns before this call):
-//     resume is the minimal-perturbation single-cycle protocol — swapping the
-//     executor mid-cycle is a bigger risk than one more stale cycle. The heal
-//     lands at the next fresh boot.
-//   - The refresh runs after runLoop's early boot side effects (plane
-//     classification, socket GC, carryover auto-prune), so a healed boot
-//     repeats them once in the child. The only non-idempotent one is the
-//     carryover cycles_unpicked bump (×2 on heal boots) — accepted: heal
-//     boots are rare by construction and the counter self-corrects at the
-//     next pick; moving the call earlier would put it before the resume
-//     branch and violate the resume exclusion above.
-//   - Concurrent double-launch can race two rebuilds of go/bin/evolve
-//     (non-atomic tool copy). No longer an accepted risk resting on an
-//     operational assumption: bootRefreshFleetLaneFn ENFORCES it. The fleet
-//     runs N>=1 concurrent lanes, so "simultaneous launches are excluded
-//     operationally" was stale relative to the real topology; the standing
-//     rule is "NEVER rebuild the plane binary mid-batch". A fresh per-run
-//     .lease anywhere under <EvolveDir>/runs stops the refresh, and an
-//     unverifiable check stops it too (fail-open like every other step).
-//   - A repin-success + exec-failure boot runs with intra-batch skew: the old
-//     loop image continues while subprocesses exec'ing go/bin/evolve get the
-//     new code. Traced safe at ship time (verifySelfSHA hashes the file, not
-//     the image); bounded to rare exec-failure boots.
-
 import (
 	"encoding/json"
 	"fmt"
@@ -65,10 +18,9 @@ import (
 
 // bootRefreshMarkerFile (under EvolveDir) records the healed-to HEAD of the
 // last boot refresh, consumed exactly once by the next boot. A FILE, not an
-// env var, deliberately: the flag-ceiling gate forbids new EVOLVE_* readers
-// (target: zero), and darwin resolves duplicate env entries first-wins —
-// making an appended env marker invisible to the child (adversarial-review
-// N1, empirically verified). File semantics have neither hazard.
+// env var, deliberately: the flag-ceiling gate forbids new EVOLVE_* readers,
+// and darwin resolves duplicate env entries first-wins, making an appended
+// env marker invisible to the child.
 const bootRefreshMarkerFile = "boot-refresh-marker"
 
 type bootBinaryRefreshResult struct {
@@ -86,33 +38,20 @@ var (
 	bootRefreshSourceDeltaFn  = defaultBootRefreshSourceDelta
 	bootRefreshRebuildFn      = defaultBootRefreshRebuild
 	bootRefreshExecFn         = defaultBootRefreshExec
-	// bootRefreshRepinFn reconciles state.json:expected_ship_sha to the
-	// REBUILT binary through the SAME provenance-gated primitive the
-	// across-version boot heal uses (attemptBootRepin ->
-	// phaseintegrity.RepinIfDrifted). Without this the re-exec'd child's
-	// within-version SELF_SHA classifier reads the fresh hash as TAMPERING
-	// and halts pre-scout — the adversarial review's CRITICAL finding.
+	// bootRefreshRepinFn reconciles the ship pin to the rebuilt binary through
+	// the same provenance-gated primitive the boot heal uses.
 	bootRefreshRepinFn = attemptBootRepin
-	// bootRefreshExecTargetFn reports whether the running executable IS the
-	// plane binary the rebuild writes (go/bin/evolve). A loop launched from
-	// an installed copy must refuse the self-heal BEFORE rebuilding: it would
-	// rebuild one file and re-exec another — a silent no-op heal on a mined
-	// pin (review finding 5).
+	// bootRefreshExecTargetFn reports whether the running executable is the
+	// plane binary the rebuild writes (go/bin/evolve).
 	bootRefreshExecTargetFn = defaultBootRefreshExecTarget
-	// bootRefreshFleetLaneFn reports whether ANOTHER fleet lane is
-	// concurrently active. The plane binary is shared by every lane, so a
-	// mid-batch rebuild+re-exec swaps the executable out from under running
-	// lanes (the stale-binary false-FAIL class, 2026-08-05). The heal is a
-	// convenience; a live batch is not. Both "yes" and "cannot tell" skip.
+	// bootRefreshFleetLaneFn reports whether another fleet lane is
+	// concurrently active, since the plane binary is shared by every lane.
 	bootRefreshFleetLaneFn = defaultBootRefreshFleetLane
 )
 
 // defaultBootRefreshFleetLane reports a concurrently active fleet lane from
-// the shared per-run .lease heartbeat (internal/runlease — the same contract
-// gc reads to classify a run dir as live). A fresh lease under
-// <EvolveDir>/runs/<run>/ means some lane is mid-cycle right now. An
-// unreadable runs/ dir or an unparsable lease is an ERROR, not a "no": the
-// caller must not rebuild on an unproven-safe plane.
+// the shared per-run .lease heartbeat (internal/runlease). An unreadable or
+// unparsable lease is an error, not "no lane active".
 func defaultBootRefreshFleetLane(cfg loopConfig) (bool, error) {
 	runsDir := filepath.Join(cfg.EvolveDir, "runs")
 	entries, err := os.ReadDir(runsDir)
@@ -160,9 +99,7 @@ func defaultBootRefreshHead(projectRoot string) (string, error) {
 }
 
 // defaultBootRefreshSourceDelta reports whether binaryCommit..head touches
-// go/ — the only tree the binary embeds (skills/, agents/, .evolve/ are read
-// from disk at runtime, so a docs-or-config-only delta never warrants a
-// rebuild).
+// go/, the only tree the binary embeds.
 func defaultBootRefreshSourceDelta(projectRoot, from, to string) (bool, error) {
 	out, err := exec.Command("git", "-C", projectRoot, "diff", "--name-only", from+".."+to, "--", "go/").Output()
 	if err != nil {
@@ -215,9 +152,8 @@ func bootBinaryRefresh(cfg loopConfig, stderr io.Writer) bootBinaryRefreshResult
 	var res bootBinaryRefreshResult
 	projectRoot := cfg.ProjectRoot
 
-	// Operator dial (.evolve/policy.json boot.binary_refresh): "off" pins the
-	// current binary deliberately (incident bisects). A load error resolves to
-	// the compiled default ("auto") — the self-heal is integrity posture.
+	// A policy load error resolves to the compiled default ("auto") — the
+	// self-heal is integrity posture, so a malformed policy must not disable it.
 	if pol, _ := policy.Load(filepath.Join(cfg.EvolveDir, "policy.json")); pol.BootBinaryRefresh() == "off" {
 		fmt.Fprintf(stderr, "[loop] boot-refresh: policy boot.binary_refresh=off — staleness self-heal disabled by operator\n")
 		return res
@@ -252,10 +188,8 @@ func bootBinaryRefresh(cfg loopConfig, stderr io.Writer) bootBinaryRefreshResult
 	}
 	res.Stale = true
 
-	// Fleet-lane concurrency guard: the rebuild rewrites go/bin/evolve, the
-	// binary every concurrently running lane execs its subprocesses from.
-	// Checked BEFORE the marker is consumed so a skipped boot leaves the next
-	// one's staleness judgment untouched.
+	// Checked before the marker is consumed, so a skipped boot leaves the
+	// next one's staleness judgment untouched.
 	laneActive, lerr := bootRefreshFleetLaneFn(cfg)
 	if lerr != nil {
 		fmt.Fprintf(stderr, "[loop] boot-refresh: WARN fleet-lane check unverifiable (%v) — cannot prove the plane is idle, so refusing to rebuild the shared binary; booting as-is\n", lerr)
@@ -266,11 +200,6 @@ func bootBinaryRefresh(cfg loopConfig, stderr io.Writer) bootBinaryRefreshResult
 		return res
 	}
 
-	// Marker carries the healed-to HEAD (VALUE semantics, review finding 2):
-	// refuse only when the prior heal targeted this SAME head — a rebuild
-	// that did not change the stamp. New staleness (different head)
-	// legitimately re-heals. Consume-once: read + remove, so a stale marker
-	// can never outlive the boot that observed it.
 	markerPath := filepath.Join(cfg.EvolveDir, bootRefreshMarkerFile)
 	priorB, _ := os.ReadFile(markerPath)
 	_ = os.Remove(markerPath)
@@ -292,14 +221,6 @@ func bootBinaryRefresh(cfg loopConfig, stderr io.Writer) bootBinaryRefreshResult
 	}
 	res.Rebuilt = true
 
-	// Reconcile the ship pin to the rebuilt binary BEFORE exec (review
-	// finding 1, CRITICAL): provenance-gated via the shared primitive; a
-	// decline means the running stamp is not HEAD-ancestral — a foreign
-	// binary — so the child would boot into the tamper halt. Keep the old
-	// binary running and leave the pin flagging the on-disk file.
-	// Tri-state (re-review N2): a PINLESS plane has nothing to reconcile and
-	// the child boots cleanly without one — only a present-and-unreconciled
-	// pin blocks the exec.
 	if shipPinPresent(cfg) {
 		if !bootRefreshRepinFn(cfg, stderr) {
 			fmt.Fprintf(stderr, "[loop] boot-refresh: NOT exec'ing — the pin above stayed unreconciled, so the child would halt as tampered\n")
@@ -307,9 +228,6 @@ func bootBinaryRefresh(cfg loopConfig, stderr io.Writer) bootBinaryRefreshResult
 		}
 	}
 
-	// Write the marker (atomic per repo convention) BEFORE exec; if exec
-	// fails, remove it — the old binary continues and the next launch should
-	// judge staleness fresh, not inherit this attempt's target.
 	tmp := markerPath + ".tmp"
 	if werr := os.WriteFile(tmp, []byte(head+"\n"), 0o644); werr == nil {
 		_ = os.Rename(tmp, markerPath)

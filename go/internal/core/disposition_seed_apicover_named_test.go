@@ -1,12 +1,5 @@
 package core
 
-// disposition_seed_apicover_named_test.go — apicover named binding for the
-// exported SeedDispositionSkeleton (issue #433 class: a new exported surface
-// needs a NAMED covering test in its owning package; the phases/audit
-// singlesource pin exercises it cross-package, which apicover does not
-// count). Behavior is pinned by disposition_seed_test.go and the audit-side
-// gate-semantics pin; this test binds the exported name.
-
 import (
 	"os"
 	"path/filepath"

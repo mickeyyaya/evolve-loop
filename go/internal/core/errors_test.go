@@ -6,9 +6,6 @@ import (
 	"testing"
 )
 
-// Sentinel errors must round-trip through errors.Is when wrapped via %w.
-// This is the contract the orchestrator and adapters rely on to make
-// branching decisions on error type.
 func TestSentinels_ErrorsIs(t *testing.T) {
 	t.Parallel()
 	sentinels := []error{

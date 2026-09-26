@@ -5,11 +5,6 @@ import (
 	"testing"
 )
 
-// TestPendingAtInputLine pins the discrimination the whole fix rests on: a
-// re-send fires ONLY when the input line still holds what THIS driver sent.
-// The "agent typed something else" row is the double-submit hazard the
-// cycle-1526 premise challenge flagged as the highest risk of the fix — a
-// driver that re-sends there submits the agent's half-typed text.
 func TestPendingAtInputLine(t *testing.T) {
 	const nudge = "Please write the deliverable to /ws/build-report.md to complete the phase."
 	cases := []struct {
@@ -27,13 +22,6 @@ func TestPendingAtInputLine(t *testing.T) {
 		{"paste chip parked", "❯ [Pasted text #1 +812 lines]", []string{"# Evolve Builder", tmuxPastePlaceholderEcho}, true},
 		{"no marker on screen at all", "zsh: command not found", []string{nudge}, false},
 		{"empty echo never matches", "❯ something", []string{""}, false},
-		// cycle-1526 audit M1: the forward branch had no length floor while the
-		// reverse branch enforced one, so a SHORT echo matched almost any input
-		// line — arming up to submitVerifyMaxResends Enters into text the AGENT
-		// typed. That is the double-submit desync this guard exists to prevent.
-		// A prompt whose first non-empty line is short (frontmatter `---`, a
-		// stub header) is all it takes; today's 53-char first lines are a
-		// measurement, not an invariant.
 		{"short echo must not match agent typing", "❯ let me check --- the diff", []string{"---"}, false},
 		{"sub-floor echo below the rune floor", "❯ yes", []string{"y"}, false},
 		{"echo one rune below the floor", "❯ abcdefg and more", []string{"abcdefg"}, false},
@@ -47,12 +35,6 @@ func TestPendingAtInputLine(t *testing.T) {
 		})
 	}
 
-	// Second mechanism, pinned separately (review M1): a family that declares no
-	// input-line marker is refused HERE too, not only by verifySubmitted's early
-	// return. The two are deliberately redundant — that is why a mutation which
-	// deletes the early return alone is still safe — so the redundancy itself
-	// needs a test, or a later "simplification" could remove this check and
-	// leave the whole guard resting on one branch.
 	t.Run("empty marker is refused — no anchor, no match", func(t *testing.T) {
 		if pendingAtInputLine("● out\n? for shortcuts\n"+nudge, "", []string{nudge}) {
 			t.Error("pendingAtInputLine() = true for an empty marker; with nothing to anchor on it must never claim the input line is pending")
@@ -60,11 +42,6 @@ func TestPendingAtInputLine(t *testing.T) {
 	})
 }
 
-// TestPromptSubmitEcho pins the prompt-site echo pair. Both cycle-1526 reviewers
-// observed that reverting promptSubmitEcho to firstNonEmptyLine left the whole
-// suite green — the helper's entire reason for existing was asserted in a
-// comment and never demonstrated. These rows fail for that revert, and for the
-// opposite degenerate form (returning the prompt unbounded).
 func TestPromptSubmitEcho(t *testing.T) {
 	// The motivating shape: a short first non-empty line under the rune floor.
 	frontmatter := "---\ntitle: build\n---\n\n## Task\nRefactor the widget pipeline end to end.\n"

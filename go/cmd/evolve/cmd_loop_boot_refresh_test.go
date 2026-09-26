@@ -1,14 +1,5 @@
 package main
 
-// cmd_loop_boot_refresh_test.go — the binary-lag class (2026-08-05 retro):
-// fixes land on main but the loop keeps executing a frozen binary until an
-// operator manually rebuilds. Measured cost overnight: the sentinel tail-anchor
-// fix landed at cycle-1301 while cycles 1302–1309 ran the OLD parser — three
-// wasted lane-cycles and the cycle-1309 identical-fingerprint batch HALT, on a
-// defect already fixed in the repo. These tests pin the boot-time self-heal:
-// detect staleness → rebuild → re-exec, every step fail-open (a refresh
-// failure WARNs and boots the old binary — never bricks the loop).
-
 import (
 	"bytes"
 	"context"
@@ -90,12 +81,11 @@ func swapExecTargetOK(t *testing.T) {
 	bootRefreshExecTargetFn = func(projectRoot string) (bool, string, error) { return true, "go/bin/evolve", nil }
 }
 
-// swapFleetLaneCheck installs a fake for the fleet-lane-concurrency guard
-// (chain-boundary-binary-refresh-stop): bootRefreshFleetLaneFn reports
-// whether ANOTHER fleet lane is concurrently active, so the plane-binary
-// self-heal can refuse to rebuild mid-batch (the standing rule: "NEVER
-// rebuild plane binary mid-batch"). Returns a pointer to the live call count
-// so callers can assert the seam was actually consulted.
+// swapFleetLaneCheck installs a fake for the fleet-lane-concurrency guard:
+// bootRefreshFleetLaneFn reports whether another fleet lane is concurrently
+// active, so the plane-binary self-heal can refuse to rebuild mid-batch.
+// Returns a pointer to the live call count so callers can assert the seam
+// was actually consulted.
 func swapFleetLaneCheck(t *testing.T, active bool, err error) *int {
 	t.Helper()
 	calls := 0
@@ -374,11 +364,9 @@ func TestBootBinaryRefresh_NewStalenessAfterPriorHealReheals(t *testing.T) {
 	spy := swapRefreshSeams(t, "eeee23def456fffffffffffffffffffffffffff0", nil, true, nil, nil, nil)
 	swapRepinSuccess(t)
 	swapExecTargetOK(t)
-	// Prior heal targeted a DIFFERENT head — this is legitimate new staleness,
-	// not a refresh loop (the reviewer's chain-mode finding). File marker is
-	// consume-once and REPLACED with the new target (the env-var design was
-	// retired: darwin resolves duplicate env first-wins, and the flag-ceiling
-	// gate forbids new EVOLVE_* readers).
+	// Prior heal targeted a different head — this is legitimate new staleness,
+	// not a refresh loop; the marker is consume-once and replaced with the new
+	// target.
 	evolveDir := t.TempDir()
 	writeMarker(t, evolveDir, "0ldhead0000000000000000000000000000000000")
 	var errBuf bytes.Buffer
@@ -410,9 +398,9 @@ func TestBootBinaryRefresh_ExecFailureRemovesMarker(t *testing.T) {
 	}
 }
 
-// N2: a PINLESS plane (no expected_ship_sha in state.json) has nothing to
-// reconcile — the heal must proceed to exec without invoking the repin, and
-// the child boots cleanly (no pin -> no mismatch -> no halt).
+// TestBootBinaryRefresh_PinlessPlaneExecsWithoutRepin: a pinless plane (no
+// expected_ship_sha) has nothing to reconcile, so the heal proceeds to exec
+// without invoking the repin.
 func TestBootBinaryRefresh_PinlessPlaneExecsWithoutRepin(t *testing.T) {
 	swapBinaryCommit(t, "abc123def456")
 	spy := swapRefreshSeams(t, "eeee23def456fffffffffffffffffffffffffff0", nil, true, nil, nil, nil)
@@ -432,11 +420,10 @@ func TestBootBinaryRefresh_PinlessPlaneExecsWithoutRepin(t *testing.T) {
 	}
 }
 
-// F1 (the reviewer's CRITICAL): a rebuild changes the on-disk binary hash; the
-// within-version SELF_SHA classifier reads an unreconciled pin as TAMPERING
-// and halts pre-scout. The refresh must reconcile the pin through the SAME
-// provenance-gated primitive the boot heal uses (attemptBootRepin ->
-// phaseintegrity.RepinIfDrifted) after the rebuild and BEFORE exec.
+// TestBootBinaryRefresh_ReconcilesShipPinViaRealPrimitive: a rebuild changes
+// the on-disk binary hash, so the refresh must reconcile the pin through the
+// same provenance-gated primitive the boot heal uses, after the rebuild and
+// before exec.
 func TestBootBinaryRefresh_ReconcilesShipPinViaRealPrimitive(t *testing.T) {
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
@@ -490,9 +477,9 @@ func TestBootBinaryRefresh_ReconcilesShipPinViaRealPrimitive(t *testing.T) {
 	}
 }
 
-// F1 decline path: unverifiable provenance must NOT exec (the child would boot
-// into the tamper halt); it WARNs with the operator recipe and keeps the old
-// binary running — the pin now legitimately flags the foreign on-disk file.
+// TestBootBinaryRefresh_RepinDeclineSkipsExec: unverifiable provenance must
+// not exec — it WARNs with the operator recipe and keeps the old binary
+// running.
 func TestBootBinaryRefresh_RepinDeclineSkipsExec(t *testing.T) {
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
@@ -527,9 +514,8 @@ func TestBootBinaryRefresh_RepinDeclineSkipsExec(t *testing.T) {
 	}
 }
 
-// F5: a loop launched from a non-plane binary (installed copy) must refuse the
-// self-heal BEFORE rebuilding — rebuilding the plane copy while exec'ing the
-// old path is a silent no-op heal plus a mined pin.
+// TestBootBinaryRefresh_NonPlaneExecutableRefusesHeal: a loop launched from
+// a non-plane binary must refuse the self-heal before rebuilding.
 func TestBootBinaryRefresh_NonPlaneExecutableRefusesHeal(t *testing.T) {
 	swapBinaryCommit(t, "abc123def456")
 	spy := swapRefreshSeams(t, "eeee23def456fffffffffffffffffffffffffff0", nil, true, nil, nil, nil)
@@ -548,13 +534,9 @@ func TestBootBinaryRefresh_NonPlaneExecutableRefusesHeal(t *testing.T) {
 	}
 }
 
-// TestBootBinaryRefresh_ConcurrentFleetLaneStopsRefresh pins
-// chain-boundary-binary-refresh-stop AC1: the documented "accepted risk"
-// (cmd_loop_boot_refresh.go:37-40, "simultaneous loop launches are already
-// excluded operationally") is now an ENFORCED guard — a confirmed
+// TestBootBinaryRefresh_ConcurrentFleetLaneStopsRefresh: a confirmed
 // concurrently-active fleet lane must stop the refresh before either
-// rebuild or exec fires, closing the gap against the standing memory rule
-// "NEVER rebuild plane binary mid-batch".
+// rebuild or exec fires — the plane binary is never rebuilt mid-batch.
 func TestBootBinaryRefresh_ConcurrentFleetLaneStopsRefresh(t *testing.T) {
 	swapBinaryCommit(t, "abc123def456")
 	spy := swapRefreshSeams(t, "eeee23def456fffffffffffffffffffffffffff0", nil, true, nil, nil, nil)
@@ -575,11 +557,9 @@ func TestBootBinaryRefresh_ConcurrentFleetLaneStopsRefresh(t *testing.T) {
 	}
 }
 
-// TestBootBinaryRefresh_FleetLaneCheckErrorFailsOpen pins AC2: an
-// UNVERIFIABLE lease/lane check (the guard itself errored) must fail open
-// the same way every other uncertainty in this function does — skip the
-// refresh and boot as-is — NOT crash and NOT proceed to rebuild on an
-// unproven "no concurrent lane" assumption.
+// TestBootBinaryRefresh_FleetLaneCheckErrorFailsOpen: an unverifiable
+// lease/lane check must fail open — skip the refresh and boot as-is, never
+// proceed to rebuild on an unproven "no concurrent lane" assumption.
 func TestBootBinaryRefresh_FleetLaneCheckErrorFailsOpen(t *testing.T) {
 	swapBinaryCommit(t, "abc123def456")
 	spy := swapRefreshSeams(t, "eeee23def456fffffffffffffffffffffffffff0", nil, true, nil, nil, nil)
@@ -597,12 +577,9 @@ func TestBootBinaryRefresh_FleetLaneCheckErrorFailsOpen(t *testing.T) {
 	}
 }
 
-// TestBootBinaryRefresh_FleetLaneWarningsAreDistinguishable pins AC3: a
-// confirmed active lane and an unverifiable lease check are DIFFERENT
-// operator-facing conditions (one is "known unsafe", the other is "unknown")
-// and must not collapse into the same WARN text — an operator scanning
-// stderr needs to tell "another lane is really running" apart from "the
-// check itself broke".
+// TestBootBinaryRefresh_FleetLaneWarningsAreDistinguishable: a confirmed
+// active lane and an unverifiable lease check are different operator-facing
+// conditions and must not collapse into the same WARN text.
 func TestBootBinaryRefresh_FleetLaneWarningsAreDistinguishable(t *testing.T) {
 	swapBinaryCommit(t, "abc123def456")
 	swapRefreshSeams(t, "eeee23def456fffffffffffffffffffffffffff0", nil, true, nil, nil, nil)

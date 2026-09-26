@@ -18,16 +18,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/version"
 )
 
-// cmd_loop_boot_recovery.go — WIRING of the boot-time recovery primitives into
-// runLoop's boot path (cycle 507, task wire-boot-recovery-functions). This is
-// the layer cycle 506 was missing: it built the core primitives (fully unit
-// tested) but never called them from runLoop (audit F1, CRITICAL — the project's
-// own warnship_apicover_ci_gap "green unit test, absent integration" trap).
-//
-// Mirrors the established runLoopPreflightFn / wireOrchestratorDepsFn package-var
-// seam idiom so tests can spy the invocation. Best-effort / fail-open: a recovery
-// error WARNs but never halts the batch.
-
 // bootRecoveryResult reports which boot-time self-heal actions fired.
 type bootRecoveryResult struct {
 	Quarantined bool // leaked tracked-source dirt was stashed
@@ -67,40 +57,24 @@ func defaultShipRepinProvenance(projectRoot string) (string, phaseintegrity.Prov
 func defaultBootRecovery(ctx context.Context, cfg loopConfig, ledger core.Ledger, stderr io.Writer) bootRecoveryResult {
 	var res bootRecoveryResult
 
-	// 1. Detect a ship-binary SHA mismatch FIRST — before quarantine, which would
-	//    otherwise stash an untracked ship binary out from under the SHA read (the
-	//    498/500/502 SELF_SHA_TAMPERED cascade, caught at boot).
+	// Detect a ship-binary SHA mismatch first, before quarantine — quarantine
+	// would otherwise stash an untracked ship binary out from under the SHA read.
 	if mismatch, _ := detectShipSHAMismatch(cfg, stderr); mismatch {
 		res.SHAMismatch = true
-		// Classify the mismatch the SAME way the terminal ship gate does
-		// (verifySelfSHA, internal/phases/ship/verify.go): a WITHIN-version change
-		// (expected_ship_version present AND == the current plugin version, SHA
-		// differs) is SELF_SHA_TAMPERED — real tampering/install corruption, NOT a
-		// legit rebuild (a legit rebuild is version-bumped, or healed by the
-		// post-build repin). Such a ship is doomed from boot, so HALT pre-scout with
-		// the operator-unblock recipe instead of burning a full ~32-40 min lane on it
-		// (8 cycles wasted, 625-634). Deliberately do NOT auto-repin — repinning a
-		// tampered pin away is exactly the anti-tamper bypass the ship gate forbids.
 		if withinVersionShipSHAMismatch(cfg) {
 			res.HaltSelfSHA = true
 			printSelfSHAHaltRecipe(cfg, stderr)
 			return res
 		}
-		// Across-version / legacy-unversioned mismatch (a legit plugin/version bump):
-		// auto-heal the 508-513 cascade. A provenance-verified binary (its build-commit
-		// is an ancestor of HEAD) is re-pinned in place, the unattended-boot successor
-		// to `evolve reset-sha`, so the ship gate stops falsely blocking every cycle.
-		// NEVER operatorAuthorized from an unattended boot: an unverifiable binary
-		// (possible tampering) is refused and stays flagged (res.SHAMismatch).
 		if attemptBootRepin(cfg, stderr) {
 			res.Healed = true
 			res.SHAMismatch = false // re-pinned in place; the ship gate now passes
 		}
 	}
 
-	// 2. Auto-seal a stranded cycle-state marker whose owner PID is dead, so a
-	//    crashed cycle's role-gate no longer blocks the next dispatch. Reuses
-	//    SealCycle(Force). ErrNothingToReset (no marker) is the common case.
+	// Auto-seal a stranded cycle-state marker whose owner PID is dead, so a
+	// crashed cycle's role-gate no longer blocks the next dispatch. Reuses
+	// SealCycle(Force); ErrNothingToReset (no marker) is the common case.
 	if _, sealed, err := core.AutosealStaleMarker(ctx, ledger, core.SealOptions{
 		EvolveDir:   cfg.EvolveDir,
 		ProjectRoot: cfg.ProjectRoot,
@@ -114,14 +88,8 @@ func defaultBootRecovery(ctx context.Context, cfg loopConfig, ledger core.Ledger
 		fmt.Fprintf(stderr, "[loop] boot-recovery: auto-sealed a stranded dead-owner cycle marker\n")
 	}
 
-	// 3. Quarantine leaked tracked-source dirt (non-destructive stash) LAST so the
-	//    tree-diff guard doesn't attribute pre-existing dirt to this batch's first
-	//    phase and wedge the loop. Runs after the SHA read so it never stashes the
-	//    binary being verified. The label keeps the recognisable "boot-quarantine"
-	//    prefix but carries a UTC RFC3339 timestamp so successive boot quarantines
-	//    stay individually identifiable/recoverable (an operator can tell which
-	//    stash came from which boot instead of every quarantine collapsing under one
-	//    ambiguous fixed name).
+	// Quarantine leaked tracked-source dirt last, after the SHA read, so it
+	// never stashes the binary being verified.
 	quarantineLabel := fmt.Sprintf("boot-quarantine-%s", time.Now().UTC().Format(time.RFC3339))
 	if stashed, err := core.QuarantineDirtyTree(ctx, cfg.ProjectRoot, quarantineLabel); err != nil {
 		fmt.Fprintf(stderr, "[loop] boot-recovery: quarantine: %v\n", err)
@@ -185,9 +153,9 @@ func withinVersionShipSHAMismatch(cfg loopConfig) bool {
 	return expectedVer == ship.PluginVersion(cfg.ProjectRoot)
 }
 
-// printSelfSHAHaltRecipe writes the operator-unblock recipe for a within-version
-// self-SHA halt so a human can act without hunting for it (the 8-cycle waste was
-// partly not-knowing-what-to-do). Mirrors the per-phase-integrity self-heal recipe.
+// printSelfSHAHaltRecipe writes the operator-unblock recipe for a
+// within-version self-SHA halt, mirroring the per-phase-integrity self-heal
+// recipe.
 func printSelfSHAHaltRecipe(cfg loopConfig, stderr io.Writer) {
 	fmt.Fprintf(stderr, "[loop] boot-recovery: ship binary was modified WITHIN plugin version %q "+
 		"(expected_ship_sha != on-disk go/bin/evolve) — SELF_SHA_TAMPERED. HALTING pre-scout; "+
@@ -199,14 +167,9 @@ func printSelfSHAHaltRecipe(cfg loopConfig, stderr io.Writer) {
 	fmt.Fprintln(stderr, "[loop]   (If this is NOT expected, investigate local tampering / plugin install corruption before re-pinning.)")
 }
 
-// attemptBootRepin re-pins expected_ship_sha to the on-disk ship binary via the
-// shared, provenance-gated phaseintegrity.RepinIfDrifted — the SAME primitive the
-// post-build repin (core.repinShipSHAAfterBuild) uses, so boot and post-build can
-// never diverge (cycle 636, "never duplicate, centralize"). operatorAuthorized is
-// always false here: an unattended boot must never let a tampered binary bypass
-// the anti-tamper gate, so the re-pin fires only on verified provenance. Returns
-// true iff the re-pin fired. Fail-open: a refusal/error WARNs and returns false,
-// leaving the mismatch flagged.
+// attemptBootRepin uses the same phaseintegrity.RepinIfDrifted primitive as
+// the post-build repin (core.repinShipSHAAfterBuild), so boot and post-build
+// can never diverge.
 func attemptBootRepin(cfg loopConfig, stderr io.Writer) bool {
 	commit, prov := shipRepinProvenanceFn(cfg.ProjectRoot)
 	statePath := filepath.Join(cfg.EvolveDir, "state.json")

@@ -11,11 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// TestCycleLoop_PostScoutHookFiresOncePreBuild pins the WS2-S0 hook call site
-// (ADR-0052): the post-scout re-plan hook fires EXACTLY ONCE per cycle, after
-// scout's handoff has been recorded (scout ∈ CompletedPhases) and BEFORE build
-// (build ∉ CompletedPhases) — the pre-build ordering that lets the re-plan run
-// without contradicting a completed anchor. Uses the postScoutReplanProbe DI seam.
 func TestCycleLoop_PostScoutHookFiresOncePreBuild(t *testing.T) {
 	// NOT parallel: mutates the package-level probe seam.
 	var fires int
@@ -44,8 +39,6 @@ func TestCycleLoop_PostScoutHookFiresOncePreBuild(t *testing.T) {
 	}
 }
 
-// replanPlanner is a fake re-invokable planner: implements router.Planner (Plan)
-// and the optional rePlanner (RePlan), recording the signals RePlan received.
 type replanPlanner struct {
 	replanCalls int
 	gotSignals  router.RoutingSignals
@@ -65,18 +58,15 @@ func replanOrchestrator(t *testing.T, led *fakeLedger, pl *replanPlanner) *Orche
 	cfg.Mode = config.ModeDynamicLLM
 	cfg.RouterReplan = config.StageShadow
 	cfg.RePlanMaxDepth = 1
-	// A measured-scope trigger so the WS2-S5 mismatch gate fires: "tester" inserts
-	// when scout.item_count >= 1; the initial plans below omit tester, so the
-	// measured signals diverge from the plan → a material mismatch → re-plan.
+	// A measured-scope trigger: "tester" inserts when scout.item_count >= 1; the
+	// initial plans below omit tester, so the measured signals diverge from the
+	// plan, producing a material mismatch that triggers a re-plan.
 	cfg.Triggers = map[string]config.RoutingBlock{
 		"tester": {InsertWhen: []config.Condition{{Field: "scout.item_count", Op: "gte", Value: 1}}},
 	}
 	return NewOrchestrator(&fakeStorage{}, led, buildRunners(nil), WithRouting(cfg, router.StaticPreset{}), WithPlanner(pl))
 }
 
-// TestPlanCycle_RePlanAfterScoutInShadow pins WS2-S3 SHADOW: the post-scout
-// re-plan is called with MEASURED scout signals and recorded (phase-replan.json),
-// but the cycle's drive plan (cr.clampedPlan) is NOT swapped — static still wins.
 func TestPlanCycle_RePlanAfterScoutInShadow(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
@@ -113,9 +103,6 @@ func TestPlanCycle_RePlanAfterScoutInShadow(t *testing.T) {
 	}
 }
 
-// TestPlanCycle_NoRePlanWhenSignalsAbsent pins the fail-safe: when scout's
-// handoff signals are absent (no measured need), the re-plan is not called and
-// nothing is recorded.
 func TestPlanCycle_NoRePlanWhenSignalsAbsent(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir() // no handoff-scout.json ⇒ Scout.Present=false
@@ -137,9 +124,8 @@ func TestPlanCycle_NoRePlanWhenSignalsAbsent(t *testing.T) {
 	}
 }
 
-// scoutWorkspace writes a handoff-scout.json with ItemCount=2 so the WS2-S5
-// mismatch gate (tester inserts at item_count>=1) fires for a plan that omits
-// tester.
+// scoutWorkspace writes a handoff-scout.json with ItemCount=2, which fires the
+// mismatch gate (tester inserts at item_count>=1) for a plan that omits tester.
 func scoutWorkspace(t *testing.T) string {
 	t.Helper()
 	ws := t.TempDir()
@@ -150,9 +136,6 @@ func scoutWorkspace(t *testing.T) string {
 	return ws
 }
 
-// TestRePlan_DepthCappedAndEscalates pins WS2-S5: the re-plan fires while
-// cr.replanDepth < cap(=1); at the cap it records a debugger-escalation marker
-// and does NOT re-plan again (no thrash on a persistent mismatch).
 func TestRePlan_DepthCappedAndEscalates(t *testing.T) {
 	t.Parallel()
 	ws := scoutWorkspace(t)
@@ -186,9 +169,6 @@ func TestRePlan_DepthCappedAndEscalates(t *testing.T) {
 	}
 }
 
-// TestRePlan_FailOpenToStage1Plan pins the fail-safe: a RePlan error leaves the
-// initial plan in place (no swap — shadow never swaps anyway), writes no re-plan
-// artifact, and does not consume a depth slot.
 func TestRePlan_FailOpenToStage1Plan(t *testing.T) {
 	t.Parallel()
 	ws := scoutWorkspace(t)
@@ -234,10 +214,6 @@ func countOccurrences(xs []string, want string) int {
 	return n
 }
 
-// TestRePlan_AdvisoryReplacesPlanAfterClamp pins WS2-S6: at
-// EVOLVE_ROUTER_REPLAN=advisory the re-plan REPLACES the drive plan — with the
-// CLAMPED re-plan. The re-plan ships without scheduling audit; the floor must
-// force audit, and the swapped drive plan must carry that forced audit.
 func TestRePlan_AdvisoryReplacesPlanAfterClamp(t *testing.T) {
 	t.Parallel()
 	ws := scoutWorkspace(t)
@@ -266,9 +242,6 @@ func TestRePlan_AdvisoryReplacesPlanAfterClamp(t *testing.T) {
 	}
 }
 
-// TestRePlan_NeverWeakensFloorOnReplace proves the swap can never let a re-plan
-// reach ship without build+audit — the clamp re-asserts the floor on the re-plan
-// path (the clamp, not the advisor, is the trust boundary).
 func TestRePlan_NeverWeakensFloorOnReplace(t *testing.T) {
 	t.Parallel()
 	ws := scoutWorkspace(t)
@@ -287,9 +260,6 @@ func TestRePlan_NeverWeakensFloorOnReplace(t *testing.T) {
 	cr.postScoutReplan()
 
 	p := cr.clampedPlan
-	// The swap MUST have fired and MUST ship — otherwise the floor assertion is
-	// vacuous (a skipped re-plan leaves {scout}, which never ships, so the check
-	// below would pass without proving anything).
 	if p == initial {
 		t.Fatal("advisory re-plan must replace the initial plan")
 	}
@@ -301,10 +271,6 @@ func TestRePlan_NeverWeakensFloorOnReplace(t *testing.T) {
 	}
 }
 
-// TestRePlan_MintRegistrationIdempotent is the must-fix: stage-1 mints A; the
-// re-plan re-mints A and adds B. Each name must appear EXACTLY ONCE in runners
-// and in cfg.Order — registerMintedPhases's runner-existence guard gates all
-// three splices, so a re-mint of an already-wired phase is a no-op.
 func TestRePlan_MintRegistrationIdempotent(t *testing.T) {
 	t.Parallel()
 	o := mintOrchestrator(t, fakeMinter{})

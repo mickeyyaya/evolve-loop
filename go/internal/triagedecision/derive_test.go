@@ -162,7 +162,7 @@ func TestDerive_DeclinesAnIncompleteOrUnreadableReport(t *testing.T) {
 		"prose where a bucket should be":       replace(noneDeferred, "we will see next cycle"),
 		"prose mixed into a bucket":            replace(noneDeferred, "- later-item: do it later\nand maybe more"),
 		"cards and none together":              replace(noneDeferred, "- later-item: do it later\n(none)"),
-		"a present bucket stating nothing":     replace(noneDeferred, ""),
+		"an empty top_n section":               replace(topN1707, ""),
 		"an empty top_n stated as prose":       replace(topN1707, "nothing fits this cycle"),
 		"a superseded section holding prose":   replace("## Rationale", "## superseded\nnothing to retire\n\n## Rationale"),
 		"a phase_skip header that is no array": replace("phase_skip: []", `phase_skip: {"tdd": true}`),
@@ -240,5 +240,27 @@ func TestProject_ReadsTheCardsItCan(t *testing.T) {
 	}
 	if got := compact(t, doc["deferred"]); got != `[{"id":"x"}]` {
 		t.Errorf("deferred = %s", got)
+	}
+}
+
+// An optional bucket left empty states no cards: cycle 1713's triage wrote `## superseded` with nothing
+// under it, the strict reader declined, and the gate rejected a decision the report already carried.
+func TestDerive_ReadsAnEmptyOptionalBucketAsNoCards(t *testing.T) {
+	noneDeferred := "(none — this cycle is scoped solely to the assigned fleet task)"
+	for name, report := range map[string]string{
+		"deferred left empty":   strings.Replace(report1707, noneDeferred, "", 1),
+		"superseded left empty": strings.Replace(report1707, "## Rationale", "## superseded\n\n## Rationale", 1),
+	} {
+		raw, err := Derive([]byte(report), 1707, nil)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		var d struct {
+			Deferred   []any `json:"deferred"`
+			Superseded []any `json:"superseded"`
+		}
+		if err := json.Unmarshal(raw, &d); err != nil || len(d.Deferred) != 0 || len(d.Superseded) != 0 {
+			t.Fatalf("%s: deferred=%v superseded=%v err=%v, want empty buckets", name, d.Deferred, d.Superseded, err)
+		}
 	}
 }

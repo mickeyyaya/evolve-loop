@@ -64,7 +64,10 @@ level-two sections exactly once:
 entry for every material path. Paths outside the Build diff are rejected.
 
 The host classifies documentation, knowledge-base files, eval definitions, ACS
-predicates, testdata, and unambiguous test files as non-material. When no other
+predicates, testdata, unambiguous test files and the inbox lifecycle records under
+`.evolve/inbox/` (the host claims, moves, stamps and retires them; a build's
+consumption of its item is the ship's in-commit effect, not the builder's design)
+as non-material. When no other
 path changed, Builder declares `NOT_APPLICABLE` with a concrete reason and does
 not create a cycle record. Builder cannot use that declaration to hide a
 material change because the host derives the path set from Git.

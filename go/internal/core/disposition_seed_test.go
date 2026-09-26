@@ -1,14 +1,5 @@
 package core
 
-// disposition_seed_test.go — RED contract for the disposition-skeleton preseed
-// (inbox disposition-skeleton-preseed 0.9; 2026-08-10 investigation). The
-// orchestrator KNOWS the inherited OPEN ids at adoption; making the auditor
-// hand-enumerate them from the ancestor ledger was an avoidable failure
-// surface (15/30 FAILs cycles 1390-1429 on disposition-preflight). The seam
-// writes a skeleton — one status-OPEN entry per inherited OPEN id — that the
-// gate treats as present-but-undispositioned (per-id block, never MISSING,
-// never laundered: OPEN is not FIXED/DEFERRED, so nothing passes untouched).
-
 import (
 	"encoding/json"
 	"os"

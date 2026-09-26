@@ -1,16 +1,5 @@
 package bridge
 
-// contextfill_warn_test.go — WIRING proof for cycle-1444 task
-// `context-fill-warn-threshold`. This is a REACHABILITY test, not a unit test:
-// it drives the real production caller (Engine.recordTokenUsage, engine.go:640 —
-// the one site every Launch funnels its token telemetry through) and asserts the
-// fill WARN and the persisted fill_pct both come out of THAT path. A test that
-// called tokenusage.FillWarn directly would pass on dead code.
-//
-// RED: Deps.ContextFillWarnPct, tokenusage.Result.FillPct, the llm-calls
-// fill_pct field and the WARN emission do not exist yet — this file fails to
-// COMPILE until Builder adds them (compile-fail = RED evidence).
-
 import (
 	"bytes"
 	"encoding/json"
@@ -23,16 +12,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/tokenusage"
 )
 
-// contextFillMarker is the stable grep key the WARN line must carry. The
-// pre-existing per-driver coverage WARN already names the agent, so keying on
-// the agent name alone would false-green on that older line; only a distinct
-// marker proves the fill WARN specifically fired.
-var contextFillMarker = string(CodeContextFillHigh) // the code the rendered bridge.warning line carries (ADR-0101 S3)
+// contextFillMarker is the stable grep key the WARN line must carry: keying on
+// the agent name alone would false-green on the pre-existing per-driver
+// coverage WARN, which also names the agent.
+var contextFillMarker = string(CodeContextFillHigh)
 
-// runContextFillCase drives recordTokenUsage with a resolver stubbed to report a
-// known fill reading, and returns the captured stderr plus the appended
-// llm-calls.ndjson contents. readLLMCalls comes from tokenfallback_red_test.go
-// (same package).
 func runContextFillCase(t *testing.T, fill float64, warnPct int, agent string) (stderr, record string) {
 	t.Helper()
 	start := time.Date(2026, 8, 12, 10, 0, 0, 0, time.UTC)
@@ -59,7 +43,6 @@ func runContextFillCase(t *testing.T, fill float64, warnPct int, agent string) (
 	return errBuf.String(), readLLMCalls(t, ws)
 }
 
-// contextFillLine returns the first stderr line carrying the fill marker.
 func contextFillLine(stderr string) (string, bool) {
 	for _, ln := range strings.Split(stderr, "\n") {
 		if strings.Contains(ln, contextFillMarker) {
@@ -69,9 +52,6 @@ func contextFillLine(stderr string) (string, bool) {
 	return "", false
 }
 
-// TestContextFillWarn_EmittedAtDispatchNamingPhase is the crux reachability
-// assertion: a launch resolving above the threshold must produce a WARN from the
-// production telemetry path, and that WARN must name the phase.
 func TestContextFillWarn_EmittedAtDispatchNamingPhase(t *testing.T) {
 	stderr, _ := runContextFillCase(t, 91.4, 60, "build")
 	line, ok := contextFillLine(stderr)
@@ -83,9 +63,9 @@ func TestContextFillWarn_EmittedAtDispatchNamingPhase(t *testing.T) {
 	}
 }
 
-// TestContextFillWarn_BoundaryAndSentinelStaySilent is the negative half. Three
-// ways a WARN must NOT fire, each of which a naive `>=` or a missing sentinel
-// guard would break: exactly at threshold, below it, and unmeasured.
+// Three ways a WARN must not fire, each of which a naive `>=` comparison or a
+// missing sentinel guard would break: exactly at threshold, below it, and
+// unmeasured.
 func TestContextFillWarn_BoundaryAndSentinelStaySilent(t *testing.T) {
 	cases := []struct {
 		name string
@@ -105,10 +85,9 @@ func TestContextFillWarn_BoundaryAndSentinelStaySilent(t *testing.T) {
 	}
 }
 
-// TestContextFillWarn_ZeroDepsResolvesToDefaultThreshold pins the Deps default:
-// an unconfigured ContextFillWarnPct (the zero value every existing composition
-// path leaves) must behave as 60, matching policy's built-in — not as 0, which
-// would warn on every single launch.
+// An unconfigured ContextFillWarnPct (the zero value every existing
+// composition path leaves) must resolve to 60, matching policy's built-in —
+// not to 0, which would warn on every launch.
 func TestContextFillWarn_ZeroDepsResolvesToDefaultThreshold(t *testing.T) {
 	if stderr, _ := runContextFillCase(t, 59, 0, "scout"); func() bool { _, ok := contextFillLine(stderr); return ok }() {
 		t.Errorf("59%% fill warned under the zero-value threshold — zero must resolve to 60, not to 0")
@@ -119,9 +98,8 @@ func TestContextFillWarn_ZeroDepsResolvesToDefaultThreshold(t *testing.T) {
 	}
 }
 
-// TestContextFillWarn_PersistedInLLMCallsRecord proves the reading is DURABLE,
-// not merely printed: the deferred fill%-vs-verdict correlation report has no
-// corpus to read unless every launch record carries fill_pct.
+// fill_pct must persist in the llm-calls record, not merely print to stderr:
+// the deferred fill%-vs-verdict correlation report has no corpus without it.
 func TestContextFillWarn_PersistedInLLMCallsRecord(t *testing.T) {
 	_, record := runContextFillCase(t, 72.5, 60, "audit")
 	var rec struct {

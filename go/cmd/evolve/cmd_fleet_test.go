@@ -26,9 +26,6 @@ func TestRunFleet_RejectsMissingGoalHash(t *testing.T) {
 	}
 }
 
-// TestLoadPlanSpecs_AssignsDisjointScopesWithGoalHash: --plan partitions the
-// backlog into disjoint-scoped specs, each stamped with the goal hash; a todo
-// bridging two cycles defers.
 func TestLoadPlanSpecs_AssignsDisjointScopesWithGoalHash(t *testing.T) {
 	planJSON := []byte(`[
 		{"id":"t1","files":["a.go"]},
@@ -61,8 +58,6 @@ func TestLoadPlanSpecs_BadJSON(t *testing.T) {
 	}
 }
 
-// TestDispatch_FleetRegistered: `evolve fleet` must route to runFleet, not the
-// dispatch unknown-command path (rc 2). Bad args → rc 1 from runFleet's validation.
 func TestDispatch_FleetRegistered(t *testing.T) {
 	var out, errb bytes.Buffer
 	rc := dispatch([]string{"fleet"}, nil, &out, &errb)

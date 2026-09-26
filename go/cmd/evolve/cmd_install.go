@@ -155,10 +155,10 @@ func installClaude(srcDir, homeDir string, stdin io.Reader, stdout, stderr io.Wr
 	return 0
 }
 
-// runUninstall is `evolve uninstall [--ci]` — the native port of uninstall.sh.
-// With --ci (or CI=true) it dry-runs (lists targets, deletes nothing); without
-// it removes evolve-* agents and the loop skill dir from $HOME/.claude. It
-// never touches the project's .evolve/ workspace.
+// runUninstall is `evolve uninstall [--ci]`. With --ci (or CI=true) it
+// dry-runs (lists targets, deletes nothing); without it removes evolve-*
+// agents and the loop skill dir from $HOME/.claude. It never touches the
+// project's .evolve/ workspace.
 func runUninstall(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	ci := installModeCI(args)
 	for _, a := range args {

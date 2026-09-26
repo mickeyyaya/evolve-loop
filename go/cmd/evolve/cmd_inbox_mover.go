@@ -8,8 +8,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 )
 
-// runInboxMover is `evolve inbox-mover <subcmd> [args]`. Mirrors
-// legacy/scripts/utility/inbox-mover.sh exit codes:
+// runInboxMover is `evolve inbox-mover <subcmd> [args]`. Exit codes:
 //
 //	0  — success (or promote no-op for ship.sh compat)
 //	1  — not-found / bad args (claim only)
@@ -75,8 +74,7 @@ func runInboxMover(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		}
 		// A non-delivery (destination mkdir failed) is NOT the ship.sh
 		// "already moved" case: the task is stranded and the cycle must see
-		// it. Exit 2 matches claim's mv-failed code
-		// (inboxmover-promote-mkdir-fail-loud).
+		// it. Exit 2 matches claim's mv-failed code.
 		if errors.Is(err, inboxmover.ErrMvFailed) {
 			fmt.Fprintf(stderr, "[inbox-mover] ERROR: promote did not deliver '%s': %v\n", taskID, err)
 			return 2

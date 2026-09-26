@@ -29,9 +29,3 @@ func TestEmitChannelBreadcrumb_IdleReachedFormat(t *testing.T) {
 		t.Fatalf("breadcrumb = %s", got)
 	}
 }
-
-// NOTE: the busy→idle bracket integration (formerly
-// TestRunTmuxREPL_EmitsBothBreadcrumbsOnBusyToIdle, which asserted breadcrumbs on
-// stderr) moved to TestRunTmuxREPL_ChannelOn_BreadcrumbsToFile in
-// driver_tmux_repl_panelive_test.go when RT2 (ADR-0037) redirected breadcrumbs to
-// the <agent>-breadcrumbs.live file the Producer tails.

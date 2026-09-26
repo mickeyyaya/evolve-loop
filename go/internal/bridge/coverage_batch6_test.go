@@ -8,10 +8,6 @@ import (
 	"time"
 )
 
-// coverage_batch6_test.go — driver-level error returns reached by calling
-// Launch directly (LaunchArgs pre-validates the prompt, so these paths
-// are unreachable through it) + the small FS-helper branches.
-
 func covDeps() Deps {
 	return Deps{
 		Stderr:            io.Discard,
@@ -44,7 +40,6 @@ func TestHeadlessDrivers_PreparePromptError(t *testing.T) {
 }
 
 func TestRunTmuxREPL_PreparePromptError(t *testing.T) {
-	// Covers the shared runTmuxREPL preparePrompt-error path (all 3 tmux drivers).
 	ws := t.TempDir()
 	cfg := &Config{
 		Model: "haiku", AllowBypass: true,

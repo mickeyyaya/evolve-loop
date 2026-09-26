@@ -67,11 +67,6 @@ func TestReviewCheckpoint_BuildsAndPublishesEvidence(t *testing.T) {
 	}
 }
 
-// TestRunTmuxREPL_PersistentFatalCheckpointPreservesTheWholeDecisionChain
-// characterizes the checkpoint boundary before it is extracted from wait().
-// A persistent fatal pane must cross the gate once, bypass the reviewer on the
-// crossing checkpoint, publish the stop decision, skip the idle nudge, and
-// reach the ordinary exit-81 closeout with its evidence intact.
 func TestRunTmuxREPL_PersistentFatalCheckpointPreservesTheWholeDecisionChain(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
 	fatalPane := tmuxPromptMarkerDefault + "\n" + fatalTail + "\n" + tmuxPromptMarkerDefault
@@ -153,12 +148,6 @@ func TestRunTmuxREPL_PersistentFatalCheckpointPreservesTheWholeDecisionChain(t *
 	}
 }
 
-// TestRunTmuxREPL_FatalPaneDialIsIndependentOfPhaseRecovery (F27): the C2
-// fatal-pane fast-fail rides its OWN dial. Crossing the two dials proves the
-// checkpoint reads Deps.FatalPaneStage and never the program dial: arming the
-// fast-fail cannot arm the channel / ask-broker / advisor that PhaseRecovery
-// gates, and the program's shadow cannot silence a soak-proven fast-fail
-// (cycles 1595 and 1687 idled 1200s / 900s on dead panes it had classified).
 func TestRunTmuxREPL_FatalPaneDialIsIndependentOfPhaseRecovery(t *testing.T) {
 	cases := []struct {
 		name, fatalStage, recoveryStage string

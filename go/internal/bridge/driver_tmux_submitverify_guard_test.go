@@ -1,21 +1,5 @@
 package bridge
 
-// driver_tmux_submitverify_guard_test.go — RED contracts for the cycle-1526
-// audit prescriptions that shipped unaddressed with 75a8aed9 (WARN verdict,
-// red_count==0).
-//
-// Two holes, both about the guard being SILENT when it cannot do its job:
-//
-//  1. agy's promptMarker is the footer "? for shortcuts", not an input-line
-//     prompt. pendingAtInputLine reads the text AFTER the last marker, so for
-//     agy it reads whatever follows a footer — inert at best, and a SPURIOUS
-//     re-send if that footer ever renders mid-pane. The guard has to know the
-//     difference between "where the REPL said it booted" and "where the live
-//     input line starts", and say so out loud when it has no input-line marker.
-//
-//  2. A CapturePane error inside the re-send loop returned with no log line at
-//     all — a silent exit from a loop whose entire purpose is to be loud.
-
 import (
 	"bytes"
 	"context"
@@ -73,11 +57,6 @@ func parkedPane(text string) string {
 
 const guardNudge = "Please write the deliverable to /ws/build-report.md to complete the phase."
 
-// TestVerifySubmitted_NoInputLineMarker_IsLoudNotSilent pins prescription (2):
-// a family that declares no input-line marker must not be verified silently.
-// The guard sends NOTHING (an unanchored match could re-send agent text) and
-// says why, so a stalled agy cycle's log shows the gap instead of implying the
-// submission was checked.
 func TestVerifySubmitted_NoInputLineMarker_IsLoudNotSilent(t *testing.T) {
 	tm := &fakeTmux{paneSeq: []string{parkedPane(guardNudge)}}
 	var stderr bytes.Buffer
@@ -100,11 +79,9 @@ func TestVerifySubmitted_NoInputLineMarker_IsLoudNotSilent(t *testing.T) {
 		t.Errorf("skipping verification must be LOUD: stderr does not explain why\ngot: %q", stderr.String())
 	}
 
-	// Load-bearing case (review M1): the pane above never contains the footer,
-	// so pendingAtInputLine would return false on marker-absence alone and an
-	// implementation that logs but FALLS THROUGH would still pass. Render the
-	// footer mid-pane with the echo after it — the shape the file header warns
-	// about — so only an actual early return keeps this at zero.
+	// This second pane renders the footer MID-PANE with the echo after it, so
+	// only an actual early return (not a lucky marker-absence) keeps Resends
+	// at zero.
 	footerPane := "● scrollback\n? for shortcuts\n" + guardNudge
 	tm2 := &fakeTmux{paneSeq: []string{footerPane}}
 	var stderr2 bytes.Buffer
@@ -117,9 +94,6 @@ func TestVerifySubmitted_NoInputLineMarker_IsLoudNotSilent(t *testing.T) {
 	}
 }
 
-// TestVerifySubmitted_InputLineMarkerDrivesTheMatch pins that the match is
-// anchored on inputLineMarker, NOT promptMarker. A family whose boot marker
-// differs from its input-line marker must still verify correctly.
 func TestVerifySubmitted_InputLineMarkerDrivesTheMatch(t *testing.T) {
 	// Pending on the FIRST observation, cleared on the re-capture: exactly one
 	// re-send, then the loop exits.
@@ -142,9 +116,6 @@ func TestVerifySubmitted_InputLineMarkerDrivesTheMatch(t *testing.T) {
 	}
 }
 
-// TestVerifySubmitted_CaptureErrorIsLogged pins prescription (4): the capture
-// error inside the loop was swallowed with no log line, so an operator saw a
-// re-send start and nothing after it.
 func TestVerifySubmitted_CaptureErrorIsLogged(t *testing.T) {
 	tm := &captureErrTmux{fakeTmux: &fakeTmux{paneSeq: []string{parkedPane(guardNudge)}}, errAfter: 1}
 	var stderr bytes.Buffer
@@ -205,12 +176,6 @@ func TestRunTmuxREPL_InitialSubmitVerificationCaptureFailureIsLoud(t *testing.T)
 	}
 }
 
-// TestRealDriversDeclareInputLineMarker is a keep-guard over the tracked driver
-// sources: every real tmux driver must state its input-line marker EXPLICITLY,
-// so a new driver cannot inherit silent inertness by simply omitting the field.
-// agy is the declared exception — it has no input-line prompt today — and the
-// exception list is self-pruning: if agy ever declares one, this test fails
-// until it is removed from the list.
 func TestRealDriversDeclareInputLineMarker(t *testing.T) {
 	// A driver whose boot marker is NOT an input-line prompt declares the field
 	// empty; it must still NAME the field so the choice is visible in review.
@@ -224,8 +189,8 @@ func TestRealDriversDeclareInputLineMarker(t *testing.T) {
 	}
 
 	// Bind git-TRACKED state, not whatever sits on disk (ADR-0084 lens 5a): an
-	// untracked scratch driver_*tmux.go would otherwise become a subject of this
-	// guard and produce a false RED — the cd49274beab2 class.
+	// untracked scratch driver_*tmux.go would otherwise become a subject of
+	// this guard and produce a false RED.
 	root, err := exec.Command("git", "rev-parse", "--show-toplevel").Output()
 	if err != nil {
 		t.Fatalf("git rev-parse --show-toplevel: %v", err)
@@ -275,10 +240,9 @@ func TestRealDriversDeclareInputLineMarker(t *testing.T) {
 			t.Errorf("%s is listed as having no input-line marker but now declares one — "+
 				"delist it from noInputLine (self-pruning exception list)", d)
 		}
-		// Symmetry (review M2): without this, a driver regressing to an empty
-		// marker — or to a comment that merely MENTIONS the field while the
-		// literal omits it — passes green and silently joins agy on the inert
-		// path. The exception list must bite in both directions.
+		// Symmetry: without this, a driver regressing to an empty marker
+		// passes green and silently joins agy on the inert path — the
+		// exception list must bite in both directions.
 		if !noInputLine[d] && declaresEmpty {
 			t.Errorf("%s constructs tmuxLaunch with no (or an empty) inputLineMarker — submit-verify "+
 				"goes inert for this family; add the marker, or list it in noInputLine with a reason", d)
@@ -325,13 +289,6 @@ func (t *timelineTmux) PasteBuffer(ctx context.Context, session string) error {
 	return t.fakeTmux.PasteBuffer(ctx, session)
 }
 
-// TestTmuxREPL_PromptDelivery_SettlesBeforeBaselineCapture pins prescription
-// (3). The nudge site sleeps submitVerifySettle between its Enter and the
-// capture that judges it; the prompt site did not — it fired the delivery Enter
-// and let an unrelated capture much later serve as the first observation. A
-// pane read before the REPL redraws still shows the prompt at the input line,
-// so submit-verify would re-send an Enter into an already-submitted prompt:
-// the double-submit this guard exists to prevent, caused by the guard itself.
 func TestTmuxREPL_PromptDelivery_SettlesBeforeBaselineCapture(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
 	rec := &timelineRecorder{}
@@ -366,8 +323,8 @@ func TestTmuxREPL_PromptDelivery_SettlesBeforeBaselineCapture(t *testing.T) {
 		if ev[i] == "capture" {
 			break // first observation reached without settling
 		}
-		// Pin the CONSTANT (review L2): accepting any non-zero sleep would let a
-		// 1ns settle — or an unrelated pause — satisfy this contract.
+		// Pin the constant: accepting any non-zero sleep would let a 1ns
+		// settle — or an unrelated pause — satisfy this contract.
 		if ev[i] == "sleep:"+submitVerifySettle.String() {
 			settled = true
 			break

@@ -6,11 +6,6 @@ import (
 	"testing"
 )
 
-// TestIsInfraTeardownError pins the single-source reconcile trigger: an infra
-// teardown is an artifact-wait timeout OR a transient bridge failure (quota /
-// liveness), including wrapped wire shapes. A substantive launch/boot/safety
-// error, a generic error, and nil are NOT infra teardowns — those hard-fail
-// without consulting the on-disk deliverable (anti-gaming boundary).
 func TestIsInfraTeardownError(t *testing.T) {
 	cases := []struct {
 		name string

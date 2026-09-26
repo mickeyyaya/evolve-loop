@@ -1,11 +1,5 @@
 package main
 
-// cmd_loop_blockerbreaker_test.go — wiring pins for the mid-batch pipeline-
-// blocker breaker (unit-green != live-green): the helper must read REAL digest
-// artifacts, honor batch scoping, and on a trip leave the ADR-0072 breadcrumbs
-// (escalation dossier + P0 pipeline-repair inbox item) exactly like the forged-
-// verdict halt.
-
 import (
 	"io"
 	"os"
@@ -71,12 +65,11 @@ func TestBlockerBreakerHalt_HistoricDigestsExcluded(t *testing.T) {
 	}
 }
 
-// TestBlockerBreakerHalt_AckedFingerprintDoesNotReHalt is the P1 item's
-// explicit wiring-proof fixture: the actual loop-boot call site
-// (blockerBreakerHalt) replaying the cycle-1329 incident (3x identical-
-// fingerprint digests on disk) must NOT halt once the ack ledger carries a
-// matching record, and must still halt (unchanged ADR-0072 behavior) when
-// the ledger is absent.
+// TestBlockerBreakerHalt_AckedFingerprintDoesNotReHalt is the explicit
+// wiring-proof fixture: the actual loop-boot call site (blockerBreakerHalt),
+// replaying three identical-fingerprint digests on disk, must not halt once
+// the ack ledger carries a matching record, and must still halt (unchanged
+// behavior) when the ledger is absent.
 func TestBlockerBreakerHalt_AckedFingerprintDoesNotReHalt(t *testing.T) {
 	fp := "ship|unknown|76d0f4fca190"
 

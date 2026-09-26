@@ -13,10 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
 )
 
-// `evolve dashboard` is a READ-ONLY render of the loop's on-disk state
-// (ADR-0095). --snapshot is the scriptable form; the served form goes through
-// the dashboardServe seam so the wiring is provable without binding a port.
-
 func writeDashboardDossier(t *testing.T, root string, cycle int) {
 	t.Helper()
 	dir := filepath.Join(root, "knowledge-base", "cycles")

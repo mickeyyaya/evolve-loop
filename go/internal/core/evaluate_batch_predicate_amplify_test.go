@@ -22,13 +22,6 @@ func amplNewSkipOrchestrator(t *testing.T, mandatory, floor []string, specs []ph
 	return &Orchestrator{cfg: config.RoutingConfig{Mandatory: mandatory}, catalog: cat, shipFloor: floor}
 }
 
-// These target the exact two predicates (optionalInfraSkip / postShipObserverSkip)
-// that Task 3 (evaluate-batch-retry-parity) newly wires into dispatchRunnerWithRetry's
-// give-up path. The AC table names them directly ("optionalInfraSkip parity",
-// "postShipObserverSkip parity"), so their edge-case correctness is exactly what the
-// batch dispatch's new behavior now depends on for every phase, not just the three
-// scenarios the RED suite already covers.
-
 func TestOptionalInfraSkip_WrappedArtifactTimeoutError_StillMatches(t *testing.T) {
 	o := amplNewSkipOrchestrator(t, nil, nil, []phasespec.PhaseSpec{
 		{Name: "learn", Optional: true},
@@ -49,9 +42,6 @@ func TestOptionalInfraSkip_NonInfraError_NeverMatches(t *testing.T) {
 }
 
 func TestOptionalInfraSkip_MandatoryOverridesOptionalFlag(t *testing.T) {
-	// A phase mis-marked Optional=true in the catalog but ALSO listed in
-	// cfg.Mandatory must never skip: the mandatory guard is generic and
-	// config-driven, so it must win regardless of the catalog flag.
 	o := amplNewSkipOrchestrator(t, []string{"build"}, nil, []phasespec.PhaseSpec{
 		{Name: "build", Optional: true},
 	})
@@ -95,8 +85,6 @@ func TestPostShipObserverSkip_ShipItself_NeverMatchesEvenIfShipped(t *testing.T)
 }
 
 func TestPostShipObserverSkip_WrongRole_NeverMatches(t *testing.T) {
-	// Optional + shipped + not-ship, but role is Evaluate not Control: must
-	// not match; only RoleControl observers (memo, post-ship-monitor) qualify.
 	o := amplNewSkipOrchestrator(t, nil, nil, []phasespec.PhaseSpec{
 		{Name: "evaluate-batch-check", Optional: true, Role: string(phasespec.RoleEvaluate)},
 	})

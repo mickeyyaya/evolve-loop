@@ -1,20 +1,5 @@
 package core
 
-// covering_tests_ensure_test.go — cycle-1270 Task 3
-// (`test-amplification-context-scope`), the open residual.
-//
-// writeCoveringTests is called from inside `if completed == PhaseBuild`
-// (phase_bindings.go). On any path where test-amplification runs without a
-// fresh build completion in the SAME process — a resume past build, or a future
-// insertion after a different phase — the artifact is absent and the phase
-// silently reverts to the whole-repo Grep the corpus exists to remove.
-//
-// SILENT is the defect, not slow. The corpus exists to make a before/after
-// token measurement interpretable (5.4M cache-read tokens/run baseline); a run
-// that quietly degrades produces a number nobody can read. The fail-open
-// contract is untouched: an underivable diff still leaves the phase working
-// exactly as it does today — it just says so.
-
 import (
 	"context"
 	"os"

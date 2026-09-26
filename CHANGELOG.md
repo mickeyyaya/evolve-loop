@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — an inbox lifecycle record is non-material to the explanation document (ADR-0106 X1, 2026-09-27)
+
+- Cycle 1712 sealed FAIL with its code verified (ACS 10/10, EGPS red 0, a mutation probe): the build floor had demanded that the explanation document describe `.evolve/inbox/…-lineage-datestamp-normalization.json` (twelve corrections across 1707, 1708 and 1712), the builder wrote "content unchanged" for the item it moved to `consumed/`, the ship's in-commit consumption stamped the file, and the auditor's review found the sentence contradicted. `.evolve/inbox/` joins `nonMaterialPrefixes`: the host claims, moves, stamps and retires those records, so neither the floor nor the auditor asks the builder to explain them.
+
+## Fixed — a shipped or declined id no inbox item backs is retired, so no later wave re-pins it (ADR-0106 W1, 2026-09-27)
+
+- Cycle 1706 committed and shipped `gittest-fixture-centralize`, an id its triage authored with no inbox item behind it. `Promote` no-ops on such an id and no retirement dir ever held it, while the wave planner's prune and the launcher's freshness probe keep an id with no lifecycle evidence, so the prior-decision carry re-pinned it as a lane in 1709, 1710 and 1713, and each of those lanes shipped nothing. `lifecycle.(*Mover).RetireUnbacked` now writes a retirement record (`{id, unbacked, retired_reason, retired_cycle, git_sha}`) where `Promote` would have moved the item; `inboxmover.RetireUnbacked` is the one door and writes only for an id whose dispatch state is unknown; the PASS seam retires what it could not move as processed (`OutcomeResult.RetiredUnbacked`, the ship log names them) and the planned no-work closeout retires every scoped id no inbox item backs as rejected with the lane's own answer (`NoWorkResult.Retired`). A FAIL writes nothing, so the id stays retryable. Design: `docs/architecture/logic-first-delivery-design.md` §5.6 and §7.7.
+
+## Fixed — an empty optional bucket in triage-report.md reads as no cards (ADR-0106 H1b, 2026-09-27)
+
+- Cycle 1713's triage wrote `## superseded` with nothing under it; the strict reader declined the report ("states neither cards nor none"), the host had nothing to derive, and the contract gate rejected the phase with `missing_secondary` and re-dispatched it. `deferred`, `dropped` and `superseded` left empty now derive to `[]`; an empty `top_n` is still a missing commitment and still declines.
+
 ## Fixed — a credential wall benches the family and names the operator's fix (ADR-0106 Q2, 2026-09-27)
 
 - `clihealth.Benchable` admits `auth_recheck` (`CredentialPattern`): wave 14 re-dispatched claude fourteen times into "Please log in". Unlike a quota bench it stays active for routing after its cooldown (the cooldown only schedules the canary's next probe; a succeeding probe after the operator's login clears it), a login pane's stale reset hint never sets it, and while it stands, `clihealth.OperatorAction` names the fix on the chain walker's bench line and the canary's re-bench line.

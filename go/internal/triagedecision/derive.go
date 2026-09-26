@@ -62,7 +62,7 @@ func Project(report string, cycle int) ([]byte, error) {
 func build(report string, cycle int, strict bool) (decision, error) {
 	d := decision{Cycle: cycle, Projected: true, PhaseSkip: json.RawMessage("[]"),
 		TopN: []card{}, Deferred: []ref{}, Dropped: []dropped{}, Superseded: []string{}}
-	top, present, err := section(report, "top_n", strict)
+	top, present, err := section(report, "top_n", strict, true)
 	if err != nil {
 		return d, err
 	}
@@ -72,21 +72,21 @@ func build(report string, cycle int, strict bool) (decision, error) {
 	for _, it := range top {
 		d.TopN = append(d.TopN, card{ID: it.ID, Action: ActionOf(it.Rest), Files: FilesOf(it.Rest)})
 	}
-	deferred, _, err := section(report, "deferred", strict)
+	deferred, _, err := section(report, "deferred", strict, false)
 	if err != nil {
 		return d, err
 	}
 	for _, it := range deferred {
 		d.Deferred = append(d.Deferred, ref{ID: it.ID})
 	}
-	droppedCards, _, err := section(report, "dropped", strict)
+	droppedCards, _, err := section(report, "dropped", strict, false)
 	if err != nil {
 		return d, err
 	}
 	for _, it := range droppedCards {
 		d.Dropped = append(d.Dropped, dropped{ID: it.ID, Reason: ReasonOf(it.Rest)})
 	}
-	superseded, _, err := section(report, "superseded", strict)
+	superseded, _, err := section(report, "superseded", strict, false)
 	if err != nil {
 		return d, err
 	}
@@ -103,19 +103,24 @@ func build(report string, cycle int, strict bool) (decision, error) {
 }
 
 // section reads one bucket's cards; present is false when the section is absent. In strict mode a present
-// bucket states cards or none and nothing else.
-func section(report, name string, strict bool) (items []Item, present bool, err error) {
+// bucket states cards or none and nothing else, except that an optional bucket left empty states no cards.
+func section(report, name string, strict, required bool) (items []Item, present bool, err error) {
 	body, ok := SectionBody(report, name)
 	if !ok {
 		return nil, false, nil
 	}
 	sec := ParseSection(body)
-	if strict {
+	if strict && (required || !sec.empty()) {
 		if err := sectionError(name, sec); err != nil {
 			return nil, true, err
 		}
 	}
 	return sec.Items, true, nil
+}
+
+// empty reports a section with nothing under its heading.
+func (s Section) empty() bool {
+	return !s.None && len(s.Items) == 0 && len(s.Rejected) == 0 && len(s.Prose) == 0
 }
 
 func sectionError(name string, sec Section) error {

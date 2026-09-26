@@ -25,6 +25,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
+// NoWorkResult is what the no-work closeout did to the lane's scoped ids.
+type NoWorkResult struct {
+	Routed  []string // scoped inbox items handed to the console
+	Retired []string // scoped ids no inbox item backs, retired as rejected/cycle-N/ records
+}
+
 // NoWorkInputs is one planned-no-work cycle's closeout context.
 type NoWorkInputs struct {
 	ProjectRoot string    // repo root containing .evolve/
@@ -65,10 +71,11 @@ func (in NoWorkInputs) WithSignals(c *signalcenter.Center) NoWorkInputs {
 // failure (review m4). Route and release faults are on the stream and are
 // returned joined, for the caller to WARN — a lifecycle hiccup never changes
 // a cycle's exit code.
-func ApplyNoWork(in NoWorkInputs) ([]string, error) {
+func ApplyNoWork(in NoWorkInputs) (NoWorkResult, error) {
+	res := NoWorkResult{}
 	scope := LaneScopeIDs(in.Workspace)
 	if len(scope) == 0 {
-		return nil, nil
+		return res, nil
 	}
 	stderr := in.Stderr
 	if stderr == nil {
@@ -76,27 +83,52 @@ func ApplyNoWork(in NoWorkInputs) ([]string, error) {
 	}
 	opts := inboxmover.Options{ProjectRoot: in.ProjectRoot, Ledger: in.Ledger, Stderr: stderr, Signals: in.Signals}
 	inboxDir := filepath.Join(in.ProjectRoot, ".evolve", "inbox")
-	var routed []string
 	var errs []error
+	answers := map[string]string{}
 	for _, d := range committedset.Dispositions(in.Workspace) {
 		if !containsID(scope, d.ID) {
 			continue
 		}
+		answers[d.ID] = noWorkRouteReason(in.Cycle, d)
 		if present, alreadyRouted := itemRouteState(inboxDir, d.ID); !present || alreadyRouted {
 			continue
 		}
-		if _, err := inboxmover.RouteConsole(opts, d.ID, noWorkRouteReason(in.Cycle, d), in.Cycle); err != nil {
+		if _, err := inboxmover.RouteConsole(opts, d.ID, answers[d.ID], in.Cycle); err != nil {
 			if !errors.Is(err, inboxmover.ErrNotFound) {
 				errs = append(errs, err)
 			}
 			continue
 		}
-		routed = append(routed, d.ID)
+		res.Routed = append(res.Routed, d.ID)
+	}
+	retired, err := retireUnbackedScope(opts, in.Cycle, scope, answers)
+	res.Retired = retired
+	if err != nil {
+		errs = append(errs, err)
 	}
 	if _, err := inboxmover.ReleaseCycleProcessingWithReason(opts, in.Cycle, "planned no-work: the lane's triage answered without committing"); err != nil {
 		errs = append(errs, err)
 	}
-	return routed, errors.Join(errs...)
+	return res, errors.Join(errs...)
+}
+
+// retireUnbackedScope retires every scoped id no inbox item backs as rejected, each with the lane's own
+// answer for it or the statement that the lane answered for nothing; the next wave then plans around it.
+func retireUnbackedScope(opts inboxmover.Options, cycle int, scope []string, answers map[string]string) ([]string, error) {
+	var retired []string
+	var errs []error
+	for _, id := range scope {
+		reason, answered := answers[id]
+		if !answered {
+			reason = fmt.Sprintf("planned no-work (cycle %d): the lane's triage answered for nothing", cycle)
+		}
+		ids, err := inboxmover.RetireUnbacked(opts, cycle, inboxmover.StateRejected, reason, "", []string{id})
+		retired = append(retired, ids...)
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return retired, errors.Join(errs...)
 }
 
 // itemRouteState locates an inbox item (root or any claim dir) and reports

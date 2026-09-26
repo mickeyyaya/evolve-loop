@@ -1,13 +1,3 @@
-// cmd_loop_cyclelevel_test.go — cycle-234 task `cycle-level-bridge-failure` (RED).
-//
-// Loop-side half of Invariant 3: when RunCycle returns a CYCLE-level failure
-// (core.ErrCycleLevelFailure — bridge exhaustion, contract dead-end, …), the
-// batch must log it and CONTINUE to the next cycle. Today cmd_loop.go breaks
-// on ANY error with StopReason="error" rc=2 — the exact batch-fatal inversion
-// that killed batches c225/c230/c231.
-//
-// Uses the wireOrchestratorDepsFn seam + the m4 stub fakes (noopRunner,
-// newFakeLedger, fixtures.FakeStorage) defined in cmd_loop_m4_test.go.
 package main
 
 import (
@@ -42,8 +32,8 @@ func (r *secondCallErrRunner) Run(context.Context, core.PhaseRequest) (core.Phas
 	return core.PhaseResponse{Verdict: core.VerdictPASS}, nil
 }
 
-// TestLoop_CycleLevelFailureContinues — scout AC: "loop with 3 cycles,
-// second fails with ErrCycleLevelFailure → third cycle still runs".
+// TestLoop_CycleLevelFailureContinues: loop with 3 cycles, the second fails
+// with ErrCycleLevelFailure, and the third cycle still runs.
 func TestLoop_CycleLevelFailureContinues(t *testing.T) {
 	projectRoot := t.TempDir()
 	initLoopContractRepo(t, projectRoot)

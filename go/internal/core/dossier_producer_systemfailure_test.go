@@ -1,52 +1,5 @@
 package core
 
-// dossier_producer_systemfailure_test.go — cycle 1663 RED contract for the
-// inbox item lost-ship-dossier-evidence (re-filed 2026-08-23 after the
-// cycle-1546 salvage excised the draft).
-//
-// finalizeCycle stamps the landing-lost SystemFailureSignal onto CycleResult
-// (lost_landing_floor.go, PR #482) and correctly downgrades the verdict to
-// WARN — but writeCycleDossier receives only the terminal outcome string, so
-// the committed record (knowledge-base/cycles/cycle-N.{json,md}) carries a
-// WARN indistinguishable from any other WARN. An operator reading the dossier
-// cannot see WHY the cycle was downgraded; the only evidence is in gitignored
-// runtime (ship-error.json vs ship-binding.json, diffed by hand per cycle).
-//
-// Contract (test-report.md ## AC-Materialization):
-//
-//	AC1 a landing-lost cycle's committed dossier carries the signal's
-//	    structured category AND evidence text, driven through the REAL
-//	    writeCycleDossier path — i.e. its two production callers,
-//	    cycleRun.completeCycle (cycle_closeout.go) and
-//	    cycleRun.abnormalEpilogue (cyclerun_epilogue.go). A seam that only a
-//	    direct writeCycleDossier(…) call can reach is dead code.
-//	AC2 the landed sibling of the SAME race (same transient ship error, but a
-//	    ship-binding) carries NO landing-lost evidence; an ordinary PASS
-//	    dossier stays byte-clean (golden captured from the pre-change
-//	    producer, the cycle-1652 pin shape).
-//	AC3 acs/cycle1544 predicates 004-005 restored — bound to the tests here.
-//
-// Wire shape pinned here (the one decision the tests must make so they can
-// assert on something): the record lands under the top-level JSON key
-// `system_failure`, an object carrying at least `category` and `evidence`.
-// Generic — mirrors CycleResult.SystemFailure and the signal's own JSON tags
-// — so the second producer of SystemFailureSignal (detectVerdictIncoherence)
-// is not precluded later; a key named for one category would be. Extra keys
-// (level, halt) are allowed, never required. The Go field/type names in
-// internal/dossier and the BuildOpts spelling are the Builder's call — the
-// FailureRecord/d.Failure pattern (failure.go, dossier.go:54-59) is the
-// precedent to mirror; TestSchema_NoDrift enforces the schema half.
-//
-// Evidence is carried VERBATIM (asserted equal to the signal the floor
-// produced, not merely "contains the code"): the floor formats one bounded
-// line whose tail is the operator instruction ("rebase + re-verify …"), so a
-// FailureRecord-style byte cap would cut exactly the actionable part.
-//
-// Fixtures are the REAL artifacts of the wave-20260822a-verify race
-// (testdata/lostlanding): cycle-1535 lost its landing, cycle-1536 hit the
-// same GIT_FLEET_REBASE_NEEDED and landed. The two are distinguishable ONLY
-// by ship-binding.json, which is exactly what makes 1536 the right negative.
-
 import (
 	"bytes"
 	"context"
@@ -58,14 +11,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
 )
 
-// systemFailureKey is the pinned top-level wire key (see the file comment).
 const systemFailureKey = "system_failure"
 
-// closeoutRun builds a cycleRun whose completeCycle drives the REAL closeout:
-// finalizeCycle (the landing-lost floor) → emitCycleClose → writeCycleDossier
-// into a git-initialised project root, the same shape
-// TestCompleteCycle_ForwardsTheShipLatchToTheOutcomeLabel uses. The
-// workspace is the vendored cycle's real ship artifacts.
+// closeoutRun drives the REAL closeout chain (finalizeCycle → emitCycleClose →
+// writeCycleDossier), not a direct producer call, so a seam only reachable via
+// a hand-rolled call is not mistaken for wired.
 func closeoutRun(t *testing.T, cycle int, fixture string) (*cycleRun, string) {
 	t.Helper()
 	root := t.TempDir()
@@ -99,19 +49,12 @@ func systemFailureBlock(t *testing.T, m map[string]any) map[string]any {
 	return sf
 }
 
-// TestDossierSystemFailure_LostLandingReachesTheCommittedDossier — AC1, the
-// headline wiring test. cycle-1535's real artifacts through the real
-// completeCycle: the floor fires (that half already ships — asserted as a
-// precondition so a RED here can only mean the dossier sink), and the
-// committed pair must carry the signal's category and its evidence verbatim,
-// while the verdict routing dossierVerdict already does (WARN) is unchanged.
 func TestDossierSystemFailure_LostLandingReachesTheCommittedDossier(t *testing.T) {
 	cr, root := closeoutRun(t, 1535, "cycle-1535")
 	if err := cr.completeCycle(); err != nil {
 		t.Fatalf("completeCycle: %v", err)
 	}
-	// Precondition: the witness half. If this fails the floor regressed, not
-	// the sink — keep the two failures distinguishable.
+	// Precondition: keeps a floor regression distinguishable from a dossier-sink one.
 	sig := cr.result.SystemFailure
 	if sig == nil || sig.Category != "landing-lost" {
 		t.Fatalf("precondition: finalizeCycle must record the landing-lost signal on the result; got %+v", sig)
@@ -132,15 +75,11 @@ func TestDossierSystemFailure_LostLandingReachesTheCommittedDossier(t *testing.T
 	if !strings.Contains(evidence, "GIT_FLEET_REBASE_NEEDED") {
 		t.Errorf("%s.evidence must name the ship-error code an operator has to act on; got %q", systemFailureKey, evidence)
 	}
-	// The human-readable half must agree with the JSON: an operator reading
-	// cycle-N.md sees the category and the code without opening the JSON.
 	for _, want := range []string{"landing-lost", "GIT_FLEET_REBASE_NEEDED"} {
 		if !strings.Contains(md, want) {
 			t.Errorf("dossier md must carry %q; got:\n%s", want, md)
 		}
 	}
-	// The written record must still parse + validate through the package's
-	// own trust boundary — a field the reader rejects is not durable.
 	jb, err := os.ReadFile(filepath.Join(root, "knowledge-base", "cycles", "cycle-1535.json"))
 	if err != nil {
 		t.Fatalf("read dossier: %v", err)
@@ -154,13 +93,6 @@ func TestDossierSystemFailure_LostLandingReachesTheCommittedDossier(t *testing.T
 	}
 }
 
-// TestDossierSystemFailure_LandedSiblingCarriesNone — AC2, the negative that
-// stops the feature from turning every contended wave into a wall of false
-// evidence. cycle-1536 recorded the SAME transient ship error and LANDED
-// (ship-binding commit adcbddb2): through the same real path its dossier
-// carries no system-failure object, no landing-lost text, no leaked error
-// code — and DOES carry the binding's commit, which proves the producer read
-// this very workspace rather than an empty one.
 func TestDossierSystemFailure_LandedSiblingCarriesNone(t *testing.T) {
 	cr, root := closeoutRun(t, 1536, "cycle-1536")
 	if err := cr.completeCycle(); err != nil {
@@ -186,12 +118,9 @@ func TestDossierSystemFailure_LandedSiblingCarriesNone(t *testing.T) {
 	}
 }
 
-// goldenPassDossierParams is the FIXED ordinary-PASS input the byte-clean
-// golden was captured from through the PRE-change producer (HEAD b9c0df76,
-// before any system-failure field existed). Never shipped anything the
-// workspace can prove (nonexistent workspace ⇒ no binding, no ship-error): the
-// plain "ordinary PASS" every healthy cycle writes. Do not change a value here
-// without regenerating the golden through a producer with NO signal support.
+// goldenPassDossierParams is the fixed ordinary-PASS input the byte-clean
+// golden was captured from, through a producer with no signal support at all.
+// Do not change a value here without regenerating the golden the same way.
 func goldenPassDossierParams(projectRoot string) cycleDossierParams {
 	return cycleDossierParams{
 		ProjectRoot:   projectRoot,
@@ -208,12 +137,6 @@ func goldenPassDossierParams(projectRoot string) cycleDossierParams {
 	}
 }
 
-// TestDossierSystemFailure_OrdinaryPassStaysByteClean — AC2's second half,
-// in the strongest form the words allow: for an ordinary PASS input with no
-// signal, the producer writes EXACTLY the bytes it wrote before the feature —
-// no `system_failure: null`, no empty markdown section, no reordered key.
-// Also the never-shipped edge: a workspace with no ship artifacts at all has
-// no landing to lose.
 func TestDossierSystemFailure_OrdinaryPassStaysByteClean(t *testing.T) {
 	root := t.TempDir()
 	initDossierRepo(t, root)
@@ -238,14 +161,6 @@ func TestDossierSystemFailure_OrdinaryPassStaysByteClean(t *testing.T) {
 	}
 }
 
-// TestDossierSystemFailure_AbnormalEpilogueThreadsTheSignal — AC1 at the
-// SECOND production caller. A system-class signal can already be stamped on
-// CycleResult mid-cycle (the audit and retro chokepoints,
-// cyclerun_record.go) before the cycle dies; the abnormal-exit dossier must
-// carry it exactly as the normal closeout would, or the two call sites
-// diverge and the epilogue silently loses the classification. The signal is
-// the real floor's value (detectLostLanding over the 1535 artifacts), not a
-// hand-rolled literal. The no-signal row is the anti-fabrication twin.
 func TestDossierSystemFailure_AbnormalEpilogueThreadsTheSignal(t *testing.T) {
 	cases := []struct {
 		name   string

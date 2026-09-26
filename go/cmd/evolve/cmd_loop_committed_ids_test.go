@@ -1,20 +1,5 @@
 package main
 
-// cmd_loop_committed_ids_test.go — cycle-1176, task
-// `wave-lane-claim-into-processing` (inbox item wave-lane-task-quarantine-dead).
-//
-// failedCycleCommittedIDs (cmd_loop.go:1060) is the reader that feeds
-// CycleOutcome.CommittedIDs at the production FAIL site (cmd_loop.go:728). It
-// is the hinge of the whole quarantine-dead fix: return the wrong set and the
-// drain either bumps nothing (ceiling stays unreachable — the original defect)
-// or bumps the entire menu (healthy backlog quarantined after N failures of an
-// unrelated task). It had no direct coverage; these tests pin its contract.
-//
-// The `_ =` on the fixture writes is deliberate: t.Fatal on error would be
-// noise for a t.TempDir write that cannot realistically fail, and every
-// assertion below reads the value back, so a silent write failure still fails
-// the test loudly at the assertion.
-
 import (
 	"os"
 	"path/filepath"
@@ -34,9 +19,9 @@ func writeTriageDecision(t *testing.T, body string) string {
 	return ws
 }
 
-// TestFailedCycleCommittedIDs_ReadsTopNAndSkipShipped — the positive contract:
-// the committed set is the top_n ∪ skip_shipped union, deduped and
-// order-preserving, so a FAIL bumps exactly the ids triage committed to.
+// TestFailedCycleCommittedIDs_ReadsTopNAndSkipShipped: the committed set is
+// the top_n ∪ skip_shipped union, deduped and order-preserving, so a FAIL
+// bumps exactly the ids triage committed to.
 func TestFailedCycleCommittedIDs_ReadsTopNAndSkipShipped(t *testing.T) {
 	t.Parallel()
 	ws := writeTriageDecision(t, `{
@@ -63,10 +48,10 @@ func TestFailedCycleCommittedIDs_ReadsTopNAndSkipShipped(t *testing.T) {
 	}
 }
 
-// TestFailedCycleCommittedIDs_ExcludesDeferredAndDropped — NEGATIVE, menu
-// semantics (PR #366). An id triage explicitly did NOT commit to must never
-// enter the committed set: it accrues no failure_count and cannot be walked
-// toward the S5 ceiling by a failure it had no part in.
+// TestFailedCycleCommittedIDs_ExcludesDeferredAndDropped: an id triage
+// explicitly did not commit to must never enter the committed set — it
+// accrues no failure_count and cannot be walked toward the ceiling by a
+// failure it had no part in.
 func TestFailedCycleCommittedIDs_ExcludesDeferredAndDropped(t *testing.T) {
 	t.Parallel()
 	ws := writeTriageDecision(t, `{
@@ -82,11 +67,11 @@ func TestFailedCycleCommittedIDs_ExcludesDeferredAndDropped(t *testing.T) {
 	}
 }
 
-// TestFailedCycleCommittedIDs_AbsentOrCorruptDecisionIsNil — EDGE, fail-open.
-// A missing or unparseable decision yields nil, which the drain reads as
-// "no committed set known" and falls back to the legacy whole-dir behavior. A
-// panic or a bogus non-nil set here would corrupt the failure ledger of a cycle
-// that crashed before triage even wrote its verdict.
+// TestFailedCycleCommittedIDs_AbsentOrCorruptDecisionIsNil: a missing or
+// unparseable decision yields nil, which the drain reads as "no committed
+// set known" and falls back to the legacy whole-dir behavior. A panic or a
+// bogus non-nil set here would corrupt the failure ledger of a cycle that
+// crashed before triage even wrote its verdict.
 func TestFailedCycleCommittedIDs_AbsentOrCorruptDecisionIsNil(t *testing.T) {
 	t.Parallel()
 	if got := cycleoutcome.CommittedIDsFor(t.TempDir()); got != nil {

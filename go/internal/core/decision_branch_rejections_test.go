@@ -11,11 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// WS2-S2 (ADR-0052): planCycle records the WS2-S1 ValidatePlan findings to
-// advisor-rejections.json for forensics — STANDALONE telemetry, decoupled from
-// the WS3-S3 decision span, and never altering the disposed plan (the floor stays
-// the sole disposer).
-
 func TestPlanCycle_RecordsValidationRejections(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
@@ -39,8 +34,6 @@ func TestPlanCycle_RecordsValidationRejections(t *testing.T) {
 		t.Errorf("rejections round-trip mismatch:\n got=%+v\nwant=%+v", got, rej)
 	}
 
-	// Hash-bound into the ledger (tamper-evidence, like every sibling artifact):
-	// one plan_rejections entry whose ArtifactSHA256 matches the written file.
 	var bound *LedgerEntry
 	for i := range led.entries {
 		if led.entries[i].Kind == "plan_rejections" {
@@ -55,20 +48,15 @@ func TestPlanCycle_RecordsValidationRejections(t *testing.T) {
 	}
 }
 
-// TestPlanCycle_PlanUnchangedWhenRejectionsRecorded is the must-fix decoupling
-// proof: recording rejections writes a SEPARATE file and leaves phase-plan.json
-// byte-identical, and ValidatePlan never mutates the plan it inspects.
 func TestPlanCycle_PlanUnchangedWhenRejectionsRecorded(t *testing.T) {
 	t.Parallel()
 	plan := &router.PhasePlan{Entries: []router.PhasePlanEntry{{Phase: "build", Run: true}, {Phase: "ship", Run: true}}}
 
-	// Baseline: recordPhasePlan alone.
 	wsA := t.TempDir()
 	NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil)).
 		recordPhasePlan(context.Background(), 1, CycleState{WorkspacePath: wsA}, plan, nil)
 	base, _ := os.ReadFile(filepath.Join(wsA, "phase-plan.json"))
 
-	// With rejection recording added.
 	wsB := t.TempDir()
 	oB := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
 	before := append([]router.PhasePlanEntry(nil), plan.Entries...)

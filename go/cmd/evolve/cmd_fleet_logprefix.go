@@ -1,17 +1,14 @@
 package main
 
-// cmd_fleet_logprefix.go — per-cycle log attribution (Decorator). Concurrent
-// fleet/campaign cycles share one stdout/stderr; without this their output
-// byte-interleaves into an unreadable stream. prefixLineWriter line-buffers each
-// cycle's output, tags every complete line with the cycle's scope, and serializes
-// writes through one shared mutex so lines from different cycles never tear.
-
 import (
 	"bytes"
 	"io"
 	"sync"
 )
 
+// prefixLineWriter line-buffers and tags each cycle's output with its scope, and
+// serializes writes through one shared mutex so lines from different cycles
+// sharing a sink never interleave mid-line.
 type prefixLineWriter struct {
 	w      io.Writer
 	prefix string

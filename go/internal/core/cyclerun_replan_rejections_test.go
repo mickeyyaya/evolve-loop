@@ -12,27 +12,13 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// Cycle-1155 RED contract — replan-rejections-telemetry.
-//
-// The enforcement half is already shipped: ClampPlanToFloorWith drops
-// unknown-phase entries on BOTH the upfront (cyclerun.go) and the post-scout
-// re-plan (cyclerun_replan.go) path. The telemetry half is not:
-// router.ValidatePlan has exactly one call site (cyclerun.go:676), so a re-plan
-// that hallucinates a phase is dropped SILENTLY — zero forensic trail, which is
-// precisely what dropUnknownPhases' own doc comment (floor.go:151) exists to
-// close. Compounding it, recordPlanRejections writes advisor-rejections.json
-// UNCONDITIONALLY, so a naive second call site would overwrite the upfront
-// record instead of accumulating.
-//
-// These tests pin BEHAVIOUR, not a file format. The builder is free to
-// accumulate as a kind-keyed object in advisor-rejections.json, as sibling
-// advisor-rejections-<kind>.json files, or any other shape — the assertions go
-// through collectWorkspaceRejections/replanRecordPresent, which read every
+// collectWorkspaceRejections and replanRecordPresent read every
 // advisor-rejections*.json in the workspace and recover rejections from any
-// nesting, attributing each to a plan-kind via the filename and the JSON keys on
-// its path. What is NOT negotiable: a re-plan's rejections must be recoverable
-// and attributable to the re-plan, and recording them must not destroy the
-// upfront plan's record.
+// nesting, attributing each to a plan-kind via the filename and the JSON keys
+// on its path — these tests pin BEHAVIOUR, not a file format, so the on-disk
+// shape stays free to change. What is NOT negotiable: a re-plan's rejections
+// must be recoverable and attributable to the re-plan, and recording them
+// must not destroy the upfront plan's record.
 
 // phantomReplanPhase / phantomReplanPhase2 are names no known-phase channel can
 // supply: not canonical, not in Cfg.Order/Mandatory/Triggers/Conditional, not in
@@ -41,9 +27,9 @@ import (
 const (
 	phantomReplanPhase  = "phantom-replan-1155"
 	phantomReplanPhase2 = "phantom-replan-1155-b"
-	// seededInitialPhase stands in for a rejection the UPFRONT plan already
-	// recorded before the re-plan runs (the shape recordPlanRejections writes
-	// today: a flat array in advisor-rejections.json). It must survive.
+	// seededInitialPhase stands in for a rejection the upfront plan already
+	// recorded before the re-plan runs (the shape recordPlanRejections writes:
+	// a flat array in advisor-rejections.json). It must survive.
 	seededInitialPhase = "phantom-initial-1155"
 )
 
@@ -236,13 +222,9 @@ func planWithPhantom(phantom string) *router.PhasePlan {
 	return p
 }
 
-// TestReplan_UnknownPhase_RecordsRejection — AC1 (the crux). A post-scout re-plan
-// naming a phase outside the known set must leave a forensic record: an
-// "unknown-phase" rejection for that phase, attributable to the re-plan. Today
-// the clamp drops it silently and no rejection is recorded anywhere, so this is
-// RED. The cheapest fake — recording the CLAMPED plan's rejections — records
-// nothing (the clamp already removed the phantom), so it cannot pass:
-// ValidatePlan must run on the RAW re-plan, pre-clamp.
+// TestReplan_UnknownPhase_RecordsRejection pins that validation runs on the
+// RAW re-plan, before the floor clamp: validating the clamped plan would
+// record nothing, since the clamp already removed the unknown phase.
 func TestReplan_UnknownPhase_RecordsRejection(t *testing.T) {
 	t.Parallel()
 	ws := scoutWorkspace(t)
@@ -265,18 +247,15 @@ func TestReplan_UnknownPhase_RecordsRejection(t *testing.T) {
 	}
 }
 
-// TestReplan_KnownPhasesOnly_NoSpuriousRejection — AC2 (negative + no-data-loss).
-// A clean re-plan must (a) record NO unknown-phase rejection, (b) still leave
-// proof that validation RAN on the re-plan ("[]" = validated-clean, distinct from
-// "never ran" — recordPlanRejections' stated contract), and (c) not destroy the
-// upfront plan's already-written record. (c) is the overwrite bug: today
-// recordPlanRejections rewrites advisor-rejections.json unconditionally, so a
-// second call site added naively erases the seeded initial record.
+// TestReplan_KnownPhasesOnly_NoSpuriousRejection: a clean re-plan records no
+// unknown-phase rejection, still proves validation ran ("[]" means
+// validated-clean, distinct from never having run), and must not erase the
+// upfront plan's already-written record.
 func TestReplan_KnownPhasesOnly_NoSpuriousRejection(t *testing.T) {
 	t.Parallel()
 	ws := scoutWorkspace(t)
 	// Seed the upfront plan's record in the exact shape recordPlanRejections
-	// writes today (a flat PlanRejection array).
+	// writes (a flat PlanRejection array).
 	seeded, err := json.MarshalIndent([]router.PlanRejection{{
 		Phase: seededInitialPhase, Reason: "unknown-phase", Detail: "recorded by the upfront plan",
 	}}, "", "  ")
@@ -309,10 +288,9 @@ func TestReplan_KnownPhasesOnly_NoSpuriousRejection(t *testing.T) {
 	}
 }
 
-// TestReplan_MultipleReplans_AllRejectionsRecorded — AC3 (accumulation under
-// depth > 1). RePlanMaxDepth allows more than one re-plan per cycle; each must
-// keep its own record. An "upfront + latest re-plan" fix still loses the
-// intermediate one and fails here.
+// TestReplan_MultipleReplans_AllRejectionsRecorded: RePlanMaxDepth allows more
+// than one re-plan per cycle, and each must keep its own record — a fix that
+// only tracked the latest re-plan would still lose the intermediate one.
 func TestReplan_MultipleReplans_AllRejectionsRecorded(t *testing.T) {
 	t.Parallel()
 	ws := scoutWorkspace(t)

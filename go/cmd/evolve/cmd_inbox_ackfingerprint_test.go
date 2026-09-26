@@ -1,15 +1,5 @@
 package main
 
-// cmd_inbox_ackfingerprint_test.go — caller proof for cycle-1334's
-// `evolve inbox ack-fingerprint <item-path>` subcommand, the transactional-
-// consumption counterpart to cycle-1332's manual `evolve loop --reset
-// --fingerprint <fp>` (cmd_loop_fingerprint_ack_test.go). Drives the REAL
-// production entrypoint (runInbox) rather than calling
-// core.ConsumePipelineDefectFingerprint directly — a predicate that only
-// calls the core helper proves nothing about the operator/automation-facing
-// CLI surface actually being wired (house rule: a wiring proof is a
-// reachability test, not a unit test).
-
 import (
 	"bytes"
 	"os"
@@ -73,9 +63,8 @@ func TestRunInbox_AckFingerprint_WritesLedgerFromRealItem(t *testing.T) {
 }
 
 func TestRunInbox_AckFingerprint_FallsBackToNotesField(t *testing.T) {
-	// Semantic: an item consumed before consumed_by narrative exists — the
-	// CLI must fall through to notes, exercising the SAME fallback path as
-	// core.ConsumePipelineDefectFingerprint from the real entrypoint.
+	// Omits consumed_by to simulate an item consumed before a narrative
+	// exists, exercising the notes fallback.
 	projectRoot := t.TempDir()
 	t.Setenv("EVOLVE_PROJECT_ROOT", projectRoot)
 	itemPath := filepath.Join(projectRoot, ".evolve", "inbox", "consumed", "pipeline-defect-pipeline-blocker.json")
@@ -99,8 +88,6 @@ func TestRunInbox_AckFingerprint_FallsBackToNotesField(t *testing.T) {
 }
 
 func TestRunInbox_AckFingerprint_MissingItemReturnsNonZero(t *testing.T) {
-	// Negative: a nonexistent item path must fail loudly (nonzero exit, no
-	// ledger write), never silently no-op.
 	projectRoot := t.TempDir()
 	t.Setenv("EVOLVE_PROJECT_ROOT", projectRoot)
 	var stdout, stderr bytes.Buffer
@@ -114,8 +101,6 @@ func TestRunInbox_AckFingerprint_MissingItemReturnsNonZero(t *testing.T) {
 }
 
 func TestRunInbox_AckFingerprint_NoFingerprintInItemReturnsNonZero(t *testing.T) {
-	// Negative: a real item with neither field carrying a fingerprint must
-	// fail loudly rather than silently no-op the consumption.
 	projectRoot := t.TempDir()
 	t.Setenv("EVOLVE_PROJECT_ROOT", projectRoot)
 	itemPath := filepath.Join(projectRoot, ".evolve", "inbox", "consumed", "no-fp.json")

@@ -21,10 +21,6 @@ func writeDossierFloorPolicy(t *testing.T, root string) {
 	}
 }
 
-// TestDossierVerify_FloorEnrolledButAbsent_Fails is the Potemkin-fix: when the
-// policy floor enrolls "dossier-closeout" but no dossiers exist, verify must
-// FAIL — previously it returned OK on an absent dir, so the declared gate
-// enforced nothing.
 func TestDossierVerify_FloorEnrolledButAbsent_Fails(t *testing.T) {
 	root := t.TempDir()
 	writeDossierFloorPolicy(t, root)
@@ -35,8 +31,6 @@ func TestDossierVerify_FloorEnrolledButAbsent_Fails(t *testing.T) {
 	}
 }
 
-// TestDossierVerify_NoFloor_AbsentIsOK keeps back-compat: with no floor
-// enrollment an absent dir is a no-op success (safe to run mid-batch).
 func TestDossierVerify_NoFloor_AbsentIsOK(t *testing.T) {
 	root := t.TempDir() // no policy.json → empty policy → no enrollment
 	t.Setenv("EVOLVE_PROJECT_ROOT", root)
@@ -46,8 +40,6 @@ func TestDossierVerify_NoFloor_AbsentIsOK(t *testing.T) {
 	}
 }
 
-// TestDossierVerify_FloorEnrolledWithValidDossier_OK confirms enforcement is
-// satisfied once a real, valid dossier is present.
 func TestDossierVerify_FloorEnrolledWithValidDossier_OK(t *testing.T) {
 	root := t.TempDir()
 	writeDossierFloorPolicy(t, root)

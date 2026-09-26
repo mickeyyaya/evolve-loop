@@ -17,7 +17,7 @@ func TestMergeVerdict(t *testing.T) {
 		{VerdictWARN, VerdictPASS, VerdictWARN},
 		{VerdictPASS, VerdictFAIL, VerdictFAIL},
 		{VerdictWARN, VerdictFAIL, VerdictFAIL},
-		{VerdictFAIL, VerdictPASS, VerdictFAIL}, // FAIL is sticky
+		{VerdictFAIL, VerdictPASS, VerdictFAIL},
 	}
 	for _, c := range cases {
 		if got := mergeVerdict(c.acc, c.v); got != c.want {
@@ -87,8 +87,6 @@ func batchHas(cr *cycleRun, phase string) bool {
 	return false
 }
 
-// The two evaluate phases must run CONCURRENTLY (maxActive ≥ 2), both record
-// outcomes, and a clean batch merges to PASS + loopNext.
 func TestDispatchEvaluateBatch_Concurrent(t *testing.T) {
 	t.Parallel()
 	var active, maxActive int32
@@ -115,7 +113,6 @@ func TestDispatchEvaluateBatch_Concurrent(t *testing.T) {
 	}
 }
 
-// Weakest-link: one WARN in the batch ⇒ the batch verdict is WARN.
 func TestDispatchEvaluateBatch_WeakestLink(t *testing.T) {
 	t.Parallel()
 	var a, m int32
@@ -133,8 +130,6 @@ func TestDispatchEvaluateBatch_WeakestLink(t *testing.T) {
 	}
 }
 
-// Crash-safety: one runner hard-errors ⇒ all-or-nothing abort, but EVERY phase's
-// outcome is still recorded first (C1-complete — no silent loss).
 func TestDispatchEvaluateBatch_CrashSafety(t *testing.T) {
 	t.Parallel()
 	var a, m int32
@@ -147,7 +142,6 @@ func TestDispatchEvaluateBatch_CrashSafety(t *testing.T) {
 	if act != loopAbort || err == nil {
 		t.Fatalf("a hard error must abort the batch; got act=%v err=%v", act, err)
 	}
-	// C1-complete: both ran and both were recorded BEFORE the abort.
 	if !batchHas(cr, "tester") || !batchHas(cr, "evaluator") {
 		t.Errorf("all batch outcomes must be recorded even on abort; PhasesRun=%v", cr.result.PhasesRun)
 	}

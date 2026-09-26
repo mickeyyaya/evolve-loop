@@ -28,10 +28,6 @@ func initDossierRepo(t *testing.T, root string) {
 	}
 }
 
-// TestDossierVerdict_MapsCycleOutcomes pins the CycleOutcome → dossier verdict
-// mapping. Only a clean ship is PASS; an explicit FAIL is FAIL; every other
-// terminal (WARN/SKIPPED/advisory/unknown) is WARN — a non-PASS record that
-// captures experience without fabricating a pass or demanding defects.
 func TestDossierVerdict_MapsCycleOutcomes(t *testing.T) {
 	cases := map[string]string{
 		VerdictPASS:                      dossier.VerdictPass,
@@ -51,8 +47,6 @@ func TestDossierVerdict_MapsCycleOutcomes(t *testing.T) {
 	}
 }
 
-// TestWriteCycleDossier_WritesValidArtifact is the core of the ADR-0055 fix: a
-// completed cycle writes knowledge-base/cycles/cycle-N.json and it is valid.
 func TestWriteCycleDossier_WritesValidArtifact(t *testing.T) {
 	root := t.TempDir()
 	initDossierRepo(t, root)
@@ -79,8 +73,6 @@ func TestWriteCycleDossier_WritesValidArtifact(t *testing.T) {
 	}
 }
 
-// TestWriteCycleDossier_FailOutcomeRecordsDefect proves a failed cycle's record
-// is truthful (FAIL + a defect), not an always-PASS skeleton.
 func TestWriteCycleDossier_FailOutcomeRecordsDefect(t *testing.T) {
 	root := t.TempDir()
 	initDossierRepo(t, root)
@@ -97,9 +89,8 @@ func TestWriteCycleDossier_FailOutcomeRecordsDefect(t *testing.T) {
 	}
 }
 
-// TestWriteCycleDossier_LeavesCleanTree is the regression for the recurring
-// tree-diff-guard P0: after writeCycleDossier, the main tree must carry NO
-// untracked knowledge-base/cycles/* pair for a later phase's guard to flag.
+// Regression: the tree-diff guard trips on any untracked
+// knowledge-base/cycles/* pair left behind.
 func TestWriteCycleDossier_LeavesCleanTree(t *testing.T) {
 	root := t.TempDir()
 	initDossierRepo(t, root)

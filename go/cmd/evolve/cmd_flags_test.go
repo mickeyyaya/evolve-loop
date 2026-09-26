@@ -1,7 +1,3 @@
-// cmd_flags_test.go — L2.2 (concurrency-factory plan): `evolve flags
-// generate|check` projects the flagregistry SSOT into the marker region of
-// docs/architecture/control-flags.md; check exits 2 on drift so a flag can
-// no longer ship undocumented.
 package main
 
 import (
@@ -17,9 +13,9 @@ import (
 
 // anyRenderedFlagToken returns the backticked name of the first registered flag,
 // for assertions that "some registry content was rendered" without hardcoding a
-// specific flag (the flag-reduction campaign deletes flags, so any pinned name
-// eventually 404s — the cycle-12 lesson). Skips the test when the registry is
-// empty (the campaign's terminal state).
+// specific flag name, since the flag-reduction campaign continually deletes
+// flags and a pinned name would eventually 404. Skips the test when the
+// registry is empty.
 func anyRenderedFlagToken(t *testing.T) string {
 	t.Helper()
 	if len(flagregistry.All) == 0 {
@@ -62,9 +58,9 @@ func TestFlagsGenerateThenCheck_RoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, want := range []string{
-		"Hand-written prose ABOVE",   // prose preserved
-		"GENERATED:flag-index BEGIN", // markers present
-		anyRenderedFlagToken(t),      // registry content rendered (campaign-robust)
+		"Hand-written prose ABOVE",
+		"GENERATED:flag-index BEGIN",
+		anyRenderedFlagToken(t),
 	} {
 		if !strings.Contains(string(doc), want) {
 			t.Errorf("generated doc missing %q", want)
@@ -73,7 +69,6 @@ func TestFlagsGenerateThenCheck_RoundTrip(t *testing.T) {
 	if rc := runFlags([]string{"check"}, nil, io.Discard, os.Stderr); rc != 0 {
 		t.Errorf("check after generate rc=%d, want 0 (round-trip)", rc)
 	}
-	// Idempotency: a second generate must not change the file.
 	before := string(doc)
 	if rc := runFlags([]string{"generate"}, nil, io.Discard, os.Stderr); rc != 0 {
 		t.Fatalf("second generate rc=%d", rc)
@@ -108,8 +103,6 @@ func TestFlagsCheck_DriftExitsTwo(t *testing.T) {
 	}
 }
 
-// TestSpliceMarkedRegion_EmptyAnchorAppendsAtEOF pins the flags-path splice
-// contract directly: no markers + no fallback anchor ⇒ block appended at EOF.
 func TestSpliceMarkedRegion_EmptyAnchorAppendsAtEOF(t *testing.T) {
 	out, err := skillcheck.SpliceMarkedRegion("# Doc\n\nprose\n", "BEGIN\nblock\nEND", "BEGIN", "END", "")
 	if err != nil {
@@ -126,28 +119,16 @@ func TestFlagsUnknownSubcommand(t *testing.T) {
 	}
 }
 
-// TestFlagsCheck_ResolvesWorktreeRootOverProjectRoot is the cycle-355
-// regression guard. Under the ACS suite a predicate runs with
-// EVOLVE_PROJECT_ROOT pinned to the MAIN checkout so it can read `.evolve/`
-// runtime STATE (issue #12). But a generated SOURCE doc like control-flags.md
-// is part of the cycle's committed deliverable and lives in the WORKTREE — so
-// `flags check` must validate the WORKTREE doc, not main's stale working copy.
-// acssuite exports EVOLVE_WORKTREE_ROOT=<worktree>; flags resolution must
-// prefer it over EVOLVE_PROJECT_ROOT. Before the fix, `flags check` read the
-// stale main root and red-failed correct work (the cycle-355 audit FAIL).
 func TestFlagsCheck_ResolvesWorktreeRootOverProjectRoot(t *testing.T) {
 	worktree := seedFlagsProject(t) // brought in sync with the registry
 	mainRoot := seedFlagsProject(t) // stays the bare seed → stale vs registry
 
-	// Bring ONLY the worktree's doc in sync, via the known-good generate path.
 	t.Setenv("EVOLVE_WORKTREE_ROOT", "")
 	t.Setenv("EVOLVE_PROJECT_ROOT", worktree)
 	if rc := runFlags([]string{"generate"}, nil, io.Discard, io.Discard); rc != 0 {
 		t.Fatalf("seed generate rc=%d, want 0", rc)
 	}
 
-	// Point PROJECT_ROOT at the stale main and WORKTREE_ROOT at the synced
-	// worktree. check must resolve the worktree (in sync) → exit 0.
 	t.Setenv("EVOLVE_PROJECT_ROOT", mainRoot)
 	t.Setenv("EVOLVE_WORKTREE_ROOT", worktree)
 	if rc := runFlags([]string{"check"}, nil, io.Discard, io.Discard); rc != 0 {
@@ -155,9 +136,6 @@ func TestFlagsCheck_ResolvesWorktreeRootOverProjectRoot(t *testing.T) {
 			"(in-sync worktree), not EVOLVE_PROJECT_ROOT (stale main)", rc)
 	}
 
-	// Falsifiability: with WORKTREE unset, resolution falls back to the stale
-	// PROJECT_ROOT and MUST report drift — proving the assertion above exercises
-	// the worktree redirect, not an unrelated path.
 	t.Setenv("EVOLVE_WORKTREE_ROOT", "")
 	if rc := runFlags([]string{"check"}, nil, io.Discard, io.Discard); rc != 2 {
 		t.Fatalf("check rc=%d with WORKTREE unset + stale PROJECT_ROOT, want 2 (drift); "+

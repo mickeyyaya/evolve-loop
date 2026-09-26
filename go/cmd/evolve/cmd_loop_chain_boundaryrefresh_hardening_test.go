@@ -1,72 +1,5 @@
 package main
 
-// cmd_loop_chain_boundaryrefresh_hardening_test.go — RED tests (cycle 1323,
-// continuation of cycle 1320, inbox item auto-refresh-binary-at-boundary).
-//
-// Cycle 1320 landed the boundary-refresh sequence (ahead-check -> rebuild ->
-// repin -> ledger -> re-exec) but its audit FAILed with 9 defects, 2 of which
-// (D1 short-sha ahead-check, D2 short-sha test gap) are already fixed in this
-// tree. The remaining OPEN defects are what THIS file encodes:
-//
-//	dd8a8d64 / dcaf44e4 (CRIT, same defect) — maybeRefreshChainBoundary passes
-//	  trivialProvenance = func(string) bool { return true } into
-//	  phaseintegrity.RepinShipSHA, stubbing out the ProvenanceVerified
-//	  anti-tamper control and stamping Authorized="provenance" without ever
-//	  verifying anything. ADR-0072 forged-verdict class.
-//	d7542cf6 (MAJOR) — the repin hashes the RUNNING executable via
-//	  selfsha.Running() instead of the rebuilt go/bin/evolve the rebuild just
-//	  produced, so it pins the STALE hash under the forged label.
-//	ddb8f717 (CRIT) — rebuild writes go/bin/evolve but the re-exec targets
-//	  exec.LookPath(os.Args[0]); nothing guarantees the process that comes back
-//	  is the binary that was just built.
-//	de8b9e49 / df20cf48 (CRIT) — no re-exec loop breaker: any ahead-check false
-//	  positive (or a rebuild that does not move the binary's build commit)
-//	  becomes an unbounded rebuild -> repin -> re-exec livelock in which zero
-//	  batches ever run, because the refresh check precedes chainStartDecision.
-//	d9d245d4 — dead fallback: repinCommit = "boundary-refresh" on an empty
-//	  running commit is unreachable AND would launder an unverifiable commit
-//	  past a real provenance gate if it ever were reached.
-//
-// Contract the Builder implements. Three NEW package-var seams, mirroring the
-// established postBuildRepinProvenanceFn / chainRebuildFn idiom, plus a
-// re-shaped repin that reuses the SHARED primitive post_build_repin.go already
-// uses instead of hand-rolling a second repin path:
-//
-//	// chainRunningCommitFn resolves the running binary's build commit.
-//	// Production = version.Commit. A seam so the loop breaker's
-//	// same-commit-twice behaviour is deterministic under test.
-//	var chainRunningCommitFn = version.Commit
-//
-//	// chainBoundaryRepinProvenanceFn mirrors core.defaultPostBuildRepinProvenance:
-//	// it returns the running binary's build commit AND a REAL
-//	// phaseintegrity.ProvenanceVerified closure asserting that commit is an
-//	// ancestor of HEAD (`git merge-base --is-ancestor <c> HEAD`). An empty
-//	// commit is unverifiable and MUST return false. There is no sentinel
-//	// substitute for an empty commit — an unstamped binary simply does not get
-//	// to self-authorize a re-pin.
-//	var chainBoundaryRepinProvenanceFn = defaultChainBoundaryRepinProvenance
-//	func defaultChainBoundaryRepinProvenance(projectRoot string) (string, phaseintegrity.ProvenanceVerified)
-//
-//	// chainReExecTargetFn resolves the executable the boundary refresh re-execs
-//	// into: the REBUILT <projectRoot>/go/bin/evolve, never os.Args[0]. An
-//	// absent/non-executable target is an error and degrades to no refresh.
-//	var chainReExecTargetFn = defaultChainReExecTarget
-//	func defaultChainReExecTarget(projectRoot string) (string, error)
-//
-//	// chainBoundaryRefreshAttemptFile is the on-disk loop breaker. A refresh
-//	// records the running commit that triggered it; a LATER refresh attempt
-//	// carrying that SAME running commit means the previous re-exec came back on
-//	// a binary that had not moved — it is refused (WARN, refreshed=false) so the
-//	// chain degrades to running batches on the current binary instead of
-//	// livelocking. On-disk because a re-exec destroys any in-process counter.
-//	var chainBoundaryRefreshAttemptFile = "boundary-refresh-attempt.json"
-//
-// The repin itself becomes phaseintegrity.RepinIfDrifted(statePath,
-// <projectRoot>/go/bin/evolve, commit, "", prov) — the SAME shared
-// detect-drift + provenance-gate + repin path core.repinShipSHAAfterBuild uses,
-// which fixes the forged-provenance and wrong-hash defects together and deletes
-// the second hand-rolled repin path (never_duplicate_centralize).
-
 import (
 	"bytes"
 	"crypto/sha256"
@@ -121,14 +54,11 @@ func brhReadPin(t *testing.T, evolveDir string) string {
 	return pin
 }
 
-// --- AC1 (dd8a8d64 / dcaf44e4): the provenance gate is REAL, not stubbed ---
-
-// AC1 negative — the load-bearing anti-forgery assertion. When provenance says
-// "I cannot verify this build commit", the boundary refresh MUST refuse: the
-// ship pin stays untouched, nothing is ledgered as authorized, no re-exec
-// happens, and the chain degrades to running on the current binary. Today the
-// production path hands RepinShipSHA an always-true stub, so the pin moves and
-// this test fails.
+// TestMaybeRefreshChainBoundary_UnverifiedProvenanceRefusesRepinAndReExec is
+// the load-bearing anti-forgery assertion: when provenance says "I cannot
+// verify this build commit", the boundary refresh must refuse — the ship pin
+// stays untouched, nothing is ledgered as authorized, no re-exec happens, and
+// the chain degrades to running on the current binary.
 func TestMaybeRefreshChainBoundary_UnverifiedProvenanceRefusesRepinAndReExec(t *testing.T) {
 	root, evolveDir, _ := brhProject(t, "STALE_PIN", "REBUILT-BINARY-BYTES")
 
@@ -172,10 +102,10 @@ func TestMaybeRefreshChainBoundary_UnverifiedProvenanceRefusesRepinAndReExec(t *
 	}
 }
 
-// AC1 positive/production-default — the shipped default provenance closure is
-// a real git-ancestor check, not a constant. This is what makes AC1's seam
-// meaningful in production: an arbitrary commit is rejected, an empty commit is
-// rejected, and only a real ancestor of HEAD is accepted.
+// TestDefaultChainBoundaryRepinProvenance_RejectsNonAncestorAndEmptyCommits:
+// the shipped default provenance closure is a real git-ancestor check, not a
+// constant — an arbitrary commit is rejected, an empty commit is rejected,
+// and only a real ancestor of HEAD is accepted.
 func TestDefaultChainBoundaryRepinProvenance_RejectsNonAncestorAndEmptyCommits(t *testing.T) {
 	dir, commitA := brfInitRepo(t)
 	brfAdvance(t, dir)
@@ -198,9 +128,9 @@ func TestDefaultChainBoundaryRepinProvenance_RejectsNonAncestorAndEmptyCommits(t
 	}
 }
 
-// AC1 edge (d9d245d4) — the dead sentinel fallback must be gone: an unstamped
-// binary (empty build commit) must never have the literal "boundary-refresh"
-// laundered through the provenance gate in its place.
+// TestMaybeRefreshChainBoundary_NeverSubstitutesSentinelForEmptyCommit: an
+// unstamped binary (empty build commit) must never have the literal
+// "boundary-refresh" laundered through the provenance gate in its place.
 func TestMaybeRefreshChainBoundary_NeverSubstitutesSentinelForEmptyCommit(t *testing.T) {
 	root, evolveDir, _ := brhProject(t, "STALE_PIN", "REBUILT-BINARY-BYTES")
 
@@ -236,11 +166,9 @@ func TestMaybeRefreshChainBoundary_NeverSubstitutesSentinelForEmptyCommit(t *tes
 	}
 }
 
-// --- AC2 (d7542cf6): the pin is the sha of the REBUILT binary ---
-
-// The rebuild writes <root>/go/bin/evolve; the repin must hash THAT file, not
-// the running test executable. Today selfsha.Running() hashes the test binary,
-// so the pin can never equal sha256(go/bin/evolve).
+// TestMaybeRefreshChainBoundary_PinsShaOfRebuiltBinaryNotRunningExecutable:
+// the rebuild writes <root>/go/bin/evolve, and the repin must hash that
+// file, not the running executable.
 func TestMaybeRefreshChainBoundary_PinsShaOfRebuiltBinaryNotRunningExecutable(t *testing.T) {
 	root, evolveDir, wantSHA := brhProject(t, "STALE_PIN", "REBUILT-BINARY-BYTES")
 
@@ -272,10 +200,9 @@ func TestMaybeRefreshChainBoundary_PinsShaOfRebuiltBinaryNotRunningExecutable(t 
 	}
 }
 
-// --- AC3 (ddb8f717): re-exec targets the rebuilt binary ---
-
-// The whole point of the refresh is to come back on the NEW binary. argv0 must
-// be the <root>/go/bin/evolve the rebuild just wrote, not
+// TestMaybeRefreshChainBoundary_ReExecTargetsRebuiltBinaryNotArgv0: the whole
+// point of the refresh is to come back on the new binary, so argv0 must be
+// the <root>/go/bin/evolve the rebuild just wrote, not
 // exec.LookPath(os.Args[0]) (the running, stale image).
 func TestMaybeRefreshChainBoundary_ReExecTargetsRebuiltBinaryNotArgv0(t *testing.T) {
 	root, evolveDir, _ := brhProject(t, "STALE_PIN", "REBUILT-BINARY-BYTES")
@@ -318,8 +245,9 @@ func TestMaybeRefreshChainBoundary_ReExecTargetsRebuiltBinaryNotArgv0(t *testing
 	}
 }
 
-// AC3 edge — an absent rebuilt binary means there is nothing safe to re-exec
-// into: degrade to no refresh rather than exec'ing an unknown path.
+// TestMaybeRefreshChainBoundary_MissingRebuiltBinaryDegradesToNoRefresh: an
+// absent rebuilt binary means there is nothing safe to re-exec into —
+// degrade to no refresh rather than exec'ing an unknown path.
 func TestMaybeRefreshChainBoundary_MissingRebuiltBinaryDegradesToNoRefresh(t *testing.T) {
 	root, evolveDir, _ := brhProject(t, "STALE_PIN", "REBUILT-BINARY-BYTES")
 	if err := os.Remove(filepath.Join(root, "go", "bin", "evolve")); err != nil {
@@ -355,13 +283,11 @@ func TestMaybeRefreshChainBoundary_MissingRebuiltBinaryDegradesToNoRefresh(t *te
 	}
 }
 
-// --- AC4 (de8b9e49 / df20cf48): the re-exec loop breaker ---
-
-// Two refresh attempts carrying the SAME running build commit mean the
-// previous re-exec came back on a binary that had not moved. The second attempt
-// MUST be refused so the chain degrades to running batches on the current
-// binary instead of livelocking. The marker is on disk because a real re-exec
-// destroys any in-process counter.
+// TestMaybeRefreshChainBoundary_SecondAttemptSameCommitIsRefusedLoopBreaker:
+// two refresh attempts carrying the same running build commit mean the
+// previous re-exec came back on a binary that had not moved, so the second
+// attempt must be refused — the marker persists on disk because a real
+// re-exec destroys any in-process counter.
 func TestMaybeRefreshChainBoundary_SecondAttemptSameCommitIsRefusedLoopBreaker(t *testing.T) {
 	root, evolveDir, _ := brhProject(t, "STALE_PIN", "REBUILT-BINARY-BYTES")
 
@@ -408,9 +334,9 @@ func TestMaybeRefreshChainBoundary_SecondAttemptSameCommitIsRefusedLoopBreaker(t
 	}
 }
 
-// AC4 positive — the breaker is per-commit, not a permanent kill switch: once
-// the running commit actually moves (the rebuild worked), a refresh is allowed
-// again.
+// TestMaybeRefreshChainBoundary_LoopBreakerRearmsWhenCommitMoves: the
+// breaker is per-commit, not a permanent kill switch — once the running
+// commit actually moves, a refresh is allowed again.
 func TestMaybeRefreshChainBoundary_LoopBreakerRearmsWhenCommitMoves(t *testing.T) {
 	root, evolveDir, _ := brhProject(t, "STALE_PIN", "REBUILT-BINARY-BYTES")
 
@@ -449,12 +375,11 @@ func TestMaybeRefreshChainBoundary_LoopBreakerRearmsWhenCommitMoves(t *testing.T
 	}
 }
 
-// AC4 reachability (production caller) — drives runLoopChain, not the helper.
-// With a permanently-true ahead-check, the FIRST chain run refreshes and stops
-// for the re-exec, and the process that comes back (a second runLoopChain over
-// the SAME .evolve dir, still on the same build commit) must run real batches
-// instead of refreshing again. Today, with no breaker, the second run refreshes
-// too and zero batches ever execute — the bricked chain of df20cf48.
+// TestRunLoopChain_LoopBreakerLetsBatchesRunAfterAFruitlessReExec drives
+// runLoopChain, not the helper: with a permanently-true ahead-check, the
+// first chain run refreshes and stops for the re-exec, and the process that
+// comes back (a second runLoopChain over the same .evolve dir, still on the
+// same build commit) must run real batches instead of refreshing again.
 func TestRunLoopChain_LoopBreakerLetsBatchesRunAfterAFruitlessReExec(t *testing.T) {
 	root, evolveDir, _ := brhProject(t, "STALE_PIN", "REBUILT-BINARY-BYTES")
 	inboxDir := filepath.Join(evolveDir, "inbox")

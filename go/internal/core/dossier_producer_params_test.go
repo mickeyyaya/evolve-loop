@@ -7,36 +7,7 @@ import (
 	"testing"
 )
 
-// dossier_producer_params_test.go — cycle 1652 RED contract for the inbox item
-// dossier-producer-params-struct: writeCycleDossier grew to ELEVEN positional
-// parameters by accretion (the 11th, live phase timings, touched every call
-// site to append one value), so the producer takes ONE named params value
-// mirroring dossier.BuildOpts and a field addition touches only the producer
-// and the site that supplies it.
-//
-// Contract (test-report.md ## AC-Materialization):
-//
-//	AC1 writeCycleDossier(lock gitMutationLocker, p cycleDossierParams) error —
-//	    two parameters; every current input preserved as a NAMED field:
-//	      ProjectRoot, WorkspacePath, Cycle, Goal, RunID, Outcome,
-//	      SkippedPhases, VerdictsNotAdopted, SpineFailOpens, PhaseTimings
-//	    (BuildOpts' spellings where BuildOpts has the field; Outcome keeps the
-//	    producer's current name because it is the RAW cycle outcome that
-//	    dossierVerdict maps — BuildOpts.FinalVerdict is the mapped value).
-//	AC2 keyed construction: a caller that names only the fields it has compiles
-//	    and runs — the property that makes a field addition non-breaking.
-//	AC3 no behavior change: the bytes for a fixed input are unchanged. The
-//	    golden under testdata/dossierparams/ was captured from the 11-argument
-//	    producer at HEAD 287aa81c BEFORE this refactor — the JSON and Markdown
-//	    the refactored producer emits for the same input must match byte for
-//	    byte. The projection is clock-free (no time.Now in internal/dossier), so
-//	    the pin is exact, not fuzzy.
-//
-// RED today as a compile failure: cycleDossierParams does not exist and
-// writeCycleDossier has eleven parameters. Restore compilation FIRST (the
-// struct + signature), then every other core test runs again.
-
-// goldenDossierParams is the FIXED input the golden was captured from. Do not
+// goldenDossierParams is the fixed input the golden was captured from. Do not
 // change a value here without regenerating the golden through the pre-refactor
 // producer — the point is that the bytes come from the OLD signature.
 func goldenDossierParams(projectRoot string) cycleDossierParams {
@@ -67,9 +38,6 @@ func readGolden(t *testing.T, name string) []byte {
 	return b
 }
 
-// TestWriteCycleDossier_ParamsStructPreservesFixedInputBytes — AC1 + AC3. The
-// refactored producer, fed the golden's input through the params value, must
-// write the exact JSON and Markdown the eleven-argument producer wrote.
 func TestWriteCycleDossier_ParamsStructPreservesFixedInputBytes(t *testing.T) {
 	root := t.TempDir()
 	initDossierRepo(t, root)
@@ -91,12 +59,6 @@ func TestWriteCycleDossier_ParamsStructPreservesFixedInputBytes(t *testing.T) {
 	}
 }
 
-// TestWriteCycleDossier_ParamsAreKeyedAndOptional — AC2 in executable form: a
-// caller supplying only the fields it has (no skipped/not-adopted/spine/timing
-// evidence — the shape a hypothetical twelfth field would be absent in at every
-// unrelated call site) compiles, runs, and yields a valid PASS record whose
-// named fields round-trip. This is the same input the pre-existing
-// TestWriteCycleDossier_WritesValidArtifact fed positionally.
 func TestWriteCycleDossier_ParamsAreKeyedAndOptional(t *testing.T) {
 	root := t.TempDir()
 	initDossierRepo(t, root)

@@ -43,21 +43,14 @@ func (w replWaiter) applyCheckpointDisposition(state *replWaitState, elapsed int
 }
 
 // idleNudge is the ONE decision the idle reminder's text, the operator log
-// label and the interaction trigger all come from (F39, cycle 1691).
+// label and the interaction trigger all come from.
 type idleNudge struct {
 	msg, label, trigger string
 }
 
-// idleNudgeFor words the reminder by what the host sees. A deliverable found
-// at any candidate location (artifactLocate — the resolution the completion
-// poll and the admission check share) that still matches the dispatch
-// baseline gets the reason a rewrite is needed: completion is the deliverable
-// being written after THIS dispatch (the stale-leftover guard, right for every
-// dispatch), so an agent told only to "write the deliverable" sees a report
-// that is already right and stops. The remedy is bound to a re-check — the
-// agent answers "is it still true for this attempt?", never "touch it" — so a
-// stale verdict cannot be carried forward unexamined (architecture review M1).
-// Otherwise the plain reminder.
+// idleNudgeFor words the reminder by what the host sees: a stale leftover
+// deliverable gets a reminder bound to a re-check (see carryForwardRemedy),
+// never a blind "touch it"; otherwise the plain reminder.
 func idleNudgeFor(cfg *Config, base artifactBaseline) idleNudge {
 	if path, found := artifactLocate(cfg); found {
 		if fi, err := os.Lstat(path); err == nil && base.matches(path, fi) {
@@ -75,10 +68,10 @@ func idleNudgeFor(cfg *Config, base artifactBaseline) idleNudge {
 	}
 }
 
-// carryForwardRemedy is how a re-checked deliverable is carried forward by its
-// format (architecture review M2): a markdown report takes an appended
-// attestation line; any other format (a JSON plan) is written again in full —
-// a line appended to JSON breaks its parse.
+// carryForwardRemedy carries a re-checked deliverable forward by its format:
+// a markdown report takes an appended attestation line; any other format (a
+// JSON plan) is written again in full — an appended line would break its
+// parse.
 func carryForwardRemedy(artifact string) string {
 	if strings.EqualFold(filepath.Ext(artifact), ".md") {
 		return "if it still holds, append a line recording what this attempt changed and that you re-verified it; if not, rewrite it."

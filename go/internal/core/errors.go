@@ -2,10 +2,6 @@ package core
 
 import "errors"
 
-// Sentinel errors. All wrapping in this codebase goes through fmt.Errorf
-// with %w so callers can recover the root via errors.Is. Distinct values
-// are intentional — every branch on err in the orchestrator checks one
-// of these, so collisions would silently mask bugs.
 var (
 	// ErrPhaseGateFailed is returned when a trust-kernel guard denies
 	// an action (ship, role-write outside allowlist, etc).
@@ -24,38 +20,23 @@ var (
 	ErrSubprocessNonZero = errors.New("core: subprocess exited non-zero")
 
 	// ErrArtifactTimeout is wrapped into the Bridge.Launch error when a
-	// driver returns ExitArtifactTimeout (81) — the agent's contracted
-	// artifact never appeared within the wait window. It lives on the
-	// Bridge port (not the concrete bridge adapter) so the generic phase
-	// runner can errors.Is-match it WITHOUT importing a specific driver:
-	// an OPTIONAL phase that hits this degrades to WARN+advance instead of
-	// aborting the whole cycle (Workstream D — cycle-120 build-planner).
+	// driver returns ExitArtifactTimeout (81): the agent's contracted
+	// artifact never appeared within the wait window. 127 (missing binary)
+	// is deliberately NOT transient: an absent CLI is an environment defect
+	// that must fail loud.
 	ErrArtifactTimeout = errors.New("core: bridge artifact timeout")
 
 	// ErrTransientBridgeFailure is wrapped into the Bridge.Launch error when a
-	// driver returns exit 80, 85, 86, or 124 (boot timeout / unknown prompt /
-	// respond-loop guard / command-level timeout kill) — transient infra issues —
-	// OR when the driver subprocess exits -1 (signal death) while our own context
-	// is cancelled (a completion-wait / phase-timeout teardown SIGKILL'd it;
-	// cycle-859). 127 (missing binary) is deliberately NOT transient: an absent
-	// CLI is an environment defect that must fail loud, recovered only by the
-	// exit-code-triggered family fallback.
+	// driver returns exit 80, 85, 86, or 124, or exits -1 while our own
+	// context is already cancelled.
 	ErrTransientBridgeFailure = errors.New("core: transient bridge failure")
 
 	// ErrAgentDocMissing marks a phase-dispatch failure whose cause is the
-	// agent persona doc not existing on disk (soak-20260824a cycle-1551: an
-	// optional menu phase with no persona anywhere killed its whole lane
-	// rc=4). Wrapped by the runner at the load-agent step; consumed by
-	// optionalInfraSkip so a genuinely OPTIONAL phase degrades to a recorded
-	// skip while mandatory/floor phases still fail loud.
+	// agent persona doc not existing on disk.
 	ErrAgentDocMissing = errors.New("core: agent persona doc missing")
 
-	// ErrAllFamiliesExhausted marks the quota-terminal exhaustion case
-	// (cycle-656): every retry attempt for a phase returned exit=85, meaning
-	// every CLI family in the fallback chain is quota-drained. The dispatch
-	// seam writes a quota-likely checkpoint before aborting with this, so the
-	// batch stops resumable (`evolve loop --resume`) instead of failing
-	// forward into the same wall.
+	// ErrAllFamiliesExhausted marks every CLI family in the fallback chain
+	// as quota-drained (every retry returned exit=85).
 	ErrAllFamiliesExhausted = errors.New("core: all CLI families quota-exhausted (exit=85)")
 
 	// ErrPhaseInvalid means the supplied Phase value isn't a member of
@@ -68,42 +49,27 @@ var (
 
 	// ErrUnsafeConfig means the loaded transition config (legality graph, gates,
 	// verdict branches) violates a safety invariant — a flow that could ship
-	// without the integrity floor. The composition root computes the violations
-	// via ValidateSafetyInvariants at construction; RunCycle/RunCycleFromPhase
-	// fail closed with this before any phase runs (PA-DDK DDK-5, ADR-0060 §1a).
+	// without the integrity floor.
+	//
+	// See ADR-0060.
 	ErrUnsafeConfig = errors.New("core: unsafe transition config")
 )
 
-// IsInfraTeardownError reports whether err is a bridge INFRA teardown — an
-// artifact-wait timeout (ErrArtifactTimeout, exit 81) OR a transient bridge
-// failure (ErrTransientBridgeFailure, exit 80/85/86/124: quota exhaustion,
-// liveness-exhaustion, command-timeout kill; and exit -1 under ctx-cancel: a
-// context-cancellation SIGKILL of the driver — cycle-859). Both end the SESSION
-// without implying the agent failed: it may have written its contracted
-// deliverable before the teardown.
-// The phase runner uses this as the single-source trigger for reconciling
-// against the on-disk deliverable instead of synthesizing FAIL (cycle-254/255
-// timeout false-FAIL; cycle-835 quota false-FAIL). Substantive errors
-// (launch/boot/safety/cost) are NEITHER sentinel and are intentionally excluded —
-// their output is untrustworthy, so those hard-fail without consulting disk.
+// IsInfraTeardownError reports whether err is a bridge infra teardown: an
+// artifact-wait timeout or a transient bridge failure. Both end the session
+// without implying the agent failed.
 func IsInfraTeardownError(err error) bool {
 	return errors.Is(err, ErrArtifactTimeout) || errors.Is(err, ErrTransientBridgeFailure)
 }
 
-// isArtifactTimeout is the timeout-ONLY gate unit 02 (ADR-0103) injects into
-// the failure-diag writer: it decides exit_code 81 and whether a delivery
-// cause may be attributed. Never widen it to the IsInfraTeardownError union
-// (TestTimeoutOnlySites_NotWidenedToUnion pins its body and both injection
-// sites).
+// isArtifactTimeout must never widen to the IsInfraTeardownError union: it
+// feeds only the failure-diagnostic writer's exit_code/delivery-cause
+// attribution, a narrower question than teardown reconciliation.
 func isArtifactTimeout(err error) bool { return errors.Is(err, ErrArtifactTimeout) }
 
-// IsOptionalSkippableError is the FULL admission predicate for
-// optionalInfraSkip's error gate: infra teardown (IsInfraTeardownError — the
-// original Workstream-D class) OR a missing agent persona doc
-// (ErrAgentDocMissing, cycle-1551 — a config defect whose blast radius must
-// not exceed the phase carrying it). Single-sourced beside the sentinels so
-// the dispatch site and its invariant tests share one spelling; widen ONLY
-// alongside a paired incident + regression pin, never ad hoc at a call site.
+// IsOptionalSkippableError is the full admission predicate for
+// optionalInfraSkip's error gate: infra teardown or a missing agent persona
+// doc.
 func IsOptionalSkippableError(err error) bool {
 	return IsInfraTeardownError(err) || errors.Is(err, ErrAgentDocMissing)
 }

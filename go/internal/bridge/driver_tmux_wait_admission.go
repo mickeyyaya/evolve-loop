@@ -44,9 +44,6 @@ func (w replWaiter) admitPrompt(state *replWaitState) int {
 		return ExitOK
 	}
 
-	// Pane echo is heuristic evidence. A new regular artifact on disk proves the
-	// prompt landed even when the input line still looks parked; the completion
-	// detector retains responsibility for its stability window.
 	if path, found := artifactLocate(w.cfg); found {
 		// Match regularFileNonEmpty's no-symlink contract and reject an artifact
 		// that is identical to the pre-dispatch baseline.

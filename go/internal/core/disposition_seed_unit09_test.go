@@ -11,12 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// Test 48 (ADR-0103 unit 09) — the adoption seeder decodes the ancestor ledger
-// through the leaf: a leaf-written ledger with OPEN and FIXED rows seeds only
-// the OPEN ids, byte-identical to the G6 skeleton captured on 8e8f080f; a
-// directory at the ancestor ledger path seeds nothing; and the leaf's Read is
-// Center-free — a carryover lifecycle reading the same broken file reports
-// CARRYOVER_WORKSPACE_READ_FAILED and never an AUDIT_* code.
 func TestSeedDispositionSkeleton_DecodesThroughTheLeaf_AndReadsAreSignalFree(t *testing.T) {
 	root := t.TempDir()
 	ws := RunWorkspacePath(root, 1431)

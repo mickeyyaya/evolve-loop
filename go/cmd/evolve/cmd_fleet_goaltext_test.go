@@ -5,15 +5,6 @@ import (
 	"testing"
 )
 
-// cmd_fleet_goaltext_test.go pins the loop-goaltext-wave-lane-propagation fix
-// (inbox loop-goaltext-not-propagated-to-wave-lanes, weight 0.90): `evolve
-// loop --goal-text` is parsed into loopConfig.GoalText but the wave-launch
-// path never threads it — cmd_loop.go:409 calls productionWaveLauncher with
-// only cfg.GoalHash, so every wave lane whose CycleSpec.OutputContract is
-// empty silently drops the operator's --goal-text. cycleRunArgs is the pure
-// seam where the --goal flag is decided; it grows a new goalText fallback
-// parameter that ONLY applies when outputContract is empty (the per-todo
-// contract must never be overridden).
 func TestCycleRunArgs_FallsBackToLoopGoalText_WhenLaneHasNoOutputContract(t *testing.T) {
 	args := cycleRunArgs("abc123", "", "fix the flaky bridge test", false, "")
 	got := strings.Join(args, " ")
@@ -23,11 +14,6 @@ func TestCycleRunArgs_FallsBackToLoopGoalText_WhenLaneHasNoOutputContract(t *tes
 	}
 }
 
-// TestCycleRunArgs_OutputContractTakesPrecedenceOverGoalText is the guard
-// against the fallback overriding a real per-todo contract: the plan's
-// OutputContract is the lane's binding goal (cmd_fleet.go's existing
-// cycleRunArgs doc) and must win even when an operator-level --goal-text is
-// also present.
 func TestCycleRunArgs_OutputContractTakesPrecedenceOverGoalText(t *testing.T) {
 	args := cycleRunArgs("abc123", "planned removal task", "operator free text goal", false, "")
 	got := strings.Join(args, " ")
@@ -37,9 +23,6 @@ func TestCycleRunArgs_OutputContractTakesPrecedenceOverGoalText(t *testing.T) {
 	}
 }
 
-// TestCycleRunArgs_BothOutputContractAndGoalTextEmpty_OmitsGoalFlag pins the
-// regression-safe baseline (inbox acceptance #3): when neither is set, the
-// argv must be byte-identical to today's output — no fabricated --goal flag.
 func TestCycleRunArgs_BothOutputContractAndGoalTextEmpty_OmitsGoalFlag(t *testing.T) {
 	args := cycleRunArgs("abc123", "", "", false, "")
 	got := strings.Join(args, " ")

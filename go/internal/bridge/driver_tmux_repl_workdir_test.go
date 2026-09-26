@@ -1,23 +1,3 @@
-// driver_tmux_repl_workdir_test.go — CB.2 contract (concurrency campaign W4):
-// the tmux session's working directory is bound at session BIRTH and the
-// silent cwd fallback is fail-closed under fleet mode.
-//
-// Pre-CB.2, runTmuxREPL fell back to os.Getwd() when no worktree was
-// designated — silently launching the agent over WHATEVER directory the
-// dispatching process happened to sit in (under a fleet supervisor that is
-// another run's tree, or main). And the workdir was applied only via a
-// `cd` keystroke AFTER the session existed: a slow/echoing pane could run
-// the CLI from the wrong directory for its first moments (or forever, if
-// the keystroke was swallowed — the codex-menu class). CB.2:
-//
-//  1. EVOLVE_FLEET=1 + empty cfg.Worktree → typed refusal (ExitBadFlags +
-//     errWorktreeRequired), no session ever created. Exit 10 is a
-//     non-trigger code: a config bug must surface, never CLI-fallback.
-//  2. Single mode keeps the cwd fallback for operator ergonomics but WARNs
-//     loudly (once per launch) — the silent part is what dies.
-//  3. Controllers implementing the optional workdirSessionStarter capability
-//     get the workdir passed at new-session time (`tmux new-session -c`);
-//     the `cd` keystroke stays as belt-and-suspenders for both layers.
 package bridge
 
 import (
@@ -29,8 +9,7 @@ import (
 	"testing"
 )
 
-// workdirRecordingTmux implements the CB.2 optional capability and records
-// the workdir the driver passed at session birth.
+// workdirRecordingTmux records the workdir the driver passed at session birth.
 type workdirRecordingTmux struct {
 	*FakeTmuxController
 	bornIn string
@@ -43,7 +22,7 @@ func (w *workdirRecordingTmux) NewSessionIn(ctx context.Context, name string, wi
 
 func TestFleetModeRefusesEmptyWorktree(t *testing.T) {
 	cfg := fixtureConfig(t)
-	cfg.Worktree = "" // no worktree designated
+	cfg.Worktree = ""
 	tm := &FakeTmuxController{CaptureFrames: []string{"❯", "❯"}}
 	deps := fixtureDeps(tm)
 	deps.LookupEnv = mapLookup(map[string]string{"EVOLVE_FLEET": "1"})
@@ -118,7 +97,7 @@ func TestNewSessionBindsWorkdirAtBirth(t *testing.T) {
 	}
 }
 
-// recipeWorkdirTmux gives the recipe-path fake the CB.2 birth-bind capability.
+// recipeWorkdirTmux gives the recipe-path fake the birth-bind capability.
 type recipeWorkdirTmux struct {
 	*fakeTmux
 	bornIn string
@@ -129,9 +108,6 @@ func (w *recipeWorkdirTmux) NewSessionIn(ctx context.Context, name string, width
 	return w.fakeTmux.NewSession(ctx, name, width, height)
 }
 
-// TestRecipeFleetModeRefusesEmptyWorktree: newRecipeDriver is a SECOND launch
-// path with the same silent cwd fallback (review HIGH finding) — under fleet
-// mode it must refuse exactly like runTmuxREPL, before any tmux side effect.
 func TestRecipeFleetModeRefusesEmptyWorktree(t *testing.T) {
 	deps := recipeDeps(&fakeTmux{})
 	deps.LookupEnv = mapLookup(map[string]string{"EVOLVE_FLEET": "1"})
@@ -141,8 +117,6 @@ func TestRecipeFleetModeRefusesEmptyWorktree(t *testing.T) {
 	}
 }
 
-// TestRecipeEnsureSessionBindsWorkdirAtBirth: the recipe session must use the
-// workdirSessionStarter capability when available, like runTmuxREPL.
 func TestRecipeEnsureSessionBindsWorkdirAtBirth(t *testing.T) {
 	wd := t.TempDir()
 	tm := &recipeWorkdirTmux{fakeTmux: &fakeTmux{paneSeq: []string{"❯"}}}
@@ -165,10 +139,6 @@ func TestRecipeEnsureSessionBindsWorkdirAtBirth(t *testing.T) {
 	}
 }
 
-// TestCapabilityAbsentFallsBackToPlainNewSession: a controller WITHOUT the
-// optional capability keeps the exact pre-CB.2 behavior (plain NewSession +
-// cd keystroke) — the optional-interface degradation rule (PaneCommander,
-// windowJiggler precedent).
 func TestCapabilityAbsentFallsBackToPlainNewSession(t *testing.T) {
 	cfg := fixtureConfig(t)
 	tm := &FakeTmuxController{CaptureFrames: []string{"❯", "❯"}}

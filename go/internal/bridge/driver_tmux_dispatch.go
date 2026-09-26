@@ -6,10 +6,9 @@ import (
 	"time"
 )
 
-// dispatchTmuxPrompt snapshots pre-existing completion evidence, applies any
-// one-time REPL seed, and submits the phase prompt. It owns the ordering
-// contract between those operations: the baseline must precede every input,
-// and submit verification must observe the pane only after the REPL redraws.
+// dispatchTmuxPrompt requires the completion-evidence baseline to be captured
+// before any input, and submit verification to observe the pane only after
+// the REPL redraws.
 func dispatchTmuxPrompt(
 	ctx context.Context,
 	cfg *Config,

@@ -9,16 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// Workstream F unit tests for the ollama-tmux driver.
-//
-// Three property layers:
-//   1. Driver registration + manifest realization (cheap, hermetic).
-//   2. Write-phase rejection (the load-bearing design constraint).
-//   3. Real-CLI ground truth, gated on ollama installed (skipped on CI).
-
-// TestOllamaTmux_DriverRegistered pins that the package init() registered
-// ollama-tmux under the canonical name. Mirrors the registration check the
-// other tmux peers get.
 func TestOllamaTmux_DriverRegistered(t *testing.T) {
 	d, ok := LookupDriver("ollama-tmux")
 	if !ok {
@@ -29,15 +19,6 @@ func TestOllamaTmux_DriverRegistered(t *testing.T) {
 	}
 }
 
-// TestOllamaTmux_ManifestRealizesYoloOnly is the realizer contract after the
-// cycle-124 G1a wire-up: ollama-tmux declares all params channel:noop EXCEPT
-// session_mode (controller), so the params table contributes NOTHING to
-// LaunchFlags for a typical LaunchIntent — but manifest.default_args =
-// ["--experimental-yolo"] now lands in LaunchFlags (cycle-124 activated the
-// previously-dead default_args channel in Realize()). The model still
-// composes positionally in the driver, not via the realizer; the realized
-// --experimental-yolo flag is threaded through cfg.Realization.LaunchFlags
-// into ollamaComposeLaunchCmd's extras tail (after the positional model).
 func TestOllamaTmux_ManifestRealizesYoloOnly(t *testing.T) {
 	intent := LaunchIntent{
 		ModelTier:     "sonnet",
@@ -50,10 +31,6 @@ func TestOllamaTmux_ManifestRealizesYoloOnly(t *testing.T) {
 	}
 }
 
-// TestOllamaTmux_RejectsWritePhase is the load-bearing design constraint:
-// plain `ollama run` has no agentic tool use (no Bash/Edit/Write), so
-// assigning it to a source-writing phase (cfg.Worktree != "") is a config
-// error — fail loud, do NOT silently run a phase that can't succeed.
 func TestOllamaTmux_RejectsWritePhase(t *testing.T) {
 	var stderr strings.Builder
 	deps := Deps{Stderr: &stderr}.withDefaults()
@@ -61,7 +38,7 @@ func TestOllamaTmux_RejectsWritePhase(t *testing.T) {
 		CLI:      "ollama-tmux",
 		Model:    "llama3.1:8b",
 		Agent:    "build",
-		Worktree: "/abs/wt/cycle-5", // non-empty = source-writing phase
+		Worktree: "/abs/wt/cycle-5",
 	}
 	rc, err := ollamaTmuxDriver{}.Launch(context.Background(), cfg, deps)
 	if err == nil {
@@ -81,17 +58,9 @@ func TestOllamaTmux_RejectsWritePhase(t *testing.T) {
 	}
 }
 
-// TestOllamaTmux_AcceptsReasoningPhase is the positive case: a reasoning
-// phase (no worktree set by the orchestrator) passes the gate. We can't
-// proceed past `tmuxNonClaudePreflight` without real tmux + ollama, but the
-// rejection branch is the only one we need to prove here — the rest is
-// inherited from the shared runTmuxREPL plumbing the other tmux drivers test.
 func TestOllamaTmux_AcceptsReasoningPhase_RejectionDoesNotFire(t *testing.T) {
-	// A bogus binary (BRIDGE_TESTING=1 + an override that doesn't exist)
-	// forces tmuxNonClaudePreflight to short-circuit before launching real
-	// tmux. The point of the assertion is the ABSENCE of the
-	// "source-writing phase" rejection — anything else (binary missing,
-	// preflight degraded) is acceptable for this slice.
+	// A bogus binary forces tmuxNonClaudePreflight to short-circuit before
+	// launching real tmux, so only the rejection's ABSENCE is asserted here.
 	var stderr strings.Builder
 	deps := Deps{
 		Stderr: &stderr,
@@ -104,7 +73,7 @@ func TestOllamaTmux_AcceptsReasoningPhase_RejectionDoesNotFire(t *testing.T) {
 		CLI:      "ollama-tmux",
 		Model:    "llama3.1:8b",
 		Agent:    "review",
-		Worktree: "", // reasoning phase — no worktree
+		Worktree: "",
 	}
 	_, _ = ollamaTmuxDriver{}.Launch(context.Background(), cfg, deps)
 	if strings.Contains(stderr.String(), "source-writing phase") {
@@ -112,10 +81,6 @@ func TestOllamaTmux_AcceptsReasoningPhase_RejectionDoesNotFire(t *testing.T) {
 	}
 }
 
-// TestOllamaTmux_RealCLI_BootMarkerDetected is the real-CLI ground-truth
-// test, gated on `ollama` being installed. Verifies the `>>> ` prompt
-// marker really does appear (not a docs-only claim) and a `/bye` exits
-// cleanly. Skipped automatically in CI environments without ollama.
 func TestOllamaTmux_RealCLI_BootMarkerDetected(t *testing.T) {
 	if _, err := exec.LookPath("ollama"); err != nil {
 		t.Skip("ollama not installed; skipping real-CLI ground-truth test")
@@ -123,11 +88,10 @@ func TestOllamaTmux_RealCLI_BootMarkerDetected(t *testing.T) {
 	if _, err := exec.LookPath("tmux"); err != nil {
 		t.Skip("tmux not installed; skipping real-CLI ground-truth test")
 	}
-	// We don't actually invoke the driver against a real model here (would
-	// require a pulled model + boot time + flaky on shared hosts). The
-	// real-CLI flow is exercised by the broader real-tmux integration
-	// suite when EVOLVE_BRIDGE_INTEGRATION_LIVE=1 is set; this test only
-	// proves the binary is on PATH so the registration is reachable.
+	// This only proves the binary is reachable; it does not invoke the driver
+	// against a real model (needs a pulled model and boot time, and flakes on
+	// shared hosts). The real-CLI flow runs under the real-tmux integration
+	// suite (EVOLVE_BRIDGE_INTEGRATION_LIVE=1).
 	d, ok := LookupDriver("ollama-tmux")
 	if !ok {
 		t.Fatal("ollama-tmux driver missing despite host having both binaries")
@@ -135,9 +99,6 @@ func TestOllamaTmux_RealCLI_BootMarkerDetected(t *testing.T) {
 	_ = d // touch to silence linter
 }
 
-// TestOllamaTmux_LaunchCmdComposition pins the launch-line contract via the
-// SHARED ollamaComposeLaunchCmd — the driver and this test call the same
-// function, so a future driver-side change can't silently drift past this pin.
 func TestOllamaTmux_LaunchCmdComposition(t *testing.T) {
 	cases := []struct {
 		name      string
@@ -158,41 +119,28 @@ func TestOllamaTmux_LaunchCmdComposition(t *testing.T) {
 	}
 }
 
-// TestOllamaTmux_LaunchCmd_AppendsExtrasAfterModel pins the cycle-124 G1a
-// contract: `ollama run <model>` is followed by manifest default_args (and
-// any operator raw extras) in the launch line, AFTER the positional model.
-// Order is load-bearing — ollama's CLI parses `ollama run <model>` as a
-// subcommand-with-positional; flags before the model would be misparsed.
 func TestOllamaTmux_LaunchCmd_AppendsExtrasAfterModel(t *testing.T) {
 	got := ollamaComposeLaunchCmd("ollama", "llama3.1:8b", []string{"--experimental-yolo"})
 	want := "ollama run llama3.1:8b --experimental-yolo"
 	if got != want {
 		t.Errorf("got %q, want %q (extras must follow positional model)", got, want)
 	}
-	// Empty / nil extras MUST be byte-identical to the pre-extras signature.
 	if cmd := ollamaComposeLaunchCmd("ollama", "llama3.1:8b", nil); cmd != "ollama run llama3.1:8b" {
 		t.Errorf("nil extras must produce pre-fix shape; got %q", cmd)
 	}
 	if cmd := ollamaComposeLaunchCmd("ollama", "llama3.1:8b", []string{}); cmd != "ollama run llama3.1:8b" {
 		t.Errorf("empty extras must produce pre-fix shape; got %q", cmd)
 	}
-	// Multiple extras append in order with single-space separators.
 	multi := ollamaComposeLaunchCmd("ollama", "m", []string{"--a", "--b", "--c"})
 	if multi != "ollama run m --a --b --c" {
 		t.Errorf("multi-extras: got %q, want %q", multi, "ollama run m --a --b --c")
 	}
-	// Empty string in extras is skipped (defensive).
 	skipped := ollamaComposeLaunchCmd("ollama", "m", []string{"--a", "", "--b"})
 	if skipped != "ollama run m --a --b" {
 		t.Errorf("empty-string extras must be skipped; got %q", skipped)
 	}
 }
 
-// TestOllamaTmux_CompositionPinsDriverInvariant is a structural pin: the
-// driver MUST compose `<binary> run <model>` — never just `<binary>`, never
-// `-m`, never positional after extra flags. Because we call the SAME
-// ollamaComposeLaunchCmd the driver uses, any drift in the function body
-// fails this pin.
 func TestOllamaTmux_CompositionPinsDriverInvariant(t *testing.T) {
 	got := ollamaComposeLaunchCmd("ollama", "test-model:tag", nil)
 	if !strings.HasPrefix(got, "ollama run ") {
@@ -204,11 +152,6 @@ func TestOllamaTmux_CompositionPinsDriverInvariant(t *testing.T) {
 	}
 }
 
-// TestOllamaTmux_RejectsShellInjectionInModelTag is the cycle-119-class
-// security pin: the launchCmd reaches the shell via tmux send-keys (NOT
-// exec), so an unvalidated model tag like `llama3.1:8b; rm -rf /` would
-// execute the trailing command. The driver MUST reject any tag containing
-// shell-special chars before composing the launch line.
 func TestOllamaTmux_RejectsShellInjectionInModelTag(t *testing.T) {
 	bad := []string{
 		"llama3.1:8b; rm -rf /",
@@ -227,7 +170,6 @@ func TestOllamaTmux_RejectsShellInjectionInModelTag(t *testing.T) {
 				CLI:   "ollama-tmux",
 				Model: model,
 				Agent: "review",
-				// reasoning phase (no worktree) so we reach the model-tag check
 			}
 			rc, err := ollamaTmuxDriver{}.Launch(context.Background(), cfg, deps)
 			if err == nil {
@@ -243,10 +185,8 @@ func TestOllamaTmux_RejectsShellInjectionInModelTag(t *testing.T) {
 	}
 }
 
-// Defensive: the driver passes context.Context through. Pin that.
 func TestOllamaTmux_LaunchSignatureMatchesDriver(t *testing.T) {
 	var _ Driver = ollamaTmuxDriver{}
-	// Also sanity-check that the runtime type embeds nothing we don't want.
 	want := ollamaTmuxDriver{}.Name()
 	if d, ok := LookupDriver("ollama-tmux"); ok {
 		if d.Name() != want {
@@ -255,9 +195,6 @@ func TestOllamaTmux_LaunchSignatureMatchesDriver(t *testing.T) {
 	}
 }
 
-// Sanity: PhaseRequest carries Worktree through, so the reject-write-phase
-// guard fires on a real cycle if the orchestrator routes a write phase to
-// ollama-tmux. This pin is the cross-package smoke between core + bridge.
 func TestOllamaTmux_WorktreeFromPhaseRequest(t *testing.T) {
 	// PhaseRequest.Worktree is the non-bridge mirror of cfg.Worktree.
 	var pr core.PhaseRequest

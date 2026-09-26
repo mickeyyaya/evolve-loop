@@ -1,11 +1,5 @@
 package main
 
-// cmd_inbox_quarantine_test.go — the coverage-gate CRITICAL remediation for
-// cycle-1019 (its report prescribed exactly these three groups): the
-// `evolve inbox quarantine` operator surface, the isTaskLevelFailure
-// classification the S5 quarantine decision hinges on, and the runInbox
-// dispatch wiring. Salvaged console-first from the preserved worktree.
-
 import (
 	"bytes"
 	"encoding/json"
@@ -53,7 +47,6 @@ func TestRunInboxQuarantine_ListEmptyPopulatedAndJSON(t *testing.T) {
 	if code != 0 || !strings.Contains(out, "poison-alpha") {
 		t.Fatalf("populated list: code=%d out=%q", code, out)
 	}
-	// --json emits a decodable array carrying the item.
 	code, out, _ = runQuarantineCLI(t, root, "list", "--json")
 	if code != 0 {
 		t.Fatalf("json list: code=%d", code)
@@ -62,7 +55,6 @@ func TestRunInboxQuarantine_ListEmptyPopulatedAndJSON(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &items); err != nil || len(items) != 1 {
 		t.Fatalf("json list not decodable single item: %v %q", err, out)
 	}
-	// Unknown flag is a usage error.
 	if code, _, eb := runQuarantineCLI(t, root, "list", "--nope"); code != 10 || !strings.Contains(eb, "unknown arg") {
 		t.Fatalf("unknown list arg: code=%d stderr=%q", code, eb)
 	}
@@ -78,7 +70,6 @@ func TestRunInboxQuarantine_ReleaseSuccessAndMissing(t *testing.T) {
 	if !strings.Contains(out, "released poison-beta") {
 		t.Fatalf("release output: %q", out)
 	}
-	// The item is back at the inbox root with its failure count reset.
 	raw, err := os.ReadFile(filepath.Join(root, ".evolve", "inbox", "poison-beta.json"))
 	if err != nil {
 		t.Fatalf("released item not at inbox root: %v", err)
@@ -88,11 +79,9 @@ func TestRunInboxQuarantine_ReleaseSuccessAndMissing(t *testing.T) {
 	if fc, _ := m["failure_count"].(float64); fc != 0 {
 		t.Fatalf("failure_count not reset on release: %v", m["failure_count"])
 	}
-	// Missing id fails loudly, exit 1.
 	if code, _, eb := runQuarantineCLI(t, root, "release", "no-such-id"); code != 1 || eb == "" {
 		t.Fatalf("missing id: code=%d stderr=%q", code, eb)
 	}
-	// Empty id is a usage error.
 	if code, _, _ := runQuarantineCLI(t, root, "release"); code != 10 {
 		t.Fatalf("bare release: code=%d", code)
 	}
@@ -108,9 +97,6 @@ func TestRunInboxQuarantine_UsageAndUnknown(t *testing.T) {
 	}
 }
 
-// TestIsTaskLevelFailure_AllClassifications pins AC4 (S3 precedence): ONLY
-// genuine per-task defect classes quarantine; infrastructure and
-// system/kernel classes never do — they take the S3 halt path instead.
 func TestIsTaskLevelFailure_AllClassifications(t *testing.T) {
 	cases := []struct {
 		c    cycleclassify.Classification
@@ -129,8 +115,6 @@ func TestIsTaskLevelFailure_AllClassifications(t *testing.T) {
 	}
 }
 
-// TestRunInbox_DispatchesQuarantine pins the ONLY wiring between the CLI and
-// runInboxQuarantine.
 func TestRunInbox_DispatchesQuarantine(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("EVOLVE_PROJECT_ROOT", root)

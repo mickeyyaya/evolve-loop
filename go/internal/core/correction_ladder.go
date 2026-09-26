@@ -1,26 +1,5 @@
 package core
 
-// correction_ladder.go — ADR-0045 I2: the orchestrator-side executors for the
-// graduated correction ladder (the DECISION lives in interaction.NextCorrection,
-// a pure leaf). Rung 1 (salvage) turns the cycle-265 class — a valid
-// deliverable at the wrong path, burned through two full re-dispatches — into
-// an atomic relocate + breaker-neutral verify, no agent involved. Rung 3's
-// directive is enriched with kernel-verified evidence so correction attempts
-// stop retrying blind (cycle-265: attempt 2 carried only the violation text).
-//
-// Salvage safety posture (threat S2 — salvage as a smuggling vector):
-//   - candidates are constructed by the KERNEL from the phase's own roots
-//     (worktree, workspace, cwd) + the CONTRACTED basename — never from agent
-//     input, so traversal cannot be steered;
-//   - lstat gate: only regular files move (a planted symlink at the stray
-//     location must not be followed into the contracted path);
-//   - size + staleness caps bound what a hostile or ancient stray can inject;
-//   - relocate FIRST, verify the DESTINATION after (TOCTOU: the pre-move copy
-//     is never the trusted artifact — what landed at the contracted path is
-//     what gets verified and gated);
-//   - salvage NEVER upgrades a verdict: a verified relocation still faces the
-//     review gate (the breaker-touching FINAL outcome) like any native artifact.
-
 import (
 	"context"
 	"fmt"
@@ -183,9 +162,9 @@ func fileSalvageable(path string, now time.Time) (ok bool, reason string) {
 }
 
 // kernelEvidenceDigest composes the rung-3 directive's evidence block from
-// kernel-verified facts only (design principle #1: external, unfakeable —
-// never agent self-assessment): the worktree's git-status NAMES and, when
-// rung 1 found-but-couldn't-validate a stray, its original path. Compact by
+// kernel-verified facts only — external and unfakeable, never agent
+// self-assessment: the worktree's git-status NAMES and, when rung 1
+// found-but-couldn't-validate a stray, its original path. Compact by
 // construction (ACI): name-level only, capped, never file contents.
 func kernelEvidenceDigest(worktree, foundButInvalid string) string {
 	var b strings.Builder

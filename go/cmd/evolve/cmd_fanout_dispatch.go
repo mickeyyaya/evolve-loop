@@ -11,8 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// runFanoutDispatch is the `evolve fanout-dispatch [--cache-prefix-file=PATH] <cmds> <results>` subcommand.
-// Ports legacy/scripts/dispatch/fanout-dispatch.sh.
 func runFanoutDispatch(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	var pos []string
 	var cachePrefix string
@@ -60,10 +58,8 @@ func runFanoutDispatch(args []string, _ io.Reader, stdout, stderr io.Writer) int
 	cfg.CommandsFile = pos[0]
 	cfg.ResultsFile = pos[1]
 	cfg.CachePrefixFile = cachePrefix
-	// CycleStateHelperBin intentionally left unset (zero value disables
-	// worker-status tracking). The legacy bash probe that pointed at
-	// legacy/scripts/lifecycle/cycle-state.sh was removed in v12 (ADR-0062/T1.7);
-	// the generic Config.CycleStateHelperBin seam remains for callers that inject
+	// CycleStateHelperBin is intentionally left unset: the zero value disables
+	// worker-status tracking, and the seam remains for callers that inject
 	// their own helper.
 	return fanoutdispatch.Run(cfg, stderr)
 }

@@ -123,6 +123,37 @@ Wave 14 (cycles 1708 and 1709) failed with every CLI family walled: claude-tmux 
 
 Q1–Q3 land before the next soak wave; Q4 is a routing hygiene follow-up. None of them changes a verdict: a capacity wall stays a deferral, a credential wall becomes an operator halt, and the FAIL streak counts logic.
 
+### 5.6 A pin without an inbox item (the wave-15 deep-dive)
+
+Wave 15 (cycles 1712 and 1713) was the first wave on the P3/Q1/Q2 train. Lane 1713 was pinned to `gittest-fixture-centralize`, sealed `SKIPPED_UNKNOWN` with `triage-empty-commitment` and shipped nothing, and the same pin had already cost 1709 and 1710. The chain, from the run dirs:
+
+| Cycle | Lane pin | Decision | End |
+|---|---|---|---|
+| 1706 | `tempdir-cleanup-vs-git-flake` | `top_n: [gittest-fixture-centralize]`: an id triage authored, with no inbox item behind it | shipped 51edfb7f; the promote no-op'd ("not found: already moved?") |
+| 1709 | `gittest-fixture-centralize` | `top_n: [fromgit-test-gittest-migration, treestate-test-gittest-migration]`: two more authored ids | deferred on capacity (exit 85) |
+| 1710 | `gittest-fixture-centralize` | none | deferred |
+| 1713 | `gittest-fixture-centralize` | first report: `## superseded` with nothing under it, declined ("states neither cards nor none"), so `missing_secondary` and a correction; second report: `dropped: already-shipped: 51edfb7f` | planned no-work |
+
+Two defects, one of form and one of lifecycle, neither of logic:
+
+- **H1b: an empty optional bucket is no cards.** The strict reader (H1) accepted a present bucket only when it stated cards or `none`; a heading followed directly by the next heading is what an agent writes when it has nothing to say, and declining it turned a complete answer into a gate rejection and a re-dispatch. `deferred`, `dropped` and `superseded` left empty now derive to `[]`; `top_n` left empty is still a missing commitment and still declines, because an absent or empty `top_n` must never read as "commit to nothing" by accident (the invariant H1 already pinned for the absent case).
+- **W1: an id no inbox item backs leaves no retirement evidence.** Every retirement door tolerates such an id by doing nothing: `Promote` no-ops ("a missing item never blocks the ship"), `RecordRootTaskFailure` no-ops, `ClaimLaneScope` skips with a WARN, and the no-work closeout treats it as "simply gone". Every reader that decides whether to run the id again reads the same inbox lifecycle and, by design, keeps an id with no evidence: the wave planner's prune fails open (over-pruning starves the wave) and the launcher's freshness probe calls it fresh (not every planned id is inbox-backed). So the moment triage authors an id and the cycle ships it, nothing in the system can ever say the id is done, and the prior-decision carry re-pins it into a lane every wave until a lane's triage happens to drop it, and even that drop reaches no reader. Three lanes went to it in one soak.
+
+The design keeps one source of truth. The two doors where such an id is finished write the evidence the readers already consult, as a record in the retirement dir `Promote` would have moved the item to:
+
+| Door | When | Record | Reason |
+|---|---|---|---|
+| the PASS seam (`ApplyCycleOutcome`, through ship's post-commit closeout) | a committed id `Promote` could not move and no inbox item backs | `processed/cycle-N/<sha8>-<id>.json` | `ship-promote-processed: no inbox item backs the id` |
+| the planned no-work closeout (`ApplyNoWork`) | every scoped id no inbox item backs, answered or not | `rejected/cycle-N/<id>.json` | the lane's own answer (`lane triage (cycle N) dropped: already-shipped: 51edfb7f`) or `the lane's triage answered for nothing` |
+
+`inboxmover.RetireUnbacked` is the one door and writes only for an id whose `ResolveDispatchState` is unknown, so an inbox-backed item keeps its own lifecycle (a no-work lane routes it to the console in place and never retires it: the anti-laundering rule stands) and an already retired id is never written twice. The record carries `id`, `unbacked: true`, `retired_reason`, `retired_cycle` and the ship sha, is found by `FindFileByTaskID` like any item, and the plan-time prune and the dispatch-time probe drop the id on their next read. A FAIL writes nothing: the id must stay retryable.
+
+What W1 does not fix: a failing authored id still has no durable failure count, so the S5 retry ceiling cannot reach it (W2, designed). The lane pin that started the chain (1706 committing an id other than its pin) is triage's choice and stays legal; the retirement makes it finite.
+
+**X1: a host-owned inbox record is not the builder's to explain.** Lane 1712 (the third cycle on `lineage-datestamp-normalization`, after 1707 and 1708) sealed FAIL with the code verified: ACS 10/10, EGPS red 0, a mutation probe that catches a partial fix. The one defect was a sentence in the explanation document. The chain: the build floor's material-path set included `.evolve/inbox/2026-08-05T15-30-00Z-lineage-datestamp-normalization.json` (twelve corrections across the lane's three cycles demanded that path), the builder wrote "content unchanged" for the item it moved to `consumed/`, the ship's in-commit consumption then stamped that file with a `consumed` block (`via: ship`), and the auditor's explanation review found the sentence contradicted by the diff (`NEEDS_CORRECTION`), which ADR-0102 turns into the audit's FAIL. The builder was made to describe an effect the host produces after the build and was judged on it. `nonMaterialPrefixes` exempted `.evolve/runs/`, `.evolve/worktrees/` and `.evolve/evals/` and not `.evolve/inbox/`, whose records the host claims, moves, stamps and retires; it now does (`TestMaterialPaths_InboxLifecycleRecordsAreTheHosts`). The auditor reads the same host-derived set, so the review has nothing to demand for the path either.
+
+**X2 (designed): an inaccurate explanation of a verified build is a form failure.** ADR-0102 made the auditor's honest `NEEDS_CORRECTION` force the audit's FAIL so that the document could not be waved through. Under this policy the judgment stays and the verdict changes: when the code is verified and the review names only the document, the correction is a recovery rung on the document (the recovery agent of F4/F6, or the host for a mechanical claim such as a rename's similarity), re-reviewed, and the cycle ships; only a review that names the code blocks. X1 removes the manufactured case; X2 removes the class.
+
 ## 6. Decision tables
 
 ### 6.1 Routing by violation code (`deliverable`, beside the codes)
@@ -175,6 +206,7 @@ Status: **shipped** (commit on a branch, PR open or merged) · **built** (green 
 | Id | Component | Status | Where |
 |---|---|---|---|
 | H1 | one triage-report reader: `Derive` (strict) and `Project` (lenient); `triagecap` delegates; one stamp `projected_by_orchestrator`; protected surface | merged, #656 | `internal/triagedecision` |
+| H1b | an empty optional bucket (`deferred`, `dropped`, `superseded`) derives to no cards; an empty `top_n` still declines | shipped | `internal/triagedecision` |
 | H2 | registry `outputs.derived_from`; the host derives an absent or empty declared secondary after the effects, before the judges, waiting out a write in flight | merged, #656 | `deliverable/host_effects.go`, `phasespec`, `phasecontract`, `phase-registry.json` |
 | H3 | the `## Explanation Documentation` declaration derived by the host | designed | `deliverable/host_effects.go`, `explanationdocs` |
 
@@ -221,6 +253,15 @@ Status: **shipped** (commit on a branch, PR open or merged) · **built** (green 
 | L1 | recovered paths and the evidence verdict in `CycleResult.Remediations`, the dossier, the audit prompt, and an in-file marker | designed | `core/`, `dossier/`, the audit prompt |
 | L2 | recovery-rung exhaustion recorded as a system-level pipeline defect; breakers unchanged; an exhausted assign-back stays the task's logic FAIL | designed | `core/blocker_breaker.go`, the retro paths |
 
+### 7.7 Lane lifecycle (W) and the explanation document (X)
+
+| Id | Component | Status | Where |
+|---|---|---|---|
+| W1 | a shipped or declined id no inbox item backs is retired by record: `lifecycle.(*Mover).RetireUnbacked` writes it, `inboxmover.RetireUnbacked` is the one door (unknown dispatch state only), the PASS seam retires what `Promote` could not move (`OutcomeResult.RetiredUnbacked`, processed) and the no-work closeout retires every such scoped id (`NoWorkResult.Retired`, rejected, the lane's answer as the reason); the planner's prune and the freshness probe read the record | shipped | `internal/inboxmover`, `internal/inboxmover/lifecycle`, `internal/cycleoutcome`, `internal/phases/ship` |
+| W2 | a failing authored id accrues a durable failure count toward the S5 ceiling | designed (§5.6) | `internal/inboxmover` |
+| X1 | `.evolve/inbox/` is non-material to the explanation document: the host claims, moves, stamps and retires those records | shipped | `internal/explanationdocs` |
+| X2 | an explanation review that names only the document of a verified build is a recovery rung, never the audit's FAIL | designed (§5.6) | `phases/audit/explanation_review_gate.go`, the recovery agent (F4/F6) |
+
 ## 8. Interfaces
 
 Shipped signatures are exact; designed ones are the contract the component must meet.
@@ -233,6 +274,7 @@ func SectionBody(report, heading string) (string, bool)
 func ParseSection(body string) Section // Items, Rejected, Prose, None
 func ActionOf, ReasonOf(rest string) string; FilesOf(rest string) []string
 func SplitDeclaredFiles(rest string) (tokens []string, stripped string); DeclaredFilePath(tok string) (string, bool)
+// H1b (shipped): section(report, name, strict, required) reads an empty optional bucket as no cards; Section.empty()
 
 // H2 — registry and contract (shipped)
 phasespec.IO.DerivedFrom map[string]string          // outputs.derived_from: owed basename → primary basename
@@ -257,6 +299,16 @@ func Block(f Facts) string // "" without Agent and Session
 
 // P4 — internal/bridge/launchoutcome (shipped)
 // exit 85: cause_code = the escalation pattern (rate_limit, model_unsupported, …) or unknown_prompt
+
+// W1 — internal/inboxmover/lifecycle (shipped)
+func (m *Mover) RetireUnbacked(taskID, newState string, p PromoteOpts, reason string) (string, error) // processed|rejected; <state>/cycle-N/[<sha8>-]<id>.json; plain ids only
+// W1 — internal/inboxmover (shipped)
+func RetireUnbacked(opts Options, cycle int, state, reason, commitSHA string, ids []string) ([]string, error) // only ids whose dispatch state is unknown
+OutcomeResult.RetiredUnbacked []string // the PASS seam: committed ids Promote could not move and no inbox item backs
+// X1 — internal/explanationdocs (shipped): nonMaterialPrefixes gains ".evolve/inbox/"
+// W1 — internal/cycleoutcome (shipped)
+type NoWorkResult struct{ Routed, Retired []string }
+func ApplyNoWork(in NoWorkInputs) (NoWorkResult, error) // every scoped id no inbox item backs is retired as rejected
 
 // E1 — internal/evidence (designed)
 type Input struct{ Phase, Workspace, Worktree, BaseSHA string; Kind string; Acceptance []string; DecisionSections []string; /* host results injected */ }
@@ -300,6 +352,7 @@ Cycles ~1550–1707 (the inventory gathered for ADR-0106):
 | an agent refused its own task as an intruder (1707 TDD) | process | ~1 hour | P3, the persona's identity statement |
 | a correction that touched only the explanation document left the primary unrewritten, so the finished phase idled through a review interval (1707 build) | process | ~20 min | F0; completion on the corrected file |
 | a passed build aborted when the explanation floor exhausted its correction budget (1707, after a rebase and a passed re-audit) | form | the cycle | F0, E1/E2 |
+| a verified build (ACS 10/10, EGPS red 0, mutation probe) sealed FAIL because the explanation document's sentence about a host-consumed inbox record contradicted the consumption stamp (1712 audit; the floor demanded the path twelve times across 1707, 1708 and 1712) | form | the cycle | X1 (shipped), X2 |
 
 No `missing_section` or `bad_verdict` rejection is recorded in the range, so the recovery agent (F4/F6) lands last, after H1/H2 and the evidence decision are measured again.
 
@@ -345,6 +398,7 @@ Merges happen only at wave boundaries. Each step is its own PR; each component i
 | 2026-09-26 | code-reviewer (train) | WARNING | the derivation's write-in-flight grace (MAJOR) applied; the duplicate projector absorbed |
 | 2026-09-26 | security-reviewer (train) | BLOCK → APPROVE-WITH-MINOR | unfenced boundary; allowed-path type check; no network declared; anchored markers; three gaps filed |
 | 2026-09-27 | code-simplifier, go-reviewer, code-reviewer (Q2) | no edits; WARNING → fixed; WARNING → fixed | a login pane's stale reset hint never sets the bench; the fix names no login command (the families' logins differ); a credential bench holds for routing until a probe clears it; the fix is durable on the bench entry; the design rows state the shipped shape and its trade-offs |
+| 2026-09-27 | code-simplifier, go-reviewer, code-reviewer (W1, H1b) | one gofmt alignment; PASS with three MINORs → applied; PASS with two MINORs → one applied | a present item whose move fails is never stamped unbacked (regression test); the lock-free write is an idempotent create, said in one line; the no-work closeout logs what it routed and retired; the plain-id guard is the one place a path is built from a caller's id |
 | 2026-09-27 | code-simplifier, go-reviewer, code-reviewer (Q1) | one closure; APPROVE-WITH-MINOR → applied; WARNING → justified and fixed | the one-sample reading of a walled `Run` stated in code and §12; the deferral records the phase's total dispatches; the digest assertion made non-vacuous |
 | 2026-09-27 | code-simplifier, go-reviewer, code-reviewer, security-reviewer (P3) | no edits; APPROVE; WARNING → fixed; APPROVE-WITH-MINOR → hardened | the sole-writer line was false for stdout-completion phases (fixed); a manifest `default_env` could set credential or loop variables the guards never see (refused at parse); facts rendered into the block are sanitized; no manifest pattern may match the block (pinned) |
 | 2026-09-26 | consistency audit (every doc vs the design vs the shipped code) | INCONSISTENCIES-FOUND → fixed | three stale package pages, one stale sentence in phase-architecture.md, one imprecise ADR sentence; two new package pages |
@@ -362,3 +416,4 @@ Merges happen only at wave boundaries. Each step is its own PR; each component i
 | 2026-09-27 | Q1 shipped on the P3 train: five tests pin the three seams and the negative case; eleven mutants killed; `isQuotaWall` reads the runner's exit 85 alone, because the sentinel half of the check had no caller (a mutant proved it). |
 | 2026-09-27 | §5.5 and §7.5: the wave-14 deep-dive (three consecutive FAILs: 1707 form, 1708 and 1709 capacity) designs Q1–Q4 — capacity is a deferral through the one seam that already exists, a credential wall is an operator halt, and neither counts toward the FAIL streak. |
 | 2026-09-27 | P3 shipped: §5.4 records the design (driver-appended statement; environment channel over a settings flag; what it does not fix); §8 signatures; §12 the other-CLIs question. Wave 14 (1708, 1709) failed on capacity — every CLI family walled (`auth_recheck`, `rate_limit`, `model_unsupported`) — with `cause_code` naming each pattern, the live proof of P4. |
+| 2026-09-27 | §5.6 and §7.7: the wave-15 deep-dive (1713 planned no-work on a pin shipped by 1706 and carried through 1709 and 1710) designs and ships W1, the retirement record for an id no inbox item backs, and H1b, an empty optional bucket read as no cards, and X1, the inbox record made non-material to the explanation document (1712's verified build sealed FAIL on one sentence about a host-stamped file); §8 signatures; W2 and X2 designed |

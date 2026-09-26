@@ -1,13 +1,3 @@
-// driver_tmux_repl_runscope_test.go — CB.5 contract (concurrency campaign
-// W4), bridge half: tmux sessions are RUN-SCOPED.
-//
-//  1. Names carry the run token: evolve-bridge-r<runid8>-c<cycle>-<agent>-…
-//     so observers/watchers can ASSERT ownership (CB.6) and a human reading
-//     `tmux ls` during an M-run fleet sees which run owns what. RunID=""
-//     keeps the legacy name byte-identical (single-driver mode unchanged).
-//  2. Every ephemeral session is RECORDED in the per-run registry
-//     (<workspace>/tmux-sessions.jsonl) at creation, so run teardown reaps
-//     exactly what this run created — by registry, never by glob.
 package bridge
 
 import (
@@ -41,9 +31,6 @@ func TestResolveSessionRunScopedPrefix(t *testing.T) {
 	}
 }
 
-// TestLaunchRecordsSessionInRunRegistry: the driver appends a record for the
-// session it creates, into the run's own registry file, before the launch
-// completes — so even a crash mid-phase leaves the session reapable.
 func TestLaunchRecordsSessionInRunRegistry(t *testing.T) {
 	cfg := fixtureConfig(t)
 	cfg.RunID = "01ARZ3NDEKTSV4RRFFQ69G5FAV"
@@ -69,10 +56,6 @@ func TestLaunchRecordsSessionInRunRegistry(t *testing.T) {
 	}
 }
 
-// TestRecipeEnsureSessionRecordsInRunRegistry: the recipe path is a second
-// session-creation surface (review HIGH on this slice) — a crash between
-// EnsureSession and the caller's deferred KillSession would leak an
-// unrecorded session, the exact pre-CB.5 state.
 func TestRecipeEnsureSessionRecordsInRunRegistry(t *testing.T) {
 	ws := t.TempDir()
 	tm := &fakeTmux{paneSeq: []string{"❯"}}
@@ -106,8 +89,6 @@ func (d runIDPinDriver) Launch(_ context.Context, cfg *Config, _ Deps) (int, err
 	return ExitOK, nil
 }
 
-// TestEngineLaunchThreadsRunID: BridgeRequest.RunID → --run-id arg →
-// parseLaunchArgs → Config.RunID, through the real Engine.Launch pipeline.
 // Not parallel: mutates the global driver registry.
 func TestEngineLaunchThreadsRunID(t *testing.T) {
 	var got string

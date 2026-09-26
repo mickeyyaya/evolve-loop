@@ -25,13 +25,11 @@ func TestRunTmuxREPL_PauseWritesEscalationReport(t *testing.T) {
 		t.Fatalf("exit = %d, want %d (ExitArtifactTimeout after pause); stderr=%q", code, ExitArtifactTimeout, stderr)
 	}
 
-	// Verify escalation-report.json exists in workspace
 	reportPath := filepath.Join(fx.ws, "scout-escalation-report.json")
 	if _, err := os.Stat(reportPath); err != nil {
 		t.Fatalf("escalation report %s does not exist: %v", reportPath, err)
 	}
 
-	// Read and parse report
 	data, err := os.ReadFile(reportPath)
 	if err != nil {
 		t.Fatalf("failed to read escalation report: %v", err)
@@ -71,7 +69,6 @@ func TestRunTmuxREPL_ExtendNoEscalationReport(t *testing.T) {
 		t.Fatalf("exit = %d, want 0 (success); stderr=%q", code, stderr)
 	}
 
-	// Verify escalation-report.json does NOT exist in workspace
 	reportPath := filepath.Join(fx.ws, "scout-escalation-report.json")
 	if _, err := os.Stat(reportPath); err == nil {
 		t.Fatalf("escalation report %s should not exist for successful (completed) run", reportPath)
@@ -79,13 +76,10 @@ func TestRunTmuxREPL_ExtendNoEscalationReport(t *testing.T) {
 }
 
 // writingReviewer models the agent finishing its deliverable mid-wait: the
-// artifact is written ONCE, at the first review checkpoint, and then left alone.
-//
-// The write-once guard is load-bearing under the cycle-1233 cross-poll
-// stability window (completion.go): a reviewer that rewrote the file at every
-// checkpoint would bump its mtime on every tick, so the window could never
-// close and this fixture would spin forever. A real agent writes its deliverable
-// and stops — the fixture now models that instead of a permanent rewriter.
+// artifact is written ONCE, at the first review checkpoint, then left alone.
+// A reviewer that rewrote the file at every checkpoint would bump its mtime
+// on every tick, so the cross-poll stability window could never close and
+// this fixture would spin forever.
 type writingReviewer struct {
 	artifact string
 	wrote    bool
