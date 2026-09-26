@@ -10,7 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// newTestReviewer builds the composite with a capturing logger.
 func newTestReviewer(stage config.Stage, log *[]string) *reviewer {
 	return &reviewer{
 		stage: stage,
@@ -21,7 +20,7 @@ func newTestReviewer(stage config.Stage, log *[]string) *reviewer {
 
 func TestReviewer_EnforceBlocksMissingEval(t *testing.T) {
 	ws, root := t.TempDir(), t.TempDir()
-	writeScoutReport(t, ws, "needs-eval") // no eval file written
+	writeScoutReport(t, ws, "needs-eval")
 	var log []string
 	r := newTestReviewer(config.StageEnforce, &log)
 	res := r.Review(context.Background(), core.ReviewInput{Phase: "scout", Workspace: ws, ProjectRoot: root})
@@ -63,7 +62,6 @@ func TestReviewer_OffNeverBlocks(t *testing.T) {
 func TestReviewer_NonGatedPhaseApproves(t *testing.T) {
 	var log []string
 	r := newTestReviewer(config.StageEnforce, &log)
-	// build phase: neither gate applies → approve, nothing logged.
 	if res := r.Review(context.Background(), core.ReviewInput{Phase: "build", Workspace: t.TempDir(), ProjectRoot: t.TempDir()}); !res.Approve {
 		t.Errorf("no gate applies to build; want approve")
 	}

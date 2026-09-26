@@ -16,21 +16,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/triagecap"
 )
 
-// floorbinding.go — Gate C (R9.3, triage capacity): EGPS floor predicates
-// must bind ONLY floors triage committed this cycle. The cycle-280 failure
-// mode: TDD authored coverage-floor predicates for tasks triage had
-// DEFERRED, and the builder starved the committed task clearing gates that
-// were never this cycle's work. The check is fully deterministic:
-//
-//  1. extract the target packages of coverage-floor predicates from this
-//     cycle's acs package (go/ast over predicates_test.go — floor predicates
-//     name their target as a path literal, e.g. "./internal/core/");
-//  2. ask the triage artifact which of those packages appear in
-//     floor-bearing ## deferred / ## dropped items;
-//  3. any overlap is a CERTAIN violation → block at enforce.
-//
-// Fail-open on every ambiguity: missing predicates file, unparseable Go,
-// missing triage artifact, or no floor predicates at all.
+// floorBindingGate (Gate C) blocks EGPS floor predicates that bind a package
+// triage deferred or dropped this cycle. It fails open on every ambiguity.
 type floorBindingGate struct{}
 
 func (floorBindingGate) name() string                { return "floor-binding" }
@@ -44,20 +31,16 @@ func (floorBindingGate) check(in core.ReviewInput) (string, bool) {
 	predPath := filepath.Join(in.Worktree, "go", "acs", fmt.Sprintf("cycle%d", cycle), "predicates_test.go")
 	targets := floorPredicateTargets(predPath)
 	if len(targets) == 0 {
-		return "", false // no floor predicates → nothing to bind wrongly
+		return "", false
 	}
 	artifact, err := os.ReadFile(filepath.Join(in.Workspace, triagecap.TriageArtifactName()))
 	if err != nil {
-		return "", false // no triage artifact → fail open
+		return "", false
 	}
 	companionPath := filepath.Join(in.Workspace, triagecap.TriageDecisionName())
 	deferred := triagecap.DeferredFloorPackagesDecl(string(artifact), companionPath, targets)
-	// Committed-wins subtraction: a package floor-committed this cycle may
-	// carry predicates even if more of its work was ALSO deferred for later
-	// (cycle 310: the gate blocked the committed package's own predicates).
-	// Provenance rule (declarations outrank prose, the Layer-1 contract): a
-	// DECLARED deferred_floors entry yields only to a DECLARED committed
-	// floor; prose-derived deferral yields to committed evidence of any rank.
+	// Committed wins over deferred; a declared deferral yields only to a declared commitment.
+	// See ADR-0046.
 	_, deferredDeclared, _ := triagecap.ReadDeferredFloors(companionPath)
 	_, committedDeclared, _ := triagecap.ReadDeclaredFloors(companionPath)
 	if !deferredDeclared || committedDeclared {
@@ -66,8 +49,7 @@ func (floorBindingGate) check(in core.ReviewInput) (string, bool) {
 			for _, pkg := range committed {
 				committedSet[pkg] = true
 			}
-			// [:0:0] zero-caps the reuse so appends allocate fresh — a future
-			// callee returning a shared sub-slice cannot be silently corrupted.
+			// [:0:0] makes appends allocate, so a callee-shared backing array is never overwritten.
 			kept := deferred[:0:0]
 			for _, pkg := range deferred {
 				if !committedSet[pkg] {
@@ -85,11 +67,10 @@ func (floorBindingGate) check(in core.ReviewInput) (string, bool) {
 		strings.Join(deferred, ", ")), true
 }
 
-// cycleNumFromWorkspace parses N from the run-dir basename "cycle-<N>".
-// Sub-paths of the workspace (e.g. cycle-300/artifacts) return 0 → fail
-// open; the orchestrator always passes the workspace root.
 var cycleDirRE = regexp.MustCompile(`^cycle-(\d+)$`)
 
+// cycleNumFromWorkspace parses N from a workspace basename of exactly
+// "cycle-<N>", returning 0 for anything else.
 func cycleNumFromWorkspace(workspace string) int {
 	m := cycleDirRE.FindStringSubmatch(filepath.Base(workspace))
 	if m == nil {
@@ -102,19 +83,14 @@ func cycleNumFromWorkspace(workspace string) int {
 	return n
 }
 
-// pkgPathLitRE recognizes a Go package-path string literal a floor predicate
-// targets (e.g. "./internal/core/", "./internal/adapters/bridge/"). Segments
-// never start with a dot (kills "..." and hidden-dir literals); the go-test
-// wildcard suffix "/..." is trimmed by the caller before matching so the
-// ellipsis form still attributes to its package.
+// pkgPathLitRE matches a package-path literal such as "./internal/core/". A
+// segment never starts with a dot, so "..." and hidden directories never match.
 var pkgPathLitRE = regexp.MustCompile(`^\.?/?(?:internal|cmd|go)(?:/[A-Za-z0-9_][A-Za-z0-9_.-]*)+/?$`)
 
-// floorNameRE selects coverage/floor predicates by function name.
 var floorNameRE = regexp.MustCompile(`(?i)coverage|floor`)
 
-// floorPredicateTargets parses the cycle's predicates file and returns the
-// distinct basenames of package paths referenced inside coverage/floor
-// predicate functions (sorted). Any read/parse failure → nil (fail open).
+// floorPredicateTargets returns the sorted, distinct package basenames that
+// coverage or floor Test functions name; nil when the file cannot be read or parsed.
 func floorPredicateTargets(predPath string) []string {
 	src, err := os.ReadFile(predPath)
 	if err != nil {
@@ -127,10 +103,7 @@ func floorPredicateTargets(predPath string) []string {
 	seen := map[string]bool{}
 	for _, decl := range f.Decls {
 		fn, ok := decl.(*ast.FuncDecl)
-		// Only Test* functions are predicates — a non-Test helper named
-		// "floorPercentHelper" must never contribute targets (its literals
-		// could false-block a healthy cycle). The walk below visits the whole
-		// body including nested closures (t.Run subtests).
+		// Only Test functions are predicates; a helper's literals could false-block a healthy cycle.
 		if !ok || fn.Body == nil || !strings.HasPrefix(fn.Name.Name, "Test") || !floorNameRE.MatchString(fn.Name.Name) {
 			continue
 		}
@@ -143,7 +116,7 @@ func floorPredicateTargets(predPath string) []string {
 			if uerr != nil {
 				return true
 			}
-			s = strings.TrimSuffix(s, "/...") // go-test wildcard targets the same package
+			s = strings.TrimSuffix(s, "/...")
 			if !pkgPathLitRE.MatchString(s) {
 				return true
 			}

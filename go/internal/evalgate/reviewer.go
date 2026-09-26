@@ -9,45 +9,29 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// gate is one structural inter-phase check. appliesTo selects the phase whose
-// deliverable it inspects; check returns block=true only when a violation is
-// CERTAIN (a stat'd-missing eval file, a definite tautology) and so should abort
-// the cycle at enforce. Any ambiguity (parse failure, advisory WARN) returns
-// block=false so enforce never false-blocks a healthy cycle.
-//
-// `block` IS THE VIOLATION SIGNAL — `reason` is not. An ADVISORY gate returns a
-// non-empty reason on a perfectly healthy deliverable, because that reason is
-// how its observation reaches the phase log at all (flakyShapeGate emits exactly
-// one line per tdd phase on EVERY path, including the clean one). A future
-// simplification of Review that keys rejection off `reason != ""` would
-// therefore fail every tdd phase — including cycles with no Go predicate package
-// (review MEDIUM). Key on block, always.
-// remediator is the OPTIONAL half of the gate contract: implement it when the
-// gate can state, concretely, what would satisfy it. Optional by design — most
-// violations are "the artifact is malformed", for which the default correction
-// directive is already correct.
+// remediator is an optional gate capability: it states what would satisfy the
+// gate's violation. Gates without it keep the default correction directive.
 type remediator interface {
 	remediation(in core.ReviewInput) string
 }
 
+// gate is one inter-phase check. block, not reason, signals a violation: an
+// advisory gate returns a reason on a healthy deliverable so it reaches the log.
 type gate interface {
 	name() string
 	appliesTo(phase string) bool
 	check(in core.ReviewInput) (reason string, block bool)
 }
 
-// reviewer composes the structural gates behind one core.DeliverableReviewer.
-// It is stage-aware: at StageShadow every violation is logged but approved; at
-// StageEnforce a CERTAIN violation aborts the cycle. StageOff is never
-// constructed (the composition root skips WithReviewer entirely).
+// reviewer composes the gates behind one core.DeliverableReviewer. It is never
+// built for StageOff, because the composition root then skips WithReviewer.
 type reviewer struct {
 	stage config.Stage
 	gates []gate
 	logf  func(format string, args ...any)
 }
 
-// NewReviewer builds the composite gate reviewer for the given stage. Callers
-// wire it via core.WithReviewer only when stage != StageOff.
+// NewReviewer builds the composite gate reviewer for the given stage.
 func NewReviewer(stage config.Stage) core.DeliverableReviewer {
 	return &reviewer{
 		stage: stage,
@@ -56,9 +40,7 @@ func NewReviewer(stage config.Stage) core.DeliverableReviewer {
 	}
 }
 
-// Review runs each applicable gate. The first CERTAIN violation aborts at
-// StageEnforce; everything else (advisory violations, any violation at shadow)
-// is logged and approved.
+// Review logs every gate reason and, at StageEnforce, rejects on the first blocking violation.
 func (r *reviewer) Review(_ context.Context, in core.ReviewInput) core.ReviewResult {
 	for _, g := range r.gates {
 		if !g.appliesTo(in.Phase) {
@@ -71,12 +53,8 @@ func (r *reviewer) Review(_ context.Context, in core.ReviewInput) core.ReviewRes
 		r.logf("[evalgate] %s: %s (stage=%s, blocking=%v)", g.name(), reason, r.stage, block && r.stage == config.StageEnforce)
 		if block && r.stage == config.StageEnforce {
 			res := core.ReviewResult{Approve: false, Reason: reason}
-			// OPTIONAL capability: a gate that knows how to satisfy its own
-			// violation says so, and the correction directive relays it instead
-			// of emitting the generic "fix the deliverable / do not change
-			// unrelated files" text — which forbids the fix when the remedy is
-			// to CREATE a missing artifact. Gates that do not implement this are
-			// untouched and their corrections stay byte-identical.
+			// The generic correction forbids creating files, so a gate whose remedy
+			// is a missing file must supply its own.
 			if rm, ok := g.(remediator); ok {
 				res.Remediation = rm.remediation(in)
 			}

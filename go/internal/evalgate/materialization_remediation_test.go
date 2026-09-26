@@ -1,18 +1,5 @@
 package evalgate
 
-// materialization_remediation_test.go — Gate A must say HOW to satisfy it.
-//
-// The gate knows exactly which paths it probed: evalFilePath builds
-// <projectRoot>/.evolve/evals/<slug>.md and <workspace>/.evolve/evals/<slug>.md
-// and then discards them, reporting only bare slug stems. The agent is told a
-// filename with no directory, and the generic correction directive then tells it
-// not to create files at all. Every scout|gate-block failure in recorded history
-// is this gate (1471, 1476, 1504, 1531), each "rejected after 2 correction(s)".
-//
-// Precedent: audit's gates already inline their remedy (e.g. "Run `evolve skills
-// generate`"), which floorVerdictError joins so the recorded reason names the
-// fix. Gate A is the outlier.
-
 import (
 	"context"
 	"os"
@@ -24,15 +11,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// scoutWorkspaceSelecting builds a workspace whose scout-report selects slugs,
-// with no eval files anywhere — the exact cycle-1531 shape.
+// scoutWorkspaceSelecting names slugs as backticked bullets and in the Decision
+// Trace, and writes no eval file.
 func scoutWorkspaceSelecting(t *testing.T, slugs ...string) (projectRoot, workspace string) {
 	t.Helper()
 	projectRoot, workspace = t.TempDir(), t.TempDir()
-	// Mirrors the REAL scout-report shape (cycle-1531): slugs reach the gate via
-	// the "## Decision Trace" JSON, which is the path production actually uses.
-	// Note the prose fallback (slugLineRE) does NOT match the persona's own
-	// backticked "- **Slug:** `x`" form, so the trace is the only live source.
 	var b strings.Builder
 	b.WriteString("# Scout Report\n\n## Selected Tasks\n\n")
 	for _, s := range slugs {
@@ -52,8 +35,6 @@ func scoutWorkspaceSelecting(t *testing.T, slugs ...string) (projectRoot, worksp
 	return projectRoot, workspace
 }
 
-// TestMaterializationGate_RemediationNamesTheExactPath: the gate must name where
-// the file goes, per missing slug.
 func TestMaterializationGate_RemediationNamesTheExactPath(t *testing.T) {
 	root, ws := scoutWorkspaceSelecting(t, "judgment-phase-shadow-config", "judgment-verdict-shadow-classifier")
 	in := core.ReviewInput{Phase: "scout", ProjectRoot: root, Workspace: ws}
@@ -77,9 +58,6 @@ func TestMaterializationGate_RemediationNamesTheExactPath(t *testing.T) {
 	}
 }
 
-// TestMaterializationGate_RemediationReachesTheReviewResult is the WIRING proof:
-// a remediation the reviewer never attaches is dead code. This is what makes the
-// correction directive class-aware in production.
 func TestMaterializationGate_RemediationReachesTheReviewResult(t *testing.T) {
 	root, ws := scoutWorkspaceSelecting(t, "brand-new-slug")
 	r := NewReviewer(config.StageEnforce)
@@ -97,16 +75,12 @@ func TestMaterializationGate_RemediationReachesTheReviewResult(t *testing.T) {
 	}
 }
 
-// TestMaterializationGate_NotWeakened: the gate still blocks. A "fix" that made
-// the gate accept an unmaterialized eval would pass the tests above while
-// silently removing the anti-specification-gaming surface.
 func TestMaterializationGate_NotWeakened(t *testing.T) {
 	root, ws := scoutWorkspaceSelecting(t, "still-missing")
 	in := core.ReviewInput{Phase: "scout", ProjectRoot: root, Workspace: ws}
 	if _, block := (materializationGate{}).check(in); !block {
 		t.Error("gate stopped blocking an unmaterialized eval — the gate must not be weakened by this change")
 	}
-	// And a materialized eval still passes.
 	dir := filepath.Join(ws, ".evolve", "evals")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
@@ -119,9 +93,6 @@ func TestMaterializationGate_NotWeakened(t *testing.T) {
 	}
 }
 
-// TestOtherGates_SupplyNoRemediation: the optional capability must stay optional.
-// A gate that does not know how to fix its violation must leave Remediation
-// empty so its correction directive is byte-identical to today.
 func TestOtherGates_SupplyNoRemediation(t *testing.T) {
 	for _, g := range newGatesForTest() {
 		if g.name() == "evals-materialized" {
@@ -134,15 +105,8 @@ func TestOtherGates_SupplyNoRemediation(t *testing.T) {
 	}
 }
 
-// TestMaterializationGate_RemediationNamesOnlyTheMissing closes a mutation the
-// rest of this file cannot see. Every other fixture has ALL selected slugs
-// missing, so "all selected" and "all missing" are indistinguishable — a
-// remediation built from SelectedSlugs instead of missingSlugs passes them all
-// while telling the agent to create a file that already exists, and to overwrite
-// work the gate already accepted.
 func TestMaterializationGate_RemediationNamesOnlyTheMissing(t *testing.T) {
 	root, ws := scoutWorkspaceSelecting(t, "already-there", "genuinely-missing")
-	// Materialize exactly one of the two.
 	dir := filepath.Join(ws, ".evolve", "evals")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
