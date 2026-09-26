@@ -63,10 +63,13 @@ while True:
 	if err != nil || rc != ExitOK {
 		t.Fatalf("REPL launch: rc=%d err=%v", rc, err)
 	}
-	// runTmuxREPL appends one LF when materializing resolved-prompt.txt.
-	want := prompt + "\n"
+	// The driver pastes resolved-prompt.txt: the prompt, the identity statement, one LF.
+	want := readFile(t, filepath.Join(cfg.Workspace, "resolved-prompt.txt"))
+	if !strings.HasPrefix(want, prompt+"\n\n") || len(want) <= len(prompt)+2 {
+		t.Fatalf("resolved-prompt.txt must be the prompt followed by the identity statement; got %d bytes", len(want))
+	}
 	got := readFile(t, cfg.Artifact)
 	if got != want {
-		t.Fatalf("prompt changed in transit: received %d bytes, want all %d bytes (head, body, tail and LF intact)", len(got), len(want))
+		t.Fatalf("prompt changed in transit: received %d bytes, want all %d bytes (head, body, identity statement and LF intact)", len(got), len(want))
 	}
 }
