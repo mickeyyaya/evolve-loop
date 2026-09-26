@@ -578,7 +578,7 @@ var nonMaterialExactPaths = []string{
 
 var nonMaterialPrefixes = []string{
 	"docs/", "knowledge-base/",
-	".evolve/runs/", ".evolve/worktrees/", ".evolve/evals/",
+	".evolve/runs/", ".evolve/worktrees/", ".evolve/evals/", ".evolve/inbox/",
 	"go/acs/", "acs/",
 }
 
