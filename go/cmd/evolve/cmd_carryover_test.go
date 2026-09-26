@@ -10,9 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/statemap"
 )
 
-// TestCarryoverSubcommandRegistered — the `carryover` command is wired into the
-// dispatcher table (an unregistered command is dead code the CLI can never
-// route to).
 func TestCarryoverSubcommandRegistered(t *testing.T) {
 	found := false
 	for _, c := range commands {
@@ -28,8 +25,6 @@ func TestCarryoverSubcommandRegistered(t *testing.T) {
 	}
 }
 
-// writeFixtureState writes a state.json with the given carryover ids and returns
-// its path.
 func writeFixtureState(t *testing.T, ids ...string) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -70,11 +65,7 @@ func readCarryoverIDs(t *testing.T, statePath string) map[string]bool {
 	return ids
 }
 
-// TestCarryoverApplyDecisions_DropsEntriesToCeiling — applying a fixture
-// decisions set removes the drop + cluster ids and lands the live count under
-// the ceiling (the actual convergence behaviour the inbox item asks for).
 func TestCarryoverApplyDecisions_DropsEntriesToCeiling(t *testing.T) {
-	// 30 entries: keep 3, drop 25, cluster 2 → survivors = 3, well under 25.
 	ids := make([]string, 0, 30)
 	doc := carryoverDecisionsDoc{SourceCount: 30}
 	for i := 0; i < 30; i++ {
@@ -118,7 +109,6 @@ func TestCarryoverApplyDecisions_DropsEntriesToCeiling(t *testing.T) {
 	if len(surviving) != 3 {
 		t.Errorf("surviving id count = %d, want 3", len(surviving))
 	}
-	// Every dropped/clustered id must be gone; every keep id must remain.
 	for _, d := range doc.Decisions {
 		switch d.Decision {
 		case "drop", "cluster":
@@ -133,10 +123,6 @@ func TestCarryoverApplyDecisions_DropsEntriesToCeiling(t *testing.T) {
 	}
 }
 
-// TestCarryoverApplyDecisions_RejectsMissingReason — NEGATIVE. A decision row
-// with an empty reason is rejected and state.json is left UNMUTATED (the
-// anti-hand-edit / anti-unjustified-drop guard). Validation must run before any
-// lock or write.
 func TestCarryoverApplyDecisions_RejectsMissingReason(t *testing.T) {
 	statePath := writeFixtureState(t, "todo-keep-me", "todo-drop-me")
 	before := readCarryoverIDs(t, statePath)
@@ -146,14 +132,13 @@ func TestCarryoverApplyDecisions_RejectsMissingReason(t *testing.T) {
 		SourceCount: 2,
 		Decisions: []carryoverDecisionRow{
 			{ID: "todo-keep-me", Decision: "keep", Reason: "still live"},
-			{ID: "todo-drop-me", Decision: "drop", Reason: "  "}, // whitespace-only → empty
+			{ID: "todo-drop-me", Decision: "drop", Reason: "  "},
 		},
 	}
 	if err := validateCarryoverDecisions(doc); err == nil {
 		t.Fatalf("validateCarryoverDecisions accepted a row with an empty reason")
 	}
 
-	// The full command path must also refuse without mutating state.json.
 	code := runCarryoverApplyDecisions([]string{"--apply", "--state", statePath, "--decisions", writeDecisionsFile(t, doc)}, os.Stderr, os.Stderr)
 	if code == 0 {
 		t.Fatalf("runCarryoverApplyDecisions returned 0 for an empty-reason decisions file")
@@ -168,7 +153,6 @@ func TestCarryoverApplyDecisions_RejectsMissingReason(t *testing.T) {
 	}
 }
 
-// writeDecisionsFile writes doc to a temp decisions JSON and returns its path.
 func writeDecisionsFile(t *testing.T, doc carryoverDecisionsDoc) string {
 	t.Helper()
 	raw, err := json.MarshalIndent(doc, "", "  ")
@@ -182,12 +166,6 @@ func writeDecisionsFile(t *testing.T, doc carryoverDecisionsDoc) string {
 	return path
 }
 
-// TestCarryoverApplyDecisions_UsesLockedRMW — the apply goes through the
-// sanctioned flock.WithPathLock RMW path (no ad-hoc unlocked write). Proven two
-// ways: (1) the sidecar lock file `<statePath>.lock` is materialised by the
-// PathLock code path, and (2) concurrent applies serialise without corrupting
-// the array (run under -race). An unlocked implementation fails both: no sidecar
-// and/or a torn/duplicated final state.
 func TestCarryoverApplyDecisions_UsesLockedRMW(t *testing.T) {
 	statePath := writeFixtureState(t, "todo-a", "todo-b", "todo-keep")
 	doc := carryoverDecisionsDoc{
@@ -206,8 +184,6 @@ func TestCarryoverApplyDecisions_UsesLockedRMW(t *testing.T) {
 		t.Fatalf("sidecar lock %s.lock was not created — apply did not go through flock.WithPathLock: %v", statePath, err)
 	}
 
-	// Concurrent applies (idempotent) must never corrupt the file. Under -race
-	// + the flock serialization this converges to a single valid state.
 	var wg sync.WaitGroup
 	for i := 0; i < 8; i++ {
 		wg.Add(1)
@@ -218,17 +194,12 @@ func TestCarryoverApplyDecisions_UsesLockedRMW(t *testing.T) {
 	}
 	wg.Wait()
 
-	surviving := readCarryoverIDs(t, statePath) // fatals if JSON is torn
+	surviving := readCarryoverIDs(t, statePath)
 	if !surviving["todo-keep"] || surviving["todo-a"] || surviving["todo-b"] {
 		t.Fatalf("post-concurrency state wrong: %v", surviving)
 	}
 }
 
-// TestCarryoverApplyDecisions_PreservesStateSymlink is the cycle-999
-// regression pin: applying decisions through a WORKTREE-style symlinked
-// state.json must write THROUGH to the canonical target and leave the link
-// intact — the pre-fix hand-rolled temp+rename replaced the link with a
-// detached regular file, stranding the 135->14 convergence in a dead copy.
 func TestCarryoverApplyDecisions_PreservesStateSymlink(t *testing.T) {
 	canonicalDir := t.TempDir()
 	worktreeDir := t.TempDir()

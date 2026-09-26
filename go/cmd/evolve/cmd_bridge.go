@@ -50,9 +50,6 @@ Exit codes: 0 ok | 2 safety-gate | 3 cost-leak | 10 bad-flags |
   86 respond-loop-guard | 99 require-full-unmet | 127 missing-binary
 `
 
-// runBridge is the `evolve bridge <subcommand>` shim — a thin CLI over
-// the in-process bridge.Engine, preserving the historical
-// `bridge <subcommand>` surface (launch / probe / version / help).
 func runBridge(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
 		fmt.Fprint(stderr, bridgeUsage)
@@ -286,8 +283,7 @@ func runBridge(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	}
 }
 
-// emitProbeJSON renders a BridgeProbe in the {os, results:[{cli,tier}]}
-// shape the historical `bridge probe` emitted (consumed by the adapter).
+// emitProbeJSON writes the {os, results:[{cli,tier}]} shape the adapter parses.
 func emitProbeJSON(stdout io.Writer, p core.BridgeProbe, filter string) {
 	type result struct {
 		CLI  string `json:"cli"`
@@ -325,9 +321,6 @@ Drives a scripted, multi-step interactive slash-command sequence (e.g.
 plugin-install) through the CLI's tmux REPL. Independent of the cycle loop.
 `
 
-// runBridgeRecipe implements `evolve bridge recipe <run|list|show>`. It keeps
-// the bridge independently drivable — an operator or the orchestrator can
-// install a plugin or run any scripted sequence with just a CLI + workspace.
 func runBridgeRecipe(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
 		fmt.Fprint(stderr, recipeUsage)
@@ -436,14 +429,11 @@ func runBridgeRecipeRun(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
-// emitRecipeResult prints a recipe run's per-step outcome as JSON.
 func emitRecipeResult(stdout io.Writer, res recipe.Result) {
 	b, _ := json.MarshalIndent(res, "", "  ")
 	fmt.Fprintln(stdout, string(b))
 }
 
-// runBridgeCapabilities implements `evolve bridge capabilities --cli=X [--json]`
-// — print the static, research-grounded capability catalog for a CLI.
 func runBridgeCapabilities(args []string, stdout, stderr io.Writer) int {
 	cli, jsonMode := "", false
 	for _, a := range args {
@@ -496,9 +486,8 @@ func emitCatalogText(stdout io.Writer, cat capabilities.Catalog) {
 	}
 }
 
-// runBridgeIntrospect implements `evolve bridge introspect --cli=X`. With
-// --pane-file it diffs a captured /help pane against the catalog offline
-// (no tmux); otherwise it drives the live REPL to capture /help itself.
+// runBridgeIntrospect diffs a CLI's /help against its catalog, read offline
+// from --pane-file or captured from the live REPL.
 func runBridgeIntrospect(args []string, stdout, stderr io.Writer) int {
 	cli, paneFile, ws, session := "", "", "", ""
 	allowBypass := false
@@ -564,13 +553,11 @@ func runBridgeIntrospect(args []string, stdout, stderr io.Writer) int {
 	b, _ := json.MarshalIndent(drift, "", "  ")
 	fmt.Fprintln(stdout, string(b))
 	if !drift.Clean() {
-		return 3 // drift detected — non-fatal, but a distinct exit code
+		return 3
 	}
 	return 0
 }
 
-// envMap snapshots the process environment as a map for LaunchArgs's
-// BRIDGE_* fallbacks.
 func envMap() map[string]string {
 	env := os.Environ()
 	m := make(map[string]string, len(env))

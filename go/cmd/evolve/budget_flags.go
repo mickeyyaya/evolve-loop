@@ -6,13 +6,8 @@ import (
 	"strings"
 )
 
-// isRemovedBudgetFlag reports whether name is one of the retired cost-budget
-// flags (--budget-usd / --budget / --batch-cap-usd). They were long-since
-// reduced to deprecated no-ops; they are now removed from the parameter surface
-// entirely. Per-cycle token cost is tracked accurately across LLM CLIs as
-// display-only telemetry (total_cost_usd / per-phase cost_usd) — it is NOT a cap
-// input. Bound a run with --cycles N (or let the advisor decide) instead.
-// A stateless switch (not a package-level map) keeps the set immutable.
+// isRemovedBudgetFlag reports whether name is a retired cost-budget flag; cost
+// is display-only telemetry, never a cap input.
 func isRemovedBudgetFlag(name string) bool {
 	switch name {
 	case "budget-usd", "budget", "batch-cap-usd":
@@ -22,14 +17,9 @@ func isRemovedBudgetFlag(name string) bool {
 	}
 }
 
-// stripRemovedBudgetFlags removes every occurrence of a removed cost-budget flag
-// (and its value) from args, emitting a single consolidated WARN via warn if any
-// were present. Removing the flags from the FlagSet means flag.Parse would reject
-// them ("flag provided but not defined") and abort the run; stripping them here
-// first keeps old scripts/CI working — they get a deprecation notice, not a crash.
-//
-// It handles every form flag.Parse accepts for a value-bearing flag:
-// -flag, --flag, -flag=v, --flag=v, and the space-separated "-flag v".
+// stripRemovedBudgetFlags removes every removed budget flag and its value in any
+// form flag.Parse accepts, warning once, so old scripts get a notice rather
+// than a "flag provided but not defined" abort.
 func stripRemovedBudgetFlags(args []string, warn func(string)) []string {
 	out := make([]string, 0, len(args))
 	warned := false
@@ -45,11 +35,8 @@ func stripRemovedBudgetFlags(args []string, warn func(string)) []string {
 				"(or omit it and let the advisor decide); ignoring.")
 			warned = true
 		}
-		// Space-separated form ("--budget-usd 5") carries its value in the next
-		// token — drop that too. The removed flags are all float-valued, so a
-		// following token that parses as a float is the value (this also catches a
-		// negative like "-1", which a naive leading-dash check would mistake for
-		// another flag); a non-numeric token (e.g. "--cycles") is left in place.
+		// The flags are float-valued, so a numeric next token (even "-1") is the
+		// value; a non-numeric one such as "--cycles" is a real flag.
 		if !hasEqValue && i+1 < len(args) && isFloatValue(args[i+1]) {
 			i++
 		}
@@ -57,16 +44,14 @@ func stripRemovedBudgetFlags(args []string, warn func(string)) []string {
 	return out
 }
 
-// removedBudgetFlagName reports the canonical flag name if arg is one of the
-// removed budget flags in -flag / --flag / -flag=v form, and whether the value
-// was attached via "=value" (so the caller knows not to also consume the next
-// token). Returns "" for anything that is not a removed budget flag.
+// removedBudgetFlagName returns the canonical name of a removed budget flag, or
+// "", and whether its value was attached with "=".
 func removedBudgetFlagName(arg string) (name string, hasEqValue bool) {
 	if len(arg) < 2 || arg[0] != '-' {
 		return "", false
 	}
 	s := arg[1:]
-	if s[0] == '-' { // accept both -flag and --flag, like the flag package
+	if s[0] == '-' {
 		s = s[1:]
 	}
 	if eq := strings.IndexByte(s, '='); eq >= 0 {
@@ -81,11 +66,8 @@ func removedBudgetFlagName(arg string) (name string, hasEqValue bool) {
 	return "", false
 }
 
-// isFloatValue reports whether tok is a bare, finite numeric value (e.g. "5",
-// "7.50", "-1") — i.e. the space-separated value of a removed float-valued
-// budget flag, as opposed to a following flag token like "--cycles". Non-finite
-// inputs ParseFloat would otherwise accept ("Inf", "NaN") are rejected so a
-// pathological positional goal of that form is never mistaken for a value.
+// isFloatValue reports whether tok is a finite number; "Inf" and "NaN" are
+// rejected so a goal word of that form is never eaten as a flag value.
 func isFloatValue(tok string) bool {
 	f, err := strconv.ParseFloat(strings.TrimSpace(tok), 64)
 	return err == nil && !math.IsInf(f, 0) && !math.IsNaN(f)

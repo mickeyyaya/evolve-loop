@@ -7,8 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/aggregator"
 )
 
-// runAggregator is the `evolve aggregator <phase> <output> <worker>...` subcommand.
-// Ports legacy/scripts/dispatch/aggregator.sh.
 func runAggregator(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	var pos []string
 	for _, a := range args {

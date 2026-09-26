@@ -1,13 +1,5 @@
 package main
 
-// cli_wave_budget.go is the production assembly for Q4 quota-driven wave sizing:
-// it measures each family's live quota (reusing the proactive usage-probe's
-// per-family bridge controller) and the pipeline's recent pace (budgethistory),
-// hands both to the pure quotaAwareWaveConfig sizer, and idles the loop for the
-// budget-computed inter-wave PaceDelay. Every measurement is fail-open and runs
-// ONLY when the operator supplied a fleet.budget block — no block ⇒ no probe,
-// no added latency, byte-identical lanes.
-
 import (
 	"context"
 	"fmt"
@@ -23,14 +15,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/usageprobe"
 )
 
-// budgetAwareWaveConfig resolves this wave's lane count + inter-wave pace. It
-// always applies the quota-bench shrink; when a fleet.budget block is present it
-// additionally probes live quota + recent pace and sizes via fleetbudget.Plan
-// (shadow logs the decision, enforce applies it). A single now is shared by the
-// quota snapshot and the plan so ObservedAt and the reset-horizon math agree.
-// The loop's ctx threads all the way into the probe + storage read so a
-// SIGINT/SIGTERM during measurement cancels it (mirroring productionWavePlanFn).
+// budgetAwareWaveConfig resolves this wave's lane count and inter-wave pace;
+// quota and pace are measured only when a fleet.budget block is present.
 func budgetAwareWaveConfig(ctx context.Context, fleetCfg policy.FleetConfig, projectRoot, evolveDir string, storage core.Storage, stderr io.Writer) (policy.FleetConfig, time.Duration) {
+	// One now for the quota snapshot and the plan keeps ObservedAt and the
+	// reset-horizon math in agreement.
 	now := time.Now()
 	var (
 		states []quotastate.QuotaState
@@ -43,11 +32,8 @@ func budgetAwareWaveConfig(ctx context.Context, fleetCfg policy.FleetConfig, pro
 	return quotaAwareWaveConfig(fleetCfg, projectRoot, stderr, states, tp, now)
 }
 
-// probeWaveQuota measures each installed interactive family's quota for the
-// budget allocator, reusing the SAME per-family bridge controller assembly the
-// proactive usage probe uses — one way to reach a family's /usage command. It
-// captures each pane and parses it into a quotastate.QuotaState; individual
-// family failures are omitted by usageprobe.ProbeQuota (fail-open).
+// probeWaveQuota measures each installed family's quota through the usage
+// probe's bridge path; a family that fails to answer is omitted.
 func probeWaveQuota(ctx context.Context, projectRoot, evolveDir string, now time.Time, stderr io.Writer) []quotastate.QuotaState {
 	families := bridge.InteractiveFamilies()
 	if len(families) == 0 {
@@ -58,10 +44,8 @@ func probeWaveQuota(ctx context.Context, projectRoot, evolveDir string, now time
 	return usageprobe.ProbeQuota(ctx, families, bridgeUsageProbe(factory), now)
 }
 
-// collectWaveThroughput rolls up the pipeline's recent pace: the last `window`
-// completed cycles' durations via budgethistory.Collect. A non-positive window
-// or no prior cycle yields the zero Throughput, which the allocator degrades to
-// reset-pace / floor.
+// collectWaveThroughput rolls up the last window cycles' pace; the zero
+// Throughput it returns without history makes the allocator fall back to the floor.
 func collectWaveThroughput(ctx context.Context, projectRoot string, storage core.Storage, window int) budgethistory.Throughput {
 	if window <= 0 {
 		return budgethistory.Throughput{}
@@ -77,11 +61,8 @@ func collectWaveThroughput(ctx context.Context, projectRoot string, storage core
 	return budgethistory.Collect(projectRoot, cycles)
 }
 
-// paceBeforeNextWave idles the loop for the budget-computed inter-wave delay so
-// an enforce-mode floor-forced wave doesn't burn quota before its reset. Zero
-// delay (the default — shadow, or no floor pressure) returns immediately. The
-// idle is interruptible: a SIGINT/SIGTERM during the pause cancels ctx and the
-// loop stops promptly instead of sleeping out the full delay.
+// paceBeforeNextWave idles for the budget's inter-wave delay, so an enforce-mode
+// wave does not burn quota before its reset; an interrupt ends the idle.
 func paceBeforeNextWave(ctx context.Context, delay time.Duration, stderr io.Writer) {
 	if delay <= 0 {
 		return
