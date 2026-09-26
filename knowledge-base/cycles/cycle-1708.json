@@ -1,0 +1,208 @@
+{
+  "schema_version": 2,
+  "cycle": 1708,
+  "run_id": "01M3F1YH2MF2NP7BVGY0389FNT",
+  "goal": "Pipeline-health verification, wave 14 (2026-09-26, on main 6216f80f, the first wave with ADR-0106 P4, H1 and H2 live: a triage lane that omits triage-decision.json must proceed without a missing_secondary rejection, and a codex quota wall must read as cause_code=rate_limit). Work the highest-weight lane-eligible inbox items end-to-end — claim, tdd, build, audit, ship — with full phase integrity, on the fixed plane. That includes everything waves 3–12 verified, and two new fixes:\n- (#651) a Build may `git rm` its cycle's own never-committed explanation draft: the doc guard no longer sends a draft where the host predicate gate refuses it (cycle 1705). The guard still denies every other removal under docs/ or knowledge-base/, including through cd, git -C, case or bare doc-root spellings, and advises `git mv` for archiving committed content;\n- (#649) the explanation contract can move to a new base without a Build when the host proves the change byte-identical (ADR-0105 B2); nothing calls it yet.\n\nEarlier fixes still in force: a worktree ship binds its own tree (#648); routing never sends a lane work its builder's sandbox forbids; a lane's cycle-state override applies only inside its own evolve dir; the guards judge each simple command on its own; code comments follow docs/conventions/code-comments.md.\n\nEvery cycle must:\n- commit to a claimed inbox item (an empty top_n must not run the spine);\n- bind its audit to the changes tree it ships;\n- disposition the cycle's OWN defect ledger as well as inherited ids;\n- record a terminal outcome on every exit;\n- never modify a protected control-plane file by any tool;\n- leave no stale worktree behind.\n\nPipeline-integrity items and items whose fix surface is protected are console-owned, not lane work. ADR-0099 document deliverables are eligible. The measure of this wave is consecutive shipped cycles: 1704 shipped after 1705 failed, so the streak stands at one.",
+  "final_verdict": "FAIL",
+  "tasks": [
+    "lineage-datestamp-normalization"
+  ],
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 83757,
+      "started_at": "2026-09-26T14:30:23Z",
+      "ended_at": "2026-09-26T14:31:48Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 14,
+        "output": 5460,
+        "cache_read": 430481,
+        "cache_write": 78960
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 49579,
+      "started_at": "2026-09-26T14:32:25Z",
+      "ended_at": "2026-09-26T14:33:15Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 16,
+        "output": 2537,
+        "cache_read": 586468,
+        "cache_write": 35105
+      }
+    },
+    {
+      "name": "fault-localization",
+      "verdict": "PASS",
+      "duration_ms": 216738,
+      "started_at": "2026-09-26T14:33:17Z",
+      "ended_at": "2026-09-26T14:36:55Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 26,
+        "output": 9679,
+        "cache_read": 566844,
+        "cache_write": 61804
+      }
+    },
+    {
+      "name": "bug-reproduction",
+      "verdict": "PASS",
+      "duration_ms": 463163,
+      "started_at": "2026-09-26T14:36:55Z",
+      "ended_at": "2026-09-26T14:44:39Z",
+      "archetype": "evaluate",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 30,
+        "output": 14440,
+        "cache_read": 1166286,
+        "cache_write": 98640
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 422505,
+      "started_at": "2026-09-26T14:44:39Z",
+      "ended_at": "2026-09-26T14:51:42Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 62,
+        "output": 25745,
+        "cache_read": 3325706,
+        "cache_write": 141551
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "FAIL",
+      "duration_ms": 36836,
+      "started_at": "2026-09-26T14:51:42Z",
+      "ended_at": "2026-09-26T14:55:49Z",
+      "archetype": "build",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "retro",
+      "verdict": "FAIL",
+      "duration_ms": 35753,
+      "started_at": "2026-09-26T14:55:49Z",
+      "ended_at": "2026-09-26T14:56:25Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "failure": {
+    "fingerprint": "build|infra-error|b646f5840b7d",
+    "pre_class": "infra-error",
+    "reasons": [
+      "phase \"build\" correction 1 dispatch failed: build: bridge: bridge: launch exit=85: escalation report written (pattern=rate_limit reason=escalate): core: transient bridge failure"
+    ]
+  },
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 1708",
+      "priority": "high"
+    }
+  ],
+  "skipped_phases": [
+    {
+      "phase": "closeout",
+      "reason": "abnormal exit in phase retro"
+    }
+  ],
+  "timing": {
+    "total_ms": 1308331,
+    "phase_count": 7,
+    "retried_count": 0,
+    "longest_phase": "bug-reproduction",
+    "longest_ms": 463163,
+    "by_archetype_ms": {
+      "build": 36836,
+      "control": 35753,
+      "evaluate": 463163,
+      "plan": 772579
+    },
+    "total_tokens": {
+      "input": 148,
+      "output": 57861,
+      "cache_read": 6075785,
+      "cache_write": 416060
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "control": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "evaluate": {
+        "input": 30,
+        "output": 14440,
+        "cache_read": 1166286,
+        "cache_write": 98640
+      },
+      "plan": {
+        "input": 118,
+        "output": 43421,
+        "cache_read": 4909499,
+        "cache_write": 317420
+      }
+    },
+    "wasted_tokens": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "cache_hit_ratio": 0.9999756416010512,
+    "hot_phase_count": 5,
+    "hot_phases": [
+      "scout",
+      "triage",
+      "fault-localization",
+      "bug-reproduction",
+      "tdd"
+    ]
+  }
+}
