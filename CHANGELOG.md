@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## Changed — the pasted prompt ends by stating who the agent is (ADR-0106 P3, 2026-09-27)
+
+- `prepareTmuxREPL` appends `phaseidentity.Block` to the bytes it writes to `resolved-prompt.txt`, after the engine's composed prompt, which stays a byte-identical prefix; the deliverable path stays the last thing the agent reads. Only the driver knows the session, so the statement is finished here, for every tmux CLI. A launch without an agent name pastes the prompt alone. The real-tmux transit test now compares against the file the driver pastes.
+
 ## Added — a CLI manifest declares its process environment (`default_env`, ADR-0106 P3, unwired, 2026-09-27)
 
 - `default_env` is to variables what `default_args` is to flags. The realizer copies it into `Realization.Env`; `driverEnv` layers it between the process environment and the request's `Deps.Env` overrides (the last value of a key wins); `exportLines` renders the `export KEY=value` lines a tmux driver will send, sorted and shell-quoted. The parser refuses a key that is not a shell identifier, a key that belongs to the loop (`EVOLVE_`), the bridge (`BRIDGE_`) or a credential (the guards read the process environment before a launch and never see a manifest's map), and a value carrying a control byte.

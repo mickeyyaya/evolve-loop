@@ -64,6 +64,9 @@ artifact=""
 while IFS= read -r line; do
   case "$line" in ARTIFACT=*) artifact="${line#ARTIFACT=}"; break ;; esac
 done
+# Drain the rest of the paste before printing anything: a canonical-mode read is slower than the
+# paste, and a print in between interleaves with the echo and drops input (a real CLI reads raw).
+while IFS= read -r -t 1 _; do :; done
 
 if [ "$timing" = mid ]; then
   if [ "$mode" = persist ]; then
