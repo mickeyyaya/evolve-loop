@@ -1,8 +1,5 @@
 package advisor
 
-// todos_test.go — the carryover-todo section (ADR-0103 unit 04 §6 tests 30,
-// 31; the ACS-named length/order tests stay in core over the facade).
-
 import (
 	"strings"
 	"testing"
@@ -11,8 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// Test 30 — the rank table binds the carryover unit's vocabulary and the
-// legacy word forms; junk ranks lowest.
 func TestCarryoverPriorityRank_BindsToTheCarryoverVocabulary(t *testing.T) {
 	for p, want := range map[string]int{
 		"P0": 6, "P1": 5, "H": 5, "HIGH": 5, "P2": 4, "P3": 3, "M": 3, "MED": 3, "MEDIUM": 3, "L": 1, "LOW": 1,
@@ -28,9 +23,6 @@ func TestCarryoverPriorityRank_BindsToTheCarryoverVocabulary(t *testing.T) {
 	}
 }
 
-// Test 31 — rank desc, then FirstSeenCycle desc, stable ties; exactly the
-// count cap renders; the action is capped at 600 runes with the ellipsis;
-// the trailer counts the rest; the caller's slice is untouched.
 func TestWriteCarryoverTodos_OrdersByRankThenRecencyCapsAtTwentyAndSixHundredRunes(t *testing.T) {
 	todos := richCarryoverTodos()
 	before := append([]router.CarryoverTodo(nil), todos...)
@@ -41,9 +33,6 @@ func TestWriteCarryoverTodos_OrdersByRankThenRecencyCapsAtTwentyAndSixHundredRun
 		t.Errorf("exactly %d lines and the trailer:\n%s", MaxCarryoverTodosInPrompt, out)
 	}
 	lines := strings.Split(strings.TrimSpace(out), "\n")[1:]
-	// The four P0/p0 todos lead (rank 6), most recent first; then the P1/H/HIGH
-	// block (rank 5) in which cycle-40-todo-01 and cycle-39-todo-02 keep their
-	// on-disk order among equal cycles.
 	if !strings.HasPrefix(lines[0], "- [P0] cycle-40-todo-00:") || !strings.HasPrefix(lines[1], "- [P0] cycle-39-todo-21:") || !strings.HasPrefix(lines[2], "- [P0] cycle-38-todo-17:") || !strings.HasPrefix(lines[3], "- [p0] cycle-36-todo-14:") {
 		t.Errorf("rank desc, then recency desc:\n%s", strings.Join(lines[:4], "\n"))
 	}

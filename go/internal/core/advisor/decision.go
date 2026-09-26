@@ -2,15 +2,8 @@ package advisor
 
 import "github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 
-// decision is the closed enum of the advisor's three calls — the initial
-// whole-cycle Plan (the zero value), the post-scout RePlan and the
-// per-transition Propose — folding the per-call literals (contract id,
-// capture kind, completion contract, error prefix, span depth, signal
-// origin) into ONE table. The artifact the model writes is projected from
-// the phase-contract registry, which already holds the same names, so the
-// (contract, artifact) pair is spelled once. The capture kind is closed by
-// construction, so the <kind> token in the capture filenames is
-// unconstructible from outside (the former isSafeArtifactKind guard).
+// decision is the closed enum of the advisor's three calls; the zero value is the initial Plan.
+// Being closed keeps the <kind> token in the capture filenames unconstructible from outside.
 type decision int
 
 const (
@@ -34,45 +27,27 @@ var decisionRows = [...]decisionRow{
 	decisionProposal: {contract: "router-proposal", kind: "proposal", completion: "artifact", errPfx: "routing proposer", origin: "Advisor.Propose"},
 }
 
-// contractID is the deliverable protocol selected for the decision. It stays
-// separate from the shared router agent identity used for model and profile
-// resolution.
+// contractID is the deliverable protocol, separate from the router identity that resolves model and profile.
 func (d decision) contractID() string { return decisionRows[d].contract }
 
-// artifactFile is the raw artifact the model writes (routing-plan.json /
-// routing-replan.json / routing-proposal.json), projected from the contract
-// registry.
+// artifactFile is projected from the contract registry, so the (contract, artifact) pair is spelled once.
 func (d decision) artifactFile() string { return phasecontract.ArtifactName(d.contractID()) }
 
-// captureKind is the <kind> token in the capture filenames
-// (advisor-{prompt,response,span}-<kind>.*) and the decision field on events.
+// captureKind is the <kind> token in advisor-{prompt,response,span}-<kind>.* and the decision field on events.
 func (d decision) captureKind() string { return decisionRows[d].kind }
 
-// completion is the bridge completion contract: every decision uses the
-// uniform artifact contract — the brain WRITES its artifact and the bridge
-// reads it back. The proposal completed on REPL-idle stdout (ADR-0027) until
-// 2026-09-14: its prompt carries the same deliverable contract as the plans
-// ("write routing-proposal.json"), so the model wrote the file while the
-// kernel read the scrollback, found only the prompt's echoed JSON example,
-// and raised ADVISOR_RESPONSE_UNPARSEABLE on every proposal (cycles
-// 1673–1677; docs/incidents/2026-09-14-router-proposal-read-the-scrollback.md).
+// completion is "artifact" for every decision: each prompt tells the model to write its artifact,
+// so the scrollback holds only the prompt's echoed example.
 func (d decision) completion() string { return decisionRows[d].completion }
 
-// errPfx prefixes every error the decision returns — the texts the
-// orchestrator prints.
 func (d decision) errPfx() string { return decisionRows[d].errPfx }
 
 // origin is the exported method whose call produced an event.
 func (d decision) origin() string { return decisionRows[d].origin }
 
-// replanDepth is the depth stamped on the decision span: a re-plan is one
-// level deeper than the initial plan.
 func (d decision) replanDepth() int { return decisionRows[d].depth }
 
-// decisionForArtifact maps a plan artifact back onto its decision for the
-// stamp on a compose-time event: the re-plan artifact ⇒ RePlan, anything
-// else ⇒ Plan (the composer is also reached through the test facade with an
-// arbitrary artifact name).
+// decisionForArtifact maps anything but the re-plan artifact to Plan, since the test facade passes arbitrary names.
 func decisionForArtifact(artifactFile string) decision {
 	if artifactFile == decisionRePlan.artifactFile() {
 		return decisionRePlan

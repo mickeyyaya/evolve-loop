@@ -1,11 +1,5 @@
 package advisor
 
-// importgraph_test.go — the package is a leaf under core (ADR-0103 unit 04
-// §2): stdlib plus the fourteen named internal packages, never internal/core
-// itself, clihealth, gitexec or the carryover lifecycle (the compiler is the
-// cycle guard; this is the leaf-ness declaration — signalcenter/
-// importgraph_test.go idiom).
-
 import (
 	"go/parser"
 	"go/token"

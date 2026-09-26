@@ -1,11 +1,5 @@
 package advisor
 
-// launch_test.go — the launch: preflight order, the fourteen threaded
-// fields, the router-profile fallback chain and its faults, the skill
-// overlays, the profile path (ADR-0103 unit 04 §6 tests 13-19, 27, 28; the
-// core launch/fallback/amplify/skilloverlay/replan tests moved verbatim in
-// intent against the exported spellings).
-
 import (
 	"errors"
 	"fmt"
@@ -21,9 +15,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// writeRouterProfile drops a .evolve/profiles/router.json with a cli_fallback
-// chain under a fresh temp project root and returns that root for
-// RouteInput.ProjectRoot (the launch derives the SAME path).
 func writeRouterProfile(t *testing.T, primaryCLI string, fallback []string, onExit []int) string {
 	t.Helper()
 	root := t.TempDir()
@@ -72,8 +63,6 @@ func assertOneEvent(t *testing.T, got []signalcenter.Event, code signalcenter.Co
 	return e
 }
 
-// Test 13 — a nil launcher is not a Null Object: every launch fails with the
-// legacy "nil bridge" text and one preflight signal.
 func TestNew_NilLauncherFailsEveryLaunchWithNilBridge(t *testing.T) {
 	for _, c := range []struct {
 		name, want, decision string
@@ -94,9 +83,6 @@ func TestNew_NilLauncherFailsEveryLaunchWithNilBridge(t *testing.T) {
 	}
 }
 
-// Test 14 — the preflight order is launcher → workspace → depth → profile:
-// each refusal fires before the next check, the loader and the launcher are
-// never reached on a refusal.
 func TestLaunch_PreflightOrderIsBridgeWorkspaceDepthProfile(t *testing.T) {
 	noWs := baseRouteInput()
 	noWs.Workspace = ""
@@ -123,16 +109,12 @@ func TestLaunch_PreflightOrderIsBridgeWorkspaceDepthProfile(t *testing.T) {
 	if loads != 0 {
 		t.Errorf("the profile loader ran %d time(s) on refused launches", loads)
 	}
-	// The dormant production guard (always false) never blocks the path.
 	fl := &fakeLauncher{stdout: planJSON()}
 	if _, err := New(fl, defaultIdentity(), nil, WithDepthCheck(func(map[string]string) bool { return false })).Plan(tempInput(t)); err != nil || fl.calls != 1 {
 		t.Fatalf("a false depth guard must not block the advisor: %v (%d calls)", err, fl.calls)
 	}
 }
 
-// Test 15 — every threaded field: the worktree falls back to the workspace,
-// the artifact is the absolute workspace artifact, contract/completion/agent
-// follow the decision, the cycle and the env map flow through untouched.
 func TestLaunch_ThreadsWorktreeArtifactContractCompletionAgentCycleEnv(t *testing.T) {
 	for _, c := range []struct {
 		name, stdout, contract, artifact, completion string
@@ -170,11 +152,6 @@ func TestLaunch_ThreadsWorktreeArtifactContractCompletionAgentCycleEnv(t *testin
 	}
 }
 
-// Test 16 — the fallback chain walk (the cycle-435 class): a trigger exit
-// advances to the profile's fallback, every candidate flows through the
-// port, exhaustion is one dispatch signal naming the chain, a non-trigger
-// exit never reroutes, and an absent or explicit-empty cli_fallback
-// dispatches exactly once.
 func TestLaunch_WalksTheProfileFallbackChainAndReportsExhaustion(t *testing.T) {
 	for _, code := range []int{80, 81, 85, 124, 127} {
 		root := writeRouterProfile(t, "agy-tmux", []string{"claude-tmux"}, []int{80, 81, 85, 124, 127})
@@ -251,9 +228,6 @@ func TestLaunch_WalksTheProfileFallbackChainAndReportsExhaustion(t *testing.T) {
 	}
 }
 
-// Test 17 — the profile read: a present-but-unreadable or malformed
-// router.json is one ADVISOR_PROFILE_LOAD_FAILED and the dispatch still runs
-// once on the primary; an ABSENT file is the silent single-candidate degrade.
 func TestLaunch_ProfileLoadFaultWarnsOnceAndAbsenceIsSilent(t *testing.T) {
 	seed := func(t *testing.T, seedFn func(path string)) (string, string) {
 		t.Helper()
@@ -310,9 +284,6 @@ func TestLaunch_ProfileLoadFaultWarnsOnceAndAbsenceIsSilent(t *testing.T) {
 	})
 }
 
-// Test 18 — the skill overlays resolve per attempt for the ATTEMPTED cli
-// from the compiled defaults: a deep tier carries fable, the raw opus default
-// carries none, and an injected resolver sees each chain step.
 func TestLaunch_ResolvesSkillOverlaysPerAttemptFromTheZeroPolicy(t *testing.T) {
 	fl := &fakeLauncher{stdout: planJSON()}
 	if _, err := New(fl, Identity{CLI: "claude-tmux", Model: "deep", AgentLabel: "router"}, nil).Plan(tempInput(t)); err != nil {
@@ -342,8 +313,6 @@ func TestLaunch_ResolvesSkillOverlaysPerAttemptFromTheZeroPolicy(t *testing.T) {
 	}
 }
 
-// Test 19 — the profile path projects the ONE .evolve layout spelling and an
-// explicit identity profile overrides it.
 func TestLaunch_ProfilePathProjectsEvolveDirOf(t *testing.T) {
 	fl := &fakeLauncher{stdout: planJSON()}
 	in := tempInput(t)
@@ -363,8 +332,6 @@ func TestLaunch_ProfilePathProjectsEvolveDirOf(t *testing.T) {
 	}
 }
 
-// Test 27 — the Propose path's faults are visible for the first time (the
-// router strategy swallows the error), and the kernel clamp still disposes.
 func TestPropose_FailuresAreVisibleForTheFirstTime(t *testing.T) {
 	a, got := observed(t, &fakeLauncher{err: errors.New("boom")}, defaultIdentity())
 	if _, err := a.Propose(tempInput(t)); err == nil || err.Error() != "routing proposer: bridge launch: boom" {
@@ -392,9 +359,6 @@ func TestPropose_FailuresAreVisibleForTheFirstTime(t *testing.T) {
 	}
 }
 
-// Test 28 — the re-plan decision end to end: the distinct artifact and
-// contract, the replan capture kind and depth, the measured signals in the
-// prompt.
 func TestRePlan_UsesTheReplanDecisionEndToEnd(t *testing.T) {
 	ws := t.TempDir()
 	fl := &fakeLauncher{stdout: `[{"phase":"scout","run":true,"justification":"x"},{"phase":"build","run":true,"justification":"y"}]`, durationMS: 9}
@@ -423,8 +387,6 @@ func TestRePlan_UsesTheReplanDecisionEndToEnd(t *testing.T) {
 	}
 }
 
-// The configured {cli,model} REACH the launch request on every CLI family —
-// the any-CLI × any-model invariant (moved from core).
 func TestLaunch_DispatchWiringFlowsToTheLauncher(t *testing.T) {
 	for _, c := range []struct{ cli, model string }{{"codex-tmux", "gpt-5.5"}, {"agy", "gemini-3.5-flash"}, {"claude-tmux", "opus"}} {
 		fl := &fakeLauncher{stdout: planJSON()}
