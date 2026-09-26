@@ -82,10 +82,6 @@ func TestRoute_BuildInsertsTesterOnRed(t *testing.T) {
 	}
 }
 
-// TestRoute_UserPhaseInsertedViaCatalogOrder proves the runtime integration: a
-// user-defined phase spliced into cfg.Order (after build) is proposed when its
-// insert_when fires against the uniform signal plane (sig.Generic). This is the
-// end of the chain — author → catalog → cfg.Order+Triggers → routed.
 func TestRoute_UserPhaseInsertedViaCatalogOrder(t *testing.T) {
 	in := base("build")
 	in.Completed = []string{"scout", "tdd", "build"}
@@ -104,8 +100,6 @@ func TestRoute_UserPhaseInsertedViaCatalogOrder(t *testing.T) {
 	}
 }
 
-// TestRoute_UserPhaseSkippedWhenTriggerQuiet confirms the user phase is skipped
-// (→ audit) when its signal trigger does not fire — no spurious insertion.
 func TestRoute_UserPhaseSkippedWhenTriggerQuiet(t *testing.T) {
 	in := base("build")
 	in.Completed = []string{"scout", "tdd", "build"}
@@ -155,8 +149,7 @@ func TestRoute_AuditFailToRetrospective(t *testing.T) {
 }
 
 func TestRoute_Retro_DelegatesToFailureAdapter(t *testing.T) {
-	// Two distinct code-audit-fail cycles (non-expired) → BLOCK-CODE → end.
-	// BLOCK actions are strict-gated in failureadapter (fluent → AWARE/PROCEED).
+	// Two unexpired code-audit-fail entries give BLOCK-CODE, which failureadapter returns only under Strict.
 	in := base("retro")
 	in.Strict = true
 	in.History = []failureadapter.Entry{
@@ -165,7 +158,6 @@ func TestRoute_Retro_DelegatesToFailureAdapter(t *testing.T) {
 	}
 	d := Route(in, nil)
 
-	// Parity: Route's retro branch must equal failureadapter.Decide's mapping.
 	dec := failureadapter.Decide(in.History, failureadapter.Options{Now: fixedTime(), Strict: true})
 	if dec.Action != failureadapter.ActionBlockCode {
 		t.Fatalf("precondition: expected BLOCK-CODE, got %s", dec.Action)
@@ -198,7 +190,7 @@ func TestRoute_Clamp_MandatoryNeverSkipped(t *testing.T) {
 	in := base("audit")
 	in.Verdict = "PASS"
 	in.Completed = []string{"scout", "build", "audit"}
-	in.Cfg.PhaseEnable["ship"] = config.EnableOff // try to disable a mandatory phase
+	in.Cfg.PhaseEnable["ship"] = config.EnableOff
 	d := Route(in, nil)
 	if d.NextPhase != "ship" {
 		t.Errorf("ship=off → %q, want ship (mandatory clamp)", d.NextPhase)
@@ -225,7 +217,7 @@ func TestRoute_Clamp_MaxInsertionsCap(t *testing.T) {
 func TestRoute_Clamp_LLMProposalClampedToKernelNext(t *testing.T) {
 	in := base("build")
 	in.Completed = []string{"scout", "tdd", "build"}
-	in.Signals.Build = BuildSignals{ACSRed: 0, Present: true} // kernel → audit
+	in.Signals.Build = BuildSignals{ACSRed: 0, Present: true}
 	prop := &Proposal{NextPhase: "ship", Justification: "skip audit, looks fine"}
 	d := Route(in, prop)
 	if d.NextPhase != "audit" {
@@ -242,7 +234,6 @@ func TestStrategy_StaticVsLLM_SameClampFloor(t *testing.T) {
 	in.Signals.Build = BuildSignals{ACSRed: 0, Present: true}
 
 	static := StaticPreset{}.Decide(in)
-	// LLM proposer that tries to jump to ship; must be clamped to the same next.
 	llm := LLMProposal{Proposer: fakeProposer{p: &Proposal{NextPhase: "ship"}}}.Decide(in)
 
 	if static.NextPhase != llm.NextPhase {
@@ -250,18 +241,13 @@ func TestStrategy_StaticVsLLM_SameClampFloor(t *testing.T) {
 	}
 }
 
-// --- cycle-240 advisory-soak defect tests (D1 plan-veto, D3 insertion cap) ---
-
-// advisoryCfg is testCfg lifted to Stage:Advisory — the configuration under
-// which the advisor's whole-cycle plan drives shouldRun's plan path.
 func advisoryCfg() config.RoutingConfig {
 	c := testCfg()
 	c.Stage = config.StageAdvisory
 	return c
 }
 
-// spinePlan is the floor-clamped plan shape the orchestrator always threads:
-// the full ship-chain Run:true, plus any extra entries the test supplies.
+// spinePlan is the floor-clamped shape the orchestrator always threads, plus extra entries.
 func spinePlan(extra ...PhasePlanEntry) *PhasePlan {
 	entries := []PhasePlanEntry{
 		pe("scout", true), pe("tdd", true), pe("build", true),
@@ -270,10 +256,6 @@ func spinePlan(extra ...PhasePlanEntry) *PhasePlan {
 	return &PhasePlan{Entries: append(entries, extra...)}
 }
 
-// TestRoute_AdvisoryTriggerCapEnforced encodes cycle-238 defect D3: a
-// trigger-class (EnableContent) phase scheduled by the advisory plan must
-// still respect MaxInsertions. In cycle 238, 9 optional inserts ran against a
-// cap of 6 because the plan path skipped the cap check wholesale.
 func TestRoute_AdvisoryTriggerCapEnforced(t *testing.T) {
 	in := base("build")
 	in.Cfg = advisoryCfg()
@@ -294,9 +276,6 @@ func TestRoute_AdvisoryTriggerCapEnforced(t *testing.T) {
 	}
 }
 
-// TestRoute_AdvisoryTriggerWithinCap is the cap test's negative case AND the
-// D1 negative case (plan run:true phase still fires): the same plan-scheduled
-// EnableContent phase runs normally while the cap has headroom.
 func TestRoute_AdvisoryTriggerWithinCap(t *testing.T) {
 	in := base("build")
 	in.Cfg = advisoryCfg() // MaxInsertions: 4
@@ -313,10 +292,6 @@ func TestRoute_AdvisoryTriggerWithinCap(t *testing.T) {
 	}
 }
 
-// TestRoute_AdvisoryPlanPhaseExemptsFromCap: an operator-forced (EnableOn)
-// phase the plan schedules is NOT a content-trigger insert — it stays
-// cap-exempt even when the cap is exhausted. Guards against over-fixing D3
-// into "cap everything in the plan".
 func TestRoute_AdvisoryPlanPhaseExemptsFromCap(t *testing.T) {
 	in := base("build")
 	in.Cfg = advisoryCfg()
@@ -331,12 +306,6 @@ func TestRoute_AdvisoryPlanPhaseExemptsFromCap(t *testing.T) {
 	}
 }
 
-// TestRoute_AdvisoryFloorPhaseNotCapped is the integrity-floor guard on the D3
-// fix (intent.md constraint: "veto/cap logic must never drop mandatory
-// phases"): with a shrunken mandatory set, audit is EnableContent by default
-// and reaches shouldRun via the plan path with a floor-forced Run:true entry.
-// The insertion cap must NEVER skip a ship-floor phase — precedence is
-// floor > cap.
 func TestRoute_AdvisoryFloorPhaseNotCapped(t *testing.T) {
 	in := base("build")
 	in.Cfg = advisoryCfg()
@@ -351,9 +320,6 @@ func TestRoute_AdvisoryFloorPhaseNotCapped(t *testing.T) {
 	}
 }
 
-// TestRoute_AdvisoryPlanRunFalse encodes cycle-238 defect D1 at the kernel
-// layer: an explicit plan run:false VETOES a phase whose insert_when trigger
-// fires. The plan's veto outranks the content trigger.
 func TestRoute_AdvisoryPlanRunFalse(t *testing.T) {
 	in := base("build")
 	in.Cfg = advisoryCfg()
@@ -373,11 +339,6 @@ func TestRoute_AdvisoryPlanRunFalse(t *testing.T) {
 	}
 }
 
-// TestRoute_AdvisoryPlanVetoUserPhaseAbsentSignal composes D1+D2 in the exact
-// cycle-238 shape: a catalog phase spliced into cfg.Order, with a
-// `goal_type ne <other-goal>` trigger over a NEVER-EMITTED generic signal, and
-// a plan run:false entry. Neither the fail-open trigger nor the plan path may
-// run it.
 func TestRoute_AdvisoryPlanVetoUserPhaseAbsentSignal(t *testing.T) {
 	in := base("build")
 	in.Cfg = advisoryCfg()
@@ -386,7 +347,7 @@ func TestRoute_AdvisoryPlanVetoUserPhaseAbsentSignal(t *testing.T) {
 		InsertWhen: []config.Condition{{Field: "scout.goal_type", Op: "ne", Value: "growth"}},
 	}
 	in.Completed = []string{"scout", "tdd", "build"}
-	// No Generic signals: scout.goal_type was never emitted (the cycle-238 state).
+	// No generic signals: scout.goal_type is never emitted.
 	in.Plan = spinePlan(pe("growth-loop", false))
 
 	d := Route(in, nil)
@@ -420,11 +381,6 @@ func hasClamp(d RouterDecision, rule string) bool {
 	return false
 }
 
-// Phase 4b risk pin: a rubric-only routing block on MANDATORY phases must be
-// walk-inert — mandatory phases never consult Triggers, and an empty
-// insert_when never fires. The registry adds routing.rubric_hint to
-// scout/build/audit; this guards the walk against that becoming a behavior
-// change.
 func TestWalk_MandatoryPhaseWithRubricOnlyRoutingBlockUnchanged(t *testing.T) {
 	run := func(in RouteInput) RouterDecision { return Route(in, nil) }
 

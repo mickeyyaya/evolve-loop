@@ -4,9 +4,6 @@ import (
 	"testing"
 )
 
-// TestOllamaDetector_ThinkingConverging (eval AC1): OllamaDetector must return
-// LivenessConverging at higher confidence than DefaultDetector when the pane
-// contains the "Thinking..." header but no new content delta appeared.
 func TestOllamaDetector_ThinkingConverging(t *testing.T) {
 	p := Profiles["ollama"]
 	base := NewDefaultDetector(3)
@@ -15,11 +12,10 @@ func TestOllamaDetector_ThinkingConverging(t *testing.T) {
 	// Minimal thinking frame: "Thinking..." is present; no idle "Send a message".
 	thinkingFrame := "user@host /tmp % ollama run gemma4:latest\n>>> what is tmux?\nThinking...\n"
 
-	// Prime both on the initial thinking frame.
 	base.Assess(thinkingFrame, p)
 	det.Assess(thinkingFrame, p)
 
-	// Feed the same frame again: no new content lines → DefaultDetector BusyButStagnant.
+	// Same frame again: no new content, so DefaultDetector reads BusyButStagnant.
 	baseState, baseConf := base.Assess(thinkingFrame, p)
 	ollamaState, ollamaConf := det.Assess(thinkingFrame, p)
 
@@ -31,14 +27,11 @@ func TestOllamaDetector_ThinkingConverging(t *testing.T) {
 	}
 }
 
-// TestOllamaDetector_StaticFallsBack (eval AC2): when "Thinking..." is absent,
-// OllamaDetector must produce byte-identical state+confidence to DefaultDetector.
 func TestOllamaDetector_StaticFallsBack(t *testing.T) {
 	p := Profiles["ollama"]
 	base := NewDefaultDetector(3)
 	det := NewOllamaDetector(3)
 
-	// Completed answer frame: no "Thinking..." header, idle placeholder present.
 	noThinkingFrame := "user@host /tmp % ollama run gemma4:latest\n>>> what is tmux?\n*   tmux is a terminal multiplexer.\n*   It keeps sessions alive.\n>>> Send a message (/? for help)\n"
 
 	for range 3 {
@@ -56,8 +49,6 @@ func TestOllamaDetector_StaticFallsBack(t *testing.T) {
 	}
 }
 
-// TestOllamaDetector_Malformed (eval AC3): malformed/garbage headers must not
-// panic and must not elevate confidence above default.
 func TestOllamaDetector_Malformed(t *testing.T) {
 	p := Profiles["ollama"]
 	edgeCases := []struct {
@@ -66,8 +57,8 @@ func TestOllamaDetector_Malformed(t *testing.T) {
 	}{
 		{"empty", ""},
 		{"whitespace-only", "   \n  \n"},
-		{"partial-thinking", "Thinking\n"},          // missing "..."
-		{"thinking-as-suffix", "DeepThinking...\n"}, // not standalone
+		{"partial-thinking", "Thinking\n"},
+		{"thinking-as-suffix", "DeepThinking...\n"},
 		{"pure-garbage", "\x00\xff\xfe\n"},
 		{"done-thinking-only", "...done thinking.\n"},
 	}
@@ -92,9 +83,6 @@ func TestOllamaDetector_Malformed(t *testing.T) {
 	}
 }
 
-// TestDetectorFor_OllamaRoutesOllama (eval AC4 router check): DetectorFor must
-// route "ollama" to the OllamaDetector (verified by confidence uplift on a
-// thinking frame that DefaultDetector would not uplift).
 func TestDetectorFor_OllamaRoutesOllama(t *testing.T) {
 	p := Profiles["ollama"]
 	probe := DetectorFor(p)
@@ -115,9 +103,6 @@ func TestDetectorFor_OllamaRoutesOllama(t *testing.T) {
 	}
 }
 
-// TestDetectorFor_CodexAgyUnchanged (eval AC4 non-regression): DetectorFor must
-// still return DefaultDetector-equivalent for codex and agy (OllamaDetector is
-// additive, not a replacement for those CLIs).
 func TestDetectorFor_CodexAgyUnchanged(t *testing.T) {
 	for _, cli := range []string{"codex", "agy"} {
 		cli := cli

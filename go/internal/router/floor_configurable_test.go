@@ -2,9 +2,6 @@ package router
 
 import "testing"
 
-// TestClampPlanToFloorWith_AuditOnlyPermitsBuildlessShip is the WS4 keystone:
-// with an audit-only floor, a plan that ships WITHOUT build/tdd is left intact —
-// the advisor's discretion is honored, only the evaluator is forced.
 func TestClampPlanToFloorWith_AuditOnlyPermitsBuildlessShip(t *testing.T) {
 	in := nonTrivialIn()
 	p := &PhasePlan{Entries: []PhasePlanEntry{
@@ -13,7 +10,6 @@ func TestClampPlanToFloorWith_AuditOnlyPermitsBuildlessShip(t *testing.T) {
 		{Phase: "ship", Run: true},
 	}}
 
-	// audit-only floor
 	out, clamps := ClampPlanToFloorWith(in, p, []string{"audit"}, false)
 	if len(clamps) != 0 {
 		t.Errorf("audit-only floor on an already-audited ship plan should clamp nothing, got %v", clamps)
@@ -26,8 +22,6 @@ func TestClampPlanToFloorWith_AuditOnlyPermitsBuildlessShip(t *testing.T) {
 	}
 }
 
-// TestClampPlanToFloorWith_AuditOnlyStillForcesAudit: even under audit-only, a
-// plan that omits audit gets audit forced on.
 func TestClampPlanToFloorWith_AuditOnlyStillForcesAudit(t *testing.T) {
 	in := nonTrivialIn()
 	p := &PhasePlan{Entries: []PhasePlanEntry{pe("scout", true), pe("ship", true)}}
@@ -41,9 +35,6 @@ func TestClampPlanToFloorWith_AuditOnlyStillForcesAudit(t *testing.T) {
 	}
 }
 
-// TestClampPlanToFloorWith_SelfSealsAudit proves the function re-asserts the
-// evaluator even when a caller passes a floor that omits it — the invariant does
-// not depend on policy.FloorPhases having pre-added audit.
 func TestClampPlanToFloorWith_SelfSealsAudit(t *testing.T) {
 	in := nonTrivialIn()
 	p := &PhasePlan{Entries: []PhasePlanEntry{pe("scout", true), pe("ship", true)}}
@@ -53,9 +44,6 @@ func TestClampPlanToFloorWith_SelfSealsAudit(t *testing.T) {
 	}
 }
 
-// TestClampPlanToFloor_DelegatesToDefault proves the back-compat wrapper enforces
-// exactly DefaultShipFloor — build+audit forced on a bare ship plan (tdd via the
-// pin). This guards that the refactor kept the default path byte-identical.
 func TestClampPlanToFloor_DelegatesToDefault(t *testing.T) {
 	in := nonTrivialIn()
 	p := &PhasePlan{Entries: []PhasePlanEntry{{Phase: "ship", Run: true}}}

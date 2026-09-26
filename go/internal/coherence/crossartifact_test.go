@@ -1,63 +1,5 @@
 package coherence
 
-// crossartifact_test.go — the RED contract for cycle-1676 inbox item
-// `crossartifact-invariant-stack` (triage `## top_n`, weight 0.85).
-//
-// WHAT IS BEING BUILT. One deterministic, per-cycle aggregate over a cycle
-// workspace that evaluates the four weak verifiers the inbox record names, and
-// reports each one's evidence independently:
-//
-//	verdict-agreement       embedded <!-- evolve-verdict --> sentinel == the
-//	                        standalone acs-verdict.json verdict
-//	test-count-agreement    the claimed counts in acs-verdict.json == the
-//	                        counts independently recounted from its parsed
-//	                        runner results (cycle-1673 M1 shipped a document
-//	                        claiming "zero red predicates" while the artifact
-//	                        beside it recorded red_count=3)
-//	referenced-paths-exist  every evidence_path the audit sentinel cites
-//	                        resolves on disk under the workspace or the LANE
-//	                        worktree
-//	provenance-phase-order  phase-timing.json's recorded chain runs forward and
-//	                        respects the scout→tdd→build→audit floor
-//
-// Weaver (arXiv:2506.18203): a stack of weak deterministic verifiers approaches
-// strong-verifier power at near-zero cost and is immune to LLM-judge bias. The
-// aggregate COMPLEMENTS the adversarial audit; it never replaces it.
-//
-// THREE STATUSES, NOT TWO. `indeterminate` is the load-bearing one: an absent
-// or malformed artifact can never read as a verified match (that is how a
-// presence-only implementation games this suite), and it is equally never a
-// violation (that is how an advisory check earns a false-positive rate and gets
-// switched off). Every invariant fails SAFE into it.
-//
-// ADVISORY. Per the inbox record's own rule ("each invariant ships ADVISORY
-// until its false-positive rate is evidenced ~0 — the 1054/1060 breaker
-// lesson"), InvariantReport.Advisory is true and NOTHING in this cycle may make
-// a violation blocking. The no-blocking half is pinned at the real call site in
-// internal/core (crossartifact_invariants_wiring_test.go).
-//
-// These tests are authored by the TDD engineer and are RED now — they do not
-// compile until the aggregate exists, which is a valid RED per the
-// compile-failure rule. The Builder makes them GREEN by adding production code
-// ONLY and must NOT modify this file.
-//
-// ADVERSARIAL DIVERSITY (skills/adversarial-testing §6):
-//   - NEGATIVE  : prose "PASS" without a sentinel must NOT satisfy
-//     verdict-agreement (an arbitrary PASS string is not a verdict); a cited
-//     path that exists nowhere under the two lane roots must be reported
-//     missing BY NAME.
-//   - EDGE/OOD  : empty workspace, truncated JSON, wrong-typed fields, an
-//     empty results array, a one-entry timing log, timestamps that do not
-//     parse — every one indeterminate, none a violation, none a panic.
-//   - SEMANTIC  : four distinct behaviours with four distinct evidence
-//     strings, plus determinism (same workspace ⇒ byte-identical report).
-//
-// Reachability probe (cycle-644 rule): the aggregate lives in THIS package, and
-// `go list -deps ./internal/phasetiming ./internal/acssuite` contains no edge
-// back to internal/coherence — so reading phase-timing.json through
-// phasetiming.Read is buildable from here. No import is pinned by these tests;
-// only behaviour is.
-
 import (
 	"encoding/json"
 	"os"
@@ -67,15 +9,8 @@ import (
 	"testing"
 )
 
-// ---------------------------------------------------------------------------
-// Fixtures. `xa` prefix = cross-artifact, so nothing collides with the verdict-
-// coherence helpers in coherence_test.go.
-// ---------------------------------------------------------------------------
-
-// xaWriteAudit writes an audit-report.md carrying a REAL canonical
-// evolve-verdict sentinel (schema_version 2 with a failure block when evidence
-// paths are cited). Deliberately built with encoding/json, never hand-spelled,
-// so the fixture is the shape phasecontract actually parses.
+// xaWriteAudit marshals the sentinel with encoding/json, never hand-spelled, so
+// the fixture is the shape phasecontract actually parses.
 func xaWriteAudit(t *testing.T, dir, verdict string, evidencePaths []string) {
 	t.Helper()
 	payload := map[string]any{"phase": "audit", "verdict": verdict, "schema_version": 1}
@@ -97,7 +32,6 @@ func xaWriteAudit(t *testing.T, dir, verdict string, evidencePaths []string) {
 	}
 }
 
-// xaWriteRaw drops arbitrary bytes at <dir>/<name> — the malformed/OOD lane.
 func xaWriteRaw(t *testing.T, dir, name, body string) {
 	t.Helper()
 	if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
@@ -105,10 +39,8 @@ func xaWriteRaw(t *testing.T, dir, name, body string) {
 	}
 }
 
-// xaACS builds an acs-verdict.json body in the live acssuite.Verdict shape:
-// claimed summary counts up top, the independently parsed runner results below.
-// total and the three counts are explicit so a test can make the claim disagree
-// with its own evidence.
+// xaACS takes the claimed total and counts explicitly so a test can make the
+// claim disagree with its own results.
 func xaACS(t *testing.T, verdict string, total, green, red, skip int, results []string) string {
 	t.Helper()
 	rows := make([]map[string]any, 0, len(results))
@@ -137,7 +69,6 @@ func xaACS(t *testing.T, verdict string, total, green, red, skip int, results []
 	return string(b)
 }
 
-// xaPhase is one phase-timing.json entry (the phasetiming.Entry wire shape).
 type xaPhase struct{ phase, started, ended string }
 
 func xaWriteTiming(t *testing.T, dir string, entries ...xaPhase) {
@@ -156,8 +87,6 @@ func xaWriteTiming(t *testing.T, dir string, entries ...xaPhase) {
 	xaWriteRaw(t, dir, "phase-timing.json", string(b))
 }
 
-// xaCoherentWorkspace is the all-green fixture: agreeing verdicts, counts that
-// survive a recount, cited paths that exist, a forward-running phase chain.
 func xaCoherentWorkspace(t *testing.T) (workspace, worktree string) {
 	t.Helper()
 	workspace, worktree = t.TempDir(), t.TempDir()
@@ -176,8 +105,6 @@ func xaCoherentWorkspace(t *testing.T) (workspace, worktree string) {
 	return workspace, worktree
 }
 
-// xaFind returns the named invariant, failing loudly when the aggregate did not
-// report it at all (a suite that silently drops an invariant proves nothing).
 func xaFind(t *testing.T, r InvariantReport, name string) Invariant {
 	t.Helper()
 	for _, inv := range r.Invariants {
@@ -189,9 +116,6 @@ func xaFind(t *testing.T, r InvariantReport, name string) Invariant {
 	return Invariant{}
 }
 
-// xaWantStatus asserts one invariant's status and that a non-ok verdict always
-// carries concrete evidence — a status with an empty Evidence string is a
-// finding nobody can act on.
 func xaWantStatus(t *testing.T, r InvariantReport, name string, want InvariantStatus) Invariant {
 	t.Helper()
 	got := xaFind(t, r, name)
@@ -204,7 +128,6 @@ func xaWantStatus(t *testing.T, r InvariantReport, name string, want InvariantSt
 	return got
 }
 
-// xaAllFour is the declared, stable report order.
 var xaAllFour = []string{
 	InvariantVerdictAgreement,
 	InvariantTestCounts,
@@ -212,14 +135,6 @@ var xaAllFour = []string{
 	InvariantPhaseOrder,
 }
 
-// ---------------------------------------------------------------------------
-// AC1 — the four invariants report independently, with concrete evidence.
-// ---------------------------------------------------------------------------
-
-// TestCrossArtifactInvariants_CoherentWorkspaceIsAllOK is the positive pole:
-// a workspace whose artifacts agree yields four ok invariants and zero
-// violations. Without this, an implementation that returns "violated" for
-// everything would pass every negative test in this file.
 func TestCrossArtifactInvariants_CoherentWorkspaceIsAllOK(t *testing.T) {
 	ws, wt := xaCoherentWorkspace(t)
 	got := CheckCrossArtifactInvariants(ws, wt)
@@ -231,11 +146,6 @@ func TestCrossArtifactInvariants_CoherentWorkspaceIsAllOK(t *testing.T) {
 	}
 }
 
-// TestCrossArtifactInvariants_ReportShapeIsDeterministic — AC3's determinism
-// half. Exactly the four named invariants, always in the declared order, and
-// two evaluations of the same unchanged workspace are byte-identical (a report
-// that reorders or drops entries cannot be diffed across cycles, which is the
-// only way an advisory false-positive rate ever becomes measurable).
 func TestCrossArtifactInvariants_ReportShapeIsDeterministic(t *testing.T) {
 	ws, wt := xaCoherentWorkspace(t)
 	first := CheckCrossArtifactInvariants(ws, wt)
@@ -256,10 +166,6 @@ func TestCrossArtifactInvariants_ReportShapeIsDeterministic(t *testing.T) {
 	}
 }
 
-// TestCrossArtifactInvariants_VerdictDisagreementIsViolatedWithBothSides —
-// invariant 1. The embedded sentinel says FAIL, the standalone verdict JSON
-// says PASS: violated, and the evidence must name BOTH sides (a finding that
-// says only "disagreement" sends the reader back to the artifacts).
 func TestCrossArtifactInvariants_VerdictDisagreementIsViolatedWithBothSides(t *testing.T) {
 	ws, wt := xaCoherentWorkspace(t)
 	xaWriteAudit(t, ws, "FAIL", nil)
@@ -270,12 +176,6 @@ func TestCrossArtifactInvariants_VerdictDisagreementIsViolatedWithBothSides(t *t
 	}
 }
 
-// TestCrossArtifactInvariants_ProseVerdictCannotSatisfyTheSentinelInvariant —
-// AC2's anti-gaming pole and AC3's canonical-parser half. The report is full of
-// the word PASS in prose (including a placeholder echo of the contract's own
-// example) but carries NO real sentinel. An implementation that greps for
-// "PASS" reads this as a verified match; the canonical phasecontract parse
-// finds no verdict and the invariant must degrade to indeterminate.
 func TestCrossArtifactInvariants_ProseVerdictCannotSatisfyTheSentinelInvariant(t *testing.T) {
 	ws, wt := xaCoherentWorkspace(t)
 	xaWriteRaw(t, ws, "audit-report.md",
@@ -289,9 +189,6 @@ func TestCrossArtifactInvariants_ProseVerdictCannotSatisfyTheSentinelInvariant(t
 	}
 }
 
-// TestCrossArtifactInvariants_TestCountDisagreementNamesClaimedAndCounted —
-// invariant 2, the cycle-1673 M1 shape: the artifact claims zero reds while its
-// own parsed runner results carry one. Violated, with both numbers in evidence.
 func TestCrossArtifactInvariants_TestCountDisagreementNamesClaimedAndCounted(t *testing.T) {
 	ws, wt := xaCoherentWorkspace(t)
 	// claims 3 green / 0 red over a 3-entry suite; the results say 2 green, 1 red.
@@ -306,12 +203,6 @@ func TestCrossArtifactInvariants_TestCountDisagreementNamesClaimedAndCounted(t *
 	}
 }
 
-// TestCrossArtifactInvariants_TestCountTotalDisagreementIsViolated — the second
-// count shape: the suite's claimed total does not match the number of results
-// it actually carries (a truncated or padded runner parse). Verified on three
-// real artifacts (cycles 1659/1666/1673: total == len(results), and the three
-// claimed counts equal the recount) before being pinned — the advisory's
-// measured false-positive rate on real data is 0/3.
 func TestCrossArtifactInvariants_TestCountTotalDisagreementIsViolated(t *testing.T) {
 	ws, wt := xaCoherentWorkspace(t)
 	xaWriteRaw(t, ws, "acs-verdict.json", xaACS(t, "PASS", 230, 2, 0, 0, []string{"green", "green"}))
@@ -322,9 +213,6 @@ func TestCrossArtifactInvariants_TestCountTotalDisagreementIsViolated(t *testing
 	}
 }
 
-// TestCrossArtifactInvariants_MissingReferencedPathIsViolatedAndNamed —
-// invariant 3. Two cited evidence paths, one of which exists nowhere: violated,
-// and the finding names the missing path (and not the present one).
 func TestCrossArtifactInvariants_MissingReferencedPathIsViolatedAndNamed(t *testing.T) {
 	ws, wt := xaCoherentWorkspace(t)
 	xaWriteAudit(t, ws, "PASS", []string{"acs-verdict.json", "docs/explain/builds/cycle-1676-never-written.md"})
@@ -338,12 +226,6 @@ func TestCrossArtifactInvariants_MissingReferencedPathIsViolatedAndNamed(t *test
 	}
 }
 
-// TestCrossArtifactInvariants_ReferencedPathsResolveUnderWorkspaceThenWorktree
-// — AC3's lane-binding half at the unit level. The SAME cited path is missing
-// while it exists only under an unrelated root, and ok once it exists under the
-// lane worktree that was actually passed in. (That the production caller passes
-// the LANE worktree rather than the project root is pinned at the seam, in
-// internal/core/crossartifact_invariants_wiring_test.go.)
 func TestCrossArtifactInvariants_ReferencedPathsResolveUnderWorkspaceThenWorktree(t *testing.T) {
 	ws, wt := xaCoherentWorkspace(t)
 	decoy := t.TempDir() // an unrelated root the aggregate is never handed
@@ -362,12 +244,6 @@ func TestCrossArtifactInvariants_ReferencedPathsResolveUnderWorkspaceThenWorktre
 	xaWantStatus(t, CheckCrossArtifactInvariants(ws, wt), InvariantReferencedPaths, InvariantOK)
 }
 
-// TestCrossArtifactInvariants_EscapingReferencedPathIsViolatedNotResolved is the
-// cycle-1676 audit's L1, as a test: a citation that climbs out of both roots with
-// enough "../" segments lands, after filepath.Join's cleaning, on a file that
-// really exists — /etc/hosts here — and a containment-free implementation reports
-// the invariant OK. A path outside the tree the lane wrote is never evidence the
-// lane produced, so the only sound status is violated.
 func TestCrossArtifactInvariants_EscapingReferencedPathIsViolatedNotResolved(t *testing.T) {
 	ws, wt := xaCoherentWorkspace(t)
 	escape := strings.Repeat("../", 12) + "etc/hosts"
@@ -382,10 +258,6 @@ func TestCrossArtifactInvariants_EscapingReferencedPathIsViolatedNotResolved(t *
 	}
 }
 
-// TestCrossArtifactInvariants_PhaseOrderViolationsAreReported — invariant 4,
-// table-driven over the two provenance shapes that cannot happen in a sound
-// cycle: a chain that runs backwards, and an audit recorded before the build it
-// is supposed to be auditing.
 func TestCrossArtifactInvariants_PhaseOrderViolationsAreReported(t *testing.T) {
 	cases := []struct {
 		name    string
@@ -432,14 +304,6 @@ func TestCrossArtifactInvariants_PhaseOrderViolationsAreReported(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// AC2 — absent and malformed artifacts fail SAFE, and are distinguishable from
-// a verified match.
-// ---------------------------------------------------------------------------
-
-// TestCrossArtifactInvariants_AbsentArtifactsAreIndeterminateNotOK — an empty
-// workspace proves nothing about anything. Four indeterminates, zero
-// violations (no false positive), and never ok (no false confidence).
 func TestCrossArtifactInvariants_AbsentArtifactsAreIndeterminateNotOK(t *testing.T) {
 	got := CheckCrossArtifactInvariants(t.TempDir(), t.TempDir())
 	for _, name := range xaAllFour {
@@ -450,11 +314,6 @@ func TestCrossArtifactInvariants_AbsentArtifactsAreIndeterminateNotOK(t *testing
 	}
 }
 
-// TestCrossArtifactInvariants_MalformedArtifactsAreIndeterminateNotOK — the OOD
-// lane, table-driven: truncated JSON, a wrong-typed field, an empty results
-// array, a timing log that is an object instead of an array, and timestamps
-// that do not parse. Each must be indeterminate — never ok, never violated,
-// never a panic.
 func TestCrossArtifactInvariants_MalformedArtifactsAreIndeterminateNotOK(t *testing.T) {
 	cases := []struct {
 		name      string
@@ -511,9 +370,6 @@ func TestCrossArtifactInvariants_MalformedArtifactsAreIndeterminateNotOK(t *test
 	}
 }
 
-// TestCrossArtifactInvariants_ViolationsReturnsOnlyTheViolated — the projection
-// the advisory surface reports through: indeterminates never leak into the
-// violation list, and a violation keeps its evidence.
 func TestCrossArtifactInvariants_ViolationsReturnsOnlyTheViolated(t *testing.T) {
 	ws, wt := xaCoherentWorkspace(t)
 	xaWriteAudit(t, ws, "FAIL", nil)                                          // verdict-agreement → violated
@@ -537,9 +393,6 @@ func TestCrossArtifactInvariants_ViolationsReturnsOnlyTheViolated(t *testing.T) 
 	}
 }
 
-// TestCrossArtifactInvariants_ExistingVerdictCoherenceIsUntouched — AC4's
-// no-regression half at the unit level: the ADR-0072 leaf this package already
-// owns keeps its exact behaviour while the aggregate is added beside it.
 func TestCrossArtifactInvariants_ExistingVerdictCoherenceIsUntouched(t *testing.T) {
 	forged := CheckVerdictCoherence(VerdictInputs{Recorded: "FAIL", Audit: "PASS", ACS: "PASS", AuditRan: true})
 	if !forged.Incoherent || forged.Category != "verdict-incoherence" {

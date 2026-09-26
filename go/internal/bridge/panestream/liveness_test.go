@@ -7,13 +7,8 @@ import (
 	"testing"
 )
 
-// liveness_test.go — Unit tests for DefaultDetector, ClaudeDetector, and DetectorFor.
-// These supplement the ACS predicates in go/acs/cycle423/ with lower-level
-// behavioral assertions over individual pane frame sequences.
-
 func testdataFrame(t *testing.T, relPath string) string {
 	t.Helper()
-	// Locate testdata relative to this file.
 	_, file, _, _ := runtime.Caller(0)
 	dir := filepath.Dir(file)
 	b, err := os.ReadFile(filepath.Join(dir, "testdata", relPath))
@@ -23,8 +18,6 @@ func testdataFrame(t *testing.T, relPath string) string {
 	return string(b)
 }
 
-// TestDefaultDetector_Converging asserts the four CLIs all classify Converging
-// when new stable content appears (thinking → answer frame sequence).
 func TestDefaultDetector_Converging(t *testing.T) {
 	cases := []struct{ cli, think, answer string }{
 		{"claude", "claude/thinking.txt", "claude/answer.txt"},
@@ -45,14 +38,9 @@ func TestDefaultDetector_Converging(t *testing.T) {
 	}
 }
 
-// TestDefaultDetector_SpinnerOnlyIsNotConverging is the load-bearing negative
-// test: a frame pair whose ONLY delta is spinner/chrome (no new content line)
-// must NOT classify as Converging. This prevents gaming by treating any
-// pane-diff as "progress" (the historic ticking-clock hole).
 func TestDefaultDetector_SpinnerOnlyIsNotConverging(t *testing.T) {
 	p := Profiles["claude"]
 	det := NewDefaultDetector(3)
-	// Prime on content frame.
 	det.Assess("⏺ real content\n❯ \n", p)
 	// Spinner-only frame: only the chrome/affordance changes, content is identical.
 	spinner := "⏺ real content\n✽ Thinking… (5s · ↓ 50 tokens)\n❯ \n"
@@ -62,8 +50,6 @@ func TestDefaultDetector_SpinnerOnlyIsNotConverging(t *testing.T) {
 	}
 }
 
-// TestDefaultDetector_PrimingNotHung asserts the first Assess call on an empty
-// or minimal pane never returns LivenessHung.
 func TestDefaultDetector_PrimingNotHung(t *testing.T) {
 	p := Profiles["claude"]
 	for _, frame := range []string{
@@ -79,58 +65,42 @@ func TestDefaultDetector_PrimingNotHung(t *testing.T) {
 	}
 }
 
-// TestDefaultDetector_HungAfterThreshold asserts Hung is emitted after exactly
-// stallThreshold consecutive busy-stagnant intervals.
 func TestDefaultDetector_HungAfterThreshold(t *testing.T) {
 	p := Profiles["claude"]
 	const stall = 2
 	det := NewDefaultDetector(stall)
 	det.Assess("⏺ initial\n❯ \n", p) // prime
-	// Interval 1 — stalls=1 < 2, expect BusyButStagnant.
 	s1, _ := det.Assess("⏺ initial\n✽ Thinking… (5s · ↓ 10 tokens)\n❯ \n", p)
 	if s1 == LivenessHung {
 		t.Fatalf("interval 1/%d: must NOT be Hung yet (got %v)", stall, s1)
 	}
-	// Interval 2 — stalls=2 ≥ 2, expect Hung.
 	s2, _ := det.Assess("⏺ initial\n✽ Thinking… (8s · ↓ 25 tokens)\n❯ \n", p)
 	if s2 != LivenessHung {
 		t.Errorf("interval 2/%d: got %v, want LivenessHung", stall, s2)
 	}
 }
 
-// TestDefaultDetector_IdleResetsStalls asserts that a non-busy quiet frame
-// resets the stall counter so subsequent busy-stagnant intervals restart from 0
-// rather than accumulating across an Idle gap.
 func TestDefaultDetector_IdleResetsStalls(t *testing.T) {
 	p := Profiles["claude"]
 	det := NewDefaultDetector(2)
 	det.Assess("⏺ content\n❯ \n", p) // prime
-	// One busy-stagnant interval (stalls=1).
 	det.Assess("⏺ content\n✽ Thinking… (3s · ↓ 5 tokens)\n❯ \n", p)
-	// An idle frame (not busy) — resets stalls to 0.
 	det.Assess("⏺ content\n❯ \n", p)
-	// Another busy-stagnant interval (stalls=1 again, not 2).
 	s, _ := det.Assess("⏺ content\n✽ Thinking… (3s · ↓ 5 tokens)\n❯ \n", p)
 	if s == LivenessHung {
 		t.Errorf("after idle reset, one more busy-stagnant interval must NOT be Hung (stallThreshold=2), got %v", s)
 	}
 }
 
-// TestClaudeDetector_IncreasingTokensConverging asserts that a strictly-
-// increasing ↓ token counter over multiple intervals yields Converging with
-// higher confidence than DefaultDetector on the same frames (pure chrome frames
-// where DefaultDetector would classify BusyButStagnant or Hung).
 func TestClaudeDetector_IncreasingTokensConverging(t *testing.T) {
 	p := Profiles["claude"]
 	base := NewDefaultDetector(3)
 	det := NewClaudeDetector(3)
-	// Three frames with strictly increasing ↓ token counters, no content lines.
 	frames := []string{
 		"✽ Thinking… (5s · ↓ 50 tokens)\n❯ \n",
 		"✽ Thinking… (10s · ↓ 150 tokens)\n❯ \n",
 		"✽ Thinking… (15s · ↓ 300 tokens)\n❯ \n",
 	}
-	// Feed frames[0:2] to both (prime + one more).
 	for _, f := range frames[:2] {
 		base.Assess(f, p)
 		det.Assess(f, p)
@@ -145,8 +115,6 @@ func TestClaudeDetector_IncreasingTokensConverging(t *testing.T) {
 	}
 }
 
-// TestClaudeDetector_StaticTokenFallsBack asserts that a static (non-increasing)
-// ↓ token counter produces the same state+confidence as DefaultDetector.
 func TestClaudeDetector_StaticTokenFallsBack(t *testing.T) {
 	p := Profiles["claude"]
 	base := NewDefaultDetector(3)
@@ -166,8 +134,6 @@ func TestClaudeDetector_StaticTokenFallsBack(t *testing.T) {
 	}
 }
 
-// TestClaudeDetector_MalformedTokenNoPanic asserts malformed token lines cause
-// no panic and no confidence elevation above the default.
 func TestClaudeDetector_MalformedTokenNoPanic(t *testing.T) {
 	p := Profiles["claude"]
 	malformed := []string{
@@ -196,8 +162,6 @@ func TestClaudeDetector_MalformedTokenNoPanic(t *testing.T) {
 	}
 }
 
-// TestDetectorFor_NonClaudeIsDefault asserts DetectorFor returns a detector
-// byte-identical to DefaultDetector for non-claude CLIs.
 func TestDetectorFor_NonClaudeIsDefault(t *testing.T) {
 	for _, cli := range []string{"codex", "agy", "ollama"} {
 		t.Run(cli, func(t *testing.T) {
@@ -220,8 +184,6 @@ func TestDetectorFor_NonClaudeIsDefault(t *testing.T) {
 	}
 }
 
-// TestDetectorFor_ClaudeIsClaudeDetector asserts DetectorFor returns a detector
-// that activates the token-counter layer for claude (higher conf on increasing ↓ tokens).
 func TestDetectorFor_ClaudeIsClaudeDetector(t *testing.T) {
 	p := Profiles["claude"]
 	probe := DetectorFor(p)
@@ -239,31 +201,21 @@ func TestDetectorFor_ClaudeIsClaudeDetector(t *testing.T) {
 	}
 }
 
-// TestExtractResponseTokens pins the exported ExtractResponseTokens contract:
-// the single-source token extractor (S1, cycle-429). Named so apicover -enforce
-// can locate the exported symbol. Table covers k-form, plain-integer (superset
-// behavior vs. old stopreview k-only extractor), peak-across-matches, malformed
-// inputs, and empty — the adversarial negative (malformed→0) prevents a no-op
-// that returns a constant from passing the k-form cases.
 func TestExtractResponseTokens(t *testing.T) {
 	cases := []struct {
 		name string
 		pane string
 		want int
 	}{
-		// k-form — the real claude production rendering
+		// k-form is claude's real rendering; plain integers appear in synthetic frames.
 		{"k-form integer", "↓ 12k tokens", 12000},
 		{"k-form fractional", "↓ 5.2k tokens", 5200},
 		{"k-form half", "↓ 3.5k tokens", 3500},
-		// plain-integer — synthetic test frames; superset of the old k-only extractor
 		{"plain-integer 50", "↓ 50 tokens", 50},
 		{"plain-integer 200", "↓ 200 tokens", 200},
-		// peak-across-matches
 		{"multiple → peak", "↓ 1k tokens\n↓ 5k tokens\n↓ 3k tokens\n", 5000},
 		{"peak-is-last", "↓ 2k tokens\n↓ 9.9k tokens\n", 9900},
-		// chrome-embedded
 		{"in chrome line", "✽ Thinking… (5s · ↓ 50 tokens)\n❯ \n", 50},
-		// adversarial negative — malformed must return 0 (no-op can't pass k-form)
 		{"empty pane", "", 0},
 		{"no counter", "❯ ready\n", 0},
 		{"malformed: no digits", "↓ k tokens", 0},

@@ -38,13 +38,10 @@ func TestCoreAdapter_NoProducer_WhenChannelOff(t *testing.T) {
 	}
 }
 
-// TestChannelSourcePaths_TmuxFamily: a tmux-family CLI (the default, or any
-// *-tmux) streams live content to <agent>-pane.live + breadcrumbs to
-// <agent>-breadcrumbs.live, so the producer must tail those.
 func TestChannelSourcePaths_TmuxFamily(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
-	a := &CoreAdapter{} // no override → default claude-tmux
+	a := &CoreAdapter{}
 
 	cases := []struct {
 		name string
@@ -69,9 +66,6 @@ func TestChannelSourcePaths_TmuxFamily(t *testing.T) {
 	}
 }
 
-// TestChannelSourcePaths_Headless: a headless (-p) CLI streams live to
-// <phase>-stdout.log, so the helper returns empty strings and the producer
-// falls back to its legacy defaults (no pane.live exists for headless).
 func TestChannelSourcePaths_Headless(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
@@ -83,9 +77,8 @@ func TestChannelSourcePaths_Headless(t *testing.T) {
 	}
 }
 
-// TestChannelSourcePaths_PerAgentKeyIgnoresProcessEnv: request-scoped per-agent
-// keys remain supported, hyphens map to underscores, and the persistent process
-// environment is ignored because agent profiles are the routing SSOT.
+// Process env is never read at all; TestCoreAdapter_HasNoStderrLinesAndNoEnvReads
+// pins that. This test covers the request-scoped key and its hyphen mapping.
 func TestChannelSourcePaths_PerAgentKeyIgnoresProcessEnv(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()

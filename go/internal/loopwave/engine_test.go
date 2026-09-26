@@ -18,9 +18,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// harness is one engine over a temp project root, reporting into a recording
-// Center whose WARN+ events also render on console (the root sink topology's
-// shape), with the kept stderr lines on stderr.
+// harness mirrors the root sink topology: every event is recorded, and WARN+ also renders on console.
 type harness struct {
 	root, evolveDir string
 	stderr, console *bytes.Buffer
@@ -89,8 +87,6 @@ func golden(t *testing.T, name string) string {
 	return string(raw)
 }
 
-// recorder records every Run and answers one result per spec; failing lists
-// the spec indexes that fail.
 type recorder struct {
 	calls   [][]fleet.CycleSpec
 	failing map[int]bool
@@ -126,8 +122,6 @@ func waveFC(count int) policy.FleetConfig {
 
 func pass() error { return nil }
 
-// --- 11. codes ---
-
 func TestCodes_AreRegisteredUnderLoopWithDocs(t *testing.T) {
 	for _, c := range []signalcenter.Code{CodeMinWidthRepair, CodeWaveDispatchFailed, CodeWaveEmptyPlan, CodeWaveAllLanesStale} {
 		if m, ok := signalcenter.IsRegistered(c); !ok || m != signalcenter.ModuleLoop {
@@ -148,8 +142,6 @@ func TestCodes_AreRegisteredUnderLoopWithDocs(t *testing.T) {
 	}
 }
 
-// --- 12. the gate ---
-
 func TestShouldRunWave_GateTable(t *testing.T) {
 	cases := []struct {
 		fc   policy.FleetConfig
@@ -169,8 +161,6 @@ func TestShouldRunWave_GateTable(t *testing.T) {
 		}
 	}
 }
-
-// --- 13. the typed step error ---
 
 func TestStepError_RendersTheThreeLiteralsAndUnwraps(t *testing.T) {
 	cause := errors.New("boom")
@@ -205,8 +195,6 @@ func TestStepError_RendersTheThreeLiteralsAndUnwraps(t *testing.T) {
 		}
 	}
 }
-
-// --- 14-16. Dispatch ---
 
 func TestDispatch_GateOffTouchesNothing(t *testing.T) {
 	h := newHarness(t)
@@ -264,7 +252,6 @@ func TestDispatch_EmptyPlanIsRanFalseWithNoSignalAndNoLaunch(t *testing.T) {
 	if err != nil || out.Ran || len(l.calls) != 0 || len(*h.events) != 0 {
 		t.Errorf("an empty plan is ran=false, silent, unlaunched: %+v %v %v", out, err, h.codes())
 	}
-	// A clean wave: two lanes, the caller's ctx, no event.
 	ctx := context.WithValue(context.Background(), ctxKey{}, "probe")
 	seen := ""
 	plan := func(c context.Context, _ int) ([]byte, []string, error) {
@@ -278,8 +265,6 @@ func TestDispatch_EmptyPlanIsRanFalseWithNoSignalAndNoLaunch(t *testing.T) {
 }
 
 type ctxKey struct{}
-
-// --- 17-18. ForceOneLane and the shared body ---
 
 func TestForceOneLane_CapsAtOneLaneUngatedAndSilent(t *testing.T) {
 	h := newHarness(t)
@@ -307,7 +292,7 @@ func TestForceOneLane_CapsAtOneLaneUngatedAndSilent(t *testing.T) {
 func TestDispatchAndForceOneLane_ShareOneBody(t *testing.T) {
 	h := newHarness(t)
 	l1, l2 := &recorder{}, &recorder{}
-	// One-card plan: the fan-out and the repair produce identical specs.
+	// One card, so the one-lane cap cannot make the repair's specs differ from the fan-out's.
 	one := func(context.Context, int) ([]byte, []string, error) {
 		return []byte(`{"top_n":[{"id":"a","files":["a.go"]}]}`), nil, nil
 	}
@@ -334,8 +319,6 @@ func TestDispatchAndForceOneLane_ShareOneBody(t *testing.T) {
 		}
 	}
 }
-
-// --- 19. RepairMinWidth ---
 
 func TestRepairMinWidth_FourBranchesAndTheirSignals(t *testing.T) {
 	t.Run("guard not met", func(t *testing.T) {
@@ -405,8 +388,6 @@ func TestRepairMinWidth_FourBranchesAndTheirSignals(t *testing.T) {
 	})
 }
 
-// --- 20. FailedLanes ---
-
 func TestFailedLanes_CountsErrOrNonZeroExit(t *testing.T) {
 	results := []fleet.Result{{Err: errors.New("x")}, {ExitCode: 4}, {}, {Err: errors.New("y"), ExitCode: 1}}
 	if got := FailedLanes(results); got != 3 {
@@ -416,8 +397,6 @@ func TestFailedLanes_CountsErrOrNonZeroExit(t *testing.T) {
 		t.Error("no results, no failures")
 	}
 }
-
-// --- 21-22. the fleet config loaders ---
 
 func TestLoadFleetConfig_DefaultsOnAnyError(t *testing.T) {
 	dir := t.TempDir()
@@ -438,10 +417,6 @@ func TestLoadFleetConfig_DefaultsOnAnyError(t *testing.T) {
 	}
 }
 
-// Review fold R3 — the roots are a Parameter Object with an invariant: both
-// halves populated, or neither (the rootless engine of the pure dispatch
-// facades). RootsOf derives EvolveDir from the project root the production
-// way (paths.EvolveDirOf), for the host facades that carry a root alone.
 func TestRootsOf_DerivesEvolveDirTheProductionWay(t *testing.T) {
 	if got := RootsOf("/x"); got != (Roots{ProjectRoot: "/x", EvolveDir: paths.EvolveDirOf("/x")}) || got.EvolveDir != filepath.Join("/x", ".evolve") {
 		t.Errorf("RootsOf = %+v", got)
@@ -483,8 +458,6 @@ func TestReloadFleetConfig_HoldsWithTheVerbatimWarnAndReportsOnlyChanges(t *test
 	run(t, "reload_concurrency_only", `{"fleet":{"count":3,"min_lanes":2,"concurrency":9,"plan_source":"triage"}}`, func(fc policy.FleetConfig) bool { return fc.Concurrency == 9 })
 }
 
-// --- 26. the routed resolver ---
-
 func TestRoutedResolver_RefusalPrintsTheVerbatimLineOnceAndPassesThrough(t *testing.T) {
 	h := newHarness(t)
 	writeJSON(t, filepath.Join(h.evolveDir, "inbox", "console.json"), map[string]any{"id": "console-item", "weight": 0.9, "files": []string{"go/protected/x.go"}})
@@ -507,8 +480,6 @@ func TestRoutedResolver_RefusalPrintsTheVerbatimLineOnceAndPassesThrough(t *test
 		t.Errorf("printed once, no event: %q %v", h.stderr.String(), h.codes())
 	}
 }
-
-// --- 34-35. EmitWave and the Null Object ---
 
 func TestEmitWave_InfoWithoutCodeWarnWithAndStampsWaveOnACopy(t *testing.T) {
 	h := newHarness(t)
@@ -565,7 +536,6 @@ func TestEngine_NullObjectAndSignalsWired(t *testing.T) {
 	if stderr.Len() != 0 {
 		t.Errorf("nothing hand-written reaches stderr for the coded conditions: %q", stderr.String())
 	}
-	// The accessor is read live: a Center installed later is seen.
 	var c *signalcenter.Center
 	e := New(Roots{}, h.ports, io.Discard, WithSignals(func() *signalcenter.Center { return c }))
 	if e.SignalsWired() {

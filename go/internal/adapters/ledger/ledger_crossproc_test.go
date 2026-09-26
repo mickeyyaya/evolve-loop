@@ -10,24 +10,14 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// ledger_crossproc_test.go — CA.1 (concurrency-factory plan, Track C-A):
-// FileLedger.Append must be cross-PROCESS safe, not just cross-goroutine.
-// The in-process sync.Mutex cannot serialize two `evolve` processes
-// (fleet supervisor + a cycle, or two concurrent batches — the 278/279
-// two-session launch race class): without an OS-level lock the
-// tip-read→append→tip-write window interleaves and the hash chain breaks.
-
 const stressDirEnv = "EVOLVE_LEDGER_STRESS_DIR"
 const stressN = 150
 
-// stressEntry builds a minimal distinguishable entry for the stress test.
 func stressEntry(kind string, i int) core.LedgerEntry {
 	return core.LedgerEntry{TS: fmt.Sprintf("2026-06-11T00:00:%02dZ", i%60), Cycle: 9000 + i, Role: "stress", Kind: kind}
 }
 
-// TestHelperLedgerAppender is not a real test: it is the child process body
-// for the two-process stress test below. Gated on the env var so a normal
-// `go test` run skips it instantly.
+// Not a test: the child-process body the cross-process stress tests spawn.
 func TestHelperLedgerAppender(t *testing.T) {
 	dir := os.Getenv(stressDirEnv)
 	if dir == "" {
@@ -42,9 +32,6 @@ func TestHelperLedgerAppender(t *testing.T) {
 	}
 }
 
-// TestAppend_TwoProcessStress — the CA.1 acceptance: two OS processes
-// append concurrently; afterwards the chain verifies and every entry made
-// it in with a unique, gapless entry_seq.
 func TestAppend_TwoProcessStress(t *testing.T) {
 	if testing.Short() {
 		t.Skip("two-process stress skipped in -short")

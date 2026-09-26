@@ -11,11 +11,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
-// canonicalOrder is the linear phase sequence the walk advances through. The
-// mandatory spine (scout→build→audit→ship) is a subset; optional phases sit
-// between anchors and run only when triggered/enabled. "retrospective" is the
-// canonical name for the retro phase (core.PhaseRetro="retro" is an alias the
-// orchestrator maps at the boundary).
+// canonicalOrder is the walk order when the config supplies none.
 var canonicalOrder = []string{
 	"intent", "scout", "triage", "plan-review",
 	"tdd", "build-planner", "build", "tester",
@@ -26,130 +22,71 @@ var canonicalOrder = []string{
 const PhaseEnd = "end"
 
 // RouteInput is the complete, pre-digested context for one routing decision.
-// PURE: the caller does all I/O and hands in plain values.
 type RouteInput struct {
-	Current        string                 // phase that just completed ("start" on cycle entry)
-	Verdict        string                 // its canonical verdict
-	Signals        RoutingSignals         // digest envelope (objective)
-	History        []failureadapter.Entry // converted state.failedApproaches
+	Current        string // "start" on cycle entry
+	Verdict        string
+	Signals        RoutingSignals
+	History        []failureadapter.Entry // state.failedApproaches, converted
 	Cfg            config.RoutingConfig
-	Completed      []string // phases already done this cycle
-	Strict         bool     // policy.json workflow.strict_audit — threaded to failureadapter for retro
+	Completed      []string
+	Strict         bool // policy.json workflow.strict_audit, passed to failureadapter
 	Now            time.Time
 	IntentRequired bool
-	PSMASEnabled   bool // EVOLVE_PSMAS_SKIP — consume triage phase_skip[] when enabled.
+	PSMASEnabled   bool // consume triage phase_skip[]
 
-	// Proposer context — populated by the orchestrator, consumed ONLY by a
-	// DynamicLLM Proposer (which needs to dispatch a bridge call). The pure
-	// Route() function ignores these, so determinism is preserved.
+	// Workspace through Env are the advisor's bridge-launch context; the pure Route ignores them.
 	Workspace   string
 	ProjectRoot string
-	// ActiveWorktree is the cycle's git source worktree, threaded to the advisor's
-	// bridge launch. Required under EVOLVE_FLEET=1 (the tmux driver refuses an empty
-	// worktree); ignored by the pure Route(), so determinism is preserved.
+	// ActiveWorktree is required under EVOLVE_FLEET=1: the tmux driver refuses an empty worktree.
 	ActiveWorktree string
 	Cycle          int
 	Env            map[string]string
 
-	// BenchedCLIs is ENVIRONMENTAL context (not a handoff signal — it keeps
-	// RoutingSignals handoff-pure): CLI families currently benched by the
-	// cli-health store (classified transient wall, e.g. rate_limit). Consumed
-	// ONLY by the DynamicLLM advisor prompt so plans adapt to a degraded
-	// family — fewer inserts routed there, scope sized for the fallback CLI
-	// carrying the cycle. The pure Route() ignores it.
+	// BenchedCLIs is advisor prompt context only, like GoalText, CarryoverTodos, LastReason and Lessons.
 	BenchedCLIs []BenchedCLI
-	// UnavailablePhases is ENVIRONMENTAL context like BenchedCLIs: catalog-
-	// Optional phases whose persona doc does not exist (core probes every
-	// optional runner at plan time — 2026-09-09 token-waste root cause #2).
-	// The advisor is not offered them, the floor clamp drops them if proposed
-	// anyway, and the legacy trigger path never inserts them. Mandatory and
-	// floor phases are never listed here: their absence stays a loud dispatch
-	// failure.
+	// UnavailablePhases are catalog-optional phases whose persona doc is absent; the walk and the
+	// floor clamp drop them. Mandatory and floor phases are never listed: their absence must fail loudly.
 	UnavailablePhases []string
 
-	// GoalText is the human-readable goal/strategy for this cycle (the same text
-	// Scout works from). Populated by the orchestrator from
-	// CycleRequest.Context["strategy"]; consumed ONLY by the DynamicLLM advisor's
-	// prompt so the brain can reason about WHAT the cycle is for — the precondition
-	// for genuinely selecting a design phase or minting one, rather than planning
-	// blind. The pure Route() ignores it, so determinism is preserved. Empty when
-	// no goal text was threaded (the advisor then plans from signals + recall only).
 	GoalText string
 
-	// CarryoverTodos are unresolved operator/workflow tasks from previous cycles,
-	// projected from state.json:carryoverTodos by the orchestrator at cycle start.
-	// Consumed ONLY by the DynamicLLM planner prompt so the upfront whole-cycle
-	// advisor can select phases based on known backlog before Scout has produced
-	// any handoff artifacts. The pure Route() ignores it.
 	CarryoverTodos []CarryoverTodo
 
-	// Catalog is the set of pre-defined phases the advisor may SELECT instead of
-	// minting a new one (WS3: prefer select-over-mint = DRY at the agent level).
-	// Populated by the orchestrator from the phase catalog; consumed ONLY by a
-	// DynamicLLM Planner when rendering its prompt. The pure Route() ignores it,
-	// so determinism is preserved. Additive: nil until the advisor-prompt slice
-	// wires it.
+	// Catalog is the set of pre-defined phases the advisor may select instead of minting.
 	Catalog []PhaseCard
-	// OnDemandPhases names the installed phases that declined a SELECT slot
-	// (phasespec.CatalogOnDemand). Carried beside Catalog deliberately: the menu
-	// and the index of what is off the menu are two halves of one statement, and
-	// splitting them is how one half goes stale.
+	// OnDemandPhases are installed phases that declined a SELECT slot (phasespec.CatalogOnDemand).
+	// They travel with Catalog: the menu and what is off it are one statement.
 	OnDemandPhases []string
 
-	// LastReason + Lessons are the recall-memory context (WS2): the short "why"
-	// of the most recent failure and the prior lessons that match it, looked up
-	// from the knowledge base by the orchestrator. Consumed ONLY by the advisor's
-	// prompt (recall informs planning); the pure Route() ignores them. Empty when
-	// there is no recent failure or no matching lesson — which is itself the
-	// novel-failure signal.
+	// LastReason and Lessons are recall context; empty means a novel failure.
 	LastReason string
 	Lessons    []string
 
-	// Plan is the advisor's whole-cycle run/skip plan, ALREADY clamped to the
-	// integrity floor (ClampPlanToFloor) by the orchestrator before threading.
-	// Consulted by shouldRun ONLY at Stage>=Advisory: a NON-mandatory phase runs
-	// iff the plan schedules it (Run==true). Because the plan is pre-clamped, the
-	// ship-chain (build∧audit∧tdd) is Run even when those phases are not in the
-	// configurable mandatory set — the integrity floor that config cannot weaken.
-	// Nil ⇒ no advisor plan this cycle ⇒ the legacy trigger-driven path runs
-	// unchanged (byte-identical / fail-safe to static). Plain data handed in by
-	// the caller, so Route stays deterministic and I/O-free.
+	// Plan is the advisor's whole-cycle plan, already floor-clamped by the caller.
+	// At Stage>=Advisory it drives non-mandatory phases; nil keeps the trigger path.
 	Plan *PhasePlan
 
-	// Blocker is the string-only ship-error envelope the orchestrator passes
-	// when routing a ship FAILURE for recovery (Recover, not Route). It is nil
-	// for ordinary (non-recovery) routing; the pure Route() ignores it entirely.
+	// Blocker is the ship failure Recover routes; nil for ordinary routing.
 	Blocker *Blocker
 }
 
-// PhaseCard is the advisor-facing projection of one pre-defined phase: enough
-// for the planner to decide "select this" vs "mint a new one" — identity plus
-// the spec's advisor-facing metadata (ADR-0038). The renderer (writeCatalog)
-// caps how much of this reaches the prompt; relevance judgment stays with the
-// advisor LLM, never a deterministic classifier.
+// PhaseCard is the advisor-facing projection of one pre-defined phase.
 type PhaseCard struct {
 	Name         string   `json:"name"`
 	Role         string   `json:"role"` // plan|build|evaluate|control
 	Tier         string   `json:"tier,omitempty"`
 	WritesSource bool     `json:"writes_source,omitempty"`
-	Optional     bool     `json:"optional,omitempty"`    // SELECTable (vs spine) — prioritized for enriched rendering
+	Optional     bool     `json:"optional,omitempty"`    // selectable, not spine
 	Description  string   `json:"description,omitempty"` // one line: what the phase produces
 	WhenToUse    string   `json:"when_to_use,omitempty"` // the SELECT hint
 	Categories   []string `json:"categories,omitempty"`  // goal types
-	// AllowedCLIs + ModelTierEnvelope (cycle-436 MR1) project this phase's own
-	// profile guardrails into the plan prompt, so the advisor's per-phase
-	// {cli,tier} proposal is grounded in-bounds instead of guessing blind.
-	// Both nil/empty in the common case (no per-phase guardrail configured);
-	// the MR2 clamp re-validates regardless of whether the advisor honored
-	// the projection. Reuses profiles.ModelTierEnvelope's exact JSON shape
-	// rather than forking a router-local type.
+	// AllowedCLIs and ModelTierEnvelope project the phase's profile guardrails so the
+	// advisor proposes in bounds; ClampPlanModelRouting re-validates regardless.
 	AllowedCLIs       []string                    `json:"allowed_clis,omitempty"`
 	ModelTierEnvelope *profiles.ModelTierEnvelope `json:"model_tier_envelope,omitempty"`
 }
 
-// CarryoverTodo is the router/advisor-facing projection of one unresolved
-// carryover task. It mirrors core.CarryoverTodo without importing core into the
-// leaf router package.
+// CarryoverTodo mirrors core.CarryoverTodo for the advisor without importing core.
 type CarryoverTodo struct {
 	ID             string `json:"id"`
 	Action         string `json:"action"`
@@ -158,9 +95,7 @@ type CarryoverTodo struct {
 	CyclesUnpicked int    `json:"cycles_unpicked"`
 }
 
-// Clamp records a hard-rule override applied to a soft/proposed decision.
-// Phase names which phase entry the clamp fired on (empty for a whole-plan
-// clamp with no single-phase owner, e.g. an empty-plan rejection).
+// Clamp records a hard rule overriding a proposed decision; Phase is empty for a whole-plan clamp.
 type Clamp struct {
 	Phase    string `json:"phase,omitempty"`
 	Rule     string `json:"rule"`
@@ -168,9 +103,7 @@ type Clamp struct {
 	Forced   string `json:"forced"`
 }
 
-// RouterDecision is the structured output. NextPhase is the immediate next
-// phase to run; InsertPhases/SkipPhases are the optional phases chosen/declined
-// while reaching it (forensic + ledger). Reason names the rule that fired.
+// RouterDecision is the next phase to run plus the inserts, skips and rule that led to it.
 type RouterDecision struct {
 	NextPhase    string                 `json:"next_phase"`
 	InsertPhases []string               `json:"insert_phases,omitempty"`
@@ -178,70 +111,40 @@ type RouterDecision struct {
 	Reason       string                 `json:"reason"`
 	Evidence     map[string]interface{} `json:"evidence,omitempty"`
 	Clamps       []Clamp                `json:"clamps,omitempty"`
-	// Justification is the LLM advisor's one-sentence rationale (DynamicLLM
-	// mode only; empty in deterministic/static routing). Captured even when the
-	// proposal is clamped, so the shadow soak can diff advisor-rationale against
-	// the kernel's static path (ADR-0024 problem #2).
+	// Justification is the advisor's rationale, captured even when its proposal is clamped.
 	Justification string `json:"justification,omitempty"`
 }
 
-// Proposal is the optional LLM advisory input (DynamicLLM mode). Route treats
-// it as advisory only and clamps it to legal/objective bounds.
+// Proposal is the advisor's per-transition advice; Route treats it as advisory and clamps it.
 type Proposal struct {
 	NextPhase     string   `json:"next_phase"`
 	InsertPhases  []string `json:"insert_phases"`
 	Justification string   `json:"justification"`
-	// Failure-path vocabulary (failure floor Phase 3) — meaningful only
-	// at failure transitions, applied ABOVE the deterministic floor:
-	// LearningRichness picks WHICH learning phase follows an audit FAIL
-	// ("full" → retrospective, "memo" → memo; never none) and
-	// RecoveryAction picks the post-retro branch ("retry" → tdd, "end")
-	// unless the failure-adapter says BLOCK (non-overridable, clamped).
+	// LearningRichness ("memo") picks the learning phase after an audit FAIL; RecoveryAction
+	// ("retry"|"end") picks the post-retro branch unless the failure adapter blocks.
 	LearningRichness string `json:"learning_richness,omitempty"`
 	RecoveryAction   string `json:"recovery_action,omitempty"`
 }
 
-// PhasePlanEntry is one phase's whole-cycle run/skip decision plus the advisor's
-// rationale. It is the building block of PhasePlan (ADR-0024 §2): the upfront,
-// whole-cycle advisory deciding which phases run this cycle, computed once at
-// cycle start. It is the cadence companion to Proposal — Proposal answers the
-// per-branch "insert this optional phase?" question from post-phase signals the
-// upfront plan cannot yet see.
+// PhasePlanEntry is one phase's run/skip decision in the whole-cycle plan.
 type PhasePlanEntry struct {
 	Phase         string `json:"phase"`
 	Run           bool   `json:"run"`
 	Justification string `json:"justification,omitempty"`
-	// CLI/Tier mirror MintSpec{Tier,CLI} (cycle-436 MR1) onto an EXISTING
-	// (non-minted) phase's plan entry: the advisor's proposed dispatch CLI and
-	// abstract model TIER (fast|balanced|deep — never a raw model name). Both
-	// omitempty so a plan that never sets them (today's entire static-routing
-	// fleet) marshals BYTE-IDENTICAL to the pre-MR1 wire form — the H1
-	// regression floor. Advisory only: router.ClampPlanModelRouting
-	// re-validates against the phase's profile guardrails + the live model
-	// catalog before either ever reaches dispatch.
+	// CLI and Tier are the advisor's proposed dispatch CLI and abstract tier, never a raw
+	// model. ClampPlanModelRouting re-validates both before dispatch.
 	CLI  string `json:"cli,omitempty"`
 	Tier string `json:"tier,omitempty"`
-	// Mint, when present, marks this entry as a NEW phase the advisor is
-	// proposing (absent from the catalog). The orchestrator registers it via
-	// the trust-kernel clamp and dispatches it by Phase name. Absent (the
-	// common case) ⇒ a plain run/skip decision for an existing phase.
+	// Mint marks a new phase absent from the catalog; nil for an existing phase.
 	Mint *MintSpec `json:"mint,omitempty"`
 }
 
-// MintSpec is the LLM-authorable subset of a minted phase: the persona + the
-// dispatch knobs an advisor can realistically emit. The advisor emits a TIER
-// (fast/balanced/deep), never a raw model. The full phaseconfig.PhaseConfig is
-// reconstructed from this + the entry's Phase name at parse time; gates/IO take
-// safe defaults (the registrar forces Optional + sandboxes source-writers).
+// MintSpec is the advisor-authorable subset of a minted phase: its prompt, tier and CLI.
 type MintSpec struct {
 	Prompt string `json:"prompt"`
 	Tier   string `json:"tier,omitempty"`
 	CLI    string `json:"cli,omitempty"`
-	// Description/WhenToUse are the advisor's SELECT metadata (ADR-0038),
-	// carrying the SAME json keys phasespec.PhaseSpec uses so the minter can
-	// thread them through without a vocabulary translation. Optional: omitted
-	// metadata mints exactly as before (cycle-1275 — the minter now satisfies
-	// the catalog metadata contract itself instead of metadataAllowlist padding).
+	// Description and WhenToUse use phasespec.PhaseSpec's json keys so the minter needs no translation.
 	Description string `json:"description,omitempty"`
 	WhenToUse   string `json:"when_to_use,omitempty"`
 	// WritesSource is tri-state so omitted advisor output can take the safe
@@ -249,34 +152,19 @@ type MintSpec struct {
 	WritesSource *bool `json:"writes_source,omitempty"`
 }
 
-// PhasePlan is the advisor's whole-cycle plan. ADVISORY only: the kernel clamp
-// re-validates it against the integrity floor before any phase runs, so a
-// hallucinated plan can never weaken the ship guarantee ("model proposes, kernel
-// disposes"). The clamp itself lands in a later slice; this is the carrier type.
-//
-// Wire format note: the on-disk/LLM form is a BARE JSON array of PhasePlanEntry
-// (see parsePhasePlan). Entries carries no json tag deliberately — callers
-// serialize plan.Entries directly (a bare array), never the PhasePlan wrapper,
-// so the round-trip stays symmetric with what the advisor emits.
+// PhasePlan is the advisor's whole-cycle plan; the floor clamp re-validates it before any phase runs.
+// Entries has no json tag because callers serialize plan.Entries as a bare array, the form the advisor emits.
 type PhasePlan struct {
 	Entries []PhasePlanEntry
-	// MintPhases are NEW phases the advisor proposes that are absent from the
-	// catalog — each a self-contained config (inline prompt/persona + tier +
-	// CLI + gates). The orchestrator registers them through the trust-kernel
-	// clamp (envelope/allowed-CLIs) at cycle start, then dispatches them by
-	// name through the same path as a built-in. Empty in the common case.
+	// MintPhases are new phases the orchestrator registers through the trust-kernel clamp at cycle start.
 	MintPhases []phaseconfig.PhaseConfig
 }
 
-// Route computes the routing decision. PURE: deterministic given its inputs.
-// Ordered rules; the clamp pass is non-bypassable and runs last.
+// Route computes the routing decision from ordered rules; the clamp pass runs last.
 func Route(in RouteInput, proposal *Proposal) RouterDecision {
 	cur := normalize(in.Current)
 
-	// Rule 0 — Retro delegation. Do NOT duplicate failure logic; defer to the
-	// deterministic failure-adapter exactly as orchestrator.decideAfterRetro
-	// does. The advisor's failure vocabulary (RecoveryAction, failure-scoped
-	// inserts) applies above that floor — BLOCK is non-overridable.
+	// Defer to the failure adapter exactly as the orchestrator's decideAfterRetro does.
 	if cur == "retrospective" {
 		return retroDecision(in, proposal)
 	}
@@ -298,10 +186,7 @@ func Route(in RouteInput, proposal *Proposal) RouterDecision {
 		}
 	}
 
-	// Rule 1 — Audit verdict branch (the one verdict-driven edge). FAIL must not
-	// proceed to ship; it diverts to a learning phase. The advisor's
-	// LearningRichness picks WHICH one (full retrospective vs memo) — never
-	// none: a disabled choice is clamped back to the retrospective.
+	// Audit FAIL never proceeds to ship; it diverts to a learning phase.
 	if cur == "audit" {
 		if in.Verdict == "FAIL" {
 			d := RouterDecision{
@@ -310,9 +195,7 @@ func Route(in RouteInput, proposal *Proposal) RouterDecision {
 				Evidence:  map[string]interface{}{"verdict": in.Verdict},
 			}
 			if in.Cfg.AuditFailRoutesTo != "" {
-				// Phase 4a: policy.json:failure_floor is the one surface
-				// for this route; it supersedes the deprecated env-flag
-				// enable chain entirely.
+				// policy.json:failure_floor supersedes the deprecated enable chain.
 				d.NextPhase = in.Cfg.AuditFailRoutesTo
 				d.Reason = "audit-fail-to-" + in.Cfg.AuditFailRoutesTo
 			} else if enableOf(in.Cfg, "retrospective") == config.EnableOff {
@@ -321,23 +204,19 @@ func Route(in RouteInput, proposal *Proposal) RouterDecision {
 			applyLearningRichness(&d, proposal, in)
 			return d
 		}
-		// PASS/WARN fall through to the walk (→ ship).
 	}
 
-	// Rules 1–3 — walk the canonical order from Current+1 to the first runnable
-	// phase, accumulating chosen inserts and declined skips.
 	return walk(in, proposal)
 }
 
-// retroDecision implements Rule 0 via failureadapter.Decide, then applies
-// the advisor's failure proposal above that floor.
+// retroDecision applies failureadapter.Decide, then the advisor's failure proposal above it.
 func retroDecision(in RouteInput, proposal *Proposal) RouterDecision {
 	dec := failureadapter.Decide(in.History, failureadapter.Options{Now: in.Now, Strict: in.Strict})
 	d := RouterDecision{
 		Reason:   "retro:" + string(dec.Action),
 		Evidence: map[string]interface{}{"action": string(dec.Action)},
 	}
-	d.SkipPhases = append(d.SkipPhases, dec.SkipPhases...) // carry failure-adapter skips
+	d.SkipPhases = append(d.SkipPhases, dec.SkipPhases...)
 	switch dec.Action {
 	case failureadapter.ActionRetryWithFallback:
 		d.NextPhase = "tdd"
@@ -350,18 +229,14 @@ func retroDecision(in RouteInput, proposal *Proposal) RouterDecision {
 	return d
 }
 
-// failureInsertPhases are the only phases an advisor may insert on the
-// retry path: both precede tdd in canonical order, so after they run the
-// walk continues naturally into the retry.
+// failureInsertPhases may be inserted ahead of a retry; both precede tdd, so the walk continues into it.
 var failureInsertPhases = map[string]struct{}{
 	"fault-localization": {},
 	"bug-reproduction":   {},
 }
 
-// applyFailureProposal adopts the advisor's RecoveryAction (and an
-// optional failure-scoped insert) ONLY when the failure-adapter permits:
-// BLOCK is the floor — an override attempt is recorded as a clamp, never
-// honored. Mirrors applyProposal's "annotate or clamp, never weaken".
+// applyFailureProposal adopts the advisor's RecoveryAction and optional failure-scoped insert
+// unless the failure adapter blocks; a blocked override is recorded as a clamp.
 func applyFailureProposal(d *RouterDecision, proposal *Proposal, action failureadapter.Action) {
 	if proposal == nil || proposal.RecoveryAction == "" {
 		return
@@ -369,9 +244,7 @@ func applyFailureProposal(d *RouterDecision, proposal *Proposal, action failurea
 	if proposal.Justification != "" {
 		d.Justification = proposal.Justification
 	}
-	// Validate before recording: an unrecognized action must neither route
-	// nor masquerade as a real one in the evidence — clamp and keep the
-	// kernel branch.
+	// Validate before recording: an unknown action must not appear in the evidence.
 	if proposal.RecoveryAction != "retry" && proposal.RecoveryAction != "end" {
 		d.Clamps = append(d.Clamps, Clamp{
 			Rule:     "failure-proposal-clamped",
@@ -405,19 +278,13 @@ func applyFailureProposal(d *RouterDecision, proposal *Proposal, action failurea
 	d.NextPhase = want
 }
 
-// IsFailureInsert reports whether phase is one of the failure-scoped
-// inserts an advisor may schedule ahead of a retry. Exported so the
-// orchestrator's SM clamp can distinguish a retry-intent insert from an
-// arbitrary illegal phase.
+// IsFailureInsert reports whether phase is a failure-scoped insert an advisor may schedule ahead of a retry.
 func IsFailureInsert(phase string) bool {
 	_, ok := failureInsertPhases[phase]
 	return ok
 }
 
-// FailureInsertPhases returns the retry-path insert phases, sorted. The
-// advisor prompt renders its failure vocabulary from this — the kernel map
-// above is the ONE home of that belief (never restate the names in prompt
-// code or phase cards).
+// FailureInsertPhases returns the retry-path insert phases, sorted; the advisor prompt renders from it.
 func FailureInsertPhases() []string {
 	out := make([]string, 0, len(failureInsertPhases))
 	for p := range failureInsertPhases {
@@ -427,22 +294,15 @@ func FailureInsertPhases() []string {
 	return out
 }
 
-// applyLearningRichness lets the advisor choose the LIGHTWEIGHT learning
-// phase (memo) over the full retrospective after an audit FAIL. The
-// floor: some learning phase always runs — a memo choice with memo
-// disabled is clamped back to the retrospective, and unknown richness
-// values are ignored.
+// applyLearningRichness lets the advisor pick memo over the retrospective after an audit FAIL;
+// some learning phase always runs, so a memo choice that cannot apply is clamped.
 func applyLearningRichness(d *RouterDecision, proposal *Proposal, in RouteInput) {
 	if proposal == nil || proposal.LearningRichness != "memo" {
 		return
 	}
-	// Always record the proposal — a memo choice that cannot apply
-	// (retrospective disabled → end, or memo disabled) is clamped, never
-	// silently dropped: the forensic trail is the point of this feature.
 	d.Evidence["learning_richness"] = proposal.LearningRichness
 	if d.NextPhase == "memo" {
-		// Policy already routed memo (Phase 4a) and the advisor agrees —
-		// nothing was forced, so a clamp here would be forensic noise.
+		// Policy already routed memo; nothing was forced, so no clamp.
 		return
 	}
 	if d.NextPhase != "retrospective" || enableOf(in.Cfg, "memo") == config.EnableOff {
@@ -490,7 +350,6 @@ func walk(in RouteInput, proposal *Proposal) RouterDecision {
 		}
 		d.NextPhase = phase
 		d.Reason = reasonFor(in, phase, optional)
-		// Rule 4 — apply the LLM proposal as advisory, clamped to this legal next.
 		applyProposal(&d, proposal, in)
 		return d
 	}
@@ -514,14 +373,10 @@ func psmasSkipSet(in RouteInput) map[string]bool {
 	return out
 }
 
-// reserved imports guard removed; all imports are used.
-
-// shouldRun decides whether a candidate phase runs. Returns (run, isOptional,
-// clamp) where clamp is non-nil when a hard rule overrode the soft decision.
+// shouldRun returns (run, optional, clamp); clamp is non-nil when a hard rule overrode the soft decision.
 func shouldRun(in RouteInput, phase string, optionalUsed int) (bool, bool, *Clamp) {
 	enable := enableOf(in.Cfg, phase)
 
-	// Mandatory phases always run (kernel clamp: enable=Off cannot disable them).
 	if isMandatory(in.Cfg, phase) {
 		if enable == config.EnableOff {
 			return true, false, &Clamp{Rule: "mandatory-never-skipped", Proposed: phase + "=off", Forced: phase + "=on"}
@@ -529,58 +384,31 @@ func shouldRun(in RouteInput, phase string, optionalUsed int) (bool, bool, *Clam
 		return true, false, nil
 	}
 
-	// Conditional-mandatory (e.g. tdd pinned unless cycle_size==trivial).
 	if rule, ok := in.Cfg.Conditional[phase]; ok {
 		if evalCondRule(in.Signals, rule) {
 			if enable == config.EnableOff {
 				return true, false, &Clamp{Rule: "conditional-mandatory-pin", Proposed: phase + "=off", Forced: phase + "=on"}
 			}
-			return true, false, nil // pinned
+			return true, false, nil
 		}
-		// rule not satisfied → phase is genuinely optional this cycle; fall through.
 	}
 
-	// A phase whose persona doc is absent is never inserted — by the plan or by
-	// a trigger: the dispatch would only produce a skip (2026-09-09 token-waste
-	// root cause #2). Recorded as a clamp so the routing-plan artifact cites the
-	// exclusion; mandatory and floor phases never reach here (core lists only
-	// catalog-Optional, non-floor phases as unavailable).
+	// A phase whose persona doc is absent would only dispatch a skip. Core lists
+	// only optional, non-floor phases here.
 	if slices.Contains(in.UnavailablePhases, phase) {
 		return false, true, &Clamp{Phase: phase, Rule: DropUnavailablePhaseRule, Proposed: phase + "=insert", Forced: phase + "=skip"}
 	}
 
-	// Advisory+ with an advisor plan: the (already floor-clamped) whole-cycle
-	// plan drives run/skip for every NON-mandatory phase, replacing the
-	// trigger-driven path below. ClampPlanToFloor ran before this plan was
-	// threaded in, so the ship-chain (build∧audit∧tdd) is Run==true here even
-	// when those phases are absent from cfg.Mandatory — the non-configurable
-	// integrity floor. A phase the advisor skipped/omitted is genuinely optional
-	// this cycle (scout/triage included, when the operator shrinks the mandatory
-	// set). Below Advisory, or with no plan, control falls through to the legacy
-	// trigger path (byte-identical / fail-safe to static). The MaxInsertions cap
-	// is intentionally not applied here: the plan is the advisor's coherent
-	// whole-cycle selection, clamped by the floor rather than capped.
+	// At Advisory and above, the pre-clamped plan drives every non-mandatory
+	// phase; below that, or with no plan, the trigger path runs.
 	if in.Cfg.Stage >= config.StageAdvisory && in.Plan != nil {
 		runs := planRuns(in.Plan, phase)
-		// A declarative skip_when (phase-catalog routing block / policy.json —
-		// CONFIG, never a Go literal about cycle class) gates the advisor's
-		// plan. Without this the plan won unconditionally for every
-		// non-mandatory phase, so a trivial-class cycle still burned the
-		// measured 0.83M-1.67M cache-read tokens per advisor-inserted optional
-		// (knowledge-base/research/token-usage-history-2026-07-20.md). Floor
-		// phases are excluded: `ship ⇒ build ∧ audit ∧ (tdd unless trivial)` is
-		// non-configurable, so a skip_when aimed at one must never become a
-		// floor bypass. The skip is RECORDED (returned optional==true → walk
-		// appends to SkipPhases) so the routing-plan artifact cites it rather
-		// than silently dropping the phase.
+		// A configured skip_when gates the plan. Floor phases are exempt so the
+		// gate can never bypass the floor.
 		if runs && !isFloorPhase(phase) && skipWhenFires(in.Signals, in.Cfg.Triggers[phase]) {
 			return false, true, &Clamp{Rule: "skip-when-gates-plan", Proposed: phase + "=run", Forced: phase + "=skip"}
 		}
 		if runs && enable == config.EnableOff {
-			// The (clamped) plan runs a phase the operator disabled via EnableOff.
-			// The integrity floor or the advisor overrides the operator's off;
-			// record a clamp so the ledger shows the override — mirroring the
-			// mandatory-never-skipped clamp, never a silent discrepancy.
 			return true, true, &Clamp{Rule: "floor-overrides-enable-off", Proposed: phase + "=off", Forced: phase + "=run"}
 		}
 		if runs && enable == config.EnableContent && optionalUsed >= in.Cfg.MaxInsertions && !isFloorPhase(phase) {
@@ -594,7 +422,7 @@ func shouldRun(in RouteInput, phase string, optionalUsed int) (bool, bool, *Clam
 		return false, true, nil
 	case config.EnableOn:
 		return true, true, nil
-	default: // EnableContent → trigger-driven, subject to insertion cap
+	default: // EnableContent: trigger-driven, under the insertion cap
 		if optionalUsed >= in.Cfg.MaxInsertions {
 			return false, true, &Clamp{Rule: "max-insertions-cap", Proposed: phase + "=insert", Forced: phase + "=skip"}
 		}
@@ -602,9 +430,7 @@ func shouldRun(in RouteInput, phase string, optionalUsed int) (bool, bool, *Clam
 	}
 }
 
-// skipWhenFires reports whether any of a RoutingBlock's skip_when clauses hold.
-// Shared by the trigger path and the advisor-plan gate so both read the same
-// declarative veto.
+// skipWhenFires reports whether any skip_when clause holds; the trigger path and the plan gate share it.
 func skipWhenFires(sig RoutingSignals, block config.RoutingBlock) bool {
 	for _, c := range block.SkipWhen {
 		if evalCondition(sig, c) {
@@ -627,19 +453,16 @@ func triggerFires(sig RoutingSignals, block config.RoutingBlock) bool {
 	return false
 }
 
-// applyProposal adopts an LLM-proposed insert ONLY if it is the legal next phase
-// the kernel already permits; any divergence is recorded as a clamp. The proposal
-// can never introduce a mandatory-skip or a ship the objective signals don't support.
+// applyProposal records the advisor's rationale and clamps any divergence from the kernel's
+// next phase; it never changes NextPhase.
 func applyProposal(d *RouterDecision, proposal *Proposal, in RouteInput) {
 	if proposal == nil || proposal.NextPhase == "" {
 		return
 	}
-	// Capture the advisor's rationale on the decision (whether or not it gets
-	// clamped) so the recorded decision carries the would-have-routed reasoning.
 	d.Justification = proposal.Justification
 	want := normalize(proposal.NextPhase)
 	if want == d.NextPhase {
-		return // proposal agrees with the kernel; nothing to clamp
+		return
 	}
 	d.Clamps = append(d.Clamps, Clamp{
 		Rule:     "llm-proposal-clamped",
@@ -667,8 +490,7 @@ func isMandatory(cfg config.RoutingConfig, phase string) bool {
 	return false
 }
 
-// countOptionalInserts counts completed phases that are neither mandatory nor a
-// conditional key — i.e. optional inserts already spent against the cap.
+// countOptionalInserts counts the optional inserts already spent against the cap.
 func countOptionalInserts(cfg config.RoutingConfig, completed []string) int {
 	n := 0
 	for _, p := range completed {
@@ -697,19 +519,14 @@ func reasonFor(in RouteInput, phase string, optional bool) string {
 	if enableOf(in.Cfg, phase) == config.EnableOn {
 		return "forced-on:" + phase
 	}
-	// Plan-driven (Stage>=Advisory): the upfront whole-cycle plan scheduled this
-	// phase, not a content trigger — name it so the ledger/forensics distinguish
-	// advisor-planned from trigger-inserted.
+	// Name plan-driven phases so forensics tell advisor-planned from trigger-inserted.
 	if in.Cfg.Stage >= config.StageAdvisory && in.Plan != nil && planRuns(in.Plan, phase) {
 		return "plan:" + phase
 	}
 	return "content-insert:" + phase
 }
 
-// effectiveOrder is the phase sequence the walk advances through: the
-// config-supplied Order (registry order, possibly with user phases spliced in)
-// when present, else the built-in canonicalOrder. Keeping the fallback means a
-// RoutingConfig built without a registry stays byte-identical to pre-Order behavior.
+// effectiveOrder is cfg.Order (registry order with user phases spliced in) when set, else canonicalOrder.
 func effectiveOrder(cfg config.RoutingConfig) []string {
 	if len(cfg.Order) > 0 {
 		return cfg.Order
@@ -726,7 +543,7 @@ func indexOfIn(order []string, phase string) int {
 	return -1
 }
 
-// normalize folds the core.PhaseRetro alias "retro" to the canonical "retrospective".
+// normalize folds the aliases "retro" and "tdd-engineer" to their canonical phase names.
 func normalize(phase string) string {
 	switch phase {
 	case "retro":
@@ -746,10 +563,9 @@ func isFloorPhase(phase string) bool {
 	}
 }
 
-// BenchedCLI is one benched CLI family projected from the cli-health store
-// for the advisor's environmental context (see RouteInput.BenchedCLIs).
+// BenchedCLI is one CLI family the cli-health store has benched, carried as advisor context.
 type BenchedCLI struct {
-	Family string    // CLI family, e.g. "codex"
+	Family string    // e.g. "codex"
 	Reason string    // classifier pattern, e.g. "rate_limit"
-	Until  time.Time // bench expiry (the canary re-probes after this)
+	Until  time.Time // the canary re-probes after this
 }

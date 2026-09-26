@@ -11,13 +11,9 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 )
 
-// Write persists d to dir as cycle-N.json and cycle-N.md using atomic
-// temp+rename via atomicwrite.Bytes. When commit is true, the two files are
-// then git-added and committed (scoped to just those paths) in the repo that
-// contains dir, so the closeout dossier lands as the "ONE committed artifact"
-// this package promises — leaving the main tree clean instead of tripping the
-// next phase's tree-diff guard on the untracked pair. commit==false writes the
-// files only (git untouched); use it when dir is not a git working tree.
+// Write atomically writes d to dir as cycle-N.json and cycle-N.md. With commit
+// it also commits exactly that pair, so the next phase's tree-diff guard never
+// sees it untracked; pass false when dir is not a git working tree.
 func Write(d *Dossier, dir string, commit bool) error {
 	if dir == "" {
 		return fmt.Errorf("dossier: Write: dir must not be blank")
@@ -48,31 +44,24 @@ func Write(d *Dossier, dir string, commit bool) error {
 	return nil
 }
 
-// commitPair stages and commits cycle-<base>.{json,md} in the git repo enclosing
-// dir. Thin wrapper over commitPairGit with the production git runner; kept so
-// existing callers (Write) pass a dir, while the retry/backoff logic lives in
-// one injectable place the fast test tier can drive without racing real locks.
+// commitPair commits the pair in the repo enclosing dir, through the injectable
+// commitPairGit.
 func commitPair(dir, base string) error {
 	return commitPairGit(gitexec.Default(dir), base)
 }
 
-// commitMaxAttempts bounds the transient-lock retry: 1 initial + 3 retries. A
-// genuinely stuck lock surfaces as an error in a small, fixed number of tries
-// rather than hanging cycle finalization (cycle-564 write_retry_test bounds).
+// commitMaxAttempts is one try plus three retries, so a stuck lock errors
+// instead of hanging cycle finalization.
 const commitMaxAttempts = 4
 
-// commitBackoffBase is the linear per-attempt backoff step (attempt N sleeps
-// N*base) — enough to let a concurrent fleet lane's index.lock clear, small
-// enough that the whole bounded budget stays well under a second.
+// commitBackoffBase is the linear backoff step (attempt N sleeps N*base): long
+// enough for a concurrent lane's index.lock to clear, with the whole budget
+// under a second.
 const commitBackoffBase = 25 * time.Millisecond
 
-// commitPairGit stages and commits cycle-<base>.{json,md} in g's repo, scoped by
-// pathspec so no unrelated staged change is swept in. A re-write with identical
-// content (nothing staged) is a no-op, never an empty commit. A transient git
-// index.lock failure on commit — the cycle-564 root cause: concurrent fleet
-// lanes sharing one repo contend on .git/index.lock, which the old un-retried
-// commitPair swallowed, permanently orphaning 9 recorded cycles' dossiers — is
-// retried with bounded linear backoff. A non-lock (permanent) error fails fast.
+// commitPairGit stages and commits the pair by pathspec, so no unrelated staged
+// change is swept in. An identical rewrite is a no-op, a transient index.lock
+// failure is retried with bounded backoff, and a permanent error fails fast.
 func commitPairGit(g gitexec.Git, base string) error {
 	ctx := context.Background()
 	jsonName, mdName := base+".json", base+".md"
@@ -96,9 +85,6 @@ func commitPairGit(g gitexec.Git, base string) error {
 		}
 		lastErr = commitFailure(base, code, stderr, err)
 		if !isTransientGitLock(stderr) {
-			// Permanent error → don't burn the retry budget, but unstage the pair
-			// we `git add`ed so it can't survive into the next cycle's tree-diff
-			// guard as a phantom staged change. The original error surfaces verbatim.
 			unstagePair(ctx, g, jsonName, mdName)
 			return lastErr
 		}
@@ -106,22 +92,19 @@ func commitPairGit(g gitexec.Git, base string) error {
 			time.Sleep(time.Duration(attempt) * commitBackoffBase)
 		}
 	}
-	// Retry budget exhausted on a stuck lock: same rollback so a failed commit
-	// never leaves the pair staged, regardless of failure class.
 	unstagePair(ctx, g, jsonName, mdName)
 	return fmt.Errorf("dossier: commit %s: giving up after %d attempts: %w", base, commitMaxAttempts, lastErr)
 }
 
-// unstagePair removes the just-added dossier pair from the index after a failed
-// commit, so the staged files never pollute the next cycle's tree-diff guard.
-// Best-effort: the caller returns the original commit error regardless of
-// whether the reset itself succeeds.
+// unstagePair removes the pair from the index after a failed commit, so it
+// never reaches the next tree-diff guard as a phantom staged change. The reset
+// is best-effort: the caller returns the commit error either way.
 func unstagePair(ctx context.Context, g gitexec.Git, jsonName, mdName string) {
 	_ = g.Run(ctx, "reset", "--", jsonName, mdName)
 }
 
-// commitFailure renders a commit failure, carrying the underlying git stderr so
-// the sweep can log it loudly instead of silently swallowing it (AC3).
+// commitFailure renders a commit failure with git's stderr, so the sweep can
+// log the real cause.
 func commitFailure(base string, code int, stderr string, err error) error {
 	if err != nil {
 		return fmt.Errorf("dossier: git commit %s: %w", base, err)

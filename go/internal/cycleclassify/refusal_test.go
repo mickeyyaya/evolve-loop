@@ -1,13 +1,5 @@
 package cycleclassify
 
-// refusal_test.go — the C1-record pass: a cycle whose LAST recorded phase
-// outcome is a FAIL carrying a diagnostic Code is a phase-refusal — the phase's
-// own deterministic gate stopped the cycle (triage refusing a protected-surface
-// card), which is task-attributable and re-occurs on every retry. Read from
-// phase-timing.json, never from prose; ranked after the agent's sentinel class
-// (pass 0) and before the regex passes, because a coded refusal IS the reason
-// the cycle stopped (docs/incidents/2026-09-14-triage-refusal-poison-loop.md).
-
 import (
 	"encoding/json"
 	"os"
@@ -73,7 +65,7 @@ func TestClassify_CodedRefusalOutranksTheRegexPasses(t *testing.T) {
 func TestClassify_SentinelClassStillOutranksTheRefusal(t *testing.T) {
 	ws := t.TempDir()
 	writePhaseTiming(t, ws, refusalEntries(cyclestate.DiagCodeTriageProtectedSurface))
-	// The sentinel comes from the phase that ended the cycle: its own classed FAIL is the authority.
+	// The sentinel comes from triage, the phase the cycle stopped on.
 	sentinel := "# triage\n<!-- evolve-verdict: {\"phase\":\"triage\",\"verdict\":\"FAIL\",\"failure\":{\"class\":\"infrastructure\"}} -->\n"
 	if err := os.WriteFile(filepath.Join(ws, "triage-report.md"), []byte(sentinel), 0o644); err != nil {
 		t.Fatal(err)
@@ -83,9 +75,6 @@ func TestClassify_SentinelClassStillOutranksTheRefusal(t *testing.T) {
 	}
 }
 
-// A classed FAIL sentinel from an EARLIER phase (a scout that wedged, retried
-// and passed) is stale once the record says the cycle stopped on a coded
-// refusal — pass 0 is recency-aware (architecture review MEDIUM-2).
 func TestClassify_StaleEarlierSentinelDoesNotOutrankTheRefusal(t *testing.T) {
 	ws := t.TempDir()
 	writePhaseTiming(t, ws, refusalEntries(cyclestate.DiagCodeTriageProtectedSurface))

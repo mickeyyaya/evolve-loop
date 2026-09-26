@@ -1,8 +1,3 @@
-// reap_runsessions_test.go — CB.5 contract (concurrency campaign W4), reap
-// half: run teardown kills exactly the sessions in the RUN'S OWN registry
-// file — never a glob over the shared tmux server, never another run's
-// sessions. The 2026-06-11 killer-B forensics are the why: name-fuzzy
-// teardown on a shared server is how every soak that day died.
 package swarm
 
 import (
@@ -25,13 +20,10 @@ func writeRegistry(t *testing.T, dir string, sessions ...string) string {
 	return sessionrecord.PathIn(dir)
 }
 
-// TestReapRunSessions_KillsOwnRegistryOnly: the acceptance — run A's teardown
-// reaps run A's sessions and is STRUCTURALLY incapable of touching run B's
-// (it never sees them: per-run file, no server-wide listing).
 func TestReapRunSessions_KillsOwnRegistryOnly(t *testing.T) {
 	t.Parallel()
 	pathA := writeRegistry(t, t.TempDir(), "evolve-bridge-rAAAA0000-c1-build-pid1-1", "evolve-bridge-rAAAA0000-c1-audit-pid1-2")
-	_ = writeRegistry(t, t.TempDir(), "evolve-bridge-rBBBB1111-c2-build-pid2-1") // run B: must stay untouched
+	_ = writeRegistry(t, t.TempDir(), "evolve-bridge-rBBBB1111-c2-build-pid2-1")
 
 	var killed []string
 	kill := func(_ context.Context, session string) error {
@@ -49,9 +41,6 @@ func TestReapRunSessions_KillsOwnRegistryOnly(t *testing.T) {
 	}
 }
 
-// TestReapRunSessions_RefusesUnsafeNames: empty names (the killer-B suicide
-// class) and names outside the evolve-bridge namespace are skipped and
-// counted, never passed to the killer.
 func TestReapRunSessions_RefusesUnsafeNames(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -74,9 +63,6 @@ func TestReapRunSessions_RefusesUnsafeNames(t *testing.T) {
 	}
 }
 
-// TestReapRunSessions_MissingRegistryIsNoop: a run that launched no tmux
-// sessions (headless cycle) has no registry file — that is the success case,
-// not an error.
 func TestReapRunSessions_MissingRegistryIsNoop(t *testing.T) {
 	t.Parallel()
 	report := ReapRunSessions(context.Background(), filepath.Join(t.TempDir(), "absent.jsonl"), func(_ context.Context, s string) error {

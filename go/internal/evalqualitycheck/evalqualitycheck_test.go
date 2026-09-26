@@ -17,8 +17,6 @@ func writeEval(t *testing.T, body string) string {
 	return path
 }
 
-// TestCheck_NonTrivialCommand_PASS — a real workspace-touching command
-// classifies as PASS.
 func TestCheck_NonTrivialCommand_PASS(t *testing.T) {
 	path := writeEval(t, "```bash\ngo test ./...\n```\n")
 	r, err := Check(Options{Path: path})
@@ -30,7 +28,6 @@ func TestCheck_NonTrivialCommand_PASS(t *testing.T) {
 	}
 }
 
-// TestCheck_TautologyExact_HALT — :, true, exit 0 → HALT.
 func TestCheck_TautologyExact_HALT(t *testing.T) {
 	cases := []string{":", "true", "exit 0", "/bin/true"}
 	for _, c := range cases {
@@ -45,7 +42,6 @@ func TestCheck_TautologyExact_HALT(t *testing.T) {
 	}
 }
 
-// TestCheck_TautologyBracket_HALT — [ true ], [ 1 -eq 1 ] → HALT.
 func TestCheck_TautologyBracket_HALT(t *testing.T) {
 	cases := []string{"[ true ]", "[ 1 -eq 1 ]", `[ "a" = "a" ]`}
 	for _, c := range cases {
@@ -60,7 +56,6 @@ func TestCheck_TautologyBracket_HALT(t *testing.T) {
 	}
 }
 
-// TestCheck_EchoOnly_WARN — echo doesn't inspect anything.
 func TestCheck_EchoOnly_WARN(t *testing.T) {
 	path := writeEval(t, "```bash\necho \"hello\"\n```\n")
 	r, err := Check(Options{Path: path})
@@ -72,8 +67,6 @@ func TestCheck_EchoOnly_WARN(t *testing.T) {
 	}
 }
 
-// TestCheck_GrepInlineConstant_WARN — grep against a literal in its
-// own args is a weak signal.
 func TestCheck_GrepInlineConstant_WARN(t *testing.T) {
 	path := writeEval(t, "```bash\ngrep \"foo\" \"foobar\"\n```\n")
 	r, err := Check(Options{Path: path})
@@ -85,8 +78,6 @@ func TestCheck_GrepInlineConstant_WARN(t *testing.T) {
 	}
 }
 
-// TestCheck_WorstOf_HALTBeatsPASS — the overall verdict reflects the
-// most severe classification, not the average.
 func TestCheck_WorstOf_HALTBeatsPASS(t *testing.T) {
 	path := writeEval(t, "```bash\ngo test ./...\ntrue\n```\n")
 	r, err := Check(Options{Path: path})
@@ -101,10 +92,6 @@ func TestCheck_WorstOf_HALTBeatsPASS(t *testing.T) {
 	}
 }
 
-// TestCheck_NonBashFencedBlock_Ignored — only bash fences are parsed as
-// commands. (Since the ADR-0084 vacuity fix, an eval with zero parsed
-// commands additionally carries one explanatory WARN entry — that entry is a
-// diagnostic, not a parsed command.)
 func TestCheck_NonBashFencedBlock_Ignored(t *testing.T) {
 	path := writeEval(t, "```python\nexit(0)\n```\n")
 	r, err := Check(Options{Path: path})
@@ -121,8 +108,6 @@ func TestCheck_NonBashFencedBlock_Ignored(t *testing.T) {
 	}
 }
 
-// TestCheck_CommentsAndBlanksIgnored — # comments and blank lines
-// inside bash blocks are skipped.
 func TestCheck_CommentsAndBlanksIgnored(t *testing.T) {
 	path := writeEval(t, "```bash\n# this is a comment\n\ngo build ./...\n```\n")
 	r, err := Check(Options{Path: path})
@@ -134,7 +119,6 @@ func TestCheck_CommentsAndBlanksIgnored(t *testing.T) {
 	}
 }
 
-// TestCheck_MissingFile_Error — file-not-found surfaces as error.
 func TestCheck_MissingFile_Error(t *testing.T) {
 	_, err := Check(Options{Path: "/no/such/file.md"})
 	if err == nil {
@@ -142,7 +126,6 @@ func TestCheck_MissingFile_Error(t *testing.T) {
 	}
 }
 
-// TestCheck_EmptyPath_Error — required-field validation.
 func TestCheck_EmptyPath_Error(t *testing.T) {
 	_, err := Check(Options{})
 	if err == nil {
@@ -150,8 +133,6 @@ func TestCheck_EmptyPath_Error(t *testing.T) {
 	}
 }
 
-// TestCheck_MultipleBashBlocks_Concatenated — all bash blocks
-// contribute commands.
 func TestCheck_MultipleBashBlocks_Concatenated(t *testing.T) {
 	path := writeEval(t, "## section\n```bash\ngo build\n```\n\n## second\n```bash\ngo test\n```\n")
 	r, err := Check(Options{Path: path})
@@ -163,8 +144,6 @@ func TestCheck_MultipleBashBlocks_Concatenated(t *testing.T) {
 	}
 }
 
-// TestClassify_DirectUnit_AllLevels — direct helper test pinning
-// each classification branch.
 func TestClassify_DirectUnit_AllLevels(t *testing.T) {
 	cases := []struct {
 		cmd  string
@@ -187,11 +166,6 @@ func TestClassify_DirectUnit_AllLevels(t *testing.T) {
 	}
 }
 
-// TestCheck_CommitPresenceRange_HALT — `git log`/`git rev-list` range
-// assertions are structurally false after worktree-normalize (builder
-// commits are soft-reset to base before audit), so predicates asserting
-// commit PRESENCE must be rejected at pre-flight. This is the defect that
-// killed cycles 236 and 237 (inbox: normalize-vs-commit-claims).
 func TestCheck_CommitPresenceRange_HALT(t *testing.T) {
 	cases := []string{
 		"git log --oneline 81d2c2f..HEAD",
@@ -216,9 +190,6 @@ func TestCheck_CommitPresenceRange_HALT(t *testing.T) {
 	}
 }
 
-// TestCheck_ContentParityAndPlainGit_PASS — the GOOD exemplar (content
-// parity via git diff, cycle-236 001-rescue-parity-landed.sh) and
-// range-free git inspection must NOT be flagged.
 func TestCheck_ContentParityAndPlainGit_PASS(t *testing.T) {
 	cases := []string{
 		"git diff 81d2c2f..HEAD --quiet -- go/",
@@ -227,7 +198,7 @@ func TestCheck_ContentParityAndPlainGit_PASS(t *testing.T) {
 		"git rev-parse HEAD",
 		"git log -p dir/../file",
 		"git log --follow -- docs/../README.md",
-		"git log ..HEAD", // left-open range: documented regex gap, pinned
+		"git log ..HEAD", // left-open range: a known gap of commitPresenceRE
 	}
 	for _, c := range cases {
 		path := writeEval(t, "```bash\n"+c+"\n```\n")

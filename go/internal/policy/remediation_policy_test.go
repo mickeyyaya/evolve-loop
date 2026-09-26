@@ -2,9 +2,6 @@ package policy
 
 import "testing"
 
-// TestWorkflowConfig_RemediationDefaults pins the graduated-remediation
-// compiled defaults (2026-07-21): ON at 1 round for coverage-gate only, with
-// policy.json workflow overrides honored — including explicit 0 to disable.
 func TestWorkflowConfig_RemediationDefaults(t *testing.T) {
 	c := Policy{}.WorkflowConfig()
 	if c.RemediationRounds != 1 {

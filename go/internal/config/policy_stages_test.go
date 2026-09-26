@@ -7,9 +7,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// sentinelStages is an input every ApplyPolicyStages assignment must overwrite:
-// each field differs from what the positional fixture resolves to, so a dropped
-// assignment is observable (a defaults() input would hide three of them).
+// sentinelStages differs from everything the positional fixture resolves to, so a dropped
+// assignment is observable.
 func sentinelStages() RoutingConfig {
 	cfg := defaults()
 	cfg.ContractGate, cfg.EvalGate, cfg.TriageCapGate, cfg.TopNGate, cfg.ReviewGate = StageAdvisory, StageAdvisory, StageAdvisory, StageAdvisory, StageAdvisory
@@ -20,8 +19,6 @@ func sentinelStages() RoutingConfig {
 	return cfg
 }
 
-// Test 28 — the fourteen dials cross by value; a typo'd gate word warns with
-// the policy key and resolves to off; the input is untouched.
 func TestApplyPolicyStages_ProjectsEveryDialAndWarnsOnTypos(t *testing.T) {
 	l, events := observed(t)
 	in := sentinelStages()
@@ -49,7 +46,6 @@ func TestApplyPolicyStages_ProjectsEveryDialAndWarnsOnTypos(t *testing.T) {
 	}
 }
 
-// Test 29 — the gate dials use the trichotomy, the router dials the full ladder.
 func TestApplyPolicyStages_GateLadderRejectsAdvisoryRouterLadderAcceptsIt(t *testing.T) {
 	ps := PolicyStages{"advisory", "enforce", "enforce", "enforce", "off", "shadow", "enforce", "enforce", "advisory", "off", 3, false, false, 1}
 	got, ws := New().ApplyPolicyStages(defaults(), ps)

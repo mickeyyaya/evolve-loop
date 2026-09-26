@@ -1,12 +1,5 @@
 package phaseobserver
 
-// order_pins_test.go — ADR-0103 unit 12 step 0: the poll-tick order and the
-// rule invariants of Run, pinned on the pre-extraction code (8e8f080f) BEFORE
-// the tick body moved into internal/observerengine. Each test names the
-// one-line mutant it kills; every one was proven red against that mutant by
-// hand before the move. They drive the kept Run facade, so they stay in the
-// host as the regression net after the move.
-
 import (
 	"bytes"
 	"encoding/json"
@@ -21,8 +14,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
 )
 
-// steppedClock returns t0 for the first `hold` calls and t0+jump afterwards —
-// the count-stepping idiom the host suite already uses (coverage_test.go).
+// steppedClock returns t0 for the first hold calls and t0+jump afterwards.
 func steppedClock(t0 time.Time, hold int, jump time.Duration) func() time.Time {
 	var mu sync.Mutex
 	calls := 0
@@ -37,7 +29,7 @@ func steppedClock(t0 time.Time, hold int, jump time.Duration) func() time.Time {
 	}
 }
 
-// killRecorder counts KillPgrp calls under a mutex (Run's goroutine vs the test's).
+// killRecorder counts KillPgrp calls; the mutex guards Run's goroutine against the test's.
 type killRecorder struct {
 	mu    sync.Mutex
 	calls int
@@ -96,10 +88,6 @@ var threeLines = []string{
 	`{"type":"result","total_cost_usd":0.5,"usage":{"cache_read_input_tokens":10,"cache_creation_input_tokens":2}}`,
 }
 
-// TestRun_ProbeRunsBeforeTail — the process probe fires BEFORE the log tail
-// (phaseobserver.go:325-338 before :339): with three lines pending, the
-// process_dead envelope's id ends `_0` (eventCount before this tick's ingest).
-// Kills M1 (ingest hoisted above the probe → `_3`).
 func TestRun_ProbeRunsBeforeTail(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
@@ -130,11 +118,6 @@ func TestRun_ProbeRunsBeforeTail(t *testing.T) {
 	}
 }
 
-// TestRun_IngestRunsBeforeStallRules — the tick ingests new lines BEFORE the
-// stall rules read the idle clock (:339-348 before :350): lines seeded, the
-// clock jumps +700 s from the third call on, so the per-line Now stamps refresh
-// lastEventTS and the first rule pass sees idle 0. Kills M2 (rules hoisted
-// above ingest → stuck_no_output + a kill on the first tick).
 func TestRun_IngestRunsBeforeStallRules(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
@@ -158,11 +141,6 @@ func TestRun_IngestRunsBeforeStallRules(t *testing.T) {
 	}
 }
 
-// TestRun_NudgeThenHardStallInOneTick — inside one tick the soft-stall nudge
-// (:356-369) runs BEFORE the hard stall (:370-379): with idle 700 ≥ both
-// thresholds the soft_stall_nudge envelope sits on an EARLIER line than the
-// first stuck_no_output, and the inbox holds exactly one nudge. Kills M3 (the
-// two rules swapped) and M4 (`!obs.nudged` dropped → a nudge per tick).
 func TestRun_NudgeThenHardStallInOneTick(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
@@ -194,9 +172,6 @@ func TestRun_NudgeThenHardStallInOneTick(t *testing.T) {
 	}
 }
 
-// TestRun_HeartbeatCountsThisTicksLines — the heartbeat (:407-415) runs AFTER
-// ingest: with HeartbeatEvery 1 and four lines seeded, the first heartbeat's
-// event_count is already 4. Kills M10 (heartbeat hoisted above ingest → 0).
 func TestRun_HeartbeatCountsThisTicksLines(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
@@ -221,9 +196,6 @@ func TestRun_HeartbeatCountsThisTicksLines(t *testing.T) {
 	}
 }
 
-// TestRun_EOFGraceNeedsAtLeastOneEvent — the EOF-grace shutdown (:418) needs
-// eventCount > 0: an empty log never self-terminates, the stop timer ends the
-// run. Kills M11 (`obs.eventCount > 0` dropped → reason eof_grace).
 func TestRun_EOFGraceNeedsAtLeastOneEvent(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
@@ -247,10 +219,6 @@ func TestRun_EOFGraceNeedsAtLeastOneEvent(t *testing.T) {
 	}
 }
 
-// TestRun_IncidentIsAppendedBeforeTheKill — the INCIDENT envelope is on disk
-// BEFORE SIGTERM is sent (:272→:275 and :290→:293): the KillPgrp closure reads
-// the events file at kill time and finds stuck_no_output. Kills M9 (kill
-// hoisted above the emit).
 func TestRun_IncidentIsAppendedBeforeTheKill(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
@@ -282,11 +250,6 @@ func TestRun_IncidentIsAppendedBeforeTheKill(t *testing.T) {
 	}
 }
 
-// TestRun_KillRetryWithoutPGID_RecordsSkippedAndNeverKills — the
-// record-reflects-reality invariant (:280-287): a kill_retry verdict with no
-// pgid records `kill_retry_skipped_no_pgid` and never calls KillPgrp. Kills M6
-// (`effective = string(action)` unconditionally) and M6b (`willKill` without
-// the pgid guard).
 func TestRun_KillRetryWithoutPGID_RecordsSkippedAndNeverKills(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
@@ -311,9 +274,6 @@ func TestRun_KillRetryWithoutPGID_RecordsSkippedAndNeverKills(t *testing.T) {
 	}
 }
 
-// TestRun_ValidationLinesAreVerbatim — the three validation lines (:176/:180/
-// :184) STAY on the injected stderr, byte-for-byte, with ExitInvalidArgs; any
-// rewording is red.
 func TestRun_ValidationLinesAreVerbatim(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
@@ -337,11 +297,6 @@ func TestRun_ValidationLinesAreVerbatim(t *testing.T) {
 	}
 }
 
-// TestRun_UnknownScopeRunsNoRules — characterization of the :351 tautology: a
-// Scope that is neither phase nor cycle runs NO stall rule (no incident, no
-// kill) while observer_started still records it verbatim. The :37 comment's
-// "cycle-scope runs only stall_no_output" was never implemented; any third
-// value disables ALL rules. Kills M12 (`==` → `!=` on the scope check).
 func TestRun_UnknownScopeRunsNoRules(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()

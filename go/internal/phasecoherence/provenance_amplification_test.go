@@ -1,15 +1,5 @@
 package phasecoherence
 
-// Cycle-242 amplification tests — encode the cycle-241 audit HIGH finding:
-// CheckProvenance only compared tree_sha against the ledger, never directly
-// against expected.TreeSHA, so a bad tree_sha with no ledger produced zero
-// violations. These tests pin the direct check AND the dedup contract
-// (exactly one tree_sha violation when both the direct check and the ledger
-// cross-check would fire — scout B2 risk; TestProvenanceGate_LedgerCrossCheck
-// already requires len==1 for that scenario).
-//
-// TDD contract (cycle 242): Builder makes these pass WITHOUT modifying them.
-
 import (
 	"os"
 	"path/filepath"
@@ -17,7 +7,6 @@ import (
 	"testing"
 )
 
-// writeLedger materializes <root>/.evolve/ledger.jsonl with the given lines.
 func writeLedger(t *testing.T, root, lines string) {
 	t.Helper()
 	evolveDir := filepath.Join(root, ".evolve")
@@ -29,9 +18,8 @@ func writeLedger(t *testing.T, root, lines string) {
 	}
 }
 
-// hermeticEnv points the ledger lookup at an empty temp project root so the
-// real .evolve/ledger.jsonl can never leak into a test (CheckProvenance
-// resolves the ledger via paths.Resolve(os.Getenv, "")).
+// hermeticEnv points the ledger lookup at an empty temp root: CheckProvenance resolves the
+// ledger from the environment, so the real .evolve/ledger.jsonl would otherwise leak in.
 func hermeticEnv(t *testing.T) string {
 	t.Helper()
 	tmpDir := t.TempDir()
@@ -40,8 +28,6 @@ func hermeticEnv(t *testing.T) string {
 	return tmpDir
 }
 
-// AC1 (primary, audit HIGH): both tree_sha and inputs_digest mismatches must
-// each fire a violation — with NO ledger present.
 func TestCheckProvenance_BothTreeSHAAndInputsDigestMismatch(t *testing.T) {
 	hermeticEnv(t)
 
@@ -69,8 +55,6 @@ func TestCheckProvenance_BothTreeSHAAndInputsDigestMismatch(t *testing.T) {
 	}
 }
 
-// tree_sha mismatch ALONE (digest matches, no ledger) must fire exactly one
-// error violation — the direct-check gap in its purest form.
 func TestCheckProvenance_TreeSHAMismatchOnly_NoLedger(t *testing.T) {
 	hermeticEnv(t)
 
@@ -96,8 +80,6 @@ func TestCheckProvenance_TreeSHAMismatchOnly_NoLedger(t *testing.T) {
 	}
 }
 
-// Edge: empty expected.TreeSHA means "no expectation" — the direct check must
-// NOT fire (mirrors the existing inputs_digest guard semantics).
 func TestCheckProvenance_EmptyExpectedTreeSHA_NoViolation(t *testing.T) {
 	hermeticEnv(t)
 
@@ -113,8 +95,6 @@ func TestCheckProvenance_EmptyExpectedTreeSHA_NoViolation(t *testing.T) {
 	}
 }
 
-// Negative/anti-over-fix: a fully matching header must stay at zero
-// violations after the direct check lands.
 func TestCheckProvenance_ValidHeaderAllFields(t *testing.T) {
 	hermeticEnv(t)
 
@@ -130,12 +110,6 @@ func TestCheckProvenance_ValidHeaderAllFields(t *testing.T) {
 	}
 }
 
-// Dedup contract (scout B2): when a ledger entry exists AND agrees with
-// expected.TreeSHA, a mismatched artifact tree_sha must yield exactly ONE
-// tree_sha violation — not one from the direct check plus one from the
-// ledger cross-check. This is the same invariant the pre-existing
-// TestProvenanceGate_LedgerCrossCheck (len==1) enforces; restated here so
-// the dedup requirement is explicit in the cycle-242 contract.
 func TestCheckProvenance_LedgerAndDirectMismatch_SingleTreeSHAViolation(t *testing.T) {
 	tmpDir := hermeticEnv(t)
 

@@ -8,24 +8,14 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 )
 
-// ChangedFile is one repo-relative path that differs between a base ref and
-// the WORKING TREE: a tracked modification or deletion from `git diff`, or an
-// untracked file from `git ls-files --others`. Added is true for a path the
-// base does not have — an index-added or untracked file, or the destination
-// of a rename. A rename's source is not a changed file: what it left behind
-// has nothing to import.
+// ChangedFile is a repo-relative path that differs between a base ref and the working tree; Added marks a path the base lacks.
 type ChangedFile struct {
 	Path  string
 	Added bool
 }
 
-// ChangedFilesChecked is the ONE git derivation of "what does this tree change
-// versus baseRef"; FromGitChecked and the ship gate's backstops are projections
-// of it. It reads the working tree, never the index: a lane's build output is
-// unstaged, and its new files untracked, until the ship itself stages them —
-// an index-based seed at gate time sees nothing (the 2026-09-14 ship-gate
-// incident). ok is false whenever git could not answer: empty inputs, no
-// repository, a bad ref, a concurrent index.lock — never "nothing changed".
+// ChangedFilesChecked lists the files the working tree changes versus baseRef; ok is false when git could not answer.
+// It reads the working tree, never the index: a lane's output stays unstaged until the ship stages it.
 func ChangedFilesChecked(repoRoot, baseRef string) ([]ChangedFile, bool) {
 	if repoRoot == "" || baseRef == "" {
 		return nil, false
@@ -38,8 +28,7 @@ func ChangedFilesChecked(repoRoot, baseRef string) ([]ChangedFile, bool) {
 	}
 	var files []ChangedFile
 	for _, line := range strings.Split(out, "\n") {
-		// "M\tpath", "A\tpath", "D\tpath", "R100\told\tnew" — the last field
-		// is the path that exists now (a rename's destination).
+		// The last field is the path that exists now: "R100\told\tnew" names the rename's destination.
 		fields := strings.Split(strings.TrimRight(line, "\r"), "\t")
 		if len(fields) < 2 || strings.TrimSpace(fields[0]) == "" {
 			continue
@@ -59,9 +48,7 @@ func ChangedFilesChecked(repoRoot, baseRef string) ([]ChangedFile, bool) {
 	return files, true
 }
 
-// PackagesOf projects changed files onto the sorted, deduped go test patterns
-// of the Go packages they live in (FileToPackage); nil when none is a Go file
-// inside the module.
+// PackagesOf returns the sorted, deduped test patterns of the packages holding files, or nil when none is module Go source.
 func PackagesOf(files []ChangedFile) []string {
 	set := map[string]struct{}{}
 	for _, f := range files {

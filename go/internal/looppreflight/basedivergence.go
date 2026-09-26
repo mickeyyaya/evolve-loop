@@ -1,18 +1,3 @@
-// basedivergence.go — boot-time guard against cutting lanes from a stale base.
-//
-// A fleet lane's worktree is branched from whatever the project root's HEAD is
-// at boot. When that local base has fallen behind `origin/<base>`, every lane in
-// the batch is built on stale history and the ship at the end fails with
-// GIT_PUSH_REJECTED — after the whole batch's work is already spent (cycle-969).
-// The reconcile is a single operator command (`evolve sync-main`), so the cheap
-// remedy is to fetch origin at boot and HALT loudly, naming that command, BEFORE
-// any lane spawns.
-//
-// The check fetches origin ITSELF rather than reading a possibly-stale local
-// `origin/<base>` ref: an operator-prepared ref is exactly the thing that is out
-// of date in this failure mode. A fetch that cannot complete degrades to Warn —
-// unverified is surfaced, never silently passed — and a base that is merely
-// AHEAD of origin (normal unpushed work) is a pass, not a halt.
 package looppreflight
 
 import (
@@ -25,17 +10,13 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 )
 
-// reconcileCommand is the operator command the halt must name so the stop comes
-// with a next step rather than just a wall.
+// reconcileCommand is named in the halt so the stop comes with a next step.
 const reconcileCommand = "evolve sync-main"
 
-// baseDivergenceTimeout bounds the whole probe (fetch included) so a wedged
-// remote cannot hang boot.
+// baseDivergenceTimeout bounds the whole probe, fetch included, so a wedged remote cannot hang boot.
 const baseDivergenceTimeout = 60 * time.Second
 
-// baseState is the probe's verdict. Skipped marks a topology the check has no
-// opinion on (not a git work tree, detached HEAD, no origin remote); Reason
-// carries the why for the operator-visible detail.
+// baseState is the probe verdict; Skipped means there is nothing to compare, and Reason says why.
 type baseState struct {
 	Skipped bool
 	Reason  string
@@ -44,19 +25,14 @@ type baseState struct {
 	Behind  int
 }
 
-// baseDivergenceProbe is the injectable seam. Production uses the real git
-// probe; in-package tests substitute a deterministic verdict so the fast tier
-// never shells out to git or touches a network remote.
+// baseDivergenceProbe is a test seam, so the fast tier never shells out to git.
 var baseDivergenceProbe = defaultBaseDivergenceProbe
 
-// newGit builds the git runner the probe drives. Split out so the probe's own
-// branch logic is testable against scripted git replies instead of a real repo
-// with a real remote.
+// newGit is a test seam for scripted git replies.
 var newGit = gitexec.Default
 
-// defaultBaseDivergenceProbe compares projectRoot's current branch against the
-// freshly fetched origin counterpart. An error means UNVERIFIED (caller warns);
-// a Skipped result means there is nothing to compare.
+// defaultBaseDivergenceProbe compares HEAD with the freshly fetched origin branch;
+// an error means the comparison is unverified.
 func defaultBaseDivergenceProbe(ctx context.Context, projectRoot string) (baseState, error) {
 	g := newGit(projectRoot)
 
@@ -78,8 +54,7 @@ func defaultBaseDivergenceProbe(ctx context.Context, projectRoot string) (baseSt
 		return baseState{Skipped: true, Reason: "no `origin` remote"}, nil
 	}
 
-	// The fetch is the point of the check: FETCH_HEAD is written by THIS
-	// invocation, so the comparison below can never read a stale ref.
+	// Compare against the FETCH_HEAD this fetch writes: a local origin/<base> ref may itself be stale.
 	if err := g.Run(ctx, "fetch", "origin", branch); err != nil {
 		return baseState{}, fmt.Errorf("fetch origin %s: %w", branch, err)
 	}
@@ -94,7 +69,6 @@ func defaultBaseDivergenceProbe(ctx context.Context, projectRoot string) (baseSt
 	return baseState{Branch: branch, Ahead: ahead, Behind: behind}, nil
 }
 
-// hasRemoteOrigin reports whether `git remote` output lists origin.
 func hasRemoteOrigin(remotes string) bool {
 	for _, r := range strings.Fields(remotes) {
 		if r == "origin" {
@@ -104,9 +78,7 @@ func hasRemoteOrigin(remotes string) bool {
 	return false
 }
 
-// parseLeftRightCount parses `rev-list --left-right --count A...B` output
-// ("<left>\t<right>") into ahead (left, local-only) and behind (right,
-// remote-only) commit counts.
+// parseLeftRightCount parses the "<left>\t<right>" output of `rev-list --left-right --count HEAD...FETCH_HEAD`.
 func parseLeftRightCount(out string) (ahead, behind int, err error) {
 	fields := strings.Fields(out)
 	if len(fields) != 2 {
@@ -121,10 +93,8 @@ func parseLeftRightCount(out string) (ahead, behind int, err error) {
 	return ahead, behind, nil
 }
 
-// checkBaseDivergence (Halt) refuses to start a batch whose base is behind the
-// fetched origin base. Ahead-only is healthy (unpushed local work); an
-// unverifiable comparison is a Warn, so a transient network fault degrades the
-// signal without benching an otherwise-ready boot.
+// checkBaseDivergence halts when the base is behind origin; ahead-only passes, an unverifiable comparison warns.
+// See ADR-0081.
 func checkBaseDivergence(o resolved) CheckResult {
 	const name = "base-divergence"
 

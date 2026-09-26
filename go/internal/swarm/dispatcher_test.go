@@ -13,12 +13,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 )
 
-// fakeLauncher records launches, tracks max in-flight (for the cap test), and
-// can be scripted to fail per-agent.
 type fakeLauncher struct {
 	mu          sync.Mutex
 	launched    []string
-	portByAgent map[string]string // captures the injected PORT env per worker
+	portByAgent map[string]string
 	inFlight    int32
 	maxInFl     int32
 	exit        map[string]int
@@ -47,7 +45,7 @@ func (f *fakeLauncher) Launch(ctx context.Context, req LaunchRequest) (LaunchRes
 	if f.portByAgent == nil {
 		f.portByAgent = map[string]string{}
 	}
-	f.portByAgent[req.Agent] = req.Env["PORT"] // nil-map read is "" — fine
+	f.portByAgent[req.Agent] = req.Env["PORT"]
 	f.mu.Unlock()
 	if f.failAgent[req.Agent] {
 		return LaunchResult{}, errors.New("launch failed")
@@ -70,7 +68,6 @@ type noopKiller struct{}
 
 func (noopKiller) Kill(context.Context, SessionHandle) error { return nil }
 
-// recordingKiller captures the SessionHandles it was asked to reap.
 type recordingKiller struct {
 	mu     sync.Mutex
 	killed []SessionHandle
@@ -83,10 +80,6 @@ func (k *recordingKiller) Kill(_ context.Context, h SessionHandle) error {
 	return nil
 }
 
-// Orphan-on-cancel hardening: a tmux worker whose LAUNCH FAILS must STILL be
-// reapable — the dispatcher pre-registers a deterministic named session BEFORE
-// the launch, so the post-wg Reap kills it by name even though Launch never
-// returned a session identity.
 func TestDispatch_TmuxWorker_PreRegisteredAndReapedOnLaunchFailure(t *testing.T) {
 	reg := NewSessionRegistry(filepath.Join(t.TempDir(), "s.json"), 1, "scout", 1)
 	fk := &fakeLauncher{failAgent: map[string]bool{"r-w0": true}}
@@ -102,14 +95,12 @@ func TestDispatch_TmuxWorker_PreRegisteredAndReapedOnLaunchFailure(t *testing.T)
 	if len(rk.killed) != 1 {
 		t.Fatalf("the pre-registered session must be reaped despite launch failure, got %d kills", len(rk.killed))
 	}
-	want := bridge.NamedSessionName("swarm-c0-w0") // sessionName = swarm-c<cycle>-<workerID>
+	want := bridge.NamedSessionName("swarm-c0-w0")
 	if rk.killed[0].TmuxSession != want {
 		t.Errorf("reaped session name = %q, want the pre-pinned %q", rk.killed[0].TmuxSession, want)
 	}
 }
 
-// Headless workers create no tmux session: they register with an empty session
-// name (the killer is a benign no-op; ctx-cancel kills the subprocess).
 func TestDispatch_HeadlessWorker_NoTmuxSession(t *testing.T) {
 	reg := NewSessionRegistry(filepath.Join(t.TempDir(), "s.json"), 1, "scout", 1)
 	fk := &fakeLauncher{}
@@ -120,7 +111,6 @@ func TestDispatch_HeadlessWorker_NoTmuxSession(t *testing.T) {
 		Deps{Launcher: fk, Registry: reg, Killer: noopKiller{}, Concurrency: 1}); err != nil {
 		t.Fatal(err)
 	}
-	// The session was recorded (manifest completeness) but with no tmux name.
 	snap := reg.Snapshot()
 	if len(snap) != 1 || snap[0].TmuxSession != "" {
 		t.Errorf("headless worker must register with empty tmux session, got %+v", snap)
@@ -159,8 +149,6 @@ func TestDispatch_CapturesWorkerArtifactPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dispatch: %v", err)
 	}
-	// Each worker result must record the artifact the dispatcher told it to write,
-	// so the reader fan-in can fold them without re-deriving the path convention.
 	for _, w := range res.Workers {
 		want := filepath.Join(ws, w.Agent, w.Agent+"-report.md")
 		if w.ArtifactPath != want {
@@ -177,8 +165,6 @@ func TestDispatch_WriterWorkersGetUniquePorts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dispatch: %v", err)
 	}
-	// base + worker index → collision-free within the plan, so concurrent dev
-	// servers in isolated worktrees never clash.
 	if fk.portByAgent["t1-w0"] != "52000" || fk.portByAgent["t1-w1"] != "52001" {
 		t.Errorf("writer ports not isolated: %v", fk.portByAgent)
 	}
@@ -188,7 +174,7 @@ func TestDispatch_WriterPortDefaultsWhenBaseUnset(t *testing.T) {
 	fk := &fakeLauncher{}
 	_, err := Dispatch(context.Background(), twoWriterPlan(),
 		DispatchRequest{ProjectRoot: ".", Cycle: 1, Workspace: t.TempDir()},
-		Deps{Launcher: fk, Concurrency: 2}) // PortBase 0 → DefaultPortBase
+		Deps{Launcher: fk, Concurrency: 2})
 	if err != nil {
 		t.Fatalf("dispatch: %v", err)
 	}
@@ -206,7 +192,6 @@ func TestDispatch_ReaderWorkersGetNoPort(t *testing.T) {
 		Deps{Launcher: fk, Concurrency: 2}); err != nil {
 		t.Fatal(err)
 	}
-	// Readers share the read-only tree and run no dev server → no port to isolate.
 	if got := fk.portByAgent["r-w0"]; got != "" {
 		t.Errorf("reader must NOT get an isolated port, got %q", got)
 	}

@@ -1,35 +1,5 @@
 package dossier
 
-// schema_drift_test.go — the TestSchema_NoDrift that ADR-0055 promised
-// ("The Go struct is the SSOT; schemas/cycle-dossier.schema.json is a derived
-// artifact. The TestSchema_NoDrift drift test guards this in CI.") and that
-// did not exist. Its absence is why the schema silently rotted: three fields
-// (skipped_phases, spine_fail_opens, timing) were added to the struct and
-// never to the schema, and the schema declares additionalProperties:false —
-// so every real dossier would have FAILED validation by any external tool
-// that took the committed schema at its word.
-//
-// The check is BIDIRECTIONAL on names and structural on shape.
-//
-// Bidirectional, because a one-way "every Go field appears in the schema"
-// test still lets a removed field linger in the schema forever, and a
-// schema-side-only test lets a new Go field rot exactly the way these did.
-//
-// Structural, because a name-only inventory is green while the schema is
-// unusable. Concretely: swapping the items.$ref of skipped_phases and
-// phases_run_verdict_not_adopted keeps every property name identical, yet the
-// two definitions carry disjoint required keys, so every real dossier
-// carrying either array is rejected. Shape is checked for the three axes that
-// can produce that class of false rejection — $ref target, JSON type, and
-// required — rather than by pulling in a JSON-Schema validator dependency
-// into a module that deliberately has two.
-//
-// The `required` check is deliberately ONE-WAY: every schema-required field
-// must be a Go field that is always marshalled (no omitempty). The reverse is
-// not asserted, because a non-omitempty field absent from `required` is merely
-// permissive, while a required field the writer may omit rejects valid
-// documents. Assert the direction that can cause a false rejection.
-
 import (
 	"encoding/json"
 	"os"
@@ -43,10 +13,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasetiming"
 )
 
-// schemaObjects maps each object in cycle-dossier.schema.json to the Go type
-// it is derived from. The empty key is the schema root. Every entry under
-// "definitions" must appear here, and the test asserts that too — so adding a
-// definition without naming its Go type fails rather than going unchecked.
+// schemaObjects maps each schema object (the empty key is the root) to its Go
+// type. Every schema definition must be registered here.
 var schemaObjects = map[string]reflect.Type{
 	"":                    reflect.TypeOf(Dossier{}),
 	"PhaseRecord":         reflect.TypeOf(PhaseRecord{}),
@@ -82,17 +50,14 @@ type schemaDoc struct {
 	Definitions map[string]schemaObject `json:"definitions"`
 }
 
-// wireField is one field as encoding/json will actually emit it.
 type wireField struct {
 	name      string
 	typ       reflect.Type
 	omitempty bool
 }
 
-// wireFields returns the fields t marshals, in declaration order. Untagged
-// embedded structs are flattened the way encoding/json promotes them — the
-// test's own schemaDoc relies on that promotion, so mis-modelling it here
-// would be a check that cannot describe its own helper types.
+// wireFields returns the fields t marshals, flattening untagged embedded
+// structs the way encoding/json promotes them.
 func wireFields(t reflect.Type) []wireField {
 	var out []wireField
 	for i := 0; i < t.NumField(); i++ {
@@ -135,7 +100,6 @@ func names(fs []wireField) []string {
 	return out
 }
 
-// defNameFor returns the schema definition name registered for t, if any.
 func defNameFor(t reflect.Type) string {
 	if t.Kind() == reflect.Pointer {
 		t = t.Elem()
@@ -148,8 +112,7 @@ func defNameFor(t reflect.Type) string {
 	return ""
 }
 
-// wantShape describes how the schema must spell a Go type. Returns a
-// human-readable expectation and a predicate over the schema property.
+// wantShape describes how the schema must spell a Go type.
 func wantShape(t reflect.Type) (string, func(schemaProp) bool) {
 	if def := defNameFor(t); def != "" {
 		ref := "#/definitions/" + def
@@ -226,7 +189,6 @@ func loadSchema(t *testing.T) schemaDoc {
 func TestSchema_NoDrift(t *testing.T) {
 	doc := loadSchema(t)
 
-	// Every definition must be registered, and every registration must exist.
 	for name := range doc.Definitions {
 		if _, ok := schemaObjects[name]; !ok {
 			t.Errorf("schema definition %q has no Go type in schemaObjects — register it so drift in it is checked too", name)
@@ -255,7 +217,6 @@ func TestSchema_NoDrift(t *testing.T) {
 
 		fields := wireFields(goType)
 
-		// 1. Name inventory, both directions.
 		want := append([]string(nil), names(fields)...)
 		got := make([]string, 0, len(obj.Properties))
 		for k := range obj.Properties {
@@ -268,8 +229,6 @@ func TestSchema_NoDrift(t *testing.T) {
 				label, goType, missing(want, got), missing(got, want))
 		}
 
-		// 2. Shape: $ref target and JSON type. A name-only check is green
-		//    while the schema rejects every real document.
 		byName := make(map[string]wireField, len(fields))
 		for _, f := range fields {
 			byName[f.name] = f
@@ -289,7 +248,6 @@ func TestSchema_NoDrift(t *testing.T) {
 			}
 		}
 
-		// 3. required must never name a field the writer may omit.
 		for _, req := range obj.Required {
 			f, ok := byName[req]
 			if !ok {
@@ -332,10 +290,6 @@ func missing(a, b []string) []string {
 	return out
 }
 
-// TestSchema_NoDrift_CatchesTheMutationsThatMatter is the anti-no-op twin. A
-// drift test that reads both sides from the same place passes forever; these
-// cases prove each axis of the comparison actually bites. The $ref-swap case
-// is the specific mutation a name-only inventory could not see.
 func TestSchema_NoDrift_CatchesTheMutationsThatMatter(t *testing.T) {
 	t.Run("an unaccounted Go field is surfaced", func(t *testing.T) {
 		type withExtra struct {
@@ -376,10 +330,8 @@ func TestSchema_NoDrift_CatchesTheMutationsThatMatter(t *testing.T) {
 	})
 
 	t.Run("a swapped $ref is caught", func(t *testing.T) {
-		// The exact green-while-wrong mutation a name-only inventory misses:
-		// skipped_phases pointing at VerdictNotAdopted. Both definitions
-		// exist, both are registered, every name matches — but the two carry
-		// disjoint required keys, so every real dossier is rejected.
+		// Every name still matches, but the two definitions carry disjoint
+		// required keys, so every real dossier would be rejected.
 		_, pred := wantShape(reflect.TypeOf([]cyclestate.SkippedPhase{}))
 		if pred == nil {
 			t.Fatal("no shape predicate for []cyclestate.SkippedPhase")
@@ -410,9 +362,7 @@ func TestSchema_NoDrift_CatchesTheMutationsThatMatter(t *testing.T) {
 	})
 
 	t.Run("requiring an omitempty field is caught", func(t *testing.T) {
-		// The mutation: append "commit_sha" to the root required list. It is
-		// omitempty, so a cycle that did not ship omits it and the document
-		// is rejected.
+		// commit_sha is omitempty, so requiring it rejects a cycle that did not ship.
 		var found bool
 		for _, f := range wireFields(reflect.TypeOf(Dossier{})) {
 			if f.name == "commit_sha" {
@@ -434,10 +384,6 @@ func TestSchema_NoDrift_CatchesTheMutationsThatMatter(t *testing.T) {
 	})
 }
 
-// TestSchema_EveryRegisteredTypeIsReachedFromTheRoot proves the registry is
-// not a place where a definition can hide: every registered type must be
-// reachable from Dossier by following fields. A definition nothing points at
-// is dead schema, and dead schema is what rots.
 func TestSchema_EveryRegisteredTypeIsReachedFromTheRoot(t *testing.T) {
 	seen := map[reflect.Type]bool{}
 	var walk func(reflect.Type)

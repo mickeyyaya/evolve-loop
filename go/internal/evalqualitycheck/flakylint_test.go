@@ -7,14 +7,6 @@ import (
 	"testing"
 )
 
-// flakylint_test.go — authoring-time flaky-shape lint over ACS predicate
-// sources (acs-metapredicate-suite-scope). Each flagged fixture is the shape
-// that burned cycles 1173/1175/1178 (whole-package meta-predicates whose inner
-// tests are environment-sensitive under fleet load); each clean fixture is the
-// sanctioned equivalent that must NOT be flagged.
-
-// writePredicateDir writes src as predicates_test.go into a fresh temp dir
-// (dir mode — the shape `evolve eval quality-check -predicates` passes).
 func writePredicateDir(t *testing.T, src string) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -24,9 +16,7 @@ func writePredicateDir(t *testing.T, src string) string {
 	return dir
 }
 
-// lintDir runs the lint over src-in-a-temp-dir and returns the findings, failing
-// the test on error. The file receipt is asserted for EVERY fixture: a lint that
-// parsed nothing must never be able to look like a clean tree.
+// lintDir asserts the file receipt on every fixture, so a lint that parsed nothing never looks clean.
 func lintDir(t *testing.T, src string) []FlakyFinding {
 	t.Helper()
 	var report FlakyLintReport
@@ -40,7 +30,6 @@ func lintDir(t *testing.T, src string) []FlakyFinding {
 	return report.Findings
 }
 
-// findingFor returns the first finding for fn whose reason contains substr.
 func findingFor(fs []FlakyFinding, fn, substr string) (FlakyFinding, bool) {
 	for _, f := range fs {
 		if f.Func == fn && strings.Contains(f.Reason, substr) {
@@ -49,8 +38,6 @@ func findingFor(fs []FlakyFinding, fn, substr string) (FlakyFinding, bool) {
 	}
 	return FlakyFinding{}, false
 }
-
-// --- pattern 1: suite-scope go-test shells ----------------------------------
 
 const suiteScopeSrc = `//go:build acs
 
@@ -100,10 +87,6 @@ func TestC9999_ShellRecursive(t *testing.T) {
 }
 `
 
-// TestLintFlaky_SuiteScope_Flagged — `./...`, `/...` expansion, the known
-// 40s+ suites (internal/core, cmd/evolve — including via const indirection,
-// the cycle-1117 bridgePkg shape), multi-package invocations, and sh -c
-// wrapped forms are all suite-scope findings of the concurrency class.
 func TestLintFlaky_SuiteScope_Flagged(t *testing.T) {
 	fs := lintDir(t, suiteScopeSrc)
 	cases := []struct{ fn, substr string }{
@@ -129,8 +112,6 @@ func TestLintFlaky_SuiteScope_Flagged(t *testing.T) {
 	}
 }
 
-// --- pattern 2: wall-clock deadlines ----------------------------------------
-
 const wallClockSrc = `//go:build acs
 
 package cycle9999
@@ -155,8 +136,6 @@ func TestC9999_ElapsedWallClock(t *testing.T) {
 }
 `
 
-// TestLintFlaky_WallClockDeadline_Flagged — time.Now()-derived deadlines
-// (.Add/.Before chains) and time.Since elapsed checks are async-wait class.
 func TestLintFlaky_WallClockDeadline_Flagged(t *testing.T) {
 	fs := lintDir(t, wallClockSrc)
 	cases := []struct{ fn, substr string }{
@@ -175,8 +154,6 @@ func TestLintFlaky_WallClockDeadline_Flagged(t *testing.T) {
 		}
 	}
 }
-
-// --- pattern 3: hardcoded PIDs ----------------------------------------------
 
 const pidSrc = `//go:build acs
 
@@ -214,9 +191,6 @@ func TestC9999_KillDashZero(t *testing.T) {
 }
 `
 
-// TestLintFlaky_HardcodedPID_Flagged — literal PIDs below 100000 used for
-// liveness (syscall.Kill / os.FindProcess / kill -0 / /proc paths) are
-// environment class: PIDs are never stable across hosts or runs.
 func TestLintFlaky_HardcodedPID_Flagged(t *testing.T) {
 	fs := lintDir(t, pidSrc)
 	cases := []struct{ fn, substr string }{
@@ -236,8 +210,6 @@ func TestLintFlaky_HardcodedPID_Flagged(t *testing.T) {
 		}
 	}
 }
-
-// --- pattern 4: git without -C ----------------------------------------------
 
 const gitNoCSrc = `//go:build acs
 
@@ -262,9 +234,6 @@ func TestC9999_ShellGitCwdDependent(t *testing.T) {
 }
 `
 
-// TestLintFlaky_GitWithoutC_Flagged — subprocess git resolving the repo from
-// process cwd (no -C, no cmd.Dir) is environment class, in both direct-exec
-// and sh -c forms.
 func TestLintFlaky_GitWithoutC_Flagged(t *testing.T) {
 	fs := lintDir(t, gitNoCSrc)
 	for _, fn := range []string{"TestC9999_GitCwdDependent", "TestC9999_ShellGitCwdDependent"} {
@@ -309,8 +278,6 @@ func TestC9999_ShellGitAfterCd(t *testing.T) {
 }
 `
 
-// TestLintFlaky_GitAnchored_Clean — git WITH -C, git with cmd.Dir set, and
-// sh -c scripts that cd first are all repo-anchored: no findings.
 func TestLintFlaky_GitAnchored_Clean(t *testing.T) {
 	fs := lintDir(t, gitAnchoredSrc)
 	if len(fs) != 0 {
@@ -338,17 +305,12 @@ func git(t *testing.T, dir string, args ...string) string {
 }
 `
 
-// TestLintFlaky_GitDashCInAppend_Clean — the corpus house idiom (cycles
-// 962/968): -C passed inside an append([]string{"-C", dir}, args...) composite
-// is anchored; the lint must find the literal at any nesting depth.
 func TestLintFlaky_GitDashCInAppend_Clean(t *testing.T) {
 	fs := lintDir(t, gitAppendIdiomSrc)
 	if len(fs) != 0 {
 		t.Errorf("append-composed -C must count as anchored; got %+v", fs)
 	}
 }
-
-// --- pattern 5: unreaped load-generation ------------------------------------
 
 const loadGenSrc = `//go:build acs
 
@@ -379,9 +341,6 @@ func TestC9999_UnreapedStress(t *testing.T) {
 }
 `
 
-// TestLintFlaky_LoadGenUnreaped_Flagged — exec.Command (no context) spawning
-// load generators (`yes`, `stress`, shell busy loops) is resource-leak class:
-// nothing reaps the child when the predicate exits.
 func TestLintFlaky_LoadGenUnreaped_Flagged(t *testing.T) {
 	fs := lintDir(t, loadGenSrc)
 	cases := []struct{ fn, substr string }{
@@ -423,18 +382,12 @@ func TestC9999_VetClean(t *testing.T) {
 }
 `
 
-// TestLintFlaky_GoBuildVet_NotSuiteScope — the suite-scope rule targets
-// go-TEST shells: a direct `go build` / `go vet` over the same patterns is a
-// compile, not a 40s+ test suite under contention (cycle-969 buildEvolve /
-// cycle-941 module_builds corpus shapes must stay clean).
 func TestLintFlaky_GoBuildVet_NotSuiteScope(t *testing.T) {
 	fs := lintDir(t, goBuildVetSrc)
 	if len(fs) != 0 {
 		t.Errorf("go build/vet invocations must not be suite-scope findings; got %+v", fs)
 	}
 }
-
-// --- clean composite ---------------------------------------------------------
 
 const cleanSrc = `//go:build acs
 
@@ -476,9 +429,6 @@ func TestC9999_RuntimePIDLiveness(t *testing.T) {
 }
 `
 
-// TestLintFlaky_CleanEquivalents_NotFlagged — the sanctioned shapes: a single
-// named-package go test, CommandContext-reaped load-gen, runtime-discovered
-// PIDs, and plain small int consts outside liveness contexts.
 func TestLintFlaky_CleanEquivalents_NotFlagged(t *testing.T) {
 	fs := lintDir(t, cleanSrc)
 	if len(fs) != 0 {
@@ -486,10 +436,6 @@ func TestLintFlaky_CleanEquivalents_NotFlagged(t *testing.T) {
 	}
 }
 
-// --- modes + error paths -----------------------------------------------------
-
-// TestLintFlaky_SingleFileMode — a direct predicates_test.go path (not a dir)
-// lints identically.
 func TestLintFlaky_SingleFileMode(t *testing.T) {
 	dir := writePredicateDir(t, wallClockSrc)
 	path := filepath.Join(dir, "predicates_test.go")
@@ -505,16 +451,12 @@ func TestLintFlaky_SingleFileMode(t *testing.T) {
 	}
 }
 
-// TestLintFlaky_MissingPath_Error — a bad path surfaces as error (the CLI
-// degrades it to a loud advisory skip, never a block).
 func TestLintFlaky_MissingPath_Error(t *testing.T) {
 	if _, err := LintFlakyPredicates("/no/such/predicates_test.go"); err == nil {
 		t.Error("missing path: want error")
 	}
 }
 
-// TestLintFlaky_UnparseableSource_Error — garbage source is an error, not a
-// silent zero-findings pass (fail-open must be loud at the caller).
 func TestLintFlaky_UnparseableSource_Error(t *testing.T) {
 	dir := writePredicateDir(t, "package cycle9999\nfunc {{{")
 	if _, err := LintFlakyPredicates(dir); err == nil {
@@ -522,11 +464,6 @@ func TestLintFlaky_UnparseableSource_Error(t *testing.T) {
 	}
 }
 
-// TestLintFlaky_DirWithNoGoFiles_Error is the H2 silent-clean pin: a directory
-// holding no .go files linted NOTHING. Returning (nil, nil) there made
-// "0 findings over 0 files" byte-indistinguishable from "0 findings over a
-// linted tree" — the same class as the dropped -predicates flag. It must be an
-// error, and the report must still name the path it was asked about.
 func TestLintFlaky_DirWithNoGoFiles_Error(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "notes.md"), []byte("no go here\n"), 0o644); err != nil {
@@ -543,8 +480,6 @@ func TestLintFlaky_DirWithNoGoFiles_Error(t *testing.T) {
 		t.Errorf("report on error: Path=%q Linted=%d, want %q and 0", report.Path, report.Linted(), dir)
 	}
 }
-
-// --- M4: argv-position awareness (the dominant false-positive class) ---------
 
 const nonTestExecPatternSrc = `//go:build acs
 
@@ -574,12 +509,6 @@ func TestC9999_ListRecursive(t *testing.T) {
 }
 `
 
-// TestLintFlaky_PatternInNonTestExecArgv_NotFlagged is the M4 pin: a package
-// pattern handed to a subprocess that is NOT `go test` — rg, go vet, go list — is
-// a search or a compile, never a 40s+ suite under contention. Flagging it prints
-// a claim that is false about the code, which is how authors learn to ignore a
-// linter. This shape was the single largest false-positive source in the
-// 121-of-284 corpus calibration.
 func TestLintFlaky_PatternInNonTestExecArgv_NotFlagged(t *testing.T) {
 	fs := lintDir(t, nonTestExecPatternSrc)
 	if len(fs) != 0 {
@@ -606,10 +535,6 @@ func TestC9999_VetThenTestSamePattern(t *testing.T) {
 }
 `
 
-// TestLintFlaky_GoTestArgvWins_EvenBesideNonTestUse — a same-function `go vet` on
-// the pattern must NOT suppress the `go test` on it. The old design's benign-set
-// let one compile hide a real suite shell; the argv-position index gives go-test
-// evidence priority.
 func TestLintFlaky_GoTestArgvWins_EvenBesideNonTestUse(t *testing.T) {
 	fs := lintDir(t, mixedExecPatternSrc)
 	if _, ok := findingFor(fs, "TestC9999_VetThenTestSamePattern", "internal/core"); !ok {
@@ -630,10 +555,6 @@ func TestC9999_HelperShellsSuite(t *testing.T) {
 func runSuite(t *testing.T, pkg string) { t.Helper() }
 `
 
-// TestLintFlaky_HelperMediatedPattern_StillFlagged — a pattern that reaches NO
-// exec argv is unresolvable here: it may be handed to a helper that shells
-// `go test` (the shape above). The advisory note stands — the safe direction for
-// an advisory lint is to over-report the unknowable, not to go quiet.
 func TestLintFlaky_HelperMediatedPattern_StillFlagged(t *testing.T) {
 	fs := lintDir(t, helperMediatedPatternSrc)
 	if _, ok := findingFor(fs, "TestC9999_HelperShellsSuite", "./internal/core/..."); !ok {
@@ -678,18 +599,6 @@ func TestC9999_GitViaHelper(t *testing.T) {
 }
 `
 
-// TestLintFlaky_AcsassertSubprocessOutputIsAnExecConstructor — the corpus's real
-// exec constructor is acsassert.SubprocessOutput (198 of 282 historical acs dirs
-// use it; 20 use exec.Command). Recognizing only exec.Command made the M4
-// argv-position rule technically implemented but practically INERT: a
-// `go vet ./...` through the house helper reached no recognized exec argv, landed
-// in the "unresolvable" bucket, and kept its false suite-scope finding — which was
-// the single largest remaining false-positive class on the real corpus.
-//
-// All four consequences are asserted together, because they are one decision:
-// the helper's go-vet sweep is clean, its go-test on a known-slow package still
-// fires, and — since it binds no context — its load-gen and its bare git are
-// correctly flagged.
 func TestLintFlaky_AcsassertSubprocessOutputIsAnExecConstructor(t *testing.T) {
 	fs := lintDir(t, acsassertHelperSrc)
 
@@ -709,10 +618,7 @@ func TestLintFlaky_AcsassertSubprocessOutputIsAnExecConstructor(t *testing.T) {
 	}
 }
 
-// helperHopSrc is the CANONICAL corpus idiom, verbatim in shape from
-// go/acs/cycle1034: the package pattern lives in a const the TEST function names,
-// and the -run narrowing lives in a same-file helper that takes the package as a
-// parameter.
+// helperHopSrc mirrors the idiom in go/acs/cycle1034: the pattern in a const, the -run in a shared helper.
 const helperHopSrc = `//go:build acs
 
 package cycle9999
@@ -739,12 +645,6 @@ func TestC9999_001_NarrowedThroughHelper(t *testing.T) {
 }
 `
 
-// TestLintFlaky_HelperHopResolvesNarrowedInvocation is the HIGH-2 pin. Indexing
-// only the test function's OWN body saw no exec argv here, fell into the
-// "unresolvable → keep the note" branch, and printed "narrow the invocation with
-// -run" at code that already narrows — 142 of 297 corpus findings (48%), measured
-// on the live 282-dir corpus. Following ONE level into the same-package helper,
-// with the call's args bound to the helper's params, resolves it correctly.
 func TestLintFlaky_HelperHopResolvesNarrowedInvocation(t *testing.T) {
 	fs := lintDir(t, helperHopSrc)
 	if len(fs) != 0 {
@@ -776,10 +676,6 @@ func TestC9999_001_WideThroughHelper(t *testing.T) {
 }
 `
 
-// TestLintFlaky_HelperHopStillFlagsWideInvocation — the helper hop must resolve
-// BOTH ways. A helper that shells the whole known-slow package with no -run is
-// the real cycles-1173/1175/1178 shape and must still fire; a hop that only ever
-// suppressed would have traded 48% false positives for false negatives.
 func TestLintFlaky_HelperHopStillFlagsWideInvocation(t *testing.T) {
 	fs := lintDir(t, helperHopWideSrc)
 	if _, ok := findingFor(fs, "TestC9999_001_WideThroughHelper", "internal/core"); !ok {
@@ -812,18 +708,12 @@ func TestC9999_001_TwoLevelsDown(t *testing.T) {
 }
 `
 
-// TestLintFlaky_HelperHopIsDepthOneOnly pins the bound: the hop follows exactly
-// one level, so a two-level chain stays unresolvable and KEEPS its advisory note.
-// Depth 1 is what makes the walk terminate without a visited set; the residual is
-// documented rather than silently deepened.
 func TestLintFlaky_HelperHopIsDepthOneOnly(t *testing.T) {
 	fs := lintDir(t, helperHopTwoLevelSrc)
 	if _, ok := findingFor(fs, "TestC9999_001_TwoLevelsDown", "internal/core"); !ok {
 		t.Errorf("two levels down is unresolvable and must keep its note (safe direction); got %+v", fs)
 	}
 }
-
-// --- M6: -run narrowing suppresses the known-slow finding --------------------
 
 const runNarrowedSrc = `//go:build acs
 
@@ -853,10 +743,6 @@ func TestC9999_NarrowedShellForm(t *testing.T) {
 }
 `
 
-// TestLintFlaky_RunNarrowedKnownSlow_NotFlagged is the M6 pin: the known-slow
-// finding estimates the cost of running a whole 40s+ package. A `-run`-narrowed
-// invocation runs a handful of tests, so the estimate no longer holds and the
-// finding would be a false claim — in the direct, `-run=` and sh -c forms alike.
 func TestLintFlaky_RunNarrowedKnownSlow_NotFlagged(t *testing.T) {
 	fs := lintDir(t, runNarrowedSrc)
 	if len(fs) != 0 {
@@ -880,9 +766,6 @@ func TestC9999_NarrowedButRecursive(t *testing.T) {
 }
 `
 
-// TestLintFlaky_RunNarrowedRecursive_StillFlagged — the M6 boundary: -run selects
-// which TESTS run, not which PACKAGES are built and loaded, so a narrowed
-// recursive sweep still pays whole-subtree cost and stays flagged.
 func TestLintFlaky_RunNarrowedRecursive_StillFlagged(t *testing.T) {
 	fs := lintDir(t, runNarrowedRecursiveSrc)
 	if _, ok := findingFor(fs, "TestC9999_NarrowedButRecursive", "./internal/bridge/..."); !ok {
@@ -909,9 +792,6 @@ func TestC9999_NarrowedThenWide(t *testing.T) {
 }
 `
 
-// TestLintFlaky_NarrowedPlusWideSameSuite_StillFlagged — narrowing is credited
-// only when EVERY go-test argv carrying the pattern is narrowed. One wide
-// invocation elsewhere in the same function keeps the finding (safe direction).
 func TestLintFlaky_NarrowedPlusWideSameSuite_StillFlagged(t *testing.T) {
 	fs := lintDir(t, runNarrowedAndWideSrc)
 	if _, ok := findingFor(fs, "TestC9999_NarrowedThenWide", "internal/core"); !ok {

@@ -1,29 +1,6 @@
-// Package interaction owns interaction telemetry (ADR-0045 I1): every
-// injection the loop fires into a phase agent — nudge, auto-respond
-// keystrokes, salvage, kernel answer, correction re-dispatch — records a
-// typed Event with its deterministically-resolved Outcome through one
-// chokepoint, mirroring internal/recovery's C1 discipline ("an interaction
-// that isn't recorded with its outcome doesn't exist").
-//
-// The validation batch (cycles 263–269) proved the cost of not having this:
-// `nudgeSent=true` and nothing measures whether any nudge ever worked, so
-// there is no tuning signal and no learning. I1 ships FIRST in the ADR-0045
-// build order because every later component's effectiveness claim (salvage
-// saved a re-dispatch; rule X fired N times, 0 false) must be measurable from
-// day one — the soak for I2–I4 is this telemetry.
-//
-// Stage coupling: recording is side-effect-free observation, so the recorder
-// runs at EVERY EVOLVE_PHASE_RECOVERY stage including `off` (the
-// FatalPaneDetector precedent — classification always-on, only ACTING is
-// staged). Only corrective actions gate on shadow/enforce.
-//
-// Threat S10 (stored-injection): pane-derived strings persist in the ledger
-// and may later be read by an LLM (retro, advisor). Record therefore passes
-// Payload and Result through panetrust neutralization BEFORE write — the
-// ledger is safe-by-construction to feed back to any LLM.
-//
-// Leaf constraints (mirrors internal/recovery): importable by both core and
-// bridge, so it imports neither — stdlib + the panetrust leaf only.
+// Package interaction records every injection the loop fires into a phase agent with its
+// resolved outcome, and decides the corrective interactions that repair a phase.
+// See docs/architecture/packages/internal-interaction.md.
 package interaction
 
 import (
@@ -42,125 +19,80 @@ const (
 	KindSalvage              = "salvage"
 	KindKernelAnswer         = "kernel_answer"
 	KindCorrectionRedispatch = "correction_redispatch"
-	// KindSubmitVerify is one driver-initiated submission checked for delivery
-	// (driver_tmux_submitverify.go). Recorded on EVERY outcome, including the
-	// clean one: stderr is discarded on the phase-success path, so this ledger
-	// is the only durable place a recovered stall can be observed.
+	// KindSubmitVerify is one driver submission checked for delivery, recorded on every outcome.
 	KindSubmitVerify = "submit_verify"
 )
 
-// Outcome results: the deterministic resolution vocabulary. Resolution never
-// trusts agent self-assessment — only artifact presence, pane pattern state,
-// and re-dispatch verdicts (external, unfakeable evidence).
+// Outcome results. Resolution uses only external evidence (artifact presence,
+// pane pattern state, re-dispatch verdicts), never the agent's self-assessment.
 const (
-	// ResultArtifactAppeared: the contracted artifact appeared within the
-	// bounded wait window after the interaction.
+	// ResultArtifactAppeared: the contracted artifact appeared within the bounded wait window.
 	ResultArtifactAppeared = "artifact_appeared"
-	// ResultPromptCleared: the prompt pattern that triggered the interaction
-	// no longer matched on the next capture.
+	// ResultPromptCleared: the pattern that triggered the interaction no longer matched on the next capture.
 	ResultPromptCleared = "prompt_cleared"
-	// ResultNoEffect: the evidence shows the interaction did not help (the
-	// artifact never appeared / the same pattern fired again). Recorded
-	// honestly — a fired-and-forgotten interaction is the defect this
-	// package exists to kill.
+	// ResultNoEffect: the evidence shows the interaction did not help.
 	ResultNoEffect = "no_effect"
-	// ResultSuppressedLingering: a fire-once prompt's dismissed text still
-	// matches in scrollback; the responder suppressed a re-fire. Genuinely
-	// indistinguishable from an unanswered dialog at this layer, so it gets
-	// its own honest bucket instead of a guess.
+	// ResultSuppressedLingering: a fire-once prompt's dismissed text still matched, so a re-fire was suppressed.
 	ResultSuppressedLingering = "suppressed_lingering"
-	// ResultRunEnded: the run concluded before the next capture could
-	// resolve the interaction.
+	// ResultRunEnded: the run ended before the next capture could resolve the interaction.
 	ResultRunEnded = "run_ended"
-	// ResultAccepted / ResultRejectedAgain: a correction re-dispatch's
-	// deliverable passed / failed the review gate that triggered it.
+	// ResultAccepted / ResultRejectedAgain: a correction re-dispatch's deliverable passed / failed its gate.
 	ResultAccepted      = "accepted"
 	ResultRejectedAgain = "rejected_again"
-	// ResultDispatchFailed / ResultNonCanonicalVerdict: the correction
-	// re-dispatch itself errored / returned an unevaluable verdict.
+	// ResultDispatchFailed / ResultNonCanonicalVerdict: the correction re-dispatch errored / returned an unevaluable verdict.
 	ResultDispatchFailed      = "dispatch_failed"
 	ResultNonCanonicalVerdict = "non_canonical_verdict"
 
-	// submit-verify outcomes.
-	//
-	// ResultSubmitVerified is the CLEAN case: the input line was already clear,
-	// so nothing needed doing. Deliberately NOT ResultPromptCleared — that const
-	// means "the prompt pattern that TRIGGERED an interaction stopped matching",
-	// i.e. our injection worked, and every other producer of it (autorespond,
-	// kernel-answer) means exactly that. submit_verify fires on every dispatch
-	// while auto-responds are occasional, so folding no-ops into that bucket
-	// would flip Summary.ByResult["prompt_cleared"] from "injections that
-	// succeeded" to mostly "nothing happened".
-	//
-	// NOTE for anyone diffing interaction-summary.json across this change:
-	// Summary.Total (and ByRung["none"]) grow by 1-2 per dispatch from here on.
-	// Volume is not comparable across this boundary; nothing regressed.
+	// ResultSubmitVerified: the input line was already clear. It is not ResultPromptCleared,
+	// which counts injections that worked; every dispatch's no-op would swamp that count.
 	ResultSubmitVerified = "submit_verified"
-	//
-	// ResultSubmittedAfterResend is the one that makes the guard measurable:
-	// the input line was still parked and a bounded re-send cleared it, so the
-	// cycles 1505/1510/1517 stall class occurred AND was absorbed.
+	// ResultSubmittedAfterResend: the input line was still parked and a bounded re-send cleared it.
 	ResultSubmittedAfterResend = "submitted_after_resend"
-	// ResultSubmitWedged is the re-send budget exhausted — known ~20 minutes
-	// before the phase times out, and previously typed nowhere.
+	// ResultSubmitWedged: the re-send budget ran out with the input line still parked.
 	ResultSubmitWedged = "submit_wedged"
-	// ResultNotVerified is "could not check", which must never read as
-	// "checked and clean": no input-line marker, or the capture failed.
+	// ResultNotVerified: delivery could not be checked, which must never read as clean.
 	ResultNotVerified = "not_verified"
 )
 
-// Event is one injection fired at a phase agent (ADR-0045 I1).
+// Event is one injection fired at a phase agent.
 type Event struct {
 	// Kind is one of the Kind* constants.
 	Kind string `json:"kind"`
-	// Phase is the canonical phase name ("build"); falls back to the driver
-	// name when the launch carries no agent.
+	// Phase is the canonical phase name, or the driver name when the launch carries no agent.
 	Phase string `json:"phase"`
-	// Cycle is the loop cycle the interaction belongs to (0 outside a cycle).
+	// Cycle is 0 outside a cycle.
 	Cycle int `json:"cycle"`
-	// Trigger names what provoked the interaction ("idle_no_artifact",
-	// "idle_unrewritten_deliverable" — F39: present but not rewritten since
-	// dispatch — "contract_reject", "unknown_prompt", ...).
+	// Trigger names what provoked the interaction: "idle_no_artifact",
+	// "idle_unrewritten_deliverable" (present but not rewritten since dispatch),
+	// "contract_reject", "unknown_prompt".
 	Trigger string `json:"trigger"`
-	// Rung is the correction-ladder rung that produced this event
-	// ("salvage"|"live_fix"|"redispatch"|"") — load-bearing for the
-	// rung-distribution acceptance metric (ADR-0045 §10(d)).
+	// Rung is the correction-ladder rung that produced the event, or "" outside the ladder.
 	Rung string `json:"rung,omitempty"`
-	// DecisionID correlates all rungs of ONE correction decision, so a
-	// salvage outcome can be linked to the re-dispatch it averted.
+	// DecisionID correlates every rung of one correction decision.
 	DecisionID string `json:"decision_id,omitempty"`
-	// Payload is a digest of what was injected (≤200 chars, neutralized
-	// before write — never raw pane-derived text at full length).
+	// Payload is a digest of what was injected, neutralized and capped at 200 runes before write.
 	Payload string `json:"payload,omitempty"`
-	// RuleID is the auto-respond rule (or promoted-rule id) that fired,
-	// when applicable.
+	// RuleID is the auto-respond or promoted rule that fired, when one did.
 	RuleID string `json:"rule_id,omitempty"`
 }
 
-// Outcome is the Event plus its deterministically-resolved result. One ledger
-// line per interaction: the Outcome embeds the Event it resolves.
+// Outcome is an Event plus its resolved result; the ledger holds one Outcome per line.
 type Outcome struct {
 	Event
-	// Result is one of the Result* constants (open vocabulary: later slices
-	// add their own).
+	// Result is one of the Result* constants; the vocabulary is open to later producers.
 	Result string `json:"result"`
-	// LatencyMS is injection→resolution latency.
+	// LatencyMS runs from injection to resolution.
 	LatencyMS int64 `json:"latency_ms"`
-	// CostUSD is advisor-consult spend attributed to this interaction
-	// (0 for deterministic rungs).
+	// CostUSD is advisor spend attributed to the interaction; 0 for deterministic rungs.
 	CostUSD float64 `json:"cost_usd"`
 }
 
-// Payload digest caps: 200 chars over at most 3 tail lines — compact,
-// actionable feedback (the ACI principle), never raw injected text at length.
 const (
 	payloadMaxChars = 200
 	payloadMaxLines = 3
 )
 
-// Recorder is the single recording chokepoint. Nil-receiver-safe (a nil
-// recorder records nothing) so producers need no nil guards — the recovery
-// detector idiom. Safe for concurrent use.
+// Recorder is the single recording chokepoint, safe for concurrent use; a nil Recorder records nothing.
 type Recorder struct {
 	workspace string
 	mu        sync.Mutex
@@ -168,22 +100,18 @@ type Recorder struct {
 }
 
 // NewRecorder returns a Recorder appending to <workspace>/<phase>-interactions.ndjson.
-// An empty workspace keeps in-memory records only (the C1 cwd-leak lesson:
-// never invent a file location).
+// An empty workspace keeps records in memory only, so no file lands in the cwd.
 func NewRecorder(workspace string) *Recorder {
 	return &Recorder{workspace: workspace}
 }
 
-// Record resolves one interaction: neutralizes pane-derived fields (S10),
-// keeps the outcome in memory, and best-effort appends one ndjson line to the
-// per-phase ledger. Telemetry must never abort a phase, so file errors are
-// swallowed by design — the in-memory record still exists.
+// Record neutralizes pane-derived fields, keeps the outcome in memory, and appends it to the
+// per-phase ledger. File errors are swallowed: telemetry must never abort a phase.
 func (r *Recorder) Record(out Outcome) {
 	if r == nil {
 		return
 	}
-	// Neutralize at the chokepoint, never trust the producer: Payload (and,
-	// defense-in-depth, Result) may carry pane-derived text.
+	// Never trust the producer; Result is neutralized too, as defense in depth.
 	out.Payload = neutralize(out.Payload)
 	out.Result = neutralize(out.Result)
 	r.mu.Lock()
@@ -207,17 +135,13 @@ func (r *Recorder) Outcomes() []Outcome {
 	return out
 }
 
-// neutralize runs a string through the panetrust digest under the payload
-// caps. Closed-vocabulary strings pass through unchanged; pane-derived text
-// comes out ANSI-stripped, marker-defanged, and length-capped.
+// neutralize ANSI-strips, marker-defangs and length-caps pane-derived text;
+// closed-vocabulary strings pass through unchanged.
 func neutralize(s string) string {
 	if s == "" {
 		return ""
 	}
-	// Digest caps each LINE at payloadMaxChars runes; the joined multi-line
-	// result can exceed that. The Event.Payload contract is a TOTAL cap
-	// (≤200 chars), so the joined string is capped again — both cuts are
-	// intentional, not redundant.
+	// Digest caps each line, not the joined result; Payload's contract is a total cap.
 	d := panetrust.Digest(s, payloadMaxLines, payloadMaxChars)
 	if r := []rune(d); len(r) > payloadMaxChars {
 		d = string(r[:payloadMaxChars])
@@ -225,8 +149,6 @@ func neutralize(s string) string {
 	return d
 }
 
-// ledgerPath names the per-phase ledger. An empty phase falls back to
-// "unknown" rather than inventing an unnameable file.
 func ledgerPath(workspace, phase string) string {
 	if phase == "" {
 		phase = "unknown"
@@ -234,14 +156,8 @@ func ledgerPath(workspace, phase string) string {
 	return filepath.Join(workspace, phase+"-interactions.ndjson")
 }
 
-// appendLedgerLine best-effort appends one outcome. O_APPEND keeps the
-// per-phase ledger safe under TODAY's producer timeline, which is temporally
-// disjoint by construction: the bridge subprocess flushes its outcomes (defer
-// in runTmuxREPL) before runner.Run returns, and the orchestrator records
-// corrections only after that. POSIX guarantees append atomicity only up to
-// PIPE_BUF, so if a later slice adds a producer that writes WHILE the phase
-// runs (an I2 salvage rung, the I3 broker), this invariant must be revisited
-// (file lock or single-writer funnel) — do not silently rely on it.
+// appendLedgerLine relies on O_APPEND only because the bridge and orchestrator never write one
+// ledger at the same time; a concurrent cross-process producer needs a file lock.
 func appendLedgerLine(workspace string, out Outcome) {
 	b, err := json.Marshal(out)
 	if err != nil {

@@ -5,9 +5,6 @@ import (
 	"testing"
 )
 
-// bridge_rules_test.go — facet B: launch-time system-prompt/rules prepend.
-// CLI-agnostic, composed with the interactive-policy block at the same seam.
-
 func TestInjectRulesPrefix_EmptyRulesUnchanged(t *testing.T) {
 	if got := injectRulesPrefix("body", ""); got != "body" {
 		t.Errorf("empty rules should pass through unchanged; got %q", got)
@@ -27,8 +24,6 @@ func TestInjectRulesPrefix_PrependsRulesBlock(t *testing.T) {
 	}
 }
 
-// Composition order: rules block precedes the policy block, which precedes
-// the body — the exact order the adapter applies at both launch seams.
 func TestRulesAndPolicy_ComposeInOrder(t *testing.T) {
 	withPolicy := injectPolicyPrefix("BODY", PolicyRecommendedOrFirst)
 	composed := injectRulesPrefix(withPolicy, "RULE TEXT")

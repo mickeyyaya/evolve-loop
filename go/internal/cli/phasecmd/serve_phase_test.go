@@ -13,8 +13,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/phaseproto"
 )
 
-// envelopeStdin builds an envelope-framed request line ready to feed
-// into runServePhase's stdin. Mirrors what SubprocessRunner writes.
+// envelopeStdin frames req the way phaseproto.SubprocessRunner writes it.
 func envelopeStdin(t *testing.T, req core.PhaseRequest) []byte {
 	t.Helper()
 	env, err := phaseproto.EncodeRequest("corr-test", req)
@@ -28,8 +27,6 @@ func envelopeStdin(t *testing.T, req core.PhaseRequest) []byte {
 	return append(raw, '\n')
 }
 
-// decodeResponseEnvelope parses one envelope from stdout and returns
-// it, failing the test on any framing error.
 func decodeResponseEnvelope(t *testing.T, out []byte) phaseproto.Envelope {
 	t.Helper()
 	out = bytes.TrimRight(out, "\n")
@@ -110,10 +107,6 @@ func TestRunServePhase_RunnerErrorEmitsErrorEnvelope(t *testing.T) {
 
 	stdin := bytes.NewReader(envelopeStdin(t, core.PhaseRequest{Cycle: 1}))
 	var stdout, stderr bytes.Buffer
-	// Handler errors are wrapped into a WireError envelope by ServeStdio;
-	// the process still exits 0 because the envelope IS the response —
-	// surfaced as a transport error on the parent side. (CodeChildCrashed
-	// is reserved for non-zero exit codes.)
 	code := RunServePhase([]string{"intent"}, stdin, &stdout, &stderr)
 	if code != 0 {
 		t.Errorf("code=%d want 0 (handler errors are wire-level, not exit-level); stderr=%s", code, stderr.String())
@@ -145,9 +138,6 @@ func TestRunServePhase_MalformedEnvelopeExits1(t *testing.T) {
 	}
 }
 
-// Exercises RunServePhase end-to-end: an envelope-framed request round-trips to
-// a response envelope. (Dispatcher routing for "serve-phase" → RunServePhase is
-// covered separately in cmd/evolve/dispatch_test.go.)
 func TestRunServePhase_EnvelopeRoundTrip(t *testing.T) {
 	stub := &stubPhase{resp: core.PhaseResponse{Phase: "scout", Verdict: core.VerdictPASS}}
 	defer registry.SnapshotForTest()()
@@ -166,9 +156,6 @@ func TestRunServePhase_EnvelopeRoundTrip(t *testing.T) {
 	}
 }
 
-// Defensive: the underlying ServeStdio uses context.Background(), so we
-// only need to ensure the context is plumbed through. Smoke check by
-// ensuring the stub sees a non-nil context.
 type ctxCapturingPhase struct {
 	stubPhase
 	ctx context.Context

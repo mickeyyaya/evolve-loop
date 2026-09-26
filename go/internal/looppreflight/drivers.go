@@ -7,8 +7,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
-// profileCLIs returns the non-empty CLI driver names a profile can run against:
-// its primary CLI plus every cli_fallback entry, in declaration order.
+// profileCLIs returns the profile's non-empty primary CLI and cli_fallback names, in order.
 func profileCLIs(p profiles.Profile) []string {
 	out := make([]string, 0, 1+len(p.CLIFallback))
 	if p.CLI != "" {
@@ -22,10 +21,8 @@ func profileCLIs(p profiles.Profile) []string {
 	return out
 }
 
-// distinctDrivers returns the sorted, de-duplicated set of driver names across
-// all loadable profiles (primary CLI + fallbacks). Profiles that fail to load
-// are skipped here — checkPipelineStructure is the check that reports load
-// failures; the CLI/boot checks only act on what resolves.
+// distinctDrivers returns the sorted driver names across loadable profiles; load failures
+// are skipped because checkPipelineStructure reports them.
 func distinctDrivers(list func() ([]string, error), get func(string) (profiles.Profile, error)) []string {
 	seen := map[string]struct{}{}
 	names, _ := list()
@@ -46,9 +43,7 @@ func distinctDrivers(list func() ([]string, error), get func(string) (profiles.P
 	return out
 }
 
-// sandboxWanted reports whether any loadable profile enables sandboxing. A
-// profile that sets sandbox.enabled IS a write-phase that wants the bridge to
-// sandbox it — so this doubles as "is there a write phase that needs sandbox".
+// sandboxWanted reports whether any loadable profile enables sandboxing, i.e. a write phase needs it.
 func sandboxWanted(list func() ([]string, error), get func(string) (profiles.Profile, error)) bool {
 	names, _ := list()
 	for _, n := range names {
@@ -63,10 +58,7 @@ func sandboxWanted(list func() ([]string, error), get func(string) (profiles.Pro
 	return false
 }
 
-// driverBinary maps a driver name to the underlying CLI executable that must be
-// on PATH (claude-tmux→claude, codex-tmux→codex, agy-tmux→agy,
-// ollama-tmux→ollama, claude-p→claude). The binary is the segment before the
-// first dash, matching every driver the bridge registers today.
+// driverBinary maps a driver to its executable, the segment before the first dash (claude-tmux → claude).
 func driverBinary(driver string) string {
 	if i := strings.IndexByte(driver, '-'); i > 0 {
 		return driver[:i]

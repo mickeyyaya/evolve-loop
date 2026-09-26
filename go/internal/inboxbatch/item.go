@@ -1,15 +1,5 @@
-// Package inboxbatch groups .evolve/inbox items into batches a SINGLE cycle
-// can consume coherently — the deterministic half of task selection (Core Rule
-// 5: grouping is mechanical signal-following, so it lives in Go; CHOOSING a
-// batch stays the triage LLM's judgment). One-item-per-cycle consumption pays
-// the full pipeline overhead (scout→triage→tdd→build→audit→ship) per item;
-// batching related items amortizes it across work that shares a campaign, a
-// package area, or an explicit dependency/link edge.
-//
-// Design: Strategy — each grouping signal is a Rule emitting edges; a
-// union-find clusters items over the union of all rules' edges; batches order
-// dep-topologically and split at a configurable cap. Pure and deterministic
-// end to end: same inbox in, same batches out.
+// Package inboxbatch loads .evolve/inbox items, groups them into batches one cycle can carry,
+// and decides which items are console-routed. See docs/architecture/packages/internal-inboxbatch.md.
 package inboxbatch
 
 import (
@@ -25,72 +15,41 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 )
 
-// Item is the structured view of one .evolve/inbox/*.json entry. Fields are
-// tolerant-by-default: real items are a mix of hand-authored and
-// agent-autofiled JSON, so anything absent zero-values rather than erroring.
+// Item is one .evolve/inbox/*.json record; absent fields zero-value rather than error.
 type Item struct {
 	ID     string  `json:"id"`
 	Title  string  `json:"title"`
 	Weight float64 `json:"weight"`
 	Kind   string  `json:"kind"`
-	// Class is the item's declared archetype ("pipeline-architecture",
-	// "task-contract-design", …). Authors have been writing it into inbox JSON
-	// for a while; it was silently dropped at load until cycle-1190. It is the
-	// routing signal downstream archetype detectors key off (IsOperatorState).
+	// Class is the declared archetype that IsOperatorState keys on.
 	Class      string   `json:"class"`
 	Priority   string   `json:"priority"`
 	Campaign   string   `json:"campaign"`
 	Files      []string `json:"files"`
 	ConnectsTo []string `json:"connects_to"`
 	Deps       []string `json:"deps"`
-	// Route is the ADR-0074 dispatch-authority field: "console-*" values mark
-	// the item operator-owned (never lane-dispatchable), "lane" is the explicit
-	// override for protected-files false positives. Empty = derive (see
-	// ConsoleRouted).
+	// Route "console-*" makes the item operator-owned; "lane" overrides a heuristic derivation; empty derives.
 	Route string `json:"route"`
-	// InjectedBy carries autofile provenance (retrofile, chronicle-escalation,
-	// …). ADR-0074 clamp: an agent-autofiled item may NOT lane-override a
-	// protected-surface derivation — agent-authored fields cannot widen agent
-	// authority (ADR-0073 clamp-parity vocabulary).
+	// InjectedBy is autofile provenance; a non-empty value clamps the route:"lane" override.
 	InjectedBy string `json:"injected_by"`
-	// Continuation (ADR-0076 slice C) binds a FAILed cycle's preserved,
-	// snapshot-committed work to this item so the next attempt resumes instead
-	// of restarting cold. Machine-consumed only (never rendered into the triage
-	// prompt); validated at adoption time, tolerant here. Nil = fresh start.
+	// Continuation binds a failed cycle's preserved work; machine-consumed, never rendered.
 	Continuation *continuation.Continuation `json:"continuation,omitempty"`
-	// Acceptance is the item's verbatim acceptance criteria. It is the SINGLE
-	// source the harness projects into the tdd, build and audit prompts' Task Contract block
-	// (ADR-0098) — never re-typed by an agent, so the builder and the auditor
-	// grade against the same words.
+	// Acceptance is the single source of the Task Contract block's criteria.
 	Acceptance []string `json:"acceptance,omitempty"`
-	// DeliverableKind is what the item wants built — "code" (default) or
-	// "document" (ADR-0099: a solutions/<id>/ deliverable with candidate options
-	// and a recommendation). Projected into the Task Contract block; the cycle's
-	// authoritative kind is what triage declares in its report header.
+	// DeliverableKind is "code" (default) or "document".
 	DeliverableKind string `json:"deliverable_kind,omitempty"`
-	// CreatedAt is the item's filing timestamp as authored (RFC3339 or a bare
-	// date); FiledAt is the parsed view, with the filename prefix as fallback.
+	// CreatedAt is the filing timestamp as authored: RFC3339 or a bare date.
 	CreatedAt string `json:"created_at,omitempty"`
-	// Path is the source file (relative name inside the inbox dir) — operator
-	// affordance for `evolve inbox batches` output; not part of grouping.
+	// Path is the file name inside the inbox dir, for display only.
 	Path string `json:"-"`
-	// mentions are the FILES the record's own text names, derived at decode
-	// (UnmarshalJSON). With no declared surface they are the item's surface for
-	// the console classifier (F29) — the surface triage's breaker would
-	// otherwise derive only after a lane has paid for scout and triage.
+	// mentions are the files the record's own text names, derived at decode.
 	mentions []string
 }
 
-// UnmarshalJSON decodes an inbox record and derives the files its own text
-// names. Deriving at DECODE, not in one loader, is deliberate: the wave seed,
-// the claim floor and LoadFile each unmarshal records themselves, and the
-// console classifier must see the same surface from every one of them. The
-// walk reads DECODED strings (so an escaped "\/" is still a slash) from every
-// author-written field — authors spread paths across summary, fix, notes,
-// root_cause, problem, details and the rest — skipping the declared surface
-// and the machine-written fields (mentionSkip).
+// UnmarshalJSON decodes a record and derives the files its author-written fields name.
+// Deriving at decode gives every reader (wave seed, claim floor, LoadFile) the same surface.
 func (it *Item) UnmarshalJSON(raw []byte) error {
-	type record Item // the same fields without this method: default decoding
+	type record Item // drops this method, so decoding does not recurse
 	var r record
 	if err := json.Unmarshal(raw, &r); err != nil {
 		return err
@@ -103,19 +62,12 @@ func (it *Item) UnmarshalJSON(raw []byte) error {
 	return nil
 }
 
-// DeclaredSurface reports whether the item DECLARES its fix surface: at least
-// one files[] token shaped like a repo path (a slash-separated path). It is the
-// ONE home of that belief — the console classifier's "a declared surface wins"
-// rule and the seed's admissibility tie-break both read it (F29) — and a
-// placeholder ("TBD", "N/A", "()") or a bare file name ("role.go", which the
-// triage LLM would resolve into the tree) declares nothing.
+// DeclaredSurface reports whether any files[] token is path-shaped; placeholders and bare file names declare nothing.
 func (it Item) DeclaredSurface() bool {
 	return len(declaredTokens(it.Files)) > 0
 }
 
-// DeclaredPaths returns the item's declared fix surface — the path-shaped
-// files[] tokens (declaredTokens, the ONE token set the console classifier
-// judges) — for evidence gathering such as triage's premise drift (F40).
+// DeclaredPaths returns the item's declared fix surface: its path-shaped files[] tokens.
 func (it Item) DeclaredPaths() []string {
 	return declaredTokens(it.Files)
 }
@@ -123,13 +75,11 @@ func (it Item) DeclaredPaths() []string {
 // filedAtLayouts are the created_at shapes authors write, most specific first.
 var filedAtLayouts = []string{time.RFC3339, "2006-01-02"}
 
-// filenameStampLayout is the timestamp prefix inbox filenames carry
-// ("2026-08-16T19-30-00Z-<id>.json") — colons are not filename-safe.
+// filenameStampLayout is the timestamp prefix of inbox file names; colons are not filename-safe.
 const filenameStampLayout = "2006-01-02T15-04-05Z"
 
-// FiledAt is when the item was filed: its created_at (RFC3339 or a bare
-// date), else the timestamp prefix of its filename; zero when neither parses —
-// a missing date is never guessed (F40: premise drift measures from it).
+// FiledAt is when the item was filed: its created_at, else its file name's timestamp prefix.
+// It is zero when neither parses; premise drift measures from it, so a date is never guessed.
 func (it Item) FiledAt() time.Time {
 	created := strings.TrimSpace(it.CreatedAt)
 	for _, layout := range filedAtLayouts {
@@ -145,10 +95,7 @@ func (it Item) FiledAt() time.Time {
 	return time.Time{}
 }
 
-// declaredTokens is the ONE token set a declared surface consists of: the
-// path-shaped files[] tokens. The console classifier judges exactly these in
-// scope and DeclaredSurface asks whether any exist, so an annotation word
-// ("(go test)" yields "go") is never read as a directory (F29 review).
+// declaredTokens is the path-shaped files[] tokens: the declared surface the console classifier judges.
 func declaredTokens(files []string) []string {
 	var out []string
 	for _, tok := range surfaceTokens(files) {
@@ -159,8 +106,7 @@ func declaredTokens(files []string) []string {
 	return out
 }
 
-// surfaceTokens splits files[] entries into bare tokens (the loose shapes
-// authors write: "a.go b.go", "(a.go)", "a.go;", "a.go:178").
+// surfaceTokens splits files[] entries into bare tokens ("a.go b.go", "(a.go)", "a.go;", "a.go:178").
 func surfaceTokens(files []string) []string {
 	var out []string
 	for _, f := range files {
@@ -174,23 +120,14 @@ func surfaceTokens(files []string) []string {
 	return out
 }
 
-// lineLocatorRE matches the source locator authors append when citing a file
-// ("a.go:178", "a.go:178:5", "a.go:189,205,221", "a.go:10-20", "a.go#L10-L20")
-// — any trailing ":<digits>" run joined by "-", "," or ":", so a date-shaped suffix
-// ("x.md:2026-09-26") strips too, equally not part of the path. It is how the
-// file is cited, not part of its path — kept, the ":" failed the path shape
-// and the file went unjudged while triage's breaker still matched it (F35).
+// lineLocatorRE matches a trailing citation locator (":178", ":189,205,221", ":10-20", "#L10-L20"),
+// which is not part of the path; a date-shaped suffix strips too.
 var lineLocatorRE = regexp.MustCompile(`(?::\d+(?:[-,:]\d+)*|#L\d+(?:-L?\d+)?)$`)
 
-// repoPathRE matches a WHOLE slash-bearing token: segments of path characters
-// joined by slashes, or one segment with a trailing slash ("go/", "skills/").
+// repoPathRE matches a whole token of slash-joined path segments, or one segment with a trailing slash ("go/").
 var repoPathRE = regexp.MustCompile(`^[A-Za-z0-9_.@-]+(?:/[A-Za-z0-9_.@-]+)*/$|^[A-Za-z0-9_.@-]+(?:/[A-Za-z0-9_.@-]+)+$`)
 
-// isPathShaped reports whether a files[] token names a repo path rather than a
-// placeholder: wholly slash-separated path characters, not every segment a
-// single character — "go/internal/core", "docs/x.md", "skills/audit", "go/" and
-// "go/internal/x/y.go" declare a surface while "N/A", "w/o", "I/O", "TBD" and a
-// bare "role.go" do not.
+// isPathShaped accepts "go/", "docs/x.md" and "skills/audit" but not "N/A", "w/o", "TBD" or a bare "role.go".
 func isPathShaped(tok string) bool {
 	if !repoPathRE.MatchString(tok) {
 		return false
@@ -203,18 +140,14 @@ func isPathShaped(tok string) bool {
 	return false
 }
 
-// pathInProseRE finds slash-separated path tokens inside prose.
 var pathInProseRE = regexp.MustCompile(`[A-Za-z0-9_.@-]+(?:/[A-Za-z0-9_.@-]+)+/?`)
 
-// mentionSkip are the fields the mention walk never reads: the declared surface
-// (judged on its own) and machine-written provenance/routing state. Every field
-// the console router stamps starts with "routed_" (inboxmover/lifecycle
-// route.go), so skipMention matches that prefix rather than copying its names.
+// mentionSkip holds the declared surface and the machine-written fields the mention walk never reads.
 var mentionSkip = map[string]bool{
 	"files": true, "continuation": true, "route": true, "injected_by": true,
 }
 
-// skipMention reports whether the walk skips field k.
+// skipMention also skips every "routed_" field, the prefix the console router stamps on all it writes.
 func skipMention(k string) bool {
 	return mentionSkip[k] || strings.HasPrefix(k, "routed_")
 }
@@ -222,10 +155,7 @@ func skipMention(k string) bool {
 // maxMentions bounds the walk so a runaway record cannot make routing costly.
 const maxMentions = 64
 
-// mentionedFiles returns the distinct FILE paths (a last segment with an
-// extension) the record's author-written fields name, in walk order, at most
-// maxMentions. Directory mentions are context, not surface: "the stall shows
-// in go/internal/core" names no file a lane would change.
+// mentionedFiles returns the distinct file paths the fields name, in walk order; directory mentions are context.
 func mentionedFiles(doc map[string]any) []string {
 	var out []string
 	seen := map[string]bool{}
@@ -255,14 +185,12 @@ func mentionedFiles(doc map[string]any) []string {
 	return out
 }
 
-// isFileSpelling reports whether p's last segment carries an extension after
-// its first character ("runner.go" yes; "core", ".evolve", "evolve/" no).
+// isFileSpelling reports whether p's last segment has an extension after its first character ("runner.go", not ".evolve").
 func isFileSpelling(p string) bool {
 	last := p[strings.LastIndex(p, "/")+1:]
 	return len(last) > 1 && strings.Contains(last[1:], ".")
 }
 
-// sortedKeys keeps the walk deterministic.
 func sortedKeys(m map[string]any) []string {
 	keys := make([]string, 0, len(m))
 	for k := range m {
@@ -272,12 +200,7 @@ func sortedKeys(m map[string]any) []string {
 	return keys
 }
 
-// LoadDir parses every *.json under dir into Items, sorted by ID for
-// deterministic downstream grouping. A missing dir is an empty inbox (nil,
-// nil, nil) — the loop runs fine with no backlog. A malformed item is skipped
-// LOUDLY via the warnings slice (fail-open: one broken file must not hide the
-// rest of the backlog), never silently. Non-JSON files are ignored (the inbox
-// hosts occasional notes/subdirs).
+// LoadDir loads every *.json in dir sorted by ID; a missing dir is empty and a malformed file is a warning.
 func LoadDir(dir string) (items []Item, warnings []string, err error) {
 	entries, rerr := os.ReadDir(dir)
 	if rerr != nil {
@@ -300,8 +223,7 @@ func LoadDir(dir string) (items []Item, warnings []string, err error) {
 		items = append(items, it)
 	}
 	sort.Slice(items, func(i, j int) bool { return items[i].ID < items[j].ID })
-	// A duplicate id silently mis-wires dep/connects resolution (last wins in
-	// the resolver index) — keep both items but surface the collision.
+	// The resolver index keeps the last duplicate, so a collision is surfaced rather than dropped.
 	for i := 1; i < len(items); i++ {
 		if items[i].ID == items[i-1].ID {
 			warnings = append(warnings, items[i].Path+": duplicate id "+items[i].ID+" (also "+items[i-1].Path+") — dep/connects references resolve ambiguously")
@@ -310,18 +232,13 @@ func LoadDir(dir string) (items []Item, warnings []string, err error) {
 	return items, warnings, nil
 }
 
-// maxFieldLen caps rendered fields — long enough for every legitimate id in
-// the backlog, short enough that a runaway field cannot flood the prompt.
+// maxFieldLen fits every legitimate id yet stops a runaway field flooding the prompt.
 const maxFieldLen = 160
 
-// maxAcceptanceLen bounds one acceptance criterion as rendered into a prompt —
-// wide enough for a real criterion (the filed items run 150–400 characters),
-// narrow enough that an item cannot smuggle a page of instructions.
+// maxAcceptanceLen fits a real criterion yet stops an item smuggling in a page of instructions.
 const maxAcceptanceLen = 600
 
-// LoadFile reads ONE inbox item record (the shape the lane-scope resolver
-// hands back per task id) with the same identity fallback and prompt-surface
-// sanitisation LoadDir applies. Warnings are non-fatal sanitisation notes.
+// LoadFile loads one record with LoadDir's id fallback and sanitization; warnings are non-fatal.
 func LoadFile(path string) (Item, []string, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -333,14 +250,9 @@ func LoadFile(path string) (Item, []string, error) {
 	}
 	name := filepath.Base(path)
 	if it.ID == "" {
-		// Filename stem is the stable fallback identity (some autofiled
-		// items omit id; the filename is unique by construction).
 		it.ID = strings.TrimSuffix(name, ".json")
 	}
 	it.Path = name
-	// Prompt-injection surface: id/campaign/files/acceptance render into LLM
-	// prompts (RenderMarkdown / Edge reasons / the Task Contract block). Strip
-	// control characters and bound each field.
 	var warnings []string
 	if sanitizeItem(&it) {
 		warnings = append(warnings, name+": sanitized control characters/overlength in rendered fields")
@@ -348,14 +260,12 @@ func LoadFile(path string) (Item, []string, error) {
 	return it, warnings, nil
 }
 
-// sanitizeItem cleans the fields that reach the triage prompt, reporting
-// whether anything changed. Control characters collapse to a single space
-// (never a newline — one batch, one line) and overlength truncates.
+// sanitizeItem cleans the prompt-rendered fields and reports whether anything changed.
 func sanitizeItem(it *Item) bool {
 	changed := false
 	clean := func(s string) string { return cleanBounded(s, maxFieldLen, &changed) }
 	it.ID = clean(it.ID)
-	it.Title = clean(it.Title) // renders as the Task Contract heading
+	it.Title = clean(it.Title)
 	it.Campaign = clean(it.Campaign)
 	it.Route = clean(it.Route)
 	it.DeliverableKind = clean(it.DeliverableKind)
@@ -368,10 +278,8 @@ func sanitizeItem(it *Item) bool {
 	return changed
 }
 
-// StripControl replaces control characters (C0 and DEL) with spaces — the ONE
-// control-character rule for agent-authorable text entering a prompt: a
-// newline in an id, a title or a commit subject would forge a new context
-// bullet (prompt injection through the data channel).
+// StripControl replaces control characters (C0 and DEL) with spaces.
+// A newline in agent-authored text entering a prompt would forge a new context line.
 func StripControl(s string) string {
 	return strings.Map(func(r rune) rune {
 		if r < 0x20 || r == 0x7f {
@@ -381,8 +289,7 @@ func StripControl(s string) string {
 	}, s)
 }
 
-// cleanBounded strips control characters and bounds s to max bytes, flagging
-// changed when either applied.
+// cleanBounded strips control characters and truncates s to max bytes, flagging changed when either applied.
 func cleanBounded(s string, max int, changed *bool) string {
 	mapped := StripControl(s)
 	if len(mapped) > max {

@@ -1,32 +1,3 @@
-// RED contract for cycle-1255 task `test-amplification-covering-tests-scope`.
-//
-// test-amplification is the pipeline's per-run context outlier (81.2M cache-read
-// tokens / 15 runs = 5.4M per run, 13.5 min avg — knowledge-base/research/
-// token-usage-history-2026-07-20.md). Root cause: its phase spec declares only
-// tdd-contract.md + build-report.md as inputs, and the agent is forbidden from
-// reading diffs/implementation, so it must Grep/Glob the WHOLE repo to discover
-// which existing test files cover the paths it was handed.
-//
-// The fix: derive the covering-test set deterministically (changed packages →
-// their _test.go files) and inject it as an explicit input, so the agent is TOLD
-// the in-scope tests instead of searching for them. The black-box constraint is
-// untouched: a list of test-file PATHS is not the diff and not the implementation.
-//
-// CoveringTests is the deriver. Contract pinned below:
-//
-//	CoveringTests(repoRoot string, pkgPatterns []string) []string
-//
-// It maps go-test package patterns (the exact strings ChangedPackages/FromGit
-// already emit, e.g. "./internal/foo/...") to the sorted, deduped, repo-relative
-// slash-separated paths of the _test.go files in those packages. It is fail-open
-// like the rest of this package: any unusable input yields nil, never an error
-// and never a panic — the phase then behaves exactly as it does today.
-//
-// Import-shape probe (the cycle-644 obligation): this test pins the symbol from
-// INSIDE package changedpkgs (no new import at all), and the reachability test
-// below resolves callers from the parsed import graph rather than by importing
-// them, so no new edge is introduced in either direction. changedpkgs imports
-// only internal/gitexec, so a caller in core/phases/router adds no cycle.
 package changedpkgs
 
 import (
@@ -40,8 +11,6 @@ import (
 	"testing"
 )
 
-// writeFiles materialises a fake repo tree (paths repo-relative, slash-separated)
-// under root and returns root.
 func writeFiles(t *testing.T, root string, paths ...string) string {
 	t.Helper()
 	for _, p := range paths {
@@ -56,11 +25,6 @@ func writeFiles(t *testing.T, root string, paths ...string) string {
 	return root
 }
 
-// TestCoveringTests_DerivesTestFilesForChangedPackagesOnly — AC5 (the crux).
-// Only the _test.go files of the CHANGED packages come back: non-test sources are
-// excluded (they are implementation, which the phase may not read), and untouched
-// packages are excluded (that exclusion IS the token saving). Sub-packages of a
-// "/..." pattern are included, because that is what the pattern means to go test.
 func TestCoveringTests_DerivesTestFilesForChangedPackagesOnly(t *testing.T) {
 	root := writeFiles(t, t.TempDir(),
 		"go/internal/foo/foo.go",
@@ -81,9 +45,6 @@ func TestCoveringTests_DerivesTestFilesForChangedPackagesOnly(t *testing.T) {
 	}
 }
 
-// TestCoveringTests_DedupesAcrossOverlappingPatterns — AC6. ChangedPackages can
-// emit a parent and a child pattern for the same diff; a duplicated path would
-// inflate the injected corpus the fix exists to shrink.
 func TestCoveringTests_DedupesAcrossOverlappingPatterns(t *testing.T) {
 	root := writeFiles(t, t.TempDir(),
 		"go/internal/foo/foo_test.go",
@@ -97,10 +58,6 @@ func TestCoveringTests_DedupesAcrossOverlappingPatterns(t *testing.T) {
 	}
 }
 
-// TestCoveringTests_AcceptsNonRecursivePatternForm — AC7, the EDGE axis. A caller
-// may hand a bare package path without the "/..." suffix; the deriver must not
-// silently return nothing (a silent empty set is indistinguishable from
-// fail-open, so the phase would keep its blind search forever).
 func TestCoveringTests_AcceptsNonRecursivePatternForm(t *testing.T) {
 	root := writeFiles(t, t.TempDir(), "go/internal/foo/foo_test.go")
 
@@ -111,12 +68,6 @@ func TestCoveringTests_AcceptsNonRecursivePatternForm(t *testing.T) {
 	}
 }
 
-// TestCoveringTests_FailsOpenOnUnusableInput — AC8, the NEGATIVE axis and the
-// task's own hard constraint: never block the phase. Every unusable input must
-// yield nil (the injection is skipped and the agent searches exactly as it does
-// today), never a panic. The module-wide "./..." pattern is included here on
-// purpose: injecting every test file in the repo is strictly worse than today's
-// behaviour, so it must fail open rather than "succeed" hugely.
 func TestCoveringTests_FailsOpenOnUnusableInput(t *testing.T) {
 	populated := writeFiles(t, t.TempDir(), "go/internal/foo/foo_test.go")
 
@@ -142,11 +93,6 @@ func TestCoveringTests_FailsOpenOnUnusableInput(t *testing.T) {
 	}
 }
 
-// TestCoveringTests_ReachableFromProduction — AC9, the WIRING proof. A deriver
-// whose only caller is a test is dead code and saves zero tokens. This resolves
-// callers from the parsed import graph of the whole go/ module: at least one
-// NON-test file outside package changedpkgs (and outside go/acs, whose predicates
-// are the gate, not the product) must reference changedpkgs.CoveringTests.
 func TestCoveringTests_ReachableFromProduction(t *testing.T) {
 	moduleDir, err := filepath.Abs(filepath.Join("..", ".."))
 	if err != nil {
@@ -157,7 +103,7 @@ func TestCoveringTests_ReachableFromProduction(t *testing.T) {
 	fset := token.NewFileSet()
 	walkErr := filepath.Walk(moduleDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return nil // best-effort walk; an unreadable dir is not a verdict
+			return nil
 		}
 		if info.IsDir() {
 			switch info.Name() {
@@ -170,11 +116,11 @@ func TestCoveringTests_ReachableFromProduction(t *testing.T) {
 			return nil
 		}
 		if filepath.Dir(path) == moduleDir+string(os.PathSeparator)+filepath.Join("internal", "changedpkgs") {
-			return nil // the definition site is not a caller
+			return nil
 		}
 		file, perr := parser.ParseFile(fset, path, nil, 0)
 		if perr != nil {
-			return nil // unparseable file is not evidence either way
+			return nil
 		}
 		if file.Name.Name == "changedpkgs" {
 			return nil

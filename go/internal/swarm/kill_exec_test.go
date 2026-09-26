@@ -9,18 +9,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 )
 
-// ExecTmuxKill is the production TmuxKiller. These tests pin the 2026-06-11
-// killer-B contract: `tmux kill-session -t ''` resolves to the CLIENT'S CURRENT
-// session, so an empty name fired from inside any tmux pane (an agent, a soak
-// driver, a test) kills the caller's own session. The empty case must be
-// refused BEFORE any tmux exec; everything else stays best-effort.
-//
-// All cases go through the tmuxRun seam — the unit suite must never touch a
-// real tmux server (the unseamed predecessor tests live-fired kill-session
-// against the shared default socket and destroyed soak sessions #1-#4).
-
-// withTmuxRunStub swaps the package-level tmuxRun seam. Do NOT add t.Parallel()
-// to any test using it — a package-var mutation under parallel tests is a data race.
+// withTmuxRunStub swaps a package variable, so tests that use it must not call t.Parallel().
 func withTmuxRunStub(t *testing.T, stub func(ctx context.Context, args ...string) error) *[][]string {
 	t.Helper()
 	var calls [][]string
@@ -67,7 +56,6 @@ func TestExecTmuxKill_NamedSessionKillArgs(t *testing.T) {
 }
 
 func TestExecTmuxKill_RunnerErrorIsBestEffort(t *testing.T) {
-	// A missing session is the desired end state — tmux exit codes are ignored.
 	withTmuxRunStub(t, func(context.Context, ...string) error {
 		return errors.New("no server running")
 	})

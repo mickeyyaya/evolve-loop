@@ -2,16 +2,6 @@ package prompts
 
 import "testing"
 
-// strip_test.go — RED contract for cycle-256 task `prompt-ondemand-section-strip`.
-//
-// Agent docs carry a static "## Reference Index" tail (lookup tables, on-demand
-// links) that is identical across cycles and re-sent on every dispatch.
-// StripOnDemandSections removes that section (heading through EOF) so a compact
-// prompt mode can drop the dead weight; a body WITHOUT the heading is returned
-// byte-for-byte unchanged. The heading match is LINE-ANCHORED — an inline prose
-// mention of "## Reference Index" must NOT trigger a strip (the anti-naive-
-// substring guard; a bare strings.Index impl fails the "inline mention" case).
-
 func TestStripOnDemandSections(t *testing.T) {
 	cases := []struct {
 		name string

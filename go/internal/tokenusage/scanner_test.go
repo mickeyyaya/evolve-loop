@@ -1,22 +1,5 @@
 package tokenusage
 
-// scanner_test.go — RED contract for token-telemetry S1 (docs/plans/
-// token-telemetry-2026-07.md S1; inbox token-telemetry-s1-transcript-scanner,
-// weight 0.95). internal/tokenusage does not exist yet: every symbol below
-// (Window, Result, Source*, ScanConfigRoot) is undefined, so this package
-// fails to compile — the intended RED signal. Builder implements the scanner
-// against this contract; do not modify these tests.
-//
-// Fixture shape mirrors the real Claude Code transcript JSONL: one JSON
-// object per line, "type" in {"user","assistant"}, a top-level "cwd", and for
-// assistant lines a "message" object carrying "id" (message id, repeated
-// across streamed deltas for the same logical turn) and "usage" (token
-// counts). ScanConfigRoot must sum usage across all assistant lines whose cwd
-// matches the launch Window's Worktree exactly (never trust the session
-// directory name/slug), deduplicating repeated message ids (streamed usage
-// deltas), and tie-breaking multiple same-cwd session files by requiring the
-// Window's ArtifactPath to appear in the first user message's text.
-
 import (
 	"os"
 	"path/filepath"
@@ -50,9 +33,6 @@ func mustParse(t *testing.T, s string) time.Time {
 	return ts
 }
 
-// TestTranscriptScan_SumsUsageWithinWindow: two assistant turns inside the
-// launch window, both cwd-matched to the worktree, sum their usage fields
-// into cyclestate.TokenUsage and report SourceTranscript.
 func TestTranscriptScan_SumsUsageWithinWindow(t *testing.T) {
 	worktree := "/repo/worktrees/cycle-999"
 	root := t.TempDir()
@@ -81,9 +61,6 @@ func TestTranscriptScan_SumsUsageWithinWindow(t *testing.T) {
 	}
 }
 
-// TestTranscriptScan_DeduplicatesStreamedUsageByMessageID: the CLI streams
-// usage deltas for the SAME logical turn under one message id; only the last
-// (highest-cumulative) line per id counts, never a raw sum of every line.
 func TestTranscriptScan_DeduplicatesStreamedUsageByMessageID(t *testing.T) {
 	worktree := "/repo/worktrees/cycle-998"
 	root := t.TempDir()
@@ -104,33 +81,21 @@ func TestTranscriptScan_DeduplicatesStreamedUsageByMessageID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ScanConfigRoot: %v", err)
 	}
-	// Only the final streamed delta for message id "m1" must count.
 	want := cyclestate.TokenUsage{Input: 10, Output: 9, CacheRead: 2, CacheWrite: 0}
 	if res.Usage != want {
 		t.Errorf("Usage = %+v, want %+v (dedup by message id — must take the last delta, not sum all three)", res.Usage, want)
 	}
 }
 
-// TestTranscriptScan_ConcurrentSessionsSameDir_OnlyContentVerifiedCounted:
-// swarm lanes can share one session-directory slug (the slug is a lossy
-// sanitization of cwd, not a unique key). When two transcript files in the
-// SAME session directory both claim the matching cwd, only the one whose
-// first user message contains the launch's unique ArtifactPath is counted —
-// the other must be excluded even though its cwd also matches.
 func TestTranscriptScan_ConcurrentSessionsSameDir_OnlyContentVerifiedCounted(t *testing.T) {
 	worktree := "/repo/worktrees/cycle-997"
 	root := t.TempDir()
 	sessionDir := filepath.Join(root, "projects", "-repo-worktrees-cycle-997")
 
-	// Session A: the real launch — first user message carries the assembler's
-	// "Artifact path: " marker ahead of the unique artifact path the
-	// orchestrator stamped for this launch (the attribution key's real shape).
 	bodyA := `{"type":"user","cwd":"` + worktree + `","timestamp":"2026-07-07T10:00:01Z","message":{"id":"uA","content":[{"type":"text","text":"Artifact path: .evolve/runs/cycle-997/launch-token-abc123"}]}}
 {"type":"assistant","cwd":"` + worktree + `","timestamp":"2026-07-07T10:00:02Z","message":{"id":"mA","usage":{"input_tokens":40,"output_tokens":4,"cache_read_input_tokens":0,"cache_creation_input_tokens":0}}}
 `
-	// Session B: a concurrent swarm reader sharing the same sanitized dir and
-	// (coincidentally) the same cwd, but its first user message does NOT cite
-	// this launch's artifact path — must be excluded.
+	// Session B shares the cwd and session directory but not the launch's artifact path.
 	bodyB := `{"type":"user","cwd":"` + worktree + `","timestamp":"2026-07-07T10:00:01Z","message":{"id":"uB","content":[{"type":"text","text":"unrelated swarm reader task"}]}}
 {"type":"assistant","cwd":"` + worktree + `","timestamp":"2026-07-07T10:00:03Z","message":{"id":"mB","usage":{"input_tokens":9000,"output_tokens":9000,"cache_read_input_tokens":0,"cache_creation_input_tokens":0}}}
 `
@@ -156,12 +121,8 @@ func TestTranscriptScan_ConcurrentSessionsSameDir_OnlyContentVerifiedCounted(t *
 	}
 }
 
-// TestTranscriptScan_MissingDirYieldsSourceNone: no projects/<slug> directory
-// under the config root at all (e.g. tmux driver, or CLI never wrote a
-// transcript) must yield a zero Usage and SourceNone, never an error — token
-// telemetry is best-effort instrumentation, not a hard requirement.
 func TestTranscriptScan_MissingDirYieldsSourceNone(t *testing.T) {
-	root := t.TempDir() // no projects/ subdirectory created at all
+	root := t.TempDir()
 	w := Window{
 		Worktree: "/repo/worktrees/cycle-996",
 		Start:    mustParse(t, launchWindowStart),

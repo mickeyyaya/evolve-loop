@@ -1,18 +1,11 @@
 package phasecoherence
 
-// coherence_adversarial_test.go — cycle-281 test amplification.
-// Targets the uncovered branches in Check (76.1%) and CheckArtifactNames
-// (67.3%) identified by the cycle-281 coverage baseline (88.6% total).
-// All tests are black-box (spec-derived), never reading the implementation.
-
 import (
 	"strings"
 	"testing"
 	"testing/fstest"
 )
 
-// TestCoherence_MalformedProfileJSON — adversarial: a JSON-malformed profile
-// must return an error, not silently produce zero violations (corpus rot guard).
 func TestCoherence_MalformedProfileJSON(t *testing.T) {
 	agents, _ := fixtures(
 		map[string]string{"evolve-widget": personaMD("widget", `tools: ["Read"]`)},
@@ -27,8 +20,6 @@ func TestCoherence_MalformedProfileJSON(t *testing.T) {
 	}
 }
 
-// TestCoherence_MultiplePersonasMixedViolations — adversarial: two personas,
-// one clean and one drifting; only the drifting persona must appear in violations.
 func TestCoherence_MultiplePersonasMixedViolations(t *testing.T) {
 	agents, profs := fixtures(
 		map[string]string{
@@ -60,9 +51,6 @@ func TestCoherence_MultiplePersonasMixedViolations(t *testing.T) {
 	}
 }
 
-// TestCoherence_BothDisallowedAndUndeclared — adversarial: persona declares a
-// tool the profile disallows AND the profile allows a tool the persona omits;
-// both violation kinds must appear.
 func TestCoherence_BothDisallowedAndUndeclared(t *testing.T) {
 	agents, profs := fixtures(
 		map[string]string{"evolve-widget": personaMD("widget", `tools: ["Read", "Write"]`)},
@@ -89,8 +77,6 @@ func TestCoherence_BothDisallowedAndUndeclared(t *testing.T) {
 	}
 }
 
-// TestCoherence_EmptyAllowedToolsList — adversarial: profile has an empty
-// allowed_tools array (not absent) → treated as no constraint → skip.
 func TestCoherence_EmptyAllowedToolsList(t *testing.T) {
 	agents, profs := fixtures(
 		map[string]string{"evolve-widget": personaMD("widget", `tools: ["Read", "Write"]`)},
@@ -100,14 +86,11 @@ func TestCoherence_EmptyAllowedToolsList(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Check: %v", err)
 	}
-	// An empty allowed_tools list means no constraint — same semantics as absent.
 	if len(vs) != 0 {
 		t.Errorf("empty allowed_tools must produce zero violations (no constraint); got %+v", vs)
 	}
 }
 
-// TestArtifactCoherence_MalformedProfileJSON — adversarial: malformed JSON in
-// a profile must propagate an error, not silently produce zero violations.
 func TestArtifactCoherence_MalformedProfileJSON(t *testing.T) {
 	agents, _ := fixtures(
 		map[string]string{"evolve-builder": personaMD("builder",
@@ -123,9 +106,6 @@ func TestArtifactCoherence_MalformedProfileJSON(t *testing.T) {
 	}
 }
 
-// TestArtifactCoherence_OutputFormatWithNoMdToken — adversarial: output-format
-// line present but contains no .md token → the checker has nothing to compare,
-// must produce zero violations (not a WARN).
 func TestArtifactCoherence_OutputFormatWithNoMdToken(t *testing.T) {
 	agents, profs := fixtures(
 		map[string]string{"evolve-probe": personaMD("probe",
@@ -141,8 +121,6 @@ func TestArtifactCoherence_OutputFormatWithNoMdToken(t *testing.T) {
 	}
 }
 
-// TestArtifactCoherence_MultiplePersonasOnlyOneMismatch — adversarial: five
-// personas, only one mismatched → exactly one violation, naming both basenames.
 func TestArtifactCoherence_MultiplePersonasOnlyOneMismatch(t *testing.T) {
 	agents, profs := fixtures(
 		map[string]string{
@@ -176,9 +154,6 @@ func TestArtifactCoherence_MultiplePersonasOnlyOneMismatch(t *testing.T) {
 	}
 }
 
-// TestArtifactCoherence_OutputFormatQuotedMdName — adversarial: output-format
-// value where the .md filename is quoted with double-quotes → parser must still
-// extract the first .md token.
 func TestArtifactCoherence_OutputFormatQuotedMdName(t *testing.T) {
 	agents, profs := fixtures(
 		map[string]string{"evolve-scout": personaMD("scout",

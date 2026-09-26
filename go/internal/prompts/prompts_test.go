@@ -1,6 +1,3 @@
-// Package prompts loads agent/skill markdown with YAML frontmatter.
-// This test file pins the front-matter parsing semantics and the
-// fs.FS-backed lookup contract that phase impls will rely on.
 package prompts
 
 import (
@@ -14,9 +11,7 @@ import (
 	"testing/fstest"
 )
 
-// sampleAgent mirrors the real agents/evolve-scout.md frontmatter shape:
-// flat string fields, an array of identifiers, quoted long strings with
-// embedded em-dashes, and an unquoted multi-word description.
+// sampleAgent mirrors the frontmatter shapes of the real agents/evolve-scout.md.
 const sampleAgent = `---
 name: evolve-scout
 description: Discovery and planning agent for the Evolve Loop. Scans codebase.
@@ -42,9 +37,6 @@ argument-hint: "[--budget-usd N | --cycles N | --resume]"
 The body.
 `
 
-// fixtureFS builds a virtual filesystem matching the repo layout
-// (agents/<name>.md + skills/<name>/SKILL.md) so the loader can be
-// exercised without touching the real .md files.
 func fixtureFS() fstest.MapFS {
 	return fstest.MapFS{
 		"agents/evolve-scout.md":       &fstest.MapFile{Data: []byte(sampleAgent)},
@@ -55,9 +47,6 @@ func fixtureFS() fstest.MapFS {
 	}
 }
 
-// TestNewFromFS_Agent_HappyPath verifies the full read+parse path for
-// a typical agent file. Body must be content AFTER the closing --- of
-// the frontmatter block.
 func TestNewFromFS_Agent_HappyPath(t *testing.T) {
 	l := NewFromFS(fixtureFS())
 	p, err := l.Agent("evolve-scout")
@@ -81,7 +70,6 @@ func TestNewFromFS_Agent_HappyPath(t *testing.T) {
 	if !reflect.DeepEqual(caps, wantCaps) {
 		t.Errorf("capabilities=%v, want %v", caps, wantCaps)
 	}
-	// Body must start with the heading line, not contain any "---".
 	if p.Body == "" {
 		t.Error("Body empty")
 	}
@@ -90,8 +78,6 @@ func TestNewFromFS_Agent_HappyPath(t *testing.T) {
 	}
 }
 
-// TestNewFromFS_Skill_PathConvention verifies skills/<name>/SKILL.md
-// resolution (NOT skills/<name>.md). Mirrors the repo convention.
 func TestNewFromFS_Skill_PathConvention(t *testing.T) {
 	l := NewFromFS(fixtureFS())
 	p, err := l.Skill("loop")
@@ -106,7 +92,6 @@ func TestNewFromFS_Skill_PathConvention(t *testing.T) {
 	}
 }
 
-// TestNewFromFS_Agent_NotFound returns fs.ErrNotExist-wrapped error.
 func TestNewFromFS_Agent_NotFound(t *testing.T) {
 	l := NewFromFS(fixtureFS())
 	_, err := l.Agent("nonexistent")
@@ -118,9 +103,6 @@ func TestNewFromFS_Agent_NotFound(t *testing.T) {
 	}
 }
 
-// TestAgents_SortedList — discovery surface for the orchestrator.
-// Skipped helper files like .DS_Store (not in fixture, but loader
-// must accept only *.md). Order: sorted by name.
 func TestAgents_SortedList(t *testing.T) {
 	l := NewFromFS(fixtureFS())
 	names, err := l.Agents()
@@ -128,15 +110,12 @@ func TestAgents_SortedList(t *testing.T) {
 		t.Fatalf("Agents: %v", err)
 	}
 	want := []string{"evolve-builder", "evolve-scout"}
-	sort.Strings(want) // defensive — verify sort property
+	sort.Strings(want)
 	if !reflect.DeepEqual(names, want) {
 		t.Errorf("Agents()=%v, want %v", names, want)
 	}
 }
 
-// TestSkills_OnlySKILL_Md — skills/ must only enumerate directories
-// containing a SKILL.md file. The "empty/notSkillFile.md" entry in
-// fixtureFS must be ignored.
 func TestSkills_OnlySKILL_Md(t *testing.T) {
 	l := NewFromFS(fixtureFS())
 	names, err := l.Skills()
@@ -149,8 +128,6 @@ func TestSkills_OnlySKILL_Md(t *testing.T) {
 	}
 }
 
-// TestParseFrontmatter_NoFrontmatter — files without --- markers
-// return nil map and the entire content as Body.
 func TestParseFrontmatter_NoFrontmatter(t *testing.T) {
 	raw := "# Just a heading\n\nNo frontmatter here."
 	fm, body, err := ParseFrontmatter(raw)
@@ -165,8 +142,6 @@ func TestParseFrontmatter_NoFrontmatter(t *testing.T) {
 	}
 }
 
-// TestParseFrontmatter_EmptyBlock — opening and closing --- with no
-// content between → empty map + body.
 func TestParseFrontmatter_EmptyBlock(t *testing.T) {
 	raw := "---\n---\n\nbody"
 	fm, body, err := ParseFrontmatter(raw)
@@ -181,8 +156,6 @@ func TestParseFrontmatter_EmptyBlock(t *testing.T) {
 	}
 }
 
-// TestParseFrontmatter_QuotedStrings — both single and double quotes
-// strip cleanly; embedded em-dashes survive.
 func TestParseFrontmatter_QuotedStrings(t *testing.T) {
 	raw := "---\nperspective: \"a — b\"\noutput: 'plain'\n---\nbody"
 	fm, _, err := ParseFrontmatter(raw)
@@ -197,8 +170,6 @@ func TestParseFrontmatter_QuotedStrings(t *testing.T) {
 	}
 }
 
-// TestParseFrontmatter_InlineArray — bracketed arrays with mixed
-// quoted/unquoted elements both parse to []string.
 func TestParseFrontmatter_InlineArray(t *testing.T) {
 	raw := "---\ntools: [\"Read\", \"Grep\", Bash]\nnums: []\n---\nbody"
 	fm, _, err := ParseFrontmatter(raw)
@@ -222,9 +193,6 @@ func TestParseFrontmatter_InlineArray(t *testing.T) {
 	}
 }
 
-// TestParseFrontmatter_ColonInValue — descriptions often contain
-// colons (e.g., "Phase X: do Y"). The first colon must split key/value,
-// remaining colons stay in the value.
 func TestParseFrontmatter_ColonInValue(t *testing.T) {
 	raw := "---\ndescription: Phase 2: do Y\n---\nbody"
 	fm, _, err := ParseFrontmatter(raw)
@@ -236,8 +204,6 @@ func TestParseFrontmatter_ColonInValue(t *testing.T) {
 	}
 }
 
-// TestParseFrontmatter_UnterminatedBlock — opening --- with no closing
-// returns an error so callers can surface clearly.
 func TestParseFrontmatter_UnterminatedBlock(t *testing.T) {
 	raw := "---\nname: foo\n(no closing fence)\n"
 	_, _, err := ParseFrontmatter(raw)
@@ -246,9 +212,6 @@ func TestParseFrontmatter_UnterminatedBlock(t *testing.T) {
 	}
 }
 
-// TestParseFrontmatter_BlankAndCommentLines — blank lines and #-comments
-// inside frontmatter must be skipped (don't crash, don't create empty
-// keys).
 func TestParseFrontmatter_BlankAndCommentLines(t *testing.T) {
 	raw := "---\n# This is a comment\nname: foo\n\ndescription: bar\n---\nbody"
 	fm, _, err := ParseFrontmatter(raw)
@@ -266,9 +229,6 @@ func TestParseFrontmatter_BlankAndCommentLines(t *testing.T) {
 	}
 }
 
-// TestNewFromDir_ReadsFromDisk — the dev-override path
-// ($EVOLVE_PROMPTS_DIR) uses os.DirFS under the hood. Verify the disk
-// round-trip works for at least one real agent file.
 func TestNewFromDir_ReadsFromDisk(t *testing.T) {
 	tmp := t.TempDir()
 	if err := writeFile(t, tmp, "agents/test-agent.md", "---\nname: test-agent\ndescription: x\n---\nbody"); err != nil {
@@ -284,8 +244,6 @@ func TestNewFromDir_ReadsFromDisk(t *testing.T) {
 	}
 }
 
-// TestNewFromDir_EmptyDir — empty path treated as "no source"; all
-// loads fail with fs.ErrNotExist.
 func TestNewFromDir_EmptyDir(t *testing.T) {
 	l := NewFromDir("")
 	_, err := l.Agent("anything")
@@ -294,7 +252,6 @@ func TestNewFromDir_EmptyDir(t *testing.T) {
 	}
 }
 
-// TestZeroLoader_AgentReadsErrNotExist — explicit zero-loader contract.
 func TestZeroLoader_AgentReadsErrNotExist(t *testing.T) {
 	l := NewFromFS(nil)
 	_, err := l.Agent("any")
@@ -303,7 +260,6 @@ func TestZeroLoader_AgentReadsErrNotExist(t *testing.T) {
 	}
 }
 
-// TestZeroLoader_AgentsAndSkills — listing on zero loader yields nil.
 func TestZeroLoader_AgentsAndSkills(t *testing.T) {
 	l := NewFromFS(nil)
 	if got, err := l.Agents(); err != nil || got != nil {
@@ -314,9 +270,6 @@ func TestZeroLoader_AgentsAndSkills(t *testing.T) {
 	}
 }
 
-// TestAgents_SkipsDirsAndNonMD — agents/ directory may contain nested
-// dirs or non-md files (e.g., AGENTS.md is fine; .DS_Store / reference
-// subdirs should be ignored).
 func TestAgents_SkipsDirsAndNonMD(t *testing.T) {
 	fsys := fstest.MapFS{
 		"agents/foo.md":      &fstest.MapFile{Data: []byte("---\nname: foo\n---\nb")},
@@ -333,8 +286,6 @@ func TestAgents_SkipsDirsAndNonMD(t *testing.T) {
 	}
 }
 
-// TestSkills_SkipsFileEntries — entries in skills/ that are plain
-// files (not dirs) must be skipped.
 func TestSkills_SkipsFileEntries(t *testing.T) {
 	fsys := fstest.MapFS{
 		"skills/README.md":     &fstest.MapFile{Data: []byte("not a skill")},
@@ -349,8 +300,6 @@ func TestSkills_SkipsFileEntries(t *testing.T) {
 	}
 }
 
-// TestAgent_ParseErrorSurfacesAtLoad — load() must wrap ParseFrontmatter
-// errors with file context so operator logs are diagnosable.
 func TestAgent_ParseErrorSurfacesAtLoad(t *testing.T) {
 	fsys := fstest.MapFS{
 		"agents/bad.md": &fstest.MapFile{Data: []byte("---\nname: bad\n(missing close fence)\n")},
@@ -364,8 +313,6 @@ func TestAgent_ParseErrorSurfacesAtLoad(t *testing.T) {
 	}
 }
 
-// TestParseFrontmatter_LineWithoutColonIsSkipped — guards the parser
-// against bare keys (e.g., comment-likes without `#`).
 func TestParseFrontmatter_LineWithoutColonIsSkipped(t *testing.T) {
 	raw := "---\nname: foo\nbarewordnocolon\ndescription: bar\n---\nbody"
 	fm, _, err := ParseFrontmatter(raw)
@@ -380,7 +327,6 @@ func TestParseFrontmatter_LineWithoutColonIsSkipped(t *testing.T) {
 	}
 }
 
-// TestParseFrontmatter_EmptyKey — ": value" with no key must be skipped.
 func TestParseFrontmatter_EmptyKey(t *testing.T) {
 	raw := "---\nname: foo\n: orphan\n---\nbody"
 	fm, _, err := ParseFrontmatter(raw)
@@ -392,8 +338,6 @@ func TestParseFrontmatter_EmptyKey(t *testing.T) {
 	}
 }
 
-// TestParseValue_EmptyValue — "key:" with no value yields empty string,
-// not a panic.
 func TestParseValue_EmptyValue(t *testing.T) {
 	raw := "---\nkey:\n---\nbody"
 	fm, _, err := ParseFrontmatter(raw)
@@ -405,9 +349,6 @@ func TestParseValue_EmptyValue(t *testing.T) {
 	}
 }
 
-// TestParseFrontmatter_CRLFLines — Windows line endings shouldn't
-// derail the parser (e.g., when a user edits a .md in a text editor
-// that emits CRLF).
 func TestParseFrontmatter_CRLFLines(t *testing.T) {
 	raw := "---\r\nname: foo\r\n---\r\nbody"
 	fm, _, err := ParseFrontmatter(raw)
@@ -419,11 +360,6 @@ func TestParseFrontmatter_CRLFLines(t *testing.T) {
 	}
 }
 
-// TestSmoke_RealAgentFiles — load every agent under repo agents/ via
-// NewFromDir and assert each has a name. Skipped if the dir is absent
-// (CI fixtures may not include it). This is the safety net the
-// projecthash live-bash test plays for hash equivalence: a real-data
-// smoke that catches parser regression against actual production files.
 func TestSmoke_RealAgentFiles(t *testing.T) {
 	root := "../../../" // go/internal/prompts → repo root
 	if _, err := os.Stat(filepath.Join(root, "agents")); err != nil {
@@ -437,10 +373,8 @@ func TestSmoke_RealAgentFiles(t *testing.T) {
 	if len(agents) == 0 {
 		t.Fatal("expected at least one real agent file")
 	}
-	// Repo convention: *-reference.md, AGENTS.md, and agent-templates.md
-	// are supplementary docs without frontmatter. Only the canonical
-	// agent personas (e.g., evolve-scout, evolve-builder) carry the
-	// `name:` field that subagent dispatch keys on.
+	// Subagent dispatch keys on the frontmatter `name:`; *-reference.md, AGENTS.md and
+	// agent-templates.md are supplementary docs that carry none.
 	skipNoFM := func(n string) bool {
 		return contains(n, "-reference") || contains(n, "AGENTS") || contains(n, "agent-templates")
 	}
@@ -458,8 +392,6 @@ func TestSmoke_RealAgentFiles(t *testing.T) {
 		}
 	}
 }
-
-// Helpers ------------------------------------------------------------
 
 func writeFile(t *testing.T, root, rel, content string) error {
 	t.Helper()
@@ -479,9 +411,6 @@ func contains(s, sub string) bool {
 	return false
 }
 
-// TestZeroLoader_CarriesBothSentinels — the zero loader keeps its documented
-// fs.ErrNotExist contract AND is discriminable as a wiring defect via
-// ErrNoSource, so a nil source can never masquerade as one missing doc.
 func TestZeroLoader_CarriesBothSentinels(t *testing.T) {
 	_, err := NewFromFS(nil).Agent("any")
 	if !errors.Is(err, fs.ErrNotExist) {

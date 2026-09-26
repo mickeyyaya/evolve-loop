@@ -1,10 +1,5 @@
 package policy_test
 
-// FanoutPolicy — the typed parameters that replaced EVOLVE_FANOUT_*. The
-// accessor encodes the non-obvious rules: Concurrency overrides only when >=1
-// (0/negative → default 2, NOT 1); int fields pass 0 through as a downstream
-// sentinel; *bool fields preserve an explicit false vs nil→true.
-
 import (
 	"testing"
 
@@ -12,7 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// fanoutWant is the resolved expectation (pointers flattened to bools).
 type fanoutWant struct {
 	concurrency        int
 	timeoutSecs        int
@@ -79,7 +73,6 @@ func TestFanoutConfig_Resolution(t *testing.T) {
 
 func TestLoad_FanoutBlock(t *testing.T) {
 	t.Run("explicit-false-survives-json-round-trip", func(t *testing.T) {
-		// track_workers:false stays false; cache_prefix_enabled:false stays false.
 		json := `{"fanout":{"concurrency":4,"timeout_secs":30,"cancel_on_consensus":true,` +
 			`"consensus_k":3,"consensus_poll_secs":2,"track_workers":false,` +
 			`"cache_prefix_enabled":false,"test_executor":"harness"}}`
@@ -94,7 +87,6 @@ func TestLoad_FanoutBlock(t *testing.T) {
 	})
 
 	t.Run("concurrency-zero-in-json-clamps-to-default", func(t *testing.T) {
-		// concurrency:0 via JSON still clamps up to the default 2.
 		pol, err := policy.Load(writeTempPolicy(t, `{"fanout":{"concurrency":0}}`))
 		if err != nil {
 			t.Fatalf("Load: %v", err)
@@ -105,11 +97,8 @@ func TestLoad_FanoutBlock(t *testing.T) {
 	})
 }
 
-// TestFanoutConfig_WiringToDispatch documents the cmd_fanout_dispatch mapping:
-// FanoutConfig() feeds fanoutdispatch.Config, dereferencing *TrackWorkers. The
-// accessor's never-nil guarantee is what makes that deref panic-free.
 func TestFanoutConfig_WiringToDispatch(t *testing.T) {
-	fc := policy.Policy{}.FanoutConfig() // absent policy → resolved defaults
+	fc := policy.Policy{}.FanoutConfig()
 	cfg := fanoutdispatch.Config{
 		Concurrency:       fc.Concurrency,
 		TimeoutSecs:       fc.TimeoutSecs,
@@ -118,8 +107,7 @@ func TestFanoutConfig_WiringToDispatch(t *testing.T) {
 		ConsensusPollSecs: fc.ConsensusPollSecs,
 		TrackWorkers:      derefBool(t, "TrackWorkers", fc.TrackWorkers),
 	}
-	// fanoutdispatch.Config has a func field (Now) so it is not ==-comparable;
-	// assert the six default-resolved wired fields explicitly.
+	// fanoutdispatch.Config has a func field (Now), so it cannot be compared with ==.
 	if cfg.Concurrency != 2 || cfg.TimeoutSecs != 0 || cfg.CancelOnConsensus ||
 		cfg.ConsensusK != 0 || cfg.ConsensusPollSecs != 0 || !cfg.TrackWorkers {
 		t.Errorf("wired fanoutdispatch.Config = %+v, want default-resolved {Concurrency:2, TrackWorkers:true, rest zero}", cfg)

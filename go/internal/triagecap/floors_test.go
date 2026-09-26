@@ -6,14 +6,8 @@ import (
 	"testing"
 )
 
-// knownPkgsFixture mirrors the package basenames that exist in the repo —
-// the subset relevant to the replay fixtures plus common English-word
-// packages to prove word-boundary matching does not overcount. It includes
-// the names that collide with the triage bullet contract's own vocabulary
-// (`evidence`, `scout` — every bullet must carry evidence=/source=scout)
-// and with coverage prose (`paths` — "error paths"): cycle 301 failed on
-// exactly these phantoms, so the production vocabulary must be represented
-// here or the replay pins prove nothing.
+// knownPkgsFixture must keep evidence, scout and paths: they collide with contract metadata and coverage
+// prose, and without them the replay pins pass against a vocabulary production does not have.
 var knownPkgsFixture = []string{
 	"swarmrunner", "swarmplan", "swarm",
 	"bridge", "phasecoherence", "looppreflight", "modelcatalog",
@@ -31,9 +25,6 @@ func readFixture(t *testing.T, name string) string {
 	return string(data)
 }
 
-// TestCountCommittedFloors_Cycle283Replay pins the overpacked shape that
-// failed three consecutive coverage cycles (inbox coverage-floor-overpacking):
-// 3 tasks × ~12 package floors @98% must count as 12 committed floors.
 func TestCountCommittedFloors_Cycle283Replay(t *testing.T) {
 	artifact := readFixture(t, "triage-cycle283.md")
 	got := CountCommittedFloors(artifact, knownPkgsFixture)
@@ -42,9 +33,6 @@ func TestCountCommittedFloors_Cycle283Replay(t *testing.T) {
 	}
 }
 
-// TestCountCommittedFloors_Cycle281Replay pins the PASS baseline: one
-// aggregate coverage item ("toward 93%") = 1 floor; the two non-coverage
-// tasks contribute zero.
 func TestCountCommittedFloors_Cycle281Replay(t *testing.T) {
 	artifact := readFixture(t, "triage-cycle281.md")
 	got := CountCommittedFloors(artifact, knownPkgsFixture)
@@ -53,13 +41,6 @@ func TestCountCommittedFloors_Cycle281Replay(t *testing.T) {
 	}
 }
 
-// TestCountCommittedFloors_Cycle301Replay pins the soak-#2 incident
-// (2026-06-12): a correctly-sized 2-bullet coverage commitment was counted
-// as 6 floors because the contract-mandated evidence=/source=scout fields
-// and the prose word "paths" matched real package basenames. The phantom
-// floors made the correction directive unsatisfiable — triage could not
-// remove tokens its own bullet contract requires — so the cycle burned both
-// corrections and failed. True count: one package per bullet.
 func TestCountCommittedFloors_Cycle301Replay(t *testing.T) {
 	artifact := readFixture(t, "triage-cycle301.md")
 	got := CountCommittedFloors(artifact, knownPkgsFixture)
@@ -68,10 +49,6 @@ func TestCountCommittedFloors_Cycle301Replay(t *testing.T) {
 	}
 }
 
-// TestCountCommittedFloors_Cycle298Bullet pins the window-poisoning shape:
-// cycle 298's single floor-bearing bullet was recorded as 4 floors
-// (gc + evidence + scout + "safety-critical paths"), fabricating K=4 for
-// the throughput window. True count: 1.
 func TestCountCommittedFloors_Cycle298Bullet(t *testing.T) {
 	artifact := "## top_n\n" +
 		"- gc-coverage-boost: Boost internal/gc coverage from 88.8% to ≥95% by covering Apply/nowLive/protected/dirEntriesOlderThan safety-critical paths — priority=M, evidence=scout-report.md#task-2, source=scout\n"
@@ -182,8 +159,6 @@ func TestCountCommittedFloors_Table(t *testing.T) {
 	}
 }
 
-// TestKnownPackages_RealTree proves the enumerator finds the actual repo
-// packages the replay fixtures mention (run against this repository's tree).
 func TestKnownPackages_RealTree(t *testing.T) {
 	root := repoRoot(t)
 	pkgs := KnownPackages(root)
@@ -205,6 +180,5 @@ func repoRoot(t *testing.T) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// triagecap lives at <root>/go/internal/triagecap.
 	return filepath.Dir(filepath.Dir(filepath.Dir(wd)))
 }

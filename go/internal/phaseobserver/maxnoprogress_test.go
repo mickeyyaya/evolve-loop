@@ -10,14 +10,7 @@ import (
 	"time"
 )
 
-// Workstream E1 tests for the babbling-agent backstop. The pre-E1 idle
-// stall (StallS) resets on ANY valid JSON line — including pure
-// assistant_text token streaming — so a livelocked agent that emits forever
-// never trips it. MaxNoProgressS only resets on tool_use / tool_result, so
-// a babbling agent that's doing no real work DOES trip the new INCIDENT.
-
-// babbleStream returns N stream-json lines of pure assistant_text with no
-// tool use. Mirrors the live stream-json shape claude -p emits.
+// babbleStream returns n assistant-text lines with no tool use, in the stream-json shape claude -p emits.
 func babbleStream(n int) []string {
 	lines := make([]string, 0, n)
 	for i := 0; i < n; i++ {
@@ -26,21 +19,14 @@ func babbleStream(n int) []string {
 	return lines
 }
 
-// toolUseStream returns ONE stream-json line of a tool_use event (meaningful
-// progress).
 func toolUseStream() string {
 	return `{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Edit","input":{"file":"x.go"}}]}}`
 }
 
-// TestRun_MaxNoProgress_BabbleAgent_Fires is the E1 invariant: an agent
-// streaming pure assistant_text with NO tool_use trips stuck_no_progress
-// despite never triggering the idle StallS rule.
 func TestRun_MaxNoProgress_BabbleAgent_Fires(t *testing.T) {
 	t.Parallel()
 	ws := tempWorkspace(t)
 	stdoutPath := filepath.Join(ws, "builder-stdout.log")
-	// Seed the log with babbling text — these resets lastEventTS (idle clock
-	// stays low) but NOT lastProgressTS (progress clock keeps ticking).
 	if err := os.WriteFile(stdoutPath, []byte(strings.Join(babbleStream(20), "\n")+"\n"), 0o644); err != nil {
 		t.Fatalf("seed log: %v", err)
 	}
@@ -49,10 +35,7 @@ func TestRun_MaxNoProgress_BabbleAgent_Fires(t *testing.T) {
 	mu := &sync.Mutex{}
 	startTime := time.Date(2026, 5, 28, 12, 0, 0, 0, time.UTC)
 	callIdx := 0
-	// First few Now() calls are at startTime (init + emit + first poll see
-	// the babbling); subsequent calls jump past MaxNoProgressS so the
-	// progress check fires while the idle check would NOT (lastEventTS was
-	// just bumped by the babble lines).
+	// Reads after the sixth jump 700 s: past MaxNoProgressS, while StallS 9999 keeps the idle rule quiet.
 	nowFn := func() time.Time {
 		mu.Lock()
 		defer mu.Unlock()
@@ -73,8 +56,8 @@ func TestRun_MaxNoProgress_BabbleAgent_Fires(t *testing.T) {
 		Workspace: ws, SubagentPGID: 12345, Cycle: 1,
 		Phase: "build", Agent: "builder",
 		PollS:          1,
-		StallS:         9999, // idle stall would NEVER fire (babble keeps lastEventTS fresh)
-		MaxNoProgressS: 600,  // but no-progress catches the livelock
+		StallS:         9999,
+		MaxNoProgressS: 600,
 		EOFGraceS:      9999,
 		Enforce:        true,
 		Now:            nowFn,
@@ -97,22 +80,15 @@ func TestRun_MaxNoProgress_BabbleAgent_Fires(t *testing.T) {
 	if !strings.Contains(string(events), "stuck_no_progress") {
 		t.Errorf("missing stuck_no_progress INCIDENT:\n%s", events)
 	}
-	// And the idle stall must NOT have fired (assistant_text keeps
-	// lastEventTS fresh; we only set MaxNoProgressS to trip).
 	if strings.Contains(string(events), "stuck_no_output") {
 		t.Errorf("idle StallS=9999 should NOT have fired:\n%s", events)
 	}
 }
 
-// TestRun_MaxNoProgress_ToolUsingAgent_DoesNotFire proves E1 is correctly
-// scoped: an agent doing real work (tool_use events) bumps lastProgressTS
-// on each tool dispatch, so the no-progress clock stays low and no INCIDENT
-// fires. This is the false-positive guard.
 func TestRun_MaxNoProgress_ToolUsingAgent_DoesNotFire(t *testing.T) {
 	t.Parallel()
 	ws := tempWorkspace(t)
 	stdoutPath := filepath.Join(ws, "builder-stdout.log")
-	// Seed with several tool_use events — each resets lastProgressTS.
 	lines := []string{toolUseStream(), toolUseStream(), toolUseStream()}
 	if err := os.WriteFile(stdoutPath, []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
 		t.Fatalf("seed log: %v", err)
@@ -122,10 +98,8 @@ func TestRun_MaxNoProgress_ToolUsingAgent_DoesNotFire(t *testing.T) {
 	mu := &sync.Mutex{}
 	startTime := time.Date(2026, 5, 28, 12, 0, 0, 0, time.UTC)
 	callIdx := 0
-	// Now() advances only modestly — within the MaxNoProgressS window — so a
-	// healthy tool-using agent never trips. (If lastProgressTS were buggy
-	// and reset on every line like lastEventTS, this would still not fire.
-	// The real test of the SCOPING is the babble-agent test above.)
+	// The clock never leaves the MaxNoProgressS window, so this guards false positives only;
+	// the babble test is the one that proves which events count as progress.
 	nowFn := func() time.Time {
 		mu.Lock()
 		defer mu.Unlock()
@@ -168,10 +142,6 @@ func TestRun_MaxNoProgress_ToolUsingAgent_DoesNotFire(t *testing.T) {
 	}
 }
 
-// TestRun_MaxNoProgress_Disabled_IsLegacyByteIdentical pins the opt-in
-// contract: when MaxNoProgressS==0 (default), the feature is off — no
-// stuck_no_progress emit even when the clock would otherwise trip. Pre-E1
-// posture is preserved for operators who don't opt in.
 func TestRun_MaxNoProgress_Disabled_IsLegacyByteIdentical(t *testing.T) {
 	t.Parallel()
 	ws := tempWorkspace(t)
@@ -198,7 +168,7 @@ func TestRun_MaxNoProgress_Disabled_IsLegacyByteIdentical(t *testing.T) {
 		Phase: "build", Agent: "builder",
 		PollS:          1,
 		StallS:         9999,
-		MaxNoProgressS: 0, // OFF — legacy posture
+		MaxNoProgressS: 0,
 		EOFGraceS:      9999,
 		Now:            nowFn,
 		StopAfterMS:    400,

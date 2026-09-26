@@ -6,11 +6,6 @@ import (
 	"testing"
 )
 
-// TestPrefixQueue_ConcurrentEnqueue_NoLostWork is the T2 single-writer-safety
-// regression (run under `go test -race ./internal/fleet/...`). It drives many
-// concurrent Enqueue / OnGreen / OnRed calls against one queue: the mutex must
-// prevent both a data race (caught by -race) and a lost append (caught by the
-// length invariant on ComposePrefixes, which emits exactly one prefix per lane).
 func TestPrefixQueue_ConcurrentEnqueue_NoLostWork(t *testing.T) {
 	const n = 500
 	q := NewPrefixQueue()
@@ -35,6 +30,7 @@ func TestPrefixQueue_ConcurrentEnqueue_NoLostWork(t *testing.T) {
 	}
 	wg.Wait()
 
+	// Disjoint files keep every lane in one group, so ComposePrefixes yields one prefix per lane.
 	if got := len(q.ComposePrefixes()); got != n {
 		t.Fatalf("%d lanes survived %d concurrent Enqueues — lost appends under contention", got, n)
 	}

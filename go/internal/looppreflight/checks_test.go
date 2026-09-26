@@ -10,8 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
-// --- checkLLMCLIStatus -----------------------------------------------------
-
 func TestRun_LLMCLIStatus_AllPresent(t *testing.T) {
 	r, err := Run(goodPipelineOptions(t))
 	if err != nil {
@@ -25,7 +23,6 @@ func TestRun_LLMCLIStatus_AllPresent(t *testing.T) {
 
 func TestRun_LLMCLIStatus_MissingBinary_Halts(t *testing.T) {
 	opts := goodPipelineOptions(t)
-	// claude-tmux → binary "claude". Report it missing, with a probe trail.
 	opts.ProbeCLI = func(bin string) (doctor.Result, error) {
 		if bin == "claude" {
 			return doctor.Result{Tool: bin, Found: false, Checked: []string{
@@ -54,7 +51,6 @@ func TestRun_LLMCLIStatus_MissingBinary_Halts(t *testing.T) {
 	}
 }
 
-// claude-tmux and claude-p both map to the "claude" binary — probe it once.
 func TestRun_LLMCLIStatus_DedupsBinaries(t *testing.T) {
 	opts := goodPipelineOptions(t)
 	opts.ProfileGetter = func(name string) (profiles.Profile, error) {
@@ -78,8 +74,6 @@ func TestRun_LLMCLIStatus_DedupsBinaries(t *testing.T) {
 		t.Fatalf("expected the claude binary probed exactly once, probed=%v", probed)
 	}
 }
-
-// --- checkHostCapabilities -------------------------------------------------
 
 func TestRun_HostCapabilities_AllGood(t *testing.T) {
 	r, err := Run(goodPipelineOptions(t))
@@ -126,17 +120,12 @@ func TestRun_HostCapabilities_EvolveDirUnwritable_Halts(t *testing.T) {
 	}
 }
 
-// Fresh-cycle Build explanation enforcement requires a real filesystem
-// sandbox, so an unavailable host capability must halt before phase spend.
 func TestRun_HostCapabilities_SandboxWantedButUnavailable_Halts(t *testing.T) {
 	opts := goodPipelineOptions(t)
 	opts.ProfileGetter = func(name string) (profiles.Profile, error) {
 		return profiles.Profile{Name: name, CLI: "claude-tmux", Sandbox: &profiles.SandboxConfig{Enabled: true}}, nil
 	}
 	opts.HostProbe = func() preflight.Profile {
-		// NON-nested (ClaudeCode.Nested zero): a standalone host with a broken
-		// sandbox is genuinely unconfined — the halt case. The nested variant
-		// warns instead: TestRun_HostCapabilities_SandboxWantedNested_WarnsNotHalts.
 		return preflight.Profile{Sandbox: preflight.Sandbox{ExpectedToWork: false, Reason: "sandbox binary present but sandbox_apply failed (standalone host)"}}
 	}
 	r, err := Run(opts)
@@ -178,7 +167,7 @@ func TestRun_HostCapabilities_NoSandboxProfiles_Passes(t *testing.T) {
 
 func TestRun_HostCapabilities_LowDisk_Warns(t *testing.T) {
 	opts := goodPipelineOptions(t)
-	opts.DiskFreeBytes = func(string) (uint64, error) { return 100 << 20, nil } // 100 MiB
+	opts.DiskFreeBytes = func(string) (uint64, error) { return 100 << 20, nil }
 	r, err := Run(opts)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
@@ -192,7 +181,6 @@ func TestRun_HostCapabilities_LowDisk_Warns(t *testing.T) {
 	}
 }
 
-// A disk-probe error is non-fatal: the check must not halt or warn on it.
 func TestRun_HostCapabilities_DiskProbeError_Ignored(t *testing.T) {
 	opts := goodPipelineOptions(t)
 	opts.DiskFreeBytes = func(string) (uint64, error) { return 0, errors.New("statfs boom") }
@@ -206,7 +194,6 @@ func TestRun_HostCapabilities_DiskProbeError_Ignored(t *testing.T) {
 	}
 }
 
-// Nested markers do not verify the required profile-specific restrictions.
 func TestRun_HostCapabilities_SandboxWantedNested_FailsClosed(t *testing.T) {
 	opts := goodPipelineOptions(t)
 	opts.ProfileGetter = func(name string) (profiles.Profile, error) {
@@ -231,10 +218,6 @@ func TestRun_HostCapabilities_SandboxWantedNested_FailsClosed(t *testing.T) {
 	}
 }
 
-// EVOLVE_SANDBOX=off is the host opt-out cell of the shared predicate: the
-// dispatch gate honours it loudly and runs; preflight must WARN, not HALT
-// (before the sandbox.ConfinementSatisfied extraction the two sites diverged
-// in exactly this cell — bridge ran, preflight blocked).
 func TestRun_HostCapabilities_SandboxWantedOptOut_WarnsNotHalts(t *testing.T) {
 	opts := goodPipelineOptions(t)
 	opts.ProfileGetter = func(name string) (profiles.Profile, error) {

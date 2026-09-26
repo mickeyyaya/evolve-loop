@@ -1,16 +1,5 @@
 package ledger
 
-// rebaseline_foreign_tail_test.go — the console-plane live failure 2026-08-11:
-// Rebaseline appended its seal through the TIP-chained path, but the physical
-// last line of the file was a FOREIGN record (inboxmover's raw O_APPEND write:
-// no prev_hash, no tip update), so the seal's prev_hash pointed at the last
-// CHAINED line, sealChainsFromPrev rejected it against the physical
-// predecessor, the anchor never moved, and the command failed with "seal
-// appended but the chain still does not verify forward" — on exactly the
-// damage class (out-of-band interleaved appends) the command was built for.
-// A seal must bind the file AS IT PHYSICALLY EXISTS, not as the tip remembers
-// it.
-
 import (
 	"context"
 	"os"
@@ -28,8 +17,7 @@ func TestRebaseline_ForeignUnchainedTailLine_SealsAndVerifies(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	// The rogue writer: a raw unchained line appended straight to the file —
-	// no prev_hash, no entry_seq, tip left behind (the inboxmover shape).
+	// A foreign raw line past the tip: no prev_hash, no entry_seq, tip not moved.
 	f, err := os.OpenFile(l.ledgerPath, os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
 		t.Fatal(err)
@@ -40,7 +28,6 @@ func TestRebaseline_ForeignUnchainedTailLine_SealsAndVerifies(t *testing.T) {
 	if err := f.Close(); err != nil {
 		t.Fatal(err)
 	}
-	// Sanity: the chain is broken exactly as the live plane's was.
 	if err := l.VerifyDeep(ctx); err == nil {
 		t.Fatal("fixture not broken — the foreign line should break the walk")
 	}
@@ -51,8 +38,6 @@ func TestRebaseline_ForeignUnchainedTailLine_SealsAndVerifies(t *testing.T) {
 	if err := l.VerifyDeep(ctx); err != nil {
 		t.Fatalf("chain not green after rebaseline: %v", err)
 	}
-	// Appending after the seal must keep the chain green: the tip has to have
-	// moved to the seal line, or the NEXT chained append re-breaks the file.
 	if err := l.Append(ctx, core.LedgerEntry{TS: "2026-08-11T00:00:02Z", Role: "orchestrator", Kind: "test"}); err != nil {
 		t.Fatal(err)
 	}

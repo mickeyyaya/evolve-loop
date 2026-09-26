@@ -12,24 +12,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// demotion_test.go — ADR-0046 Layer 2: identical-rejection demotion for the
-// triage capacity clamp (the one production heuristic gate). A heuristic
-// gate rejecting with a byte-identical reason TEMPLATE across two
-// consecutive cycles is a gate defect, not a work defect: real overpacking
-// varies cycle to cycle; identical rejections are a determinism artifact
-// (cycles 301/302, soak #2 — the phantom-floor counter re-rejected an
-// honest commitment until both cycles burned their corrections and died).
-//
-// Two prior loop attempts at this slice failed and are pinned here:
-//   - cycle 306: the hash erased ALL digits, collapsing "7 floors / cap 6"
-//     with "700 floors / cap 600" — the template must be jitter-insensitive
-//     but MAGNITUDE-sensitive (digit-run length survives, digit values do
-//     not).
-//   - cycle 307: the demotion helper existed but was never called from the
-//     composition root. Demotion therefore lives INSIDE NewReviewer — there
-//     is no separate constructor to forget.
-
-// Verbatim summaries from state.json:failedApproaches, cycles 301/302.
+// Verbatim summaries from state.json failedApproaches.
 const (
 	summary301 = `cycle 301 failed during triage: review gate: phase "triage" deliverable rejected after 2 correction(s): triage overpacked: 6 committed coverage floors exceed the capacity cap 5 (= ceil(1.25×K), K=4 observed floors/turn over 1 shipped cycles). Re-emit the triage report keeping at most 5 coverage floors in ## top_n and move the remaining floor work to ## deferred — deferred items carry over to the next cycle automatically.`
 	summary302 = `cycle 302 failed during triage: review gate: phase "triage" deliverable rejected after 2 correction(s): triage overpacked: 7 committed coverage floors exceed the capacity cap 5 (= ceil(1.25×K), K=4 observed floors/turn over 1 shipped cycles). Re-emit the triage report keeping at most 5 coverage floors in ## top_n and move the remaining floor work to ## deferred — deferred items carry over to the next cycle automatically.`
@@ -76,12 +59,6 @@ func TestShouldDemote(t *testing.T) {
 			t.Errorf("detail %q must name the evidence cycles", detail)
 		}
 	})
-	// Adapted for F4 (cycle 459, inbox triagecap-prose-counter-defect):
-	// ShouldDemote is now window-scoped so reset-sealed cycles between the
-	// pair and the review are transparent gaps; the one-cycle relief bound
-	// moved to the Review seam, which tracks consumption via the pair's
-	// auto-filed defect marker (TestCapReviewer_ReliefIsOneCycleThenEnforces
-	// pins that production behavior).
 	t.Run("window scope: fires through a reset-sealed gap (cycle 304)", func(t *testing.T) {
 		if ok, _ := ShouldDemote(pair, 304); !ok {
 			t.Error("the 301/302 pair is within the demotion window of cycle 304 — a reset-sealed 303 must be a transparent gap")
@@ -123,8 +100,7 @@ func TestShouldDemote(t *testing.T) {
 	})
 }
 
-// overpackedArtifact builds a top_n that counts over any small cap: three
-// floor-bearing bullets each naming a distinct known package.
+// overpackedArtifact counts three floors, one distinct package per bullet.
 const overpackedArtifact = `## top_n (commit to THIS cycle)
 - coverage-a: push swarmrunner coverage to ≥98%
 - coverage-b: push bridge coverage to ≥98%
@@ -133,10 +109,7 @@ const overpackedArtifact = `## top_n (commit to THIS cycle)
 ## deferred (carry to NEXT cycle's carryoverTodos)
 `
 
-// newDemotionFixture wires a CapReviewer whose seams put it at enforce with
-// cap 2 (K=1 window ⇒ cap ceil(1.25)=2) against a 3-floor artifact, and a
-// failedApproaches history replaying the 301/302 pair. workspace run.json
-// carries cycle_id so the reviewer knows "now".
+// newDemotionFixture enforces cap 2 (a K=1 window) against the 3-floor artifact; an empty cycleID omits run.json.
 func newDemotionFixture(t *testing.T, cycleID string, fails []FailEntry) (*CapReviewer, core.ReviewInput, string) {
 	t.Helper()
 	root := t.TempDir()
@@ -175,7 +148,6 @@ func TestCapReviewer_DemotesAfterIdenticalPair(t *testing.T) {
 		t.Fatalf("demoted gate must approve (shadow semantics), got reject: %s", res.Reason)
 	}
 
-	// Exactly one auto-filed defect, idempotent across a second review.
 	matches, _ := filepath.Glob(filepath.Join(root, ".evolve", "inbox", "auto-heuristic-demotion-*.json"))
 	if len(matches) != 1 {
 		t.Fatalf("demotion must auto-file exactly one inbox defect, found %d", len(matches))
@@ -188,10 +160,6 @@ func TestCapReviewer_DemotesAfterIdenticalPair(t *testing.T) {
 }
 
 func TestCapReviewer_EnforcesWithoutPair(t *testing.T) {
-	// Same overpacked artifact, no failure history → the clamp still BLOCKs.
-	// Demotion must never weaken first-offense enforcement (cycle-307
-	// composition-root lesson: this exercises the REAL production reviewer,
-	// not a helper that wiring can forget).
 	r, in, _ := newDemotionFixture(t, "303", nil)
 	if res := r.Review(context.Background(), in); res.Approve {
 		t.Fatal("no identical-rejection history: enforce must still reject an overpacked triage")
@@ -199,26 +167,12 @@ func TestCapReviewer_EnforcesWithoutPair(t *testing.T) {
 }
 
 func TestCapReviewer_NoRunJSONStaysEnforcing(t *testing.T) {
-	// Missing run.json ⇒ unknown current cycle ⇒ demotion cannot prove the
-	// one-cycle scope ⇒ fail toward enforcement.
 	pair := []FailEntry{{Cycle: 301, Summary: summary301}, {Cycle: 302, Summary: summary302}}
 	r, in, _ := newDemotionFixture(t, "", pair)
 	if res := r.Review(context.Background(), in); res.Approve {
 		t.Fatal("without a readable cycle_id the gate must keep enforcing")
 	}
 }
-
-// --- cycle-1301: remedy_status on the demotion ledger record ---------------
-//
-// The auto-filed record is the DURABLE ledger entry for a demotion event, but
-// it only ever carried a prose `action` narrative: nothing on it says whether a
-// salvage of the suspected gate defect was ATTEMPTED or whether the loop
-// concluded NO REMEDY was possible. Commit 29915424 had to explain two gate
-// demotions in a queue chore commit body for exactly that reason. remedy_status
-// is caller-declared (the writer has no way to infer it), defaults to `pending`
-// at file time, and carries a CLOSED vocabulary — an unknown value normalises
-// to pending rather than being written through, so a downstream reader can
-// switch on three cases and no more.
 
 func TestNormalizeRemedyStatus(t *testing.T) {
 	cases := []struct {
@@ -284,8 +238,6 @@ func TestNewDemotionLedgerRecord_DeclaredOutcomes(t *testing.T) {
 }
 
 func TestCapReviewer_LedgerRecordDefaultsToPendingRemedy(t *testing.T) {
-	// Wiring proof through the REAL reviewer: the production call site must
-	// thread a status, and at file time the honest value is `pending`.
 	pair := []FailEntry{{Cycle: 301, Summary: summary301}, {Cycle: 302, Summary: summary302}}
 	r, in, root := newDemotionFixture(t, "303", pair)
 	if res := r.Review(context.Background(), in); !res.Approve {

@@ -1,11 +1,3 @@
-// flakylint_exec.go — subprocess-argv analysis for the flaky-shape lint
-// (flakylint.go holds the patterns and their reporters; this file holds the
-// question "what argv position did this string actually reach?").
-//
-// Split out purely for the 800-LOC file ceiling; the two halves are one lint and
-// share its package doc. Everything here is a pure AST reader — no findings are
-// produced in this file, only the evidence the pattern rules consult.
-
 package evalqualitycheck
 
 import (
@@ -17,69 +9,29 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/gopkgpattern"
 )
 
-// --- M4/M6: argv-position index over a function's exec calls -----------------
-
-// execPatternIndex records, for one function body, where each package pattern
-// appeared across the argvs of ALL recognized subprocess constructors
-// (execConstructors). It is what makes the suite-scope rule argv-position aware
-// instead of a blanket literal scan.
+// execPatternIndex records which exec argvs each package pattern reached in one
+// function, which makes the suite-scope rule argv-position aware.
 type execPatternIndex struct {
-	inGoTest    map[string]bool // reached a `go test` argv
-	inAnyExec   map[string]bool // reached ANY exec argv (go test included)
+	inGoTest    map[string]bool
+	inAnyExec   map[string]bool // reached any exec argv, go test included
 	wideGoTest  map[string]bool // reached a `go test` argv that carried NO -run
 	hasNarrowed map[string]bool // reached a `go test` argv that carried -run/-run=
 }
 
-// suiteScopeApplies decides whether s is in a position where a suite-scope
-// finding is a true claim: it reached a `go test` argv (direct evidence), or it
-// reached no exec argv at all (helper-mediated / pure data — unresolvable, so
-// the advisory note stands, the safe direction). A pattern that reached only
-// non-test subprocesses is a compile or a search, never a suite.
+// suiteScopeApplies holds when s reached a go test argv or no exec argv at all:
+// an unresolvable pattern keeps its advisory note, the safe direction.
 func (ix execPatternIndex) suiteScopeApplies(s string) bool {
 	return ix.inGoTest[s] || !ix.inAnyExec[s]
 }
 
-// narrowedWithRun reports whether EVERY `go test` argv carrying s also carried
-// -run/-run=. Requiring "every" (not "any") keeps the safe direction: one wide
-// invocation of the same pattern elsewhere in the function keeps the finding.
-//
-// PROMOTION PRECONDITIONS (review MEDIUM — this is presence-only by design at
-// ADVISORY stage, where a false claim costs author trust and suppression costs
-// nothing; both must be closed BEFORE any promotion to enforce, or the gate is
-// evadable):
-//  1. The -run VALUE is never inspected, so `-run .`, `-run .*`, `-run ^Test`
-//     and an empty value all read as narrowing. Reject trivial values.
-//  2. A package pattern built at runtime (fmt.Sprintf, os.Getenv) never reaches
-//     the literal scan at all, so string construction alone evades the lint.
-//     Treat an unresolvable pattern as NOT narrowed.
-//
-// Bounded today: IsRecursive findings are checked before this suppression and so
-// are never suppressible, and acssuite's run-time scope demotion still fires.
+// narrowedWithRun requires every go test argv carrying s to carry -run, so one wide invocation keeps the finding.
+// The -run value is not inspected, which is evadable; close that before promoting past advisory.
 func (ix execPatternIndex) narrowedWithRun(s string) bool {
 	return ix.hasNarrowed[s] && !ix.wideGoTest[s]
 }
 
-// indexExecPatterns records every package pattern's argv position(s) across the
-// exec constructors reachable from fn — its own body, plus ONE level into
-// same-package helpers it calls, with the call's arguments bound to the helper's
-// parameter names.
-//
-// The helper hop is not a nicety, it is what makes the rule true on the real
-// corpus. The canonical house shape puts the package pattern in a const the TEST
-// function names and the `-run` narrowing in a shared helper:
-//
-//	const corePkg = "github.com/.../internal/core"
-//	func TestC1034_001_X(t *testing.T) { assertDefaultSuiteTestsPass(t, corePkg, "TestAssembler_X") }
-//	func assertDefaultSuiteTestsPass(t *testing.T, pkg string, names ...string) {
-//	        acsassert.SubprocessOutput("go", "test", "-run", pattern, "-v", "-count=1", pkg)
-//	}
-//
-// Body-only indexing saw no exec argv in the test function, fell into the
-// "unresolvable, keep the note" branch, and printed "narrow the invocation with
-// -run" at code that already does exactly that — 142 of 297 corpus findings
-// (48%), measured. A lint that prints a false claim is one authors learn to
-// ignore, so resolving the hop is the fix; the truly unresolvable case (a pattern
-// built by concatenation, or handed to a helper two levels down) keeps its note.
+// indexExecPatterns indexes fn's own exec calls plus those one level into same-package
+// helpers, with the call's args bound to the helper's params.
 func indexExecPatterns(fn *ast.FuncDecl, consts map[string]string, helpers map[string]*ast.FuncDecl) execPatternIndex {
 	ix := execPatternIndex{
 		inGoTest:    map[string]bool{},
@@ -88,9 +40,7 @@ func indexExecPatterns(fn *ast.FuncDecl, consts map[string]string, helpers map[s
 		hasNarrowed: map[string]bool{},
 	}
 	ix.addFrom(fn.Body, consts)
-	// Depth 1 exactly: a helper's own helper calls are NOT followed, so this
-	// terminates unconditionally (no recursion, no visited set needed) — and a
-	// self-call cannot loop either.
+	// Depth 1 exactly: a helper's own calls are not followed, so the walk terminates without a visited set.
 	ast.Inspect(fn.Body, func(n ast.Node) bool {
 		call, ok := n.(*ast.CallExpr)
 		if !ok {
@@ -110,8 +60,6 @@ func indexExecPatterns(fn *ast.FuncDecl, consts map[string]string, helpers map[s
 	return ix
 }
 
-// addFrom folds one body's exec argvs into the index, resolving string args
-// through scope (package consts, plus bound helper params on the helper hop).
 func (ix execPatternIndex) addFrom(body *ast.BlockStmt, scope map[string]string) {
 	ast.Inspect(body, func(n ast.Node) bool {
 		call, ok := n.(*ast.CallExpr)
@@ -143,11 +91,8 @@ func (ix execPatternIndex) addFrom(body *ast.BlockStmt, scope map[string]string)
 	})
 }
 
-// bindParams returns scope extended with helper's parameter names bound to the
-// call site's resolvable string arguments, positionally. Binding stops at a
-// variadic parameter (many args, one name — not a string binding). The result is
-// a COPY: helper bindings must never leak into the package-const map the
-// finding-generating scan reads.
+// bindParams returns a copy so helper bindings never leak into the package-const map
+// the finding scan reads. Binding stops at a variadic param.
 func bindParams(helper *ast.FuncDecl, call *ast.CallExpr, scope map[string]string) map[string]string {
 	out := make(map[string]string, len(scope)+4)
 	for k, v := range scope {
@@ -173,9 +118,6 @@ func bindParams(helper *ast.FuncDecl, call *ast.CallExpr, scope map[string]strin
 	return out
 }
 
-// argvHasRunFilter reports whether a `go test` argv carries a -run selector
-// (M6): a correctly narrowed invocation runs a handful of tests, not the suite,
-// so its known-slow-package cost estimate no longer holds.
 func argvHasRunFilter(argv []string) bool {
 	for _, a := range argv {
 		if a == "-run" || a == "--run" || strings.HasPrefix(a, "-run=") || strings.HasPrefix(a, "--run=") {
@@ -185,33 +127,18 @@ func argvHasRunFilter(argv []string) bool {
 	return false
 }
 
-// --- exec-call plumbing ------------------------------------------------------
-
-// execConstructor describes one recognized way an ACS predicate spawns a
-// subprocess: the pkg.Fn selector, whether a leading context arg must be
-// skipped, and whether the constructor BINDS that context to the child's
-// lifetime (which is what makes load-generation reaped rather than orphaned).
+// execConstructor: ctxBound means the child dies with its context, which is what reaps load generation.
 type execConstructor struct{ skipCtxArg, ctxBound bool }
 
-// execConstructors is the recognized set, keyed "pkg.Fn". acsassert
-// .SubprocessOutput belongs here on evidence, not on taste: it is a thin
-// exec.Command(name, args...) wrapper and it is what the corpus actually uses —
-// 198 of 282 historical acs dirs call it, against 20 that reach for exec.Command.
-// Omitting it made the argv-position rule (M4) technically implemented and
-// practically inert, because virtually every real `go vet ./...` / `go build`
-// predicate went through it and so landed in the "reached no exec argv at all"
-// bucket that keeps its finding. It carries no context, so its load-generation
-// really is un-reaped (the 8-cores-for-9-hours class).
+// execConstructors is keyed "pkg.Fn". acsassert.SubprocessOutput is the corpus's usual
+// exec wrapper; it binds no context, so its load generation is unreaped.
 var execConstructors = map[string]execConstructor{
 	"exec.Command":               {},
 	"exec.CommandContext":        {skipCtxArg: true, ctxBound: true},
 	"acsassert.SubprocessOutput": {},
 }
 
-// execArgv extracts the literal/const-resolved argv of a recognized subprocess
-// constructor (a leading ctx arg is skipped); non-literal args become "" so
-// positions stay aligned. hasCtx reports whether the child's lifetime is bound
-// to a context. ok=false when call is not an exec constructor.
+// execArgv resolves a recognized exec call's argv; non-literal args become "" so positions stay aligned.
 func execArgv(call *ast.CallExpr, consts map[string]string) (argv []string, hasCtx, ok bool) {
 	sel, isSel := call.Fun.(*ast.SelectorExpr)
 	if !isSel {
@@ -236,8 +163,6 @@ func execArgv(call *ast.CallExpr, consts map[string]string) (argv []string, hasC
 	return argv, hasCtx, true
 }
 
-// resolveStringExpr returns a string literal's value, a package-level string
-// const's value, or "" for anything dynamic.
 func resolveStringExpr(e ast.Expr, consts map[string]string) string {
 	switch v := e.(type) {
 	case *ast.BasicLit:
@@ -252,8 +177,7 @@ func resolveStringExpr(e ast.Expr, consts map[string]string) string {
 	return ""
 }
 
-// dirAnchoredVars returns the names assigned a `.Dir` in body (cmd.Dir = x —
-// the house repo-anchoring idiom, equivalent to git -C).
+// dirAnchoredVars names the vars assigned a .Dir, which anchors git the way -C does.
 func dirAnchoredVars(body *ast.BlockStmt) map[string]bool {
 	out := map[string]bool{}
 	ast.Inspect(body, func(n ast.Node) bool {
@@ -273,9 +197,7 @@ func dirAnchoredVars(body *ast.BlockStmt) map[string]bool {
 	return out
 }
 
-// execAssignNames maps each call expression appearing as a direct RHS of an
-// assignment to its LHS ident name (`cmd := exec.Command(...)` → cmd), so the
-// git rule can honor a later cmd.Dir assignment.
+// execAssignNames maps each call assigned to an ident to that name, so the git rule can honor a later cmd.Dir.
 func execAssignNames(body *ast.BlockStmt) map[*ast.CallExpr]string {
 	out := map[*ast.CallExpr]string{}
 	ast.Inspect(body, func(n ast.Node) bool {
@@ -297,7 +219,6 @@ func execAssignNames(body *ast.BlockStmt) map[*ast.CallExpr]string {
 	return out
 }
 
-// isPkgCall reports whether call is pkg.name(...) on a plain package ident.
 func isPkgCall(call *ast.CallExpr, pkg, name string) bool {
 	sel, ok := call.Fun.(*ast.SelectorExpr)
 	if !ok || sel.Sel.Name != name {
@@ -307,7 +228,6 @@ func isPkgCall(call *ast.CallExpr, pkg, name string) bool {
 	return ok && x.Name == pkg
 }
 
-// containsArg reports whether args contains the exact literal want.
 func containsArg(args []string, want string) bool {
 	for _, a := range args {
 		if a == want {
@@ -317,10 +237,7 @@ func containsArg(args []string, want string) bool {
 	return false
 }
 
-// argsContainStringLit reports whether want appears as a string literal (or a
-// resolvable package const) ANYWHERE inside the given arg expressions —
-// including nested composites like append([]string{"-C", dir}, args...).
-// Presence can only UNFLAG (anchor), so deep matching is the safe direction.
+// argsContainStringLit matches at any nesting depth; presence can only unflag, so deep matching is the safe direction.
 func argsContainStringLit(args []ast.Expr, want string, consts map[string]string) bool {
 	found := false
 	for _, a := range args {

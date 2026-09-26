@@ -5,10 +5,6 @@ import (
 	"testing"
 )
 
-// TestSpineFailOpen_JSONShapeIsTheOperatorSurface pins the wire form of
-// SpineFailOpen: the dossier's on-disk record is the ONLY surface an operator or
-// a later sweep can read, so the (phase, missing_artifact) pair must serialize
-// under those exact keys, and an absent reason must not emit an empty field.
 func TestSpineFailOpen_JSONShapeIsTheOperatorSurface(t *testing.T) {
 	raw, err := json.Marshal(SpineFailOpen{Phase: "ship", MissingArtifact: "build", Reason: "would-block at enforce"})
 	if err != nil {
@@ -28,8 +24,6 @@ func TestSpineFailOpen_JSONShapeIsTheOperatorSurface(t *testing.T) {
 	}
 }
 
-// TestCycleResult_AccumulatesSpineFailOpens — the counter's whole point is that
-// repeats ADD UP: a 76-event epidemic must read as 76, never as 1.
 func TestCycleResult_AccumulatesSpineFailOpens(t *testing.T) {
 	var r CycleResult
 	if len(r.SpineFailOpens) != 0 {

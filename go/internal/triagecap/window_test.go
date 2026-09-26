@@ -7,8 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// TestK_EmptyWindowSeedsCycle281Baseline: with no observed history the
-// throughput estimate is the cycle-281 PASS baseline (~5 floors/turn).
 func TestK_EmptyWindowSeedsCycle281Baseline(t *testing.T) {
 	if got := K(nil); got != 5 {
 		t.Errorf("K(empty) = %d, want 5 (cycle-281 seed)", got)
@@ -73,8 +71,6 @@ func TestCap_CeilOnePointTwoFiveK(t *testing.T) {
 	}
 }
 
-// TestRecord_AppendsAndCapsAtFive: rolling window of the last 5 floor-bearing
-// PASS cycles; the input slice is never mutated (immutability rule).
 func TestRecord_AppendsAndCapsAtFive(t *testing.T) {
 	var w []core.TriageThroughputEntry
 	for c := 1; c <= 7; c++ {

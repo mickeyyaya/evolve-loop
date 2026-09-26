@@ -1,10 +1,5 @@
 package policy
 
-// size_budget_policy_test.go — ADR-0076 slice A: cycle-size → budget
-// multipliers (compiled defaults, per-key positive-override merge — the
-// PhaseArtifactTimeouts idiom). Consumed by the correction-limit and build
-// artifact-timeout scaling.
-
 import "testing"
 
 func TestSizeBudgetMultipliers_CompiledDefaults(t *testing.T) {

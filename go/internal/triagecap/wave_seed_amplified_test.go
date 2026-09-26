@@ -8,14 +8,6 @@ import (
 	"testing"
 )
 
-// wave_seed_amplified_test.go — cycle-541 test-amplification lane for
-// ReadInboxBacklog (extracted this cycle as the single inbox-JSON reader
-// shared by SelectWaveSeedTopN and WidenTopNToFleetWidth's caller) and its
-// SelectWaveSeedTopN regression path. Authored black-box from the exported
-// godoc contract (filename-order tie-break; unreadable/malformed files and
-// empty-id todos skipped, best-effort) plus the on-disk .evolve/inbox/*.json
-// schema (id/weight/files) — not from wave_seed.go's implementation.
-
 type c541ampInboxTodo struct {
 	ID     string   `json:"id"`
 	Weight float64  `json:"weight,omitempty"`
@@ -85,7 +77,6 @@ func TestC541Amp_ReadInboxBacklog_SkipsEmptyIDTodos(t *testing.T) {
 
 func TestC541Amp_ReadInboxBacklog_FilenameOrderTiesEqualWeight(t *testing.T) {
 	evolveDir, inboxDir := c541ampInboxDir(t)
-	// same weight on all three -> order must follow filename, not insertion/id order
 	c541ampWriteInboxTodo(t, inboxDir, "b-second.json", c541ampInboxTodo{ID: "second", Weight: 0.5, Files: []string{"b.go"}})
 	c541ampWriteInboxTodo(t, inboxDir, "a-first.json", c541ampInboxTodo{ID: "first", Weight: 0.5, Files: []string{"a.go"}})
 	c541ampWriteInboxTodo(t, inboxDir, "c-third.json", c541ampInboxTodo{ID: "third", Weight: 0.5, Files: []string{"c.go"}})

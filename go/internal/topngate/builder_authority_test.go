@@ -7,9 +7,7 @@ import (
 	"testing"
 )
 
-// repoRoot resolves the repository root from this test's own location:
-// <root>/go/internal/topngate. Mirrors internal/triagecap/floors_test.go's
-// repoRoot helper.
+// repoRoot assumes the test runs in <root>/go/internal/topngate.
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	wd, err := os.Getwd()
@@ -19,16 +17,6 @@ func repoRoot(t *testing.T) string {
 	return filepath.Dir(filepath.Dir(filepath.Dir(wd)))
 }
 
-// TestBuilderPromptNamesTopNAsSoleTaskAuthority is the AC-2 regression test:
-// the Builder's own instructions must name triage-report.md's ## top_n as its
-// sole task authority, demoting scout-report.md to background context only.
-//
-// Before this fix, agents/evolve-builder.md instructed the opposite: "Read
-// task from workspace/scout-report.md" and "the `## Task: <slug>` line ...
-// MUST be ... copied verbatim from the scout-report's `## Selected Tasks`" —
-// the root cause of the cycle-640 wrong-task build
-// (builder-task-binding-topn-gate, 7th recurrence: cycles 282, 310, 522, 575,
-// 577, 599, 640).
 func TestBuilderPromptNamesTopNAsSoleTaskAuthority(t *testing.T) {
 	path := filepath.Join(repoRoot(t), "agents", "evolve-builder.md")
 	data, err := os.ReadFile(path)

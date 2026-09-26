@@ -7,10 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// Ship is the port of scripts/guards/ship-gate.sh.
-// Rule: ship-class verbs (git commit, git push, gh release create, gh
-// release edit) are denied UNLESS the command's entry point is
-// scripts/lifecycle/ship.sh. Constructor-injected bypass=true bypasses.
 func TestShip_Name(t *testing.T) {
 	g := NewShip(false)
 	if g.Name() != "ship" {
@@ -58,7 +54,6 @@ func TestShip_DeniesBareGitCommit(t *testing.T) {
 
 func TestShip_DeniesPipedShipVerbs(t *testing.T) {
 	g := NewShip(false)
-	// Common bypass attempts.
 	for _, cmd := range []string{
 		`echo y | git commit -m 'x'`,
 		`bash -c "git commit -m 'x'"`,

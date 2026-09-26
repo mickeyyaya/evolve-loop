@@ -6,17 +6,6 @@ import (
 	"testing"
 )
 
-// TestLoad_BindsRoutingTypes binds all four EVOLVE dynamic-routing config
-// structs to their real producer, Load, which parses a phase-registry.json.
-// Each type is asserted through the field mapping Load is responsible for:
-//
-//   - RoutingConfig — the immutable typed object Load returns (var cfg ... = Load).
-//   - CondRule      — parsed from the registry's conditional_mandatory expr
-//     "field<op>value"; Load splits it into {Field, Op, Value}.
-//   - RoutingBlock  — the per-phase "routing" block; InsertWhen/SkipWhen carry
-//     []Condition and are copied verbatim into cfg.Triggers[phase].
-//   - Condition     — one insert_when/skip_when clause; Field/Op/Value must
-//     survive the JSON round-trip intact (the router later evaluates them).
 func TestLoad_BindsRoutingTypes(t *testing.T) {
 	dir := t.TempDir()
 	regPath := filepath.Join(dir, "phase-registry.json")
@@ -40,8 +29,7 @@ func TestLoad_BindsRoutingTypes(t *testing.T) {
 		t.Fatalf("write registry: %v", err)
 	}
 
-	// Load returns (RoutingConfig, []Warning) — warnings are non-fatal, not an
-	// error; capture them rather than silently discarding, and surface any.
+	// Explicit declarations name RoutingConfig and Warning for apicover.
 	var cfg RoutingConfig
 	var warnings []Warning
 	cfg, warnings = Load(regPath, map[string]string{})
@@ -49,14 +37,11 @@ func TestLoad_BindsRoutingTypes(t *testing.T) {
 		t.Logf("Load returned non-fatal warnings on the clean fixture: %v", warnings)
 	}
 
-	// CondRule: the conditional_mandatory expr must parse into the exact triple.
 	wantRule := CondRule{Field: "cycle_size", Op: "!=", Value: "trivial"}
 	if got := cfg.Conditional["tdd"]; got.Field != wantRule.Field || got.Op != wantRule.Op || got.Value != wantRule.Value || len(got.And) != 0 {
 		t.Errorf("Conditional[tdd] = %+v, want %+v", got, wantRule)
 	}
 
-	// RoutingBlock + Condition: the per-phase routing block must round-trip
-	// field-for-field from the registry JSON into cfg.Triggers["tester"].
 	block, ok := cfg.Triggers["tester"]
 	if !ok {
 		t.Fatalf("Triggers missing tester routing block")
@@ -75,16 +60,11 @@ func TestLoad_BindsRoutingTypes(t *testing.T) {
 		t.Errorf("SkipWhen[0] = %+v, want %+v", block.SkipWhen[0], wantBlock.SkipWhen[0])
 	}
 
-	// RoutingConfig: the loaded object must reflect the registry's phase order.
 	if len(cfg.Order) != 1 || cfg.Order[0] != "tester" {
 		t.Errorf("Order = %v, want [tester]", cfg.Order)
 	}
 }
 
-// TestModelRouting_ParsesAndStringifies binds the cycle-436 ModelRouting axis
-// (type + its three consts + String) to its real producer, Load, exercising
-// all three values through the registry's model_routing key and asserting the
-// human-readable String() form each renders to.
 func TestModelRouting_ParsesAndStringifies(t *testing.T) {
 	cases := []struct {
 		value string

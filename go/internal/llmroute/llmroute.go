@@ -1,30 +1,6 @@
-// Package llmroute is the single resolver for a phase's dispatch decision:
-// the ordered CLI fallback chain AND the concrete model, in one place.
-//
-// Before this package the decision lived in two code paths the runner had to
-// stitch together: runner.resolveCLIChain picked the CLI chain, while
-// resolvellm.Resolve (invoked only to expand the "auto" model sentinel)
-// separately computed a CLI that the runner then DISCARDED. Two readers of
-// profile.cli, one ignored. llmroute.Resolve folds both into a single Plan so
-// there is exactly one place to reason about "which CLI + model runs this
-// phase" — the seam the advisor/Registrar will reuse when it mints a phase.
-// For an overlay CLI, a bare name is a family selector, a hyphen-qualified name
-// is a driver selector, and an exact chain entry outranks both.
-//
-// Precedence (preserved verbatim from the prior two paths):
-//
-//	CLI primary:  EVOLVE_<AGENT>_CLI > EVOLVE_CLI > profile.cli > "claude-tmux"
-//	CLI chain:    primary + profile.cli_fallback (deduped, order-preserving)
-//	triggers:     profile.cli_fallback_on_exit or {80,81,124,127}
-//	model:        EVOLVE_<AGENT>_MODEL > profile.model_tier_default > defaultModel,
-//	              then if the result is "auto", expand via the injected resolver
-//	              (the per-phase profile) — same call the runner made before.
-//
-// Layering: imports envchain + profiles + stdlib only. It MUST NOT import the
-// runner, resolvellm, or core. resolvellm stays an independent public API; the
-// runner bridges it in via the AutoModel seam, so "auto" expansion is
-// byte-identical to the pre-llmroute behavior. (Step 9 removed the
-// llm_config.json layer entirely; the resolver now reads the per-phase profile.)
+// Package llmroute resolves a phase's dispatch plan (CLI chain, triggers, model, tiers) and walks it.
+// For an overlay CLI, a bare name is a family selector, a hyphen-qualified name is a driver selector, and an exact chain entry outranks both.
+// See docs/architecture/packages/internal-llmroute.md.
 package llmroute
 
 import (
@@ -37,31 +13,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
-// defaultFallbackOnExit is the conservative trigger set covering all known
-// CLI-side stall + missing-binary signals (mirror of bridge/exitcodes.go;
-// kept as integer literals so this leaf package doesn't depend on bridge):
-//
-//   - 80  ExitREPLBootTimeout    (the *-tmux REPL never showed its prompt)
-//   - 81  ExitArtifactTimeout    (bridge artifact-timeout; cycle-122 codex stall)
-//   - 85  ExitUnknownPrompt      (pane stuck on an unhandled interactive prompt,
-//     incl. provider rate-limit escalations — cycle-267: codex's usage quota
-//     exhausted mid-batch, the rate_limit pattern escalated with 85, and the
-//     codex→claude chain never fired because 85 wasn't a trigger; a
-//     quota-blocked/stuck primary is exactly when a different CLI family can
-//     serve. The escalation report is still written before the chain advances.)
-//   - 124 coreutils timeout(1)   (defensive — if any wrapper uses `timeout`)
-//   - 127 ExitMissingBinary      (the CLI binary isn't on PATH)
-//
-// Operators extend per-agent via profile.cli_fallback_on_exit (e.g. add 2
-// ExitSafetyGate) or shrink to [80,127] for the production-strict posture. A
-// CLI failure NOT in this list still hard-fails — a legitimate FAIL verdict
-// never silently routes to a different CLI.
+// defaultFallbackOnExit mirrors bridge/exitcodes.go as literals so this leaf package stays bridge-free:
+// REPL boot timeout, artifact timeout, unknown prompt (incl. quota), timeout(1), missing binary.
 var defaultFallbackOnExit = []int{80, 81, 85, 124, 127}
 
-// cliBinaryFor maps a registered CLI driver name to the binary the host needs
-// on PATH. Used by Probe to demote candidates whose binary is missing — fast
-// fail in milliseconds instead of a 60s REPL boot timeout. Mirror of
-// bridge.doctorBinaryFor (kept here so this leaf package stays bridge-free).
+// cliBinaryFor mirrors bridge.doctorBinaryFor and is this package's one list of registered drivers.
 var cliBinaryFor = map[string]string{
 	"claude-p":    "claude",
 	"claude-tmux": "claude",
@@ -72,26 +28,19 @@ var cliBinaryFor = map[string]string{
 	"ollama-tmux": "ollama",
 }
 
-// AutoModel expands the "auto" model sentinel for a phase role, returning the
-// concrete model (or tier) and ok=false when it cannot (so the caller keeps
-// "auto" unchanged, matching the pre-llmroute switch). The runner supplies a
-// closure over resolvellm.Resolve; tests can stub it.
+// AutoModel expands the "auto" sentinel for a phase role; ok=false leaves "auto" unchanged.
 type AutoModel func(role string) (model string, ok bool)
 
-// Plan is the resolved dispatch decision for one phase invocation: the ordered
-// CLI chain to try, the exit codes that promote to the next CLI, a human label
-// for the primary's source, and the resolved (auto-expanded) model.
+// Plan is the resolved dispatch decision for one phase invocation.
 type Plan struct {
 	Candidates    []string // CLI chain, primary first
 	Triggers      []int    // exit codes that advance the chain
-	PrimarySource string   // "env(EVOLVE_AUDITOR_CLI)" / "env(EVOLVE_CLI)" / "profile.auditor.cli" / "default"
+	PrimarySource string   // "env(EVOLVE_AUDITOR_CLI)" / "env(EVOLVE_CLI)" / "profile.auditor.cli" / "policy.pin" / "default"
 	Model         string   // resolved model, "auto" already expanded when possible
 	Tiers         []string // ordered tier fallback chain, resolved tier first (see TierChain)
 }
 
-// TriggersFallback reports whether exitCode should advance the chain. A
-// non-trigger exit (or zero) breaks the dispatch loop — either the phase
-// succeeded or it produced a legitimate FAIL the classifier should see.
+// TriggersFallback reports whether exitCode advances the chain; any other exit is a result, not a stall.
 func (p Plan) TriggersFallback(exitCode int) bool {
 	for _, t := range p.Triggers {
 		if t == exitCode {
@@ -101,29 +50,7 @@ func (p Plan) TriggersFallback(exitCode int) bool {
 	return false
 }
 
-// Resolve composes the full dispatch Plan for one phase invocation.
-//
-//   - agent is the canonical profile name ("auditor", "tdd-engineer"): it keys
-//     the per-agent env vars (EVOLVE_<AGENT>_CLI / _MODEL) and the profile.
-//   - phase is the phase/role name ("audit", "build"): it is the role passed to
-//     the AutoModel expander (keyed by phase, not agent — this asymmetry is
-//     preserved from the prior runner behavior, when the now-removed llm_config
-//     layer was phase-keyed).
-//   - defaultModel is the phase Hooks' DefaultModel() (usually "auto").
-//   - prof may be nil (no profile on disk).
-//   - autoExpand may be nil (then "auto" is left as-is).
-//   - pin may be nil (no policy pin). A non-nil pin is ABSOLUTE: pin.CLI
-//     replaces the resolved primary CLI (source="policy.pin"), normalized from a
-//     bare family to its default tmux driver (defaultDriverForFamily: "codex" →
-//     "codex-tmux"), and pin.Model replaces the resolved model outright —
-//     bypassing the env/profile/default
-//     chain AND the "auto" expansion (so a pinned model never triggers a
-//     resolvellm/catalog lookup). The caller is responsible for the
-//     --bypass-policy escape hatch (pass nil to bypass) and for validating
-//     the pin against the profile guardrails (policy.ValidatePin) before here.
-//     The profile fallback CHAIN is still appended after a pinned primary, so a
-//     pinned phase keeps CLI-failure resilience; an operator wanting a strict
-//     single-CLI phase empties profile.cli_fallback.
+// Resolve composes the dispatch Plan: env and profile keyed by agent, AutoModel by phase; a non-nil pin is absolute.
 func Resolve(agent, phase, defaultModel string, env map[string]string, prof *profiles.Profile, autoExpand AutoModel, pin *policy.Pin) Plan {
 	primary, source := resolvePrimary(agent, env, prof)
 	if pin != nil && pin.CLI != "" {
@@ -132,8 +59,8 @@ func Resolve(agent, phase, defaultModel string, env map[string]string, prof *pro
 	var model string
 	tiers := []string(nil)
 	if pin != nil && pin.Model != "" {
-		model = pin.Model       // absolute — skip the env/profile/default/auto chain entirely
-		tiers = []string{model} // a pin is ABSOLUTE: never tier-step-down away from it
+		model = pin.Model       // skips the env/profile/default chain and "auto" expansion
+		tiers = []string{model} // a pinned model never steps down a tier
 	} else {
 		model = resolveModel(agent, phase, defaultModel, env, prof, autoExpand)
 		tiers = TierChain(model, envelopeMin(prof))
@@ -147,9 +74,7 @@ func Resolve(agent, phase, defaultModel string, env map[string]string, prof *pro
 	}
 }
 
-// envelopeMin returns the profile's ModelTierEnvelope.Min tier floor, or ""
-// (→ TierChain's universal "balanced" floor) when the profile or envelope is
-// absent.
+// envelopeMin returns the profile's tier floor, or "" (TierChain's universal floor) when absent.
 func envelopeMin(prof *profiles.Profile) string {
 	if prof == nil || prof.ModelTierEnvelope == nil {
 		return ""
@@ -157,8 +82,6 @@ func envelopeMin(prof *profiles.Profile) string {
 	return prof.ModelTierEnvelope.Min
 }
 
-// resolveModel runs the model precedence: request override > profile
-// .model_tier_default > defaultModel, then expands "auto" via autoExpand.
 func resolveModel(agent, phase, defaultModel string, env map[string]string, prof *profiles.Profile, autoExpand AutoModel) string {
 	profileModelTier := ""
 	if prof != nil {
@@ -179,16 +102,8 @@ func resolveModel(agent, phase, defaultModel string, env map[string]string, prof
 	return model
 }
 
-// defaultDriverForFamily normalizes a bare CLI family (e.g. "codex") to its
-// default interactive driver ("codex-tmux") when one is registered. Policy pins
-// and `evolve setup apply` emit bare base families (Assignment.CLI is the base
-// family), but the dispatch default is the tmux driver (CLAUDE.md: "Default
-// execution = tmux-LLM drivers"). The headless "<family>" driver lacks the
-// manifest model_tier_map and the codex ChatGPT model clamp, so a bare-family
-// pin previously selected it and codex exited rc=1 every cycle (cycle-378). A
-// name that is already driver-qualified, or whose "<family>-tmux" form is not a
-// registered driver (e.g. the explicit headless "claude-p"), is returned
-// unchanged. cliBinaryFor is the single source of registered driver names.
+// defaultDriverForFamily maps a bare family to its "<family>-tmux" driver when registered, since pins
+// carry bare families and the headless driver lacks codex's model clamp; other names pass through.
 func defaultDriverForFamily(cli string) string {
 	if _, ok := cliBinaryFor[cli+"-tmux"]; ok {
 		return cli + "-tmux"
@@ -196,7 +111,6 @@ func defaultDriverForFamily(cli string) string {
 	return cli
 }
 
-// resolvePrimary returns the primary CLI and its provenance label.
 func resolvePrimary(agent string, env map[string]string, prof *profiles.Profile) (cli, source string) {
 	perAgentKey := envchain.PhaseEnvKey(agent, "CLI")
 	if v := env[perAgentKey]; v != "" {
@@ -211,8 +125,6 @@ func resolvePrimary(agent string, env map[string]string, prof *profiles.Profile)
 	return "claude-tmux", "default"
 }
 
-// resolveTriggers returns profile.cli_fallback_on_exit or the conservative
-// default when unset.
 func resolveTriggers(prof *profiles.Profile) []int {
 	if prof != nil && len(prof.CLIFallbackOnExit) > 0 {
 		return append([]int(nil), prof.CLIFallbackOnExit...)
@@ -220,16 +132,7 @@ func resolveTriggers(prof *profiles.Profile) []int {
 	return defaultFallbackOnExit
 }
 
-// Probe returns a copy of p with candidates whose binary isn't on PATH demoted
-// (not deleted) to the end of the chain, so an already-missing CLI doesn't burn
-// a 60s boot timeout before the chain advances. If ALL candidates are missing
-// the original order is kept so the classifier still sees a real
-// ExitMissingBinary. lookPath is the seam: production passes nil (exec.LookPath);
-// tests inject a closure.
-//
-// The reorder is intentionally a demote, not a drop: a CLI may be installed but
-// not yet on PATH at probe time, and the bridge's later launch may still resolve
-// it via a richer search.
+// Probe demotes (never drops) candidates whose binary is off PATH; nil lookPath means exec.LookPath.
 func Probe(p Plan, lookPath func(string) (string, error)) Plan {
 	if lookPath == nil {
 		lookPath = exec.LookPath
@@ -251,33 +154,19 @@ func Probe(p Plan, lookPath func(string) (string, error)) Plan {
 		}
 	}
 	if len(available) == 0 {
-		return p
+		return p // all missing: keep the order so the classifier sees ExitMissingBinary
 	}
-	// Copy p and overwrite only Candidates so any future Plan field is carried
-	// through Probe automatically (no silent omission).
 	out := p
 	out.Candidates = append(available, missing...)
 	return out
 }
 
-// ApplyUniversalFallback appends the discovered CLIs (installed + authed on
-// this host, already filtered by the profile's allowed_clis and the operator's
-// universal_fallback_exclude) AFTER the configured chain, deduped against it.
-// The configured chain keeps precedence — it runs first, in order — and the
-// appended tail is the last resort every launch walks before a phase gives up.
-//
-// Until 2026-09-14 the tail was added only when EVERY configured CLI's binary
-// was absent; a configured CLI that was present but walled (quota, a rejected
-// model, a boot timeout) ended the walk with the phase and, at the last phase,
-// the cycle. Operator policy since wave 2: try every available CLI before
-// giving up. Empty discovered ⇒ untouched (fail-loud preserved: the classifier
-// still sees a real ExitMissingBinary on an absent chain). lookPath is kept as
-// the seam for callers that probe. Non-Candidates Plan fields are carried through.
+// ApplyUniversalFallback appends the discovered CLIs after the configured chain, deduped against it.
 func ApplyUniversalFallback(p Plan, discovered []string, lookPath func(string) (string, error)) Plan {
 	if len(discovered) == 0 {
 		return p
 	}
-	_ = lookPath // the seam stays for callers; presence no longer suppresses the tail
+	_ = lookPath // unused: binary presence never suppresses the tail
 	seen := make(map[string]struct{}, len(p.Candidates))
 	for _, c := range p.Candidates {
 		seen[c] = struct{}{}
@@ -295,10 +184,7 @@ func ApplyUniversalFallback(p Plan, discovered []string, lookPath func(string) (
 	return out
 }
 
-// Family maps a registered CLI driver name to its CLI family — the binary
-// name from cliBinaryFor ("codex-tmux" → "codex"). A transient outage (quota
-// wall, auth expiry) hits every transport of a family, so health state is
-// keyed here, not per driver. Unknown names map to themselves.
+// Family maps a driver name to its CLI family ("codex-tmux" → "codex"); unknown names map to themselves.
 func Family(cli string) string {
 	if bin := cliBinaryFor[cli]; bin != "" {
 		return bin
@@ -306,13 +192,7 @@ func Family(cli string) string {
 	return cli
 }
 
-// ApplyDriverBench demotes candidates whose specific driver is bench-flagged
-// (driver-scoped boot-timeout bench: "codex-tmux" benched ≠ "codex" benched).
-// benchedDrivers maps driver name → BenchedAt from clihealth.Active(). Bench
-// is advice, never a veto: when ALL candidates are driver-benched, the chain is
-// ordered least-recently-benched first (same policy as ApplyBench). Keyed on
-// the full driver name, never on Family(cli), so headless/tmux variants are
-// independent. Copy-struct convention carries non-Candidates fields.
+// ApplyDriverBench demotes candidates benched by full driver name (driver → BenchedAt), never by family.
 func ApplyDriverBench(p Plan, benchedDrivers map[string]time.Time) Plan {
 	if len(p.Candidates) <= 1 || len(benchedDrivers) == 0 {
 		return p
@@ -326,7 +206,7 @@ func ApplyDriverBench(p Plan, benchedDrivers map[string]time.Time) Plan {
 		}
 	}
 	out := p
-	if len(healthy) == 0 {
+	if len(healthy) == 0 { // bench is advice, never a veto
 		all := append([]string(nil), p.Candidates...)
 		sort.SliceStable(all, func(i, j int) bool {
 			return benchedDrivers[all[i]].Before(benchedDrivers[all[j]])
@@ -338,12 +218,7 @@ func ApplyDriverBench(p Plan, benchedDrivers map[string]time.Time) Plan {
 	return out
 }
 
-// ApplyBench demotes candidates whose family is benched (cycle-283: a walled
-// codex re-burned its 5-15min boot on every dispatch) to the chain end,
-// mirroring Probe's demote-not-drop reorder. benched maps family → BenchedAt.
-// Bench is advice, never a veto: when EVERY candidate is benched the chain is
-// instead ordered least-recently-benched first — the caller logs loudly and
-// dispatch proceeds. Copy-struct convention carries non-Candidates fields.
+// ApplyBench demotes candidates whose family is benched (family → BenchedAt); all benched runs least-recent first.
 func ApplyBench(p Plan, benched map[string]time.Time) Plan {
 	if len(p.Candidates) <= 1 || len(benched) == 0 {
 		return p

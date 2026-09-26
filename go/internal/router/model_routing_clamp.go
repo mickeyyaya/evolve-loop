@@ -7,31 +7,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
-// universalTierFloor is the compiled-default model-tier envelope applied when a
-// profile declares no explicit model_tier_envelope (cycle-480,
-// universal-envelope-floor). 72/91 profiles omit an envelope; without a default
-// those phases skipped the clamp-up gate entirely and a below-floor advisor tier
-// proposal fell through to policy.ValidatePin as a mere PREFERENCE (B2), never
-// clamped. Single-sourcing the floor HERE — rather than editing every profile
-// JSON — guarantees a below-floor tier is clamped UP to "balanced" for EVERY
-// phase, while any profile that DOES declare an envelope still wins (its explicit
-// Min is used verbatim). Min feeds the clamp-up gate; Max feeds the clamp-DOWN
-// gate (L5, 2026-07-16): "top" is the HIGHEST rank in policy.TierRank's
-// fast<balanced<deep<top ladder (a live advisor-proposable frontier tier —
-// sanitizeAdvisorTier keeps it legal), so envelope-less profiles accept every
-// tier unchanged — only a profile declaring a lower explicit Max (e.g. a
-// memo-class balanced ceiling) gets a real ceiling. Pre-ceiling this field was
-// documentation-only and said "deep"; activating the ceiling with "deep" would
-// have silently foreclosed "top" for the 72/91 envelope-less profiles
-// (go-reviewer HIGH, 2026-07-16).
+// universalTierFloor is the envelope for a profile that declares none. Max is "top", the highest
+// policy.TierRank, so only an explicitly declared lower Max ever clamps a tier down.
 var universalTierFloor = &profiles.ModelTierEnvelope{Min: "balanced", Max: "top"}
 
-// envelopeClamp builds the model-routing-guardrail Clamp record shared by the
-// floor (clamp-up) and ceiling (clamp-down) branches of ClampPlanModelRouting:
-// same rule, same proposed/forced format, differing only in the tier they
-// force onto and the reason phrase. reason is echoed into Forced so an
-// operator reading advisor-rejections.json can tell floor from ceiling at a
-// glance (RejectionsFromClamps' consumers grep for "ceiling"/"floor").
+// envelopeClamp records a floor or ceiling clamp. reason is echoed into Forced because
+// RejectionsFromClamps' consumers grep for "floor" and "ceiling".
 func envelopeClamp(e *PhasePlanEntry, forcedTier, reason string) Clamp {
 	return Clamp{
 		Phase:    e.Phase,
@@ -41,26 +22,10 @@ func envelopeClamp(e *PhasePlanEntry, forcedTier, reason string) Clamp {
 	}
 }
 
-// ClampPlanModelRouting is the cycle-436 MR2 guardrail: it re-validates every
-// plan entry's advisor-proposed {CLI,Tier} against the phase's OWN profile
-// guardrails (allowed_clis + model_tier_envelope, via the EXISTING
-// policy.ValidatePin — reused, not forked) and the live model catalog
-// (modelcatalog.Catalog.Lookup), clamping any out-of-bounds or
-// catalog-unresolvable proposal back to the safe static default ({cli:"",
-// tier:""}, which the resolver already treats as "use the profile's pinned
-// default") rather than ever letting an illegal or unresolvable pair reach
-// dispatch ("model proposes, kernel disposes"). profileFor resolves a
-// phase's profile lazily (nil ⇒ nothing to validate ⇒ honored, matching
-// ValidatePin's own nil-profile contract); a NIL profile is distinct from a
-// profile with an empty AllowedCLIs (B2: no restriction configured is a
-// PREFERENCE, not a violation — ValidatePin already encodes this). An entry
-// that proposes neither CLI nor Tier is left untouched (nothing to clamp).
-// catalogLookup resolves (cli,tier)→(model,ok); it is INJECTED (dependency
-// inversion) so router stays a leaf and never imports modelcatalog — the
-// caller passes modelcatalog.Catalog.Lookup. A nil catalogLookup skips the
-// catalog-resolvability gate (guardrail validation still applies).
-// PURE: returns a NEW plan (input unmutated) plus the clamps applied, so it
-// composes with ClampPlanToFloorWith exactly like every other router clamp.
+// ClampPlanModelRouting re-validates each entry's proposed {CLI, Tier} against its profile envelope,
+// policy.ValidatePin and catalogLookup (modelcatalog.Catalog.Lookup, injected; nil skips the catalog
+// check). A tier outside the envelope is clamped to its bound; any other violation empties the pair to
+// the profile default. It returns a new plan and the clamps applied.
 func ClampPlanModelRouting(plan *PhasePlan, profileFor func(phase string) *profiles.Profile, catalogLookup func(cli, tier string) (string, bool)) (*PhasePlan, []Clamp) {
 	if plan == nil {
 		return nil, nil
@@ -74,17 +39,12 @@ func ClampPlanModelRouting(plan *PhasePlan, profileFor func(phase string) *profi
 	for i := range out.Entries {
 		e := &out.Entries[i]
 		if e.CLI == "" && e.Tier == "" {
-			continue // nothing proposed — nothing to clamp
+			continue
 		}
 		prof := profileFor(e.Phase)
 
-		// Operator low-model floor (cycle-463 T4; universalized cycle-480): a tier
-		// proposal BELOW the phase's envelope minimum clamps UP to the floor rather
-		// than emptying the whole proposal — the CLI is left untouched since only
-		// the tier violated a bound. When the profile declares no envelope, the
-		// compiled universalTierFloor is substituted so the floor is UNIVERSAL
-		// across every phase (72/91 profiles omit an envelope). TierRank returns 0
-		// for an unclassifiable string, so this only fires when both ranks are real.
+		// A tier outside the envelope clamps to the bound and keeps the CLI. TierRank
+		// is 0 for an unknown tier, so only real ranks clamp.
 		if prof != nil && e.Tier != "" {
 			env := prof.ModelTierEnvelope
 			if env == nil {
@@ -96,11 +56,6 @@ func ClampPlanModelRouting(plan *PhasePlan, profileFor func(phase string) *profi
 				e.Tier = env.Min
 				continue
 			}
-			// Ceiling (L5, 2026-07-16): a tier ABOVE the envelope maximum clamps
-			// DOWN to the ceiling — an over-provisioned proposal is cost/quota
-			// drift (a memo-class phase routed to deep), the same shape the floor
-			// closes from below. The universal envelope's Max is the top tier, so
-			// this only ever fires against an explicitly-declared lower Max.
 			if maxRank := policy.TierRank(env.Max); tierRank > 0 && maxRank > 0 && tierRank > maxRank {
 				clamps = append(clamps, envelopeClamp(e, env.Max, "clamped down to envelope ceiling"))
 				e.Tier = env.Max
@@ -134,12 +89,7 @@ func ClampPlanModelRouting(plan *PhasePlan, profileFor func(phase string) *profi
 	return out, clamps
 }
 
-// RejectionsFromClamps converts router Clamps (from ClampPlanModelRouting or
-// the integrity-floor clamp) into the PlanRejection shape the
-// advisor-rejections.json artifact already uses, so a model-routing clamp is
-// visible in the SAME rejection artifact operators already read — naming the
-// phase and the rule that fired. Empty input yields nil (no artifact noise
-// for the common no-clamp cycle).
+// RejectionsFromClamps converts clamps into advisor-rejections.json records; no clamps yields nil.
 func RejectionsFromClamps(clamps []Clamp) []PlanRejection {
 	if len(clamps) == 0 {
 		return nil

@@ -6,7 +6,6 @@ import (
 	"testing"
 )
 
-// writeRegistry writes a phase-registry.json into a temp dir and returns its path.
 func writeRegistry(t *testing.T, body string) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -213,16 +212,9 @@ func TestStageAndModeString(t *testing.T) {
 func TestLoad_PhaseRecoveryStage(t *testing.T) {
 	absent := filepath.Join(t.TempDir(), "absent.json")
 
-	// Default (no env): SHADOW — ADR-0044's behavior-neutral first ship. Note
-	// the R8.5 spine-floor flip deliberately did NOT move this dial: it is
-	// overloaded (bidirectional channel + failure-adviser promotion), so the
-	// floor got its own SpineFloor dial instead (TestLoad_SpineFloorStage).
 	if cfg, _ := Load(absent, map[string]string{}); cfg.PhaseRecovery != StageShadow {
 		t.Errorf("default PhaseRecovery = %v, want StageShadow", cfg.PhaseRecovery)
 	}
-	// EVOLVE_PHASE_RECOVERY is retired (cycle-12 flag retirement). The env var
-	// is ignored by applyEnv; the dial is now policy-driven (policy.RecoveryConfig).
-	// Passing the env var has no effect — PhaseRecovery stays at the default StageShadow.
 	for _, v := range []string{"off", "0", "shadow", "enforce", "banana"} {
 		cfg, _ := Load(absent, map[string]string{"EVOLVE_PHASE_RECOVERY": v})
 		if cfg.PhaseRecovery != StageShadow {
@@ -231,16 +223,11 @@ func TestLoad_PhaseRecoveryStage(t *testing.T) {
 	}
 }
 
-// TestLoad_SpineFloorStage pins the R8.5 flip: the artifact-backed spine floor
-// defaults ENFORCE on its OWN dial (decoupled from the overloaded PhaseRecovery
-// — see the SpineFloor field doc), with no env-var override (policy-only:
-// `recovery.spine_floor`).
 func TestLoad_SpineFloorStage(t *testing.T) {
 	absent := filepath.Join(t.TempDir(), "absent.json")
 	if cfg, _ := Load(absent, map[string]string{}); cfg.SpineFloor != StageEnforce {
 		t.Errorf("default SpineFloor = %v, want StageEnforce (R8.5 flip)", cfg.SpineFloor)
 	}
-	// No env vocabulary exists for it — any EVOLVE_SPINE_FLOOR value is inert.
 	for _, v := range []string{"off", "shadow", "banana"} {
 		cfg, _ := Load(absent, map[string]string{"EVOLVE_SPINE_FLOOR": v})
 		if cfg.SpineFloor != StageEnforce {
@@ -249,10 +236,6 @@ func TestLoad_SpineFloorStage(t *testing.T) {
 	}
 }
 
-// TestLoad_FatalPaneStage pins the F27 flip the same way: the ADR-0044 C2
-// fatal-pane fast-fail defaults ENFORCE on its OWN dial, with no env-var
-// override (policy-only: `recovery.fatal_pane`) — neither a would-be
-// EVOLVE_FATAL_PANE nor the program dial's old env name moves it.
 func TestLoad_FatalPaneStage(t *testing.T) {
 	absent := filepath.Join(t.TempDir(), "absent.json")
 	if cfg, _ := Load(absent, map[string]string{}); cfg.FatalPane != StageEnforce {
@@ -268,20 +251,12 @@ func TestLoad_FatalPaneStage(t *testing.T) {
 	}
 }
 
-// TestPhaseIOStage pins the EVOLVE_PHASE_IO dial (ADR-0050 Phase 3): the unified
-// phase I/O rollout uses the FULL off→shadow→advisory→enforce ladder (4-value,
-// unlike the 3-value gate dials), defaults ENFORCE as of the 3.10 cutover (the
-// typed envelope is now authoritative; set EVOLVE_PHASE_IO=off to roll back), and
-// a typo falls back to off with a warning (never silently leaving the dial in an
-// unintended state). Covers DefaultEnforce / Off / Shadow / Advisory / Enforce / TypoDefaultsOff.
 func TestPhaseIOStage(t *testing.T) {
 	absent := filepath.Join(t.TempDir(), "absent.json")
 
-	// DefaultEnforce: no env ⇒ the typed envelope is authoritative (3.10 cutover).
 	if cfg, _ := Load(absent, map[string]string{}); cfg.PhaseIO != StageEnforce {
 		t.Errorf("default PhaseIO = %v, want StageEnforce", cfg.PhaseIO)
 	}
-	// The full 4-value ladder (advisory is the middle state the gates omit).
 	for v, want := range map[string]Stage{
 		"off": StageOff, "0": StageOff, "shadow": StageShadow,
 		"advisory": StageAdvisory, "enforce": StageEnforce,
@@ -290,7 +265,6 @@ func TestPhaseIOStage(t *testing.T) {
 			t.Errorf("EVOLVE_PHASE_IO=%q → %v, want %v", v, cfg.PhaseIO, want)
 		}
 	}
-	// TypoDefaultsOff: an unknown value never silently enables the envelope.
 	cfg, ws := Load(absent, map[string]string{"EVOLVE_PHASE_IO": "banana"})
 	if cfg.PhaseIO != StageOff {
 		t.Errorf("typo EVOLVE_PHASE_IO → %v, want StageOff", cfg.PhaseIO)
@@ -300,11 +274,6 @@ func TestPhaseIOStage(t *testing.T) {
 	}
 }
 
-// TestDefaults_PhaseIO_Enforce pins the 3.10 cutover at the struct-default level:
-// the baked-in RolloutStages default is StageEnforce, so the typed envelope is
-// authoritative on every production path that doesn't explicitly override the dial.
-// This is the byte-behavior flip — guard it explicitly so a future default edit
-// can't silently roll the cutover back to off.
 func TestDefaults_PhaseIO_Enforce(t *testing.T) {
 	if got := defaults().RolloutStages.PhaseIO; got != StageEnforce {
 		t.Errorf("default RolloutStages.PhaseIO = %v, want StageEnforce (3.10 cutover)", got)

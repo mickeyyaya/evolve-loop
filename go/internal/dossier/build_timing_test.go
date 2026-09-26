@@ -9,10 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasetiming"
 )
 
-// When a phase-timing.json exists in the workspace, Build must ingest it: one
-// PhaseRecord per timed phase carrying duration/start/end/archetype, plus a
-// cycle-level Timing summary — so the committed dossier (the durable, git-tracked
-// evidence) records WHERE the cycle spent its wall-clock, not just the verdict.
 func TestBuild_IngestsPhaseTiming(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
@@ -34,7 +30,6 @@ func TestBuild_IngestsPhaseTiming(t *testing.T) {
 		t.Fatalf("Validate: %v", err)
 	}
 
-	// Real per-phase records replace the stub.
 	if len(d.Phases) != 3 {
 		t.Fatalf("want 3 phase records from the timing log, got %d: %+v", len(d.Phases), d.Phases)
 	}
@@ -49,7 +44,6 @@ func TestBuild_IngestsPhaseTiming(t *testing.T) {
 		t.Errorf("scout record must carry archetype+start: %+v", byName["scout"])
 	}
 
-	// Cycle-level roll-up.
 	if d.Timing == nil {
 		t.Fatal("Dossier.Timing summary must be populated when a timing log exists")
 	}
@@ -61,10 +55,6 @@ func TestBuild_IngestsPhaseTiming(t *testing.T) {
 	}
 }
 
-// The markdown timing section must render deterministically: text/template
-// iterates maps in sorted key order, so the archetype rows are stable across
-// renders. This locks that contract (a non-deterministic render would corrupt
-// committed dossiers and break diffs).
 func TestRenderMarkdown_TimingSectionDeterministic(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
@@ -97,7 +87,6 @@ func TestRenderMarkdown_TimingSectionDeterministic(t *testing.T) {
 	}
 }
 
-// No timing log → Build keeps the always-valid stub (backward compatible).
 func TestBuild_NoTimingLogKeepsStub(t *testing.T) {
 	t.Parallel()
 	d, err := Build(8, BuildOpts{WorkspacePath: t.TempDir(), Goal: "g", FinalVerdict: VerdictPass})

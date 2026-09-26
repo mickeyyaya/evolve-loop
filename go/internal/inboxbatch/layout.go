@@ -1,12 +1,5 @@
 package inboxbatch
 
-// layout.go — the ONE home of the inbox claim layout. A claim moves an item
-// from the inbox root into processing/cycle-<N>/; the writer (inboxmover.Claim),
-// every reader (inboxmover.Locate, core's dispatch-time claim scan) and the
-// name parser derive that path from here, so the gate that judges a claim can
-// never read a shape the claim did not write. It lives in this leaf package
-// because core cannot import inboxmover (the ledger adapter imports core).
-
 import (
 	"os"
 	"path/filepath"
@@ -28,18 +21,13 @@ func ProcessingCycleDir(inboxDir string, cycle int) string {
 	return CycleDir(ProcessingDir(inboxDir), strconv.Itoa(cycle))
 }
 
-// CycleDir is the ONE spelling of a cycle-nested lifecycle directory:
-// <parent>/cycle-<cycle>. The promoter composes its processed/ and rejected/
-// destinations through it and CycleDirs/ParseProcessingCycle read them back,
-// so a respelling on either side cannot hide a retired item from the readers.
+// CycleDir is the one spelling of a cycle-nested lifecycle directory, <parent>/cycle-<cycle>.
 func CycleDir(parent, cycle string) string {
 	return filepath.Join(parent, cycleDirPrefix+cycle)
 }
 
-// ParseProcessingCycle inverts ProcessingCycleDir's basename: the claiming
-// cycle of a "cycle-<N>" directory name, or ok=false for anything else
-// (notes, stray files, a name with extra segments, and "cycle-0": cycles start
-// at 1 and 0 is the "pending at the root" sentinel of inboxmover.Location).
+// ParseProcessingCycle returns the cycle a "cycle-<N>" name claims, N >= 1.
+// N = 0 is rejected because it is inboxmover.Location's "pending at the root" sentinel.
 func ParseProcessingCycle(dirName string) (cycle int, ok bool) {
 	if !strings.HasPrefix(dirName, cycleDirPrefix) {
 		return 0, false
@@ -51,18 +39,12 @@ func ParseProcessingCycle(dirName string) (cycle int, ok bool) {
 	return n, true
 }
 
-// ProcessingCycleDirs lists the existing claim dirs, ascending by cycle —
-// the one walk every reader of processing/ uses (inboxmover.Locate, orphan
-// recovery, dispatch state, failure counts). Anything that is not a parseable
-// cycle dir is skipped; a missing processing/ is an empty list.
+// ProcessingCycleDirs lists the existing claim dirs in ascending cycle order.
 func ProcessingCycleDirs(inboxDir string) []string {
 	return CycleDirs(ProcessingDir(inboxDir))
 }
 
-// CycleDirs lists the cycle-<N> subdirectories of parent in ascending cycle
-// order — the ONE scan for every lifecycle directory the promoter nests by
-// cycle (processing/, processed/, rejected/). A missing parent is an empty
-// list, never an error: an absent lifecycle dir means no item ever reached it.
+// CycleDirs lists parent's cycle-<N> subdirectories in ascending cycle order; a missing parent yields nil.
 func CycleDirs(parent string) []string {
 	entries, err := os.ReadDir(parent)
 	if err != nil {

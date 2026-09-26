@@ -442,7 +442,7 @@ func (o *Orchestrator) reviewResumedDeliverable(
 	if err := recoverBeforeReview(); err != nil {
 		return resp, err
 	}
-	review := o.reviewer.Review(ctx, reviewInput(resp))
+	review := o.performEffectsAndReview(ctx, reviewInput(resp))
 	maxCorrections := (&cycleRun{o: o, cs: cs, retryConfig: o.retryConfig}).correctionLimitFor(phase, o.retryConfig.ContractCorrectionRetries)
 	for correction := 1; !review.Approve && correction <= maxCorrections; correction++ {
 		req.CorrectionDirective = composeCorrection(review.Reason, review.Remediation)
@@ -468,7 +468,7 @@ func (o *Orchestrator) reviewResumedDeliverable(
 		// Correction output is a fresh worktree mutation. Normalize it before
 		// re-running the reviewer so a newly sealed snapshot is final.
 		o.normalizeBuildWorktree(ctx, phase, cs, projectRoot)
-		review = o.reviewer.Review(ctx, reviewInput(resp))
+		review = o.performEffectsAndReview(ctx, reviewInput(resp))
 	}
 	if !review.Approve {
 		return resp, fmt.Errorf("resume review gate: phase %q deliverable rejected after %d correction(s): %s", phase, maxCorrections, review.Reason)

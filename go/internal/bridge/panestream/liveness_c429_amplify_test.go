@@ -7,18 +7,6 @@ import (
 	"testing"
 )
 
-// Adversarial amplification tests for ExtractResponseTokens (cycle-429).
-// Written by Test Amplifier — black-box, spec only: no implementation reading.
-//
-// Contract under test:
-//   ExtractResponseTokens(pane string) int
-//   - k-form:  "↓ 5.2k tokens" → 5200
-//   - plain:   "↓ 200 tokens"  → 200
-//   - peak:    returns max across all matches in pane
-//   - invalid: returns 0
-
-// TestExtractResponseTokens_Concurrent verifies no data race when many
-// goroutines call the exported function simultaneously.
 func TestExtractResponseTokens_Concurrent(t *testing.T) {
 	const workers = 20
 	pane := "↓ 3.0k tokens\n↓ 1.5k tokens\n↓ 4.0k tokens"
@@ -45,8 +33,6 @@ func TestExtractResponseTokens_Concurrent(t *testing.T) {
 	}
 }
 
-// TestExtractResponseTokens_KFormEdgeCases tests k-form boundary values not
-// covered by the TDD engineer's 14 baseline cases.
 func TestExtractResponseTokens_KFormEdgeCases(t *testing.T) {
 	cases := []struct {
 		name string
@@ -89,9 +75,6 @@ func TestExtractResponseTokens_KFormEdgeCases(t *testing.T) {
 	}
 }
 
-// TestExtractResponseTokens_PlainIntegerEdgeCases tests plain-integer boundary
-// values.  The old k-only extractor returned 0 for all of these — this is the
-// "superset" guarantee the unified function adds.
 func TestExtractResponseTokens_PlainIntegerEdgeCases(t *testing.T) {
 	cases := []struct {
 		name string
@@ -129,8 +112,6 @@ func TestExtractResponseTokens_PlainIntegerEdgeCases(t *testing.T) {
 	}
 }
 
-// TestExtractResponseTokens_MixedKFormAndPlainPeak verifies that peak selection
-// works correctly across both parse paths in a single pane.
 func TestExtractResponseTokens_MixedKFormAndPlainPeak(t *testing.T) {
 	cases := []struct {
 		name string
@@ -139,19 +120,16 @@ func TestExtractResponseTokens_MixedKFormAndPlainPeak(t *testing.T) {
 	}{
 		{
 			name: "plain_wins_over_k_form",
-			// 300 plain > 0.2k (200) → expect 300
 			pane: "↓ 0.2k tokens\n↓ 300 tokens",
 			want: 300,
 		},
 		{
 			name: "k_form_wins_over_plain",
-			// 1.5k (1500) > 200 plain → expect 1500
 			pane: "↓ 200 tokens\n↓ 1.5k tokens",
 			want: 1500,
 		},
 		{
 			name: "equal_values_both_forms",
-			// 1.0k == 1000 plain → expect 1000
 			pane: "↓ 1.0k tokens\n↓ 1000 tokens",
 			want: 1000,
 		},
@@ -171,8 +149,6 @@ func TestExtractResponseTokens_MixedKFormAndPlainPeak(t *testing.T) {
 	}
 }
 
-// TestExtractResponseTokens_NotMatchingFormats verifies that plausible-looking
-// but spec-non-conforming strings return 0, not a spurious value.
 func TestExtractResponseTokens_NotMatchingFormats(t *testing.T) {
 	cases := []struct {
 		name string
@@ -190,7 +166,7 @@ func TestExtractResponseTokens_NotMatchingFormats(t *testing.T) {
 			name: "bare_number_no_arrow",
 			pane: "5200 tokens",
 		},
-		// DISCOVERED: regex matches "arrow_no_space" (↓5.2k tokens) — more permissive than spec example but pre-429 behavior.
+		// "↓5.2k tokens" (no space) is deliberately absent: the regex accepts it.
 		{
 			name: "singular_token_word",
 			pane: "↓ 5.2k token",
@@ -218,9 +194,6 @@ func TestExtractResponseTokens_NotMatchingFormats(t *testing.T) {
 	}
 }
 
-// TestExtractResponseTokens_TokenLineBuriedInLongPane checks that the function
-// correctly extracts from a realistic multi-hundred-line pane where the token
-// line is not at the top.
 func TestExtractResponseTokens_TokenLineBuriedInLongPane(t *testing.T) {
 	var sb strings.Builder
 	for i := 0; i < 200; i++ {
@@ -238,8 +211,6 @@ func TestExtractResponseTokens_TokenLineBuriedInLongPane(t *testing.T) {
 	}
 }
 
-// TestExtractResponseTokens_MultipleIdenticalValues verifies that peak across
-// repeated identical token lines returns the value once, not an accumulated sum.
 func TestExtractResponseTokens_MultipleIdenticalValues(t *testing.T) {
 	pane := "↓ 500 tokens\n↓ 500 tokens\n↓ 500 tokens"
 	got := ExtractResponseTokens(pane)
@@ -249,8 +220,6 @@ func TestExtractResponseTokens_MultipleIdenticalValues(t *testing.T) {
 	}
 }
 
-// TestExtractResponseTokens_DecreasingSequence verifies that peak across a
-// strictly decreasing sequence still returns the first (largest) value.
 func TestExtractResponseTokens_DecreasingSequence(t *testing.T) {
 	pane := "↓ 2.0k tokens\n↓ 1.5k tokens\n↓ 1.0k tokens\n↓ 0.5k tokens"
 	got := ExtractResponseTokens(pane)
@@ -260,9 +229,6 @@ func TestExtractResponseTokens_DecreasingSequence(t *testing.T) {
 	}
 }
 
-// TestExtractResponseTokens_WindowsCRLF verifies correct extraction from pane
-// output that uses Windows-style line endings (\r\n), as tmux may emit these
-// on some hosts.
 func TestExtractResponseTokens_WindowsCRLF(t *testing.T) {
 	pane := "some pane output\r\n↓ 2.5k tokens\r\nmore output\r\n"
 	got := ExtractResponseTokens(pane)

@@ -1,30 +1,14 @@
 package profiles
 
-// deep_tier_family_arrangement_test.go — the 2026-08-26 operator directive:
-// deep/top-tier task types run on codex (gpt-5.6-sol — the 2026-09-09 gpt-6-astra cutover was withdrawn 2026-09-10 for token cost, at the directed rung — high since 2026-09-01; the model is pinned by bridge/codex_tier_map_test.go and effort by effort_defaults_test.go, not here), EXCEPT the two
-// adversarial checks whose independence from the codex builder is the
-// pipeline's anti-gaming core (cross-family floor: builder=codex ⇒ its graders
-// are another family) and the advisor brain. Pins the WHOLE arrangement so a
-// single-profile drift — either direction — is loud: a mover slipping back to
-// claude silently sheds sol leverage; auditor/adversarial-review slipping to
-// codex silently puts codex in judgment of codex.
-
 import (
 	"testing"
 )
 
 func TestDeepTierFamilyArrangement(t *testing.T) {
-	// The adversarial exceptions PROJECT from claudeFamilyFloor (the one home
-	// of "which phases stay off the builder's family and why" —
-	// family_floor_test.go); only the advisor brain is pinned here directly.
+	// The graders' exceptions come from claudeFamilyFloor; only the advisor is pinned here.
 	exceptions := map[string]string{
-		"router": "agy-tmux", // advisor brain — separate decision
+		"router": "agy-tmux",
 	}
-	// TrackedRealProfileNames is the package's ONE funnel over the live
-	// profiles dir: the runtime mints untracked stubs into the same directory,
-	// and a raw ReadDir scanner reds on state no CI checkout can see (the
-	// 2026-08-09 zero-ship batch, fingerprint cd49274beab2) — exactly the
-	// shape this test's first draft reintroduced.
 	loader, names := RealTreeProfiles(t)
 	checked := 0
 	for _, name := range names {
@@ -43,8 +27,6 @@ func TestDeepTierFamilyArrangement(t *testing.T) {
 			continue
 		}
 		if _, floored := claudeFamilyFloor[name]; floored {
-			// Family correctness (vs the live builder) is asserted by
-			// TestClaudeFamilyFloor's reverse direction — one home, projected.
 			continue
 		}
 		if p.CLI != "codex-tmux" {

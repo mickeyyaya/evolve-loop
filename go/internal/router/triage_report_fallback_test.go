@@ -2,13 +2,6 @@ package router
 
 import "testing"
 
-// triage_report_fallback_test.go — ADR-0076 slice A (A1): handoff-triage.json
-// has been extinct since ~cycle 215, so without a report fallback the triage
-// size signal is dead and every size-conditioned budget silently multiplies by
-// 1.0. triageFromReportFallback mirrors scoutFromReportFallback but is richer:
-// it extracts `cycle_size_estimate: <size>` from triage-report.md so
-// RoutingSignals.CycleSize() carries a real value on the live artifact path.
-
 func TestDigest_TriageFromReportFallback_ExtractsSize(t *testing.T) {
 	ws := t.TempDir()
 	writeFile(t, ws, "triage-report.md", "<!-- challenge-token: abc -->\n"+

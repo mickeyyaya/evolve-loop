@@ -1,11 +1,5 @@
 package dossier
 
-// sweep_result_test.go — apicover naming + field-semantics test for the
-// SweepResult type (flagged UNCOVERED: sweep_test.go exercises SweepOrphans
-// but never names the result type in its AST). One pass pins all three
-// fields' meanings against a real repo: a complete orphan pair is
-// Recommitted, a lone half-pair is Skipped, and a clean run leaves Failed
-// empty but non-nil (safe to range/assign into).
 import (
 	"io"
 	"testing"
@@ -20,9 +14,7 @@ func TestSweepResult_FieldsReportOnePassOutcome(t *testing.T) {
 	writePairFile(t, dir, "cycle-7.md", "# cycle 7\n")
 	writePairFile(t, dir, "cycle-8.json", `{"cycle":8}`) // lone half-pair
 
-	// Explicitly typed (not just `:=`): apicover requires the SweepResult
-	// identifier to appear in this package's test AST — collapsing this into
-	// the short declaration would re-flag the type as UNCOVERED.
+	// Typed explicitly so apicover sees the SweepResult identifier in the test AST.
 	var got SweepResult
 	got, err := SweepOrphans(gitexec.Default(dir), io.Discard)
 	if err != nil {

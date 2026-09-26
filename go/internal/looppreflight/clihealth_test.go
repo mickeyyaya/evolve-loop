@@ -20,7 +20,6 @@ func resolvedWithBenches(t *testing.T, entries []clihealth.Entry) resolved {
 	return o
 }
 
-// TestCheckCLIHealthPassWhenNoBenches: an empty bench store is a clean pass.
 func TestCheckCLIHealthPassWhenNoBenches(t *testing.T) {
 	t.Parallel()
 	res := checkCLIHealth(resolvedWithBenches(t, nil))
@@ -29,9 +28,6 @@ func TestCheckCLIHealthPassWhenNoBenches(t *testing.T) {
 	}
 }
 
-// TestCheckCLIHealthWarnsNamedFamilies: active benches surface as a WARN
-// naming the family, the until-time, and the fallback-first consequence —
-// never a Halt (the fallback chain exists for exactly this).
 func TestCheckCLIHealthWarnsNamedFamilies(t *testing.T) {
 	t.Parallel()
 	until := time.Date(2026, 6, 11, 6, 13, 0, 0, time.UTC)
@@ -48,8 +44,6 @@ func TestCheckCLIHealthWarnsNamedFamilies(t *testing.T) {
 	}
 }
 
-// TestCheckCLIHealthDefaultSeamReadsStore: the default seam reads the real
-// .evolve/cli-health.json under ProjectRoot.
 func TestCheckCLIHealthDefaultSeamReadsStore(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

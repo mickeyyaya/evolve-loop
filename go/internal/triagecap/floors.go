@@ -1,15 +1,5 @@
-// Package triagecap bounds per-cycle coverage-floor commitments by observed
-// builder throughput (R9; inbox coverage-floor-overpacking). Three consecutive
-// coverage cycles failed on the same shape — triage committing ~12 package
-// floors when the observed sustainable throughput is ~5 per builder turn
-// (cycle 281, the PASS baseline). The package has three parts:
-//
-//   - floors.go  — deterministic committed-floor counter over the triage
-//     artifact's ## top_n section (deferred/dropped floors do not count);
-//   - window.go  — the rolling throughput window persisted in
-//     state.json:triageThroughput (core.TriageThroughputEntry);
-//   - reviewer.go — the capacity clamp at the orchestrator's deliverable-
-//     review seam, rejecting overpacked triage through the correction ladder.
+// Package triagecap bounds per-cycle coverage-floor commitments by observed builder
+// throughput, and parses the triage report into floors, the decision companion and fleet seeds.
 package triagecap
 
 import (
@@ -25,58 +15,35 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// topNHeadingRE locates the committed-selection heading. The canonical
-// heading string comes from phasecontract.Triage (single source — the same
-// constant the triage phase's own classifier uses). The init guard turns a
-// future empty-Sections refactor into a named crash instead of a bare
-// index-out-of-range at package init.
+// init rejects an empty phasecontract.Triage.Sections. Package vars initialize before
+// init, so topNHeadingRE's index expression would panic first.
 func init() {
 	if len(phasecontract.Triage.Sections) == 0 {
 		panic("triagecap: phasecontract.Triage has no sections — topNHeadingRE cannot be constructed")
 	}
 }
 
+// topNHeadingRE anchors on phasecontract.Triage's canonical heading, the one the triage classifier uses.
 var topNHeadingRE = regexp.MustCompile(`(?m)^` + regexp.QuoteMeta(phasecontract.Triage.Sections[0].Canonical) + `\b`)
 
-// nextHeadingRE finds the next "## " section heading (section terminator).
 var nextHeadingRE = regexp.MustCompile(`(?m)^## `)
 
-// TriageDecisionName is the companion handoff file emitted beside the triage
-// artifact. It carries agent-owned declarations that are safer than prose.
+// TriageDecisionName is the companion file of agent-owned declarations written beside the triage artifact.
 func TriageDecisionName() string { return "triage-decision.json" }
 
-// listItemRE captures one Markdown list-item line's text.
 var listItemRE = regexp.MustCompile(`(?m)^[-*]\s+(\S.*)$`)
 
-// floorContextRE marks an item as coverage-floor-bearing: it must talk about
-// coverage (or a floor) AND name a percentage target. A bare percentage
-// ("reduce latency by 30%") is not a floor.
+// An item is floor-bearing only when it mentions coverage or a floor AND a percentage.
 var (
 	floorWordRE    = regexp.MustCompile(`(?i)coverage|floor`)
 	floorPercentRE = regexp.MustCompile(`\d+(?:\.\d+)?\s*%`)
 )
 
-// targetPercentRE marks a floor-TARGET percent — one the item explicitly
-// commits to with ≥ (or its ASCII spelling >=) or the "to N%" idiom ("raise
-// bridge coverage to 95%"). Evidence citations quote bare measured percents
-// ("core 83.1%", "matchExhausted 66.7%", "at 0%") and carry no target
-// marker. \b keeps "toward 93%" an aggregate, not a target. minimal: these
-// are the only committed-target spellings observed across the replay
-// corpus (281/283/298/301/448/449); extend here if triage grows another.
+// targetPercentRE marks a committed target: ≥N%, >=N% or "to N%" (\b keeps "toward N%" an aggregate).
+// Deliberately minimal: these are the only target spellings in the replay corpus; extend it if triage grows another.
 var targetPercentRE = regexp.MustCompile(`(?:(?:≥|>=)\s*|\bto\s+)\d+(?:\.\d+)?\s*%`)
 
-// CountCommittedFloors counts the coverage floors committed in the triage
-// artifact's ## top_n section. Each floor-bearing item contributes one floor
-// per distinct known package in floor-TARGET position (named in the clause
-// leading up to a ≥-marked percent — see floorTargetPackages), with a
-// minimum of one (an aggregate target like "toward 93%" is one floor).
-// Packages named only in evidence citations contribute nothing: cycles
-// 448/449 committed exactly three floors yet counted 7 because the
-// contract-mandated evidence sentences named other packages with
-// percentages — the gate punished what the eval-quality rules demand (F1).
-// Items in ## deferred / ## dropped contribute nothing — that is the point:
-// deferral is the relief valve the capacity clamp pushes overpacked floors
-// into.
+// CountCommittedFloors counts ## top_n floors: one per package in target position, at least one per floor item.
 func CountCommittedFloors(artifact string, knownPkgs []string) int {
 	body, ok := topNSection(artifact)
 	if !ok {
@@ -97,14 +64,8 @@ func CountCommittedFloors(artifact string, knownPkgs []string) int {
 	return total
 }
 
-// floorTargetPackages returns the distinct known packages in floor-TARGET
-// position in one item: named in the clause leading up to a ≥-marked
-// percent. A clause reaches back to the previous percent occurrence (or the
-// item start), so an earlier measurement citation never leaks into a later
-// target's clause, while list-style commitments ("floors core ≥85.0%,
-// audit ≥96.0%, bridge ≥94.5%") attribute each package to its own target.
-// Items whose floors carry no ≥ marker resolve to nil and fall back to the
-// min-1 aggregate rule in CountCommittedFloors.
+// floorTargetPackages returns the packages named in the clause ending at each target percent.
+// A clause starts after the previous percent, so an earlier measurement never leaks into a later target.
 func floorTargetPackages(item string, candidatePkgs []string) []string {
 	stripped := metadataFieldRE.ReplaceAllString(item, " ")
 	targets := targetPercentRE.FindAllStringIndex(stripped, -1)
@@ -132,9 +93,7 @@ func floorTargetPackages(item string, candidatePkgs []string) []string {
 	return pkgs
 }
 
-// ReadDeclaredFloors reads committed_floors from a triage-decision.json
-// companion. Missing files or missing fields are not errors: callers should
-// fall back to the prose counter for backward compatibility.
+// ReadDeclaredFloors reads committed_floors from the companion; a missing file or field is (nil, false, nil).
 func ReadDeclaredFloors(companionPath string) ([]string, bool, error) {
 	data, err := os.ReadFile(companionPath)
 	if err != nil {
@@ -158,9 +117,7 @@ func ReadDeclaredFloors(companionPath string) ([]string, bool, error) {
 	return floors, true, nil
 }
 
-// CommittedFloorCount is declaration-primary: if the companion declares
-// committed_floors, its length is authoritative. Otherwise the legacy prose
-// counter remains the fail-open fallback for older triage artifacts.
+// CommittedFloorCount is len(committed_floors) when the companion declares it, else the prose count.
 func CommittedFloorCount(artifact, companionPath string, knownPkgs []string) int {
 	if declared, ok, err := ReadDeclaredFloors(companionPath); err == nil && ok {
 		return len(declared)
@@ -168,12 +125,8 @@ func CommittedFloorCount(artifact, companionPath string, knownPkgs []string) int
 	return CountCommittedFloors(artifact, knownPkgs)
 }
 
-// CommittedFloorPackages returns the candidate packages committed as floors
-// this cycle — declaration-primary (committed_floors filtered to the
-// candidates), prose fallback otherwise. Gate C subtracts this set from the
-// deferred set so a package listed on BOTH sides resolves committed-wins:
-// a floor predicate on this cycle's own committed package is a legitimate
-// ratchet, never the cycle-280 starvation the gate exists to block.
+// CommittedFloorPackages returns the sorted candidate packages committed as floors, declaration first.
+// Gate C subtracts this set from the deferred one, so a package on both sides resolves committed-wins.
 func CommittedFloorPackages(artifact, companionPath string, candidatePkgs []string) []string {
 	if declared, ok, err := ReadDeclaredFloors(companionPath); err == nil && ok {
 		candidates := map[string]bool{}
@@ -203,16 +156,11 @@ func CommittedFloorPackages(artifact, companionPath string, candidatePkgs []stri
 	return pkgs
 }
 
-// MalformedCommittedFloorWarning returns a non-empty parse-error string when the
-// companion at companionPath is present but its JSON is malformed. Three cases:
-//
-//   - absent file           → "" (silent; backward compat)
-//   - present, field absent → "" (silent; backward compat)
-//   - present-but-malformed → non-empty string naming committed_floors + the parse error
+// MalformedCommittedFloorWarning names the parse error of a present-but-malformed companion; otherwise "".
 func MalformedCommittedFloorWarning(companionPath string) string {
 	data, err := os.ReadFile(companionPath)
 	if err != nil {
-		return "" // absent → silent
+		return ""
 	}
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(data, &raw); err != nil {
@@ -220,7 +168,7 @@ func MalformedCommittedFloorWarning(companionPath string) string {
 	}
 	field, ok := raw["committed_floors"]
 	if !ok {
-		return "" // field absent → silent
+		return ""
 	}
 	var floors []string
 	if err := json.Unmarshal(field, &floors); err != nil {
@@ -229,8 +177,7 @@ func MalformedCommittedFloorWarning(companionPath string) string {
 	return ""
 }
 
-// FloorDivergenceCorrective cross-checks prose floor package mentions against
-// committed_floors. It returns an actionable correction string, not a reject.
+// FloorDivergenceCorrective returns a satisfiable correction when prose floors and committed_floors disagree, else "".
 func FloorDivergenceCorrective(artifact, companionPath string, knownPkgs []string) string {
 	declared, ok, err := ReadDeclaredFloors(companionPath)
 	if err != nil || !ok {
@@ -263,9 +210,7 @@ func FloorDivergenceCorrective(artifact, companionPath string, knownPkgs []strin
 		strings.Join(proseOnly, ", "), strings.Join(declaredOnly, ", "))
 }
 
-// proseFloorPackages is target-scoped like CountCommittedFloors, so the
-// counted-package list in the reject reason and the divergence corrective
-// describe exactly what the counter attributed — never a superset of it.
+// proseFloorPackages is target-scoped like CountCommittedFloors, so reasons never list more than was counted.
 func proseFloorPackages(artifact string, knownPkgs []string) map[string]bool {
 	seen := map[string]bool{}
 	body, ok := topNSection(artifact)
@@ -284,85 +229,40 @@ func proseFloorPackages(artifact string, knownPkgs []string) map[string]bool {
 	return seen
 }
 
-// topNSection extracts the ## top_n body. Delegates to sectionBody (project.go),
-// the single home for "## heading"→body extraction.
 func topNSection(artifact string) (string, bool) {
 	return sectionBody(artifact, topNHeadingRE)
 }
 
-// tokenRE splits item text into identifier-like tokens. Hyphens are token
-// characters on purpose: a slug compound like "fake-config" is ONE token and
-// therefore not a mention of package "config", while path segments
-// ("adapters/bridge") and prose separators still split.
+// tokenRE keeps hyphens inside tokens, so a slug like "fake-config" is not a mention of package config.
 var tokenRE = regexp.MustCompile(`[A-Za-z0-9_-]+`)
 
-// metadataFieldRE strips the bullet contract's own metadata before package
-// matching: the contract REQUIRES every item to carry evidence=/source=scout
-// fields, and those literals collide with the real packages core/evidence and
-// phases/scout — every conformant bullet counted +2 phantom floors, which made
-// the cap's correction directive unsatisfiable (cycle 301: an honest 2-bullet
-// commitment counted 6, burned both corrections, failed the cycle). The
-// source=/priority= values are closed contract vocabulary, dropped whole;
-// defer_reason= is stripped to END OF LINE — defer reasons are free-form
-// scheduling prose that routinely references OTHER work ("co-scheduling
-// with the looppreflight blocker fix", cycle 310: that mention made Gate C
-// block the COMMITTED package's own predicates — a reason naming a package
-// is NOT a floor on that package). The evidence= VALUE is kept because
-// evidence pointers carry real package paths
-// ("evidence=go/internal/clihealth/clihealth.go"). RE2's ASCII \b also fires
-// after a hyphen, so a hypothetical slug like "low-priority=x" is stripped
-// too — that only ever undercounts (fail-open direction).
+// metadataFieldRE strips contract metadata, whose words (evidence, scout) are also package names.
+// defer_reason= goes to end of line because it names other work; the evidence= value stays because it names real packages.
 var metadataFieldRE = regexp.MustCompile(`\bdefer_reason=[^\n]*|\b(?:source|priority)=\S+|\bevidence=`)
 
-// filesFieldRE locates the START of a declared-footprint field; the VALUE is
-// delimited by span parsing (splitDeclaredFiles), not by \S+. The whole field is
-// removed from the item before ANY floor matching runs (floorItem) — a footprint
-// is the files the work will touch, never a coverage commitment. Left in place it
-// would (a) flip a non-floor card into a floor-bearing one whenever a declared
-// path contains "floor"/"coverage" (go/internal/triagecap/floors.go does), adding
-// a phantom committed floor straight into the capacity clamp, and (b) attribute
-// deferred floors to packages a card merely edits, so Gate C would block
-// predicates on them.
+// filesFieldRE finds only the start of a files= field; splitDeclaredFiles delimits its value.
 var filesFieldRE = regexp.MustCompile(`\bfiles\s*[=:]\s*`)
 
-// nextMetadataFieldRE finds the start of the next `, key=` metadata field, which
-// is what terminates a files= value (the tail is comma-separated `key=value`
-// pairs). Requiring the comma is what lets a files= value itself contain commas.
+// nextMetadataFieldRE ends a files= value at the next ", key=" field, which lets the value itself contain commas.
 var nextMetadataFieldRE = regexp.MustCompile(`,\s*[A-Za-z_][A-Za-z0-9_]*=`)
 
-// floorItem is the item text every floor matcher must see: the declared footprint
-// removed. The SINGLE place this stripping happens, so a new floor scan cannot
-// forget it (the four existing scans all route through here).
+// floorItem removes the declared footprint; every floor scan goes through it, because a footprint is never a floor.
 func floorItem(item string) string {
 	_, stripped := splitDeclaredFiles(item)
 	return stripped
 }
 
-// pathOnlyPkgs are packages whose basenames are also ordinary coverage prose;
-// they count only when slash-qualified ("internal/paths"), never as bare
-// tokens — cycle 298's "safety-critical paths" counted a phantom floor for
-// go/internal/paths and poisoned the throughput window (K=4, true K=1).
-// Each pattern requires a token boundary after the name (same character
-// class as tokenRE), so "internal/pathsX" is not a mention of "paths".
-// Matching runs on the metadata-stripped item, in which evidence= VALUES
-// survive — "evidence=go/internal/paths/util.go" therefore counts paths,
-// deliberately: that is a real package reference, the mirror image of the
-// prose phantom this list suppresses. Read-only after init.
+// pathOnlyPkgs are basenames that are also coverage prose ("error paths"); they count only slash-qualified.
 var pathOnlyPkgs = map[string]*regexp.Regexp{
 	"paths": regexp.MustCompile(`/paths(?:[^A-Za-z0-9_-]|$)`),
 }
 
-// mentionedPackages returns the candidate package names that appear as
-// whole tokens anywhere in the item text, after contract metadata is
-// stripped. Deferred/dropped scanning (deferred.go) stays mention-based on
-// purpose: those sections answer "which targets did triage push out", not
-// "what did triage commit to" — only committed counting is target-scoped.
+// mentionedPackages matches packages anywhere in the item; deferred scanning is mention-based, not target-scoped.
 func mentionedPackages(item string, candidatePkgs []string) []string {
 	return packagesInText(metadataFieldRE.ReplaceAllString(item, " "), candidatePkgs)
 }
 
-// packagesInText is the token matcher shared by mention-scoped and
-// target-scoped extraction; text must already be metadata-stripped.
+// packagesInText expects metadata-stripped text.
 func packagesInText(text string, candidatePkgs []string) []string {
 	tokens := map[string]bool{}
 	for _, tok := range tokenRE.FindAllString(text, -1) {
@@ -386,11 +286,8 @@ func packagesInText(text string, candidatePkgs []string) []string {
 	return pkgs
 }
 
-// KnownPackages enumerates Go package directory basenames under the repo's
-// go/internal and go/cmd trees — the vocabulary the floor counter matches
-// items against. Hidden directories (embedded .evolve worktrees) and
-// testdata are skipped. Best-effort: an unreadable tree yields a short list,
-// which only ever undercounts floors (fail-open direction).
+// KnownPackages lists Go package basenames under go/internal and go/cmd, skipping hidden dirs and testdata.
+// Best-effort: an unreadable tree yields a short list, which can only undercount floors.
 func KnownPackages(projectRoot string) []string {
 	seen := map[string]bool{}
 	for _, base := range []string{"go/internal", "go/cmd"} {

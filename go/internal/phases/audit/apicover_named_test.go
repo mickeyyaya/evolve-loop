@@ -121,6 +121,25 @@ func TestWithSignals_NamedOptionReachesTheGates(t *testing.T) {
 	}
 }
 
+type noHostEffects struct{}
+
+func (noHostEffects) Perform(context.Context, core.ReviewInput) error { return nil }
+
+func TestWithHostEffects_NamedOptionReachesTheEngine(t *testing.T) {
+	var opt Option = WithHostEffects(func() core.HostEffects { return noHostEffects{} })
+	var cfg Config
+	opt(&cfg)
+	if cfg.HostEffects == nil || cfg.HostEffects() != (noHostEffects{}) {
+		t.Fatal("WithHostEffects stores the accessor on the Config")
+	}
+	if !New(cfg).HostEffectsWired() {
+		t.Fatal("a Config with HostEffects builds a Phase whose engine performs them")
+	}
+	if NewDefaultWithStageCompactSpec(&fakeBridge{}, fakePromptsFS("body"), config.StageOff, false, nil).HostEffectsWired() {
+		t.Fatal("without the option the engine performs no host effects")
+	}
+}
+
 // TestWithContractVerifier_NamedOptionReachesTheEngine names the F22 export:
 // the Option stores the gate's verifier accessor on the Config, and a Phase
 // built from it reports the wiring the same way Signals does — the engine

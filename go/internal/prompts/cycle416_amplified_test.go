@@ -1,22 +1,5 @@
 package prompts
 
-// cycle416_amplified_test.go — Adversarial amplification for cycle-416 tasks.
-//
-// Probes gaps NOT covered by:
-//   intent_compaction_test.go (4 tests: ≥500B, 5-anchor check, ## Composition absent, synthetic anti-gaming),
-//   compaction_coverage_test.go (2 tests: all 7 agents strict-decrease, markerless unchanged),
-//   compact_marker_gate_test.go (bodyHasCompactMarker gate for 6 agents, excluding intent).
-//
-// New adversarial angles:
-//   - evolve-intent.md stripped body floor (≥5000B prevents over-stripping the behavior-bearing head)
-//   - Reflection Authoring anchor in stripped intent body (eval spec mandates it; not in the 5-anchor list)
-//   - Ask-when-Needed (AwN) classifier in stripped intent body (eval spec mandates; no Go test covers it)
-//   - ## Reference section absent after strip (build-report moved BOTH ## Composition and ## Reference below marker)
-//   - bodyHasCompactMarker gate applied to intent (TestAlwaysOnPhaseDocsHaveCompactMarker covers 6 agents not 7)
-//   - Tighter byte-savings bound ≥600B (build-report states ~650B; adversarially tighter than existing ≥500B)
-//   - Real-doc idempotency: strip applied twice to real evolve-intent.md (synthetic idempotency exists; real-doc does not)
-//   - evolve-intent.md file existence guard (TestAlwaysOnDocFilesExist covers 6 agents; intent is absent)
-
 import (
 	"os"
 	"path/filepath"
@@ -24,10 +7,6 @@ import (
 	"testing"
 )
 
-// TestIntentStrippedBodyFloor asserts that the stripped evolve-intent.md body retains at
-// least 5,000 bytes — guarding against over-stripping that would accidentally place required
-// operating instructions (IMKI, STOP CRITERION, Output contract, AwN classifier) below the
-// ## Reference Index marker.
 func TestIntentStrippedBodyFloor(t *testing.T) {
 	root := repoRoot(t)
 	raw, err := os.ReadFile(filepath.Join(root, "agents", "evolve-intent.md"))
@@ -45,13 +24,6 @@ func TestIntentStrippedBodyFloor(t *testing.T) {
 	}
 }
 
-// TestIntentCompaction_ReflectionAuthoringNotDeleted asserts that the Reflection Authoring
-// section still exists in the raw evolve-intent.md body (relocated, not deleted).
-//
-// Cycle-416 placed ## Reflection Authoring (v10.20.0+) above the marker.
-// Cycle-422 intentionally moves it BELOW the marker as on-demand reference — so checking
-// for it in the stripped body would fail correctly. This test guards the complementary
-// invariant: the section must still exist in the full document (relocated, not removed).
 func TestIntentCompaction_ReflectionAuthoringNotDeleted(t *testing.T) {
 	root := repoRoot(t)
 	raw, err := os.ReadFile(filepath.Join(root, "agents", "evolve-intent.md"))
@@ -67,11 +39,6 @@ func TestIntentCompaction_ReflectionAuthoringNotDeleted(t *testing.T) {
 	}
 }
 
-// TestIntentCompaction_AskWhenNeededAboveMarker asserts that the Ask-when-Needed (AwN)
-// classifier framework is present in the stripped evolve-intent.md body.
-//
-// Eval spec requires "AwN classifier" to survive strip (remain above the marker). No existing
-// Go test verifies this. The agent description confirms intent classifies goals via this framework.
 func TestIntentCompaction_AskWhenNeededAboveMarker(t *testing.T) {
 	root := repoRoot(t)
 	raw, err := os.ReadFile(filepath.Join(root, "agents", "evolve-intent.md"))
@@ -88,12 +55,6 @@ func TestIntentCompaction_AskWhenNeededAboveMarker(t *testing.T) {
 	}
 }
 
-// TestIntentCompaction_ReferenceSectionAbsentAfterStrip asserts that any "## Reference"
-// section heading (NOT the strip-marker heading "## Reference Index …") is absent from the
-// stripped evolve-intent.md body.
-//
-// Gap: TestIntentCompaction_ReferenceContentAbsentAfterStrip_Negative only verifies ## Composition.
-// The build-report states "## Composition and ## Reference sections relocated below marker".
 func TestIntentCompaction_ReferenceSectionAbsentAfterStrip(t *testing.T) {
 	root := repoRoot(t)
 	raw, err := os.ReadFile(filepath.Join(root, "agents", "evolve-intent.md"))
@@ -107,20 +68,12 @@ func TestIntentCompaction_ReferenceSectionAbsentAfterStrip(t *testing.T) {
 	stripped := StripOnDemandSections(body)
 	for _, line := range strings.Split(stripped, "\n") {
 		l := strings.TrimSpace(line)
-		// Match any "## Reference …" heading that is NOT the strip-marker itself.
 		if strings.HasPrefix(l, "## Reference") && !strings.HasPrefix(l, "## Reference Index") {
 			t.Errorf("reference section heading %q still appears in stripped body — must be relocated below ## Reference Index marker in evolve-intent.md", line)
 		}
 	}
 }
 
-// TestIntentHasCompactMarkerViaGate asserts that evolve-intent.md's body is recognized by
-// bodyHasCompactMarker — the same gate function used in TestAlwaysOnPhaseDocsHaveCompactMarker.
-//
-// Gap: TestAlwaysOnPhaseDocsHaveCompactMarker covers 6 per-cycle agents (scout, builder,
-// auditor, orchestrator, tdd-engineer, triage) but NOT evolve-intent, which was added in
-// cycle-416. TestAllPerCycleAgentsStrictlyCompact covers intent via length-decrease, not
-// via the bodyHasCompactMarker gate function itself.
 func TestIntentHasCompactMarkerViaGate(t *testing.T) {
 	root := repoRoot(t)
 	raw, err := os.ReadFile(filepath.Join(root, "agents", "evolve-intent.md"))
@@ -136,12 +89,6 @@ func TestIntentHasCompactMarkerViaGate(t *testing.T) {
 	}
 }
 
-// TestIntentCompaction_TighterBytesSavingThreshold asserts that stripping evolve-intent.md
-// saves at least 600 bytes — an adversarial tightening of the existing ≥500-byte threshold.
-//
-// The build-report states "~650 bytes saved (Composition + Reference sections below marker)".
-// A ≥600-byte threshold catches a regression where only ONE of the two sections was relocated
-// below the marker instead of both, yielding savings just above 500 but well below 600.
 func TestIntentCompaction_TighterBytesSavingThreshold(t *testing.T) {
 	root := repoRoot(t)
 	raw, err := os.ReadFile(filepath.Join(root, "agents", "evolve-intent.md"))
@@ -159,11 +106,6 @@ func TestIntentCompaction_TighterBytesSavingThreshold(t *testing.T) {
 	}
 }
 
-// TestIntentCompaction_RealDocIdempotent asserts that applying StripOnDemandSections twice
-// to the real evolve-intent.md body yields the same result as applying it once.
-//
-// Distinct from TestStripOnDemandSections_Idempotent (synthetic bodies only); exercises the
-// real production heading "## Reference Index (Layer 3, on-demand)" in the actual agent file.
 func TestIntentCompaction_RealDocIdempotent(t *testing.T) {
 	root := repoRoot(t)
 	raw, err := os.ReadFile(filepath.Join(root, "agents", "evolve-intent.md"))
@@ -181,12 +123,6 @@ func TestIntentCompaction_RealDocIdempotent(t *testing.T) {
 	}
 }
 
-// TestIntentAgentFileExists asserts that evolve-intent.md exists on disk and is non-empty.
-//
-// Guard against silent renames or deletions: TestAlwaysOnDocFilesExist covers 6 canonical
-// agents (scout, builder, auditor, orchestrator, tdd-engineer, triage) but NOT evolve-intent.
-// Without this guard, a missing evolve-intent.md causes the intent-specific tests above to
-// fail with a misleading I/O error rather than a clear description of what broke.
 func TestIntentAgentFileExists(t *testing.T) {
 	root := repoRoot(t)
 	path := filepath.Join(root, "agents", "evolve-intent.md")

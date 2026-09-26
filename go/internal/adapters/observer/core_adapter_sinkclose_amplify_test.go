@@ -8,9 +8,6 @@ import (
 	"time"
 )
 
-// amplFakeCloser records Close() calls/errors independently of any fixture
-// the existing RED suite may already define, so this file adds coverage
-// without depending on it.
 type amplFakeCloser struct {
 	mu       sync.Mutex
 	closed   int
@@ -74,7 +71,7 @@ func TestCloseSinkAfterWait_CloserErrorDoesNotPanic(t *testing.T) {
 }
 
 func TestCloseSinkAfterWait_NilDoneChannelAlwaysTimesOut(t *testing.T) {
-	var done chan struct{} // nil: blocks forever in select, must fall through to the timeout arm
+	var done chan struct{} // nil: never ready, so only the timeout arm can fire
 	fc := &amplFakeCloser{}
 	got := closeSinkAfterWait(done, 10*time.Millisecond, fc)
 	if got {
@@ -85,11 +82,6 @@ func TestCloseSinkAfterWait_NilDoneChannelAlwaysTimesOut(t *testing.T) {
 	}
 }
 
-// TestCloseSinkAfterWait_ConcurrentInvocations_NoRaceOnDistinctClosers exercises
-// the exact production shape the fix targets: many phases' Start() cancel
-// closures racing to wait+close concurrently in the batch dispatch path. Each
-// goroutine owns an independent done/closer pair; run with -race to catch any
-// shared mutable state closeSinkAfterWait might introduce.
 func TestCloseSinkAfterWait_ConcurrentInvocations_NoRaceOnDistinctClosers(t *testing.T) {
 	const n = 50
 	var wg sync.WaitGroup
@@ -101,7 +93,7 @@ func TestCloseSinkAfterWait_ConcurrentInvocations_NoRaceOnDistinctClosers(t *tes
 			done := make(chan struct{})
 			fc := &amplFakeCloser{}
 			if i%2 == 0 {
-				close(done) // half fire immediately
+				close(done)
 			}
 			if closeSinkAfterWait(done, 20*time.Millisecond, fc) {
 				atomic.AddInt64(&trueCount, 1)

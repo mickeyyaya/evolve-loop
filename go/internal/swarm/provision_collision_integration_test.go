@@ -11,11 +11,6 @@ import (
 	"testing"
 )
 
-// TestGitWorkerProvisioner_ConcurrentSiblingsNoCollision is the swarm mirror of
-// the core sibling-collision test: two worktrees of one repo each provision a
-// cycle-1 integration + worker branch under a SHARED base. Pre-runscope both
-// minted bare cycle-1-integration / cycle-1-w0 and collided on the global branch
-// namespace; with the per-root lane each sibling gets distinct names.
 func TestGitWorkerProvisioner_ConcurrentSiblingsNoCollision(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not on PATH")

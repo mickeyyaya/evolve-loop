@@ -1,12 +1,5 @@
 package router
 
-// failure_proposal_test.go — failure floor Phase 3: advisor failure-path
-// vocabulary. The Proposal gains LearningRichness ("full"|"memo") and
-// RecoveryAction ("retry"|"end"), applied ABOVE the deterministic floor:
-// the failure-adapter's BLOCK verdicts are non-overridable, richness can
-// only choose WHICH learning phase runs (never none), and every clamp is
-// recorded — same "LLM proposes, kernel disposes" shape as applyProposal.
-
 import (
 	"testing"
 
@@ -27,7 +20,6 @@ func blockHistory() []failureadapter.Entry {
 	}
 }
 
-// Advisor may end a retryable failure early (e.g. budget judgment).
 func TestRetroDecision_AdvisorChoosesEndOverRetry(t *testing.T) {
 	in := base("retro")
 	in.Strict = true
@@ -42,17 +34,14 @@ func TestRetroDecision_AdvisorChoosesEndOverRetry(t *testing.T) {
 	}
 }
 
-// Advisor may retry when the kernel default is proceed-to-end.
 func TestRetroDecision_AdvisorChoosesRetryOverEnd(t *testing.T) {
-	// Empty history → adapter PROCEED → end; the advisor upgrades to retry.
+	// Empty history makes the adapter PROCEED to end.
 	d := Route(base("retro"), &Proposal{RecoveryAction: "retry"})
 	if d.NextPhase != "tdd" {
 		t.Errorf("retro(proceed)+advisor-retry → %q, want tdd", d.NextPhase)
 	}
 }
 
-// Unrecognized recovery actions neither route nor enter the evidence —
-// they are clamped, keeping the kernel branch.
 func TestRetroDecision_UnknownRecoveryActionClamped(t *testing.T) {
 	in := base("retro")
 	in.Strict = true
@@ -76,8 +65,6 @@ func TestRetroDecision_UnknownRecoveryActionClamped(t *testing.T) {
 	}
 }
 
-// The load-bearing invariant: failure-adapter BLOCK is the floor — no
-// advisor proposal may resurrect a blocked cycle; the attempt is clamped.
 func TestRetroDecision_BlockVerdictNonOverridable(t *testing.T) {
 	in := base("retro")
 	in.Strict = true
@@ -101,9 +88,6 @@ func TestRetroDecision_BlockVerdictNonOverridable(t *testing.T) {
 	}
 }
 
-// On the retry path the advisor may localize first: fault-localization /
-// bug-reproduction precede tdd in canonical order, so the walk continues
-// naturally into the retry after they run.
 func TestRetroDecision_AdvisorInsertsFaultLocalization(t *testing.T) {
 	in := base("retro")
 	in.Strict = true
@@ -114,16 +98,12 @@ func TestRetroDecision_AdvisorInsertsFaultLocalization(t *testing.T) {
 		t.Errorf("retro(retry)+insert → %q, want fault-localization", d.NextPhase)
 	}
 
-	// Only failure-scoped phases may be inserted here.
 	d2 := Route(in, &Proposal{RecoveryAction: "retry", InsertPhases: []string{"ship"}})
 	if d2.NextPhase != "tdd" {
 		t.Errorf("retro(retry)+insert(ship) → %q, want tdd (non-failure insert ignored)", d2.NextPhase)
 	}
 }
 
-// Richness picks WHICH learning phase runs after an audit FAIL — never
-// none. "memo" routes the lightweight memo phase; anything else keeps
-// the full retrospective.
 func TestAuditFail_AdvisorChoosesMemoOverFullRetro(t *testing.T) {
 	in := base("audit")
 	in.Verdict = "FAIL"
@@ -145,8 +125,6 @@ func TestAuditFail_AdvisorChoosesMemoOverFullRetro(t *testing.T) {
 	}
 }
 
-// Floor invariant: richness can choose memo only when memo is enabled;
-// a disabled memo phase keeps the full retrospective (clamped, recorded).
 func TestAuditFail_RichnessNeverSuppressesLearning(t *testing.T) {
 	in := base("audit")
 	in.Verdict = "FAIL"
@@ -161,8 +139,6 @@ func TestAuditFail_RichnessNeverSuppressesLearning(t *testing.T) {
 		t.Errorf("suppressed memo choice must record a clamp; got %+v", d.Clamps)
 	}
 
-	// Retrospective disabled entirely (→ end): the memo proposal still
-	// must not vanish silently — evidence + clamp survive.
 	in.Cfg.PhaseEnable["retrospective"] = config.EnableOff
 	d2 := Route(in, &Proposal{LearningRichness: "memo"})
 	if got := d2.Evidence["learning_richness"]; got != "memo" {
@@ -173,9 +149,6 @@ func TestAuditFail_RichnessNeverSuppressesLearning(t *testing.T) {
 	}
 }
 
-// The retro transition is a branch transition: under a plan-driven
-// advisory cycle the proposer must be consulted there (failure paths are
-// exactly where new objective signals appear).
 func TestShouldPropose_RetroIsBranchTransition(t *testing.T) {
 	in := base("retro")
 	in.Plan = &PhasePlan{Entries: []PhasePlanEntry{{Phase: "build", Run: true}}}
@@ -184,9 +157,6 @@ func TestShouldPropose_RetroIsBranchTransition(t *testing.T) {
 	}
 }
 
-// Phase 4a: the audit-FAIL route comes from ONE surface —
-// policy.json:failure_floor — not the deprecated env-flag enable chain.
-// Policy wins when both are set.
 func TestAuditFail_RoutesPerFailurePolicyNotEnableVar(t *testing.T) {
 	auditFail := func() RouteInput {
 		in := base("audit")
@@ -195,7 +165,6 @@ func TestAuditFail_RoutesPerFailurePolicyNotEnableVar(t *testing.T) {
 		return in
 	}
 
-	// Deprecated env-flag path says OFF — policy must still win.
 	t.Run("memo route beats enable-chain off", func(t *testing.T) {
 		in := auditFail()
 		in.Cfg.AuditFailRoutesTo = "memo"
@@ -216,9 +185,6 @@ func TestAuditFail_RoutesPerFailurePolicyNotEnableVar(t *testing.T) {
 		}
 	})
 
-	// Policy already routed memo and the advisor proposes memo richness:
-	// the proposal AGREES with the decision — evidence recorded, but a
-	// clamp here would be forensic noise (nothing was forced).
 	t.Run("memo route with agreeing memo proposal records no clamp", func(t *testing.T) {
 		in := auditFail()
 		in.Cfg.AuditFailRoutesTo = "memo"
@@ -234,7 +200,6 @@ func TestAuditFail_RoutesPerFailurePolicyNotEnableVar(t *testing.T) {
 		}
 	})
 
-	// Unset (legacy) keeps the deprecated enable-chain behavior.
 	t.Run("legacy path unset falls back to enable-chain", func(t *testing.T) {
 		in := auditFail()
 		in.Cfg.PhaseEnable["retrospective"] = config.EnableOff

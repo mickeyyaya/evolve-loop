@@ -1,11 +1,5 @@
 package policy
 
-// failurefloor_test.go — failure floor Phase 4a: .evolve/policy.json is
-// the ONE user surface for failure-learning policy (replacing the
-// scattered env-flag/registry/config/router enable chain). The
-// deterministic floor itself is NON-configurable — failure_floor only
-// tunes the LLM-learning richness and the audit-FAIL route.
-
 import (
 	"os"
 	"path/filepath"
@@ -14,7 +8,6 @@ import (
 
 func TestFailurePolicy_DefaultsAlwaysLearn(t *testing.T) {
 	t.Parallel()
-	// Zero policy (no failure_floor key) → full learning, retrospective.
 	alwaysLearn, route := Policy{}.FailurePolicy()
 	if !alwaysLearn {
 		t.Error("always_learn must default to true")

@@ -11,14 +11,9 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
-// White-box, fast-tier coverage of mergeWith, the gitexec-backed core behind
-// ExecGitMerger.Merge. The real-git path stays covered by
-// mergetrain_adversarial_test.go; these pin the exact invocation + the
-// conflict-aborts-and-wraps-ErrMergeConflict contract via fixtures.FakeExec.
-
 func TestMergeWith_Success(t *testing.T) {
 	t.Parallel()
-	fake := &fixtures.FakeExec{} // merge succeeds (zero value)
+	fake := &fixtures.FakeExec{}
 	g := gitexec.Git{Dir: "/integ", Exec: fake.Run}
 
 	if err := mergeWith(context.Background(), g, "worker-branch"); err != nil {
@@ -44,7 +39,6 @@ func TestMergeWith_Conflict_AbortsAndWrapsErr(t *testing.T) {
 	if !errors.Is(err, ErrMergeConflict) {
 		t.Fatalf("err = %v, want it to wrap ErrMergeConflict", err)
 	}
-	// A failed merge MUST abort so the integration tip is left clean.
 	if keys := fake.CallKeys(); !reflect.DeepEqual(keys, []string{"git merge", "git merge"}) {
 		t.Fatalf("calls = %v, want [git merge, git merge] (merge then merge --abort)", keys)
 	}

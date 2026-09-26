@@ -5,42 +5,8 @@ import (
 	"testing"
 )
 
-// family_floor_test.go — the claude-family FLOOR (2026-09-02 operator
-// directive: rebalance claude/codex usage; claude is the quota-constrained
-// family). claudeFamilyFloor is the ONE home of "which phases stay claude and
-// why" — the deep-tier arrangement guard projects its exceptions from this
-// map rather than restating it (2026-09-02 architecture review: the belief
-// briefly had three homes, one self-contradicting).
-//
-// THE HONEST PREDICATE (stated because the tree falsifies the tempting one):
-// this floor is NOT "everything that feeds a blocking verdict". The residual
-// claude set is: the two ADVERSARIAL graders whose judgment of build CONTENT
-// must be cross-family (anti-gaming core), the test author (anti-cooperative
-// -bias family split from the builder), and the two spec verifiers
-// (audit-side verification of build output). Verdict-DECLARING mechanical
-// gates — merge-to-main-gate, coverage-gate — are deliberately on codex:
-// their verdicts are deterministic measurements the host re-verifies, not
-// adversarial judgment. The classify.require_sections("Verdict") discriminator
-// exists in phase.json but deliberately does NOT map onto this floor.
-//
-// Every floor entry keeps its cli_fallback INSIDE the floor family ON PURPOSE
-// (claude-p behind claude-tmux — a driver-level rescue for a boot or artifact
-// timeout, 2026-09-14 operator policy "try every available CLI before giving
-// up"): a claude-quota halt on a floored phase still fails loudly, because the
-// "obvious" operator remedy — adding a codex fallback to the auditor — silently
-// puts codex in judgment of codex on every fallback dispatch. The guard binds
-// cli, cli_fallback, AND allowed_clis (the policy-pin validator's enforcement
-// surface, mirrored per the tdd-engineer precedent) so no plane can breach the
-// floor quietly.
-//
-// Tier and effort facts live with their own guards
-// (deep_tier_family_arrangement_test.go, effort_defaults_test.go), never
-// restated here. Runtime-minted audit-side stubs
-// (pre-audit-evidence-check, production-path-wiring-proof,
-// defect-disposition-*, inherited-defect-reconcile, ship-stage-hygiene-check)
-// are UNTRACKED runtime-plane state — RealTreeProfiles filters them by design
-// (the 2026-08-09 zero-ship class); their family is the minting registrar's
-// contract, not this guard's.
+// claudeFamilyFloor lists the phases that must stay off the builder's CLI
+// family, each with its reason. See ADR-0104.
 var claudeFamilyFloor = map[string]string{
 	"auditor":            "adversarial grading of build content — cross-family anti-gaming core",
 	"adversarial-review": "adversarial grading of build content — cross-family anti-gaming core",
@@ -49,9 +15,8 @@ var claudeFamilyFloor = map[string]string{
 	"spec-verify":        "audit-side verification of build output",
 }
 
-// family reduces a driver name to its CLI family (claude-tmux and a future
-// claude-p are the same family for floor purposes). Local mirror of
-// policy.BaseCLI semantics — importing internal/policy here would cycle.
+// family reduces a driver name to its CLI family. It mirrors policy.BaseCLI
+// because importing internal/policy here would create an import cycle.
 func family(cli string) string {
 	if i := strings.IndexByte(cli, '-'); i > 0 {
 		return cli[:i]
@@ -59,16 +24,8 @@ func family(cli string) string {
 	return cli
 }
 
-// TestClaudeFamilyFloor holds both directions, value-free against the live
-// builder so a future builder flip cannot make the floor self-contradictory:
-//
-//	forward: a claude-family profile outside the floor is unjustified spend on
-//	         the quota-constrained family (2026-09-02: 24 such moved to codex,
-//	         triage included — the every-cycle spine win);
-//	reverse: every floor entry must resolve, must NOT share the builder's
-//	         family (on cli, on every cli_fallback entry, and on every
-//	         allowed_clis entry — the policy-pin plane), and must keep the
-//	         loud-failure empty fallback.
+// It compares against the live builder's family, not a literal, so a builder
+// flip cannot make the floor contradict itself.
 func TestClaudeFamilyFloor(t *testing.T) {
 	loader, names := RealTreeProfiles(t)
 	builder, err := loader.Get("builder")

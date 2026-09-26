@@ -1,21 +1,6 @@
-// Package looppreflight is the pre-batch environment-readiness gate for
-// `evolve loop`. It runs BEFORE the first cycle dispatches and verifies the
-// pipeline can actually run: every spine phase has a factory + deliverable
-// contract, the profiles load and name known drivers, the LLM CLIs are present,
-// the host has the capabilities the bridge needs, and — the check that matters
-// most — each configured *-tmux CLI's REPL really boots.
-//
-// Motivation (cycle-258): a 3-cycle batch churned ~30 min before anyone
-// discovered the bridge could not boot the CLI (exit 80 = ExitREPLBootTimeout).
-// This gate catches that at batch start and aborts with a clear diagnostic so a
-// doomed run never costs a cycle.
-//
-// Design: a DETERMINISTIC host-side gate, NOT an LLM agent phase — an env-check
-// agent would have to run THROUGH the very bridge it is meant to verify
-// (chicken-and-egg), and environment verification is deterministic work. It
-// mirrors the releasepreflight blueprint (Options → Run → Result, nil→default
-// seams) but ACCUMULATES every check result before deciding, so the operator
-// sees all problems at once. The overall verdict halts iff any check halts.
+// Package looppreflight is the deterministic readiness gate `evolve loop` runs
+// before the first cycle: it accumulates every check and halts iff any halts.
+// See docs/architecture/packages/internal-looppreflight.md.
 package looppreflight
 
 import (
@@ -38,21 +23,19 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
 )
 
-// CheckLevel is a check's severity. Ordered so the worst level across a set of
-// checks is simply the maximum (LevelHalt > LevelWarn > LevelPass).
+// CheckLevel is a check's severity, ordered so the worst of a set is the maximum.
 type CheckLevel int
 
 const (
-	// LevelPass — the check found nothing wrong.
+	// LevelPass means the check found nothing wrong.
 	LevelPass CheckLevel = iota
-	// LevelWarn — a degraded-but-runnable condition; surfaced, never blocking.
+	// LevelWarn is a degraded but runnable condition; it never blocks.
 	LevelWarn
-	// LevelHalt — a hard readiness gap; the batch must not start.
+	// LevelHalt is a readiness gap; the batch must not start.
 	LevelHalt
 )
 
-// String renders the level as the stable lowercase token used in JSON and the
-// human summary.
+// String returns the stable lowercase token used in JSON and the summary.
 func (l CheckLevel) String() string {
 	switch l {
 	case LevelPass:
@@ -66,9 +49,7 @@ func (l CheckLevel) String() string {
 	}
 }
 
-// CheckResult is one check's outcome. Message is a one-line headline; Detail
-// carries the multi-line diagnostic (the gap list, the probe trail, the boot
-// scrollback tail) the operator needs to act.
+// CheckResult is one check's outcome: a one-line Message and a multi-line Detail.
 type CheckResult struct {
 	Name    string
 	Level   CheckLevel
@@ -76,102 +57,67 @@ type CheckResult struct {
 	Detail  string
 }
 
-// Result is the accumulated outcome of a Run. OverallLevel is the max level
-// across Checks; Halted() reports whether the batch must abort.
+// Result is the accumulated outcome of a Run; OverallLevel is the maximum check level.
 type Result struct {
 	Checks       []CheckResult
 	ChecksPassed int
 	ChecksTotal  int
 	OverallLevel CheckLevel
 	GeneratedAt  string
-	CLIVersions  map[string]string // CLI binary → version string; populated by drift check
+	CLIVersions  map[string]string // CLI binary → version token
 }
 
 // Halted reports whether any check halted (the batch must not start).
 func (r Result) Halted() bool { return r.OverallLevel == LevelHalt }
 
-// DefaultSpinePhases are the agent phases a real cycle always dispatches; each
-// must have BOTH a registered factory and a deliverable contract or the loop
-// cannot run.
+// DefaultSpinePhases are the phases every cycle dispatches; each needs a factory and a contract.
 var DefaultSpinePhases = []string{"build", "scout", "tdd", "audit", "intent", "triage"}
 
-// Options drives a Run. Seam fields default to real implementations when nil so
-// production callers pass only the paths, while tests inject deterministic
-// lookups and never touch the real registry/driver/profile-dir state.
+// Options drives a Run; every nil seam defaults to the real implementation.
 type Options struct {
-	ProjectRoot string // required; the harness faults if empty
-	ProfileDir  string // .evolve/profiles dir; drives the default profile seams
-	EvolveDir   string // .evolve dir; used by later host-capability checks
+	ProjectRoot string // required
+	ProfileDir  string // read only by the default profile seams
+	EvolveDir   string // default ProjectRoot/.evolve
 	Stderr      io.Writer
 	Now         func() time.Time
 
 	SkipBoot   bool          // run the cheap checks but skip the real bridge boot
-	BootBudget time.Duration // per-driver boot deadline (default 90s)
+	BootBudget time.Duration // per-driver boot deadline; default DefaultBootBudget
 
-	// Pipeline-structure seams.
-	// SpinePhases: nil OR an explicit empty slice both fall back to
-	// DefaultSpinePhases. (The integration test passes []string{} to skip the
-	// phase-wiring check when the test binary has no phases registered.)
-	SpinePhases   []string                                    // default DefaultSpinePhases
-	FactoryKnown  func(name string) bool                      // default registry.For
-	ContractKnown func(name string) bool                      // default phasecontract.For
-	ProfileLister func() ([]string, error)                    // default profiles.NewFromDir(ProfileDir).List
-	ProfileGetter func(name string) (profiles.Profile, error) // default ...Get
-	DriverKnown   func(cli string) bool                       // default bridge.LookupDriver
+	SpinePhases   []string // nil or empty → DefaultSpinePhases
+	FactoryKnown  func(name string) bool
+	ContractKnown func(name string) bool
+	ProfileLister func() ([]string, error)
+	ProfileGetter func(name string) (profiles.Profile, error)
+	DriverKnown   func(cli string) bool
 
-	// CLI / host-capability seams.
-	ProbeCLI      func(bin string) (doctor.Result, error) // default doctor.Probe
-	HostProbe     func() preflight.Profile                // default preflight.Probe(ProjectRoot)
-	SandboxMode   func() string                           // EVOLVE_SANDBOX mode (test seam; default os.Getenv)
-	DirWritable   func(dir string) bool                   // default real touch-probe
-	DiskFreeBytes func(path string) (uint64, error)       // default statfs; error → disk check skipped
-	// OrphanKill is the killer handed to the boot orphan sweep (deadline-bound
-	// via sessionreaper.DefaultReapTimeout). Default swarm.ExecTmuxKill;
-	// injected because preflight is untestable against a real tmux server.
-	OrphanKill swarm.TmuxKiller
+	ProbeCLI      func(bin string) (doctor.Result, error)
+	HostProbe     func() preflight.Profile
+	SandboxMode   func() string // the EVOLVE_SANDBOX value
+	DirWritable   func(dir string) bool
+	DiskFreeBytes func(path string) (uint64, error) // an error skips the low-disk warning
+	OrphanKill    swarm.TmuxKiller                  // used by the boot orphan sweep
 
-	// Verified-fallback (sandbox.nested_fallback) seams.
-	// NestedFallbackStage gates the write-canary that verifies the OUTER
-	// environment confines source-writing phases when the inner sandbox is
-	// skipped under nesting. Resolved from policy at the composition root via
-	// parseGateStage; the zero value (StageOff) disables the canary.
+	// NestedFallbackStage is the sandbox.nested_fallback stage; the zero value (StageOff) disables the canary.
 	NestedFallbackStage config.Stage
-	// SandboxCanaryProbe reports whether a write OUTSIDE the inner sandbox's
-	// allow-list was BLOCKED by the outer environment (true = confined/verified).
-	// Default: defaultSandboxCanary(ProjectRoot). Tests inject a deterministic
-	// verdict to avoid touching the real filesystem.
+	// SandboxCanaryProbe reports true when the outer environment denied an out-of-allowlist write.
 	SandboxCanaryProbe func() bool
 
-	// BootTester really boots one *-tmux driver's REPL (boot-only, no prompt)
-	// under the supplied context and returns its bridge exit code + scrollback.
-	// Default wraps bridge.BootSmokeTest (mirrors `evolve doctor boot`).
+	// BootTester boots one *-tmux driver's REPL without a prompt and returns the bridge exit code and scrollback.
 	BootTester func(ctx context.Context, driver string, sandbox bool) (rc int, scrollback string)
 
-	// CLI-version-freeze seams (ADR-0044 C5).
-	// SelfUpdateEvidence reports whether bin self-updates on launch, plus the
-	// host evidence found. A non-nil error means the evidence was
-	// UNVERIFIABLE (ambiguity → Warn), distinct from a clean absence.
-	// Default: the known-updater registry (codex → ~/.codex/version.json).
+	// SelfUpdateEvidence reports whether bin self-updates on launch; an error means unverifiable (Warn).
 	SelfUpdateEvidence func(bin string) (bool, string, error)
-	// PinnedLister lists version-frozen package names. Default:
-	// `brew list --pinned`; an error is treated as ambiguity (Warn).
+	// PinnedLister lists version-frozen package names; an error is ambiguity (Warn).
 	PinnedLister func() ([]string, error)
 
-	// CLIHealthActive lists CLI families with an ACTIVE bench (classified
-	// transient wall, e.g. rate_limit). Default reads
-	// .evolve/cli-health.json via the clihealth store.
+	// CLIHealthActive lists the CLI families with an active bench.
 	CLIHealthActive func() []clihealth.Entry
 
-	// VersionInventory returns the current CLI version map (bin→version string).
-	// Default: captures versions of all distinct profile CLI binaries via
-	// captureVersionInventory. Tests inject a deterministic map closure to avoid
-	// shelling out to real CLIs.
+	// VersionInventory returns the current CLI binary → version map.
 	VersionInventory func() map[string]string
 
-	// PhaseRoutingWarnings returns the warnings phasespec produced while merging
-	// user phases into the built-in catalog (dropped hijack overlays, malformed
-	// phase.json, non-optional overrides). Default: phasespec.MergedCatalog with
-	// a swallowed load error (fail-open). Tests inject a deterministic closure.
+	// PhaseRoutingWarnings returns the user-phase specs phasespec dropped while merging the catalog.
 	PhaseRoutingWarnings func() []string
 }
 
@@ -212,8 +158,7 @@ type resolved struct {
 	phaseRoutingWarnings func() []string
 }
 
-// DefaultBootBudget is the per-driver REPL boot deadline (mirrors the
-// `evolve doctor boot` 90s timeout).
+// DefaultBootBudget is the per-driver REPL boot deadline, matching `evolve doctor boot`.
 const DefaultBootBudget = 90 * time.Second
 
 func resolve(opts Options) (resolved, error) {
@@ -329,7 +274,7 @@ func resolve(opts Options) (resolved, error) {
 		o.phaseRoutingWarnings = defaultPhaseRoutingWarnings(o.projectRoot)
 	}
 	if o.versionInventory == nil {
-		// Capture versions lazily so the closure sees the final resolved state.
+		// Resolved after the profile seams so the closure binds the final lister and getter.
 		lister, getter := o.profileLister, o.profileGetter
 		o.versionInventory = func() map[string]string {
 			seen := map[string]struct{}{}
@@ -347,10 +292,7 @@ func resolve(opts Options) (resolved, error) {
 	return o, nil
 }
 
-// Run executes every readiness check, accumulates the results, and returns the
-// combined verdict. The error return is reserved for HARNESS faults (e.g. an
-// empty ProjectRoot); a failed check lives in the Result as a halt, never an
-// error — the caller inspects Result.Halted().
+// Run executes every check; a failed check halts in the Result, and err reports only harness faults.
 func Run(opts Options) (Result, error) {
 	o, err := resolve(opts)
 	if err != nil {
@@ -373,7 +315,6 @@ func Run(opts Options) (Result, error) {
 	return r, nil
 }
 
-// finalize folds the per-check results into the overall Result.
 func finalize(checks []CheckResult, now time.Time) Result {
 	r := Result{
 		Checks:       checks,

@@ -1,12 +1,5 @@
 package config_test
 
-// defaults_parity_test.go — the two-source gate defaults (config.defaults()
-// vs policy's compiled accessors, applied unconditionally over config's at the
-// root) are a replicated belief acs/cycle34 records in prose; this is the
-// consumer pin that turns it into a tested one (ADR-0103 unit 08 test 36; F6
-// unifies them once the operator picks the winner). External test package so
-// it can import policy (policy imports config).
-
 import (
 	"reflect"
 	"strings"
@@ -16,8 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// jsonTag is the name half of a struct field's `json:"name,omitempty"` tag —
-// the spelling .evolve/policy.json actually carries for that field.
 func jsonTag(t *testing.T, typ reflect.Type, field string) string {
 	t.Helper()
 	f, ok := typ.FieldByName(field)
@@ -27,13 +18,6 @@ func jsonTag(t *testing.T, typ reflect.Type, field string) string {
 	return strings.Split(f.Tag.Get("json"), ",")[0]
 }
 
-// TestPolicyStages_KeysMatchPolicyJSONTags — the nine policy keys
-// ApplyPolicyStages names in CONFIG_UNKNOWN_VALUE (fields.key and the message)
-// are a SECOND home of policy.json's spellings; this is their consumer pin:
-// each must equal <section tag on policy.Policy>.<field tag on the block>
-// (architecture-review fold, ADR-0103 unit 08). A policy rename that leaves
-// config's label behind would otherwise point a triage at a key that no
-// longer exists.
 func TestPolicyStages_KeysMatchPolicyJSONTags(t *testing.T) {
 	policyType := reflect.TypeOf(policy.Policy{})
 	dials := []struct {
@@ -53,8 +37,7 @@ func TestPolicyStages_KeysMatchPolicyJSONTags(t *testing.T) {
 	}
 	for _, d := range dials {
 		wantKey := jsonTag(t, policyType, d.section) + "." + jsonTag(t, d.block, d.blockField)
-		// Every stage word valid ("off") except the one under test, so exactly
-		// one warning fires and it must carry policy.json's own spelling.
+		// Every stage word is valid except the one under test, so exactly one warning fires.
 		ps := config.PolicyStages{ContractGate: "off", EvalGate: "off", TriageCapGate: "off", TopNGate: "off", ReviewGate: "off", PhaseRecovery: "off", SpineFloor: "off", FatalPane: "off", RouterReplan: "off", ParallelEvaluate: "off"}
 		reflect.ValueOf(&ps).Elem().FieldByName(d.stagesField).SetString("typo")
 		_, ws := config.New().ApplyPolicyStages(config.RoutingConfig{}, ps)

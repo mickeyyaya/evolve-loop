@@ -8,45 +8,19 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
-// PoolConfig configures a rolling lane pool (cycle-550 supervisor-continuous-
-// lane-keeping). Target is the width the pool tries to hold — up to Target lanes
-// run at once, drawn incrementally from the backlog. Concurrency optionally caps
-// the live-lane count below Target (<=0 ⇒ follow Target); it never raises the cap
-// above Target.
+// PoolConfig sets the width a rolling pool holds; a positive Concurrency may only lower it below Target.
 type PoolConfig struct {
 	Target      int
 	Concurrency int
 }
 
-// PoolTransition is the data backing the caller-formatted "lanes live: N/target"
-// telemetry line, emitted on every live-lane-count change. This package stays
-// I/O-free (same idiom as FleetConfig.Warnings) — the caller formats/logs it.
+// PoolTransition is the live-lane count the caller formats as "lanes live: N/target".
 type PoolTransition struct {
 	Live   int
 	Target int
 }
 
-// RunPool maintains up to cfg.Target concurrently-running lanes drawn from
-// backlog and BACKFILLS a replacement the instant any lane exits (PASS or FAIL),
-// instead of the wave barrier's "wait for every sibling before re-planning". It
-// removes the min-over-time width collapse Supervisor.Run suffers when lane
-// durations are skewed (batch bh1rt946t: one early exit stranded the wave 1-wide).
-//
-// Selection: the initial fill dispatches disjoint todos in backlog order (the
-// SAME file-ownership rule Partition applies statically, here applied
-// INCREMENTALLY against the currently-RUNNING set). On any lane exit it selects
-// the highest-Priority pending todo whose Files are disjoint from every
-// STILL-RUNNING lane's Files (lowest backlog index breaks ties) and dispatches it
-// as a replacement, without waiting for any sibling. When no disjoint candidate
-// exists the pool simply runs fewer lanes — never zero while pending work
-// remains, never the unisolated in-supervisor sequential path (per L4, every
-// dispatch goes through the same isolated `launch` seam as Supervisor.Run).
-//
-// onTransition (nil-safe) fires on every live-lane-count change. Result.Index
-// indexes into backlog. A zero-length backlog returns immediately with zero
-// results and zero launch calls (the pool-mode analogue of the wave path's
-// empty-plan guard). RunPool returns once every backlog item has been dispatched
-// and has finished.
+// RunPool keeps up to cfg.Target file-disjoint lanes running, backfilling as each exits; Result.Index indexes backlog.
 func RunPool(ctx context.Context, cfg PoolConfig, backlog []Todo, launch LaunchFn, onTransition func(PoolTransition)) []Result {
 	results := make([]Result, len(backlog))
 	if len(backlog) == 0 || launch == nil {
@@ -58,7 +32,7 @@ func RunPool(ctx context.Context, cfg PoolConfig, backlog []Todo, launch LaunchF
 		limit = cfg.Concurrency
 	}
 	if limit < 1 {
-		limit = 1 // never a zero-width pool while backlog remains
+		limit = 1
 	}
 
 	pending := make(map[int]bool, len(backlog))
@@ -89,11 +63,8 @@ func RunPool(ctx context.Context, cfg PoolConfig, backlog []Todo, launch LaunchF
 		}
 		running++
 		emit()
-		// The rendezvous gives each admitted lane a chance to run before another
-		// slot is filled. It orders goroutine admission, not launch callback entry:
-		// the scheduler may pause the lane after its send and run a later callback
-		// first. Pool correctness comes from claiming files and incrementing running
-		// before the goroutine starts, so it does not depend on callback order.
+		// Correctness comes from claiming files and counting the lane before its goroutine
+		// starts; the rendezvous and Gosched are hints and do not order launch callbacks.
 		started := make(chan struct{})
 		go func() {
 			started <- struct{}{}
@@ -102,19 +73,15 @@ func RunPool(ctx context.Context, cfg PoolConfig, backlog []Todo, launch LaunchF
 			completions <- idx
 		}()
 		<-started
-		// Yield so the admitted lane can advance toward launch. This is a scheduling
-		// hint only; launch callbacks remain concurrent and unordered.
 		runtime.Gosched()
 	}
 
-	// Initial fill: dispatch disjoint todos in backlog order up to the cap.
 	for i := 0; i < len(backlog) && running < limit; i++ {
 		if pending[i] && disjoint(i) {
 			dispatch(i)
 		}
 	}
 
-	// Roll: on each lane exit, free its files and backfill by highest Priority.
 	for running > 0 {
 		idx := <-completions
 		for f := range normalizeFiles(backlog[idx].Files) {
@@ -133,9 +100,7 @@ func RunPool(ctx context.Context, cfg PoolConfig, backlog []Todo, launch LaunchF
 	return results
 }
 
-// selectDisjoint returns the highest-Priority pending todo whose files are
-// disjoint from every running lane (lowest backlog index breaks ties), or -1 when
-// no pending todo can be co-scheduled with the current running set.
+// selectDisjoint returns the highest-Priority disjoint pending todo (lowest index on ties), or -1.
 func selectDisjoint(backlog []Todo, pending map[int]bool, disjoint func(int) bool) int {
 	best := -1
 	for i := range backlog {
@@ -149,10 +114,7 @@ func selectDisjoint(backlog []Todo, pending map[int]bool, disjoint func(int) boo
 	return best
 }
 
-// poolSpec builds the isolated launch spec for one backlog todo. It mirrors
-// PlanCycles' single-todo scope (Scope + Env[FleetScopeKey]) and forces
-// EVOLVE_FLEET on exactly as Supervisor.launchOne does, so a pool dispatch is the
-// SAME isolated seam as the wave path — never the unisolated sequential fallback.
+// poolSpec builds the same scoped fleet-mode spec a wave launch gets, so a pool lane is equally isolated.
 func poolSpec(td Todo, width int) CycleSpec {
 	env := map[string]string{
 		ipcenv.FleetScopeKey: td.ID,

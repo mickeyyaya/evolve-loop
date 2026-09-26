@@ -11,6 +11,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
+// setupStorageWithCS writes cs through storage, which mirrors run.json into cs.WorkspacePath; a test
+// that sets a workspace gives it a writable t.TempDir() path even when the decision never reads it.
 func setupStorageWithCS(t *testing.T, cs core.CycleState) (*storage.FilesystemStorage, string) {
 	t.Helper()
 	dir := t.TempDir()
@@ -35,13 +37,6 @@ func setupStorageNoCS(t *testing.T) (*storage.FilesystemStorage, string) {
 	return storage.New(evolveDir), evolveDir
 }
 
-// Phase is the port of scripts/guards/phase-gate-precondition.sh.
-// Phase-1 rule subset:
-//   - When cycle-state.json reports an active cycle, the Agent tool
-//     is denied (in-process Agent calls bypass subagent-run.sh's
-//     audit-binding contract).
-//   - Outside an active cycle, Agent passes through.
-//   - Constructor-injected bypass=true bypasses.
 func TestPhase_Name(t *testing.T) {
 	g := NewPhase(nil, false)
 	if g.Name() != "phase" {

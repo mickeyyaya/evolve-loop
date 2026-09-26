@@ -9,22 +9,10 @@ import (
 	"strings"
 )
 
-// deferred.go — R9.3: the deferred/dropped floor vocabulary. Triage's
-// ## deferred and ## dropped sections are where the capacity clamp pushes
-// overpacked floors; a TDD floor predicate that binds one of THOSE packages
-// gates work the cycle never committed to (the cycle-280 failure mode).
-
-// deferredHeadingRE matches the section headings whose floor items are out
-// of this cycle's committed scope. The headings carry free-form suffixes
-// ("## deferred (carry to NEXT cycle's carryoverTodos)") and models
-// occasionally capitalise them, so match by word, case-insensitively.
+// deferredHeadingRE matches by word, case-insensitively: models add suffixes and sometimes capitalize the headings.
 var deferredHeadingRE = regexp.MustCompile(`(?mi)^## (?:deferred|dropped)\b`)
 
-// DeferredFloorPackages returns the distinct candidate packages (sorted)
-// mentioned by floor-bearing items in the artifact's ## deferred and
-// ## dropped sections. candidatePkgs is the vocabulary to match — typically
-// the floor-predicate target packages the caller extracted, so the result
-// is exactly "which of these targets did triage push out of this cycle".
+// DeferredFloorPackages returns the sorted candidates mentioned by floor items in ## deferred and ## dropped.
 func DeferredFloorPackages(artifact string, candidatePkgs []string) []string {
 	seen := map[string]bool{}
 	for _, loc := range deferredHeadingRE.FindAllStringIndex(artifact, -1) {
@@ -53,9 +41,7 @@ func DeferredFloorPackages(artifact string, candidatePkgs []string) []string {
 	return pkgs
 }
 
-// ReadDeferredFloors reads deferred_floors from a triage-decision.json
-// companion. Missing files or missing fields are not errors: callers should
-// fall back to the prose scanner for backward compatibility.
+// ReadDeferredFloors reads deferred_floors from the companion; a missing file or field is (nil, false, nil).
 func ReadDeferredFloors(companionPath string) ([]string, bool, error) {
 	data, err := os.ReadFile(companionPath)
 	if err != nil {
@@ -79,10 +65,7 @@ func ReadDeferredFloors(companionPath string) ([]string, bool, error) {
 	return floors, true, nil
 }
 
-// DeferredFloorPackagesDecl is declaration-primary: if the companion declares
-// deferred_floors, the declared packages filtered to candidatePkgs are
-// authoritative. Otherwise the legacy prose scanner remains the fail-open
-// fallback for older triage artifacts.
+// DeferredFloorPackagesDecl returns declared deferred_floors filtered to candidatePkgs, else the prose scan.
 func DeferredFloorPackagesDecl(artifact, companionPath string, candidatePkgs []string) []string {
 	if declared, ok, err := ReadDeferredFloors(companionPath); err == nil && ok {
 		return filterDeclaredPackages(declared, candidatePkgs)
@@ -90,16 +73,11 @@ func DeferredFloorPackagesDecl(artifact, companionPath string, candidatePkgs []s
 	return DeferredFloorPackages(artifact, candidatePkgs)
 }
 
-// MalformedDeferredFloorWarning returns a non-empty parse-error string when the
-// companion at companionPath is present but its JSON is malformed. Three cases:
-//
-//   - absent file           → "" (silent; backward compat)
-//   - present, field absent → "" (silent; backward compat)
-//   - present-but-malformed → non-empty string naming deferred_floors + the parse error
+// MalformedDeferredFloorWarning names the parse error of a present-but-malformed companion; otherwise "".
 func MalformedDeferredFloorWarning(companionPath string) string {
 	data, err := os.ReadFile(companionPath)
 	if err != nil {
-		return "" // absent → silent
+		return ""
 	}
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(data, &raw); err != nil {
@@ -107,7 +85,7 @@ func MalformedDeferredFloorWarning(companionPath string) string {
 	}
 	field, ok := raw["deferred_floors"]
 	if !ok {
-		return "" // field absent → silent
+		return ""
 	}
 	var floors []string
 	if err := json.Unmarshal(field, &floors); err != nil {
@@ -116,8 +94,7 @@ func MalformedDeferredFloorWarning(companionPath string) string {
 	return ""
 }
 
-// DeferredFloorDivergence cross-checks prose deferred package mentions against
-// deferred_floors. It returns an actionable correction string, not a reject.
+// DeferredFloorDivergence returns a satisfiable correction when prose deferrals and deferred_floors disagree, else "".
 func DeferredFloorDivergence(artifact, companionPath string, knownPkgs []string) string {
 	declared, ok, err := ReadDeferredFloors(companionPath)
 	if err != nil || !ok {

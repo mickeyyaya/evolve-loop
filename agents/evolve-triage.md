@@ -257,13 +257,16 @@ For each `.evolve/inbox/*.json` (maxdepth 1):
    `.classification` matches `code-(build|audit)-fail`. Count ≥ 2 → **escalate-block**:
    record in `escalate_block[]`; proceed to next file.
 
-4. **Claim the file** (atomic hand-off to this cycle):
-   `evolve inbox-mover claim "$id" "$CYCLE"`
-   Exit 3 = console-routed refusal (ADR-0074): the item is operator-owned —
-   record it in `escalate_block[]` with reason "console-routed" and do NOT
-   select it into `top_n`.
-   If claim exits non-zero: log WARN in `## Inbox Errors`, skip this file (another
-   cycle may be processing it). If claim succeeds, proceed to Step 0 validation.
+4. **The claim is the host's** (atomic hand-off to this cycle, F36): after you
+   finish, the host claims every id you commit (`top_n` minus `deferred`, or your
+   lane's pin) into `processing/cycle-$CYCLE/` through the same floor as
+   `evolve inbox-mover claim "$id" "$CYCLE"`, and the gate verifies the claim.
+   You need not run it; it is idempotent if you do, and it is how you learn
+   whether an item can be drawn. Exit 3 = console-routed refusal (ADR-0074):
+   the item is operator-owned — record it in `escalate_block[]` with reason
+   "console-routed" and do NOT select it into `top_n`. Any other non-zero exit:
+   log WARN in `## Inbox Errors` and skip this file (another cycle may hold it).
+   Then proceed to Step 0 validation.
 
 Emit machine-readable arrays in the companion `triage-decision.json` (see Step 4):
 `skip_shipped[]`, `skip_rejected[]`, `escalate_block[]`, `top_n[]`, `committed_floors[]`.
@@ -289,7 +292,7 @@ Before reading the main inputs, ingest any pending files from `.evolve/inbox/`:
 1. List `.evolve/inbox/*.json` (maxdepth 1; skip `processed/` and `rejected/` subdirs).
 2. Parse each file; malformed JSON → log `inbox-malformed-json` WARN in `## Inbox Errors`, reject.
 6. Transform to reconcile-compatible schema: set `defer_count=0`, `cycles_unpicked=0`, `first_seen_cycle=last_seen_cycle=<N>`; wrap operator metadata in `_inbox_source`.
-7. Append to in-memory carryoverTodos working set. (File move is handled by Step 0a's claim call + ship.sh's post-commit promote — do NOT manually mv files here.)
+7. Append to in-memory carryoverTodos working set. (File moves are the host's: the claim of your committed ids after you finish (Step 0a.4) and the post-commit promote — do NOT manually mv files here.)
 8. Write ledger entry: `role=triage, action=ingest-inbox, count=<ingested>, rejected=<rejected>`.
 
 Honor `weight` as tie-breaker within priority class (default 0.5 when null). Full algorithm: [agents/evolve-triage-reference.md](agents/evolve-triage-reference.md). Proceed to Step 1 regardless of inbox count (inbox may be empty).

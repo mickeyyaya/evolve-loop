@@ -1,29 +1,15 @@
 package router
 
-// PlanRejection reports one structural problem ValidatePlan found in an advisory
-// whole-cycle plan. It is pure telemetry — ValidatePlan NEVER mutates the plan,
-// so the integrity floor (ClampPlanToFloorWith) remains the sole disposer. Reason
-// is a stable token for metrics; Detail is the human one-liner. Phase is empty
-// for whole-plan problems (e.g. an empty plan).
+// PlanRejection is one problem found in a plan, or one clamp, as recorded in advisor-rejections.json.
+// Phase is empty for a whole-plan problem.
 type PlanRejection struct {
 	Phase  string
-	Reason string // empty-plan | unknown-phase | duplicate-phase | ship-skips-audit
+	Reason string // a stable token, e.g. empty-plan | unknown-phase | duplicate-phase | ship-skips-audit
 	Detail string
 }
 
-// ValidatePlan reports structural problems in an advisory whole-cycle plan
-// (ADR-0052 WS2-S1; research principle P6 — validate before clamp). It is PURE
-// and REPORT-ONLY: it never mutates the plan, never widens the run-set, and sits
-// strictly ABOVE the integrity floor — ClampPlanToFloorWith still runs last,
-// unconditionally, as the sole trust boundary. The orchestrator uses the
-// rejections for telemetry (WS2-S2) and, once the re-plan is at advisory, to
-// refuse a malformed re-plan back to the prior clamped plan rather than acting
-// on garbage.
-//
-// Mint-aware (must-fix): a phase minted IN THIS PLAN counts as known, never
-// "unknown". Checks, in order: empty plan; per entry — duplicate name, unknown
-// name; and finally a run:true ship while audit is not scheduled (the floor will
-// force audit, but surfacing the advisor's intent keeps the decision debuggable).
+// ValidatePlan reports structural problems in a plan without changing it; ClampPlanToFloorWith
+// stays the sole disposer. A phase minted in this plan counts as known.
 func ValidatePlan(in RouteInput, plan *PhasePlan) []PlanRejection {
 	if plan == nil || len(plan.Entries) == 0 {
 		return []PlanRejection{{Reason: "empty-plan", Detail: "plan has no entries"}}
@@ -55,15 +41,7 @@ func ValidatePlan(in RouteInput, plan *PhasePlan) []PlanRejection {
 	return rej
 }
 
-// PlanMismatch reports whether the MEASURED signals materially diverge from what
-// the plan scheduled (ADR-0052 WS2-S4; research P4 TAPE — mismatch-triggered
-// replanning). It is true ONLY when an optional phase whose insert_when trigger
-// now FIRES on the measured signals is NOT scheduled in the plan — i.e. the
-// initial plan (composed with empty signals) missed a need the post-scout
-// measurement reveals. It reuses triggerFires (the exact insert_when eval the
-// kernel walks), so the mismatch threshold can never disagree with the trigger.
-// A fired trigger the plan ALREADY covers is not a mismatch (re-planning would be
-// churn); a nil plan ⇒ no mismatch. PURE.
+// PlanMismatch reports whether a trigger now fires for a phase the plan does not run, the signal to re-plan.
 func PlanMismatch(in RouteInput, plan *PhasePlan) bool {
 	if plan == nil {
 		return false
@@ -76,11 +54,8 @@ func PlanMismatch(in RouteInput, plan *PhasePlan) bool {
 	return false
 }
 
-// knownPhaseSet is the set of phase names a plan may legitimately reference: the
-// built-in canonical order, the configured walk order + mandatory + trigger +
-// conditional phases (which already include any catalog phases spliced in at the
-// composition root), and — mint-aware — the phases minted in THIS plan. Reusing
-// in.Cfg avoids a parallel notion of "known phase" drifting from the walk.
+// knownPhaseSet is every phase a plan may reference. It is deliberately generous, because the
+// unknown-phase drop must never delete a legitimate phase.
 func knownPhaseSet(in RouteInput, plan *PhasePlan) map[string]struct{} {
 	known := make(map[string]struct{}, len(canonicalOrder)+len(in.Cfg.Order)+len(plan.MintPhases))
 	add := func(names ...string) {
@@ -92,11 +67,7 @@ func knownPhaseSet(in RouteInput, plan *PhasePlan) map[string]struct{} {
 	}
 	add(canonicalOrder...)
 	add(in.Cfg.Order...)
-	// The catalog the advisor was OFFERED: a phase we showed it as selectable is
-	// legitimate by construction, so it can never be "unknown". Cfg.Order already
-	// carries these in production (the composition root splices both the registry
-	// and .evolve/phases/ into it), making this defense in depth — the drop must
-	// never delete a phase the plan prompt itself advertised.
+	// A phase the plan prompt offered is known by construction, even though Cfg.Order carries it too.
 	for _, c := range in.Catalog {
 		add(c.Name)
 	}
@@ -110,9 +81,7 @@ func knownPhaseSet(in RouteInput, plan *PhasePlan) map[string]struct{} {
 	for _, m := range plan.MintPhases {
 		add(m.Name)
 	}
-	// Second minting channel: a phase minted INLINE on its own entry
-	// (PhasePlanEntry.Mint) is just as legitimate as one in plan.MintPhases —
-	// missing it would make the floor's drop delete the advisor's own mints.
+	// Phases minted inline on their own entry, the second minting channel.
 	for _, e := range plan.Entries {
 		if e.Mint != nil {
 			add(e.Phase)

@@ -6,12 +6,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 )
 
-// skip_when_gates_plan_test.go — cycle-1140, optional-phase-ev-gating-by-cycle-class.
-// Before this gate, the Advisory+plan branch of shouldRun returned planRuns()
-// directly, so an advisor-inserted optional ran on EVERY cycle class regardless
-// of any configured skip_when. The ACS predicates live behind the `acs` build
-// tag; these keep the behaviour in the default suite.
-
 func routeC1140(t *testing.T, cycleSize, triggerPhase string, block config.RoutingBlock) RouterDecision {
 	t.Helper()
 	return Route(RouteInput{
@@ -40,8 +34,6 @@ func TestShouldRun_SkipWhenGatesAdvisorPlanByCycleClass(t *testing.T) {
 		SkipWhen: []config.Condition{{Field: "cycle_size", Op: "eq", Value: "trivial"}},
 	}
 
-	// Condition holds → the optional is declined AND recorded, so the
-	// routing-plan artifact cites the skip instead of silently dropping it.
 	dec := routeC1140(t, "trivial", "coverage-gate", trivialSkip)
 	if dec.NextPhase == "coverage-gate" {
 		t.Errorf("NextPhase = %q on a trivial cycle, want the optional gated", dec.NextPhase)
@@ -59,22 +51,15 @@ func TestShouldRun_SkipWhenGatesAdvisorPlanByCycleClass(t *testing.T) {
 		t.Errorf("Clamps = %v, want a skip-when-gates-plan entry (the forensic trail)", dec.Clamps)
 	}
 
-	// Condition does NOT hold → the plan still governs. Guards against a "fix"
-	// that just disables optionals.
 	if dec = routeC1140(t, "medium", "coverage-gate", trivialSkip); dec.NextPhase != "coverage-gate" {
 		t.Errorf("NextPhase = %q on a medium cycle, want \"coverage-gate\"", dec.NextPhase)
 	}
 
-	// No skip_when configured → the gate is inert even on a trivial cycle: it
-	// comes from config, never a Go literal about cycle class.
 	if dec = routeC1140(t, "trivial", "coverage-gate", config.RoutingBlock{}); dec.NextPhase != "coverage-gate" {
 		t.Errorf("NextPhase = %q with no skip_when, want \"coverage-gate\"", dec.NextPhase)
 	}
 }
 
-// TestShouldRun_SkipWhenNeverReachesFloorPhase is the integrity-floor negative:
-// `ship ⇒ build ∧ audit ∧ (tdd unless trivial)` is non-configurable, so a
-// skip_when aimed at a floor phase must never become a floor bypass.
 func TestShouldRun_SkipWhenNeverReachesFloorPhase(t *testing.T) {
 	dec := routeC1140(t, "trivial", "audit", config.RoutingBlock{
 		SkipWhen: []config.Condition{{Field: "cycle_size", Op: "eq", Value: "trivial"}},

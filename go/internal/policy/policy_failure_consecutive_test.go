@@ -2,9 +2,6 @@ package policy
 
 import "testing"
 
-// Pins the compiled default for the consecutive-failures halt (operator
-// directive 2026-08-10) and its per-threshold merge override.
-
 func TestDefaultConsecutiveFailuresHaltCeilingIsThree(t *testing.T) {
 	if got := DefaultSystemFailurePolicy().Thresholds.ConsecutiveFailuresHaltCeiling; got != 3 {
 		t.Fatalf("compiled default ConsecutiveFailuresHaltCeiling = %d, want 3", got)

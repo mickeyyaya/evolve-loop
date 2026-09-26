@@ -46,7 +46,6 @@ func TestChain_DeniesBroken(t *testing.T) {
 	_ = l.Append(context.Background(), core.LedgerEntry{Role: "scout", Cycle: 1})
 	_ = l.Append(context.Background(), core.LedgerEntry{Role: "build", Cycle: 1})
 
-	// Tamper to break the chain.
 	path := filepath.Join(dir, "ledger.jsonl")
 	raw, _ := os.ReadFile(path)
 	tampered := strings.Replace(string(raw), `"role":"scout"`, `"role":"FORGED"`, 1)
@@ -62,8 +61,7 @@ func TestChain_DeniesBroken(t *testing.T) {
 	}
 }
 
-// A fake ledger that returns a non-chain-broken error — guard should
-// still deny (it doesn't try to distinguish error kinds).
+// erroringLedger fails Verify with an error unrelated to a broken chain.
 type erroringLedger struct{}
 
 func (e *erroringLedger) Append(_ context.Context, _ core.LedgerEntry) error { return nil }

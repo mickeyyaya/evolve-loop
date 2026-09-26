@@ -1,14 +1,5 @@
 package fleet
 
-// wave_disjoint_test.go — fleet-s3-guards AC4 (cycle 467): the WAVE-LEVEL
-// disjointness regression pin. TestPartition_CrossBucketFileDisjoint pins the
-// invariant at the bucket level only; nothing pinned it on the []CycleSpec
-// output of PlanWaves / PlanFromTriage — the shape the wave launcher actually
-// consumes (scout Key Finding 5). These are regression pins over EXISTING
-// behavior (expected pre-existing GREEN once the package compiles): if a
-// future change lets two specs of one wave share a file, concurrent lanes
-// would collide on the shared tree at ship time.
-
 import (
 	"strings"
 	"testing"
@@ -16,9 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
-// specFiles maps a spec's scoped todo IDs back to the files those todos
-// declared, so disjointness is asserted on FILES (the collision unit), not
-// just IDs.
 func specFiles(t *testing.T, spec CycleSpec, byID map[string]Todo) map[string]bool {
 	t.Helper()
 	files := map[string]bool{}
@@ -34,8 +22,6 @@ func specFiles(t *testing.T, spec CycleSpec, byID map[string]Todo) map[string]bo
 	return files
 }
 
-// assertWaveFileDisjoint fails if any file is reachable from two DISTINCT
-// specs of the same wave.
 func assertWaveFileDisjoint(t *testing.T, wave []CycleSpec, byID map[string]Todo) {
 	t.Helper()
 	owner := map[string]int{}
@@ -49,11 +35,6 @@ func assertWaveFileDisjoint(t *testing.T, wave []CycleSpec, byID map[string]Todo
 	}
 }
 
-// TestPlanWaves_WaveLevelFileDisjoint: within ONE wave, todos that
-// (transitively) share a file must land in the SAME spec — never spread
-// across two concurrently-launched specs. A file MAY reappear in a LATER
-// wave (dependency-ordered, runs after the earlier wave lands): the
-// invariant is per-wave, not global.
 func TestPlanWaves_WaveLevelFileDisjoint(t *testing.T) {
 	todos := []Todo{
 		{ID: "a", Files: []string{"f1.go"}},
@@ -76,9 +57,6 @@ func TestPlanWaves_WaveLevelFileDisjoint(t *testing.T) {
 	for wi, wave := range waves {
 		assertWaveFileDisjoint(t, wave, byID)
 		if wi == 0 {
-			// a,b,c share files transitively → exactly one spec; d is disjoint →
-			// its own spec. A wave that merged everything into one spec would
-			// hide the concurrency; one that split a/b/c would collide.
 			if len(wave) != 2 {
 				t.Fatalf("wave 0: len(specs) = %d, want 2 (merged {a,b,c} + {d})", len(wave))
 			}
@@ -86,11 +64,6 @@ func TestPlanWaves_WaveLevelFileDisjoint(t *testing.T) {
 	}
 }
 
-// TestPlanFromTriage_WaveLevelFileDisjoint: PlanFromTriage's single-wave
-// []CycleSpec output must never scope the same todo id (== file scope; each
-// triage todo's Files is its own id) into two specs, even when the decision
-// repeats an id across its sources — the duplicate must collapse, not
-// co-schedule.
 func TestPlanFromTriage_WaveLevelFileDisjoint(t *testing.T) {
 	decision := []byte(`{"committed_floors":["bridge","core","bridge","audit"]}`)
 	specs, _, err := PlanFromTriage(decision, []string{"core"}, 3, nil)

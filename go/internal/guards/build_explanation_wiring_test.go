@@ -8,11 +8,7 @@ import (
 	"testing"
 )
 
-// explanationLifecycleCallPins is the SINGLE list of "this function must call
-// that explanation-lifecycle callee" pins. It is package-level (not a local
-// literal) so integrity_surface_explanation_callsites_test.go can project the
-// SAME belief into a call-site scanner's vocabulary — a pin that lives only
-// inside one test function's body cannot be read by another test.
+// explanationLifecycleCallPins is package-level so the call-site scanner's vocabulary reads the same pins.
 var explanationLifecycleCallPins = []struct {
 	path     string
 	function string
@@ -30,11 +26,7 @@ var explanationLifecycleCallPins = []struct {
 	{"../core/resume_execution.go", "run", "projectBuildExplanation"},
 }
 
-// explanationLifecycleAssignPins is the companion list for a callee that
-// reaches the lifecycle by VALUE (a struct-literal field assignment) rather
-// than a bare call. expressionName still resolves a wrapped call expression
-// (e.g. `RequireSandbox: requiresExplanationSandbox(phase, req)`) to the
-// called function's name, so this list also feeds the call-site vocabulary.
+// explanationLifecycleAssignPins pins lifecycle values wired by struct-literal field; they feed the vocabulary too.
 var explanationLifecycleAssignPins = []struct {
 	path, function, field, value string
 }{

@@ -7,16 +7,6 @@ import (
 	"testing"
 )
 
-// topn_width_amplified_test.go — cycle-541 test-amplification lane for
-// WidenTopNToFleetWidth (inbox triage-supply-disjoint-topn-for-fleet-width).
-// Authored black-box from the exported godoc contract and test-report.md's
-// builder contract (preserve committed verbatim; count<2 no-op; backfill
-// highest-weight-first skipping duplicate-ID/file-overlap; never fabricate a
-// colliding lane) — not from topn_width.go's implementation. These probe
-// boundaries the RED predicates (TestC541_004..006) did not exercise:
-// negative counts, nil/empty inputs, multi-file partial overlap, duplicate
-// IDs inside the backlog itself, mutation safety, and large-scale backfills.
-
 func c541ampCand(id string, weight float64, files ...string) FleetCandidate {
 	return FleetCandidate{ID: id, Weight: weight, Files: append([]string(nil), files...)}
 }
@@ -136,7 +126,7 @@ func TestC541Amp_BackfillsHighestWeightFirstAmongDisjoint(t *testing.T) {
 func TestC541Amp_SkipsBacklogCandidateOverlappingCommittedFiles(t *testing.T) {
 	committed := []FleetCandidate{c541ampCand("committed-1", 1.0, "shared/pkg.go")}
 	backlog := []FleetCandidate{
-		c541ampCand("colliding-high-weight", 0.95, "shared/pkg.go"), // overlaps committed
+		c541ampCand("colliding-high-weight", 0.95, "shared/pkg.go"),
 		c541ampCand("disjoint-lower-weight", 0.4, "other/pkg.go"),
 	}
 	got := WidenTopNToFleetWidth(committed, backlog, 2)
@@ -323,7 +313,7 @@ func TestC541Amp_CommittedAlreadyAtCount_BacklogNotConsumed(t *testing.T) {
 		c541ampCand("committed-2", 0.1, "b.go"),
 	}
 	backlog := []FleetCandidate{
-		c541ampCand("higher-weight-disjoint", 99.0, "z.go"), // higher weight, fully disjoint
+		c541ampCand("higher-weight-disjoint", 99.0, "z.go"),
 	}
 	got := WidenTopNToFleetWidth(committed, backlog, 2)
 	if len(got) != 2 || c541ampContainsID(got, "higher-weight-disjoint") {

@@ -5,13 +5,6 @@ import (
 	"testing"
 )
 
-// WS5-S1 (ADR-0052): RenderRecipeProjection is the generate side of the
-// single-source goal-type recipe projection (P10). It renders the recipe SSOT
-// (cfg.GoalRecipes) into the persona's "Goal-Type Recipes" table body — one row
-// per goal type, sorted for determinism, tokens joined with " → ". The persona
-// table is drift-locked against this output (WS5-S2) and the RecipeVerifier
-// reads the same source, killing the three-source recipe drift (gap #3).
-
 func TestRenderRecipeProjection_FromConfig(t *testing.T) {
 	recipes := map[string][]string{
 		"bugfix":       {"fault-localization", "bug-reproduction", "[tdd, build]", "coverage-gate"},
@@ -43,8 +36,6 @@ func TestRenderRecipeProjection_Deterministic(t *testing.T) {
 	}
 }
 
-// An empty recipe set renders to the empty string (no rows) — a clean no-op so
-// the projection is safe before any recipes are wired.
 func TestRenderRecipeProjection_EmptyIsEmpty(t *testing.T) {
 	if got := RenderRecipeProjection(nil); got != "" {
 		t.Errorf("empty recipes should render empty, got %q", got)

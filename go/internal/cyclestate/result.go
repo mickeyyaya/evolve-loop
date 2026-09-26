@@ -1,73 +1,37 @@
 package cyclestate
 
-// This file holds the cycle/phase EXECUTION-RESULT value types — the small,
-// pure data records a cycle produces as it runs. Like the rest of this leaf
-// they have no methods and no dependencies; the orchestrator builds them and
-// serializes them into ledger/phase artifacts.
-
 // CycleResult summarises what RunCycle did.
 type CycleResult struct {
 	Cycle        int
 	FinalVerdict string
 	PhasesRun    []Phase
-	// TerminationReason records a host-owned terminal disposition that cannot
-	// be reconstructed safely from phase artifacts alone. An empty value means
-	// the cycle followed the ordinary verdict/state-machine closeout path.
+	// TerminationReason is a host-owned terminal disposition that phase artifacts cannot
+	// reconstruct safely; empty means the ordinary closeout path.
 	TerminationReason string
 	// RetroDecision is the failure-adapter's verdict on the retro branch,
 	// populated only when retro ran. Format: "<action>: <reason>".
 	RetroDecision string
-	// SkippedPhases records phases that genuinely did NOT run, with the cause
-	// (e.g. closeout after an abnormal mid-cycle exit). Surfaced in the cycle
-	// dossier as skipped_phases.
-	//
-	// It is NOT the home for a phase that ran and had its verdict declined —
-	// that is VerdictsNotAdopted. Conflating the two is the
-	// dossier-retro-skipped-mislabel defect: every FAIL dossier from 1028/1035
-	// through 1198 claimed `skipped_phases: [{phase: retro, reason: FAIL}]` while
-	// the run dir held retro's report, so the committed record contradicted its
-	// own artifacts.
+	// SkippedPhases lists phases that did not run, with the skip cause; a phase that ran
+	// and had its verdict declined belongs in VerdictsNotAdopted.
 	SkippedPhases []SkippedPhase
-	// VerdictsNotAdopted records non-floor phases (retrospective, memo, the
-	// *-scans, router/advisor) that RAN and returned non-PASS AFTER a floor-derived
-	// FinalVerdict was recorded, so their verdict was PREVENTED from overwriting it
-	// (cycle-802, retro-bridge-timeout-width10). Without this a retro FAIL under
-	// quota/timeout pressure clobbered an audit PASS and zeroed the wave. The
-	// outcome is preserved here (never silently dropped) and surfaced in the cycle
-	// dossier as phases_run_verdict_not_adopted — a name that cannot be misread as
-	// "this phase did not run".
+	// VerdictsNotAdopted lists non-floor phases that ran and returned non-PASS after the
+	// floor-derived FinalVerdict was recorded, which they may not overwrite.
 	VerdictsNotAdopted []VerdictNotAdopted
-	// SystemFailure, when non-nil, marks that this cycle's failure was
-	// classified as SYSTEM-level (ADR-0072): the pipeline itself — not the
-	// task's code — is the cause (verdict-incoherence, infra-systemic,
-	// non-progress). The batch loop reads it to HALT + escalate instead of
-	// re-selecting the same inbox task. Nil ⇒ an ordinary task-level outcome
-	// (never-stop: retry/defer/quarantine as usual).
+	// SystemFailure, when non-nil, marks a pipeline-caused failure on which the batch loop
+	// halts instead of re-selecting the task.
 	SystemFailure *SystemFailureSignal
-	// Remediations records graduated fix-forward rounds (operator directive
-	// 2026-07-21): each entry is "<gate>: round N -> <verdict>" for a
-	// deterministic gate that FAILed, received one bounded builder fix, and
-	// was re-run. Provenance only — the re-run verdict is what recorded; a
-	// remediated cycle is never a silent PASS.
+	// Remediations records fix-forward rounds as "<gate>: round N -> <verdict>"; provenance
+	// only, since the re-run verdict is the one recorded.
 	Remediations []string
-	// SpineFailOpens records every spine-gate fail-open this cycle took: the
-	// gate found a mandatory predecessor's handoff artifact missing and
-	// proceeded anyway (SpineFloor below enforce, or a non-clean absence).
-	// Before cycle-1166 these went to stderr and nowhere else — a width-3 batch
-	// emitted 76 of them with no counter, no dossier field and no threshold.
-	// Occurrences ACCUMULATE (never collapse repeats): the count IS the signal.
+	// SpineFailOpens records every spine-gate fail-open; repeats accumulate because the
+	// count is the signal.
 	SpineFailOpens []SpineFailOpen
-	// FailReasons surfaces the floor-override explanations (the untruncated
-	// audit-fail-reason.json / CycleState.AuditFailReasons content) in the
-	// cycle summary and dossier — cycle-1022's lesson: the reason WAS recorded
-	// on disk while every operator-facing surface stayed silent.
+	// FailReasons surfaces the floor-override explanations in the cycle summary and dossier.
 	FailReasons []string
 }
 
-// SystemFailureSignal records a system-level failure classification (ADR-0072).
-// Category is the failure_policy category (e.g. "verdict-incoherence"); Halt is
-// true when the Go floor mandates a loop halt regardless of orchestrator
-// judgment. Evidence is the deterministic proof (e.g. the coherence signal).
+// SystemFailureSignal is a system-level failure classification; Halt means the Go floor mandates a loop halt.
+// See ADR-0072.
 type SystemFailureSignal struct {
 	Category string `json:"category"`
 	Level    string `json:"level"` // "system"
@@ -75,29 +39,19 @@ type SystemFailureSignal struct {
 	Halt     bool   `json:"halt"`
 }
 
-// SkippedPhase is one phase that did NOT run. Reason is the SKIP CAUSE (e.g.
-// "abnormal exit in phase build"), not a verdict — a phase that ran belongs in
-// VerdictNotAdopted.
+// SkippedPhase is one phase that did not run; Reason is the skip cause, not a verdict.
 type SkippedPhase struct {
 	Phase  string `json:"phase"`
 	Reason string `json:"reason"`
 }
 
-// VerdictNotAdopted is one phase that RAN to completion whose non-PASS verdict was
-// NOT adopted as the cycle verdict (the cycle-802 floor guard: a post-verdict
-// non-floor phase may not clobber a floor-derived FinalVerdict). Verdict is what
-// the phase actually returned (FAIL|WARN|SKIPPED) — the value the old
-// SkippedPhase.Reason carried, under a name that no longer implies a skip.
+// VerdictNotAdopted is one phase that ran whose non-PASS Verdict was not adopted over the floor-derived FinalVerdict.
 type VerdictNotAdopted struct {
 	Phase   string `json:"phase"`
 	Verdict string `json:"verdict"`
 }
 
-// SpineFailOpen is one spine-gate fail-open event. Phase is the phase that was
-// entered anyway; MissingArtifact is the FIRST unsatisfied predecessor anchor
-// (the real cause — phase alone cannot group 76 WARNs by cause); Reason is the
-// fail-open reason verbatim ("would-block at enforce" vs "digest degraded: …"),
-// which is what distinguishes a dialed-down SpineFloor from a degraded read.
+// SpineFailOpen is one spine-gate fail-open: the Phase entered, its first unsatisfied predecessor, and the verbatim reason.
 type SpineFailOpen struct {
 	Phase           string `json:"phase"`
 	MissingArtifact string `json:"missing_artifact"`
@@ -116,39 +70,26 @@ type TokenUsage struct {
 type Diagnostic struct {
 	Severity string `json:"severity"`
 	Message  string `json:"message"`
-	// Code is the machine-readable reason a phase's OWN deterministic gate
-	// stamps beside its prose (the DiagCode* vocabulary below) so the closeout
-	// and the classifier act on the class of a FAIL without regexing the
-	// sentence; empty on an agent's diagnostic. Subject names the item the
-	// code is about (a top_n card id) when there is one.
+	// Code is the DiagCode* reason a phase's own deterministic gate stamps (empty on an agent's
+	// diagnostic); Subject names the item it concerns, such as a top_n card id.
 	Code    string `json:"code,omitempty"`
 	Subject string `json:"subject,omitempty"`
 }
 
-// The triage gate's refusal codes — the reasons triage.Classify itself FAILs a
-// cycle (not the agent's verdict). TRIAGE_PROTECTED_SURFACE is the one that is
-// deterministic AND operator-owned: the FAIL closeout routes its Subject to
-// console-manual on the first hit (docs/incidents/2026-09-14-triage-refusal-poison-loop.md).
+// The triage gate's refusal codes: the reasons triage.Classify itself FAILs a cycle, not the agent's verdict.
 const (
 	DiagCodeTriageProtectedSurface  = "TRIAGE_PROTECTED_SURFACE"
 	DiagCodeTriageTopNEmpty         = "TRIAGE_TOPN_EMPTY"
 	DiagCodeTriageCommitmentInvalid = "TRIAGE_COMMITMENT_INVALID"
 )
 
-// Severity vocabulary of Diagnostic — the wire values producers emit. Only
-// SeverityError entries are a phase's REASONS for a FAIL verdict; everything
-// else is a trail.
+// Severity values of Diagnostic; only SeverityError entries are a phase's reasons for a FAIL verdict.
 const (
 	SeverityError   = "error"
 	SeverityWarning = "warning"
 )
 
-// ErrorMessages is the ONE projection from diagnostics to a FAIL's reasons:
-// the error-severity messages, in order (nil when there are none). core's
-// FailedRecord, floor fail reasons, chokepoint log line, seal backfill and
-// judgment lessons, and cyclehealth's outcome detail, all call it — the rule
-// lives beside the vocabulary so no reader can re-derive it differently
-// (cycles 1634/1636).
+// ErrorMessages projects diagnostics onto a FAIL's reasons: the error-severity messages in order, nil when none.
 func ErrorMessages(diags []Diagnostic) []string {
 	var msgs []string
 	for _, d := range diags {
@@ -159,9 +100,7 @@ func ErrorMessages(diags []Diagnostic) []string {
 	return msgs
 }
 
-// ErrorCodes is the ONE projection of a diagnostics list onto its error-severity
-// codes — deduped, order-preserving, blanks dropped — as ErrorMessages is for
-// the prose; the C1 chokepoint's signal field and the classifier read it.
+// ErrorCodes projects diagnostics onto their error-severity codes, deduped in order with blanks dropped.
 func ErrorCodes(diags []Diagnostic) []string {
 	var codes []string
 	seen := map[string]bool{}
@@ -175,19 +114,16 @@ func ErrorCodes(diags []Diagnostic) []string {
 	return codes
 }
 
-// Disposition is whose fault a coded refusal is — the ONE place that answers
-// it, beside the vocabulary (a fourth code added here decides its own fate):
-// TaskLevel charges the item's failure_count toward the ADR-0072 S5 ceiling;
-// RouteConsole hands the refused Subject to the operator on the first hit.
+// Disposition says whose fault a coded refusal is.
 type Disposition struct {
-	TaskLevel    bool
+	// TaskLevel charges the item's failure_count toward the quarantine ceiling.
+	TaskLevel bool
+	// RouteConsole hands the refused Subject to the operator on the first hit.
 	RouteConsole bool
 }
 
-// RefusalDisposition maps a refusal code to its disposition. A code that names
-// an item is the item's fault; TRIAGE_COMMITMENT_INVALID is stamped on pure
-// I/O faults reading the decision and must never charge the queue; an unknown
-// or empty code charges nobody (system-level, the AC4 default).
+// RefusalDisposition maps a refusal code to its disposition; an unknown or empty code charges nobody.
+// TRIAGE_COMMITMENT_INVALID is stamped on I/O faults reading the decision, so it never charges the queue.
 func RefusalDisposition(code string) Disposition {
 	switch code {
 	case DiagCodeTriageProtectedSurface:

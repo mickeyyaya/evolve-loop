@@ -1,30 +1,5 @@
 package tokenusage
 
-// chain_test.go — RED contract for token-telemetry S2 (collector-chain;
-// inbox token-telemetry-s2-collector-chain, weight 0.94; scout-report Task 1).
-//
-// The collector chain composes several usage sources in fidelity order —
-// transcript > eventsResult > scrollbackPeak — and returns the FIRST non-empty
-// tier, recording which source produced the figure. Every symbol these tests
-// reference (Chain, Collector, TranscriptCollector, EventsResultCollector,
-// ScrollbackPeakCollector, SourceEventsResult, SourceScrollbackPeak) is
-// undefined today, so package tokenusage fails to compile — the intended RED
-// signal (identical strategy to scanner_test.go's S1 contract). Builder
-// implements the chain against this contract; DO NOT modify these tests.
-//
-// Contract summary the Builder must satisfy:
-//   - A Collector is `func() Result`. It returns the zero Result (Source ==
-//     SourceNone) when it has no data — the chain treats SourceNone as "empty".
-//   - Chain(collectors...) runs them in the given (fidelity) order and returns
-//     the first Result whose Source != SourceNone; all-empty yields SourceNone.
-//   - EventsResultCollector(logPath) reuses the SAME *-events.ndjson result-
-//     envelope extraction as cyclecost.parseEventsLog (shared func, no
-//     duplication): it must recover the exact token counts cyclecost would.
-//   - ScrollbackPeakCollector(pane) wraps panestream.ExtractResponseTokens as
-//     an OUTPUT-ONLY floor: Usage.Output == ExtractResponseTokens(pane) and the
-//     input/cache fields it cannot know stay zero.
-//   - TranscriptCollector(root, w) wraps ScanConfigRoot (highest fidelity tier).
-
 import (
 	"os"
 	"path/filepath"
@@ -33,10 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 )
 
-// TestCollectorChain_FidelityOrderFirstNonEmptyWins — AC-1 (design-doc-named
-// RED test). An empty highest tier falls through to the next tier; the first
-// NON-empty tier wins and its source is recorded in the output. Uses collector
-// literals to isolate the chain ordering semantics from any adapter.
 func TestCollectorChain_FidelityOrderFirstNonEmptyWins(t *testing.T) {
 	empty := func() Result { return Result{Source: SourceNone} }
 	events := func() Result {
@@ -46,8 +17,6 @@ func TestCollectorChain_FidelityOrderFirstNonEmptyWins(t *testing.T) {
 		return Result{Usage: cyclestate.TokenUsage{Output: 9}, Source: SourceScrollbackPeak}
 	}
 
-	// transcript tier empty → fall through to eventsResult (higher fidelity than
-	// scrollbackPeak) which is non-empty and must win.
 	got := Chain(empty, events, scrollback)
 
 	if got.Source != SourceEventsResult {
@@ -58,9 +27,6 @@ func TestCollectorChain_FidelityOrderFirstNonEmptyWins(t *testing.T) {
 	}
 }
 
-// TestCollectorChain_AllEmptyYieldsNone — AC-1 negative / anti-no-op. When every
-// tier is empty the chain must yield SourceNone with zero usage, NOT spuriously
-// return the first tier. Forbids a degenerate `return collectors[0]()` impl.
 func TestCollectorChain_AllEmptyYieldsNone(t *testing.T) {
 	empty := func() Result { return Result{Source: SourceNone} }
 
@@ -74,12 +40,6 @@ func TestCollectorChain_AllEmptyYieldsNone(t *testing.T) {
 	}
 }
 
-// TestChain_RealAdaptersPreferHigherFidelity — AC-1 binding on the REAL adapters:
-// with an empty transcript root, the assembled chain of the three production
-// collectors must prefer eventsResult over the lower-fidelity scrollbackPeak
-// even though both carry data. This is what proves production wires the tiers in
-// the transcript > eventsResult > scrollbackPeak order (not just that Chain
-// works on literals).
 func TestChain_RealAdaptersPreferHigherFidelity(t *testing.T) {
 	dir := t.TempDir()
 	// No projects/ subdir under dir → the transcript tier is empty.
@@ -101,11 +61,6 @@ func TestChain_RealAdaptersPreferHigherFidelity(t *testing.T) {
 	}
 }
 
-// TestEventsResultCollector_ExtractsResultEnvelopeTokens — AC-2 (shared
-// extraction, no duplication). The eventsResult tier must recover the exact
-// token counts cyclecost.parseEventsLog reads from the same result envelope. If
-// the two share one extraction func they agree by construction; a divergent
-// figure here is the "duplicated/forked parser" regression.
 func TestEventsResultCollector_ExtractsResultEnvelopeTokens(t *testing.T) {
 	dir := t.TempDir()
 	log := filepath.Join(dir, "scout-events.ndjson")
@@ -122,9 +77,6 @@ func TestEventsResultCollector_ExtractsResultEnvelopeTokens(t *testing.T) {
 	}
 }
 
-// TestEventsResultCollector_NoResultEnvelopeIsEmpty — AC-2 edge. A log carrying
-// no kind==result envelope yields an empty tier (SourceNone) so the chain falls
-// through, rather than reporting a spurious zero-with-source.
 func TestEventsResultCollector_NoResultEnvelopeIsEmpty(t *testing.T) {
 	dir := t.TempDir()
 	log := filepath.Join(dir, "scout-events.ndjson")
@@ -137,10 +89,6 @@ func TestEventsResultCollector_NoResultEnvelopeIsEmpty(t *testing.T) {
 	}
 }
 
-// TestScrollbackPeakCollector_OutputOnlyFloorFromPane — AC-3. The scrollbackPeak
-// tier wraps panestream.ExtractResponseTokens as an output-only floor: Output
-// equals the extracted peak, and the input/cache fields it cannot observe stay
-// zero (it must not fabricate them).
 func TestScrollbackPeakCollector_OutputOnlyFloorFromPane(t *testing.T) {
 	pane := "some output\n↓ 12k tokens\nmore lines\n"
 
@@ -157,8 +105,6 @@ func TestScrollbackPeakCollector_OutputOnlyFloorFromPane(t *testing.T) {
 	}
 }
 
-// TestScrollbackPeakCollector_NoTokensIsEmpty — AC-3 edge. A pane with no
-// "↓ N tokens" marker yields an empty tier (peak 0 → SourceNone).
 func TestScrollbackPeakCollector_NoTokensIsEmpty(t *testing.T) {
 	got := ScrollbackPeakCollector("no token marker in this pane")()
 
@@ -167,10 +113,6 @@ func TestScrollbackPeakCollector_NoTokensIsEmpty(t *testing.T) {
 	}
 }
 
-// TestTranscriptCollector_EmptyRootFallsThroughAsNone — AC-1 (transcript tier).
-// The highest-fidelity tier wraps ScanConfigRoot; a root with no projects/
-// directory is empty, so the collector reports SourceNone and the chain falls
-// through to the next tier.
 func TestTranscriptCollector_EmptyRootFallsThroughAsNone(t *testing.T) {
 	got := TranscriptCollector(t.TempDir(), Window{})()
 
@@ -179,7 +121,6 @@ func TestTranscriptCollector_EmptyRootFallsThroughAsNone(t *testing.T) {
 	}
 }
 
-// writeFile is a tiny helper so the RED contract stays self-contained.
 func writeFile(t *testing.T, path, content string) {
 	t.Helper()
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {

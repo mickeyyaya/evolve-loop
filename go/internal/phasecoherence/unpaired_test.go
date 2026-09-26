@@ -1,18 +1,3 @@
-// unpaired_test.go — inbox dispatchable-agent-profile-completeness
-// (2026-06-10T09-42Z): cycle-270's debugger persona existed, its profile
-// didn't, and the route died exit=10 at launch with no earlier signal —
-// because Check() silently skipped persona↔profile pairs with a missing
-// side. These tests pin the visibility fix:
-//
-//  1. A persona without a profile → Kind "unpaired" WARN naming both paths
-//     (the runner's typed fail-fast is the runtime half, landed cycle 276;
-//     this is the look-ahead half).
-//  2. "-reference" personas (auditor-reference, …) are documentation by
-//     convention — never dispatched, no profile expected, NO violation.
-//  3. TestRepoPersonaProfilePairing — the drift gate against the REAL tree:
-//     every dispatchable persona is paired, with an explicit allowlist for
-//     the intentional singletons. New unpaired personas fail CI here, which
-//     is even earlier than batch preflight.
 package phasecoherence
 
 import (
@@ -29,7 +14,7 @@ import (
 func TestCoherence_UnpairedPersonaWarns(t *testing.T) {
 	agents, profs := fixtures(
 		map[string]string{"evolve-debugger": personaMD("debugger", `tools: ["Read", "Bash"]`)},
-		map[string]string{}, // no profile — the cycle-270 shape
+		map[string]string{},
 	)
 	vs, err := Check(Options{AgentsFS: agents, ProfilesFS: profs})
 	if err != nil {
@@ -66,16 +51,13 @@ func TestCoherence_ReferencePersonaIsDocumentation(t *testing.T) {
 	}
 }
 
-// repoRootForPairing walks up from this source file to the repo root (the
-// directory containing agents/ and .evolve/profiles/).
+// repoRootForPairing returns the repo root four directories above this file; every real-tree test uses it.
 func repoRootForPairing(t *testing.T) string {
 	t.Helper()
 	_, thisFile, _, ok := runtime.Caller(0)
 	if !ok {
 		t.Fatal("runtime.Caller failed")
 	}
-	// <root>/go/internal/phasecoherence/unpaired_test.go → 4 Dir() calls
-	// (file → phasecoherence → internal → go → <root>).
 	root := filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(thisFile))))
 	if _, err := os.Stat(filepath.Join(root, "agents")); err != nil {
 		t.Skipf("repo layout not found from %s: %v", thisFile, err)
@@ -83,47 +65,20 @@ func repoRootForPairing(t *testing.T) string {
 	return root
 }
 
-// trackedProfiles returns the basenames (sans .json) of the profiles git
-// tracks under .evolve/profiles — the Direction-B binding set. An untracked
-// profile is an untracked runtime mint (not necessarily gitignored; the
-// minter completes phase->profile pairing at dispatch time): it never
-// reaches a CI checkout, cannot red main, and so is runtime state rather
-// than repo config. Callers fall back to binding every on-disk profile when
-// git is unavailable. Thin seam over the shared repostate helper; regression
-// pin: unpaired_tracked_test.go.
+// trackedProfiles returns the git-tracked profile names. An untracked profile is a runtime
+// mint that never reaches main, so the profile-to-persona check must not bind it.
 func trackedProfiles(root string) (map[string]bool, error) {
-	// Stderr-surfaced errors, staged-counts-as-tracked, and top-level-only
-	// (no nested basename aliasing) all live in the shared helper now;
-	// unpaired_tracked_edge_test.go pins each property through this seam.
 	return repostate.TrackedSet(root, ".evolve/profiles", ".json")
 }
 
-// TestRepoPersonaProfilePairing is the bijection drift gate on the live tree.
-//
-// Direction A (persona → profile): every agents/evolve-<name>.md must have
-// .evolve/profiles/<name>.json, except documentation ("-reference") and the
-// allowlisted intentional singletons. Adding a dispatchable persona without
-// its profile fails THIS test at CI time instead of exit=10 at launch.
-//
-// Direction B (profile → persona): every profile must have a persona at
-// agents/evolve-<name>.md or agents/<name>.md, except allowlisted
-// non-persona profiles.
 func TestRepoPersonaProfilePairing(t *testing.T) {
 	root := repoRootForPairing(t)
 
-	// Direction-A allowlist: personas that are intentionally undispatchable.
 	personaOnly := map[string]string{
 		"operator":      "human-operator playbook, never machine-dispatched",
 		"swarm-planner": "swarm is EVOLVE_SWARM_STAGE=shadow; MUST be paired before swarm promotion (plan task CF.2)",
 	}
-	// Direction-B allowlist: TRACKED profiles whose prompt source is not an
-	// agents/evolve-*.md persona. Runtime-minted stubs no longer need entries
-	// here: they are untracked runtime mints (not necessarily gitignored), so
-	// trackedProfiles excludes them structurally (the cycle-~1326 firing was
-	// patched with per-name entries;
-	// the cd49274beab2 storm, cycles 1402/1403/1405, proved that ratchet
-	// re-arms on every new mint and killed a whole batch — see
-	// unpaired_tracked_test.go).
+	// Untracked runtime mints need no entry here: trackedProfiles excludes them structurally.
 	profileOnly := map[string]string{
 		"evaluator":   "persona projected from skills/evaluator",
 		"inspirer":    "persona projected from skills/inspirer",
@@ -160,14 +115,12 @@ func TestRepoPersonaProfilePairing(t *testing.T) {
 	}
 	tracked, terr := trackedProfiles(root)
 	if terr == nil && len(tracked) == 0 {
-		// A pathspec that matches nothing exits 0. An empty tracked set on
-		// the real tree means a misresolved root or sparse checkout, never
-		// "no profiles" — going dark here would unbind the whole gate.
+		// A pathspec that matches nothing exits 0, so an empty set on the real tree means a
+		// misresolved root or sparse checkout; accepting it would unbind the whole gate.
 		terr = fmt.Errorf("empty tracked-profile set at %s — pathspec matched nothing", root)
 	}
 	if terr != nil {
-		// No usable git context (e.g. exported source tarball): fall back to
-		// the stricter pre-seam behavior of binding every on-disk profile.
+		// Without git context, bind every on-disk profile: the stricter direction.
 		t.Logf("trackedProfiles: %v — binding all on-disk profiles", terr)
 		tracked = nil
 	}
@@ -178,12 +131,6 @@ func TestRepoPersonaProfilePairing(t *testing.T) {
 		}
 		name := strings.TrimSuffix(n, ".json")
 		if tracked != nil && !tracked[name] {
-			// Untracked = runtime mint (untracked, not necessarily
-			// gitignored; the minter pairs phase->profile at dispatch
-			// time). It never lands on main, so it is not repo config
-			// and Direction B must not
-			// bind it — binding it is what turned the live plane's ship
-			// gate red for every lane (fingerprint cd49274beab2).
 			t.Logf("untracked profile %q: runtime-minted state, not bound", name)
 			continue
 		}

@@ -4,37 +4,24 @@ import (
 	"strings"
 )
 
-// Blocker is the string-only ship-error envelope the orchestrator passes to
-// the router for recovery routing. It mirrors the structured ship error
-// defined in the core package (core.ShipError) as plain strings so that the
-// router stays a leaf package and never imports core (which would cycle).
+// Blocker mirrors core.ShipError as plain strings so the router never imports core.
 type Blocker struct {
-	// Code is the ship-error code (e.g. "AUDIT_BINDING_HEAD_MOVED").
-	Code string
-	// Class is the ship-error class: "transient", "precondition",
-	// "integrity", or "config".
-	Class string
-	// Stage is the ship sub-stage where the error surfaced (for evidence).
-	Stage string
+	Code  string // e.g. "AUDIT_BINDING_HEAD_MOVED"
+	Class string // "transient", "precondition", "integrity" or "config"
+	Stage string // the ship sub-stage, recorded as evidence
 }
 
-// recoveryHandler is one link in the recovery Chain of Responsibility. It
-// returns the next phase and whether it claimed the blocker.
+// recoveryHandler is one link in the recovery Chain of Responsibility.
 type recoveryHandler struct {
 	name  string
 	match func(b Blocker) (nextPhase string, matched bool)
 }
 
-// auditBindingPrefix is the code prefix shared by every audit-binding failure.
 const auditBindingPrefix = "AUDIT_BINDING_"
 
-// shipLocalCodes are ship-LOCAL preconditions a re-audit cannot re-establish:
-// re-running audit re-verifies the same code while the blocking condition
-// (merge divergence, prefix-gate scope, detached HEAD, unresolvable worktree)
-// lives entirely on the ship side — the cycle-230 audit↔ship loop (3 PASS
-// audits, 0 ships). Ship's in-Run repair ladder (ADR-0039 §8) already
-// attempted the typed repair before this error surfaced, so the residue goes
-// to the LLM debugger phase for triage, never back to audit.
+// shipLocalCodes are ship-side preconditions a re-audit cannot re-establish; ship's repair ladder
+// has already declined them, so they go to the debugger.
+// See ADR-0039.
 var shipLocalCodes = map[string]bool{
 	"GIT_FF_MERGE_DIVERGED": true,
 	"COMMIT_PREFIX_GATE":    true,
@@ -43,17 +30,13 @@ var shipLocalCodes = map[string]bool{
 	"WORKTREE_RESOLVE":      true,
 }
 
-// recoveryChain is the ordered Chain of Responsibility for ship-failure
-// recovery. Order is load-bearing: integrity is checked before precondition so
-// an integrity breach that also looks like a binding precondition still blocks.
+// recoveryChain routes ship failures, first match wins. Order is load-bearing: integrity precedes
+// every code-keyed handler except the fleet rebase conflict, so an integrity breach always blocks.
 var recoveryChain = []recoveryHandler{
 	{
-		// ADR-0049 G13a: a fleet rebase CONFLICT is genuinely overlapping work the
-		// advisor's disjoint-file partition should have separated. It carries the
-		// integrity class, but unlike a tamper/drift breach it is RECOVERABLE by
-		// triage — route to the LLM debugger (recommend sequential retry / partition
-		// split), NOT a blind block. Ordered FIRST so this specific code wins over
-		// the generic integrity-block below (the one integrity code that recovers).
+		// A fleet rebase conflict is overlapping work the debugger can split: the one
+		// integrity-class code that recovers.
+		// See ADR-0049.
 		name: "fleet-rebase-conflict-debugger",
 		match: func(b Blocker) (string, bool) {
 			if b.Code == "GIT_FLEET_REBASE_CONFLICT" {
@@ -63,7 +46,6 @@ var recoveryChain = []recoveryHandler{
 		},
 	},
 	{
-		// Integrity breaches never auto-recover — block loudly.
 		name: "integrity-block",
 		match: func(b Blocker) (string, bool) {
 			if b.Class == "integrity" {
@@ -73,12 +55,9 @@ var recoveryChain = []recoveryHandler{
 		},
 	},
 	{
-		// F37: a cycle diff touching the protected control plane (ADR-0064,
-		// ship's verifyNoControlPlaneEdits) is the BUILD's to reshape. A
-		// re-audit re-verifies the same diff — the cycle-230 audit↔ship loop —
-		// and the debugger cannot change what a cycle may write; the build
-		// handoff floor names the path on re-entry. Ordered BEFORE
-		// precondition-reaudit (it carries the precondition class).
+		// Only the build can reshape a diff that touches the control plane; a re-audit
+		// would verify the same diff again.
+		// See ADR-0064.
 		name: "control-plane-rebuild",
 		match: func(b Blocker) (string, bool) {
 			if b.Code == "CONTROL_PLANE_VIOLATION" {
@@ -88,9 +67,7 @@ var recoveryChain = []recoveryHandler{
 		},
 	},
 	{
-		// Ship-local precondition (repair ladder already declined) → debugger.
-		// Ordered AFTER integrity-block (integrity always wins) and BEFORE
-		// precondition-reaudit (these codes must never loop back to audit).
+		// Before precondition-reaudit: these codes must never loop back to audit.
 		name: "ship-local-debugger",
 		match: func(b Blocker) (string, bool) {
 			if shipLocalCodes[b.Code] {
@@ -100,7 +77,6 @@ var recoveryChain = []recoveryHandler{
 		},
 	},
 	{
-		// Stale binding / gate precondition → re-run audit (saga alt path).
 		name: "precondition-reaudit",
 		match: func(b Blocker) (string, bool) {
 			if b.Class == "precondition" ||
@@ -112,15 +88,8 @@ var recoveryChain = []recoveryHandler{
 		},
 	},
 	{
-		// ADR-0049 S5b: a fleet-mode ff-merge divergence (a peer cycle moved main
-		// mid-pipeline) is recovered by rebasing the cycle branch onto the new
-		// main and re-running AUDIT on the merged tree — the test-the-merged-tree
-		// / merge-queue pattern, which produces a FRESH audit binding for the
-		// rebased tree (re-pinning in place would be self-referential). NOT a
-		// retry-ship (it would just diverge again) and NOT the debugger. The
-		// rebase action itself runs in the orchestrator's recoverFromShipError
-		// before this re-audit. Ordered BEFORE transient-retry-ship because this
-		// transient code needs re-audit, not a blind ship retry.
+		// The orchestrator has rebased onto the moved main; the merged tree needs a fresh
+		// audit binding, and a blind ship retry would diverge again.
 		name: "fleet-rebase-reaudit",
 		match: func(b Blocker) (string, bool) {
 			if b.Code == "GIT_FLEET_REBASE_NEEDED" {
@@ -130,7 +99,7 @@ var recoveryChain = []recoveryHandler{
 		},
 	},
 	{
-		// Transient I/O / push races → retry ship (orchestrator bounds depth).
+		// The orchestrator bounds the retry depth.
 		name: "transient-retry-ship",
 		match: func(b Blocker) (string, bool) {
 			if b.Class == "transient" {
@@ -140,7 +109,6 @@ var recoveryChain = []recoveryHandler{
 		},
 	},
 	{
-		// Terminal catch-all: any unknown/novel code → LLM debugger phase.
 		name: "unknown-debugger",
 		match: func(b Blocker) (string, bool) {
 			return "debugger", true
@@ -148,10 +116,7 @@ var recoveryChain = []recoveryHandler{
 	},
 }
 
-// Recover is the pure recovery router: given a RouteInput carrying a Blocker, it
-// walks the recovery Chain of Responsibility and returns the next-phase
-// decision. It is deterministic and shared by every RoutingStrategy (recovery
-// needs no LLM). When in.Blocker is nil it defensively returns PhaseEnd.
+// Recover routes in.Blocker through the recovery chain; every RoutingStrategy shares it. A nil Blocker ends the cycle.
 func Recover(in RouteInput) RouterDecision {
 	if in.Blocker == nil {
 		return RouterDecision{NextPhase: PhaseEnd, Reason: "recover:no-blocker"}
@@ -170,6 +135,6 @@ func Recover(in RouteInput) RouterDecision {
 			}
 		}
 	}
-	// Unreachable: the terminal handler always matches.
+	// Unreachable: the last handler always matches.
 	return RouterDecision{NextPhase: "debugger", Reason: "recover:unknown-debugger"}
 }

@@ -6,14 +6,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 )
 
-// TestSocketTmuxRunner_PrependsIsolatedSocket: the observer's liveness probe must
-// query the bridge's dedicated tmux socket, not the operator's default. If the
-// driver moved agent panes to bridge.TmuxSocket but the probe stayed on the
-// default, `tmux ls` would never see them — the probe would report every agent
-// dead and the stall clock would never be reset by genuine liveness.
 func TestSocketTmuxRunner_PrependsIsolatedSocket(t *testing.T) {
-	// F6: TmuxSocketArgs now resolves a per-run socket from the env; clear it so
-	// this test pins the DEFAULT socket name invariant regardless of the shell.
+	// TmuxSocketArgs reads a per-run socket from the env; clearing it pins the default name.
 	t.Setenv(bridge.TmuxSocketEnv, "")
 	var got []string
 	wrapped := socketTmuxRunner(func(args ...string) ([]byte, error) {

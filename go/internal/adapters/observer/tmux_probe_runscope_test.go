@@ -1,9 +1,3 @@
-// tmux_probe_runscope_test.go — CB.6 contract (concurrency campaign W4):
-// the observer's pane-liveness probe asserts RUN ownership before making a
-// liveness claim. The probe's match grants stall-clock extensions; matching
-// ANOTHER run's session would keep a dead agent's clock fresh forever (the
-// cross-run variant of the cycles-254/255 false-liveness class). Fail-closed:
-// a probe that knows its run id refuses any session without the run token.
 package observer
 
 import (
@@ -29,7 +23,7 @@ func fakeSessions(names ...string) tmuxRunner {
 
 func TestProbeRefusesForeignRunSession(t *testing.T) {
 	t.Parallel()
-	// Another run's session matches cycle+phase infix but carries run token rBBBB1111.
+	// The cycle and phase infix match, but the run token belongs to another run.
 	run := fakeSessions("evolve-bridge-rBBBB1111-c190-build-pid9-7")
 	probe := newTmuxPaneProbe(190, "build", "01AAAA22XXXXXXXXXXXXXXXXXX", run)
 	if probe() {
@@ -48,8 +42,6 @@ func TestProbeMatchesOwnRunSession(t *testing.T) {
 
 func TestProbeLegacyNoRunIDMatchesAny(t *testing.T) {
 	t.Parallel()
-	// RunID unknown (legacy single-driver dispatch) → infix-only match, the
-	// pre-CB.6 behavior, byte-identical.
 	run := fakeSessions("evolve-bridge-c190-build-pid9-7")
 	probe := newTmuxPaneProbe(190, "build", "", run)
 	if !probe() {

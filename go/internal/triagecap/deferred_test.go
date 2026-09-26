@@ -7,15 +7,8 @@ import (
 	"testing"
 )
 
-// R9.3: the deferred/dropped floor vocabulary — packages whose coverage
-// floors triage explicitly pushed OUT of this cycle. TDD predicates binding
-// these floors is the cycle-280 failure mode (builder starved the committed
-// task while clearing deferred-task gates).
-
 func TestDeferredFloorPackages_Cycle281Replay(t *testing.T) {
-	// cycle-281 deferred floor items name cmd/evolve ("evolve" is the package
-	// basename); the bridge item's only package reference is inside hyphenated
-	// slug compounds, which are single tokens — not mentions.
+	// The fixture defers cmd/evolve (basename "evolve"); its bridge item names bridge only inside hyphenated slugs.
 	pkgs := append([]string{"evolve"}, knownPkgsFixture...)
 	got := DeferredFloorPackages(readFixture(t, "triage-cycle281.md"), pkgs)
 	want := []string{"evolve"}
@@ -56,13 +49,6 @@ func TestDeferredFloorPackages_Table(t *testing.T) {
 			want: nil,
 		},
 		{
-			// Pins the metadata-strip semantics on deferred items: the
-			// contract fields' own vocabulary never counts, and the ENTIRE
-			// defer_reason value (to end of line) is stripped — defer
-			// reasons are scheduling prose that routinely references OTHER
-			// work. Cycle 310 (soak #3d) proved the earlier tail-matchable
-			// reading wrong: "co-scheduling with the looppreflight blocker
-			// fix" made Gate C block the COMMITTED package's predicates.
 			name: "deferred metadata stripped including full defer_reason prose",
 			artifact: "## top_n\n- fix: a bug fix\n\n" +
 				"## deferred\n" +
@@ -70,9 +56,6 @@ func TestDeferredFloorPackages_Table(t *testing.T) {
 			want: []string{"swarm"},
 		},
 		{
-			// Counterpart to the strip pin: bridge as the item's ACTUAL
-			// floor package (in the task prose, not defer_reason) is still
-			// detected after the defer_reason strip.
 			name: "genuine bridge floor in task prose still detected",
 			artifact: "## top_n\n- fix: a bug fix\n\n" +
 				"## deferred\n" +
@@ -80,10 +63,6 @@ func TestDeferredFloorPackages_Table(t *testing.T) {
 			want: []string{"bridge"},
 		},
 		{
-			// Cycle-310 verbatim replay (soak #3d): the deferred ledger-seal
-			// item's defer_reason references the committed looppreflight
-			// blocker — that mention must NOT make looppreflight a deferred
-			// floor package (it blocked the committed task's own predicates).
 			name: "cycle-310 replay: defer_reason referencing committed work does not count",
 			artifact: "## top_n\n" +
 				"- looppreflight-env-seams: Convert defaultTmuxSessions to var-seam; add deterministic branch tests; cover saveVersionCache write-error path — priority=H, evidence=scout-report §Task 3, source=scout\n\n" +
@@ -102,34 +81,7 @@ func TestDeferredFloorPackages_Table(t *testing.T) {
 	}
 }
 
-// ----------------------------------------------------------------------------
-// ADR-0046 Layer 1 (cycle 305): declaration-primary deferred floors.
-//
-// New API this file pins (Builder implements in deferred.go, mirroring the
-// shipped committed-floor path in floors.go):
-//
-//   - ReadDeferredFloors(companionPath) ([]string, bool, error)
-//       reads triage-decision.json's deferred_floors[]; missing file / missing
-//       field is NOT an error (returns nil,false,nil → caller falls back to
-//       prose), parallel to ReadDeclaredFloors.
-//   - DeferredFloorPackagesDecl(artifact, companionPath, candidatePkgs) []string
-//       declaration-PRIMARY: when deferred_floors[] is present, the declared
-//       packages (filtered to candidatePkgs, sorted, distinct) are authoritative
-//       and prose is ignored; otherwise it falls back to prose DeferredFloorPackages.
-//   - DeferredFloorDivergence(artifact, companionPath, knownPkgs) string
-//       the deferred analog of FloorDivergenceCorrective: an actionable, non-empty
-//       message when prose-deferred packages and deferred_floors[] disagree; ""
-//       when they agree or no declaration exists. The triage-floors guard prints it.
-//
-// These are RED until Builder adds the three functions: the test package
-// fails to compile against the absent symbols.
-// ----------------------------------------------------------------------------
-
-// writeDeferredCompanion writes a triage-decision.json companion into dir.
-// A nil deferredFloors writes a companion WITHOUT the deferred_floors field
-// (the "present file, absent field" fallback case); a non-nil (possibly empty)
-// slice writes the field. committedFloors, when non-nil, is written too so the
-// divergence/fallback tests can exercise a realistic two-field companion.
+// writeDeferredCompanion omits deferred_floors for a nil slice and writes it for a non-nil, possibly empty, one.
 func writeDeferredCompanion(t *testing.T, dir string, deferredFloors []string) string {
 	t.Helper()
 	quote := func(xs []string) string {
@@ -163,9 +115,6 @@ func joinComma(xs []string) string {
 	return out
 }
 
-// TestReadDeferredFloors pins the declaration reader's missing-file /
-// missing-field fail-open contract and its happy path — exactly mirroring
-// ReadDeclaredFloors (floors.go:85) so the two floor kinds share one shape.
 func TestReadDeferredFloors(t *testing.T) {
 	t.Run("present field returns floors", func(t *testing.T) {
 		dir := t.TempDir()
@@ -194,7 +143,7 @@ func TestReadDeferredFloors(t *testing.T) {
 
 	t.Run("present file without deferred_floors field falls through", func(t *testing.T) {
 		dir := t.TempDir()
-		path := writeDeferredCompanion(t, dir, nil) // companion, but no deferred_floors
+		path := writeDeferredCompanion(t, dir, nil)
 		got, ok, err := ReadDeferredFloors(path)
 		if err != nil {
 			t.Fatalf("absent field must not error, got: %v", err)
@@ -206,8 +155,6 @@ func TestReadDeferredFloors(t *testing.T) {
 
 	t.Run("malformed deferred_floors is an error", func(t *testing.T) {
 		dir := t.TempDir()
-		// deferred_floors as a string, not an array → a genuine schema error
-		// the caller must surface (not silently fail open).
 		path := filepath.Join(dir, triageDecisionFile)
 		if err := os.WriteFile(path, []byte(`{"deferred_floors":"core"}`), 0o644); err != nil {
 			t.Fatal(err)
@@ -218,15 +165,9 @@ func TestReadDeferredFloors(t *testing.T) {
 	})
 }
 
-// TestDeferredFloorPackagesDecl_DeclarationPrimary: when the companion declares
-// deferred_floors, those packages are authoritative and contradictory prose is
-// ignored. The declared set is filtered to the caller's candidate packages
-// (the floor-predicate targets) so a declaration can only ever block a package
-// some predicate actually binds.
 func TestDeferredFloorPackagesDecl_DeclarationPrimary(t *testing.T) {
 	dir := t.TempDir()
 	path := writeDeferredCompanion(t, dir, []string{"core"})
-	// Prose disagrees: it defers `bridge`, not `core`. Declaration must win.
 	artifact := "## top_n\n- coverage-core: core coverage ≥98%\n\n" +
 		"## deferred\n- coverage-bridge: push bridge coverage to ≥98%\n"
 	got := DeferredFloorPackagesDecl(artifact, path, []string{"core", "bridge"})
@@ -235,15 +176,12 @@ func TestDeferredFloorPackagesDecl_DeclarationPrimary(t *testing.T) {
 	}
 }
 
-// TestDeferredFloorPackagesDecl_FallbackToProse: with no companion present, the
-// wrapper degrades to the legacy prose scanner — preserving the shipped R9.3
-// behavior for older artifacts.
 func TestDeferredFloorPackagesDecl_FallbackToProse(t *testing.T) {
 	artifact := "## top_n\n- fix: a bug fix\n\n" +
 		"## deferred\n- coverage-rest: recovery, interaction coverage to ≥98%\n"
 	noCompanion := filepath.Join(t.TempDir(), "absent.json")
 	got := DeferredFloorPackagesDecl(artifact, noCompanion, knownPkgsFixture)
-	want := DeferredFloorPackages(artifact, knownPkgsFixture) // [interaction recovery]
+	want := DeferredFloorPackages(artifact, knownPkgsFixture)
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("no companion: got %v, want prose result %v", got, want)
 	}
@@ -252,12 +190,9 @@ func TestDeferredFloorPackagesDecl_FallbackToProse(t *testing.T) {
 	}
 }
 
-// TestDeferredFloorPackagesDecl_CompanionNoFieldFallsBack: a companion that
-// exists but omits deferred_floors must still fall back to prose (the field is
-// optional; its absence is not "zero deferred floors").
 func TestDeferredFloorPackagesDecl_CompanionNoFieldFallsBack(t *testing.T) {
 	dir := t.TempDir()
-	path := writeDeferredCompanion(t, dir, nil) // present file, no deferred_floors
+	path := writeDeferredCompanion(t, dir, nil)
 	artifact := "## top_n\n- fix: a bug fix\n\n" +
 		"## deferred\n- coverage-core: push core coverage to ≥98%\n"
 	got := DeferredFloorPackagesDecl(artifact, path, []string{"core"})
@@ -266,9 +201,6 @@ func TestDeferredFloorPackagesDecl_CompanionNoFieldFallsBack(t *testing.T) {
 	}
 }
 
-// TestDeferredFloorPackagesDecl_FiltersToCandidates: a declared package that no
-// floor predicate targets must NOT appear in the result — declarations bound
-// the gate, they do not invent new bindings.
 func TestDeferredFloorPackagesDecl_FiltersToCandidates(t *testing.T) {
 	dir := t.TempDir()
 	path := writeDeferredCompanion(t, dir, []string{"core", "ghostpkg"})
@@ -278,9 +210,6 @@ func TestDeferredFloorPackagesDecl_FiltersToCandidates(t *testing.T) {
 	}
 }
 
-// TestDeferredFloorDivergence pins the guard's reporting helper: a non-empty,
-// actionable message when prose-deferred packages and the declaration disagree,
-// "" when they agree or no declaration exists. Mirrors FloorDivergenceCorrective.
 func TestDeferredFloorDivergence(t *testing.T) {
 	t.Run("agreement is silent", func(t *testing.T) {
 		dir := t.TempDir()
@@ -294,7 +223,6 @@ func TestDeferredFloorDivergence(t *testing.T) {
 	t.Run("divergence is reported", func(t *testing.T) {
 		dir := t.TempDir()
 		path := writeDeferredCompanion(t, dir, []string{"core"})
-		// Prose defers bridge; declaration defers core → divergence.
 		artifact := "## top_n\n- x: y\n\n## deferred\n- coverage-bridge: bridge coverage ≥98%\n"
 		msg := DeferredFloorDivergence(artifact, path, knownPkgsFixture)
 		if msg == "" {

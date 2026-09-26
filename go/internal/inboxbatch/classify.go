@@ -6,39 +6,27 @@ import (
 	"strings"
 )
 
-// DefaultMaxItems caps a batch when Config.MaxItems is unset. Four related
-// items is the most a single cycle's tdd→build→audit pipeline carries without
-// tripping the triage capacity clamp's overpacking territory; the policy
-// layer may override per project.
+// DefaultMaxItems caps a batch when Config.MaxItems is unset.
 const DefaultMaxItems = 4
 
-// Config parameterizes Classify. The zero value is safe (compiled defaults).
+// Config parameterizes Classify; the zero value uses the compiled defaults.
 type Config struct {
-	// MaxItems caps a batch's size; clusters above it chunk in topological
-	// order. <=0 means DefaultMaxItems.
+	// MaxItems <= 0 means DefaultMaxItems.
 	MaxItems int
-	// Rules overrides the grouping signals (tests, future policy wiring).
-	// nil means defaultRules().
+	// Rules nil means DefaultRules().
 	Rules []Rule
 }
 
-// Batch is one coherent unit of work for a single cycle: items ordered so
-// dependencies come first, the binding signals that justify the grouping, and
-// the max member weight (a batch is as urgent as its most urgent member —
-// summing would reward padding).
+// Batch is one cycle's unit of work: deps-first items, binding reasons, and the max member weight.
 type Batch struct {
 	Items   []Item
 	Reasons []string
 	Weight  float64
-	// DependsOnPrev marks a chunk split off an oversized cluster whose dep
-	// chain crosses the split: run the previous batch first.
+	// DependsOnPrev marks a later chunk of a split cluster: run the previous batch first.
 	DependsOnPrev bool
 }
 
-// Classify groups items into batches: rules emit edges → union-find clusters
-// → dep-topological order inside each cluster → cap-split into chunks →
-// batches ranked by weight (desc), ties by first item id. Pure and
-// deterministic: same items, same config, same batches.
+// Classify groups items into dep-ordered, cap-split batches ranked by weight; it is pure and deterministic.
 func Classify(items []Item, cfg Config) []Batch {
 	if len(items) == 0 {
 		return nil
@@ -53,38 +41,23 @@ func Classify(items []Item, cfg Config) []Batch {
 	}
 
 	uf := newUnionFind(len(items))
-	// Campaign is a PARTITION, not a signal: the operator's campaign field is
-	// the explicit "this is one initiative" declaration, so an inferred edge
-	// (file-area, dep, connects) must never merge two DISTINCT non-empty
-	// campaigns — measured live (2026-07-28), area chains fused 17 campaigns
-	// into one ~37-item cluster serialized over 9 "run the previous batch
-	// first" batches. clusterCampaign tracks each ROOT's campaign claim so the
-	// guard holds transitively too: a campaign-less item may join a campaign's
-	// cluster, but can never become the bridge that unions two campaigns. A
-	// blocked cross-campaign dep still executes in order — the dispatch
-	// freshness gate holds a lane until its deps land; only co-batching is
-	// prevented.
+	// Campaign is a partition: an inferred edge never merges two distinct
+	// non-empty campaigns, and each root's claim keeps the guard transitive.
 	clusterCampaign := make([]string, len(items))
 	for i, it := range items {
 		clusterCampaign[i] = strings.TrimSpace(it.Campaign)
 	}
-	reasons := map[int][]string{} // root → binding signals (dedup'd on emit)
-	// The guard makes union outcomes order-dependent (which cluster a
-	// campaign-less bridge joins depends on which edge unions first) and two
-	// rules emit from map iteration, so edges are sorted into one canonical
-	// order first — Classify's determinism contract now rests on this.
+	reasons := map[int][]string{} // root → binding signals
+	// The partition guard makes union outcomes order-dependent, so determinism rests on the sorted edges.
 	for _, e := range sortedRuleEdges(rules, items) {
 		ra, rb := uf.find(e.A), uf.find(e.B)
 		if ra != rb {
 			ca, cb := clusterCampaign[ra], clusterCampaign[rb]
 			if ca != "" && cb != "" && ca != cb {
-				continue // two initiatives never merge on an inferred signal
+				continue
 			}
 			uf.union(ra, rb)
-			// The merged root is ra or rb, so its claim is ca or cb; when that
-			// claim is empty the other side's claim transfers (the guard above
-			// rules out two DIFFERENT non-empty claims, and equal claims skip
-			// via the non-empty check) — correct under any union root choice.
+			// An empty merged claim means one side was empty, so ca+cb is the other side's claim.
 			if merged := uf.find(ra); clusterCampaign[merged] == "" {
 				clusterCampaign[merged] = ca + cb
 			}
@@ -92,8 +65,7 @@ func Classify(items []Item, cfg Config) []Batch {
 		reasons[uf.find(e.A)] = append(reasons[uf.find(e.A)], e.Reason)
 	}
 
-	// Collect clusters; re-root the reason lists (unions after an emit can
-	// move a root, so fold every recorded list into the FINAL root).
+	// A later union can move a root, so fold every reason list into its final root.
 	clusters := map[int][]int{}
 	for i := range items {
 		clusters[uf.find(i)] = append(clusters[uf.find(i)], i)
@@ -103,13 +75,7 @@ func Classify(items []Item, cfg Config) []Batch {
 		finalReasons[uf.find(root)] = append(finalReasons[uf.find(root)], rs...)
 	}
 
-	// Rank clusters as UNITS (go-reviewer HIGH, 2026-07-16): a flat per-chunk
-	// weight sort let a continuation outrank its own predecessor whenever a
-	// low-weight dep chain gated a high-weight item past the chunk boundary —
-	// the render's "run the previous batch first" note then pointed nowhere.
-	// Sorting whole clusters by their max member weight keeps chunks adjacent
-	// and predecessor-first BY CONSTRUCTION, and ranks the cluster where its
-	// most urgent item deserves.
+	// Rank whole clusters, not chunks, so a continuation always follows its predecessor.
 	type clusterOut struct {
 		chunks  []Batch
 		weight  float64
@@ -155,9 +121,7 @@ func Classify(items []Item, cfg Config) []Batch {
 	return batches
 }
 
-// sortedRuleEdges collects every rule's edges into one canonical (A, B,
-// Reason) order. Connectivity alone is order-independent, but the campaign
-// partition guard is not — see the Classify union loop.
+// sortedRuleEdges collects every rule's edges in one canonical (A, B, Reason) order.
 func sortedRuleEdges(rules []Rule, items []Item) []Edge {
 	var edges []Edge
 	for _, r := range rules {
@@ -175,10 +139,7 @@ func sortedRuleEdges(rules []Rule, items []Item) []Edge {
 	return edges
 }
 
-// topoOrder returns member indices with every dep before its dependent
-// (Kahn), ready-set ordered by weight desc then id for determinism. A dep
-// cycle (bad data) falls back to the same weight-then-id order over the
-// remainder — items are never dropped, never hang.
+// topoOrder returns member indices deps-first (Kahn); a dep cycle appends the remainder in weight-then-id order.
 func topoOrder(items []Item, member []int) []int {
 	inCluster := map[string]int{}
 	for _, i := range member {
@@ -218,7 +179,7 @@ func topoOrder(items []Item, member []int) []int {
 		}
 		sort.Slice(ready, func(x, y int) bool { return less(ready[x], ready[y]) })
 	}
-	if len(out) < len(member) { // dep cycle: append the remainder deterministically
+	if len(out) < len(member) {
 		var rest []int
 		seen := map[int]bool{}
 		for _, i := range out {
@@ -235,14 +196,10 @@ func topoOrder(items []Item, member []int) []int {
 	return out
 }
 
-// maxRenderedReasons caps the binding signals shown per batch line — a prompt
-// section, not a forensic dump (real clusters can carry dozens of signals).
+// maxRenderedReasons caps the binding signals shown per batch line.
 const maxRenderedReasons = 3
 
-// RenderMarkdown formats batches for the triage prompt and the operator CLI:
-// one line per batch with rank, weight, binding signals (compacted), and
-// member ids — enough for the LLM to select a WHOLE batch as top_n. Empty
-// input renders empty (the byte-identical prompt pin).
+// RenderMarkdown formats one line per batch for the triage prompt and the CLI; no batches render "".
 func RenderMarkdown(batches []Batch) string {
 	if len(batches) == 0 {
 		return ""
@@ -263,8 +220,6 @@ func RenderMarkdown(batches []Batch) string {
 	return b.String()
 }
 
-// compactReasons renders at most maxRenderedReasons signals plus a "+N more"
-// summary for the rest.
 func compactReasons(rs []string) string {
 	if len(rs) == 0 {
 		return "no shared signal"
@@ -275,9 +230,7 @@ func compactReasons(rs []string) string {
 	return fmt.Sprintf("%s, +%d more", strings.Join(rs[:maxRenderedReasons], ", "), len(rs)-maxRenderedReasons)
 }
 
-// weightDescThenID is the tie-break rule shared by topoOrder's ready-set and
-// Classify's final batch ranking: higher weight first, lower id second — one
-// invariant, defined once, so the two orderings can never drift apart.
+// weightDescThenID is the one ordering topoOrder's ready set and Classify's ranking share.
 func weightDescThenID(weightA float64, idA string, weightB float64, idB string) bool {
 	if weightA != weightB {
 		return weightA > weightB
@@ -285,8 +238,6 @@ func weightDescThenID(weightA float64, idA string, weightB float64, idB string) 
 	return idA < idB
 }
 
-// dedupSorted returns the unique reasons, sorted — stable operator-facing
-// output regardless of rule emission order.
 func dedupSorted(rs []string) []string {
 	seen := map[string]bool{}
 	var out []string
@@ -300,8 +251,6 @@ func dedupSorted(rs []string) []string {
 	return out
 }
 
-// unionFind is the minimal disjoint-set with path compression — connectivity
-// over rule edges is all Classify needs.
 type unionFind struct{ parent []int }
 
 func newUnionFind(n int) *unionFind {
@@ -314,7 +263,7 @@ func newUnionFind(n int) *unionFind {
 
 func (u *unionFind) find(x int) int {
 	for u.parent[x] != x {
-		u.parent[x] = u.parent[u.parent[x]] // path halving
+		u.parent[x] = u.parent[u.parent[x]]
 		x = u.parent[x]
 	}
 	return x

@@ -8,21 +8,13 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 )
 
-// Marker pair delimiting the generated recipe-table body inside the persona.
-// The BEGIN marker's trailing comment is matched by prefix so the rationale
-// note inside it can evolve without breaking the lock.
+// The BEGIN marker is matched by prefix so the note inside it can change without breaking the lock.
 const (
 	recipeBeginMarker = "<!-- GENERATED:goal-recipes BEGIN"
 	recipeEndMarker   = "<!-- GENERATED:goal-recipes END -->"
 )
 
-// TestRouterPersonaRecipeTable_NoDrift locks the persona's "## Goal-Type Recipes"
-// table body (agents/evolve-router.md, between the GENERATED markers) to the
-// single source of truth — config.goal_recipes in phase-registry.json projected
-// through RenderRecipeProjection (ADR-0052 WS5-S2). If a recipe is edited in the
-// persona by hand, or in the registry without regenerating the table, this fails.
 func TestRouterPersonaRecipeTable_NoDrift(t *testing.T) {
-	// cwd is the router package dir; the persona and registry are repo-root relative.
 	const personaPath = "../../../agents/evolve-router.md"
 	const registryPath = "../../../docs/architecture/phase-registry.json"
 
@@ -36,7 +28,6 @@ func TestRouterPersonaRecipeTable_NoDrift(t *testing.T) {
 	if begin < 0 {
 		t.Fatalf("BEGIN marker %q not found in %s", recipeBeginMarker, personaPath)
 	}
-	// Block starts after the end of the BEGIN marker's line (its trailing newline).
 	nl := strings.IndexByte(persona[begin:], '\n')
 	if nl < 0 {
 		t.Fatalf("BEGIN marker line has no terminating newline in %s", personaPath)

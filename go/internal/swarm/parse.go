@@ -6,13 +6,7 @@ import (
 	"strings"
 )
 
-// ParsePlan extracts the SwarmPlan from a swarm-plan.md artifact. The planner
-// persona emits a fenced ```json block wrapping {"swarm_plan": {...}}; we take
-// the first such block. Falling back, if the whole artifact is bare JSON we
-// parse that directly (keeps the parser robust to a CLI that omits the fence).
-//
-// Pure and I/O-free: the caller reads the file. Returns an error the caller
-// treats as "no usable plan" → N=1 fallback, never a hard cycle abort.
+// ParsePlan extracts the SwarmPlan from the first ```json block of a swarm-plan.md artifact, or from bare JSON.
 func ParsePlan(artifact string) (SwarmPlan, error) {
 	block, err := firstJSONBlock(artifact)
 	if err != nil {
@@ -29,8 +23,6 @@ func ParsePlan(artifact string) (SwarmPlan, error) {
 	return plan, nil
 }
 
-// firstJSONBlock returns the contents of the first ```json ... ``` fence, or the
-// whole trimmed input if no fence is present (and it looks like JSON).
 func firstJSONBlock(s string) (string, error) {
 	const fence = "```"
 	lower := strings.ToLower(s)

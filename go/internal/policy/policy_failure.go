@@ -2,17 +2,8 @@ package policy
 
 import "fmt"
 
-// ADR-0072 — the system-failure DECISION policy. This is the declarative
-// surface the orchestrator classifies each failure against; Go enforces the
-// floor (verdict-incoherence, infra-systemic ALWAYS halt) and provides the
-// deterministic fallback. See docs/architecture/adr/0072-system-failure-policy-and-halt.md.
-//
-// NOTE: the type is SystemFailurePolicy (not FailurePolicy) because
-// (Policy).FailurePolicy() already resolves the distinct failure_floor
-// LLM-learning block — this is the failure DECISION policy, a separate surface.
-
-// Category level and action vocabularies. Kept as string consts (not an enum)
-// to mirror the checked-in policy.json shape; validated in FailurePolicyConfig.
+// Level and action vocabularies of the failure_policy table.
+// See ADR-0072.
 const (
 	LevelSystem = "system"
 	LevelTask   = "task"
@@ -22,11 +13,7 @@ const (
 	ActionDeferOrQuarantine = "defer-or-quarantine"
 )
 
-// Floor category keys are the two non-negotiable halts: a broken pipeline
-// cannot be talked out of stopping on these regardless of operator policy or
-// orchestrator judgment (authority model: "orchestrator decides, Go enforces
-// floor"). These keys are the policy vocabulary; the dossier layer maps the
-// deterministic failureadapter.Classification onto them.
+// Category keys of the failure_policy table; the dossier layer maps failureadapter classifications onto them.
 const (
 	CategoryVerdictIncoherence = "verdict-incoherence"
 	CategoryInfraSystemic      = "infra-systemic"
@@ -39,51 +26,37 @@ const (
 
 // FailureCategory is one row of the failure_policy category table.
 type FailureCategory struct {
-	Level      string `json:"level"`                 // "system" | "task"
-	Action     string `json:"action"`                // halt-and-diagnose | retry-with-fix | defer-or-quarantine
-	FixType    string `json:"fix_type,omitempty"`    // the kind of fix the next cycle should deploy
-	Signature  string `json:"signature,omitempty"`   // human-readable detection signature
-	Floor      bool   `json:"floor,omitempty"`       // Go always-enforces halt (non-negotiable)
-	MaxRetries int    `json:"max_retries,omitempty"` // task-level: retries before quarantine
+	Level      string `json:"level"`
+	Action     string `json:"action"`
+	FixType    string `json:"fix_type,omitempty"`
+	Signature  string `json:"signature,omitempty"`
+	Floor      bool   `json:"floor,omitempty"`       // Go always halts; not overridable
+	MaxRetries int    `json:"max_retries,omitempty"` // task-level retries before quarantine
 }
 
-// FailureThresholds are the non-progress / retry counters (ADR-0072 S2/S5).
+// FailureThresholds are the non-progress, retry and halt counters.
 type FailureThresholds struct {
-	// RepeatCeiling: same task or same failure-class recurring this many
-	// cycles with no landed progress ⇒ non-progress (system-level halt).
+	// RepeatCeiling: the same task or failure class recurring this many cycles without landed progress is non-progress.
 	RepeatCeiling int `json:"repeat_ceiling,omitempty"`
-	// VerifiedNotLandedCeiling: verified-green (audit PASS + ACS PASS) cycles
-	// that do not land this many times ⇒ non-progress (the clean-exit signature).
+	// VerifiedNotLandedCeiling: this many verified-green cycles that do not land is non-progress.
 	VerifiedNotLandedCeiling int `json:"verified_not_landed_ceiling,omitempty"`
-	// TaskRetryCeiling: a task-level failure count reaching this ⇒ quarantine
-	// (stop re-picking the poison todo).
+	// TaskRetryCeiling: a task-level failure count reaching this quarantines the todo.
 	TaskRetryCeiling int `json:"task_retry_ceiling,omitempty"`
-	// GuardClassHaltCeiling: guard-abort-class failure digests in one batch
-	// reaching this ⇒ pipeline-blocker halt (guard aborts are pipeline
-	// machinery failing by construction — never task defects).
+	// GuardClassHaltCeiling: this many guard-abort failures in one batch halt it,
+	// since guard aborts are pipeline failures, never task defects.
 	GuardClassHaltCeiling int `json:"guard_class_halt_ceiling,omitempty"`
-	// IdenticalFingerprintHaltCeiling: one exact failure fingerprint recurring
-	// this many times in one batch ⇒ pipeline-blocker halt (identical failure
-	// identities cannot be distinct honest defects — the 862–899 signature).
+	// IdenticalFingerprintHaltCeiling: one failure fingerprint recurring this many times in a batch halts it.
 	IdenticalFingerprintHaltCeiling int `json:"identical_fingerprint_halt_ceiling,omitempty"`
-	// UnexplainedFailuresHaltCeiling: failures with NO machine-readable reason
-	// reaching this in one batch ⇒ diagnosability halt (batch-6 first-firing:
-	// three distinct reason-less failures shared one degenerate fingerprint).
+	// UnexplainedFailuresHaltCeiling: this many failures with no machine-readable reason in a batch halt it.
 	UnexplainedFailuresHaltCeiling int `json:"unexplained_failures_halt_ceiling,omitempty"`
-	// ConsecutiveFailuresHaltCeiling: this many cycles failing back-to-back
-	// (any fingerprints) ⇒ pipeline-blocker halt + deep-dive before further
-	// dispatch (operator directive 2026-08-10: the 2026-08-09 batch burned 10
-	// failed cycles / 0 ships before an identity-keyed rule tripped).
+	// ConsecutiveFailuresHaltCeiling: this many back-to-back failing cycles, any fingerprints, halt the batch.
 	ConsecutiveFailuresHaltCeiling int `json:"consecutive_failures_halt_ceiling,omitempty"`
-	// BuildDeepEscalateAtFailures: an item whose failure_count has reached
-	// this routes its NEXT build to the deep tier (ADR-0076 D — retrying a
-	// hard item at the same tier re-fails identically). Raise-only; envelope
-	// Max still clamps. 0 keeps the compiled default (per-threshold merge
-	// convention); disable via the core escalation seam, not this knob.
+	// BuildDeepEscalateAtFailures: an item with this many failures builds next at the
+	// deep tier (raise-only; the envelope still clamps).
 	BuildDeepEscalateAtFailures int `json:"build_deep_escalate_at_failures,omitempty"`
 }
 
-// SystemFailurePolicy is the resolved decision policy.
+// SystemFailurePolicy is the failure_policy decision table (Policy.FailurePolicy resolves failure_floor instead).
 type SystemFailurePolicy struct {
 	Categories         map[string]FailureCategory `json:"categories,omitempty"`
 	Thresholds         FailureThresholds          `json:"thresholds,omitempty"`
@@ -91,10 +64,7 @@ type SystemFailurePolicy struct {
 	OnSystemLevel      string                     `json:"on_system_level,omitempty"`
 }
 
-// DefaultSystemFailurePolicy is the compiled default surfaced when the
-// failure_policy block is absent. It matches ADR-0072's table so behavior is
-// correct without editing the checked-in policy.json (mirrors the
-// gates/observer default pattern).
+// DefaultSystemFailurePolicy returns the compiled decision table used when the block is absent.
 func DefaultSystemFailurePolicy() SystemFailurePolicy {
 	return SystemFailurePolicy{
 		Categories: map[string]FailureCategory{
@@ -116,28 +86,20 @@ func DefaultSystemFailurePolicy() SystemFailurePolicy {
 	}
 }
 
-// floorCategories are the keys whose {level:system, action:halt-and-diagnose,
-// floor:true} shape is non-negotiable. FailurePolicyConfig re-stamps them even
-// if operator policy or a typo tries to demote them — mirroring how ShipFloor
-// always re-appends "audit".
+// floorCategories always halt: FailurePolicyConfig re-stamps their default rows over any override.
 var floorCategories = []string{CategoryVerdictIncoherence, CategoryInfraSystemic}
 
-// FailurePolicyConfig returns the failure_policy with compiled defaults
-// resolved and the floor invariant enforced. An absent block yields
-// DefaultSystemFailurePolicy(); a partial block merges over the defaults
-// per-category and per-threshold. Malformed levels/actions are rejected explicitly.
+// FailurePolicyConfig merges failure_policy over the defaults, rejecting unknown levels and actions.
 func (p Policy) FailurePolicyConfig() (SystemFailurePolicy, error) {
 	out := DefaultSystemFailurePolicy()
 	if c := p.SystemFailurePolicy; c != nil {
-		// Per-category merge: an override replaces the whole category row, but
-		// categories not mentioned survive from defaults.
+		// An override replaces a whole category row; unmentioned rows keep their defaults.
 		for name, cat := range c.Categories {
 			if err := validateCategory(name, cat); err != nil {
 				return SystemFailurePolicy{}, err
 			}
 			out.Categories[name] = cat
 		}
-		// Per-threshold merge: only positive overrides win; zero ⇒ keep default.
 		if c.Thresholds.RepeatCeiling > 0 {
 			out.Thresholds.RepeatCeiling = c.Thresholds.RepeatCeiling
 		}
@@ -169,8 +131,7 @@ func (p Policy) FailurePolicyConfig() (SystemFailurePolicy, error) {
 			out.OnSystemLevel = c.OnSystemLevel
 		}
 	}
-	// Enforce the floor invariant: the non-negotiable halt categories are
-	// re-stamped to their canonical shape no matter what the override said.
+	// The floor categories are re-stamped whatever the override said.
 	def := DefaultSystemFailurePolicy()
 	for _, key := range floorCategories {
 		out.Categories[key] = def.Categories[key]
@@ -184,14 +145,7 @@ func (fp SystemFailurePolicy) IsFloor(category string) bool {
 	return ok && c.Floor
 }
 
-// RetryPolicyFor returns the declarative retry policy for a failure category —
-// the Action / MaxRetries / FixType fields that ADR-0072 has always declared and
-// that nothing consumed. It completes the accessor set beside IsFloor and
-// IsSystemLevel so the retry decision reads the SAME table the floor does,
-// instead of a parallel knob (the max_audit_repair_attempts duplication).
-//
-// ok is false for an unrecognised category; callers must treat that as
-// "no retry", never as a default-allow.
+// RetryPolicyFor returns the category's row; callers treat ok=false as "no retry", never a default allow.
 func (fp SystemFailurePolicy) RetryPolicyFor(category string) (FailureCategory, bool) {
 	c, ok := fp.Categories[category]
 	return c, ok

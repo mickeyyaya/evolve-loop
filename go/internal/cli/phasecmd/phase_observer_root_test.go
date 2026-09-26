@@ -1,11 +1,5 @@
 package phasecmd
 
-// phase_observer_root_test.go — ADR-0103 unit 12 §6 tests 39-40: the manual
-// subcommand's argument contract pinned verbatim (help text, flags, the three
-// usage lines, the discarded Atoi errors — Q8) and the root's stderr-only
-// Signal Center rendering the engine's codes on the SAME stderr the replaced
-// [phase-observer] lines used.
-
 import (
 	"bytes"
 	"os"
@@ -20,9 +14,6 @@ import (
 
 const usageLine = "[phase-observer] usage: phase-observer [--enforce] [--scope=...] <workspace> <pgid> <cycle> <phase> <agent> [cycle-state]\n"
 
-// TestParseObserverArgs_TableVerbatim — kills M55 (a root stderr line
-// reworded), M56 (an Atoi error surfaced: a bogus pgid/cycle parses as 0 and
-// `cycle must be integer` fires downstream in Run).
 func TestParseObserverArgs_TableVerbatim(t *testing.T) {
 	t.Parallel()
 	five := []string{"/ws", "123", "7", "build", "builder"}
@@ -58,7 +49,7 @@ func TestParseObserverArgs_TableVerbatim(t *testing.T) {
 			}
 		})
 	}
-	// Q8: the Atoi errors are discarded — a bogus pgid/cycle becomes 0.
+	// Atoi errors are discarded by design: a bogus pgid or cycle becomes 0.
 	shutdown := make(chan struct{})
 	cfg := observerConfig(observerArgs{pos: []string{"/ws", "bogus", "x", "build", "builder", "state.json"}}, shutdown, nil)
 	if cfg.SubagentPGID != 0 || cfg.Cycle != 0 || cfg.CycleState != "state.json" || cfg.Workspace != "/ws" || cfg.Phase != "build" || cfg.Agent != "builder" {
@@ -69,14 +60,8 @@ func TestParseObserverArgs_TableVerbatim(t *testing.T) {
 	}
 }
 
-// TestRunPhaseObserver_RendersObserverCodesOnStderr — end to end through the
-// subcommand: the report path is a DIRECTORY, so the engine's
-// OBSERVER_REPORT_WRITE_FAILED renders on the subcommand's stderr through the
-// root's WARN-filtered Center; rc stays 0. Termination: the handler at
-// signal.Notify is armed before Run, so once observer_started is on disk a
-// SIGUSR1 to this process closes the shutdown channel (critic B3). The
-// project root points at an empty temp dir so no real policy.json is read.
-// Kills M57 (a nil Signals at the root), M58 (a missing Flush).
+// A directory at the report path forces OBSERVER_REPORT_WRITE_FAILED. SIGUSR1 to this process is
+// safe once observer_started is on disk, because the handler is armed before Run.
 func TestRunPhaseObserver_RendersObserverCodesOnStderr(t *testing.T) {
 	t.Setenv("EVOLVE_PROJECT_ROOT", t.TempDir())
 	ws := t.TempDir()
@@ -120,11 +105,7 @@ func TestRunPhaseObserver_RendersObserverCodesOnStderr(t *testing.T) {
 	}
 }
 
-// TestRunPhaseObserver_FlushesItsCenterOnReturn — the root defers Flush like
-// the two orchestrator roots (TestSignalCenterFlush_IsWiredAtBothRoots idiom).
-// Behaviourally the subprocess's stderr-only Center delivers synchronously on
-// its one goroutine, so a removed Flush is an EQUIVALENT mutant at runtime;
-// this source pin keeps the root idiom structurally.
+// A source pin: the stderr-only Center delivers synchronously, so a missing Flush is not observable at runtime.
 func TestRunPhaseObserver_FlushesItsCenterOnReturn(t *testing.T) {
 	t.Parallel()
 	src, err := os.ReadFile("phase_observer.go")

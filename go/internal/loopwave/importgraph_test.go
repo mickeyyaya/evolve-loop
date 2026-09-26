@@ -1,12 +1,5 @@
 package loopwave
 
-// importgraph_test.go — the package is a leaf beside cmd/evolve (ADR-0103 unit
-// 13 §2): stdlib plus the twelve named internal packages — never internal/core
-// and never internal/guards directly (the protected-surface predicate is a
-// port; note fleet and triagecap already reach both transitively, so this is
-// the leaf-ness DECLARATION, the compiler stays the cycle guard —
-// signalcenter/importgraph_test.go idiom).
-
 import (
 	"go/parser"
 	"go/token"

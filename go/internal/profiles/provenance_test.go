@@ -1,15 +1,3 @@
-// provenance_test.go — cycle-238 task `profile-provenance-field` (RED first).
-//
-// Pins the Invariant-1 foothold: every profile carries a `generated_from`
-// provenance marker distinguishing hand-authored originals from generated
-// projections (campaign retro §4, migration step 4; architecture-design R1,
-// blueprint B1/B2). Contract for Builder:
-//
-//	Profile gains `GeneratedFrom string `json:"generated_from,omitempty"``
-//
-// Provenance vocabulary is free-form (architecture: "hand-authored" today,
-// "phasespec:<name>@<sha>" later) — the validation logic lives at the CLI
-// (`phases validate`, see cmd_phases_cycle238_test.go), not here.
 package profiles
 
 import (
@@ -19,8 +7,6 @@ import (
 	"testing/fstest"
 )
 
-// stampedProfile mirrors a post-cycle-238 .evolve/profiles/*.json with the
-// provenance stamp applied.
 const stampedProfile = `{
   "name": "stamped",
   "role": "stamped",
@@ -43,8 +29,6 @@ func TestProvenanceField_ParsesGeneratedFrom(t *testing.T) {
 }
 
 func TestProvenanceField_EmptyWhenAbsent(t *testing.T) {
-	// B2(b): a pre-stamp profile (no generated_from key) round-trips with
-	// the zero value — absence is the signal `phases validate` keys off.
 	l := NewFromFS(fixtureFS())
 	p, err := l.Get("scout")
 	if err != nil {
@@ -66,8 +50,6 @@ func TestProvenanceField_MarshalsAsGeneratedFromKey(t *testing.T) {
 }
 
 func TestProvenanceField_OmittedWhenEmpty(t *testing.T) {
-	// omitempty: an unstamped Profile must not grow a phantom empty key on
-	// marshal — the JSON round-trip of unstamped profiles is unchanged (B1).
 	b, err := json.Marshal(Profile{Name: "naked"})
 	if err != nil {
 		t.Fatalf("Marshal: %v", err)

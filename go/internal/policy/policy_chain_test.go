@@ -6,10 +6,6 @@ import (
 	"testing"
 )
 
-// TestChainConfig_DefaultsAndOverride pins the compiled-default-then-override
-// contract of the `chain` block. The edge case is load-bearing: a
-// non-positive max_batches must NOT resolve to a 0 cap, which would silently
-// refuse to run a single batch for an operator who explicitly asked to chain.
 func TestChainConfig_DefaultsAndOverride(t *testing.T) {
 	t.Parallel()
 	yes, no := true, false
@@ -42,9 +38,6 @@ func TestChainConfig_DefaultsAndOverride(t *testing.T) {
 	}
 }
 
-// TestDefaultChainMaxBatches pins the compiled backstop itself: it must be a
-// positive runaway bound, not an accidental 0/negative that would make every
-// chained invocation a no-op.
 func TestDefaultChainMaxBatches(t *testing.T) {
 	t.Parallel()
 	if DefaultChainMaxBatches <= 1 {
@@ -52,9 +45,6 @@ func TestDefaultChainMaxBatches(t *testing.T) {
 	}
 }
 
-// TestChainConfig_FromJSON exercises the block through the real loader so the
-// json tags (`chain`, `enabled`, `max_batches`) are part of the contract, not
-// just the Go struct.
 func TestChainConfig_FromJSON(t *testing.T) {
 	t.Parallel()
 	path := filepath.Join(t.TempDir(), "policy.json")

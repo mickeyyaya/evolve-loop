@@ -1,16 +1,5 @@
 package tokenusage
 
-// fillpct_test.go — RED contract for cycle-1444 task `context-fill-telemetry-record`.
-//
-// RED: fillpct.go does not exist yet. PromptTokens / EffectiveWindow / FillPct /
-// FillPctUnmeasured / FillWarn and the Result.FillPct field are all undefined, so
-// this file fails to COMPILE until Builder adds them (compile-fail = RED evidence).
-//
-// The contract, in one line: context fill is a DERIVED reading off the usage the
-// existing scanner already recovers (prompt-side tokens ÷ the driver family's
-// effective window) — never a second independent measurement path — and an
-// unmeasurable reading is an explicit sentinel, never 0%, never Inf/NaN.
-
 import (
 	"math"
 	"os"
@@ -21,14 +10,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 )
 
-// claudeWindow is the conservative per-family effective window the research
-// update pins for the claude family (200K — deliberately below any advertised
-// 1M, per the 2026-08-03 reliability finding embedded in the inbox item).
 const claudeWindow = 200_000
 
-// TestFillTelemetry_PctFromPromptTokensAndWindow pins the arithmetic: FillPct is
-// a PERCENTAGE (0–100), not a 0–1 ratio, so a WARN threshold expressed in
-// percent compares directly against it.
 func TestFillTelemetry_PctFromPromptTokensAndWindow(t *testing.T) {
 	cases := []struct {
 		name   string
@@ -52,10 +35,6 @@ func TestFillTelemetry_PctFromPromptTokensAndWindow(t *testing.T) {
 	}
 }
 
-// TestFillTelemetry_ZeroWindowGuard is the load-bearing negative test: an
-// unconfigured (zero or nonsense) window must yield the explicit unmeasured
-// sentinel — never a divide-by-zero Inf/NaN that would poison every downstream
-// comparison, and never a plain 0 that reads as "measured empty".
 func TestFillTelemetry_ZeroWindowGuard(t *testing.T) {
 	for _, window := range []int{0, -1, -200_000} {
 		got := FillPct(120_000, window)
@@ -71,10 +50,6 @@ func TestFillTelemetry_ZeroWindowGuard(t *testing.T) {
 	}
 }
 
-// TestFillTelemetry_PromptTokensSumsInputSideOnly pins WHAT fills the context:
-// every input-side count (fresh input + cache read + cache write) occupies the
-// window; generated output does not. Summing Output in would overstate fill and
-// make the WARN fire on long answers rather than on big prompts.
 func TestFillTelemetry_PromptTokensSumsInputSideOnly(t *testing.T) {
 	u := cyclestate.TokenUsage{Input: 1_000, Output: 9_999_999, CacheRead: 300, CacheWrite: 70}
 	if got, want := PromptTokens(u), 1_370; got != want {
@@ -85,10 +60,6 @@ func TestFillTelemetry_PromptTokensSumsInputSideOnly(t *testing.T) {
 	}
 }
 
-// TestFillTelemetry_EffectiveWindowClaudeFamily pins the family table for the
-// one family this cycle measures. Empty driver means claude for backward
-// compatibility, exactly as isClaudeDriver already treats it — the window table
-// must not disagree with the collector dispatch about who is a claude launch.
 func TestFillTelemetry_EffectiveWindowClaudeFamily(t *testing.T) {
 	for _, driver := range []string{"", "claude", "claude-tmux"} {
 		if got := EffectiveWindow(driver); got != claudeWindow {
@@ -97,10 +68,6 @@ func TestFillTelemetry_EffectiveWindowClaudeFamily(t *testing.T) {
 	}
 }
 
-// TestFillTelemetry_EffectiveWindowUnconfiguredFamily is the negative half: a
-// family with no configured window reports 0 (unconfigured) so FillPct degrades
-// to the sentinel. Guessing a window for an unknown CLI would publish a
-// fabricated fill reading.
 func TestFillTelemetry_EffectiveWindowUnconfiguredFamily(t *testing.T) {
 	if got := EffectiveWindow("no-such-cli-family"); got != 0 {
 		t.Errorf("EffectiveWindow(\"no-such-cli-family\") = %d, want 0 (never guess a window for an unknown family)", got)
@@ -110,11 +77,6 @@ func TestFillTelemetry_EffectiveWindowUnconfiguredFamily(t *testing.T) {
 	}
 }
 
-// TestFillTelemetry_ResolverStampsFillPct is the SINGLE-SOURCING proof: fill%
-// must ride out of the production resolver on the usage it already recovered,
-// not from a second scan. A claude-driver launch with no transcript falls to the
-// events tier; the recovered prompt-side counts (100_000 in + 20_000 cache_r)
-// are 60.0% of the 200K claude window.
 func TestFillTelemetry_ResolverStampsFillPct(t *testing.T) {
 	ws := t.TempDir()
 	events := filepath.Join(ws, "build-events.ndjson")
@@ -123,7 +85,7 @@ func TestFillTelemetry_ResolverStampsFillPct(t *testing.T) {
 		t.Fatalf("write events fixture: %v", err)
 	}
 
-	got, err := DefaultResolver(t.TempDir())(Window{ // empty config root: no transcript tier
+	got, err := DefaultResolver(t.TempDir())(Window{
 		Driver:        "claude-tmux",
 		EventsLogPath: events,
 	})
@@ -138,10 +100,6 @@ func TestFillTelemetry_ResolverStampsFillPct(t *testing.T) {
 	}
 }
 
-// TestFillTelemetry_UnmeasuredResolveCarriesSentinel is the anti-false-zero
-// test: when NO tier observed the launch, prompt tokens are zero — but that is
-// "unmeasured", not "0% full". Stamping 0.0 here would make every uncovered
-// driver look like an empty context forever.
 func TestFillTelemetry_UnmeasuredResolveCarriesSentinel(t *testing.T) {
 	got, err := DefaultResolver(t.TempDir())(Window{Driver: "claude-tmux"})
 	if err != nil {
@@ -155,9 +113,6 @@ func TestFillTelemetry_UnmeasuredResolveCarriesSentinel(t *testing.T) {
 	}
 }
 
-// TestFillWarn_FiresOnlyStrictlyAboveThreshold pins the boundary and the message
-// content. The message must name the phase, or an operator reading the WARN
-// cannot tell WHICH launch is close to compaction.
 func TestFillWarn_FiresOnlyStrictlyAboveThreshold(t *testing.T) {
 	cases := []struct {
 		name      string
@@ -185,19 +140,6 @@ func TestFillWarn_FiresOnlyStrictlyAboveThreshold(t *testing.T) {
 	}
 }
 
-// TestFillTelemetry_PromptTokenOverflowIsUnmeasured is the RED contract for
-// cycle-1446 task `contextfill-promptTokens-overflow-guard` (cycle-1444 audit
-// finding M1). The three counters are driver-controlled: each value below is
-// individually a valid `int` that encoding/json will happily land in the
-// TokenUsage fields, but the SUM wraps negative. Today PromptTokens is plain
-// unguarded addition, so FillPct returns a fabricated negative percentage that
-// is neither a real reading nor the documented sentinel — FillWarn then treats
-// it as unmeasured and stays silent on exactly the launch whose telemetry is
-// bogus, while the bogus number is still persisted to llm-calls.ndjson.
-//
-// The contract is behavioural and implementation-agnostic: whatever the guard
-// looks like, the full PromptTokens→FillPct path must yield FillPctUnmeasured
-// for a wrapped or otherwise negative prompt-side total.
 func TestFillTelemetry_PromptTokenOverflowIsUnmeasured(t *testing.T) {
 	cases := []struct {
 		name  string
@@ -228,10 +170,6 @@ func TestFillTelemetry_PromptTokenOverflowIsUnmeasured(t *testing.T) {
 	}
 }
 
-// TestFillTelemetry_OverflowGuardKeepsHonestReadings is the anti-overfit half:
-// the guard must not be a blanket "big or unusual ⇒ unmeasured" clamp. Honest
-// large readings — including the deliberately-unclamped over-full case the
-// file's invariant promises — must survive untouched.
 func TestFillTelemetry_OverflowGuardKeepsHonestReadings(t *testing.T) {
 	cases := []struct {
 		name  string

@@ -1,43 +1,24 @@
 package config
 
-// policy_stages.go — the second resolution step: the composition root's
-// projection of .evolve/policy.json's gate, recovery, router and
-// parallel-evaluate dials onto the resolved value. config can never import
-// internal/policy (policy imports config), so the dials cross as plain
-// strings, ints and bools in a Parameter Object; the two stage ladders are
-// the same GateStage / RouterStage the loader's own parsers use, so a typo'd
-// policy word resolves to off WITH a warning instead of the silent off the
-// root's hand copies produced.
-
-// PolicyStages is the strings/ints/bools Parameter Object the composition
-// root projects from policy.GatesConfig / RecoveryConfig / RouterConfig /
-// ParallelEvaluateConfig. Field order is the root's assignment order; the
-// in-package tests construct it POSITIONALLY so a new field breaks the build.
+// PolicyStages is the root's projection of the .evolve/policy.json dials. config cannot import
+// policy, so the dials cross as plain values. Tests construct it positionally so a new field breaks the build.
 type PolicyStages struct {
-	// gates.contract_gate, gates.eval_gate, gates.triage_cap_gate,
-	// gates.topn_gate, gates.review_gate — the GateStage trichotomy.
+	// The gates.* keys, on the GateStage trichotomy.
 	ContractGate, EvalGate, TriageCapGate, TopNGate, ReviewGate string
-	// recovery.phase_recovery, recovery.spine_floor, recovery.fatal_pane — the
-	// GateStage trichotomy.
+	// The recovery.* keys, on the GateStage trichotomy.
 	PhaseRecovery, SpineFloor, FatalPane string
-	// router.router_replan — the RouterStage ladder.
+	// router.router_replan, on the RouterStage ladder.
 	RouterReplan string
-	// parallel_evaluate.stage — the RouterStage ladder (policy sanitises the
-	// word before it reaches the loader, so a typo never warns from this path).
+	// parallel_evaluate.stage, on the RouterStage ladder; policy sanitises it first, so it never warns here.
 	ParallelEvaluate string
-	// parallel_evaluate.concurrency, router.routing_judge, router.recon_digest,
-	// router.replan_depth — copied as resolved by policy.
+	// Copied as policy resolved them.
 	ParallelEvaluateConcurrency int
 	RoutingJudge, ReconDigest   bool
 	RePlanMaxDepth              int
 }
 
-// ApplyPolicyStages resolves the fourteen policy dials over cfg — cfg by
-// VALUE in, a new value out. The eight gate/recovery dials use the
-// off/shadow/enforce trichotomy, the two router dials the full ladder; a
-// word outside its ladder resolves to off with a CONFIG_UNKNOWN_VALUE naming
-// the policy key (fields.key = gates.eval_gate …, step = source = policy).
-// Origin Loader.ApplyPolicyStages.
+// ApplyPolicyStages returns cfg with the policy dials applied; a stage word outside its ladder
+// resolves to off with a warning that names the policy key.
 func (l *Loader) ApplyPolicyStages(cfg RoutingConfig, ps PolicyStages) (RoutingConfig, []Warning) {
 	var ws []Warning
 	cfg.ContractGate = parseEvidenceStage(ps.ContractGate, "gates.contract_gate", &ws)

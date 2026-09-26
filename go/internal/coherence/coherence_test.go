@@ -7,7 +7,7 @@ import (
 )
 
 func TestCoherence_ResultShape(t *testing.T) {
-	// Names the Coherence result type (apicover) and pins its incoherent shape.
+	// The explicit Coherence type names the result type for apicover.
 	var got Coherence = CheckVerdictCoherence(VerdictInputs{Recorded: "FAIL", Audit: "PASS", ACS: "PASS", AuditRan: true})
 	if !got.Incoherent || got.Category != "verdict-incoherence" || got.Evidence == "" {
 		t.Errorf("Coherence = %+v; want incoherent verdict-incoherence with evidence", got)
@@ -27,18 +27,11 @@ func TestReadCycleVerdicts_Fixture(t *testing.T) {
 	if !ran || gotA != "PASS" || gotACS != "PASS" {
 		t.Fatalf("ReadCycleVerdicts = audit=%q acs=%q ran=%v; want PASS/PASS/true", gotA, gotACS, ran)
 	}
-	// Absent artifacts → empty, auditRan=false, no fabrication.
 	a2, acs2, ran2 := ReadCycleVerdicts(t.TempDir())
 	if ran2 || a2 != "" || acs2 != "" {
 		t.Errorf("absent workspace = audit=%q acs=%q ran=%v; want empty/empty/false", a2, acs2, ran2)
 	}
 }
-
-// ADR-0072 S2: the verdict-coherence signal. A recorded FAIL/WARN is only
-// trustworthy if the phases' own on-disk artifacts agree. When the audit report
-// says PASS and ACS says PASS but the cycle recorded FAIL/WARN, the pipeline
-// forged the verdict — that is verdict-incoherence, the clean-exit signature
-// that must halt (not retry). This is the exact fingerprint of cycles 862→899.
 
 func TestCheckVerdictCoherence(t *testing.T) {
 	tests := []struct {
@@ -105,12 +98,6 @@ func TestCheckVerdictCoherence(t *testing.T) {
 	}
 }
 
-// TestCheckVerdictCoherence_Reconcile — the clean-exit-late-write self-heal: the
-// SAME forgery signature (recorded FAIL/WARN, green artifacts) but with a
-// FULLY-VALID deliverable (DeliverableValid=true) is a benign timing race →
-// Reconciled, NOT Incoherent (no halt). Also pins that DeliverableValid never
-// manufactures a reconcile out of a case that is coherent without it — it only
-// ever downgrades the would-be halt.
 func TestCheckVerdictCoherence_Reconcile(t *testing.T) {
 	for _, rec := range []string{"FAIL", "WARN"} {
 		got := CheckVerdictCoherence(VerdictInputs{Recorded: rec, Audit: "PASS", ACS: "PASS", AuditRan: true, DeliverableValid: true})
@@ -125,8 +112,6 @@ func TestCheckVerdictCoherence_Reconcile(t *testing.T) {
 		}
 	}
 
-	// DeliverableValid only downgrades the forgery signature; a case that is
-	// coherent without it must stay the zero Coherence{} even when valid.
 	coherentWithValid := []struct {
 		name string
 		in   VerdictInputs
@@ -144,10 +129,6 @@ func TestCheckVerdictCoherence_Reconcile(t *testing.T) {
 	}
 }
 
-// TestCheckVerdictCoherence_ForgedStillHalts — the anti-laundering boundary: the
-// forgery signature with a deliverable that does NOT fully verify
-// (DeliverableValid=false — a malformed report merely tagged with a PASS
-// sentinel) is genuine forgery → still Incoherent (halt), never Reconciled.
 func TestCheckVerdictCoherence_ForgedStillHalts(t *testing.T) {
 	for _, rec := range []string{"FAIL", "WARN"} {
 		got := CheckVerdictCoherence(VerdictInputs{Recorded: rec, Audit: "PASS", ACS: "PASS", AuditRan: true, DeliverableValid: false})

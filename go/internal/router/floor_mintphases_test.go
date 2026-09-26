@@ -7,9 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
-// TestClampPlanToFloor_PreservesMintPhases proves the clamp carries minted
-// phase configs through unchanged — the clamp governs the run/skip Entries
-// (the integrity floor), it must never drop the advisor's minted phases.
 func TestClampPlanToFloor_PreservesMintPhases(t *testing.T) {
 	mint := []phaseconfig.PhaseConfig{
 		{PhaseSpec: phasespec.PhaseSpec{Name: "minted-x", Optional: true}, Prompt: "p"},

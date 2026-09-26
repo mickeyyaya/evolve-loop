@@ -7,32 +7,16 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
-// DispatchResult is the outcome of walking a Plan's CLI chain: the CLI that
-// was last attempted, every CLI attempted in order, and the terminal error
-// (nil on success).
+// DispatchResult is the outcome of walking a Plan's CLI chain.
 type DispatchResult struct {
 	CLI      string   // the CLI that produced the terminal result (success or final failure)
 	Attempts []string // every CLI launched, in order
 	Err      error    // nil on success; the terminal attempt's error otherwise
 }
 
-// Dispatch walks plan.Candidates in order, calling launch(cli) for each. A
-// nil error stops the walk on success. A non-nil error advances to the next
-// candidate ONLY when plan.TriggersFallback(exitCode) — a real failure (a
-// non-trigger exit) stops the walk immediately so a legitimate FAIL is never
-// silently rerouted to a different CLI. When every candidate is exhausted on
-// a trigger exit, the LAST candidate's error is returned so the caller can
-// degrade to its own backstop.
-//
-// This is the single home for the "advance the CLI chain on a trigger exit"
-// algorithm — extracted from the runner's WS-G1 inline loop so the advisor
-// and the runner consume exactly one implementation
-// ([[never_duplicate_centralize_via_design_patterns]]).
+// Dispatch walks the CLI chain until success, a non-trigger exit, or exhaustion (returning the last error).
 func Dispatch(plan Plan, launch func(cli string) (exitCode int, err error)) DispatchResult {
-	// An empty chain is never a successful dispatch: launching nothing must fail
-	// loudly rather than return Err=nil, which a caller checking only Err would
-	// treat as a successful dispatch to no CLI at all (Rule 12). ChainFor always
-	// seeds >=1 candidate, so this is a defensive guard, not a reachable path.
+	// A caller checking only Err would read a nil from an empty chain as success.
 	if len(plan.Candidates) == 0 {
 		return DispatchResult{Err: errors.New("llmroute: Dispatch called with no candidates")}
 	}
@@ -53,17 +37,7 @@ func Dispatch(plan Plan, launch func(cli string) (exitCode int, err error)) Disp
 	return DispatchResult{CLI: cli, Attempts: attempts, Err: err}
 }
 
-// ChainFor builds a Plan from an EXPLICIT already-resolved primary CLI plus
-// the profile's declared fallback chain — never re-deriving the primary via
-// resolvePrimary (which reads profile.cli and would ignore a bench-aware
-// composition-root swap, e.g. the advisor already routed away from a benched
-// family before ChainFor is ever called). prof.CLI itself is excluded from
-// the appended fallback (it names the CLI the composition root already chose
-// not to use as primary, so re-appending it as a "fallback" would just walk
-// back into the same swapped-away CLI); a prof-declared fallback entry that
-// duplicates the explicit primary is likewise deduped. prof may be nil (no
-// profile on disk) — the chain degrades to a single candidate on the
-// package default trigger set.
+// ChainFor builds a Plan from an already-chosen primary plus the profile's fallback, excluding prof.CLI.
 func ChainFor(primary string, prof *profiles.Profile) Plan {
 	return Plan{
 		Candidates: buildCandidates(primary, prof, true),
@@ -71,27 +45,8 @@ func ChainFor(primary string, prof *profiles.Profile) Plan {
 	}
 }
 
-// buildCandidates is the single home for the "primary first, then the deduped
-// profile.cli_fallback list" chain — the one builder behind BOTH entry points
-// (Resolve via llmroute.go and ChainFor above), which previously carried
-// near-identical private copies of this loop
-// ([[never_duplicate_centralize_via_design_patterns]]). Fallback entries are
-// whitespace-trimmed, empties dropped, and first occurrence wins so the
-// operator's declared order survives.
-//
-// excludeProfileCLI is the ONE documented behavioural difference between the
-// two callers, now an explicit parameter rather than a second copy of the loop:
-//
-//   - ChainFor passes true — prof.CLI names the CLI the composition root
-//     deliberately swapped away from, so re-appending it as a "fallback" would
-//     just walk back into it (see ChainFor's doc comment).
-//   - Resolve passes false — a pinned/env-forced primary keeps the profile's
-//     chain intact so the phase retains CLI-failure resilience (see Resolve's
-//     doc comment).
-//
-// prof may be nil, and a fallback list of nothing but noise collapses to the
-// primary alone: the result always holds >=1 candidate, which is the invariant
-// Dispatch's empty-chain guard depends on.
+// buildCandidates always returns at least the primary. ChainFor excludes prof.CLI because the
+// composition root swapped away from it; Resolve keeps it so a forced primary retains the fallback.
 func buildCandidates(primary string, prof *profiles.Profile, excludeProfileCLI bool) []string {
 	candidates := []string{primary}
 	if prof == nil {

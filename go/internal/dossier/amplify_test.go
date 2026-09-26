@@ -1,14 +1,5 @@
 package dossier
 
-// amplify_test.go — Test Amplification phase adversarial cases.
-// Covers contract edge cases NOT exercised by TDD-engineer RED tests:
-// boundary inputs, nil guards, postcondition invariants, determinism,
-// idempotency, and special-character handling.
-//
-// Several tests are DELIBERATELY GAP TESTS that expose contract requirements
-// not yet satisfied by the current stub implementation (marked with "GAP:").
-// These tests fail intentionally, setting amplify.failures_found.
-
 import (
 	"bytes"
 	"fmt"
@@ -18,8 +9,6 @@ import (
 	"testing"
 )
 
-// ampPass returns a minimal valid PASS dossier for amplification tests.
-// Named distinctly from passDossier() in dossier_test.go to avoid collision.
 func ampPass() *Dossier {
 	return &Dossier{
 		Cycle:        5,
@@ -29,7 +18,6 @@ func ampPass() *Dossier {
 	}
 }
 
-// ampFail returns a minimal valid FAIL dossier for amplification tests.
 func ampFail() *Dossier {
 	return &Dossier{
 		Cycle:        6,
@@ -41,9 +29,6 @@ func ampFail() *Dossier {
 	}
 }
 
-// safeCall invokes f and catches panics, converting them to errors.
-// Used for nil-dereference gap tests where the implementation panics
-// instead of returning a proper error.
 func safeCallJSON(f func() ([]byte, error)) (out []byte, err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -62,10 +47,6 @@ func safeCallWrite(f func() error) (err error) {
 	return f()
 }
 
-// ── Build adversarial tests ────────────────────────────────────────────────
-
-// TestBuild_ZeroCycleBoundary: cycle == 0 is the exact boundary violation;
-// spec requires cycle >= 1.
 func TestBuild_ZeroCycleBoundary(t *testing.T) {
 	tmp := t.TempDir()
 	_, err := Build(0, BuildOpts{WorkspacePath: tmp, Goal: "g"})
@@ -74,7 +55,6 @@ func TestBuild_ZeroCycleBoundary(t *testing.T) {
 	}
 }
 
-// TestBuild_NegativeCycle: cycle < 0 is also invalid.
 func TestBuild_NegativeCycle(t *testing.T) {
 	tmp := t.TempDir()
 	_, err := Build(-99, BuildOpts{WorkspacePath: tmp, Goal: "g"})
@@ -83,8 +63,6 @@ func TestBuild_NegativeCycle(t *testing.T) {
 	}
 }
 
-// TestBuild_BlankWorkspacePath: GAP — contract requires non-empty WorkspacePath.
-// Current stub implementation does not validate this precondition.
 func TestBuild_BlankWorkspacePath(t *testing.T) {
 	_, err := Build(1, BuildOpts{WorkspacePath: "", Goal: "g"})
 	if err == nil {
@@ -92,8 +70,6 @@ func TestBuild_BlankWorkspacePath(t *testing.T) {
 	}
 }
 
-// TestBuild_BlankGoal: GAP — contract requires non-blank Goal.
-// Current stub does not validate Goal before constructing the dossier.
 func TestBuild_BlankGoal(t *testing.T) {
 	tmp := t.TempDir()
 	_, err := Build(1, BuildOpts{WorkspacePath: tmp, Goal: ""})
@@ -106,8 +82,6 @@ func TestBuild_BlankGoal(t *testing.T) {
 	}
 }
 
-// TestBuild_PostconditionPassesValidate: the returned dossier must satisfy
-// Validate() (contract postcondition). Tests with a valid non-blank goal.
 func TestBuild_PostconditionPassesValidate(t *testing.T) {
 	tmp := t.TempDir()
 	d, err := Build(1, BuildOpts{WorkspacePath: tmp, Goal: "validate-post"})
@@ -119,7 +93,6 @@ func TestBuild_PostconditionPassesValidate(t *testing.T) {
 	}
 }
 
-// TestBuild_PostconditionHasAtLeastOnePhase: contract mandates >=1 PhaseRecord.
 func TestBuild_PostconditionHasAtLeastOnePhase(t *testing.T) {
 	tmp := t.TempDir()
 	d, err := Build(1, BuildOpts{WorkspacePath: tmp, Goal: "phases-post"})
@@ -131,8 +104,6 @@ func TestBuild_PostconditionHasAtLeastOnePhase(t *testing.T) {
 	}
 }
 
-// TestBuild_Deterministic: contract requires deterministic output.
-// "Must not use current time, randomness, or Go map iteration order."
 func TestBuild_Deterministic(t *testing.T) {
 	tmp := t.TempDir()
 	opts := BuildOpts{WorkspacePath: tmp, Goal: "determinism-goal", RunID: "run-det-test"}
@@ -151,7 +122,6 @@ func TestBuild_Deterministic(t *testing.T) {
 	}
 }
 
-// TestBuild_CyclePreservedInResult: Dossier.Cycle must equal the input cycle.
 func TestBuild_CyclePreservedInResult(t *testing.T) {
 	tmp := t.TempDir()
 	const want = 42
@@ -164,22 +134,14 @@ func TestBuild_CyclePreservedInResult(t *testing.T) {
 	}
 }
 
-// ── RenderJSON adversarial tests ───────────────────────────────────────────
-
-// TestRenderJSON_NilDossier: GAP — contract says "Rejects nil".
-// Current implementation calls json.MarshalIndent(nil) → returns "null", nil
-// (no error). The test fails to expose this gap because "null" != "null\n".
-// Fixed: any nil-error result is a gap.
 func TestRenderJSON_NilDossier(t *testing.T) {
 	out, err := safeCallJSON(func() ([]byte, error) { return RenderJSON(nil) })
 	if err != nil {
-		return // correct: nil input properly returned an error
+		return
 	}
 	t.Errorf("GAP: RenderJSON(nil) must return error; got nil err with output: %q", out)
 }
 
-// TestRenderJSON_InvalidDossierReturnsError: GAP — contract says "Rejects any
-// dossier for which Validate fails". Current impl does not call Validate.
 func TestRenderJSON_InvalidDossierReturnsError(t *testing.T) {
 	bad := &Dossier{
 		Cycle:        0, // fails Validate
@@ -193,8 +155,6 @@ func TestRenderJSON_InvalidDossierReturnsError(t *testing.T) {
 	}
 }
 
-// TestRenderJSON_TrailingNewline: GAP — contract says "Returns UTF-8 JSON with
-// a trailing newline." json.MarshalIndent does not add a trailing newline.
 func TestRenderJSON_TrailingNewline(t *testing.T) {
 	d := ampPass()
 	out, err := RenderJSON(d)
@@ -209,8 +169,6 @@ func TestRenderJSON_TrailingNewline(t *testing.T) {
 	}
 }
 
-// TestRenderJSON_Deterministic: same dossier → byte-identical output.
-// Map-valued Signals must use encoding/json stable key ordering.
 func TestRenderJSON_Deterministic(t *testing.T) {
 	d := ampPass()
 	d.Phases[0].Signals = map[string]any{"z-key": 99, "a-key": 1, "m-key": "mid"}
@@ -224,7 +182,6 @@ func TestRenderJSON_Deterministic(t *testing.T) {
 	}
 }
 
-// TestRenderJSON_DoesNotMutateDossier: contract says "Does not mutate d."
 func TestRenderJSON_DoesNotMutateDossier(t *testing.T) {
 	d := ampPass()
 	origCycle := d.Cycle
@@ -239,8 +196,6 @@ func TestRenderJSON_DoesNotMutateDossier(t *testing.T) {
 	}
 }
 
-// TestRenderJSON_FailDossierRoundtrip: FAIL dossier with defects+carryover
-// must survive RenderJSON → ParseJSON intact.
 func TestRenderJSON_FailDossierRoundtrip(t *testing.T) {
 	d := ampFail()
 	data, err := RenderJSON(d)
@@ -262,10 +217,6 @@ func TestRenderJSON_FailDossierRoundtrip(t *testing.T) {
 	}
 }
 
-// ── RenderMarkdown adversarial tests ──────────────────────────────────────
-
-// TestRenderMarkdown_NilDossier: GAP — contract says "Rejects nil".
-// Current implementation may panic via template.Execute on nil pointer.
 func TestRenderMarkdown_NilDossier(t *testing.T) {
 	_, err := safeCallJSON(func() ([]byte, error) { return RenderMarkdown(nil) })
 	if err == nil {
@@ -273,8 +224,6 @@ func TestRenderMarkdown_NilDossier(t *testing.T) {
 	}
 }
 
-// TestRenderMarkdown_InvalidDossierReturnsError: GAP — contract says "Rejects
-// invalid dossiers". Current implementation does not call Validate.
 func TestRenderMarkdown_InvalidDossierReturnsError(t *testing.T) {
 	bad := &Dossier{
 		Cycle:        0,
@@ -288,11 +237,8 @@ func TestRenderMarkdown_InvalidDossierReturnsError(t *testing.T) {
 	}
 }
 
-// TestRenderMarkdown_TrailingNewline: contract says "Returns UTF-8 Markdown
-// with a trailing newline."
 func TestRenderMarkdown_TrailingNewline(t *testing.T) {
-	// Use a dossier with all optional collections populated to ensure trailing
-	// content renders and the newline is present.
+	// ampFail populates the trailing optional sections.
 	d := ampFail()
 	out, err := RenderMarkdown(d)
 	if err != nil {
@@ -306,9 +252,6 @@ func TestRenderMarkdown_TrailingNewline(t *testing.T) {
 	}
 }
 
-// TestRenderMarkdown_GoalWithPoundSignsStable: contract says "Escapes or safely
-// formats untrusted artifact text so it cannot alter the intended section hierarchy."
-// A goal containing '#' must not produce spurious section headers.
 func TestRenderMarkdown_GoalWithPoundSignsStable(t *testing.T) {
 	d := ampPass()
 	d.Goal = "implement ## the dossier # feature"
@@ -319,7 +262,6 @@ func TestRenderMarkdown_GoalWithPoundSignsStable(t *testing.T) {
 	if len(out) == 0 {
 		t.Error("RenderMarkdown returned empty output for goal with '#'")
 	}
-	// Call twice to verify output is stable (not randomized).
 	out2, err2 := RenderMarkdown(d)
 	if err2 != nil {
 		t.Fatalf("RenderMarkdown second call failed: %v", err2)
@@ -329,9 +271,6 @@ func TestRenderMarkdown_GoalWithPoundSignsStable(t *testing.T) {
 	}
 }
 
-// TestRenderMarkdown_EmptyOptionalCollectionsAreStable: contract says empty
-// optional collections are either omitted or rendered with one fixed placeholder;
-// the choice must be stable.
 func TestRenderMarkdown_EmptyOptionalCollectionsAreStable(t *testing.T) {
 	d := ampPass()
 	d.Defects = nil
@@ -348,7 +287,6 @@ func TestRenderMarkdown_EmptyOptionalCollectionsAreStable(t *testing.T) {
 	}
 }
 
-// TestRenderMarkdown_DoesNotMutateDossier: contract says "Does not mutate d."
 func TestRenderMarkdown_DoesNotMutateDossier(t *testing.T) {
 	d := ampPass()
 	origGoal := d.Goal
@@ -360,9 +298,6 @@ func TestRenderMarkdown_DoesNotMutateDossier(t *testing.T) {
 	}
 }
 
-// ── ParseJSON adversarial tests ────────────────────────────────────────────
-
-// TestParseJSON_Nil: nil input must return error.
 func TestParseJSON_Nil(t *testing.T) {
 	_, err := ParseJSON(nil)
 	if err == nil {
@@ -370,7 +305,6 @@ func TestParseJSON_Nil(t *testing.T) {
 	}
 }
 
-// TestParseJSON_Empty: empty bytes must return error.
 func TestParseJSON_Empty(t *testing.T) {
 	_, err := ParseJSON([]byte{})
 	if err == nil {
@@ -378,7 +312,6 @@ func TestParseJSON_Empty(t *testing.T) {
 	}
 }
 
-// TestParseJSON_InvalidJSON: non-object JSON must return error.
 func TestParseJSON_InvalidJSON(t *testing.T) {
 	cases := []string{
 		"not-json",
@@ -394,7 +327,6 @@ func TestParseJSON_InvalidJSON(t *testing.T) {
 	}
 }
 
-// TestParseJSON_PreservesAllFields: all Dossier fields survive RenderJSON → ParseJSON.
 func TestParseJSON_PreservesAllFields(t *testing.T) {
 	original := &Dossier{
 		Cycle:        9,
@@ -442,10 +374,6 @@ func TestParseJSON_PreservesAllFields(t *testing.T) {
 	}
 }
 
-// ── Write adversarial tests ────────────────────────────────────────────────
-
-// TestWrite_NilDossier: GAP — Write(nil,...) should return error but currently
-// may panic on d.Cycle dereference.
 func TestWrite_NilDossier(t *testing.T) {
 	err := safeCallWrite(func() error { return Write(nil, t.TempDir(), false) })
 	if err == nil {
@@ -453,8 +381,6 @@ func TestWrite_NilDossier(t *testing.T) {
 	}
 }
 
-// TestWrite_BlankDir: GAP — Write with empty dir should return error.
-// Current impl calls filepath.Join("", ...) which silently writes to CWD.
 func TestWrite_BlankDir(t *testing.T) {
 	err := Write(ampPass(), "", false)
 	if err == nil {
@@ -465,9 +391,6 @@ func TestWrite_BlankDir(t *testing.T) {
 	}
 }
 
-// TestWrite_FilesCreated: Write(d, dir, false) must produce both json and md
-// files at dir/cycle-N.json and dir/cycle-N.md.
-// Note: current implementation writes directly to dir (not dir/knowledge-base/cycles/).
 func TestWrite_FilesCreated(t *testing.T) {
 	dir := t.TempDir()
 	d := ampPass()
@@ -483,7 +406,6 @@ func TestWrite_FilesCreated(t *testing.T) {
 	}
 }
 
-// TestWrite_JSONIsValidDossier: the written JSON must decode to a valid dossier.
 func TestWrite_JSONIsValidDossier(t *testing.T) {
 	dir := t.TempDir()
 	d := ampPass()
@@ -506,8 +428,6 @@ func TestWrite_JSONIsValidDossier(t *testing.T) {
 	}
 }
 
-// TestWrite_Idempotent: repeated Write calls with same dossier produce
-// byte-identical files (contract: "Is idempotent").
 func TestWrite_Idempotent(t *testing.T) {
 	dir := t.TempDir()
 	d := ampPass()
@@ -531,7 +451,6 @@ func TestWrite_Idempotent(t *testing.T) {
 	}
 }
 
-// TestWrite_CommitFalseWritesFiles: commit=false must still write files.
 func TestWrite_CommitFalseWritesFiles(t *testing.T) {
 	dir := t.TempDir()
 	d := ampPass()
@@ -547,10 +466,6 @@ func TestWrite_CommitFalseWritesFiles(t *testing.T) {
 	}
 }
 
-// ── Validate invariant stress tests ───────────────────────────────────────
-
-// TestValidate_FailWithDefectsButNoCarryover: FAIL + defects but no carryover
-// must fail ("the fix work is required").
 func TestValidate_FailWithDefectsButNoCarryover(t *testing.T) {
 	d := ampFail()
 	d.Carryover = nil
@@ -563,8 +478,6 @@ func TestValidate_FailWithDefectsButNoCarryover(t *testing.T) {
 	}
 }
 
-// TestValidate_FailWithCarryoverButNoDefects: FAIL + carryover but no defects
-// must fail ("why it failed is required").
 func TestValidate_FailWithCarryoverButNoDefects(t *testing.T) {
 	d := ampFail()
 	d.Defects = nil
@@ -577,8 +490,6 @@ func TestValidate_FailWithCarryoverButNoDefects(t *testing.T) {
 	}
 }
 
-// TestValidate_WarnNeedNotCarryDefects: WARN is not FAIL; no
-// defect/carryover requirement applies.
 func TestValidate_WarnNeedNotCarryDefects(t *testing.T) {
 	d := &Dossier{
 		Cycle:        10,
@@ -591,8 +502,6 @@ func TestValidate_WarnNeedNotCarryDefects(t *testing.T) {
 	}
 }
 
-// TestValidate_MultiplePhasesMixedValidity: any phase with empty name or
-// invalid verdict must cause Validate to fail.
 func TestValidate_MultiplePhasesMixedValidity(t *testing.T) {
 	d := ampPass()
 	d.Phases = append(d.Phases, PhaseRecord{Name: "", Verdict: VerdictPass})

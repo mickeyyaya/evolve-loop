@@ -1,13 +1,5 @@
 package policy_test
 
-// RouterPolicy / SwarmPolicy / DispatchConfig — the typed parameters that
-// replaced the EVOLVE_ROUTER_* (advisor-maximization), EVOLVE_SWARM_*, and
-// EVOLVE_DISPATCH_* env reads (flag-reduction v20). Each accessor encodes the
-// non-obvious default rules: RouterConfig RouterReplan→"shadow", ReplanDepth→1
-// (override only when >0); SwarmConfig Stage→"shadow", PortBase passes through;
-// DispatchConfig Policy→"verify", RepeatThreshold→5 (override only when >0).
-// Black-box: drives only the exported accessors + explicit inputs, zero env.
-
 import (
 	"testing"
 
@@ -88,10 +80,6 @@ func TestDispatchConfig_Resolution(t *testing.T) {
 	}
 }
 
-// TestRetryPolicy_UnmarshalJSON pins the custom unmarshaler that records whether
-// retry_backoff_base_s / contract_correction_retries were EXPLICITLY present, so
-// an explicit 0 (disable) is distinguishable from absent (use default). Drives
-// RetryPolicy.UnmarshalJSON directly.
 func TestRetryPolicy_UnmarshalJSON(t *testing.T) {
 	t.Run("explicit-zero-disables", func(t *testing.T) {
 		pol, err := policy.Load(writeTempPolicy(t, `{"retry":{"retry_backoff_base_s":0,"contract_correction_retries":0}}`))
@@ -106,13 +94,10 @@ func TestRetryPolicy_UnmarshalJSON(t *testing.T) {
 
 	t.Run("absent-uses-defaults", func(t *testing.T) {
 		var rp policy.RetryPolicy
-		// Call the custom unmarshaler directly so the symbol is named (apicover)
-		// and exercised: only phase_max_attempts present, the two "explicit-zero"
-		// sentinel fields absent.
+		// Called directly so apicover sees the method named.
 		if err := rp.UnmarshalJSON([]byte(`{"phase_max_attempts":3}`)); err != nil {
 			t.Fatalf("UnmarshalJSON: %v", err)
 		}
-		// retry_backoff_base_s absent ⇒ the resolver applies the default (5), not 0.
 		rc := (policy.Policy{Retry: &rp}).RetryConfig()
 		if rc.RetryBackoffBaseS != 5 || rc.ContractCorrectionRetries != 2 {
 			t.Errorf("absent fields must resolve to defaults backoff=5 correction=2, got backoff=%d correction=%d", rc.RetryBackoffBaseS, rc.ContractCorrectionRetries)

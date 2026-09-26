@@ -1,20 +1,12 @@
 package fleet
 
-// triageplan_amplify_test.go — test-amplification (salvaged from cycle 465)
-// for the PlanFromTriage contract. Black-box against the spec only (tdd
-// handoff + build-report contract lines): floors → one Todo per DISTINCT id
-// → PlanCycles disjoint lanes; cards are a fallback when floors are
-// absent/empty, never a union; malformed input rejects with zero specs;
-// degenerate counts and large-scale inputs never panic or over-schedule.
-
 import (
 	"encoding/json"
 	"fmt"
 	"testing"
 )
 
-// specScopeUnion collects every Env-scoped todo id across specs, failing the
-// test on any id that appears in more than one spec (cross-lane disjointness).
+// specScopeUnion collects every Env-scoped todo id and fails the test on an id owned by two specs.
 func specScopeUnion(t *testing.T, specs []CycleSpec) map[string]bool {
 	t.Helper()
 	union := map[string]bool{}
@@ -29,11 +21,6 @@ func specScopeUnion(t *testing.T, specs []CycleSpec) map[string]bool {
 	return union
 }
 
-// TestPlanFromTriage_DuplicateFloorsNeverOverSchedule (edge): triage output
-// repeating one floor id must collapse to one Todo per DISTINCT id — 2
-// distinct ids over count=3 yield exactly 2 specs, and no spec's scope may
-// list an id twice. Kills an adapter that skips dedup and either pads lanes
-// with duplicates or ships a "core,core,core" scope to a lane's triage.
 func TestPlanFromTriage_DuplicateFloorsNeverOverSchedule(t *testing.T) {
 	decisionJSON := []byte(`{"committed_floors":["core","core","audit","core"]}`)
 	specs, _, err := PlanFromTriage(decisionJSON, nil, 3, nil)
@@ -58,10 +45,6 @@ func TestPlanFromTriage_DuplicateFloorsNeverOverSchedule(t *testing.T) {
 	}
 }
 
-// TestPlanFromTriage_FloorsTakePrecedenceOverCards (negative/precedence):
-// when committed_floors is present and non-empty, the caller's card packages
-// are dead weight — they must NOT be merged in. Kills an adapter that unions
-// floors+cards and over-schedules lanes triage never committed.
 func TestPlanFromTriage_FloorsTakePrecedenceOverCards(t *testing.T) {
 	decisionJSON := []byte(`{"committed_floors":["bridge"]}`)
 	specs, _, err := PlanFromTriage(decisionJSON, []string{"core", "audit"}, 2, nil)
@@ -77,11 +60,6 @@ func TestPlanFromTriage_FloorsTakePrecedenceOverCards(t *testing.T) {
 	}
 }
 
-// TestPlanFromTriage_NonPositiveCountNeverPanicsOrOverSchedules (edge/OOD):
-// count<=0 is a degenerate wave. Whatever the adapter chooses (explicit
-// reject or PlanCycles' documented clamp-to-one-lane), it must never panic,
-// never return specs alongside an error, and never spread work across more
-// than one lane.
 func TestPlanFromTriage_NonPositiveCountNeverPanicsOrOverSchedules(t *testing.T) {
 	for _, count := range []int{0, -1} {
 		t.Run(fmt.Sprintf("count=%d", count), func(t *testing.T) {
@@ -103,10 +81,6 @@ func TestPlanFromTriage_NonPositiveCountNeverPanicsOrOverSchedules(t *testing.T)
 	}
 }
 
-// TestPlanFromTriage_WrongTypeDecisionFieldsRejected (negative): valid JSON
-// whose committed_floors is the wrong TYPE is malformed for this schema and
-// must reject with zero specs — falling back to cards here would silently
-// mask a corrupted triage artifact ("rejects, not guesses").
 func TestPlanFromTriage_WrongTypeDecisionFieldsRejected(t *testing.T) {
 	cases := []struct {
 		name string
@@ -130,11 +104,6 @@ func TestPlanFromTriage_WrongTypeDecisionFieldsRejected(t *testing.T) {
 	}
 }
 
-// TestPlanFromTriage_DegenerateDecisionBytesFailSafe (edge/OOD): empty bytes
-// and a bare JSON null sit between "malformed" and "absent floors". Either
-// fail-safe outcome is acceptable — an explicit reject (error + zero specs)
-// or a clean fallback to the card packages — but never a panic, never a
-// partial/unscoped plan, and never an error that still carries specs.
 func TestPlanFromTriage_DegenerateDecisionBytesFailSafe(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -164,10 +133,6 @@ func TestPlanFromTriage_DegenerateDecisionBytesFailSafe(t *testing.T) {
 	}
 }
 
-// TestPlanFromTriage_LargeScaleAllFloorsScheduledDisjoint (limit): 100
-// distinct floors over count=4 must fill exactly 4 lanes, keep every lane's
-// scope pairwise disjoint, and schedule ALL 100 ids — PlanCycles' one-file
-// todos can never collide, so nothing may be silently deferred or dropped.
 func TestPlanFromTriage_LargeScaleAllFloorsScheduledDisjoint(t *testing.T) {
 	floors := make([]string, 100)
 	for i := range floors {
@@ -195,9 +160,6 @@ func TestPlanFromTriage_LargeScaleAllFloorsScheduledDisjoint(t *testing.T) {
 	}
 }
 
-// TestPlanFromTriage_PathLikeFloorIDsSurviveVerbatim (edge): floor ids are
-// package/path-shaped strings; slashed and non-ASCII ids must survive the
-// adapter → PlanCycles round trip without normalization mangling identity.
 func TestPlanFromTriage_PathLikeFloorIDsSurviveVerbatim(t *testing.T) {
 	floors := []string{"go/internal/fleet", "docs/architecture", "パッケージ"}
 	raw, err := json.Marshal(map[string][]string{"committed_floors": floors})

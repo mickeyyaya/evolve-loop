@@ -7,21 +7,7 @@ import (
 	"strings"
 )
 
-// Validate is the pure, mode-aware partition validator — the correctness crux of
-// the writer swarm. It runs after the planner and before any worker launches.
-// It never touches the filesystem or git, so it is exhaustively table-testable.
-//
-//   - WRITER mode (strict): every target file must be owned by at most one
-//     worker. ANY overlap → Collapse to N=1 (a writer swarm runs only on a
-//     provably-disjoint plan; per ADR-0032, "when not cleanly independent, do
-//     NOT swarm writers"). The depends_on DAG must also be acyclic with no
-//     dangling refs; the resulting topological order is the merge-train order.
-//   - READER mode (lenient): overlap is allowed (read overlap wastes tokens,
-//     never corrupts), so the disjointness check is skipped. Only N≥2 and DAG
-//     validity (usually a no-op — readers rarely declare deps) are checked.
-//
-// A plan that IsFallback() (planner declared non-partitionable, or <2 workers)
-// short-circuits to Collapse without inspecting file ownership.
+// Validate is the pure, mode-aware partition check that runs after the planner and before any worker launches.
 func Validate(plan SwarmPlan) ValidationResult {
 	if plan.IsFallback() {
 		return ValidationResult{
@@ -30,9 +16,7 @@ func Validate(plan SwarmPlan) ValidationResult {
 		}
 	}
 
-	// Duplicate worker_id is a planner bug that would silently dedupe in the
-	// ownership/indegree maps (a 2-worker plan could validate OK with a 1-entry
-	// merge order). Reject before any mode-specific check.
+	// A duplicate worker_id would silently dedupe in the ownership and DAG maps, so reject it before any mode check.
 	if dup := duplicateWorkerID(plan.Workers); dup != "" {
 		return ValidationResult{
 			Collapse: true,
@@ -53,7 +37,6 @@ func Validate(plan SwarmPlan) ValidationResult {
 	}
 }
 
-// validateWriter enforces strict disjoint file ownership + a valid merge DAG.
 func validateWriter(plan SwarmPlan) ValidationResult {
 	conflicts := detectConflicts(plan.Workers)
 	if len(conflicts) > 0 {
@@ -73,11 +56,8 @@ func validateWriter(plan SwarmPlan) ValidationResult {
 	return ValidationResult{OK: true, MergeOrder: order}
 }
 
-// validateReader checks only DAG validity (overlap is allowed for readers).
 func validateReader(plan SwarmPlan) ValidationResult {
 	if _, err := TopoOrder(plan.Workers); err != nil {
-		// Readers rarely declare deps; a bad one is still a planner bug worth
-		// collapsing on rather than silently ignoring.
 		return ValidationResult{
 			Collapse: true,
 			Reason:   fmt.Sprintf("invalid reader DAG: %v → falling back to N=1", err),
@@ -86,11 +66,8 @@ func validateReader(plan SwarmPlan) ValidationResult {
 	return ValidationResult{OK: true}
 }
 
-// detectConflicts returns every file claimed by more than one worker, after
-// normalizing paths (clean + slash). Deterministic: conflicts sorted by file,
-// and the offending worker IDs within each conflict sorted ascending.
 func detectConflicts(workers []WorkerSpec) []Conflict {
-	owners := make(map[string]map[string]bool) // normalized file → set(workerID)
+	owners := make(map[string]map[string]bool)
 	for _, w := range workers {
 		for _, f := range w.TargetFiles {
 			norm := normalizePath(f)
@@ -120,8 +97,6 @@ func detectConflicts(workers []WorkerSpec) []Conflict {
 	return conflicts
 }
 
-// duplicateWorkerID returns the first worker_id that appears more than once, or
-// "" if all IDs are unique.
 func duplicateWorkerID(workers []WorkerSpec) string {
 	seen := make(map[string]bool, len(workers))
 	for _, w := range workers {
@@ -133,13 +108,7 @@ func duplicateWorkerID(workers []WorkerSpec) string {
 	return ""
 }
 
-// normalizePath makes two spellings of the same repo file compare equal so an
-// overlap can't slip through via "./a.go" vs "a.go". Repo-relative, forward
-// slashes, no trailing slash, and CASE-FOLDED — because the dev hosts (macOS
-// HFS+/APFS default, Windows) are case-insensitive, so "Foo/A.go" and
-// "foo/a.go" are the same file and must collide in the disjointness check.
-// (Absolute/escape rejection is enforced later by the post-build git-status
-// guard, which runs against the real worktree.)
+// normalizePath case-folds because macOS and Windows filesystems are case-insensitive: Foo/A.go and foo/a.go are one file.
 func normalizePath(p string) string {
 	p = strings.TrimSpace(p)
 	if p == "" {

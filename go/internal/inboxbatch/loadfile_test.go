@@ -7,10 +7,6 @@ import (
 	"testing"
 )
 
-// TestLoadFile_ParsesAcceptanceAndSanitises — the single-file loader the Task
-// Contract projects from: acceptance is carried verbatim, control characters
-// are stripped and overlength criteria bounded (a prompt surface), the id
-// falls back to the filename stem exactly as LoadDir does.
 func TestLoadFile_ParsesAcceptanceAndSanitises(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -43,7 +39,6 @@ func TestLoadFile_ParsesAcceptanceAndSanitises(t *testing.T) {
 	if _, _, err := LoadFile(filepath.Join(dir, "bad.json")); err == nil {
 		t.Fatal("malformed JSON must be an error")
 	}
-	// LoadDir sees the same record the same way (one parser).
 	items, _, err := LoadDir(dir)
 	if err != nil {
 		t.Fatal(err)
@@ -55,8 +50,6 @@ func TestLoadFile_ParsesAcceptanceAndSanitises(t *testing.T) {
 	}
 }
 
-// TestLoadFile_TitleIsAPromptSurfaceToo — the title renders as the Task
-// Contract heading, so it gets the same control-character strip and bound.
 func TestLoadFile_TitleIsAPromptSurfaceToo(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
