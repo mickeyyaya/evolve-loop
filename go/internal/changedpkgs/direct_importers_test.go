@@ -1,50 +1,5 @@
 package changedpkgs
 
-// RED contract for cycle-1267 Task 1 (`scope-test-amplification-context`,
-// inbox test-amplification-context-scope, w=0.89) — the HALF that is still
-// missing.
-//
-// The inbox item's how_to_apply spells the corpus as:
-//
-//	packages touched by the cycle diff -> their *_test.go files
-//	                                   +  direct reverse-import test packages
-//
-// The first half landed (CoveringTests, covering_tests.go, cycle-1255). The
-// second half did NOT: CoveringTests walks ONLY the changed packages' own
-// directories, so a package whose *_test.go imports the changed package — the
-// literal definition of a covering test — is still invisible to the
-// amplification agent, which then falls back to the whole-repo Grep this task
-// exists to remove. There is no reverse-dependency seam in the module today
-// (the cycle-1267 fault-localization report cites a
-// `changedpkgs.ImporterClosure`; it does not exist — verified by grep over
-// go/internal, go/cmd and go/pkg).
-//
-// This file pins the missing seam:
-//
-//	DirectImporters(repoRoot string, pkgPatterns []string) []string
-//
-// Given the same go-test package patterns the rest of this package speaks
-// ("./internal/foo/..." or the bare "./internal/foo"), it returns the sorted,
-// deduped, bare-form patterns of the module packages that DIRECTLY import any
-// of them — counting imports from *_test.go files, which is precisely how a
-// covering test package depends on the code it covers. The input packages
-// themselves are never returned (they are already in the corpus), and
-// transitive importers are not (DIRECT means one hop: the item says "direct
-// reverse-import", and an unbounded closure would re-inflate the very context
-// this task shrinks).
-//
-// Fail-open, like every other deriver here: any unusable input yields nil —
-// never an error, never a panic — and the corpus degrades to exactly today's
-// changed-packages-only set.
-//
-// Import-shape probe (the cycle-644 obligation): every symbol pinned here is
-// pinned from INSIDE package changedpkgs, so no new import edge is introduced
-// in either direction; the reachability test below resolves its caller from the
-// parsed import graph rather than by importing it. changedpkgs imports only
-// internal/gitexec and internal/gopkgpattern, so the production caller this
-// contract requires (internal/core, which already imports changedpkgs) adds no
-// cycle. Confirmed against the current graph before freezing this pin.
-
 import (
 	"go/ast"
 	"go/parser"
@@ -56,9 +11,7 @@ import (
 	"testing"
 )
 
-// writeSource materialises one repo-relative, slash-separated Go source file
-// with the given package clause and imports. The files are parsed by the
-// deriver, never compiled, so a minimal body is enough.
+// writeSource writes only a package clause and imports: the deriver parses imports, never compiles.
 func writeSource(t *testing.T, root, relPath, pkgName string, imports ...string) {
 	t.Helper()
 	var b strings.Builder
@@ -79,17 +32,8 @@ func writeSource(t *testing.T, root, relPath, pkgName string, imports ...string)
 	}
 }
 
-// importerFixture builds a synthetic module whose reverse-import graph exercises
-// every axis of the contract:
-//
-//	internal/foo   — the CHANGED package (the input)
-//	internal/bar   — imports foo from a NON-test file      => direct importer
-//	internal/zed   — imports foo from zed_test.go ONLY     => direct importer
-//	                 (the covering-test case: the whole point of the widening)
-//	internal/qux   — imports bar, not foo                  => TRANSITIVE, excluded
-//	internal/lone  — imports nothing                       => unrelated, excluded
-//	internal/decoy — imports a DIFFERENT module's foo      => excluded (the
-//	                 suffix "internal/foo" must not match across module paths)
+// importerFixture: bar imports foo, zed imports foo only from its test, qux imports bar (transitive),
+// lone imports nothing, and decoy imports another module's internal/foo.
 func importerFixture(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
@@ -112,13 +56,6 @@ func importerFixture(t *testing.T) string {
 	return root
 }
 
-// TestDirectImporters_WidensToReverseImportersIncludingTestOnly — AC1, the crux.
-// The covering-test corpus must reach the packages whose tests exercise the
-// changed package. A test-only importer (zed) is the case that matters most: it
-// is invisible to CoveringTests today, and it is exactly what "covering test"
-// means. Transitive importers, unrelated packages, a same-suffix package from a
-// DIFFERENT module, and the input package itself must all stay out — that
-// exclusion IS the token saving this task exists for.
 func TestDirectImporters_WidensToReverseImportersIncludingTestOnly(t *testing.T) {
 	root := importerFixture(t)
 
@@ -134,11 +71,6 @@ func TestDirectImporters_WidensToReverseImportersIncludingTestOnly(t *testing.T)
 	}
 }
 
-// TestDirectImporters_AcceptsBothPatternForms — AC2. ChangedPackages/FromGit emit
-// the recursive "./internal/foo/..." form and core's changedGoTestPackages emits
-// the bare "./internal/foo" form; the widening sits downstream of both, so the
-// two must derive identically. Output is always the bare form, which is what
-// CoveringTests consumes.
 func TestDirectImporters_AcceptsBothPatternForms(t *testing.T) {
 	root := importerFixture(t)
 
@@ -150,12 +82,6 @@ func TestDirectImporters_AcceptsBothPatternForms(t *testing.T) {
 	}
 }
 
-// TestDirectImporters_DeterministicSortedAndDeduped — AC3. The corpus is written
-// into a run-dir artifact that lands in an agent's prompt; a set that reorders
-// between runs churns the prompt cache and makes before/after token measurement
-// (the item's own success metric) unreadable. Overlapping patterns must also
-// collapse: bar imports foo and qux imports bar, so asking for both foo and bar
-// must report bar/zed/qux each exactly once.
 func TestDirectImporters_DeterministicSortedAndDeduped(t *testing.T) {
 	root := importerFixture(t)
 
@@ -173,16 +99,9 @@ func TestDirectImporters_DeterministicSortedAndDeduped(t *testing.T) {
 	}
 }
 
-// TestDirectImporters_FailsOpenOnUnusableInput — AC4, the negative half and the
-// item's explicit guard ("scoping must fail-open to today's behaviour on
-// derivation error, never block the phase"). Every unusable input yields nil,
-// never a panic and never an error: the corpus then contains exactly the
-// changed packages, which is today's behaviour. The module-wide "./..." pattern
-// is unusable ON PURPOSE — widening from every package would name the whole
-// repo, which is strictly worse than the blind search this artifact replaces.
 func TestDirectImporters_FailsOpenOnUnusableInput(t *testing.T) {
 	populated := importerFixture(t)
-	noModule := t.TempDir() // a directory with no go/go.mod at all
+	noModule := t.TempDir()
 
 	cases := []struct {
 		name     string
@@ -210,9 +129,6 @@ func TestDirectImporters_FailsOpenOnUnusableInput(t *testing.T) {
 	}
 }
 
-// TestDirectImporters_NoImportersIsNotAnError — AC5. A cycle that touches a leaf
-// package nothing imports is the common case, not a failure: it must yield nil
-// so the corpus is the changed packages alone, byte-identically to today.
 func TestDirectImporters_NoImportersIsNotAnError(t *testing.T) {
 	root := importerFixture(t)
 	if got := DirectImporters(root, []string{"./internal/lone"}); got != nil {
@@ -221,13 +137,6 @@ func TestDirectImporters_NoImportersIsNotAnError(t *testing.T) {
 	}
 }
 
-// TestDirectImporters_ReachableFromProduction — AC6, the WIRING proof. A widening
-// seam whose only caller is a test injects nothing into the phase and saves zero
-// tokens (the cycle-1255 precedent for CoveringTests itself). Callers are
-// resolved from the parsed import graph of the whole go/ module: at least one
-// NON-test file outside package changedpkgs — and outside go/acs, whose
-// predicates are the gate, not the product — must reference
-// changedpkgs.DirectImporters.
 func TestDirectImporters_ReachableFromProduction(t *testing.T) {
 	moduleDir, err := filepath.Abs(filepath.Join("..", ".."))
 	if err != nil {
@@ -238,7 +147,7 @@ func TestDirectImporters_ReachableFromProduction(t *testing.T) {
 	fset := token.NewFileSet()
 	walkErr := filepath.Walk(moduleDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return nil // best-effort walk; an unreadable dir is not a verdict
+			return nil
 		}
 		if info.IsDir() {
 			switch info.Name() {
@@ -252,10 +161,10 @@ func TestDirectImporters_ReachableFromProduction(t *testing.T) {
 		}
 		file, perr := parser.ParseFile(fset, path, nil, 0)
 		if perr != nil {
-			return nil // unparseable file is not evidence either way
+			return nil
 		}
 		if file.Name.Name == "changedpkgs" {
-			return nil // the definition site is not a caller
+			return nil
 		}
 		ast.Inspect(file, func(n ast.Node) bool {
 			sel, ok := n.(*ast.SelectorExpr)

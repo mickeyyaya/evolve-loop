@@ -10,61 +10,26 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// importerClosureTimeout bounds the `go list` invocation. A cold module cache
-// makes the graph load the slowest thing this package does; past the bound we
-// fall back to the input set rather than hang a predicate.
+// importerClosureTimeout bounds `go list` on a cold module cache; past it the input set is returned rather than hang a predicate.
 const importerClosureTimeout = 120 * time.Second
 
-// moduleRootPattern is the go test pattern covering every package in the
-// module. Its closure is the identity — it already selects everything.
 const moduleRootPattern = "./..."
 
 // Closure is one reverse-dependency walk over the module's import graph.
 type Closure struct {
-	// Patterns is the sorted, deduped union of the input patterns and a
-	// "./dir/..." pattern for every module package whose build OR TEST binary
-	// transitively links one of them. Inputs are never dropped.
+	// Patterns is the sorted union of the inputs and every package whose build or test binary transitively links one.
 	Patterns []string
-	// Testable is the subset of Patterns under which `go list` finds at least
-	// one package with Go files in the default build context — what `go test`
-	// can run without tags. A tag-only package (`//go:build acs`) or a removed
-	// directory is in Patterns (its importers are exactly what break) but not
-	// here: naming it to `go test` is "matched no packages", exit 1.
+	// Testable is the subset of Patterns that `go test` can run without tags; a tag-only or removed dir is left out.
 	Testable []string
 }
 
-// ImporterClosure widens a changed-package set with its REVERSE dependencies:
-// the sorted, deduped union of pkgs and a "./dir/..." pattern for every module
-// package that transitively imports one of them — through its build
-// dependencies or through the imports of its own tests (an untouched
-// `_test.go` asserting a changed package's contract is the 2026-09-14 ship-gate
-// incident; a routingtest that imports router is the cycle-1250 one).
-//
-// Every other derivation in this package is forward-only — FileToPackage maps a
-// changed file to the package it lives in, and nothing walks the import graph.
-// Test-impact selection built on a forward-only set silently hides that whole
-// regression class.
-//
-// repoRoot is the REPOSITORY root (the dir containing the go/ module dir), the
-// same parameter meaning as FromGit/FromGitChecked. pkgs are "./dir/..."
-// patterns as emitted by FileToPackage.
-//
-// Best-effort, like the rest of this package: an empty or nonexistent repoRoot,
-// a junk pattern, or any `go list` failure yields the input set unchanged (an
-// EMPTY added closure) — never an error, never a panic, never a lost input
-// entry. Closure only ever widens; narrowing below the forward-only baseline
-// would be strictly worse than not having this function at all. Callers that
-// must distinguish "nothing imports it" from "go list failed" use
-// ImporterClosureChecked.
+// ImporterClosure returns pkgs widened by every module package that transitively imports one; any failure returns pkgs unchanged.
 func ImporterClosure(repoRoot string, pkgs []string) []string {
 	c, _ := ImporterClosureChecked(repoRoot, pkgs)
 	return c.Patterns
 }
 
-// ImporterClosureChecked is ImporterClosure plus the derivability signal and
-// the testable projection: ok is false when the module could not be listed
-// (no module, `go list` failed or timed out) — Patterns is then the input set
-// and Testable is empty.
+// ImporterClosureChecked is ImporterClosure plus Testable; ok is false when the module could not be listed.
 func ImporterClosureChecked(repoRoot string, pkgs []string) (Closure, bool) {
 	if len(pkgs) == 0 {
 		return Closure{}, true
@@ -100,7 +65,7 @@ func ImporterClosureChecked(repoRoot string, pkgs []string) (Closure, bool) {
 	hit := func(dep string) bool { return matchesAny(dep, targets, modPath) }
 	for _, pkg := range listing {
 		if matchesAny(pkg.path, targets, modPath) {
-			continue // inside an input pattern already
+			continue
 		}
 		if pkg.links(hit) {
 			set[patternFor(pkg.path, modPath)] = struct{}{}
@@ -122,13 +87,8 @@ type listedPkg struct {
 	testable    bool     // has Go files in the default build context
 }
 
-// links reports whether pkg's build deps (transitive) or its tests' DIRECT
-// imports name a package hit accepts. A test's imports count one hop on
-// purpose: the helper it imports is in the closure through its own deps, and
-// that helper's tests are where its contract is asserted — following a test
-// import's deps would pull every package whose tests use a shared fixture
-// (test/fixtures links core) into every closure, and selection would be
-// `./...` by another name.
+// links reports whether pkg's transitive build deps or its tests' direct imports name a package hit accepts.
+// A test import counts one hop: following its deps would pull every user of a shared fixture into every closure.
 func (p listedPkg) links(hit func(string) bool) bool {
 	for _, d := range p.deps {
 		if hit(d) {
@@ -143,8 +103,7 @@ func (p listedPkg) links(hit func(string) bool) bool {
 	return false
 }
 
-// listModule runs one `go list` over the module. -e keeps a single unloadable
-// package from failing the whole listing; .Deps is already transitive.
+// listModule runs one `go list -e` over the module; -e keeps one unloadable package from failing the whole listing.
 func listModule(ctx context.Context, moduleDir string) (map[string]listedPkg, error) {
 	out, err := sysexec.Output(ctx, sysexec.DefaultRunner, moduleDir, "go", "list", "-e", "-f",
 		`{{.ImportPath}}|{{join .Deps " "}}|{{join .TestImports " "}} {{join .XTestImports " "}}|{{len .GoFiles}} {{len .TestGoFiles}} {{len .XTestGoFiles}}`,
@@ -168,8 +127,7 @@ func listModule(ctx context.Context, moduleDir string) (map[string]listedPkg, er
 	return listing, nil
 }
 
-// testableUnder keeps the patterns under which at least one listed package has
-// default-context Go files. patterns is sorted, so the result is too.
+// testableUnder keeps the patterns under which a listed package has default-context Go files, in input order.
 func testableUnder(patterns []string, listing map[string]listedPkg, modPath string) []string {
 	var out []string
 	for _, pat := range patterns {
@@ -191,9 +149,7 @@ func testableUnder(patterns []string, listing map[string]listedPkg, modPath stri
 	return out
 }
 
-// targetPrefixes converts "./dir/..." patterns into module-relative directory
-// prefixes. Unparseable patterns are skipped: they contribute no closure but
-// still survive in the output, per the never-drop-an-input contract.
+// targetPrefixes converts "./dir/..." patterns into module-relative dirs; an unparseable one adds no closure but stays in the output.
 func targetPrefixes(pkgs []string) []string {
 	var out []string
 	for _, p := range pkgs {
@@ -230,8 +186,7 @@ func patternFor(importPath, modPath string) string {
 	return "./" + rel + "/..."
 }
 
-// sortedDedup returns pkgs sorted and deduped without mutating the input, so
-// the degenerate-input fallbacks share the shape contract of the real result.
+// sortedDedup returns a sorted, deduped copy of pkgs, so the fallbacks share the real result's shape.
 func sortedDedup(pkgs []string) []string {
 	set := map[string]struct{}{}
 	for _, p := range pkgs {
