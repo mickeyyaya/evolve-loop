@@ -63,7 +63,6 @@ func TestDoctorAuth(t *testing.T) {
 	home := t.TempDir()
 	eng := doctorEngine(map[string]string{"HOME": home}, nil, 0, nil)
 
-	// all absent → hints
 	if a := eng.doctorAuth("claude-p"); a.Configured {
 		t.Fatal("claude auth should be unconfigured")
 	}
@@ -77,12 +76,10 @@ func TestDoctorAuth(t *testing.T) {
 		t.Fatal("unknown cli should carry a hint")
 	}
 
-	// claude credentials file
 	mkfile(t, filepath.Join(home, ".claude", ".credentials.json"), "{}")
 	if a := eng.doctorAuth("claude-tmux"); !a.Configured || a.Source != "file:credentials.json" {
 		t.Fatalf("claude auth = %+v", a)
 	}
-	// codex valid + invalid
 	mkfile(t, filepath.Join(home, ".codex", "auth.json"), "{}")
 	if a := eng.doctorAuth("codex"); !a.Configured {
 		t.Fatalf("codex valid auth = %+v", a)
@@ -91,7 +88,6 @@ func TestDoctorAuth(t *testing.T) {
 	if a := eng.doctorAuth("codex"); a.Configured {
 		t.Fatal("codex invalid JSON should be unconfigured")
 	}
-	// agy config dir
 	if err := os.MkdirAll(filepath.Join(home, ".config", "agy"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -100,13 +96,12 @@ func TestDoctorAuth(t *testing.T) {
 	}
 }
 
-// TestDoctorAuth_ClaudeKeychain — claude OAuth lives in the macOS login
-// Keychain (service "Claude Code-credentials"), NOT a file, so the file-only
-// check false-negatives. doctorAuth must consult the KeychainProbe seam.
+// claude OAuth lives in the macOS login Keychain (service
+// "Claude Code-credentials"), not a file, so doctorAuth must consult the
+// KeychainProbe seam or a file-only check false-negatives.
 func TestDoctorAuth_ClaudeKeychain(t *testing.T) {
 	home := t.TempDir() // deliberately NO ~/.claude/.credentials.json
 
-	// Keychain present → configured via the keychain source.
 	eng := NewEngine(Deps{
 		LookupEnv:     mapLookup(map[string]string{"HOME": home}),
 		KeychainProbe: func(service string) bool { return service == "Claude Code-credentials" },
@@ -115,7 +110,6 @@ func TestDoctorAuth_ClaudeKeychain(t *testing.T) {
 		t.Fatalf("claude keychain auth = %+v, want Configured via keychain", a)
 	}
 
-	// Keychain absent AND no file → unconfigured (hint), for both families.
 	eng2 := NewEngine(Deps{
 		LookupEnv:     mapLookup(map[string]string{"HOME": home}),
 		KeychainProbe: func(string) bool { return false },
@@ -148,12 +142,10 @@ func TestDoctorEnvWarnings(t *testing.T) {
 }
 
 func TestDoctorDeep(t *testing.T) {
-	// tmux variant → not run
 	e := doctorEngine(nil, nil, 0, nil)
 	if dp := e.doctorDeep(context.Background(), "claude-tmux", "claude"); dp.Ran {
 		t.Fatal("tmux deep should not run")
 	}
-	// headless pass
 	if dp := e.doctorDeep(context.Background(), "claude-p", "claude"); !dp.Ran || !dp.Passed {
 		t.Fatalf("claude-p deep = %+v", dp)
 	}
@@ -163,7 +155,6 @@ func TestDoctorDeep(t *testing.T) {
 	if dp := e.doctorDeep(context.Background(), "agy", "agy"); !dp.Ran || !dp.Passed {
 		t.Fatalf("agy deep = %+v", dp)
 	}
-	// unknown → not run
 	if dp := e.doctorDeep(context.Background(), "zzz", "zzz"); dp.Ran {
 		t.Fatal("unknown cli deep should not run")
 	}
@@ -187,15 +178,12 @@ func TestDoctor_VerdictsAndExitCodes(t *testing.T) {
 	home := t.TempDir()
 	mkfile(t, filepath.Join(home, ".claude", ".credentials.json"), "{}")
 
-	// blocked: no binaries present at all
 	if _, code := doctorEngine(map[string]string{"HOME": home}, nil, 0, nil).Doctor(context.Background(), "claude-p", false); code != 2 {
 		t.Fatalf("no-binary exit = %d, want 2 (blocked)", code)
 	}
-	// blocked: binary present but auth file absent
 	if _, code := doctorEngine(map[string]string{"HOME": t.TempDir()}, map[string]bool{"claude": true}, 0, nil).Doctor(context.Background(), "claude-p", false); code != 2 {
 		t.Fatalf("present-binary no-auth exit = %d, want 2 (blocked)", code)
 	}
-	// ready: binary present + auth file + no warnings
 	rep, code := doctorEngine(map[string]string{"HOME": home}, map[string]bool{"claude": true}, 0, nil).Doctor(context.Background(), "claude-p", false)
 	if code != ExitOK || rep.Summary.Ready != 1 {
 		t.Fatalf("ready exit=%d summary=%+v", code, rep.Summary)

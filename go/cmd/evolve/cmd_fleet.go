@@ -1,8 +1,3 @@
-// cmd_fleet.go — `evolve fleet` concurrent-cycle supervisor (ADR-0049 S6 / CE.2).
-// Launches N cycles at the same time, each `evolve cycle run` in its OWN process
-// with EVOLVE_FLEET=1, so the orchestrator skips the whole-cycle global lock
-// (root-cause R1) and the per-resource flocks (S2–S5) serialize the shared
-// writes. The missing producer for the EVOLVE_FLEET flag.
 package main
 
 import (
@@ -22,12 +17,9 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 )
 
-// loadPlanSpecs parses an `evolve fleet --plan` backlog ([{"id","files"}]) and
-// partitions it into at most `count` disjoint-scoped cycle specs (ADR-0049 E:
-// the advisor assigns independent todos to independent cycles), each stamped
-// with goalHash. Returns the launch specs and the deferred todos (run in a later
-// wave). The partition guarantees every file is owned by one cycle, so the
-// launched cycles never collide on the shared tree.
+// loadPlanSpecs parses an `evolve fleet --plan` backlog into up to `count`
+// disjoint-scoped cycle specs stamped with goalHash; the second return is the
+// deferred backlog for a later wave.
 func loadPlanSpecs(planJSON []byte, goalHash string, count int) ([]fleet.CycleSpec, []fleet.Todo, error) {
 	var todos []fleet.Todo
 	if err := json.Unmarshal(planJSON, &todos); err != nil {
@@ -41,7 +33,6 @@ func loadPlanSpecs(planJSON []byte, goalHash string, count int) ([]fleet.CycleSp
 }
 
 func runFleet(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	// Sub-command: evolve fleet soak
 	if len(args) > 0 && args[0] == "soak" {
 		return runFleetSoak(args[1:], stdin, stdout, stderr)
 	}
@@ -87,8 +78,6 @@ func runFleet(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 
 	var specs []fleet.CycleSpec
 	if planPath != "" {
-		// Advisor-partitioned: each cycle gets a DISJOINT todo subset so the
-		// concurrent cycles never edit the same file (ADR-0049 E).
 		planJSON, rerr := os.ReadFile(planPath)
 		if rerr != nil {
 			fmt.Fprintf(stderr, "evolve fleet: read --plan %s: %v\n", planPath, rerr)
@@ -109,8 +98,6 @@ func runFleet(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		}
 		fmt.Fprintf(stderr, "[fleet] advisor plan: %d disjoint cycles, %d deferred\n", len(specs), len(deferred))
 	} else {
-		// No plan: count identical cycles. The per-resource locks keep them SAFE,
-		// but they may pick overlapping work (S5b rebase-reaudit is the net).
 		specs = make([]fleet.CycleSpec, count)
 		for i := range specs {
 			specs[i] = fleet.CycleSpec{GoalHash: goalHash}
@@ -133,28 +120,13 @@ func runFleet(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	return 0
 }
 
-// execCycleLaunch returns a fleet.LaunchFn that runs one `evolve cycle run` in a
-// child process. The child inherits the parent env plus the supervisor's
-// per-spec overlay (which already forced EVOLVE_FLEET=1).
 // cycleRunArgs builds the `evolve cycle run` argv for one fleet cycle. Pure +
 // testable; --simulate threads the no-LLM -simulate flag through.
 func cycleRunArgs(goalHash, outputContract, goalText string, simulate bool, projectRoot string) []string {
 	args := []string{"cycle", "run", "--goal-hash", goalHash}
-	// The plan's per-cycle output contract is the cycle's BINDING goal: threaded
-	// as --goal it reaches the scout (Context["goal"]) so the cycle executes the
-	// PLANNED removal instead of free-choosing a task (campaign-6 cycle-1 shipped
-	// a classify-only cycle and never lowered FlagCeiling). Empty keeps the
-	// generic goal (goal-hash only) — back-compat for plans without contracts.
-	// The contract is the goal text by design: the scout still reads the campaign
-	// docs in-repo for the "why" framing, and the adversarial auditor enforces the
-	// anti-gaming gate regardless of the goal prose — so a terse contract is the
-	// task, not a weakened constraint.
 	if outputContract != "" {
 		args = append(args, "--goal", outputContract)
 	} else if goalText != "" {
-		// No per-todo contract: fall back to the operator's loop-level
-		// --goal-text so a wave lane no longer silently drops it. The contract
-		// (above) always wins — this only fills the gap when the lane has none.
 		args = append(args, "--goal", goalText)
 	}
 	if simulate {
@@ -166,12 +138,8 @@ func cycleRunArgs(goalHash, outputContract, goalText string, simulate bool, proj
 	return args
 }
 
-// laneGoalHash resolves the goal-hash for a lane's `evolve cycle run`: the
-// spec's own GoalHash when a planner set it, else the wave/campaign-level
-// goalHash the launcher was built with. Fixes the fleet-lane defect where the
-// wave planners (PlanFromTriage/PlanCycles) build scoped specs WITHOUT a
-// GoalHash, so every lane died on "evolve cycle run: --goal-hash is required"
-// and the wave fell back to sequential.
+// laneGoalHash prefers the spec's own GoalHash over the wave/campaign-level
+// fallback the launcher was built with.
 func laneGoalHash(specGoalHash, fallback string) string {
 	if specGoalHash != "" {
 		return specGoalHash
@@ -190,9 +158,8 @@ func execCycleLaunch(binPath string, simulate bool, projectRoot, goalHash, goalT
 		cmd.Env = append(os.Environ(), envPairs(spec.Env)...)
 		cmd.Stdout = ow
 		cmd.Stderr = ew
-		// On ctx cancel/timeout (Ctrl-C or per-cycle deadline), SIGTERM the child
-		// for a graceful exit, then let WaitDelay escalate to SIGKILL if it ignores
-		// the term — so a wedged cycle is reaped, never left orphaned.
+		// On ctx cancel/timeout, SIGTERM the child for a graceful exit; WaitDelay
+		// escalates to SIGKILL if it ignores the signal, so a wedged cycle is reaped.
 		cmd.Cancel = func() error { return cmd.Process.Signal(syscall.SIGTERM) }
 		cmd.WaitDelay = 10 * time.Second
 		if err := cmd.Run(); err != nil {
@@ -206,8 +173,6 @@ func execCycleLaunch(binPath string, simulate bool, projectRoot, goalHash, goalT
 	}
 }
 
-// cycleLogTag identifies a cycle in interleaved fleet output: its todo scope, or
-// a short goal hash when no scope is assigned.
 func cycleLogTag(spec fleet.CycleSpec) string {
 	if len(spec.Scope) > 0 {
 		return strings.Join(spec.Scope, "+")

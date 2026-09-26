@@ -1,10 +1,3 @@
-// cmd_flags.go — `evolve flags generate|check` (L2.2, concurrency-factory
-// plan): projects the internal/flagregistry SSOT into a marker-delimited
-// region of docs/architecture/control-flags.md, exactly like `evolve skills
-// generate|check` projects phase facts (ADR-0040). Hand-written cluster
-// prose outside the markers is preserved byte-for-byte; the generated region
-// is the complete flat flag index. `check` exits 2 on drift so CI can gate
-// undocumented flags.
 package main
 
 import (
@@ -28,8 +21,8 @@ func runFlags(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return 10
 	}
 	// control-flags.md is a generated SOURCE doc, part of a cycle's committed
-	// deliverable — resolve it from the worktree under the ACS suite, not main's
-	// stale working copy (cycle-355 fix; see sourceRoot).
+	// deliverable — resolve it via sourceRoot() so an ACS suite run reads the
+	// worktree copy, not main's stale one.
 	project := sourceRoot()
 	docPath := filepath.Join(project, "docs", "architecture", "control-flags.md")
 	switch args[0] {
@@ -43,8 +36,6 @@ func runFlags(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	}
 }
 
-// flagsRun renders the expected doc and either writes it (generate) or
-// compares against disk (check; exit 2 on drift — the L2.3 CI contract).
 func flagsRun(docPath string, write bool, stdout, stderr io.Writer) int {
 	doc, err := os.ReadFile(docPath)
 	if err != nil {

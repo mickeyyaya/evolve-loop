@@ -1,23 +1,5 @@
 package main
 
-// cmd_dossier_retro_mislabel_test.go — `evolve dossier retro-mislabel`, the
-// derived (never estimated) count of dossier-corpus-carries-retro-mislabel
-// (cycle 1666): how many committed dossiers claim retro was SKIPPED while an
-// execution receipt proves it RAN. It is the production caller of the
-// corpus-reading seam (dossier.ReadCommitted + dossier.PhaseSkipEvidence) —
-// the audit is a fold of that seam over the corpus, so this test is a
-// reachability proof for the consumer-side safeguard, not a unit test of it.
-//
-// Output contract (`--json`): an object with at least
-//
-//	candidates     integer — legacy (unversioned) records whose skipped_phases names retro
-//	mislabeled     [int]   — …of those, a receipt proves retro ran (THE derived count)
-//	uncorroborated [int]   — …no receipt survives: unknown, never counted as mislabeled
-//
-// candidates == len(mislabeled) + len(uncorroborated); both lists ascending.
-// The command is READ-ONLY: it must never rewrite a record (the inbox record
-// forbids doing the backfill alongside the discriminator).
-
 import (
 	"bytes"
 	"encoding/json"
@@ -97,11 +79,6 @@ type mislabelReport struct {
 	Uncorroborated []int `json:"uncorroborated"`
 }
 
-// TestDossierRetroMislabel_DerivedCountCrossChecksArtifacts — the count is
-// DERIVED per record from a receipt, never from the reason string: 10 and 11
-// are mislabeled (one receipt source each), 12 and 15 are unknown, 13 is a
-// trusted post-fix skip, 14 never claimed a retro skip. And the corpus is
-// byte-identical afterwards: the audit reads, it does not backfill.
 func TestDossierRetroMislabel_DerivedCountCrossChecksArtifacts(t *testing.T) {
 	root := t.TempDir()
 	files := buildMislabelCorpus(t, root)
@@ -138,7 +115,6 @@ func TestDossierRetroMislabel_DerivedCountCrossChecksArtifacts(t *testing.T) {
 		}
 	}
 
-	// Human mode: same derivation, prose on stdout, exit 0.
 	out.Reset()
 	errb.Reset()
 	if rc := runDossier([]string{"retro-mislabel", "--project-root", root}, nil, &out, &errb); rc != 0 {
@@ -149,9 +125,6 @@ func TestDossierRetroMislabel_DerivedCountCrossChecksArtifacts(t *testing.T) {
 	}
 }
 
-// TestDossierRetroMislabel_AbsentCorpusFailsLoudly — the NEGATIVE row. A
-// count over a corpus that is not there is the "estimated" number the inbox
-// record rejects: exit non-zero and name the missing directory, never print 0.
 func TestDossierRetroMislabel_AbsentCorpusFailsLoudly(t *testing.T) {
 	root := t.TempDir()
 	var out, errb bytes.Buffer

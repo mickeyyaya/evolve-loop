@@ -8,9 +8,6 @@ import (
 	"testing"
 )
 
-// The corpus is byte-capped with a LOUD note: a silently short list would make
-// the amplification agent skip real covering tests it was handed, which is worse
-// than the blind search this artifact replaces.
 func TestRenderCoveringTests_TruncatesWithVisibleNote(t *testing.T) {
 	var many []string
 	for i := 0; i < 5000; i++ {
@@ -26,7 +23,6 @@ func TestRenderCoveringTests_TruncatesWithVisibleNote(t *testing.T) {
 	}
 }
 
-// A small corpus is emitted whole, one path per line, with no truncation note.
 func TestRenderCoveringTests_EmitsEveryPathWhenUnderCap(t *testing.T) {
 	out, _ := renderCoveringTests([]string{"go/internal/foo/foo_test.go", "go/internal/bar/bar_test.go"})
 
@@ -40,9 +36,6 @@ func TestRenderCoveringTests_EmitsEveryPathWhenUnderCap(t *testing.T) {
 	}
 }
 
-// Fail-open at the write seam: with no worktree or no workspace there is nothing
-// to derive and nothing to write, and the phase falls back to today's behaviour.
-// It must never create a file (or panic) on those inputs.
 func TestWriteCoveringTests_NoOpWithoutWorktreeOrWorkspace(t *testing.T) {
 	ws := t.TempDir()
 	writeCoveringTests(context.Background(), "", ws)

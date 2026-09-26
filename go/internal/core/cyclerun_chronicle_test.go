@@ -1,25 +1,5 @@
 package core_test
 
-// Chronicle S3 RED contract (cycle-784, chronicle-s3-digest-wiring, task
-// seed-digest-at-cycle-start). newCycleRun must resolve the chronicle policy
-// ONCE and, per stage:
-//
-//   off     → write nothing, inject nothing (byte-identical cycle start).
-//   shadow  → assemble DigestInput (last-N dossiers from
-//             knowledge-base/cycles/cycle-*.json, entriesFromRecords(state.FailedAt),
-//             best-effort recurrence ledger) and WriteDigest into the run
-//             workspace — but do NOT inject Context["recent_outcomes"].
-//   enforce → same write, PLUS Context["recent_outcomes"] carries the digest
-//             bytes into every phase request (scout/triage render it).
-//
-// WriteDigest is best-effort: a digest failure logs a WARN to stderr and the
-// cycle proceeds (mirrors the archivePollutedWorkspace idiom two blocks away).
-//
-// API pin (mirrors WithRetryConfig/WithWorkflowConfig, orchestrator.go): the
-// resolved policy.ChronicleConfig is injected at the composition root via
-// core.WithChronicleConfig; the zero-option default is the compiled default
-// (shadow). Builder implements; must NOT modify these tests.
-
 import (
 	"context"
 	"fmt"
@@ -101,9 +81,6 @@ func chronicleDigestPath(projectRoot string, cycle int) string {
 	return filepath.Join(core.RunWorkspacePath(projectRoot, cycle), "recent-outcomes.md")
 }
 
-// Shadow (the compiled default — NO option passed): the digest artifact is
-// seeded into the run workspace at cycle start from the dossier history, but
-// the context key is NOT injected (today's prompt bytes preserved).
 func TestNewCycleRun_SeedsRecentOutcomesDigestAtShadow(t *testing.T) {
 	root := t.TempDir()
 	seedChronicleDossier(t, root, 42, "harden the flux capacitor", "PASS")
@@ -124,8 +101,6 @@ func TestNewCycleRun_SeedsRecentOutcomesDigestAtShadow(t *testing.T) {
 	}
 }
 
-// Off: nothing is written and nothing is injected — a cycle start
-// byte-identical to the pre-chronicle behavior.
 func TestNewCycleRun_OffStageWritesNoDigest(t *testing.T) {
 	root := t.TempDir()
 	seedChronicleDossier(t, root, 42, "harden the flux capacitor", "PASS")
@@ -143,9 +118,6 @@ func TestNewCycleRun_OffStageWritesNoDigest(t *testing.T) {
 	}
 }
 
-// Enforce: the digest is written AND its content is injected once at the
-// cycle-start resolution point, so every downstream phase request carries
-// Context["recent_outcomes"].
 func TestNewCycleRun_EnforceInjectsRecentOutcomesContext(t *testing.T) {
 	root := t.TempDir()
 	seedChronicleDossier(t, root, 42, "harden the flux capacitor", "PASS")

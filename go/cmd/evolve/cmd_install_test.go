@@ -6,9 +6,6 @@ import (
 	"testing"
 )
 
-// TestPresentCLIs pins the install dispatch decision: which CLIs `evolve install`
-// targets, in install order, for a given PATH. It stubs the lookup seam so it
-// never runs a real install or depends on the dev machine's PATH.
 func TestPresentCLIs(t *testing.T) {
 	orig := installLookPath
 	t.Cleanup(func() { installLookPath = orig })

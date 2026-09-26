@@ -15,11 +15,6 @@ import (
 
 func fixedTime() time.Time { return time.Date(2026, 5, 26, 12, 0, 0, 0, time.UTC) }
 
-// driver_inject_test.go — live command injection: draining an agent inbox
-// from the artifact-wait poll loop and injecting envelopes into the running
-// REPL. injectEnvelope is tested directly for the three semantics; the loop
-// wiring (cursor-at-EOF + drain) is tested via runTmuxREPL.
-
 func injectCfg(ws string) *Config {
 	return &Config{Workspace: ws, Agent: "build", Worktree: ws}
 }
@@ -60,61 +55,43 @@ func TestInjectEnvelope_CommandMidTurn_Defers(t *testing.T) {
 
 	injectEnvelope(context.Background(), cfg, deps, lp, inbox.Envelope{Kind: inbox.KindCommand, Body: "later"})
 
-	// Must NOT paste while busy.
 	if _, err := os.Stat(scratchPath(ws)); err == nil {
 		t.Fatal("scratch file should not be written when agent is mid-turn")
 	}
-	// Must re-queue with an incremented defer count.
 	envs, _ := inbox.NewCursor(ws, "build").Drain()
 	if len(envs) != 1 || envs[0].Body != "later" || envs[0].DeferCount != 1 {
 		t.Fatalf("expected one re-queued envelope with DeferCount=1, got %+v", envs)
 	}
 }
 
-// TestInjectEnvelope_Keystroke_RawSendNoEscNoGate covers the cycle-124 F4
-// hatch: a keystroke envelope is sent via SendKeys verbatim — NO ESC prefix
-// (unlike interrupt), NO idle-gate (unlike command/nudge/system_rule), NO
-// paste-buffer scratch file (unlike everything else), NO auto-Enter. This
-// is the "full tmux control" channel the operator needs to dismiss the
-// codex per-edit-approval modal that hung cycle-123 (`--body=Enter`),
-// confirm y/N prompts (`--body=y`), navigate menus (`--body=Up`), or send
-// control chars (`--body=C-c`). The gate-bypass is intentional: the
-// operator may need to send keys precisely BECAUSE the agent isn't idle.
 func TestInjectEnvelope_Keystroke_RawSendNoEscNoGate(t *testing.T) {
 	ws := t.TempDir()
 	cfg := injectCfg(ws)
 	deps := covDeps()
-	// Pane is busy (no marker) — keystroke must STILL fire (no idle-gate).
+	// pane is busy (no idle marker)
 	tmux := &fakeTmux{paneSeq: []string{"thinking..."}}
 	deps.Tmux = tmux
 	lp := tmuxLaunch{name: "claude-tmux", session: "s", promptMarker: "❯"}
 
 	injectEnvelope(context.Background(), cfg, deps, lp, inbox.Envelope{Kind: inbox.KindKeystroke, Body: "Enter"})
 
-	// The sole SendKeys call must be the body, with enter=false.
 	if len(tmux.sentSeq) != 1 || tmux.sentSeq[0] != "Enter|false" {
 		t.Fatalf("keystroke must SendKeys body verbatim with enter=false; sentSeq=%v", tmux.sentSeq)
 	}
-	// MUST NOT pre-send Escape (that's interrupt's behavior).
 	for _, k := range tmux.sentSeq {
 		if k == "Escape|false" {
 			t.Fatalf("keystroke must NOT pre-send Escape; sentSeq=%v", tmux.sentSeq)
 		}
 	}
-	// MUST NOT write a paste-buffer scratch file (that's injectText's path).
 	if _, err := os.Stat(scratchPath(ws)); err == nil {
 		t.Fatal("keystroke must not write the paste-buffer scratch file")
 	}
-	// MUST NOT re-queue (that's the command/nudge defer path).
 	envs, _ := inbox.NewCursor(ws, "build").Drain()
 	if len(envs) != 0 {
 		t.Fatalf("keystroke must not re-queue; got %+v", envs)
 	}
 }
 
-// TestInjectEnvelope_Keystroke_SuspectWarnsButSends pins the keyspec
-// warn-not-block contract: a mistyped key name is flagged on stderr yet still
-// sent verbatim (the operator hatch is never refused).
 func TestInjectEnvelope_Keystroke_SuspectWarnsButSends(t *testing.T) {
 	ws := t.TempDir()
 	cfg := injectCfg(ws)
@@ -135,10 +112,6 @@ func TestInjectEnvelope_Keystroke_SuspectWarnsButSends(t *testing.T) {
 	}
 }
 
-// TestInjectEnvelope_Keystroke_EmptyBodyIsNoop is a defensive pin: an empty
-// --body must not crash and must not paste — the SendKeys impl (tmux.go
-// line 59) treats an empty keys arg as a no-op send-keys call. The test
-// also confirms no Escape pre-send leaks into the empty-body branch.
 func TestInjectEnvelope_Keystroke_EmptyBodyIsNoop(t *testing.T) {
 	ws := t.TempDir()
 	cfg := injectCfg(ws)
@@ -159,14 +132,8 @@ func TestInjectEnvelope_Keystroke_EmptyBodyIsNoop(t *testing.T) {
 	}
 }
 
-// TestInjectEnvelope_Keystroke_TmuxKeyNames covers the operator's
-// per-modal-class repertoire: every tmux named key the bridge might need
-// to send as a single envelope. The body is sent verbatim to SendKeys
-// with enter=false — tmux interprets these names natively, so a body of
-// "Escape" presses ESC, "C-c" sends Ctrl-C, "Up" presses ↑ etc. The fake
-// tmux records `<keys>|<enter>` so the assertion pins both the body and
-// the no-Enter contract. Idle-gate is bypassed (pane shows "busy") to
-// prove the named-key send fires regardless of agent state.
+// The fake tmux records "<keys>|<enter>", pinning both the body and the
+// no-Enter contract in one string.
 func TestInjectEnvelope_Keystroke_TmuxKeyNames(t *testing.T) {
 	keys := []string{
 		"Escape", // cancel a modal
@@ -205,11 +172,6 @@ func TestInjectEnvelope_Keystroke_TmuxKeyNames(t *testing.T) {
 	}
 }
 
-// TestInjectEnvelope_Keystroke_MultiToken pins that space-separated tmux
-// tokens reach SendKeys as ONE concatenated string (tmux's send-keys
-// itself parses the tokens). This is how the operator builds
-// y-then-Enter, Esc-then-text, navigate-then-confirm sequences — the
-// bridge is a transparent pass-through, the operator owns parsing.
 func TestInjectEnvelope_Keystroke_MultiToken(t *testing.T) {
 	cases := []struct {
 		body string
@@ -239,10 +201,8 @@ func TestInjectEnvelope_Keystroke_MultiToken(t *testing.T) {
 	}
 }
 
-// TestInjectEnvelope_Keystroke_UnicodeBody pins that UTF-8 body bytes
-// survive the SendKeys pass-through. Some CLIs prompt in non-ASCII
-// (Japanese, Korean, Chinese localizations), and a literal `--body=はい`
-// must reach the REPL byte-for-byte.
+// Some CLIs prompt in non-ASCII (Japanese, Korean, Chinese localizations),
+// and a literal `--body=はい` must reach the REPL byte-for-byte.
 func TestInjectEnvelope_Keystroke_UnicodeBody(t *testing.T) {
 	cases := []string{
 		"はい",      // Japanese "yes"
@@ -271,12 +231,6 @@ func TestInjectEnvelope_Keystroke_UnicodeBody(t *testing.T) {
 	}
 }
 
-// TestInjectEnvelope_Keystroke_DeferCountIgnored pins that the
-// DeferCount field on a keystroke envelope is NOT consulted by the
-// dispatch — keystroke bypasses the idle-gate entirely, so it never
-// enters the re-queue/defer path. An envelope arriving with
-// DeferCount=99 (well past maxInjectDefer=10) must STILL fire its
-// SendKeys, NOT drop.
 func TestInjectEnvelope_Keystroke_DeferCountIgnored(t *testing.T) {
 	ws := t.TempDir()
 	cfg := injectCfg(ws)
@@ -291,18 +245,14 @@ func TestInjectEnvelope_Keystroke_DeferCountIgnored(t *testing.T) {
 	if len(tmux.sentSeq) != 1 || tmux.sentSeq[0] != "Enter|false" {
 		t.Fatalf("keystroke with high DeferCount must still fire; sentSeq=%v", tmux.sentSeq)
 	}
-	// And MUST NOT be re-queued to the inbox.
 	envs, _ := inbox.NewCursor(ws, "build").Drain()
 	if len(envs) != 0 {
 		t.Fatalf("keystroke with high DeferCount must not re-queue; got %+v", envs)
 	}
 }
 
-// TestInjectEnvelope_Keystroke_LongBody pins that very long bodies reach
-// SendKeys intact. The tmux command line itself has limits in real
-// deployments, but the bridge's pass-through must not truncate or split.
-// 4 KB is well above any realistic operator-scripted body but below
-// macOS ARG_MAX (256 KB) so the test stays portable.
+// 4 KB is well above any realistic operator-scripted body but below macOS
+// ARG_MAX (256 KB) so the test stays portable.
 func TestInjectEnvelope_Keystroke_LongBody(t *testing.T) {
 	ws := t.TempDir()
 	cfg := injectCfg(ws)
@@ -328,12 +278,6 @@ func TestInjectEnvelope_Keystroke_LongBody(t *testing.T) {
 	}
 }
 
-// TestInjectEnvelope_Keystroke_SendKeysErrorSurfaced is the cycle-124
-// review MEDIUM regression guard: a failing SendKeys MUST produce a
-// "keystroke send failed" stderr line, NOT a "injected keystroke" success
-// line. Prevents the silent-failure mode where an operator sees `injected
-// keystroke "Enter"` in logs but nothing actually reached the (vanished)
-// pane.
 func TestInjectEnvelope_Keystroke_SendKeysErrorSurfaced(t *testing.T) {
 	ws := t.TempDir()
 	cfg := injectCfg(ws)
@@ -355,9 +299,8 @@ func TestInjectEnvelope_Keystroke_SendKeysErrorSurfaced(t *testing.T) {
 	}
 }
 
-// errInjectingTmux is a minimal fakeTmux that returns a configured error
-// from SendKeys — used only by TestInjectEnvelope_Keystroke_SendKeysErrorSurfaced
-// to drive the error branch added in cycle-124 review MEDIUM fix.
+// errInjectingTmux is a fakeTmux that returns a configured error from
+// SendKeys, driving injectEnvelope's error branch.
 type errInjectingTmux struct {
 	sendKeysErr error
 }
@@ -401,7 +344,7 @@ func TestInjectEnvelope_DeferBudgetExhausted_Drops(t *testing.T) {
 	deps.Tmux = tmux
 	lp := tmuxLaunch{name: "claude-tmux", session: "s", promptMarker: "❯"}
 
-	// Already at the max defer count → dropped, not re-queued.
+	// Already at the max defer count.
 	injectEnvelope(context.Background(), cfg, deps, lp, inbox.Envelope{Kind: inbox.KindCommand, Body: "x", DeferCount: maxInjectDefer})
 
 	envs, _ := inbox.NewCursor(ws, "build").Drain()
@@ -448,10 +391,8 @@ type captureHookTmux struct {
 }
 
 // CapturePane drops the artifact on the second capture and then leaves it
-// alone. The write-once guard is load-bearing under the cycle-1233 cross-poll
-// stability window (completion.go): rewriting the file on every capture would
-// bump its mtime on every tick, so the window could never close and the driver
-// would run out its whole wait budget. A real agent writes its deliverable once.
+// alone: rewriting it on every capture would keep bumping its mtime and the
+// completion stability window would never close.
 func (c *captureHookTmux) CapturePane(_ context.Context, _ string, _ int) (string, error) {
 	c.n++
 	if c.n >= 2 && !c.wrote {
@@ -478,8 +419,6 @@ func TestRunTmuxREPL_InjectsPostLaunchAppend(t *testing.T) {
 			_ = inbox.Append(ws, "build", inbox.Envelope{Kind: inbox.KindCommand, Body: "live cmd"}, fixedTime)
 		}
 	}
-	// pasteHookTmux writes the artifact once the injection paste completes
-	// (PasteBuffer #2; #1 is the prompt) so the loop exits deterministically.
 	pt := &pasteHookTmux{artifact: artifact, marker: "❯"}
 	deps.Tmux = pt
 	lp := tmuxLaunch{name: "claude-tmux", session: "s", launchCmd: "x", promptMarker: "❯", bootIntervalS: 1}
@@ -504,7 +443,7 @@ type pasteHookTmux struct {
 }
 
 func (p *pasteHookTmux) CapturePane(_ context.Context, _ string, _ int) (string, error) {
-	return p.marker, nil // always idle
+	return p.marker, nil
 }
 
 func (p *pasteHookTmux) PasteBuffer(_ context.Context, _ string) error {

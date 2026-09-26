@@ -6,9 +6,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// FanoutConfig replaces fanoutEnvConfig. These tests pin the built-in defaults
-// and override behavior of policy.Policy.FanoutConfig().
-
 func TestFanoutPolicyConfig_Defaults(t *testing.T) {
 	pol := policy.Policy{}
 	fc := pol.FanoutConfig()
@@ -55,7 +52,6 @@ func TestFanoutPolicyConfig_Override(t *testing.T) {
 }
 
 func TestFanoutPolicyConfig_ConcurrencyFloor(t *testing.T) {
-	// Concurrency < 1 falls back to the default 2.
 	pol := policy.Policy{Fanout: &policy.FanoutPolicy{Concurrency: 0}}
 	if fc := pol.FanoutConfig(); fc.Concurrency != 2 {
 		t.Errorf("Concurrency(0) = %d, want 2 (floor)", fc.Concurrency)

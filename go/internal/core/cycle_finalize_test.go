@@ -10,18 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
-// cycle_finalize_test.go — RED tests for S2 (workspace-hygiene-2026-07 plan):
-// ClearCompletedCycleMarker is the clean-exit counterpart to SealCycle. Unlike
-// SealCycle (abandon semantics: archive + faillearn lesson + ledger entry),
-// a clean batch-end marker clear must be SILENT — no `.reset-*` archive, no
-// lesson, no state.json mutation — or every healthy `max_cycles` exit would
-// falsely poison failure-learning (the plan's stated root-cause concern).
-//
-// ClearCompletedCycleMarker(evolveDir, FinalizeOptions{Now, LeaseTTL, PidAlive})
-// (bool, error) does not exist yet — this file, plus
-// cmd/evolve/cmd_loop_finalize_test.go, is the RED contract Builder implements
-// against.
-
 const finalizeFixedNow = "2026-07-06T12:00:00Z"
 
 func mustParseFinalizeNow(t *testing.T) time.Time {

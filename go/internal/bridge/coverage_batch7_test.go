@@ -12,11 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// coverage_batch7_test.go — the final uncovered branches: driver note +
-// model-omit paths, preparePrompt/ensureDirs/write errors (direct), the
-// runTmuxREPL extend-timeout + zero-interval paths (manifest seam), the
-// LaunchArgs (0,err) driver path (registry seam), and report/stream edges.
-
 func TestClaudeTmux_StreamOutputNote(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
 	_, se := runTmux(t, fx, &fakeTmux{}, nil, "--allow-bypass", "--stream-output")
@@ -48,14 +43,6 @@ func TestCodex_AutoModelOmitsM(t *testing.T) {
 	}
 }
 
-// TestPreparePrompt_ReadsExistingChallengeToken (cycle-136 lesson, PR 7):
-// when workspace/challenge-token.txt already exists (orchestrator minted +
-// wrote it at cycle start per PR 6), preparePrompt MUST reuse the existing
-// value and NOT mint+overwrite. One token per cycle is the invariant; the
-// bridge's per-phase mint was overwriting the orchestrator's token, causing
-// scout-report.md to use the orchestrator's token (plumbed via Context per
-// PR 6 / scout.go:64) while later phases saw the bridge's new token in the
-// workspace file. Cycle 136 audit C1 surfaced the divergence.
 func TestPreparePrompt_ReadsExistingChallengeToken(t *testing.T) {
 	ws := t.TempDir()
 	pf := writeJSON(t, filepath.Join(ws, "p.txt"), "prompt body $CHALLENGE_TOKEN tail")
@@ -85,7 +72,6 @@ func TestPreparePrompt_ReadsExistingChallengeToken(t *testing.T) {
 	if mintCalls != 0 {
 		t.Errorf("NewChallengeToken called %d times; should be 0 when challenge-token.txt exists", mintCalls)
 	}
-	// File must still contain the orchestrator's value (no overwrite).
 	if b, _ := os.ReadFile(filepath.Join(ws, "challenge-token.txt")); strings.TrimSpace(string(b)) != existing {
 		t.Errorf("challenge-token.txt was overwritten; got %q want %q", strings.TrimSpace(string(b)), existing)
 	}
@@ -94,7 +80,6 @@ func TestPreparePrompt_ReadsExistingChallengeToken(t *testing.T) {
 func TestPreparePrompt_TokenErrors(t *testing.T) {
 	ws := t.TempDir()
 	pf := writeJSON(t, filepath.Join(ws, "p.txt"), "x $CHALLENGE_TOKEN")
-	// NewChallengeToken error
 	if _, err := preparePrompt(&Config{PromptFile: pf, Workspace: ws},
 		Deps{NewChallengeToken: func() (string, error) { return "", errors.New("no tok") }}); err == nil {
 		t.Fatal("token-mint error should propagate")

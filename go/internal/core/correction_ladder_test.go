@@ -1,9 +1,5 @@
 package core
 
-// correction_ladder_test.go — ADR-0045 I2 (§8): the orchestrator-side ladder.
-// White-box: reuses fakeStorage / fakeLedger / buildRunners /
-// sequencedReviewer / recordingReviewer and the slice-1 ledger readers.
-
 import (
 	"context"
 	"encoding/json"
@@ -80,9 +76,9 @@ func readLadderOutcomes(t *testing.T, ws string) []interaction.Outcome {
 }
 
 // strayWriterRunner delegates to fakeRunner and plants a stray deliverable at
-// the LIVE workspace root on its first dispatch — modeling the cycle-265
-// agent that wrote a valid report at the wrong path. (RunCycle provisions a
-// fresh workspace, so pre-seeding from the test would be wiped.)
+// the LIVE workspace root on its first dispatch — modeling an agent that wrote
+// a valid report at the wrong path. (RunCycle provisions a fresh workspace, so
+// pre-seeding from the test would be wiped.)
 type strayWriterRunner struct {
 	*fakeRunner
 	strayName string
@@ -106,11 +102,11 @@ func plantStray(runners map[Phase]PhaseRunner) *strayWriterRunner {
 	return sw
 }
 
-// TestSalvage_RelocatesThenVerifiesDESTINATION — the 265 replay: a
-// misplaced-but-valid deliverable is salvaged in rung 1 with ZERO agent
-// re-dispatches; the verifier saw the destination absent on the locate call
-// and PRESENT on the verify-after-move call (relocate-first order, S2); the
-// relocated artifact still went through the review gate (final outcome).
+// TestSalvage_RelocatesThenVerifiesDESTINATION: a misplaced-but-valid
+// deliverable is salvaged in rung 1 with ZERO agent re-dispatches; the
+// verifier saw the destination absent on the locate call and PRESENT on the
+// verify-after-move call (relocate-first order, S2); the relocated artifact
+// still went through the review gate (final outcome).
 func TestSalvage_RelocatesThenVerifiesDESTINATION(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

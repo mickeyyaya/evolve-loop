@@ -1,23 +1,3 @@
-// cyclelevel_failure_test.go — cycle-234 task `cycle-level-bridge-failure` (RED).
-//
-// Invariant 3 root fix (retro I-9, batch deaths c225/c230/c231): a bridge or
-// phase error is a CYCLE-level failure — the batch must survive it. Only
-// kernel-integrity invariants (phase gate denial, broken ledger chain, lock
-// contention) stay batch-fatal.
-//
-// Contract encoded here:
-//   - core exposes an ErrCycleLevelFailure wrapper (Phase + Cause) with
-//     errors.As/errors.Is roundtrip;
-//   - RunCycle wraps the bridge-exhaustion abort path in it;
-//   - integrity breaches are NEVER wrapped (they must keep killing the batch);
-//   - the audit↔ship recovery loop is budget-bounded and its exhaustion is
-//     itself cycle-level, not batch-fatal (the c230 signature: 3 PASSed
-//     audits, 0 ships, batch dead).
-//
-// RED note: this file references core.ErrCycleLevelFailure, which does not
-// exist yet — the compile error "undefined: core.ErrCycleLevelFailure" is the
-// intended RED signal. Builder defines it in go/internal/core/errors.go.
-// Shares the core_test harness from orchestrator_recovery_test.go.
 package core_test
 
 import (
@@ -30,9 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// TestErrCycleLevelFailure_WrapsCauseForErrorsIs pins the sentinel's shape:
-// a struct error carrying the failed phase and the original cause, with
-// Unwrap so errors.Is reaches the root.
 func TestErrCycleLevelFailure_WrapsCauseForErrorsIs(t *testing.T) {
 	t.Parallel()
 	cause := errors.New("tmux pane died")
@@ -68,9 +45,6 @@ func (r *bridgeDeadRunner) Run(context.Context, core.PhaseRequest) (core.PhaseRe
 	return core.PhaseResponse{}, fmt.Errorf("bridge launch failed (pane died): %w", core.ErrTransientBridgeFailure)
 }
 
-// TestOrchestrator_BridgeExhaustion_CycleLevelFailure — scout AC: RunCycle
-// with a bridge that always fails returns ErrCycleLevelFailure (carrying the
-// failed phase + the bridge cause), instead of a bare batch-fatal error.
 func TestOrchestrator_BridgeExhaustion_CycleLevelFailure(t *testing.T) {
 	t.Parallel()
 	scout := &bridgeDeadRunner{name: "scout"}
@@ -107,10 +81,6 @@ func (r *integrityErrRunner) Run(context.Context, core.PhaseRequest) (core.Phase
 	return core.PhaseResponse{}, fmt.Errorf("kernel says no: %w", r.err)
 }
 
-// TestOrchestrator_IntegrityBreach_StillBatchFatal — scout AC: integrity
-// breaches must NOT be downgraded to cycle-level. A wrapper that
-// indiscriminately converts every phase error would pass the bridge test
-// above but fail here (the adversarial pair).
 func TestOrchestrator_IntegrityBreach_StillBatchFatal(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
@@ -179,15 +149,6 @@ func (r *countingPassRunner) Run(_ context.Context, req core.PhaseRequest) (core
 	return core.PhaseResponse{Phase: r.name, Verdict: core.VerdictPASS, ArtifactsDir: req.Workspace}, nil
 }
 
-// TestOrchestrator_RecoveryDepthBudget — scout AC: the audit↔ship recovery
-// loop is capped at maxRecoveryDepth (2). The c230 incident signature was 3
-// PASSed audits with 0 ships, then a batch-fatal abort. Under Invariant 3:
-//   - the traversal stays bounded: 1 initial audit + at most 2 recovery
-//     re-audits, same bound for ship attempts;
-//   - exhaustion of a PRECONDITION-class recovery is a cycle-level failure
-//     (ErrCycleLevelFailure), NOT batch-fatal — only integrity breaches kill
-//     the batch (covered by TestOrchestrator_IntegrityBreach_StillBatchFatal
-//     and the existing TestRunCycle_ShipIntegrityError_AbortsLoud).
 func TestOrchestrator_RecoveryDepthBudget(t *testing.T) {
 	t.Parallel()
 	se := core.NewShipError(core.CodeAuditBindingHeadMoved, core.ShipClassPrecondition, core.StageVerifyClass, "always stale")

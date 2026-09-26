@@ -9,10 +9,6 @@ import (
 	"time"
 )
 
-// coverage_batch3_test.go — error-injection + note branches: driver
-// runner failures, tmux spawn failure, the auto-responder tick layer,
-// extra cost guards, and the per-driver no-op notes.
-
 func TestDrivers_RunnerError_MissingBinary(t *testing.T) {
 	for _, cli := range []string{"claude-p", "codex", "agy"} {
 		t.Run(cli, func(t *testing.T) {
@@ -59,7 +55,6 @@ func TestCodex_Notes(t *testing.T) {
 func TestAgy_NotesAndModelWarn(t *testing.T) {
 	fx := newFixture(t, "agy", "")
 	fr := &fakeRunner{writeArtifactPath: fx.artifact, writeArtifactBody: "ok"}
-	// non-tier model → WARN; + stream/session notes
 	args := []string{
 		"--cli=agy", "--profile=" + fx.profile, "--model=some-weird-model",
 		"--prompt-file=" + fx.promptFile, "--workspace=" + fx.ws,
@@ -85,17 +80,15 @@ func TestCodexTmux_StreamOutputNote(t *testing.T) {
 
 func TestAutoResponder_Tick(t *testing.T) {
 	mkAR := func(prompts []ManifestPrompt, tmux *fakeTmux) *autoResponder {
-		// no-op Sleep: the auto_respond path now paces multi-keystroke sends
-		// via deps.Sleep (production sets it via withDefaults).
+		// no-op Sleep: auto_respond paces multi-keystroke sends via deps.Sleep
+		// (production wires it through withDefaults).
 		deps := Deps{Tmux: tmux, Stderr: io.Discard, Sleep: func(time.Duration) {}}
 		return &autoResponder{prompts: prompts, workspace: t.TempDir(), cli: "x", counts: map[string]int{}, deps: deps}
 	}
-	// extend_timeout → ("extend:N", 2)
 	ar := mkAR([]ManifestPrompt{{Name: "e", Regex: "slow", ResponseKeys: "30", Policy: "extend_timeout"}}, &fakeTmux{paneSeq: []string{"slow op"}})
 	if a, rc := ar.tick(context.Background(), "s"); a != "extend:30" || rc != 2 {
 		t.Fatalf("tick extend = (%q,%d)", a, rc)
 	}
-	// auto_respond send → ("",1) + keys sent
 	tmux := &fakeTmux{paneSeq: []string{"Continue?"}}
 	ar = mkAR([]ManifestPrompt{{Name: "s", Regex: "Continue", ResponseKeys: "y,Enter", Policy: "auto_respond"}}, tmux)
 	if a, rc := ar.tick(context.Background(), "s"); a != "" || rc != 1 {
@@ -104,7 +97,6 @@ func TestAutoResponder_Tick(t *testing.T) {
 	if !tmux.sentContains("y") {
 		t.Fatalf("tick send should deliver keys; sent=%v", tmux.sentKeys)
 	}
-	// noop
 	ar = mkAR(nil, &fakeTmux{paneSeq: []string{"nothing"}})
 	if a, rc := ar.tick(context.Background(), "s"); a != "" || rc != 0 {
 		t.Fatalf("tick noop = (%q,%d)", a, rc)

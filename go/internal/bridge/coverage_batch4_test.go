@@ -11,10 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// coverage_batch4_test.go — remaining reachable branches: driver log-file
-// open errors, engine.Launch argv branches, named-session create path,
-// and profile/report edge cases.
-
 func TestDrivers_OpenLogsError(t *testing.T) {
 	// --stdout-log points at the workspace dir itself → os.Create fails.
 	for _, cli := range []string{"claude-p", "codex", "agy"} {
@@ -58,9 +54,9 @@ func TestEngineLaunch_ArgBranchesAndMissingArtifact(t *testing.T) {
 	}
 }
 
+// The session name does not already exist, so this exercises the
+// CREATE-NAMED path; the session must be preserved on exit (no /exit).
 func TestRunTmuxREPL_NamedSessionCreate(t *testing.T) {
-	// --session-name that does NOT exist → CREATE-NAMED path; session
-	// preserved on exit (no /exit), artifact already present.
 	fx := newFixture(t, "claude-tmux", "")
 	writeJSON(t, fx.artifact, "done")
 	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}} // boots (new session)

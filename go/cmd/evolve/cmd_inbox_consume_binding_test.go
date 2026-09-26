@@ -1,15 +1,5 @@
 package main
 
-// cmd_inbox_consume_binding_test.go — the immortal-binding class through the
-// MANUAL consume path (cycles 1487/1497 → recurred 2026-08-25 as cycle-1558:
-// an operator `evolve inbox consume` moved the premise-challenge item to
-// consumed/ but left its scope-keyed continuation binding in the registry,
-// and the next wave minted a lane straight off it — a full lane burned
-// re-proving finished work AGAIN). The ship-path release landed with the
-// lane-scope-union fix; this pins the operator command and the consumed-corpus
-// reconciler to the same contract: consumption releases the binding, and a
-// binding whose item already lives in consumed/ is definitionally dead.
-
 import (
 	"bytes"
 	"encoding/json"
@@ -31,8 +21,6 @@ func writeBinding(t *testing.T, root, id string, cycle int) {
 	}
 }
 
-// Consuming an item must release its continuation binding in the same
-// invocation, and the consumed item must carry the released pointer.
 func TestRunInbox_Consume_ReleasesContinuationBinding(t *testing.T) {
 	root := t.TempDir()
 	withProjectRoot(t, root)
@@ -61,9 +49,6 @@ func TestRunInbox_Consume_ReleasesContinuationBinding(t *testing.T) {
 	}
 }
 
-// The reconciler half: a binding whose item ALREADY lives in consumed/ (a past
-// manual consume from before this fix, or a bare mv) is dead and must be
-// released by the consumed-corpus sweep on the breaker's boot path.
 func TestReconcileConsumedBindings_ReleasesStrayBinding(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
@@ -84,8 +69,6 @@ func TestReconcileConsumedBindings_ReleasesStrayBinding(t *testing.T) {
 	}
 }
 
-// A binding for an id whose item is NOT consumed must survive the sweep —
-// live work keeps its salvage pointer.
 func TestReconcileConsumedBindings_LiveBindingUntouched(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
@@ -100,8 +83,6 @@ func TestReconcileConsumedBindings_LiveBindingUntouched(t *testing.T) {
 	}
 }
 
-// Wiring pin: the sweep must actually run on the breaker's boot path — a
-// reconciler nothing calls is the tenth-plus NOT-WIRED candidate this month.
 func TestBlockerBreakerBootPath_RunsBindingReconcile(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
@@ -121,10 +102,8 @@ func TestBlockerBreakerBootPath_RunsBindingReconcile(t *testing.T) {
 	}
 }
 
-// The cycle-1507 RECENCY guard, inherited by the sweep: a consumed copy OLDER
-// than the binding is stale evidence — the id was re-filed and rebound after
-// that retirement, and releasing would destroy live preserved work (measured
-// 7/91 real bindings pre-guard). The sweep must skip it, loudly.
+// A consumed copy OLDER than the binding is stale evidence (recency guard);
+// the sweep must skip it, loudly.
 func TestReconcileConsumedBindings_NewerBindingSurvivesStaleConsumedCopy(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")

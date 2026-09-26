@@ -1,14 +1,5 @@
 package core
 
-// continuation_stamp.go — ADR-0076 slice C, produce side. At the preserve
-// decision (finalizeCycle, FAIL verdict) the cycle's dirty worktree is
-// snapshot-committed onto its cycle branch and a continuation manifest is
-// written into the workspace — IF the carry-forward screen classifies the
-// snapshot Clean against main. The inbox mover later stamps released items
-// from this manifest, transactionally with the release; the next claim adopts
-// the snapshot ref. Everything here is best-effort and LOUD: a salvage failure
-// must never fail cycle finalization, and must never be silent.
-
 import (
 	"context"
 	"encoding/json"
@@ -34,8 +25,6 @@ var snapshotIdentity = []string{"-c", "user.name=evolve-loop", "-c", "user.email
 // preserve EVERYTHING the attempt produced in its isolated worktree; the
 // declared-manifest staging discipline applies to SHIP binding, not salvage.
 func snapshotPreservedWorktree(ctx context.Context, projectRoot, worktree string) (string, error) {
-	// A salvage snapshot is `add -A` + commit of a cycle's ISOLATED worktree;
-	// the operator's own tree is never committed (inPlaceWorktree).
 	if inPlaceWorktree(worktree, projectRoot) {
 		return "", errors.New("the active worktree is the project root — no salvage snapshot (never commit the operator's tree)")
 	}
@@ -93,15 +82,8 @@ func (o *Orchestrator) stampContinuationManifest(ctx context.Context, cs CycleSt
 		Branch:      strings.TrimSpace(branch),
 		SnapshotSHA: sha,
 		BaseSHA:     cs.WorktreeBaseSHA,
-		// audit-fail-reason.json, NOT failure-digest.json (live gap,
-		// 1146→1148): the digest is the content-free identity shell
-		// {cycle, fingerprint, pre_class} — served as "prior findings" it
-		// told the next builder NOTHING, so attempt 2 repeated attempt 1's
-		// protectedsurface rejection byte-for-byte while the fail-reason
-		// carried the predicate's own rename remedy the whole time. The
-		// artifact exists whenever a floor or the ensureFailureDigest
-		// fallback produced one; absence degrades to no findings, WARNed at
-		// read time.
+		// audit-fail-reason.json carries the failing phase's actual reasons;
+		// failure-digest.json is only an identity shell with no findings text.
 		FindingsPath: filepath.Join(cs.WorkspacePath, "audit-fail-reason.json"),
 		Cycle:        cycle,
 	}
@@ -179,16 +161,14 @@ func readContinuationFindings(path string) string {
 	}
 	body, err := os.ReadFile(path)
 	if err != nil {
-		// Absence degrades to "no findings" — but loudly, so the operator can
-		// tell "none existed" from "manifest points at the wrong path"
-		// (review MEDIUM: the fail-reason artifact is only written when a
-		// floor or the ensureFailureDigest fallback produced one).
+		// Loud, not silent: the operator must be able to tell "no findings
+		// existed" from "manifest points at the wrong path".
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN continuation: findings artifact %s unreadable (%v) — builder gets no prior-attempt findings\n", path, err)
 		return ""
 	}
-	// Render the reason artifact as readable lines, not raw JSON: the reasons
-	// carry the actionable remedy (1146→1148), and a builder should not read
-	// them through \n escapes. Unmarshal failure falls back to the raw body.
+	// Render the reason artifact as readable lines, not raw JSON, so the
+	// builder does not read escaped \n sequences; a failed unmarshal falls
+	// back to the raw body.
 	var a auditFailReason
 	if json.Unmarshal(body, &a) == nil && len(a.Reasons) > 0 {
 		rendered := "failed phase: " + a.Phase + "\n- " + strings.Join(a.Reasons, "\n- ")
@@ -197,10 +177,9 @@ func readContinuationFindings(path string) string {
 	return truncateFindings(strings.TrimSpace(string(body)))
 }
 
-// truncateFindings bounds the findings text with an EXPLICIT marker — the cap
-// was unreachable while findings were the ~150-byte digest shell, but a
-// reason artifact can embed whole go-test blocks, and a silent mid-JSON cut
-// could hide the very remedy the findings exist to deliver.
+// truncateFindings bounds the findings text with an explicit marker, because
+// a reason artifact can embed whole go-test blocks and a silent mid-JSON cut
+// would hide the remedy the findings exist to deliver.
 func truncateFindings(s string) string {
 	if len(s) <= maxFindingsBytes {
 		return s
@@ -215,20 +194,14 @@ func truncateFindings(s string) string {
 	return s[:cut] + fmt.Sprintf("\n…[truncated %d bytes]", len(s)-cut)
 }
 
-// adoptContinuationAfterTriage is the ADR-0076 slice C adoption seam, invoked
-// right after the triage phase completes — the moment this cycle's claims
-// exist on disk, so the resolver reads REAL scope (architect finding #1: any
-// earlier and processing/cycle-N does not exist yet). On a valid stamped
-// claim it RE-SEEDS the cycle worktree from the salvage snapshot (CreateFrom
-// force-recreates the same lane-namespaced path, so downstream phases pick it
-// up unchanged), moves the review base to the ORIGINAL attempt's base — or to
-// main's tip when the base-advance heals a stale one (continuation_baseadvance.go);
-// either way the cumulative work is reviewed and shipped whole, copies the continuation
-// manifest into THIS cycle's workspace (ship's manifest reconciliation unions
-// the prior attempt's declared paths from it; a re-FAIL overwrites it at the
-// next preserve), and serves the prior findings to the build prompt. Every
-// validation failure keeps fresh provisioning. After seeding, any failure
-// stops the cycle and preserves the worktree for diagnosis.
+// adoptContinuationAfterTriage is the continuation adoption seam. It runs
+// right after triage, once this cycle's own claims exist on disk, so the
+// resolver reads real scope. On a valid stamped claim it re-seeds the cycle
+// worktree from the salvage snapshot, advances the review base, copies the
+// continuation manifest into this cycle's workspace, and serves the prior
+// findings to the build prompt. A validation failure keeps fresh
+// provisioning; a failure after seeding stops the cycle and preserves the
+// worktree for diagnosis.
 func (cr *cycleRun) adoptContinuationAfterTriage() error {
 	if cr.o.continuationFor == nil {
 		return nil
@@ -245,9 +218,8 @@ func (cr *cycleRun) adoptContinuationAfterTriage() error {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d continuation from cycle %d rejected (%v) — keeping fresh worktree\n", cr.cycle, c.Cycle, err)
 		// Release the declined binding, or the root-owned registry entry
 		// outlives its lineage and the defect-ledger gate's out-of-band check
-		// auto-FAILs every future lane on this scope (the 1412/1418
-		// absorbing-FAIL state). Orchestrator-side only — an agent deleting
-		// the WORKSPACE manifest still hits the gate's cycle-1285 block.
+		// auto-FAILs every future lane on this scope. Orchestrator-side only:
+		// an agent deleting the workspace manifest still hits the gate's block.
 		releaseDeclinedBinding(cr.req.ProjectRoot, scopeIDs, c)
 		return nil
 	}
@@ -284,7 +256,6 @@ func (cr *cycleRun) adoptContinuationAfterTriage() error {
 	if err := continuation.WriteManifest(cr.cs.WorkspacePath, *c); err != nil {
 		return fmt.Errorf("continuation workspace manifest copy: %w", err)
 	}
-	// Disposition-skeleton preseed — see disposition_seed.go.
 	SeedDispositionSkeleton(cr.cs.WorkspacePath, cr.req.ProjectRoot, c.Cycle)
 	if findings := readContinuationFindings(c.FindingsPath); findings != "" {
 		cr.ctxSnap["continuation_findings"] = findings
@@ -296,9 +267,9 @@ func (cr *cycleRun) adoptContinuationAfterTriage() error {
 // releaseDeclinedBinding removes the registry binding(s) that produced a
 // DECLINED continuation: every scope in scopeIDs whose entry names the same
 // ancestor cycle as the rejected candidate. Scopes bound to a different
-// ancestor are untouched. Best-effort with a loud line either way — a release
-// that fails leaves the pre-fix behavior (the next lane declines again), never
-// anything worse.
+// ancestor are untouched. Best-effort with a loud line either way: a release
+// that fails simply leaves the binding in place, so the next lane declines
+// again — never worse than that.
 func releaseDeclinedBinding(projectRoot string, scopeIDs []string, declined *continuation.Continuation) {
 	if declined == nil {
 		return

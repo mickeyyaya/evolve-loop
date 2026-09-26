@@ -1,22 +1,5 @@
 package bridge
 
-// contextfill_contributors_test.go — WIRING half of the cycle-1482 task
-// `context-fill-warning-attribution` RED contract. This is a REACHABILITY
-// test, not a unit test: it drives the real production caller
-// (Engine.recordTokenUsage) and asserts the contributor breakdown attached to
-// the CONTEXT-FILL WARN comes from the SAME basis result.FillPct was derived
-// from — never a second, disagreeing total. A test that called
-// tokenusage.FillWarnWithContributors directly would pass on dead code.
-//
-// RED: tokenusage.Result carries no PeakUsage field yet, so this file fails to
-// COMPILE until Builder adds it and wires recordTokenUsage to prefer
-// result.PeakUsage over result.Usage whenever result.PeakPromptTokens != 0 —
-// the same distinction fillpct.go's windowOccupancy already documents for the
-// percentage itself (compile-fail = RED evidence).
-//
-// Reuses runContextFillCase's sibling helpers (contextFillLine) from
-// contextfill_warn_test.go, same package.
-
 import (
 	"bytes"
 	"strings"
@@ -28,15 +11,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/tokenusage"
 )
 
-// TestContextFillWarn_ContributorsMatchPeakPromptReading is the cycle-1458 M1
-// continuation predicate: the contributor breakdown attached to a fill WARN
-// must be measured on the SAME basis as the percentage it annotates — the
-// fullest single observed turn — never the whole-launch summed total
-// (adversarial-review F1: a 70% reading annotated with contributor figures
-// that total far more than the window).
-//
-// Fixture: an early, large-cache_read turn dominates the whole-launch SUM, but
-// a LATER, smaller turn is the actual PEAK (the one the resolver already
+// Fixture: an early, large-cache_read turn dominates the whole-launch sum, but
+// a later, smaller turn is the actual peak (the one the resolver already
 // selected for FillPct via windowOccupancy). Only a fix that carries the peak
 // turn's own components through to the contributor breakdown can pass.
 func TestContextFillWarn_ContributorsMatchPeakPromptReading(t *testing.T) {
@@ -81,13 +57,9 @@ func TestContextFillWarn_ContributorsMatchPeakPromptReading(t *testing.T) {
 	}
 }
 
-// TestContextFillWarn_ContributorsFallBackToUsageWithoutPeakData is the
-// adversarial edge half of the same fix: a tier that never reports a per-turn
-// breakdown (events/scrollback — PeakPromptTokens == 0) has only the
-// whole-launch total to show, and that total IS already a single reading in
-// that case (fillpct.go's windowOccupancy documents the same distinction).
-// This pins that the M1 fix must not regress the pre-existing, already-correct
-// contributor path for those tiers.
+// A tier with no per-turn breakdown (PeakPromptTokens == 0) has only the
+// whole-launch total, which fillpct.go's windowOccupancy already treats as a
+// single reading in that case.
 func TestContextFillWarn_ContributorsFallBackToUsageWithoutPeakData(t *testing.T) {
 	start := time.Date(2026, 8, 16, 10, 0, 0, 0, time.UTC)
 	end := start.Add(30 * time.Second)

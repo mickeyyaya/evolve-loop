@@ -1,21 +1,5 @@
 package core
 
-// crossartifact_invariants.go — the ADVISORY half of the cycle-1676
-// cross-artifact invariant stack. internal/coherence computes the four weak
-// verifiers; this is the one place the real cycle-close path records them.
-//
-// Two properties are load-bearing and are pinned at this seam
-// (crossartifact_invariants_wiring_test.go):
-//
-//  1. The stack is bound to the LANE worktree (cs.ActiveWorktree), never the
-//     projectRoot argument — in fleet mode a project-root snapshot names a tree
-//     this lane did not write, which is the #612 lesson.
-//  2. A finding NEVER blocks. It changes no verdict, raises no system failure,
-//     and is recorded on EVERY cycle, all-ok included: a false-positive rate
-//     that is never recorded can never be evidenced, and that evidence is the
-//     only door to graduating any of these invariants to blocking (the
-//     1054/1060 breaker lesson, and the inbox record's own rule).
-
 import (
 	"encoding/json"
 	"fmt"

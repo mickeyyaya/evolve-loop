@@ -1,35 +1,13 @@
 package core
 
-// correction_directive_class_test.go — a correction directive must not forbid
-// the action the gate requires.
-//
-// The defect: composeCorrection emits ONE directive for every deliverable
-// rejection, written for a single failure class — "the contracted artifact
-// exists but is malformed". Gate A (evals-materialized) rejects for a DIFFERENT
-// class: a required SIDECAR artifact was never created. For that class the
-// generic directive misdirects on every clause. It says "fix THE deliverable"
-// (singular — pointing at a scout-report.md that is already well-formed), frames
-// the defect as "required sections / valid structure", and closes with
-// "Do not change unrelated files" — which forbids creating the eval sidecars,
-// the one action that would satisfy the gate.
-//
-// Live consequence: every scout|gate-block failure in recorded history is this
-// gate (cycles 1471, 1476, 1504, 1531) and all four read "rejected after 2
-// correction(s)". 0-for-4 recovery. A merely weak directive recovers sometimes.
-//
-// Contract: a gate that knows how to fix its own violation supplies a
-// remediation; when one is present the directive carries it and drops the
-// clause forbidding file creation. When absent, the directive is byte-identical
-// to today.
-
 import (
 	"os"
 	"strings"
 	"testing"
 )
 
-// gateARejection is the real Gate A reject reason, verbatim from cycle-1531's
-// dispatched prompt (.evolve/runs/cycle-1531/scout-prompt.txt line 5).
+// gateARejection is a real Gate A reject reason, verbatim from a production
+// scout-prompt dispatch.
 const gateARejection = "scout did not materialize evals for selected slug(s): " +
 	"judgment-phase-shadow-config, judgment-verdict-shadow-classifier"
 
@@ -44,7 +22,6 @@ func forbidsFileCreation(directive string) bool {
 	return strings.Contains(directive, "Do not change unrelated files")
 }
 
-// TestComposeCorrection_SidecarClassDoesNotForbidTheFix is the core regression.
 func TestComposeCorrection_SidecarClassDoesNotForbidTheFix(t *testing.T) {
 	got := composeCorrection(gateARejection, gateARemediation)
 
@@ -79,9 +56,8 @@ func TestComposeCorrection_MalformedClassIsByteIdentical(t *testing.T) {
 }
 
 // TestComposeContractSalvageRetry_CarriesRemediation: Gate A failures reach the
-// SECOND-STRIKE path — all four production failures were "rejected after 2
-// correction(s)" — so fixing only composeCorrection leaves the defect live on
-// the path that actually decides those cycles.
+// SECOND-STRIKE path, so fixing only composeCorrection leaves the defect live
+// on the path that actually decides those cycles.
 func TestComposeContractSalvageRetry_CarriesRemediation(t *testing.T) {
 	got := composeContractSalvageRetry(gateARejection, gateARemediation)
 

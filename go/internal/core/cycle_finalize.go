@@ -11,13 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
-// cycle_finalize.go — S2 (workspace-hygiene-2026-07 plan): the clean-exit
-// counterpart to SealCycle. Where SealCycle ABANDONS a stuck cycle (archive +
-// faillearn lesson + ledger entry), ClearCompletedCycleMarker clears a
-// terminal-but-not-yet-cleared on-disk cycle-state.json marker left behind by
-// a normal `max_cycles` batch exit — SILENTLY, so a healthy exit never
-// poisons failure-learning the way SealCycle's abandon semantics would.
-
 // FinalizeOptions configures ClearCompletedCycleMarker. Now/LeaseTTL/PidAlive
 // mirror the same-named SealOptions fields — the liveness fence must agree
 // with SealCycle's.
