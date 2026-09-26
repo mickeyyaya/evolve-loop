@@ -255,12 +255,15 @@ func closeoutCycleOutcome(result core.CycleResult, projectRoot, evolveDir string
 // applyCycleNoWorkOutcome hands a no-work lane's answered scoped items to the
 // console and releases its claims; a cycle without a lane pin has none.
 func applyCycleNoWorkOutcome(projectRoot string, cycle int, stderr io.Writer, lifecycle inboxmover.LedgerAppender, signals *signalcenter.Center) error {
-	_, err := cycleoutcome.ApplyNoWork(cycleoutcome.NoWorkInputs{
+	res, err := cycleoutcome.ApplyNoWork(cycleoutcome.NoWorkInputs{
 		ProjectRoot: projectRoot,
 		Workspace:   cycleWorkspace(projectRoot, cycle),
 		Cycle:       cycle,
 		Stderr:      stderr,
 	}.WithLedger(lifecycle).WithSignals(signals))
+	if len(res.Routed)+len(res.Retired) > 0 {
+		fmt.Fprintf(stderr, "[cycle] planned no-work closeout for cycle %d: routed %v to the console, retired %v (no inbox item)\n", cycle, res.Routed, res.Retired)
+	}
 	return err
 }
 

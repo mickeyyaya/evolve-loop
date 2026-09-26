@@ -56,12 +56,12 @@ func TestApplyNoWork_HandsTheLanesAnsweredItemToTheConsole(t *testing.T) {
 		`{"top_n":[],"dropped":[{"id":"answered","reason":"stale: closed by #535"},{"id":"elsewhere","reason":"duplicate"}]}`)
 	c, events := recordingCenter()
 
-	routed, err := ApplyNoWork(NoWorkInputs{ProjectRoot: root, Workspace: ws, Cycle: 7, Stderr: io.Discard}.WithSignals(c))
+	res, err := ApplyNoWork(NoWorkInputs{ProjectRoot: root, Workspace: ws, Cycle: 7, Stderr: io.Discard}.WithSignals(c))
 	if err != nil {
 		t.Fatalf("ApplyNoWork: %v", err)
 	}
-	if len(routed) != 1 || routed[0] != "answered" {
-		t.Fatalf("routed = %v, want exactly the lane's answered item", routed)
+	if len(res.Routed) != 1 || res.Routed[0] != "answered" {
+		t.Fatalf("routed = %v, want exactly the lane's answered item", res.Routed)
 	}
 	inbox := filepath.Join(root, ".evolve", "inbox")
 	rec := itemRecord(t, inbox, "answered")
@@ -93,13 +93,13 @@ func TestApplyNoWork_HandsTheLanesAnsweredItemToTheConsole(t *testing.T) {
 func TestApplyNoWork_RoutesNothingWithoutAPinOrAPendingItem(t *testing.T) {
 	decision := `{"top_n":[],"skip_shipped":[{"task_id":"shipped","git_sha":"abc123"}]}`
 	root, ws := seedLane(t, []string{"shipped"}, nil, decision)
-	if routed, err := ApplyNoWork(NoWorkInputs{ProjectRoot: root, Workspace: ws, Cycle: 7, Stderr: io.Discard}); err != nil || len(routed) != 0 {
-		t.Fatalf("no lane pin ⇒ nothing to hand over: routed=%v err=%v", routed, err)
+	if res, err := ApplyNoWork(NoWorkInputs{ProjectRoot: root, Workspace: ws, Cycle: 7, Stderr: io.Discard}); err != nil || len(res.Routed) != 0 {
+		t.Fatalf("no lane pin ⇒ nothing to hand over: routed=%v err=%v", res.Routed, err)
 	}
 
 	root, ws = seedLane(t, nil, []string{"shipped"}, decision)
-	if routed, err := ApplyNoWork(NoWorkInputs{ProjectRoot: root, Workspace: ws, Cycle: 7, Stderr: io.Discard}); err != nil || len(routed) != 0 {
-		t.Fatalf("an answered item no longer in the inbox is not an error: routed=%v err=%v", routed, err)
+	if res, err := ApplyNoWork(NoWorkInputs{ProjectRoot: root, Workspace: ws, Cycle: 7, Stderr: io.Discard}); err != nil || len(res.Routed) != 0 {
+		t.Fatalf("an answered item no longer in the inbox is not an error: routed=%v err=%v", res.Routed, err)
 	}
 }
 
@@ -111,8 +111,8 @@ func TestApplyNoWork_AppendsTheRouteThroughTheInjectedLedger(t *testing.T) {
 		`{"top_n":[],"escalate_block":[{"task_id":"answered","reason":"console-routed"}]}`)
 	rec := &recordingLifecycleLedger{}
 	in := NoWorkInputs{ProjectRoot: root, Workspace: ws, Cycle: 7, Stderr: io.Discard}
-	if routed, err := ApplyNoWork(in.WithLedger(rec)); err != nil || len(routed) != 1 {
-		t.Fatalf("ApplyNoWork: routed=%v err=%v", routed, err)
+	if res, err := ApplyNoWork(in.WithLedger(rec)); err != nil || len(res.Routed) != 1 {
+		t.Fatalf("ApplyNoWork: routed=%v err=%v", res.Routed, err)
 	}
 	if in.Ledger != nil {
 		t.Error("WithLedger must not mutate its receiver")
@@ -136,9 +136,9 @@ func TestApplyNoWork_ReleasesWhatTheLaneClaimed(t *testing.T) {
 	if _, err := inboxmover.Claim(inboxmover.Options{ProjectRoot: root, Stderr: io.Discard}, "answered", "7"); err != nil {
 		t.Fatalf("claim: %v", err)
 	}
-	routed, err := ApplyNoWork(NoWorkInputs{ProjectRoot: root, Workspace: ws, Cycle: 7, Stderr: io.Discard})
-	if err != nil || len(routed) != 1 {
-		t.Fatalf("ApplyNoWork: routed=%v err=%v", routed, err)
+	res, err := ApplyNoWork(NoWorkInputs{ProjectRoot: root, Workspace: ws, Cycle: 7, Stderr: io.Discard})
+	if err != nil || len(res.Routed) != 1 {
+		t.Fatalf("ApplyNoWork: routed=%v err=%v", res.Routed, err)
 	}
 	inbox := filepath.Join(root, ".evolve", "inbox")
 	if rec := itemRecord(t, inbox, "answered"); rec["route"] != "console-manual" {
@@ -165,9 +165,9 @@ func TestApplyNoWork_KeepsTheConsolesEvidenceAndSkipsWhatIsGone(t *testing.T) {
 		t.Fatal(err)
 	}
 	c, events := recordingCenter()
-	routed, err := ApplyNoWork(NoWorkInputs{ProjectRoot: root, Workspace: ws, Cycle: 7, Stderr: io.Discard}.WithSignals(c))
-	if err != nil || len(routed) != 0 {
-		t.Fatalf("nothing new to route: routed=%v err=%v", routed, err)
+	res, err := ApplyNoWork(NoWorkInputs{ProjectRoot: root, Workspace: ws, Cycle: 7, Stderr: io.Discard}.WithSignals(c))
+	if err != nil || len(res.Routed) != 0 {
+		t.Fatalf("nothing new to route: routed=%v err=%v", res.Routed, err)
 	}
 	if rec := itemRecord(t, inbox, "routed"); rec["routed_reason"] != "protected surface: go/internal/core/cyclerun.go" {
 		t.Errorf("the console's original evidence is kept: %v", rec["routed_reason"])

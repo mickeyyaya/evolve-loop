@@ -299,6 +299,9 @@ func promoteInbox(ctx context.Context, opts *Options, res *RunResult) error {
 		if len(or.Promoted) > 0 {
 			res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: promoted %d committed inbox item(s) for cycle %d: %v", len(or.Promoted), cid, or.Promoted))
 		}
+		if len(or.RetiredUnbacked) > 0 {
+			res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: retired %d committed id(s) no inbox item backs for cycle %d: %v", len(or.RetiredUnbacked), cid, or.RetiredUnbacked))
+		}
 		res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: inbox lifecycle drain complete for cycle %d", cid))
 	}
 	return nil

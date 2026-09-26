@@ -13,29 +13,30 @@ import (
 
 func TestAPI_EveryExportIsNamed(t *testing.T) {
 	var (
-		_ func(string, LedgerAppender, ...Option) *Mover                   = New
-		_ func(io.Writer) Option                                           = WithStderr
-		_ func(func() time.Time) Option                                    = WithNow
-		_ func(func() (string, error)) Option                              = WithActiveCycle
-		_ func(func(string) (bool, error)) Option                          = WithLanded
-		_ func(func(string) bool) Option                                   = WithProtectedPath
-		_ func(func(string, string, string)) Option                        = WithRetire
-		_ func(func(int) string) Option                                    = WithRunWorkspace
-		_ func(func() *signalcenter.Center) Option                         = WithSignals
-		_ func(*Mover) bool                                                = (*Mover).SignalsWired
-		_ func(*Mover, string, string) (ClaimResult, error)                = (*Mover).Claim
-		_ func(*Mover, string, string, PromoteOpts) (PromoteResult, error) = (*Mover).Promote
-		_ func(*Mover, string) (PromoteResult, error)                      = (*Mover).ReleaseFromQuarantine
-		_ func(*Mover) (RecoverResult, error)                              = (*Mover).RecoverOrphans
-		_ func(*Mover, int, string, *Policy) (RecoverResult, error)        = (*Mover).Release
-		_ func(*Mover, string, string, int) (RouteResult, error)           = (*Mover).RouteConsole
-		_ string                                                           = RouteConsoleValue
-		_ func(*Mover, string) (int, bool)                                 = (*Mover).ReadFailureCount
-		_ func(string, string) (Location, error)                           = Locate
-		_ func(string, string) (string, error)                             = FindFileByTaskID
-		_ func(int, int, bool) bool                                        = ShouldQuarantine
-		_ func(string, string) (int, error)                                = BumpFailureCount
-		_ func(string, func(map[string]json.RawMessage)) error             = UpdateItemJSON
+		_ func(string, LedgerAppender, ...Option) *Mover                    = New
+		_ func(io.Writer) Option                                            = WithStderr
+		_ func(func() time.Time) Option                                     = WithNow
+		_ func(func() (string, error)) Option                               = WithActiveCycle
+		_ func(func(string) (bool, error)) Option                           = WithLanded
+		_ func(func(string) bool) Option                                    = WithProtectedPath
+		_ func(func(string, string, string)) Option                         = WithRetire
+		_ func(func(int) string) Option                                     = WithRunWorkspace
+		_ func(func() *signalcenter.Center) Option                          = WithSignals
+		_ func(*Mover) bool                                                 = (*Mover).SignalsWired
+		_ func(*Mover, string, string) (ClaimResult, error)                 = (*Mover).Claim
+		_ func(*Mover, string, string, PromoteOpts) (PromoteResult, error)  = (*Mover).Promote
+		_ func(*Mover, string, string, PromoteOpts, string) (string, error) = (*Mover).RetireUnbacked
+		_ func(*Mover, string) (PromoteResult, error)                       = (*Mover).ReleaseFromQuarantine
+		_ func(*Mover) (RecoverResult, error)                               = (*Mover).RecoverOrphans
+		_ func(*Mover, int, string, *Policy) (RecoverResult, error)         = (*Mover).Release
+		_ func(*Mover, string, string, int) (RouteResult, error)            = (*Mover).RouteConsole
+		_ string                                                            = RouteConsoleValue
+		_ func(*Mover, string) (int, bool)                                  = (*Mover).ReadFailureCount
+		_ func(string, string) (Location, error)                            = Locate
+		_ func(string, string) (string, error)                              = FindFileByTaskID
+		_ func(int, int, bool) bool                                         = ShouldQuarantine
+		_ func(string, string) (int, error)                                 = BumpFailureCount
+		_ func(string, func(map[string]json.RawMessage)) error              = UpdateItemJSON
 	)
 	var appender LedgerAppender = &recordingAppender{}
 	if err := appender.AppendLifecycle(context.Background(), ledger.LifecycleRecord{}); err != nil {

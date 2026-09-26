@@ -25,10 +25,14 @@ type CycleOutcome struct {
 
 // OutcomeResult reports what the seam moved, by task id or destination path.
 type OutcomeResult struct {
-	Promoted    []string // committed ids moved to processed/cycle-N/
-	Released    []string
-	Quarantined []string
+	Promoted        []string // committed ids moved to processed/cycle-N/
+	RetiredUnbacked []string // committed ids no inbox item backs, retired as processed/cycle-N/ records
+	Released        []string
+	Quarantined     []string
 }
+
+// shipUnbackedReason is the retirement reason of a shipped id no inbox item backs.
+const shipUnbackedReason = "ship-promote-processed: no inbox item backs the id"
 
 // ApplyCycleOutcome applies one cycle's verdict to the inbox lifecycle.
 // See ADR-0079.
@@ -42,15 +46,23 @@ func ApplyCycleOutcome(opts Options, oc CycleOutcome) (OutcomeResult, error) {
 		// Promote errors are collected, not returned early: the residual drain
 		// below must always run, or claimed items strand in processing/.
 		var errs []error
+		var notMoved []string
 		for _, id := range committed {
 			pr, err := Promote(opts, id, "processed", PromoteOpts{Cycle: cycleStr, CommitSHA: oc.CommitSHA})
 			if err != nil {
 				errs = append(errs, fmt.Errorf("promote %q: %w", id, err))
 				continue
 			}
-			if !pr.NoOp {
-				res.Promoted = append(res.Promoted, id)
+			if pr.NoOp {
+				notMoved = append(notMoved, id)
+				continue
 			}
+			res.Promoted = append(res.Promoted, id)
+		}
+		retired, err := RetireUnbacked(opts, oc.Cycle, StateProcessed, shipUnbackedReason, oc.CommitSHA, notMoved)
+		res.RetiredUnbacked = retired
+		if err != nil {
+			errs = append(errs, err)
 		}
 		rr, err := releaseCycleProcessing(opts, oc.Cycle, oc.Reason, nil)
 		res.Released = rr.Paths
