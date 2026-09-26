@@ -31,7 +31,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable"
 	"github.com/mickeyyaya/evolve-loop/go/internal/evalgate"
-	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/mintregistry"
@@ -568,6 +567,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 	verifierOf := func() runner.ContractVerifier { return contractVerifier }
 	var hostEffects core.HostEffects
 	hostEffectsOf := func() core.HostEffects { return hostEffects }
+	forbidden := laneForbidden(projectRoot, os.Stderr)
 
 	runners := map[core.Phase]core.PhaseRunner{
 		core.PhaseIntent: intent.New(intent.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, CompactPrompts: cfg.CompactPrompts}),
@@ -578,7 +578,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 		// PhaseIO threads cfg.PhaseIO into the reconcile rung (3.10 Slice 1); StageOff
 		// (the shipping default) keeps these byte-identical.
 		core.PhaseScout:        swarmrunner.New(scout.New(scout.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, PhaseIO: cfg.PhaseIO, CompactPrompts: cfg.CompactPrompts}), walked, swarm.ModeReader, swCfg),
-		core.PhaseTriage:       triage.New(triage.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, PhaseIO: cfg.PhaseIO, CompactPrompts: cfg.CompactPrompts}),
+		core.PhaseTriage:       triage.New(triage.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, PhaseIO: cfg.PhaseIO, CompactPrompts: cfg.CompactPrompts, LaneForbidden: forbidden}),
 		core.PhaseTDD:          tdd.New(tdd.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, CompactPrompts: cfg.CompactPrompts}),
 		core.PhaseBuildPlanner: buildplanner.New(buildplanner.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf}).BaseRunner(),
 		core.PhaseBuild:        swarmrunner.New(build.New(build.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, PhaseIO: cfg.PhaseIO, CompactPrompts: cfg.CompactPrompts}), walked, swarm.ModeWriter, swCfg),
@@ -878,7 +878,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 	// branch carries the audit verdict forward instead of always re-auditing.
 	// All fail-closed — see cmd_composition_wiring.go.
 	opts = append(opts, compositionOptions()...)
-	hostEffects = deliverable.NewHostEffects(catalog, hostInboxClaimer(ld, signals))
+	hostEffects = deliverable.NewHostEffects(catalog, hostInboxClaimer(ld, signals, forbidden))
 	opts = append(opts, core.WithHostEffects(hostEffects))
 	opts = append(opts, core.WithSignalCenter(signals))
 
@@ -893,9 +893,9 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 }
 
 // hostInboxClaimer claims through the same floor as `evolve inbox-mover claim`.
-func hostInboxClaimer(ld inboxmover.LedgerAppender, signals *signalcenter.Center) deliverable.Claimer {
+func hostInboxClaimer(ld inboxmover.LedgerAppender, signals *signalcenter.Center, forbidden func(string) bool) deliverable.Claimer {
 	return func(inboxDir string, cycle int, ids []string) error {
-		return inboxmover.ClaimPending(inboxmover.Options{InboxDir: inboxDir, Stderr: os.Stderr, Ledger: ld, Signals: signals, IsProtectedPath: guards.IsProtectedScope}, cycle, ids)
+		return inboxmover.ClaimPending(inboxmover.Options{InboxDir: inboxDir, Stderr: os.Stderr, Ledger: ld, Signals: signals, IsProtectedPath: forbidden}, cycle, ids)
 	}
 }
 

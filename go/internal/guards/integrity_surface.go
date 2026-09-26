@@ -161,8 +161,8 @@ func IsProtectedSurface(path string) bool {
 }
 
 // IsProtectedScope reports whether path is, or as a directory spelling contains, protected surface.
-// Inbox routing judges declared fix surfaces with it while write-time checks keep IsProtectedSurface;
-// membership implies scope, so routing refuses at least what the triage breaker would.
+// Routing and triage's breaker compose it with the build sandbox (lanerouting); the ship tripwire
+// and role guard keep IsProtectedSurface. Membership implies scope.
 func IsProtectedScope(path string) bool {
 	if IsProtectedSurface(path) {
 		return true

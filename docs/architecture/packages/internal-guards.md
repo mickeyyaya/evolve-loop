@@ -4,7 +4,7 @@
 
 ## Purpose
 
-`internal/guards` is the in-process trust kernel. It holds the six `core.Guard` implementations that `evolve guard <name>` runs as Claude Code PreToolUse hooks, and `ProtectedSurfaceManifest`, the single list of the pipeline control plane that no autonomous cycle may modify. Other packages (the ship tripwire, the build floor, the fleet preflight, triage's breaker and the inbox router) inject `IsProtectedSurface` or `IsProtectedScope` rather than keeping their own list.
+`internal/guards` is the in-process trust kernel. It holds the six `core.Guard` implementations that `evolve guard <name>` runs as Claude Code PreToolUse hooks, and `ProtectedSurfaceManifest`, the single list of the pipeline control plane that no autonomous cycle may modify. Other packages (the ship tripwire, the build floor and the fleet preflight) inject `IsProtectedSurface` rather than keeping their own list. The inbox routing roots and triage's breaker judge with `lanerouting.Forbidden`, which composes `IsProtectedScope` with the build profile's sandbox deny list ([internal-lanerouting](internal-lanerouting.md)).
 
 ## Design
 

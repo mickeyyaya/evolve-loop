@@ -99,7 +99,7 @@ type Options struct {
 	IsLandedFn func(sha string) (bool, error)
 
 	// IsProtectedPath is the control-plane SCOPE predicate for the
-	// ADR-0074 claim floor (guards.IsProtectedScope at composition roots — F29).
+	// ADR-0074 claim floor (the lane-routing predicate, cmd/evolve laneForbidden, at composition roots).
 	// nil disables only the files-derived rule; an explicit route:"console-*"
 	// field always refuses the claim.
 	IsProtectedPath func(path string) bool

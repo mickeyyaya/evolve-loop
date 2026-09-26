@@ -11,12 +11,13 @@ package main
 import (
 	"context"
 	"io"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/budgethistory"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
-	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
 	"github.com/mickeyyaya/evolve-loop/go/internal/loopwave"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/quotastate"
@@ -30,7 +31,7 @@ type (
 )
 
 // newWaveEngine is the ONE loopwave.New( site (TestWaveEngine_OneConstructionSite):
-// the real protected-surface predicate, the prior-cycle readers over the
+// the lane-routing predicate, the prior-cycle readers over the
 // host's storage, and fleet.QuotaAwareCount as the bench shrink — the shrink
 // IS wired into the live wave path (acs/cycle467), by code.
 func newWaveEngine(cfg loopConfig, storage core.Storage, warn io.Writer, signals func() *signalcenter.Center) *loopwave.Engine {
@@ -38,7 +39,7 @@ func newWaveEngine(cfg loopConfig, storage core.Storage, warn io.Writer, signals
 	ports := loopwave.Ports{
 		LastCycle: func(ctx context.Context) (int, error) { return readLastCycleNumber(ctx, storage) },
 		Workspace: func(cycle int) string { return cycleWorkspace(cfg.ProjectRoot, cycle) },
-		Protected: guards.IsProtectedScope, // routing roots judge declared surfaces in SCOPE (F29)
+		Protected: laneForbidden(cfg.ProjectRoot, warn),
 		Shrink:    fleet.QuotaAwareCount,
 	}
 	return loopwave.New(roots, ports, warn, loopwave.WithSignals(signals))
@@ -109,12 +110,12 @@ func quotaAwareWaveConfig(fc policy.FleetConfig, projectRoot string, warn io.Wri
 
 // seedWavePlanFromInbox seeds a wave plan from the inbox backlog.
 func seedWavePlanFromInbox(evolveDir string, count int) ([]byte, error) {
-	return loopwave.SeedWavePlanFromInbox(evolveDir, count, guards.IsProtectedScope)
+	return loopwave.SeedWavePlanFromInbox(evolveDir, count, laneForbidden(filepath.Dir(evolveDir), os.Stderr))
 }
 
 // widenNarrowDecision widens a narrow prior decision to fleet width.
 func widenNarrowDecision(data []byte, evolveDir string, count int) []byte {
-	return loopwave.WidenNarrowDecision(data, evolveDir, count, guards.IsProtectedScope)
+	return loopwave.WidenNarrowDecision(data, evolveDir, count, laneForbidden(filepath.Dir(evolveDir), os.Stderr))
 }
 
 // --- test/ACS-only facades: ZERO production callers (TestWaveEngine_OneConstructionSite); the coordinator drives the engine ---

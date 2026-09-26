@@ -646,3 +646,5 @@
 # under which build tags"; consumers: the ship repo-contract gate and the build floor.
 ./internal/addedtests
 ./internal/commentaudit
+# lanerouting — the one predicate for "no lane can change this path": protected surface OR the build profile's sandbox deny list.
+./internal/lanerouting
