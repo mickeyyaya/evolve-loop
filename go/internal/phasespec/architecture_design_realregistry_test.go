@@ -5,13 +5,6 @@ import (
 	"testing"
 )
 
-// TestRealRegistry_ArchitectureDesign guards the architecture-design phase entry
-// in the actual repo registry: it must load as a Plan-archetype, kind:llm,
-// optional spec phase whose AgentName resolves to its persona, with the required
-// classify sections. This is the WS3 free-topology proof phase — the specrunner
-// fallback (registerBuiltinSpecRunners) wires it only because it is non-Control
-// kind:llm with a persona, and the advisor catalog (phaseCardsFromCatalog) shows
-// it only because RoleOrDefault()==plan (non-Control).
 func TestRealRegistry_ArchitectureDesign(t *testing.T) {
 	path := filepath.Join("..", "..", "..", "docs", "architecture", "phase-registry.json")
 	cat, err := Load(path)
@@ -49,14 +42,6 @@ func TestRealRegistry_ArchitectureDesign(t *testing.T) {
 	}
 }
 
-// TestRealRegistry_PlanReviewAgentResolves guards the plan-review fix: its
-// AgentName must resolve to the persona file that actually exists
-// (agents/plan-reviewer.md) rather than the evolve-<name> default
-// (evolve-plan-review.md, which does NOT exist). Without the explicit
-// "agent":"plan-reviewer" field, the specrunner fallback's persona guard
-// (prm.Agent(AgentName())) skips plan-review + WARNs, leaving it
-// selectable-but-runnerless. This pins the resolution so plan-review is
-// dispatchable (its Plan archetype + kind:llm make it a fallback candidate).
 func TestRealRegistry_PlanReviewAgentResolves(t *testing.T) {
 	path := filepath.Join("..", "..", "..", "docs", "architecture", "phase-registry.json")
 	cat, err := Load(path)

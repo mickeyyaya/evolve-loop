@@ -5,9 +5,6 @@ import (
 	"testing"
 )
 
-// TestValidateOutputsPartition pins the ADR-0100 declaration rule at the seam
-// both spec sources pass through, so an unclassified secondary is a load
-// failure — never a phase that is silently ungated.
 func TestValidateOutputsPartition(t *testing.T) {
 	spec := func(files, owed, harness []string) PhaseSpec {
 		return PhaseSpec{Name: "x", Outputs: IO{Files: files, AgentOwed: owed, HarnessProduced: harness}}
@@ -42,9 +39,6 @@ func TestValidateOutputsPartition(t *testing.T) {
 	}
 }
 
-// TestValidateUserSpec_EnforcesOutputsPartition: overlays and user phases pass
-// through the same rule — an overlay replaces a built-in's spec wholesale, so
-// a rule that ran only on the registry would let the overlay ungate the phase.
 func TestValidateUserSpec_EnforcesOutputsPartition(t *testing.T) {
 	s := PhaseSpec{Name: "widget-scan", Optional: true, Kind: "llm",
 		Outputs: IO{Files: []string{".evolve/runs/cycle-{cycle}/widget-scan-report.md", ".evolve/runs/cycle-{cycle}/widget-findings.json"}}}

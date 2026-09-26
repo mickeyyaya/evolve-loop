@@ -6,8 +6,6 @@ import (
 	"testing"
 )
 
-// metadataRegistry exercises the advisor-facing metadata fields (ADR-0038):
-// description, when_to_use, categories.
 const metadataRegistry = `{
   "schema_version": 4,
   "phases": [
@@ -47,7 +45,6 @@ func TestLoad_MetadataFields(t *testing.T) {
 		t.Errorf("Categories = %v", s.Categories)
 	}
 
-	// A spec without metadata parses with zero values (tolerant schema).
 	scout, _ := cat.Get("scout")
 	if scout.Description != "" || scout.WhenToUse != "" || len(scout.Categories) != 0 {
 		t.Errorf("scout metadata should be empty; got %q/%q/%v", scout.Description, scout.WhenToUse, scout.Categories)

@@ -1,20 +1,5 @@
 package phasespec
 
-// clamp_test.go — RED contract for the load-time registrar-equivalent clamp
-// (inbox loadtime-userspec-registrar-clamp 0.93; ADR-0073 security review,
-// Finding 1 downstream trace). DiscoverUserSpecsFromRoots loads any on-disk
-// .evolve/phases/*/phase.json into the catalog with NONE of the registrar's
-// normalization: a smuggled/residue/typo spec claiming writes_source:true
-// became a schedulable phase with worktree-write ELIGIBILITY
-// (core.worktreePhase reads spec.WritesSource straight from the catalog) and
-// no sandbox anywhere — specrunner has no sandbox plumbing; the registrar
-// mint path enforces the invariant by CONSTRUCTION (it persists a
-// sandbox-enabled profile). The discovery clamp enforces it by VERIFICATION:
-// writes_source survives only when the spec's dispatch profile — the SAME
-// on-disk profile the runner resolves at dispatch (TrimPrefix(AgentName,
-// "evolve-")) — exists with sandbox enabled. On-disk reads are correct here
-// (dispatch-parity, not a repo-contract scan — ADR-0084 I1 does not apply).
-
 import (
 	"os"
 	"path/filepath"
@@ -72,8 +57,7 @@ func TestSandboxedProfilePredicate_ReadsDispatchProfile(t *testing.T) {
 	write("sandboxed", `{"name":"sandboxed","sandbox":{"enabled":true}}`)
 	write("unsandboxed", `{"name":"unsandboxed"}`)
 	write("disabled", `{"name":"disabled","sandbox":{"enabled":false}}`)
-	// Registrar mirror: a writer needs to write — read-only sandboxes grant
-	// eligibility without capability and must not verify.
+	// A read-only sandbox grants eligibility without write capability, so it must not verify.
 	write("readonly", `{"name":"readonly","sandbox":{"enabled":true,"read_only_repo":true}}`)
 
 	pred := SandboxedProfilePredicate(dir)

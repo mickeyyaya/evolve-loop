@@ -9,24 +9,16 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
-// repoRoot walks up from this test file to the repo root (the dir containing
-// .evolve/phases). The test reads the REAL operator-overlay phases, so it proves
-// the research-informed phases are added as pure config — no production Go edit.
+// repoRoot returns the repo root, located from this file's path.
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	_, file, _, ok := runtime.Caller(0)
 	if !ok {
 		t.Fatal("cannot locate test file")
 	}
-	// .../go/internal/phasespec/usercatalog_research_test.go → up 4 to repo root.
 	return filepath.Clean(filepath.Join(filepath.Dir(file), "..", "..", ".."))
 }
 
-// TestResearchPhasesAreConfigOnly loads the real merged catalog and asserts the
-// 2026-research-informed phases (adversarial-review, perf-profile) plus the
-// domain-wave phases (Wave Ops + Wave Accounting, domain-phase-catalog.md §3)
-// exist as optional user phases whose spec-derived contract is well-formed —
-// the zero-Go proof for WS-A + WS-C and the campaign's config-only invariant.
 func TestResearchPhasesAreConfigOnly(t *testing.T) {
 	root := repoRoot(t)
 	registry := filepath.Join(root, "docs", "architecture", "phase-registry.json")
@@ -38,9 +30,6 @@ func TestResearchPhasesAreConfigOnly(t *testing.T) {
 	for _, w := range warns {
 		t.Logf("discover warning: %s", w)
 	}
-	// Bind only phases from git-TRACKED dirs: untracked dirs are runtime/local
-	// state that can never reach a CI checkout (cd49274beab2 class); nil
-	// tracked set = no usable git context = bind all (stricter fallback).
 	if tracked := phasespec.TrackedUserPhaseNames(t, root); tracked != nil {
 		kept := make([]phasespec.PhaseSpec, 0, len(user))
 		for _, s := range user {
@@ -65,6 +54,9 @@ func TestResearchPhasesAreConfigOnly(t *testing.T) {
 		sections   []string
 		hasVerdict bool
 	}
+	// Plan and control phases may carry verdict_on_pass, but contract derivation
+	// leaves it inert, so their hasVerdict is false.
+	// See ADR-0035.
 	cases := map[string]want{
 		"adversarial-review": {
 			artifact:   "adversarial-review-report.md",
@@ -76,10 +68,6 @@ func TestResearchPhasesAreConfigOnly(t *testing.T) {
 			sections:   []string{"## Benchmarks", "## Findings", "## Verdict"},
 			hasVerdict: true,
 		},
-		// Wave Ops (cycle 5) — domain-phase-catalog.md §3 Wave Ops table.
-		// incident-postmortem is the only evaluate phase (verdict vocabulary);
-		// runbook-draft (control) and capacity-plan (plan) carry
-		// verdict_on_pass but contract derivation leaves it inert (ADR-0035).
 		"incident-postmortem": {
 			artifact:   "incident-postmortem-report.md",
 			sections:   []string{"## Impact", "## Timeline", "## Root Cause", "## Action Items"},
@@ -95,10 +83,6 @@ func TestResearchPhasesAreConfigOnly(t *testing.T) {
 			sections:   []string{"## Demand Forecast", "## Current Capacity", "## Capacity Gap"},
 			hasVerdict: false,
 		},
-		// Wave Accounting (cycle-3 carry-forward) — domain-phase-catalog.md §3
-		// Wave Accounting table. Phase dirs were authored in cycle 3 but never
-		// committed; these cases pin the contract so the carry-forward commit
-		// is spec-covered.
 		"account-reconcile": {
 			artifact:   "account-reconcile-report.md",
 			sections:   []string{"## GL vs Source Balance", "## Reconciling Items", "## Adjustments", "## Sign-off"},
@@ -114,11 +98,6 @@ func TestResearchPhasesAreConfigOnly(t *testing.T) {
 			sections:   []string{"## Tasks", "## Blocking Items", "## Sign-off"},
 			hasVerdict: false,
 		},
-		// Wave PM (cycle 6) — domain-phase-catalog.md §3 Wave PM table.
-		// dependency-map is the only evaluate phase (verdict vocabulary);
-		// risk-register and scope-baseline are plan phases — verdict_on_pass
-		// is carried for uniformity but contract derivation leaves it inert
-		// (ADR-0035, runbook-draft/capacity-plan precedent).
 		"risk-register": {
 			artifact:   "risk-register-report.md",
 			sections:   []string{"## Risks", "## Scoring", "## Response Strategies", "## Owners"},
@@ -134,11 +113,6 @@ func TestResearchPhasesAreConfigOnly(t *testing.T) {
 			sections:   []string{"## Dependencies", "## Critical Path", "## Blockers"},
 			hasVerdict: true,
 		},
-		// Wave Strategy (cycle 8) — domain-phase-catalog.md §3 Wave Strategy
-		// table. forces-analysis and market-sizing are evaluate phases
-		// (verdict vocabulary); okr-draft is a plan phase — verdict_on_pass
-		// is carried for uniformity but contract derivation leaves it inert
-		// (ADR-0035, risk-register/scope-baseline precedent).
 		"forces-analysis": {
 			artifact:   "forces-analysis-report.md",
 			sections:   []string{"## Competitive Rivalry", "## Buyer and Supplier Power", "## Entry and Substitute Threats", "## Attractiveness Verdict"},
@@ -154,11 +128,6 @@ func TestResearchPhasesAreConfigOnly(t *testing.T) {
 			sections:   []string{"## Objective", "## Key Results", "## Confidence and Scoring"},
 			hasVerdict: false,
 		},
-		// Wave Product (cycle 10) — domain-phase-catalog.md §3 Wave Product
-		// table. metric-tree is the only evaluate phase (verdict vocabulary);
-		// opportunity-map and prd-draft are plan phases — verdict_on_pass
-		// is carried for uniformity but contract derivation leaves it inert
-		// (ADR-0035, okr-draft/risk-register precedent).
 		"opportunity-map": {
 			artifact:   "opportunity-map-report.md",
 			sections:   []string{"## Desired Outcome", "## Opportunities", "## Candidate Solutions", "## Assumption Tests"},
@@ -174,8 +143,6 @@ func TestResearchPhasesAreConfigOnly(t *testing.T) {
 			sections:   []string{"## North Star Metric", "## Input Metrics", "## Guardrail Metrics"},
 			hasVerdict: true,
 		},
-		// Wave 4 — adversarial-pipeline phases (2026-06-14, micro-phase-catalog.md §8).
-		// All 15 are evaluate gates → hasVerdict true; artifact <name>-report.md.
 		"premise-challenge": {
 			artifact:   "premise-challenge-report.md",
 			sections:   []string{"## Stated Premise", "## Falsification Attempts", "## Verdict"},
@@ -251,10 +218,6 @@ func TestResearchPhasesAreConfigOnly(t *testing.T) {
 			sections:   []string{"## Localized Surfaces", "## Formatting Findings", "## Verdict"},
 			hasVerdict: true,
 		},
-		// Wave 5 — coverage expansion + plan/evaluate design pairing (2026-06-14,
-		// micro-phase-catalog.md §9). 9 evaluate gates (hasVerdict true, end in
-		// ## Verdict) + 5 plan design phases (hasVerdict false, no ## Verdict —
-		// ADR-0035 leaves plan verdict_on_pass inert, risk-register precedent).
 		"query-performance-scan": {
 			artifact:   "query-performance-scan-report.md",
 			sections:   []string{"## Queries Touched", "## Performance Findings", "## Verdict"},
