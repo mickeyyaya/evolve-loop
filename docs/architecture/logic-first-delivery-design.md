@@ -209,7 +209,7 @@ Status: **shipped** (commit on a branch, PR open or merged) · **built** (green 
 
 | Id | Component | Status | Where |
 |---|---|---|---|
-| Q1 | exhaustion during a correction re-dispatch, a remediation re-run and the resume review gate defers through `pauseForQuota` | designed (§5.5) | `core/cyclerun_correction.go`, `core/cyclerun_remediate.go`, `core/resume.go` |
+| Q1 | exhaustion during a correction re-dispatch, a remediation re-run and the resume review gate defers through `pauseForQuota` (`isQuotaWall`: the runner's exit 85 means its whole family chain was walled — one sample suffices, unlike the first dispatch's two-sample rule, which predates the tiered chain); a non-wall failure stays a failure; the pause records the phase's total dispatches | shipped on the P3 train | `core/cyclerun_correction.go`, `core/cyclerun_remediate.go`, `core/resume.go` |
 | Q2 | `auth_recheck` benches the family until the operator clears it and raises an ERROR naming the fix | designed (§5.5) | `internal/clihealth`, `bridge/launchoutcome`, the loop's quota defer |
 | Q3 | a deferral writes no failure digest and counts toward no halt | designed (§5.5) | `core/blocker_breaker.go`, `cmd/evolve` wave accounting |
 | Q4 | the fallback chain filters candidates by the phase's requirements | designed (§5.5) | `internal/bridgechain` |
@@ -330,6 +330,8 @@ Merges happen only at wave boundaries. Each step is its own PR; each component i
 - **Provenance granularity** (F2b): byte ranges are strict; a repair that reorders a table may need line-level matching. Decide with the first real repair.
 - **Document-kind cycles**: E1's `solutioncheck` path is designed, not measured.
 - **Other CLIs' suggestion features**: codex, agy and ollama panes show no next-prompt suggestion today; if one appears, its off-switch is a `default_env` entry in that CLI's manifest, not code.
+- **One rule for a walled dispatch**: the first dispatch's ladder still wants two all-85 attempts (`allFamiliesQuotaExhausted`, from before the tiered chain walked every family in one `Run`), while Q1 reads one walled `Run` as the same fact; unify on `isQuotaWall` once the ladder's tests model the chain.
+- **One rule for a walled dispatch**: the first dispatch's ladder still wants two all-85 attempts (`allFamiliesQuotaExhausted`, from before the tiered chain walked every family in one `Run`), while Q1 reads one walled `Run` as the same fact; unify on `isQuotaWall` once the ladder's tests model the chain.
 - **Completion after a correction**: the bridge completes a corrected phase only when the primary artifact is rewritten; a correction whose violation names only a secondary or the explanation document should complete on that file's rewrite (or on `evolve phase verify` passing); it lands with F0.
 
 ## 13. Review log
@@ -342,6 +344,7 @@ Merges happen only at wave boundaries. Each step is its own PR; each component i
 | 2026-09-26 | go-reviewer (train) | APPROVE-WITH-MINOR | four minors applied |
 | 2026-09-26 | code-reviewer (train) | WARNING | the derivation's write-in-flight grace (MAJOR) applied; the duplicate projector absorbed |
 | 2026-09-26 | security-reviewer (train) | BLOCK → APPROVE-WITH-MINOR | unfenced boundary; allowed-path type check; no network declared; anchored markers; three gaps filed |
+| 2026-09-27 | code-simplifier, go-reviewer, code-reviewer (Q1) | one closure; APPROVE-WITH-MINOR → applied; WARNING → justified and fixed | the one-sample reading of a walled `Run` stated in code and §12; the deferral records the phase's total dispatches; the digest assertion made non-vacuous |
 | 2026-09-27 | code-simplifier, go-reviewer, code-reviewer, security-reviewer (P3) | no edits; APPROVE; WARNING → fixed; APPROVE-WITH-MINOR → hardened | the sole-writer line was false for stdout-completion phases (fixed); a manifest `default_env` could set credential or loop variables the guards never see (refused at parse); facts rendered into the block are sanitized; no manifest pattern may match the block (pinned) |
 | 2026-09-26 | consistency audit (every doc vs the design vs the shipped code) | INCONSISTENCIES-FOUND → fixed | three stale package pages, one stale sentence in phase-architecture.md, one imprecise ADR sentence; two new package pages |
 | 2026-09-26 | code-reviewer (design document) | APPROVE-WITH-MINOR | the exit-85 census corrected; the audit-seal clause restored; F2b cross-referenced |
@@ -354,5 +357,7 @@ Merges happen only at wave boundaries. Each step is its own PR; each component i
 | 2026-09-26 | Review (APPROVE-WITH-MINOR): the exit-85 census corrected (the eight unknown-prompt exits were four `rate_limit` and four `model_unsupported`); the audit-seal reuse clause restored; F2b cross-referenced from the ADR. |
 | 2026-09-26 | F3 routed to the codex family with claude as fallback: the balanced-tier floor (`TestClaudeFamilyFloor`) reserves claude for judgment phases with a justification, and the recovery agent is an analytic helper. |
 | 2026-09-26 | #652, #655 and #656 merged at the wave-13 boundary (1706 shipped, 1707 failed on form); statuses updated; two wave-13 observations added to the evidence and the open questions. |
+| 2026-09-27 | Q1 shipped on the P3 train: five tests pin the three seams and the negative case; eleven mutants killed; `isQuotaWall` reads the runner's exit 85 alone, because the sentinel half of the check had no caller (a mutant proved it). |
+| 2026-09-27 | Q1 shipped on the P3 train: five tests pin the three seams and the negative case; eleven mutants killed; `isQuotaWall` reads the runner's exit 85 alone, because the sentinel half of the check had no caller (a mutant proved it). |
 | 2026-09-27 | §5.5 and §7.5: the wave-14 deep-dive (three consecutive FAILs: 1707 form, 1708 and 1709 capacity) designs Q1–Q4 — capacity is a deferral through the one seam that already exists, a credential wall is an operator halt, and neither counts toward the FAIL streak. |
 | 2026-09-27 | P3 shipped: §5.4 records the design (driver-appended statement; environment channel over a settings flag; what it does not fix); §8 signatures; §12 the other-CLIs question. Wave 14 (1708, 1709) failed on capacity — every CLI family walled (`auth_recheck`, `rate_limit`, `model_unsupported`) — with `cause_code` naming each pattern, the live proof of P4. |
