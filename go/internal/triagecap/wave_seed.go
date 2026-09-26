@@ -16,7 +16,7 @@ func SelectWaveSeedTopN(evolveDir string, count int, isProtected func(string) bo
 
 // ReadInboxBacklog reads <evolveDir>/inbox/*.json in filename order, skipping bad, id-less and console-routed items.
 // Console items are dropped here so the seed backfills with dispatchable work instead of planning zero lanes.
-// isProtected is guards.IsProtectedScope at the roots; nil disables only the files-derived routing rule.
+// isProtected is the lane-routing predicate at the roots (cmd/evolve laneForbidden); nil disables only the files-derived routing rule.
 func ReadInboxBacklog(evolveDir string, isProtected func(string) bool) []FleetCandidate {
 	entries, _ := filepath.Glob(filepath.Join(evolveDir, "inbox", "*.json"))
 	sort.Strings(entries)

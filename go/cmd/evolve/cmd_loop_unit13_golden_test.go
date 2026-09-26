@@ -269,6 +269,8 @@ func u13WaveStderrSections(t *testing.T) string {
 	})
 	section("routed_refused", func(w io.Writer) {
 		root := t.TempDir()
+		u13WriteJSON(t, filepath.Join(root, ".evolve", "profiles", "builder.json"),
+			map[string]any{"name": "builder", "sandbox": map[string]any{"deny_subpaths": []string{".evolve/profiles"}}})
 		u13WriteJSON(t, filepath.Join(root, ".evolve", "inbox", "console.json"),
 			map[string]any{"id": "console-item", "weight": 0.9, "files": []string{"go/internal/guards/integrity_surface.go"}})
 		consoleRoutedResolver(root, w)("console-item")

@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — routing sends no lane work its builder's sandbox forbids (2026-09-26)
+
+Cycles 1696 and 1699 both failed at the build floor on the same item. It declared `.evolve/profiles/historian.json (new)`, but the builder profile's sandbox denies `.evolve/profiles`, so no lane could ever create the file. The ADR-0074 routing floor judged declared paths only with the integrity manifest, which names two specific profiles, and routed the item to a lane twice.
+
+- `profiles.SandboxConfig.Denies` projects the sandbox's `deny_subpaths` as a path predicate. It is the same list the OS sandbox enforces.
+- `lanerouting.Forbidden` combines protected surface with the build profile's `Denies`. `build.ProfileName` names that profile once, and the build agent's prompt name derives from it.
+- `cmd/evolve`'s `laneForbidden` wires the one predicate into the loop's routing roots: the wave seed and widen, the host and CLI claim floors, and `evolve inbox batches`. A profile that will not load degrades loudly to protected surface only. Only an enabled sandbox counts, since that is when the bridge enforces it.
+- Triage receives it through `triage.Config.LaneForbidden`, for both its prompt partition and its breaker on `top_n` cards. A scout-originated card naming a builder-denied path is refused before build.
+- On the live queue, one more item now routes to the console: `skill-allowlist-for-skill-using-phases`, which edits two builder-denied profiles. No item left the console. Two known gaps remain, filed as a follow-up: core's sequential termination check and the triage registry factory.
+- Docs: ADR-0074 amendment, the incident record, `docs/architecture/packages/internal-lanerouting.md`, and a REGRESSION-COVERAGE-INDEX row.
+
 ## Fixed — triage re-checks a queued item's premise against what changed since it was filed (F40, 2026-09-26)
 
 Cycle 1691 picked an item filed on 2026-08-16. #535 had made its premise unreachable on 2026-09-09. Fault-localization and bug-reproduction accepted a unit fixture that fed the unreachable state straight to an inner function, and the builder "fixed" a non-bug and opened a fail-open. The audit caught it a full cycle later. A console audit of the next ten queued items found six whose premise or scope was wrong.
