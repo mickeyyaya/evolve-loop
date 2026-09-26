@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -129,8 +130,9 @@ func (o *Orchestrator) recoverFromShipError(ctx context.Context, projectRoot str
 	return cand, true
 }
 
-// routeRebasedExplanation moves the explanation's base binding to the rebased base, the lane's fork
-// point, and invalidates the snapshot so Build re-authors the explanation.
+// routeRebasedExplanation moves the explanation's base binding to the rebased base. When the host proves
+// the explained change byte-identical there, the approved Build stands and only Audit re-runs
+// (ADR-0105); otherwise the snapshot is invalidated and Build re-authors the explanation.
 func (o *Orchestrator) routeRebasedExplanation(ctx context.Context, projectRoot string, cycle int, cs *CycleState) (Phase, bool) {
 	newBase, err := forkPoint(ctx, gitCapture, cs.ActiveWorktree)
 	if err != nil {
@@ -141,12 +143,36 @@ func (o *Orchestrator) routeRebasedExplanation(ctx context.Context, projectRoot 
 	rebasedState.WorktreeBaseSHA = newBase
 	persist := func() error { return o.storage.WriteCycleState(ctx, rebasedState) }
 	binding := explanationBinding(projectRoot, *cs)
+	rebound, err := rebindPendingChange(ctx, binding, newBase, persist)
+	switch {
+	case errors.Is(err, explanationdocs.ErrRebindIncomplete):
+		fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d %v; aborting, resume recovers the split\n", cycle, err)
+		return "", false
+	case err != nil:
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d identity-preserving rebind not attempted: %v; returning to Build\n", cycle, err)
+	case rebound:
+		*cs = rebasedState
+		fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d rebase is byte-identical on %s: explanation rebound, re-auditing without a Build (ADR-0105)\n", cycle, newBase)
+		return PhaseAudit, true
+	default:
+		fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d rebased change is not proven identical and pending on %s; Build re-authors the explanation\n", cycle, newBase)
+	}
 	if err := explanationdocs.RebaseBuildAndPersist(ctx, binding, newBase, persist); err != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d invalidate rebased Build explanation failed: %v\n", cycle, err)
 		return "", false
 	}
 	*cs = rebasedState
 	return PhaseBuild, true
+}
+
+// rebindPendingChange attempts the identity-preserving rebind only for a change pending on newBase. Audit
+// reads `git diff HEAD`, so a committed change must go through Build, whose normalisation pends it.
+func rebindPendingChange(ctx context.Context, binding explanationdocs.CycleBinding, newBase string, persist func() error) (bool, error) {
+	head, err := gitStdout(ctx, gitCapture, binding.Worktree, "rev-parse", "HEAD")
+	if err != nil || head != newBase {
+		return false, err
+	}
+	return explanationdocs.RebindIdenticalRebase(ctx, binding, newBase, persist)
 }
 
 // gitFn runs a git subcommand in dir and returns (stdout, exitCode, err); it
