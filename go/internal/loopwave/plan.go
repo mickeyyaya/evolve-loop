@@ -13,19 +13,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/triagecap"
 )
 
-// PlanFn is the wave's single-writer plan source. Preferred: the immediately
-// prior cycle's committed triage-decision.json (LastCycle → Workspace), pruned
-// of consumed and console-routed ids and THEN widened to fleet width from the
-// inbox backlog (an id consumed during an earlier wave, or one the plan-time
-// gate would refuse, is dead work; dropping it first frees the slot for the
-// widening to refill — pruning after would leave the wave a lane short). A
-// prior decision absent (fresh start, a sealed run dir, a cycle that
-// failed before triage) or a failed last-cycle read falls through to the inbox
-// seed, so 2-wide starts on the FIRST cycle; a seed too narrow errors and the
-// caller falls back to sequential. cardPackages is always nil (no dedicated
-// card-package reader exists; top_n[].id cards flow through PlanFromTriage's
-// own fallback). Only LastCycle observes ctx — the decision read is a plain
-// os.ReadFile (Q-W10).
+// PlanFn returns the wave's plan source: the prior cycle's triage decision, else an
+// inbox seed. It prunes the decision before widening it, so the widen refills the freed slots.
 func (e *Engine) PlanFn(count int) PlanFn {
 	return func(ctx context.Context, wave int) ([]byte, []string, error) {
 		if lastCycle, err := e.ports.LastCycle(ctx); err == nil && lastCycle > 0 {
@@ -43,14 +32,8 @@ func (e *Engine) PlanFn(count int) PlanFn {
 	}
 }
 
-// SeedWavePlanFromInbox synthesizes a triage-decision.json (top_n[].id+files)
-// from the inbox backlog so PlanFromTriage can partition it into disjoint
-// lanes without a prior cycle's decision. count is the caller's resolved wave
-// width, clamped to >= 2; fewer than 2 disjoint LANES (menus, not flattened
-// ids — a single 4-item cluster still fails to fill a 2-lane wave) returns an
-// error so the caller falls back to sequential. Each lane is deepened with
-// its same-file cluster mates up to the compiled inboxbatch.DefaultMaxItems —
-// the batching cap's single source today.
+// SeedWavePlanFromInbox builds a triage decision from the inbox backlog. count is
+// clamped to at least 2, and fewer than 2 file-disjoint lanes is an error.
 func SeedWavePlanFromInbox(evolveDir string, count int, protected func(string) bool) ([]byte, error) {
 	if count < 2 {
 		count = 2
@@ -68,8 +51,7 @@ type card struct {
 	Files []string `json:"files"`
 }
 
-// decision is the wire shape both the prune and the widen read — ONE
-// declaration.
+// decision is the triage-decision wire shape the prunes and the widen read.
 type decision struct {
 	CommittedFloors []string `json:"committed_floors"`
 	TopN            []card   `json:"top_n"`
@@ -83,7 +65,6 @@ func parseDecision(data []byte) (decision, bool) {
 	return d, true
 }
 
-// cardOf is the ONE top_n card builder: id, plus files only when declared.
 func cardOf(id string, files []string) map[string]any {
 	c := map[string]any{"id": id}
 	if len(files) > 0 {
@@ -92,8 +73,7 @@ func cardOf(id string, files []string) map[string]any {
 	return c
 }
 
-// cards flattens lane menus into top_n cards, files preserved — the shape
-// PlanFromTriage re-partitions into the same lanes.
+// cards flattens lane menus into top_n cards, keeping files so the fan-out re-derives the same lanes.
 func cards(menus [][]triagecap.FleetCandidate) []map[string]any {
 	var topN []map[string]any
 	for _, menu := range menus {
@@ -104,17 +84,8 @@ func cards(menus [][]triagecap.FleetCandidate) []map[string]any {
 	return topN
 }
 
-// pruneConsumed drops every top_n id whose inbox lifecycle resolves to a
-// CONSUMED state (isConsumed) before the prior decision is widened. FAIL
-// OPEN: only positively-consumed ids are dropped — pending ids and ids with
-// no lifecycle evidence are kept (over-pruning would starve the wave). It
-// resolves through inboxmover's ProjectRoot-derived inbox (Q-W7) and keeps
-// EVERY other key of the decision (remarshalFull) — the first of the two
-// re-marshal fidelities. Best-effort: an unparseable decision, one carrying
-// committed_floors (dispatched ahead of top_n, which is ignored), an empty
-// top_n or nothing consumed returns the original bytes. Note the three
-// "consumed" beliefs (TestConsumedHasThreeBeliefs): this prune's set, widen's
-// triagecap.PruneConsumed and the dispatch probe's differ deliberately.
+// pruneConsumed drops top_n ids whose lifecycle is positively consumed. It fails
+// open, keeping ids with no lifecycle evidence, because over-pruning starves the wave.
 func (e *Engine) pruneConsumed(data []byte) []byte {
 	opts := inboxmover.Options{ProjectRoot: e.roots.ProjectRoot, Stderr: io.Discard, Signals: e.center()}
 	return e.pruneTopN(data, func(id string) (string, bool) {
@@ -123,13 +94,8 @@ func (e *Engine) pruneConsumed(data []byte) []byte {
 	})
 }
 
-// pruneRouted drops every top_n id the plan-time gate would refuse — the
-// ADR-0074 classifier NOW routes it to the console (an operator stamp or a
-// protected surface landed after the prior cycle's triage committed it) —
-// before the widen, for the consumed prune's reason: kept, a routed id holds a
-// lane slot the widen will not refill, and the gate refuses it only after the
-// lanes are cut (F34: wave 7 ran 1 of 2 lanes, 2026-09-26). Same fidelity and
-// passthroughs as pruneConsumed; routedBase is the gate's own authority.
+// pruneRouted drops top_n ids the plan-time gate would now refuse. Kept, such an
+// id holds a lane slot the widen never refills, and the gate refuses it after the lanes are cut.
 func (e *Engine) pruneRouted(data []byte) []byte {
 	routed := e.routedBase()
 	return e.pruneTopN(data, func(id string) (string, bool) {
@@ -138,11 +104,8 @@ func (e *Engine) pruneRouted(data []byte) []byte {
 	})
 }
 
-// pruneTopN is the prunes' one skeleton: drop every non-empty top_n id dead
-// reports, one WARN line each, keeping every other key of the decision. An
-// unparseable decision, one carrying committed_floors (dispatched ahead of
-// top_n, which is ignored), an empty top_n or nothing dropped returns the
-// original bytes.
+// pruneTopN drops each non-empty top_n id that dead reports, with one WARN line
+// per id. A decision with committed_floors passes through, because the fan-out then ignores top_n.
 func (e *Engine) pruneTopN(data []byte, dead func(id string) (line string, drop bool)) []byte {
 	d, ok := parseDecision(data)
 	if !ok || len(d.CommittedFloors) > 0 || len(d.TopN) == 0 {
@@ -164,8 +127,7 @@ func (e *Engine) pruneTopN(data []byte, dead func(id string) (line string, drop 
 	return remarshalFull(data, kept)
 }
 
-// remarshalFull rewrites top_n inside the decision's full map — every other
-// key survives (the prune's fidelity).
+// remarshalFull rewrites top_n and keeps every other key of the decision.
 func remarshalFull(data []byte, topN []map[string]any) []byte {
 	var full map[string]any
 	if err := json.Unmarshal(data, &full); err != nil {
@@ -175,15 +137,13 @@ func remarshalFull(data []byte, topN []map[string]any) []byte {
 	return marshalOr(data, full)
 }
 
-// remarshalTopN emits {"top_n": …} only — every other key dropped (the
-// widen's fidelity; Q-W3).
+// remarshalTopN emits {"top_n": …} only, dropping every other key.
 func remarshalTopN(data []byte, topN []map[string]any) []byte {
 	return marshalOr(data, map[string]any{"top_n": topN})
 }
 
-// marshalOr marshals v, returning the original bytes on the (structurally
-// unreachable for parsed JSON) marshal failure — widening and pruning are
-// optimizations, never a correctness dependency.
+// marshalOr falls back to the original bytes on a marshal failure: widening and
+// pruning are optimizations, never a correctness dependency.
 func marshalOr(data []byte, v any) []byte {
 	out, err := json.Marshal(v)
 	if err != nil {
@@ -192,11 +152,8 @@ func marshalOr(data []byte, v any) []byte {
 	return out
 }
 
-// isConsumed reports whether a lifecycle state means the item is done with
-// at plan time: processed, consumed (the in-commit landing consumption),
-// rejected or retry. StateProcessing is NOT
-// consumed: it is in flight, and its own claim keeps a second lane off it;
-// quarantine is not in this set either (belief 1 of 3 — Q-W5).
+// isConsumed reports whether an item is done with at plan time. Processing is
+// not: the item is in flight, and its own claim keeps a second lane off it.
 func isConsumed(state string) bool {
 	switch state {
 	case inboxmover.StateProcessed, inboxmover.StateConsumed, inboxmover.StateRejected, inboxmover.StateRetry:

@@ -18,8 +18,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/triagecap"
 )
 
-// The fold-0 sizing fixtures (cmd_loop_wave_budget_test.go's tightQuota /
-// fastPace / tokenFastPace, copied verbatim so the golden replays).
+// These fixtures match cmd/evolve's cmd_loop_wave_budget_test.go so the shared golden replays.
 func tightQuota(now time.Time) []quotastate.QuotaState {
 	return []quotastate.QuotaState{{
 		Family:     "claude",
@@ -50,8 +49,6 @@ func stderrSection(t *testing.T, name string) string {
 	t.Fatalf("no golden section %q", name)
 	return ""
 }
-
-// --- 28-29. Size ---
 
 func TestSize_NilBudgetByteIdentical(t *testing.T) {
 	h := newHarness(t)
@@ -84,7 +81,6 @@ func TestSize_EnforceResizesAndPaces(t *testing.T) {
 	if got.Count != 1 || fc.Count != 3 || h.stderr.String() != stderrSection(t, "size_enforce") {
 		t.Errorf("enforce applies the plan: %+v %+v %q", got, fc, h.stderr.String())
 	}
-	// Floor-forced: the surplus is paced.
 	fc = policy.FleetConfig{Count: 4, Concurrency: 4, MinLanes: 2, Budget: &policy.FleetBudgetConfig{Stage: "enforce", CapacityCycles: 10, Safety: 0.5, HistoryWindow: 10}}
 	states := tightQuota(now)
 	states[0].Buckets[0].UsedFraction = 0.8
@@ -111,7 +107,6 @@ func TestSize_BenchedFamiliesReadFromTheStore(t *testing.T) {
 	if got.Count != 2 || seenCount != 3 || seenMin != 2 || seen["codex"] != "rate_limit" || len(seen) != 1 {
 		t.Errorf("the shrink port sees the bench map and the floor: %+v %v %d %d", got, seen, seenCount, seenMin)
 	}
-	// The real shrink prints fleet's own line through the engine's writer.
 	got, _ = h.e.Size(policy.FleetConfig{Count: 3, MinLanes: 1}, nil, budgethistory.Throughput{}, time.Now())
 	if got.Count != 2 || !strings.Contains(h.stderr.String(), `[loop] WARN: fleet: quota bench on CLI family "codex" (rate_limit): wave count 3 -> 2 (min 1)`) {
 		t.Errorf("fleet.QuotaAwareCount shrinks and warns: %+v %q", got, h.stderr.String())
@@ -120,8 +115,6 @@ func TestSize_BenchedFamiliesReadFromTheStore(t *testing.T) {
 		t.Error("benchedFamilies reads the store; no benches is nil")
 	}
 }
-
-// --- 30-31. PlanFn ---
 
 func TestPlanFn_PriorDecisionIsPrunedThenWidened(t *testing.T) {
 	h := newHarness(t)
@@ -144,7 +137,6 @@ func TestPlanFn_PriorDecisionIsPrunedThenWidened(t *testing.T) {
 	if !strings.Contains(h.stderr.String(), `pruned consumed top_n id "gamma"`) {
 		t.Errorf("the :577 line on stderr: %q", h.stderr.String())
 	}
-	// A LastCycle error falls through to the seed, never a missing workspace.
 	h.ports.LastCycle = func(context.Context) (int, error) { return 0, errors.New("state unreadable") }
 	e = New(Roots{ProjectRoot: h.root, EvolveDir: h.evolveDir}, h.ports, io.Discard)
 	if data, _, err := e.PlanFn(2)(context.Background(), 1); err != nil || !strings.Contains(string(data), `"beta"`) {
@@ -152,13 +144,6 @@ func TestPlanFn_PriorDecisionIsPrunedThenWidened(t *testing.T) {
 	}
 }
 
-// TestPlanFn_ConsoleRoutedPriorIDsArePrunedBeforeWidening (F34, wave 7,
-// 2026-09-26): the prior cycle's triage committed ids the classifier NOW
-// routes to the console — an operator stamp landed after that triage, or the
-// declared surface is protected. Kept, they filled the fleet width, the widen
-// short-circuited, and the plan-time gate refused them only after the lanes
-// were cut: the wave ran 1 of 2 lanes. Pruned BEFORE the widen (the same
-// ordering the consumed prune keeps), their slots refill from the backlog.
 func TestPlanFn_ConsoleRoutedPriorIDsArePrunedBeforeWidening(t *testing.T) {
 	h := newHarness(t)
 	h.ports.LastCycle = func(context.Context) (int, error) { return 3, nil }
@@ -205,8 +190,6 @@ func TestPlanFn_TooNarrowSeedErrorsWithTheWrappedText(t *testing.T) {
 	}
 }
 
-// --- 3/31. the seed ---
-
 func TestSeedWavePlanFromInbox_ClampsAndRefuses(t *testing.T) {
 	evolveDir := filepath.Join(t.TempDir(), ".evolve")
 	for i, id := range []string{"todo-a", "todo-b", "todo-c"} {
@@ -225,8 +208,6 @@ func TestSeedWavePlanFromInbox_ClampsAndRefuses(t *testing.T) {
 		t.Errorf("the predicate is threaded into the seed: %s %v", data, err)
 	}
 }
-
-// --- 32-33. prune and widen ---
 
 func TestPruneConsumed_PreservesKeysAndReturnsOriginalWhenNothingDropped(t *testing.T) {
 	h := newHarness(t)
@@ -282,31 +263,25 @@ func TestWidenNarrow_PrunedDisarmsBothShortcutsAndRemarshalsTopNOnly(t *testing.
 	if got := WidenNarrowDecision([]byte(`{not json`), evolveDir, 2, nil); string(got) != `{not json` {
 		t.Errorf("unparseable passes through: %s", got)
 	}
-	// A consumed committed id at fleet width: pruned disarms the short-circuit.
 	lifecycleItem(t, evolveDir, inboxmover.StateProcessed, "gone")
 	stale := []byte(`{"top_n":[{"id":"alpha","files":["a.go"]},{"id":"gone","files":["z.go"]}]}`)
 	if got := string(WidenNarrowDecision(stale, evolveDir, 2, nil)); strings.Contains(got, "gone") || !strings.Contains(got, "beta") {
 		t.Errorf("the consumed id is dropped and the lane refilled: %s", got)
 	}
-	// Still fleet-width AFTER the prune (three committed, one consumed): the
-	// prune disarms the "already wide" shortcut too (Q-W2).
+	// Three committed, one consumed: still fleet-width after the prune.
 	wideStale := []byte(`{"top_n":[{"id":"alpha","files":["a.go"]},{"id":"beta","files":["b.go"]},{"id":"gone","files":["z.go"]}]}`)
 	if got := string(WidenNarrowDecision(wideStale, evolveDir, 2, nil)); strings.Contains(got, "gone") {
 		t.Errorf("a fleet-width decision carrying a consumed id is rewritten, never returned verbatim: %s", got)
 	}
-	// Nothing to add and nothing pruned: original bytes.
 	lonely := filepath.Join(t.TempDir(), ".evolve")
 	if got := WidenNarrowDecision(narrow, lonely, 2, nil); !bytes.Equal(got, narrow) {
 		t.Errorf("no backlog to widen with returns the original: %s", got)
 	}
-	// Empty ids are skipped when building the committed list.
 	if got := string(WidenNarrowDecision([]byte(`{"top_n":[{"id":""}]}`), evolveDir, 2, nil)); !strings.Contains(got, "alpha") {
 		t.Errorf("an empty id is not a committed lane: %s", got)
 	}
-	// The predicate excludes protected backlog items from the widening. It
-	// judges the DECLARED surface — path-shaped files[] tokens (F29) — so the
-	// protected item declares a path; the heavier gamma would win the lane
-	// without the predicate, so the exclusion is observable.
+	// gamma declares a path because the predicate judges path-shaped files[], and
+	// outweighs beta so its exclusion is observable.
 	writeJSON(t, filepath.Join(evolveDir, "inbox", "gamma.json"), map[string]any{"id": "gamma", "weight": 0.95, "files": []string{"pkg/c.go"}})
 	protected := func(p string) bool { return p == "pkg/c.go" }
 	if got := string(WidenNarrowDecision(narrow, evolveDir, 2, protected)); strings.Contains(got, "gamma") || !strings.Contains(got, "beta") {

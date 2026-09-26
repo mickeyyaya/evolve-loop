@@ -34,3 +34,4 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/reachabilityprobe` | proves a frozen test's pins stay reachable through the import graph | [internal-reachabilityprobe.md](internal-reachabilityprobe.md) |
 | `internal/interaction` | records every prompt interaction and correction outcome, and promotes auto-respond rules | [internal-interaction.md](internal-interaction.md) |
 | `internal/phaseobserver` | watches one running phase for stalls and dead processes | [internal-phaseobserver.md](internal-phaseobserver.md) |
+| `internal/loopwave` | plans, gates and launches each fleet wave | [internal-loopwave.md](internal-loopwave.md) |
