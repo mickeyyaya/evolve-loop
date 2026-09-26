@@ -646,7 +646,7 @@
 # under which build tags"; consumers: the ship repo-contract gate and the build floor.
 ./internal/addedtests
 ./internal/commentaudit
-# auditledger — the one reader of auditor ledger rows; consumers: ship, cmd/evolve composition, releasepreflight.
+# auditledger — the one reader of auditor ledger rows; consumers: ship, cmd/evolve composition, releasepreflight, core ship recovery (ADR-0105 B1).
 ./internal/auditledger
 # lanerouting — the one predicate for "no lane can change this path": protected surface OR the build profile's sandbox deny list.
 ./internal/lanerouting
