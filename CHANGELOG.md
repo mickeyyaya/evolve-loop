@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## Added — a fleet rebase replays the audited change, not ship's commit (ADR-0105 rung B1, 2026-09-26)
+
+When a peer moved main between a lane's audit and its landing, recovery rebased ship's own commit, which carried ship's inbox consumption. Every cycle then returned to Build, and the rebuilt explanations had to explain inbox moves. B1 undoes ship's commit before the rebase. It lands as five commits, one component each:
+
+1. **Fork point** (a fix): the rebased explanation binds to `merge-base HEAD main`. Before, it bound to main's tip, which a later landing moves.
+2. **`latestAuditedTree`** reads the tree the newest audit reviewed (`T0`), by the same row rule ship binds (`auditledger.IsAuditorRow` + `BindRun`).
+3. **`unwindShipCommit`** replaces ship's commit with a carrier of `T0` on the audited base. It declines, with a logged reason, unless:
+   - the worktree is clean, untracked files included;
+   - the lane forked at the audited base;
+   - git holds `T0`;
+   - the change since audit is exactly ship's inbox consumption pairs;
+   - no consumed item released a continuation.
+
+   After the rebase, **`pendRebasedChange`** soft-resets the carrier to the fork point, whatever the rebase did.
+4. **`routeRebasedExplanation`** tries B2's identity-preserving rebind only when the change is pending on its fork point: the Auditor reads `git diff HEAD`, which would be empty for a committed change. A proven-identical change returns to Audit with no Build; anything else returns to Build.
+5. **Wiring**: contract cycles only, and never when the pre-screen predicts a conflict.
+
+- Reviews: architect, security-reviewer and go-reviewer, two rounds each. Round 1 blocked on the committed-change hazard and a stranded carrier, both fixed.
+- Follow-ups: `resume-heals-a-carrier-left-at-head` (required before B3/B4) and `consumption-releases-the-continuation-binding-before-the-landing`.
+
 ## Fixed — a Build may retract a draft it never committed (cycle 1705, 2026-09-26)
 
 Cycle 1705 passed audit and still failed. `guard:docdelete` denied the Builder's removal of its own never-committed explanation draft, and its deny message prescribed a plain `mv` into the archive home. That left the draft untracked, and the host predicate gate refuses untracked inputs. So it forced FAIL over the auditor's PASS.
