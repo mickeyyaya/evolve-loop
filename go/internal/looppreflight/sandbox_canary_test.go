@@ -8,10 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
-// TestSandboxNestedFallbackCanary — the verified-fallback canary gates on the
-// nested_fallback dial: off ⇒ no canary (the dormant default); shadow ⇒ WARN
-// when the outer environment fails to block an out-of-allowlist write; enforce
-// ⇒ HALT. A verified (blocked) write, or a standalone session, ⇒ Pass.
 func TestSandboxNestedFallbackCanary(t *testing.T) {
 	sandboxProfile := func(name string) (profiles.Profile, error) {
 		return profiles.Profile{Name: name, CLI: "claude-tmux", Sandbox: &profiles.SandboxConfig{Enabled: true}}, nil
@@ -27,8 +23,8 @@ func TestSandboxNestedFallbackCanary(t *testing.T) {
 		name      string
 		stage     config.Stage
 		nested    bool
-		noSandbox bool // leave the default (no-sandbox) profile ⇒ sandboxWanted=false
-		blocked   bool // canary verdict: true = outer blocked the write (verified)
+		noSandbox bool
+		blocked   bool // true: the outer environment denied the write
 		wantLevel CheckLevel
 	}{
 		{"off → no canary, pass", config.StageOff, true, false, false, LevelPass},

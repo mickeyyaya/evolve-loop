@@ -11,7 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 )
 
-// stubProbe swaps the git probe for the duration of a test.
 func stubProbe(t *testing.T, fn func(context.Context, string) (baseState, error)) {
 	t.Helper()
 	orig := baseDivergenceProbe
@@ -19,9 +18,6 @@ func stubProbe(t *testing.T, fn func(context.Context, string) (baseState, error)
 	t.Cleanup(func() { baseDivergenceProbe = orig })
 }
 
-// TestCheckBaseDivergence_BehindHalts — the cycle-969 case: a base behind
-// origin must HALT and the halt must name `evolve sync-main`, so the operator
-// gets a stop WITH a next step.
 func TestCheckBaseDivergence_BehindHalts(t *testing.T) {
 	stubProbe(t, func(context.Context, string) (baseState, error) {
 		return baseState{Branch: "main", Ahead: 0, Behind: 3}, nil
@@ -36,8 +32,6 @@ func TestCheckBaseDivergence_BehindHalts(t *testing.T) {
 	}
 }
 
-// TestCheckBaseDivergence_InSyncPasses — the anti-blanket-halt negative. An
-// in-sync base must pass or every healthy boot is benched.
 func TestCheckBaseDivergence_InSyncPasses(t *testing.T) {
 	stubProbe(t, func(context.Context, string) (baseState, error) {
 		return baseState{Branch: "main"}, nil
@@ -48,8 +42,6 @@ func TestCheckBaseDivergence_InSyncPasses(t *testing.T) {
 	}
 }
 
-// TestCheckBaseDivergence_AheadOnlyPasses — unpushed local work is normal and
-// must not halt; only BEHIND (stale base) does.
 func TestCheckBaseDivergence_AheadOnlyPasses(t *testing.T) {
 	stubProbe(t, func(context.Context, string) (baseState, error) {
 		return baseState{Branch: "main", Ahead: 4}, nil
@@ -60,10 +52,6 @@ func TestCheckBaseDivergence_AheadOnlyPasses(t *testing.T) {
 	}
 }
 
-// TestCheckBaseDivergence_ProbeErrorWarns — an unverifiable comparison is
-// surfaced as Warn, never a silent PASS (a fetch failure must not read as
-// "base is fine") and never a Halt (a transient network fault must not bench a
-// ready boot).
 func TestCheckBaseDivergence_ProbeErrorWarns(t *testing.T) {
 	stubProbe(t, func(context.Context, string) (baseState, error) {
 		return baseState{}, errors.New("fetch origin main: connection refused")
@@ -78,8 +66,6 @@ func TestCheckBaseDivergence_ProbeErrorWarns(t *testing.T) {
 	}
 }
 
-// TestCheckBaseDivergence_SkippedPasses — a non-repo / no-origin project root
-// has nothing to compare and must pass with the reason visible.
 func TestCheckBaseDivergence_SkippedPasses(t *testing.T) {
 	stubProbe(t, func(context.Context, string) (baseState, error) {
 		return baseState{Skipped: true, Reason: "no `origin` remote"}, nil
@@ -94,8 +80,6 @@ func TestCheckBaseDivergence_SkippedPasses(t *testing.T) {
 	}
 }
 
-// TestParseLeftRightCount covers the rev-list parse, including the malformed
-// output that must become an error rather than a silent 0/0 ("up to date").
 func TestParseLeftRightCount(t *testing.T) {
 	ahead, behind, err := parseLeftRightCount("2\t5\n")
 	if err != nil || ahead != 2 || behind != 5 {
@@ -106,8 +90,6 @@ func TestParseLeftRightCount(t *testing.T) {
 	}
 }
 
-// TestHasRemoteOrigin guards the remote-name match against substring hits like
-// "upstream-origin".
 func TestHasRemoteOrigin(t *testing.T) {
 	if !hasRemoteOrigin("upstream\norigin\n") {
 		t.Errorf("origin present but not detected")
@@ -117,11 +99,7 @@ func TestHasRemoteOrigin(t *testing.T) {
 	}
 }
 
-// --- defaultBaseDivergenceProbe: scripted-git branch coverage ---
-
-// scriptGit installs a fake git whose reply is chosen by the first argument
-// (the git subcommand). A "" reply with a non-nil error slot makes that
-// subcommand exit non-zero, which gitexec folds into an error.
+// scriptGit fakes git: replies are keyed by subcommand, and a subcommand in failing exits 1.
 func scriptGit(t *testing.T, replies map[string]string, failing map[string]bool) {
 	t.Helper()
 	orig := newGit
@@ -153,8 +131,6 @@ func healthyReplies() map[string]string {
 	}
 }
 
-// TestDefaultProbe_BehindIsReported — the probe must surface the behind count
-// the halt is built from.
 func TestDefaultProbe_BehindIsReported(t *testing.T) {
 	r := healthyReplies()
 	r["rev-list"] = "1\t7\n"
@@ -169,7 +145,6 @@ func TestDefaultProbe_BehindIsReported(t *testing.T) {
 	}
 }
 
-// TestDefaultProbe_InSync — 0/0 is a clean, non-skipped verdict.
 func TestDefaultProbe_InSync(t *testing.T) {
 	scriptGit(t, healthyReplies(), nil)
 
@@ -179,8 +154,6 @@ func TestDefaultProbe_InSync(t *testing.T) {
 	}
 }
 
-// TestDefaultProbe_NotAWorkTree — a non-repo project root is skipped, not an
-// error: the loop legitimately runs outside a checkout in some fixtures.
 func TestDefaultProbe_NotAWorkTree(t *testing.T) {
 	scriptGit(t, healthyReplies(), map[string]bool{"rev-parse": true})
 
@@ -190,7 +163,6 @@ func TestDefaultProbe_NotAWorkTree(t *testing.T) {
 	}
 }
 
-// TestDefaultProbe_DetachedHead — no base branch to compare against.
 func TestDefaultProbe_DetachedHead(t *testing.T) {
 	r := healthyReplies()
 	r["rev-parse"] = "HEAD"
@@ -202,7 +174,6 @@ func TestDefaultProbe_DetachedHead(t *testing.T) {
 	}
 }
 
-// TestDefaultProbe_NoOriginRemote — nothing to diverge from.
 func TestDefaultProbe_NoOriginRemote(t *testing.T) {
 	r := healthyReplies()
 	r["remote"] = "upstream\n"
@@ -214,9 +185,6 @@ func TestDefaultProbe_NoOriginRemote(t *testing.T) {
 	}
 }
 
-// TestDefaultProbe_FetchFailureErrors — the fetch is the whole point of the
-// check, so a failed fetch must become an error (→ Warn), NEVER a clean 0/0
-// that reads as "base is up to date".
 func TestDefaultProbe_FetchFailureErrors(t *testing.T) {
 	scriptGit(t, healthyReplies(), map[string]bool{"fetch": true})
 
@@ -229,8 +197,6 @@ func TestDefaultProbe_FetchFailureErrors(t *testing.T) {
 	}
 }
 
-// TestDefaultProbe_RemoteListFailureErrors — an unusable git also degrades to
-// UNVERIFIED rather than a skip.
 func TestDefaultProbe_RemoteListFailureErrors(t *testing.T) {
 	scriptGit(t, healthyReplies(), map[string]bool{"remote": true})
 
@@ -239,7 +205,6 @@ func TestDefaultProbe_RemoteListFailureErrors(t *testing.T) {
 	}
 }
 
-// TestDefaultProbe_RevListFailureErrors — likewise for the comparison itself.
 func TestDefaultProbe_RevListFailureErrors(t *testing.T) {
 	scriptGit(t, healthyReplies(), map[string]bool{"rev-list": true})
 
@@ -248,8 +213,6 @@ func TestDefaultProbe_RevListFailureErrors(t *testing.T) {
 	}
 }
 
-// TestDefaultProbe_MalformedRevListErrors — garbage counts must not silently
-// become "0 behind".
 func TestDefaultProbe_MalformedRevListErrors(t *testing.T) {
 	r := healthyReplies()
 	r["rev-list"] = "not-a-count\n"
@@ -260,16 +223,13 @@ func TestDefaultProbe_MalformedRevListErrors(t *testing.T) {
 	}
 }
 
-// TestDefaultProbe_BranchResolveFailureErrors — an empty branch name from a
-// failing rev-parse --abbrev-ref must not be treated as a work tree check.
 func TestDefaultProbe_BranchResolveFailureErrors(t *testing.T) {
 	calls := 0
 	orig := newGit
 	newGit = func(dir string) gitexec.Git {
 		return gitexec.Git{Dir: dir, Exec: func(_ context.Context, _, _ string, args, _ []string,
 			_ io.Reader, stdout, stderr io.Writer) (int, error) {
-			// First rev-parse (--is-inside-work-tree) succeeds; the second
-			// (--abbrev-ref HEAD) fails.
+			// The work-tree rev-parse succeeds; the --abbrev-ref HEAD one fails.
 			if len(args) > 0 && args[0] == "rev-parse" {
 				calls++
 				if calls == 1 {

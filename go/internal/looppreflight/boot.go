@@ -10,12 +10,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 )
 
-// checkBridgeBoot (Halt) is the check that catches the cycle-258 failure: it
-// REALLY boots each configured *-tmux driver's REPL (boot-only, no prompt) and
-// halts if any fails to reach its prompt marker. When SkipBoot is set it warns
-// instead (CI/offline). Boots run sequentially, each under its own BootBudget
-// deadline. The sandbox boot path is exercised iff the profiles request it AND
-// the host can actually sandbox.
+// checkBridgeBoot boots each *-tmux driver's REPL in turn and halts if any misses its
+// prompt marker; SkipBoot warns instead. Sandbox needs a profile request and a capable host.
 func checkBridgeBoot(o resolved) CheckResult {
 	const name = "bridge-boot"
 
@@ -65,17 +61,14 @@ func checkBridgeBoot(o resolved) CheckResult {
 	}
 }
 
-// bootOne runs one driver's boot under a per-driver BootBudget deadline.
 func bootOne(o resolved, driver string, sandbox bool) (int, string) {
 	ctx, cancel := context.WithTimeout(context.Background(), o.bootBudget)
 	defer cancel()
 	return o.bootTester(ctx, driver, sandbox)
 }
 
-// newDefaultBootTester returns the production BootTester: a near-copy of
-// `evolve doctor boot` that provisions a throwaway workspace (and, for the
-// sandbox path, a throwaway worktree + build agent) and calls
-// bridge.BootSmokeTest.
+// newDefaultBootTester mirrors `evolve doctor boot`: it boots in a throwaway workspace,
+// plus a throwaway worktree and the build agent on the sandbox path.
 func newDefaultBootTester(projectRoot string, stderr io.Writer) func(context.Context, string, bool) (int, string) {
 	return func(ctx context.Context, driver string, sandbox bool) (int, string) {
 		ws, err := os.MkdirTemp("", "evolve-looppreflight-*")
@@ -96,13 +89,10 @@ func newDefaultBootTester(projectRoot string, stderr io.Writer) func(context.Con
 	}
 }
 
-// exitWorkspaceSetupFailed is a local (negative, never a bridge exit code)
-// sentinel for a boot adapter that could not even provision its throwaway
-// workspace — kept distinct from bridge.ExitBadFlags so the diagnostic does not
-// misreport a disk/`os.MkdirTemp` failure as an unknown-driver error.
+// exitWorkspaceSetupFailed is negative so it never collides with a bridge exit code
+// and a MkdirTemp failure is not misreported as ExitBadFlags.
 const exitWorkspaceSetupFailed = -1
 
-// bootRCName names the bridge exit codes a boot can return, for the diagnostic.
 func bootRCName(rc int) string {
 	switch rc {
 	case bridge.ExitREPLBootTimeout:
@@ -114,14 +104,11 @@ func bootRCName(rc int) string {
 	case exitWorkspaceSetupFailed:
 		return "workspace setup failed (os.MkdirTemp)"
 	default:
-		// Carry the numeric code: a bare "boot failure" made rc=42
-		// indistinguishable from rc=99 in preflight output (cycle-270
-		// fault-localization Rank 2).
+		// Carry the number so distinct unknown codes stay distinguishable.
 		return fmt.Sprintf("boot failure (exit=%d)", rc)
 	}
 }
 
-// indent prefixes every line of s with prefix.
 func indent(s, prefix string) string {
 	lines := strings.Split(s, "\n")
 	for i := range lines {
