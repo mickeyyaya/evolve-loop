@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## Docs — ADR-0106 P3 landed; the design document, the bridge pages and the manifest channel (2026-09-27)
+
+- `logic-first-delivery-design.md` §5.4 records the P3 decisions (the statement is finished by the driver and appended; the environment channel over a settings flag; what the block does not fix), the P3 row reads shipped, §8 carries its signatures, §12 the open question on other CLIs' suggestion features. `internal-bridge-phaseidentity.md` is new; `internal-bridge.md`, the packages index, `full-tmux-control.md` §9, ADR-0022 and ADR-0106 describe `default_env` and the identity statement. The F3 routing bullet that a replay placed above its heading sits under it again.
+
 ## Changed — phase panes run without prompt suggestions (ADR-0106 P3, 2026-09-27)
 
 - The tmux boot sends a manifest's `default_env` as `export` lines after `cd` and `EVOLVE_PROJECT_ROOT` and before the launch command, because a pane inherits the tmux server's environment, not the bridge's. `claude-tmux` declares `CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false`: a suggestion is a background model request per turn and dim text under the input box that reads like agent output (cycle 1707 rendered "Yes, kill that session first." there). The environment variable takes precedence over the setting, and unlike a `--settings` flag it is honoured under `--setting-sources project`.
