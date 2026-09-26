@@ -1,15 +1,3 @@
-// cmd_composition_wiring.go — the composition root's binding of the RUNG 0
-// trivial-rebase composition-verdict fast path (merge-concurrency-2026,
-// cycle-786/801 built the pieces, cycle-804 wires them).
-//
-// core cannot import internal/adapters/ledger (ledger already imports core —
-// an import cycle), so cmd/evolve — the only package that legally depends on
-// both — binds the three Option-injected closures to the real adapters, and
-// core stays adapter-agnostic. Every closure fails closed: a missing bound
-// audit, an unreadable ledger, a red gate, or a writer error makes
-// compositionCarryForward fall back to the pre-existing full re-audit path.
-// A bad binding can only keep the fast path dark (status quo), never widen
-// what ships.
 package main
 
 import (
@@ -29,10 +17,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/verdictcache"
 )
 
-// compositionOptions binds all three composition closures. Appending these
-// in wireOrchestratorDeps is what makes Orchestrator.CompositionFastPathWired
-// report true in production (it AND's the three — a partial binding stays
-// dark).
+// compositionOptions binds the three composition closures.
+// Orchestrator.CompositionFastPathWired ANDs them, so a partial binding stays dark.
 func compositionOptions() []core.Option {
 	return []core.Option{
 		core.WithCompositionVerdictWriter(writeCompositionVerdict),
@@ -41,10 +27,8 @@ func compositionOptions() []core.Option {
 	}
 }
 
-// writeCompositionVerdict is a 1:1 pass-through into the real ledger writer —
-// core.CompositionVerdictInput mirrors ledger.CompositionVerdictInput
-// field-for-field so no validation is duplicated here; the ledger writer
-// stays the single source of fail-closed patch-id/gate checks.
+// writeCompositionVerdict passes straight through to the ledger writer, the
+// single home of the fail-closed patch-id and gate checks.
 func writeCompositionVerdict(ledgerPath string, in core.CompositionVerdictInput) error {
 	return ledger.WriteCompositionVerdict(ledgerPath, ledger.CompositionVerdictInput{
 		Cycle:        in.Cycle,
@@ -61,12 +45,9 @@ func writeCompositionVerdict(ledgerPath string, in core.CompositionVerdictInput)
 	})
 }
 
-// composedGateTargets maps each required composed-tree gate to the Makefile
-// target that runs it, so the fast path executes the SAME commands CI and the
-// cycle audit run (ADR-0069) — single-sourced through the Makefile, never a
-// second gate implementation that could drift. Keys stay in lock-step with
-// ciparity.RequiredComposedGates; an unmapped gate is left absent, which
-// MissingComposedGates counts as not-green (fail-closed).
+// composedGateTargets maps each required composed-tree gate to its Makefile
+// target, so the fast path runs the commands CI runs. Keys track
+// ciparity.RequiredComposedGates; an unmapped gate stays absent, so not green.
 var composedGateTargets = map[string]string{
 	"compile":  "build",
 	"test":     "test",
@@ -74,12 +55,8 @@ var composedGateTargets = map[string]string{
 	"apicover": "apicover-enforce",
 }
 
-// runComposedGates re-runs the full native gate set against the composed
-// (rebased) worktree and records "pass"/"fail" per gate. Gates follow the
-// TREE: even when the audit verdict follows the change across a clean rebase,
-// every required gate must be green on the composed tree before the verdict
-// carries forward. Any non-zero exit → "fail" → MissingComposedGates trips →
-// full re-audit.
+// runComposedGates re-runs every required gate on the composed worktree: gates
+// follow the tree even when the audit verdict follows the change.
 func runComposedGates(ctx context.Context, worktree string) map[string]string {
 	results := make(map[string]string, len(ciparity.RequiredComposedGates))
 	for _, gate := range ciparity.RequiredComposedGates {
@@ -98,12 +75,9 @@ func runComposedGates(ctx context.Context, worktree string) map[string]string {
 	return results
 }
 
-// auditLedgerEntry is the composition-verdict-scoped subset of an auditor
-// ledger line the snapshot needs. Ship's audit reader (findLatestAudit) is
-// package-private; a 4-field scan avoids exporting ship internals for this
-// single call site.
-// TODO(merge-concurrency-2026): fold into a shared ledger read-side helper if
-// a third consumer appears.
+// auditLedgerEntry is the subset of an auditor ledger line the snapshot needs;
+// ship's reader is package-private.
+// TODO(merge-concurrency-2026): fold into a shared ledger read helper if a third consumer appears.
 type auditLedgerEntry struct {
 	Role           string `json:"role"`
 	Kind           string `json:"kind"`
@@ -113,12 +87,9 @@ type auditLedgerEntry struct {
 	GitHEAD        string `json:"git_head"`
 }
 
-// readCompositionSnapshot captures what the bound audit reviewed BEFORE a
-// peer moved main: the auditor entry's artifact SHA (LaneAuditRef), the git
-// HEAD it bound (AuditedBase), and the audited change as a diff + its
-// patch-id. For a clean rebase, git patch-id is offset-insensitive, so this
-// pre-rebase diff recomputes to the same patch-id as the post-rebase composed
-// diff — the RUNG 0 identity check compositionCarryForward enforces.
+// readCompositionSnapshot captures what the bound audit reviewed before a peer
+// moved main. git patch-id is offset-insensitive, so after a clean rebase the
+// composed diff recomputes the same patch-id.
 func readCompositionSnapshot(ctx context.Context, worktree, runID string) (core.CompositionAuditSnapshot, error) {
 	ledgerPath := filepath.Join(worktree, ".evolve", "ledger.jsonl")
 	entry, err := latestAuditEntry(ledgerPath, runID)
@@ -128,8 +99,7 @@ func readCompositionSnapshot(ctx context.Context, worktree, runID string) (core.
 	if err := requireReusableAudit(entry); err != nil {
 		return core.CompositionAuditSnapshot{}, err
 	}
-	// Three-dot: the lane's change against the merge-base with main — i.e.
-	// exactly what the audit reviewed at the base it bound.
+	// Three-dot: the change against the merge-base, exactly what the audit reviewed.
 	diff, err := gitDiffCapture(ctx, worktree, "main..."+entry.GitHEAD)
 	if err != nil {
 		return core.CompositionAuditSnapshot{}, err
@@ -146,16 +116,9 @@ func readCompositionSnapshot(ctx context.Context, worktree, runID string) (core.
 	}, nil
 }
 
-// latestAuditEntry walks ledger.jsonl backwards for the most recent bound
-// auditor entry OF THIS RUN. Run-scoped since 2026-08-26, same hardening as
-// ship.findLatestAudit (whose old cross-run fallback was cycle-1571's H3
-// fail-open hole): the ledger is host-global across fleet worktrees, and the
-// producer now records auditor entries for FAIL verdicts too, so an unscoped
-// "latest" can be a sibling lane's — or a FAILed — audit. runID=="" (no run
-// context) keeps latest-any. findCompositionVerdict's LaneAuditRef equality
-// against this run's own bound artifact remains the downstream safety net
-// either way. Alien/unparseable lines are skipped; a miss is an error the
-// snapshot surfaces so compositionCarryForward fails closed to full re-audit.
+// latestAuditEntry returns this run's newest bound auditor entry; runID "" keeps
+// latest-any. The ledger is host-global and records FAIL audits too, so an
+// unscoped "latest" can be a sibling lane's or a failed one.
 func latestAuditEntry(ledgerPath, runID string) (auditLedgerEntry, error) {
 	raw, err := os.ReadFile(ledgerPath)
 	if err != nil {
@@ -181,19 +144,9 @@ func latestAuditEntry(ledgerPath, runID string) (auditLedgerEntry, error) {
 	return auditLedgerEntry{}, fmt.Errorf("composition snapshot: no bound auditor entry for run %q in %s (foreign-run entries refused)", runID, ledgerPath)
 }
 
-// requireReusableAudit refuses to build a carry-forward snapshot from an audit
-// that did not pass. Cycle-1571 H2: the run-scoping added alongside this
-// function closed only half the hazard its own comment named — a FAILed audit
-// belonging to THIS run still bound, so RUNG 0 would run the full composed-tree
-// gate set and write a composition-verdict record certifying the carry-forward
-// of a REJECTION into a hash-chained ledger. Ship blocks the result downstream,
-// so the cost is a wasted gate pass and a dishonest provenance record.
-//
-// The verdict is read from the bound ARTIFACT, not the ledger entry: exit_code
-// is 1 for WARN and FAIL alike, and the binding recorder states plainly that
-// severity lives in the artifact. Deliberately no fallback to an older PASS —
-// if this run's newest audit says FAIL, carry-forward declines rather than
-// reaching behind it. Every failure path here fails CLOSED to a full re-audit.
+// requireReusableAudit refuses a snapshot from an audit that did not pass. The
+// verdict comes from the bound artifact, since the ledger's exit_code is 1 for
+// WARN and FAIL alike, and there is no fallback to an older PASS.
 func requireReusableAudit(entry auditLedgerEntry) error {
 	if entry.ArtifactPath == "" {
 		return fmt.Errorf("composition snapshot: bound auditor entry has no artifact_path — cannot confirm its verdict")
@@ -206,11 +159,8 @@ func requireReusableAudit(entry auditLedgerEntry) error {
 	if !ok {
 		return fmt.Errorf("composition snapshot: audit artifact %s declares no parseable verdict sentinel", entry.ArtifactPath)
 	}
-	// The sentinel must be the AUDIT phase's own. ParseVerdictSentinelFull is
-	// tail-anchored, so a foreign-phase sentinel quoted into the artifact (a
-	// build-report block pasted as evidence) would otherwise be able to satisfy
-	// a carry-forward. Ship's reader states this rule explicitly and this one is
-	// modelled on it — phases/ship/audit.go, "only an exact 'audit' phase is trusted".
+	// Only the audit phase's own sentinel counts: the parser is tail-anchored, so
+	// a quoted foreign-phase sentinel could otherwise satisfy it.
 	if sentinel.Phase != string(core.PhaseAudit) {
 		return fmt.Errorf("composition snapshot: audit artifact %s carries a %q-phase verdict sentinel, not audit",
 			entry.ArtifactPath, sentinel.Phase)

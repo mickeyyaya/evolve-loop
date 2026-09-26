@@ -8,21 +8,6 @@ import (
 	"testing"
 )
 
-// cmd_composition_verdict_guard_test.go — cycle-1571 H2.
-//
-// PR #503 run-scoped latestAuditEntry and its own comment named the full
-// hazard: an unscoped lookup "can be a sibling lane's — OR A FAILED — audit".
-// The filter it added closed only the sibling half (Kind/Role/GitHEAD/RunID);
-// no verdict was consulted. So a FAILed audit from THIS run was still taken as
-// "the audited snapshot", and RUNG 0 carry-forward would run the entire
-// composed-tree gate set and write a composition-verdict record certifying the
-// carry-forward of a REJECTION. Ship blocks the result downstream, so the cost
-// is a wasted gate pass plus a dishonest entry in a hash-chained ledger.
-//
-// The verdict lives in the bound artifact, not the ledger: exit_code is 1 for
-// WARN and FAIL alike, and phase_bindings.go states the artifact is where the
-// severity lives. So the guard reads the artifact the entry already points at.
-
 func writeArtifact(t *testing.T, verdict string) string {
 	t.Helper()
 	p := filepath.Join(t.TempDir(), "audit-report.md")
@@ -34,7 +19,6 @@ func writeArtifact(t *testing.T, verdict string) string {
 	return p
 }
 
-// TestRequireReusableAudit_RefusesFAIL is the pin for the live defect.
 func TestRequireReusableAudit_RefusesFAIL(t *testing.T) {
 	t.Parallel()
 	err := requireReusableAudit(auditLedgerEntry{ArtifactPath: writeArtifact(t, "FAIL")})
@@ -46,9 +30,6 @@ func TestRequireReusableAudit_RefusesFAIL(t *testing.T) {
 	}
 }
 
-// TestRequireReusableAudit_AcceptsShippableVerdicts: WARN ships by default
-// under the fluent-audit posture, so carrying a WARN forward is legitimate.
-// Excluding it would silently narrow the fast path.
 func TestRequireReusableAudit_AcceptsShippableVerdicts(t *testing.T) {
 	t.Parallel()
 	for _, v := range []string{"PASS", "WARN"} {
@@ -58,10 +39,6 @@ func TestRequireReusableAudit_AcceptsShippableVerdicts(t *testing.T) {
 	}
 }
 
-// TestRequireReusableAudit_UnreadableArtifactFailsClosed: the snapshot's whole
-// contract is that any error routes to a full re-audit. An artifact that cannot
-// be read or carries no recognizable verdict must therefore REFUSE, never
-// default to eligible.
 func TestRequireReusableAudit_UnreadableArtifactFailsClosed(t *testing.T) {
 	t.Parallel()
 	missing := filepath.Join(t.TempDir(), "gone.md")
@@ -82,14 +59,8 @@ func TestRequireReusableAudit_UnreadableArtifactFailsClosed(t *testing.T) {
 	}
 }
 
-// TestReadCompositionSnapshot_RefusesFailBeforeAnyGitWork is the WIRING proof
-// (§3.3) for the guard above. Asserting requireReusableAudit in isolation would
-// stay green if nothing ever called it — the exact unit-green/live-dark shape
-// this PR exists to fix. So drive the real production entry point.
-//
-// The temp worktree is deliberately NOT a git repo: requireReusableAudit runs
-// before gitDiffCapture, so a refusal here also proves the check is positioned
-// early enough to spare the composed-tree gate run that motivated the fix.
+// The worktree is deliberately not a git repo: a refusal here also proves the
+// guard runs before gitDiffCapture and spares the composed-tree gate run.
 func TestReadCompositionSnapshot_RefusesFailBeforeAnyGitWork(t *testing.T) {
 	t.Parallel()
 	worktree := t.TempDir()
@@ -112,12 +83,6 @@ func TestReadCompositionSnapshot_RefusesFailBeforeAnyGitWork(t *testing.T) {
 	}
 }
 
-// TestRequireReusableAudit_ForeignPhaseSentinelRefused — architect review MUST.
-// ParseVerdictSentinelFull is tail-anchored, so a sentinel from another phase
-// quoted into the audit artifact (a build-report block pasted as evidence) would
-// otherwise be able to satisfy a carry-forward. Ship's reader states the rule
-// explicitly — only an exact "audit" phase is trusted — and this reader was
-// modelled on it, so it must honour the same contract.
 func TestRequireReusableAudit_ForeignPhaseSentinelRefused(t *testing.T) {
 	t.Parallel()
 	p := filepath.Join(t.TempDir(), "audit-report.md")

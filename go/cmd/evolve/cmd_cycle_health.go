@@ -13,12 +13,9 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// runCycleHealth implements `evolve cycle-health <N> <workspace>`.
-// Exit codes:
-//   - 0 healthy (no anomalies, or only warnings)
-//   - 1 OverallFatal (at least one fatal anomaly — caller HALTs)
-//   - 10 bad args
-//   - 1 internal error
+// runCycleHealth implements `evolve cycle-health <N> <workspace>`. It exits 0
+// when healthy or only warned, 1 on a fatal anomaly or an internal error, and
+// 10 on bad arguments.
 func runCycleHealth(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("cycle-health", flag.ContinueOnError)
 	fs.SetOutput(stderr)

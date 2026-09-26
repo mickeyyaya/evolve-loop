@@ -94,6 +94,21 @@ Go files is each batch's count of changed Go files. The landing proof's verified
 | 22 | `internal/adapters/ledger` | 26 | 878 → 140 | 29 → 0 | on the comment PR |
 | 23 | `internal/changedpkgs` | 12 | 504 → 43 | 23 → 0 | on the comment PR |
 | 24 | `internal/cyclestate` | 13 | 384 → 100 | 24 → 0 | on the comment PR |
+| 25-32 | eight more packages, one design page each (see the package index) | — | — | — | batches 0-32 merged: #638, then #640 as one squashed commit |
+| 33 | `internal/phasecontract` | 29 | 1,033 → 113 | 71 → 3 | #642 |
+| 34 | `internal/phasespec` | 35 | 1,004 → 125 | 73 → 0 | #642 |
+| 35 | `internal/inboxmover` | 39 | 1,237 → 155 | 108 → 1 | #642 |
+| 36 | `internal/inboxmover/lifecycle` | 20 | 459 → 75 | 29 → 0 | #642 |
+| 37 | `internal/phases/runner` | 62 | 1,681 → 152 | 87 → 0 | #642 |
+| 38 | `internal/deliverable` | 53 | 2,123 → 268 | 138 → 0 | #642 |
+| 39 | `internal/core/advisor` | 24 | 659 → 110 | 36 → 0 | #642 |
+| 40 | `internal/phases/runner/verdict` | 13 | 439 → 106 | 28 → 0 | #642 |
+| 41 | `internal/core`, file group 1 of 13 | 39 | 1,509 → 169 | — | #642 |
+| 42 | `cmd/evolve`, file group 1 of 8 | 39 | 719 → 142 | — | #642 |
+| 43 | `internal/bridge`, file group 1 of 7 | 40 | 1,685 → 275 | — | #642 |
+| 44 | `cmd/evolve`, file group 2 of 8 | 41 | 1,381 → 341 | 137 → 1 | #642 |
+
+The three largest packages are split into file groups of about 40 files, taken in name order. Each group is one batch, and the package's design page fills in group by group. Narrative is not measured per group.
 
 The narrative figures after batches 1-2 predate the pointer fix. The 5 left in each are `See ADR` pointers, which no longer count.
 
@@ -119,3 +134,4 @@ Code problems the editors found are reported, not changed, and filed as inbox it
 - `auditchain-scout-report-literal`: found while landing, not by an editor
 - `guards-path-traversal-and-ship-bypass` (P1)
 - `lane-lint-debt-class`: the lint debt that held batch 11.
+- `codex-pretrust-presence-and-escaping` (P2), from batch 43.
