@@ -1,21 +1,11 @@
 package reachabilityprobe
 
-// apicover_named_test.go — repo-wide apicover public-API coverage (House
-// Rule 1 / ADR-0069's second gate): names and exercises every exported symbol
-// of this package (ImportGraph, CallSite, Violation, CheckCallSite,
-// BuildImportGraph, FrozenTestFiles, ExtractFrozenPins, CheckFrozenPins) by
-// identifier.
-
 import (
 	"os"
 	"path/filepath"
 	"testing"
 )
 
-// TestExportedSymbols_Named names every exported identifier of this package
-// and pins the two load-bearing contracts: CheckCallSite detects the
-// cycle-644 shape (non-nil Violation with a populated Cycle and Error()) and
-// leaves an acyclic pin unchanged (nil).
 func TestExportedSymbols_Named(t *testing.T) {
 	var graph ImportGraph = ImportGraph{
 		"storage": {"core"},
@@ -43,10 +33,6 @@ func TestExportedSymbols_Named(t *testing.T) {
 	}
 }
 
-// TestBuildImportGraph_Named names BuildImportGraph and exercises it against
-// the real toolchain: a known direct edge (this package imports
-// internal/sysexec) must surface in the returned graph, and an unresolvable
-// package pattern must produce a wrapped, non-nil error.
 func TestBuildImportGraph_Named(t *testing.T) {
 	repoRoot, err := filepath.Abs(filepath.Join("..", ".."))
 	if err != nil {
@@ -81,11 +67,6 @@ func TestBuildImportGraph_Named(t *testing.T) {
 	}
 }
 
-// TestFrozenPinExports_Named names and exercises the frozen-pin seam
-// (FrozenTestFiles, ExtractFrozenPins, CheckFrozenPins) end to end against a
-// real throwaway module carrying the cycle-644 shape: storage imports core, so
-// a frozen test pinning `storage.UpdateStateMap(` into a core file demands
-// core -> storage -> core.
 func TestFrozenPinExports_Named(t *testing.T) {
 	const module = "example.com/named"
 	const frozenTest = "go/internal/core/frozen_cyclic_test.go"

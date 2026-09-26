@@ -31,3 +31,4 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/evalqualitycheck` | grades eval commands for vacuity, diversity and flaky shapes before they run | [internal-evalqualitycheck.md](internal-evalqualitycheck.md) |
 | `internal/adapters/bridge` | assembles each phase prompt and turns policy.json into the bridge engine's settings | [internal-adapters-bridge.md](internal-adapters-bridge.md) |
 | `internal/coherence` | checks that a cycle's recorded verdicts and artifacts agree with each other | [internal-coherence.md](internal-coherence.md) |
+| `internal/reachabilityprobe` | proves a frozen test's pins stay reachable through the import graph | [internal-reachabilityprobe.md](internal-reachabilityprobe.md) |
