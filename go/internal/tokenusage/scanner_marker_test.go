@@ -1,15 +1,5 @@
 package tokenusage
 
-// scanner_marker_test.go — regression contract for the over-attribution vector
-// closed in cycle-1457. attributes() used to key on a BARE ArtifactPath
-// substring anywhere in the first user message. Every production launch carries
-// the path, but so does any prompt that merely cites it in prose:
-// .evolve/profiles/retrospective.json instructs a retrospective launch to "Read
-// .evolve/runs/cycle-{cycle}/build-report.md", which under the bare rule billed
-// the whole retrospective launch to the BUILDER's Window. Both assemblers stamp
-// a literal label — subagent.go:358 ("Artifact path: %s\n") and run.go:442
-// ("- Artifact path: %s\n") — so the match anchors on artifactMarker+path.
-
 import (
 	"path/filepath"
 	"strings"
@@ -19,12 +9,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// TestAttributes_MarkerAnchored drives the real ScanConfigRoot entry point over
-// one fixture per prompt shape and asserts the attribution verdict. The two
-// assembler forms must still attribute (the anchor must not narrow genuine
-// launches out); a prose citation and every near-miss label must not. Each
-// fixture records a cwd DIFFERENT from Window.Worktree so the ArtifactPath-less
-// cwd fallback can never rescue a match and mask the anchor.
+// Every fixture records a foreign cwd, so the cwd fallback can never rescue a match and mask the anchor.
 func TestAttributes_MarkerAnchored(t *testing.T) {
 	const (
 		worktree = "/repo/worktrees/cycle-1457"
@@ -55,12 +40,6 @@ func TestAttributes_MarkerAnchored(t *testing.T) {
 			why:           "run.go:442's leading list bullet is prose decoration OUTSIDE the key",
 		},
 		{
-			// The shape a REAL loop-phase prompt carries: the bridge's contract
-			// footer, not the subagent assembler's marker. Verified against the
-			// cycle-1457 build prompt itself, whose only path disclosure is
-			// "DELIVERABLE PATH: <abs>" (phasecontract/render.go:86) — an anchor
-			// set that omitted this would silently zero every loop launch's
-			// transcript-tier token telemetry.
 			name:          "bridge contract footer form attributes",
 			firstUserText: "…END OF PROMPT\n\nDELIVERABLE PATH: " + artifact + "\n",
 			wantSource:    SourceTranscript,
@@ -135,12 +114,6 @@ func TestAttributes_MarkerAnchored(t *testing.T) {
 	}
 }
 
-// TestArtifactAnchors_MatchRenderedContract is the drift guard for the bridge
-// side of the anchor set. Predicate 003 pins the two subagent format strings by
-// grep; the contract footer and tail have no such guard, so this renders them
-// from the REAL phasecontract assembler and requires each anchor form to match
-// the rendered bytes. If render.go ever restyles its path disclosure, this fails
-// loudly instead of letting loop-phase attribution silently go dark.
 func TestArtifactAnchors_MatchRenderedContract(t *testing.T) {
 	const artifact = "/repo/.evolve/runs/cycle-1457/build-report.md"
 	c := phasecontract.Contract{Phase: "build", AgentName: "build", ArtifactName: "build-report.md"}
@@ -163,8 +136,6 @@ func TestArtifactAnchors_MatchRenderedContract(t *testing.T) {
 	}
 }
 
-// jsonQuote encodes s as a JSON string literal so multi-line prompt bodies
-// survive embedding in a fixture transcript.
 func jsonQuote(s string) string {
 	var b []byte
 	b = append(b, '"')

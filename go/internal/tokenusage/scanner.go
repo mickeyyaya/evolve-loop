@@ -1,18 +1,6 @@
-// Package tokenusage scans Claude Code transcript JSONL files to recover the
-// token usage a launch actually consumed (token-telemetry campaign S1;
-// docs/plans/token-telemetry-2026-07.md). It is best-effort instrumentation:
-// a missing or unreadable transcript yields zero usage and SourceNone rather
-// than an error, so telemetry never blocks a cycle.
-//
-// The scanner attributes a transcript to a launch by the launch's unique
-// ArtifactPath appearing in the transcript's first user message — the only key
-// that is both stable and unique across the exec boundary. Neither the on-disk
-// session-directory slug (a lossy sanitisation of cwd) nor the recorded cwd
-// itself can be trusted: cwd degrades when WORKTREE_PATH falls back to the repo
-// root and shifts when the agent cd's into a subdir. ArtifactPath-less Windows
-// (legacy launches, unit fixtures) fall back to an exact cwd==Worktree match.
-// Streamed usage deltas that repeat one message id are deduplicated to the last
-// (highest-cumulative) delta, never summed.
+// Package tokenusage recovers, best-effort, the token usage and context fill of one CLI launch
+// from its transcript, events log or pane scrollback.
+// See docs/architecture/packages/internal-tokenusage.md.
 package tokenusage
 
 import (
@@ -31,66 +19,45 @@ import (
 type Source string
 
 const (
-	// SourceNone means no transcript was found for the Window; Usage is zero.
+	// SourceNone means no source observed the launch; Usage is zero.
 	SourceNone Source = "none"
-	// SourceTranscript means usage was recovered from a matched transcript.
+	// SourceTranscript means usage was recovered from an attributed Claude Code transcript.
 	SourceTranscript Source = "transcript"
 )
 
-// Window describes the launch whose token usage is being recovered.
-// ArtifactPath is the launch's unique deliverable reference and the PRIMARY
-// attribution key: it appears verbatim in the transcript's first user message.
-// Worktree is the fallback key — the exact cwd a matching transcript must
-// record — consulted only for ArtifactPath-less Windows.
-// Start and End bound the assistant turns that count toward the launch.
-// EventsLogPath and Scrollback carry the lower fallback tiers' inputs:
-// the launch's *-events.ndjson path (tier 2) and the captured pane
-// scrollback content — not a pane id — (tier 3). Either may be empty; an
-// empty input simply leaves that tier with no data. Driver is the launch's
-// CLI/driver identity (req.CLI, e.g. "claude-tmux", "codex", "agy") so the
-// resolver can dispatch the fidelity chain per driver; empty means claude
-// (backward compatible).
+// Window identifies the launch whose token usage is recovered, and carries each tier's input.
 type Window struct {
-	Worktree      string
+	// Worktree is the exact-cwd fallback key, used only when ArtifactPath is empty.
+	Worktree string
+	// ArtifactPath is the primary attribution key, stamped into the launch's first user message.
 	ArtifactPath  string
 	EventsLogPath string
-	Scrollback    string
-	Driver        string
-	Start         time.Time
-	End           time.Time
+	// Scrollback is the captured pane content, not a pane id.
+	Scrollback string
+	// Driver is the launch's CLI identity, such as "claude-tmux" or "codex"; empty means claude.
+	Driver string
+	// Start and End bound, inclusively, the assistant turns that count.
+	Start time.Time
+	End   time.Time
 }
 
-// Result is the outcome of a scan: the summed token usage and the Source that
-// produced it. Warn carries an explicit per-driver coverage warning when no
-// tier could observe the launch's usage (Source == SourceNone) — the signal
-// that distinguishes "unmeasured" from "measured zero" so uncovered drivers
-// never masquerade as free (the 2026-07-13 all-zeros baseline defect).
-// FillPct is the derived context-fill reading for the launch (percent of the
-// driver family's effective window occupied by prompt-side tokens), stamped by
-// DefaultResolver off the usage that same resolve recovered. It carries
-// FillPctUnmeasured when the fill could not be derived — an uncovered launch
-// or an unmapped driver family — so "unmeasured" never reads as "0% full".
-// PeakPromptTokens is the fullest any SINGLE observed turn's prompt side got —
-// the numerator the fill reading is measured against, and deliberately not the
-// summed Usage: each turn's cache_read already carries that turn's whole prior
-// context, so summing turns re-counts the same context once per turn (a 12-turn
-// phase then reports several hundred percent — cycle-1455). Zero means the tier
-// observed no per-turn breakdown (events/scrollback report one whole-launch
-// envelope, which is already a single reading); negative means turns were
-// expected but none was observed, which degrades the fill to the sentinel.
-// PeakUsage carries that same turn's component counters so a fill warning can
-// name contributors without mixing a single-turn percentage with launch totals.
+// Result is a launch's recovered usage, the Source that produced it, and the derived fill reading.
 type Result struct {
-	Usage            cyclestate.TokenUsage
-	Source           Source
-	Warn             string
-	FillPct          float64
+	// Usage is the launch's total spend, summed across its turns.
+	Usage  cyclestate.TokenUsage
+	Source Source
+	// Warn names the driver when no source observed the launch, so unmeasured never reads as free.
+	Warn string
+	// FillPct is the percent of the driver's effective window in use, or FillPctUnmeasured.
+	FillPct float64
+	// PeakPromptTokens is the fullest single turn's prompt side: 0 when the tier reports no
+	// turns, negative when turns were expected but none fell inside the Window.
 	PeakPromptTokens int
-	PeakUsage        cyclestate.TokenUsage
+	// PeakUsage holds the counters of that same fullest turn.
+	PeakUsage cyclestate.TokenUsage
 }
 
-// transcriptLine is the subset of a Claude Code transcript JSONL record the
-// scanner reads. One JSON object per line.
+// transcriptLine is the subset of a Claude Code transcript JSONL record the scanner reads.
 type transcriptLine struct {
 	Type      string `json:"type"`
 	Cwd       string `json:"cwd"`
@@ -103,24 +70,19 @@ type transcriptLine struct {
 			CacheRead  int `json:"cache_read_input_tokens"`
 			CacheWrite int `json:"cache_creation_input_tokens"`
 		} `json:"usage"`
-		// Content is a JSON union (bare string OR array of typed blocks); kept
-		// raw so contentText can decode either form.
+		// Content is a bare string or an array of text blocks, kept raw for contentText.
 		Content json.RawMessage `json:"content"`
 	} `json:"message"`
 }
 
-// ScanConfigRoot walks <root>/projects for transcript JSONL files, attributes
-// the ones belonging to the launch described by w, and returns their summed
-// token usage. A missing projects directory (or no matching transcript) yields
-// a zero Usage with SourceNone and no error — token telemetry is best-effort.
+// ScanConfigRoot sums the usage of the transcripts under root/projects attributed to w; finding none is SourceNone, not an error.
 func ScanConfigRoot(root string, w Window) (Result, error) {
 	projects := filepath.Join(root, "projects")
 	if _, err := os.Stat(projects); err != nil {
 		return Result{Source: SourceNone}, nil
 	}
 
-	// Last usage per message id (dedup streamed deltas), accumulated across
-	// every attributed transcript.
+	// Streamed deltas repeat a message id and are cumulative, so only the last one per id counts.
 	perMsg := map[string]cyclestate.TokenUsage{}
 	matched := false
 
@@ -157,14 +119,8 @@ func ScanConfigRoot(root string, w Window) (Result, error) {
 	if !matched {
 		return Result{Source: SourceNone}, nil
 	}
-	// Two readings off the same turns, answering different questions: the SUM is
-	// what the launch cost, the PEAK single turn is how full its window got. The
-	// peak is taken (rather than the last turn) because perMsg is keyed by
-	// message id across every attributed transcript — there is no reliable
-	// ordering to call "terminal" — and because the operational question the
-	// fill WARN answers is how close this launch came to compaction at all, not
-	// where it happened to land on its final turn. Within a phase, context only
-	// accumulates, so the two coincide on real transcripts.
+	// The sum is what the launch cost; the peak turn is how full its window got.
+	// perMsg has no reliable turn order, so the peak stands in for the last turn.
 	var total cyclestate.TokenUsage
 	peak := promptTokensUnmeasured
 	var peakUsage cyclestate.TokenUsage
@@ -181,8 +137,7 @@ func ScanConfigRoot(root string, w Window) (Result, error) {
 	return Result{Usage: total, Source: SourceTranscript, PeakPromptTokens: peak, PeakUsage: peakUsage}, nil
 }
 
-// readLines parses a transcript file into its records, silently skipping
-// unparseable lines (best-effort). A file it cannot open yields nil.
+// readLines skips unparseable lines and returns nil for a file it cannot open.
 func readLines(path string) []transcriptLine {
 	f, err := os.Open(path)
 	if err != nil {
@@ -203,40 +158,19 @@ func readLines(path string) []transcriptLine {
 	return out
 }
 
-// artifactMarker is the label the subagent assemblers stamp ahead of the
-// deliverable path: subagent.go's composePrompt ("Artifact path: %s\n") and
-// run.go's assembleV2Prompt ("- Artifact path: %s\n"), whose leading list bullet
-// sits outside the key.
+// artifactMarker is the label both subagent prompt assemblers stamp before the deliverable path.
 const artifactMarker = "Artifact path: "
 
-// artifactAnchors are every literal label a dispatched prompt puts immediately
-// ahead of the launch's deliverable path. Attribution keys on anchor+path rather
-// than on a bare path substring so that a transcript which merely CITES another
-// launch's artifact in prose — e.g. the retrospective profile's "Read
-// .evolve/runs/cycle-{cycle}/build-report.md" — is not billed to that launch's
-// Window.
-//
-// All three disclosure forms must stay listed: the subagent assemblers stamp
-// artifactMarker, while the bridge dispatch path every loop phase takes stamps
-// the contract footer (phasecontract.FooterMarker, see render.go:86) and the
-// contract tail's <artifact-path> element (render.go:117) — a real cycle-1457
-// build prompt carries the footer form and no artifactMarker at all. Dropping a
-// form here does not narrow attribution loudly; it silently degrades those
-// launches to the scrollback tier (input:0, cache_read:0), the cycle-867 defect
-// this scanner exists to close.
+// artifactAnchors are every label a prompt puts before its deliverable path; anchor+path keeps a prompt that only
+// cites another launch's artifact from being billed to it. A dropped form silently degrades its launches to scrollback.
 var artifactAnchors = []string{
 	artifactMarker,
 	phasecontract.FooterMarker + " ",
 	"<artifact-path>",
 }
 
-// attributes reports whether a transcript belongs to the launch. When
-// w.ArtifactPath is set (all production launches) it alone attributes: the
-// deliverable path is stamped into this launch's first user message behind one
-// of the artifactAnchors and is cycle+phase unique. Cwd is unreliable across the
-// exec boundary (see the package doc), so it is only a fallback for
-// ArtifactPath-less Windows (legacy launches, unit fixtures), which require an
-// exact cwd == w.Worktree match.
+// attributes matches the anchored ArtifactPath when set, else an exact cwd; cwd is lossy across the exec boundary.
+// See ADR-0071.
 func attributes(lines []transcriptLine, w Window) bool {
 	if w.ArtifactPath != "" {
 		text := firstUserText(lines)
@@ -255,10 +189,6 @@ func attributes(lines []transcriptLine, w Window) bool {
 	return false
 }
 
-// firstUserText returns the text of the first user message, or "" if there is
-// none. The Claude Code transcript encodes message content in two forms and the
-// scanner must read both (the first user message — the phase prompt carrying the
-// ArtifactPath attribution key — is commonly the bare-string form).
 func firstUserText(lines []transcriptLine) string {
 	for _, ln := range lines {
 		if ln.Type != "user" {
@@ -269,10 +199,7 @@ func firstUserText(lines []transcriptLine) string {
 	return ""
 }
 
-// contentText decodes a transcript message's content, which is EITHER a bare
-// JSON string OR an array of typed blocks ({"type":"text","text":...}). It
-// returns the string form directly, or the concatenated block text; unknown or
-// empty content yields "".
+// contentText decodes both content forms; real transcripts carry the phase prompt as a bare string.
 func contentText(raw json.RawMessage) string {
 	if len(raw) == 0 {
 		return ""
@@ -294,10 +221,7 @@ func contentText(raw json.RawMessage) string {
 	return ""
 }
 
-// withinWindow reports whether an assistant turn's timestamp falls inside the
-// launch window. An absent or unparseable timestamp is included (best-effort:
-// a real turn missing a timestamp should still be attributed once its
-// transcript is content-verified).
+// withinWindow admits a turn with no parseable timestamp, since its transcript is already attributed.
 func withinWindow(ts string, w Window) bool {
 	if ts == "" {
 		return true

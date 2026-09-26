@@ -20,3 +20,4 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/triagecap` | bounds the coverage floors triage may commit per cycle | [internal-triagecap.md](internal-triagecap.md) |
 | `internal/cli/phasecmd` | the `evolve phase` and `evolve phases` commands | [internal-cli-phasecmd.md](internal-cli-phasecmd.md) |
 | `internal/topngate` | holds a build to the tasks triage selected | [internal-topngate.md](internal-topngate.md) |
+| `internal/tokenusage` | measures a phase launch's token usage and context fill | [internal-tokenusage.md](internal-tokenusage.md) |
