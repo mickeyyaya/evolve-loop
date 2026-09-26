@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## Docs — ADR-0106 P3 landed; the design document, the bridge pages and the manifest channel (2026-09-27)
+
+- `logic-first-delivery-design.md` §5.4 records the P3 decisions (the statement is finished by the driver and appended; the environment channel over a settings flag; what the block does not fix), the P3 row reads shipped, §8 carries its signatures, §12 the open question on other CLIs' suggestion features. `internal-bridge-phaseidentity.md` is new; `internal-bridge.md`, the packages index, `full-tmux-control.md` §9, ADR-0022 and ADR-0106 describe `default_env` and the identity statement. The F3 routing bullet that a replay placed above its heading sits under it again.
+
 ## Changed — phase panes run without prompt suggestions (ADR-0106 P3, 2026-09-27)
 
 - The tmux boot sends a manifest's `default_env` as `export` lines after `cd` and `EVOLVE_PROJECT_ROOT` and before the launch command, because a pane inherits the tmux server's environment, not the bridge's. `claude-tmux` declares `CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false`: a suggestion is a background model request per turn and dim text under the input box that reads like agent output (cycle 1707 rendered "Yes, kill that session first." there). The environment variable takes precedence over the setting, and unlike a `--settings` flag it is honoured under `--setting-sources project`.
@@ -20,10 +24,10 @@ Cycle 1707's tdd agent listed the tmux sessions, found its own, read its own pro
 
 - `Block(Facts)` renders five lines a tmux driver appends to the bytes it pastes: the phase and cycle; the tmux session and the command that prints it; the two prompt files and that finding them, or the session in `tmux ls`, is expected; the sole-writer fact and the standing instruction not to kill, pause or hand off the session or wait for an operator; and that instruction files addressed to the console operator describe the operator's sessions, not this one. `""` without an agent name or a session; every fact is stripped of control bytes and backticks before it is rendered. Pure, standard library only, golden-pinned, in `.apicover-enforce`.
 
-- The profile runs on the codex family with claude as its fallback, as the other helpers do: the balanced-tier floor (`TestClaudeFamilyFloor`) reserves claude for judgment phases with a justification, and the recovery agent decides nothing. The first ship routed it to claude and the full floor caught it.
 ## Added — the recovery agent's profile and persona (ADR-0106 F3, unwired, 2026-09-26)
 
 - `.evolve/profiles/deliverable-recovery.json` runs sandboxed over a read-only repository with the run directory as its only write grant, so a helper launched without a worktree is wrapped rather than unconfined. It declares no network, but the wrapper forces the network on for every dispatch today (`sandboxPrefixForLaunch`, filed as `sandbox-wrapper-forces-network-on`) and the tmux drivers enforce no tool list (filed as `tmux-drivers-ignore-profile-tool-lists`), so the filesystem grant is the boundary that holds; the test pins the forced-on launch path so it flips when the wrapper honours the declaration; `agents/evolve-deliverable-recovery.md` states the agent's identity and sole-writer fact up front (cycle 1707's TDD agent refused its own task for an hour, taking itself for an intruder) and forbids inventing, editing code, or deciding a verdict. Tests pin that no grant reaches the repository beyond the run dir or any worktree.
+- The profile runs on the codex family with claude as its fallback, as the other helpers do: the balanced-tier floor (`TestClaudeFamilyFloor`) reserves claude for judgment phases with a justification, and the recovery agent decides nothing. The first ship routed it to claude and the full floor caught it.
 
 ## Added — `internal/recoveryguard`, the kernel fence for a recovery dispatch (ADR-0106 F2, unwired, 2026-09-26)
 
