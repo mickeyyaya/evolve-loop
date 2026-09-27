@@ -59,6 +59,12 @@ func (b *loopBatchCoordinator) handleCycleError(result core.CycleResult, cycleEr
 	}
 
 	fmt.Fprintf(b.stderr, "evolve loop: cycle %d: %v\n", result.Cycle, cycleErr)
+	// A wall is resumable from its checkpoint, so its claims stay claimed and nothing is a failure yet; every
+	// producer wraps it as a cycle-level failure, which is why the check above lets it through to here.
+	if errors.Is(cycleErr, core.ErrAllFamiliesExhausted) {
+		b.result.emitQuotaPause(b.cfg, result.Cycle, b.stdout, b.stderr)
+		return batchDecision{flow: batchReturn, exitCode: 5}
+	}
 	b.result.RecoverableFailures++
 	workspace := cycleWorkspace(b.cfg.ProjectRoot, result.Cycle)
 	classification := cycleclassify.Classify(workspace)
@@ -76,9 +82,5 @@ func (b *loopBatchCoordinator) handleCycleError(result core.CycleResult, cycleEr
 		fmt.Fprintf(b.stderr, "[loop] WARN: could not record cycle failure: %v\n", recordErr)
 	}
 	b.applyCycleFailureOutcome(result.Cycle)
-	if errors.Is(cycleErr, core.ErrAllFamiliesExhausted) {
-		b.result.emitQuotaPause(b.cfg, result.Cycle, b.stdout, b.stderr)
-		return batchDecision{flow: batchReturn, exitCode: 5}
-	}
 	return batchDecision{flow: batchNextIteration}
 }

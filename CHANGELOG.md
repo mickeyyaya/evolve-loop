@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — a capacity deferral in the sequential loop is nobody's failed approach (ADR-0106 Q3, 2026-09-27)
+
+- The sequential dispatcher recorded a walled cycle in `state.json`'s `failedApproaches` (which triage's demotion reads) and ran the failure closeout before it noticed the wall and paused. It now pauses first: a deferral records nothing, closes nothing and counts toward no breaker; the wave path already behaved this way because its breaker reads only failure digests, which a deferral never writes.
+
 ## Changed — a byte-identical rebase ships on its audited verdict (ADR-0105 B3/B4, ADR-0106 P1, 2026-09-27)
 
 - Cycles 1712 and 1715 each passed their audit, met a sibling's closeout dossier commit on the plane's `main` at ship, rebased byte-identically and then re-audited an unchanged tree for seven to ten minutes. The rebind route returned Audit and never reached the carry-forward rungs, the old RUNG 0 diffed commits so a pended change could never match, and ship had no reader of carry records. Now `identityCarryForward` runs after the rebind: the auditor row names the audited tree and artifact, `treedelta.Identical` (a new leaf) proves the pended tree's change is byte for byte the audited one, the composed gates run under the fence with the index checked intact, and an `identical-rebase` record naming the audited tree goes to the root ledger; ship's one binding rule then re-proves the record (ancestry, bytes, green gates) and accepts the tree. Any doubt on either side is the old path: a second audit.
