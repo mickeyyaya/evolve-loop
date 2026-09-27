@@ -252,6 +252,7 @@ type Orchestrator struct {
 	compositionSnapshot      func(ctx context.Context, worktree, runID string) (CompositionAuditSnapshot, error)
 	compositionGateRunner    func(ctx context.Context, worktree string) map[string]string
 	compositionVerdictWriter func(ledgerPath string, in CompositionVerdictInput) error
+	laneMenu                 LaneMenuFn
 
 	// scopedMergeReviewer wires the merge ladder's RUNG 2 scoped merge review
 	// into recoverFromShipError, between the RUNG 0 carry-forward miss and the
