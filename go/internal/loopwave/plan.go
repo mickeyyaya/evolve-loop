@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 
@@ -20,7 +19,7 @@ func (e *Engine) PlanFn(count int) PlanFn {
 		if lastCycle, err := e.ports.LastCycle(ctx); err == nil && lastCycle > 0 {
 			companion := filepath.Join(e.ports.Workspace(lastCycle), triagecap.TriageDecisionName())
 			if data, rerr := os.ReadFile(companion); rerr == nil {
-				data = e.pruneRouted(e.pruneConsumed(data))
+				data = e.pruneRouted(e.pruneUndispatchable(data))
 				return WidenNarrowDecision(data, e.roots.EvolveDir, count, e.ports.Protected), nil, nil
 			}
 		}
@@ -84,13 +83,11 @@ func cards(menus [][]triagecap.FleetCandidate) []map[string]any {
 	return topN
 }
 
-// pruneConsumed drops top_n ids whose lifecycle is positively consumed. It fails
-// open, keeping ids with no lifecycle evidence, because over-pruning starves the wave.
-func (e *Engine) pruneConsumed(data []byte) []byte {
-	opts := inboxmover.Options{ProjectRoot: e.roots.ProjectRoot, Stderr: io.Discard, Signals: e.center()}
+func (e *Engine) pruneUndispatchable(data []byte) []byte {
+	lifecycle := e.lifecycle()
 	return e.pruneTopN(data, func(id string) (string, bool) {
-		return fmt.Sprintf("pruned consumed top_n id %q from prior decision", id),
-			isConsumed(inboxmover.ResolveDispatchState(opts, id).State)
+		d := inboxmover.ResolveDispatchability(lifecycle, id)
+		return fmt.Sprintf("pruned undispatchable top_n id %q from prior decision (%s)", id, d.Reason), !d.Dispatchable
 	})
 }
 
@@ -150,14 +147,4 @@ func marshalOr(data []byte, v any) []byte {
 		return data
 	}
 	return out
-}
-
-// isConsumed reports whether an item is done with at plan time. Processing is
-// not: the item is in flight, and its own claim keeps a second lane off it.
-func isConsumed(state string) bool {
-	switch state {
-	case inboxmover.StateProcessed, inboxmover.StateConsumed, inboxmover.StateRejected, inboxmover.StateRetry:
-		return true
-	}
-	return false
 }

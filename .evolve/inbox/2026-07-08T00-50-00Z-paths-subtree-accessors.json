@@ -1,7 +1,7 @@
 {
   "id": "paths-subtree-accessors",
   "created_at": "2026-07-08T00:50:00Z",
-  "weight": 0.78,
+  "weight": 0.52,
   "title": ".evolve/ subtree paths (runs/cycle-N, worktrees, inbox, instincts) hand-built by raw filepath.Join in ~10 production sites — internal/paths models only top-level files, so the layout cannot evolve in one place",
   "kind": "refactor",
   "priority": "medium",
@@ -13,6 +13,21 @@
     "grep gate: no filepath.Join(..., \".evolve\", \"runs\"...) outside internal/paths (add to the item's audit script)",
     "go vet, -race, apicover -enforce green; behavior-neutral (paths byte-identical)"
   ],
-  "files": ["go/internal/paths/paths.go", "go/internal/core/runworkspace.go", "go/internal/runscope/runscope.go", "go/internal/budgethistory/budgethistory.go", "go/internal/acssuite/acssuite.go", "go/cmd/evolve/cmd_loop_control.go", "go/internal/pruneephemeral/pruneephemeral.go", "go/internal/swarm/provision.go"],
-  "connects_to": ["fleet_cyclestate_isolation (the precedent wound: ResolveCycleStatePath)", "subagent-workspace-absolutize (same layer)"]
+  "files": [
+    "go/internal/paths/paths.go",
+    "go/internal/core/runworkspace.go",
+    "go/internal/runscope/runscope.go",
+    "go/internal/budgethistory/budgethistory.go",
+    "go/internal/acssuite/acssuite.go",
+    "go/cmd/evolve/cmd_loop_control.go",
+    "go/internal/pruneephemeral/pruneephemeral.go",
+    "go/internal/swarm/provision.go"
+  ],
+  "connects_to": [
+    "fleet_cyclestate_isolation (the precedent wound: ResolveCycleStatePath)",
+    "subagent-workspace-absolutize (same layer)"
+  ],
+  "priority_class": "hygiene",
+  "priority_rationale": "inbox review 2026-09-27: Behavior-neutral layout refactor; the core accessor already landed, there is no recent incident, and the codebase has adopted migrate-as-touched.",
+  "review_status": "inbox review 2026-09-27: PARTIAL. paths.RunWorkspace(projectRoot, cycle) exists as \"the ONE home of that layout\" (internal/paths/paths.go:219-221, e37894dd #593), beside EvolveDirOf and PolicyPath. paths.go:209-212 sets the policy as \"migrate as touched\", and at 3082d91b about 25 production sites still hand-join \".evolve\",\"runs\"/cycle-N (e.g. runscope/runscope.go:134, budgethistory/budgethistory.go:70, acssuite/acssuite.go:567,768,840, cmd/evolve/cmd_loop_control.go:304, inboxmover/inboxmover.go:148, phases/ship/postship.go:179,"
 }

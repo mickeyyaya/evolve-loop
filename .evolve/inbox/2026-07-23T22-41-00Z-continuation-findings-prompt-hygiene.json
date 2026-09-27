@@ -14,5 +14,8 @@
   ],
   "route": "lane",
   "injected_by": "console-architect-review",
-  "notes": "ADR-0076 slice C architect finding #4 (LOW, note-only): readContinuationFindings injects failure-digest.json verbatim (8KB cap + TrimSpace) into build's ComposePrompt. Content is pipeline-self-produced and the kernel floor is deterministic, so no gate bypass \u2014 but add the same control-character hygiene the inboxbatch sanitizer applies, and prefer rendering the digest's structured fields over raw JSON."
+  "notes": "ADR-0076 slice C architect finding #4 (LOW, note-only): readContinuationFindings injects failure-digest.json verbatim (8KB cap + TrimSpace) into build's ComposePrompt. Content is pipeline-self-produced and the kernel floor is deterministic, so no gate bypass — but add the same control-character hygiene the inboxbatch sanitizer applies, and prefer rendering the digest's structured fields over raw JSON.",
+  "priority_class": "hygiene",
+  "priority_rationale": "inbox review 2026-09-27: The content is pipeline-produced and the injection has no known exploit; the residual is defensive hygiene.",
+  "review_status": "inbox review 2026-09-27: PARTIAL. The structure half landed in #370 (9a613a50, 2026-07-28). readContinuationFindings (go/internal/core/continuation_stamp.go:158-178) renders the reason artifact's fields as lines instead of raw JSON, and truncateFindings (:183-195) cuts at a line boundary with an explicit marker. Still open: no control-character sanitizer runs on the injected block (no sanitize/cleanBounded call in continuation_stamp.go; inboxbatch.cleanBounded is at go/internal/inboxbatch/item.go:293)."
 }

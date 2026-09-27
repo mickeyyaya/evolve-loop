@@ -10,8 +10,8 @@ import (
 
 // TaskFreshness is one task id re-resolved at dispatch time.
 type TaskFreshness struct {
-	Fresh  bool   // still pending in the inbox AND all deps satisfied
-	Reason string // non-empty when !Fresh, e.g. "consumed: promoted processed cycle-N" or "deps unmet: needs <dep-id>"
+	Fresh  bool
+	Reason string
 }
 
 // FreshnessProbeFn re-resolves one task id against current inbox and dependency state.

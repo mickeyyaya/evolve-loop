@@ -1,0 +1,40 @@
+{
+  "id": "identity-preserving-fleet-rebase",
+  "kind": "pipeline-repair",
+  "priority": "P1",
+  "weight": 0.86,
+  "route": "console",
+  "title": "a passed audit must survive a clean fleet rebase of an unchanged change (ADR-0105 rungs B1–B4)",
+  "summary": "Operator directive 2026-09-26: a change that passed audit must not be blocked by a process issue. Today every clean fleet rebase re-runs Build and Audit, because the explanation base binding is invalidated before RUNG 0 (cycles 1698 and 1701, 20–30 minutes plus an LLM round each). Review found RUNG 0 has never fired in worktree mode (F1), a written verdict would not bind at ship (F2), the base SHA sits inside the audited patch (F3), the failed ship's inbox consumption rides in the diverged commit (F4), and RUNG 0 artifacts live in the worktree (F5). Rung 0, the worktree-mode tree binding, ships on fix/ship-trusts-a-passed-audit.",
+  "fix": "Implement docs/architecture/adr/0105-identity-preserving-fleet-rebase.md rung by rung, test-first, each merged at a wave boundary: B2 RebindIdenticalRebase (per-path byte-identity proof, lineage-aware Verify), then B1 unwind plus reordered recovery, then B3 repaired RUNG 0 with F5, then B4 ship carry acceptance. The test list and mutation map are in docs/research/2026-09-26-identity-preserving-rebase-design-review.md.",
+  "acceptance": [
+    "TestFleetRebase_Cycle1701Shape_ShipsWithoutBuildOrAudit (integration)",
+    "each mutation in the design review's mutation map is killed by its named test",
+    "(from fleet-rebase-rebuild-chase) RED first: a fleet lane whose clean rebase leaves its patch-id unchanged reships via the composition carry-forward with NO Build or Audit re-dispatch, its explanation binding re-bound to the new base (the cycle-1691 shape, pinned end to end through recoverFromShipError)",
+    "(from fleet-rebase-rebuild-chase) A rebase that changes the lane's patch-id (overlapping edits) still invalidates the explanation and returns to Build (existing RebaseBuildAndPersist path)",
+    "(from fleet-rebase-rebuild-chase) The rebind never changes the document's bytes or sha256 and is refused when the documented diff does not match the rebased diff",
+    "(from fleet-rebase-rebuild-chase) A replay of cycle 1637's sequence (audit PASS then repeated peer moves) ships on the first recovery instead of chasing to FAIL",
+    "(from fleet-rebase-rebuild-chase) ADR note (explanation documentation × ADR-0049 S5b) + incident record (cycles 1637/1691) + REGRESSION-COVERAGE-INDEX row",
+    "(merged at the inbox review 2026-09-27) Absorbs fleet-rebase-rebuild-chase: the same defect family, superseded by the ADR-0105 carry, whose three acceptance lines are still unmet (a replay test of cycle 1637's sequence, an incident record for cycles 1637 and 1691, and a row in REGRESSION-COVERAGE-INDEX.md)."
+  ],
+  "files": [
+    "go/internal/explanationdocs/contract_state.go",
+    "go/internal/core/ship_recovery.go",
+    "go/internal/core/composition_carryforward.go",
+    "go/internal/phases/ship/audit.go",
+    "go/internal/phases/ship/composition.go",
+    "go/internal/adapters/ledger/composition.go"
+  ],
+  "created_at": "2026-09-26T21:30:00Z",
+  "source": "console-operator-directive-cycle-1701",
+  "absorbs": [
+    "fleet-rebase-rebuild-chase"
+  ],
+  "merge_notes": [
+    "inbox review 2026-09-27: absorbed fleet-rebase-rebuild-chase. Same defect family as identity-preserving-fleet-rebase, superseded by the ADR-0105 carry. Its acceptance (a replay test of cycle 1637's sequence, an incident record for cycles 1637 and 1691, a row in REGRESSION-COVERAGE-INDEX.md) is unmet and moves to the survivor.",
+    "inbox review 2026-09-27: absorbed fleet-rebase-rebuild-chase. Absorbs fleet-rebase-rebuild-chase: the same defect family, superseded by the ADR-0105 carry, whose three acceptance lines are still unmet (a replay test of cycle 1637's sequence, an incident record for cycles 1637 and 1691, and a row in REGRESSION-COVERAGE-INDEX.md)."
+  ],
+  "priority_class": "stability",
+  "priority_rationale": "inbox review 2026-09-27: stability: the carry is live on every fleet rebase; its ship path has unit tests only, and the first live carry is still to be observed.",
+  "review_status": "inbox review 2026-09-27: PARTIAL. The B3 carry shipped (identityCarryForward, unit-tested). Remaining: the B4 integration test TestFleetRebase_Cycle1701Shape_ShipsWithoutBuildOrAudit that ADR-0105 names does not exist, and no live carry-to-ship has happened yet."
+}

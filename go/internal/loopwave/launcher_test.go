@@ -2,6 +2,7 @@ package loopwave
 
 import (
 	"context"
+	"encoding/json"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -132,31 +133,64 @@ func TestRefill_PicksHighestWeightNotExcludedWithFleetScopeEnv(t *testing.T) {
 		t.Error("an exhausted backlog reports no candidate")
 	}
 	other := New(Roots{ProjectRoot: t.TempDir(), EvolveDir: h.evolveDir}, h.ports, h.stderr)
-	if _, ok := other.refill()(map[string]bool{}); ok {
-		t.Error("the refill reads ProjectRoot/.evolve, not EvolveDir (Q-W8 held)")
+	if spec, ok := other.refill()(map[string]bool{}); !ok || spec.Scope[0] != "high" {
+		t.Errorf("the refill reads the configured EvolveDir whatever the project root: %+v %v", spec, ok)
 	}
 }
 
-func TestConsumedHasThreeBeliefs(t *testing.T) {
-	if !isConsumed(inboxmover.StateRetry) || isConsumed(inboxmover.StateQuarantine) || isConsumed(inboxmover.StateProcessing) || isConsumed(inboxmover.StatePending) || isConsumed(inboxmover.StateUnknown) {
-		t.Error("plan-time prune: processed|rejected|retry are consumed; quarantine and processing are not (belief 1)")
-	}
-	if !isConsumed(inboxmover.StateProcessed) || !isConsumed(inboxmover.StateRejected) || !isConsumed(inboxmover.StateConsumed) {
-		t.Error("processed, rejected and consumed (the in-commit landing consumption) are consumed")
-	}
+func TestPlanPruneWidenPruneAndLaunchGateGiveOneAnswer(t *testing.T) {
 	h := newHarness(t)
-	lifecycleItem(t, h.evolveDir, inboxmover.StateQuarantine, "q")
-	lifecycleItem(t, h.evolveDir, inboxmover.StateRetry, "r")
-	lifecycleItem(t, h.evolveDir, inboxmover.StateConsumed, "c")
-	lifecycleItem(t, h.evolveDir, inboxmover.StateProcessed, "s")
-	kept := triagecap.PruneConsumed(h.evolveDir, []triagecap.FleetCandidate{{ID: "q"}, {ID: "r"}, {ID: "c"}, {ID: "s"}})
-	if len(kept) != 1 || kept[0].ID != "r" {
-		t.Errorf("widen's PruneConsumed drops quarantine, consumed and processed (nested by cycle) and keeps retry (belief 2): %+v", kept)
+	states := []string{inboxmover.StatePending, inboxmover.StateProcessing, inboxmover.StateProcessed,
+		inboxmover.StateRejected, inboxmover.StateRetry, inboxmover.StateQuarantine, inboxmover.StateConsumed}
+	ids := []string{"never-filed", "deps-unmet"}
+	for _, state := range states {
+		lifecycleItem(t, h.evolveDir, state, "in-"+state)
+		ids = append(ids, "in-"+state)
 	}
-	lifecycleItem(t, h.evolveDir, inboxmover.StateProcessing, "p")
-	if f := h.e.probe()("p"); f.Fresh {
-		t.Error("the dispatch probe marks processing stale (belief 3)")
+	lifecycleItem(t, h.evolveDir, inboxmover.StatePending, "deps-unmet", "in-"+inboxmover.StatePending)
+	cards := make([]map[string]any, 0, len(ids))
+	committed := make([]triagecap.FleetCandidate, 0, len(ids))
+	for _, id := range ids {
+		cards = append(cards, map[string]any{"id": id})
+		committed = append(committed, triagecap.FleetCandidate{ID: id})
 	}
+	planKept := topNIDs(t, h.e.pruneUndispatchable(mustJSON(t, map[string]any{"top_n": cards})))
+	widenKept := map[string]bool{}
+	for _, c := range triagecap.PruneUndispatchable(h.evolveDir, committed) {
+		widenKept[c.ID] = true
+	}
+	probe := h.e.probe()
+	for _, id := range ids {
+		fresh := probe(id).Fresh
+		if planKept[id] != fresh || widenKept[id] != fresh {
+			t.Errorf("%s: plan prune kept=%v, widen prune kept=%v, launch gate fresh=%v — one rule must give one answer", id, planKept[id], widenKept[id], fresh)
+		}
+	}
+	if !planKept["never-filed"] || !planKept["in-pending"] || len(planKept) != 2 {
+		t.Errorf("only the pending item and the id with no lifecycle evidence are dispatchable: %v", planKept)
+	}
+}
+
+func topNIDs(t *testing.T, data []byte) map[string]bool {
+	t.Helper()
+	d, ok := parseDecision(data)
+	if !ok {
+		t.Fatalf("unparsable decision %s", data)
+	}
+	kept := map[string]bool{}
+	for _, c := range d.TopN {
+		kept[c.ID] = true
+	}
+	return kept
+}
+
+func mustJSON(t *testing.T, v any) []byte {
+	t.Helper()
+	data, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
 }
 
 func TestPreflight_RefusesANonGitRoot(t *testing.T) {

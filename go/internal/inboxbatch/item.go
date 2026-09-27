@@ -4,7 +4,6 @@ package inboxbatch
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -202,34 +201,14 @@ func sortedKeys(m map[string]any) []string {
 
 // LoadDir loads every *.json in dir sorted by ID; a missing dir is empty and a malformed file is a warning.
 func LoadDir(dir string) (items []Item, warnings []string, err error) {
-	entries, rerr := os.ReadDir(dir)
-	if rerr != nil {
-		if os.IsNotExist(rerr) {
-			return nil, nil, nil
-		}
-		return nil, nil, fmt.Errorf("inboxbatch: read dir: %w", rerr)
+	scan, err := ScanDir(dir)
+	if err != nil {
+		return nil, nil, err
 	}
-	for _, e := range entries {
-		name := e.Name()
-		if e.IsDir() || !strings.HasSuffix(name, ".json") {
-			continue
-		}
-		it, ws, ferr := LoadFile(filepath.Join(dir, name))
-		if ferr != nil {
-			warnings = append(warnings, name+": "+ferr.Error())
-			continue
-		}
-		warnings = append(warnings, ws...)
-		items = append(items, it)
+	for _, w := range scan.Warnings {
+		warnings = append(warnings, w.Text)
 	}
-	sort.Slice(items, func(i, j int) bool { return items[i].ID < items[j].ID })
-	// The resolver index keeps the last duplicate, so a collision is surfaced rather than dropped.
-	for i := 1; i < len(items); i++ {
-		if items[i].ID == items[i-1].ID {
-			warnings = append(warnings, items[i].Path+": duplicate id "+items[i].ID+" (also "+items[i-1].Path+") — dep/connects references resolve ambiguously")
-		}
-	}
-	return items, warnings, nil
+	return scan.Items, warnings, nil
 }
 
 // maxFieldLen fits every legitimate id yet stops a runaway field flooding the prompt.

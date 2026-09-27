@@ -1,7 +1,7 @@
 {
   "id": "harness-minted-completion",
   "created_at": "2026-09-02T23:40:00Z",
-  "weight": 0.88,
+  "weight": 0.55,
   "title": "R5 completion minted by the harness: builder reports per-criterion {id, status ∈ met|partial|blocked, evidence}; the checker writes Closes-Inbox only when every criterion re-verifies; `partial` is a first-class honest outcome routed to carryover without penalty",
   "kind": "pipeline-repair",
   "class": "task-contract-design",
@@ -15,7 +15,17 @@
     "Regression fixture from cycle 1604 (one-fifth met) yields `partial`, not FAIL.",
     "go vet ./..., -race, apicover -enforce green."
   ],
-  "files": ["go/internal/inboxmover/closesmarker.go", "go/internal/deliverable/", "go/internal/phases/build/", "agents/evolve-builder.md"],
-  "connects_to": ["inline-task-contract-into-build-prompt (R4)", "build-exit-deterministic-floor (R3)"],
-  "notes": "Filed 2026-09-02 (proposal R5)."
+  "files": [
+    "go/internal/inboxmover/closesmarker.go",
+    "go/internal/deliverable/",
+    "go/internal/phases/build/",
+    "agents/evolve-builder.md"
+  ],
+  "connects_to": [
+    "inline-task-contract-into-build-prompt (R4)",
+    "build-exit-deterministic-floor (R3)"
+  ],
+  "notes": "Filed 2026-09-02 (proposal R5).",
+  "priority_class": "feature",
+  "priority_rationale": "inbox review 2026-09-27: Evidence-based (1595-1605 over-claims), but §5.10 found all eleven ships in waves 11-20 delivered their task, so the pressure is off."
 }

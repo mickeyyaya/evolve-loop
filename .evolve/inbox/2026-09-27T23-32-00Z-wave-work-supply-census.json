@@ -1,0 +1,19 @@
+{
+  "id": "wave-work-supply-census",
+  "created_at": "2026-09-27T23:30:00Z",
+  "title": "An empty or short wave plan names why the backlog is not lane material (console kind, console route, protected surface, unmet dependency, no id)",
+  "weight": 0.84,
+  "kind": "pipeline-repair",
+  "priority_class": "debuggability",
+  "files": [
+    "go/internal/triagecap",
+    "go/internal/loopwave"
+  ],
+  "summary": "Wave 20 planned nothing launchable from 169 inbox items and nothing said why; the answer took a throwaway diagnostic (162 console-owned, 5 without an id, 2 blocked on console-owned dependencies). Design doc §7.7 W6.",
+  "acceptance": [
+    "LOOP_WAVE_EMPTY_PLAN and a short wave carry counts of pending items by exclusion reason, and the blockers of dependency-waiting items.",
+    "The census reads the same lane menu the planner reads (inboxmover.PartitionLaneMenu)."
+  ],
+  "source": "inbox review 2026-09-27 (design doc §7.7 W6)",
+  "priority_rationale": "inbox review 2026-09-27: an empty or short wave says nothing about why the backlog is not lane material; the wave-20 diagnosis took a throwaway program"
+}

@@ -458,8 +458,8 @@ func TestNullWaveEngine_EveryConstructionCarriesBothRootsOrNone(t *testing.T) {
 		}
 		return true
 	})
-	if calls < 5 {
-		t.Errorf("expected the five Null-Center constructions in the seam, found %d", calls)
+	if calls < 4 {
+		t.Errorf("expected the four Null-Center constructions in the seam, found %d", calls)
 	}
 	src, err := os.ReadFile("cmd_loop_wave.go")
 	if err != nil {
