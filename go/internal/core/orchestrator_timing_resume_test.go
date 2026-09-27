@@ -1,7 +1,5 @@
 //go:build integration
 
-// HIGH-1 regression (integration tier — reuses the git-backed initBindingRepo
-// harness, same as the sibling resume tests).
 package core
 
 import (
@@ -12,10 +10,6 @@ import (
 	"testing"
 )
 
-// The --resume path (RunCycleFromPhase) is a first-class dispatch surface and
-// must stamp started_at too — a post-crash resume is exactly when latency
-// evidence matters most. Before the fix, cs.PhaseStartedAt was never set on
-// resume, so every resumed phase wrote an empty started_at.
 func TestPhaseTiming_ResumeStampsStart(t *testing.T) {
 	t.Parallel()
 	repo, ws := initBindingRepo(t, "cycle-7")

@@ -1,37 +1,5 @@
 package main
 
-// cmd_syncmain_test.go — RED tests (cycle 611, task sync-main-boundary-command)
-// for the new `evolve sync-main` operator/boundary command (inbox
-// ship-repair-merge-diverged-origin, weight 0.85): a recurring diverged-origin
-// stall (3x on 2026-07-07) currently requires manual operator reconciliation.
-//
-// Contract the Builder implements (TDD-defined seam):
-//
-//	func runSyncMain(args []string, stdin io.Reader, stdout, stderr io.Writer) int
-//
-// Registered in registry.go as the "sync-main" subcommand (mirrors
-// runResetSHA's `--project-root` flag convention, cmd_resetsha.go).
-//
-// Preconditions (ALL must hold before any git mutation is attempted):
-//   - no live run lease: read .evolve/cycle-state.json's workspace_path (if the
-//     marker exists) and refuse if runlease.OwnerLive is true there
-//   - clean index (git status --porcelain empty, ignoring .evolve/** per repo
-//     .gitignore) — refuse on any uncommitted change
-//   - cycle-state idle (see above)
-//
-// Behavior:
-//   - fetch origin, then `git merge --no-edit origin/<branch>` on divergence
-//   - a clean, non-conflicting divergence merges (a real merge commit, two
-//     parents) — quiet tree, no operator involvement
-//   - a conflicting divergence aborts cleanly: working tree and HEAD end up
-//     EXACTLY as they started (no MERGE_HEAD, no conflict markers)
-//   - NEVER rebases, force-pushes, or pushes — sync-main only ever moves local
-//     history forward via merge; the bare origin ref must be byte-identical
-//     before and after every scenario in this file
-//
-// RED now (undefined symbol runSyncMain → package main test build fails). Do
-// NOT modify this file — implement the seam in a new cmd_syncmain.go.
-
 import (
 	"bytes"
 	"encoding/json"
@@ -129,8 +97,8 @@ func smRemoteCommit(t *testing.T, bare, filename, content string) {
 	t.Helper()
 	clone := t.TempDir()
 	smGit(t, t.TempDir(), "clone", "-q", bare, clone)
-	// Hermetic identity: do not rely on the host's global git config
-	// (reviewer finding — a runner without user.email would fail the commit).
+	// Hermetic identity: does not rely on the host's global git config — a
+	// runner without user.email would fail the commit.
 	smGit(t, clone, "config", "user.email", "ci@example.com")
 	smGit(t, clone, "config", "user.name", "ci")
 	if err := os.WriteFile(filepath.Join(clone, filename), []byte(content), 0o644); err != nil {
@@ -178,9 +146,6 @@ func smWriteLiveLease(t *testing.T, repo string) {
 	}
 }
 
-// AC: "Merges diverged origin on quiet tree" — a clean, non-conflicting
-// divergence (local commit + a distinct remote commit) merges automatically
-// into a real merge commit, and the merge NEVER pushes (bare ref unchanged).
 func TestSyncMain_MergesQuietDivergedTree(t *testing.T) {
 	repo, bare := smInitRepoWithRemote(t)
 	smRemoteCommit(t, bare, "remote-change.txt", "from origin\n")
@@ -218,9 +183,6 @@ func TestSyncMain_MergesQuietDivergedTree(t *testing.T) {
 	}
 }
 
-// AC: "refuses cleanly on ... dirty index" — an uncommitted change blocks the
-// sync entirely; nothing is fetched/merged, HEAD and the dirty change survive
-// untouched.
 func TestSyncMain_RefusesOnDirtyIndex(t *testing.T) {
 	repo, bare := smInitRepoWithRemote(t)
 	smRemoteCommit(t, bare, "remote-change.txt", "from origin\n")
@@ -247,8 +209,6 @@ func TestSyncMain_RefusesOnDirtyIndex(t *testing.T) {
 	}
 }
 
-// AC: "refuses cleanly on live lease" — an active cycle (fresh lease
-// referenced by cycle-state.json) blocks the sync; HEAD is untouched.
 func TestSyncMain_RefusesOnLiveLease(t *testing.T) {
 	repo, bare := smInitRepoWithRemote(t)
 	smRemoteCommit(t, bare, "remote-change.txt", "from origin\n")
@@ -266,10 +226,6 @@ func TestSyncMain_RefusesOnLiveLease(t *testing.T) {
 	}
 }
 
-// AC: "refuses cleanly on conflict" — a genuinely conflicting divergence
-// (same line edited on both sides) must abort back to the EXACT pre-merge
-// state: no MERGE_HEAD, no conflict markers, HEAD unmoved, working tree
-// unchanged. No auto-rebase escape hatch.
 func TestSyncMain_RefusesCleanlyOnConflict(t *testing.T) {
 	repo, bare := smInitRepoWithRemote(t)
 	smRemoteCommit(t, bare, "base.txt", "line1\nremote-edit\nline3\n")

@@ -1,14 +1,5 @@
 package bridge
 
-// nudge_stale_deliverable_test.go — F39 (2026-09-26, cycle 1691): a
-// correction re-dispatch whose fix lived in another file left the deliverable
-// from the earlier attempt untouched. The completion baseline (size+mtime at
-// dispatch) rightly refused it as a pre-dispatch leftover, but the idle nudge
-// only said "Please write the deliverable" — so the agent, seeing the report
-// was already correct, re-verified and stopped, and the phase would have
-// closed as exit 81. The nudge now says what the host sees, why a rewrite is
-// needed, and binds the carry-forward to a re-check.
-
 import (
 	"bytes"
 	"context"
@@ -54,9 +45,6 @@ func TestIdleNudgeFor_NamesAnUnrewrittenDeliverableAndBindsARecheck(t *testing.T
 	}
 }
 
-// TestIdleNudgeFor_CarriesANonMarkdownDeliverableForwardInFull (architecture
-// review M2): appending a line to a JSON deliverable breaks its parse, so the
-// remedy for any non-markdown format is a full rewrite in the same format.
 func TestIdleNudgeFor_CarriesANonMarkdownDeliverableForwardInFull(t *testing.T) {
 	ws := t.TempDir()
 	plan := filepath.Join(ws, "routing-plan.json")
@@ -70,11 +58,6 @@ func TestIdleNudgeFor_CarriesANonMarkdownDeliverableForwardInFull(t *testing.T) 
 	}
 }
 
-// TestIdleNudgeFor_SeesALeftoverAtAFallbackLocation (go review F39 MAJOR): the
-// baseline snapshots EVERY candidate location, so an unrewritten leftover at a
-// fallback (<workspace>/workspace/<base>) is named too — resolved through
-// artifactLocate, the completion poll's own resolution — with the canonical
-// path the rewrite must land on.
 func TestIdleNudgeFor_SeesALeftoverAtAFallbackLocation(t *testing.T) {
 	ws := t.TempDir()
 	canonical := filepath.Join(ws, "build-report.md")
@@ -134,11 +117,6 @@ func launchWithLeftover(t *testing.T, tm func(fx launchFixture) TmuxController) 
 	return code, stderr.String(), fx
 }
 
-// TestTmuxREPL_IdleNudge_ExplainsAnUnrewrittenDeliverable drives the real
-// claude-tmux wait with the PRODUCTION baseline: the deliverable exists from an
-// earlier attempt and the idle agent never rewrites it — the one nudge says
-// so (and the operator's log line names it), instead of the plain reminder
-// the 1691 agent could not act on.
 func TestTmuxREPL_IdleNudge_ExplainsAnUnrewrittenDeliverable(t *testing.T) {
 	var tmux *nudgeRecordingTmux
 	code, stderr, _ := launchWithLeftover(t, func(launchFixture) TmuxController {
@@ -153,10 +131,6 @@ func TestTmuxREPL_IdleNudge_ExplainsAnUnrewrittenDeliverable(t *testing.T) {
 	}
 }
 
-// TestTmuxREPL_IdleNudge_AnAgentThatReChecksAndAppendsCompletes (architecture
-// review m2): the prescribed fix works end to end — an agent that appends its
-// re-verification line after the explaining nudge completes the phase (exit 0)
-// under the production baseline, with no operator touch.
 func TestTmuxREPL_IdleNudge_AnAgentThatReChecksAndAppendsCompletes(t *testing.T) {
 	code, stderr, _ := launchWithLeftover(t, func(fx launchFixture) TmuxController {
 		return &appendOnNudgeTmux{nudgeRecordingTmux: &nudgeRecordingTmux{fakeTmux: &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}}, artifact: fx.artifact}

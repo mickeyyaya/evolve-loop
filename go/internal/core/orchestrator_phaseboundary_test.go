@@ -1,19 +1,3 @@
-// orchestrator_phaseboundary_test.go — cycle-234 task `phase-boundary-checkpoint` (RED).
-//
-// Invariant 3 (campaign retro cycles 215-231): a durable checkpoint must
-// exist at EVERY phase boundary so `evolve loop --resume` can reconstruct a
-// cycle after a kill at any point — not only at the quota wall (the only
-// trigger before this cycle; three --resume attempts failed this campaign
-// with "no live checkpoint").
-//
-// Behavioral contract under test: after each phase completes, the on-disk
-// <projectRoot>/.evolve/cycle-state.json gains/updates an additive
-// "checkpoint" block with reason "phase-complete" whose completedPhases
-// include the just-completed phase. The probe runner reads the REAL file
-// mid-cycle, so a checkpoint written only at cycle end cannot fake a pass.
-//
-// Shares the core_test harness (newRunners / newTestOrchestrator) defined in
-// orchestrator_recovery_test.go.
 package core_test
 
 import (
@@ -29,9 +13,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// seedCycleStateFile creates <root>/.evolve/cycle-state.json with a minimal
-// pre-existing body, so the additive checkpoint splice has a file to merge
-// into and the test can verify pre-existing fields survive.
+// seedCycleStateFile seeds a pre-existing cycle-state.json so the additive
+// checkpoint splice has a file to merge into and preserved fields can be checked.
 func seedCycleStateFile(t *testing.T, root string) string {
 	t.Helper()
 	dir := filepath.Join(root, ".evolve")
@@ -45,8 +28,6 @@ func seedCycleStateFile(t *testing.T, root string) string {
 	return path
 }
 
-// readCheckpointBlock parses the checkpoint block (nil when absent) plus the
-// full state map from cycle-state.json.
 func readCheckpointBlock(t *testing.T, path string) (map[string]any, map[string]any) {
 	t.Helper()
 	raw, err := os.ReadFile(path)
@@ -61,7 +42,6 @@ func readCheckpointBlock(t *testing.T, path string) (map[string]any, map[string]
 	return cp, state
 }
 
-// completedPhasesOf extracts checkpoint.completedPhases as []string.
 func completedPhasesOf(cp map[string]any) []string {
 	raw, _ := cp["completedPhases"].([]any)
 	out := make([]string, 0, len(raw))
@@ -83,9 +63,8 @@ func containsStr(ss []string, want string) bool {
 }
 
 // checkpointProbeRunner runs as the TRIAGE phase and snapshots the on-disk
-// checkpoint block at that moment — i.e. after scout completed but before
-// anything later. This pins "written at the phase BOUNDARY", which an
-// end-of-cycle-only write cannot satisfy.
+// checkpoint block after scout completes but before anything later, pinning
+// "written at the phase BOUNDARY" (an end-of-cycle-only write can't satisfy this).
 type checkpointProbeRunner struct {
 	name      string
 	statePath string
@@ -104,11 +83,6 @@ func (p *checkpointProbeRunner) Run(_ context.Context, req core.PhaseRequest) (c
 	return core.PhaseResponse{Phase: p.name, Verdict: core.VerdictPASS, ArtifactsDir: req.Workspace}, nil
 }
 
-// TestOrchestrator_PhaseBoundaryCheckpoint — scout AC:
-//   - orchestrator writes the checkpoint block after each phase completes
-//   - the block carries reason "phase-complete" and lists the just-completed
-//     phase in completedPhases
-//   - pre-existing cycle-state.json fields survive (additive splice)
 func TestOrchestrator_PhaseBoundaryCheckpoint(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -127,8 +101,6 @@ func TestOrchestrator_PhaseBoundaryCheckpoint(t *testing.T) {
 		t.Fatalf("RunCycle: %v", err)
 	}
 
-	// 1. Mid-cycle: by the time triage RAN, scout's boundary checkpoint must
-	// already be on disk.
 	if probe.sawBlock == nil {
 		t.Fatal("no checkpoint block on disk when triage ran — phase boundary after scout did not write one")
 	}
@@ -143,7 +115,6 @@ func TestOrchestrator_PhaseBoundaryCheckpoint(t *testing.T) {
 		t.Errorf("mid-cycle completedPhases = %v, want to include \"scout\" (the just-completed phase)", midPhases)
 	}
 
-	// 2. End of cycle: the final boundary write must list the LAST phase too.
 	cp, state := readCheckpointBlock(t, statePath)
 	if cp == nil {
 		t.Fatal("no checkpoint block in cycle-state.json after the cycle")
@@ -156,13 +127,11 @@ func TestOrchestrator_PhaseBoundaryCheckpoint(t *testing.T) {
 		t.Errorf("final completedPhases = %v, want to include \"ship\"", finalPhases)
 	}
 
-	// 3. Additive splice: seeded fields must survive every checkpoint write.
 	if got := state["custom_field"]; got != "preserve-me" {
 		t.Errorf("custom_field = %v, want \"preserve-me\" (checkpoint write must be additive, not clobbering)", got)
 	}
 }
 
-// alwaysErrRunner fails every invocation with a plain (non-transient) error.
 type alwaysErrRunner struct{ name string }
 
 func (r *alwaysErrRunner) Name() string { return r.name }
@@ -183,14 +152,6 @@ func (r *recordingRetroRunner) Run(_ context.Context, req core.PhaseRequest) (co
 	return core.PhaseResponse{Phase: r.name, Verdict: core.VerdictPASS, ArtifactsDir: req.Workspace}, nil
 }
 
-// TestOrchestrator_FailedPhase_NoSuccessCheckpoint — scout AC: "Failed phase
-// (error path) does NOT write a success checkpoint."
-//
-// Scout completes (its boundary checkpoint IS written — that durability is
-// exactly what --resume needs after the subsequent crash), then triage fails
-// hard. The on-disk checkpoint must not list triage: recording the failed phase
-// as completed would resume PAST the failed phase and lose work. Retro may be
-// recorded after failure-learning runs.
 func TestOrchestrator_FailedPhase_NoSuccessCheckpoint(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

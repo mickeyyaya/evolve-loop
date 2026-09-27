@@ -8,16 +8,6 @@ import (
 	"time"
 )
 
-// scrollback_lines_test.go — contract for scrollback depth configurability.
-//
-// `tmuxArtifactScrollback = 10000` is the built-in default at the two final-
-// capture sites (artifact-completion + tmuxCleanup). This is now configured
-// via Deps.ScrollbackLines (BridgePolicy.ScrollbackLines); zero or negative →
-// defaultIfZero → 10000. claude-tmux's bootScrollback is 0, so any NON-ZERO
-// value recorded by the fake is a final/cleanup capture — the distinguisher
-// this test keys on. Behavioral: inspects the actual scrollback argument
-// passed to CapturePane (not a source string check).
-
 // runScrollbackPhase runs a happy-path claude-tmux launch (artifact pre-seeded)
 // with the given scrollbackLines typed field and returns recorded CapturePane
 // scrollback arguments.

@@ -11,13 +11,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 )
 
-// Workstream B unit tests for the bridge-side sandbox seam.
-//
-// These exercise the decision matrix + the prefix-argv plumbing without
-// running real sandbox-exec / bwrap. The "wrap actually confines" property
-// is owned by adapters/sandbox (which has its own host-gated integration
-// suite); here we prove the bridge calls the seam under the right conditions
-// and composes the prefix correctly for each driver's contract.
+// These tests exercise the sandbox decision matrix and the prefix-argv
+// plumbing without running real sandbox-exec/bwrap. The "wrap actually
+// confines" property is owned by adapters/sandbox, which has its own
+// host-gated integration suite; these prove the bridge calls the seam under
+// the right conditions and composes the prefix correctly for each driver's
+// contract.
 
 // fakeWrap returns a SandboxWrapper that records its inputs and returns a
 // scripted result. Lets tests assert on what the bridge would have done.
@@ -68,8 +67,7 @@ func TestSandboxPrefix_RequiredContractConsultsWrapperWithoutWorktree(t *testing
 
 func TestSandboxPrefix_WorktreePhase_PassesAbsolutePaths(t *testing.T) {
 	// Source-writing phases pass their absolute Worktree+Workspace+RepoRoot
-	// to the wrapper — the SBPL profile depends on every path being absolute
-	// (matches Workstream A's invariant; relative paths broke cycle-119).
+	// to the wrapper — the SBPL profile depends on every path being absolute.
 	fw := &fakeWrap{prefix: []string{"sandbox-exec", "-p", "/tmp/sb.sb"}, available: true}
 	deps := Deps{SandboxWrap: fw.wrap()}
 	cfg := &Config{
@@ -92,12 +90,10 @@ func TestSandboxPrefix_WorktreePhase_PassesAbsolutePaths(t *testing.T) {
 	}
 }
 
-// TestSandboxPrefix_ForcesNetwork pins the structural invariant: every phase that
-// reaches the sandbox (cfg.Worktree != "") runs a cloud model-reaching CLI —
-// ollama-tmux, the only local driver, rejects any Worktree — so AllowNetwork is
-// FORCED true regardless of the profile value, guarding source-writing phases
-// (incl. future custom ones) and scratch-CWD probes from booting network-denied.
-// The profile value controls only whether a misconfig WARN fires.
+// TestSandboxPrefix_ForcesNetwork pins the structural invariant: every phase
+// that reaches the sandbox runs a cloud model-reaching CLI, so AllowNetwork
+// is forced true regardless of the profile value; the profile value controls
+// only whether a misconfiguration WARN fires.
 func TestSandboxPrefix_ForcesNetwork(t *testing.T) {
 	base := func() *Config {
 		return &Config{Worktree: "/wt", Workspace: "/ws", ProjectRoot: "/repo", Agent: "tdd"}
@@ -151,8 +147,7 @@ func TestSandboxPrefix_NoWrapper_Degrades(t *testing.T) {
 }
 
 func TestWrapHeadless_NoWrap_PassesThrough(t *testing.T) {
-	// When wrap is unavailable the (name, args) pair must come out unchanged
-	// — the headless driver's runner call is byte-identical to pre-B.
+	// When wrap is unavailable the (name, args) pair must come out unchanged.
 	fw := &fakeWrap{returnEmpty: true}
 	deps := Deps{SandboxWrap: fw.wrap()}
 	cfg := &Config{Worktree: "/abs/wt/x", Agent: "build"}
@@ -219,10 +214,10 @@ func TestDefaultSandboxWrap_NestedClaudeAuto_DoesNotWrap(t *testing.T) {
 }
 
 func TestDefaultSandboxWrap_NestedViaLookupEnv_DoesNotWrap(t *testing.T) {
-	// depEnvGetter consults the Env map FIRST, then falls back to deps.LookupEnv.
-	// The sibling nested tests cover the Env-map branch; this pins the LookupEnv
-	// fallback branch (a nested signal present only via LookupEnv must still be
-	// detected, so the wrap is skipped). Audit follow-up (cycle-990613 LOW).
+	// depEnvGetter consults the Env map FIRST, then falls back to
+	// deps.LookupEnv; this pins the LookupEnv fallback branch (a nested signal
+	// present only via LookupEnv must still be detected, so the wrap is
+	// skipped).
 	deps := Deps{
 		Env: map[string]string{"EVOLVE_SANDBOX": config.SandboxModeAuto},
 		LookupEnv: func(k string) (string, bool) {
@@ -252,9 +247,8 @@ func fakeProbe(os string, available bool) func() sandbox.ProbeResult {
 func TestDefaultSandboxWrap_Darwin_WritesSBPLAndUsesDashF(t *testing.T) {
 	// Darwin path: the SBPL profile is materialized into the workspace
 	// (per-phase file) AND the prefix uses `-f` (file path), NOT `-p` (which
-	// passes the inline SBPL string). This pins the cycle-119 fix: a `-p
-	// <path>` would silently leave the phase unconfined because sandbox-exec
-	// would parse the path AS the profile.
+	// would make sandbox-exec parse the path AS the inline profile, silently
+	// leaving the phase unconfined).
 	ws := t.TempDir()
 	deps := Deps{Env: map[string]string{"EVOLVE_SANDBOX": config.SandboxModeOn}}
 	wrap := defaultSandboxWrapWithProbe(deps, fakeProbe("darwin", true))
@@ -339,13 +333,8 @@ func TestDefaultSandboxWrap_AutoMode_UnavailableProbe_Silent(t *testing.T) {
 }
 
 func TestDefaultSandboxWrap_UnknownMode_NestedClaude_DoesNotWrap(t *testing.T) {
-	// Regression (2026-06-13 soak, cycles 324-326): an UNRECOGNIZED
-	// EVOLVE_SANDBOX value (operator typo "1" instead of auto|on|off) was
-	// neither "off" nor "auto", so it slipped past the nested-claude skip
-	// (which only fired for the literal "auto") and forced a sandbox-exec
-	// wrap on nested macOS. That hung claude's REPL boot >60s
-	// (exit=80 ExitREPLBootTimeout), failing every cycle at scout. An
-	// unrecognized value MUST normalize to auto so the nested-skip applies.
+	// An unrecognized EVOLVE_SANDBOX value must normalize to auto so the
+	// nested-skip applies.
 	//
 	// Workspace must be writable: with the bug, the darwin branch writes an
 	// SBPL file there and returns the wrap prefix — t.TempDir() ensures that
@@ -384,12 +373,9 @@ func TestDefaultSandboxWrap_UnknownMode_NormalizesToAuto_WarnsAndWrapsWhenNotNes
 }
 
 func TestDefaultSandboxWrap_OnMode_NestedClaude_DoesNotWrap(t *testing.T) {
-	// THE footgun the old auto-only nested skip missed: EVOLVE_SANDBOX=on
-	// (correctly spelled, mandatory confinement) under nested Claude used to
-	// force a sandbox-exec wrap that hangs the REPL boot on macOS (exit=80).
-	// Post-SSOT, nested-Claude skips the wrap for ALL modes — and `on` emits a
-	// loud WARN since its mandatory-confinement request is delegated to the
-	// outer session rather than silently honoured.
+	// Nested-Claude detection skips the wrap for ALL modes, not just auto —
+	// `on` still emits a loud WARN since its mandatory-confinement request is
+	// delegated to the outer session rather than silently honoured.
 	var stderr strings.Builder
 	deps := Deps{Env: map[string]string{
 		"EVOLVE_SANDBOX":         config.SandboxModeOn,
@@ -429,13 +415,11 @@ func sbplPathOf(t *testing.T, prefix []string) string {
 	return prefix[2]
 }
 
-// TestDefaultSandboxWrap_Darwin_PerInvocationProfileDir pins ADR-0049 S0 / gap
-// G6: two same-phase dispatches sharing ONE workspace must NOT write the same
-// sandbox-<phase>.sb. Pre-fix both wrote <workspace>/sandbox-build.sb, so if
-// their WritePaths differed, B's profile landing between A's write and A's
-// sandbox-exec read confined A to B's allow-list (A's legit source writes
-// EPERM-denied). A per-invocation profile dir isolates them. This is a true RED
-// before the fix (identical paths) and GREEN after (distinct mktemp -d dirs).
+// TestDefaultSandboxWrap_Darwin_PerInvocationProfileDir pins that two
+// same-phase dispatches sharing one workspace must not write the same
+// sandbox-<phase>.sb file, or B's profile landing between A's write and A's
+// sandbox-exec read could confine A to B's allow-list.
+// See ADR-0049.
 func TestDefaultSandboxWrap_Darwin_PerInvocationProfileDir(t *testing.T) {
 	ws := t.TempDir()                      // one shared workspace for both dispatches
 	deps := Deps{Env: map[string]string{}} // not nested, mode auto → wraps

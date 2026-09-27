@@ -8,10 +8,6 @@ import (
 	"testing"
 )
 
-// TestSolutionCheck — ADR-0099 slice 2: `evolve solution check <dir>` is the
-// eval [code] grader and the agent's self-check for a document deliverable;
-// it runs the same engine as the build floor and the audit gate. Exit 0 =
-// well-formed, 1 = violations (printed one per line), 2 = usage.
 func TestSolutionCheck(t *testing.T) {
 	if lookupCommand("solution") == nil {
 		t.Fatal("no `solution` command registered")

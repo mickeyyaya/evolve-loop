@@ -1,11 +1,3 @@
-// Command cmd_swarm.go — `evolve swarm status|reap`. Operator surface for the
-// swarm harness (ADR-0032): inspect the per-cycle session manifest and reap
-// orphaned worker sessions after a crash. Read-only `status`; teardown `reap`.
-//
-// `reap` is the crash-safe backstop: the in-process dispatcher reaps on normal
-// exit, but a hard SIGKILL of the orchestrator leaves orphaned tmux sessions +
-// process groups that only the on-disk manifest can recover. It NEVER does a
-// broad `pkill` — it kills exactly the pgids/sessions the manifest recorded.
 package main
 
 import (
@@ -68,8 +60,6 @@ func runSwarmReapOrphans(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
-// manifestPath resolves the per-cycle swarm manifest the registry writes:
-// <evolveDir>/runs/cycle-<N>/.swarm/sessions.json.
 func manifestPath(evolveDir string, cycle int) string {
 	return filepath.Join(evolveDir, "runs", "cycle-"+strconv.Itoa(cycle), ".swarm", "sessions.json")
 }
@@ -126,7 +116,6 @@ func runSwarmReap(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stdout, "no swarm sessions to reap for cycle %d\n", cycle)
 		return 0
 	}
-	// Rebuild a registry over the loaded manifest so Reap can mark + persist.
 	reg := swarm.NewSessionRegistry(path, c, phase, pid)
 	for _, s := range sessions {
 		_ = reg.Register(s)
@@ -135,10 +124,11 @@ func runSwarmReap(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 	killer := swarm.ExecSessionKiller{
+		// Kills only the pgid/session pairs this manifest recorded, never a
+		// broad pkill; refusing group 0/1 here is defense in depth against
+		// signaling the caller's own group or session (ExecSessionKiller
+		// already gates pgid>1 before calling KillGroup).
 		KillGroup: func(pgid int) error {
-			// Defense in depth (ExecSessionKiller already gates pgid>1): never
-			// signal group 0 (caller's own group) or 1 (everything) — that would
-			// kill the reaper / whole session, not the orphaned worker.
 			if pgid <= 1 {
 				return fmt.Errorf("refusing to kill process group %d", pgid)
 			}

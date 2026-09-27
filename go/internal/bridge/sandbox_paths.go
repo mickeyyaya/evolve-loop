@@ -125,25 +125,10 @@ func canonicalSandboxPath(path string) (string, error) {
 const worktreePathTemplate = "{worktree_path}"
 
 // resolveSandboxWriteGrants turns a profile's declared sandbox.write_subpaths
-// into the absolute paths the SBPL generator grants. It is the write-side
-// sibling of resolveSandboxDenials, with the opposite failure posture:
-//
-//   - A denial resolves to BOTH the declared path and its symlink target, so
-//     a retarget cannot dodge it (fail-closed for denies).
-//   - A grant must resolve to EXACTLY the declared path below the canonical
-//     base. If any component under the base is a symlink, the grant is
-//     refused and the launch fails, because honoring it would hand the phase
-//     write access to wherever the link points (fail-closed for allows). This
-//     is the defense the retrospective grant's former hard-coded helper
-//     carried for its one path, now applied to every declared one.
-//
-// Relative entries resolve against the project root — the bash contract the
-// profiles were written to — and "{worktree_path}" entries against the
-// worktree; a worktree-templated entry with no worktree is skipped (there is
-// nothing to grant and the phase cannot write source anyway). A glob entry is
-// widened here to its longest glob-free ancestor (see globFreeAncestor), and
-// the canonical-path walk stops at the first existing ancestor, so a
-// not-yet-created claim dir resolves cleanly.
+// into the absolute paths the SBPL generator grants: it is the write-side
+// sibling of resolveSandboxDenials, but fails closed on retarget rather than
+// resolving through it, since honoring a symlinked grant would hand the phase
+// write access to wherever the link points.
 func resolveSandboxWriteGrants(subpaths []string, root, worktree string) ([]string, error) {
 	var out []string
 	for _, declared := range subpaths {
@@ -171,11 +156,8 @@ func resolveSandboxWriteGrants(subpaths []string, root, worktree string) ([]stri
 			return nil, fmt.Errorf("write grant escapes its base: %q", declared)
 		}
 		// A glob names a family of paths ("cycle-*"); the grant is that family's
-		// home — the longest glob-free ancestor. This is the ONE home of that
-		// projection: the adapters receive only literal absolute paths (their
-		// stated contract), so SBPL and bwrap cannot disagree about what a glob
-		// means, and a non-terminal glob ("cycle-*/learn") widens to the right
-		// ancestor instead of to a literal "*" that matches nothing.
+		// home — the longest glob-free ancestor. The adapters receive only
+		// literal absolute paths, so this is the one place glob-widening happens.
 		rel = globFreeAncestor(rel)
 		if base == "" || !filepath.IsAbs(base) {
 			return nil, fmt.Errorf("write grant %q needs an absolute project root or worktree", declared)

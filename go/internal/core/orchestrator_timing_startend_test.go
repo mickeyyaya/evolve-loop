@@ -1,19 +1,5 @@
 package core
 
-// RED tests for PR1/A1 (phase-timing start/end wall-clock evidence).
-//
-// Today phase-timing.json records only a relative duration_ms; the per-phase
-// wall-clock anchors (started_at/ended_at) are captured at dispatch
-// (cyclerun_dispatch.go: PhaseStartedAt) but thrown away into transient
-// cycle-state — never persisted. These white-box tests (package core, reusing
-// the orchestrator_test.go harness) pin the contract: EVERY recorded phase
-// carries an RFC3339 started_at and ended_at, ended_at is not before started_at,
-// and an advancing clock proves ended_at is captured strictly after started_at
-// (i.e. the orchestrator brackets the dispatch, it does not stamp one instant
-// twice). They reference only already-public symbols, so the core test binary
-// still COMPILES at the pre-implementation baseline and fails at RUNTIME (keys
-// absent) — the correct RED signal.
-
 import (
 	"context"
 	"encoding/json"
@@ -24,9 +10,9 @@ import (
 	"time"
 )
 
-// readTimings unmarshals <workspace>/phase-timing.json (local helper — the
-// integration-tagged orchestrator_phaseoutcome_test.go has equivalents under a
-// build tag this default-suite file cannot see).
+// readTimings unmarshals <workspace>/phase-timing.json. Duplicated here
+// (rather than reused) because orchestrator_phaseoutcome_test.go's equivalent
+// sits behind a build tag this default-suite file cannot see.
 func readTimings(t *testing.T, workspace string) []map[string]any {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join(workspace, "phase-timing.json"))
@@ -40,7 +26,6 @@ func readTimings(t *testing.T, workspace string) []map[string]any {
 	return entries
 }
 
-// timingEntry returns the single entry for phase, failing on absence/duplicates.
 func timingEntry(t *testing.T, entries []map[string]any, phase string) map[string]any {
 	t.Helper()
 	var found []map[string]any
@@ -55,9 +40,8 @@ func timingEntry(t *testing.T, entries []map[string]any, phase string) map[strin
 	return found[0]
 }
 
-// advancingClock returns a monotonically increasing clock: each call returns a
-// timestamp `step` later than the previous. Mutex-guarded so a concurrent
-// observer probe cannot race the dispatch under `go test -race`.
+// advancingClock returns a monotonically increasing clock. Mutex-guarded so a
+// concurrent observer probe cannot race the dispatch under `go test -race`.
 func advancingClock(start time.Time, step time.Duration) func() time.Time {
 	var mu sync.Mutex
 	var n int64
@@ -70,9 +54,6 @@ func advancingClock(start time.Time, step time.Duration) func() time.Time {
 	}
 }
 
-// AC-1: a fully-PASS cycle persists started_at + ended_at on every phase entry,
-// both RFC3339-parseable, ended_at not before started_at. The per-phase
-// presence (not a single cycle-level pair) is the anti-no-op guard.
 func TestPhaseTiming_StartEndPopulated_HappyPath(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -115,9 +96,6 @@ func TestPhaseTiming_StartEndPopulated_HappyPath(t *testing.T) {
 	}
 }
 
-// AC-2: an advancing clock proves ended_at is strictly after started_at — the
-// orchestrator captured end AFTER start with real clock progression, not the
-// same instant stamped twice.
 func TestPhaseTiming_EndStrictlyAfterStart_AdvancingClock(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -141,8 +119,6 @@ func TestPhaseTiming_EndStrictlyAfterStart_AdvancingClock(t *testing.T) {
 	}
 }
 
-// AC-3: a phase that exhausts its retries and aborts the cycle must STILL carry
-// started_at/ended_at (the deferred writer flushes on the abort path too).
 func TestPhaseTiming_StartEndOnAbort(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -164,12 +140,6 @@ func TestPhaseTiming_StartEndOnAbort(t *testing.T) {
 	}
 }
 
-// A2: every timing entry carries the phase's config-driven archetype
-// (plan/build/evaluate/control) so the evidence roll-up can bucket cycle time
-// into productive vs checking vs planning vs recovery WITHOUT a hand-maintained
-// phase list. Reuses the existing phasespec taxonomy (single source), so the
-// classification matches the inventory exactly. RED until recordPhaseOutcome
-// stamps the archetype.
 func TestPhaseTiming_ArchetypeClassified(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -193,8 +163,6 @@ func TestPhaseTiming_ArchetypeClassified(t *testing.T) {
 	}
 }
 
-// AC-4: the <phase>-usage.json sidecar carries the same start/end anchors, so
-// the per-phase evidence reads uniformly across both timing surfaces.
 func TestPhaseTiming_UsageSidecarCarriesStartEnd(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

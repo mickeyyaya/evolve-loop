@@ -1,12 +1,5 @@
 package core
 
-// Cycle-238 advisory-soak defect D4, orchestrator call-site: the upfront-plan
-// RouteInput (planIn) the orchestrator hands the advisor — and then passes to
-// ClampPlanToFloorWith — must carry the cycle's IntentRequired bit. Without
-// it the floor clamp cannot force intent into the plan, and the advisory
-// override drops the operator's EVOLVE_REQUIRE_INTENT=1 gate (see
-// floor_intent_test.go in internal/router for the clamp-side contract).
-
 import (
 	"context"
 	"testing"
@@ -40,13 +33,11 @@ func TestOrchestrator_ThreadsIntentRequiredToPlannerInput(t *testing.T) {
 		return cp.got
 	}
 
-	// Positive: PhaseEnables["intent"]="on" must reach the plan-clamp input.
 	got := runIntent(t, policy.WorkflowConfig{PhaseEnables: map[string]string{"intent": "on"}})
 	if !got.IntentRequired {
 		t.Errorf("planIn.IntentRequired=false with PhaseEnables[intent]=on; floor clamp cannot force intent without it")
 	}
 
-	// Negative: without the enable the bit stays false.
 	got = runIntent(t, policy.WorkflowConfig{})
 	if got.IntentRequired {
 		t.Errorf("planIn.IntentRequired=true without intent enable; must default false")

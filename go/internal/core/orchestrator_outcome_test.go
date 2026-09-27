@@ -2,13 +2,6 @@ package core
 
 import "testing"
 
-// finalizeOutcome unit tests — the cycle-level verdict disambiguator
-// extracted from RunCycle. Driven by (lastPhaseVerdict, retroDecision,
-// shipped). See cycle_outcome.go for the routing rules; the composed wiring
-// (ship latch → finalizeCycle → label) is pinned by
-// shipped_via_build_own_ship_test.go and the TestOrchestrator_HappyPath_*
-// tests in orchestrator_test.go.
-
 func TestFinalizeOutcome_KeepsFAILUnchanged(t *testing.T) {
 	t.Parallel()
 	o := &Orchestrator{}
@@ -43,8 +36,6 @@ func TestFinalizeOutcome_SkippedWithOwnShip_ShippedViaBuild(t *testing.T) {
 
 func TestFinalizeOutcome_SkippedWithoutOwnShip_NeverShippedViaBuild(t *testing.T) {
 	t.Parallel()
-	// Cycle 1630: a sibling lane's landing moved HEAD, but this cycle never
-	// shipped. The label must not be inferred from anything but the latch.
 	o := &Orchestrator{}
 	if got := o.finalizeOutcome(VerdictSKIPPED, "proceed: fluent mode", false); got != CycleOutcomeSkippedUnknown {
 		t.Errorf("SKIPPED without this cycle's own ship must be SKIPPED_UNKNOWN, got %q", got)
@@ -70,8 +61,6 @@ func TestFinalizeOutcome_SkippedBareNoSignal_SkippedUnknown(t *testing.T) {
 
 func TestFinalizeOutcome_OwnShipTrumpsAdvisory(t *testing.T) {
 	t.Parallel()
-	// If this cycle shipped AND retro had an advisory, the ship wins — the
-	// cycle DID deliver value, the advisory is informational.
 	o := &Orchestrator{}
 	decision := "proceed: fluent mode: would-have-blocked: BLOCK-CODE"
 	if got := o.finalizeOutcome(VerdictSKIPPED, decision, true); got != CycleOutcomeShippedViaBuild {

@@ -1,10 +1,3 @@
-// `evolve tokens report [--last N]` is the S7 (token-telemetry) read-only
-// reporter: it walks the last N cycles' phase-timing.json logs (the same
-// per-cycle walk budgethistory.Collect uses for duration/cost) and rolls
-// their per-phase terminal token usage into a ranked top-consumers table —
-// the evidence that answers "which phase/site is burning the most tokens"
-// once S1-S6 populate real (non-zero) token counts. --json emits the
-// TokensReport struct for tooling.
 package main
 
 import (
@@ -22,8 +15,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasetiming"
 )
 
-// PhaseTokenTotal is one phase's summed token usage across the walked
-// cycles, plus how many of those cycles actually ran it.
+// PhaseTokenTotal is one phase's summed token usage across the walked cycles.
 type PhaseTokenTotal struct {
 	Phase      string                `json:"phase"`
 	Tokens     cyclestate.TokenUsage `json:"tokens"`
@@ -31,9 +23,6 @@ type PhaseTokenTotal struct {
 }
 
 // TokensReport is the walked-window aggregate `evolve tokens report` emits.
-// PhasesWithData/PhasesRun are the telemetry-coverage counters (cycle-779):
-// how many walked phase runs carried ANY token data versus how many ran —
-// so an unmeasured window reads as a coverage gap, not as "free".
 type TokensReport struct {
 	CyclesWalked   []int                 `json:"cycles_walked"`
 	Phases         []PhaseTokenTotal     `json:"phases"` // ranked, highest InputTokens first
@@ -42,18 +31,11 @@ type TokensReport struct {
 	CacheHitRatio  float64               `json:"cache_hit_ratio"`
 	PhasesWithData int                   `json:"phases_with_data"`
 	PhasesRun      int                   `json:"phases_run"`
-	// TripwireCount/Tripwires surface the engine's telemetry-coverage tripwire
-	// (cycle-1005): a non-claude launch that exits 0, runs past the 60s success
-	// threshold, and resolves to source=none burned real tokens the resolver
-	// never measured. The engine records `"tripwire":true` in llm-calls.ndjson;
-	// this reporter reads and surfaces it so the miss shows up in the report,
-	// not just engine stderr.
-	TripwireCount int             `json:"tripwire_count"`
-	Tripwires     []TripwireEvent `json:"tripwires"`
+	TripwireCount  int                   `json:"tripwire_count"`
+	Tripwires      []TripwireEvent       `json:"tripwires"`
 }
 
-// TripwireEvent is one surfaced telemetry-coverage tripwire — the CLI/agent/
-// phase/cycle of a non-claude success launch whose token usage went unmeasured.
+// TripwireEvent is one surfaced telemetry-coverage tripwire.
 type TripwireEvent struct {
 	Cycle      int    `json:"cycle"`
 	CLI        string `json:"cli"`
@@ -125,9 +107,6 @@ func runTokensReport(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
-// recentCyclesWithTiming scans runsDir for cycle-N dirs carrying a
-// phase-timing.json, and returns up to `last` of the highest cycle numbers,
-// ascending (oldest first — matches budgethistory.Collect's walk order).
 func recentCyclesWithTiming(runsDir string, last int) []int {
 	matches, _ := filepath.Glob(filepath.Join(runsDir, "cycle-*", phasetiming.FileName))
 	seen := map[int]bool{}
@@ -148,10 +127,6 @@ func recentCyclesWithTiming(runsDir string, last int) []int {
 	return nums
 }
 
-// buildTokensReport walks the given cycle numbers' phase-timing.json logs and
-// rolls their per-phase terminal token usage into a ranked TokensReport.
-// Missing/unreadable cycles are skipped as absent evidence, matching
-// budgethistory.Collect's degrade-gracefully contract.
 func buildTokensReport(runsDir string, cycles []int) TokensReport {
 	totals := map[string]cyclestate.TokenUsage{}
 	counts := map[string]int{}
@@ -159,8 +134,6 @@ func buildTokensReport(runsDir string, cycles []int) TokensReport {
 	var cacheReadSum, cacheDenomSum int
 	for _, c := range cycles {
 		ws := filepath.Join(runsDir, fmt.Sprintf("cycle-%d", c))
-		// Read tripwires before the phasetiming continue so a cycle with real
-		// tripwire hits but no/empty phase-timing data still surfaces them.
 		tws := readCycleTripwires(runsDir, c)
 		report.Tripwires = append(report.Tripwires, tws...)
 		report.TripwireCount += len(tws)
@@ -191,8 +164,6 @@ func buildTokensReport(runsDir string, cycles []int) TokensReport {
 	return report
 }
 
-// readCycleTripwires projects the canonical bounded ledger reader into the
-// token report. Missing, malformed, and partial evidence degrades quietly.
 func readCycleTripwires(runsDir string, cycle int) []TripwireEvent {
 	workspace := filepath.Join(runsDir, fmt.Sprintf("cycle-%d", cycle))
 	result, _ := llmcalls.ReadWorkspace(workspace)
@@ -216,11 +187,6 @@ func readCycleTripwires(runsDir string, cycle int) []TripwireEvent {
 	return out
 }
 
-// stripControlBytes removes control bytes (< 0x20 and 0x7f) from an
-// llm-calls.ndjson-sourced string before it reaches the TTY. A compromised
-// non-claude driver could embed ANSI escapes in its own record's CLI/agent/
-// phase fields to rewrite or hide the very tripwire line meant to expose it
-// (cycle-1010 audit F1); the --json path is unaffected (already safe).
 func stripControlBytes(s string) string {
 	return strings.Map(func(r rune) rune {
 		if r < 0x20 || r == 0x7f {
@@ -230,8 +196,6 @@ func stripControlBytes(s string) string {
 	}, s)
 }
 
-// rankPhasesByInputTokens sorts phases by summed InputTokens, highest first;
-// ties break alphabetically by phase name for deterministic output.
 func rankPhasesByInputTokens(totals map[string]cyclestate.TokenUsage, counts map[string]int) []PhaseTokenTotal {
 	rows := make([]PhaseTokenTotal, 0, len(totals))
 	for phase, tok := range totals {
@@ -246,7 +210,6 @@ func rankPhasesByInputTokens(totals map[string]cyclestate.TokenUsage, counts map
 	return rows
 }
 
-// addTokenUsage sums two TokenUsage values field-wise.
 func addTokenUsage(a, b cyclestate.TokenUsage) cyclestate.TokenUsage {
 	a.Input += b.Input
 	a.Output += b.Output
@@ -275,11 +238,6 @@ func renderTokensReport(w io.Writer, r TokensReport) {
 	fmt.Fprintf(w, "Coverage: %d/%d phases with token data\n", r.PhasesWithData, r.PhasesRun)
 }
 
-// renderTripwires prints the telemetry-coverage tripwire section. It runs
-// unconditionally above the empty-phases early return so a cycle with tripwire
-// hits but no phase-timing data still surfaces the miss (cycle-1007 render-order
-// regression). Silent when no tripwire fired. CLI/agent/phase fields are
-// control-byte-stripped before hitting the TTY (F1).
 func renderTripwires(w io.Writer, r TokensReport) {
 	if r.TripwireCount == 0 {
 		return

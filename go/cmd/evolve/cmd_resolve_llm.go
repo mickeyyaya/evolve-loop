@@ -8,10 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/resolvellm"
 )
 
-// runResolveLLM is the `evolve resolve-llm <role>` subcommand. Resolves the
-// role's CLI + model tier from its profile. Emits a single JSON line.
-// (Step 9 removed llm_config.json, so the legacy optional [config_path] arg is
-// gone.)
 func runResolveLLM(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	var role string
 	for _, a := range args {

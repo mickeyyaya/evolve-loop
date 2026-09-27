@@ -1,10 +1,3 @@
-// orchestrator_runid_threading_test.go — CB.5 contract (concurrency campaign
-// W4), core half: the CA.5 run identity reaches every PhaseRequest, on every
-// dispatch surface (RunCycle loop, resume, failure-learning retro), so the
-// bridge can mint run-scoped tmux session names (evolve-bridge-r<runid8>-…)
-// and the per-run session registry records the right owner. Without the
-// threading, two concurrent runs' sessions are distinguishable only by
-// pid+timestamp — nothing an observer or reaper can ASSERT on (CB.6).
 package core
 
 import (
@@ -12,8 +5,6 @@ import (
 	"testing"
 )
 
-// TestCB5_EveryDispatchedPhaseCarriesRunID: the RunCycle loop stamps the
-// minted run id into every PhaseRequest.
 func TestCB5_EveryDispatchedPhaseCarriesRunID(t *testing.T) {
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	runners := buildRunners(nil)
@@ -38,8 +29,6 @@ func TestCB5_EveryDispatchedPhaseCarriesRunID(t *testing.T) {
 	}
 }
 
-// TestCB5_ResumePathCarriesRunID: RunCycleFromPhase threads the PERSISTED
-// run id (resume reuses the run-record identity, CA.5) into resumed phases.
 func TestCB5_ResumePathCarriesRunID(t *testing.T) {
 	t.Parallel()
 	const runID = "01ARZ3NDEKTSV4RRFFQ69G5FAV"
@@ -68,8 +57,6 @@ func TestCB5_ResumePathCarriesRunID(t *testing.T) {
 	}
 }
 
-// TestCB5_FailureLearningRetroCarriesRunID: the third construction site
-// (the CB.1 review taught us to sweep them all).
 func TestCB5_FailureLearningRetroCarriesRunID(t *testing.T) {
 	t.Parallel()
 	fl := failureLearningRequest{

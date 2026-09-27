@@ -1,7 +1,3 @@
-// cmd_ship_signal_center_test.go — ADR-0103 unit 07 wiring proofs: the ship
-// phase built by the orchestrator root carries the root's Signal Center, the
-// landing's WARN renders at the --simulate root, and the standalone
-// `evolve ship` root builds the one sink topology for its own Center.
 package main
 
 import (
@@ -19,11 +15,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// Test 40 (the critic's fold: orchDeps carries no runners map and
-// core.Orchestrator exposes only HasRunner, so the wiring is pinned at the
-// source) — the ONE ship.New(ship.Config{ literal of the production root
-// passes the root's Center; the behavioural proof is ship's own
-// TestShipOptions_ThreadsSignals.
 func TestWireOrchestratorDeps_ShipPhaseCarriesTheRootSignalCenter(t *testing.T) {
 	src, err := os.ReadFile("cmd_cycle.go")
 	if err != nil {
@@ -38,9 +29,6 @@ func TestWireOrchestratorDeps_ShipPhaseCarriesTheRootSignalCenter(t *testing.T) 
 	}
 }
 
-// Test 41 — the landing's module tag renders at the --simulate root: a
-// landing built on the root's Center with a failing tracked-binary reset
-// reaches the console sink and the durable cycle-workspace stream.
 func TestWireSimulateOrchestrator_ShipWarningRenders(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
@@ -68,9 +56,6 @@ func TestWireSimulateOrchestrator_ShipWarningRenders(t *testing.T) {
 	}
 }
 
-// Test 42 — the standalone `evolve ship` root builds its own Center through
-// the ONE sink topology (newRootSignalCenter), threads it into Options and
-// flushes it: a WARN emitted on that Center renders on the given stderr.
 func TestCmdShip_BuildsTheRootSignalCenter(t *testing.T) {
 	src, err := os.ReadFile("cmd_ship.go")
 	if err != nil {

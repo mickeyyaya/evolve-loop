@@ -1,9 +1,3 @@
-// cmd_signals.go — `evolve signals codes generate|check`: projects the Signal
-// Center code registry (every module's RegisterCode, all linked into this
-// binary) into the GENERATED region of docs/architecture/signal-codes.md,
-// exactly like `evolve flags generate|check` projects the flag registry.
-// `check` exits 2 on drift; a cmd/evolve test runs it, so CI gates an
-// undocumented or re-documented code (ADR-0101 S2, design §5.4).
 package main
 
 import (
@@ -38,8 +32,6 @@ func runSignals(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	}
 }
 
-// signalCodesRun renders the registry into the doc's marked region and either
-// writes it (generate) or compares against disk (check; exit 2 on drift).
 func signalCodesRun(docPath string, write bool, stdout, stderr io.Writer) int {
 	doc, err := os.ReadFile(docPath)
 	if err != nil {

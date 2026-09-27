@@ -8,10 +8,6 @@ import (
 	"time"
 )
 
-// report.go — re-derive a structured JSON summary from a past workspace
-// (Go port of lib/report.sh). Verdict is derived from file state, not a
-// status file. Consumed by `evolve bridge report` and the orchestrator.
-
 // FileRef describes a workspace file's presence + size.
 type FileRef struct {
 	Path      string `json:"path"`

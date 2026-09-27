@@ -5,22 +5,6 @@ import (
 	"testing"
 )
 
-// realizer_dedupe_pairs_test.go — dedupeLaunchFlags must dedupe flag-VALUE
-// PAIRS as units, not individual tokens.
-//
-// The function's doc comment used to state a contract it did not implement:
-// "a flag with distinct values (e.g. -m gpt-5.4 vs -m gpt-5.5) is correctly
-// kept twice because the token values differ" and "flag-value pairs that
-// legitimately repeat should NOT be deduped this way". Token-wise dedupe does
-// neither: the repeated FLAG token is dropped while both value tokens survive,
-// silently reassembling `-m a -m b` into `-m a b` — a different command line,
-// not a deduplicated one.
-//
-// Latent until 2026-08-27, when codex's effort param needed two `-c` overrides
-// (model_reasoning_effort and plan_mode_reasoning_effort). The realized argv
-// came out as `-c model_reasoning_effort=high plan_mode_reasoning_effort=high`,
-// passing the second key as a bare positional. Caught by an existing argv pin
-// rather than in production, which is the argument for pinning argv exactly.
 func TestDedupeLaunchFlags_KeepsDistinctValuesForRepeatedFlag(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -54,19 +38,11 @@ func TestDedupeLaunchFlags_KeepsDistinctValuesForRepeatedFlag(t *testing.T) {
 			[]string{"--yolo", "-m", "gpt-5.6-terra", "-c", "x=1"},
 		},
 		{
-			// KNOWN LIMITATION, pinned so it cannot regress silently: pairing
-			// keys on "next token does not start with -", not on flag arity, so
-			// a value that itself looks like a flag is not recognised and the
-			// pair degrades to the old token-wise behaviour. Unreachable today
-			// (no manifest or tracked profile emits a `-`-leading value); this
-			// row is the tripwire for the day one does.
 			"dash-leading VALUE is not recognised as a value (documented limit)",
 			[]string{"--min", "-1", "--max", "-1"},
 			[]string{"--min", "-1", "--max"},
 		},
 		{
-			// The empty-token guard, pinned for the same reason: an empty token
-			// is manifest noise, not a value, so it stays standalone.
 			"empty token does not pair; duplicates collapse",
 			[]string{"", "--a", ""},
 			[]string{"", "--a"},

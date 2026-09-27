@@ -14,15 +14,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/version"
 )
 
-// runResetSHA implements `evolve reset-sha` — the sanctioned successor to
-// hand-editing state.json:expected_ship_sha (ADR-0065). It re-pins the ship
-// gate's binary anti-tamper SHA to the RUNNING evolve binary, so a legitimate
-// rebuild (e.g. after pulling a fix) can ship/resume without a false
-// SELF_SHA_TAMPERED. It is provenance-gated: the re-pin is granted only when the
-// running binary's embedded build-commit is an ancestor of HEAD, UNLESS
-// --operator explicitly authorizes an unverifiable binary.
-//
-// Exit codes: 0 re-pinned; 1 refused/error (pin unchanged on refusal).
+// See ADR-0065.
 func runResetSHA(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve reset-sha", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -44,9 +36,8 @@ func runResetSHA(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 			return 1
 		}
 	}
-	// Mirror runShipCmd: a relative root would make the state.json path diverge
-	// from the audit/commit-gate paths. RepinShipSHA's own IsAbs guard is the
-	// terminal check.
+	// Mirrors runShipCmd: an absolute root keeps this aligned with the
+	// audit/commit-gate paths; RepinShipSHA's IsAbs guard is the terminal check.
 	absRoot := paths.AbsoluteRoot("--project-root", projectRoot, func(m string) {
 		fmt.Fprintf(stderr, "evolve reset-sha: WARN: %s\n", m)
 	})
@@ -58,12 +49,10 @@ func runResetSHA(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	}
 	commit := version.Commit()
 
-	// Provenance: is the running binary's build-commit an ancestor of HEAD?
 	prov := func(c string) bool {
 		if c == "" {
 			return false
 		}
-		// exit 0 ⇒ c is an ancestor of HEAD.
 		return exec.Command("git", "-C", absRoot, "merge-base", "--is-ancestor", c, "HEAD").Run() == nil
 	}
 

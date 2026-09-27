@@ -1,10 +1,5 @@
 package core
 
-// optional_skip_details_test.go — the skip's forensic surface must split by
-// error class: a missing persona (cycle-1551, zero retries, no infra event)
-// filed under "optional_infra_skip" at exit 0 would merge two failure classes
-// the ledger has been burned by merging before.
-
 import (
 	"fmt"
 	"strings"

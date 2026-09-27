@@ -13,22 +13,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// realizer_wiring_test.go — ADR-0022 Phase 2b/3 acceptance. Proves the tmux
-// drivers build their launch command from the per-CLI Realization (the single
-// owner of model+permission+raw flags), so a claude-origin profile's flags
-// never leak into agy/codex. This is the contract the cycle-1 multi-CLI boot
-// failure violated: profile.extra_flags were claude argv forwarded verbatim to
-// every CLI.
-//
-// The migrated profile shape: extra_flags_by_cli keyed per CLI (claude flags
-// live under "claude-tmux"), and NO permission_mode (the bypass posture is the
-// realized default). A profile switched to agy/codex therefore realizes to
-// that CLI's own flags only — RawByCLI[agy/codex] is nil.
-
 // writeIntentProfile writes a migrated-shape profile (extra_flags_by_cli, no
-// permission_mode) and returns its path. The launch goes through the real
-// runner entry (engine.Launch), which must enable bypass for the in-process
-// path so the tmux safety gates pass without an explicit --allow-bypass.
+// permission_mode) and returns its path.
 func writeIntentProfile(t *testing.T, dir, name, cli string, extraByCLI map[string][]string) string {
 	t.Helper()
 	body := map[string]any{
@@ -62,8 +48,8 @@ func launchedCmd(tmux *fakeTmux, binary string) string {
 
 func TestRealizerWiring_NoCrossCLILeak(t *testing.T) {
 	injectCatalogDir(t, t.TempDir()) // pin manifest offline defaults (no host-catalog overlay)
-	// The claude flags every profile carried before the migration. Keyed under
-	// claude-tmux so a profile switched to agy/codex realizes none of them.
+	// claudeRaw is keyed under claude-tmux so a profile switched to agy/codex
+	// realizes none of these flags.
 	claudeRaw := []string{
 		"--exclude-dynamic-system-prompt-sections",
 		"--disable-slash-commands",
@@ -90,11 +76,10 @@ func TestRealizerWiring_NoCrossCLILeak(t *testing.T) {
 			cli:    "agy-tmux",
 			binary: "agy",
 			marker: "? for shortcuts",
-			// agy 1.0.15 selects its model via --model (cycle-447 live probe);
-			// the display-name token is shell-quoted by launchCmdLine. The
-			// undefined -m short flag stays in `absent` (space-delimited so the
-			// substring can't match inside --model) — the cycle-154 regression
-			// lock. Model "sonnet" → legacy ladder → balanced → offline default.
+			// The -m short flag stays in `absent` (space-delimited so the
+			// substring can't match inside --model). Model "sonnet" resolves via
+			// the legacy ladder → balanced → offline default; the display-name
+			// token is shell-quoted by launchCmdLine.
 			want:   "agy --model 'Gemini 3.7 Flash (High)' --dangerously-skip-permissions",
 			absent: []string{" -m ", "--setting-sources", "--plugin-dir", "--exclude-dynamic-system-prompt-sections", "--no-session-persistence"},
 		},
@@ -102,24 +87,14 @@ func TestRealizerWiring_NoCrossCLILeak(t *testing.T) {
 			cli:    "codex-tmux",
 			binary: "codex",
 			marker: "›",
-			// Cycle-124 G1a: --yolo from codex-tmux.json:default_args lands
-			// FIRST per the realizer's wire-up order (default_args before
-			// per-param scalars), then -m from the params.model_tier tier_alias
-			// (sonnet → gpt-5.4). Behavior contract: --yolo at boot sets
-			// approval=never AND sandbox=danger-full-access, short-circuiting
-			// the per-edit-approval modal that hung cycle-123 tdd. (Codex's
-			// --help 0.134 omits --yolo from its option list, but clap parses
-			// it; verified empirically.)
-			// Cycle-142: this launch runs with no OPENAI_API_KEY → codexAuthMode
-			// == "chatgpt"; the clamp seam stays armed but no longer fires —
-			// the whole gpt-5.6 family (2026-08-14 operator-confirmed refresh)
-			// is in chatgpt_safe_models, so the realized balanced tier
-			// (gpt-5.6-terra) passes through. The leak-absent assertions below
-			// are what this case actually guards; the model value rides along.
-			// The second -c is the plan-mode effort override (2026-08-27). This
-			// is the END-TO-END launch string reaching tmux, so it is also the
-			// wiring proof that the flag survives realization, dedupe and
-			// quoting — the three places it could have been dropped.
+			// --yolo (default_args) lands FIRST, ahead of the per-param scalars;
+			// the second -c is the plan-mode effort override. This launch runs
+			// with no OPENAI_API_KEY, so the codex auth-mode clamp stays armed
+			// but does not fire — the whole gpt-5.6 family is in
+			// chatgpt_safe_models, so the realized balanced tier (gpt-5.6-terra)
+			// passes through unclamped. This is the end-to-end launch string
+			// reaching tmux, so it is also the wiring proof that the flag
+			// survives realization, dedupe and quoting.
 			want:   "codex --yolo -m gpt-5.6-terra -c 'model_reasoning_effort=high' -c 'plan_mode_reasoning_effort=high'",
 			absent: []string{"--setting-sources", "--plugin-dir", "--dangerously-skip-permissions", "--exclude-dynamic-system-prompt-sections", "--no-session-persistence"},
 		},
@@ -163,11 +138,10 @@ func TestRealizerWiring_NoCrossCLILeak(t *testing.T) {
 	}
 }
 
-// TestEngineLaunch_EnablesBypassForInProcessPath pins the fix for the
-// AllowBypass gap: the runner's in-process entry (engine.Launch) must let the
-// tmux safety gates pass without the caller threading --allow-bypass, since
-// the autonomous orchestrator is the trusted bypass authority. Uses a buffer
-// to confirm we never hit ExitSafetyGate.
+// TestEngineLaunch_EnablesBypassForInProcessPath pins that the runner's
+// in-process entry (engine.Launch) lets the tmux safety gates pass without
+// the caller threading --allow-bypass, since the autonomous orchestrator is
+// the trusted bypass authority.
 func TestEngineLaunch_EnablesBypassForInProcessPath(t *testing.T) {
 	ws := t.TempDir()
 	profile := writeIntentProfile(t, ws, "agent", "agy-tmux", nil)

@@ -9,9 +9,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
-// Profile is the parsed agent profile JSON — the Go port of
-// lib/profile.sh's bridge_profile_* exports. Loaded once per launch and
-// folded into the resolved Config.
+// Profile is the parsed agent profile JSON, loaded once per launch and folded into the resolved Config.
 type Profile struct {
 	Name           string
 	Model          string
@@ -20,28 +18,17 @@ type Profile struct {
 	StreamOutput   bool
 	SessionName    string
 	Sandbox        *ProfileSandbox
-	// EffortLevel is the abstract reasoning-effort dial (low | medium | high)
-	// carried from the profile JSON's effort_level and realized per-CLI at the
-	// launch seam via LaunchIntent.Effort. Empty = unset (additive no-op).
+	// EffortLevel is the abstract reasoning-effort dial (low | medium | high) carried from the profile JSON and realized per-CLI via LaunchIntent.Effort.
 	EffortLevel string
-	// ExtraFlagsByCLI is the per-CLI raw-flag escape hatch (ADR-0022). Flags
-	// are keyed by the CLI they belong to ("claude-tmux": [...]) and realized
-	// ONLY for the matching CLI, so a claude-origin profile switched to
-	// agy/codex realizes none of claude's argv. Replaces the flat extra_flags
-	// that forwarded one CLI's vocabulary verbatim to every CLI.
+	// ExtraFlagsByCLI is the per-CLI raw-flag escape hatch, realized only for
+	// the matching CLI so a profile switched to another CLI carries none of
+	// the original CLI's argv.
+	// See ADR-0022.
 	ExtraFlagsByCLI map[string][]string
-	// EffortOverrides maps a RESOLVED model tier to the effort rung to launch
-	// with when the profile lands on that tier (`effort_overrides` in the
-	// profile JSON, e.g. {"deep": "high"}). It lets a tier escalation — the
-	// audit-repair `audit_retry_2plus` override raising builder from balanced
-	// to deep — carry the deeper tier's reasoning effort with it, without a
-	// second situation-plumbing path: the tier IS the situation. Absent tier
-	// key ⇒ EffortLevel. Config-injected; no Go literal names a rung.
+	// EffortOverrides maps a resolved model tier to the effort rung to launch with; an absent tier key falls back to EffortLevel.
 	EffortOverrides map[string]string
 }
 
-// effortForTier returns the effort rung for the tier this launch resolved to:
-// the profile's effort_overrides[tier] when declared, else effort_level.
 func (p Profile) effortForTier(tier string) string {
 	if e, ok := p.EffortOverrides[tier]; ok && e != "" {
 		return e
@@ -53,9 +40,8 @@ func (p Profile) effortForTier(tier string) string {
 // drop filesystem restrictions parsed by the profile loader.
 type ProfileSandbox = profiles.SandboxConfig
 
-// validPermissionModes mirrors the claude --permission-mode choice set
-// that bin/bridge and profile.sh both validate against. "" means
-// "let the driver/CLI decide" (back-compat with v1 profiles).
+// validPermissionModes mirrors claude's --permission-mode set; "" means
+// "let the driver/CLI decide" (v1 profile back-compat).
 var validPermissionModes = map[string]bool{
 	"":                  true,
 	"plan":              true,
@@ -86,11 +72,7 @@ type profileWire struct {
 	ExtraFlagsByCLI map[string][]string `json:"extra_flags_by_cli"`
 }
 
-// LoadProfile reads and validates an agent profile JSON, returning the
-// parsed Profile. Error messages mirror lib/profile.sh so operator-facing
-// diagnostics stay identical across the bash→Go cutover. Validation:
-// name required; permission_mode in the allowed set; session_name (when
-// set) ≤32 chars and matching [a-zA-Z0-9._-]+.
+// LoadProfile reads and validates an agent profile JSON, returning the parsed Profile.
 func LoadProfile(path string) (Profile, error) {
 	if path == "" {
 		return Profile{}, fmt.Errorf("bridge:profile: empty path")

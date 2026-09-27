@@ -1,11 +1,5 @@
 package main
 
-// cmd_routing.go — ADR-0052 WS3-S4: `evolve routing explain --cycle N` renders
-// a recorded routing decision (the clamped plan, the integrity-floor clamps,
-// and the OTel decision span) for debugging WHY a cycle ran the phases it did.
-// WS3-S5 adds the `replay` subcommand. Pure reader: no state/ledger/registry
-// mutation — safe to run mid-batch.
-
 import (
 	"encoding/json"
 	"flag"
@@ -36,9 +30,6 @@ func runRouting(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	}
 }
 
-// routingCycleRoot resolves the per-cycle workspace dir for the shared --cycle/
-// --project-root flags both subcommands take. Returns ("", code) on a usage or
-// cwd error (caller returns code); otherwise ("<workspace>", 0).
 func routingCycleRoot(fs *flag.FlagSet, cycle *int, root *string, args []string, name string, stderr io.Writer) (string, int) {
 	if err := fs.Parse(args); err != nil {
 		return "", 10
@@ -78,14 +69,8 @@ func runRoutingExplain(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
-// runRoutingReplay reparses the captured advisor response through the live
-// parse+clamp (core.ReplayPlanFromResponse) and compares its RUN-SET to the
-// recorded phase-plan.json. MATCH (exit 0) ⇒ the capture still reproduces the
-// recorded plan; MISMATCH (exit 3) ⇒ it diverged — a corrupted/tampered
-// capture, or (in WS4) a prompt/model regression. Replay uses the DEFAULT ship
-// floor; a per-cycle policy-floor override is not persisted, so the run-set
-// comparison is the robust, floor-anchored invariant (it's exactly what WS4-S2
-// locks: never schedules a forbidden phase / ship-without-audit).
+// Replay always uses the DEFAULT ship floor, since a per-cycle policy-floor
+// override is not persisted; the run-set comparison stays floor-anchored.
 func runRoutingReplay(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("routing replay", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -126,7 +111,6 @@ func runRoutingReplay(args []string, stdout, stderr io.Writer) int {
 	return 3
 }
 
-// runSet returns the sorted names of the phases an entry list runs (Run==true).
 func runSet(entries []router.PhasePlanEntry) []string {
 	var out []string
 	for _, e := range entries {
@@ -138,9 +122,6 @@ func runSet(entries []router.PhasePlanEntry) []string {
 	return out
 }
 
-// explainPlan renders the clamped whole-cycle plan (phase-plan.json) as one
-// RUN/SKIP line per phase with its justification. A missing/unreadable plan is
-// a clean message, not an error — a partially-recorded cycle still explains.
 func explainPlan(w io.Writer, ws string) {
 	var entries []router.PhasePlanEntry
 	if !readJSONArtifact(filepath.Join(ws, "phase-plan.json"), &entries) || len(entries) == 0 {
@@ -166,10 +147,6 @@ func explainPlan(w io.Writer, ws string) {
 	fmt.Fprintln(w)
 }
 
-// explainClamps aggregates the integrity-floor clamps recorded across the
-// cycle's routing-decision-*.json artifacts (RouterDecision.Clamps), in stable
-// file order. No clamps ⇒ a clean message (the advisor's plan passed the floor
-// untouched, which is the healthy case).
 func explainClamps(w io.Writer, ws string) {
 	files, _ := filepath.Glob(filepath.Join(ws, "routing-decision-*.json"))
 	slices.Sort(files)
@@ -192,7 +169,6 @@ func explainClamps(w io.Writer, ws string) {
 	fmt.Fprintln(w)
 }
 
-// explainSpan renders the OTel-GenAI decision span (advisor-span-plan.json).
 func explainSpan(w io.Writer, ws string) {
 	var span core.AdvisorSpan
 	if !readJSONArtifact(filepath.Join(ws, "advisor-span-plan.json"), &span) {
@@ -207,9 +183,6 @@ func explainSpan(w io.Writer, ws string) {
 	fmt.Fprintf(w, "  response_sha: %s\n", span.ResponseSHA)
 }
 
-// readJSONArtifact reads+unmarshals path into v, returning false on any
-// absence/read/parse error (the caller renders a clean "not recorded" line —
-// explain is read-only and best-effort by contract).
 func readJSONArtifact(path string, v any) bool {
 	buf, err := os.ReadFile(path)
 	if err != nil {
