@@ -126,7 +126,6 @@
   "internal/committedset.DispositionsFrom": 57,
   "internal/consensusdispatch.Run": 157,
   "internal/core.EvaluateBlockerBreaker": 79,
-  "internal/core.LedgerEntry.UnmarshalJSON": 74,
   "internal/core.Orchestrator.RunCycle": 221,
   "internal/core.Orchestrator.RunCycleFromPhase": 81,
   "internal/core.Orchestrator.adviseOnUnclassifiedFailure": 51,

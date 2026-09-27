@@ -106,6 +106,7 @@ type LedgerEntry struct {
 	// tree-drift check binds to the audited CHANGES, not the auditor's
 	// HEAD^{tree} (which is the unchanged base in the worktree flow, cycle-152).
 	WorktreeTreeSHA string   `json:"worktree_tree_sha,omitempty"`
+	WorktreeBaseSHA string   `json:"worktree_base_sha,omitempty"`
 	EntrySeq        int      `json:"entry_seq"`
 	PrevHash        string   `json:"prev_hash"`
 	WorkerCount     int      `json:"worker_count,omitempty"`
@@ -151,6 +152,7 @@ type ledgerEntryWire struct {
 	GitHEAD         string          `json:"git_head,omitempty"`
 	TreeStateSHA    string          `json:"tree_state_sha,omitempty"`
 	WorktreeTreeSHA string          `json:"worktree_tree_sha,omitempty"`
+	WorktreeBaseSHA string          `json:"worktree_base_sha,omitempty"`
 	EntrySeq        int             `json:"entry_seq,omitempty"`
 	PrevHash        string          `json:"prev_hash,omitempty"`
 	WorkerCount     int             `json:"worker_count,omitempty"`
@@ -182,6 +184,7 @@ func (e *LedgerEntry) UnmarshalJSON(data []byte) error {
 	e.GitHEAD = wire.GitHEAD
 	e.TreeStateSHA = wire.TreeStateSHA
 	e.WorktreeTreeSHA = wire.WorktreeTreeSHA
+	e.WorktreeBaseSHA = wire.WorktreeBaseSHA
 	e.EntrySeq = wire.EntrySeq
 	e.PrevHash = wire.PrevHash
 	e.WorkerCount = wire.WorkerCount
@@ -191,20 +194,16 @@ func (e *LedgerEntry) UnmarshalJSON(data []byte) error {
 	e.Message = wire.Message
 	e.Source = wire.Source
 	e.RunID = wire.RunID
+	return e.setCycle(wire.Cycle)
+}
 
-	// Route the cycle field: int → Cycle, string → CycleLabel.
-	if len(wire.Cycle) == 0 {
-		return nil
-	}
-	trimmed := bytes.TrimSpace(wire.Cycle)
+func (e *LedgerEntry) setCycle(raw json.RawMessage) error {
+	trimmed := bytes.TrimSpace(raw)
 	if len(trimmed) == 0 {
 		return nil
 	}
 	switch trimmed[0] {
 	case 'n':
-		// JSON null ≡ absent (live pin: 15 "cycle":null inbox-lifecycle
-		// entries written 2026-07-22 are permanent append-only history —
-		// rejecting them hard-fails every full-ledger iteration forever).
 		if !bytes.Equal(trimmed, []byte("null")) {
 			return fmt.Errorf("ledger cycle: unsupported JSON value %q", trimmed)
 		}
@@ -217,11 +216,6 @@ func (e *LedgerEntry) UnmarshalJSON(data []byte) error {
 		e.CycleLabel = s
 		e.Cycle = 0
 	case '-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
-		// Numeric — accept whole-number floats too. Range-check explicitly
-		// against int32 bounds (instead of MaxInt) so behaviour is
-		// identical on 32-bit and 64-bit targets — cycle numbers > 2^31
-		// would never realistically appear, but a silent truncation on a
-		// 32-bit builder would be a surprise.
 		var n float64
 		if err := json.Unmarshal(trimmed, &n); err != nil {
 			return fmt.Errorf("ledger cycle: %w", err)

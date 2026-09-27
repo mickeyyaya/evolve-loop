@@ -27,6 +27,7 @@ type Entry struct {
 	GitHEAD         string `json:"git_head"`
 	TreeStateSHA    string `json:"tree_state_sha"`
 	WorktreeTreeSHA string `json:"worktree_tree_sha"`
+	WorktreeBaseSHA string `json:"worktree_base_sha"`
 }
 
 // AuditorRows returns every auditor row of the ledger, newest first; a read failure wraps the os error.
@@ -87,6 +88,13 @@ func LatestAuditorEntry(ledgerPath, runID string) (Entry, error) {
 		return Entry{}, err
 	}
 	return BindRun(rows, runID)
+}
+
+func (e Entry) AuditedBase() string {
+	if e.WorktreeBaseSHA != "" {
+		return e.WorktreeBaseSHA
+	}
+	return e.GitHEAD
 }
 
 // IsAuditorRow reports whether e is an auditor row that binds a ship: the audit agent's own subprocess
