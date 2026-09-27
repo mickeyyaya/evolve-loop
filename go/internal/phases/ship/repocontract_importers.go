@@ -63,7 +63,7 @@ func changedFilesTwice(out io.Writer, root, baseRef string) ([]changedpkgs.Chang
 // runImporterBackstop is the third gate layer. files is the gate's seed;
 // alreadyRun are the patterns an earlier layer paid for in the default build
 // context (the fixed pack, the untagged added-test groups).
-func runImporterBackstop(ctx context.Context, out io.Writer, root, moduleDir, workspace string, files []changedpkgs.ChangedFile, alreadyRun []string) error {
+func runImporterBackstop(ctx context.Context, out io.Writer, root, moduleDir, workspace string, files []changedpkgs.ChangedFile, alreadyRun []string, cleared func([]string)) error {
 	changed := changedpkgs.PackagesOf(files)
 	if len(changed) == 0 {
 		fmt.Fprintf(out, "[ship] repo-contract importer backstop: no Go change in the tree — skipped\n")
@@ -97,6 +97,11 @@ func runImporterBackstop(ctx context.Context, out io.Writer, root, moduleDir, wo
 	}()
 	return runClassifiedPackRetrying(bctx, out, workspace, "importer backstop", len(targets) <= importerBackstopRetryMaxTargets, func() packOutcome {
 		return runRepoContractPackages(bctx, moduleDir, out, targets)
+	}, &aloneRerun{
+		run: func(failures []packFailure) packOutcome {
+			return runRepoContractPackagesAlone(bctx, moduleDir, out, failures)
+		},
+		cleared: cleared,
 	})
 }
 

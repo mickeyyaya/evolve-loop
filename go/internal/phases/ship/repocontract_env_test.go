@@ -27,8 +27,8 @@ func TestRunRepoContractPackages_ScrubsTheLaneIPCEnvFromGoTest(t *testing.T) {
 	var out bytes.Buffer
 	outcome := runRepoContractPackages(context.Background(), module, &out, []string{"./..."})
 
-	if outcome.err != nil || len(outcome.failedTests) != 0 {
-		t.Fatalf("the gate leaked the lane's IPC env into go test: err=%v failed=%v\n%s", outcome.err, outcome.failedTests, out.String())
+	if outcome.err != nil || len(outcome.failures) != 0 {
+		t.Fatalf("the gate leaked the lane's IPC env into go test: err=%v failed=%v\n%s", outcome.err, outcome.failedNames(), out.String())
 	}
 	if _, err := os.Stat(filepath.Join(module, probeRanMarker)); err != nil {
 		t.Fatalf("probe test did not run (%v):\n%s", err, out.String())
