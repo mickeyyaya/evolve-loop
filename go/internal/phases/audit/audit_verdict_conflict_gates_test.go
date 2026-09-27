@@ -8,52 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// audit_verdict_conflict_gates_test.go — RED contract for the cycle-1127
-// continuation of `emit-verdict-conflict-diagnostic` (inbox item
-// `verdict-coherence-auditor-vs-egps`, weight 0.92, 4th recurrence of the
-// cycle-87 / cycle-352 / cycle-456 family).
-//
-// What is ALREADY done (cycle-1124 salvage, HEAD 33596bb0): the three EGPS
-// override branches (acs-verdict.json unreadable, red_count>0,
-// ship_eligible=false) record the disagreement — see
-// audit_verdict_conflict_test.go, all GREEN at HEAD.
-//
-// What is STILL OPEN and is what this file pins: AC-1 names FIVE more gates
-// that force `verdict = core.VerdictFAIL` in hooks.Classify —
-//
-//	audit.go  gofmt gate                       (h.gofmtCheck)
-//	audit.go  skills-drift gate                (h.skillsDriftCheck)
-//	audit.go  applyCIGate x5                   (goVet, acsDurable,
-//	                                            integrationTier,
-//	                                            apicoverEnforce,
-//	                                            apicoverNewPkgGraduation)
-//
-// — and NONE of them records the auditor's narrative verdict before clobbering
-// it. The operator-facing consequence is identical to the EGPS case the salvage
-// already closed: a FAIL dossier whose SubstantiveError says only "gofmt: 3
-// file(s) are not gofmt -s clean" cannot be told apart from one where the
-// auditor itself independently found the cycle broken. Half a fix is a fix that
-// still loses the signal on 5 of 8 gates.
-//
-// Contract pinned here (an extension of the salvaged contract, NOT a rewrite —
-// every existing TestVerdictConflict_* case must stay green):
-//
-//  1. EVERY gate that forces FAIL over a found, non-FAIL narrative emits the
-//     error-severity `verdict-conflict:` record naming that narrative verdict.
-//  2. Exactly ONE record per Classify call, no matter how many gates fired —
-//     the record is a statement about the call, not about each gate. This is
-//     what makes a post-gate single-exit emission the natural implementation.
-//  3. The fail-OPEN paths stay silent: a gate that could not RUN emits its
-//     existing warning and does not force FAIL, so there is no conflict.
-//  4. AC-4: the returned verdict is byte-identical to today's behaviour in
-//     every case. The record is additive; it never softens a gate.
-//
-// Out of scope, deliberately unpinned: the policy.json workflow.strict_audit
-// WARN→FAIL promotion. AC-1 does not name it, and it is a policy decision on a
-// narrative the auditor already declined to pass, not a mechanical gate
-// disagreeing with a clean read. Whether the implementation happens to cover it
-// is left free; no test here asserts either way.
-
 // offenders is a check seam that reports a gate hit.
 func offenders(names ...string) func(core.PhaseRequest) ([]string, error) {
 	return func(core.PhaseRequest) ([]string, error) { return names, nil }

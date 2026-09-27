@@ -2,22 +2,6 @@
 
 package ship
 
-// RED-phase contract for cycle-249 task `macos-ebadf-test-hardening`
-// (inbox: macos-ci-ebadf-flake-hardening).
-//
-// TestShipFromWorktree_GitAddFails_Errors flakes on macos-latest CI with
-// `read |0: bad file descriptor` — a darwin pipe-teardown race in the
-// test git-runner's CombinedOutput path. The mitigation is TEST-INFRA
-// ONLY: a capture helper that retries exactly once when the error chain
-// contains syscall.EBADF or io.ErrClosedPipe, used by runGit/runGitOut.
-//
-// Contract (to be implemented in a _test.go helper file — production
-// ship/ files must NOT change):
-//
-//	func captureWithEBADFRetry(run func() ([]byte, error)) ([]byte, error)
-//
-// Fails at baseline: captureWithEBADFRetry is undefined (compile RED).
-
 import (
 	"errors"
 	"io"
@@ -69,8 +53,6 @@ func TestCaptureWithEBADFRetry_RetriesOnceOnClosedPipe(t *testing.T) {
 	}
 }
 
-// Negative: retry ONCE, not forever — a persistent EBADF must surface
-// after exactly two attempts, preserving the original error chain.
 func TestCaptureWithEBADFRetry_PersistentEBADF_FailsAfterOneRetry(t *testing.T) {
 	calls := 0
 	_, err := captureWithEBADFRetry(func() ([]byte, error) {
@@ -88,8 +70,6 @@ func TestCaptureWithEBADFRetry_PersistentEBADF_FailsAfterOneRetry(t *testing.T) 
 	}
 }
 
-// Negative: a non-EBADF failure (e.g. a real git error) must NOT be
-// retried — masking genuine failures would hide real test signal.
 func TestCaptureWithEBADFRetry_NonEBADFError_NoRetry(t *testing.T) {
 	calls := 0
 	sentinel := errors.New("exit status 128: not a git repository")

@@ -1,15 +1,7 @@
 package audit
 
-// ciparity_premove_pins_test.go — ADR-0103 unit 14, step 1: the order and
-// byte-identity invariants no test pinned before the CI-parity gates moved
-// into internal/phases/audit/ciparitygate. Every pin here was GREEN on the
-// pre-extraction code (8e8f080f) and proven RED against its named mutant
-// before the move; they run through the kept facades, so the leaf must keep
-// them green byte-for-byte. The goldens they read were captured on the same
-// tree (ciparitygate/testdata/*.golden.*). The pins that named moved symbols
-// (the module guard before derivation, the lock root, the attempt-1 write
-// before the lock wait, the two stderr lines) moved with them into the leaf
-// (scope, lock, stream and stderr tests) and were deleted here.
+// The order and byte-identity invariants the CI-parity gates must keep, run
+// through the kept facades onto internal/phases/audit/ciparitygate.
 
 import (
 	"context"
@@ -26,7 +18,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// premoveGolden reads one `key<TAB>quoted` golden file captured on 8e8f080f.
+// premoveGolden reads one `key<TAB>quoted` golden file.
 func premoveGolden(t *testing.T, name string) map[string]string {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join("ciparitygate", "testdata", name))
@@ -122,8 +114,8 @@ func TestIntegrationTier_RetakeUsesAFreshBudget(t *testing.T) {
 	}
 }
 
-// Pin 6 (M7, M8): integration-tier.log is byte-identical to the golden
-// captured on 8e8f080f for the red-then-green run.
+// Pin 6 (M7, M8): integration-tier.log is byte-identical to the golden for
+// the red-then-green run.
 func TestIntegrationTierLog_MatchesTheGoldenBytes(t *testing.T) {
 	req := tierFixture(t)
 	fn, _, _ := seqRunFunc(t, []struct {
@@ -147,9 +139,9 @@ func TestIntegrationTierLog_MatchesTheGoldenBytes(t *testing.T) {
 	}
 }
 
-// Pin 7 (M9, M10): the cycle-581 severity asymmetry, byte-exact — the three
-// whole-repo gates WARN with the one underivable text; the two apicover gates
-// hard-FAIL with their own D1/D2 sentence.
+// Pin 7 (M9, M10): the severity asymmetry, byte-exact — the whole-repo gates
+// WARN with the one underivable text; the two apicover gates hard-FAIL with
+// their own D1/D2 sentence.
 func TestChangedSetUnderivable_SeverityAsymmetryBytes(t *testing.T) {
 	g := premoveGolden(t, "messages.golden.txt")
 	root := enforceFixtureNonGit(t)

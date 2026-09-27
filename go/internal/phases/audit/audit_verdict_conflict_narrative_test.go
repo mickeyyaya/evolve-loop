@@ -7,33 +7,9 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// audit_verdict_conflict_narrative_test.go — regression contract for the
-// cycle-1124 audit finding C1 (blocking): the conflict record interpolated the
-// auditor's narrative verdict with NO enum check.
-//
-// `narrative` originates in extractAuditVerdict → phasecontract.ParseVerdictSentinel,
-// and ParseVerdictSentinelFull rejects only the empty string — it never
-// constrains the value to PASS/WARN/FAIL/SKIPPED. audit-report.md is
-// LLM-authored content in an agent-writable workspace, so an arbitrary string
-// (including one carrying newlines) could reach an ERROR-severity diagnostic —
-// which is exactly the diagnostic cyclestate.ErrorMessages lifts into
-// CycleState.AuditFailReasons → <phase>-fail-reason.json → the failure
-// dossier's FailReasons → the sha256 fingerprint (failure_digest.go) → the
-// identical-fingerprint blocker breaker (blocker_breaker.go).
-//
-// Two consequences the tests below pin:
-//
-//	C1a — a per-attempt-varying narrative ("PASS (2 caveats)", routine LLM
-//	      output) yields a different fingerprint every retry for the SAME
-//	      defect, so the runaway-loop halt never fires. This is the very
-//	      invariant egpsRedIDCycleTokens strips cycle tokens to protect.
-//	C1b — a "\n"-bearing sentinel verdict renders as MULTIPLE reason lines in
-//	      the operator-facing dossier and in retro/failure-adapter prompts, so
-//	      one FailReasons entry can forge a second, authoritative-looking line.
-//
-// The regex path is NOT the interesting one (it can only match a canonical
-// verdict). Every case here therefore probes the SENTINEL path, where
-// verdictFound==true for a value that was never a verdict.
+// The regex path is not the interesting one here (it can only match a
+// canonical verdict). Every case in this file therefore probes the sentinel
+// path, where verdictFound==true for a value that was never a verdict.
 
 // sentinelReport renders an audit-report.md whose ONLY verdict declaration is
 // the machine-readable evolve-verdict sentinel, carrying verdict verbatim —
@@ -48,11 +24,9 @@ func sentinelReport(verdict string) string {
 // `verdictFound && narrative != FAIL` fabricates a conflict against a value
 // that was never a verdict. Only the four canonical verdicts may be recorded.
 func TestVerdictConflict_SentinelNarrativeMustBeACanonicalVerdict(t *testing.T) {
-	// Each case carries a SHORT name: t.Run's name feeds t.TempDir()'s
-	// directory component, and the 40xPASS narrative used as its own subtest
-	// name overflowed the 255-byte filename limit on CI's Go 1.23
-	// ("mkdir: file name too long" — main RED 2026-07-27). Newer local
-	// toolchains truncate TempDir names, so the per-cycle gate never saw it.
+	// Each case carries a short name: t.Run's name feeds t.TempDir()'s
+	// directory component, and a long narrative used as its own subtest name
+	// can overflow a filename length limit.
 	junk := []struct{ name, narrative string }{
 		{"per-retry-suffix", "PASS-r1"},                                   // C1a: a per-retry-varying narrative
 		{"caveat-phrasing", "PASS (2 caveats)"},                           // routine LLM phrasing, no adversary needed
@@ -94,23 +68,17 @@ func TestVerdictConflict_SentinelCanonicalVerdictStillRecorded(t *testing.T) {
 	}
 }
 
-// TestVerdictConflict_RecordVariesOnlyInTheNarrativeToken — C1a stated as the
-// property the blocker breaker actually needs, over the ACCEPTED alphabet.
-//
-// The previous version of this test compared sentinelReport("PASS-r1") against
-// ("PASS-r2"); both are REJECTED by the core.IsVerdict guard it meant to
-// exercise, so both sides were the empty set and it passed for the wrong reason
-// (cycle-1127 audit finding C2 — a green assertion that probed nothing).
-//
-// The real risk is the three values that ARE accepted. They must reach the
-// operator verbatim (that is the whole point of the record), so the records
-// cannot be byte-identical; what must hold is that `narrative=<verdict>` is the
-// ONE token they differ in. That is precisely the contract
-// core.normalizeReasonForFingerprint relies on to fold three attempts at one
+// TestVerdictConflict_RecordVariesOnlyInTheNarrativeToken states the property
+// the blocker breaker actually needs, over the accepted alphabet: the three
+// canonical values must reach the operator verbatim (the whole point of the
+// record), so the records cannot be byte-identical, but `narrative=<verdict>`
+// must be the ONE token they differ in — the contract
+// core.normalizeReasonForFingerprint relies on to fold several attempts at one
 // defect back into one fingerprint (pinned end-to-end by
 // TestVerdictConflict_FingerprintIsStableAcrossTheNarrativeAlphabet in
-// internal/core). A second varying token added here — a timestamp, a cycle
-// number, a retry counter — would silently re-open C1, and fails here.
+// internal/core). A second varying token here — a timestamp, a cycle number, a
+// retry counter — would silently re-split one recurring defect across
+// fingerprint buckets.
 func TestVerdictConflict_RecordVariesOnlyInTheNarrativeToken(t *testing.T) {
 	reds := func(ws string) { writeACSVerdictReds(t, ws, "cycleX/TestRed_A") }
 	canon := func(v string) string {

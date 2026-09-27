@@ -7,17 +7,6 @@ import (
 	"testing"
 )
 
-// changedpkgs_git_test.go — RED contract for cycle-573 Task 2, the integration
-// half. changedPackagesForAudit is the audit phase's changed-package locator; it
-// gates apicover. Today it reads an extinct handoff-build.json and returns nil
-// (fail-open) when absent, so the apicover gate never fires on a real cycle.
-// After the fix it derives the set from git (changedpkgs.FromGit), so a cycle
-// that changed a package is detected even with NO handoff file present.
-//
-// RED today: with no handoff file, changedPackagesForAudit returns nil, so this
-// assertion (non-empty, includes the changed package) fails. GREEN once the
-// locator is git-derived.
-
 func gitInAudit(t *testing.T, dir string, args ...string) {
 	t.Helper()
 	full := append([]string{"-c", "user.email=test@example.com", "-c", "user.name=test"}, args...)
@@ -40,10 +29,9 @@ func writeAuditFile(t *testing.T, root, rel, content string) {
 	}
 }
 
-// TestChangedPackagesForAudit_GitDerivedNoHandoff — AC-2d (integration): a
-// worktree that changed go/internal/foo/foo.go, with NO handoff-build.json in
-// the cycle run dir, must still yield ./internal/foo/... The old handoff lookup
-// returned nil here (silent fail-open); the git-derived locator must not.
+// TestChangedPackagesForAudit_GitDerivedNoHandoff: a worktree that changed
+// go/internal/foo/foo.go, with no handoff-build.json in the cycle run dir,
+// must still yield ./internal/foo/... via the git-derived fallback.
 func TestChangedPackagesForAudit_GitDerivedNoHandoff(t *testing.T) {
 	root := t.TempDir()
 	gitInAudit(t, root, "init")
@@ -51,8 +39,8 @@ func TestChangedPackagesForAudit_GitDerivedNoHandoff(t *testing.T) {
 	gitInAudit(t, root, "add", "-A")
 	gitInAudit(t, root, "commit", "-m", "baseline")
 
-	// The cycle's change: a new package, uncommitted, and deliberately NO
-	// handoff-build.json / handoff-builder.json in .evolve/runs/cycle-573.
+	// The cycle's change: a new package, uncommitted, and deliberately no
+	// handoff-build.json / handoff-builder.json in the cycle run dir.
 	writeAuditFile(t, root, "go/internal/foo/foo.go", "package foo\n\nfunc New() {}\n")
 
 	got, _ := changedPackagesForAudit(root, 573)

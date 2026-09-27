@@ -1,12 +1,3 @@
-// binary_staging_guard.go — a staging-time backstop against accidental
-// compiled-binary commits (tracked-binary-in-acs-dir).
-//
-// Root cause (ship 0405658a): an ACS predicate under go/acs/cycle536/ ran
-// `go build` without `-o os.DevNull`, dropping an ~18MB `evolve` binary into
-// the worktree that `git add -A` then swept into history. `.gitignore` closes
-// the known instance; this guard closes the CLASS by refusing to commit any
-// staged oversized executable outside the two legitimate committed-binary
-// locations (go/bin/** and go/evolve).
 package ship
 
 import (
@@ -19,17 +10,13 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// binaryStagingMaxBytes is the size threshold above which a staged executable
-// outside the allowlist is treated as an accidental `go build` artifact rather
-// than a legitimately committed file. A source file never trips this; a built
-// Go binary always does.
-const binaryStagingMaxBytes = 1 << 20 // 1MB
+// binaryStagingMaxBytes is the size above which a staged executable outside
+// the allowlist is treated as an accidental `go build` artifact.
+const binaryStagingMaxBytes = 1 << 20
 
-// stageBinaryGuard inspects the staged set (`git diff --cached --name-only`)
-// and returns an error naming the first staged path that is BOTH larger than
-// binaryStagingMaxBytes AND owner-executable, unless that path is an
-// allowlisted committed-binary location (go/bin/** or exactly go/evolve). It is
-// best-effort on the git query itself — a failed/empty listing yields nil so a
+// stageBinaryGuard refuses to stage a path larger than binaryStagingMaxBytes
+// and owner-executable, unless it is an allowlisted committed-binary location
+// (go/bin/** or go/evolve). It fails open on the git query itself, so a
 // transient git hiccup never blocks an otherwise-clean ship.
 func stageBinaryGuard(ctx context.Context, opts *Options) error {
 	var buf strings.Builder
@@ -44,7 +31,7 @@ func stageBinaryGuard(ctx context.Context, opts *Options) error {
 		}
 		slash := filepath.ToSlash(rel)
 		if slash == "go/evolve" || strings.HasPrefix(slash, "go/bin/") {
-			continue // legitimate committed-binary locations
+			continue
 		}
 		info, statErr := os.Stat(filepath.Join(opts.ProjectRoot, rel))
 		if statErr != nil {

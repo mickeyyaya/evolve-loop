@@ -1,36 +1,5 @@
 package core
 
-// post_build_repin_test.go — RED tests (cycle 636, task ship-sha-repin-after-build).
-//
-// The cycle-514 boot healer auto-repins expected_ship_sha ONLY at boot; a
-// legitimate within-version rebuild of go/bin/evolve between boots leaves a frozen
-// pin that denied the ship gate on 8 consecutive cycles (625->634,
-// SELF_SHA_TAMPERED, repair_outcome=declined). This closes the class: the orchestrator
-// re-pins immediately AFTER a successful build phase, reusing the SAME
-// provenance-gated primitive the boot healer uses (phaseintegrity.RepinIfDrifted).
-//
-// Contract the Builder implements (TDD-defined seam; mirrors cmd/evolve's proven
-// shipRepinProvenanceFn boot-repin seam so the decision stays git-free/
-// deterministic under test):
-//
-//	// postBuildRepinProvenanceFn resolves the running binary's build-commit + the
-//	// provenance predicate authorizing a post-build auto-repin. Production:
-//	// version.Commit() + a `git merge-base --is-ancestor <commit> HEAD` closure
-//	// over projectRoot — identical to cmd/evolve's defaultShipRepinProvenance.
-//	var postBuildRepinProvenanceFn = defaultPostBuildRepinProvenance
-//	func defaultPostBuildRepinProvenance(projectRoot string) (commit string, prov phaseintegrity.ProvenanceVerified)
-//
-//	// repinShipSHAAfterBuild re-pins <projectRoot>/.evolve/state.json:expected_ship_sha
-//	// to the freshly-built <projectRoot>/go/bin/evolve after a successful build, via
-//	// phaseintegrity.RepinIfDrifted(statePath, binPath, commit, "", prov). NEVER
-//	// operator-authorized (unattended). Fail-open: a refusal/error WARNs and returns
-//	// a zero RepinResult; the ship gate stays the backstop. Wire it into
-//	// recordAndBranch's `next == PhaseBuild` branch (see test-report.md WIR-1 checklist).
-//	func repinShipSHAAfterBuild(projectRoot string) phaseintegrity.RepinResult
-//
-// RED now: repinShipSHAAfterBuild + postBuildRepinProvenanceFn undefined -> package
-// core test build fails. Do NOT modify this file — implement the seam + wire it.
-
 import (
 	"crypto/sha256"
 	"encoding/hex"
@@ -101,10 +70,6 @@ func withVerifiedProvenance(t *testing.T, verified bool) {
 	}
 }
 
-// AC-1 (the named RED test): a legitimate in-version rebuild that changed
-// go/bin/evolve — provenance VERIFIED — is re-pinned AFTER the build (not only at
-// boot). expected_ship_sha now tracks the freshly-built binary, so the frozen-pin
-// cascade cannot recur.
 func TestBootRecovery_RepinsAfterBuildNotJustBoot(t *testing.T) {
 	binBytes := []byte("\x7fELF-rebuilt-this-cycle-within-version-22.0.1")
 	root, _, statePath := pbSetupProject(t, "STALE_PIN_FROM_A_PRIOR_BINARY", binBytes)
@@ -121,10 +86,6 @@ func TestBootRecovery_RepinsAfterBuildNotJustBoot(t *testing.T) {
 	}
 }
 
-// AC-3 (verify-only no-op cycle ships): the mechanical proof that after the
-// post-build repin the ship gate's self-SHA check sees NO mismatch — i.e. a
-// verify-only cycle on the freshly-rebuilt binary would not be denied
-// SELF_SHA_TAMPERED. Uses the exact detector the ship gate uses (ShipSHAMismatch).
 func TestBootRecovery_AfterBuildRepin_ShipGateSeesNoMismatch(t *testing.T) {
 	binBytes := []byte("\x7fELF-fresh-binary-for-verify-only-cycle")
 	root, binPath, _ := pbSetupProject(t, "STALE_PIN", binBytes)
@@ -143,9 +104,6 @@ func TestBootRecovery_AfterBuildRepin_ShipGateSeesNoMismatch(t *testing.T) {
 	}
 }
 
-// AC-2 (twin / anti-tamper at the wiring layer): a provenance-UNVERIFIED binary
-// change is NOT re-pinned post-build — the pin is left untouched and tamper
-// detection is preserved. The fix must not weaken the trust boundary.
 func TestBootRecovery_PostBuildRepin_UnverifiedProvenance_KeepsPin(t *testing.T) {
 	const pin = "TRUSTED_PIN_DO_NOT_TOUCH"
 	root, _, statePath := pbSetupProject(t, pin, []byte("\x7fELF-UNTRUSTED-post-build"))
@@ -161,9 +119,6 @@ func TestBootRecovery_PostBuildRepin_UnverifiedProvenance_KeepsPin(t *testing.T)
 	}
 }
 
-// Edge: a project with no built binary yet (or no pin) is a fail-open no-op —
-// never a panic — so the post-build hook is safe on every cycle, including ones
-// that never rebuilt the binary.
 func TestBootRecovery_PostBuildRepin_NoBinaryIsNoOp(t *testing.T) {
 	root, _, statePath := pbSetupProject(t, "SOME_PIN", nil) // no binary written
 	withVerifiedProvenance(t, true)

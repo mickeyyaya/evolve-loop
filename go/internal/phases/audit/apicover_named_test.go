@@ -12,16 +12,14 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// TestNewDefaultWithStage_NamedPhase names the concrete audit.Phase type
-// (New/NewDefault return *Phase but the type is never named in a test) and
-// exercises NewDefaultWithStage — the composition-root seam that threads the
-// EVOLVE_PHASE_IO stage into verdict extraction (ADR-0050 §3.10 Slice 5).
+// TestNewDefaultWithStage_NamedPhase names the concrete audit.Phase type and
+// exercises NewDefaultWithStage, the composition-root seam that threads the
+// EVOLVE_PHASE_IO stage into verdict extraction.
+// See ADR-0050.
 func TestNewDefaultWithStage_NamedPhase(t *testing.T) {
 	br := &fakeBridge{}
 	prm := fakePromptsFS("# Auditor body")
 
-	// Contract 1: NewDefaultWithStage returns a runnable *Phase with the "audit"
-	// identity that satisfies the embedded core.PhaseRunner.
 	var enforce *Phase = NewDefaultWithStage(br, prm, config.StageEnforce)
 	if enforce == nil {
 		t.Fatal("NewDefaultWithStage must return a non-nil *Phase")
@@ -31,17 +29,11 @@ func TestNewDefaultWithStage_NamedPhase(t *testing.T) {
 		t.Fatalf("Name() = %q, want %q", got, core.PhaseAudit)
 	}
 
-	// Contract 2: the StageOff convenience constructor returns the same runnable
-	// identity (byte-identical legacy path).
 	off := NewDefaultWithStage(br, prm, config.StageOff)
 	if off == nil || off.Name() != string(core.PhaseAudit) {
 		t.Fatalf("StageOff NewDefaultWithStage Name() = %q, want audit", off.Name())
 	}
 
-	// Contract 3: the stage is the gate that drives sentinel-mandatory grading.
-	// A prose-only report (no evolve-verdict sentinel) is read as PASS below
-	// enforce but is unparseable AT enforce — exactly the stage NewDefaultWithStage
-	// wired into the phase's hooks.
 	prose := "## Verdict\n**PASS**\n"
 	if v, found := extractAuditVerdict(prose, config.StageOff); !found || v != core.VerdictPASS {
 		t.Errorf("StageOff: prose verdict = (%q,%v), want (PASS,true)", v, found)
@@ -51,15 +43,12 @@ func TestNewDefaultWithStage_NamedPhase(t *testing.T) {
 	}
 }
 
-// TestNewDefaultWithStageCompact_NamedPhase names + exercises
-// NewDefaultWithStageCompact — the compact-prompts seam added in cycle 413
-// (workflow.compact_prompts) that shipped without an apicover naming test and
-// reddened main CI (apicover -enforce: "UNCOVERED (no test names it)"). Beyond
-// the name gate, it pins the constructor's reason to exist: compact=true threads
-// prompts.StripOnDemandSections into the dispatch path so the on-demand reference
-// tail never reaches the model, while compact=false leaves the body intact.
+// TestNewDefaultWithStageCompact_NamedPhase names NewDefaultWithStageCompact
+// and pins the constructor's reason to exist: compact=true threads
+// prompts.StripOnDemandSections into the dispatch path so the on-demand
+// reference tail never reaches the model, while compact=false leaves the body
+// intact.
 func TestNewDefaultWithStageCompact_NamedPhase(t *testing.T) {
-	// Contract 1: the constructor returns a runnable *Phase with audit identity.
 	var compactPhase *Phase = NewDefaultWithStageCompact(&fakeBridge{}, fakePromptsFS("# Auditor body"), config.StageEnforce, true)
 	if compactPhase == nil {
 		t.Fatal("NewDefaultWithStageCompact must return a non-nil *Phase")
@@ -69,11 +58,9 @@ func TestNewDefaultWithStageCompact_NamedPhase(t *testing.T) {
 		t.Fatalf("Name() = %q, want %q", got, core.PhaseAudit)
 	}
 
-	// Contract 2: compact=true strips the on-demand reference tail from the
-	// DISPATCHED prompt; compact=false leaves it. Driven end-to-end through the
-	// fake bridge, which captures the request the adapter would materialize. The
-	// production "## Reference Index (Layer 3, on-demand)" heading form is used so
-	// this also guards the cycle-413 prefix-match fix at the dispatch boundary.
+	// Driven end-to-end through the fake bridge, which captures the request the
+	// adapter would materialize, using the production "## Reference Index
+	// (Layer 3, on-demand)" heading form.
 	const body = "# Auditor body\n\n## Reference Index (Layer 3, on-demand)\n\n- tail-only reference content\n"
 	dispatchedPrompt := func(compact bool) string {
 		fb := &fakeBridge{writeArtifact: "## Verdict\n**PASS**\n"}
@@ -140,10 +127,11 @@ func TestWithHostEffects_NamedOptionReachesTheEngine(t *testing.T) {
 	}
 }
 
-// TestWithContractVerifier_NamedOptionReachesTheEngine names the F22 export:
-// the Option stores the gate's verifier accessor on the Config, and a Phase
-// built from it reports the wiring the same way Signals does — the engine
-// classifies through the gate's own verify+salvage, not a second verifier.
+// TestWithContractVerifier_NamedOptionReachesTheEngine names the
+// ContractVerifier export: the Option stores the gate's verifier accessor on
+// the Config, and a Phase built from it reports the wiring the same way
+// Signals does — the engine classifies through the gate's own verify+salvage,
+// not a second verifier.
 func TestWithContractVerifier_NamedOptionReachesTheEngine(t *testing.T) {
 	verifier := deliverable.PlainVerifier{PhaseIO: config.StageOff}
 	var opt Option = WithContractVerifier(func() runner.ContractVerifier { return verifier })

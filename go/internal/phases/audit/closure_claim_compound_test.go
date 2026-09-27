@@ -1,25 +1,19 @@
 package audit
 
-// closure_claim_compound_test.go — RED contract for the cycle-1493 infra-systemic
-// halt (batch-20260816c): two more weak-rung false-positive classes, both live-fired.
-// (1) HYPHEN COMPOUNDS: `\bclosed\b` matches inside "fail-closed" — the hyphen is a
-// word boundary, so the cycle-1431 fix's "disclosed/foreclosed never match" guarantee
-// does not extend to hyphenated adjectives. (2) PATH-SHAPED CYCLE REFS: the weak rung's
-// cycle-reference requirement was satisfied by the report's OWN evidence path
-// (`.evolve/runs/cycle-1493/coverage-gate-report.md:32-36`) — a citation locator, not a
-// prose claim about a prior cycle. Line 36 of the live audit-report asserted the
-// inherited defect was "reproduced, not fixed" (the OPPOSITE of closure), carried
-// "closed" only inside two "fail-closed" tokens and a cycle ref only inside its
-// evidence path — and still force-FAILed a narrative-green audit. Cycle-1486's two
-// closure flags ("fail-closed by construction" prose) were the same class.
+// Two weak-rung false-positive classes: (1) hyphen compounds — `\bclosed\b`
+// matches inside "fail-closed" because a hyphen is a word boundary, so the
+// "disclosed/foreclosed never match" guarantee does not extend to hyphenated
+// adjectives; (2) path-shaped cycle refs — the weak rung's cycle-reference
+// requirement can be satisfied by the report's own evidence path (a citation
+// locator, not a prose claim about a prior cycle).
 
 import (
 	"strings"
 	"testing"
 )
 
-// The live cycle-1493 audit-report.md line 36, byte-shape preserved (trimmed of the
-// table's trailing spaces): every signal on it is a false one.
+// A real audit-report.md line, byte-shape preserved (trimmed of the table's
+// trailing spaces): every signal on it is a false one.
 const cycle1493Line36 = "| H3 | HIGH | Inherited defect `d8e3cdca…` is reproduced, not fixed: the coverage gate FAILs at 75.6% changed-line coverage against the 85% floor, with the new `internal/dispatchgate` package at 66.7% and 33 uncovered changed lines. The uncovered lines remain the fail-closed error branches this feature's safety argument rests on. Root cause: the fail-closed branches (`retire.go:144-161`, `dispatchgate.go:58-72`) are reachable only through store-write failure and are not exercised by any test. | `.evolve/runs/cycle-1493/coverage-gate-report.md:32-36` |"
 
 func TestClosureClaimOffenders_Cycle1493LiveLineIsBenign(t *testing.T) {
@@ -54,9 +48,9 @@ func TestClosureClaimOffenders_CompoundFixKeepsRealCatches(t *testing.T) {
 		"the cycle-1424 defect is closed",
 		"cycle-1272: closed during this lane's build",
 		"the cycle-1255 CRITICAL is verified closed", // strong rung
-		// review HIGH-1: the hyphen carve-out must not make the one-character
-		// mutation of the canonical phrase a both-rungs miss — strong rung
-		// accepts the hyphenated spelling.
+		// The hyphen carve-out must not make the one-character mutation of the
+		// canonical phrase a both-rungs miss — the strong rung accepts the
+		// hyphenated spelling.
 		"the cycle-1424 defect is verified-closed",
 		// a path on the line does not launder a separate prose cycle ref + claim
 		"cycle-1272 is closed; see .evolve/runs/cycle-1300/notes.md",
@@ -75,11 +69,11 @@ func TestClosureClaimOffenders_CompoundFixKeepsRealCatches(t *testing.T) {
 	}
 }
 
-// Documented ACCEPTED MISSES of the path-token strip (review MEDIUM-3): these
-// weak-rung shapes no longer flag. Pinned so a future tightening flips them
-// deliberately, not accidentally — and because the evasion they open is
-// cost-equivalent to omitting the cycle ref, which was always free. The
-// strong rung and the citation demand still apply to such lines.
+// Documented accepted misses of the path-token strip: these weak-rung shapes
+// no longer flag. Pinned so a future tightening flips them deliberately, not
+// accidentally — and because the evasion they open is cost-equivalent to
+// omitting the cycle ref, which was always free. The strong rung and the
+// citation demand still apply to such lines.
 func TestClosureClaimOffenders_PathStripAcceptedMisses(t *testing.T) {
 	t.Parallel()
 	accepted := []string{

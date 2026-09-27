@@ -1,14 +1,5 @@
 package core
 
-// remediation_rerun_review_test.go — ADR-0100 §4: the remediated gate re-run's
-// deliverable goes through the same review as the original dispatch.
-//
-// maybeRemediate re-dispatches the failed gate after the Builder's fix and
-// overwrote dr.resp with the re-run's response; that response then reached
-// recordAndBranch without ever meeting the reviewer, so a re-run that omitted
-// a declared deliverable — or any contract check — was recorded on the
-// strength of its verdict alone.
-
 import (
 	"context"
 	"testing"

@@ -46,6 +46,8 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/inboxmover` | moves inbox items through their lifecycle across concurrent lanes and enforces the routing floor | [internal-inboxmover.md](internal-inboxmover.md) |
 | `internal/inboxmover/lifecycle` | the pure inbox lifecycle moves: route, promote, release, recover and quarantine | [internal-inboxmover-lifecycle.md](internal-inboxmover-lifecycle.md) |
 | `internal/phases/runner` | the shared phase engine: launch, fence, verify, correction ladder and host effects before the judge | [internal-phases-runner.md](internal-phases-runner.md) |
+| `internal/phases/audit` | the audit phase's EGPS gate: classifies audit-report.md and acs-verdict.json into a verdict | [internal-phases-audit.md](internal-phases-audit.md) |
+| `internal/phases/ship` | the native commit-and-push phase: audit-binding, EGPS gate, atomic commit+ff-merge+push | [internal-phases-ship.md](internal-phases-ship.md) |
 | `internal/deliverable` | the ADR-0100 declared-deliverables gate: verify, salvage and host effects | [internal-deliverable.md](internal-deliverable.md) |
 | `internal/core/advisor` | the routing advisor that plans and re-plans a cycle's phases | [internal-core-advisor.md](internal-core-advisor.md) |
 | `internal/phases/runner/verdict` | the judge: classifies a phase attempt from its artifact, pane and snapshots | [internal-phases-runner-verdict.md](internal-phases-runner-verdict.md) |

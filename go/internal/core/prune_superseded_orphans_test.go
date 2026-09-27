@@ -1,12 +1,5 @@
 package core
 
-// prune_superseded_orphans_test.go — fast-tier coverage for the orphan-prune
-// walker (cycle 962). Reuses the seamGit seam from
-// carryforward_filter_test.go (same package). The assertions probe the two
-// safety-critical intents: a superseded branch WITHOUT an open PR is deleted,
-// but a superseded branch WITH an open PR is flagged-but-KEPT
-// (verify_remote_pr_before_branch_delete) — never silently deleted.
-
 import (
 	"context"
 	"errors"
@@ -42,8 +35,6 @@ func TestPruneSupersededOrphans_SupersededNoPRIsPruned(t *testing.T) {
 	}
 }
 
-// The safety guard: a superseded branch that still has an open PR (or remote
-// presence) is flagged Superseded but must NOT be deleted — no `git branch -D`.
 func TestPruneSupersededOrphans_OpenPRFlaggedButKept(t *testing.T) {
 	s := &seamGit{respond: func(args []string) (string, int) {
 		switch {
@@ -70,8 +61,6 @@ func TestPruneSupersededOrphans_OpenPRFlaggedButKept(t *testing.T) {
 	}
 }
 
-// A distinct, not-yet-landed (different-goal) orphan is left untouched: not
-// superseded, not pruned, and hasOpenPR is never even consulted.
 func TestPruneSupersededOrphans_DistinctBranchUntouched(t *testing.T) {
 	s := &seamGit{respond: func(args []string) (string, int) {
 		switch {
@@ -104,8 +93,6 @@ func TestPruneSupersededOrphans_DistinctBranchUntouched(t *testing.T) {
 	}
 }
 
-// An error from hasOpenPR aborts the walk — it must never silently skip a
-// branch (a swallowed error there could drop a real delete or hide a bug).
 func TestPruneSupersededOrphans_HasOpenPRErrorAborts(t *testing.T) {
 	s := &seamGit{respond: func(args []string) (string, int) {
 		switch {

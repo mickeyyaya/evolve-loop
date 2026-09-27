@@ -7,37 +7,18 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// changelog_closure_test.go — RED contract for cycle-1285 Task 2
-// (`changelog-closure-cite-gate`; inbox item `continuation-defect-ledger`
-// clause (3), batch-integrity-review-2026-08-04.md:123).
+// Two levels, both required: closureClaimOffenders(text) is the content rule,
+// line-scoped; hooks.Classify is the wiring. A gate reachable only from a unit
+// test is dead code, so every acceptance case below reaches the rule through
+// the real audit verdict seam.
 //
-// The defect this pins: the 1255 → 1268 → 1270 → 1272 chain closed a named
-// CRITICAL by ASSERTION. A bookkeeping line reading "verified closed" was
-// enough — nothing anywhere required that claim to point at the per-defect
-// disposition record that would let a reader check it. defect_ledger.go now
-// mints that record (`defect-dispositions.json` / `defect-ledger.json`); this
-// contract makes citing it mandatory whenever a report claims a prior cycle's
-// defect is closed.
-//
-// Two levels, both required:
-//
-//   - closureClaimOffenders(text) — the content rule, line-scoped.
-//   - hooks.Classify — the WIRING. A gate reachable only from a unit test is
-//     dead code; every acceptance case below reaches the rule through the real
-//     audit verdict seam, the same seam reconcileContinuationDefects hangs off
-//     (audit.go:311).
-//
-// Detection rule pinned by this contract (case-insensitive, per LINE):
+// Detection rule pinned by this contract (case-insensitive, per line):
 //
 //	claim   := line contains "verified closed"
 //	           OR (line contains "closed" AND line references cycle-<digits>)
 //	cited   := THE SAME line contains "defect-dispositions.json"
 //	           or "defect-ledger.json"
 //	offender := claim AND NOT cited
-//
-// Line-scoped deliberately: a single mention of the artifact elsewhere in a
-// long CHANGELOG must not vouch for every closure claim in the file. That
-// whole-document reading is the loophole, not the feature.
 
 // closureReport renders a narrative-PASS audit artifact whose evolve-verdict
 // sentinel declares PASS, with body as the bookkeeping prose. Same artifact
@@ -76,9 +57,9 @@ func classifyClosure(t *testing.T, body string) (string, string) {
 	return verdict, closureDiags(diags)
 }
 
-// TestC1285_401_ClassifyBlocksUncitedClosureClaim is the genuine RED: the exact
-// 1272 shape — a prior cycle's CRITICAL declared closed with nothing to check
-// the claim against — must not be able to ride out on PASS.
+// TestC1285_401_ClassifyBlocksUncitedClosureClaim: a prior cycle's CRITICAL
+// declared closed with nothing to check the claim against must not be able to
+// ride out on PASS.
 func TestC1285_401_ClassifyBlocksUncitedClosureClaim(t *testing.T) {
 	verdict, diags := classifyClosure(t,
 		"## Bookkeeping\n\nThe CRITICAL defect raised by cycle-1272 is verified closed.")

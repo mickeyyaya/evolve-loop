@@ -50,9 +50,6 @@ func (f *seqFailRunner) Run(_ context.Context, req PhaseRequest) (PhaseResponse,
 	return PhaseResponse{Phase: f.name, Verdict: VerdictPASS, ArtifactsDir: req.Workspace}, nil
 }
 
-// Regression for cycle-656 D2: every attempt exits 85 → the dispatch seam must
-// write a quota-likely checkpoint, record the C1 abort reason + ledger entry,
-// and abort with ErrAllFamiliesExhausted — not fail forward.
 // NOT t.Parallel: it swaps the package-level QuotaBoundaryCheckpointer hook.
 func TestRunCycle_AllFamilies85_CheckpointsAndDefers(t *testing.T) {
 	prevHook := QuotaBoundaryCheckpointer
@@ -106,8 +103,6 @@ func TestRunCycle_AllFamilies85_CheckpointsAndDefers(t *testing.T) {
 	}
 }
 
-// A signal that arrives while the quota pause is being persisted must not
-// replace that typed pause with the lower-information operator checkpoint.
 // NOT t.Parallel: it swaps both package-level checkpoint hooks.
 func TestRunCycle_InterruptDuringQuotaCheckpointPreservesQuotaPause(t *testing.T) {
 	previousQuota := QuotaBoundaryCheckpointer
@@ -146,10 +141,6 @@ func TestRunCycle_InterruptDuringQuotaCheckpointPreservesQuotaPause(t *testing.T
 	}
 }
 
-// Mixed exit codes (85 then 80) prove NOT all families are quota-drained: the
-// existing loud-abort path must run unchanged — no checkpoint, no defer.
-// (Single-family 85 followed by a healthy sibling success is already pinned by
-// TestOrchestrator_RetryOnTransientExit.)
 func TestRunCycle_MixedExitCodes_NoDefer(t *testing.T) {
 	prevHook := QuotaBoundaryCheckpointer
 	defer func() { QuotaBoundaryCheckpointer = prevHook }()

@@ -42,35 +42,14 @@ type Bridge interface {
 	Probe(ctx context.Context) (BridgeProbe, error)
 }
 
-// (Retired in Workstream B.) The historical core.Sandbox port + SandboxProfile
-// struct were placeholders whose signature never matched the actual
-// adapters/sandbox.Sandbox.Exec impl, and nothing wired them. CLI-agnostic
-// confinement now lives at the bridge layer: bridge.Deps.SandboxWrap calls
-// adapters/sandbox.GenerateSBPL / BwrapPrefix directly. Removed to avoid the
-// dead port collecting future implementations.
-
 // Guard runs a trust-kernel guard. Impls live in internal/guards.
 type Guard interface {
 	Name() string
 	Decide(ctx context.Context, in GuardInput) GuardDecision
 }
 
-// (Legacy speculative Observer interface removed in cycle-122 Fix 3 /
-// ADR-0030 — it was scaffolding with zero callers. The live interface
-// is in observer.go with the Start(ctx, phase, req)→cancel shape that
-// the orchestrator actually wires from RunCycle.)
-
-// State mirrors the .evolve/state.json schema (subset used by orchestrator).
-// Full field set is round-tripped through encoding/json by the storage
-// adapter; this struct exposes only the orchestrator-load-bearing fields.
-// State, CycleState, and the state.json sub-records (BatchAccrual,
-// FailedRecord, CarryoverTodo, TriageThroughputEntry) are defined in the
-// zero-dependency leaf internal/cyclestate — they are pure on-disk DTOs, and
-// hoisting them there keeps the most-serialized value types out of this
-// god-package. These aliases keep the ~141 existing core.State /
-// core.CycleState / core.FailedRecord / … call sites AND the Storage/Ledger
-// port signatures below unchanged; the byte-identity-critical JSON shape is
-// owned by the leaf.
+// State mirrors the .evolve/state.json schema (subset used by orchestrator);
+// these are aliases of the pure on-disk DTOs defined in internal/cyclestate.
 type (
 	State                 = cyclestate.State
 	CycleState            = cyclestate.CycleState
@@ -80,12 +59,11 @@ type (
 	TriageThroughputEntry = cyclestate.TriageThroughputEntry
 )
 
-// LedgerEntry is one .jsonl line in .evolve/ledger.jsonl.
-//
-// The cycle field has a custom unmarshaler that accepts int (canonical)
-// or string (legacy manual entries, e.g. "manual-release-v10.16.0").
-// On-disk bytes are never rewritten — doing so would cascade SHA256
-// hash-chain breaks through every subsequent entry.
+// LedgerEntry is one .jsonl line in .evolve/ledger.jsonl. The cycle field has
+// a custom unmarshaler accepting int (canonical) or string (legacy manual
+// entries, e.g. "manual-release-v10.16.0"). On-disk bytes are never
+// rewritten — doing so would cascade SHA256 hash-chain breaks through every
+// subsequent entry.
 type LedgerEntry struct {
 	TS             string `json:"ts"`
 	Cycle          int    `json:"cycle"`
@@ -100,11 +78,10 @@ type LedgerEntry struct {
 	ChallengeToken string `json:"challenge_token,omitempty"`
 	GitHEAD        string `json:"git_head,omitempty"`
 	TreeStateSHA   string `json:"tree_state_sha,omitempty"`
-	// WorktreeTreeSHA is the git tree SHA of the per-cycle worktree's WORKING
-	// state (all changes staged) at audit time — the tree ship will commit.
-	// Written by the orchestrator's audit-binding entry so ship's pre/post-merge
-	// tree-drift check binds to the audited CHANGES, not the auditor's
-	// HEAD^{tree} (which is the unchanged base in the worktree flow, cycle-152).
+	// WorktreeTreeSHA is the git tree SHA of the per-cycle worktree's working
+	// state (all changes staged) at audit time — the tree ship will commit. It
+	// binds ship's tree-drift check to the audited CHANGES, not the auditor's
+	// unchanged HEAD^{tree} base.
 	WorktreeTreeSHA string   `json:"worktree_tree_sha,omitempty"`
 	EntrySeq        int      `json:"entry_seq"`
 	PrevHash        string   `json:"prev_hash"`
@@ -114,11 +91,8 @@ type LedgerEntry struct {
 	// "pause" for stop_review entries) and for inbox-lifecycle entries (e.g.
 	// "claim", "promote"). Empty for all other entry kinds.
 	Action string `json:"action,omitempty"`
-	// TaskID names the inbox item an inbox-lifecycle entry moved. These
-	// records previously bypassed the chained append entirely (raw O_APPEND,
-	// no prev_hash — the per-cycle chain-break generator under fleet
-	// concurrency); routing them through the chain is what this field exists
-	// for. Empty for all other entry kinds.
+	// TaskID names the inbox item an inbox-lifecycle entry moved. Empty for
+	// all other entry kinds.
 	TaskID string `json:"task_id,omitempty"`
 	// Message carries a human-readable detail string for self-heal events
 	// (e.g. the stop-reviewer's justification text). Empty for other kinds.
@@ -126,10 +100,10 @@ type LedgerEntry struct {
 	// Source identifies the skip-decision origin for phase_skipped entries.
 	// Values: router | psmas | content. Omitted for all other entry kinds.
 	Source string `json:"source,omitempty"`
-	// RunID is the event-sourced run identity (CA.2, Track C-A): the ULID
-	// minted per cycle run, threaded into every entry that run emits (CA.5)
-	// so concurrent runs' entries are attributable. Empty (omitted) for
-	// single-mode and all pre-CA.2 lines — additive field only, byte-stable.
+	// RunID is the event-sourced run identity: the ULID minted per cycle run,
+	// threaded into every entry that run emits so concurrent runs' entries are
+	// attributable. Empty for single-mode and pre-existing lines (additive,
+	// byte-stable).
 	RunID string `json:"run_id,omitempty"`
 }
 
@@ -192,7 +166,6 @@ func (e *LedgerEntry) UnmarshalJSON(data []byte) error {
 	e.Source = wire.Source
 	e.RunID = wire.RunID
 
-	// Route the cycle field: int → Cycle, string → CycleLabel.
 	if len(wire.Cycle) == 0 {
 		return nil
 	}
@@ -202,9 +175,9 @@ func (e *LedgerEntry) UnmarshalJSON(data []byte) error {
 	}
 	switch trimmed[0] {
 	case 'n':
-		// JSON null ≡ absent (live pin: 15 "cycle":null inbox-lifecycle
-		// entries written 2026-07-22 are permanent append-only history —
-		// rejecting them hard-fails every full-ledger iteration forever).
+		// JSON null is treated as absent: existing on-disk entries with
+		// "cycle":null are permanent append-only history, so rejecting them
+		// would hard-fail every full-ledger iteration forever.
 		if !bytes.Equal(trimmed, []byte("null")) {
 			return fmt.Errorf("ledger cycle: unsupported JSON value %q", trimmed)
 		}
@@ -217,11 +190,9 @@ func (e *LedgerEntry) UnmarshalJSON(data []byte) error {
 		e.CycleLabel = s
 		e.Cycle = 0
 	case '-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
-		// Numeric — accept whole-number floats too. Range-check explicitly
-		// against int32 bounds (instead of MaxInt) so behaviour is
-		// identical on 32-bit and 64-bit targets — cycle numbers > 2^31
-		// would never realistically appear, but a silent truncation on a
-		// 32-bit builder would be a surprise.
+		// Numeric — accept whole-number floats too. Range-checked against
+		// int32 bounds (not MaxInt) so behavior is identical on 32-bit and
+		// 64-bit targets; a silent truncation there would be a surprise.
 		var n float64
 		if err := json.Unmarshal(trimmed, &n); err != nil {
 			return fmt.Errorf("ledger cycle: %w", err)
@@ -250,31 +221,29 @@ type BridgeRequest struct {
 	Prompt    string `json:"prompt"`    // prompt body; adapter materializes as a file
 	Workspace string `json:"workspace"` // absolute path; bridge writes outputs here
 	Worktree  string `json:"worktree,omitempty"`
-	// RunID is the CA.5 run identity (CB.5): the bridge namespaces tmux
-	// session names with r<runid8> and stamps the per-run session registry.
+	// RunID namespaces the bridge's tmux session names with r<runid8> and
+	// stamps the per-run session registry.
 	RunID string `json:"run_id,omitempty"`
-	// ProjectRoot is the absolute path to the main repo root. Needed by the
-	// bridge's SandboxWrap (Workstream B) to set RepoRoot read-only while
-	// allowing writes to Worktree+Workspace. Optional for back-compat: a zero
-	// value disables sandbox confinement for that call (degraded — the trust
-	// kernel's pre-B Claude-only PreToolUse hooks remain in effect).
+	// ProjectRoot is the absolute path to the main repo root, used by the
+	// bridge's SandboxWrap to set RepoRoot read-only while allowing writes to
+	// Worktree+Workspace. A zero value disables sandbox confinement for that
+	// call (degraded: the pre-sandbox Claude-only PreToolUse hooks remain in
+	// effect).
 	ProjectRoot  string `json:"project_root,omitempty"`
 	StdoutLog    string `json:"stdout_log,omitempty"`
 	StderrLog    string `json:"stderr_log,omitempty"`
 	ArtifactPath string `json:"artifact_path,omitempty"` // adapter requires non-empty
 	// SecondaryArtifacts are additional deliverables the phase contract
 	// requires beyond ArtifactPath (absolute paths). The completion detector
-	// holds phase-complete until every one EXISTS (existence only — the
-	// settle window stays primary-only, respecting the cycle-1210/1212 race
-	// design); the artifact-timeout final poll still completes without them,
-	// and the phase gate then reports the absence loudly. Closes the
-	// single-artifact cutoff class (retro disposition.json since <=1382;
-	// audit defect-dispositions.json, cycles 1397-1429; plan Phase B).
+	// holds phase-complete until every one exists (existence only; the settle
+	// window stays primary-only); the artifact-timeout final poll still
+	// completes without them, and the phase gate then reports the absence
+	// loudly.
 	SecondaryArtifacts []string `json:"secondary_artifacts,omitempty"`
-	// Completion selects the phase-completion contract (ADR-0027): "" /
-	// "artifact" = poll the artifact file (default); "stdout" = complete on
-	// REPL-idle for agents that print their answer and write no file (the
-	// router/advisor). Only the *-tmux drivers honor it; others ignore it.
+	// Completion selects the phase-completion contract: "" / "artifact" =
+	// poll the artifact file (default); "stdout" = complete on REPL-idle for
+	// agents that print their answer and write no file (the router/advisor).
+	// Only the *-tmux drivers honor it; others ignore it.
 	Completion string `json:"completion,omitempty"`
 	Agent      string `json:"agent,omitempty"` // role label
 	// Contract selects the deliverable protocol independently from Agent. Empty
@@ -282,11 +251,11 @@ type BridgeRequest struct {
 	// one router persona produces plan, replan, and proposal artifacts.
 	Contract string `json:"contract,omitempty"`
 	Cycle    int    `json:"cycle,omitempty"`
-	// Attempt is the 1-based fallback-retry ordinal for this Launch (token-
-	// telemetry S3): the caller's fallback loop calls Launch once per CLI
-	// candidate, and Attempt lets each call's llm-calls.ndjson record be
-	// distinguished so the double-dispatch waste class is measurable. Zero
-	// (unset, existing callers) is treated as attempt 1.
+	// Attempt is the 1-based fallback-retry ordinal for this Launch: the
+	// caller's fallback loop calls Launch once per CLI candidate, and Attempt
+	// lets each call's llm-calls.ndjson record be distinguished so the
+	// double-dispatch waste class is measurable. Zero (unset) is treated as
+	// attempt 1.
 	Attempt int `json:"attempt,omitempty"`
 	// ChainAttempt marks one attempt of a chain walk (llmroute.DispatchTiered in
 	// the runner, the advisor's Dispatch, bridgechain.Walking itself). A
@@ -294,10 +263,10 @@ type BridgeRequest struct {
 	// of resolving and walking the chain again; a launch WITHOUT it is a caller
 	// that never heard of the chain and gets the walk by construction.
 	ChainAttempt bool `json:"chain_attempt,omitempty"`
-	// BudgetScale scales the launch's artifact-wait budget (ADR-0076 slice A:
-	// difficulty-conditioned budgets — a large cycle's build gets a longer
-	// deadline). 0 or 1 = unscaled; <1 never shrinks. The engine applies it to
-	// the per-agent policy base (or the builtin when the map has no entry).
+	// BudgetScale scales the launch's artifact-wait budget (a large cycle's
+	// build gets a longer deadline). 0 or 1 = unscaled; <1 never shrinks. The
+	// engine applies it to the per-agent policy base, or the builtin when the
+	// map has no entry.
 	BudgetScale float64 `json:"budget_scale,omitempty"`
 	// RequireSandbox fails the launch closed when filesystem confinement is
 	// unavailable. Activated Build explanation contracts set this for Builder.
@@ -317,15 +286,10 @@ type BridgeRequest struct {
 	// SystemPrompt is the per-agent launch-time rules block prepended to the
 	// prompt body (facet B). Resolved by the runner via systemprompt.Resolve.
 	SystemPrompt string `json:"system_prompt,omitempty"`
-	// Skills is the ordered list of policy-resolved skill-overlay NAMES to
-	// preload for this dispatch (internal/policy Policy.ResolveOverlays, keyed on
-	// phase/cli/model/tier — "which skill for which phase agent" is config, not
-	// code). The bridge adapter materializes each named skill's SKILL.md persona
-	// body into a prompt prefix (skilloverlay.Materialize) just above the profile
-	// Rules block, so the phase agent begins with the configured operating discipline
-	// preloaded — CLI-agnostic. Empty ⇒ no overlay (byte-identical to a
-	// pre-feature dispatch). The runner is the producer; the adapter the injector
-	// (mirrors SystemPrompt's producer→adapter split).
+	// Skills is the ordered list of policy-resolved skill-overlay names to
+	// preload for this dispatch. The bridge adapter materializes each named
+	// skill's SKILL.md persona body into a prompt prefix just above the
+	// profile Rules block. Empty means no overlay.
 	Skills []string `json:"skills,omitempty"`
 	// CorrectionDirective, when non-empty, is prepended as a "## Correction"
 	// block (the orchestrator's contract-correction retry — the previous
@@ -338,10 +302,10 @@ type BridgeRequest struct {
 	OperatorDirectives string `json:"operator_directives,omitempty"`
 	// SessionName, when non-empty, pins the tmux session to a deterministic,
 	// caller-controlled name (claude-tmux/*-tmux only; headless drivers ignore
-	// it). The swarm harness (ADR-0032) sets this and REGISTERS the name before
-	// calling Launch, so a worker cancelled mid-spawn can still be reaped by name
-	// (closing the orphan-on-cancel gap). A named session is preserved by the
-	// driver's own cleanup — the caller owns teardown.
+	// it). The swarm harness sets this and registers the name before calling
+	// Launch, so a worker cancelled mid-spawn can still be reaped by name. A
+	// named session is preserved by the driver's own cleanup — the caller owns
+	// teardown.
 	SessionName string `json:"session_name,omitempty"`
 }
 
@@ -353,10 +317,10 @@ type BridgeResponse struct {
 	CostUSD    float64    `json:"cost_usd"`
 	Tokens     TokenUsage `json:"tokens"`
 	DurationMS int64      `json:"duration_ms"`
-	// BootMS is the cold-boot latency the tmux-REPL driver spent from
-	// tmux new-session to the REPL prompt marker appearing — pure dispatch
-	// overhead, paid before the prompt is delivered (ADR-0043 A0). 0 when no
-	// cold boot happened (a resumed/warm named session, or a headless driver).
+	// BootMS is the cold-boot latency the tmux-REPL driver spent from tmux
+	// new-session to the REPL prompt marker appearing — pure dispatch overhead
+	// paid before the prompt is delivered. 0 when no cold boot happened (a
+	// resumed/warm named session, or a headless driver).
 	BootMS int64 `json:"boot_ms,omitempty"`
 }
 

@@ -8,10 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseio"
 )
 
-// PhaseRequest/PhaseResponse must round-trip through encoding/json
-// exactly — they're the wire format for the subprocess phase override
-// (pkg/phaseproto) and the in-memory contract between orchestrator
-// and phases.
 func TestPhaseRequest_JSONRoundTrip(t *testing.T) {
 	t.Parallel()
 	in := PhaseRequest{
@@ -80,8 +76,6 @@ func TestPhaseResponse_JSONShape(t *testing.T) {
 	}
 }
 
-// VerdictPASS/FAIL/WARN/SKIPPED are the only allowed verdict strings
-// (matches EGPS gate semantics — see CLAUDE.md env-var table).
 func TestVerdict_Recognised(t *testing.T) {
 	t.Parallel()
 	for _, v := range []string{VerdictPASS, VerdictFAIL, VerdictWARN, VerdictSKIPPED} {

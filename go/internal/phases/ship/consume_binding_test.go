@@ -2,17 +2,6 @@
 
 package ship
 
-// consume_binding_test.go — RED contract for the cycle-1506 pipeline-blocker
-// halt (batch-20260817b): #466's in-commit consumption mutates the staged tree
-// AFTER the audit bound it, so the pre-commit tree-drift integrity check
-// refused EVERY PASS ship of an inbox-claimed item — two individually-correct
-// mechanisms, jointly contradictory. (#466's own tests passed because they set
-// no audit binding, and the check self-skips.) The fix: a drift whose tree
-// delta consists EXACTLY of the sanctioned consumption moves is accepted with
-// a loud log; any other path in the delta still refuses. The integrity
-// guarantee is not weakened — it is taught about the one mutation the ship
-// itself performs by design.
-
 import (
 	"context"
 	"io"
@@ -39,9 +28,6 @@ func preConsumptionTree(t *testing.T, wt string) string {
 	return strings.TrimSpace(string(out))
 }
 
-// The cycle-1506 shape: audit binding set to the pre-consumption tree; the
-// ship consumes its item; the resulting drift is exactly the consumption move
-// and MUST be accepted.
 func TestShipFromWorktree_ConsumptionDriftIsSanctioned(t *testing.T) {
 	repo, wt, ws, _ := consumeScenario(t, "PASS")
 	bound := preConsumptionTree(t, wt)
@@ -66,15 +52,14 @@ func TestShipFromWorktree_ConsumptionDriftIsSanctioned(t *testing.T) {
 	}
 }
 
-// The integrity control: an UNSANCTIONED extra file in the drift still refuses
-// — the tolerance is exactly the consumption set, nothing wider.
+// The tolerance is exactly the sanctioned consumption set — an unsanctioned
+// extra file in the drift still refuses.
 func TestShipFromWorktree_UnsanctionedDriftStillRefuses(t *testing.T) {
 	repo, wt, ws, _ := consumeScenario(t, "PASS")
 	bound := preConsumptionTree(t, wt)
-	// A post-audit smuggle, STAGED so it is guaranteed to be in the tree the
-	// pre-commit check verifies (whether ship's own staging would pick an
-	// undeclared untracked file up is a separate policy — this control pins
-	// the drift check itself).
+	// Staged explicitly so the file is guaranteed to be in the tree the
+	// pre-commit check verifies; whether ship's own `git add -A` would pick up
+	// an untracked file is a separate policy this test doesn't pin.
 	if err := os.WriteFile(filepath.Join(wt, "smuggled.go"), []byte("package smuggled\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -99,9 +84,8 @@ func TestShipFromWorktree_UnsanctionedDriftStillRefuses(t *testing.T) {
 	}
 }
 
-// Review M3: a SECOND, unconsumed inbox file staged post-binding must refuse —
-// pins that the tolerance is the exact consumption set, never an
-// .evolve/inbox/ prefix.
+// A second, unconsumed inbox file staged post-binding must still refuse: the
+// tolerance is the exact consumption set, never an .evolve/inbox/ prefix.
 func TestShipFromWorktree_SecondUnconsumedInboxFileRefuses(t *testing.T) {
 	repo, wt, ws, _ := consumeScenario(t, "PASS")
 	bound := preConsumptionTree(t, wt)
@@ -126,9 +110,9 @@ func TestShipFromWorktree_SecondUnconsumedInboxFileRefuses(t *testing.T) {
 	}
 }
 
-// Review HIGH: an item TAMPERED after audit binding must not be sanctioned —
-// consumption refuses the move (rolled back, pickable), the ship proceeds
-// WITHOUT it, and nothing unaudited rides the commit.
+// An item tampered with after audit binding must not be sanctioned:
+// consumption refuses the move (rolled back, pickable), and the ship proceeds
+// without it — nothing unaudited rides the commit.
 func TestShipFromWorktree_TamperedItemIsNotSanctioned(t *testing.T) {
 	repo, wt, ws, itemRel := consumeScenario(t, "PASS")
 	bound := preConsumptionTree(t, wt)
@@ -158,15 +142,14 @@ func TestShipFromWorktree_TamperedItemIsNotSanctioned(t *testing.T) {
 		}
 		return
 	}
-	// Ship succeeded: then the commit must NOT contain a consumed/ record.
 	files := commitFileList(t, wt, "cycle-1")
 	if strings.Contains(files, "consumed/") {
 		t.Fatalf("tampered item must not ship as consumed; files=%q", files)
 	}
 }
 
-// No binding set: byte-identical legacy behavior (the check self-skips) —
-// pinned so the fix cannot accidentally arm the check where it never ran.
+// No binding set: legacy behavior is byte-identical (the check self-skips) —
+// pinned so this fix cannot accidentally arm the check where it never ran.
 func TestShipFromWorktree_NoBindingStillSkipsCheck(t *testing.T) {
 	repo, wt, ws, _ := consumeScenario(t, "PASS")
 	opts := &Options{

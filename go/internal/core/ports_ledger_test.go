@@ -6,8 +6,6 @@ import (
 	"testing"
 )
 
-// TestLedgerEntry_Unmarshal_IntCycle is the existing happy path: cycle
-// arrives as a JSON number, populates Cycle, leaves CycleLabel empty.
 func TestLedgerEntry_Unmarshal_IntCycle(t *testing.T) {
 	t.Parallel()
 	raw := `{"ts":"2026-05-26T00:00:00Z","cycle":107,"role":"build","kind":"phase","exit_code":0,"entry_seq":1865,"prev_hash":"abc"}`
@@ -23,10 +21,6 @@ func TestLedgerEntry_Unmarshal_IntCycle(t *testing.T) {
 	}
 }
 
-// TestLedgerEntry_Unmarshal_StringCycle covers the legacy malformed
-// entry at .evolve/ledger.jsonl line 1741 from the v10.16.0 manual
-// release. cycle="manual-release-v10.16.0" must parse without error and
-// land in CycleLabel; Cycle stays 0.
 func TestLedgerEntry_Unmarshal_StringCycle(t *testing.T) {
 	t.Parallel()
 	raw := `{"ts":"2026-05-20T04:15:01Z","cycle":"manual-release-v10.16.0","role":"auditor","kind":"agent_subprocess","exit_code":0,"entry_seq":1740,"prev_hash":"4f288f60"}`
@@ -45,8 +39,6 @@ func TestLedgerEntry_Unmarshal_StringCycle(t *testing.T) {
 	}
 }
 
-// TestLedgerEntry_Unmarshal_ExplicitCycleLabel covers the canonical
-// new-writer convention: numeric cycle: 0 + explicit cycle_label field.
 func TestLedgerEntry_Unmarshal_ExplicitCycleLabel(t *testing.T) {
 	t.Parallel()
 	raw := `{"ts":"2026-06-01T00:00:00Z","cycle":0,"cycle_label":"manual-release-v12.2.0","role":"auditor","exit_code":0,"entry_seq":2000,"prev_hash":"deadbeef"}`
@@ -62,8 +54,6 @@ func TestLedgerEntry_Unmarshal_ExplicitCycleLabel(t *testing.T) {
 	}
 }
 
-// TestLedgerEntry_Marshal_NormalEntry confirms normal entries serialize
-// WITHOUT a cycle_label field (omitempty).
 func TestLedgerEntry_Marshal_NormalEntry(t *testing.T) {
 	t.Parallel()
 	e := LedgerEntry{Cycle: 107, Role: "build", EntrySeq: 1865, PrevHash: "abc"}
@@ -79,8 +69,6 @@ func TestLedgerEntry_Marshal_NormalEntry(t *testing.T) {
 	}
 }
 
-// TestLedgerEntry_Marshal_LabeledEntry confirms manual entries written
-// with the new convention round-trip (int cycle + explicit label).
 func TestLedgerEntry_Marshal_LabeledEntry(t *testing.T) {
 	t.Parallel()
 	e := LedgerEntry{Cycle: 0, CycleLabel: "manual-release-v12.2.0", Role: "auditor", EntrySeq: 2000, PrevHash: "deadbeef"}
@@ -96,10 +84,6 @@ func TestLedgerEntry_Marshal_LabeledEntry(t *testing.T) {
 	}
 }
 
-// TestLedgerEntry_RoundTrip_StringCycle_NormalizesToLabel: read a legacy
-// string-cycle entry, then marshal it back. The result is the new
-// canonical form (cycle:0 + cycle_label) — NOT the original string form
-// — so future writers and consumers see normalized data.
 func TestLedgerEntry_RoundTrip_StringCycle_NormalizesToLabel(t *testing.T) {
 	t.Parallel()
 	raw := `{"ts":"2026-05-20T04:15:01Z","cycle":"manual-release-v10.16.0","role":"auditor","exit_code":0,"entry_seq":1740,"prev_hash":"abc"}`
@@ -120,9 +104,6 @@ func TestLedgerEntry_RoundTrip_StringCycle_NormalizesToLabel(t *testing.T) {
 	}
 }
 
-// TestLedgerEntry_Unmarshal_MalformedCycle exercises non-int, non-string
-// values for the cycle field (e.g., null, object). These must surface
-// as errors so corrupt entries aren't silently absorbed.
 func TestLedgerEntry_Unmarshal_MalformedCycle(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -143,9 +124,6 @@ func TestLedgerEntry_Unmarshal_MalformedCycle(t *testing.T) {
 	}
 }
 
-// TestLedgerEntry_Unmarshal_FloatCycle: JSON numbers can be float in
-// theory. Real ledger entries never use floats, but the unmarshaler
-// should accept whole-number floats (102.0 → 102) and reject fractional.
 func TestLedgerEntry_Unmarshal_FloatCycle(t *testing.T) {
 	t.Parallel()
 	t.Run("whole-number float accepted", func(t *testing.T) {
@@ -165,8 +143,6 @@ func TestLedgerEntry_Unmarshal_FloatCycle(t *testing.T) {
 	})
 }
 
-// TestLedgerEntry_Unmarshal_EmptyCycle: cycle field absent entirely is
-// the pre-v8.37 case; LedgerEntry.Cycle defaults to 0 and parses cleanly.
 func TestLedgerEntry_Unmarshal_EmptyCycle(t *testing.T) {
 	t.Parallel()
 	var e LedgerEntry
@@ -178,10 +154,6 @@ func TestLedgerEntry_Unmarshal_EmptyCycle(t *testing.T) {
 	}
 }
 
-// TestLedgerEntry_Unmarshal_CycleOutOfRange exercises the int32 range
-// guard so behaviour is identical on 32- and 64-bit targets — without
-// the guard, very-large cycle numbers would silently truncate on a
-// 32-bit builder.
 func TestLedgerEntry_Unmarshal_CycleOutOfRange(t *testing.T) {
 	t.Parallel()
 	cases := []string{
@@ -198,12 +170,6 @@ func TestLedgerEntry_Unmarshal_CycleOutOfRange(t *testing.T) {
 	}
 }
 
-// TestLedgerEntry_NullCycleAbsorbed — live corruption pin (2026-07-22): 15
-// inbox-lifecycle promote entries carry "cycle":null, and append-only history
-// cannot be rewritten — the defensive unmarshal must absorb null exactly like
-// an absent field (Cycle=0, no label, no error), or every full-ledger
-// iteration (evolve ledger verify, TestIter_RealLedger_NoStringCycleError)
-// hard-fails forever at seq 80361.
 func TestLedgerEntry_NullCycleAbsorbed(t *testing.T) {
 	raw := `{"ts":"2026-07-22T22:54:50Z","class":"inbox-lifecycle","action":"promote","task_id":"x","cycle":null,"git_sha":null,"reason":"ship-promote-processed"}`
 	var e LedgerEntry

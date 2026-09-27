@@ -1,18 +1,3 @@
-// commitgate.go — commit-gate review-attestation enforcement for --class manual.
-//
-// Interactive commits go through `evolve ship --class manual` (bare `git commit`
-// is blocked by ship-gate), and ship performs that commit as an internal
-// subprocess — so a PreToolUse hook can't observe it. This is the single
-// enforcement point for the review attestation: the manual class verifies it
-// HERE, at the real chokepoint, reusing the exact sha256(git diff HEAD) that
-// the commit-gate writer (go/internal/commitgate, via `evolve commit-gate run`)
-// stamped into the attestation.
-//
-// Class scope: ONLY --class manual. --class cycle keeps audit-binding
-// (autonomous cycles are exempt by construction); --class release/trivial are
-// driven by their own pipelines and are not interactive commits.
-//
-// Bypass: Options.BypassCommitGate (routine use is a policy violation).
 package ship
 
 import (
@@ -34,19 +19,10 @@ type commitGateAttestation struct {
 	ReviewersRun []string `json:"reviewers_run"`
 }
 
-// reviewedByTrailer returns a "Reviewed-by:" git trailer block derived from the
-// commit-gate attestation's reviewers_run — one standard `Reviewed-by: <name>`
-// line per reviewer, as a trailing paragraph git parses as trailers. This makes
-// "was this commit reviewed before commit, by whom" a durable, machine-parseable
-// property of the SHA (`git log --format='%(trailers:key=Reviewed-by)'`).
-//
-// Returns "" (no trailer == not reviewed) unless ALL hold: class is manual (the
-// only class that carries + verifies a review attestation), the commit gate was
-// NOT bypassed (a bypass means review was skipped, so
-// a stale on-disk attestation must NOT falsely assert review), and the
-// attestation parses with ≥1 valid reviewer. Best-effort: a read/parse error
-// omits the trailer. Reviewers with embedded newlines are dropped so a corrupt
-// attestation can't inject spurious lines into the trailer block.
+// reviewedByTrailer returns a "Reviewed-by:" trailer block from the
+// attestation's reviewers_run, or "" when the commit was not reviewed.
+// Embedded-newline reviewers are dropped so a corrupt attestation cannot
+// inject spurious trailer lines.
 func reviewedByTrailer(opts *Options) string {
 	if opts.Class != ClassManual || opts.BypassCommitGate {
 		return ""
@@ -69,17 +45,13 @@ func reviewedByTrailer(opts *Options) string {
 	if b.Len() == 0 {
 		return ""
 	}
-	return "\n" + b.String() // leading blank line separates the trailer block from the body
+	return "\n" + b.String()
 }
 
-// verifyCommitGateAttestation requires a fresh review attestation whose
-// tree_state_sha matches sha256(git diff HEAD). MUST be called AFTER
-// verifyManualConfirm's `git add -A`, so the computed SHA reflects exactly the
-// tree that will be committed.
+// verifyCommitGateAttestation must run after verifyManualConfirm's `git add
+// -A`, so the computed SHA reflects the tree that will be committed.
 func verifyCommitGateAttestation(ctx context.Context, opts *Options, res *RunResult) error {
 	if opts.DryRun {
-		// Dry-run simulates and commits nothing, so the review attestation is
-		// not required (matches the dry-run journal-only contract).
 		res.Logs = append(res.Logs, "[ship] commit-gate: dry-run — review attestation not required (no commit)")
 		return nil
 	}
