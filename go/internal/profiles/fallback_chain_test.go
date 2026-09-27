@@ -4,22 +4,18 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
+	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
-func trackedProfilesDir(t *testing.T) string {
-	t.Helper()
-	_, thisFile, _, _ := runtime.Caller(0)
-	return filepath.Join(filepath.Dir(thisFile), "..", "..", "..", ".evolve", "profiles")
-}
-
-// See ADR-0104.
+// See ADR-0104. Only git-tracked profiles bind; untracked runtime-minted stubs
+// are skipped unless there is no tracked set, in which case every file binds.
 func TestEveryAgentProfileHasAFallbackChain(t *testing.T) {
-	dir := trackedProfilesDir(t)
+	dir := profiles.RealProfilesDir(t)
+	tracked := profiles.TrackedRealProfileNames(t)
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		t.Fatalf("read %s: %v", dir, err)
@@ -27,6 +23,10 @@ func TestEveryAgentProfileHasAFallbackChain(t *testing.T) {
 	checked := 0
 	for _, e := range entries {
 		if e.IsDir() || !strings.HasSuffix(e.Name(), ".json") {
+			continue
+		}
+		if tracked != nil && !tracked[strings.TrimSuffix(e.Name(), ".json")] {
+			t.Logf("untracked profile %s: runtime-minted state, not bound", e.Name())
 			continue
 		}
 		raw, err := os.ReadFile(filepath.Join(dir, e.Name()))

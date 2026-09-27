@@ -11,9 +11,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/repostate"
 )
 
-// realProfilesDir is the repo's live .evolve/profiles. Go's test cache does not
-// track reads outside the module, so run go test -count=1 after a profile edit.
-func realProfilesDir(t *testing.T) string {
+// RealProfilesDir is the repo's live .evolve/profiles, the package's one resolver
+// for it. Go's test cache does not track reads outside the module, so run
+// go test -count=1 after a profile edit.
+func RealProfilesDir(t *testing.T) string {
 	t.Helper()
 	_, thisFile, _, ok := runtime.Caller(0)
 	if !ok {
@@ -25,7 +26,7 @@ func realProfilesDir(t *testing.T) string {
 // TrackedRealProfileNames returns the git-tracked profile names; nil means bind every profile.
 func TrackedRealProfileNames(t *testing.T) map[string]bool {
 	t.Helper()
-	root := filepath.Join(realProfilesDir(t), "..", "..")
+	root := filepath.Join(RealProfilesDir(t), "..", "..")
 	set, err := repostate.TrackedSet(root, ".evolve/profiles", ".json")
 	if err == nil && len(set) == 0 {
 		err = fmt.Errorf("empty tracked-profile set at %s — pathspec matched nothing (misresolved root or sparse checkout)", root)
@@ -41,7 +42,7 @@ func TrackedRealProfileNames(t *testing.T) map[string]bool {
 // Real-tree scans go through it because the runtime mints untracked stubs no CI checkout has.
 func RealTreeProfiles(t *testing.T) (*Loader, []string) {
 	t.Helper()
-	return treeProfiles(t, filepath.Join(realProfilesDir(t), "..", ".."))
+	return treeProfiles(t, filepath.Join(RealProfilesDir(t), "..", ".."))
 }
 
 // treeProfiles is RealTreeProfiles for an arbitrary repo root.
@@ -77,7 +78,7 @@ func TestRealTreeProfiles_ExcludesUntrackedDecoy(t *testing.T) {
 		t.Skip("no usable git context — filter disabled (bind-all fallback), nothing to prove")
 	}
 	// Phase sandboxes deny writes to the live .evolve/profiles, so the decoy goes in a mirror.
-	root := mirrorTrackedProfiles(t, filepath.Join(realProfilesDir(t), "..", ".."), tracked)
+	root := mirrorTrackedProfiles(t, filepath.Join(RealProfilesDir(t), "..", ".."), tracked)
 	const decoy = "zz-decoy-mint-profiles-funnel"
 	payload := `{"name":"` + decoy + `","role":"decoy","cli":"claude","model_tier_default":"fast"}`
 	if err := os.WriteFile(filepath.Join(root, ".evolve", "profiles", decoy+".json"), []byte(payload), 0o644); err != nil {

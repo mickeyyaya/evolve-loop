@@ -1,22 +1,9 @@
 package profiles
 
-import (
-	"path/filepath"
-	"runtime"
-	"testing"
-)
-
-func effortProfilesDir(t *testing.T) string {
-	t.Helper()
-	_, thisFile, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("runtime.Caller failed")
-	}
-	return filepath.Join(filepath.Dir(thisFile), "..", "..", "..", ".evolve", "profiles")
-}
+import "testing"
 
 func TestEffortDefaults_Matrix(t *testing.T) {
-	loader := NewFromDir(effortProfilesDir(t))
+	loader := NewFromDir(RealProfilesDir(t))
 	// The claude-routed graders run xhigh, above codex's deep/top rung, by design.
 	want := map[string]string{
 		"scout":              "low",

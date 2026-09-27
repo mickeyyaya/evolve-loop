@@ -7,27 +7,22 @@ import (
 	"testing"
 )
 
-func TestLoopUnblockProfilesRouteTimeoutPronePhasesToAgy(t *testing.T) {
-	loader := NewFromDir(realProfilesDir(t))
-	// Only the router stays on agy; the other phases moved off it.
-	for _, name := range []string{"router"} {
-		t.Run(name, func(t *testing.T) {
-			p, err := loader.Get(name)
-			if err != nil {
-				t.Fatalf("load profile: %v", err)
-			}
-			if p.CLI != "agy-tmux" {
-				t.Fatalf("CLI=%q, want agy-tmux", p.CLI)
-			}
-			if len(p.CLIFallback) != 1 || p.CLIFallback[0] != "claude-tmux" {
-				t.Fatalf("CLIFallback=%v, want [claude-tmux]", p.CLIFallback)
-			}
-		})
+// Only the router stays on agy; the other phases moved off it.
+func TestRouterStaysOnAgyWithClaudeFallback(t *testing.T) {
+	p, err := NewFromDir(RealProfilesDir(t)).Get("router")
+	if err != nil {
+		t.Fatalf("load profile: %v", err)
+	}
+	if p.CLI != "agy-tmux" {
+		t.Fatalf("CLI=%q, want agy-tmux", p.CLI)
+	}
+	if len(p.CLIFallback) != 1 || p.CLIFallback[0] != "claude-tmux" {
+		t.Fatalf("CLIFallback=%v, want [claude-tmux]", p.CLIFallback)
 	}
 }
 
 func TestRetrospectiveRoutesToCodexDeep(t *testing.T) {
-	loader := NewFromDir(realProfilesDir(t))
+	loader := NewFromDir(RealProfilesDir(t))
 	p, err := loader.Get("retrospective")
 	if err != nil {
 		t.Fatalf("load profile: %v", err)
@@ -44,7 +39,7 @@ func TestRetrospectiveRoutesToCodexDeep(t *testing.T) {
 }
 
 func TestAdversarialReviewRoutesToClaudeDeep(t *testing.T) {
-	p, err := NewFromDir(realProfilesDir(t)).Get("adversarial-review")
+	p, err := NewFromDir(RealProfilesDir(t)).Get("adversarial-review")
 	if err != nil {
 		t.Fatalf("load profile: %v", err)
 	}
@@ -62,7 +57,7 @@ func TestAdversarialReviewRoutesToClaudeDeep(t *testing.T) {
 }
 
 func TestTriageRoutesToCodexForQuotaBalance(t *testing.T) {
-	p, err := NewFromDir(realProfilesDir(t)).Get("triage")
+	p, err := NewFromDir(RealProfilesDir(t)).Get("triage")
 	if err != nil {
 		t.Fatalf("load profile: %v", err)
 	}
@@ -78,7 +73,7 @@ func TestTriageRoutesToCodexForQuotaBalance(t *testing.T) {
 }
 
 func TestLoopUnblockProfilesAllowScoutWorkspaceEvalMaterialization(t *testing.T) {
-	p, err := NewFromDir(realProfilesDir(t)).Get("scout")
+	p, err := NewFromDir(RealProfilesDir(t)).Get("scout")
 	if err != nil {
 		t.Fatalf("load scout profile: %v", err)
 	}
@@ -90,7 +85,7 @@ func TestLoopUnblockProfilesAllowScoutWorkspaceEvalMaterialization(t *testing.T)
 }
 
 func TestLoopUnblockProfileAllowsTestAmplificationWorktreeWrites(t *testing.T) {
-	p, err := NewFromDir(realProfilesDir(t)).Get("test-amplification")
+	p, err := NewFromDir(RealProfilesDir(t)).Get("test-amplification")
 	if err != nil {
 		t.Fatalf("load test-amplification profile: %v", err)
 	}

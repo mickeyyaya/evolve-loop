@@ -233,7 +233,7 @@ func TestNewFromDir_Empty_ReturnsZeroLoader(t *testing.T) {
 }
 
 func TestSmoke_RealProfiles(t *testing.T) {
-	if _, err := os.Stat(realProfilesDir(t)); err != nil {
+	if _, err := os.Stat(RealProfilesDir(t)); err != nil {
 		t.Skipf("profiles dir not reachable: %v", err)
 	}
 	l, names := RealTreeProfiles(t)
