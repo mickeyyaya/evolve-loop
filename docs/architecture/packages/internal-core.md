@@ -107,6 +107,7 @@
 - **`recordPhaseOutcome` is the one production chokepoint that derives the context-fill projection.** `phaseOutcomeFrom` copies `ResolvedModel` (the tier) and `Tokens` off the `PhaseResponse`; `recordPhaseOutcome` then calls `contextfill.WindowSizeForTier(out.ResolvedModel)` — an unresolvable tier (a concrete model id, empty, or unknown string) yields `contextfill.ErrInvalidWindow` and both `ContextFillRatio`/`ContextWindowHot` stay zero rather than a guessed window. Pinned by `TestRecordPhaseOutcome_ProjectsContextFillWhenTierResolvable`, `TestRecordPhaseOutcome_ColdPhaseIsNotFlaggedHot`, `TestRecordPhaseOutcome_UnresolvableTierLeavesContextFillZero`, `TestRecordPhaseOutcome_ZeroTokensRecordsZeroFillNotHot` and `TestPhaseOutcomeFrom_CarriesTierProvenanceAndTokens`.
 - **`RetroDecision` is prefix+suffix composed.** When a cycle has no `disposition.json`, the disposition gate prepends a `disposition-gate:` prefix reason, with the underlying branch decision (e.g. `proceed:`) carried as a suffix. Pinned by `TestOrchestrator_RetroPASS_DoesNotRouteToShip`.
 - **Recurring audit-fail disposition has two modes**: strict mode blocks on 2 distinct `code-audit-fail` records; fluent mode (the default) proceeds with awareness and ends the cycle. Pinned by `TestOrchestrator_RetroFAIL_RecurringAudit_FluentEnd`.
+- A debugger that served a fleet-rebase recovery hands its resolved tree back to the rebase route (`resumeFleetRebaseAfterDebugger`): the tree is carried as a commit on the fork point, rebased, pended and routed via `routeRebasedExplanation`; the debugger's own target is honored for every other recovery (`ship_recovery_debugger.go`).
 
 ## Invariants
 
@@ -231,6 +232,7 @@
 - **`CycleRequest.Env` propagates to every `PhaseRequest.Env`**: phases read `EVOLVE_CLI` and `EVOLVE_*_MODEL` from it for CLI/model selection; without the passthrough every cycle silently hardcodes to claude-p and the default model. Pinned by `TestOrchestrator_CycleEnv_PropagatesToEveryPhase`.
 - **`CycleState.IntentRequired` is persisted** so resume and downstream consumers (the classifier) can tell whether intent ran this cycle. Pinned by `TestOrchestrator_IntentGate_DefaultRunsScoutFirst` and `TestOrchestrator_IntentGate_PhaseEnableRunsIntentFirst`.
 - **Intent-required resolution precedence is Context over Env**: `Context["intent_required"]` overrides the environment knob.
+- A resolved fleet-rebase conflict never re-audits or reships on the base the ship diverged from; a conflict that survives the debugger ends the cycle instead of a reship that cannot fast-forward (`TestRecoverFromShipError_ADebuggerResolvedConflictReentersTheRebaseNotAStaleReship`, `TestRecoverFromShipError_AConflictTheDebuggerLeftEndsTheCycleWithoutAReship`).
 
 ## Findings
 
