@@ -661,3 +661,5 @@
 ./internal/gittest
 # sizeratchet — the one repo-wide 50-line function limit: a go/ast walk against a checked-in offender list that may only shrink.
 ./internal/sizeratchet
+# rawgitratchet — ratchet refusing new raw git fixtures in tests outside internal/gittest; baseline.json may only shrink.
+./internal/rawgitratchet

@@ -13,6 +13,50 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 )
 
+func doctorBootConfig(sandbox bool, ws string, stderr io.Writer) (cfg *bridge.Config, cleanup func(), code int, ok bool) {
+	cwd, _ := os.Getwd()
+	cfg = &bridge.Config{Workspace: ws, ProjectRoot: cwd}
+	cleanup = func() {}
+	if !sandbox {
+		return cfg, cleanup, 0, true
+	}
+	wt, err := os.MkdirTemp("", "evolve-doctorboot-wt-*")
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve doctor boot: temp worktree: %v\n", err)
+		return nil, cleanup, 1, false
+	}
+	cfg.Worktree = wt
+	cfg.Agent = "build"
+	return cfg, func() { _ = os.RemoveAll(wt) }, 0, true
+}
+
+func reportDoctorBootResult(driver string, sandbox, asJSON bool, rc int, scrollback string, stdout, stderr io.Writer) int {
+	if asJSON {
+		buf, _ := json.MarshalIndent(struct {
+			Driver   string `json:"driver"`
+			Sandbox  bool   `json:"sandbox"`
+			ExitCode int    `json:"exit_code"`
+			Booted   bool   `json:"booted"`
+		}{driver, sandbox, rc, rc == bridge.ExitOK}, "", "  ")
+		fmt.Fprintf(stdout, "%s\n", buf)
+	}
+
+	switch rc {
+	case bridge.ExitOK:
+		fmt.Fprintf(stderr, "[doctor] BOOT OK: %s REPL booted (sandbox=%v)\n", driver, sandbox)
+		return 0
+	case bridge.ExitBadFlags:
+		fmt.Fprintf(stderr, "[doctor] boot: %q is not a known *-tmux driver\n", driver)
+		return 10
+	default:
+		fmt.Fprintf(stderr, "[doctor] BOOT FAILED: %s rc=%d (sandbox=%v)\n", driver, rc, sandbox)
+		if tail := bridge.ScrollbackTail(scrollback, 12); tail != "" {
+			fmt.Fprintf(stderr, "[doctor] final pane:\n%s\n", tail)
+		}
+		return 1
+	}
+}
+
 // runDoctorBoot implements `evolve doctor boot <driver> [--sandbox] [--json]`:
 // a standalone "is my bridge bootable right now?" probe. It really boots the
 // driver's REPL (boot-only, no prompt/artifact) via bridge.BootSmokeTest and
@@ -40,45 +84,16 @@ func runDoctorBoot(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	defer func() { _ = os.RemoveAll(ws) }()
-	cwd, _ := os.Getwd()
-	cfg := &bridge.Config{Workspace: ws, ProjectRoot: cwd}
-	if sandbox {
-		wt, werr := os.MkdirTemp("", "evolve-doctorboot-wt-*")
-		if werr != nil {
-			fmt.Fprintf(stderr, "evolve doctor boot: temp worktree: %v\n", werr)
-			return 1
-		}
-		defer func() { _ = os.RemoveAll(wt) }()
-		cfg.Worktree = wt
-		cfg.Agent = "build"
+
+	cfg, cleanup, code, ok := doctorBootConfig(sandbox, ws, stderr)
+	defer cleanup()
+	if !ok {
+		return code
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 	rc, scrollback := bridge.BootSmokeTest(ctx, driver, cfg, bridge.Deps{Stderr: stderr})
 
-	if asJSON {
-		buf, _ := json.MarshalIndent(struct {
-			Driver   string `json:"driver"`
-			Sandbox  bool   `json:"sandbox"`
-			ExitCode int    `json:"exit_code"`
-			Booted   bool   `json:"booted"`
-		}{driver, sandbox, rc, rc == bridge.ExitOK}, "", "  ")
-		fmt.Fprintf(stdout, "%s\n", buf)
-	}
-
-	switch rc {
-	case bridge.ExitOK:
-		fmt.Fprintf(stderr, "[doctor] BOOT OK: %s REPL booted (sandbox=%v)\n", driver, sandbox)
-		return 0
-	case bridge.ExitBadFlags:
-		fmt.Fprintf(stderr, "[doctor] boot: %q is not a known *-tmux driver\n", driver)
-		return 10
-	default:
-		fmt.Fprintf(stderr, "[doctor] BOOT FAILED: %s rc=%d (sandbox=%v)\n", driver, rc, sandbox)
-		if tail := bridge.ScrollbackTail(scrollback, 12); tail != "" {
-			fmt.Fprintf(stderr, "[doctor] final pane:\n%s\n", tail)
-		}
-		return 1
-	}
+	return reportDoctorBootResult(driver, sandbox, asJSON, rc, scrollback, stdout, stderr)
 }

@@ -46,6 +46,18 @@ func addedTestPackages(root string) (packages, excluded []string) {
 // touched open.
 const scanChatter = "=== RUN   TestGuardSuite\n"
 
+// writeGreenGuardSuites gives a lane module one passing test in every package
+// the fixed pack names, so a fixture tracks the real pack instead of a copy.
+func writeGreenGuardSuites(t *testing.T, goDir string) {
+	t.Helper()
+	for _, pattern := range repoContractPackages {
+		dir := strings.TrimSuffix(strings.TrimPrefix(pattern, "./"), "/...")
+		pkg := filepath.Base(dir)
+		mustWrite(t, filepath.Join(goDir, filepath.FromSlash(dir), "pass_test.go"),
+			"package "+pkg+"\n\nimport \"testing\"\n\nfunc TestPass(t *testing.T) {}\n")
+	}
+}
+
 // swapRepoContractTest installs a fake pack that returns the given outcomes in
 // order (the last one repeats, so an over-eager retry loop is caught by the
 // invocation count rather than a panic). The returned slice records one entry
@@ -284,9 +296,7 @@ func TestRepoContractGate_NewlyAddedFailingTestBlocksShip(t *testing.T) {
 	repo := makeRepo(t)
 	goDir := filepath.Join(repo, "go")
 	mustWrite(t, filepath.Join(goDir, "go.mod"), "module example.com/lane\n\ngo 1.24\n")
-	for _, pkg := range []string{"phasespec", "profiles", "phasecoherence", "routingtest"} {
-		mustWrite(t, filepath.Join(goDir, "internal", pkg, "pass_test.go"), "package "+pkg+"\n\nimport \"testing\"\n\nfunc TestPass(t *testing.T) {}\n")
-	}
+	writeGreenGuardSuites(t, goDir)
 	runGit(t, repo, "add", "go")
 	runGit(t, repo, "commit", "-qm", "add green scanner suites")
 
@@ -319,9 +329,7 @@ func TestRepoContractGate_AddedTestSelectionIgnoresModifiedAndNonTestFiles(t *te
 		repo := makeRepo(t)
 		goDir := filepath.Join(repo, "go")
 		mustWrite(t, filepath.Join(goDir, "go.mod"), "module example.com/lane\n\ngo 1.24\n")
-		for _, pkg := range []string{"phasespec", "profiles", "phasecoherence", "routingtest"} {
-			mustWrite(t, filepath.Join(goDir, "internal", pkg, "pass_test.go"), "package "+pkg+"\n\nimport \"testing\"\n\nfunc TestPass(t *testing.T) {}\n")
-		}
+		writeGreenGuardSuites(t, goDir)
 		trackedTest := filepath.Join(goDir, "internal", "tracked", "tracked_test.go")
 		mustWrite(t, trackedTest, "package tracked\n\nimport \"testing\"\n\nfunc TestTracked(t *testing.T) {}\n")
 		runGit(t, repo, "add", "go")
@@ -354,9 +362,7 @@ func TestRepoContractGate_AddedTestSelectionIgnoresModifiedAndNonTestFiles(t *te
 		repo := makeRepo(t)
 		goDir := filepath.Join(repo, "go")
 		mustWrite(t, filepath.Join(goDir, "go.mod"), "module example.com/lane\n\ngo 1.24\n")
-		for _, pkg := range []string{"phasespec", "profiles", "phasecoherence", "routingtest"} {
-			mustWrite(t, filepath.Join(goDir, "internal", pkg, "pass_test.go"), "package "+pkg+"\n\nimport \"testing\"\n\nfunc TestPass(t *testing.T) {}\n")
-		}
+		writeGreenGuardSuites(t, goDir)
 		trackedTest := filepath.Join(goDir, "internal", "tracked", "tracked_test.go")
 		mustWrite(t, trackedTest, "package tracked\n\nimport \"testing\"\n\nfunc TestTracked(t *testing.T) {}\n")
 		runGit(t, repo, "add", "go")
@@ -377,9 +383,7 @@ func TestRepoContractGate_AddedTestSelectionIgnoresModifiedAndNonTestFiles(t *te
 		repo := makeRepo(t)
 		goDir := filepath.Join(repo, "go")
 		mustWrite(t, filepath.Join(goDir, "go.mod"), "module example.com/lane\n\ngo 1.24\n")
-		for _, pkg := range []string{"phasespec", "profiles", "phasecoherence", "routingtest"} {
-			mustWrite(t, filepath.Join(goDir, "internal", pkg, "pass_test.go"), "package "+pkg+"\n\nimport \"testing\"\n\nfunc TestPass(t *testing.T) {}\n")
-		}
+		writeGreenGuardSuites(t, goDir)
 		runGit(t, repo, "add", "go")
 		runGit(t, repo, "commit", "-qm", "baseline only, nothing staged")
 
@@ -478,9 +482,7 @@ func TestPhaseRunNative_NewlyAddedFailingTestPreventsRun(t *testing.T) {
 	repo := makeRepo(t)
 	goDir := filepath.Join(repo, "go")
 	mustWrite(t, filepath.Join(goDir, "go.mod"), "module example.com/lane\n\ngo 1.24\n")
-	for _, pkg := range []string{"phasespec", "profiles", "phasecoherence", "routingtest"} {
-		mustWrite(t, filepath.Join(goDir, "internal", pkg, "pass_test.go"), "package "+pkg+"\n\nimport \"testing\"\n\nfunc TestPass(t *testing.T) {}\n")
-	}
+	writeGreenGuardSuites(t, goDir)
 	runGit(t, repo, "add", "go")
 	runGit(t, repo, "commit", "-qm", "add green scanner suites")
 
@@ -523,9 +525,7 @@ func TestRunNative_AddedSkippedTestDoesNotBlockShip(t *testing.T) {
 	repo := makeRepo(t)
 	goDir := filepath.Join(repo, "go")
 	mustWrite(t, filepath.Join(goDir, "go.mod"), "module example.com/lane\n\ngo 1.24\n")
-	for _, pkg := range []string{"phasespec", "profiles", "phasecoherence", "routingtest"} {
-		mustWrite(t, filepath.Join(goDir, "internal", pkg, "pass_test.go"), "package "+pkg+"\n\nimport \"testing\"\n\nfunc TestPass(t *testing.T) {}\n")
-	}
+	writeGreenGuardSuites(t, goDir)
 	runGit(t, repo, "add", "go")
 	runGit(t, repo, "commit", "-qm", "add green scanner suites")
 
@@ -569,9 +569,7 @@ func TestRepoContractGate_AddedEnvExclusiveTestBackstopRecorded(t *testing.T) {
 	repo := makeRepo(t)
 	goDir := filepath.Join(repo, "go")
 	mustWrite(t, filepath.Join(goDir, "go.mod"), "module example.com/lane\n\ngo 1.24\n")
-	for _, pkg := range []string{"phasespec", "profiles", "phasecoherence", "routingtest"} {
-		mustWrite(t, filepath.Join(goDir, "internal", pkg, "pass_test.go"), "package "+pkg+"\n\nimport \"testing\"\n\nfunc TestPass(t *testing.T) {}\n")
-	}
+	writeGreenGuardSuites(t, goDir)
 	runGit(t, repo, "add", "go")
 	runGit(t, repo, "commit", "-qm", "add green scanner suites")
 
