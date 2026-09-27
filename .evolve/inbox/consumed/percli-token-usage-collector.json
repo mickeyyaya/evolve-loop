@@ -9,5 +9,7 @@
     "go/internal/bridge/clicontrol/usage.go",
     "go/internal/bridge/engine.go"
   ],
-  "surface_note": "2026-09-26 console readiness audit (read-only, against main b9553b9b): the per-CLI usage collector lands in the protected bridge (attempt_telemetry.go:65, clicontrol/usage.go, engine.go) — routes console by files[]."
+  "surface_note": "2026-09-26 console readiness audit (read-only, against main b9553b9b): the per-CLI usage collector lands in the protected bridge (attempt_telemetry.go:65, clicontrol/usage.go, engine.go) — routes console by files[].",
+  "consumed_by": "inbox review 2026-09-27: DUPLICATE, merged into agent-router-token-resolver-nil. The survivor must absorb the TRIPWIRE acceptance and downgrade rule, the explicit unavailable-with-reason alternative, and the attempt_telemetry.go and clicontrol/usage.go file list.",
+  "consumed_at": "2026-09-27T23:30:00Z"
 }

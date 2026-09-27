@@ -39,5 +39,7 @@
     "go/cmd/evolve/cmd_cycle.go",
     "go/cmd/evolve/cmd_loop_preflight.go"
   ],
-  "surface_note": "2026-09-26 console curation (F29 follow-up): files[] typed from a read-only classification against guards.ProtectedSurfaceManifest — protected=true (/go/cmd/evolve/cmd_cycle_config.go, /go/internal/config/), confidence=high. parseGateStage silently drops the ok flag from config.GateStage (parse.go:17), and both files are protected."
+  "surface_note": "2026-09-26 console curation (F29 follow-up): files[] typed from a read-only classification against guards.ProtectedSurfaceManifest — protected=true (/go/cmd/evolve/cmd_cycle_config.go, /go/internal/config/), confidence=high. parseGateStage silently drops the ok flag from config.GateStage (parse.go:17), and both files are protected.",
+  "consumed_by": "inbox review 2026-09-27: DUPLICATE, merged into config-single-authority-sweep. Survivor config-single-authority-sweep (2026-07-08, other partition): same gate-stage single-authority theme, named RED tests, and still valid (config.go:113-114 still hardcodes enforce). Absorb P-1: validate unknown gate words at policy.Load, or coerce them toward enforce with a logged line, for the two remaining parseGateStage readers, mirroring TestRepoContractGate_UnknownStageFailsTowardEnforce. Absorb L1/L2: the cmd/evolve assertion must pin the resolved Stage, not a reviewer count (the survivor's TestGateDefaults_PolicyIsSingleAuthority).",
+  "consumed_at": "2026-09-27T23:30:00Z"
 }

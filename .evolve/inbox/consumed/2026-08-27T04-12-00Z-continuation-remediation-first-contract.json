@@ -16,5 +16,7 @@
     "go/internal/phasecontract/contract.go",
     "agents/evolve-builder.md"
   ],
-  "surface_note": "2026-09-26 console curation (F29 follow-up): files[] typed from a read-only classification against guards.ProtectedSurfaceManifest — protected=true (/go/internal/core/defectledger/, /agents/evolve-builder.md), confidence=high. dispositions.go lets any inherited defect be marked FIXED or DEFERRED, so making blockers non-deferrable is a change to the protected defect-ledger gate; taking the Changes table out of the builder's hands changes the protected builder persona (the linked docs/incidents/continuation-defect-ledger.md does not exist)."
+  "surface_note": "2026-09-26 console curation (F29 follow-up): files[] typed from a read-only classification against guards.ProtectedSurfaceManifest — protected=true (/go/internal/core/defectledger/, /agents/evolve-builder.md), confidence=high. dispositions.go lets any inherited defect be marked FIXED or DEFERRED, so making blockers non-deferrable is a change to the protected defect-ledger gate; taking the Changes table out of the builder's hands changes the protected builder persona (the linked docs/incidents/continuation-defect-ledger.md does not exist).",
+  "consumed_by": "inbox review 2026-09-27: DUPLICATE, merged into continuation-findings-anchor-first. Survivor continuation-findings-anchor-first: older, with acceptance and a red-first fixture, where this item has no acceptance. Carry over the non-deferrable-blocker gate, the refuse-at-mint option, the derived Changes table and the cycle-1573 evidence (itemized on the survivor).",
+  "consumed_at": "2026-09-27T23:30:00Z"
 }

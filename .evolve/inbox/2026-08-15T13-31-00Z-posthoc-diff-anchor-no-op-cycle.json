@@ -9,13 +9,18 @@
     "agents/evolve-builder-reference.md",
     "go/internal/phases/audit/",
     "go/internal/explanationdocs/",
-    "go/internal/core/build_explanation_handoff.go"
+    "go/internal/core/build_explanation_handoff.go",
+    "agents/evolve-builder.md",
+    "go/internal/phasecontract/contract.go",
+    "go/internal/changedpkgs/changedfiles.go"
   ],
   "acceptance": [
     "Table-driven regression: no-commit / one-commit / multi-commit worktree fixtures produce 0 / exact / cumulative stats; the HEAD^ inheritance shape is pinned red-first.",
     "Cycle base SHA sourced from run state, not recomputed via relative revs.",
     "go vet + touched-package suites green.",
-    "Placeholder shape pinned: a report writer that fails to substitute POSTHOC emits 0/absent with a loud log line, never the literal 'pending' template text (red-first on the cycle-1480 shape)."
+    "Placeholder shape pinned: a report writer that fails to substitute POSTHOC emits 0/absent with a loud log line, never the literal 'pending' template text (red-first on the cycle-1480 shape).",
+    "(from build-report-narrative) Sweep: build report narrative (3 auditor prescriptions amortised)",
+    "(merged at the inbox review 2026-09-27) build-report-narrative (other partition, sweep of 3) is the same fix. Its d2b983c9 (cycle 1479) is this item's prescription verbatim. d7d21ff3 (1569, substitute POSTHOC before handoff) matches this item's 'pending' placeholder acceptance. d848a8ea (1572, derive '## Changes' from git diff --cached --name-status) should join as an added acceptance line. Survivor chosen as the older item with table-driven acceptance. Related: worktree-scope-continuation db2be6fb (coverage-gate HEAD~1..HEAD anchor) is the same anchor class on another surface. ADR-0106 H3 (host-derived explanation declaration) is the natural home: the host derives the diff stats from the worktree base."
   ],
   "connects_to": [
     "carryover-lane-retirement-verifiableby (same cycle's M1; retirement removes most no-op cycles, this fixes honest disclosure for the rest)",
@@ -25,5 +30,12 @@
   "weight": 0.8,
   "created_at": "2026-08-15T13:31:00Z",
   "notes": "Filed from console monitoring of batch-20260815c (cycle-1479 audit WARN M2). Evidence-integrity adjacent: the false stat rode INTO an audit artifact and the auditor caught it by re-deriving — the fix makes the artifact honest at the source. THIRD occurrence same batch: cycle-1478 audit M1 posthoc-unresolved — build-report.md:192-193 both POSTHOC markers literal 'pending' while ground truth was 43 files/+3699/-133. Three cycles, two shapes, one writer: this is now the batch's most recurrent defect; consider raising priority at triage.",
-  "surface_note": "2026-09-26 console readiness audit (read-only, against main): the fix site is the 'Files changed'/ANCHOR:diff_summary template in agents/evolve-builder-reference.md:423,431 plus the POSTHOC-executing audit package — protected surface (routes console by files[])."
+  "surface_note": "2026-09-26 console readiness audit (read-only, against main): the fix site is the 'Files changed'/ANCHOR:diff_summary template in agents/evolve-builder-reference.md:423,431 plus the POSTHOC-executing audit package — protected surface (routes console by files[]).",
+  "absorbs": [
+    "build-report-narrative"
+  ],
+  "merge_notes": [
+    "inbox review 2026-09-27: absorbed build-report-narrative. posthoc-diff-anchor-no-op-cycle should absorb d848a8ea: derive build-report's ## Changes from `git diff --cached --name-status`, host-derived like design H3, so the table cannot diverge from the commit and reverted paths are disclosed. It should also take the wave-3 evidence (cycles 1569, 1572 and 1573, including the 1573 rejection) and these files: agents/evolve-builder.md, go/internal/phasecontract/contract.go and go/internal/changedpkgs/changedfiles.go.",
+    "inbox review 2026-09-27: absorbed build-report-narrative. build-report-narrative (other partition, sweep of 3) is the same fix. Its d2b983c9 (cycle 1479) is this item's prescription verbatim. d7d21ff3 (1569, substitute POSTHOC before handoff) matches this item's 'pending' placeholder acceptance. d848a8ea (1572, derive '## Changes' from git diff --cached --name-status) should join as an added acceptance line. Survivor chosen as the older item with table-driven acceptance. Related: worktree-scope-continuation db2be6fb (coverage-gate HEAD~1..HEAD anchor) is the same anchor class on another surface. ADR-0106 H3 (host-derived explanation declaration) is the natural home: the host derives the diff stats from the worktree base."
+  ]
 }

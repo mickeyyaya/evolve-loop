@@ -11,5 +11,7 @@
     "go/internal/router/digest.go",
     "go/internal/phases/audit/audit.go"
   ],
-  "surface_note": "console 2026-09-26: typed surface from the item's own text (F29 curation) — the fix edits protected control-plane files, so this is console work"
+  "surface_note": "console 2026-09-26: typed surface from the item's own text (F29 curation) — the fix edits protected control-plane files, so this is console work",
+  "consumed_by": "inbox review 2026-09-27: DUPLICATE, merged into auditchain-scout-report-literal. Same fix class (artifact filename literals to their single-source constant, pinned by an AST uniqueness scan), with an overlapping file (auditchain/evidence_access.go). The survivor absorbs the acs-verdict literal sites, the one-archive-name helper and the uniqueness-scan acceptance, with import-direction care for leaf-safe coherence. This item is the older one but has no id, so the survivor is the id-bearing item.",
+  "consumed_at": "2026-09-27T23:30:00Z"
 }

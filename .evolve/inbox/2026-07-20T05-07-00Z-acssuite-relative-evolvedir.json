@@ -10,5 +10,14 @@
     "go/cmd/evolve/cmd_acs.go"
   ],
   "class": "path-hermeticity",
-  "created_at": "2026-07-20T05:07:00Z"
+  "created_at": "2026-07-20T05:07:00Z",
+  "absorbs": [
+    "ledger-binding-runid#1453"
+  ],
+  "merge_notes": [
+    "inbox review 2026-09-27: absorbed ledger-binding-runid#1453. ledger-binding-runid's prescription 1453 is this same defect: \"evolve acs suite resolves .evolve/runs/<cycle>/ relative to cwd, so a worktree cwd silently writes acs-verdict.json outside the workspace\". Move it here. The fix: absolutize and require a .../.evolve suffix in WriteVerdict and in the command (or resolve through the paths SSOT), reject or WARN on relative input, add a regression test, then sweep the existing go/.evolve litter."
+  ],
+  "acceptance": [
+    "(merged at the inbox review 2026-09-27) ledger-binding-runid's prescription 1453 is this same defect: \"evolve acs suite resolves .evolve/runs/<cycle>/ relative to cwd, so a worktree cwd silently writes acs-verdict.json outside the workspace\". Move it here. The fix: absolutize and require a .../.evolve suffix in WriteVerdict and in the command (or resolve through the paths SSOT), reject or WARN on relative input, add a regression test, then sweep the existing go/.evolve litter."
+  ]
 }

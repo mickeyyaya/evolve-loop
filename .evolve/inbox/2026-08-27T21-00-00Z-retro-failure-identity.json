@@ -13,12 +13,12 @@
     {
       "origin_id": "d14d12472115391ab733ed4d0555cd057",
       "first_seen_cycle": 1494,
-      "text": "PRESCRIPTION: Before the next ship of this lane, mint one .evolve/inbox/ item covering the two unbuilt acceptance criteria of sleep-time-kb-consolidation: the memo/retro warm-start brief (injection seam go/internal/phases/runner/runner.go:633; the existing operator->scout next-cycle-brief.json contract is dead on both sides and must be wired or replaced, not duplicated) and the Scout phase-token instrument that the soak measurement blocks on (scout-usage.json tokens.input == 0 in 8/8 sampled cyc\u2026"
+      "text": "PRESCRIPTION: Before the next ship of this lane, mint one .evolve/inbox/ item covering the two unbuilt acceptance criteria of sleep-time-kb-consolidation: the memo/retro warm-start brief (injection seam go/internal/phases/runner/runner.go:633; the existing operator->scout next-cycle-brief.json contract is dead on both sides and must be wired or replaced, not duplicated) and the Scout phase-token instrument that the soak measurement blocks on (scout-usage.json tokens.input == 0 in 8/8 sampled cyc…"
     },
     {
       "origin_id": "d6d0d110db5df72e3c9d2624f1eea203e",
       "first_seen_cycle": 1508,
-      "text": "PRESCRIPTION: Count no-rewrite rounds in a separate counter and let CLI escalation trigger on it, leaving the contract gate's block count and the breaker untouched \u2014 this preserves AC1's breaker-neutrality without disarming the escalation remedy."
+      "text": "PRESCRIPTION: Count no-rewrite rounds in a separate counter and let CLI escalation trigger on it, leaving the contract gate's block count and the breaker untouched — this preserves AC1's breaker-neutrality without disarming the escalation remedy."
     },
     {
       "origin_id": "d00b0b7d4166117172ffc122bce90cea3",
@@ -33,7 +33,7 @@
     {
       "origin_id": "d2db79cec19393b5df78c06b8397892b0",
       "first_seen_cycle": 1549,
-      "text": "PRESCRIPTION: Carry the sentinel FailureBlock from applySentinelStage to recordJudgmentLesson \u2014 add a Failure field to PhaseResponse read by recordJudgmentLesson, or have SentinelStageEnforce append the parsed defects as error-severity diagnostics \u2014 so the delivered test goes green unmodified; do NOT re-insert the hand-built diagnostic"
+      "text": "PRESCRIPTION: Carry the sentinel FailureBlock from applySentinelStage to recordJudgmentLesson — add a Failure field to PhaseResponse read by recordJudgmentLesson, or have SentinelStageEnforce append the parsed defects as error-severity diagnostics — so the delivered test goes green unmodified; do NOT re-insert the hand-built diagnostic"
     },
     {
       "origin_id": "dd910ec0fe8f025091c9ddeac014d607c",
@@ -76,5 +76,8 @@
       "text": "PRESCRIPTION: Either set RequireChallengeToken on the audit contract before the reconcile boundary is load-bearing, or correct the doc comment at system_failure.go:167-171 and the evidence string at coherence.go:99-103 to state what is actually verified for audit ('## Verdict' section + sentinel)"
     }
   ],
-  "created_at": "2026-08-27T21:00:00Z"
+  "created_at": "2026-08-27T21:00:00Z",
+  "merge_notes": [
+    "inbox review 2026-09-27: prescription 1568-llmroute moved to retro-events-stream-missing; fix it there, not here."
+  ]
 }

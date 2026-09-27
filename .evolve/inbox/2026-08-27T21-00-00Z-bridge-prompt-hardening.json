@@ -8,7 +8,7 @@
     {
       "origin_id": "d365e57d980d38614cb45ecc7a56c60bb",
       "first_seen_cycle": 1418,
-      "text": "PRESCRIPTION: go/internal/phases/audit/defect_ledger.go:757-765 \u2014 the inlined dispositionSchemaExample's DEFERRED entry carries a fully-formed reusable `reason` and is echoed straight into the failing agent's next prompt, while the DEFERRED branch at :672-678 checks only non-emptiness; replace it with a self-evidently non-reusable placeholder such as \"<why THIS id is deferred \u2014 one sentence naming the id's defect>\" while keeping id/status/evidence literal"
+      "text": "PRESCRIPTION: go/internal/phases/audit/defect_ledger.go:757-765 — the inlined dispositionSchemaExample's DEFERRED entry carries a fully-formed reusable `reason` and is echoed straight into the failing agent's next prompt, while the DEFERRED branch at :672-678 checks only non-emptiness; replace it with a self-evidently non-reusable placeholder such as \"<why THIS id is deferred — one sentence naming the id's defect>\" while keeping id/status/evidence literal"
     },
     {
       "origin_id": "d567cbc5a4c061d558e92335705a1b271",
@@ -28,7 +28,7 @@
     {
       "origin_id": "d0a3d0c2ddcc6ce1dcc46d98778f87503",
       "first_seen_cycle": 1517,
-      "text": "PRESCRIPTION: Extend the agents/evolve-auditor.md:190 exemption clause to name the <!-- evolve-audit-chain --> block alongside acs-verdict.json / Ledger Entry JSON / AC-cite table \u2014 fold onto the existing line, the persona budget has one line of headroom (750/751)"
+      "text": "PRESCRIPTION: Extend the agents/evolve-auditor.md:190 exemption clause to name the <!-- evolve-audit-chain --> block alongside acs-verdict.json / Ledger Entry JSON / AC-cite table — fold onto the existing line, the persona budget has one line of headroom (750/751)"
     },
     {
       "origin_id": "dbb895087ef294cd241ccf3230265db0a",
@@ -48,7 +48,7 @@
     {
       "origin_id": "da2d417508bdf8f2c8c3a51e05c193e8e",
       "first_seen_cycle": 1526,
-      "text": "PRESCRIPTION: Either scope the submit-verify guard to families whose promptMarker is an input-line marker, or give tmuxLaunch a distinct inputLineMarker \u2014 for agy the marker is the footer '? for shortcuts' (driver_agytmux.go:32) and the guard is silently inert."
+      "text": "PRESCRIPTION: Either scope the submit-verify guard to families whose promptMarker is an input-line marker, or give tmuxLaunch a distinct inputLineMarker — for agy the marker is the footer '? for shortcuts' (driver_agytmux.go:32) and the guard is silently inert."
     },
     {
       "origin_id": "d9805b3ee67fb9cc2aa7d2dd484c22b0c",
@@ -63,12 +63,12 @@
     {
       "origin_id": "d5406d70a3d0010de46fbfd49ea0cc0a1",
       "first_seen_cycle": 1562,
-      "text": "PRESCRIPTION: Emit the delivery classification as a driver-authored field on the artifact-timeout marker line (delivery=prompt_submit_wedged resends=3) and parse that field, not free-text reason=\"\u2026\", restoring the ADR-0090 Decision 7 invariant; additionally strip artifactTimeoutMarker from listWorkspaceFiles output as defence-in-depth"
+      "text": "PRESCRIPTION: Emit the delivery classification as a driver-authored field on the artifact-timeout marker line (delivery=prompt_submit_wedged resends=3) and parse that field, not free-text reason=\"…\", restoring the ADR-0090 Decision 7 invariant; additionally strip artifactTimeoutMarker from listWorkspaceFiles output as defence-in-depth"
     },
     {
       "origin_id": "d731f9a5e6d988a2eb89f456511e072dc",
       "first_seen_cycle": 1562,
-      "text": "PRESCRIPTION: Poll the completion detector once before the prompt-site short-circuit \u2014 an artifact on disk proves the prompt was submitted whatever the input line shows (same discipline as the ctx-cancel final poll at driver_tmux_repl.go:625-650)"
+      "text": "PRESCRIPTION: Poll the completion detector once before the prompt-site short-circuit — an artifact on disk proves the prompt was submitted whatever the input line shows (same discipline as the ctx-cancel final poll at driver_tmux_repl.go:625-650)"
     },
     {
       "origin_id": "d600862334db27e4a457d89a9cf056ed5",
@@ -83,7 +83,7 @@
     {
       "origin_id": "daffe705353eea354e6bd564f6a0575d8",
       "first_seen_cycle": 1562,
-      "text": "PRESCRIPTION: Add a confirming observation before the prompt-site short-circuit \u2014 one further capture after a longer settle, or a completion-detector poll \u2014 so a merely slow paste-chip redraw cannot become a 2s phase kill; cover falsely-pending-then-healthy with a test"
+      "text": "PRESCRIPTION: Add a confirming observation before the prompt-site short-circuit — one further capture after a longer settle, or a completion-detector poll — so a merely slow paste-chip redraw cannot become a 2s phase kill; cover falsely-pending-then-healthy with a test"
     },
     {
       "origin_id": "d55bd447a96c2c2efeb7dfc6ec4a28a48",
@@ -93,7 +93,7 @@
     {
       "origin_id": "db665324300c016718bb1c2962a4052f2",
       "first_seen_cycle": 1567,
-      "text": "PRESCRIPTION: Fix the phase-mint path so a minted menu phase cannot enter the git-tracked catalog without a persona or catalog:on-demand \u2014 the stub-level fix cures this instance only"
+      "text": "PRESCRIPTION: Fix the phase-mint path so a minted menu phase cannot enter the git-tracked catalog without a persona or catalog:on-demand — the stub-level fix cures this instance only"
     },
     {
       "origin_id": "d7570669667e23f01a2d47af42160d7d1",
@@ -108,12 +108,12 @@
     {
       "origin_id": "dc6ce2ad8c8b3c73a20956f51650b3120",
       "first_seen_cycle": 1568,
-      "text": "PRESCRIPTION: agents/evolve-auditor.md:152 states 'WARN blocks shipping' but go/internal/phases/ship/audit.go:100-110 ships WARN unless workflow.strict_audit is set (unset in .evolve/policy.json) \u2014 correct the persona text to the fluent-by-default runtime so an operator reading the rubric predicts the real ship outcome"
+      "text": "PRESCRIPTION: agents/evolve-auditor.md:152 states 'WARN blocks shipping' but go/internal/phases/ship/audit.go:100-110 ships WARN unless workflow.strict_audit is set (unset in .evolve/policy.json) — correct the persona text to the fluent-by-default runtime so an operator reading the rubric predicts the real ship outcome"
     },
     {
       "origin_id": "d562cfbb91540fc722b7c7bc781052a8c",
       "first_seen_cycle": 1568,
-      "text": "PRESCRIPTION: Set attempt-scoped core.BridgeRequest.StdoutLog/StderrLog on the second Launch in go/internal/phases/retro/retro.go (honoured by the bridge engine) so attempt 1's capture survives, and emit a [retro] WARN line naming core.DeliveryFailureCause(bridgeErr) before relaunching \u2014 a silent recovery is indistinguishable from a clean first try"
+      "text": "PRESCRIPTION: Set attempt-scoped core.BridgeRequest.StdoutLog/StderrLog on the second Launch in go/internal/phases/retro/retro.go (honoured by the bridge engine) so attempt 1's capture survives, and emit a [retro] WARN line naming core.DeliveryFailureCause(bridgeErr) before relaunching — a silent recovery is indistinguishable from a clean first try"
     },
     {
       "origin_id": "d47b63a9a6d7b18d954f9d7f14150635f",
@@ -126,5 +126,10 @@
       "text": "PRESCRIPTION: Before ship, un-track the out-of-lane phase spec: git rm --cached .evolve/phases/production-path-wiring-proof/phase.json - do NOT delete it from disk, dispatch reads minted stubs from disk; alternatively land it as its own reviewed change WITH an agents/evolve-production-path-wiring-proof.md persona"
     }
   ],
-  "created_at": "2026-08-27T21:00:00Z"
+  "created_at": "2026-08-27T21:00:00Z",
+  "merge_notes": [
+    "inbox review 2026-09-27: prescription d82379d5 moved to retro-events-stream-missing; fix it there, not here.",
+    "inbox review 2026-09-27: prescription d562cfbb moved to retro-events-stream-missing; fix it there, not here.",
+    "inbox review 2026-09-27: prescription d47b63a9 moved to retro-events-stream-missing; fix it there, not here."
+  ]
 }

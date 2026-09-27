@@ -18,5 +18,7 @@
     "RED first: a sequential cycle whose root holds only an item declaring a protected file ends as planned no-work, not claim-failed",
     "Every production composition root wires the predicate (root-coverage pin); a nil predicate is allowed only on the pinned test root",
     "The lane path is unchanged (triage_termination_lane_test.go stays green)"
-  ]
+  ],
+  "consumed_by": "inbox review 2026-09-27: DUPLICATE, merged into termination-check-uses-no-routing-predicate. The survivor is the superset: m2 plus the triage registry factory (m4) plus the coded routing-fallback signal (m9). It also names the current composed lane predicate (lanerouting.Forbidden), where this item's guards.IsProtectedScope is stale after #647. The survivor must absorb this item's acceptance: RED-first, a sequential cycle whose root holds only a protected-file item ends as planned no-work; a root-coverage pin, with nil allowed only on the routingtest root; the lane path unchanged (triage_termination_lane_test.go). Also its evidence pointer, the F30 addendum in docs/incidents/2026-09-15-shipped-item-re-pinned-and-sealed-lease-blocks-refresh.md.",
+  "consumed_at": "2026-09-27T23:30:00Z"
 }

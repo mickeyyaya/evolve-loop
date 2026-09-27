@@ -28,5 +28,7 @@
     "go/internal/phasecontract/contract.go",
     "go/internal/changedpkgs/changedfiles.go"
   ],
-  "surface_note": "2026-09-26 console curation (F29 follow-up): files[] typed from a read-only classification against guards.ProtectedSurfaceManifest — protected=true (/agents/evolve-builder.md, /agents/evolve-builder-reference.md), confidence=medium. POSTHOC exists only in the builder and auditor personas (no Go code substitutes the results), so deriving Changes from the staged diff means editing the protected builder persona and adding a step at the protected build-to-audit handoff in core."
+  "surface_note": "2026-09-26 console curation (F29 follow-up): files[] typed from a read-only classification against guards.ProtectedSurfaceManifest — protected=true (/agents/evolve-builder.md, /agents/evolve-builder-reference.md), confidence=medium. POSTHOC exists only in the builder and auditor personas (no Go code substitutes the results), so deriving Changes from the staged diff means editing the protected builder persona and adding a step at the protected build-to-audit handoff in core.",
+  "consumed_by": "inbox review 2026-09-27: DUPLICATE, merged into posthoc-diff-anchor-no-op-cycle. posthoc-diff-anchor-no-op-cycle should absorb d848a8ea: derive build-report's ## Changes from `git diff --cached --name-status`, host-derived like design H3, so the table cannot diverge from the commit and reverted paths are disclosed. It should also take the wave-3 evidence (cycles 1569, 1572 and 1573, including the 1573 rejection) and these files: agents/evolve-builder.md, go/internal/phasecontract/contract.go and go/internal/changedpkgs/changedfiles.go.",
+  "consumed_at": "2026-09-27T23:30:00Z"
 }

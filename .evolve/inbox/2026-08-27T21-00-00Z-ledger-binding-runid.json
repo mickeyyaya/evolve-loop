@@ -55,5 +55,8 @@
     "go/internal/phases/ship/audit.go",
     "go/internal/phases/ship/gitops.go"
   ],
-  "surface_note": "2026-09-26 console curation (F29 follow-up): files[] typed from a read-only classification against guards.ProtectedSurfaceManifest — protected=true (/go/internal/core/cyclerun_dispatch.go, /go/internal/core/defectledger/, /go/internal/phases/ship/gitops.go), confidence=medium. Sweep of 8: stateRoot is the cycle1420 test helper, and cmd_acs.go's --evolve-dir defaults to a cwd-relative '.evolve'; both are unprotected, but the acs-verdict build-to-audit check, the inherited-defect block and the tree-drift check behind audit_bound_tree_sha are protected; the shipping-delta prescription is new code with no existing home."
+  "surface_note": "2026-09-26 console curation (F29 follow-up): files[] typed from a read-only classification against guards.ProtectedSurfaceManifest — protected=true (/go/internal/core/cyclerun_dispatch.go, /go/internal/core/defectledger/, /go/internal/phases/ship/gitops.go), confidence=medium. Sweep of 8: stateRoot is the cycle1420 test helper, and cmd_acs.go's --evolve-dir defaults to a cwd-relative '.evolve'; both are unprotected, but the acs-verdict build-to-audit check, the inherited-defect block and the tree-drift check behind audit_bound_tree_sha are protected; the shipping-delta prescription is new code with no existing home.",
+  "merge_notes": [
+    "inbox review 2026-09-27: prescription 1453 moved to acssuite-relative-evolvedir-litter; fix it there, not here."
+  ]
 }

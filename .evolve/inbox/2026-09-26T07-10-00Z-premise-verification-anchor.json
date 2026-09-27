@@ -9,9 +9,20 @@
   "acceptance": [
     "A console-confirmed premise resets the drift window (premise_verified_at), pinned in phases/triage premise_drift tests",
     "A stale drop whose cited sha is not an ancestor of HEAD (or whose cited file is absent) is flagged evidence_verified=false in the routed item, pinned in cycleoutcome",
-    "The same id stale-dropped twice emits a coded escalation instead of a third lane"
+    "The same id stale-dropped twice emits a coded escalation instead of a third lane",
+    "(from triage-zero-input-reads) Triage dropped its assigned task by asserting an unverified negative — zero reads of the assigned id's Scout occurrences"
   ],
-  "files": ["go/internal/phases/triage/premise_drift.go", "go/internal/cycleoutcome/nowork.go", "go/internal/inboxbatch/item.go"],
+  "files": [
+    "go/internal/phases/triage/premise_drift.go",
+    "go/internal/cycleoutcome/nowork.go",
+    "go/internal/inboxbatch/item.go"
+  ],
   "created_at": "2026-09-26T07:10:00Z",
-  "source": "console-f40-architecture-review"
+  "source": "console-f40-architecture-review",
+  "absorbs": [
+    "triage-zero-input-reads"
+  ],
+  "merge_notes": [
+    "inbox review 2026-09-27: absorbed triage-zero-input-reads. premise-verification-anchor should absorb one extension: verify evidence on the host for the 'assigned id absent or invalid' drop too, not only for 'stale: <evidence>'. Such a drop must cite the scout-report lines it consulted, and the host checks those against the id's occurrences in scout-report.md (cycle-1571 H1: zero reads while the id appeared 7 times). The regression fixture needs re-authoring, because cycle 1571's artifacts are gone."
+  ]
 }
