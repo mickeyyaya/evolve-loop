@@ -2,12 +2,20 @@
   "id": "gc-reaps-before-its-refusal",
   "kind": "pipeline-repair",
   "priority": "P2",
-  "weight": 0.45,
+  "weight": 0.58,
   "title": "evolve gc reaps host tmux sessions and sockets before refusing a missing --project-root, so a unit test runs real host reapers",
   "summary": "Found by comment-reduction cmd/evolve group 3 (2026-09-26); verified by the console. cmd/evolve/cmd_gc.go runs swarm.ExecReapOrphans and ExecReapOrphanSockets, which are real host reaps, before the mutating-run check that refuses without --project-root. A bare `evolve gc` therefore reaps, then exits 1. TestRunGC_MutatingRunRefusesWithoutProjectRoot (cmd_gc_workspace_test.go) goes through that path, so `go test ./cmd/evolve` runs the real reapers against the host tmux server during the test. They only reap dead-owner sessions, but a test must not act on the host. The help text also says the root defaults to the current directory, while a mutating run refuses without it.",
   "fix": "Validate arguments, including the --project-root refusal, before any reap. Inject the reapers through the command's seams so tests never touch the host tmux server, and correct the help text.",
-  "acceptance": ["a bare `evolve gc` refuses without reaping anything (test with fake reapers)", "no cmd/evolve test calls swarm.Exec* reapers (AST or seam pin)"],
-  "files": ["go/cmd/evolve/cmd_gc.go", "go/cmd/evolve/cmd_gc_workspace_test.go"],
+  "acceptance": [
+    "a bare `evolve gc` refuses without reaping anything (test with fake reapers)",
+    "no cmd/evolve test calls swarm.Exec* reapers (AST or seam pin)"
+  ],
+  "files": [
+    "go/cmd/evolve/cmd_gc.go",
+    "go/cmd/evolve/cmd_gc_workspace_test.go"
+  ],
   "created_at": "2026-09-26T20:41:00Z",
-  "source": "console-comment-workstream-cmd-group-3"
+  "source": "console-comment-workstream-cmd-group-3",
+  "priority_class": "hygiene",
+  "priority_rationale": "inbox review 2026-09-27: The test acts on the live host from inside lanes, though it reaps only dead-owner sessions so the risk is low, and the help text contradicts the refusal."
 }

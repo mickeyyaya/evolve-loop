@@ -2,12 +2,21 @@
   "id": "interaction-rollup-tmp-collision",
   "kind": "pipeline-repair",
   "priority": "P3",
-  "weight": 0.3,
+  "weight": 0.52,
   "title": "interaction: WriteRollup writes through a shared path+\".tmp\" (the ADR-0049 N14 collision class), and Record appends outside its mutex",
   "summary": "Found by comment-reduction batch 30 (2026-09-26) and reported without changing code. (1) WriteRollup still writes via a fixed path+\".tmp\", the same collision class ADR-0049 N14 fixed for rule writes. It is safe today only because one orchestrator writes each workspace's summary once. (2) Recorder.Record calls appendLedgerLine outside its mutex, so concurrent Record calls in one process each open the ledger separately with O_APPEND, which the documented invariant does not cover. (3) TestRuleFiles_AbsentOnlyAndCorruptSafe never exercises the absent-only write its name claims. (4) Outside the package: core/cyclerun_correction.go:85 points readers at interaction/correction.go for reasoning that now lives in docs/architecture/packages/internal-interaction.md, and a test-inventory row names the old result code prompt_cleared.",
   "fix": "Write the rollup through atomicwrite. Take the mutex around the ledger append, or document and test the concurrent-append guarantee. Make the test exercise the absent-only path. Repoint the two stale references.",
-  "acceptance": ["WriteRollup uses the single atomic-write path (test with two concurrent writers)", "Concurrent Record calls produce whole, uninterleaved ledger lines (race test)"],
-  "files": ["go/internal/interaction/rollup.go", "go/internal/interaction/recorder.go", "go/internal/interaction/rules_test.go"],
+  "acceptance": [
+    "WriteRollup uses the single atomic-write path (test with two concurrent writers)",
+    "Concurrent Record calls produce whole, uninterleaved ledger lines (race test)"
+  ],
+  "files": [
+    "go/internal/interaction/rollup.go",
+    "go/internal/interaction/recorder.go",
+    "go/internal/interaction/rules_test.go"
+  ],
   "created_at": "2026-09-26T16:40:00Z",
-  "source": "console-comment-workstream-batch30"
+  "source": "console-comment-workstream-batch30",
+  "priority_class": "hygiene",
+  "priority_rationale": "inbox review 2026-09-27: A latent instance of the collision class ADR-0049 already solved elsewhere; switching to atomicwrite is a one-line change."
 }

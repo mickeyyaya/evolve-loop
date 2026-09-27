@@ -2,7 +2,7 @@
   "id": "termination-check-uses-no-routing-predicate",
   "kind": "pipeline-repair",
   "priority": "P2",
-  "weight": 0.55,
+  "weight": 0.82,
   "route": "console-pipeline-integrity",
   "title": "Two routing seams still judge without the lane-routing predicate: core's sequential termination check and the triage registry factory",
   "summary": "Deferred from the architect's review of fix/routing-honors-sandbox-deny (2026-09-26, APPROVE-WITH-MINOR). (m2) core/triage_termination.go:116 hasClaimableInboxWork calls inboxbatch.PartitionConsole(items, nil). When a lane-forbidden item (protected or builder-sandbox-denied) is the only pending work, triage correctly commits nothing, but this check calls the item claimable, and cycle_closeout.go:44-48 then seals the sequential cycle FAIL. (m4) The triage phase-registry factory (triage.go init, used by serve-phase and `evolve phase triage`) builds triage.Config with no LaneForbidden. Those paths silently fall back to protected surface only, which contradicts the 'degrades loudly' contract. (m9) The [routing] WARN from laneForbidden goes only to stderr; the coordinator has a Signal Center that could carry it as a coded event.",
@@ -30,5 +30,8 @@
   "merge_notes": [
     "inbox review 2026-09-27: absorbed triage-termination-scope-aware. The survivor is the superset: m2 plus the triage registry factory (m4) plus the coded routing-fallback signal (m9). It also names the current composed lane predicate (lanerouting.Forbidden), where this item's guards.IsProtectedScope is stale after #647. The survivor must absorb this item's acceptance: RED-first, a sequential cycle whose root holds only a protected-file item ends as planned no-work; a root-coverage pin, with nil allowed only on the routingtest root; the lane path unchanged (triage_termination_lane_test.go). Also its evidence pointer, the F30 addendum in docs/incidents/2026-09-15-shipped-item-re-pinned-and-sealed-lease-blocks-refresh.md.",
     "inbox review 2026-09-27: absorbed triage-termination-scope-aware. Absorbs triage-termination-scope-aware's acceptance (RED-first sequential protected-only root ends as planned no-work; a root-coverage pin with nil only on routingtest; the lane path unchanged) and its F30 addendum evidence. Add: dispatchableIDs must use the W3 rule (inboxmover.ResolveDispatchability or PendingDispatchability plus the lane predicate). As it stands it is a sixth copy of the 'may a lane take this id' belief W3 unified. Land it with or before the W3 merge."
-  ]
+  ],
+  "priority_class": "debuggability",
+  "priority_rationale": "inbox review 2026-09-27, revised after ADR-0106 W3: the no-work check now reads the lane menu (m2 shipped in W3, which also renamed dispatchableIDs to admittedIDs and made it fail closed only on unreadable files). What remains is the triage registry factory (m4) and a coded routing-fallback signal (m9), both debuggability.",
+  "review_status": "inbox review 2026-09-27: PARTIAL after ADR-0106 W3 (c4): the no-work check reads the lane menu through core.WithLaneMenu (the real routing predicate and the dependency rule). Remaining: m4 (the triage registry factory) and m9 (a coded routing-fallback signal)."
 }

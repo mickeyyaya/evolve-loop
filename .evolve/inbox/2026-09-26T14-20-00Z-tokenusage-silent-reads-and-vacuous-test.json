@@ -2,7 +2,7 @@
   "id": "tokenusage-silent-reads-and-vacuous-test",
   "kind": "pipeline-repair",
   "priority": "P3",
-  "weight": 0.3,
+  "weight": 0.51,
   "title": "tokenusage: readLines ignores scanner errors, and one apicover test compares a value with itself",
   "summary": "Found by comment-reduction batch 17 (2026-09-26) and reported without changing code. (1) scanner.go readLines never checks sc.Err(), so a transcript line over 8 MiB silently ends the read and under-counts usage. (2) apicover_named_test.go checks `r.Usage != (r.Usage)`, which compares a value with itself and can never fail. (3) fallbackchain_test.go hand-rolls an itoa that returns \"\" for negative numbers; use strconv.Itoa. (4) scanner_marker_test.go's jsonQuote escapes only quote, backslash and newline, so a tab produces invalid JSON. Its why-strings also cite stale lines: subagent.go:358 is now :354, and run.go:442 is now subagentrun/prompt.go:18. (5) In FillWarn, `pct == FillPctUnmeasured || pct < 0` has a redundant first half. (6) policy-config.md says only claude maps to a 200000 window, but codex, codex-tmux, agy and agy-tmux do too.",
   "fix": "Return or flag sc.Err() from readLines. Replace the self-comparison with a real expectation. Use strconv.Itoa and encoding/json in the test helpers, and drop line numbers from the why-strings. Simplify FillWarn. Correct policy-config.md.",
@@ -22,5 +22,7 @@
   "source": "console-comment-workstream-batch17",
   "merge_notes": [
     "inbox review 2026-09-27: prescription 6 moved to docs-drift-sweep-2026-07; fix it there, not here."
-  ]
+  ],
+  "priority_class": "hygiene",
+  "priority_rationale": "inbox review 2026-09-27: Test and telemetry hygiene; a transcript line over 8 MiB is rare."
 }

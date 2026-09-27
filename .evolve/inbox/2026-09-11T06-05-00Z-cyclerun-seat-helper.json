@@ -1,7 +1,7 @@
 {
   "id": "cyclerun-seat-helper",
   "created_at": "2026-09-11T06:05:00Z",
-  "weight": 0.45,
+  "weight": 0.5,
   "title": "RunCycleFromPhase's shared cycleRun re-seats different field subsets at three sites — extract one seat helper",
   "kind": "techdebt",
   "priority": "medium",
@@ -22,5 +22,7 @@
     "the 2026-09-11 dossier-evidence projection fix, which introduced the shared owner"
   ],
   "notes": "Architecture reviewer MEDIUM, round 3, explicitly a follow-up rather than a merge condition. The end-to-end guard the same review asked for (a test driving RunCycleFromPhase) landed partially as core/phase_timing_single_writer_test.go, a source-scan guard pinning the writer count at 1.",
-  "routed_reason": "re-routed 2026-09-26 (console, F35 evidence): the operator-authored route:\"lane\" declared protected FILES (go/internal/core/resume.go, go/internal/core/cyclerun.go) — on guards.ProtectedSurfaceManifest, so triage's breaker (membership) refuses the top_n card and the ship tripwire refuses the diff; a lane can only burn scout+triage. Work it hands-on at a batch boundary."
+  "routed_reason": "re-routed 2026-09-26 (console, F35 evidence): the operator-authored route:\"lane\" declared protected FILES (go/internal/core/resume.go, go/internal/core/cyclerun.go) — on guards.ProtectedSurfaceManifest, so triage's breaker (membership) refuses the top_n card and the ship tripwire refuses the diff; a lane can only burn scout+triage. Work it hands-on at a batch boundary.",
+  "priority_class": "hygiene",
+  "priority_rationale": "inbox review 2026-09-27: A maintainability follow-up; a single-writer source-scan guard already exists."
 }

@@ -1,7 +1,7 @@
 {
   "id": "docs-drift-sweep-2026-07",
   "title": "Docs-code alignment sweep (parts 1+2 merged): verified drift set from the 2026-07-13 three-agent audit — routing/checkpoint/loop-skill/flag-index/version lines + gates/ship/release/sandbox",
-  "weight": 0.82,
+  "weight": 0.66,
   "kind": "docs",
   "priority": "medium",
   "campaign": "docs-code-alignment-2026-07",
@@ -40,5 +40,8 @@
   ],
   "merge_notes": [
     "inbox review 2026-09-27: absorbed bridge-adapter-policy-literal#3, tokenusage-silent-reads-and-vacuous-test#6. This is the natural home for the doc-vs-code nits the comment workstream filed inside code items. Absorb bridge-adapter-policy-literal part (3): runtime-reference.md:109-110 document EVOLVE_INTERACTIVE_POLICY and EVOLVE_<AGENT>_INTERACTIVE_POLICY, which no Go code reads. Absorb tokenusage-silent-reads-and-vacuous-test part (6): policy-config.md's claude-only 200000-window claim. Drop entries (3) and (7), which are fixed."
-  ]
+  ],
+  "priority_class": "hygiene",
+  "priority_rationale": "inbox review 2026-09-27: Docs are the project's primary asset and these contradictions mislead operators, but no pipeline behavior depends on them.",
+  "review_status": "inbox review 2026-09-27: PARTIAL. Re-verified at origin/main 3082d91b. FIXED: (3) checkpoint-resume.md was rewritten for the Go resume (09d32a19 #535, fa771701, 7e4e76c8), with no resume-cycle.sh or EVOLVE_RESUME_* left. (7) role.go's header no longer makes the claim, and Decide now has the retro lessons-corpus allowance (guards/role.go:85-107). STILL OPEN: (1) dynamic-phase-routing.md:145 says the advisor defaults to haiku while NewPhaseAdvisor uses claude-tmux/opus (core/phase_advisor.go:113), and its ':158 | Default | Off' ro"
 }

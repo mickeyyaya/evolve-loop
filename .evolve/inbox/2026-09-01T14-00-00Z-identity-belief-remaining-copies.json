@@ -9,6 +9,8 @@
   "routed_reason": "top_n card \"explanation-identity-belief-remaining-copies\" names protected surface \"go/internal/explanationdocs/explanationdocs.go\" — control-plane changes go through the console route (operator-gated), not lane top_n",
   "source": "console-architecture-re-review",
   "title": "Route the three remaining identity-belief copies through CrossCheckActivation (arch re-review 2026-09-01, 2 HIGHs narrowed not closed)",
-  "weight": 0.85,
-  "created_at": "2026-09-01T14:00:00Z"
+  "weight": 0.9,
+  "created_at": "2026-09-01T14:00:00Z",
+  "priority_class": "stability",
+  "priority_rationale": "inbox review 2026-09-27: A zero ContractVersion can still silently disable retro's explanation check, and resume trusts partial markers. These are latent integrity holes in the explanation-document subsystem, the most failure-prone surface of waves 12-18 (X1-X3)."
 }

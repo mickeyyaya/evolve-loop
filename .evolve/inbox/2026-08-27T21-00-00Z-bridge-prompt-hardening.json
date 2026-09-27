@@ -1,7 +1,7 @@
 {
   "id": "bridge-prompt-hardening",
   "kind": "sweep",
-  "weight": 0.78,
+  "weight": 0.6,
   "title": "Sweep: bridge prompt hardening (24 auditor prescriptions amortised)",
   "summary": "Bridge/prompt-delivery prescriptions: persona composition, tmux dispatch, prompt-body assembly. Amortised from 24 content-hash carryoverTodos that were unreachable by any operator directive: their ids were 32-char hashes, so goal-text could never name them and triage could not prioritise them (all 144 were stamped priority=high, which is the same as none being high). Queue audit 2026-08-27. Member prescriptions verbatim below; work them as one sweep, smallest-blast-radius first, and retire the group when the theme is clean.",
   "prescriptions": [
@@ -131,5 +131,8 @@
     "inbox review 2026-09-27: prescription d82379d5 moved to retro-events-stream-missing; fix it there, not here.",
     "inbox review 2026-09-27: prescription d562cfbb moved to retro-events-stream-missing; fix it there, not here.",
     "inbox review 2026-09-27: prescription d47b63a9 moved to retro-events-stream-missing; fix it there, not here."
-  ]
+  ],
+  "priority_class": "hygiene",
+  "priority_rationale": "inbox review 2026-09-27: Once the relaunch moves out, two text fixes remain. Agents can echo the reusable DEFERRED reason verbatim, which keeps this above the floor.",
+  "review_status": "inbox review 2026-09-27: PARTIAL. 18 of 24 prescriptions are fixed or obsolete. FIXED: fillpct saturation (tokenusage/fillpct.go:22-58); peak-turn contributors (bridge/attempt_telemetry.go:219-222); agy exhausted_regex no longer has a bare rate-limit match (manifests/agy-tmux.json); the 8-rune echo floor now applies in both directions (driver_tmux_submitverify.go:70,73); a capture error mid-resend is logged (:128-133); agy submit-verify now reports an explicit 'NOT verified' (:101-104); the prompt-wedge short-circuit now polls t"
 }

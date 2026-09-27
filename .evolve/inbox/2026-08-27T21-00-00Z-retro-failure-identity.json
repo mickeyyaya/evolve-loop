@@ -1,7 +1,7 @@
 {
   "id": "retro-failure-identity",
   "kind": "sweep",
-  "weight": 0.82,
+  "weight": 0.56,
   "title": "Sweep: retro failure identity (14 auditor prescriptions amortised)",
   "summary": "Retro/failure-identity prescriptions: fingerprint normalization, escalation hints, failure-digest fidelity. Amortised from 14 content-hash carryoverTodos that were unreachable by any operator directive: their ids were 32-char hashes, so goal-text could never name them and triage could not prioritise them (all 144 were stamped priority=high, which is the same as none being high). Queue audit 2026-08-27. Member prescriptions verbatim below; work them as one sweep, smallest-blast-radius first, and retire the group when the theme is clean.",
   "prescriptions": [
@@ -79,5 +79,8 @@
   "created_at": "2026-08-27T21:00:00Z",
   "merge_notes": [
     "inbox review 2026-09-27: prescription 1568-llmroute moved to retro-events-stream-missing; fix it there, not here."
-  ]
+  ],
+  "priority_class": "hygiene",
+  "priority_rationale": "inbox review 2026-09-27: The remaining members are a latent rebaseline ordering, a model-tier literal and a doc-versus-contract mismatch; none is evidenced in recent waves.",
+  "review_status": "inbox review 2026-09-27: PARTIAL. Fixed or obsolete: P2, P7 and P8 (one-shot instructions to specific 1494/1561 lanes, expired); P3 (no production no-rewrite skip exists: internal/core/contract_escalation.go:242-244, \"No production caller yet\"); P4/P5 (IsDeliveryFailure never landed on main; the delivery classifier was rebuilt as internal/core/failurediag, 0f9f8523 #586); P6 (recordJudgmentLesson reads phasecontract.ReadFailureBlock, internal/core/judgment_lesson.go:35-39, df322f6c); P9/P11 (the failure_learning.go literal site "
 }

@@ -1,7 +1,6 @@
 {
   "id": "acssuite-relative-evolvedir-litter",
   "title": "acssuite accepts relative evolveDir/root — a run with cwd=<worktree>/go littered go/.evolve/runs/cycle-104/ inside the 949 worktree; abs-resolve inputs",
-  "weight_hint": 0.85,
   "why": "Found .evolve/worktrees/cycle-21f9f7ae-949/go/.evolve/runs/cycle-104/acs-verdict.json (mtime Jul 20 00:36, TestC104_* advisory predicates, all PASS) — an acssuite invocation resolved '.evolve' relative to a go/ cwd and wrote a nested phantom tree. Harmless this time, but a relative resolution in the WRITE path means a future gate could also READ from the wrong root, recreating the 949 missing-file class from the other side.",
   "how_to_apply": "In acssuite.Run/WriteVerdict (and cmd_acs.go arg handling): filepath.Abs + require the evolveDir to end in /.evolve (or resolve via core.ResolveCycleStatePath SSOT); reject/WARN on relative inputs. Add a regression test. Sweep + delete existing go/.evolve litter in worktrees.",
   "evidence": "ls -la .evolve/worktrees/cycle-21f9f7ae-949/go/.evolve/runs/cycle-104/",
@@ -19,5 +18,8 @@
   ],
   "acceptance": [
     "(merged at the inbox review 2026-09-27) ledger-binding-runid's prescription 1453 is this same defect: \"evolve acs suite resolves .evolve/runs/<cycle>/ relative to cwd, so a worktree cwd silently writes acs-verdict.json outside the workspace\". Move it here. The fix: absolutize and require a .../.evolve suffix in WriteVerdict and in the command (or resolve through the paths SSOT), reject or WARN on relative input, add a regression test, then sweep the existing go/.evolve litter."
-  ]
+  ],
+  "weight": 0.56,
+  "priority_class": "hygiene",
+  "priority_rationale": "inbox review 2026-09-27: It recurs weekly but git ignores it and nothing reads it today, so this is a hermeticity fix that heads off a future wrong-root read."
 }

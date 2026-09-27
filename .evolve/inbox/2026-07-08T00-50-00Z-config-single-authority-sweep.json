@@ -38,11 +38,14 @@
   "root_cause": "Defaults and vocabulary normalization duplicated instead of owned: policy vs config both author gate stages; the alias lives at call sites instead of the resolver.",
   "summary": "(1) config.go:501 hardcodes EvalGate/ContractGate/TriageCapGate = StageEnforce while policy.go:1168 GatesConfig() authors the same defaults as strings; cmd_cycle.go unconditionally overwrites config from policy, so the config literals are dead defaults — a debugging trap (editing the visible DefaultRoutingConfig does nothing) and an equivalence nothing tests. (2) `if cli == \"antigravity\" { cli = \"agy\" }` inlined at subagent/run.go:199, dispatchparallel.go:124, validateprofile.go:137; bridge/driver.go:112 documents it trusts upstream normalization — a 4th dispatch path that forgets the block fails with 'adapter not executable' three call-sites from the root cause.",
   "title": "Two single-source violations in config plumbing: gate-stage defaults authored in BOTH config.DefaultRoutingConfig (dead — always clobbered from policy at cmd_cycle.go:332-338) AND policy.GatesConfig; antigravity→agy CLI alias copy-pasted in 3 subagent files with the bridge trusting all copies stay identical",
-  "weight": 0.72,
+  "weight": 0.54,
   "absorbs": [
     "config-policy-single-authority"
   ],
   "merge_notes": [
     "inbox review 2026-09-27: absorbed config-policy-single-authority. Survivor config-single-authority-sweep (2026-07-08, other partition): same gate-stage single-authority theme, named RED tests, and still valid (config.go:113-114 still hardcodes enforce). Absorb P-1: validate unknown gate words at policy.Load, or coerce them toward enforce with a logged line, for the two remaining parseGateStage readers, mirroring TestRepoContractGate_UnknownStageFailsTowardEnforce. Absorb L1/L2: the cmd/evolve assertion must pin the resolved Stage, not a reviewer count (the survivor's TestGateDefaults_PolicyIsSingleAuthority)."
-  ]
+  ],
+  "priority_class": "hygiene",
+  "priority_rationale": "inbox review 2026-09-27: Half of it is fixed and the other half is now drift-pinned by a test, so what is left is a single-source cleanup with no live failure mode.",
+  "review_status": "inbox review 2026-09-27: PARTIAL. (2) FIXED: detectcli.Canonical (go/internal/detectcli/detectcli.go:67-83, landed 5cd7f9ba 2026-08-04) is now the one alias authority, and all three dispatch paths call it (subagent/dispatchparallel.go:132, subagent/validateprofile.go:136, subagent/subagentrun/resolve.go:47). (1) The dual authoring remains: config.defaultRollout still writes EvalGate/ContractGate/TriageCapGate=StageEnforce (config/config.go:113-115) beside policy.GatesConfig. But the \"an equivalence nothing tests\" premise is gone"
 }

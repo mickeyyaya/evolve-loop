@@ -27,7 +27,7 @@
     "standing goal: per-agent token usage optimization (unmeasured phases are invisible to it)"
   ],
   "priority": "medium",
-  "weight": 0.65,
+  "weight": 0.74,
   "created_at": "2026-08-15T10:30:00Z",
   "notes": "Filed mid-batch 20260815c from console monitoring; preexisting class (present in 20260815b + wave5 logs), NOT a regression from v22.18.0. Fail-open is honest so not batch-blocking; weight below the 0.85+ pipeline-integrity band by design.",
   "absorbs": [
@@ -36,5 +36,8 @@
   "merge_notes": [
     "inbox review 2026-09-27: absorbed percli-token-usage-collector. The survivor must absorb the TRIPWIRE acceptance and downgrade rule, the explicit unavailable-with-reason alternative, and the attempt_telemetry.go and clicontrol/usage.go file list.",
     "inbox review 2026-09-27: absorbed percli-token-usage-collector. Retitle to the per-CLI usage collector. Absorb from percli-token-usage-collector: (a) acceptance 'TRIPWIRE count for a healthy run is 0', with the TRIPWIRE (attempt_telemetry.go:231-233) firing only for a family that has a collector yet returned nothing; (b) the 'explicit unavailable-with-reason' option when a CLI exposes no usage; (c) files attempt_telemetry.go and clicontrol/usage.go, plus the hint to read codex's session self-report (#508-#516 fidelity arc). Update the evidence: agy-tmux (router, flake-rerun-scan, memo) is now the main unmeasured family. Keep the residual-roots coherence test."
-  ]
+  ],
+  "priority_class": "performance",
+  "priority_rationale": "inbox review 2026-09-27: Quota budgeting and the consumption ledger are blind to every non-claude dispatch (about 45 per 6 cycles), and the TRIPWIRE noise buries real signals; nothing breaks because of it.",
+  "review_status": "inbox review 2026-09-27: PARTIAL. Sub-defect 1 is fixed in practice. Every phase root uses adapters/bridge.NewDefault, which wires tokenusage.DefaultResolver (bridge.go:110), and the subagent root does too (subagent/bridgeadapter.go:66). The 14 loop logs from 2026-09-26/27 contain 0 'TokenResolver is nil' and 0 BRIDGE_TOKEN_RESOLVER_MISSING lines. Two roots are still unwired: `evolve bridge launch` (cmd_bridge.go:59, which consensusdispatch.go:360 shells) and cmd_models_live.go:174. No enumeration-based coherence test exists. Su"
 }

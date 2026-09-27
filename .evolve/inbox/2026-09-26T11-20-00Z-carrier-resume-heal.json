@@ -4,7 +4,7 @@
   "kind": "hardening",
   "class": "pipeline-integrity",
   "priority": "P1",
-  "weight": 0.8,
+  "weight": 0.91,
   "route": "console",
   "created_at": "2026-09-26T11:20:00Z",
   "files": [
@@ -17,5 +17,7 @@
     "A resume with a rebased carrier at HEAD leaves the change pending on its fork point before Ship or Audit runs.",
     "A carrier naming another cycle or run is left alone.",
     "The design review's crash-window table gains both B1 windows with their recovery."
-  ]
+  ],
+  "priority_class": "stability",
+  "priority_rationale": "inbox review 2026-09-27: A crash between rebase and pend now strands a carrier from either of two writers, and the resumed ship re-audits an empty diff. Latent, but on the live ship path."
 }

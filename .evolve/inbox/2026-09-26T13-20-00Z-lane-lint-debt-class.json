@@ -2,7 +2,7 @@
   "id": "lane-lint-debt-class",
   "kind": "pipeline-repair",
   "priority": "P2",
-  "weight": 0.6,
+  "weight": 0.62,
   "title": "Lane ships skip golangci-lint, so lint debt reaches main and then blocks every console commit to that package",
   "summary": "The local commit gate (internal/commitgate/lanes.go laneGo) runs golangci-lint over every package a change touches. Lane ships do not run it, and neither does CI (go/.golangci.yml says CI enforces vet+gofmt+tests only). On 2026-09-26 origin/main carried two production findings: errcheck on `defer f.Close()` at internal/dossier/read.go (added by cycle commit f3044a3b), and staticcheck QF1001 at internal/faillearn/novelty.go. A comment-only console batch on internal/dossier could not pass its commit gate, because a comment-only change may not fix code. The console fix is branch fix/production-lint-debt. Until the class is fixed, debt can come back with any lane.",
   "fix": "Put one lint check in the lane path, the same golangci-lint config over the changed packages, as a composed ship or build-exit gate. It must share the commit gate's implementation, not copy it. Roll it out shadow → enforce through the stage config, the way the other gates do. Another option is to make the commit gate lint only new issues (--new-from-rev), but that lets debt pile up with nothing noticing, so only consider it alongside the lane gate.",
@@ -11,7 +11,13 @@
     "The lane check and the commit gate share one lint implementation and one config",
     "A test proves a lane build with an unchecked Close error is caught"
   ],
-  "files": ["go/internal/commitgate/lanes.go", "go/internal/phases/ship/", "go/.golangci.yml"],
+  "files": [
+    "go/internal/commitgate/lanes.go",
+    "go/internal/phases/ship/",
+    "go/.golangci.yml"
+  ],
   "created_at": "2026-09-26T13:20:00Z",
-  "source": "console-comment-workstream-batch11"
+  "source": "console-comment-workstream-batch11",
+  "priority_class": "hygiene",
+  "priority_rationale": "inbox review 2026-09-27: Lane lint debt blocks console commits (seen 2026-09-26). It is two standards for one tree, not a loop-stability defect."
 }

@@ -2,12 +2,23 @@
   "id": "core-floor-checks-hygiene",
   "kind": "pipeline-repair",
   "priority": "P3",
-  "weight": 0.3,
+  "weight": 0.52,
   "title": "core floor checks: removal-claim pathspec magic, head-first byte cut in the persona-budget floor, ignored rev-parse errors, callerless scoped-review duplicates",
   "summary": "Found by comment-reduction batch 45 (core group 2, 2026-09-26) and reported without code changes. The console verified (1) and (2). (1) build_removal_check.go runs `git ls-files --error-unmatch -- <claimed>`. `--` does not turn off pathspec magic, so a claimed removal spelled with a glob or `:(…)` can match other tracked files and record a false failure. (2) build_persona_budget_check.go keeps the FIRST 400 bytes of `go test` output by byte index; the rest of the floor keeps the last 400 since cycle 1268, and a byte cut can split a UTF-8 rune. (3) composition_carryforward.go:96 and :183 ignore the `git rev-parse HEAD` error, writing an empty GitHead into the verdict input; the RUNG 0 and RUNG 2 bodies duplicate about 40 lines. (4) composition_scoped_review.go's ScopedReviewMethod and ReverifyResolution duplicate mergerung2.go's scopedReviewMethod and ResolutionMatchesAudited, and ScopedReviewVerdict, Composes, ReverifyResolution and IntersectingHunks have no production caller. (5) ClassifyFleetRebaseCandidate returns the zero value FleetRebaseAlreadyLanded together with an error. (6) docs/architecture/phase-recovery.md:65-66 and ADR-0044:23 say recoverBuildLeak never relocates .evolve/ paths; deliverable subpaths are relocated since cycle 268.",
   "fix": "(1) Pass `:(literal)<path>` or set GIT_LITERAL_PATHSPECS=1. (2) Use the floor's shared tail-truncation helper, rune-safe. (3) Propagate the rev-parse error and extract the shared rung body. (4) Delete the duplicates and the callerless API, or wire one caller. (5) Return a distinct unknown zero value with an error. (6) Correct the two docs.",
-  "acceptance": ["a removal claim spelled `*.go` whose file is gone and untracked is not a failure (test)", "a persona-budget failure message ends with the test output's last bytes and is valid UTF-8 (test)"],
-  "files": ["go/internal/core/build_removal_check.go", "go/internal/core/build_persona_budget_check.go", "go/internal/core/composition_carryforward.go", "go/internal/core/composition_scoped_review.go", "docs/architecture/phase-recovery.md"],
+  "acceptance": [
+    "a removal claim spelled `*.go` whose file is gone and untracked is not a failure (test)",
+    "a persona-budget failure message ends with the test output's last bytes and is valid UTF-8 (test)"
+  ],
+  "files": [
+    "go/internal/core/build_removal_check.go",
+    "go/internal/core/build_persona_budget_check.go",
+    "go/internal/core/composition_carryforward.go",
+    "go/internal/core/composition_scoped_review.go",
+    "docs/architecture/phase-recovery.md"
+  ],
   "created_at": "2026-09-26T18:30:00Z",
-  "source": "console-comment-workstream-batch45"
+  "source": "console-comment-workstream-batch45",
+  "priority_class": "hygiene",
+  "priority_rationale": "inbox review 2026-09-27: Small correctness nits in floors: a glob-spelled removal claim can false-FAIL, and a truncated failure message drops its tail."
 }

@@ -22,10 +22,12 @@
   ],
   "id": "chronicle-s7b-historian-filer",
   "kind": "feature",
-  "notes": "[SCOPE 2026-07-23] Implement against the landed S4 boundary applier (recurrence.ApplyBoundary) \u2014 no second filer; clamp/namespace rules carry over. | reprioritized 2026-07-29 operator directive: pipeline improvement + token optimization first; DEMOTED below the two priority classes",
+  "notes": "[SCOPE 2026-07-23] Implement against the landed S4 boundary applier (recurrence.ApplyBoundary) — no second filer; clamp/namespace rules carry over. | reprioritized 2026-07-29 operator directive: pipeline improvement + token optimization first; DEMOTED below the two priority classes",
   "priority": "high",
   "source": "approved plan 2026-07-10 (failure mode 5 mitigation)",
   "summary": "Close the loop from batch review to queued work WITHOUT an unvalidated LLM->inbox channel (failure mode 5): a deterministic post-step in cmd_loop parses historian-actions.json {preventive_actions:[{id,title,weight_hint,evidence}]} with STRICT validation and files items via the existing auto-injector idiom (cmd_loop_outcome.go:225 fileUnexplainedOutcomeDefect pattern). Hard rules enforced by the filer, not the prompt: id forced into the historian- namespace; weight clamped to [0.5, 0.95]; max 3 actions per batch; evidence field REQUIRED (reject actions without artifact pointers); NEVER overwrites an existing inbox item (os.Stat dedup); strict json decode of the actions envelope. Rejected actions are logged in the historian workspace, never filed silently.",
   "title": "Chronicle S7b: deterministic historian-actions filer - the ONLY writer from historian to inbox (validated, clamped, namespaced)",
-  "weight": 0.71
+  "weight": 0.42,
+  "priority_class": "feature",
+  "priority_rationale": "inbox review 2026-09-27: A speculative feature behind a console-owned dependency; weighted below S7a because it cannot start first."
 }

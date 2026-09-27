@@ -2,7 +2,7 @@
   "id": "premise-verification-anchor",
   "kind": "pipeline-repair",
   "priority": "P1",
-  "weight": 0.7,
+  "weight": 0.74,
   "title": "Premise drift never resets, and a stale drop's evidence is free text: stamp console re-verification, verify cited evidence on the host, and screen stale items before the planner spends a lane",
   "summary": "F40 architecture review M3 + M5 + follow-up (a)-(c). (1) FiledAt is fixed at filing, so an item the console re-verifies and re-queues shows the same premise_drift forever and can bounce between lanes (stale drop → console → re-queue → stale drop). (2) `stale: <evidence>` is free text: nothing checks a cited sha exists and is an ancestor of HEAD, or a cited file exists — a lazy triage can drop real work cheaply (with F30 that yields a SKIPPED lane plus a console item). (3) The wave planner picks items before any lane runs: a stale item still burns scout + triage before the drop.",
   "fix": "(1) `premise_verified_at` (+ the sha verified against), stamped when the console confirms a premise; drift measures from the later of it and created_at; a Signal Center code when the same id is stale-dropped twice, escalating instead of looping. (2) In F30's hand-off, verify cited evidence deterministically (a cited sha exists and is an ancestor of HEAD; a cited file:line's file exists at HEAD), record evidence_verified beside routed_reason, and flag a stale drop with no drift and no id-naming commit. (3) Planner-side cheap pre-filters: never dispatch an item with vanished declared paths or a commit naming its id without a premise re-check; and a batched wave-boundary premise audit over the top-K dispatchable items (stale → console, never consumed; mis-scoped → narrowed; confirmed → premise_verified_at).",
@@ -24,5 +24,7 @@
   ],
   "merge_notes": [
     "inbox review 2026-09-27: absorbed triage-zero-input-reads. premise-verification-anchor should absorb one extension: verify evidence on the host for the 'assigned id absent or invalid' drop too, not only for 'stale: <evidence>'. Such a drop must cite the scout-report lines it consulted, and the host checks those against the id's occurrences in scout-report.md (cycle-1571 H1: zero reads while the id appeared 7 times). The regression fixture needs re-authoring, because cycle 1571's artifacts are gone."
-  ]
+  ],
+  "priority_class": "performance",
+  "priority_rationale": "inbox review 2026-09-27: Stale items still cost a lane scout and triage and can bounce between lane and console."
 }

@@ -4,7 +4,7 @@
   "kind": "hardening",
   "class": "pipeline-integrity",
   "priority": "P2",
-  "weight": 0.6,
+  "weight": 0.9,
   "route": "console",
   "created_at": "2026-09-26T21:51:00Z",
   "files": [
@@ -17,5 +17,7 @@
     "A fleet lane with no pin does not reach triage; the refusal is a coded signal.",
     "A sequential cycle (no fleet) is unaffected.",
     "The provisioning path that writes the pin is covered by a test that fails when the write is skipped."
-  ]
+  ],
+  "priority_class": "stability",
+  "priority_rationale": "inbox review 2026-09-27: A latent integrity hole (the agent picks what the host claims) behind a best-effort write; no instance observed."
 }

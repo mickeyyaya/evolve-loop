@@ -11,7 +11,13 @@
     "Write(nil) returns an error without panicking (test that does not recover)",
     "BuildOpts has no dead fields"
   ],
-  "files": ["go/internal/dossier/sweep.go", "go/internal/dossier/write.go", "go/internal/dossier/build.go"],
+  "files": [
+    "go/internal/dossier/sweep.go",
+    "go/internal/dossier/write.go",
+    "go/internal/dossier/build.go"
+  ],
   "created_at": "2026-09-26T12:40:00Z",
-  "source": "console-comment-workstream-batch11"
+  "source": "console-comment-workstream-batch11",
+  "priority_class": "hygiene",
+  "priority_rationale": "inbox review 2026-09-27: The wrong-pair commit is only reachable through a function nothing calls; the rest is a nil guard and a dead field."
 }

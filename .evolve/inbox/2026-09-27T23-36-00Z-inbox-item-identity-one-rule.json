@@ -1,0 +1,19 @@
+{
+  "id": "inbox-item-identity-one-rule",
+  "created_at": "2026-09-27T23:30:00Z",
+  "title": "One item identity: every inbox reader resolves an id-less item the same way (or the host stamps the id at intake)",
+  "weight": 0.9,
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "files": [
+    "go/internal/inboxbatch/item.go",
+    "go/internal/inboxmover/lifecycle/item.go",
+    "go/internal/triagecap/wave_seed.go"
+  ],
+  "summary": "inboxbatch.LoadFile gives an item without an id its filename stem; lifecycle.readID and triagecap.ReadInboxBacklog read the JSON id alone. Five id-less items were visible to triage, invisible to the planner and unclaimable by the lifecycle (one of them lane work). The 2026-09-27 curation stamped ids by hand; the class needs one rule. Design doc §7.7 W5.",
+  "acceptance": [
+    "Every reader derives the same id for an item, or intake refuses/stamps an id-less item loudly; a test pins the three readers to one answer."
+  ],
+  "source": "inbox review 2026-09-27 (design doc §7.7 W5)",
+  "priority_rationale": "inbox review 2026-09-27: an item visible to triage but invisible to the planner and unclaimable by the lifecycle can end a sequential cycle as a claim failure"
+}

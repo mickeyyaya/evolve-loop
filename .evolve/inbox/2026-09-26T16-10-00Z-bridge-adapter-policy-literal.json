@@ -2,7 +2,7 @@
   "id": "bridge-adapter-policy-literal",
   "kind": "pipeline-repair",
   "priority": "P3",
-  "weight": 0.3,
+  "weight": 0.53,
   "title": "bridge adapter: resolvePolicy compares a literal instead of PolicyRecommendedOrFirst, so policy.json cannot force it; stale env rows in runtime-reference",
   "summary": "Found by comment-reduction batch 27 (2026-09-26) and reported without changing code. (1) resolvePolicy compares against the literal \"recommended_or_first\" instead of the PolicyRecommendedOrFirst constant. That value is also indistinguishable from 'unset', so policy.json cannot force recommended_or_first over a profile that sets something else. (2) bridge_rules_test.go defines `func min(a, b int) int`, which shadows Go's builtin. (3) docs/operations/runtime-reference.md rows 114-115 still describe EVOLVE_INTERACTIVE_POLICY and EVOLVE_<AGENT>_INTERACTIVE_POLICY, which nothing reads anymore. (4) The Adapter's setters are not synchronized, so it must be fully configured before it is shared; nothing enforces that.",
   "fix": "Use the constant, and represent 'unset' distinctly (a pointer or a typed zero) so an explicit policy value wins. Delete the shadowing min. Remove the two stale rows. Make the Adapter immutable after construction (functional options), or document and test the construction-only contract.",
@@ -19,5 +19,7 @@
   "source": "console-comment-workstream-batch27",
   "merge_notes": [
     "inbox review 2026-09-27: prescription 3 moved to docs-drift-sweep-2026-07; fix it there, not here."
-  ]
+  ],
+  "priority_class": "hygiene",
+  "priority_rationale": "inbox review 2026-09-27: A small config-authority bug (an explicit policy value loses to the profile) plus doc and test cleanup."
 }

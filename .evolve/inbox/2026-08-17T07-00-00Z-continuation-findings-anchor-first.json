@@ -27,7 +27,7 @@
     "acs-absence-primitive-and-unsatisfiability-lint 0.85 (prevents the anchor being authored; this makes retries fix it when it slips through)"
   ],
   "priority": "high",
-  "weight": 0.86,
+  "weight": 0.93,
   "created_at": "2026-08-17T07:00:00Z",
   "notes": "Filed from the 2026-08-17 failure-rate review. Two full lanes (~4M tokens) were spent re-deriving green work around a ten-line repair. | REPRIORITIZED 2026-08-17 0.78->0.86 per docs/incidents/2026-08-17-failure-rate-review-1481-1503.md ranked plan (operator directive: prioritize pipeline/fail-rate improvements).",
   "absorbs": [
@@ -36,5 +36,7 @@
   "merge_notes": [
     "inbox review 2026-09-27: absorbed continuation-remediation-first-contract. Survivor continuation-findings-anchor-first: older, with acceptance and a red-first fixture, where this item has no acceptance. Carry over the non-deferrable-blocker gate, the refuse-at-mint option, the derived Changes table and the cycle-1573 evidence (itemized on the survivor).",
     "inbox review 2026-09-27: absorbed continuation-remediation-first-contract. Absorb from continuation-remediation-first-contract: (a) blocker-class inherited defects cannot be DEFERRED, or the continuation is refused at mint (gradeClaim, defectledger/reconcile.go:139-160, knows no severity, and the Entry schema has none, schema.go:82-88); (b) the build-report Changes table is derived from `git diff --cached --name-status`, not authored (1572-M1/1574-M1 narrative-fidelity evidence), which overlaps posthoc-diff-anchor-no-op-cycle and design H3; (c) its evidence, cycle 1573 (19/19 inherited defects deferred including both parent blockers; wave 3 went 0/3); (d) its files: defectledger/dispositions.go, continuation/continuation.go, phasecontract/contract.go. Related, not merged: continuation-findings-prompt-hygiene (same rendering seam, sanitization only)."
-  ]
+  ],
+  "priority_class": "stability",
+  "priority_rationale": "inbox review 2026-09-27: Wasted whole lanes in August (1492/1495, and 1573 in the 0/3 wave 3); continuations still run every few waves and the ledger still lets a blocker be deferred."
 }

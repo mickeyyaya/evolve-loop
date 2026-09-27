@@ -3,7 +3,7 @@
   "title": "Linux sandbox: bwrap binds every WritePath with --bind, which fails the launch when a declared write dir does not exist yet (--bind-try or mkdir-before-bind)",
   "kind": "bug",
   "class": "pipeline-integrity",
-  "weight": 0.62,
+  "weight": 0.55,
   "priority": "P2",
   "route": "console-manual",
   "created_at": "2026-09-12T11:00:00Z",
@@ -19,5 +19,7 @@
     "go/internal/adapters/sandbox/sandbox_test.go"
   ],
   "notes": "Surfaced by the architecture review of the write_subpaths landing (2026-09-12); out of that slice's scope because it is adapter behavior on a platform the runtime does not run.",
-  "routed_reason": "re-routed 2026-09-26 (console, F35 evidence): the operator-authored route:\"lane\" declared protected FILES (go/internal/adapters/sandbox/sandbox.go, go/internal/adapters/sandbox/sandbox_test.go) — on guards.ProtectedSurfaceManifest, so triage's breaker (membership) refuses the top_n card and the ship tripwire refuses the diff; a lane can only burn scout+triage. Work it hands-on at a batch boundary."
+  "routed_reason": "re-routed 2026-09-26 (console, F35 evidence): the operator-authored route:\"lane\" declared protected FILES (go/internal/adapters/sandbox/sandbox.go, go/internal/adapters/sandbox/sandbox_test.go) — on guards.ProtectedSurfaceManifest, so triage's breaker (membership) refuses the top_n card and the ship tripwire refuses the diff; a lane can only burn scout+triage. Work it hands-on at a batch boundary.",
+  "priority_class": "hygiene",
+  "priority_rationale": "inbox review 2026-09-27: A real launch failure, but only on Linux hosts, which the live runtime never uses."
 }

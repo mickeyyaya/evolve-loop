@@ -1,0 +1,19 @@
+{
+  "id": "consumed-item-resurrection-guard",
+  "created_at": "2026-09-27T23:30:00Z",
+  "title": "An id present both at the inbox root and in consumed/ is flagged, never silently read as pending",
+  "weight": 0.91,
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "files": [
+    "go/internal/inboxmover/dispatchstate.go",
+    "go/internal/inboxmover/lifecycle/recover.go"
+  ],
+  "summary": "a603c42f ('six orphans recovered from processing/', 2026-09-26) re-added ledger-verify-seal-anchor and inbox-console-worklist-view, both already consumed by ship 38d3a411; ResolveDispatchState ranks a root copy above a consumed record, so both read as pending again. recover-orphans returns every non-active processing claim to the root without checking the retirement dirs.",
+  "acceptance": [
+    "recover-orphans skips (and names) a claim whose id already has a retirement record.",
+    "A root item whose id also has a retirement record is reported at plan time instead of dispatched."
+  ],
+  "source": "inbox review 2026-09-27 (design doc §5.10)",
+  "priority_rationale": "inbox review 2026-09-27: a recovered claim resurrects finished work as pending, which the planner then dispatches"
+}
