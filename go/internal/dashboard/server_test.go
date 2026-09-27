@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -174,13 +175,60 @@ func TestServer_SSEPushesOnChangeAndKeepsAlive(t *testing.T) {
 
 func TestServer_UnchangedRootDoesNotBumpSeq(t *testing.T) {
 	t.Parallel()
-	s, _, _ := newTestServer(t, seedProject(t, time.Now()), time.Now())
-	time.Sleep(60 * time.Millisecond)
+	const poll = 10 * time.Millisecond
+	now := time.Now()
+	s := New(seedProject(t, now), Options{PollInterval: poll, Now: func() time.Time { return now }})
+	// Subscribe before Run starts, so the poller's first publication cannot be missed.
+	published, unsubscribe := s.subscribe()
+	defer unsubscribe()
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	go s.Run(ctx)
+
+	select {
+	case <-published:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the poller never published the first snapshot")
+	}
 	_, seq1 := s.current()
-	time.Sleep(60 * time.Millisecond)
+	// Several poll ticks over the unchanged root must publish nothing.
+	select {
+	case seq := <-published:
+		t.Fatalf("seq %d published without a change", seq)
+	case <-time.After(10 * poll):
+	}
 	_, seq2 := s.current()
 	if seq1 != seq2 {
 		t.Fatalf("seq moved without a change: %d -> %d", seq1, seq2)
+	}
+}
+
+func TestServer_ConcurrentOnDemandReadersPublishOnce(t *testing.T) {
+	t.Parallel()
+	now := time.Now()
+	s := New(seedProject(t, now), Options{PollInterval: time.Hour, Now: func() time.Time { return now }})
+	const readers = 16
+	seqs := make([]uint64, readers)
+	var wg sync.WaitGroup
+	for i := range seqs {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			_, seqs[i] = s.current()
+		}(i)
+	}
+	wg.Wait()
+	for i, seq := range seqs {
+		if seq != 1 {
+			t.Fatalf("reader %d saw seq %d, want 1: every early reader of an unchanged root shares one publish (all: %v)", i, seq, seqs)
+		}
+	}
+	// Run's startup refresh of the same unchanged root must not publish again.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	s.Run(ctx)
+	if _, seq := s.current(); seq != 1 {
+		t.Fatalf("Run's startup refresh re-published an unchanged root: seq 1 -> %d", seq)
 	}
 }
 
