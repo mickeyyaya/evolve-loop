@@ -8,29 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// repro_cycle1285_core_test.go — executable reproduction of the cycle-1285
-// adversarial review's F1 (HIGH), the finding that lives on the failure-floor
-// side of the diff.
-//
-// It drives writeDeterministicLearning — the production seam the failure path
-// calls (the three fallback tails of recordFailureLearning) — not
-// faillearn.WriteArtifacts directly, because the collision is MINTED by the
-// failure-learning engine (ADR-0103 unit 03b, internal/core/failurelearning):
-// remediationItems derives the inbox id from remediationSlug(title), and
-// remediationSlug stops at remediationSlugMaxRunes = 60.
-//
-// Chain: two defect lines sharing a 60-rune slug prefix → one id, two different
-// titles → inbox.go:114-116 (the cycle-1282 DEF-4 fix) raises a hard error →
-// writer.go:30-32 (the WithInbox ordering) returns BEFORE the retrospective and
-// the lesson are written → the engine downgrades the whole thing to one
-// FAILURELEARNING_FLOOR_WRITE_FAILED signal.
-//
-// Net effect: a failing cycle produces NO retrospective and NO lesson. That is
-// the cycle-1255 state — a defect with no durable record — reached through the
-// mechanism built to make it unreachable, and reached more completely, because
-// 1255 at least had a report. No adversary is required; two real defects from
-// one subsystem routinely share a 60-character prefix.
-
 // collidingDefects returns two distinct, entirely ordinary defect lines whose
 // remediationSlug is identical because they diverge only after rune 60.
 //
@@ -46,9 +23,13 @@ func collidingDefects() []string {
 	}
 }
 
-// TestRepro1285_F1_CollidingRemediationSlugSuppressesRetrospectiveAndLesson —
-// F1. The floor's own guarantee ("the retrospective survives") is voided by
-// agent-authored defect text.
+// TestRepro1285_F1_CollidingRemediationSlugSuppressesRetrospectiveAndLesson
+// drives writeDeterministicLearning — the production seam the failure path
+// calls (the three fallback tails of recordFailureLearning) — not
+// faillearn.WriteArtifacts directly, because the collision is minted by the
+// failure-learning engine (internal/core/failurelearning): remediationItems
+// derives the inbox id from remediationSlug(title), and remediationSlug stops
+// at remediationSlugMaxRunes.
 func TestRepro1285_F1_CollidingRemediationSlugSuppressesRetrospectiveAndLesson(t *testing.T) {
 	o, fl, root := remediationFixture(t)
 	defects := collidingDefects()
@@ -75,8 +56,7 @@ func TestRepro1285_F1_CollidingRemediationSlugSuppressesRetrospectiveAndLesson(t
 	}
 
 	// 3. Both remediation items must reach the queue. Colliding ids are the
-	//    trigger; dropping one of two real defects is the second-order damage,
-	//    and it is what DEF-4 was filed to stop.
+	//    trigger; dropping one of two real defects is the second-order damage.
 	if files := inboxFiles(t, root); len(files) != 2 {
 		t.Errorf("inbox holds %v; want one addressable item per defect — two distinct defects sharing a 60-rune slug prefix need the disambiguating suffix derived from the FULL text", files)
 	}

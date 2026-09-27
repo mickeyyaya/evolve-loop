@@ -1,13 +1,3 @@
-// signal_loop.go — ADR-0101 S4a: the loop module's Signal Center producers.
-// A batch halt is ONE loop.halt INCIDENT whose code names the rule (system
-// failure, pipeline blocker, a fleet lane's halt code, a wave-boundary halt);
-// a wave is loop.wave (INFO for the summary the report also prints — INFO
-// never reaches the console — WARN with a code for a min-width repair); an
-// escalation boundary is loop.escalation WARN. Each replaces a hand-written
-// "[loop] …" line 1:1 (the wave summary stays: it is the operator's report,
-// not a fact printed twice). The batch report reads the driven runner's
-// per-cycle SignalSummary through formatSignalReport — it reports, never
-// gates.
 package main
 
 import (
@@ -23,8 +13,7 @@ const (
 	CodeLoopFleetLaneHalt       signalcenter.Code = "LOOP_FLEET_LANE_HALT"
 	CodeLoopHalt                signalcenter.Code = "LOOP_HALT"
 	CodeLoopEscalationBoundary  signalcenter.Code = "LOOP_ESCALATION_BOUNDARY"
-	// CodeLoopMinWidthRepair projects the wave engine's code (ADR-0103 unit
-	// 13): the leaf registers it, once.
+	// CodeLoopMinWidthRepair projects the wave engine's min-width-repair code.
 	CodeLoopMinWidthRepair signalcenter.Code = loopwave.CodeMinWidthRepair
 )
 
@@ -56,10 +45,8 @@ func emitLoopHalt(signals *signalcenter.Center, cycle int, origin string, code s
 	})
 }
 
-// emitLoopWave is the coordinator's spelling of the ONE loop.wave producer
-// (loopwave.EmitWave, ADR-0103 unit 13): batch-level (no cycle), the wave
-// number stamped on the producer's own copy of the caller's fields; INFO
-// without a code, WARN with one.
+// emitLoopWave is the coordinator's spelling of the one loop.wave producer
+// (loopwave.EmitWave): batch-level, INFO without a code, WARN with one.
 func emitLoopWave(signals *signalcenter.Center, wave int, origin string, code signalcenter.Code, reason string, fields map[string]string) {
 	loopwave.EmitWave(signals, wave, origin, code, reason, fields)
 }
@@ -73,9 +60,8 @@ func emitLoopEscalation(signals *signalcenter.Center, cycle int, origin, reason 
 	})
 }
 
-// formatSignalReport renders the runner's per-cycle view for the batch
-// report: counts by severity and the last INCIDENT; "" when the cycle raised
-// no signal. A report line, not a signal — the loop reports, never gates.
+// formatSignalReport renders the runner's per-cycle signal counts for the
+// batch report — a report line, not a signal; the loop reports, never gates.
 func formatSignalReport(cycle int, s signalcenter.Summary) string {
 	if s.Total == 0 {
 		return ""
@@ -85,8 +71,7 @@ func formatSignalReport(cycle int, s signalcenter.Summary) string {
 	if s.LastIncident != nil {
 		line += fmt.Sprintf(" (last INCIDENT %s — %s)", s.LastIncident.Code, s.LastIncident.Reason)
 	}
-	// ADR-0101 S2b: the gate verdicts per cycle — the "checked → advanced"
-	// record the operator asked the orchestrator to keep.
+	// The gate verdicts per cycle, the "checked → advanced" record.
 	if p, r, c := s.ByKind[signalcenter.KindGatePassed], s.ByKind[signalcenter.KindGateRejected], s.ByKind[signalcenter.KindGateCorrected]; p+r+c > 0 {
 		line += fmt.Sprintf(" · gates: %d passed, %d rejected, %d corrected", p, r, c)
 	}

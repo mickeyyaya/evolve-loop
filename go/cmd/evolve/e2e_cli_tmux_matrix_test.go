@@ -1,30 +1,5 @@
 //go:build e2e
 
-// End-to-end matrix that drives a FULL evolve cycle (Scout → Triage → TDD →
-// Build → Audit → Ship) through the INTERACTIVE tmux drivers — claude-tmux,
-// codex-tmux, agy-tmux — against a REAL tmux server, with evolve-fake-cli
-// serving a persistent REPL in place of the real CLI binary.
-//
-// This is the tmux companion to e2e_cycle_cli_matrix_test.go (which covers
-// the 3 HEADLESS drivers). Together they assert the "any CLI × any phase"
-// invariant end-to-end for every shipped driver on the happy path.
-//
-// How the offline tmux path is made deterministic:
-//   - BRIDGE_TESTING=1 + BRIDGE_<CLI>_BINARY point the driver at the fake
-//     (resolveBinary honors this for tmux drivers too — verified at
-//     driver_claudetmux.go).
-//   - The fake auto-detects REPL mode (no -p / no `exec`) and prints a boot
-//     line containing EVERY driver's hardcoded marker (❯ / › / "? for
-//     shortcuts" / ">>> "). The drivers hardcode these and ignore the
-//     manifest prompt_marker, so no manifest override is needed — one fake
-//     satisfies any driver's boot-ready capture-pane check.
-//   - HOME + EVOLVE_CODEX_CONFIG_PATH are redirected to temp dirs so the
-//     codex/agy tmux preflights never touch the operator's real ~/.codex,
-//     and so a fancy user shell prompt (starship/pure use ❯) can't trip a
-//     false boot-ready from the bare tmux shell.
-//
-// Live opt-in (EVOLVE_E2E_LIVE=1) runs one real-binary tmux cycle per CLI,
-// auto-skipped when the binary is absent — same gating as the headless matrix.
 package main
 
 import (
@@ -52,15 +27,6 @@ func envDurationSeconds(key string, def time.Duration) time.Duration {
 var tmuxCLIs = []string{"claude-tmux", "codex-tmux", "agy-tmux"}
 
 func TestE2ECycleTmuxMatrix(t *testing.T) {
-	// Stage 5.1 (Go-only consolidation): like its headless twin
-	// TestE2ECycleCLIMatrix, this happy-path-through-ship matrix fake-shipped
-	// via the now-removed EVOLVE_NATIVE_SHIP=0 + EVOLVE_SHIP_SCRIPT legacy
-	// hatch. With native-only ship the shipper can no longer be stubbed here:
-	// the tmux drivers DO complete all six phases (verified), but the native
-	// ff-merge into the fixture's main can't succeed without a seeded bare
-	// remote + audit-binding + tracked-state.json handling. A proper native
-	// tmux-matrix e2e belongs in go/test/e2e/ alongside its headless twin —
-	// tracked in go/test/trustkernel/PORTING-LEDGER.md.
 	t.Skip("legacy ship-script hatch removed (Stage 5.1); native tmux-matrix e2e pending port to go/test/e2e/ — see PORTING-LEDGER.md")
 	if testing.Short() {
 		t.Skip("E2E test; skipped in -short mode")

@@ -1,16 +1,5 @@
 package core
 
-// reset_autoseal_role_test.go — cycle-1194 continuation (ADR-0081 audit
-// defect): the in-band ledger seal's trust anchor must not be reachable via
-// the unattended boot self-heal path. AutosealStaleMarker is triggered
-// merely by a dead owner PID (trivially arrangeable — kill the owning
-// process), so before SealOptions.AutomatedRecovery existed, that path wrote
-// the identical Role:"operator" a genuine human `evolve cycle reset` writes.
-// Ledger verify's epoch-anchor resolver (go/internal/adapters/ledger/anchor.go)
-// trusts ANY ledger line with Role=="operator" — Role/CycleLabel are
-// otherwise self-declared, unauthenticated fields — so the automated path was
-// enough to mint a trust-anchor-eligible seal with no human sign-off at all.
-
 import (
 	"context"
 	"testing"
@@ -18,10 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
-// TestSealCycle_ManualSeal_RoleIsOperator pins the human-invoked contract: a
-// direct SealCycle call (as `evolve cycle reset` makes) still writes
-// Role:"operator", the only role the ledger verify epoch-anchor resolver
-// trusts.
 func TestSealCycle_ManualSeal_RoleIsOperator(t *testing.T) {
 	t.Parallel()
 	ev := t.TempDir()
@@ -39,11 +24,6 @@ func TestSealCycle_ManualSeal_RoleIsOperator(t *testing.T) {
 	}
 }
 
-// TestSealCycle_AutomatedRecovery_RoleIsNotOperator is the regression guard
-// for the audit defect: when SealOptions.AutomatedRecovery is set (the only
-// way AutosealStaleMarker seals), the ledger entry's Role must NOT be
-// "operator" — it must never be mistaken for a human trust decision by the
-// epoch-anchor resolver.
 func TestSealCycle_AutomatedRecovery_RoleIsNotOperator(t *testing.T) {
 	t.Parallel()
 	ev := t.TempDir()
@@ -63,9 +43,6 @@ func TestSealCycle_AutomatedRecovery_RoleIsNotOperator(t *testing.T) {
 	}
 }
 
-// TestAutosealStaleMarker_SealsWithAutomatedRecoveryRole proves the wiring
-// end-to-end: the real boot self-heal path (AutosealStaleMarker) — not just a
-// hand-set SealOptions — produces a non-operator-role ledger entry.
 func TestAutosealStaleMarker_SealsWithAutomatedRecoveryRole(t *testing.T) {
 	t.Parallel()
 	evolveDir := t.TempDir()

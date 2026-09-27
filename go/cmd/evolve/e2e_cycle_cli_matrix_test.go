@@ -1,23 +1,5 @@
 //go:build e2e
 
-// End-to-end matrix test that drives a full evolve cycle (Scout →
-// Triage → TDD → Build → Audit → Ship) for each of the three CLI
-// backends — claude-p, codex, agy — through the real agent-bridge,
-// with the bridge's BRIDGE_TESTING=1 + BRIDGE_*_BINARY seam pointed at
-// our evolve-fake-cli stub.
-//
-// Hybrid spend mode:
-//   - Default: offline. Zero spend, deterministic, runs in CI.
-//   - EVOLVE_E2E_LIVE=1: also runs ONE live cycle per CLI. agy is
-//     auto-skipped if the binary is not on PATH (per CLAUDE.md
-//     EVOLVE_AGY_REQUIRE_FULL=0 default).
-//
-// What this test does NOT cover:
-//   - Intent phase (default state-machine path skips it; gated by
-//     EVOLVE_REQUIRE_INTENT=1 in production).
-//   - Retro phase (only invoked on Audit FAIL/WARN).
-//   - The real ship.sh (overridden via EVOLVE_SHIP_SCRIPT — see
-//     writeFakeShipScript below for why).
 package main
 
 import (
@@ -42,18 +24,10 @@ var expectedPhasesHappyPath = []string{"scout", "triage", "tdd", "build", "audit
 var allCLIs = []string{"claude-p", "codex", "agy"}
 
 func TestE2ECycleCLIMatrix(t *testing.T) {
-	// Stage 5.1 (Go-only consolidation): this harness fake-shipped via the now-removed
-	// EVOLVE_NATIVE_SHIP=0 + EVOLVE_SHIP_SCRIPT legacy hatch. With native-only ship,
-	// the shipper can no longer be stubbed here; the native ship path is covered by
-	// native_test.go + dispatch_test.go (which seed a real remote + auditor binding).
-	// A proper native CLI-matrix e2e (seed bare remote + audit ledger binding + resolve
-	// the worktree ff-merge divergence) belongs in go/test/e2e/ — tracked in
-	// go/test/trustkernel/PORTING-LEDGER.md.
 	t.Skip("legacy ship-script hatch removed (Stage 5.1); native CLI-matrix e2e pending port to go/test/e2e/ — see PORTING-LEDGER.md")
 	if testing.Short() {
 		t.Skip("E2E test; skipped in -short mode")
 	}
-	// Pre-flight: required tooling on PATH.
 	for _, bin := range []string{"git", "jq", "bash"} {
 		if _, err := exec.LookPath(bin); err != nil {
 			t.Skipf("required tool %q not on PATH; skipping E2E", bin)
@@ -125,9 +99,9 @@ func runOneCycle(t *testing.T, cfg cycleRunConfig) {
 		"EVOLVE_CLI="+cfg.CLI,
 		"EVOLVE_PROMPTS_DIR="+cfg.RepoRoot,
 		"EVOLVE_SHIP_SCRIPT="+shipScript,
-		// v11.3.0: pin the legacy shell-out path. EVOLVE_SHIP_SCRIPT only
-		// takes effect when the dispatcher routes to bash; the fake-cli
-		// e2e harness depends on the script substitution.
+		// Pin the legacy shell-out path: EVOLVE_SHIP_SCRIPT only takes effect
+		// when the dispatcher routes to bash, and the fake-cli harness depends
+		// on the script substitution.
 		"EVOLVE_NATIVE_SHIP=0",
 		// Skip the deep-research quota for this test.
 		"EVOLVE_RESEARCH_HOOK_DISABLED=1",
@@ -140,8 +114,6 @@ func runOneCycle(t *testing.T, cfg cycleRunConfig) {
 			"BRIDGE_AGY_BINARY="+cfg.FakeBin,
 		)
 	} else {
-		// Live mode: cap the per-cycle budget hard and require the CLI
-		// binary actually exists on PATH.
 		if _, err := exec.LookPath(liveBinaryName(cfg.CLI)); err != nil {
 			t.Skipf("live mode: %s binary not on PATH (%v); skipping", cfg.CLI, err)
 		}
@@ -171,7 +143,6 @@ func runOneCycle(t *testing.T, cfg cycleRunConfig) {
 		t.Fatalf("evolve cycle run failed: %v", err)
 	}
 
-	// 1. Ledger has every phase entry the happy path runs.
 	entries := readLedger(t, projRoot)
 	if len(entries) == 0 {
 		dumpWorkspaceLogs(t, projRoot)
@@ -189,14 +160,12 @@ func runOneCycle(t *testing.T, cfg cycleRunConfig) {
 		dumpWorkspaceLogs(t, projRoot)
 	}
 
-	// 2. state.json advances.
 	state := readState(t, projRoot)
 	if state.LastCycleNumber < 1 {
 		t.Errorf("state.json:lastCycleNumber=%d, want >=1", state.LastCycleNumber)
 	}
 
-	// 3. Final commit landed in the temp repo (fake ship.sh did the
-	// commit). git log should show our message.
+	// The fake ship.sh made the commit; git log should show our message.
 	logOut, err := exec.Command("git", "-C", projRoot, "log", "--format=%s", "-1").Output()
 	if err != nil {
 		t.Fatalf("git log: %v", err)
@@ -238,8 +207,7 @@ func buildBinary(t *testing.T, outDir, name, pkg, repoRoot string) string {
 
 // mustRepoRoot resolves the evolve-loop repo root from this test's
 // file location (go/cmd/evolve/<this>.go). Walks up until it finds the
-// go/go.mod module marker (the bash tools/agent-bridge marker was removed
-// in the v12 Go-bridge cutover).
+// go/go.mod module marker.
 func mustRepoRoot(t *testing.T) string {
 	t.Helper()
 	_, thisFile, _, ok := runtime.Caller(0)
@@ -266,7 +234,7 @@ func mustRepoRoot(t *testing.T) string {
 //   - committed durable Go predicate input for native Audit
 //
 // The in-process Go bridge resolves paths from the request (no
-// tools/agent-bridge tree is symlinked — that was the pre-cutover bash path).
+// tools/agent-bridge tree is symlinked).
 func setupTempProject(t *testing.T, repoRoot string) string {
 	t.Helper()
 	_ = repoRoot // reserved; the Go bridge needs no project-local bridge tree
@@ -279,21 +247,9 @@ func setupTempProject(t *testing.T, repoRoot string) string {
 	// retrospective.json) AND with CLAUDE.md's documented env-var
 	// convention (EVOLVE_TDD_ENGINEER_PERMISSION_MODE, etc.).
 	//
-	// Source: cycle 106 (2026-05-25) integration smoke caught the
-	// mismatch when the runner looked for `tdd.json` and prod only had
-	// `tdd-engineer.json`.
-	// .evolve/policy.json — disable the cycle-start LIVE model-catalog refresh.
-	// The compiled default is AutoRefresh=true (policy.go: "the cycle-start live
-	// refresh is on") and production turns it off in the checked-in
-	// .evolve/policy.json; this fixture seeded no policy at all, so it inherited
-	// the default and every `evolve cycle run` launched real CLI probes for EVERY
-	// family before its first phase — agy and ollama with no fake binary at all,
-	// plus a `/model` picker wait per family that can only time out against the
-	// fake REPL. That startup cost alone exceeded the 120s harness budget, so the
-	// cycle was killed before reaching ship: TestE2ECLIFallbackChain failed on all
-	// four trigger codes for a reason that had nothing to do with the fallback
-	// chain it exists to prove. Model discovery has its own tests; a fallback-chain
-	// fixture must not pay for it.
+	// Disable the cycle-start live model-catalog refresh (compiled default is
+	// on): an unseeded policy here launches real CLI probes for every family
+	// before the first phase and can exceed the harness timeout budget.
 	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
 		t.Fatalf("mkdir .evolve: %v", err)
 	}
@@ -370,13 +326,9 @@ func gitInit(t *testing.T, root string) {
 	run("config", "user.email", "e2e@test.local")
 	run("config", "user.name", "E2E Test")
 	run("config", "commit.gpgsign", "false")
-	// .gitignore, COMMITTED so worktrees inherit it (an uncommitted root
-	// ignore never reaches a worktree checkout). Production shape: the real
-	// repo ignores .evolve/* and go/bin/ — without those rules the worktree's
-	// symlinked runtime state and the build-selfcheck's compiled binary read
-	// as untracked "changes" to every base-bound diff consumer (the
-	// explanation floor demanded a full REQUIRED document for builds that
-	// changed no code, hanging every pipeline e2e in the correction ladder).
+	// COMMITTED so worktrees inherit it: an uncommitted root .gitignore never
+	// reaches a worktree checkout, and without excluding .evolve/ and go/bin/
+	// those paths read as untracked changes to every base-bound diff consumer.
 	if err := os.WriteFile(filepath.Join(root, ".gitignore"),
 		[]byte("tools/\n.evolve/\ngo/bin/\n"), 0o644); err != nil {
 		t.Fatalf("write .gitignore: %v", err)

@@ -1,11 +1,5 @@
 package core_test
 
-// reset_concurrency_test.go lives in the EXTERNAL core_test package (not
-// package core) specifically to import adapters/storage — storage imports
-// core, so an internal (package core) test file importing storage forms an
-// import cycle (see reset_test.go, which stays package core and cannot use
-// storage.New directly).
-
 import (
 	"context"
 	"encoding/json"
@@ -81,37 +75,6 @@ func intField(m map[string]any, key string) int {
 	return int(v)
 }
 
-// TestSealCycle_ConcurrentUpdateStateNoLostUpdate is the cycle-616 regression
-// for the fable5_deep_scan finding "statefile-rmw-flock-consolidation":
-// SealCycle's state.json read-modify-write (reset.go's
-// readJSONMapFile/writeJSONMapFileAtomic, step 4) holds NO flock, while
-// storage.UpdateState (the documented single-writer contract in
-// adapters/storage/updatestate.go) holds "<state.json>.lock" for its whole
-// RMW. In fleet mode (2+ concurrent lanes are the live operating mode — see
-// fleet_concurrency_respect_architecture memory) SealCycle can race a
-// concurrent UpdateState caller and lose one side's write.
-//
-// The interleaving is forced deterministically via channels (no sleep-based
-// race gambling), mirroring the existing
-// TestWithPathLock_SerializesConcurrentRMW pattern in
-// adapters/flock/withpath_test.go:
-//  1. A goroutine starts storage.UpdateState, which locks state.json, reads
-//     it (lastCycleNumber=41, version=18), then blocks mid-mutate on a
-//     channel — the lock stays held the whole time (release is deferred
-//     until mutate returns AND the merged write completes).
-//  2. While UpdateState is paused holding the lock, a second goroutine runs
-//     SealCycle (which today does its own unlocked read+write of the SAME
-//     state.json) and is given a bounded window to run to completion.
-//  3. UpdateState is then released to finish its own write.
-//
-// Without a shared lock, SealCycle's unlocked write completes first and is
-// then clobbered by UpdateState's write, because UpdateState's in-memory
-// state was read BEFORE SealCycle ran and does not reflect SealCycle's
-// lastCycleNumber bump — the classic lost update. Once reset.go's RMW
-// acquires the same flock.PathLock(statePath) storage.UpdateState uses,
-// SealCycle blocks until UpdateState releases, then reads the
-// POST-UpdateState state and its own write lands cleanly on top — both
-// writers' changes survive.
 func TestSealCycle_ConcurrentUpdateStateNoLostUpdate(t *testing.T) {
 	ev := t.TempDir()
 	concurrencySealFixture(t, ev, 42) // state.json{lastCycleNumber:41,version:18,...}
@@ -144,10 +107,10 @@ func TestSealCycle_ConcurrentUpdateStateNoLostUpdate(t *testing.T) {
 		sealErr <- err
 	}()
 
-	// Bounded window for SealCycle to run its (today unlocked) RMW while
-	// UpdateState deliberately holds the lock. If SealCycle is fixed to lock
-	// too, it blocks here and the loop just times out harmlessly — no
-	// assertion is made until after releaseUpdate below, in either case.
+	// Bounded window that gives SealCycle's RMW a chance to run while
+	// UpdateState deliberately holds the lock; if SealCycle also locks, this
+	// loop just times out harmlessly — no assertion is made until after
+	// releaseUpdate below, in either case.
 	cycleStatePath := filepath.Join(ev, "cycle-state.json")
 	deadline := time.Now().Add(300 * time.Millisecond)
 	for time.Now().Before(deadline) {
@@ -176,30 +139,6 @@ func TestSealCycle_ConcurrentUpdateStateNoLostUpdate(t *testing.T) {
 	}
 }
 
-// --- Test-amplification additions (cycle 616 black-box adversarial pass) ---
-//
-// The AC-Materialization contract for statefile-rmw-flock-consolidation
-// requires "reset.go RMW uses the same flock.PathLock-protected accessor as
-// statefile.go; concurrent-writer regression test passes; no duplicate RMW
-// implementation remains." The RED test above pins the minimal 2-writer
-// interleaving. The tests below amplify that same contract along two
-// adversarial axes the RED test does not cover: (1) scaling from a single
-// concurrent writer to many (the actual fleet operating mode is 2+ lanes,
-// per the fleet_concurrency_respect_architecture memory, and the lock must
-// hold under N-way contention, not just N=2), and (2) verifying the lock is
-// released promptly on SealCycle's success path — a lock-leak/deadlock class
-// of regression the original test never checks for, since it only observes
-// state AFTER releasing its own paused writer.
-
-// TestSealCycle_ManyConcurrentUpdateStateWritersNoLostUpdate scales the
-// RED test's 2-writer interleaving up to N independent, uncoordinated
-// storage.UpdateState callers racing a single SealCycle call. Unlike the RED
-// test, these writers are not paused on a channel — they are left to race
-// naturally, exercising the shared flock.PathLock sidecar under genuine
-// concurrent contention rather than one forced, deterministic interleaving.
-// If SealCycle's RMW does not hold the SAME lock, at least one of the N
-// increments (or SealCycle's own lastCycleNumber bump) is expected to be
-// lost to a lost-update race.
 func TestSealCycle_ManyConcurrentUpdateStateWritersNoLostUpdate(t *testing.T) {
 	ev := t.TempDir()
 	concurrencySealFixture(t, ev, 42) // state.json{lastCycleNumber:41,version:18,...}
@@ -254,15 +193,6 @@ func TestSealCycle_ManyConcurrentUpdateStateWritersNoLostUpdate(t *testing.T) {
 	}
 }
 
-// TestSealCycle_LockReleasedPromptlyAfterCompletion guards against a
-// lock-leak/deadlock class of regression that TestSealCycle_
-// ConcurrentUpdateStateNoLostUpdate cannot catch, because that test only
-// inspects state.json AFTER its own paused writer has already released the
-// lock. A correct fix must release the shared flock.PathLock(statePath) on
-// SealCycle's success path; if it instead leaks the lock (e.g. by opening a
-// second, never-closed lock handle, or by holding the lock past return), any
-// subsequent legitimate writer — like a following cycle's storage.UpdateState
-// — would hang indefinitely.
 func TestSealCycle_LockReleasedPromptlyAfterCompletion(t *testing.T) {
 	ev := t.TempDir()
 	concurrencySealFixture(t, ev, 7)

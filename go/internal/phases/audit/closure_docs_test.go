@@ -7,15 +7,11 @@ import (
 	"testing"
 )
 
-// closure_docs_test.go — cycle-1287 RED contract for the closure-citation gate's
-// own paperwork (Task 2, batch-integrity-review-doc-closure-crossref).
-//
-// The gate in closure_claim.go exists because the 1255 → 1272 chain closed a
-// CRITICAL with the words "verified closed" and no record. The two documents
-// that narrate that gate must therefore SATISFY it — a doc that announces the
-// rule while breaking it is the exact pattern the inbox item names. This is a
-// self-check, not prose review: it runs the production `closureClaimOffenders`
-// over the real committed files.
+// The documents that narrate the closure-citation gate (closure_claim.go) must
+// themselves satisfy it — a doc that announces the rule while breaking it is
+// exactly the pattern the gate exists to catch. This is a self-check, not
+// prose review: it runs the production `closureClaimOffenders` over the real
+// committed files.
 
 // closureGovernedDocs are the documents this cycle's landing must leave in a
 // state the shipped gate accepts. Scoped deliberately to the two files named in
@@ -48,10 +44,9 @@ func closureDocsRepoRoot(t *testing.T) string {
 	}
 }
 
-// TestC1287_DocsPassClosureCitationGate is the cycle-1287 crux for Task 2: every
-// closure claim in the two governed documents must name the per-defect
-// disposition record on its own line. RED until the "Not closed here" section
-// and the F1 accounting lines are rewritten as cited closure records.
+// TestC1287_DocsPassClosureCitationGate: every closure claim in the two
+// governed documents must name the per-defect disposition record on its own
+// line.
 func TestC1287_DocsPassClosureCitationGate(t *testing.T) {
 	root := closureDocsRepoRoot(t)
 	for _, rel := range closureGovernedDocs {

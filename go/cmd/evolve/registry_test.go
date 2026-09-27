@@ -5,10 +5,6 @@ import (
 	"testing"
 )
 
-// TestRegistry_UniqueNames guards against accidental duplicate Name or
-// Alias entries colliding in the dispatcher table. A duplicate would
-// silently route the second registration's command to the first
-// (lookupCommand returns on first match).
 func TestRegistry_UniqueNames(t *testing.T) {
 	seen := make(map[string]string) // key → "name" or alias-of-name
 	for _, c := range commands {
@@ -26,8 +22,6 @@ func TestRegistry_UniqueNames(t *testing.T) {
 	}
 }
 
-// TestRegistry_RunNotNil ensures every registered command has a non-nil
-// handler. A nil Run would panic at dispatch time.
 func TestRegistry_RunNotNil(t *testing.T) {
 	for _, c := range commands {
 		if c.Run == nil {
@@ -36,11 +30,6 @@ func TestRegistry_RunNotNil(t *testing.T) {
 	}
 }
 
-// TestRegistry_SummaryNonEmpty guards against the Summary field
-// silently going stale. The field is not yet rendered to users, but
-// keeping it populated means a future short-listing feature can light
-// up without a per-entry audit. Without this test, the field is dead
-// weight (per YAGNI) — with it, the field has a contract.
 func TestRegistry_SummaryNonEmpty(t *testing.T) {
 	for _, c := range commands {
 		if c.Summary == "" {
@@ -49,8 +38,6 @@ func TestRegistry_SummaryNonEmpty(t *testing.T) {
 	}
 }
 
-// TestRegistry_LookupResolvesAliases is the core invariant: every
-// declared alias must route to the same row as the canonical name.
 func TestRegistry_LookupResolvesAliases(t *testing.T) {
 	for _, c := range commands {
 		got := lookupCommand(c.Name)
@@ -75,16 +62,12 @@ func TestRegistry_LookupResolvesAliases(t *testing.T) {
 	}
 }
 
-// TestRegistry_LookupUnknownReturnsNil — sanity check the negative path.
 func TestRegistry_LookupUnknownReturnsNil(t *testing.T) {
 	if got := lookupCommand("definitely-not-a-real-subcommand-xyz"); got != nil {
 		t.Errorf("lookupCommand(unknown) = %+v, want nil", got)
 	}
 }
 
-// TestRegistry_VersionAndHelpAliases pins the well-known short flags.
-// Regression guard: dropping --version or -h would silently break
-// user muscle memory.
 func TestRegistry_VersionAndHelpAliases(t *testing.T) {
 	cases := []struct {
 		alias string
@@ -102,7 +85,6 @@ func TestRegistry_VersionAndHelpAliases(t *testing.T) {
 	}
 }
 
-// TestRegistry_VersionRun emits something and returns 0.
 func TestRegistry_VersionRun(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	rc := runVersion(nil, nil, &stdout, &stderr)
@@ -114,7 +96,6 @@ func TestRegistry_VersionRun(t *testing.T) {
 	}
 }
 
-// TestRegistry_HelpRun prints the usage banner.
 func TestRegistry_HelpRun(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	rc := runHelp(nil, nil, &stdout, &stderr)

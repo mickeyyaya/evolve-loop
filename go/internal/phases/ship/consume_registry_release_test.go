@@ -1,13 +1,5 @@
 package ship
 
-// consume_registry_release_test.go — the ship-side wiring proof for the
-// transactional retire (park-consume-releases-continuation-binding). Consuming
-// an item takes it out of the batch loader's reach, so its scope-keyed
-// continuation binding must go in the SAME operation; otherwise the next wave
-// mints a lane straight off the immortal binding (cycles 1487, 1497). The
-// pointer must survive the release, and an unrelated live lane's binding must
-// not be touched.
-
 import (
 	"context"
 	"encoding/json"
@@ -20,7 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 )
 
-// stubRunner accepts every command (git add) without touching a real repo.
 func stubRunner(_ context.Context, _ string, _ string, _ []string, _ []string, _ io.Reader, _ io.Writer, _ io.Writer) (int, error) {
 	return 0, nil
 }
@@ -55,11 +46,6 @@ func consumeFixture(t *testing.T, id string) (root, workspace, itemBase string) 
 	return root, workspace, itemBase
 }
 
-// TestConsumeCommittedItems_ReleasesRegistryBinding drives the real
-// consumeCommittedItems against an on-disk fixture and asserts all three halves
-// of the contract: the consumed id's binding is released, its VALUE is
-// preserved into the consumed item file, and an unrelated live scope's binding
-// survives untouched.
 func TestConsumeCommittedItems_ReleasesRegistryBinding(t *testing.T) {
 	const id = "context-fill-telemetry-and-cap"
 	const liveSibling = "some-other-live-todo"
@@ -118,9 +104,6 @@ func TestConsumeCommittedItems_ReleasesRegistryBinding(t *testing.T) {
 	}
 }
 
-// TestConsumeCommittedItems_NoBindingIsCleanNoOp is the ordinary case: an item
-// that never carried preserved work consumes exactly as before, with no
-// released_continuations[] key invented on it.
 func TestConsumeCommittedItems_NoBindingIsCleanNoOp(t *testing.T) {
 	const id = "plain-todo-with-no-binding"
 	root, workspace, itemBase := consumeFixture(t, id)

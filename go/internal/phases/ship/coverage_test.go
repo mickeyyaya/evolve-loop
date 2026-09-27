@@ -1,7 +1,3 @@
-// Coverage tests for internal/phases/ship — drives 48.2% baseline higher
-// by exercising small pure functions that the existing test matrix doesn't hit:
-// splitNonEmpty, extractIDs, isTerminal, IntegrityError.Error, stateInt,
-// readStateMap edge cases, sha256File edge cases.
 package ship
 
 import (
@@ -11,7 +7,6 @@ import (
 	"testing"
 )
 
-// TestSplitNonEmpty covers the splitNonEmpty pure helper.
 func TestSplitNonEmpty(t *testing.T) {
 	cases := []struct {
 		in   string
@@ -31,17 +26,13 @@ func TestSplitNonEmpty(t *testing.T) {
 	}
 }
 
-// TestExtractIDs covers the JSON parsing + dedup branches.
 func TestExtractIDs(t *testing.T) {
-	// Invalid JSON returns nil
 	if got := extractIDs([]byte("not json{")); got != nil {
 		t.Errorf("invalid JSON should return nil, got %v", got)
 	}
-	// Empty doc returns empty slice
 	if got := extractIDs([]byte("{}")); len(got) != 0 {
 		t.Errorf("empty doc: got %v", got)
 	}
-	// Top_n + skip_shipped union, with dedup
 	body := `{
 		"top_n": [{"id": "task-a"}, {"id": "task-b"}, {"id": ""}],
 		"skip_shipped": [{"task_id": "task-b"}, {"task_id": "task-c"}]
@@ -59,14 +50,12 @@ func TestExtractIDs(t *testing.T) {
 	}
 }
 
-// TestIsTerminal_NonFile covers the non-*os.File branch.
 func TestIsTerminal_NonFile(t *testing.T) {
 	if isTerminal(&bytes.Buffer{}) {
 		t.Errorf("bytes.Buffer should not be terminal")
 	}
 }
 
-// TestIsTerminal_TempFile covers the *os.File-but-not-tty branch.
 func TestIsTerminal_TempFile(t *testing.T) {
 	f, err := os.CreateTemp("", "isterminal-*")
 	if err != nil {
@@ -79,7 +68,6 @@ func TestIsTerminal_TempFile(t *testing.T) {
 	}
 }
 
-// TestCleanExitError covers the Error() method.
 func TestCleanExitError(t *testing.T) {
 	e := (&cleanExitError{}).Error()
 	if e == "" {
@@ -87,7 +75,6 @@ func TestCleanExitError(t *testing.T) {
 	}
 }
 
-// TestStateInt covers all type branches of stateInt.
 func TestStateInt(t *testing.T) {
 	m := map[string]any{
 		"float":   float64(42),
@@ -112,7 +99,6 @@ func TestStateInt(t *testing.T) {
 	}
 }
 
-// TestReadStateMap_Missing covers the os.ErrNotExist soft-return path.
 func TestReadStateMap_Missing(t *testing.T) {
 	m, err := readStateMap("/nonexistent/state.json")
 	if err != nil {
@@ -123,7 +109,6 @@ func TestReadStateMap_Missing(t *testing.T) {
 	}
 }
 
-// TestReadStateMap_InvalidJSON covers the json.Unmarshal error path.
 func TestReadStateMap_InvalidJSON(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "state.json")
@@ -135,7 +120,6 @@ func TestReadStateMap_InvalidJSON(t *testing.T) {
 	}
 }
 
-// TestReadStateMap_Valid covers the happy path.
 func TestReadStateMap_Valid(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "state.json")
@@ -151,7 +135,6 @@ func TestReadStateMap_Valid(t *testing.T) {
 	}
 }
 
-// TestWriteStateMap_RoundTrip covers writeStateMap basic happy path.
 func TestWriteStateMap_RoundTrip(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "state.json")
@@ -167,14 +150,12 @@ func TestWriteStateMap_RoundTrip(t *testing.T) {
 	}
 }
 
-// TestSha256File_Missing covers the os.Open error path.
 func TestSha256File_Missing(t *testing.T) {
 	if _, err := sha256File("/nonexistent/file"); err == nil {
 		t.Errorf("expected error")
 	}
 }
 
-// TestSha256File_Valid covers the happy path.
 func TestSha256File_Valid(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "f")
@@ -185,22 +166,18 @@ func TestSha256File_Valid(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sha256File: %v", err)
 	}
-	// sha256("hello") = 2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824
 	want := "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
 	if h != want {
 		t.Errorf("sha=%s want %s", h, want)
 	}
 }
 
-// TestPluginVersion_Missing returns empty for missing file.
 func TestPluginVersion_Missing(t *testing.T) {
 	if got := pluginVersion("/nonexistent/plugin.json"); got != "" {
 		t.Errorf("expected empty, got %q", got)
 	}
 }
 
-// TestPluginVersion_Valid covers the happy path. pluginVersion takes
-// pluginRoot and looks up .claude-plugin/plugin.json inside it.
 func TestPluginVersion_Valid(t *testing.T) {
 	dir := t.TempDir()
 	pluginDir := filepath.Join(dir, ".claude-plugin")
@@ -216,7 +193,6 @@ func TestPluginVersion_Valid(t *testing.T) {
 	}
 }
 
-// TestIntegrityError_Error covers the Error() method.
 func TestIntegrityError_Error(t *testing.T) {
 	e := &IntegrityError{Msg: "test failure"}
 	if e.Error() == "" {

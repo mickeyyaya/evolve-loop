@@ -1,30 +1,11 @@
 package audit
 
-// ciparity_touchedgo_derivability_test.go — RED contract for the inbox defect
-// `cycletouchedgo-derivability-silent-skip`.
-//
-// TODAY cycleTouchedGo computed `pkgs, _ := changedPackagesForAudit(...); return
-// len(pkgs) > 0` — it DISCARDED the derivable bool. changedpkgs.FromGitChecked
-// only ever returns (nil,false) on git failure, so !derivable implies
-// len(pkgs)==0 implies cycleTouchedGo==false. When git diff fails (the concrete
-// trigger the changedpkgs doc names: a concurrent-fleet .git/index.lock race)
-// all three whole-repo gates — go vet, acs-durable, integration-tier — short-
-// circuited to (nil,nil): a SILENT skip, neither a WARN nor a whole-repo run.
-//
-// That is the cycle-581 D1/D2 fail-open conflation (git-clean vs underivable)
-// reintroduced one call-frame UP from where apicover was hardened against it.
-// A gate that cannot determine its input must not resolve to "nothing to check".
-//
-// FIX CONTRACT:
-//   - the touched∧derivable decision has ONE owner (changedScopeForGate); no
-//     gate re-derives the change-set independently;
-//   - underivable ⇒ (nil, error) so applyCIGate surfaces a WARN diagnostic
-//     ("gate skipped, CI backstops") — WARN not FAIL, since a transient index
-//     lock must not hard-block a shippable cycle;
-//   - a genuinely Go-untouched but DERIVABLE cycle still no-ops silently — the
-//     paired negative that stops a naive "always WARN" implementation;
-//   - a worktree with no Go module at all stays silent (nothing to check), so a
-//     docs-only / synthetic-fixture cycle gains no spurious WARN.
+// The touched∧derivable decision for the three whole-repo gates has one
+// owner; no gate re-derives the change-set independently. Underivable ⇒
+// (nil, error) so applyCIGate surfaces a WARN diagnostic — WARN not FAIL,
+// since a transient index lock must not hard-block a shippable cycle. A
+// genuinely Go-untouched but derivable cycle still no-ops silently, and a
+// worktree with no Go module at all stays silent regardless of git state.
 
 import (
 	"strings"

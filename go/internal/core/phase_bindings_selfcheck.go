@@ -1,20 +1,5 @@
 package core
 
-// phase_bindings_selfcheck.go — deterministic post-build self-check (the
-// false-green backstop). A builder can delete an env read, break a pre-existing
-// UNIT test in a changed package, "pass" its own ACS check (which does not run
-// that package's unit tests), and hand off a green build-report — the regression
-// then only surfaces at audit, two attempts later (cycle-2 / w1-config-singletons
-// M1). Running the changed packages' unit tests here, deterministically, records
-// ground-truth so the builder's self-report cannot lie and the audit/retro have
-// the exact failing tests. UNIT tests only (no -tags integration): the
-// env-dependent tmux/REPL integration tests are intentionally excluded so a real
-// regression fails the check while a flaky live-launch test does not.
-//
-// Like build-gofmt and build-derived-regen this is deterministic work that must
-// not depend on the LLM builder remembering; best-effort and NEVER aborts —
-// audit stays the verdict authority (build's only legal successor is audit).
-
 import (
 	"context"
 	"encoding/json"

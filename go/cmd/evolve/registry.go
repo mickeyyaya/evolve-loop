@@ -1,13 +1,3 @@
-// registry.go defines the subcommand table that drives `evolve <cmd>`
-// dispatch. Replaces the 91-line switch that previously lived in
-// dispatch(), which forced contributors to update two places when
-// adding a subcommand (the switch case and the const usage string).
-//
-// The const usage in main.go remains hand-maintained — auto-generating
-// it from Summary fields would lose the multi-line flag detail that
-// `evolve help` users rely on. Adding a subcommand still requires two
-// edits (this table + the usage block), but the table is now the
-// authoritative source for routing.
 package main
 
 import (
@@ -25,29 +15,22 @@ type subcommand struct {
 	// Name is the canonical command name as the user types it.
 	Name string
 	// Aliases are alternate spellings that route to the same Run.
-	// `version` aliases include `--version` and `-v` for parity with
-	// common CLI conventions.
 	Aliases []string
-	// Summary is a one-line description; not currently rendered (the
-	// detailed const usage in main.go is shown to users), but kept on
-	// the struct so future tooling can derive a short listing.
+	// Summary is a one-line description, not currently rendered, but
+	// kept on the struct so future tooling can derive a short listing.
 	Summary string
 	// Run is the handler with the standard signature used by every
 	// existing cmd_*.go file in this package.
 	Run func(args []string, stdin io.Reader, stdout, stderr io.Writer) int
 }
 
-// commands is the canonical dispatcher table — single source of truth
-// for routing. Lookups by Name or any Alias hit the same row.
-//
-// Order matches the historical const-usage layout in main.go so a
-// reader scanning both side-by-side stays oriented.
+// commands is the canonical dispatcher table, single source of truth for
+// routing. Its order matches main.go's usage listing so a reader scanning
+// both stays oriented.
 var commands = []subcommand{
-	// Built-in informational commands.
 	{Name: "version", Aliases: []string{"--version", "-v"}, Summary: "Print build version", Run: runVersion},
 	{Name: "help", Aliases: []string{"--help", "-h"}, Summary: "Show usage", Run: runHelp},
 
-	// Phase 1 + Phase 2 core surface.
 	{Name: "doctor", Summary: "Probe environment", Run: opscmd.RunDoctor},
 	{Name: "console-lease", Summary: "Time-bounded operator lease for runtime-tree paths (ADR-0080 S4)", Run: opscmd.RunConsoleLease},
 	{Name: "setup", Summary: "Onboarding: detect CLIs, validate per-phase models, mark first-run", Run: runSetup},
@@ -83,7 +66,6 @@ var commands = []subcommand{
 	{Name: "commit-gate", Summary: "Pre-commit quality gate (lint + targeted tests + attestation)", Run: guardcmd.RunCommitGate},
 	{Name: "bridge", Summary: "Native-Go multi-CLI agent bridge (launch|probe)", Run: runBridge},
 
-	// Phase 3a + 3b dispatch helpers (ported from bash).
 	{Name: "detect-cli", Summary: "Identify driving AI CLI", Run: runDetectCLI},
 	{Name: "detect-nested-claude", Summary: "Detect nested claude -p", Run: runDetectNested},
 	{Name: "phase-order", Summary: "List phases from registry", Run: phasecmd.RunPhaseOrder},
@@ -113,7 +95,6 @@ var commands = []subcommand{
 	{Name: "release-verify-clis", Summary: "Verify the release installs + performs for every LLM CLI", Run: runReleaseVerifyCLIs},
 	{Name: "release-verify-binaries", Summary: "Verify every prebuilt binary + checksums is published on a release tag", Run: runReleaseVerifyBinaries},
 
-	// v12.1 utilities + composition.
 	{Name: "skill-inventory", Summary: "Build skill inventory cache", Run: runSkillInventory},
 	{Name: "skills", Summary: "Project phase facts into skill docs from SSOT (generate|check); publish skills to other LLM CLIs (publish) — ADR-0040/0041", Run: runSkills},
 	{Name: "flags", Summary: "Project the EVOLVE_* flag registry into control-flags.md (generate|check; check exits 2 on drift) — L2 flag SSOT", Run: runFlags},
@@ -132,9 +113,8 @@ var commands = []subcommand{
 	{Name: "context-fill", Summary: "Context-window fill telemetry: correlate (peak fill band vs cycle final verdict)", Run: runContextFill},
 }
 
-// lookupCommand returns the subcommand matching name or any of its
-// aliases. Linear scan is fine — the table has ~40 entries and
-// lookups happen once per process at startup.
+// lookupCommand returns the subcommand matching name or any alias. A linear
+// scan is fine: the table has ~40 entries and lookups happen once at startup.
 func lookupCommand(name string) *subcommand {
 	for i := range commands {
 		if commands[i].Name == name {
@@ -149,15 +129,11 @@ func lookupCommand(name string) *subcommand {
 	return nil
 }
 
-// runVersion handles `evolve version` (and `--version` / `-v`). Adapter
-// to match the standard subcommand signature.
 func runVersion(_ []string, _ io.Reader, stdout, _ io.Writer) int {
 	fmt.Fprintln(stdout, version.Get())
 	return 0
 }
 
-// runHelp handles `evolve help` (and `--help` / `-h`). Prints the
-// hand-maintained const usage from main.go.
 func runHelp(_ []string, _ io.Reader, stdout, _ io.Writer) int {
 	fmt.Fprint(stdout, usage)
 	return 0

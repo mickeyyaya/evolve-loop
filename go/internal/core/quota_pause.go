@@ -10,8 +10,8 @@ import (
 // preserve the same checkpoint and classification rather than creating a FAIL.
 func (cr *cycleRun) pauseForQuota(next Phase, resp PhaseResponse, attempt int) error {
 	phaseErr := fmt.Errorf("phase %s: %w: every family in the fallback chain returned exit=85 across %d attempts; checkpoint written — resume with `evolve loop --resume` after quota reset", next, ErrAllFamiliesExhausted, attempt)
-	// ADR-0101 S2a: the pause is the quota.paused signal (WARN); the sink
-	// renders it — this seam is the one both dispatch roots reach.
+	// The pause is the quota.paused signal (WARN); the sink renders it — this
+	// seam is the one both dispatch roots reach.
 	cr.emitQuotaPaused(next, phaseErr)
 	if QuotaBoundaryCheckpointer != nil {
 		if cperr := QuotaBoundaryCheckpointer(cr.cs, cr.req.ProjectRoot, cr.o.now()); cperr != nil {
@@ -27,8 +27,6 @@ func (cr *cycleRun) pauseForQuota(next Phase, resp PhaseResponse, attempt int) e
 	}); lerr != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN all_families_exhausted ledger append: %v\n", lerr)
 	}
-	// ADR-0044 C1: record the abort reason with the DEFERRED
-	// prefix so cyclehealth classifies the cycle DEFERRED.
 	cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempt,
 		fmt.Sprintf("%s: %s", abortReasonAllFamiliesExhausted, phaseErr.Error()), cr.cs.PhaseStartedAt))
 	cr.o.writePhaseFailureDiag(cr.cs.WorkspacePath, string(next), cr.cycle, phaseErr, attempt)

@@ -27,30 +27,26 @@ func (o *Orchestrator) emitPhaseBindings(ctx context.Context, cycle int, project
 	}
 	switch {
 	case phase == PhaseAudit && (verdict == VerdictPASS || verdict == VerdictWARN || verdict == VerdictFAIL):
-		// FAIL included since cycle-1571 H3: without a binding, ship's lookup
-		// has nothing for this run and the FAIL verdict is invisible to the
-		// gate built to enforce it — the binding is how ship reads THIS run's
-		// report and returns the honest VERDICT_FAIL terminal. SKIPPED stays
-		// excluded (no audit ran, no artifact to bind).
+		// FAIL is included: without a binding, ship's lookup has nothing for
+		// this run and the FAIL verdict is invisible to the gate built to
+		// enforce it. SKIPPED stays excluded (no audit ran, no artifact to bind).
 		o.recordPhaseBinding(ctx, phase, in)
 	case phase == PhaseBuild && verdict != VerdictSKIPPED:
 		o.recordPhaseBinding(ctx, phase, in)
 	case o.cfg.PhaseIO >= config.StageEnforce && phase != PhaseAudit && phase != PhaseBuild:
-		// Phase 3.9: phase-agnostic binding for user/inserted phases. Dormant
-		// until EVOLVE_PHASE_IO=enforce, so the default-off loop emits exactly
-		// the audit/build bindings it did before (byte-identical ledger).
+		// Phase-agnostic binding for user/inserted phases. Dormant until
+		// EVOLVE_PHASE_IO=enforce, so the default-off loop emits exactly the
+		// audit/build bindings it did before (byte-identical ledger).
 		o.recordPhaseBinding(ctx, phase, in)
 	}
 }
 
-// phaseRole maps a phase to the agent role its provenance ledger entry records.
-// audit→auditor and build→builder are the exact role strings ship's audit-binding
-// (findLatestAudit) and the rt-001-ledger-role-completeness red-team predicate
-// require; every other phase binds under its own name (identity), so a
-// user-defined phase gets a stable, predictable role and the identity fallback
-// never renames a known agent role. It is a TOTAL map over all phases (so direct
-// callers and TestPhaseRole pin the canonical vocabulary); recordPhaseBinding
-// itself only routes non-audit/non-build phases through it.
+// phaseRole maps a phase to the agent role its provenance ledger entry
+// records. audit→auditor and build→builder are the exact role strings
+// ship's audit-binding (findLatestAudit) and the rt-001-ledger-role-
+// completeness red-team predicate require; every other phase binds under
+// its own name (identity). It is a TOTAL map over all phases, pinned by
+// TestPhaseRole.
 func phaseRole(phase Phase) string {
 	switch phase {
 	case PhaseAudit:
@@ -72,11 +68,8 @@ type bindingInputs struct {
 	workspace   string
 	worktree    string
 	// worktreeBase is the worktree's own base commit (CycleState.WorktreeBaseSHA)
-	// — the ONLY correct operand for the Put-site fresh-base guard. projectRoot
-	// HEAD at audit time diverges under fleet concurrency (a sibling ship
-	// advances main mid-cycle to a commit the lane worktree may not contain),
-	// which either mismatches the operands or fails the resolution open and
-	// re-admits the shared fresh-base cache write ADR-0048 exists to prevent.
+	// — the correct operand for the verdict-cache fresh-base guard; projectRoot
+	// HEAD at audit time can diverge under fleet concurrency.
 	worktreeBase string
 	// verdict is consumed only by the audit recorder (verdict→exit_code: WARN→1);
 	// build and generic bindings always record exit_code 0.
@@ -85,9 +78,8 @@ type bindingInputs struct {
 
 // recordPhaseBinding is the phase-agnostic entry point for provenance bindings.
 // audit and build DELEGATE to their specialized recorders UNCHANGED, so their
-// ledger bytes stay byte-identical to before (the role vocabulary + fields ship
-// depends on — Risk #1). The bodies are genuinely asymmetric (audit alone
-// computes a worktree-tree SHA, reads its artifact fatally, derives exit code
+// ledger bytes stay byte-identical to before. The bodies are genuinely
+// asymmetric (audit alone computes a worktree-tree SHA, reads its artifact fatally, derives exit code
 // from the verdict, and projects into the verdict cache), so the collapse is at
 // the dispatch/role-naming layer, NOT a merged body. Any other phase records a
 // generic builder-shaped entry under its identity role; the caller
@@ -103,29 +95,34 @@ func (o *Orchestrator) recordPhaseBinding(ctx context.Context, phase Phase, in b
 	}
 }
 
+func auditBindingExitCode(verdict string) int {
+	switch verdict {
+	case VerdictWARN:
+		return 1
+	case VerdictFAIL:
+		return 2
+	default:
+		return 0
+	}
+}
+
 // recordAuditBinding writes the rich auditor ledger entry that ship's
 // audit-binding (verify.go findLatestAudit / verifyAuditBinding) requires:
 // role=auditor, kind=agent_subprocess, with git_head + tree_state_sha +
-// artifact_path/sha256. Without it the Go orchestrator recorded audit only as
-// kind:phase (no binding fields), so ship fell back to an ancient bash-era
-// auditor entry and every cycle failed AUDIT_BINDING_HEAD_MOVED (root cause,
-// 2026-05-29). tree_state_sha is sha256(`git diff HEAD`) — byte-identical to
-// ship's computeTreeStateSHA so the bind matches. Best-effort: a failure WARNs
-// and is swallowed; ship then fails loudly on the missing/stale binding rather
-// than shipping unbound.
+// artifact_path/sha256. tree_state_sha is sha256(`git diff HEAD`) —
+// byte-identical to ship's computeTreeStateSHA so the bind matches.
+// Best-effort: a failure WARNs and is swallowed; ship then fails loudly on
+// the missing/stale binding rather than shipping unbound.
 func (o *Orchestrator) recordAuditBinding(ctx context.Context, cycle int, projectRoot, workspace, worktree, worktreeBase, verdict string) {
 	head, _, err := gitCapture(ctx, projectRoot, "rev-parse", "HEAD")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN audit-binding: git rev-parse HEAD failed: %v (ship will refuse to bind)\n", err)
 		return
 	}
-	// Worktree CHANGES tree: stage tracked changes and write a tree object = the
-	// tree ship will commit from the builder-declared index. This is what the auditor
-	// SHOULD bind (it audited the worktree's working changes); its persona binds
-	// HEAD^{tree} = the unchanged base, which can never equal the changes-commit
-	// tree → INTEGRITY_TREE_DRIFT every cycle (cycle-152). Ship prefers this
-	// over the auditor's comment. Best-effort: empty ⇒ ship falls back to the
-	// auditor's value. No commit is made (write-tree only); ship re-stages anyway.
+	// The tree ship will commit from the builder-declared index — not the
+	// auditor's own HEAD^{tree}, which can never equal it. Best-effort: empty
+	// means ship falls back to the auditor's value. No commit is made
+	// (write-tree only); ship re-stages anyway.
 	worktreeTree := worktreeContentSHA(ctx, projectRoot, worktree)
 	// `git diff HEAD` returns exit 1 when differences exist — not an error;
 	// only exit >1 (e.g. 128) is fatal. Match computeTreeStateSHA semantics.
@@ -142,56 +139,22 @@ func (o *Orchestrator) recordAuditBinding(ctx context.Context, cycle int, projec
 		return
 	}
 	artSum := sha256.Sum256(artBytes)
-	// This host-owned disposition cannot be overridden by the report narrative:
-	// PASS=0, fluent WARN=1, rejected audit=2. Keeping FAIL unshippable also
-	// protects failures to invalidate stale candidate evidence on disk.
-	exitCode := 0
-	switch verdict {
-	case VerdictWARN:
-		exitCode = 1
-	case VerdictFAIL:
-		exitCode = 2
-	}
 	if err := o.ledger.Append(ctx, LedgerEntry{
 		TS:              o.now().UTC().Format(time.RFC3339),
 		Cycle:           cycle,
 		Role:            "auditor",
 		Kind:            "agent_subprocess",
-		ExitCode:        exitCode,
+		ExitCode:        auditBindingExitCode(verdict),
 		GitHEAD:         strings.TrimSpace(head),
 		TreeStateSHA:    hex.EncodeToString(treeSum[:]),
 		WorktreeTreeSHA: worktreeTree,
+		WorktreeBaseSHA: worktreeBase,
 		ArtifactPath:    artPath,
 		ArtifactSHA256:  hex.EncodeToString(artSum[:]),
 	}); err != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN audit-binding ledger append: %v\n", err)
 	}
 
-	// ADR-0048 Slice B: project this verdict into the content-addressed verdict
-	// cache, keyed by the SAME worktree tree SHA the binding records. The cache
-	// is a projection of the audit binding (single-source), not a second record.
-	// Best-effort + advisory: an empty key (no worktree content identity) or a
-	// write failure never blocks the cycle — a future lookup miss just costs a
-	// full re-run.
-	//
-	// The fresh-base guard is the SAME predicate the pre-loop shadow probe reads
-	// (verdictcache.ProbeEligible), fed the SAME base operand: the worktree's
-	// own base commit, never projectRoot HEAD at audit time (salvage-review
-	// HIGH-1 — a sibling ship advancing main mid-cycle diverged the operands
-	// and re-admitted the shared fresh-base write). An untouched worktree's
-	// tree identity is shared by every sibling lane at that base, so recording
-	// under it would contaminate their lookups.
-	//
-	// Write-side fail-CLOSED, deliberately asymmetric with the read side's
-	// fail-open: a skipped Lookup costs one shadow log line, but a poisoned
-	// Put sits in the shared store for every future consumer. No base
-	// identity ⇒ no cache write.
-	// Ledger-bound above, but only a REUSABLE verdict is cache-projected: the
-	// cache exists to let identical known-good trees skip a re-audit, so a FAIL
-	// (a rejection) and a SKIPPED (no audit ran) must never enter it. The
-	// vocabulary lives in verdictcache.Reusable, the same predicate the store's
-	// write guard and the RUNG 0 composition snapshot use, so the three sites
-	// cannot drift apart (the ProbeEligible precedent, ADR-0048 cycle-1488).
 	if !verdictcache.Reusable(verdict) {
 		return
 	}
@@ -266,11 +229,11 @@ func worktreeBaseTreeSHA(ctx context.Context, worktree, baseCommit string) strin
 // kind=agent_subprocess — that BOTH the red-team predicate rt-001-ledger-role-
 // completeness AND the auditor's Ledger-Verification check require as proof the
 // builder actually ran. The orchestrator's per-phase entry is role="build" (the
-// PHASE name), not "builder" (the AGENT name), and recent cycles no longer get a
-// bridge-written per-agent entry — so a cycle that goes through FORMAL audit (vs the
-// inline build-commit path that bypasses it) false-FAILed provenance with "no
-// role:builder entry" even though the build ran (cycle-181 / issue #13). Mirrors
-// recordAuditBinding (role=auditor); best-effort + loud WARN, never blocks the cycle.
+// PHASE name), not "builder" (the AGENT name), so a cycle that goes through
+// FORMAL audit (vs the inline build-commit path that bypasses it) would
+// otherwise false-FAIL provenance with "no role:builder entry" even though the
+// build ran. Mirrors recordAuditBinding (role=auditor); best-effort + loud
+// WARN, never blocks the cycle.
 func (o *Orchestrator) recordBuildBinding(ctx context.Context, cycle int, projectRoot, workspace string) {
 	head, _, err := gitCapture(ctx, projectRoot, "rev-parse", "HEAD")
 	if err != nil {
@@ -344,21 +307,17 @@ func (o *Orchestrator) recordGenericBinding(ctx context.Context, phase Phase, in
 }
 
 // normalizeWorktreeToBase soft-resets the worktree to baseSHA so any commits a
-// builder made during the build phase become PENDING changes again. The builder
-// is instructed to `git add -A && git commit -m "… [worktree-build]"`
-// (agents/evolve-builder.md:235) for crash-safety, but the auditor
-// (agents/evolve-auditor.md:57: "Run `git diff HEAD`") and the orchestrator's
-// audit-binding (recordAuditBinding: sha256(`git diff HEAD`)) both inspect the
-// PENDING diff — which is empty after a commit. agy/Gemini followed the commit
-// instruction literally and every cycle's work was discarded as "tree lacks the
-// files". Resetting --soft to the cycle base re-exposes the work to `git diff
-// HEAD` without changing the auditor prompt or the security binding. See
-// docs/incidents/cycle-156-builder-commit-vs-audit-pending-diff.md (Option C).
+// builder made during the build phase become PENDING changes again. The
+// builder is instructed to commit for crash-safety, but the auditor and the
+// orchestrator's audit-binding both inspect the PENDING diff, which is empty
+// after a commit. Resetting --soft to the cycle base re-exposes the work to
+// `git diff HEAD` without changing the auditor prompt or the security
+// binding.
 //
 // Best-effort: any failure WARNs and leaves the worktree untouched (audit then
 // inspects whatever state exists); it NEVER aborts the cycle. No-op when HEAD is
-// already at baseSHA (the builder left changes uncommitted — the historical
-// Claude-builder path), so opting in is byte-identical for non-committing builders.
+// already at baseSHA (the builder left changes uncommitted), so opting in is
+// byte-identical for non-committing builders.
 func normalizeWorktreeToBase(ctx context.Context, worktree, baseSHA string) {
 	if worktree == "" || baseSHA == "" {
 		return
@@ -369,7 +328,7 @@ func normalizeWorktreeToBase(ctx context.Context, worktree, baseSHA string) {
 		return
 	}
 	if strings.TrimSpace(head) == baseSHA {
-		return // builder left changes uncommitted — nothing to normalize
+		return
 	}
 	// Rebase-recovery guard: a PERSISTED base (resume path) can be stale after
 	// the operator rebased the cycle worktree onto a moved main. Resetting
@@ -395,11 +354,11 @@ func normalizeWorktreeToBase(ctx context.Context, worktree, baseSHA string) {
 // worktree, shared by RunCycle and RunCycleFromPhase (resume). The whole
 // function is a no-op when there is no active worktree.
 //
-//  1. Build-commit soft-reset (cycle-156): runs ONLY after PhaseBuild —
-//     re-exposes a committing builder's work as pending for audit's
-//     `git diff HEAD`. Base comes from the persisted CycleState.WorktreeBaseSHA.
-//  2. gofmt -s normalize (cycle-352): runs after EVERY worktree phase, because
-//     tdd, build, AND test-amplification all author .go that the audit gofmt
+//  1. Build-commit soft-reset: runs ONLY after PhaseBuild — re-exposes a
+//     committing builder's work as pending for audit's `git diff HEAD`. Base
+//     comes from the persisted CycleState.WorktreeBaseSHA.
+//  2. gofmt -s normalize: runs after EVERY worktree phase, because tdd,
+//     build, AND test-amplification all author .go that the audit gofmt
 //     gate scans. Cheap no-op when the worktree is already clean.
 func (o *Orchestrator) normalizeBuildWorktree(ctx context.Context, completed Phase, cs CycleState, projectRoot string) {
 	// An in-place worktree is the operator's tree: no soft reset, no gofmt -w,
@@ -408,16 +367,9 @@ func (o *Orchestrator) normalizeBuildWorktree(ctx context.Context, completed Pha
 	if cs.ActiveWorktree == "" || inPlaceWorktree(cs.ActiveWorktree, projectRoot) {
 		return
 	}
-	// The build-commit soft-reset (cycle-156) is build-ONLY: it re-exposes a
-	// committing builder's work as pending for audit's `git diff HEAD`.
 	if completed == PhaseBuild {
 		normalizeWorktreeToBase(ctx, cs.ActiveWorktree, cs.WorktreeBaseSHA)
 	}
-	// The gofmt -s normalize runs after EVERY worktree phase, not just build:
-	// tdd, build, AND test-amplification all author .go, and the audit gofmt
-	// gate scans the whole worktree. Cycle 352: test-amplification left
-	// modeltier_amp_test.go dirty AFTER the build-only normalize, re-failing the
-	// gate. Cheap no-op when the worktree is already clean.
 	normalizeBuildGofmt(cs.ActiveWorktree)
 	// Derived-projection regen is build-ONLY: the flag registry (the SSOT) is
 	// edited in the build phase, and the regen is gated on the SSOT actually
@@ -452,8 +404,8 @@ func (o *Orchestrator) normalizeBuildWorktree(ctx context.Context, completed Pha
 // edit), in the build worktree, BEFORE the audit/docs gate inspects it. Like
 // build-gofmt, regenerating a derived projection is deterministic work that must
 // NOT depend on the LLM builder remembering: a flag cycle edits registry_table.go
-// but the builder routinely leaves the control-flags.md projection stale
-// (cycle-11 H1), which the docs/flags gate then correctly FAILs. This closes that
+// but the builder routinely leaves the control-flags.md projection stale,
+// which the docs/flags gate then correctly FAILs. This closes that
 // class at the source — the gate stays the backstop. Best-effort; never aborts.
 //
 // Timing/integrity: this runs in the BUILD iteration of recordAndBranch (after
@@ -496,9 +448,10 @@ func changedWorktreePaths(ctx context.Context, worktree string) []string {
 // self-check judges the SAME diff the host-side docs-floor reviewer does
 // (build_floor_reviewer.go:136). A projection, not a second implementation:
 // re-deriving the diff in internal/cli/phasecmd would put two answers to "what
-// did this cycle change?" in the tree and let the gate and the self-check drift
-// (the ADR-0034 no-drift invariant). Fail-open semantics are inherited — a path
+// did this cycle change?" in the tree and let the gate and the self-check drift.
+// Fail-open semantics are inherited — a path
 // that is not a git repo yields no paths rather than an error.
+// See ADR-0034.
 func ChangedWorktreePaths(ctx context.Context, worktree string) []string {
 	return changedWorktreePaths(ctx, worktree)
 }
@@ -507,8 +460,8 @@ func ChangedWorktreePaths(ctx context.Context, worktree string) []string {
 // the build worktree's Go module BEFORE the audit gofmt gate inspects it.
 // Formatting is deterministic work and must not depend on the LLM builder
 // remembering to run it: when the builder leaves a non-gofmt-s-clean file
-// (comment alignment, etc.), the audit gate correctly FAILs the whole cycle
-// (cycles 339-341, 350, 351). This closes that class at the source — the gate
+// (comment alignment, etc.), the audit gate correctly FAILs the whole cycle.
+// This closes that class at the source — the gate
 // stays the backstop, but the builder's formatting lapses are normalized away
 // first. Best-effort: a gofmt failure WARNs and lets the audit gate catch
 // anything that slips through; it NEVER aborts the cycle. Scoped to the same
@@ -534,4 +487,4 @@ func normalizeBuildGofmt(worktree string) {
 // cycle start so recoverBuildLeak only touches paths the BUILD introduced, never
 // the operator's pre-existing uncommitted work. (The tree-diff guard's
 // `git diff --name-only HEAD` baseline is tracked-only and misses untracked, so
-// it can't serve this purpose — see the cycle-160 incident.)
+// it can't serve this purpose.)

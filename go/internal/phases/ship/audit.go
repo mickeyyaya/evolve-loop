@@ -1,13 +1,3 @@
-// audit.go — audit-binding verification for --class cycle.
-//
-// Mirrors ship.sh sections 3-6 (lines 396-575):
-//
-//  3. Locate most recent Auditor ledger entry (kind=agent_subprocess, role=auditor)
-//  4. Verify exit_code ∈ {0,1}, artifact exists, SHA matches
-//     4b. Parse Verdict from artifact: PASS/WARN/FAIL with dual-detection
-//     4c. EGPS predicate suite gate: acs-verdict.json:red_count == 0
-//  5. Cycle binding: current git HEAD + tree must match ledger entry
-//  6. Freshness: artifact age < 7 days
 package ship
 
 import (
@@ -62,7 +52,6 @@ func verifyAuditBinding(ctx context.Context, opts *Options, res *RunResult) erro
 			"audit-report.md declares 'Verdict: FAIL' — auditor explicitly rejected this build",
 			"artifact_path", entry.ArtifactPath)
 	case pass:
-		// clean ship
 	case warn:
 		if policy.StrictAuditFor(opts.ProjectRoot) {
 			return shipErr(core.CodeAuditBindingVerdictWarn, core.ShipClassPrecondition, core.StageVerifyClass,
@@ -78,20 +67,14 @@ func verifyAuditBinding(ctx context.Context, opts *Options, res *RunResult) erro
 			"artifact_path", entry.ArtifactPath)
 	}
 
-	// The audit-bound tree is the ledger's WorktreeTreeSHA: the worktree CHANGES
-	// tree the orchestrator will commit. The auditor report is never a source —
-	// its persona binds HEAD^{tree}, the unchanged base, which can never equal
-	// the changes-commit tree. An empty WorktreeTreeSHA leaves the field unset
-	// and is refused below by verifyPredicateReceipt and the treefence check.
 	opts.internalAuditBoundTreeSHA = entry.WorktreeTreeSHA
 	opts.internalAuditArtifactSHA = entry.ArtifactSHA256
 
-	// 5. Cycle binding: current HEAD/tree must match ledger entry.
 	if entry.GitHEAD == "" || entry.TreeStateSHA == "" {
 		return shipErr(core.CodeAuditBindingNoLedger, core.ShipClassPrecondition, core.StageVerifyClass,
 			"Auditor ledger entry predates v8.13.0 cycle-binding (no git_head/tree_state_sha) — re-run audit")
 	}
-	// The report SHA above binds the host receipt. The mutable verdict must
+	// The report SHA above binds the host receipt; the mutable verdict must also
 	// match its exact execution identity and bytes before it can authorize ship.
 	if err := verifyPredicateReceipt(opts, entry, string(body), res); err != nil {
 		return err
@@ -107,12 +90,8 @@ func verifyAuditBinding(ctx context.Context, opts *Options, res *RunResult) erro
 	}
 	currentHEAD = strings.TrimSpace(currentHEAD)
 	if currentHEAD != entry.GitHEAD {
-		// Trivial-rebase carry-forward (merge ladder RUNG 0, cycle-786): a
-		// valid composition-verdict entry — unchanged patch-id, green
-		// composed-tree gates — lets the audit verdict follow the change
-		// across a clean rebase. Any rejected condition falls back here.
-		// The composition entry binds the COMPOSED tree (tree_state_sha
-		// verified inside), so the base tree check below is superseded.
+		// The composition entry binds the composed tree already, so the
+		// base-tree check below is superseded when it carries forward.
 		carried, cfErr := tryTrivialRebaseCarryForward(ctx, opts, res, ledgerPath, entry, currentHEAD)
 		if cfErr != nil {
 			return cfErr
@@ -123,9 +102,6 @@ func verifyAuditBinding(ctx context.Context, opts *Options, res *RunResult) erro
 				"audited", entry.GitHEAD, "current", currentHEAD)
 		}
 	} else if filepath.Clean(testedRoot) == filepath.Clean(opts.ProjectRoot) {
-		// The plane-wide diff binds a ship only when the plane is the tree it lands from. A worktree
-		// ship is bound by the tree fence below, and the plane's tracked bookkeeping (the inbox
-		// queue) is not part of what it commits.
 		currentTree, err := computeTreeStateSHA(ctx, opts)
 		if err != nil {
 			return err
@@ -143,7 +119,6 @@ func verifyAuditBinding(ctx context.Context, opts *Options, res *RunResult) erro
 			fmt.Sprintf("predicate execution tree-state mismatch or unavailable after Audit (audited=%s current=%s error=%v); re-run Audit", entry.WorktreeTreeSHA, currentExecution.Tree, err), "audited_tree", entry.WorktreeTreeSHA, "current_tree", currentExecution.Tree)
 	}
 
-	// 6. Freshness (7d cap when cycle-bound).
 	fi, err := os.Stat(entry.ArtifactPath)
 	if err != nil {
 		return shipErr(core.CodeStateIO, core.ShipClassTransient, core.StageVerifyClass,
@@ -182,24 +157,12 @@ func findLatestAudit(ledgerPath, runID string) (*auditEntry, error) {
 	}
 }
 
-// parseVerdicts grep-and-awk's the audit report for PASS/WARN/FAIL.
-// Mirrors the bash has_pass/has_warn/has_fail logic:
-//
-//  1. Inline `Verdict: <X>` (case-insensitive, optional asterisks)
-//  2. Heading-style: `# Verdict\n**X**` (within 5 lines)
+// parseVerdicts recognizes two verdict shapes in the audit report: an inline
+// `Verdict: <X>` line, or a heading-style `# Verdict` followed by `**X**`
+// within 5 lines.
 func parseVerdicts(body string, stage config.Stage) (pass, warn, fail bool) {
 	if stage >= config.StageEnforce {
-		// ADR-0050 §3.10 Slice 6: sentinel-first at enforce. The machine-readable
-		// verdict is authoritative and single-valued, so the prose regex below
-		// (which can match multiple verdict words and trip the dual-verdict guard at
-		// audit.go) is gated off. No usable sentinel → all false →
-		// CodeAuditBindingMalformed, i.e. the sentinel becomes mandatory.
-		//
-		// The sentinel MUST be the audit phase's own: this is a ship gate, so a
-		// foreign-phase sentinel (e.g. a build-report sentinel quoted into the
-		// audit artifact) must not be allowed to satisfy it. ParseVerdictSentinelFull
-		// surfaces the phase field; only an exact "audit" phase is trusted. SKIPPED
-		// and any out-of-vocab verdict also fall through to all-false (malformed).
+		// See ADR-0050.
 		if s, ok := phasecontract.ParseVerdictSentinelFull(body); ok && s.Phase == string(core.PhaseAudit) {
 			switch s.Verdict {
 			case core.VerdictPASS:
@@ -225,7 +188,7 @@ func parseVerdicts(body string, stage config.Stage) (pass, warn, fail bool) {
 //	**Verdict: PASS**
 //
 // The pattern is case-insensitive on the verdict word and allows
-// surrounding asterisks. Mirrors the bash grep -qiE pattern.
+// surrounding asterisks.
 var inlineVerdictRe = map[string]*regexp.Regexp{
 	"PASS": regexp.MustCompile(`(?i)Verdict\s*:\s*\*?\*?\s*PASS(\s|$|\*)`),
 	"WARN": regexp.MustCompile(`(?i)Verdict\s*:\s*\*?\*?\s*WARN(\s|$|\*)`),
@@ -233,9 +196,8 @@ var inlineVerdictRe = map[string]*regexp.Regexp{
 }
 
 // headingVerdictRe matches the `## Verdict` heading followed, within 5
-// lines, by either `**X**` (bash awk window parity) or a BARE verdict line
-// (exactly `X` — the cycle-249 shape; a sentence containing the word must
-// not match).
+// lines, by either `**X**` or a bare verdict line (exactly `X`; a sentence
+// containing the word must not match).
 var headingVerdictRe = map[string]*regexp.Regexp{
 	"PASS": regexp.MustCompile(`(?m)^#+[ \t]+Verdict[ \t]*\n(?:.*\n){0,4}(?:.*\*\*PASS\*\*|[ \t]*PASS[ \t]*$)`),
 	"WARN": regexp.MustCompile(`(?m)^#+[ \t]+Verdict[ \t]*\n(?:.*\n){0,4}(?:.*\*\*WARN\*\*|[ \t]*WARN[ \t]*$)`),
@@ -252,10 +214,8 @@ func hasVerdict(body, verdict string) bool {
 // readAuditArtifact checks the exact bytes consumed below, avoiding a second
 // read between SHA verification and interpretation.
 func readAuditArtifact(entry *auditEntry) ([]byte, error) {
-	// 4. Exit code: 0|1 ok, 2+ is true error.
 	switch entry.ExitCode {
 	case 0, 1:
-		// fall through
 	default:
 		return nil, shipErr(core.CodeAuditBindingAuditorExit, core.ShipClassPrecondition, core.StageVerifyClass,
 			fmt.Sprintf("most recent Auditor exited %d (error state — not a Unix-convention findings signal)", entry.ExitCode),
@@ -347,14 +307,8 @@ func verifyPredicateReceipt(opts *Options, entry *auditEntry, report string, res
 		"ship predicate evidence invalid; re-run Audit: "+err.Error(), "path", path)
 }
 
-// computeTreeStateSHA computes sha256(git diff HEAD) — the same
-// fingerprint the bash Auditor records. This is the audit-binding
-// model: tracked-file mutations after audit invalidate ship.
-//
-// The git-run + hashing live in the shared internal/treestate package so the
-// commit-gate attestation reader (verifyCommitGate) and the audit-binding
-// verifier hash byte-identically; this thin wrapper maps treestate's typed
-// failure onto ship's error vocabulary without changing behavior.
+// computeTreeStateSHA computes sha256(git diff HEAD): a tracked-file
+// mutation after audit invalidates the ship.
 func computeTreeStateSHA(ctx context.Context, opts *Options) (string, error) {
 	sum, err := treestate.SHA(ctx, opts.runner(), opts.ProjectRoot, os.Environ())
 	if err != nil {
@@ -371,9 +325,9 @@ func computeTreeStateSHA(ctx context.Context, opts *Options) (string, error) {
 	return sum, nil
 }
 
-// underlyingErr returns the runner error carried by a treestate.RunError, or the
-// error itself otherwise — so the "git_err" field stays the raw runner message
-// (boom), matching the pre-extraction behavior byte-for-byte.
+// underlyingErr returns the runner error carried by a treestate.RunError, or
+// the error itself otherwise, so the "git_err" field stays the raw runner
+// message.
 func underlyingErr(err error) error {
 	var re *treestate.RunError
 	if errors.As(err, &re) && re.Err != nil {

@@ -1,20 +1,13 @@
 package audit
 
-// ciparity_newexport_test.go — RED contract for cycle-1331's
-// percycle-audit-apicover-newexport-parity task (scout finding 4). The
-// existing two-gate split (apicoverEnforceChangedDefault: touched∩enforced;
-// apicoverNewPackageGraduationDefault: new-package blind spot) has never had a
-// regression test proving the specific edge: a new EXPORTED symbol landing in
-// an EXISTING enforced package via a brand-new file (not a new package, and
-// not an edit to an already-tracked file). This is the untested case flagged
-// in scout-report.md Finding 4 — the per-cycle gate must catch it exactly as
-// CI's whole-repo `apicover -enforce` would, since the new file is recorded
-// under the handoff's `files_new` bucket rather than `files_modified`.
-//
-// changedpkgs.ChangedPackages folds BOTH files_new and files_modified into the
-// same changed-package set (changedpkgs.go:85-86), so the hypothesis is that
-// no code change is required — this test exists to make that parity a durable,
-// provable guard rather than an assumption (scout Hypothesis 2).
+// The two-gate split (apicoverEnforceChangedDefault: touched∩enforced;
+// apicoverNewPackageGraduationDefault: new-package blind spot) must also catch
+// a new exported symbol landing in an existing enforced package via a
+// brand-new file (not a new package, and not an edit to an already-tracked
+// file), exactly as CI's whole-repo `apicover -enforce` would — since the new
+// file is recorded under the handoff's `files_new` bucket rather than
+// `files_modified`, and changedpkgs.ChangedPackages folds both buckets into
+// the same changed-package set.
 
 import (
 	"os"
@@ -26,14 +19,14 @@ import (
 
 // TestApicoverEnforceChangedDefault_NewExportViaNewFileInExistingPackage_CaughtByGate
 // pins the new-export-in-existing-package parity case: `./internal/p` is
-// already enforced and already has a clean, exported-symbol-free file
-// (x.go). This cycle adds a SECOND file (y.go) to that SAME existing package
-// directory, carrying an exported func no test names. The handoff records
-// y.go under files_new (a brand-new file, not a modification to x.go) — the
-// exact shape scout Finding 4 called out as untested. The per-cycle gate must
-// flag it: touched∩enforced scoping must not silently drop a new-file/
-// existing-package change the way it (correctly) drops a same-cycle new
-// PACKAGE (that's apicoverNewPackageGraduationDefault's job, not this one's).
+// already enforced and already has a clean, exported-symbol-free file (x.go).
+// This cycle adds a second file (y.go) to that same existing package
+// directory, carrying an exported func no test names, and the handoff records
+// y.go under files_new (a brand-new file, not a modification to x.go). The
+// per-cycle gate must flag it: touched∩enforced scoping must not silently
+// drop a new-file/existing-package change the way it correctly drops a
+// same-cycle new package (that's apicoverNewPackageGraduationDefault's job,
+// not this one's).
 func TestApicoverEnforceChangedDefault_NewExportViaNewFileInExistingPackage_CaughtByGate(t *testing.T) {
 	root, goDir := goWorktree(t)
 	if err := os.WriteFile(filepath.Join(goDir, ".apicover-enforce"), []byte("./internal/p\n"), 0o644); err != nil {
@@ -73,15 +66,14 @@ func TestApicoverEnforceChangedDefault_NewExportViaNewFileInExistingPackage_Caug
 	}
 }
 
-// TestApicoverEnforceChangedDefault_NewExportViaNewFile_NotGraduationGate is the
-// negative/boundary half: the SAME fixture must be a no-op for
+// TestApicoverEnforceChangedDefault_NewExportViaNewFile_NotGraduationGate is
+// the negative/boundary half: the same fixture must be a no-op for
 // apicoverNewPackageGraduationDefault, because ./internal/p is already
 // enforced — this scenario belongs to the touched∩enforced gate, not the
-// new-package graduation gate. Without this split, a change that quietly
-// mis-routes new-file-in-existing-package detection into the graduation gate
-// (which explicitly ignores already-enforced packages, ciparity.go:134) would
-// go completely unflagged by either gate — the exact silent-drop this task
-// closes the proof for.
+// new-package graduation gate, which explicitly ignores already-enforced
+// packages. Without this split, a change that quietly mis-routes
+// new-file-in-existing-package detection into the graduation gate would go
+// completely unflagged by either gate.
 func TestApicoverEnforceChangedDefault_NewExportViaNewFile_NotGraduationGate(t *testing.T) {
 	root, goDir := goWorktree(t)
 	if err := os.WriteFile(filepath.Join(goDir, ".apicover-enforce"), []byte("./internal/p\n"), 0o644); err != nil {

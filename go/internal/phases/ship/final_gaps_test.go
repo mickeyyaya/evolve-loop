@@ -1,22 +1,5 @@
 //go:build integration
 
-// final_gaps_test.go — last achievable coverage gaps after 92.5%:
-//
-//   - verifySelfSHA: sha256File error on unreadable binary (verify.go:65)
-//   - verifySelfSHA: repin writeStateMap error (verify.go:81)
-//   - verifyManualConfirm: diff --cached --quiet runner error (verify.go:161)
-//   - verifyTrivial: diff --cached --name-only runner error (verify.go:232)
-//   - verifyAuditBinding: sha256File error on unreadable artifact (audit.go:66)
-//   - verifyAuditBinding: os.ReadFile error on unreadable artifact (audit.go:77)
-//   - verifyAuditBinding: rev-parse HEAD runner error (audit.go:131)
-//   - verifyAuditBinding: computeTreeStateSHA runner error (audit.go:141)
-//   - verifyAuditBinding: os.Stat freshness error (audit.go:152)
-//   - shipDirect: runCommitPrefixGate error (gitops.go:103)
-//   - shipFromWorktree: runCommitPrefixGate error (gitops.go:186)
-//   - shipFromWorktree: git commit runner failure (gitops.go:195)
-//   - shipFromWorktree: write-tree error + empty-output fail-closed (ADR-0048 C1)
-//   - repinPostCycle: readStateMap error (postship.go:167)
-//   - repinPostCycle: writeStateMap error (postship.go:188)
 package ship
 
 import (
@@ -31,12 +14,9 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// --- verifySelfSHA: sha256File error on unreadable binary (verify.go:65) ---
-
 func TestVerifySelfSHA_UnreadableBinary_Errors(t *testing.T) {
 	repo := makeRepo(t)
 
-	// Create a file for the binary path, then make it unreadable.
 	bin := filepath.Join(repo, "unreadable-bin")
 	mustWrite(t, bin, "binary content\n")
 	if err := os.Chmod(bin, 0o000); err != nil {
@@ -59,19 +39,16 @@ func TestVerifySelfSHA_UnreadableBinary_Errors(t *testing.T) {
 	}
 }
 
-// --- verifySelfSHA: repin writeStateMap error (verify.go:81) ---------------
-// First-run (no expected_ship_sha in state.json) triggers repin → tries to
-// write state.json. Make .evolve/ read-only so writeStateMap fails.
-
 func TestVerifySelfSHA_RepinWriteStateFails_Errors(t *testing.T) {
 	repo := makeRepo(t)
 	bin := filepath.Join(repo, "ship-binary-fixture")
-	preSeedTOFU(t, repo, bin) // seeds expected_sha != actual so repin fires... actually we want FIRST-RUN
+	preSeedTOFU(t, repo, bin)
 
-	// Overwrite state.json with empty object → no expected_ship_sha → first-run repin.
+	// Overwrites state.json with an empty object so no expected_ship_sha is
+	// present, forcing the first-run repin path.
 	mustWrite(t, filepath.Join(repo, ".evolve", "state.json"), "{}\n")
 
-	// Make .evolve/ read-only so writeStateMap (CreateTemp) fails.
+	// .evolve is made read-only so writeStateMap (CreateTemp) fails.
 	evolveDir := filepath.Join(repo, ".evolve")
 	if err := os.Chmod(evolveDir, 0o555); err != nil {
 		t.Skip("cannot chmod .evolve dir")
@@ -88,18 +65,14 @@ func TestVerifySelfSHA_RepinWriteStateFails_Errors(t *testing.T) {
 		Stderr:         io.Discard,
 	}
 	err := verifySelfSHA(context.Background(), opts, &RunResult{})
-	// With the ADR-0049 S2 shared state.json lock, a read-only .evolve dir now
-	// fails at lock-acquire (the .lock file can't be created) BEFORE the write —
-	// both are the same fail-safe STATE_IO refusal on an unwritable state dir.
-	// Assert the contract (a STATE_IO refusal, not silent pass), not the site.
+	// A read-only .evolve dir fails at lock-acquire before the write; assert
+	// the STATE_IO refusal, not the site.
+	// See ADR-0049.
 	var se *core.ShipError
 	if err == nil || !errors.As(err, &se) || se.Code != core.CodeStateIO {
 		t.Fatalf("want a STATE_IO refusal on read-only .evolve, got %v", err)
 	}
 }
-
-// --- verifyManualConfirm: diff --cached --quiet runner error (verify.go:161) -
-// git add -A succeeds (exit 0), then diff --cached --quiet runner errors.
 
 func TestVerifyManualConfirm_DiffCachedQuietRunnerError_Errors(t *testing.T) {
 	call := 0
@@ -127,8 +100,6 @@ func TestVerifyManualConfirm_DiffCachedQuietRunnerError_Errors(t *testing.T) {
 	}
 }
 
-// --- verifyTrivial: diff --cached --name-only runner error (verify.go:232) --
-
 func TestVerifyTrivial_StagedNameOnlyRunnerError_Errors(t *testing.T) {
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, ".evolve", "cycle-state.json"),
@@ -153,8 +124,6 @@ func TestVerifyTrivial_StagedNameOnlyRunnerError_Errors(t *testing.T) {
 	}
 }
 
-// --- verifyAuditBinding: sha256File error on unreadable artifact (audit.go:66)
-
 func TestVerifyAuditBinding_UnreadableArtifact_SHA256Error(t *testing.T) {
 	repo := makeRepo(t)
 	seedAudit(t, repo, "PASS")
@@ -171,22 +140,10 @@ func TestVerifyAuditBinding_UnreadableArtifact_SHA256Error(t *testing.T) {
 	if err == nil {
 		t.Fatal("want sha256File error on unreadable artifact, got nil")
 	}
-	// Must be a plain error (not IntegrityError — Stat passes, sha256 fails).
 	if _, ok := err.(*IntegrityError); ok {
 		t.Errorf("sha256 read error should be plain error, not IntegrityError; got %v", err)
 	}
 }
-
-// --- verifyAuditBinding: os.ReadFile error (audit.go:77) -------------------
-// sha256File reads byte-by-byte via sha256.New(); it succeeds even if
-// os.ReadFile would fail in principle. To get audit.go:66 to pass but
-// audit.go:77 to fail we need the file to be readable for sha256File but
-// not for os.ReadFile. This is only possible with a custom sha256File seam
-// which doesn't exist. Skip: practically identical to the chmod test above.
-// audit.go:77 is reachable only if sha256File succeeds but ReadFile fails —
-// not achievable without OS-level fault injection between two open() calls.
-
-// --- verifyAuditBinding: rev-parse HEAD runner error (audit.go:131) --------
 
 func TestVerifyAuditBinding_RevParseHeadRunnerError_Errors(t *testing.T) {
 	repo := makeRepo(t)
@@ -210,8 +167,6 @@ func TestVerifyAuditBinding_RevParseHeadRunnerError_Errors(t *testing.T) {
 	}
 }
 
-// --- verifyAuditBinding: computeTreeStateSHA runner error (audit.go:141) ---
-
 func TestVerifyAuditBinding_ComputeTreeSHARunnerError_Errors(t *testing.T) {
 	repo := makeRepo(t)
 	seedAudit(t, repo, "PASS")
@@ -232,21 +187,11 @@ func TestVerifyAuditBinding_ComputeTreeSHARunnerError_Errors(t *testing.T) {
 	}
 }
 
-// --- shipDirect: runCommitPrefixGate error (gitops.go:103) -----------------
-// Exercise the prefix-gate path by faulting the runner for the gate's git
-// call. runCommitPrefixGate shells out to "git diff --cached --name-only" to
-// gather the file list; fail that to trigger a gate error.
-// (The commitprefixgate library reads the manifest then checks file names
-// against prefixes; its internal git call uses the Runner seam.)
-
 func TestShipDirect_CommitPrefixGateRejects_Errors(t *testing.T) {
 	repo := makeRepo(t)
 	addRemote(t, repo)
 	mustWrite(t, filepath.Join(repo, "staged.txt"), "staged change\n")
 
-	// Real manifest schema (prefixes map): a "docs:" commit must touch docs/.
-	// The only staged path is staged.txt (outside docs/), so the gate raises a
-	// scope violation, which shipDirect surfaces as a commit-prefix-gate error.
 	manifest := `{"prefixes":{"docs":{"required_paths":["docs/"]}}}`
 	mustWrite(t, filepath.Join(repo, ".evolve", "commit-prefix-scope.json"), manifest)
 
@@ -265,14 +210,10 @@ func TestShipDirect_CommitPrefixGateRejects_Errors(t *testing.T) {
 	}
 }
 
-// --- shipFromWorktree: runCommitPrefixGate rejection (gitops.go:186) --------
-
 func TestShipFromWorktree_CommitPrefixGateRejects_Errors(t *testing.T) {
 	repo, wt := makeWorktreeScenario(t)
 
 	// The gate uses RepoDir=worktree, so the manifest lives in wt/.evolve/.
-	// makeWorktreeScenario stages wt-change.txt (outside docs/), so a "docs:"
-	// commit violates required_paths → the gate rejects pre-merge.
 	manifest := `{"prefixes":{"docs":{"required_paths":["docs/"]}}}`
 	mustWrite(t, filepath.Join(wt, ".evolve", "commit-prefix-scope.json"), manifest)
 
@@ -291,8 +232,6 @@ func TestShipFromWorktree_CommitPrefixGateRejects_Errors(t *testing.T) {
 	}
 }
 
-// --- shipFromWorktree: git commit runner failure (gitops.go:195) -----------
-
 func TestShipFromWorktree_GitCommitFails_Errors(t *testing.T) {
 	repo, wt := makeWorktreeScenario(t)
 
@@ -310,11 +249,6 @@ func TestShipFromWorktree_GitCommitFails_Errors(t *testing.T) {
 		t.Fatalf("want 'git commit in worktree failed' error, got %v", err)
 	}
 }
-
-// --- shipFromWorktree: write-tree error in the pre-commit binding check -----
-// ADR-0048 Slice C1 moved the audit-bound tree-SHA verification to a
-// `git write-tree` on the staged index BEFORE the commit. A write-tree failure
-// must propagate (the binding cannot be verified, so ship must not advance).
 
 func TestShipFromWorktree_WriteTreeFails_Errors(t *testing.T) {
 	repo, wt := makeWorktreeScenario(t)
@@ -343,10 +277,6 @@ func TestShipFromWorktree_WriteTreeFails_Errors(t *testing.T) {
 	}
 }
 
-// TestShipFromWorktree_WriteTreeEmptyOutput_FailsClosed: ADR-0048 Slice C1
-// fail-closed posture — if `write-tree` returns exit 0 but EMPTY stdout, the
-// audit binding cannot be verified, so ship must abort rather than commit
-// unverified work (a set binding is never silently skipped).
 func TestShipFromWorktree_WriteTreeEmptyOutput_FailsClosed(t *testing.T) {
 	repo, wt := makeWorktreeScenario(t)
 
@@ -375,8 +305,3 @@ func TestShipFromWorktree_WriteTreeEmptyOutput_FailsClosed(t *testing.T) {
 		t.Fatalf("want CodeGitIO ShipError, got %v", err)
 	}
 }
-
-// Note: repinPostCycle readStateMap error (postship.go:167) and writeStateMap
-// error (postship.go:188) are already covered by
-// TestRepinPostCycle_StateReadError_ReturnsError and
-// TestRepinPostCycle_WriteStateFails_ReturnsError in coverage_final_test.go.

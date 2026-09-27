@@ -1,28 +1,5 @@
 //go:build e2e
 
-// End-to-end coverage of the CLI fallback chain (ADR-0029 / Workstream G)
-// driven through `evolve cycle run`: when the primary CLI fails with a
-// trigger exit code, the runner must retry the phase on the next allowed CLI
-// and the cycle must still complete.
-//
-// Scope note — what this asserts vs. what lives elsewhere:
-//   - Fallback ORCHESTRATION (the runner looping candidates on a trigger code)
-//     is exercised here, end-to-end, because nothing else covers it.
-//   - The require-full → exit-99 GATE (BRIDGE_REQUIRE_FULL with a sub-full
-//     tier) is already covered at the bridge level — see
-//     internal/bridge/launch_modes_test.go:TestLaunchArgs_RequireFull_Unmet
-//     and coverage_batch2_test.go:TestRequireFull_ManifestMissing — so it is
-//     NOT re-tested here. Exit 99 appears below only as a NON-trigger code
-//     that must NOT fall back.
-//   - The bash adapters' graceful-degradation stub (missing binary → stub
-//     artifact → exit 0) does NOT exist in the v11+ Go path; the Go path
-//     returns a fallback-trigger exit code (e.g. 127 ExitMissingBinary) and
-//     relies on the fallback chain instead. Asserting the bash stub here would
-//     test behavior the Go path does not have. See docs/TEST_PLAN.md.
-//
-// Deterministic + host-independent: the fake's per-CLI exit injection
-// (FAKE_CLI_CLAUDE_EXIT) makes the primary claude-p fail with a chosen code
-// while codex (same fake binary, codex invocation style) succeeds.
 package main
 
 import (
@@ -51,22 +28,8 @@ func TestE2ECLIFallbackChain(t *testing.T) {
 	evolveBin := buildBinary(t, binDir, "evolve", "./cmd/evolve", repoRoot)
 	fakeBin := buildBinary(t, binDir, "evolve-fake-cli", "./cmd/evolve-fake-cli", repoRoot)
 
-	// ONE representative trigger walks the whole spine end to end. 81
+	// ONE representative trigger walks the whole spine end to end: 81
 	// (artifact-timeout) is the code that actually fires in production.
-	//
-	// This loop used to run all four default triggers (80/81/124/127) and that
-	// is why the test rotted: reaching ship now costs ~10 MINUTES per code —
-	// every phase pays a primary failure plus a fallback, and the spine has
-	// roughly doubled since this was written (intent, triage, plan-review,
-	// build-planner, tester… all arrived later). Four of those in parallel
-	// exceeded the harness budget and the test failed on ALL FOUR codes for a
-	// reason unrelated to the fallback chain.
-	//
-	// PER-CODE trigger semantics did not go away — they moved to
-	// llmroute.TestDispatch_FallsBackOnTriggerExit, which is table-driven over
-	// defaultFallbackOnExit itself (so a new code is covered automatically) and
-	// costs microseconds. What only an e2e can prove is what stays here: a real
-	// cycle, every phase falling back, still reaches ship.
 	t.Run("trigger_81_falls_back_to_codex", func(t *testing.T) {
 		t.Parallel()
 		runFallbackCycle(t, fallbackCfg{
@@ -121,32 +84,16 @@ func runFallbackCycle(t *testing.T, cfg fallbackCfg) {
 	cmd := exec.Command(cfg.EvolveBin, args...)
 	cmd.Env = env
 	cmd.Dir = projRoot
-	// CEILING, not a target: measured ~500-900s to reach ship on a quiet M4; a CI
-	// runner is slower, and an under-sized ceiling is exactly how this test rotted
-	// (the old 120s became unreachable when the spine roughly doubled). Because the
-	// harness POLLS, a fast host exits as soon as ship appears and never pays the
-	// ceiling — so raising it costs nothing except on a host that genuinely needs it.
-	//
-	// The cycle does NOT exit cleanly in this fixture by design (native ship
-	// cannot complete a real ff-merge here — see the note below), so waiting for
-	// the process means always burning the whole budget and, worse, passing only
-	// because the cycle happened to reach ship before an arbitrary wall-clock
-	// kill. That is precisely how this test rotted once already. Instead: poll
-	// the ledger for the role we are asserting and stop the moment it appears.
-	// The ceiling stays generous; a faster machine finishes sooner and a slower
-	// one still passes, so the result depends on the INVARIANT, not the host.
+	// CEILING, not a target: the harness polls the ledger and stops as soon as
+	// the target role appears, so a fast host pays nothing extra and a slow one
+	// still gets the full ceiling — the result depends on the invariant, not
+	// the host's speed.
 	out, err := runUntilLedgerRole(cmd, projRoot, "ship", cfg.ExpectShip, 1500*time.Second)
 
-	// The primary (claude-p) ALWAYS fails with the chosen code. Whether the
-	// cycle REACHES the ship phase is read from the ledger role — the
-	// orchestrator records role="ship" the moment ship is attempted
-	// (orchestrator.recordShipError) — rather than a landed commit: native-only
-	// ship cannot complete a real ff-merge in this fixture (no seeded remote +
-	// audit binding; that successful-native-ship e2e is deferred to go/test/e2e/
-	// — see PORTING-LEDGER.md). Reaching ship at all PROVES every phase fell
-	// back to codex, since the primary fails on every invocation. The legacy
-	// EVOLVE_NATIVE_SHIP=0 + EVOLVE_SHIP_SCRIPT fake-ship hatch this test was
-	// first authored against was removed in the Go-only consolidation.
+	// Whether the cycle reaches ship is read from the ledger role, not a landed
+	// commit (native ship cannot ff-merge in this fixture). Reaching ship at
+	// all proves every phase fell back to codex, since the primary fails on
+	// every invocation.
 	entries := readLedger(t, projRoot)
 	reachedShip := ledgerHasRole(entries, "ship")
 
@@ -157,8 +104,6 @@ func runFallbackCycle(t *testing.T, cfg fallbackCfg) {
 			t.Errorf("trigger exit=%d should fall back to codex and reach the ship phase; ledger roles=%v", cfg.PrimaryExitCode, ledgerRoles(entries))
 		}
 	} else {
-		// 99 is not a trigger → no fallback → the cycle must fail at the first
-		// phase and never reach ship.
 		if err == nil {
 			t.Errorf("cycle should FAIL (exit %d is not a fallback trigger), but it succeeded\noutput:\n%s", cfg.PrimaryExitCode, out)
 		}

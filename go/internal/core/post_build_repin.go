@@ -10,16 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/version"
 )
 
-// post_build_repin.go — cycle 636, task ship-sha-repin-after-build.
-//
-// The cycle-514 boot healer auto-re-pins expected_ship_sha ONLY at boot; a
-// legitimate within-version rebuild of go/bin/evolve between boots leaves a
-// frozen pin that denied the terminal ship gate on 8 consecutive cycles
-// (625->634, SELF_SHA_TAMPERED). This closes the class: the orchestrator re-pins
-// immediately AFTER a successful build phase, reusing the SAME provenance-gated
-// primitive the boot healer uses (phaseintegrity.RepinIfDrifted) so the two
-// paths can never diverge.
-
 // postBuildRepinProvenanceFn resolves the running binary's build-commit + the
 // provenance predicate authorizing a post-build auto-repin. A package-var seam
 // (mirrors cmd/evolve's shipRepinProvenanceFn) so the decision stays git-free —

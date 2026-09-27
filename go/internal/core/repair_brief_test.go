@@ -1,10 +1,5 @@
 package core
 
-// repair_brief_test.go — R2: the repair brief carries the auditor's findings,
-// not only the gate strings, and names the ones that persisted from the
-// previous round; the previous attempt's prompt is archived. Grammar is
-// reportdoc's (the dashboard renders the same list).
-
 import (
 	"context"
 	"os"
@@ -127,9 +122,6 @@ func (r *findingsAuditRunner) Run(_ context.Context, req PhaseRequest) (PhaseRes
 	return PhaseResponse{Phase: string(PhaseAudit), Verdict: VerdictPASS, ArtifactsDir: req.Workspace}, nil
 }
 
-// TestRepairRoundDispatch_BriefCarriesAuditorFindingsAndArchivesPrompt is the
-// wiring proof through RunCycle: the repair-round build is TOLD the auditor's
-// H1 (not only gate strings) and the round-1 prompt is archived.
 func TestRepairRoundDispatch_BriefCarriesAuditorFindingsAndArchivesPrompt(t *testing.T) {
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	runners := buildRunners(map[Phase]string{PhaseRetro: VerdictFAIL})
@@ -155,9 +147,6 @@ func TestRepairRoundDispatch_BriefCarriesAuditorFindingsAndArchivesPrompt(t *tes
 	}
 }
 
-// TestAuditorFindingsBrief_UnreadableReportWarns — a report that EXISTS but
-// cannot be read is the "looked in the wrong place" class, and must be
-// reported on stderr like the gate reader beside it; plain absence stays quiet.
 func TestAuditorFindingsBrief_UnreadableReportWarns(t *testing.T) {
 	ws := t.TempDir()
 	auditName := phasecontract.ArtifactFilename(string(PhaseAudit))
@@ -177,9 +166,6 @@ func TestAuditorFindingsBrief_UnreadableReportWarns(t *testing.T) {
 	}
 }
 
-// TestTruncateFindings_CutsAtLineBoundary — the brief budget cut lands on a
-// line break, never mid-rune or mid-finding (the em dashes and ellipses the
-// auditor findings carry are multi-byte).
 func TestTruncateFindings_CutsAtLineBoundary(t *testing.T) {
 	line := strings.Repeat("x", 100) + " — finding…\n" // 100 ASCII + multi-byte tail
 	s := strings.Repeat(line, maxFindingsBytes/len(line)+3)

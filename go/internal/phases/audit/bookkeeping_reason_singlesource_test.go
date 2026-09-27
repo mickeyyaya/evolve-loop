@@ -1,16 +1,10 @@
 package audit
 
-// bookkeeping_reason_singlesource_test.go — producer↔classifier binding for
-// the bookkeeping-regrade micro-cycle (ADR-0084 I2 spirit: the reader and the
-// writer of a machine-graded string must be pinned against each other).
-//
 // core.BookkeepingRegradeEligible classifies CycleState.AuditFailReasons by
-// prefix. The reasons are minted HERE (defect_ledger.go, closure_claim.go,
-// audit.go's verdict-conflict record). This test feeds REAL minted
-// diagnostics through the core matchers, so a prefix drift on either side —
-// a reworded "defect ledger:" mint, a reanchored matcher — reds it instead
-// of silently disarming the regrade (the class that made the eval
-// quality-gate vacuous, #426).
+// prefix. The reasons are minted in defect_ledger.go, closure_claim.go and
+// audit.go's verdict-conflict record. This test feeds real minted diagnostics
+// through the core matchers, so a prefix drift on either side reds it instead
+// of silently disarming the regrade.
 
 import (
 	"testing"

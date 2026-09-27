@@ -1,9 +1,5 @@
 package bridge
 
-// wallcorroborate_test.go — contracts for the wall-corroboration seam. The
-// incident narrative and design rationale live ONCE, in wallcorroborate.go's
-// header (2026-08-15 false-wall class; Strategy via DI, nil = legacy).
-
 import (
 	"context"
 	"io"
@@ -31,9 +27,6 @@ func (r *corroboratorProbeRunner) run(_ context.Context, name, _ string, args, _
 	return r.rc, nil
 }
 
-// TestWallCorroborator_NilMeansLegacyVerdict names the strategy TYPE
-// (apicover) and pins the seam's zero value: nil = the pane match IS the
-// verdict, byte-identical to pre-fix behavior for every un-wired caller.
 func TestWallCorroborator_NilMeansLegacyVerdict(t *testing.T) {
 	t.Parallel()
 	var c WallCorroborator
@@ -82,8 +75,6 @@ func TestDefaultWallCorroborator_CodexRecipeUsesExecWithStdin(t *testing.T) {
 	}
 }
 
-// Families without a declared probe recipe stay CONSERVATIVE: corroborated
-// walled (legacy behavior), and no subprocess is ever invented for them.
 func TestDefaultWallCorroborator_UnknownFamilyStaysConservative(t *testing.T) {
 	t.Parallel()
 	r := &corroboratorProbeRunner{rc: 0}
@@ -96,13 +87,10 @@ func TestDefaultWallCorroborator_UnknownFamilyStaysConservative(t *testing.T) {
 	}
 }
 
-// The probe is deadline-bounded: a hung probe must return walled=true (the
-// provider not answering IS the wall signature) rather than hang the poll.
 func TestDefaultWallCorroborator_HungProbeIsWalled(t *testing.T) {
 	// NOT parallel — this test WRITES the package-level wallProbeTimeout var;
 	// Go runs serial tests to completion before any t.Parallel test resumes,
-	// which is the only ordering that makes the write race-free (the -race
-	// CI run on PR #466 caught the parallel variant racing every reader).
+	// which is the only ordering that makes the write race-free.
 	hang := func(ctx context.Context, _, _ string, _, _ []string, _ io.Reader, _, _ io.Writer) (int, error) {
 		<-ctx.Done()
 		return 1, ctx.Err()
@@ -125,11 +113,6 @@ func TestDefaultWallCorroborator_HungProbeIsWalled(t *testing.T) {
 
 // --- tick-level wiring: the two decision sites ---
 
-// A pane whose wall text is FILE CONTENT (not prompt echo — the 2026-08-15
-// class: fixtures under edit persist frame after frame) must NOT escalate
-// when the corroborator proves the provider healthy; the suppression is loud
-// and the scan disables for the rest of the phase (exactly ONE probe, not one
-// per tick).
 func TestTick_ContentWallSuppressedWhenCorroboratorSaysHealthy(t *testing.T) {
 	pane := "editing usageclassify_test.go\nfixture: \"You have reached your usage limit\"\nrunning tests...\n"
 	var log strings.Builder
@@ -157,8 +140,6 @@ func TestTick_ContentWallSuppressedWhenCorroboratorSaysHealthy(t *testing.T) {
 	}
 }
 
-// A genuine wall — corroborator confirms — must still escalate exactly as
-// before: the seam must never blanket-disable the fast-fail.
 func TestTick_CorroboratedWallStillEscalates(t *testing.T) {
 	pane := "You have reached your usage limit. Resets in 4h.\n"
 	probe := &corroboratorProbeRunner{rc: 1}
@@ -181,11 +162,6 @@ func TestTick_CorroboratedWallStillEscalates(t *testing.T) {
 
 // --- taxonomy: burst/display vocabulary out of the exhaustion regexes ---
 
-// The manifests' exhaustion regexes must match WINDOW-EXHAUSTION wording only.
-// A 429 burst ("Too many requests") recovers in minutes — benching a family or
-// checkpointing a batch on it is the wrong recovery (operator directive), and
-// the usage DISPLAY's own labels ("Rate limits: … % left") are subject-matter
-// vocabulary, not state (the false-bench class fixed at the probe layer).
 func TestManifestExhaustedRegexes_WindowWallOnlyNeverBurstOrDisplay(t *testing.T) {
 	t.Parallel()
 	mustNotMatch := []string{
@@ -218,11 +194,6 @@ func TestManifestExhaustedRegexes_WindowWallOnlyNeverBurstOrDisplay(t *testing.T
 	}
 }
 
-// A REAL wall must corroborate exactly ONCE per responder even when the
-// caller discards rc (boot loop, recipe adapter, capture ticks): the gate
-// LATCHES, so without a probed-latch every subsequent tick would re-fire a
-// 60s quota-consuming probe against an already-confirmed wall — a live
-// regression in the exact scenario the corroborator protects (review HIGH-1).
 func TestTick_RealWallProbesExactlyOnceAcrossTicks(t *testing.T) {
 	pane := "You have reached your usage limit. Resets in 4h.\n"
 	probe := &corroboratorProbeRunner{rc: 1}
@@ -246,10 +217,6 @@ func TestTick_RealWallProbesExactlyOnceAcrossTicks(t *testing.T) {
 	}
 }
 
-// checkpointWallState is the stop-review site's decision (extracted for
-// direct testability — review HIGH-2). Same contract as the responder:
-// exactly one probe per phase, suppression logged once, a confirmed wall
-// escalates on every subsequent crossing without re-probing.
 func TestCheckpointWallState_HealthySuppressesOnceThenSilent(t *testing.T) {
 	t.Parallel()
 	probe := &corroboratorProbeRunner{rc: 0}

@@ -10,38 +10,6 @@ import (
 	"time"
 )
 
-// RED contract for cycle-1585 task `quota-defer-short-circuits-retro`
-// (instinct inst-L1582a), SUPERSEDED by the cycle-1587 fix for
-// `pipeline-defect-pipeline-blocker-cycle1582`
-// (.evolve/evals/pipeline-defect-pipeline-blocker-cycle1582.md). The
-// all-families-quota-exhausted abort (cyclerun_dispatch.go:264-287) is a
-// DEFERRED, resumable checkpoint, not a diagnosed phase failure: the
-// quota-boundary checkpoint is already written and the loop exits rc=5 to be
-// resumed after the quota resets.
-//
-// cycle-1585 only fixed the "no retro dispatch" half (recordFailureLearning
-// still called recordFailedApproachState unconditionally before its
-// ErrAllFamiliesExhausted short-circuit, so a FailedRecord + P0 carryover todo
-// were still appended on every quota wall — the cycle-1582 dossier root
-// cause: it queued a spurious `cycle-N-failed-scout` P0 todo that competed
-// with real work every time the fleet hit quota). This RED contract closes
-// the remaining half: the guard must short-circuit BEFORE
-// recordFailedApproachState on the all-families-exhausted arm, not merely
-// before the retro dispatch that follows it.
-//
-//	AC1 — retro runner is never called on the all-families-exhausted path
-//	AC2 — CycleState.Phase / ActiveAgent are never mutated to "retro" there
-//	AC3 — state.FailedAt / carryover-todo bookkeeping is NOT recorded for the
-//	      all-families-exhausted arm (superseded from cycle-1585's "still
-//	      recorded" expectation — a DEFERRED checkpoint is not a FAIL)
-//	AC4 — a genuine non-quota failure still dispatches retro exactly once and
-//	      still records FailedAt (unaffected by the guard)
-//	AC5 — a multiply-wrapped sentinel is still matched (errors.Is, not ==),
-//	      and skips bookkeeping too
-//	AC6 — a single-family exit=85 attempt with a differently-shaped sibling
-//	      (not the all-85 signature) is NOT the exhaustion arm at all, so it
-//	      must learn exactly as before: unaffected by the guard
-
 // allFamiliesExhaustedRun drives a full RunCycle to all-families quota
 // exhaustion using the same harness as
 // TestRunCycle_AllFamilies85_CheckpointsAndDefers: scout returns exit=85 on
@@ -73,14 +41,7 @@ func allFamiliesExhaustedRun(t *testing.T) (*fakeStorage, *fakeLedger, map[Phase
 	return st, led, runners, err
 }
 
-// AC1 + AC3: the counting fake proves the PRODUCTION dispatch chain never
-// reaches the retro runner, AND — superseding cycle-1585's "bookkeeping still
-// recorded" expectation — that a DEFERRED quota checkpoint records no
-// FailedRecord and no P0 carryover todo either: it is not a diagnosed failure,
-// so failure-learning must not fire at all on this arm (cycle-1582 dossier:
-// the spurious `cycle-N-failed-scout` P0 todo competed with real work on every
-// quota wall). NOT t.Parallel: swaps the package-level
-// QuotaBoundaryCheckpointer hook.
+// NOT t.Parallel: swaps the package-level QuotaBoundaryCheckpointer hook.
 func TestRunCycle_AllFamiliesExhausted_DoesNotDispatchRetro(t *testing.T) {
 	st, _, runners, _ := allFamiliesExhaustedRun(t)
 
@@ -101,9 +62,6 @@ func TestRunCycle_AllFamiliesExhausted_DoesNotDispatchRetro(t *testing.T) {
 	}
 }
 
-// Regression reproducer for cycle-1582: all-family quota exhaustion is a
-// DEFERRED checkpoint, not a diagnosed phase failure. The current tree skips
-// retro but still creates failed-at and P0 carryover state before that guard.
 func TestDispatch_AllFamiliesExhausted_NoFailureLearning(t *testing.T) {
 	t.Run("no_FailedRecord_appended", func(t *testing.T) {
 		st, _, _, _ := allFamiliesExhaustedRun(t)
@@ -149,10 +107,6 @@ func TestDispatch_AllFamiliesExhausted_NoFailureLearning(t *testing.T) {
 	})
 }
 
-// AC2: the deferral must leave the cycle state resumable at the exhausted
-// phase. Mutating Phase/ActiveAgent to "retro" (and persisting it) makes
-// `evolve loop --resume` resume into retro instead of the drained phase, so the
-// guard must land before those writes — not merely skip the runner call.
 func TestRunCycle_AllFamiliesExhausted_NeverWritesRetroCycleState(t *testing.T) {
 	st, _, _, _ := allFamiliesExhaustedRun(t)
 
@@ -174,16 +128,12 @@ func TestRunCycle_AllFamiliesExhausted_NeverWritesRetroCycleState(t *testing.T) 
 	}
 }
 
-// AC4 (negative / anti-no-op): a plain non-quota dispatch failure is a real
-// FAIL and MUST still reach retro exactly once. A fix that short-circuits
-// unconditionally — or that keys off "any transient error" instead of the typed
-// sentinel — passes AC1 and fails here.
 func TestRunCycle_NonQuotaDispatchFailure_StillDispatchesRetroOnce(t *testing.T) {
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	runners := buildRunners(nil)
 	// exit=1 → errGenericExit, not transient and not quota: the loud-abort
-	// branch (cyclerun_dispatch.go:366) records failure learning.
+	// branch records failure learning.
 	runners[PhaseScout] = &fakeRunner{name: "scout", failErr: wrapTransient(1), failUntil: 99}
 	o := NewOrchestrator(st, led, runners)
 
@@ -203,12 +153,11 @@ func TestRunCycle_NonQuotaDispatchFailure_StillDispatchesRetroOnce(t *testing.T)
 	}
 }
 
-// AC5 (edge / anti-gaming): the sentinel arrives %w-wrapped at least twice by
-// the time it reaches recordFailureLearning (dispatch wraps it, then
-// wrapCycleLevelError wraps that). A cheap `fl.Err == ErrAllFamiliesExhausted`
-// identity check would pass AC1's happy path only by accident and break the
-// moment another wrapper is added, so drive the chokepoint directly with a
-// deliberately over-wrapped error.
+// The sentinel arrives %w-wrapped at least twice by the time it reaches
+// recordFailureLearning (dispatch wraps it, then wrapCycleLevelError wraps
+// that). A cheap `fl.Err == ErrAllFamiliesExhausted` identity check would pass
+// by accident and break the moment another wrapper is added, so this test
+// drives the chokepoint directly with a deliberately over-wrapped error.
 func TestRecordFailureLearning_MultiplyWrappedExhausted_SkipsRetro(t *testing.T) {
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
@@ -250,9 +199,6 @@ func TestRecordFailureLearning_MultiplyWrappedExhausted_SkipsRetro(t *testing.T)
 	}
 }
 
-// TestRecordFailureLearning_ShipExhausted_PreservesCoherenceCarrier ensures a
-// deferred ship quota checkpoint remains out of failure learning while keeping
-// its real dispatch error available to the ADR-0072 coherence floor.
 func TestRecordFailureLearning_ShipExhausted_PreservesCoherenceCarrier(t *testing.T) {
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
 	state := State{}
@@ -274,12 +220,6 @@ func TestRecordFailureLearning_ShipExhausted_PreservesCoherenceCarrier(t *testin
 	}
 }
 
-// AC6: a single-family exit=85 attempt with a differently-shaped sibling (80,
-// not 85) is NOT the all-families-exhausted signature — allFamiliesQuotaExhausted
-// returns false, so the loud-abort path (cyclerun_dispatch.go:366) runs
-// unchanged. The fix must be scoped to the typed ErrAllFamiliesExhausted
-// sentinel, never to "any attempt exited 85" — otherwise this ordinary
-// mixed-failure path would silently stop learning too.
 func TestDispatch_SingleFamily85WithSibling_FailureLearningUnchanged(t *testing.T) {
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}

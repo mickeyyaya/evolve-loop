@@ -11,15 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// TDD RED (cycle-806, task ciparity-integration-tier).
-//
-// Config.CheckIntegrationTier and integrationTierCheckDefault do not yet exist
-// → compile RED until Builder adds the integration-tier CI-parity gate. Root
-// cause it closes: the `go` workflow's `-tags integration` job (TestFleetSoak)
-// went red while the per-cycle audit stayed green, because ciparity ran
-// go vet / acs-durable / apicover but NEVER the integration tier — the
-// warnship_apicover_ci_gap disease, one tier up (per-cycle proof ⊊ repo CI).
-
 // AC3.1 — an integration-tier gate reporting offenders must FAIL audit even
 // when the EGPS suite is green and the report says PASS, exactly like the other
 // CI-parity gates (mirrors TestRun_CIParityGate_Offenders_FAILsAudit). Forces
@@ -61,9 +52,9 @@ func TestIntegrationTierCheckDefault_NoOpWithoutGoModule(t *testing.T) {
 	}
 }
 
-// AC3.3 (membership / anti-drift pin) — NewDefault must WIRE the real
-// integration-tier gate (cycle-147 dormant-seam lesson), and that gate must
-// actually build the test binary under `-tags integration`. Proof that does NOT
+// AC3.3 (membership / anti-drift pin) — NewDefault must wire the real
+// integration-tier gate, and that gate must actually build the test binary
+// under `-tags integration`. Proof that does NOT
 // couple to the exact -run pattern: a fixture cmd/tool package (not env-exclusive — membership is the record table integrationTierEnvExclusive, the single authority) with an
 // integration-tagged test file that FAILS TO COMPILE only under that tag. Under
 // `-tags integration` the whole test binary fails to build → non-zero exit →
@@ -111,17 +102,6 @@ func TestNewDefault_WiresIntegrationTierGate(t *testing.T) {
 		t.Errorf("integration-tier gate did not catch a failing //go:build integration package — is `-tags integration` actually in the gate command?")
 	}
 }
-
-// TDD RED (cycle-809, task ciparity-integration-tier-race-parity).
-//
-// Root cause it closes: integrationTierCheckDefault runs
-// `go test -count=1 -tags integration <pkgs>` (ciparity.go:205) but the CI step
-// it claims to mirror runs `go test -race -count=1 -tags integration ...`
-// (.github/workflows/go.yml:59). `-race` is present in CI, absent from the gate.
-// A genuine data race in a touched package therefore passes this cycle's audit
-// clean and then goes CI-red on the exact `-tags integration` step this gate was
-// built to pre-empt — the warnship_apicover_ci_gap disease (per-cycle proof ⊊
-// repo CI), recurring one flag short of parity.
 
 // writeRaceFixtureWorktree builds a minimal cycle worktree whose only
 // integration-tagged test contains a GENUINE data race: two hundred goroutines
@@ -178,12 +158,9 @@ func writeRaceFixtureWorktree(t *testing.T) string {
 	return root
 }
 
-// AC1 (behavioral, headline RED) — the integration-tier gate must catch a REAL
-// data race, which is only possible when its `go test` command carries `-race`.
-// Currently the gate runs without `-race`, so the int-counter race passes → the
-// gate reports zero offenders → this test FAILs (RED). After Builder adds `-race`
-// the race detector fires → non-zero exit → offenders → GREEN. This proves the
-// flag by effect, never by string presence (cycle-85 anti-gaming rule).
+// AC1 (behavioral) — the integration-tier gate must catch a real data race,
+// which is only possible when its `go test` command carries `-race`. This
+// proves the flag by effect, never by string presence.
 func TestIntegrationTierGate_Race(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skips real `go test -race -tags integration` subprocess under -short; full `go test` + CI still run it")
@@ -201,12 +178,11 @@ func TestIntegrationTierGate_Race(t *testing.T) {
 	}
 }
 
-// AC2 (negative / anti-gaming) — proves the fixture's failure is a GENUINE race,
-// not a compile or logic error a mere flag-string flip would also surface. The
-// SAME fixture, run under plain `-tags integration` (NO -race), must PASS. This
-// is GREEN today and stays GREEN across the Builder's change: it pins that the
-// detection in TestIntegrationTierGate_Race can only come from `-race`, closing
-// the "the fixture just fails for any reason" gaming path (adversarial SKILL §2).
+// AC2 (negative / anti-gaming) — proves the fixture's failure is a genuine
+// race, not a compile or logic error a mere flag-string flip would also
+// surface: the same fixture, run under plain `-tags integration` (no -race),
+// must PASS, pinning that the detection in TestIntegrationTierGate_Race can
+// only come from `-race`.
 func TestIntegrationTierGate_RaceFixtureIsRaceOnly(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skips real `go test -tags integration` subprocess under -short; full `go test` + CI still run it")

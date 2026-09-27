@@ -11,17 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// ciparity.go — the unit-14 seam (ADR-0103) between the audit phase and the
-// CI-parity gates, which live in internal/phases/audit/ciparitygate: the
-// deterministic gates that stop a cycle shipping green-locally / red-in-CI.
-// This file keeps the host's two package-var seams, the change-set locator,
-// the ONE construction of the gates and the five Strangler facades the
-// by-name tests and ACS predicates keep. The gates are wired ONLY through
-// NewDefaultWithStageCompactSpec (production); New(Config{}) leaves them nil
-// so the audit package's own `go test` never recursively forks the go
-// toolchain. They run in the phase-runner process (not the sandboxed auditor
-// LLM), so the subprocess is unrestricted.
-
 // runCmd is the subprocess runner the CI-parity gates and the probe
 // quarantine use. A package var so tests can inject a fake runner and
 // exercise the gates without forking the real go toolchain.
@@ -37,12 +26,9 @@ var integrationTierTimeout = ciparitygate.DefaultTimeouts().TierAttempt
 // its only state (nil = the registry path's Null Object).
 type ciParity struct{ signals func() *signalcenter.Center }
 
-// wiredGates is the ONE construction of the gates
-// (TestCIParityGates_OneConstructionSite, needle `ciparitygate.New(`), built
-// PER CALL so runCmd and integrationTierTimeout are read live — the
-// capture-at-entry the old gates did. Deliberately NOT a lazily cached
-// accessor: a cached Gates would freeze the fake runner and the shrunk
-// budget under the host tests that swap them after a Phase exists.
+// wiredGates is the one construction of the gates
+// (TestCIParityGates_OneConstructionSite), built per call so runCmd and
+// integrationTierTimeout are read live rather than cached at entry.
 func (c ciParity) wiredGates() *ciparitygate.Gates {
 	t := ciparitygate.DefaultTimeouts()
 	t.TierAttempt = integrationTierTimeout
@@ -75,11 +61,10 @@ func (c ciParity) apicoverGraduation(req core.PhaseRequest) ([]string, error) {
 	return c.wiredGates().ApicoverGraduation(requestOf(req))
 }
 
-// wire fills the five CI-parity hooks with the adapter's methods — ONLY the
-// hooks no Option set (the nil-fill idiom New uses for CheckSolution): an
-// Option over the full Config is honoured in full, so a fake hook injected
-// through the production constructor is the hook the phase runs, never
-// post-clobbered (TestNewDefaultWithStageCompactSpec_AnOptionSettingAHookIsHonoured).
+// wire fills the five CI-parity hooks with the adapter's methods, only the
+// hooks no Option already set, so a fake hook injected through the production
+// constructor is never post-clobbered
+// (TestNewDefaultWithStageCompactSpec_AnOptionSettingAHookIsHonoured).
 func (c ciParity) wire(cfg *Config) {
 	fill := func(hook *func(core.PhaseRequest) ([]string, error), gate func(core.PhaseRequest) ([]string, error)) {
 		if *hook == nil {
@@ -93,10 +78,9 @@ func (c ciParity) wire(cfg *Config) {
 	fill(&cfg.CheckApicoverNewPkgGraduation, c.apicoverGraduation)
 }
 
-// The five Strangler Fig facades — the spellings the host tests and the
-// by-name ACS predicates (cycle806/809/547/573/1329/1331) keep. Center-less
-// (Null Object) and guarded to have NO non-test caller
-// (TestCIParityGates_OneConstructionSite).
+// The five Strangler facades are the spellings the host tests and the by-name
+// ACS predicates keep. Center-less (Null Object) and guarded to have no
+// non-test caller (TestCIParityGates_OneConstructionSite).
 //
 // Deprecated: removed when the ACS predicates are re-pointed at the leaf
 // (follow-up 14-3); production wires ciParity's methods.
@@ -118,17 +102,11 @@ func apicoverNewPackageGraduationDefault(req core.PhaseRequest) ([]string, error
 	return ciParity{}.apicoverGraduation(req)
 }
 
-// changedPackagesForAudit locates this cycle's changed-package set and reports
-// whether it is derivable. It prefers the build handoff when present (same
-// locator the EGPS suite uses; a handoff yielding >=1 pkg is derivable), then
-// falls back to a deterministic git derivation (changedpkgs.FromGitChecked vs
-// HEAD). The handoff has been extinct since ~cycle 215, so the git fallback is
-// what keeps the apicover gate live. The derivable flag closes the last
-// fail-open hole: previously the git fallback returned nil identically whether
-// the tree was git-clean (nothing changed) or the set was underivable (git
-// failed), letting an underivable cycle ship with a silent PASS (cycle-581
-// D1/D2, standing memory warnship_apicover_ci_gap). Injected into the gates as
-// their change-set Strategy: git and the handoff layout never enter the leaf.
+// changedPackagesForAudit locates this cycle's changed-package set and
+// reports whether it is derivable. It prefers the build handoff when present,
+// then falls back to a deterministic git derivation. The derivable flag tells
+// a git-clean tree (nothing changed) apart from an underivable set (git
+// failed), so an underivable cycle cannot ship a silent PASS.
 func changedPackagesForAudit(projectRoot string, cycle int) ([]string, bool) {
 	if projectRoot == "" {
 		return nil, false

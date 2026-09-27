@@ -30,6 +30,7 @@ var legacyLedgerEntryKeys = []string{
 var additiveLedgerEntryKeys = []string{
 	"run_id",
 	"task_id",
+	"worktree_base_sha",
 }
 
 var legacyCycleStateKeys = []string{

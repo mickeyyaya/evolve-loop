@@ -1,12 +1,5 @@
 //go:build integration
 
-// audit_bound_witness_integration_test.go — cycle-585 RED contract for
-// preventiveAction #2 of the cycle-583 audit finding: "any post-audit tree
-// mutation MUST be covered by a test that exercises the REAL push-integrity
-// guard." Complements the static scan in audit_bound_witness_test.go, which
-// pins WHO may write the field; this test pins WHAT HAPPENS when the value
-// it holds doesn't match what was actually pushed to main — the exact
-// failure mode a rebind (like the one cycle-583 rejected) would produce.
 package ship
 
 import (
@@ -20,16 +13,9 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// TestShipFromWorktree_PostPushGuard_FiresOnRebind simulates a post-merge
-// rebind: the cycle branch already carries a real commit (worktree clean,
-// branch ahead of main) so shipFromWorktree's pre-commit tree-SHA check
-// (gitops.go:407-409) never runs — it only runs inside the "have an
-// uncommitted worktree diff to stage" branch. That leaves the post-push
-// check (gitops.go:493-497) as the ONLY guard standing between a wrong
-// opts.internalAuditBoundTreeSHA and a silently-shipped tree-drift. Setting
-// the field to a value that doesn't match the real committed tree must
-// still surface CodeIntegrityTreeDrift from that post-push check, not a
-// clean ship.
+// The cycle branch is pre-committed (worktree clean, branch ahead of main), so
+// the pre-commit tree-SHA check never runs and the post-push check is the only
+// guard between a wrong internalAuditBoundTreeSHA and a silently shipped drift.
 func TestShipFromWorktree_PostPushGuard_FiresOnRebind(t *testing.T) {
 	repo := makeRepo(t)
 	addRemote(t, repo)

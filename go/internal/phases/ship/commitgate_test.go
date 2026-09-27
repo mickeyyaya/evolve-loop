@@ -1,12 +1,5 @@
 //go:build integration
 
-// commitgate_test.go — verifyCommitGateAttestation (commitgate.go).
-//
-// The --class manual path is the interactive-commit chokepoint. These tests
-// assert the review-attestation hard gate: missing/stale → refuse, valid →
-// ship, EVOLVE_BYPASS_COMMIT_GATE=1 → skip. Cycle/release classes are NOT
-// affected (covered by the native parity matrix).
-
 package ship
 
 import (
@@ -32,7 +25,6 @@ func excludeCommitGate(t *testing.T, repo string) {
 	}
 }
 
-// Missing attestation → manual ship refuses (ExitIntegrity).
 func TestCommitGate_ManualMissingAttestation_Refuses(t *testing.T) {
 	repo := makeRepo(t)
 	excludeCommitGate(t, repo)
@@ -52,7 +44,6 @@ func TestCommitGate_ManualMissingAttestation_Refuses(t *testing.T) {
 	}
 }
 
-// Valid attestation matching the staged tree → ships.
 func TestCommitGate_ManualValidAttestation_Ships(t *testing.T) {
 	repo := makeRepo(t)
 	excludeCommitGate(t, repo)
@@ -77,7 +68,6 @@ func TestCommitGate_ManualValidAttestation_Ships(t *testing.T) {
 	}
 }
 
-// Attestation present but bound to a different tree → stale → refuse.
 func TestCommitGate_ManualStaleAttestation_Refuses(t *testing.T) {
 	repo := makeRepo(t)
 	excludeCommitGate(t, repo)
@@ -99,7 +89,6 @@ func TestCommitGate_ManualStaleAttestation_Refuses(t *testing.T) {
 	}
 }
 
-// Dry-run requires no attestation (it commits nothing).
 func TestCommitGate_ManualDryRun_SkipsAttestation(t *testing.T) {
 	repo := makeRepo(t)
 	excludeCommitGate(t, repo)
@@ -116,7 +105,6 @@ func TestCommitGate_ManualDryRun_SkipsAttestation(t *testing.T) {
 	}
 }
 
-// BypassCommitGate=true → ships without an attestation.
 func TestCommitGate_ManualBypass_Ships(t *testing.T) {
 	repo := makeRepo(t)
 	excludeCommitGate(t, repo)
@@ -136,30 +124,6 @@ func TestCommitGate_ManualBypass_Ships(t *testing.T) {
 		t.Errorf("missing bypass log in: %v", res.Logs)
 	}
 }
-
-// --- persona lint (cycle-241, migration step 5: commitgate-persona-lint) ---
-//
-// runPersonaLint wires phasecoherence.Check + CheckArtifactNames into the
-// ship gate for BOTH --class manual and --class cycle, so persona↔profile
-// drift cannot silently enter the commit chain. Contract pinned here:
-//
-//   - layout: agents/ under opts.ProjectRoot; profiles under
-//     <ProjectRoot>/.evolve/profiles (the phasesCheckCoherence default).
-//   - Kind "disallowed" (persona declares a tool its profile forbids — a
-//     contradiction) BLOCKS with *IntegrityError. A persona lying about its
-//     capabilities is an integrity breach, never acceptable drift.
-//   - Kind "undeclared"/artifact-name "mismatch" (profile allows more than
-//     the persona declares) LOGS loudly but does NOT block: the real repo
-//     carries ~40 such WARNs today (`evolve phases check-coherence`);
-//     blocking on them would brick every ship including this cycle's own.
-//   - missing agents/ or profiles dir → skip with a log (repos without
-//     personas — including every other ship test fixture — are unaffected).
-//   - BypassCommitGate=true → lint skipped (consistent with the attestation
-//     bypass; routine use is a policy violation).
-//
-// NOTE for Builder: the real repo has 7 "disallowed" contradictions across
-// doc-sync/intent/scout personas. Those persona/profile pairs MUST be
-// reconciled in this cycle or the new gate blocks our own --class cycle ship.
 
 // writePersonaFixture writes agents/evolve-<name>.md (tools frontmatter) and
 // .evolve/profiles/<name>.json (allowed_tools) under root, mirroring the real
@@ -192,7 +156,6 @@ func lintOpts(root string) *Options {
 	}
 }
 
-// Coherent persona/profile pair → lint passes.
 func TestPersonaLint_CleanTreePasses(t *testing.T) {
 	root := t.TempDir()
 	writePersonaFixture(t, root, "builder", []string{"Read", "Bash"}, []string{"Read", "Bash"})
@@ -203,8 +166,6 @@ func TestPersonaLint_CleanTreePasses(t *testing.T) {
 	}
 }
 
-// Injected persona→profile contradiction (persona declares a tool the profile
-// disallows) → *IntegrityError.
 func TestPersonaLint_ViolationBlocks(t *testing.T) {
 	root := t.TempDir()
 	// Persona claims Bash; profile only allows Read → Kind "disallowed".
@@ -221,8 +182,6 @@ func TestPersonaLint_ViolationBlocks(t *testing.T) {
 	}
 }
 
-// Undeclared drift (profile allows more than the persona declares) is the
-// pre-existing repo-wide WARN class: logged loudly, never blocking.
 func TestPersonaLint_UndeclaredDriftLogsButPasses(t *testing.T) {
 	root := t.TempDir()
 	writePersonaFixture(t, root, "builder", []string{"Read"}, []string{"Read", "WebSearch"})
@@ -236,8 +195,6 @@ func TestPersonaLint_UndeclaredDriftLogsButPasses(t *testing.T) {
 	}
 }
 
-// Repo without agents/ or profiles dirs (every other ship test fixture) →
-// lint skips instead of erroring.
 func TestPersonaLint_MissingDirsSkips(t *testing.T) {
 	res := &RunResult{}
 	if err := runPersonaLint(context.Background(), lintOpts(t.TempDir()), res); err != nil {
@@ -245,7 +202,6 @@ func TestPersonaLint_MissingDirsSkips(t *testing.T) {
 	}
 }
 
-// BypassCommitGate skips the lint even over a blocking violation.
 func TestPersonaLint_BypassSkipsLint(t *testing.T) {
 	root := t.TempDir()
 	writePersonaFixture(t, root, "builder", []string{"Read", "Bash"}, []string{"Read"}) // would block
@@ -261,9 +217,6 @@ func TestPersonaLint_BypassSkipsLint(t *testing.T) {
 	}
 }
 
-// End-to-end wiring pin: a full --class cycle ship on a repo with coherent
-// personas runs the lint (visible in logs) and ships. This is what makes
-// runPersonaLint a gate rather than dead code.
 func TestCommitGate_CyclePersonaLint(t *testing.T) {
 	repo := makeRepo(t)
 	addRemote(t, repo)

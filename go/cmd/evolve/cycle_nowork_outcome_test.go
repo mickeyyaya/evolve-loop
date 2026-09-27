@@ -1,13 +1,5 @@
 package main
 
-// cycle_nowork_outcome_test.go — F30's loop breaker at the cycle-run root.
-// Every fleet lane runs `evolve cycle run` as a subprocess and the parent wave
-// loop's fleet.Result carries neither the lane's cycle number nor its
-// workspace, so a lane's closeout happens HERE. closeoutCycleOutcome is the
-// one post-result closeout: the failure walk for a FAIL, the planned-no-work
-// hand-off for a lane that answered for its scope without committing, nothing
-// for anything else.
-
 import (
 	"bytes"
 	"encoding/json"
@@ -21,7 +13,7 @@ import (
 )
 
 // seedNoWorkLane writes a lane scoped to one inbox item whose triage dropped
-// it with a reason (the cycle-1682 shape) and returns the .evolve dir.
+// it with a reason, and returns the .evolve dir.
 func seedNoWorkLane(t *testing.T, root string, cycle int) string {
 	t.Helper()
 	evolveDir := filepath.Join(root, ".evolve")
@@ -86,9 +78,6 @@ func TestCloseoutCycleOutcome_PlannedNoWorkHandsTheLanesAnsweredItemToTheConsole
 	}
 }
 
-// TestCloseoutCycleOutcome_OnlyAPlannedNoWorkHandsOver: a PASS never hands its
-// scope to the console, and neither does a SKIPPED that is not the planned
-// no-work disposition (IsTriageNoWorkResult is the one authority).
 func TestCloseoutCycleOutcome_OnlyAPlannedNoWorkHandsOver(t *testing.T) {
 	notNoWork := plannedNoWork(7)
 	notNoWork.TerminationReason = "audit-advisory"
@@ -102,8 +91,6 @@ func TestCloseoutCycleOutcome_OnlyAPlannedNoWorkHandsOver(t *testing.T) {
 	}
 }
 
-// TestCloseoutCycleOutcome_ReportsWhatItApplied: the one closeout names what
-// it applied so each root WARNs in its own voice; nothing applies to a PASS.
 func TestCloseoutCycleOutcome_ReportsWhatItApplied(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := seedNoWorkLane(t, root, 7)
@@ -115,10 +102,6 @@ func TestCloseoutCycleOutcome_ReportsWhatItApplied(t *testing.T) {
 	}
 }
 
-// TestCompleteSequentialCycle_PlannedNoWorkHandsTheLaneOver (F30 architecture
-// review M1): the sequential loop makes the same one closeout, so a lane pin
-// reaching it — however it got there — is handed over like the cycle-run
-// root's.
 func TestCompleteSequentialCycle_PlannedNoWorkHandsTheLaneOver(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := seedNoWorkLane(t, root, 7)

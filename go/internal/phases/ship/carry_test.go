@@ -65,7 +65,6 @@ func writeCarryStating(t *testing.T, l carriedLane, ref, auditedTree, treeState 
 	writeCarryOf(t, l, ref, auditedTree, treeState, audited, composed)
 }
 
-// writeCarryOf writes a chained carry record over the given diffs; the writer binds the record's patch-id to them.
 func writeCarryOf(t *testing.T, l carriedLane, ref, auditedTree, treeState string, audited, composed []byte) {
 	t.Helper()
 	patchID, err := ledger.PatchID(audited)

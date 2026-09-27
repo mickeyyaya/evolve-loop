@@ -1,44 +1,5 @@
 package core
 
-// phase_bindings_staging_scope_test.go — cycle-1594 RED contract for
-// `gitignore-staging-sweep`.
-//
-// The defect (reproduced in .evolve/runs/cycle-1594/bug-reproduction-report.md):
-// worktreeContentSHA stages the whole worktree with `git add -A` purely to
-// compute a content identity. Any unrelated untracked file that happens to sit
-// in the lane — a bug-reproduction reproducer, a regenerated coverage artifact,
-// a minted phase stub, another agent's scratch file — is therefore adopted into
-// the tree the audit binding records (phase_bindings.go:129) and into the
-// ADR-0048 verdict-cache key. The binding then attests a tree the auditor never
-// reviewed, and the cache is keyed on foreign content. This is the mechanism
-// behind the wave-3 cycle-1572/1574 staging rejections amortised into the
-// `gitignore-staging-sweep` inbox record.
-//
-// The contract these tests pin is a SELECTION boundary, deliberately expressed
-// in observable git terms so the Builder keeps design freedom (no new exported
-// symbol, parameter, or carrier is frozen here — the current signature
-// `worktreeContentSHA(ctx, "", worktree)` stays valid):
-//
-//	declared     = content already in the lane's git index (tracked files, plus
-//	               anything the builder explicitly `git add`ed) + tracked
-//	               modifications on disk
-//	NOT declared = untracked files nobody staged
-//
-// Adversarial axes:
-//   - negative  : ExcludesUnrelatedUntrackedResidue / ResidueOnlyWorktreeKeepsBaseIdentity
-//                 (residue must NOT ride) and CapturesUnstagedTrackedModification
-//                 (the anti-degenerate guard — a fix that just returns HEAD^{tree}
-//                 passes the two exclusion pins and dies here, because a binding
-//                 identical to the base is exactly the INTEGRITY_TREE_DRIFT /
-//                 fresh-base cache collision this identity exists to avoid).
-//   - edge      : the residue-ONLY worktree, where no declared work exists at
-//                 all and the empty selection must not silently adopt residue.
-//   - semantic  : exclusion, retention, tracked-modification capture and
-//                 production reachability are four distinct behaviors.
-//
-// Every pin drives real git against a real repository and asserts on the real
-// tree object; none greps source.
-
 import (
 	"context"
 	"os"
@@ -100,8 +61,6 @@ func writeFile(t *testing.T, path, body string) {
 	}
 }
 
-// AC1 (RED). An untracked file nobody declared must be ABSENT from the binding
-// tree. This is the reproduced defect verbatim: `git add -A` adopts it.
 func TestWorktreeContentSHA_ExcludesUnrelatedUntrackedResidue(t *testing.T) {
 	t.Parallel()
 	repo := stagingScopeRepo(t)
@@ -109,8 +68,8 @@ func TestWorktreeContentSHA_ExcludesUnrelatedUntrackedResidue(t *testing.T) {
 	// trivially the base tree.
 	writeFile(t, filepath.Join(repo, "base.txt"), "base\ndeclared edit\n")
 	// Residue: an unrelated untracked file. Not gitignored — that is the whole
-	// point; .gitignore already excludes the families it knows about, and the
-	// classes that burned cycles 1572/1574 were precisely the ones it did not.
+	// point; .gitignore already excludes the families it knows about, but not
+	// every class of stray file.
 	writeFile(t, filepath.Join(repo, "foreign-residue.txt"), "must not enter the audit binding\n")
 
 	tree := worktreeContentSHA(context.Background(), "", repo)
@@ -124,10 +83,10 @@ func TestWorktreeContentSHA_ExcludesUnrelatedUntrackedResidue(t *testing.T) {
 	}
 }
 
-// AC2 (regression guard). A NEW file the builder declared by staging it must be
-// RETAINED. Expected to be GREEN before the fix; it is the over-correction pin —
-// a fix that simply stops staging anything, or that binds HEAD^{tree}, drops
-// legitimate new source from the tree ship will commit.
+// A NEW file the builder declared by staging it must be RETAINED — the
+// over-correction pin: a fix that simply stops staging anything, or that
+// binds HEAD^{tree}, drops legitimate new source from the tree ship will
+// commit.
 func TestWorktreeContentSHA_StagesDeclaredNewFile(t *testing.T) {
 	t.Parallel()
 	repo := stagingScopeRepo(t)
@@ -147,12 +106,10 @@ func TestWorktreeContentSHA_StagesDeclaredNewFile(t *testing.T) {
 	}
 }
 
-// AC3 (regression guard / anti-degenerate). A modification to a TRACKED file
-// that was never `git add`ed must still be captured. Without this, the cheapest
-// way to pass AC1 and AC4 — return the base tree, or stage nothing at all —
-// would look correct while making every binding identical to its base: the
-// INTEGRITY_TREE_DRIFT class (cycle-152) and the verdict-cache fresh-base
-// collision ADR-0048's ProbeEligible guard exists to prevent.
+// A modification to a TRACKED file that was never `git add`ed must still be
+// captured. Without this, the cheapest way to pass the other pins — return
+// the base tree, or stage nothing at all — would look correct while making
+// every binding identical to its base.
 func TestWorktreeContentSHA_CapturesUnstagedTrackedModification(t *testing.T) {
 	t.Parallel()
 	repo := stagingScopeRepo(t)
@@ -172,11 +129,11 @@ func TestWorktreeContentSHA_CapturesUnstagedTrackedModification(t *testing.T) {
 	}
 }
 
-// AC4 (RED, edge). The empty-selection case: a lane whose ONLY difference from
-// its base is unrelated residue must keep its base identity exactly. Adopting
-// residue here is worse than cosmetic — it manufactures a "changed" identity for
-// an untouched worktree, which is precisely what ProbeEligible reads to decide
-// whether a verdict may be cached or reused.
+// The empty-selection case: a lane whose ONLY difference from its base is
+// unrelated residue must keep its base identity exactly — adopting residue
+// here would manufacture a "changed" identity for an untouched worktree,
+// which is precisely what ProbeEligible reads to decide whether a verdict may
+// be cached or reused.
 func TestWorktreeContentSHA_ResidueOnlyWorktreeKeepsBaseIdentity(t *testing.T) {
 	t.Parallel()
 	repo := stagingScopeRepo(t)
@@ -194,11 +151,11 @@ func TestWorktreeContentSHA_ResidueOnlyWorktreeKeepsBaseIdentity(t *testing.T) {
 	}
 }
 
-// AC5 (RED, wiring proof). The seam must be reached from the PRODUCTION caller,
-// not merely be correct in isolation: emitPhaseBindings → recordAuditBinding →
-// worktreeContentSHA is the path that writes WorktreeTreeSHA into the auditor
-// ledger entry ship verifies (phase_bindings.go:129). A predicate that only
-// called the helper would pass on dead code. This drives the real orchestrator
+// The seam must be reached from the PRODUCTION caller, not merely be
+// correct in isolation: emitPhaseBindings → recordAuditBinding →
+// worktreeContentSHA is the path that writes WorktreeTreeSHA into the
+// auditor ledger entry ship verifies. A predicate that only called the
+// helper would pass on dead code. This drives the real orchestrator
 // method against a real repository and reads the identity back off the real
 // ledger entry.
 func TestEmitPhaseBindings_AuditBindingTreeExcludesUnrelatedResidue(t *testing.T) {

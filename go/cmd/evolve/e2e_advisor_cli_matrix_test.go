@@ -1,20 +1,5 @@
 //go:build e2e
 
-// Advisor × all-CLIs LIVE matrix. The routing brain (agents/evolve-router.md) is
-// configurable to ANY LLM CLI, so this proves the per-CLI WIRING the brain
-// depends on: for each available driver (claude-p/codex/agy + tmux variants),
-// fire ONE live `evolve bridge launch` carrying the router persona under the
-// artifact-completion contract and assert the driver WRITES a parseable
-// routing-plan.json. This is the e2e half of "the advisor is e2e-validated on
-// every LLM CLI" — the unit half (phase_advisor_test.go, resolveRouterDispatch)
-// pins the Go-side option/precedence wiring without spending quota.
-//
-// Runs the advisor at its DEEP production tier (advisorModelFor: opus / the codex family manifest's deep model /
-// the family's strongest) — the routing brain is deep-reasoning work, so a fast
-// model would not represent its real behavior. Assertions stay STRUCTURAL (a
-// valid plan is produced), not on plan wording. Unavailable binaries SKIP
-// (liveCLIAvailable); quota/rate-limit/timeout SKIP (isTransient) — only a booted
-// CLI that fails the plan contract hard-fails. Gate: EVOLVE_E2E_LIVE_ADVISOR=1.
 package main
 
 import (
@@ -126,12 +111,8 @@ func firstBalancedArray(s string) (string, bool) {
 }
 
 // advisorModelFor resolves the DEEP / high-level model the advisor runs on per
-// CLI. The routing brain composes the whole cycle and may mint phases — deep-
-// reasoning work — so (unlike the cheap-tier smoke/T2 helpers) the advisor e2e
-// validates at the PRODUCTION tier: opus / the codex family manifest's deep model / the family's strongest. A
-// fast model like haiku is fine for basic-function checks but does not represent
-// the advisor's real behavior. Overridable per CLI via
-// EVOLVE_E2E_ADVISOR_MODEL_<BASE> (e.g. EVOLVE_E2E_ADVISOR_MODEL_CLAUDE=sonnet).
+// CLI, overridable via EVOLVE_E2E_ADVISOR_MODEL_<BASE> (e.g.
+// EVOLVE_E2E_ADVISOR_MODEL_CLAUDE=sonnet).
 func advisorModelFor(driver string) string {
 	base := strings.TrimSuffix(strings.TrimSuffix(driver, "-tmux"), "-p")
 	if v := os.Getenv("EVOLVE_E2E_ADVISOR_MODEL_" + strings.ToUpper(base)); v != "" {
@@ -145,21 +126,18 @@ func advisorModelFor(driver string) string {
 	case "agy":
 		return "gemini-3.5-flash" // agy's manifest pins all tiers to one model
 	case "ollama":
-		return "llama3.1:8b" // overridable via EVOLVE_E2E_ADVISOR_MODEL_OLLAMA above
+		return "llama3.1:8b"
 	default:
 		return "deep"
 	}
 }
 
 // launchAdvisor fires ONE live `evolve bridge launch` carrying the evolve-router
-// persona + a representative cycle digest, with artifact=routing-plan.json — the
-// deliverable PhaseAdvisor.Plan uses. It is the thin per-CLI driver for the
-// advisor matrix, mirroring liveBridgeLaunch. It returns the plan BYTES from the
-// artifact file when written, else falling back to the captured stdout. The
-// matrix runs the advisor at its DEEP production tier (advisorModelFor), which
-// reliably writes the artifact; the stdout fallback only guards a model that
-// chooses to print instead. A synthetic permissive profile (allowed_clis:["all"])
-// keeps the floor from rejecting whatever driver the matrix selects.
+// persona + a representative cycle digest, with artifact=routing-plan.json. It
+// returns the plan bytes from the artifact when written, else falls back to
+// captured stdout for a model that prints instead of writing. A synthetic
+// permissive profile (allowed_clis:["all"]) keeps the floor from rejecting
+// whatever driver the matrix selects.
 func launchAdvisor(t *testing.T, evolveBin, repoRoot, driver, model string, timeout time.Duration) ([]byte, string, error) {
 	t.Helper()
 	dir := t.TempDir()
@@ -220,8 +198,6 @@ func launchAdvisor(t *testing.T, evolveBin, repoRoot, driver, model string, time
 	if b, rerr := os.ReadFile(stderrLog); rerr == nil && len(b) > 0 {
 		out += "\n" + string(b)
 	}
-	// Prefer the written artifact; fall back to the captured stdout (a fast model
-	// often prints the plan instead of invoking Write — see the doc comment).
 	raw, _ := os.ReadFile(artifact)
 	if len(raw) == 0 {
 		if b, rerr := os.ReadFile(stdoutLog); rerr == nil {
@@ -247,8 +223,6 @@ func TestParseRoutingPlanArray(t *testing.T) {
 		{"clean array", `[{"phase":"scout","run":true,"justification":"x"}]`, 1, false},
 		{"json fence", "```json\n[{\"phase\":\"scout\",\"run\":false,\"justification\":\"queued\"}]\n```", 1, false},
 		{"bare fence", "```\n[{\"phase\":\"build\",\"run\":true,\"justification\":\"y\"}]\n```", 1, false},
-		// The HIGH regression: a valid array followed by prose containing ']'.
-		// LastIndexByte(']') would extend the slice into the prose and fail to parse.
 		{"trailing prose with stray bracket", `[{"phase":"scout","run":true,"justification":"go"}]` + "\nNote: see phases [scout] and [build].", 1, false},
 		{"bracket inside justification", `[{"phase":"build","run":true,"justification":"touches arr[i] and map[k]"}]`, 1, false},
 		{"no array", "I could not produce a plan.", 0, true},
@@ -327,17 +301,11 @@ func advisorEnvUnavailable(out string) bool {
 }
 
 // TestE2ELiveAdvisorActivation is the ACTIVATION proof: it runs one real,
-// isolated (temp-project) cycle with EVOLVE_DYNAMIC_ROUTING=advisory and the
-// advisor on claude-p@opus (deep, ~30s headless — claude-tmux@opus exceeds the
-// REPL ceiling), then asserts the orchestrator actually consulted the planner
-// and disposed its plan. The definitive signal is the orchestrator's
-// `phase_plan` ledger entry (recordPhasePlan: planner ran → kernel clamped to the
-// integrity floor → recorded) plus the advisor's raw routing-plan.json artifact.
-// NOTE: there is intentionally NO `role:router` ledger entry — the advisor calls
-// bridge.Launch directly (not via the phase runner that stamps agent roles), so
-// `phase_plan` (role=orchestrator) is the real activation signal, correcting the
-// plan's original assumption. EVOLVE_MANDATORY_PHASES=scout keeps the cycle tiny;
-// the planner runs at cycle start regardless. Gate: EVOLVE_E2E_LIVE_ADVISOR=1.
+// isolated cycle with EVOLVE_DYNAMIC_ROUTING=advisory and the advisor on
+// claude-p@opus (headless — claude-tmux@opus exceeds the REPL ceiling), then
+// asserts the orchestrator actually consulted the planner and disposed its
+// plan. EVOLVE_MANDATORY_PHASES=scout keeps the cycle tiny; the planner runs
+// at cycle start regardless.
 func TestE2ELiveAdvisorActivation(t *testing.T) {
 	liveGate(t, "EVOLVE_E2E_LIVE_ADVISOR")
 	if ok, why := liveCLIAvailable(liveCLI{Driver: "claude-p", Binary: "claude"}); !ok {
@@ -364,8 +332,7 @@ func TestE2ELiveAdvisorActivation(t *testing.T) {
 		t.Skipf("activation transient (quarantined):\n%s", lastN(res.Out, 600))
 	}
 
-	// Proof 1: the orchestrator consulted the planner, clamped its plan to the
-	// integrity floor, and recorded it (recordPhasePlan → kind=phase_plan).
+	// Proof 1: the orchestrator consulted the planner and recorded it (kind=phase_plan).
 	hasPhasePlan := false
 	for _, e := range res.Entries {
 		if e.Kind == "phase_plan" {
@@ -380,8 +347,7 @@ func TestE2ELiveAdvisorActivation(t *testing.T) {
 		t.Fatalf("ACTIVATION FAILED: no phase_plan ledger entry — the planner was not consulted at dynamic_routing=advisory\n%s", lastN(res.Out, 1200))
 	}
 
-	// Proof 2: the advisor's RAW plan artifact (routing-plan.json) was written and
-	// parses to a non-empty plan.
+	// Proof 2: the advisor's raw plan artifact was written and parses.
 	raw := readFirstFileNamed(res.ProjRoot, "routing-plan.json")
 	if len(raw) == 0 {
 		t.Fatalf("phase_plan present but no routing-plan.json artifact found under %s", res.ProjRoot)
@@ -413,12 +379,11 @@ func readFirstFileNamed(root, name string) []byte {
 	return found
 }
 
-// TestE2ELiveAdvisorSelectsDesignPhase is the Phase 3 payoff: with the advisor
-// now goal-aware (GoalText threaded), an explicitly architectural goal should make
-// the brain SELECT the non-spine `architecture-design` phase (or MINT one) in its
-// routing-plan.json — genuine AI-driven composition, not the rubber-stamped spine.
-// The advisor runs at opus (deep). Tolerant: transient/env-unavailable → skip.
-// Gate: EVOLVE_E2E_LIVE_ADVISOR=1.
+// TestE2ELiveAdvisorSelectsDesignPhase: with the advisor goal-aware (GoalText
+// threaded), an explicitly architectural goal should make the brain select
+// (or mint) the non-spine architecture-design phase — genuine AI-driven
+// composition, not the rubber-stamped spine. Tolerant: transient/
+// env-unavailable → skip.
 func TestE2ELiveAdvisorSelectsDesignPhase(t *testing.T) {
 	liveGate(t, "EVOLVE_E2E_LIVE_ADVISOR")
 	if ok, why := liveCLIAvailable(liveCLI{Driver: "claude-p", Binary: "claude"}); !ok {

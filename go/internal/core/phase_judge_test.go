@@ -9,9 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// TestJudgeVerdict_Fields names the JudgeVerdict type directly (public-API
-// coverage) and pins its zero/sentinel semantics: the -1 "no opinion" sentinel
-// is distinct from a real [0,1] score.
 func TestJudgeVerdict_Fields(t *testing.T) {
 	t.Parallel()
 	v := JudgeVerdict{Score: 0.5, Rationale: "ok", MissingPhases: []string{"bug-reproduction"}}
@@ -34,8 +31,6 @@ func samplePlan() *router.PhasePlan {
 	}}
 }
 
-// WS4-S3 (ADR-0052): GradePlan scores a routing plan against the goal and
-// returns a typed verdict, dispatched as a NON-router agent on the fast tier.
 func TestRouteQualityJudge_ScoresPlanAgainstGoal(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -59,8 +54,6 @@ func TestRouteQualityJudge_ScoresPlanAgainstGoal(t *testing.T) {
 			}
 		})
 	}
-	// missing_phases threads through, and dispatch uses the NON-router "judge"
-	// label (the recursion guard).
 	fb := &fakeBridge{stdout: `{"score":0.4,"rationale":"x","missing_phases":["bug-reproduction","plan-review"]}`}
 	v := NewPlanJudge(fb).GradePlan(context.Background(), judgeInput(), samplePlan())
 	if len(v.MissingPhases) != 2 {
@@ -69,10 +62,6 @@ func TestRouteQualityJudge_ScoresPlanAgainstGoal(t *testing.T) {
 	if fb.gotReq.Agent != "judge" {
 		t.Errorf("Agent=%q, want judge (never the router label)", fb.gotReq.Agent)
 	}
-	// D2: the judge is the FAST/cheap tier (deep is reserved for Plan/RePlan), and
-	// it uses the uniform artifact-completion contract — locks the dispatch shape
-	// against drift (a flip to opus would defeat D2; a wrong artifact path is the
-	// cycle-210 silent-timeout class the sibling advisor test pins).
 	if fb.gotReq.CLI != "claude-tmux" {
 		t.Errorf("CLI=%q, want claude-tmux", fb.gotReq.CLI)
 	}
@@ -90,9 +79,6 @@ func TestRouteQualityJudge_ScoresPlanAgainstGoal(t *testing.T) {
 	}
 }
 
-// WS4-S3: every failure path yields the fail-open sentinel Score=-1. The
-// signature has NO error return, so a malformed grade structurally cannot block
-// the cycle.
 func TestRouteQualityJudge_FailOpenToMinusOne(t *testing.T) {
 	t.Parallel()
 	in, plan := judgeInput(), samplePlan()
@@ -125,10 +111,6 @@ func TestRouteQualityJudge_FailOpenToMinusOne(t *testing.T) {
 	}
 }
 
-// WS4-S3: the judge can NEVER trigger an advisor. Structural guard: a PlanJudge
-// is not a routing brain, so it cannot be wired as a Proposer/Planner into
-// LLMProposal/Select — closing the recursion path without depending on the
-// WS1-S2 mint denylist (not yet built).
 func TestRouteQualityJudge_RecursionGuarded(t *testing.T) {
 	t.Parallel()
 	var v interface{} = NewPlanJudge(&fakeBridge{stdout: `{"score":0.5}`})
@@ -140,8 +122,6 @@ func TestRouteQualityJudge_RecursionGuarded(t *testing.T) {
 	}
 	fb := &fakeBridge{stdout: `{"score":0.5,"rationale":"ok"}`}
 	NewPlanJudge(fb).GradePlan(context.Background(), judgeInput(), samplePlan())
-	// Positive form (not == "router"): an empty/unset Agent must also fail, so
-	// deleting the Agent:"judge" literal in production is caught here.
 	if fb.gotReq.Agent != "judge" {
 		t.Error("the judge must dispatch under the NON-router judge label")
 	}

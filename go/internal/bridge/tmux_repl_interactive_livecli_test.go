@@ -13,26 +13,6 @@ import (
 	"time"
 )
 
-// tmux_repl_interactive_livecli_test.go — the ULTIMATE no-hang proof: drive the
-// REAL claude binary through a real tmux REPL into a genuine AskUserQuestion
-// menu (which --dangerously-skip-permissions does NOT suppress) with the
-// production auto-responder active, and confirm the menu is auto-answered and
-// the REPL moves PAST it instead of blocking for a human.
-//
-// What we assert is the auto-reply property itself: after the auto-responder
-// acts, claude prints "User answered Claude's questions" and continues. We do
-// NOT assert that the model then completes some follow-up task — that is model
-// behavior, not the bridge's job, and conflating the two makes the test flaky
-// (haiku often treats answering the question as task-complete). A deliberately
-// short ArtifactTimeoutS keeps the run fast: the prompt has no artifact step,
-// so the bridge will EC81 after the cap, by which point the scrollback already
-// proves the menu was answered.
-//
-// Gated by EVOLVE_BRIDGE_LIVE_CLI_INTERACTIVE=1 (real LLM spend). The
-// deterministic, no-spend coverage of the same rules is in
-// autorespond_decision_test.go + tmux_repl_interactive_test.go; this is the
-// real-CLI ground truth behind them.
-
 func claudeLiveSpec(t *testing.T) liveCLISpec {
 	t.Helper()
 	for _, sp := range liveCLISpecs {

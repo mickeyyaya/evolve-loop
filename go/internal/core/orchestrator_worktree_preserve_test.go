@@ -1,13 +1,3 @@
-// orchestrator_worktree_preserve_test.go — RED contract for ship-failure
-// worktree preservation (ADR-0039 §8, operator-approved 2026-06-07).
-//
-// D10 incident (domain-campaign cycles 7/12): a ship abort BEFORE the
-// worktree-commit step let the deferred cycle cleanup prune the worktree with
-// uncommitted, substantively-PASS work inside — cycle 7's work was lost
-// entirely. The rule under test: when the cycle ends with an unresolved
-// ship failure, the worktree is PRESERVED for recovery; it is only cleaned
-// up when the cycle's ship eventually succeeds (or the operator runs an
-// explicit `evolve cycle reset`).
 package core
 
 import (
@@ -15,7 +5,6 @@ import (
 	"testing"
 )
 
-// failingShipRunner always fails with the configured ShipError.
 type failingShipRunner struct{ err error }
 
 func (r *failingShipRunner) Name() string { return "ship" }
@@ -23,8 +12,6 @@ func (r *failingShipRunner) Run(_ context.Context, _ PhaseRequest) (PhaseRespons
 	return PhaseResponse{Phase: "ship", Verdict: VerdictFAIL}, r.err
 }
 
-// recoveringShipRunner fails the first call, then passes — exercising the
-// "ship eventually succeeds after recovery" cleanup path.
 type recoveringShipRunner struct{ calls int }
 
 func (r *recoveringShipRunner) Name() string { return "ship" }
@@ -37,9 +24,6 @@ func (r *recoveringShipRunner) Run(_ context.Context, _ PhaseRequest) (PhaseResp
 	return PhaseResponse{Phase: "ship", Verdict: VerdictPASS}, nil
 }
 
-// TestOrchestrator_ShipFailureAborts_PreservesWorktree: an unrecoverable
-// (integrity) ship failure aborts the cycle — and the worktree must survive
-// for operator/recovery triage instead of being pruned by the exit cleanup.
 func TestOrchestrator_ShipFailureAborts_PreservesWorktree(t *testing.T) {
 	t.Parallel()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
@@ -59,9 +43,6 @@ func TestOrchestrator_ShipFailureAborts_PreservesWorktree(t *testing.T) {
 	}
 }
 
-// TestOrchestrator_ShipRecoversThenSucceeds_CleansWorktree: when recovery
-// retries ship and it succeeds, the normal exit cleanup applies — the
-// preservation rule must not leak worktrees on eventually-successful cycles.
 func TestOrchestrator_ShipRecoversThenSucceeds_CleansWorktree(t *testing.T) {
 	t.Parallel()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
@@ -83,12 +64,6 @@ func TestOrchestrator_ShipRecoversThenSucceeds_CleansWorktree(t *testing.T) {
 	}
 }
 
-// TestPreserveOnVerdict pins inbox preserve-worktree-on-verdict-fail: a cycle
-// that COMPLETES with a FAIL verdict (audit FAIL → retro → end, err==nil)
-// leaves the builder's work UNCOMMITTED in the worktree. Pruning it discards
-// salvageable work (ADR-0046 Layer 2 was built and lost twice this way, cycles
-// 306/307). Only a FAIL verdict warrants completion-time preservation; PASS
-// (shipped to main) and other outcomes clean as before.
 func TestPreserveOnVerdict(t *testing.T) {
 	cases := []struct {
 		verdict string

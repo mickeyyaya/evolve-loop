@@ -1,36 +1,5 @@
 package core
 
-// repair_brief.go — what a tdd/build re-dispatch inside an audit-repair round
-// is TOLD (research proposal R2, docs/research/ship-rate-harness-reliability-
-// 2026-09-02.md §4).
-//
-// Before this file the brief was audit-fail-reason.json alone: the coherence
-// floor's deterministic gate strings ("EGPS: ship_eligible=false", "apicover
-// -enforce flagged 2 line(s)"). The auditor's actual findings — the HIGH
-// entries in audit-report.md with root cause and path:line evidence — never
-// reached the builder. Cycle 1605's H1 (a new exported package with zero
-// production callers) survived three rounds while the round-2 builder rewrote
-// one sentence of the explanation document; cycle 1596's round-4 builder
-// received one truncated defect. The literature is unambiguous that repair
-// without the specific finding does not converge (Olausson et al.: feedback
-// quality is the bottleneck; Self-Debug: execution-grounded feedback beats
-// explanation-only by an order of magnitude).
-//
-// The brief now carries, in this order and inside the existing byte budget:
-//  1. the gate reasons (unchanged — deterministic evidence outranks prose);
-//  2. the auditor's findings of the round that just rejected, CRITICAL/HIGH
-//     first, MEDIUM after, LOW omitted — parsed by the SAME grammar the
-//     dashboard renders (reportdoc.Findings), so the operator and the agent
-//     read one list;
-//  3. the findings that PERSISTED from the previous round (matched by
-//     reportdoc.FindingKey against the archived audit-report.round<N-1>.md) —
-//     the "you were told this already" line that turns a blind retry into a
-//     targeted one.
-//
-// The previous round's prompt is archived beside the audit archives
-// (build-prompt.round<N>.txt) so what each round was actually told is
-// forensically recoverable — gap G10.
-
 import (
 	"fmt"
 	"os"

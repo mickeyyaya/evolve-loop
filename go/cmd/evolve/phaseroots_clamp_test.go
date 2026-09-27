@@ -1,12 +1,5 @@
 package main
 
-// phaseroots_clamp_test.go — wiring proof for the load-time registrar-parity
-// clamp (inbox loadtime-userspec-registrar-clamp; ADR-0073 Finding 1): the
-// clamp must run in the COMPOSED cmd_cycle discovery path, not just as a
-// phasespec unit. A smuggled .evolve/phases/*/phase.json claiming
-// writes_source:true must come out of the composed path stripped unless its
-// dispatch profile is registrar-minted with sandbox enabled.
-
 import (
 	"encoding/json"
 	"os"

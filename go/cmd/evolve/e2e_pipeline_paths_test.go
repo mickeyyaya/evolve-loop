@@ -1,20 +1,5 @@
 //go:build e2e
 
-// End-to-end coverage of the ADVERSARIAL pipeline paths that the happy-path
-// matrices never exercise: audit FAIL → retro → no-ship, audit WARN under
-// fluent vs strict, and the optional intent phase. All run through the
-// headless claude-p driver, where env (FAKE_CLI_AUDIT_VERDICT, EVOLVE_*)
-// propagates directly to the fake subprocess.
-//
-// Assertions key off OBSERVABLE ledger routing — which phases the pipeline
-// reached (audit, retro, ship) — not the process exit code or a landed ship
-// commit. The orchestrator records a role="ship" ledger entry the moment ship
-// is attempted (orchestrator.recordShipError), so "reached ship" is provable
-// even though native-only ship cannot complete a real ff-merge in this unit
-// fixture (no seeded remote + audit binding; that successful-native-ship e2e is
-// deferred to go/test/e2e/ — see go/test/trustkernel/PORTING-LEDGER.md). The
-// legacy EVOLVE_NATIVE_SHIP=0 + EVOLVE_SHIP_SCRIPT fake-ship hatch these tests
-// were first authored against was removed in the Go-only consolidation.
 package main
 
 import (
@@ -26,15 +11,12 @@ import (
 )
 
 // pipelineCycle runs one headless claude-p cycle with the given env overlay and
-// returns the ledger entries. It never fails the test on a non-zero cycle exit —
-// a blocked cycle (and, post Stage-5.1, a native ship that cannot ff-merge in
-// the fixture) legitimately returns non-zero — so callers assert on the
-// ledger-observable routing (which phases the pipeline reached) via ledgerHasRole.
-// strictPolicyMarker is a TEST-ONLY sentinel (not a production flag, so it never
-// reaches the cycle subprocess). When present in a pipelineCycle extraEnv list it
-// makes the harness drop a .evolve/policy.json with workflow.strict_audit:true into
-// the cycle's project root — the policy.json replacement for the retired
-// EVOLVE_STRICT_AUDIT env dial (flag-reduction, ADR-0064).
+// returns the ledger entries. It never fails the test on a non-zero cycle exit
+// — callers assert on ledger-observable routing via ledgerHasRole.
+
+// strictPolicyMarker is a harness-only sentinel; it never reaches the cycle
+// subprocess. Present in extraEnv, it makes pipelineCycle drop a
+// .evolve/policy.json with workflow.strict_audit:true into the project root.
 const strictPolicyMarker = "TEST_WRITE_STRICT_POLICY=1"
 
 func pipelineCycle(t *testing.T, evolveBin, fakeBin, repoRoot, goalHash string, extraEnv ...string) []ledgerEntry {
@@ -47,13 +29,10 @@ func pipelineCycle(t *testing.T, evolveBin, fakeBin, repoRoot, goalHash string, 
 		"EVOLVE_RESEARCH_HOOK_DISABLED=1",
 		"BRIDGE_TESTING=1",
 		"BRIDGE_CLAUDE_BINARY="+fakeBin,
-		// Explicit host opt-out of OS confinement, honoured (loudly) by the
-		// Build-explanation contract's sandbox gate. DELIBERATE and
-		// deterministic: these tests exercise pipeline semantics with fake
-		// CLIs, not confinement — and the runners cannot promise a working
-		// wrap (ubuntu images ship no bwrap; a nested local run is skipped by
-		// ShouldWrap by design). The gate's own three-way classification is
-		// pinned by TestSandboxGate_* in internal/bridge.
+		// Explicit opt-out of OS confinement: these tests exercise pipeline
+		// semantics with fake CLIs, not confinement, and CI runners cannot
+		// promise a working sandbox wrap (e.g. no bwrap on Ubuntu images). The
+		// gate's own classification is pinned by TestSandboxGate_* in internal/bridge.
 		"EVOLVE_SANDBOX=off",
 	)
 	for _, e := range extraEnv {
@@ -74,13 +53,9 @@ func pipelineCycle(t *testing.T, evolveBin, fakeBin, repoRoot, goalHash string, 
 	)
 	cmd.Env = env
 	cmd.Dir = projRoot
-	// 300s, was 120s: the Build-explanation contract added real per-cycle work
-	// (contract activation, the build handoff floor's base-bound git diffs, the
-	// audit review gate, and up to two correction re-dispatches), and an audit
-	// FAIL now takes the bounded ADR-0093 repair loop (tdd+build+audit again)
-	// before retro. A probe cycle completes in ~200-250s; 120s was tuned for
-	// the shorter pre-contract pipeline and killed every cycle mid-flight,
-	// losing the subprocess output with it.
+	// 300s: a probe cycle runs contract activation, the build handoff floor's
+	// git diffs, the audit review gate, and up to two correction re-dispatches
+	// (a shorter bound kills cycles mid-flight and loses the subprocess output).
 	out, err := runWithTimeout(cmd, 300*time.Second)
 	t.Logf("cycle run (%s) err=%v\n%s", goalHash, err, lastN(out, 1200))
 
@@ -111,7 +86,6 @@ func mustBuildPipelineBins(t *testing.T) (evolveBin, fakeBin, repoRoot string) {
 	return
 }
 
-// Audit FAIL (red_count=1) must block the ship and route to the retro phase.
 func TestE2EPipeline_AuditFail_RunsRetro_NoShip(t *testing.T) {
 	evolveBin, fakeBin, repoRoot := mustBuildPipelineBins(t)
 	entries := pipelineCycle(t, evolveBin, fakeBin, repoRoot, "e2efail",
@@ -128,8 +102,6 @@ func TestE2EPipeline_AuditFail_RunsRetro_NoShip(t *testing.T) {
 	}
 }
 
-// Audit WARN ships by default (fluent), but workflow.strict_audit promotes it
-// to FAIL → block + retro.
 func TestE2EPipeline_AuditWarn_FluentShips_StrictBlocks(t *testing.T) {
 	evolveBin, fakeBin, repoRoot := mustBuildPipelineBins(t)
 
@@ -153,8 +125,6 @@ func TestE2EPipeline_AuditWarn_FluentShips_StrictBlocks(t *testing.T) {
 	})
 }
 
-// EVOLVE_REQUIRE_INTENT=1 inserts the intent phase ahead of scout; the cycle
-// still reaches ship on the happy path.
 func TestE2EPipeline_IntentPhase_RunsAndShips(t *testing.T) {
 	evolveBin, fakeBin, repoRoot := mustBuildPipelineBins(t)
 	entries := pipelineCycle(t, evolveBin, fakeBin, repoRoot, "e2eintent",

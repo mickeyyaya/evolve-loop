@@ -57,8 +57,7 @@ func TestBuildSelfCheck_WritesArtifactOnFailure(t *testing.T) {
 func TestBuildSelfCheck_ClearsStaleArtifactOnPass(t *testing.T) {
 	// A prior failed attempt wrote the artifact; the retry's changed package now
 	// PASSES. The artifact must be cleared so the toolchain gate (which reads it)
-	// does not loop forever on a stale failure. Regression for the gate-hardening
-	// after relaunch cycle 12 shipped vet-failing code.
+	// does not loop forever on a stale failure.
 	wt := initGitWorktree(t)
 	fp := filepath.Join(wt, "go", "internal", "foo", "foo.go")
 	if err := os.MkdirAll(filepath.Dir(fp), 0o755); err != nil {
@@ -67,7 +66,6 @@ func TestBuildSelfCheck_ClearsStaleArtifactOnPass(t *testing.T) {
 	if err := os.WriteFile(fp, []byte("package foo\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// Pre-seed a stale failure artifact.
 	if err := os.MkdirAll(filepath.Join(wt, ".evolve"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +75,7 @@ func TestBuildSelfCheck_ClearsStaleArtifactOnPass(t *testing.T) {
 	}
 	old := buildSelfCheckRunner
 	t.Cleanup(func() { buildSelfCheckRunner = old })
-	buildSelfCheckRunner = func(_ context.Context, _, _ string) (string, bool) { return "", true } // all pass now
+	buildSelfCheckRunner = func(_ context.Context, _, _ string) (string, bool) { return "", true }
 
 	(&Orchestrator{}).buildSelfCheck(context.Background(), wt)
 
@@ -183,8 +181,8 @@ func TestRealGoUnitTest_BuildTagExcludedIsNotFailure(t *testing.T) {
 	}
 }
 
-// TestRealGoUnitTest_DeletedPackageIsNotFailure guards the false RED cycle 1697
-// surfaced: a diff that DELETES a package's only .go files still maps those
+// TestRealGoUnitTest_DeletedPackageIsNotFailure guards a false RED a live
+// cycle surfaced: a diff that DELETES a package's only .go files still maps those
 // paths to the package pattern (changedGoTestPackages is pure over paths), and
 // `go test` on the now-missing directory reports "directory not found …
 // [setup failed]". A deleted package has nothing left to unit-test, so it must
@@ -235,12 +233,12 @@ func TestGoTestExcludedByBuildTags(t *testing.T) {
 	}
 }
 
-// TestRealGoUnitTest_SanitizesCampaignEnv proves end-to-end that the self-check
-// does NOT leak the campaign's runtime env into its `go test` subprocess. A live
-// cycle surfaced this: the self-check inherited EVOLVE_FLEET=1, which flips
-// internal/bridge's fleet-mode worktree guard into a false failure. The temp
-// package's test fails iff it observes EVOLVE_FLEET — so realGoUnitTest passing
-// proves the env was sanitized.
+// TestRealGoUnitTest_SanitizesCampaignEnv proves end-to-end that the
+// self-check does NOT leak the campaign's runtime env into its `go test`
+// subprocess: an inherited EVOLVE_FLEET=1 would flip internal/bridge's
+// fleet-mode worktree guard into a false failure. The temp package's test
+// fails iff it observes EVOLVE_FLEET — so realGoUnitTest passing proves the
+// env was sanitized.
 func TestRealGoUnitTest_SanitizesCampaignEnv(t *testing.T) {
 	t.Setenv("EVOLVE_FLEET", "1") // campaign runtime flag present in the parent env
 	mod := t.TempDir()

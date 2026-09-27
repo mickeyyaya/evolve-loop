@@ -14,15 +14,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// TestComposePlanPrompt_ElicitsTierAndCLI (T1 AC1): the PRODUCTION persona
-// path (composePlanPrompt with a non-empty persona) must show the SAME
-// optional per-phase {cli,tier} schema example that today only lives in the
-// legacy buildPlanPrompt fallback (#293 divergence — phase_advisor.go:484-489
-// never ran when identity.Persona != ""). The example must attach cli/tier to
-// an EXISTING phase entry (no "mint" block on that entry), proving the
+// The PRODUCTION persona path (composePlanPrompt with a non-empty persona)
+// must show the SAME optional per-phase {cli,tier} schema example that the
+// legacy buildPlanPrompt fallback carries. The example must attach cli/tier
+// to an EXISTING phase entry (no "mint" block on that entry), proving the
 // elicitation is single-sourced across both prompt-assembly paths rather than
-// re-forked. RED today: composePlanPrompt's output is persona + cycle context
-// only — it never calls the schema/example writer buildPlanPrompt uses.
+// re-forked.
 func TestComposePlanPrompt_ElicitsTierAndCLI(t *testing.T) {
 	t.Parallel()
 	p := NewPhaseAdvisor(nil, WithPersona("PERSONA BODY"))
@@ -33,9 +30,7 @@ func TestComposePlanPrompt_ElicitsTierAndCLI(t *testing.T) {
 	}
 	// The cli/tier examples must appear on an EXISTING-phase entry, not only
 	// inside a "mint" block — find the JSON object carrying "tier" and assert
-	// it has no "mint" key alongside it (a mint-only elicitation would leave
-	// existing-phase proposals undocumented, reproducing the #293 gap in a new
-	// shape).
+	// it has no "mint" key alongside it.
 	tierIdx := strings.Index(got, `"tier":"balanced"`)
 	if tierIdx < 0 {
 		t.Fatalf("no tier example found; got:\n%s", got)
@@ -51,13 +46,10 @@ func TestComposePlanPrompt_ElicitsTierAndCLI(t *testing.T) {
 	}
 }
 
-// TestComposePlanPrompt_RendersOperatorModelPolicy (T1 AC1): the persona-path
-// prompt must carry the operator's model-tier policy guidance — deep for
-// judgment-heavy phases, fast confined to mechanical-only phases — so the
-// advisor never proposes fast for a phase that writes source or renders a
-// verdict. RED today: this guidance exists nowhere in composePlanPrompt's
-// output (buildPlanPrompt doesn't carry it either — it is genuinely new
-// prose, not a #293-style migration).
+// The persona-path prompt must carry the operator's model-tier policy
+// guidance — deep for judgment-heavy phases, fast confined to
+// mechanical-only phases — so the advisor never proposes fast for a phase
+// that writes source or renders a verdict.
 func TestComposePlanPrompt_RendersOperatorModelPolicy(t *testing.T) {
 	t.Parallel()
 	p := NewPhaseAdvisor(nil, WithPersona("PERSONA BODY"))
@@ -71,14 +63,10 @@ func TestComposePlanPrompt_RendersOperatorModelPolicy(t *testing.T) {
 	}
 }
 
-// TestPhaseCardsFromCatalog_ProjectsDispatchGuardrails (T1 AC2): a phase spec
-// declaring dispatch guardrails (allowed_clis + model_tier_envelope, the
-// per-phase profile contracts phase-registry.json carries) must have them
-// projected onto the advisor-facing PhaseCard so writeCatalog's EXISTING
-// rendering (phase_advisor.go:575-579) actually fires instead of the
-// always-nil fields it gets today. RED today: phasespec.PhaseSpec carries no
-// AllowedCLIs/ModelTierEnvelope fields at all (compile-fails until added),
-// and phaseCardsFromCatalog never reads or copies them.
+// A phase spec declaring dispatch guardrails (allowed_clis +
+// model_tier_envelope, the per-phase profile contracts phase-registry.json
+// carries) must have them projected onto the advisor-facing PhaseCard so
+// writeCatalog's rendering fires instead of always-nil fields.
 func TestPhaseCardsFromCatalog_ProjectsDispatchGuardrails(t *testing.T) {
 	t.Parallel()
 	cat, err := phasespec.Catalog{}.Merge([]phasespec.PhaseSpec{
@@ -104,14 +92,10 @@ func TestPhaseCardsFromCatalog_ProjectsDispatchGuardrails(t *testing.T) {
 	}
 }
 
-// TestComposePlanPrompt_RendersGuardrailLinesForCatalogPhase (T1 AC2,
-// end-to-end): once a catalog phase carries dispatch guardrails, the
-// PERSONA-path composed prompt must show the `allowed_clis:` and
-// `model_tier_envelope:` lines writeCatalog already knows how to render.
-// This closes the loop from phase-registry.json contract -> PhaseCard ->
-// rendered prompt. RED today for the same reason as the projection test
-// above: the catalog->card copy never happens, so writeCatalog's guardrail
-// branch never fires from a real catalog.
+// Once a catalog phase carries dispatch guardrails, the persona-path
+// composed prompt must show the `allowed_clis:` and `model_tier_envelope:`
+// lines writeCatalog knows how to render — closing the loop from
+// phase-registry.json's contract to the rendered prompt.
 func TestComposePlanPrompt_RendersGuardrailLinesForCatalogPhase(t *testing.T) {
 	t.Parallel()
 	cat, err := phasespec.Catalog{}.Merge([]phasespec.PhaseSpec{
@@ -137,13 +121,10 @@ func TestComposePlanPrompt_RendersGuardrailLinesForCatalogPhase(t *testing.T) {
 	}
 }
 
-// TestComposePlanPrompt_NamesBenchedCLIAsWalled (T1 AC3): with an ACTIVE
-// environmental bench for a CLI family whose reason indicates full quota
-// exhaustion (not a soft rate-limit blip), the composed plan prompt must
-// name it as WALLED/unavailable — a clearer, harder-to-miss signal than the
-// current generic "benched (<reason>) until <time>" wording, which never
-// says the family is unavailable. RED today: writeRoutingContext renders
-// only the generic sentence.
+// With an ACTIVE environmental bench for a CLI family whose reason
+// indicates full quota exhaustion (not a soft rate-limit blip), the composed
+// plan prompt must name it as WALLED/unavailable rather than the generic
+// "benched (<reason>) until <time>" wording.
 func TestComposePlanPrompt_NamesBenchedCLIAsWalled(t *testing.T) {
 	t.Parallel()
 	in := baseRouteInput()
@@ -162,16 +143,10 @@ func TestComposePlanPrompt_NamesBenchedCLIAsWalled(t *testing.T) {
 	}
 }
 
-// TestParsePhasePlan_AbsentCLITierFieldsStayEmpty (T1 AC4, NEGATIVE — degrade
-// path byte-identical): an advisor response shaped like the pre-change
-// (cycle-459-era) wire format — {phase,run,justification} only, no cli/tier
-// keys at all — must parse to entries whose CLI/Tier are empty, so nothing
-// downstream ever applies a dispatch overlay for them (llmroute.
-// ApplySoftOverlay is gated on non-empty CLI/Tier). This is the regression
-// pin a gaming fake ("add the schema text but break absent-field parsing")
-// must not be able to defeat. Expected pre-existing GREEN: parsePhasePlan
-// already zero-values unset JSON fields; this test locks that fact in as
-// part of the T1 contract.
+// An advisor response shaped like the legacy wire format —
+// {phase,run,justification} only, no cli/tier keys — must parse to entries
+// whose CLI/Tier are empty, so nothing downstream ever applies a dispatch
+// overlay for them (llmroute.ApplySoftOverlay is gated on non-empty CLI/Tier).
 func TestParsePhasePlan_AbsentCLITierFieldsStayEmpty(t *testing.T) {
 	t.Parallel()
 	raw := `[{"phase":"build","run":true,"justification":"legacy shape, no cli/tier"}]`
@@ -187,19 +162,10 @@ func TestParsePhasePlan_AbsentCLITierFieldsStayEmpty(t *testing.T) {
 	}
 }
 
-// TestSanitizeAdvisorTier_RejectsHighAndRawModel (T1 AC5, EDGE — tier
-// vocabulary confinement): an advisor response entry proposing "high" or a
-// raw model name must never propagate past sanitizeAdvisorTier — only the
-// canonical tier vocabulary survives. Originally named
-// TestSanitizeAdvisorTier_RejectsHighTopAndRawModel and asserted "top" was
-// rejected too, back when fast/balanced/deep were the only three canonical
-// tiers (phase_advisor.go:857-864 era). cycle-516 (task
-// advisor-tier-vocab-add-top) intentionally widens the vocabulary to
-// fast/balanced/deep/top — modelcatalog.CanonicalTiers already treats "top"
-// as canonical — so "top" moves to the ACCEPTED table in
-// TestSanitizeAdvisorTier (phase_advisor_tier_test.go). This test keeps
-// confining every OTHER non-canonical string, so a future change still
-// can't silently widen the vocabulary further than intended.
+// An advisor response entry proposing "high" or a raw model name must never
+// propagate past sanitizeAdvisorTier — only the canonical tier vocabulary
+// survives (see TestSanitizeAdvisorTier in phase_advisor_tier_test.go for the
+// accepted table).
 func TestSanitizeAdvisorTier_RejectsHighAndRawModel(t *testing.T) {
 	t.Parallel()
 	for _, bad := range []string{"high", "claude-fable-5", "opus", "HIGH", ""} {
@@ -214,24 +180,11 @@ func TestSanitizeAdvisorTier_RejectsHighAndRawModel(t *testing.T) {
 	}
 }
 
-// --- cycle-476 T1: advisor-real-persona-liveness-golden ---
-//
-// The missing test class scout root-caused: EVERY other advisor-prompt test
-// injects a STUB persona (WithPersona("PERSONA BODY")) and so is structurally
-// blind to the SHIPPED agents/evolve-router.md, whose own existing-phase
-// response-schema example (line 35) omits {cli,tier} and — appearing BEFORE and
-// competing with the Go-appended {cli,tier} example (writePlanResponseSchema) —
-// makes the composed prompt show two conflicting schemas. LLMs mimic the
-// earliest/most-authoritative example, so the optional tier fields are emitted
-// intermittently. These goldens load the REAL persona exactly as production does.
-
 // realRouterPersona reads the SHIPPED agents/evolve-router.md exactly as the
-// production planner does (cmd_cycle.go: prm.Agent("evolve-router").Body — the
-// frontmatter is parsed off and the body is injected as the persona) and returns
-// both halves. The path is resolved off runtime.Caller so it is cwd-independent,
-// and it points at the WORKTREE copy (three levels up from this test file), so
-// the golden validates the file Builder harmonizes THIS cycle, not a stub and not
-// main's stale copy.
+// production planner does (cmd_cycle.go: prm.Agent("evolve-router").Body —
+// the frontmatter is parsed off and the body is injected as the persona) and
+// returns both halves. The path is resolved off runtime.Caller so it is
+// cwd-independent, and it points at the WORKTREE copy, not main's stale copy.
 func realRouterPersona(t *testing.T) (frontmatter map[string]any, body string) {
 	t.Helper()
 	_, thisFile, _, ok := runtime.Caller(0)
@@ -280,7 +233,7 @@ func topLevelJSONObjects(s string) []string {
 // existingPhaseExamples filters topLevelJSONObjects to the response-schema
 // examples for an EXISTING phase: a plan entry (has "phase" and "run") that is
 // NOT a mint block. These are exactly the objects whose {cli,tier} shape the
-// advisor mimics; the bare persona example at agents/evolve-router.md:35 is one.
+// advisor mimics; the bare persona example in agents/evolve-router.md is one.
 func existingPhaseExamples(s string) []string {
 	var out []string
 	for _, o := range topLevelJSONObjects(s) {
@@ -291,15 +244,12 @@ func existingPhaseExamples(s string) []string {
 	return out
 }
 
-// TestComposePlanPrompt_RealPersonaExistingExampleCarriesTierAndCLI (T1 AC1): the
-// PRODUCTION composed plan prompt, built with the REAL shipped persona, must show
-// {cli,tier} on EVERY existing-phase response-schema example — no surviving bare
-// example the advisor could mimic. RED today: agents/evolve-router.md:35 ships a
-// bare {"phase","run","justification"} example, so the composed prompt carries a
-// competing schema that omits the optional fields. Builder harmonizes :35 to gain
-// optional cli/tier to turn this GREEN. The >=2 floor is the anti-delete guard:
-// silently deleting the persona example (leaving only the Go-appended one) must
-// NOT green the golden — the persona itself must teach the tiered schema.
+// The PRODUCTION composed plan prompt, built with the REAL shipped persona,
+// must show {cli,tier} on EVERY existing-phase response-schema example — no
+// surviving bare example the advisor could mimic. The >=2 floor is the
+// anti-delete guard: silently deleting the persona example (leaving only the
+// Go-appended one) must NOT green the golden — the persona itself must teach
+// the tiered schema.
 func TestComposePlanPrompt_RealPersonaExistingExampleCarriesTierAndCLI(t *testing.T) {
 	t.Parallel()
 	_, body := realRouterPersona(t)
@@ -317,13 +267,10 @@ func TestComposePlanPrompt_RealPersonaExistingExampleCarriesTierAndCLI(t *testin
 	}
 }
 
-// TestRealPersonaFrontmatterOutputFormatEnumeratesTierCLI (T1 AC1, distinct
-// surface): the persona frontmatter's output-format contract string
-// (agents/evolve-router.md:10) must enumerate cli/tier alongside
-// phase/run/justification, so the one-line schema summary agrees with the body
-// example and the Go schema. RED today: it lists only {phase, run,
-// justification, [mint]}. Semantic diversity vs the body-example test above — a
-// fix to the body example alone must not silently satisfy this frontmatter AC.
+// The persona frontmatter's output-format contract string must enumerate
+// cli/tier alongside phase/run/justification, so the one-line schema summary
+// agrees with the body example and the Go schema — a fix to the body example
+// alone must not silently satisfy this frontmatter requirement too.
 func TestRealPersonaFrontmatterOutputFormatEnumeratesTierCLI(t *testing.T) {
 	t.Parallel()
 	fm, _ := realRouterPersona(t)

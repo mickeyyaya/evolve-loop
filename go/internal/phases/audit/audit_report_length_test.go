@@ -10,36 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// audit_report_length_test.go — RED contract for the cycle-1522 fleet-scoped
-// task `cap-audit-report-length` (scout-report.md ## Selected Tasks, Task 1).
-//
-// The defect: audit-report.md has no upper bound on total size. The ## Issues
-// table grows one row per finding with no cap, the report is re-read in full at
-// ship time (go/internal/phases/ship/audit.go:83, which also SHA-binds it), and
-// the next cycle's handoff carries prior audit context — so an oversized report
-// compounds token cost on every downstream read. defect_ledger.go:56-61 already
-// bounds the *ledger* (defectLedgerMaxEntries / defectTextMaxRunes) with the
-// exact idiom this task extends to the *report*: overflow is RECORDED, never
-// silently dropped.
-//
-// The contract pinned here, in three load-bearing parts:
-//
-//  1. A package const `auditReportMaxBytes` exists and carries a sane budget
-//     (this file references it directly, so RED is a compile failure until
-//     Builder declares it).
-//  2. Classify emits EXACTLY ONE warning-severity diagnostic when the artifact
-//     exceeds the cap, naming both the actual size and the cap.
-//  3. The check is DIAGNOSTIC-ONLY. It must never flip the verdict (an
-//     oversized but green report still classifies exactly as its verdict says)
-//     and must never mutate the on-disk artifact — ship SHA-binds those bytes
-//     (ship/audit.go:83), so a truncating cap would break the ship-time
-//     integrity check.
-//
-// Severity is WIRING, not taste: cyclestate.ErrorMessages keys off
-// Severity=="error" to build AuditFailReasons, so an error-severity size
-// diagnostic would convert a merely-verbose report into a dossier-visible
-// failure. The size warning must be Severity=="warning".
-
 // sizeMarker is the stable substring every size diagnostic must carry, so a
 // downstream operator (and this contract) can find it without matching prose.
 const sizeMarker = "audit-report.md size"
@@ -62,10 +32,9 @@ func reportOfSize(t *testing.T, n int) string {
 	return out
 }
 
-// classifySized runs the REAL production Classify path (the seam
-// runner.BaseRunner.Run calls at runner.go:1117) over a temp workspace holding
-// a green acs-verdict.json plus the artifact on disk, and returns the verdict,
-// the diagnostics, and the artifact's post-call on-disk bytes.
+// classifySized runs the real production Classify path over a temp workspace
+// holding a green acs-verdict.json plus the artifact on disk, and returns the
+// verdict, the diagnostics, and the artifact's post-call on-disk bytes.
 func classifySized(t *testing.T, artifact string) (string, []core.Diagnostic, string) {
 	t.Helper()
 	ws := t.TempDir()
@@ -94,8 +63,8 @@ func sizeDiags(diags []core.Diagnostic) []core.Diagnostic {
 }
 
 // TestAuditReportLength is the table-driven size contract. Sub-test names are
-// part of the contract: go/acs/cycle1522 asserts each one reports PASS by name,
-// so a rename or a silent skip cannot green the ACS predicate.
+// part of the contract: an ACS predicate asserts each one reports PASS by
+// name, so a rename or a silent skip cannot green the predicate.
 func TestAuditReportLength(t *testing.T) {
 	capBytes := auditReportMaxBytes
 
@@ -163,7 +132,7 @@ func TestAuditReportLength(t *testing.T) {
 	})
 
 	t.Run("over_cap_does_not_mutate_artifact", func(t *testing.T) {
-		// ship/audit.go:83 re-reads and SHA-binds these exact bytes; a cap that
+		// ship/audit.go re-reads and SHA-binds these exact bytes; a cap that
 		// truncated on disk would break that integrity check.
 		want := reportOfSize(t, capBytes*2)
 		_, _, after := classifySized(t, want)

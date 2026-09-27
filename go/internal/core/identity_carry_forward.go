@@ -2,10 +2,12 @@ package core
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/auditledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
 	"github.com/mickeyyaya/evolve-loop/go/internal/treefence"
 )
@@ -25,12 +27,9 @@ func (o *Orchestrator) identityCarryForward(ctx context.Context, cycle int, cs C
 		return false
 	}
 	worktree := cs.ActiveWorktree
-	audit, err := o.latestAuditEntry(ctx, cs.RunID)
-	if err != nil || audit.WorktreeTreeSHA == "" || audit.ArtifactSHA256 == "" {
-		return decline("no auditor row names both the tree and the artifact (err=%v)", err)
-	}
-	if audit.GitHEAD != "" && audit.GitHEAD != base0 {
-		return decline("the audit was bound on %s, not on the base %s the change was authored on", audit.GitHEAD, base0)
+	audit, err := o.carriedAudit(ctx, cs.RunID, base0)
+	if err != nil {
+		return decline("%v", err)
 	}
 	tree0 := audit.WorktreeTreeSHA
 	base1, err := gitStdout(ctx, gitCapture, worktree, "rev-parse", "HEAD")
@@ -66,6 +65,21 @@ func (o *Orchestrator) identityCarryForward(ctx context.Context, cycle int, cs C
 	}
 	fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d rebase is byte-identical: the audited verdict carries, shipping without a second audit (ADR-0105 B3)\n", cycle)
 	return true
+}
+
+func (o *Orchestrator) carriedAudit(ctx context.Context, runID, base0 string) (auditledger.Entry, error) {
+	audit, err := o.latestAuditEntry(ctx, runID)
+	if err != nil || audit.WorktreeTreeSHA == "" || audit.ArtifactSHA256 == "" {
+		return audit, fmt.Errorf("no auditor row names both the tree and the artifact (err=%v)", err)
+	}
+	switch bound := audit.AuditedBase(); bound {
+	case "":
+		return audit, errors.New("the audit row names no base")
+	case base0:
+		return audit, nil
+	default:
+		return audit, fmt.Errorf("the audited worktree stood on %s, not on the base %s the change was authored on", bound, base0)
+	}
 }
 
 // gatesOnIntactTree runs the composed-tree gates under the fence and reports them only when the tree they ran on

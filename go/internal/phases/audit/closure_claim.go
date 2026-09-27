@@ -8,27 +8,9 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// closure_claim.go — the closure-citation gate (cycle-1285 Task 2; inbox item
-// `continuation-defect-ledger` clause (3), batch-integrity-review-2026-08-04.md:123).
-//
-// The 1255 → 1268 → 1270 → 1272 chain closed a named CRITICAL by ASSERTION: a
-// bookkeeping line reading "verified closed" was the entire proof, and nothing
-// required it to point at a record a reader could check. defect_ledger.go now
-// MINTS that record (defect-ledger.json / defect-dispositions.json); this gate
-// makes citing it mandatory whenever a report claims a prior cycle's defect is
-// closed. Without it the ledger is a filing cabinet nobody is obliged to open.
-//
-// LINE-scoped, deliberately. A whole-document reading — "the file mentions
-// defect-dispositions.json somewhere, so every closure claim in it is cited" —
-// is the loophole, not the feature: one incidental mention would vouch for
-// twenty unevidenced claims.
-
 // closureCycleRef matches a cycle reference in prose ("cycle-1272", "cycle
-// 1255"), with the number captured. Serves two callers: the weak rung below
-// (MatchString — does this line reference ANY cycle) and closureLineCycleRefs
-// (the captured numbers themselves, for the lineage-scoped demotion in
-// audit.go) — one pattern, so a future tune to what counts as a cycle
-// reference cannot update one caller's notion of it and not the other's.
+// 1255"), with the number captured, so the weak rung's reference check and
+// closureLineCycleRefs share one pattern and cannot drift apart.
 var closureCycleRef = regexp.MustCompile(`cycle[- ]?(\d+)`)
 
 // closureLineCycleRefs returns the cycle numbers a line references in PROSE
@@ -43,25 +25,20 @@ func closureLineCycleRefs(line string) []int {
 	return out
 }
 
-// The closure-claim token matchers (cycle-1431 lesson — see
-// closureClaimOffenders and the stripQuotedSpans design record): word-bounded
-// so "disclosed"/"foreclosed" never match; the negation/openness guards apply
-// to the WEAK rung only. The negation vocabulary is deliberately small
-// ("hasn't/won't/cannot be closed" still flag) — grow it from firings, not
-// speculation.
+// The token matchers are word-bounded so "disclosed"/"foreclosed" never
+// match; the negation/openness guards apply to the weak rung only. The
+// negation vocabulary stays deliberately small — grow it from real firings,
+// not speculation.
 var (
-	// `[ -]`: the hyphen-compound carve-out on the WEAK rung (below) must not
-	// turn "verified-closed" — a one-character mutation of the canonical
-	// laundering phrase — into a both-rungs miss; the strong rung accepts the
-	// hyphenated spelling directly. "verified fail-closed" still cannot match
-	// (the compound's own hyphen sits between "fail" and "closed").
+	// The hyphen-compound carve-out ([ -]) must not turn "verified-closed" into
+	// a miss on either rung; the strong rung accepts the hyphenated spelling
+	// directly, and "verified fail-closed" still cannot match, because the
+	// compound's own hyphen sits between "fail" and "closed".
 	closureClaimRE = regexp.MustCompile(`\bverified[ -]closed\b`)
-	// `(?:^|[^-\w])` instead of `\b`: a hyphen IS a word boundary, so plain
-	// \bclosed\b matched inside "fail-closed" — a state adjective, not a
-	// closure claim (cycle-1493 infra-systemic halt; the same compound in
-	// cycle-1486's "fail-closed by construction" prose fired twice more).
-	// Letter-prefixed compounds ("disclosed") stay excluded because a letter
-	// is rejected by [^-\w] just as it was by \b.
+	// `(?:^|[^-\w])` instead of `\b`: a hyphen is itself a word boundary, so a
+	// plain \bclosed\b matches inside "fail-closed", a state adjective, not a
+	// closure claim. Letter-prefixed compounds ("disclosed") stay excluded
+	// because a letter is rejected by [^-\w] just as it was by \b.
 	closureClosedTokenRE = regexp.MustCompile(`(?:^|[^-\w])closed\b`)
 	closureNegationRE    = regexp.MustCompile(`\b(?:not|never|isn['’]?t|wasn['’]?t|aren['’]?t)\s+(?:\w+\s+){0,2}closed\b`)
 	closureOpenAssertRE  = regexp.MustCompile(`\b(?:still|remains?|left|stays?)\s+open\b|\bre-?opened\b`)
@@ -85,19 +62,16 @@ func closureClaimOffenders(text string) []string {
 	var offenders []string
 	for _, line := range strings.Split(text, "\n") {
 		lower := stripQuotedSpans(strings.ToLower(line))
-		// Two rungs (cycle-1431 lesson — see the matcher var block): the
-		// STRONG rung ("verified closed") is never guard-suppressed — an
-		// appended "…still open" clause must not become a one-token bypass of
-		// the citation demand; only the WEAK rung (bare "closed" + cycle-ref)
-		// accepts the negation/openness guards, whose whole job is the
-		// disclosed/"still open" false-RED class.
+		// The strong rung ("verified closed") is never guard-suppressed, so an
+		// appended "…still open" clause cannot become a one-token bypass of the
+		// citation demand; only the weak rung (bare "closed" + cycle-ref)
+		// accepts the negation/openness guards.
 		strong := closureClaimRE.MatchString(lower)
-		// The weak rung's cycle reference must come from PROSE, not from a
-		// path: `.evolve/runs/cycle-1493/…` is a citation locator, and it was
-		// the ONLY cycle token on the line that force-FAILed cycle-1493's
-		// narrative-green audit. Tokens containing '/' are dropped for this
-		// one check; the closed-token, negation, and citation checks keep the
-		// full line (a real prose claim next to a path still flags — pinned).
+		// The weak rung's cycle reference must come from prose, not from a
+		// path: a citation locator like `.evolve/runs/cycle-N/…` is not itself
+		// a prose claim about that cycle. Tokens containing '/' are dropped for
+		// this one check; the closed-token, negation, and citation checks keep
+		// the full line.
 		weak := closureClosedTokenRE.MatchString(lower) && closureCycleRef.MatchString(stripPathTokens(lower)) &&
 			!closureNegationRE.MatchString(lower) && !closureOpenAssertRE.MatchString(lower)
 		if !strong && !weak {
@@ -117,41 +91,13 @@ func closureClaimOffenders(text string) []string {
 	return offenders
 }
 
-// stripQuotedSpans removes text between matched quotation marks so the gate
-// matches an ASSERTION of closure rather than the mere presence of the phrase
-// (cycle-1285 F5).
-//
-// The canonical inherited defect text in this repo literally contains the words
-// "verified closed" — batch-integrity-review-2026-08-04.md reports the 1255-D1
-// CRITICAL as having been «narrowed to 'verified closed'». Substring matching
-// therefore FAILED the auditor who correctly reported that defect as still
-// open, which is worse than useless: the cheapest way out is to append the
-// literal token "defect-dispositions.json" to the line, which satisfies the
-// gate and adds no evidence at all. A gate whose remedy is a one-token
-// appeasement becomes noise and then gets deleted.
-//
-// Quoting is the signal because it is what the honest report actually does:
-// quoting someone else's closure claim is reporting, asserting one unquoted is
-// claiming. Explicit negation markers ("still open", "not closed") were
-// originally REJECTED as a second signal — they would hand the gate a bypass
-// strictly cheaper than the citation it demands, since appending "not closed"
-// is one token and evidences nothing. Cycle-1431 (with prior firings
-// 1339/1371/1428) revised that posture for the WEAK rung only: four P0
-// false-RED batch halts on honest refutations outweigh a one-rung leak that
-// the per-id dispositions gate still backstops, so bare-"closed"+cycle-ref
-// lines accept the negation/openness guards. The STRONG rung ("verified
-// closed") keeps the original rejection in full — no guard suppresses it —
-// so the one-token bypass remains closed where the claim is unambiguous.
-// Quoting cannot be used the same way: a claim wrapped in quotes reads as
-// someone else's.
-//
-// Backticks are NOT delimiters. In markdown a code span is how a real citation
-// is written (`defect-dispositions.json`), so stripping them would erase the
-// evidence and manufacture offenders.
-//
-// An unmatched delimiter strips nothing: a line with one apostrophe must not
-// swallow its own tail. A `'` is a delimiter only when it is not word-internal,
-// which keeps ordinary possessives ("the gate's record") out of the pairing.
+// stripQuotedSpans removes text between matched quotation marks, so the gate
+// matches an assertion of closure rather than the mere presence of the
+// phrase: the repo's own canonical defect text quotes "verified closed" while
+// correctly reporting the defect as still open. Backticks are not delimiters,
+// since a markdown code span is how a real citation is written. An unmatched
+// delimiter strips nothing, and a `'` is a delimiter only when it is not
+// word-internal, so an ordinary possessive is left alone.
 func stripQuotedSpans(line string) string {
 	r := []rune(line)
 	var out []rune
@@ -176,14 +122,12 @@ func stripQuotedSpans(line string) string {
 	return string(out)
 }
 
-// stripPathTokens drops whitespace-delimited tokens containing '/' — file
-// paths and locators. Used ONLY for the weak rung's cycle-reference check: a
-// cycle number inside an evidence path is where a citation points, not a
-// prose claim about that cycle (cycle-1493). Accepted misses, documented in
-// the compound test: a markdown-link ref ("[cycle-1272](docs/x.md)") and a
-// dual-ref token ("cycle-1272/cycle-1273") also strip — both are weak-rung
-// shapes an author could already evade by omitting the ref outright, and the
-// strong rung + citation demand still stand on such lines.
+// stripPathTokens drops whitespace-delimited tokens containing '/': file
+// paths and locators. Used only for the weak rung's cycle-reference check, so
+// a cycle number inside a citation path is not read as a prose claim about
+// that cycle. A markdown-link ref and a dual-ref token also strip; both are
+// weak-rung shapes an author could already evade by omitting the ref
+// outright, and the strong rung plus the citation demand still stand.
 func stripPathTokens(line string) string {
 	fields := strings.Fields(line)
 	kept := fields[:0]
