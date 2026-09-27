@@ -74,6 +74,8 @@ The cycle's production composition root, `wireOrchestratorDeps` in `cmd_cycle.go
 
 ## Invariants
 
+- **A capacity deferral is nobody's failed approach.** The sequential dispatcher pauses on `core.ErrAllFamiliesExhausted` before it records a failed approach or runs the failure closeout, so a wall never demotes the item or counts as a recoverable failure (ADR-0106 Q3). Pinned by `TestRunLoop_AFreshCycleWalledOnCapacityIsNobodysFailedApproach`.
+
 - **A cancelled canary touches no bench**, before the loop and after each probe: a smoke test cut short by an interrupt reports "not a wall", which would clear a bench that is still walled. Pinned by `TestCanary_CancelledContextTouchesNoBench`.
 - **Probes run on the runner's interrupt context**, and `runPreWaveProbes` returns its error, so a caller never dispatches a wave that would be cancelled at spawn.
 - **One `now` per budget sizing.** The quota snapshot and the plan share it so `ObservedAt` and the reset-horizon math agree.
