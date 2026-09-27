@@ -253,7 +253,7 @@ func selectableBatchesNote(ready []inboxbatch.Item) string {
 	if rendered == "" {
 		return ""
 	}
-	return "- inbox_batches: the backlog below is pre-grouped by campaign/file-area/links; " +
+	return "- inbox_batches: the backlog below is pre-grouped by campaign/file-area; " +
 		"prefer selecting a whole batch as top_n (its items share a worktree, build, and audit — " +
 		"one cycle amortizes the pipeline across them) over cherry-picking single items across batches:\n" +
 		rendered

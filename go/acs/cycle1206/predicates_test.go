@@ -26,12 +26,14 @@ import (
 )
 
 // TestC1206_001_DefaultRulesHasNoRootCauseSignal asserts the compiled default
-// rule set is EXACTLY the three documented structural signals — campaign,
-// file-area, dep — by probing each rule with a pair of items bound by one
-// signal only and requiring every rule to be accounted for by one probe.
+// rule set is EXACTLY the documented structural signals — campaign and
+// file-area — by probing each rule with a pair of items bound by one signal
+// only and requiring every rule to be accounted for by one probe. (The dep
+// signal was removed in cycle 1724: under ADR-0106 W3 a dependent never shares
+// a lane menu with its unlanded dependency, so dep edges could not bind.)
 //
 // This is the load-bearing anti-regression assertion: a re-added rootCauseRule
-// responds to none of the three structural probes (the Go Item type carries no
+// responds to none of the structural probes (the Go Item type carries no
 // root_cause field at all), so it lands as UNACCOUNTED and this predicate goes
 // RED. A source grep for "RootCause" would be gameable by renaming; this is not.
 func TestC1206_001_DefaultRulesHasNoRootCauseSignal(t *testing.T) {
@@ -53,18 +55,11 @@ func TestC1206_001_DefaultRulesHasNoRootCauseSignal(t *testing.T) {
 				{ID: "b", Files: []string{"go/internal/probearea/y.go"}},
 			},
 		},
-		{
-			signal: "dep",
-			items: []inboxbatch.Item{
-				{ID: "a"},
-				{ID: "b", Deps: []string{"a"}},
-			},
-		},
 	}
 
 	rules := inboxbatch.DefaultRules()
-	if len(rules) != 3 {
-		t.Errorf("C1206-001: DefaultRules() has %d rules, want exactly 3 (campaign, file-area, dep); an extra rule means a new binding signal was compiled in — root_cause binding is a rejected design (failedApproaches[54])", len(rules))
+	if len(rules) != len(probes) {
+		t.Errorf("C1206-001: DefaultRules() has %d rules, want exactly %d (campaign, file-area); an extra rule means a new binding signal was compiled in — root_cause binding is a rejected design (failedApproaches[54])", len(rules), len(probes))
 	}
 
 	for i, r := range rules {
@@ -78,9 +73,9 @@ func TestC1206_001_DefaultRulesHasNoRootCauseSignal(t *testing.T) {
 		case 1:
 			// Accounted for by exactly one known structural signal.
 		case 0:
-			t.Errorf("C1206-001: DefaultRules()[%d] (%T) emits no edge for any of the three documented structural signals (campaign, file-area, dep) — an unaccounted binding signal is compiled into the default set; root_cause binding is a rejected design (failedApproaches[54], zero edges on 20/20 unique prose values)", i, r)
+			t.Errorf("C1206-001: DefaultRules()[%d] (%T) emits no edge for any of the documented structural signals (campaign, file-area) — an unaccounted binding signal is compiled into the default set; root_cause binding is a rejected design (failedApproaches[54], zero edges on 20/20 unique prose values)", i, r)
 		default:
-			t.Errorf("C1206-001: DefaultRules()[%d] (%T) responds to multiple signals %v — the default set must be three single-signal rules", i, r, responds)
+			t.Errorf("C1206-001: DefaultRules()[%d] (%T) responds to multiple signals %v — the default set must be single-signal rules", i, r, responds)
 		}
 	}
 }

@@ -83,7 +83,7 @@ func Classify(items []Item, cfg Config) []Batch {
 	}
 	var out []clusterOut
 	for root, member := range clusters {
-		ordered := topoOrder(items, member)
+		ordered := weightOrder(items, member)
 		rs := dedupSorted(finalReasons[root])
 		co := clusterOut{firstID: items[ordered[0]].ID}
 		for start := 0; start < len(ordered); start += maxItems {
@@ -139,60 +139,14 @@ func sortedRuleEdges(rules []Rule, items []Item) []Edge {
 	return edges
 }
 
-// topoOrder returns member indices deps-first (Kahn); a dep cycle appends the remainder in weight-then-id order.
-func topoOrder(items []Item, member []int) []int {
-	inCluster := map[string]int{}
-	for _, i := range member {
-		inCluster[items[i].ID] = i
-	}
-	indeg := map[int]int{}
-	dependents := map[int][]int{}
-	for _, i := range member {
-		for _, d := range items[i].Deps {
-			if j, ok := resolveRef(d, inCluster); ok && j != i {
-				indeg[i]++
-				dependents[j] = append(dependents[j], i)
-			}
-		}
-	}
-	less := func(a, b int) bool {
-		return weightDescThenID(items[a].Weight, items[a].ID, items[b].Weight, items[b].ID)
-	}
-	var ready []int
-	for _, i := range member {
-		if indeg[i] == 0 {
-			ready = append(ready, i)
-		}
-	}
-	sort.Slice(ready, func(x, y int) bool { return less(ready[x], ready[y]) })
-
-	out := make([]int, 0, len(member))
-	for len(ready) > 0 {
-		i := ready[0]
-		ready = ready[1:]
-		out = append(out, i)
-		for _, dep := range dependents[i] {
-			indeg[dep]--
-			if indeg[dep] == 0 {
-				ready = append(ready, dep)
-			}
-		}
-		sort.Slice(ready, func(x, y int) bool { return less(ready[x], ready[y]) })
-	}
-	if len(out) < len(member) {
-		var rest []int
-		seen := map[int]bool{}
-		for _, i := range out {
-			seen[i] = true
-		}
-		for _, i := range member {
-			if !seen[i] {
-				rest = append(rest, i)
-			}
-		}
-		sort.Slice(rest, func(x, y int) bool { return less(rest[x], rest[y]) })
-		out = append(out, rest...)
-	}
+// weightOrder returns member indices sorted weight-desc-then-id (weightDescThenID);
+// this is the sole ordering Classify uses for a cluster's members.
+func weightOrder(items []Item, member []int) []int {
+	out := make([]int, len(member))
+	copy(out, member)
+	sort.Slice(out, func(x, y int) bool {
+		return weightDescThenID(items[out[x]].Weight, items[out[x]].ID, items[out[y]].Weight, items[out[y]].ID)
+	})
 	return out
 }
 
@@ -230,7 +184,7 @@ func compactReasons(rs []string) string {
 	return fmt.Sprintf("%s, +%d more", strings.Join(rs[:maxRenderedReasons], ", "), len(rs)-maxRenderedReasons)
 }
 
-// weightDescThenID is the one ordering topoOrder's ready set and Classify's ranking share.
+// weightDescThenID is the one ordering weightOrder and Classify's ranking share.
 func weightDescThenID(weightA float64, idA string, weightB float64, idB string) bool {
 	if weightA != weightB {
 		return weightA > weightB

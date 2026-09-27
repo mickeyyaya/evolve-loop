@@ -17,7 +17,7 @@ type Git interface {
 	Root() (string, error)
 }
 
-const usage = "usage: commentaudit rank [-n N] [dir] | commentaudit verify|check -base <ref> [dir ...]"
+const usage = "usage: commentaudit rank [-n N] [dir] | commentaudit verify|check|comments -base <ref> [dir ...]"
 
 // Main runs the CLI and returns its exit code: 0 ok, 1 violations, 2 usage.
 func Main(args []string, stdout, stderr io.Writer, git Git) int {
@@ -29,9 +29,11 @@ func Main(args []string, stdout, stderr io.Writer, git Git) int {
 	case "rank":
 		return rank(args[1:], stdout, stderr)
 	case "check":
-		return check(args[1:], stdout, stderr, git)
+		return listAdded("check", AddedNarrative, "narrative comments", args[1:], stdout, stderr, git)
 	case "verify":
 		return verify(args[1:], stdout, stderr, git)
+	case "comments":
+		return listAdded("comments", AddedComments, "comments", args[1:], stdout, stderr, git)
 	}
 	fmt.Fprintln(stderr, usage)
 	return 2
@@ -135,8 +137,8 @@ func verify(args []string, stdout, stderr io.Writer, git Git) int {
 	return 0
 }
 
-func check(args []string, stdout, stderr io.Writer, git Git) int {
-	d, code := loadDiff("check", args, stderr, git)
+func listAdded(name string, added func(before, after []byte) []string, what string, args []string, stdout, stderr io.Writer, git Git) int {
+	d, code := loadDiff(name, args, stderr, git)
 	if code != 0 {
 		return code
 	}
@@ -147,7 +149,7 @@ func check(args []string, stdout, stderr io.Writer, git Git) int {
 			fmt.Fprintln(stderr, err)
 			return 1
 		}
-		for _, line := range AddedNarrative(b, a) {
+		for _, line := range added(b, a) {
 			fmt.Fprintf(stdout, "%s: %s\n", f, line)
 			found++
 		}
@@ -155,7 +157,7 @@ func check(args []string, stdout, stderr io.Writer, git Git) int {
 	if found > 0 {
 		return 1
 	}
-	fmt.Fprintf(stdout, "no narrative comments added in %d changed Go file(s)\n", len(d.files))
+	fmt.Fprintf(stdout, "no %s added in %d changed Go file(s)\n", what, len(d.files))
 	return 0
 }
 

@@ -493,10 +493,12 @@ func TestC1633_008_DefaultBatchRulesUnchangedBySynthesis(t *testing.T) {
 	// A unified commitment is a triage-declared artifact validated AFTER
 	// classification; it must not become a grouping Rule. Three items with no
 	// campaign, disjoint areas and no deps stay three batches under the default
-	// rule set, and the rule set is still the three structural signals
-	// (rules_rootcause_regression_test.go forbids a prose root-cause rule).
-	if got := len(inboxbatch.DefaultRules()); got != 3 {
-		t.Errorf("DefaultRules must remain the 3 structural signals (campaign, file-area, dep); got %d", got)
+	// rule set, and the rule set is still the two structural signals, campaign
+	// and file-area (rules_rootcause_regression_test.go forbids a prose
+	// root-cause rule; the dep rule was removed in cycle 1724 as unreachable
+	// under ADR-0106 W3).
+	if got := len(inboxbatch.DefaultRules()); got != 2 {
+		t.Errorf("DefaultRules must remain the 2 structural signals (campaign, file-area); got %d", got)
 	}
 	batches := inboxbatch.Classify(threeItems(), inboxbatch.Config{})
 	if len(batches) != 3 {

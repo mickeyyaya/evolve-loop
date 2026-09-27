@@ -659,3 +659,5 @@
 ./internal/lanerouting
 # gittest — the one owner of git-backed test fixtures: quiet-maintenance repos, retried teardown that names its holder.
 ./internal/gittest
+# sizeratchet — the one repo-wide 50-line function limit: a go/ast walk against a checked-in offender list that may only shrink.
+./internal/sizeratchet
