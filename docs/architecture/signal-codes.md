@@ -219,6 +219,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `ORCHESTRATOR_PHASE_VERDICT_FAIL` | a phase recorded verdict FAIL; the reason is the phase's own error-severity diagnostics |
 | `ORCHESTRATOR_PHASE_VERDICT_WARN` | a phase recorded verdict WARN; the reason carries its error-severity diagnostics, if any |
 | `ORCHESTRATOR_QUOTA_PAUSED` | every CLI family is quota-exhausted; the cycle is paused at the named phase and resumable |
+| `ORCHESTRATOR_REBASE_REENTRY_ABORTED` | after a debugger resolved a fleet-rebase conflict, the host could not carry, rebase, pend or route the resolved tree (the reason names which), or the recovery budget was spent; the cycle ended instead of a reship on the base the ship diverged from |
 | `ORCHESTRATOR_SYSTEM_FAILURE` | an ADR-0072 system-level failure was attached to the cycle (INCIDENT when it halts the loop, WARN otherwise); fields.category names the floor |
 
 ### outcome
@@ -258,6 +259,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `SHIP_AUDIT_BINDING_TREE_MISMATCH` | verify-class: the audited tree differs from the tree being shipped |
 | `SHIP_AUDIT_BINDING_VERDICT_FAIL` | verify-class: the bound audit verdict is FAIL |
 | `SHIP_AUDIT_BINDING_VERDICT_WARN_STRICT` | verify-class: the bound audit verdict is WARN under strict audit |
+| `SHIP_BACKSTOP_FLAKE` | the importer backstop named red tests that were green when their packages re-ran by themselves, without the pack's concurrent load; the ship proceeded on that evidence — recurrence is a hygiene item, not proof of a timing window |
 | `SHIP_COMMIT_GATE_MALFORMED` | verify-class: the commit-gate attestation cannot be parsed |
 | `SHIP_COMMIT_GATE_MISSING` | verify-class: no commit-gate attestation exists for the staged tree |
 | `SHIP_COMMIT_GATE_STALE` | verify-class: the commit-gate attestation is for a different tree |

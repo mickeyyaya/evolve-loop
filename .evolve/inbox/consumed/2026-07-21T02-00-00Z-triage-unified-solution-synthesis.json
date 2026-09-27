@@ -6,17 +6,17 @@
     "codegraph-blast-radius-context-for-scout-audit-review"
   ],
   "consumed": {
-    "at": "2026-09-12T18:38:50Z",
+    "at": "2026-09-27T04:35:03Z",
     "cycle": "",
     "via": "ship"
   },
   "continuation": {
-    "base_sha": "1b9b53ea4ef371582be5a4f0f19719df2fc18e5f",
-    "branch": "cycle-cd3ae73e-1602",
-    "cycle": 1602,
-    "findings_path": "/Users/danleemh/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-1602/audit-fail-reason.json",
-    "snapshot_sha": "ab9eb9d615a141248c6761b7f2319650968c403f",
-    "worktree": "/Users/danleemh/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-1602"
+    "base_sha": "4c58eb6d1da8f5f7a26d677c0263e39b9e7842d8",
+    "branch": "cycle-cd3ae73e-1638",
+    "cycle": 1638,
+    "findings_path": "/Users/danleemh/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-1638/audit-fail-reason.json",
+    "snapshot_sha": "86e96e2ac6e494b85a477dc9ef3b9528db3ed17c",
+    "worktree": "/Users/danleemh/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-1638"
   },
   "created": "2026-07-21T02:00:00Z",
   "evidence": "Operator directive 2026-07-21; triage-decision.json top_n sizes 974-981 (avg ~1.5); knowledge-base/research/token-usage-history-2026-07-20.md (7.6M/cycle wrapper); campaign_retrospective_215_231 (12-defects-one-disease); ADR-0054 campaign runner; plan-review + buildplanner personas present in phase catalog.",
@@ -37,16 +37,6 @@
       "released_at": "2026-08-17T04:30:00Z",
       "released_because": "binding released console-side: the 1502 continuation carried findings from the closure-claim false-FAIL (fixed PR #471) — fresh dispatch is cleaner; this structured pointer supersedes the stale continuation field (cycle-1500) for salvage purposes, per review",
       "worktree": "/Users/danleemh/ai/claude/evolve-loop-runtime/.evolve/worktrees/cycle-42824668-1502"
-    },
-    {
-      "base_sha": "b496a8dc0c475bf562a19f5fcfc2fe1d93ad6fe5",
-      "branch": "cycle-cd3ae73e-1633",
-      "cycle": 1633,
-      "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-1633/audit-fail-reason.json",
-      "reason": "ship-consume-",
-      "released_at": "2026-09-12T18:38:50Z",
-      "snapshot_sha": "26680b3e45bd3115fd5dda2eb9e631cf72d93c69",
-      "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-1633"
     }
   ],
   "title": "OPERATOR EXPECTATION: triage synthesizes ACROSS backlog items — detect shared root cause, deep-think an architecture-first plan, and commit ONE unified general solution (clean code, design patterns, SSOT) that closes N items, instead of N independent patches",

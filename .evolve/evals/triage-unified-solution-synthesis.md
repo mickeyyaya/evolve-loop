@@ -54,6 +54,30 @@ score_cap:
   - criterion: "The build explanation does not attribute a go/acs package this diff ADDS to inherited history (preserved / pre-existing / inherited / older / prior cycle), checked against the base blob"
     max_if_missing: 6
     evidence: "cd go && go test -tags acs -count=1 -run 'TestC1638_011_' ./acs/cycle1638/"
+  - criterion: "The ship's in-commit consumption closes a validated unified commitment all-or-nothing: a member that cannot close (stage fault after a sibling staged, or an unresolvable item, in either order) leaves every member pickable with original bytes, no consumed/ record, no drift sanction and its continuation binding intact, and one WARN names unified_commitment and the failing member"
+    max_if_missing: 8
+    evidence: "cd go && go test -tags acs -count=1 -run 'TestC1720_001_' ./acs/cycle1720/"
+  - criterion: "A validated unified commitment whose members all close consumes every member, with each move sanctioned and no unified WARN"
+    max_if_missing: 6
+    evidence: "cd go && go test -tags acs -count=1 -run 'TestC1720_002_' ./acs/cycle1720/"
+  - criterion: "The atomic unit is exactly the validated member set: an ordinary top_n batch and a triage-rejected claim (no unified_projection) stay per-item fail-open, and an independent item still consumes beside a rolled-back commitment"
+    max_if_missing: 8
+    evidence: "cd go && go test -tags acs -count=1 -run 'TestC1720_003_' ./acs/cycle1720/"
+  - criterion: "Through the real cycle ship (shipFromWorktree over a real git worktree) the landing commit carries every member's consumed/ record or none of them, and a consumption problem never blocks the ship"
+    max_if_missing: 8
+    evidence: "cd go && go test -tags acs -count=1 -run 'TestC1720_004_' ./acs/cycle1720/"
+  - criterion: "The pre-existing consume contract (26 named tests: drift sanction, verdict gate, lane-scope union, single-writer witness, registry release, manual ship) stays green unmodified"
+    max_if_missing: 7
+    evidence: "cd go && go test -tags acs -count=1 -run 'TestC1720_005_' ./acs/cycle1720/"
+  - criterion: "processUnifiedCommitment has direct unit tests whose five branch subtests (accept-small, accept-large, reject-outside-top_n, reject-heterogeneous, reject-spoofed) pass"
+    max_if_missing: 6
+    evidence: "cd go && go test -tags acs -count=1 -run 'TestC1720_006_' ./acs/cycle1720/"
+  - criterion: "Each of those subtests detects a regression in its own branch: with that branch of production code broken through a go -overlay mutant, the matching subtest FAILs"
+    max_if_missing: 8
+    evidence: "cd go && go test -tags acs -count=1 -run 'TestC1720_007_' ./acs/cycle1720/"
+  - criterion: "The cycle-1720 predicate package and the three new test files are git-tracked so the audit tree and the ship tree agree"
+    max_if_missing: 5
+    evidence: "cd go && go test -tags acs -count=1 -run 'TestC1720_008_' ./acs/cycle1720/"
 ---
 
 # Eval: triage-unified-solution-synthesis — validated, evidence-cited unified commitment with fail-open routing
@@ -196,3 +220,35 @@ record-adding commit introduced once landed) — from git, never from a cycle
 number — so the two caps grade whichever record ships. Their evidence
 commands are unchanged; `.evolve/evals/overlay-family-name-transport-ambiguity.md`'s
 `inherited-packages-green` cap makes the harness lane reach this package.
+
+## Cycle-1720 addendum — members close all-or-nothing IN the landing commit
+
+Cycle 1637's `transactional-closure` cap pins the post-ship promotion seam
+(`inboxmover.ApplyCycleOutcome`: PASS promotes every member, FAIL none). The
+IN-COMMIT consumption that rides the ship (`ship/consume.go`,
+`consumeCommittedItems`) stayed per-item: cycle 1720's bug-reproduction phase
+drove `shipFromWorktree` with a validated two-member commitment whose second
+member could not resolve and the landing commit carried
+`consumed/…unified-member-a.json` alone — a split unified closeout with no
+record of the partial state. The 1720 caps pin that seam, keyed on
+`unified_projection` (the triage phase stamps it only beside a claim it
+validated, so a rejected claim's members stay per-item), and keep the
+per-item fail-open default for every other id.
+
+The same cycle closed the test gap under the triage call site:
+`processUnifiedCommitment` had no direct unit test. Because that task's
+deliverable IS a test, its cap is mutation-based: each branch is broken
+through a `go test -overlay` mutant (no byte of the tree changes) and the
+subtest named for that branch must FAIL — a hollow subtest that passes on
+every tree cannot satisfy it.
+
+| Pattern | Criterion | max_if_missing | Evidence |
+|---|---|---|---|
+| unified-consume-rollback | a member that cannot close leaves every member pickable, unsanctioned, binding intact; one WARN names unified_commitment + the failing member | 8/10 | `go test -tags acs -run 'TestC1720_001_' ./acs/cycle1720/` |
+| unified-consume-all-close | every member closing consumes every member | 6/10 | `go test -tags acs -run 'TestC1720_002_' ./acs/cycle1720/` |
+| atomic-unit-scope | ordinary batch + rejected claim stay per-item; an independent item still consumes | 8/10 | `go test -tags acs -run 'TestC1720_003_' ./acs/cycle1720/` |
+| landing-commit-all-or-none | the real cycle ship's commit carries all members' consumed/ records or none | 8/10 | `go test -tags acs -run 'TestC1720_004_' ./acs/cycle1720/` |
+| consume-default-unchanged | 26 pre-existing consume tests stay green unmodified | 7/10 | `go test -tags acs -run 'TestC1720_005_' ./acs/cycle1720/` |
+| triage-branch-tests | five branch subtests of processUnifiedCommitment pass | 6/10 | `go test -tags acs -run 'TestC1720_006_' ./acs/cycle1720/` |
+| triage-branch-mutants-killed | each branch mutant is caught by its own subtest | 8/10 | `go test -tags acs -run 'TestC1720_007_' ./acs/cycle1720/` |
+| ship-tree-tracking-1720 | predicate package + three new test files git-tracked | 5/10 | `go test -tags acs -run 'TestC1720_008_' ./acs/cycle1720/` |
