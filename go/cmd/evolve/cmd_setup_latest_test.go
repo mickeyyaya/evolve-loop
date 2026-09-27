@@ -1,11 +1,5 @@
 package main
 
-// cmd_setup_latest_test.go — `evolve setup latest`: the read-only live probe
-// behind /evo:setup's "a newer model is available" option. Driven through the
-// report builder with a fake lister: the defect classes are a probe that
-// quietly skips a family, a failure that kills the whole report instead of
-// its own row, and a parallel fan-out that scrambles row order.
-
 import (
 	"context"
 	"errors"
@@ -17,7 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/setup"
 )
 
-// fakeLister records concurrency and serves per-CLI candidate lists.
 type fakeLister struct {
 	mu       sync.Mutex
 	inflight int
@@ -71,7 +64,6 @@ func TestSetupLatestReport_QueriesEveryReadyFamilyInParallel(t *testing.T) {
 	if len(rep.CLIs) != 3 {
 		t.Fatalf("every READY family gets a row (blocked ollama excluded): %+v", rep.CLIs)
 	}
-	// Deterministic row order = detection order, regardless of fan-out timing.
 	for i, want := range []string{"claude", "codex", "agy"} {
 		if rep.CLIs[i].CLI != want {
 			t.Fatalf("row %d = %s, want %s (parallel fan-out must not scramble order)", i, rep.CLIs[i].CLI, want)
@@ -115,8 +107,6 @@ func TestSetupLatestReport_ProbeFailureIsOneRowNotTheReport(t *testing.T) {
 	}
 }
 
-// The catalog is the hot-reloading dispatch authority: when it carries a tier
-// map for a family, staleness is judged against IT, not the manifest default.
 func TestSetupLatestReport_CatalogOverridesManifestBaseline(t *testing.T) {
 	t.Parallel()
 	fl := &fakeLister{lists: map[string][]string{
@@ -130,9 +120,6 @@ func TestSetupLatestReport_CatalogOverridesManifestBaseline(t *testing.T) {
 	}
 }
 
-// A stale BALANCED tier alone must trip the report: most phases dispatch
-// balanced, and deep-only scoping let exactly that staleness escape (review
-// finding).
 func TestSetupLatestReport_BalancedTierStalenessCounts(t *testing.T) {
 	t.Parallel()
 	fl := &fakeLister{lists: map[string][]string{
@@ -147,9 +134,6 @@ func TestSetupLatestReport_BalancedTierStalenessCounts(t *testing.T) {
 	}
 }
 
-// The identity fallback (tier map missing -> model == tier word) must read
-// UNVERIFIED, never "freshest" — the fabricated-verdict class the live smoke
-// surfaced.
 func TestSetupLatestReport_NeverSeenCurrentIsUnverifiedNotFresh(t *testing.T) {
 	t.Parallel()
 	fl := &fakeLister{lists: map[string][]string{"ollama": {"qwen3", "llama4"}}}
@@ -162,8 +146,6 @@ func TestSetupLatestReport_NeverSeenCurrentIsUnverifiedNotFresh(t *testing.T) {
 	}
 }
 
-// The per-capture timeout is load-bearing: without it one hung capture stalls
-// the entire parallel probe. Pinned by overriding the injectable deadline.
 func TestSetupLatestReport_HungCaptureIsBoundedByTheTimeout(t *testing.T) {
 	old := setupLatestProbeTimeout
 	setupLatestProbeTimeout = 50 * time.Millisecond
@@ -185,8 +167,6 @@ func (hangingLister) List(ctx context.Context, _ string) ([]string, error) {
 	return nil, ctx.Err()
 }
 
-// A non-deep model that VANISHED from the bridge must surface per-tier — the
-// deep-anchored current_seen_live cannot express it (review finding).
 func TestSetupLatestReport_VanishedBalancedTierIsNamedUnverified(t *testing.T) {
 	t.Parallel()
 	fl := &fakeLister{lists: map[string][]string{"codex": {"gpt-5.5"}}}

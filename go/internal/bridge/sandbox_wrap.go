@@ -1,20 +1,5 @@
 package bridge
 
-// sandbox_wrap.go — default SandboxWrap implementation (Workstream B).
-//
-// CLI-agnostic confinement: every driver (claude/codex/agy/ollama) running a
-// source-writing phase gets wrapped in the host's OS sandbox
-// (sandbox-exec on macOS, bwrap on Linux). The non-Claude drivers historically
-// bypassed the trust kernel entirely (Issue 2 from cycle 119).
-//
-// This file owns ONLY the decision + prefix-argv synthesis. Drivers (tmux +
-// headless) call deps.SandboxWrap at their launch site and either prepend the
-// returned argv or enforce the profile's confinement requirement when no
-// wrapper is available. Mandatory profiles fail closed without an explicit opt-out.
-//
-// Probe is cached behind sync.Once because it shells to LookPath; the cached
-// result is captured in the closure that withDefaults returns.
-
 import (
 	"fmt"
 	"os"
@@ -45,13 +30,8 @@ func defaultSandboxWrapWithProbe(deps Deps, probeFunc func() sandbox.ProbeResult
 		if mode == "" {
 			mode = config.SandboxModeAuto
 		}
-		// Normalize any UNRECOGNIZED value to auto, mirroring config.applyEnv's
-		// validation contract. Pre-fix, an unknown value (operator typo like
-		// "1") was neither "off" nor "auto", so it slipped past the
-		// nested-claude skip below and forced a sandbox-exec wrap — which hangs
-		// claude's REPL boot on nested macOS (exit=80 ExitREPLBootTimeout; the
-		// 2026-06-13 soak burned cycles 324-326 on exactly this). Treat an
-		// unknown value as auto (the safe default) and WARN so it's observable.
+		// Normalize any unrecognized value to auto, mirroring config.applyEnv's
+		// validation contract, and WARN so the fallback is observable.
 		switch mode {
 		case config.SandboxModeOff, config.SandboxModeOn, config.SandboxModeAuto:
 			// recognized — leave as-is
@@ -87,11 +67,8 @@ func defaultSandboxWrapWithProbe(deps Deps, probeFunc func() sandbox.ProbeResult
 			}
 		}
 
-		// Build the sandbox.Config for this phase. WritePaths covers the
-		// worktree (the only place source writes are permitted) plus the
-		// workspace (for artifact/log files the agent must write) plus /tmp
-		// (the bridge's scratch space). HomeDir is read-allowed so tmux CLIs can
-		// load their own config/auth state; repo writes remain confined below.
+		// HomeDir is read-allowed so tmux CLIs can load their own config/auth
+		// state; repo writes remain confined below.
 		home, _ := os.UserHomeDir()
 		cfg := sandbox.Config{
 			TerminalPath:  req.TerminalPath,
@@ -115,10 +92,8 @@ func defaultSandboxWrapWithProbe(deps Deps, probeFunc func() sandbox.ProbeResult
 			}
 			return nil, false
 		}
-		// The profile's declared write surface (sandbox.write_subpaths) —
-		// the inbox claim dir, the retrospective lesson dir, doc-sync's docs/
-		// — resolved with the same retarget defense the lesson grant carried
-		// when it was the only one hard-coded here. A grant that cannot be
+		// The profile's declared write surface (sandbox.write_subpaths) is
+		// resolved with the same retarget defense; a grant that cannot be
 		// resolved safely refuses the launch rather than confining it wrong.
 		grants, err := resolveSandboxWriteGrants(req.WriteSubpaths, req.RepoRoot, req.Worktree)
 		if err != nil {
@@ -156,18 +131,13 @@ func defaultSandboxWrapWithProbe(deps Deps, probeFunc func() sandbox.ProbeResult
 			// -f here; the in-memory adapter at adapters/sandbox.Sandbox.Exec
 			// stays on -p because it holds the SBPL string, not a file.
 			sbpl := sandbox.GenerateSBPL(cfg)
-			// ADR-0049 S0 / gap G6: write the SBPL to a PER-INVOCATION profile
-			// dir, not a shared <workspace>/sandbox-<phase>.sb. Two same-phase
-			// dispatches sharing a workspace (a re-dispatch, two fan-out workers,
-			// or two runs reusing a cycle number) otherwise write the same file —
-			// and if their WritePaths differ, B's profile landing between A's
-			// write and A's sandbox-exec read confines A to B's allow-list (A's
-			// legit source writes EPERM-denied). A mktemp -d (0o700) per
-			// invocation isolates them — the per-invocation sandbox-profile
-			// pattern (CERT FIO21-C; Codex generates a profile per launch). A
-			// mkdir failure degrades to the shared workspace profile (confinement
-			// preserved, isolation lost) rather than running unconfined. No-op for
-			// the live sequential loop: a lone dispatch just gets its own subdir.
+			// The SBPL is written to a per-invocation temp dir (mktemp -d, 0o700),
+			// not a shared <workspace>/sandbox-<phase>.sb, so two same-phase
+			// dispatches sharing a workspace cannot race on the same profile file.
+			// A dir-creation failure degrades to the shared workspace profile
+			// (confinement preserved, isolation lost) rather than running
+			// unconfined.
+			// See ADR-0049.
 			sbplDir := req.Workspace
 			if req.Workspace != "" {
 				mk := deps.MkScratchDir
@@ -206,14 +176,12 @@ func defaultSandboxWrapWithProbe(deps Deps, probeFunc func() sandbox.ProbeResult
 }
 
 // sandboxWritePaths returns the FLOOR of the write-allowlist for a sandboxed
-// phase: worktree (source) + workspace (artifacts) + /tmp (scratch). It is the
-// orchestrator's designation, not the profile's: the profile's
-// sandbox.write_subpaths (req.WriteSubpaths) can only ADD to it. A profile
-// that declares "{worktree_path}/tests" is documenting where it intends to
-// write; the whole worktree stays writable at the OS layer, and any narrower
-// enforcement is the tool-layer hooks' job. Empty req.Worktree means the
-// orchestrator didn't designate one — return only the workspace so
-// non-worktree code paths don't silently land in the main tree.
+// phase: worktree (source) + workspace (artifacts) + /tmp (scratch). It is
+// the orchestrator's designation, not the profile's — sandbox.write_subpaths
+// can only ADD to it. The whole worktree stays writable at the OS layer
+// regardless of what a profile declares; any narrower enforcement is the
+// tool-layer hooks' job. An empty req.Worktree means the orchestrator
+// designated none, so only the workspace is returned.
 func sandboxWritePaths(req SandboxWrapRequest) []string {
 	out := []string{}
 	if req.Worktree != "" {
@@ -228,9 +196,7 @@ func sandboxWritePaths(req SandboxWrapRequest) []string {
 
 // depEnvGetter adapts a Deps to the getenv func sandbox.DetectNested expects,
 // preserving the bridge's request-local env-chain precedence: the explicit
-// Env map first, then the LookupEnv seam. Centralizing nested detection in
-// adapters/sandbox.DetectNested removed the bridge-local heuristic that used
-// to live here (and diverged from preflight's).
+// Env map first, then the LookupEnv seam.
 func depEnvGetter(deps Deps) func(string) string {
 	return func(k string) string {
 		if deps.Env != nil {
@@ -263,22 +229,11 @@ func sandboxPrefixForLaunch(deps Deps, cfg *Config, terminalPath string) ([]stri
 	if deps.SandboxWrap == nil {
 		return nil, false
 	}
-	// Reaching here means a cloud model CLI requested confinement. ollama-tmux —
-	// the only local driver — never requests this wrapper, so only
-	// claude/codex/agy-tmux get here. That covers both source-writing phases
-	// (built-in build/tdd or a custom writes_source phase) AND the boot/live-smoke
-	// probes, which set a scratch Worktree via applyScratchCwd — all of them need
-	// the network to reach the model API. The sandbox's network deny would block
-	// that connection, and "allow model, deny the rest" is NOT expressible: SBPL/
-	// bwrap can't filter per-host, and the model endpoint can't be proxied without
-	// breaking subscription billing (driver_claudetmux.go aborts on a proxy base
-	// URL). So network MUST be allowed here regardless of the profile value — a
-	// false sandbox.allow_network on a phase that reaches the sandbox is a
-	// misconfiguration, not a control. Force it true structurally so nothing —
-	// including a future custom writes_source phase — boots network-denied and
-	// hangs unable to reach the model. The real confinement boundary here is
-	// filesystem (ReadOnlyRepo + WritePaths + DenyPaths) + the kernel PreToolUse
-	// hooks, not network.
+	// Every driver that reaches this wrapper needs the network to reach its
+	// model API, and "allow the model host, deny the rest" is not expressible —
+	// SBPL/bwrap cannot filter per host, and proxying the model endpoint breaks
+	// subscription billing. Force network true structurally: the real
+	// confinement boundary here is filesystem, not network.
 	if !cfg.AllowNetwork && deps.Stderr != nil {
 		fmt.Fprintf(deps.Stderr, "[bridge] WARN: source-writing phase %q has sandbox.allow_network=false; forcing true (a sandboxed model-reaching CLI cannot boot with network denied)\n", cfg.Agent)
 	}
@@ -299,12 +254,9 @@ func sandboxPrefixForLaunch(deps Deps, cfg *Config, terminalPath string) ([]stri
 // single quotes. Used to splice the sandbox prefix into the *-tmux driver's
 // launchCmd string (SendKeys gets a single shell line, not an argv slice).
 //
-// The "safe" character set is intentionally narrow: a-z, A-Z, 0-9, and the
-// path/option chars - _ / . , + : @ %. Anything else (including !, (, ),
-// &, |, ;, <, >, ~, #, =, {, }, [, ], spaces, quotes, $, backtick, etc.)
-// triggers single-quoting. POSIX single-quoting is always correct, so when
-// in doubt we quote. The previous narrow blocklist missed several active
-// shell metacharacters; this allow-list flips the safety bias.
+// The safe character set is intentionally narrow (a-z, A-Z, 0-9, and
+// - _ / . , + : @ %); anything else triggers quoting, so an unrecognized
+// character is quoted by default rather than passed through.
 func shellQuotePOSIX(s string) string {
 	if s == "" {
 		return "''"
@@ -375,10 +327,9 @@ func sandboxRequiredButUnavailable(deps Deps, cfg *Config, wrapped bool) bool {
 	if cfg == nil || !cfg.RequireSandbox || wrapped {
 		return false
 	}
-	// The three-cell decision projects from its single home (Specification —
-	// sandbox.ConfinementSatisfied); preflight's host-capabilities check
-	// displays the same predicate, so the two can no longer diverge (the
-	// 2026-09-01 nested-HALT divergence class).
+	// The three-cell decision projects from its single home
+	// (sandbox.ConfinementSatisfied); preflight's host-capabilities check
+	// displays the same predicate, so the two can no longer diverge.
 	ok, optOut, reason := sandbox.ConfinementSatisfied(
 		sandbox.DetectNested(depEnvGetter(deps)),
 		strings.TrimSpace(deps.Env[envSandboxMode]))

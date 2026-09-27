@@ -1,12 +1,5 @@
 package main
 
-// cmd_selfcheck_test.go — RED contract for ADR-0076 slice B: `evolve selfcheck
-// build` is the builder's in-session pre-flight running the EXACT build-floor
-// checks, so fixing happens inside the builder's loop and budget instead of
-// post-hoc correction windows. DI seam (buildFloorChecksFn) so tests inject a
-// stub; a wiring pin holds the seam to productionBuildFloorChecks (the ONE
-// composition: the engine plus the protected-surface floor, F37).
-
 import (
 	"context"
 	"os"
@@ -65,10 +58,6 @@ func TestSelfcheckSeam_DefaultsToBuildFloorChecks(t *testing.T) {
 	}
 }
 
-// TestBuildFloorRoots_ComposeOnlyThroughTheProductionFloor (F37): the only
-// non-test reference to core.DefaultBuildFloorChecks in this root is the ONE
-// production composition, so no root can wire the engine without the
-// protected-surface floor beside it.
 func TestBuildFloorRoots_ComposeOnlyThroughTheProductionFloor(t *testing.T) {
 	entries, err := os.ReadDir(".")
 	if err != nil {

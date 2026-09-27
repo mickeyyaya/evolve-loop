@@ -1,10 +1,5 @@
 package main
 
-// cmd_soak_report.go — R8.3: `evolve soak-report --cycles A-B` renders the
-// read-only soak evidence table (internal/soakreport) the
-// EVOLVE_PHASE_RECOVERY enforce flip is gated on. Pure reader: no state,
-// ledger, or registry mutation; safe to run mid-batch.
-
 import (
 	"flag"
 	"fmt"
@@ -43,7 +38,6 @@ func runSoakReport(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	return 0
 }
 
-// parseCycleRange accepts "N" or "A-B" (inclusive, ascending).
 func parseCycleRange(s string) ([]int, error) {
 	if s == "" {
 		return nil, fmt.Errorf("--cycles is required (e.g. --cycles 281-284)")

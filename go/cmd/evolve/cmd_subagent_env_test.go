@@ -2,10 +2,6 @@ package main
 
 import "testing"
 
-// Flag-readers for the subagent handlers, migrated onto envchain. The tests pin
-// each knob's default — the guard against a default-flip when swapping the
-// `!= "0"` (default-on) / `== "1"` (default-off) idioms for envchain.Bool.
-
 func TestReadSubagentRunFlags_Defaults(t *testing.T) {
 	for _, k := range []string{"ADVERSARIAL_AUDIT", "LEGACY_AGENT_DISPATCH"} {
 		t.Setenv(k, "")

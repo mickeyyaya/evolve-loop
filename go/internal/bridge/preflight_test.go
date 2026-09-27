@@ -10,25 +10,6 @@ import (
 	"testing"
 )
 
-// preflight_test.go — cycle-124 G3 contract: the optional CLIPreflight
-// interface lets a Driver hook pre-launch prep work (today only codex-tmux,
-// to pre-trust the worktree+workspace in ~/.codex/config.toml before the
-// REPL boots — cycle-122 Fix 1 promoted out of an inline call). The tests
-// pin three properties:
-//
-//  1. codex-tmux IS a CLIPreflight (the driver type assertion the Engine
-//     does at launch.go would otherwise fall through silently and the
-//     pretrust never run).
-//  2. Drivers WITHOUT preflight work (claude-tmux, agy-tmux, ollama-tmux,
-//     claude-p, codex headless, agy headless) MUST NOT accidentally
-//     implement the interface — the absence is the OPT-OUT mechanism,
-//     and a no-op stub on every concrete driver would be the wrong
-//     pattern (the comment in driver.go documents this).
-//  3. codex-tmux's Preflight returns an error from pretrustCodexProjects
-//     unchanged (best-effort: error gets logged by Engine.Launch but does
-//     not abort the phase; the contract is "do something useful or return
-//     a logged-but-non-fatal error").
-
 func TestCLIPreflight_CodexTmuxImplementsIt(t *testing.T) {
 	d, ok := LookupDriver("codex-tmux")
 	if !ok {
@@ -279,12 +260,10 @@ func TestCLIPreflight_ConfigAndDepsPassThrough(t *testing.T) {
 
 // TestCLIPreflight_OptOutDoesNotPanicOnTypeAssertion pins the Engine's
 // `if pf, ok := driver.(CLIPreflight); ok` short-circuit: a driver that
-// doesn't implement CLIPreflight must evaluate `ok=false`. The comma-ok
-// form of type assertion is documented as never-panicking by the Go spec,
-// so no recover() is needed (cycle-124 test-review LOW). The second
-// assertion uses an anonymous interface to triple-check the underlying
-// type genuinely lacks Preflight — catches accidental embedded promotion
-// a refactor might introduce.
+// doesn't implement CLIPreflight must evaluate `ok=false`. The second
+// assertion uses an anonymous interface to triple-check the underlying type
+// genuinely lacks Preflight — catches accidental embedded promotion a
+// refactor might introduce.
 func TestCLIPreflight_OptOutDoesNotPanicOnTypeAssertion(t *testing.T) {
 	var d Driver = &nonPreflightDriver{name: "opt-out"}
 	if pf, ok := d.(CLIPreflight); ok {

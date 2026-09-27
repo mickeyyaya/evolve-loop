@@ -1,9 +1,5 @@
 package main
 
-// cmd_subagent_run_test.go — ADR-0103 unit 16: the `evolve subagent run` root's
-// stderr lines and exit map, pinned before the execution path moved into
-// internal/subagent/subagentrun (nothing pinned them on 8e8f080f).
-
 import (
 	"bytes"
 	"os"
@@ -15,8 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/subagent"
 )
 
-// Test 17 — a PROMPT_FILE_OVERRIDE that cannot be opened is the root's own
-// exit-1 FAIL line, verbatim.
 func TestRunSubagentRun_PromptFileOverrideMissingExitsOne(t *testing.T) {
 	root := t.TempDir()
 	ws := filepath.Join(root, "ws")
@@ -35,9 +29,6 @@ func TestRunSubagentRun_PromptFileOverrideMissingExitsOne(t *testing.T) {
 	}
 }
 
-// Test 59 — the --simulate render twin for the run root: an unknown agent
-// renders the human FAIL line AND the structured WARN line on stderr, and the
-// cycle-keyed signals.ndjson holds the code with the dispatcher's origin.
 func TestRunSubagentRun_UnknownAgentRendersTheCodeAndFilesIt(t *testing.T) {
 	root := t.TempDir()
 	ws := filepath.Join(root, "ws")
@@ -67,7 +58,6 @@ func TestRunSubagentRun_UnknownAgentRendersTheCodeAndFilesIt(t *testing.T) {
 	}
 }
 
-// Test 60 — the verdict line and the exit map are pinned by a golden.
 func TestRenderRunOutcome_LineAndExitMapArePinned(t *testing.T) {
 	want, err := os.ReadFile(filepath.Join("testdata", "root-outcome.golden"))
 	if err != nil {
@@ -85,8 +75,6 @@ func TestRenderRunOutcome_LineAndExitMapArePinned(t *testing.T) {
 	}
 }
 
-// Test 61 — the root passes its Center, flushes it and keeps the raw Warns
-// print (a source scan, the bridgeonly idiom).
 func TestSubagentRunRoot_PassesTheRootSignalCenterAndKeepsTheRawWarns(t *testing.T) {
 	body, err := os.ReadFile("cmd_subagent.go")
 	if err != nil {

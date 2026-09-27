@@ -9,11 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/skillinventory"
 )
 
-// runSkillInventory implements `evolve skill-inventory <subcommand>`.
-// Currently supports the `build` subcommand. Exit codes:
-//   - 0  success (cache hit or fresh build)
-//   - 10 bad args / unknown subcommand
-//   - 1  internal error
 func runSkillInventory(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
 		fmt.Fprintln(stderr, "evolve skill-inventory: missing subcommand (build)")

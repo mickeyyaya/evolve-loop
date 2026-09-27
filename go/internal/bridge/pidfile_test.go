@@ -20,20 +20,12 @@ func TestEnvValue(t *testing.T) {
 	}
 }
 
-// TestExecRunner_WritesPIDFile verifies the PID file is written for the child to
-// read (the child cats it into OUT, which persists) and removed after exit.
 func TestExecRunner_WritesPIDFile(t *testing.T) {
 	dir := t.TempDir()
 	pidFile := filepath.Join(dir, "x.bridge-pid")
 	out := filepath.Join(dir, "out")
 	env := append(os.Environ(), "EVOLVE_BRIDGE_PIDFILE="+pidFile, "OUT="+out)
 
-	// execRunner necessarily writes the pidfile AFTER cmd.Start() (the child PID
-	// does not exist before Start), so a consumer must poll for it — exactly
-	// what the real reader (the auto-spawn observer's CPU-liveness probe) does.
-	// The child mirrors that: poll up to ~2s for the file to appear before
-	// reading it. Without the poll the child can `cat` before the parent's write
-	// lands, yielding an empty OUT — the cycle-274-class 0.00s CI flake.
 	rc, err := execRunner(context.Background(), "sh", "",
 		[]string{"-c", `i=0; while [ $i -lt 100 ]; do [ -s "$EVOLVE_BRIDGE_PIDFILE" ] && break; sleep 0.02; i=$((i+1)); done; cat "$EVOLVE_BRIDGE_PIDFILE" > "$OUT"`},
 		env, nil, io.Discard, io.Discard)
@@ -53,9 +45,6 @@ func TestExecRunner_WritesPIDFile(t *testing.T) {
 	}
 }
 
-// TestExecRunner_NoPIDFileEnv_NoWrite confirms the gating: without
-// EVOLVE_BRIDGE_PIDFILE, no pid file is created (byte-identical to the prior
-// behavior).
 func TestExecRunner_NoPIDFileEnv_NoWrite(t *testing.T) {
 	dir := t.TempDir()
 	stray := filepath.Join(dir, "should-not-exist.bridge-pid")

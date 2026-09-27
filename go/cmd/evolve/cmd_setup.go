@@ -14,17 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/setup"
 )
 
-// runSetup implements `evolve setup <subcommand>` — the deterministic core
-// behind the in-session /setup skill. Subcommands:
-//
-//	detect    [--json]                      onboarding digest (CLIs + per-phase)
-//	recommend [--json]                      the configured presets (Recommended/Economy/Max-quality)
-//	latest    [--json]                      LIVE parallel probe: freshest model each ready CLI's
-//	                                        bridge offers vs today's dispatch map (read-only)
-//	apply     --preset <name> [--dry-run]   write the chosen preset's pins to policy.json
-//	complete                                stamp the first-run marker
-//
-// Exit codes: 0 OK, 10 bad args, 1 runtime error.
 func runSetup(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
 		fmt.Fprintln(stderr, "evolve setup: missing subcommand (detect|recommend|latest|apply|complete)")
@@ -47,11 +36,6 @@ func runSetup(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	}
 }
 
-// setupRoots resolves project/plugin/evolve/adapters dirs. Precedence for the
-// project root: --project-root flag > EVOLVE_PROJECT_ROOT > cwd. The flag gives
-// parity with `evolve loop` (which resolves from --project-root, default cwd)
-// so the dispatcher can pass the SAME root to both — guaranteeing `setup
-// complete`'s marker lands in the .evolve the loop nudge reads.
 func setupRoots(projectRootFlag, evolveDirFlag string, stderr io.Writer) (project, plugin, evolveDir, adapters string) {
 	project = projectRootFlag
 	if project == "" {
@@ -61,13 +45,10 @@ func setupRoots(projectRootFlag, evolveDirFlag string, stderr io.Writer) (projec
 		if cwd, err := os.Getwd(); err == nil {
 			project = cwd
 		} else {
-			// os.Getwd failed (cwd deleted/unmounted) — surface it rather than
-			// fall through to a silent relative ".evolve" (the cycle-119 class).
+			// Surfaced rather than silently falling through to a relative path.
 			fmt.Fprintf(stderr, "[setup] WARN: could not determine cwd (%v); marker/state paths may be relative\n", err)
 		}
 	}
-	// Absolutize so `setup complete`'s marker lands in the SAME .evolve the loop
-	// nudge reads, regardless of a relative flag/env root (cycle-119 class).
 	project = paths.AbsoluteRoot("--project-root", project, func(m string) {
 		fmt.Fprintf(stderr, "[setup] WARN: %s\n", m)
 	})
@@ -91,10 +72,8 @@ func runSetupDetect(args []string, stdout, stderr io.Writer) int {
 	fs.BoolVar(&asJSON, "json", false, "emit the digest as JSON (default human table)")
 	fs.StringVar(&evolveDirFlag, "evolve-dir", "", "path to .evolve/ (default <project>/.evolve)")
 	fs.StringVar(&projectRootFlag, "project-root", "", "project root (default $EVOLVE_PROJECT_ROOT or cwd)")
-	// No positional args here, so parse directly. reorderArgs is for commands
-	// with positionals BEFORE flags; with string flags it would let a
-	// space-separated value swallow the next flag (e.g. `--evolve-dir X --json`
-	// → --evolve-dir="--json"). See cmd_phase_verify.go for the same fix.
+	// No positional args, so parsed directly: reorderArgs would let a
+	// space-separated flag value swallow the next flag (see cmd_phase_verify.go).
 	if err := fs.Parse(args); err != nil {
 		return 10
 	}
@@ -115,8 +94,6 @@ func runSetupDetect(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
-// runSetupRecommend emits the configured presets (deterministic over detection +
-// the public preset config) — the "pick ONE" choice the /setup skill presents.
 func runSetupRecommend(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve setup recommend", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -176,9 +153,6 @@ func printRecommendHuman(w io.Writer, rr setup.RecommendReport) {
 	fmt.Fprintf(w, "\nApply with:  evolve setup apply --preset %s\n", rr.Default)
 }
 
-// runSetupApply writes the chosen preset's per-phase pins into the public
-// .evolve/policy.json (lossless merge in setup.Apply). --dry-run prints the
-// merged policy without writing. Exit: 0 OK, 10 bad args, 1 runtime refusal.
 func runSetupApply(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve setup apply", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -207,8 +181,6 @@ func runSetupApply(args []string, stdout, stderr io.Writer) int {
 	policyPath := filepath.Join(evolveDir, "policy.json")
 	existing, rerr := os.ReadFile(policyPath)
 	if rerr != nil && !os.IsNotExist(rerr) {
-		// Absent → start fresh; but a present-but-unreadable policy must fail
-		// loudly rather than be silently treated as empty and overwritten.
 		fmt.Fprintf(stderr, "evolve setup apply: reading %s: %v\n", policyPath, rerr)
 		return 1
 	}
@@ -222,7 +194,6 @@ func runSetupApply(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stdout, "%s", out)
 		return 0
 	}
-	// Atomic write (temp + rename), mirroring setup.Complete.
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		fmt.Fprintf(stderr, "evolve setup apply: mkdir: %v\n", err)
 		return 1
@@ -276,10 +247,7 @@ func printDetectHuman(w io.Writer, rep setup.DetectReport) {
 	}
 }
 
-// maybePrintSetupNudge prints a one-line, non-blocking first-run hint when the
-// onboarding marker (state.SetupCompletedAt) is absent. Best-effort and never
-// blocks the loop — defaults work without setup. Reads the marker directly to
-// stay decoupled from the (lossy-view) core.State round-trip.
+// Reads the marker directly, bypassing core.State's lossy round-trip.
 func maybePrintSetupNudge(stderr io.Writer, evolveDir string) {
 	if b, err := os.ReadFile(filepath.Join(evolveDir, "state.json")); err == nil {
 		var m struct {
@@ -298,8 +266,7 @@ func runSetupComplete(args []string, stdout, stderr io.Writer) int {
 	var evolveDirFlag, projectRootFlag string
 	fs.StringVar(&evolveDirFlag, "evolve-dir", "", "path to .evolve/ (default <project>/.evolve)")
 	fs.StringVar(&projectRootFlag, "project-root", "", "project root (default $EVOLVE_PROJECT_ROOT or cwd)")
-	// No positional args; parse directly (reorderArgs + string flags would
-	// swallow the next flag in space form — see runSetupDetect).
+	// No positional args; parsed directly, as in runSetupDetect.
 	if err := fs.Parse(args); err != nil {
 		return 10
 	}

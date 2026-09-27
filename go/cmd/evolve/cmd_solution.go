@@ -11,12 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/solutioncheck"
 )
 
-// runSolution — `evolve solution check <solutions/slug> [--project-root DIR]
-// [--registry PATH]` (ADR-0099 slice 2): the document deliverable's self-check
-// and eval [code] grader. It runs the SAME engine as the build handoff floor
-// and the audit gate (internal/solutioncheck) over the contract the registry
-// declares, so the three surfaces can never disagree. Exit 0 = well-formed,
-// 1 = violations (one per line), 2 = usage or contract not declared.
 func runSolution(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 || args[0] != "check" {
 		fmt.Fprintln(stderr, "usage: evolve solution check <slug | solutions/slug> [--project-root DIR] [--registry PATH]")
@@ -42,8 +36,6 @@ func runSolution(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if *registry == "" {
 		*registry = config.RegistryPath(*root)
 	}
-	// The same registry + env the cycle composition root loads, so the CLI can
-	// never see a different contract than the floor and the audit gate.
 	cfg, warnings := config.Load(*registry, filterEvolveEnv(os.Environ()))
 	for _, w := range warnings {
 		fmt.Fprintf(stderr, "evolve solution: registry warning [%s]: %s\n", w.Code, w.Message)
@@ -53,9 +45,6 @@ func runSolution(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "evolve solution: %s declares no config.deliverable_kinds.document\n", *registry)
 		return 2
 	}
-	// The argument is the slug, or a path whose last segment is the slug; the
-	// deliverable is always <project-root>/<spec.Root>/<slug> — the ONE
-	// location rule Check owns, never re-derived here.
 	slug := filepath.Base(filepath.Clean(rest[0]))
 	failures := solutioncheck.Check(*root, slug, spec)
 	if len(failures) == 0 {

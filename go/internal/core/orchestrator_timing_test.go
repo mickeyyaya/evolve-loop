@@ -1,15 +1,5 @@
 package core
 
-// RED tests for cycle-171 T1 (phase-timing-json + phase_retry ledger) and T2
-// (structured-failure-diag). White-box (package core) so they reuse the existing
-// fakeStorage / fakeLedger / buildRunners / wrapTimeout harness in
-// orchestrator_test.go. They reference ONLY already-public symbols so the core
-// test binary still COMPILES at the pre-implementation baseline — they fail at
-// RUNTIME (file missing / no ledger entry), which is the correct RED signal and
-// does not break sibling tests. Builder makes them GREEN by writing the
-// phase-timing.json accumulator, the phase_retry ledger append, and the
-// <phase>-failure-diag.json writer in orchestrator.go.
-
 import (
 	"context"
 	"encoding/json"
@@ -28,11 +18,6 @@ func cycleWorkspaceDir(root string, cycle int) string {
 	return filepath.Join(root, ".evolve", "runs", fmt.Sprintf("cycle-%d", cycle))
 }
 
-// T1 / AC-1+AC-2: after a full cycle runs, <workspace>/phase-timing.json must
-// exist, be a JSON array with one entry per phase that ran, and each entry must
-// carry the load-bearing fields (phase, duration_ms, verdict). The phase-name
-// subset assertion is the anti-no-op guard: an empty or stub file cannot satisfy
-// it because it pins the entries to the phases RunCycle actually executed.
 func TestPhaseTimingJSON_WrittenAfterRunCycle(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -82,10 +67,6 @@ func TestPhaseTimingJSON_WrittenAfterRunCycle(t *testing.T) {
 	}
 }
 
-// T1 / AC-3: a self-heal relaunch (ErrArtifactTimeout, recovers on attempt 2)
-// must append a kind=phase_retry ledger entry naming the retried phase and
-// carrying exit_code 81. Today only an os.Stderr WARN line is emitted (no
-// structured audit trail) — so this is RED until Builder adds the append.
 func TestPhaseTimingJSON_RetryEmitsLedgerEntry(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -118,11 +99,6 @@ func TestPhaseTimingJSON_RetryEmitsLedgerEntry(t *testing.T) {
 	}
 }
 
-// T2 / AC-1+AC-2+AC-5: when a mandatory phase exhausts its retries and aborts,
-// the orchestrator must write <workspace>/<phase>-failure-diag.json BEFORE
-// returning the error, with phase, exit_code (81 for ErrArtifactTimeout), and a
-// non-empty error_message. RED today: the abort path returns the wrapped error
-// with no structured file.
 func TestFailureDiag_WrittenOnPhaseAbort(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -159,11 +135,6 @@ func TestFailureDiag_WrittenOnPhaseAbort(t *testing.T) {
 	}
 }
 
-// T2 negative axis: a fully-PASS cycle must NOT emit any *-failure-diag.json.
-// This guards against a no-op implementation that always writes the diag. It is
-// GREEN at the pre-implementation baseline (no diag code yet) AND must stay
-// GREEN after Builder wires the abort-only writer — it pins the "abort-only"
-// contract.
 func TestFailureDiag_NotWrittenOnPassingCycle(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

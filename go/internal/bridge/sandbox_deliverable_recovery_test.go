@@ -7,8 +7,9 @@ import (
 	"testing"
 )
 
-// The recovery agent (ADR-0106) may write the cycle's run directory and nothing else: the change's worktree,
+// The recovery agent may write the cycle's run directory and nothing else: the change's worktree,
 // the inbox and the ledger stay out of reach, so a repair can restate the logic but never alter it.
+// See ADR-0106.
 func TestDeliverableRecoveryProfile_WritesOnlyTheRunDir(t *testing.T) {
 	prof, err := LoadProfile(filepath.Join(realProfilesDir(t), "deliverable-recovery.json"))
 	if err != nil {

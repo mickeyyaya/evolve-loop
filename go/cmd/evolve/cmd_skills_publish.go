@@ -1,23 +1,3 @@
-// cmd_skills_publish.go implements `evolve skills publish` — the cross-CLI
-// half of the skill projection story (ADR-0041, extends ADR-0040). Canonical
-// skills (skills/<name>/SKILL.md, enumerated from .claude-plugin/plugin.json)
-// are projected into the surfaces of three foreign LLM CLIs:
-//
-//	codex   $CODEX_HOME/skills/evolve-<name>/SKILL.md — flat namespace, so the
-//	        frontmatter name is rewritten with an evolve- prefix
-//	agy     a native plugin staging dir (plugin.json + skills/<name>/) that
-//	        `agy plugin validate|install` consumes; the plugin name supplies
-//	        the namespace, so skill names stay unprefixed
-//	ollama  Modelfiles embedding the skill body as a SYSTEM prompt (ollama has
-//	        no skill system); read-only-tier subset only, mirroring
-//	        driver_ollamatmux.go's write-phase rejection
-//
-// Safety invariant: bare `publish` is stage-only — it writes gitignored
-// mirrors under .evolve/publish/<target>/ and runs the read-only
-// `agy plugin validate`; it never mutates the user environment. `--install`
-// performs the mutating steps. Every projected artifact carries the
-// EVOLVE-PUBLISH:projection provenance marker; prune deletes only
-// evolve-*-prefixed artifacts carrying that marker, never user-authored files.
 package main
 
 import (
@@ -42,11 +22,8 @@ import (
 //go:embed templates/modelfile.tmpl
 var modelfileTmpl string
 
-// publishProvenanceSentinel marks every projected artifact. Prune refuses to
-// delete anything that does not carry it.
 const publishProvenanceSentinel = "EVOLVE-PUBLISH:projection"
 
-// publishPluginName is the plugin/namespace identity used for the agy target.
 const publishPluginName = "evo"
 
 // Exec seams — overridable in tests so no real agy/ollama binaries run.
@@ -61,11 +38,8 @@ var (
 	}
 )
 
-// ollamaCompatible is the read-only-tier subset projected to ollama. Plain
-// `ollama run` has no agentic tool use, so write/orchestration skills (tdd,
-// build, loop, ship, commit, release, publish, phase-create, setup, refactor)
-// are excluded — the same rule driver_ollamatmux.go enforces by rejecting
-// write phases. Reasoning/review skills are text-in/text-out and fit.
+// Write/orchestration skills are excluded — ollama's plain `run` has no
+// agentic tool use, mirroring driver_ollamatmux.go's write-phase rejection.
 var ollamaCompatible = map[string]bool{
 	"scout":                  true,
 	"plan-review":            true,
@@ -85,7 +59,6 @@ var ollamaCompatible = map[string]bool{
 	"solution-audit":         true,
 }
 
-// publishConfig captures the parsed `skills publish` flags.
 type publishConfig struct {
 	Targets    []string // subset of {codex, agy, ollama}
 	DryRun     bool
@@ -96,17 +69,14 @@ type publishConfig struct {
 	CodexHome  string
 }
 
-// canonicalSkill is one source skill enumerated from plugin.json.
 type canonicalSkill struct {
-	Name        string // dir name == frontmatter name (ADR-0040 rule 3)
+	Name        string
 	Raw         string // full SKILL.md contents
 	Body        string // markdown after frontmatter
 	Description string
 	ArgHint     string // frontmatter argument-hint (for the command-stub projection)
 }
 
-// parsePublishFlags parses args into a publishConfig. Returns ok=false (after
-// reporting to stderr) on unknown flags or targets — caller exits 10.
 func parsePublishFlags(args []string, stderr io.Writer) (publishConfig, bool) {
 	cfg := publishConfig{Targets: []string{"codex", "agy", "ollama"}, Prune: true}
 	for i := 0; i < len(args); i++ {
@@ -165,8 +135,8 @@ func parsePublishFlags(args []string, stderr io.Writer) (publishConfig, bool) {
 		fmt.Fprintln(stderr, "note: --check takes precedence over --dry-run (check never writes)")
 	}
 	if cfg.OllamaBase == "" {
-		// Default mirrors driver_ollamatmux.go's model default; no ollama
-		// profile exists in .evolve/profiles/ to read it from (ADR-0041).
+		// Mirrors driver_ollamatmux.go's model default; no ollama profile in
+		// .evolve/profiles/ names one.
 		cfg.OllamaBase = "llama3.1:8b"
 	}
 	if cfg.CodexHome == "" {
@@ -175,9 +145,6 @@ func parsePublishFlags(args []string, stderr io.Writer) (publishConfig, bool) {
 	return cfg, true
 }
 
-// defaultCodexHome resolves the Codex skills root: CODEX_HOME, else ~/.codex
-// (empty only if the home dir is unknown). Shared by parsePublishFlags and the
-// directly-built publishConfig in `evolve install`.
 func defaultCodexHome() string {
 	if h := os.Getenv("CODEX_HOME"); h != "" {
 		return h
@@ -188,9 +155,6 @@ func defaultCodexHome() string {
 	return ""
 }
 
-// runSkillsPublish stages (and optionally installs) every requested target.
-// Targets are independent: one failure does not stop the others, but any
-// failure yields exit 1. Check mode never writes and yields exit 2 on drift.
 func runSkillsPublish(project string, cfg publishConfig, stdout, stderr io.Writer) int {
 	skills, err := enumerateCanonicalSkills(project)
 	if err != nil {
@@ -221,9 +185,6 @@ func runSkillsPublish(project string, cfg publishConfig, stdout, stderr io.Write
 		}
 	}
 	if failed {
-		// Render failures are always fatal — including in check mode, where a
-		// silent exit-0 would be a CI false-green on the exact class of error
-		// this command exists to catch.
 		return 1
 	}
 	if cfg.Check {
@@ -235,8 +196,6 @@ func runSkillsPublish(project string, cfg publishConfig, stdout, stderr io.Write
 	return 0
 }
 
-// renderTarget produces the deterministic projection for one target: a map of
-// path-relative-to-staging-root → content. Pure except for skip logging.
 func renderTarget(project, target string, skills []canonicalSkill, cfg publishConfig, out io.Writer) (map[string][]byte, error) {
 	switch target {
 	case "codex":
@@ -249,8 +208,6 @@ func renderTarget(project, target string, skills []canonicalSkill, cfg publishCo
 	return nil, fmt.Errorf("unknown target %q", target)
 }
 
-// applyTarget writes the staging mirror and, with --install, performs the
-// target's mutating step (codex copy+prune, agy install, ollama create/rm).
 func applyTarget(project, target, staging string, files map[string][]byte, skills []canonicalSkill, cfg publishConfig, stdout, stderr io.Writer) error {
 	// Ollama's stale-model record lives in the staging manifest; read it
 	// before the rewrite below destroys it.
@@ -273,8 +230,6 @@ func applyTarget(project, target, staging string, files map[string][]byte, skill
 	return nil
 }
 
-// enumerateCanonicalSkills loads every skill listed in plugin.json (the same
-// manifest `evolve skills check` trusts) in sorted order.
 func enumerateCanonicalSkills(project string) ([]canonicalSkill, error) {
 	raw, err := os.ReadFile(filepath.Join(project, ".claude-plugin", "plugin.json"))
 	if err != nil {
@@ -306,8 +261,6 @@ func enumerateCanonicalSkills(project string) ([]canonicalSkill, error) {
 	return skills, nil
 }
 
-// renderCodex projects skills for the flat codex namespace: dir and
-// frontmatter name both become evolve-<name>.
 func renderCodex(skills []canonicalSkill) (map[string][]byte, error) {
 	files := make(map[string][]byte, len(skills))
 	for _, s := range skills {
@@ -321,19 +274,8 @@ func renderCodex(skills []canonicalSkill) (map[string][]byte, error) {
 	return files, nil
 }
 
-// agyStalePluginName is the pre-rename (v21.0.0) plugin name installAgy prunes
-// so an upgrading agy user does not keep both evo and evolve-loop installed with
-// colliding skills (mirrors installOllama's stale-model prune).
 const agyStalePluginName = "evolve-loop"
 
-// renderAgy projects skills into agy's native plugin layout. Skill names stay
-// unprefixed — the evo plugin name supplies the namespace. agy is a
-// Claude-Code-shaped plugin host, so it gets the same commands/<name>.md stubs
-// (declared in plugin.json) that surface /evo:<name> in the menu — projected
-// from the one shared renderer so the stub format never diverges across CLIs.
-// Each skill is staged WHOLE: SKILL.md plus its companion files and reference/
-// overlays (e.g. loop's reference/agy-*.md, which the SKILL.md body tells the agy
-// runtime to read first) — staging only SKILL.md left those references 404.
 func renderAgy(project string, skills []canonicalSkill) (map[string][]byte, error) {
 	manifest, _ := json.MarshalIndent(struct {
 		Name     string   `json:"name"`
@@ -351,10 +293,9 @@ func renderAgy(project string, skills []canonicalSkill) (map[string][]byte, erro
 	return files, nil
 }
 
-// stageAgySkillTree copies every file under skills/<name>/ into the agy plugin,
-// injecting the provenance header only into the entry SKILL.md — companions and
-// reference/ overlays are read by the runtime verbatim, so a header would corrupt
-// their yaml/markdown.
+// Only the entry SKILL.md gets the provenance header — companions and
+// reference/ overlays are read by the runtime verbatim, so a header would
+// corrupt their yaml/markdown.
 func stageAgySkillTree(project string, s canonicalSkill, files map[string][]byte) error {
 	skillDir := filepath.Join(project, "skills", s.Name)
 	return filepath.WalkDir(skillDir, func(path string, d fs.DirEntry, err error) error {
@@ -380,9 +321,6 @@ func stageAgySkillTree(project string, s canonicalSkill, files map[string][]byte
 	})
 }
 
-// renderOllama projects the read-only-compatible subset as Modelfiles plus a
-// manifest.json recording the model names (the only provenance `ollama list`
-// can't give us back).
 func renderOllama(skills []canonicalSkill, base string, out io.Writer) (map[string][]byte, error) {
 	tmpl, err := template.New("modelfile").Parse(modelfileTmpl)
 	if err != nil {
@@ -423,10 +361,6 @@ func renderOllama(skills []canonicalSkill, base string, out io.Writer) (map[stri
 	return files, nil
 }
 
-// rewriteFrontmatterName replaces the single top-level `name:` line inside the
-// frontmatter block with a clean `name: <newName>` line, preserving every
-// other byte (and the line's CRLF ending, if any). Lines outside the
-// frontmatter are never touched.
 func rewriteFrontmatterName(raw, newName string) (string, error) {
 	lines := strings.Split(raw, "\n")
 	if len(lines) == 0 || strings.TrimRight(lines[0], "\r") != "---" {
@@ -449,24 +383,18 @@ func rewriteFrontmatterName(raw, newName string) (string, error) {
 	return "", fmt.Errorf("frontmatter has no name: line")
 }
 
-// provenanceHeader is the marker comment injected into every projected .md.
 func provenanceHeader(canonicalRel, target string) string {
 	return fmt.Sprintf("<!-- %s — generated from %s by `evolve skills publish --target %s`; do not edit, edit the canonical skill and re-run. -->",
 		publishProvenanceSentinel, canonicalRel, target)
 }
 
-// injectProvenance inserts header as the first body line after the
-// frontmatter block (falling back to prepending when no frontmatter exists,
-// which canonical skills never hit).
 func injectProvenance(raw, header string) string {
 	for _, fence := range []string{"---\n", "---\r\n"} {
 		if !strings.HasPrefix(raw, fence) {
 			continue
 		}
-		// Search for the closing fence: "\n---" (CRLF variant: "\n---\r").
 		closingPrefix := "\n" + fence[:len(fence)-1]
 		if at := strings.Index(raw[len(fence):], closingPrefix); at >= 0 {
-			// End is right after the closing "---" (or "---\r") sequence.
 			end := len(fence) + at + len(closingPrefix)
 			return raw[:end] + "\n" + header + "\n" + raw[end:]
 		}
@@ -480,9 +408,8 @@ func sanitizeModelfileSystem(s string) string {
 	return strings.ReplaceAll(s, `"""`, "'''")
 }
 
-// writeStaging rebuilds a staging root from scratch — staging dirs are wholly
-// owned projections under .evolve/publish/, so a full rewrite is safe and
-// guarantees no stale files linger.
+// Staging dirs are wholly owned projections under .evolve/publish/, so a
+// full rewrite from scratch is safe and leaves no stale files.
 func writeStaging(root string, files map[string][]byte) error {
 	if err := os.RemoveAll(root); err != nil {
 		return fmt.Errorf("clear staging %s: %w", root, err)
@@ -495,8 +422,6 @@ func writeStaging(root string, files map[string][]byte) error {
 	return nil
 }
 
-// diffStaging compares a fresh render against the staging dir: any missing,
-// changed, or extra file is drift. Never writes.
 func diffStaging(root string, files map[string][]byte, target string, stderr io.Writer) bool {
 	drift := false
 	for _, rel := range sortedKeys(files) {
@@ -525,7 +450,6 @@ func diffStaging(root string, files map[string][]byte, target string, stderr io.
 	return drift
 }
 
-// printPublishPlan reports what a real run would write and execute.
 func printPublishPlan(target, staging string, files map[string][]byte, cfg publishConfig, out io.Writer) {
 	fmt.Fprintf(out, "[skills] %s (dry-run): would stage %d files under %s\n", target, len(files), staging)
 	for _, rel := range sortedKeys(files) {
@@ -544,8 +468,6 @@ func printPublishPlan(target, staging string, files map[string][]byte, cfg publi
 	}
 }
 
-// installCodex copies the rendered projection into $CODEX_HOME/skills and
-// prunes stale sentinel-marked evolve-* dirs. Stage-only without --install.
 func installCodex(files map[string][]byte, skills []canonicalSkill, cfg publishConfig, stdout io.Writer) error {
 	skillsDir := filepath.Join(cfg.CodexHome, "skills")
 	if !cfg.Install {
@@ -568,9 +490,6 @@ func installCodex(files map[string][]byte, skills []canonicalSkill, cfg publishC
 	return pruneStaleProvenanced(skillsDir, keep, stdout)
 }
 
-// installAgy validates the staged plugin (always, read-only) and installs it
-// with --install. A missing agy binary downgrades validation to a note but
-// fails loudly when an install was requested.
 func installAgy(project, staging string, cfg publishConfig, stdout, stderr io.Writer) error {
 	pluginDir := filepath.Join(staging, publishPluginName)
 	if _, err := publishLookPath("agy"); err != nil {
@@ -592,9 +511,7 @@ func installAgy(project, staging string, cfg publishConfig, stdout, stderr io.Wr
 	}
 	fmt.Fprintf(stdout, "[skills] agy: installed plugin %s\n", publishPluginName)
 	if cfg.Prune {
-		// Best-effort prune of the pre-rename plugin so an upgrading user does not
-		// keep both evo and evolve-loop installed with colliding skills. A missing
-		// stale plugin makes uninstall non-zero — expected, not an error.
+		// A missing stale plugin makes uninstall fail — expected, not an error.
 		if err := publishRunCmd(io.Discard, io.Discard, project, "agy", "plugin", "uninstall", agyStalePluginName); err != nil {
 			fmt.Fprintf(stdout, "[skills] agy: no stale %s plugin to prune\n", agyStalePluginName)
 		} else {
@@ -604,8 +521,6 @@ func installAgy(project, staging string, cfg publishConfig, stdout, stderr io.Wr
 	return nil
 }
 
-// installOllama creates each staged model and, with prune on, removes models
-// recorded in the previous manifest that this render no longer produces.
 func installOllama(staging string, oldModels []string, cfg publishConfig, stdout, stderr io.Writer) error {
 	models := readOllamaManifest(staging)
 	if !cfg.Install {
@@ -639,8 +554,6 @@ func installOllama(staging string, oldModels []string, cfg publishConfig, stdout
 	return nil
 }
 
-// readOllamaManifest returns the model names from a staging manifest, or nil
-// when none exists (first publish, or staging cleared).
 func readOllamaManifest(staging string) []string {
 	raw, err := os.ReadFile(filepath.Join(staging, "manifest.json"))
 	if err != nil {
@@ -655,9 +568,6 @@ func readOllamaManifest(staging string) []string {
 	return m.Models
 }
 
-// pruneStaleProvenanced removes evolve-*-prefixed skill dirs that carry the
-// provenance sentinel but are no longer in keep. Anything without the marker
-// (user-authored) or without the prefix is never touched.
 func pruneStaleProvenanced(dir string, keep map[string]bool, out io.Writer) error {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -682,7 +592,6 @@ func pruneStaleProvenanced(dir string, keep map[string]bool, out io.Writer) erro
 	return nil
 }
 
-// sortedKeys returns map keys in stable order for deterministic output.
 func sortedKeys(m map[string][]byte) []string {
 	keys := make([]string, 0, len(m))
 	for k := range m {
@@ -692,7 +601,6 @@ func sortedKeys(m map[string][]byte) []string {
 	return keys
 }
 
-// relToProject renders path relative to project for log readability.
 func relToProject(project, path string) string {
 	if rel, err := filepath.Rel(project, path); err == nil {
 		return rel

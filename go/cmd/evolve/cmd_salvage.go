@@ -1,17 +1,5 @@
 package main
 
-// cmd_salvage.go — `evolve salvage report`: the operator-facing surface for the
-// recoverable-malformed `bad_verdict` rate.
-//
-// The salvage layer's extraction/coercion stage is gated on that rate
-// (docs/research/deliverable-alignment-2026-08/README.md §7). Instrumentation
-// has been appending .evolve/bad-verdict-baseline.jsonl since cycle-1389 with
-// no reader, so the number could only be produced by hand-reading JSONL. This
-// command is the reader.
-//
-// Pure reader — opens the sidecar, folds it, prints. No state, ledger, or
-// sidecar mutation, so it is safe to run mid-batch.
-
 import (
 	"encoding/json"
 	"flag"
@@ -56,10 +44,6 @@ func runSalvageReport(args []string, stdout, stderr io.Writer) int {
 	}
 	path := filepath.Join(root, ".evolve", deliverable.BadVerdictBaselineFile)
 
-	// An absent sidecar is the normal state of a fresh project root, not a
-	// failure: the writer only creates it once a bad_verdict block occurs. It
-	// still reports through the same envelope, so a consumer never has to
-	// special-case "no file" versus "no records".
 	summary := deliverable.BaselineSummary{ByPattern: map[deliverable.SalvagePattern]int{}}
 	f, err := os.Open(path)
 	switch {
@@ -71,16 +55,11 @@ func runSalvageReport(args []string, stdout, stderr io.Writer) int {
 			return 1
 		}
 	case os.IsNotExist(err):
-		// zero summary; reported below with an explicit note on the prose path.
 	default:
 		fmt.Fprintf(stderr, "salvage report: open %s: %v\n", path, err)
 		return 1
 	}
 
-	// Actual coercions, from the sidecar the gate writes when salvage fires —
-	// a different file and a different question from the baseline above. Absent
-	// is the normal never-salvaged state, so it reports 0 through the same
-	// envelope rather than erroring.
 	appliedPath := filepath.Join(root, ".evolve", deliverable.SalvageAppliedFile)
 	af, err := os.Open(appliedPath)
 	switch {
@@ -92,7 +71,6 @@ func runSalvageReport(args []string, stdout, stderr io.Writer) int {
 			return 1
 		}
 	case os.IsNotExist(err):
-		// zero saved count.
 	default:
 		fmt.Fprintf(stderr, "salvage report: open %s: %v\n", appliedPath, err)
 		return 1
@@ -109,9 +87,6 @@ func runSalvageReport(args []string, stdout, stderr io.Writer) int {
 	}
 
 	fmt.Fprintf(stdout, "salvage report: %s\n", path)
-	// Surfaced, never silent: the sidecar is unauthenticated and append-only,
-	// so an unreadable record is reported rather than dropped — a silent skip
-	// would make one deliberately torn line a way to hide salvages.
 	if summary.Malformed > 0 {
 		fmt.Fprintf(stdout, "  WARN: %d unreadable record(s) skipped in %s — counts below are a floor\n",
 			summary.Malformed, deliverable.SalvageAppliedFile)

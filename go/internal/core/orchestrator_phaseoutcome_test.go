@@ -1,34 +1,5 @@
 //go:build integration
 
-// orchestrator_phaseoutcome_test.go — ADR-0044 C1 (Slice 1) RED tests:
-// single-source phase-outcome recording.
-//
-// cycle-262 (2026-06-09) located fork: the build phase's CLI fallback
-// SUCCEEDED (codex exit 81 → claude exit 0, build-report.md PASS, the runner
-// returned PASS/nil), then the post-phase tree-diff guard CORRECTLY aborted
-// the cycle (the fallback builder wrote the tracked config
-// .evolve/commit-prefix-scope.json to the MAIN tree, and recoverBuildLeak
-// deliberately skips .evolve/ paths). The abort path — like EVERY abort path
-// between runner.Run returning and the happy-path recording site
-// (orchestrator.go ~2084) — returned without recording the phase outcome: no
-// phase-timing.json entry, no <phase>-usage.json, no PhasesRun membership.
-// Reality (build ran, burned tokens, PASSed) diverged from the record (build
-// never happened) — the D1 divergence ADR-0044 C1 makes structurally
-// impossible.
-//
-// Contract encoded here (the C1 chokepoint): EVERY terminal disposition of a
-// phase dispatch — happy advance AND each abort return (exhausted retries,
-// non-canonical verdict, review-gate reject, tree-guard abort, ledger append
-// failure) — records the outcome exactly once: PhasesRun membership +
-// phase-timing.json entry + <phase>-usage.json sidecar, carrying the phase's
-// own canonical verdict (synthesizing FAIL when none exists — NEVER PASS)
-// and, on aborts, a non-empty abort_reason. Cycle-level semantics are
-// unchanged: a tree-guard abort still fails the cycle; recording reflects
-// reality, it does not resurrect the cycle.
-//
-// RED note: these tests compile against existing API only (same approach as
-// orchestrator_timing_test.go) and fail at RUNTIME today — the abort paths
-// return before any recording happens.
 package core
 
 import (
@@ -44,8 +15,8 @@ import (
 )
 
 // outcomeRunner PASSes its phase with a scripted cost/duration after running
-// a side effect — models cycle-262's build: real work done (tokens burned,
-// PASS report) with an optional main-tree leak that trips the tree-diff guard.
+// an optional side effect, modeling a build that did real work but left the
+// main tree dirty in a way the tree-diff guard catches.
 type outcomeRunner struct {
 	name       string
 	verdict    string
@@ -68,11 +39,8 @@ func (r *outcomeRunner) Run(_ context.Context, req PhaseRequest) (PhaseResponse,
 	}, nil
 }
 
-// initOutcomeRepo creates a real git repo whose committed tree contains the
-// tracked config file cycle-262's builder leaked (.evolve/commit-prefix-scope.json).
-// The default gitDirtyPaths runs real git against it, so the tree-diff guard
-// exercises its production code path — and recoverBuildLeak's deliberate
-// ".evolve/ paths are never relocated" skip applies exactly as it did live.
+// initOutcomeRepo creates a real git repo so the tree-diff guard runs its
+// production code path against actual git output rather than a stub.
 func initOutcomeRepo(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
@@ -99,9 +67,6 @@ func initOutcomeRepo(t *testing.T) string {
 	return root
 }
 
-// readTimingEntries unmarshals <workspace>/phase-timing.json. Fatal when the
-// file is missing — every test here runs at least one phase, and the deferred
-// writer flushes on both success AND abort returns.
 func readTimingEntries(t *testing.T, workspace string) []map[string]any {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join(workspace, "phase-timing.json"))
@@ -115,8 +80,6 @@ func readTimingEntries(t *testing.T, workspace string) []map[string]any {
 	return entries
 }
 
-// timingEntryFor returns the single entry for phase, failing on absence or
-// duplicates (the single-chokepoint invariant: one record per dispatch).
 func timingEntryFor(t *testing.T, entries []map[string]any, phase string) map[string]any {
 	t.Helper()
 	var found []map[string]any
@@ -157,19 +120,11 @@ func phasesRunContains(phases []Phase, want Phase) bool {
 	return false
 }
 
-// TestPhaseOutcome_TreeGuardAbort_RecordsBuildOutcome pins the cycle-262
-// CLASS: build PASSes with real cost, leaves the main tree dirty in a way
-// recovery cannot repair, the tree-diff guard aborts the cycle (CORRECT),
-// and the build outcome must STILL be recorded: PhasesRun membership, a
-// phase-timing entry carrying the agent's own PASS + cost + duration + a
-// non-empty abort_reason, and build-usage.json.
-//
-// Fixture note: the original fixture was 262's literal leak (a tracked
-// .evolve/commit-prefix-scope.json edit) — that is now RECOVERABLE by design
-// (the deliverable allowlist relocates it; pinned in
-// buildleak_recover_test.go), so this test uses a STAGED RENAME of a tracked
-// file, which no recovery branch handles — the canonical still-unrecoverable
-// main-tree mutation.
+// Fixture note: the original fixture (a tracked .evolve/commit-prefix-scope.json
+// edit) is now RECOVERABLE by design (the deliverable allowlist relocates it;
+// pinned in buildleak_recover_test.go), so this test uses a STAGED RENAME of a
+// tracked file, which no recovery branch handles — the canonical
+// still-unrecoverable main-tree mutation.
 func TestPhaseOutcome_TreeGuardAbort_RecordsBuildOutcome(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")
@@ -181,8 +136,7 @@ func TestPhaseOutcome_TreeGuardAbort_RecordsBuildOutcome(t *testing.T) {
 		name: string(PhaseBuild), verdict: VerdictPASS,
 		costUSD: 0.42, durationMS: 1234,
 		onRun: func() {
-			// A staged rename of a tracked file: porcelain 'R ' matches no
-			// recovery branch → the guard re-check stays dirty → abort.
+			// porcelain 'R ' (staged rename) matches no recovery branch, so the guard re-check stays dirty.
 			cmd := exec.Command("git", "-C", root, "mv", ".evolve/commit-prefix-scope.json", ".evolve/commit-prefix-scope.renamed.json")
 			if out, err := cmd.CombinedOutput(); err != nil {
 				t.Errorf("leak rename: %v\n%s", err, out)
@@ -196,8 +150,6 @@ func TestPhaseOutcome_TreeGuardAbort_RecordsBuildOutcome(t *testing.T) {
 
 	res, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: root, GoalHash: "g"})
 
-	// The guard must still abort — recording reflects reality, it never
-	// resurrects a cycle whose builder escaped its worktree.
 	if err == nil {
 		t.Fatalf("tree-guard must still abort the cycle on a real leak; got nil error (phases=%v)", res.PhasesRun)
 	}
@@ -205,7 +157,6 @@ func TestPhaseOutcome_TreeGuardAbort_RecordsBuildOutcome(t *testing.T) {
 		t.Errorf("abort must come from the tree-diff guard; got: %v", err)
 	}
 
-	// The record must reflect that build RAN.
 	if !phasesRunContains(res.PhasesRun, PhaseBuild) {
 		t.Errorf("PhasesRun=%v must contain build — the phase dispatched and completed (cycle-262 hid it entirely)", res.PhasesRun)
 	}
@@ -232,10 +183,6 @@ func TestPhaseOutcome_TreeGuardAbort_RecordsBuildOutcome(t *testing.T) {
 	}
 }
 
-// TestPhaseOutcome_AbortPaths_AlwaysRecordTimingAndUsage walks the reachable
-// abort paths between runner.Run returning and the happy recording site.
-// Every one of them must leave a timing entry + usage sidecar for the phase
-// that ran (or exhausted its attempts), with abort_reason set.
 func TestPhaseOutcome_AbortPaths_AlwaysRecordTimingAndUsage(t *testing.T) {
 	t.Parallel()
 	maxAtt := 2
@@ -252,7 +199,7 @@ func TestPhaseOutcome_AbortPaths_AlwaysRecordTimingAndUsage(t *testing.T) {
 				runners[PhaseScout] = &fakeRunner{name: "scout", failErr: wrapTimeout(), failUntil: 99}
 				return PhaseScout
 			},
-			wantVerdict:  VerdictFAIL, // no canonical agent verdict exists → synthesized FAIL
+			wantVerdict:  VerdictFAIL,
 			wantAttempts: maxAtt,
 		},
 		{
@@ -261,7 +208,7 @@ func TestPhaseOutcome_AbortPaths_AlwaysRecordTimingAndUsage(t *testing.T) {
 				runners[PhaseScout] = &fakeRunner{name: "scout", verdict: "MAYBE"}
 				return PhaseScout
 			},
-			wantVerdict:  VerdictFAIL, // non-canonical is never recorded raw, never upgraded
+			wantVerdict:  VerdictFAIL,
 			wantAttempts: maxAtt,
 		},
 		{
@@ -271,8 +218,6 @@ func TestPhaseOutcome_AbortPaths_AlwaysRecordTimingAndUsage(t *testing.T) {
 				env["EVOLVE_CONTRACT_CORRECTION_RETRIES"] = "0" // immediate abort, no correction re-dispatch
 				return PhaseScout
 			},
-			// The agent's own verdict was PASS; the reject is a cycle-level
-			// disposition recorded in abort_reason, not a verdict rewrite.
 			wantVerdict:  VerdictPASS,
 			wantAttempts: 1,
 		},
@@ -325,9 +270,6 @@ func TestPhaseOutcome_AbortPaths_AlwaysRecordTimingAndUsage(t *testing.T) {
 	}
 }
 
-// TestPhaseOutcome_NeverInventsPass pins the C1 invariant by name: when no
-// canonical agent verdict exists, the synthesized record is FAIL — a
-// PASS-looking non-canonical string must not be upgraded into a recorded PASS.
 func TestPhaseOutcome_NeverInventsPass(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -342,7 +284,6 @@ func TestPhaseOutcome_NeverInventsPass(t *testing.T) {
 	entry := timingEntryFor(t, readTimingEntries(t, cycleWorkspaceDir(root, res.Cycle)), "scout")
 	switch v, _ := entry["verdict"].(string); v {
 	case VerdictFAIL:
-		// correct: synthesized FAIL
 	case VerdictPASS, "PASSING":
 		t.Errorf("recorded verdict=%q — reconciliation invented/laundered a PASS; must synthesize FAIL", v)
 	default:
@@ -350,11 +291,6 @@ func TestPhaseOutcome_NeverInventsPass(t *testing.T) {
 	}
 }
 
-// TestPhaseOutcome_SingleChokepoint_OneRecordPerDispatch pins the
-// exactly-once property on the happy path: one timing entry per phase run,
-// no duplicates, no abort_reason, and the 1:1 PhasesRun↔timing invariant the
-// pre-existing timing tests rely on. Baseline-GREEN today; must SURVIVE the
-// chokepoint refactor byte-identically.
 func TestPhaseOutcome_SingleChokepoint_OneRecordPerDispatch(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

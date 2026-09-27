@@ -1,15 +1,5 @@
 package main
 
-// cmd_tokens_coverage_test.go — cycle-779 TDD contract (RED) for the
-// token-telemetry-input-cache-fidelity task's AC3 report half: `evolve tokens
-// report` gains a coverage line — phases WITH token data / phases RUN — so a
-// telemetry gap (the 2026-07-13 all-zeros baseline) is visible in the report
-// itself instead of masquerading as "this phase is free".
-//
-// The contract is deliberately loose about layout: the rendered report must
-// carry a line starting with "Coverage:" containing the `<with-data>/<run>`
-// ratio. Builder owns the exact wording and any TokensReport JSON field.
-
 import (
 	"bytes"
 	"path/filepath"
@@ -20,8 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasetiming"
 )
 
-// TestTokensReport_CoverageLinePresent: one phase with real token data and one
-// that ran with zero tokens → the rendered report must state coverage 1/2.
 func TestTokensReport_CoverageLinePresent(t *testing.T) {
 	root := t.TempDir()
 	writeTimingFixture(t, root, "1", []phasetiming.Entry{
@@ -43,10 +31,6 @@ func TestTokensReport_CoverageLinePresent(t *testing.T) {
 	}
 }
 
-// TestTokensReport_CoverageCountsOnlyPhasesWithData (negative): a window where
-// EVERY phase ran but NONE recorded tokens (the 2026-07-13 baseline shape)
-// must report coverage 0/2 — zero-token phases are uncovered, never counted
-// as covered-and-free.
 func TestTokensReport_CoverageCountsOnlyPhasesWithData(t *testing.T) {
 	root := t.TempDir()
 	writeTimingFixture(t, root, "1", []phasetiming.Entry{
@@ -67,26 +51,6 @@ func TestTokensReport_CoverageCountsOnlyPhasesWithData(t *testing.T) {
 	}
 }
 
-// --- cycle-1014: report-level telemetry-coverage tripwire regression lock ---
-//
-// tripwire-regression-lock (inbox telemetry-coverage-tripwire-nonclaude-success,
-// weight 0.93). Production is already landed and unchanged — the engine records
-// `"tripwire":true` in llm-calls.ndjson (recordTokenUsage) and cycle-1013 wired
-// `evolve tokens report` to read and surface it (readCycleTripwires /
-// renderTripwires). This cycle adds the single explicitly-AC-named consolidated
-// positive+negative regression at the report layer so a future hostile edit to
-// the render path (the exact cycle-1007 render-order defect) is caught by a test
-// whose name states the AC1/AC2/AC3 contract. The ACS predicate
-// (go/acs/cycle1014/predicates_test.go) requires these two names verbatim.
-// Fixture helpers (writeTokensTimingFixture / writeTokensLLMCalls /
-// lineContaining) are shared from cmd_tokens_test.go (same package main).
-
-// TestTokensReport_TripwireFiresOnNonClaudeSuccess — AC1+AC2. A single non-claude
-// launch that exited 0, ran past the 60s success threshold, and resolved to
-// source=none surfaces a TRIPWIRE line in the plain-text report, and that line
-// names the offending CLI, agent, AND cycle together (not just one). Cycle 6 is
-// discovered via its phase-timing.json; duration 90000 / exit 0 carry no stray
-// "6" digit, so the cycle-number assertion is real.
 func TestTokensReport_TripwireFiresOnNonClaudeSuccess(t *testing.T) {
 	root := t.TempDir()
 	writeTokensTimingFixture(t, root, "6", []phasetiming.Entry{
@@ -105,7 +69,6 @@ func TestTokensReport_TripwireFiresOnNonClaudeSuccess(t *testing.T) {
 	if !strings.Contains(text, "TRIPWIRE") {
 		t.Fatalf("non-claude exit-0 >60s source=none did not surface a TRIPWIRE line (AC1):\n%s", text)
 	}
-	// AC2: the offending line must name CLI + agent + cycle together on one line.
 	tw := lineContaining(text, "agy")
 	if tw == "" {
 		t.Fatalf("no tripwire line naming CLI agy:\n%s", text)
@@ -117,12 +80,6 @@ func TestTokensReport_TripwireFiresOnNonClaudeSuccess(t *testing.T) {
 	}
 }
 
-// TestTokensReport_TripwireSilentOnClaudeShortAndAbort — AC3 NEGATIVE matrix.
-// Three distinct false-positive vectors in one cycle — a claude-tmux baseline
-// (out of scope), a non-claude success under the 60s duration threshold, and a
-// non-claude quota-abort (exit 85) — must all stay silent: no TRIPWIRE line. This
-// rejects an always-on implementation. All three records carry tripwire:false, the
-// shape the engine writes for each non-fire condition.
 func TestTokensReport_TripwireSilentOnClaudeShortAndAbort(t *testing.T) {
 	root := t.TempDir()
 	writeTokensTimingFixture(t, root, "8", []phasetiming.Entry{

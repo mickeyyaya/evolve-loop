@@ -7,14 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// resolveTier computes a CLI's capability tier from its manifest and a
-// binary-presence predicate — the Go port of probe_resolve_tier:
-//
-//	stub        → none
-//	binary absent → none
-//	declared tier deps all present → declared (full/hybrid), else degraded
-//
-// An empty/"none" default_tier is treated as "full" (matching the bash).
 func resolveTier(m Manifest, hasBinary func(string) bool) string {
 	if m.Stub {
 		return "none"
@@ -34,10 +26,7 @@ func resolveTier(m Manifest, hasBinary func(string) bool) string {
 	return declared
 }
 
-// Probe satisfies core.Bridge: enumerates the embedded CLI manifests and
-// reports each CLI's tier via the LookPath seam. The Go port of
-// `bridge probe` (probe_all) reduced to the {os, cli→tier} shape the
-// core.BridgeProbe contract carries.
+// Probe satisfies core.Bridge: it enumerates the embedded CLI manifests and reports each CLI's tier via the LookPath seam.
 func (e *Engine) Probe(_ context.Context) (core.BridgeProbe, error) {
 	hasBinary := func(bin string) bool {
 		_, err := e.deps.LookPath(bin)

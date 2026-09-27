@@ -1,18 +1,3 @@
-// orchestrator_allphases_worktree_test.go — CB.1 contract (concurrency campaign W4):
-// EVERY dispatched phase runs with cwd = the cycle worktree.
-//
-// Pre-CB.1, runsInWorktree scoped the worktree cwd to source writers (tdd,
-// build, writes_source user phases) + audit. Everything else dispatched with
-// Worktree="" → cwd = the MAIN repo root, so a read-only phase's stray write
-// (or a guard misfire — the cycle-280 inserted-phase fatal) landed in the live
-// tree. CB.1 inverts the dispatch default: the worktree is provisioned at
-// cycle start, so every phase gets cwd=worktree and the main tree is touched
-// by no phase subprocess at all (the integrator alone writes main, CD track).
-//
-// CRITICAL discriminator these tests keep honest: cwd is NOT write permission.
-// The write axis (role-gate + tree-diff guard + normalize) keys off
-// worktreePhase / WorktreePhase and minted writes_source — that axis must be
-// BYTE-IDENTICAL before and after CB.1. Only the cwd axis widens.
 package core
 
 import (
@@ -20,8 +5,6 @@ import (
 	"testing"
 )
 
-// cb1Harness runs one happy-path cycle with a scripted worktree path and
-// returns the runners map so tests can inspect every recorded PhaseRequest.
 func cb1Harness(t *testing.T, wt *fakeWorktree) map[Phase]PhaseRunner {
 	t.Helper()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
@@ -37,11 +20,6 @@ func cb1Harness(t *testing.T, wt *fakeWorktree) map[Phase]PhaseRunner {
 	return runners
 }
 
-// TestCB1_EveryDispatchedPhaseCarriesWorktree: the CB.1 contract. Every phase
-// that ran — scout, triage, ship, retro included, not just tdd/build/audit —
-// must receive PhaseRequest.Worktree == the provisioned cycle worktree, so its
-// subprocess cwd (and sandbox write surface) is the isolated checkout, never
-// the live main tree.
 func TestCB1_EveryDispatchedPhaseCarriesWorktree(t *testing.T) {
 	wt := &fakeWorktree{path: t.TempDir()}
 	runners := cb1Harness(t, wt)
@@ -50,7 +28,7 @@ func TestCB1_EveryDispatchedPhaseCarriesWorktree(t *testing.T) {
 	for phase, r := range runners {
 		fr := r.(*fakeRunner)
 		if fr.calls == 0 {
-			continue // not every registered phase runs in a happy-path cycle
+			continue
 		}
 		called++
 		for i, req := range fr.requests {
@@ -66,9 +44,6 @@ func TestCB1_EveryDispatchedPhaseCarriesWorktree(t *testing.T) {
 	}
 }
 
-// TestCB1_WriteAxisUnchanged: widening the cwd axis must NOT widen the write
-// axis. The role-gate, tree-diff guard, and build-commit normalize all key off
-// worktreePhase / WorktreePhase — still exactly the source writers.
 func TestCB1_WriteAxisUnchanged(t *testing.T) {
 	t.Parallel()
 	st := &fakeStorage{}
@@ -86,10 +61,6 @@ func TestCB1_WriteAxisUnchanged(t *testing.T) {
 	}
 }
 
-// TestCB1_ProvisioningFailureDegradesToEmptyWorktree: when worktree creation
-// fails the cycle still runs (best-effort provisioning, role-gate blocks
-// source writes loudly) and every phase dispatches with Worktree="" — the
-// pre-existing degraded mode, unchanged by CB.1.
 func TestCB1_ProvisioningFailureDegradesToEmptyWorktree(t *testing.T) {
 	wt := &fakeWorktree{createErr: context.DeadlineExceeded}
 	runners := cb1Harness(t, wt)
@@ -104,12 +75,6 @@ func TestCB1_ProvisioningFailureDegradesToEmptyWorktree(t *testing.T) {
 	}
 }
 
-// TestCB1_ResumePathCarriesWorktree: RunCycleFromPhase is a first-class
-// dispatch surface — `evolve loop --resume` is the standard recovery path
-// after ANY cycle failure — and it builds its PhaseRequest independently of
-// the RunCycle loop. It must thread the persisted cs.ActiveWorktree into
-// every resumed phase, or a resumed tdd/build runs cwd=main-tree: the exact
-// cycle-280 class CB.1 closes, reopened only on resume (review BLOCK finding).
 func TestCB1_ResumePathCarriesWorktree(t *testing.T) {
 	t.Parallel()
 	const wt = "/tmp/wt-resume-cycle-9"
@@ -148,11 +113,6 @@ func TestCB1_ResumePathCarriesWorktree(t *testing.T) {
 	}
 }
 
-// TestCB1_FailureLearningRetroCarriesWorktree: the out-of-band failure-
-// learning retro (dispatched when a phase fails mid-cycle) builds its own
-// PhaseRequest via retroRequest. Read-only, but the CB.1 invariant is "no
-// phase subprocess has the main tree as cwd" — no exceptions, or the
-// invariant stops being structural.
 func TestCB1_FailureLearningRetroCarriesWorktree(t *testing.T) {
 	t.Parallel()
 	fl := failureLearningRequest{

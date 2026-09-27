@@ -13,19 +13,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sessionrecord"
 )
 
-// recipe_adapter.go wires the recipe.Engine (pure, in internal/bridge/recipe)
-// to the bridge's tmux primitives. The recipe package owns the SessionDriver
-// port; this file is its production implementation — reusing the exact INJECT
-// (injectText / SendKeys), READ (CapturePane), and DECIDE (autoResponder.tick)
-// primitives the artifact-wait driver uses, so a recipe drives the REPL
-// identically to a human and identically to a normal cycle phase.
-
 const (
-	// recipeBootScrollback is the universal capture depth for recipe READs. A
-	// scrollback of 200 surfaces the prompt marker + recent output for both
-	// visible-pane CLIs (claude/ollama) and alt-screen CLIs (codex/agy) — the
-	// extra history is harmless for the former, mandatory for the latter — so
-	// the adapter needs no per-CLI scrollback table.
+	// recipeBootScrollback is the universal capture depth for recipe READs: 200
+	// surfaces the prompt marker for both visible-pane CLIs (claude/ollama) and
+	// alt-screen CLIs (codex/agy), so the adapter needs no per-CLI scrollback
+	// table.
 	recipeBootScrollback = 200
 	// recipeSessionPrefix names ephemeral recipe sessions distinctly from the
 	// cycle drivers' sessions.
@@ -67,8 +59,6 @@ func (d *recipeSessionDriver) EnsureSession(ctx context.Context) error {
 		fmt.Fprintf(d.deps.Stderr, "[recipe] attaching to existing session %s\n", d.session)
 		return nil
 	}
-	// CB.2: bind the pane cwd at session birth when the controller can; the
-	// cd keystroke stays as the second layer (capability-less controllers).
 	if ws, ok := d.deps.Tmux.(workdirSessionStarter); ok {
 		if err := ws.NewSessionIn(ctx, d.session, tmuxPaneWidth, tmuxPaneHeight, d.workingDir); err != nil {
 			return fmt.Errorf("new-session: %w", err)
@@ -76,10 +66,6 @@ func (d *recipeSessionDriver) EnsureSession(ctx context.Context) error {
 	} else if err := d.deps.Tmux.NewSession(ctx, d.session, tmuxPaneWidth, tmuxPaneHeight); err != nil {
 		return fmt.Errorf("new-session: %w", err)
 	}
-	// CB.5: record in the run registry like runTmuxREPL does — the recipe
-	// path is a second creation surface; a crash before the caller's own
-	// teardown must still leave the session registry-reapable. (The attach
-	// branch above skips this: the session was recorded by its creator.)
 	if err := sessionrecord.Append(sessionrecord.PathIn(d.cfg.Workspace), sessionrecord.Record{
 		Session: d.session, RunID: d.cfg.RunID, Cycle: d.cfg.Cycle,
 		Agent: d.cfg.Agent, PID: os.Getpid(),
@@ -114,9 +100,9 @@ func (d *recipeSessionDriver) Capture(ctx context.Context) (string, error) {
 // any transport error so the engine surfaces a dead session immediately
 // instead of waiting out the step's full timeout.
 func (d *recipeSessionDriver) SendCommand(ctx context.Context, body string) error {
-	// Echo-veto (cycle-672): the recipe path has no single resolved prompt
-	// file — every body we inject is prompt text the pane may echo back, so
-	// accumulate it for tick()'s stripPromptEchoLines exhaustion guard.
+	// The recipe path has no single resolved prompt file — every body injected
+	// is prompt text the pane may echo back, so accumulate it for tick()'s
+	// stripPromptEchoLines exhaustion guard.
 	if d.ar != nil {
 		d.ar.injectedPrompt += body + "\n"
 	}
@@ -145,11 +131,6 @@ func newRecipeDriver(cfg *Config, deps Deps, cli string) (*recipeSessionDriver, 
 	if err != nil {
 		return nil, "", fmt.Errorf("recipe: %w", err)
 	}
-	// CB.3: the recipe path bypasses the engine's CLIPreflight chokepoint, so
-	// codex-family sessions must pretrust their worktree/workspace here or the
-	// first boot in a fresh worktree renders the cycle-122 trust modal. Same
-	// best-effort semantics as the driver preflight (the boot auto-responder
-	// remains the downstream defense).
 	if strings.HasPrefix(cli, "codex") {
 		if err := pretrustCodexProjects(cfg); err != nil {
 			fmt.Fprintf(deps.Stderr, "[recipe] WARN codex pretrust: %v (continuing — best-effort)\n", err)
@@ -158,8 +139,6 @@ func newRecipeDriver(cfg *Config, deps Deps, cli string) (*recipeSessionDriver, 
 	session, _ := resolveSession(cfg, deps, recipeSessionPrefix)
 	workingDir := cfg.Worktree
 	if workingDir == "" {
-		// CB.2: same fail-closed contract as runTmuxREPL — the recipe path is
-		// a second launch surface with the identical silent-cwd hazard.
 		if v, _ := lookupEnv(deps, ipcenv.FleetKey); envchain.BoolValue(v, false) {
 			return nil, "", fmt.Errorf("recipe: %w", errWorktreeRequired)
 		}
@@ -216,7 +195,7 @@ func captureControl(ctx context.Context, cfg *Config, deps Deps, cli, command st
 	}
 	var pane string
 	for i := 0; i < settleTicks; i++ {
-		if ctx.Err() != nil { // the caller's interrupt wins over the settle ticks (F20: the usage probe sat here)
+		if ctx.Err() != nil { // the caller's interrupt wins over the settle ticks
 			return pane, ctx.Err()
 		}
 		deps.Sleep(time.Second)
