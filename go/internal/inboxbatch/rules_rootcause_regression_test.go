@@ -10,7 +10,6 @@ import (
 var wantDefaultRuleTypes = []string{
 	"inboxbatch.campaignRule",
 	"inboxbatch.fileAreaRule",
-	"inboxbatch.depRule",
 }
 
 func TestDefaultRules_DoesNotBindOnRootCauseProse(t *testing.T) {

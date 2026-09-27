@@ -1,0 +1,20 @@
+{
+  "id": "boundary-reexec-keeps-cycle-budget-and-wave-index",
+  "created_at": "2026-09-28T05:10:00Z",
+  "title": "A boundary re-exec restarts the loop's --max-cycles budget and its wave index (every wave-21 summary said 'wave 0')",
+  "weight": 0.83,
+  "kind": "bug",
+  "priority_class": "debuggability",
+  "files": [
+    "go/cmd/evolve/cmd_loop_chain.go",
+    "go/internal/loopchain/refresh.go",
+    "go/cmd/evolve/cmd_loop_batch.go"
+  ],
+  "summary": "When a lane ship moves HEAD past the running binary's build commit, the chain boundary refresh rebuilds and re-executes the loop with os.Args unchanged (chainReExecArgvFn). The new process starts its iteration counter at 0 with the original --max-cycles, so every wave after a ship is logged and signalled as 'wave 0' (wave 21 printed '[loop] wave 0: 2/2 lanes ok' at every close) and the operator's cycle budget restarts at each shipping wave; while ships keep landing the loop never reaches --max-cycles.",
+  "acceptance": [
+    "The re-exec carries the batch's completed-iteration count (or the remaining budget) so the new process continues the same wave index and stops at the operator's --max-cycles.",
+    "A test re-execs through the chainReExecArgvFn seam after one completed wave and asserts the next wave's index is 1 and the remaining budget is max-1."
+  ],
+  "source": "wave 21 observation (2026-09-28)",
+  "priority_rationale": "wave 21 boundary 2026-09-28: the operator cannot tell waves apart in the log or the Signal Center, and --max-cycles is not a bound while ships land"
+}

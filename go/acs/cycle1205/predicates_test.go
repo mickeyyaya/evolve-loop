@@ -16,8 +16,8 @@
 // normalising producer would collapse the campaign-less backlog into one
 // over-fused cluster. The production code never landed, so there is no feature
 // to regression-test; the regression worth writing is defensive — DefaultRules()
-// must stay the three bounded structural signals, and none of them may bind
-// items on a shared free-form prose field.
+// must stay the bounded structural signals (campaign, file-area), and none of
+// them may bind items on a shared free-form prose field.
 //
 // Predicate strategy — every predicate below EXERCISES the system under test
 // (calls DefaultRules()/Rule.Edges, or runs the package's tests as a
@@ -25,7 +25,7 @@
 // degenerate-predicate ban).
 //
 //   - 001 (AC2) calls DefaultRules() and asserts the rule set IS exactly the
-//     three structural rules AND produces zero edges for items whose only
+//     structural rules AND produces zero edges for items whose only
 //     commonality is an identical free-form prose field.
 //   - 002 (AC4, negative) case/whitespace-varied prose must also bind nothing —
 //     the "a normaliser lands upstream" failure mode of D2.
@@ -66,23 +66,24 @@ import (
 const regressionTestName = "TestDefaultRules_DoesNotBindOnRootCauseProse"
 
 // regressionTestRelPath is Builder's deliverable — the package placement is
-// load-bearing (white-box access to campaignRule/fileAreaRule/depRule).
+// load-bearing (white-box access to campaignRule/fileAreaRule).
 const regressionTestRelPath = "go/internal/inboxbatch/rules_rootcause_regression_test.go"
 
-// wantRuleTypes is the audited DefaultRules() composition: campaign, file-area
-// and dependency edges — every one bounded (campaign is an explicit operator
-// declaration; fileArea has both a hub ceiling and a depth floor; deps are hard
-// structural references).
-var wantRuleTypes = []string{"inboxbatch.campaignRule", "inboxbatch.fileAreaRule", "inboxbatch.depRule"}
+// wantRuleTypes is the audited DefaultRules() composition: campaign and
+// file-area edges — both bounded (campaign is an explicit operator declaration;
+// fileArea has both a hub ceiling and a depth floor). The dependency rule was
+// removed in cycle 1724: under ADR-0106 W3 a dependent is never on the same
+// lane menu as its unlanded dependency, so dep edges could not bind.
+var wantRuleTypes = []string{"inboxbatch.campaignRule", "inboxbatch.fileAreaRule"}
 
-// TestC1205_001_DefaultRulesStaysThreeBoundedStructuralRules is AC2: the rule
-// set is exactly the three structural signals, and a shared free-form prose
-// field binds nothing through any of them.
-func TestC1205_001_DefaultRulesStaysThreeBoundedStructuralRules(t *testing.T) {
+// TestC1205_001_DefaultRulesStaysBoundedStructuralRules is AC2: the rule set is
+// exactly the structural signals, and a shared free-form prose field binds
+// nothing through any of them.
+func TestC1205_001_DefaultRulesStaysBoundedStructuralRules(t *testing.T) {
 	rules := inboxbatch.DefaultRules()
 	if got := len(rules); got != len(wantRuleTypes) {
 		t.Fatalf("DefaultRules() returned %d rules, want %d (%v) — cycle-1204 audit D1/D2 rejected adding a "+
-			"free-form-prose rule here; a 4th default-on rule needs a hubAreaMaxItems-style ceiling or a "+
+			"free-form-prose rule here; another default-on rule needs a hubAreaMaxItems-style ceiling or a "+
 			"minAreaDepth-style floor and a non-tautological eval against real .evolve/inbox data",
 			got, len(wantRuleTypes), wantRuleTypes)
 	}
@@ -95,7 +96,7 @@ func TestC1205_001_DefaultRulesStaysThreeBoundedStructuralRules(t *testing.T) {
 	// Behavioural half: items whose ONLY commonality is identical free-form
 	// prose (Title is the closest live analogue of the proposed root_cause
 	// field — unstructured, author-written, not an enum). No Campaign, no
-	// Files, no Deps: the three structural rules have nothing to bind on.
+	// Files: the structural rules have nothing to bind on.
 	const prose = "verdict incoherence under contention: the tier reported RED because SubstantiveError was never populated"
 	items := []inboxbatch.Item{
 		{ID: "a-item", Title: prose},
@@ -174,7 +175,7 @@ func TestC1205_004_RegressionTestLandsGreenInTheNormalSuite(t *testing.T) {
 // anti-no-op predicate: the guard must be LOAD-BEARING inside
 // go/internal/inboxbatch. rules.go is mutated in memory (`go test -overlay`,
 // nothing written into the tree) to reintroduce the cycle-1204 rejected design —
-// a 4th default-on rule binding items by exact match on a free-form prose field
+// another default-on rule binding items by exact match on a free-form prose field
 // — and the regression test must FAIL on it. The control run under the same
 // overlay proves the mutant compiles, so a FAIL is attributable to the guard
 // rather than to a broken build.
@@ -184,7 +185,7 @@ func TestC1205_005_RegressionTestFailsOnTheRejectedDesign(t *testing.T) {
 
 	if _, err := os.Stat(filepath.Join(root, regressionTestRelPath)); err != nil {
 		t.Fatalf("regression test file missing at %s: %v — it must live in package inboxbatch for white-box "+
-			"access to campaignRule/fileAreaRule/depRule", regressionTestRelPath, err)
+			"access to campaignRule/fileAreaRule", regressionTestRelPath, err)
 	}
 
 	overlay := writeProseRuleOverlay(t, goDir)
@@ -240,14 +241,14 @@ func writeProseRuleOverlay(t *testing.T, goDir string) string {
 	if err != nil {
 		t.Fatalf("read %s: %v", rulesPath, err)
 	}
-	const target = "return []Rule{campaignRule{}, fileAreaRule{}, depRule{}}"
+	const target = "return []Rule{campaignRule{}, fileAreaRule{}}"
 	src := string(raw)
 	if !strings.Contains(src, target) {
 		t.Fatalf("rules.go no longer contains the DefaultRules() body %q — this predicate's mutant is stale; "+
 			"re-derive it from the current DefaultRules()", target)
 	}
 	mutant := strings.Replace(src, target,
-		"return []Rule{campaignRule{}, fileAreaRule{}, depRule{}, proseRule{}}", 1) + proseRuleSrc
+		"return []Rule{campaignRule{}, fileAreaRule{}, proseRule{}}", 1) + proseRuleSrc
 
 	dir := t.TempDir()
 	mutantPath := filepath.Join(dir, "rules_mutant.go")
