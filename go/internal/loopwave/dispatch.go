@@ -11,6 +11,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
+const RepairWidth = 1
+
 // Launcher launches one wave's lane specs and returns their results; *fleet.Supervisor satisfies it.
 type Launcher interface {
 	Run(ctx context.Context, specs []fleet.CycleSpec) []fleet.Result
@@ -87,7 +89,11 @@ func dispatch(ctx context.Context, req DispatchRequest, count int) (Outcome, err
 	if len(specs) == 0 {
 		return Outcome{}, nil
 	}
-	return Outcome{Ran: true, Specs: specs, Results: req.Launcher.Run(ctx, specs)}, nil
+	results := req.Launcher.Run(ctx, specs)
+	if len(results) == 0 {
+		return Outcome{}, nil
+	}
+	return Outcome{Ran: true, Specs: specs, Results: results}, nil
 }
 
 // Dispatch runs the wave path when ShouldRunWave allows it, else returns Outcome{}
@@ -107,7 +113,7 @@ func (e *Engine) Dispatch(ctx context.Context, req DispatchRequest) (Outcome, er
 // ForceOneLane dispatches at most one lane without the ShouldRunWave gate. It
 // emits nothing, because RepairMinWidth reports.
 func (e *Engine) ForceOneLane(ctx context.Context, req DispatchRequest) (Outcome, error) {
-	return dispatch(ctx, req, 1)
+	return dispatch(ctx, req, RepairWidth)
 }
 
 // RepairMinWidth dispatches one isolated lane when the operator asked for a

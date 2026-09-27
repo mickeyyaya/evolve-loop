@@ -92,9 +92,6 @@ func (b *loopBatchCoordinator) interruptReturn(iteration int, when string) batch
 	return batchDecision{flow: batchReturn, exitCode: 130}
 }
 
-// dispatchFleetIteration runs one rolling pool or barrier wave. A failed plan
-// falls through to the sequential executor; a completed fleet window advances
-// the batch without touching sequential-only breaker state.
 func (b *loopBatchCoordinator) dispatchFleetIteration(
 	iteration int,
 	fleetConfig policy.FleetConfig,
@@ -102,87 +99,110 @@ func (b *loopBatchCoordinator) dispatchFleetIteration(
 	starvation *fleet.StarvationTracker,
 ) batchDecision {
 	if shouldRunPool(fleetConfig) {
-		poolLaunch := execCycleLaunch(waveBinary, false, b.cfg.ProjectRoot, b.cfg.GoalHash, b.cfg.GoalText, b.stdout, b.stderr)
-		ran, _, results, err := dispatchPoolIteration(
-			b.ctx,
-			fleetConfig,
-			productionWavePreflight(b.cfg.ProjectRoot),
-			productionPoolPlanFn(b.cfg, b.deps.Storage, fleetConfig.Count, b.stderr),
-			poolLaunch,
-			iteration,
-		)
-		switch {
-		case err != nil:
-			fmt.Fprintf(b.stderr, "[loop] WARN: fleet: pool %d dispatch failed, falling back to sequential: %v\n", iteration, err)
-		case ran:
-			fmt.Fprintf(b.stderr, "[loop] pool %d: %d/%d lanes ok (rolling, target=%d)\n",
-				iteration, len(results)-failedLaneCount(results), len(results), fleetConfig.Count)
-			if decision := b.fleetHaltDecision("pool", iteration, results); decision.flow == batchReturn {
-				return decision
-			}
-			applyEscalationBoundary(b.cfg.EvolveDir, iteration, b.stderr, b.deps.Signals)
-			return batchDecision{flow: batchNextIteration}
-		default:
-			fmt.Fprintf(b.stderr, "[loop] WARN: fleet: pool %d planned zero lanes (empty backlog), falling back to sequential\n", iteration)
+		if decision, done := b.dispatchPool(iteration, fleetConfig, waveBinary); done {
+			return decision
 		}
 	}
-
 	if !shouldRunWave(fleetConfig) {
 		return batchDecision{flow: batchProceed}
 	}
 	waveConfig, pace := budgetAwareWaveConfig(b.ctx, fleetConfig, b.cfg.ProjectRoot, b.cfg.EvolveDir, b.deps.Storage, b.stderr)
-	launcher := b.wave().Launcher(iteration, waveConfig.Concurrency, execCycleLaunch(waveBinary, false, b.cfg.ProjectRoot, b.cfg.GoalHash, b.cfg.GoalText, b.stdout, b.stderr))
-	out, err := b.wave().Dispatch(b.ctx, loopwave.DispatchRequest{
-		Config:    waveConfig,
-		Wave:      iteration,
-		Preflight: productionWavePreflight(b.cfg.ProjectRoot),
-		Plan:      b.wave().PlanFn(waveConfig.Count),
-		Launcher:  launcher,
-		Routed:    b.wave().RoutedResolver(),
-	})
-	ran, results := out.Ran, out.Results
+	out, err := b.wave().Dispatch(b.ctx, b.waveRequest(iteration, waveConfig, waveBinary))
 	switch {
 	case err != nil:
-		// The engine reported LOOP_WAVE_DISPATCH_FAILED (rendered by the root
-		// sink); the batch falls through to the sequential body.
+		return batchDecision{flow: batchProceed}
+	case out.Ran:
+		return b.completeWave(iteration, fleetConfig, waveConfig, out.Results, pace, starvation)
+	default:
+		return b.repairMinWidth(iteration, fleetConfig, waveConfig, waveBinary, starvation)
+	}
+}
+
+func (b *loopBatchCoordinator) dispatchPool(iteration int, fleetConfig policy.FleetConfig, waveBinary string) (batchDecision, bool) {
+	poolLaunch := execCycleLaunch(waveBinary, false, b.cfg.ProjectRoot, b.cfg.GoalHash, b.cfg.GoalText, b.stdout, b.stderr)
+	ran, _, results, err := dispatchPoolIteration(
+		b.ctx,
+		fleetConfig,
+		productionWavePreflight(b.cfg.ProjectRoot),
+		productionPoolPlanFn(b.cfg, b.deps.Storage, fleetConfig.Count, b.stderr),
+		poolLaunch,
+		iteration,
+	)
+	switch {
+	case err != nil:
+		fmt.Fprintf(b.stderr, "[loop] WARN: fleet: pool %d dispatch failed, falling back to sequential: %v\n", iteration, err)
 	case ran:
-		fmt.Fprintf(b.stderr, "[loop] wave %d: %d/%d lanes ok\n", iteration, len(results)-failedLaneCount(results), len(results))
-		emitLoopWave(b.deps.Signals, iteration, "loopBatchCoordinator.dispatchFleetIteration", "",
-			fmt.Sprintf("wave %d: %d/%d lanes ok", iteration, len(results)-failedLaneCount(results), len(results)),
-			map[string]string{"lanes_ok": strconv.Itoa(len(results) - failedLaneCount(results)), "lanes": strconv.Itoa(len(results))})
-		if decision := b.fleetHaltDecision("wave", iteration, results); decision.flow == batchReturn {
-			return decision
-		}
-		observation := fleet.WaveObservation{
-			DesiredLanes:  fleetConfig.Count,
-			RealizedLanes: len(results),
-			QuotaShrunk:   waveConfig.Count < fleetConfig.Count,
-		}
-		if starvation.Observe(observation, fleetConfig.StarvationK) {
-			item := fleet.BuildStarvationItem(observation, fleetConfig.StarvationK, fleetConfig.StarvationWeight, iteration, time.Now().UTC().Format(time.RFC3339))
-			if path, err := item.WriteTo(b.cfg.EvolveDir); err != nil {
-				fmt.Fprintf(b.stderr, "[loop] WARN: fleet: could not self-file starvation todo: %v\n", err)
-			} else {
-				fmt.Fprintf(b.stderr, "[loop] fleet: work-supply starvation after %d waves — self-filed %s\n", fleetConfig.StarvationK, path)
-			}
+		fmt.Fprintf(b.stderr, "[loop] pool %d: %d/%d lanes ok (rolling, target=%d)\n",
+			iteration, len(results)-failedLaneCount(results), len(results), fleetConfig.Count)
+		if decision := b.fleetHaltDecision("pool", iteration, results); decision.flow == batchReturn {
+			return decision, true
 		}
 		applyEscalationBoundary(b.cfg.EvolveDir, iteration, b.stderr, b.deps.Signals)
-		paceBeforeNextWave(b.ctx, pace, b.stderr)
-		return batchDecision{flow: batchNextIteration}
+		return batchDecision{flow: batchNextIteration}, true
 	default:
-		oneLauncher := b.wave().Launcher(iteration, fleetConfig.Concurrency, execCycleLaunch(waveBinary, false, b.cfg.ProjectRoot, b.cfg.GoalHash, b.cfg.GoalText, b.stdout, b.stderr))
-		if b.wave().RepairMinWidth(b.ctx, fleetConfig, waveConfig, loopwave.DispatchRequest{
-			Config:    fleetConfig,
-			Wave:      iteration,
-			Preflight: productionWavePreflight(b.cfg.ProjectRoot),
-			Plan:      b.wave().PlanFn(fleetConfig.Count),
-			Launcher:  oneLauncher,
-			Routed:    b.wave().RoutedResolver(),
-		}) {
-			return batchDecision{flow: batchNextIteration}
-		}
+		fmt.Fprintf(b.stderr, "[loop] WARN: fleet: pool %d planned zero lanes (empty backlog), falling back to sequential\n", iteration)
+	}
+	return batchDecision{}, false
+}
+
+func (b *loopBatchCoordinator) waveRequest(iteration int, cfg policy.FleetConfig, waveBinary string) loopwave.DispatchRequest {
+	return loopwave.DispatchRequest{
+		Config:    cfg,
+		Wave:      iteration,
+		Preflight: productionWavePreflight(b.cfg.ProjectRoot),
+		Plan:      b.wave().PlanFn(cfg.Count),
+		Launcher:  b.wave().Launcher(iteration, cfg.Concurrency, execCycleLaunch(waveBinary, false, b.cfg.ProjectRoot, b.cfg.GoalHash, b.cfg.GoalText, b.stdout, b.stderr)),
+		Routed:    b.wave().RoutedResolver(),
+	}
+}
+
+func (b *loopBatchCoordinator) completeWave(iteration int, fleetConfig, waveConfig policy.FleetConfig, results []fleet.Result, pace time.Duration, starvation *fleet.StarvationTracker) batchDecision {
+	lanesOK := len(results) - failedLaneCount(results)
+	fmt.Fprintf(b.stderr, "[loop] wave %d: %d/%d lanes ok\n", iteration, lanesOK, len(results))
+	emitLoopWave(b.deps.Signals, iteration, "loopBatchCoordinator.completeWave", "",
+		fmt.Sprintf("wave %d: %d/%d lanes ok", iteration, lanesOK, len(results)),
+		map[string]string{"lanes_ok": strconv.Itoa(lanesOK), "lanes": strconv.Itoa(len(results))})
+	if decision := b.fleetHaltDecision("wave", iteration, results); decision.flow == batchReturn {
+		return decision
+	}
+	b.observeWorkSupply(iteration, fleetConfig, waveConfig, len(results), starvation)
+	applyEscalationBoundary(b.cfg.EvolveDir, iteration, b.stderr, b.deps.Signals)
+	paceBeforeNextWave(b.ctx, pace, b.stderr)
+	return batchDecision{flow: batchNextIteration}
+}
+
+func (b *loopBatchCoordinator) repairMinWidth(iteration int, fleetConfig, waveConfig policy.FleetConfig, waveBinary string, starvation *fleet.StarvationTracker) batchDecision {
+	repaired := b.wave().RepairMinWidth(b.ctx, fleetConfig, waveConfig, b.waveRequest(iteration, fleetConfig, waveBinary))
+	b.observeWorkSupply(iteration, fleetConfig, waveConfig, repairedLanes(repaired), starvation)
+	if repaired {
+		return batchDecision{flow: batchNextIteration}
 	}
 	return batchDecision{flow: batchProceed}
+}
+
+func (b *loopBatchCoordinator) observeWorkSupply(iteration int, fleetConfig, waveConfig policy.FleetConfig, realized int, starvation *fleet.StarvationTracker) {
+	observation := fleet.WaveObservation{
+		DesiredLanes:  fleetConfig.Count,
+		RealizedLanes: realized,
+		QuotaShrunk:   waveConfig.Count < fleetConfig.Count,
+	}
+	if !starvation.Observe(observation, fleetConfig.StarvationK) {
+		return
+	}
+	item := fleet.BuildStarvationItem(observation, fleetConfig.StarvationK, fleetConfig.StarvationWeight, iteration, time.Now().UTC().Format(time.RFC3339))
+	path, err := item.WriteTo(b.cfg.EvolveDir)
+	if err != nil {
+		fmt.Fprintf(b.stderr, "[loop] WARN: fleet: could not self-file starvation todo: %v\n", err)
+		return
+	}
+	fmt.Fprintf(b.stderr, "[loop] fleet: work-supply starvation after %d waves — self-filed %s\n", fleetConfig.StarvationK, path)
+}
+
+func repairedLanes(repaired bool) int {
+	if repaired {
+		return loopwave.RepairWidth
+	}
+	return 0
 }
 
 func (b *loopBatchCoordinator) fleetHaltDecision(kind string, iteration int, results []fleet.Result) batchDecision {
