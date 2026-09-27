@@ -23,13 +23,13 @@ func TestRankForDispatch_WeightFirstThenVerifiedAdmissible(t *testing.T) {
 		{ID: "unknown-086", Weight: 0.86},
 		{ID: "unknown-084", Weight: 0.84},
 	}
-	got := ids(rankForDispatch(in))
+	got := ids(RankForDispatch(in))
 	want := []string{"unknown-086", "declared-085", "unknown-085", "declared-084", "unknown-084"}
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("rankForDispatch = %v, want %v", got, want)
+		t.Fatalf("RankForDispatch = %v, want %v", got, want)
 	}
 	if in[0].ID != "unknown-085" {
-		t.Error("rankForDispatch must not reorder its input in place")
+		t.Error("RankForDispatch must not reorder its input in place")
 	}
 }
 

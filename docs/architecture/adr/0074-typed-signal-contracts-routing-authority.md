@@ -161,7 +161,7 @@ item consumed ⇒ work landed (transactional consumption); dossier phase records
   is context, not surface). This is a typed, deterministic derivation that can
   only move an item TO the console — never widen lane authority — so it keeps
   this ADR's rule that prose never GRANTS routing. (3) **The weight stays the
-  priority:** `triagecap.rankForDispatch`, the one ordering the seed paths
+  priority:** `triagecap.RankForDispatch`, the one ordering the seed paths
   share, breaks EQUAL weights toward the verified-admissible candidate
   (`FleetCandidate.Declared`, set from the same belief). Live queue: 65 → 47
   lane-dispatchable. Follow-ups filed console-owned: scope-aware triage
