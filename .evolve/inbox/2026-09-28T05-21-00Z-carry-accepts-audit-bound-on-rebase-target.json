@@ -1,0 +1,18 @@
+{
+  "id": "carry-accepts-audit-bound-on-rebase-target",
+  "created_at": "2026-09-28T05:10:00Z",
+  "title": "A ship whose passing audit already bound on the rebase target re-audits anyway, because the carry demands the authored base",
+  "weight": 0.84,
+  "kind": "pipeline-repair",
+  "priority_class": "performance",
+  "files": [
+    "go/internal/core/identity_carry_forward.go"
+  ],
+  "summary": "Cycle 1724 (wave 21) failed its first audit, was repaired, and passed a re-audit bound on 7a84f047 (main after cycle 1723 landed). At ship the ff-merge diverged; the host unwound to the audited tree and declined the identity carry: 'the audit was bound on 7a84f047, not on the base c8bc27bb the change was authored on', then found the rebase byte-identical on 7a84f047 and re-audited without a Build. An audit that already bound on the rebase target covers that exact tree, so the second audit (one more auditor dispatch, about ten minutes) proved nothing new. Which record the binding's base comes from (the worktree base or the main HEAD at audit time) must be established first. It is not specific to repair rounds: cycle 1727 (same wave, no repair) had its audit bound on 30e0dc98 (main after cycle 1728's no-work dossier landed) while the change was authored on a4d083e6, and the carry declined the same way. So the audit binding records the main HEAD at audit time, and every ship that meets a moved main pays a second audit.",
+  "acceptance": [
+    "When the passing audit bound on the rebase target and the rebased tree equals the audited tree, the ship proceeds on that verdict without a second audit, and the carry record names the binding it relied on.",
+    "Tests pin both the authored-base carry and the target-base case, and a composed-tree gate failure still re-audits."
+  ],
+  "source": "wave 21 observation (2026-09-28, cycle 1724)",
+  "priority_rationale": "wave 21 boundary 2026-09-28: each such ship pays a redundant audit on the critical path after every audit-repair round"
+}
