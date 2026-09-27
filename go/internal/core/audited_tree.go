@@ -32,7 +32,7 @@ func (o *Orchestrator) latestAuditEntry(ctx context.Context, runID string) (audi
 		if !ok {
 			break
 		}
-		row := auditledger.Entry{Role: e.Role, Kind: e.Kind, RunID: e.RunID, GitHEAD: e.GitHEAD, WorktreeTreeSHA: e.WorktreeTreeSHA, ArtifactSHA256: e.ArtifactSHA256}
+		row := auditledger.Entry{Role: e.Role, Kind: e.Kind, RunID: e.RunID, GitHEAD: e.GitHEAD, WorktreeTreeSHA: e.WorktreeTreeSHA, WorktreeBaseSHA: e.WorktreeBaseSHA, ArtifactSHA256: e.ArtifactSHA256}
 		if auditledger.IsAuditorRow(row) {
 			rows = append(rows, row)
 		}

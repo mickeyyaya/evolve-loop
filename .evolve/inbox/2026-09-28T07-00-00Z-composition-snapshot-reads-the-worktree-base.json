@@ -1,0 +1,23 @@
+{
+  "id": "composition-snapshot-reads-the-worktree-base",
+  "created_at": "2026-09-28T07:00:00Z",
+  "title": "RUNG 0's composition snapshot diffs main...git_head, which names main's tip at audit time, not the audited change",
+  "weight": 0.62,
+  "kind": "pipeline-repair",
+  "priority_class": "performance",
+  "files": [
+    "go/cmd/evolve/cmd_composition_wiring.go",
+    "go/internal/phases/ship/composition.go",
+    "go/internal/core/composition_carryforward.go",
+    "go/internal/core/ship_recovery.go",
+    "go/internal/auditledger/auditledger.go"
+  ],
+  "summary": "Found while fixing carry-accepts-audit-bound-on-rebase-target (2026-09-28). A clean replay without an explanation version reaches RUNG 0 (ship_recovery.go, compositionCarryForward). Its snapshot (readCompositionSnapshot in cmd/evolve/cmd_composition_wiring.go) diffs `main...` + the auditor row's git_head and records git_head as AuditedBase. recordAuditBinding resolves git_head at the project root, so it is a commit on main, and the lane's audited change is uncommitted in its worktree: the three-dot diff is not the audited change, so RUNG 0 cannot carry a real rebase. Ship holds the same belief on the verifying side: internal/phases/ship/composition.go compares a composition record's AuditedBase with the bound row's git_head, so a snapshot rebuilt on the worktree base would be refused at ship unless that check moves with it. This is the belief ADR-0105 B3's carry had until the auditor row gained worktree_base_sha; auditledger.Entry.AuditedBase is now the one projection of the audited base, and both sides should read it. First measure how often a rebased ship reaches RUNG 0 (ExplanationDocumentationVersion == 0) and what it has carried since the worktree flow. Then either retire RUNG 0 in favor of B3's identity carry (which proves the tree-level change from worktree_tree_sha on worktree_base_sha), or rebuild the snapshot from those two fields.",
+  "acceptance": [
+    "The RUNG 0 path either proves the audited change from worktree_tree_sha on auditledger.Entry.AuditedBase, with ship's composition check (internal/phases/ship/composition.go) reading the same projection, or is removed with B3's carry serving its callers",
+    "A test drives a rebased ship with no explanation version whose main moved before the audit, and it ships on the audited verdict or re-audits for a stated reason",
+    "ADR-0105 and the design doc \u00a75.8 name the outcome"
+  ],
+  "source": "console, 2026-09-28, the audited-base fix for ADR-0105 B3",
+  "priority_rationale": "The same replicated belief B3 carried (git_head is the audited base); a RUNG 0 that cannot carry costs a re-audit per rebased ship on that path"
+}

@@ -93,6 +93,19 @@ func TestRouteRebasedExplanation_AByteIdenticalRebaseShipsOnTheCarriedVerdict(t 
 	}
 }
 
+func TestRouteRebasedExplanation_AMainThatMovedBeforeTheAuditStillCarries(t *testing.T) {
+	h := pendedIdenticalLane(t)
+	row := h.auditRow()
+	row.GitHEAD = h.fx.newBase
+	row.WorktreeBaseSHA = h.fx.base
+
+	next, recovering, _ := h.route(t, row)
+
+	if !recovering || next != PhaseShip {
+		t.Fatalf("route=(%s,%v), want Ship: the audit judged the change on its own base, whatever main's HEAD was then", next, recovering)
+	}
+}
+
 func TestRouteRebasedExplanation_ACarryThatCannotBeProvenReturnsToAudit(t *testing.T) {
 	for name, tc := range map[string]struct {
 		arrange func(h *carryHarness) []LedgerEntry
@@ -102,9 +115,19 @@ func TestRouteRebasedExplanation_ACarryThatCannotBeProvenReturnsToAudit(t *testi
 			row.WorktreeTreeSHA = h.fx.git("rev-parse", h.fx.base+"^{tree}")
 			return []LedgerEntry{row}
 		}},
-		"the audit was bound on another base": {func(h *carryHarness) []LedgerEntry {
+		"a row without the worktree base was bound on another base": {func(h *carryHarness) []LedgerEntry {
 			row := h.auditRow()
 			row.GitHEAD = h.fx.newBase
+			return []LedgerEntry{row}
+		}},
+		"the audited worktree stood on another base": {func(h *carryHarness) []LedgerEntry {
+			row := h.auditRow()
+			row.WorktreeBaseSHA = h.fx.newBase
+			return []LedgerEntry{row}
+		}},
+		"the audit row names no base": {func(h *carryHarness) []LedgerEntry {
+			row := h.auditRow()
+			row.GitHEAD = ""
 			return []LedgerEntry{row}
 		}},
 		"the audit row names no artifact": {func(h *carryHarness) []LedgerEntry {
@@ -145,5 +168,16 @@ func TestRouteRebasedExplanation_ACarryThatCannotBeProvenReturnsToAudit(t *testi
 				t.Errorf("no record is written for a carry that failed its proof: %+v", h.written)
 			}
 		})
+	}
+}
+
+func TestCarriedAudit_ARowNamingNoBaseNeverCarriesEvenOnAnEmptyBase(t *testing.T) {
+	row := LedgerEntry{Role: "auditor", Kind: "agent_subprocess", RunID: "run", WorktreeTreeSHA: "tree", ArtifactSHA256: "audit-ref"}
+	o := NewOrchestrator(nil, &fakeLedger{entries: []LedgerEntry{row}}, nil)
+
+	_, err := o.carriedAudit(context.Background(), "run", "")
+
+	if err == nil || err.Error() != "the audit row names no base" {
+		t.Fatalf("carriedAudit = %v, want the no-base decline", err)
 	}
 }
