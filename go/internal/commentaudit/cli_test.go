@@ -180,3 +180,28 @@ func TestMain_EveryScopedDirMustMatch(t *testing.T) {
 		t.Fatalf("a scoped dir with no changed Go file must fail even when another dir matches (exit %d):\n%s%s", code, out.String(), errOut.String())
 	}
 }
+
+func TestMain_Comments(t *testing.T) {
+	root := writeTree(t, map[string]string{
+		"a.go":   "package p\n\n// kept.\n//go:noinline\n// plain why.\nfunc a() {}\n",
+		"new.go": "// Package p holds the tiny fixture.\npackage p\n\n// helper restates.\nfunc h() {}\n",
+	})
+	git := fakeGit{changed: []string{"a.go", "new.go"}, base: map[string]string{"a.go": "package p\n\n// kept.\nfunc a() {}\n"}, root: root}
+	var out, errOut bytes.Buffer
+	code := Main([]string{"comments", "-base", "origin/main"}, &out, &errOut, git)
+	if want := "a.go: // plain why.\nnew.go: // helper restates.\n"; code != 1 || out.String() != want {
+		t.Fatalf("comments must list exactly the added non-directive lines (exit %d), want:\n%sgot:\n%s%s", code, want, out.String(), errOut.String())
+	}
+
+	git.base["a.go"] = "package p\n\n// kept.\n// plain why.\nfunc a() {}\n"
+	git.changed = []string{"a.go"}
+	out.Reset()
+	if code := Main([]string{"comments", "-base", "origin/main"}, &out, &errOut, git); code != 0 || !strings.Contains(out.String(), "no comments added in 1 changed Go file(s)") {
+		t.Fatalf("a directive-only diff lists nothing (exit %d):\n%s%s", code, out.String(), errOut.String())
+	}
+
+	errOut.Reset()
+	if code := Main([]string{"comments"}, &out, &errOut, git); code != 2 || !strings.Contains(errOut.String(), "comments -base") {
+		t.Fatalf("a missing -base is a usage error naming comments (exit %d):\n%s", code, errOut.String())
+	}
+}

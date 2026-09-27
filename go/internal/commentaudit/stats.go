@@ -1,6 +1,8 @@
 package commentaudit
 
 import (
+	"go/parser"
+	"go/token"
 	"io/fs"
 	"path"
 	"regexp"
@@ -55,14 +57,31 @@ func Stats(src []byte) FileStats {
 // AddedNarrative returns the whole-line narrative comments in after that
 // before does not already hold; a moved line is not added.
 func AddedNarrative(before, after []byte) []string {
-	held := map[string]int{}
-	for _, line := range narrativeLines(before) {
-		held[line]++
+	return subtract(commentLines(after, isNarrative), commentLines(before, isNarrative))
+}
+
+// AddedComments returns the non-directive comment lines after adds to before, sparing a new file's package doc.
+func AddedComments(before, after []byte) []string {
+	held := commentLines(before, isPlain)
+	if before == nil {
+		held = packageDoc(after)
+	}
+	return subtract(commentLines(after, isPlain), held)
+}
+
+func isPlain(line string) bool {
+	return !directive.MatchString(line)
+}
+
+func subtract(lines, held []string) []string {
+	count := map[string]int{}
+	for _, line := range held {
+		count[line]++
 	}
 	var added []string
-	for _, line := range narrativeLines(after) {
-		if held[line] > 0 {
-			held[line]--
+	for _, line := range lines {
+		if count[line] > 0 {
+			count[line]--
 			continue
 		}
 		added = append(added, line)
@@ -70,14 +89,29 @@ func AddedNarrative(before, after []byte) []string {
 	return added
 }
 
-func narrativeLines(src []byte) []string {
+func commentLines(src []byte, keep func(string) bool) []string {
 	var found []string
 	forEachLine(src, func(line string, isComment bool) {
-		if isComment && isNarrative(line) {
+		if isComment && keep(line) {
 			found = append(found, line)
 		}
 	})
 	return found
+}
+
+// A file whose package clause does not parse has no package doc to spare.
+func packageDoc(src []byte) []string {
+	file, err := parser.ParseFile(token.NewFileSet(), "", src, parser.PackageClauseOnly|parser.ParseComments)
+	if err != nil || file.Doc == nil {
+		return nil
+	}
+	var lines []string
+	for _, c := range file.Doc.List {
+		for _, line := range strings.Split(c.Text, "\n") {
+			lines = append(lines, strings.TrimSpace(line))
+		}
+	}
+	return lines
 }
 
 func forEachLine(src []byte, visit func(line string, isComment bool)) {

@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "A commentaudit subcommand lists every comment line the diff against a base adds, excluding machine-read directives and a new package's one-line doc, and does not count a moved line as added; it exits non-zero when it lists any line.",
+    "docs/conventions/code-comments.md, the architecture reviewer and the auditor's craft audit cite the subcommand as the comment count."
+  ],
+  "consumed": {
+    "at": "2026-09-27T19:00:11Z",
+    "cycle": "",
+    "via": "ship"
+  },
+  "created_at": "2026-09-27T23:30:00Z",
+  "files": [
+    "go/internal/commentaudit",
+    "go/cmd/commentaudit",
+    "docs/conventions/code-comments.md"
+  ],
+  "id": "commentaudit-reports-every-added-comment",
+  "kind": "hardening",
+  "priority_class": "hygiene",
+  "priority_rationale": "inbox review 2026-09-27: the zero-comment rule for new code is checked by reading the diff; a deterministic count belongs in code",
+  "source": "architecture reviewer comparison 2026-09-28 (zero-comment rule for new code)",
+  "summary": "The comment convention now says new and changed code carries no comments except machine-read ones (directives and markers) and a new package's one-line doc. `commentaudit check` flags only added comment lines that carry history markers, so the architecture reviewer and the auditor's advisory craft audit count every other added comment by reading the diff. The package already knows the machine-read directives (Directives) and the moved-line rule (AddedNarrative).",
+  "title": "commentaudit lists every comment line a diff adds, so the zero-comment rule for new code is checked by code, not by reading",
+  "weight": 0.66
+}
