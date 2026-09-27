@@ -143,6 +143,10 @@ Research packages: [code-audit-2026-07](research/code-audit-2026-07/README.md) Â
 plus three note dirs without READMEs: `research/coding-craft-2026/`,
 `research/fable-simulation-2026/`, `research/tmux-live-capture-2026-06-04/`.
 
+The architecture reviewer's comparison with five popular online review prompts,
+blind-judged on three scenarios (2026-09-28), is
+[research/coding-craft-2026/architecture-reviewer-comparison.md](research/coding-craft-2026/architecture-reviewer-comparison.md).
+
 Plus 12 single-file notes from knowledge-base/research (lessons-and-resolutions,
 verdict-classifier drift, flag-reduction design, token histories, et al.) â€” see
 `docs/research/`.

@@ -105,8 +105,8 @@ line → one line; (6) only then, the minimum that works. No single-implementati
 deletion over addition, fewest files, shortest diff; mark a deliberate shortcut with a `minimal:` comment naming the ceiling
 + upgrade path (Core Principle #1). **NEVER** simplify away trust-boundary input validation, data-loss error handling,
 security, accessibility, an explicit request, or a pipeline gate (RED test, safety invariants, eval/contract gates, ship
-floor). Ruleset: [skills/minimalism/SKILL.md](../skills/minimalism/SKILL.md). **Comments:** code explains itself; comment only a
-directive, a one-line export contract, or a non-obvious invariant's *why*, never cycle numbers, incidents, ids or dates.
+floor). Ruleset: [skills/minimalism/SKILL.md](../skills/minimalism/SKILL.md). **Comments:** new code carries none; the name, the
+signature, a test name or the package's design notes say it. Only machine-read comments (directives, markers, generated headers) and a new package's one-line doc are allowed.
 Learnings go to `build-report.md` and `docs/`; update the package's page under `docs/architecture/packages/`, if it has one, when you change a design or invariant ([rule](../docs/conventions/code-comments.md)).
 
 If `task.recommendedSkills` non-empty, consult skills before Step 3.

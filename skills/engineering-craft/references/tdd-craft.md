@@ -34,6 +34,21 @@
 
 Principle in `fable/references/verification.md` §Hermetic tests; the Go-concrete mechanics: repos created by tests get their own `git config user.name/user.email` (subprocess git never inherits your test-process env identity); env vars are set or explicitly UNSET per test (`t.Setenv`, `env -u` semantics — set-but-empty behaves differently from unset); a test that passes on your machine and fails on a runner is a hermeticity bug in the test, not "flaky CI".
 
+## Reviewing for TDD (RIGID — what a reviewer checks in a diff)
+
+1. **Every added or changed behavior maps to a test that pins it.** List each behavior (a new branch, a new outcome, a changed rule) beside the test that would fail without it. A behavior with no such test is untested, whatever the coverage says.
+2. **A bug fix ships its regression test**: a test that fails on the pre-fix code for the reported reason, plus preservation tests for the blast radius. A fix without one is unproven.
+3. **Each new test can fail.** No assertion-free test, no tautology (`len(x) >= 0`), no assertion only on a mock or on an echo of the implementation.
+4. **Red-first evidence**: the author's verification shows the red run or the mutants killed. When it does not, one overlay check settles it: copy the base tree to a scratch directory (`git archive <base> | tar -x -C <scratch>`), add the change's new tests, run them there. They must fail. The repository is never modified. A red counts only when the failing assertion is the one the test is named for: a test that fails on a setup line against a stub proves the setup, not the behavior in its name.
+5. **The refactor step happened**: the change leaves no duplication between its new code and an existing helper.
+6. **Mutants a deletion misses survive nowhere.** Killing "the guard removed" does not prove the guard's position, value or key. Run a few mutants of the changed code in a scratch copy (`go test -overlay`), after one control mutant proves the harness detects a failure. A mutant is one idea, not one line: a wrong-key mutant changes every use of that key in the function, and each map or field the change writes gets its own. Cover the classes a plain deletion misses:
+   - **Reorder:** swap a guard and the mutation it protects (count, then check).
+   - **Shift:** move a constant by one (a reset to `-1`, a `<` to `<=`).
+   - **Wrong key:** the raw value instead of the normalized one, or one shared key for every entity.
+   - **Wrong tense:** "was ever" instead of "is now" (a key that exists instead of an interval that holds).
+   - **Hard-coded input:** a literal equal to the value every test uses (a cooldown of one hour when every test uses one hour). Tests should use values no plausible literal equals.
+   A mutant that behaves identically to the code for every valid input is equivalent: name it and set it aside.
+   A kill is claimed only after the killing test ran against its mutant.
 ## What NOT to write
 
 - Assertion-free tests, tests of getters/setters, tests that re-state the implementation line-by-line.

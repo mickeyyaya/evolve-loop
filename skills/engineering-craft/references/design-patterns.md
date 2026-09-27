@@ -38,6 +38,14 @@
 4. Is it a **process boundary** (IO, time, subprocess)? → port + adapter, injected.
 5. None of the above? → **write the plain code.** The absence of a pattern is not a design smell; the wrong pattern is.
 
+## The book's principles as review questions (RIGID — *Design Patterns* ch. 1 and SOLID)
+
+- **Program to an interface, not an implementation**: does the consumer own the interface it depends on?
+- **Favor object composition over class inheritance**: in Go, embedding a type to reuse its methods while changing their meaning is inheritance by another name; hold the collaborator in a field instead.
+- **Encapsulate what varies**: does the variation axis have exactly one home, or does every caller repeat it?
+- **A named pattern has the pattern's structure**: a "Strategy" nothing selects, a "Decorator" that changes the interface it wraps, a "Factory" with one product and an "Observer" with one listener are misnamed ceremony — the name misleads the next reader.
+- **SOLID**: single responsibility (one reason to change); open-closed (a new kind adds a type, it does not edit a switch in N places); Liskov substitution (a substitute accepts everything the original accepts and never panics where it returned); interface segregation (no implementer stubs methods it does not need); dependency inversion (policy never imports mechanism).
+
 ## Refactoring toward patterns (FLEXIBLE)
 
 Patterns are destinations reached by refactoring under green tests, not blueprints imposed up front. When the third duplication or second switch site appears: write the characterization tests if missing, extract, keep the diff scoped to the extraction (the behavior change that motivated you ships separately — one concern per change). If the extraction fights the existing conventions of the package, the package's conventions win until a dedicated refactor commit argues otherwise.
