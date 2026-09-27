@@ -16,6 +16,7 @@ package triage
 import (
 	"context"
 	"fmt"
+	"io"
 	"os/exec"
 	"path/filepath"
 	"regexp"
@@ -28,6 +29,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner"
@@ -223,46 +225,58 @@ func CarryforwardCandidatesSection(ctx context.Context, dir, base string) string
 	return sect.String()
 }
 
-// inboxBatchesSection renders the deterministic backlog grouping for the
-// triage prompt, or "" when there is nothing to group (the byte-identity pin).
-// An empty projectRoot returns "" rather than resolving a CWD-relative path —
-// the dual-root landmine PhaseRequest's own docs warn about.
 func inboxBatchesSection(projectRoot string, forbidden func(string) bool) string {
 	if projectRoot == "" {
 		return ""
 	}
-	items, _, err := inboxbatch.LoadDir(filepath.Join(projectRoot, ".evolve", "inbox"))
+	inboxDir := filepath.Join(projectRoot, ".evolve", "inbox")
+	items, _, err := inboxbatch.LoadDir(inboxDir)
 	if err != nil || len(items) == 0 {
 		return ""
 	}
-	// ADR-0074 I1: console-routed items (route:"console-*", a pipeline-* kind,
-	// or a protected fix surface) are operator-owned — lanes must never see
-	// them as selectable. The exclusion is loud (ids listed) so triage knows
-	// the work exists; inboxmover.Claim is the enforcement backstop if a pick
-	// slips through.
 	if forbidden == nil {
 		forbidden = guards.IsProtectedScope
 	}
-	dispatchable, console, _ := inboxbatch.PartitionConsole(items, forbidden)
+	menu := inboxmover.PartitionLaneMenu(inboxmover.Options{InboxDir: inboxDir, Stderr: io.Discard}, items, forbidden)
 	var sect strings.Builder
-	if rendered := inboxbatch.RenderMarkdown(inboxbatch.Classify(dispatchable, inboxbatch.Config{})); rendered != "" {
-		sect.WriteString("- inbox_batches: the backlog below is pre-grouped by campaign/file-area/links; " +
-			"prefer selecting a whole batch as top_n (its items share a worktree, build, and audit — " +
-			"one cycle amortizes the pipeline across them) over cherry-picking single items across batches:\n" +
-			rendered)
-	}
-	if len(console) > 0 {
-		ids := make([]string, len(console))
-		for i, it := range console {
-			ids[i] = it.ID
-		}
-		fmt.Fprintf(&sect, "- console_routed_excluded: %d operator-owned item(s) NOT selectable (route, pipeline-* kind, or protected fix surface; the claim floor refuses them): %s\n",
-			len(console), strings.Join(ids, ", "))
-	}
+	sect.WriteString(selectableBatchesNote(menu.Ready))
+	sect.WriteString(consoleRoutedNote(menu.Console))
+	sect.WriteString(dependencyBlockedNote(menu.WaitingReasons))
 	fmt.Fprintf(&sect, "- protected_surfaces: a top_n card must not name a path under a control-plane surface; drop such an item with reason "+
 		"`protected-surface: <path>` (the host routes it to the console, and moves a card that still names one out of top_n): %s\n",
 		strings.Join(protectedSurfaceFragments(), ", "))
 	return sect.String()
+}
+
+func selectableBatchesNote(ready []inboxbatch.Item) string {
+	rendered := inboxbatch.RenderMarkdown(inboxbatch.Classify(ready, inboxbatch.Config{}))
+	if rendered == "" {
+		return ""
+	}
+	return "- inbox_batches: the backlog below is pre-grouped by campaign/file-area/links; " +
+		"prefer selecting a whole batch as top_n (its items share a worktree, build, and audit — " +
+		"one cycle amortizes the pipeline across them) over cherry-picking single items across batches:\n" +
+		rendered
+}
+
+func consoleRoutedNote(console []inboxbatch.Item) string {
+	if len(console) == 0 {
+		return ""
+	}
+	ids := make([]string, len(console))
+	for i, it := range console {
+		ids[i] = it.ID
+	}
+	return fmt.Sprintf("- console_routed_excluded: %d operator-owned item(s) NOT selectable (route, pipeline-* kind, or protected fix surface; the claim floor refuses them): %s\n",
+		len(console), strings.Join(ids, ", "))
+}
+
+func dependencyBlockedNote(reasons []string) string {
+	if len(reasons) == 0 {
+		return ""
+	}
+	return fmt.Sprintf("- dependency_blocked: %d item(s) NOT selectable until their declared dependency lands: %s\n",
+		len(reasons), strings.Join(reasons, "; "))
 }
 
 // protectedSurfaceFragments lists the manifest's fragments as the prompt names them.

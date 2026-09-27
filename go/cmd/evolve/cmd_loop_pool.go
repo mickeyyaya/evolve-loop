@@ -59,7 +59,7 @@ func productionPoolPlanFn(cfg loopConfig, storage core.Storage, count int, stder
 		// Same resolver as the wave path, freshly built per plan call; refusals
 		// WARN inside the resolver wrapper.
 		// See ADR-0074.
-		todos, _, err := fleet.TodosFromTriage(decisionJSON, cardPackages, consoleRoutedResolver(cfg.ProjectRoot, stderr))
+		todos, _, err := fleet.TodosFromTriage(decisionJSON, cardPackages, consoleRoutedResolver(cfg, stderr))
 		return todos, err
 	}
 }

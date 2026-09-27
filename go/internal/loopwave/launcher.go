@@ -4,13 +4,12 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"sort"
+	"path/filepath"
 	"strconv"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
-	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/triagecap"
 )
 
@@ -51,48 +50,24 @@ func (l gatedLauncher) Run(ctx context.Context, specs []fleet.CycleSpec) []fleet
 	return l.inner.Run(ctx, kept)
 }
 
-// probe resolves a task id's freshness from the inbox lifecycle at dispatch time.
-// An id with no lifecycle evidence is fresh, because not every planned id is inbox-backed.
+func (e *Engine) lifecycle() inboxmover.Options {
+	return inboxmover.Options{InboxDir: filepath.Join(e.roots.EvolveDir, "inbox"), Stderr: io.Discard, Signals: e.center()}
+}
+
 func (e *Engine) probe() fleet.FreshnessProbeFn {
-	opts := inboxmover.Options{ProjectRoot: e.roots.ProjectRoot, Stderr: io.Discard, Signals: e.center()}
+	lifecycle := e.lifecycle()
 	return func(taskID string) fleet.TaskFreshness {
-		ds := inboxmover.ResolveDispatchState(opts, taskID)
-		switch ds.State {
-		case inboxmover.StatePending:
-			for _, dep := range ds.Deps {
-				switch inboxmover.ResolveDispatchState(opts, dep).State {
-				case inboxmover.StatePending, inboxmover.StateProcessing, inboxmover.StateRetry:
-					return fleet.TaskFreshness{Fresh: false, Reason: "deps unmet: needs " + dep}
-				}
-			}
-			return fleet.TaskFreshness{Fresh: true}
-		case inboxmover.StateUnknown:
-			return fleet.TaskFreshness{Fresh: true}
-		default:
-			reason := "consumed: " + ds.State
-			if ds.Detail != "" {
-				reason += " " + ds.Detail
-			}
-			return fleet.TaskFreshness{Fresh: false, Reason: reason}
-		}
+		d := inboxmover.ResolveDispatchability(lifecycle, taskID)
+		return fleet.TaskFreshness{Fresh: d.Dispatchable, Reason: d.Reason}
 	}
 }
 
-// refill fills a freed slot with the highest-weight pending todo the wave does not
-// own. It picks by weight alone and does not re-check file-disjointness with kept lanes.
 func (e *Engine) refill() fleet.RefillFn {
-	evolveDir := paths.EvolveDirOf(e.roots.ProjectRoot)
 	return func(exclude map[string]bool) (fleet.CycleSpec, bool) {
-		backlog := triagecap.ReadInboxBacklog(evolveDir, e.ports.Protected)
-		sort.SliceStable(backlog, func(i, j int) bool { return backlog[i].Weight > backlog[j].Weight })
-		for _, c := range backlog {
-			if exclude[c.ID] {
-				continue
+		for _, c := range triagecap.RankForDispatch(triagecap.ReadInboxBacklog(e.roots.EvolveDir, e.ports.Protected)) {
+			if !exclude[c.ID] {
+				return fleet.CycleSpec{Scope: []string{c.ID}, Env: map[string]string{ipcenv.FleetScopeKey: c.ID}}, true
 			}
-			return fleet.CycleSpec{
-				Scope: []string{c.ID},
-				Env:   map[string]string{ipcenv.FleetScopeKey: c.ID},
-			}, true
 		}
 		return fleet.CycleSpec{}, false
 	}

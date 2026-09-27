@@ -33,7 +33,7 @@ func TestPlanFn_CarriesAPriorIDWithNoInboxItemUntilItIsRetired(t *testing.T) {
 	if err != nil || strings.Contains(string(after), `"ghost"`) || !strings.Contains(string(after), `"alpha"`) || !strings.Contains(string(after), `"beta"`) {
 		t.Errorf("the retired id is pruned and its slot refilled: %s %v", after, err)
 	}
-	if !strings.Contains(h.stderr.String(), `pruned consumed top_n id "ghost"`) {
+	if !strings.Contains(h.stderr.String(), `pruned undispatchable top_n id "ghost"`) {
 		t.Errorf("the prune says so: %q", h.stderr.String())
 	}
 }

@@ -27,7 +27,7 @@ func ExpandWithClusterMates(selection, backlog []FleetCandidate, perLane int) []
 	if perLane < 2 {
 		return menus
 	}
-	sorted := rankForDispatch(backlog)
+	sorted := RankForDispatch(backlog)
 	for _, c := range sorted {
 		if inMenu[c.ID] {
 			continue
@@ -65,7 +65,7 @@ func soleOwningLane(owner map[string]int, files []string) (lane int, ok bool) {
 // An empty prefix uses SelectFleetWidthTopN, which still yields one lane at count<2 where widening yields none.
 func SelectWaveSeedMenus(evolveDir string, committed []FleetCandidate, count, perLane int, isProtected func(string) bool) [][]FleetCandidate {
 	backlog := ReadInboxBacklog(evolveDir, isProtected)
-	committed = PruneConsumed(evolveDir, committed)
+	committed = PruneUndispatchable(evolveDir, committed)
 	seed := SelectFleetWidthTopN(backlog, count)
 	if len(committed) > 0 {
 		seed = WidenTopNToFleetWidth(committed, backlog, count)
@@ -73,20 +73,20 @@ func SelectWaveSeedMenus(evolveDir string, committed []FleetCandidate, count, pe
 	return ExpandWithClusterMates(seed, backlog, perLane)
 }
 
-// PruneConsumed drops committed ids in a terminal inbox state, since widening copies the prefix verbatim.
-// An id with no lifecycle evidence stays: dropping what cannot be resolved would starve waves of non-inbox cards.
-func PruneConsumed(evolveDir string, committed []FleetCandidate) []FleetCandidate {
+func PruneUndispatchable(evolveDir string, committed []FleetCandidate) []FleetCandidate {
 	if len(committed) == 0 {
 		return committed
 	}
-	opts := inboxmover.Options{InboxDir: filepath.Join(evolveDir, "inbox"), Stderr: io.Discard}
+	lifecycle := readOnlyLifecycle(evolveDir)
 	kept := make([]FleetCandidate, 0, len(committed))
 	for _, c := range committed {
-		switch inboxmover.ResolveDispatchState(opts, c.ID).State {
-		case inboxmover.StateProcessed, inboxmover.StateConsumed, inboxmover.StateRejected, inboxmover.StateQuarantine:
-			continue
+		if inboxmover.ResolveDispatchability(lifecycle, c.ID).Dispatchable {
+			kept = append(kept, c)
 		}
-		kept = append(kept, c)
 	}
 	return kept
+}
+
+func readOnlyLifecycle(evolveDir string) inboxmover.Options {
+	return inboxmover.Options{InboxDir: filepath.Join(evolveDir, "inbox"), Stderr: io.Discard}
 }

@@ -87,7 +87,7 @@ func protectedDerivation(it Item, isProtected func(string) bool) surfaceDerivati
 }
 
 // PartitionConsole splits items in input order, with one reason per routed item so no exclusion is silent.
-func PartitionConsole(items []Item, isProtected func(string) bool) (dispatchable, console []Item, reasons []string) {
+func PartitionConsole(items []Item, isProtected func(string) bool) (laneRoutable, console []Item, reasons []string) {
 	for _, it := range items {
 		routed, reason := ConsoleRouted(it, isProtected)
 		if routed {
@@ -95,9 +95,9 @@ func PartitionConsole(items []Item, isProtected func(string) bool) (dispatchable
 			reasons = append(reasons, it.ID+": "+reason)
 			continue
 		}
-		dispatchable = append(dispatchable, it)
+		laneRoutable = append(laneRoutable, it)
 	}
-	return dispatchable, console, reasons
+	return laneRoutable, console, reasons
 }
 
 // RoutedResolver loads dir once and classifies by id; unknown ids and a failed load resolve dispatchable.

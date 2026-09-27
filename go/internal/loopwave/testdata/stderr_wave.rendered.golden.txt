@@ -14,7 +14,7 @@
 == routed_refused
 [fleet] WARN: plan-time gate refused console-routed item "console-item" (protected fix surface: go/internal/guards/integrity_surface.go) — operator-owned, worked at a batch boundary via manual ship (ADR-0074)
 == prune_dropped
-[loop] WARN: wave plan: pruned consumed top_n id "gamma" from prior decision
+[loop] WARN: wave plan: pruned undispatchable top_n id "gamma" from prior decision (consumed: processed cycle-9)
 == launcher_all_stale
 [fleet] WARN: freshness gate skipped a: consumed: processed cycle-9
 [fleet] WARN: freshness gate skipped b: consumed: processed cycle-9

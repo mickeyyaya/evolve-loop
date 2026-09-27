@@ -4,12 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"path/filepath"
 	"strconv"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
-	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
@@ -168,7 +166,7 @@ func (e *Engine) RoutedResolver() fleet.RoutedFn {
 // routedBase is the routing authority the gate and pruneRouted share. Each reads
 // the inbox fresh, and the gate backstops an inbox write that lands between the two reads.
 func (e *Engine) routedBase() fleet.RoutedFn {
-	return inboxbatch.RoutedResolver(filepath.Join(paths.EvolveDirOf(e.roots.ProjectRoot), "inbox"), e.ports.Protected)
+	return inboxbatch.RoutedResolver(e.lifecycle().InboxDir, e.ports.Protected)
 }
 
 // Preflight refuses a wave while the main checkout has uncommitted control-plane

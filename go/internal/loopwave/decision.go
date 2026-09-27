@@ -37,7 +37,7 @@ func pruneCommitted(evolveDir string, d decision) (committed []triagecap.FleetCa
 			committed = append(committed, triagecap.FleetCandidate{ID: c.ID, Files: c.Files})
 		}
 	}
-	if kept := triagecap.PruneConsumed(evolveDir, committed); len(kept) < len(committed) {
+	if kept := triagecap.PruneUndispatchable(evolveDir, committed); len(kept) < len(committed) {
 		return kept, true
 	}
 	return committed, false
