@@ -19,5 +19,7 @@
   "source": "go-review of fix/verdict-source-file-authoritative (the architectural verdict-source fix superseding the settle-window band-aid), finding on intent-delta latency.",
   "created_at": "2026-07-19T02:00:00Z",
   "route": "console-manual",
-  "notes": " | 2026-09-14 console-routed by the operator session: lanes 1664/1668/1670 (and more) each claimed it and FAILed at triage — the top_n card names a protected surface (F4 class), so no lane can ship it; work it from the console."
+  "notes": " | 2026-09-14 console-routed by the operator session: lanes 1664/1668/1670 (and more) each claimed it and FAILed at triage — the top_n card names a protected surface (F4 class), so no lane can ship it; work it from the console.",
+  "consumed_by": "inbox review 2026-09-27: OBSOLETE. The canonical case never reaches the settle loop. Intent's ShouldSkip (phases/intent/intent.go:94-106, landed da2e8265 on 2026-06-23, before this item was filed) decides unchanged-goal delta mode deterministically BEFORE dispatch, so no deliverable is written and nothing waits. Intent is opt-in and ran in no cycle from 1600 to 1799 (no intent-* artifacts in any run dir). The only residual is an LLM that emits [intent-unchanged] after a real goal change, which costs at most SettleRetries 15 x 200 ms, about 3 s (phases/runner/verdict/verdict.go:37-40; settle.go:24-38). The item names no other ph",
+  "consumed_at": "2026-09-27T23:30:00Z"
 }

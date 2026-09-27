@@ -16,5 +16,7 @@
   ],
   "surface_note": "2026-09-26 console curation (F29 follow-up): files[] typed from a read-only classification against guards.ProtectedSurfaceManifest — protected=false, confidence=high. Already fixed (untracked, ignored, regression-pinned); all that is optional is pointing -coverprofile at t.TempDir() in these two tests and about 28 sibling cycle tests.",
   "route": "console-manual",
-  "routed_reason": "already fixed on main (untracked, ignored, regression-pinned — classification 2026-09-26); the optional remainder (-coverprofile to t.TempDir() in ~30 cycle tests) is not lane work: a lane would ship a no-op diff. Retire at a batch boundary."
+  "routed_reason": "already fixed on main (untracked, ignored, regression-pinned — classification 2026-09-26); the optional remainder (-coverprofile to t.TempDir() in ~30 cycle tests) is not lane work: a lane would ship a no-op diff. Retire at a batch boundary.",
+  "consumed_by": "inbox review 2026-09-27: FIXED. Fixed in #521 (74591d87, 2026-09-01), which deleted go/coverage.router480.txt and the sibling files and added coverage.*.txt at .gitignore:210. `git ls-tree -r origin/main go/` lists no go/coverage.*.txt. The optional remainder (-coverprofile into t.TempDir() in about 30 cycle predicates) fixes no defect.",
+  "consumed_at": "2026-09-27T23:30:00Z"
 }

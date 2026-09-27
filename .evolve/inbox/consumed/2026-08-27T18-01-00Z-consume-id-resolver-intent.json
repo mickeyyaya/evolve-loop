@@ -10,5 +10,7 @@
   ],
   "created_at": "2026-08-27T18:01:00Z",
   "route": "console-manual",
-  "routed_reason": "2026-09-26 console readiness audit (read-only, against main b9553b9b): STALE — the single-source committed-inbox-id resolution shipped in #476 (be5062ad) and was iterated in #492/#496/#499; consume.go:82-90 and postship.go:400-410 narrate the fix as shipped. Retire at a boundary."
+  "routed_reason": "2026-09-26 console readiness audit (read-only, against main b9553b9b): STALE — the single-source committed-inbox-id resolution shipped in #476 (be5062ad) and was iterated in #492/#496/#499; consume.go:82-90 and postship.go:400-410 narrate the fix as shipped. Retire at a boundary.",
+  "consumed_by": "inbox review 2026-09-27: FIXED. Shipped as be5062ad (#476, 2026-08-20), \"single-source committed-inbox-id resolution\", then iterated in ee44e7ec #492, 4ca36ded #496 and 7e44c53a #499. consumeCommittedItems now resolves through the same committedInboxIDs that the post-ship promotion uses (internal/phases/ship/consume.go:88-99), which is what fixed consumption on carryover-driven lanes.",
+  "consumed_at": "2026-09-27T23:30:00Z"
 }

@@ -7,5 +7,7 @@
   "files": [
     "go/internal/bridge/channel/e2e_test.go"
   ],
-  "surface_note": "2026-09-26 console readiness audit (read-only, against main b9553b9b): the flake (TestChannel_EndToEnd: PollEvery=1ms, 5/10ms sleeps) and every candidate fix live under go/internal/bridge/ — protected surface (routes console by files[])."
+  "surface_note": "2026-09-26 console readiness audit (read-only, against main b9553b9b): the flake (TestChannel_EndToEnd: PollEvery=1ms, 5/10ms sleeps) and every candidate fix live under go/internal/bridge/ — protected surface (routes console by files[]).",
+  "consumed_by": "inbox review 2026-09-27: FIXED. 2708caee (2026-09-27 10:32) replaced the 10 ms sleep with waitForFeed: tick 2 is written only after tick 1's envelope reaches the feed (go/internal/bridge/channel/e2e_test.go:13-23, :98). The commit reports 30 runs green under -race and load. F7 979c111e adds the importer-backstop 'alone' re-run that named this test. The last failure is cycle 1718's lane (loop-20260927-0811-verify.log:3152), before the fix; the two later logs show none. Minor residual: tick 2's stdout and stderr appends can still split across one Producer poll, and the -race -count=20 CI pin was not added.",
+  "consumed_at": "2026-09-27T23:30:00Z"
 }

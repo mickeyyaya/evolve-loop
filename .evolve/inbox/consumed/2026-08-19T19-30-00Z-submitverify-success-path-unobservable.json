@@ -27,5 +27,7 @@
   "priority": "high",
   "weight": 0.84,
   "created_at": "2026-08-19T19:30:00Z",
-  "notes": "Filed from a live verification attempt, not from code reading: the wave was launched specifically to observe #474 firing and could not, which is the strongest possible evidence for the gap. NOTE the asymmetry this creates today — a phase that FAILS persists the guard's lines via <agent>-launch-error.txt (the case that matters most is covered), so this is a measurability defect rather than a blindness defect. Do not 'fix' it by persisting all stderr on success."
+  "notes": "Filed from a live verification attempt, not from code reading: the wave was launched specifically to observe #474 firing and could not, which is the strongest possible evidence for the gap. NOTE the asymmetry this creates today — a phase that FAILS persists the guard's lines via <agent>-launch-error.txt (the case that matters most is covered), so this is a measurability defect rather than a blindness defect. Do not 'fix' it by persisting all stderr on success.",
+  "consumed_by": "inbox review 2026-09-27: FIXED. Fixed by 63e7ea54 (#475, 2026-08-20). recordSubmitVerify (driver_tmux_submitverify.go:160-178) writes a KindSubmitVerify interaction on every outcome (submit_verified, submitted_after_resend, submit_wedged, not_verified; interaction.go:48-56) at the prompt site (driver_tmux_wait_admission.go:42) and the nudge site (driver_tmux_wait_disposition.go:98). Engine stderr persistence is unchanged. Live proof: cycle-1720 *-interactions.ndjson holds 10 submit_verified, 1 submitted_after_resend and 6 not_verified records.",
+  "consumed_at": "2026-09-27T23:30:00Z"
 }

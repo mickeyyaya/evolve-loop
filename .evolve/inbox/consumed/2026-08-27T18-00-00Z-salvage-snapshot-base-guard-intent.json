@@ -4,6 +4,11 @@
   "weight": 0.6,
   "title": "Rescued intent: worktree-base capture should go through rev-parse HEAD, with unreadable ancestry failing OPEN to verbatim",
   "summary": "CAPTURED 2026-08-27 from branch fix/salvage-snapshot-base-guard before deleting it — the branch was 74 commits behind main and conflicted, so it could not be merged, and this intent existed NOWHERE else (no inbox item, no commit in main). Two commits: (1) 'salvage the snapshot-base guard from the 1539-1546 absorbing-FAIL chain — phantom test-name bindings un-poisoned'; (2) 'worktree-base capture goes through rev-parse HEAD; unreadable ancestry fails OPEN to verbatim'. Touched go/internal/core/worktree_base.go (+test), continuation_stamp.go, cyclerun.go, plus ACS predicates for cycles 1544/1546 and an eval continuation-create-reuse-snapshot-base-guard.md. RELEVANCE TODAY: the worktree-base operand is the same one PR #503's audit-binding work leans on (WorktreeBaseSHA feeds the verdict-cache fresh-base guard), and this session confirmed the binding path is load-bearing — so a guard on how that base is captured is worth re-deriving on current main rather than resurrecting the stale branch. Re-implement from scratch against today's code; the original diff is preserved in the branch bundle at ~/ai/claude/backups/ if the reasoning is needed.",
-  "connects_to": ["go/internal/core/worktree_base.go", "go/internal/core/continuation_stamp.go"],
-  "created_at": "2026-08-27T18:00:00Z"
+  "connects_to": [
+    "go/internal/core/worktree_base.go",
+    "go/internal/core/continuation_stamp.go"
+  ],
+  "created_at": "2026-08-27T18:00:00Z",
+  "consumed_by": "inbox review 2026-09-27: FIXED. Both rescued commits are already on main in e3c99d77 (#486, 2026-08-23), four days before this item was filed. worktree_base.go:63-80 (resolveWorktreeBaseSHA) captures the base via `rev-parse HEAD`, walks past salvage snapshots, and fails OPEN to HEAD verbatim with a WARN when ancestry is unreadable (:76). It is wired into cyclerun.go, the shared subject constant lives in continuation_stamp.go, and ACS cycle1544/1546 cover it. git log -S on 'recording HEAD verbatim' and on the rev-parse call both return only e3c99d77.",
+  "consumed_at": "2026-09-27T23:30:00Z"
 }

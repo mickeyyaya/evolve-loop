@@ -18,5 +18,7 @@
     "2026-08-06T06-20-00Z-null-failreasons-capture.json",
     "cycle-1601 router-launch-error.txt",
     "absorbed duplicate: router-fleet-mode-worktree-refusal (filed 2026-09-02)"
-  ]
+  ],
+  "consumed_by": "inbox review 2026-09-27: FIXED. 98d85b0e (#542, 2026-09-09) made the advisor dispatch fall back to the run workspace when no worktree is active. e8604ee4 (#598) carried it into internal/core/advisor/launch.go:106-109 (launchRequestFor). TestLaunch_ThreadsWorktreeArtifactContractCompletionAgentCycleEnv (launch_test.go:118-152) pins the replan decision with an empty ActiveWorktree. The last router-launch-error.txt with 'explicit worktree required' is cycle-1606 (2026-09-02); there are none in cycles 1607-1721.",
+  "consumed_at": "2026-09-27T23:30:00Z"
 }

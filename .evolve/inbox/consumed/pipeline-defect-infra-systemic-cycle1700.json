@@ -1,0 +1,20 @@
+{
+  "connects_to": [
+    "docs/architecture/adr/0072-system-failure-policy-and-halt.md",
+    ".evolve/pipeline-escalation.json",
+    "/Users/danleemh/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-1700"
+  ],
+  "created_at": "2026-09-26T06:00:50Z",
+  "fix": "Root-cause the pipeline failure described by the recorded evidence: orchestrator-classified infra-systemic: failure-dossier.json recorded_verdict=FAIL with audit_declared={}; audit-report.md narrative PASS 0.90; audit-chain-shadow.json chain_verdict=PASS; acs-verdict.candidate red=0 vs acs-verdict.json red=2 [TestC1700_004, TestC1700_007], whose failing tests are TestReadLoop_* over loop.go/loop_test.go that the diff never touched; retro A/B: EVOLVE_CYCLE_STATE_FILE set -> both predicates FAIL, unset -> ok. Add a regression test that reproduces it. Do NOT retry the halted task until the pipeline is fixed.",
+  "id": "pipeline-defect-infra-systemic-cycle1700",
+  "injected_by": "loop-escalation",
+  "kind": "pipeline-repair",
+  "notes": "Auto-filed by the ADR-0072 halt at 2026-09-26T06:00:50Z. Evidence: orchestrator-classified infra-systemic: failure-dossier.json recorded_verdict=FAIL with audit_declared={}; audit-report.md narrative PASS 0.90; audit-chain-shadow.json chain_verdict=PASS; acs-verdict.candidate red=0 vs acs-verdict.json red=2 [TestC1700_004, TestC1700_007], whose failing tests are TestReadLoop_* over loop.go/loop_test.go that the diff never touched; retro A/B: EVOLVE_CYCLE_STATE_FILE set -> both predicates FAIL, unset -> ok",
+  "priority": "P0",
+  "root_cause": "The system-failure signal reported: orchestrator-classified infra-systemic: failure-dossier.json recorded_verdict=FAIL with audit_declared={}; audit-report.md narrative PASS 0.90; audit-chain-shadow.json chain_verdict=PASS; acs-verdict.candidate red=0 vs acs-verdict.json red=2 [TestC1700_004, TestC1700_007], whose failing tests are TestReadLoop_* over loop.go/loop_test.go that the diff never touched; retro A/B: EVOLVE_CYCLE_STATE_FILE set -> both predicates FAIL, unset -> ok. Preserve this evidence while identifying the pipeline cause.",
+  "summary": "ADR-0072 system-failure halt at cycle 1700 (category=infra-systemic). Evidence: orchestrator-classified infra-systemic: failure-dossier.json recorded_verdict=FAIL with audit_declared={}; audit-report.md narrative PASS 0.90; audit-chain-shadow.json chain_verdict=PASS; acs-verdict.candidate red=0 vs acs-verdict.json red=2 [TestC1700_004, TestC1700_007], whose failing tests are TestReadLoop_* over loop.go/loop_test.go that the diff never touched; retro A/B: EVOLVE_CYCLE_STATE_FILE set -> both predicates FAIL, unset -> ok. This is a PIPELINE defect, not a task failure — diagnose the reported failure before retrying the task.",
+  "title": "PIPELINE DEFECT (infra-systemic): the loop halted — orchestrator-classified infra-systemic: failure-dossier.json recorded_verdict=FAIL with audit_declared={}; audit-report.md narrative PASS 0.90; audit-chain-shadow.json chain_verdict=PASS; acs-verdict.candidate red=0 vs acs-verdict.json red=2 [TestC1700_004, TestC1700_007], whose failing tests are TestReadLoop_* over loop.go/loop_test.go that the diff never touched; retro A/B: EVOLVE_CYCLE_STATE_FILE set -> both predicates FAIL, unset -> ok",
+  "weight": 0.99,
+  "consumed_by": "inbox review 2026-09-27: FIXED. The root cause, a lane's EVOLVE_CYCLE_STATE_FILE reaching every test fixture it spawned, is fixed in #647 (2d58d159, 'fix(cyclestate): a lane's override applies only inside its own evolve dir'). The fix adds paths.CycleStateFileFor (go/internal/paths/paths.go:145), which core.ResolveCycleStatePath and paths.Resolve delegate to, and fleetLaneEvolveDirOK (go/cmd/evolve/cmd_cycle_fleet_evolvedir.go:14). Regression: go/internal/paths/paths_cyclestate_scope_test.go; the whole module passes with a lane override exported. Incident: docs/incidents/2026-09-26-lane-cycle-state-override-reached-test-fixt",
+  "consumed_at": "2026-09-27T23:30:00Z"
+}
