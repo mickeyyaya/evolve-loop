@@ -22,17 +22,18 @@ type CompositionAuditSnapshot struct {
 
 // CompositionVerdictInput mirrors ledger.CompositionVerdictInput field for field; core cannot import the ledger adapter.
 type CompositionVerdictInput struct {
-	Cycle        int
-	Method       string
-	LaneAuditRef string
-	PatchID      string
-	AuditedBase  string
-	GitHead      string
-	TreeStateSHA string
-	GateResults  map[string]string
-	AuditedDiff  []byte
-	ComposedDiff []byte
-	ArtifactDir  string
+	Cycle          int
+	Method         string
+	LaneAuditRef   string
+	PatchID        string
+	AuditedBase    string
+	GitHead        string
+	TreeStateSHA   string
+	AuditedTreeSHA string
+	GateResults    map[string]string
+	AuditedDiff    []byte
+	ComposedDiff   []byte
+	ArtifactDir    string
 }
 
 const compositionArtifactDirName = "composition-artifacts"

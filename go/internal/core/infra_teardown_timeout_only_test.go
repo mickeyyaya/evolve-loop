@@ -1,34 +1,5 @@
 package core
 
-// RED contract for cycle-1267 Task 2
-// (`verify-infra-teardown-predicate-consolidation`, inbox
-// infra-teardown-predicate-single-source, w=0.86) — the acceptance criterion
-// that has NO pin today:
-//
-//	"NO site that is timeout-only or transient-only was incorrectly widened to
-//	 the union predicate"
-//
-// The item calls this its whole risk: "this item's whole risk is a blind widen
-// of a timeout-only or transient-only site into the union."
-//
-// The transient-ONLY half is already pinned
-// (infra_teardown_single_source_test.go: TestIsTransientBridgeError_StaysTransientOnly),
-// and the uniqueness of the union spelling is pinned there too. The TIMEOUT-only
-// half is not pinned anywhere: the two sites the inbox item and the cycle-1267
-// scout report both name —
-//
-//	failure_learning.go  writePhaseFailureDiag        (exit-code 81 mapping)
-//	failure_hook.go      adviseOnUnclassifiedFailure  (pane-classification gate)
-//
-// — check ErrArtifactTimeout ALONE and must keep doing so. Nothing stops a
-// future "consolidation" from folding either into IsInfraTeardownError, at
-// which point a quota bounce (ErrTransientBridgeFailure) would be recorded as
-// exit 81 and fed to the fatal-signature classifier as if it carried a
-// diagnosable pane. This file makes that regression fail.
-//
-// This is a behaviour-PRESERVING contract: both pins encode "you did not change
-// semantics", which is exactly what the item asks for ("no verdict changes").
-
 import (
 	"encoding/json"
 	"errors"
@@ -43,11 +14,6 @@ import (
 	"time"
 )
 
-// TestWritePhaseFailureDiag_TimeoutOnlyNotWidened — AC9, the behavioural pin on
-// the timeout-only exit-code mapping. Exit 81 is the artifact-wait timeout's
-// code specifically; a transient bridge failure is exit 80/85/86/124 and must
-// NOT be relabelled 81, or every quota bounce in the failure-diag record
-// becomes indistinguishable from a stalled agent.
 func TestWritePhaseFailureDiag_TimeoutOnlyNotWidened(t *testing.T) {
 	at := time.Date(2026, 8, 4, 7, 0, 0, 0, time.UTC)
 	now := func() time.Time { return at }
@@ -106,23 +72,11 @@ type timeoutOnlySite struct {
 	fn   string
 	why  string
 	// gate is the timeout-only expression the body must reference; "" means
-	// the sentinel itself. Unit 02 (ADR-0103) moved the sidecar writer into
-	// internal/core/failurediag, which cannot import either sentinel, so the
-	// gate the orchestrator injects (isArtifactTimeout) is what the pin reads.
+	// the sentinel itself. internal/core/failurediag cannot import either
+	// sentinel, so the injected isArtifactTimeout gate is what the pin reads.
 	gate string
 }
 
-// TestTimeoutOnlySites_NotWidenedToUnion — AC10, the structural half. AC9 pins
-// the one timeout-only site whose behaviour is observable from a unit test;
-// adviseOnUnclassifiedFailure's gate is reachable only through a fully wired
-// orchestrator with a real failure adviser, so it is pinned structurally
-// instead: its body must still mention ErrArtifactTimeout and must NOT mention
-// the transient sentinel, its transient-only component, or the union helper.
-//
-// This is a NON-degenerate scan for the same reason
-// TestInfraTeardownUnion_SpelledExactlyOnce is: it can only be satisfied by NOT
-// adding text. Adding the magic string is precisely what makes it fail, so it
-// cannot be gamed the way a "source contains X" predicate can.
 func TestTimeoutOnlySites_NotWidenedToUnion(t *testing.T) {
 	sites := []timeoutOnlySite{
 		{

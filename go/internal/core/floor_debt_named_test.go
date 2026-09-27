@@ -1,10 +1,5 @@
 package core
 
-// floor_debt_named_test.go — pays the cycle-1048 debt: four core exports were
-// exercised only under integration tags, reading 0% (false-green) in every
-// scoped coverage run and floor-blocking all core-touching lanes. Default-tag
-// tests with real assertions.
-
 import (
 	"context"
 	"testing"

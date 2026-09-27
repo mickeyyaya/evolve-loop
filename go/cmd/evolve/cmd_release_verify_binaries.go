@@ -1,20 +1,3 @@
-// cmd_release_verify_binaries.go implements `evolve release-verify-binaries
-// <tag>`: the release-flow gate that proves every prebuilt binary the release is
-// supposed to publish is actually present as an asset on the GitHub release.
-//
-// Why this exists: `evolve release` proves only LOCAL binary consistency, and
-// "all binaries published" lived only as prose in skills/publish/SKILL.md, which
-// is non-deterministic — v21.1.0 reported success yet published zero assets. This
-// command makes that closing check deterministic Go.
-//
-// Single source of truth: the expected asset set is DERIVED from .goreleaser.yml
-// (the only place the build matrix must exist inline). Add a target there and
-// this gate automatically requires its archive published — no second list.
-//
-// Determinism: no live LLM. The one effect — listing a release's assets — is
-// injected via releaseAssetLister so the orchestration (coverage, no early
-// return) is unit-testable with pure stubs; defaultReleaseAssetLister wires the
-// real GitHub REST call used by the release workflow.
 package main
 
 import (

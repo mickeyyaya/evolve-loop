@@ -316,6 +316,8 @@
 # the audit-binding verifier hash via ONE impl. SHA + RunError named/exercised by
 # treestate_test.go (table seam + real-git/shell parity).
 ./internal/treestate
+# treedelta — the byte-exact change between a base and a tree; the carry across a rebase (ADR-0105 B3/B4) proves identity with it.
+./internal/treedelta
 
 # bash->Go migration Wave B1 (2026-06-18): commit-gate-runner.sh ported to a
 # native gate (lang-detect + reviewer precondition + lint lanes + tree-SHA-bound

@@ -142,14 +142,16 @@ func (o *Orchestrator) recoverFromShipError(ctx context.Context, projectRoot str
 }
 
 // routeRebasedExplanation moves the explanation's base binding to the rebased base. When the host proves
-// the explained change byte-identical there, the approved Build stands and only Audit re-runs
-// (ADR-0105); otherwise the snapshot is invalidated and Build re-authors the explanation.
+// the explained change byte-identical there, the approved Build stands and the audited verdict carries to
+// ship when the carry proves it, else only Audit re-runs (ADR-0105); otherwise the snapshot is invalidated
+// and Build re-authors the explanation.
 func (o *Orchestrator) routeRebasedExplanation(ctx context.Context, projectRoot string, cycle int, cs *CycleState) (Phase, bool) {
 	newBase, err := forkPoint(ctx, gitCapture, cs.ActiveWorktree)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d resolve rebased explanation base failed: %v\n", cycle, err)
 		return "", false
 	}
+	base0 := cs.WorktreeBaseSHA
 	rebasedState := *cs
 	rebasedState.WorktreeBaseSHA = newBase
 	persist := func() error { return o.storage.WriteCycleState(ctx, rebasedState) }
@@ -163,6 +165,9 @@ func (o *Orchestrator) routeRebasedExplanation(ctx context.Context, projectRoot 
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d identity-preserving rebind not attempted: %v; returning to Build\n", cycle, err)
 	case rebound:
 		*cs = rebasedState
+		if o.identityCarryForward(ctx, cycle, rebasedState, base0, projectRoot) {
+			return PhaseShip, true
+		}
 		fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d rebase is byte-identical on %s: explanation rebound, re-auditing without a Build (ADR-0105)\n", cycle, newBase)
 		return PhaseAudit, true
 	default:

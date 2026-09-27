@@ -22,8 +22,7 @@ type replPreparation struct {
 	artifactScrollback int
 }
 
-// prepareTmuxREPL validates launch inputs and materializes the immutable files
-// and identities used by the session. It finishes before any tmux side effect.
+// prepareTmuxREPL finishes before any tmux side effect.
 func prepareTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (replPreparation, int, error) {
 	prep := replPreparation{prefix: "[" + lp.name + "]"}
 
@@ -82,8 +81,6 @@ func prepareTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch)
 	return prep, ExitOK, nil
 }
 
-// withIdentity ends the pasted prompt with the identity statement, after the composed prompt so the
-// engine's bytes stay a stable prefix and the deliverable path stays the last thing the agent reads.
 func withIdentity(prompt string, f phaseidentity.Facts) string {
 	block := phaseidentity.Block(f)
 	if block == "" {
@@ -92,8 +89,6 @@ func withIdentity(prompt string, f phaseidentity.Facts) string {
 	return strings.TrimRight(prompt, "\n") + "\n\n" + strings.TrimRight(block, "\n")
 }
 
-// writtenArtifact is the file the agent itself writes, or "" for a phase whose answer the bridge reads
-// from the pane.
 func writtenArtifact(cfg *Config) string {
 	if cfg.Completion == completionStdout {
 		return ""

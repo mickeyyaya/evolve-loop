@@ -8,12 +8,7 @@ import (
 	"strings"
 )
 
-// launch_modes.go — the non-dispatch launch modes from bin/bridge
-// cmd_launch: --validate-only (print resolved config), --dry-run (mock
-// outputs, no LLM), and the --require-full tier precheck.
-
-// printResolvedConfig writes the resolved launch configuration block to
-// w, mirroring bin/bridge's `--validate-only` output. Returns ExitOK.
+// printResolvedConfig writes the resolved launch configuration block to w.
 func printResolvedConfig(w io.Writer, cfg *Config, prof Profile) {
 	fmt.Fprintln(w, "[bridge] validate-only — resolved config:")
 	fmt.Fprintf(w, "  cli             = %s\n", cfg.CLI)
@@ -38,9 +33,8 @@ func printResolvedConfig(w io.Writer, cfg *Config, prof Profile) {
 	fmt.Fprintf(w, "  human-input     = %t\n", cfg.HumanInput)
 }
 
-// runDryRun produces mock outputs (stdout-log, stderr-log, artifact) with
-// the challenge token resolved, without invoking any LLM — the Go port of
-// bin/bridge's _bridge_dry_run. Returns ExitOK.
+// runDryRun produces mock outputs (stdout-log, stderr-log, artifact) with the challenge token resolved,
+// without invoking any LLM.
 func (e *Engine) runDryRun(cfg *Config, _ io.Writer, stderr io.Writer) int {
 	if err := ensureDirs(cfg); err != nil {
 		fmt.Fprintf(stderr, "[bridge] dry-run: %v\n", err)
@@ -71,9 +65,8 @@ func (e *Engine) runDryRun(cfg *Config, _ io.Writer, stderr io.Writer) int {
 	return ExitOK
 }
 
-// requireFullCheck enforces --require-full: the CLI's probed tier must be
-// full or hybrid. Returns (exitCode, blocked). The Go port of the
-// bin/bridge --require-full gate.
+// requireFullCheck enforces --require-full: the CLI's probed tier must be full or hybrid. Returns
+// (exitCode, blocked).
 func (e *Engine) requireFullCheck(cfg *Config, stderr io.Writer) (int, bool) {
 	tier := "none"
 	if m, err := LoadManifest(cfg.CLI); err == nil {

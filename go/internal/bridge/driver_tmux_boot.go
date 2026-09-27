@@ -54,14 +54,9 @@ func bootTmuxREPL(
 
 	deps.Sleep(time.Second)
 	_ = deps.Tmux.SendKeys(ctx, lp.session, "cd "+prep.workingDir, true)
-	// The pane is a shell the bridge did not start: it inherits the tmux
-	// server's environment, not this process's, so Deps.Env never reaches it
-	// the way driverEnv hands it to a headless CLI. Export the one variable
-	// the subprocess contract promises (core/phase.go: ProjectRoot is "what a
-	// subprocess sees as EVOLVE_PROJECT_ROOT"). Without it every `evolve`
-	// subcommand the agent runs resolves its root from the worktree cwd —
-	// batch cycle 1631 (2026-09-12) claimed an inbox item in the worktree's
-	// git-tracked inbox snapshot while the plane's queue never moved.
+	// The pane is a shell the bridge did not start; it inherits the tmux server's environment, not this
+	// process's, so ProjectRoot must be exported explicitly or `evolve` subcommands resolve it from the
+	// worktree cwd instead.
 	if cfg.ProjectRoot != "" {
 		_ = deps.Tmux.SendKeys(ctx, lp.session, "export EVOLVE_PROJECT_ROOT="+shellQuotePOSIX(cfg.ProjectRoot), true)
 	}

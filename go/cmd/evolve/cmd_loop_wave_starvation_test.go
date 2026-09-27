@@ -1,20 +1,5 @@
 package main
 
-// cmd_loop_wave_starvation_test.go — cycle-557, task
-// fix-wave-plan-source-starvation (scout-report.md ## Selected Tasks, Task 1).
-//
-// Two composed regressions this cycle removes, both of which force the wave
-// planner off its isolated-lane path and onto the leak-prone in-supervisor
-// sequential fallback (the standing rule `fleet_width_always_respected` calls
-// this "the leak path"):
-//
-//  1. widenNarrowDecision returned a present-but-EMPTY prior triage decision
-//     unchanged (the observed cycle-554 shape: top_n:[]). An empty top_n must
-//     instead widen fully from the inbox backlog, exactly as an absent decision
-//     would — otherwise the wave plans zero lanes from a non-empty backlog.
-//  2. minWidthRepair's guard excluded the empty-plan-at-full-capacity shape
-//     (fleetCfg.Count>1, waveCfg.Count>1, zero planned lanes) so it fell
-//     through to sequential instead of repairing to one isolated lane.
 import (
 	"bytes"
 	"context"
@@ -39,11 +24,6 @@ func (f *wsStarvationFakeLauncher) Run(_ context.Context, specs []fleet.CycleSpe
 	return out
 }
 
-// TestWidenNarrowDecision_EmptyTopNWidensFromInbox (regression #1). A prior
-// decision with an EMPTY top_n plus a non-empty, file-disjoint inbox backlog
-// must widen to fleet width — NOT return the empty decision unchanged. Before
-// this cycle the `len(decision.TopN)==0` early-return returned `data` verbatim,
-// starving the wave to zero lanes; this test fails against that code.
 func TestWidenNarrowDecision_EmptyTopNWidensFromInbox(t *testing.T) {
 	evolveDir := t.TempDir()
 	inbox := filepath.Join(evolveDir, "inbox")
@@ -75,9 +55,6 @@ func TestWidenNarrowDecision_EmptyTopNWidensFromInbox(t *testing.T) {
 	}
 }
 
-// TestWidenNarrowDecision_UnparseableReturnsUnchanged: only a genuinely
-// unparseable decision returns the bytes verbatim — the widening is best-effort
-// and must never corrupt a decision it cannot read.
 func TestWidenNarrowDecision_UnparseableReturnsUnchanged(t *testing.T) {
 	bad := []byte(`{not json`)
 	if got := widenNarrowDecision(bad, t.TempDir(), 2); string(got) != string(bad) {
@@ -85,12 +62,6 @@ func TestWidenNarrowDecision_UnparseableReturnsUnchanged(t *testing.T) {
 	}
 }
 
-// TestMinWidthRepair_EmptyPlanAtFullCapacityRepairsNotSequential (regression
-// #2). fleetCfg.Count>1 AND waveCfg.Count>1 (capacity held at full width) but
-// dispatchIteration planned zero lanes: the repair must still fire (one
-// isolated lane, handled=true), NOT fall through to sequential. The old guard
-// `!(fleetCfg.Count>1 && waveCfg.Count<=1)` excluded this shape and WARNed
-// "empty triage plan" with the launcher untouched — this test fails against it.
 func TestMinWidthRepair_EmptyPlanAtFullCapacityRepairsNotSequential(t *testing.T) {
 	launcher := &wsStarvationFakeLauncher{}
 	planFn := func(context.Context, int) ([]byte, []string, error) {

@@ -84,6 +84,7 @@ func verifyAuditBinding(ctx context.Context, opts *Options, res *RunResult) erro
 	// the changes-commit tree. An empty WorktreeTreeSHA leaves the field unset
 	// and is refused below by verifyPredicateReceipt and the treefence check.
 	opts.internalAuditBoundTreeSHA = entry.WorktreeTreeSHA
+	opts.internalAuditArtifactSHA = entry.ArtifactSHA256
 
 	// 5. Cycle binding: current HEAD/tree must match ledger entry.
 	if entry.GitHEAD == "" || entry.TreeStateSHA == "" {

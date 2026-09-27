@@ -1,23 +1,5 @@
 package core
 
-// Cycle-976 RED wiring proofs for the model-tier-envelope guard.
-//
-// These are INTEGRATION tests through RunCycle (not the router unit boundary):
-// they drive the REAL Orchestrator.profileForModelRouting seam so they fail
-// against the current permanent nil-stub (cyclerun.go:711-713) and pass once
-// Builder wires a real per-phase profile lookup. The router-level guard
-// (router.ClampPlanModelRouting) is already unit-covered and correct; the defect
-// under test is purely that the production DI seam feeding it real profiles
-// returns nil for every phase, silently disabling floor AND ceiling clamps
-// (including the documented "universal floor") for 100% of live cycles.
-//
-// Why RED now: profileForModelRouting returns nil → prof==nil in the guard →
-// the whole envelope branch (model_routing_clamp.go:88-109) is skipped → the
-// advisor-proposed out-of-envelope tier reaches dispatch verbatim. The
-// assertions below want the CLAMPED tier, so they fail on the assertion (right
-// reason), not on a compile error — every helper used here already exists in
-// the core test package.
-
 import (
 	"context"
 	"encoding/json"
@@ -86,12 +68,6 @@ func runBuildTierThroughCycle(t *testing.T, projectRoot, proposedTier string) st
 	return fr.requests[0].ModelRoutingTier
 }
 
-// TestModelTierEnvelope_CeilingClampsThroughRealProfileLookup — Task-1 wiring
-// proof (ceiling / explicit envelope). A phase whose OWN profile declares
-// model_tier_envelope {min:balanced,max:deep} must clamp an advisor proposal of
-// "top" (rank 4 > deep rank 3) DOWN to "deep" when driven through the real
-// Orchestrator seam. RED on the nil-stub (dispatched tier stays "top"); GREEN
-// once profileForModelRouting resolves builder.json.
 func TestModelTierEnvelope_CeilingClampsThroughRealProfileLookup(t *testing.T) {
 	root := t.TempDir()
 	writeBuilderProfile(t, root, `{"min":"balanced","max":"deep"}`)
@@ -102,13 +78,6 @@ func TestModelTierEnvelope_CeilingClampsThroughRealProfileLookup(t *testing.T) {
 	}
 }
 
-// TestModelTierEnvelope_UniversalFloorClampsThroughRealDispatch — Task-2 wiring
-// proof (universal floor). A phase whose profile declares NO envelope must still
-// clamp a below-floor proposal ("fast", rank 1) UP to the compiled
-// universalTierFloor.Min ("balanced", rank 2) in the composed production path,
-// not just at the router unit boundary. RED on the nil-stub (prof==nil skips the
-// universalTierFloor substitution entirely, so "fast" reaches dispatch); GREEN
-// once the real profile (non-nil, envelope-less) is resolved.
 func TestModelTierEnvelope_UniversalFloorClampsThroughRealDispatch(t *testing.T) {
 	root := t.TempDir()
 	writeBuilderProfile(t, root, "") // no model_tier_envelope → universal floor governs
@@ -119,13 +88,8 @@ func TestModelTierEnvelope_UniversalFloorClampsThroughRealDispatch(t *testing.T)
 	}
 }
 
-// TestModelTierEnvelope_WithinEnvelopeTierPassesThrough — anti-no-op / precision
-// guard (semantic axis). A proposal INSIDE the phase's envelope
-// ({min:balanced,max:deep}, proposing "deep") must reach dispatch UNCHANGED: the
-// wiring must clamp only genuine violations, never degenerate into "always clamp
-// to the floor/default". Holds on both the nil-stub and the wired path, so it
-// pins the fix's precision rather than discriminating the wiring — its value is
-// catching a Builder over-clamp regression.
+// Unlike its siblings, this holds on both the nil-stub and the wired path —
+// it pins precision (no over-clamp), not the wiring fix itself.
 func TestModelTierEnvelope_WithinEnvelopeTierPassesThrough(t *testing.T) {
 	root := t.TempDir()
 	writeBuilderProfile(t, root, `{"min":"balanced","max":"deep"}`)
@@ -136,14 +100,6 @@ func TestModelTierEnvelope_WithinEnvelopeTierPassesThrough(t *testing.T) {
 	}
 }
 
-// TestModelTierEnvelope_AbsentProfileDegradesNilSafe — nil-safety invariant
-// (edge axis, Task-1 AC "nil only for phases genuinely lacking one"). When NO
-// profile file exists for the phase, the real lookup must resolve to nil and the
-// guard must degrade to the documented pass-through (ValidatePin's nil-profile
-// contract) rather than erroring or emptying the proposal. A below-floor "fast"
-// proposal survives to dispatch because there is no profile — and, critically,
-// no universal floor is applied when the profile is genuinely ABSENT (distinct
-// from present-but-envelope-less, which DOES get the universal floor above).
 func TestModelTierEnvelope_AbsentProfileDegradesNilSafe(t *testing.T) {
 	root := t.TempDir() // no .evolve/profiles/ at all
 
@@ -153,10 +109,6 @@ func TestModelTierEnvelope_AbsentProfileDegradesNilSafe(t *testing.T) {
 	}
 }
 
-// TestModelTierEnvelope_ClampRecordedInPhasePlan — evidence axis: the ceiling
-// clamp must also be persisted to phase-plan.json (the operator-visible
-// artifact), not silently applied — mirroring the existing advisory/auto logging
-// contract. RED on the nil-stub (no clamp recorded because none fires).
 func TestModelTierEnvelope_ClampRecordedInPhasePlan(t *testing.T) {
 	root := t.TempDir()
 	writeBuilderProfile(t, root, `{"min":"balanced","max":"deep"}`)

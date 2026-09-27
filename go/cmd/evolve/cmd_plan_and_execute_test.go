@@ -23,7 +23,6 @@ type twoPassStub struct {
 }
 
 func (s *twoPassStub) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseResponse, error) {
-	// Capture relevant env keys for assertion.
 	snapshot := map[string]string{
 		"EVOLVE_BUILD_PERMISSION_MODE": os.Getenv("EVOLVE_BUILD_PERMISSION_MODE"),
 		"EVOLVE_BUILD_PLAN_OUTPUT":     os.Getenv("EVOLVE_BUILD_PLAN_OUTPUT"),
@@ -38,12 +37,6 @@ func (s *twoPassStub) Run(ctx context.Context, req core.PhaseRequest) (core.Phas
 	return core.PhaseResponse{Phase: "build", Verdict: core.VerdictPASS}, nil
 }
 
-// We need a real core.PhaseRunner — the registry expects that interface.
-// (realStubRunner below is the canonical core.PhaseRunner adapter.)
-
-// TestRunPlanAndExecute_TwoPass_HappyPath — pass A runs in plan mode
-// with PLAN_OUTPUT set; pass B runs in acceptEdits mode with PLAN_INPUT
-// set. Both succeed and the overall exit is 0.
 func TestRunPlanAndExecute_TwoPass_HappyPath(t *testing.T) {
 	planDir := t.TempDir()
 	planPath := filepath.Join(planDir, "build-plan.md")
@@ -72,14 +65,12 @@ func TestRunPlanAndExecute_TwoPass_HappyPath(t *testing.T) {
 	if len(stub.calls) != 2 {
 		t.Fatalf("expected 2 phase calls; got %d", len(stub.calls))
 	}
-	// Pass A: PLAN_OUTPUT set, PERMISSION_MODE=plan
 	if stub.calls[0]["EVOLVE_BUILD_PERMISSION_MODE"] != "plan" {
 		t.Errorf("pass A PERMISSION_MODE=%q, want plan", stub.calls[0]["EVOLVE_BUILD_PERMISSION_MODE"])
 	}
 	if stub.calls[0]["EVOLVE_BUILD_PLAN_OUTPUT"] != planPath {
 		t.Errorf("pass A PLAN_OUTPUT=%q, want %q", stub.calls[0]["EVOLVE_BUILD_PLAN_OUTPUT"], planPath)
 	}
-	// Pass B: PLAN_INPUT set, PERMISSION_MODE=acceptEdits
 	if stub.calls[1]["EVOLVE_BUILD_PERMISSION_MODE"] != "acceptEdits" {
 		t.Errorf("pass B PERMISSION_MODE=%q, want acceptEdits", stub.calls[1]["EVOLVE_BUILD_PERMISSION_MODE"])
 	}
@@ -96,7 +87,6 @@ func (r *realStubRunner) Run(ctx context.Context, req core.PhaseRequest) (core.P
 	return r.stub.Run(ctx, req)
 }
 
-// TestRunPlanAndExecute_MissingPhase_Exit10 — bad CLI args.
 func TestRunPlanAndExecute_MissingPhase_Exit10(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := runPlanAndExecute(nil, bytes.NewReader(nil), &stdout, &stderr)
@@ -108,7 +98,6 @@ func TestRunPlanAndExecute_MissingPhase_Exit10(t *testing.T) {
 	}
 }
 
-// TestRunPlanAndExecute_UnknownPhase_Exit10 — phase not in registry.
 func TestRunPlanAndExecute_UnknownPhase_Exit10(t *testing.T) {
 	defer registry.SnapshotForTest()()
 	registry.ResetForTesting()
@@ -122,8 +111,6 @@ func TestRunPlanAndExecute_UnknownPhase_Exit10(t *testing.T) {
 	}
 }
 
-// TestRunPlanAndExecute_SkipExecute_OnlyRunsPassA — --skip-execute
-// stops after pass A even when the plan artifact exists.
 func TestRunPlanAndExecute_SkipExecute_OnlyRunsPassA(t *testing.T) {
 	planDir := t.TempDir()
 	planPath := filepath.Join(planDir, "build-plan.md")
@@ -147,8 +134,6 @@ func TestRunPlanAndExecute_SkipExecute_OnlyRunsPassA(t *testing.T) {
 	}
 }
 
-// TestRunPlanAndExecute_PlanArtifactMissing_Exit11 — when pass A
-// returns success but the plan file doesn't exist, exit 11.
 func TestRunPlanAndExecute_PlanArtifactMissing_Exit11(t *testing.T) {
 	planDir := t.TempDir()
 	planPath := filepath.Join(planDir, "no-plan-written.md")
@@ -170,7 +155,6 @@ func TestRunPlanAndExecute_PlanArtifactMissing_Exit11(t *testing.T) {
 	}
 }
 
-// TestJoinNames_EmptyAndMulti — helper coverage.
 func TestJoinNames_EmptyAndMulti(t *testing.T) {
 	if got := joinNames(nil); got != "" {
 		t.Errorf("nil → %q, want empty", got)

@@ -60,15 +60,12 @@ func TestHumanPrimitives(t *testing.T) {
 func TestClaudeTmux_HumanInput_GateAndPath(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
 
-	// Gate: --human-input without BRIDGE_HUMAN_SIMULATION → ExitSafetyGate.
 	code, se := runTmux(t, fx, &fakeTmux{}, nil, "--allow-bypass", "--human-input")
 	if code != ExitSafetyGate || !strings.Contains(se, "BRIDGE_HUMAN_SIMULATION") {
 		t.Fatalf("human-input gate: code=%d se=%q", code, se)
 	}
 
-	// Gate passes (sim=1) → human prompt-delivery + human auto-respond send.
-	// The pane boots (❯) then shows a model-deprecation auto_respond prompt
-	// that never clears → the loop guard trips (exercising the human send path).
+	// paneSeq never clears the deprecation prompt, tripping the loop guard to exercise the human send path.
 	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault, "this model is deprecated, Continue?"}}
 	code2, se2 := runTmux(t, fx, tmux, map[string]string{"BRIDGE_HUMAN_SIMULATION": "1"}, "--allow-bypass", "--human-input")
 	if code2 != ExitRespondLoopGuard {

@@ -7,10 +7,6 @@ import (
 	"testing"
 )
 
-// launch_modes_test.go — --validate-only, --dry-run, --require-full
-// (ported from bin/bridge cmd_launch). No driver dispatch occurs in these
-// modes, so a nil runner is fine.
-
 func TestLaunchArgs_ValidateOnly(t *testing.T) {
 	fx := newFixture(t, "claude-p", "")
 	fr := &fakeRunner{}
@@ -53,8 +49,6 @@ func TestLaunchArgs_DryRun(t *testing.T) {
 }
 
 func TestLaunchArgs_RequireFull_Unmet(t *testing.T) {
-	// claude-p needs `claude`; with no binaries available the tier is none
-	// → --require-full blocks with ExitRequireFullUnmet.
 	fx := newFixture(t, "claude-p", "")
 	eng := NewEngine(Deps{
 		Runner:    (&fakeRunner{}).runner(),
@@ -72,8 +66,6 @@ func TestLaunchArgs_RequireFull_Unmet(t *testing.T) {
 }
 
 func TestLaunchArgs_RequireFull_Met(t *testing.T) {
-	// With claude available, claude-p tier is full/hybrid → require-full
-	// passes and the launch proceeds (artifact produced by the fake).
 	fx := newFixture(t, "claude-p", "")
 	fr := &fakeRunner{writeArtifactPath: fx.artifact, writeArtifactBody: "ok"}
 	eng := NewEngine(Deps{

@@ -12,38 +12,14 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core/evidence"
 )
 
-// completion.go — the phase-completion Strategy (ADR-0027). runTmuxREPL used
-// to hardcode one completion contract: poll for a non-empty artifact file
-// (artifactReady). But there are several contracts in play —
-//   - artifact: the agent's deliverable is a file it writes (scout/build/…);
-//   - stdout:   the agent prints its answer to the REPL and writes no file
-//     (the router/advisor — a meta phase whose JSON the orchestrator parses);
-//   - git-evidence (ADR-0027, a later PR): the agent commits its deliverable
-//     and completion is "HEAD advanced + Evolve-Phase trailer verified".
-//
-// A completionDetector decouples "is the phase done?" from the wait loop so
-// the loop body (ADR-0026 stop-review/extend, auto-respond, inbox drain) stays
-// identical regardless of contract. The detector ONLY decides readiness;
-// liveness (extend vs pause) remains the reviewer's job.
-//
-// Default ("" / "artifact") preserves the legacy path-poll byte-for-byte, so
-// the abstraction is dormant until a phase opts into a different contract.
-
-// The contract vocabulary — what core.BridgeRequest.Completion / Config.
-// Completion carry (ports.go:275 documents the request side). Spelled ONCE:
-// the factory switches on these names, and completionContractName is the one
-// spelling of the "" ⇒ artifact default that the engine's result read and
-// the tmux DONE line project (ADR-0103 unit 10, review fold).
 const (
 	completionArtifact = "artifact"
 	completionStdout   = "stdout"
 	completionGit      = "git"
 )
 
-// completionContractName names the contract a mode selects: "" is the
-// artifact contract (the legacy default); any other mode is its own name —
-// the factory's unknown-mode fallback is a detector choice, never a rename,
-// so a typo keeps its bytes wherever the name is rendered.
+// completionContractName names the contract a mode selects; "" is the artifact contract and any other
+// mode is its own name.
 func completionContractName(mode string) string {
 	if mode == "" {
 		return completionArtifact
@@ -51,36 +27,29 @@ func completionContractName(mode string) string {
 	return mode
 }
 
-// stdoutIdlePolls is how many consecutive unchanged poll ticks (each ~2s in
-// the wait loop) with the REPL prompt marker visible count as "the turn
-// finished" for the stdout contract. Debounce: a streaming agent's pane
+// stdoutIdlePolls is how many consecutive unchanged poll ticks (each ~2s in the wait loop) with the REPL
+// prompt marker visible count as "the turn finished" for the stdout contract: a streaming agent's pane
 // changes every tick, so the counter only accrues once output has settled.
 const stdoutIdlePolls = 3
 
-// artifactStableTicks is the artifact twin of stdoutIdlePolls: how many
-// consecutive poll ticks (each ~2s in the wait loop) must observe the SAME
-// (size, mtime) before the deliverable counts as finished. Two is the minimum
-// that is actually a window — one observation is just the legacy first-sight
-// read — and each extra tick costs ~2s on every phase, so it stays small.
+// artifactStableTicks is the artifact twin of stdoutIdlePolls: how many consecutive poll ticks must observe
+// the same (size, mtime) before the deliverable counts as finished. Two is the minimum that is actually a
+// window (one observation is just a first-sight read), and each extra tick costs ~2s on every phase.
 const artifactStableTicks = 2
 
-// finalPollGrace bounds the wait loop's ONE post-cancel completion poll. The
-// poll runs on a context DETACHED from the cancelled one (see withFinalPoll) so
-// detectors that shell a subprocess can actually run it; this timeout is what
-// keeps that detachment from re-introducing an unbounded wait during teardown.
-// Sized for a single tmux capture / `git rev-parse`, not for an agent turn.
+// finalPollGrace bounds the wait loop's one post-cancel completion poll, which runs on a context detached
+// from the cancelled one (see withFinalPoll) so detectors that shell a subprocess can actually run it;
+// sized for a single tmux capture or `git rev-parse`, not for an agent turn.
 const finalPollGrace = 5 * time.Second
 
-// finalPollCtxKey marks a context as the wait loop's LAST look before it gives
-// up. Finality is signalled EXPLICITLY rather than inferred from ctx.Err():
-// the final poll now carries a live context (a dead one cannot fork tmux or
-// git — completion.go's stdout/git detectors were starved by exactly that), so
-// cancellation is no longer observable to the detector at all.
+// finalPollCtxKey marks a context as the wait loop's last look before it gives up: finality is signalled
+// explicitly rather than inferred from ctx.Err(), since a dead context can't fork tmux or git for the
+// stdout/git detectors.
 type finalPollCtxKey struct{}
 
-// withFinalPoll returns the context for the wait loop's final completion poll:
-// detached from the caller's cancellation, bounded by finalPollGrace, and
-// carrying the finality marker. The caller MUST call the returned cancel.
+// withFinalPoll returns the context for the wait loop's final completion poll: detached from the caller's
+// cancellation, bounded by finalPollGrace, and carrying the finality marker. The caller must call the
+// returned cancel.
 func withFinalPoll(ctx context.Context) (context.Context, context.CancelFunc) {
 	live := context.WithValue(context.WithoutCancel(ctx), finalPollCtxKey{}, true)
 	return context.WithTimeout(live, finalPollGrace)
@@ -92,9 +61,8 @@ func isFinalPoll(ctx context.Context) bool {
 	return final
 }
 
-// completionEvidence carries what a detector observed at completion. Empty for
-// the artifact contract (the file at cfg.Artifact is the evidence, read by the
-// engine). Reserved for the git-evidence contract (commit SHA) in a later PR.
+// completionEvidence carries what a detector observed at completion; empty for the artifact and stdout
+// contracts, and carries the commit SHA for the git-evidence contract.
 type completionEvidence struct {
 	CommitSHA string
 }
@@ -122,20 +90,14 @@ func newCompletionDetector(mode string, cfg *Config, deps Deps, lp tmuxLaunch, b
 	}
 }
 
-// artifactBaseline is the PRE-DISPATCH snapshot of the artifact path: what was
-// already on disk before this dispatch's prompt was delivered. Cycle-1550 (and
-// the 1554 lane that pinned it): a correction re-dispatch whose prior failed
-// attempt left its report at the canonical path had those UNCHANGED bytes
-// certified as completion after two stability ticks — no post-dispatch write
-// required — so a stale FAIL report re-graded itself forever. An observation
-// identical to the baseline is the PRIOR attempt's work: it never begins a
-// stability window and never completes, the finality concession included —
-// timeout is the honest outcome for an agent that wrote nothing.
+// artifactBaseline is the pre-dispatch snapshot of the artifact path: what was already on disk before this
+// dispatch's prompt was delivered. An observation identical to the baseline is the prior attempt's work:
+// it never begins a stability window and never completes, timeout being the honest outcome for an agent
+// that wrote nothing.
 type artifactBaseline struct {
-	// entries maps each candidate path that existed pre-dispatch to its
-	// (size, mtime) snapshot — the WHOLE artifactCandidatePaths set, not just
-	// the canonical: a stray at a fallback, shadowed at capture time, must
-	// not certify later when the canonical vanishes mid-session.
+	// entries maps each candidate path that existed pre-dispatch to its (size, mtime) snapshot — the whole
+	// artifactCandidatePaths set, not just the canonical: a stray at a fallback, shadowed at capture time,
+	// must not certify later when the canonical vanishes mid-session.
 	entries map[string]baselineEntry
 }
 
@@ -144,11 +106,9 @@ type baselineEntry struct {
 	modTime time.Time
 }
 
-// captureArtifactBaseline snapshots the artifact path. MUST be called before
-// prompt delivery (the driver captures it before REPL input seeding): captured
-// later, an instant-writing agent's fresh artifact would be mistaken for the
-// prior attempt's and refused. Any error degrades to an absent baseline —
-// fail-open to the pre-fix behavior, never a new refusal class.
+// captureArtifactBaseline snapshots the artifact path; must be called before prompt delivery, or an
+// instant-writing agent's fresh artifact would be mistaken for the prior attempt's and refused. Any error
+// degrades to an absent baseline (fail-open).
 func captureArtifactBaseline(cfg *Config) artifactBaseline {
 	var b artifactBaseline
 	for _, path := range artifactCandidatePaths(cfg) {
@@ -164,21 +124,17 @@ func captureArtifactBaseline(cfg *Config) artifactBaseline {
 	return b
 }
 
-// matches reports whether an observation is byte-for-byte a pre-dispatch
-// artifact (same path, size, and mtime — the same key the stability window
-// uses, so the two checks cannot drift).
+// matches reports whether an observation is byte-for-byte a pre-dispatch artifact (same path, size, and
+// mtime — the same key the stability window uses, so the two checks cannot drift).
 func (b artifactBaseline) matches(path string, fi os.FileInfo) bool {
 	e, ok := b.entries[path]
 	return ok && fi.Size() == e.size && fi.ModTime().Equal(e.modTime)
 }
 
-// gitEvidenceDetector implements the ADR-0027 git-evidence contract: completion
-// = the worktree HEAD advanced to a NEW commit carrying an Evolve-Phase trailer
-// for this phase AND the cycle's challenge token. HEAD-advance alone is
-// insufficient (a stray/unrelated commit must not false-complete), so the
-// trailer is verified; an advance without a matching trailer just re-baselines
-// and keeps watching. gitCmd is a seam (default shells `git -C <worktree>` via
-// deps.Runner) so the detector is unit-testable without a real repo.
+// gitEvidenceDetector implements the git-evidence contract: completion is a new commit carrying an
+// Evolve-Phase trailer for this phase and the cycle's challenge token; an advance without a matching
+// trailer re-baselines and keeps watching. gitCmd is a seam so the detector is unit-testable without a
+// real repo.
 type gitEvidenceDetector struct {
 	phase       string
 	expectedTok string
@@ -194,9 +150,8 @@ func newGitEvidenceDetector(cfg *Config, deps Deps) *gitEvidenceDetector {
 		tok = strings.TrimSpace(string(b))
 	}
 	if tok == "" && deps.Stderr != nil {
-		// Fail-closed: an empty token makes Verify always false, so the detector
-		// would wait forever. Surface it loudly rather than hang silently — the
-		// prompt template likely omitted $CHALLENGE_TOKEN.
+		// Fail-closed: an empty token makes Verify always false, so the detector would wait forever;
+		// surface it loudly rather than hang silently.
 		fmt.Fprintf(deps.Stderr, "[git-evidence] WARN: challenge-token.txt missing/empty in %s — completion will never verify\n", cfg.Workspace)
 	}
 	worktree := cfg.Worktree
@@ -225,11 +180,9 @@ func (d *gitEvidenceDetector) poll(ctx context.Context) (bool, completionEvidenc
 	if head == d.baseline {
 		return false, completionEvidence{}, "", nil // HEAD not advanced yet
 	}
-	// HEAD advanced — scan EVERY new commit in baseline..HEAD, not just the tip.
-	// Two commits can land between polls (e.g. the phase evidence commit then an
-	// orchestrator commit); inspecting only HEAD would re-baseline past the
-	// evidence commit and wait forever. rev-list lists newest-first; any
-	// verifying commit in the range completes.
+	// HEAD advanced — scan every new commit in baseline..HEAD, not just the tip: two commits can land
+	// between polls, and inspecting only HEAD would re-baseline past an earlier evidence commit and wait
+	// forever. rev-list lists newest-first; any verifying commit in the range completes.
 	revList, err := d.gitCmd(ctx, "rev-list", d.baseline+"..HEAD")
 	if err != nil {
 		return false, completionEvidence{}, "", nil
@@ -244,8 +197,7 @@ func (d *gitEvidenceDetector) poll(ctx context.Context) (bool, completionEvidenc
 				fmt.Sprintf("git-evidence: %s commit %s verified", d.phase, shortSHA(sha)), nil
 		}
 	}
-	// No verifying commit in the new range (only stray commits): re-baseline to
-	// HEAD and keep watching rather than false-completing.
+	// No verifying commit in the new range: re-baseline to HEAD and keep watching rather than false-completing.
 	d.baseline = head
 	return false, completionEvidence{}, "", nil
 }
@@ -257,40 +209,9 @@ func shortSHA(s string) string {
 	return s
 }
 
-// artifactDetector implements the artifact contract: completion = a non-empty
-// file at cfg.Artifact (with the cycle-108 non-canonical relocate tolerance)
-// that has STOPPED CHANGING. artifactLocate answers "is it there?" without
-// touching the file; a cross-poll stability window answers "is it finished?";
-// artifactReady then canonicalizes it.
-//
-// Why the window (cycle-1198): an agent's deliverable is typically a Write
-// followed seconds later by an Edit. First-sight completion accepted the
-// half-written intermediate — the gate rejected a scout-report.md that parsed
-// perfectly moments afterwards. The deliverable-side grace retry
-// (deliverable.go) covers absence/emptiness only; a "parses fine, wrong
-// content" read is not retried, by design. So the fix belongs here, at the
-// source.
-//
-// The state is carried ACROSS poll calls, not within one: an in-poll settle
-// sleep (the rejected cycle-1212 design) is tens of milliseconds and cannot
-// span a multi-second Write→Edit gap. The wait loop already calls poll every
-// ~2s; that cadence IS the window. mtime is in the stability key because size
-// alone is content-blind to an equal-length fix-up Edit.
-// The window gates the DESTRUCTIVE relocation, it does not merely follow it
-// (cycle-1249). poll's read-only half is artifactLocate; relocateFile — whose
-// cross-device branch copies a partial file into the canonical path and then
-// REMOVES the source the agent is still appending to — runs only on the tick the
-// window closes. Relocating that way on first sight would defeat the debounce on
-// the very path scout flagged as highest-risk, leaving a permanently stable,
-// permanently truncated deliverable that the window then certifies as finished.
-//
-// Precisely stated, because the earlier wording of this paragraph claimed more
-// than the code did and cycle-1256 audited it as a refuted safety claim (D2):
-// the ONE path that completes without a closed window — the finality
-// short-circuit below — still canonicalizes a non-canonical fallback, but it is
-// restricted to renameOnlyRelocate. Rename relinks an inode and so is safe for a
-// file that may still be growing; copy+remove is not, and under finality it
-// never runs.
+// artifactDetector implements the artifact contract: completion is a non-empty file at cfg.Artifact that
+// has stopped changing. artifactLocate answers "is it there?" without touching the file; a cross-poll
+// stability window answers "is it finished?"; artifactReady then canonicalizes it.
 type artifactDetector struct {
 	cfg      *Config
 	baseline artifactBaseline
@@ -308,35 +229,22 @@ func (d *artifactDetector) poll(ctx context.Context) (bool, completionEvidence, 
 		d.haveLast, d.stable = false, 0
 		return false, completionEvidence{}, "", nil
 	}
-	// Final look: this is the wait loop's ONE last poll before it gives up
-	// (driver_tmux_repl.go). Demanding a fresh window it can never get would
-	// launder every finished-at-the-buzzer session into ExitArtifactTimeout —
-	// turning a truncated-read fix into a worse false-FAIL generator. The
-	// artifact is on disk, which is the evidence; short-circuit. Checked AFTER
-	// artifactLocate, whose found result already proves a non-empty artifact
-	// exists, so finality can never manufacture completion from nothing.
+	// Final look: the wait loop's one last poll before giving up. The artifact is on disk, which is the
+	// evidence, so this short-circuits the stability window rather than laundering a finished-at-the-buzzer
+	// session into ExitArtifactTimeout.
 	//
-	// stable is 0 here — no window was ever closed on this artifact — so the
-	// mover is renameOnlyRelocate, NOT relocateFile (cycle-1256 D1). Completing
-	// on an unwitnessed artifact is a deliberate, bounded concession; deleting
-	// the agent's source file after snapshotting it half-written is not, and
-	// that is exactly what relocateFile's copy+remove branch does. Rename-only
-	// keeps the concession reversible: worst case the canonical path holds a
-	// file the agent's fd is still appending into, best case a finished one, and
-	// never a truncated snapshot with the original destroyed. If the rename
-	// cannot be done, the poll reports the error and the phase takes its
-	// artifact timeout — the honest outcome for "we could not safely finish".
+	// No window was ever closed here, so the mover is renameOnlyRelocate, not relocateFile: completing on
+	// an unwitnessed artifact is a bounded concession, but destroying the agent's source file after
+	// snapshotting it half-written is not. If the rename can't be done, the poll reports the error and the
+	// phase takes its artifact timeout.
 	//
-	// Two keys, deliberately: isFinalPoll is the explicit signal the wait loop
-	// now sends (its final context is LIVE, so ctx.Err() would never fire there
-	// again), and ctx.Err() still covers a detector polled on a context that
-	// died under it mid-wait — the pre-existing contract, unchanged.
+	// Two keys, deliberately: isFinalPoll is the explicit signal the wait loop sends (its final context is
+	// live, so ctx.Err() would never fire there), and ctx.Err() still covers a detector polled on a context
+	// that died under it mid-wait.
 	if isFinalPoll(ctx) || ctx.Err() != nil {
-		// The finality concession stops at the pre-dispatch baseline: an
-		// artifact byte-identical to what was on disk BEFORE the prompt went
-		// out is the prior attempt's report, and completing on it launders a
-		// stale verdict into a fresh one (cycle-1550). Only an affirmative
-		// match refuses — a stat error here keeps the concession (fail-open).
+		// The finality concession stops at the pre-dispatch baseline: an artifact byte-identical to what
+		// was on disk before the prompt went out is the prior attempt's report. Only an affirmative match
+		// refuses; a stat error keeps the concession (fail-open).
 		if fi, serr := os.Stat(path); serr == nil && d.baseline.matches(path, fi) {
 			return false, completionEvidence{}, "", nil
 		}
@@ -349,16 +257,12 @@ func (d *artifactDetector) poll(ctx context.Context) (bool, completionEvidence, 
 		d.haveLast, d.stable = false, 0
 		return false, completionEvidence{}, "", nil
 	}
-	// The unchanged PRE-DISPATCH artifact never begins a window: those bytes
-	// predate this dispatch's prompt and are the prior attempt's work, not
-	// evidence this agent finished (cycle-1550 — the stale-FAIL re-grade loop).
 	if d.baseline.matches(path, fi) {
 		d.haveLast, d.stable = false, 0
 		return false, completionEvidence{}, "", nil
 	}
-	// path is part of the key: an artifact that moved between ticks (a fallback
-	// the agent rewrote at the canonical path) is a NEW observation, not a
-	// continuation of the old file's window.
+	// path is part of the key: an artifact that moved between ticks (a fallback the agent rewrote at the
+	// canonical path) is a new observation, not a continuation of the old file's window.
 	if d.haveLast && path == d.lastPath && fi.Size() == d.lastSize && fi.ModTime().Equal(d.lastModTime) {
 		d.stable++
 	} else {
@@ -369,33 +273,22 @@ func (d *artifactDetector) poll(ctx context.Context) (bool, completionEvidence, 
 	if d.stable < artifactStableTicks {
 		return false, completionEvidence{}, "", nil
 	}
-	// The window closed — but the contract may name SECONDARY deliverables
-	// (Phase B, the single-artifact cutoff class: retro wrote its report and
-	// the session died before disposition.json). Hold completion until every
-	// secondary EXISTS non-empty; the artifact-timeout final poll above still
-	// completes without them (bounded wait), and the phase gate then names
-	// the absence loudly.
+	// The window closed, but the contract may name secondary deliverables; hold completion until every
+	// secondary exists non-empty.
+	// See ADR-0084.
 	if missing := d.missingSecondary(); missing != "" {
 		return false, completionEvidence{}, "", nil
 	}
-	// The window closed: this artifact HAS been observed to stop changing, so
-	// the full mover — including relocateFile's cross-device copy+remove — is
-	// safe here and only here.
+	// This artifact has been observed to stop changing, so the full mover (relocateFile) is safe here.
 	return d.completeWith(relocateFile)
 }
 
-// completeWith canonicalizes the artifact with the caller's mover and reports
-// the phase done. This is the ONLY place the non-canonical fallback is moved —
-// deferring the move to here is what keeps a still-growing fallback where the
-// agent left it. The mover is a parameter rather than a constant because the two
-// callers differ in what they have PROVEN about the artifact: the window-close
-// path witnessed it settle (relocateFile), the finality short-circuit did not
-// (renameOnlyRelocate). A relocation failure surfaces as the detector's error
-// (the wait loop logs it once); an artifact that vanished between the window's
-// last look and this call restarts the window rather than completing on nothing.
-// missingSecondary returns the first contract secondary that does not yet
-// exist non-empty, or "" when the set is satisfied (or empty — legacy
-// single-artifact phases are byte-identical).
+// completeWith canonicalizes the artifact with the caller's mover and reports the phase done; the mover is
+// a parameter rather than a constant because the two callers differ in what they have proven about the
+// artifact — the window-close path witnessed it settle (relocateFile), the finality short-circuit did not
+// (renameOnlyRelocate).
+// missingSecondary returns the first contract secondary that does not yet exist non-empty, or "" when the
+// set is satisfied (or empty — legacy single-artifact phases are byte-identical).
 func (d *artifactDetector) missingSecondary() string {
 	for _, p := range d.cfg.SecondaryArtifacts {
 		if fi, err := os.Stat(p); err != nil || fi.Size() == 0 {
@@ -426,14 +319,11 @@ func (d *artifactDetector) completionNote(relocatedFrom string) string {
 	return fmt.Sprintf("artifact appeared: %s", d.cfg.Artifact)
 }
 
-// stdoutDetector implements the stdout contract for agents (the router/advisor)
-// that print their answer to the REPL and write no artifact file. Completion =
-// the prompt marker is visible AND the pane has been stable for `threshold`
-// consecutive polls AND the settled pane DIFFERS from the baseline (proof the
-// agent produced visible output). The baseline-difference check guards two
-// false-fires at once: the marker being present in the just-delivered pane
-// before the turn starts, and an agent that crashes and reverts the pane to the
-// bare prompt (== baseline) without ever answering.
+// stdoutDetector implements the stdout contract for agents (the router/advisor) that print their answer to
+// the REPL and write no artifact file. Completion is the prompt marker visible, the pane stable for
+// `threshold` consecutive polls, and the settled pane differing from the baseline (proof the agent produced
+// visible output); the baseline-difference check guards against both the marker already being present in
+// the just-delivered pane and an agent that crashes back to the bare prompt without ever answering.
 type stdoutDetector struct {
 	cfg       *Config
 	deps      Deps
@@ -449,8 +339,7 @@ type stdoutDetector struct {
 func (d *stdoutDetector) poll(ctx context.Context) (bool, completionEvidence, string, error) {
 	pane, err := d.deps.Tmux.CapturePane(ctx, d.lp.session, d.lp.bootScrollback)
 	if err != nil {
-		// Transient capture error: keep waiting. The reviewer's no-progress
-		// budget bounds a genuinely stuck session, so we never swallow a hang.
+		// Transient capture error: keep waiting; the reviewer's no-progress budget bounds a genuinely stuck session.
 		return false, completionEvidence{}, "", nil
 	}
 	if !d.haveBaseline {

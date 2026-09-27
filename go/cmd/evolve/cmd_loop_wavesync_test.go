@@ -1,11 +1,5 @@
 package main
 
-// cmd_loop_wavesync_test.go — ADR-0080 S3: the runtime plane refreshes `main`
-// from origin at wave boundaries, fast-forward ONLY. Real git fixtures: a
-// bare origin plus two clones (the runtime and a "console" that lands work
-// via origin), because the failure modes under test are git's own (non-FF
-// divergence, missing remote, detached branch).
-
 import (
 	"bytes"
 	"context"
@@ -31,7 +25,9 @@ func gitrun(t *testing.T, dir string, args ...string) string {
 	return strings.TrimSpace(string(out))
 }
 
-// syncFixture: bare origin with one commit on main; runtime clone on main.
+// syncFixture builds a bare origin plus a runtime clone using real git repos,
+// not mocks, because the failure modes under test (non-FF divergence, a
+// missing remote, a detached branch) are git's own.
 func syncFixture(t *testing.T) (origin, runtime string) {
 	t.Helper()
 	installCheckRunsGH(t, `{"total_count":1,"check_runs":[{"name":"build+test","status":"completed","conclusion":"success"}]}`, false)
@@ -224,10 +220,6 @@ func TestSyncMainAtWaveBoundary_NoRemoteSkipsWithoutError(t *testing.T) {
 	}
 }
 
-// TestSyncMainAtWaveBoundary_DirtyTrackedFileWarnsBlockedNotDiverged pins the
-// review-HIGH misdiagnosis: --ff-only refused by LOCAL TRACKED CHANGES must
-// name that cause — the "diverged" prescription ("next ship reconciles")
-// invites the ship to adopt the dirt (the stowaway class).
 func TestSyncMainAtWaveBoundary_DirtyTrackedFileWarnsBlockedNotDiverged(t *testing.T) {
 	origin, runtime := syncFixture(t)
 	originAdvance(t, origin)
@@ -245,12 +237,6 @@ func TestSyncMainAtWaveBoundary_DirtyTrackedFileWarnsBlockedNotDiverged(t *testi
 	}
 }
 
-// TestSyncMainAtWaveBoundary_LocalAheadOnlyIsNotReportedAsFastForward pins the
-// 2026-09-09 token-waste root cause #3: `git merge --ff-only origin/main`
-// SUCCEEDS without moving HEAD when the local main is strictly AHEAD (unpushed
-// dossier closeouts), and the boundary reported "fast-forwarded main" while
-// the fresh lanes were about to base on a different commit than the landing
-// branch. The honest report names the ahead state; nothing "fast-forwarded".
 func TestSyncMainAtWaveBoundary_LocalAheadOnlyIsNotReportedAsFastForward(t *testing.T) {
 	_, runtime := syncFixture(t)
 	if err := os.WriteFile(filepath.Join(runtime, "local.txt"), []byte("x"), 0o644); err != nil {

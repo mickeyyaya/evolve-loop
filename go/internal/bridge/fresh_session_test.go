@@ -1,12 +1,5 @@
 package bridge
 
-// fresh_session_test.go — F31 (2026-09-26): a fatal-pane fast-fail whose typed
-// cause is SESSION-recoverable (the REPL process is gone; the CLI and account
-// are fine) gets ONE fresh session of the same CLI before the caller's chain
-// walks on. Cycle 1687's triage pane went dead with codex quota-walled and
-// ollama unable to write source, so the chain had nowhere to go and the phase
-// aborted — a fresh claude session would very likely have finished it.
-
 import (
 	"bytes"
 	"context"
@@ -49,13 +42,6 @@ func TestFreshSessionRetry_OneFreshSessionForASessionRecoverableCause(t *testing
 	}
 }
 
-// TestFreshSessionRetry_TheGate pins every refusal of freshSessionAllowed
-// (architecture review F31): a model/config cause, no cause, a run that
-// delivered (not the fast-fail's exit), a NAMED session (kept alive for
-// resume — a re-run would reattach to the dead pane outside the sandbox; the
-// driver's own resolution rides the observation), a canceled launch, a
-// deadline with no room for another of the driver's waits, and a second
-// death (at most one retry).
 func TestFreshSessionRetry_TheGate(t *testing.T) {
 	deps, got, _ := recordingDeps(t)
 	e := NewEngine(deps)
@@ -96,9 +82,6 @@ func TestFreshSessionRetry_TheGate(t *testing.T) {
 	}
 }
 
-// TestRunTmuxREPL_FatalCheckpointReportsItsTypedCause: the wait loop hands the
-// preempting fatal verdict's typed cause to the call-local observer — the one
-// channel the engine's fresh-session retry reads — exactly once.
 func TestRunTmuxREPL_FatalCheckpointReportsItsTypedCause(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
 	deadPane := tmuxPromptMarkerDefault + "\n" + deadShellPaneLine + "\n" + tmuxPromptMarkerDefault
@@ -129,10 +112,8 @@ func TestRunTmuxREPL_FatalCheckpointReportsItsTypedCause(t *testing.T) {
 	}
 }
 
-// scriptedSessionTmux is the cycle-1687 shape end to end: the first `dead`
-// sessions' REPLs boot, take the prompt and die to a bare shell echoing the
-// nudge; every later session is a healthy REPL whose prompt delivery writes
-// the artifact.
+// scriptedSessionTmux: the first `dead` sessions' REPLs boot, take the prompt, and die to a bare shell
+// echoing the nudge; every later session is healthy and its prompt delivery writes the artifact.
 type scriptedSessionTmux struct {
 	*fakeTmux
 	sessions, dead int
@@ -187,9 +168,6 @@ func launchScripted(t *testing.T, dead int, stage string, mutate func(*core.Brid
 	return tmux, resp, err, &rows, len(eventsWithCode(*got, CodeFreshSessionRetry))
 }
 
-// TestEngineLaunch_DeadShellGetsOneFreshSessionAndSucceeds: the dead pane's
-// cause reaches the engine, which runs ONE fresh session that succeeds — the
-// launch returns OK instead of exit 81 into a chain with nowhere to go.
 func TestEngineLaunch_DeadShellGetsOneFreshSessionAndSucceeds(t *testing.T) {
 	tmux, resp, err, rows, retries := launchScripted(t, 1, "enforce", nil)
 	if err != nil || resp.ExitCode != ExitOK {
@@ -203,9 +181,6 @@ func TestEngineLaunch_DeadShellGetsOneFreshSessionAndSucceeds(t *testing.T) {
 	}
 }
 
-// TestEngineLaunch_ASecondDeathReturnsExit81ToTheChain: the fresh session dies
-// too — the launch returns exit 81 (the chain walks as before), with two rows
-// and one retry signal: at most one retry.
 func TestEngineLaunch_ASecondDeathReturnsExit81ToTheChain(t *testing.T) {
 	tmux, resp, err, rows, retries := launchScripted(t, 2, "enforce", nil)
 	if err == nil || resp.ExitCode != ExitArtifactTimeout || !strings.Contains(err.Error(), "exit=81") {
@@ -216,9 +191,6 @@ func TestEngineLaunch_ASecondDeathReturnsExit81ToTheChain(t *testing.T) {
 	}
 }
 
-// TestEngineLaunch_NoFreshSessionWithoutEnforceOrForANamedSession: at shadow the
-// fast-fail never preempts, so no cause is reported and no retry runs; a named
-// session is never retried (it would reattach to the dead pane).
 func TestEngineLaunch_NoFreshSessionWithoutEnforceOrForANamedSession(t *testing.T) {
 	for _, tc := range []struct {
 		name, stage string
@@ -226,9 +198,6 @@ func TestEngineLaunch_NoFreshSessionWithoutEnforceOrForANamedSession(t *testing.
 	}{
 		{"shadow stage", "shadow", nil},
 		{"named by the request", "enforce", func(r *core.BridgeRequest) { r.SessionName = "swarm-c1687-w1" }},
-		// Architecture re-review N1: the session name can come from the env
-		// (or a profile) — the driver's resolveSession decides named-ness, and
-		// the gate reads the driver's answer, never the request field.
 		{"named by BRIDGE_SESSION_NAME", "enforce", func(r *core.BridgeRequest) { r.Env = map[string]string{"BRIDGE_SESSION_NAME": "swarm-c1687-w1"} }},
 	} {
 		tmux, resp, _, rows, retries := launchScripted(t, 2, tc.stage, tc.mutate)
@@ -238,10 +207,6 @@ func TestEngineLaunch_NoFreshSessionWithoutEnforceOrForANamedSession(t *testing.
 	}
 }
 
-// TestFreshSessionRetry_ClearsTheDeadDispatchsBootStrike (re-review N3): the
-// dead dispatch BOOTED, so its boot strike is cleared — observable through a
-// store whose clear fails, which reports one BRIDGE_BOOT_STRIKE_CLEAR_FAILED
-// for the dead dispatch before the fresh session runs.
 func TestFreshSessionRetry_ClearsTheDeadDispatchsBootStrike(t *testing.T) {
 	deps, got, _ := recordingDeps(t)
 	deps.BootTimeoutStore = brokenBootStrikeStore(t)

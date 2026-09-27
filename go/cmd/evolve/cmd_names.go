@@ -1,12 +1,5 @@
 package main
 
-// cmd_names.go — `evolve names check|fix`, the operator surface for the
-// config-driven naming guard (pkg/naminguard, SSOT .evolve/naming.json). The
-// same scanner backs the legacynames acs gate and the release preflight, so all
-// three agree on what counts as a dead naming token. `check` is read-only and
-// exits 1 on any match; `fix` rewrites tokens in place (staged for review,
-// never committed).
-
 import (
 	"flag"
 	"fmt"
@@ -77,7 +70,6 @@ func runNames(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	}
 }
 
-// resolveRepoRoot returns explicit if set, else the git toplevel of cwd.
 func resolveRepoRoot(explicit string) (string, error) {
 	if explicit != "" {
 		return explicit, nil

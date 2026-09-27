@@ -9,22 +9,6 @@ import (
 	"testing"
 )
 
-// launch_test.go — M1 parity tests (RED until M2 engine + M3/M5 drivers land).
-//
-// These port the argv-level behavior of the bash BATS suites onto the
-// Go LaunchArgs entry point, using a recording fake runner in place of
-// the bash BRIDGE_*_BINARY fake-binary seam:
-//
-//   tools/agent-bridge/tests/integration/mock-cli-drivers.bats
-//   tools/agent-bridge/tests/integration/permission-mode-drivers.bats (non-tmux cases)
-//
-// The bash tests substitute a fake CLI binary via env and assert on the
-// artifact, exit status, and the argv the driver forwarded (captured to
-// BRIDGE_FAKE_ARGS_FILE). The Go equivalent injects a fakeRunner via
-// Deps.Runner that records every invocation's argv and (optionally)
-// simulates the CLI writing the artifact. tmux-driver cases
-// (claude-tmux et al.) need the TmuxController seam and land with M4.
-
 // recordedCall captures one CmdRunner invocation for assertions.
 type recordedCall struct {
 	name string
@@ -33,15 +17,13 @@ type recordedCall struct {
 	env  []string
 }
 
-// fakeRunner is the test double for the inner-CLI subprocess. It records
-// every call and can simulate the CLI writing its artifact. It replaces
-// the bash fake-binary seam (fake-claude.sh / fake-codex.sh / fake-agy.sh).
+// fakeRunner is the test double for the inner-CLI subprocess: it records every call and can simulate the
+// CLI writing its artifact.
 type fakeRunner struct {
 	calls []recordedCall
 	exit  int
 	err   error
-	// writeArtifactPath/Body, when set, make the fake write that file on
-	// each call — simulating the inner CLI producing its artifact.
+	// writeArtifactPath/Body, when set, make the fake write that file on each call.
 	writeArtifactPath string
 	writeArtifactBody string
 }
@@ -58,9 +40,7 @@ func (f *fakeRunner) runner() CmdRunner {
 	}
 }
 
-// argvContainsPair reports whether flag appears in any recorded call's
-// argv immediately followed by value — mirroring the BATS check that
-// "--permission-mode" is followed by "plan" in the captured args.
+// argvContainsPair reports whether flag appears in any recorded call's argv immediately followed by value.
 func (f *fakeRunner) argvContainsPair(flag, value string) bool {
 	for _, c := range f.calls {
 		for i := 0; i < len(c.args)-1; i++ {
@@ -71,8 +51,6 @@ func (f *fakeRunner) argvContainsPair(flag, value string) bool {
 	}
 	return false
 }
-
-// --- fixtures -------------------------------------------------------------
 
 // writeProfile writes a minimal valid profile JSON and returns its path.
 // permissionMode "" omits the field (back-compat profile).
@@ -98,8 +76,7 @@ func writeProfile(t *testing.T, dir, name, permissionMode string) string {
 	return path
 }
 
-// launchFixture bundles a workspace + the standard launch arg set, so
-// each test mirrors the BATS _run_launch helper.
+// launchFixture bundles a workspace and the standard launch arg set.
 type launchFixture struct {
 	ws         string
 	profile    string
@@ -130,7 +107,7 @@ func newFixture(t *testing.T, cli, permissionMode string) launchFixture {
 	}
 }
 
-// args builds the bin/bridge-style launch argv for cli, plus any extras.
+// args builds the launch argv for cli, plus any extras.
 func (fx launchFixture) args(cli string, extra ...string) []string {
 	base := []string{
 		"--cli=" + cli,
@@ -145,30 +122,18 @@ func (fx launchFixture) args(cli string, extra ...string) []string {
 	return append(base, extra...)
 }
 
-// run drives Engine.LaunchArgs with the fake runner and an EMPTY env
-// lookup, so the credential-isolation guards never fire from ambient
-// process env — keeping these tests deterministic on any machine. Tests
-// that exercise the guards use runLookup (driver_credentials_test.go).
+// run drives Engine.LaunchArgs with the fake runner and an empty env lookup, so the credential-isolation
+// guards never fire from ambient process env, keeping these tests deterministic on any machine. Tests that
+// exercise the guards use runLookup (driver_credentials_test.go).
 func run(t *testing.T, fr *fakeRunner, args []string) (int, string) {
 	t.Helper()
 	return runLookup(t, fr, args, nil)
 }
 
-// newTestEngine builds an Engine for driver tests with a HERMETIC environment
-// by default: a test that does not pin Deps.LookupEnv gets the EMPTY lookup
-// rather than falling through to os.LookupEnv (lookupEnv, driver_common.go),
-// carrying the `run`/`runLookup` convention above across to the tmux-REPL
-// suite. Deps.Env is consulted first by lookupEnv and is unaffected, so a test
-// that MEANS to exercise an env branch still opts IN explicitly.
-//
-// Why this exists: runTmuxREPL reads ipcenv.FleetKey ("EVOLVE_FLEET") through
-// lookupEnv, and under a fleet supervisor with no --worktree it fails closed
-// with the CB.2 refusal errWorktreeRequired -> ExitBadFlags(10) BEFORE the
-// artifact wait loop runs. With LookupEnv nil that read reached the AMBIENT
-// process env, so 20 driver tests passed in a developer shell and failed under
-// the ACS/EGPS runner, which inherits the orchestrator's EVOLVE_FLEET=1
-// (internal/acsrunner/runner.go does not sanitize). That cost cycle-1252 and
-// cycle-1254 a run each. The guard is correct; the fixtures were porous.
+// newTestEngine builds an Engine for driver tests with a hermetic environment by default: a test that does
+// not pin Deps.LookupEnv gets the empty lookup rather than falling through to os.LookupEnv, carrying the
+// `run`/`runLookup` convention above across to the tmux-REPL suite. Deps.Env is consulted first by
+// lookupEnv and is unaffected, so a test that means to exercise an env branch still opts in explicitly.
 func newTestEngine(d Deps) *Engine {
 	if d.LookupEnv == nil {
 		d.LookupEnv = mapLookup(nil)
@@ -176,11 +141,7 @@ func newTestEngine(d Deps) *Engine {
 	return NewEngine(d)
 }
 
-// --- mock-cli-drivers.bats parity -----------------------------------------
-
 func TestLaunchArgs_ClaudeP_HappyPath(t *testing.T) {
-	// T-mock.1: claude-p driver runs the (fake) CLI, artifact is produced
-	// with the challenge token, exit 0.
 	fx := newFixture(t, "claude-p", "")
 	fr := &fakeRunner{writeArtifactPath: fx.artifact, writeArtifactBody: "<!-- challenge-token: " + fx.token + " -->\nOK\n"}
 	code, _ := run(t, fr, fx.args("claude-p"))
@@ -197,7 +158,6 @@ func TestLaunchArgs_ClaudeP_HappyPath(t *testing.T) {
 }
 
 func TestLaunchArgs_Codex_HappyPath(t *testing.T) {
-	// T-mock.3: codex driver routes to its (fake) CLI and produces the artifact.
 	fx := newFixture(t, "codex", "")
 	fr := &fakeRunner{writeArtifactPath: fx.artifact, writeArtifactBody: "<!-- challenge-token: " + fx.token + " -->\nFAKE-CODEX\n"}
 	code, _ := run(t, fr, fx.args("codex"))
@@ -213,7 +173,6 @@ func TestLaunchArgs_Codex_HappyPath(t *testing.T) {
 }
 
 func TestLaunchArgs_Agy_HappyPath(t *testing.T) {
-	// T-mock.4: agy driver routes to its (fake) CLI and produces the artifact.
 	fx := newFixture(t, "agy", "")
 	fr := &fakeRunner{writeArtifactPath: fx.artifact, writeArtifactBody: "<!-- challenge-token: " + fx.token + " -->\nFAKE-AGY\n"}
 	code, _ := run(t, fr, fx.args("agy"))
@@ -225,11 +184,7 @@ func TestLaunchArgs_Agy_HappyPath(t *testing.T) {
 	}
 }
 
-// --- permission-mode-drivers.bats parity (non-tmux) -----------------------
-
 func TestLaunchArgs_ClaudeP_PermissionModePlanReachesInnerArgv(t *testing.T) {
-	// T-permmode-drv.1: --permission-mode=plan is forwarded into the
-	// claude argv as the pair ["--permission-mode", "plan"].
 	fx := newFixture(t, "claude-p", "")
 	fr := &fakeRunner{writeArtifactPath: fx.artifact, writeArtifactBody: "ok"}
 	code, _ := run(t, fr, fx.args("claude-p", "--permission-mode=plan"))
@@ -242,7 +197,6 @@ func TestLaunchArgs_ClaudeP_PermissionModePlanReachesInnerArgv(t *testing.T) {
 }
 
 func TestLaunchArgs_ClaudeP_PermissionModeAcceptEditsReachesInnerArgv(t *testing.T) {
-	// T-permmode-drv.15: pass-through works for any valid mode, not just plan.
 	fx := newFixture(t, "claude-p", "")
 	fr := &fakeRunner{writeArtifactPath: fx.artifact, writeArtifactBody: "ok"}
 	code, _ := run(t, fr, fx.args("claude-p", "--permission-mode=acceptEdits"))
@@ -255,8 +209,6 @@ func TestLaunchArgs_ClaudeP_PermissionModeAcceptEditsReachesInnerArgv(t *testing
 }
 
 func TestLaunchArgs_Codex_PermissionModeRejected(t *testing.T) {
-	// T-permmode-drv.5: codex does not support permission_mode → fail with
-	// a clear error mentioning permission_mode and (not) supported.
 	fx := newFixture(t, "codex", "plan")
 	fr := &fakeRunner{}
 	code, stderr := run(t, fr, fx.args("codex"))
@@ -272,7 +224,6 @@ func TestLaunchArgs_Codex_PermissionModeRejected(t *testing.T) {
 }
 
 func TestLaunchArgs_Agy_PermissionModeRejected(t *testing.T) {
-	// T-permmode-drv.7: agy does not support permission_mode → clear error.
 	fx := newFixture(t, "agy", "plan")
 	fr := &fakeRunner{}
 	code, stderr := run(t, fr, fx.args("agy"))
@@ -288,7 +239,6 @@ func TestLaunchArgs_Agy_PermissionModeRejected(t *testing.T) {
 }
 
 func TestLaunchArgs_Codex_NoPermissionModeBackCompat(t *testing.T) {
-	// T-permmode-drv.9: codex without permission_mode works as before.
 	fx := newFixture(t, "codex", "")
 	fr := &fakeRunner{writeArtifactPath: fx.artifact, writeArtifactBody: "ok"}
 	code, _ := run(t, fr, fx.args("codex"))
@@ -301,7 +251,6 @@ func TestLaunchArgs_Codex_NoPermissionModeBackCompat(t *testing.T) {
 }
 
 func TestLaunchArgs_Agy_NoPermissionModeBackCompat(t *testing.T) {
-	// T-permmode-drv.10: agy without permission_mode works as before.
 	fx := newFixture(t, "agy", "")
 	fr := &fakeRunner{writeArtifactPath: fx.artifact, writeArtifactBody: "ok"}
 	code, _ := run(t, fr, fx.args("agy"))
@@ -310,20 +259,15 @@ func TestLaunchArgs_Agy_NoPermissionModeBackCompat(t *testing.T) {
 	}
 }
 
-// --- worktree cwd parity (headless drivers ↔ tmux driver) ----------------
-
-// noSandboxWrap returns a SandboxWrapper that always declines, so the
-// headless drivers run the inner CLI unwrapped — keeping the recorded
-// (name, dir, args) clean for the assertion (no sandbox-exec/bwrap prefix
-// rewriting name/args). cfg.Worktree alone would otherwise invite the real
-// sandbox probe on hosts that can wrap.
+// noSandboxWrap returns a SandboxWrapper that always declines, so the headless drivers run the inner CLI
+// unwrapped, keeping the recorded (name, dir, args) clean for the assertion; cfg.Worktree alone would
+// otherwise invite the real sandbox probe on hosts that can wrap.
 func noSandboxWrap() SandboxWrapper {
 	return func(SandboxWrapRequest) ([]string, bool) { return nil, false }
 }
 
-// runWithSandbox drives LaunchArgs with the fake runner, an empty env
-// lookup, and an injected SandboxWrap so the run is deterministic on any
-// host. Mirrors run() but threads the sandbox seam.
+// runWithSandbox drives LaunchArgs with the fake runner, an empty env lookup, and an injected SandboxWrap
+// so the run is deterministic on any host; mirrors run() but threads the sandbox seam.
 func runWithSandbox(t *testing.T, fr *fakeRunner, sw SandboxWrapper, args []string) (int, string) {
 	t.Helper()
 	var stderr strings.Builder
@@ -333,10 +277,9 @@ func runWithSandbox(t *testing.T, fr *fakeRunner, sw SandboxWrapper, args []stri
 }
 
 func TestLaunchArgs_HeadlessDrivers_RunInWorktree(t *testing.T) {
-	// The headless drivers (claude-p/codex/agy) must set the subprocess cwd
-	// to cfg.Worktree for source-writing phases — parity with the tmux
-	// driver's `cd <worktree>`. Without this, a tdd/build agent writes test
-	// files to the MAIN tree and the tree-diff guard aborts the cycle.
+	// The headless drivers must set the subprocess cwd to cfg.Worktree for source-writing phases, parity
+	// with the tmux driver's `cd <worktree>`: without this, a build agent writes files to the main tree
+	// and the tree-diff guard aborts the cycle.
 	for _, cli := range []string{"claude-p", "codex", "agy"} {
 		t.Run(cli+"/worktree-set", func(t *testing.T) {
 			fx := newFixture(t, cli, "")
@@ -354,8 +297,7 @@ func TestLaunchArgs_HeadlessDrivers_RunInWorktree(t *testing.T) {
 			}
 		})
 		t.Run(cli+"/worktree-empty", func(t *testing.T) {
-			// No --worktree → cfg.Worktree=="" → dir=="" → inherit caller cwd
-			// (byte-identical to pre-fix behavior for non-source-writing phases).
+			// No --worktree → cfg.Worktree=="" → dir=="": inherits the caller cwd for non-source-writing phases.
 			fx := newFixture(t, cli, "")
 			fr := &fakeRunner{writeArtifactPath: fx.artifact, writeArtifactBody: "ok"}
 			code, stderr := runWithSandbox(t, fr, noSandboxWrap(), fx.args(cli))
@@ -372,11 +314,7 @@ func TestLaunchArgs_HeadlessDrivers_RunInWorktree(t *testing.T) {
 	}
 }
 
-// --- launch validation (bin/bridge cmd_launch required-field guards) ------
-
 func TestLaunchArgs_MissingRequiredFlag(t *testing.T) {
-	// bin/bridge: missing a required flag (here --cli) → EC_BAD_FLAGS with
-	// a message naming the missing field.
 	fx := newFixture(t, "claude-p", "")
 	fr := &fakeRunner{}
 	// Build args WITHOUT --cli.
@@ -399,7 +337,6 @@ func TestLaunchArgs_MissingRequiredFlag(t *testing.T) {
 }
 
 func TestLaunchArgs_UnknownCLI(t *testing.T) {
-	// bin/bridge: no driver for cli=X → EC_BAD_FLAGS ("no driver for cli=").
 	fx := newFixture(t, "nope", "")
 	fr := &fakeRunner{}
 	code, stderr := run(t, fr, fx.args("nope"))
@@ -412,8 +349,6 @@ func TestLaunchArgs_UnknownCLI(t *testing.T) {
 }
 
 func TestLaunchArgs_EmptyPromptFile(t *testing.T) {
-	// bin/bridge F5: an empty prompt file fails fast (would otherwise hang
-	// the agent at the artifact timeout) → EC_BAD_FLAGS.
 	fx := newFixture(t, "claude-p", "")
 	if err := os.WriteFile(fx.promptFile, nil, 0o644); err != nil {
 		t.Fatalf("truncate prompt: %v", err)

@@ -95,9 +95,7 @@ func runStagedCatalogRefresh(ctx context.Context, evolveDir, stage string, refre
 		}
 		return modelcatalog.WriteShadow(evolveDir, fresh)
 	}
-	// Same seam as `evolve models refresh`. This path previously called
-	// Write directly and silently destroyed operator-authored
-	// tier_fallbacks on every cycle-start refresh.
+	// Same seam as `evolve models refresh`.
 	_, cerr := modelcatalog.Commit(evolveDir, fresh, log)
 	return cerr
 }
@@ -157,9 +155,9 @@ func (c bridgeModelCapturer) CaptureModelPicker(ctx context.Context, cli string)
 }
 
 // bridgePromptDispatcher adapts bridge.Engine.Launch to
-// modelquery.PromptDispatcher (GAP 1, C1 fix): the tier-classification
-// prompt is dispatched through the same sandboxed, liveness-probed,
-// cli_fallback-aware bridge every phase uses, instead of a raw exec. It
+// modelquery.PromptDispatcher: the tier-classification prompt is dispatched
+// through the same sandboxed, liveness-probed, cli_fallback-aware bridge
+// every phase uses, instead of a raw exec. It
 // translates a base CLI name (codex|agy|claude) to the headless driver the
 // bridge launches (driver_codex.go/driver_agy.go/driver_claudep.go), mirroring
 // bridgeModelCapturer's cli->driver translation for the tmux pickers.
@@ -237,7 +235,7 @@ func liveRefresh(ctx context.Context, rep setup.DetectReport, projectRoot, evolv
 	// Diagnostics the bridge writes under the workspace (escalation reports,
 	// launch errors, the llm-calls token ledger) are salvaged to a durable
 	// home BEFORE teardown — deleting them with the scratch dir would silently
-	// destroy the one artifact that explains a failed probe (Rule 12).
+	// destroy the one artifact that explains a failed probe.
 	scratch, err := os.MkdirTemp("", "evolve-models-probe-*")
 	if err != nil {
 		return modelcatalog.Catalog{}, fmt.Errorf("liveRefresh: scratch workspace: %w", err)
@@ -274,9 +272,7 @@ func liveRefresh(ctx context.Context, rep setup.DetectReport, projectRoot, evolv
 
 // salvageProbeDiagnostics copies the diagnostic side-effects the bridge wrote
 // under the scratch probe workspace into evolveDir/models-probe before the
-// scratch dir is deleted (adversarial-review HIGH: a quota wall mid-probe
-// writes escalation-report.json — pane tail + repair instructions — and the
-// teardown used to delete the only copy while the refresh reported success):
+// scratch dir is deleted:
 //
 //   - escalation-report.json → escalation-report-<UTC stamp>.json (each event
 //     kept, never clobbered) + a WARN naming the salvaged path
@@ -287,12 +283,12 @@ func liveRefresh(ctx context.Context, rep setup.DetectReport, projectRoot, evolv
 // Deliberately allowlist-shaped: artifacts/prompts/pane logs are probe
 // plumbing and stay disposable. Best-effort throughout — salvage must never
 // fail the refresh — and fully quiet when a clean probe left nothing behind.
-// tag disambiguates destinations when multiple probes salvage CONCURRENTLY
+// tag disambiguates destinations when multiple probes salvage concurrently
 // into the shared durable home (`evolve setup latest` runs one salvage per
-// family in parallel): the second-granularity stamp alone collided in exactly
-// this shape before (tmux resolveSession, ADR-0049 N15), and the un-stamped
-// launch-error name collides outright since every family's capturer is
-// Agent "models". Empty tag keeps the historical names (single-probe callers).
+// family in parallel): a second-granularity stamp alone can still collide,
+// and the un-stamped launch-error name collides outright since every
+// family's capturer is Agent "models". Empty tag keeps the historical names
+// (single-probe callers).
 func salvageProbeDiagnostics(scratch, evolveDir, tag string, now func() time.Time, log io.Writer) {
 	entries, err := os.ReadDir(scratch)
 	if err != nil {

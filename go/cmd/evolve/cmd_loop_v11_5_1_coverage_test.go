@@ -11,9 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
-// TestRunLoop_ResetErrorLogged covers the PruneByClassification error
-// branch in the --reset wiring. Achieved by setting state.json to a
-// directory (so atomic write fails on the rename step).
 func TestRunLoop_ResetErrorLogged(t *testing.T) {
 
 	projectRoot := t.TempDir()
@@ -39,7 +36,7 @@ func TestRunLoop_ResetErrorLogged(t *testing.T) {
 	if err := os.Chmod(evolveDir, 0o555); err != nil {
 		t.Fatalf("chmod: %v", err)
 	}
-	defer os.Chmod(evolveDir, 0o755) // restore for cleanup
+	defer os.Chmod(evolveDir, 0o755)
 
 	if os.Geteuid() == 0 {
 		t.Skip("running as root — chmod 555 doesn't restrict writes")
@@ -62,10 +59,6 @@ func TestRunLoop_ResetErrorLogged(t *testing.T) {
 	}
 }
 
-// TestRunLoop_BudgetFlagsDoNotStop verifies the deprecated cost flags no longer
-// stop the loop: even when the cycle cost exceeds both --budget-usd and
-// --batch-cap-usd, the run completes its cycles normally (rc=0, no
-// BUDGET-EXHAUSTED / batch_cap), with cost reported as telemetry only.
 func TestRunLoop_BudgetFlagsDoNotStop(t *testing.T) {
 
 	projectRoot := t.TempDir()

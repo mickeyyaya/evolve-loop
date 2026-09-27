@@ -9,23 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// Cycle-230 task ledger-skip-source: phase_skipped ledger entries must carry a
-// skip-source attribution (`Source string` on LedgerEntry, json tag
-// "source,omitempty"; values psmas|router|content), and recordRoutingDecision
-// must stamp Source:"router" on the phase_skipped entries it appends.
-//
-// These tests use reflection / JSON-level assertions deliberately so the core
-// package still COMPILES at the RED baseline (no direct e.Source access) and
-// each test fails on an assertion, not a build error — "fails for the right
-// reason" per the TDD contract.
-//
-// DO NOT MODIFY (builder contract): add the field in ports.go (LedgerEntry +
-// ledgerEntryWire + UnmarshalJSON) and stamp it in
-// orchestrator.go:recordRoutingDecision.
-
-// TestLedgerEntrySource_FieldPresent: LedgerEntry must expose a Source string
-// field tagged `json:"source,omitempty"` (omitempty keeps historical hash-chain
-// bytes stable — absent on every pre-cycle-230 entry).
 func TestLedgerEntrySource_FieldPresent(t *testing.T) {
 	t.Parallel()
 	f, ok := reflect.TypeOf(LedgerEntry{}).FieldByName("Source")
@@ -40,9 +23,6 @@ func TestLedgerEntrySource_FieldPresent(t *testing.T) {
 	}
 }
 
-// TestLedgerEntrySource_RouterStamp: recordRoutingDecision must stamp
-// Source:"router" on every phase_skipped entry it appends. Asserted at the
-// JSON wire level (the observable ledger.jsonl behavior).
 func TestLedgerEntrySource_RouterStamp(t *testing.T) {
 	t.Parallel()
 	led := &fakeLedger{}
@@ -75,11 +55,6 @@ func TestLedgerEntrySource_RouterStamp(t *testing.T) {
 	}
 }
 
-// TestLedgerEntrySource_RoundTrip: a ledger line carrying "source" must
-// survive Unmarshal→Marshal (forces the ledgerEntryWire twin + custom
-// UnmarshalJSON to route the field, not silently drop it), and entries
-// WITHOUT a source must not grow a "source" key (omitempty — hash-chain
-// stability for all historical lines).
 func TestLedgerEntrySource_RoundTrip(t *testing.T) {
 	t.Parallel()
 	var e LedgerEntry

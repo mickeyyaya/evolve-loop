@@ -46,17 +46,18 @@ func compositionOptions() []core.Option {
 // stays the single source of fail-closed patch-id/gate checks.
 func writeCompositionVerdict(ledgerPath string, in core.CompositionVerdictInput) error {
 	return ledger.WriteCompositionVerdict(ledgerPath, ledger.CompositionVerdictInput{
-		Cycle:        in.Cycle,
-		Method:       in.Method,
-		LaneAuditRef: in.LaneAuditRef,
-		PatchID:      in.PatchID,
-		AuditedBase:  in.AuditedBase,
-		GitHead:      in.GitHead,
-		TreeStateSHA: in.TreeStateSHA,
-		GateResults:  in.GateResults,
-		AuditedDiff:  in.AuditedDiff,
-		ComposedDiff: in.ComposedDiff,
-		ArtifactDir:  in.ArtifactDir,
+		Cycle:          in.Cycle,
+		Method:         in.Method,
+		LaneAuditRef:   in.LaneAuditRef,
+		PatchID:        in.PatchID,
+		AuditedBase:    in.AuditedBase,
+		GitHead:        in.GitHead,
+		TreeStateSHA:   in.TreeStateSHA,
+		AuditedTreeSHA: in.AuditedTreeSHA,
+		GateResults:    in.GateResults,
+		AuditedDiff:    in.AuditedDiff,
+		ComposedDiff:   in.ComposedDiff,
+		ArtifactDir:    in.ArtifactDir,
 	})
 }
 

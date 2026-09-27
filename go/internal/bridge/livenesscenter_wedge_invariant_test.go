@@ -1,24 +1,5 @@
 package bridge
 
-// livenesscenter_wedge_invariant_test.go — cycle-431 slice S3, Task B: pins
-// every wedge-incident invariant against the center-authoritative liveness
-// path (Task A). Each case names a real panestream.Liveness* constant and
-// drives the actual production deterministicReviewer / runTmuxREPL — no
-// stubs standing in for the reviewer under test (AC6 anti-gaming).
-//
-// Incident corpus:
-//
-//	cycle-311/312 — a producing agent is NEVER capped (Converging → extend
-//	  unconditionally, past any maxExtends bound).
-//	cycle-254/255 — a busy-but-silent pane extends UP TO maxExtends, then
-//	  pauses (the bound a producing agent never reaches).
-//	cycle-262      — a dead/echoing pane must classify Hung, not Converging
-//	  (Hung fast-fails before the maxExtends backstop; Converging never
-//	  stops extending on its own).
-//	cycle-286/288  — non-empty pane evidence (StopEvent.StdoutTail) survives
-//	  across a checkpoint whose live capture comes back empty (session death
-//	  after the last good frame).
-
 import (
 	"bytes"
 	"context"
@@ -29,9 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
 )
 
-// TestWedgeCorpus_Converging_ProducingNeverCapped (AC1, cycle-311/312):
-// LivenessConverging must extend UNCONDITIONALLY — an attempt count far
-// past maxExtends must still extend, because real output is never "stuck".
 func TestWedgeCorpus_Converging_ProducingNeverCapped(t *testing.T) {
 	r := newDeterministicReviewer(2)
 	ev := StopEvent{State: panestream.LivenessConverging, Attempt: 50}
@@ -40,10 +18,6 @@ func TestWedgeCorpus_Converging_ProducingNeverCapped(t *testing.T) {
 	}
 }
 
-// TestWedgeCorpus_BusyStagnant_BoundedThenPause (AC2, cycle-254/255):
-// LivenessBusyButStagnant extends up to maxExtends, then pauses — the
-// bound that distinguishes a silently-working agent from a genuinely stuck
-// one.
 func TestWedgeCorpus_BusyStagnant_BoundedThenPause(t *testing.T) {
 	r := newDeterministicReviewer(2)
 	if got := r.Review(StopEvent{State: panestream.LivenessBusyButStagnant, Attempt: 1}).Action; got != ReviewExtend {
@@ -54,11 +28,6 @@ func TestWedgeCorpus_BusyStagnant_BoundedThenPause(t *testing.T) {
 	}
 }
 
-// TestWedgeCorpus_DeadPane_HungIsNotConverging (AC3, cycle-262): a dead or
-// self-echoing pane must classify LivenessHung and pause BEFORE the
-// maxExtends backstop — never LivenessConverging, which the cycle-262
-// bridge nudge-echo would otherwise ride to an unconditional, indefinite
-// extend.
 func TestWedgeCorpus_DeadPane_HungIsNotConverging(t *testing.T) {
 	r := newDeterministicReviewer(6)
 	got := r.Review(StopEvent{State: panestream.LivenessHung, Attempt: 0}).Action
@@ -67,11 +36,6 @@ func TestWedgeCorpus_DeadPane_HungIsNotConverging(t *testing.T) {
 	}
 }
 
-// TestWedgeCorpus_EvidenceSurvivesEmptyCapture (AC4, cycle-286/288): once
-// the tmux server dies, every later capture returns empty — the
-// checkpoint's StopEvent.StdoutTail must still carry the last NON-EMPTY
-// pane, not go blank, or an escalation report built from it loses the only
-// evidence of what the agent was doing.
 func TestWedgeCorpus_EvidenceSurvivesEmptyCapture(t *testing.T) {
 	cfg := fixtureConfig(t)
 	const evidence = "TOOL CALL: go test ./... — last real output before server death"
@@ -98,10 +62,8 @@ func TestWedgeCorpus_EvidenceSurvivesEmptyCapture(t *testing.T) {
 	}
 }
 
-// TestWedgeCorpus_UsesRealDeterministicReviewer (AC6, anti-gaming): the
-// corpus above must exercise the PRODUCTION reviewer type, not a test
-// double standing in for it — a stubbed StopReviewer could satisfy any
-// verdict table without the real Review() decision logic ever running.
+// Anti-gaming: the corpus above must exercise the production reviewer type, not a test double standing in
+// for it — a stubbed StopReviewer could satisfy any verdict table without the real Review() logic running.
 func TestWedgeCorpus_UsesRealDeterministicReviewer(t *testing.T) {
 	var r StopReviewer = newDeterministicReviewer(defaultArtifactMaxExtends)
 	if _, ok := r.(deterministicReviewer); !ok {
@@ -109,15 +71,6 @@ func TestWedgeCorpus_UsesRealDeterministicReviewer(t *testing.T) {
 	}
 }
 
-// TestStopReview_RenderWedgeOverride (cycle-432 S4, AC4, edge): the
-// cycle-291 render-wedge override must survive the migration to
-// center-sourced Busy — a blank pane from a LIVE session still classifies
-// LivenessBusyButStagnant (never Idle) AND StopEvent.Busy stays true via the
-// `center.Busy(session) || renderWedged` term, so a working agent is never
-// paused purely on a pane-render failure. Pre-existing GREEN is acceptable
-// here (the `|| renderWedged` term already exists pre-migration); this test
-// pins it as a regression guard so S4 cannot silently drop the term while
-// relocating the Busy source.
 func TestStopReview_RenderWedgeOverride(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &jiggleTmux{fakeTmux: fakeTmux{paneSeq: []string{

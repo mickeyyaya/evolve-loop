@@ -6,13 +6,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
 )
 
-// liveness_matrix_test.go — T2 behavioral tests: the reviewer maps
-// LivenessState → ReviewAction with zero CLI-name literals in stopreview.go.
-// These tests pin the four invariants that replaced the coarse boolean path.
-
-// TestLivenessMatrix covers the full LivenessState × ReviewAction decision table.
-// All four states are exercised across multiple attempt counts to prove the
-// reviewer is driven by State, not by hard-coded per-CLI logic.
 func TestLivenessMatrix(t *testing.T) {
 	const max = 6 // maxExtends for this test suite
 	r := NewDeterministicReviewer(max)
@@ -22,18 +15,18 @@ func TestLivenessMatrix(t *testing.T) {
 		ev   StopEvent
 		want ReviewAction
 	}{
-		// Converging → ReviewExtend unconditionally (cycles 311/312: no cap on real output)
+		// Converging → ReviewExtend unconditionally: no cap on real output.
 		{"converging attempt=0", StopEvent{State: panestream.LivenessConverging, Attempt: 0}, ReviewExtend},
 		{"converging attempt=max", StopEvent{State: panestream.LivenessConverging, Attempt: max}, ReviewExtend},
 		{"converging attempt=max+3", StopEvent{State: panestream.LivenessConverging, Attempt: max + 3}, ReviewExtend},
 
-		// BusyButStagnant → extend under cap, pause at/over cap (cycles 254/255)
+		// BusyButStagnant → extend under cap, pause at/over cap.
 		{"busy-stagnant attempt=0", StopEvent{State: panestream.LivenessBusyButStagnant, Attempt: 0}, ReviewExtend},
 		{"busy-stagnant attempt=max-1", StopEvent{State: panestream.LivenessBusyButStagnant, Attempt: max - 1}, ReviewExtend},
 		{"busy-stagnant attempt=max", StopEvent{State: panestream.LivenessBusyButStagnant, Attempt: max}, ReviewPause},
 		{"busy-stagnant attempt=max+1", StopEvent{State: panestream.LivenessBusyButStagnant, Attempt: max + 1}, ReviewPause},
 
-		// Hung → fast-fail BEFORE maxExtends backstop (new: detector fast-path)
+		// Hung → fast-fails before the maxExtends backstop (the detector's fast path).
 		{"hung attempt=0", StopEvent{State: panestream.LivenessHung, Attempt: 0}, ReviewPause},
 		{"hung attempt=1", StopEvent{State: panestream.LivenessHung, Attempt: 1}, ReviewPause},
 		{"hung attempt=max-1", StopEvent{State: panestream.LivenessHung, Attempt: max - 1}, ReviewPause},
@@ -52,10 +45,9 @@ func TestLivenessMatrix(t *testing.T) {
 	}
 }
 
-// TestLivenessMatrix_HungFastFailBeforeMaxExtends pins the fast-fail invariant:
-// a Hung sequence returns non-Extend at attempt=1, which is STRICTLY LESS than
-// maxExtends=6. This is the latency win: the detector fast-fails BEFORE the
-// ~maxExtends×300s = ~30-min backstop would trigger on BusyButStagnant.
+// TestLivenessMatrix_HungFastFailBeforeMaxExtends pins the latency win: a Hung sequence returns non-Extend
+// at attempt=1, strictly less than maxExtends=6, so the detector fast-fails well before the
+// maxExtends×300s backstop would otherwise trigger on BusyButStagnant.
 func TestLivenessMatrix_HungFastFailBeforeMaxExtends(t *testing.T) {
 	r := NewDeterministicReviewer(6)
 	ev := StopEvent{State: panestream.LivenessHung, Attempt: 1}
@@ -64,10 +56,6 @@ func TestLivenessMatrix_HungFastFailBeforeMaxExtends(t *testing.T) {
 	}
 }
 
-// TestLivenessMatrix_ConvergingUnconditionalPastMaxExtends pins the unconditional-
-// extend invariant: Converging at attempt=9 (past maxExtends=2) still returns
-// ReviewExtend. This closes cycles 311/312: a producing scout was killed at
-// the maxExtends backstop even while emitting real output.
 func TestLivenessMatrix_ConvergingUnconditionalPastMaxExtends(t *testing.T) {
 	r := NewDeterministicReviewer(2)
 	ev := StopEvent{State: panestream.LivenessConverging, Attempt: 9}
@@ -76,13 +64,6 @@ func TestLivenessMatrix_ConvergingUnconditionalPastMaxExtends(t *testing.T) {
 	}
 }
 
-// TestLivenessMatrix_BooleanFallbackRetired (S3) verifies the pre-S3
-// Progressed+Busy boolean fallback is RETIRED, not merely shadowed: a
-// StopEvent with State left at its zero value gets ReviewPause regardless of
-// what Progressed/Busy carry — those fields are evidence for fatalpane.go +
-// logging now, never a reviewer decision path. Supersedes the old
-// TestLivenessMatrix_BackwardCompatBooleans, which pinned the opposite
-// (now-retired) behavior.
 func TestLivenessMatrix_BooleanFallbackRetired(t *testing.T) {
 	r := NewDeterministicReviewer(3)
 	cases := []struct {

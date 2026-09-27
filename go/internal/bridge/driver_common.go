@@ -9,22 +9,12 @@ import (
 	"strings"
 )
 
-// driver_common.go — helpers shared by every Driver, factoring out the
-// blocks that were copy-pasted across drivers/*.sh (prompt substitution,
-// log-file setup, env construction). DRY by design: a new driver reuses
-// these instead of re-implementing them.
-
-// resolveBinary returns the executable name for a driver's inner CLI,
-// honoring the offline testing seam ported from the bash bridge: when
-// BRIDGE_TESTING=1, a BRIDGE_<CLI>_BINARY override (e.g.
-// BRIDGE_CLAUDE_BINARY) substitutes the real binary with a fake/stub so
-// the e2e harness can drive the full cycle path without a live CLI.
-// Outside testing the default name is always used, so a stray override in
-// a production environment can never redirect a real launch.
-//
-// defaultName must be a base binary name (claude|codex|agy) — NOT a driver
-// alias like "claude-tmux" — so the derived env key (BRIDGE_<UPPER>_BINARY)
-// is a valid shell variable. All six drivers pass the base name.
+// resolveBinary returns the executable name for a driver's inner CLI, honoring the offline testing seam:
+// when BRIDGE_TESTING=1, a BRIDGE_<CLI>_BINARY override (e.g. BRIDGE_CLAUDE_BINARY) substitutes the real
+// binary with a fake/stub so the e2e harness can drive the full cycle path without a live CLI. Outside
+// testing the default name is always used, so a stray override in production can never redirect a real
+// launch. defaultName must be a base binary name (claude|codex|agy), not a driver alias like
+// "claude-tmux", so the derived env key is a valid shell variable.
 func resolveBinary(deps Deps, defaultName string) string {
 	if v, _ := lookupEnv(deps, "BRIDGE_TESTING"); v != "1" {
 		return defaultName
@@ -60,10 +50,8 @@ func exportLines(env map[string]string) []string {
 	return lines
 }
 
-// preparePrompt reads the prompt file and applies the bridge's two
-// substitutions — $CHALLENGE_TOKEN (minted via the Deps seam and
-// persisted to workspace/challenge-token.txt) and $ARTIFACT_PATH —
-// mirroring the identical block in each bash driver.
+// preparePrompt reads the prompt file and applies the bridge's two substitutions: $CHALLENGE_TOKEN (minted
+// via the Deps seam and persisted to workspace/challenge-token.txt) and $ARTIFACT_PATH.
 func preparePrompt(cfg *Config, deps Deps) (string, error) {
 	raw, err := os.ReadFile(cfg.PromptFile)
 	if err != nil {
@@ -71,9 +59,6 @@ func preparePrompt(cfg *Config, deps Deps) (string, error) {
 	}
 	content := string(raw)
 	if strings.Contains(content, "$CHALLENGE_TOKEN") {
-		// Read-existing-or-mint: reuse the orchestrator's token written
-		// at cycle start (one token per cycle invariant); mint only when
-		// the file is absent or empty (e.g. standalone bridge invocation).
 		var tok string
 		if existing, err := os.ReadFile(filepath.Join(cfg.Workspace, "challenge-token.txt")); err == nil {
 			if v := strings.TrimSpace(string(existing)); v != "" {
@@ -139,12 +124,8 @@ func orDefault(s, def string) string {
 	return s
 }
 
-// lookupEnv resolves key against the same environment the inner CLI sees:
-// the request-local Deps.Env overlay first (the map driverEnv exports to the
-// subprocess), then the Deps.LookupEnv seam, then os.LookupEnv as a defensive
-// fallback. Consulting Deps.Env keeps the in-process int reads (envInt — e.g.
-// the artifact-wait deadline) consistent with the subprocess env, so an
-// operator override carried on the launch is not silently dropped.
+// lookupEnv resolves key against the same environment the inner CLI sees: the request-local Deps.Env
+// overlay first, then the Deps.LookupEnv seam, then os.LookupEnv as a defensive fallback.
 func lookupEnv(deps Deps, key string) (string, bool) {
 	if v, ok := deps.Env[key]; ok {
 		return v, true
@@ -155,86 +136,46 @@ func lookupEnv(deps Deps, key string) (string, bool) {
 	return os.LookupEnv(key)
 }
 
-// fileNonEmpty reports whether path exists and has size > 0 (the bash
-// `[[ -s "$f" ]]` artifact-presence test).
+// fileNonEmpty reports whether path exists and has size > 0.
 func fileNonEmpty(path string) bool {
 	fi, err := os.Stat(path)
 	return err == nil && fi.Size() > 0
 }
 
-// regularFileNonEmpty is fileNonEmpty for paths whose CONTENT is about to be
-// promoted into a committed deliverable: it Lstats, so a symlink is judged as a
-// symlink instead of as whatever it points at, and only a non-empty REGULAR
-// file qualifies. fileNonEmpty's os.Stat follows links by design (its callers —
-// doctor's credential probes, the stdout-log check — are asking "does the thing
-// at the other end exist?"), but artifactLocate is a promotion chokepoint: an
-// agent that plants `<artifact> -> ~/.claude/.credentials.json` would otherwise
-// have that file's bytes relocated into the canonical deliverable and committed
-// by `evolve ship`. Devices, FIFOs and directories are rejected for the same
-// reason — reading them is not "the agent wrote its report here". Failing
-// closed (the phase waits, then times out with the artifact diagnostic) is the
-// safe direction: a real deliverable is always a regular file.
+// regularFileNonEmpty is fileNonEmpty for paths about to be promoted into a committed deliverable: it
+// Lstats rather than following links, and only a non-empty regular file qualifies, so a planted symlink
+// (or device, FIFO or directory) can't redirect the promotion. fileNonEmpty's os.Stat follows links by
+// design; its callers only ask whether the thing at the other end exists.
 func regularFileNonEmpty(path string) bool {
 	fi, err := os.Lstat(path)
 	return err == nil && fi.Mode().IsRegular() && fi.Size() > 0
 }
 
-// IsDir reports whether path is an existing directory. Exported because the
-// fleet worktree guard below (driver_tmux_repl.go: `if !IsDir(workingDir)` →
-// ExitBadFlags) is a launch-refusal predicate that callers OUTSIDE this package
-// must be able to test against before dispatching — a phase that re-derives it
-// locally can drift from the guard and strand a lane (cycle-1278: retro handed
-// the bridge a torn-down lane's stale worktree and lost the retrospective).
-// One predicate, one definition.
+// IsDir reports whether path is an existing directory. Exported because the fleet worktree guard
+// (driver_tmux_repl.go: `if !IsDir(workingDir)` → ExitBadFlags) is a launch-refusal predicate that callers
+// outside this package must test against before dispatching, rather than re-deriving it and drifting from
+// the guard: one predicate, one definition.
 func IsDir(path string) bool {
 	fi, err := os.Stat(path)
 	return err == nil && fi.IsDir()
 }
 
-// artifactReady reports whether the phase artifact is present and non-empty.
-// It accepts the canonical cfg.Artifact path and, as a tolerance for agent
-// doc-compliance variance, an ordered set of fallback locations that get
-// relocated to the canonical path (the single source of truth downstream
-// phases read). relocatedFrom returns the fallback the artifact was found at
-// so the caller can log the normalization. Empty files never count (matching
-// fileNonEmpty / the bash `[[ -s ]]` test).
-//
-// Fallback search order (first non-empty wins):
-//  1. <workspace>/workspace/<base> — cycle-108: agents read the doc's
-//     "workspace/" prefix as a literal subdir under their cwd.
-//  2. <worktree>/<base> — cycle-141 ExitArtifactTimeout: the builder runs with
-//     cwd=worktree (driver_tmux_repl.go), and the prompt names the artifact by
-//     bare relative path ("Write build-report.md"), so the agent writes it into
-//     the worktree root — which the driver did not poll.
-//  3. <worktree>/workspace/<base> — the same "workspace/" literal-subdir
-//     misread, but relative to the worktree cwd.
-//
-// Worktree candidates are only searched when cfg.Worktree is set (headless
-// drivers / probes leave it empty), so that path is byte-identical to the
-// pre-cycle-141 behavior.
-//
-// When a fallback artifact exists but the relocation fails (e.g. a read-only
-// workspace), the error is RETURNED rather than swallowed: a silent (false, "")
-// would make the driver spin the full artifact-wait window with no signal,
-// hiding a "wrote to the wrong place AND could not be moved" condition from the
-// operator. The caller logs it.
-// See docs/architecture/adr/0024-conditional-ship-gate-floor-and-phase-advisor.md.
+// artifactReady reports whether the phase artifact is present and non-empty. It accepts the canonical
+// cfg.Artifact path and an ordered set of fallback locations (a tolerance for agent doc-compliance
+// variance) that get relocated to the canonical path; relocatedFrom returns the fallback the artifact was
+// found at so the caller can log the normalization. When a fallback exists but the relocation fails, the
+// error is returned rather than swallowed, so the driver doesn't spin the full artifact-wait window with
+// no signal.
+// See ADR-0024.
 func artifactReady(cfg *Config) (ready bool, relocatedFrom string, err error) {
 	return artifactCanonicalize(cfg, relocateFile)
 }
 
-// artifactCanonicalize is artifactReady with the mover injected, so a caller
-// that has NOT confirmed the artifact settled can restrict which relocation
-// semantics are allowed to run (cycle-1256 D1). move is only ever consulted for
-// a NON-canonical artifact; the canonical case moves nothing under either mover.
-//
-// Two movers exist, and the difference is not stylistic:
-//   - relocateFile — rename, falling back to copy+remove. Correct only for a
-//     file already observed to have stopped changing, because copy+remove
-//     snapshots the source and then deletes it.
-//   - renameOnlyRelocate — rename, or fail. Safe for a file that may still be
-//     growing, because rename preserves the inode: an agent's open fd keeps
-//     appending into the file at its new canonical path.
+// artifactCanonicalize is artifactReady with the mover injected, so a caller that has not confirmed the
+// artifact settled can restrict which relocation semantics are allowed to run; move is only ever consulted
+// for a non-canonical artifact. relocateFile (rename, falling back to copy+remove) is correct only for a
+// file already observed to have stopped changing; renameOnlyRelocate (rename or fail) is safe for a file
+// that may still be growing, since rename preserves the inode an agent's open fd keeps appending to.
 func artifactCanonicalize(cfg *Config, move func(src, dst string) error) (ready bool, relocatedFrom string, err error) {
 	path, found := artifactLocate(cfg)
 	if !found {
@@ -249,20 +190,11 @@ func artifactCanonicalize(cfg *Config, move func(src, dst string) error) (ready 
 	return true, path, nil
 }
 
-// artifactLocate reports where the phase artifact currently IS — the canonical
-// path when it holds a non-empty file, otherwise the first non-empty fallback
-// in artifactReady's search order — WITHOUT moving anything. It is the
-// read-only half of artifactReady, which layers the relocation on top.
-//
-// The split exists because relocation is irreversible and, on relocateFile's
-// cross-device copy+remove branch, destructive: it snapshots the source and
-// then removes it. Observing a fallback that is still being written and moving
-// it on that first sighting truncates the deliverable permanently. So
-// artifactDetector runs its cross-poll stability window against this read-only
-// answer and only calls artifactReady — the mover — once the file has settled.
-// Candidates are qualified with regularFileNonEmpty, not fileNonEmpty: this is
-// the chokepoint that decides which bytes become the committed deliverable, so
-// a symlink is never followed here (cycle-1256 D3).
+// artifactLocate reports where the phase artifact currently is — the canonical path when it holds a
+// non-empty file, otherwise the first non-empty fallback in artifactReady's search order — without moving
+// anything; it is the read-only half of artifactReady. The split exists because relocation is irreversible
+// and, on relocateFile's copy+remove branch, destructive, so artifactDetector runs its stability window
+// against this read-only answer and only relocates once the file has settled.
 func artifactLocate(cfg *Config) (path string, found bool) {
 	for _, c := range artifactCandidatePaths(cfg) {
 		if regularFileNonEmpty(c) {
@@ -272,12 +204,10 @@ func artifactLocate(cfg *Config) (path string, found bool) {
 	return "", false
 }
 
-// artifactCandidatePaths is the FULL ordered set of locations artifactLocate
-// can answer from: canonical first, then the fallbacks. Single-sourced so the
-// pre-dispatch baseline (captureArtifactBaseline) snapshots exactly the
-// locations completion can later certify — a stray at a fallback, shadowed by
-// the canonical at capture time, must not launder through the side door when
-// the canonical vanishes mid-session (design-review note 1).
+// artifactCandidatePaths is the full ordered set of locations artifactLocate can answer from: canonical
+// first, then the fallbacks. Single-sourced so the pre-dispatch baseline (captureArtifactBaseline)
+// snapshots exactly the locations completion can later certify, so a stray fallback shadowed by the
+// canonical at capture time can't launder through if the canonical vanishes mid-session.
 func artifactCandidatePaths(cfg *Config) []string {
 	out := []string{cfg.Artifact}
 	base := filepath.Base(cfg.Artifact)
@@ -296,20 +226,13 @@ func artifactCandidatePaths(cfg *Config) []string {
 	return out
 }
 
-// relocateFile moves src to dst, creating dst's parent directory. It tries an
-// atomic rename first and falls back to copy+remove when rename fails (e.g. a
-// cross-device move). The copy goes through a "<dst>.tmp.<pid>" temp file in
-// dst's directory that is renamed into place, so a write that fails partway
-// (ENOSPC, network I/O) never leaves a truncated non-empty file at the
-// canonical path — which the poll loop would otherwise read as "ready". This
-// mirrors the ${file}.tmp.$$ + mv discipline used across the codebase's
-// atomic writers. The temp file is created with os.CreateTemp — O_EXCL with an
-// unpredictable suffix — rather than the old "<dst>.tmp.<pid>" name, whose PID
-// component is small, guessable and disclosed in logs: an agent that pre-planted
-// that name as a symlink turned this copy into an arbitrary-write primitive
-// (cycle-1256 D4). Used by artifactReady to canonicalize a non-canonical write
-// that has already been observed to stop changing; callers that have NOT
-// established that must use renameOnlyRelocate instead.
+// relocateFile moves src to dst, creating dst's parent directory. It tries an atomic rename first and
+// falls back to copy+remove when rename fails (e.g. a cross-device move), through a temp file in dst's
+// directory that is renamed into place, so a write that fails partway never leaves a truncated non-empty
+// file at the canonical path. The temp file is created with os.CreateTemp (an unpredictable suffix) rather
+// than a predictable "<dst>.tmp.<pid>" name, so a planted symlink at a guessable name can't turn this copy
+// into an arbitrary-write primitive. Used by artifactReady to canonicalize a write already observed to
+// have stopped changing; callers that have not established that must use renameOnlyRelocate instead.
 func relocateFile(src, dst string) error {
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		return fmt.Errorf("relocate: mkdir dst dir: %w", err)
@@ -335,7 +258,7 @@ func relocateFile(src, dst string) error {
 		_ = os.Remove(tmp)
 		return fmt.Errorf("relocate: close dst tmp: %w", cerr)
 	}
-	if err := os.Chmod(tmp, 0o644); err != nil { // CreateTemp is 0600; match the old mode
+	if err := os.Chmod(tmp, 0o644); err != nil { // CreateTemp defaults to 0600; match the destination's 0644
 		_ = os.Remove(tmp)
 		return fmt.Errorf("relocate: chmod dst tmp: %w", err)
 	}
@@ -347,17 +270,12 @@ func relocateFile(src, dst string) error {
 	return nil
 }
 
-// renameOnlyRelocate canonicalizes src → dst with rename semantics ONLY: if the
-// rename cannot be done (a cross-device src, an unwritable source directory) it
-// reports the error instead of degrading to relocateFile's copy+remove.
-//
-// This is the mover for a caller that has NOT confirmed the artifact stopped
-// changing — today, artifactDetector's finality short-circuit. Rename is the one
-// canonicalization that is safe for a file still being written: it relinks the
-// same inode, so the agent's open fd keeps appending into the file at its new
-// path and the deliverable reader still sees every byte. copy+remove on the same
-// file snapshots it half-written and then deletes the original, which is
-// permanent data loss dressed up as a settled artifact (cycle-1256 D1).
+// renameOnlyRelocate canonicalizes src → dst with rename semantics only: if the rename cannot be done (a
+// cross-device src, an unwritable source directory) it reports the error instead of degrading to
+// relocateFile's copy+remove. This is the mover for a caller that has not confirmed the artifact stopped
+// changing, since rename is the one canonicalization safe for a file still being written — it relinks the
+// same inode, so an agent's open fd keeps appending at the new path — whereas copy+remove would snapshot a
+// half-written file and then delete the original.
 func renameOnlyRelocate(src, dst string) error {
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		return fmt.Errorf("relocate (rename-only): mkdir dst dir: %w", err)
@@ -369,24 +287,18 @@ func renameOnlyRelocate(src, dst string) error {
 	return nil
 }
 
-// wsListMaxDepth/wsListMaxEntries bound the timeout diagnostic so a workspace
-// that contains a git worktree (per-cycle worktrees live under the cycle dir)
-// cannot flood stderr with thousands of lines. The diagnostic only needs the
-// artifact plus one nesting level — the canonical <ws>/<file> and the
-// non-canonical <ws>/workspace/<file> are both within depth 2.
+// wsListMaxDepth/wsListMaxEntries bound the timeout diagnostic so a workspace containing a git worktree
+// can't flood stderr with thousands of lines; the diagnostic only needs the artifact plus one nesting
+// level, since the canonical <ws>/<file> and the non-canonical <ws>/workspace/<file> are both within depth 2.
 const (
 	wsListMaxDepth   = 2
 	wsListMaxEntries = 200
 )
 
-// listWorkspaceFiles returns "relpath (N bytes)" lines for regular files under
-// ws. Directories at depth >= wsListMaxDepth are pruned (their contents are
-// not walked), and the total is capped at wsListMaxEntries; together these
-// keep a per-cycle git worktree from flooding the diagnostic. Used to make an
-// artifact-wait timeout self-diagnosing: instead of only reporting the path
-// that did NOT appear, the driver lists what the agent actually wrote so an
-// operator can see a misplaced artifact at a glance. Best-effort: a walk error
-// yields a single diagnostic line rather than failing the caller.
+// listWorkspaceFiles returns "relpath (N bytes)" lines for regular files under ws, pruning directories at
+// depth >= wsListMaxDepth and capping the total at wsListMaxEntries. It makes an artifact-wait timeout
+// self-diagnosing: instead of only reporting the path that did not appear, it lists what the agent actually
+// wrote. Best-effort: a walk error yields a single diagnostic line rather than failing the caller.
 func listWorkspaceFiles(ws string) []string {
 	var out []string
 	truncated := false

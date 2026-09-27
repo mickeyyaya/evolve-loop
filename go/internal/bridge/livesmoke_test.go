@@ -1,12 +1,5 @@
 package bridge
 
-// RED contract for LiveSmokeTest (cycle-283): the boot smoke-test passes
-// against a quota-walled CLI because the wall only appears AFTER work is
-// submitted. LiveSmokeTest is the probe that can actually see it: a real
-// launch that submits one trivial contracted prompt and reports whether the
-// REPL produced the artifact (healthy), hit a classified wall (pattern name
-// from the escalation report), or failed otherwise.
-
 import (
 	"context"
 	"os"
@@ -38,16 +31,12 @@ func (a *liveArtifactTmux) PasteBuffer(ctx context.Context, session string) erro
 	return os.WriteFile(a.artifact, []byte("OK\n"), 0o644)
 }
 
-// TestLiveSmokeTest_HealthyWritesArtifact: a REPL that boots and produces the
-// artifact is healthy — ExitOK, no wall pattern.
 func TestLiveSmokeTest_HealthyWritesArtifact(t *testing.T) {
 	ws := t.TempDir()
-	// Two leading "❯" frames: claude-tmux now ticks the auto-responder during
-	// boot (tickDuringBoot), so the first boot iteration reads the pane twice
-	// (boot loop + tick) before the marker check breaks.
-	// The extra "working ❯" is the settling tick: under the cycle-1233 cross-poll
-	// stability window (completion.go) the artifact completes one tick after it
-	// first appears, so the pane is captured once more before cleanup.
+	// Two leading "❯" frames: the auto-responder ticks during boot (tickDuringBoot), so the first boot
+	// iteration reads the pane twice (boot loop + tick) before the marker check breaks.
+	// The extra "working ❯" is the settling tick: the cross-poll stability window (completion.go) completes
+	// the artifact one tick after it first appears, so the pane is captured once more before cleanup.
 	base := &FakeTmuxController{CaptureFrames: []string{"❯", "❯", "working ❯", "working ❯", "done ❯", "cleanup"}}
 	tm := &liveArtifactTmux{FakeTmuxController: base, artifact: filepath.Join(ws, LiveSmokeArtifact)}
 	rc, pattern, _ := LiveSmokeTest(context.Background(), "claude-tmux", &Config{Workspace: ws}, liveSmokeDeps(tm))
@@ -62,9 +51,6 @@ func TestLiveSmokeTest_HealthyWritesArtifact(t *testing.T) {
 	}
 }
 
-// TestLiveSmokeTest_QuotaWallClassified: the cycle-283 replay — the pane shows
-// the provider wall after submission; the autoresponder classifies rate_limit,
-// escalates (85), and LiveSmokeTest surfaces the pattern name.
 func TestLiveSmokeTest_QuotaWallClassified(t *testing.T) {
 	ws := t.TempDir()
 	wall := "■ You've hit your usage limit. Upgrade to Pro or try again at 6:11 AM."
@@ -81,8 +67,6 @@ func TestLiveSmokeTest_QuotaWallClassified(t *testing.T) {
 	}
 }
 
-// TestLiveSmokeTest_NonTmuxDriverRejected: only *-tmux drivers have a REPL to
-// probe; anything else is a usage error, mirroring BootSmokeTest.
 func TestLiveSmokeTest_NonTmuxDriverRejected(t *testing.T) {
 	rc, _, _ := LiveSmokeTest(context.Background(), "claude-p", nil, liveSmokeDeps(&FakeTmuxController{}))
 	if rc != ExitBadFlags {

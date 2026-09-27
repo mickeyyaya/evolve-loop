@@ -1,22 +1,5 @@
 package core
 
-// hermetic_project_root_test.go — no test anywhere under go/internal may pin a
-// shared, machine-global project root. Every RunCycle writes real state under its
-// ProjectRoot (.evolve/runs/, worktree bases, archived-polluted moves), so a
-// FIXED path shared by every test binary on the host is cross-process mutable
-// state: concurrent fleet lanes each running this suite sampled each other's
-// writes. Measured live 2026-07-27: the shared root had accumulated 19,521
-// run entries, and its pollution signature ("archived polluted workspace…",
-// "fatal: not a git repository") is verbatim what failed the suites_stay_green
-// meta-predicates of cycles 1107 and 1116 — false FAILs on an idle-host-green
-// suite. Per-test t.TempDir() makes each test own its root; this guard keeps
-// the class dead.
-//
-// Reach (cycle-1128): the walk covers the whole go/internal tree, recursively.
-// A package-local scan only kept the class dead in internal/core — a re-pin in
-// any sibling or nested package would have shipped undetected, which defeats
-// the guard's stated purpose.
-
 import (
 	"io/fs"
 	"os"
@@ -31,9 +14,8 @@ import (
 // from.
 const internalTreeRoot = ".."
 
-// sharedTmpRoot is assembled by concatenation so this guard's own source can
-// never match itself (the Read-tool/cat-n self-trigger lesson from the
-// exhaustion-regex fixtures).
+// sharedTmpRoot is assembled by concatenation so this guard's own source
+// can never match itself.
 var sharedTmpRoot = `"/tmp/` + `p"`
 
 func TestCoreTests_NeverPinSharedTmpProjectRoot(t *testing.T) {

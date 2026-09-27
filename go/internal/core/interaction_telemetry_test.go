@@ -1,12 +1,5 @@
 package core
 
-// interaction_telemetry_test.go — ADR-0045 I1 (slice 1), orchestrator side:
-// the contract-correction re-dispatch (PR #60) is an interaction and must
-// record a typed Outcome resolved by the re-dispatch verdict; RunCycle's
-// deferred persistence writes the per-cycle interaction-summary.json rollup
-// beside phase-timing.json. White-box: reuses the fakeStorage / fakeLedger /
-// buildRunners / sequencedReviewer harness.
-
 import (
 	"context"
 	"encoding/json"
@@ -18,10 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
 )
 
-// TestCorrectionRedispatch_RecordsInteractionOutcome — one reject→approve
-// correction ⇒ exactly one correction_redispatch outcome in the build ledger
-// (result accepted, rung redispatch, non-empty decision id), and the cycle
-// rollup summarizes it.
 func TestCorrectionRedispatch_RecordsInteractionOutcome(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -71,7 +60,6 @@ func TestCorrectionRedispatch_RecordsInteractionOutcome(t *testing.T) {
 		t.Errorf("payload should digest the violation; got %q", co.Payload)
 	}
 
-	// The per-cycle rollup is written beside phase-timing.json.
 	sdata, serr := os.ReadFile(filepath.Join(ws, "interaction-summary.json"))
 	if serr != nil {
 		t.Fatalf("interaction-summary.json must be written by RunCycle's deferred persistence: %v", serr)
@@ -85,10 +73,6 @@ func TestCorrectionRedispatch_RecordsInteractionOutcome(t *testing.T) {
 	}
 }
 
-// TestCorrectionRedispatch_ExhaustionRecordsRejectedAgain — corrections
-// exhaust (always reject) ⇒ every re-dispatch records rejected_again under
-// ONE decision id; the abort path still flushes the rollup (the deferred
-// writer runs on error returns too, the C1 posture).
 func TestCorrectionRedispatch_ExhaustionRecordsRejectedAgain(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
