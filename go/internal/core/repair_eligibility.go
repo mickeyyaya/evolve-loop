@@ -2,25 +2,6 @@ package core
 
 import "strings"
 
-// repair_eligibility.go — the in-cycle repair BOOKKEEPING: the durable attempt
-// counter, the grant primitive, and the findings-injection seam.
-//
-// Its former eligibility RULE is gone (ADR-0093). Retries are now decided at the
-// audit chokepoint from the audit's own declared failure class and the ADR-0072
-// policy table — see audit_fail_decision.go and retry_envelope.go. One retry
-// authority, not two: the deleted rule was a second mechanism built beside a
-// declarative policy that had always declared the same cap and that nothing read.
-//
-// What survives here is the machinery a retry still needs wherever it is decided:
-// a bound that outlives a crash, one primitive that spends it, and the seam that
-// hands the rebuilding agent the audit's own findings.
-//
-// The legitRejection vocabulary word below is retained for the CORROBORATION half
-// of ADR-0092, which is still live in applyFailureDecisionFloor: an agent-authored
-// floor claim contradicted by both the deterministic evidence and the agent's own
-// disposition does not halt. That narrowing is unchanged; only its retry-granting
-// half was removed.
-
 // legitRejection is the disposition vocabulary word meaning "the auditor was right
 // and the defect is in the task's own work" — the only classification that can
 // contradict an agent's own floor claim.
@@ -52,7 +33,7 @@ const CtxKeyShipErrorCode = "ship_error_code"
 // into a tdd/build re-entry that follows a SHIP-error recovery: the audit
 // passed (WARN) so no repair grant exists, yet the recovery rebuild is
 // re-audited by the same rubric and every finding left unaddressed is named
-// again as standing (cycle 1679, rounds 4→5). A rejection grant outranks it.
+// again as standing. A rejection grant outranks it.
 const CtxKeyStandingAuditFindings = "standing_audit_findings"
 
 // CtxKeyAuditDeclineReason carries the envelope's decline reason into a
@@ -89,24 +70,9 @@ func repairSeededPhase(p Phase) bool { return p == PhaseTDD || p == PhaseBuild }
 // it — or, when no repair grant is active but a ship-error recovery is
 // (CycleState.ShipRecoveryCode), the last audit's actionable findings as
 // STANDING findings: the recovery rebuild is re-audited by the same rubric.
-//
-// All three routes derive from PERSISTED cycle state (AuditRepairActive /
-// AuditRepairAttempts for a repair grant, ShipRecoveryCode for a ship-error
-// recovery, AuditDeclineReason + a retro as the last completed phase for a
-// retro-routed re-entry) rather than being pushed at decision time, so the
-// live dispatch loop and the crash-resume path cannot diverge: one rule,
-// reading fields that survive both. Copying rather
-// than mutating matters — the dispatch loop reuses one ctxSnap map across every
-// iteration of the cycle, so an in-place write would leak a stale repair brief
-// into phases that never asked for it.
-//
-// Absent/unreadable findings degrade to "no key", which the prompts treat as
-// today's behaviour; readContinuationFindings already warns loudly on that path
-// so the operator can tell "none existed" from "we looked in the wrong place".
-//
-// The brief is composeRepairBrief (repair_brief.go): the gate reasons, THEN
-// the rejecting round's auditor findings and the ones that persisted from the
-// previous round — the half of the rejection that used to be dropped (R2).
+// All three routes derive from persisted cycle state, so the live dispatch
+// loop and the crash-resume path cannot diverge. Absent/unreadable findings
+// degrade to "no key", which the prompts treat as today's behaviour.
 func seedAuditRepairContext(base map[string]string, next Phase, cs CycleState) map[string]string {
 	if !repairSeededPhase(next) {
 		return base
@@ -130,13 +96,13 @@ func seedAuditRepairContext(base map[string]string, next Phase, cs CycleState) m
 // retroRouted reports whether the phase about to be dispatched re-enters the
 // cycle straight after a retrospective that followed an audit-fail DECLINE —
 // the envelope refused a direct repair (unrecognised class, budget,
-// system-level class) and the retro's floor gates then adjudicated a retry
-// (cycle 1684). Both halves are required: a retro reached from a dispatch
-// error or an exhausted correction ladder is not re-audited work owed the
-// audit's findings (AuditDeclineReason is empty there), and a decline whose
-// retro sealed the cycle never re-enters. Such a re-entry is re-audited by
-// the same rubric, so it carries the standing findings exactly as a
-// ship-error recovery does.
+// system-level class) and the retro's floor gates then adjudicated a retry.
+// Both halves are required: a retro reached from a dispatch error or an
+// exhausted correction ladder is not re-audited work owed the audit's
+// findings (AuditDeclineReason is empty there), and a decline whose retro
+// sealed the cycle never re-enters. Such a re-entry is re-audited by the same
+// rubric, so it carries the standing findings exactly as a ship-error
+// recovery does.
 func retroRouted(cs CycleState) bool {
 	n := len(cs.CompletedPhases)
 	return cs.AuditDeclineReason != "" && n > 0 && cs.CompletedPhases[n-1] == string(PhaseRetro)

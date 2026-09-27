@@ -1,13 +1,5 @@
 //go:build integration
 
-// consume_integration_test.go — transactional inbox consumption (the re-pick
-// killer, consumption-rides-landing-ship 0.92; three live burns: cycle-1448,
-// cycle-1464, cycle-1471). The defect: PASS promotion moves items to the
-// GITIGNORED processed/ on the runtime plane AFTER the commit, so main keeps
-// the tracked item and every fresh lane worktree re-picks it. The contract:
-// the PASS ship commit ITSELF carries the consumption — tracked root deletion
-// plus a tracked consumed/ record — so main stops offering the item the
-// moment the work lands.
 package ship
 
 import (
@@ -27,20 +19,15 @@ func consumeScenario(t *testing.T, acsVerdict string) (repo, wt, ws, itemRel str
 	repo, wt = makeWorktreeScenario(t)
 	runGit(t, wt, "reset", "HEAD", "wt-change.txt")
 
-	// Mirror the REAL repo's inbox tracking shape: .evolve/ ignored wholesale
-	// by the base scenario, with the inbox API re-included and its runtime
-	// subdirs ignored again (the exact negation ladder from the live
-	// .gitignore — also the wall the layer-4 stager fix covers).
+	// Mirrors the real repo's .gitignore negation ladder for .evolve/inbox.
 	mustWrite(t, filepath.Join(wt, ".gitignore"),
 		".evolve/\n!.evolve/\n.evolve/*\n!.evolve/inbox/\n.evolve/inbox/processed/\n.evolve/inbox/processing/\n.evolve/inbox/rejected/\n")
 	runGit(t, wt, "add", ".gitignore")
 	itemRel = ".evolve/inbox/2026-08-15T03-00-00Z-fix-the-widget.json"
 	mustWrite(t, filepath.Join(wt, filepath.FromSlash(itemRel)),
 		`{"id":"fix-the-widget","title":"Fix the widget","weight":0.5}`)
-	// Staged, not committed — the harness pattern the eval-drop test proved
-	// (the ship commit carries the seed; production's pre-existing-item shape
-	// differs only in WHERE the addition lives in history, and the contract
-	// under test is the tree/consumed-record state after the ship).
+	// Staged, not committed: the ship commit itself carries the seed; only
+	// the tree/consumed-record state after ship is under test.
 	runGit(t, wt, "add", itemRel)
 
 	ws = t.TempDir()
@@ -85,13 +72,6 @@ func TestShipFromWorktree_ConsumesCommittedItemInTheShipCommit(t *testing.T) {
 	}
 }
 
-// Consumption is authorized by the verdict string PASS alone — never WARN.
-// Neither verdict writer (acssuite, acsrunner) emits WARN, and on the cycle
-// path acssuite.ReadVerdict refuses a WARN + red_count:0 artifact before
-// consumption can run (pinned by
-// TestCheckEGPSGate_WarnWithZeroRedCountNeverReachesConsumption). A WARN file
-// is therefore unknown evidence, and unknown evidence must leave the item
-// pickable (warn-ship-consumption-gap, cycle-1691 audit H1/H2).
 func TestShipFromWorktree_WarnVerdictDoesNotConsume(t *testing.T) {
 	repo, wt, ws, itemRel := consumeScenario(t, "WARN")
 	opts := &Options{
@@ -108,7 +88,6 @@ func TestShipFromWorktree_WarnVerdictDoesNotConsume(t *testing.T) {
 	}
 }
 
-// WARN with red_count>0 is doubly unconsumable: not PASS, and a RED is present.
 func TestShipFromWorktree_WarnWithRedsDoesNotConsume(t *testing.T) {
 	repo, wt, ws, itemRel := consumeScenarioWith(t, func(ws string) {
 		mustWrite(t, filepath.Join(ws, "acs-verdict.json"), `{"verdict":"WARN","red_count":2}`)
@@ -127,8 +106,6 @@ func TestShipFromWorktree_WarnWithRedsDoesNotConsume(t *testing.T) {
 	}
 }
 
-// An id the tree does not hold (already consumed, foreign, or never tracked)
-// is a loud no-op — never an error that blocks the ship.
 func TestShipFromWorktree_MissingItemIsANoOp(t *testing.T) {
 	repo, wt, ws, _ := consumeScenario(t, "PASS")
 	mustWrite(t, filepath.Join(ws, "triage-decision.json"),
@@ -144,9 +121,6 @@ func TestShipFromWorktree_MissingItemIsANoOp(t *testing.T) {
 	}
 }
 
-// shipDirect wiring + the PRODUCTION staged-D shape (review survivors): the
-// item lives in HEAD (committed), the direct cycle-class ship consumes it, and
-// the resulting commit carries BOTH the root deletion and the consumed record.
 func TestShipDirect_ConsumesCommittedItemFromHead(t *testing.T) {
 	repo := makeRepo(t)
 	addRemote(t, repo)
@@ -189,9 +163,6 @@ func TestShipDirect_ConsumesCommittedItemFromHead(t *testing.T) {
 	}
 }
 
-// consumeScenarioWith builds the consume harness and lets the caller replace the
-// workspace's id-source files, so a test can express "no triage decision" or
-// "triage named something else" without duplicating the fixture.
 func consumeScenarioWith(t *testing.T, mutate func(ws string)) (repo, wt, ws, itemRel string) {
 	t.Helper()
 	repo, wt, ws, itemRel = consumeScenario(t, "PASS")
@@ -199,20 +170,11 @@ func consumeScenarioWith(t *testing.T, mutate func(ws string)) (repo, wt, ws, it
 	return repo, wt, ws, itemRel
 }
 
-// TestConsume_ResolvesIDsLikePostShip pins that IN-COMMIT consumption resolves the
-// committed-id set from the same sources the POST-ship promotion already does.
-//
-// consume.go read triage top_n alone, while postship.go (:190-250) resolves from
-// three and even documents the gap ("extractIDs only walks top_n/skip_shipped, so
-// these orphans were never retired"). The asymmetry is why consumption never fired
-// in 8 cycles: a carryover-driven lane carries no triage id matching its inbox
-// file, so the item stayed pickable even on a PASS ship that closed it.
 func TestConsume_ResolvesIDsLikePostShip(t *testing.T) {
 	consumedRel := ".evolve/inbox/consumed/2026-08-15T03-00-00Z-fix-the-widget.json"
 
 	t.Run("no triage decision: the lane-scope pin is the committed set", func(t *testing.T) {
 		repo, wt, ws, itemRel := consumeScenarioWith(t, func(ws string) {
-			// A continuation/lane cycle carries NO triage decision at all.
 			mustRemove(t, filepath.Join(ws, "triage-decision.json"))
 			mustWrite(t, filepath.Join(ws, "lane-scope.json"),
 				`{"todo_ids":["fix-the-widget"],"goal_hash":"abc"}`)
@@ -222,10 +184,6 @@ func TestConsume_ResolvesIDsLikePostShip(t *testing.T) {
 	})
 
 	t.Run("triage decided nothing: a lane-scope pin must NOT retire the declined menu", func(t *testing.T) {
-		// Precedence guard at the CONSUME site. postship has its own pin
-		// (TestPromoteInbox_EmptyCommittedDeclinedMenuStaysOpen) but the blast
-		// radius here is worse: a wrong consume lands a tracked deletion on main,
-		// where postship would only have made a recoverable processed/ move.
 		repo, wt, ws, itemRel := consumeScenarioWith(t, func(ws string) {
 			mustWrite(t, filepath.Join(ws, "triage-decision.json"),
 				`{"schema_version":1,"top_n":[],"deferred":[],"dropped":[]}`)
@@ -246,11 +204,6 @@ func TestConsume_ResolvesIDsLikePostShip(t *testing.T) {
 	})
 
 	t.Run("triage dropped the assigned id as already-shipped: the PASS ship still consumes it (cycle-1552)", func(t *testing.T) {
-		// soak-20260824a wave-2 burn: 1552's triage put the fleet-scope id in
-		// dropped[] with top_n:[], build shipped the item's implementation
-		// anyway (df322f6c), consumption resolved zero ids, and the stale item
-		// cost the next wave a full lane re-proving finished work. A dropped
-		// ASSIGNED id is an affirmative close and must retire in-commit.
 		repo, wt, ws, itemRel := consumeScenarioWith(t, func(ws string) {
 			mustWrite(t, filepath.Join(ws, "triage-decision.json"),
 				`{"schema_version":1,"top_n":[],"deferred":[],"dropped":[{"id":"fix-the-widget","reason":"already-shipped"}]}`)
@@ -264,8 +217,7 @@ func TestConsume_ResolvesIDsLikePostShip(t *testing.T) {
 
 	t.Run("triage named a different id: the Closes-Inbox marker still closes it", func(t *testing.T) {
 		repo, wt, ws, itemRel := consumeScenarioWith(t, func(ws string) {
-			// The decomposition shape: triage renames the work, so top_n never
-			// matches the inbox file's own id.
+			// Triage renamed the work, so top_n never matches the inbox file's own id.
 			mustWrite(t, filepath.Join(ws, "triage-decision.json"),
 				`{"schema_version":1,"top_n":[{"id":"some-decomposed-subtask"}],"deferred":[],"dropped":[]}`)
 			mustWrite(t, filepath.Join(ws, "build-report.md"),
@@ -283,8 +235,6 @@ func mustRemove(t *testing.T, path string) {
 	}
 }
 
-// shipConsumeAndAssert runs a cycle ship over wt and asserts the item was
-// consumed INTO the commit: root deletion + tracked consumed/ record + a loud log.
 func shipConsumeAndAssert(t *testing.T, repo, wt, ws, itemRel, consumedRel, why string) {
 	t.Helper()
 	opts := &Options{
@@ -311,18 +261,6 @@ func shipConsumeAndAssert(t *testing.T, repo, wt, ws, itemRel, consumedRel, why 
 	}
 }
 
-// --- Which acs-verdict.json may retire an inbox item in the landing commit
-// (warn-ship-consumption-gap, cycle-1691 audit H1/M1). The verdict string
-// PASS is the only authority: both writers derive it from their own counts
-// (acssuite: red_count==0; acsrunner: red_count==0 AND incomplete_count==0),
-// so red_count alone is a weaker key — acsrunner writes red_count:0 beside
-// verdict FAIL for a suite that never finished.
-
-// TestManualShip_NonShippableVerdictKeepsItemPickable (H1): a reviewed manual
-// ship whose workspace holds the verdict acsrunner writes for an unfinished
-// suite — verdict FAIL, ship_eligible false, red_count 0 — must land the code
-// but leave the inbox item tracked and pickable. The verdict comes from the
-// real producer, so the fixture cannot drift from what production writes.
 func TestManualShip_NonShippableVerdictKeepsItemPickable(t *testing.T) {
 	t.Parallel() // self-contained temp repo; see TestConsumeGate_OnlyVerdictPASSConsumes
 	repo := makeRepo(t)
@@ -381,9 +319,9 @@ func TestManualShip_NonShippableVerdictKeepsItemPickable(t *testing.T) {
 	}
 }
 
-// requireNonShippableZeroRed guards the fixture: the H1 quadrant is exactly
-// red_count 0 beside an explicit non-shippable verdict. If the producer ever
-// stops writing that shape, this test must say so instead of passing vacuously.
+// Guards the fixture: if the producer ever stops writing verdict FAIL,
+// ship_eligible false and red_count 0 together, this must fail loudly
+// instead of passing vacuously.
 func requireNonShippableZeroRed(t *testing.T, path string) {
 	t.Helper()
 	raw, err := os.ReadFile(path)
@@ -405,16 +343,6 @@ func requireNonShippableZeroRed(t *testing.T, path string) {
 	}
 }
 
-// TestConsumeGate_OnlyVerdictPASSConsumes (H1/H2/M1): across every verdict
-// shape a workspace can hold, the in-commit consumption fires exactly when
-// workspaceACSVerdict(ws) == "PASS" — the expression postship.go keys its
-// landedPASS scope widening on. One contract, both gates; a gate keyed on
-// red_count instead diverges on the FAIL/WARN red_count:0 rows and on a PASS
-// record that carries no red_count.
-//
-// Rows run in parallel: each builds its own temp repo/worktree/workspace, and
-// run serially the 20 real-git ships add ~11s to a package whose serial
-// integration tier already sits at the build floor's 120s per-package timeout.
 func TestConsumeGate_OnlyVerdictPASSConsumes(t *testing.T) {
 	t.Parallel()
 	acssuitePass, err := json.Marshal(predicateVerdictFixture(1691, 3, 0, 1))

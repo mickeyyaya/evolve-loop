@@ -10,42 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// audit_verdict_conflict_test.go — RED contract for the cycle-1124 inbox item
-// `verdict-coherence-auditor-vs-egps` (weight 0.92, 4th recorded instance of the
-// family: cycle-87 / cycle-352 / cycle-456).
-//
-// The defect: hooks.Classify extracts the auditor's OWN narrative verdict, then
-// unconditionally overwrites it with core.VerdictFAIL at each of three EGPS
-// gate branches (acs-verdict.json unreadable, red_count>0, ship_eligible=false)
-// WITHOUT ever recording what the narrative said. The override is correct — the
-// deterministic gate must outrank prose (cycles 339-341) — but the DISAGREEMENT
-// is silently discarded. Downstream (cyclestate.ErrorMessages → AuditFailReasons →
-// <phase>-fail-reason.json → failure dossier SubstantiveError) therefore only
-// ever sees the gate's own message, so an operator reading a dossier cannot
-// distinguish a genuine defect from a POISONED predicate the auditor itself
-// flagged as clean. The connected `audit-probe-tree-isolation` item is the live
-// case: cycles 1116 (auditor PASS) / 1107 (WARN) / 1117 ("Not FAIL") were all
-// EGPS-forced FAIL on predicates later proven poisoned by the auditor's own
-// untracked probe tests — three conflicts that left no record anywhere.
-//
-// Contract pinned here:
-//  1. When the narrative verdict was FOUND and is NOT FAIL, each of the three
-//     override branches emits an ERROR-severity `verdict-conflict:` diagnostic
-//     naming the narrative verdict and the gate reason.
-//  2. Error severity is the WIRING: cyclestate.ErrorMessages (cyclestate/result.go (ErrorMessages))
-//     keys off Severity=="error", so an error-severity diagnostic reaches
-//     AuditFailReasons/the dossier with zero new plumbing. A warning-severity
-//     conflict record would be silently dropped by that same function.
-//  3. No noise on the COHERENT case: narrative already FAIL, narrative
-//     unparseable, or the gate green ⇒ no conflict diagnostic at all.
-//  4. The override itself is untouched: every conflicting case still returns
-//     core.VerdictFAIL. The record is additive, never a softening of the gate.
-//
-// Structural constraint (why the fix lives here and not in the auditor's
-// prompt): acs-verdict.json is written AFTER audit-report.md (measured 1115:
-// 00:15:09 vs 00:13:56; 1117: 01:38:45 vs 01:37:36), so the auditor cannot
-// reconcile against a file that does not yet exist. Classify runs after both.
-
 const conflictMarker = "verdict-conflict"
 
 // narrativeReport renders an audit-report.md declaring the given verdict in the
@@ -151,10 +115,9 @@ func TestVerdictConflict_ACSErrorBranch(t *testing.T) {
 	})
 }
 
-// TestVerdictConflict_BranchesAreDistinguishable — the failure-fingerprint
-// lesson (audit_egps_red_identity_test.go, batch-12 breaker false-trip): a
-// constant conflict message blinds the identical-fingerprint breaker's identity
-// premise. Distinct gate reasons must yield distinct conflict messages.
+// TestVerdictConflict_BranchesAreDistinguishable: a constant conflict message
+// would blind the identical-fingerprint breaker's identity premise, so
+// distinct gate reasons must yield distinct conflict messages.
 func TestVerdictConflict_BranchesAreDistinguishable(t *testing.T) {
 	_, redDiags := classifyWith(t, narrativeReport("PASS"), func(ws string) {
 		writeACSVerdictReds(t, ws, "cycleX/TestRed_A")

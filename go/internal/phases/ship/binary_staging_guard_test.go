@@ -10,9 +10,8 @@ import (
 )
 
 // fakeStagedFilesRun scripts `git diff --cached --name-only` to return a
-// fixed staged-file list, ignoring every other subcommand (returns rc=0,
-// empty stdout) — enough surface for stageBinaryGuard, which only ever
-// shells that one query.
+// fixed staged-file list; every other subcommand returns rc=0, empty stdout,
+// since stageBinaryGuard only ever shells that one query.
 type fakeStagedFilesRun struct {
 	staged []string
 }
@@ -27,8 +26,6 @@ func (f *fakeStagedFilesRun) run(_ context.Context, _, _ string, args, _ []strin
 	return 0, nil
 }
 
-// writeStagedFile creates path (relative to root) with the given size and
-// mode, making parent dirs as needed.
 func writeStagedFile(t *testing.T, root, rel string, size int, mode os.FileMode) {
 	t.Helper()
 	full := filepath.Join(root, rel)
@@ -40,12 +37,6 @@ func writeStagedFile(t *testing.T, root, rel string, size int, mode os.FileMode)
 	}
 }
 
-// TestBinaryStagingGuard_RejectsLargeExecutableOutsideAllowlist is the RED
-// anchor for tracked-binary-in-acs-dir (ship 0405658a: an 18MB
-// go/acs/cycle536/evolve landed in git history via a `go build` ACS
-// predicate lacking `-o os.DevNull`). A staged executable over 1MB outside
-// the go/bin/ and go/evolve allowlist must fail the guard with an actionable
-// message naming the offending path.
 func TestBinaryStagingGuard_RejectsLargeExecutableOutsideAllowlist(t *testing.T) {
 	root := t.TempDir()
 	const rel = "go/acs/cycle536/evolve"
@@ -62,9 +53,6 @@ func TestBinaryStagingGuard_RejectsLargeExecutableOutsideAllowlist(t *testing.T)
 	}
 }
 
-// TestBinaryStagingGuard_AllowsAllowlistedAndSmallFiles is the twin GREEN
-// case: go/bin/** and go/evolve are the legitimate committed-binary
-// locations, and ordinary source files (regardless of size) are untouched.
 func TestBinaryStagingGuard_AllowsAllowlistedAndSmallFiles(t *testing.T) {
 	root := t.TempDir()
 	writeStagedFile(t, root, "go/bin/evolve", 2*1024*1024, 0o755)
@@ -80,9 +68,6 @@ func TestBinaryStagingGuard_AllowsAllowlistedAndSmallFiles(t *testing.T) {
 	}
 }
 
-// TestBinaryStagingGuard_AllowsSmallExecutableOutsideAllowlist: a small
-// (<1MB) executable is not the failure mode this guard targets — only
-// oversized binaries indicate an accidental `go build` artifact.
 func TestBinaryStagingGuard_AllowsSmallExecutableOutsideAllowlist(t *testing.T) {
 	root := t.TempDir()
 	const rel = "scripts/tiny-helper"

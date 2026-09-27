@@ -1,22 +1,5 @@
 package ship
 
-// Cross-plane note (review): the ship commit's tracked root deletion can meet
-// a runtime plane whose LOCAL copy carries an unstaged failure-count
-// write-back — `git merge origin/main` then aborts (modified-vs-delete).
-// Recovery: `git checkout -- .evolve/inbox/<file>` and re-merge; the window is
-// narrow (claimed items leave the root at dispatch) but real for
-// root-resident failure-bumped items consumed via skip_shipped.
-//
-// consume.go — transactional inbox consumption (consumption-rides-landing-ship
-// 0.92; live burns: cycles 1448, 1464, 1471). The PASS closeout promotes items
-// to the GITIGNORED processed/ on the runtime plane AFTER the commit, so main
-// keeps the tracked item and every fresh lane worktree re-picks it. The class
-// fix: the PASS ship commit ITSELF carries the consumption — the tracked root
-// file moves to the tracked inbox/consumed/ with a consumption annotation, and
-// both paths are staged into the very commit that lands the work. The post-ship
-// promotion then resolves the id nowhere and takes its documented idempotent
-// no-op path.
-
 import (
 	"context"
 	"encoding/json"
@@ -33,31 +16,18 @@ import (
 )
 
 // consumeCommittedItems moves this cycle's committed inbox items into the
-// tracked consumed/ dir INSIDE the ship tree and stages the moves, so they
-// ride the ship commit. Gated on the verdict string PASS — the sole
-// authority, shared with postship's landedPASS gate. Both writers derive it
-// from their own counts (acssuite: red_count==0; acsrunner: red_count==0 AND
-// incomplete_count==0), so red_count alone is weaker: acsrunner writes
-// red_count:0 beside verdict FAIL for a suite that never finished. On the
-// cycle path acssuite.ReadVerdict already refuses a non-PASS verdict with
-// red_count:0 before this runs; the manual path has no such reader, so this
-// gate is its only guard (warn-ship-consumption-gap, cycle-1691). Every step
-// is per-item fail-open and LOUD: a consumption problem must never block a
-// ship that already earned its verdict.
+// tracked consumed/ dir inside the ship tree and stages the moves so they
+// ride the ship commit. Every step is per-item fail-open and logs loudly: a
+// consumption problem must never block a ship that already earned its verdict.
 func consumeCommittedItems(ctx context.Context, opts *Options, res *RunResult, dir string) {
 	switch opts.Class {
 	case ClassCycle:
-		// The lane path: workspace evidence is mandatory, and its absence is
-		// LOUD below — a lane ship always has a cycle behind it.
+		// A lane ship always has a cycle behind it, so workspace evidence is
+		// mandatory; its absence is logged loudly below.
 	case ClassManual:
-		// consumption_must_ride_the_landing, the manual half (the lane half
-		// shipped as #466; cycle-1547's red-first reproduction pins this one):
-		// a reviewed console ship that closes an inbox item must retire that
-		// item IN THE LANDING COMMIT, or every later cycle rediscovers it —
-		// three recorded live burns. A manual ship WITHOUT cycle evidence
-		// (ordinary console commit, no WorkspacePath) has nothing to consume
-		// and returns silently: the loud missing-verdict warn below is for
-		// ships that CLAIM a workspace and can't prove a PASS.
+		// A manual ship with no WorkspacePath has nothing to consume and
+		// returns silently; the loud missing-verdict warn below is for ships
+		// that claim a workspace and can't prove a PASS.
 		if opts.WorkspacePath == "" {
 			return
 		}
@@ -66,8 +36,8 @@ func consumeCommittedItems(ctx context.Context, opts *Options, res *RunResult, d
 	}
 	if v := workspaceACSVerdict(opts.WorkspacePath); v != "PASS" {
 		if v == "" {
-			// LOUD fail-closed (review): a silent no-consume here is how the
-			// re-pick class resurrects invisibly after a verdict-path drift.
+			// A silent no-consume here would let the re-pick class resurrect
+			// the item invisibly after a verdict-path drift.
 			res.Logs = append(res.Logs, "[ship] WARN: inbox consumption skipped: acs-verdict.json missing/unreadable in workspace — no verdict, no consuming")
 		} else {
 			res.Logs = append(res.Logs, fmt.Sprintf("[ship] inbox consumption skipped: acs verdict %s (only PASS consumes — partial work stays pickable)", v))
@@ -83,19 +53,9 @@ func consumeCommittedItems(ctx context.Context, opts *Options, res *RunResult, d
 	}
 	body, note := triageDecisionBytes(opts.WorkspacePath, 0)
 	if body == nil && note != "" {
-		res.Logs = append(res.Logs, note) // corrupt/absent decision stays visible
+		res.Logs = append(res.Logs, note)
 	}
-	// Same resolver the post-ship promotion uses — precedence and rationale live
-	// once, at committedInboxIDs (postship.go). Reading triage alone here is what
-	// kept consumption at zero for eight cycles on carryover-driven lanes.
-	//
-	// Blast radius worth knowing: this id set also drives the continuation-binding
-	// release below (readBindingForConsume / released_continuations / the registry
-	// delete), so lane-scope and Closes-Inbox ids now reach it too. That is
-	// consistent with shipped behavior — postship's retireCommittedCarryover
-	// already retires the carryover twins for the identical set — but it is a
-	// wider set than the triage-only one this path used to see.
-	ids := committedInboxIDs(opts.WorkspacePath, body, true) // this site is PASS-gated above
+	ids := committedInboxIDs(opts.WorkspacePath, body, true)
 	if len(ids) == 0 {
 		return
 	}
@@ -108,7 +68,7 @@ func consumeCommittedItems(ctx context.Context, opts *Options, res *RunResult, d
 			if !errors.Is(err, inboxmover.ErrNotFound) {
 				res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: consume lookup %q: %v", id, err))
 			}
-			continue // absent = already consumed or never tracked — a no-op
+			continue
 		}
 		raw, err := os.ReadFile(src)
 		if err != nil {
@@ -125,13 +85,6 @@ func consumeCommittedItems(ctx context.Context, opts *Options, res *RunResult, d
 			"via":   "ship",
 			"cycle": cid,
 		}
-		// Transactional retire, registry half (park-consume-releases-continuation-
-		// binding): consumption takes the item out of the batch loader's reach, so
-		// its scope-keyed continuation binding must go too — otherwise the next
-		// wave mints a lane straight off the immortal binding (cycles 1487, 1497).
-		// The pointer is PRESERVED into the consumed item here; the registry delete
-		// happens only after the move is staged, so a rollback below leaves both
-		// stores exactly as they were.
 		bound, boundOK := readBindingForConsume(opts, res, id)
 		if boundOK {
 			doc["released_continuations"] = appendReleasedForConsume(doc, bound, cid)
@@ -158,13 +111,6 @@ func consumeCommittedItems(ctx context.Context, opts *Options, res *RunResult, d
 		}
 		srcRel := ".evolve/inbox/" + base
 		dstRel := consumedRel + "/" + base
-		// Review HIGH (cycle-1506 fix hardening): when an audit binding is set,
-		// the drift tolerance downstream will SANCTION these paths — so the
-		// consumed bytes must be exactly what the AUDITED tree carried. A file
-		// planted or tampered in the post-binding window (the one window the
-		// binding floor exists to close) rolls back loudly and stays pickable;
-		// it does not ship unaudited. shipDirect (no binding, no drift checks)
-		// is untouched — plane-side failure-count write-backs keep consuming.
 		if opts.internalAuditBoundTreeSHA != "" {
 			boundArgs := append(append([]string{}, prefix...), "show", opts.internalAuditBoundTreeSHA+":"+srcRel)
 			var boundOut strings.Builder
@@ -180,9 +126,8 @@ func consumeCommittedItems(ctx context.Context, opts *Options, res *RunResult, d
 		}
 		args := append(append([]string{}, prefix...), "add", "-A", "--", srcRel, dstRel)
 		if exit, runErr := opts.run(ctx, "git", args, io.Discard, io.Discard); runErr != nil || exit != 0 {
-			// Roll the fs move BACK (review): on the shipDirect path this tree
-			// IS the runtime plane — an unstaged deletion would strand plane
-			// state no commit records. raw is still in hand.
+			// Roll back: on shipDirect this tree IS the runtime plane, so an
+			// unstaged deletion would strand state no commit records.
 			_ = os.Remove(dstAbs)
 			if werr := os.WriteFile(src, raw, 0o644); werr != nil {
 				res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: consume rollback write %q: %v", id, werr))
@@ -198,11 +143,10 @@ func consumeCommittedItems(ctx context.Context, opts *Options, res *RunResult, d
 	}
 }
 
-// readBindingForConsume reads id's continuation binding from the ROOT-owned
-// registry (always opts.ProjectRoot — the registry is root-owned even when the
-// consumption itself happens in a ship worktree). Best-effort and LOUD: an
-// unreadable registry leaves the binding in place, where the read-side live-
-// scope guard refuses it, rather than blocking a ship that earned its verdict.
+// readBindingForConsume best-effort reads id's continuation binding from the
+// root-owned registry (opts.ProjectRoot, even when consumption runs in a ship
+// worktree); an unreadable registry leaves the binding in place rather than
+// blocking a ship that earned its verdict.
 func readBindingForConsume(opts *Options, res *RunResult, id string) (continuation.Continuation, bool) {
 	c, ok, err := continuation.ReadRegistryEntry(opts.ProjectRoot, id)
 	if err != nil {
@@ -213,13 +157,11 @@ func readBindingForConsume(opts *Options, res *RunResult, id string) (continuati
 }
 
 // appendReleasedForConsume returns doc's released_continuations[] with the
-// released binding appended, preserving any entries an earlier retirement left
-// (a non-array value is replaced — the entry being written now is the one that
-// carries the live salvage pointer).
-// The consumed item is TRACKED and rides the ship commit to the public remote,
-// so the absolute host paths are collapsed to "~" first (audit cycle-1507 M1):
-// worktree/findings_path carry the operator account name, while the snapshot,
-// base and branch refs salvage resumes from are unaffected.
+// released binding appended, preserving any entries an earlier retirement left.
+// The consumed item rides the ship commit to the public remote, so the
+// absolute host paths are collapsed to "~" first: worktree/findings_path carry
+// the operator account name, while the snapshot, base and branch refs salvage
+// resumes from are unaffected.
 func appendReleasedForConsume(doc map[string]any, c continuation.Continuation, cycleID string) []any {
 	return continuation.AppendReleased(doc, c, "ship-consume-"+cycleID)
 }
@@ -242,12 +184,9 @@ func releaseBindingForConsume(opts *Options, res *RunResult, id string, c contin
 
 // treeDriftExplainedByConsumption reports whether every path differing between
 // the audit-bound tree and the actual tree is one of the ship's own sanctioned
-// consumption moves (opts.internalConsumedPaths). gitDir=="" runs in the
-// process cwd (the direct/plane path); otherwise `git -C gitDir`. Fail-CLOSED:
-// no consumed paths, or a diff-tree that cannot run, explains nothing — the
-// caller then refuses exactly as before. The second return is a rendered
-// offender suffix for the refusal message ("" when nothing to add), so the
-// operator sees WHICH unsanctioned paths drifted.
+// consumption moves. It fails closed: no consumed paths, or a diff-tree that
+// cannot run, explains nothing. The second return names the unsanctioned
+// drift paths for the refusal message ("" when there are none).
 func treeDriftExplainedByConsumption(ctx context.Context, opts *Options, gitDir, boundTree, actualTree string) (bool, string) {
 	if len(opts.internalConsumedPaths) == 0 {
 		return false, ""
@@ -260,9 +199,9 @@ func treeDriftExplainedByConsumption(ctx context.Context, opts *Options, gitDir,
 	if gitDir != "" {
 		args = append(args, "-C", gitDir)
 	}
-	// rawPathRead/unquoteGitPath (cycle-1108): without them a non-ASCII byte in
-	// an item filename comes back C-quoted, never matches the sanctioned set,
-	// and false-refuses a legitimate consumption ship (review M4).
+	// rawPathRead/unquoteGitPath: without them a non-ASCII byte in an item
+	// filename comes back C-quoted, never matches the sanctioned set, and
+	// false-refuses a legitimate consumption ship.
 	args = append(args, rawPathRead("diff-tree", "-r", "--name-only", boundTree, actualTree)...)
 	var out strings.Builder
 	if exit, err := opts.run(ctx, "git", args, &out, io.Discard); err != nil || exit != 0 {
@@ -281,7 +220,7 @@ func treeDriftExplainedByConsumption(ctx context.Context, opts *Options, gitDir,
 	if len(offenders) == 0 {
 		return true, ""
 	}
-	// Bounded suffix (review LOW): the refusal travels into digests/escalations.
+	// Bounded: the refusal travels into digests/escalations.
 	const maxNamed = 8
 	extra := ""
 	if len(offenders) > maxNamed {

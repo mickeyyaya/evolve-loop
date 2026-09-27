@@ -10,51 +10,29 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// JudgeVerdict is the LLM-as-judge route-quality grade (ADR-0052 WS4-S3). It is
-// advisory telemetry, NOT a trust boundary: Score is in [0,1] on a successful
-// grade, or the sentinel -1 ("no opinion") when the judge could not produce a
-// valid grade. A caller treats -1 as non-blocking.
+// JudgeVerdict is the LLM-as-judge route-quality grade; Score is in [0,1], or the sentinel -1 when the judge has no opinion.
 type JudgeVerdict struct {
 	Score         float64  `json:"score"`
 	Rationale     string   `json:"rationale"`
 	MissingPhases []string `json:"missing_phases"`
 }
 
-// judgeNoOpinion is the fail-open sentinel: no valid grade, caller treats it as
-// non-blocking (the judge never gates or alters anything).
 var judgeNoOpinion = JudgeVerdict{Score: -1}
 
-// PlanJudge is the optional LLM-as-judge that scores an emitted routing plan
-// against the cycle goal (ADR-0052 WS4-S3), behind EVOLVE_ROUTING_JUDGE and
-// strictly off the build path. It is deliberately NOT a router.Proposer or
-// router.Planner — it only READS a plan and EMITS a score, so router.Select can
-// never wire it as a routing brain. That, plus dispatching under the non-router
-// "judge" agent label, is the structural recursion guard: a judge call has no
-// path back into planning, so it needs no mint denylist. Per D2 the judge is
-// the FAST/cheap tier (deep reasoning is reserved for the confidence-critical
-// Plan/RePlan).
+// PlanJudge is the optional LLM-as-judge that scores a routing plan against the cycle goal.
+// See ADR-0052.
 type PlanJudge struct {
 	bridge Bridge
 	cli    string
 	model  string
 }
 
-// NewPlanJudge builds the judge over the given bridge. The fallback cli/model is
-// the FAST tier (D2: the judge is off the critical path; deep is reserved for
-// Plan/RePlan). The composition root may override from a judge profile when it
-// wires the judge live.
+// NewPlanJudge builds the judge over the given bridge on the fast tier.
 func NewPlanJudge(bridge Bridge) *PlanJudge {
 	return &PlanJudge{bridge: bridge, cli: "claude-tmux", model: "haiku"}
 }
 
-// GradePlan scores plan against the cycle goal and returns a JudgeVerdict.
-// FAIL-OPEN BY TYPE: the signature returns ONLY a value (no error), so a caller
-// structurally cannot let a malformed grade block the cycle. Every failure path
-// — nil bridge, empty workspace, nil plan, bridge error, unparseable/empty
-// output, or an out-of-range score — funnels to the sentinel Score=-1. This
-// inverts the advisor convention (PhaseAdvisor errors so the kernel clamp
-// catches it); the judge has no kernel clamp behind it, so it fails open in the
-// value itself.
+// GradePlan scores plan against the cycle goal and returns a JudgeVerdict, failing open to Score=-1 on any error.
 func (j *PlanJudge) GradePlan(ctx context.Context, in router.RouteInput, plan *router.PhasePlan) JudgeVerdict {
 	if j.bridge == nil || in.Workspace == "" || plan == nil {
 		return judgeNoOpinion
@@ -76,9 +54,9 @@ func (j *PlanJudge) GradePlan(ctx context.Context, in router.RouteInput, plan *r
 		Workspace:    in.Workspace,
 		Worktree:     worktree,
 		ProjectRoot:  in.ProjectRoot,
-		ArtifactPath: artifactPath, // single-sourced: the prompt instructs the SAME path the bridge watches
+		ArtifactPath: artifactPath,
 		Completion:   "artifact",
-		Agent:        "judge", // NON-router label — the recursion guard (never re-enters planning)
+		Agent:        "judge",
 		Cycle:        in.Cycle,
 		Env:          in.Env,
 	})
@@ -88,9 +66,7 @@ func (j *PlanJudge) GradePlan(ctx context.Context, in router.RouteInput, plan *r
 	return parseJudgeVerdict(resp.Stdout)
 }
 
-// composeJudgePrompt renders the goal + the candidate plan's run-set and asks
-// for a strict-JSON verdict written to the artifact path. Deterministic order ⇒
-// prompt-prefix cache friendly.
+// composeJudgePrompt orders phases deterministically so the prompt prefix stays cache-friendly.
 func (j *PlanJudge) composeJudgePrompt(in router.RouteInput, plan *router.PhasePlan, artifactPath string) string {
 	var b strings.Builder
 	b.WriteString("You are the evolve-loop ROUTE-QUALITY JUDGE. Score how well the proposed phase plan ")
@@ -110,12 +86,9 @@ func (j *PlanJudge) composeJudgePrompt(in router.RouteInput, plan *router.PhaseP
 	return b.String()
 }
 
-// parseJudgeVerdict extracts the strict-JSON verdict from the judge output,
-// reusing lastBalancedSpan (string-literal-aware, so a brace inside the
-// rationale is not miscounted; takes the LAST object so the prompt's echoed
-// example is not mistaken for the answer). UNLIKE parseProposal it never returns
-// an error: any failure — no object, bad JSON, or a score outside [0,1] —
-// yields the fail-open sentinel Score=-1.
+// parseJudgeVerdict takes the LAST balanced JSON object in stdout, since a
+// brace inside the rationale must not be miscounted and the prompt's echoed
+// example must not be mistaken for the answer.
 func parseJudgeVerdict(stdout string) JudgeVerdict {
 	start, end, ok := lastBalancedSpan(stdout, '{', '}')
 	if !ok {

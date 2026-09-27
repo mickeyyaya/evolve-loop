@@ -39,20 +39,10 @@ func normalPassBridge() *fakeBridge {
 	return &fakeBridge{writeArtifact: "# Audit Report\n\n## Verdict\n**PASS**\n"}
 }
 
-// TestRun_NormalCompletion_PassReport_ShipEligibleFalse_RejectsAsUnreconciled is
-// the GENUINE RED for this cycle (auditor-egps-reconciliation-gate, criterion 1).
-//
-// The auditor completes NORMALLY (no bridge timeout), writes a narrative PASS,
-// but acs-verdict.json — the acssuite SSOT — says ship_eligible:false. The phase
-// MUST reject (FAIL/WARN), never accept the agent's PASS uncontested.
-//
-// Why this is red today: audit's Classify reads ONLY red_count (readRedCount) as
-// a proxy for ship-eligibility. When the authoritative ship_eligible flag says
-// "not shippable" while red_count happens to be 0 (the two can diverge — a
-// pre-staged/agent-written verdict, or a future acssuite that gates on more than
-// the red count), the false PASS slips straight through. The fix reads the
-// authoritative ship_eligible field on the normal-completion path, symmetric to
-// the timeout path (both route through Classify — no duplicate branch).
+// TestRun_NormalCompletion_PassReport_ShipEligibleFalse_RejectsAsUnreconciled:
+// when the auditor completes normally, writes a narrative PASS, but
+// acs-verdict.json — the acssuite SSOT — says ship_eligible:false, the phase
+// must reject (FAIL/WARN), never accept the narrative uncontested.
 func TestRun_NormalCompletion_PassReport_ShipEligibleFalse_RejectsAsUnreconciled(t *testing.T) {
 	ws := t.TempDir()
 	no := false
@@ -68,11 +58,10 @@ func TestRun_NormalCompletion_PassReport_ShipEligibleFalse_RejectsAsUnreconciled
 	}
 }
 
-// TestRun_NormalCompletion_PassReport_RedCountPositive_StaysFail materialises
-// criterion 1's headline case on the NORMAL-completion path (the existing
-// reconcile tests only cover the exit-81 timeout path). A narrative PASS with
-// red predicates must FAIL. Pre-existing GREEN: Classify's red_count gate
-// already covers this — the test locks it against regression.
+// TestRun_NormalCompletion_PassReport_RedCountPositive_StaysFail materializes
+// the headline case on the normal-completion path (the reconcile tests
+// elsewhere only cover the exit-81 timeout path): a narrative PASS with red
+// predicates must FAIL.
 func TestRun_NormalCompletion_PassReport_RedCountPositive_StaysFail(t *testing.T) {
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 2) // two red predicates, no ship_eligible field
@@ -87,10 +76,10 @@ func TestRun_NormalCompletion_PassReport_RedCountPositive_StaysFail(t *testing.T
 	}
 }
 
-// TestRun_NormalCompletion_PassReport_ShipEligibleTrue_StaysPass is the negative
-// test (criterion 2): genuine agreement must pass through untouched. It kills the
-// cheapest gaming fix — always downgrading to FAIL regardless of the ACS verdict.
-// Pre-existing GREEN; must STAY green after the ship_eligible read lands.
+// TestRun_NormalCompletion_PassReport_ShipEligibleTrue_StaysPass is the
+// negative test: genuine agreement must pass through untouched, ruling out
+// the cheapest fix of always downgrading to FAIL regardless of the ACS
+// verdict.
 func TestRun_NormalCompletion_PassReport_ShipEligibleTrue_StaysPass(t *testing.T) {
 	ws := t.TempDir()
 	yes := true
@@ -106,12 +95,10 @@ func TestRun_NormalCompletion_PassReport_ShipEligibleTrue_StaysPass(t *testing.T
 	}
 }
 
-// TestRun_NormalCompletion_PassReport_ShipEligibleAbsent_StaysPass pins criterion
-// 3 (edge/back-compat): a verdict that OMITS ship_eligible (every verdict written
-// before this cycle) with red_count:0 must still PASS — no panic, no spurious
-// reject. This is the guard that stops the ship_eligible read from being wired as
-// a mandatory-field requirement that would false-FAIL every legacy verdict.
-// Pre-existing GREEN; must STAY green after the fix.
+// TestRun_NormalCompletion_PassReport_ShipEligibleAbsent_StaysPass pins
+// back-compat: a verdict that omits ship_eligible (every verdict written
+// before the field existed) with red_count:0 must still PASS — the
+// ship_eligible read is not wired as a mandatory field.
 func TestRun_NormalCompletion_PassReport_ShipEligibleAbsent_StaysPass(t *testing.T) {
 	ws := t.TempDir()
 	writeACSVerdictShip(t, ws, 0, nil) // field absent — legacy shape

@@ -50,9 +50,10 @@ func newAuditClassification(h hooks, artifact string, req core.PhaseRequest) *au
 			len(artifact), auditReportMaxBytes,
 		))
 	}
-	// ADR-0102 (2026-09-13): the review's shape is advisory — it rides the
-	// record as warnings; only a missing reasoning or a missing delivery
-	// still forces the verdict.
+	// The review's shape is advisory: it rides the record as warnings, and
+	// only a missing reasoning or a missing delivery still forces the
+	// verdict.
+	// See ADR-0102.
 	advisories, reviewErr := validateExplanationReview(artifact, req)
 	for _, advisory := range advisories {
 		classification.warn(explanationdocs.AdvisoryPrefix + advisory)

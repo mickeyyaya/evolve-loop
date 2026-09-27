@@ -66,11 +66,10 @@ func TestRun_CIParityGate_Error_FailsOpenWithWarning(t *testing.T) {
 	}
 }
 
-// NewDefault must wire the REAL CI-parity gates (cycle-147 lesson: a seam wired
-// in one construction path but dormant in the other is the bug). Behavioral: a
-// worktree whose go/ module has a real `go vet` defect (Printf verb/arg
-// mismatch), EGPS green pre-staged, so the only possible FAIL is the real go-vet
-// gate NewDefault wires.
+// NewDefault must wire the real CI-parity gates: a worktree whose go/ module
+// has a real `go vet` defect (Printf verb/arg mismatch), EGPS green
+// pre-staged, so the only possible FAIL is the real go-vet gate NewDefault
+// wires.
 func TestNewDefault_WiresCIParityGates(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skips real go vet subprocess under -short; full `go test` + CI still run it")

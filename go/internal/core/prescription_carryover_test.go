@@ -1,58 +1,5 @@
 package core
 
-// prescription_carryover_test.go — RED contract for cycle-1375 task
-// `prescription-carryover-gate` (batch-integrity-review-2026-08-04.md F3,
-// weight 0.91; scout-report.md Task 2, fleet lane
-// audit-warn-prescriptions-unenforced).
-//
-// DEFECT BEING FIXED: audit's emitDefectLedger already tags a WARN-carried
-// structured Prescription[] entry as an OPEN "PRESCRIPTION: <text>" row in
-// <workspace>/defect-ledger.json (defect_ledger.go:134-198), and
-// reconcileAgainstAncestor already blocks PASS on any unaccounted OPEN row —
-// but ONLY when the current cycle is formally bound as a continuation of the
-// ledger-holding cycle. An ordinary next-lane ship (the common case — triage
-// picks lanes by content, not by ledger lineage) never reconciles, so the
-// prescription is silently dropped at ship. cycle-1258's own prescription
-// ("materialize .evolve/evals/artifact-ready-crosspoll-debounce.md, git add -f
-// past .gitignore") is the live, still-unrepaired instance (Task 1, this cycle).
-//
-// FIX (Builder authors go/internal/core/prescription_carryover.go + wires the
-// call site in finalizeCycle beside MergeWorkspaceCarryover, per
-// carryover_merge.go:26-40's existing pattern): a cycle-terminal hook that, if
-// <workspace>/defect-ledger.json exists, tolerant-decodes its entries, keeps
-// only Status=="OPEN" rows whose Text carries the exact "PRESCRIPTION: " prefix
-// emitDefectLedger already writes (defect_ledger.go:181), and merges one
-// CarryoverTodo per surviving entry into state.CarryoverTodos (dedup by id via
-// the existing mergeCarryoverTodos — idempotent on re-entry, same idiom as
-// MergeWorkspaceCarryover). This makes every future WARN prescription reach the
-// next scout through the already-mandatory carryoverTodos flow, regardless of
-// continuation binding.
-//
-// These tests are authored by the TDD engineer and are RED now (they will not
-// even compile until MergeWorkspacePrescriptionCarryover exists — a valid RED
-// per the compile-failure rule). The Builder must make them GREEN by adding
-// production code ONLY; it must NOT modify this file.
-//
-// ADVERSARIAL DIVERSITY (skills/adversarial-testing §6):
-//   - Positive/wiring : TestRunCycle_MergesPrescriptionCarryoverIntoState — the
-//     real terminal path (finalizeCycle) persists the prescription todo. This is
-//     the load-bearing anti-no-op signal: a helper that exists but is never
-//     wired into the terminal hook leaves F3's gap open and FAILS here.
-//   - Negative        : TestMergeWorkspacePrescriptionCarryover_FixedAndDeferredEntriesAreNotCarriedOver —
-//     a FIXED or DEFERRED prescription must NOT surface as a new carryover (it
-//     is already resolved; re-surfacing it would nag forever).
-//   - Semantic         : TestMergeWorkspacePrescriptionCarryover_NonPrescriptionOpenEntryIsIgnored —
-//     an OPEN structured-defect row that is NOT tagged "PRESCRIPTION: " (i.e.
-//     the ordinary reconcile-gate defect, already covered by
-//     reconcileAgainstAncestor) must be left alone — this hook is scoped to the
-//     PRESCRIPTION: subset only, never a blanket ledger-to-carryover mirror.
-//   - Edge/OOD         : TestMergeWorkspacePrescriptionCarryover_AbsentLedgerIsNoOp,
-//     TestMergeWorkspacePrescriptionCarryover_MalformedLedgerWarnsNotFails — a
-//     missing or corrupt ledger must never abort the cycle-terminal hook.
-//   - Semantic         : TestMergeWorkspacePrescriptionCarryover_DedupesById — a
-//     second finalize over the same still-OPEN ledger must not duplicate the
-//     carryover row (crash-resume / double-invocation idempotence).
-
 import (
 	"context"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core/carryover"
@@ -80,9 +27,6 @@ const ledgerOnePrescriptionOpen = `{
   ]
 }`
 
-// TestMergeWorkspacePrescriptionCarryover_OpenPrescriptionEntryIsCarriedOver —
-// the direct AC from scout-report.md Task 2: an OPEN "PRESCRIPTION: ..." row
-// merges into state.CarryoverTodos.
 func TestMergeWorkspacePrescriptionCarryover_OpenPrescriptionEntryIsCarriedOver(t *testing.T) {
 	ws := t.TempDir()
 	writeDefectLedgerFixture(t, ws, ledgerOnePrescriptionOpen)
@@ -115,8 +59,6 @@ func TestMergeWorkspacePrescriptionCarryover_OpenPrescriptionEntryIsCarriedOver(
 	}
 }
 
-// TestMergeWorkspacePrescriptionCarryover_FixedAndDeferredEntriesAreNotCarriedOver
-// — the negative half of the AC: a resolved prescription must not re-surface.
 func TestMergeWorkspacePrescriptionCarryover_FixedAndDeferredEntriesAreNotCarriedOver(t *testing.T) {
 	t.Run("FIXED", func(t *testing.T) {
 		ws := t.TempDir()
@@ -149,10 +91,6 @@ func TestMergeWorkspacePrescriptionCarryover_FixedAndDeferredEntriesAreNotCarrie
 	})
 }
 
-// TestMergeWorkspacePrescriptionCarryover_NonPrescriptionOpenEntryIsIgnored —
-// an OPEN entry lacking the "PRESCRIPTION: " prefix is an ordinary structured
-// defect already governed by reconcileAgainstAncestor; this hook must not
-// double-surface it as a carryover todo.
 func TestMergeWorkspacePrescriptionCarryover_NonPrescriptionOpenEntryIsIgnored(t *testing.T) {
 	ws := t.TempDir()
 	writeDefectLedgerFixture(t, ws, `{
@@ -168,9 +106,6 @@ func TestMergeWorkspacePrescriptionCarryover_NonPrescriptionOpenEntryIsIgnored(t
 	}
 }
 
-// TestMergeWorkspacePrescriptionCarryover_AbsentLedgerIsNoOp — a workspace with
-// no defect-ledger.json (the ordinary PASS cycle) must not panic or fabricate
-// todos.
 func TestMergeWorkspacePrescriptionCarryover_AbsentLedgerIsNoOp(t *testing.T) {
 	ws := t.TempDir() // no defect-ledger.json written
 	state := &State{}
@@ -180,10 +115,6 @@ func TestMergeWorkspacePrescriptionCarryover_AbsentLedgerIsNoOp(t *testing.T) {
 	}
 }
 
-// TestMergeWorkspacePrescriptionCarryover_MalformedLedgerWarnsNotFails — a
-// corrupt ledger must be tolerated (no panic, no fatal), mirroring
-// MergeWorkspaceCarryover's malformed-file discipline. The cycle-terminal hook
-// must never abort the cycle over a malformed anti-laundering record.
 func TestMergeWorkspacePrescriptionCarryover_MalformedLedgerWarnsNotFails(t *testing.T) {
 	t.Run("wired: the malformed ledger is a CARRYOVER_WORKSPACE_MALFORMED signal", func(t *testing.T) {
 		ws := t.TempDir()
@@ -207,9 +138,6 @@ func TestMergeWorkspacePrescriptionCarryover_MalformedLedgerWarnsNotFails(t *tes
 	}
 }
 
-// TestMergeWorkspacePrescriptionCarryover_DedupesById — re-entry over the same
-// still-OPEN ledger (crash-resume / double-invocation) must not duplicate the
-// carried-over row.
 func TestMergeWorkspacePrescriptionCarryover_DedupesById(t *testing.T) {
 	ws := t.TempDir()
 	writeDefectLedgerFixture(t, ws, ledgerOnePrescriptionOpen)
@@ -228,12 +156,6 @@ func TestMergeWorkspacePrescriptionCarryover_DedupesById(t *testing.T) {
 	}
 }
 
-// TestRunCycle_MergesPrescriptionCarryoverIntoState is the WIRING contract: a
-// cycle whose workspace holds an OPEN "PRESCRIPTION: " ledger row must, at the
-// cycle-terminal hook (finalizeCycle, the real terminal path — never a helper
-// that merely exists unwired), land it in the PERSISTED state. This is the
-// caller-proof predicate: without the call site in finalizeCycle, F3's gap
-// stays open even though the helper compiles and unit-passes on its own.
 func TestRunCycle_MergesPrescriptionCarryoverIntoState(t *testing.T) {
 	ws := t.TempDir()
 	writeDefectLedgerFixture(t, ws, ledgerOnePrescriptionOpen)

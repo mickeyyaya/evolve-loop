@@ -1,17 +1,12 @@
 package audit
 
-// closure_claim_demotion_test.go — RED contract for the cycle-1502
-// verdict-incoherence halt (batch-20260817a): the closure-citation gate forced
-// FAIL over ONE summary line lacking a same-line citation, on a report whose
-// per-id defect-dispositions covered EVERY inherited defect and whose
-// continuation defect-ledger reconcile had verified that accounting (acs
-// 165/0, 8/8 predicates, all 4 ids dispositioned). The reconcile's verified
-// machine record is strictly stronger evidence than the line citation the
-// prose gate demands — so when the reconcile RAN against a lineage and
-// accounted every defect, prose closure-misses demote to warning diagnostics
-// instead of verdict-forcing FAIL. Every other path is unchanged: a blocked
-// reconcile still forces, and a NON-continuation cycle (no lineage, no
-// dispositions — the original 1255 laundering shape) still forces.
+// When a continuation cycle's defect-ledger reconcile has run and verified
+// every inherited defect against its own per-id disposition, that machine
+// record is strictly stronger evidence than the line citation the closure
+// gate demands, so a prose closure-miss demotes to a warning diagnostic
+// instead of a verdict-forcing FAIL. Every other path is unchanged: a blocked
+// reconcile still forces, and a non-continuation cycle (no lineage, no
+// dispositions) still forces.
 
 import (
 	"os"
@@ -22,8 +17,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// The cycle-1502 line-139 shape: a WARN summary asserting closure, no
-// citation on that line.
+// A WARN summary asserting closure, no citation on that line.
 const demotionClosureReport = "# Audit Report\n\n## Findings\n\n" +
 	"the cycle-1490 defect is verified closed\n\n## Verdict\n**WARN**\n"
 
@@ -69,9 +63,9 @@ func TestClassify_ClosureMissOutsideLineageStillForces(t *testing.T) {
 }
 
 func TestClassify_RefLessStrongClaimStillForcesOnAccountedLineage(t *testing.T) {
-	// Review BLOCK-1: a ref-less "verified closed" — the canonical laundering
-	// sentence — names no cycle the machine record could vouch for; it must
-	// keep the full gate even when this lane's own lineage is accounted.
+	// A ref-less "verified closed" — the canonical laundering sentence — names
+	// no cycle the machine record could vouch for; it must keep the full gate
+	// even when this lane's own lineage is accounted.
 	ws, req := continuationFixture(t, 1490, 1502, []string{
 		"retirement region uncovered",
 	})
@@ -90,9 +84,9 @@ func TestClassify_RefLessStrongClaimStillForcesOnAccountedLineage(t *testing.T) 
 }
 
 func TestClassify_MissingAncestorLedgerDoesNotVouchLineage(t *testing.T) {
-	// Review BLOCK-2: an unblocked reconcile whose ancestor ledger is ABSENT
-	// verified nothing — the closure gate is the backstop that makes a deleted
-	// ancestor ledger non-silent, and it must keep forcing.
+	// An unblocked reconcile whose ancestor ledger is absent verified nothing —
+	// the closure gate is the backstop that makes a deleted ancestor ledger
+	// non-silent, and it must keep forcing.
 	ws, req := continuationFixture(t, 1490, 1502, []string{
 		"retirement region uncovered",
 	})
@@ -124,8 +118,8 @@ func TestClassify_ClosureMissStillForcesWhenReconcileBlocked(t *testing.T) {
 }
 
 func TestClassify_ClosureMissStillForcesOnNonContinuation(t *testing.T) {
-	// No lineage at all — the original 1255 laundering shape: an ordinary
-	// cycle asserting a prior cycle's defect closed with no record anywhere.
+	// No lineage at all: an ordinary cycle asserting a prior cycle's defect
+	// closed with no record anywhere.
 	verdict, _ := classifyWith(t, demotionClosureReport, func(ws string) {
 		yes := true
 		writeACSVerdictShip(t, ws, 0, &yes)

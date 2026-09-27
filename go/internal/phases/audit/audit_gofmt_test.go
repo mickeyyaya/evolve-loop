@@ -20,10 +20,8 @@ func hasDiagContaining(diags []core.Diagnostic, substr string) bool {
 	return false
 }
 
-// A cycle whose worktree has a gofmt-dirty Go file must FAIL audit — even when
-// the EGPS suite is green and the report declares PASS. This is the gate that
-// would have caught cycles 339-341's "ships green locally, red in CI gofmt"
-// class (the generated go/acs/cycle<N>/*.go predicate files).
+// A cycle whose worktree has a gofmt-dirty Go file must FAIL audit, even when
+// the EGPS suite is green and the report declares PASS.
 func TestRun_GofmtDirty_FAILsAudit(t *testing.T) {
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0) // EGPS green, so only the gofmt gate can FAIL it.
@@ -84,10 +82,9 @@ func TestRun_GofmtError_FailsOpenWithWarning(t *testing.T) {
 	}
 }
 
-// NewDefault must wire the REAL gofmt check (parity with the cycle-147 lesson:
-// a seam wired in one construction path but dormant in the other is the bug).
-// Behavioral: a worktree with a gofmt-dirty go/ file, EGPS green pre-staged, so
-// the only possible FAIL cause is the real gofmt gate NewDefault wires.
+// NewDefault must wire the real gofmt check: a worktree with a gofmt-dirty
+// go/ file, EGPS green pre-staged, so the only possible FAIL cause is the
+// real gofmt gate NewDefault wires.
 func TestNewDefault_WiresGofmtCheck(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skips real gofmt subprocess under -short; full `go test` + CI still run it")

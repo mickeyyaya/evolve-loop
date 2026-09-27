@@ -10,22 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// audit_egps_red_identity_test.go — regression lock for the 2026-07-27
-// batch-12 false breaker trip: the EGPS gate-block diagnostic said only
-// "EGPS: red_count=1 (cycle ships only when red_count==0)" with NO predicate
-// identity, so three DIFFERENT red predicates (cycles 1107/1115/1116 — three
-// distinct whole-suite meta-predicates flaking under width-2 contention)
-// produced byte-identical audit-fail reasons → one failure fingerprint
-// (audit|gate-block|048c5b1ca3fb) → the identical-fingerprint pipeline
-// breaker halted the batch on what were three distinct honest failures.
-// Same class as the cycle-1054/1060 verdict-path collision: a constant
-// failure message blinds the breaker's identity premise.
-//
-// Contract: the EGPS red_count diagnostic embeds the red predicates' ac_ids
-// (capped — the message must stay one line), so distinct red predicates yield
-// distinct fingerprints while a genuine recurrence (same predicate red again)
-// still collides exactly.
-
 // writeACSVerdictReds writes acs-verdict.json whose results carry the given
 // red ac_ids (mirroring acssuite's real shape: red_count + results[]).
 func writeACSVerdictReds(t *testing.T, ws string, redIDs ...string) {
@@ -94,10 +78,7 @@ func TestEGPSRedDiagnostic_CycleNumbersNeverEmbedded(t *testing.T) {
 		t.Errorf("cycle number leaked into the diagnostic: %s", m1)
 	}
 
-	// The TWO-PART live convention (no index group): TestC<cycle>_<Name> —
-	// real ids from .evolve/runs/cycle-841 and cycle-1000 acs-verdicts. The
-	// first normalizer required C\d+_\d+_ and left "C841_" (a cycle number)
-	// embedded — adversarial-review catch.
+	// The two-part convention (no index group): TestC<cycle>_<Name>.
 	a1 := egpsRedDiagnostic(t, "cycle841/TestC841_Amplify_CLIOutput_Memo_ResolvesToClaudeTmux")
 	a2 := egpsRedDiagnostic(t, "cycle999/TestC999_Amplify_CLIOutput_Memo_ResolvesToClaudeTmux")
 	if a1 != a2 {
@@ -109,7 +90,7 @@ func TestEGPSRedDiagnostic_CycleNumbersNeverEmbedded(t *testing.T) {
 	if !strings.Contains(a1, "Amplify_CLIOutput_Memo_ResolvesToClaudeTmux") {
 		t.Errorf("two-part id lost its semantic name: %s", a1)
 	}
-	// NEG-prefixed sibling shape (cycle-416 era) keeps its semantic tail.
+	// NEG-prefixed sibling shape keeps its semantic tail.
 	n1 := egpsRedDiagnostic(t, "cycle416/TestC416_NEG_MarkerlessBody_CompactionIsNoOp")
 	if !strings.Contains(n1, "NEG_MarkerlessBody_CompactionIsNoOp") || strings.Contains(n1, "416") {
 		t.Errorf("NEG-shape id mishandled: %s", n1)

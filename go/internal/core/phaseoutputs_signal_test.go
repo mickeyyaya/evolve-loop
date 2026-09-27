@@ -1,13 +1,5 @@
 package core_test
 
-// phaseoutputs_signal_test.go — the WIRING proof for the per-cycle
-// phase-output survey signal. The first monitored wave (cycles 1452/1453)
-// completed with ZERO phase-outputs-surveyed events because the emission
-// lived on cmd_loop's single-loop path, which fleet lanes never traverse.
-// This test drives a REAL RunCycle through the orchestrator and asserts the
-// event reached the workspace's unified stream — so the emission can never
-// again silently depend on how the cycle was dispatched.
-
 import (
 	"context"
 	"encoding/json"

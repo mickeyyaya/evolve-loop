@@ -1,12 +1,5 @@
 package ship
 
-// consume_paths_witness_test.go — single-writer witness for
-// internalConsumedPaths (review M2 on the cycle-1506 fix), mirroring the
-// cycle-583 pattern in audit_bound_witness_test.go: the drift-tolerance's
-// sanctioned set is a smuggling channel the moment any writer other than
-// consumeCommittedItems appends to it, and nothing but a mechanical scan
-// resists that drift.
-
 import (
 	"os"
 	"regexp"

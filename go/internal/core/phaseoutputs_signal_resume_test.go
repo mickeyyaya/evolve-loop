@@ -1,11 +1,5 @@
 package core
 
-// phaseoutputs_signal_resume_test.go — the RESUME-topology wiring proof for
-// the survey signal. The RunCycle proof alone left this line deletable with a
-// green suite (review finding): dropping the resume defer's call would
-// recreate the 1452/1453 silent-non-reporting class on exactly the topology
-// that runs after a crash — when the accounting matters most.
-
 import (
 	"context"
 	"os"

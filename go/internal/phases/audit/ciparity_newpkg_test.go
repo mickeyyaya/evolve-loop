@@ -1,36 +1,11 @@
 package audit
 
-// ciparity_newpkg_test.go — RED contract for cycle-547's
-// apicover-new-package-graduation-gate task, wiring half (ciparity.go's
-// NewUngraduatedPackages pure function is tested directly in
+// ciparity.go's NewUngraduatedPackages pure function is tested directly in
 // internal/ciparity/newpkg_test.go; this file pins the audit-phase gate that
-// consumes it).
-//
-// FIX CONTRACT (new surface this cycle — undefined until Builder adds it, so
-// this package's test build fails to compile today; that compile failure IS
-// the RED evidence):
-//
-//   - Config gains a new CI-parity hook field, CheckApicoverNewPkgGraduation
-//     func(req core.PhaseRequest) ([]string, error), wired through Run
-//     exactly like CheckGoVet/CheckACSDurable/CheckApicoverEnforce (offenders
-//     -> FAIL; infra error -> fail-open WARN).
-//   - apicoverNewPackageGraduationDefault(req) is the real implementation:
-//     reads the cycle's changed packages + .apicover-enforce (mirrors
-//     apicoverEnforceChangedDefault's own resolution), calls
-//     ciparity.NewUngraduatedPackages, and returns an actionable offender line
-//     per ungraduated package when non-empty.
-//   - NewDefaultWithStageCompact wires CheckApicoverNewPkgGraduation:
-//     apicoverNewPackageGraduationDefault alongside the other three CI-parity
-//     gates.
-//
-// ADVERSARIAL DIVERSITY (skills/adversarial-testing §6):
-//   - Positive : TestApicoverNewPkgGraduation_OffendersFailAudit (mirrors
-//     TestRun_CIParityGate_Offenders_FAILsAudit's exact pattern for the new
-//     hook)
-//   - Negative : TestApicoverNewPkgGraduation_NoUngraduatedPackages_NoOp (an
-//     already-graduated changed package must not FAIL)
-//   - Edge     : TestApicoverNewPkgGraduationDefault_CmdChangeNotFlagged (a
-//     go/cmd/... only change must be a no-op — the AC's explicit exclusion)
+// consumes it. apicoverNewPackageGraduationDefault reads the cycle's changed
+// packages plus .apicover-enforce (mirroring apicoverEnforceChangedDefault's
+// own resolution), calls ciparity.NewUngraduatedPackages, and returns an
+// actionable offender line per ungraduated package when non-empty.
 import (
 	"context"
 	"os"
@@ -114,18 +89,10 @@ func TestApicoverNewPkgGraduationDefault_UngraduatedPackageFlagged(t *testing.T)
 	}
 }
 
-// TestApicoverNewPkgGraduationDefault_OffenderIncludesPrescriptiveFix —
-// cycle-1329 AC1 (audit-warn-prescription-gate): the audit offender line for
-// an ungraduated package must carry the SAME copy-pasteable prescription the
-// build-entry seam already emits (graduationPrescription /
-// phase_bindings_graduation.go:81), not just the terse "add it + an
-// apicover_named_test.go" sentence the offender line has today. This is the
-// exact fixture from TestApicoverNewPkgGraduationDefault_UngraduatedPackageFlagged
-// (new ungraduated go/internal/brandnew), re-asserted against the OFFENDER
-// STRING CONTENT rather than merely its non-emptiness — the assertion this
-// task adds. Today's offender string is the terse sentence, so this is RED
-// until the audit seam is wired to the relocated ciparity prescription
-// helper (Beyond-the-Ask / Research→Implementation Map hypothesis 1).
+// TestApicoverNewPkgGraduationDefault_OffenderIncludesPrescriptiveFix: the
+// audit offender line for an ungraduated package must carry the same
+// copy-pasteable prescription the build-entry seam already emits
+// (graduationPrescription), not just a terse instruction sentence.
 func TestApicoverNewPkgGraduationDefault_OffenderIncludesPrescriptiveFix(t *testing.T) {
 	root, goDir := goWorktree(t)
 	if err := os.WriteFile(filepath.Join(goDir, ".apicover-enforce"), []byte("./internal/p\n"), 0o644); err != nil {

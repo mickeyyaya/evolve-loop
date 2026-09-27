@@ -1,14 +1,9 @@
 package audit
 
-// closure_claim_boundary_test.go — RED contract for the cycle-1431 verify-wave
-// halt (auto-filed P0; prior firings 1339/1371/1428): closureClaimOffenders
-// used an unbounded strings.Contains, so the substring "closed" inside
-// "disclosed" — on a line that literally ended "still open" — tripped the
-// gate, force-FAILed a narrative-PASS audit, and halted the batch as
-// infra-systemic. Two false-positive classes close here: (1) substring
-// matches ("disclosed", "foreclosed"); (2) negated/openness-asserting lines
-// ("is NOT closed", "still open") — a report SAYING a defect remains open is
-// the opposite of a closure claim.
+// Two false-positive classes the closure-claim gate must not trip on: (1)
+// substring matches ("disclosed", "foreclosed"); (2) negated/openness-asserting
+// lines ("is NOT closed", "still open") — a report saying a defect remains
+// open is the opposite of a closure claim.
 
 import (
 	"strings"
@@ -18,7 +13,7 @@ import (
 func TestClosureClaimOffenders_SubstringAndNegationFalsePositives(t *testing.T) {
 	t.Parallel()
 	benign := []string{
-		// The live cycle-1431 shape: "closed" only inside "disclosed", line asserts openness.
+		// "closed" only inside "disclosed", line asserts openness.
 		"The minted-path fix (cycle-1424) is disclosed in the footer; the underlying defect is still open.",
 		"foreclosed options for cycle-1339 are listed below",
 		"the cycle-1428 defect is NOT closed — evidence pending",
@@ -55,8 +50,8 @@ func TestClosureClaimOffenders_RealClaimsStillCaught(t *testing.T) {
 	}
 }
 
-// The live halt's exact evidence must not reproduce: a full report whose only
-// "closed" token is inside "disclosed" yields ZERO diagnostics.
+// A full report whose only "closed" token is inside "disclosed" yields zero
+// diagnostics.
 func TestClosureClaimDiagnostics_Cycle1431ShapeClean(t *testing.T) {
 	t.Parallel()
 	report := strings.Join([]string{

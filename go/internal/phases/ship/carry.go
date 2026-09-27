@@ -11,10 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/treedelta"
 )
 
-// carrySatisfied is ADR-0105 B4. The tree ship holds is not the audited one, but a carry record of this
-// audit says the audited change was rebased byte for byte onto the base it now sits on; ship verifies the
-// ledger chain the record sits in, then re-proves the ancestry and the bytes itself. The writer refuses a
-// record whose gates are not green, so a chained record's gates need no second look.
 func carrySatisfied(ctx context.Context, opts *Options, dir, actual string) (bool, string) {
 	if opts.internalAuditArtifactSHA == "" {
 		return false, ""
@@ -45,7 +41,7 @@ func carrySatisfied(ctx context.Context, opts *Options, dir, actual string) (boo
 	return true, fmt.Sprintf(" (the byte-identical rebase carry of cycle %d, re-proven)", rec.Cycle)
 }
 
-// gitAt runs git in the directory it is given and returns its real exit code, as treedelta's contract asks.
+// gitAt returns git's real exit code, as treedelta's contract requires.
 func gitAt(opts *Options) treedelta.Git {
 	return func(ctx context.Context, dir string, args ...string) (string, int, error) {
 		var out bytes.Buffer

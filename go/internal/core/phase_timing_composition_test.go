@@ -13,15 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// phase_timing_composition_test.go — the dossier and the durable log must
-// project the SAME record. An earlier fix let the dossier compose its own view
-// ("live replaces the file"); on the resume path core starts its timing slice
-// EMPTY and holds only the resumed segment, so that view silently dropped the
-// pre-crash prefix sitting on disk. Meanwhile the abort path flushes BEFORE the
-// dossier is built and the normal path after — so a naive append would
-// double-count on one path and drop on the other. One composition rule, one
-// flush, both paths.
-
 func writeTimingLog(t *testing.T, ws string, phases ...string) {
 	t.Helper()
 	var entries []phasetiming.Entry
@@ -45,8 +36,6 @@ func phaseNames(entries []phaseTimingEntry) string {
 	return strings.Join(names, ",")
 }
 
-// TestFlushPhaseTimings_ResumePreservesThePreCrashPrefix: the resumed segment
-// is APPENDED to what is already on disk, never substituted for it.
 func TestFlushPhaseTimings_ResumePreservesThePreCrashPrefix(t *testing.T) {
 	ws := t.TempDir()
 	writeTimingLog(t, ws, "scout", "triage", "tdd") // pre-crash attempt
@@ -56,7 +45,6 @@ func TestFlushPhaseTimings_ResumePreservesThePreCrashPrefix(t *testing.T) {
 	if got := phaseNames(cr.flushPhaseTimings()); got != "scout,triage,tdd,build,audit" {
 		t.Fatalf("composed = %q, want the pre-crash prefix followed by the resumed segment", got)
 	}
-	// The file receives exactly what the dossier projects.
 	onDisk, err := phasetiming.Read(ws)
 	if err != nil {
 		t.Fatal(err)
@@ -66,9 +54,6 @@ func TestFlushPhaseTimings_ResumePreservesThePreCrashPrefix(t *testing.T) {
 	}
 }
 
-// TestFlushPhaseTimings_IsExactlyOnce: the abort path flushes (RunCycle's
-// defer) BEFORE the dossier is built (abnormalEpilogue), so a second
-// composition must NOT re-append its own entries.
 func TestFlushPhaseTimings_IsExactlyOnce(t *testing.T) {
 	ws := t.TempDir()
 	cr := &cycleRun{cs: CycleState{WorkspacePath: ws}, phaseTimings: []phaseTimingEntry{
@@ -88,9 +73,6 @@ func TestFlushPhaseTimings_IsExactlyOnce(t *testing.T) {
 	}
 }
 
-// TestFlushPhaseTimings_DuplicatePhasesAreReality: a phase that ran twice
-// (failed attempt + repair) appears twice. The log records dispatches, and the
-// composition must not "tidy" that away.
 func TestFlushPhaseTimings_DuplicatePhasesAreReality(t *testing.T) {
 	ws := t.TempDir()
 	writeTimingLog(t, ws, "build")
@@ -100,10 +82,6 @@ func TestFlushPhaseTimings_DuplicatePhasesAreReality(t *testing.T) {
 	}
 }
 
-// Unit 01 (ADR-0103): an Orchestrator assembled as a literal — the shape this
-// package's tests keep — and a cycleRun with no orchestrator at all both get
-// the Null-Object recorder on first use, once, so every path still has ONE
-// writer; NewOrchestrator builds the wired recorder eagerly.
 func TestRecorder_LiteralOrchestratorGetsTheNullObjectRecorderOnce(t *testing.T) {
 	o := &Orchestrator{now: func() time.Time { return time.Date(2026, 9, 13, 3, 4, 5, 0, time.UTC) }}
 	first := o.recorder()
@@ -135,11 +113,6 @@ func TestRecorder_LiteralOrchestratorGetsTheNullObjectRecorderOnce(t *testing.T)
 	}
 }
 
-// Unit 01 (ADR-0103), architecture review MEDIUM-1: the recorder reads the
-// orchestrator's Center through an accessor, so WithSignalCenter applied
-// after NewOrchestrator (the shape resume_lifecycle_test.go uses) still
-// routes the recorder's own warnings — a snapshot at construction would
-// have kept them silent for the orchestrator's whole life.
 func TestRecorder_SeesASignalCenterAppliedAfterConstruction(t *testing.T) {
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
 	if o.recorder().SignalsWired() {
