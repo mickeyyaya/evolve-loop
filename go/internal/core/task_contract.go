@@ -21,7 +21,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"slices"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/acssuite"
@@ -99,57 +98,37 @@ func (o *Orchestrator) seedTaskContract(ctx context.Context, base map[string]str
 	return out
 }
 
-// taskItemRefs resolves this cycle's bound tasks to their inbox records: the
-// lane scope's id=path pairs when the cycle start resolved them
-// (Context["fleet_scope_paths"]), else the scope ids / the triage decision's
-// top_n ids through the scope-path resolver.
+// taskItemRefs resolves this cycle's committed tasks (ContractTaskIDs — the
+// same projection the TDD->Build scope gate grades against) to their inbox
+// records. Membership comes from the on-disk binding only: the dispatch
+// context's fleet_scope_paths id=path pairs merely PLACE a committed member's
+// record (a pair wins over the scope-path resolver) and never add or remove a
+// member, so a stale request-context scope cannot rebind the contract. A
+// member neither source can place renders unresolved, never dropped.
 func (o *Orchestrator) taskItemRefs(ctx map[string]string, projectRoot, workspace string) []taskItemRef {
-	refs := o.scopedTaskItemRefs(ctx, projectRoot, workspace)
-	// The pin is authoritative even when resume carries stale scope/path context.
-	// Resolve paths separately: an incomplete disclosure cannot narrow membership.
-	if ids := LaneScopeIDs(workspace); len(ids) > 0 {
-		pinned := make([]taskItemRef, 0, len(ids))
-		for _, id := range ids {
-			ref := taskItemRef{id: id}
-			for _, candidate := range refs {
-				if candidate.id == id {
-					ref = candidate
-					break
-				}
-			}
-			if ref.path == "" && o.scopePathFor != nil {
-				ref.path = o.scopePathFor(projectRoot, id)
-			}
-			pinned = append(pinned, ref)
+	ids := ContractTaskIDs(workspace)
+	pairs := scopePathPairs(ctx["fleet_scope_paths"])
+	refs := make([]taskItemRef, 0, len(ids))
+	for _, id := range ids {
+		path := pairs[id]
+		if path == "" && o.scopePathFor != nil {
+			path = o.scopePathFor(projectRoot, id)
 		}
-		refs = pinned
+		refs = append(refs, taskItemRef{id: id, path: path})
 	}
-	deferred := deferredTaskIDs(workspace)
-	return slices.DeleteFunc(refs, func(ref taskItemRef) bool { return slices.Contains(deferred, ref.id) })
+	return refs
 }
 
-// deferredTaskIDs reads the triage decision's deferrals — the ONLY thing that
-// can remove a task from its acceptance contract. Without a readable decision
-// nothing is deferred (the assigned scope is preserved).
-func deferredTaskIDs(workspace string) []string {
-	body, err := os.ReadFile(filepath.Join(workspace, "triage-decision.json"))
-	if err != nil {
-		return nil
+// scopePathPairs parses the space-separated id=path disclosure the cycle start
+// resolved; a malformed pair places nothing (its member falls to the resolver).
+func scopePathPairs(s string) map[string]string {
+	pairs := map[string]string{}
+	for _, pair := range strings.Fields(s) {
+		if id, path, ok := strings.Cut(pair, "="); ok && id != "" {
+			pairs[id] = path
+		}
 	}
-	// inboxmover cannot be imported here: its ledger adapter depends on core.
-	var decision struct {
-		Deferred []struct {
-			ID string `json:"id"`
-		} `json:"deferred"`
-	}
-	if json.Unmarshal(body, &decision) != nil {
-		return nil
-	}
-	var out []string
-	for _, item := range decision.Deferred {
-		out = append(out, item.ID)
-	}
-	return out
+	return pairs
 }
 
 // ContractTaskIDs is the ONE id set the Task Contract binds a cycle to — the
@@ -177,54 +156,6 @@ func ContractTaskIDs(workspace string) []string {
 		return nil
 	}
 	return ids
-}
-
-func (o *Orchestrator) scopedTaskItemRefs(ctx map[string]string, projectRoot, workspace string) []taskItemRef {
-	var refs []taskItemRef
-	if pairs := strings.Fields(ctx["fleet_scope_paths"]); len(pairs) > 0 {
-		seen := map[string]bool{}
-		for _, pair := range pairs {
-			id, path, ok := strings.Cut(pair, "=")
-			if !ok || id == "" {
-				// The producer refuses unencodable values; anything that still
-				// arrives malformed is rendered as an unresolved task, never dropped.
-				refs = append(refs, taskItemRef{id: pair})
-				continue
-			}
-			seen[id] = true
-			refs = append(refs, taskItemRef{id: id, path: path})
-		}
-		// A scope id the producer could not encode (or place) is still a bound
-		// task: it renders as unresolved so the omission is loud, not silent.
-		for _, id := range splitCSV(ctx["fleet_scope"]) {
-			if !seen[id] {
-				refs = append(refs, taskItemRef{id: id})
-			}
-		}
-		return refs
-	}
-	ids := splitCSV(ctx["fleet_scope"])
-	if len(ids) == 0 {
-		ids = BoundTaskIDs(workspace)
-	}
-	for _, id := range ids {
-		path := ""
-		if o.scopePathFor != nil {
-			path = o.scopePathFor(projectRoot, id)
-		}
-		refs = append(refs, taskItemRef{id: id, path: path})
-	}
-	return refs
-}
-
-func splitCSV(s string) []string {
-	var out []string
-	for _, part := range strings.Split(s, ",") {
-		if part = strings.TrimSpace(part); part != "" {
-			out = append(out, part)
-		}
-	}
-	return out
 }
 
 // BoundTaskIDs reads the cycle's triage decision for the committed task ids
