@@ -33,9 +33,7 @@ func importerFixture(t *testing.T) (repo, goDir string) {
 	repo = makeRepo(t)
 	goDir = filepath.Join(repo, "go")
 	mustWrite(t, filepath.Join(goDir, "go.mod"), "module example.com/lane\n\ngo 1.24\n")
-	for _, pkg := range []string{"phasespec", "profiles", "phasecoherence", "routingtest"} {
-		mustWrite(t, filepath.Join(goDir, "internal", pkg, "pass_test.go"), "package "+pkg+"\n\nimport \"testing\"\n\nfunc TestPass(t *testing.T) {}\n")
-	}
+	writeGreenGuardSuites(t, goDir)
 	mustWrite(t, filepath.Join(goDir, "internal", "base", "base.go"), "package base\n\nconst Stop = \"old-stop\"\n")
 	mustWrite(t, filepath.Join(goDir, "internal", "user", "user.go"), "package user\n\nimport \"example.com/lane/internal/base\"\n\nfunc Stop() string { return base.Stop }\n")
 	mustWrite(t, filepath.Join(goDir, "internal", "user", "user_test.go"), "package user\n\nimport \"testing\"\n\nfunc TestUserContract(t *testing.T) {\n\tif Stop() != \"old-stop\" {\n\t\tt.Fatalf(\"contract: %q\", Stop())\n\t}\n}\n")
