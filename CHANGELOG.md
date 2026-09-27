@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## Changed — a byte-identical rebase ships on its audited verdict (ADR-0105 B3/B4, ADR-0106 P1, 2026-09-27)
+
+- Cycles 1712 and 1715 each passed their audit, met a sibling's closeout dossier commit on the plane's `main` at ship, rebased byte-identically and then re-audited an unchanged tree for seven to ten minutes. The rebind route returned Audit and never reached the carry-forward rungs, the old RUNG 0 diffed commits so a pended change could never match, and ship had no reader of carry records. Now `identityCarryForward` runs after the rebind: the auditor row names the audited tree and artifact, `treedelta.Identical` (a new leaf) proves the pended tree's change is byte for byte the audited one, the composed gates run under the fence with the index checked intact, and an `identical-rebase` record naming the audited tree goes to the root ledger; ship's one binding rule then re-proves the record (ancestry, bytes, green gates) and accepts the tree. Any doubt on either side is the old path: a second audit.
+
 ## Fixed — a top_n card on a protected surface is routed by the host, never the cycle's FAIL (ADR-0106 R1, R2, 2026-09-27)
 
 - Cycle 1714 (wave 16) was pinned to an inbox item with no declared files; its triage named `go/internal/core/orchestrator.go`, the classify hook refused the report with `TRIAGE_PROTECTED_SURFACE`, the cycle sealed FAIL after two phases and the failure path routed the item to the console. The hook now moves every such card out of `top_n` into `escalate_block` with the reason `protected-surface: <path> — control-plane changes go through the console route (operator-gated), not lane top_n` and returns PASS with one warning per card; an emptied `top_n` is the planned no-work end and the no-work closeout routes the item with that reason, while other cards continue the cycle. A route that cannot be recorded fails closed. The triage prompt now lists the protected surfaces (`guards.ProtectedSurfaceManifest`) and the drop reason, and the persona carries the rule. Design: `docs/architecture/logic-first-delivery-design.md` §5.7 and §7.8.

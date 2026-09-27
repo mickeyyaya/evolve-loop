@@ -173,6 +173,7 @@ type Options struct {
 	// (audit_bound_witness_test.go), which turns RED on any second assignment
 	// site in this package. Not part of the public API.
 	internalAuditBoundTreeSHA string
+	internalAuditArtifactSHA  string
 
 	// internalConsumedPaths is the exact set of repo-relative paths the ship's
 	// OWN in-commit inbox consumption staged (consume.go — the one mutation
