@@ -72,6 +72,17 @@ path changed, Builder declares `NOT_APPLICABLE` with a concrete reason and does
 not create a cycle record. Builder cannot use that declaration to hide a
 material change because the host derives the path set from Git.
 
+A builder that explains a non-material diff anyway is not refused: a `REQUIRED`
+declaration naming the cycle's own record is verified like any explanation (the
+material set is empty, so `Changed Areas` may cite only paths in the diff), and a
+`NOT_APPLICABLE` declaration beside an undeclared own record passes with the
+record kept as documentation: its content is not validated (no section or path
+check reads it, and no review is owed to it), and once landed it is a published
+record like any other, immutable to every later cycle. Only foreign cycle records are immutable, and that
+rule runs before either branch with one message, `published cycle records are
+immutable` (ADR-0106 X3; cycle 1718 paid a builder re-dispatch to delete its own
+document before this).
+
 ## Provenance checks
 
 The typed handoff binds:

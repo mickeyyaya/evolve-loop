@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 ## Fixed — a capacity deferral in the sequential loop is nobody's failed approach (ADR-0106 Q3, 2026-09-27)
 
 - The sequential dispatcher recorded a walled cycle in `state.json`'s `failedApproaches` (which triage's demotion reads) and ran the failure closeout before it noticed the wall and paused. It now pauses first: a deferral records nothing, closes nothing and counts toward no breaker; the wave path already behaved this way because its breaker reads only failure digests, which a deferral never writes.
+## Fixed — a cycle's own explanation record on a non-material diff is its explanation, not history (ADR-0106 X3, 2026-09-27)
+
+- Cycle 1718 built a test-only change and explained it; the build floor's no-material branch counted the cycle's own record among the "immutable cycle explanation records" and re-dispatched the builder to delete it. Only foreign cycle records are immutable now, in every branch and with one message (`published cycle records are immutable`): a no-material diff whose report declares `REQUIRED` is verified like any explanation with an empty material set, and one declared `NOT_APPLICABLE` keeps an undeclared own record as documentation. The Verify mirror branches on the recorded status; its foreign-record check was dead behind the diff-SHA check and is gone (`internal/explanationdocs`; `TestNonMaterialDiff_*`).
+- `bridge/channel.TestChannel_EndToEnd` failed twice in 1718's lane under the ship backstop's load (its two ticks were separated by a 10 ms sleep, and both landed in one poll); it now waits for the first tick's envelope in the feed before writing the second.
 
 ## Changed — a byte-identical rebase ships on its audited verdict (ADR-0105 B3/B4, ADR-0106 P1, 2026-09-27)
 
