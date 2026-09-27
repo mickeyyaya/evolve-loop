@@ -11,7 +11,7 @@ package ship
 // catch them — the guard suites scan repo-wide state (on-disk catalogs,
 // tracked profiles, rendering parity) that a config-only diff never selects.
 //
-// The pack runs the four guard packages in the tree the ship will land — the
+// The pack runs the guard packages in the tree the ship will land — the
 // lane worktree for a cycle ship (repoContractGateRoot; until 2026-09-14 the
 // gate ran in the PROJECT ROOT, i.e. main's pre-landing tree, and could not
 // see a lane's changes at all) — BEFORE the ship binds/pushes. They are existing deterministic tests with FP≈0 by
@@ -60,12 +60,17 @@ import (
 
 // repoContractPackages are the repo-wide guard suites whose breakage turned
 // main red. Kept to the incident-proven set deliberately: every addition
-// costs every ship wall-time and must carry the same FP≈0 property.
+// costs every ship wall-time and must carry the same FP≈0 property. The raw
+// git fixture ratchet is a source scan of the tracked test files (one git
+// ls-files, about a second) and is here because a lane adding a raw fixture
+// changes neither its package nor an importer, so no other backstop would run
+// it before main does.
 var repoContractPackages = []string{
 	"./internal/phasespec/...",
 	"./internal/profiles/...",
 	"./internal/phasecoherence/...",
 	"./internal/routingtest/...",
+	"./internal/rawgitratchet/...",
 }
 
 // scanLogName is the run-dir artifact every scanner-pack run is teed to —
@@ -534,7 +539,7 @@ func contractRed(packName string, o packOutcome) error {
 	detail := packName
 	switch packName {
 	case "scanner pack":
-		detail = "fixed scanner pack (phasespec, profiles, phasecoherence, routingtest)"
+		detail = "fixed scanner pack (phasespec, profiles, phasecoherence, routingtest, rawgitratchet)"
 	case "importer backstop":
 		detail = "importer backstop (the packages that import what this ship changes)"
 	}

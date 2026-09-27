@@ -49,12 +49,9 @@ func newLaneRepo(t *testing.T) string {
 	repo := makeRepo(t)
 	goDir := filepath.Join(repo, "go")
 	mustWrite(t, filepath.Join(goDir, "go.mod"), "module example.com/lane\n\ngo 1.24\n")
-	for _, pkg := range []string{"phasespec", "profiles", "phasecoherence", "routingtest"} {
-		mustWrite(t, filepath.Join(goDir, "internal", pkg, "pass_test.go"),
-			"package "+pkg+"\n\nimport \"testing\"\n\nfunc TestPass(t *testing.T) {}\n")
-	}
+	writeGreenGuardSuites(t, goDir)
 	runGit(t, repo, "add", "go")
-	runGit(t, repo, "commit", "-qm", "baseline: four green guard suites")
+	runGit(t, repo, "commit", "-qm", "baseline: green guard suites")
 	return repo
 }
 
@@ -164,10 +161,7 @@ func TestRepoContractGate_AddedTestDiscoveryFailureIsRecorded(t *testing.T) {
 	root := t.TempDir()
 	goDir := filepath.Join(root, "go")
 	mustWrite(t, filepath.Join(goDir, "go.mod"), "module example.com/lane\n\ngo 1.24\n")
-	for _, pkg := range []string{"phasespec", "profiles", "phasecoherence", "routingtest"} {
-		mustWrite(t, filepath.Join(goDir, "internal", pkg, "pass_test.go"),
-			"package "+pkg+"\n\nimport \"testing\"\n\nfunc TestPass(t *testing.T) {}\n")
-	}
+	writeGreenGuardSuites(t, goDir)
 
 	ws := t.TempDir()
 	err := runRepoContractGate(context.Background(), "enforce", root, ws, io.Discard)
@@ -193,13 +187,13 @@ func TestRepoContractGate_AddedTestDiscoveryFailureIsRecorded(t *testing.T) {
 // scan went red, and the addition dropped the four fixed-suite names that told
 // them where to look. Both halves are asserted against the real error text.
 func TestRepoContractGate_RedMessagesDistinguishFixedPackFromAddedTests(t *testing.T) {
-	t.Run("fixed pack RED still names the four guard suites", func(t *testing.T) {
+	t.Run("fixed pack RED still names every guard suite", func(t *testing.T) {
 		swapRepoContractTest(t, redPack("internal/phasespec.TestCatalogParity"))
 		err := runRepoContractGate(context.Background(), "enforce", t.TempDir(), t.TempDir(), io.Discard)
 		if err == nil {
 			t.Fatal("fixed-pack RED must fail the ship")
 		}
-		for _, suite := range []string{"phasespec", "profiles", "phasecoherence", "routingtest"} {
+		for _, suite := range []string{"phasespec", "profiles", "phasecoherence", "routingtest", "rawgitratchet"} {
 			if !strings.Contains(err.Error(), suite) {
 				t.Errorf("fixed-pack RED must keep naming the guard suite %q so the operator knows where to look, got %q", suite, err)
 			}
