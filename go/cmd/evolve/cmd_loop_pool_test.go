@@ -68,6 +68,13 @@ func TestShouldRunWaveAndPool_MutuallyExclusive(t *testing.T) {
 	}
 }
 
+// poolTestSyncTimeout bounds each wait on a pool lane's goroutine handoff. The
+// handoff normally takes milliseconds, but -race plus coverage on a loaded
+// shared CI runner stretched it past the former 2s bound, so a slow start read
+// as a scheduling defect; 10s keeps a real hang loud without betting on the
+// runner's speed.
+const poolTestSyncTimeout = 10 * time.Second
+
 func TestDispatchPoolIteration_BackfillsReplacementWhileSiblingStillRunning(t *testing.T) {
 	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "triage", Scheduling: "pool"}
 	backlog := []fleet.Todo{
@@ -112,7 +119,7 @@ func TestDispatchPoolIteration_BackfillsReplacementWhileSiblingStillRunning(t *t
 		select {
 		case id := <-dispatched:
 			seen[id] = true
-		case <-time.After(2 * time.Second):
+		case <-time.After(poolTestSyncTimeout):
 			t.Fatalf("timed out waiting for the initial 2-lane fill; got %v", seen)
 		}
 	}
@@ -128,7 +135,7 @@ func TestDispatchPoolIteration_BackfillsReplacementWhileSiblingStillRunning(t *t
 		if id != "C" {
 			t.Fatalf("backfill dispatched %q, want C (the only remaining disjoint pending todo)", id)
 		}
-	case <-time.After(2 * time.Second):
+	case <-time.After(poolTestSyncTimeout):
 		t.Fatal("no replacement lane dispatched for B's exit while sibling A still ran — dispatchPoolIteration did not wire fleet.RunPool (wave barrier still in place)")
 	}
 
@@ -144,7 +151,7 @@ func TestDispatchPoolIteration_BackfillsReplacementWhileSiblingStillRunning(t *t
 		if len(o.results) != 3 {
 			t.Fatalf("len(results) = %d, want 3 (one per backlog item)", len(o.results))
 		}
-	case <-time.After(2 * time.Second):
+	case <-time.After(poolTestSyncTimeout):
 		t.Fatal("dispatchPoolIteration did not return after all 3 pool lanes finished")
 	}
 }
