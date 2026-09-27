@@ -3,7 +3,7 @@
   "kind": "feature",
   "title": "Complete per-edge handoff digest routing for every remaining phase prompt",
   "created_at": "2026-09-12T23:00:00Z",
-  "weight": 0.87,
+  "weight": 0.7,
   "summary": "Finish the original handoff-digest objective after cycle 1632 landed only the typed cap and one TDD prompt consumer.",
   "acceptance": [
     "Artifact flow per edge — every remaining ComposePrompt phase edge — is explicit config.",
@@ -16,5 +16,7 @@
     "go/internal/core/",
     "go/internal/phases/runner/",
     "go/internal/phases/"
-  ]
+  ],
+  "priority_class": "performance",
+  "priority_rationale": "inbox review 2026-09-27: A token optimization with no measured waste target; nothing is failing for lack of it."
 }

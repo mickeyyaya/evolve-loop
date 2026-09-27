@@ -134,7 +134,7 @@ func TestPlanFn_PriorDecisionIsPrunedThenWidened(t *testing.T) {
 	if s := string(data); !strings.Contains(s, `"alpha"`) || strings.Contains(s, `"gamma"`) || !strings.Contains(s, `"beta"`) {
 		t.Errorf("gamma pruned, the slot refilled from the backlog (prune BEFORE widen): %s", s)
 	}
-	if !strings.Contains(h.stderr.String(), `pruned consumed top_n id "gamma"`) {
+	if !strings.Contains(h.stderr.String(), `pruned undispatchable top_n id "gamma"`) {
 		t.Errorf("the :577 line on stderr: %q", h.stderr.String())
 	}
 	h.ports.LastCycle = func(context.Context) (int, error) { return 0, errors.New("state unreadable") }
@@ -209,12 +209,12 @@ func TestSeedWavePlanFromInbox_ClampsAndRefuses(t *testing.T) {
 	}
 }
 
-func TestPruneConsumed_PreservesKeysAndReturnsOriginalWhenNothingDropped(t *testing.T) {
+func TestPruneUndispatchable_PreservesKeysAndReturnsOriginalWhenNothingDropped(t *testing.T) {
 	h := newHarness(t)
 	lifecycleItem(t, h.evolveDir, inboxmover.StatePending, "alpha")
 	lifecycleItem(t, h.evolveDir, inboxmover.StateProcessed, "gamma")
 	data := []byte(`{"note":"keep","top_n":[{"id":"alpha","files":["a.go"]},{"id":"gamma","files":["g.go"]}]}`)
-	if got := string(h.e.pruneConsumed(data)); got != golden(t, "decision_prune.golden.json") {
+	if got := string(h.e.pruneUndispatchable(data)); got != golden(t, "decision_prune.golden.json") {
 		t.Errorf("prune keeps every key and rewrites top_n: %s", got)
 	}
 	if h.stderr.String() != stderrSection(t, "prune_dropped") {
@@ -226,7 +226,7 @@ func TestPruneConsumed_PreservesKeysAndReturnsOriginalWhenNothingDropped(t *test
 		[]byte(`{"top_n":[]}`),
 		[]byte(`{not json`),
 	} {
-		if got := h.e.pruneConsumed(same); !bytes.Equal(got, same) {
+		if got := h.e.pruneUndispatchable(same); !bytes.Equal(got, same) {
 			t.Errorf("passthrough: %s -> %s", same, got)
 		}
 	}

@@ -22,6 +22,8 @@
   "priority": "P2",
   "summary": "Majority voting is the best dollar-per-accuracy technique for reasoning tasks (negligible gain past N≈20) but reduces VARIANCE, not BIAS: when a model is systematically wrong all samples agree and voting cannot help. So it is wrong for the builder (whose failures are bias — it misunderstood the task) and right for cheap single-shot DECISIONS where one bad sample wastes an entire downstream cycle.",
   "title": "N=3 self-consistency on DECISION phases only (triage top_n, verdict-conflict adjudication, spec reachability)",
-  "weight": 0.87,
-  "route": "console-manual"
+  "weight": 0.4,
+  "route": "console-manual",
+  "priority_class": "feature",
+  "priority_rationale": "inbox review 2026-09-27: A speculative variance reducer: the recent decision failures (1691 stale premise, 1714 protected card) were bias that voting cannot fix, and it multiplies triage cost."
 }

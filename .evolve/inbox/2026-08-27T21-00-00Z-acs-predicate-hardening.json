@@ -1,14 +1,14 @@
 {
   "id": "acs-predicate-hardening",
   "kind": "sweep",
-  "weight": 0.8,
+  "weight": 0.6,
   "title": "Sweep: acs predicate hardening (20 auditor prescriptions amortised)",
   "summary": "ACS predicate authoring and shared acsassert helpers: end-of-options handling, uniqueness-checked lookups, satisfiability, scoped selection. Amortised from 20 content-hash carryoverTodos that were unreachable by any operator directive: their ids were 32-char hashes, so goal-text could never name them and triage could not prioritise them (all 144 were stamped priority=high, which is the same as none being high). Queue audit 2026-08-27. Member prescriptions verbatim below; work them as one sweep, smallest-blast-radius first, and retire the group when the theme is clean.",
   "prescriptions": [
     {
       "origin_id": "d58e5d3800af6f11f9478e4a32cc3b907",
       "first_seen_cycle": 1420,
-      "text": "PRESCRIPTION: Add `--end-of-options` before the SHA argument and validate it against ^[0-9a-f]{7,40}$ before any exec of git in ACS predicates \u2014 put it in a shared pkg/acsassert helper, not a per-cycle copy"
+      "text": "PRESCRIPTION: Add `--end-of-options` before the SHA argument and validate it against ^[0-9a-f]{7,40}$ before any exec of git in ACS predicates — put it in a shared pkg/acsassert helper, not a per-cycle copy"
     },
     {
       "origin_id": "da74397473973ecb2ae54d8ae0bff33a1",
@@ -18,7 +18,7 @@
     {
       "origin_id": "dcdc82e4cd641d47a8e2f0e18a0ca1c53",
       "first_seen_cycle": 1437,
-      "text": "PRESCRIPTION: Add an (?i)(\\d+)\\s+of\\s+(\\d+) licensing axis to the ratio loop at go/acs/cycle1437/predicates_test.go:297 \u2014 proven to flag a fabricated '88 of 999' while leaving the shipped '15 of 167' green"
+      "text": "PRESCRIPTION: Add an (?i)(\\d+)\\s+of\\s+(\\d+) licensing axis to the ratio loop at go/acs/cycle1437/predicates_test.go:297 — proven to flag a fabricated '88 of 999' while leaving the shipped '15 of 167' green"
     },
     {
       "origin_id": "d4606fd31af17ab845ebb8ab431924c82",
@@ -38,12 +38,12 @@
     {
       "origin_id": "de3c421a6503335b045f7e32f7feac45d",
       "first_seen_cycle": 1461,
-      "text": "PRESCRIPTION: Parameterize the healthy-display-vocabulary predicate over every shipped manifest family so the ANY-family clause is falsifiable \u2014 it must be RED for agy before the manifest edit"
+      "text": "PRESCRIPTION: Parameterize the healthy-display-vocabulary predicate over every shipped manifest family so the ANY-family clause is falsifiable — it must be RED for agy before the manifest edit"
     },
     {
       "origin_id": "d67bacd7bebf5e3a0203c1cfadcba4bd2",
       "first_seen_cycle": 1495,
-      "text": "PRESCRIPTION: Change go/acs/cycle1488/predicates_test.go:122 from acsassert.FileContains to acsassert.FileNotContains (exported at go/pkg/acsassert/assertions.go:81); TestC1492_003 then goes green on its own. Alternative: git rm --cached -r go/acs/cycle1488 go/acs/cycle1492 so only the green acs/cycle1495 package lands. Re-land the production diff unchanged \u2014 it is correct."
+      "text": "PRESCRIPTION: Change go/acs/cycle1488/predicates_test.go:122 from acsassert.FileContains to acsassert.FileNotContains (exported at go/pkg/acsassert/assertions.go:81); TestC1492_003 then goes green on its own. Alternative: git rm --cached -r go/acs/cycle1488 go/acs/cycle1492 so only the green acs/cycle1495 package lands. Re-land the production diff unchanged — it is correct."
     },
     {
       "origin_id": "d1822a29cffd2f7f3a7634532f426ad34",
@@ -63,7 +63,7 @@
     {
       "origin_id": "d014530a1a7c7428a57191718a5d92353",
       "first_seen_cycle": 1518,
-      "text": "PRESCRIPTION: In go/acs/regression/cycle1515/predicates_test.go TestMain, replace the three `os.Exit(m.Run())` sites with `code := m.Run(); os.RemoveAll(dir); os.Exit(code)` so the deferred cleanup is not skipped by os.Exit \u2014 the leak is now on the standing acs-durable CI gate."
+      "text": "PRESCRIPTION: In go/acs/regression/cycle1515/predicates_test.go TestMain, replace the three `os.Exit(m.Run())` sites with `code := m.Run(); os.RemoveAll(dir); os.Exit(code)` so the deferred cleanup is not skipped by os.Exit — the leak is now on the standing acs-durable CI gate."
     },
     {
       "origin_id": "d6b63c38a0cfb20f9d929e2a9d5cacdfb",
@@ -83,7 +83,7 @@
     {
       "origin_id": "daf12fce06a767cfc2d8f554965890209",
       "first_seen_cycle": 1522,
-      "text": "PRESCRIPTION: Move the numeric report budget ABOVE the '## Reference Index (Layer 3, on-demand)' marker in agents/evolve-auditor.md:273, and re-point the doc-sync predicate at the DISPATCHED artifact (.evolve/runs/cycle-N/audit-prompt.txt) instead of agents/evolve-auditor-reference.md \u2014 the shape cycle-1517's eval already specified. Until then the persona half of cap-audit-report-length is undeliverable regardless of how green the doc-sync predicate is."
+      "text": "PRESCRIPTION: Move the numeric report budget ABOVE the '## Reference Index (Layer 3, on-demand)' marker in agents/evolve-auditor.md:273, and re-point the doc-sync predicate at the DISPATCHED artifact (.evolve/runs/cycle-N/audit-prompt.txt) instead of agents/evolve-auditor-reference.md — the shape cycle-1517's eval already specified. Until then the persona half of cap-audit-report-length is undeliverable regardless of how green the doc-sync predicate is."
     },
     {
       "origin_id": "d280215abf79027d2b0f4bfcde82f34ce",
@@ -93,7 +93,7 @@
     {
       "origin_id": "dfa899f5b45db36f32500bdb042bfeb9a",
       "first_seen_cycle": 1547,
-      "text": "PRESCRIPTION: Replace the marker-only success condition in assertDefaultSuiteTestsPass with the stricter in-repo shape already used at go/acs/cycle1529/predicates_test.go:135 \u2014 'if err != nil || code != 0 { t.Fatalf(...) }' \u2014 and promote it into a shared acsassert helper so cycle predicate packages stop re-copying the lax form inherited from acs/cycle1544 and acs/cycle1546"
+      "text": "PRESCRIPTION: Replace the marker-only success condition in assertDefaultSuiteTestsPass with the stricter in-repo shape already used at go/acs/cycle1529/predicates_test.go:135 — 'if err != nil || code != 0 { t.Fatalf(...) }' — and promote it into a shared acsassert helper so cycle predicate packages stop re-copying the lax form inherited from acs/cycle1544 and acs/cycle1546"
     },
     {
       "origin_id": "dc0aa144eb892d25b6d79d53eac3841fa",
@@ -103,8 +103,11 @@
     {
       "origin_id": "dc0b8eea1eefe4eca719602a256ae745b",
       "first_seen_cycle": 1568,
-      "text": "PRESCRIPTION: evolve acs suite resolved 0 predicates when invoked from go/ yet still wrote verdict=PASS green=0 total=0 \u2014 a suite that resolved no predicates should refuse rather than emit PASS"
+      "text": "PRESCRIPTION: evolve acs suite resolved 0 predicates when invoked from go/ yet still wrote verdict=PASS green=0 total=0 — a suite that resolved no predicates should refuse rather than emit PASS"
     }
   ],
-  "created_at": "2026-08-27T21:00:00Z"
+  "created_at": "2026-08-27T21:00:00Z",
+  "priority_class": "hygiene",
+  "priority_rationale": "inbox review 2026-09-27: Most open members are single-predicate or shared-helper hygiene. The two integrity-relevant ones (a red predicate landing under a green gate; an empty suite reading PASS) have designed or better-scoped homes.",
+  "review_status": "inbox review 2026-09-27: PARTIAL. Of 20 members: 5 FIXED. d3f8e38c: ClassifyBadVerdict now pairs fences through an open-run index (go/internal/deliverable/salvage_instrument.go:146-157). d7a213a9: TestC1444_006 already runs -run 'TestProductionDeps.*ContextFill' (acs/cycle1444:160). d67bacd7: cycle1488:130 uses FileNotContains. d1822a29: worktreeBaseTreeSHA takes the lane base (core/phase_bindings.go:202,249). daf12fce: the auditor persona inlines the 32KB budget above the Reference Index (agents/evolve-auditor.md:221 vs :273). "
 }

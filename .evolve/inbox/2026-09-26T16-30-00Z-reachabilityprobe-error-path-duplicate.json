@@ -1,0 +1,21 @@
+{
+  "id": "reachabilityprobe-error-path-duplicate",
+  "kind": "pipeline-repair",
+  "priority": "P3",
+  "weight": 0.5,
+  "title": "reachabilityprobe: Violation.Error prints the pinning package twice, and the pin-extraction error path is dead",
+  "summary": "Found by comment-reduction batch 29 (2026-09-26) and reported without changing code. (1) (*Violation).Error() prints pathString(v.Cycle) followed by '-> PinningPackage'. Cycle already ends at PinningPackage, so the message reads 'storage -> core -> core'; it should end with the referenced package. (2) extractPins never returns a non-nil error, so the error branches in ExtractFrozenPins and CheckFrozenPins can never fire. (3) The identifier goSourceLiteal should be goSourceLiteral. (4) The package's .apicover-enforce entry lists 4 of its 9 exports, and go/acs/cycle1226's comment says the package imports nothing internal, although it imports sysexec.",
+  "fix": "End the message with ReferencedPackage, with a test on the exact string. Drop the dead error returns, or make extractPins report unreadable input. Rename the identifier. Refresh the stale descriptions.",
+  "acceptance": [
+    "Violation.Error names each package on the cycle exactly once, ending at the referenced package (test)",
+    "No unreachable error branch remains"
+  ],
+  "files": [
+    "go/internal/reachabilityprobe/reachabilityprobe.go",
+    "go/internal/reachabilityprobe/frozenpins.go"
+  ],
+  "created_at": "2026-09-26T16:30:00Z",
+  "source": "console-comment-workstream-batch29",
+  "priority_class": "hygiene",
+  "priority_rationale": "inbox review 2026-09-27: Cosmetic fixes to an error message and an identifier."
+}

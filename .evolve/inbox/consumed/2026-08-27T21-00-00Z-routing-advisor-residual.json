@@ -1,0 +1,19 @@
+{
+  "id": "routing-advisor-residual",
+  "kind": "sweep",
+  "weight": 0.7,
+  "title": "Sweep: routing advisor residual (1 auditor prescriptions amortised)",
+  "summary": "Routing/advisor prescriptions: tier resolution and advisor-plan fidelity. Amortised from 1 content-hash carryoverTodos that were unreachable by any operator directive: their ids were 32-char hashes, so goal-text could never name them and triage could not prioritise them (all 144 were stamped priority=high, which is the same as none being high). Queue audit 2026-08-27. Member prescriptions verbatim below; work them as one sweep, smallest-blast-radius first, and retire the group when the theme is clean.",
+  "prescriptions": [
+    {
+      "origin_id": "d8b1b989e2b4489859411c0965516963e",
+      "first_seen_cycle": 1522,
+      "text": "PRESCRIPTION: Give a premise-challenge BLOCK verdict an enforcement edge into the state machine, and reconcile phase-replan.json against routing-decision-*.json so a degraded replan cannot silently disagree with the executed route."
+    }
+  ],
+  "created_at": "2026-08-27T21:00:00Z",
+  "route": "console-manual",
+  "routed_reason": "2026-09-26 console premise audit (read-only, against main 4bd6f2ee): SUPERSEDED — a premise-challenge BLOCK is already VerdictFAIL (agents/evolve-premise-challenge.md:39; core/phase.go:38-41) and remediation-denied (core/cyclerun_remediate.go:47); the phase-replan vs routing-decision divergence is intended at StageShadow (config/config.go:191; core/cyclerun_replan.go:108-111), and the survive-a-routed-retry class is closed by the ADR-0072 S4 floor (core/decision_branch.go:200-207) plus ADR-0092/0093 (#507/#508) and the cycle-1603 hardening (#529), all landed after filing. Rescope to 'verify no divergence window under StageAdvisory' or retire.",
+  "consumed_by": "inbox review 2026-09-27: OBSOLETE. Both halves are superseded by explicit design, not fixed in code. (1) BLOCK enforcement was deliberately withheld: ADR-0091 (Accepted 2026-08-22) lands judgment sentinels at shadow and says enforce is not safe yet (premise-challenge stated FAIL on 52 of 55 reports). .evolve/phases/premise-challenge/phase.json declares verdict_from_sentinel=shadow, which 'routes exactly as off does' (specrunner/verdict_from_sentinel.go:44-46). (2) The replan divergence is intended: RouterReplan defaults to StageShadow (config/config.go:121), and cyclerun_replan.go:111-120 records the re-plan without adopting it",
+  "consumed_at": "2026-09-27T23:30:00Z"
+}

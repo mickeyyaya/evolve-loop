@@ -1,0 +1,25 @@
+{
+  "id": "tmux-drivers-ignore-profile-tool-lists",
+  "title": "A profile's allowed_tools and disallowed_tools are a boundary only on claude-p; the tmux drivers never pass them",
+  "kind": "hardening",
+  "class": "pipeline-integrity",
+  "priority": "P1",
+  "weight": 0.9,
+  "route": "console",
+  "created_at": "2026-09-26T21:50:00Z",
+  "files": [
+    "go/internal/bridge/profile.go",
+    "go/internal/bridge/launch.go",
+    "go/internal/bridge/driver_claudep.go",
+    "go/internal/bridge/driver_claudetmux.go"
+  ],
+  "problem": "profileWire has no disallowed_tools field, so every profile's deny list is dropped on unmarshal; allowed_tools reaches only the headless claude-p driver (--allowedTools). Every tmux driver launches without either, and the host-side PreToolUse hooks gate only ship, phase, role (Edit|Write path-scoped) and docdelete. A helper profile that lists curl, wget, WebFetch or git commit as disallowed therefore has no such boundary when it runs on claude-tmux or codex-tmux, its default. Found by the ADR-0106 security review of the recovery agent's profile (2026-09-26); the same holds for failure-advisor and failure-adjudicator.",
+  "fix": "Either project allowed_tools and disallowed_tools into the tmux launches (the claude CLI accepts --allowedTools and --disallowedTools interactively) and parse disallowed_tools in profileWire, or state in every profile that the sandbox (write grants, read_only_repo, allow_network) is the boundary and drop the inert lists. Until then every helper profile that runs without network need should set sandbox.allow_network false (deliverable-recovery does).",
+  "acceptance": [
+    "A profile that disallows Bash(curl:*) cannot run curl on claude-tmux, or the lists are gone from every profile and the docs say the sandbox is the boundary.",
+    "profileWire either parses disallowed_tools or the field is rejected as unknown.",
+    "A wiring test proves the projection for every tmux driver."
+  ],
+  "priority_class": "stability",
+  "priority_rationale": "inbox review 2026-09-27: Latent integrity gap: codex-tmux phases load no Claude hooks, so their git-mutation bans are prompt-only, and the OS sandbox still grants the worktree's index, HEAD and branch ref (sandbox_paths.go:61-99), so a stash, reset or commit in the agent's own worktree is possible. Closing it on claude-tmux is one field in launch.go; on codex it is honesty only."
+}

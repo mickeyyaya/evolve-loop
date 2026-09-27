@@ -1,0 +1,16 @@
+{
+  "connects_to": [
+    "go/internal/bridge/driver_codex.go",
+    "go/internal/clihealth/"
+  ],
+  "created_at": "2026-08-05T07:32:00Z",
+  "fix": "Root-cause the codex REPL boot timeout (driver boot marker? version freeze interaction? tmux env?), add the boot transcript to the bench record, and after fix verify strikes reset and dispatch chains start primary again.",
+  "id": "codex-repl-boot-strikes",
+  "kind": "bugfix",
+  "notes": "Filed from the overnight throughput deep-dive.",
+  "summary": "Preflights 2026-08-04/05 report codex-tmux benched (repl_boot_timeout, strikes=9). With codex benched and agy relegated for contract quality, claude-tmux carries most phases; observed verdict cadence (~1 per 30min at width-3 commitment) implies effective width ~1-1.5. Width degradation is a direct throughput tax (fleet_width_always_respected).",
+  "title": "codex-tmux benched at 9 repl_boot_timeout strikes — fleet effectively runs narrower than the width-3 commitment",
+  "weight": 0.8,
+  "consumed_by": "inbox review 2026-09-27: OBSOLETE. The boot-timeout bench is gone. The live .evolve/cli-health.json holds only `codex rate_limit strikes=17`, and ClearBootStrike (go/internal/clihealth/clihealth.go:241-256) resets a driver's boot strikes on any non-80 exit. In cycles 1700-1720, llm-calls.ndjson shows 17 codex-tmux dispatches: all exit 85, none exit 80. #495 (a24bd9fe) already recorded codex as healthy (76 dispatches, 44% share, cycles 1530-1552). The width tax still exists but has two other causes: `model_unsupported` on the deep pin (escalation-report.json in cycles 1706, 1708, 1718, 1719; that is Q5, only designed in §7.5) an",
+  "consumed_at": "2026-09-27T23:30:00Z"
+}

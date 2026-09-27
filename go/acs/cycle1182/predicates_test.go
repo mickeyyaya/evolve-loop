@@ -69,12 +69,12 @@ func runGoTest(t *testing.T, pkg, pattern string) (ok bool, out string) {
 // `len(committed) >= count` short-circuit cannot smuggle it through, and (b) when
 // the backlog is EMPTY so there is no replacement and the
 // `len(topN) <= len(committed)` guard would otherwise return the original bytes.
-// The fail-open half is asserted in the same run: pending/processing/retry and an
+// The fail-open half is asserted in the same run: a pending id and an
 // id with NO lifecycle evidence at all must be RETAINED — a prune that dropped
 // what it cannot resolve would starve every wave of non-inbox-backed cards.
 func TestC1182_001_WidenSeamPrunesConsumedCommittedIDs(t *testing.T) {
 	ok, out := runGoTest(t, wavePkg,
-		"TestWidenNarrowDecision_DropsConsumedCommittedAtFleetWidth|TestWidenNarrowDecision_ConsumedIDDroppedEvenWithNoBacklogReplacement|TestWidenNarrowDecision_PrunesTerminalStatesOnly")
+		"TestWidenNarrowDecision_DropsConsumedCommittedAtFleetWidth|TestWidenNarrowDecision_ConsumedIDDroppedEvenWithNoBacklogReplacement|TestWidenNarrowDecision_PrunesEveryIDALaneCannotTake")
 	if !ok {
 		t.Errorf("widenNarrowDecision still carries lifecycle-consumed committed ids forward "+
 			"(or over-prunes ids it cannot resolve) — a consumed id will be re-pinned into the next wave's lane-scope.json:\n%s", out)
@@ -83,18 +83,18 @@ func TestC1182_001_WidenSeamPrunesConsumedCommittedIDs(t *testing.T) {
 
 // TestC1182_002_PruneConsumedIsExportedAndSingleSourced — the reuse AC. The
 // widen seam lives in package main and cannot reach the package-private
-// pruneConsumed, so the primitive must be EXPORTED (triagecap.PruneConsumed)
+// prune, so the primitive must be EXPORTED
 // rather than reimplemented at the second call site
 // (never_duplicate_centralize_via_design_patterns). This predicate calls the
-// exported function directly through its contract test across all seven
-// lifecycle states; while it is still unexported the package does not compile
+// exported function directly through its contract test across every
+// lifecycle state; while it is still unexported the package does not compile
 // and this predicate is RED.
 func TestC1182_002_PruneConsumedIsExportedAndSingleSourced(t *testing.T) {
 	ok, out := runGoTest(t, triagecapPkg,
-		"TestPruneConsumed_ExportedTerminalDropNonTerminalKeep|TestPruneConsumed_ExportedEmptyInputIsIdentity")
+		"TestPruneUndispatchable_KeepsExactlyTheIDsALaneMayTake|TestPruneUndispatchable_EmptyInputIsIdentity")
 	if !ok {
-		t.Errorf("triagecap.PruneConsumed is not callable from outside the package with pruneConsumed's "+
-			"terminal-drop / fail-open semantics — the widen seam cannot reuse the SSOT:\n%s", out)
+		t.Errorf("triagecap.PruneUndispatchable is not callable from outside the package with the one "+
+			"dispatchability rule's semantics — the widen seam cannot reuse the SSOT:\n%s", out)
 	}
 }
 

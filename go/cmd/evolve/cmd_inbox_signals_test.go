@@ -80,13 +80,14 @@ func TestApplyCycleFailureOutcome_StampsRunWorkspaceSignals(t *testing.T) {
 func TestInboxCenterlessRootsArePinned(t *testing.T) {
 	allowed := map[string]string{
 		"cmd/evolve/cmd_inbox_mover.go":         "the triage persona's `evolve inbox-mover` root — 06-F1 verifies <run>/signals.ndjson is writable under the triage sandbox first",
+		"cmd/evolve/cmd_inbox.go":               "operator command `evolve inbox batches`: the read-only dependency partition of the lane menu (ADR-0106 W3) — never writes",
+		"internal/phases/triage/triage.go":      "the triage menu's read-only dependency partition (ADR-0106 W3) — never writes",
 		"cmd/evolve/cmd_inbox_quarantine.go":    "operator command `evolve inbox quarantine release` — 06-F1",
 		"cmd/evolve/cmd_continuation.go":        "operator command `evolve continuation` — 06-F1",
 		"cmd/evolve/cmd_inbox_consume.go":       "operator command `evolve inbox consume` (two literals) — 06-F1",
 		"cmd/evolve/cmd_cycle.go":               "read-only probes (failure count, continuation scope, dispatch state) — never write; hostInboxClaimer — WIRED (Signals: signals)",
-		"internal/loopwave/launcher.go":         "the wave engine's freshness probe (ADR-0103 unit 13) — read-only, WIRED (Signals: e.center())",
-		"internal/loopwave/plan.go":             "the wave engine's consumed-top_n prune probe (ADR-0103 unit 13) — read-only, WIRED (Signals: e.center())",
-		"internal/triagecap/lane_menu.go":       "the ProjectRoot-less prune probe — never writes",
+		"internal/loopwave/launcher.go":         "the wave engine's one read-only lifecycle, rooted at EvolveDir: the launch gate's probe and the plan-time prune (ADR-0106 W3) — WIRED (Signals: e.center())",
+		"internal/triagecap/lane_menu.go":       "the ProjectRoot-less read-only lifecycle (the undispatchable prune and the backlog deps check) — never writes",
 		"internal/phases/ship/postship.go":      "the PASS closeout inside `evolve ship` (ship.Options carries no Center) — 06-F1",
 		"internal/cycleoutcome/cycleoutcome.go": "the FAIL closeout — WIRED (Signals: in.Signals); listed because its literal is the one that names the field",
 		"internal/cycleoutcome/nowork.go":       "the planned-no-work closeout (F30) — WIRED (Signals: in.Signals); listed for the same reason",

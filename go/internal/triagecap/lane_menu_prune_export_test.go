@@ -10,7 +10,7 @@ import (
 )
 
 // writeLifecycleTodo places id where inboxmover.ResolveDispatchState classifies it as state.
-func writeLifecycleTodo(t *testing.T, evolveDir, state, id string) {
+func writeLifecycleTodo(t *testing.T, evolveDir, state, id string, deps ...string) {
 	t.Helper()
 	dir := filepath.Join(evolveDir, "inbox")
 	switch state {
@@ -24,7 +24,7 @@ func writeLifecycleTodo(t *testing.T, evolveDir, state, id string) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	b, err := json.Marshal(map[string]any{"id": id, "weight": 0.5})
+	b, err := json.Marshal(map[string]any{"id": id, "weight": 0.5, "deps": deps})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,26 +33,30 @@ func writeLifecycleTodo(t *testing.T, evolveDir, state, id string) {
 	}
 }
 
-func TestPruneConsumed_ExportedTerminalDropNonTerminalKeep(t *testing.T) {
+func TestPruneUndispatchable_KeepsExactlyTheIDsALaneMayTake(t *testing.T) {
 	cases := []struct {
 		state    string
+		deps     []string
 		wantKeep bool
 	}{
-		{inboxmover.StateProcessed, false},
-		{inboxmover.StateRejected, false},
-		{inboxmover.StateQuarantine, false},
-		{inboxmover.StatePending, true},
-		{inboxmover.StateProcessing, true},
-		{inboxmover.StateRetry, true},
-		{"no-evidence", true},
+		{inboxmover.StateProcessed, nil, false},
+		{inboxmover.StateRejected, nil, false},
+		{inboxmover.StateQuarantine, nil, false},
+		{inboxmover.StateConsumed, nil, false},
+		{inboxmover.StateProcessing, nil, false},
+		{inboxmover.StateRetry, nil, false},
+		{inboxmover.StatePending, []string{"blocker"}, false},
+		{inboxmover.StatePending, nil, true},
+		{"no-evidence", nil, true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.state, func(t *testing.T) {
 			evolveDir := t.TempDir()
+			writeLifecycleTodo(t, evolveDir, inboxmover.StatePending, "blocker")
 			if tc.state != "no-evidence" {
-				writeLifecycleTodo(t, evolveDir, tc.state, "subject")
+				writeLifecycleTodo(t, evolveDir, tc.state, "subject", tc.deps...)
 			}
-			got := PruneConsumed(evolveDir, []FleetCandidate{
+			got := PruneUndispatchable(evolveDir, []FleetCandidate{
 				cand("subject", 0.5, "go/internal/x/a.go"),
 				cand("anchor", 0.4, "go/internal/z/c.go"),
 			})
@@ -61,17 +65,17 @@ func TestPruneConsumed_ExportedTerminalDropNonTerminalKeep(t *testing.T) {
 				kept[c.ID] = true
 			}
 			if kept["subject"] != tc.wantKeep {
-				t.Errorf("state %q: subject kept=%v, want %v", tc.state, kept["subject"], tc.wantKeep)
+				t.Errorf("state %q deps %v: subject kept=%v, want %v", tc.state, tc.deps, kept["subject"], tc.wantKeep)
 			}
 			if !kept["anchor"] {
-				t.Errorf("state %q: unrelated committed id `anchor` was dropped — prune must only touch consumed ids", tc.state)
+				t.Errorf("state %q: the dispatchable id `anchor` was dropped", tc.state)
 			}
 		})
 	}
 }
 
-func TestPruneConsumed_ExportedEmptyInputIsIdentity(t *testing.T) {
-	if got := PruneConsumed(t.TempDir(), nil); len(got) != 0 {
-		t.Errorf("PruneConsumed(empty) = %v, want empty", got)
+func TestPruneUndispatchable_EmptyInputIsIdentity(t *testing.T) {
+	if got := PruneUndispatchable(t.TempDir(), nil); len(got) != 0 {
+		t.Errorf("PruneUndispatchable(empty) = %v, want empty", got)
 	}
 }

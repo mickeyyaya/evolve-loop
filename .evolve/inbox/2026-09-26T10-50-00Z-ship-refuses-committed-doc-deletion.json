@@ -1,0 +1,23 @@
+{
+  "id": "ship-refuses-deleting-committed-documentation",
+  "title": "Enforce 'committed documentation is never deleted' on the landed diff, not on shell text",
+  "kind": "hardening",
+  "class": "gate-integrity",
+  "priority": "P2",
+  "weight": 0.9,
+  "route": "console",
+  "created_at": "2026-09-26T10:50:00Z",
+  "files": [
+    "go/internal/phases/ship/repocontract.go",
+    "go/internal/guards/docdelete.go"
+  ],
+  "problem": "guard:docdelete decides from the Bash command text. Three security reviews of the cycle-1705 fix (PR #650) kept finding spellings bash resolves to a removal under docs/ that a text guard misses: quote and escape splitting, $'...' ANSI-C quoting, unlink, find -delete and find -exec /bin/rm with glob paths, git clean, mv -t. Interpreters (python -c, perl -e) and redirections are outside any text guard. Each fix invites the next spelling.",
+  "fix": "Add a ship-time repo-contract check on the diff that will land. Refuse a commit that deletes a path HEAD holds under docs/ or knowledge-base/, unless the deletion is a rename into docs/private/research/archived-YYYY-MM-DD/. It reads what actually changed, so no shell spelling can evade it. Keep docdelete as an early warning. Park its evasion hardening (docdelete-commit2.patch, 17 tests, 7 mutants killed) behind this check, or land it as defence in depth.",
+  "acceptance": [
+    "A lane commit that deletes a committed docs/ file, by any command, is refused at ship with a coded error naming the path.",
+    "A rename into the archive home still ships.",
+    "The active cycle's own never-committed explanation draft is not a committed path and does not trip the check."
+  ],
+  "priority_class": "stability",
+  "priority_rationale": "inbox review 2026-09-27: Latent loss of the repo's primary asset. The text guard is evadable by known spellings (the security reviews of #650), and a diff-level check is the only complete fix."
+}

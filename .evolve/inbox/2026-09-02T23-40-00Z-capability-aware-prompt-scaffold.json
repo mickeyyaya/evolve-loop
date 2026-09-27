@@ -1,7 +1,7 @@
 {
   "id": "capability-aware-prompt-scaffold",
   "created_at": "2026-09-02T23:40:00Z",
-  "weight": 0.8,
+  "weight": 0.35,
   "title": "R6 capability-aware scaffolding: per-tier prompt_scaffold in profiles (balanced/fast tiers get a numbered DoD with mandatory machine-checkable evidence lines; deep stays terse) + measured effort per phase/tier",
   "kind": "feature",
   "class": "pipeline-architecture",
@@ -25,5 +25,7 @@
     "evolve dashboard (ADR-0095)"
   ],
   "notes": "Filed 2026-09-02 (proposal R6).",
-  "surface_note": "2026-09-26 console readiness audit (read-only, against main): the '.evolve/profiles/*.json' glob necessarily includes builder.json + auditor.json (explicit protected fragments) — protected surface (routes console by files[])."
+  "surface_note": "2026-09-26 console readiness audit (read-only, against main): the '.evolve/profiles/*.json' glob necessarily includes builder.json + auditor.json (explicit protected fragments) — protected surface (routes console by files[]).",
+  "priority_class": "feature",
+  "priority_rationale": "inbox review 2026-09-27: A research-backed hypothesis (G8) with no measured tier-by-effort gap to motivate it, and the task contract already carries the acceptance lines."
 }
