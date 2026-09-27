@@ -42,8 +42,6 @@ type detectPhase struct {
 	PinViolation string `json:"pin_violation"`
 }
 
-// phaseFromDetectJSON runs `evolve setup detect --json` and returns the named
-// phase entry (the durable per-phase view the /setup loop inspects).
 func phaseFromDetectJSON(t *testing.T, role string) detectPhase {
 	t.Helper()
 	var out, errb bytes.Buffer
@@ -110,9 +108,6 @@ func TestRunSetup_DetectPinsAndComplete(t *testing.T) {
 	}
 }
 
-// TestRunSetup_RecommendJSON: `setup recommend --json` exits 0 and emits the
-// configured presets (3 from the shipped default) regardless of host CLIs —
-// presets come from the public config, not from detection.
 func TestRunSetup_RecommendJSON(t *testing.T) {
 	project := t.TempDir()
 	t.Setenv("EVOLVE_PROJECT_ROOT", project)
@@ -135,7 +130,6 @@ func TestRunSetup_RecommendJSON(t *testing.T) {
 	}
 }
 
-// TestRunSetup_RecommendHuman: human mode exits 0 and prints something.
 func TestRunSetup_RecommendHuman(t *testing.T) {
 	project := t.TempDir()
 	t.Setenv("EVOLVE_PROJECT_ROOT", project)
@@ -149,7 +143,6 @@ func TestRunSetup_RecommendHuman(t *testing.T) {
 	}
 }
 
-// TestRunSetup_ApplyMissingPreset: --preset is required → bad-args exit 10.
 func TestRunSetup_ApplyMissingPreset(t *testing.T) {
 	project := t.TempDir()
 	t.Setenv("EVOLVE_PROJECT_ROOT", project)
@@ -160,8 +153,6 @@ func TestRunSetup_ApplyMissingPreset(t *testing.T) {
 	}
 }
 
-// TestRunSetup_ApplyUnknownPreset: an unknown preset is a runtime refusal (exit
-// 1) naming the valid set — host-independent (rejected before any pin write).
 func TestRunSetup_ApplyUnknownPreset(t *testing.T) {
 	project := t.TempDir()
 	t.Setenv("EVOLVE_PROJECT_ROOT", project)
@@ -175,9 +166,6 @@ func TestRunSetup_ApplyUnknownPreset(t *testing.T) {
 	}
 }
 
-// TestRunSetup_ApplyWritesPolicy is host-robust: foreign keys survive whether
-// apply writes (host has an authed CLI → rc 0, pins added) or refuses a degraded
-// preset (no authed CLI → rc 1, policy.json untouched, never clobbered).
 func TestRunSetup_ApplyWritesPolicy(t *testing.T) {
 	project := t.TempDir()
 	evolveDir := filepath.Join(project, ".evolve")
@@ -204,7 +192,6 @@ func TestRunSetup_ApplyWritesPolicy(t *testing.T) {
 	if err := json.Unmarshal(raw, &obj); err != nil {
 		t.Fatalf("policy.json unreadable after apply: %v", err)
 	}
-	// Foreign keys must survive in BOTH outcomes (write preserves; refuse leaves untouched).
 	for _, k := range []string{"version", "floor"} {
 		if _, ok := obj[k]; !ok {
 			t.Errorf("apply (rc=%d) dropped foreign key %q", rc, k)
@@ -225,9 +212,6 @@ func TestRunSetup_ApplyWritesPolicy(t *testing.T) {
 	}
 }
 
-// TestRunSetup_ApplyUnreadablePolicy_FailsLoud: a present-but-unreadable
-// policy.json (here a directory) must fail loudly (exit 1), never be silently
-// treated as absent and overwritten.
 func TestRunSetup_ApplyUnreadablePolicy_FailsLoud(t *testing.T) {
 	project := t.TempDir()
 	evolveDir := filepath.Join(project, ".evolve")
@@ -242,15 +226,12 @@ func TestRunSetup_ApplyUnreadablePolicy_FailsLoud(t *testing.T) {
 	if rc != 1 {
 		t.Fatalf("unreadable policy.json should fail loud: rc=%d want 1 (%s)", rc, errb.String())
 	}
-	// The failure must come from the READ step (fired before Apply), not from a
-	// later write — proving the non-ENOENT read error is surfaced, not swallowed.
 	if !strings.Contains(errb.String(), "reading") {
 		t.Errorf("error should name the policy read failure, got %q", errb.String())
 	}
 }
 
 func TestMaybePrintSetupNudge(t *testing.T) {
-	// No state.json → nudge prints.
 	evolveDir := t.TempDir()
 	var w bytes.Buffer
 	maybePrintSetupNudge(&w, evolveDir)
@@ -258,7 +239,6 @@ func TestMaybePrintSetupNudge(t *testing.T) {
 		t.Errorf("fresh repo should nudge, got %q", w.String())
 	}
 
-	// Marker present → silent.
 	setupWrite(t, filepath.Join(evolveDir, "state.json"), `{"setupCompletedAt":"2026-01-01T00:00:00Z","setupVersion":1}`)
 	w.Reset()
 	maybePrintSetupNudge(&w, evolveDir)
@@ -266,7 +246,6 @@ func TestMaybePrintSetupNudge(t *testing.T) {
 		t.Errorf("onboarded repo should be silent, got %q", w.String())
 	}
 
-	// Empty marker → nudge.
 	setupWrite(t, filepath.Join(evolveDir, "state.json"), `{"lastCycleNumber":3}`)
 	w.Reset()
 	maybePrintSetupNudge(&w, evolveDir)
@@ -276,8 +255,6 @@ func TestMaybePrintSetupNudge(t *testing.T) {
 }
 
 func TestRunSetup_ProjectRootFlagWinsOverEnv(t *testing.T) {
-	// --project-root must override EVOLVE_PROJECT_ROOT so the dispatcher can
-	// point setup at the SAME root the loop uses (marker lands where loop reads).
 	dirEnv := t.TempDir()
 	dirFlag := t.TempDir()
 	t.Setenv("EVOLVE_PROJECT_ROOT", dirEnv)
@@ -295,8 +272,6 @@ func TestRunSetup_ProjectRootFlagWinsOverEnv(t *testing.T) {
 }
 
 func TestRunSetup_DetectJSON(t *testing.T) {
-	// detect runs the real (host) doctor probe; assert it exits 0 and emits
-	// parseable JSON regardless of which CLIs the host has.
 	project := t.TempDir()
 	t.Setenv("EVOLVE_PROJECT_ROOT", project)
 	t.Setenv("EVOLVE_PLUGIN_ROOT", project)
@@ -313,10 +288,6 @@ func TestRunSetup_DetectJSON(t *testing.T) {
 	}
 }
 
-// TestRunSetup_DetectSpaceSeparatedStringFlagThenBool regresses the
-// reorderArgs flag-swallow bug: a space-separated STRING flag followed by
-// another flag (`--evolve-dir X --json`) must NOT consume the trailing --json
-// as its value. Before the fix this emitted the human table (--json ignored).
 func TestRunSetup_DetectSpaceSeparatedStringFlagThenBool(t *testing.T) {
 	project := t.TempDir()
 	t.Setenv("EVOLVE_PROJECT_ROOT", project)

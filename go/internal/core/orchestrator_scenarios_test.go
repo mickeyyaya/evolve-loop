@@ -1,10 +1,9 @@
 package core_test
 
-// End-to-end orchestrator scenario catalog for dynamic phase-routing, built on
-// the configurable routingtest framework. Covers distinct driven phase
-// combinations across stages plus simulated-agent decisions. The 4 scenarios
-// already in orchestrator_routing_test.go (StageOff-no-forensics, shadow-tester,
-// enforce-trivial, spine-warn) are intentionally NOT duplicated here.
+// Scenario catalog for dynamic phase-routing on the routingtest framework;
+// orchestrator_routing_test.go's 4 scenarios (StageOff-no-forensics,
+// shadow-tester, enforce-trivial, spine-warn) are intentionally not duplicated
+// here.
 
 import (
 	"testing"
@@ -31,13 +30,11 @@ func cycleCatalog() []ScenarioSpec {
 		retro   = core.PhaseRetro
 	)
 	return []ScenarioSpec{
-		// --- Shadow: router logs decisions, static path unchanged ---
 		Scenario("shadow trivial logs skip but static runs full middle",
 			Cycle(), Shadow(), TrivialCycle(),
 			ExpectPhases(scout, triage, tdd, planner, build, audit, ship),
 			ExpectRoutingLedger(1)),
 
-		// --- Enforce: router drives the drivable spine ---
 		Scenario("enforce non-trivial skips no-trigger optionals (triage, build-planner)",
 			Cycle(), Enforce(), MediumCycle(),
 			ExpectPhases(scout, tdd, build, audit, ship),
@@ -54,15 +51,10 @@ func cycleCatalog() []ScenarioSpec {
 			Cycle(), Enforce(), MediumCycle(), TriageOff(),
 			ExpectAbsent(triage)),
 
-		// --- Intent gate ---
 		Scenario("intent-required runs intent first",
 			Cycle(), Shadow(), IntentRequired(),
 			ExpectPhases(intent, scout, triage, tdd, planner, build, audit, ship)),
 
-		// --- Retro arcs (SM + decideAfterRetro driven; routing-on coexists) ---
-		// A retro PASS is a deliverable-completeness verdict, never recovery: the
-		// tree is byte-identical to the one audit rejected. Same disposition as
-		// the retro-FAIL scenario immediately below.
 		Scenario("retro PASS is not recovery — same disposition as retro FAIL",
 			Cycle(), Enforce(), MediumCycle(),
 			PhaseVerdict(audit, "FAIL"), PhaseVerdict(retro, "PASS"),
@@ -77,7 +69,6 @@ func cycleCatalog() []ScenarioSpec {
 			SeedFailure("code-audit-fail", 2),
 			ExpectRetro("proceed:")),
 
-		// --- Simulated agent end-to-end ---
 		Scenario("agent legal-divergent adopted (scout->build on trivial)",
 			Cycle(), Enforce(), TrivialCycle(), Agent("scout", "build"),
 			ExpectPhases(scout, build, audit, ship), ExpectAbsent(tdd)),

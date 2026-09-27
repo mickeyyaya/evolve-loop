@@ -1,16 +1,5 @@
 package bridge
 
-// model_tier_parity_test.go — cycle-447 Task 2 (model-tier-matrix-parity-pin):
-// every embedded *-tmux CLI must translate the abstract intent.ModelTier
-// through SOME effective channel — flag emits the flag+value, repl emits
-// REPLInput, and ollama is classified effective-POSITIONAL (its model is the
-// positional arg of `ollama run <model>`, never force-migrated to a flag).
-// A multi-model CLI with channel:"noop" silently drops the tier — the exact
-// defect agy-tmux carried until cycle-447 — so the parity rule REJECTS it
-// (negative fixture below). The manifest glob is completeness-driven: a
-// future *-tmux CLI added without an effective channel fails here, no
-// hardcoded CLI list.
-
 import (
 	"context"
 	"fmt"
@@ -20,10 +9,6 @@ import (
 	"time"
 )
 
-// positionalTmuxCLIs names the manifests whose model_tier channel is
-// legitimately noop because their DRIVER delivers the model positionally.
-// The assertion is behavioral (the composed launch line must embed the
-// model), so membership here is a claim the test verifies, not an exemption.
 var positionalTmuxCLIs = map[string]func(m Manifest) error{
 	"ollama-tmux": func(m Manifest) error {
 		model := m.ModelTierMap["deep"]
@@ -37,11 +22,6 @@ var positionalTmuxCLIs = map[string]func(m Manifest) error{
 	},
 }
 
-// tierChannelEffective is the parity rule: does this manifest translate the
-// abstract tier into something the CLI actually receives? flag/repl are
-// verified behaviorally at the Realize seam; noop is acceptable ONLY for a
-// verified positional driver or a genuinely single-model map (nothing to
-// switch). A multi-model noop manifest is the silent-drop defect → error.
 func tierChannelEffective(m Manifest) error {
 	distinct := map[string]struct{}{}
 	for _, tier := range []string{"fast", "balanced", "deep"} {
@@ -82,10 +62,6 @@ func tierChannelEffective(m Manifest) error {
 	}
 }
 
-// TestModelTierMatrixParity runs the parity rule over every embedded tmux
-// manifest (one subtest per manifest base name) with the live-catalog overlay
-// neutralized, plus the noop-rejection negative fixture that keeps the rule
-// itself honest.
 func TestModelTierMatrixParity(t *testing.T) {
 	injectCatalogDir(t, t.TempDir())
 	for _, name := range ManifestNames() {
@@ -115,13 +91,6 @@ func TestModelTierMatrixParity(t *testing.T) {
 	})
 }
 
-// TestAgyTierDeepLaunchCarriesModelToPane is the integration-style pin: a
-// DISPATCHED agy-tmux launch at tier=deep must carry the resolved deep model
-// into the pane — a distinct property from Realize() merely emitting it
-// (hypothesis H3: the launch line is one shell line via SendKeys, so the
-// display-name token survives only if launchCmdLine quotes it). Drives the
-// real agyTmuxDriver.Launch through the FakeTmuxController and asserts the
-// launch keystroke line delivered to the pane embeds the quoted deep model.
 func TestAgyTierDeepLaunchCarriesModelToPane(t *testing.T) {
 	injectCatalogDir(t, t.TempDir())
 	m, err := LoadManifest("agy-tmux")

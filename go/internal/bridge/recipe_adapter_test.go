@@ -92,7 +92,7 @@ func TestRecipeDriver_SendCommand_PropagatesError(t *testing.T) {
 	tx := &fakeTmux{}
 	d := newTestRecipeDriver(t, tx, "claude-tmux", "sess")
 	// Make .bridge-inbox a regular file so injectText's MkdirAll fails — the
-	// transport error must now surface (HIGH-2 fix), not be swallowed.
+	// transport error must surface, not be swallowed.
 	if err := os.WriteFile(filepath.Join(d.cfg.Workspace, ".bridge-inbox"), []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}

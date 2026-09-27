@@ -1,16 +1,5 @@
 package core
 
-// orchestrator_ghostphase_test.go — cycle-265 incident RED tests: the routing
-// surface (registry order + catalog) can know phases the DISPATCH surface
-// cannot run. Live: registry-listed `memo` had no .evolve/phases config, so
-// no specrunner was registered; after the post-ship optional phases the
-// static order walked into it and `no runner registered for phase memo`
-// killed a batch whose cycle had already PASSED and shipped.
-//
-// Kernel floor: a selected-but-unregistered OPTIONAL phase is skipped loudly
-// (WARN; the order walk continues; it never appears in PhasesRun — nothing
-// dispatched). A missing MANDATORY runner remains a fatal wiring bug.
-
 import (
 	"context"
 	"strings"
@@ -39,8 +28,7 @@ func TestRunCycle_UnregisteredOptionalPhase_SkippedLoudly(t *testing.T) {
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	runners := buildRunners(nil)
-	// user-a IS dispatchable; ghost-phase is catalog/order-known but has NO
-	// runner — the cycle-265 memo shape.
+	// user-a is dispatchable; ghost-phase is catalog/order-known but has no runner.
 	runners[Phase("user-a")] = &fakeRunner{name: "user-a"}
 
 	cat, err := phasespec.Catalog{}.Merge([]phasespec.PhaseSpec{
@@ -76,8 +64,6 @@ func TestRunCycle_UnregisteredOptionalPhase_SkippedLoudly(t *testing.T) {
 	}
 }
 
-// A missing MANDATORY runner stays fatal — that is a wiring bug, not a
-// routing-surface drift.
 func TestRunCycle_UnregisteredMandatoryPhase_StillFatal(t *testing.T) {
 	t.Parallel()
 	runners := buildRunners(nil)

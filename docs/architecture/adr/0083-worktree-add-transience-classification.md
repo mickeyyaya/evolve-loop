@@ -1,13 +1,13 @@
 # ADR-0083 — Classify `git worktree add` failures before paying backoff
 
 - **Status:** Accepted (cycle-1270)
-- **Supersedes nothing.** Amends [ADR-0082](0082-shared-worktree-add-retry.md), whose §83 claim
+- **Supersedes nothing.** Amends [ADR-0108](0108-shared-worktree-add-retry.md) (filed as ADR-0082), whose §83 claim
   ("test tiers install a no-op sleep … so no suite pays the ladder") is false on the
   transitive-dispatch axis.
 
 ## Context
 
-ADR-0082 lifted PR #401's bounded, backoff'd `git worktree add` retry into
+ADR-0108 lifted PR #401's bounded, backoff'd `git worktree add` retry into
 `internal/gitexec` so core, swarm and the operator CLI share one loop. That loop retried on
 **any** non-zero exit with a real `time.Sleep` ladder (2s + 4s).
 
@@ -22,7 +22,7 @@ cycle-1268/1270:
 | The retried condition is PERMANENT | `fatal: not a git repository` on a `t.TempDir()`, rc=128 |
 
 Those 33 tests reach the loop transitively (`runLoop → Orchestrator.RunCycle → newCycleRun →
-gitWorktree.Create`). ADR-0082's mitigation — core's unexported `worktreeAddRetrySleep` seam —
+gitWorktree.Create`). ADR-0108's mitigation — core's unexported `worktreeAddRetrySleep` seam —
 is in a different package than the tests that pay, so it cannot reach them. The result was a
 deterministic build-floor RED that killed cycle-1268 and re-fires on any diff touching
 `go/cmd/evolve`.

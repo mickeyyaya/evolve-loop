@@ -51,13 +51,6 @@ Subcommands:
                      cache_prefix_enabled,track_workers,test_executor}.
 `
 
-// runSubagent dispatches the `evolve subagent <subcommand>` family. Mirrors
-// the cmd_* subroutines in legacy/scripts/dispatch/subagent-run.sh:
-//
-//	--check-token        → check-token   (cmd_check_token, subagent-run.sh:597)
-//	--check-ctx-advisory → check-ctx-advisory (cmd_check_ctx_advisory:605)
-//	(new)                → cache-prefix  (_write_cache_prefix:292)
-//	(new)                → resolve-tier  (resolve_model_tier:189)
 func runSubagent(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
 		fmt.Fprint(stderr, subagentUsage)
@@ -87,24 +80,6 @@ func runSubagent(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	}
 }
 
-// resolveWorkspaceArg absolutizes a relative <workspace_path> CLI argument
-// against projectRoot (EVOLVE_PROJECT_ROOT / layout.ProjectRoot), NOT the
-// ambient process cwd. The workspace value is LLM-typed at the bridge boundary;
-// a raw relative value would otherwise resolve against whatever cwd the process
-// happens to have, scattering run artifacts (.bridge-inbox/, session records,
-// prompt/stdout/stderr logs) into that cwd — the untracked-tree-drift the
-// tree-diff cycle-killer reacts to (cycle-616 subagent-workspace-absolutize
-// fix). An already-absolute value passes through unchanged; an empty value or
-// empty projectRoot is left untouched (no base to anchor against). This is the
-// single ingestion point every subagent subcommand routes its workspace arg
-// through.
-//
-// Containment (cycle-619): a relative arg whose cleaned join escapes the
-// project root (via ".." traversal) is REJECTED with an error rather than
-// silently resolving into an arbitrary sibling tree — otherwise the same
-// artifact-scatter the absolutization prevents for cwd just relocates outside
-// the root. Absolute args keep their passthrough contract: the real loop hands
-// absolute worktree/runs paths that legitimately live outside project root.
 func resolveWorkspaceArg(workspace, projectRoot string) (string, error) {
 	if workspace == "" || projectRoot == "" || filepath.IsAbs(workspace) {
 		return workspace, nil
@@ -272,7 +247,6 @@ func runSubagentCheckCtxAdvisory(args []string, stdout, stderr io.Writer) int {
 	}
 	res, err := subagent.CheckCtxAdvisory(args[0], tokens)
 	if err != nil {
-		// Bash WARNs + exits 0 on missing profile. Mirror that.
 		fmt.Fprintf(stderr, "[subagent-run] WARN: %v\n", err)
 		return 0
 	}
@@ -327,7 +301,6 @@ func runSubagentValidateProfile(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "[subagent-run] FAIL: %v\n", err)
 		return 1
 	}
-	// Mirror bash stderr lines (cli_resolution + dispatch-resolve + profile valid).
 	fmt.Fprintf(stderr, "[dispatch-resolve] cli=%s source=%s model=%s\n",
 		res.CLI, res.CLIResolutionSrc, res.Model)
 	fmt.Fprintf(stderr, "[subagent-run] cli_resolution: source=%s target_cli=%s\n",
@@ -378,17 +351,12 @@ func runSubagentRun(args []string, stdout, stderr io.Writer) int {
 		defer func() { _ = f.Close() }()
 		promptReader = f
 	} else {
-		// Read from stdin.
 		promptReader = os.Stdin
 	}
 
 	flags := readSubagentRunFlags()
 	wc := loadWorkflowConfig(layout.EvolveDir)
 
-	// The second Signal Center root (ADR-0103 unit 16): the dispatcher's
-	// BRIDGE_SUBAGENT_* warnings and the bridge engine's own producers land in
-	// <runs/cycle-N>/signals.ndjson beside the orchestrator's (the cycle-less
-	// file at cycle 0) and on stderr at WARN — the same topology cmd_cycle builds.
 	signals := newRootSignalCenter(layout.ProjectRoot, layout.EvolveDir, stderr)
 	defer signals.Flush()
 
@@ -422,9 +390,6 @@ func runSubagentRun(args []string, stdout, stderr io.Writer) int {
 	return renderRunOutcome(res, agent, cycle, stderr)
 }
 
-// renderRunOutcome prints the verdict line and maps the verdict to the
-// command's exit code: PASS 0, INTEGRITY_FAIL 2, anything else 1 (the fan-out
-// parent folds 1 and 2 to its worker-failure exit).
 func renderRunOutcome(res subagent.RunResult, agent string, cycle int, stderr io.Writer) int {
 	fmt.Fprintf(stderr, "[subagent-run] verdict=%s agent=%s cycle=%d artifact=%s exit=%d duration_ms=%d\n",
 		res.Verdict, agent, cycle, res.ArtifactPath, res.ExitCode, res.DurationMS)
@@ -490,7 +455,6 @@ func runSubagentDispatchParallel(args []string, stdout, stderr io.Writer) int {
 	}, subagent.DispatchParallelOptions{})
 	if err != nil {
 		fmt.Fprintf(stderr, "[subagent-run] FAIL: %v\n", err)
-		// parallel_eligible refusal → exit 2 to match bash semantics
 		if strings.Contains(err.Error(), "not parallel_eligible") {
 			return 2
 		}
@@ -513,27 +477,8 @@ func nextArg(args []string, i int) string {
 	return args[i]
 }
 
-// envOrCwd forwards to cmdutil.EnvOrCwd — the implementation lives there so
-// the decomposed internal/cli/* command groups share one definition.
 func envOrCwd(env string) string { return cmdutil.EnvOrCwd(env) }
 
-// sourceRoot resolves the root for reading SOURCE/DOC artifacts that are part
-// of a cycle's committed deliverable — generated-from-source docs such as
-// docs/architecture/control-flags.md (from the flagregistry) or skills/*/SKILL.md
-// (from phase facts). These live in the WORKTREE the cycle commits to, not the
-// main checkout.
-//
-// This is the source half of the dual-root pattern. EVOLVE_PROJECT_ROOT is the
-// STATE root: the ACS suite pins it to MAIN so predicates resolve `.evolve/`
-// runtime data there (issue #12). But a generated SOURCE doc must be validated
-// against the worktree, so acssuite also exports EVOLVE_WORKTREE_ROOT=<worktree>.
-// Precedence: EVOLVE_WORKTREE_ROOT (the active worktree, exported by the ACS
-// suite) > EVOLVE_PROJECT_ROOT (explicit root in CI/dev) > cwd. Outside the
-// suite EVOLVE_WORKTREE_ROOT is conventionally unset, making this byte-identical
-// to envOrCwd("EVOLVE_PROJECT_ROOT"); if it is present in a developer's shell
-// from a prior session it takes precedence (unset it if a command reads the
-// wrong root). Root-cause fix for the cycle-355 trap, where `flags check` read
-// main's stale control-flags.md and red-failed correct work.
 func sourceRoot() string {
 	if v := os.Getenv(ipcenv.WorktreeRootKey); v != "" {
 		return paths.AbsoluteRoot(ipcenv.WorktreeRootKey, v, nil)
@@ -541,11 +486,8 @@ func sourceRoot() string {
 	return envOrCwd("EVOLVE_PROJECT_ROOT")
 }
 
-// subagentRunFlags holds the run-specific env-derived boolean knobs for
-// `subagent run`, read through envchain so the truthy/falsy/default vocabulary
-// is uniform (P2). AdversarialAudit is default-on (`!= "0"`);
-// LegacyAgentDispatch is default-off (`== "1"`). DiffComplexityDisabled is read
-// inline (shared with the resolve-tier handler), not via this struct.
+// DiffComplexityDisabled is read inline (shared with the resolve-tier
+// handler), not via this struct.
 type subagentRunFlags struct {
 	adversarialAudit    bool
 	legacyAgentDispatch bool

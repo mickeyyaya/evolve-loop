@@ -1,15 +1,5 @@
 package main
 
-// cmd_salvage_test.go — cycle-1442 audit H2: `evolve salvage report` shipped as
-// a new operator-facing surface at 0.0% coverage (`runSalvage 0.0%`,
-// `runSalvageReport 0.0%`, no test in this package referencing either symbol).
-// The number it prints is the one an operator reads as "the gate coerced N
-// verdicts", so an untested renderer is an untested claim about the gate.
-//
-// Driven through the real entry points with a real on-disk sidecar pair — no
-// seams stubbed — because the defect class here is exactly a renderer that
-// diverges from what the gate writes.
-
 import (
 	"encoding/json"
 	"os"
@@ -62,7 +52,6 @@ func TestRunSalvageReport_ProseRendersCountsAndNamesSkippedRecords(t *testing.T)
 			t.Errorf("prose missing %q\n---\n%s", want, got)
 		}
 	}
-	// Tolerance must stay honest: the skipped record is named, not dropped.
 	if !strings.Contains(got, "unreadable record(s) skipped") {
 		t.Errorf("a skipped sidecar record must be surfaced — silent tolerance is how a forged torn line hides salvages\n---\n%s", got)
 	}
@@ -88,16 +77,11 @@ func TestRunSalvageReport_JSONEnvelopeMatchesProseNumbers(t *testing.T) {
 	if env.Total != 2 || env.Recoverable != 1 || env.Saved != 1 || env.Rate != 0.5 {
 		t.Errorf("envelope = %+v, want total=2 recoverable=1 saved=1 rate=0.5 (same numbers the prose renders)", env)
 	}
-	// The machine-readable consumer is precisely the one that cannot see the
-	// prose WARN, so tolerance that is honest only in prose is silent exactly
-	// where it is parsed (diff-review MEDIUM).
 	if env.Malformed != 1 {
 		t.Errorf("malformed = %d, want 1 — the JSON envelope must carry the skipped-record count, not just the prose", env.Malformed)
 	}
 }
 
-// A never-salvaged project is the NORMAL state: absent sidecars report zero
-// through the same envelope rather than erroring.
 func TestRunSalvageReport_AbsentSidecarsAreZeroNotError(t *testing.T) {
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
@@ -112,9 +96,6 @@ func TestRunSalvageReport_AbsentSidecarsAreZeroNotError(t *testing.T) {
 	}
 }
 
-// The dispatcher's own arms: usage on no subcommand, named refusal on an
-// unknown one. Both return 10 (the repo's usage-error code), never 0 — a
-// mistyped subcommand that exits success reads as "nothing to report".
 func TestRunSalvage_UsageAndUnknownSubcommand(t *testing.T) {
 	for _, tc := range []struct {
 		name string

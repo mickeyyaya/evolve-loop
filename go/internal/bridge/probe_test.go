@@ -5,10 +5,6 @@ import (
 	"testing"
 )
 
-// probe_test.go — tests for resolveTier + Engine.Probe (the embedded
-// manifest set), using a controlled LookPath so tiering is deterministic
-// regardless of which CLIs are actually installed on the host.
-
 func hasBinaryIn(set ...string) func(string) bool {
 	m := map[string]bool{}
 	for _, s := range set {

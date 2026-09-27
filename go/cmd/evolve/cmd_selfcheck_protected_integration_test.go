@@ -2,11 +2,6 @@
 
 package main
 
-// cmd_selfcheck_protected_integration_test.go — F37 wiring proof: the ONE
-// production floor composition both roots run refuses the cycle-1689 diff
-// through the REAL control-plane manifest (guards.IsProtectedSurface), not a
-// stub — go/internal/core/cyclerun.go is a manifest member.
-
 import (
 	"context"
 	"os"

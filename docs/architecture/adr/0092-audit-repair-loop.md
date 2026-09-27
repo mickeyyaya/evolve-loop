@@ -18,7 +18,7 @@
   cycle teardown to fix what a rebuild could have addressed in place.
 - **Related:** [ADR-0072](0072-system-failure-policy.md) — the floor this narrows in
   exactly one place, and preserves everywhere else.
-- **Related:** [ADR-0076](0076-continuation.md) — the cross-cycle findings handoff whose
+- **Related:** [ADR-0076](0076-convergence-architecture.md) — the cross-cycle findings handoff whose
   reader (`readContinuationFindings`) this reuses rather than duplicating.
 - **Composes with:** `docs/incidents/2026-08-12-proxy-as-verdict-findings.md` — the class
   this is an instance of: agent prose treated as a machine verdict.

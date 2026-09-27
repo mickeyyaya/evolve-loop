@@ -9,6 +9,19 @@ import (
 	"time"
 )
 
+// waitForFeed blocks until the feed file contains want, or fails the test after five seconds.
+func waitForFeed(t *testing.T, path, want string) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		if body, err := os.ReadFile(path); err == nil && strings.Contains(string(body), want) {
+			return
+		}
+		time.Sleep(time.Millisecond)
+	}
+	t.Errorf("feed %s never carried %q", path, want)
+}
+
 // appendRaw appends a single line (with a newline) to a file in ws.
 func appendRaw(t *testing.T, ws, name, line string) {
 	t.Helper()
@@ -39,10 +52,9 @@ func appendRaw(t *testing.T, ws, name, line string) {
 //
 //	collectSpan([1,2]) collects seq=2 (assistant_text) → Text() contains "3 bullets".
 //
-// The two appends are separated by 10 ms so the Producer's 1 ms ticker
-// reliably processes inject_applied in an earlier poll than the assistant +
-// idle_reached pair, giving the assistant envelope a seq inside the span.
-// Run with -race -count=20 to confirm non-flaky.
+// The second append waits for the first's envelope in the feed, so the
+// Producer processes inject_applied in an earlier poll than the assistant +
+// idle_reached pair and the assistant envelope takes a seq inside the span.
 func TestChannel_EndToEnd(t *testing.T) {
 	ws := t.TempDir()
 	now := func() time.Time { return time.Unix(0, 0).UTC() }
@@ -77,15 +89,13 @@ func TestChannel_EndToEnd(t *testing.T) {
 	// poll windows so the Normalizer assigns the assistant envelope a seq that
 	// falls inside the [startSeq, endSeq] span.
 	go func() {
-		// Let the Producer start its first poll loop.
-		time.Sleep(5 * time.Millisecond)
-
 		// Tick 1: inject_applied arrives in stderr.
 		// Normalizer processes stdout (empty) then stderr → seq=1 request correlation.
 		appendRaw(t, ws, "build-stderr.log", `{"evolve_channel":"inject_applied","corr_id":"c1"}`)
 
-		// Wait long enough for the 1 ms ticker to fire and process tick 1 alone.
-		time.Sleep(10 * time.Millisecond)
+		// Tick 2 must land in a later poll than tick 1 whatever the host's load, so wait for the
+		// feed to carry tick 1's envelope instead of assuming the ticker fired in between.
+		waitForFeed(t, FeedPath(ws, "build"), `"corr_id":"c1"`)
 
 		// Tick 2: assistant content in stdout + idle_reached in stderr.
 		// Normalizer: stdout first → seq=2 assistant_text; stderr → seq=3 response_complete{start:1,end:2}.

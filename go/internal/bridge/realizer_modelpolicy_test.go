@@ -1,25 +1,5 @@
 package bridge
 
-// realizer_modelpolicy_test.go — ADR-0044 C2/D3 (Slice 2) RED tests: the
-// ModelFlagPolicy "omit-on-auto" guard at the realizer chokepoint.
-//
-// cycle-262 (2026-06-09): retro was dispatched with model "auto" — the loop's
-// resolve-me sentinel, never a valid concrete model for ANY CLI. The
-// claude-tmux manifest realizes model_tier as `--model <value>` with
-// ModelTierMap pass-through for unmapped values, so the sentinel sailed
-// straight into `claude --model auto`, which boots into the fatal
-// "There's an issue with the selected model (auto)" pane (verified in the
-// cycle-262 tmux-final-scrollback). The headless codex driver already guards
-// this (omit -m on auto, pinned in coverage_batch7_test.go); the realizer is
-// the single emit point for every flag/repl-channel CLI, so ONE guard here
-// covers claude-tmux, codex-tmux, and any future manifest (matrix-wide fix,
-// not a per-driver patch).
-//
-// Contract: when post-resolution model_tier is still the "auto" sentinel, the
-// realizer emits NO model param at all — the CLI's own default model is
-// always preferable to a fatal boot. Concrete tiers and raw model names are
-// unaffected.
-
 import "testing"
 
 func modelPolicyManifest() Manifest {
@@ -52,8 +32,6 @@ func containsFlag(flags []string, want string) bool {
 	return false
 }
 
-// TestRealize_ModelAutoOmitsFlag is the D3 reproduction: the "auto" sentinel
-// must never be emitted as a concrete model value.
 func TestRealize_ModelAutoOmitsFlag(t *testing.T) {
 	t.Parallel()
 	flags := launchFlagsForModel(t, modelPolicyManifest(), "auto")
@@ -62,8 +40,6 @@ func TestRealize_ModelAutoOmitsFlag(t *testing.T) {
 	}
 }
 
-// TestRealize_ConcreteTiersStillEmit pins the non-regression half of the
-// policy: mapped tiers and raw model names keep flowing exactly as before.
 func TestRealize_ConcreteTiersStillEmit(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -83,9 +59,6 @@ func TestRealize_ConcreteTiersStillEmit(t *testing.T) {
 	}
 }
 
-// TestRealize_ReplChannelAutoOmitted covers the repl-template channel with a
-// synthetic manifest: the same sentinel guard must apply before ANY channel
-// emits (the realizer is the single chokepoint for both).
 func TestRealize_ReplChannelAutoOmitted(t *testing.T) {
 	t.Parallel()
 	m := Manifest{

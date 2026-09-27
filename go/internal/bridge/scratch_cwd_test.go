@@ -6,10 +6,9 @@ import (
 	"testing"
 )
 
-// I1: a PROBE launch (boot-smoke, model-query, health canary) with no designated
-// worktree must run in a disposable scratch dir under its own Workspace — never
-// the process cwd (the live checkout), where a non-Claude CLI could write into
-// main. applyScratchCwd is the shared helper the probe call sites use.
+// TestApplyScratchCwd_PointsProbeAtScratchUnderWorkspace pins that a PROBE
+// launch with no designated worktree runs in a disposable scratch dir under
+// its own Workspace, never the process cwd.
 func TestApplyScratchCwd_PointsProbeAtScratchUnderWorkspace(t *testing.T) {
 	ws := t.TempDir()
 	cfg := &Config{Workspace: ws} // probe: no Worktree designated
@@ -71,12 +70,10 @@ func TestApplyScratchCwd_NoOpWhenNoWorkspace(t *testing.T) {
 	}
 }
 
-// IsDir is the guard predicate driver_tmux_repl.go refuses a launch on
-// (ExitBadFlags) and, since cycle-1278, the one the retro phase tests a
-// candidate worktree against before dispatching. Both directions matter: a
-// false negative strands a live lane in a repo-less scratch dir, a false
-// positive hands the bridge a path it will refuse. Regular files are NOT dirs —
-// the guard must reject them, which is why this asserts the file case too.
+// TestIsDir_MatchesTheLaunchGuardPredicate pins the predicate both
+// driver_tmux_repl.go's launch guard and the retro phase's pre-dispatch check
+// share: a false negative strands a live lane in a repo-less scratch dir, a
+// false positive hands the bridge a path it will refuse.
 func TestIsDir_MatchesTheLaunchGuardPredicate(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "not-a-dir")

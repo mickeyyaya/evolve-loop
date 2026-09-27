@@ -1,31 +1,5 @@
 package bridge
 
-// RED wiring tests for cycle-672 top_n task `echo-veto-wiring-completion`,
-// AC2: stripPromptEchoLines (landed cycle-654, TestC654_004 green) has ZERO
-// production call sites — autoResponder.tick() still hands the RAW pane to the
-// exhaustion scan (autorespond.go, ExhaustedOf) and to decideAutoRespond, so
-// an agent echoing its own Deliverable-Contract exhaustion instructions can
-// escalate rc 85 / classify rate_limit (cycle-656 retro D3 fired live).
-//
-// The fix (scout map): add an injectedPrompt field to autoResponder, populate
-// it from the already-resolved prompt at BOTH construction sites
-// (driver_tmux_repl.go, recipe_adapter.go), and strip the pane via
-// stripPromptEchoLines in tick() ahead of the exhaustion check.
-//
-// RED today: autoResponder has no injectedPrompt field — compile failure.
-// DO NOT MODIFY THESE TESTS (echo-veto intent). C672_004 is the negative guard
-// (genuine banner must STILL escalate) and must be GREEN after the wiring lands.
-// C672_005 is the discriminating anti-gaming check for the construction-site
-// half — the behavioral tests alone could be satisfied by a field nothing
-// populates in production (exactly the class of gap that let cycles 654/656 slip).
-//
-// UPDATE (exhaustion-gate, 2026-07): C672_004's tick COUNT was revised from 1 to
-// exhaustionPersistObservations because the exhaustion fast-fail is now
-// persistence-gated (exhaustion_persistence.go) — a genuine wall still escalates (intent
-// preserved: it survives prompt-echo stripping), it just does so on the
-// threshold-th consecutive tick, not the first. The echo-veto behavior C672_003
-// and C672_005 pin is unchanged.
-
 import (
 	"context"
 	"os"
@@ -53,13 +27,10 @@ func newC672TickResponder(t *testing.T, pane string) *autoResponder {
 	return ar
 }
 
-// TestC672_003_TickEchoedExhaustionDoesNotEscalate — AC2 (positive): a pane
-// whose only exhaustion-matching text is a verbatim echo of the injected
-// prompt must NOT escalate rc 85 out of tick().
 func TestC672_003_TickEchoedExhaustionDoesNotEscalate(t *testing.T) {
 	pane := "thinking...\n" + c672PromptEchoLine + "\nwriting report...\n"
 	ar := newC672TickResponder(t, pane)
-	ar.injectedPrompt = "Instructions.\n" + c672PromptEchoLine + "\nProceed." // RED: field does not exist yet
+	ar.injectedPrompt = "Instructions.\n" + c672PromptEchoLine + "\nProceed."
 
 	_, rc := ar.tick(context.Background(), "s")
 	if rc == 85 {
@@ -67,20 +38,17 @@ func TestC672_003_TickEchoedExhaustionDoesNotEscalate(t *testing.T) {
 	}
 }
 
-// TestC672_004_TickGenuineExhaustionStillEscalates — AC2/AC3 (negative guard):
-// a genuine CLI quota banner ABSENT from the injected prompt must still
-// escalate rc 85 — the echo-veto wiring must not blanket-disable the wall.
+// TestC672_004_TickGenuineExhaustionStillEscalates is the negative guard: a
+// genuine CLI quota banner ABSENT from the injected prompt must still
+// escalate — the echo-veto wiring must not blanket-disable the wall.
 func TestC672_004_TickGenuineExhaustionStillEscalates(t *testing.T) {
 	pane := "You have reached your usage limit. Resets in 4h.\n"
 	ar := newC672TickResponder(t, pane)
 	ar.injectedPrompt = "Instructions: do the task and report." // banner is NOT a substring
 
-	// The genuine banner survives prompt-echo stripping (walled every tick), but
-	// the persistence guard (exhaustion_persistence.go) requires it to PERSIST for
-	// exhaustionPersistObservations consecutive ticks before escalating — the fake
-	// pane replays the banner every capture, so a genuine wall crosses on the
-	// threshold-th tick. A single transient frame (wall text passing through a
-	// working agent's pane) would never cross — that is the guard's purpose.
+	// The genuine banner survives prompt-echo stripping, but the persistence
+	// guard requires it to persist for exhaustionPersistObservations consecutive
+	// ticks before escalating, so the loop drives that many ticks.
 	var rc int
 	for i := 0; i < exhaustionPersistObservations; i++ {
 		_, rc = ar.tick(context.Background(), "s")
@@ -90,14 +58,10 @@ func TestC672_004_TickGenuineExhaustionStillEscalates(t *testing.T) {
 	}
 }
 
-// TestC672_005_ResponderConstructionSitesCarryInjectedPrompt — AC2
-// (construction wiring, discriminating anti-gaming supplement to the
-// behavioral pair above): both production construction sites of
-// autoResponder must reference injectedPrompt, i.e. populate the field from
-// their already-resolved prompt. Without this, the behavioral tests pass on a
-// field production never sets — the exact helper-without-wiring gap this task
-// closes. Load-bearing behavior is asserted by C672_003/004; this only pins
-// that the wiring reaches BOTH launch surfaces.
+// TestC672_005_ResponderConstructionSitesCarryInjectedPrompt is a
+// source-reader anti-gaming check: both production construction sites of
+// autoResponder must reference injectedPrompt, or the behavioral tests above
+// could pass on a field production never populates.
 func TestC672_005_ResponderConstructionSitesCarryInjectedPrompt(t *testing.T) {
 	_, thisFile, _, ok := runtime.Caller(0)
 	if !ok {

@@ -36,10 +36,8 @@ import (
 var PhaseBoundaryCheckpointer func(cs CycleState, projectRoot string, now time.Time) error
 
 // QuotaBoundaryCheckpointer is a package-level hook to write a quota-likely
-// checkpoint block when the dispatch seam detects all-families exit=85
-// exhaustion (cycle-656). Set by the checkpoint package to avoid circular
-// imports; it preserves completed phases + the worktree so `evolve loop
-// --resume` re-enters at the deferred phase after the quota resets.
+// checkpoint block when the dispatch seam detects all-families quota
+// exhaustion. Set by the checkpoint package to avoid circular imports.
 var QuotaBoundaryCheckpointer func(cs CycleState, projectRoot string, now time.Time) error
 
 func wrapCycleLevelError(phase Phase, err error) error {
@@ -52,27 +50,6 @@ func wrapCycleLevelError(phase Phase, err error) error {
 	return &ErrCycleLevelFailure{Phase: string(phase), Cause: err}
 }
 
-// optionalInfraSkip reports whether a phase whose retries exhausted may
-// record SKIPPED with a warning and advance instead of aborting the cycle (the Workstream-D
-// intent documented on ErrArtifactTimeout; cycle-283). Four conditions, all
-// required: the error is skippable-shaped per IsOptionalSkippableError (infra
-// teardown — artifact timeout / transient bridge — OR a missing persona doc,
-// cycle-1551; never integrity or logic failures), the phase is NOT
-// configured-mandatory,
-// the phase is catalog-Optional, and the phase sits outside the resolved ship
-// floor — so the skip can never weaken `ship ⇒ build ∧ audit ∧ tdd`. The
-// mandatory guard is generic and config-driven (the orchestrator reads
-// cfg.Mandatory, not a hardcoded phase name): it subsumes the former ship
-// special-case — ship is a mandatory anchor — while protecting any mandatory
-// phase mis-marked Optional (the floor loop alone would miss ship, which is
-// not in the floor set). Phase-agnostic flow per ADR-0035/0038.
-// optionalSkipDetails names the ledger kind, operator message, and structured
-// diagnostic for an ADMITTED optional-phase skip, split by error class so
-// forensics never files a config defect under an infra key: a missing persona
-// (cycle-1551) had zero retries and no infra event — calling it
-// "optional_infra_skip" at exit 0 would merge two failure classes the ledger
-// has already paid for merging once. The diagnostic rides the synthesized WARN
-// response so the cause reaches audit/retro, not only stderr + ledger.
 func optionalSkipDetails(p Phase, err error) (kind, msg string, diags []Diagnostic) {
 	if errors.Is(err, ErrAgentDocMissing) {
 		msg = fmt.Sprintf("optional phase %s: persona doc missing (%v) — skipping with a warning; provide the phase persona before selecting it again", p, err)
@@ -102,18 +79,6 @@ func (o *Orchestrator) optionalInfraSkip(p Phase, err error) bool {
 	return true
 }
 
-// postShipObserverSkip classifies a POST-ship best-effort observer failure as
-// non-fatal (cycle-574, inbox memo-phase-tier-envelope). A RoleControl observer
-// phase that runs after a healthy ship (memo, post-ship-monitor) must never turn
-// an already-shipped cycle abnormal: its failure degrades to a WARN diagnostic
-// and the cycle keeps its shipped/PASS outcome. This is a sibling to
-// optionalInfraSkip — same floor/mandatory guards, but keyed on ship-having-
-// -landed rather than an infra-shaped error, so it also covers a memo policy or
-// logic error (the exact tier-envelope shape that reddened healthy cycles).
-// True iff ALL hold: (1) ship already recorded PASS this cycle (shipped) — a
-// failure BEFORE ship is never swallowed; (2) p is a catalog-Optional RoleControl
-// observer and NOT ship itself; (3) p is not configured-mandatory and sits
-// outside the resolved ship floor — the skip can never weaken the integrity floor.
 func (o *Orchestrator) postShipObserverSkip(p Phase, shipped bool) bool {
 	if !shipped {
 		return false
@@ -140,24 +105,20 @@ func (o *Orchestrator) postShipObserverSkip(p Phase, shipped bool) bool {
 	return true
 }
 
-// specFor resolves a phase's descriptor, canonicalizing the name first
-// (PhaseRetro→"retrospective") so the lookup cannot silently miss on the
-// core↔router skew. The registry is the SSOT and wins; on a registry miss it
-// falls to the builtinControlSpec seam (ADR-0058 §5) for control phases that have
-// no registry home (debugger). A total miss yields (_, false), which keeps Next
-// on its byte-identical literal path. It is the StateMachine's window onto
-// config-driven transition resolution (ADR-0058).
+// specFor resolves a phase's descriptor, canonicalizing the name first so the
+// lookup cannot miss on the core↔router spelling skew. The registry is the
+// SSOT and wins over the builtinControlSpec fallback for phases with no
+// registry entry.
 func (o *Orchestrator) specFor(p Phase) (phasespec.PhaseSpec, bool) {
 	if spec, ok := o.catalog.Get(canonicalCatalogName(p)); ok {
-		return spec, true // registry SSOT wins over the control seam
+		return spec, true
 	}
 	return builtinControlSpec(p)
 }
 
-// phaseArchetype resolves a phase's composition class (plan/build/evaluate/
-// control) from the existing phasespec taxonomy — the registry spec's explicit
-// archetype when present, else name inference. The single source the latency
-// roll-up buckets by; see recordPhaseOutcome (ADR-0044 C1 chokepoint).
+// phaseArchetype resolves a phase's composition class from the registry
+// spec's archetype, falling back to name inference; recordPhaseOutcome
+// buckets latency by this.
 func (o *Orchestrator) phaseArchetype(phase string) string {
 	if spec, ok := o.specFor(Phase(phase)); ok {
 		return string(spec.RoleOrDefault())
@@ -165,21 +126,14 @@ func (o *Orchestrator) phaseArchetype(phase string) string {
 	return string(phasespec.PhaseSpec{Name: phase}.RoleOrDefault())
 }
 
-// builtinControlSpec is the control-phase metadata seam (ADR-0058 §5): the one
-// place Go data describes a phase, justified because the control phases
-// (debugger; start/end) are registered as runners in cmd_cycle.go and have no
-// registry `phases[]` home. It supplies ONLY branch metadata — debugger's
-// signal-driven successor — never an OnPass/OnFail edge, so Next stays literal
-// for control phases. A registry entry of the same name overrides it (specFor
-// precedence). Returns (_, false) for any phase the seam does not describe.
+// builtinControlSpec supplies control-phase metadata (debugger's signal-driven
+// successor) for phases with no registry home; a registry entry of the same
+// name overrides it.
 func builtinControlSpec(p Phase) (phasespec.PhaseSpec, bool) {
 	if p == PhaseDebugger {
 		return phasespec.PhaseSpec{
 			Name:              string(PhaseDebugger),
 			BranchingStrategy: phasespec.BranchingSignal,
-			// PA-DDK DDK-6: the debugger's recovery targets are config-declared in
-			// the control seam (it has no registry home), mirroring the literal —
-			// RESHIP→ship, RERUN_PHASE→audit (the default upstream), BLOCK→end.
 			Recovery: &phasespec.RecoveryMap{Targets: map[string]string{
 				"RESHIP":      string(PhaseShip),
 				"RERUN_PHASE": string(PhaseAudit),
@@ -190,13 +144,9 @@ func builtinControlSpec(p Phase) (phasespec.PhaseSpec, bool) {
 	return phasespec.PhaseSpec{}, false
 }
 
-// successorStrategy resolves how phase p's successor is chosen — the
-// branching_strategy declared on its descriptor (ADR-0058). On a catalog miss,
-// or an entry that omits the field, it degrades to the literal phase-identity
-// default (literalSuccessorStrategy), keeping the flow byte-identical when the
-// catalog is unset. "Config selects, code constrains": this only routes the
-// orchestrator among branches the state machine already deems legal — it never
-// invents an edge.
+// successorStrategy resolves branching_strategy from the phase's descriptor,
+// degrading to literalSuccessorStrategy on a catalog miss: config selects
+// among branches the state machine already deems legal, it never invents one.
 func (o *Orchestrator) successorStrategy(p Phase) string {
 	if spec, ok := o.specFor(p); ok && spec.BranchingStrategy != "" {
 		return spec.BranchingStrategy
@@ -204,11 +154,9 @@ func (o *Orchestrator) successorStrategy(p Phase) string {
 	return literalSuccessorStrategy(p)
 }
 
-// literalSuccessorStrategy is the unconfigured backstop: the successor-selection
-// strategy each phase used before ADR-0058 made it config-driven. Two phases are
-// not verdict-driven: retrospective is history-driven (the failure-adapter
-// consults cycle history) and debugger is signal-driven (its decision signal
-// picks the successor). Every other phase is verdict-driven (the empty default).
+// literalSuccessorStrategy is the unconfigured backstop: retro is
+// history-driven, debugger is signal-driven, every other phase is
+// verdict-driven.
 func literalSuccessorStrategy(p Phase) string {
 	switch p {
 	case PhaseRetro:
@@ -219,16 +167,9 @@ func literalSuccessorStrategy(p Phase) string {
 	return ""
 }
 
-// PhaseMinter registers a minted phase config into a dispatchable runner. The
-// orchestrator depends on this narrow port (not phaseregistrar directly) so
-// core stays decoupled from specrunner/phaseregistrar; the composition root
-// adapts the concrete Registrar to it. Register validates + clamps the config
-// against the trust-kernel guardrails and returns the normalized spec + runner,
-// or an error (out-of-envelope tier, disallowed CLI, invalid spec).
-// Implementations MUST return a spec with Optional=true (a minted phase can
-// never satisfy or displace the build→audit→ship floor); the orchestrator's
-// transitionLegal gate independently rejects a non-optional candidate, so a
-// non-conforming minter degrades to a refused edge rather than a kernel breach.
+// PhaseMinter registers a minted phase config into a dispatchable runner.
+// Implementations must return a spec with Optional=true: a minted phase can
+// never satisfy or displace the build→audit→ship floor.
 type PhaseMinter interface {
 	Register(cfg phaseconfig.PhaseConfig) (phasespec.PhaseSpec, PhaseRunner, error)
 }
@@ -237,30 +178,23 @@ type PhaseMinter interface {
 type CycleRequest struct {
 	ProjectRoot string
 	GoalHash    string
-	// Env is propagated to every PhaseRequest.Env that runs in this
-	// cycle. Phases consult it for CLI/model selection
-	// (EVOLVE_CLI, EVOLVE_<PHASE>_MODEL, …). The orchestrator copies the
-	// map so post-RunCycle operator mutation does not affect in-flight
-	// or completed runs.
+	// Env is propagated to every PhaseRequest.Env; phases consult it for
+	// CLI/model selection. Copied so post-RunCycle mutation never affects an
+	// in-flight or completed run.
 	Env map[string]string
-	// Context seeds the PhaseRequest.Context every phase receives. Ship
-	// requires Context["commit_message"]; Scout reads
-	// Context["strategy"]. Copied like Env.
+	// Context seeds the PhaseRequest.Context every phase receives (e.g. ship
+	// reads Context["commit_message"]). Copied like Env.
 	Context map[string]string
-	// DisableWorkspaceGuard skips the pre-cycle workspace archive that
-	// evicts stale phase artifacts from a prior interrupted cycle. Used by
-	// tests that pre-seed workspace files to simulate phase state; operators
-	// may set it via the env snapshot read in cmd_cycle.go.
+	// DisableWorkspaceGuard skips the pre-cycle workspace archive that evicts
+	// stale phase artifacts from a prior interrupted cycle.
 	DisableWorkspaceGuard bool
-	// BypassPolicy skips the policy.json pin enforcement for every phase in
-	// this cycle. Used for testing and escape-hatch operator overrides.
-	// Threaded to PhaseRequest.BypassPolicy at dispatch.
+	// BypassPolicy skips policy.json pin enforcement for every phase in this
+	// cycle, threaded to PhaseRequest.BypassPolicy at dispatch.
 	BypassPolicy bool
 }
 
 // legacyExplanationTestStorage is deliberately package-private: only core's
 // same-package legacy unit fake can opt out of the fresh-cycle contract.
-// Production and external storage adapters cannot implement this method.
 type legacyExplanationTestStorage interface {
 	disableFreshExplanationContractForTest() bool
 }
@@ -268,155 +202,108 @@ type legacyExplanationTestStorage interface {
 // Orchestrator drives one cycle through the state machine, calling a
 // PhaseRunner per phase and appending ledger entries. It is pure: all
 // I/O is delegated to the injected Storage and Ledger ports.
-//
-// This is the Phase 1 skeleton — guards, observer, budget enforcement
-// land in Phase 2.
 type Orchestrator struct {
 	storage Storage
 	ledger  Ledger
 	runners map[Phase]PhaseRunner
 	sm      *StateMachine
 	now     func() time.Time
-	outcome *outcome.Recorder       // unit 01 (ADR-0103): the C1 recording chokepoint
-	diag    *failurediag.Writer     // unit 02 (ADR-0103): the failure-diag sidecar + delivery classifier
-	carry   *carryover.Lifecycle    // unit 03 (ADR-0103): the carryover-todo lifecycle
-	learn   *failurelearning.Engine // unit 03b (ADR-0103): the failure-learning engine (the recorder, the floor, the recurrence closure)
-	// gitHEAD returns the current git HEAD SHA. Called once at cycle start
-	// and once at closeout so the throughput hook can corroborate that a
-	// shipped cycle actually moved main (shippedOutcome). It is NOT evidence
-	// that THIS cycle shipped — in fleet mode a sibling lane moves HEAD too —
-	// so the outcome label reads the ship latch instead (cycle_outcome.go).
-	// Errors are swallowed and treated as "no movement detected".
+	outcome *outcome.Recorder       // the phase-outcome recording chokepoint
+	diag    *failurediag.Writer     // the failure-diag sidecar + delivery classifier
+	carry   *carryover.Lifecycle    // the carryover-todo lifecycle
+	learn   *failurelearning.Engine // the failure-learning engine: recorder, floor, recurrence closure
+	// gitHEAD returns the current git HEAD SHA; it is NOT evidence that THIS
+	// cycle shipped (a fleet sibling can move HEAD too), so the outcome label
+	// reads the ship latch instead. Errors are swallowed as "no movement".
 	gitHEAD func() (string, error)
 
-	// gitMutationLock serializes the shared-main-repo dossier closeout commit
-	// against concurrent fleet lanes on the integrator's .evolve/ship.lock, so a
-	// lane's `dossier: cycle-N closeout` commit never races a sibling's ship
-	// commit on .git/index.lock (fleet-ship-git-index-lock-serialization). nil ⇒
-	// fail-open (the commit's bounded index.lock retry is the backstop). Defaulted
-	// to defaultGitMutationLock; a test seam swaps in a deterministic spy.
 	gitMutationLock gitMutationLocker
 
-	// dossierCommit: whether the closeout dossier is git-committed (default true).
-	// The --simulate root sets false — its walk writes records but never touches
-	// the operator's history (WithDossierCommit).
+	// dossierCommit selects whether the closeout dossier is git-committed; see WithDossierCommit.
 	dossierCommit bool
 
 	// gitDirtyPaths returns the set of modified tracked paths in the main
-	// repo's working directory (`git diff --name-only HEAD` in repoRoot).
-	// Workstream B's tree-diff guard snapshots this before each source-
-	// writing phase and compares after — any newly-dirty MAIN-tree path is a
-	// leak that escaped the sandbox (each git worktree is a separate working
-	// dir, so its writes don't show up here). Injected for tests.
+	// repo's working directory; the tree-diff guard snapshots this before and
+	// after each source-writing phase to catch a leak that escaped the sandbox.
 	gitDirtyPaths func(ctx context.Context, repoRoot string) ([]string, error)
 
-	// catalogRefresh optionally refreshes the live model catalog at cycle start
-	// (WithCatalogRefresher). It owns its own staleness check (TTL) and is
-	// best-effort: errors WARN and never block the cycle. nil ⇒ no auto-refresh
-	// (the composition root wires the closure; core never imports modelcatalog).
+	// catalogRefresh optionally refreshes the live model catalog at cycle
+	// start; best-effort, errors WARN and never block the cycle.
 	catalogRefresh func(ctx context.Context) error
 
 	// catalogRefreshStage optionally reports the resolved catalog.refresh_stage
-	// (WithCatalogRefreshStage) so the per-cycle catalog_refresh ledger entry
-	// can record WHICH stage produced the outcome — the audit trail the
-	// refresh_stage=shadow soak reads instead of stderr scrollback. nil ⇒ the
-	// outcome is still stamped, with an empty stage (never a fabricated one).
+	// stamped into the per-cycle catalog_refresh ledger entry; nil leaves the
+	// stamped stage empty rather than a guess.
 	catalogRefreshStage func() string
 
 	// modelCatalogLookup is the optional live model-catalog resolvability check
-	// (WithModelCatalogLookup) injected into router.ClampPlanModelRouting. Nil
-	// (default) ⇒ the catalog-resolvability gate is skipped (guardrail
-	// validation still runs); the composition root wires modelcatalog.Catalog.Lookup.
+	// injected into router.ClampPlanModelRouting; nil skips the resolvability
+	// gate (guardrail validation still runs).
 	modelCatalogLookup func(cli, tier string) (string, bool)
 
-	// directivesProvider optionally returns the runtime operator-directives snapshot
-	// for a cycle (WithDirectivesProvider). The injected closure owns ALL config —
-	// home/lane/path resolution — so core stays config- and environment-agnostic; it
-	// is fail-open (returns a possibly-empty Set, never errors). nil ⇒ no directives.
+	// directivesProvider returns the runtime operator-directives snapshot for a
+	// cycle; fail-open (a possibly-empty Set, never an error). nil = no directives.
 	directivesProvider func(ctx context.Context, cycle int) directives.Set
 
 	// compositionSnapshot, compositionGateRunner, and compositionVerdictWriter
-	// wire the RUNG 0 trivial-rebase composition-verdict fast path
-	// (WithCompositionSnapshot / WithCompositionGateRunner /
-	// WithCompositionVerdictWriter) into recoverFromShipError's clean
-	// fleet-rebase branch. All three nil (default) ⇒ the fast path never
-	// fires ⇒ recovery behaves exactly as it does today (byte-identical).
-	// The composition root binds the writer closure to the real
-	// ledger.WriteCompositionVerdict; core stays adapter-agnostic (ledger
-	// already imports core, so a direct import would cycle).
+	// wire the RUNG 0 trivial-rebase composition-verdict fast path into
+	// recoverFromShipError's clean fleet-rebase branch. All three nil ⇒ the
+	// fast path never fires.
 	compositionSnapshot      func(ctx context.Context, worktree, runID string) (CompositionAuditSnapshot, error)
 	compositionGateRunner    func(ctx context.Context, worktree string) map[string]string
 	compositionVerdictWriter func(ledgerPath string, in CompositionVerdictInput) error
 
 	// scopedMergeReviewer wires the merge ladder's RUNG 2 scoped merge review
-	// (WithScopedMergeReviewer) into recoverFromShipError, between the RUNG 0
-	// carry-forward miss and the RUNG 3 full re-audit. Nil (default) ⇒ RUNG 2
-	// stays dark ⇒ recovery behaves exactly as it does today (no regression).
+	// into recoverFromShipError, between the RUNG 0 carry-forward miss and the
+	// RUNG 3 full re-audit. nil ⇒ RUNG 2 stays dark.
 	scopedMergeReviewer ScopedMergeReviewer
 
 	hostEffects HostEffects
 
-	// worktree provisions/cleans the per-cycle source worktree (ADR-0027).
-	// Default gitWorktree (real git); injected in tests via
-	// WithWorktreeProvisioner so RunCycle runs without touching real git.
+	// worktree provisions/cleans the per-cycle source worktree.
 	worktree WorktreeProvisioner
 
 	// cfg + strategy drive dynamic phase routing ("model proposes, kernel
 	// disposes"). The zero value (Stage:Off, StaticPreset) reproduces the
-	// legacy static-state-machine behavior byte-for-byte: routing is
-	// computed only when the composition root opts in via WithRouting with
-	// a non-Off stage. The orchestrator never reads a routing flag itself —
-	// config.Load (the composition root) is the sole env/file reader.
+	// legacy static-state-machine behavior byte-for-byte.
 	cfg      config.RoutingConfig
 	strategy router.RoutingStrategy
 
-	// planner produces the upfront whole-cycle plan (ADR-0024 §2). Optional:
-	// nil ⇒ no advisor plan ⇒ the kernel floor falls back to the configurable
-	// never-skip spine (fail-safe to static). Consulted once at cycle start,
-	// only at Stage>=Advisory; its output is clamped to the integrity floor
-	// before being threaded into every routing decision.
+	// planner produces the upfront whole-cycle plan. nil ⇒ no advisor plan ⇒
+	// the kernel floor falls back to the never-skip spine. Consulted once at
+	// cycle start, only at Stage>=Advisory, and always clamped to the
+	// integrity floor before being threaded into routing.
 	planner router.Planner
 
-	// catalog is the merged phase catalog (built-in + user overlays). It lets
-	// the orchestrator accept and run user-defined phases on the dynamic-routing
-	// path WITHOUT hardcoding them in the Phase enum / state machine. Empty (the
-	// default) ⇒ only built-in phases exist ⇒ byte-identical legacy behavior.
+	// catalog is the merged phase catalog (built-in + user overlays), letting
+	// the orchestrator accept and run user-defined phases without hardcoding
+	// them into the Phase enum. Empty ⇒ only built-in phases exist.
 	catalog phasespec.Catalog
 
 	// safetyViolations is the ValidateSafetyInvariants result computed once at
-	// construction over the wired SM + cfg + catalog (PA-DDK DDK-5). Non-empty ⇒
-	// the loaded transition config could ship without the floor; RunCycle /
+	// construction over the wired SM + cfg + catalog. Non-empty ⇒ the loaded
+	// transition config could ship without the floor; RunCycle /
 	// RunCycleFromPhase fail closed with ErrUnsafeConfig before any phase runs.
-	// nil (the bare/empty config) ⇒ no violations ⇒ unchanged behavior.
 	safetyViolations []string
 
-	// registrar mints advisor-proposed phases at cycle start (Steps 11/12).
-	// Nil (default) ⇒ MintPhases are ignored ⇒ byte-identical legacy behavior.
-	// Set via WithRegistrar; the composition root adapts phaseregistrar.Registrar.
+	// registrar mints advisor-proposed phases at cycle start. nil ⇒ MintPhases
+	// are ignored.
 	registrar PhaseMinter
 
 	// catalogPublisher is notified with the LIVE catalog every time a mid-cycle
-	// mint changes it, so consumers that bound a resolver over the cycle-START
-	// catalog value (the bridge's deliverable-contract resolver, cmd_cycle.go)
-	// can re-bind. Without it the orchestrator knows the minted phase while the
-	// resolver keeps reading the pre-mint map for the rest of the cycle — the
-	// cycle-1424 naked-dispatch halt. Nil (default) ⇒ no-op, byte-identical
-	// legacy behavior. Set via WithCatalogPublisher.
+	// mint changes it, so a consumer that bound a resolver over the cycle-start
+	// catalog value can re-bind. nil ⇒ no-op.
 	catalogPublisher func(phasespec.Catalog)
 
-	// kb is the knowledge-base recall port (WS2): at plan time the orchestrator
-	// looks up prior lessons matching the most recent failure and threads them
-	// into the advisor's prompt (recall memory). Nil (default) ⇒ no recall is
-	// added ⇒ byte-identical legacy behavior. Set via WithKB; the composition
-	// root wires research.NewFileKB(research.SearchPathsFromEnv()).
+	// kb is the knowledge-base recall port: at plan time the orchestrator looks
+	// up prior lessons matching the most recent failure and threads them into
+	// the advisor's prompt. nil ⇒ no recall added.
 	kb research.KB
 
-	// shipFloor is the resolved integrity floor (WS4): the phases a plan reaching
-	// ship MUST run. Empty (default) ⇒ router.DefaultShipFloor ({tdd,build,audit},
-	// byte-identical legacy behavior). The composition root sets it from
-	// policy.FloorPhases() when the user configured an explicit .evolve/policy.json
-	// ship_floor (e.g. ["audit"] for the audit-only posture). The router self-seals
-	// the non-removable evaluator regardless, so this can only relax build/tdd.
+	// shipFloor is the resolved integrity floor: the phases a plan reaching
+	// ship must run. Empty ⇒ router.DefaultShipFloor ({tdd,build,audit}). The
+	// router self-seals the non-removable evaluator regardless, so this can
+	// only relax build/tdd.
 	shipFloor []string
 
 	// retryConfig is resolved once from policy.json at the composition root.
@@ -425,100 +312,81 @@ type Orchestrator struct {
 	// workflowConfig is resolved once from policy.json at the composition root.
 	workflowConfig policy.WorkflowConfig
 
-	// continuationFor resolves the ADR-0076 slice C continuation binding for a
-	// cycle's scope — claimed (the inbox mover's processing claims) or, for a
-	// lane whose scope came from the wave planner, the pinned lane-scope todo
-	// ids handed in as scopeIDs. Nil (default) = continuations never adopt —
-	// byte-identical provisioning.
+	// continuationFor resolves the continuation binding for a cycle's scope —
+	// claimed, or the pinned lane-scope todo ids for a wave-planner lane. nil =
+	// continuations never adopt.
 	continuationFor func(projectRoot string, cycle int, scopeIDs []string) *continuation.Continuation
 	// scopePathFor resolves a scoped task id to its LIVE inbox record's
-	// absolute path ("" = not inbox-backed / not pending). Injected from the
-	// composition root like continuationFor (core cannot import inboxmover).
-	// Nil (default) = no path disclosure — Context byte-identical.
+	// absolute path ("" = not inbox-backed / not pending).
 	scopePathFor func(projectRoot, taskID string) string
-	// acsPredicates lists the cycle's ACS predicate names for the Task Contract
-	// (ADR-0098); nil ⇒ listACSPredicates (real `go test -list`). Injectable so
-	// the wiring proof exercises the inventory without a Go toolchain.
+	// acsPredicates lists the cycle's ACS predicate names for the Task
+	// Contract; nil ⇒ listACSPredicates (real `go test -list`).
 	acsPredicates predicateLister
 
 	// chronicle is the resolved chronicle policy (digest stage/caps), resolved
-	// once from policy.json at the composition root (chronicle S3).
+	// once from policy.json at the composition root.
 	chronicle policy.ChronicleConfig
 
-	// failureCountFor reads an inbox item's durable failure_count (ADR-0076 D
-	// retry tier escalation). Wired at the composition root from
-	// inboxmover.ReadFailureCount; nil = escalation disabled (safe no-op).
+	// failureCountFor reads an inbox item's durable failure_count for retry
+	// tier escalation; nil = escalation disabled.
 	failureCountFor func(id string) int
 
-	// failurePolicy is the resolved system-failure DECISION policy (ADR-0072):
-	// the category→action map + Go-enforced floor. Resolved once from
-	// policy.json at the composition root; absent ⇒ compiled defaults.
+	// failurePolicy is the resolved system-failure decision policy: the
+	// category→action map plus the Go-enforced floor.
 	failurePolicy policy.SystemFailurePolicy
 
-	// retryAdjudicator proposes how to dispose of an audit FAIL among the actions
-	// the deterministic policy already made legal. nil is a supported production
-	// state (Null Object): policy alone is sufficient authority to grant a retry.
+	// retryAdjudicator proposes how to dispose of an audit FAIL among the
+	// actions the deterministic policy already made legal. nil is a supported
+	// production state: policy alone is sufficient authority to grant a retry.
 	retryAdjudicator RetryAdjudicator
 
-	// maxPhaseIterations bounds RunCycle's dispatch loop (the transition-table
-	// cycle guard). 0 ⇒ defaultMaxPhaseIterations. Injected via
-	// WithMaxPhaseIterations; tests set it low to exercise the C1
-	// chokepoint-escape guard deterministically.
+	// maxPhaseIterations bounds RunCycle's dispatch loop. 0 ⇒
+	// defaultMaxPhaseIterations.
 	maxPhaseIterations int
 
-	// explanationContractVersion is the writer version stamped on fresh cycles.
-	// It has no exported option: production callers cannot downgrade the
-	// mandatory contract. Same-package tests may set it to zero when exercising
-	// unrelated legacy fixtures.
+	// explanationContractVersion is the writer version stamped on fresh
+	// cycles. It has no exported option: production callers cannot downgrade
+	// the mandatory contract.
 	explanationContractVersion int
 
 	// reviewer adjudicates a finished phase's deliverable before the cycle
-	// advances (Workstream E2). Nil ⇒ noopReviewer default ⇒ every non-error,
-	// non-SKIPPED verdict is recorded as a success (pre-E2 behavior). Set via
-	// WithReviewer; the deterministic default + future LLM reviewer
-	// implementations share the DeliverableReviewer interface.
+	// advances. nil ⇒ noopReviewer: every non-error, non-SKIPPED verdict is
+	// recorded as a success.
 	reviewer DeliverableReviewer
 
-	// observer is the per-phase stall detector (cycle-122 Fix 3 / ADR-0030).
-	// Start is called once before each runner.Run; the returned cancel runs
-	// once after. Nil ⇒ noopObserver default ⇒ byte-identical to the pre-
-	// ADR-0030 cycle. Set via WithObserver; cmd_cycle.go wires the real
-	// implementation when ObserverPolicy.Autospawn is enabled.
+	// observer is the per-phase stall detector. Start is called once before
+	// each runner.Run; the returned cancel runs once after. nil ⇒ noopObserver.
 	observer Observer
 
-	// failureAdviser is the ADR-0044 C3 LLM escalation tail consulted by
-	// adviseOnUnclassifiedFailure (failure_hook.go) — only at
-	// cfg.PhaseRecovery == StageEnforce, only for unclassified
-	// artifact-timeout panes. Nil (default) ⇒ hook inert. Set via
-	// WithFailureAdviser.
+	// failureAdviser is the LLM escalation tail consulted by
+	// adviseOnUnclassifiedFailure, only at cfg.PhaseRecovery == StageEnforce,
+	// only for unclassified artifact-timeout panes. nil ⇒ hook inert.
 	failureAdviser FailureAdviser
 
-	// contractVerifier is the ADR-0045 I2 breaker-neutral deliverable
-	// re-check used by the correction ladder's salvage rung. Nil (default)
-	// ⇒ the salvage rung gets zero budget and the ladder degrades to
-	// redispatch-only — exactly the pre-I2 correction loop.
+	// contractVerifier is the breaker-neutral deliverable re-check used by the
+	// correction ladder's salvage rung. nil ⇒ the salvage rung gets zero
+	// budget and the ladder degrades to redispatch-only.
 	contractVerifier ContractVerifier
 
 	// throughputRecorder observes shipped cycles' coverage-floor counts for
-	// the R9 triage-capacity window (throughput_hook.go). Nil (default) ⇒
-	// no-op. Set via WithThroughputRecorder.
+	// the triage-capacity window. nil ⇒ no-op.
 	throughputRecorder ThroughputRecorder
 
-	// signals is the ADR-0101 Signal Center the orchestrator listens to; nil is
-	// the Null Object (tests and the two pinned secondary roots). signalSummary
-	// is the current cycle's view, guarded by signalMu — the first production
-	// mutex in core: the Center holds no lock while delivering, observeSignal
-	// never emits, and no orchestrator path holds signalMu across an Emit.
+	// signals is the Signal Center the orchestrator listens to; nil is the
+	// Null Object. signalSummary is the current cycle's view, guarded by
+	// signalMu — the first production mutex in core: the Center holds no lock
+	// while delivering, observeSignal never emits, and no orchestrator path
+	// holds signalMu across an Emit.
 	signals       *signalcenter.Center
 	signalMu      sync.Mutex
 	signalSummary *signalcenter.Summary
 
-	// verdictCacheLookupHook, if non-nil, is invoked during the verdict-cache lookup
-	// phase of RunCycle, letting tests verify whether the cache was queried, skipped,
-	// or matched.
+	// verdictCacheLookupHook, if non-nil, is invoked during the verdict-cache
+	// lookup phase of RunCycle, letting tests verify whether the cache was
+	// queried, skipped, or matched.
 	verdictCacheLookupHook func(sha string, skipped bool, matched bool, entry verdictcache.Entry)
 
-	// currentRunID holds the in-flight run's ULID (CA.5) as a string; the
+	// currentRunID holds the in-flight run's ULID as a string; the
 	// construction-time stampingLedger reads it atomically on every Append.
 	// Empty ⇒ no run in flight ⇒ entries are not stamped.
 	currentRunID atomic.Value
@@ -528,10 +396,9 @@ type Orchestrator struct {
 // Absent any option, the orchestrator runs in legacy Stage:Off mode.
 type Option func(*Orchestrator)
 
-// WithRouting injects the loaded routing config + the strategy selected once
-// at the composition root. A nil strategy is ignored so the StaticPreset
-// default stands; the orchestrator depends only on the RoutingStrategy
-// interface, never on a mode conditional.
+// WithRouting injects the loaded routing config and the strategy selected
+// once at the composition root. A nil strategy is ignored, leaving the
+// StaticPreset default.
 func WithRouting(cfg config.RoutingConfig, strategy router.RoutingStrategy) Option {
 	return func(o *Orchestrator) {
 		o.cfg = cfg
@@ -541,10 +408,9 @@ func WithRouting(cfg config.RoutingConfig, strategy router.RoutingStrategy) Opti
 	}
 }
 
-// WithPlanner injects the whole-cycle phase planner (ADR-0024 §2 hybrid
-// cadence). A nil planner is ignored so the no-plan default stands; the
-// orchestrator consults it only at Stage>=Advisory and always clamps its
-// output to the integrity floor — "model proposes, kernel disposes".
+// WithPlanner injects the whole-cycle phase planner. A nil planner is
+// ignored: the orchestrator consults it only at Stage>=Advisory and always
+// clamps its output to the integrity floor.
 func WithPlanner(p router.Planner) Option {
 	return func(o *Orchestrator) {
 		if p != nil {
@@ -554,15 +420,13 @@ func WithPlanner(p router.Planner) Option {
 }
 
 // WithCatalog injects the merged phase catalog so the orchestrator can accept
-// and run user-defined (non-built-in) phases on the dynamic-routing path. The
-// empty default keeps behavior byte-identical to the built-in-only pipeline.
+// and run user-defined (non-built-in) phases on the dynamic-routing path.
 func WithCatalog(cat phasespec.Catalog) Option {
 	return func(o *Orchestrator) { o.catalog = cat }
 }
 
 // WithRegistrar injects the phase minter so the orchestrator can register
-// advisor-proposed phases at cycle start (Steps 11/12). Nil is ignored, leaving
-// the no-mint default (byte-identical legacy behavior).
+// advisor-proposed phases at cycle start. Nil is ignored, leaving the no-mint default.
 func WithRegistrar(m PhaseMinter) Option {
 	return func(o *Orchestrator) {
 		if m != nil {
@@ -571,11 +435,9 @@ func WithRegistrar(m PhaseMinter) Option {
 	}
 }
 
-// WithCatalogPublisher injects the sink notified with the orchestrator's LIVE
-// catalog whenever a mid-cycle mint changes it (see registerMintedPhases). The
-// composition root wires it to re-bind the bridge's contract resolver, closing
-// the same-cycle CatalogResolver.Resolve miss for a freshly-minted phase. Nil is
-// ignored, leaving the no-publish default (byte-identical legacy behavior).
+// WithCatalogPublisher injects the sink notified with the orchestrator's live
+// catalog whenever a mid-cycle mint changes it, so a resolver bound over the
+// cycle-start catalog can re-bind. Nil is ignored.
 func WithCatalogPublisher(fn func(phasespec.Catalog)) Option {
 	return func(o *Orchestrator) {
 		if fn != nil {
@@ -585,14 +447,11 @@ func WithCatalogPublisher(fn func(phasespec.Catalog)) Option {
 }
 
 // CatalogPublisherWired reports whether the composition root bound a catalog
-// publisher — the reachability predicate cmd/evolve asserts against the real
-// wireOrchestratorDeps (same idiom as CompositionFastPathWired). Without it a
-// mid-cycle mint never reaches the live contract resolver.
+// publisher; without it a mid-cycle mint never reaches the live contract resolver.
 func (o *Orchestrator) CatalogPublisherWired() bool { return o.catalogPublisher != nil }
 
-// WithKB injects the knowledge-base recall port (WS2). Nil is ignored, leaving
-// the no-recall default (byte-identical legacy behavior). The composition root
-// wires research.NewFileKB(research.SearchPathsFromEnv()).
+// WithKB injects the knowledge-base recall port. Nil is ignored, leaving the
+// no-recall default.
 func WithKB(kb research.KB) Option {
 	return func(o *Orchestrator) {
 		if kb != nil {
@@ -601,10 +460,8 @@ func WithKB(kb research.KB) Option {
 	}
 }
 
-// WithShipFloor sets the resolved integrity floor (WS4) — the phases a plan
-// reaching ship must run. Empty/nil is ignored, leaving the safe structural
-// default (router.DefaultShipFloor). The composition root passes the user's
-// policy.FloorPhases() result when an explicit ship_floor is configured.
+// WithShipFloor sets the resolved integrity floor — the phases a plan
+// reaching ship must run. Empty/nil is ignored, leaving router.DefaultShipFloor.
 func WithShipFloor(floor []string) Option {
 	return func(o *Orchestrator) {
 		if len(floor) > 0 {
@@ -618,10 +475,9 @@ func WithRetryConfig(cfg policy.RetryConfig) Option {
 	return func(o *Orchestrator) { o.retryConfig = cfg }
 }
 
-// WithWorkflowConfig injects the resolved workflow policy.
-// WithContinuationResolver injects the scope continuation lookup (ADR-0076
-// slice C): claimed scopes first, then the cycle's pinned lane-scope todo ids.
-// Nil is ignored — adoption stays off.
+// WithContinuationResolver injects the scope continuation lookup: claimed
+// scopes first, then the cycle's pinned lane-scope todo ids. Nil is ignored —
+// adoption stays off.
 func WithContinuationResolver(fn func(projectRoot string, cycle int, scopeIDs []string) *continuation.Continuation) Option {
 	return func(o *Orchestrator) {
 		if fn != nil {
@@ -630,22 +486,8 @@ func WithContinuationResolver(fn func(projectRoot string, cycle int, scopeIDs []
 	}
 }
 
-// WithScopePathResolver injects the live-record path lookup for scoped task
-// ids, so a lane's phases receive the ONE correct file instead of a bare name.
-//
-// Why a name is not enough (cycle-1548, soak-20260823a): auto-minted ids are
-// deliberately stable per category — the dedup identity — so inbox/consumed/
-// accumulates same-id namesakes forever (17 records for one id at the
-// incident). An agent handed only the name name-searches the tree and finds
-// whichever namesake matches first; every phase of cycle-1548 worked a record
-// from a halt cured two weeks earlier. Nil is ignored — disclosure stays off.
 // ScopePathProbe reports whether a scope-path resolver is wired and, when it
-// is, what it resolves taskID to. A WIRING probe, not a workflow API: the
-// composition root's registration of the resolver is exactly the layer unit
-// tests of the resolver function cannot see (this week's nine NOT-WIRED
-// mutation survivors are all this shape), and Orchestrator's fields are
-// unexported by design — this is the narrow window that lets cmd/evolve pin
-// its own wiring without widening anything else.
+// is, what it resolves taskID to. A wiring probe, not a workflow API.
 func (o *Orchestrator) ScopePathProbe(projectRoot, taskID string) (string, bool) {
 	if o.scopePathFor == nil {
 		return "", false
@@ -653,6 +495,9 @@ func (o *Orchestrator) ScopePathProbe(projectRoot, taskID string) (string, bool)
 	return o.scopePathFor(projectRoot, taskID), true
 }
 
+// WithScopePathResolver injects the live-record path lookup for scoped task
+// ids, so a lane's phases receive the one correct file instead of a bare
+// name that could resolve to a stale duplicate.
 func WithScopePathResolver(fn func(projectRoot, taskID string) string) Option {
 	return func(o *Orchestrator) {
 		if fn != nil {
@@ -661,19 +506,19 @@ func WithScopePathResolver(fn func(projectRoot, taskID string) string) Option {
 	}
 }
 
+// WithWorkflowConfig injects the resolved workflow policy.
 func WithWorkflowConfig(cfg policy.WorkflowConfig) Option {
 	return func(o *Orchestrator) { o.workflowConfig = cfg }
 }
 
-// WithChronicleConfig injects the resolved chronicle policy (chronicle S3:
-// recent-outcomes digest stage + caps). The zero-option default is the
-// compiled default (digest=shadow).
+// WithChronicleConfig injects the resolved chronicle policy (recent-outcomes
+// digest stage + caps). The zero-option default is digest=shadow.
 func WithChronicleConfig(cfg policy.ChronicleConfig) Option {
 	return func(o *Orchestrator) { o.chronicle = cfg }
 }
 
-// WithFailureCountReader injects the item failure-count read seam (ADR-0076
-// D). Nil is ignored, preserving any prior reader (the WithKB idiom).
+// WithFailureCountReader injects the item failure-count read seam. Nil is
+// ignored, preserving any prior reader.
 func WithFailureCountReader(fn func(id string) int) Option {
 	return func(o *Orchestrator) {
 		if fn != nil {
@@ -682,8 +527,8 @@ func WithFailureCountReader(fn func(id string) int) Option {
 	}
 }
 
-// WithFailurePolicy injects the resolved system-failure decision policy
-// (ADR-0072). The zero-option default is the compiled DefaultSystemFailurePolicy.
+// WithFailurePolicy injects the resolved system-failure decision policy. The
+// zero-option default is the compiled DefaultSystemFailurePolicy.
 func WithFailurePolicy(fp policy.SystemFailurePolicy) Option {
 	return func(o *Orchestrator) { o.failurePolicy = fp }
 }
@@ -694,10 +539,8 @@ func WithRetryAdjudicator(a RetryAdjudicator) Option {
 	return func(o *Orchestrator) { o.retryAdjudicator = a }
 }
 
-// WithMaxPhaseIterations overrides the dispatch-loop iteration bound (the
-// transition-table cycle guard). n<=0 is ignored so the defaultMaxPhaseIterations
-// safety oracle stands; tests set it low to drive RunCycle into the C1
-// chokepoint-escape path deterministically.
+// WithMaxPhaseIterations overrides the dispatch-loop iteration bound. n<=0 is
+// ignored so the defaultMaxPhaseIterations safety oracle stands.
 func WithMaxPhaseIterations(n int) Option {
 	return func(o *Orchestrator) {
 		if n > 0 {
@@ -716,12 +559,10 @@ func WithWorktreeProvisioner(p WorktreeProvisioner) Option {
 	}
 }
 
-// WithWorktreeBase injects the operator worktree-base override, resolved once
-// from policy.json (worktree.base) at the composition root. Empty ⇒ no override
-// (the gitWorktree default <root>/.evolve/worktrees stands). Replaces the former
-// EVOLVE_WORKTREE_BASE env read (flag-reduction, ADR-0064). Mutually exclusive
-// with WithWorktreeProvisioner (both set o.worktree); production uses only this
-// one, tests use only the fake — never both.
+// WithWorktreeBase injects the operator worktree-base override. Empty is
+// ignored, leaving the gitWorktree default. Mutually exclusive with
+// WithWorktreeProvisioner (both set o.worktree); production uses only this
+// one, tests use only the fake.
 func WithWorktreeBase(base string) Option {
 	return func(o *Orchestrator) {
 		if base != "" {
@@ -730,15 +571,9 @@ func WithWorktreeBase(base string) Option {
 	}
 }
 
-// WithObserver injects a per-phase stall detector (cycle-122 Fix 3 / ADR-0030).
-// The orchestrator calls observer.Start(...) before each phase's runner.Run
-// and the returned cancel after — running a background watcher that emits
-// stall_no_output events to the workspace when the subagent's stdout-log
-// stops growing. A nil observer (default) keeps the noopObserver default,
-// which is byte-identical to the pre-ADR-0030 cycle.
-//
-// cmd_cycle.go wires the real implementation via
-// observer.NewCoreAdapter when ObserverPolicy.Autospawn is enabled.
+// WithObserver injects a per-phase stall detector. The orchestrator calls
+// observer.Start before each phase's runner.Run and the returned cancel
+// after. A nil observer keeps the noopObserver default.
 func WithObserver(o Observer) Option {
 	return func(orch *Orchestrator) {
 		if o != nil {
@@ -748,51 +583,37 @@ func WithObserver(o Observer) Option {
 }
 
 // WithCatalogRefresher injects a best-effort live-model-catalog refresh run at
-// cycle start. The closure owns its TTL/staleness check; the orchestrator calls
-// it once per cycle before any phase runs and only WARNs on error (never blocks).
+// cycle start. The closure owns its TTL/staleness check; the orchestrator
+// calls it once per cycle before any phase runs and only WARNs on error.
 func WithCatalogRefresher(fn func(ctx context.Context) error) Option {
 	return func(o *Orchestrator) { o.catalogRefresh = fn }
 }
 
 // WithCatalogRefreshStage injects the resolved catalog.refresh_stage accessor
 // stamped into the per-cycle catalog_refresh ledger entry. Optional: without
-// it the outcome entry is still appended, carrying an empty stage rather than
-// a guess. Read at cycle start (the operator can edit policy.json between
-// cycles), which is why it is an accessor and not a plain string.
+// it the entry still stamps with an empty stage rather than a guess.
 func WithCatalogRefreshStage(fn func() string) Option {
 	return func(o *Orchestrator) { o.catalogRefreshStage = fn }
 }
 
-// WithModelCatalogLookup injects the model resolvability check (cycle-440
-// MR4a) consulted by router.ClampPlanModelRouting: (cli,tier)→(model,ok).
-// Nil (default) skips the resolvability gate — the plan's guardrail validation
-// (allowed_clis/model_tier_envelope) still applies.
-//
-// The composition root wires the manifest-backed resolver (cmd/evolve/
-// model_tier_resolver.go, which documents why not Catalog.Lookup) so core
-// stays a leaf and never imports bridge or modelcatalog (dependency
-// inversion, mirroring catalogRefresh above). ModelCatalogLookupWired
-// (failure_hook.go) lets that wiring be proven in a real test.
+// WithModelCatalogLookup injects the model resolvability check consulted by
+// router.ClampPlanModelRouting: (cli,tier)→(model,ok). Nil skips the
+// resolvability gate — the plan's guardrail validation still applies.
 func WithModelCatalogLookup(fn func(cli, tier string) (string, bool)) Option {
 	return func(o *Orchestrator) { o.modelCatalogLookup = fn }
 }
 
-// WithDirectivesProvider injects the runtime operator-directives provider. The
-// closure (wired at the composition root) owns ALL config — home/lane/path
-// resolution — and re-reads the directive files each cycle so live operator edits
-// propagate at the next cycle boundary; the orchestrator snapshots the result once
-// per cycle, stamps its version into the ledger, and threads it to every phase. A
-// nil fn leaves directives off (byte-identical dispatch).
+// WithDirectivesProvider injects the runtime operator-directives provider.
+// The closure re-reads the directive files each cycle so live operator edits
+// propagate at the next cycle boundary; a nil fn leaves directives off.
 func WithDirectivesProvider(fn func(ctx context.Context, cycle int) directives.Set) Option {
 	return func(o *Orchestrator) { o.directivesProvider = fn }
 }
 
-// WithReviewer injects a per-phase deliverable reviewer (Workstream E2). The
-// orchestrator calls reviewer.Review(...) after each phase's runner.Run returns
-// a non-error, non-SKIPPED verdict, BEFORE the ledger append or
-// CompletedPhases++. Approve=false aborts the cycle with the reviewer's Reason
-// (no retry budget yet — that's a follow-up; see the WS-E plan). The core-owned
-// Build explanation floor and lifecycle remain outside this optional seam.
+// WithReviewer injects a per-phase deliverable reviewer. The orchestrator
+// calls reviewer.Review after each phase's runner.Run returns a non-error,
+// non-SKIPPED verdict, before the ledger append. Approve=false aborts the
+// cycle with the reviewer's Reason.
 func WithReviewer(r DeliverableReviewer) Option {
 	return func(o *Orchestrator) {
 		if r != nil {
@@ -802,9 +623,8 @@ func WithReviewer(r DeliverableReviewer) Option {
 }
 
 // WithContractVerifier injects the breaker-neutral deliverable re-check the
-// ADR-0045 I2 salvage rung verifies relocations with. Nil is ignored, leaving
-// the redispatch-only ladder (byte-identical to the pre-I2 correction loop).
-// cmd_cycle.go wires deliverable.NewVerifierWithCatalog beside the reviewer.
+// correction ladder's salvage rung verifies relocations with. Nil is
+// ignored, leaving the redispatch-only ladder.
 func WithContractVerifier(v ContractVerifier) Option {
 	return func(o *Orchestrator) {
 		if v != nil {
@@ -831,18 +651,18 @@ func WithVerdictCacheLookupHook(fn func(sha string, skipped bool, matched bool, 
 	}
 }
 
-// NewOrchestrator wires the orchestrator with its dependencies. Routing stays
-// off unless a WithRouting option supplies an enabled-stage config.
 // HasRunner reports whether a PhaseRunner is registered for p. It is the
 // composition-root's read seam: a phase the router can nominate but that has
 // no runner is silently skipped by cyclerun_dispatch's missing-runner escape
-// hatch (the cycle-563 memo-dispatch bug), so tests assert on this to prove the
-// routing→dispatch handoff is actually wired, not just that Route() names it.
+// hatch, so tests assert on this to prove the routing→dispatch handoff is
+// actually wired, not just that Route() names it.
 func (o *Orchestrator) HasRunner(p Phase) bool {
 	_, ok := o.runners[p]
 	return ok
 }
 
+// NewOrchestrator wires the orchestrator with its dependencies. Routing stays
+// off unless a WithRouting option supplies an enabled-stage config.
 func NewOrchestrator(storage Storage, ledger Ledger, runners map[Phase]PhaseRunner, opts ...Option) *Orchestrator {
 	o := &Orchestrator{
 		storage:                    storage,
@@ -862,7 +682,7 @@ func NewOrchestrator(storage Storage, ledger Ledger, runners map[Phase]PhaseRunn
 		failurePolicy:              policy.DefaultSystemFailurePolicy(),
 		reviewer:                   withMandatoryExplanationReviewer(noopReviewer{}),
 		explanationContractVersion: explanationdocs.CurrentContractVersion,
-		observer:                   noopObserver{}, // cycle-122 Fix 3 / ADR-0030: byte-identical default until WithObserver is used
+		observer:                   noopObserver{},
 	}
 	if legacy, ok := storage.(legacyExplanationTestStorage); ok && legacy.disableFreshExplanationContractForTest() {
 		o.explanationContractVersion = 0
@@ -870,52 +690,35 @@ func NewOrchestrator(storage Storage, ledger Ledger, runners map[Phase]PhaseRunn
 	for _, opt := range opts {
 		opt(o)
 	}
-	// Unit 01 (ADR-0103): the recorder reads the clock and the catalog LIVE (tests
-	// swap o.now after construction; mints change the catalog mid-cycle) and
-	// raises the orchestrator's phase.outcome through emitPhaseOutcome.
+	// The recorder reads the clock and the catalog live: tests swap o.now
+	// after construction, and mints change the catalog mid-cycle.
 	o.outcome = o.wiredRecorder()
 	o.diag = o.wiredFailureDiag()
 	o.carry = o.wiredCarryover()
-	o.learn = o.wiredFailureLearning() // after o.carry: the engine mints through the ONE wired lifecycle
-	// ADR-0058: hand the state machine its config-driven verdict-branch
-	// resolution now that the catalog (hence specFor) is settled by options.
-	// Without a catalog, specFor misses and Next stays on the literal table
-	// (byte-identical). PA-DDK DDK-3: the linear spine is now config-declared
-	// (cfg.SpineOrder); an empty order leaves the SM on the canonical literal.
+	o.learn = o.wiredFailureLearning() // after o.carry: the engine mints through the one wired lifecycle
+	// Hand the state machine its config-driven verdict-branch resolution now
+	// that the catalog (hence specFor) is settled by options; an empty catalog
+	// or spine order degrades to the literal table.
 	o.sm.WithCatalog(o.specFor).WithSpine(spinePhasesFrom(o.cfg.SpineOrder)).
 		WithLegalGraph(legalGraphFrom(o.cfg.LegalSuccessors))
-	// PA-DDK DDK-5 (ADR-0060 §1a): with the legality graph + gates + verdict
-	// branches all config-driven, the floor's only structural guarantee is the
-	// phase-agnostic validator. Compute its verdict once over the fully-wired SM;
-	// RunCycle/RunCycleFromPhase fail closed if it found a floor hole. A bare/empty
-	// config yields no violations, so default orchestrators are unaffected.
+	// Computed once over the fully-wired SM; RunCycle/RunCycleFromPhase fail
+	// closed if it found a floor hole.
 	o.safetyViolations = ValidateSafetyInvariants(o.sm, o.cfg, o.catalog)
-	// CA.5: the run-id stamping decorator wraps the (possibly option-
-	// replaced) ledger exactly once at construction. The per-run identity
-	// flows through the atomic currentRunID — RunCycle never mutates the
-	// ledger field, so goroutine-spawning observers can read it race-free.
+	// The run-id stamping decorator wraps the ledger exactly once at
+	// construction; the per-run identity flows through the atomic
+	// currentRunID so goroutine-spawning observers can read it race-free.
 	o.ledger = stampingLedger{inner: o.ledger, runID: &o.currentRunID}
 	return o
 }
 
-// archivePollutedWorkspace renames <workspace>/ to
-// <workspace>.polluted-<UTCnano>/ when it exists and is non-empty.
-// Returns nil for the empty-or-missing case (the cycle just runs in a
-// fresh directory). Returns the underlying error only when stat/rename
-// actually fails. Tests inject a deterministic clock via now.
 func fleetMode(env map[string]string) bool {
 	return envchain.BoolValue(env[ipcenv.FleetKey], false)
 }
 
-// RunCycle drives one cycle from PhaseStart to PhaseEnd, returning a
-// summary of what ran. The lock is acquired up front (except in fleet mode,
-// see fleetMode) and released on every exit path. State is updated
-// incrementally so a crash leaves an inspectable trail in .evolve/.
 // ensureSafeConfig fails closed when the loaded transition config violates a
-// safety invariant (PA-DDK DDK-5). It is the run-time half of the relocated
-// trust anchor: the composition root computes the violations at construction;
-// every cycle-run entry refuses to proceed if the floor could be bypassed, so an
-// unsafe registry edit can never run a single phase.
+// safety invariant: the composition root computes the violations at
+// construction, and every cycle-run entry refuses to proceed if the floor
+// could be bypassed, so an unsafe registry edit can never run a single phase.
 func (o *Orchestrator) ensureSafeConfig() error {
 	if len(o.safetyViolations) > 0 {
 		return fmt.Errorf("%w: %s", ErrUnsafeConfig, strings.Join(o.safetyViolations, "; "))
@@ -923,25 +726,26 @@ func (o *Orchestrator) ensureSafeConfig() error {
 	return nil
 }
 
+// RunCycle drives one cycle from PhaseStart to PhaseEnd, returning a summary
+// of what ran. The lock is acquired up front (except in fleet mode, see
+// fleetMode) and released on every exit path. State is updated incrementally
+// so a crash leaves an inspectable trail in .evolve/.
 func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (_ CycleResult, retErr error) {
 	if err := o.ensureSafeConfig(); err != nil {
 		return CycleResult{}, err
 	}
-	// Resource setup (lock, state read, cycle allocation, run-ID mint, CycleState,
-	// workspace-pollution guard, source worktree, cycle-state persist, run lease)
-	// → newCycleRun. It returns a single cleanup closure carrying the four exit
-	// actions (lock release, run-ID clear, worktree prune/preserve, lease stop);
-	// RunCycle defers it in its OWN frame so the actions fire here at cycle exit,
-	// LIFO, exactly as the original inline defers did. The worktree branch reads
-	// cr.preserveWorktree/cr.cycleCompletedNormally at defer-execution time — the
-	// cycleRun method object holds those late-mutated fields (R2 late-visibility).
+	// newCycleRun does resource setup (lock, state read, cycle allocation,
+	// run-ID mint, CycleState, workspace-pollution guard, source worktree,
+	// cycle-state persist, run lease) and returns a cleanup closure carrying
+	// the exit actions; RunCycle defers it in its own frame so the actions
+	// fire here at cycle exit, LIFO.
 	init, cleanup, err := o.newCycleRun(ctx, req)
 	if err != nil {
 		return CycleResult{}, err
 	}
-	// cycleRun method object: the ONE addressable home for the dispatch loop's
-	// shared + loop-carried state, so the sub-methods' late mutations are visible
-	// to the exit defers and the next iteration (pointer receivers throughout).
+	// cycleRun is the one addressable home for the dispatch loop's shared and
+	// loop-carried state, so late mutations by sub-methods (pointer receivers
+	// throughout) are visible to the exit defers and the next iteration.
 	cr := &cycleRun{
 		o:                 o,
 		ctx:               ctx,
@@ -956,23 +760,17 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (_ CycleR
 		lastVerdict:       VerdictPASS,
 		retryConfig:       o.retryConfig,
 		workflowConfig:    o.workflowConfig,
-		// scheduledNext "", routingSeq 0, recoveryDepth 0, preserveWorktree false,
-		// cycleCompletedNormally false — zero-valued by construction.
 	}
-	// Cleanup defer registered FIRST (fires LAST, LIFO) and BEFORE planCycle —
-	// byte-identical registration order to the inline version. Reads the LATE
-	// field values at exit (R2 late-visibility): the single most important
-	// state-promotion of the method-object refactor.
+	// Registered first (fires last, LIFO); reads cr.preserveWorktree /
+	// cr.cycleCompletedNormally at defer-execution time so late mutations by
+	// the dispatch loop are honored.
 	defer func() { cleanup(cr.preserveWorktree, cr.cycleCompletedNormally) }()
-	// Cycle-778: no exit path (abort, chokepoint escape, panic-free error
-	// return) may leave the ship-window lease held — siblings would wait out
-	// the full TTL. Idempotent; the normal release happens in recordAndBranch.
+	// No exit path may leave the ship-window lease held — siblings would wait
+	// out the full TTL. Idempotent; the normal release happens in recordAndBranch.
 	defer cr.releaseShipWindow()
-	// Cycle-1048: no exit path may leave a started cycle without its evidence
-	// trail (dossier + digest + coherent state) — see cyclerun_epilogue.go.
-	// retErr (the named return) is the abort's cause at defer-execution time —
-	// the distinguisher that keeps three distinct aborts from sharing one
-	// Unexplained fingerprint (batch-19 cycle-1208 halt).
+	// No exit path may leave a started cycle without its evidence trail
+	// (dossier + digest + coherent state). retErr is read at defer-execution
+	// time as the abort's cause.
 	defer func() { cr.abnormalEpilogue(retErr) }()
 	// A graceful interrupt must resume the phase that was actually active, not
 	// the previous phase-complete boundary. Registered after abnormalEpilogue so
@@ -988,10 +786,9 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (_ CycleR
 		}
 	}
 
-	// Pre-loop planning (catalog refresh, per-cycle env/ctx snapshots, fleet
-	// scope, challenge-token mint, pre-cycle HEAD capture, clamped whole-cycle
-	// advisory plan) → planCycle. Outputs thread into every routing decision in
-	// the dispatch loop below.
+	// planCycle resolves catalog refresh, per-cycle env/ctx snapshots, fleet
+	// scope, the challenge token, pre-cycle HEAD, and the clamped whole-cycle
+	// advisory plan; outputs thread into every routing decision below.
 	plan := o.planCycle(ctx, req, cr.state, cr.cs, cr.cycle)
 	cr.envSnap = plan.envSnap
 	cr.ctxSnap = plan.ctxSnap
@@ -1001,48 +798,32 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (_ CycleR
 	cr.clampedPlan = plan.clampedPlan
 	cr.directivesSet = plan.directivesSet
 
-	// Deferred write of phase-timing.json runs even when RunCycle returns an
-	// error so partial timing data is preserved for operator inspection.
-	// Registered SECOND (fires FIRST, LIFO); reads cr.phaseTimings live so the
-	// grown slice header is observed.
+	// Runs even when RunCycle returns an error, so partial timing data is
+	// preserved for operator inspection; reads cr.phaseTimings live.
 	defer func() {
 		if len(cr.phaseTimings) > 0 {
 			cr.flushPhaseTimings()
 		}
-		// ADR-0045 I1: roll every per-phase interaction ledger (bridge
-		// subprocess + orchestrator producers alike) into
-		// interaction-summary.json. Best-effort, abort paths included —
-		// an interaction that isn't recorded with its outcome doesn't exist.
+		// Best-effort, abort paths included: an interaction not recorded with
+		// its outcome doesn't exist.
 		if werr := interaction.WriteRollup(cr.cs.WorkspacePath); werr != nil {
 			fmt.Fprintf(os.Stderr, "[orchestrator] WARN interaction-summary write: %v\n", werr)
 		}
-		// Per-cycle phase-output survey → unified signal stream (rationale:
-		// phaseoutputs_signal.go header). o.catalog is read at defer-exec
-		// time, so mid-cycle mints are visible to the resolver.
+		// o.catalog is read at defer-exec time, so mid-cycle mints are visible
+		// to the resolver.
 		emitPhaseOutputsSignal(cr.cs.WorkspacePath, cr.cycle, cr.cs.CompletedPhases,
 			phasecontract.NewCatalogResolver(cr.o.catalog.Get))
 	}()
-	// ADR-0048 Slice B (SHADOW): content-addressed audit-reuse probe. If this
-	// cycle's worktree content already matches a prior audited verdict, the
-	// tdd/build/audit pipeline COULD be skipped and the prior verdict carried
-	// forward. Observe-only — logs the would-reuse and changes nothing (mirrors
-	// the Slice A shadow precedent; the EVOLVE_VERDICT_CACHE enforce dial lands
-	// with the enforce stage, after soak observation per ADR-0046 discipline).
-	//
-	// Probe location is pre-loop ON PURPOSE: it targets the "fast re-land" case
-	// (the ADR's cycles 247-248 motivation) — a preserved/re-dispatched worktree
-	// that still carries content a prior cycle audited PASS. A FRESH cycle's
-	// worktree is a clean HEAD clone with no build changes yet, so it will not
-	// match (correctly — there is nothing to reuse before any work runs). A
-	// richer post-build probe (same-tree-already-audited within a normal cycle)
-	// is an enforce-stage decision, deliberately out of the shadow increment.
+	// Content-addressed audit-reuse probe (SHADOW): observe-only, logs a
+	// would-reuse and changes nothing. Pre-loop on purpose, targeting a
+	// preserved/re-dispatched worktree that still carries prior-audited
+	// content; a fresh cycle's clean worktree never matches.
 	if cr.cs.ActiveWorktree != "" {
 		if sha := worktreeContentSHA(ctx, cr.req.ProjectRoot, cr.cs.ActiveWorktree); sha != "" {
 			baseTree := worktreeBaseTreeSHA(ctx, cr.cs.ActiveWorktree, cr.cs.WorktreeBaseSHA)
 			if !verdictcache.ProbeEligible(baseTree, sha) {
-				// Untouched/fresh worktree (no changes compared to the base commit),
-				// skip verdict-cache lookup to prevent fresh-base collisions. The
-				// decision is the shared predicate's, never a local copy of it.
+				// An untouched/fresh worktree skips the lookup to prevent
+				// fresh-base collisions.
 				if o.verdictCacheLookupHook != nil {
 					o.verdictCacheLookupHook(sha, true, false, verdictcache.Entry{})
 				}
@@ -1058,11 +839,10 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (_ CycleR
 		}
 	}
 
-	// Bounded loop guards against any transition-table cycle bug. The bound is
-	// injectable (WithMaxPhaseIterations) but defaults to the safety oracle.
-	// Labeled so the extracted sub-methods can signal loop termination
-	// (loopBreak → `break OuterLoop`) from inside the switch ladder below —
-	// a bare `break` there would exit the switch, not the loop (H15).
+	// Bounded loop guards against any transition-table cycle bug. Labeled so
+	// the extracted sub-methods can signal loop termination (loopBreak →
+	// `break OuterLoop`) from inside the switch ladder below — a bare `break`
+	// there would exit the switch, not the loop.
 	maxIter := o.maxPhaseIterations
 	if maxIter <= 0 {
 		maxIter = defaultMaxPhaseIterations
@@ -1088,11 +868,10 @@ OuterLoop:
 			}
 		}
 
-		// PR2b: at ParallelEvaluate=enforce, when `next` begins a run of
-		// independent post-build checking phases (archetype "evaluate", audit
-		// excluded), dispatch the whole run CONCURRENTLY as one batch and skip
-		// the per-phase path. StageOff/Shadow (the default) never enter here, so
-		// the sequential dispatch below is byte-identical to pre-PR2b.
+		// At ParallelEvaluate=enforce, when `next` begins a run of independent
+		// post-build checking phases (archetype "evaluate", audit excluded),
+		// dispatch the whole run concurrently as one batch and skip the
+		// per-phase path. StageOff/Shadow never enter here.
 		if cr.o.cfg.ParallelEvaluate == config.StageEnforce {
 			if batch := cr.evaluateBatchAt(next); len(batch) >= 2 {
 				if bact, berr := cr.dispatchEvaluateBatch(batch); bact == loopAbort {
@@ -1119,10 +898,10 @@ OuterLoop:
 			return cr.result, rerr
 		}
 
-		// Graduated remediation (2026-07-21): a configured deterministic gate
-		// that FAILed gets one bounded builder fix + a same-gate re-run BEFORE
-		// the verdict is recorded. Nothing downstream is bypassed — the same
-		// gate must pass and audit/EGPS/ship floors run unchanged.
+		// A configured deterministic gate that FAILed gets one bounded builder
+		// fix and a same-gate re-run before the verdict is recorded. Nothing
+		// downstream is bypassed — the same gate must pass and audit/ship
+		// floors run unchanged.
 		if act, merr := cr.maybeRemediate(next, &dr); act == loopAbort {
 			return cr.result, merr
 		}
@@ -1138,30 +917,16 @@ OuterLoop:
 			break OuterLoop
 		}
 
-		// WS2-S0 (ADR-0052): post-scout re-plan hook. Fires once per cycle after
-		// scout's handoff has been recorded (recordAndBranch above) and BEFORE the
-		// next selectNext — gated on the just-completed phase being scout. Firing
-		// here (post-record, pre-select) is what keeps the re-plan from widening the
-		// run-set or bypassing the spine gate. No-op until WS2-S3 wires the shadow
-		// RePlan behind EVOLVE_ROUTER_REPLAN.
+		// The post-scout re-plan hook fires once per cycle after scout's
+		// handoff is recorded (above) and before the next selectNext, so a
+		// re-plan can never widen the run-set or bypass the spine gate.
 		if next == PhaseScout {
-			// Lane-scope reconciliation (cycle-640 pin; supersedes the old
-			// hard-abort gate). The scout is asked to echo the pinned goal_hash
-			// into its Decision Trace, but that echo is a FRAGILE signal — a
-			// deterministic LLM transcription flip false-aborted healthy cycles
-			// before triage (cycles 945/947/... — greedy decoding reproduces the
-			// same wrong digit, so retries never self-heal). The pinned
-			// lane-scope.json goal_hash is authoritative, so a divergence is
-			// machine-STAMPED into the report (triage proceeds on a coherent lane)
-			// with a WARN, not an abort. Fail-open on missing pin/report/hash.
 			normalizeScoutGoalHash(cr.cs.WorkspacePath)
 			cr.postScoutReplan()
 		}
-		// ADR-0076 slice C: adoption is keyed to the ACTUAL claim — triage
-		// claims items into processing/cycle-N mid-cycle, so only AFTER the
-		// triage phase can the resolver see whether this cycle's scope
-		// carries preserved work (architect finding #1: resolving at
-		// provisioning time reads a dir that does not exist yet).
+		// Adoption is keyed to the actual claim: triage claims items into
+		// processing/cycle-N mid-cycle, so only after the triage phase can the
+		// resolver see whether this cycle's scope carries preserved work.
 		if next == PhaseTriage {
 			if err := cr.adoptContinuationAfterTriage(); err != nil {
 				cr.result.FinalVerdict = VerdictFAIL
@@ -1170,14 +935,10 @@ OuterLoop:
 		}
 	}
 
-	// ADR-0044 C1 chokepoint-escape guard: the bounded loop can exit by
-	// exhausting its iteration budget (a transition-table cycle) instead of
-	// reaching PhaseEnd. That exit recorded no terminal outcome, so
-	// cyclehealth.ClassifyOutcome would page the cycle FAILED_UNEXPLAINED — the
-	// alarm bucket (the cycle-492 escape). Record an explicit abort so the escape
-	// is FAILED_EXPLAINED and diagnosable: it names the phase the cursor stalled
-	// on. Runs BEFORE finalizeCycle so the recorded FAIL preserves the worktree
-	// for salvage.
+	// The bounded loop can exit by exhausting its iteration budget instead of
+	// reaching PhaseEnd; record an explicit abort naming the stalled phase so
+	// the escape is diagnosable rather than FAILED_UNEXPLAINED. Runs before
+	// finalizeCycle so the recorded FAIL preserves the worktree for salvage.
 	if !cr.reachedPhaseEnd {
 		cr.recordChokepointEscape(fmt.Sprintf(
 			"transition-table cycle guard: dispatch loop ran %d iterations without reaching PhaseEnd (cursor stalled at phase %q) — a transition cycle prevented termination; ADR-0044 C1 chokepoint escape",
@@ -1193,8 +954,8 @@ OuterLoop:
 
 // WithDossierCommit decides whether each cycle's closeout dossier is
 // git-committed into the project root (the production default) or only
-// written (the --simulate root: a no-LLM plumbing walk must never mutate the
-// operator's repository — docs/incidents/2026-09-14-simulate-runs-against-the-checkout.md).
+// written — the --simulate root's contract, since a no-LLM plumbing walk
+// must never mutate the operator's repository.
 func WithDossierCommit(commit bool) Option {
 	return func(o *Orchestrator) { o.dossierCommit = commit }
 }

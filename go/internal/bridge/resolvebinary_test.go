@@ -2,10 +2,6 @@ package bridge
 
 import "testing"
 
-// resolvebinary_test.go — the BRIDGE_TESTING offline binary-override seam
-// (ported from the bash bridge). The override only applies under
-// BRIDGE_TESTING=1 so a stray BRIDGE_*_BINARY can never redirect a real
-// production launch.
 func TestResolveBinary(t *testing.T) {
 	cases := []struct {
 		name        string

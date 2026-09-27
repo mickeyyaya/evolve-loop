@@ -6,7 +6,7 @@
 
 ## Automation Loop Guardrails
 
-- When running the evolve loop or any batch/merge-train automation, evaluate output after EVERY cycle. If 2 consecutive cycles produce zero ships (0 merged PRs), STOP the loop immediately and root-cause the pipeline before running another wave.
+- When running the evolve loop or any batch/merge-train automation, evaluate output after EVERY cycle. If 2 consecutive cycles produce zero ships (0 merged PRs), STOP the loop immediately and root-cause the pipeline before running another wave. Canonical zero-ship halt rule (operator guardrail, not a compiled breaker): [docs/operations/operating-policy.md §4.1](docs/operations/operating-policy.md).
 - Never let a batch run more than 2 unproductive waves "to see if it self-corrects".
 - ADR-0072 reconciliation: a zero-ship streak is SYSTEM-fail evidence — HALT + P0 applies. This does not conflict with "never stop the queue", which governs task-level failures.
 

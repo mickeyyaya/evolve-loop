@@ -1,9 +1,3 @@
-// cmd_skills_drift_test.go is the producer-side alarm for ADR-0040's skill
-// projection: it runs `evolve skills check` in-process against the live repo,
-// so a hand edit inside a GENERATED:phase-facts region — or an SSOT change
-// without a regenerate — fails CI instead of silently shipping drifted docs.
-// Same pattern as phasecontract/contract_test.go (runtime.Caller locates the
-// repo; the live tree is the fixture).
 package main
 
 import (
@@ -15,9 +9,6 @@ import (
 	"testing"
 )
 
-// repoRootForSkills locates the repo root from this file's location
-// (go/cmd/evolve/ → three levels up) and skips the test if the skills/ tree
-// is absent (e.g. a vendored or partial checkout).
 func repoRootForSkills(t *testing.T) string {
 	t.Helper()
 	_, thisFile, _, ok := runtime.Caller(0)
@@ -31,8 +22,6 @@ func repoRootForSkills(t *testing.T) string {
 	return root
 }
 
-// TestSkills_NoDrift asserts every phase skill's generated region matches what
-// the SSOTs produce today, and every skill's frontmatter name equals its dir.
 func TestSkills_NoDrift(t *testing.T) {
 	root := repoRootForSkills(t)
 	var out, errBuf bytes.Buffer
@@ -41,14 +30,10 @@ func TestSkills_NoDrift(t *testing.T) {
 	}
 }
 
-// TestSkills_CheckDetectsDrift mutates a generated region in a temp copy and
-// asserts check exits 2 — the alarm actually fires.
 func TestSkills_CheckDetectsDrift(t *testing.T) {
 	root := repoRootForSkills(t)
 	tmp := t.TempDir()
 
-	// Minimal repo copy: registry + profiles + agents + skills + commands (the
-	// inputs skillsRun reads — commands/ is the second projection surface).
 	for _, rel := range []string{
 		filepath.Join("docs", "architecture", "phase-registry.json"),
 	} {
@@ -79,9 +64,6 @@ func TestSkills_CheckDetectsDrift(t *testing.T) {
 		t.Errorf("stderr missing DRIFT report:\n%s", errBuf.String())
 	}
 }
-
-// The spliceGeneratedRegion idempotency/corruption tests moved with the splice
-// logic to internal/skillcheck/skillcheck_test.go.
 
 func copyFileForTest(t *testing.T, src, dst string) {
 	t.Helper()

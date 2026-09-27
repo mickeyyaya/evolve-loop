@@ -1,7 +1,8 @@
-# ADR-0076 — Failure-disposition routing floors and boundary escalation
+# ADR-0107 — Failure-disposition routing floors and boundary escalation
 
 - **Status:** Accepted (shadow-first)
 - **Date:** 2026-07-23
+- **Renumbered:** filed as ADR-0076 alongside [ADR-0076 convergence architecture](0076-convergence-architecture.md); moved to 0107 on 2026-09-27 so each ADR number names one file. Slice D of ADR-0076 (the deterministic tier-escalation floor) is a different decision and keeps its number.
 - **Cycle:** 1062 (`chronicle-s6-escalation-boundary`, superseded into `failure-disposition-router` S3+S4)
 - **Supersedes/extends:** the recurrence ledger (cycle-661), `internal/retrofile` (cycle-657)
 

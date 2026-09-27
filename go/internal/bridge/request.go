@@ -1,11 +1,5 @@
 package bridge
 
-// request.go — the in-process launch request's required-field gauntlet
-// (ADR-0103 unit 10, review fold: a pre-launch rule lives in the host beside
-// the Launch that runs it, not in the launch-outcome classifier). The
-// production Adapter (adapters/bridge) projects the same function, so the
-// engine and the adapter reject one request with one string.
-
 import (
 	"errors"
 

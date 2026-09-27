@@ -8,22 +8,6 @@ import (
 	"time"
 )
 
-// render_wedge_test.go — claude ≥2.1.173 BLANK-PANE render wedge (inbox
-// claude-2.1.173-blank-pane-after-interval): the Ink renderer can blank a
-// detached pane mid-turn while the agent keeps working (cycle-291: healthy
-// frames to 12:10:36, capture-rc-0-but-empty from 12:11:06, interval-2
-// still saw stdout growth). A blank capture with a LIVE session is a
-// render wedge, not idleness — the legacy reviewer read it as a stall and
-// paused, burning interval×attempts to exit=81 on a working agent.
-//
-// Contract:
-//  1. blank pane + live session ⇒ the driver jiggles the window width
-//     (SIGWINCH → Ink full re-render) and re-captures;
-//  2. still blank ⇒ the stop event reads Busy (extend; never pause a live
-//     agent on a pane that stopped rendering), bounded by maxExtends;
-//  3. the jiggle recovering content ⇒ the recovered frame feeds the normal
-//     progressed/busy evaluation.
-
 // jiggleTmux upgrades fakeTmux with the optional windowJiggler capability.
 type jiggleTmux struct {
 	fakeTmux
@@ -48,11 +32,10 @@ func runTmuxWedge(t *testing.T, fx launchFixture, tmux TmuxController, spy func(
 	return code, stderr.String()
 }
 
-// TestRunTmuxREPL_BlankPaneWedge_JigglesAndExtends — the cycle-291 shape:
-// pane boots, renders once, then goes permanently blank while the session
-// stays alive. The driver must jiggle and EXTEND (busy) every interval —
-// never the legacy "stalled; pause for investigation" — until the
-// maxExtends backstop exhausts.
+// TestRunTmuxREPL_BlankPaneWedge_JigglesAndExtends: pane boots, renders once,
+// then goes permanently blank while the session stays alive. The driver must
+// jiggle and extend (busy) every interval until the maxExtends backstop
+// exhausts.
 func TestRunTmuxREPL_BlankPaneWedge_JigglesAndExtends(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &jiggleTmux{fakeTmux: fakeTmux{paneSeq: []string{

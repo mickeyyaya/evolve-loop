@@ -1,11 +1,5 @@
 package main
 
-// cmd_signals_test.go — `evolve signals codes generate|check` (ADR-0101 S2):
-// the checked-in docs/architecture/signal-codes.md is a projection of the code
-// registry every module links into this binary. The repo-doc test is the CI
-// gate: a code registered without regenerating the doc (or documented
-// differently from its registration) fails here.
-
 import (
 	"bytes"
 	"os"
@@ -92,8 +86,6 @@ func TestSignalsCodes_ErrorsAreLoud(t *testing.T) {
 	}
 }
 
-// The command resolves the doc from the SOURCE root (the worktree under the
-// ACS suite, like `evolve flags`), and dispatches generate|check.
 func TestRunSignals_DispatchesAgainstTheSourceRoot(t *testing.T) {
 	root, err := filepath.Abs(filepath.Join("..", "..", ".."))
 	if err != nil {

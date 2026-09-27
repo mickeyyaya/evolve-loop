@@ -178,14 +178,11 @@ func checkBuildV1(ctx context.Context, binding CycleBinding) []string {
 		return explanationFailure(errors.New("build-report.md is missing the required ## Explanation Documentation section"))
 	}
 	material := materialPaths(paths)
-	if len(material) == 0 {
-		if records := changedCycleRecords(paths); len(records) != 0 {
-			return explanationFailure(fmt.Errorf("not-applicable Build changed immutable cycle explanation record(s): %s", strings.Join(records, ", ")))
-		}
-		return checkNotApplicable(binding, declaration, material, diffSHA)
-	}
 	if failures := foreignHistoryFailures(paths, cycleDocumentPath(binding.Cycle, binding.RunID)); len(failures) != 0 {
 		return failures
+	}
+	if len(material) == 0 && declaration.Status != "REQUIRED" {
+		return checkNotApplicable(binding, declaration, material, diffSHA)
 	}
 	return checkRequired(ctx, binding, declaration, paths, material, diffSHA)
 }
@@ -310,11 +307,8 @@ func verifyResolvedV1(ctx context.Context, binding CycleBinding, verificationRoo
 		}
 		return nil, true, err
 	}
-	if len(material) == 0 {
-		if records := changedCycleRecords(paths); len(records) != 0 {
-			return nil, true, fmt.Errorf("not-applicable Build changed immutable cycle explanation record(s): %s", strings.Join(records, ", "))
-		}
-		if view.Status != statusNA || view.DocumentPath != "" || view.DocumentSHA256 != "" || !declares(declaration, view) {
+	if view.Status == statusNA {
+		if view.DocumentPath != "" || view.DocumentSHA256 != "" || !declares(declaration, view) {
 			return nil, true, fmt.Errorf("not-applicable explanation handoff does not match the Build declaration")
 		}
 		return view, true, nil

@@ -509,7 +509,7 @@ func TestNotApplicable_CannotRewritePublishedCycleDocument(t *testing.T) {
 	f.activate(t)
 	f.write(t, "docs/explain/builds/cycle-41-prior-run.md", "rewritten prior explanation\n")
 	f.writeWorkspace(t, "build-report.md", "## Explanation Documentation\n- Status: NOT_APPLICABLE\n- Reason: documentation-only Build\n")
-	if failures := f.check(t); !containsFailure(failures, "immutable cycle explanation") {
+	if failures := f.check(t); !containsFailure(failures, "published cycle records are immutable") {
 		t.Fatalf("N/A accepted a prior cycle-document rewrite: %v", failures)
 	}
 }

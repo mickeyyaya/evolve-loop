@@ -1,7 +1,7 @@
 package policy
 
 // FailureDispositionPolicy is the "failure_disposition" block for the escalation boundary applier.
-// See ADR-0076.
+// See ADR-0107.
 type FailureDispositionPolicy struct {
 	// Stage is "shadow" (report only) or "enforce" (mutate the inbox); absent follows chronicle.escalation.
 	Stage string `json:"stage,omitempty"`

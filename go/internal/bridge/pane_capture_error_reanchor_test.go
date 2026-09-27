@@ -1,15 +1,5 @@
 package bridge
 
-// pane_capture_error_reanchor_test.go — cycle-1580 audit-repair RED test for
-// defect L1. The transient-dwell refactor hoisted the completion-wait's
-// CapturePane out of the `if channelOn` block to make ONE canonical frame per
-// tick, and in doing so dropped the old `if rendered, cerr := …; cerr == nil`
-// guard (driver_tmux_repl.go:697-703). An errored capture now yields "" and is
-// still fed to recordTokens and PaneDelta.Next — and Next("") re-anchors the
-// delta (emitted=0, anchor=""), so the NEXT successful frame re-emits the whole
-// stable pane to <agent>-pane.live. Pre-refactor a capture error skipped the
-// delta entirely and the stream stayed monotone.
-
 import (
 	"context"
 	"errors"
@@ -46,14 +36,11 @@ func (p *flakyPaneTmux) CapturePane(_ context.Context, _ string, _ int) (string,
 	return p.pane, nil
 }
 
-// errCapture is the capture transport failure under test.
 var errCapture = errors.New("capture-pane: no server running")
 
-// TestRunTmuxREPL_CaptureErrorDoesNotReanchorPaneDelta drives the real driver
-// through a good → good → ERROR → good frame sequence and asserts the answer
-// line reaches pane.live exactly once. With the dropped guard the errored frame
-// re-anchors the delta and tick 4 re-emits the entire stable pane, so the line
-// lands twice.
+// TestRunTmuxREPL_CaptureErrorDoesNotReanchorPaneDelta drives a good → good →
+// ERROR → good frame sequence and asserts the answer line reaches pane.live
+// exactly once.
 func TestRunTmuxREPL_CaptureErrorDoesNotReanchorPaneDelta(t *testing.T) {
 	ws := t.TempDir()
 	cfg := paneLiveCfg(t, ws)
@@ -97,10 +84,9 @@ func TestRunTmuxREPL_CaptureErrorDoesNotReanchorPaneDelta(t *testing.T) {
 	}
 }
 
-// TestRunTmuxREPL_CaptureErrorStillCompletes is the guard's negative axis: the
-// fix must skip the delta on error, not abort or stall the wait. A pane that
-// never captures successfully after priming must still complete on its
-// artifact and emit nothing spurious.
+// TestRunTmuxREPL_CaptureErrorStillCompletes asserts a pane that never
+// captures successfully after priming still completes on its artifact and
+// emits nothing spurious.
 func TestRunTmuxREPL_CaptureErrorStillCompletes(t *testing.T) {
 	ws := t.TempDir()
 	cfg := paneLiveCfg(t, ws)

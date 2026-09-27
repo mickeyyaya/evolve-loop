@@ -14,17 +14,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// Orchestrator phase-1 test surface — uses fake adapters to verify the
-// sequencing contract without touching disk or processes. Real adapter
-// impls land in Phase 2.
-
-// --- fakes ---
-//
-// These stay local (not migrated to go/test/fixtures, which has the canonical
-// FakeStorage/FakeLedger/FakeRunner): this is a white-box `package core` test
-// that also exercises unexported internals (recordAuditBinding, runGit, …), and
-// fixtures imports core — importing it here would be a cycle. This is the one
-// place the test-double dedup deliberately cannot reach.
+// These fakes stay local rather than moving to go/test/fixtures: this white-box `package core` test exercises unexported internals (recordAuditBinding, runGit, …), and fixtures imports core, so importing it here would cycle.
 
 type fakeStorage struct {
 	state                      State
@@ -133,16 +123,12 @@ func (it *sliceLedgerIterator) Next() (LedgerEntry, bool, error) {
 
 func (it *sliceLedgerIterator) Close() error { return nil }
 
-// fakeRunner records every call. verdict[i] is the verdict returned on
-// the i-th call; later calls return the last entry.
 type fakeRunner struct {
 	name     string
 	calls    int
 	requests []PhaseRequest
 	verdict  string
-	// failErr (when set) is returned for the first failUntil calls, then the
-	// runner succeeds. Models a transient phase failure for the self-heal
-	// retry path (Fix D). failErr nil → never fails (default).
+	// failErr, when set, is returned for the first failUntil calls; nil never fails.
 	failErr   error
 	failUntil int
 }
@@ -207,8 +193,6 @@ type normalizingExplanationBuilder struct{}
 
 func (*normalizingExplanationBuilder) Name() string { return string(PhaseBuild) }
 func (*normalizingExplanationBuilder) Run(ctx context.Context, req PhaseRequest) (PhaseResponse, error) {
-	// Intentionally leave valid but non-gofmt source behind. The host owns this
-	// normalization, so the explanation must be sealed only after it runs.
 	if err := os.WriteFile(filepath.Join(req.Worktree, "go", "feature.go"), []byte("package fixture\n\nfunc Answer()int{return 42}\n"), 0o644); err != nil {
 		return PhaseResponse{}, err
 	}
@@ -268,8 +252,6 @@ func buildRunners(verdicts map[Phase]string) map[Phase]PhaseRunner {
 	return out
 }
 
-// --- tests ---
-
 func TestOrchestrator_HappyPath_RunsAllPhasesInOrder(t *testing.T) {
 	st := &fakeStorage{state: State{LastCycleNumber: 9}}
 	led := &fakeLedger{}
@@ -299,7 +281,6 @@ func TestOrchestrator_HappyPath_RunsAllPhasesInOrder(t *testing.T) {
 			}
 		}
 	}
-	// One ledger entry per phase that ran.
 	if len(led.entries) != len(want) {
 		t.Errorf("ledger entries=%d, want %d", len(led.entries), len(want))
 	}
@@ -313,10 +294,6 @@ func TestOrchestrator_HappyPath_RunsAllPhasesInOrder(t *testing.T) {
 	}
 }
 
-// CycleRequest.Env must reach every PhaseRequest.Env. Phases consult
-// req.Env["EVOLVE_CLI"] and req.Env["EVOLVE_*_MODEL"] for CLI/model
-// selection; without this passthrough every cycle is silently hardcoded
-// to claude-p + default model.
 func TestOrchestrator_CycleEnv_PropagatesToEveryPhase(t *testing.T) {
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
@@ -336,7 +313,6 @@ func TestOrchestrator_CycleEnv_PropagatesToEveryPhase(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RunCycle: %v", err)
 	}
-	// Every fakeRunner should have seen these env vars.
 	for _, p := range []Phase{PhaseScout, PhaseTriage, PhaseTDD, PhaseBuildPlanner, PhaseBuild, PhaseAudit, PhaseShip} {
 		fr := runners[p].(*fakeRunner)
 		if fr.calls == 0 {
@@ -353,8 +329,6 @@ func TestOrchestrator_CycleEnv_PropagatesToEveryPhase(t *testing.T) {
 	}
 }
 
-// Mutating the operator's Env map post-RunCycle must not retroactively
-// change what phases saw — the orchestrator must copy the map.
 func TestOrchestrator_CycleEnv_IsCopied(t *testing.T) {
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
@@ -385,7 +359,6 @@ func TestOrchestrator_AuditFAIL_RoutesThroughRetro(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RunCycle: %v", err)
 	}
-	// Sequence should include retro after audit.
 	foundRetro := false
 	for _, p := range res.PhasesRun {
 		if p == PhaseRetro {
@@ -481,8 +454,7 @@ func TestOrchestrator_InitialWriteCycleStateError(t *testing.T) {
 }
 
 func TestOrchestrator_WriteCycleStateMidPhaseError(t *testing.T) {
-	// Fail on the 2nd write (after init). The orchestrator writes
-	// pre-phase and post-phase, so this fails before scout's run.
+	// Init=1, pre-scout=2 → fails before scout's run.
 	st := &fakeStorage{writeCSFailAt: 2}
 	led := &fakeLedger{}
 	o := NewOrchestrator(st, led, buildRunners(nil))
@@ -523,7 +495,6 @@ func TestOrchestrator_FinalWriteStateError(t *testing.T) {
 	}
 }
 
-// A runner that returns an error from Run.
 type erroringRunner struct{ name string }
 
 func (e *erroringRunner) Name() string { return e.name }
@@ -543,7 +514,6 @@ func TestOrchestrator_RunnerErrorPropagates(t *testing.T) {
 	}
 }
 
-// A runner that returns a non-canonical verdict.
 type badVerdictRunner struct{ name string }
 
 func (b *badVerdictRunner) Name() string { return b.name }
@@ -573,7 +543,6 @@ func TestOrchestrator_RecordsCompletedPhases(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RunCycle: %v", err)
 	}
-	// Final cycle-state should list every phase that ran.
 	final := st.cycleState
 	wantPhases := []string{"scout", "triage", "tdd", "build-planner", "build", "audit", "ship"}
 	if len(final.CompletedPhases) != len(wantPhases) {
@@ -638,12 +607,6 @@ func TestOrchestrator_NormalizesBuildBeforeSealingExplanationForFirstAudit(t *te
 	}
 }
 
-// --- intent-gate tests (M2 wiring) ---
-
-// When intent is not required, the first phase to run is Scout — the
-// historical default. Verified by the happy-path test above; this one
-// just asserts that PhaseIntent did NOT execute and that the runner
-// registered for intent was never invoked.
 func TestOrchestrator_IntentGate_DefaultRunsScoutFirst(t *testing.T) {
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
@@ -661,16 +624,11 @@ func TestOrchestrator_IntentGate_DefaultRunsScoutFirst(t *testing.T) {
 	if len(res.PhasesRun) == 0 || res.PhasesRun[0] != PhaseScout {
 		t.Errorf("phases[0]=%v, want scout", res.PhasesRun)
 	}
-	// CycleState should record intent_required=false for downstream
-	// consumers (resume / classifier).
 	if st.cycleState.IntentRequired {
 		t.Errorf("CycleState.IntentRequired=true, want false")
 	}
 }
 
-// PhaseEnables["intent"]="on" in WorkflowConfig triggers the intent phase
-// before Scout. CycleState.IntentRequired is persisted so resume +
-// downstream consumers can read it.
 func TestOrchestrator_IntentGate_PhaseEnableRunsIntentFirst(t *testing.T) {
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
@@ -704,9 +662,6 @@ func TestOrchestrator_IntentGate_PhaseEnableRunsIntentFirst(t *testing.T) {
 	}
 }
 
-// Context["intent_required"]="true" is the explicit caller-side knob;
-// it should also trigger intent regardless of env. Source priority is
-// Context > Env in the orchestrator.
 func TestOrchestrator_IntentGate_ContextOverrideRunsIntent(t *testing.T) {
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
@@ -736,20 +691,10 @@ func TestStateMachine_NextFromStart(t *testing.T) {
 	}
 }
 
-// --- failure-adapter retro branching (M3) ---
-
-// Retro PASS short-circuits to ship — failureadapter not consulted.
-// Renamed from TestOrchestrator_RetroPASS_RoutesToShip, whose fixture comment read
-// "Even with prior failures, retro PASS overrides and ships" — the clearest
-// statement of the category error being corrected. A retro verdict reports whether
-// the POST-MORTEM is complete; it cannot override a failure it merely described,
-// and the retro persona is read-only outside its own artifacts, so the tree here is
-// byte-identical to the one the auditor rejected.
 func TestOrchestrator_RetroPASS_DoesNotRouteToShip(t *testing.T) {
 	st := &fakeStorage{state: State{
 		LastCycleNumber: 0,
 		FailedAt: []FailedRecord{
-			// Prior failures stand: a well-written retrospective does not clear them.
 			{Cycle: 1, Verdict: "FAIL", Classification: "code-build-fail"},
 			{Cycle: 2, Verdict: "FAIL", Classification: "code-build-fail"},
 		},
@@ -765,7 +710,6 @@ func TestOrchestrator_RetroPASS_DoesNotRouteToShip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RunCycle: %v", err)
 	}
-	// After retro PASS, ship should have run.
 	wantTail := []Phase{PhaseAudit, PhaseRetro}
 	got := res.PhasesRun
 	if len(got) < len(wantTail) {
@@ -777,9 +721,6 @@ func TestOrchestrator_RetroPASS_DoesNotRouteToShip(t *testing.T) {
 			t.Errorf("tail[%d]=%s, want %s; full=%v", i, tail[i], p, got)
 		}
 	}
-	// Disposition contract (cycle-1046 verdict-path wiring): fixtures carry no
-	// disposition.json, so the gate prefixes its loud reason — the branch
-	// decision must still be carried (suffix), and the gate must be audible.
 	for _, p := range res.PhasesRun {
 		if p == PhaseShip {
 			t.Fatalf("ship ran after an audit FAIL that only a retrospective 'recovered'; phases=%v", res.PhasesRun)
@@ -793,7 +734,6 @@ func TestOrchestrator_RetroPASS_DoesNotRouteToShip(t *testing.T) {
 	}
 }
 
-// Retro FAIL + clean failedApproaches → PROCEED → end (no ship, no retry).
 func TestOrchestrator_RetroFAIL_NoHistory_RoutesToEnd(t *testing.T) {
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
@@ -807,7 +747,6 @@ func TestOrchestrator_RetroFAIL_NoHistory_RoutesToEnd(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RunCycle: %v", err)
 	}
-	// Retro is the last phase — no ship, no second tdd.
 	last := res.PhasesRun[len(res.PhasesRun)-1]
 	if last != PhaseRetro {
 		t.Errorf("last phase=%s, want retro", last)
@@ -824,8 +763,6 @@ func TestOrchestrator_RetroFAIL_NoHistory_RoutesToEnd(t *testing.T) {
 	}
 }
 
-// Retro FAIL + 2 distinct code-audit-fail records → BLOCK-CODE (strict)
-// or PROCEED awareness (fluent default). Default fluent mode → end.
 func TestOrchestrator_RetroFAIL_RecurringAudit_FluentEnd(t *testing.T) {
 	st := &fakeStorage{state: State{
 		LastCycleNumber: 5,
@@ -845,7 +782,6 @@ func TestOrchestrator_RetroFAIL_RecurringAudit_FluentEnd(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RunCycle: %v", err)
 	}
-	// Fluent mode default → PROCEED with awareness → end.
 	last := res.PhasesRun[len(res.PhasesRun)-1]
 	if last != PhaseRetro {
 		t.Errorf("last phase=%s, want retro (fluent proceed→end)", last)
@@ -855,8 +791,6 @@ func TestOrchestrator_RetroFAIL_RecurringAudit_FluentEnd(t *testing.T) {
 	}
 }
 
-// entriesFromRecords sanity: classification + retrospected fields survive
-// the cross-package projection.
 func TestEntriesFromRecords_PreservesClassification(t *testing.T) {
 	records := []FailedRecord{
 		{Cycle: 1, Verdict: "FAIL", Classification: "code-build-fail", Retrospected: true},
@@ -877,11 +811,6 @@ func TestEntriesFromRecords_PreservesClassification(t *testing.T) {
 	}
 }
 
-// --- Fix D: self-heal on bridge ArtifactTimeout (exit=81) ---
-
-// A phase that hits a bridge ArtifactTimeout once then succeeds must be
-// relaunched, and the cycle must complete normally (cycle-149 exit=81 at scout
-// aborted the whole loop with no retry).
 func TestOrchestrator_PhaseArtifactTimeout_RetriesAndRecovers(t *testing.T) {
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
@@ -900,7 +829,6 @@ func TestOrchestrator_PhaseArtifactTimeout_RetriesAndRecovers(t *testing.T) {
 	if res.FinalVerdict != VerdictPASS {
 		t.Errorf("verdict=%s, want PASS after recovery", res.FinalVerdict)
 	}
-	// The retry must not double-run downstream phases: each runs exactly once.
 	for _, p := range []Phase{PhaseTriage, PhaseTDD, PhaseBuild, PhaseAudit, PhaseShip} {
 		if got := runners[p].(*fakeRunner).calls; got != 1 {
 			t.Errorf("phase %s calls=%d, want 1 (scout retry must not re-run downstream)", p, got)
@@ -908,8 +836,6 @@ func TestOrchestrator_PhaseArtifactTimeout_RetriesAndRecovers(t *testing.T) {
 	}
 }
 
-// A phase that times out on every attempt must abort after the configured cap —
-// not retry forever — and the error must still wrap ErrArtifactTimeout.
 func TestOrchestrator_PhaseArtifactTimeout_AbortsAfterCap(t *testing.T) {
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
@@ -929,8 +855,6 @@ func TestOrchestrator_PhaseArtifactTimeout_AbortsAfterCap(t *testing.T) {
 	}
 }
 
-// A non-timeout error must abort immediately with NO retry — retry is reserved
-// for the recoverable artifact-timeout case.
 func TestOrchestrator_PhaseNonTimeoutError_NoRetry(t *testing.T) {
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
@@ -947,8 +871,6 @@ func TestOrchestrator_PhaseNonTimeoutError_NoRetry(t *testing.T) {
 	}
 }
 
-// wrapTimeout returns an error that wraps ErrArtifactTimeout the way the bridge
-// engine does (fmt.Errorf("...: %w", ErrArtifactTimeout)).
 func wrapTimeout() error {
 	return errArtifactTimeoutWrapper{}
 }

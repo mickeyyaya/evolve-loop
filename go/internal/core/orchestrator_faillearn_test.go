@@ -1,15 +1,3 @@
-// orchestrator_faillearn_test.go — failure-floor Phase 2 (inbox
-// retro-always-invariant, gap 1 / cycle-243 reproduction).
-//
-// Behavioral contract: when the LLM retro degrades during failure
-// learning (retro runner error, e.g. bridge timeout exit=81, or a
-// non-canonical verdict), the orchestrator must still produce durable
-// learning artifacts deterministically — a retrospective-report.md in
-// the cycle workspace and a failure-lesson YAML in
-// .evolve/instincts/lessons/ — instead of only a stderr WARN.
-//
-// Shares the core_test harness (newRunners / newTestOrchestrator)
-// defined in orchestrator_recovery_test.go.
 package core_test
 
 import (
@@ -23,9 +11,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// staticVerdictRunner succeeds at the transport level but returns a
-// fixed (possibly non-canonical) verdict — the cycle-243 "retro ran but
-// produced garbage" shape.
+// staticVerdictRunner succeeds at the transport level but returns a fixed
+// (possibly non-canonical) verdict, modeling a retro that ran but produced garbage.
 type staticVerdictRunner struct {
 	name    string
 	verdict string
@@ -36,8 +23,6 @@ func (r *staticVerdictRunner) Run(_ context.Context, req core.PhaseRequest) (cor
 	return core.PhaseResponse{Phase: r.name, Verdict: r.verdict, ArtifactsDir: req.Workspace}, nil
 }
 
-// runCycleWithFailingTriage drives a cycle where triage fails hard and
-// the retro runner behaves per `retro`. Returns the project root.
 func runCycleWithFailingTriage(t *testing.T, retro core.PhaseRunner) string {
 	t.Helper()
 	root := t.TempDir()
@@ -89,8 +74,6 @@ func TestRecordFailureLearning_NonCanonicalVerdict_WritesDeterministicArtifacts(
 	assertDeterministicArtifacts(t, root)
 }
 
-// The floor adds artifacts; it must not regress the FailedRecord that
-// recordFailureLearning already persists on the degradation path.
 func TestRecordFailureLearning_RetroRunnerError_FailedRecordStillPersisted(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -120,8 +103,6 @@ func TestRecordFailureLearning_RetroRunnerError_FailedRecordStillPersisted(t *te
 	}
 }
 
-// When the LLM retro succeeds, the floor must stay out of the way: no
-// deterministic-fallback report may shadow or precede the LLM artifact.
 func TestRecordFailureLearning_RetroSucceeds_NoDeterministicFallback(t *testing.T) {
 	t.Parallel()
 	root := runCycleWithFailingTriage(t, &recordingRetroRunner{name: "retro"})
@@ -137,8 +118,9 @@ func TestRecordFailureLearning_RetroSucceeds_NoDeterministicFallback(t *testing.
 }
 
 // reportingErrRunner writes a report carrying a v2 failure-block sentinel,
-// then fails — the "phase was healthy enough to self-report" shape
-// (ADR-0039 §7 item 5).
+// then fails — the phase was healthy enough to self-report.
+//
+// See ADR-0039.
 type reportingErrRunner struct{ name string }
 
 func (r *reportingErrRunner) Name() string { return r.name }
@@ -158,10 +140,6 @@ type errStatic string
 
 func (e errStatic) Error() string { return string(e) }
 
-// A failed phase that self-reported a structured failure block must have its
-// REAL defects/class/evidence flow into the deterministic learning artifacts —
-// not the generic summary string. Supervisor synthesis stays the fallback for
-// phases that died without reporting (the existing tests above).
 func TestRecordFailureLearning_StructuredBlockFlowsIntoArtifacts(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

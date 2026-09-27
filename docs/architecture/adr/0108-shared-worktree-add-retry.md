@@ -1,8 +1,9 @@
-# ADR-0082 — One shared retry contract for `git worktree add`
+# ADR-0108 — One shared retry contract for `git worktree add`
 
 - **Status:** Accepted (cycle-1268)
+- **Renumbered:** filed as ADR-0082 alongside [ADR-0082 regression test-impact selection](0082-regression-test-impact-selection-shadow.md); moved to 0108 on 2026-09-27 so each ADR number names one file. Older records that cite "ADR-0082" for the `git worktree add` retry mean this ADR.
 - **Supersedes nothing.** Generalizes the single-site fix from PR #401 (`a497ffe1`).
-- **Related:** ADR-0076 (continuation architecture — `CreateFrom` is its seeding path), ADR-0032 (swarm harness), refuted PR #400.
+- **Related:** [ADR-0076](0076-convergence-architecture.md) (continuation architecture — `CreateFrom` is its seeding path), ADR-0032 (swarm harness), refuted PR #400.
 
 ## Context
 

@@ -11,12 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// WS3-S4 (ADR-0052): `evolve routing explain --cycle N` is a READ-ONLY render
-// of a recorded routing decision — the clamped plan (run/skip + justification),
-// the integrity-floor clamps that fired, and the OTel decision span — so an
-// operator can debug WHY a cycle ran the phases it did. Missing artifacts are a
-// clean message, not an error (a partially-recorded cycle still explains).
-
 func writeJSON(t *testing.T, path string, v any) {
 	t.Helper()
 	buf, err := json.MarshalIndent(v, "", "  ")
@@ -75,16 +69,11 @@ func TestRoutingExplain_MissingArtifactsAreCleanExitZero(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("a cycle with no recorded artifacts must still exit 0, got %d; stderr=%s", code, errb.String())
 	}
-	// A clean "nothing recorded" message, not a crash or an error.
 	if !bytes.Contains(out.Bytes(), []byte("no phase plan")) {
 		t.Errorf("want a clean 'no phase plan' message for an unrecorded cycle:\n%s", out.String())
 	}
 }
 
-// WS3-S5: `evolve routing replay --cycle N` reparses the captured response and
-// compares its run-set to the recorded phase-plan.json — MATCH (exit 0) when
-// the capture still reproduces the recorded plan, MISMATCH (non-zero) when it
-// diverges (a tampered/corrupted capture, or a prompt/model regression).
 func TestRoutingReplay_MatchesRecordedRunSet(t *testing.T) {
 	t.Parallel()
 	pr := t.TempDir()
@@ -110,7 +99,6 @@ func TestRoutingReplay_MatchesRecordedRunSet(t *testing.T) {
 		t.Errorf("want MATCH in output:\n%s", out.String())
 	}
 
-	// Now a recorded plan whose run-set DIVERGES from the capture → MISMATCH.
 	writeJSON(t, filepath.Join(ws, "phase-plan.json"), []router.PhasePlanEntry{
 		{Phase: "scout", Run: false, Justification: "tampered"},
 	})

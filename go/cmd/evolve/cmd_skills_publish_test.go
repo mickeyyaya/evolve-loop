@@ -1,7 +1,3 @@
-// cmd_skills_publish_test.go covers `evolve skills publish` (ADR-0041): the
-// cross-CLI projection of canonical skills/ into Codex, agy, and Ollama
-// surfaces. All tests are hermetic — temp project trees, a temp CODEX_HOME,
-// and seam-recorded exec calls (no real agy/ollama runs).
 package main
 
 import (
@@ -18,13 +14,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 )
 
-// publishSkillDoc builds a minimal canonical SKILL.md.
 func publishSkillDoc(name, desc, body string) string {
 	return "---\nname: " + name + "\ndescription: " + desc + "\n---\n\n" + body
 }
 
-// publishTestProject writes a temp repo with .claude-plugin/plugin.json and
-// the given skills (name → SKILL.md content), returning its root.
 func publishTestProject(t *testing.T, skills map[string]string) string {
 	t.Helper()
 	root := t.TempDir()
@@ -190,7 +183,6 @@ func TestPublishCodex_StageOnlyDoesNotTouchCodexHome(t *testing.T) {
 		t.Fatalf("exit %d\nstderr:\n%s", code, errBuf.String())
 	}
 
-	// Mirror staged with rewritten name + sentinel, body preserved.
 	staged, err := os.ReadFile(filepath.Join(project, ".evolve", "publish", "codex", "evolve-build", "SKILL.md"))
 	if err != nil {
 		t.Fatalf("staged mirror missing: %v", err)
@@ -206,7 +198,6 @@ func TestPublishCodex_StageOnlyDoesNotTouchCodexHome(t *testing.T) {
 		t.Errorf("body lost:\n%s", s)
 	}
 
-	// CODEX_HOME untouched without --install.
 	if entries, _ := os.ReadDir(filepath.Join(codexHome, "skills")); len(entries) != 0 {
 		t.Errorf("codex home mutated without --install: %v", entries)
 	}
@@ -230,7 +221,6 @@ func TestPublishCodex_InstallIsIdempotentAndNameMatchesDir(t *testing.T) {
 		t.Fatalf("want 2 installed skills, got %d: %v", len(first), first)
 	}
 
-	// ADR-0041 analogue of the ADR-0040 invariant: frontmatter name == dir name.
 	for rel, content := range first {
 		dir := filepath.Dir(rel) // evolve-<name>
 		fm, _, err := prompts.ParseFrontmatter(content)
@@ -296,10 +286,6 @@ func TestPublishCodex_PrunesOnlySentinelMarked(t *testing.T) {
 	}
 }
 
-// TestPublishAgy_IncludesCommandStubs: agy is a Claude-Code-shaped plugin host,
-// so its projection must carry the same commands/<name>.md stubs (and declare
-// them in plugin.json) that surface /evo:<name> in the menu — otherwise agy has
-// the identical skills-only discoverability gap this projection exists to close.
 func TestPublishAgy_IncludesCommandStubs(t *testing.T) {
 	stubPublishExec(t, true)
 	doc := "---\nname: scout\ndescription: Scout the codebase\nargument-hint: \"[area]\"\n---\n\nbody\n"
@@ -335,15 +321,10 @@ func TestPublishAgy_IncludesCommandStubs(t *testing.T) {
 	}
 }
 
-// TestPublishAgy_StagesSkillCompanionFiles pins the D5 fix: agy stages each skill
-// WHOLE — SKILL.md plus companion files and reference/ overlays — so the body's
-// "read reference/agy-tools.md first" instruction does not 404 in the installed
-// plugin. Staging only SKILL.md (the old behavior) silently dropped them.
 func TestPublishAgy_StagesSkillCompanionFiles(t *testing.T) {
 	stubPublishExec(t, true)
 	doc := "---\nname: loop\ndescription: Run the loop\n---\n\nbody: read reference/agy-tools.md first\n"
 	project := publishTestProject(t, map[string]string{"loop": doc})
-	// A reference/ overlay + a sibling companion file the SKILL.md body depends on.
 	refDir := filepath.Join(project, "skills", "loop", "reference")
 	if err := os.MkdirAll(refDir, 0o755); err != nil {
 		t.Fatal(err)
@@ -367,19 +348,14 @@ func TestPublishAgy_StagesSkillCompanionFiles(t *testing.T) {
 			t.Errorf("agy bundle missing %s — agy runtime would 404 on it: %v", rel, err)
 		}
 	}
-	// Companion files are staged verbatim (a provenance header would corrupt them).
 	if ref, _ := os.ReadFile(filepath.Join(stagingPlugin, "skills", "loop", "reference", "agy-tools.md")); string(ref) != "agy tool map" {
 		t.Errorf("reference file must be staged verbatim, got: %q", ref)
 	}
-	// Only the entry SKILL.md carries the provenance marker.
 	if skill, _ := os.ReadFile(filepath.Join(stagingPlugin, "skills", "loop", "SKILL.md")); !strings.Contains(string(skill), publishProvenanceSentinel) {
 		t.Error("agy SKILL.md should carry the provenance header")
 	}
 }
 
-// TestPublishAgy_PrunesStalePreRenamePlugin pins D7: installing evo prunes the
-// pre-rename evolve-loop plugin so an upgrading user doesn't keep both with
-// colliding skills (mirrors the ollama stale-model prune).
 func TestPublishAgy_PrunesStalePreRenamePlugin(t *testing.T) {
 	calls := stubPublishExec(t, true)
 	doc := "---\nname: scout\ndescription: Scout\n---\n\nbody\n"
@@ -400,7 +376,6 @@ func TestPublishAgy_PrunesStalePreRenamePlugin(t *testing.T) {
 	}
 }
 
-// TestPublishAgy_NoPruneWithoutPruneFlag — --no-prune must not uninstall anything.
 func TestPublishAgy_NoPruneWithoutPruneFlag(t *testing.T) {
 	calls := stubPublishExec(t, true)
 	doc := "---\nname: scout\ndescription: Scout\n---\n\nbody\n"
@@ -415,10 +390,6 @@ func TestPublishAgy_NoPruneWithoutPruneFlag(t *testing.T) {
 	}
 }
 
-// TestPublish_CrossCLISurfaces pins the deliberate per-CLI discoverability
-// surface across all three targets so a future change can't silently drop or
-// mismatch one: codex skills load natively (no command layer), agy is a
-// plugin host that needs the command stubs, ollama has only models.
 func TestPublish_CrossCLISurfaces(t *testing.T) {
 	stubPublishExec(t, true)
 	doc := "---\nname: scout\ndescription: Scout the codebase\nargument-hint: \"[area]\"\n---\n\nScout body.\n"
@@ -491,7 +462,6 @@ func TestPublishAgy_StagingLayoutAndValidate(t *testing.T) {
 		t.Errorf("sentinel missing:\n%s", staged)
 	}
 
-	// validate runs even without --install; install must NOT have run.
 	var sawValidate, sawInstall bool
 	for _, c := range *calls {
 		if c.Name == "agy" && len(c.Args) > 1 && c.Args[1] == "validate" {
@@ -584,7 +554,6 @@ func TestPublishOllama_SelectsReadOnlySubset(t *testing.T) {
 		t.Errorf("description/body not embedded in SYSTEM:\n%s", scout)
 	}
 
-	// Manifest records exactly the projected models.
 	raw, err := os.ReadFile(filepath.Join(staging, "manifest.json"))
 	if err != nil {
 		t.Fatalf("manifest.json missing: %v", err)
@@ -704,7 +673,6 @@ func TestRunSkillsPublish_CheckDetectsStagingDrift(t *testing.T) {
 		t.Fatalf("check on fresh staging: exit %d, want 0\nstderr:\n%s", code, errBuf.String())
 	}
 
-	// Mutate the staged file → drift.
 	staged := filepath.Join(project, ".evolve", "publish", "codex", "evolve-scout", "SKILL.md")
 	if err := os.WriteFile(staged, []byte("tampered"), 0o644); err != nil {
 		t.Fatal(err)
@@ -719,9 +687,6 @@ func TestRunSkillsPublish_CheckDetectsStagingDrift(t *testing.T) {
 	}
 }
 
-// TestRunSkillsPublish_CheckFailsOnRenderError pins the review finding: a
-// render failure (e.g. a skill with no name: line) must exit 1 even in check
-// mode — never a false-green "check OK".
 func TestRunSkillsPublish_CheckFailsOnRenderError(t *testing.T) {
 	stubPublishExec(t, false)
 	project := publishTestProject(t, map[string]string{
@@ -762,7 +727,6 @@ func TestParsePublishFlags_Defaults(t *testing.T) {
 	}
 }
 
-// readTreeForPublishTest returns rel path → content for every file under root.
 func readTreeForPublishTest(t *testing.T, root string) map[string]string {
 	t.Helper()
 	got := map[string]string{}

@@ -1,6 +1,6 @@
 # Worktree provisioning contention: the retry, and the refuted alternative
 **Period:** 2026-08-02 → 2026-08-04 · **Status:** shipped
-**Primary artifacts:** PR #401 (merge `a497ffe1`) · refuted PR #400 (CLOSED, never landed) · `go/internal/core/worktree.go` · `go/internal/core/worktree_retry_test.go` · `go/internal/gitexec/worktree.go` (consolidation, cycle commit `751791ac`) · ADR-0082 · ADR-0083 · inbox `2026-08-03T02-20-00Z-worktree-provisioning-retry.json`
+**Primary artifacts:** PR #401 (merge `a497ffe1`) · refuted PR #400 (CLOSED, never landed) · `go/internal/core/worktree.go` · `go/internal/core/worktree_retry_test.go` · `go/internal/gitexec/worktree.go` (consolidation, cycle commit `751791ac`) · ADR-0108 · ADR-0083 · inbox `2026-08-03T02-20-00Z-worktree-provisioning-retry.json`
 
 ## Problem
 
@@ -119,7 +119,7 @@ the shared `gitexec.AddWorktreeWithRetry` loop:
   `-race`.
 - Verification: `go test -race -count=1 ./internal/core/ ./cmd/evolve/` — PASS
   (PR #401 test plan).
-- **Consolidation (cycle commit `751791ac`, 2026-08-04, ADR-0082):** #401
+- **Consolidation (cycle commit `751791ac`, 2026-08-04, ADR-0108):** #401
   fixed exactly one of the **four** `git worktree add` call sites. Residual M1
   from the review (inbox item notes) drove `AddWorktreeWithRetry` into
   `internal/gitexec` — the one bound (`DefaultWorktreeAddAttempts = 3`),
@@ -127,7 +127,7 @@ the shared `gitexec.AddWorktreeWithRetry` loop:
   `core.Create`, `core.CreateFrom` (a collision there drops *salvaged* work),
   `swarm/provision.go` (highest contention), and `cmd_worktree.go` (operator
   CLI). "Wiring a fix into one execution path only is the same defect, just
-  narrower" (ADR-0082).
+  narrower" (ADR-0108).
 
 ## Results (measured)
 
@@ -171,7 +171,7 @@ the shared `gitexec.AddWorktreeWithRetry` loop:
   code never made — the OnRetry text says "retryable", not "transient",
   precisely because a permanent rc=128 was once logged as contention 33 times
   per run (`worktree.go` comment).
-- **One-site fixes recur as fresh incident classes.** M1 → ADR-0082's
+- **One-site fixes recur as fresh incident classes.** M1 → ADR-0108's
   four-site consolidation, before the next site presented independently.
 - **Still open** (recorded in the inbox item's notes; verified against main):
   M2 — the terminal error still reports only the *last* attempt's rc/stderr
@@ -183,7 +183,7 @@ the shared `gitexec.AddWorktreeWithRetry` loop:
 
 ## Links
 
-- ADR-0082 (shared retry contract) · ADR-0083 (transience classification)
+- ADR-0108 (shared retry contract) · ADR-0083 (transience classification)
 - Refuted PR #400 (closed with evidence) · PR #401 (merge `a497ffe1`) ·
   consolidation `751791ac`
 - Inbox record: `evolve-loop-runtime/.evolve/inbox/2026-08-03T02-20-00Z-worktree-provisioning-retry.json`

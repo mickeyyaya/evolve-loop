@@ -8,36 +8,6 @@ import (
 	"testing"
 )
 
-// cmd_subagent_workspace_test.go is the cycle-616 regression for the
-// fable5_deep_scan finding "subagent-workspace-absolutize": cmd_subagent.go
-// passes the LLM-typed <workspace_path> positional argument (runSubagentRun,
-// runSubagentDispatchParallel, runSubagentCachePrefix's --workspace) straight
-// through to subagent/run.go and bridge/engine.go, which only os.Stat/MkdirAll
-// it — no absolutization, no validation. A relative arg resolves against
-// whatever the process's ambient CWD happens to be at invocation time
-// (confirmed in the repo tree by untracked go/tmux-sessions.jsonl and
-// go/.bridge-inbox/ scattered by exactly this path), which is the class of
-// untracked-tree-drift the tree-diff cycle-killer guard reacts to (see the
-// boundary_only_main_tree_writes standing rule).
-//
-// This test targets `run`, the highest-traffic of the three call sites. It
-// proves the CURRENT behavior black-box: point EVOLVE_PROJECT_ROOT at one temp
-// dir, chdir the test process into a DIFFERENT (empty) temp dir, and invoke
-// `evolve subagent run <agent> <cycle> <relative-workspace>` where
-// <relative-workspace> exists under the project root but NOT under cwd.
-//
-//   - Today: workspace is used exactly as typed, so
-//     os.Stat("<relative-workspace>") resolves against cwd (the empty temp
-//     dir), fails, and subagent/run.go returns "workspace dir does not exist" —
-//     even though the SAME relative path is a real, valid directory one level
-//     up under the project root. This is the observable symptom of "no
-//     absolutization at the ingestion point."
-//   - After the fix: the ingestion point must resolve a relative workspace arg
-//     against a known base (EVOLVE_PROJECT_ROOT / layout.ProjectRoot) — NOT
-//     raw cwd — before handing it to subagent.Run, so the stat succeeds and
-//     the run proceeds (failing later for an unrelated, expected reason: no
-//     profile fixture is set up in this test). Either way, nothing may be
-//     created under the invoking cwd.
 func TestRunSubagentRun_RelativeWorkspaceResolvesAgainstProjectRootNotCwd(t *testing.T) {
 	projectRoot := t.TempDir()
 	cwd := t.TempDir()
@@ -86,9 +56,6 @@ func TestRunSubagentRun_RelativeWorkspaceResolvesAgainstProjectRootNotCwd(t *tes
 	}
 }
 
-// TestRunSubagentRun_AbsoluteWorkspacePassesThroughUnchanged is regression
-// coverage: the fix for relative args must not disturb the existing (working)
-// absolute-path contract every real loop invocation already relies on.
 func TestRunSubagentRun_AbsoluteWorkspacePassesThroughUnchanged(t *testing.T) {
 	projectRoot := t.TempDir()
 	workspace := filepath.Join(t.TempDir(), "runs", "cycle-9")
@@ -111,24 +78,6 @@ func TestRunSubagentRun_AbsoluteWorkspacePassesThroughUnchanged(t *testing.T) {
 	}
 }
 
-// --- Test-amplification additions (cycle 616 black-box adversarial pass) ---
-//
-// The AC for subagent-workspace-absolutize names THREE ingestion points
-// (runSubagentRun, runSubagentDispatchParallel, runSubagentCachePrefix), but
-// the TDD RED test above only exercises `run` — "the highest-traffic of the
-// three call sites" per its own comment. The tests below extend the same
-// black-box contract (relative workspace resolves against project root, not
-// cwd; nothing is ever written into the invoking cwd) to the other two
-// ingestion points, plus edge/limit inputs (empty, parent-traversal,
-// deeply-nested) against the `run` call site the RED test already covers.
-
-// TestRunSubagentCachePrefix_RelativeWorkspaceResolvesAgainstProjectRootNotCwd
-// exercises the SECOND ingestion point named in the build report:
-// runSubagentCachePrefix resolves its own `--project-root` for a different
-// purpose and, per the build report, "can reuse the same value" for
-// `--workspace`. A relative `--workspace` must resolve against
-// `--project-root`, not the invoking cwd, and the emitted artifact's
-// `workspace=` metadata line must reflect the resolved absolute path.
 func TestRunSubagentCachePrefix_RelativeWorkspaceResolvesAgainstProjectRootNotCwd(t *testing.T) {
 	projectRoot := t.TempDir()
 	cwd := t.TempDir()
@@ -179,17 +128,6 @@ func TestRunSubagentCachePrefix_RelativeWorkspaceResolvesAgainstProjectRootNotCw
 	}
 }
 
-// TestRunSubagentDispatchParallel_RelativeWorkspaceDoesNotPolluteCwd exercises
-// the THIRD ingestion point named in the build report. Unlike `run` and
-// `cache-prefix`, dispatch-parallel's happy path requires substantial
-// additional fixture scaffolding (an agent profile marked parallel-eligible
-// with parallel_subtasks configured) that lies outside this phase's black-box
-// budget and, per the test-amplifier's anti-bias mandate, must not be
-// discovered by reading cmd_subagent.go itself. Regardless of how far
-// dispatch-parallel gets before failing, the cwd-pollution invariant the AC
-// promises ("no artifacts land in cwd for a relative-path invocation") must
-// hold even on the early-failure path — this is the implementation-agnostic
-// slice of the contract that is safe to pin without that scaffolding.
 func TestRunSubagentDispatchParallel_RelativeWorkspaceDoesNotPolluteCwd(t *testing.T) {
 	projectRoot := t.TempDir()
 	cwd := t.TempDir()
@@ -227,11 +165,6 @@ func TestRunSubagentDispatchParallel_RelativeWorkspaceDoesNotPolluteCwd(t *testi
 	}
 }
 
-// TestRunSubagentRun_EmptyWorkspaceArgDoesNotPanicOrPolluteCwd is the null/empty
-// boundary case: an empty positional workspace argument (e.g. a template
-// expansion gone wrong upstream) must fail cleanly — no panic, no crash loop,
-// and critically no fallback to "resolve against cwd" (an empty relative
-// value must not silently become the cwd itself).
 func TestRunSubagentRun_EmptyWorkspaceArgDoesNotPanicOrPolluteCwd(t *testing.T) {
 	projectRoot := t.TempDir()
 	cwd := t.TempDir()
@@ -274,12 +207,6 @@ func TestRunSubagentRun_EmptyWorkspaceArgDoesNotPanicOrPolluteCwd(t *testing.T) 
 	}
 }
 
-// TestRunSubagentRun_DeeplyNestedRelativeWorkspaceResolvesAgainstProjectRoot is
-// the large-scale/limit case: a relative path with many path segments (as a
-// deeply-nested cycle/worker layout could plausibly produce) must resolve
-// correctly against the project root, exactly like a single-segment relative
-// path — the join must not truncate, mis-index, or otherwise mishandle a long
-// component chain.
 func TestRunSubagentRun_DeeplyNestedRelativeWorkspaceResolvesAgainstProjectRoot(t *testing.T) {
 	projectRoot := t.TempDir()
 	cwd := t.TempDir()
@@ -322,17 +249,6 @@ func TestRunSubagentRun_DeeplyNestedRelativeWorkspaceResolvesAgainstProjectRoot(
 	}
 }
 
-// TestRunSubagentRun_WorkspaceOutsideProjectRootRejected is the cycle-619
-// containment slice of subagent-workspace-absolutize. Cycle 616 landed
-// absolutization (a relative arg resolves against project root, not cwd) but
-// left the ".." escape unhandled — a relative workspace like "../sibling"
-// still resolves to a real directory OUTSIDE the project root and then gets
-// os.Stat'd + MkdirAll'd (workers/, logs), scattering run artifacts into an
-// arbitrary sibling tree. That is the same untracked-tree-drift class the
-// absolutization fixed for cwd, just relocated. The resolver must now REJECT a
-// relative workspace whose cleaned join escapes the project root, loudly and
-// with no MkdirAll side effect. (Absolute args keep their documented
-// passthrough contract — the real loop hands absolute worktree/runs paths.)
 func TestRunSubagentRun_WorkspaceOutsideProjectRootRejected(t *testing.T) {
 	parent := t.TempDir()
 	projectRoot := filepath.Join(parent, "proj")
@@ -369,7 +285,6 @@ func TestRunSubagentRun_WorkspaceOutsideProjectRootRejected(t *testing.T) {
 	if !strings.Contains(stderr.String(), "project root") {
 		t.Errorf("rejection must name the containment violation; got stderr=%q", stderr.String())
 	}
-	// No MkdirAll side effect: the escaped sibling tree must gain no artifacts.
 	entries, err := os.ReadDir(sibling)
 	if err != nil {
 		t.Fatalf("readdir sibling: %v", err)
@@ -379,13 +294,10 @@ func TestRunSubagentRun_WorkspaceOutsideProjectRootRejected(t *testing.T) {
 	}
 }
 
-// TestRunSubagentRun_ParentTraversalRelativeWorkspaceDoesNotPolluteCwd probes
-// the traversal edge case: a relative workspace containing ".." components
-// (escaping the project root's own subtree, e.g. into a sibling directory).
-// The AC does not promise sandboxing against ".." (only "resolved against
-// project root, not cwd"), so this test does not assert containment — it
-// pins the one invariant the AC does guarantee regardless of how ".." is
-// handled: the invoking cwd is never touched.
+// This does not assert containment (a relative arg escaping the project root
+// is a separate invariant, see TestRunSubagentRun_WorkspaceOutsideProjectRootRejected);
+// it pins only that the invoking cwd is never touched, regardless of how ".."
+// is handled.
 func TestRunSubagentRun_ParentTraversalRelativeWorkspaceDoesNotPolluteCwd(t *testing.T) {
 	parent := t.TempDir()
 	projectRoot := filepath.Join(parent, "proj")
