@@ -190,7 +190,7 @@ func (p *Phase) runNative(ctx context.Context, req core.PhaseRequest, msg string
 	if rerr != nil {
 		return core.PhaseResponse{}, fmt.Errorf("ship repo-contract gate: %w", rerr)
 	}
-	if gerr := runRepoContractGateAt(ctx, p.repoContractGate, gateRoot, baseRef, req.Workspace, os.Stderr); gerr != nil {
+	if gerr := runRepoContractGateAt(ctx, p.repoContractGate, gateRoot, baseRef, req.Workspace, os.Stderr, backstopFlakeSignal(p.signals, req.Cycle)); gerr != nil {
 		return core.PhaseResponse{}, fmt.Errorf("ship repo-contract gate: %w", gerr)
 	}
 	res, err := Run(ctx, opts)

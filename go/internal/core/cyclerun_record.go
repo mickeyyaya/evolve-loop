@@ -206,6 +206,13 @@ func (cr *cycleRun) recordAndBranch(next Phase, dr dispatchResult) (loopAction, 
 		if branch == PhaseEnd {
 			return loopBreak, nil
 		}
+		if next, resumed := cr.o.resumeFleetRebaseAfterDebugger(cr.ctx, cr.req.ProjectRoot, cr.cycle, &cr.cs, branch, cr.recoveryDepth, fleetWidthFromEnv(cr.req.Env)); resumed {
+			cr.recoveryDepth++
+			if next == PhaseEnd {
+				return loopBreak, nil
+			}
+			branch = next
+		}
 		if !cr.o.sm.CanTransition(PhaseDebugger, branch) {
 			return loopAbort, fmt.Errorf("debugger→%s not allowed by state machine", branch)
 		}
