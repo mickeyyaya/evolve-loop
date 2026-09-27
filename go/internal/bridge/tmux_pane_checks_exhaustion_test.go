@@ -5,12 +5,6 @@ import (
 	"testing"
 )
 
-// paneProfileFor must project the per-CLI manifest's quota/rate-limit pattern
-// into PaneProfile.ExhaustedRegex (single-source), so the LivenessCenter's
-// ExhaustionProbe detects a mid-phase wall. Acceptance: the projected pattern
-// must match the REAL Gemini incident wording — "Individual quota reached" —
-// the exact message that hung the agy router phase (usage-probe pattern already
-// matches it; the bug was it was never wired into phase execution).
 func TestPaneProfileFor_ProjectsExhaustedRegex(t *testing.T) {
 	p := paneProfileFor(tmuxLaunch{name: "agy-tmux", promptMarker: "? for shortcuts"})
 	if p.ExhaustedRegex == "" {
@@ -26,9 +20,6 @@ func TestPaneProfileFor_ProjectsExhaustedRegex(t *testing.T) {
 	}
 }
 
-// A CLI whose manifest defines no exhaustion pattern (or an unknown driver)
-// leaves ExhaustedRegex empty — exhaustion detection off, fail-open (never
-// invents a wall for a driver that cannot report one).
 func TestPaneProfileFor_UnknownDriver_NoExhaustedRegex(t *testing.T) {
 	p := paneProfileFor(tmuxLaunch{name: "itest-tmux", promptMarker: "> "})
 	if p.ExhaustedRegex != "" {

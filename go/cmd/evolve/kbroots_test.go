@@ -16,7 +16,6 @@ func TestKBRootsAbs(t *testing.T) {
 			t.Errorf("resolved root %q is not absolute", p)
 		}
 	}
-	// The default lessons dir must resolve under the project root.
 	wantLessons := filepath.Join(root, ".evolve/instincts/lessons")
 	found := false
 	for _, p := range got {

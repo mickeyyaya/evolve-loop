@@ -1,19 +1,3 @@
-// docs_contract_test.go — v12.1 test layer 7: docs-contract enforcement.
-// Asserts that every EVOLVE_* env var referenced in the Go code (via
-// envchain.PhaseEnvKey, os.Getenv, or req.Env lookups) appears in the
-// "Current behavior" table — which lives in
-// docs/operations/runtime-reference.md since 2026-06-05 (moved out of
-// CLAUDE.md to keep it under the 40k-char context limit; both files are
-// scanned). Fails when a developer adds a new env var without
-// documenting it.
-//
-// Two intentional softnesses:
-//   - We allow EVOLVE_<PHASE>_PERMISSION_MODE / _MODEL / _PLAN_INPUT /
-//     _PLAN_OUTPUT / _INTERACTIVE_POLICY as documented patterns; only
-//     the parent variable needs to be in the scanned docs.
-//   - Test-only env vars (EVOLVE_TEST_*, EVOLVE_GO_BIN test override)
-//     are exempted.
-
 package main
 
 import (
@@ -34,7 +18,6 @@ var envVarRE = regexp.MustCompile(`EVOLVE_[A-Z][A-Z0-9_]*`)
 // rationale comment when expanding this list — these become technical
 // debt otherwise.
 var allowedUndocumented = map[string]bool{
-	// Test-only injection vars.
 	"EVOLVE_TEST_COST_THRESHOLD":    true,
 	"EVOLVE_TEST_COST_GUARD_STRICT": true,
 	"EVOLVE_TESTING":                true,
@@ -58,14 +41,12 @@ var allowedUndocumented = map[string]bool{
 	"EVOLVE_TDD_ENGINEER_MODEL":            true,
 	"EVOLVE_TDD_ENGINEER_PERMISSION_MODE":  true,
 	"EVOLVE_PLAN_REVIEWER_PERMISSION_MODE": true,
-	// Internal markers / unused literal names referenced in tests.
-	"EVOLVE_SKIP_CYCLE_HEALTH": true, // documented as inline operator escape in cyclehealth doc comment
+	"EVOLVE_SKIP_CYCLE_HEALTH":             true, // documented as inline operator escape in cyclehealth doc comment
 
-	// --- Pre-v12.1 baseline: env vars that existed in the codebase
-	// before this contract test landed. Each should eventually be
-	// either (a) documented in runtime-reference.md OR (b) removed from
-	// code. Tracked as technical debt; the contract test still catches
-	// NEW additions.
+	// Baseline: env vars that existed before this contract test landed. Each
+	// should eventually be either (a) documented in runtime-reference.md OR
+	// (b) removed from code. Tracked as technical debt; the contract test
+	// still catches NEW additions.
 	"EVOLVE_HANG_CLASSIFIER":           true, // legacy dispatcher classifier override
 	"EVOLVE_LEDGER_OVERRIDE":           true, // ledger adapter test override
 	"EVOLVE_PHASE_":                    true, // regex anchor leak — not a real var
@@ -86,15 +67,10 @@ var allowedUndocumented = map[string]bool{
 	"EVOLVE_USE_PHASE_REGISTRY":        true, // v12.1 internal toggle
 }
 
-// TestEnvVars_DocumentedInCLAUDEmd is the docs-contract enforcement.
-// Adds a check that every EVOLVE_* identifier referenced in production
-// Go code (excluding _test.go files) appears either in CLAUDE.md or in
-// the allowedUndocumented exemption set.
 func TestEnvVars_DocumentedInCLAUDEmd(t *testing.T) {
 	repoRoot := findRepoRoot(t)
-	// The env-var table moved to docs/operations/runtime-reference.md
-	// (2026-06-05); CLAUDE.md keeps a digest. Scan both so a row in
-	// either file satisfies the contract.
+	// CLAUDE.md keeps a digest and runtime-reference.md the full table; scan
+	// both so a row in either file satisfies the contract.
 	var claudeBody string
 	for _, rel := range []string{"CLAUDE.md", filepath.Join("docs", "operations", "runtime-reference.md")} {
 		body, err := os.ReadFile(filepath.Join(repoRoot, rel))
@@ -159,8 +135,6 @@ func findRepoRoot(t *testing.T) string {
 	return ""
 }
 
-// collectEnvVarsFromCode walks goRoot for .go files (excluding _test.go),
-// extracts every EVOLVE_* identifier, and returns the set.
 func collectEnvVarsFromCode(t *testing.T, goRoot string) map[string]bool {
 	t.Helper()
 	out := map[string]bool{}

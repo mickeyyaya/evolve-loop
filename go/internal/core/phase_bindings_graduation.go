@@ -1,18 +1,5 @@
 package core
 
-// phase_bindings_graduation.go — deterministic build-entry graduation guard
-// (inbox new-package-graduation-buildentry-gate, 3rd recurrence: cycles
-// 575/587/652). A package NEW this cycle cannot be in go/.apicover-enforce yet,
-// so the touched∩enforced apicover gate never inspects it — the recurring
-// warnship_apicover_ci_gap blind spot. The audit-side half
-// (apicoverNewPackageGraduationDefault) landed 2026-07-07; this is the
-// build-entry half: the same predicate at the post-build seam, but
-// abort-capable — unlike buildSelfCheck (WARN-only, NEVER aborts, see
-// phase_bindings_selfcheck.go), an ungraduated new package FAILS the build
-// phase with an explicit abort_reason, because graduation is a hard shipping
-// obligation the builder itself must satisfy, not a diagnostic for audit to
-// re-discover two attempts later.
-
 import (
 	"context"
 	"fmt"
@@ -25,29 +12,26 @@ import (
 )
 
 // buildGraduationCheck reports the graduation abort reason for the cycle's
-// worktree: non-empty iff a changed go/internal/<pkg> package is NEW this cycle
-// (no committed files at HEAD — a modified pre-existing package is the
-// enforce-ratchet's concern, and a deleted/renamed-away package is not new) and
-// absent from go/.apicover-enforce. Fail-open ("" — mirroring the audit
-// default) when the worktree is empty or the enforce file is unreadable:
-// with no enforce list there is nothing to graduate against. Detection reuses
-// ciparity.NewUngraduatedPackages over the same changed-path derivation the
-// WARN-only self-check uses, so the two seams cannot disagree on scope.
+// worktree: non-empty iff a changed go/internal/<pkg> package is NEW this
+// cycle (no committed files at HEAD — a modified pre-existing package is the
+// enforce-ratchet's concern, and a deleted/renamed-away package is not new)
+// and absent from go/.apicover-enforce. Fail-open ("") when the worktree is
+// empty or the enforce file is unreadable.
 func buildGraduationCheck(ctx context.Context, worktree string) string {
 	if worktree == "" {
 		return ""
 	}
 	enforceBytes, err := os.ReadFile(filepath.Join(codequality.ModuleDir(worktree), ".apicover-enforce"))
 	if err != nil {
-		return "" // no enforce list → nothing to graduate against (fail-open)
+		return ""
 	}
 	changed := changedGoTestPackages(changedWorktreePaths(ctx, worktree))
 	var fresh []string
 	for _, pkg := range ciparity.NewUngraduatedPackages(changed, enforceBytes) {
 		if packageNewThisCycle(ctx, worktree, pkg) {
 			if !packageHasProductionGoFiles(worktree, pkg) {
-				// Never silently skip (review F2): the vacuous-obligation skip
-				// is announced, so a test-only mint that lands unenrolled is
+				// Never silently skip: the vacuous-obligation skip is
+				// announced, so a test-only mint that lands unenrolled is
 				// visible in the cycle log rather than discovered at audit.
 				fmt.Fprintf(os.Stderr, "[build-floor] graduation deferred: new package %s is test-only (no production .go surface) — abort suppressed; audit re-flags the package on any later change\n", pkg)
 				continue
@@ -64,7 +48,7 @@ func buildGraduationCheck(ctx context.Context, worktree string) string {
 
 // packageHasProductionGoFiles delegates to the SHARED graduation predicate —
 // see ciparity.PackageDirHasProductionGoFiles for the test-only-package
-// rationale (cycles 1223/1224/1228). One predicate, two seams, no disagreement.
+// rationale. One predicate, two seams, no disagreement.
 func packageHasProductionGoFiles(worktree, pkg string) bool {
 	return ciparity.PackageDirHasProductionGoFiles(codequality.ModuleDir(worktree), pkg)
 }
@@ -74,7 +58,7 @@ func packageHasProductionGoFiles(worktree, pkg string) bool {
 // package was introduced by this cycle's pending diff. A package present at
 // HEAD is pre-existing (modified or deleted this cycle), which the graduation
 // obligation does not cover: flagging a delete/rename would make graduation
-// hygiene un-shippable (AC3). Fail-open on git error: a package we cannot
+// hygiene un-shippable. Fail-open on git error: a package we cannot
 // prove new must not abort the build (audit stays the backstop).
 func packageNewThisCycle(ctx context.Context, worktree, pkg string) bool {
 	rel := "go/" + strings.TrimPrefix(pkg, "./")

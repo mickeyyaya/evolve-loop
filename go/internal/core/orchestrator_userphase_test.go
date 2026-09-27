@@ -7,8 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
-// userPhaseOrchestrator builds an orchestrator whose catalog carries three user
-// phases and whose routing order splices them between build and audit.
 func userPhaseOrchestrator(t *testing.T) *Orchestrator {
 	t.Helper()
 	cat, _ := phasespec.Catalog{}.Merge([]phasespec.PhaseSpec{
@@ -83,14 +81,6 @@ func TestWorktreePhase_FromSpec(t *testing.T) {
 	}
 }
 
-// Issue #9: the AUDIT phase must run with cwd=worktree so its read-only
-// verification commands (git diff HEAD, go test, test -d) inspect the builder's
-// pending work in the worktree — a non-Claude auditor running a relative `cd go`
-// from the project root saw an empty main tree and false-FAILed work that was
-// present in the worktree. Post-CB.1 the worktree CWD is universal (pinned by
-// TestCB1_EveryDispatchedPhaseCarriesWorktree); what this table pins is the
-// WRITE axis — worktreePhase / role-gate permission stays exactly the source
-// writers, audit and the read-only spine included as non-writers.
 func TestWorktreePhase_WriteAxisIsSourceWritersOnly(t *testing.T) {
 	t.Parallel()
 	o := userPhaseOrchestrator(t)

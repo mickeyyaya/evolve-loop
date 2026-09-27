@@ -1,19 +1,5 @@
 package bridge
 
-// tokenfallback_red_test.go — RED contract for cycle-754 task
-// token-resolver-production-wiring (composition-root half; the tokenusage half
-// is internal/tokenusage/fallbackchain_test.go).
-//
-// recordTokenUsage (engine.go) currently builds a tokenusage.Window carrying
-// only Worktree/ArtifactPath/Start/End, so the lower fallback tiers can never
-// fire and every tmux-driven launch records "source":"none" with zero tokens
-// (confirmed live across 124 .evolve/runs/*/llm-calls.ndjson files). This
-// contract requires the engine to thread the launch's events-log context —
-// the workspace's <agent>-events.ndjson — into the Window it hands the
-// resolver, so the REAL production resolver (tokenusage.DefaultResolver)
-// recovers usage for a launch with no transcript. DO NOT modify these tests;
-// make them pass by wiring context into the Window at the call site.
-
 import (
 	"os"
 	"path/filepath"
@@ -64,12 +50,6 @@ func readLLMCalls(t *testing.T, workspace string) string {
 	return string(b)
 }
 
-// TestRecordTokenUsage_EventsLogFallback_EndToEnd — AC2/AC5 (hermetic form).
-// A tmux-style launch with NO transcript but a present workspace
-// <agent>-events.ndjson must record REAL token usage via the eventsResult
-// tier: resp.Tokens carries the envelope counts and the llm-calls.ndjson
-// record says "source":"events_result" — not the permanently-zero
-// "source":"none" the production fleet shows today.
 func TestRecordTokenUsage_EventsLogFallback_EndToEnd(t *testing.T) {
 	e, req, start := tokenLaunchFixture(t, true)
 
@@ -88,11 +68,6 @@ func TestRecordTokenUsage_EventsLogFallback_EndToEnd(t *testing.T) {
 	}
 }
 
-// TestRecordTokenUsage_NoSources_RecordsSourceNoneZeroTokens — AC3 negative
-// (anti-fabrication guard; expected pre-existing GREEN). A launch with no
-// transcript, no events log, and no scrollback data must keep recording
-// "source":"none" with zero tokens. An implementation that stamps a
-// non-none source or invents counts to satisfy the e2e test must fail here.
 func TestRecordTokenUsage_NoSources_RecordsSourceNoneZeroTokens(t *testing.T) {
 	e, req, start := tokenLaunchFixture(t, false)
 

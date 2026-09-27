@@ -1,12 +1,5 @@
 package bridge
 
-// signal_test.go — ADR-0101 S3: the bridge engine receives the Signal Center
-// at construction (Deps.Signals, proven by SignalsWired), its telemetry
-// warnings and tripwires are bridge.warning / bridge.tripwire events with the
-// call identity in fields, and the tmux-pane liveness edges the LivenessCenter
-// dispatches become pane.liveness events. Hand-written "[engine] WARN" lines
-// for those facts are gone; the WARN-filtered stderr sink renders them.
-
 import (
 	"bytes"
 	"context"
@@ -135,9 +128,6 @@ func TestPaneLivenessHandler_ProjectsStateEdgesToPaneLiveness(t *testing.T) {
 	}
 }
 
-// The driver registers the handler on the LivenessCenter it uses for this
-// dispatch, so a real liveness edge reaches the Center with the dispatch's
-// identity — the wiring proof for pane.liveness.
 func TestNewReplWaitState_RegistersThePaneLivenessHandler(t *testing.T) {
 	c, got := recordingSignals()
 	lc := panestream.NewLivenessCenter()
@@ -172,18 +162,12 @@ func TestNewReplWaitState_RegistersThePaneLivenessHandler(t *testing.T) {
 	}
 }
 
-// sinkDeps builds the Center a test hands to Deps.Signals with the root's
-// WARN-filtered stderr sink rendering into buf — so a test asserts exactly
-// what the operator reads for the engine's signals (the one line format),
-// never a hand-written line.
 func sinkDeps(w io.Writer) *signalcenter.Center {
 	c := signalcenter.New()
 	c.Subscribe(signalcenter.Filter(signalcenter.StderrSink(w), signalcenter.SeverityWarn))
 	return c
 }
 
-// The per-attempt ledger append failing is itself a signal (the record the
-// operator would read is missing), named by its code and the path.
 func TestRecordModelAttempt_LedgerAppendFailureIsABridgeWarning(t *testing.T) {
 	t.Parallel()
 	c, got := recordingSignals()
@@ -205,9 +189,6 @@ func TestRecordModelAttempt_LedgerAppendFailureIsABridgeWarning(t *testing.T) {
 	}
 }
 
-// One identity rule for every bridge signal of a dispatch: the request's
-// cycle/run and its agent role as the phase; the driver's Config carries the
-// same values. No fallback — a request without a Cycle stays at cycle 0.
 func TestDispatchIdentity_OneRuleFromTheRequestAndTheConfig(t *testing.T) {
 	t.Parallel()
 	req := core.BridgeRequest{Cycle: 1005, RunID: "run-1005", Agent: "builder", Workspace: "/x/.evolve/runs/cycle-1005"}

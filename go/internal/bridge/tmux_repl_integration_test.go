@@ -15,30 +15,6 @@ import (
 	"time"
 )
 
-// tmux_repl_integration_test.go — HEAVY edge-case coverage of the bridge's
-// core value: driving a real CLI REPL through a real tmux server.
-//
-// Unlike driver_claudetmux_test.go (which drives the runTmuxREPL state
-// machine with a *fake* TmuxController), these tests run the FULL
-// runTmuxREPL flow against a REAL tmux server (execTmux) with a scripted
-// fake-CLI standing in for claude/codex/agy. That exercises the parts a
-// fake can never prove: that real `capture-pane` actually contains the
-// boot marker when the CLI is ready, that `load-buffer`+`paste-buffer`
-// actually delivers the prompt (multi-line, special chars) to the REPL's
-// stdin, that the artifact-wait observes a real on-disk write, and that
-// session lifecycle (named preserve/resume, ephemeral kill, concurrent
-// isolation) behaves on a real server.
-//
-// Speed: the Tmux and Sleep seams are independent, so we keep real tmux
-// but inject a scaled-down Sleep. Boot/artifact-timeout cases use a tiny
-// sleep (marker/artifact never appear, so rendering time is irrelevant);
-// happy-path cases use a slightly larger sleep so real tmux has wall-time
-// to render between launch and the first capture-pane poll.
-
-// itTmuxCtl is the production tmux controller used directly for setup /
-// teardown assertions (HasSession, KillSession). execTmux is stateless, so
-// one shared value is safe; a named var also avoids the `itTmuxCtl.M()`
-// composite-literal ambiguity inside if/for conditions.
 var itTmuxCtl = execTmux{}
 
 func requireTmux(t *testing.T) {
@@ -50,17 +26,9 @@ func requireTmux(t *testing.T) {
 
 // writeFakeREPL writes a scripted fake CLI to dir and returns its launch
 // command. mode selects behavior; marker is the boot-ready string the fake
-// prints once on startup.
-//
-// The marker is BAKED INTO the script body, never passed as an argv token —
-// otherwise the shell would echo the launch command (which contains the
-// marker) into the pane, and capture-pane would "detect" the marker from
-// the echoed command line before the CLI ever started (a false boot-ready).
-// Real markers (❯, ›) avoid this naturally because they aren't substrings
-// of `claude --model …`; the fake must be equally careful.
-//
-// The fake reads pasted prompt lines from stdin and acts on the
-// ARTIFACT=<path> / SPECIAL=<value> directives the test prompt carries.
+// prints once on startup. The marker is baked into the script body, never
+// passed as an argv token, so the shell's echo of the launch command cannot
+// trip a false boot-ready before the CLI actually starts.
 func writeFakeREPL(t *testing.T, dir, mode, marker string) string {
 	t.Helper()
 	script := fmt.Sprintf(`#!/usr/bin/env bash
@@ -186,8 +154,7 @@ func TestRealTmux_HappyPath(t *testing.T) {
 	}
 	// The fake models a CLEAN real REPL (marker redrawn after every consumed
 	// line): submit-verify must see a clear input line, not lean on the
-	// ground-truth belt. A resend here means the harness regressed to the
-	// parked shape that produced the v22.20.0 release red.
+	// ground-truth belt.
 	if strings.Contains(stderr.String(), "re-sending Enter") {
 		t.Fatalf("clean-REPL fake triggered submit-verify resends; stderr=%s", stderr.String())
 	}
@@ -373,11 +340,6 @@ func TestRealTmux_ConcurrentSessionsIsolated(t *testing.T) {
 	}
 	wg.Wait()
 
-	// Under the OLD global-buffer LoadBuffer/PasteBuffer, the concurrent
-	// load-buffers raced and every paste pulled whichever buffer was loaded
-	// last — so the per-run artifact assertion below would see the WRONG
-	// payload. With session-scoped buffers (tmux.go), each run gets its own.
-
 	for i := 0; i < n; i++ {
 		if codes[i] != ExitOK {
 			t.Fatalf("run %d exit = %d, want ExitOK", i, codes[i])
@@ -406,10 +368,6 @@ func readFile(t *testing.T, path string) string {
 	return string(b)
 }
 
-// TestRealTmux_NewSessionInBindsPaneCwd pins the CB.2 acceptance on a real
-// server: a session created via the workdirSessionStarter capability has its
-// pane cwd bound to the workdir at BIRTH (`tmux new-session -c`), before any
-// cd keystroke could run (or be swallowed).
 func TestRealTmux_NewSessionInBindsPaneCwd(t *testing.T) {
 	requireTmux(t)
 	ctx := context.Background()

@@ -1,13 +1,5 @@
 package bridge
 
-// tmux_default_env_test.go — the pane shell exports the manifest's default_env before the launch.
-//
-// A tmux pane inherits the tmux server's environment, so the manifest's variables reach the CLI only
-// through `export` lines the driver sends after the cd and before the launch command, as
-// EVOLVE_PROJECT_ROOT does. claude-tmux uses the channel to turn prompt suggestions off: a suggestion is a
-// background model request per turn and dim text in the pane that reads like agent output (cycle 1707
-// rendered "Yes, kill that session first." under the idle input box).
-
 import (
 	"strings"
 	"testing"

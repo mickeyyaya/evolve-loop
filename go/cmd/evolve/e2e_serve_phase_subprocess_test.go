@@ -1,21 +1,5 @@
 //go:build e2e && evolve_test_phases
 
-// End-to-end proof that phaseproto.SubprocessRunner can drive a real
-// `evolve serve-phase` subprocess. Closes the "cross-CLI parity
-// hardening" gate from Phase 3 task #17 (progress doc, sub-bullet 1).
-//
-// Strategy: build the evolve binary with -tags evolve_test_phases so a
-// test-only `echo` phase is registered. The wire path under test is:
-//
-//	test goroutine
-//	  └── phaseproto.SubprocessRunner.Run
-//	         └── exec.CommandContext("evolve", "serve-phase", "echo")
-//	                └── dispatch -> runServePhase
-//	                       └── phaseproto.ServeStdio
-//	                              └── echoPhaseRunner.Run
-//	         (response envelope flows back up)
-//
-// No real phase work, no Claude CLI required.
 package main
 
 import (
@@ -56,7 +40,7 @@ func TestServePhase_SubprocessRunnerRoundTrip(t *testing.T) {
 		"echo",
 		bin,
 		[]string{"serve-phase", "echo"},
-		nil, // no extra env
+		nil,
 	)
 
 	req := core.PhaseRequest{
@@ -88,9 +72,6 @@ func TestServePhase_SubprocessRunnerRoundTrip(t *testing.T) {
 	}
 }
 
-// TestServePhase_SubprocessRunner_UnknownPhaseSurfacesError confirms
-// the "unknown phase" exit path produces a CodeChildCrashed wire error
-// (exit 10 from the binary), not a parse error or hang.
 func TestServePhase_SubprocessRunner_UnknownPhaseSurfacesError(t *testing.T) {
 	if testing.Short() {
 		t.Skip("E2E subprocess test; skipped in -short mode")

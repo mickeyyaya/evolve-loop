@@ -1,7 +1,3 @@
-// `evolve worktree` manages per-cycle git worktrees provisioned under the
-// --base flag (default .evolve/worktrees/; the loop resolves it from policy.json
-// worktree.base). This is the v1 port of the worktree-management surface from
-// scripts/lifecycle/run-cycle.sh.
 package main
 
 import (
@@ -21,31 +17,23 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// worktreeGitRunner is the command seam `evolve worktree create` provisions
-// through, mirroring core's gitRunner and swarm's newGit precedents. It exists
-// so the operator path — previously a raw exec.Command with no injection point
-// and therefore no test coverage at all — can be driven in the fast tier.
+// worktreeGitRunner is the command seam evolve worktree create provisions
+// through, mirroring core's gitRunner and swarm's newGit precedents.
 var worktreeGitRunner sysexec.RunFunc = sysexec.DefaultRunner
 
-// worktreeAddRetry is the operator path's share of the single retry contract
-// (bound + backoff live in gitexec). Tests swap in a sleep recorder.
-//
-// Retryable is the SAME shared classifier core and swarm pass, so an operator
-// running `evolve worktree create` outside a repository fails immediately with
-// git's own message instead of waiting out a 6s ladder that cannot help.
+// worktreeAddRetry shares gitexec's single retry contract; Retryable is the
+// same classifier core and swarm pass, so a non-repository fails immediately
+// instead of waiting out a retry ladder that cannot help.
 var worktreeAddRetry = gitexec.WorktreeAddRetry{Retryable: gitexec.RetryableWorktreeAddFailure}
 
-// absWorktreeRoot absolutizes a worktree subcommand's --project-root (default
-// ".") so the recorded worktree path and base dir are cwd-independent — the
-// same canonicalization every entrypoint applies (cycle-119 path-divergence).
+// absWorktreeRoot absolutizes a worktree subcommand's --project-root so the
+// recorded worktree path and base dir are cwd-independent.
 func absWorktreeRoot(projectRoot string, stderr io.Writer) string {
 	return paths.AbsoluteRoot("--project-root", projectRoot, func(m string) {
 		fmt.Fprintf(stderr, "evolve worktree: WARN: %s\n", m)
 	})
 }
 
-// runWorktree implements `evolve worktree <subcommand>`. Subcommands:
-// create | list | cleanup.
 func runWorktree(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
 		fmt.Fprintln(stderr, "evolve worktree: missing subcommand (create|list|cleanup)")
@@ -92,15 +80,12 @@ func runWorktreeCreate(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "evolve worktree create: mkdir: %v\n", err)
 		return 1
 	}
-	// runscope is the single source for the lane-namespaced worktree dir so this
-	// CLI provisions (and `cleanup` later locates) the SAME path the in-process
-	// core.gitWorktree provisioner uses, and concurrent worktrees never collide.
+	// runscope gives the SAME lane-namespaced path core.gitWorktree provisions,
+	// so concurrent worktrees never collide.
 	wt := runscope.New(runscope.ResolveLane(lane, projectRoot, os.Getenv), "", cycle).WorktreeDir(base)
-	// Routes through the SHARED gitexec retry helper (not a raw exec.Command)
-	// for two reasons: the operator path was the last unretried `worktree add`
-	// call site, and the raw path could only ever report "exit status 255" from
-	// err — going through gitexec surfaces git's exit code AND its own stderr, so
-	// an operator can tell lane contention from a real fault.
+	// The shared gitexec retry surfaces git's own exit code and stderr, so an
+	// operator can tell lane contention from a real fault (a raw err only ever
+	// reports "exit status 255").
 	_, gitErr, code, err := gitexec.Git{Dir: projectRoot, Exec: worktreeGitRunner}.
 		AddWorktreeWithRetry(context.Background(), worktreeAddRetry, "--detach", wt, "HEAD")
 	if err != nil || code != 0 {

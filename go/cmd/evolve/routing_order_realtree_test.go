@@ -1,12 +1,5 @@
 package main
 
-// Layer-N+1 wiring pin for the anchor-fixpoint splice (cycle-1550): the REAL
-// production composition — config.Load(registry) order + discoverUserSpecsClamped
-// (alphabetically sorted, clamped) + ApplyUserRouting — must place every
-// anchored tracked phase AFTER its declared anchor. The unit fixpoint tests in
-// internal/phasespec can pass while this path still mis-slots (different specs,
-// different order source); this test runs the exact seam cmd_cycle.go runs.
-
 import (
 	"os"
 	"path/filepath"

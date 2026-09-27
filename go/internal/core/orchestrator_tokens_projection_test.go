@@ -1,12 +1,3 @@
-// orchestrator_tokens_projection_test.go — token-telemetry S4 (terminal
-// projection) RED tests. S3 (llm-calls.ndjson per-attempt detail) is shipped;
-// S4 projects the TERMINAL attempt's token counts through the C1 chokepoint
-// (recordPhaseOutcome) into phase-timing.json and <phase>-usage.json, beside
-// the existing cost_usd field, so the durable per-phase record carries tokens.
-//
-// Legacy compat: artifacts written before this field existed must still parse
-// (the two Legacy* tests are the guard — a struct field with omitempty degrades
-// to a zero value, never a parse error).
 package core
 
 import (
@@ -20,9 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
 )
 
-// TestRecordPhaseOutcome_ProjectsTokensToSidecarAndTiming asserts the C1
-// chokepoint threads PhaseOutcome.Tokens into BOTH the timing entry and the
-// usage sidecar for the terminal attempt.
 func TestRecordPhaseOutcome_ProjectsTokensToSidecarAndTiming(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
@@ -49,7 +37,6 @@ func TestRecordPhaseOutcome_ProjectsTokensToSidecarAndTiming(t *testing.T) {
 		t.Errorf("timing entry tokens = %+v, want %+v", got, want)
 	}
 
-	// Sidecar on disk must carry the same tokens.
 	data, err := os.ReadFile(filepath.Join(ws, "build-usage.json"))
 	if err != nil {
 		t.Fatalf("read sidecar: %v", err)
@@ -63,9 +50,6 @@ func TestRecordPhaseOutcome_ProjectsTokensToSidecarAndTiming(t *testing.T) {
 	}
 }
 
-// TestSidecar_LegacyWithoutTokensParses guards backward compatibility: a
-// usage sidecar written before the tokens field existed must still unmarshal,
-// leaving Tokens zero-valued (never a parse error).
 func TestSidecar_LegacyWithoutTokensParses(t *testing.T) {
 	t.Parallel()
 	legacy := `{"phase":"scout","cost_usd":0.1,"duration_ms":500,"attempt_count":1,"verdict":"PASS"}`

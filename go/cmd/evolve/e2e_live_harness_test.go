@@ -1,14 +1,6 @@
 //go:build e2e
 
-// Shared robustness harness for the LIVE e2e tiers (T0–T3) that exercise real
-// LLM CLIs. See docs/testing/live-e2e-plan.md.
-//
-// The whole point of this file is to make live testing ROBUST rather than
-// flaky: auth-preflight that skips (never fails), a transient-vs-contract
-// failure classifier with bounded retry+backoff, a cumulative budget ceiling
-// with a per-CLI cost report, and failure-artifact capture for triage. Live
-// assertions are STRUCTURAL (artifact parses, verdict ∈ valid set, ledger
-// roles) — never model wording.
+// See docs/testing/live-e2e-plan.md.
 package main
 
 import (
@@ -62,11 +54,8 @@ var liveTmuxCLIs = []liveCLI{
 }
 
 // liveCLIAvailable reports whether a live run of cli can even be attempted.
-// Binary-on-PATH is necessary; auth is assumed when the operator opted in via
-// the tier gate (a real auth check would itself cost a call). The claude
-// keychain false-negative (`evolve setup detect` reports MISCONFIGURED while
-// the launching Claude session's OAuth works) is handled by trusting a present
-// `claude` binary — NEVER hard-failing on it. Returns (ok, reasonToSkip).
+// Binary-on-PATH is necessary; auth is assumed once the operator opted in via
+// the tier gate — a real auth check would itself cost a call.
 func liveCLIAvailable(cli liveCLI) (bool, string) {
 	if _, err := exec.LookPath(cli.Binary); err != nil {
 		return false, fmt.Sprintf("%s binary not on PATH", cli.Binary)
@@ -83,16 +72,12 @@ var transientMarkers = []string{
 	"connection reset", "connection refused", "i/o timeout", "timed out", "timeout",
 	"EOF", "temporarily unavailable", "network",
 	"exit=81", "exit=124", "ExitArtifactTimeout", "ExitREPLBootTimeout", "bridge artifact timeout",
-	// Subscription usage/quota exhaustion. The CLI booted and authenticated;
-	// the account is simply capped until a reset date — a provider limit, not a
-	// broken contract. Observed live 2026-05-30: codex "You've hit your usage
-	// limit. Upgrade to Plus … try again at Jun 4th". claude/agy use similar
-	// phrasings ("usage limit reached", "limit will reset"). These are
-	// quota-SPECIFIC substrings unlikely in model-generated output. We
-	// deliberately exclude the codex message's generic "try again at" tail:
-	// phaseStderrTail folds the model's own stdout/stderr into the classified
-	// string, and that ordinary English phrase could mask a real contract break
-	// (the quota-specific markers below already catch the codex/claude/agy caps).
+	// Subscription usage/quota exhaustion: the CLI booted and authenticated, but
+	// the account is capped until a reset date — a provider limit, not a broken
+	// contract. These are quota-specific substrings unlikely in model-generated
+	// output. We deliberately exclude the generic "try again at" tail: that
+	// ordinary English phrase could mask a real contract break, and the
+	// quota-specific markers here already catch the codex/claude/agy caps.
 	"usage limit", "upgrade to plus", "limit will reset", "plan limit",
 }
 
@@ -119,8 +104,6 @@ func isTransient(out string, err error) bool {
 	}
 	return isTransientFailure(s)
 }
-
-// --- cumulative budget ceiling -------------------------------------------------
 
 var (
 	liveBudgetMu     sync.Mutex
@@ -164,7 +147,6 @@ func recordLiveSpend(usd float64) {
 	}
 }
 
-// ledgerTotalCost sums cost_usd across all ledger entries.
 func ledgerTotalCost(entries []ledgerEntry) float64 {
 	var sum float64
 	for _, e := range entries {
@@ -172,8 +154,6 @@ func ledgerTotalCost(entries []ledgerEntry) float64 {
 	}
 	return sum
 }
-
-// --- failure-artifact capture --------------------------------------------------
 
 // captureLiveFailure copies a failed cycle's workspace logs/artifacts into a
 // retained dir under the repo's testdata so a flaky/real live failure is
@@ -204,8 +184,6 @@ func captureLiveFailure(t *testing.T, repoRoot, projRoot, label string) string {
 	t.Logf("[live-capture] failure artifacts for %s → %s", label, dst)
 	return dst
 }
-
-// --- live cycle runner with retry ---------------------------------------------
 
 // liveCycleCfg configures one live `evolve cycle run` attempt.
 type liveCycleCfg struct {
@@ -282,9 +260,8 @@ func runLiveCycleOnce(t *testing.T, cfg liveCycleCfg) liveResult {
 	env := append(os.Environ(),
 		"EVOLVE_CLI="+cfg.Driver,
 		"EVOLVE_PROMPTS_DIR="+cfg.RepoRoot,
-		// Native-only ship: the legacy EVOLVE_NATIVE_SHIP=0 + EVOLVE_SHIP_SCRIPT
-		// fake-ship hatch was removed in the Go-only consolidation, so a live
-		// cycle runs the native shipper. Shipped (below) is OBSERVED, not asserted.
+		// A live cycle runs the native shipper; Shipped (below) is observed, not
+		// asserted.
 		"EVOLVE_RESEARCH_HOOK_DISABLED=1",
 		// Redirect codex/agy preflight writes away from the operator's real home.
 		"EVOLVE_CODEX_CONFIG_PATH="+filepath.Join(fakeHome, ".codex", "config.toml"),
@@ -307,13 +284,10 @@ func runLiveCycleOnce(t *testing.T, cfg liveCycleCfg) liveResult {
 	cmd.Dir = projRoot
 
 	out, err := runWithTimeout(cmd, cfg.Timeout)
-	// The classifier matches against Out, but the `evolve cycle run` subprocess
-	// only surfaces a structured "bridge: launch exit=1" line — the real provider
-	// message (e.g. codex "You've hit your usage limit") lands in the per-phase
-	// *-stderr.log artifact, not the subprocess stdout. Fold those artifacts into
-	// Out so a quota/provider failure is classified transient instead of being
-	// mis-graded a contract break. (Confirmed live 2026-05-30: without this the
-	// codex quota cap red-failed the suite.)
+	// The classifier matches against Out, but the real provider message lands in
+	// the per-phase *-stderr.log artifact, not this subprocess's stdout. Fold
+	// those artifacts in so a quota/provider failure classifies transient
+	// instead of mis-grading as a contract break.
 	out += "\n" + phaseStderrTail(projRoot)
 	entries := readLedgerSafe(projRoot)
 	return liveResult{

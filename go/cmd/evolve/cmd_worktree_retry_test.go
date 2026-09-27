@@ -1,20 +1,5 @@
 package main
 
-// cmd_worktree_retry_test.go — RED contract for cycle-1268 task
-// `worktree-provisioning-retry-consolidate`, adoption site #3:
-// runWorktreeCreate (cmd_worktree.go:82).
-//
-// This site is doubly exposed. It has no retry, and it is the only one of the
-// four that bypasses the gitexec seam entirely — a raw
-// exec.Command("git", "-C", ...) whose failure handling prints err and returns
-// 1 without ever seeing git's exit code. That is why it has no test coverage
-// today: there is nothing to inject. Adopting the shared helper therefore also
-// buys the rc/stderr parity the other three sites already have.
-//
-// The two pins below (worktreeGitRunner, worktreeAddRetry) are the minimum
-// seam that makes the operator path testable at all; they mirror core's
-// gitRunner and swarm's newGit/retry precedents rather than inventing a shape.
-
 import (
 	"bytes"
 	"context"
@@ -91,9 +76,6 @@ func TestRunWorktreeCreate_PersistentFailureStillFailsLoudly(t *testing.T) {
 		t.Errorf("attempts = %d, want exactly DefaultWorktreeAddAttempts=%d — the CLI must share ONE bound with core and swarm",
 			attempts, gitexec.DefaultWorktreeAddAttempts)
 	}
-	// rc/stderr parity: the raw exec.Command path could only report "exit status
-	// 255" from err; routing through the shared helper must surface git's own
-	// diagnosis so an operator can tell contention from a real fault.
 	diag := errb.String()
 	if !strings.Contains(diag, "255") || !strings.Contains(diag, "Preparing worktree") {
 		t.Errorf("stderr must carry git's exit code AND its own message, got:\n%s", diag)

@@ -1,13 +1,5 @@
 //go:build integration
 
-// Phase 3.9 — phase-agnostic ledger binding. These tests pin (a) that the new
-// recordPhaseBinding dispatcher routes audit/build to their specialized,
-// byte-unchanged recorders with a faithful CycleState→bindingInputs mapping
-// (Risk #1: ship's auditor/builder binding bytes must not drift), and (b) the
-// NEW phase-agnostic capability — any non-audit/non-build phase binds under its
-// identity role, gated to EVOLVE_PHASE_IO=enforce so the default-off loop is
-// byte-identical (no new ledger lines). They reuse initBindingRepo from
-// resume_audit_binding_test.go (same package, same integration tag).
 package core
 
 import (
@@ -24,19 +16,11 @@ func fixedNowFn() func() time.Time {
 	return func() time.Time { return time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC) }
 }
 
-// TestEmitPhaseBindings_AuditBuild_CorrectMapping proves the new path
-// (emitPhaseBindings → recordPhaseBinding → recordAuditBinding/recordBuildBinding)
-// maps CycleState into the specialized recorders correctly: the audit binding
-// reads the WORKTREE (ActiveWorktree) for its worktree-tree SHA and the WORKSPACE
-// (WorkspacePath) for its audit-report.md artifact, with verdict-derived exit
-// code; the build binding uses the workspace for build-report.md and never
-// computes a worktree-tree SHA.
 func TestEmitPhaseBindings_AuditBuild_CorrectMapping(t *testing.T) {
 	t.Parallel()
 	repo, ws := initBindingRepo(t, "cycle-9")
 	cs := CycleState{CycleID: 9, WorkspacePath: ws, ActiveWorktree: detachedWorktree(t, repo)}
 
-	// --- audit, PASS ---
 	ledA := &fakeLedger{}
 	oA := NewOrchestrator(nil, ledA, nil)
 	oA.now = fixedNowFn()
@@ -61,7 +45,6 @@ func TestEmitPhaseBindings_AuditBuild_CorrectMapping(t *testing.T) {
 		t.Errorf("audit: worktree_tree_sha empty — ActiveWorktree was not mapped to the worktree recorder")
 	}
 
-	// --- audit, WARN → exit_code 1 ---
 	ledW := &fakeLedger{}
 	oW := NewOrchestrator(nil, ledW, nil)
 	oW.now = fixedNowFn()
@@ -70,7 +53,6 @@ func TestEmitPhaseBindings_AuditBuild_CorrectMapping(t *testing.T) {
 		t.Errorf("audit WARN: want 1 entry with exit_code 1, got %+v", ledW.entries)
 	}
 
-	// --- build, PASS ---
 	ledB := &fakeLedger{}
 	oB := NewOrchestrator(nil, ledB, nil)
 	oB.now = fixedNowFn()
@@ -93,17 +75,11 @@ func TestEmitPhaseBindings_AuditBuild_CorrectMapping(t *testing.T) {
 	}
 }
 
-// TestEmitPhaseBindings_UserPhase_OnlyAtEnforce is the master gate test: a
-// non-audit/non-build phase produces NO binding below enforce (default-off is
-// byte-identical to pre-3.9 — no new ledger lines in the live loop), while
-// audit/build keep binding as before; at EVOLVE_PHASE_IO=enforce the user phase
-// binds under its identity role with a builder-shaped generic entry.
 func TestEmitPhaseBindings_UserPhase_OnlyAtEnforce(t *testing.T) {
 	t.Parallel()
 	repo, ws := initBindingRepo(t, "cycle-11")
 	cs := CycleState{CycleID: 11, WorkspacePath: ws, ActiveWorktree: detachedWorktree(t, repo)}
 
-	// default (StageOff): user phase scout does NOT bind; audit still binds.
 	ledOff := &fakeLedger{}
 	oOff := NewOrchestrator(nil, ledOff, nil)
 	oOff.now = fixedNowFn()
@@ -116,7 +92,6 @@ func TestEmitPhaseBindings_UserPhase_OnlyAtEnforce(t *testing.T) {
 		t.Errorf("PhaseIO=off: audit must still bind as auditor, got %+v", ledOff.entries)
 	}
 
-	// enforce: scout now binds under its identity role.
 	ledEnf := &fakeLedger{}
 	oEnf := NewOrchestrator(nil, ledEnf, nil)
 	oEnf.now = fixedNowFn()

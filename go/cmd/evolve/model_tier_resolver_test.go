@@ -1,18 +1,5 @@
 package main
 
-// model_tier_resolver_test.go — the model-resolvability gate and its wiring.
-//
-// router.ClampPlanModelRouting clears an advisor-proposed {cli,tier} that
-// cannot resolve to a model, fed by an injected lookup so router stays a leaf
-// (ADR-0069's import-cycle lesson). core.WithModelCatalogLookup is that seam:
-// defined, documented, unit-tested — and never called from the composition
-// root, so o.modelCatalogLookup was nil in every real cycle and the gate was
-// dead. TestWireOrchestrator_ModelCatalogLookupWired is the regression guard,
-// asserted through the REAL composition root (mirroring
-// TestWireOrchestrator_CompositionFastPathWired) rather than by source
-// inspection: an AST scan cannot tell WithModelCatalogLookup(resolver) from
-// WithModelCatalogLookup(nil), and nil is precisely the dead-gate state.
-
 import (
 	"io"
 	"os"
@@ -22,14 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/modelcatalog"
 )
 
-// TestResolveModelTier_ResolvesEveryCanonicalTierForEveryFamily pins that the
-// gate cannot OVER-clamp: every shipped family resolves every canonical tier,
-// so no legitimate advisor proposal is cleared to the profile default.
-//
-// This is why the resolver goes through bridge.LoadManifest rather than
-// modelcatalog.Catalog.Lookup — the cached catalog reports ok=false for any CLI
-// stuck on source:"detect" (codex today), which would silently strip codex from
-// every advisor plan even though dispatch resolves it fine.
 func TestResolveModelTier_ResolvesEveryCanonicalTierForEveryFamily(t *testing.T) {
 	for _, cli := range []string{"claude", "codex", "agy", "ollama"} {
 		for _, tier := range modelcatalog.CanonicalTiers {
@@ -45,9 +24,6 @@ func TestResolveModelTier_ResolvesEveryCanonicalTierForEveryFamily(t *testing.T)
 	}
 }
 
-// TestResolveModelTier_RejectsUnresolvablePairings (negative / anti-degenerate):
-// a resolver that returned ok=true unconditionally would pass the test above
-// while leaving the gate just as dead.
 func TestResolveModelTier_RejectsUnresolvablePairings(t *testing.T) {
 	for _, tc := range []struct {
 		name, cli, tier string
@@ -67,9 +43,10 @@ func TestResolveModelTier_RejectsUnresolvablePairings(t *testing.T) {
 	}
 }
 
-// TestWireOrchestrator_ModelCatalogLookupWired is the WIRING proof: the option
-// must reach a real Orchestrator built by the production composition root, with
-// a non-nil resolver. A gate that isn't wired isn't a gate.
+// TestWireOrchestrator_ModelCatalogLookupWired asserts against the real
+// composition root rather than by source inspection: an AST scan cannot
+// tell WithModelCatalogLookup(resolver) from WithModelCatalogLookup(nil),
+// and nil is precisely the dead-gate state.
 func TestWireOrchestrator_ModelCatalogLookupWired(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")

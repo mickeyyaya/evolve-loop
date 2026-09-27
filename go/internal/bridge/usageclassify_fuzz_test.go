@@ -1,13 +1,8 @@
 package bridge
 
-// Fuzz harness for ClassifyExhausted (inbox fuzz-parser-surfaces, slice 1).
 // Seeded from the TestClassifyExhausted_RealManifests goldens (real
 // claude/codex/agy /usage pane shapes) plus known-adversarial family/pane
-// combinations, then explores mutations. ClassifyExhausted is fail-open by
-// design (unloadable manifest/pattern -> false, never invents a cap), so the
-// only universal invariants are: never panic (an arbitrary family must not
-// reach an unsafe filesystem path or an invalid-regex crash) and determinism
-// (same input, same answer -> no hidden global state).
+// combinations, then explores mutations.
 
 import "testing"
 
