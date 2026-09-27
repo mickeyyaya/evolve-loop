@@ -1,0 +1,21 @@
+{
+  "id": "fleet-rebase-debugger-resolution-fenced",
+  "created_at": "2026-09-28T05:10:00Z",
+  "title": "The fleet-rebase debugger's conflict resolution is reverted by the read-only worktree fence, so ADR-0105 B5's re-entry can never succeed on a real conflict",
+  "weight": 0.9,
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "files": [
+    "go/internal/core/ship_recovery_debugger.go",
+    ".evolve/profiles/debugger.json",
+    "go/internal/phases/runner"
+  ],
+  "summary": "Cycle 1725 (wave 21) met a genuine fleet-rebase conflict on go/.apicover-enforce (both it and cycle 1726 appended a package line). The host routed to the debugger (recover:fleet-rebase-conflict-debugger); the debugger resolved the file, but the runner logged 'worktree fence: read-only phase debugger wrote 1 path(s) into its worktree; restored to the dispatched tree: go/.apicover-enforce' (debugger.json sets read_only_repo). resumeFleetRebaseAfterDebugger then re-ran the rebase on the restored tree, met the same conflict and aborted ('the conflict survived the debugger's resolution'). B5's live path needs the debugger to write its resolution; as configured it never can. The append-only registry class is now a union merge in .repo.git/info/attributes (go/.apicover-enforce), which prevents this shape but not a real overlapping edit.",
+  "acceptance": [
+    "A debugger dispatched for a fleet-rebase conflict can write the conflicted paths (and only those) into its worktree, or the host applies a resolution the debugger returns as data; the fence still reverts any other write.",
+    "A test drives a genuine conflict through the debugger with the production fence in place and ships the resolved tree.",
+    "go/.apicover-enforce merge=union moves from .repo.git/info/attributes into the versioned .gitattributes."
+  ],
+  "source": "wave 21 observation (2026-09-28, cycle 1725)",
+  "priority_rationale": "wave 21 boundary 2026-09-28: every genuine rebase conflict between parallel lanes currently ends its cycle; B5 was built for exactly this and cannot run"
+}

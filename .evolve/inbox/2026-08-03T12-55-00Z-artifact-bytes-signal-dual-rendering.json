@@ -26,5 +26,6 @@
   "priority_rationale": "inbox review 2026-09-27: Telemetry with no named consumer ('feeds budget/routing decisions' is aspirational), so it belongs in the speculative-feature band.",
   "merge_notes": [
     "inbox review 2026-09-27: dropped deps [egps-regression-tia-selection]; the ship importer backstop already selects routingtest for router changes, and the console-owned dependency held the only lane item back"
-  ]
+  ],
+  "review_status": "2026-09-28: NOT shipped. Cycle 1728's triage dropped it as 'already-shipped: e50654b5', but e50654b5 is the module-rename commit, and router.Digest emits no run_dir.artifact_bytes (grep -rn artifact_bytes go/internal/router finds nothing). Verify the cited commit implements the feature before dropping this as shipped."
 }
