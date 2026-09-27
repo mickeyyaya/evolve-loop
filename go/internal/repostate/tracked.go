@@ -31,6 +31,24 @@ import (
 // TrackedFiles returns the git-tracked paths directly under relDir (relative
 // paths as git reports them, nested entries excluded).
 func TrackedFiles(root, relDir string) ([]string, error) {
+	all, err := TrackedTree(root, relDir)
+	if err != nil {
+		return nil, err
+	}
+	var files []string
+	clean := filepath.Clean(relDir)
+	for _, rel := range all {
+		if filepath.Dir(rel) == clean {
+			files = append(files, rel)
+		}
+	}
+	return files, nil
+}
+
+// TrackedTree returns every git-tracked path under relDir at any depth
+// (relative to root, as git reports them) — the binding set for a scanner
+// that walks a whole tree rather than one flat directory.
+func TrackedTree(root, relDir string) ([]string, error) {
 	out, err := exec.Command("git", "-C", root, "ls-files", "--", relDir).Output()
 	if err != nil {
 		// exec.ExitError.Error() is just "exit status N"; the reason an
@@ -42,13 +60,10 @@ func TrackedFiles(root, relDir string) ([]string, error) {
 		return nil, fmt.Errorf("git ls-files %s in %s: %w", relDir, root, err)
 	}
 	var files []string
-	clean := filepath.Clean(relDir)
 	for _, line := range strings.Split(string(out), "\n") {
-		rel := strings.TrimSpace(line)
-		if rel == "" || filepath.Dir(rel) != clean {
-			continue
+		if rel := strings.TrimSpace(line); rel != "" {
+			files = append(files, rel)
 		}
-		files = append(files, rel)
 	}
 	return files, nil
 }

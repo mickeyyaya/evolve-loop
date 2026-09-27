@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -49,5 +50,28 @@ func TestTrackedSet_BindsTrackedFilesThroughRealGit(t *testing.T) {
 	}
 	if !set["tracked"] || set["minted"] || len(set) != 1 {
 		t.Errorf("TrackedSet = %v, want {tracked:true} only", set)
+	}
+}
+
+// TestTrackedTree_BindsNestedTrackedFiles names TrackedTree: it lists tracked
+// and staged files at every depth under relDir and never an untracked one —
+// the recursive binding set TrackedFiles narrows to direct children.
+func TestTrackedTree_BindsNestedTrackedFiles(t *testing.T) {
+	root, git := fixtureRepo(t)
+	write(t, root, "go/a_test.go")
+	write(t, root, "go/internal/p/b_test.go")
+	write(t, root, "go/internal/p/untracked_test.go")
+	write(t, root, "other/c_test.go")
+	git("add", "go/a_test.go", "go/internal/p/b_test.go", "other/c_test.go")
+
+	files, err := TrackedTree(root, "go")
+	if err != nil {
+		t.Fatalf("TrackedTree: %v", err)
+	}
+	if got := strings.Join(files, ","); got != "go/a_test.go,go/internal/p/b_test.go" {
+		t.Errorf("TrackedTree = %q, want the two staged files under go/ at any depth", got)
+	}
+	if _, err := TrackedTree(filepath.Join(t.TempDir(), "absent"), "."); err == nil {
+		t.Error("TrackedTree outside a work tree must fail so callers can fall back to bind-all")
 	}
 }
