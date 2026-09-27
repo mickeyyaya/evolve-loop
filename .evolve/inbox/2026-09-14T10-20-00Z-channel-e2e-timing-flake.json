@@ -1,4 +1,5 @@
 {
+  "id": "channel-e2e-timing-flake",
   "title": "TestChannel_EndToEnd is timing-based and reds the Ubuntu Go 1.23 race job — make the producer/normalizer span deterministic",
   "weight": 0.6,
   "source": "console-wave2-20260914",

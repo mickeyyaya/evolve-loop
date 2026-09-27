@@ -1,4 +1,5 @@
 {
+  "id": "audit-deadline-kill-test-flakes-under-load",
   "title": "TestAuditOrchestration_IntegrationTier_DeadlineKill_MarkerFreeDegradesToWarn flakes under whole-module load (seen 2x on 2026-09-13)",
   "weight": 0.55,
   "priority": "P2",

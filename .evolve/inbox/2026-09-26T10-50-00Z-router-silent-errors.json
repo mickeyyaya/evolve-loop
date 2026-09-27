@@ -1,0 +1,17 @@
+{
+  "id": "router-silent-errors",
+  "kind": "pipeline-repair",
+  "priority": "P2",
+  "weight": 0.5,
+  "title": "router swallows errors: LLMProposal.Decide drops Propose's error, PolicyForProject ignores config.Load's error, and Digest's error return is always nil",
+  "summary": "Found by comment-reduction batch 4 (2026-09-26) and reported without changing code. (1) LLMProposal.Decide drops the error from Propose without logging or signalling it, so an advisor failure is indistinguishable from an advisor that chose the static route. (2) PolicyForProject ignores the config.Load error (`cfg, _ :=`), so a malformed config silently becomes the defaults. (3) Digest never returns a non-nil error, so its error return and the check in AssembleHandoffs are dead. (4) In retroDecision the BLOCK cases and the default both go to PhaseEnd; the switch is redundant. (5) triage.cycle_size falls back to scout's estimate rather than triage's own value. (6) BuildSignals.FilesTouched holds a package count on the git fallback path, which its name hides. The test helper routeC1140 carries a cycle number in its name.",
+  "fix": "Emit a coded Signal Center WARN when Propose fails, and when config.Load fails in PolicyForProject, keeping the fail-open behavior. Remove Digest's dead error return or give it a real failure. Collapse retroDecision's switch. Make the cycle_size fallback explicit and named. Rename FilesTouched's fallback value or split it into a separate field. Rename routeC1140 to what it tests.",
+  "acceptance": [
+    "A failing Propose emits one coded WARN and the static decision still applies (test)",
+    "A malformed config in PolicyForProject emits one coded WARN (test)",
+    "No function in internal/router has an error return that is always nil"
+  ],
+  "files": ["go/internal/router/"],
+  "created_at": "2026-09-26T10:50:00Z",
+  "source": "console-comment-workstream-batch4"
+}

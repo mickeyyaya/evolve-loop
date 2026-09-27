@@ -1,0 +1,17 @@
+{
+  "id": "evalgate-floorbinding-silent-errors",
+  "kind": "pipeline-repair",
+  "priority": "P2",
+  "weight": 0.45,
+  "title": "evalgate: floorBindingGate discards triage-decision read errors; Gate A may point the agent at a deny-write path",
+  "summary": "Found by comment-reduction batch 12 (2026-09-26) and reported without changing code. (1) floorBindingGate.check discards the errors from triagecap.ReadDeferredFloors and ReadDeclaredFloors, so a malformed triage-decision.json reads as 'nothing declared' and the gate passes in silence. (2) For an eval that exists but has no [code] grader, Gate A's remediation names whatever path evalFilePath found. That can be the project-root path, which the gate's own reasoning says is deny-write under the sandbox. (3) LintMonotonicBinaryTarget has no production caller; only tests and go/acs/cycle1690 use it. (4) Comments in go/acs/cycle332 and cycle987 cite evalgate line numbers that are now stale.",
+  "fix": "Treat a read or parse error on triage-decision.json as a gate finding (fail loud), with a test. Make the remediation always name the writable workspace path. Wire LintMonotonicBinaryTarget into its intended gate, or delete it along with its predicate.",
+  "acceptance": [
+    "A malformed triage-decision.json makes the floor-binding gate report an error, not a pass (test)",
+    "Gate A's remediation never names a deny-write path (test)",
+    "LintMonotonicBinaryTarget has a production caller or is gone"
+  ],
+  "files": ["go/internal/evalgate/floorbinding.go", "go/internal/evalgate/gates.go"],
+  "created_at": "2026-09-26T13:22:00Z",
+  "source": "console-comment-workstream-batch12"
+}

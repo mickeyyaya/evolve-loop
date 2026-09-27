@@ -1,0 +1,14 @@
+{
+  "id": "commit-gate-waiver-followups",
+  "kind": "pipeline-repair",
+  "priority": "P3",
+  "weight": 0.35,
+  "route": "console",
+  "title": "Commit-gate comment waiver follow-ups: record the waiver in the attestation, guard the proof code as judging apparatus, and settle the pure-docs review policy",
+  "summary": "Deferred from the architect's review of batch 0 of the comment-reduction workstream (2026-09-26, APPROVE-WITH-MINOR). (m4) A waived commit and a --bypass-commit-gate commit look the same in git log: neither carries a Reviewed-by trailer. Add an optional review_waiver field to the attestation, omitted when empty so the byte-layout golden holds. Have ship's reviewedByTrailer emit `Review-waived: comment-only` for it. (m5) commentaudit decides whether review is skipped, so it is now judging apparatus: a wrong 'true' from Equivalent skips review. Add go/internal/commentaudit/ and go/internal/commitgate/ to scopedelta.signalDirs (go/internal/scopedelta/gaming.go), so a lane cannot loosen the directive pattern as ordinary code. (docs) operating-policy.md says pure-docs diffs may skip the simplifier, CLAUDE.md says they may skip the fleet, and the commit gate requires both reviewers for a docs-only change. Pick one rule and make all three agree.",
+  "fix": "(m4) An attestation field plus a trailer, with a golden test showing the field is absent when empty and a ship test showing the trailer. (m5) Add the two dirs to signalDirs, with a test that a lane diff touching them is flagged. (docs) Decide the pure-docs rule with the operator, then change the gate, or the two docs, to match.",
+  "acceptance": ["git log distinguishes a waived commit from a bypassed one", "A lane change to commentaudit or commitgate is flagged as a signal-dir change", "operating-policy.md, CLAUDE.md and the commit gate state one pure-docs rule"],
+  "files": ["go/internal/commitgate/attestation.go", "go/internal/phases/ship/commitgate.go", "go/internal/scopedelta/gaming.go", "docs/operations/operating-policy.md", "CLAUDE.md"],
+  "created_at": "2026-09-26T15:00:00Z",
+  "source": "console-comment-workstream-batch0-review"
+}

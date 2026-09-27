@@ -1,4 +1,5 @@
 {
+  "id": "resume-does-not-refresh-a-stale-worktree-base",
   "title": "Resume reuses a worktree base that main has moved past — cycle 1628 shipped into GIT_FF_MERGE_DIVERGED after 11 phases",
   "weight": 0.86,
   "priority": "P1",

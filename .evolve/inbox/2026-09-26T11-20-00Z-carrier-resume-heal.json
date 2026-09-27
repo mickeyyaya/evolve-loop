@@ -1,0 +1,21 @@
+{
+  "id": "resume-heals-a-carrier-left-at-head",
+  "title": "Resume must heal an ADR-0105 B1 carrier left at HEAD between the rebase and the pend (required before B3/B4)",
+  "kind": "hardening",
+  "class": "pipeline-integrity",
+  "priority": "P1",
+  "weight": 0.8,
+  "route": "console",
+  "created_at": "2026-09-26T11:20:00Z",
+  "files": [
+    "go/internal/core/resume_bootstrap.go",
+    "go/internal/core/ship_recovery_unwind.go"
+  ],
+  "problem": "ADR-0105 B1 replaces ship's commit with a carrier commit of the audited tree, rebases it, then soft-resets it to pending. A crash after the carrier reset but before the rebase heals itself: a re-ship binds the audited tree and the unwind repeats. A crash after the rebase but before the pend leaves the carrier rebased onto the new base as a commit. The resumed ship then fails its tree binding (T1 is not T0) and goes to a re-audit of a committed change, whose `git diff HEAD` is empty: the hazard B1's route guard exists to prevent. The B1 architect review requires this heal before B3 or B4 builds on B1.",
+  "fix": "On resume, before any phase runs, recognise a commit at HEAD whose message carries an `Evolve-Carrier: cycle-<N>/<run>` trailer naming this cycle and run, and pend it: `git reset --soft $(git merge-base HEAD main)`. Record a coded signal. The trailer is written by unwindShipCommit.",
+  "acceptance": [
+    "A resume with a rebased carrier at HEAD leaves the change pending on its fork point before Ship or Audit runs.",
+    "A carrier naming another cycle or run is left alone.",
+    "The design review's crash-window table gains both B1 windows with their recovery."
+  ]
+}

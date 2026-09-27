@@ -1,4 +1,5 @@
 {
+  "id": "percli-token-usage-collector",
   "title": "Per-CLI token-usage collector — codex-tmux launches report source=none (TRIPWIRE fired 30x in one run)",
   "weight": 0.58,
   "source": "console-progress-check-20260902",

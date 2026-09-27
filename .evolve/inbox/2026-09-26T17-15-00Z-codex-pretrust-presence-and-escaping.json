@@ -1,0 +1,17 @@
+{
+  "id": "codex-pretrust-presence-and-escaping",
+  "kind": "pipeline-repair",
+  "priority": "P2",
+  "weight": 0.5,
+  "title": "codex pretrust: presence is a substring match, so an untrusted or disabled entry suppresses the fix; control characters beyond the TOML short escapes pass unescaped",
+  "summary": "Found by comment-reduction batch 43 (2026-09-26) and verified by the console without changing code. go/internal/bridge/codex_pretrust.go: (1) appendCodexTrustEntries skips a path when its [projects.\"<path>\"] header text appears anywhere, so an existing block with trust_level = \"untrusted\" (or the header quoted inside a comment) keeps codex's trust modal armed. (2) appendCodexNotice skips when the key text hide_rate_limit_model_nudge appears anywhere, so `hide_rate_limit_model_nudge = false` keeps the rate-limit model-switch modal, the cycle-142 hang class. (3) tomlKeyEscaper escapes only backslash, quote and the short-escape controls (\\b \\t \\n \\f \\r). TOML basic strings forbid every other U+0000-U+001F and U+007F unescaped, so such a path writes an invalid config.toml and codex will not start. That is the failure the escaper exists to prevent.",
+  "fix": "Decide presence by parsing: read the table and key (a TOML decoder, or a line-anchored match on the header followed by its trust_level value) and set the value when it is wrong, not only when it is absent. Escape every remaining control character as \\uXXXX. Keep the merge under flock.WithPathLock, as it is now.",
+  "acceptance": [
+    "a config with trust_level = \"untrusted\" for the worktree ends trusted after pretrust (test)",
+    "a config with hide_rate_limit_model_nudge = false ends true after pretrust (test)",
+    "a path containing \\x01 and \\x7f produces a config.toml that a TOML parser accepts (test)"
+  ],
+  "files": ["go/internal/bridge/codex_pretrust.go", "go/internal/bridge/codex_pretrust_test.go"],
+  "created_at": "2026-09-26T17:15:00Z",
+  "source": "console-comment-workstream-batch43"
+}
