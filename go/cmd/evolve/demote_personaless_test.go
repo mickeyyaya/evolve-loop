@@ -1,10 +1,5 @@
 package main
 
-// demote_personaless_test.go — the registration-seam prevention layer for
-// cycle-1551: a discovered spec whose persona doc does not load is demoted to
-// catalog:"on-demand" IN MEMORY before the catalog merge, so the SELECT menu
-// never offers an undispatchable phase — on any host, tracked or not.
-
 import (
 	"os"
 	"path/filepath"
@@ -22,7 +17,7 @@ func TestDemotePersonalessSpecs(t *testing.T) {
 	})
 	specs := []phasespec.PhaseSpec{
 		{Name: "has-doc", Optional: true},                              // resolvable: untouched
-		{Name: "no-doc", Optional: true},                               // cycle-1551 shape: demoted
+		{Name: "no-doc", Optional: true},                               // persona missing: demoted
 		{Name: "already-hidden", Optional: true, Catalog: "on-demand"}, // already off the menu: untouched
 		{Name: "ship", Optional: true},                                 // control role (name-inferred): exempt
 		{Name: "script-phase", Optional: true, Kind: "script"},         // non-llm: exempt
@@ -47,10 +42,6 @@ func TestDemotePersonalessSpecs(t *testing.T) {
 	}
 }
 
-// The COMPOSED path (discovery + clamp + demotion) is what cmd_cycle actually
-// calls — this pins the wiring, not just the helper: a persona-less spec
-// discovered from disk must come back demoted from discoverUserSpecsClamped
-// itself, so no future caller can forget the demotion step.
 func TestDiscoverUserSpecsClamped_DemotesPersonalessFromDisk(t *testing.T) {
 	root := t.TempDir()
 	dir := filepath.Join(root, ".evolve", "phases", "ghost-check")

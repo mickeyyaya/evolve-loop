@@ -1,18 +1,5 @@
 package bridge
 
-// tmux_project_root_env_test.go — the pane shell carries the plane's root.
-//
-// Headless drivers hand the inner CLI driverEnv (the process env, the manifest's
-// default_env, then Deps.Env) — but a tmux pane is a shell the bridge did not
-// start: it inherits the tmux server's environment, and the bridge sends it only
-// `cd <worktree>`, its export lines and the launch command. So every `evolve` subcommand an agent
-// runs in that pane resolves its root through cmdutil.EnvOrCwd → the cycle
-// worktree — whose .evolve/inbox is a git-tracked snapshot of the plane's
-// queue. Batch cycle 1631 (2026-09-12) claimed an inbox item in that copy;
-// the plane's item never moved. core/phase.go documents ProjectRoot as
-// "what a subprocess sees as EVOLVE_PROJECT_ROOT"; this pins that the pane
-// sees it, in the one shell that survives into the agent's commands.
-
 import (
 	"strings"
 	"testing"
@@ -46,9 +33,6 @@ func TestTmuxBoot_ExportsProjectRootIntoThePaneShell(t *testing.T) {
 	}
 }
 
-// TestTmuxBoot_NoProjectRootMeansNoExport pins the guard: an empty root must
-// not clobber a pane variable with an empty export (the fallback is cwd, by
-// contract), which a benign "always export" refactor would do.
 func TestTmuxBoot_NoProjectRootMeansNoExport(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "plan")
 	tmux := &fakeTmux{}

@@ -10,20 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
 )
 
-// tokencount_test.go — RED contract for cycle-256 task `token-counter-extraction`.
-//
-// The bridge already compiles `rxTokens` (↓ N.Nk tokens) only to STRIP volatile
-// counter lines from cleanPane(). This task repurposes that same pattern to
-// EXTRACT the peak observed token count into a structured value, write a
-// `token-usage.json` sidecar after a tmux phase, and surface it on bridge.Report.
-//
-// These tests are behavioral: TestExtractTokenCount exercises the pure parser
-// across positive/fractional/multi/no-match/malformed inputs (the strongest
-// anti-no-op signal — a presence-only impl that returns a constant fails the
-// peak + zero cases); TestTmuxPhase_WritesTokenUsage runs the real REPL engine
-// and asserts the sidecar the agent's pane produced; TestBuildReport_TokenUsage
-// asserts the report field is populated from (and tolerant of) the sidecar.
-
 // TestExtractTokenCount pins the parser contract: a visible "↓ N.Nk tokens"
 // counter → integer token count (k = thousands), the PEAK across multiple
 // counters, and 0 for any no-match / malformed / empty input.
@@ -43,10 +29,9 @@ func TestExtractTokenCount(t *testing.T) {
 		{"no counter at all", "❯ ready\nTool: Read main.go\n", 0},
 		{"empty pane", "", 0},
 		{"malformed: no digits", "↓ k tokens", 0},
-		// Reconciled (cycle-429 S1): the old k-only extractor returned 0 here; the
-		// unified ExtractResponseTokens superset correctly yields 5200 (plain-integer
-		// path). Production panes always render the k-form; this form only appears in
-		// synthetic test frames where 5200 is the correct value.
+		// ExtractResponseTokens also accepts a plain-integer count (no "k" suffix);
+		// production panes always render the k-form, so this form only appears in
+		// synthetic test frames.
 		{"unified extractor: plain-integer → 5200", "↓ 5200 tokens", 5200},
 		{"malformed: missing tokens word", "↓ 5.2k", 0},
 		{"malformed: non-numeric", "↓ abck tokens", 0},

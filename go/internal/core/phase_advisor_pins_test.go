@@ -1,16 +1,5 @@
 package core
 
-// phase_advisor_pins_test.go — ADR-0103 unit 04 §6 step 1: the pre-move pins
-// on the phase advisor, green on the pre-extraction code and each proven red
-// against its named mutant before a line moved. They pin the seam the
-// composition root, the orchestrator and the ledger read: the error texts
-// cyclerun.go prints, the depth guard's refusal, capture-before-parse, the
-// prompt/launch/capture goldens and the stderr + stream silence on the happy
-// paths. After the move they run through core's seam (the one wired
-// construction + the Bridge→Launcher projection); the leaf carries its own
-// copies against its exported spellings, and the pure-render goldens (the
-// routing/plan prompts, the capture artifacts) live only in the leaf.
-
 import (
 	"context"
 	"encoding/json"
@@ -25,7 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// refusingBridge fails the test if the advisor launches through it.
 type refusingBridge struct {
 	t *testing.T
 	fakeBridge
@@ -124,7 +112,6 @@ func firstDiff(a, b string) int {
 	return n
 }
 
-// Test 1 — the depth guard's TRUE branch refuses BEFORE the launch.
 func TestAdvisorLaunch_DepthGuardRefusesBeforeLaunch(t *testing.T) {
 	rb := &refusingBridge{t: t}
 	adv := NewPhaseAdvisor(rb, WithDepthCheck(func(map[string]string) bool { return true }))
@@ -137,7 +124,6 @@ func TestAdvisorLaunch_DepthGuardRefusesBeforeLaunch(t *testing.T) {
 	}
 }
 
-// Test 2 — the twelve error texts the orchestrator prints, verbatim.
 func TestPhaseAdvisor_ErrorTextsAreTheOrchestratorsStderrText(t *testing.T) {
 	noWs := baseRouteInput()
 	noWs.Workspace = ""
@@ -171,8 +157,8 @@ func TestPhaseAdvisor_ErrorTextsAreTheOrchestratorsStderrText(t *testing.T) {
 	}
 }
 
-// Test 3 — the capture lands BEFORE the parse, so an unparseable response is
-// still forensically debuggable.
+// The capture lands before the parse, so an unparseable response is still
+// forensically debuggable.
 func TestAdvisorLaunch_CapturesEvenWhenTheResponseIsUnparseable(t *testing.T) {
 	ws := t.TempDir()
 	in := baseRouteInput()
@@ -187,8 +173,8 @@ func TestAdvisorLaunch_CapturesEvenWhenTheResponseIsUnparseable(t *testing.T) {
 	readAdvisorArtifact(t, filepath.Join(ws, "advisor-span-plan.json"))
 }
 
-// Test 6 — G5/G6/G7: the persona-composed plan prompt with the recon off, on
-// (through a real git history) and for the re-plan artifact.
+// Covers the persona-composed plan prompt with the recon off, on (through a
+// real git history), and for the re-plan artifact.
 func TestComposePlanPrompt_MatchesGolden(t *testing.T) {
 	rich := richRouteInput()
 	p := NewPhaseAdvisor(nil, WithPersona(goldenPersona))
@@ -200,7 +186,6 @@ func TestComposePlanPrompt_MatchesGolden(t *testing.T) {
 	assertGolden(t, "prompt-plan-persona-recon.golden.txt", p.composePlanPrompt(recon, "routing-plan.json"))
 }
 
-// Test 7 — G8: the bridge request per decision, every field.
 func TestLaunchRequest_GoldenPerDecision(t *testing.T) {
 	ws, root, wt := t.TempDir(), t.TempDir(), t.TempDir()
 	for _, d := range []struct {
@@ -227,8 +212,6 @@ func TestLaunchRequest_GoldenPerDecision(t *testing.T) {
 	}
 }
 
-// Test 9 — G10: a successful Propose/Plan/RePlan writes nothing to stderr and
-// emits nothing on the stream.
 func TestAdvisorStderrAndStream_HappyPathAreSilent(t *testing.T) {
 	c, got := recordingCenter()
 	ws := t.TempDir()

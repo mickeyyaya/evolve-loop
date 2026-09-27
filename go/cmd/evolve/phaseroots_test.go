@@ -7,7 +7,6 @@ import (
 )
 
 func TestPhaseRoots_DefaultWhenUnset(t *testing.T) {
-	// No policy.json in tempdir → phaseRoots falls back to .evolve/phases default.
 	root := t.TempDir()
 	got := phaseRoots(root)
 	want := filepath.Join(root, ".evolve", "phases")
@@ -18,7 +17,6 @@ func TestPhaseRoots_DefaultWhenUnset(t *testing.T) {
 
 func TestPhaseRoots_ColonSplitRelativeAndAbsolute(t *testing.T) {
 	root := t.TempDir()
-	// Write policy.json with custom phase roots to test full stack via phaseRoots().
 	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
 		t.Fatal(err)
 	}

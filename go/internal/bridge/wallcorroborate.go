@@ -1,24 +1,5 @@
 package bridge
 
-// wallcorroborate.go — out-of-band corroboration for the exhaustion fast-fail
-// (2026-08-15 false-wall incident; inbox exhaustion-scan-needs-corroboration).
-//
-// The pane exhaustion scan can never distinguish STATE from SUBJECT MATTER: a
-// lane fixing the exhaustion regexes renders the true wall phrases from its
-// own test fixtures, the file persists on-pane exactly like a real wall, both
-// existing guards (prompt-echo strip, persistence gate) are structurally
-// defeated, and every fallback family "walls" on the same content — a false
-// all-families quota checkpoint while the plans have headroom.
-//
-// Pattern: Strategy via DI. WallCorroborator is a Deps seam (like Runner/Now):
-// on a persistence-gate cross the site asks the corroborator; only a
-// corroborated wall escalates rc 85. The default strategy sends ONE cheap
-// headless request to the family — a truth the pane's content cannot forge:
-// a provider that answers is not walled, whatever the terminal shows. nil
-// corroborator = legacy behavior byte-identical (every pre-existing test and
-// caller unaffected); the production composition root wires
-// DefaultWallCorroborator explicitly.
-
 import (
 	"context"
 	"fmt"
@@ -39,8 +20,7 @@ var wallProbeTimeout = 60 * time.Second
 
 // wallProbeRecipes is the per-family probe DATA: the cheapest one-shot
 // headless request each CLI supports. Families without an entry cannot be
-// corroborated and stay conservative (walled=true — legacy behavior). Argv
-// forms verified live 2026-08-15 (CODEX-ALIVE / CLAUDE-ALIVE probes).
+// corroborated and stay conservative (walled=true — legacy behavior).
 var wallProbeRecipes = map[string]struct {
 	argv  []string
 	stdin string
@@ -93,10 +73,10 @@ func wallCorroborated(ctx context.Context, corroborate WallCorroborator, cli str
 	return corroborate(ctx, cli)
 }
 
-// checkpointWallState carries the stop-review site's one-probe latch. Extracted
-// from runTmuxREPL's checkpoint block (review HIGH-2: the site's logic needs a
-// direct test; inline it was untestable without contriving a pane the fast
-// poll cannot see first).
+// checkpointWallState carries the stop-review site's one-probe latch,
+// extracted from runTmuxREPL's checkpoint block because the site's logic
+// needed a direct test — inline it was untestable without contriving a pane
+// the fast poll cannot see first.
 type checkpointWallState struct {
 	suppressed bool
 	probed     bool

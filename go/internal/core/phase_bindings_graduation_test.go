@@ -1,27 +1,5 @@
 package core
 
-// phase_bindings_graduation_test.go — cycle-675 RED contract for the
-// build-entry new-package graduation guard (inbox
-// new-package-graduation-buildentry-gate, 3rd recurrence: cycles 575/587/652).
-//
-// The audit-side half (apicoverNewPackageGraduationDefault, audit.go:248) landed
-// 2026-07-07; this encodes the missing build-entry half: a deterministic
-// post-build check that FAILS the build phase — explicit abort_reason, unlike
-// buildSelfCheck's WARN-only contract — when a changed go/internal/<pkg> is new
-// this cycle and absent from go/.apicover-enforce.
-//
-// Contract under test (Builder implements; tests must not be modified):
-//
-//	buildGraduationCheck(ctx context.Context, worktree string) string
-//
-// returns "" when nothing is ungraduated (or the check cannot apply: empty
-// worktree, no enforce file — fail-open mirroring the audit default), else a
-// non-empty abort reason naming each ungraduated package and the
-// .apicover-enforce graduation obligation. Detection reuses
-// ciparity.NewUngraduatedPackages over the worktree's changed set; a package
-// whose directory no longer exists in the worktree (delete/rename) is NOT new
-// and must never be flagged (AC3).
-
 import (
 	"context"
 	"os"
@@ -61,7 +39,7 @@ func gradCommitAll(t *testing.T, wt string) {
 	gradGit(t, wt, "commit", "-q", "-m", "seed")
 }
 
-// TestBuildGraduationCheck is the AC1/AC3 table: the guard fires exactly on a
+// TestBuildGraduationCheck is the table: the guard fires exactly on a
 // NEW ungraduated go/internal/<pkg> and stays silent on enrolled, out-of-scope,
 // deleted, and renamed-but-reenrolled changes.
 func TestBuildGraduationCheck(t *testing.T) {
@@ -79,9 +57,9 @@ func TestBuildGraduationCheck(t *testing.T) {
 		wantContains []string
 	}{
 		{
-			// AC1 positive: reproduces cycle-652 — a brand-new internal package
-			// with no .apicover-enforce entry must fail the build phase, and the
-			// reason must name the package AND the graduation obligation.
+			// A brand-new internal package with no .apicover-enforce entry
+			// must fail the build phase, and the reason must name the
+			// package AND the graduation obligation.
 			name: "new-ungraduated-package-fails",
 			setup: func(t *testing.T, wt string) {
 				gradWrite(t, wt, "go/.apicover-enforce", "./internal/other\n")
@@ -91,15 +69,11 @@ func TestBuildGraduationCheck(t *testing.T) {
 			wantContains: []string{"./internal/brandnew", ".apicover-enforce"},
 		},
 		{
-			// cycle-1223/1224/1228 halt class (batch of 2026-08-02): the tdd
-			// phase RED-first mints a package containing ONLY a _test.go file.
-			// A test-only package has ZERO exported production symbols, so the
-			// repo-wide apicover gate this graduation protects cannot fire on
-			// it (CI's own enforce step: "apicover finds 0 exported symbols in
-			// the test-only acs packages and passes") — the obligation is
-			// vacuous, but the abort was fatal AND unreachable by any in-cycle
-			// correction, so the next cycle re-minted the same package and the
-			// identical-fingerprint breaker halted the batch at 3.
+			// A test-only package (only a _test.go file, e.g. from a
+			// RED-first tdd mint) has ZERO exported production symbols, so
+			// the repo-wide apicover gate this graduation protects cannot
+			// fire on it — the obligation is vacuous, and the abort would
+			// otherwise be fatal and unreachable by any in-cycle correction.
 			name: "test-only-package-does-not-abort",
 			setup: func(t *testing.T, wt string) {
 				gradWrite(t, wt, "go/.apicover-enforce", "./internal/other\n")
@@ -124,9 +98,9 @@ func TestBuildGraduationCheck(t *testing.T) {
 			wantContains: []string{"./internal/mixed", ".apicover-enforce"},
 		},
 		{
-			// AC1 negative (the anti-no-op arm): the same new package enrolled in
-			// the SAME diff (self-graduation) must pass — a guard that flags every
-			// new package regardless of enrollment is wrong.
+			// The same new package enrolled in the SAME diff (self-graduation)
+			// must pass — a guard that flags every new package regardless of
+			// enrollment is wrong.
 			name: "enrolled-same-diff-passes",
 			setup: func(t *testing.T, wt string) {
 				gradWrite(t, wt, "go/.apicover-enforce", "./internal/other\n")
@@ -153,7 +127,7 @@ func TestBuildGraduationCheck(t *testing.T) {
 			},
 		},
 		{
-			// AC3: a package DELETED this cycle (its enforce entry removed in the
+			// A package DELETED this cycle (its enforce entry removed in the
 			// same diff) appears in the changed set but is not NEW — flagging it
 			// would make graduation hygiene un-shippable.
 			name: "deleted-package-not-flagged",
@@ -166,7 +140,7 @@ func TestBuildGraduationCheck(t *testing.T) {
 			},
 		},
 		{
-			// AC3: a RENAME whose destination is enrolled in the same diff — the
+			// A RENAME whose destination is enrolled in the same diff — the
 			// old side is deleted (not new), the new side is enrolled.
 			name: "renamed-package-reenrolled-passes",
 			setup: func(t *testing.T, wt string) {
@@ -235,7 +209,7 @@ func gradCycleRun(t *testing.T, wt string) *cycleRun {
 	}
 }
 
-// TestRecordAndBranch_BuildGraduationGuardAborts is the wiring half of AC1: at
+// TestRecordAndBranch_BuildGraduationGuardAborts is the wiring half: at
 // the post-build seam (recordAndBranch(PhaseBuild)), an ungraduated new package
 // must FAIL the phase — a returned error naming the package and obligation, NOT
 // loopNext — and the abort_reason must land on the recorded phase outcome

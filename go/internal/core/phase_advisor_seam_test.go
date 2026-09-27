@@ -1,11 +1,5 @@
 package core
 
-// phase_advisor_seam_test.go — ADR-0103 unit 04 §6 step 4: the core seam —
-// the ONE wired construction, the Bridge→Launcher projection, the facades the
-// composition root, resume, the judge/adjudicator, the failure digest and the
-// by-name tests keep, the git reader the seam injects, the Center reaching
-// the brain through the option, and the unit-05 handoff pin.
-
 import (
 	"context"
 	"errors"
@@ -23,7 +17,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// Test 39 — the ONE projection of the leaf's fourteen-field request onto the
+// The ONE projection of the leaf's fourteen-field request onto the
 // bridge request (every field set to a distinct value so a dropped or swapped
 // mapping shows; the leaf's own positional pin makes a NEW field a compile
 // error) and of the four response fields back.
@@ -47,7 +41,7 @@ func TestBridgeRequestOf_ProjectsEveryLaunchField(t *testing.T) {
 	}
 }
 
-// Test 40 — the leaf is constructed in exactly one non-test file, and the
+// The leaf is constructed in exactly one non-test file, and the
 // composition root constructs the seam in exactly one.
 func TestPhaseAdvisor_OneConstructionSite(t *testing.T) {
 	for needle, onlySite := range map[string]string{
@@ -64,10 +58,8 @@ func TestPhaseAdvisor_OneConstructionSite(t *testing.T) {
 	}
 }
 
-// Test 41 — a literal PhaseAdvisor lazily builds ONE brain; a nil bridge
-// yields the legacy error; the seam injects the atomic capture writer (no
-// .tmp sibling survives, a directory at the artifact path is a capture WARN
-// while the plan still returns).
+// A literal PhaseAdvisor lazily builds ONE brain; a nil bridge yields the
+// legacy error.
 func TestPhaseAdvisor_LiteralGetsTheBrainOnce(t *testing.T) {
 	p := &PhaseAdvisor{identity: AgentIdentity{CLI: "claude-tmux", Model: "opus", AgentLabel: "router"}}
 	if p.brain != nil {
@@ -82,10 +74,10 @@ func TestPhaseAdvisor_LiteralGetsTheBrainOnce(t *testing.T) {
 	}
 }
 
-// Test 41b (review fold, Go MINOR) — the lazy cache is safe by construction:
-// concurrent FIRST uses of a literal PhaseAdvisor build ONE brain and every
-// caller sees the same one. Red under -race on the unsynchronized nil-check
-// (a read-check-write on the pointer field); green under sync.Once.
+// The lazy cache is safe by construction: concurrent FIRST uses of a literal
+// PhaseAdvisor build ONE brain and every caller sees the same one. Red under
+// -race on the unsynchronized nil-check (a read-check-write on the pointer
+// field); green under sync.Once.
 func TestPhaseAdvisor_LiteralBuildsOneBrainUnderConcurrentFirstUse(t *testing.T) {
 	p := &PhaseAdvisor{identity: AgentIdentity{CLI: "claude-tmux", Model: "opus", AgentLabel: "router"}}
 	const callers = 8
@@ -151,8 +143,8 @@ func TestNewPhaseAdvisor_WiresTheAtomicCaptureWriter(t *testing.T) {
 	}
 }
 
-// Test 42 — every facade projects the leaf; resume and replay re-parse a
-// reserved mint silently.
+// Every facade projects the leaf; resume and replay re-parse a reserved mint
+// silently.
 func TestCoreFacades_ProjectTheLeaf(t *testing.T) {
 	raw := `[{"phase":"scout","run":true,"tier":"opus"},{"phase":"router","run":true,"mint":{"prompt":"x"}},{"phase":"new-helper","run":true,"mint":{"prompt":"y"}}]`
 	c, got := recordingCenter()
@@ -228,11 +220,9 @@ func TestCoreFacades_ProjectTheLeaf(t *testing.T) {
 	var _ AgentIdentity = advisor.Identity{}
 }
 
-// Test 43 — the unit-05 handoff pin: a failing Planner under RunCycle emits
-// NO orchestrator code naming the plan (the advisor reports its own fault)
-// while the verbatim `[orchestrator] WARN phase advisor Plan failed` line
-// still prints. A handoff pin: it cannot go red on the base; its throwaway
-// mutant is a hand-added ORCHESTRATOR_* Emit in cyclerun.go's degrade branch.
+// A failing Planner under RunCycle emits NO orchestrator code naming the
+// plan (the advisor reports its own fault) while the verbatim
+// `[orchestrator] WARN phase advisor Plan failed` line still prints.
 func TestRunCycle_PlanDegradeEmitsNoOrchestratorCode(t *testing.T) {
 	c, got := recordingCenter()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
@@ -263,7 +253,7 @@ func (erroringPlanner) Plan(router.RouteInput) (*router.PhasePlan, error) {
 	return nil, errors.New("planner: boom")
 }
 
-// Test 44 — the git reader the seam injects: duplicates kept as git prints
+// The git reader the seam injects: duplicates kept as git prints
 // them, a non-repo is an error, an empty root reads nothing.
 func TestRecentlyChangedFiles_ReadsGitLogAndReportsErrors(t *testing.T) {
 	root := goldenGitRepo(t)
@@ -282,7 +272,7 @@ func TestRecentlyChangedFiles_ReadsGitLogAndReportsErrors(t *testing.T) {
 	}
 }
 
-// Test 45 — the Center reaches the brain through the option: without it a
+// The Center reaches the brain through the option: without it a
 // reserved mint drops silently; with it the drop is one ADVISOR_MINT_REJECTED
 // stamped with the cycle and the decision.
 func TestPhaseAdvisor_SeesTheSignalCenterAppliedThroughTheOption(t *testing.T) {

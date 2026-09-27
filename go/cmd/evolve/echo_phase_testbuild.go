@@ -1,14 +1,7 @@
 //go:build evolve_test_phases
 
-// Test-only phase registration. Compiled into the `evolve` binary only
-// when built with `-tags evolve_test_phases`, which the serve-phase
-// subprocess integration test does. Production builds never include it,
-// so there is zero runtime surface in shipped binaries.
-//
-// Why a build tag and not an env-var-gated registration: keeps the
-// echo phase entirely out of the production binary's symbol table, and
-// makes the dependency explicit in `go build` invocations rather than
-// hiding it behind runtime state.
+// A build tag, not an env-var gate, keeps this test-only phase entirely out
+// of the production binary's symbol table.
 package main
 
 import (
@@ -20,11 +13,8 @@ import (
 )
 
 func init() {
-	// Register into the phases registry that `evolve serve-phase`
-	// (phasecmd.RunServePhase → registry.For) resolves against. The former
-	// package-local `phaseFactories` map was removed when serve-phase moved to
-	// internal/cli/phasecmd, which silently bit-rotted this test build
-	// (undefined: phaseFactories) — see ADR-0062/T1.7 follow-up.
+	// registry.Register wires this test phase into the resolution path
+	// evolve serve-phase (phasecmd.RunServePhase → registry.For) uses.
 	registry.Register("echo", func(req core.PhaseRequest) core.PhaseRunner {
 		return &echoPhaseRunner{}
 	})

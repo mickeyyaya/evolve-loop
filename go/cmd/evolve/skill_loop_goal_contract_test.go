@@ -1,15 +1,3 @@
-// skill_loop_goal_contract_test.go — durable regression lock for the
-// /evo:loop goal-required doc contract (cycle-1029, inbox item
-// loop-skill-goal-mandatory-prompt-before-act).
-//
-// The Go binary REQUIRES a goal unless --resume/--dry-run
-// (go/cmd/evolve/cmd_loop_args.go:151-156 → rc=10 "a goal is required …",
-// locked by dispatch_test.go's TestDispatch_LoopRoutesToRunLoop). This test
-// locks the OTHER half of that contract: skills/loop/SKILL.md must frame the
-// goal as REQUIRED, so a future edit that re-introduces the optional `[goal]`
-// bracket in the argument-hint or Usage line fails the suite here. It is the
-// permanent counterpart to the per-cycle ACS predicates in
-// go/acs/cycle1029/predicates_test.go, which are pruned after the cycle.
 package main
 
 import (
@@ -34,7 +22,6 @@ func readSkillLoopLines(t *testing.T) []string {
 	return strings.Split(string(raw), "\n")
 }
 
-// firstLineContaining returns the first line containing needle, or "".
 func firstLineContaining(lines []string, needle string) string {
 	for _, ln := range lines {
 		if strings.Contains(ln, needle) {
@@ -44,10 +31,6 @@ func firstLineContaining(lines []string, needle string) string {
 	return ""
 }
 
-// TestSkillLoopGoalRequired_ArgumentHintAndUsage locks the doc/binary parity:
-// the argument-hint frontmatter and the Usage line must mark the goal REQUIRED
-// (`<goal>`, never the optional `[goal]` bracket). Fails if a future edit
-// re-introduces optional-goal framing.
 func TestSkillLoopGoalRequired_ArgumentHintAndUsage(t *testing.T) {
 	lines := readSkillLoopLines(t)
 

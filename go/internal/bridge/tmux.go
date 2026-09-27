@@ -23,10 +23,10 @@ type TmuxController interface {
 	// NewSession creates a detached session of the given pane size.
 	NewSession(ctx context.Context, name string, width, height int) error
 	// SendKeys sends literal keys to the session; when enter is true a
-	// trailing Enter keypress is appended (the bash `send-keys … Enter`).
+	// trailing Enter keypress is appended.
 	SendKeys(ctx context.Context, session, keys string, enter bool) error
 	// CapturePane returns the pane contents. scrollback>0 captures that
-	// many lines of history (bash `-S -<n>`); 0 captures the visible pane.
+	// many lines of history; 0 captures the visible pane.
 	CapturePane(ctx context.Context, session string, scrollback int) (string, error)
 	// LoadBuffer loads a file into the tmux paste buffer.
 	LoadBuffer(ctx context.Context, session, file string) error
@@ -38,10 +38,6 @@ type TmuxController interface {
 
 // PaneCommander is an OPTIONAL TmuxController capability: the foreground
 // process name of the session's active pane (`#{pane_current_command}`).
-// The boot handshake and post-paste spill check type-assert for it — a
-// controller without it degrades to the marker-only behavior (cycle-274
-// fix, inbox codex-update-menu-swallows-injection). Optional so existing
-// test doubles keep compiling.
 type PaneCommander interface {
 	PaneCommand(ctx context.Context, session string) (string, error)
 }
@@ -53,17 +49,9 @@ type paneTTYReader interface {
 }
 
 // execTmux is the production TmuxController — thin wrappers over the
-// tmux binary. Mirrors the exact invocations in drivers/claude-tmux.sh.
+// tmux binary.
 type execTmux struct{}
 
-// tmuxCmdTimeout bounds every tmux subprocess call. tmux ops are sub-second in
-// health, so 30s never throttles a working call — it exists solely so a WEDGED
-// tmux server cannot block a call forever. Without it, `tmux capture-pane`'s
-// read() blocked the completion wait loop indefinitely (flag-campaign-8): the
-// loop only checks ctx between iterations, so a mid-iteration blocking call froze
-// every liveness mechanism (poll, stop-review, ctx-cancel) with the deliverable
-// already on disk. A per-call deadline keeps the loop iterating no matter what
-// tmux does. See TestRunCmdBounded_*.
 const tmuxCmdTimeout = 30 * time.Second
 
 // runCmdBounded runs name+args capturing combined output, with a per-call
@@ -85,28 +73,13 @@ func runCmdBounded(ctx context.Context, timeout time.Duration, name string, args
 	return out.String(), err
 }
 
-// TmuxSocket is the DEFAULT bridge tmux socket — isolating agent panes from the
-// operator's shared default socket (/tmp/tmux-<uid>/default), where a stray
-// `tmux attach` could land in a live agent REPL (the flag-campaign-8 "show
-// progress" leak). The bridge runs every pane on its own socket so the
-// operator's default-socket tmux never sees agent panes.
-//
-// F6: the socket name is now PER-RUN by default (the loop sets TmuxSocketEnv to
-// evolve-bridge-p<looppid> and propagates it to every bridge subprocess). The
-// old single-shared-socket design relied on session names carrying the run id +
-// reap-by-name (never kill-server) so concurrent runs never tore down one
-// another — that holds for evolve's OWN reaper, but an EXTERNAL `tmux -L
-// evolve-bridge kill-server` (a sibling session / operator) would still nuke
-// every run's panes at once. A per-run socket forecloses that: a kill-server on
-// one run's socket leaves the others untouched. Crashed runs' sockets are
-// reclaimed by the orphan-socket GC (swarm.ExecReapOrphanSockets).
+// TmuxSocket is the bridge's default tmux socket, isolated from the
+// operator's shared default socket.
 const TmuxSocket = "evolve-bridge"
 
-// TmuxSocketEnv overrides the active socket name for a run. It is an IPC channel
-// (loop → its bridge subprocesses, like BRIDGE_RUN_ID), NOT a user feature flag:
-// the loop derives one per-run value (DeriveRunSocket) and exports it so the
-// loop, every bridge subprocess, the reaper, and the GC all resolve the same
-// socket. Empty/unset ⇒ the shared TmuxSocket default (backward compatible).
+// TmuxSocketEnv overrides the active socket name for a run; it is an IPC
+// channel from the loop to its bridge subprocesses, not a user flag. Empty
+// or unset falls back to the shared TmuxSocket default.
 const TmuxSocketEnv = "EVOLVE_TMUX_SOCKET"
 
 // DeriveRunSocket builds a per-run socket name from a run-scoped integer key
@@ -115,9 +88,6 @@ func DeriveRunSocket(pid int) string {
 	return TmuxSocket + "-p" + strconv.Itoa(pid)
 }
 
-// tmuxSocketName resolves the active socket at call time (so loop + bridge
-// subprocess + reaper + GC all agree via the inherited env): the per-run
-// override if set, else the shared default.
 func tmuxSocketName() string {
 	if s := strings.TrimSpace(os.Getenv(TmuxSocketEnv)); s != "" {
 		return s
@@ -125,11 +95,8 @@ func tmuxSocketName() string {
 	return TmuxSocket
 }
 
-// TmuxSocketArgs prepends tmux's GLOBAL -L socket selector (which must precede the
-// subcommand) so the invocation targets the bridge server. It is the single SSOT
-// for socket selection across every bridge tmux consumer — execTmux (here), swarm
-// teardown (swarm.ExecTmuxKill), the orphan GC, and the observer liveness probe —
-// so all resolve the same per-run socket and none drift onto the default socket.
+// TmuxSocketArgs prepends tmux's global -L socket selector, which must
+// precede the subcommand, so the invocation targets the bridge server.
 func TmuxSocketArgs(args ...string) []string {
 	return append([]string{"-L", tmuxSocketName()}, args...)
 }
@@ -148,12 +115,6 @@ func (t execTmux) NewSession(ctx context.Context, name string, width, height int
 	return err
 }
 
-// workdirSessionStarter is an OPTIONAL TmuxController capability (CB.2): create
-// the detached session with its pane cwd bound at BIRTH (`tmux new-session -c`)
-// instead of relying solely on the later `cd` keystroke — a swallowed keystroke
-// (the codex-menu class) otherwise leaves the CLI running from the dispatcher's
-// cwd. Controllers without it degrade to plain NewSession + cd (the
-// PaneCommander / windowJiggler optional-interface convention).
 type workdirSessionStarter interface {
 	NewSessionIn(ctx context.Context, name string, width, height int, workdir string) error
 }
@@ -186,7 +147,6 @@ func (t execTmux) CapturePane(ctx context.Context, session string, scrollback in
 func (t execTmux) LoadBuffer(ctx context.Context, session, file string) error {
 	// Name the buffer after the session (via -b) so concurrent launches on the
 	// shared tmux server each have their own buffer and cannot cross-paste.
-	// Single-launch behavior is identical to the old global-buffer approach.
 	_, err := t.run(ctx, "load-buffer", "-b", session, file)
 	return err
 }
@@ -222,10 +182,6 @@ func (t execTmux) KillSession(ctx context.Context, session string) error {
 	return err
 }
 
-// PaneCommand implements PaneCommander: the active pane's foreground process
-// name. A wedged shell reports "zsh"/"bash"; a healthy claude REPL reports
-// "node", codex "codex" — which is why callers reject-known-shell instead of
-// require-known-binary.
 func (t execTmux) PaneCommand(ctx context.Context, session string) (string, error) {
 	out, err := t.run(ctx, "display-message", "-p", "-t", session, "#{pane_current_command}")
 	return strings.TrimSpace(out), err
@@ -237,8 +193,7 @@ func (t execTmux) paneTTY(ctx context.Context, session string) (string, error) {
 }
 
 // FakeTmuxController is a scriptable TmuxController for deterministic REPL
-// state-machine tests. CapturePane consumes CaptureFrames in order and panics on
-// underrun, so a fixture that forgets a frame fails at the exact missing read.
+// state-machine tests.
 type FakeTmuxController struct {
 	mu             sync.Mutex
 	Existing       map[string]bool
@@ -256,7 +211,7 @@ type FakeTmuxController struct {
 	PaneCmd string
 }
 
-// PaneCommand implements PaneCommander (see TmuxController docs).
+// PaneCommand implements PaneCommander.
 func (f *FakeTmuxController) PaneCommand(_ context.Context, _ string) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -338,12 +293,11 @@ func (f *FakeTmuxController) KillSession(_ context.Context, session string) erro
 	return nil
 }
 
-// ansiRE matches the CSI / OSC escape sequences the bash driver strips
-// from scrollback (sed 's/\x1b\[[0-9;]*[a-zA-Z]//g; s/\x1b\][^\x07]*\x07//g').
+// ansiRE matches the CSI / OSC escape sequences stripped from tmux scrollback.
 var ansiRE = regexp.MustCompile("\x1b\\[[0-9;]*[a-zA-Z]|\x1b\\][^\x07]*\x07")
 
 // stripANSI removes terminal escape sequences from captured scrollback so
-// the stdout-log is plain text (the bash driver's sed pass).
+// the stdout-log is plain text.
 func stripANSI(s string) string {
 	return ansiRE.ReplaceAllString(s, "")
 }

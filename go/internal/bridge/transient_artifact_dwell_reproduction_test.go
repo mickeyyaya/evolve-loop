@@ -2,10 +2,6 @@ package bridge
 
 import "testing"
 
-// TestRunTmuxREPL_TransientPaneSkipsFullArtifactTimeout reproduces the
-// transient-artifact-timeout defect: an idle pane that continuously displays
-// the live 529 upstream error must stop through the existing exit-81 path
-// after its 60-second dwell, before the normal artifact-timeout reviewer runs.
 func TestRunTmuxREPL_TransientPaneSkipsFullArtifactTimeout(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
 	const pane = "API Error: 529 Overloaded. This is a server-side issue, usually temporary — try again in a moment.\n❯"

@@ -8,21 +8,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/tokenusage"
 )
 
-// Cycle-745 task token-resolver-boot-warn: Deps.TokenResolver is a fail-open
-// seam. Historically nil disabled the whole token record, which is how the
-// all-zeros first telemetry batch shipped unnoticed. Lifecycle telemetry now
-// remains active, but token usage is unavailable, so fail-open must still be
-// loud. Constructing an Engine with a nil TokenResolver emits one WARN naming
-// TokenResolver; a wired resolver stays silent.
-
 // stubResolver is a minimal non-nil TokenResolver for the wired case.
 func stubResolver(tokenusage.Window) (tokenusage.Result, error) {
 	return tokenusage.Result{}, nil
 }
 
-// TestEngine_WarnsOnNilTokenResolver — AC1 (positive): a nil TokenResolver at
-// construction produces exactly one WARN line mentioning TokenResolver on the
-// engine's own Stderr, so telemetry fail-open is loud instead of silent.
 func TestEngine_WarnsOnNilTokenResolver(t *testing.T) {
 	var buf bytes.Buffer
 	NewEngine(Deps{Stderr: &buf, Signals: sinkDeps(&buf)})
@@ -35,10 +25,6 @@ func TestEngine_WarnsOnNilTokenResolver(t *testing.T) {
 	}
 }
 
-// TestEngine_NoTokenResolverWarnWhenWired — AC2 (negative / anti-noise): an
-// Engine constructed WITH a TokenResolver must not emit the nil-resolver WARN —
-// otherwise every healthy production boot logs a false alarm and the signal
-// value of AC1 is destroyed.
 func TestEngine_NoTokenResolverWarnWhenWired(t *testing.T) {
 	var buf bytes.Buffer
 	NewEngine(Deps{Stderr: &buf, Signals: sinkDeps(&buf), TokenResolver: stubResolver})

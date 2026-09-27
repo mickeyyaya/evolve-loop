@@ -10,25 +10,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
 )
 
-// stopreview.go — Stage-0 of the self-healing review layer (the "vertical
-// slice"; see docs/architecture/adr/0026-self-healing-review-layer.md).
-//
-// A pipeline stop condition (today: the *-tmux artifact wait elapsing a review
-// interval without the artifact appearing) is no longer a silent kill. Instead
-// it is an Observation that triggers a Review which justifies the next move:
-//
-//	Observe   → StopEvent (the evidence envelope)
-//	Review    → StopReviewer.Review (deterministic now; LLM/orchestrator later)
-//	Translate → ReviewVerdict {extend | pause | stop}
-//	Execute   → the caller applies it and logs the justification
-//
-// Stage 0 ships the envelope + interface + a deterministic reviewer wired into
-// the artifact wait. The loop extends this seam (Stage 1) to the other stop
-// kinds (non-zero exit, launch error, audit block) and an LLM reviewer.
-
-// StopKind classifies the pipeline stop condition under review. Stage 0 emits
-// only StopArtifactTimeout; the enum is extension-ready so one review layer can
-// cover every stop point without a parallel mechanism per kind.
+// StopKind classifies the pipeline stop condition under review.
 type StopKind string
 
 const (
@@ -38,8 +20,7 @@ const (
 )
 
 // StopEvent is the Observe-layer envelope: the evidence a reviewer needs to
-// justify the next move. Fields are additive — a new StopKind populates what it
-// has and leaves the rest zero.
+// justify the next move.
 type StopEvent struct {
 	Kind       StopKind
 	Phase      string // agent/role, e.g. "scout"
@@ -49,21 +30,11 @@ type StopEvent struct {
 	Attempt    int    // review index: 0 = first review, 1 = after one extension, …
 	Progressed bool   // did the agent emit new output during the last interval?
 	Busy       bool   // is the agent visibly mid-turn per the per-CLI busy affordance?
-	StdoutTail string // recent pane/stdout — evidence for an LLM reviewer (Stage 1)
-	// InjectedPrompt is the prompt actually delivered into this session — the
-	// same string the exhaustion scan strips against (autoResponder.injectedPrompt).
-	// fatalpane.go's C2 detector consumes it via strippedForFatalPaneScan so the
-	// agent quoting its own instructions cannot read as the CLI's fatal chrome.
-	// Empty = fail-open (strip no echoes), never a suppressed signal.
+	StdoutTail string // recent pane/stdout — evidence for an LLM reviewer
+	// InjectedPrompt: empty means fail-open — no echoes are stripped, never a
+	// suppressed signal.
 	InjectedPrompt string
-	// State carries the per-CLI liveness detector's structured verdict — the
-	// reviewer's SOLE decision input (ev.livenessState()). Populated by the
-	// driver via panestream.LivenessCenter.Observe+Aggregate (ADR-0068, S3); the
-	// pre-S3 Progressed+Busy boolean fallback is retired (an actually-unset
-	// State carries no liveness signal, never a boolean-derived extend).
-	// Progressed/Busy stay populated for fatalpane.go's C2 detector and
-	// checkpoint logging — they are evidence fields, not a decision path.
-	State panestream.LivenessState
+	State          panestream.LivenessState
 }
 
 // ReviewAction is the Translate-layer verdict vocabulary.
@@ -76,39 +47,20 @@ const (
 )
 
 // ReviewVerdict is a reviewer's decision plus a human-readable justification,
-// which the caller logs to the self-healing trail. Cause is the typed terminal
-// cause of a fatal-pane fast-fail (empty for every other verdict) — what the
-// engine's fresh-session retry keys on (F31), never the Reason prose.
+// which the caller logs to the self-healing trail.
 type ReviewVerdict struct {
 	Action ReviewAction
 	Reason string
 	Cause  recovery.TerminalCause
 }
 
-// StopReviewer adjudicates a StopEvent into a verdict. Stage 0 ships
-// deterministicReviewer; Stage 1 adds an LLM/orchestrator reviewer behind this
-// same interface, so the loop wiring never changes.
+// StopReviewer adjudicates a StopEvent into a verdict.
 type StopReviewer interface {
 	Review(ev StopEvent) ReviewVerdict
 }
 
-// artifactTimeoutMarker prefixes the ONE self-describing summary line the
-// artifact wait emits before returning ExitArtifactTimeout, and is the token
-// Engine.Launch matches on to lift that line into the exit-81 error
-// (artifactTimeoutSummary). It exists because a timeout death otherwise carries
-// no reason beyond the code: the reader of a dead cycle cannot tell "the agent
-// was still working and ran out of budget" (raise bridge.phase_artifact_timeout_s)
-// from "the pane was wedged" (fix the wedge). Marker-driven rather than
-// position-driven on purpose — real launches emit `[bridge] WARN:` sandbox
-// chatter BEFORE the wait, which a first-`[bridge]`-line heuristic would report
-// as the timeout's cause. The marker's ONE spelling is the parser's
-// (launchoutcome.ArtifactTimeoutMarker, ADR-0103 unit 10); the emitters here
-// project it.
 const artifactTimeoutMarker = launchoutcome.ArtifactTimeoutMarker
 
-// reviewActionOrNone renders a review action for the timeout summary, naming the
-// case where the wait ended before any review checkpoint (ctx cancel) instead of
-// printing an empty field the reader must guess at.
 func reviewActionOrNone(a ReviewAction) string {
 	if a == "" {
 		return "none"
@@ -116,27 +68,16 @@ func reviewActionOrNone(a ReviewAction) string {
 	return string(a)
 }
 
-// livenessOrUnknown renders a LivenessState as the stable snake_case word the
-// timeout summary carries: the vocabulary's ONE spelling (LivenessState.String,
-// ADR-0101 S3) with "-" folded to "_". The zero value means "no checkpoint
-// observed liveness" — itself the signal — and renders "unknown" through the
-// same path, so a new state can never be spelled twice.
+// livenessOrUnknown routes every LivenessState, including the zero value,
+// through the same String() call, so a state can never be spelled twice.
 func livenessOrUnknown(s panestream.LivenessState) string {
 	return strings.ReplaceAll(s.String(), "-", "_")
 }
 
-// defaultArtifactMaxExtends backstops a continuously-working-but-never-finishing
-// agent: after this many review intervals the reviewer pauses for investigation
-// rather than extending forever. With the 300s default interval this is ~30 min
-// of wall-clock before a hung-yet-noisy agent is surfaced.
+// defaultArtifactMaxExtends bounds a busy-but-silent agent to ~30 min of
+// extends (interval × 6) before the reviewer pauses for investigation.
 const defaultArtifactMaxExtends = 6
 
-// deterministicReviewer is the Stage-0 reviewer: extend WITHOUT bound while the
-// agent produces substantive output (converging work is never "stuck"), extend
-// a busy-but-silent pane only up to maxExtends (a bare spinner proves liveness,
-// not progress), else pause for investigation. No LLM call — a fast, cheap
-// first-line decision whose key property is that it never kills an agent that is
-// still doing work.
 type deterministicReviewer struct {
 	maxExtends int
 }
@@ -149,32 +90,15 @@ func newDeterministicReviewer(maxExtends int) deterministicReviewer {
 }
 
 // NewDeterministicReviewer constructs the Stage-0 deterministic reviewer.
-// Exported so external callers (ACS predicates, integration wiring) can use it
-// without depending on the unexported newDeterministicReviewer.
 func NewDeterministicReviewer(maxExtends int) StopReviewer {
 	return newDeterministicReviewer(maxExtends)
 }
 
-// livenessState returns ev.State — the reviewer's sole liveness input (S3: the
-// driver always supplies State via panestream.LivenessCenter, so an unset State
-// carries no signal at all and must never be derived from Progressed/Busy).
 func (ev StopEvent) livenessState() panestream.LivenessState {
 	return ev.State
 }
 
 func (r deterministicReviewer) Review(ev StopEvent) ReviewVerdict {
-	// Reviewer decides from LivenessState → ReviewAction alone (S3: the
-	// Progressed+Busy boolean fallback is retired; zero State falls through to
-	// the default case below and pauses).
-	//
-	// Invariants preserved from the boolean era:
-	//  Converging → Extend UNCONDITIONALLY (cycles 311/312: producing scout killed
-	//    mid-work by the backstop — real output is never "stuck").
-	//  BusyButStagnant → Extend BOUNDED by maxExtends (cycles 254/255: quiet-Opus
-	//    extended-thinking paused at interval 0).
-	//  Hung → fast-fail BEFORE maxExtends×interval backstop (new: the detector
-	//    declares Hung after stallThreshold consecutive busy-stagnant intervals).
-	//  Idle → Pause (no liveness signal at all).
 	switch ev.livenessState() {
 	case panestream.LivenessConverging:
 		return ReviewVerdict{
@@ -205,9 +129,6 @@ func (r deterministicReviewer) Review(ev StopEvent) ReviewVerdict {
 	}
 }
 
-// envInt resolves a positive integer from the launch environment via
-// lookupEnv (the Deps.Env overlay, then the Deps.LookupEnv seam / os env),
-// falling back to def when unset, empty, or non-positive.
 func envInt(deps Deps, key string, def int) int {
 	v, ok := lookupEnv(deps, key)
 	if !ok {
