@@ -10,17 +10,9 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// TestReplayPlanFromResponse_ModelRoutingOverlayAppliesUnderAuto (T4 AC1):
-// a recorded advisor plan response carrying a per-phase {cli,tier} proposal
-// drives the SAME chain a live model_routing=auto cycle runs: floor clamp
-// (ReplayPlanFromResponse) -> model-routing guardrail clamp
-// (ClampPlanModelRouting) -> soft dispatch overlay (llmroute.
-// ApplySoftOverlay, the exact seam runner.go's MR4c uses). The final dispatch
-// plan must carry the advisor's CLI promoted to primary and its tier as the
-// resolved model. This is a golden regression lock proving the pieces
-// documented as already-shipped (parse, floor clamp, MR clamp, soft overlay)
-// still compose correctly end to end from a raw recorded response — the
-// exact composition a prompt or clamp regression could silently break.
+// A recorded advisor plan response carrying a per-phase {cli,tier} proposal
+// drives the same chain a live model_routing=auto cycle runs end to end:
+// floor clamp, model-routing guardrail clamp, then the soft dispatch overlay.
 func TestReplayPlanFromResponse_ModelRoutingOverlayAppliesUnderAuto(t *testing.T) {
 	t.Parallel()
 	raw := `[{"phase":"build","run":true,"justification":"needs deep reasoning","cli":"codex","tier":"balanced"}]`
@@ -52,7 +44,6 @@ func TestReplayPlanFromResponse_ModelRoutingOverlayAppliesUnderAuto(t *testing.T
 		t.Fatal("no build entry in the clamped plan")
 	}
 
-	// Simulate the runner's MR4c dispatch overlay from the clamped entry.
 	base := llmroute.Plan{Candidates: []string{"claude-tmux"}, Model: "sonnet"}
 	overlaid := llmroute.ApplySoftOverlay(base, llmroute.Overlay{CLI: entry.CLI, Tier: entry.Tier}, prof)
 	if len(overlaid.Candidates) == 0 || overlaid.Candidates[0] != "codex-tmux" {
@@ -63,12 +54,6 @@ func TestReplayPlanFromResponse_ModelRoutingOverlayAppliesUnderAuto(t *testing.T
 	}
 }
 
-// TestReplayPlanFromResponse_LegacyResponseByteIdenticalDispatch (T4 AC5,
-// EDGE): replaying a legacy plan response — the exact cycle-459 shape,
-// {phase,run,justification} only — must yield ZERO model-routing clamps and
-// ZERO dispatch overlay: the simulated dispatch chain and model equal the
-// profile-static baseline exactly. No overlay, no rejection artifact
-// entries, for either phase entry.
 func TestReplayPlanFromResponse_LegacyResponseByteIdenticalDispatch(t *testing.T) {
 	t.Parallel()
 	raw := `[{"phase":"scout","run":true,"justification":"scout the work"},{"phase":"build","run":true,"justification":"do the work"}]`
@@ -94,14 +79,10 @@ func TestReplayPlanFromResponse_LegacyResponseByteIdenticalDispatch(t *testing.T
 	}
 }
 
-// TestComposePlanPrompt_LiveShapeReplayCarriesTierSchemaAndGuardrails (T4
-// AC3): rendering the PRODUCTION persona-path prompt against a recorded
-// RouteInput fixture (a realistic catalog + goal + cycle header, the shape a
-// live cycle actually threads) must show the {cli,tier} schema AND the
-// per-phase guardrail lines together — so a prompt regression that silently
-// drops either the T1 elicitation or the T1 guardrail projection turns this
-// red, independent of the narrower unit tests in phase_advisor_tier_
-// elicitation_test.go.
+// Renders the production persona-path prompt against a realistic RouteInput
+// fixture; must show the {cli,tier} schema and guardrail lines together, so a
+// regression dropping either turns this red independent of the narrower unit
+// tests in phase_advisor_tier_elicitation_test.go.
 func TestComposePlanPrompt_LiveShapeReplayCarriesTierSchemaAndGuardrails(t *testing.T) {
 	t.Parallel()
 	in := baseRouteInput()

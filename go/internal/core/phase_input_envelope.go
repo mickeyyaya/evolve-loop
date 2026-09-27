@@ -11,7 +11,7 @@ import (
 )
 
 // readUpstreamBuildPlan returns the build phase's upstream build-plan.md body to
-// serve via the typed PhaseRequest.BuildPlan envelope (ADR-0050 Phase 3.7). It is
+// serve via the typed PhaseRequest.BuildPlan envelope. It is
 // the dispatch-seam relocation of the ad-hoc os.ReadFile the build phase did
 // inside ComposePrompt: same file, read once at the seam so the phase no longer
 // reaches to disk for an upstream artifact.
@@ -32,9 +32,8 @@ func readUpstreamBuildPlan(stage config.Stage, phase Phase, phaseEnables map[str
 	return ""
 }
 
-// assemblePhaseIO is the dispatch-seam phase-I/O hook (ADR-0050 Phase 3.4 shadow
-// comparison + Phase 3.10 enforce input), invoked only at EVOLVE_PHASE_IO>=shadow.
-// It owns the SINGLE router.Digest of the upstream and then:
+// assemblePhaseIO is the dispatch-seam phase-I/O hook, invoked only at
+// EVOLVE_PHASE_IO>=shadow. It owns the SINGLE router.Digest of the upstream and then:
 //   - runs the shadow comparison (the typed-vs-legacy divergence tripwire); and
 //   - at >=enforce, returns the authoritative typed PhaseInput the phase consumes
 //     in place of the legacy Context map.

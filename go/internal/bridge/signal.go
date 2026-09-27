@@ -1,16 +1,5 @@
 package bridge
 
-// signal.go — ADR-0101 S3: the bridge module's Signal Center codes and the
-// producers' shared shape. Producers: NewEngine (a missing token resolver),
-// attemptLogContext.warn (telemetry warnings), attemptLogContext.tripwire
-// (a successful-but-silent attempt beyond the threshold),
-// attemptLogContext.launchWarn (ADR-0103 unit 10: the Launch spine's four
-// step failures registered here and the BRIDGE_EXIT_* classification the
-// launchoutcome leaf registers) and paneLivenessHandler (liveness edges the
-// LivenessCenter dispatches — module liveness). Each replaces a hand-written
-// "[engine] WARN" line 1:1; the WARN-filtered stderr sink at the root renders
-// them in the one line format.
-
 import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
@@ -25,16 +14,15 @@ const (
 	CodeTelemetryAppendFailed signalcenter.Code = "BRIDGE_TELEMETRY_APPEND_FAILED"
 	CodeTelemetryTripwire     signalcenter.Code = "BRIDGE_TELEMETRY_TRIPWIRE"
 
-	// The Launch spine's step failures (ADR-0103 unit 10): each names the host
-	// step that could not do its best-effort work; the launch's classified
-	// error is unchanged by any of them.
+	// CodeBootStrikeClearFailed: the boot-strike store could not clear a
+	// driver's consecutive boot-timeout strike after a non-80 exit.
 	CodeBootStrikeClearFailed    signalcenter.Code = "BRIDGE_BOOT_STRIKE_CLEAR_FAILED"
 	CodeBootStrikeRecordFailed   signalcenter.Code = "BRIDGE_BOOT_STRIKE_RECORD_FAILED"
 	CodeLaunchErrorPersistFailed signalcenter.Code = "BRIDGE_LAUNCH_ERROR_PERSIST_FAILED"
 	CodeResultReadFailed         signalcenter.Code = "BRIDGE_RESULT_READ_FAILED"
 
-	// CodeFreshSessionRetry (F31): a launch whose pane died with a
-	// session-recoverable cause gets one fresh session of the same CLI.
+	// CodeFreshSessionRetry: a launch whose pane died with a session-recoverable
+	// cause gets one fresh session of the same CLI.
 	CodeFreshSessionRetry signalcenter.Code = "BRIDGE_FRESH_SESSION_RETRY"
 
 	CodePaneStagnant  signalcenter.Code = "LIVENESS_PANE_STAGNANT"
@@ -59,11 +47,6 @@ func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleLiveness, CodePaneExhausted, "a tmux pane shows the CLI's quota/rate-limit exhaustion (LivenessCenter edge: exhausted; the exhaustion gate corroborates before rc 85)")
 }
 
-// dispatchIdentity is what every bridge signal of one dispatch carries — ONE
-// derivation: cycle and run from the request (the driver's Config carries the
-// same values), phase = the agent role. No fallback: every production
-// dispatcher stamps Cycle; a request without one is an operator probe whose
-// signals stay at cycle 0 (kept in Recent, never filed under a cycle).
 type dispatchIdentity struct {
 	cycle int
 	runID string
@@ -78,11 +61,6 @@ func configIdentity(cfg *Config) dispatchIdentity {
 	return dispatchIdentity{cycle: cfg.Cycle, runID: cfg.RunID, phase: cfg.Agent}
 }
 
-// paneLivenessHandler adapts one LivenessCenter edge (session, new state) to
-// a pane.liveness event stamped with the dispatch's cycle, run and phase —
-// the Adapter from the bridge-internal liveness vocabulary to the Signal
-// Center's. Idle and converging are INFO; stagnant, hung and exhausted are
-// WARN with a code. A nil Center is the Null Object (test affordance).
 func paneLivenessHandler(signals *signalcenter.Center, id dispatchIdentity) panestream.LivenessHandler {
 	return func(ev panestream.LivenessEvent) {
 		state := ev.State.String()
@@ -99,8 +77,6 @@ func paneLivenessHandler(signals *signalcenter.Center, id dispatchIdentity) pane
 	}
 }
 
-// paneLivenessCode names the rule behind a WARN liveness edge; "" for the
-// INFO states.
 func paneLivenessCode(s panestream.LivenessState) signalcenter.Code {
 	switch s {
 	case panestream.LivenessBusyButStagnant:

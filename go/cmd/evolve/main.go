@@ -1,7 +1,4 @@
 // Package main is the evolve CLI entrypoint.
-//
-// Phase 1 subcommands: version, doctor, guard, ledger, acs.
-// Phase 2: loop, cycle, worktree, phase.
 package main
 
 import (
@@ -145,12 +142,8 @@ v12.1 utilities + composition:
                                 [--json] [--out PATH] )
 `
 
-// dispatch is the top-level subcommand router. Extracted so tests can
-// drive it without invoking os.Exit. Returns the process exit code.
-//
-// As of PR-4, the 91-line switch was replaced by a table lookup
-// against `commands` defined in registry.go. Adding a subcommand is
-// now a one-line registry entry instead of a switch case + import.
+// dispatch is the top-level subcommand router, extracted so tests can
+// drive it without invoking os.Exit. It returns the process exit code.
 func dispatch(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
 		fmt.Fprint(stderr, usage)

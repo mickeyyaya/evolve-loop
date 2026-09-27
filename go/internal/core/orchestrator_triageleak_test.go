@@ -1,17 +1,5 @@
 //go:build integration
 
-// orchestrator_triageleak_test.go — cycle-564 task
-// decouple-leak-recovery-from-worktree-phase-gate (RED).
-//
-// Mirrors orchestrator_auditleak_test.go's harness, but proves the OTHER half
-// of the fix: recovery must fire for a phase that is NOT a WorktreePhase
-// (role-gate write-permission axis) at all — triage, scout, audit, and
-// bug-reproduction all get an active cycle worktree (provisioned once at
-// cycle start, before any phase runs) but today's recovery call site
-// (cyclerun_review.go ~263) gates on cr.o.worktreePhase(next), which is false
-// for triage. An untracked leak there has ZERO recovery path today and hard-
-// aborts via the tree-diff guard — the exact recurring signature behind
-// cycles 390/399/491/496/501/538/540/556 (9 recorded carryover failures).
 package core
 
 import (
@@ -23,8 +11,6 @@ import (
 	"testing"
 )
 
-// triageLeakRunner writes an untracked file into the MAIN tree during Run —
-// models any phase subprocess leaking output outside its worktree.
 type triageLeakRunner struct {
 	name string
 	root string
@@ -68,9 +54,8 @@ func initLeakRecoverRepo(t *testing.T) string {
 	git("init", "-q")
 	// Identity must live IN the repo, not in the helper's env: RunCycle's own
 	// git children (the dossier-closeout commit) don't inherit these env vars,
-	// and CI's ubuntu runners have no ambient identity git can auto-detect —
-	// the commit fails there, leaving staged dossier files that broke the
-	// clean-tree assertion below (ubuntu-only red, 2026-07-06).
+	// and CI's ubuntu runners have no ambient identity git can auto-detect, so
+	// the commit fails there.
 	git("config", "user.name", "t")
 	git("config", "user.email", "t@t")
 	git("add", ".")
@@ -78,10 +63,6 @@ func initLeakRecoverRepo(t *testing.T) string {
 	return root
 }
 
-// TestOrchestrator_TriageLeakRecover proves recovery generalizes past
-// tdd/build: an untracked leak during TRIAGE (an active-worktree phase that
-// is NOT a WorktreePhase) must be relocated into the worktree instead of
-// hard-aborting the cycle.
 func TestOrchestrator_TriageLeakRecover(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")

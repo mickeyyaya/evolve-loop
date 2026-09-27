@@ -1,12 +1,5 @@
 //go:build e2e
 
-// Tier 1 — LIVE per-CLI happy cycle. Each available CLI runs a full cycle
-// against its cheapest real model, through both the headless and tmux drivers.
-// Assertions are STRUCTURAL: the real CLIs must drive the pipeline far enough to
-// produce the core phase artifacts (scout → build → audit in the ledger). A
-// PASS-and-ship vs. a legitimate audit-block both count as integration success;
-// only a crash/contract break before audit (non-transient) fails the test.
-// Gate: EVOLVE_E2E_LIVE=1.
 package main
 
 import (
@@ -64,7 +57,6 @@ func runLiveCycleTier1(t *testing.T, repoRoot, evolveBin string, cli liveCLI, ti
 		t.Skipf("%s live cycle quarantined after transient retries:\n%s", cli.Driver, lastN(res.Out, 800))
 	}
 
-	// Structural success = the real CLI drove the pipeline to the core phases.
 	reachedCore := true
 	for _, role := range corePhaseRoles {
 		if !ledgerHasRole(res.Entries, role) {
@@ -77,8 +69,6 @@ func runLiveCycleTier1(t *testing.T, repoRoot, evolveBin string, cli liveCLI, ti
 		// synthetic task and is not a CLI-integration concern — just report it.
 		return
 	}
-	// Did not reach audit. If the error looks transient, quarantine; else it is
-	// a real contract break — capture for triage and fail.
 	if isTransient(res.Out, res.Err) {
 		t.Skipf("%s live cycle: provider failure before reaching audit (quarantined):\nerr=%v\n%s", cli.Driver, res.Err, lastN(res.Out, 800))
 	}

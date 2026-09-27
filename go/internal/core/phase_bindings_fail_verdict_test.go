@@ -1,15 +1,5 @@
 //go:build integration
 
-// Cycle-1571 H3 producer half: a FAIL audit verdict emitted NO auditor ledger
-// binding (phase_bindings.go guarded to PASS|WARN), so ship's findLatestAudit
-// had nothing for this run and fell back to a FOREIGN run's entry — the FAIL
-// verdict was the very thing that removed the gate's ability to see it. These
-// pins flip the producer: FAIL records the same rich auditor binding (so ship
-// reads THIS cycle's host rejection rather than another run's evidence),
-// while the verdict-cache projection stays PASS|WARN-only (the cache exists to
-// skip re-audits of known-good trees; caching FAIL would change its consumers'
-// contract, and the WARN control below proves the guard is what's observed,
-// not an environmental skip).
 package core
 
 import (
@@ -25,10 +15,10 @@ func TestEmitPhaseBindings_AuditFAIL_RecordsBinding_NoCachePut(t *testing.T) {
 	wt := detachedWorktree(t, repo)
 	// Dirty the worktree so the content tree differs from the base tree —
 	// ProbeEligible would be TRUE, so only the verdict guard can skip the Put.
-	// The delta MUST be a tracked modification: since cycle-1594's declared-
-	// content contract, worktreeContentSHA stages `git add -u`, so an untracked
-	// file is residue that keeps base identity — it would make this pin pass
-	// vacuously via the fresh-base guard instead of the verdict guard.
+	// The delta MUST be a tracked modification: worktreeContentSHA stages
+	// `git add -u`, so an untracked file is residue that keeps base identity —
+	// it would make this pin pass vacuously via the fresh-base guard instead of
+	// the verdict guard.
 	if err := os.WriteFile(filepath.Join(wt, "f.txt"), []byte("delta"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -47,8 +37,6 @@ func TestEmitPhaseBindings_AuditFAIL_RecordsBinding_NoCachePut(t *testing.T) {
 	if e.Role != "auditor" || e.Kind != "agent_subprocess" {
 		t.Errorf("audit FAIL: role/kind = %q/%q, want auditor/agent_subprocess", e.Role, e.Kind)
 	}
-	// Host rejection must not be overridden by a PASS narrative or candidate
-	// evidence still present on disk. WARN remains the separate fluent case.
 	if e.ExitCode != 2 {
 		t.Errorf("audit FAIL: exit_code = %d, want unshippable host rejection 2", e.ExitCode)
 	}
@@ -60,10 +48,9 @@ func TestEmitPhaseBindings_AuditFAIL_RecordsBinding_NoCachePut(t *testing.T) {
 	}
 }
 
-// TestEmitPhaseBindings_AuditWARN_CachePut_Control is the positive control for
-// the pin above: identical repo shape, WARN verdict → the cache file IS
-// written. If this control ever reds, the FAIL pin's no-cache assertion is
-// vacuous and must not be trusted.
+// The positive control for the pin above: identical repo shape, WARN verdict
+// → the cache file IS written. If this control ever reds, the FAIL pin's
+// no-cache assertion is vacuous and must not be trusted.
 func TestEmitPhaseBindings_AuditWARN_CachePut_Control(t *testing.T) {
 	t.Parallel()
 	repo, ws := initBindingRepo(t, "cycle-14")

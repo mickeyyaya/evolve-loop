@@ -13,29 +13,6 @@ import (
 	"time"
 )
 
-// tmux_repl_livecli_test.go — the REAL-CLI tier of the tmux REPL suite,
-// grounded in the ground-truth capture in
-// knowledge-base/research/tmux-repl-cli-behavior-2026-05-26.md.
-//
-// These drive the ACTUAL claude / codex / agy binaries inside a real tmux
-// server, so they validate the one thing neither the fake-tmux unit tests
-// nor the scripted-fake integration tests can: that the boot markers the
-// drivers grep for (❯ / › / "? for shortcuts") actually appear in the real
-// CLI's pane, at the real version installed on this host.
-//
-// Two tiers, both OFF by default (so `go test` / CI needs neither the CLIs
-// installed nor any LLM spend):
-//
-//	EVOLVE_BRIDGE_LIVE_CLI=1            → boot-marker tier (cheap: launches
-//	                                      the CLI, asserts the marker, exits.
-//	                                      No prompt delivered → no inference).
-//	EVOLVE_BRIDGE_LIVE_CLI_ROUNDTRIP=1 → full round-trip tier (real LLM
-//	                                      spend: prompt → artifact write).
-//
-// The specs below MUST match the production driver constants. If a CLI
-// upgrade moves a marker, the boot-marker test fails loudly here before it
-// breaks a real cycle — that is the point.
-
 type liveCLISpec struct {
 	name           string // driver name (also the manifest key for auto-respond)
 	bin            string // binary to LookPath
@@ -82,16 +59,10 @@ func liveCLIGate(t *testing.T, envKey string) {
 // --- boot-marker tier (cheap: no prompt, no inference) --------------------
 
 // TestLiveCLI_BootMarkerDetected validates that each driver's boot marker
-// actually appears in the real CLI's pane within the boot budget. This is
-// the load-bearing assumption of runTmuxREPL — if it drifts, launches die
-// with EC 80. Costs nothing beyond CLI startup (no prompt is delivered, so
-// no inference).
-//
-// It mirrors runTmuxREPL's boot loop EXACTLY, including ticking the
-// auto-responder for tickDuringBoot CLIs — codex/agy show a trust prompt at
-// boot that must be dismissed with Enter before the ready marker appears.
-// Dismissing that dialog is free (it is not inference). Replicating it is
-// what makes this cheap tier faithful to the real bridge boot.
+// actually appears in the real CLI's pane within the boot budget — the
+// load-bearing assumption of runTmuxREPL; if it drifts, launches die with
+// EC80. It mirrors runTmuxREPL's boot loop exactly, including ticking the
+// auto-responder for tickDuringBoot CLIs to dismiss a boot-time trust prompt.
 func TestLiveCLI_BootMarkerDetected(t *testing.T) {
 	liveCLIGate(t, "EVOLVE_BRIDGE_LIVE_CLI")
 	wd, _ := os.Getwd() // a real, trusted dir for the CLI to start in
@@ -122,9 +93,7 @@ func TestLiveCLI_BootMarkerDetected(t *testing.T) {
 			_ = tx.SendKeys(ctx, sess, sp.launchCmd, true)
 
 			// Poll for the marker using the SAME deadline as production
-			// (tmuxREPLBootTimeoutS) so a pass here means a pass in a real
-			// launch. Captured boot was 1–2s; the budget is the safety
-			// ceiling. Mirrors runTmuxREPL's boot loop incl. tickDuringBoot.
+			// (tmuxREPLBootTimeoutS) so a pass here means a pass in a real launch.
 			const budget = tmuxREPLBootTimeoutS
 			interval := sp.bootIntervalS
 			if interval <= 0 {

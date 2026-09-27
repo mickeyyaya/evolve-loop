@@ -1,11 +1,5 @@
 //go:build e2e
 
-// Tier 2 — LIVE model-tier matrix. For each CLI, fire a single cheap bridge
-// launch at EACH supported tier's concrete model and assert the call succeeds
-// and writes an artifact. This catches model-deprecation / tier-resolution
-// drift (e.g. a provider 400-rejecting a model the manifest still advertises —
-// the cycle-142 codex ChatGPT-safe-model class of bug) that the cheapest-tier-
-// only T0/T1 would miss. Gate: EVOLVE_E2E_LIVE_MATRIX=1.
 package main
 
 import (
@@ -22,10 +16,8 @@ import (
 func liveTierModels() map[string]map[string]string {
 	return map[string]map[string]string{
 		"claude-p": {"fast": "haiku", "balanced": "sonnet", "deep": "opus"},
-		// codex: a PROJECTION of the family manifest, never a copy (this table sat
-		// three model generations stale until 2026-09-09).
-		"codex": codexTierModels(),
-		"agy":   {"fast": "gemini-3.5-flash", "balanced": "gemini-3.5-flash", "deep": "gemini-3.5-flash"},
+		"codex":    codexTierModels(), // a projection of the family manifest, never a copy
+		"agy":      {"fast": "gemini-3.5-flash", "balanced": "gemini-3.5-flash", "deep": "gemini-3.5-flash"},
 	}
 }
 
@@ -34,11 +26,8 @@ func liveTierModels() map[string]map[string]string {
 // single source every codex reader resolves through). A load failure panics — loud, never a silent nil that
 // would launch every case without -m.
 func codexTierModels() map[string]string {
-	m, err := bridge.LoadManifest("codex") // the headless manifest the matrix drives; its model_tier_map_from pointer yields the family table
+	m, err := bridge.LoadManifest("codex")
 	if err != nil {
-		// e2e-only binary: an embedded manifest that fails to load is a broken
-		// build, and a silent nil here would launch every codex case with no -m
-		// (the CLI default) while the test still claimed to exercise a tier.
 		panic("e2e: codex family manifest unavailable: " + err.Error())
 	}
 	if len(m.ModelTierMap) == 0 {

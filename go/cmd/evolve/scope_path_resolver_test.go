@@ -1,8 +1,5 @@
 package main
 
-// scope_path_resolver_test.go — the composition-root half of the cycle-1548
-// fix, tested against a REAL temp inbox in the live namesake shape.
-
 import (
 	"encoding/json"
 	"io"
@@ -40,11 +37,6 @@ func TestScopePathResolver_LiveBeatsNamesakes(t *testing.T) {
 	}
 }
 
-// Mutation note: dropping scopePathResolver's StatePending guard is an
-// EQUIVALENT mutant today — ResolveDispatchState populates Path only for
-// Pending, so the guard is belt-and-braces against a future resolver change
-// that populates Path for other states. It stays because the invariant it
-// defends (never hand an agent a non-pending record) is the entire fix.
 func TestScopePathResolver_ConsumedOnlyResolvesEmpty(t *testing.T) {
 	root := t.TempDir()
 	seedInbox(t, root, "consumed", "cured-task")
@@ -56,8 +48,6 @@ func TestScopePathResolver_ConsumedOnlyResolvesEmpty(t *testing.T) {
 	}
 }
 
-// The resolved path must be inside the inbox root — a defensive pin so a future
-// resolver change can never hand an agent a path outside the lifecycle tree.
 func TestScopePathResolver_PathStaysUnderTheInbox(t *testing.T) {
 	root := t.TempDir()
 	seedInbox(t, root, "", "a-task")
@@ -67,10 +57,6 @@ func TestScopePathResolver_PathStaysUnderTheInbox(t *testing.T) {
 	}
 }
 
-// THE WIRING (the ninth NOT-WIRED of the week, and the reason this test
-// exists): wireOrchestratorDeps must REGISTER the resolver on the orchestrator
-// it builds. The function-level tests above pass even when the composition
-// root never wires it — this drives the real builder and probes the result.
 func TestWireOrchestratorDeps_RegistersTheScopePathResolver(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")

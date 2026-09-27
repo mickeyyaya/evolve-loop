@@ -1,12 +1,5 @@
 package bridge
 
-// tmux_identity_test.go — the pasted prompt ends by stating who the agent is.
-//
-// Cycle 1707's tdd agent listed tmux sessions, found its own, read its own prompt file, and refused the
-// phase as a prompt injection racing "the real agent" — an hour lost to a process misunderstanding. Only
-// the driver knows the session name, so it appends the statement to the bytes it pastes; the engine's
-// composed prompt stays byte-identical across dispatches.
-
 import (
 	"os"
 	"path/filepath"

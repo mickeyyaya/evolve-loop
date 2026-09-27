@@ -25,7 +25,6 @@ func TestOrchestrator_WritesPhaseUsageSidecar(t *testing.T) {
 
 	workspace := cycleWorkspaceDir(root, res.Cycle)
 
-	// We want to verify that `<workspace>/<phase>-usage.json` is written for each phase run.
 	for _, next := range res.PhasesRun {
 		phaseName := string(next)
 		path := filepath.Join(workspace, fmt.Sprintf("%s-usage.json", phaseName))
@@ -45,7 +44,6 @@ func TestOrchestrator_WritesPhaseUsageSidecar(t *testing.T) {
 		if sidecar.Verdict != "PASS" {
 			t.Errorf("got verdict %q, want PASS", sidecar.Verdict)
 		}
-		// cost_usd, duration_ms, attempt_count, verdict should be populated
 		if sidecar.AttemptCount != 1 {
 			t.Errorf("got attempt_count %d, want 1", sidecar.AttemptCount)
 		}

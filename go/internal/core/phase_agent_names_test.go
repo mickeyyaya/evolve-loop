@@ -6,13 +6,6 @@ import (
 	"testing"
 )
 
-// TestPhaseAgentName_ValuesResolveToCheckedInProfiles is the drift guard for the
-// phaseAgentName table (scout H2): core cannot import the phases/* packages to
-// compare each entry against its AgentPromptName() (import cycle), so instead we
-// assert every mapped agent name resolves to a real .evolve/profiles/<agent>.json
-// in the repo. A rename that desyncs the table from a phase package's
-// AgentPromptName() — or a typo'd entry — fails loudly here rather than silently
-// resolving to a nil profile and quietly disabling that phase's envelope guard.
 func TestPhaseAgentName_ValuesResolveToCheckedInProfiles(t *testing.T) {
 	profilesDir := findProfilesDir(t)
 	for phase, agent := range phaseAgentName {

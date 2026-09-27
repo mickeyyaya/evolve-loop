@@ -114,6 +114,19 @@ Go files is each batch's count of changed Go files. The landing proof's verified
 | 49 | `internal/core`, file group 4 of 13 | 40 | 1,490 → 230 | — | on the comment PR |
 | 50 | `cmd/evolve`, file group 4 of 8 | 42 | 2,273 → 1,116 | — | on the comment PR |
 | 51 | `internal/bridge`, file group 3 of 7 | 38 | 1,176 → 367 | — | on the comment PR; 2 files the P3 train edits deferred to group 2b |
+| 52 | `internal/core`, file group 5 of 13 | 40 | 1,316 → 330 | — | on the round-3 comment PR |
+| 53 | `cmd/evolve`, file group 5 of 8 | 42 (40 edited) | 1,390 → 273 | — | on the round-3 comment PR |
+| 54 | `internal/bridge`, file group 4 of 7 | 40 (37 edited) | 1,462 → 330 | — | on the round-3 comment PR |
+| 55 | `internal/core`, file group 6 of 13 | 37 | 1,554 → 381 | — | on the round-4 comment PR |
+| 56 | `cmd/evolve`, file group 6 of 8 | 36 | 1,315 → 418 | — | on the round-4 comment PR |
+| 57 | `internal/bridge`, file group 5 of 7 (with the 9 files group 2 deferred) | 47 | 1,593 → 567 | — | on the round-4 comment PR |
+| 58 | `internal/core`, file group 7 of 13 | 37 | 1,778 → 488 | — | on the round-5 comment PR |
+| 59 | `cmd/evolve`, file group 7 of 8 | 38 | 1,002 → 120 | — | on the round-5 comment PR |
+| 60 | `internal/bridge`, file group 6 of 7 | 34 | 1,327 → 645 | — | on the round-5 comment PR |
+| 61 | `internal/core`, file group 8 of 13 | 37 | 1,506 → 860 | — | on the round-6 comment PR |
+| 62 | `cmd/evolve`, file group 8 of 8 | 40 | 1,132 → 449 | — | on the round-6 comment PR |
+| 63 | `internal/bridge`, file group 7 of 7 | 32 | 1,101 → 376 | — | on the round-6 comment PR |
+
 
 The three largest packages are split into file groups of about 40 files, taken in name order. Each group is one batch, and the package's design page fills in group by group. Narrative is not measured per group.
 

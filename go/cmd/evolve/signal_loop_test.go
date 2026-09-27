@@ -1,14 +1,5 @@
 package main
 
-// signal_loop_test.go — ADR-0101 S4a: the loop module's producers. A batch halt
-// (system failure, pipeline blocker, a fleet lane's halt code, a wave-boundary
-// halt) is ONE loop.halt INCIDENT whose code names the rule; a wave summary is
-// loop.wave INFO (the report line stays — INFO never prints); a min-width
-// repair is loop.wave WARN; an escalation boundary is loop.escalation WARN.
-// The hand-written "[loop] … HALT" lines are gone: the root's WARN-filtered
-// stderr sink renders them. The batch report reads the driven runner's
-// per-cycle SignalSummary through the loop's own orchestrator seam.
-
 import (
 	"bytes"
 	"context"
@@ -91,8 +82,6 @@ func TestEmitLoopWave_NilFieldsStillCarryTheWave(t *testing.T) {
 	}
 }
 
-// The producer stamps the wave on its own copy: a caller's map is never
-// written to (go review S4a).
 func TestEmitLoopWave_DoesNotWriteIntoTheCallersFields(t *testing.T) {
 	c, got, _ := recordingLoopSignals()
 	fields := map[string]string{"lanes": "3"}
@@ -119,10 +108,6 @@ func TestEmitLoopEscalation_IsAWarnNamingTheStage(t *testing.T) {
 	}
 }
 
-// haltOnSystemFailure is the ONE shared halt+escalate action: it emits ONE
-// loop.halt INCIDENT whose code the caller's rule supplies, whose
-// fields.next is the dossier's own next_action (one home for what the
-// operator does), and whose fields name the dossier and the P0 item it wrote.
 func TestHaltOnSystemFailure_EmitsOneHaltNamingTheDossierItWrote(t *testing.T) {
 	c, got, console := recordingLoopSignals()
 	root := t.TempDir()
@@ -173,10 +158,6 @@ func TestHaltOnSystemFailure_EmitsOneHaltNamingTheDossierItWrote(t *testing.T) {
 	}
 }
 
-// The pipeline-blocker breaker halts through the same chokepoint with its
-// own rule: ONE INCIDENT whose code names the breaker and whose fields carry
-// the rule and fingerprint — not a second, generic system-failure INCIDENT
-// on top (S4a architecture review MEDIUM-1).
 func TestBlockerBreakerHalt_OneIncidentNamesTheRule(t *testing.T) {
 	c, got, console := recordingLoopSignals()
 	root := t.TempDir()
@@ -219,9 +200,6 @@ func TestFormatSignalReport_NamesCountsAndTheLastIncident(t *testing.T) {
 	}
 }
 
-// summaryOrch is a loopCycleRunner whose only interesting answer is its
-// SignalSummary — the report must read the runner the loop drives, not the
-// concrete orchestrator in deps (S4a architecture review MEDIUM-3).
 type summaryOrch struct{ summary signalcenter.Summary }
 
 func (o *summaryOrch) RunCycle(context.Context, core.CycleRequest) (core.CycleResult, error) {
@@ -234,7 +212,6 @@ func (o *summaryOrch) RunCycleFromPhase(context.Context, core.CycleRequest, *cor
 
 func (o *summaryOrch) SignalSummary() signalcenter.Summary { return o.summary }
 
-// noSignals is the SignalSummary of the scripted runners that raise none.
 type noSignals struct{}
 
 func (noSignals) SignalSummary() signalcenter.Summary { return signalcenter.Summary{} }
@@ -256,8 +233,6 @@ func TestObserveSequentialCycle_ReportsTheDrivenRunnersSignalSummary(t *testing.
 	}
 }
 
-// testRootSignals builds the production sink topology over a throwaway root
-// for the direct producer tests (the stub root builds it over the test's own).
 func testRootSignals(t *testing.T, console io.Writer) *signalcenter.Center {
 	t.Helper()
 	root := t.TempDir()
@@ -273,13 +248,6 @@ func ndjsonLines(t *testing.T, path string) int {
 	return strings.Count(strings.TrimSpace(string(raw)), "\n") + 1
 }
 
-// newRootSignalCenter is the ONE sink topology: the durable signals.ndjson
-// (per cycle workspace; the batch-level file under the evolve dir for
-// cycle-less signals — the loop's own halts and wave summaries, which would
-// otherwise be reported as drops after every wave) and the console at WARN
-// and above. The production root and the loop tests' stub root both build it
-// here, so a test that asserts the rendered line proves production's
-// topology (S4a architecture review MEDIUM-2).
 func TestNewRootSignalCenter_WritesTheDurableFilesAndRendersWarnOnTheConsole(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
@@ -303,10 +271,6 @@ func TestNewRootSignalCenter_WritesTheDurableFilesAndRendersWarnOnTheConsole(t *
 	}
 }
 
-// A fleet lane that exited with the system-failure halt code stops the
-// batch through fleetHaltDecision — one loop.halt INCIDENT, rendered, whose
-// reason points at the lane's own INCIDENT instead of restating what the
-// lane wrote (S4a architecture review MEDIUM-4).
 func TestFleetHaltDecision_ALaneHaltCodeIsALoopHaltIncident(t *testing.T) {
 	c, got, console := recordingLoopSignals()
 	var stdout, stderr bytes.Buffer

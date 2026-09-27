@@ -1,9 +1,5 @@
 //go:build e2e
 
-// Tier 0 — LIVE SMOKE. The cheapest real-CLI proof: a single `evolve bridge
-// launch` call (one LLM turn) per available CLI, asserting the real binary
-// boots, accepts the prompt, and writes a parseable artifact. ollama is FREE
-// and the CI-safe canary. Gate: EVOLVE_E2E_LIVE_SMOKE=1.
 package main
 
 import (
@@ -40,8 +36,8 @@ func TestE2ELiveSmoke(t *testing.T) {
 	repoRoot := mustRepoRoot(t)
 	evolveBin := buildBinary(t, t.TempDir(), "evolve", "./cmd/evolve", repoRoot)
 
-	// ollama first (free canary), then the paid headless CLIs. tmux smoke is
-	// redundant with the headless single-call here; the full tmux path is T1.
+	// ollama first: it's the free canary. tmux smoke is redundant with the
+	// headless call here; the full tmux path is T1.
 	targets := append([]liveCLI{
 		{Driver: "ollama-tmux", Binary: "ollama", CheapTier: "fast", Family: "local"},
 	}, liveHeadlessCLIs...)
