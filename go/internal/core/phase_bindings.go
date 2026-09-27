@@ -95,6 +95,17 @@ func (o *Orchestrator) recordPhaseBinding(ctx context.Context, phase Phase, in b
 	}
 }
 
+func auditBindingExitCode(verdict string) int {
+	switch verdict {
+	case VerdictWARN:
+		return 1
+	case VerdictFAIL:
+		return 2
+	default:
+		return 0
+	}
+}
+
 // recordAuditBinding writes the rich auditor ledger entry that ship's
 // audit-binding (verify.go findLatestAudit / verifyAuditBinding) requires:
 // role=auditor, kind=agent_subprocess, with git_head + tree_state_sha +
@@ -128,25 +139,16 @@ func (o *Orchestrator) recordAuditBinding(ctx context.Context, cycle int, projec
 		return
 	}
 	artSum := sha256.Sum256(artBytes)
-	// This host-owned disposition cannot be overridden by the report narrative:
-	// PASS=0, fluent WARN=1, rejected audit=2. Keeping FAIL unshippable also
-	// protects failures to invalidate stale candidate evidence on disk.
-	exitCode := 0
-	switch verdict {
-	case VerdictWARN:
-		exitCode = 1
-	case VerdictFAIL:
-		exitCode = 2
-	}
 	if err := o.ledger.Append(ctx, LedgerEntry{
 		TS:              o.now().UTC().Format(time.RFC3339),
 		Cycle:           cycle,
 		Role:            "auditor",
 		Kind:            "agent_subprocess",
-		ExitCode:        exitCode,
+		ExitCode:        auditBindingExitCode(verdict),
 		GitHEAD:         strings.TrimSpace(head),
 		TreeStateSHA:    hex.EncodeToString(treeSum[:]),
 		WorktreeTreeSHA: worktreeTree,
+		WorktreeBaseSHA: worktreeBase,
 		ArtifactPath:    artPath,
 		ArtifactSHA256:  hex.EncodeToString(artSum[:]),
 	}); err != nil {

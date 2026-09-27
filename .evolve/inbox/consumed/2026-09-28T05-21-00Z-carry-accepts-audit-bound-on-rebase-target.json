@@ -14,5 +14,7 @@
     "Tests pin both the authored-base carry and the target-base case, and a composed-tree gate failure still re-audits."
   ],
   "source": "wave 21 observation (2026-09-28, cycle 1724)",
-  "priority_rationale": "wave 21 boundary 2026-09-28: each such ship pays a redundant audit on the critical path after every audit-repair round"
+  "priority_rationale": "wave 21 boundary 2026-09-28: each such ship pays a redundant audit on the critical path after every audit-repair round",
+  "consumed_by": "console landing fix/carry-reads-the-audited-worktree-base (2026-09-28): FIXED. The auditor row's git_head is main's HEAD when the audit was bound, not the audited worktree's base, so the carry declined 1724 and 1727 on a moved main. The row now records worktree_base_sha and identityCarryForward compares it with the authored base (legacy rows fall back to git_head). Tests: TestRouteRebasedExplanation_AMainThatMovedBeforeTheAuditStillCarries, the 'audited worktree stood on another base' decline, TestEmitPhaseBindings_TheAuditRowNamesTheBaseTheAuditedWorktreeStoodOn; composed-gate failure still re-audits ('a composed gate is red').",
+  "consumed_at": "2026-09-28T07:05:00Z"
 }

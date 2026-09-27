@@ -1,0 +1,23 @@
+{
+  "id": "comment-regrowth-build-exit-gate",
+  "created_at": "2026-09-28T07:01:00Z",
+  "title": "Comment regrowth guard (batch 0b): a lane's added comments are caught at build exit, not by the auditor",
+  "weight": 0.8,
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "files": [
+    "go/internal/commentaudit/",
+    "go/internal/core/",
+    "docs/plans/comment-reduction-2026-09.md",
+    "docs/conventions/code-comments.md"
+  ],
+  "summary": "Cycle 1730 (wave 22, sizeratchet-shrink-opscmd) was a correct refactor: every function under 50 lines and the full ACS suite green (172/0). Its audit still FAILed on the item's acceptance criterion 'No comments are added'. `commentaudit comments -base ad816b70 internal/cli/opscmd` exits 1 with 54 added lines, mostly doc comments on new unexported helpers that restate the name. No ACS predicate or gate checks the criterion, so it cost an audit round and a build retry that a deterministic check would have prevented. docs/plans/comment-reduction-2026-09.md 'Guard against regrowth' already designs batch 0b: run the check at build exit so a correction returns to build before audit, keep ship as the backstop, and roll out shadow then enforce. Count added comments across the whole diff so decomposition moves are not flagged, and fix the design inputs listed there (trailing comments, raw-string lines). This item carries that design into code.",
+  "acceptance": [
+    "A build whose diff adds whole-line comments (commentaudit comments semantics) gets a correction back to build before audit, naming each added line; in shadow it emits a WARN signal instead",
+    "A moved comment and a new file's package doc are not counted, as commentaudit comments already rules",
+    "The stage is config (shadow then enforce), never a flag; tests pin both stages",
+    "The plan's batch 0b row and code-comments.md Enforcement name the gate"
+  ],
+  "source": "wave 22 observation (2026-09-28, cycle 1730 audit H1)",
+  "priority_rationale": "A logic-correct lane FAILed its first audit on a mechanical rule; the streak goal pays for every such round"
+}
