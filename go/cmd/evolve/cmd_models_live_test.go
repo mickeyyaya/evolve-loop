@@ -55,12 +55,9 @@ func TestPickClassifierCLI(t *testing.T) {
 }
 
 func TestPickClassifierCLIEnvOverride(t *testing.T) {
-	// Honored when the override names a READY CLI.
 	if got := pickClassifierCLI([]string{"codex", "agy"}, "agy"); got != "agy" {
 		t.Fatalf("ready override = %q, want agy", got)
 	}
-	// Ignored (falls through to preference) when the override is NOT ready —
-	// a stale override must not classify against a blocked CLI.
 	if got := pickClassifierCLI([]string{"codex", "agy"}, "gemini"); got != "codex" {
 		t.Fatalf("non-ready override should fall through to codex, got %q", got)
 	}

@@ -16,10 +16,6 @@ import (
 // Deprecated cost flags are accepted no-ops
 // ============================================================================
 
-// TestParseLoopArgs_BudgetAliasAccepted verifies a legacy --budget-usd and its
-// --budget alias are stripped (not rejected) so existing scripts/CI don't break,
-// and drive no behavior — cost is display-only telemetry now, and the flag must
-// NOT bump the cycle count (the former budget-mode 50-cycle default is gone).
 func TestParseLoopArgs_BudgetAliasAccepted(t *testing.T) {
 	t.Parallel()
 	for _, flag := range []string{"--budget-usd", "--budget"} {
@@ -42,9 +38,6 @@ func TestParseLoopArgs_BudgetAliasAccepted(t *testing.T) {
 // Deprecation WARN
 // ============================================================================
 
-// TestParseLoopArgs_NegativeBudgetAccepted — --budget-usd is removed and stripped
-// before parse, so ANY value (incl. a negative like "-1", which the strip must
-// consume as the value rather than leave for flag.Parse) is accepted and ignored.
 func TestParseLoopArgs_NegativeBudgetAccepted(t *testing.T) {
 	t.Parallel()
 	var stderr bytes.Buffer
@@ -82,7 +75,7 @@ func TestParseLoopArgs_ExplicitCyclesNoWarn(t *testing.T) {
 }
 
 // ============================================================================
-// Gap #3: QUOTA-PAUSE detection
+// QUOTA-PAUSE detection
 // ============================================================================
 
 func TestDetectQuotaPause_HappyPath(t *testing.T) {
@@ -177,8 +170,6 @@ func TestDetectQuotaPause_FallbackFields(t *testing.T) {
 	}
 }
 
-// TestRunLoop_QuotaPause_Rc5 drives runLoop end-to-end with a
-// cycle-state.json checkpoint that triggers quota-pause → rc=5.
 func TestRunLoop_QuotaPause_Rc5(t *testing.T) {
 
 	projectRoot := t.TempDir()
@@ -280,10 +271,6 @@ func TestRunLoop_ResetPrunesAtStart(t *testing.T) {
 // Deprecated cost env-vars are inert
 // ============================================================================
 
-// TestRunLoop_DeprecatedCostEnvVarsInert verifies the former budget env-vars
-// (EVOLVE_CHECKPOINT_DISABLE) no longer change behavior: cost is always
-// summarized as display-only telemetry, no BATCH-BUDGET output is ever emitted,
-// and the loop exits 0 regardless of cost.
 func TestRunLoop_DeprecatedCostEnvVarsInert(t *testing.T) {
 
 	projectRoot := t.TempDir()
@@ -293,7 +280,7 @@ func TestRunLoop_DeprecatedCostEnvVarsInert(t *testing.T) {
 	storage := &fixtures.FakeStorage{}
 	ledger := newFakeLedger()
 	defer installStubDeps(t, storage, ledger)()
-	// $2.50 of the former $1.00 cap — would once have tripped rc=4; now inert.
+	// $2.50 exceeds the --batch-cap-usd of 1.0; the cap must not fire (it is inert).
 	writeStdoutLog(t, cycleWorkspace(projectRoot, 1), "scout", 2.50)
 
 	var stdout, stderr bytes.Buffer
@@ -310,7 +297,6 @@ func TestRunLoop_DeprecatedCostEnvVarsInert(t *testing.T) {
 	if strings.Contains(stderr.String(), "BATCH-BUDGET") {
 		t.Fatalf("no BATCH-BUDGET output expected; got %q", stderr.String())
 	}
-	// Cost telemetry is always summarized now (the env-var no longer skips it).
 	if !strings.Contains(stderr.String(), "cycle 1 cost: $2.5000") {
 		t.Fatalf("expected cycle cost still logged as telemetry; got %q", stderr.String())
 	}

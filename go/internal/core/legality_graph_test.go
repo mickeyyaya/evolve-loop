@@ -1,12 +1,5 @@
 package core
 
-// legality_graph_test.go — PA-DDK DDK-5 (ADR-0060 §1a). The legality graph
-// (`allowed`) is now config-driven via config.legal_successors, and the
-// load-time validator is the relocated trust anchor that gates it. These tests
-// load the real registry via the kerneltest fixture and reference phases through
-// structural accessors — never hardcoded names — so renaming a phase needs no
-// test rewrite.
-
 import (
 	"context"
 	"errors"
@@ -19,10 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// TestLegalGraph_ConfigMatchesLiteral: the config-built legality graph from the
-// reference registry is identical to the kernel's literal `allowed`. This is the
-// DDK-5 equivalence oracle — config-driving the graph changes nothing for the
-// shipped flow.
 func TestLegalGraph_ConfigMatchesLiteral(t *testing.T) {
 	t.Parallel()
 	ref := kerneltest.Load(t)
@@ -36,8 +25,6 @@ func TestLegalGraph_ConfigMatchesLiteral(t *testing.T) {
 	}
 }
 
-// TestWithLegalGraph_EmptyDegradesToLiteral: an empty config graph leaves the SM
-// on its literal `allowed` (byte-identical bare SM / a registry omitting the map).
 func TestWithLegalGraph_EmptyDegradesToLiteral(t *testing.T) {
 	t.Parallel()
 	literal := NewStateMachine().allowed
@@ -47,9 +34,6 @@ func TestWithLegalGraph_EmptyDegradesToLiteral(t *testing.T) {
 	}
 }
 
-// TestValidateSafetyInvariants_ConfigGraphStrandsShip: a config graph that drops
-// every edge INTO the ship terminal makes it unreachable; the validator — now
-// quantifying over the CONFIG graph, not the literal — rejects it at load.
 func TestValidateSafetyInvariants_ConfigGraphStrandsShip(t *testing.T) {
 	t.Parallel()
 	ref := kerneltest.Load(t)
@@ -66,10 +50,6 @@ func TestValidateSafetyInvariants_ConfigGraphStrandsShip(t *testing.T) {
 	}
 }
 
-// TestOrchestrator_UnsafeLegalGraphFailsClosed: the validator is wired as a HARD
-// gate — an orchestrator constructed with an unsafe legality graph refuses to run
-// a cycle, returning ErrUnsafeConfig before any phase executes. This is the
-// trust-anchor relocation made enforceable (DDK-1 landed it dark).
 func TestOrchestrator_UnsafeLegalGraphFailsClosed(t *testing.T) {
 	ref := kerneltest.Load(t)
 	ship := ref.ShipTerminal()
@@ -94,15 +74,10 @@ func TestOrchestrator_UnsafeLegalGraphFailsClosed(t *testing.T) {
 	}
 }
 
-// TestOrchestrator_SafeConfigRunsNormally: the guard does not false-positive — an
-// orchestrator built with the real reference config runs a full cycle.
-//
 // SpineFloor is dialed to shadow here because this test's fake runners write
-// NO artifacts (the literal cycle-283 shape) and the R8.5-armed floor now
-// correctly ABORTS that — which is the floor working, not the legality-graph
-// validator false-positiving. The floor's own contract (enforce blocks /
-// shadow proceeds / degraded fails open) is pinned by orchestrator_spinegate_test.go;
-// this test pins ONLY that ValidateSafetyInvariants accepts the reference config.
+// no artifacts, which the spine floor would otherwise abort on — that would
+// test the floor, not this validator. Only ValidateSafetyInvariants accepting
+// the reference config is pinned here.
 func TestOrchestrator_SafeConfigRunsNormally(t *testing.T) {
 	ref := kerneltest.Load(t)
 	cfg := ref.Config
@@ -116,8 +91,6 @@ func TestOrchestrator_SafeConfigRunsNormally(t *testing.T) {
 		t.Fatalf("the reference config is safe and must run; got err=%v", err)
 	}
 }
-
-// --- graph test helpers (no hardcoded phase names) ---
 
 func diffGraph(want, got map[Phase]map[Phase]bool) string {
 	var b strings.Builder

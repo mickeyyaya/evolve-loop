@@ -2,8 +2,6 @@ package bridge
 
 import "testing"
 
-// TestManifestIsTmux verifies that the Transport field drives IsTmux() correctly
-// for all 7 embedded manifests, and that IsTmuxDriver dispatches to the manifest.
 func TestManifestIsTmux(t *testing.T) {
 	cases := []struct {
 		cli  string
@@ -34,8 +32,6 @@ func TestManifestIsTmux(t *testing.T) {
 	}
 }
 
-// TestIsTmuxDriver tests IsTmuxDriver with the tmux positive, headless negative,
-// and empty/unknown->false edge cases required by R3 (behavior preservation).
 func TestIsTmuxDriver(t *testing.T) {
 	cases := []struct {
 		cli  string
@@ -62,8 +58,6 @@ func TestIsTmuxDriver(t *testing.T) {
 	}
 }
 
-// TestManifestIsTmux_UnknownCLI verifies that IsTmuxDriver falls back to the
-// "-tmux" suffix for operator-installed CLIs that have no embedded manifest.
 func TestManifestIsTmux_UnknownCLI(t *testing.T) {
 	if !IsTmuxDriver("custom-tmux") {
 		t.Error("IsTmuxDriver(custom-tmux)=false, want true (suffix fallback)")

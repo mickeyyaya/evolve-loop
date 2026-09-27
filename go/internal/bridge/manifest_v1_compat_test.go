@@ -6,24 +6,6 @@ import (
 	"testing"
 )
 
-// manifest_v1_compat_test.go — pins the cycle-124-followup v1→v2 schema
-// migration for the per-CLI parameter mapping table. v1 manifests use the
-// Anthropic-leaked vocabulary `tier_aliases: {haiku|sonnet|opus → native}`;
-// v2 manifests use the provider-neutral vocabulary `model_tier_map:
-// {fast|balanced|deep → native}` matching what profiles already declare.
-//
-// The contract: a v1-shape manifest installed in EVOLVE_BRIDGE_MANIFEST_DIR
-// (or hand-rolled by an operator) continues to work for one release after
-// the migration. parseManifest detects the legacy key shape, translates
-// haiku→fast / sonnet→balanced / opus→deep on read, populates the new
-// ModelTierMap field, and emits ONE stderr deprecation line per manifest.
-// After the deprecation window the v1 path is removed; this test fails
-// loudly when the planned removal happens.
-
-// TestManifestV1Compat_TranslatesTierAliasesKeys pins the read-side
-// translation. A v1 manifest JSON with `tier_aliases` keys MUST realize
-// to a Manifest whose ModelTierMap has the canonical abstract keys, with
-// the same native model values.
 func TestManifestV1Compat_TranslatesTierAliasesKeys(t *testing.T) {
 	v1JSON := []byte(`{
 		"cli": "test-cli",
@@ -39,7 +21,6 @@ func TestManifestV1Compat_TranslatesTierAliasesKeys(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parseManifest: %v", err)
 	}
-	// New abstract keys present with their original native values.
 	want := map[string]string{
 		"fast":     "tiny-model",
 		"balanced": "mid-model",
@@ -53,16 +34,11 @@ func TestManifestV1Compat_TranslatesTierAliasesKeys(t *testing.T) {
 			t.Errorf("ModelTierMap[%q]=%q, want %q", k, got, v)
 		}
 	}
-	// MUST emit a deprecation warning on stderr naming the cli.
 	if got := stderr.String(); !strings.Contains(got, "deprecated") || !strings.Contains(got, "test-cli") {
 		t.Errorf("expected stderr deprecation warning naming cli; got: %q", got)
 	}
 }
 
-// TestManifestV1Compat_PartialKeysTranslate covers a v1 manifest that
-// declares only a subset of haiku/sonnet/opus (e.g., an operator override
-// pinning just `opus`). The partial set translates verbatim; missing
-// keys stay missing.
 func TestManifestV1Compat_PartialKeysTranslate(t *testing.T) {
 	v1JSON := []byte(`{
 		"cli": "test-cli",
@@ -84,9 +60,6 @@ func TestManifestV1Compat_PartialKeysTranslate(t *testing.T) {
 	}
 }
 
-// TestManifestV2_LoadsModelTierMapDirectly covers the canonical v2 path:
-// a manifest declaring `model_tier_map` is loaded verbatim, no translation,
-// no deprecation warning.
 func TestManifestV2_LoadsModelTierMapDirectly(t *testing.T) {
 	v2JSON := []byte(`{
 		"cli": "v2-cli",
@@ -116,10 +89,6 @@ func TestManifestV2_LoadsModelTierMapDirectly(t *testing.T) {
 	}
 }
 
-// TestManifestV1Compat_NonStandardKeysPassThrough pins that v1 keys
-// outside the Anthropic triple (haiku/sonnet/opus) pass through to the
-// new ModelTierMap verbatim. An operator override might have declared
-// {"large": "..."} as a custom tier; the migration must not drop it.
 func TestManifestV1Compat_NonStandardKeysPassThrough(t *testing.T) {
 	v1JSON := []byte(`{
 		"cli": "v1-custom",

@@ -5,11 +5,6 @@ import (
 	"testing"
 )
 
-// TestManifestControls_RealManifests locks the per-CLI mapping table the probe
-// depends on: every embedded interactive manifest resolves the abstract control
-// events to the researched concrete commands, every usage exhausted_regex
-// compiles, and ollama (a local model with no quota) correctly reports
-// usage-unsupported while still mapping the universal clean_ctx → /clear.
 func TestManifestControls_RealManifests(t *testing.T) {
 	type want struct {
 		event, send string
@@ -56,11 +51,6 @@ func TestManifestControls_RealManifests(t *testing.T) {
 	})
 }
 
-// TestManifestControl_Resolution verifies the per-CLI control mapping table:
-// the `controls` manifest block parses into Controls, and Control(event)
-// resolves a present event to its ControlSpec and reports a missing event
-// (or a manifest with no controls at all) as not-found — the ErrUnsupported
-// signal the abstract Controller turns into a clean no-op.
 func TestManifestControl_Resolution(t *testing.T) {
 	data := []byte(`{
 		"cli": "fake-tmux",
@@ -105,9 +95,6 @@ func TestManifestControl_Resolution(t *testing.T) {
 	})
 }
 
-// TestManifestControl_NoControlsBlock verifies a manifest with no `controls`
-// block (the pre-feature shape, and every CLI that supports no control events)
-// reports every event as not-found without panicking on the nil map.
 func TestManifestControl_NoControlsBlock(t *testing.T) {
 	m, err := parseManifest("bare-tmux", []byte(`{"cli":"bare-tmux","binary":"bare"}`))
 	if err != nil {

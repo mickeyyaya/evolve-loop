@@ -38,11 +38,6 @@ func TestLaunchErrorIncludesCapturedStderrCause(t *testing.T) {
 	}
 }
 
-// TestLaunchFailurePersistsLaunchErrorFile — R3.6 acceptance (inbox
-// bridge-launch-validation-stderr-lost): a launch dying in the validate
-// gauntlet (here: LoadProfile on a missing profile, the cycle-270 shape)
-// must leave the cause string in the run dir as <agent>-launch-error.txt,
-// because the failure precedes per-agent stderr-log creation.
 func TestLaunchFailurePersistsLaunchErrorFile(t *testing.T) {
 	ws := t.TempDir()
 	req := core.BridgeRequest{
@@ -65,8 +60,6 @@ func TestLaunchFailurePersistsLaunchErrorFile(t *testing.T) {
 	if !strings.Contains(err.Error(), "[bridge]") {
 		t.Errorf("returned error lost the [bridge] diagnostic: %v", err)
 	}
-	// The orchestrator's bridgeExitCode digit-scan reads the number right
-	// after "launch exit=" — the appended cause must not break that linkage.
 	if !strings.Contains(err.Error(), "launch exit=10:") {
 		t.Errorf("error must keep the parseable exit code before the cause: %v", err)
 	}

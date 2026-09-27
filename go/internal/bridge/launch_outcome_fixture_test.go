@@ -1,17 +1,5 @@
 package bridge
 
-// launch_outcome_fixture_test.go — ADR-0103 unit 10: the ONE scripted driver
-// the launch-outcome goldens, the stream golden and the Launch step tests
-// drive the real Engine.Launch → LaunchArgs → driver path with. The script
-// rides ExtraFlags (after `--`, so it reaches Config.ExtraFlags through the
-// same argv every launch field takes): "exit=<code>" is the exit the driver
-// returns, "stderr=<fixture>" names the captured-stderr fixture it prints,
-// "artifact=both" makes it write DISTINCT bytes to the artifact and the
-// stdout log (the Completion == "stdout" read path). Registered on demand
-// (ensureLaunchFixtureDriver) rather than at init: the registry-reset tests
-// restore only the seven builtins, and TestDriverRegistry counts them
-// strictly. The script is per-call, never package state.
-
 import (
 	"context"
 	"fmt"
@@ -28,11 +16,9 @@ const (
 	launchFixtureMarkerSubmitWed = "[bridge] artifact-timeout: cause=submit_wedged reason=\"prompt submit wedged\" phase=build cycle=3 driver=claude-tmux artifact=\"a.md\" waited=300s interval=300s extends_used=0 max_extends=6 last_review=none liveness=hung progressed=false busy=false transient=false detector_error=\"\""
 )
 
-// launchStderrFixtures are the seven captured-stderr shapes the classifier
-// sees: nothing; a gauntlet cause first; driver chatter ending in the causal
-// line; tmux chatter then the artifact-timeout marker with a typed cause; a
-// marker whose only `cause=` token is quoted prose; a 301-rune last line; an
-// 1100-rune marker line.
+// launchStderrFixtures are the seven captured-stderr shapes the classifier sees: nothing; a gauntlet cause
+// first; driver chatter ending in the causal line; tmux chatter then the artifact-timeout marker with a
+// typed cause; a marker whose only `cause=` token is quoted prose; a 301-rune last line; a 1100-rune marker line.
 var launchStderrFixtures = map[string]string{
 	"empty": "",
 	"first-bridge-line": "[bridge] launch: missing required (flag or env): --profile\n" +
@@ -71,8 +57,9 @@ func (launchOutcomeFixtureDriver) Launch(_ context.Context, cfg *Config, deps De
 	return code, nil
 }
 
-// ensureLaunchFixtureDriver registers the fixture driver unless a prior
-// launch already did (Register panics on a duplicate).
+// ensureLaunchFixtureDriver registers the fixture driver on demand rather than at init, so the
+// registry-reset tests (which restore only the seven builtins) and TestDriverRegistry's strict count are
+// unaffected; Register panics on a duplicate, so a prior launch's registration is skipped.
 func ensureLaunchFixtureDriver(t *testing.T) {
 	t.Helper()
 	if _, ok := LookupDriver(launchOutcomeFixtureCLI); !ok {

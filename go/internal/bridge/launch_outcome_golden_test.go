@@ -1,13 +1,5 @@
 package bridge
 
-// launch_outcome_golden_test.go — ADR-0103 unit 10, the characterization
-// goldens captured on the pre-extraction code (8e8f080f) and replayed after:
-// what one launch exit MEANS (the error string, the sentinel it wraps, the
-// attempt ledger's cause code), the full argv vector Launch serializes, and
-// the ordered signal stream per Launch path. A missing golden is captured and
-// the test FAILS ("captured — re-run"), so an absent file is never a silent
-// green; the committed file is the oracle.
-
 import (
 	"context"
 	"encoding/json"
@@ -130,10 +122,8 @@ func goldenJSON(t *testing.T, path string, got any) {
 	}
 }
 
-// Test 5 — the oracle: every code × ctx × stderr fixture through Launch;
-// (err string, sentinel, ledger CauseCode) replayed against
-// testdata/launch-outcome.golden.json. The err carries no temp path (the
-// fixtures are path-free) — templated anyway so a future fixture cannot leak one.
+// The err carries no temp path today (the fixtures are path-free) — templated anyway so a future fixture
+// can't leak one.
 func TestLaunchOutcome_Golden_Capture(t *testing.T) {
 	var rows []launchOutcomeRow
 	for _, code := range launchGoldenCodes {
@@ -151,10 +141,6 @@ func TestLaunchOutcome_Golden_Capture(t *testing.T) {
 	goldenJSON(t, filepath.Join("testdata", "launch-outcome.golden.json"), rows)
 }
 
-// Test 6 — the full argv vector for a request with every optional field set
-// (SecondaryArtifacts ×2, Cycle, Agent, Worktree, RunID, ProjectRoot,
-// RequireSandbox, Completion, PermissionMode, SessionName, ExtraFlags, the
-// scaled per-phase artifact budget) equals testdata/launch-args.golden.txt.
 func TestLaunchArgs_Golden_FullArgvVector(t *testing.T) {
 	req := core.BridgeRequest{
 		CLI: "claude-tmux", Profile: "/p/profile.json", Model: "opus", Workspace: "/ws",
@@ -248,8 +234,7 @@ func runLaunchStreamPath(t *testing.T, p launchStreamPath) []string {
 	}
 	req := core.BridgeRequest{Agent: "build", Cycle: 3, RunID: "run-3"}
 	if p.launchErrDir {
-		// The persist target pre-exists as a DIRECTORY in a prepared workspace:
-		// the write fails, the launch does not.
+		// The persist target pre-exists as a directory in a prepared workspace: the write fails, the launch does not.
 		req.Workspace = t.TempDir()
 		if err := os.MkdirAll(filepath.Join(req.Workspace, "build-launch-error.txt"), 0o755); err != nil {
 			t.Fatal(err)
@@ -259,10 +244,7 @@ func runLaunchStreamPath(t *testing.T, p launchStreamPath) []string {
 	return signalSequence(*got)
 }
 
-// Test 9 — the ordered {module, kind, code} sequence per Launch path equals
-// testdata/launch-signals.golden.json (captured on 8e8f080f: the
-// construction-time resolver warning only). The landing commit EDITS the
-// golden with the unit's declared additions — the diff is the declaration.
+// A commit that changes this golden's signal sequence carries the diff as its own declaration of the change.
 func TestEngineLaunch_SignalStream_Golden(t *testing.T) {
 	got := map[string][]string{}
 	for _, p := range launchStreamPaths {

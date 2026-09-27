@@ -48,8 +48,7 @@ func (b *loopBatchCoordinator) prepareIteration(
 	}
 
 	// An interrupt that landed during the probes must not dispatch a wave
-	// that is cancelled at spawn (2026-09-15: "wave 2: 0/2 lanes ok" printed
-	// after the boundary SIGINT).
+	// that would be cancelled at spawn.
 	if err := runPreWaveProbes(b.ctx, b.cfg.ProjectRoot, b.cfg.EvolveDir, b.cycleEnv, b.stderr); err != nil {
 		return b.interruptReturn(iteration, "during the pre-wave probes ")
 	}

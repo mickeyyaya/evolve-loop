@@ -1,20 +1,3 @@
-// mergerung2.go — the merge ladder's RUNG 2: scoped merge review
-// (cycle-941, fleet-scoped todo merge-rung2-scoped-merge-review;
-// knowledge-base/research/merge-concurrency-2026, MergeBERT lineage).
-//
-// RUNG 0 (composition_carryforward.go) carries an audit verdict forward when a
-// clean fleet rebase leaves the composed diff's patch-id UNCHANGED. When the
-// patch-id DID change — real overlapping edits, not a trivial rebase — today's
-// only fallback is RUNG 3, a full re-audit. RUNG 2 is the missing middle: it
-// reviews ONLY the hunks that actually intersect between the audited change and
-// the composed change and, if that overlap is compatible, composes directly;
-// only genuine entanglement escalates to the full re-audit.
-//
-// The reviewer is an injected closure (Option seam, mirroring RUNG 0) so this
-// pure core stays adapter- and LLM-agnostic. An LLM-assisted resolution the
-// reviewer may return is SUGGESTION-GRADE: it is trusted only after re-entering
-// RUNG 0 patch-id verification (ResolutionMatchesAudited), never on the
-// reviewer's word.
 package core
 
 import (

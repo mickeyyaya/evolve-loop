@@ -1,20 +1,5 @@
 package core
 
-// infra_teardown_scan_scope_test.go — cycle-1270 Task 1
-// (`infra-teardown-predicate-single-source`), the open residual.
-//
-// The consolidation itself is landed and green: IsInfraTeardownError is adopted
-// at orchestrator.go and cyclerun_dispatch.go, and
-// TestInfraTeardownUnion_SpelledExactlyOnce guards it. But that guard scans
-// `.` — internal/core ONLY. The predicate's consumers live OUTSIDE it
-// (phases/runner, bridge), so a re-spelled union in either package passes the
-// "spelled exactly once" check untouched.
-//
-// No live duplicate exists today, which is precisely why this is pinned now:
-// the guard's whole purpose is the item's own "if a THIRD sentinel is ever
-// added" concern, and a guard that cannot see two thirds of its own blast
-// radius does not serve it.
-
 import (
 	"os"
 	"path/filepath"

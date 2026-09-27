@@ -11,13 +11,9 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core/evidence"
 )
 
-// git_evidence_test.go — the ADR-0027 git-evidence completion contract:
-// completion = a NEW commit in baseline..HEAD whose trailer verifies the phase
-// + challenge token. Driven through the gitCmd seam (no real repo).
-
-// fakeGit scripts the three git calls the detector makes: rev-parse HEAD
-// (advances once per call, last repeats), rev-list <base>..HEAD (commits in the
-// range, keyed by the base SHA, newest-first), and log -1 --format=%B <sha>.
+// fakeGit scripts the three git calls the detector makes: rev-parse HEAD (advances once per call, last
+// repeats), rev-list <base>..HEAD (commits in the range, keyed by the base SHA, newest-first), and
+// log -1 --format=%B <sha>.
 type fakeGit struct {
 	heads   []string
 	hi      int
@@ -69,9 +65,8 @@ func TestGitEvidence_ReadyOnVerifiedCommit(t *testing.T) {
 }
 
 func TestGitEvidence_FindsEvidenceWhenNotTip(t *testing.T) {
-	// HIGH-fix regression: two commits land between polls — the evidence commit
-	// (sha1) then a stray commit (sha2, now HEAD). Inspecting only HEAD would
-	// re-baseline PAST sha1 and hang forever; the range walk must find sha1.
+	// Two commits land between polls: the evidence commit (sha1), then a stray commit (sha2, now HEAD).
+	// Inspecting only HEAD would re-baseline past sha1 and hang forever; the range walk must find it.
 	good := "build done\n" + evidence.Trailer{Phase: "build", Challenge: "tok"}.Build()
 	g := &fakeGit{
 		heads:   []string{"sha0", "sha2"},

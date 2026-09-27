@@ -7,16 +7,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// claudePArgs builds the `claude -p` argv from cfg and the prepared prompt.
-// Pure — extracted from Launch so flag emission is testable without driving a
-// real CLI (the same seam as engine.launchArgs).
-//
-// omittedModel is the model value that was SUPPRESSED, empty when none was.
-// An unresolved vocabulary token (isUnresolvedModelToken) must not be sent:
-// `claude -p --model top` fails exactly like the cycle-262 `--model auto`
-// incident, and this driver builds its own argv, so the realizer's guard never
-// saw it. An empty cfg.Model is "nothing requested" rather than "a request we
-// refused", so it emits no flag and reports no suppression.
+// claudePArgs builds the `claude -p` argv from cfg and the prepared prompt; pure, extracted from Launch so
+// flag emission is testable without driving a real CLI. omittedModel is the model value that was
+// suppressed (empty when none was): an unresolved vocabulary token must not be sent as `--model`, since
+// this driver builds its own argv and the realizer's guard never sees it. An empty cfg.Model is "nothing
+// requested" rather than "a request we refused", so it emits no flag and reports no suppression.
 func claudePArgs(cfg *Config, prompt string) (args []string, omittedModel string) {
 	args = []string{"-p", prompt}
 	switch {
@@ -27,7 +22,6 @@ func claudePArgs(cfg *Config, prompt string) (args []string, omittedModel string
 		args = append(args, "--model", cfg.Model)
 	}
 	if cfg.PermissionMode != "" {
-		// v0.2 pass-through; bin/bridge already validated the value.
 		args = append(args, "--permission-mode", cfg.PermissionMode)
 	}
 	if cfg.StreamOutput {
@@ -38,19 +32,13 @@ func claudePArgs(cfg *Config, prompt string) (args []string, omittedModel string
 		args = append(args, "--allowedTools")
 		args = append(args, cfg.AllowedTools...)
 	}
-	// Inner-CLI pass-through flags (the bash `--` separator): --bare,
-	// --strict-mcp-config, --setting-sources, etc. from the adapter.
-	// Profile raw flags (extra_flags_by_cli["claude-p"]) realized per-CLI,
-	// then the direct `--` pass-through. Uniform with the tmux drivers.
 	args = append(args, cfg.Realization.LaunchFlags...)
 	args = append(args, cfg.ExtraFlags...)
 	return args, omittedModel
 }
 
-// effectiveModelLabel reports the model the CLI will actually run under, for
-// logging. A suppressed model must never be logged as if it were dispatched —
-// that is how an adversarial-audit tier silently degrades to the account
-// default while the log still claims the requested tier.
+// effectiveModelLabel reports the model the CLI will actually run under, for logging; a suppressed model
+// must never be logged as if it were dispatched, or a degraded tier would log as the requested one.
 func effectiveModelLabel(requested, omitted string) string {
 	if omitted != "" {
 		return ""
@@ -58,18 +46,16 @@ func effectiveModelLabel(requested, omitted string) string {
 	return requested
 }
 
-// claudePDriver is the headless `claude -p` driver — the Go port of
-// drivers/claude-p.sh. It forwards --permission-mode straight into the
-// claude argv (claude is the only CLI that supports it).
+// claudePDriver is the headless `claude -p` driver; it forwards --permission-mode straight into the
+// claude argv, the only CLI that supports it.
 type claudePDriver struct{}
 
 func (claudePDriver) Name() string { return "claude-p" }
 
 func (claudePDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, error) {
-	// Credential-isolation guards (drivers/claude-p.sh): refuse to run when
-	// an ambient auth path would override the CLI's configured one. The
-	// in-process inner CLI inherits these via driverEnv, so an ambient leak
-	// is real — fail loudly (EC_COST_LEAK) so the operator confirms intent.
+	// Credential-isolation guard: refuse to run when an ambient auth path would override the CLI's
+	// configured one; the in-process inner CLI inherits it via driverEnv, so the leak is real — fail
+	// loudly so the operator confirms intent.
 	if v, ok := lookupEnv(deps, "ANTHROPIC_API_KEY"); ok && v != "" {
 		fmt.Fprintln(deps.Stderr, "[claude-p] credential-isolation guard: ANTHROPIC_API_KEY is set; refusing to run to avoid an ambiguous credential path")
 		fmt.Fprintln(deps.Stderr, "[claude-p] unset the variable, or use a different shell, then retry.")
@@ -104,8 +90,8 @@ func (claudePDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, e
 	}
 	defer closeFn()
 
-	// Workstream B: confine to worktree when this is a source-writing phase
-	// and the host can wrap (sandbox-exec / bwrap). Degrades unwrapped.
+	// Confines to the worktree when this is a source-writing phase and the host can wrap (sandbox-exec /
+	// bwrap); degrades unwrapped.
 	name, args, wrapped := wrapHeadlessInvocation(deps, cfg, resolveBinary(deps, "claude"), args)
 	if sandboxRequiredButUnavailable(deps, cfg, wrapped) {
 		fmt.Fprintln(deps.Stderr, "[claude-p] safety gate: activated Build explanation contract requires OS sandbox confinement")
@@ -118,11 +104,9 @@ func (claudePDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, e
 	selection = modelDispatchFromRealization("claude-p", selection, cfg.Realization)
 	selection = modelDispatchFromExtraArgs("claude-p", selection, cfg.ExtraFlags)
 	observeModelDispatch(deps, selection)
-	// Publish the agent PID to a per-phase file so the auto-spawn observer's CPU
-	// liveness probe can tell a silently-thinking headless agent from a hung one
-	// (the tmux drivers use the pane probe instead, so only the headless driver
-	// sets this). Derived from StdoutLog so it matches the observer's path
-	// (<ws>/<phase>.bridge-pid); a mismatch degrades to no probe (best-effort).
+	// Publishes the agent PID to a per-phase file so the auto-spawn observer's CPU liveness probe can tell
+	// a silently-thinking headless agent from a hung one (tmux drivers use the pane probe instead, so only
+	// the headless driver sets this); derived from StdoutLog so it matches the observer's path.
 	env := driverEnv(deps, cfg.Realization.Env)
 	if pidFile := core.BridgePIDFile(cfg.StdoutLog); pidFile != "" {
 		env = append(env, bridgePidfileEnv+"="+pidFile)

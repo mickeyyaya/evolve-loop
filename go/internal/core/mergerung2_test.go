@@ -1,66 +1,7 @@
-// mergerung2_test.go — RED contract for the merge ladder RUNG 2 scoped
-// merge review (cycle-941, fleet-scoped todo merge-rung2-scoped-merge-review;
-// knowledge-base/research/merge-concurrency-2026, MergeBERT lineage).
-//
-// RUNG 0 (composition_carryforward.go) carries an audit verdict forward when a
-// clean fleet rebase leaves the composed diff's patch-id unchanged. When the
-// patch-id DID change (real overlapping edits, not a trivial rebase), today's
-// only fallback is RUNG 3 — a full re-audit. RUNG 2 is the missing middle: it
-// reviews ONLY the hunks that actually intersect between the audited change and
-// the composed change and, if that overlap is compatible, composes directly;
-// only genuine entanglement escalates to the full re-audit.
-//
-// This file is the pure-core RED contract (Task A merge-rung2-scoped-review-core
-// + the Task B re-entry invariant and orchestrator wiring observability). It
-// references symbols the Builder must create in go/internal/core/mergerung2.go
-// and the Method field on CompositionVerdictInput; at authoring every reference
-// is undefined, so the package fails to compile — the correct RED. Builder
-// contract: implement the documented API to turn these GREEN; DO NOT modify
-// this file.
-//
-// Documented API the Builder must implement (go/internal/core/mergerung2.go):
-//
-//	type ScopedMergeDisposition string
-//	const ScopedMergeCompatible ScopedMergeDisposition = "compatible"
-//	const ScopedMergeEntangled  ScopedMergeDisposition = "entangled"
-//	type MergeHunk struct { File, Header, Body string }
-//	type ScopedMergeReviewOutcome struct {
-//	    Disposition    ScopedMergeDisposition
-//	    ResolutionDiff []byte // optional LLM-assisted resolution (suggestion-grade)
-//	}
-//	type ScopedMergeReviewer func(hunks []MergeHunk, auditedSummary, composedSummary string) ScopedMergeReviewOutcome
-//	type ScopedMergeInput struct { AuditedDiff, ComposedDiff []byte; AuditedSummary, ComposedSummary string }
-//	type ScopedMergeResult struct {
-//	    Disposition     ScopedMergeDisposition
-//	    DispatchedHunks []MergeHunk
-//	    Dispatched      bool
-//	}
-//	func RunScopedMergeReview(in ScopedMergeInput, review ScopedMergeReviewer) (ScopedMergeResult, error)
-//	func ResolutionMatchesAudited(auditedPatchID string, resolutionDiff []byte) (bool, error)
-//	// plus: CompositionVerdictInput.Method string (core mirror), and on
-//	// *Orchestrator: WithScopedMergeReviewer(fn) Option + ScopedMergeReviewWired() bool.
-//
-// Contract details Builder must honor:
-//   - RunScopedMergeReview parses both diffs into hunks and computes the hunks
-//     whose file+line ranges intersect. A malformed diff (a `@@` hunk header
-//     that does not parse as `@@ -old,n +new,m @@`) is fail-closed: it returns a
-//     non-nil error, does NOT invoke the reviewer, and does NOT report
-//     compatible.
-//   - Empty intersection: the reviewer is NOT invoked, Dispatched is false,
-//     Disposition is compatible (nothing entangled — no wasted review).
-//   - Non-empty intersection: exactly the intersecting hunks (never the
-//     audited-only or composed-only hunks) are dispatched; the reviewer's
-//     Disposition is carried through verbatim.
-//   - ResolutionMatchesAudited recomputes the resolution diff's OWN patch-id
-//     (rung-0 verification) and returns true only if it equals auditedPatchID —
-//     an LLM-assisted resolution is trusted by patch-id, never on the reviewer's
-//     word (MergeBERT lineage). A malformed resolution fails closed (error).
 package core
 
 import "testing"
 
-// --- unified-diff fixtures -------------------------------------------------
-//
 // "shared.txt" is touched by BOTH the audited and composed change on
 // overlapping line ranges (the one intersecting file). "audonly.txt" is
 // audited-only; "cmponly.txt" is composed-only — neither intersects. Distinct
@@ -167,8 +108,6 @@ func stringContains(s, sub string) bool {
 	return false
 }
 
-// A1 (semantic + intersecting-hunk core): only the hunks for the shared file
-// are dispatched — never the audited-only or composed-only hunks.
 func TestScopedReview_SeesOnlyIntersectingHunks(t *testing.T) {
 	spy := &scopedMergeReviewSpy{outcome: ScopedMergeReviewOutcome{Disposition: ScopedMergeCompatible}}
 	res, err := RunScopedMergeReview(ScopedMergeInput{
@@ -203,8 +142,6 @@ func TestScopedReview_SeesOnlyIntersectingHunks(t *testing.T) {
 	}
 }
 
-// A2 (semantic): the reviewer's compatible/entangled disposition is carried
-// through verbatim — compatible composes, entangled escalates.
 func TestScopedReview_CompatibleComposesEntangledEscalates(t *testing.T) {
 	in := ScopedMergeInput{
 		AuditedDiff:  []byte(auditedDiffSharedPlusAudOnly),
@@ -224,11 +161,8 @@ func TestScopedReview_CompatibleComposesEntangledEscalates(t *testing.T) {
 	}
 }
 
-// A3 (NEGATIVE — strongest anti-no-op): a disjoint change set has an empty
-// intersection, so the reviewer is NOT consulted and the result is compatible
-// (no wasted review, no false entanglement). The spy is armed to return
-// entangled: if the core ever dispatched, the result would be entangled and
-// this test would catch it.
+// The spy is armed to return entangled: if the core ever dispatched, the
+// result would be entangled and this test would catch it.
 func TestScopedReview_EmptyIntersectionNoDispatch(t *testing.T) {
 	spy := &scopedMergeReviewSpy{outcome: ScopedMergeReviewOutcome{Disposition: ScopedMergeEntangled}}
 	res, err := RunScopedMergeReview(ScopedMergeInput{
@@ -252,9 +186,6 @@ func TestScopedReview_EmptyIntersectionNoDispatch(t *testing.T) {
 	}
 }
 
-// A4 (EDGE — malformed): a corrupt hunk header is fail-closed. The reviewer is
-// never invoked and the result is NOT compatible — a broken diff must never
-// silently green a composition.
 func TestScopedReview_MalformedDiffFailsClosed(t *testing.T) {
 	spy := &scopedMergeReviewSpy{outcome: ScopedMergeReviewOutcome{Disposition: ScopedMergeCompatible}}
 	res, err := RunScopedMergeReview(ScopedMergeInput{
@@ -272,10 +203,6 @@ func TestScopedReview_MalformedDiffFailsClosed(t *testing.T) {
 	}
 }
 
-// B2 (MergeBERT invariant): an LLM-assisted resolution re-enters RUNG 0
-// patch-id verification. A resolution whose recomputed patch-id matches the
-// audited change is trusted; a different resolution is rejected regardless of
-// what the reviewer claimed; a malformed resolution fails closed.
 func TestLLMResolution_ReentersRung0Verification(t *testing.T) {
 	// compositionPatchID is core's own patch-id (git patch-id --stable); it is
 	// exactly what ResolutionMatchesAudited must recompute internally.
@@ -313,10 +240,6 @@ func TestLLMResolution_ReentersRung0Verification(t *testing.T) {
 	}
 }
 
-// B1 (wiring observability): WithScopedMergeReviewer binds the rung-2 reviewer
-// closure; ScopedMergeReviewWired reports it. Nil (default) is off, so recovery
-// behaves exactly as before (zero regression). Mirrors
-// CompositionFastPathWired (composition_carryforward_wired_test.go).
 func TestOrchestrator_ScopedMergeReviewWired(t *testing.T) {
 	t.Parallel()
 

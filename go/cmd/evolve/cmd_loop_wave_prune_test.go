@@ -1,27 +1,3 @@
-// cmd_loop_wave_prune_test.go — cycle-1182 RED contract for
-// wave-planner-pass-scope-prune.
-//
-// The defect: widenNarrowDecision is the PRIMARY per-wave planning path (it runs
-// whenever a prior cycle's triage-decision.json exists — the common case, not
-// just the first wave). It builds `committed` straight from decision.top_n and
-// then either short-circuits (`len(committed) >= count`) or hands the list to
-// WidenTopNToFleetWidth, which copies the committed prefix through VERBATIM.
-// Neither branch consults the inbox lifecycle, so an id a previous cycle already
-// CONSUMED survives in the prior decision file and gets re-pinned into the next
-// wave's plan / lane-scope.json (cycle-1116 re-pinned tdd-topn-binding-gate after
-// cycle-1113 consumed it). The sibling fresh-seed path
-// (triagecap.SelectWaveSeedMenus) already prunes; only this seam does not.
-//
-// CONTRACT for Builder (do NOT modify these tests — implement production code):
-//   - Call the exported triagecap.PruneConsumed on `committed` immediately after
-//     it is built from decision.TopN and BEFORE the `len(committed) >= count`
-//     early-return, so a fleet-width-but-stale list is still cleaned and then
-//     re-widened from the backlog.
-//   - A prune that drops ids must never fall back to returning the ORIGINAL
-//     bytes: the stale id would ride through the `len(topN) <= len(committed)`
-//     guard untouched.
-//   - The committed_floors byte-identical passthrough is unchanged (pinned by
-//     the existing TestWidenNarrowDecision_CommittedFloorsShortCircuit).
 package main
 
 import (
@@ -60,7 +36,6 @@ func writeLifecycleItem(t *testing.T, evolveDir, state, id string, files ...stri
 	}
 }
 
-// decisionIDs parses a decision blob's top_n ids.
 func decisionIDs(t *testing.T, data []byte) map[string]bool {
 	t.Helper()
 	var doc struct {
@@ -78,11 +53,6 @@ func decisionIDs(t *testing.T, data []byte) map[string]bool {
 	return ids
 }
 
-// TestWidenNarrowDecision_DropsConsumedCommittedAtFleetWidth is the crux: the
-// prior decision is ALREADY fleet-width (2 committed, count=2), so today's
-// `len(committed) >= count` short-circuit returns it verbatim and the consumed
-// id `gone` is re-pinned into the next wave. After the fix the consumed id must
-// be absent and the freed lane re-widened from the pending backlog.
 func TestWidenNarrowDecision_DropsConsumedCommittedAtFleetWidth(t *testing.T) {
 	dir := t.TempDir()
 	writeLifecycleItem(t, dir, inboxmover.StateProcessed, "gone", "go/internal/x/a.go")
@@ -103,12 +73,6 @@ func TestWidenNarrowDecision_DropsConsumedCommittedAtFleetWidth(t *testing.T) {
 	}
 }
 
-// TestWidenNarrowDecision_ConsumedIDDroppedEvenWithNoBacklogReplacement is the
-// adversarial edge on the same criterion: with an EMPTY backlog there is nothing
-// to widen with, so a naive fix falls through to the
-// `len(topN) <= len(committed)` guard and returns the ORIGINAL bytes — carrying
-// the consumed id forward exactly as before. Correctness (an honest plan) must
-// win over the "nothing to add, leave as-is" optimization.
 func TestWidenNarrowDecision_ConsumedIDDroppedEvenWithNoBacklogReplacement(t *testing.T) {
 	dir := t.TempDir()
 	writeLifecycleItem(t, dir, inboxmover.StateRejected, "gone", "go/internal/x/a.go")
@@ -125,10 +89,6 @@ func TestWidenNarrowDecision_ConsumedIDDroppedEvenWithNoBacklogReplacement(t *te
 	}
 }
 
-// TestWidenNarrowDecision_PrunesTerminalStatesOnly is the fail-open negative
-// axis: only processed/rejected/quarantine may be pruned. pending, processing,
-// retry and an id with NO lifecycle evidence at all must be retained — dropping
-// unresolvable ids would starve every wave of non-inbox-backed cards.
 func TestWidenNarrowDecision_PrunesTerminalStatesOnly(t *testing.T) {
 	cases := []struct {
 		state    string
@@ -162,11 +122,6 @@ func TestWidenNarrowDecision_PrunesTerminalStatesOnly(t *testing.T) {
 	}
 }
 
-// TestWaveNPlusOneExcludesConsumedScope is the two-wave regression the inbox item
-// describes, driven end-to-end through the REAL planner: wave N committed
-// {consumed, keeper}; the cycle then consumed `consumed` (inbox → processed/).
-// Wave N+1 re-plans from wave N's decision bytes — no lane may carry the consumed
-// id in its scope.
 func TestWaveNPlusOneExcludesConsumedScope(t *testing.T) {
 	dir := t.TempDir()
 	writeLifecycleItem(t, dir, inboxmover.StateProcessed, "consumed", "go/internal/x/a.go")

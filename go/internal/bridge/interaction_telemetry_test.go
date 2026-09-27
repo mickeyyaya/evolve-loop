@@ -1,12 +1,5 @@
 package bridge
 
-// interaction_telemetry_test.go — ADR-0045 I1 (slice 1): the bridge's two
-// existing interactions (one-shot nudge, auto-respond sends) must record a
-// typed Outcome in <workspace>/<phase>-interactions.ndjson, resolved against
-// external evidence only (artifact presence, pane pattern state). cycles
-// 263–269: `nudgeSent=true` and nothing measures whether any nudge ever
-// worked — these tests pin that the measurement now exists and is honest.
-
 import (
 	"context"
 	"encoding/json"
@@ -40,9 +33,8 @@ func readInteractionLedger(t *testing.T, ws, phase string) []interaction.Outcome
 	return outs
 }
 
-// nudgeReactiveTmux simulates an agent that reacts to the nudge: when the
-// nudge text (naming the artifact path) is sent into the pane, the "agent"
-// writes the artifact — so the nudge outcome resolves artifact_appeared.
+// nudgeReactiveTmux simulates an agent that reacts to the nudge: when the nudge text (naming the artifact
+// path) is sent into the pane, the "agent" writes the artifact, so the nudge outcome resolves artifact_appeared.
 type nudgeReactiveTmux struct {
 	*fakeTmux
 	artifact string
@@ -97,9 +89,6 @@ func runTelemetryLaunch(t *testing.T, fx launchFixture, tm TmuxController, looku
 	return eng.LaunchArgs(ctx, fx.args("claude-tmux", "--allow-bypass", "--agent=build", "--cycle=7"), nil, &stdout, &stderr)
 }
 
-// TestOutcome_ArtifactAppearedWithinWindow — the nudge worked: the artifact
-// appeared within the bounded wait after the nudge ⇒ exactly one nudge
-// outcome with result artifact_appeared.
 func TestOutcome_ArtifactAppearedWithinWindow(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
 	tm := &nudgeReactiveTmux{
@@ -180,9 +169,6 @@ func TestOutcome_NudgeCaptureFailureContinuesAndRecordsDeferredResult(t *testing
 	}
 }
 
-// TestOutcome_NoEffectRecordedHonestly — the nudge did NOT work (artifact
-// never appeared, run timed out) ⇒ the outcome says no_effect; a
-// fired-and-forgotten interaction or a fabricated success is the defect.
 func TestOutcome_NoEffectRecordedHonestly(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
 	tm := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}
@@ -204,9 +190,6 @@ func TestOutcome_NoEffectRecordedHonestly(t *testing.T) {
 	}
 }
 
-// TestRecorder_RecordsAtStageOff — stage coupling: telemetry records at
-// EVOLVE_PHASE_RECOVERY=off too (observation is never the kill-switch's
-// business; only ACTIONS gate on the stage).
 func TestRecorder_RecordsAtStageOff(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
 	tm := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}
@@ -219,8 +202,6 @@ func TestRecorder_RecordsAtStageOff(t *testing.T) {
 		t.Fatal("interaction ledger must be written at stage off — telemetry is decoupled from the dial")
 	}
 }
-
-// --- auto-respond outcome resolution (next-capture evidence) ---------------
 
 // autoRespondHarness builds a recording autoResponder over scripted panes.
 func autoRespondHarness(t *testing.T, panes []string, prompts []ManifestPrompt) (*autoResponder, *interaction.Recorder) {
@@ -236,9 +217,6 @@ func autoRespondHarness(t *testing.T, panes []string, prompts []ManifestPrompt) 
 
 var trustPrompt = []ManifestPrompt{{Name: "trust_folder", Regex: "Do you trust", Policy: "auto_respond", ResponseKeys: "y,Enter"}}
 
-// TestAutoRespondOutcome_PromptClearedOnNextCapture — the keys worked: the
-// pattern no longer matches the next capture ⇒ prompt_cleared, RuleID carries
-// the rule that fired.
 func TestAutoRespondOutcome_PromptClearedOnNextCapture(t *testing.T) {
 	t.Parallel()
 	ar, rec := autoRespondHarness(t,
@@ -266,9 +244,6 @@ func TestAutoRespondOutcome_PromptClearedOnNextCapture(t *testing.T) {
 	}
 }
 
-// TestAutoRespondOutcome_NoEffectWhenRuleRefires — the keys did NOT work: the
-// same rule fires again on the next capture ⇒ the prior send resolves
-// no_effect (honestly), and the re-fire opens its own pending outcome.
 func TestAutoRespondOutcome_NoEffectWhenRuleRefires(t *testing.T) {
 	t.Parallel()
 	ar, rec := autoRespondHarness(t,
@@ -288,8 +263,6 @@ func TestAutoRespondOutcome_NoEffectWhenRuleRefires(t *testing.T) {
 	}
 }
 
-// TestAutoRespondOutcome_FlushResolvesPendingAtRunEnd — a send the run ends
-// on (no further capture) must still record: run_ended, never silence.
 func TestAutoRespondOutcome_FlushResolvesPendingAtRunEnd(t *testing.T) {
 	t.Parallel()
 	ar, rec := autoRespondHarness(t, []string{"Do you trust this folder?"}, trustPrompt)

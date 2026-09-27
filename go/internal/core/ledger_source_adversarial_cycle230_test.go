@@ -9,19 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// Cycle-230 test-amplification adversarial tests for task ledger-skip-source.
-// Written from spec only (no implementation read) — anti-bias isolation.
-//
-// Coverage gaps addressed:
-//   - Large skip list: ALL entries (not just first 2) must carry Source:"router"
-//   - Non-"router" source value: round-trip must preserve custom sources without
-//     hardcoding "router" in UnmarshalJSON
-//   - Direct struct marshal: struct with Source set must produce "source" key in
-//     JSON without going through the unmarshal→marshal path first
-
-// TestLedgerEntrySource_LargeSkipList_Amp: recordRoutingDecision with 5 skipped
-// phases must produce exactly 5 phase_skipped entries, all carrying
-// Source:"router". Guards against off-by-one or partial-stamping bugs.
 func TestLedgerEntrySource_LargeSkipList_Amp(t *testing.T) {
 	t.Parallel()
 	led := &fakeLedger{}
@@ -62,10 +49,6 @@ func TestLedgerEntrySource_LargeSkipList_Amp(t *testing.T) {
 	}
 }
 
-// TestLedgerEntrySource_NonRouterSourcePreserved_Amp: when a ledger line carries
-// a source value OTHER than "router" (e.g. "psmas" or "content"), round-trip
-// must preserve it verbatim. This guards against UnmarshalJSON hardcoding
-// "router" instead of routing the raw wire field.
 func TestLedgerEntrySource_NonRouterSourcePreserved_Amp(t *testing.T) {
 	t.Parallel()
 	customSources := []string{"psmas", "content", "user-defined-value"}
@@ -89,10 +72,8 @@ func TestLedgerEntrySource_NonRouterSourcePreserved_Amp(t *testing.T) {
 	}
 }
 
-// TestLedgerEntrySource_DirectMarshal_Amp: directly constructing a LedgerEntry
-// with Source set and marshalling it (no unmarshal step first) must produce a
-// JSON object with a "source" key. Uses reflection (same pattern as
-// ledger_source_test.go) so this file compiles even if the field is absent.
+// Uses reflection (same pattern as ledger_source_test.go) so this file
+// compiles even if the field is absent.
 func TestLedgerEntrySource_DirectMarshal_Amp(t *testing.T) {
 	t.Parallel()
 	var e LedgerEntry

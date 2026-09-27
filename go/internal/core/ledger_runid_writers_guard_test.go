@@ -9,33 +9,8 @@ import (
 	"testing"
 )
 
-// ledger_runid_writers_guard_test.go — the DURABLE half of the cycle-1571 H1
-// fix. Fixing the three unstamped writers closes today's hole; this guard is
-// what stops the fourth from being added silently.
-//
-// PR #503 made run_id load-bearing: ship's binding lookup and the composition
-// snapshot both refuse an auditor entry that does not carry THIS run's id. That
-// turned every agent_subprocess writer into a participant in a ship-gate
-// contract, but nothing enforced participation — the premise "every current
-// recorder stamps run_id" was simply asserted, and was false for three of four
-// writers.
-//
-// The scan is deliberately line-level: a line that ASSIGNS the kind (`Kind:` or
-// `"kind":`) writes entries; a line that COMPARES it (`!=`, `==`) merely reads
-// them, and readers owe nothing here.
-//
-// KNOWN LIMIT, stated because it already bit once: this guard proves the
-// resolver is CALLED, never that its value reaches the emitted bytes. The first
-// attempt at stamping cyclesimulator called it and still emitted nothing —
-// jsonCompact drops any key outside its own allowlist — and this test was green
-// throughout. Source scanning closes "a writer was added and nobody noticed";
-// only a behavioural test over the real writer closes "the value is dropped on
-// the way out". Every writer therefore also owes one: subagent/runid_stamp_test.go,
-// cyclesimulator/runid_stamp_test.go, core/phase_bindings_fail_verdict_test.go.
-
-// agentSubprocessWriters is the closed set of files that CONSTRUCT an
-// agent_subprocess ledger entry. A new writer must be added here deliberately,
-// which is the point: the addition is where you decide how it gets its run id.
+// agentSubprocessWriters is the closed set of files that construct an
+// agent_subprocess ledger entry.
 var agentSubprocessWriters = map[string]string{
 	"internal/core/phase_bindings.go":           "orchestrator bindings — stamped centrally, see centrallyStamped",
 	"internal/subagent/subagentrun/ledger.go":   "out-of-process `evolve subagent run` — the cycle-1571 H1 writer, since ADR-0103 unit 16 the dispatcher's ledger step; stamped through a port, see centrallyStamped",
@@ -43,11 +18,8 @@ var agentSubprocessWriters = map[string]string{
 	"internal/cyclesimulator/cyclesimulator.go": "simulator",
 }
 
-// centrallyStamped names writers that legitimately do not mention run_id
-// themselves because they append through the Orchestrator's stampingLedger,
-// which stamps every entry (core/runid.go). SELF-PRUNING: if such a file starts
-// referencing the field directly it no longer needs the exemption and this test
-// fails until it is delisted, so the list cannot rot into a blanket excuse.
+// centrallyStamped names writers that append through the Orchestrator's
+// stampingLedger (core/runid.go), which stamps every entry for them.
 var centrallyStamped = map[string]string{
 	"internal/core/phase_bindings.go":         "appends via o.ledger == stampingLedger (core/runid.go stamps run_id)",
 	"internal/subagent/subagentrun/ledger.go": "a leaf that cannot import core: its Dispatcher takes the resolver as the Deps.RunID port, which the ONE wired construction in internal/subagent/run.go (wiredDispatcher) binds to core.RunIDFromWorkspace, resolved once after admission; subagentrun/ledger_test.go and resolve_test.go are the behavioural pins (the run id reaches the emitted bytes)",
@@ -59,15 +31,9 @@ func TestAgentSubprocessWriters_AllStampRunID(t *testing.T) {
 
 	for _, rel := range found {
 		body := mustReadRepoFile(t, rel)
-		// Requiring the RESOLVER, not merely the words "run_id", is deliberate:
-		// a writer can declare the field and still never populate it, which is
-		// unit-green and live-dark — the same failure class as the composition
-		// seam this PR also pins. Naming RunIDFromWorkspace proves the identity
-		// is actually obtained at the call site.
-		// Match a CALL, not the bare identifier: a doc comment naming the
-		// resolver must neither satisfy the requirement nor — for an excepted
-		// file — red the exemption. In a codebase this comment-dense that is a
-		// live hazard, not a theoretical one.
+		// Matching a CALL (the open paren), not the bare identifier, is
+		// deliberate: a doc comment merely naming the resolver must not satisfy
+		// the requirement or false-red an exemption.
 		mentionsRunID := strings.Contains(body, "RunIDFromWorkspace(")
 		reason, exempt := centrallyStamped[rel]
 
@@ -85,10 +51,6 @@ func TestAgentSubprocessWriters_AllStampRunID(t *testing.T) {
 	}
 }
 
-// TestAgentSubprocessWriters_SetIsClosed fails when a NEW file starts writing
-// agent_subprocess entries. Without this, the guard above only ever inspects
-// files someone remembered to list — the same "asserted, not verified" shape
-// that produced H1.
 func TestAgentSubprocessWriters_SetIsClosed(t *testing.T) {
 	t.Parallel()
 	found := scanAgentSubprocessWriters(t)

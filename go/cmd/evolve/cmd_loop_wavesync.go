@@ -1,23 +1,5 @@
 package main
 
-// cmd_loop_wavesync.go — ADR-0080 S3: refresh the runtime plane from origin
-// at the wave boundary, fast-forward ONLY. Post-cutover, origin/main is the
-// single integration channel (console PRs merge there; lane ships push
-// there), so a wave that plans against a stale local main bases its lanes on
-// work origin has already superseded. FF-only covers HISTORY safety; the one
-// review-HIGH hazard it does not cover is handled explicitly below: a merge
-// refusal distinguishes "local tracked changes block FF" (expected: binary
-// rebuild churn) from real history divergence — the wrong diagnosis
-// prescribed the stowaway-adopting remedy.
-//
-// Self-SHA note (review round 2, investigated to ground truth): an FF CANNOT
-// drift the ship self-SHA pin — verifySelfSHA hashes os.Executable()
-// (gitignored bin/evolve, an untracked build output no git operation
-// rewrites). The hazard is confined to operator rebuilds, already covered by
-// the boot and post-build re-pins. An earlier draft shipped a repin seam
-// here; it was provably inert and was DELETED rather than left as a false
-// protection claim (ADR-0080 implementation notes).
-
 import (
 	"context"
 	"encoding/json"
@@ -82,16 +64,11 @@ func mainCIRedForSHA(ctx context.Context, projectRoot, sha string) (bool, []stri
 }
 
 // syncMainFromOriginAtWaveBoundary fetches origin and fast-forwards a
-// checked-out `main` onto origin/main. synced is true only when the tree
-// actually moved. Every skip path is deliberate: not-on-main (sequential /
-// console launches), no origin remote (offline dev), fetch failure
-// (transient network — WARN), already current (quiet), local main AHEAD
-// (WARN — the local integration HEAD is the lane base; nothing moved),
-// blocked by local tracked changes (WARN, names the cause). DIVERGED history
-// returns halt: the ONE main-relation resolver (gitexec.RelationToRemote)
-// that laneStartRef also reads would refuse every lane, so the batch stops
-// here, before any lane spends a phase, with the same sentence — the two
-// consumers can no longer disagree (2026-09-09 token-waste root cause #3).
+// checked-out `main` onto origin/main; synced is true only when the tree
+// actually moved. A DIVERGED relation halts rather than skips, since
+// gitexec.RelationToRemote is the one main-relation resolver laneStartRef
+// also reads — continuing here would let the two consumers disagree about
+// whether main is safe to lane from.
 func syncMainFromOriginAtWaveBoundary(ctx context.Context, projectRoot string, warn io.Writer) (synced bool, halt error) {
 	if info, err := plane.Classify(projectRoot); err != nil || info.Branch != "main" {
 		return false, nil

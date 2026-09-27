@@ -1,12 +1,5 @@
 package core
 
-// lanescope_apicover_test.go — ADR-0050 Phase-5 public-API coverage for the
-// fleet lane-scope pin (cycle-808 soak-invariants-reconcile: the landed
-// lane-scope sweep left LaneScope / LaneScopeFile unnamed by any test, so the
-// apicover per-package hard-fail gate flagged them UNCOVERED and turned the go
-// workflow RED on main). This white-box test NAMES + EXERCISES both symbols
-// against the production writer — no `_ = pkg.X` padding.
-
 import (
 	"context"
 	"encoding/json"
@@ -17,13 +10,9 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
-// TestLaneScope_ExportedSchemaAndFilename names the exported LaneScope type and
-// LaneScopeFile const while pinning the production writer's contract: an
-// env-scoped RunCycle materializes the pin at <workspace>/<LaneScopeFile>, and
-// its bytes unmarshal into the exported LaneScope struct carrying the todo ids
-// and goal hash the lane was provisioned for. A drift in either the filename
-// const or the struct's JSON schema breaks the supervisor↔orchestrator pin
-// hand-off that lane-scope.json exists to guarantee.
+// TestLaneScope_ExportedSchemaAndFilename names the exported LaneScope type
+// and LaneScopeFile const, pinning that an env-scoped RunCycle materializes
+// the pin at <workspace>/<LaneScopeFile> with a schema matching LaneScope.
 func TestLaneScope_ExportedSchemaAndFilename(t *testing.T) {
 	root := t.TempDir()
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))

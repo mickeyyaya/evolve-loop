@@ -24,8 +24,6 @@ func cannedCatalog(fetchedAt time.Time, cli, deepModel string) modelcatalog.Cata
 	}
 }
 
-// TestRunStagedCatalogRefresh_OffIsNoOp: stage off never invokes the pipeline
-// and touches no file.
 func TestRunStagedCatalogRefresh_OffIsNoOp(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -42,10 +40,6 @@ func TestRunStagedCatalogRefresh_OffIsNoOp(t *testing.T) {
 	}
 }
 
-// TestRunStagedCatalogRefresh_ShadowWritesShadowOnly: the shadow stage runs
-// the full pipeline but lands ONLY in model-catalog.shadow.json, logs the
-// per-tier would-change diff against the live catalog, and never touches the
-// live file — dispatch stays byte-identical to off.
 func TestRunStagedCatalogRefresh_ShadowWritesShadowOnly(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -80,11 +74,6 @@ func TestRunStagedCatalogRefresh_ShadowWritesShadowOnly(t *testing.T) {
 	}
 }
 
-// TestRunStagedCatalogRefresh_ShadowTTLGatesOnShadowFile: a fresh shadow file
-// suppresses the run even when the live catalog is stale (gating on the live
-// file would drive the expensive probe every cycle), and a prior shadow file
-// is what the pipeline receives as Prior (that is where its reuse
-// fingerprints live).
 func TestRunStagedCatalogRefresh_ShadowTTLGatesOnShadowFile(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -119,9 +108,6 @@ func TestRunStagedCatalogRefresh_ShadowTTLGatesOnShadowFile(t *testing.T) {
 	}
 }
 
-// TestRunStagedCatalogRefresh_EnforceCommitsLive: enforce lands in the live
-// catalog through the Commit seam (operator tier_fallbacks carried forward —
-// the property Commit's own tests pin).
 func TestRunStagedCatalogRefresh_EnforceCommitsLive(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -137,8 +123,6 @@ func TestRunStagedCatalogRefresh_EnforceCommitsLive(t *testing.T) {
 	}
 }
 
-// TestShadowDiffLines_DeterministicAndComplete: sorted CLI × canonical-tier
-// order, absent sides render "(none)", unchanged tiers are silent.
 func TestShadowDiffLines_DeterministicAndComplete(t *testing.T) {
 	t.Parallel()
 	live := modelcatalog.Catalog{CLIs: map[string]modelcatalog.CLIEntry{
@@ -163,9 +147,6 @@ func TestShadowDiffLines_DeterministicAndComplete(t *testing.T) {
 	}
 }
 
-// TestFreshnessFromManifests_ManifestDataNotGoConditionals: claude's alias
-// policy comes from its manifest block; enumerating CLIs get no entry (zero
-// policy); a CLI with no manifest is skipped silently.
 func TestFreshnessFromManifests_ManifestDataNotGoConditionals(t *testing.T) {
 	t.Parallel()
 	got := freshnessFromManifests([]string{"claude", "codex", "ollama"})

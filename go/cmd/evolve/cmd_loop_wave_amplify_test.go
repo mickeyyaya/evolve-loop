@@ -1,26 +1,5 @@
 package main
 
-// cmd_loop_wave_amplify_test.go — test-amplification (salvaged from cycle
-// 465) for the loop-wave-dispatch seam. Black-box against the spec only:
-// shouldRunWave is the pure Count>1 && PlanSource=="triage" gate (closed
-// vocab, no normalization at this layer), and dispatchIteration is the
-// single per-iteration wave-or-sequential decision point whose injected
-// planFn / launcher seams these tests drive with hostile inputs. Reuses the
-// scaffold's fakeWaveLauncher / waveScopeIDs helpers (same package).
-//
-// TestDispatchIteration_EmptyPlanNeverClaimsAWave is the cycle-466 D1
-// regression: cycle 465's audit (audit-report.md, confidence 0.95)
-// independently reproduced this exact defect via its predecessor
-// TestLoopWave_EmptyTriagePlanNeverClaimsAWave — dispatchIteration
-// (cmd_loop_wave.go:56-70 in the 465 worktree) did not guard
-// len(specs)==0, so an empty adapted plan invoked launcher.Run with a
-// zero-lane spec list and returned ran=true, silently consuming a
-// --max-cycles iteration doing zero work (the livelock class named in the
-// cycle-466 goal). Renamed to the TestDispatchIteration_ prefix so this
-// cycle's eval AC1 grading command (`go test -run 'TestDispatchIteration'`)
-// exercises it directly; assertions preserved verbatim from the proven
-// cycle-465 audit evidence, plus an explicit launcher.calls-count check.
-
 import (
 	"context"
 	"errors"
@@ -44,12 +23,6 @@ func (l *resultEchoLauncher) Run(ctx context.Context, _ []fleet.CycleSpec) []fle
 	return l.canned
 }
 
-// TestShouldRunWave_AdversarialGateTable (edge/negative): the gate must stay
-// shut for zero/negative counts (fail-safe even if a caller bypasses
-// FleetConfig()'s clamp) and for any PlanSource not exactly "triage" — the
-// vocab is closed and case/space-sensitive because FleetConfig() already
-// normalized unknowns to "manual" upstream. The upper extreme fires: the gate
-// itself imposes no hidden count cap.
 func TestShouldRunWave_AdversarialGateTable(t *testing.T) {
 	cases := []struct {
 		name string
@@ -72,14 +45,6 @@ func TestShouldRunWave_AdversarialGateTable(t *testing.T) {
 	}
 }
 
-// TestDispatchIteration_EmptyPlanNeverClaimsAWave (AC1, D1 regression, edge/
-// livelock guard): a wave-eligible config whose triage plan commits NOTHING
-// (no floors, no cards) has zero lanes to launch. dispatchIteration must not
-// report a successful ran=true wave with zero specs — that would silently
-// consume --max-cycles iterations doing no work — and must never invoke the
-// launcher with an empty spec list. Gaming fake this kills: a guard that
-// still returns ran=true with an empty results slice (caller `continue`s,
-// the wave iteration is still consumed).
 func TestDispatchIteration_EmptyPlanNeverClaimsAWave(t *testing.T) {
 	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "triage"}
 	launcher := &fakeWaveLauncher{}
@@ -103,12 +68,6 @@ func TestDispatchIteration_EmptyPlanNeverClaimsAWave(t *testing.T) {
 	}
 }
 
-// TestDispatchIteration_LaneResultsPropagateVerbatim (positive/negative
-// mix): lane failures are DATA for the loop's failure accounting, not a
-// dispatch error. The results the launcher returns — including non-zero
-// exits and lane errors — must come back verbatim, in order, with ran=true
-// and a nil dispatch error. Kills a dispatcher that swallows, filters, or
-// reorders failed lanes.
 func TestDispatchIteration_LaneResultsPropagateVerbatim(t *testing.T) {
 	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "triage"}
 	laneErr := errors.New("lane 1 wedged")
@@ -140,10 +99,6 @@ func TestDispatchIteration_LaneResultsPropagateVerbatim(t *testing.T) {
 	}
 }
 
-// TestDispatchIteration_WaveIndexReachesPlanFn (seam contract): the
-// waveIndex handed to dispatchIteration must reach the plan function
-// unchanged — production wavePlanFn keys the wave's triage artifact off it,
-// so an off-by-one here silently replans a stale wave.
 func TestDispatchIteration_WaveIndexReachesPlanFn(t *testing.T) {
 	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "triage"}
 	for _, waveIndex := range []int{0, 7} {
@@ -161,10 +116,6 @@ func TestDispatchIteration_WaveIndexReachesPlanFn(t *testing.T) {
 	}
 }
 
-// TestDispatchIteration_ContextReachesLauncher (seam contract): the caller's
-// context must flow through to the launcher — it carries the wave's
-// cancellation and per-cycle timeout lineage. A dispatcher that substitutes
-// context.Background() would orphan running lanes on loop shutdown.
 func TestDispatchIteration_ContextReachesLauncher(t *testing.T) {
 	type ctxKey struct{}
 	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "triage"}
@@ -184,10 +135,6 @@ func TestDispatchIteration_ContextReachesLauncher(t *testing.T) {
 	}
 }
 
-// TestDispatchIteration_CardsFallbackFlowsThroughDispatch (positive): the
-// adapter's card-package fallback must survive the dispatch layer — a plan
-// with no floors but committed-card packages still launches a scoped,
-// disjoint wave.
 func TestDispatchIteration_CardsFallbackFlowsThroughDispatch(t *testing.T) {
 	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "triage"}
 	launcher := &fakeWaveLauncher{}
@@ -218,11 +165,6 @@ func TestDispatchIteration_CardsFallbackFlowsThroughDispatch(t *testing.T) {
 	}
 }
 
-// TestDispatchIteration_DuplicateFloorsNeverCoScheduled (S3 pre-regression
-// at the S2 layer): a hostile/buggy triage plan repeating a floor id must
-// never yield two lanes owning the same scope — overlapping scopes
-// co-scheduled is the exact collision class fleet partitioning exists to
-// prevent.
 func TestDispatchIteration_DuplicateFloorsNeverCoScheduled(t *testing.T) {
 	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "triage"}
 	launcher := &fakeWaveLauncher{}

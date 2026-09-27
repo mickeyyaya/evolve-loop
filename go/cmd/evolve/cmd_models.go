@@ -15,19 +15,13 @@ import (
 )
 
 // runModels implements `evolve models <subcommand>` — the live tier→model
-// catalog cached at .evolve/model-catalog.json (Step 10 of the unified-config
-// refactor). Subcommands:
+// catalog cached at .evolve/model-catalog.json. Subcommands:
 //
 //	refresh [--evolve-dir P] [--project-root P] [--json]   re-query CLIs, rewrite the cache
 //	list        [--evolve-dir P] [--project-root P] [--json]   print the cached catalog + staleness
 //	performance [--evolve-dir P] [--project-root P] [--json]   aggregate model-attempt latency + I/O
 //
 // Exit codes: 0 OK, 1 runtime error, 10 bad args.
-//
-// NOTE (Step 10b): refresh currently sources tier→model from `setup detect`
-// (the manifest-derived map). The higher-fidelity live `/model`-query source
-// is a flagged follow-up (10b-live) — it produces the same Catalog shape, so
-// only the producer changes, not this command or the cache schema.
 func runModels(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
 		fmt.Fprintln(stderr, "evolve models: missing subcommand (refresh|list|performance)")
@@ -194,9 +188,7 @@ func printCatalogHuman(w io.Writer, cat modelcatalog.Catalog) {
 		tm := e.TierModels
 		fmt.Fprintf(w, "  %-8s fast=%-16s balanced=%-16s deep=%s\n",
 			cli, dash(tm["fast"]), dash(tm["balanced"]), dash(tm["deep"]))
-		// Show the discovered ladder. Printing it is the point: a rung the CLI
-		// gained is only actionable if an operator can SEE that the offering
-		// moved. Silence here is what let codex's max rung go unnoticed.
+		// An operator can only notice a CLI's offering moved if this prints it.
 		if len(e.Efforts) > 0 {
 			fmt.Fprintf(w, "  %-8s efforts: %s\n", "", strings.Join(e.Efforts, ", "))
 		}

@@ -5,10 +5,6 @@ import (
 	"fmt"
 )
 
-// agyDriver is the Antigravity (Gemini-backed) CLI driver — the Go port
-// of drivers/agy.sh (`agy -p <prompt> --dangerously-skip-permissions`).
-// agy exposes no model flag (all tiers map to its default) and no
-// claude-style plan mode, so it rejects permission_mode loudly.
 type agyDriver struct{}
 
 func (agyDriver) Name() string { return "agy" }
@@ -39,8 +35,8 @@ func (agyDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, error
 		return ExitBadFlags, err
 	}
 	args := []string{"-p", prompt, "--dangerously-skip-permissions"}
-	args = append(args, cfg.Realization.LaunchFlags...) // profile raw flags (extra_flags_by_cli["agy"])
-	args = append(args, cfg.ExtraFlags...)              // direct `--` pass-through
+	args = append(args, cfg.Realization.LaunchFlags...)
+	args = append(args, cfg.ExtraFlags...)
 	name, args, wrapped := wrapHeadlessInvocation(deps, cfg, resolveBinary(deps, "agy"), args)
 	if sandboxRequiredButUnavailable(deps, cfg, wrapped) {
 		fmt.Fprintln(deps.Stderr, "[agy] required OS sandbox is unavailable; refusing an unconfined launch")

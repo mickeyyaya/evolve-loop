@@ -5,14 +5,6 @@ import (
 	"testing"
 )
 
-// TestRunCycle_FleetMode_SkipsGlobalLock pins ADR-0049 S6 / root-cause R1: under
-// the fleet supervisor (EVOLVE_FLEET=1) a cycle must NOT take the whole-cycle
-// global project lock (LOCK_NB), which refuses concurrent runs. Concurrent fleet
-// cycles run in separate processes, each isolated by its per-run worktree +
-// workspace and serialized on every SHARED resource by that resource's own flock
-// (state.json via UpdateState/withStateLock, the ledger chain, the .evolve/
-// ship.lock integrator) — the safety nets S2–S5 put in place. RED before the
-// fleet gate (lockCount=1), GREEN after (0).
 func TestRunCycle_FleetMode_SkipsGlobalLock(t *testing.T) {
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	o := NewOrchestrator(st, &fakeLedger{}, buildRunners(nil))
@@ -27,8 +19,6 @@ func TestRunCycle_FleetMode_SkipsGlobalLock(t *testing.T) {
 	}
 }
 
-// TestRunCycle_Default_AcquiresGlobalLock: the live sequential loop (no
-// EVOLVE_FLEET) keeps the whole-cycle global lock — byte-identical to pre-S6.
 func TestRunCycle_Default_AcquiresGlobalLock(t *testing.T) {
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	o := NewOrchestrator(st, &fakeLedger{}, buildRunners(nil))

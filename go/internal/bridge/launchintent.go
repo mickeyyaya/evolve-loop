@@ -1,16 +1,5 @@
 package bridge
 
-// launchintent.go — the CLI-agnostic launch abstraction (ADR-0022).
-//
-// A phase agent describes HOW it wants to be launched in high-level terms
-// (which model tier, what permission posture, project-only settings, an
-// ephemeral or named session). A per-CLI Realizer translates that intent into
-// the concrete realization for ONE CLI — launch flags it actually defines,
-// post-boot REPL input, controller (tmux lifecycle) hints — never a flag the
-// target CLI does not understand. This decouples intent from realization so
-// the same intent drives claude, codex, and agy without leaking one CLI's
-// argv vocabulary into another.
-
 // LaunchIntent is the high-level, CLI-agnostic launch description. Zero-value
 // fields are "unset" and realize to nothing.
 type LaunchIntent struct {
@@ -18,15 +7,10 @@ type LaunchIntent struct {
 	Permission    string // bypass | plan | default
 	SettingsScope string // project | all
 	SessionMode   string // "ephemeral" | "named:<name>"
-	// Effort is the abstract reasoning-effort dial (low | medium | high),
-	// realized per-manifest to each CLI's native mechanism (claude --effort,
-	// codex model_reasoning_effort) or cleanly no-op'd where the CLI has no
-	// such dial (agy/ollama). Empty = unset → emits nothing (purely additive).
-	Effort       string
-	AllowedTools []string
-	// RawByCLI is the per-CLI escape hatch for genuinely CLI-specific argv that
-	// has no high-level intent. Flags are applied ONLY to the matching CLI, so
-	// a claude-only raw flag never reaches agy/codex.
+	Effort        string
+	AllowedTools  []string
+	// RawByCLI is the per-CLI escape hatch for CLI-specific argv with no high-level intent; a claude-only
+	// raw flag never reaches agy/codex.
 	RawByCLI map[string][]string
 }
 
@@ -40,16 +24,11 @@ type Realization struct {
 	Env         map[string]string // the CLI process environment (manifest default_env); exported in a pane, passed to a headless process
 	Ephemeral   bool              // controller: kill the session on exit
 	SessionName string            // controller: named/resumable session ("" = unnamed)
-	// ModelOmitted is the model value the realizer SUPPRESSED because it was
-	// still an abstract vocabulary token (isUnresolvedModelToken) rather than a
-	// concrete model id — empty when nothing was suppressed. Drivers log it so
-	// a launch that silently fell back to the CLI's own default cannot be
-	// reported as if the requested tier had been dispatched.
+	// ModelOmitted is the model value the realizer suppressed because it was still an abstract vocabulary
+	// token rather than a concrete model id (empty when nothing was suppressed); drivers log it so a launch
+	// that fell back to the CLI's own default isn't reported as the requested tier.
 	ModelOmitted string
-	// modelDispatchEffect retains selector, ambiguity, and argv-terminator
-	// provenance from the final deduplicated LaunchFlags. Manifest-generated
-	// flags are parsed as trusted structure; the surviving raw-profile suffix is
-	// parsed conservatively. Drivers apply this effect to their own base selector
-	// at the invocation boundary.
+	// modelDispatchEffect retains selector, ambiguity and argv-terminator provenance from the final
+	// deduplicated LaunchFlags; drivers apply it to their own base selector at the invocation boundary.
 	modelDispatchEffect modelDispatch
 }

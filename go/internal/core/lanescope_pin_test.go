@@ -1,30 +1,5 @@
 package core
 
-// Cycle-766 RED contract — fleet-lane-provisioning-split (inbox id
-// fleet-lane-provisioning-split, cycle-640 incident: scout scouted lane A's
-// goal while triage was handed lane B's fleet_scope, so the run had no
-// coherent lane identity).
-//
-// Contract encoded here (Builder implements, must NOT modify these tests):
-//
-//  1. PIN: when `evolve fleet` provides EVOLVE_FLEET_SCOPE, the orchestrator
-//     materializes <workspace>/lane-scope.json ({"todo_ids":[...],
-//     "goal_hash":"..."}) BEFORE any phase runs.
-//  2. INJECT: when <workspace>/lane-scope.json exists (supervisor- or
-//     orchestrator-written), Context["fleet_scope"] handed to every phase is
-//     derived from THAT file (comma-joined todo_ids) — authoritative over the
-//     env snapshot, so cross-lane env drift can no longer split lane identity.
-//     Absent file ⇒ legacy env fallback (sequential loop byte-identical).
-//  3. COHERENCE (superseded — scout-goalhash-machine-stamped): after scout
-//     completes and before triage runs, a scout-report whose Decision Trace
-//     goal_hash differs from lane-scope.json's goal_hash is MACHINE-STAMPED to
-//     the pin (the authoritative lane identity) + WARNed, and triage PROCEEDS —
-//     it no longer aborts. The old hard-abort false-fired on a deterministic LLM
-//     transcription flip (retries could never self-heal), and the echo verified
-//     nothing the workspace isolation + fleet_scope directive don't already
-//     guarantee. Missing report / goal_hash key / lane-scope.json stay
-//     fail-open (no-op) — never a false abort on a healthy cycle.
-
 import (
 	"context"
 	"encoding/json"
@@ -87,8 +62,6 @@ func phaseScopeSeen(t *testing.T, runners map[Phase]PhaseRunner, p Phase) string
 	return fr.requests[0].Context["fleet_scope"]
 }
 
-// INJECT: a supervisor-provisioned lane-scope.json is the fleet_scope source
-// for every phase, with no EVOLVE_FLEET_SCOPE env needed at all.
 func TestLaneScopePin_FileInjectsFleetScopeToPhases(t *testing.T) {
 	root := t.TempDir()
 	writeLaneScopeFixture(t, RunWorkspacePath(root, 1), []string{"todo-a", "todo-b"}, "goal-1")
@@ -105,9 +78,6 @@ func TestLaneScopePin_FileInjectsFleetScopeToPhases(t *testing.T) {
 	}
 }
 
-// INJECT/negative: two lanes with distinct lane-scope.json each see ONLY their
-// own scope even when the env snapshot carries the OTHER lane's scope — the
-// exact cycle-640 cross-lane drift. lane-scope.json must win over env.
 func TestLaneScopePin_TwoLanesSeeOnlyOwnScope(t *testing.T) {
 	root := t.TempDir()
 	lanes := []struct {
@@ -141,9 +111,6 @@ func TestLaneScopePin_TwoLanesSeeOnlyOwnScope(t *testing.T) {
 	}
 }
 
-// Legacy edge: no lane-scope.json ⇒ the env snapshot still feeds fleet_scope
-// (pre-existing behavior, cyclerun.go env→ctx bridge; regression guard so the
-// pin cannot break sequential / older-supervisor runs).
 func TestLaneScopePin_AbsentFileFallsBackToEnv(t *testing.T) {
 	root := t.TempDir()
 	runners := buildRunners(nil)
@@ -161,8 +128,6 @@ func TestLaneScopePin_AbsentFileFallsBackToEnv(t *testing.T) {
 	}
 }
 
-// PIN: an env-scoped run materializes lane-scope.json into the run workspace
-// so the lane identity is on disk before any phase output exists.
 func TestLaneScopePin_MaterializedFromEnvBeforePhases(t *testing.T) {
 	root := t.TempDir()
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
@@ -192,19 +157,11 @@ func TestLaneScopePin_MaterializedFromEnvBeforePhases(t *testing.T) {
 	}
 }
 
-// COHERENCE (superseded contract, scout-goalhash-machine-stamped): a scout-report
-// goal_hash ≠ lane-scope.json goal_hash is MACHINE-STAMPED to the pin and triage
-// PROCEEDS — it no longer aborts. The old hard-abort false-fired on a
-// deterministic LLM transcription flip (cycles 945/947/... — greedy decoding
-// reproduces the same wrong digit, so retries never self-heal), and the echo
-// verified nothing the workspace isolation + fleet_scope directive don't already
-// guarantee. The pin is authoritative; the divergence is reconciled, not fatal.
 func TestLaneScopePin_ScoutGoalHashMismatchNormalizesAndProceeds(t *testing.T) {
 	root := t.TempDir()
 	ws := RunWorkspacePath(root, 1)
-	// Canonical 64-hex pin vs a one-digit-flipped canonical echo (pinGoalHash /
-	// misGoalHash, defined in lanescope_normalize_test.go) — the real failure
-	// shape the machine-stamp guard reconciles.
+	// pinGoalHash / misGoalHash (defined in lanescope_normalize_test.go) mirror
+	// a one-digit transcription flip, the shape the machine-stamp guard reconciles.
 	writeLaneScopeFixture(t, ws, []string{"todo-a"}, pinGoalHash)
 
 	runners := buildRunners(nil)
@@ -225,8 +182,6 @@ func TestLaneScopePin_ScoutGoalHashMismatchNormalizesAndProceeds(t *testing.T) {
 	}
 }
 
-// COHERENCE/negative: a MATCHING goal hash must proceed normally — the gate
-// must not turn into a blanket abort.
 func TestLaneScopePin_ScoutGoalHashMatchProceeds(t *testing.T) {
 	root := t.TempDir()
 	writeLaneScopeFixture(t, RunWorkspacePath(root, 1), []string{"todo-a"}, "goal-1")
@@ -246,9 +201,6 @@ func TestLaneScopePin_ScoutGoalHashMatchProceeds(t *testing.T) {
 	}
 }
 
-// COHERENCE/fail-open edge: a scout-report with NO goal_hash key (legacy or
-// malformed Decision Trace) must proceed — an over-strict gate that destroys
-// healthy cycles would recreate the cycle-760..762 abort class.
 func TestLaneScopePin_ScoutReportWithoutGoalHashProceeds(t *testing.T) {
 	root := t.TempDir()
 	writeLaneScopeFixture(t, RunWorkspacePath(root, 1), []string{"todo-a"}, "goal-1")

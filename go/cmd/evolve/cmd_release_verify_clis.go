@@ -1,20 +1,3 @@
-// cmd_release_verify_clis.go implements `evolve release-verify-clis`: the
-// release-flow gate that proves the release artifact can be INSTALLED for every
-// supported LLM CLI and that the release BINARY answers the core subcommands the
-// installed skills shell out to.
-//
-// Why this exists: `evolve release` (releasepipeline) proves only LOCAL binary
-// consistency — disk == committed blob == expected_ship_sha. "Every CLI installs
-// and performs" lived only as prose in skills/publish/SKILL.md, which is
-// non-deterministic (v21.1.0 shipped with the prose green yet published zero
-// assets). This command makes that closing check deterministic Go.
-//
-// Determinism: no live LLM, no network. Each CLI is verified by exercising the
-// real install/projection path into an isolated location, and the binary is
-// smoke-checked with a side-effect-free `<bin> <sub> --help`. The effects are
-// injected via matrixDeps so the orchestration (coverage, isolation, no early
-// return) is unit-testable with pure stubs; defaultMatrixDeps() wires the real
-// implementations used by the release flow.
 package main
 
 import (
@@ -66,11 +49,9 @@ var releaseVerifyCLIs = []string{"claude", "codex", "agy", "gemini"}
 // answers every core subcommand (distinct from the per-CLI install rows).
 const binaryRowKey = "binary:core-subcommands"
 
-// coreSubcommands are the subcommands the installed skills shell out to. Every
-// name here MUST be a registered command (TestCoreSubcommandsRegistered guards
-// the SSOT against drift). If the release binary stopped answering any of these,
-// the installed skills would silently break — that is the regression this gate
-// catches.
+// coreSubcommands are the subcommands the installed skills shell out to. If the
+// release binary stopped answering any of these, the installed skills would
+// silently break — that is the regression this gate catches.
 var coreSubcommands = []string{
 	"loop",
 	"subagent",

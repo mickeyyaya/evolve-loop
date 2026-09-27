@@ -1,36 +1,3 @@
-// mergerung2_consolidation_test.go — RED contract for cycle-946's
-// reconcile-rung2-duplicate-implementations task (fleet-scoped todo
-// merge-rung2-scoped-merge-review, campaign merge-efficiency-2026-07).
-//
-// go/internal/core carries TWO unreconciled rung-2 implementations of the
-// same concept ("which hunks intersect between an audited diff and a
-// composed diff"):
-//
-//   - mergerung2.go's intersectingHunks/RunScopedMergeReview (cycle-941) —
-//     the PRODUCTION-WIRED path: compares each hunk's OLD-side (pre-image)
-//     line range and is the one recoverFromShipError actually dispatches to
-//     (scopedMergeCarryForward, composition_carryforward.go).
-//   - composition_scoped_review.go's IntersectingHunks (cycle-942) — built
-//     and unit/ACS-tested (go/acs/cycle942/predicates_test.go) but never
-//     wired into any production call site; it compares each hunk's NEW-side
-//     (post-image) line range instead.
-//
-// Because the two compare DIFFERENT coordinate spaces, they can disagree on
-// whether the same diff pair overlaps at all — a hunk pair whose old-side
-// ranges intersect (dispatched for review on the real, wired path) can have
-// disjoint new-side ranges (silently skipped as "no conflict" on the unwired
-// path). This test pins that divergence as a failing (RED) contract: the
-// Builder's consolidation must make both call sites agree on ONE overlap
-// semantic (the production-wired old-side comparison), not merely delete
-// one file and hope the ACS-pinned public API (IntersectingHunks,
-// ScopedReviewVerdict, ScopedReviewMethod, ReverifyResolution — see
-// go/acs/cycle942/predicates_test.go) keeps behaving as before.
-//
-// RED today: composition_scoped_review.IntersectingHunks reports the fixture
-// pair as NON-overlapping while mergerung2's canonical intersectingHunks
-// reports it as overlapping (see the Errorf message for the exact
-// assertion). This is a genuine behavioral divergence, not a source-text
-// grep — both implementations are invoked and asserted on their real output.
 package core
 
 import "testing"

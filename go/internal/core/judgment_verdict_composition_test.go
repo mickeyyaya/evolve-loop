@@ -1,27 +1,5 @@
 package core
 
-// judgment_verdict_composition_test.go — the coupling between "a judgment phase
-// can now FAIL a cycle" and "a judgment FAIL teaches the next one".
-//
-// Two changes have to compose. specrunner's verdict_from_sentinel lets a
-// judgment phase's stated verdict become the routed verdict; judgment_lesson.go
-// turns such a FAIL into a carryover lesson instead of a silent halt. Enable the
-// first on a phase the second does not know about and the loop gets the worst of
-// both: a cycle stopped by an objection that leaves no trace, so the next cycle
-// re-derives the same falsified premise — exactly the gap judgment_lesson.go was
-// written to close.
-//
-// Bound at DECLARATION, not at enforce, so promoting a TRACKED catalog phase
-// from shadow to enforce can never open the gap: by the time anyone flips the
-// stage word, this test has already required the teaching side to exist.
-//
-// Scope limit, stated because docs/architecture/user-defined-phases.md now
-// documents the key for user phases: this binds git-TRACKED catalog phases only.
-// A runtime-minted, untracked phase that declares the key gets neither this
-// guard nor phasespec's stage-word guard, and judgmentTeachingPhases has no
-// runtime enforcement (recordJudgmentLesson simply no-ops). That is the residual
-// gap; the author docs carry the requirement in prose.
-
 import (
 	"encoding/json"
 	"os"
@@ -82,25 +60,18 @@ func TestJudgmentTeachingPhases_CoverEveryPhaseThatCanStateItsOwnVerdict(t *test
 		t.Skip("no phase.json files found — catalog layout moved?")
 	}
 	if declaring == 0 {
-		// Deliberately NOT an error. Setting both phases back to "" is the
-		// designed CONFIG rollback for this feature; failing the build on it
-		// would convert a config action into a code change, against
-		// phase_settings_from_config_not_code. Inertness still surfaces — the
-		// shadow records simply stop appearing in the run workspaces.
+		// Deliberately not an error: setting the key back to "" is a config
+		// rollback, and failing the build on it would turn a config action
+		// into a code change.
 		t.Log("no tracked phase declares classify.verdict_from_sentinel — the judgment-verdict wiring is currently inert (expected only if it was deliberately rolled back)")
 	}
 }
 
-// trackedPhaseDirsForTest returns the git-tracked phase dirs, or nil when there
-// is no usable git context (then the caller binds every dir — the stricter
-// fallback).
-//
-// Builds on repostate.TrackedFiles, the production primitive, rather than
-// shelling out to git again: a second hand-rolled implementation drifted from
-// phasespec.TrackedPhaseDirs on the definition of "tracked" (any file under the
-// dir, versus the phase.json itself), so a dir with a tracked agent.md and an
-// untracked phase.json bound in one guard and not the other. Same primitive,
-// same predicate, one meaning.
+// trackedPhaseDirsForTest returns the git-tracked phase dirs, or nil when
+// there is no usable git context (then the caller binds every dir, the
+// stricter fallback). It builds on repostate.TrackedFiles, the production
+// primitive, rather than a second hand-rolled "tracked" definition that once
+// drifted from it.
 func trackedPhaseDirsForTest(t *testing.T, root string) map[string]bool {
 	t.Helper()
 	entries, err := os.ReadDir(filepath.Join(root, ".evolve", "phases"))

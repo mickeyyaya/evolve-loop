@@ -1,46 +1,5 @@
 package main
 
-// cmd_loop_wave_minwidth_test.go — RED contract for cycle-547's
-// fleet-min-width-lane-fallback task.
-//
-// PROBLEM (scout Key Finding 2): cmd_loop.go's batch loop dispatches a wave
-// via dispatchIteration; when that reports ran=false with a nil error (0
-// lanes planned — either an empty triage plan, D1, or the wave's Count was
-// quota/budget-shrunk to <=1 so shouldRunWave's Count>1 gate rejects it
-// before planning), the loop unconditionally WARNs and falls through to the
-// legacy sequential orch.RunCycle path — cmd_loop_wave.go's own doc calls
-// this "the ONLY path that can leak into the main tree" (unisolated, runs in
-// the process cwd instead of a dedicated worktree). A fleet.count=2 operator
-// whose wave shrank to 1 lane via a quota bench gets width ZERO (sequential),
-// not width 1 — defeating fleet.count in the worst way.
-//
-// FIX CONTRACT (new surface this cycle — undefined until Builder adds it, so
-// this package's test build fails to compile today; that compile failure IS
-// the RED evidence, mirroring the cycle-465/507 precedent):
-//
-//	forceOneLaneDispatch(ctx, preflight, planFn, launcher, waveIndex) —
-//	drives up to ONE disjoint candidate through the SAME isolated-worktree
-//	path dispatchIteration uses (preflight -> planFn -> fleet.PlanFromTriage
-//	capped at count=1 -> launcher.Run), WITHOUT the shouldRunWave(Count>1)
-//	gate (the caller already knows the original fleet config wanted >1 lanes
-//	and only reached here because the wave-sized Count shrank to <=1 — this
-//	is the shrink-repair path, not the general multi-lane entry point).
-//	Mirrors dispatchIteration's other safety contracts exactly: a preflight
-//	refusal surfaces an error with planFn/launcher never invoked, and a
-//	genuinely empty candidate backlog (PlanFromTriage adapts to zero specs)
-//	reports ran=false, err=nil so the caller correctly falls back to
-//	sequential — true sequential fallback stays reserved for that case.
-//
-// ADVERSARIAL DIVERSITY (skills/adversarial-testing §6):
-//   - Positive : TestForceOneLaneDispatch_DispatchesIsolatedWaveWhenCandidateExists
-//   - Negative : TestForceOneLaneDispatch_EmptyBacklogStaysFalseNoLauncherInvoked
-//     (the strongest anti-no-op: a naive "always dispatch" impl fails here)
-//   - Safety   : TestForceOneLaneDispatch_PreflightRefusalNeverPlansNorLaunches
-//     (the S3 dirty-control-plane guard must still gate the repair path)
-//   - Regression (guards against the WRONG fix): TestShouldRunWave_CountOneOrZeroStillFalse
-//     pins that shouldRunWave itself is NOT loosened to Count>=1 — that would
-//     also route an operator's genuinely-static fleet.count=1 config through
-//     the wave path, violating "fleet.count=1 legacy path untouched".
 import (
 	"context"
 	"errors"
@@ -130,13 +89,6 @@ func TestForceOneLaneDispatch_PreflightRefusalNeverPlansNorLaunches(t *testing.T
 	}
 }
 
-// TestShouldRunWave_CountOneOrZeroStillFalse guards against the wrong fix: the
-// min-width repair must be a NEW seam (forceOneLaneDispatch) invoked
-// specifically when a wave-sized Count shrank below the gate, not a loosened
-// shouldRunWave(Count>=1) — the latter would ALSO route an operator's
-// genuinely-static fleet.count=1 config through the wave path at cmd_loop.go's
-// outer `if shouldRunWave(fleetCfg)` gate, violating "fleet.count=1 legacy
-// path untouched".
 func TestShouldRunWave_CountOneOrZeroStillFalse(t *testing.T) {
 	if shouldRunWave(policy.FleetConfig{Count: 1, PlanSource: "triage"}) {
 		t.Fatalf("shouldRunWave(Count:1, triage) = true, want false — Count=1 must keep the existing sequential orch.RunCycle path untouched")

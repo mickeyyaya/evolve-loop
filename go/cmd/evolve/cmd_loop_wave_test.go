@@ -1,24 +1,5 @@
 package main
 
-// cmd_loop_wave_test.go — RED-first contract for the loop-wave-dispatch seam
-// (FLEET-AS-POLICY S2, salvaged from cycle 465's preserved worktree per
-// cycle-466's operator T1: fix D1 empty-plan livelock). Pins the
-// per-iteration seam cmd_loop.go's batch for-loop must call, factored into
-// cmd_loop_wave.go: shouldRunWave (the Count>1 && PlanSource=="triage" gate,
-// mirroring the consecutiveFailBreaker pure-decision-function precedent in
-// cmd_loop_failbreaker_test.go) and dispatchIteration (obtains one wave's
-// triage plan via the injected wavePlanFn, adapts it through
-// fleet.PlanFromTriage, and launches through the injected waveLauncher —
-// production wiring is *fleet.Supervisor + execCycleLaunch). None of these
-// symbols exist yet; every test below fails to COMPILE until Builder adds
-// cmd_loop_wave.go — that compile failure IS the RED evidence (mirrors
-// cycle-465's precedent). Functions directly exercising dispatchIteration
-// are named TestDispatchIteration_* (renamed from cycle 465's TestLoopWave_*
-// prefix) so `go test -run 'TestDispatchIteration'` — the eval's AC1 grading
-// command — exercises the full contract, including the D1 empty-plan guard
-// added in cmd_loop_wave_amplify_test.go. See
-// .evolve/evals/s2-wave-salvage-fix-d1.md for the acceptance criteria.
-
 import (
 	"context"
 	"errors"
@@ -57,11 +38,6 @@ func waveScopeIDs(spec fleet.CycleSpec) map[string]bool {
 	return ids
 }
 
-// TestShouldRunWave_GateTable (AC4, decision table): the wave path fires
-// ONLY when Count>1 AND the resolved PlanSource is "triage" — an absent/
-// Count==1 block, or a Count>1 block whose plan_source fell back to the
-// closed-vocab "manual" default, must both keep the existing sequential
-// orch.RunCycle body untouched.
 func TestShouldRunWave_GateTable(t *testing.T) {
 	cases := []struct {
 		name string
@@ -82,12 +58,6 @@ func TestShouldRunWave_GateTable(t *testing.T) {
 	}
 }
 
-// TestDispatchIteration_TwoWavesDisjointLaneScopes (AC1, positive): fleet{count:2,
-// plan_source:triage} driven for 2 iterations (the --max-cycles 2 contract:
-// each iteration IS a wave) must run the wave path both times, launch through
-// the injected launcher exactly twice, and never repeat a scoped todo id
-// across any lane in either wave. Gaming fake it kills: a wave loop that
-// launches Count unscoped identical cycles.
 func TestDispatchIteration_TwoWavesDisjointLaneScopes(t *testing.T) {
 	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "triage"}
 	launcher := &fakeWaveLauncher{}
@@ -126,12 +96,6 @@ func TestDispatchIteration_TwoWavesDisjointLaneScopes(t *testing.T) {
 	}
 }
 
-// TestDispatchIteration_AbsentFleetBlockStaysSequentialGolden (AC4,
-// negative/golden): with no fleet block (Count==1, the FleetConfig()
-// default), dispatchIteration must report ran=false and MUST NOT invoke the
-// launcher or the plan function — the existing sequential orch.RunCycle path
-// runs unchanged, no Supervisor is ever constructed. This test MUST fail if
-// the wave path is unconditionally enabled.
 func TestDispatchIteration_AbsentFleetBlockStaysSequentialGolden(t *testing.T) {
 	fc := policy.FleetConfig{Count: 1, Concurrency: 1, PlanSource: "triage"}
 	launcher := &fakeWaveLauncher{}
@@ -154,11 +118,6 @@ func TestDispatchIteration_AbsentFleetBlockStaysSequentialGolden(t *testing.T) {
 	}
 }
 
-// TestDispatchIteration_MalformedTriagePlanFallsBackSequential (AC3,
-// negative, beyond the eval's minimum bar): a malformed triage-decision.json
-// for a wave-eligible config must surface a non-nil error and fall back to
-// sequential — never a silent unscoped launch — mirroring PlanFromTriage's
-// own fail-safe contract at the loop-integration layer.
 func TestDispatchIteration_MalformedTriagePlanFallsBackSequential(t *testing.T) {
 	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "triage"}
 	launcher := &fakeWaveLauncher{}
@@ -177,10 +136,6 @@ func TestDispatchIteration_MalformedTriagePlanFallsBackSequential(t *testing.T) 
 	}
 }
 
-// TestDispatchIteration_PlanFnErrorFallsBackSequential (negative): when the
-// single-writer triage step itself fails (e.g. the triage phase errored), the
-// wave path must surface that error (wrapped, so errors.Is still matches) and
-// never invoke the launcher.
 func TestDispatchIteration_PlanFnErrorFallsBackSequential(t *testing.T) {
 	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "triage"}
 	launcher := &fakeWaveLauncher{}
