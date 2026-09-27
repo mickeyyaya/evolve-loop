@@ -1,0 +1,20 @@
+{
+  "action": "recurring failure contract gate demoted enforce->advisory on phase coverage-gate (cli=claude-tmux) (3 occurrences)",
+  "evidence_pointer": "[orchestrator] WARN CONTRACT GATE DEMOTED: phase coverage-gate on cli=claude-tmux tripped the contract-gate circuit breaker — the gate is now advisory (enforce→advisory) for the rest of this run, so later phases ship UNGATED. CLI escalation already ran and the escalated CLI failed the contract too. Last violation: coverage-gate deliverable failed contract: [missing_section] required section \"## Coverage Delta\" is missing; [missing_section] required section \"## Uncovered Changed Lines\" is missing; [missing_section] required section \"## Verdict\" is missing; [bad_verdict] no parseable verdict; expected one of [PASS FAIL WARN SKIPPED]",
+  "files": [
+    "agents/evolve-coverage-gate.md",
+    ".evolve/phases/coverage-gate/phase.json",
+    ".evolve/profiles/coverage-gate.json"
+  ],
+  "id": "contract-gate-demoted-coverage-gate",
+  "injected_at": "2026-08-22T10:37:59Z",
+  "injected_by": "retro-preventive-actions-autofiler",
+  "priority": "HIGH",
+  "recurrence": 3,
+  "weight": 0.75,
+  "surface_note": "2026-09-26 console curation (F29 follow-up): files[] typed from a read-only classification against guards.ProtectedSurfaceManifest — protected=false, confidence=medium. The contract (require_sections Coverage Delta, Uncovered Changed Lines, Verdict) and the output template both sit on unprotected persona, phase and profile files; the protected verdict parser should not need to change.",
+  "route": "console-manual",
+  "routed_reason": "2026-09-26 console readiness audit (read-only, against main): NO CODE DELTA — the three required sections (Coverage Delta, Uncovered Changed Lines, Verdict) are already declared verbatim in .evolve/phases/coverage-gate/phase.json classify.require_sections and agents/evolve-coverage-gate.md:10; the item has no acceptance/fix. Retire or re-author.",
+  "consumed_by": "inbox review 2026-09-27: OBSOLETE. No code change was owed: coverage-gate's classify.require_sections already lists Coverage Delta, Uncovered Changed Lines and Verdict (.evolve/phases/coverage-gate/phase.json). The failure has not recurred: all 14 loop-2026092*-verify.log files show zero coverage-gate contract violations, and the recent coverage-gate-report.md files (cycles 1697 and 1700) carry a parseable '## Verdict PASS'. The 36 'CONTRACT GATE DEMOTED' lines in the 2026-09-26/27 logs are all phase=build go-test fixture output (TestContractCorrection_* temp dirs) from lane test runs, not live demotions. Verified by context: t",
+  "consumed_at": "2026-09-27T23:30:00Z"
+}

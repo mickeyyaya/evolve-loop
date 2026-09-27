@@ -1,0 +1,29 @@
+{
+  "id": "host-stages-declared-deliverables",
+  "kind": "pipeline-repair",
+  "priority": "P1",
+  "weight": 0.97,
+  "title": "F43: the audit's predicate run refuses a tree whose phase-owned deliverables were never staged, and does not name them; the host should stage declared deliverables itself",
+  "summary": "Cycle 1694 (wave 9, lane atomicwrite-linked-state-sweep) audit FAILed although the auditor's narrative was WARN. predicateTreeFor (go/internal/phases/audit/predicate_authority.go) compares treefence.Take and TakeTracked of the worktree and refuses when they differ: 'predicate execution tree includes undeclared inputs absent from the ship tree'. So acs-verdict.json is never written and a second gate forces FAIL. The inputs were not junk. They were the cycle's own deliverables, left untracked: go/acs/cycle1694/predicates_test.go (the TDD phase's ACS predicate) and .evolve/evals/atomicwrite-linked-state-sweep.md (the scout's eval). The builder staged only its own files. Cycles 1623 and 1628 failed the same way; both are still P0 carryovers. The error names no path, so the correction directive cannot say what to stage. This is the F36 class again: a deterministic action (staging phase-owned deliverables) left to an agent.",
+  "fix": "(1) predicateTreeFor names every path that differs between the full and tracked trees, in the error and in a coded signal. (2) The host stages each phase's declared deliverables at the phase boundary through the declared-effects registry that F36 introduced (deliverable.effects {check, perform}). Candidates: a 'stage-deliverables' effect on scout and tdd, performed by the host before review, and verified by the gate as staged. That keeps the audit's tree check strict, while the cycle's own files can no longer trip it. (3) Anything still untracked after that is genuinely undeclared and stays a FAIL, now with its path named.",
+  "acceptance": [
+    "RED first: a cycle whose TDD predicate file and scout eval are untracked reaches the audit's predicate run with both staged by the host, and acs-verdict.json is written (replay of cycle 1694's worktree state)",
+    "An untracked file that no phase declares still fails predicateTreeFor, and the error names its path",
+    "The staging is config-driven through the phase registry's declared outputs, never a Go list of phases or paths"
+  ],
+  "files": [
+    "go/internal/phases/audit/predicate_authority.go",
+    "go/internal/deliverable/effects.go",
+    "go/internal/deliverable/host_effects.go",
+    "docs/architecture/phase-registry.json"
+  ],
+  "connects_to": [
+    ".evolve/runs/cycle-1694 (audit-fail-reason.json, worktree status)",
+    "P0 carryovers cycle-1623-failed-audit and cycle-1628-failed-audit",
+    "F36 host-performed effects (fix/host-performed-claim)"
+  ],
+  "created_at": "2026-09-26T11:20:00Z",
+  "source": "console-wave9-1694",
+  "priority_class": "stability",
+  "priority_rationale": "inbox review 2026-09-27: It sealed a verified cycle FAIL and helped halt the loop in wave 12 (1705), after 1694, 1623 and 1628. An unnamed refusal is uncorrectable by any agent."
+}

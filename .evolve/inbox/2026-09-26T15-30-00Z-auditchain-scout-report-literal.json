@@ -1,0 +1,36 @@
+{
+  "id": "auditchain-scout-report-literal",
+  "kind": "pipeline-repair",
+  "priority": "P3",
+  "weight": 0.55,
+  "title": "Artifact filenames are declared as literals at about 10 production sites outside the phasecontract registry; go/acs/cycle1145, 1149 and 1153 are red on main",
+  "summary": "Hand-rolled artifact-filename literals remain in go/internal, outside the phasecontract single source: internal/auditchain/evidence_access.go:54-59 (\"intent.md\", \"scout-report.md\", \"build-report.md\"), internal/explanationdocs/explanationdocs.go:506, internal/failurelog/record.go:147, and more; TestC1153_004 lists 10. go/acs/cycle1145 TestC1145_001, cycle1149 TestC1149_001 and cycle1153 TestC1153_004 all fail on main for this reason, which predates the comment-reduction batches (auditchain since fb2e8040, 2026-08-12). Found while landing comment-reduction batches 16 and 33.",
+  "fix": "Resolve every site through phasecontract.For(<phase>).ArtifactName (or phasecontract.ArtifactFilename) as a single source with projections. Then TestC1153_004 lists zero sites.",
+  "acceptance": [
+    "go test -tags acs ./acs/cycle1145 ./acs/cycle1149 ./acs/cycle1153 passes",
+    "No artifact filename is written as a literal outside internal/phasecontract",
+    "(from acs-verdict-filename-literal-sweep) Sweep the remaining acs-verdict.json filename literals onto acssuite.VerdictFilename + unify the archive-name conventions",
+    "(merged at the inbox review 2026-09-27) Survivor for the artifact-filename single-source class. Absorb from acs-verdict-filename-literal-sweep: (a) the acs-verdict.json literals, about 10 production sites: coherence/coherence.go:89, coherence/crossartifact.go:101, phases/ship/consume.go:441, router/digest.go:271, phases/audit/classification.go:84, phases/runner/verdict/reconcile.go:131, acsrunner/runner.go:254, auditchain/evidence_access.go:60 and dossier/build.go:130, each projected from acssuite.VerdictFilename (acssuite.go:835); (b) one archive-name helper for acs-verdict.candidate.*.json (predicate_authority.go:15) and phasecontract.RoundArchiveFilename (round_archive.go:11); (c) its acceptance, an AST uniqueness-scan guard test (the infra_teardown_single_source_test.go pattern) and import-direction care for leaf-safe coherence. This item survives because it has an id and executable acceptance; the absorbed item has no id (W5)."
+  ],
+  "files": [
+    "go/internal/auditchain/evidence_access.go",
+    "go/internal/explanationdocs/explanationdocs.go",
+    "go/internal/failurelog/record.go",
+    "go/internal/coherence/coherence.go",
+    "go/internal/phases/ship/audit.go",
+    "go/internal/phases/ship/consume.go",
+    "go/internal/router/digest.go",
+    "go/internal/phases/audit/audit.go"
+  ],
+  "created_at": "2026-09-26T15:30:00Z",
+  "source": "console-comment-workstream-batch16",
+  "absorbs": [
+    "acs-verdict-filename-literal-sweep"
+  ],
+  "merge_notes": [
+    "inbox review 2026-09-27: absorbed acs-verdict-filename-literal-sweep. Same fix class (artifact filename literals to their single-source constant, pinned by an AST uniqueness scan), with an overlapping file (auditchain/evidence_access.go). The survivor absorbs the acs-verdict literal sites, the one-archive-name helper and the uniqueness-scan acceptance, with import-direction care for leaf-safe coherence. This item is the older one but has no id, so the survivor is the id-bearing item.",
+    "inbox review 2026-09-27: absorbed acs-verdict-filename-literal-sweep. Survivor for the artifact-filename single-source class. Absorb from acs-verdict-filename-literal-sweep: (a) the acs-verdict.json literals, about 10 production sites: coherence/coherence.go:89, coherence/crossartifact.go:101, phases/ship/consume.go:441, router/digest.go:271, phases/audit/classification.go:84, phases/runner/verdict/reconcile.go:131, acsrunner/runner.go:254, auditchain/evidence_access.go:60 and dossier/build.go:130, each projected from acssuite.VerdictFilename (acssuite.go:835); (b) one archive-name helper for acs-verdict.candidate.*.json (predicate_authority.go:15) and phasecontract.RoundArchiveFilename (round_archive.go:11); (c) its acceptance, an AST uniqueness-scan guard test (the infra_teardown_single_source_test.go pattern) and import-direction care for leaf-safe coherence. This item survives because it has an id and executable acceptance; the absorbed item has no id (W5)."
+  ],
+  "priority_class": "hygiene",
+  "priority_rationale": "inbox review 2026-09-27: A single-source cleanup across roughly 20 sites that also turns three red historical predicates green; no runtime defect."
+}

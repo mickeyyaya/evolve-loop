@@ -1,0 +1,21 @@
+{
+  "id": "acs-run-names-vacuous",
+  "created_at": "2026-09-27T23:30:00Z",
+  "title": "An ACS predicate that runs tests by name passes vacuously when a name matches no test (26 stale names today)",
+  "weight": 0.93,
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "files": [
+    "go/pkg/acsassert/assertions.go",
+    "go/acs/regression/acsnames"
+  ],
+  "summary": "249 go/acs predicate files shell `go test -run '^(A|B)$'`, which exits 0 when a name matches nothing. At the waves 11-20 review (design doc §5.10, component A1) 26 exact test names referenced by predicates no longer exist, so those acceptance checks pass without verifying anything. go/acs/cycle1678 TestC1678_011 also fails on clean main because it appends stderr after stdout and trims only leading warning lines.",
+  "acceptance": [
+    "A predicate that runs tests by name fails when any exact name matches no test function (verified by name, not by exit code alone).",
+    "The 26 stale names found at review are repointed to their renamed tests or the predicate is retired with a reason.",
+    "A repo-level check fails CI when a predicate names a test that no longer exists.",
+    "TestC1678_011 parses stdout alone."
+  ],
+  "source": "inbox review 2026-09-27 (design doc §7.9 A1)",
+  "priority_rationale": "inbox review 2026-09-27: the acceptance ledger passes vacuously wherever a named test no longer exists, so a regression can ship green; 26 names are stale today"
+}

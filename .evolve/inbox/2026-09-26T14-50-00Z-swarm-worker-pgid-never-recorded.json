@@ -1,0 +1,24 @@
+{
+  "id": "swarm-worker-pgid-never-recorded",
+  "kind": "pipeline-repair",
+  "priority": "P2",
+  "weight": 0.5,
+  "title": "swarm: worker PGIDs are never recorded, so teardown's group kill never fires; one unit test kills a real tmux session",
+  "summary": "Found by comment-reduction batch 21 (2026-09-26) and reported without changing code. (1) Dispatch never copies LaunchResult.PGID or TmuxSession into the session registry, and swarmrunner's launcher never fills them in. The recorded PGID is always 0, the pgid>1 guard skips the group kill, and teardown relies on the tmux kill alone, so a worker's child processes outlive a killed session. (2) TestTmuxKiller_SatisfiedByExecTmuxKill (apicover_named_test.go) calls the real ExecTmuxKill(\"evolve-bridge-test\") without stubbing tmuxRun. It runs `tmux kill-session` against the bridge socket, which breaks the package's rule that unit tests never touch a real tmux server. (3) ReapReport.Skipped and manifest.Updated are never written. (4) A comment in go/internal/gitexec/worktree_retry_test.go cites provision.go:14-19, a stale line reference.",
+  "fix": "Have the launcher return the worker's PGID and session, have Dispatch record both, and test that teardown group-kills a recorded PGID. Stub tmuxRun in the apicover test. Delete the dead fields, or write them. Drop the line reference.",
+  "acceptance": [
+    "A dispatched worker's registry entry carries its real PGID and session (test with a fake launcher)",
+    "Teardown kills the process group of a recorded worker (test)",
+    "No unit test runs a real tmux command"
+  ],
+  "files": [
+    "go/internal/swarm/dispatch.go",
+    "go/internal/swarm/registry.go",
+    "go/internal/swarm/apicover_named_test.go",
+    "go/internal/phases/swarmrunner/swarmrunner.go"
+  ],
+  "created_at": "2026-09-26T14:50:00Z",
+  "source": "console-comment-workstream-batch21",
+  "priority_class": "hygiene",
+  "priority_rationale": "inbox review 2026-09-27: Latent in a shadow-stage feature that no live wave dispatches; the only live effect is a unit test that touches the host tmux server."
+}

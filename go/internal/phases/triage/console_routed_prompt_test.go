@@ -62,3 +62,19 @@ func TestTriageComposePrompt_PartitionKeepsEmptyInboxByteIdentity(t *testing.T) 
 		t.Errorf("empty inbox must not render an exclusion note:\n%s", a)
 	}
 }
+
+func TestTriageComposePrompt_HoldsBackItemsWaitingOnADependency(t *testing.T) {
+	root := t.TempDir()
+	writeInboxItem(t, root, "a.json", `{"id":"lane-work","weight":0.9}`)
+	writeInboxItem(t, root, "b.json", `{"id":"operator-work","weight":0.96,"route":"console-manual"}`)
+	writeInboxItem(t, root, "c.json", `{"id":"blocked-work","weight":0.95,"deps":["operator-work"]}`)
+
+	out := hooks{}.ComposePrompt("BODY", core.PhaseRequest{ProjectRoot: root})
+	note := strings.Index(out, "dependency_blocked")
+	if note < 0 || !strings.Contains(out[note:], "blocked-work: deps unmet: needs operator-work") {
+		t.Fatalf("an item waiting on a dependency must be listed loudly as not selectable:\n%s", out)
+	}
+	if batches := out[strings.Index(out, "inbox_batches"):note]; strings.Contains(batches, "blocked-work") {
+		t.Errorf("an item waiting on a dependency must not appear inside the selectable batch listing:\n%s", out)
+	}
+}

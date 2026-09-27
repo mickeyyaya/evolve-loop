@@ -10,7 +10,9 @@
   "kind": "pipeline-integrity",
   "notes": "From the 2026-07-30 literature review; deterministic, Go-native, no embeddings.",
   "priority": "P2",
-  "summary": "Crash-dedup research (Igor CCS'21, ECHO 2025) shows exact hashing both over-splits (noise tokens) and over-merges (generic frames) \u2014 the exact arc of our fingerprint fixes (#368 content-free templates, #370 duration tokens, #376 constant epilogue reasons; each fixed one over-split/over-merge by hand). The structural next step: a similarity band \u2014 two normalized reason strings with >=0.9 token-LCS ratio count as the SAME recurrence even when their hashes differ (one path segment, one attempt number the normalizers do not yet fold). Keeps the exact-hash rule as tier 1; the LCS band is tier 2 with its own ceiling and a distinct halt message naming both members.",
+  "summary": "Crash-dedup research (Igor CCS'21, ECHO 2025) shows exact hashing both over-splits (noise tokens) and over-merges (generic frames) — the exact arc of our fingerprint fixes (#368 content-free templates, #370 duration tokens, #376 constant epilogue reasons; each fixed one over-split/over-merge by hand). The structural next step: a similarity band — two normalized reason strings with >=0.9 token-LCS ratio count as the SAME recurrence even when their hashes differ (one path segment, one attempt number the normalizers do not yet fold). Keeps the exact-hash rule as tier 1; the LCS band is tier 2 with its own ceiling and a distinct halt message naming both members.",
   "title": "Blocker breaker: LCS near-identical band beside the exact-hash rule (Igor/ECHO crash-dedup shape)",
-  "weight": 0.86
+  "weight": 0.45,
+  "priority_class": "feature",
+  "priority_rationale": "inbox review 2026-09-27: A research-derived refinement with no recurrence in waves 11-20, and mostly subsumed by #423's any-fingerprint streak rule."
 }

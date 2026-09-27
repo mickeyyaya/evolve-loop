@@ -89,7 +89,7 @@ func TestWidenNarrowDecision_ConsumedIDDroppedEvenWithNoBacklogReplacement(t *te
 	}
 }
 
-func TestWidenNarrowDecision_PrunesTerminalStatesOnly(t *testing.T) {
+func TestWidenNarrowDecision_PrunesEveryIDALaneCannotTake(t *testing.T) {
 	cases := []struct {
 		state    string
 		wantKeep bool
@@ -97,9 +97,10 @@ func TestWidenNarrowDecision_PrunesTerminalStatesOnly(t *testing.T) {
 		{inboxmover.StateProcessed, false},
 		{inboxmover.StateRejected, false},
 		{inboxmover.StateQuarantine, false},
+		{inboxmover.StateConsumed, false},
+		{inboxmover.StateProcessing, false},
+		{inboxmover.StateRetry, false},
 		{inboxmover.StatePending, true},
-		{inboxmover.StateProcessing, true},
-		{inboxmover.StateRetry, true},
 		{"no-evidence", true},
 	}
 	for _, tc := range cases {
@@ -116,7 +117,7 @@ func TestWidenNarrowDecision_PrunesTerminalStatesOnly(t *testing.T) {
 				t.Errorf("lifecycle state %q: `subject` present=%v, want %v:\n%s", tc.state, ids["subject"], tc.wantKeep, out)
 			}
 			if !ids["anchor"] {
-				t.Errorf("lifecycle state %q: unrelated committed id `anchor` was dropped — the prune must only touch consumed ids:\n%s", tc.state, out)
+				t.Errorf("lifecycle state %q: the dispatchable committed id `anchor` was dropped:\n%s", tc.state, out)
 			}
 		})
 	}

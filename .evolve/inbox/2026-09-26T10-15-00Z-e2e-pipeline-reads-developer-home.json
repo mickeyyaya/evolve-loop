@@ -1,0 +1,27 @@
+{
+  "id": "e2e-pipeline-reads-the-developer-home",
+  "title": "TestE2EPipeline_AuditWarn_FluentShips_StrictBlocks routes differently under the developer's HOME, so the local floor goes red while CI is green",
+  "kind": "bug",
+  "class": "test-hermeticity",
+  "priority": "P2",
+  "weight": 0.8,
+  "route": "console",
+  "created_at": "2026-09-26T10:15:00Z",
+  "files": [
+    "go/cmd/evolve/e2e_pipeline_paths_test.go"
+  ],
+  "problem": "On origin/main 5806b56b, `go test -tags 'e2e evolve_test_phases' -run TestE2EPipeline_AuditWarn_FluentShips_StrictBlocks ./cmd/evolve/` fails locally: strict_blocks times out after 5m. Instead of routing a strict WARN to retro, the cycle loops audit -> tdd -> build-planner -> build -> audit three times. The same test passes in CI (go workflow run 36231859130, all three jobs). It also passes locally in 17s with HOME set to an empty directory, with GOPATH, GOCACHE, GOMODCACHE and a git identity kept. So a file under the developer's HOME reaches the pipeline the test drives and changes the post-audit route. The test is not hermetic in HOME, and the local CI-parity floor goes red on every branch.",
+  "fix": "Bisect which HOME entry changes the route: ~/.evolve host state, ~/.claude, ~/.codex, ~/.gitconfig, ~/.config. Inject that input at the composition root, as guards-role-hermetic-home did for the guards. Make the e2e pipeline tests set HOME to a t.TempDir() while keeping the Go caches. Add a test that fails when a host HOME entry reaches the pipeline under test.",
+  "acceptance": [
+    "The e2e test passes locally under the developer's real HOME, not only under an empty one.",
+    "The HOME input that changed the route is named in the fix and read only through an injected seam.",
+    "A regression test fails if a HOME entry reaches the e2e pipeline again."
+  ],
+  "evidence": {
+    "failing_local_run": "504s, strict_blocks timeout, ledger roles show 3 audit->tdd correction rounds",
+    "clean_home_run": "ok 17.222s (origin/main 5806b56b); ok 15.834s (feat/rebind-identical-rebase)",
+    "ci_run": "https://github.com/mickeyyaya/evolve-loop/actions/runs/36231859130"
+  },
+  "priority_class": "debuggability",
+  "priority_rationale": "inbox review 2026-09-27: A red local CI-parity floor on every branch trains operators to ignore it and hides real e2e regressions locally."
+}

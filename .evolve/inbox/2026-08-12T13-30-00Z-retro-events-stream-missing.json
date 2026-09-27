@@ -11,5 +11,21 @@
   "notes": "Found by adversarial review of the phase-output tracker (feat/phase-output-monitoring). Until fixed, every retro cycle's survey reports exactly one known gap: 'retro: retro-events.ndjson missing' — disclosed in the wave protocol, intentionally NOT exempted.",
   "summary": "Retro produces NO phasestream events file in any live workspace (verified cycles 1432/1441/1442: retro-observer-events.ndjson exists but is the observer's stream, a different mechanism; neither retro-events.ndjson nor retrospective-events.ndjson exists). Retro dispatches outside the runner path (runner.go sets Agent=phase and phasestream keys on it), so its prompt is agent-named (retrospective-prompt.txt) and its events stream was simply never wired. A reviewer of a FAIL cycle's retro therefore cannot replay what the retro agent did — exactly the 'not enough data for review' class the phase-output tracker exists to surface.",
   "title": "Retro phase produces no events stream — its dispatch path never wired phasestream",
-  "weight": 0.8
+  "weight": 0.84,
+  "absorbs": [
+    "bridge-prompt-hardening#d47b63a9",
+    "bridge-prompt-hardening#d562cfbb",
+    "bridge-prompt-hardening#d82379d5",
+    "inbox-consume-contract#d772af4b",
+    "retro-failure-identity#1568-llmroute"
+  ],
+  "merge_notes": [
+    "inbox review 2026-09-27: absorbed bridge-prompt-hardening#d82379d5, bridge-prompt-hardening#d562cfbb, bridge-prompt-hardening#d47b63a9, inbox-consume-contract#d772af4b, retro-failure-identity#1568-llmroute. Reframe as \"retro dispatches through the shared phase runner\" (the single-source fix), which gives retro phasestream, llmroute resolution, attempt logs and relaunch discipline at once. Absorb from bridge-prompt-hardening: d82379d5, d562cfbb and d47b63a9 (a relaunch WARN naming DeliveryFailureCause, attempt-scoped StdoutLog/StderrLog, and -race plus escalation-report fixtures). Absorb inbox-consume-contract d772af4b (skip the relaunch when ctx is already cancelled). Absorb retro-failure-identity's cycle-1568 prescription (route the retro 'auto' model through llmroute.Resolve instead of the 'balanced' literal). Keep this item's wiring proof: `evolve cycle outputs` reports 0 retro gaps."
+  ],
+  "acceptance": [
+    "(merged at the inbox review 2026-09-27) Reframe as \"retro dispatches through the shared phase runner\" (the single-source fix), which gives retro phasestream, llmroute resolution, attempt logs and relaunch discipline at once. Absorb from bridge-prompt-hardening: d82379d5, d562cfbb and d47b63a9 (a relaunch WARN naming DeliveryFailureCause, attempt-scoped StdoutLog/StderrLog, and -race plus escalation-report fixtures). Absorb inbox-consume-contract d772af4b (skip the relaunch when ctx is already cancelled). Absorb retro-failure-identity's cycle-1568 prescription (route the retro 'auto' model through llmroute.Resolve instead of the 'balanced' literal). Keep this item's wiring proof: `evolve cycle outputs` reports 0 retro gaps.",
+    "The retrospective dispatches through the shared phase runner, so its phase stream, llmroute resolution, attempt logs and relaunch discipline are those of every other phase; a failed cycle's retrospective leaves no gap in the events stream."
+  ],
+  "priority_class": "debuggability",
+  "priority_rationale": "inbox review 2026-09-27: Every FAIL cycle's retro cannot be replayed, and its silent relaunch looks the same as a clean first try: a standing diagnosis gap on the failure path."
 }

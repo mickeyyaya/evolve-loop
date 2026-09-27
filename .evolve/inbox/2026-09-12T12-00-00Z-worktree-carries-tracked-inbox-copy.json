@@ -3,7 +3,7 @@
   "title": ".evolve/inbox is git-tracked, so every cycle worktree carries a divergent snapshot of the plane's queue — a phase command that resolves the wrong root claims a copy nobody reads",
   "kind": "bug",
   "class": "pipeline-integrity",
-  "weight": 0.7,
+  "weight": 0.9,
   "priority": "P2",
   "route": "console",
   "created_at": "2026-09-12T12:00:00Z",
@@ -14,6 +14,13 @@
     "A phase command run from a cycle worktree cwd cannot move a worktree-local inbox copy: either there is no copy (symlink), or the tool refuses with a message naming the plane root.",
     "The existing provisioning tests keep passing; the claim tests in go/internal/inboxmover keep passing."
   ],
-  "files": ["go/internal/core/worktree.go", "go/internal/inboxmover/inboxmover.go", ".gitignore"],
-  "notes": "Surfaced by the 2026-09-12 batch analysis (cycles 1630/1631) that produced ADR-0100. The operator owns the tracked-vs-not decision because it changes what `git status` shows in every worktree."
+  "files": [
+    "go/internal/core/worktree.go",
+    "go/internal/inboxmover/inboxmover.go",
+    ".gitignore"
+  ],
+  "notes": "Surfaced by the 2026-09-12 batch analysis (cycles 1630/1631) that produced ADR-0100. The operator owns the tracked-vs-not decision because it changes what `git status` shows in every worktree.",
+  "priority_class": "stability",
+  "priority_rationale": "inbox review 2026-09-27: Latent since the env export, but the tracked inbox is the shared root of live plane dirt (see console-route-stamps-block-wave-sync).",
+  "review_status": "inbox review 2026-09-27: PARTIAL. .evolve/inbox is still tracked (125 root entries at origin/main; .gitignore:70), worktree provisioning symlinks only the state files (internal/core/worktree.go:296-300), and inboxmover has no linked-worktree refusal. The reported instance is mitigated: EVOLVE_PROJECT_ROOT is exported into the pane (internal/bridge/driver_tmux_boot.go:61, f36c5b78 #573), and the host performs the inbox claim itself (b96710b9 #637), so an agent no longer needs cwd resolution."
 }

@@ -1,0 +1,17 @@
+{
+  "id": "raw-git-fixture-ratchet",
+  "created_at": "2026-09-27T23:30:00Z",
+  "title": "A ratchet refuses a new raw git fixture outside internal/gittest (116 remain after cycle 1706's instance fix)",
+  "weight": 0.62,
+  "kind": "hardening",
+  "priority_class": "hygiene",
+  "files": [
+    "go/internal/gittest"
+  ],
+  "summary": "Cycle 1706 closed a flake-class ticket by migrating the three sighted tests; 116 test files still build raw git repositories in t.TempDir() exposed to the same unlinkat flake, and nothing stops a new one. Design doc §7.9 G3.",
+  "acceptance": [
+    "A repo-contract test fails on a new raw git init in a test outside internal/gittest; the existing call sites are listed and may only shrink."
+  ],
+  "source": "inbox review 2026-09-27 (design doc §7.9 G3)",
+  "priority_rationale": "inbox review 2026-09-27: 116 raw git fixtures stay exposed to the unlinkat flake and nothing stops a new one"
+}
