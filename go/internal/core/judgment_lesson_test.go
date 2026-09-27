@@ -1,27 +1,5 @@
 package core
 
-// judgment_lesson_test.go — a JUDGMENT phase's FAIL verdict must leave a lesson.
-//
-// The defect: a judgment phase (premise-challenge, plan-review,
-// adversarial-review) returns FAIL as a VERDICT with err == nil. Neither
-// learning path catches that shape:
-//
-//   - recordFloorVerdictFailure fires only for isAuthoritativePhase() — the
-//     resolved ship floor {tdd,build,audit} plus ship. No judgment phase is in it.
-//   - recordFailureLearning early-returns unless fl.Err != nil. A FAIL verdict
-//     carries no error.
-//
-// So a challenged premise left NO trace: the next cycle's Scout had no memory of
-// it and re-derived the same doomed premise. Live instance — cycle-1528's
-// premise-challenge FAIL produced a CRITICAL objection that survived only because
-// a human copied it into an inbox item by hand.
-//
-// The fix records ONLY a carryover todo — deliberately NOT a FailedRecord.
-// Appending to state.FailedAt would feed the failure adapter, which carries two
-// documented halt vectors: tailInfraTransientStreak breaks on any foreign class,
-// and sameClassStreak manufactures a streak from consecutive same-class records.
-// A phase that TEACHES must not also be able to HALT the batch.
-
 import (
 	"context"
 	"fmt"
@@ -36,7 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// judgmentLessonTodos returns the carryover todos whose action names phase.
 func judgmentLessonTodos(cr *cycleRun, phase Phase) []CarryoverTodo {
 	var out []CarryoverTodo
 	for _, td := range cr.state.CarryoverTodos {
@@ -274,9 +251,6 @@ func TestArtifactTimeoutEndToEnd_DiagnosticNeverMutatesRetryOrFailureLearning(t 
 	}
 }
 
-// TestRecordAndBranch_PremiseChallengeFAILTeaches: the live trigger point. A
-// premise-challenge FAIL verdict with NO dispatch error must leave a
-// Scout-visible carryover todo carrying the objection.
 func TestRecordAndBranch_PremiseChallengeFAILTeaches(t *testing.T) {
 	cr := retroGateHarness(t, phasespec.Catalog{})
 	dr := dispatchResult{resp: PhaseResponse{
@@ -300,11 +274,6 @@ func TestRecordAndBranch_PremiseChallengeFAILTeaches(t *testing.T) {
 	}
 }
 
-// TestRecordAndBranch_PremiseChallengeFAILDoesNotRecordFailedApproach is the
-// other half of the contract, and the reason the first attempt at this fix was
-// blocked: teaching must not import a halt vector. state.FailedAt feeds
-// failureadapter.Decide; a judgment phase appending there can manufacture a
-// same-class streak and break the infra-transient tail streak.
 func TestRecordAndBranch_PremiseChallengeFAILDoesNotRecordFailedApproach(t *testing.T) {
 	cr := retroGateHarness(t, phasespec.Catalog{})
 	dr := dispatchResult{resp: PhaseResponse{
@@ -324,10 +293,6 @@ func TestRecordAndBranch_PremiseChallengeFAILDoesNotRecordFailedApproach(t *test
 	}
 }
 
-// TestJudgmentLesson_PriorityIsNotP0: the failure path's todos are P0 because a
-// floor failure blocks the cycle. A judgment lesson is advice for the NEXT
-// cycle's planner — filed at P0 it outranks the actual blocking work and
-// distorts triage.
 func TestJudgmentLesson_PriorityIsNotP0(t *testing.T) {
 	cr := retroGateHarness(t, phasespec.Catalog{})
 	dr := dispatchResult{resp: PhaseResponse{
@@ -350,13 +315,6 @@ func TestJudgmentLesson_PriorityIsNotP0(t *testing.T) {
 	}
 }
 
-// TestJudgmentLesson_ControlPhasesDoNotTeach pins the exact defect that blocked
-// the first attempt. Deriving the teaching set as
-// `remediationDenied[p] && !isAuthoritativePhase(p)` silently sweeps in retro and
-// debugger — control phases, not judgment phases. recordFailureLearning already
-// excludes PhaseRetro explicitly (a direct call routes AROUND that guard), and a
-// retro that FAILs must not file a lesson about itself: retro is the mechanism
-// that WRITES lessons, so it would recurse into its own output.
 func TestJudgmentLesson_ControlPhasesDoNotTeach(t *testing.T) {
 	for _, phase := range []Phase{PhaseRetro, PhaseDebugger} {
 		t.Run(string(phase), func(t *testing.T) {
@@ -376,10 +334,6 @@ func TestJudgmentLesson_ControlPhasesDoNotTeach(t *testing.T) {
 	}
 }
 
-// TestJudgmentLesson_PersistedToStorage: durability. recordAndBranch runs
-// mid-loop and several abort branches return before finalizeCycle persists, so
-// an in-memory-only append is lost exactly when the cycle dies — which is the
-// case this fix exists for.
 func TestJudgmentLesson_PersistedToStorage(t *testing.T) {
 	cr := retroGateHarness(t, phasespec.Catalog{})
 	dr := dispatchResult{resp: PhaseResponse{
@@ -405,8 +359,6 @@ func TestJudgmentLesson_PersistedToStorage(t *testing.T) {
 	}
 }
 
-// TestJudgmentLesson_DedupedByID: a re-dispatched judgment phase failing twice in
-// one cycle must not file the lesson twice.
 func TestJudgmentLesson_DedupedByID(t *testing.T) {
 	cr := retroGateHarness(t, phasespec.Catalog{})
 	dr := dispatchResult{resp: PhaseResponse{
@@ -423,15 +375,9 @@ func TestJudgmentLesson_DedupedByID(t *testing.T) {
 	}
 }
 
-// TestJudgmentLesson_WiredInLockstepWithFloorRecorder is a WIRING proof, not a
-// behavioral one. Fresh and resumed phase completion share one durable
-// boundary, and that boundary must invoke both FAIL-verdict learning recorders.
-//
-// This exists because the failure mode is silent and path-specific. resume.go's
-// own comment on the floor recorder records the precedent: wiring it on one path
-// only "silently reproduce[s] the storm class for resumed cycles specifically" —
-// every unit test passes, and the defect appears only after a mid-batch recovery.
-// A third dispatch path added later must wire BOTH recorders or fail here.
+// TestJudgmentLesson_WiredInLockstepWithFloorRecorder is a wiring proof (it
+// greps source), not a behavioral one: a third dispatch path added later
+// must wire both recorders or fail here.
 func TestJudgmentLesson_WiredInLockstepWithFloorRecorder(t *testing.T) {
 	shared, err := os.ReadFile("phase_completion.go")
 	if err != nil {
@@ -454,16 +400,6 @@ func TestJudgmentLesson_WiredInLockstepWithFloorRecorder(t *testing.T) {
 	}
 }
 
-// TestJudgmentLesson_ExpiresAtSurvivesALoopPause: the lesson's TTL must not land
-// in the 1-day fallback bucket. "cycle-mid-execution-fail" — the failure path's
-// default — is OUTSIDE the taxonomy, so it normalizes to UnknownClassification
-// and ages out in 24h; this repo routinely pauses the loop for days, and an
-// expired lesson silently reproduces the "Scout has no memory" defect this whole
-// file exists to prevent. A falsified premise does not become true again, so the
-// lesson is classified IntentRejected (effectively never ages out).
-//
-// This is the mutation the rest of the suite misses: dedupe keys only off
-// Action/ID, so breaking the TTL passes every other assertion here.
 func TestJudgmentLesson_ExpiresAtSurvivesALoopPause(t *testing.T) {
 	cr := retroGateHarness(t, phasespec.Catalog{})
 	dr := dispatchResult{resp: PhaseResponse{
@@ -484,22 +420,15 @@ func TestJudgmentLesson_ExpiresAtSurvivesALoopPause(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ExpiresAt %q is not RFC3339: %v", todos[0].ExpiresAt, err)
 	}
-	// A week is the discriminator: the 1-day fallback bucket fails this, every
-	// long-lived classification passes it. Asserting the BEHAVIOR (survives a
-	// realistic pause) rather than the exact constant keeps this from breaking
-	// when a TTL is retuned.
+	// A week is the discriminator: the 1-day fallback bucket fails this and
+	// every long-lived classification passes; asserting behavior rather than
+	// an exact constant survives a TTL retune.
 	if minWanted := cr.o.now().UTC().Add(7 * 24 * time.Hour); got.Before(minWanted) {
 		t.Errorf("lesson expires at %s, less than a week out — a multi-day loop pause would drop it "+
 			"before Scout ever reads it (the 1-day unknown-classification fallback bucket)", got)
 	}
 }
 
-// TestJudgmentLesson_AuthoritativePhaseYieldsToFloorRecorder: policy.ship_floor is
-// operator-configurable, so a judgment phase CAN be made authoritative. Both
-// recorders would then fire for one FAIL, and because they synthesize an
-// identical summary the fingerprint dedupe would collapse the floor path's P0
-// todo into this path's P1 one — leaving an "advice" label shadowing a
-// halt-capable FailedRecord. The lesson path yields.
 func TestJudgmentLesson_AuthoritativePhaseYieldsToFloorRecorder(t *testing.T) {
 	cr := retroGateHarness(t, phasespec.Catalog{})
 	// Make the judgment phase authoritative, as an operator ship_floor override would.

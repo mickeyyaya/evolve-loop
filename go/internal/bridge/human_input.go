@@ -9,17 +9,6 @@ import (
 	"time"
 )
 
-// human_input.go — the Go port of lib/human-input.sh: a behavioral-
-// plausibility timing layer for the tmux drivers. It changes only the
-// CADENCE of input (Gaussian inter-key delays, boot/review/reading
-// pauses) — never the tmux operations or the produced artifact. All
-// delays go through the Deps.Sleep seam, so unit tests (no-op Sleep) are
-// deterministic and the layer is a pure no-op-for-correctness.
-//
-// Double-gated OFF by default, mirroring the bash two-gate:
-//   1. BRIDGE_HUMAN_SIMULATION=1 (host opt-in)
-//   2. --human-input on the launch (per-invocation choice)
-
 // humanActive reports whether both gates are satisfied.
 func humanActive(deps Deps, humanInput bool) bool {
 	if !humanInput {
@@ -55,9 +44,6 @@ func pastePrompt(ctx context.Context, deps Deps, pfx, session, promptFile string
 	if err := deps.Tmux.PasteBuffer(ctx, session); err != nil {
 		return pasteOutcome{}, fmt.Errorf("prompt paste-buffer: %w", err)
 	}
-	// Size only. tmux's load-buffer is another process, so a Go-side read can
-	// still fail after it succeeded; assuming size 0 would skip the stability
-	// wait and silently reproduce the wedge — say so and assume a LARGE paste.
 	data, readErr := os.ReadFile(promptFile)
 	size := len(data)
 	if readErr != nil {

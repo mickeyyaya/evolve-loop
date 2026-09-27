@@ -60,8 +60,7 @@ func TestVerifyReleaseBinaries_AllPresent(t *testing.T) {
 
 func TestVerifyReleaseBinaries_MissingArchive(t *testing.T) {
 	cfg := fixtureConfig()
-	// linux_arm64 archive absent — its row must FAIL, the others stay OK
-	// (no early return: the operator sees the full picture).
+	// linux_arm64 archive deliberately absent.
 	list := func(owner, repo, tag string) ([]string, error) {
 		return []string{"evolve_darwin_amd64.tar.gz", "checksums.txt"}, nil
 	}

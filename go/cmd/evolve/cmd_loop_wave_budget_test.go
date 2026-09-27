@@ -1,15 +1,5 @@
 package main
 
-// cmd_loop_wave_budget_test.go — Q4 wiring: quotaAwareWaveConfig composes the
-// existing bench-shrink (availability envelope) with fleetbudget.Plan (size
-// against measured quota headroom). Contracts pinned here:
-//   - Budget==nil ⇒ byte-identical to the pre-Q4 bench-only behavior (no probe,
-//     no resize, no pace) — the shadow-safe default.
-//   - Stage=="shadow" ⇒ compute + LOG the decision, but HOLD the lane count.
-//   - Stage=="enforce" ⇒ apply plan.Lanes and surface plan.PaceDelay.
-// An empty projectRoot temp dir has no benches, so the bench-shrink is a no-op
-// and each case isolates the budget branch.
-
 import (
 	"bytes"
 	"strings"

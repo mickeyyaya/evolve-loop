@@ -1,9 +1,5 @@
 package main
 
-// cmd_loop_unit13_seam_test.go — ADR-0103 unit 13: the host-side pins. The
-// origin guard (fold 0, red on 8e8f080f: "runWaveIteration" names no
-// function) and the seam tests of fold 4.
-
 import (
 	"bytes"
 	"context"
@@ -97,9 +93,6 @@ func declaredFuncs(t *testing.T, fset *token.FileSet) map[string]bool {
 	return out
 }
 
-// Test 8 — every loop producer's origin names a declared function or
-// Type.method (the schema's origin contract); a renamed function must take
-// its origin literal with it.
 func TestLoopSignalOrigins_NameDeclaredFunctions(t *testing.T) {
 	fset := token.NewFileSet()
 	declared := declaredFuncs(t, fset)
@@ -152,10 +145,6 @@ func nonTestSourcesMentioningU13(t *testing.T, needle, allowed string) []string 
 	return offenders
 }
 
-// Test 56 — ONE wired wave engine: loopwave.New( lives in the seam file
-// only; the five test-only facades have no production caller (one would drop
-// the unit's WARNs through the Null Center); the producer's tokens are not
-// re-spelled in main.
 func TestWaveEngine_OneConstructionSite(t *testing.T) {
 	const seam = "cmd/evolve/cmd_loop_wave.go"
 	if offenders := nonTestSourcesMentioningU13(t, "loopwave.New(", seam); len(offenders) > 0 {
@@ -173,9 +162,6 @@ func TestWaveEngine_OneConstructionSite(t *testing.T) {
 	}
 }
 
-// Test 57 — ONE wired Refresher and Driver: the constructions live in the
-// chain seam; the 3-arg maybeRefreshChainBoundary (a test facade over a
-// throwaway root Center) has no production caller.
 func TestChainEngines_OneConstructionSite(t *testing.T) {
 	const seam = "cmd/evolve/cmd_loop_chain.go"
 	for _, needle := range []string{"loopchain.NewRefresher(", "loopchain.NewDriver("} {
@@ -195,8 +181,6 @@ func TestChainEngines_OneConstructionSite(t *testing.T) {
 	}
 }
 
-// Test 58 — the coordinator's lazy engine is cached and reads the batch
-// Center live.
 func TestLoopBatchCoordinator_WaveEngineIsCachedAndReadsTheCenterLive(t *testing.T) {
 	root := t.TempDir()
 	b := &loopBatchCoordinator{cfg: loopConfig{ProjectRoot: root, EvolveDir: filepath.Join(root, ".evolve")}, stderr: io.Discard}
@@ -213,8 +197,6 @@ func TestLoopBatchCoordinator_WaveEngineIsCachedAndReadsTheCenterLive(t *testing
 	}
 }
 
-// Test 59 — the minWidthRepair facade through the production sink: the four
-// pinned substrings stay on the console and the ndjson carries the codes.
 func TestMinWidthRepairFacade_ConsoleKeepsTheFourPinnedSubstringsAndNdjsonCarriesTheCodes(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
@@ -250,8 +232,6 @@ func TestMinWidthRepairFacade_ConsoleKeepsTheFourPinnedSubstringsAndNdjsonCarrie
 	}
 }
 
-// Test 60 — the coordinator's wave path renders ONE LOOP_WAVE_DISPATCH_FAILED
-// on a preflight refusal (a non-git root) and no hand-written line.
 func TestDispatchFleetIteration_PreflightRefusalRendersDispatchFailedOnce(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
@@ -282,8 +262,6 @@ func TestDispatchFleetIteration_PreflightRefusalRendersDispatchFailedOnce(t *tes
 	}
 }
 
-// Test 61 — the host keeps no hand-written twin of the coded line, and the
-// ACS tokens hold by code.
 func TestCmdLoopWindow_NoHandWrittenWaveDispatchFailedLine(t *testing.T) {
 	src, err := os.ReadFile("cmd_loop_window.go")
 	if err != nil {
@@ -314,8 +292,6 @@ func TestCmdLoopWave_ACSTokensHoldByCode(t *testing.T) {
 	}
 }
 
-// Test 62 — the refresh seam reads the package vars at call time (a cached
-// Refresher would ignore a swap between calls).
 func TestMaybeRefreshChainBoundary_ReadsTheSeamVarsAtCallTime(t *testing.T) {
 	root, evolveDir, _ := brhProject(t, "STALE_PIN", "REBUILT-BINARY-BYTES")
 	u13StubRefresh(t, func() bool { return true })
@@ -331,8 +307,6 @@ func TestMaybeRefreshChainBoundary_ReadsTheSeamVarsAtCallTime(t *testing.T) {
 	}
 }
 
-// Test 63 — the coordinator hands the batch Center to the refresh: a rebuild
-// failure renders as the coded WARN on the batch console.
 func TestPrepareIteration_PassesTheBatchCenterToTheRefresh(t *testing.T) {
 	root, evolveDir, _ := brhProject(t, "STALE_PIN", "REBUILT-BINARY-BYTES")
 	u13StubRefresh(t, func() bool { return true })
@@ -353,8 +327,6 @@ func TestPrepareIteration_PassesTheBatchCenterToTheRefresh(t *testing.T) {
 	}
 }
 
-// Test 64 — runLoopChain builds a batch-level Center: its warnings render on
-// the console and land in <evolveDir>/signals.ndjson.
 func TestRunLoopChain_ConstructsABatchLevelCenterAndRendersItsWarnings(t *testing.T) {
 	root, evolveDir := u13ChainEnv(t, 3)
 	boundary := 0
@@ -373,7 +345,6 @@ func TestRunLoopChain_ConstructsABatchLevelCenterAndRendersItsWarnings(t *testin
 	}
 }
 
-// Test 65 — one loop.wave producer, one registrar for the moved code.
 func TestEmitLoopWave_ProjectsToTheLeafProducerWithOneRegistrar(t *testing.T) {
 	if CodeLoopMinWidthRepair != loopwave.CodeMinWidthRepair {
 		t.Error("CodeLoopMinWidthRepair projects the leaf's code")
@@ -400,9 +371,6 @@ func TestEmitLoopWave_ProjectsToTheLeafProducerWithOneRegistrar(t *testing.T) {
 	}
 }
 
-// Review fold R1 — the chain summary's stdout schema has ONE home: chainResult
-// IS loopchain.Result (an alias, so the by-name tests keep their spelling) and
-// no wire tag is re-spelled in package main.
 func TestChainResult_IsTheLeafResultWithNoReSpelledSchema(t *testing.T) {
 	if reflect.TypeOf(chainResult{}) != reflect.TypeOf(loopchain.Result{}) {
 		t.Error("chainResult must alias loopchain.Result — two declarations of one wire schema drift silently")
@@ -414,12 +382,6 @@ func TestChainResult_IsTheLeafResultWithNoReSpelledSchema(t *testing.T) {
 	}
 }
 
-// Review fold R2 — the chain root drains its own Center before EVERY batch:
-// a chained batch can re-exec at a wave boundary, and that refresh flushes
-// only the BATCH Center (D-7), so whatever the chain root emitted at the
-// boundary must already be delivered when the batch starts. The held-drain
-// idiom of signalcenter/flush_test.go proves the wait: an event queued behind
-// a running drain keeps the batch from starting until the drain ends.
 func TestWiredChain_FlushesTheChainCenterBeforeEveryBatch(t *testing.T) {
 	root, evolveDir := u13ChainEnv(t, 0)
 	u13StubRefresh(t, func() bool { return false })
@@ -462,12 +424,6 @@ func TestWiredChain_FlushesTheChainCenterBeforeEveryBatch(t *testing.T) {
 	}
 }
 
-// Review fold R3 — the Roots Parameter Object is never half populated at a
-// facade: every nullWaveEngine( construction in the seam passes either
-// loopwave.RootsOf(<projectRoot>) (both halves derived the production way) or
-// the zero loopwave.Roots{} (the rootless engine of the pure dispatch
-// facades); a bare "" half would resolve CWD-relative the day a method reads
-// it. The boundary reload constructs nothing: it is a package function.
 func TestNullWaveEngine_EveryConstructionCarriesBothRootsOrNone(t *testing.T) {
 	fset := token.NewFileSet()
 	f, err := parser.ParseFile(fset, "cmd_loop_wave.go", nil, 0)
@@ -514,7 +470,6 @@ func TestNullWaveEngine_EveryConstructionCarriesBothRootsOrNone(t *testing.T) {
 	}
 }
 
-// Test 66 — failedLaneCount is a one-line projection onto loopwave.FailedLanes.
 func TestFailedLaneCount_ProjectsToTheLeaf(t *testing.T) {
 	fset := token.NewFileSet()
 	f, err := parser.ParseFile(fset, "cmd_loop_window.go", nil, 0)

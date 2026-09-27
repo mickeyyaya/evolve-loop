@@ -1,28 +1,5 @@
 package core
 
-// infra_teardown_single_source_test.go — RED contract for cycle-1166 Task 2
-// (infra-teardown-predicate-single-source, inbox weight 0.86).
-//
-// The union predicate "is this a bridge infra teardown?" —
-//
-//	errors.Is(err, ErrArtifactTimeout) || errors.Is(err, ErrTransientBridgeFailure)
-//
-// — now has a single-source home (core.IsInfraTeardownError, errors.go:81) but
-// is STILL hand-spelled at call sites (most notably optionalInfraSkip in
-// orchestrator.go, which spells the De Morgan negation
-// `!errors.Is(err, ErrArtifactTimeout) && !isTransientBridgeError(err)`).
-// That is the 7th spelling of one concept: if a THIRD teardown sentinel is ever
-// added, every hand-spelled site must be found and updated or the definitions
-// silently diverge.
-//
-// This is a BEHAVIOR-PRESERVING refactor, so most assertions here are pins that
-// must stay green before AND after (they encode "you did not change semantics").
-// The one genuinely RED assertion is the UNIQUENESS scan.
-//
-// The item's own loudest warning is the anti-goal: "this item's whole risk is a
-// blind widen of a timeout-only or transient-only site into the union." The
-// negative tests below encode exactly that.
-
 import (
 	"errors"
 	"fmt"
@@ -38,10 +15,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
-// TestIsInfraTeardownError_UnionSemantics pins the single source's meaning:
-// BOTH sentinels (wrapped or bare) are infra teardowns; nothing else is.
-// Must stay green across the refactor — it is the contract every adopting site
-// inherits.
 func TestIsInfraTeardownError_UnionSemantics(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -63,10 +36,6 @@ func TestIsInfraTeardownError_UnionSemantics(t *testing.T) {
 	}
 }
 
-// TestIsTransientBridgeError_StaysTransientOnly is the ANTI-WIDEN negative test
-// the item calls its whole risk. isTransientBridgeError is a COMPONENT of the
-// union, not the union: it must keep returning false for ErrArtifactTimeout.
-// A "consolidation" that aliases it to IsInfraTeardownError fails here.
 func TestIsTransientBridgeError_StaysTransientOnly(t *testing.T) {
 	if !isTransientBridgeError(ErrTransientBridgeFailure) {
 		t.Error("isTransientBridgeError must still match ErrTransientBridgeFailure — it is the reusable transient-only component")
@@ -80,12 +49,6 @@ func TestIsTransientBridgeError_StaysTransientOnly(t *testing.T) {
 	}
 }
 
-// TestOptionalInfraSkip_InfraGateUnchangedAfterConsolidation pins the
-// behavior of the single loudest adoption site named by the item
-// (orchestrator.go optionalInfraSkip, whose guard is exactly
-// !IsInfraTeardownError(err)). Adopting the helper must not change ANY of these
-// verdicts — including the negative, which forbids collapsing the infra gate
-// into "always skip".
 func TestOptionalInfraSkip_InfraGateUnchangedAfterConsolidation(t *testing.T) {
 	o := amplNewSkipOrchestrator(t, nil, nil, optionalSpecFor("learn"))
 
@@ -108,13 +71,6 @@ func TestOptionalInfraSkip_InfraGateUnchangedAfterConsolidation(t *testing.T) {
 	}
 }
 
-// TestOptionalInfraSkip_GateAgreesWithIsOptionalSkippableError pins the gate
-// to its single-source predicate: for a phase that clears every OTHER guard
-// (optional, off-floor, non-mandatory), optionalInfraSkip's verdict must equal
-// IsOptionalSkippableError's verdict for every error shape — infra teardown
-// AND the missing-persona class (cycle-1551) alike. If these ever disagree,
-// the site has grown a private error taxonomy and must be re-single-sourced
-// through core/errors.go before any consolidation touches it.
 func TestOptionalInfraSkip_GateAgreesWithIsOptionalSkippableError(t *testing.T) {
 	o := amplNewSkipOrchestrator(t, nil, nil, optionalSpecFor("learn"))
 	for _, err := range []error{
@@ -133,20 +89,6 @@ func TestOptionalInfraSkip_GateAgreesWithIsOptionalSkippableError(t *testing.T) 
 	}
 }
 
-// TestInfraTeardownUnion_SpelledExactlyOnce is the RED uniqueness scan (AC-2:
-// "a grep-style assertion documents that (timeout OR transient) is spelled
-// exactly ONCE via IsInfraTeardownError").
-//
-// It parses every non-test .go file in this package and counts boolean
-// expressions that combine the two sentinels — in either polarity:
-//
-//	errors.Is(e, ErrArtifactTimeout) || errors.Is(e, ErrTransientBridgeFailure)   (union)
-//	!errors.Is(e, ErrArtifactTimeout) && !isTransientBridgeError(e)               (De Morgan)
-//
-// Exactly one such expression may exist: the body of IsInfraTeardownError.
-// This is a UNIQUENESS assertion, not a "source contains string X" check — it
-// cannot be satisfied by ADDING text, only by REMOVING the duplicate spellings,
-// so it is not a degenerate source-grep predicate.
 func TestInfraTeardownUnion_SpelledExactlyOnce(t *testing.T) {
 	sites, err := findInfraTeardownUnionSpellings(".")
 	if err != nil {

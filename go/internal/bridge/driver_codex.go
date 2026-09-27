@@ -7,15 +7,10 @@ import (
 	"strings"
 )
 
-// codexDriver is the OpenAI Codex CLI driver — the Go port of
-// drivers/codex.sh (`codex exec --output-last-message`). Codex exposes no
-// --permission-mode FLAG (it uses approval_policy/sandbox_mode instead), so it
-// rejects permission_mode loudly rather than silently ignoring an operator's
-// safety declaration. NOTE: this is about the flag, not the feature — codex DOES
-// have plan mode (0.147.0 ships collaboration_modes graduated-on; entry is
-// `/plan` or Shift+Tab, in-session). An earlier form of this comment said "codex
-// has no claude-style plan mode" and was read as settling the capability
-// question; see docs/incidents/2026-08-27-plan-mode-dialog-blind-spot.md.
+// codexDriver is the OpenAI Codex CLI driver (`codex exec --output-last-message`). Codex exposes no
+// --permission-mode flag (it uses approval_policy/sandbox_mode instead), so it rejects permission_mode
+// loudly rather than silently ignoring an operator's safety declaration; this is about the flag, not the
+// feature — codex does have its own in-session plan mode (collaboration_modes, entered via /plan or Shift+Tab).
 type codexDriver struct{}
 
 func (codexDriver) Name() string { return "codex" }
@@ -33,8 +28,7 @@ func (codexDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, err
 	if cfg.SessionName != "" {
 		fmt.Fprintf(deps.Stderr, "[codex] NOTE: --session-name='%s' is no-op for this driver (single-shot process).\n", cfg.SessionName)
 	}
-	// Credential-isolation guard (drivers/codex.sh): an ambient
-	// OPENAI_API_KEY would be inherited by the in-process inner CLI.
+	// Credential-isolation guard: an ambient OPENAI_API_KEY would be inherited by the in-process inner CLI.
 	if v, ok := lookupEnv(deps, "OPENAI_API_KEY"); ok && v != "" {
 		if allow, _ := lookupEnv(deps, "BRIDGE_ALLOW_OPENAI_API_KEY"); allow != "1" {
 			fmt.Fprintln(deps.Stderr, "[codex] credential-isolation guard: OPENAI_API_KEY set without BRIDGE_ALLOW_OPENAI_API_KEY=1")
@@ -47,13 +41,10 @@ func (codexDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, err
 		return ExitBadFlags, err
 	}
 
-	// Single tier table (inbox codex-tier-map-single-source): this driver's
-	// manifest (codex.json) declares no map of its own — its model_tier_map_from
-	// points at the codex FAMILY table (codex-tmux.json) and LoadManifest adopts
-	// it — and the driver resolves through the shared realizer ladder, carrying
-	// no table of its own. A manifest that cannot load (own or family) leaves the
-	// value untranslated — the vocabulary guard below then omits -m (the CLI
-	// default beats a fatal boot) and the WARN names the cause.
+	// This driver's manifest declares no model_tier_map of its own; it points at the codex family table via
+	// model_tier_map_from and resolves through the shared realizer ladder. A manifest that fails to load
+	// (own or family) leaves the value untranslated, and the vocabulary guard below omits -m rather than
+	// fatal-booting.
 	man, merr := LoadManifest(cfg.CLI)
 	if merr != nil {
 		fmt.Fprintf(deps.Stderr, "[codex] WARN: manifest unavailable (%v) — tier not translated\n", merr)
@@ -62,8 +53,6 @@ func (codexDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, err
 	args := []string{"exec", "--output-last-message", cfg.Artifact}
 	switch {
 	case resolved == "" || isUnresolvedModelToken(resolved):
-		// Was `resolved == "auto"`; widened to the shared vocabulary so an
-		// untranslated TIER name is omitted here too, not just the sentinel.
 		fmt.Fprintf(deps.Stderr, "[codex] model='%s' → omitting -m (codex picks default)\n", cfg.Model)
 	case isCodexModelName(resolved):
 		args = []string{"exec", "-m", resolved, "--output-last-message", cfg.Artifact}
@@ -71,15 +60,13 @@ func (codexDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, err
 	default:
 		fmt.Fprintf(deps.Stderr, "[codex] WARN: unrecognized model '%s' — omitting -m\n", resolved)
 	}
-	// Codex's SECOND model layer (2026-08-15 operator directive): pin the
-	// reasoning effort so the headless path never runs the CLI's own default —
-	// mirrors the tmux manifest's params.effort default=high. Skipped when the
-	// caller already set one (raw flags / extra flags own the override).
+	// Codex's second model layer: pin the reasoning effort so the headless path never runs the CLI's own
+	// default, mirroring the tmux manifest's params.effort default=high; skipped when the caller already set one.
 	if !argsContainEffort(cfg.Realization.LaunchFlags) && !argsContainEffort(cfg.ExtraFlags) {
 		args = append(args, "-c", "model_reasoning_effort=high")
 	}
-	args = append(args, cfg.Realization.LaunchFlags...) // profile raw flags (extra_flags_by_cli["codex"])
-	args = append(args, cfg.ExtraFlags...)              // direct `--` pass-through
+	args = append(args, cfg.Realization.LaunchFlags...)
+	args = append(args, cfg.ExtraFlags...)
 
 	stdoutF, stderrF, closeFn, err := openDriverLogs(cfg)
 	if err != nil {
@@ -87,8 +74,7 @@ func (codexDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, err
 	}
 	defer closeFn()
 
-	// codex reads the prompt on stdin.
-	// Workstream B: sandbox-confine source-writing phases (CLI-agnostic).
+	// codex reads the prompt on stdin; sandbox-confines source-writing phases (CLI-agnostic).
 	name, args, wrapped := wrapHeadlessInvocation(deps, cfg, resolveBinary(deps, "codex"), args)
 	if sandboxRequiredButUnavailable(deps, cfg, wrapped) {
 		fmt.Fprintln(deps.Stderr, "[codex] safety gate: activated Build explanation contract requires OS sandbox confinement")
@@ -110,8 +96,7 @@ func (codexDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, err
 	return rc, nil
 }
 
-// isCodexModelName reports whether m looks like a codex-acceptable model
-// id (the prefixes drivers/codex.sh passes via -m).
+// isCodexModelName reports whether m looks like a codex-acceptable model id.
 func isCodexModelName(m string) bool {
 	for _, p := range []string{"gpt-", "o-", "o1", "o3", "o4", "codex"} {
 		if strings.HasPrefix(m, p) {
@@ -123,9 +108,8 @@ func isCodexModelName(m string) bool {
 
 func init() { Register(codexDriver{}) }
 
-// argsContainEffort reports whether an arg vector already carries a
-// model_reasoning_effort override — the headless default must never duplicate
-// or fight an explicit caller choice.
+// argsContainEffort reports whether an arg vector already carries a model_reasoning_effort override; the
+// headless default must never duplicate or fight an explicit caller choice.
 func argsContainEffort(args []string) bool {
 	for _, a := range args {
 		if strings.Contains(a, "model_reasoning_effort=") {

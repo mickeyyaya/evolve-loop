@@ -11,15 +11,6 @@ import (
 
 func salvageNow() time.Time { return time.Date(2026, 8, 5, 23, 0, 0, 0, time.UTC) }
 
-// TestSalvageProbeDiagnostics_DurableBeforeTeardown: the probe's scratch
-// workspace is deleted after every refresh, but the bridge writes diagnostics
-// there that must OUTLIVE it (adversarial-review HIGH: a quota wall mid-probe
-// writes escalation-report.json with the repair instructions, then the
-// deferred RemoveAll deleted the only copy — silent loss on a documented
-// failure class). Salvage copies escalation reports (timestamped),
-// launch-error files, and APPENDS llm-calls.ndjson records to the durable
-// token-telemetry ledger under evolveDir/models-probe, WARNing loudly with
-// the salvaged paths.
 func TestSalvageProbeDiagnostics_DurableBeforeTeardown(t *testing.T) {
 	t.Parallel()
 	scratch, evolveDir := t.TempDir(), t.TempDir()
@@ -68,8 +59,6 @@ func TestSalvageProbeDiagnostics_DurableBeforeTeardown(t *testing.T) {
 	}
 }
 
-// TestSalvageProbeDiagnostics_QuietWhenNothingToSalvage: a clean probe leaves
-// no diagnostics; salvage must not create the durable dir or log noise.
 func TestSalvageProbeDiagnostics_QuietWhenNothingToSalvage(t *testing.T) {
 	t.Parallel()
 	scratch, evolveDir := t.TempDir(), t.TempDir()
@@ -105,12 +94,6 @@ func TestSalvageProbeDiagnostics_PathCannotInjectLogLines(t *testing.T) {
 	}
 }
 
-// The tag path IS the collision fix (parallel per-family salvage into the
-// shared durable home): two same-second probes with different tags must land
-// as two distinct durable files for BOTH the stamped escalation report and
-// the un-stamped launch-error name. An implementation that ignores the tag
-// passes every other test while last-write-wins destroys a sibling family's
-// diagnostics — the exact class ADR-0049 N15 closed for tmux session names.
 func TestSalvageProbeDiagnostics_TagsKeepConcurrentFamiliesDistinct(t *testing.T) {
 	t.Parallel()
 	evolveDir := t.TempDir()

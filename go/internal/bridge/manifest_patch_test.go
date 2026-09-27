@@ -71,7 +71,7 @@ func TestAddRule_RoundTrip(t *testing.T) {
 	useBridgeManifestDir(t, t.TempDir())
 	rule := ManifestPrompt{Name: "covrule", Regex: "WIDGET", ResponseKeys: "y,Enter", Policy: "auto_respond", Note: "test"}
 
-	path, err := AddRule("claude-p", rule) // loads embedded, appends, writes override
+	path, err := AddRule("claude-p", rule)
 	if err != nil {
 		t.Fatalf("AddRule err: %v", err)
 	}

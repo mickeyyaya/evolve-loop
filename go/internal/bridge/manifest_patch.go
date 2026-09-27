@@ -7,20 +7,12 @@ import (
 	"path/filepath"
 )
 
-// manifest_patch.go — the Go port of lib/manifest-patcher.sh (`bridge
-// add-rule`): turn an escalation into a permanent interactive_prompts
-// rule. Since the manifests are go:embed (read-only at runtime), the
-// patched manifest is written to the writable override directory that
-// LoadManifest consults first.
-
-// marshalIndent is json.MarshalIndent behind a var so the (otherwise
-// unreachable) marshal-error path in AddRule is testable.
+// marshalIndent is json.MarshalIndent behind a var, so AddRule's otherwise-unreachable marshal-error path
+// is testable.
 var marshalIndent = json.MarshalIndent
 
-// AppendInteractiveRule validates and appends rule to prompts, returning a
-// new slice. Mirrors manifest_append_rule's checks: name/regex/policy
-// required; policy ∈ {auto_respond, escalate}; auto_respond needs keys;
-// duplicate name rejected.
+// AppendInteractiveRule validates rule (name, regex, policy required; policy ∈ {auto_respond, escalate};
+// auto_respond needs keys; duplicate name rejected) and returns a new slice with it appended.
 func AppendInteractiveRule(prompts []ManifestPrompt, rule ManifestPrompt) ([]ManifestPrompt, error) {
 	if rule.Name == "" || rule.Regex == "" || rule.Policy == "" {
 		return nil, fmt.Errorf("bridge:add-rule: name, regex, policy are required")
@@ -41,9 +33,8 @@ func AppendInteractiveRule(prompts []ManifestPrompt, rule ManifestPrompt) ([]Man
 	return append(append([]ManifestPrompt(nil), prompts...), rule), nil
 }
 
-// AddRule loads cli's current manifest (override or embedded), appends
-// rule, and writes the result to the override dir. Returns the written
-// path. The bridge then auto-responds to the rule on the next run.
+// AddRule loads cli's current manifest (override or embedded), appends rule, and writes the result to the
+// override dir, returning the written path.
 func AddRule(cli string, rule ManifestPrompt) (string, error) {
 	m, err := LoadManifest(cli)
 	if err != nil {

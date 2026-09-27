@@ -1,11 +1,3 @@
-// cmd_loop_wave_seed_test.go — regression for the wave-planner fresh-start/reset
-// blocker (inbox wave-planner-requires-prior-cycle-triage-decision, 0.9).
-//
-// productionWavePlanFn used to hard-error when the prior cycle's
-// triage-decision.json was absent (fresh loop, `evolve cycle reset` sealed the
-// run dir, or a failed prior cycle), forcing a sequential fallback that never
-// runs 2-wide — AND is the only path that leaks into the main tree. It now seeds
-// the wave from the durable inbox backlog. These tests pin the seed.
 package main
 
 import (
@@ -41,7 +33,6 @@ func TestSeedWavePlanFromInbox_SynthesizesTopNDecision(t *testing.T) {
 	if err != nil {
 		t.Fatalf("seedWavePlanFromInbox: %v", err)
 	}
-	// The synthesized decision must parse as fleet.PlanFromTriage expects (top_n[].id).
 	var decision struct {
 		TopN []struct {
 			ID string `json:"id"`
@@ -62,17 +53,11 @@ func TestSeedWavePlanFromInbox_FewerThanTwoTodosErrors(t *testing.T) {
 		t.Fatal(err)
 	}
 	writeInboxItem(t, inbox, "a.json", "only", 0.90)
-	// One todo cannot fill a 2-lane wave — must error so the caller falls back to sequential.
 	if _, err := seedWavePlanFromInbox(dir, 2); err == nil {
 		t.Error("seedWavePlanFromInbox with 1 inbox todo must return an error (can't seed a >= 2-lane wave)")
 	}
 }
 
-// TestProductionWavePlanFn_SeedsFromInboxWhenNoPriorDecision pins the load-bearing
-// seam: when the prior cycle's triage-decision is unavailable (fresh start, reset,
-// or a failed prior cycle — modeled here by a storage read error), the planFn
-// falls through to the inbox seed instead of erroring the wave into a sequential
-// fallback.
 func TestProductionWavePlanFn_SeedsFromInboxWhenNoPriorDecision(t *testing.T) {
 	dir := t.TempDir()
 	inbox := filepath.Join(dir, "inbox")

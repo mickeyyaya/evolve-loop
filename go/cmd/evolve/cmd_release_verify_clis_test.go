@@ -21,7 +21,6 @@ func okDeps() matrixDeps {
 	}
 }
 
-// resultFor returns the matrix row whose CLI equals key (ok=false if absent).
 func resultFor(results []cliVerify, key string) (cliVerify, bool) {
 	for _, r := range results {
 		if r.CLI == key {
@@ -31,8 +30,6 @@ func resultFor(results []cliVerify, key string) (cliVerify, bool) {
 	return cliVerify{}, false
 }
 
-// TestVerifyReleaseCLIMatrix_AllPass: with every dep succeeding, every supported
-// CLI plus the binary-subcommand row must report OK.
 func TestVerifyReleaseCLIMatrix_AllPass(t *testing.T) {
 	results := verifyReleaseCLIMatrix("/src", "/bin/evolve", okDeps())
 
@@ -50,9 +47,6 @@ func TestVerifyReleaseCLIMatrix_AllPass(t *testing.T) {
 	}
 }
 
-// TestVerifyReleaseCLIMatrix_MissingSubcommand: a release binary that does not
-// answer a core subcommand must fail the binary row and NAME the offender — this
-// is the "installed skills silently break" regression the gate exists to catch.
 func TestVerifyReleaseCLIMatrix_MissingSubcommand(t *testing.T) {
 	d := okDeps()
 	d.binAnswers = func(binPath, sub string) error {
@@ -70,14 +64,11 @@ func TestVerifyReleaseCLIMatrix_MissingSubcommand(t *testing.T) {
 	if !strings.Contains(r.Detail, "loop") {
 		t.Errorf("binary row must name the missing subcommand 'loop', got: %s", r.Detail)
 	}
-	// A binary fault must not be misattributed to a CLI install.
 	if c, _ := resultFor(results, "claude"); !c.OK {
 		t.Errorf("claude install should still be OK; a binary fault must not bleed into a CLI row: %s", c.Detail)
 	}
 }
 
-// TestVerifyReleaseCLIMatrix_OneCLIFails: a per-CLI projection failure must fail
-// exactly that CLI and leave the others green (isolation).
 func TestVerifyReleaseCLIMatrix_OneCLIFails(t *testing.T) {
 	d := okDeps()
 	d.projectTarget = func(srcDir, target string) error {
@@ -98,8 +89,6 @@ func TestVerifyReleaseCLIMatrix_OneCLIFails(t *testing.T) {
 	}
 }
 
-// TestVerifyReleaseCLIMatrix_AllFailVisible: when every CLI fails, every failure
-// is reported (no early return hiding later CLIs).
 func TestVerifyReleaseCLIMatrix_AllFailVisible(t *testing.T) {
 	d := matrixDeps{
 		installClaude: func(string, string) error { return errTest },
@@ -115,9 +104,6 @@ func TestVerifyReleaseCLIMatrix_AllFailVisible(t *testing.T) {
 	}
 }
 
-// TestCoreSubcommandsRegistered: every name in coreSubcommands must be a real
-// registered command — the SSOT must not drift to a subcommand that does not
-// exist, or the gate would demand the impossible.
 func TestCoreSubcommandsRegistered(t *testing.T) {
 	registered := map[string]bool{}
 	for _, c := range commands {
@@ -133,11 +119,8 @@ func TestCoreSubcommandsRegistered(t *testing.T) {
 	}
 }
 
-// TestBinAnswersStartFailureIsLoud exercises the REAL default binAnswers (not a
-// stub): a binary that cannot be started at all (missing/not executable) must
-// surface a hard error, never a silent OK. "The smoke never ran" must never be
-// mistaken for "the subcommand answered" — without distinguishing start failure
-// from an *exec.ExitError, an unstarted binary would falsely pass the gate.
+// TestBinAnswersStartFailureIsLoud exercises the real default binAnswers, not a
+// stub, so a genuinely missing binary is exercised.
 func TestBinAnswersStartFailureIsLoud(t *testing.T) {
 	d := defaultMatrixDeps()
 	if err := d.binAnswers(filepath.Join(t.TempDir(), "does-not-exist-evolve"), "loop"); err == nil {

@@ -15,7 +15,6 @@ func runModelsCLI(args ...string) (int, string, string) {
 	return code, out.String(), errb.String()
 }
 
-// seedCatalog writes a small catalog into a fresh temp .evolve dir.
 func seedCatalog(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -51,8 +50,6 @@ func TestModelsListEmpty(t *testing.T) {
 }
 
 func TestModelsListEmptyJSON(t *testing.T) {
-	// `list --json` on a fresh repo must emit an explicit empty signal, not a
-	// zero-value {"clis":null}.
 	code, out, _ := runModelsCLI("list", "--evolve-dir", t.TempDir(), "--json")
 	if code != 0 {
 		t.Fatalf("code=%d", code)
@@ -76,9 +73,6 @@ func TestModelsListHuman(t *testing.T) {
 	}
 }
 
-// TestModelsListJSONFlagOrdering is the regression guard for the reorderArgs
-// value-flag bug: `--json` AFTER `--evolve-dir <path>` must still emit JSON,
-// not fall through to the human/empty path.
 func TestModelsListJSONFlagOrdering(t *testing.T) {
 	dir := seedCatalog(t)
 	cases := [][]string{

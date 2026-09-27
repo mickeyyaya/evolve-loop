@@ -1,11 +1,3 @@
-// cmd_loop_wave.go — the unit-13 wave seam (ADR-0103). The wave engine —
-// the sequential-vs-wave gate, the ONE dispatch body the fan-out and the
-// min-width repair share, the fleet-config loaders, the freshness-gated
-// launcher, the quota/budget sizing and the plan source — lives in
-// internal/loopwave. This file keeps the engine's ONE wired construction
-// (newWaveEngine), the coordinator's accessor pair (wave / wiredWave) and the
-// Strangler Fig facades the pool scheduler, the budget wrapper and the
-// by-name tests keep, so no production call site learned the unit exists.
 package main
 
 import (
@@ -30,10 +22,6 @@ type (
 	wavePlanFn   = loopwave.PlanFn
 )
 
-// newWaveEngine is the ONE loopwave.New( site (TestWaveEngine_OneConstructionSite):
-// the lane-routing predicate, the prior-cycle readers over the
-// host's storage, and fleet.QuotaAwareCount as the bench shrink — the shrink
-// IS wired into the live wave path (acs/cycle467), by code.
 func newWaveEngine(cfg loopConfig, storage core.Storage, warn io.Writer, signals func() *signalcenter.Center) *loopwave.Engine {
 	roots := loopwave.Roots{ProjectRoot: cfg.ProjectRoot, EvolveDir: cfg.EvolveDir}
 	ports := loopwave.Ports{
@@ -45,12 +33,9 @@ func newWaveEngine(cfg loopConfig, storage core.Storage, warn io.Writer, signals
 	return loopwave.New(roots, ports, warn, loopwave.WithSignals(signals))
 }
 
-// wave returns the coordinator's wave engine, lazily built and cached: the
-// coordinator is assembled as a literal (cmd_loop.go and the loop tests), so
-// there is no constructor to build it eagerly in. The cache is unsynchronized
-// by design: one batch is driven by ONE goroutine (the lanes are
-// subprocesses), so wave() is never called concurrently — a caller that
-// parallelizes iteration prep must build the engine eagerly instead.
+// The cache is unsynchronized: a batch runs on one goroutine, so wave() is
+// never called concurrently — a caller that parallelizes iteration prep must
+// build the engine eagerly instead.
 func (b *loopBatchCoordinator) wave() *loopwave.Engine {
 	if b.waveEngine == nil {
 		b.waveEngine = b.wiredWave()
@@ -58,29 +43,21 @@ func (b *loopBatchCoordinator) wave() *loopwave.Engine {
 	return b.waveEngine
 }
 
-// wiredWave builds the engine over the batch's config, storage, console and
-// Center — the Center through an accessor, read live.
 func (b *loopBatchCoordinator) wiredWave() *loopwave.Engine {
 	return newWaveEngine(b.cfg, b.deps.Storage, b.stderr, func() *signalcenter.Center { return b.deps.Signals })
 }
 
-// nilSignals is the Null-Center accessor of the facades below.
 func nilSignals() *signalcenter.Center { return nil }
 
 // nullWaveEngine builds a Null-Center engine over roots for the facades that
 // carry no storage (the pool's resolver, the budget wrapper, the launcher):
-// the plan port is never reached on their paths. roots is never half
-// populated: loopwave.RootsOf(projectRoot) where a facade has a root (both
-// halves derived the production way), the zero loopwave.Roots{} where it has
-// none (the pure dispatch facades reach no root) —
-// TestNullWaveEngine_EveryConstructionCarriesBothRootsOrNone.
+// the plan port is never reached on their paths.
 func nullWaveEngine(roots loopwave.Roots, warn io.Writer) *loopwave.Engine {
 	return newWaveEngine(loopConfig{ProjectRoot: roots.ProjectRoot, EvolveDir: roots.EvolveDir}, nil, warn, nilSignals)
 }
 
 // --- production facades: spellings kept for cmd_loop_batch.go, cmd_loop_window.go, cmd_loop_pool.go, cli_wave_budget.go ---
 
-// shouldRunWave is the ONE sequential-vs-wave decision (loopwave.ShouldRunWave).
 func shouldRunWave(fc policy.FleetConfig) bool { return loopwave.ShouldRunWave(fc) }
 
 // loadFleetConfig is the batch-start loader (defaults on any error).
@@ -108,17 +85,15 @@ func quotaAwareWaveConfig(fc policy.FleetConfig, projectRoot string, warn io.Wri
 	return nullWaveEngine(loopwave.RootsOf(projectRoot), warn).Size(fc, states, tp, now)
 }
 
-// seedWavePlanFromInbox seeds a wave plan from the inbox backlog.
 func seedWavePlanFromInbox(evolveDir string, count int) ([]byte, error) {
 	return loopwave.SeedWavePlanFromInbox(evolveDir, count, laneForbidden(filepath.Dir(evolveDir), os.Stderr))
 }
 
-// widenNarrowDecision widens a narrow prior decision to fleet width.
 func widenNarrowDecision(data []byte, evolveDir string, count int) []byte {
 	return loopwave.WidenNarrowDecision(data, evolveDir, count, laneForbidden(filepath.Dir(evolveDir), os.Stderr))
 }
 
-// --- test/ACS-only facades: ZERO production callers (TestWaveEngine_OneConstructionSite); the coordinator drives the engine ---
+// --- test/ACS-only facades: no production call site reaches these; the coordinator drives the engine directly ---
 
 // dispatchIteration is the by-name facade of Engine.Dispatch over a Null
 // Center (its WARN is the coordinator's to render).
@@ -127,7 +102,6 @@ func dispatchIteration(ctx context.Context, fc policy.FleetConfig, preflight fun
 	return out.Ran, out.Specs, out.Results, err
 }
 
-// forceOneLaneDispatch is the by-name facade of Engine.ForceOneLane.
 func forceOneLaneDispatch(ctx context.Context, preflight func() error, planFn wavePlanFn, launcher waveLauncher, routed fleet.RoutedFn, waveIndex int) (ran bool, specs []fleet.CycleSpec, results []fleet.Result, err error) {
 	out, err := nullWaveEngine(loopwave.Roots{}, io.Discard).ForceOneLane(ctx, loopwave.DispatchRequest{Wave: waveIndex, Preflight: preflight, Plan: planFn, Launcher: launcher, Routed: routed})
 	return out.Ran, out.Specs, out.Results, err

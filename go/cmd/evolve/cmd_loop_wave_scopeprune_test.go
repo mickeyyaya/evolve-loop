@@ -1,35 +1,5 @@
 package main
 
-// cmd_loop_wave_scopeprune_test.go — RED tests for cycle-1172, inbox item
-// `wave-planner-pass-scope-prune` (scout task wave-planner-plan-time-scope-prune).
-//
-// THE GAP: productionWavePlanFn's PRIMARY path reads the prior cycle's
-// triage-decision.json and widens it (widenNarrowDecision). Nothing on that
-// path re-resolves each top_n id against the inbox lifecycle, so an id that was
-// consumed — moved to inbox/processed|rejected|retry/ — during an earlier wave
-// is still planned into the NEXT wave's lane-scope.json (one confirmed
-// instance: cycle-1116). The dispatch-time freshness gate
-// (productionFreshnessProbe / freshnessGatedLauncher) then skips it, so the
-// lane does not actually re-execute the dead work — but the PLAN is still
-// wrong: lane-scope.json advertises work that no longer exists, which is what
-// every downstream reader (operator, dossier, retro) sees.
-//
-// CONTRACT for Builder (do NOT modify these tests — implement production code):
-//
-//  1. Before the plan is returned, productionWavePlanFn drops every top_n id
-//     whose inboxmover.ResolveDispatchState is a CONSUMED state (processed,
-//     rejected, retry). Reuse ResolveDispatchState — the same resolver the
-//     dispatch-time probe already uses. No second bookkeeping file (the inbox
-//     item's own fix note).
-//  2. Prune BEFORE widening, so the freed lane slots are refilled from the live
-//     backlog instead of being lost.
-//  3. FAIL OPEN: `pending` ids and ids with NO lifecycle evidence (`unknown` —
-//     not every planned id is inbox-backed) are retained untouched. Over-
-//     pruning would starve the wave, which is strictly worse than the stale
-//     entry this fixes.
-//  4. The dispatch-time freshness gate STAYS as defense in depth — this is a
-//     plan-hygiene addition, not a replacement.
-
 import (
 	"context"
 	"encoding/json"
@@ -122,11 +92,6 @@ func containsID(ids []string, want string) bool {
 	return false
 }
 
-// TestProductionWavePlanFn_PrunesConsumedScopeFromPriorDecision is the crux
-// (the cycle-1116 shape): `gamma` was consumed during the prior wave and now
-// lives in inbox/processed/, yet the prior decision still lists it. The next
-// wave's plan must not re-pick it. RED today: the primary path never consults
-// the lifecycle, so gamma survives into lane-scope.json.
 func TestProductionWavePlanFn_PrunesConsumedScopeFromPriorDecision(t *testing.T) {
 	cfg := scopePruneEnv(t, 7, []map[string]any{
 		{"id": "alpha", "files": []string{"go/internal/alpha/alpha.go"}},
@@ -149,11 +114,6 @@ func TestProductionWavePlanFn_PrunesConsumedScopeFromPriorDecision(t *testing.T)
 	}
 }
 
-// TestProductionWavePlanFn_KeepsPendingAndUnknownScopes is the fail-open
-// NEGATIVE: a pending id and an id with NO inbox evidence at all must both
-// survive. A prune that keeps only ids it can positively confirm as pending
-// would starve every non-inbox-backed lane — strictly worse than the stale
-// entry being fixed.
 func TestProductionWavePlanFn_KeepsPendingAndUnknownScopes(t *testing.T) {
 	cfg := scopePruneEnv(t, 4, []map[string]any{
 		{"id": "alpha", "files": []string{"go/internal/alpha/alpha.go"}},
@@ -172,11 +132,6 @@ func TestProductionWavePlanFn_KeepsPendingAndUnknownScopes(t *testing.T) {
 	}
 }
 
-// TestProductionWavePlanFn_AllConsumedStillPlansLiveWork is the edge case: when
-// EVERY id in the prior decision is consumed, the planner must not return an
-// empty/dead plan (which collapses the wave to the sequential fallback — the
-// only path that can leak into the main tree). It must widen from the live
-// backlog instead.
 func TestProductionWavePlanFn_AllConsumedStillPlansLiveWork(t *testing.T) {
 	cfg := scopePruneEnv(t, 9, []map[string]any{
 		{"id": "gamma", "files": []string{"go/internal/gamma/gamma.go"}},

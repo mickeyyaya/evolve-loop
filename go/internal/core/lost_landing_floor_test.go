@@ -1,27 +1,5 @@
 package core
 
-// lost_landing_floor_test.go — a cycle that lost its landing must not report PASS.
-//
-// Live incident (wave-20260822a-verify, 2026-08-22). Two lanes raced one main:
-//
-//	cycle-1536  ship-error GIT_FLEET_REBASE_NEEDED  +  ship-binding commit=adcbddb2  → LANDED
-//	cycle-1535  ship-error GIT_FLEET_REBASE_NEEDED  +  no ship-binding at all        → LOST
-//
-// The recovery machinery behaved CORRECTLY for both: 1535's rebase hit a genuine
-// non-derived conflict on .evolve/evals/pipeline-replay-contract-boundary.md and
-// routed to the debugger, exactly as designed. What went wrong is downstream of
-// that — cycle-1535 closed out with final_verdict PASS. Its audit passed, and
-// nothing at cycle close ever asks whether the cycle's own ship actually landed:
-// finalizeOutcome only reclassifies a SKIPPED verdict, so a PASS from audit
-// stands whether or not ship succeeded.
-//
-// The cost is not cosmetic. A lost landing that reports PASS makes a zero-ship
-// wave read as a builder-quality problem when it is really a landing race, which
-// is the first thing the zero-ship halt protocol tells an operator to rule out.
-//
-// The fixtures are the REAL artifacts from both cycles, because the whole point
-// is that the two are distinguishable ONLY by the presence of ship-binding.json.
-
 import (
 	"context"
 	"os"
@@ -52,7 +30,6 @@ func realCycleWorkspace(t *testing.T, cycleDir string) string {
 	return ws
 }
 
-// THE headline regression: cycle-1535's real artifacts must not read as a PASS.
 func TestDetectLostLanding_RealCycle1535IsNotAPass(t *testing.T) {
 	ws := realCycleWorkspace(t, "cycle-1535")
 	sig := detectLostLanding(ws, VerdictPASS)
@@ -67,8 +44,6 @@ func TestDetectLostLanding_RealCycle1535IsNotAPass(t *testing.T) {
 	}
 }
 
-// The other half of the SAME race must stay clean — otherwise the detector
-// would convert every contended wave into a wall of false alarms.
 func TestDetectLostLanding_RealCycle1536Landed(t *testing.T) {
 	ws := realCycleWorkspace(t, "cycle-1536")
 	if sig := detectLostLanding(ws, VerdictPASS); sig != nil {
@@ -76,16 +51,12 @@ func TestDetectLostLanding_RealCycle1536Landed(t *testing.T) {
 	}
 }
 
-// A cycle that never reached ship (no ship-error, no ship-binding) is not a lost
-// landing — scout-only and audit-FAIL cycles must stay untouched.
 func TestDetectLostLanding_CycleThatNeverShippedIsNotFlagged(t *testing.T) {
 	if sig := detectLostLanding(t.TempDir(), VerdictPASS); sig != nil {
 		t.Fatalf("a cycle with no ship artifacts at all did not lose a landing: %+v", sig)
 	}
 }
 
-// Only a SHIPPING verdict can lose a landing. A cycle already reporting FAIL or
-// WARN is telling the truth and must not be re-flagged.
 func TestDetectLostLanding_OnlyShippingVerdictsAreFlagged(t *testing.T) {
 	ws := realCycleWorkspace(t, "cycle-1535")
 	for _, v := range []string{VerdictFAIL, VerdictWARN, VerdictSKIPPED} {
@@ -95,13 +66,9 @@ func TestDetectLostLanding_OnlyShippingVerdictsAreFlagged(t *testing.T) {
 	}
 }
 
-// An empty workspace path (unit paths, dry runs) must be inert — and inert for
-// the RIGHT reason. filepath.Join("", "ship-error.json") is "ship-error.json",
-// i.e. a read from the process CWD, so without the guard an empty workspace
-// silently inspects whatever happens to be lying in the working directory. That
-// is not hypothetical: a mutation run earlier the same day left a stray record
-// file in a package directory and broke an unrelated suite. Deliberately NOT
-// t.Parallel — it chdirs.
+// filepath.Join("", "ship-error.json") is "ship-error.json", i.e. a read
+// from the process CWD, so without the guard an empty workspace silently
+// inspects the working directory. Deliberately not t.Parallel — it chdirs.
 func TestDetectLostLanding_NoWorkspaceDoesNotReadTheProcessCWD(t *testing.T) {
 	decoy := t.TempDir()
 	if err := os.WriteFile(filepath.Join(decoy, "ship-error.json"),
@@ -126,11 +93,6 @@ func TestDetectLostLanding_NoWorkspaceDoesNotReadTheProcessCWD(t *testing.T) {
 	}
 }
 
-// The signal must not HALT the batch. The recovery machinery handled the
-// conflict correctly and siblings are still working; halting a whole wave every
-// time two lanes contend would be a worse failure than the one being reported.
-// Correcting the verdict is the fix; stopping the batch is a policy call this
-// floor deliberately does not make.
 func TestDetectLostLanding_DoesNotHaltTheBatch(t *testing.T) {
 	sig := detectLostLanding(realCycleWorkspace(t, "cycle-1535"), VerdictPASS)
 	if sig == nil {
@@ -141,8 +103,6 @@ func TestDetectLostLanding_DoesNotHaltTheBatch(t *testing.T) {
 	}
 }
 
-// The corrected verdict must be one the dossier accepts (PASS|WARN|FAIL) and
-// must NOT count as shipped throughput.
 func TestLostLandingVerdict_IsLegalAndNotShipping(t *testing.T) {
 	got := lostLandingVerdict()
 	switch got {
@@ -155,9 +115,6 @@ func TestLostLandingVerdict_IsLegalAndNotShipping(t *testing.T) {
 	}
 }
 
-// THE WIRING TEST. The detector above is correct in isolation; this proves it
-// FIRES from the real cycle-close path. A floor nothing calls is the same defect
-// class it was written to catch.
 func TestFinalizeCycle_LostLandingDowngradesTheVerdictAndRecordsTheSignal(t *testing.T) {
 	ws := realCycleWorkspace(t, "cycle-1535")
 	o := &Orchestrator{storage: &fakeUpdaterStorage{}, gitHEAD: func() (string, error) { return "same-head", nil }}
@@ -178,8 +135,6 @@ func TestFinalizeCycle_LostLandingDowngradesTheVerdictAndRecordsTheSignal(t *tes
 	}
 }
 
-// The sibling that DID land must pass through finalizeCycle untouched — the
-// no-regression half, through the same real path.
 func TestFinalizeCycle_LandedCycleIsUnchanged(t *testing.T) {
 	ws := realCycleWorkspace(t, "cycle-1536")
 	o := &Orchestrator{storage: &fakeUpdaterStorage{}, gitHEAD: func() (string, error) { return "same-head", nil }}

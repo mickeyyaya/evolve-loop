@@ -6,10 +6,6 @@ import (
 	"testing"
 )
 
-// coverage_test.go — exhaustive coverage of pure helpers, the driver
-// registry, and the env/flag glue. Pairs with exec_integration_test.go
-// (real exec/tmux) to drive internal/bridge to 100%.
-
 func mustPanic(t *testing.T, fn func()) {
 	t.Helper()
 	defer func() {
@@ -26,9 +22,8 @@ type stubDriver struct{ name string }
 func (s stubDriver) Name() string                                     { return s.name }
 func (stubDriver) Launch(context.Context, *Config, Deps) (int, error) { return 0, nil }
 
-// registerBuiltins re-registers the seven production drivers after a
-// ResetDriversForTesting, so the global registry is restored for other tests.
-// WS-F added ollama-tmux as the seventh peer.
+// registerBuiltins re-registers the seven production drivers after a ResetDriversForTesting, so the
+// global registry is restored for other tests.
 func registerBuiltins() {
 	Register(claudePDriver{})
 	Register(codexDriver{})
@@ -40,10 +35,8 @@ func registerBuiltins() {
 }
 
 func TestDriverRegistry(t *testing.T) {
-	// DriverNames over the real (init-registered) set. Strict count: an
-	// accidental init() registration (e.g. a test stub forgetting deferred
-	// cleanup) gets caught immediately; a deliberate addition explicitly
-	// bumps this constant.
+	// Strict count over the real (init-registered) set: an accidental init() registration (e.g. a test
+	// stub forgetting deferred cleanup) gets caught immediately; a deliberate addition bumps this constant.
 	names := DriverNames()
 	if len(names) != 7 {
 		t.Fatalf("DriverNames = %v (len %d), want exactly 7 builtins", names, len(names))
@@ -54,7 +47,6 @@ func TestDriverRegistry(t *testing.T) {
 		}
 	}
 
-	// Reset → empty → register a stub → lookup hit, then restore builtins.
 	ResetDriversForTesting()
 	defer func() { ResetDriversForTesting(); registerBuiltins() }()
 	if len(DriverNames()) != 0 {

@@ -1,11 +1,5 @@
 package bridge
 
-// launch_outcome_seam_test.go — ADR-0103 unit 10, the host seam: the exit
-// numerics, the marker and the timeout-cause vocabulary are ONE belief with
-// the leaf (consumer pins), the classifier is called from exactly one host
-// site per projection, and the driver's marker line round-trips through the
-// classifier's vocabulary (design §6 tests 36-38).
-
 import (
 	"os"
 	"path/filepath"
@@ -16,9 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/launchoutcome"
 )
 
-// Test 36 — the host's spellings ARE the leaf's values: the 11 exit literals
-// (kept in exitcodes.go for acs/cycle1580's source scan), the marker alias,
-// the seven typed cause aliases and the artifactTimeoutSummary facade.
 func TestExitCodes_HostAliasesAreTheLeafValues(t *testing.T) {
 	for name, pair := range map[string][2]int{
 		"ExitOK":               {ExitOK, launchoutcome.ExitOK},
@@ -107,11 +98,6 @@ func nonTestSourcesMentioning(t *testing.T, needle string) []string {
 	return hits
 }
 
-// Test 37 — one classification site, one ledger projection, two gauntlet
-// sites: the classifier's projections are called from exactly the declared
-// host files (a second Classify call would split the wire belief); the
-// signal code is a column of the one Outcome Classify returns, so it has no
-// projection site of its own.
 func TestLaunchOutcome_OneClassificationSite(t *testing.T) {
 	for needle, want := range map[string][]string{
 		"launchoutcome.Classify(":  {"internal/bridge/engine.go"},
@@ -125,8 +111,6 @@ func TestLaunchOutcome_OneClassificationSite(t *testing.T) {
 	}
 }
 
-// Test 38 — every cause the driver can select renders a marker line the
-// classifier admits as that cause: the emitter's set IS the parser's set.
 func TestTimeoutCauseVocabulary_DriverAndClassifierAgree(t *testing.T) {
 	evidence := []artifactTimeoutEvidence{
 		{cancellationErr: errCancelledForTest{}},

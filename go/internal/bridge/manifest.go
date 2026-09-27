@@ -26,24 +26,15 @@ var bridgeManifestDirFn = func() string {
 	return filepath.Join(layout.EvolveDir, "bridge-manifests")
 }
 
-// bridgeManifestDir is the writable manifest-override directory consulted
-// before the embedded set. `bridge add-rule` writes here; LoadManifest reads
-// here first so operator-added rules take effect.
+// bridgeManifestDir is the writable manifest-override directory consulted before the embedded set.
 func bridgeManifestDir() string {
 	return bridgeManifestDirFn()
 }
 
-// manifests/*.json are the per-CLI capability manifests (ported verbatim
-// from tools/agent-bridge/lib/manifests/). Embedding them makes the Go
-// bridge self-contained — no dependency on the bash tree after the M7
-// cutover deletes it.
-//
 //go:embed manifests/*.json
 var embeddedManifests embed.FS
 
-// manifestSource is the (test-swappable) source of manifest files. The
-// embed.FS satisfies it in production; tests inject a fake to drive the
-// ReadFile/ReadDir error branches that the always-valid embed can't.
+// manifestSource lets tests inject a fake to drive ReadFile/ReadDir error branches the always-valid embed can't.
 type manifestSource interface {
 	ReadFile(name string) ([]byte, error)
 	ReadDir(name string) ([]fs.DirEntry, error)
@@ -59,33 +50,15 @@ type ManifestPrompt struct {
 	ResponseKeys string `json:"response_keys"`
 	Policy       string `json:"policy"` // auto_respond | escalate
 	Note         string `json:"note"`
-	// Once marks a fire-once prompt (e.g. a boot-time trust dialog): after it has
-	// auto-responded a single time it is NOT re-evaluated, because its dismissed
-	// text lingers in the captured scrollback (bootScrollback) and would otherwise
-	// re-match every poll and trip the loop guard. Recurring prompts (per-edit
-	// approval, AskUserQuestion menus) leave this false.
-	Once bool `json:"once"`
-	// TailLines restricts matching to the LAST n lines of the captured pane.
-	// A live modal is always at the bottom; anything that has scrolled above it
-	// — a dialog the agent already answered, or one quoted in a file the agent
-	// is reading — is then structurally unmatchable rather than merely
-	// improbable. Zero (the default) matches the whole capture, so existing
-	// rules are unaffected.
-	//
-	// This exists because a byte-distance bound cannot express "is it live":
-	// a generous tail bound still matches a dismissed dialog with a little
-	// output under it, and a tight one breaks when the dialog's own footer
-	// wraps. Line windows survive both.
+	Once         bool   `json:"once"`
+	// TailLines restricts matching to the pane's last n lines (0 = whole capture): a live modal sits at the
+	// bottom, and a fixed-size byte window can't express that scrolled-off text is unmatchable regardless of length.
 	TailLines int `json:"tail_lines"`
 }
 
 // Manifest is a per-CLI capability manifest (schema v1). Drives probe
-// tiering, the REPL prompt marker, and the auto-respond rule set.
-// ModelFreshness is a manifest-declared fact about how a CLI's "latest within
-// a lineage" is chosen. Prefer "alias" marks a CLI that resolves the bare
-// family alias to its newest release at LAUNCH (the alias is then strictly
-// fresher than any concrete id a catalog could cache); the zero value is the
-// enumerating-CLI default — newest concrete version.
+// ModelFreshness declares how a CLI's "latest within a lineage" is chosen: "alias" resolves the family alias
+// at launch (fresher than any cached catalog id); the zero value keeps the newest concrete version.
 type ModelFreshness struct {
 	// Prefer selects the freshness rule: "alias" or "" (newest_version).
 	Prefer string `json:"prefer,omitempty"`
@@ -98,11 +71,8 @@ type ModelFreshness struct {
 type Manifest struct {
 	CLI    string `json:"cli"`
 	Binary string `json:"binary"`
-	// Transport classifies the execution model: "tmux" for interactive REPL
-	// drivers that require a tmux session, "headless" for non-interactive
-	// subprocess drivers. Use Manifest.IsTmux() rather than inspecting the
-	// CLI name string directly — that is the closed abstraction point for
-	// this distinction across the entire codebase.
+	// Transport is "tmux" for interactive REPL drivers or "headless" for non-interactive subprocess drivers;
+	// use Manifest.IsTmux() rather than the CLI name string.
 	Transport        string              `json:"transport,omitempty"`
 	BinaryMinVersion string              `json:"binary_min_version"`
 	DefaultTier      string              `json:"default_tier"`
@@ -110,113 +80,56 @@ type Manifest struct {
 	PromptMarker     string              `json:"prompt_marker"`
 	DefaultModel     string              `json:"default_model"`
 	DefaultArgs      []string            `json:"default_args"`
-	// DefaultEnv is the always-on environment of the CLI process, as DefaultArgs is its always-on flags:
-	// a headless driver hands it to the process, a tmux driver exports it in the pane shell before the
-	// launch. Keys are shell identifiers (validated at parse).
+	// DefaultEnv is the always-on environment of the CLI process, as DefaultArgs is its always-on flags.
 	DefaultEnv         map[string]string `json:"default_env,omitempty"`
 	InteractivePrompts []ManifestPrompt  `json:"interactive_prompts"`
-	// TransientRegex recognizes a TEMPORARY upstream failure in this CLI's PHASE
-	// pane — an overloaded, unavailable or erroring server — as distinct from the
-	// permanent quota wall controls.usage.exhausted_regex matches. Top-level, not
-	// under controls.usage, because the two read DIFFERENT surfaces: the wall
-	// pattern classifies the output of the /usage control, while this one
-	// classifies the working pane. Hanging it off that control would also make it
-	// undeclarable for a family that has no usage control at all (ollama-tmux,
-	// a local model with no quota concept but a server that still returns 500s).
-	//
-	// Consulted only on the artifact-timeout teardown path, where it labels the
-	// self-describing summary line so a silence budget burned by a server-side
-	// blip is distinguishable from a genuinely wedged pane. Diagnostic-only: it
-	// never changes the exit code, so exit 81 stays non-transient
-	// (transient-bridge-retry AC-1). Empty = recognition off (fail-open).
+	// TransientRegex recognizes a temporary upstream failure on the phase pane, distinct from the permanent
+	// quota wall; empty disables it.
 	TransientRegex string `json:"transient_regex,omitempty"`
 	Stub           bool   `json:"stub"`
-	// ModelTierMap translates the abstract, provider-neutral model tier
-	// (fast|balanced|deep — the same vocabulary profiles' model_tier_default
-	// + model_tier_envelope already use) to this CLI's concrete model
-	// identifier. Each CLI's table is the single source of truth for that
-	// translation; the realizer at realizer.go:realizeScalar is generic.
-	// Consumed by ParamSpec.From == "model_tier_map" (canonical) — the
-	// legacy spelling "tier_alias" is accepted for one release for
-	// backward compat with operator-installed v1 override manifests.
-	// See docs/architecture/adr/0022-launch-intent-realizer.md.
+	// ModelTierMap translates the abstract fast|balanced|deep model tier to this CLI's concrete model id;
+	// each CLI's table is the single source of truth for that translation.
 	ModelTierMap map[string]string `json:"model_tier_map,omitempty"`
-	// ModelTierMapFrom names another manifest whose model_tier_map this one
-	// adopts when it declares none of its own — the explicit "one table per
-	// FAMILY, declared once" pointer (inbox codex-tier-map-single-source: the
-	// headless codex.json copy sat three model generations stale). Resolved
-	// by LoadManifest; a pointer that cannot be resolved is a manifest ERROR,
-	// never an empty map. Explicit rather than implied from the family name so
-	// a headless manifest that legitimately declares no map (claude-p — the
-	// tiers ARE its selectors) is never changed.
+	// ModelTierMapFrom names another manifest whose model_tier_map this one adopts when it declares none of
+	// its own; see resolveTierMapFrom.
 	ModelTierMapFrom string `json:"model_tier_map_from,omitempty"`
-	// ChatGPTSafeModels lists the concrete model IDs a ChatGPT/subscription
-	// account can reliably use for this CLI. When the resolved auth mode is
-	// "chatgpt" and the realized -m model is NOT in this set, the driver clamps
-	// it to ChatGPTDefaultModel. Empty → no clamp (API-key-only CLIs, or no
-	// constraint). codex's model picker/docs advertise models that the live
-	// backend 400-rejects on ChatGPT accounts by plan tier (gpt-5.4/5.5 in 2026-06; multiple open OpenAI issues); this set is the proven-safe
-	// subset. See docs/incidents/cycle-142-* and the codex-chatgpt-model-support
-	// research dossier.
+	// ChatGPTSafeModels lists the model ids a ChatGPT/subscription account can reliably use; empty means no clamp.
 	ChatGPTSafeModels []string `json:"chatgpt_safe_models,omitempty"`
-	// ChatGPTDefaultModel is the model substituted when a ChatGPT-auth launch
-	// resolves to a non-safe model. MUST be a member of ChatGPTSafeModels.
+	// ChatGPTDefaultModel replaces a non-safe model on ChatGPT auth; it must itself be a member of ChatGPTSafeModels.
 	ChatGPTDefaultModel string `json:"chatgpt_default_model,omitempty"`
-	// ModelFreshness declares how this CLI's "latest model within a lineage"
-	// is chosen by the catalog-refresh pipeline. It is a fact about the CLI
-	// binary (like ChatGPTSafeModels), not an operator preference: claude
-	// resolves a bare family alias to that family's newest release at launch,
-	// so its manifest prefers the alias; enumerating CLIs omit the block and
-	// get the zero value (newest concrete version wins). Consumed by the
-	// composition root in cmd/evolve, which maps it to
-	// modelquery.FreshnessPolicy — modelquery never imports bridge.
+	// ModelFreshness is a fact about the CLI binary, not an operator preference; cmd/evolve's composition root
+	// maps it to modelquery.FreshnessPolicy, and modelquery never imports bridge.
 	ModelFreshness ModelFreshness `json:"model_freshness,omitempty"`
-	// Params is the declarative per-CLI realization table: how each high-level
-	// LaunchIntent parameter maps to this CLI's launch flags / REPL input /
-	// controller hints. Absent param → no-op. See ADR-0022 + realizer.go.
+	// Params is the declarative per-CLI realization table: how each LaunchIntent parameter maps to this CLI's
+	// flags, REPL input or controller hints; an absent param is a no-op.
+	// See ADR-0022.
 	Params map[string]ParamSpec `json:"params,omitempty"`
-	// Controls is the per-CLI control mapping table: how each ABSTRACT control
-	// event (usage|status|clean_ctx|…) maps to THIS CLI's concrete slash
-	// command. It is the data half of the CLI-control abstraction — the
-	// pipeline names an abstract event, this table resolves the command, and
-	// the CLI implementation stays hidden behind the abstraction (Adapter).
-	// Absent event → Control() reports not-found, which the Controller turns
-	// into a clean ErrUnsupported (e.g. ollama has no usage command).
+	// Controls is the per-CLI control mapping table: an abstract event (usage|status|clean_ctx|…) to this
+	// CLI's concrete slash command; an absent event reports not-found.
 	Controls map[string]ControlSpec `json:"controls,omitempty"`
 }
 
-// ControlSpec is one abstract-event → concrete-command mapping (a manifest
-// `controls.<event>` entry). Send is the literal command pasted into the REPL;
-// Await names the pane condition to wait for after sending (default
-// "prompt_marker"); ExhaustedRegex, when set, is the conservative classifier a
-// consumer matches against the captured response to decide the family is
-// quota-capped (empty → the consumer treats the response as informational only).
+// ControlSpec is one abstract-event → concrete-command manifest entry: Send is pasted into the REPL, Await
+// names the pane condition to wait for (default "prompt_marker"), and ExhaustedRegex, when set, classifies
+// the response as a quota wall.
 type ControlSpec struct {
 	Send           string `json:"send"`
 	Await          string `json:"await,omitempty"`
 	ExhaustedRegex string `json:"exhausted_regex,omitempty"`
-	// DriftProbeRegex is a BROAD, deliberately-loose quota-wall heuristic used
-	// ONLY by the fail-loud drift alarm (exhaustion_drift.go): when an exit-81
-	// teardown pane matches this but ExhaustedRegex did NOT, the wall wording
-	// likely drifted ahead of ExhaustedRegex. Diagnostic-only — it never drives
-	// the fast-fail (too loose to be a verdict). Empty = drift alarm off for
-	// this CLI (fail-open).
+	// DriftProbeRegex is a broad, deliberately-loose quota-wall heuristic used only by the drift alarm
+	// (exhaustion_drift.go); empty disables the alarm for this CLI.
 	DriftProbeRegex string `json:"drift_probe_regex,omitempty"`
 }
 
-// Control resolves the ControlSpec for an abstract event. ok=false when the CLI
-// declares no mapping for event (or no controls block at all) — a nil map reads
-// cleanly, so callers need no nil guard.
+// Control resolves the ControlSpec for an abstract event; ok=false when the CLI declares no mapping (or no
+// controls block at all) — a nil map reads cleanly.
 func (m Manifest) Control(event string) (ControlSpec, bool) {
 	spec, ok := m.Controls[event]
 	return spec, ok
 }
 
-// LoadManifest reads and validates the embedded manifest for cli, then overlays
-// any LIVE model-catalog tier models over its ModelTierMap (see
-// catalog_overlay.go). The overlay is a no-op when no catalog exists, so this
-// is byte-identical to the raw load until `evolve models refresh` writes one.
-// Error messages mirror lib/manifest-loader.sh.
+// LoadManifest reads and validates the embedded manifest for cli, then overlays any live model-catalog tier
+// models over its ModelTierMap; the overlay is a no-op until `evolve models refresh` writes a catalog.
 func LoadManifest(cli string) (Manifest, error) {
 	m, err := loadManifestRaw(cli)
 	if err != nil {
@@ -229,14 +142,8 @@ func LoadManifest(cli string) (Manifest, error) {
 	return overlayManifestCatalog(m), nil
 }
 
-// resolveTierMapFrom adopts the model_tier_map of the manifest named by
-// m.ModelTierMapFrom when m declares none of its own (a copied map, never a
-// shared reference). A manifest that declares BOTH keeps its own table. An
-// unresolvable pointer (absent, corrupt, or a target that does not itself DECLARE
-// a map — the target is loaded raw, so pointer chains are rejected, one hop only)
-// is an error:
-// silently launching with an empty map would degrade every dispatch of this
-// CLI to the account default with the log still naming the requested tier.
+// resolveTierMapFrom adopts m.ModelTierMapFrom's model_tier_map when m declares none of its own (a copy,
+// never a shared reference); an unresolvable pointer is a manifest error, never a silent empty map.
 func resolveTierMapFrom(cli string, m Manifest) (Manifest, error) {
 	if m.ModelTierMapFrom == "" || len(m.ModelTierMap) != 0 {
 		return m, nil
@@ -260,7 +167,6 @@ func loadManifestRaw(cli string) (Manifest, error) {
 	if cli == "" {
 		return Manifest{}, fmt.Errorf("bridge:manifest: empty cli name")
 	}
-	// Operator override (from `bridge add-rule`) wins over the embedded set.
 	if data, err := os.ReadFile(filepath.Join(bridgeManifestDir(), cli+".json")); err == nil {
 		return parseManifest(cli, data)
 	}
@@ -271,18 +177,14 @@ func loadManifestRaw(cli string) (Manifest, error) {
 	return parseManifest(cli, data)
 }
 
-// parseManifest unmarshals + validates manifest bytes. Split out so the
-// JSON-error and missing-field branches are testable (the embedded
-// manifests are all valid, so they'd otherwise be unreachable). Defers
-// the actual work to parseManifestWithStderr with os.Stderr.
+// parseManifest unmarshals and validates manifest bytes; split out so the JSON-error and missing-field
+// branches are testable, since the embedded manifests are all valid otherwise.
 func parseManifest(cli string, data []byte) (Manifest, error) {
 	return parseManifestWithStderr(cli, data, os.Stderr)
 }
 
-// parseManifestWithStderr is the testable seam for parseManifest. The
-// stderr writer captures the v1 deprecation warning so test suites can
-// assert it without polluting os.Stderr. Production calls go through
-// parseManifest with os.Stderr.
+// parseManifestWithStderr is parseManifest's testable seam: the stderr writer captures the v1 deprecation
+// warning so tests can assert it without polluting os.Stderr.
 func parseManifestWithStderr(cli string, data []byte, stderr io.Writer) (Manifest, error) {
 	var m Manifest
 	if err := json.Unmarshal(data, &m); err != nil {
@@ -302,22 +204,14 @@ func parseManifestWithStderr(cli string, data []byte, stderr io.Writer) (Manifes
 			return Manifest{}, fmt.Errorf("bridge:manifest: default_env value for %q (cli=%s) carries a control byte; it is typed into a pane", key, cli)
 		}
 	}
-	// v1 → v2 schema compat (cycle-124 followup): a manifest declaring the
-	// legacy `tier_aliases` key — with the Anthropic-leaked vocabulary
-	// `{haiku|sonnet|opus → native}` — is read into a sidecar struct,
-	// translated to the canonical `fast|balanced|deep` keys, and merged
-	// into ModelTierMap. We only translate when ModelTierMap is empty
-	// (v1-only); a manifest declaring both keys keeps ModelTierMap as the
-	// source of truth without warnings. One deprecation line per manifest.
+	// A manifest declaring the legacy `tier_aliases` key translates it to `model_tier_map` only when
+	// ModelTierMap is empty; a manifest declaring both keeps ModelTierMap as the source of truth.
 	if len(m.ModelTierMap) == 0 {
 		var v1 struct {
 			TierAliases map[string]string `json:"tier_aliases"`
 		}
-		// Second Unmarshal of the same bytes: an error here is impossible
-		// given the first Unmarshal into `m` already validated the JSON
-		// shape; a struct-tag mismatch just leaves v1.TierAliases at nil.
-		// Explicit discard documents the intent for future readers (per
-		// cycle-124 PR 2 review).
+		// The error is always nil: the first Unmarshal into m already validated the JSON shape, so a
+		// struct-tag mismatch here can only leave v1.TierAliases at nil.
 		_ = json.Unmarshal(data, &v1)
 		if len(v1.TierAliases) > 0 {
 			m.ModelTierMap = translateV1TierAliases(v1.TierAliases)
@@ -358,13 +252,9 @@ func isShellIdentifier(key string) bool {
 	return key != ""
 }
 
-// translateV1TierAliases maps the legacy Anthropic-named tier keys to the
-// canonical abstract vocabulary. Non-standard keys (e.g. operator-custom
-// "large") pass through verbatim. Delegates per-key translation to
-// translateV1TierKey so the alias mapping is the single source of truth
-// (also called from realizer.go's intent-vocabulary fallback ladder —
-// keeping it canonical here avoids silent drift if another legacy alias
-// is ever added).
+// translateV1TierAliases maps legacy Anthropic-named tier keys to the canonical vocabulary; non-standard
+// keys pass through verbatim. translateV1TierKey is the single source of truth for the mapping, also used
+// by realizer.go's fallback ladder, so a new legacy alias can't drift between the two call sites.
 func translateV1TierAliases(v1 map[string]string) map[string]string {
 	out := make(map[string]string, len(v1))
 	for k, v := range v1 {
@@ -373,13 +263,9 @@ func translateV1TierAliases(v1 map[string]string) map[string]string {
 	return out
 }
 
-// translateV1TierKey is the canonical haiku/sonnet/opus → fast/balanced/deep
-// mapping, plus the "high"→"deep" input alias. Pass-through for anything else
-// (so custom operator tiers — and the frontier "top" tier — survive the
-// migration unchanged). Pure function exported
-// at package scope so both the parse-time shim (translateV1TierAliases)
-// and the realize-time fallback ladder (realizer.legacyTierAlias)
-// reference the same table.
+// translateV1TierKey is the canonical haiku/sonnet/opus → fast/balanced/deep mapping plus the "high"→"deep"
+// alias; everything else, including "top", passes through unchanged. Both the parse-time shim and the
+// realize-time fallback ladder reference this table.
 func translateV1TierKey(k string) string {
 	switch k {
 	case "haiku":
@@ -389,24 +275,20 @@ func translateV1TierKey(k string) string {
 	case "opus":
 		return "deep"
 	case "high":
-		// "high" is an input alias of "deep" (latest-model-preference TIER
-		// VOCABULARY). It is NOT the frontier "top" tier — that stays distinct.
 		return "deep"
 	default:
 		return k
 	}
 }
 
-// IsTmux reports whether this manifest represents a tmux-driven REPL driver.
-// Prefer this over inspecting CLI name strings (e.g. strings.HasSuffix(cli, "-tmux"))
-// so the transport classification has a single authoritative source.
+// IsTmux reports whether this manifest represents a tmux-driven REPL driver; prefer it over inspecting the
+// CLI name string, so the transport classification has a single authoritative source.
 func (m Manifest) IsTmux() bool {
 	return m.Transport == "tmux"
 }
 
-// IsTmuxDriver reports whether cli is a tmux-driven REPL driver by consulting
-// its manifest's Transport field. Falls back to the "-tmux" suffix check when
-// the manifest cannot be loaded (e.g. an unknown operator-installed CLI).
+// IsTmuxDriver reports whether cli is a tmux-driven REPL driver by consulting its manifest's Transport
+// field, falling back to the "-tmux" suffix check when the manifest cannot be loaded.
 func IsTmuxDriver(cli string) bool {
 	if m, err := LoadManifest(cli); err == nil {
 		return m.IsTmux()

@@ -1,12 +1,5 @@
 package bridge
 
-// manifest_default_env_test.go — a CLI manifest declares the environment its process runs in.
-//
-// `default_env` is to environment variables what `default_args` is to flags: the manifest's always-on
-// channel, read once by the realizer. A headless driver hands the variables to the process; a tmux driver
-// exports them in the pane shell before the launch command (driver_tmux_boot.go). Keys must be shell
-// identifiers because the pane path writes `export KEY=value`.
-
 import (
 	"maps"
 	"reflect"

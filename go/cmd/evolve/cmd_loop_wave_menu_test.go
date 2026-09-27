@@ -1,14 +1,3 @@
-// cmd_loop_wave_menu_test.go — the seed and widen paths hand PlanFromTriage a
-// MENU pool, not pre-flattened single reps (fleet-lane-batch-menu). Two
-// defects pinned here, both proven live on batch-14 wave-1:
-//
-//  1. seedWavePlanFromInbox dropped candidate FILES from the synthesized
-//     top_n cards, so fleet.Partition saw every card as an independent island
-//     — it could never cluster same-file items into one lane, and (worse) it
-//     could SPREAD two same-file items across two concurrent lanes.
-//  2. Both paths carried exactly one id per lane, so a lane could never
-//     amortize its worktree/build/audit across the cluster the batching layer
-//     deliberately groups.
 package main
 
 import (
@@ -31,10 +20,6 @@ func writeInboxItemFiles(t *testing.T, inbox, name, id string, weight float64, f
 	}
 }
 
-// TestSeedWavePlanFromInbox_CardsCarryFilesAndClusterIntoLanes drives the
-// synthesized decision through the REAL fleet.PlanFromTriage: two same-file
-// clusters must become two lanes whose Scope carries the whole cluster, and
-// the same-file pair must never split across lanes.
 func TestSeedWavePlanFromInbox_CardsCarryFilesAndClusterIntoLanes(t *testing.T) {
 	dir := t.TempDir()
 	inbox := filepath.Join(dir, "inbox")
@@ -68,17 +53,12 @@ func TestSeedWavePlanFromInbox_CardsCarryFilesAndClusterIntoLanes(t *testing.T) 
 	if byLane["b1"] == byLane["a1"] {
 		t.Errorf("b1 must own its own lane, got lane %d shared with a1", byLane["b1"])
 	}
-	// The menu itself: lane a's scope carries the whole cluster.
 	laneA := specs[byLane["a1"]]
 	if len(laneA.Scope) < 2 {
 		t.Errorf("lane a Scope = %v, want the full same-file cluster (a1 + a2) as its menu", laneA.Scope)
 	}
 }
 
-// TestWidenNarrowDecision_ExpandsCommittedLaneWithClusterMates pins the
-// mid-batch path: a narrow prior decision (one committed id) widens to fleet
-// width AND each lane deepens with its pending same-file mates from the inbox
-// backlog, files preserved on every card.
 func TestWidenNarrowDecision_ExpandsCommittedLaneWithClusterMates(t *testing.T) {
 	dir := t.TempDir()
 	inbox := filepath.Join(dir, "inbox")
@@ -114,13 +94,6 @@ func TestWidenNarrowDecision_ExpandsCommittedLaneWithClusterMates(t *testing.T) 
 	}
 }
 
-// TestWidenNarrowDecision_CommittedFloorsShortCircuit (diff-review HIGH-1): a
-// decision carrying committed_floors must pass through BYTE-IDENTICAL.
-// fleet.TodosFromTriage's first switch case dispatches floors and ignores
-// top_n entirely, so widening/deepening top_n cannot change the wave — but
-// the re-marshal here rebuilds ONLY {"top_n":...}, so it would silently DROP
-// the floors and flip the planner onto the top_n source. Mate expansion made
-// that loss reachable in shapes the width-only guard used to pass through.
 func TestWidenNarrowDecision_CommittedFloorsShortCircuit(t *testing.T) {
 	dir := t.TempDir()
 	inbox := filepath.Join(dir, "inbox")

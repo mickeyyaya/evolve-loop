@@ -1,17 +1,5 @@
 package core
 
-// lanescope_normalize_test.go — focused unit coverage for
-// normalizeScoutGoalHash, the scout→triage lane-identity reconciliation that
-// SUPERSEDED the cycle-640 hard-abort gate. The orchestrator-level pin test
-// (lanescope_pin_test.go) exercises only the mismatch→stamp→proceed happy path;
-// this file pins the branches that matter most for NOT regressing to a
-// false-abort AND for the blast-radius / no-silent-failure guards the reviewer
-// flagged: every degraded input (no pin / no report / no echo) is a silent
-// no-op, a coherent report is left byte-identical, a NON-canonical echo is
-// refused (never a blind whole-file replace), a valid mis-echo is corrected at
-// every occurrence, and a write failure is a loud no-op — never a swallowed
-// mismatch.
-
 import (
 	"os"
 	"path/filepath"
@@ -20,8 +8,7 @@ import (
 )
 
 // pinGoalHash / misGoalHash are canonical 64-hex goal hashes differing by a
-// single digit — mirroring the real deterministic transcription flip
-// (…c05376e pinned vs …c05356e echoed) that motivated the whole fix.
+// single digit, mirroring a real single-digit transcription flip.
 var (
 	pinGoalHash = strings.Repeat("a", 57) + "c05376e"
 	misGoalHash = strings.Repeat("a", 57) + "c05356e"
@@ -54,9 +41,6 @@ func readScoutReport(t *testing.T, workspace string) string {
 	return string(b)
 }
 
-// TestNormalizeScoutGoalHash_StampsMismatchToPin: the core reconciliation — a
-// mis-echoed canonical goal_hash is rewritten to the authoritative pin, so a
-// subsequent scoutReportGoalHash reads the pin, not the wrong transcription.
 func TestNormalizeScoutGoalHash_StampsMismatchToPin(t *testing.T) {
 	ws := t.TempDir()
 	writeLaneScopeFixture(t, ws, []string{"todo-a"}, pinGoalHash)
@@ -69,9 +53,6 @@ func TestNormalizeScoutGoalHash_StampsMismatchToPin(t *testing.T) {
 	}
 }
 
-// TestNormalizeScoutGoalHash_CoherentReportUnchanged: when the echo already
-// matches the pin there is nothing to reconcile — the report must be left
-// byte-identical (no needless rewrite, no spurious WARN-triggering mutation).
 func TestNormalizeScoutGoalHash_CoherentReportUnchanged(t *testing.T) {
 	ws := t.TempDir()
 	writeLaneScopeFixture(t, ws, []string{"todo-a"}, pinGoalHash)
@@ -85,11 +66,6 @@ func TestNormalizeScoutGoalHash_CoherentReportUnchanged(t *testing.T) {
 	}
 }
 
-// TestNormalizeScoutGoalHash_NonCanonicalEchoRefused pins the blast-radius
-// guard: a real mismatch whose echoed value is NOT a canonical 64-hex hash
-// (truncation / placeholder / hallucination) must NOT trigger the whole-file
-// replace — the report is left untouched so a short/generic needle can never
-// corrupt unrelated content.
 func TestNormalizeScoutGoalHash_NonCanonicalEchoRefused(t *testing.T) {
 	ws := t.TempDir()
 	writeLaneScopeFixture(t, ws, []string{"todo-a"}, pinGoalHash)
@@ -103,10 +79,7 @@ func TestNormalizeScoutGoalHash_NonCanonicalEchoRefused(t *testing.T) {
 	}
 }
 
-// TestNormalizeScoutGoalHash_CorrectsEveryOccurrence documents (and proves safe)
-// the whole-file replace of a CANONICAL mis-echo: when the wrong hash appears in
-// both the Decision Trace and report prose, every occurrence is corrected to the
-// pin. Two distinct equal-length hex strings can't be substrings of each other,
+// Two distinct equal-length hex strings can't be substrings of each other,
 // so a canonical needle only ever replaces genuine echoes.
 func TestNormalizeScoutGoalHash_CorrectsEveryOccurrence(t *testing.T) {
 	ws := t.TempDir()
@@ -131,9 +104,6 @@ func TestNormalizeScoutGoalHash_CorrectsEveryOccurrence(t *testing.T) {
 	}
 }
 
-// TestNormalizeScoutGoalHash_FailOpen pins the degraded inputs that MUST be
-// no-ops — the cycle-760..762 lesson: a coherence step that touches a
-// healthy/absent cycle is worse than the incoherence it chases.
 func TestNormalizeScoutGoalHash_FailOpen(t *testing.T) {
 	t.Run("no pin leaves report untouched", func(t *testing.T) {
 		ws := t.TempDir()
@@ -172,10 +142,6 @@ func TestNormalizeScoutGoalHash_FailOpen(t *testing.T) {
 	})
 }
 
-// TestNormalizeScoutGoalHash_WriteFailureIsLoudNoOp: when the stamp write fails
-// (read-only report), the function must NOT panic and must leave the on-disk
-// bytes intact — the pin still governs the lane identity, and the failure is
-// WARNed (not swallowed into a false green).
 func TestNormalizeScoutGoalHash_WriteFailureIsLoudNoOp(t *testing.T) {
 	ws := t.TempDir()
 	writeLaneScopeFixture(t, ws, []string{"todo-a"}, pinGoalHash)

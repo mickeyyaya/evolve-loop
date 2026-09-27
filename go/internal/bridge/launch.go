@@ -9,23 +9,12 @@ import (
 	"strings"
 )
 
-// LaunchArgs is the argv-faithful launch entry point: it parses the same
-// flag surface as `tools/agent-bridge/bin/bridge launch` (with BRIDGE_*
-// env fallbacks; flags win), runs the launch pipeline, and returns a
-// bridge exit code (one of the Exit* constants). It is what the
-// `evolve bridge launch` CLI shim calls, and the surface the BATS parity
-// tests target.
-//
-// Pipeline (Template Method): parse → load profile → validate required →
-// prompt guards → resolve effective config (model/permission-mode/
-// stream-output/session-name precedence: flag > env > profile) →
-// dispatch to the registered Driver. Launch (the core.Bridge entry)
-// shares this by mapping a core.BridgeRequest onto the same Config.
-//
-// Not yet ported (each lands with its own test slice): --validate-only,
-// --dry-run, --require-full tier check, stale-workspace WARN, tmux
-// orphan-sweep, --json report, and the per-driver credential-isolation
-// guards (those live in the drivers).
+// LaunchArgs is the argv-faithful launch entry point: it parses flags with BRIDGE_* env fallbacks (flags
+// win), runs the launch pipeline, and returns a bridge exit code (one of the Exit* constants). It is what
+// the `evolve bridge launch` CLI shim calls. Pipeline (Template Method): parse → load profile → validate
+// required → prompt guards → resolve effective config (model/permission-mode/stream-output/session-name
+// precedence: flag > env > profile) → dispatch to the registered Driver; Launch (the core.Bridge entry)
+// shares this pipeline by mapping a core.BridgeRequest onto the same Config.
 func (e *Engine) LaunchArgs(ctx context.Context, args []string, env map[string]string, stdout, stderr io.Writer) int {
 	raw, err := parseLaunchArgs(args, env)
 	if err != nil {
@@ -33,8 +22,7 @@ func (e *Engine) LaunchArgs(ctx context.Context, args []string, env map[string]s
 		return ExitBadFlags
 	}
 
-	// Required-field validation (after flag-vs-env merge), mirroring
-	// bin/bridge cmd_launch's `missing` accumulation.
+	// Required-field validation, after the flag-vs-env merge.
 	missing := raw.missingRequired()
 	if len(missing) > 0 {
 		fmt.Fprintf(stderr, "[bridge] launch: missing required (flag or env): %s\n", strings.Join(missing, " "))
@@ -47,8 +35,8 @@ func (e *Engine) LaunchArgs(ctx context.Context, args []string, env map[string]s
 		return ExitBadFlags
 	}
 
-	// Prompt guards: readable + non-empty (an empty prompt would hang the
-	// agent at the artifact timeout — fail fast, bin/bridge F5).
+	// Prompt guards: readable and non-empty; an empty prompt would hang the agent at the artifact timeout,
+	// so fail fast.
 	promptData, err := os.ReadFile(raw.promptFile)
 	if err != nil {
 		fmt.Fprintf(stderr, "[bridge] launch: prompt file not readable: %s\n", raw.promptFile)
@@ -60,9 +48,6 @@ func (e *Engine) LaunchArgs(ctx context.Context, args []string, env map[string]s
 		return ExitBadFlags
 	}
 
-	// --human-input two-gate: the per-invocation flag also requires the
-	// BRIDGE_HUMAN_SIMULATION=1 host opt-in (the keystroke-plausibility
-	// layer is double-gated OFF by default).
 	if raw.humanInput {
 		if v, _ := lookupEnv(e.deps, "BRIDGE_HUMAN_SIMULATION"); v != "1" {
 			fmt.Fprintln(stderr, "[bridge] --human-input requires BRIDGE_HUMAN_SIMULATION=1 host opt-in")
@@ -76,8 +61,8 @@ func (e *Engine) LaunchArgs(ctx context.Context, args []string, env map[string]s
 		effectiveModel = prof.Model
 	}
 
-	// Resolve effective permission mode: flag/env > profile. Re-validate
-	// here because an operator-passed flag bypasses LoadProfile's check.
+	// Resolve effective permission mode: flag/env > profile; re-validate here because an operator-passed
+	// flag bypasses LoadProfile's check.
 	permMode := raw.permissionMode
 	if permMode == "" {
 		permMode = prof.PermissionMode
@@ -116,13 +101,11 @@ func (e *Engine) LaunchArgs(ctx context.Context, args []string, env map[string]s
 
 	cycle := 0
 	if raw.cycle != "" {
-		cycle, _ = strconv.Atoi(raw.cycle) // non-numeric → 0, matching bash's permissive default
+		cycle, _ = strconv.Atoi(raw.cycle) // non-numeric → 0 (permissive default)
 	}
 
-	// Per-phase artifact budget (Deps.PhaseArtifactTimeoutS → Engine.Launch).
-	// Permissive like --cycle: a non-numeric or non-positive value resolves 0,
-	// which falls through to the built-in deadline rather than failing the
-	// launch or installing a negative one.
+	// Per-phase artifact budget (Deps.PhaseArtifactTimeoutS → Engine.Launch), permissive like --cycle: a
+	// non-numeric or non-positive value resolves 0, falling through to the built-in deadline.
 	artifactTimeoutS := 0
 	if raw.artifactTimeoutS != "" {
 		if n, err := strconv.Atoi(raw.artifactTimeoutS); err == nil && n > 0 {
@@ -130,12 +113,10 @@ func (e *Engine) LaunchArgs(ctx context.Context, args []string, env map[string]s
 		}
 	}
 
-	// Realize the launch intent against this CLI's manifest (ADR-0022). The
-	// *-tmux drivers build their launch command from this rather than
-	// constructing model/permission flags inline, so a claude-origin profile's
-	// raw flags realize only for the matching CLI (RawByCLI[agy/codex] = nil).
-	// permMode is still carried on Config for the safety gates and the headless
-	// claude-p driver; the realizer is what the tmux launch command consumes.
+	// Realize the launch intent against this CLI's manifest: the *-tmux drivers build their launch command
+	// from this rather than constructing model/permission flags inline, so a claude-origin profile's raw
+	// flags realize only for the matching CLI. permMode is still carried on Config for the safety gates and
+	// the headless claude-p driver.
 	sessionMode := "ephemeral"
 	if sessionName != "" {
 		sessionMode = "named:" + sessionName
@@ -181,13 +162,11 @@ func (e *Engine) LaunchArgs(ctx context.Context, args []string, env map[string]s
 		cfg.AllowNetwork = prof.Sandbox.AllowNetwork
 		if prof.Sandbox.Enabled {
 			cfg.RequireSandbox = true
-			// Carried verbatim; sandboxPrefixForLaunch threads it to the wrapper,
-			// which resolves it against RepoRoot/Worktree with the retarget
-			// defense (resolveSandboxWriteGrants) — the seam where that defense
-			// has always run and where retro_lessons_test.go pins it. Denials were
-			// already resolved eagerly here before this change (a bad policy is
-			// ExitBadFlags at Config build); the two lists resolving at different
-			// seams is inherited drift, noted, not a rule.
+			// Carried verbatim; sandboxPrefixForLaunch threads it to the wrapper, which resolves it against
+			// RepoRoot/Worktree with the retarget defense (resolveSandboxWriteGrants), pinned by
+			// retro_lessons_test.go. Denials resolve eagerly here (a bad policy is ExitBadFlags at Config
+			// build) while writes resolve later at the wrapper — the two lists resolving at different seams
+			// is inherited drift, not a deliberate rule.
 			cfg.SandboxWriteSubpaths = prof.Sandbox.WriteSubpaths
 			cfg.DenyPaths, err = resolveSandboxDenials(prof.Sandbox.DenySubpaths, cfg.ProjectRoot, cfg.Worktree, true)
 			if err == nil {
@@ -200,8 +179,7 @@ func (e *Engine) LaunchArgs(ctx context.Context, args []string, env map[string]s
 		}
 	}
 
-	// Non-dispatch modes (bin/bridge order: validate-only → dry-run →
-	// require-full → driver dispatch).
+	// Non-dispatch modes, in order: validate-only → dry-run → require-full → driver dispatch.
 	if raw.validateOnly {
 		printResolvedConfig(stdout, &cfg, prof)
 		return ExitOK
@@ -221,20 +199,15 @@ func (e *Engine) LaunchArgs(ctx context.Context, args []string, env map[string]s
 		return ExitBadFlags
 	}
 
-	// Thread the caller's diagnostic streams into a per-call Deps copy so
-	// drivers emit their `[driver] ...` notes to the bridge's stderr.
+	// Thread the caller's diagnostic streams into a per-call Deps copy so drivers emit their `[driver] ...`
+	// notes to the bridge's stderr.
 	d := e.deps
 	d.Stdout = stdout
 	d.Stderr = stderr
 
-	// Cycle-124 G3: per-CLI Preflight seam (ADR-0022 extension). Drivers
-	// that implement the optional CLIPreflight interface get a uniform
-	// hook BEFORE Launch — today codex-tmux uses it to pre-trust the
-	// worktree + workspace paths in ~/.codex/config.toml (cycle-122 Fix 1).
-	// Best-effort: a non-nil error is logged but does NOT abort Launch
-	// (matches the prior inline behavior; Fix 2's extended fallback
-	// trigger list defends downstream). A driver opts in by declaring the
-	// method; nothing changes for drivers that don't.
+	// Drivers that implement the optional CLIPreflight interface get a uniform hook before Launch
+	// (codex-tmux pre-trusts the worktree/workspace paths); a non-nil error is logged but does not abort
+	// Launch. A driver opts in by declaring the method; nothing changes for drivers that don't.
 	if pf, ok := driver.(CLIPreflight); ok {
 		if err := pf.Preflight(ctx, &cfg, d); err != nil {
 			fmt.Fprintf(stderr, "[bridge] %s preflight: %v (continuing — best-effort)\n", cfg.CLI, err)
@@ -251,15 +224,12 @@ func (e *Engine) LaunchArgs(ctx context.Context, args []string, env map[string]s
 	return rc
 }
 
-// secondaryArtifactSep joins/splits the --secondary-artifacts flag value.
-// ASCII unit separator: argv-safe and impossible in a file path — a comma
-// separator would corrupt the round trip for any install whose project path
-// contains a comma (adversarial-review MEDIUM).
+// secondaryArtifactSep joins/splits the --secondary-artifacts flag value: an ASCII unit separator,
+// argv-safe and impossible in a file path, unlike a comma which could appear in a project path.
 const secondaryArtifactSep = "\x1f"
 
-// splitNonEmptyCSV splits a sep-joined flag value, dropping blanks — ""
-// yields nil so an absent --secondary-artifacts stays byte-identical to the
-// pre-Phase-B request shape.
+// splitNonEmptyCSV splits a sep-joined flag value, dropping blanks; "" yields nil so an absent
+// --secondary-artifacts stays byte-identical to the request shape without it.
 func splitNonEmptyCSV(s string) []string {
 	var out []string
 	for _, p := range strings.Split(s, secondaryArtifactSep) {
@@ -270,8 +240,7 @@ func splitNonEmptyCSV(s string) []string {
 	return out
 }
 
-// rawLaunch holds the parsed launch flags before profile-aware
-// resolution. Mirrors the local variables in bin/bridge cmd_launch.
+// rawLaunch holds the parsed launch flags before profile-aware resolution.
 type rawLaunch struct {
 	cli, profile, model, promptFile, workspace, stdoutLog, stderrLog, artifact string
 	cycle, worktree, projectRoot, agent, completion                            string
@@ -281,8 +250,7 @@ type rawLaunch struct {
 	extra                                                                      []string // args after `--`, forwarded to the inner CLI
 }
 
-// missingRequired returns the names of unset required fields, in the
-// same flag/ENV label form bin/bridge prints.
+// missingRequired returns the names of unset required fields, in flag/ENV label form.
 func (r rawLaunch) missingRequired() []string {
 	var m []string
 	check := func(v, label string) {
@@ -301,10 +269,8 @@ func (r rawLaunch) missingRequired() []string {
 	return m
 }
 
-// parseLaunchArgs initializes raw fields from env fallbacks then applies
-// flags (flags win). Supports both --key=value and --key value forms,
-// the boolean toggles, and the `--` inner-CLI passthrough separator —
-// matching bin/bridge cmd_launch's getopts loop.
+// parseLaunchArgs initializes raw fields from env fallbacks then applies flags (flags win); it supports
+// both --key=value and --key value forms, the boolean toggles, and the `--` inner-CLI passthrough separator.
 func parseLaunchArgs(args []string, env map[string]string) (rawLaunch, error) {
 	get := func(k string) string {
 		if env == nil {

@@ -1,11 +1,5 @@
 package core
 
-// gate_signal_test.go — ADR-0101 S2b: the correction ladder is a producer.
-// Every rung the orchestrator runs after a gate rejection is ONE gate.corrected
-// INFO under module orchestrator, on BOTH dispatch roots, naming the correction
-// ordinal, the budget, the rung and the CLI it re-dispatched on — so the stream
-// shows "rejected → corrected (1/2, redispatch) → passed" for a phase boundary.
-
 import (
 	"context"
 	"os"

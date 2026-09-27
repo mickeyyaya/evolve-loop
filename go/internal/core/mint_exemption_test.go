@@ -7,12 +7,6 @@ import (
 	"testing"
 )
 
-// TestVerifiedActiveMints pins the content-verification half of the mint
-// exemption (security review, Finding 1): a registered NAME is kept only when
-// its on-disk .evolve/phases/<name>/phase.json passes the same spec-side
-// clamp the registrar enforces — parses, user-floor valid (ValidateUserSpec),
-// optional, and spec name == dir name. A forged registry entry therefore buys
-// nothing beyond what a sanctioned mint could already carry.
 func TestVerifiedActiveMints(t *testing.T) {
 	root := t.TempDir()
 	write := func(name, body string) {
@@ -32,10 +26,9 @@ func TestVerifiedActiveMints(t *testing.T) {
 	// "bad-missing" has a registry entry but no file at all; "../bad-trav"
 	// is a forged path-traversal name that must be dropped BEFORE any
 	// filesystem access (path-segment safety).
-	// "bad-huge" and "bad-symlink" pin the read-bounding half (security
-	// delta review): the spec read must be Lstat-gated to a small REGULAR
-	// file, so a planted FIFO/symlink/giant file cannot hang or exhaust the
-	// guard (and a symlink cannot point the read outside the tree).
+	// "bad-huge" and "bad-symlink" pin the read-bounding half: the spec read
+	// must be Lstat-gated to a small regular file, so a planted FIFO/symlink/
+	// giant file cannot hang or exhaust the guard.
 	write("bad-huge", `{"name":"bad-huge","optional":true,"pad":"`+strings.Repeat("x", 1<<20)+`"}`)
 	if err := os.MkdirAll(filepath.Join(root, ".evolve", "phases", "bad-symlink"), 0o755); err != nil {
 		t.Fatal(err)
@@ -60,13 +53,8 @@ func TestVerifiedActiveMints(t *testing.T) {
 	}
 }
 
-// TestIsActiveMintPhasePath pins the classifier's scope so the exemption
-// cannot widen: ONLY the two paths a legitimate mint writes —
-// .evolve/phases/<registered-name> (bare dir entry) and
-// .evolve/phases/<registered-name>/phase.json — are exempt. Companion payload
-// files under a registered name, prefix look-alikes, other deliverables,
-// source paths, and an empty registry all stay armed. Companion end-to-end
-// pins live in treediff_crosslane_mint_test.go (integration tag).
+// Companion end-to-end pins live in treediff_crosslane_mint_test.go
+// (integration tag).
 func TestIsActiveMintPhasePath(t *testing.T) {
 	mints := map[string]bool{"gate-wiring-proof": true, "gate": true}
 	cases := []struct {

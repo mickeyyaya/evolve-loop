@@ -73,7 +73,6 @@ func TestCmd_PruneEphemeral_HappyPath(t *testing.T) {
 	if !strings.Contains(stderr.String(), "DRY-RUN would remove") {
 		t.Errorf("stderr missing DRY-RUN log: %s", stderr.String())
 	}
-	// Dry-run must NOT have removed the dir.
 	if _, err := os.Stat(cyclePath); err != nil {
 		t.Errorf("dry-run removed the dir: %v", err)
 	}

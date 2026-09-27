@@ -1,21 +1,5 @@
 package main
 
-// cmd_loop_wave_shadowjoin_test.go — S8 WIRING proof. A new exported symbol that
-// nothing composes is inert (operating-policy: wiring proofs mandatory), so the
-// quota↔tokens shadow join must be reachable from the SAME composed CLI path the
-// wave sizer already runs: quotaAwareWaveConfig, called by budgetAwareWaveConfig
-// (cli_wave_budget.go) on every wave.
-//
-// Contract pinned here:
-//   - Budget block present + both halves of the join measured ⇒ ONE
-//     "[budget] shadow-join" line carrying the binding family and the median
-//     tokens/cycle, on BOTH stages (shadow and enforce) — it is an observation,
-//     not a stage-gated decision.
-//   - Budget==nil ⇒ still byte-identical: no probe, no [budget] output at all.
-//   - Token evidence absent ⇒ no join line (never a fabricated count), while the
-//     existing sizing log is unaffected.
-//   - The lane count / pace decisions are UNCHANGED by the join.
-
 import (
 	"bytes"
 	"strings"
@@ -52,7 +36,6 @@ func TestQuotaAwareWaveConfig_LogsShadowQuotaTokenJoin(t *testing.T) {
 	if !strings.Contains(log, "claude") {
 		t.Errorf("shadow-join line must name the binding quota family; got:\n%s", log)
 	}
-	// Zero behavior change: the shadow stage still HOLDS the bench-shrunk count.
 	if got.Count != 3 {
 		t.Errorf("Count = %d, want 3 HELD (the join must not resize)", got.Count)
 	}

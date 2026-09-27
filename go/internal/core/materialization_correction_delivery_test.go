@@ -1,32 +1,5 @@
 package core_test
 
-// materialization_correction_delivery_test.go — cycle-1554 RED contract for
-// `scout-eval-materialization-correction-delivery` (inbox
-// pipeline-defect-pipeline-blocker, P0).
-//
-// evalgate_escalation_test.go (package core) already proves the CLI-escalation
-// ladder using a hand-authored evalGateProbe reviewer that FAKES the gate's
-// Approve/Reason/Remediation shape. That test never runs the REAL
-// evalgate.materializationGate — it never stats a real
-// .evolve/evals/<slug>.md file, never reads a real scout-report.md, and never
-// verifies that a file the agent creates in response to the correction
-// directive actually clears the real gate on re-review. Nothing in either the
-// core or evalgate suite drives the production seam end-to-end: real
-// scout-report.md (missing eval) -> real materializationGate rejection with
-// its real remediation text -> correction re-dispatch -> agent creates the
-// eval at the EXACT workspace path the remediation named -> real
-// materializationGate re-review APPROVES. This file closes that gap (cycles
-// 1540/1545: the remediation text was byte-perfect and the correction still
-// burned its full budget without landing — "produced a remediation string
-// without a proven consumer" per the scout hypothesis).
-//
-// External test package (core_test): wiring the REAL evalgate.NewReviewer
-// (which itself imports core) alongside core would be an import cycle from an
-// internal test file — see internal/core/evalgate_escalation_test.go's header
-// for why that file stays a fake instead. test/fixtures supplies the
-// canonical FakeStorage/FakeLedger/BuildRunners so this file needs no
-// unexported core test helpers.
-
 import (
 	"context"
 	"os"
@@ -75,7 +48,7 @@ func initMaterializationRepo(t *testing.T, root string) {
 type materializationScoutRunner struct {
 	slug       string
 	requests   []core.PhaseRequest
-	createEval bool // when false, NEVER complies — the live 0-for-N shape
+	createEval bool // when false, the scout never writes the eval
 }
 
 func (r *materializationScoutRunner) Name() string { return string(core.PhaseScout) }
@@ -95,8 +68,8 @@ func (r *materializationScoutRunner) Run(_ context.Context, req core.PhaseReques
 		if err := os.MkdirAll(filepath.Dir(evalPath), 0o755); err != nil {
 			return core.PhaseResponse{}, err
 		}
-		// A complying scout writes the [code] grader the remediation now requires
-		// (cycle 1679), not only the legacy bash fence.
+		// A complying scout writes the [code] grader the remediation requires,
+		// not only the legacy bash fence.
 		body := "# Eval " + r.slug + "\n\n- [code] `go test ./internal/widget/...`\n\n```bash\ngo test ./internal/widget/...\n```\n"
 		if err := os.WriteFile(evalPath, []byte(body), 0o644); err != nil {
 			return core.PhaseResponse{}, err
@@ -124,11 +97,6 @@ func runMaterializationCycle(t *testing.T, scout *materializationScoutRunner) er
 	return err
 }
 
-// TestMaterializationCorrectionDelivery_RemediationReachesReDispatchAndClearsTheRealGate
-// is the headline: the real materializationGate rejects a missing eval,
-// names the exact workspace path in the correction directive, and a
-// complying re-dispatch that writes the eval there clears the SAME real gate
-// on re-review — the production correction round-trip, not a mock of it.
 func TestMaterializationCorrectionDelivery_RemediationReachesReDispatchAndClearsTheRealGate(t *testing.T) {
 	scout := &materializationScoutRunner{slug: "widget-thing", createEval: true}
 	if err := runMaterializationCycle(t, scout); err != nil {
@@ -160,10 +128,6 @@ func TestMaterializationCorrectionDelivery_RemediationReachesReDispatchAndClears
 	}
 }
 
-// TestMaterializationCorrectionDelivery_NonComplyingReDispatchStaysRejected —
-// the anti-no-op axis: a correction round that does NOT create the eval must
-// keep failing the real gate every round (the live 0-for-N shape prior to the
-// fix), never silently pass just because a correction round happened.
 func TestMaterializationCorrectionDelivery_NonComplyingReDispatchStaysRejected(t *testing.T) {
 	scout := &materializationScoutRunner{slug: "widget-thing", createEval: false}
 	if err := runMaterializationCycle(t, scout); err == nil {

@@ -19,17 +19,11 @@ const LiveSmokeArtifact = "live-smoke-ok.txt"
 // a probe should fail fast, that is its job.
 const liveSmokeArtifactTimeoutS = 120
 
-// LiveSmokeTest performs a REAL launch of the given *-tmux driver that
-// SUBMITS one trivial contracted prompt and waits (briefly) for the artifact.
-// It is the only probe shape that can see a quota wall: BootSmokeTest passes
-// against a rate-limited CLI because provider walls appear only after work is
-// submitted (cycle-283 — every codex phase re-discovered the wall the
-// expensive way). Used by `evolve doctor live` and the loop's per-cycle bench
-// canary.
-//
-// Returns the bridge exit code, the escalation pattern name when the launch
-// died on a classified interactive wall ("rate_limit" — empty otherwise), and
-// the captured pane scrollback (carries the wall text for reset-hint parsing).
+// LiveSmokeTest performs a real launch of the given *-tmux driver, submits one trivial contracted prompt,
+// and waits briefly for the artifact. It is the only probe shape that can see a quota wall — BootSmokeTest
+// alone passes against a rate-limited CLI, since provider walls appear only after work is submitted.
+// Returns the bridge exit code, the escalation pattern name when the launch died on a classified
+// interactive wall ("rate_limit" — empty otherwise), and the captured pane scrollback.
 func LiveSmokeTest(ctx context.Context, driverName string, cfg *Config, deps Deps) (rc int, pattern, scrollback string) {
 	d, ok := LookupDriver(driverName)
 	if !ok || !strings.HasSuffix(driverName, "-tmux") {
@@ -48,8 +42,8 @@ func LiveSmokeTest(ctx context.Context, driverName string, cfg *Config, deps Dep
 		defer func() { _ = os.RemoveAll(tmp) }()
 		cfg.Workspace = tmp
 	}
-	// I1: a health-canary probe has no worktree; run it in a scratch dir under
-	// its Workspace, never the live checkout (avoids the os.Getwd() fallback).
+	// A health-canary probe has no worktree; it runs in a scratch dir under its Workspace, never the live
+	// checkout, avoiding the os.Getwd() fallback.
 	applyScratchCwd(cfg)
 	cfg.Artifact = filepath.Join(cfg.Workspace, LiveSmokeArtifact)
 	if cfg.PromptFile == "" {
@@ -64,15 +58,14 @@ func LiveSmokeTest(ctx context.Context, driverName string, cfg *Config, deps Dep
 		cfg.ArtifactTimeoutS = liveSmokeArtifactTimeoutS
 	}
 	deps = deps.withDefaults()
-	// Dead-shell guard is armed by the real driver constructor (guardDeadShell),
-	// so smoke boots get the same cycle-274 rejection a phase launch gets.
+	// Dead-shell guard is armed by the real driver constructor (guardDeadShell), so smoke boots get the
+	// same rejection a phase launch gets.
 	rc, _ = d.Launch(ctx, cfg, deps)
 	if b, err := os.ReadFile(filepath.Join(cfg.Workspace, "tmux-final-scrollback.txt")); err == nil {
 		scrollback = string(b)
 	}
-	// The autoresponder persists its classification before an escalate exit;
-	// surface the pattern name so callers can act on the CLASS (rate_limit)
-	// rather than the bare exit code.
+	// The autoresponder persists its classification before an escalate exit; surface the pattern name so
+	// callers can act on the class (rate_limit) rather than the bare exit code.
 	if raw, err := os.ReadFile(filepath.Join(cfg.Workspace, "escalation-report.json")); err == nil {
 		var rep struct {
 			Pattern string `json:"pattern_name"`

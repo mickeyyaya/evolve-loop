@@ -1,9 +1,5 @@
 package bridge
 
-// interaction_rules_test.go — ADR-0045 I4 consumption side: enforce-stage
-// promoted rules become live auto-respond prompts; shadow rules do not; the
-// embedded healthy corpus parses and a corpus-matching rule is demoted at load.
-
 import (
 	"os"
 	"path/filepath"
@@ -25,8 +21,6 @@ func TestHealthyCorpus_EmbeddedAndParsed(t *testing.T) {
 	}
 }
 
-// TestLoadPromotedPrompts_EnforceOnly — only enforce-stage rules join the
-// active set; a shadow rule rides in the registry without firing.
 func TestLoadPromotedPrompts_EnforceOnly(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

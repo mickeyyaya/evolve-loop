@@ -1,10 +1,5 @@
 package core
 
-// gate_test.go — PA-DDK DDK-4 (ADR-0060): the artifact-floor THRESHOLDS are
-// config-driven. The evaluator's verdict requirement comes from the loaded
-// registry gate (config), evaluated against the trusted Go signal digest. Phases
-// are resolved through the kerneltest fixture — no hardcoded names.
-
 import (
 	"testing"
 
@@ -35,8 +30,6 @@ func TestGateSatisfied_ConfigThresholds(t *testing.T) {
 	}
 }
 
-// TestGateSatisfied_DegradesToLiteral: with no catalog (bare SM) the gate falls
-// back to the literal artifact map — byte-identical to pre-DDK-4.
 func TestGateSatisfied_DegradesToLiteral(t *testing.T) {
 	t.Parallel()
 	sm := NewStateMachine() // no catalog → literal fallback

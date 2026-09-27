@@ -14,9 +14,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 )
 
-// runPlanAndExecute implements `evolve plan-and-execute <phase>`. It is
-// the operator-facing convenience for v12.1 Capability 1's two-pass
-// dispatch:
+// runPlanAndExecute implements `evolve plan-and-execute <phase>`, the
+// operator-facing convenience for a two-pass dispatch:
 //
 //  1. Pass A: run the phase with --permission-mode=plan, writing the
 //     plan to EVOLVE_<PHASE>_PLAN_OUTPUT (default: <workspace>/<phase>-plan.md).
@@ -56,9 +55,7 @@ func runPlanAndExecute(args []string, stdin io.Reader, stdout, stderr io.Writer)
 		return 10
 	}
 
-	// Read the rest of args as phase-request JSON via stdin OR as
-	// flags passed through. For simplicity at this slice, the phase
-	// request envelope is read from stdin (same as `evolve phase`)
+	// The phase request envelope is read from stdin (same as `evolve phase`)
 	// and re-fed to each pass.
 	envReq, err := io.ReadAll(stdin)
 	if err != nil {
@@ -77,9 +74,6 @@ func runPlanAndExecute(args []string, stdin io.Reader, stdout, stderr io.Writer)
 		}
 	}
 
-	// Pass A: plan mode. Sets EVOLVE_<PHASE>_PERMISSION_MODE=plan and
-	// EVOLVE_<PHASE>_PLAN_OUTPUT=<planPath>. The runner resolves the
-	// permission mode into BridgeRequest.PermissionMode (realized per-CLI).
 	planKey := envchain.PhaseEnvKey(phase, "PERMISSION_MODE")
 	outputKey := envchain.PhaseEnvKey(phase, "PLAN_OUTPUT")
 
@@ -97,16 +91,12 @@ func runPlanAndExecute(args []string, stdin io.Reader, stdout, stderr io.Writer)
 		return 0
 	}
 
-	// Verify the plan artifact exists before pass B.
 	if _, err := os.Stat(planPath); err != nil {
 		fmt.Fprintf(stderr, "[plan-and-execute] plan artifact missing at %s (pass A produced no plan): %v\n",
 			planPath, err)
 		return 11
 	}
 
-	// Pass B: execute mode. Sets EVOLVE_<PHASE>_PERMISSION_MODE=acceptEdits
-	// and EVOLVE_<PHASE>_PLAN_INPUT=<planPath> so the agent reads the
-	// plan as context.
 	inputKey := envchain.PhaseEnvKey(phase, "PLAN_INPUT")
 
 	fmt.Fprintf(stdout, "[plan-and-execute] pass B: %s in acceptEdits mode (plan ← %s)\n", phase, planPath)

@@ -12,16 +12,6 @@ import (
 	"time"
 )
 
-// doctor.go — per-CLI auth + binary preflight (Go port of lib/doctor.sh's
-// shallow path + an optional deep live-noop via the runner seam).
-//
-// Auth detection is file/env-based with one macOS exception: claude stores its
-// OAuth token in the login Keychain (service "Claude Code-credentials"), not a
-// file, so doctorAuth consults the KeychainProbe seam (defaultKeychainProbe)
-// for claude before reporting unconfigured. The probe is injectable so tests
-// stay hermetic and non-darwin hosts skip it. Verdict + exit-code contract is
-// preserved.
-
 // BinaryInfo describes a CLI binary's presence on PATH.
 type BinaryInfo struct {
 	Present bool   `json:"present"`
@@ -72,8 +62,6 @@ type DoctorReport struct {
 	} `json:"summary"`
 }
 
-// doctorBinaryFor maps a cli to its underlying binary (claude-p/claude-tmux
-// → claude, codex* → codex, agy* → agy, ollama-tmux → ollama).
 func doctorBinaryFor(cli string) string {
 	switch cli {
 	case "claude-p", "claude-tmux":
@@ -95,11 +83,9 @@ func (e *Engine) doctorHome() string {
 	return os.Getenv("HOME")
 }
 
-// defaultKeychainProbe builds the production KeychainProbe seam. On macOS it
-// shells (via the Runner seam) to `security find-generic-password -s <service>`
-// and reports presence by exit code; on every other OS there is no login
-// Keychain, so it returns a probe that is always false (file/env checks cover
-// those hosts). Kept as a constructor so it can capture the resolved Runner.
+// defaultKeychainProbe builds the production KeychainProbe seam: on macOS it shells to
+// `security find-generic-password -s <service>` and reports presence by exit code; on every other OS
+// there is no login Keychain, so it returns a probe that is always false.
 func defaultKeychainProbe(d Deps) func(service string) bool {
 	if runtime.GOOS != "darwin" {
 		return func(string) bool { return false }
@@ -109,8 +95,7 @@ func defaultKeychainProbe(d Deps) func(service string) bool {
 		if runner == nil || service == "" {
 			return false
 		}
-		// Bound the probe so a stalled securityd can't hang `setup detect`
-		// (mirrors doctorDeep's timeout; a local Keychain lookup is sub-second).
+		// Bound the probe so a stalled securityd can't hang `setup detect`; a local Keychain lookup is sub-second.
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
 		rc, err := runner(ctx, "security", "",
@@ -155,13 +140,12 @@ func (e *Engine) doctorAuth(cli string) AuthInfo {
 		if fileNonEmpty(filepath.Join(home, ".ollama", "id_ed25519")) {
 			return AuthInfo{Configured: true, Source: "file:~/.ollama/id_ed25519", SubscriptionType: "ollama-cloud"}
 		}
-		// Local-only: NOT blocked — that's the primary WS-F use case.
 		return AuthInfo{AuthOptional: true, Hint: "Local models work without auth; for :cloud models run `ollama signin` or set OLLAMA_API_KEY"}
 	}
 	return AuthInfo{Hint: "unknown CLI"}
 }
 
-// doctorEnvWarnings mirrors lib/doctor.sh's env-leak warnings.
+// doctorEnvWarnings warns when an env var would silently change the CLI's billing or auth path.
 func (e *Engine) doctorEnvWarnings(cli string) []string {
 	var w []string
 	set := func(k string) bool { v, ok := lookupEnv(e.deps, k); return ok && v != "" }
@@ -222,9 +206,8 @@ func (e *Engine) doctorOne(ctx context.Context, cli string, deep bool) DoctorRes
 	case !r.Binary.Present:
 		r.Verdict = "blocked"
 	case !r.Auth.Configured && !r.Auth.AuthOptional:
-		// AuthOptional=true (local-only ollama) skips the blocked verdict
-		// because no auth is actually required to run. Every other driver
-		// keeps the historical fail-loud posture.
+		// AuthOptional=true (local-only ollama) skips the blocked verdict since no auth is required; every
+		// other driver keeps the fail-loud posture where missing auth blocks the launch.
 		r.Verdict = "blocked"
 	case r.DeepProbe.Ran && !r.DeepProbe.Passed:
 		r.Verdict = "blocked"
