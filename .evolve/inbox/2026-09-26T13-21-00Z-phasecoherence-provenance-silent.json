@@ -1,0 +1,24 @@
+{
+  "id": "phasecoherence-provenance-silent",
+  "kind": "pipeline-repair",
+  "priority": "P2",
+  "weight": 0.5,
+  "title": "phasecoherence: CheckProvenance swallows ledger errors, stops silently past 64 KiB lines, and canonicalRole is case-sensitive",
+  "summary": "Found by comment-reduction batch 14 (2026-09-26) and reported without changing code. (1) CheckProvenance ignores os.Open failures and never checks scanner.Err(). A ledger line over bufio's 64 KiB default silently ends the scan, and malformed JSON lines are skipped with no count. (2) canonicalRole maps aliases only in lowercase: 'build' becomes 'builder', but 'Build' stays 'build', so the ledger cross-check misses when the case differs. Tests pin this behavior. (3) Violation severities mix 'WARN' and 'error'. (4) Check and CheckArtifactNames repeat about 40 lines of persona iteration, profile lookup and frontmatter parsing. (5) docs/incidents/cycle-1348-evals-birth-ignored-batch-halt.md claims an inbox-parked .gitignore carve-out that does not exist; the test allowlists the directory instead.",
+  "fix": "Surface ledger open and scan errors as a violation (or a coded WARN), and set a scanner buffer that fits the largest ledger record. Normalize case before alias lookup. Use one severity vocabulary. Extract the shared persona walk as a Template Method or an iterator. Correct the incident record.",
+  "acceptance": [
+    "A ledger with a >64 KiB line or an unreadable file yields a reported problem, never a silent partial scan (test)",
+    "canonicalRole('Build') == canonicalRole('build') (test)",
+    "The persona walk exists once"
+  ],
+  "files": [
+    "go/internal/phasecoherence/provenance.go",
+    "go/internal/phasecoherence/coherence.go",
+    "go/internal/phasecoherence/artifact_coherence.go",
+    "docs/incidents/cycle-1348-evals-birth-ignored-batch-halt.md"
+  ],
+  "created_at": "2026-09-26T13:21:00Z",
+  "source": "console-comment-workstream-batch14",
+  "priority_class": "hygiene",
+  "priority_rationale": "inbox review 2026-09-27: The silent paths are real, but the function is test-only, so the fix is hygiene or deletion."
+}

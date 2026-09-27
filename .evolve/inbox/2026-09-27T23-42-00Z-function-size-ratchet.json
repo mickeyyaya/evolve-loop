@@ -1,0 +1,17 @@
+{
+  "id": "function-size-ratchet",
+  "created_at": "2026-09-27T23:30:00Z",
+  "title": "The 50-line function limit is one repo-wide ratchet, not a test in a few packages",
+  "weight": 0.6,
+  "kind": "hardening",
+  "priority_class": "hygiene",
+  "files": [
+    "go/internal/sizeratchet"
+  ],
+  "summary": "A bugfix cycle (1720) left ship/consume.go's consumeCommittedItems at ~110 lines and stage at ~99; only packages that pin their own limits test enforce the rule. Design doc §7.9 G2. The ratchet lives in its own package (go/internal/sizeratchet: a test that walks the module with go/ast, plus a checked-in offender list that may only shrink), so the lane shares no surface with other work; go/acs/regression is a protected surface a lane cannot write.",
+  "acceptance": [
+    "A ratchet fails CI when a function grows past 50 lines or a new function exceeds it; existing offenders are listed and may only shrink."
+  ],
+  "source": "inbox review 2026-09-27 (design doc §7.9 G2)",
+  "priority_rationale": "inbox review 2026-09-27: the 50-line limit is enforced only in packages that pin their own limits"
+}

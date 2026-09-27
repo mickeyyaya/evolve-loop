@@ -1,0 +1,21 @@
+{
+  "id": "cycleclassify-cycle-grep-substring",
+  "kind": "pipeline-repair",
+  "priority": "P2",
+  "weight": 0.51,
+  "title": "cycleclassify: gitLogMatchesCycle greps `cycle N` as a substring, so cycle 4 matches a commit about cycle 42; a hang test passes vacuously",
+  "summary": "Found by comment-reduction batch 25 (2026-09-26) and reported without changing code. (1) gitLogMatchesCycle runs `git log --grep=cycle N`, which matches substrings. A workspace for cycle 4 matches any commit that mentions cycle 42 or cycle 400, so the opt-in hang reclassifier can report a false 'already shipped'. (2) TestClassify_HangClassifier_NoShippedFallthrough still calls t.Setenv(\"EVOLVE_HANG_CLASSIFIER\", \"1\"), a removed flag that now does nothing. The classifier stays off, and the test passes without reaching the branch it claims to cover. That is the failure docs/research/flag-parameter-conversion-standard.md step 7 warns about. (3) firstInfraMarker ends with a redundant branch. hasAssistantEvents could return scanner.Err() != nil directly. The test helpers stringRepeat and itoa duplicate the standard library.",
+  "fix": "Anchor the grep: use --grep with a word-boundary pattern and -E, or match the cycle's typed trailer or ship binding instead of free text. Test that cycle 4 does not match a 'cycle 42' commit. Switch the hang test to setHangClassifierForTest(t, true), and add a mutant check that fails when the branch is removed. Simplify the two helpers.",
+  "acceptance": [
+    "gitLogMatchesCycle(4) is false when only a 'cycle 42' commit exists (test)",
+    "The hang test fails if the no-shipped fallthrough branch is removed (mutation check)"
+  ],
+  "files": [
+    "go/internal/cycleclassify/classify.go",
+    "go/internal/cycleclassify/hang_coverage_test.go"
+  ],
+  "created_at": "2026-09-26T15:50:00Z",
+  "source": "console-comment-workstream-batch25",
+  "priority_class": "hygiene",
+  "priority_rationale": "inbox review 2026-09-27: Latent behind an off-by-default switch; the vacuous test is the more useful fix."
+}

@@ -3,7 +3,7 @@
   "title": "Family→tier-table manifest rule is a string recipe in setup.familyDriverManifest and cmd/evolve/model_tier_resolver.go — one bridge.FamilyManifest seam",
   "kind": "pipeline-repair",
   "class": "single-source",
-  "weight": 0.5,
+  "weight": 0.6,
   "created_at": "2026-09-09T00:20:00Z",
   "connects_to": [
     "go/internal/setup/setup.go",
@@ -15,6 +15,16 @@
   "acceptance": [
     "No production caller composes a manifest name from BaseCLI+\"-tmux\" (grep proves it)",
     "setup.tierModelsFor(\"codex\") and the advisor clamp probe resolve through bridge.FamilyManifest",
-    "go test -count=1 ./internal/setup/... ./internal/bridge/... ./cmd/... green"
-  ]
+    "go test -count=1 ./internal/setup/... ./internal/bridge/... ./cmd/... green",
+    "(merged at the inbox review 2026-09-27) One family-naming seam. Absorb policy-resolver-hygiene part (3): delete setup.baseCLI and use policy.BaseCLI. Absorb llmroute-default-trigger-aliasing part (4): the overlay rung's strings.HasPrefix(c, ov.CLI+\"-\") at model_routing_overlay.go:32 should call Family(). Widen the acceptance grep to cover all seven name-building sites."
+  ],
+  "absorbs": [
+    "llmroute-default-trigger-aliasing#4",
+    "policy-resolver-hygiene#3"
+  ],
+  "merge_notes": [
+    "inbox review 2026-09-27: absorbed policy-resolver-hygiene#3, llmroute-default-trigger-aliasing#4. One family-naming seam. Absorb policy-resolver-hygiene part (3): delete setup.baseCLI and use policy.BaseCLI. Absorb llmroute-default-trigger-aliasing part (4): the overlay rung's strings.HasPrefix(c, ov.CLI+\"-\") at model_routing_overlay.go:32 should call Family(). Widen the acceptance grep to cover all seven name-building sites."
+  ],
+  "priority_class": "hygiene",
+  "priority_rationale": "inbox review 2026-09-27: A replicated naming belief across about seven call sites, the never-duplicate class. It is not failing, but each new family or transport multiplies the drift points."
 }

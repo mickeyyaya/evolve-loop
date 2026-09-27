@@ -3,7 +3,7 @@
   "title": "agy.json duplicates agy-tmux.json's model_tier_map — point it at the family table via model_tier_map_from",
   "kind": "pipeline-repair",
   "class": "single-source",
-  "weight": 0.6,
+  "weight": 0.52,
   "created_at": "2026-09-09T00:10:00Z",
   "connects_to": [
     "go/internal/bridge/manifests/agy.json",
@@ -16,5 +16,7 @@
     "agy.json declares no model_tier_map and carries model_tier_map_from: agy-tmux",
     "LoadManifest(\"agy\").ModelTierMap equals loadManifestRaw(\"agy-tmux\").ModelTierMap (relational test, no literal ids)",
     "go test -count=1 ./internal/bridge/... ./internal/profiles/... ./internal/setup/... green"
-  ]
+  ],
+  "priority_class": "hygiene",
+  "priority_rationale": "inbox review 2026-09-27: A single-source violation whose drift is already visible but is read by no dispatch path."
 }

@@ -1,0 +1,20 @@
+{
+  "id": "codex-model-unsupported-bench",
+  "created_at": "2026-09-27T23:30:00Z",
+  "title": "A model_unsupported exit benches the family's model at that tier until the pin changes (codex deep bounces ~8 times per wave)",
+  "weight": 0.79,
+  "kind": "pipeline-repair",
+  "priority_class": "performance",
+  "files": [
+    "go/internal/clihealth",
+    "go/internal/bridgechain"
+  ],
+  "summary": "Every codex deep/top dispatch since 2026-09-14 exits 85 model_unsupported (the gpt-5.6-sol pin is not available on the account); all 17 codex dispatches in cycles 1700-1729 bounced, each paying a boot before the claude fallback. The failure is deterministic for the (family, model) pair, so it should bench like Q2's credential wall until the pin changes (design doc §7.5 Q5). The pin itself stays the operator's decision. Separately, the most common exit-85 cause is unknown_prompt, which the tier chain treats as a quota wall.",
+  "acceptance": [
+    "A model_unsupported exit benches that family's model for that tier; the bench clears when the resolved model for the tier changes.",
+    "The bench line names the operator action (re-pin or accept the fallback).",
+    "An unknown_prompt exit is not read as a quota wall."
+  ],
+  "source": "inbox review 2026-09-27 (design doc §7.5 Q5)",
+  "priority_rationale": "inbox review 2026-09-27: every codex deep or top dispatch pays a boot and bounces to claude; the bounce is deterministic, so a bench saves a boot per dispatch"
+}

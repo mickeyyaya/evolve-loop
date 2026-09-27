@@ -10,9 +10,7 @@
     "egps-regression-tia-selection"
   ],
   "created_at": "2026-08-03T12:55:00Z",
-  "deps": [
-    "egps-regression-tia-selection"
-  ],
+  "deps": [],
   "files": [
     "go/internal/router/digest.go",
     "go/internal/routingtest/"
@@ -21,7 +19,12 @@
   "kind": "feature",
   "priority": "medium",
   "source": "console-2026-08-03 main-red forensics; revert PR carries the full chain",
-  "summary": "Cycle-1250 (99a82b3c, REVERTED console-first 2026-08-03) injected sig.Generic['run_dir.artifact_bytes']=dirSize(workspace) unconditionally into router.Digest. routingtest's keystone (TestSignalSpec_DualRenderingAgree: pure rendering MUST equal Digest extraction from ONE fixture) can never pass against a runtime-computed value the fixture cannot model \u2014 main red 5 commits, both platforms, while per-cycle changed-scope gates never selected routingtest. The telemetry intent is GOOD (artifact-size signals feed budget/routing decisions). Re-land it the framework's way: SignalSpec gains ArtifactBytes; the orchestrator rendering writes it from the run dir; the PURE rendering emits it from the spec; the keystone stays green because both sides derive from the fixture. Alternative if size must stay runtime-truthful: a non-signal telemetry channel (phasetiming), never Digest.Generic.",
-  "title": "run_dir.artifact_bytes telemetry re-landed through the SANCTIONED dual-rendering path \u2014 cycle-1250's Digest-side injection made the keystone parity unsatisfiable and held main RED",
-  "weight": 0.8
+  "summary": "Cycle-1250 (99a82b3c, REVERTED console-first 2026-08-03) injected sig.Generic['run_dir.artifact_bytes']=dirSize(workspace) unconditionally into router.Digest. routingtest's keystone (TestSignalSpec_DualRenderingAgree: pure rendering MUST equal Digest extraction from ONE fixture) can never pass against a runtime-computed value the fixture cannot model — main red 5 commits, both platforms, while per-cycle changed-scope gates never selected routingtest. The telemetry intent is GOOD (artifact-size signals feed budget/routing decisions). Re-land it the framework's way: SignalSpec gains ArtifactBytes; the orchestrator rendering writes it from the run dir; the PURE rendering emits it from the spec; the keystone stays green because both sides derive from the fixture. Alternative if size must stay runtime-truthful: a non-signal telemetry channel (phasetiming), never Digest.Generic.",
+  "title": "run_dir.artifact_bytes telemetry re-landed through the SANCTIONED dual-rendering path — cycle-1250's Digest-side injection made the keystone parity unsatisfiable and held main RED",
+  "weight": 0.4,
+  "priority_class": "feature",
+  "priority_rationale": "inbox review 2026-09-27: Telemetry with no named consumer ('feeds budget/routing decisions' is aspirational), so it belongs in the speculative-feature band.",
+  "merge_notes": [
+    "inbox review 2026-09-27: dropped deps [egps-regression-tia-selection]; the ship importer backstop already selects routingtest for router changes, and the console-owned dependency held the only lane item back"
+  ]
 }

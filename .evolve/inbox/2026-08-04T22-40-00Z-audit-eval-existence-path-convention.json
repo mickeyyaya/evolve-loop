@@ -3,7 +3,7 @@
   "title": "Audit eval-existence check keys on .evolve/evals/<slug>.md while this era's acceptance criteria live in go/acs/cycleNNNN/predicates_test.go — reconcile the two path conventions",
   "kind": "loop-reliability",
   "priority": "medium",
-  "weight": 0.7,
+  "weight": 0.52,
   "campaign": "continuation-defect-ledger",
   "files": [
     "go/internal/phases/audit/",
@@ -18,5 +18,7 @@
     "RED first: a reproducer showing a cycle whose acceptance criteria exist only as go/acs/cycleNNNN/predicates_test.go is scored eval-missing by the audit eval-existence check.",
     "The gate accepts (or explicitly rejects, with a message naming the path it looked for) each convention; no cycle can be both fully covered and eval-missing.",
     "cd go && go test ./internal/phases/audit/... N/N PASS, no regression."
-  ]
+  ],
+  "priority_class": "hygiene",
+  "priority_rationale": "inbox review 2026-09-27: No FAIL since the scout gate landed; the remaining cost is recurring LOW audit noise from slug and path drift."
 }

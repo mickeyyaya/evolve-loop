@@ -1,0 +1,24 @@
+{
+  "id": "config-dead-dials",
+  "kind": "pipeline-repair",
+  "priority": "P3",
+  "weight": 0.5,
+  "title": "Three rollout dials in internal/config have no production reader, and ParallelEvaluate's ladder disagrees with its docs",
+  "summary": "Found by comment-reduction batch 6 (2026-09-26) and reported without changing code. RolloutStages.MergeGate, RolloutStages.ScoutDecompose and RoutingConfig.ScoutDecomposeConcurrency are parsed but nothing outside the package reads them, and policy.MergeGateConfig() has no production caller. This is dead config: a knob whose value never reaches a construction. Separately, ParallelEvaluate parses on the full off/shadow/advisory/enforce ladder, while the design docs describe off/shadow/enforce and TestParallelEvaluate_StageLadder never exercises advisory. ADR-0044 (around line 171) still describes the retired EVOLVE_PHASE_RECOVERY env dial.",
+  "fix": "Delete the three dead dials and MergeGateConfig, or wire them to a real consumer with a wiring pin. Make ParallelEvaluate's accepted values match its docs, with a test for each accepted value. Correct the ADR-0044 paragraph.",
+  "acceptance": [
+    "grep finds a production reader for every RolloutStages and RoutingConfig field that remains",
+    "ParallelEvaluate's accepted values equal its documented ladder, and a table test covers each one",
+    "ADR-0044 no longer describes EVOLVE_PHASE_RECOVERY as a live env dial"
+  ],
+  "files": [
+    "go/internal/config/rollout.go",
+    "go/internal/config/config.go",
+    "go/internal/policy/",
+    "docs/architecture/adr/0044-unified-phase-recovery-protocol.md"
+  ],
+  "created_at": "2026-09-26T09:45:00Z",
+  "source": "console-comment-workstream-batch6",
+  "priority_class": "hygiene",
+  "priority_rationale": "inbox review 2026-09-27: Dead config and a doc mismatch; no runtime effect."
+}

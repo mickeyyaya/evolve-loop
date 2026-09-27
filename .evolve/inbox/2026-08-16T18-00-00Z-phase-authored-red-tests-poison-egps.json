@@ -24,7 +24,9 @@
     "ADR-0088 chain-of-reasoning + adversarial-audit separation (the anti-gaming property any design must preserve)"
   ],
   "priority": "high",
-  "weight": 0.87,
+  "weight": 0.91,
   "created_at": "2026-08-16T18:00:00Z",
-  "notes": "Filed during the cycle-1493 console-first response. The closure-claim matcher false-positive from the same halt is FIXED (hyphen-compound + path-ref carve-outs, red-first on the live line 36 bytes); this item is the remaining structural half. Do NOT rush this through a lane — the ship-floor is the one surface where a wrong 'fix' weakens the whole anti-gaming stack."
+  "notes": "Filed during the cycle-1493 console-first response. The closure-claim matcher false-positive from the same halt is FIXED (hyphen-compound + path-ref carve-outs, red-first on the live line 36 bytes); this item is the remaining structural half. Do NOT rush this through a lane — the ship-floor is the one surface where a wrong 'fix' weakens the whole anti-gaming stack.",
+  "priority_class": "stability",
+  "priority_rationale": "inbox review 2026-09-27: One self-broken phase test red-counts an innocent green cycle, which halted a batch as infra-systemic. Today only a prompt stands in the way."
 }

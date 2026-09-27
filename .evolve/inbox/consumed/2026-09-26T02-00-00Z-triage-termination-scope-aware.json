@@ -1,0 +1,24 @@
+{
+  "id": "triage-termination-scope-aware",
+  "kind": "pipeline-repair",
+  "priority": "P1",
+  "weight": 0.8,
+  "title": "F30 remainder: the SEQUENTIAL empty-commitment check partitions the inbox with a nil predicate, so a surface-routed item counts as claimable work",
+  "summary": "The fleet-lane half of F30 landed (fix/no-work-lane-terminal): a lane is judged on its own scope and triage's answers (committedset.Dispositions), ends as planned no-work, and hands answered items to the console (cycleoutcome.ApplyNoWork). What remains is the sequential path: hasClaimableInboxWork (core/triage_termination.go) still calls inboxbatch.PartitionConsole(items, nil). Kind- and route-stamp routing apply, but the protected-SURFACE derivation needs the routing predicate, so an item declaring a protected file (console-routed by the ADR-0074 claim floor since F35) counts as claimable and turns a legitimate sequential no-work end into triage-empty-commitment-claimable-work (architecture review of F35, MINOR 2). Inert for fleet lanes: a lane is judged only on its own scoped items (the root is read to locate them, but no other item counts as its claimable work).",
+  "fix": "Inject the routing scope predicate (guards.IsProtectedScope — core cannot import guards) through an Orchestrator option wired at every composition root (cmd/evolve wiring for the cycle-run, simulate and sequential-loop roots; routingtest stays the one pinned nil root), and pass it to PartitionConsole in hasClaimableInboxWork / claimableInboxIDs so the check agrees with the claim floor on every surface-routed item.",
+  "notes": "Found in the 2026-09-26 census of cycles 1620-1688 (F29 research finding); the architecture review of F29 placed it in the same follow-up as re-selection. triage_termination.go is not on the protected manifest, but the orchestrator call sites are. | Architecture review 2026-09-26 (F35, MINOR 2): hasClaimableInboxWork partitions with a NIL predicate, so it disagrees with the claim floor on every surface-routed item — now also on an operator route:lane over a declared protected file (the claim refuses it; the termination check counts it claimable → triage-empty-commitment-claimable-work → FAIL). Inject the same routing-root predicate (or the F35c Surface port) here. | 2026-09-26: the fleet-lane half landed with its own tests and mutation checks; see the F30 addendum in docs/incidents/2026-09-15-shipped-item-re-pinned-and-sealed-lease-blocks-refresh.md.",
+  "created_at": "2026-09-26T02:00:00Z",
+  "source": "console-f29-architecture-review",
+  "connects_to": [
+    "go/internal/core/triage_termination.go",
+    "go/internal/cycleoutcome/cycleoutcome.go",
+    "docs/research/verification-wave-findings-2026-09-14.md"
+  ],
+  "acceptance": [
+    "RED first: a sequential cycle whose root holds only an item declaring a protected file ends as planned no-work, not claim-failed",
+    "Every production composition root wires the predicate (root-coverage pin); a nil predicate is allowed only on the pinned test root",
+    "The lane path is unchanged (triage_termination_lane_test.go stays green)"
+  ],
+  "consumed_by": "inbox review 2026-09-27: DUPLICATE, merged into termination-check-uses-no-routing-predicate. The survivor is the superset: m2 plus the triage registry factory (m4) plus the coded routing-fallback signal (m9). It also names the current composed lane predicate (lanerouting.Forbidden), where this item's guards.IsProtectedScope is stale after #647. The survivor must absorb this item's acceptance: RED-first, a sequential cycle whose root holds only a protected-file item ends as planned no-work; a root-coverage pin, with nil allowed only on the routingtest root; the lane path unchanged (triage_termination_lane_test.go). Also its evidence pointer, the F30 addendum in docs/incidents/2026-09-15-shipped-item-re-pinned-and-sealed-lease-blocks-refresh.md.",
+  "consumed_at": "2026-09-27T23:30:00Z"
+}

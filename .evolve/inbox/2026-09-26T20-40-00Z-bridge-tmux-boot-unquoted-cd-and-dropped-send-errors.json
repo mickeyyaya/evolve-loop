@@ -1,0 +1,22 @@
+{
+  "id": "bridge-tmux-boot-unquoted-cd-and-dropped-send-errors",
+  "kind": "pipeline-repair",
+  "priority": "P2",
+  "weight": 0.8,
+  "title": "bridge: the tmux boot sends `cd <workingDir>` unquoted, and two pane sends drop their errors into false clean outcomes",
+  "summary": "Found by comment-reduction bridge groups 3 and 4 (2026-09-26); the console verified (1). (1) internal/bridge/driver_tmux_boot.go:56 sends \"cd \"+prep.workingDir to the pane's shell unquoted, while the EVOLVE_PROJECT_ROOT export two lines later uses shellQuotePOSIX. A working dir with a space breaks the cd, so the agent runs in the wrong directory, and shell metacharacters in the path would run as commands. (2) driver_tmux_wait_disposition.go (deliverArtifactNudge) discards the nudge's SendKeys error; a failed send then reads as a clear input line, and the ledger records submit_verified, a false clean result. (3) driver_tmux_wait_interaction.go:23 `envs, _ := w.cursor.Drain()` drops the inbox drain error silently.",
+  "fix": "Quote the cd target with shellQuotePOSIX, and add a test with a working dir containing a space and a `;`. Propagate the nudge send error into the disposition, so a failed send is not submit_verified. Surface the drain error as a coded WARN.",
+  "acceptance": [
+    "a worktree path with a space and a ';' boots into that directory and runs nothing else (test)",
+    "a failed nudge send is never recorded as submit_verified (test)"
+  ],
+  "files": [
+    "go/internal/bridge/driver_tmux_boot.go",
+    "go/internal/bridge/driver_tmux_wait_disposition.go",
+    "go/internal/bridge/driver_tmux_wait_interaction.go"
+  ],
+  "created_at": "2026-09-26T20:40:00Z",
+  "source": "console-comment-workstream-bridge-groups-3-4",
+  "priority_class": "debuggability",
+  "priority_rationale": "inbox review 2026-09-27: A failed send is recorded as a clean submit_verified and a drain error is swallowed; the triggers are rare, so it sits at the bottom of the band. The unquoted cd is a hardening rider with no impact on this host's space-free paths."
+}

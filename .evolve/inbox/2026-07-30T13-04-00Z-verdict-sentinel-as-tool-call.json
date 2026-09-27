@@ -13,8 +13,10 @@
   "priority": "P2",
   "summary": "Constrained decoding (FSM token masking against a JSON schema) is the 2026 production standard for structured output and gives 100% schema-valid results — but it is unavailable to us: we drive interactive CLI REPLs under tmux, not raw APIs. Consequence, observed live: agy ignored the deliverable contract 7/7 times across corrections (its own report format, no machine verdict line), demoting the contract gate to advisory in both wave-1 lanes; and the sentinel being the LAST LINE OF PROSE is also what made the verify-read race visible as [bad_verdict] (cycle-1198).",
   "title": "Emit the machine verdict as a TOOL CALL where the CLI supports one — the available equivalent of constrained decoding",
-  "weight": 0.86,
+  "weight": 0.4,
   "route": "console-manual",
   "routed_reason": "triage refused 9 lanes (cycles 1650–1675): the fix names protected surface go/internal/bridge/streamjson_verdict.go — control-plane change, operator-owned (routed by console 2026-09-14 pending the triage-refusal closeout fix)",
-  "routed_at": "2026-09-14T04:20:00Z"
+  "routed_at": "2026-09-14T04:20:00Z",
+  "priority_class": "feature",
+  "priority_rationale": "inbox review 2026-09-27: Defense in depth for a format failure that the prompt contract and host salvage already hold at zero, so it is speculative."
 }

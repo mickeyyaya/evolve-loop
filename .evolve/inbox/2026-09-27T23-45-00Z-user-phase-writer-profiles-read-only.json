@@ -1,0 +1,24 @@
+{
+  "id": "user-phase-writer-profiles-read-only",
+  "created_at": "2026-09-27T23:30:00Z",
+  "title": "bug-reproduction and test-amplification author files into the worktree, but their profiles are read-only, so boot strips writes_source and the fence reverts their deliverable",
+  "weight": 0.9,
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "files": [
+    ".evolve/profiles/bug-reproduction.json",
+    ".evolve/profiles/test-amplification.json",
+    "go/internal/phasespec/clamp.go",
+    "go/internal/phaseregistrar"
+  ],
+  "summary": "Every loop boot warns 'user phase bug-reproduction claims writes_source:true but its dispatch profile is not a sandbox-enabled registrar-minted profile — writes_source STRIPPED', and the same for test-amplification. phasespec.TestUserSpecs_SourceWritersDeclareWritesSource pins that both personas write files into the worktree (ADR-0097), while both profiles set sandbox.read_only_repo:true with write_subpaths limited to .evolve/runs/cycle-*, which SandboxedProfilePredicate rejects. The inserted phase therefore runs without worktree-write eligibility and its reproduction or amplified tests are fenced. Making the spec claim false is wrong (the test above fails); the fix is a trust decision on the profiles: mint them through the registrar as sandboxed repo writers scoped to the lane worktree, or move the deliverable into the run directory and change the personas and the test together.",
+  "acceptance": [
+    "A loop boot prints no writes_source STRIPPED warning for bug-reproduction or test-amplification.",
+    "On a bugfix cycle that inserts bug-reproduction, its FAIL_TO_PASS test survives the fence into the build's tree (or, if the deliverable moves to the run directory, the personas, the phase specs and TestUserSpecs_SourceWritersDeclareWritesSource change in the same landing)."
+  ],
+  "source": "inbox review 2026-09-27 (boot warning traced 2026-09-28)",
+  "priority_rationale": "inbox review 2026-09-27: every boot strips writes_source from two user phases, so their deliverables are fenced; companion of worktreephase-test-amplification-gap",
+  "connects_to": [
+    "worktreephase-test-amplification-gap"
+  ]
+}
