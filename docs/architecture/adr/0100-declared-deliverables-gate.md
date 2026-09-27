@@ -235,9 +235,12 @@ Unit: `internal/deliverable` (secondaries table: absent / empty / malformed JSON
 harness-produced not gated / markdown secondary existence), `internal/phasecontract` (partition,
 `ArtifactName == files[0]`, overlay by registry key), `internal/core` (remediation re-run reviewed,
 legacy-checkpoint resume reviewed, wiring predicate), `cmd/evolve` (composition-root proof).
-End-to-end (`declared_deliverables_e2e_test.go`): a real cycle whose builder omits
-`handoff-build.json` is re-dispatched with the file named and ends `FAILED_EXPLAINED` naming it,
-on both `RunCycle` and `RunCycleFromPhase`; a builder that writes it on the correction round ships.
+End-to-end (`declared_deliverables_e2e_test.go`): the proof runs against a test-local
+`fixtureCatalog` that declares one agent-owed secondary for build (it happens to be named
+`handoff-build.json`), not against the checked-in registry, which no longer declares that file
+(Decision 1). A real cycle whose builder omits the fixture's secondary is re-dispatched with the
+file named and ends `FAILED_EXPLAINED` naming it, on both `RunCycle` and `RunCycleFromPhase`; a
+builder that writes it on the correction round ships.
 Every guard was shown to fail by assertion under a reverted mutation.
 Slice 2: `internal/deliverable` effects table (pending at root / claimed by this cycle / held by
 another cycle / no inbox file / empty commitment / no decision; unbound effect; cycle missing

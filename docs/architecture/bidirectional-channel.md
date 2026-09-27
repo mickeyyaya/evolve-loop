@@ -96,8 +96,10 @@ The original correlation bracketed the answer span on a **busy→idle transition
   - ollama: no affordance; its `Thinking…` header *persists into the answer*, so that is not a
     signal either. The real distinction is the idle input **placeholder** `Send a message`,
     which is absent mid-turn. → `PaneProfile.IdlePlaceholder`.
-  - codex: the captured frames carry *no* busy affordance and no placeholder → **documented
-    weak-signal degradation** (monitoring works; its span cannot be bracketed).
+  - codex: the original fixtures carried no busy affordance, so codex was first documented as a
+    weak-signal degradation. Superseded: codex 0.139 shows `Working (24s • esc to interrupt)` while
+    generating (`testdata/codex/generating.txt`), which the shared affordance regex already matches;
+    pinned by `panebusy_test.go::TestPaneBusy_Codex0_139_Working`. Codex spans bracket like claude's.
 
 → `panestream.PaneBusy(rendered, profile)`: busy = affordance present **OR** idle placeholder
 absent. Validated against every `testdata/<cli>/{thinking,answer,final}.txt`.
@@ -142,7 +144,7 @@ Supervisor.Ask(question)                     [go/internal/bridge/channel/supervi
 | CLI | BoundaryMarker | BoundaryExact | IdlePlaceholder | busy signal |
 |---|---|---|---|---|
 | claude | `❯` | – | – | `esc to interrupt` |
-| codex | `›` | – | – | *(none captured → weak-signal degradation)* |
+| codex | `›` | – | – | `esc to interrupt` (codex ≥0.139; pinned by `TestPaneBusy_Codex0_139_Working` in `panebusy_test.go`) |
 | agy | `>` | ✓ (blockquote `>` vs empty box) | – | `esc to cancel` |
 | ollama | `>>>` | – | `Send a message` | idle placeholder absent |
 
@@ -172,7 +174,7 @@ Off (`EVOLVE_CHANNEL` unset): none of these exist; no producer goroutine; no ext
 
 | Env var | Default | Effect |
 |---|---|---|
-| `EVOLVE_CHANNEL` | `0` | **DEPRECATED (ADR-0045 I6)** — the channel is now implied by `EVOLVE_PHASE_RECOVERY` (`enforce` ⇒ on). `1` still enables the producer + live feed + `.live` files for one more release (with a WARN); then removed. Resolution lives in `bridge/channel.Enabled`. |
+| `EVOLVE_CHANNEL` | `0` | **DEPRECATED (ADR-0045 I6)** — the channel is now implied by the phase-recovery stage (`enforce` ⇒ on) — then `EVOLVE_PHASE_RECOVERY`, now the policy key `recovery.phase_recovery` (the env var is retired, see ADR-0044). `1` still enables the producer + live feed + `.live` files for one more release (with a WARN); then removed. Resolution lives in `bridge/channel.Enabled`. |
 | `EVOLVE_CHANNEL_SUPERVISOR` | `0` | Reserved: auto-attach a `Supervisor` on phase launch (manual wiring only today). **Not** affected by the I6 fold — only the feed flag (`EVOLVE_CHANNEL`) is deprecated. |
 | `EVOLVE_<AGENT>_CLI` / `EVOLVE_CLI` | unset → `claude-tmux` | Resolves the per-phase CLI family for transport-aware source selection. |
 
@@ -196,8 +198,9 @@ Off (`EVOLVE_CHANNEL` unset): none of these exist; no producer goroutine; no ext
 
 ## 6. Known limitations & follow-ups (non-blocking)
 
-1. **codex weak-signal:** no capturable busy affordance in the fixtures → codex spans are not
-   bracketed (monitoring still works). Revisit if codex exposes an interrupt affordance.
+1. **codex weak-signal — resolved.** The early fixtures had no capturable busy affordance, so codex
+   spans were not bracketed. codex 0.139 exposes `esc to interrupt`; `TestPaneBusy_Codex0_139_Working`
+   pins it, and codex now reads busy through the same affordance as claude.
 2. **profile.cli-pin family mis-read:** `phaseCLI` resolves family from env only; a CLI pinned
    in `profile.json` (not env) is mis-read as tmux. Now *loud* (silent-feed WARN fires) but not
    *correct* — full fix is to surface the resolved CLI to the observer spawn site.

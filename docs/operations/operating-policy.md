@@ -163,6 +163,33 @@ against the digest so identity cannot be invented). Honest rejections stay
 rejected; the pass-rate metric is never bought by weakening judges — judgment
 and control phases are excluded from remediation by hard deny-list.
 
+### 4.1 Zero-ship halt and the ship-streak goal (canonical home)
+
+This is the one statement of the rule; `CLAUDE.md`, [pipeline-factory-rules.md](pipeline-factory-rules.md)
+and [runtime-reference.md](runtime-reference.md) link here instead of restating it.
+
+1. **Two consecutive zero-ship cycles stop the batch.** When running the evolve loop or any
+   batch/merge-train automation, evaluate the outcome after every cycle; if two consecutive cycles
+   produce zero ships (0 merged PRs / landed cycle commits), stop the loop and root-cause the pipeline
+   before running another wave. Never run more than two unproductive waves "to see if it
+   self-corrects". A zero-ship streak is SYSTEM-fail evidence: the ADR-0072 halt and its P0 apply,
+   which does not conflict with "never stop the queue" (§2.1 governs task-level failures).
+2. **It is an operator guardrail, not a compiled breaker.** No Go code counts zero-ship cycles. The
+   console operator applies it (adopted after the 2026-08-10
+   [absorbing-FAIL incident](../incidents/2026-08-10-continuation-absorbing-fail.md), made repo policy
+   in #430). The nearest compiled mechanisms are looser and fire later: the blocker breaker's
+   `consecutive-failures` rule halts after `failure_policy.thresholds.consecutive_failures_halt_ceiling`
+   (default 3) back-to-back *failing* cycles of any fingerprint (`go/internal/core/blocker_breaker.go`,
+   #423), and the goal-stall escalation files an item after 3 empty or 5 non-shipping cycles on one
+   goal (`goal_stall`, `go/cmd/evolve/cmd_loop_goalstall.go`). An empty or mixed EMPTY/FAIL streak
+   therefore reaches the operator rule first.
+3. **Ship-streak goal: six consecutive ships.** The operator's pipeline-health target is six
+   consecutive shipped cycles. It was five consecutive ships during the 2026-09-14
+   [verification wave](../research/verification-wave-findings-2026-09-14.md) and moved to six by
+   2026-09-26 (the "six-consecutive-ships campaign" of waves 6–8, e.g.
+   [the triage-claim incident](../incidents/2026-09-26-triage-claim-left-to-the-agent.md)). The goal
+   measures pipeline health; the halt in item 1 is the stop condition on the way to it.
+
 ## 5. Release policy
 
 Release trigger: 4 consecutive PASS verdicts in a batch (or operator word).

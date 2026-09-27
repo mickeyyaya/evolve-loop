@@ -40,7 +40,9 @@ the defects) was blocked by the other defect.
    completion detector tears the session down after the first artifact write,
    so `disposition.json` (ADR-0074 S2) has been absent on every retro cycle
    since ≤1382 — the S3 failure-learning router ran blind the whole time.
-   Still open as inbox item `retro-disposition-completion-cutoff` (0.90).
+   Tracked as inbox item `retro-disposition-completion-cutoff` (0.90); fixed
+   since by #432 (Phase B, `a812b5c3`: completion waits for the full artifact
+   set), with the index row flipped to covered in #434 — see Follow-ups closed.
 
 ## Fixes
 
@@ -97,9 +99,16 @@ the defects) was blocked by the other defect.
 
 ## Follow-ups still open
 
-- `retro-disposition-completion-cutoff` (0.90) — root cause #4.
 - Reviewer note (#423): `ensureFailureDigest` is fail-soft; a digest-write
   failure on a genuinely failed cycle can hide a streak hole. Harden
   separately.
 - Pre-existing ledger hash-chain break at line 78729 (2026-07-22, both
   planes) — unrelated to this incident; needs a re-anchor decision.
+
+## Follow-ups closed
+
+- `retro-disposition-completion-cutoff` (0.90) — root cause #4. Fixed by
+  #432 (Phase B, `a812b5c3`): the completion detector now waits for every
+  declared artifact, pinned by `bridge/completion_secondary_test.go`. The
+  [coverage index](REGRESSION-COVERAGE-INDEX.md) row "retro completion
+  detector" records it as covered (flipped in #434).

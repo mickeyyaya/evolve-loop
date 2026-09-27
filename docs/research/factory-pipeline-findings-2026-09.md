@@ -142,7 +142,7 @@ Each principle names the failure class that taught it, the evidence, and the mec
 
 ### P10. Unit-green is not live-green: every mechanism ships with a wiring proof
 - **Taught by:**
-  - `retrofile` and the recurrence escalator shipped inert (ADR-0074; `docs/architecture/adr/0076-failure-disposition-boundary-escalation.md`).
+  - `retrofile` and the recurrence escalator shipped inert (ADR-0074; `docs/architecture/adr/0107-failure-disposition-boundary-escalation.md`).
   - Each ADR-0076 convergence slice's first design had a dead link (July lessons §6b).
   - A tier-escalation fix would have shipped off the dispatch path (`docs/incidents/2026-09-03-repair-rounds-blind-and-flat.md`).
   - A release went red because local test runs skipped the RealTmux family and nobody watched CI after the push (`docs/incidents/2026-08-25-submitverify-false-wedge-release-red.md`).

@@ -62,13 +62,19 @@ write lock, readers take the read lock.
 
 `Aggregate()` applies a priority sweep over all active sessions:
 
-1. Any `LivenessConverging` session ⇒ return `LivenessConverging`.
-2. Else any `LivenessHung` ⇒ return `LivenessHung`.
-3. Else any `LivenessBusyButStagnant` ⇒ return `LivenessBusyButStagnant`.
-4. Else any `LivenessIdle` ⇒ return `LivenessIdle`.
-5. No sessions (empty center) ⇒ return `0` (unset/undefined).
+1. Any `LivenessExhausted` session ⇒ return `LivenessExhausted` (added by
+   [ADR-0070](0070-signal-center-exhaustion-signal.md); pinned by
+   `TestSignalCenter_ExhaustedDominatesAggregate`).
+2. Else any `LivenessConverging` session ⇒ return `LivenessConverging`.
+3. Else any `LivenessHung` ⇒ return `LivenessHung`.
+4. Else any `LivenessBusyButStagnant` ⇒ return `LivenessBusyButStagnant`.
+5. Else any `LivenessIdle` ⇒ return `LivenessIdle`.
+6. No sessions (empty center) ⇒ return `0` (unset/undefined).
 
-Rationale: if any session is actively producing output (`Converging`), the
+The order is the `aggregatePriority` table in `panestream/livenesscenter.go`.
+Rationale: a quota/rate-limit wall (`Exhausted`) dominates every other state —
+a walled CLI will not recover within the phase, so it must fast-fail even while
+a sibling session still converges (ADR-0070). Otherwise, if any session is actively producing output (`Converging`), the
 overall signal is `Converging`. `Hung` takes priority over stagnancy because
 fast-failing a hung session is more urgent than waiting for a stagnant one.
 

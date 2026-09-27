@@ -1,6 +1,8 @@
 # ADR-0101 — Signal Center: one event stream every component produces into and the orchestrator listens to
 
-- **Status:** Proposed (2026-09-13). Slice S0 (this ADR + [signal-center-design.md](../signal-center-design.md)
+- **Status:** Accepted (2026-09-13); implemented in slices. S0, S1, S2a, S2b, S3 and S4a have landed (S2b
+  as re-scoped in the design's §15.5: the contract-gate producers, with the rest of its original row moved to S2c); S2c, S4b and S5 remain open — the live per-slice state is the slice table
+  in [signal-center-design.md §10](../signal-center-design.md) and its §15 landing notes. Original plan: slice S0 (this ADR + [signal-center-design.md](../signal-center-design.md)
   + the [inventory](../../research/signal-center-inventory-2026-09-13.md)) lands as a docs-only PR; S1
   (the `signalcenter` package, the orchestrator listener, the C1 chokepoint as first producer, the
   durable + stderr sinks, the composition-root wiring proof) lands after PR #575/#576/#577 merge,
@@ -26,8 +28,9 @@
     `observer` info/warn/incident — the schema-1.0 contract) and **two classification vocabularies**
     (`failureadapter` 11 values, `failurelog` the same 11 + 3).
   - **361 hand-written `fmt.Fprint*(os.Stderr, …)` sites** (350 of them opening with a bracketed module
-    prefix — `[orchestrator]` alone 284), plus module prefixes written through other writers
-    (`[loop]` 132 and `[ship]` 130 occurrences of the literal), against 23 uses of the shared `log.Diag()`.
+    prefix), plus module prefixes written through other writers. Measured as prefix-literal occurrences
+    in non-test Go (any writer, the unit S5 drives to zero): `[orchestrator]` 287, of which 284 are these stderr sites;
+    `[loop]` 132 and `[ship]` 130 — against 23 uses of the shared `log.Diag()`.
   - The cost, twice in one night: cycles 1634 and 1636 each took an operator investigation to learn that
     a triage FAIL was a working-as-designed gate, because the phase's own reason had no durable home
     (fixed narrowly by PR #577); cycle 1630 was labelled shipped because the label read a HEAD delta

@@ -1,7 +1,11 @@
 # ADR-0044: Unified Phase Recovery Protocol — deterministic-first, single-owner recovery
 
 > Status: **Implemented** (designed 2026-06-09; all six slices shipped 2026-06-10 — record in
-> §Implementation; rollout dial `EVOLVE_PHASE_RECOVERY` default **shadow**, flip to `enforce` after soak).
+> §Implementation; rollout dial is the policy key `recovery.phase_recovery` (`.evolve/policy.json`), default
+> **shadow**, flip to `enforce` after soak). The env var `EVOLVE_PHASE_RECOVERY` named in the body below is the
+> original dial, retired in the cycle-12 flag retirement and now inert — see
+> [internal-config.md](../packages/internal-config.md) ("Retired env flags stay inert"); the spine floor and the
+> fatal-pane fast-fail later split off as `recovery.spine_floor` and `recovery.fatal_pane`.
 > Design-first: records the analysis and chosen direction; implementation is
 > risk-ranked and gate-tested (no blind change to the hot dispatch loop). Full evidence + design:
 > [phase-recovery.md](../phase-recovery.md). Builds on [ADR-0026](0026-self-healing-review-layer.md) (stop-reviewer),
